@@ -34,7 +34,7 @@ if (isset($name) && $name == $_REQUEST['name']) {
 
     // Phase-based access control (replaces nuke_modules query)
     global $mysqli_db, $leagueContext;
-    $season = new Season($mysqli_db);
+    $season = new \Season\Season($mysqli_db);
     $accessControl = new Module\ModuleAccessControl($season, $leagueContext, $mysqli_db);
 
     if (!$accessControl->isModuleAccessible($name) && !is_admin()) {

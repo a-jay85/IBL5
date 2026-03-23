@@ -9,6 +9,7 @@ use Player\Player;
 use Player\PlayerImageHelper;
 use Utilities\HtmlSanitizer;
 use Team\Team;
+use Season\Season;
 
 /**
  * Contracts - Displays team contracts table
@@ -23,12 +24,12 @@ class Contracts
      * @param \mysqli $db Database connection
      * @param iterable<int, array<string, mixed>> $result Player result set
      * @param Team $team Team object
-     * @param \Season $season Season object
+     * @param Season $season Season object
      * @param list<int> $starterPids Starter player IDs
      * @param list<int> $excludeFromCapPids PIDs to exclude from cap total sums (e.g. outgoing trade players)
      * @return string HTML table
      */
-    public static function render(\mysqli $db, iterable $result, Team $team, \Season $season, array $starterPids = [], array $excludeFromCapPids = []): string
+    public static function render(\mysqli $db, iterable $result, Team $team, Season $season, array $starterPids = [], array $excludeFromCapPids = []): string
     {
         $isFreeAgency = $season->isOffseasonPhase();
         $isExtensionPhase = in_array($season->phase, ['Preseason', 'Regular Season', 'Playoffs'], true);

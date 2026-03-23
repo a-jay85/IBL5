@@ -3,6 +3,8 @@
 declare(strict_types=1);
 
 namespace Trading\Contracts;
+use Season\Season;
+
 
 /**
  * Interface for the Trading read-path orchestrator
@@ -87,10 +89,10 @@ interface TradingServiceInterface
      * Computes per-year salary totals and player counts for up to 6 future years.
      *
      * @param list<array<string, mixed>> $players Array of player rows from repository
-     * @param \Season $season Season object for phase-based contract year adjustment
+     * @param Season $season Season object for phase-based contract year adjustment
      * @return array{player: array<int, int>, hold: array<int, int>} Future salary data:
      *         - 'player': Salary totals by future year index (0-5)
      *         - 'hold': Player counts with salary by future year index (0-5)
      */
-    public function calculateFutureSalaries(array $players, \Season $season): array;
+    public function calculateFutureSalaries(array $players, Season $season): array;
 }

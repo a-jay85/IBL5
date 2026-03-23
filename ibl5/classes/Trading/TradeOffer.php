@@ -6,6 +6,7 @@ namespace Trading;
 
 use Trading\Contracts\TradeOfferInterface;
 use Trading\Contracts\TradeCashRepositoryInterface;
+use Season\Season;
 
 /**
  * TradeOffer - Creates and manages trade offers
@@ -26,7 +27,7 @@ class TradeOffer implements TradeOfferInterface
     protected TradingRepository $repository;
     protected TradeCashRepositoryInterface $cashRepository;
     protected \Services\CommonMysqliRepository $commonRepository;
-    protected \Season $season;
+    protected Season $season;
     protected CashTransactionHandler $cashHandler;
     protected TradeValidator $validator;
     protected ?\Discord $discord;
@@ -37,7 +38,7 @@ class TradeOffer implements TradeOfferInterface
         $this->repository = $repository ?? new TradingRepository($db);
         $this->cashRepository = new TradeCashRepository($db);
         $this->commonRepository = new \Services\CommonMysqliRepository($db);
-        $this->season = new \Season($db);
+        $this->season = new Season($db);
         $this->cashHandler = new CashTransactionHandler($db, $this->repository, $this->cashRepository);
         $this->validator = new TradeValidator($db);
 

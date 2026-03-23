@@ -3,6 +3,8 @@
 declare(strict_types=1);
 
 namespace SavedDepthChart\Contracts;
+use Season\Season;
+
 
 /**
  * Interface for saved depth chart business logic
@@ -33,7 +35,7 @@ interface SavedDepthChartServiceInterface
         array $rosterPlayers,
         array $postData,
         int $loadedDcId,
-        \Season $season
+        Season $season
     ): int;
 
     /**
@@ -62,14 +64,14 @@ interface SavedDepthChartServiceInterface
      *
      * Shows phase, phase-specific sim number, date range, and win-loss record.
      */
-    public function buildCurrentLiveLabel(int $tid, \Season $season): string;
+    public function buildCurrentLiveLabel(int $tid, Season $season): string;
 
     /**
      * Get formatted dropdown options for a team's saved depth charts
      *
      * @return list<array{id: int, label: string, isActive: bool}>
      */
-    public function getDropdownOptions(int $tid, \Season $season): array;
+    public function getDropdownOptions(int $tid, Season $season): array;
 
     /**
      * Build a player snapshot from roster data and depth chart POST values
@@ -91,5 +93,5 @@ interface SavedDepthChartServiceInterface
      *
      * @return array{success: bool, id: int, name: string}|array{success: bool, error: string}
      */
-    public function nameOrCreateActive(int $tid, string $username, string $name, \Season $season): array;
+    public function nameOrCreateActive(int $tid, string $username, string $name, Season $season): array;
 }

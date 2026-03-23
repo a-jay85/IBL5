@@ -6,6 +6,7 @@ namespace NextSim;
 
 use Standings\StandingsRepository;
 use TeamSchedule\TeamScheduleRepository;
+use Season\Season;
 use Team\Team;
 
 /**
@@ -36,7 +37,7 @@ class NextSimTabApiHandler
             }
         }
 
-        $season = new \Season($this->db);
+        $season = new Season($this->db);
         $team = Team::initialize($this->db, $teamID);
 
         // Load power rankings for SOS tier indicators

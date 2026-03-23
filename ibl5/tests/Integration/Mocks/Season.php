@@ -88,7 +88,7 @@ class Season
     /**
      * Check if trades are currently allowed (mock implementation)
      *
-     * @see \Season::areTradesAllowed()
+     * @see Season::areTradesAllowed()
      */
     public function areTradesAllowed(): bool
     {
@@ -102,7 +102,7 @@ class Season
     /**
      * Check if waivers are currently allowed (mock implementation)
      *
-     * @see \Season::areWaiversAllowed()
+     * @see Season::areWaiversAllowed()
      */
     public function areWaiversAllowed(): bool
     {

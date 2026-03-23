@@ -8,6 +8,7 @@ use TeamSchedule\Contracts\TeamScheduleViewInterface;
 use TeamSchedule\Contracts\TeamScheduleServiceInterface;
 use Utilities\HtmlSanitizer;
 use Team\Team;
+use Season\Season;
 
 /**
  * TeamScheduleView - HTML rendering for team schedule
@@ -57,7 +58,7 @@ class TeamScheduleView implements TeamScheduleViewInterface
         if ($isPlayoffPhase) {
             foreach (array_keys($gamesByMonth) as $key) {
                 $monthTimestamp = strtotime($key . '-01');
-                if ($monthTimestamp !== false && (int)date('n', $monthTimestamp) === \Season::IBL_PLAYOFF_MONTH) {
+                if ($monthTimestamp !== false && (int)date('n', $monthTimestamp) === Season::IBL_PLAYOFF_MONTH) {
                     $playoffMonthKey = $key;
                     break;
                 }

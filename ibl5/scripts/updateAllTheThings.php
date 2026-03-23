@@ -108,7 +108,7 @@ try {
     echo $view->renderInitStatus('CommonRepository initialized');
     flush();
 
-    $season = new \Season($mysqli_db);
+    $season = new \Season\Season($mysqli_db);
 
     $sharedRepository = new Shared\SharedRepository($mysqli_db, $leagueContext);
     echo $view->renderInitStatus('Shared repository initialized');

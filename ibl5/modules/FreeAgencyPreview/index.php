@@ -29,7 +29,7 @@ get_lang($module_name);
 global $mysqli_db;
 
 // Get current season info
-$season = new Season($mysqli_db);
+$season = new \Season\Season($mysqli_db);
 
 // Check if season is available
 if ($season->endingYear === null || $season->endingYear === 0) {

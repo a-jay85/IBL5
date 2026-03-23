@@ -7,6 +7,7 @@ namespace Tests\UpdateAllTheThings;
 use PHPUnit\Framework\TestCase;
 use Updater\ScheduleUpdater;
 use League\LeagueContext;
+use Season\Season;
 
 /**
  * Tests for ScheduleUpdater class
@@ -19,7 +20,7 @@ use League\LeagueContext;
 class ScheduleUpdaterTest extends TestCase
 {
     private \MockDatabase $mockDb;
-    private \Season $mockSeason;
+    private Season $mockSeason;
     private ScheduleUpdater $scheduleUpdater;
     private LeagueContext $leagueContext;
 
@@ -39,7 +40,7 @@ class ScheduleUpdaterTest extends TestCase
         $_SESSION['current_league'] = LeagueContext::LEAGUE_IBL;
 
         $this->mockDb = new \MockDatabase();
-        $this->mockSeason = new \Season($this->mockDb);
+        $this->mockSeason = new Season($this->mockDb);
         $this->scheduleUpdater = new ScheduleUpdater($this->mockDb, $this->mockSeason);
     }
 
@@ -88,7 +89,7 @@ class ScheduleUpdaterTest extends TestCase
         $result = $method->invoke($this->scheduleUpdater, 'November 1, 2023');
 
         $this->assertIsArray($result);
-        $this->assertSame(\Season::IBL_REGULAR_SEASON_STARTING_MONTH, $result['month']);
+        $this->assertSame(Season::IBL_REGULAR_SEASON_STARTING_MONTH, $result['month']);
     }
 
     /**
@@ -105,7 +106,7 @@ class ScheduleUpdaterTest extends TestCase
         $result = $method->invoke($this->scheduleUpdater, 'November 1, 2023');
 
         $this->assertIsArray($result);
-        $this->assertSame(\Season::IBL_HEAT_MONTH, $result['month']);
+        $this->assertSame(Season::IBL_HEAT_MONTH, $result['month']);
     }
 
     /**

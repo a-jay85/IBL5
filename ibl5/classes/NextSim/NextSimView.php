@@ -12,6 +12,7 @@ use UI\Components\TooltipLabel;
 use UI\TableStyles;
 use Utilities\HtmlSanitizer;
 use Team\Team;
+use Season\Season;
 
 /**
  * NextSimView - Position-centric HTML rendering for next simulation games
@@ -25,7 +26,7 @@ use Team\Team;
  */
 class NextSimView implements NextSimViewInterface
 {
-    private \Season $season;
+    private Season $season;
 
     /** @var array<string, string> Position abbreviation to full name */
     public const POSITION_LABELS = [
@@ -36,7 +37,7 @@ class NextSimView implements NextSimViewInterface
         'C' => 'Centers',
     ];
 
-    public function __construct(\Season $season)
+    public function __construct(Season $season)
     {
         $this->season = $season;
     }

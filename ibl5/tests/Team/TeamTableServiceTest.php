@@ -9,6 +9,7 @@ use PHPUnit\Framework\TestCase;
 use Team\Contracts\TeamTableServiceInterface;
 use League\League;
 use Team\TeamTableService;
+use Season\Season;
 
 /**
  * Tests for TeamTableService
@@ -141,9 +142,9 @@ class TeamTableServiceTest extends TestCase
         return new TeamTableService($mockDb, $repository);
     }
 
-    private function createSeasonStub(string $phase): \Season
+    private function createSeasonStub(string $phase): Season
     {
-        $season = $this->createStub(\Season::class);
+        $season = $this->createStub(Season::class);
         $season->phase = $phase;
         return $season;
     }

@@ -10,6 +10,7 @@ use Trading\Contracts\TradeCashRepositoryInterface;
 use Trading\TradeOffer;
 use Trading\TradeValidator;
 use Trading\TradingRepository;
+use Season\Season;
 
 /**
  * @covers \Trading\TradeOffer
@@ -24,7 +25,7 @@ class TradeOfferTest extends TestCase
         TradeValidator $validator,
         CashTransactionHandler $cashHandler,
         \Services\CommonMysqliRepository $commonRepo,
-        \Season $season,
+        Season $season,
         ?\Discord $discord = null,
         ?TradeCashRepositoryInterface $cashRepo = null,
     ): TradeOffer {
@@ -36,7 +37,7 @@ class TradeOfferTest extends TestCase
                 TradeValidator $validator,
                 CashTransactionHandler $cashHandler,
                 \Services\CommonMysqliRepository $commonRepo,
-                \Season $season,
+                Season $season,
                 ?\Discord $discord,
                 TradeCashRepositoryInterface $cashRepo,
             ) {
@@ -79,7 +80,7 @@ class TradeOfferTest extends TestCase
     }
 
     /**
-     * @return array{TradingRepository&\PHPUnit\Framework\MockObject\MockObject, TradeValidator&\PHPUnit\Framework\MockObject\Stub, CashTransactionHandler&\PHPUnit\Framework\MockObject\Stub, \Services\CommonMysqliRepository&\PHPUnit\Framework\MockObject\Stub, \Season&\PHPUnit\Framework\MockObject\Stub}
+     * @return array{TradingRepository&\PHPUnit\Framework\MockObject\MockObject, TradeValidator&\PHPUnit\Framework\MockObject\Stub, CashTransactionHandler&\PHPUnit\Framework\MockObject\Stub, \Services\CommonMysqliRepository&\PHPUnit\Framework\MockObject\Stub, Season&\PHPUnit\Framework\MockObject\Stub}
      */
     private function makeStubs(): array
     {
@@ -87,7 +88,7 @@ class TradeOfferTest extends TestCase
         $validator = $this->createStub(TradeValidator::class);
         $cashHandler = $this->createStub(CashTransactionHandler::class);
         $commonRepo = $this->createStub(\Services\CommonMysqliRepository::class);
-        $season = $this->createStub(\Season::class);
+        $season = $this->createStub(Season::class);
 
         return [$repository, $validator, $cashHandler, $commonRepo, $season];
     }
@@ -231,7 +232,7 @@ class TradeOfferTest extends TestCase
         $validator = $this->createMock(TradeValidator::class);
         $cashHandler = $this->createStub(CashTransactionHandler::class);
         $commonRepo = $this->createStub(\Services\CommonMysqliRepository::class);
-        $season = $this->createStub(\Season::class);
+        $season = $this->createStub(Season::class);
 
         $repository->expects($this->once())->method('generateNextTradeOfferId')->willReturn(1);
         $validator->expects($this->once())->method('validateMinimumCashAmounts')->willReturn(['valid' => true, 'error' => null]);
@@ -395,7 +396,7 @@ class TradeOfferTest extends TestCase
         $validator = $this->createMock(TradeValidator::class);
         $cashHandler = $this->createStub(CashTransactionHandler::class);
         $commonRepo = $this->createStub(\Services\CommonMysqliRepository::class);
-        $season = $this->createStub(\Season::class);
+        $season = $this->createStub(Season::class);
 
         $repository->expects($this->once())->method('generateNextTradeOfferId')->willReturn(1);
         $validator->expects($this->once())->method('validateMinimumCashAmounts')->willReturn(['valid' => true, 'error' => null]);

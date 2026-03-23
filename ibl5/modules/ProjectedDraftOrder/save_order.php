@@ -69,7 +69,7 @@ foreach ($intOrder as $tid) {
 }
 
 try {
-    $season = new Season($mysqli_db);
+    $season = new \Season\Season($mysqli_db);
     $repository = new ProjectedDraftOrderRepository($mysqli_db);
     $service = new ProjectedDraftOrderService($repository);
     $service->saveLotteryOrder($season->endingYear, $intOrder);

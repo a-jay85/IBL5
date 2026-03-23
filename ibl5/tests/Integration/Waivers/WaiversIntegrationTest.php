@@ -9,7 +9,7 @@ use Tests\Integration\Mocks\TestDataFactory;
 use Waivers\WaiversRepository;
 use Waivers\WaiversProcessor;
 use Waivers\WaiversValidator;
-use Season;
+use Season\Season;
 
 /**
  * Integration tests for complete waiver wire workflows
@@ -784,7 +784,7 @@ class WaiversIntegrationTest extends IntegrationTestCase
      */
     private function createMockSeason(string $phase): Season
     {
-        $stubSeason = $this->createStub(\Season::class);
+        $stubSeason = $this->createStub(Season::class);
         $stubSeason->phase = $phase;
         $stubSeason->method('isOffseasonPhase')->willReturn(
             $phase === 'Draft' || $phase === 'Free Agency'

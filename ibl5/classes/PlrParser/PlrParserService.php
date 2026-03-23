@@ -6,6 +6,7 @@ namespace PlrParser;
 
 use PlrParser\Contracts\PlrParserRepositoryInterface;
 use PlrParser\Contracts\PlrParserServiceInterface;
+use Season\Season;
 
 /**
  * Service for processing .plr files from the JSB simulation engine.
@@ -18,12 +19,12 @@ class PlrParserService implements PlrParserServiceInterface
 {
     private PlrParserRepositoryInterface $repository;
     private \Services\CommonMysqliRepository $commonRepository;
-    private \Season $season;
+    private Season $season;
 
     public function __construct(
         PlrParserRepositoryInterface $repository,
         \Services\CommonMysqliRepository $commonRepository,
-        \Season $season,
+        Season $season,
     ) {
         $this->repository = $repository;
         $this->commonRepository = $commonRepository;

@@ -9,6 +9,7 @@ use Tests\Integration\IntegrationTestCase;
 use Voting\VotingResultsController;
 use Voting\VotingResultsService;
 use Voting\VotingResultsTableRenderer;
+use Season\Season;
 
 /**
  * Integration tests for complete voting results display workflows

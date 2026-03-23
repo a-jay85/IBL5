@@ -16,7 +16,7 @@ get_lang($module_name);
 
 global $mysqli_db;
 
-$season = new Season($mysqli_db);
+$season = new \Season\Season($mysqli_db);
 $repository = new ProjectedDraftOrderRepository($mysqli_db);
 $service = new ProjectedDraftOrderService($repository);
 $view = new ProjectedDraftOrderView();

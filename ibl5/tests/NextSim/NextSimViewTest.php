@@ -9,6 +9,7 @@ use NextSim\NextSimView;
 use NextSim\Contracts\NextSimViewInterface;
 use Player\Player;
 use Team\Team;
+use Season\Season;
 
 /**
  * NextSimViewTest - Tests for NextSimView HTML rendering
@@ -27,7 +28,7 @@ class NextSimViewTest extends TestCase
 
     protected function setUp(): void
     {
-        $mockSeason = $this->createStub(\Season::class);
+        $mockSeason = $this->createStub(Season::class);
         $mockSeason->lastSimEndDate = '2025-01-01';
 
         $this->view = new NextSimView($mockSeason);

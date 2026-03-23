@@ -8,11 +8,12 @@ use League\LeagueContext;
 use Module\ModuleAccessControl;
 use PHPUnit\Framework\TestCase;
 
+use Season\Season;
 class ModuleAccessControlTest extends TestCase
 {
     private function createAccessControl(string $phase, string $triviaMode = 'Off'): ModuleAccessControl
     {
-        $season = $this->createStub(\Season::class);
+        $season = $this->createStub(Season::class);
         $season->phase = $phase;
 
         $leagueContext = $this->createStub(LeagueContext::class);
@@ -28,7 +29,7 @@ class ModuleAccessControlTest extends TestCase
 
     private function createAccessControlWithDisabledModule(string $phase, string $disabledModule): ModuleAccessControl
     {
-        $season = $this->createStub(\Season::class);
+        $season = $this->createStub(Season::class);
         $season->phase = $phase;
 
         $leagueContext = $this->createStub(LeagueContext::class);

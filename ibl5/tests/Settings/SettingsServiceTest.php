@@ -7,6 +7,7 @@ namespace Tests\Settings;
 use PHPUnit\Framework\TestCase;
 use Settings\SettingsService;
 
+use Season\Season;
 class SettingsServiceTest extends TestCase
 {
     private function createSeasonStub(
@@ -14,8 +15,8 @@ class SettingsServiceTest extends TestCase
         string $allowWaivers = '',
         string $showDraftLink = 'Off',
         string $freeAgencyNotificationsState = ''
-    ): \Season {
-        $season = $this->createStub(\Season::class);
+    ): Season {
+        $season = $this->createStub(Season::class);
         $season->allowTrades = $allowTrades;
         $season->allowWaivers = $allowWaivers;
         $season->showDraftLink = $showDraftLink;

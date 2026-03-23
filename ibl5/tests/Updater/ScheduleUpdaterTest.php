@@ -7,6 +7,7 @@ namespace Tests\Updater;
 use League\LeagueContext;
 use PHPUnit\Framework\TestCase;
 use Tests\Integration\Mocks\MockDatabase;
+use Season\Season;
 
 /**
  * @covers \Updater\ScheduleUpdater
@@ -22,7 +23,7 @@ class ScheduleUpdaterTest extends TestCase
 
     private function createUpdater(string $phase = 'Regular Season', int $endingYear = 2025): TestableScheduleUpdater
     {
-        $season = $this->createStub(\Season::class);
+        $season = $this->createStub(Season::class);
         $season->endingYear = $endingYear;
         $season->beginningYear = $endingYear - 1;
         $season->phase = $phase;

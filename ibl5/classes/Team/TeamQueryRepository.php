@@ -7,6 +7,7 @@ namespace Team;
 use League\League;
 use Player\Player;
 use Team\Contracts\TeamQueryRepositoryInterface;
+use Season\Season;
 
 /**
  * TeamQueryRepository - Query methods for team-related data
@@ -126,7 +127,7 @@ class TeamQueryRepository extends \BaseMysqliRepository implements TeamQueryRepo
      *
      * @return list<PlayerRow>
      */
-    public function getHealthyAndInjuredPlayersOrderedByName(int $teamId, ?\Season $season = null): array
+    public function getHealthyAndInjuredPlayersOrderedByName(int $teamId, ?Season $season = null): array
     {
         $freeAgencyCondition = '';
         if ($season !== null && $season->isOffseasonPhase()) {
@@ -161,7 +162,7 @@ class TeamQueryRepository extends \BaseMysqliRepository implements TeamQueryRepo
      *
      * @return list<PlayerRow>
      */
-    public function getHealthyPlayersOrderedByName(int $teamId, ?\Season $season = null): array
+    public function getHealthyPlayersOrderedByName(int $teamId, ?Season $season = null): array
     {
         $freeAgencyCondition = '';
         if ($season !== null && $season->isOffseasonPhase()) {
@@ -315,7 +316,7 @@ class TeamQueryRepository extends \BaseMysqliRepository implements TeamQueryRepo
      *
      * @return array<string, int>
      */
-    public function getSalaryCapArray(string $teamName, int $teamId, \Season $season): array
+    public function getSalaryCapArray(string $teamName, int $teamId, Season $season): array
     {
         /** @var array<string, int> $salaryCapSpent */
         $salaryCapSpent = [];

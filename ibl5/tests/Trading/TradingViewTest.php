@@ -6,6 +6,7 @@ namespace Tests\Trading;
 
 use PHPUnit\Framework\TestCase;
 use Trading\TradingView;
+use Season\Season;
 
 class TradingViewTest extends TestCase
 {
@@ -395,7 +396,7 @@ class TradingViewTest extends TestCase
 
     public function testRenderTradesClosedShowsMessage(): void
     {
-        $season = $this->createStub(\Season::class);
+        $season = $this->createStub(Season::class);
         $season->method('areWaiversAllowed')->willReturn(false);
 
         $html = $this->view->renderTradesClosed($season);
@@ -406,7 +407,7 @@ class TradingViewTest extends TestCase
 
     public function testRenderTradesClosedShowsWaiverLinksWhenOpen(): void
     {
-        $season = $this->createStub(\Season::class);
+        $season = $this->createStub(Season::class);
         $season->method('areWaiversAllowed')->willReturn(true);
 
         $html = $this->view->renderTradesClosed($season);

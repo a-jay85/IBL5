@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace TeamSchedule\Contracts;
 
 use Team\Team;
+use Season\Season;
 
 /**
  * TeamScheduleServiceInterface - Contract for team schedule business logic
@@ -34,8 +35,8 @@ interface TeamScheduleServiceInterface
      * Get processed schedule data for a team
      *
      * @param int $teamId Team ID
-     * @param \Season $season Current season
+     * @param Season $season Current season
      * @return list<ScheduleGameRow> Processed game data with results, streaks, etc.
      */
-    public function getProcessedSchedule(int $teamId, \Season $season): array;
+    public function getProcessedSchedule(int $teamId, Season $season): array;
 }

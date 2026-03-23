@@ -15,6 +15,7 @@ use Team\TeamTableService;
 use TeamSchedule\TeamScheduleRepository;
 use UI\Components\TableViewDropdown;
 use Team\Team;
+use Season\Season;
 
 /**
  * @see DepthChartEntryControllerInterface
@@ -61,7 +62,7 @@ class DepthChartEntryController implements DepthChartEntryControllerInterface
             $display = 'ratings';
         }
 
-        $season = new \Season($this->db);
+        $season = new Season($this->db);
 
         $teamName = $this->getUserTeamName($username);
         $teamID = $this->commonRepository->getTidFromTeamname($teamName) ?? 0;
@@ -134,7 +135,7 @@ class DepthChartEntryController implements DepthChartEntryControllerInterface
      */
     public function getTableOutput(int $teamID, string $display, ?string $split = null): string
     {
-        $season = new \Season($this->db);
+        $season = new Season($this->db);
         $team = Team::initialize($this->db, $teamID);
 
         // Delegate roster + starters to TeamService (single source of truth)
@@ -150,7 +151,7 @@ class DepthChartEntryController implements DepthChartEntryControllerInterface
         return $dropdown->wrap($tableHtml);
     }
 
-    private function renderNextSimSection(int $teamID, Team $team, \Season $season): void
+    private function renderNextSimSection(int $teamID, Team $team, Season $season): void
     {
         // Load power rankings for SOS tier indicators
         $standingsRepo = new StandingsRepository($this->db);

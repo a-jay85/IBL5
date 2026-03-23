@@ -7,6 +7,7 @@ namespace Trading;
 use Trading\Contracts\TradeProcessorInterface;
 use Trading\Contracts\TradeCashRepositoryInterface;
 use Trading\Contracts\TradeExecutionRepositoryInterface;
+use Season\Season;
 
 /**
  * TradeProcessor - Executes trades
@@ -28,7 +29,7 @@ class TradeProcessor implements TradeProcessorInterface
     protected TradeCashRepositoryInterface $cashRepository;
     protected TradeExecutionRepositoryInterface $executionRepository;
     protected \Services\CommonMysqliRepository $commonRepository;
-    protected \Season $season;
+    protected Season $season;
     protected CashTransactionHandler $cashHandler;
     protected \Services\NewsService $newsService;
     protected ?\Discord $discord;
@@ -40,7 +41,7 @@ class TradeProcessor implements TradeProcessorInterface
         $this->cashRepository = new TradeCashRepository($db);
         $this->executionRepository = new TradeExecutionRepository($db);
         $this->commonRepository = new \Services\CommonMysqliRepository($db);
-        $this->season = new \Season($db);
+        $this->season = new Season($db);
         $this->cashHandler = new CashTransactionHandler($db, $this->repository, $this->cashRepository);
         $this->newsService = new \Services\NewsService($db);
 

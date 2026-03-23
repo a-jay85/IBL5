@@ -7,6 +7,7 @@ namespace Tests\UpdateAllTheThings;
 use PHPUnit\Framework\TestCase;
 use Updater\PowerRankingsUpdater;
 use Statistics\TeamStatsCalculator;
+use Season\Season;
 
 /**
  * Testable subclass that exposes protected methods for testing
@@ -39,13 +40,13 @@ class TestablePowerRankingsUpdater extends PowerRankingsUpdater
 class PowerRankingsUpdaterTest extends TestCase
 {
     private \MockDatabase $mockDb;
-    private \Season $mockSeason;
+    private Season $mockSeason;
     private TestablePowerRankingsUpdater $powerRankingsUpdater;
 
     protected function setUp(): void
     {
         $this->mockDb = new \MockDatabase();
-        $this->mockSeason = new \Season($this->mockDb);
+        $this->mockSeason = new Season($this->mockDb);
         $this->powerRankingsUpdater = new TestablePowerRankingsUpdater($this->mockDb, $this->mockSeason);
     }
 
@@ -62,7 +63,7 @@ class PowerRankingsUpdaterTest extends TestCase
         
         $result = $this->powerRankingsUpdater->publicDetermineMonth();
         
-        $this->assertEquals(\Season::IBL_REGULAR_SEASON_STARTING_MONTH, $result);
+        $this->assertEquals(Season::IBL_REGULAR_SEASON_STARTING_MONTH, $result);
     }
 
     public function testDetermineMonthForHEAT(): void
@@ -71,7 +72,7 @@ class PowerRankingsUpdaterTest extends TestCase
         
         $result = $this->powerRankingsUpdater->publicDetermineMonth();
         
-        $this->assertEquals(\Season::IBL_HEAT_MONTH, $result);
+        $this->assertEquals(Season::IBL_HEAT_MONTH, $result);
     }
 
     public function testDetermineMonthForRegularSeason(): void
@@ -80,7 +81,7 @@ class PowerRankingsUpdaterTest extends TestCase
         
         $result = $this->powerRankingsUpdater->publicDetermineMonth();
         
-        $this->assertEquals(\Season::IBL_REGULAR_SEASON_STARTING_MONTH, $result);
+        $this->assertEquals(Season::IBL_REGULAR_SEASON_STARTING_MONTH, $result);
     }
 
     public function testCalculateTeamStatsInitializesCorrectly(): void

@@ -2,6 +2,8 @@
 
 declare(strict_types=1);
 
+namespace Season;
+
 use League\League;
 
 /**
@@ -67,7 +69,7 @@ class Season
     const IBL_POST_ALL_STAR_FIRST_DAY = 5;    // Feb 5 - first valid sim day after break
 
     private \mysqli $db;
-    private Season\Contracts\SeasonQueryRepositoryInterface $queryRepo;
+    private Contracts\SeasonQueryRepositoryInterface $queryRepo;
 
     /**
      * Constructor - initializes season data from database
@@ -77,7 +79,7 @@ class Season
     public function __construct(\mysqli $db)
     {
         $this->db = $db;
-        $this->queryRepo = new Season\SeasonQueryRepository($db);
+        $this->queryRepo = new SeasonQueryRepository($db);
 
         // Bulk-fetch all needed settings in a single query
         $settings = $this->queryRepo->getBulkSettings([

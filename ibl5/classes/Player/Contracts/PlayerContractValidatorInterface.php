@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Player\Contracts;
 
 use Player\PlayerData;
+use Season\Season;
 
 /**
  * PlayerContractValidatorInterface - Contract for player contract eligibility rules
@@ -76,10 +77,10 @@ interface PlayerContractValidatorInterface
      * If this calculated year equals the season's ending year, the player becomes a free agent.
      * 
      * @param PlayerData $playerData The player to check
-     * @param \Season $season Season object with endingYear property
+     * @param Season $season Season object with endingYear property
      * @return bool True if player becomes free agent this season
      */
-    public function isPlayerFreeAgent(PlayerData $playerData, \Season $season): bool;
+    public function isPlayerFreeAgent(PlayerData $playerData, Season $season): bool;
 
     /**
      * Check if a player's rookie option was previously exercised

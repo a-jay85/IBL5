@@ -10,6 +10,7 @@ use Player\PlayerImageHelper;
 use UI\TableStyles;
 use UI\TeamCellHelper;
 use Utilities\HtmlSanitizer;
+use Season\Season;
 
 /**
  * @see TradingViewInterface
@@ -241,7 +242,7 @@ $tradeConfig = [
     /**
      * @see TradingViewInterface::renderTradesClosed()
      */
-    public function renderTradesClosed(\Season $season): string
+    public function renderTradesClosed(Season $season): string
     {
         ob_start();
         echo 'Sorry, but trades are not allowed right now.';

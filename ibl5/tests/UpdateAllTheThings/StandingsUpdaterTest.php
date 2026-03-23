@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use PHPUnit\Framework\TestCase;
 use Updater\StandingsUpdater;
+use Season\Season;
 
 /**
  * Testable subclass that overrides DB methods to inject test data
@@ -62,7 +63,7 @@ class TestableStandingsUpdater extends StandingsUpdater
 class StandingsUpdaterTest extends TestCase
 {
     private MockDatabase $mockDb;
-    private \Season $mockSeason;
+    private Season $mockSeason;
     private TestableStandingsUpdater $updater;
 
     /** @var array<int, array{conference: string, division: string, teamName: string}> */
@@ -71,7 +72,7 @@ class StandingsUpdaterTest extends TestCase
     protected function setUp(): void
     {
         $this->mockDb = new MockDatabase();
-        $this->mockSeason = new \Season($this->mockDb);
+        $this->mockSeason = new Season($this->mockDb);
         $this->mockSeason->phase = 'Regular Season';
         $this->mockSeason->beginningYear = 2006;
         $this->mockSeason->endingYear = 2007;

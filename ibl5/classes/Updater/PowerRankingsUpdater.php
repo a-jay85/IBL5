@@ -8,15 +8,16 @@ use League\LeagueContext;
 use Statistics\TeamStatsCalculator;
 use StrengthOfSchedule\StrengthOfScheduleCalculator;
 use Utilities\SeasonPhaseHelper;
+use Season\Season;
 
 /**
  * @phpstan-import-type TeamStats from TeamStatsCalculator
  */
 class PowerRankingsUpdater extends \BaseMysqliRepository {
-    private \Season $season;
+    private Season $season;
     private TeamStatsCalculator $statsCalculator;
 
-    public function __construct(\mysqli $db, \Season $season, ?TeamStatsCalculator $statsCalculator = null, ?LeagueContext $leagueContext = null) {
+    public function __construct(\mysqli $db, Season $season, ?TeamStatsCalculator $statsCalculator = null, ?LeagueContext $leagueContext = null) {
         parent::__construct($db, $leagueContext);
         $this->season = $season;
         $this->statsCalculator = $statsCalculator ?? new TeamStatsCalculator($db, $leagueContext);

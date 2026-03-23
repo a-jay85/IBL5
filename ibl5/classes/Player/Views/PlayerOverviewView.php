@@ -11,6 +11,7 @@ use Player\Contracts\PlayerOverviewViewInterface;
 use Services\CommonMysqliRepository;
 use BasketballStats\StatsFormatter;
 use Utilities\HtmlSanitizer;
+use Season\Season;
 
 /**
  * PlayerOverviewView - Renders the player overview page
@@ -49,19 +50,19 @@ class PlayerOverviewView implements PlayerOverviewViewInterface
         int $playerID,
         Player $player,
         PlayerStats $playerStats,
-        \Season $season,
+        Season $season,
         \Shared\Contracts\SharedRepositoryInterface $sharedRepository,
         ?array $colorScheme = null
     ): string {
         // Calculate date range based on season phase
         if ($season->phase === "Preseason") {
-            $startDate = \Season::IBL_PRESEASON_YEAR . "-" . \Season::IBL_REGULAR_SEASON_STARTING_MONTH . "-01";
-            $endDate = (\Season::IBL_PRESEASON_YEAR + 1) . "-07-01";
+            $startDate = Season::IBL_PRESEASON_YEAR . "-" . Season::IBL_REGULAR_SEASON_STARTING_MONTH . "-01";
+            $endDate = (Season::IBL_PRESEASON_YEAR + 1) . "-07-01";
         } elseif ($season->phase === "HEAT") {
-            $startDate = $season->beginningYear . "-" . \Season::IBL_HEAT_MONTH . "-01";
+            $startDate = $season->beginningYear . "-" . Season::IBL_HEAT_MONTH . "-01";
             $endDate = $season->endingYear . "-07-01";
         } else {
-            $startDate = $season->beginningYear . "-" . \Season::IBL_REGULAR_SEASON_STARTING_MONTH . "-01";
+            $startDate = $season->beginningYear . "-" . Season::IBL_REGULAR_SEASON_STARTING_MONTH . "-01";
             $endDate = $season->endingYear . "-07-01";
         }
         

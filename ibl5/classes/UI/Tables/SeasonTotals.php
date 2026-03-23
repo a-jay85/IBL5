@@ -10,6 +10,7 @@ use Player\PlayerStats;
 use UI\TeamCellHelper;
 use Utilities\HtmlSanitizer;
 use Team\Team;
+use Season\Season;
 
 /**
  * SeasonTotals - Displays season totals statistics table
@@ -31,7 +32,7 @@ class SeasonTotals
     {
         $playerRows = PlayerRowTransformer::resolveWithStats($db, $result, $yr);
 
-        $season = new \Season($db);
+        $season = new Season($db);
         $teamStats = \TeamStats::withTeamName($db, $team->name, $season->endingYear);
 
         ob_start();

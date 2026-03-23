@@ -1,0 +1,462 @@
+@layer components {
+
+/* ==========================================================================
+   Schedule Page - Month/Day Grouped Layout
+   ========================================================================== */
+
+.schedule-container {
+    width: 100%;
+    max-width: 600px;
+    margin: 0 auto;
+    font-family: var(--font-display);
+}
+
+/* Header */
+.schedule-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: var(--space-3);
+}
+
+.schedule-header__center {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.25rem;
+}
+
+.schedule-highlight-note {
+    font-size: 0.875rem;
+    font-style: italic;
+    color: var(--gray-500);
+    margin: 0;
+}
+
+.schedule-container a.schedule-jump-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 5px 10px;
+    background: var(--accent-500);
+    color: white;
+    font-size: 1rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    text-decoration: none;
+    border-radius: var(--radius-full);
+    transition: all var(--transition-fast);
+    box-shadow: 0 2px 6px rgb(249 115 22 / 0.3);
+}
+
+.schedule-container a.schedule-jump-btn:hover {
+    background: var(--accent-600);
+    box-shadow: 0 3px 10px rgb(249 115 22 / 0.4);
+}
+
+/* Month Navigation — base styles provided by .ibl-jump-menu (navigation.css).
+   Schedule-specific additions: container queries for full/abbreviated month names,
+   margin-bottom for spacing in the schedule layout. */
+.schedule-months {
+    margin-bottom: var(--space-4);
+    container-type: inline-size;
+}
+
+/* Full/abbreviated month name toggle */
+.schedule-months__full {
+    display: inline;
+}
+
+.schedule-months__abbr {
+    display: none;
+}
+
+/* Switch to abbreviations when container is narrow */
+@container (max-width: 480px) {
+    .schedule-months__full {
+        display: none;
+    }
+    .schedule-months__abbr {
+        display: inline;
+    }
+}
+
+/* Fallback for browsers without container query support */
+@supports not (container-type: inline-size) {
+    @media (max-width: 540px) {
+        .schedule-months__full {
+            display: none;
+        }
+        .schedule-months__abbr {
+            display: inline;
+        }
+    }
+}
+
+/* Month Section */
+.schedule-month {
+    margin-bottom: var(--space-4);
+    scroll-margin-top: 80px; /* Offset for sticky header */
+    border: 1px solid var(--gray-200, #e5e7eb);
+    border-radius: var(--radius-md);
+    overflow: hidden;
+}
+
+.schedule-month__header {
+    padding: 4px 8px;
+    background: var(--navy-800);
+    color: white;
+    font-family: var(--font-display);
+    font-size: 1.125rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    border-radius: var(--radius-md) var(--radius-md) 0 0;
+}
+
+.schedule-month__header--playoffs {
+    background: var(--accent-500);
+}
+
+/* Day Row */
+.schedule-day {
+    display: flex;
+    border-bottom: 2px solid var(--gray-100);
+    background: white;
+}
+
+.schedule-day:last-child {
+    border-bottom: none;
+    border-radius: 0 0 var(--radius-md) var(--radius-md);
+}
+
+.schedule-day__header {
+    flex-shrink: 0;
+    width: 36px;
+    padding: 4px 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    background: var(--gray-50);
+    border-right: 1px solid var(--gray-100);
+}
+
+.schedule-day__num {
+    font-family: var(--font-display);
+    font-size: 1.125rem;
+    font-weight: 700;
+    color: var(--navy-800);
+    line-height: 1;
+}
+
+/* Games within a day */
+.schedule-day__games {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+}
+
+/* Game Row - CSS Grid for vertical alignment */
+.schedule-game {
+    display: grid;
+    grid-template-columns: 12px 1fr 25px 24px 16px 24px 25px 1fr 12px;
+    align-items: center;
+    gap: 4px;
+    padding: 4px 8px;
+    text-decoration: none;
+    color: inherit;
+    transition: background var(--transition-fast);
+    font-size: 1rem;
+    border-bottom: 1px solid var(--gray-50);
+}
+
+.schedule-game:last-child {
+    border-bottom: none;
+}
+
+.schedule-game:hover {
+    background: var(--gray-50);
+}
+
+/* Team name alignment */
+.schedule-game__team-link:first-of-type {
+    text-align: right;
+}
+
+.schedule-game__team-link:last-of-type {
+    text-align: left;
+}
+
+/* Upcoming game - highlighted for next sim */
+.schedule-game--upcoming {
+    background: var(--accent-100);
+    border-left: 3px solid var(--accent-500);
+}
+
+.schedule-game--upcoming:hover {
+    background: var(--accent-300);
+}
+
+.schedule-game.user-team-game {
+    background: var(--warning-100, #fef3c7);
+}
+
+.schedule-game.user-team-game:hover {
+    background: var(--warning-200, #fde68a);
+}
+
+/* Team name */
+.schedule-game__team {
+    font-weight: 500;
+    color: var(--navy-700);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* Winner styling */
+.schedule-game__team--win {
+    font-weight: 700;
+    color: var(--accent-600);
+}
+
+/* Team record (W-L) - inline with team name */
+.schedule-game__record {
+    font-size: 1rem;
+    font-weight: 400;
+    color: var(--gray-400);
+}
+
+/* Team logo */
+.schedule-game__logo {
+    width: 25px;
+    height: 25px;
+    object-fit: contain;
+    justify-self: center;
+}
+
+/* Team link (name) */
+.schedule-game__team-link {
+    text-decoration: none;
+    color: inherit;
+    min-width: 0;
+    overflow: hidden;
+}
+
+.schedule-game__team-link:hover .schedule-game__team {
+    color: var(--accent-600);
+}
+
+/* Logo link */
+.schedule-game__logo-link {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+.schedule-game__logo-link:hover {
+    opacity: 0.8;
+}
+
+/* Score link */
+.schedule-game__score-link {
+    font-size: 1rem;
+    font-weight: 700;
+    color: var(--navy-600);
+    text-align: center;
+    text-decoration: none;
+}
+
+.schedule-game__score-link:hover {
+    color: var(--accent-600);
+}
+
+.schedule-game__score-link.schedule-game__team--win {
+    color: var(--accent-600);
+}
+
+/* @ symbol */
+.schedule-game__vs,
+.schedule-game__vs:link,
+.schedule-game__vs:visited {
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--gray-300);
+    text-align: center;
+    text-decoration: none;
+}
+
+.schedule-game__vs:hover {
+    color: var(--accent-600);
+    text-decoration: none;
+}
+
+/* Mobile */
+@media (max-width: 640px) {
+    .schedule-container {
+        margin: 0;
+        padding-left: 8px;
+        padding-right: 8px;
+        overflow-x: hidden;
+    }
+
+    .schedule-header {
+        padding: 0;
+    }
+
+    .schedule-months {
+        border-radius: 0;
+        margin-left: -8px;
+        margin-right: -8px;
+        width: calc(100% + 16px);
+        padding: 2px;
+    }
+
+    .schedule-months__link {
+        padding: 5px 2px;
+        font-size: 1rem;
+    }
+
+    .schedule-month {
+        margin-left: -8px;
+        margin-right: -8px;
+        width: calc(100% + 16px);
+    }
+
+    .schedule-month__header {
+        border-radius: 0;
+    }
+
+    .schedule-day:last-child {
+        border-radius: 0;
+    }
+
+    .schedule-day__header {
+        width: 32px;
+    }
+
+    .schedule-day__num {
+        font-size: 1rem;
+    }
+
+    .schedule-game {
+        grid-template-columns: 10px 1fr 25px 20px 12px 20px 25px 1fr 10px;
+        padding: 3px 4px;
+        font-size: 1rem;
+    }
+
+    .schedule-game__score-link {
+        font-size: 1rem;
+    }
+
+    .schedule-game__record {
+        display: none;
+    }
+
+    .schedule-game__logo {
+        width: 25px;
+        height: 25px;
+    }
+}
+
+/* ==========================================================================
+   Team Schedule Module - Team banner (reuses .schedule-* classes for layout)
+   ========================================================================== */
+
+/* Team Banner - unique to Team Schedule */
+.schedule-team-banner {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    padding: 4px;
+    margin: 0 auto var(--space-4);
+    border-radius: var(--radius-lg);
+    width: fit-content;
+}
+
+.schedule-team-banner__logo {
+    width: 100%;
+    max-width: 415px;
+    aspect-ratio: 415 / 50;
+    height: auto;
+    border-radius: var(--radius-md);
+}
+
+/* Mobile adjustments for team banner */
+@media (max-width: 640px) {
+    .schedule-team-banner {
+        padding: 4px;
+        margin-bottom: var(--space-3);
+        border-radius: var(--radius-md);
+        margin-left: auto;
+        margin-right: auto;
+    }
+}
+
+/* Team Schedule - Add streak column to grid */
+.schedule-container--team .schedule-game {
+    grid-template-columns: 1fr 25px 24px 16px 24px 25px 1fr 36px;
+}
+
+/* Streak column styling */
+.schedule-game__streak {
+    font-family: var(--font-display);
+    font-size: 0.875rem;
+    font-weight: 700;
+    text-align: center;
+    color: var(--gray-500);
+}
+
+.schedule-game__streak--win {
+    color: var(--accent-500);
+}
+
+.schedule-game__streak--loss {
+    color: var(--gray-400);
+}
+
+/* Team Schedule - Color overrides using custom properties
+   --team-primary and --team-secondary are set inline on .schedule-container--team */
+.schedule-container--team .schedule-month__header {
+    background: var(--team-primary);
+    color: var(--team-secondary);
+}
+
+.schedule-container--team .schedule-month__header--playoffs {
+    background: var(--accent-500);
+    color: white;
+}
+
+.schedule-container--team .ibl-jump-menu__link:hover {
+    background: var(--team-primary);
+    color: var(--team-secondary);
+}
+
+.schedule-container--team a.schedule-jump-btn {
+    background: var(--team-primary);
+    color: var(--team-secondary);
+    box-shadow: 0 2px 8px color-mix(in srgb, var(--team-primary) 40%, transparent);
+}
+
+.schedule-container--team a.schedule-jump-btn:hover {
+    background: var(--team-primary);
+    opacity: 0.9;
+    box-shadow: 0 4px 12px color-mix(in srgb, var(--team-primary) 50%, transparent);
+}
+
+/* Mobile adjustments for team schedule grid with streak */
+@media (max-width: 640px) {
+    .schedule-container--team .schedule-game {
+        grid-template-columns: 1fr 25px 20px 12px 20px 25px 1fr 28px;
+    }
+
+    .schedule-game__streak {
+        font-size: 0.75rem;
+    }
+}
+
+
+} /* end @layer components */

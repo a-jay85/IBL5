@@ -1,0 +1,35 @@
+#!/usr/bin/env php
+<?php
+
+declare(strict_types=1);
+
+if (php_sapi_name() !== 'cli') {
+    http_response_code(403);
+    exit('This script must be run from the command line.');
+}
+
+$_SERVER['DOCUMENT_ROOT'] = dirname(__DIR__, 2);
+require $_SERVER['DOCUMENT_ROOT'] . '/ibl5/vendor/autoload.php';
+include $_SERVER['DOCUMENT_ROOT'] . '/ibl5/config.php';
+include $_SERVER['DOCUMENT_ROOT'] . '/ibl5/db/db.php';
+
+/** @var \mysqli $mysqli_db */
+
+/** @var list<\Migration\SchemaAssertion> $assertions */
+$assertions = require dirname(__DIR__) . '/config/schema-assertions.php';
+
+$validator = new \Migration\SchemaValidator($mysqli_db);
+$result = $validator->validate($assertions);
+
+if ($result->passed) {
+    echo "Schema validation passed (" . count($assertions) . " assertions).\n";
+    exit(0);
+}
+
+echo "SCHEMA VALIDATION FAILED:\n";
+foreach ($result->missing as $column) {
+    echo "  MISSING: {$column}\n";
+}
+echo "\n" . count($result->missing) . " missing column(s) detected.\n";
+echo "Run the appropriate migration or ALTER TABLE to fix.\n";
+exit(1);

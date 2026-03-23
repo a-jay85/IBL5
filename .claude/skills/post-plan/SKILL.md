@@ -182,7 +182,70 @@ bin/e2e-wt.sh <worktree-name>           # run Playwright against worktree
 
 After both agents complete:
 - If either fails, fix the issues in the worktree, commit, and push the fix. Then re-run the failing verification.
-- Once all pass, proceed to Phase 7.
+- Once all pass, proceed to Phase 6.5.
+
+---
+
+## Phase 6.5: Manual Testing Automation
+
+Re-evaluate the PR's manual testing checklist and convert automatable steps into Playwright E2E tests. This maximizes auto-merge eligibility and reduces reviewer burden.
+
+**Skip this phase if** the PR description already says "No manual testing needed."
+
+### Step 1: Extract manual testing steps
+
+```bash
+gh pr view --json body --jq '.body' | sed -n '/## Manual Testing/,/^## /p'
+```
+
+Parse the checklist items into a numbered list.
+
+### Step 2: Classify each step
+
+For each manual testing step, determine whether it can be automated with Playwright:
+
+| Automatable — write an E2E test | Must stay manual |
+|---|---|
+| Navigate to page, assert element/content exists | Subjective visual aesthetics ("does it look right?") |
+| Click/interact → assert state change | Cross-browser rendering judgment |
+| Form submission → assert result page | Production data comparison (iblhoops.net) |
+| Table data presence and correctness | Performance "feel" (perceived speed) |
+| Mobile viewport layout (via `setViewportSize`) | Accessibility beyond ARIA/semantic checks |
+| Error states and edge-case flows | Auth flows requiring real user credentials |
+| URL routing and redirects | Anything requiring human sensory judgment |
+
+### Step 3: Write E2E tests for automatable steps
+
+For each automatable step:
+
+1. Write a Playwright test in the appropriate `e2e/tests/` file (or create a new one if no suitable file exists)
+2. Follow existing E2E patterns — use `appState` fixtures, CI seed data, no `test.skip()`
+3. Run the new test directly from the worktree (not via `bin/e2e-wt.sh`, which runs from the main repo and won't pick up new test files in the worktree):
+   ```bash
+   cd <worktree>/ibl5 && BASE_URL=http://<slug>.localhost/ibl5 \
+     IBL_TEST_USER=<test-user> IBL_TEST_PASS=<test-pass> \
+     bunx playwright test --grep "test name"
+   ```
+4. Fix until green. If a test cannot be made green after 2 attempts, reclassify the step as manual and move on — do not burn cycles on flaky automation.
+
+### Step 4: Update PR description
+
+After all new E2E tests pass:
+
+1. Commit and push the new E2E tests
+2. Build the updated PR body — remove automated steps from the Manual Testing checklist
+3. If no manual steps remain, replace the entire Manual Testing section with:
+   `No manual testing needed — all changes are covered by unit and E2E tests.`
+4. Apply the update:
+   ```bash
+   gh pr edit --body "<updated body>"
+   ```
+
+### Step 5: Re-evaluate (loop)
+
+Re-read the updated Manual Testing section. If any remaining steps are now indirectly covered by the tests just written (e.g., a step was "check X and Y" — X is now tested, and Y is also testable as a side effect), go back to Step 2.
+
+**Exit the loop when** every remaining step genuinely requires human judgment, or the section says "No manual testing needed."
 
 ---
 

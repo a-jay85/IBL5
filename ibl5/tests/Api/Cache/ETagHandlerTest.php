@@ -102,6 +102,20 @@ class ETagHandlerTest extends TestCase
         $this->assertTrue($this->handler->matches($etag));
     }
 
+    public function testMatchesReturnsTrueWithWeakPrefixOnHeader(): void
+    {
+        $_SERVER['HTTP_IF_NONE_MATCH'] = 'W/"abc123"';
+
+        $this->assertTrue($this->handler->matches('"abc123"'));
+    }
+
+    public function testMatchesReturnsTrueWithWeakPrefixOnBoth(): void
+    {
+        $_SERVER['HTTP_IF_NONE_MATCH'] = 'W/"abc123"';
+
+        $this->assertTrue($this->handler->matches('W/"abc123"'));
+    }
+
     public function testMatchesReturnsFalseWhenHeaderDiffers(): void
     {
         $etag = '"abc123"';

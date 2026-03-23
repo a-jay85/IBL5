@@ -40,6 +40,10 @@ export async function apiFetch(
 
   for (let attempt = 0; attempt < 3; attempt++) {
     const res = await fetch(url, { ...init, headers });
+
+    // 304 Not Modified has no body/Content-Type — return immediately
+    if (res.status === 304) return res;
+
     const ct = res.headers.get('content-type') ?? '';
     if (ct.includes('json') || ct.includes('application/json')) {
       return res;

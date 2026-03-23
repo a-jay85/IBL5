@@ -72,7 +72,7 @@ async function mockRosterPreviewApi(page: Page): Promise<void> {
 
 test.describe('Trading flow', () => {
   test.beforeEach(async ({ appState, page }) => {
-    await appState({ 'Allow Trades': 'Yes' });
+    await appState({ 'Allow Trades': 'Yes', 'Current Season Ending Year': '2026' });
     await gotoWithRetry(page, 'modules.php?name=Trading');
   });
 
@@ -121,7 +121,7 @@ test.describe('Trading flow', () => {
 
 test.describe('Trade offer form structure', () => {
   test.beforeEach(async ({ appState, page }) => {
-    await appState({ 'Allow Trades': 'Yes' });
+    await appState({ 'Allow Trades': 'Yes', 'Current Season Ending Year': '2026' });
     await navigateToTradeForm(page);
   });
 
@@ -210,7 +210,7 @@ test.describe('Trade offer form structure', () => {
 
 test.describe('Trade offer form: roster preview interactions', () => {
   test.beforeEach(async ({ appState, page }) => {
-    await appState({ 'Allow Trades': 'Yes' });
+    await appState({ 'Allow Trades': 'Yes', 'Current Season Ending Year': '2026' });
     await mockRosterPreviewApi(page);
     await navigateToTradeForm(page);
   });
@@ -386,7 +386,7 @@ test.describe('Trade offer form: roster preview interactions', () => {
 
 test.describe('Trade offer form: cap warnings', () => {
   test.beforeEach(async ({ appState, page }) => {
-    await appState({ 'Allow Trades': 'Yes' });
+    await appState({ 'Allow Trades': 'Yes', 'Current Season Ending Year': '2026' });
     await mockRosterPreviewApi(page);
     await navigateToTradeForm(page);
   });
@@ -453,7 +453,7 @@ test.describe('Trade offer form: cap warnings', () => {
 
 test.describe('Trade review page: offer cards and preview', () => {
   test.beforeEach(async ({ appState, page }) => {
-    await appState({ 'Allow Trades': 'Yes' });
+    await appState({ 'Allow Trades': 'Yes', 'Current Season Ending Year': '2026' });
     await gotoWithRetry(page, 'modules.php?name=Trading&op=reviewtrade');
   });
 
@@ -461,9 +461,7 @@ test.describe('Trade review page: offer cards and preview', () => {
     const cards = page.locator('.trade-offer-card');
     const cardCount = await cards.count();
 
-    if (cardCount === 0) {
-      test.skip(true, 'No trade offers to review');
-    }
+    expect(cardCount, 'CI seed must provide trade offers').toBeGreaterThan(0);
 
     for (let i = 0; i < cardCount; i++) {
       const card = cards.nth(i);
@@ -478,9 +476,7 @@ test.describe('Trade review page: offer cards and preview', () => {
     await mockRosterPreviewApi(page);
 
     const cards = page.locator('.trade-offer-card');
-    if ((await cards.count()) === 0) {
-      test.skip(true, 'No trade offers to review');
-    }
+    expect(await cards.count(), 'CI seed must provide trade offers').toBeGreaterThan(0);
 
     const previewBtn = page.locator('[data-preview-offer]').first();
     const offerId = await previewBtn.getAttribute('data-preview-offer');
@@ -501,9 +497,7 @@ test.describe('Trade review page: offer cards and preview', () => {
     await mockRosterPreviewApi(page);
 
     const cards = page.locator('.trade-offer-card');
-    if ((await cards.count()) === 0) {
-      test.skip(true, 'No trade offers to review');
-    }
+    expect(await cards.count(), 'CI seed must provide trade offers').toBeGreaterThan(0);
 
     let apiRequestCount = 0;
     page.on('request', (req) => {
@@ -532,12 +526,7 @@ test.describe('Trade review page: offer cards and preview', () => {
     await mockRosterPreviewApi(page);
 
     const buttons = page.locator('[data-preview-offer]');
-    if ((await buttons.count()) < 2) {
-      test.skip(
-        true,
-        'Need at least 2 trade offers for independent state test',
-      );
-    }
+    expect(await buttons.count(), 'CI seed must provide at least 2 trade offers').toBeGreaterThanOrEqual(2);
 
     // Open first panel, switch to Totals tab
     const btn1 = buttons.first();
@@ -570,9 +559,7 @@ test.describe('Trade review page: offer cards and preview', () => {
     page,
   }) => {
     const cards = page.locator('.trade-offer-card');
-    if ((await cards.count()) === 0) {
-      test.skip(true, 'No trade offers to review');
-    }
+    expect(await cards.count(), 'CI seed must provide trade offers').toBeGreaterThan(0);
 
     // The CSS fix sets width: fit-content so the card constrains its
     // intrinsic size and doesn't stretch to match sibling elements
@@ -598,7 +585,7 @@ test.describe('Trade review page: offer cards and preview', () => {
 
 test.describe('Trading pages: no PHP errors', () => {
   test('no PHP errors on trade form', async ({ appState, page }) => {
-    await appState({ 'Allow Trades': 'Yes' });
+    await appState({ 'Allow Trades': 'Yes', 'Current Season Ending Year': '2026' });
     await gotoWithRetry(page, 'modules.php?name=Trading');
 
     const firstTeamLink = page.locator('.trading-team-select a').first();
@@ -610,7 +597,7 @@ test.describe('Trading pages: no PHP errors', () => {
   });
 
   test('no PHP errors on trade review page', async ({ appState, page }) => {
-    await appState({ 'Allow Trades': 'Yes' });
+    await appState({ 'Allow Trades': 'Yes', 'Current Season Ending Year': '2026' });
     await gotoWithRetry(page, 'modules.php?name=Trading&op=reviewtrade');
 
     await assertNoPhpErrors(page);
@@ -628,6 +615,7 @@ test.describe('Trading: trades-closed state', () => {
     await appState({
       'Current Season Phase': 'Regular Season',
       'Allow Trades': 'No',
+      'Current Season Ending Year': '2026',
     });
     await gotoWithRetry(page, 'modules.php?name=Trading');
   });
@@ -649,7 +637,7 @@ test.describe('Trading: trades-closed state', () => {
 
 test.describe('Trading: result banners', () => {
   test.beforeEach(async ({ appState }) => {
-    await appState({ 'Allow Trades': 'Yes' });
+    await appState({ 'Allow Trades': 'Yes', 'Current Season Ending Year': '2026' });
   });
 
   test('offer_sent success banner', async ({ page }) => {

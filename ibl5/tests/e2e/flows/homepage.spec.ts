@@ -23,11 +23,9 @@ test.describe('Homepage flow', () => {
 
   test('article links point to News module', async ({ page }) => {
     const articleLinks = page.locator('a[href*="sid="]');
-    const count = await articleLinks.count();
-    if (count > 0) {
-      const href = await articleLinks.first().getAttribute('href');
-      expect(href).toContain('News');
-    }
+    await expect(articleLinks.first()).toBeVisible();
+    const href = await articleLinks.first().getAttribute('href');
+    expect(href).toContain('News');
   });
 
   test('main content area renders', async ({ page }) => {

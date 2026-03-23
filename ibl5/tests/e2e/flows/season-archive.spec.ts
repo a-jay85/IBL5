@@ -42,20 +42,11 @@ test.describe('Season Archive flow', () => {
     await assertNoPhpErrors(page, 'on Season Archive detail via link');
   });
 
-  test('detail page has navigation links when data exists', async ({ page }) => {
-    await page.goto('modules.php?name=SeasonArchive&year=2026');
-    await assertNoPhpErrors(page, 'on Season Archive detail year=2026');
-    const navLinks = page.locator('.season-archive-nav a');
-    const count = await navLinks.count();
-    if (count > 0) {
-      await expect(navLinks.first()).toBeVisible();
-    }
-  });
-
   test('detail page renders without errors for year 2026', async ({ page }) => {
+    // Year 2026 (season 38) exceeds the archive season cap — no detail sections render,
+    // but the page must load without PHP errors.
     await page.goto('modules.php?name=SeasonArchive&year=2026');
     await assertNoPhpErrors(page, 'on Season Archive detail year=2026');
-    // Sections render when archive data exists; just verify no errors
   });
 
   test('nonexistent year shows no sections', async ({ page }) => {

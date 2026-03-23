@@ -32,7 +32,7 @@ if (isset($name) && $name == $_REQUEST['name']) {
         exit;
     }
 
-    // Phase-based access control (replaces nuke_modules query)
+    // Phase-based access control
     global $mysqli_db, $leagueContext;
     $season = new \Season\Season($mysqli_db);
     $accessControl = new Module\ModuleAccessControl($season, $leagueContext, $mysqli_db);

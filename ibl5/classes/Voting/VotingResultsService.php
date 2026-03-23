@@ -140,19 +140,19 @@ class VotingResultsService implements VotingResultsServiceInterface
         // Use mysqli with prepared statements (no parameters needed for these queries)
         $stmt = $this->db->prepare($query);
         if ($stmt === false) {
-            error_log("VotingResultsService: Failed to prepare query: " . $this->db->error);
+            \Logging\LoggerFactory::getChannel('db')->error('VotingResultsService: Failed to prepare query', ['error' => $this->db->error]);
             return [];
         }
 
         if (!$stmt->execute()) {
-            error_log("VotingResultsService: Failed to execute query: " . $stmt->error);
+            \Logging\LoggerFactory::getChannel('db')->error('VotingResultsService: Failed to execute query', ['error' => $stmt->error]);
             $stmt->close();
             return [];
         }
 
         $result = $stmt->get_result();
         if ($result === false) {
-            error_log("VotingResultsService: Failed to get result: " . $stmt->error);
+            \Logging\LoggerFactory::getChannel('db')->error('VotingResultsService: Failed to get result', ['error' => $stmt->error]);
             $stmt->close();
             return [];
         }

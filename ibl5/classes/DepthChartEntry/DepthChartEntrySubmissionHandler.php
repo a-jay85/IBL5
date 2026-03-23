@@ -135,7 +135,7 @@ class DepthChartEntrySubmissionHandler implements DepthChartEntrySubmissionHandl
             );
         } catch (\RuntimeException $e) {
             // Don't fail the main submission if snapshot save fails
-            error_log('SavedDepthChart snapshot error: ' . $e->getMessage());
+            \Logging\LoggerFactory::getChannel('app')->error('SavedDepthChart snapshot error', ['error' => $e->getMessage()]);
         }
     }
 

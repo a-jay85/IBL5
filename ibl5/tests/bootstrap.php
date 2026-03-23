@@ -49,6 +49,9 @@ if (is_link(__DIR__ . '/../vendor')) {
     }
 }
 
+// Use NullHandler logger in tests — no file I/O, no console output
+\Logging\LoggerFactory::forTests();
+
 // Now that autoloader is registered, define class aliases for backward compatibility
 // This maps the old global mock classes to the new namespaced ones
 class_alias('Tests\\Integration\\Mocks\\MockDatabase', 'MockDatabase');

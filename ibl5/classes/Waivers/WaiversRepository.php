@@ -73,7 +73,7 @@ class WaiversRepository extends BaseMysqliRepository implements WaiversRepositor
 
             return $affectedRows > 0;
         } catch (\RuntimeException $e) {
-            error_log("Failed to sign player from waivers: " . $e->getMessage());
+            \Logging\LoggerFactory::getChannel('db')->error('Failed to sign player from waivers', ['error' => $e->getMessage()]);
             return false;
         }
     }

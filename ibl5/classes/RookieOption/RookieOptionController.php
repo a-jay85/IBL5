@@ -42,21 +42,21 @@ class RookieOptionController implements RookieOptionControllerInterface
         // Validate player eligibility
         if (!$player->canRookieOption($season->phase)) {
             $errorMessage = "This player's experience doesn't match their rookie status; please let the commish know about this error.";
-            error_log("[RookieOption] Validation error for player ID {$playerID}: {$errorMessage}");
+            \Logging\LoggerFactory::getChannel('app')->warning('RookieOption validation error', ['player_id' => $playerID, 'error' => $errorMessage]);
             return ['success' => false, 'type' => 'validation_error', 'message' => $errorMessage, 'playerID' => $playerID];
         }
 
         // Determine which contract year to update based on draft round
         if ($player->draftRound !== 1 && $player->draftRound !== 2) {
             $errorMessage = "This player's experience doesn't match their rookie status; please let the commish know about this error.";
-            error_log("[RookieOption] Draft round validation error for player ID {$playerID}: Draft round {$player->draftRound} is invalid");
+            \Logging\LoggerFactory::getChannel('app')->warning('RookieOption draft round validation error', ['player_id' => $playerID, 'draft_round' => $player->draftRound]);
             return ['success' => false, 'type' => 'validation_error', 'message' => $errorMessage, 'playerID' => $playerID];
         }
 
         // Update player's contract
         if (!$this->repository->updatePlayerRookieOption($playerID, $player->draftRound, $extensionAmount)) {
             $errorMessage = "Failed to update player contract. Please contact the commissioner.";
-            error_log("[RookieOption] Database update failed for player ID {$playerID}, draft round {$player->draftRound}, extension amount {$extensionAmount}");
+            \Logging\LoggerFactory::getChannel('app')->error('RookieOption database update failed', ['player_id' => $playerID, 'draft_round' => $player->draftRound, 'extension_amount' => $extensionAmount]);
             return ['success' => false, 'type' => 'database_error', 'message' => $errorMessage, 'playerID' => $playerID];
         }
 

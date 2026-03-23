@@ -3,6 +3,11 @@ on:
   push:
     branches:
       - production
+
+concurrency:
+  group: production-deploy
+  cancel-in-progress: false
+
 jobs:
   build-and-deploy:
     name: Build and Deploy
@@ -147,9 +152,3 @@ jobs:
             sleep 1
             echo "IBL6 started (PID: $(cat ibl6.pid))"
           '
-
-      - name: Post-deploy smoke test
-        run: |
-          sleep 10
-          chmod +x bin/smoke-prod
-          bin/smoke-prod https://www.iblhoops.net

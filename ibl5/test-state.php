@@ -62,6 +62,7 @@ $db->set_charset('utf8mb4');
 // Allowlist of mutable settings
 $ALLOWLIST = [
     'Current Season Phase',
+    'Current Season Ending Year',
     'Allow Trades',
     'Allow Waiver Moves',
     'Show Draft Link',

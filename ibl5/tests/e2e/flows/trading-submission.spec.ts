@@ -282,7 +282,7 @@ test.describe('Trade submission: players-only (UI)', () => {
     appState,
     page,
   }) => {
-    await appState({ 'Allow Trades': 'Yes' });
+    await appState({ 'Allow Trades': 'Yes', 'Current Season Ending Year': '2026' });
 
     const fd = await findPartner(
       page,
@@ -291,13 +291,7 @@ test.describe('Trade submission: players-only (UI)', () => {
         getPartnerPlayerIndices(fd).length > 0,
     );
 
-    if (!fd) {
-      test.skip(
-        true,
-        'No trade partner with tradeable players on both sides',
-      );
-      return;
-    }
+    expect(fd, 'CI seed must provide a trade partner with tradeable players on both sides').toBeTruthy();
 
     // Page is already on the form — check one player from each roster
     const userCheckbox = page
@@ -318,15 +312,9 @@ test.describe('Trade submission: players-only (UI)', () => {
       'form[name="Trade_Offer"] button[type="submit"]',
     );
     await Promise.all([
-      page.waitForURL(/result=offer_sent|error=/),
+      page.waitForURL(/result=offer_sent/),
       submitBtn.click(),
     ]);
-
-    if (page.url().includes('error=')) {
-      // Cap validation or other server-side rejection — the form pipeline works correctly
-      test.skip(true, `Trade rejected by server: ${decodeURIComponent(page.url().split('error=')[1] ?? '')}`);
-      return;
-    }
 
     await expect(page.locator('.ibl-alert--success')).toBeVisible();
     await assertNoPhpErrors(page, 'after player trade submission');
@@ -363,7 +351,7 @@ test.describe('Trade submission: draft pick trade (API)', () => {
     page,
     request,
   }) => {
-    await appState({ 'Allow Trades': 'Yes' });
+    await appState({ 'Allow Trades': 'Yes', 'Current Season Ending Year': '2026' });
 
     const fd = await findPartner(
       page,
@@ -372,16 +360,13 @@ test.describe('Trade submission: draft pick trade (API)', () => {
         getPartnerPlayerIndices(fd).length > 0,
     );
 
-    if (!fd) {
-      test.skip(true, 'No partner with user pick + partner player');
-      return;
-    }
+    expect(fd, 'CI seed must provide a partner with user pick + partner player').toBeTruthy();
 
     const existingIds = await collectAllOfferIds(page);
 
-    const pickIdx = getUserPickIndices(fd)[0];
-    const partnerIdx = getPartnerPlayerIndices(fd)[0];
-    const body = buildFormBody(fd, [pickIdx, partnerIdx]);
+    const pickIdx = getUserPickIndices(fd!)[0];
+    const partnerIdx = getPartnerPlayerIndices(fd!)[0];
+    const body = buildFormBody(fd!, [pickIdx, partnerIdx]);
     const location = await submitOffer(request, body);
 
     // Accept either success or cap/validation error — both prove the pipeline works
@@ -413,25 +398,19 @@ test.describe('Trade submission: cash-only trade (API)', () => {
     page,
     request,
   }) => {
-    await appState({ 'Allow Trades': 'Yes' });
+    await appState({ 'Allow Trades': 'Yes', 'Current Season Ending Year': '2026' });
 
     // Any partner works for a cash-only trade
     const fd = await findPartner(page, () => true);
-    if (!fd) {
-      test.skip(true, 'No trade partner available');
-      return;
-    }
+    expect(fd, 'CI seed must provide a trade partner').toBeTruthy();
 
     const existingIds = await collectAllOfferIds(page);
 
-    const cashYear = fd.cashStartYear;
-    const body = buildFormBody(fd, [], { [cashYear]: 200 });
+    const cashYear = fd!.cashStartYear;
+    const body = buildFormBody(fd!, [], { [cashYear]: 200 });
     const location = await submitOffer(request, body);
 
-    if (location.includes('error=')) {
-      test.skip(true, `Cash trade rejected: ${decodeURIComponent(location.split('error=')[1]?.split('&')[0] ?? '')}`);
-      return;
-    }
+    // CI seed provides teams under cap — cash trade must succeed
     expect(location).toContain('result=offer_sent');
 
     createdOfferIds = await collectNewOfferIds(page, existingIds);
@@ -456,7 +435,7 @@ test.describe('Trade submission: mixed trade (API)', () => {
     page,
     request,
   }) => {
-    await appState({ 'Allow Trades': 'Yes' });
+    await appState({ 'Allow Trades': 'Yes', 'Current Season Ending Year': '2026' });
 
     const fd = await findPartner(
       page,
@@ -464,18 +443,15 @@ test.describe('Trade submission: mixed trade (API)', () => {
         getUserPlayerIndices(fd).length > 0 &&
         getPartnerPlayerIndices(fd).length > 0,
     );
-    if (!fd) {
-      test.skip(true, 'No partner with tradeable players on both sides');
-      return;
-    }
+    expect(fd, 'CI seed must provide a partner with tradeable players on both sides').toBeTruthy();
 
     const existingIds = await collectAllOfferIds(page);
 
-    const userIdx = getUserPlayerIndices(fd)[0];
-    const partnerIdx = getPartnerPlayerIndices(fd)[0];
-    const cashYear = fd.cashStartYear;
+    const userIdx = getUserPlayerIndices(fd!)[0];
+    const partnerIdx = getPartnerPlayerIndices(fd!)[0];
+    const cashYear = fd!.cashStartYear;
     const body = buildFormBody(
-      fd,
+      fd!,
       [userIdx, partnerIdx],
       { [cashYear]: 100 },
       { [cashYear]: 150 },
@@ -509,17 +485,14 @@ test.describe('Trade submission: validation errors', () => {
     page,
     request,
   }) => {
-    await appState({ 'Allow Trades': 'Yes' });
+    await appState({ 'Allow Trades': 'Yes', 'Current Season Ending Year': '2026' });
 
     const fd = await findPartner(page, () => true);
-    if (!fd) {
-      test.skip(true, 'No trade partner available');
-      return;
-    }
+    expect(fd, 'CI seed must provide a trade partner').toBeTruthy();
 
-    const cashYear = fd.cashStartYear;
+    const cashYear = fd!.cashStartYear;
     // 50 is below the 100 minimum
-    const body = buildFormBody(fd, [], { [cashYear]: 50 });
+    const body = buildFormBody(fd!, [], { [cashYear]: 50 });
     const location = await submitOffer(request, body);
     expect(location).toContain('error=');
 
@@ -538,6 +511,7 @@ test.describe('Trade submission: validation errors', () => {
     await appState({
       'Allow Trades': 'No',
       'Current Season Phase': 'Regular Season',
+      'Current Season Ending Year': '2026',
     });
     await gotoWithRetry(page, 'modules.php?name=Trading');
 
@@ -568,7 +542,7 @@ test.describe('Trade submission: accept and reject', () => {
     page,
     request,
   }) => {
-    await appState({ 'Allow Trades': 'Yes' });
+    await appState({ 'Allow Trades': 'Yes', 'Current Season Ending Year': '2026' });
 
     const fd = await findPartner(
       page,
@@ -577,31 +551,24 @@ test.describe('Trade submission: accept and reject', () => {
         getPartnerPlayerIndices(fd).length >= 2,
     );
 
-    if (!fd) {
-      test.skip(true, 'No partner with 2+ tradeable players on each side');
-      return;
-    }
+    expect(fd, 'CI seed must provide a partner with 2+ tradeable players on each side').toBeTruthy();
 
-    offeringTeam = fd.offeringTeam;
-    listeningTeam = fd.listeningTeam;
+    offeringTeam = fd!.offeringTeam;
+    listeningTeam = fd!.listeningTeam;
 
     const existingIds = await collectAllOfferIds(page);
-    const userPlayers = getUserPlayerIndices(fd);
-    const partnerPlayers = getPartnerPlayerIndices(fd);
+    const userPlayers = getUserPlayerIndices(fd!);
+    const partnerPlayers = getPartnerPlayerIndices(fd!);
 
-    const bodyA = buildFormBody(fd, [userPlayers[0], partnerPlayers[0]]);
+    const bodyA = buildFormBody(fd!, [userPlayers[0], partnerPlayers[0]]);
     const locationA = await submitOffer(request, bodyA);
 
-    const bodyB = buildFormBody(fd, [userPlayers[1], partnerPlayers[1]]);
+    const bodyB = buildFormBody(fd!, [userPlayers[1], partnerPlayers[1]]);
     const locationB = await submitOffer(request, bodyB);
 
-    if (
-      !locationA.includes('result=offer_sent') ||
-      !locationB.includes('result=offer_sent')
-    ) {
-      test.skip(true, `Trade offers rejected by cap validation — A: ${locationA.split('error=')[1]?.split('&')[0] ?? 'ok'}, B: ${locationB.split('error=')[1]?.split('&')[0] ?? 'ok'}`);
-      return;
-    }
+    // CI seed provides teams under cap — both offers must succeed
+    expect(locationA).toContain('result=offer_sent');
+    expect(locationB).toContain('result=offer_sent');
 
     const newIds = await collectNewOfferIds(page, existingIds);
     newIds.sort((a, b) => a - b);
@@ -612,12 +579,9 @@ test.describe('Trade submission: accept and reject', () => {
   });
 
   test('reject offer via UI', async ({ appState, page }) => {
-    if (!setupDone) {
-      test.skip(true, 'Setup test did not create offers');
-      return;
-    }
+    expect(setupDone, 'Setup test must have created offers').toBe(true);
 
-    await appState({ 'Allow Trades': 'Yes' });
+    await appState({ 'Allow Trades': 'Yes', 'Current Season Ending Year': '2026' });
     await gotoWithRetry(page, 'modules.php?name=Trading&op=reviewtrade');
 
     const offerBCard = page.locator('.trade-offer-card').filter({
@@ -640,12 +604,9 @@ test.describe('Trade submission: accept and reject', () => {
     request,
     page,
   }) => {
-    if (!setupDone) {
-      test.skip(true, 'Setup test did not create offers');
-      return;
-    }
+    expect(setupDone, 'Setup test must have created offers').toBe(true);
 
-    await appState({ 'Allow Trades': 'Yes' });
+    await appState({ 'Allow Trades': 'Yes', 'Current Season Ending Year': '2026' });
 
     const response = await request.post(
       '/ibl5/modules/Trading/rejecttradeoffer.php',
@@ -666,7 +627,7 @@ test.describe('Trade submission: accept and reject', () => {
   });
 
   test('accept offer via UI', async ({ appState, page, request }) => {
-    await appState({ 'Allow Trades': 'Yes' });
+    await appState({ 'Allow Trades': 'Yes', 'Current Season Ending Year': '2026' });
     await gotoWithRetry(page, 'modules.php?name=Trading&op=reviewtrade');
 
     // Find any offer card with an Accept button (user has the "hammer").
@@ -676,10 +637,7 @@ test.describe('Trade submission: accept and reject', () => {
       has: page.locator('.ibl-btn--success'),
     });
 
-    if ((await acceptableCard.count()) === 0) {
-      test.skip(true, 'No offers with Accept button (user lacks hammer)');
-      return;
-    }
+    expect(await acceptableCard.count(), 'CI seed must provide offers with Accept button').toBeGreaterThan(0);
 
     const acceptBtn = acceptableCard.first().locator('.ibl-btn--success');
 
@@ -704,7 +662,7 @@ test.describe('Trade submission: accept and reject', () => {
 
 test.describe('Trade review page: no PHP errors after mutations', () => {
   test('review page has no PHP errors', async ({ appState, page }) => {
-    await appState({ 'Allow Trades': 'Yes' });
+    await appState({ 'Allow Trades': 'Yes', 'Current Season Ending Year': '2026' });
     await gotoWithRetry(page, 'modules.php?name=Trading&op=reviewtrade');
     await assertNoPhpErrors(page, 'on review page after mutations');
   });

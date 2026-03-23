@@ -17,7 +17,7 @@ const PAGES = [
   { name: 'season leaderboards', url: 'modules.php?name=SeasonLeaderboards', selector: '.ibl-data-table', hasWideTables: true },
   { name: 'career leaderboards', url: 'modules.php?name=CareerLeaderboards', selector: '.ibl-title, .ibl-data-table', hasWideTables: false },
   { name: 'draft history', url: 'modules.php?name=DraftHistory', selector: '.ibl-data-table', hasWideTables: true },
-  { name: 'cap space', url: 'modules.php?name=CapSpace', selector: '.ibl-data-table, .sticky-table, table', hasWideTables: false, dataDependentSkip: true },
+  { name: 'cap space', url: 'modules.php?name=CapSpace', selector: '.ibl-data-table, .sticky-table, table', hasWideTables: false },
   { name: 'schedule', url: 'modules.php?name=Schedule', selector: '.schedule-container, .ibl-data-table, table', hasWideTables: false },
   { name: 'injuries', url: 'modules.php?name=Injuries', selector: '.ibl-title, h2, h3', hasWideTables: false },
   { name: 'player database', url: 'modules.php?name=PlayerDatabase', selector: 'form[name="Search"]', hasWideTables: false },
@@ -39,11 +39,11 @@ const PAGES = [
   { name: 'team off/def stats', url: 'modules.php?name=TeamOffDefStats', selector: '.ibl-data-table, .ibl-title', hasWideTables: true },
   { name: 'transaction history', url: 'modules.php?name=TransactionHistory', selector: '.ibl-title, .ibl-data-table, table', hasWideTables: false },
   { name: 'search', url: 'modules.php?name=Search', selector: 'input[type="radio"]', hasWideTables: false, skipOverflow: true },
-  { name: 'boxscore', url: 'modules.php?name=Boxscore&boxid=1', selector: '.ibl-data-table, table', hasWideTables: false, dataDependentSkip: true },
+  { name: 'boxscore', url: 'modules.php?name=Boxscore&boxid=1', selector: '.ibl-data-table, table', hasWideTables: false },
   { name: 'season archive', url: 'modules.php?name=SeasonArchive', selector: '.ibl-title, .ibl-data-table, table', hasWideTables: false },
   { name: 'one-on-one game', url: 'modules.php?name=OneOnOneGame', selector: '#pid1', hasWideTables: false, skipOverflow: true },
   { name: 'topics', url: 'modules.php?name=Topics', selector: '.ibl-title, table, a', hasWideTables: false, skipOverflow: true },
-  { name: 'news', url: 'modules.php?name=News', selector: '.ibl-title, .story-title, table', hasWideTables: false, dataDependentSkip: true },
+  { name: 'news', url: 'modules.php?name=News', selector: '.ibl-title, .story-title, table', hasWideTables: false },
 ] as const;
 
 test.describe('Mobile public page smoke tests', () => {
@@ -55,15 +55,6 @@ test.describe('Mobile public page smoke tests', () => {
     test(`${pageInfo.name} — no horizontal overflow on mobile`, async ({ page }) => {
       test.setTimeout(60_000);
       await gotoWithRetry(page, pageInfo.url);
-
-      // Data-dependent skip — content may not exist in seed data
-      if (pageInfo.dataDependentSkip) {
-        const table = page.locator(pageInfo.selector).first();
-        const visible = await table.isVisible().catch(() => false);
-        if (!visible) {
-          test.skip(true, `${pageInfo.name} rendered no content (local DB state)`);
-        }
-      }
 
       await expect(page.locator(pageInfo.selector).first()).toBeVisible();
 
@@ -87,12 +78,7 @@ test.describe('Mobile public page smoke tests', () => {
   test('draft history year detail — no horizontal overflow on mobile', async ({ page }) => {
     test.setTimeout(60_000);
     await gotoWithRetry(page, 'modules.php?name=DraftHistory&year=2026');
-    // CI seed has 2026 draft picks; local DB may not — skip if no table rendered
     const table = page.locator('.ibl-data-table').first();
-    const visible = await table.isVisible().catch(() => false);
-    if (!visible) {
-      test.skip(true, 'draft history year 2026 has no data (local DB state)');
-    }
     await expect(table).toBeVisible();
     await assertNoHorizontalOverflow(page, 'on draft history year detail');
     await assertScrollWrappersPresent(page, 'on draft history year detail');

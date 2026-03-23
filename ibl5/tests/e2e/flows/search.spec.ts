@@ -101,19 +101,12 @@ test.describe('Search flow', () => {
 
     await assertNoPhpErrors(page);
 
-    // Check for pagination links
+    // CI seed has enough stories for pagination
     const pagination = page.locator('.search-pagination');
-    const results = page.locator('.search-result');
+    await expect(pagination).toBeVisible();
 
-    if ((await results.count()) > 0) {
-      // If there are results, pagination may or may not be present
-      // depending on result count
-      const paginationVisible = await pagination.isVisible().catch(() => false);
-      if (paginationVisible) {
-        const nextLink = page.locator('.search-pagination__link--next');
-        await expect(nextLink).toBeVisible();
-      }
-    }
+    const nextLink = page.locator('.search-pagination__link--next');
+    await expect(nextLink).toBeVisible();
   });
 
   test('pagination Next link navigates to offset page', async ({ page }) => {
@@ -121,11 +114,7 @@ test.describe('Search flow', () => {
     await page.locator('.ibl-search__btn').click();
 
     const nextLink = page.locator('.search-pagination__link--next');
-    const hasNext = await nextLink.isVisible().catch(() => false);
-
-    if (!hasNext) {
-      test.skip(true, 'Not enough search results for pagination test');
-    }
+    await expect(nextLink).toBeVisible();
 
     const href = await nextLink.getAttribute('href');
     await page.goto(href!);

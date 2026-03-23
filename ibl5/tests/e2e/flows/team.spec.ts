@@ -142,12 +142,6 @@ test.describe('Team page: dropdown content changes', () => {
   test('split option (home) loads table', async ({ page }) => {
     const dropdown = page.locator('.ibl-view-select').first();
 
-    // Check if split:home option exists
-    const homeOption = dropdown.locator('option[value="split:home"]');
-    if ((await homeOption.count()) === 0) {
-      test.skip(true, 'No split:home option in dropdown');
-    }
-
     await dropdown.selectOption('split:home');
     await expect(page.locator('.ibl-data-table, table').first()).toBeVisible();
     await assertNoPhpErrors(page, 'after switching to split:home');

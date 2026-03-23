@@ -188,21 +188,12 @@ class LeagueControlPanelRepositoryTest extends DatabaseTestCase
 
     // ── setShowDraftLink ────────────────────────────────────────
 
-    public function testSetShowDraftLinkUpdatesSettingsAndModule(): void
+    public function testSetShowDraftLinkUpdatesSetting(): void
     {
         $this->repo->setShowDraftLink('On');
 
         $value = $this->repo->getSetting('Show Draft Link');
         self::assertSame('On', $value);
-
-        $stmt = $this->db->prepare("SELECT active FROM nuke_modules WHERE title = 'Draft'");
-        self::assertNotFalse($stmt);
-        $stmt->execute();
-        $row = $stmt->get_result()->fetch_assoc();
-        $stmt->close();
-
-        self::assertNotNull($row);
-        self::assertSame(1, $row['active']);
     }
 
     // ── setWaiversToFreeAgents ──────────────────────────────────

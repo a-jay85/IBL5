@@ -10,7 +10,7 @@ use Season\Season;
 /**
  * ModuleAccessControl - Derives module availability from Season phase and settings
  *
- * Replaces the legacy nuke_modules active/view flags with phase-based access control.
+ * Phase-based access control for IBL modules.
  * Combines season phase restrictions, trivia mode, and league context checks.
  */
 class ModuleAccessControl

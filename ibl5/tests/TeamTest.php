@@ -1,8 +1,8 @@
 <?php
 
 declare(strict_types=1);
-use Team\Team;
 
+use Team\Team;
 
 /**
  * TeamTest - Tests for Team class

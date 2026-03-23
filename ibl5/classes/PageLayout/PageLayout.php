@@ -24,7 +24,9 @@ class PageLayout
 
         online();
         self::renderHead();
-        include "includes/counter.php";
+        if (isset($GLOBALS['mysqli_db']) && $GLOBALS['mysqli_db'] instanceof \mysqli) {
+            (new \SiteStatistics\StatisticsRepository($GLOBALS['mysqli_db']))->recordHit();
+        }
         if (
             isset($_SESSION['flash_success'])
             && is_string($_SESSION['flash_success'])

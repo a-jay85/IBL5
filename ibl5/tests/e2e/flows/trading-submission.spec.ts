@@ -632,10 +632,18 @@ test.describe('Trade submission: accept and reject', () => {
 
     await appState({ 'Allow Trades': 'Yes', 'Current Season Ending Year': '2026' });
 
+    // Navigate to review page to get a CSRF token from a reject form
+    await gotoWithRetry(page, 'modules.php?name=Trading&op=reviewtrade');
+    const rejectToken = await page
+      .locator('form[name="tradereject"] input[name="_csrf_token"]')
+      .first()
+      .getAttribute('value') ?? '';
+
     const response = await request.post(
       '/ibl5/modules/Trading/rejecttradeoffer.php',
       {
         form: {
+          _csrf_token: rejectToken,
           offer: String(offerBId),
           teamRejecting: offeringTeam,
           teamReceiving: listeningTeam,

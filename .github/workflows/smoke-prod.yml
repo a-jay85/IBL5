@@ -81,9 +81,13 @@ jobs:
         if: steps.check.outputs.should_revert == 'true'
         continue-on-error: true
         run: |
-          git revert HEAD --no-edit
+          PARENT_COUNT=$(git cat-file -p HEAD | grep -c "^parent ")
+          if [ "$PARENT_COUNT" -gt 1 ]; then
+            git revert HEAD -m 1 --no-edit
+          else
+            git revert HEAD --no-edit
+          fi
           git push origin production
-          echo "Reverted: ${{ steps.check.outputs.commit_msg }}"
 
       - name: Setup SSH
         run: |
@@ -95,23 +99,29 @@ jobs:
           DEPLOY_KEY: ${{ secrets.PRIVATE_KEY }}
 
       - name: Send Discord DM
+        env:
+          COMMIT_MSG: ${{ steps.check.outputs.commit_msg }}
+          COMMIT_SHA: ${{ steps.check.outputs.commit_sha }}
+          SHOULD_REVERT: ${{ steps.check.outputs.should_revert }}
+          REVERT_OUTCOME: ${{ steps.revert.outcome }}
+          OWNER_DISCORD_ID: ${{ secrets.OWNER_DISCORD_ID }}
         run: |
           RUN_URL="https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
-          COMMIT="${{ steps.check.outputs.commit_sha }}"
-          SHORT_SHA="${COMMIT:0:7}"
+          SHORT_SHA="${COMMIT_SHA:0:7}"
 
-          if [ "${{ steps.check.outputs.should_revert }}" = "false" ]; then
-            MSG="Production smoke test FAILED but HEAD is already a revert — manual intervention required.\n\nCommit: ${SHORT_SHA}\nRun: ${RUN_URL}"
-          elif [ "${{ steps.revert.outcome }}" = "failure" ]; then
-            MSG="Production smoke test FAILED and auto-revert FAILED (push rejected?) — manual intervention required.\n\nCommit: ${SHORT_SHA}\nRun: ${RUN_URL}"
+          if [ "$SHOULD_REVERT" = "false" ]; then
+            MSG=$(printf 'Production smoke test FAILED but HEAD is already a revert — manual intervention required.\n\nCommit: %s\nRun: %s' "$SHORT_SHA" "$RUN_URL")
+          elif [ "$REVERT_OUTCOME" = "failure" ]; then
+            MSG=$(printf 'Production smoke test FAILED and auto-revert FAILED (push rejected?) — manual intervention required.\n\nCommit: %s\nRun: %s' "$SHORT_SHA" "$RUN_URL")
           else
-            MSG="Production smoke test FAILED after deploy. Auto-reverted commit ${SHORT_SHA}. A recovery deploy is in progress.\n\nReverted: ${{ steps.check.outputs.commit_msg }}\nRun: ${RUN_URL}"
+            MSG=$(printf 'Production smoke test FAILED after deploy. Auto-reverted commit %s. A recovery deploy is in progress.\n\nReverted: %s\nRun: %s' "$SHORT_SHA" "$COMMIT_MSG" "$RUN_URL")
           fi
 
-          ssh -p ${{ secrets.PORT }} -i ~/.ssh/id_deploy ${{ secrets.USERNAME }}@${{ secrets.HOST }} \
-            "curl -s --max-time 10 -X POST http://localhost:50000/discordDM \
-              -H 'Content-Type: application/json' \
-              -d '{\"content\":{\"receivingUserDiscordID\":\"${{ secrets.OWNER_DISCORD_ID }}\",\"message\":\"${MSG}\"}}'" \
+          PAYLOAD=$(jq -n --arg id "$OWNER_DISCORD_ID" --arg msg "$MSG" \
+            '{content: {receivingUserDiscordID: $id, message: $msg}}')
+
+          echo "$PAYLOAD" | ssh -p ${{ secrets.PORT }} -i ~/.ssh/id_deploy ${{ secrets.USERNAME }}@${{ secrets.HOST }} \
+            'curl -s --max-time 10 -X POST http://localhost:50000/discordDM -H "Content-Type: application/json" -d @-' \
             || echo "IBLbot notification failed (bot may be down)"
 
   notify-scheduled-failure:
@@ -135,13 +145,16 @@ jobs:
           DEPLOY_KEY: ${{ secrets.PRIVATE_KEY }}
 
       - name: Send Discord DM
+        env:
+          OWNER_DISCORD_ID: ${{ secrets.OWNER_DISCORD_ID }}
         run: |
           RUN_URL="https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
           TRIGGER="${{ github.event_name }}"
-          MSG="Production smoke test FAILED (${TRIGGER} trigger — no auto-rollback).\n\nThis may be a transient issue. Check the run for details: ${RUN_URL}"
+          MSG=$(printf 'Production smoke test FAILED (%s trigger — no auto-rollback).\n\nThis may be a transient issue. Check the run for details: %s' "$TRIGGER" "$RUN_URL")
 
-          ssh -p ${{ secrets.PORT }} -i ~/.ssh/id_deploy ${{ secrets.USERNAME }}@${{ secrets.HOST }} \
-            "curl -s --max-time 10 -X POST http://localhost:50000/discordDM \
-              -H 'Content-Type: application/json' \
-              -d '{\"content\":{\"receivingUserDiscordID\":\"${{ secrets.OWNER_DISCORD_ID }}\",\"message\":\"${MSG}\"}}'" \
+          PAYLOAD=$(jq -n --arg id "$OWNER_DISCORD_ID" --arg msg "$MSG" \
+            '{content: {receivingUserDiscordID: $id, message: $msg}}')
+
+          echo "$PAYLOAD" | ssh -p ${{ secrets.PORT }} -i ~/.ssh/id_deploy ${{ secrets.USERNAME }}@${{ secrets.HOST }} \
+            'curl -s --max-time 10 -X POST http://localhost:50000/discordDM -H "Content-Type: application/json" -d @-' \
             || echo "IBLbot notification failed (bot may be down)"

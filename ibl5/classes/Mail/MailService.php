@@ -146,7 +146,7 @@ class MailService implements MailServiceInterface
 
             return $mail->send();
         } catch (PHPMailerException $e) {
-            error_log('[MailService] SMTP send failed: ' . $e->getMessage());
+            \Logging\LoggerFactory::getChannel('mail')->error('SMTP send failed', ['error' => $e->getMessage()]);
             return false;
         }
     }
@@ -162,14 +162,12 @@ class MailService implements MailServiceInterface
 
     private function sendViaLog(string $to, string $subject, string $body, string $fromEmail): bool
     {
-        error_log(sprintf(
-            '[MailService] LOG transport — To: %s | From: %s | Subject: %s | Body length: %d',
-            $to,
-            $fromEmail,
-            $subject,
-            strlen($body)
-        ));
-        error_log('[MailService] Body: ' . $body);
+        \Logging\LoggerFactory::getChannel('mail')->info('LOG transport — mail sent', [
+            'to' => $to,
+            'from' => $fromEmail,
+            'subject' => $subject,
+            'body_length' => strlen($body),
+        ]);
         return true;
     }
 

@@ -46,7 +46,7 @@ class TradeOffer implements TradeOfferInterface
             $this->discord = new \Discord($db);
         } catch (\Exception $e) {
             // Discord unavailable - will skip notifications
-            error_log("Discord initialization failed in TradeOffer: " . $e->getMessage());
+            \Logging\LoggerFactory::getChannel('trade')->warning('Discord initialization failed in TradeOffer', ['error' => $e->getMessage()]);
             $this->discord = null;
         }
     }
@@ -484,7 +484,7 @@ class TradeOffer implements TradeOfferInterface
     {
         // Skip notification if Discord is not available
         if ($this->discord === null) {
-            error_log("Trade #{$tradeOfferId}: Discord notification skipped — Discord class not initialized");
+            \Logging\LoggerFactory::getChannel('trade')->warning('Discord notification skipped: Discord class not initialized', ['trade_id' => $tradeOfferId]);
             return;
         }
 
@@ -495,7 +495,7 @@ class TradeOffer implements TradeOfferInterface
             $receivingUserDiscordID = $this->discord->getDiscordIDFromTeamname($listeningTeamName);
 
             if ($receivingUserDiscordID === '' || $receivingUserDiscordID === '0') {
-                error_log("Trade #{$tradeOfferId}: Discord notification skipped — no Discord ID for team '{$listeningTeamName}'");
+                \Logging\LoggerFactory::getChannel('trade')->warning('Discord notification skipped: no Discord ID for team', ['trade_id' => $tradeOfferId, 'team' => $listeningTeamName]);
                 return;
             }
 
@@ -503,7 +503,7 @@ class TradeOffer implements TradeOfferInterface
 
             \Discord::sendTradeDM($receivingUserDiscordID, $tradeOfferId, $offeringTeamName, $cleanTradeText);
         } catch (\Exception $e) {
-            error_log("Trade #{$tradeOfferId}: Discord notification failed — " . $e->getMessage());
+            \Logging\LoggerFactory::getChannel('trade')->error('Discord notification failed', ['trade_id' => $tradeOfferId, 'error' => $e->getMessage()]);
         }
     }
 }

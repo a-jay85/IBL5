@@ -93,7 +93,7 @@ class SharedRepository extends \BaseMysqliRepository implements SharedRepository
             );
         } catch (\Exception $e) {
             $errorMessage = 'Failed to reset sim contract extension attempts: ' . $e->getMessage();
-            error_log("[Shared] Database error: {$errorMessage}");
+            \Logging\LoggerFactory::getChannel('db')->error('SharedRepository database error', ['error' => $errorMessage]);
             throw new \RuntimeException($errorMessage, 1002);
         }
     }

@@ -42,7 +42,8 @@ class ETagHandler
      */
     public function matches(string $etag): bool
     {
-        $ifNoneMatch = $_SERVER['HTTP_IF_NONE_MATCH'] ?? '';
+        $headerValue = $_SERVER['HTTP_IF_NONE_MATCH'] ?? '';
+        $ifNoneMatch = is_string($headerValue) ? $headerValue : '';
 
         return $this->stripWeakPrefix($ifNoneMatch) === $this->stripWeakPrefix($etag);
     }

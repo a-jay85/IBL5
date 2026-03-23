@@ -56,7 +56,7 @@ function tradereview($username)
 function reviewtrade($user)
 {
     global $mysqli_db;
-    $season = new Season($mysqli_db);
+    $season = new \Season\Season($mysqli_db);
 
     if (!is_user($user)) {
         loginbox();

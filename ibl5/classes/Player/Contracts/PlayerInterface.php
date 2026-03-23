@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Player\Contracts;
 
 use Player\PlayerData;
+use Season\Season;
 
 /**
  * PlayerInterface - Contract for the Player facade
@@ -163,10 +164,10 @@ interface PlayerInterface
      * Calculates: draftYear + yearsOfExperience + contractTotalYears - contractCurrentYear
      * If this equals the season's ending year, the player becomes a free agent.
      *
-     * @param int|\Season $season Season object or ending year to check
+     * @param int|Season $season Season object or ending year to check
      * @return bool True if player becomes free agent in this season
      */
-    public function isPlayerFreeAgent(int|\Season $season): bool;
+    public function isPlayerFreeAgent(int|Season $season): bool;
 
     /**
      * Check if a player's rookie option was previously exercised

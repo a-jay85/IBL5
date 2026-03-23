@@ -6,6 +6,7 @@ namespace Draft;
 
 use Draft\Contracts\DraftSelectionHandlerInterface;
 use Shared\Contracts\SharedRepositoryInterface;
+use Season\Season;
 
 /**
  * @see DraftSelectionHandlerInterface
@@ -19,9 +20,9 @@ class DraftSelectionHandler implements DraftSelectionHandlerInterface
     private DraftProcessor $processor;
     private DraftView $view;
     private SharedRepositoryInterface $sharedRepository;
-    private \Season $season;
+    private Season $season;
 
-    public function __construct(\mysqli $db, SharedRepositoryInterface $sharedRepository, \Season $season)
+    public function __construct(\mysqli $db, SharedRepositoryInterface $sharedRepository, Season $season)
     {
         $this->db = $db;
         $this->sharedRepository = $sharedRepository;

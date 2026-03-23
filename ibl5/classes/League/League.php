@@ -6,7 +6,7 @@ namespace League;
 
 use BaseMysqliRepository;
 use JSB;
-use Season;
+use Season\Season;
 
 /**
  * League - IBL league-wide operations and queries

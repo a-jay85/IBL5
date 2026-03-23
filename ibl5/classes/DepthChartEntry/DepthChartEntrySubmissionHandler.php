@@ -6,6 +6,7 @@ namespace DepthChartEntry;
 
 use DepthChartEntry\Contracts\DepthChartEntrySubmissionHandlerInterface;
 use SavedDepthChart\SavedDepthChartService;
+use Season\Season;
 
 /**
  * @phpstan-import-type ProcessedPlayerData from Contracts\DepthChartEntryProcessorInterface
@@ -38,7 +39,7 @@ class DepthChartEntrySubmissionHandler implements DepthChartEntrySubmissionHandl
      */
     public function handleSubmission(array $postData): void
     {
-        $season = new \Season($this->db);
+        $season = new Season($this->db);
 
         /** @var string $rawTeamName */
         $rawTeamName = $postData['Team_Name'] ?? '';
@@ -92,7 +93,7 @@ class DepthChartEntrySubmissionHandler implements DepthChartEntrySubmissionHandl
      *
      * @param array<string, mixed> $postData
      */
-    private function saveDepthChartSnapshot(string $teamName, array $postData, \Season $season): void
+    private function saveDepthChartSnapshot(string $teamName, array $postData, Season $season): void
     {
         try {
             $commonRepo = new \Services\CommonMysqliRepository($this->db);

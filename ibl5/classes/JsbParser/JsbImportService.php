@@ -6,6 +6,7 @@ namespace JsbParser;
 
 use JsbParser\Contracts\JsbImportRepositoryInterface;
 use JsbParser\Contracts\JsbImportServiceInterface;
+use Season\Season;
 
 /**
  * Orchestrator service for JSB file parsing and database import.
@@ -36,7 +37,7 @@ class JsbImportService implements JsbImportServiceInterface
     /**
      * @see JsbImportServiceInterface::processCurrentSeason()
      */
-    public function processCurrentSeason(string $basePath, \Season $season, string $filePrefix = 'IBL5'): JsbImportResult
+    public function processCurrentSeason(string $basePath, Season $season, string $filePrefix = 'IBL5'): JsbImportResult
     {
         $result = new JsbImportResult();
         $seasonYear = $season->beginningYear;

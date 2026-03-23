@@ -3,8 +3,8 @@
 declare(strict_types=1);
 
 namespace Waivers;
+use Season\Season;
 
-use Season;
 use Player\Player;
 use Player\PlayerContractCalculator;
 use Services\PlayerDataConverter;

@@ -8,6 +8,7 @@ use CapSpace\Contracts\CapSpaceRepositoryInterface;
 use League\League;
 use Team\Contracts\TeamQueryRepositoryInterface;
 use Team\Team;
+use Season\Season;
 
 /**
  * CapSpaceService - Business logic for salary cap information
@@ -45,10 +46,10 @@ class CapSpaceService
     /**
      * Get processed cap data for all teams
      *
-     * @param \Season $season Current season
+     * @param Season $season Current season
      * @return list<CapSpaceTeamData> Processed team cap data
      */
-    public function getTeamsCapData(\Season $season): array
+    public function getTeamsCapData(Season $season): array
     {
         $teams = $this->repository->getAllTeams();
         $teamsData = [];
@@ -65,10 +66,10 @@ class CapSpaceService
      * Process salary cap data for a single team
      *
      * @param Team $team Team object
-     * @param \Season $season Current season
+     * @param Season $season Current season
      * @return CapSpaceTeamData Processed cap data for the team
      */
-    protected function processTeamCapData(Team $team, \Season $season): array
+    protected function processTeamCapData(Team $team, Season $season): array
     {
         $salaryCapSpent = $this->teamQueryRepo->getSalaryCapArray($team->name, $team->teamID, $season);
         $freeAgencySlots = 15;
@@ -122,10 +123,10 @@ class CapSpaceService
     /**
      * Get adjusted years for header display based on season phase
      *
-     * @param \Season $season Current season
+     * @param Season $season Current season
      * @return DisplayYears Beginning and ending years
      */
-    public function getDisplayYears(\Season $season): array
+    public function getDisplayYears(Season $season): array
     {
         $beginningYear = $season->isOffseasonPhase()
             ? $season->beginningYear + 1

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Player;
 
 use Player\Contracts\PlayerInterface;
+use Season\Season;
 
 /**
  * Player - Facade for player-related operations
@@ -531,11 +532,11 @@ class Player implements PlayerInterface
     /**
      * @see PlayerInterface::isPlayerFreeAgent()
      *
-     * @param int|\Season $season Season object or ending year to check
+     * @param int|Season $season Season object or ending year to check
      */
-    public function isPlayerFreeAgent(int|\Season $season): bool
+    public function isPlayerFreeAgent(int|Season $season): bool
     {
-        if ($season instanceof \Season) {
+        if ($season instanceof Season) {
             return $this->contractValidator->isPlayerFreeAgent($this->getPlayerData(), $season);
         }
 

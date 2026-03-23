@@ -7,6 +7,7 @@ namespace Api\Controller;
 use Api\Cache\ETagHandler;
 use Api\Contracts\ControllerInterface;
 use Api\Response\JsonResponder;
+use Season\Season;
 
 class SeasonController implements ControllerInterface
 {
@@ -22,7 +23,7 @@ class SeasonController implements ControllerInterface
      */
     public function handle(array $params, array $query, JsonResponder $responder, ?array $body = null): void
     {
-        $season = new \Season($this->db);
+        $season = new Season($this->db);
         $etag = new ETagHandler();
 
         $phaseSimNumber = $season->getPhaseSpecificSimNumber();

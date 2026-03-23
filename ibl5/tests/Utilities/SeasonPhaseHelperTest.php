@@ -6,6 +6,7 @@ namespace Tests\Utilities;
 
 use PHPUnit\Framework\TestCase;
 use Utilities\SeasonPhaseHelper;
+use Season\Season;
 
 /**
  * SeasonPhaseHelperTest - Tests for season phase utilities
@@ -15,25 +16,25 @@ class SeasonPhaseHelperTest extends TestCase
     public function testGetMonthForHEATPhase(): void
     {
         $result = SeasonPhaseHelper::getMonthForPhase('HEAT');
-        $this->assertEquals(\Season::IBL_HEAT_MONTH, $result);
+        $this->assertEquals(Season::IBL_HEAT_MONTH, $result);
     }
 
     public function testGetMonthForRegularSeasonPhase(): void
     {
         $result = SeasonPhaseHelper::getMonthForPhase('Regular Season');
-        $this->assertEquals(\Season::IBL_REGULAR_SEASON_STARTING_MONTH, $result);
+        $this->assertEquals(Season::IBL_REGULAR_SEASON_STARTING_MONTH, $result);
     }
 
     public function testGetMonthForPreseasonPhase(): void
     {
         $result = SeasonPhaseHelper::getMonthForPhase('Preseason');
-        $this->assertEquals(\Season::IBL_REGULAR_SEASON_STARTING_MONTH, $result);
+        $this->assertEquals(Season::IBL_REGULAR_SEASON_STARTING_MONTH, $result);
     }
 
     public function testGetMonthForFreeAgencyPhase(): void
     {
         $result = SeasonPhaseHelper::getMonthForPhase('Free Agency');
-        $this->assertEquals(\Season::IBL_REGULAR_SEASON_STARTING_MONTH, $result);
+        $this->assertEquals(Season::IBL_REGULAR_SEASON_STARTING_MONTH, $result);
     }
 
     public function testIsRegularSeasonPhaseForRegularSeason(): void

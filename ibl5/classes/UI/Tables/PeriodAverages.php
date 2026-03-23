@@ -7,6 +7,7 @@ namespace UI\Tables;
 use Player\PlayerImageHelper;
 use Utilities\HtmlSanitizer;
 use Team\Team;
+use Season\Season;
 
 /**
  * PeriodAverages - Displays period (simulation) averages statistics table
@@ -18,7 +19,7 @@ class PeriodAverages
      *
      * @param \mysqli $db Database connection
      * @param Team $team Team object
-     * @param \Season $season Season object
+     * @param Season $season Season object
      * @param string|null|\DateTime $startDate Start date for the period (defaults to last sim)
      * @param string|null|\DateTime $endDate End date for the period (defaults to last sim)
      * @param list<int> $starterPids Starter player IDs

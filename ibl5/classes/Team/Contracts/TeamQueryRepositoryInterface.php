@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Team\Contracts;
 
 use Player\Player;
+use Season\Season;
 
 /**
  * TeamQueryRepositoryInterface - Query methods for team-related data
@@ -58,18 +59,18 @@ interface TeamQueryRepositoryInterface
     /**
      * Get healthy and injured players ordered by name
      *
-     * @param \Season|null $season Season object for free agency filtering
+     * @param Season|null $season Season object for free agency filtering
      * @return list<PlayerRow> Array of player rows
      */
-    public function getHealthyAndInjuredPlayersOrderedByName(int $teamId, ?\Season $season = null): array;
+    public function getHealthyAndInjuredPlayersOrderedByName(int $teamId, ?Season $season = null): array;
 
     /**
      * Get healthy players ordered by name
      *
-     * @param \Season|null $season Season object for free agency filtering
+     * @param Season|null $season Season object for free agency filtering
      * @return list<PlayerRow> Array of player rows
      */
-    public function getHealthyPlayersOrderedByName(int $teamId, ?\Season $season = null): array;
+    public function getHealthyPlayersOrderedByName(int $teamId, ?Season $season = null): array;
 
     /**
      * Get player ID of last sim starter for a position
@@ -121,7 +122,7 @@ interface TeamQueryRepositoryInterface
      *
      * @return array<string, int> Array of salary cap spent by year
      */
-    public function getSalaryCapArray(string $teamName, int $teamId, \Season $season): array;
+    public function getSalaryCapArray(string $teamName, int $teamId, Season $season): array;
 
     /**
      * Get total current season salaries from player result array

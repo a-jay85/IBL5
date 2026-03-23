@@ -11,6 +11,7 @@ use TeamSchedule\TeamScheduleRepository;
 use TeamSchedule\TeamScheduleService;
 use TeamSchedule\TeamScheduleView;
 use Team\Team;
+use Season\Season;
 
 /**
  * Integration tests for complete schedule display workflows
@@ -892,9 +893,9 @@ class ScheduleIntegrationTest extends IntegrationTestCase
     /**
      * Create a mock Season object with projectedNextSimEndDate
      */
-    private function createMockSeason(string $projectedNextSimEndDate): \Season
+    private function createMockSeason(string $projectedNextSimEndDate): Season
     {
-        $season = $this->createStub(\Season::class);
+        $season = $this->createStub(Season::class);
         $season->projectedNextSimEndDate = date_create($projectedNextSimEndDate);
         // lastSimEndDate is stored as string (DATE column format) in the Season class
         $lastSimEndDate = date_create($projectedNextSimEndDate)->modify('-7 days');

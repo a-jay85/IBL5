@@ -8,6 +8,7 @@ use PHPUnit\Framework\TestCase;
 use League\League;
 use Voting\VotingBallotService;
 use Voting\Contracts\VotingBallotServiceInterface;
+use Season\Season;
 
 class VotingBallotServiceTest extends TestCase
 {
@@ -23,7 +24,7 @@ class VotingBallotServiceTest extends TestCase
     {
         $db = $this->createStub(\mysqli::class);
 
-        $season = $this->createStub(\Season::class);
+        $season = $this->createStub(Season::class);
         $season->phase = 'Regular Season';
 
         $league = $this->createStub(League::class);
@@ -43,7 +44,7 @@ class VotingBallotServiceTest extends TestCase
     {
         $db = $this->createStub(\mysqli::class);
 
-        $season = $this->createStub(\Season::class);
+        $season = $this->createStub(Season::class);
         $season->phase = 'Playoffs';
 
         $league = $this->createStub(League::class);
@@ -66,7 +67,7 @@ class VotingBallotServiceTest extends TestCase
     {
         $db = $this->createStub(\mysqli::class);
 
-        $season = $this->createStub(\Season::class);
+        $season = $this->createStub(Season::class);
         $season->phase = 'Regular Season';
 
         $league = $this->createStub(League::class);
@@ -85,7 +86,7 @@ class VotingBallotServiceTest extends TestCase
     {
         $db = $this->createStub(\mysqli::class);
 
-        $season = $this->createStub(\Season::class);
+        $season = $this->createStub(Season::class);
         $season->phase = 'Draft';
 
         $league = $this->createStub(League::class);
@@ -107,7 +108,7 @@ class VotingBallotServiceTest extends TestCase
     {
         $db = $this->createStub(\mysqli::class);
 
-        $season = $this->createStub(\Season::class);
+        $season = $this->createStub(Season::class);
         $season->phase = 'Playoffs';
 
         $league = $this->createStub(League::class);

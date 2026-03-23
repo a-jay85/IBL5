@@ -6,6 +6,7 @@ namespace Team;
 
 use League\League;
 use Team\Contracts\SplitStatsRepositoryInterface;
+use Season\Season;
 
 /**
  * SplitStatsRepository - Queries per-game averages filtered by game context
@@ -223,7 +224,7 @@ class SplitStatsRepository extends \BaseMysqliRepository implements SplitStatsRe
 
         // Season half splits
         if ($splitKey === 'pre_allstar') {
-            $cutoffDate = sprintf('%d-%02d-%02d', $seasonEndingYear, \Season::IBL_ALL_STAR_MONTH, \Season::IBL_ALL_STAR_BREAK_START_DAY);
+            $cutoffDate = sprintf('%d-%02d-%02d', $seasonEndingYear, Season::IBL_ALL_STAR_MONTH, Season::IBL_ALL_STAR_BREAK_START_DAY);
             $result['where'] = 'AND bs.`Date` < ?';
             $result['types'] = 's';
             $result['params'] = [$cutoffDate];
@@ -231,7 +232,7 @@ class SplitStatsRepository extends \BaseMysqliRepository implements SplitStatsRe
         }
 
         if ($splitKey === 'post_allstar') {
-            $cutoffDate = sprintf('%d-%02d-%02d', $seasonEndingYear, \Season::IBL_ALL_STAR_MONTH, \Season::IBL_POST_ALL_STAR_FIRST_DAY);
+            $cutoffDate = sprintf('%d-%02d-%02d', $seasonEndingYear, Season::IBL_ALL_STAR_MONTH, Season::IBL_POST_ALL_STAR_FIRST_DAY);
             $result['where'] = 'AND bs.`Date` >= ?';
             $result['types'] = 's';
             $result['params'] = [$cutoffDate];

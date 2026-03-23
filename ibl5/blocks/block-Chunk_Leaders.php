@@ -14,7 +14,7 @@ global $mysqli_db, $leagueContext;
 $leagueConfig = $leagueContext->getConfig();
 $imagesPath = $leagueConfig['images_path'];
 
-$season = new Season($mysqli_db);
+$season = new \Season\Season($mysqli_db);
 $lastSimStartDate = $season->lastSimStartDate;
 $lastSimEndDate = $season->lastSimEndDate;
 $simNumber = $season->lastSimNumber;

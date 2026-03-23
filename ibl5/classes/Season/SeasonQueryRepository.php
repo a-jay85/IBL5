@@ -168,7 +168,7 @@ class SeasonQueryRepository extends \BaseMysqliRepository implements SeasonQuery
      */
     public function getLastRegularSeasonGameDate(int $endingYear): ?string
     {
-        $playoffsStart = sprintf('%d-%02d-01', $endingYear, \Season::IBL_PLAYOFF_MONTH);
+        $playoffsStart = sprintf('%d-%02d-01', $endingYear, Season::IBL_PLAYOFF_MONTH);
 
         /** @var array{max_date: string|null}|null $result */
         $result = $this->fetchOne(
@@ -249,20 +249,20 @@ class SeasonQueryRepository extends \BaseMysqliRepository implements SeasonQuery
 
         switch ($phase) {
             case 'Preseason':
-                $phaseStartDate = sprintf('%d-%02d-01', \Season::IBL_PRESEASON_YEAR, \Season::IBL_REGULAR_SEASON_STARTING_MONTH);
-                $phaseEndDate = sprintf('%d-%02d-30', \Season::IBL_PRESEASON_YEAR + 1, \Season::IBL_REGULAR_SEASON_ENDING_MONTH);
+                $phaseStartDate = sprintf('%d-%02d-01', Season::IBL_PRESEASON_YEAR, Season::IBL_REGULAR_SEASON_STARTING_MONTH);
+                $phaseEndDate = sprintf('%d-%02d-30', Season::IBL_PRESEASON_YEAR + 1, Season::IBL_REGULAR_SEASON_ENDING_MONTH);
                 break;
             case 'HEAT':
-                $phaseStartDate = sprintf('%d-%02d-01', $beginningYear, \Season::IBL_HEAT_MONTH);
-                $phaseEndDate = sprintf('%d-%02d-30', $beginningYear, \Season::IBL_HEAT_MONTH);
+                $phaseStartDate = sprintf('%d-%02d-01', $beginningYear, Season::IBL_HEAT_MONTH);
+                $phaseEndDate = sprintf('%d-%02d-30', $beginningYear, Season::IBL_HEAT_MONTH);
                 break;
             case 'Playoffs':
-                $phaseStartDate = sprintf('%d-%02d-01', $seasonYear, \Season::IBL_PLAYOFF_MONTH);
-                $phaseEndDate = sprintf('%d-%02d-30', $seasonYear, \Season::IBL_PLAYOFF_MONTH);
+                $phaseStartDate = sprintf('%d-%02d-01', $seasonYear, Season::IBL_PLAYOFF_MONTH);
+                $phaseEndDate = sprintf('%d-%02d-30', $seasonYear, Season::IBL_PLAYOFF_MONTH);
                 break;
             default: // Regular Season (and fallback for other phases)
-                $phaseStartDate = sprintf('%d-%02d-01', $beginningYear, \Season::IBL_REGULAR_SEASON_STARTING_MONTH);
-                $phaseEndDate = sprintf('%d-%02d-30', $seasonYear, \Season::IBL_REGULAR_SEASON_ENDING_MONTH);
+                $phaseStartDate = sprintf('%d-%02d-01', $beginningYear, Season::IBL_REGULAR_SEASON_STARTING_MONTH);
+                $phaseEndDate = sprintf('%d-%02d-30', $seasonYear, Season::IBL_REGULAR_SEASON_ENDING_MONTH);
                 break;
         }
 

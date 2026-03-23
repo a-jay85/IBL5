@@ -7,6 +7,7 @@ namespace Tests\PlrParser;
 use PHPUnit\Framework\TestCase;
 use PlrParser\Contracts\PlrParserRepositoryInterface;
 use PlrParser\PlrParserService;
+use Season\Season;
 
 class PlrParserServiceTest extends TestCase
 {
@@ -18,8 +19,8 @@ class PlrParserServiceTest extends TestCase
     /** @var \Services\CommonMysqliRepository&\PHPUnit\Framework\MockObject\Stub */
     private \Services\CommonMysqliRepository $stubCommonRepo;
 
-    /** @var \Season&\PHPUnit\Framework\MockObject\Stub */
-    private \Season $stubSeason;
+    /** @var Season&\PHPUnit\Framework\MockObject\Stub */
+    private Season $stubSeason;
 
     protected function setUp(): void
     {
@@ -28,7 +29,7 @@ class PlrParserServiceTest extends TestCase
         $this->stubCommonRepo = $this->createStub(\Services\CommonMysqliRepository::class);
         $this->stubCommonRepo->method('getTeamnameFromTeamID')->willReturn('Test Team');
 
-        $this->stubSeason = $this->createStub(\Season::class);
+        $this->stubSeason = $this->createStub(Season::class);
         $this->stubSeason->endingYear = 2026;
 
         $this->service = new PlrParserService(

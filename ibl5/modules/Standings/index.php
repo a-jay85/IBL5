@@ -27,7 +27,7 @@ if (!isset($mysqli_db) || !$mysqli_db) {
 
 // Create repository and view instances
 $repository = new Standings\StandingsRepository($mysqli_db);
-$season = new Season($mysqli_db);
+$season = new \Season\Season($mysqli_db);
 $seriesRecordsService = new SeriesRecords\SeriesRecordsService();
 $view = new Standings\StandingsView($repository, $season->endingYear, $seriesRecordsService);
 

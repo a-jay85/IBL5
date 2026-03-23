@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace JsbParser\Contracts;
 
 use JsbParser\JsbImportResult;
+use Season\Season;
 
 /**
  * Interface for the JSB import orchestration service.
@@ -17,10 +18,10 @@ interface JsbImportServiceInterface
      * Process all JSB files for the current season from the base path.
      *
      * @param string $basePath Path to the ibl5 directory containing IBL5.car, IBL5.trn, etc.
-     * @param \Season $season Current season object for year resolution
+     * @param Season $season Current season object for year resolution
      * @return JsbImportResult Summary of import results
      */
-    public function processCurrentSeason(string $basePath, \Season $season, string $filePrefix = 'IBL5'): JsbImportResult;
+    public function processCurrentSeason(string $basePath, Season $season, string $filePrefix = 'IBL5'): JsbImportResult;
 
     /**
      * Process a .car file and upsert records into ibl_hist.

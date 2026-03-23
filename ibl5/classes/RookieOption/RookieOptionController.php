@@ -7,6 +7,7 @@ namespace RookieOption;
 use Player\Player;
 use Shared\SalaryConverter;
 use RookieOption\Contracts\RookieOptionControllerInterface;
+use Season\Season;
 
 /**
  * @see RookieOptionControllerInterface
@@ -36,7 +37,7 @@ class RookieOptionController implements RookieOptionControllerInterface
     public function processRookieOption(string $teamName, int $playerID, int $extensionAmount): array
     {
         $commonRepository = new \Services\CommonMysqliRepository($this->db);
-        $season = new \Season($this->db);
+        $season = new Season($this->db);
         $player = Player::withPlayerID($this->db, $playerID);
 
         // Validate player eligibility

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Voting;
 
 use Voting\Contracts\VotingResultsControllerInterface;
+use Season\Season;
 
 /**
  * @see VotingResultsControllerInterface
@@ -14,7 +15,7 @@ class VotingResultsController implements VotingResultsControllerInterface
     public function __construct(
         private readonly VotingResultsService $service,
         private readonly VotingResultsTableRenderer $renderer,
-        private readonly \Season $season
+        private readonly Season $season
     ) {
     }
 

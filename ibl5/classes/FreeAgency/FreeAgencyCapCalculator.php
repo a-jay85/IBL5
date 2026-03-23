@@ -9,6 +9,7 @@ use League\League;
 use Player\Player;
 use Team\Contracts\TeamQueryRepositoryInterface;
 use Team\Team;
+use Season\Season;
 
 /**
  * @see FreeAgencyCapCalculatorInterface
@@ -18,16 +19,16 @@ class FreeAgencyCapCalculator implements FreeAgencyCapCalculatorInterface
 {
     private \mysqli $mysqli_db;
     private Team $team;
-    private \Season $season;
+    private Season $season;
     private TeamQueryRepositoryInterface $teamQueryRepo;
 
     /**
      * @param \mysqli $mysqli_db Database connection
      * @param Team $team Team entity
-     * @param \Season $season Season entity
+     * @param Season $season Season entity
      * @param TeamQueryRepositoryInterface|null $teamQueryRepo Team query repository (created internally if not provided)
      */
-    public function __construct(\mysqli $mysqli_db, Team $team, \Season $season, ?TeamQueryRepositoryInterface $teamQueryRepo = null)
+    public function __construct(\mysqli $mysqli_db, Team $team, Season $season, ?TeamQueryRepositoryInterface $teamQueryRepo = null)
     {
         $this->mysqli_db = $mysqli_db;
         $this->team = $team;

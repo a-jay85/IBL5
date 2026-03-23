@@ -8,6 +8,7 @@ use Tests\Integration\IntegrationTestCase;
 use Tests\Integration\Mocks\TestDataFactory;
 use Draft\DraftSelectionHandler;
 use Shared\Contracts\SharedRepositoryInterface;
+use Season\Season;
 
 /**
  * Integration tests for complete draft selection workflows
@@ -28,7 +29,7 @@ class DraftIntegrationTest extends IntegrationTestCase
 {
     private DraftSelectionHandler $handler;
     private SharedRepositoryInterface $mockSharedFunctions;
-    private \Season $mockSeason;
+    private Season $mockSeason;
 
     protected function setUp(): void
     {
@@ -40,7 +41,7 @@ class DraftIntegrationTest extends IntegrationTestCase
         $this->mockSharedFunctions = $stub;
 
         // Create mock Season
-        $this->mockSeason = $this->createStub(\Season::class);
+        $this->mockSeason = $this->createStub(Season::class);
         $this->mockSeason->endingYear = 2025;
         $this->mockSeason->freeAgencyNotificationsState = 'Off';
 

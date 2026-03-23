@@ -8,6 +8,7 @@ use Team\TeamRepository;
 use Team\TeamTableService;
 use UI\Components\TableViewDropdown;
 use Team\Team;
+use Season\Season;
 
 /**
  * AJAX JSON endpoint handler for trade roster preview panel
@@ -110,7 +111,7 @@ class TradeRosterPreviewApiHandler
             }
 
             $team = Team::initialize($this->db, $teamID);
-            $season = new \Season($this->db);
+            $season = new Season($this->db);
 
             // Build PID list for aggregate views
             /** @var list<int> $rosterPids */
@@ -489,7 +490,7 @@ class TradeRosterPreviewApiHandler
      * @param list<int> $rosterPids All PIDs in the modified roster (for aggregate queries)
      * @param list<int> $removePids Outgoing player PIDs to exclude from cap totals
      */
-    private function renderTable(string $display, array $roster, Team $team, \Season $season, array $starterPids, array $rosterPids, ?string $split, TeamTableService $teamTableService, array $removePids = []): string
+    private function renderTable(string $display, array $roster, Team $team, Season $season, array $starterPids, array $rosterPids, ?string $split, TeamTableService $teamTableService, array $removePids = []): string
     {
         switch ($display) {
             case 'contracts':

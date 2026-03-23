@@ -61,45 +61,6 @@
     letter-spacing: 0.05em;
 }
 
-/* Tabs Bar */
-.leaders-tabbed__tabs {
-    display: flex;
-    background: var(--navy-800);
-    padding: 0;
-    gap: 0;
-    width: 100%;
-    box-sizing: border-box;
-}
-
-.leaders-tabbed__tab {
-    flex: 1 1 0;
-    min-width: 0;
-    padding: var(--space-2) var(--space-1);
-    font-family: var(--font-display);
-    font-size: 1rem;
-    font-weight: 600;
-    color: var(--gray-400);
-    text-transform: uppercase;
-    letter-spacing: 0;
-    background: transparent;
-    border: none;
-    border-bottom: 2px solid transparent;
-    cursor: pointer;
-    transition: all var(--transition-fast);
-    text-align: center;
-}
-
-.leaders-tabbed__tab:hover {
-    color: white;
-    background: rgba(255, 255, 255, 0.05);
-}
-
-.leaders-tabbed__tab--active {
-    color: white;
-    background: rgba(255, 255, 255, 0.1);
-    border-bottom-color: var(--accent-500);
-}
-
 /* Tab Panels */
 .leaders-tabbed__panels {
     position: relative;

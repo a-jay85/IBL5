@@ -131,17 +131,17 @@ $content = '<div class="leaders-tabbed" id="' . $blockId . '">
     <div class="leaders-tabbed__header">
         <h3 class="leaders-tabbed__title">' . HtmlSanitizer::safeHtmlOutput($season->phase) . ' ' . TooltipLabel::render('Sim #' . $phaseSimNumber, 'Overall Sim #' . $simNumber) . ' Leaders</h3>
     </div>
-    <div class="leaders-tabbed__tabs" role="tablist">';
+    <div class="ibl-tabs" role="tablist">';
 
 // Generate tabs
 foreach ($categories as $index => $category) {
     $tabId = $blockId . '-tab-' . $index;
     $panelId = $blockId . '-panel-' . $index;
-    $isActive = ($category === $firstCategory) ? ' leaders-tabbed__tab--active' : '';
+    $isActive = ($category === $firstCategory) ? ' ibl-tab--active' : '';
     $ariaSelected = ($category === $firstCategory) ? 'true' : 'false';
     $tabLabel = $tabLabels[$category] ?? HtmlSanitizer::safeHtmlOutput($category);
 
-    $content .= '<button class="leaders-tabbed__tab' . $isActive . '" id="' . $tabId . '" role="tab" aria-selected="' . $ariaSelected . '" aria-controls="' . $panelId . '">' . $tabLabel . '</button>';
+    $content .= '<button class="ibl-tab' . $isActive . '" id="' . $tabId . '" role="tab" aria-selected="' . $ariaSelected . '" aria-controls="' . $panelId . '">' . $tabLabel . '</button>';
 }
 
 $content .= '</div>
@@ -211,13 +211,13 @@ $content .= '</div>
 (function() {
     var block = document.getElementById("' . $blockId . '");
     if (!block) return;
-    var tabs = block.querySelectorAll(".leaders-tabbed__tab");
+    var tabs = block.querySelectorAll(".ibl-tab");
     var panels = block.querySelectorAll(".leaders-tabbed__panel");
     tabs.forEach(function(tab) {
         tab.addEventListener("click", function() {
-            tabs.forEach(function(t) { t.classList.remove("leaders-tabbed__tab--active"); t.setAttribute("aria-selected", "false"); });
+            tabs.forEach(function(t) { t.classList.remove("ibl-tab--active"); t.setAttribute("aria-selected", "false"); });
             panels.forEach(function(p) { p.classList.remove("leaders-tabbed__panel--active"); });
-            tab.classList.add("leaders-tabbed__tab--active");
+            tab.classList.add("ibl-tab--active");
             tab.setAttribute("aria-selected", "true");
             var panel = document.getElementById(tab.getAttribute("aria-controls"));
             if (panel) panel.classList.add("leaders-tabbed__panel--active");

@@ -62,7 +62,6 @@ check() {
 echo "Smoke testing $BASE ..."
 echo ""
 
-check "Rollback test" "$BASE/ibl5/nonexistent-rollback-test-page"             "THIS_WILL_NEVER_MATCH"
 check "Homepage"     "$BASE/ibl5/index.php"                                 "IBL"
 check "Standings"    "$BASE/ibl5/modules.php?name=Standings"                "Standings"
 check "Team page"    "$BASE/ibl5/modules.php?name=Team&op=team&teamID=1"    "team"

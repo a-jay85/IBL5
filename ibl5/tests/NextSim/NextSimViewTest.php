@@ -10,6 +10,7 @@ use NextSim\Contracts\NextSimViewInterface;
 use Player\Player;
 use Team\Team;
 use Season\Season;
+use LeagueSchedule\Game;
 
 /**
  * NextSimViewTest - Tests for NextSimView HTML rendering
@@ -219,7 +220,7 @@ class NextSimViewTest extends TestCase
         $oppTeam->color2 = 'FFFF00';
         $oppTeam->seasonRecord = '8-7';
 
-        $game = $this->createStub(\Game::class);
+        $game = $this->createStub(Game::class);
         $game->date = '2025-01-02';
 
         $oppStarters = [];

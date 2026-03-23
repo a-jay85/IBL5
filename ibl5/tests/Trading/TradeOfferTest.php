@@ -11,6 +11,7 @@ use Trading\TradeOffer;
 use Trading\TradeValidator;
 use Trading\TradingRepository;
 use Season\Season;
+use Discord\Discord;
 
 /**
  * @covers \Trading\TradeOffer
@@ -26,7 +27,7 @@ class TradeOfferTest extends TestCase
         CashTransactionHandler $cashHandler,
         \Services\CommonMysqliRepository $commonRepo,
         Season $season,
-        ?\Discord $discord = null,
+        ?Discord $discord = null,
         ?TradeCashRepositoryInterface $cashRepo = null,
     ): TradeOffer {
         $cashRepoStub = $cashRepo ?? $this->createStub(TradeCashRepositoryInterface::class);
@@ -38,7 +39,7 @@ class TradeOfferTest extends TestCase
                 CashTransactionHandler $cashHandler,
                 \Services\CommonMysqliRepository $commonRepo,
                 Season $season,
-                ?\Discord $discord,
+                ?Discord $discord,
                 TradeCashRepositoryInterface $cashRepo,
             ) {
                 // Skip parent constructor — inject directly
@@ -381,7 +382,7 @@ class TradeOfferTest extends TestCase
         ]);
 
         // Discord should never be called
-        $discord = $this->createMock(\Discord::class);
+        $discord = $this->createMock(Discord::class);
         $discord->expects($this->never())->method($this->anything());
 
         $offer = $this->makeTradeOffer($repository, $validator, $cashHandler, $commonRepo, $season, $discord);

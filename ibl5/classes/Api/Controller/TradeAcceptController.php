@@ -8,6 +8,7 @@ use Api\Contracts\ControllerInterface;
 use Api\Response\JsonResponder;
 use Trading\TradeProcessor;
 use Trading\TradingRepository;
+use Discord\Discord;
 
 class TradeAcceptController implements ControllerInterface
 {
@@ -51,7 +52,7 @@ class TradeAcceptController implements ControllerInterface
 
         if (!$isLocalhostTestTrade) {
             // Verify the Discord user is the GM of the approval team
-            $discord = new \Discord($this->db);
+            $discord = new Discord($this->db);
             $gmDiscordId = $discord->getDiscordIDFromTeamname($approvalTeam);
 
             if ($gmDiscordId === '' || $gmDiscordId !== $discordUserId) {

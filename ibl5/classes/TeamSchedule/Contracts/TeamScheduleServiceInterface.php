@@ -6,6 +6,7 @@ namespace TeamSchedule\Contracts;
 
 use Team\Team;
 use Season\Season;
+use LeagueSchedule\Game;
 
 /**
  * TeamScheduleServiceInterface - Contract for team schedule business logic
@@ -13,7 +14,7 @@ use Season\Season;
  * Defines methods for processing team schedule data.
  *
  * @phpstan-type ScheduleGameRow array{
- *     game: \Game,
+ *     game: Game,
  *     currentMonth: string,
  *     opposingTeam: Team,
  *     opponentText: string,

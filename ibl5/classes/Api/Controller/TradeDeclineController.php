@@ -7,6 +7,7 @@ namespace Api\Controller;
 use Api\Contracts\ControllerInterface;
 use Api\Response\JsonResponder;
 use Trading\TradingRepository;
+use Discord\Discord;
 
 class TradeDeclineController implements ControllerInterface
 {
@@ -63,7 +64,7 @@ class TradeDeclineController implements ControllerInterface
         // and decline notification (no real GM to notify)
         if ($approvalTeam !== 'test') {
             // Verify the Discord user is the GM of the approval team
-            $discord = new \Discord($this->db);
+            $discord = new Discord($this->db);
             $gmDiscordId = $discord->getDiscordIDFromTeamname($approvalTeam);
 
             if ($gmDiscordId === '' || $gmDiscordId !== $discordUserId) {
@@ -76,7 +77,7 @@ class TradeDeclineController implements ControllerInterface
                 try {
                     $offeringGmDiscordId = $discord->getDiscordIDFromTeamname($offeringTeam);
                     $declineMessage = \Trading\TradingService::buildDeclineMessage($gmDiscordId, $approvalTeam);
-                    \Discord::sendDM($offeringGmDiscordId, $declineMessage);
+                    Discord::sendDM($offeringGmDiscordId, $declineMessage);
                 } catch (\Exception $e) {
                     // Log but don't fail the decline
                     \Logging\LoggerFactory::getChannel('discord')->error('Discord decline notification failed', ['error' => $e->getMessage()]);

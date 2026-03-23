@@ -7,6 +7,7 @@ namespace Tests\Discord;
 use PHPUnit\Framework\Attributes\AllowMockObjectsWithoutExpectations;
 use Tests\Integration\IntegrationTestCase;
 use Tests\Integration\Mocks\TestDataFactory;
+use Discord\Discord;
 
 /**
  * DiscordIntegrationTest - Integration tests for Discord class
@@ -27,9 +28,9 @@ class DiscordIntegrationTest extends IntegrationTestCase
      */
     public function testConstructorAcceptsMockDatabase(): void
     {
-        $discord = new \Discord($this->mockDb);
+        $discord = new Discord($this->mockDb);
 
-        $this->assertInstanceOf(\Discord::class, $discord);
+        $this->assertInstanceOf(Discord::class, $discord);
     }
 
     /**
@@ -39,9 +40,9 @@ class DiscordIntegrationTest extends IntegrationTestCase
     {
         // If config is not available, this should still work
         // because the example config should exist
-        $discord = new \Discord($this->mockDb);
+        $discord = new Discord($this->mockDb);
 
-        $this->assertInstanceOf(\Discord::class, $discord);
+        $this->assertInstanceOf(Discord::class, $discord);
     }
 
     // ============================================
@@ -57,7 +58,7 @@ class DiscordIntegrationTest extends IntegrationTestCase
             ['discordID' => '123456789012345678']
         ]);
 
-        $discord = new \Discord($this->mockDb);
+        $discord = new Discord($this->mockDb);
         $result = $discord->getDiscordIDFromTeamname('Test Team');
 
         $this->assertEquals('123456789012345678', $result);
@@ -70,7 +71,7 @@ class DiscordIntegrationTest extends IntegrationTestCase
     {
         $this->mockDb->setMockData([]);
 
-        $discord = new \Discord($this->mockDb);
+        $discord = new Discord($this->mockDb);
         $result = $discord->getDiscordIDFromTeamname('NonExistent Team');
 
         $this->assertEquals('', $result);
@@ -85,7 +86,7 @@ class DiscordIntegrationTest extends IntegrationTestCase
             ['discordID' => null]
         ]);
 
-        $discord = new \Discord($this->mockDb);
+        $discord = new Discord($this->mockDb);
         $result = $discord->getDiscordIDFromTeamname('Team With Null ID');
 
         $this->assertEquals('', $result);
@@ -98,7 +99,7 @@ class DiscordIntegrationTest extends IntegrationTestCase
     {
         $this->mockDb->setMockData([]);
 
-        $discord = new \Discord($this->mockDb);
+        $discord = new Discord($this->mockDb);
         $this->mockDb->clearQueries(); // Clear any queries from constructor
         $discord->getDiscordIDFromTeamname('Miami');
 
@@ -119,7 +120,7 @@ class DiscordIntegrationTest extends IntegrationTestCase
             ['discordID' => '999888777666555444']
         ]);
 
-        $discord = new \Discord($this->mockDb);
+        $discord = new Discord($this->mockDb);
         $result = $discord->getDiscordIDFromTeamname("Team's Name");
 
         $this->assertEquals('999888777666555444', $result);
@@ -132,7 +133,7 @@ class DiscordIntegrationTest extends IntegrationTestCase
     {
         $this->mockDb->setMockData([]);
 
-        $discord = new \Discord($this->mockDb);
+        $discord = new Discord($this->mockDb);
         $discord->getDiscordIDFromTeamname('Test');
 
         $queries = $this->mockDb->getExecutedQueries();
@@ -149,7 +150,7 @@ class DiscordIntegrationTest extends IntegrationTestCase
             ['discordID' => 123456789]
         ]);
 
-        $discord = new \Discord($this->mockDb);
+        $discord = new Discord($this->mockDb);
         $result = $discord->getDiscordIDFromTeamname('Team');
 
         $this->assertIsString($result);
@@ -164,7 +165,7 @@ class DiscordIntegrationTest extends IntegrationTestCase
      */
     public function testSendCurlPOSTReturnsNullInTestMode(): void
     {
-        $result = \Discord::sendCurlPOST('https://discord.com/api/webhooks/test', 'Test message');
+        $result = Discord::sendCurlPOST('https://discord.com/api/webhooks/test', 'Test message');
 
         $this->assertNull($result);
     }

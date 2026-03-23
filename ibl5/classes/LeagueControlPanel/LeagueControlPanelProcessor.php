@@ -6,6 +6,7 @@ namespace LeagueControlPanel;
 
 use LeagueControlPanel\Contracts\LeagueControlPanelProcessorInterface;
 use LeagueControlPanel\Contracts\LeagueControlPanelRepositoryInterface;
+use Discord\Discord;
 
 /**
  * @see LeagueControlPanelProcessorInterface
@@ -157,7 +158,7 @@ class LeagueControlPanelProcessor implements LeagueControlPanelProcessorInterfac
         $this->repository->setFreeAgencyNotifications($value);
 
         $message = 'Free Agency Notifications are now ' . $value . '.';
-        \Discord::postToChannel('#free-agency', $message);
+        Discord::postToChannel('#free-agency', $message);
 
         return ['success' => true, 'message' => $message];
     }

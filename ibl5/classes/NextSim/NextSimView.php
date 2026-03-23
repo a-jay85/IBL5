@@ -145,7 +145,18 @@ window.IBL_initNextSimHighlight();
     public function renderTabbedPositionTable(array $games, string $activePosition, Team $userTeam, array $userStarters): string
     {
         $tabs = self::POSITION_LABELS;
-        $switcher = new \UI\Components\TableViewSwitcher($tabs, $activePosition, 'modules.php?name=NextSim', $userTeam->color1, $userTeam->color2);
+        $apiUrl = 'modules.php?name=DepthChartEntry&op=nextsim-api&teamID=' . $userTeam->teamID;
+        $switcher = new \UI\Components\TableViewSwitcher(
+            $tabs,
+            $activePosition,
+            'modules.php?name=NextSim',
+            $userTeam->color1,
+            $userTeam->color2,
+            $apiUrl,
+            'closest .nextsim-tab-container',
+            'position',
+            false
+        );
         $tableHtml = $this->renderPositionTable($games, $activePosition, $userTeam, $userStarters);
 
         return '<div class="next-sim-position-section">' . $switcher->wrap($tableHtml) . '</div>';

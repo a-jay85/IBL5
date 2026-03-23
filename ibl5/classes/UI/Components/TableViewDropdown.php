@@ -32,25 +32,37 @@ class TableViewDropdown
     /** @var string Secondary team hex color (without #) */
     private string $color2;
 
+    /** @var string|null HTMX API base URL */
+    private ?string $htmxGetUrl;
+
+    /** @var string HTMX target selector */
+    private string $htmxTarget;
+
     /**
      * @param array<string, array<string, string>> $groups Optgroup label => [value => label]
      * @param string $activeValue Currently active value
      * @param string $baseUrl Plain URL with & separators (not &amp;)
      * @param string $color1 Primary team hex color (without #)
      * @param string $color2 Secondary team hex color (without #)
+     * @param string|null $htmxGetUrl HTMX API base URL
+     * @param string $htmxTarget HTMX target selector
      */
     public function __construct(
         array $groups,
         string $activeValue,
         string $baseUrl,
         string $color1,
-        string $color2
+        string $color2,
+        ?string $htmxGetUrl = null,
+        string $htmxTarget = 'closest .table-scroll-container'
     ) {
         $this->groups = $groups;
         $this->activeValue = $activeValue;
         $this->baseUrl = $baseUrl;
         $this->color1 = \UI\TableStyles::sanitizeColor($color1);
         $this->color2 = \UI\TableStyles::sanitizeColor($color2);
+        $this->htmxGetUrl = $htmxGetUrl;
+        $this->htmxTarget = $htmxTarget;
     }
 
     /**
@@ -59,15 +71,25 @@ class TableViewDropdown
     public function renderDropdown(): string
     {
         $html = '<div class="ibl-view-dropdown" style="--team-tab-bg-color: #' . $this->color1 . '; --team-tab-active-color: #' . $this->color2 . '">';
-        // Inline onchange provides a fallback before ajax-tabs.js loads.
-        // Once ajax-tabs.js initializes, it sets window.IBL_AJAX_TABS_READY
-        // which disables this handler so the AJAX path takes over.
+        // Inline onchange provides a fallback when HTMX/JS is unavailable.
+        // When HTMX is loaded it handles the change event; the fallback returns early.
         $safeBaseUrl = HtmlSanitizer::safeHtmlOutput($this->baseUrl);
-        $onchange = "if(window.IBL_AJAX_TABS_READY)return;"
+        $onchange = "if(window.htmx)return;"
             . "var v=this.value,d=v,s='';"
             . "if(v.indexOf('split:')===0){d='split';s='&amp;split='+v.substring(6)}"
             . "window.location.href='" . $safeBaseUrl . "&amp;display='+d+s";
-        $html .= '<select class="ibl-view-select" aria-label="Stats display" onchange="' . $onchange . '">';
+
+        $htmxAttrs = '';
+        if ($this->htmxGetUrl !== null) {
+            $safeHtmxUrl = HtmlSanitizer::safeHtmlOutput($this->htmxGetUrl);
+            $safeTarget = HtmlSanitizer::safeHtmlOutput($this->htmxTarget);
+            $htmxAttrs = ' hx-get="' . $safeHtmxUrl . '"'
+                . ' hx-target="' . $safeTarget . '"'
+                . ' hx-swap="innerHTML"'
+                . ' hx-trigger="change"';
+        }
+
+        $html .= '<select class="ibl-view-select" aria-label="Stats display"' . $htmxAttrs . ' onchange="' . $onchange . '">';
 
         foreach ($this->groups as $groupLabel => $options) {
             $safeGroupLabel = HtmlSanitizer::safeHtmlOutput($groupLabel);

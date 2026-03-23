@@ -143,6 +143,44 @@ test.describe('Team page: dropdown content changes', () => {
     await expect(page.locator('.ibl-data-table, table').first()).toBeVisible();
     await assertNoPhpErrors(page, 'after switching to split:home');
   });
+
+  test('dropdown switch updates URL with display parameter', async ({ page }) => {
+    const dropdown = page.locator('.ibl-view-select').first();
+    await dropdown.selectOption('contracts');
+    await expect(page.locator('th.col-salary').first()).toBeVisible({ timeout: 10000 });
+    await expect(page).toHaveURL(/display=contracts/);
+  });
+
+  test('browser back restores previous view after dropdown switch', async ({ page }) => {
+    const dropdown = page.locator('.ibl-view-select').first();
+    await dropdown.selectOption('contracts');
+    await expect(page.locator('th.col-salary').first()).toBeVisible({ timeout: 10000 });
+
+    await page.goBack();
+
+    // Back should restore ratings view (no salary columns)
+    await expect(page.locator('.ibl-data-table, table').first()).toBeVisible({ timeout: 10000 });
+    const salaryHeaders = page.locator('.ibl-data-table th.col-salary');
+    expect(await salaryHeaders.count()).toBe(0);
+  });
+
+  test('table columns remain sortable after dropdown switch', async ({ page }) => {
+    const dropdown = page.locator('.ibl-view-select').first();
+    await dropdown.selectOption('ratings');
+    await expect(page.locator('.ibl-data-table, table').first()).toBeVisible({ timeout: 10000 });
+
+    // Click a sortable column header (skip first two — player name and position)
+    const header = page.locator('.ibl-data-table thead th').nth(2);
+    await header.click();
+
+    // Table should still be visible (no JS error crashed it)
+    await expect(page.locator('.ibl-data-table, table').first()).toBeVisible();
+    // The header should now have a sort indicator
+    await expect(
+      page.locator('.ibl-data-table th.sorttable_sorted, .ibl-data-table th.sorttable_sorted_reverse')
+        .first()
+    ).toBeVisible({ timeout: 5000 });
+  });
 });
 
 // ===========================================================================

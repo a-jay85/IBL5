@@ -109,12 +109,12 @@ test.describe('DCE: NextSim position tabs', () => {
     const tabs = page.locator('.nextsim-tab-container .ibl-tab');
     await expect(tabs).toHaveCount(5);
 
-    // Click a non-default tab
+    // Click a non-default tab and wait for HTMX response
     const sfTab = tabs.nth(2);
-    await sfTab.click();
-
-    // Wait for AJAX content to load
-    await page.waitForTimeout(500);
+    await Promise.all([
+      page.waitForResponse(resp => resp.url().includes('nextsim-api') && resp.status() === 200),
+      sfTab.click(),
+    ]);
     await assertNoPhpErrors(page, 'after NextSim tab switch');
   });
 });

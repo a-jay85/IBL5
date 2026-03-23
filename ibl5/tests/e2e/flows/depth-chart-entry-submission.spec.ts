@@ -55,7 +55,7 @@ test.describe('Depth Chart submission', () => {
     await expect(form).toBeVisible({ timeout: 15000 });
 
     // Submit the current depth chart (already valid from seed data)
-    const submitBtn = page.locator('.depth-chart-submit-btn');
+    const submitBtn = page.locator('.depth-chart-buttons .depth-chart-submit-btn');
     await expect(submitBtn).toBeVisible();
     await submitBtn.click();
 

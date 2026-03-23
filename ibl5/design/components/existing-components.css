@@ -1348,9 +1348,14 @@ td.next-sim-game-info-cell > span {
     margin: 0 auto;
 }
 
-/* Allow horizontal page scrolling on Depth Chart Entry so users can pan/zoom */
-html:has(.depth-chart-form) {
-    overflow-x: auto;
+/* Allow horizontal page scrolling on Depth Chart Entry so users can pan/zoom.
+   Desktop only — on mobile, overflow on <html> creates a scroll container
+   that captures position:fixed elements (nav scrolls with content). The
+   mobile card view doesn't need horizontal scrolling anyway. */
+@media (min-width: 769px) {
+    html:has(.depth-chart-form) {
+        overflow-x: auto;
+    }
 }
 
 .depth-chart-form {

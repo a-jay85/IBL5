@@ -215,7 +215,7 @@ class SavedDepthChartService implements SavedDepthChartServiceInterface
             $startDate = (new \DateTime($rawStartDate))->format('M j');
             $endDate = (new \DateTime($rawEndDate))->format('M j');
         } else {
-            $parts[] = $season->phase . ' Sim ' . $currentPhaseSim;
+            $parts[] = 'Sim ' . $currentPhaseSim;
             $startDate = (new \DateTime($season->lastSimStartDate))->format('M j');
             $endDate = (new \DateTime($season->lastSimEndDate))->format('M j');
         }
@@ -455,7 +455,7 @@ class SavedDepthChartService implements SavedDepthChartServiceInterface
             );
             $parts[] = $this->formatSimRange($dc['phase'], $phaseSimStart, $phaseSimEnd);
         } else {
-            $parts[] = $dc['phase'] . ' Sim ' . $phaseSimStart;
+            $parts[] = 'Sim ' . $phaseSimStart;
         }
 
         // Date range
@@ -481,10 +481,10 @@ class SavedDepthChartService implements SavedDepthChartServiceInterface
     private function formatSimRange(string $phase, int $start, int $end): string
     {
         if ($start === $end) {
-            return $phase . ' Sim ' . $start;
+            return 'Sim ' . $start;
         }
 
-        return $phase . ' Sims ' . $start . '-' . $end;
+        return 'Sims ' . $start . '-' . $end;
     }
 
     /**

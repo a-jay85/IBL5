@@ -42,10 +42,7 @@ test.describe('One-on-One Game flow', () => {
     const form = page.locator('form').filter({ has: page.getByRole('button', { name: /begin/i }) });
     const selects = form.locator('select');
     const selectCount = await selects.count();
-    if (selectCount < 2) {
-      test.skip();
-      return;
-    }
+    expect(selectCount).toBeGreaterThanOrEqual(2);
 
     const firstSelect = selects.nth(0);
     const secondSelect = selects.nth(1);
@@ -53,10 +50,7 @@ test.describe('One-on-One Game flow', () => {
     // Get options from first select (skip any blank/placeholder)
     const options = firstSelect.locator('option');
     const optionCount = await options.count();
-    if (optionCount < 2) {
-      test.skip();
-      return;
-    }
+    expect(optionCount).toBeGreaterThanOrEqual(2);
 
     // Select different players in each dropdown using index
     await firstSelect.selectOption({ index: 1 });

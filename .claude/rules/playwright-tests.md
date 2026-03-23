@@ -127,6 +127,8 @@ test.describe('Public module flow', () => {
 });
 ```
 
+**WARNING:** Never use `setState()` from `helpers/test-state` in tests — it modifies the database directly and races with parallel workers. The `public` fixture's `appState` uses per-request cookies instead.
+
 ## Auth Patterns
 
 | Scenario | Import from | Extra setup |
@@ -255,16 +257,12 @@ test.describe('Public module flow', () => {
     await appState({ 'Trivia Mode': 'Off' });
     await page.goto('modules.php?name=Module');
   });
-
-  test('page loads', async ({ page }) => {
-    // Test steps...
-  });
 });
 ```
 
-**WARNING:** Never use `setState()` from `helpers/test-state` in tests — it modifies the database directly and races with parallel workers. The `public` fixture's `appState` uses per-request cookies instead.
+**WARNING:** Never use `setState()` from `helpers/test-state` in tests — it modifies the database directly and races with parallel workers.
 
-**Allowlisted settings:** `Current Season Phase`, `Allow Trades`, `Allow Waiver Moves`, `Show Draft Link`, `Trivia Mode`, `ASG Voting`, `EOY Voting`, `Free Agency Notifications`.
+**Allowlisted settings:** `Current Season Phase`, `Current Season Ending Year`, `Allow Trades`, `Allow Waiver Moves`, `Show Draft Link`, `Trivia Mode`, `ASG Voting`, `EOY Voting`, `Free Agency Notifications`.
 
 **Serial mode:** When multiple `describe` blocks in the same file set the same setting to different values, use `test.describe.configure({ mode: 'serial' })` at the file level to prevent interleaving.
 
@@ -272,7 +270,7 @@ test.describe('Public module flow', () => {
 1. Check for PHP errors on every page you visit in smoke tests
 2. Use the auth fixture for authenticated tests
 3. Use `storageState: { cookies: [], origins: [] }` for public tests
-4. Use `appState` fixture (from `../fixtures/auth` or `../fixtures/public`) to set required state
+4. Use `appState` fixture (from `../fixtures/auth` or `../fixtures/public`) to set required state — always include `'Current Season Ending Year': '2026'` when tests depend on CI seed data
 5. Use stable CSS classes or accessible roles for locators
 6. Keep smoke tests fast — one assertion per test, no complex interactions
 7. Add new pages to the PHP error check loop when adding smoke tests
@@ -290,6 +288,41 @@ test.describe('Public module flow', () => {
 9. **Don't** use `boundingBox()` to verify CSS properties like `width: fit-content` — parent layout context affects the bounding box. Use `page.evaluate(() => getComputedStyle(el).property)` to check computed CSS values directly
 10. **Don't** import `Page` type from `../fixtures/auth` — it only exports `test` and `expect`. Import `Page` separately: `import type { Page } from '@playwright/test'`
 11. **Don't** use `link.click()` for page-to-page navigation — it triggers a Playwright-managed navigation wait that can time out under concurrent load from parallel workers. Instead, extract the href with `getAttribute('href')` and use `page.goto(href)`, which handles navigation more reliably
+12. **Don't** use `test.skip()` — set prerequisites via `appState` + CI seed instead
+13. **Don't** use `.catch(() => false)` to swallow visibility errors — use `await expect().toBeVisible()` with a timeout (exception: `phase-gating-public.spec.ts` where testing element absence is the purpose)
+14. **Don't** use bare `return` without a preceding assertion — every code path must assert something
+15. **Don't** write dual-path `if/else` inside tests — split into separate focused tests with explicit `appState` prerequisites
+16. **Don't** write `if (count > 0) { assert }` with no else — the test silently passes when the element is absent. Use a hard assertion instead
+
+## Mandatory: No Skips, No Silent Passes
+
+Every E2E test must either **pass with a real assertion** or **fail loudly**. No `test.skip()`. No bare `return`. No `.catch(() => false)` + early exit. No `if (count > 0) { assert }` without an else.
+
+**Set prerequisites, don't detect state.** Use `appState` (from `../fixtures/auth` or `../fixtures/public`) to set `Current Season Phase` and `Current Season Ending Year`. CI seed data (`ci-seed.sql`) provides all test data for year 2026. Tests that need specific data should set `'Current Season Ending Year': '2026'` so the app resolves CI-seed players, schedule, and settings.
+
+```typescript
+// CORRECT — each test has one purpose, one setup, one assertion path
+test('feature X works', async ({ appState, page }) => {
+  await appState({ 'Current Season Phase': 'Regular Season', 'Current Season Ending Year': '2026' });
+  await page.goto('modules.php?name=Module');
+  await expect(page.locator('.feature-x')).toBeVisible();
+});
+
+// BANNED — test.skip hides failures
+if (count === 0) { test.skip(true, 'No data'); return; }
+
+// BANNED — .catch(() => false) swallows errors
+if (!(await form.isVisible().catch(() => false))) return;
+
+// BANNED — bare return without assertion
+if (count === 0) return;
+
+// BANNED — dual-path if/else in one test
+if (count > 0) { assertA(); } else { assertB(); }
+
+// BANNED — true-only guard (silently passes when absent)
+if (count > 0) { await expect(el).toBeVisible(); }
+```
 
 ## CI Workflow Notes
 

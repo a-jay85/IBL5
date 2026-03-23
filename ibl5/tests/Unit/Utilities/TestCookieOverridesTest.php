@@ -161,6 +161,7 @@ class TestCookieOverridesTest extends TestCase
         putenv('E2E_TESTING=1');
         $_COOKIE['_test_overrides'] = json_encode([
             'Current Season Phase' => 'Draft',
+            'Current Season Ending Year' => '2026',
             'Allow Trades' => 'Yes',
             'Allow Waiver Moves' => 'Yes',
             'Show Draft Link' => 'On',
@@ -170,6 +171,7 @@ class TestCookieOverridesTest extends TestCase
 
         $result = TestCookieOverrides::getOverrides();
 
-        $this->assertCount(6, $result);
+        $this->assertCount(7, $result);
+        $this->assertSame('2026', $result['Current Season Ending Year']);
     }
 }

@@ -77,11 +77,10 @@ test.describe('Player rookie option sub-page', () => {
   }) => {
     await page.goto('modules.php?name=Player&pa=rookieoption&pid=1');
     const alert = page.locator('.ibl-alert--error');
-    if ((await alert.count()) > 0) {
-      const text = await alert.textContent();
-      // Could be ownership error ("not on your team") or eligibility error
-      expect(text).toMatch(/not eligible|rookie option|not on your team/i);
-    }
+    await expect(alert).toBeVisible();
+    const text = await alert.textContent();
+    // Could be ownership error ("not on your team") or eligibility error
+    expect(text).toMatch(/not eligible|rookie option|not on your team/i);
   });
 
   test('rookie option with invalid PID shows no PHP errors', async ({

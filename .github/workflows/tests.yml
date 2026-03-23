@@ -8,6 +8,7 @@ on:
       - 'ibl5/migrations/**.sql'
   pull_request:
     branches: [ master, develop ]
+    types: [opened, synchronize, reopened, ready_for_review]
     paths:
       - '**.php'
       - 'ibl5/migrations/**.sql'
@@ -55,10 +56,27 @@ jobs:
       working-directory: ibl5
       run: |
         mkdir -p coverage
+        echo "::group::Full PHPUnit output"
+        set +eo pipefail
         vendor/bin/phpunit \
           --testdox \
           --coverage-clover coverage/clover.xml \
-          --colors=always
+          --colors=always 2>&1 | tee /tmp/phpunit-output.txt
+        PHPUNIT_EXIT=${PIPESTATUS[0]}
+        set -eo pipefail
+        echo "::endgroup::"
+
+        if [ $PHPUNIT_EXIT -ne 0 ]; then
+          echo ""
+          echo "════════════════════════════════════════"
+          echo "  FAILURE SUMMARY"
+          echo "════════════════════════════════════════"
+          sed 's/\x1b\[[0-9;]*m//g' /tmp/phpunit-output.txt | awk '/✔/{show=0} /✘/{show=1} show' || true
+          echo ""
+          sed 's/\x1b\[[0-9;]*m//g' /tmp/phpunit-output.txt | awk '/^FAILURES!$/,0' || true
+          echo "════════════════════════════════════════"
+        fi
+        exit $PHPUNIT_EXIT
 
     - name: Check coverage threshold
       working-directory: ibl5

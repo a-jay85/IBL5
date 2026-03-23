@@ -6,13 +6,14 @@ namespace NextSim\Contracts;
 
 use Team\Team;
 use Season\Season;
+use LeagueSchedule\Game;
 
 /**
  * NextSimServiceInterface - Contract for next sim business logic
  *
  * Defines methods for processing next simulation game data.
  *
- * @phpstan-type NextSimGameData array{game: \Game, date: \DateTime, dayNumber: int, opposingTeam: Team, locationPrefix: string, opposingStarters: array<string, \Player\Player>, opponentTier: string, opponentPowerRanking: float}
+ * @phpstan-type NextSimGameData array{game: Game, date: \DateTime, dayNumber: int, opposingTeam: Team, locationPrefix: string, opposingStarters: array<string, \Player\Player>, opponentTier: string, opponentPowerRanking: float}
  *
  * @see \NextSim\NextSimService For the concrete implementation
  */

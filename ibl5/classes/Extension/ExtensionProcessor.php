@@ -10,6 +10,7 @@ use Extension\Contracts\ExtensionProcessorInterface;
 use Services\CommonContractValidator;
 use Team\Contracts\TeamQueryRepositoryInterface;
 use Team\Team;
+use Discord\Discord;
 
 /**
  * ExtensionProcessor - Processes contract extension offers
@@ -198,11 +199,11 @@ class ExtensionProcessor implements ExtensionProcessorInterface
             // Send Discord notification
             if (class_exists('Discord')) {
                 $hometext = "{$playerName} today accepted a contract extension offer from the {$teamName} worth $offerInMillions million dollars over $offerYears years:<br>" . $offerDetails;
-                \Discord::postToChannel('#extensions', $hometext);
+                Discord::postToChannel('#extensions', $hometext);
 
                 $serverName = $_SERVER['SERVER_NAME'] ?? 'localhost';
                 if ($serverName !== 'localhost' && $serverName !== '127.0.0.1') {
-                    \Discord::postToChannel('#general-chat', $hometext);
+                    Discord::postToChannel('#general-chat', $hometext);
                 }
             }
 
@@ -242,7 +243,7 @@ class ExtensionProcessor implements ExtensionProcessorInterface
             // Send Discord notification
             if (class_exists('Discord')) {
                 $hometext = "{$playerName} today rejected a contract extension offer from the {$teamName} worth $offerInMillions million dollars over $offerYears years.";
-                \Discord::postToChannel('#extensions', $hometext);
+                Discord::postToChannel('#extensions', $hometext);
             }
 
             // Send email notification

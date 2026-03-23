@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Tests;
 
 use PHPUnit\Framework\TestCase;
-use Game;
+use LeagueSchedule\Game;
 
 /**
  * GameTest - Tests for Game entity class

@@ -37,11 +37,11 @@ $repository->deleteTradeOffer($offerId);
 
 // Attempt Discord notification (gracefully fail if not available)
 try {
-    $discord = new Discord($mysqli_db);
+    $discord = new \Discord\Discord($mysqli_db);
     $rejectingUserDiscordID = $discord->getDiscordIDFromTeamname($teamRejecting);
     $receivingUserDiscordID = $discord->getDiscordIDFromTeamname($teamReceiving);
     $declineMessage = Trading\TradingService::buildDeclineMessage($rejectingUserDiscordID, $teamRejecting);
-    \Discord::sendDM($receivingUserDiscordID, $declineMessage);
+    \Discord\Discord::sendDM($receivingUserDiscordID, $declineMessage);
 } catch (Exception $e) {
     // Silently fail if Discord notification fails
     // The trade rejection itself has already succeeded

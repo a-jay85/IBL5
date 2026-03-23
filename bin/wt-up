@@ -1,6 +1,6 @@
 #!/bin/bash
 # Start a Docker environment for a worktree with its own PHP-Apache + MariaDB.
-# Usage: bin/wt-up <worktree-name> [--pr] [--seed] [--prod] [--no-data]
+# Usage: bin/wt-up <worktree-name> [--pr] [--seed] [--prod] [--no-data] [--fresh-vendor]
 
 set -euo pipefail
 
@@ -10,6 +10,7 @@ USE_PR=false
 SEED_DB=false
 PROD_DB=false
 NO_DATA=false
+FRESH_VENDOR=false
 
 # Wrapper to suppress MariaDB "password on command line" warning
 db_exec() {
@@ -26,6 +27,7 @@ for arg in "$@"; do
         --seed) SEED_DB=true ;;
         --prod) PROD_DB=true ;;
         --no-data) NO_DATA=true ;;
+        --fresh-vendor) FRESH_VENDOR=true ;;
         -*) echo "Unknown option: $arg" >&2; exit 1 ;;
         *) WORKTREE_NAME="$arg" ;;
     esac
@@ -39,6 +41,7 @@ if [ -z "$WORKTREE_NAME" ]; then
     echo "  --seed     Import ci-seed.sql for test data (schema + CI seed)" >&2
     echo "  --prod     Import prod-seed.sql (default if no data flag given)" >&2
     echo "  --no-data  Schema only, no seed data" >&2
+    echo "  --fresh-vendor  Remove vendor volume and reinstall (use after composer.lock changes)" >&2
     exit 1
 fi
 
@@ -95,14 +98,11 @@ if [ ! -s "$STYLE_CSS" ]; then
     cp "$REPO_ROOT/ibl5/themes/IBL/style/style.css" "$STYLE_CSS" 2>/dev/null || true
 fi
 
-# Replace vendor symlink with a real directory so Docker's bind mount overlays it.
-# When vendor is a symlink, Docker follows it and the separate vendor bind mount
-# in the compose template is ignored — causing autoloader paths to resolve to the
-# host filesystem path (which doesn't exist inside the container).
+# Remove vendor symlink if present — named volume mounts over this path.
+# The symlink is created by wt-new for host-side tools; Docker doesn't need it.
 VENDOR_DIR="$WORKTREE_PATH/ibl5/vendor"
 if [ -L "$VENDOR_DIR" ]; then
     rm "$VENDOR_DIR"
-    mkdir -p "$VENDOR_DIR"
 fi
 
 # Copy config.php into worktree (can't use bind mount — VirtioFS fails on nested mounts)
@@ -134,14 +134,16 @@ ENV_FILE_FLAG=""
 if [ -f "$REPO_ROOT/.env" ]; then
     ENV_FILE_FLAG="--env-file $REPO_ROOT/.env"
 fi
-docker compose -f "$COMPOSE_FILE" $ENV_FILE_FLAG -p "ibl5-$SLUG" up -d --build
 
-# Fix autoloader paths inside the container.
-# vendor/ is bind-mounted from the host, so PHP's realpath() resolves it to the
-# host filesystem path (e.g. /Users/.../ibl5/vendor). Composer's generated
-# autoloader uses dirname(realpath(__DIR__)) which then points to a host path
-# that doesn't exist inside the container. Regenerating the autoloader inside
-# the container fixes all paths to use /var/www/html/ibl5/classes.
+# --fresh-vendor: remove vendor volume so entrypoint re-runs composer install.
+# DB volume is preserved — only vendor is reset.
+if [ "$FRESH_VENDOR" = true ]; then
+    echo "Removing vendor volume for fresh install..."
+    docker compose -f "$COMPOSE_FILE" $ENV_FILE_FLAG -p "ibl5-$SLUG" down 2>/dev/null || true
+    docker volume rm "ibl5-${SLUG}_vendor-${SLUG}-data" 2>/dev/null || true
+fi
+
+docker compose -f "$COMPOSE_FILE" $ENV_FILE_FLAG -p "ibl5-$SLUG" up -d --build
 
 # Wait for MariaDB to be healthy
 echo "Waiting for MariaDB (db-$SLUG) to be ready..."

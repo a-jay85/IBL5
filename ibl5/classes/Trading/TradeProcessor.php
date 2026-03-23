@@ -101,6 +101,14 @@ class TradeProcessor implements TradeProcessorInterface
 
             $this->db->commit();
 
+            \Logging\LoggerFactory::getChannel('audit')->info('trade_executed', [
+                'action' => 'trade_executed',
+                'offer_id' => $offerId,
+                'offering_team' => $offeringTeamName,
+                'listening_team' => $listeningTeamName,
+                'story_title' => $storytitle,
+            ]);
+
             return [
                 'success' => true,
                 'storytext' => $storytext,

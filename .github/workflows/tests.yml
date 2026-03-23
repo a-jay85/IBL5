@@ -69,14 +69,11 @@ jobs:
         if [ $PHPUNIT_EXIT -ne 0 ]; then
           echo ""
           echo "════════════════════════════════════════"
-          echo "  FAILING TESTS"
+          echo "  FAILURE SUMMARY"
           echo "════════════════════════════════════════"
-          sed 's/\x1b\[[0-9;]*m//g' /tmp/phpunit-output.txt | grep '✘' || true
+          sed 's/\x1b\[[0-9;]*m//g' /tmp/phpunit-output.txt | awk '/✔/{show=0} /✘/{show=1} show' || true
           echo ""
-          echo "════════════════════════════════════════"
-          echo "  FAILURE DETAILS"
-          echo "════════════════════════════════════════"
-          sed 's/\x1b\[[0-9;]*m//g' /tmp/phpunit-output.txt | awk '/^There (was|were) [0-9]+ (failure|error)/,0' || true
+          sed 's/\x1b\[[0-9;]*m//g' /tmp/phpunit-output.txt | awk '/^FAILURES!$/,0' || true
           echo "════════════════════════════════════════"
         fi
         exit $PHPUNIT_EXIT

@@ -32,11 +32,8 @@ test.describe('Navigation bar smoke tests (public)', () => {
     }
 
     // Teams is database-driven (JOIN ibl_team_info + ibl_standings).
-    // Verified separately in flows/navigation.spec.ts with full data.
-    const teamsButton = nav.getByRole('button', { name: 'Teams' });
-    if (await teamsButton.count() > 0) {
-      await expect(teamsButton).toBeVisible();
-    }
+    // CI seed has team data, so the button should render.
+    await expect(nav.getByRole('button', { name: 'Teams' })).toBeVisible();
   });
 
   test('login button shown for unauthenticated users', async ({ page }) => {
@@ -126,11 +123,10 @@ test.describe('Navigation bar smoke tests (mobile viewport)', () => {
       ).toBeVisible();
     }
 
-    // Teams is database-driven — conditionally check
-    const teamsBtn = mobileMenu.locator('.mobile-dropdown-btn', { hasText: 'Teams' }).first();
-    if (await teamsBtn.count() > 0) {
-      await expect(teamsBtn).toBeVisible();
-    }
+    // Teams is database-driven — CI seed has team data, so the button should render
+    await expect(
+      mobileMenu.locator('.mobile-dropdown-btn', { hasText: 'Teams' }).first(),
+    ).toBeVisible();
   });
 
   test('mobile accordion expands on tap', async ({ page }) => {

@@ -51,11 +51,9 @@ test.describe('Season Highs flow', () => {
 
   test('stat values are numeric', async ({ page }) => {
     const valueCells = page.locator('.value-cell');
-    const count = await valueCells.count();
-    if (count > 0) {
-      const text = await valueCells.first().textContent();
-      expect(text?.trim()).toMatch(/^\d+(\.\d+)?$/);
-    }
+    await expect(valueCells.first()).toBeVisible();
+    const text = await valueCells.first().textContent();
+    expect(text?.trim()).toMatch(/^\d+(\.\d+)?$/);
   });
 
   test('no PHP errors', async ({ page }) => {

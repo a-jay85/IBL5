@@ -12,7 +12,7 @@ const SCHEDULE_URL = 'modules.php?name=Schedule';
 
 test.describe('League Schedule — smoke', () => {
   test.beforeEach(async ({ appState, page }) => {
-    await appState({ 'Current Season Phase': 'Regular Season' });
+    await appState({ 'Current Season Phase': 'Regular Season', 'Current Season Ending Year': '2026' });
     await page.goto(SCHEDULE_URL);
   });
 
@@ -47,13 +47,6 @@ test.describe('League Schedule — smoke', () => {
       '.schedule-game span.schedule-game__score-link',
       { hasText: '–' },
     );
-    const count = await dashScore.count();
-    if (count === 0) {
-      // All games in schedule have been played — no unplayed dashes to verify.
-      // CI seed data has unplayed games; local/prod DBs may not.
-      test.skip(true, 'All games played — no unplayed game dashes in current DB');
-      return;
-    }
     await expect(dashScore.first()).toBeVisible();
   });
 
@@ -75,25 +68,17 @@ test.describe('League Schedule — smoke', () => {
 
 test.describe('League Schedule — Next Games button', () => {
   test.beforeEach(async ({ appState, page }) => {
-    await appState({ 'Current Season Phase': 'Regular Season' });
+    await appState({ 'Current Season Phase': 'Regular Season', 'Current Season Ending Year': '2026' });
     await page.goto(SCHEDULE_URL);
   });
 
   test('jump button visible when upcoming games exist', async ({ page }) => {
     const jumpBtn = page.locator('.schedule-jump-btn');
-    if (await jumpBtn.count() === 0) {
-      test.skip(true, 'All games played — no upcoming games, jump button correctly absent');
-      return;
-    }
     await expect(jumpBtn).toBeVisible();
   });
 
   test('upcoming games have highlight class', async ({ page }) => {
     const upcoming = page.locator('.schedule-game--upcoming');
-    if (await upcoming.count() === 0) {
-      test.skip(true, 'All games played — no upcoming games to highlight');
-      return;
-    }
     await expect(upcoming.first()).toBeVisible();
   });
 });
@@ -104,7 +89,7 @@ test.describe('League Schedule — Next Games button', () => {
 
 test.describe('League Schedule — played games', () => {
   test.beforeEach(async ({ appState, page }) => {
-    await appState({ 'Current Season Phase': 'Regular Season' });
+    await appState({ 'Current Season Phase': 'Regular Season', 'Current Season Ending Year': '2026' });
     await page.goto(SCHEDULE_URL);
   });
 
@@ -145,10 +130,6 @@ test.describe('League Schedule — played games', () => {
     const unplayedSpan = page.locator(
       '.schedule-game span.schedule-game__score-link',
     );
-    if (await unplayedSpan.count() === 0) {
-      test.skip(true, 'All games played — no unplayed score spans in current DB');
-      return;
-    }
     await expect(unplayedSpan.first()).toBeVisible();
   });
 });
@@ -159,7 +140,7 @@ test.describe('League Schedule — played games', () => {
 
 test.describe('League Schedule — SOS tier dots', () => {
   test.beforeEach(async ({ appState, page }) => {
-    await appState({ 'Current Season Phase': 'Regular Season' });
+    await appState({ 'Current Season Phase': 'Regular Season', 'Current Season Ending Year': '2026' });
     await page.goto(SCHEDULE_URL);
   });
 
@@ -190,7 +171,7 @@ test.describe('League Schedule — SOS tier dots', () => {
 
 test.describe('League Schedule — Playoff phase', () => {
   test.beforeEach(async ({ appState, page }) => {
-    await appState({ 'Current Season Phase': 'Playoffs' });
+    await appState({ 'Current Season Phase': 'Playoffs', 'Current Season Ending Year': '2026' });
     await page.goto(SCHEDULE_URL);
   });
 

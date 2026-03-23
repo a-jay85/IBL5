@@ -94,14 +94,11 @@ test.describe('Mobile authenticated page smoke tests', () => {
   });
 
   test('free agency negotiate page — no horizontal overflow on mobile', async ({ appState, page }) => {
-    await appState({ 'Current Season Phase': 'Free Agency' });
+    await appState({ 'Current Season Phase': 'Free Agency', 'Current Season Ending Year': '2026' });
     await gotoWithRetry(page, 'modules.php?name=FreeAgency&pa=negotiate&pid=11');
-    const card = page.locator('.ibl-card__title').first();
-    const visible = await card.isVisible().catch(() => false);
-    if (!visible) {
-      test.skip(true, 'negotiate page for pid=11 unavailable (local DB state)');
-    }
-    await expect(card).toBeVisible();
+    // Verify page rendered (card or alert — depends on roster/demand data)
+    const content = page.locator('.ibl-card__title, .ibl-alert, .ibl-title').first();
+    await expect(content).toBeVisible();
     await assertNoHorizontalOverflow(page, 'on free agency negotiate page');
   });
 

@@ -10,6 +10,7 @@ test.describe('Draft board: renders', () => {
     await appState({
       'Current Season Phase': 'Draft',
       'Show Draft Link': 'On',
+      'Current Season Ending Year': '2026',
     });
     await page.goto('modules.php?name=Draft');
   });
@@ -42,14 +43,8 @@ test.describe('Draft board: renders', () => {
   });
 
   test('undrafted players listed with radio buttons', async ({ page }) => {
-    // Radio buttons only appear when the authenticated user's team owns the current pick.
-    // In CI seed, Metros own pick 1. Locally, draft state may differ.
+    // CI seed: Metros own pick 1, so radio buttons render.
     const radios = page.locator('input[type="radio"][name="player"]');
-    const count = await radios.count();
-    if (count === 0) {
-      test.skip(true, 'User team does not own current pick — no radio buttons rendered');
-      return;
-    }
     await expect(radios.first()).toBeVisible();
   });
 
@@ -62,43 +57,28 @@ test.describe('Draft board: renders', () => {
   test('submit button visible when user owns current pick', async ({
     page,
   }) => {
-    // Metros own pick 1 in CI seed. Locally, draft state may differ.
+    // CI seed: Metros own pick 1.
     const submitBtn = page.locator('button, input[type="submit"]').filter({
       hasText: /draft player/i,
     });
-    if (await submitBtn.count() === 0) {
-      test.skip(true, 'User team does not own current pick — no submit button rendered');
-      return;
-    }
     await expect(submitBtn.first()).toBeVisible();
   });
 
   test('submit button is fixed to bottom of viewport', async ({ page }) => {
     const container = page.locator('.draft-submit-container');
-    if (await container.count() === 0) {
-      test.skip(true, 'User team does not own current pick — no submit container');
-      return;
-    }
     await expect(container).toBeVisible();
     await expect(container).toHaveCSS('position', 'fixed');
   });
 
   test('submit button visible without scrolling', async ({ page }) => {
     const submitBtn = page.locator('.draft-submit-container .ibl-btn');
-    if (await submitBtn.count() === 0) {
-      test.skip(true, 'User team does not own current pick — no submit button');
-      return;
-    }
     await expect(submitBtn).toBeVisible();
     await expect(submitBtn).toBeInViewport();
   });
 
   test('submit button remains visible after scrolling', async ({ page }) => {
     const submitBtn = page.locator('.draft-submit-container .ibl-btn');
-    if (await submitBtn.count() === 0) {
-      test.skip(true, 'User team does not own current pick — no submit button');
-      return;
-    }
+    await expect(submitBtn).toBeVisible();
 
     // Scroll to the bottom of the draft table
     await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
@@ -117,18 +97,15 @@ test.describe('Draft selection: submission', () => {
     await appState({
       'Current Season Phase': 'Draft',
       'Show Draft Link': 'On',
+      'Current Season Ending Year': '2026',
     });
     await page.goto('modules.php?name=Draft');
 
-    // Select the first undrafted player
+    // Select the first undrafted player — CI seed: Metros own pick 1
     const firstRadio = page
       .locator('input[type="radio"][name="player"]')
       .first();
-    if (
-      (await page.locator('input[type="radio"][name="player"]').count()) === 0
-    ) {
-      test.skip(true, 'No undrafted players available (pick already filled)');
-    }
+    await expect(firstRadio).toBeVisible();
     await firstRadio.check();
 
     // Submit the form — navigates to draft_selection.php
@@ -158,14 +135,13 @@ test.describe('Draft selection: submission', () => {
     await appState({
       'Current Season Phase': 'Draft',
       'Show Draft Link': 'On',
+      'Current Season Ending Year': '2026',
     });
     await page.goto('modules.php?name=Draft');
 
-    // Submit without selecting a player
+    // Submit without selecting a player — CI seed: Metros own pick 1
     const form = page.locator('form[name="draft_form"]');
-    if ((await form.count()) === 0) {
-      test.skip(true, 'Draft form not found (pick may already be filled)');
-    }
+    await expect(form).toBeVisible();
 
     // Submit via JS to bypass client-side validation
     await Promise.all([
@@ -194,6 +170,7 @@ test.describe('Draft: phase gating', () => {
     await appState({
       'Current Season Phase': 'Free Agency',
       'Show Draft Link': 'On',
+      'Current Season Ending Year': '2026',
     });
     await page.goto('modules.php?name=Draft');
 

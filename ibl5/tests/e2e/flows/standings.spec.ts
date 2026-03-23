@@ -60,30 +60,27 @@ test.describe('Standings page flow', () => {
     expect(count).toBeGreaterThanOrEqual(28);
   });
 
-  test('clinch indicators are valid when present', async ({ page }) => {
+  test('clinch indicators are valid', async ({ page }) => {
     const clinchIndicators = page.locator('.ibl-clinched-indicator');
-    const count = await clinchIndicators.count();
-    if (count > 0) {
-      const texts = await clinchIndicators.evaluateAll((els) =>
-        els.map((el) => el.textContent?.trim() ?? ''),
-      );
-      for (const text of texts) {
-        expect(['W', 'X', 'Y', 'Z']).toContain(text);
-      }
+    await expect(clinchIndicators.first()).toBeVisible();
+
+    const texts = await clinchIndicators.evaluateAll((els) =>
+      els.map((el) => el.textContent?.trim() ?? ''),
+    );
+    for (const text of texts) {
+      expect(['W', 'X', 'Y', 'Z']).toContain(text);
     }
   });
 
-  test('clinch rows with bottom-locked class are valid when present', async ({ page }) => {
+  test('clinch rows with bottom-locked class have team IDs', async ({ page }) => {
     const bottomLocked = page.locator('tr.bottom-locked');
-    const count = await bottomLocked.count();
-    // bottom-locked is optional — only present if feature branch merged
-    if (count > 0) {
-      const teamIds = await bottomLocked.evaluateAll((els) =>
-        els.map((el) => el.getAttribute('data-team-id')),
-      );
-      for (const teamId of teamIds) {
-        expect(teamId).toBeTruthy();
-      }
+    await expect(bottomLocked.first()).toBeVisible();
+
+    const teamIds = await bottomLocked.evaluateAll((els) =>
+      els.map((el) => el.getAttribute('data-team-id')),
+    );
+    for (const teamId of teamIds) {
+      expect(teamId).toBeTruthy();
     }
   });
 

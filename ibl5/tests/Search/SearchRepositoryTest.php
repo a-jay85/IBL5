@@ -163,16 +163,11 @@ class SearchRepositoryTest extends IntegrationTestCase
         $this->assertSame('Trades', $result[0]['title']);
     }
 
-    public function testGetAuthorsReturnsAuthorsArray(): void
+    public function testGetAuthorsReturnsEmptyArray(): void
     {
-        $this->mockDb->setMockData([
-            ['aid' => 'admin'],
-            ['aid' => 'editor'],
-        ]);
-
         $result = $this->repository->getAuthors();
 
-        $this->assertSame(['admin', 'editor'], $result);
+        $this->assertSame([], $result);
     }
 
     public function testGetTopicInfoReturnsTransformedData(): void

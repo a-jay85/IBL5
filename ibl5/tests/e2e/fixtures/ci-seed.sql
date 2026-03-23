@@ -761,11 +761,6 @@ INSERT INTO nuke_stories_cat (catid, title) VALUES
   (15, 'General')
 ON DUPLICATE KEY UPDATE title = VALUES(title);
 
--- Authors for search filter dropdown (admin already used in stories above)
-INSERT INTO nuke_authors (aid, name) VALUES
-  ('admin', 'Admin')
-ON DUPLICATE KEY UPDATE name = VALUES(name);
-
 -- ============================================================
 -- Draft class prospects (for Draft E2E tests)
 -- 4 undrafted + 2 already drafted

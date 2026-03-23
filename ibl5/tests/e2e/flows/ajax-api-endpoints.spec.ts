@@ -4,7 +4,7 @@ import { test, expect } from '../fixtures/auth';
 // JavaScript for tab switching and saved depth chart management. A broken
 // endpoint would cause silent failures in the UI.
 
-// Helper: retry GET requests that return HTML instead of JSON (MAMP/CI load)
+// Helper: retry GET requests that return HTML instead of JSON (CI load)
 async function fetchJson(
   request: import('@playwright/test').APIRequestContext,
   url: string,

@@ -50,7 +50,8 @@ class NukeCompat
      */
     public function getUserInfo(mixed $user): ?array
     {
-        return getusrinfo($user);
+        global $authService;
+        return $authService->getUserInfo();
     }
 
     /**
@@ -68,7 +69,13 @@ class NukeCompat
      */
     public function formatTimestamp(int|string $timestamp): string
     {
-        return formatTimestamp($timestamp);
+        $time = $timestamp;
+        if (!is_numeric($time)) {
+            preg_match('/(\d{4})-(\d{1,2})-(\d{1,2}) (\d{1,2}):(\d{1,2}):(\d{1,2})/', (string) $time, $dtParts);
+            $time = gmmktime((int) $dtParts[4], (int) $dtParts[5], (int) $dtParts[6], (int) $dtParts[2], (int) $dtParts[3], (int) $dtParts[1]);
+        }
+        $time = (int) $time - (int) date("Z");
+        return ucfirst(date(_DATESTRING, $time));
     }
 
     /**

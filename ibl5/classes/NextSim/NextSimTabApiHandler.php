@@ -6,6 +6,7 @@ namespace NextSim;
 
 use Standings\StandingsRepository;
 use TeamSchedule\TeamScheduleRepository;
+use Team\Team;
 
 /**
  * AJAX JSON endpoint handler for NextSim position tab switching
@@ -36,7 +37,7 @@ class NextSimTabApiHandler
         }
 
         $season = new \Season($this->db);
-        $team = \Team::initialize($this->db, $teamID);
+        $team = Team::initialize($this->db, $teamID);
 
         // Load power rankings for SOS tier indicators
         $standingsRepo = new StandingsRepository($this->db);

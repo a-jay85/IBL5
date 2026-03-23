@@ -9,6 +9,7 @@ use Player\PlayerImageHelper;
 use Player\PlayerStats;
 use UI\TeamCellHelper;
 use Utilities\HtmlSanitizer;
+use Team\Team;
 
 /**
  * SeasonAverages - Displays season averages statistics table
@@ -20,13 +21,13 @@ class SeasonAverages
      *
      * @param \mysqli $db Database connection
      * @param iterable<int, Player|array<string, mixed>> $result Player result set
-     * @param \Team $team Team object
+     * @param Team $team Team object
      * @param string $yr Year filter (empty for current season)
      * @param list<int> $starterPids Starter player IDs
      * @param string $moduleName Module name
      * @return string HTML table
      */
-    public static function render(\mysqli $db, $result, \Team $team, string $yr, array $starterPids = [], string $moduleName = ""): string
+    public static function render(\mysqli $db, $result, Team $team, string $yr, array $starterPids = [], string $moduleName = ""): string
     {
         $playerRows = PlayerRowTransformer::resolveWithStats($db, $result, $yr);
 

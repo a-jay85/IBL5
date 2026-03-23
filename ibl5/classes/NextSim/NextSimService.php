@@ -9,6 +9,7 @@ use Player\Player;
 use StrengthOfSchedule\StrengthOfScheduleCalculator;
 use Team\Contracts\TeamQueryRepositoryInterface;
 use TeamSchedule\Contracts\TeamScheduleRepositoryInterface;
+use Team\Team;
 
 /**
  * NextSimService - Business logic for next simulation games
@@ -67,7 +68,7 @@ class NextSimService implements NextSimServiceInterface
             $dayNumber = $gameDate->diff($lastSimEndDateObject)->format('%a');
 
             $opposingTeamId = $game->getOpposingTeamID($teamId);
-            $opposingTeam = \Team::initialize($this->db, $opposingTeamId);
+            $opposingTeam = Team::initialize($this->db, $opposingTeamId);
             $opponentRanking = $this->teamPowerRankings[$opposingTeamId] ?? 0.0;
 
             $games[] = [
@@ -90,7 +91,7 @@ class NextSimService implements NextSimServiceInterface
      *
      * @return array<string, Player>
      */
-    public function getUserStartingLineup(\Team $team): array
+    public function getUserStartingLineup(Team $team): array
     {
         $starters = [];
         foreach (\JSB::PLAYER_POSITIONS as $position) {
@@ -107,10 +108,10 @@ class NextSimService implements NextSimServiceInterface
     /**
      * Get opposing team's starting lineup
      *
-     * @param \Team $opposingTeam Opposing team
+     * @param Team $opposingTeam Opposing team
      * @return array<string, Player> Starting players by position
      */
-    private function getOpposingStartingLineup(\Team $opposingTeam): array
+    private function getOpposingStartingLineup(Team $opposingTeam): array
     {
         $starters = [];
 

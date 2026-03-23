@@ -9,6 +9,7 @@ use Player\Player;
 use Team\Contracts\TeamQueryRepositoryInterface;
 use UI\Components\TableViewSwitcher;
 use Waivers\Contracts\WaiversControllerInterface;
+use Team\Team;
 
 /**
  * @see WaiversControllerInterface
@@ -245,7 +246,7 @@ class WaiversController implements WaiversControllerInterface
         \PageLayout\PageLayout::header();
 
         $teamName = $this->commonRepository->getTeamnameFromUsername((string) ($userInfo['username'] ?? '')) ?? '';
-        $team = \Team::initialize($this->db, $teamName);
+        $team = Team::initialize($this->db, $teamName);
 
         $season = new \Season($this->db);
         $players = $this->getPlayersForAction($team, $action);
@@ -275,10 +276,10 @@ class WaiversController implements WaiversControllerInterface
             $styleTeam = $team;
         } elseif ($season->isOffseasonPhase()) {
             $tableResult = $league->getFreeAgentsResult($season);
-            $styleTeam = \Team::initialize($this->db, League::FREE_AGENTS_TEAMID);
+            $styleTeam = Team::initialize($this->db, League::FREE_AGENTS_TEAMID);
         } else {
             $tableResult = $league->getWaivedPlayersResult();
-            $styleTeam = \Team::initialize($this->db, League::FREE_AGENTS_TEAMID);
+            $styleTeam = Team::initialize($this->db, League::FREE_AGENTS_TEAMID);
         }
 
         $tabDefinitions = [
@@ -301,7 +302,7 @@ class WaiversController implements WaiversControllerInterface
      *
      * @param array<int, array<string, mixed>|Player> $result
      */
-    private function renderTableForDisplay(string $display, array $result, \Team $team, \Season $season): string
+    private function renderTableForDisplay(string $display, array $result, Team $team, \Season $season): string
     {
         switch ($display) {
             case 'total_s':
@@ -318,7 +319,7 @@ class WaiversController implements WaiversControllerInterface
     /**
      * @return list<string>
      */
-    private function getPlayersForAction(\Team $team, string $action): array
+    private function getPlayersForAction(Team $team, string $action): array
     {
         $league = new League($this->db);
         $season = new \Season($this->db);

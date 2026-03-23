@@ -7,6 +7,7 @@ namespace CapSpace;
 use CapSpace\Contracts\CapSpaceRepositoryInterface;
 use League\League;
 use Team\Contracts\TeamQueryRepositoryInterface;
+use Team\Team;
 
 /**
  * CapSpaceService - Business logic for salary cap information
@@ -16,7 +17,7 @@ use Team\Contracts\TeamQueryRepositoryInterface;
  * @phpstan-import-type PlayerRow from \Services\CommonMysqliRepository
  * @phpstan-type AvailableSalary array{year1: int, year2: int, year3: int, year4: int, year5: int, year6: int}
  * @phpstan-type PositionSalaries array<string, int>
- * @phpstan-type CapSpaceTeamData array{team: \Team, teamId: int, teamName: string, teamCity: string, color1: string, color2: string, availableSalary: AvailableSalary, positionSalaries: PositionSalaries, freeAgencySlots: int, hasMLE: bool, hasLLE: bool}
+ * @phpstan-type CapSpaceTeamData array{team: Team, teamId: int, teamName: string, teamCity: string, color1: string, color2: string, availableSalary: AvailableSalary, positionSalaries: PositionSalaries, freeAgencySlots: int, hasMLE: bool, hasLLE: bool}
  * @phpstan-type DisplayYears array{beginningYear: int, endingYear: int}
  *
  * @see CapSpaceRepositoryInterface For data access
@@ -53,7 +54,7 @@ class CapSpaceService
         $teamsData = [];
 
         foreach ($teams as $teamRow) {
-            $team = \Team::initialize($this->db, $teamRow);
+            $team = Team::initialize($this->db, $teamRow);
             $teamsData[] = $this->processTeamCapData($team, $season);
         }
 
@@ -63,11 +64,11 @@ class CapSpaceService
     /**
      * Process salary cap data for a single team
      *
-     * @param \Team $team Team object
+     * @param Team $team Team object
      * @param \Season $season Current season
      * @return CapSpaceTeamData Processed cap data for the team
      */
-    protected function processTeamCapData(\Team $team, \Season $season): array
+    protected function processTeamCapData(Team $team, \Season $season): array
     {
         $salaryCapSpent = $this->teamQueryRepo->getSalaryCapArray($team->name, $team->teamID, $season);
         $freeAgencySlots = 15;

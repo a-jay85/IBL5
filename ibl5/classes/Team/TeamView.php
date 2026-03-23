@@ -117,11 +117,11 @@ class TeamView implements TeamViewInterface
     /**
      * Render the team banner row with logo centered and action links flanking it
      *
-     * @param \Team $team Team object with color1, color2, name, discordID properties
+     * @param Team $team Team object with color1, color2, name, discordID properties
      */
     private function renderTeamBanner(int $teamID, object $team, string $imagesPath, string $userTeamName, bool $isOwnTeam): string
     {
-        /** @var \Team $team */
+        /** @var Team $team */
         $color1 = \UI\TableStyles::sanitizeColor($team->color1);
         $color2 = \UI\TableStyles::sanitizeColor($team->color2);
 
@@ -159,11 +159,11 @@ class TeamView implements TeamViewInterface
     /**
      * Render the draft picks section with team-colored header
      *
-     * @param \Team $team Team object with color1, color2 properties
+     * @param Team $team Team object with color1, color2 properties
      */
     private function renderDraftPicksSection(object $team, string $draftPicksTable): string
     {
-        /** @var \Team $team */
+        /** @var Team $team */
         ob_start();
         ?>
 <div class="team-card" style="<?= \UI\TableStyles::inlineVars($team->color1, $team->color2) ?>">

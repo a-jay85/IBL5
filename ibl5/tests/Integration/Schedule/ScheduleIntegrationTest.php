@@ -10,6 +10,7 @@ use Tests\Integration\Mocks\TestDataFactory;
 use TeamSchedule\TeamScheduleRepository;
 use TeamSchedule\TeamScheduleService;
 use TeamSchedule\TeamScheduleView;
+use Team\Team;
 
 /**
  * Integration tests for complete schedule display workflows
@@ -906,9 +907,9 @@ class ScheduleIntegrationTest extends IntegrationTestCase
     /**
      * Create a mock Team object for view testing
      */
-    private function createMockTeam(int $teamId, string $name, string $color1, string $color2): \Team
+    private function createMockTeam(int $teamId, string $name, string $color1, string $color2): Team
     {
-        $team = $this->getMockBuilder(\Team::class)
+        $team = $this->getMockBuilder(Team::class)
             ->disableOriginalConstructor()
             ->getMock();
 

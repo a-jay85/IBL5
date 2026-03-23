@@ -2,6 +2,8 @@
 
 declare(strict_types=1);
 
+use Team\Team;
+
 /**
  * TeamTest - Tests for Team class
  */
@@ -40,12 +42,12 @@ class TeamTest extends \PHPUnit\Framework\TestCase
 
     public function testBuyoutPercentageMaxConstant(): void
     {
-        $this->assertSame(0.40, \Team::BUYOUT_PERCENTAGE_MAX);
+        $this->assertSame(0.40, Team::BUYOUT_PERCENTAGE_MAX);
     }
 
     public function testRosterSpotsMaxConstant(): void
     {
-        $this->assertSame(15, \Team::ROSTER_SPOTS_MAX);
+        $this->assertSame(15, Team::ROSTER_SPOTS_MAX);
     }
 
     // ============================================
@@ -54,8 +56,8 @@ class TeamTest extends \PHPUnit\Framework\TestCase
 
     public function testCanBeInstantiated(): void
     {
-        $team = new \Team($this->mockDb);
+        $team = new Team($this->mockDb);
 
-        $this->assertInstanceOf(\Team::class, $team);
+        $this->assertInstanceOf(Team::class, $team);
     }
 }

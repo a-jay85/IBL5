@@ -9,6 +9,7 @@ use Player\PlayerImageHelper;
 use UI\Components\TooltipLabel;
 use UI\TeamCellHelper;
 use Utilities\HtmlSanitizer;
+use Team\Team;
 
 /**
  * Ratings - Displays player ratings table
@@ -20,7 +21,7 @@ class Ratings
      *
      * @param \mysqli $db Database connection
      * @param iterable<int, \Player\Player|array<string, mixed>> $data Player data
-     * @param \Team $team Team object
+     * @param Team $team Team object
      * @param string $yr Year filter (empty for current season)
      * @param \Season $season Season object
      * @param string $moduleName Module name for styling variations

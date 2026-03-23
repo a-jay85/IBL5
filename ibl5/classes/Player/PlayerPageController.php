@@ -14,6 +14,7 @@ use Player\Views\PlayerViewFactory;
 use Player\Views\TeamColorHelper;
 use Services\CommonMysqliRepository;
 use Utilities\HtmlSanitizer;
+use Team\Team;
 
 /**
  * PlayerPageController - Orchestrates the player page rendering
@@ -94,7 +95,7 @@ class PlayerPageController
 
         // Action buttons
         $userTeamName = $commonRepository->getTeamnameFromUsername($username) ?? League::FREE_AGENTS_TEAM_NAME;
-        $userTeam = \Team::initialize($this->mysqliDb, $userTeamName);
+        $userTeam = Team::initialize($this->mysqliDb, $userTeamName);
 
         $actionButtons = $this->renderActionButtons($pageService, $player, $playerID, $userTeam, $season);
         if ($actionButtons !== '') {
@@ -133,7 +134,7 @@ class PlayerPageController
         PlayerPageService $pageService,
         Player $player,
         int $playerID,
-        \Team $userTeam,
+        Team $userTeam,
         \Season $season
     ): string {
         $html = '';

@@ -8,6 +8,7 @@ use FreeAgency\Contracts\FreeAgencyCapCalculatorInterface;
 use League\League;
 use Player\Player;
 use Team\Contracts\TeamQueryRepositoryInterface;
+use Team\Team;
 
 /**
  * @see FreeAgencyCapCalculatorInterface
@@ -16,17 +17,17 @@ use Team\Contracts\TeamQueryRepositoryInterface;
 class FreeAgencyCapCalculator implements FreeAgencyCapCalculatorInterface
 {
     private \mysqli $mysqli_db;
-    private \Team $team;
+    private Team $team;
     private \Season $season;
     private TeamQueryRepositoryInterface $teamQueryRepo;
 
     /**
      * @param \mysqli $mysqli_db Database connection
-     * @param \Team $team Team entity
+     * @param Team $team Team entity
      * @param \Season $season Season entity
      * @param TeamQueryRepositoryInterface|null $teamQueryRepo Team query repository (created internally if not provided)
      */
-    public function __construct(\mysqli $mysqli_db, \Team $team, \Season $season, ?TeamQueryRepositoryInterface $teamQueryRepo = null)
+    public function __construct(\mysqli $mysqli_db, Team $team, \Season $season, ?TeamQueryRepositoryInterface $teamQueryRepo = null)
     {
         $this->mysqli_db = $mysqli_db;
         $this->team = $team;
@@ -90,12 +91,12 @@ class FreeAgencyCapCalculator implements FreeAgencyCapCalculatorInterface
     {
         /** @var array<int, int> $rosterSpots */
         $rosterSpots = [
-            0 => \Team::ROSTER_SPOTS_MAX,
-            1 => \Team::ROSTER_SPOTS_MAX,
-            2 => \Team::ROSTER_SPOTS_MAX,
-            3 => \Team::ROSTER_SPOTS_MAX,
-            4 => \Team::ROSTER_SPOTS_MAX,
-            5 => \Team::ROSTER_SPOTS_MAX,
+            0 => Team::ROSTER_SPOTS_MAX,
+            1 => Team::ROSTER_SPOTS_MAX,
+            2 => Team::ROSTER_SPOTS_MAX,
+            3 => Team::ROSTER_SPOTS_MAX,
+            4 => Team::ROSTER_SPOTS_MAX,
+            5 => Team::ROSTER_SPOTS_MAX,
         ];
 
         // Count players under contract

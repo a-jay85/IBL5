@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace DraftHistory\Contracts;
 
+use Team\Team;
+
 /**
  * View interface for Draft History module rendering.
  *
@@ -28,9 +30,9 @@ interface DraftHistoryViewInterface
     /**
      * Render the team-specific draft history page.
      *
-     * @param \Team $team Team object
+     * @param Team $team Team object
      * @param list<DraftPickByTeamRow> $draftPicks Array of draft pick data
      * @return string HTML output for the team draft history page
      */
-    public function renderTeamHistory(\Team $team, array $draftPicks): string;
+    public function renderTeamHistory(Team $team, array $draftPicks): string;
 }

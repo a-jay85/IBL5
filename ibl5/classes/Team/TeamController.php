@@ -110,19 +110,6 @@ class TeamController implements TeamControllerInterface
 
         echo $this->view->render($pageData);
 
-        // Output JS configuration for AJAX tab/dropdown switching
-        $params = ['teamID' => $teamID];
-        if ($yr !== null) {
-            $params['yr'] = $yr;
-        }
-        $jsConfig = json_encode([
-            'apiBaseUrl' => 'modules.php?name=Team&op=api',
-            'params' => $params,
-            'fallbackBaseUrl' => 'modules.php?name=Team&op=team&teamID=' . $teamID,
-        ], JSON_THROW_ON_ERROR);
-        echo '<script>window.IBL_AJAX_TABS_CONFIG = ' . $jsConfig . ';</script>';
-        echo '<script src="jslib/ajax-tabs.js"></script>';
-
         \PageLayout\PageLayout::footer();
     }
 

@@ -139,6 +139,55 @@ class TableViewDropdownTest extends TestCase
         $this->assertSame(1, $captionCount);
     }
 
+    // --- HTMX attributes ---
+
+    public function testWithoutHtmxGetUrlNoHtmxAttributesRendered(): void
+    {
+        $dropdown = $this->createDropdown();
+        $html = $dropdown->renderDropdown();
+
+        $this->assertStringNotContainsString('hx-get', $html);
+        $this->assertStringNotContainsString('hx-target', $html);
+        $this->assertStringNotContainsString('hx-swap', $html);
+        $this->assertStringNotContainsString('hx-trigger', $html);
+    }
+
+    public function testWithHtmxGetUrlRendersHtmxAttributes(): void
+    {
+        $dropdown = $this->createDropdownWithHtmx();
+        $html = $dropdown->renderDropdown();
+
+        $this->assertStringContainsString('hx-get="modules.php?name=Team&amp;op=api&amp;teamID=1"', $html);
+        $this->assertStringContainsString('hx-target="closest .table-scroll-container"', $html);
+        $this->assertStringContainsString('hx-swap="innerHTML"', $html);
+        $this->assertStringContainsString('hx-trigger="change"', $html);
+    }
+
+    public function testOnchangeFallbackChecksWindowHtmx(): void
+    {
+        $dropdown = $this->createDropdownWithHtmx();
+        $html = $dropdown->renderDropdown();
+
+        $this->assertStringContainsString('if(window.htmx)return;', $html);
+        $this->assertStringNotContainsString('IBL_AJAX_TABS_READY', $html);
+    }
+
+    public function testWithoutHtmxOnchangeAlsoChecksWindowHtmx(): void
+    {
+        $dropdown = $this->createDropdown();
+        $html = $dropdown->renderDropdown();
+
+        $this->assertStringContainsString('if(window.htmx)return;', $html);
+    }
+
+    public function testHtmxDoesNotIncludePushUrlOnDropdown(): void
+    {
+        $dropdown = $this->createDropdownWithHtmx();
+        $html = $dropdown->renderDropdown();
+
+        $this->assertStringNotContainsString('hx-push-url', $html);
+    }
+
     // --- Helper ---
 
     private function createDropdown(
@@ -154,5 +203,24 @@ class TableViewDropdownTest extends TestCase
             ],
         ];
         return new TableViewDropdown($groups, $activeValue, '/team.php?id=1', $color1, $color2);
+    }
+
+    private function createDropdownWithHtmx(
+        string $activeValue = 'ratings',
+    ): TableViewDropdown {
+        $groups = [
+            'Views' => [
+                'ratings' => 'Ratings',
+                'total_s' => 'Season Totals',
+            ],
+        ];
+        return new TableViewDropdown(
+            $groups,
+            $activeValue,
+            '/team.php?id=1',
+            'FF0000',
+            '0000FF',
+            'modules.php?name=Team&op=api&teamID=1'
+        );
     }
 }

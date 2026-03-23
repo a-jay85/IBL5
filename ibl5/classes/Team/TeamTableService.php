@@ -72,13 +72,16 @@ class TeamTableService implements TeamTableServiceInterface
 
         $tableHtml = $this->renderTableForDisplay($display, $result, $team, $yr, $season, $starterPids, $split);
 
+        // HTMX API URL for tab/dropdown switching
+        $apiUrl = 'modules.php?name=Team&op=api&teamID=' . $teamID . $insertyear;
+
         // Use dropdown for actual teams in current season; tabs for everything else
         $useDropdown = $teamID > 0 && ($yr === null || $yr === '');
 
         if ($useDropdown) {
             $dropdownGroups = $this->buildDropdownGroups($season);
             $activeValue = ($display === 'split' && $split !== null) ? 'split:' . $split : $display;
-            $dropdown = new TableViewDropdown($dropdownGroups, $activeValue, $baseUrl, $teamColor1, $teamColor2);
+            $dropdown = new TableViewDropdown($dropdownGroups, $activeValue, $baseUrl, $teamColor1, $teamColor2, $apiUrl);
             return $dropdown->wrap($tableHtml);
         }
 
@@ -96,7 +99,7 @@ class TeamTableService implements TeamTableServiceInterface
 
         $tabDefinitions['contracts'] = 'Contracts';
 
-        $switcher = new TableViewSwitcher($tabDefinitions, $display, $baseUrl, $teamColor1, $teamColor2);
+        $switcher = new TableViewSwitcher($tabDefinitions, $display, $baseUrl, $teamColor1, $teamColor2, $apiUrl);
         return $switcher->wrap($tableHtml);
     }
 

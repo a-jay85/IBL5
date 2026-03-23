@@ -252,4 +252,102 @@ class TableViewSwitcherTest extends TestCase
         $this->assertLessThan($posPer36, $posAverages);
         $this->assertLessThan($posContracts, $posPer36);
     }
+
+    public function testWithoutHtmxGetUrlNoHtmxAttributesRendered(): void
+    {
+        $switcher = new TableViewSwitcher(
+            $this->defaultTabs,
+            'ratings',
+            'modules.php?name=Team&op=team&teamID=1',
+            'FF0000',
+            '0000FF'
+        );
+
+        $result = $switcher->renderTabs();
+
+        $this->assertStringNotContainsString('hx-get', $result);
+        $this->assertStringNotContainsString('hx-target', $result);
+        $this->assertStringNotContainsString('hx-swap', $result);
+        $this->assertStringNotContainsString('hx-push-url', $result);
+    }
+
+    public function testWithHtmxGetUrlRendersHtmxAttributes(): void
+    {
+        $switcher = new TableViewSwitcher(
+            $this->defaultTabs,
+            'ratings',
+            'modules.php?name=Team&op=team&teamID=1',
+            'FF0000',
+            '0000FF',
+            'modules.php?name=Team&op=api&teamID=1'
+        );
+
+        $result = $switcher->renderTabs();
+
+        $this->assertStringContainsString('hx-get="modules.php?name=Team&amp;op=api&amp;teamID=1&amp;display=ratings"', $result);
+        $this->assertStringContainsString('hx-get="modules.php?name=Team&amp;op=api&amp;teamID=1&amp;display=total_s"', $result);
+        $this->assertStringContainsString('hx-target="closest .table-scroll-container"', $result);
+        $this->assertStringContainsString('hx-swap="innerHTML"', $result);
+    }
+
+    public function testHtmxPushUrlUsesHrefValue(): void
+    {
+        $switcher = new TableViewSwitcher(
+            ['ratings' => 'Ratings'],
+            'ratings',
+            'modules.php?name=Team&op=team&teamID=5',
+            'FF0000',
+            '0000FF',
+            'modules.php?name=Team&op=api&teamID=5'
+        );
+
+        $result = $switcher->renderTabs();
+
+        $this->assertStringContainsString(
+            'hx-push-url="modules.php?name=Team&amp;op=team&amp;teamID=5&amp;display=ratings"',
+            $result
+        );
+    }
+
+    public function testHtmxPushUrlFalseOmitsAttribute(): void
+    {
+        $switcher = new TableViewSwitcher(
+            ['PG' => 'Point Guards'],
+            'PG',
+            'modules.php?name=NextSim',
+            'FF0000',
+            '0000FF',
+            'modules.php?name=DepthChartEntry&op=nextsim-api&teamID=1',
+            'closest .nextsim-tab-container',
+            'position',
+            false
+        );
+
+        $result = $switcher->renderTabs();
+
+        $this->assertStringNotContainsString('hx-push-url', $result);
+        $this->assertStringContainsString('hx-get="modules.php?name=DepthChartEntry&amp;op=nextsim-api&amp;teamID=1&amp;position=PG"', $result);
+        $this->assertStringContainsString('hx-target="closest .nextsim-tab-container"', $result);
+    }
+
+    public function testCustomHtmxParamNameUsedInHxGet(): void
+    {
+        $switcher = new TableViewSwitcher(
+            ['PG' => 'Point Guards', 'SG' => 'Shooting Guards'],
+            'PG',
+            'modules.php?name=NextSim',
+            'FF0000',
+            '0000FF',
+            'modules.php?name=DepthChartEntry&op=nextsim-api&teamID=1',
+            'closest .nextsim-tab-container',
+            'position'
+        );
+
+        $result = $switcher->renderTabs();
+
+        $this->assertStringContainsString('&amp;position=PG"', $result);
+        $this->assertStringContainsString('&amp;position=SG"', $result);
+        // hx-get should use position param, not display param
+        $this->assertStringNotContainsString('hx-get="modules.php?name=DepthChartEntry&amp;op=nextsim-api&amp;teamID=1&amp;display=', $result);
+    }
 }

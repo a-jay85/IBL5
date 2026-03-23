@@ -43,7 +43,7 @@ if (!is_user($user)) {
         $teamPowerRankings[$tid] = (float)$data['ranking'];
     }
 
-    // Render header first (populates $cookie via online() → cookiedecode())
+    // Render header first (populates $cookie via cookiedecode())
     PageLayout\PageLayout::header();
 
     $username = strval($cookie[1] ?? '');

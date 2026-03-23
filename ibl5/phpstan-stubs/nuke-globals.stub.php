@@ -77,8 +77,6 @@ function include_secure(string $file): void {}
 /** @return void */
 function blocks(string $position): void {}
 
-/** @return void */
-function online(): void {}
 
 /** @return void */
 function themeheader(): void {}

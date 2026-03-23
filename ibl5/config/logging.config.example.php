@@ -18,4 +18,7 @@ return [
 
     // Number of daily log files to retain (0 = keep forever)
     'retention' => 30,
+
+    // Log queries slower than this threshold (milliseconds). 0 = disabled.
+    'slow_query_threshold_ms' => 200,
 ];

@@ -84,16 +84,9 @@ function themeheader(): void {}
 /** @return void */
 function themefooter(): void {}
 
-/**
- * @return array<string, mixed>|null
- */
-function getusrinfo(mixed $user): ?array { return null; }
-
 /** @return int 1 if admin, 0 otherwise */
 function is_admin(mixed $admin = null): int { return 0; }
 
-/** @return string */
-function formatTimestamp(int|string $timestamp): string { return ''; }
 
 /**
  * PHP-Nuke filter function — sanitizes input.

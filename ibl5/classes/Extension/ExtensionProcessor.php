@@ -197,7 +197,7 @@ class ExtensionProcessor implements ExtensionProcessorInterface
             ]);
 
             // Send Discord notification
-            if (class_exists('Discord')) {
+            if (class_exists(Discord::class)) {
                 $hometext = "{$playerName} today accepted a contract extension offer from the {$teamName} worth $offerInMillions million dollars over $offerYears years:<br>" . $offerDetails;
                 Discord::postToChannel('#extensions', $hometext);
 
@@ -225,7 +225,7 @@ class ExtensionProcessor implements ExtensionProcessorInterface
                 'extensionYears' => $offerYears,
                 'offerInMillions' => $offerInMillions,
                 'offerDetails' => $offerDetails,
-                'discordNotificationSent' => class_exists('Discord'),
+                'discordNotificationSent' => class_exists(Discord::class),
                 'discordChannel' => '#extensions'
             ];
         } else {
@@ -241,7 +241,7 @@ class ExtensionProcessor implements ExtensionProcessorInterface
             ]);
 
             // Send Discord notification
-            if (class_exists('Discord')) {
+            if (class_exists(Discord::class)) {
                 $hometext = "{$playerName} today rejected a contract extension offer from the {$teamName} worth $offerInMillions million dollars over $offerYears years.";
                 Discord::postToChannel('#extensions', $hometext);
             }
@@ -264,7 +264,7 @@ class ExtensionProcessor implements ExtensionProcessorInterface
                 'extensionYears' => $offerYears,
                 'offerInMillions' => $offerInMillions,
                 'offerDetails' => $offerDetails,
-                'discordNotificationSent' => class_exists('Discord'),
+                'discordNotificationSent' => class_exists(Discord::class),
                 'discordChannel' => '#extensions'
             ];
         }

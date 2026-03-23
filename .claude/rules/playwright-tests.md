@@ -111,25 +111,14 @@ test.describe('Module flow', () => {
 });
 ```
 
-### Public test with manual state control
+### Public test with cookie-based state control
 ```typescript
-import { test, expect } from '@playwright/test';
-import { setState, type Settings } from '../helpers/test-state';
-
-test.use({ storageState: { cookies: [], origins: [] } });
-test.describe.configure({ mode: 'serial' });
+import { test, expect } from '../fixtures/public';
 
 test.describe('Public module flow', () => {
-  let restoreSettings: Settings;
-
-  test.beforeEach(async ({ request, page }) => {
-    const result = await setState(request, { 'Trivia Mode': 'Off' });
-    restoreSettings = result.previous;
+  test.beforeEach(async ({ appState, page }) => {
+    await appState({ 'Trivia Mode': 'Off' });
     await page.goto('modules.php?name=Module');
-  });
-
-  test.afterEach(async ({ request }) => {
-    await setState(request, restoreSettings);
   });
 
   test('page loads', async ({ page }) => {
@@ -142,8 +131,9 @@ test.describe('Public module flow', () => {
 
 | Scenario | Import from | Extra setup |
 |----------|-------------|-------------|
-| Public page | `@playwright/test` | `test.use({ storageState: { cookies: [], origins: [] } })` |
-| Authenticated page | `../fixtures/auth` | None (uses stored auth state) |
+| Public page (no state control) | `@playwright/test` | `test.use({ storageState: { cookies: [], origins: [] } })` |
+| Public page (with state control) | `../fixtures/public` | None (uses cookie-based appState) |
+| Authenticated page | `../fixtures/auth` | None (uses stored auth state + cookie-based appState) |
 
 **Never** call the login flow inside a test — always use the auth fixture. The `auth.setup.ts` project runs first and saves browser state to `playwright/.auth/user.json`.
 
@@ -256,19 +246,23 @@ test.beforeEach(async ({ appState, page }) => {
 });
 ```
 
-**Public tests** — use `setState` directly with manual restore:
+**Public tests** — use the `public` fixture with cookie-based `appState` (same auto-restore, no DB races):
 ```typescript
-import { setState, type Settings } from '../helpers/test-state';
+import { test, expect } from '../fixtures/public';
 
-let restoreSettings: Settings;
-test.beforeEach(async ({ request }) => {
-  const result = await setState(request, { 'Trivia Mode': 'Off' });
-  restoreSettings = result.previous;
-});
-test.afterEach(async ({ request }) => {
-  await setState(request, restoreSettings);
+test.describe('Public module flow', () => {
+  test.beforeEach(async ({ appState, page }) => {
+    await appState({ 'Trivia Mode': 'Off' });
+    await page.goto('modules.php?name=Module');
+  });
+
+  test('page loads', async ({ page }) => {
+    // Test steps...
+  });
 });
 ```
+
+**WARNING:** Never use `setState()` from `helpers/test-state` in tests — it modifies the database directly and races with parallel workers. The `public` fixture's `appState` uses per-request cookies instead.
 
 **Allowlisted settings:** `Current Season Phase`, `Allow Trades`, `Allow Waiver Moves`, `Show Draft Link`, `Trivia Mode`, `ASG Voting`, `EOY Voting`, `Free Agency Notifications`.
 
@@ -278,7 +272,7 @@ test.afterEach(async ({ request }) => {
 1. Check for PHP errors on every page you visit in smoke tests
 2. Use the auth fixture for authenticated tests
 3. Use `storageState: { cookies: [], origins: [] }` for public tests
-4. Use `appState` fixture (authenticated) or `setState` helper (public) to set required state
+4. Use `appState` fixture (from `../fixtures/auth` or `../fixtures/public`) to set required state
 5. Use stable CSS classes or accessible roles for locators
 6. Keep smoke tests fast — one assertion per test, no complex interactions
 7. Add new pages to the PHP error check loop when adding smoke tests
@@ -286,16 +280,16 @@ test.afterEach(async ({ request }) => {
 
 ## DON'T:
 1. **Don't** call login inside tests — use the auth fixture
-2. **Don't** skip tests due to season phase — use `appState` or `setState` to set the state you need
+2. **Don't** skip tests due to season phase — use `appState` (from fixtures) to set the state you need. Never use `setState()` directly — it races with parallel workers
 3. **Don't** use `.only` — it will fail in CI (`forbidOnly: true`)
 4. **Don't** use fragile structural selectors
 5. **Don't** mutate production data (create trades, submit forms) without cleanup
-6. **Don't** assume MAMP is running — tests will fail with connection errors if it's not
+6. **Don't** assume Docker is running — tests will fail with connection errors if it's not
 7. **Don't** import from `@playwright/test` for authenticated tests — import from `../fixtures/auth`
 8. **Don't** use `toBeVisible()` or `toHaveText()` on locators that match multiple elements — Playwright strict mode throws. Use `.first()`, `.nth(n)`, or check `.count()` instead
 9. **Don't** use `boundingBox()` to verify CSS properties like `width: fit-content` — parent layout context affects the bounding box. Use `page.evaluate(() => getComputedStyle(el).property)` to check computed CSS values directly
 10. **Don't** import `Page` type from `../fixtures/auth` — it only exports `test` and `expect`. Import `Page` separately: `import type { Page } from '@playwright/test'`
-11. **Don't** use `link.click()` for page-to-page navigation — it triggers a Playwright-managed navigation wait that can time out when MAMP is under concurrent load from parallel workers. Instead, extract the href with `getAttribute('href')` and use `page.goto(href)`, which handles navigation more reliably
+11. **Don't** use `link.click()` for page-to-page navigation — it triggers a Playwright-managed navigation wait that can time out under concurrent load from parallel workers. Instead, extract the href with `getAttribute('href')` and use `page.goto(href)`, which handles navigation more reliably
 
 ## CI Workflow Notes
 

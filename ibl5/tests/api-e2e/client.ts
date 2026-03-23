@@ -21,7 +21,13 @@ export const SEED_PLAYER_UUID = 'a0000000-0000-0000-0000-000000000001';
 export const SEED_TEAM_UUID = 'b0000000-0000-0000-0000-000000000001';
 export const SEED_GAME_UUID = 'c0000000-0000-0000-0000-000000000001';
 
-/** Fetch a REST API endpoint with the auth header. */
+/**
+ * Fetch a REST API endpoint with auth header and HTML retry.
+ *
+ * CI's Apache container sometimes serves HTML instead of JSON under load.
+ * Retries up to 3 times with 250ms delays when a non-JSON response is received.
+ * Vitest's built-in retry (config level) handles other transient failures.
+ */
 export async function apiFetch(
   path: string,
   init: RequestInit = {},
@@ -30,5 +36,17 @@ export async function apiFetch(
     ...AUTH_HEADERS,
     ...((init.headers as Record<string, string> | undefined) ?? {}),
   };
-  return fetch(`${API_BASE}${path}`, { ...init, headers });
+  const url = `${API_BASE}${path}`;
+
+  for (let attempt = 0; attempt < 3; attempt++) {
+    const res = await fetch(url, { ...init, headers });
+    const ct = res.headers.get('content-type') ?? '';
+    if (ct.includes('json') || ct.includes('application/json')) {
+      return res;
+    }
+    // Got HTML — pause and retry
+    await new Promise((r) => setTimeout(r, 250));
+  }
+  // Return last response even if non-JSON — let the test assertion fail clearly
+  return fetch(url, { ...init, headers });
 }

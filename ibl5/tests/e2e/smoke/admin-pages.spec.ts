@@ -2,7 +2,6 @@ import { test, expect } from '../fixtures/auth';
 import { assertNoPhpErrors } from '../helpers/php-errors';
 
 // Admin-only page smoke tests — require roles_mask = 1 (ADMIN) on the test user.
-// If the authenticated user is not an admin, tests skip gracefully.
 
 const ADMIN_URLS = [
   'scripts/updateAllTheThings.php',
@@ -15,11 +14,8 @@ test.describe('Admin page smoke tests', () => {
       timeout: 60_000,
     });
     const status = response?.status() ?? 0;
-    const body = await page.locator('body').textContent();
 
-    if (status === 403 || body?.includes('Access denied')) {
-      test.skip(true, 'Test user does not have admin privileges');
-    }
+    expect(status, 'Test user must have admin privileges — ensure roles_mask=1').not.toBe(403);
 
     // The page renders an Initialization section on success
     await expect(page.getByText('Initialization')).toBeVisible();
@@ -30,11 +26,8 @@ test.describe('Admin page smoke tests', () => {
       timeout: 60_000,
     });
     const status = response?.status() ?? 0;
-    const body = await page.locator('body').textContent();
 
-    if (status === 403 || body?.includes('Access denied')) {
-      test.skip(true, 'Test user does not have admin privileges');
-    }
+    expect(status, 'Test user must have admin privileges — ensure roles_mask=1').not.toBe(403);
 
     // Pipeline renders a summary: "X steps completed" or "X succeeded"
     await expect(
@@ -45,11 +38,8 @@ test.describe('Admin page smoke tests', () => {
   test('block.php loads for admin', async ({ page }) => {
     const response = await page.goto('block.php');
     const status = response?.status() ?? 0;
-    const body = await page.locator('body').textContent();
 
-    if (status === 403 || body?.includes('Access denied')) {
-      test.skip(true, 'Test user does not have admin privileges');
-    }
+    expect(status, 'Test user must have admin privileges — ensure roles_mask=1').not.toBe(403);
 
     // block.php is the Free Agency admin page — it should render without crashing
     // Content depends on season phase, so just verify no access denial
@@ -60,12 +50,8 @@ test.describe('Admin page smoke tests', () => {
     for (const url of ADMIN_URLS) {
       const response = await page.goto(url, { timeout: 60_000 });
       const status = response?.status() ?? 0;
-      const body = await page.locator('body').textContent();
 
-      if (status === 403 || body?.includes('Access denied')) {
-        // Non-admin user — skip the whole check
-        test.skip(true, 'Test user does not have admin privileges');
-      }
+      expect(status, 'Test user must have admin privileges — ensure roles_mask=1').not.toBe(403);
 
       await assertNoPhpErrors(page, `on ${url}`);
     }

@@ -3,7 +3,7 @@ name: E2E Tests
 on:
   pull_request:
     branches: [master]
-    types: [opened, synchronize, reopened, labeled]
+    types: [opened, synchronize, reopened, ready_for_review, labeled]
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}

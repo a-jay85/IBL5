@@ -8,6 +8,7 @@ on:
       - 'ibl5/migrations/**.sql'
   pull_request:
     branches: [ master, develop ]
+    types: [opened, synchronize, reopened, ready_for_review]
     paths:
       - '**.php'
       - 'ibl5/migrations/**.sql'

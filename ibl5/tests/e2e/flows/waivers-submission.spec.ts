@@ -26,7 +26,7 @@ test.describe('Waivers: add player', () => {
   });
 
   test('submit add: sign free agent', async ({ appState, page }) => {
-    await appState({ 'Allow Waiver Moves': 'Yes' });
+    await appState({ 'Allow Waiver Moves': 'Yes', 'Current Season Ending Year': '2026' });
     await page.goto('modules.php?name=Waivers');
 
     const form = page.locator('form[name="Waiver_Move"]');
@@ -35,12 +35,7 @@ test.describe('Waivers: add player', () => {
     // Check if Action hidden field is set to "add"
     const actionInput = form.locator('input[name="Action"]');
     const actionValue = await actionInput.inputValue();
-
-    if (actionValue !== 'add') {
-      // The page may show "waive" form by default — look for add section
-      // Try navigating directly or toggling
-      test.skip(true, 'Add form not the default view');
-    }
+    expect(actionValue, 'Waivers must default to add form').toBe('add');
 
     // Select the first available player
     const playerSelect = form.locator('select[name="Player_ID"]');

@@ -96,6 +96,7 @@ class DepthChartEntryController implements DepthChartEntryControllerInterface
         }
 
         $this->view->renderFormFooter();
+        $this->view->renderMobileView($playersResult, $slotNames);
 
         echo '<div class="table-scroll-wrapper"><div class="table-scroll-container" tabindex="0" role="region" aria-label="Player ratings">';
         echo $this->getTableOutput($teamID, $display, $split);
@@ -110,6 +111,7 @@ class DepthChartEntryController implements DepthChartEntryControllerInterface
         echo '<script>window.IBL_DEPTH_CHART_CONFIG = ' . $jsConfig . ';</script>';
         echo '<script src="jslib/depth-chart-changes.js"></script>';
         echo '<script src="jslib/saved-depth-charts.js"></script>';
+        echo '<script src="jslib/depth-chart-mobile.js"></script>';
 
         // Output JS configuration for AJAX tab switching
         $ajaxTabsConfig = json_encode([

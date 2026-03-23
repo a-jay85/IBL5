@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace FreeAgency\Contracts;
 
 use Team\Team;
+use Season\Season;
 
 /**
  * Interface for the FreeAgency read-path orchestrator
@@ -25,15 +26,15 @@ interface FreeAgencyServiceInterface
      * - All other free agents
      *
      * @param Team $team Team object
-     * @param \Season $season Current season
+     * @param Season $season Current season
      * @return array{
      *     capMetrics: array{totalSalaries: array<int, int>, softCapSpace: array<int, int>, hardCapSpace: array<int, int>, rosterSpots: array<int, int>},
      *     team: Team,
-     *     season: \Season,
+     *     season: Season,
      *     allOtherPlayers: list<array<string, mixed>>
      * }
      */
-    public function getMainPageData(Team $team, \Season $season): array;
+    public function getMainPageData(Team $team, Season $season): array;
 
     /**
      * Assemble all data needed by the negotiation page
@@ -44,7 +45,7 @@ interface FreeAgencyServiceInterface
      *
      * @param int $playerID Player ID to negotiate with
      * @param Team $team Team making the offer
-     * @param \Season $season Current season
+     * @param Season $season Current season
      * @return array{
      *     player: \Player\Player,
      *     capMetrics: array{totalSalaries: array<int, int>, softCapSpace: array<int, int>, hardCapSpace: array<int, int>, rosterSpots: array<int, int>},
@@ -56,7 +57,7 @@ interface FreeAgencyServiceInterface
      *     maxContract: int
      * }
      */
-    public function getNegotiationData(int $playerID, Team $team, \Season $season): array;
+    public function getNegotiationData(int $playerID, Team $team, Season $season): array;
 
     /**
      * Get existing offer from a team to a player, with defaults

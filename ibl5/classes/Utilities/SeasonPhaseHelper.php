@@ -3,6 +3,8 @@
 declare(strict_types=1);
 
 namespace Utilities;
+use Season\Season;
+
 
 /**
  * SeasonPhaseHelper - Season phase logic utilities
@@ -17,9 +19,9 @@ class SeasonPhaseHelper
     public static function getMonthForPhase(string $phase): int
     {
         if ($phase === "HEAT") {
-            return \Season::IBL_HEAT_MONTH;
+            return Season::IBL_HEAT_MONTH;
         }
-        return \Season::IBL_REGULAR_SEASON_STARTING_MONTH;
+        return Season::IBL_REGULAR_SEASON_STARTING_MONTH;
     }
 
     /**

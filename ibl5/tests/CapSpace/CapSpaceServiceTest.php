@@ -10,13 +10,14 @@ use CapSpace\CapSpaceService;
 use CapSpace\Contracts\CapSpaceRepositoryInterface;
 use Team\Contracts\TeamQueryRepositoryInterface;
 use Team\Team;
+use Season\Season;
 
 /**
  * Testable subclass that exposes protected methods for testing
  */
 class TestableCapSpaceService extends CapSpaceService
 {
-    public function publicProcessTeamCapData(Team $team, \Season $season): array
+    public function publicProcessTeamCapData(Team $team, Season $season): array
     {
         return $this->processTeamCapData($team, $season);
     }
@@ -236,11 +237,11 @@ class CapSpaceServiceTest extends TestCase
      * @param string $phase Season phase
      * @param int $beginningYear Starting year
      * @param int $endingYear Ending year
-     * @return \Season&\PHPUnit\Framework\MockObject\MockObject Mock Season
+     * @return Season&\PHPUnit\Framework\MockObject\MockObject Mock Season
      */
-    private function createMockSeason(string $phase = 'Regular Season', int $beginningYear = 2024, int $endingYear = 2025): \Season
+    private function createMockSeason(string $phase = 'Regular Season', int $beginningYear = 2024, int $endingYear = 2025): Season
     {
-        $mockSeason = $this->createMock(\Season::class);
+        $mockSeason = $this->createMock(Season::class);
         $mockSeason->phase = $phase;
         $mockSeason->beginningYear = $beginningYear;
         $mockSeason->endingYear = $endingYear;

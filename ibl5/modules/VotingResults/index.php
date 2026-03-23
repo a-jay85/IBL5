@@ -28,7 +28,7 @@ get_lang($module_name);
 PageLayout\PageLayout::header();
 
 global $mysqli_db;
-$season = new Season($mysqli_db);
+$season = new \Season\Season($mysqli_db);
 $service = new VotingResultsService($mysqli_db);
 $renderer = new VotingResultsTableRenderer();
 $controller = new VotingResultsController($service, $renderer, $season);

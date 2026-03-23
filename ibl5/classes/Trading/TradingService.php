@@ -8,6 +8,7 @@ use League\League;
 use Trading\Contracts\TradingServiceInterface;
 use Trading\Contracts\TradingRepositoryInterface;
 use Trading\Contracts\TradeCashRepositoryInterface;
+use Season\Season;
 
 /**
  * @see TradingServiceInterface
@@ -48,7 +49,7 @@ class TradingService implements TradingServiceInterface
     {
         /** @var \mysqli $mysqliDb */
         $mysqliDb = $this->mysqli_db;
-        $season = new \Season($mysqliDb);
+        $season = new Season($mysqliDb);
 
         $userTeam = $this->commonRepository->getTeamnameFromUsername($username) ?? '';
 
@@ -109,7 +110,7 @@ class TradingService implements TradingServiceInterface
 
         /** @var \mysqli $mysqliDb */
         $mysqliDb = $this->mysqli_db;
-        $season = new \Season($mysqliDb);
+        $season = new Season($mysqliDb);
 
         $allTradeRows = $this->repository->getAllTradeOffers();
         $tradeOffers = $this->groupTradeOffers($allTradeRows, $userTeam, $season->endingYear);
@@ -135,7 +136,7 @@ class TradingService implements TradingServiceInterface
      * @param list<array<string, mixed>> $players Player rows from repository
      * @return array{player: array<int, int>, hold: array<int, int>}
      */
-    public function calculateFutureSalaries(array $players, \Season $season): array
+    public function calculateFutureSalaries(array $players, Season $season): array
     {
         $futureSalary = [
             'player' => [0, 0, 0, 0, 0, 0],
@@ -362,7 +363,7 @@ class TradingService implements TradingServiceInterface
      * @param list<TeamWithCityRow> $allTeams
      * @return array<int, array{from: string, to: string, approval: string, oppositeTeam: string, hasHammer: bool, items: list<array{type: string, description: string, notes: string|null, from: string, to: string}>, previewData: array{fromPids: list<int>, toPids: list<int>, fromTeamId: int, toTeamId: int, fromColor1: string, toColor1: string, fromCash: array<int, int>, toCash: array<int, int>, cashStartYear: int, cashEndYear: int, seasonEndingYear: int}}>
      */
-    private function enrichOffersWithPreviewData(array $tradeOffers, array $allTeams, \Season $season): array
+    private function enrichOffersWithPreviewData(array $tradeOffers, array $allTeams, Season $season): array
     {
         // Build team lookup map: team_name => {teamid, color1}
         $teamLookup = [];

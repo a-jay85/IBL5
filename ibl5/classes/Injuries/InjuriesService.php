@@ -8,6 +8,7 @@ use Injuries\Contracts\InjuriesServiceInterface;
 use League\League;
 use Player\Player;
 use Team\Team;
+use Season\Season;
 
 /**
  * Service for retrieving injured players with team information.
@@ -33,7 +34,7 @@ class InjuriesService implements InjuriesServiceInterface
      */
     public function getInjuredPlayersWithTeams(): array
     {
-        $season = new \Season($this->db);
+        $season = new Season($this->db);
         $injuredPlayers = [];
 
         $injuredRows = $this->league->getInjuredPlayersResult();

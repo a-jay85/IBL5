@@ -6,6 +6,7 @@ namespace Tests\Utilities;
 
 use PHPUnit\Framework\TestCase;
 use Utilities\DateParser;
+use Season\Season;
 
 /**
  * DateParserTest - Tests for DateParser utility
@@ -151,7 +152,7 @@ class DateParserTest extends TestCase
 
         $this->assertIsArray($result);
         // Preseason uses IBL_PRESEASON_YEAR constant
-        $this->assertEquals(\Season::IBL_PRESEASON_YEAR, $result['year']);
+        $this->assertEquals(Season::IBL_PRESEASON_YEAR, $result['year']);
     }
 
     // Date Format Output
@@ -199,7 +200,7 @@ class DateParserTest extends TestCase
         );
 
         $this->assertIsArray($result);
-        $this->assertEquals(\Season::IBL_OLYMPICS_MONTH, $result['month']);
+        $this->assertEquals(Season::IBL_OLYMPICS_MONTH, $result['month']);
     }
 
     public function testExtractDateOlympicsCaseInsensitive(): void
@@ -212,7 +213,7 @@ class DateParserTest extends TestCase
             'OLYMPICS'
         );
 
-        $this->assertEquals(\Season::IBL_OLYMPICS_MONTH, $result['month']);
+        $this->assertEquals(Season::IBL_OLYMPICS_MONTH, $result['month']);
     }
 
     // Edge Cases

@@ -6,6 +6,7 @@ namespace Tests\DatabaseIntegration;
 
 use League\League;
 use Team\TeamQueryRepository;
+use Season\Season;
 
 class TeamQueryRepositoryTest extends DatabaseTestCase
 {
@@ -297,7 +298,7 @@ class TeamQueryRepositoryTest extends DatabaseTestCase
 
     public function testGetSalaryCapArrayCalculatesMultiYearBreakdown(): void
     {
-        $season = new \Season($this->db);
+        $season = new Season($this->db);
 
         $result = $this->repo->getSalaryCapArray('Test', self::TEST_TID, $season);
 

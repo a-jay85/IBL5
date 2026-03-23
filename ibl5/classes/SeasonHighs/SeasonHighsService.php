@@ -6,6 +6,7 @@ namespace SeasonHighs;
 
 use SeasonHighs\Contracts\SeasonHighsServiceInterface;
 use SeasonHighs\Contracts\SeasonHighsRepositoryInterface;
+use Season\Season;
 
 /**
  * SeasonHighsService - Business logic for season highs
@@ -21,7 +22,7 @@ use SeasonHighs\Contracts\SeasonHighsRepositoryInterface;
 class SeasonHighsService implements SeasonHighsServiceInterface
 {
     private SeasonHighsRepositoryInterface $repository;
-    private \Season $season;
+    private Season $season;
 
     /**
      * Stat definitions with SQL expressions and display names.
@@ -74,7 +75,7 @@ class SeasonHighsService implements SeasonHighsServiceInterface
 
     private const HOME_AWAY_LIMIT = 10;
 
-    public function __construct(SeasonHighsRepositoryInterface $repository, \Season $season)
+    public function __construct(SeasonHighsRepositoryInterface $repository, Season $season)
     {
         $this->repository = $repository;
         $this->season = $season;
@@ -256,26 +257,26 @@ class SeasonHighsService implements SeasonHighsServiceInterface
         switch ($seasonPhase) {
             case 'Playoffs':
                 return [
-                    'start' => sprintf('%d-%02d-01', $endingYear, \Season::IBL_PLAYOFF_MONTH),
-                    'end' => sprintf('%d-%02d-30', $endingYear, \Season::IBL_PLAYOFF_MONTH),
+                    'start' => sprintf('%d-%02d-01', $endingYear, Season::IBL_PLAYOFF_MONTH),
+                    'end' => sprintf('%d-%02d-30', $endingYear, Season::IBL_PLAYOFF_MONTH),
                 ];
 
             case 'Preseason':
                 return [
-                    'start' => sprintf('%d-%02d-01', \Season::IBL_PRESEASON_YEAR, \Season::IBL_REGULAR_SEASON_STARTING_MONTH),
-                    'end' => sprintf('%d-%02d-30', \Season::IBL_PRESEASON_YEAR + 1, \Season::IBL_REGULAR_SEASON_ENDING_MONTH),
+                    'start' => sprintf('%d-%02d-01', Season::IBL_PRESEASON_YEAR, Season::IBL_REGULAR_SEASON_STARTING_MONTH),
+                    'end' => sprintf('%d-%02d-30', Season::IBL_PRESEASON_YEAR + 1, Season::IBL_REGULAR_SEASON_ENDING_MONTH),
                 ];
 
             case 'HEAT':
                 return [
-                    'start' => sprintf('%d-%02d-01', $beginningYear, \Season::IBL_HEAT_MONTH),
-                    'end' => sprintf('%d-%02d-30', $beginningYear, \Season::IBL_HEAT_MONTH),
+                    'start' => sprintf('%d-%02d-01', $beginningYear, Season::IBL_HEAT_MONTH),
+                    'end' => sprintf('%d-%02d-30', $beginningYear, Season::IBL_HEAT_MONTH),
                 ];
 
             default: // Regular Season
                 return [
-                    'start' => sprintf('%d-%02d-01', $beginningYear, \Season::IBL_REGULAR_SEASON_STARTING_MONTH),
-                    'end' => sprintf('%d-%02d-30', $endingYear, \Season::IBL_REGULAR_SEASON_ENDING_MONTH),
+                    'start' => sprintf('%d-%02d-01', $beginningYear, Season::IBL_REGULAR_SEASON_STARTING_MONTH),
+                    'end' => sprintf('%d-%02d-30', $endingYear, Season::IBL_REGULAR_SEASON_ENDING_MONTH),
                 ];
         }
     }

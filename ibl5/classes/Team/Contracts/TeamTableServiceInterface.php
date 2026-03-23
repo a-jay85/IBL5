@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Team\Contracts;
 
 use Team\Team;
+use Season\Season;
 
 /**
  * TeamTableServiceInterface - Contract for Team module table rendering
@@ -36,20 +37,20 @@ interface TeamTableServiceInterface
      * @param list<PlayerRow>|list<array<string, mixed>> $result Roster data
      * @param Team $team Team object
      * @param ?string $yr Historical year (null for current)
-     * @param \Season $season Season object
+     * @param Season $season Season object
      * @param list<int> $starterPids Player IDs of starters for highlighting
      * @param ?string $split Split stats key when display is 'split'
      * @return string Table HTML
      */
-    public function renderTableForDisplay(string $display, array $result, Team $team, ?string $yr, \Season $season, array $starterPids = [], ?string $split = null): string;
+    public function renderTableForDisplay(string $display, array $result, Team $team, ?string $yr, Season $season, array $starterPids = [], ?string $split = null): string;
 
     /**
      * Build the optgroup structure for the dropdown view selector
      *
-     * @param \Season $season Season object (used to determine playoff availability)
+     * @param Season $season Season object (used to determine playoff availability)
      * @return array<string, array<string, string>> Groups keyed by label, each containing value => label pairs
      */
-    public function buildDropdownGroups(\Season $season): array;
+    public function buildDropdownGroups(Season $season): array;
 
     /**
      * Extract starting lineup data from roster array

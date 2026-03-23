@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Waivers\Contracts;
 
 use Player\Player;
-use Season;
+use Season\Season;
 
 /**
  * WaiversProcessorInterface - Contract for waiver wire business logic

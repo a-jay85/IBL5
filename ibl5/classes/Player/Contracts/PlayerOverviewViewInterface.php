@@ -7,6 +7,7 @@ namespace Player\Contracts;
 use Player\Player;
 use Player\PlayerStats;
 
+use Season\Season;
 
 /**
  * PlayerOverviewViewInterface - Contract for player overview page view
@@ -24,7 +25,7 @@ interface PlayerOverviewViewInterface extends PlayerViewInterface
      * @param int $playerID Player ID for game log queries
      * @param Player $player Player object with all data
      * @param PlayerStats $playerStats Player stats object
-     * @param \Season $season Season object for date calculations
+     * @param Season $season Season object for date calculations
      * @param \Shared\Contracts\SharedRepositoryInterface $sharedRepository Shared repository
      * @param array{primary: string, secondary: string, gradient_start: string, gradient_mid: string, gradient_end: string, border: string, border_rgb: string, accent: string, text: string, text_muted: string}|null $colorScheme Team color scheme for stats card styling
      * @return string Rendered HTML content
@@ -33,7 +34,7 @@ interface PlayerOverviewViewInterface extends PlayerViewInterface
         int $playerID,
         Player $player,
         PlayerStats $playerStats,
-        \Season $season,
+        Season $season,
         \Shared\Contracts\SharedRepositoryInterface $sharedRepository,
         ?array $colorScheme = null
     ): string;

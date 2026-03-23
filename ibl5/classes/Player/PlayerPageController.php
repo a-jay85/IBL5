@@ -15,6 +15,7 @@ use Player\Views\TeamColorHelper;
 use Services\CommonMysqliRepository;
 use Utilities\HtmlSanitizer;
 use Team\Team;
+use Season\Season;
 
 /**
  * PlayerPageController - Orchestrates the player page rendering
@@ -46,7 +47,7 @@ class PlayerPageController
     {
         $sharedRepository = new \Shared\SharedRepository($this->mysqliDb);
         $commonRepository = new CommonMysqliRepository($this->mysqliDb);
-        $season = new \Season($this->mysqliDb);
+        $season = new Season($this->mysqliDb);
 
         $player = Player::withPlayerID($this->mysqliDb, $playerID);
         $playerStats = PlayerStats::withPlayerID($this->mysqliDb, $playerID);
@@ -135,7 +136,7 @@ class PlayerPageController
         Player $player,
         int $playerID,
         Team $userTeam,
-        \Season $season
+        Season $season
     ): string {
         $html = '';
 
@@ -163,7 +164,7 @@ class PlayerPageController
         int $playerID,
         Player $player,
         PlayerStats $playerStats,
-        \Season $season,
+        Season $season,
         \Shared\Contracts\SharedRepositoryInterface $sharedRepository,
         array $colorScheme
     ): string {

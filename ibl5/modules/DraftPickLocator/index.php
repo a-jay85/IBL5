@@ -27,7 +27,7 @@ get_lang($module_name);
 
 global $mysqli_db;
 
-$season = new Season($mysqli_db);
+$season = new \Season\Season($mysqli_db);
 
 $pagetitle = "- Draft Pick Locator";
 

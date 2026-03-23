@@ -7,6 +7,7 @@ namespace Updater\Steps;
 use JsbParser\JsbImportService;
 use Updater\Contracts\PipelineStepInterface;
 use Updater\StepResult;
+use Season\Season;
 
 /**
  * Step 10: Parse JSB engine files (.car, .trn, .his, .asw, .rcb).
@@ -18,7 +19,7 @@ class ParseJsbFilesStep implements PipelineStepInterface
     public function __construct(
         private readonly JsbImportService $service,
         private readonly string $basePath,
-        private readonly \Season $season,
+        private readonly Season $season,
         private readonly string $filePrefix = 'IBL5',
     ) {
     }

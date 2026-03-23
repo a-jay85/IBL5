@@ -9,6 +9,7 @@ use Player\Player;
 use Player\PlayerStats;
 use Voting\Contracts\VotingBallotServiceInterface;
 use Voting\Contracts\VotingBallotViewInterface;
+use Season\Season;
 
 /**
  * VotingBallotService - Assembles ballot candidate data for voting
@@ -37,7 +38,7 @@ class VotingBallotService implements VotingBallotServiceInterface
      */
     public function getBallotData(
         string $voterTeamName,
-        \Season $season,
+        Season $season,
         League $league
     ): array {
         if ($season->phase === 'Regular Season') {

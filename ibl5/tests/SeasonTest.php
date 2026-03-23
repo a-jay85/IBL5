@@ -2,6 +2,8 @@
 
 declare(strict_types=1);
 
+use Season\Season;
+
 /**
  * SeasonTest - Tests for Season class
  */
@@ -132,62 +134,62 @@ class SeasonTest extends \PHPUnit\Framework\TestCase
 
     public function testIblPreseasonYearConstant(): void
     {
-        $this->assertSame(9998, \Season::IBL_PRESEASON_YEAR);
+        $this->assertSame(9998, Season::IBL_PRESEASON_YEAR);
     }
 
     public function testIblOlympicsMonthConstant(): void
     {
-        $this->assertSame(8, \Season::IBL_OLYMPICS_MONTH);
+        $this->assertSame(8, Season::IBL_OLYMPICS_MONTH);
     }
 
     public function testIblHeatMonthConstant(): void
     {
-        $this->assertSame(10, \Season::IBL_HEAT_MONTH);
+        $this->assertSame(10, Season::IBL_HEAT_MONTH);
     }
 
     public function testIblRegularSeasonStartingMonthConstant(): void
     {
-        $this->assertSame(11, \Season::IBL_REGULAR_SEASON_STARTING_MONTH);
+        $this->assertSame(11, Season::IBL_REGULAR_SEASON_STARTING_MONTH);
     }
 
     public function testIblAllStarMonthConstant(): void
     {
-        $this->assertSame(2, \Season::IBL_ALL_STAR_MONTH);
+        $this->assertSame(2, Season::IBL_ALL_STAR_MONTH);
     }
 
     public function testIblRegularSeasonEndingMonthConstant(): void
     {
-        $this->assertSame(5, \Season::IBL_REGULAR_SEASON_ENDING_MONTH);
+        $this->assertSame(5, Season::IBL_REGULAR_SEASON_ENDING_MONTH);
     }
 
     public function testIblPlayoffMonthConstant(): void
     {
-        $this->assertSame(6, \Season::IBL_PLAYOFF_MONTH);
+        $this->assertSame(6, Season::IBL_PLAYOFF_MONTH);
     }
 
     public function testIblAllStarBreakStartDayConstant(): void
     {
-        $this->assertSame(1, \Season::IBL_ALL_STAR_BREAK_START_DAY);
+        $this->assertSame(1, Season::IBL_ALL_STAR_BREAK_START_DAY);
     }
 
     public function testIblRisingStarsGameDayConstant(): void
     {
-        $this->assertSame(2, \Season::IBL_RISING_STARS_GAME_DAY);
+        $this->assertSame(2, Season::IBL_RISING_STARS_GAME_DAY);
     }
 
     public function testIblAllStarGameDayConstant(): void
     {
-        $this->assertSame(3, \Season::IBL_ALL_STAR_GAME_DAY);
+        $this->assertSame(3, Season::IBL_ALL_STAR_GAME_DAY);
     }
 
     public function testIblAllStarBreakEndDayConstant(): void
     {
-        $this->assertSame(4, \Season::IBL_ALL_STAR_BREAK_END_DAY);
+        $this->assertSame(4, Season::IBL_ALL_STAR_BREAK_END_DAY);
     }
 
     public function testIblPostAllStarFirstDayConstant(): void
     {
-        $this->assertSame(5, \Season::IBL_POST_ALL_STAR_FIRST_DAY);
+        $this->assertSame(5, Season::IBL_POST_ALL_STAR_FIRST_DAY);
     }
 
     // ============================================
@@ -196,15 +198,15 @@ class SeasonTest extends \PHPUnit\Framework\TestCase
 
     public function testCanBeInstantiated(): void
     {
-        $season = new \Season($this->mockDb);
+        $season = new Season($this->mockDb);
 
-        $this->assertInstanceOf(\Season::class, $season);
+        $this->assertInstanceOf(Season::class, $season);
     }
 
 
     public function testHasShowDraftLinkProperty(): void
     {
-        $season = new \Season($this->mockDb);
+        $season = new Season($this->mockDb);
 
         $this->assertTrue(property_exists($season, 'showDraftLink'));
     }
@@ -221,13 +223,13 @@ class SeasonTest extends \PHPUnit\Framework\TestCase
      *
      * @param int $simLengthInDays Sim length in days
      * @param string|null $lastRSGameDate Last regular season game date (YYYY-MM-DD), or null
-     * @return \Season Configured mock Season
+     * @return Season Configured mock Season
      */
     private function createGapSkipSeason(
         int $simLengthInDays,
         ?string $lastRSGameDate,
-    ): \Season {
-        $season = new \Season($this->mockDb);
+    ): Season {
+        $season = new Season($this->mockDb);
         $season->endingYear = 2025;
         $season->playoffsStartDate = new \DateTime('2025-06-01');
         $season->simLengthInDays = $simLengthInDays;

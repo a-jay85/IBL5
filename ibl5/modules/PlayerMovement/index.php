@@ -23,7 +23,7 @@ use PlayerMovement\PlayerMovementView;
 
 global $mysqli_db;
 
-$season = new Season($mysqli_db);
+$season = new \Season\Season($mysqli_db);
 $previousSeasonEndingYear = $season->endingYear - 1;
 
 $pagetitle = "- Player Movement";

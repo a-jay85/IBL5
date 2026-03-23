@@ -22,7 +22,7 @@ use FranchiseHistory\FranchiseHistoryView;
 
 global $mysqli_db;
 
-$season = new Season($mysqli_db);
+$season = new \Season\Season($mysqli_db);
 
 PageLayout\PageLayout::header();
 

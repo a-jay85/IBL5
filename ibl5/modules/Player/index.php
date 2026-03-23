@@ -73,7 +73,7 @@ function rookieoption($pid)
 
     // Initialize dependencies
     $commonRepository = new CommonMysqliRepository($mysqli_db);
-    $season = new Season($mysqli_db);
+    $season = new \Season\Season($mysqli_db);
     $validator = new RookieOptionValidator();
     $formView = new RookieOptionFormView();
 

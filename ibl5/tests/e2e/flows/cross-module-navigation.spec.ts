@@ -1,11 +1,14 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from '../fixtures/public';
 import { assertNoPhpErrors } from '../helpers/php-errors';
 
 // Cross-module navigation — verify links between modules resolve correctly.
 // All read-only — no data mutation.
-test.use({ storageState: { cookies: [], origins: [] } });
 
 test.describe('Cross-module navigation', () => {
+  test.beforeEach(async ({ appState }) => {
+    await appState({ 'Current Season Ending Year': '2026' });
+  });
+
   test('standings → click team → team page loads', async ({ page }) => {
     await page.goto('modules.php?name=Standings');
     await assertNoPhpErrors(page, 'on Standings');
@@ -32,9 +35,7 @@ test.describe('Cross-module navigation', () => {
 
     const playerLink = page.locator('a[href*="name=Player"][href*="pid="]').first();
     const count = await playerLink.count();
-    if (count === 0) {
-      test.skip(true, 'No player links on team page');
-    }
+    expect(count, 'CI seed must provide player links on team page').toBeGreaterThan(0);
 
     const href = await playerLink.getAttribute('href');
     expect(href).toBeTruthy();
@@ -66,9 +67,7 @@ test.describe('Cross-module navigation', () => {
 
     const playerLink = page.locator('a[href*="name=Player"][href*="pid="]').first();
     const count = await playerLink.count();
-    if (count === 0) {
-      test.skip(true, 'No player links on Draft History page');
-    }
+    expect(count, 'CI seed must provide player links on Draft History page').toBeGreaterThan(0);
 
     const href = await playerLink.getAttribute('href');
     expect(href).toBeTruthy();
@@ -84,9 +83,7 @@ test.describe('Cross-module navigation', () => {
 
     const playerLink = page.locator('.injuries-table a[href*="pid="]');
     const count = await playerLink.count();
-    if (count === 0) {
-      test.skip(true, 'No injured players in database');
-    }
+    expect(count, 'CI seed must provide injured players').toBeGreaterThan(0);
 
     const href = await playerLink.first().getAttribute('href');
     expect(href).toBeTruthy();
@@ -102,9 +99,7 @@ test.describe('Cross-module navigation', () => {
 
     const playerLink = page.locator('.ibl-data-table a[href*="pid="]');
     const count = await playerLink.count();
-    if (count === 0) {
-      test.skip(true, 'No All-Star data in database');
-    }
+    expect(count, 'CI seed must provide All-Star data').toBeGreaterThan(0);
 
     const href = await playerLink.first().getAttribute('href');
     expect(href).toBeTruthy();

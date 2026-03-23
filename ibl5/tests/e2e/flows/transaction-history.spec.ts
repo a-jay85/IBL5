@@ -68,13 +68,12 @@ test.describe('Transaction History flow', () => {
 
   test('reset link navigates to unfiltered state', async ({ page }) => {
     const resetLink = page.locator('.txn-reset');
-    if (await resetLink.isVisible()) {
-      const href = await resetLink.getAttribute('href');
-      await page.goto(href!);
+    await expect(resetLink).toBeVisible();
+    const href = await resetLink.getAttribute('href');
+    await page.goto(href!);
 
-      // Should load unfiltered page with transactions
-      await expect(page.locator('.txn-table')).toBeVisible();
-    }
+    // Should load unfiltered page with transactions
+    await expect(page.locator('.txn-table')).toBeVisible();
   });
 
   test('empty filter combination renders without PHP errors', async ({

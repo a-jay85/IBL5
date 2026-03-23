@@ -22,6 +22,7 @@ final class TestCookieOverrides
      */
     private const ALLOWED_KEYS = [
         'Current Season Phase',
+        'Current Season Ending Year',
         'Allow Trades',
         'Allow Waiver Moves',
         'Show Draft Link',

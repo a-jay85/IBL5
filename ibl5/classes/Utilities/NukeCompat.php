@@ -50,6 +50,7 @@ class NukeCompat
      */
     public function getUserInfo(mixed $user): ?array
     {
+        /** @var \Auth\AuthService $authService */
         global $authService;
         return $authService->getUserInfo();
     }
@@ -71,11 +72,13 @@ class NukeCompat
     {
         $time = $timestamp;
         if (!is_numeric($time)) {
-            preg_match('/(\d{4})-(\d{1,2})-(\d{1,2}) (\d{1,2}):(\d{1,2}):(\d{1,2})/', (string) $time, $dtParts);
-            $time = gmmktime((int) $dtParts[4], (int) $dtParts[5], (int) $dtParts[6], (int) $dtParts[2], (int) $dtParts[3], (int) $dtParts[1]);
+            if (preg_match('/(\d{4})-(\d{1,2})-(\d{1,2}) (\d{1,2}):(\d{1,2}):(\d{1,2})/', (string) $time, $dtParts) === 1) {
+                $time = gmmktime((int) $dtParts[4], (int) $dtParts[5], (int) $dtParts[6], (int) $dtParts[2], (int) $dtParts[3], (int) $dtParts[1]);
+            }
         }
-        $time = (int) $time - (int) date("Z");
-        return ucfirst(date(_DATESTRING, $time));
+        $unixTime = (int) $time - (int) date("Z");
+        $format = defined('_DATESTRING') ? (string) _DATESTRING : 'l, F d, Y @ H:i';
+        return ucfirst(date($format, $unixTime));
     }
 
     /**

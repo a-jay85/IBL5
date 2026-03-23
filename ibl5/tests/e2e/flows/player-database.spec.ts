@@ -8,7 +8,7 @@ test.use({ storageState: { cookies: [], origins: [] } });
 test.describe('Player Database flow', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto('modules.php?name=PlayerDatabase');
-    // Under parallel MAMP load, the page may render blank — retry once
+    // Under parallel load, the page may render blank — retry once
     const body = await page.locator('body').innerText();
     if (body.trim().length < 20) {
       await page.waitForLoadState('domcontentloaded');

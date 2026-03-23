@@ -10,6 +10,7 @@ use Player\PlayerImageHelper;
 use Team\Contracts\TeamQueryRepositoryInterface;
 use UI\TeamCellHelper;
 use Utilities\HtmlSanitizer;
+use Team\Team;
 
 /**
  * @see FreeAgencyViewInterface
@@ -31,7 +32,7 @@ class FreeAgencyView implements FreeAgencyViewInterface
     /**
      * @see FreeAgencyViewInterface::render()
      *
-     * @param array{team: \Team, season: \Season, capMetrics: CapMetrics, allOtherPlayers: list<PlayerRow>} $mainPageData
+     * @param array{team: Team, season: \Season, capMetrics: CapMetrics, allOtherPlayers: list<PlayerRow>} $mainPageData
      */
     public function render(array $mainPageData, ?string $result = null): string
     {
@@ -65,12 +66,12 @@ class FreeAgencyView implements FreeAgencyViewInterface
     /**
      * Render players under contract table
      *
-     * @param \Team $team Team object
+     * @param Team $team Team object
      * @param \Season $season Season object
      * @param CapMetrics $capMetrics Cap metrics from service
      * @return string HTML table
      */
-    private function renderPlayersUnderContract(\Team $team, \Season $season, array $capMetrics): string
+    private function renderPlayersUnderContract(Team $team, \Season $season, array $capMetrics): string
     {
         ob_start();
         ?>
@@ -150,11 +151,11 @@ class FreeAgencyView implements FreeAgencyViewInterface
     /**
      * Render contract offers table
      *
-     * @param \Team $team Team object
+     * @param Team $team Team object
      * @param CapMetrics $capMetrics Cap metrics from service
      * @return string HTML table
      */
-    private function renderContractOffers(\Team $team, \Season $season, array $capMetrics): string
+    private function renderContractOffers(Team $team, \Season $season, array $capMetrics): string
     {
         ob_start();
         ?>
@@ -207,12 +208,12 @@ class FreeAgencyView implements FreeAgencyViewInterface
     /**
      * Render team free agents table
      *
-     * @param \Team $team Team object
+     * @param Team $team Team object
      * @param \Season $season Season object
      * @param CapMetrics $capMetrics Cap metrics from service
      * @return string HTML table
      */
-    private function renderTeamFreeAgents(\Team $team, \Season $season, array $capMetrics): string
+    private function renderTeamFreeAgents(Team $team, \Season $season, array $capMetrics): string
     {
         ob_start();
         ?>
@@ -265,12 +266,12 @@ class FreeAgencyView implements FreeAgencyViewInterface
     /**
      * Render other free agents table
      *
-     * @param \Team $team Team object
+     * @param Team $team Team object
      * @param \Season $season Season object
      * @param list<PlayerRow> $allOtherPlayers Pre-fetched player rows from service
      * @return string HTML table
      */
-    private function renderOtherFreeAgents(\Team $team, \Season $season, array $allOtherPlayers): string
+    private function renderOtherFreeAgents(Team $team, \Season $season, array $allOtherPlayers): string
     {
         ob_start();
         ?>
@@ -334,10 +335,10 @@ class FreeAgencyView implements FreeAgencyViewInterface
      *
      * @param string $title Table title to display in header
      * @param bool $showBirdRightsNote Whether to show the Bird Rights note
-     * @param \Team $team Team object for name display
+     * @param Team $team Team object for name display
      * @return string HTML table header
      */
-    private function renderTableHeader(string $title, bool $showBirdRightsNote, \Team $team, bool $showTeamColumn = true, bool $showOptionsColumn = true, ?\Season $season = null): string
+    private function renderTableHeader(string $title, bool $showBirdRightsNote, Team $team, bool $showTeamColumn = true, bool $showOptionsColumn = true, ?\Season $season = null): string
     {
         $fullTitle = $title;
 
@@ -534,11 +535,11 @@ class FreeAgencyView implements FreeAgencyViewInterface
     /**
      * Render cap space footer rows
      *
-     * @param \Team $team Team object
+     * @param Team $team Team object
      * @param CapMetrics $capMetrics Cap metrics from service
      * @return string HTML table rows
      */
-    private function renderCapSpaceFooter(\Team $team, array $capMetrics): string
+    private function renderCapSpaceFooter(Team $team, array $capMetrics): string
     {
         $MLEicon = ($team->hasMLE === 1) ? "\u{2705}" : "\u{274C}";
         $LLEicon = ($team->hasLLE === 1) ? "\u{2705}" : "\u{274C}";

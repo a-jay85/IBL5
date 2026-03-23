@@ -7,7 +7,7 @@ namespace Injuries;
 use Injuries\Contracts\InjuriesServiceInterface;
 use League\League;
 use Player\Player;
-use Team;
+use Team\Team;
 
 /**
  * Service for retrieving injured players with team information.

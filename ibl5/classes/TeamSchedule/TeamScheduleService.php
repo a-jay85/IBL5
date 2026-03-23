@@ -7,6 +7,7 @@ namespace TeamSchedule;
 use StrengthOfSchedule\StrengthOfScheduleCalculator;
 use TeamSchedule\Contracts\TeamScheduleRepositoryInterface;
 use TeamSchedule\Contracts\TeamScheduleServiceInterface;
+use Team\Team;
 
 /**
  * TeamScheduleService - Business logic for team schedule display
@@ -23,7 +24,7 @@ class TeamScheduleService implements TeamScheduleServiceInterface
 
     private TeamScheduleRepositoryInterface $repository;
 
-    /** @var array<int, \Team> */
+    /** @var array<int, Team> */
     private array $teamCache = [];
 
     /** @var array<int, float> Power rankings by team ID (0.0-100.0) */
@@ -63,7 +64,7 @@ class TeamScheduleService implements TeamScheduleServiceInterface
             $game = new \Game($gameRow);
             $opposingTeamId = $game->getOpposingTeamID($teamId);
             if (!isset($this->teamCache[$opposingTeamId])) {
-                $this->teamCache[$opposingTeamId] = \Team::initialize($this->db, $opposingTeamId);
+                $this->teamCache[$opposingTeamId] = Team::initialize($this->db, $opposingTeamId);
             }
             $opposingTeam = $this->teamCache[$opposingTeamId];
 

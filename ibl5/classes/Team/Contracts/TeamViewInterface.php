@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Team\Contracts;
 
+use Team\Team;
+
 /**
  * TeamViewInterface - Contract for Team module HTML rendering
  *

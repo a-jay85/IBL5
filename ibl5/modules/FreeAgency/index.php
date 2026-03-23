@@ -41,7 +41,7 @@ function display()
 
     $username = strval($cookie[1] ?? '');
     $teamName = $commonRepository->getTeamnameFromUsername($username) ?? '';
-    $team = Team::initialize($mysqli_db, $teamName);
+    $team = \Team\Team::initialize($mysqli_db, $teamName);
 
     // Service assembles data, view renders it
     $repository = new FreeAgencyRepository($mysqli_db);
@@ -70,7 +70,7 @@ function negotiate($pid)
     $userTeamName = $commonRepository->getTeamnameFromUsername($username) ?? '';
     $teamID = $commonRepository->getTidFromTeamname($userTeamName) ?? 0;
 
-    $team = \Team::initialize($mysqli_db, $teamID);
+    $team = \Team\Team::initialize($mysqli_db, $teamID);
     $season = new Season($mysqli_db);
 
     // Service assembles data, view renders it

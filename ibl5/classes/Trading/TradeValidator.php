@@ -6,6 +6,7 @@ namespace Trading;
 
 use League\League;
 use Trading\Contracts\TradeValidatorInterface;
+use Team\Team;
 
 /**
  * TradeValidator - Validates trade legality
@@ -107,12 +108,12 @@ class TradeValidator implements TradeValidatorInterface
 
         $errors = [];
 
-        if ($userPostTradeRoster > \Team::ROSTER_SPOTS_MAX) {
-            $errors[] = 'This trade is illegal since it puts your team over the ' . \Team::ROSTER_SPOTS_MAX . '-player roster limit.';
+        if ($userPostTradeRoster > Team::ROSTER_SPOTS_MAX) {
+            $errors[] = 'This trade is illegal since it puts your team over the ' . Team::ROSTER_SPOTS_MAX . '-player roster limit.';
         }
 
-        if ($partnerPostTradeRoster > \Team::ROSTER_SPOTS_MAX) {
-            $errors[] = 'This trade is illegal since it puts the other team over the ' . \Team::ROSTER_SPOTS_MAX . '-player roster limit.';
+        if ($partnerPostTradeRoster > Team::ROSTER_SPOTS_MAX) {
+            $errors[] = 'This trade is illegal since it puts the other team over the ' . Team::ROSTER_SPOTS_MAX . '-player roster limit.';
         }
 
         return [

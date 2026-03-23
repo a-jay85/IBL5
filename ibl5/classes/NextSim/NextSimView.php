@@ -11,6 +11,7 @@ use Player\PlayerImageHelper;
 use UI\Components\TooltipLabel;
 use UI\TableStyles;
 use Utilities\HtmlSanitizer;
+use Team\Team;
 
 /**
  * NextSimView - Position-centric HTML rendering for next simulation games
@@ -46,7 +47,7 @@ class NextSimView implements NextSimViewInterface
      * @param array<int, NextSimGameData> $games Processed game data
      * @param array<string, Player> $userStarters User's starting lineup by position
      */
-    public function render(array $games, \Team $userTeam, array $userStarters): string
+    public function render(array $games, Team $userTeam, array $userStarters): string
     {
         $html = '<div class="next-sim-container">';
         $html .= '<h2 class="ibl-title">Next Sim</h2>';
@@ -140,7 +141,7 @@ window.IBL_initNextSimHighlight();
      * @param array<int, NextSimGameData> $games Processed game data
      * @param array<string, Player> $userStarters User's starting lineup by position
      */
-    public function renderTabbedPositionTable(array $games, string $activePosition, \Team $userTeam, array $userStarters): string
+    public function renderTabbedPositionTable(array $games, string $activePosition, Team $userTeam, array $userStarters): string
     {
         $tabs = self::POSITION_LABELS;
         $switcher = new \UI\Components\TableViewSwitcher($tabs, $activePosition, 'modules.php?name=NextSim', $userTeam->color1, $userTeam->color2);
@@ -191,7 +192,7 @@ window.IBL_initNextSimHighlight();
      * @param array<int, NextSimGameData> $games Processed game data
      * @param array<string, Player> $userStarters User's starting lineup by position
      */
-    private function renderPositionSection(array $games, string $position, \Team $userTeam, array $userStarters): string
+    private function renderPositionSection(array $games, string $position, Team $userTeam, array $userStarters): string
     {
         $label = self::POSITION_LABELS[$position] ?? $position;
         $safeLabel = HtmlSanitizer::safeHtmlOutput($label);
@@ -210,7 +211,7 @@ window.IBL_initNextSimHighlight();
      * @param array<int, NextSimGameData> $games Processed game data
      * @param array<string, Player> $userStarters User's starting lineup by position
      */
-    public function renderPositionTable(array $games, string $position, \Team $userTeam, array $userStarters): string
+    public function renderPositionTable(array $games, string $position, Team $userTeam, array $userStarters): string
     {
         $tableStyle = TableStyles::inlineVars($userTeam->color1, $userTeam->color2);
 
@@ -284,7 +285,7 @@ window.IBL_initNextSimHighlight();
      *
      * @param NextSimGameData|null $gameData Game data for opponent rows, null for user row
      */
-    private function renderPlayerRow(Player $player, \Team $team, ?array $gameData): string
+    private function renderPlayerRow(Player $player, Team $team, ?array $gameData): string
     {
         $isUserRow = ($gameData === null);
         $rowClass = $isUserRow ? 'next-sim-row--user' : 'next-sim-row--opponent';
@@ -349,7 +350,7 @@ window.IBL_initNextSimHighlight();
      *
      * @param NextSimGameData|null $gameData Null for user row
      */
-    private function renderGameInfoCell(\Team $team, ?array $gameData): string
+    private function renderGameInfoCell(Team $team, ?array $gameData): string
     {
         $teamId = $team->teamID;
 

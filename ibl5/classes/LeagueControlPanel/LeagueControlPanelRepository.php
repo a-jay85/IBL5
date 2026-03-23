@@ -102,9 +102,6 @@ class LeagueControlPanelRepository extends \BaseMysqliRepository implements Leag
                 $this->execute(
                     "UPDATE ibl_settings SET value = 'Off' WHERE name = 'Show Draft Link'"
                 );
-                $this->execute(
-                    "UPDATE nuke_modules SET active = 0 WHERE title = 'Draft'"
-                );
             }
         });
 
@@ -130,20 +127,11 @@ class LeagueControlPanelRepository extends \BaseMysqliRepository implements Leag
      */
     public function setShowDraftLink(string $value): bool
     {
-        $this->transactional(function () use ($value): void {
-            $this->execute(
-                "UPDATE ibl_settings SET value = ? WHERE name = 'Show Draft Link'",
-                "s",
-                $value
-            );
-
-            $moduleActive = $value === 'On' ? 1 : 0;
-            $this->execute(
-                "UPDATE nuke_modules SET active = ? WHERE title = 'Draft'",
-                "i",
-                $moduleActive
-            );
-        });
+        $this->execute(
+            "UPDATE ibl_settings SET value = ? WHERE name = 'Show Draft Link'",
+            "s",
+            $value
+        );
 
         return true;
     }

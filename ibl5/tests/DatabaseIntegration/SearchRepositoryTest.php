@@ -65,9 +65,9 @@ class SearchRepositoryTest extends DatabaseTestCase
 
     // ── searchComments ──────────────────────────────────────────
 
-    public function testSearchCommentsReturnsEmptyForShortQuery(): void
+    public function testSearchCommentsAlwaysReturnsEmpty(): void
     {
-        $result = $this->repo->searchComments('ab');
+        $result = $this->repo->searchComments('test query');
 
         self::assertSame([], $result['results']);
         self::assertFalse($result['hasMore']);

@@ -85,33 +85,12 @@ class SearchRepositoryTest extends IntegrationTestCase
         $this->assertCount(10, $result['results']);
     }
 
-    public function testSearchCommentsReturnsEmptyForShortQuery(): void
+    public function testSearchCommentsAlwaysReturnsEmpty(): void
     {
-        $result = $this->repository->searchComments('ab');
+        $result = $this->repository->searchComments('test query');
 
         $this->assertSame([], $result['results']);
         $this->assertFalse($result['hasMore']);
-    }
-
-    public function testSearchCommentsReturnsResults(): void
-    {
-        $this->mockDb->setMockData([
-            [
-                'tid' => 1,
-                'sid' => 10,
-                'subject' => 'Test Comment',
-                'date' => '2024-01-15 12:00:00',
-                'name' => 'testuser',
-                'article_title' => 'Article Title',
-                'reply_count' => 2,
-            ],
-        ]);
-
-        $result = $this->repository->searchComments('test');
-
-        $this->assertCount(1, $result['results']);
-        $this->assertSame('Test Comment', $result['results'][0]['subject']);
-        $this->assertSame(2, $result['results'][0]['replyCount']);
     }
 
     public function testSearchUsersReturnsEmptyForShortQuery(): void

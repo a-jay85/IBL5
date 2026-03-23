@@ -47,7 +47,7 @@ class PlayerSimStatsView implements PlayerSimStatsViewInterface
     <tr>
         <td colspan=16 class="player-table-header">Sim Averages</td>
     </tr>
-    <tr class="text-bold">
+    <tr class="font-bold">
         <th>sim</th>
         <th>g</th>
         <th>min</th>

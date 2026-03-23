@@ -43,19 +43,19 @@ class PlayerAwardsView implements PlayerAwardsViewInterface
                 <th colspan=2>All-Star Activity</th>
             </tr>
             <tr>
-                <td class="text-bold">All Star Games:</td>
+                <td class="font-bold">All Star Games:</td>
                 <td><?= $allStarGames ?></td>
             </tr>
             <tr>
-                <td class="text-bold">Three-Point<br>Contests:</td>
+                <td class="font-bold">Three-Point<br>Contests:</td>
                 <td><?= $threePointContests ?></td>
             </tr>
             <tr>
-                <td class="text-bold">Slam Dunk<br>Competitions:</td>
+                <td class="font-bold">Slam Dunk<br>Competitions:</td>
                 <td><?= $dunkContests ?></td>
             </tr>
             <tr>
-                <td class="text-bold">Rookie-Sophomore<br>Challenges:</td>
+                <td class="font-bold">Rookie-Sophomore<br>Challenges:</td>
                 <td><?= $rookieSophChallenges ?></td>
             </tr>
         </table>

@@ -1819,6 +1819,13 @@ td.ibl-team-cell--colored {
     border-radius: 0 0 var(--radius-md) var(--radius-md);
 }
 
+/* When one roster is collapsed and the other is open, stack vertically
+   so the expanded table gets full width instead of being squeezed to 50% */
+.team-cards-row:has(.trading-roster-details:not([open])):has(.trading-roster-details[open]) .trading-layout__card {
+    flex-basis: 100%;
+    max-width: 100%;
+}
+
 /* ---------- Checkbox tap targets ---------- */
 
 .trading-roster input[type="checkbox"] {

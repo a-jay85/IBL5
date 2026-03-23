@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Tests\Discord;
 
 use PHPUnit\Framework\TestCase;
+use Discord\Discord;
 
 /**
  * Tests for Discord class
@@ -23,7 +24,7 @@ class DiscordTest extends TestCase
      */
     public function testGetDiscordIDFromTeamnameReturnsString(): void
     {
-        $discord = new \Discord($this->mockDb);
+        $discord = new Discord($this->mockDb);
         $result = $discord->getDiscordIDFromTeamname('NonExistentTeam');
         
         // Mock returns '123456789', real implementation would return '' for non-existent team

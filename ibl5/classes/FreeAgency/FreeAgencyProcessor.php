@@ -7,6 +7,7 @@ namespace FreeAgency;
 use FreeAgency\Contracts\FreeAgencyProcessorInterface;
 use Team\Team;
 use Season\Season;
+use Discord\Discord;
 
 /**
  * @see FreeAgencyProcessorInterface
@@ -312,7 +313,7 @@ class FreeAgencyProcessor implements FreeAgencyProcessorInterface
             return;
         }
 
-        $discord = new \Discord($mysqliDb);
+        $discord = new Discord($mysqliDb);
         $playerTeamName = $player->teamName ?? '';
         $playerTeamDiscordID = $discord->getDiscordIDFromTeamname($playerTeamName);
 
@@ -324,7 +325,7 @@ _**{$player->teamName}** GM <@!$playerTeamDiscordID> could not be reached for co
 _**{$player->teamName}** GM <@!$playerTeamDiscordID> could not be reached for comment._";
         }
 
-        \Discord::postToChannel('#free-agency', $message);
+        Discord::postToChannel('#free-agency', $message);
     }
 
     /**

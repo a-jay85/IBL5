@@ -7,6 +7,7 @@ namespace Draft;
 use Draft\Contracts\DraftSelectionHandlerInterface;
 use Shared\Contracts\SharedRepositoryInterface;
 use Season\Season;
+use Discord\Discord;
 
 /**
  * @see DraftSelectionHandlerInterface
@@ -117,7 +118,7 @@ class DraftSelectionHandler implements DraftSelectionHandlerInterface
         }
 
         try {
-            \Discord::postToChannel('#general-chat', $message);
+            Discord::postToChannel('#general-chat', $message);
         } catch (\Throwable $e) {
             \Logging\LoggerFactory::getChannel('draft')->error('Draft Discord #general-chat error', ['error' => $e->getMessage()]);
         }
@@ -129,7 +130,7 @@ class DraftSelectionHandler implements DraftSelectionHandlerInterface
         );
 
         try {
-            \Discord::postToChannel('#draft-picks', $messageWithNextTeam);
+            Discord::postToChannel('#draft-picks', $messageWithNextTeam);
         } catch (\Throwable $e) {
             \Logging\LoggerFactory::getChannel('draft')->error('Draft Discord #draft-picks error', ['error' => $e->getMessage()]);
         }

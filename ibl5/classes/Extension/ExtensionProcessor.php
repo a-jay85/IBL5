@@ -25,6 +25,7 @@ use Discord\Discord;
  * @phpstan-type TraditionData array{currentSeasonWins: int, currentSeasonLosses: int, tradition_wins: int, tradition_losses: int}
  * @phpstan-type TeamTraditionDbRow array{Contract_Wins: int, Contract_Losses: int, Contract_AvgW: int, Contract_AvgL: int}
  * @phpstan-type MoneyCommittedDbRow array{money_committed_at_position: int}
+ * @phpstan-type EvaluationContext array{teamFactors: array{wins: int, losses: int, tradition_wins: int, tradition_losses: int, money_committed_at_position: int}, playerPreferences: array{winner: int, tradition: int, loyalty: int, playing_time: int}, demands: ExtensionOffer}
  *
  * @see ExtensionProcessorInterface
  */
@@ -60,64 +61,99 @@ class ExtensionProcessor implements ExtensionProcessorInterface
      */
     public function processExtension($extensionData)
     {
+        // Phase 1: Resolve entities
         $offer = $extensionData['offer'];
         $demands = $extensionData['demands'] ?? null;
         $player = $this->getPlayerObject($extensionData);
         if ($player === null) {
-            return [
-                'success' => false,
-                'error' => 'Player not found in database.'
-            ];
+            return ['success' => false, 'error' => 'Player not found in database.'];
         }
 
         $team = $this->getTeamObject($extensionData, $player);
         if ($team === null) {
-            return [
-                'success' => false,
-                'error' => 'Team not found in database.'
-            ];
+            return ['success' => false, 'error' => 'Team not found in database.'];
         }
 
+        // Phase 2: Validate offer
+        $validationError = $this->validateExtensionOffer($offer, $player, $team);
+        if ($validationError !== null) {
+            return $validationError;
+        }
+
+        // Phase 3: Build evaluation context
+        $context = $this->buildEvaluationContext($team, $player, $demands, $offer);
+
+        // Phase 4: Evaluate offer and prepare result data
+        $evaluation = $this->evaluator->evaluateOffer($offer, $context['demands'], $context['teamFactors'], $context['playerPreferences']);
+
+        $offerData = $this->contractValidator->calculateOfferValue($offer);
+        $offerTotal = $offerData['total'];
+        $offerYears = $offerData['years'];
+        $offerInMillions = SalaryConverter::convertToMillions($offerTotal);
+        $offerDetails = $offer['year1'] . " " . $offer['year2'] . " " . $offer['year3'] . " " . $offer['year4'] . " " . $offer['year5'];
+
+        $playerName = $player->name ?? '';
+        $teamName = $team->name;
+
+        // Phase 5: Handle acceptance or rejection
+        if ($evaluation['accepted']) {
+            return $this->handleAcceptedExtension(
+                $player, $team, $offer, $evaluation,
+                $offerTotal, $offerInMillions, $offerYears, $offerDetails
+            );
+        }
+
+        return $this->handleRejectedExtension(
+            $playerName, $teamName, $evaluation,
+            $offerTotal, $offerInMillions, $offerYears, $offerDetails
+        );
+    }
+
+    /**
+     * Validate extension offer amounts, eligibility, contract rules
+     *
+     * @param ExtensionOffer $offer
+     * @return array{success: false, error: string}|null Error result or null on success
+     */
+    private function validateExtensionOffer(array $offer, Player $player, Team $team): ?array
+    {
         $amountValidation = $this->validator->validateOfferAmounts($offer);
         if ($amountValidation['valid'] !== true) {
-            return [
-                'success' => false,
-                'error' => (string) $amountValidation['error']
-            ];
+            return ['success' => false, 'error' => (string) $amountValidation['error']];
         }
 
         $eligibilityValidation = $this->validator->validateExtensionEligibility($team);
         if ($eligibilityValidation['valid'] !== true) {
-            return [
-                'success' => false,
-                'error' => (string) $eligibilityValidation['error']
-            ];
+            return ['success' => false, 'error' => (string) $eligibilityValidation['error']];
         }
 
         $maxOfferValidation = $this->contractValidator->validateMaximumYearOne($offer, $player->yearsOfExperience ?? 0);
         if ($maxOfferValidation['valid'] !== true) {
-            return [
-                'success' => false,
-                'error' => (string) $maxOfferValidation['error']
-            ];
+            return ['success' => false, 'error' => (string) $maxOfferValidation['error']];
         }
 
         $raisesValidation = $this->contractValidator->validateRaises($offer, $player->birdYears ?? 0);
         if ($raisesValidation['valid'] !== true) {
-            return [
-                'success' => false,
-                'error' => (string) $raisesValidation['error']
-            ];
+            return ['success' => false, 'error' => (string) $raisesValidation['error']];
         }
 
         $decreasesValidation = $this->contractValidator->validateSalaryDecreases($offer);
         if ($decreasesValidation['valid'] !== true) {
-            return [
-                'success' => false,
-                'error' => (string) $decreasesValidation['error']
-            ];
+            return ['success' => false, 'error' => (string) $decreasesValidation['error']];
         }
 
+        return null;
+    }
+
+    /**
+     * Build evaluation context: mark sim usage, calculate factors, normalize demands
+     *
+     * @param ExtensionOffer $offer
+     * @param array{total: int, years: int}|ExtensionOffer|null $demands
+     * @return EvaluationContext
+     */
+    private function buildEvaluationContext(Team $team, Player $player, array|null $demands, array $offer): array
+    {
         $this->dbOps->markExtensionUsedThisSim($team->name);
         $moneyCommittedAtPosition = $this->calculateMoneyCommittedAtPosition($team, $player->position);
         $traditionData = $this->getTeamTraditionData($team->name);
@@ -162,112 +198,136 @@ class ExtensionProcessor implements ExtensionProcessorInterface
         }
 
         /** @var ExtensionOffer $demands */
-        $evaluation = $this->evaluator->evaluateOffer($offer, $demands, $teamFactors, $playerPreferences);
+        return [
+            'teamFactors' => $teamFactors,
+            'playerPreferences' => $playerPreferences,
+            'demands' => $demands,
+        ];
+    }
 
-        $offerData = $this->contractValidator->calculateOfferValue($offer);
-        $offerTotal = $offerData['total'];
-        $offerYears = $offerData['years'];
-        $offerInMillions = SalaryConverter::convertToMillions($offerTotal);
-        $offerDetails = $offer['year1'] . " " . $offer['year2'] . " " . $offer['year3'] . " " . $offer['year4'] . " " . $offer['year5'];
-
+    /**
+     * Handle accepted extension: DB transaction, audit log, Discord, email
+     *
+     * @param ExtensionOffer $offer
+     * @param array{accepted: bool, offerValue: float, demandValue: float, modifier: float} $evaluation
+     * @return array{success: true, accepted: true, message: string, offerValue: float, demandValue: float, modifier: float, extensionYears: int, offerInMillions: float, offerDetails: string, discordNotificationSent: bool, discordChannel: string}
+     */
+    private function handleAcceptedExtension(
+        Player $player,
+        Team $team,
+        array $offer,
+        array $evaluation,
+        int $offerTotal,
+        float $offerInMillions,
+        int $offerYears,
+        string $offerDetails
+    ): array {
         $playerName = $player->name ?? '';
         $teamName = $team->name;
+        $currentSalary = $player->currentSeasonSalary ?? 0;
 
-        if ($evaluation['accepted']) {
-            $currentSalary = $player->currentSeasonSalary ?? 0;
-
-            $this->db->begin_transaction();
-            try {
-                $this->dbOps->updatePlayerContract($playerName, $offer, $currentSalary);
-                $this->dbOps->markExtensionUsedThisSeason($teamName);
-                $this->dbOps->createAcceptedExtensionStory($playerName, $teamName, $offerInMillions, $offerYears, $offerDetails);
-                $this->db->commit();
-            } catch (\Throwable $e) {
-                $this->db->rollback();
-                throw $e;
-            }
-
-            \Logging\LoggerFactory::getChannel('audit')->info('extension_accepted', [
-                'action' => 'extension_accepted',
-                'player_name' => $playerName,
-                'team_name' => $teamName,
-                'years' => $offerYears,
-                'total_millions' => $offerInMillions,
-                'details' => $offerDetails,
-            ]);
-
-            // Send Discord notification
-            if (class_exists(Discord::class)) {
-                $hometext = "{$playerName} today accepted a contract extension offer from the {$teamName} worth $offerInMillions million dollars over $offerYears years:<br>" . $offerDetails;
-                Discord::postToChannel('#extensions', $hometext);
-
-                $serverName = $_SERVER['SERVER_NAME'] ?? 'localhost';
-                if ($serverName !== 'localhost' && $serverName !== '127.0.0.1') {
-                    Discord::postToChannel('#general-chat', $hometext);
-                }
-            }
-
-            // Send email notification
-            $emailsubject = "Successful Extension - " . $playerName;
-            $filetext = "{$playerName} accepts an extension offer from the {$teamName} of $offerTotal for $offerYears years.\n";
-            $filetext .= "For reference purposes: the offer was " . $offerDetails;
-            $filetext .= " and the offer value was thus considered to be " . $evaluation['offerValue'];
-            $filetext .= "; the player wanted an offer with a value of " . $evaluation['demandValue'];
-            \Mail\MailService::fromConfig()->send('ibldepthcharts@gmail.com', $emailsubject, $filetext, 'accepted-extensions@iblhoops.net');
-
-            return [
-                'success' => true,
-                'accepted' => true,
-                'message' => "{$playerName} accepts your extension offer of $offerInMillions million dollars over $offerYears years. Thank you! (Can't believe you gave me that much... sucker!)",
-                'offerValue' => $evaluation['offerValue'],
-                'demandValue' => $evaluation['demandValue'],
-                'modifier' => $evaluation['modifier'],
-                'extensionYears' => $offerYears,
-                'offerInMillions' => $offerInMillions,
-                'offerDetails' => $offerDetails,
-                'discordNotificationSent' => class_exists(Discord::class),
-                'discordChannel' => '#extensions'
-            ];
-        } else {
-            // Create news story for rejection
-            $this->dbOps->createRejectedExtensionStory($playerName, $teamName, $offerInMillions, $offerYears);
-
-            \Logging\LoggerFactory::getChannel('audit')->info('extension_rejected', [
-                'action' => 'extension_rejected',
-                'player_name' => $playerName,
-                'team_name' => $teamName,
-                'years' => $offerYears,
-                'total_millions' => $offerInMillions,
-            ]);
-
-            // Send Discord notification
-            if (class_exists(Discord::class)) {
-                $hometext = "{$playerName} today rejected a contract extension offer from the {$teamName} worth $offerInMillions million dollars over $offerYears years.";
-                Discord::postToChannel('#extensions', $hometext);
-            }
-
-            // Send email notification
-            $emailsubject = "Unsuccessful Extension - " . $playerName;
-            $filetext = "{$playerName} refuses an extension offer from the {$teamName} of $offerTotal for $offerYears years.\n";
-            $filetext .= "For reference purposes: the offer was " . $offerDetails;
-            $filetext .= " and the offer value was thus considered to be " . $evaluation['offerValue'] . ".";
-            \Mail\MailService::fromConfig()->send('ibldepthcharts@gmail.com', $emailsubject, $filetext, 'rejected-extensions@iblhoops.net');
-
-            return [
-                'success' => true,
-                'accepted' => false,
-                'message' => "While I appreciate your offer of $offerInMillions million dollars over $offerYears years, I refuse it as it kinda sucks, and isn't what I'm looking for. You're gonna have to try harder if you want me to stick around this dump!",
-                'refusalMessage' => "refuses",
-                'offerValue' => $evaluation['offerValue'],
-                'demandValue' => $evaluation['demandValue'],
-                'modifier' => $evaluation['modifier'],
-                'extensionYears' => $offerYears,
-                'offerInMillions' => $offerInMillions,
-                'offerDetails' => $offerDetails,
-                'discordNotificationSent' => class_exists(Discord::class),
-                'discordChannel' => '#extensions'
-            ];
+        $this->db->begin_transaction();
+        try {
+            $this->dbOps->updatePlayerContract($playerName, $offer, $currentSalary);
+            $this->dbOps->markExtensionUsedThisSeason($teamName);
+            $this->dbOps->createAcceptedExtensionStory($playerName, $teamName, $offerInMillions, $offerYears, $offerDetails);
+            $this->db->commit();
+        } catch (\Throwable $e) {
+            $this->db->rollback();
+            throw $e;
         }
+
+        \Logging\LoggerFactory::getChannel('audit')->info('extension_accepted', [
+            'action' => 'extension_accepted',
+            'player_name' => $playerName,
+            'team_name' => $teamName,
+            'years' => $offerYears,
+            'total_millions' => $offerInMillions,
+            'details' => $offerDetails,
+        ]);
+
+        if (class_exists(Discord::class)) {
+            $hometext = "{$playerName} today accepted a contract extension offer from the {$teamName} worth $offerInMillions million dollars over $offerYears years:<br>" . $offerDetails;
+            Discord::postToChannel('#extensions', $hometext);
+
+            $serverName = $_SERVER['SERVER_NAME'] ?? 'localhost';
+            if ($serverName !== 'localhost' && $serverName !== '127.0.0.1') {
+                Discord::postToChannel('#general-chat', $hometext);
+            }
+        }
+
+        $emailsubject = "Successful Extension - " . $playerName;
+        $filetext = "{$playerName} accepts an extension offer from the {$teamName} of $offerTotal for $offerYears years.\n";
+        $filetext .= "For reference purposes: the offer was " . $offerDetails;
+        $filetext .= " and the offer value was thus considered to be " . $evaluation['offerValue'];
+        $filetext .= "; the player wanted an offer with a value of " . $evaluation['demandValue'];
+        \Mail\MailService::fromConfig()->send('ibldepthcharts@gmail.com', $emailsubject, $filetext, 'accepted-extensions@iblhoops.net');
+
+        return [
+            'success' => true,
+            'accepted' => true,
+            'message' => "{$playerName} accepts your extension offer of $offerInMillions million dollars over $offerYears years. Thank you! (Can't believe you gave me that much... sucker!)",
+            'offerValue' => $evaluation['offerValue'],
+            'demandValue' => $evaluation['demandValue'],
+            'modifier' => $evaluation['modifier'],
+            'extensionYears' => $offerYears,
+            'offerInMillions' => $offerInMillions,
+            'offerDetails' => $offerDetails,
+            'discordNotificationSent' => class_exists(Discord::class),
+            'discordChannel' => '#extensions'
+        ];
+    }
+
+    /**
+     * Handle rejected extension: news story, audit log, Discord, email
+     *
+     * @param array{accepted: bool, offerValue: float, demandValue: float, modifier: float} $evaluation
+     * @return array{success: true, accepted: false, message: string, refusalMessage: string, offerValue: float, demandValue: float, modifier: float, extensionYears: int, offerInMillions: float, offerDetails: string, discordNotificationSent: bool, discordChannel: string}
+     */
+    private function handleRejectedExtension(
+        string $playerName,
+        string $teamName,
+        array $evaluation,
+        int $offerTotal,
+        float $offerInMillions,
+        int $offerYears,
+        string $offerDetails
+    ): array {
+        $this->dbOps->createRejectedExtensionStory($playerName, $teamName, $offerInMillions, $offerYears);
+
+        \Logging\LoggerFactory::getChannel('audit')->info('extension_rejected', [
+            'action' => 'extension_rejected',
+            'player_name' => $playerName,
+            'team_name' => $teamName,
+            'years' => $offerYears,
+            'total_millions' => $offerInMillions,
+        ]);
+
+        if (class_exists(Discord::class)) {
+            $hometext = "{$playerName} today rejected a contract extension offer from the {$teamName} worth $offerInMillions million dollars over $offerYears years.";
+            Discord::postToChannel('#extensions', $hometext);
+        }
+
+        $emailsubject = "Unsuccessful Extension - " . $playerName;
+        $filetext = "{$playerName} refuses an extension offer from the {$teamName} of $offerTotal for $offerYears years.\n";
+        $filetext .= "For reference purposes: the offer was " . $offerDetails;
+        $filetext .= " and the offer value was thus considered to be " . $evaluation['offerValue'] . ".";
+        \Mail\MailService::fromConfig()->send('ibldepthcharts@gmail.com', $emailsubject, $filetext, 'rejected-extensions@iblhoops.net');
+
+        return [
+            'success' => true,
+            'accepted' => false,
+            'message' => "While I appreciate your offer of $offerInMillions million dollars over $offerYears years, I refuse it as it kinda sucks, and isn't what I'm looking for. You're gonna have to try harder if you want me to stick around this dump!",
+            'refusalMessage' => "refuses",
+            'offerValue' => $evaluation['offerValue'],
+            'demandValue' => $evaluation['demandValue'],
+            'modifier' => $evaluation['modifier'],
+            'extensionYears' => $offerYears,
+            'offerInMillions' => $offerInMillions,
+            'offerDetails' => $offerDetails,
+            'discordNotificationSent' => class_exists(Discord::class),
+            'discordChannel' => '#extensions'
+        ];
     }
 
     /**
@@ -408,5 +468,4 @@ class ExtensionProcessor implements ExtensionProcessorInterface
             'tradition_losses' => 41
         ];
     }
-
 }

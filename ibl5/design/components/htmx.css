@@ -4,8 +4,11 @@
         transition: opacity 200ms;
     }
 
-    /* AJAX tab/dropdown loading state — mirrors htmx-request dimming */
-    .ajax-loading {
+    /* Tab/dropdown loading state — HTMX adds .htmx-request to the triggering
+       element (tab link or select), which is inside the container via caption.
+       :has() matches when any descendant has that class. */
+    .table-scroll-container:has(.htmx-request),
+    .nextsim-tab-container:has(.htmx-request) {
         opacity: 0.5;
         transition: opacity 200ms;
         pointer-events: none;

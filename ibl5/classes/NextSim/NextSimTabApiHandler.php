@@ -10,7 +10,7 @@ use Season\Season;
 use Team\Team;
 
 /**
- * AJAX JSON endpoint handler for NextSim position tab switching
+ * HTMX endpoint handler for NextSim position tab switching
  *
  * Returns the tabbed position table HTML for a given position without the full page layout.
  */
@@ -25,7 +25,7 @@ class NextSimTabApiHandler
 
     public function handle(): void
     {
-        header('Content-Type: application/json; charset=utf-8');
+        header('Content-Type: text/html; charset=utf-8');
 
         $teamID = isset($_GET['teamID']) && is_string($_GET['teamID']) ? (int) $_GET['teamID'] : 0;
 
@@ -56,8 +56,6 @@ class NextSimTabApiHandler
         $games = $service->getNextSimGames($teamID, $season);
         $userStarters = $service->getUserStartingLineup($team);
 
-        $html = $view->renderTabbedPositionTable($games, $position, $team, $userStarters);
-
-        echo json_encode(['html' => $html], JSON_THROW_ON_ERROR);
+        echo $view->renderTabbedPositionTable($games, $position, $team, $userStarters);
     }
 }

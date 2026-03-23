@@ -115,15 +115,6 @@ class DepthChartEntryController implements DepthChartEntryControllerInterface
         echo '<script src="jslib/saved-depth-charts.js"></script>';
         echo '<script src="jslib/depth-chart-mobile.js"></script>';
 
-        // Output JS configuration for AJAX tab switching
-        $ajaxTabsConfig = json_encode([
-            'apiBaseUrl' => 'modules.php?name=DepthChartEntry&op=tab-api',
-            'params' => ['teamID' => $teamID],
-            'fallbackBaseUrl' => 'modules.php?name=DepthChartEntry',
-        ], JSON_THROW_ON_ERROR);
-        echo '<script>window.IBL_AJAX_TABS_CONFIG = ' . $ajaxTabsConfig . ';</script>';
-        echo '<script src="jslib/ajax-tabs.js"></script>';
-
         // NextSim position tables section
         $this->renderNextSimSection($teamID, $team, $season);
 
@@ -145,7 +136,8 @@ class DepthChartEntryController implements DepthChartEntryControllerInterface
 
         $activeValue = ($display === 'split' && $split !== null) ? 'split:' . $split : $display;
         $baseUrl = 'modules.php?name=DepthChartEntry';
-        $dropdown = new TableViewDropdown($groups, $activeValue, $baseUrl, $team->color1, $team->color2);
+        $apiUrl = 'modules.php?name=DepthChartEntry&op=tab-api&teamID=' . $teamID;
+        $dropdown = new TableViewDropdown($groups, $activeValue, $baseUrl, $team->color1, $team->color2, $apiUrl);
         $tableHtml = $this->teamTableService->renderTableForDisplay($display, $rosterData['roster'], $team, null, $season, $rosterData['starterPids'], $split);
 
         return $dropdown->wrap($tableHtml);
@@ -183,14 +175,6 @@ class DepthChartEntryController implements DepthChartEntryControllerInterface
         }
 
         echo '</div>';
-
-        // Output JS configuration for NextSim AJAX tab switching
-        $nextSimTabsConfig = json_encode([
-            'apiBaseUrl' => 'modules.php?name=DepthChartEntry&op=nextsim-api',
-            'params' => ['teamID' => $teamID],
-        ], JSON_THROW_ON_ERROR);
-        echo '<script>window.IBL_NEXTSIM_TABS_CONFIG = ' . $nextSimTabsConfig . ';</script>';
-        echo '<script src="jslib/nextsim-tabs.js"></script>';
     }
 
     private function getUserTeamName(string $username): string

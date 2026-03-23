@@ -5,9 +5,10 @@ declare(strict_types=1);
 namespace Team;
 
 /**
- * AJAX JSON endpoint handler for team page tab switching
+ * HTMX endpoint handler for team page tab switching
  *
  * Returns the table HTML for a given display mode without the full page layout.
+ * Emits HX-Push-Url header so HTMX pushes the user-friendly URL.
  */
 class TeamApiHandler
 {
@@ -34,7 +35,7 @@ class TeamApiHandler
 
     public function handle(): void
     {
-        header('Content-Type: application/json; charset=utf-8');
+        header('Content-Type: text/html; charset=utf-8');
 
         $teamID = isset($_GET['teamID']) && is_string($_GET['teamID']) ? (int) $_GET['teamID'] : 0;
 
@@ -68,8 +69,16 @@ class TeamApiHandler
             $display = 'ratings';
         }
 
-        $html = $this->tableService->getTableOutput($teamID, $yr, $display, $split);
+        // Emit HX-Push-Url so HTMX pushes the user-friendly URL
+        $pushUrl = 'modules.php?name=Team&op=team&teamID=' . $teamID . '&display=' . $display;
+        if ($split !== null) {
+            $pushUrl .= '&split=' . $split;
+        }
+        if ($yr !== null) {
+            $pushUrl .= '&yr=' . $yr;
+        }
+        header('HX-Push-Url: ' . $pushUrl);
 
-        echo json_encode(['html' => $html], JSON_THROW_ON_ERROR);
+        echo $this->tableService->getTableOutput($teamID, $yr, $display, $split);
     }
 }

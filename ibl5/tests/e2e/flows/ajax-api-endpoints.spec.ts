@@ -1,10 +1,9 @@
 import { test, expect } from '../fixtures/auth';
 
-// AJAX/Tab API endpoint tests — these are internal JSON endpoints called by
-// JavaScript for tab switching and saved depth chart management. A broken
-// endpoint would cause silent failures in the UI.
+// Tab API endpoint tests — these are HTMX endpoints that return HTML fragments
+// for tab/dropdown switching. The Saved Depth Chart API remains JSON.
 
-// Helper: retry GET requests that return HTML instead of JSON (CI load)
+// Helper: retry GET requests that return unexpected content (CI load)
 async function fetchJson(
   request: import('@playwright/test').APIRequestContext,
   url: string,
@@ -37,23 +36,20 @@ async function fetchJson(
 
 // ============================================================
 // DCE Tab API (DepthChartEntry&op=tab-api)
-// Returns {"html": "..."} with table HTML for a given display mode
+// Returns HTML table fragment for a given display mode
 // ============================================================
 
 test.describe('DCE Tab API', () => {
-  test('ratings display returns JSON with html property', async ({
-    request,
-  }) => {
-    const { status, body, contentType } = await fetchJson(
-      request,
+  test('ratings display returns HTML with table', async ({ request }) => {
+    const response = await request.get(
       'modules.php?name=DepthChartEntry&op=tab-api&teamID=1&display=ratings',
     );
 
-    expect(contentType, 'API endpoint must return JSON, not HTML').toContain('json');
+    const contentType = response.headers()['content-type'] ?? '';
+    expect(contentType, 'API endpoint must return HTML').toContain('text/html');
 
-    expect(status).toBe(200);
-    expect(body).toHaveProperty('html');
-    const html = (body as Record<string, string>).html;
+    expect(response.status()).toBe(200);
+    const html = await response.text();
     expect(html).toContain('<table');
   });
 
@@ -61,91 +57,85 @@ test.describe('DCE Tab API', () => {
     const modes = ['ratings', 'total_s', 'avg_s', 'per36mins', 'contracts'];
 
     for (const mode of modes) {
-      const { status, body, contentType } = await fetchJson(
-        request,
+      const response = await request.get(
         `modules.php?name=DepthChartEntry&op=tab-api&teamID=1&display=${mode}`,
       );
 
-      expect(contentType, `${mode} API must return JSON, not HTML`).toContain('json');
-
-      expect(status, `${mode} should return 200`).toBe(200);
-      expect(body, `${mode} should have html property`).toHaveProperty('html');
-      const html = (body as Record<string, string>).html;
+      expect(response.status(), `${mode} should return 200`).toBe(200);
+      const html = await response.text();
       expect(html.length, `${mode} should return non-empty html`).toBeGreaterThan(0);
     }
   });
 
   test('invalid display mode falls back to ratings', async ({ request }) => {
-    const { status, body, contentType } = await fetchJson(
-      request,
+    const response = await request.get(
       'modules.php?name=DepthChartEntry&op=tab-api&teamID=1&display=invalid_mode',
     );
 
-    expect(contentType, 'API endpoint must return JSON, not HTML').toContain('json');
-
-    expect(status).toBe(200);
-    expect(body).toHaveProperty('html');
-    // Falls back to ratings — should still return a table
-    const html = (body as Record<string, string>).html;
+    expect(response.status()).toBe(200);
+    const html = await response.text();
     expect(html).toContain('<table');
+  });
+
+  test('response includes HX-Push-Url header', async ({ request }) => {
+    const response = await request.get(
+      'modules.php?name=DepthChartEntry&op=tab-api&teamID=1&display=contracts',
+    );
+
+    const pushUrl = response.headers()['hx-push-url'] ?? '';
+    expect(pushUrl).toContain('display=contracts');
   });
 });
 
 // ============================================================
 // NextSim Tab API (DepthChartEntry&op=nextsim-api)
-// Returns {"html": "..."} with position table HTML
+// Returns HTML position table fragment
 // ============================================================
 
 test.describe('NextSim Tab API', () => {
-  test('position endpoints return valid JSON', async ({ request }) => {
+  test('position endpoints return valid HTML', async ({ request }) => {
     const positions = ['PG', 'SG', 'SF', 'PF', 'C'];
 
     for (const pos of positions) {
-      const { status, body, contentType } = await fetchJson(
-        request,
+      const response = await request.get(
         `modules.php?name=DepthChartEntry&op=nextsim-api&teamID=1&position=${pos}`,
       );
 
-      expect(contentType, `${pos} API must return JSON, not HTML`).toContain('json');
+      const contentType = response.headers()['content-type'] ?? '';
+      expect(contentType, `${pos} API must return HTML`).toContain('text/html');
 
-      expect(status, `${pos} should return 200`).toBe(200);
-      expect(body, `${pos} should have html property`).toHaveProperty('html');
+      expect(response.status(), `${pos} should return 200`).toBe(200);
       // HTML may be empty if no games in sim window — that's valid
     }
   });
 
   test('invalid position falls back to PG', async ({ request }) => {
-    const { status, body, contentType } = await fetchJson(
-      request,
+    const response = await request.get(
       'modules.php?name=DepthChartEntry&op=nextsim-api&teamID=1&position=XX',
     );
 
-    expect(contentType, 'API endpoint must return JSON, not HTML').toContain('json');
-
-    expect(status).toBe(200);
-    expect(body).toHaveProperty('html');
+    const contentType = response.headers()['content-type'] ?? '';
+    expect(contentType, 'API endpoint must return HTML').toContain('text/html');
+    expect(response.status()).toBe(200);
   });
 });
 
 // ============================================================
 // Team API (Team&op=api)
-// Returns {"html": "..."} — public endpoint, no auth required
+// Returns HTML table fragment — public endpoint, no auth required
 // ============================================================
 
 test.describe('Team API', () => {
-  test('ratings display returns JSON with html property', async ({
-    request,
-  }) => {
-    const { status, body, contentType } = await fetchJson(
-      request,
+  test('ratings display returns HTML with table', async ({ request }) => {
+    const response = await request.get(
       'modules.php?name=Team&op=api&teamID=1&display=ratings',
     );
 
-    expect(contentType, 'API endpoint must return JSON, not HTML').toContain('json');
+    const contentType = response.headers()['content-type'] ?? '';
+    expect(contentType, 'API endpoint must return HTML').toContain('text/html');
 
-    expect(status).toBe(200);
-    expect(body).toHaveProperty('html');
-    const html = (body as Record<string, string>).html;
+    expect(response.status()).toBe(200);
+    const html = await response.text();
     expect(html).toContain('<table');
   });
 
@@ -153,16 +143,24 @@ test.describe('Team API', () => {
     const modes = ['ratings', 'total_s', 'avg_s', 'per36mins', 'contracts'];
 
     for (const mode of modes) {
-      const { status, body, contentType } = await fetchJson(
-        request,
+      const response = await request.get(
         `modules.php?name=Team&op=api&teamID=1&display=${mode}`,
       );
 
-      expect(contentType, `Team API ${mode} must return JSON, not HTML`).toContain('json');
-
-      expect(status, `Team API ${mode} should return 200`).toBe(200);
-      expect(body, `Team API ${mode} should have html`).toHaveProperty('html');
+      expect(response.status(), `Team API ${mode} should return 200`).toBe(200);
+      const html = await response.text();
+      expect(html.length, `Team API ${mode} should return non-empty html`).toBeGreaterThan(0);
     }
+  });
+
+  test('response includes HX-Push-Url header', async ({ request }) => {
+    const response = await request.get(
+      'modules.php?name=Team&op=api&teamID=1&display=contracts',
+    );
+
+    const pushUrl = response.headers()['hx-push-url'] ?? '';
+    expect(pushUrl).toContain('display=contracts');
+    expect(pushUrl).toContain('teamID=1');
   });
 
   test('invalid teamID returns error response', async ({ request }) => {
@@ -178,7 +176,7 @@ test.describe('Team API', () => {
 
 // ============================================================
 // Saved Depth Chart API (DepthChartEntry&op=api)
-// Requires auth — returns 401 without valid session
+// Requires auth — returns 401 without valid session (still JSON)
 // ============================================================
 
 test.describe('Saved Depth Chart API', () => {

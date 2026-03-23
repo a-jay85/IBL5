@@ -19,7 +19,9 @@ use Trading\TradeProcessor;
  * - Trade cleanup and notifications
  *
  * @covers \Trading\TradeProcessor
- * @covers \Trading\TradingRepository
+ * @covers \Trading\TradeOfferRepository
+ * @covers \Trading\TradeAssetRepository
+ * @covers \Trading\TradeFormRepository
  * @covers \Trading\CashTransactionHandler
  * @covers \Trading\TradeValidator
  */

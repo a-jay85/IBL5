@@ -56,10 +56,30 @@ jobs:
       working-directory: ibl5
       run: |
         mkdir -p coverage
+        echo "::group::Full PHPUnit output"
+        set +eo pipefail
         vendor/bin/phpunit \
           --testdox \
           --coverage-clover coverage/clover.xml \
-          --colors=always
+          --colors=always 2>&1 | tee /tmp/phpunit-output.txt
+        PHPUNIT_EXIT=${PIPESTATUS[0]}
+        set -eo pipefail
+        echo "::endgroup::"
+
+        if [ $PHPUNIT_EXIT -ne 0 ]; then
+          echo ""
+          echo "════════════════════════════════════════"
+          echo "  FAILING TESTS"
+          echo "════════════════════════════════════════"
+          sed 's/\x1b\[[0-9;]*m//g' /tmp/phpunit-output.txt | grep '✘' || true
+          echo ""
+          echo "════════════════════════════════════════"
+          echo "  FAILURE DETAILS"
+          echo "════════════════════════════════════════"
+          sed 's/\x1b\[[0-9;]*m//g' /tmp/phpunit-output.txt | awk '/^There (was|were) [0-9]+ (failure|error)/,0' || true
+          echo "════════════════════════════════════════"
+        fi
+        exit $PHPUNIT_EXIT
 
     - name: Check coverage threshold
       working-directory: ibl5

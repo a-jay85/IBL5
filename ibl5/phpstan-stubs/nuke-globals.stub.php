@@ -67,8 +67,6 @@ function is_user(mixed $cookie): int { return 0; }
  */
 function cookiedecode(mixed $cookie): ?array { return null; }
 
-/** @return string */
-function get_theme(): string { return ''; }
 
 /** @return void */
 function get_lang(string $module): void {}

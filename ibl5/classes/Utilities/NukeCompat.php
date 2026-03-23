@@ -142,7 +142,7 @@ class NukeCompat
      */
     public function getTheme(): string
     {
-        return get_theme();
+        return 'IBL';
     }
 
     /**

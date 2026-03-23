@@ -24,7 +24,7 @@ if (!defined('MODULE_FILE')) {
 $module_name = basename(dirname(__FILE__));
 get_lang($module_name);
 $pagetitle = "- " . _STATS;
-$ThemeSel = get_theme();
+$ThemeSel = 'IBL';
 
 // Initialize controller
 $controller = new SiteStatistics\StatisticsController($mysqli_db, $module_name, $ThemeSel);

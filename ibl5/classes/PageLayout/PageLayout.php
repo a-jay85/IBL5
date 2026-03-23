@@ -71,7 +71,7 @@ class PageLayout
         global $slogan;
         /** @var string $name */
         global $name;
-        $ThemeSel = get_theme();
+        $ThemeSel = 'IBL';
 
         // Calculate the correct base path for resources
         $currentFileRaw = $_SERVER['SCRIPT_FILENAME'] ?? '';

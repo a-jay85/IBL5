@@ -27,7 +27,6 @@ final class BanDirectNukeGlobalsRule implements Rule
         'formattimestamp',
         'getusrinfo',
         'loginbox',
-        'get_theme',
         'get_lang',
     ];
 

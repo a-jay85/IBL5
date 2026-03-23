@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace Trading;
 
 use Trading\Contracts\TradeOfferInterface;
+use Trading\Contracts\TradeOfferRepositoryInterface;
+use Trading\Contracts\TradeAssetRepositoryInterface;
 use Trading\Contracts\TradeCashRepositoryInterface;
 use Season\Season;
 use Discord\Discord;
@@ -18,14 +20,15 @@ use Discord\Discord;
  * @see TradeOfferInterface
  *
  * @phpstan-import-type PlayerRow from \Services\CommonMysqliRepository
- * @phpstan-import-type DraftPickRow from \Trading\Contracts\TradingRepositoryInterface
+ * @phpstan-import-type DraftPickRow from \Trading\Contracts\TradeAssetRepositoryInterface
  *
  * @phpstan-type TradeFormData array{offeringTeam: string, listeningTeam: string, switchCounter: int, fieldsCounter: int, check: array<int, string|null>, index: array<int, string>, type: array<int, string>, contract: array<int, string>, userSendsCash: array<int, int>, partnerSendsCash: array<int, int>}
  */
 class TradeOffer implements TradeOfferInterface
 {
     protected \mysqli $db;
-    protected TradingRepository $repository;
+    protected TradeOfferRepositoryInterface $offerRepository;
+    protected TradeAssetRepositoryInterface $assetRepository;
     protected TradeCashRepositoryInterface $cashRepository;
     protected \Services\CommonMysqliRepository $commonRepository;
     protected Season $season;
@@ -33,14 +36,18 @@ class TradeOffer implements TradeOfferInterface
     protected TradeValidator $validator;
     protected ?Discord $discord;
 
-    public function __construct(\mysqli $db, ?TradingRepository $repository = null)
-    {
+    public function __construct(
+        \mysqli $db,
+        ?TradeOfferRepositoryInterface $offerRepository = null,
+        ?TradeAssetRepositoryInterface $assetRepository = null
+    ) {
         $this->db = $db;
-        $this->repository = $repository ?? new TradingRepository($db);
+        $this->offerRepository = $offerRepository ?? new TradeOfferRepository($db);
+        $this->assetRepository = $assetRepository ?? new TradeAssetRepository($db);
         $this->cashRepository = new TradeCashRepository($db);
         $this->commonRepository = new \Services\CommonMysqliRepository($db);
         $this->season = new Season($db);
-        $this->cashHandler = new CashTransactionHandler($db, $this->repository, $this->cashRepository);
+        $this->cashHandler = new CashTransactionHandler($db, $this->assetRepository, $this->cashRepository);
         $this->validator = new TradeValidator($db);
 
         // Initialize Discord with error handling (may fail if column doesn't exist)
@@ -141,7 +148,7 @@ class TradeOffer implements TradeOfferInterface
      */
     protected function generateTradeOfferId(): int
     {
-        return $this->repository->generateNextTradeOfferId();
+        return $this->offerRepository->generateNextTradeOfferId();
     }
 
     /**
@@ -355,7 +362,7 @@ class TradeOffer implements TradeOfferInterface
         $itemType = TradeItemType::fromFormInt($assetType);
 
         // Use repository with prepared statements
-        $this->repository->insertTradeItem(
+        $this->offerRepository->insertTradeItem(
             $tradeOfferId,
             $itemId,
             $itemType,
@@ -386,7 +393,7 @@ class TradeOffer implements TradeOfferInterface
      */
     protected function getPickTradeText(int $pickId, string $offeringTeamName, string $listeningTeamName): string
     {
-        $pickData = $this->repository->getDraftPickById($pickId);
+        $pickData = $this->assetRepository->getDraftPickById($pickId);
 
         if ($pickData === null) {
             return '';
@@ -417,7 +424,7 @@ class TradeOffer implements TradeOfferInterface
      */
     protected function getPlayerTradeText(int $playerId, string $offeringTeamName, string $listeningTeamName): string
     {
-        $playerData = $this->repository->getPlayerById($playerId);
+        $playerData = $this->assetRepository->getPlayerById($playerId);
 
         if ($playerData === null) {
             return '';
@@ -453,7 +460,7 @@ class TradeOffer implements TradeOfferInterface
 
         $itemId = (int) ($offeringTeamId . '0' . $listeningTeamId . '0');
 
-        $this->repository->insertTradeItem(
+        $this->offerRepository->insertTradeItem(
             $tradeOfferId,
             $itemId,
             TradeItemType::Cash,

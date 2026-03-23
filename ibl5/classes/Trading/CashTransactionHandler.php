@@ -6,7 +6,7 @@ namespace Trading;
 
 use Trading\Contracts\CashTransactionHandlerInterface;
 use Trading\Contracts\TradeCashRepositoryInterface;
-use Trading\Contracts\TradingRepositoryInterface;
+use Trading\Contracts\TradeAssetRepositoryInterface;
 
 /**
  * CashTransactionHandler - Handles cash considerations in trades
@@ -20,17 +20,17 @@ use Trading\Contracts\TradingRepositoryInterface;
 class CashTransactionHandler implements CashTransactionHandlerInterface
 {
     protected \mysqli $db;
-    protected TradingRepositoryInterface $repository;
+    protected TradeAssetRepositoryInterface $assetRepository;
     protected TradeCashRepositoryInterface $cashRepository;
     protected \Services\CommonMysqliRepository $commonRepository;
 
     public function __construct(
         \mysqli $db,
-        ?TradingRepositoryInterface $repository = null,
+        ?TradeAssetRepositoryInterface $assetRepository = null,
         ?TradeCashRepositoryInterface $cashRepository = null
     ) {
         $this->db = $db;
-        $this->repository = $repository ?? new TradingRepository($db);
+        $this->assetRepository = $assetRepository ?? new TradeAssetRepository($db);
         $this->cashRepository = $cashRepository ?? new TradeCashRepository($db);
         $this->commonRepository = new \Services\CommonMysqliRepository($db);
     }
@@ -40,7 +40,7 @@ class CashTransactionHandler implements CashTransactionHandlerInterface
      */
     public function generateUniquePid(int $pid): int
     {
-        if (!$this->repository->playerIdExists($pid)) {
+        if (!$this->assetRepository->playerIdExists($pid)) {
             return $pid;
         }
 

@@ -8,7 +8,7 @@ namespace Trading\Contracts;
  * TradeCashRepositoryInterface - Contract for cash transaction database operations
  *
  * Defines methods for accessing and modifying cash-related trade data.
- * Extracted from TradingRepositoryInterface to follow single-responsibility principle.
+ * Extracted from the original TradingRepositoryInterface to follow single-responsibility principle.
  *
  * @phpstan-type TradeCashRow array{tradeOfferID: int, sendingTeam: string, receivingTeam: string, cy1: ?int, cy2: ?int, cy3: ?int, cy4: ?int, cy5: ?int, cy6: ?int}
  * @phpstan-type CashPlayerData array{ordinal: int, pid: int, name: string, tid: int, exp: int, cy: int, cyt: int, cy1: int, cy2: int, cy3: int, cy4: int, cy5: int, cy6: int, retired: int}

@@ -1,6 +1,8 @@
 <?php
 
-use Trading\TradingRepository;
+use Trading\TradeOfferRepository;
+use Trading\TradeAssetRepository;
+use Trading\TradeFormRepository;
 use Trading\TradingService;
 use Trading\TradingView;
 
@@ -17,9 +19,11 @@ function tradeoffer($username)
 {
     global $partner, $mysqli_db;
 
-    $repository = new TradingRepository($mysqli_db);
+    $offerRepository = new TradeOfferRepository($mysqli_db);
+    $assetRepository = new TradeAssetRepository($mysqli_db);
+    $formRepository = new TradeFormRepository($mysqli_db);
     $commonRepository = new \Services\CommonMysqliRepository($mysqli_db);
-    $service = new TradingService($repository, $commonRepository, $mysqli_db);
+    $service = new TradingService($offerRepository, $assetRepository, $formRepository, $commonRepository, $mysqli_db);
     $view = new TradingView();
 
     $pageData = $service->getTradeOfferPageData($username, $partner);
@@ -39,9 +43,11 @@ function tradereview($username)
 {
     global $mysqli_db;
 
-    $repository = new TradingRepository($mysqli_db);
+    $offerRepository = new TradeOfferRepository($mysqli_db);
+    $assetRepository = new TradeAssetRepository($mysqli_db);
+    $formRepository = new TradeFormRepository($mysqli_db);
     $commonRepository = new \Services\CommonMysqliRepository($mysqli_db);
-    $service = new TradingService($repository, $commonRepository, $mysqli_db);
+    $service = new TradingService($offerRepository, $assetRepository, $formRepository, $commonRepository, $mysqli_db);
     $view = new TradingView();
 
     $pageData = $service->getTradeReviewPageData($username);

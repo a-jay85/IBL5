@@ -167,7 +167,6 @@ class MailService implements MailServiceInterface
             'from' => $fromEmail,
             'subject' => $subject,
             'body_length' => strlen($body),
-            'body' => $body,
         ]);
         return true;
     }

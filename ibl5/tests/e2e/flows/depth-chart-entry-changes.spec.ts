@@ -9,7 +9,7 @@ test.describe('Depth Chart change detection', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto('modules.php?name=DepthChartEntry');
 
-    // Wait for the form to load (async rendering)
+    // Wait for the depth chart form to load
     const form = page.locator('.depth-chart-form');
     await expect(form).toBeVisible({ timeout: 15000 });
   });

@@ -223,6 +223,31 @@ if [ "$SEED_DB" = true ]; then
     fi
 fi
 
+# Validate schema integrity — catches migrations that were marked as applied
+# (via prod-seed backfill) but whose DDL was never actually executed.
+PHP_CONTAINER="ibl5-php-$SLUG"
+echo "Validating schema integrity..."
+RETRIES=0
+MAX_RETRIES=15
+until docker exec "$PHP_CONTAINER" php /var/www/html/ibl5/bin/validate-schema &>/dev/null; do
+    RETRIES=$((RETRIES + 1))
+    if [ "$RETRIES" -ge 2 ]; then
+        # First retry was waiting for PHP container — now it's a real failure
+        echo ""
+        echo "  WARNING: Schema validation failed!"
+        docker exec "$PHP_CONTAINER" php /var/www/html/ibl5/bin/validate-schema 2>&1 || true
+        echo ""
+        echo "  The prod-seed may predate migrations that the code depends on."
+        echo "  Re-run with --fresh-vendor or manually apply the missing migration."
+        echo ""
+        break
+    fi
+    sleep 2
+done
+if [ "$RETRIES" -lt 2 ]; then
+    echo "Schema validation passed."
+fi
+
 echo ""
 echo "================================================"
 echo "  Worktree environment ready!"

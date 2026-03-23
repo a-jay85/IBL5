@@ -35,7 +35,7 @@ $mop = trim($mop);
 if (str_contains($name, "..") || (isset($file) && str_contains($file, "..")) || str_contains($mod_file, "..") || str_contains($mop, "..")) {
     die("You are so cool...");
 } else {
-    $ThemeSel = get_theme();
+    $ThemeSel = 'IBL';
     if (file_exists("themes/$ThemeSel/module.php")) {
         include "themes/$ThemeSel/module.php";
         if (is_active("$default_module") and file_exists("modules/$default_module/" . $mod_file . ".php")) {

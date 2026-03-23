@@ -60,7 +60,7 @@ if (isset($name) && $name == $_REQUEST['name']) {
             die("You are so cool...");
         }
 
-        $ThemeSel = get_theme();
+        $ThemeSel = 'IBL';
         if (file_exists("themes/$ThemeSel/modules/$name/" . $file . ".php")) {
             $modpath = "themes/$ThemeSel/";
         } else {

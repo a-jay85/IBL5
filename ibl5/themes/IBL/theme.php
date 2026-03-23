@@ -114,7 +114,7 @@ function themefooter()
 function themeindex($aid, $informant, $time, $title, $counter, $topic, $thetext, $notes, $morelink, $topicname, $topicimage, $topictext)
 {
     global $tipath;
-    $ThemeSel = get_theme();
+    $ThemeSel = 'IBL';
     if (file_exists("themes/$ThemeSel/images/topics/$topicimage")) {
         $t_image = "themes/$ThemeSel/images/topics/$topicimage";
     } else {
@@ -193,7 +193,7 @@ function themeindex($aid, $informant, $time, $title, $counter, $topic, $thetext,
 function themearticle($aid, $informant, $datetime, $title, $thetext, $topic, $topicname, $topicimage, $topictext)
 {
     global $tipath, $anonymous;
-    $ThemeSel = get_theme();
+    $ThemeSel = 'IBL';
     if (file_exists("themes/$ThemeSel/images/topics/$topicimage")) {
         $t_image = "themes/$ThemeSel/images/topics/$topicimage";
     } else {

@@ -93,7 +93,7 @@
         var isMobile = window.innerWidth <= MOBILE_BREAKPOINT;
 
         var nameLinks = document.querySelectorAll(
-            '.ibl-data-table a[href*="pid="]:not([data-no-abbreviate])'
+            '.ibl-data-table a[href*="pid="]:not([data-no-abbreviate]), .dc-card__name[href*="pid="]'
         );
 
         // First pass: abbreviate names (compact tables always, others on mobile only)

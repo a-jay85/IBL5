@@ -63,7 +63,7 @@ test.describe('Depth Chart Entry flow', () => {
   });
 
   test('reset button prompts confirmation', async ({ page }) => {
-    const resetBtn = page.locator('.depth-chart-reset-btn');
+    const resetBtn = page.locator('.depth-chart-buttons .depth-chart-reset-btn');
     await expect(resetBtn).toBeVisible({ timeout: 15000 });
 
     let dialogFired = false;
@@ -80,7 +80,7 @@ test.describe('Depth Chart Entry flow', () => {
     const form = page.locator('.depth-chart-form');
     await expect(form).toBeVisible({ timeout: 15000 });
 
-    await expect(page.locator('.depth-chart-submit-btn')).toBeVisible();
+    await expect(page.locator('.depth-chart-buttons .depth-chart-submit-btn')).toBeVisible();
   });
 
   test('no PHP errors', async ({ page }) => {

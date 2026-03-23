@@ -67,6 +67,7 @@
 @import './components/season-archive.css';
 @import './components/saved-depth-charts.css';
 @import './components/depth-chart-changes.css';
+@import './components/depth-chart-mobile.css';
 @import './components/sco-parser.css';
 @import './components/updater.css';
 @import './components/auth.css';
@@ -85,5 +86,6 @@
     padding: 0rem 1rem;
     vertical-align: top;
     text-align: center;
+    overflow-x: clip; /* Prevent wide content (tables, selects) from expanding body width beyond viewport — this breaks position:fixed nav in mobile browsers */
   }
 }

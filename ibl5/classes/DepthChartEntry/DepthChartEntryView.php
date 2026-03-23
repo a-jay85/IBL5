@@ -266,6 +266,14 @@ function resetDepthChart() {
         select.value = defaultValue;
     }
 
+    // Also reset mobile card checkboxes
+    var checkboxes = form.querySelectorAll('.dc-card__active-cb');
+    for (var j = 0; j < checkboxes.length; j++) {
+        checkboxes[j].checked = true;
+        var card = checkboxes[j].closest('.dc-card');
+        if (card) card.classList.remove('dc-card--inactive');
+    }
+
     if (typeof window.IBL_recalculateDepthChartGlows === 'function') {
         window.IBL_recalculateDepthChartGlows();
     }
@@ -285,7 +293,7 @@ JAVASCRIPT;
                     </td>
                 </tr>
             </tfoot>
-        </table></div></form>';
+        </table></div>';
     }
 
     /**
@@ -365,5 +373,166 @@ JAVASCRIPT;
         }
 
         echo '</tbody></table>';
+    }
+
+    /**
+     * @see DepthChartEntryViewInterface::renderMobileView()
+     * @param list<array<string, mixed>> $players
+     * @param array<string> $slotNames
+     */
+    public function renderMobileView(array $players, array $slotNames): void
+    {
+        echo '<div class="dc-mobile-cards" id="dc-mobile-cards" aria-hidden="true">';
+
+        $depthCount = 1;
+        foreach ($players as $player) {
+            $this->renderMobilePlayerCard($player, $depthCount, $slotNames);
+            $depthCount++;
+        }
+
+        echo '<div class="dc-mobile-cards__footer">
+            <input type="button" value="Reset" onclick="resetDepthChart();" class="depth-chart-reset-btn">
+            <input type="submit" value="Submit Depth Chart" class="depth-chart-submit-btn">
+        </div>';
+        echo '</div></form>';
+    }
+
+    /**
+     * Render a single mobile card for a player
+     *
+     * @param array<string, mixed> $player Player data from database
+     * @param int $depthCount Row counter for form field names
+     * @param array<string> $slotNames Position slot names
+     */
+    private function renderMobilePlayerCard(array $player, int $depthCount, array $slotNames): void
+    {
+        /** @var int $pid */
+        $pid = $player['pid'];
+        /** @var string $pos */
+        $pos = $player['pos'];
+        $name = $player['name'];
+        /** @var int $injured */
+        $injured = $player['injured'] ?? 0;
+
+        $nameHtml = HtmlSanitizer::safeHtmlOutput($name);
+        $posHtml = HtmlSanitizer::safeHtmlOutput($pos);
+        $imageUrl = \Player\PlayerImageHelper::getImageUrl($pid);
+
+        /** @var int $dcActive */
+        $dcActive = $player['dc_canPlayInGame'] ?? 0;
+        $checkedAttr = ($dcActive === 1) ? ' checked' : '';
+
+        /** @var int $sta */
+        $sta = $player['sta'] ?? 0;
+        $staminaCap = $sta + 40;
+        if ($staminaCap > 40) {
+            $staminaCap = 40;
+        }
+
+        echo "<div class=\"dc-card\" data-pid=\"{$pid}\">";
+
+        // Header: photo + pos badge + name + active toggle
+        echo '<div class="dc-card__header">';
+        echo "<img class=\"dc-card__photo\" src=\"{$imageUrl}\" alt=\"\" width=\"48\" height=\"48\" loading=\"lazy\">";
+        echo "<span class=\"dc-card__pos-badge\">{$posHtml}</span>";
+        echo "<a href=\"./modules.php?name=Player&amp;pa=showpage&amp;pid={$pid}\" class=\"dc-card__name\">{$nameHtml}</a>";
+
+        // Hidden fields (disabled — JS enables on mobile)
+        echo "<input type=\"hidden\" name=\"pid{$depthCount}\" value=\"{$pid}\" disabled>";
+        echo "<input type=\"hidden\" name=\"Injury{$depthCount}\" value=\"{$injured}\" disabled>";
+        echo "<input type=\"hidden\" name=\"Name{$depthCount}\" value=\"{$nameHtml}\" disabled>";
+
+        // Active checkbox toggle
+        echo "<label class=\"dc-card__active-toggle\" aria-label=\"Active status for {$nameHtml}\">";
+        echo "<input type=\"hidden\" name=\"canPlayInGame{$depthCount}\" value=\"0\" disabled>";
+        echo "<input type=\"checkbox\" name=\"canPlayInGame{$depthCount}\" value=\"1\" class=\"dc-card__active-cb\"{$checkedAttr} disabled>";
+        echo '<span class="dc-card__active-pill">Active</span>';
+        echo '</label>';
+        echo '</div>';
+
+        // Body
+        echo '<div class="dc-card__body">';
+
+        // Position slots grid (5 columns)
+        echo '<div class="dc-card__pos-grid">';
+        $positions = ['pg', 'sg', 'sf', 'pf', 'c'];
+        foreach ($positions as $idx => $posKey) {
+            $dcField = 'dc_' . strtoupper($posKey) . 'Depth';
+            /** @var int $currentValue */
+            $currentValue = $player[$dcField];
+            $label = $slotNames[$idx] ?? strtoupper($posKey);
+            $labelHtml = HtmlSanitizer::safeHtmlOutput($label);
+
+            echo "<div class=\"dc-card__field\">";
+            echo "<span class=\"dc-card__field-label\">{$labelHtml}</span>";
+            echo "<select name=\"{$posKey}{$depthCount}\" aria-label=\"{$labelHtml} depth for {$nameHtml}\" disabled>";
+            $this->renderPositionOptions($currentValue);
+            echo '</select></div>';
+        }
+        echo '</div>';
+
+        echo '<hr class="dc-card__divider">';
+
+        // Settings grid (6 columns)
+        echo '<div class="dc-card__settings-grid">';
+
+        /** @var int $dcMinutes */
+        $dcMinutes = $player['dc_minutes'] ?? 0;
+        /** @var int $dcOf */
+        $dcOf = $player['dc_of'] ?? 0;
+        /** @var int $dcDf */
+        $dcDf = $player['dc_df'] ?? 0;
+        /** @var int $dcOi */
+        $dcOi = $player['dc_oi'] ?? 0;
+        /** @var int $dcDi */
+        $dcDi = $player['dc_di'] ?? 0;
+        /** @var int $dcBh */
+        $dcBh = $player['dc_bh'] ?? 0;
+
+        // Minutes
+        echo "<div class=\"dc-card__field\">";
+        echo '<span class="dc-card__field-label">Min</span>';
+        echo "<select name=\"min{$depthCount}\" aria-label=\"Minutes for {$nameHtml}\" disabled>";
+        $this->renderMinutesOptions($dcMinutes, $staminaCap);
+        echo '</select></div>';
+
+        // OF
+        echo "<div class=\"dc-card__field\">";
+        echo '<span class="dc-card__field-label">OF</span>';
+        echo "<select name=\"OF{$depthCount}\" aria-label=\"Offense for {$nameHtml}\" disabled>";
+        $this->renderOffDefOptions($dcOf);
+        echo '</select></div>';
+
+        // DF
+        echo "<div class=\"dc-card__field\">";
+        echo '<span class="dc-card__field-label">DF</span>';
+        echo "<select name=\"DF{$depthCount}\" aria-label=\"Defense for {$nameHtml}\" disabled>";
+        $this->renderOffDefOptions($dcDf);
+        echo '</select></div>';
+
+        // OI
+        echo "<div class=\"dc-card__field\">";
+        echo '<span class="dc-card__field-label">OI</span>';
+        echo "<select name=\"OI{$depthCount}\" aria-label=\"Offensive intensity for {$nameHtml}\" disabled>";
+        $this->renderSettingOptions($dcOi);
+        echo '</select></div>';
+
+        // DI
+        echo "<div class=\"dc-card__field\">";
+        echo '<span class="dc-card__field-label">DI</span>';
+        echo "<select name=\"DI{$depthCount}\" aria-label=\"Defensive intensity for {$nameHtml}\" disabled>";
+        $this->renderSettingOptions($dcDi);
+        echo '</select></div>';
+
+        // BH
+        echo "<div class=\"dc-card__field\">";
+        echo '<span class="dc-card__field-label">BH</span>';
+        echo "<select name=\"BH{$depthCount}\" aria-label=\"Ball handling for {$nameHtml}\" disabled>";
+        $this->renderSettingOptions($dcBh);
+        echo '</select></div>';
+
+        echo '</div>'; // end settings grid
+        echo '</div>'; // end body
+        echo '</div>'; // end card
     }
 }

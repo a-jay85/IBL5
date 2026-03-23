@@ -34,6 +34,23 @@
     cursor: pointer;
 }
 
+@media (max-width: 768px) {
+    .saved-dc-dropdown-container {
+        flex-direction: column;
+        align-items: stretch;
+        padding: 0 var(--space-2);
+    }
+
+    .saved-dc-select-wrapper {
+        width: 100%;
+    }
+
+    .saved-dc-select {
+        width: 100%;
+        max-width: 100%;
+    }
+}
+
 .saved-dc-rename-btn {
     background: none;
     border: 1px solid var(--gray-300);

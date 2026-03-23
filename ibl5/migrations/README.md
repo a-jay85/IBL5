@@ -6,6 +6,17 @@ This directory contains SQL migration scripts to improve the IBL5 database schem
 
 These migrations implement the recommendations from `DATABASE_SCHEMA_IMPROVEMENTS.md` in a phased approach to minimize risk and downtime.
 
+## Auto-Rollback Compatibility (New Migrations)
+
+The production deploy workflow automatically reverts the last commit if post-deploy smoke tests fail. Because the migration runner is forward-only (no down migrations), a reverted commit deploys old PHP code against the new schema. For this to work safely, **new migrations must be backward-compatible** with the previous PHP version:
+
+1. **Additive only**: Add columns with `DEFAULT` values or `NULL`; never remove or rename columns in the same deploy as PHP code that reads the new name
+2. **No irreversible data transforms**: Data migrations that destroy the old format cannot be auto-rolled back; use a two-step deploy (schema first, data transform after confirming stability)
+3. **Backward-compatible indexes**: Adding indexes is safe; removing indexes that existing PHP code depends on is not
+4. **Two-step pattern for breaking changes**: Deploy 1 adds new column + PHP reads both old and new. Deploy 2 (after Deploy 1 is stable) removes old column.
+
+If a reverted deploy still fails smoke tests (because the old code is incompatible with the new schema), the workflow sends a "manual intervention required" notification instead of reverting again.
+
 ## Automated Migration Runner
 
 Migrations are applied automatically during deployment via `ibl5/bin/migrate`. The runner:

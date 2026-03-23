@@ -178,6 +178,12 @@ INSERT INTO ibl_standings (tid, team_name, pct, leagueRecord, wins, losses, conf
   (27, 'Jazz',         0.500, '20-20', 20, 20, 'Western',  'Midwest'),
   (28, 'Thunder',      0.500, '20-20', 20, 20, 'Western',  'Pacific');
 
+-- Clinch indicators for standings E2E tests
+-- Y = clinched playoff berth, X = clinched division, W = clinched conference
+UPDATE ibl_standings SET clinchedPlayoffs = 1 WHERE tid = 1;
+UPDATE ibl_standings SET clinchedDivision = 1 WHERE tid = 2;
+UPDATE ibl_standings SET clinchedConference = 1 WHERE tid = 3;
+
 -- ============================================================
 -- Franchise seasons (required by trigger FK; 1 row per franchise)
 -- ============================================================
@@ -732,7 +738,10 @@ ON DUPLICATE KEY UPDATE player_name = VALUES(player_name);
 INSERT INTO ibl_schedule (Year, Date, Visitor, Home, VScore, HScore, BoxID, uuid) VALUES
   (2026, '2026-03-08', 1, 2,  0, 0, 0, 'c0000000-0000-0000-0000-000000000001'),
   (2026, '2026-03-10', 3, 1,  0, 0, 0, 'c0000000-0000-0000-0000-000000000002'),
-  (2026, '2026-03-12', 1, 14, 0, 0, 0, 'c0000000-0000-0000-0000-000000000003');
+  (2026, '2026-03-12', 1, 14, 0, 0, 0, 'c0000000-0000-0000-0000-000000000003'),
+  -- Schedule for teamID=5 (Minutemen) — needed by team-schedule no-SOS-data tests
+  (2026, '2026-03-09', 5, 6,  0, 0, 0, 'c0000000-0000-0000-0000-000000000010'),
+  (2026, '2026-03-11', 7, 5,  0, 0, 0, 'c0000000-0000-0000-0000-000000000011');
 
 -- ============================================================
 -- Topics (nuke_topics) for Topics module E2E tests
@@ -1175,6 +1184,35 @@ INSERT INTO nuke_stories (catid, aid, title, time, hometext, bodytext, topic, ih
   (0, 'admin', 'All-Star Game recap', '2026-03-05 18:00:00',
    'The Eastern Conference won the All-Star Game.',
    'Complete recap of the All-Star festivities.', 1, 0, 3, 15);
+
+-- ============================================================
+-- Drafted rookie with draftyear=2026 (DraftHistory year detail tests)
+-- DraftHistory module queries ibl_plr.draftyear, not ibl_draft.
+-- ============================================================
+
+INSERT INTO ibl_plr (
+  pid, name, age, peak, tid, pos, ordinal,
+  sta, oo, od, `do`, dd, po, pd, `to`, td,
+  cy, cyt, cy1,
+  retired, exp,
+  htft, htin, wt, college,
+  draftround, draftpickno, draftyear, draftedby, draftedbycurrentname,
+  stats_gm, stats_min, stats_fgm, stats_fga, stats_ftm, stats_fta,
+  stats_3gm, stats_3ga, stats_orb, stats_drb, stats_ast, stats_stl,
+  stats_to, stats_blk, stats_pf,
+  uuid
+) VALUES
+  (31, 'Draft Rookie 2026', 20, 25, 2, 'PG', 5,
+   70, 65, 60, 55, 50, 62, 58, 60, 55,
+   1, 3, 500,
+   0, 0,
+   6, 2, 185, 'Draft College',
+   1, 1, 2026, 'Stars', 'Stars',
+   10, 300, 30, 80, 20, 30,
+   10, 30, 5, 15, 25, 8,
+   12, 3, 15,
+   'plr-uuid-00000000-0000-000000000031')
+ON DUPLICATE KEY UPDATE name = VALUES(name), draftyear = VALUES(draftyear);
 
 -- ============================================================
 -- Extension-eligible player on Metros (contract extension flow tests)

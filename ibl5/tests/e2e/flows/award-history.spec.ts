@@ -24,8 +24,8 @@ test.describe('Award History flow', () => {
     const radioButtons = page.locator('input[name="aw_sortby"]');
     await expect(radioButtons.first()).toBeVisible();
 
-    // Sort by year should be checked by default
-    const yearRadio = page.locator('input[name="aw_sortby"][value="year"]');
+    // Sort by year should be checked by default (value="3" maps to Year sort)
+    const yearRadio = page.locator('input[name="aw_sortby"][value="3"]');
     await expect(yearRadio).toBeVisible();
     await expect(yearRadio).toBeChecked();
   });

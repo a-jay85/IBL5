@@ -43,7 +43,7 @@ const PAGES = [
   { name: 'season archive', url: 'modules.php?name=SeasonArchive', selector: '.ibl-title, .ibl-data-table, table', hasWideTables: false },
   { name: 'one-on-one game', url: 'modules.php?name=OneOnOneGame', selector: '#pid1', hasWideTables: false, skipOverflow: true },
   { name: 'topics', url: 'modules.php?name=Topics', selector: '.ibl-title, table, a', hasWideTables: false, skipOverflow: true },
-  { name: 'news', url: 'modules.php?name=News', selector: '.ibl-title, .story-title, table', hasWideTables: false },
+  { name: 'news', url: 'modules.php?name=News', selector: '.news-article, .news-article__title, article', hasWideTables: false },
 ] as const;
 
 test.describe('Mobile public page smoke tests', () => {

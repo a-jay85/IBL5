@@ -13,6 +13,7 @@ nohup.out
 *.phar
 settings.local.json
 .claude/.workflow-pending
+.claude/scheduled_tasks.lock
 
 config.json
 config.php

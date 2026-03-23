@@ -119,6 +119,7 @@ class DepthChartEntryView implements DepthChartEntryViewInterface
         $slot3 = HtmlSanitizer::safeHtmlOutput($slotNames[3]);
         $slot4 = HtmlSanitizer::safeHtmlOutput($slotNames[4]);
         echo '<form name="DepthChartEntry" method="post" action="modules.php?name=DepthChartEntry&amp;op=submit" class="depth-chart-form">
+            ' . \Utilities\CsrfGuard::generateToken('depth_chart') . '
             <input type="hidden" name="Team_Name" value="' . $teamLogoEscaped . '">
             <input type="hidden" name="loaded_dc_id" id="loaded_dc_id" value="0">';
 

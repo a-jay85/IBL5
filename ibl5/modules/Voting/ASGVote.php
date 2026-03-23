@@ -10,6 +10,12 @@ PageLayout\PageLayout::header();
 
 echo "<HTML><HEAD><TITLE>ASG Voting Result</TITLE></HEAD><BODY>";
 
+if (!\Utilities\CsrfGuard::validateSubmittedToken('asg_vote')) {
+    echo 'Invalid or expired form submission. Please go back and try again.';
+    PageLayout\PageLayout::footer();
+    return;
+}
+
 $Team_Name = $_POST['teamname'] ?? '';
 $ECF1 = $_POST['ECF'][0] ?? '';
 $ECF2 = $_POST['ECF'][1] ?? '';

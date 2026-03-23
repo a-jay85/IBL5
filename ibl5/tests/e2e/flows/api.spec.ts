@@ -155,7 +155,7 @@ async function assertApiErrorRoute(
 ): Promise<void> {
   let lastStatus = 0;
   // More retries than assertGetRoute — error routes are more susceptible to
-  // Apache serving the HTML homepage under load (200 HTML vs expected 404 JSON).
+  // PHP built-in server serving the HTML homepage under load (200 HTML vs expected 404 JSON).
   for (let attempt = 0; attempt < 5; attempt++) {
     const response = method === 'get'
       ? await request.get(`${BASE_URL}${path}`, { headers: authHeaders })
@@ -163,7 +163,7 @@ async function assertApiErrorRoute(
     lastStatus = response.status();
     const contentType = response.headers()['content-type'] ?? '';
     if (!contentType.includes('json')) {
-      // Brief pause before retry — gives Apache time to recover from load
+      // Brief pause before retry — gives server time to recover from load
       await new Promise((r) => setTimeout(r, 200));
       continue;
     }

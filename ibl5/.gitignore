@@ -17,7 +17,9 @@ bun.lockb
 .DS_Store
 Thumbs.db
 
-# PHP
+# PHP — "vendor" (no slash) catches the symlink created by bin/wt-new;
+# "vendor/" catches the directory form. Both are needed so git never tracks either.
+vendor
 vendor/
 composer.lock
 

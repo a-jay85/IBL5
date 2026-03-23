@@ -4,9 +4,11 @@ declare(strict_types=1);
 
 namespace UI\Tables;
 
+use BasketballStats\StatsFormatter;
 use Player\Player;
 use Player\PlayerImageHelper;
 use Player\PlayerStats;
+use TeamOffDefStats\TeamOffDefStatsRepository;
 use UI\TeamCellHelper;
 use Utilities\HtmlSanitizer;
 use Team\Team;
@@ -14,6 +16,9 @@ use Season\Season;
 
 /**
  * SeasonTotals - Displays season totals statistics table
+ *
+ * @phpstan-import-type TeamOffenseStatsRow from \TeamOffDefStats\Contracts\TeamOffDefStatsRepositoryInterface
+ * @phpstan-import-type TeamDefenseStatsRow from \TeamOffDefStats\Contracts\TeamOffDefStatsRepositoryInterface
  */
 class SeasonTotals
 {
@@ -33,7 +38,8 @@ class SeasonTotals
         $playerRows = PlayerRowTransformer::resolveWithStats($db, $result, $yr);
 
         $season = new Season($db);
-        $teamStats = \TeamStats::withTeamName($db, $team->name, $season->endingYear);
+        $offDefRepo = new TeamOffDefStatsRepository($db);
+        $bothStats = $offDefRepo->getTeamBothStats($team->name, $season->endingYear);
 
         ob_start();
         ?>
@@ -98,48 +104,52 @@ endif; ?>
 <?php endforeach; ?>
     </tbody>
     <tfoot>
-<?php if ($yr === ""):
+<?php if ($yr === "" && $bothStats !== null):
     $labelColspan = ($moduleName === "LeagueStarters") ? 3 : 2;
+    $off = $bothStats['offense'];
+    $def = $bothStats['defense'];
+    $offPts = StatsFormatter::calculatePoints($off['fgm'], $off['ftm'], $off['tgm']);
+    $defPts = StatsFormatter::calculatePoints($def['fgm'], $def['ftm'], $def['tgm']);
 ?>
         <tr>
             <td colspan="<?= $labelColspan ?>"><?= HtmlSanitizer::e($team->name) ?> Offense</td>
-            <td><?= $teamStats->seasonOffenseGamesPlayed ?></td>
-            <td><?= $teamStats->seasonOffenseGamesPlayed ?></td>
+            <td><?= $off['games'] ?></td>
+            <td><?= $off['games'] ?></td>
             <td class="sep-r-team"></td>
-            <td><?= $teamStats->seasonOffenseTotalFieldGoalsMade ?></td>
-            <td class="sep-r-weak"><?= $teamStats->seasonOffenseTotalFieldGoalsAttempted ?></td>
-            <td><?= $teamStats->seasonOffenseTotalFreeThrowsMade ?></td>
-            <td class="sep-r-weak"><?= $teamStats->seasonOffenseTotalFreeThrowsAttempted ?></td>
-            <td><?= $teamStats->seasonOffenseTotalThreePointersMade ?></td>
-            <td class="sep-r-team"><?= $teamStats->seasonOffenseTotalThreePointersAttempted ?></td>
-            <td><?= $teamStats->seasonOffenseTotalOffensiveRebounds ?></td>
-            <td><?= $teamStats->seasonOffenseTotalRebounds ?></td>
-            <td><?= $teamStats->seasonOffenseTotalAssists ?></td>
-            <td><?= $teamStats->seasonOffenseTotalSteals ?></td>
-            <td><?= $teamStats->seasonOffenseTotalTurnovers ?></td>
-            <td><?= $teamStats->seasonOffenseTotalBlocks ?></td>
-            <td><?= $teamStats->seasonOffenseTotalPersonalFouls ?></td>
-            <td><?= $teamStats->seasonOffenseTotalPoints ?></td>
+            <td><?= StatsFormatter::formatTotal($off['fgm']) ?></td>
+            <td class="sep-r-weak"><?= StatsFormatter::formatTotal($off['fga']) ?></td>
+            <td><?= StatsFormatter::formatTotal($off['ftm']) ?></td>
+            <td class="sep-r-weak"><?= StatsFormatter::formatTotal($off['fta']) ?></td>
+            <td><?= StatsFormatter::formatTotal($off['tgm']) ?></td>
+            <td class="sep-r-team"><?= StatsFormatter::formatTotal($off['tga']) ?></td>
+            <td><?= StatsFormatter::formatTotal($off['orb']) ?></td>
+            <td><?= StatsFormatter::formatTotal($off['reb']) ?></td>
+            <td><?= StatsFormatter::formatTotal($off['ast']) ?></td>
+            <td><?= StatsFormatter::formatTotal($off['stl']) ?></td>
+            <td><?= StatsFormatter::formatTotal($off['tvr']) ?></td>
+            <td><?= StatsFormatter::formatTotal($off['blk']) ?></td>
+            <td><?= StatsFormatter::formatTotal($off['pf']) ?></td>
+            <td><?= StatsFormatter::formatTotal($offPts) ?></td>
         </tr>
         <tr>
             <td colspan="<?= $labelColspan ?>"><?= HtmlSanitizer::e($team->name) ?> Defense</td>
-            <td><?= $teamStats->seasonDefenseGamesPlayed ?></td>
-            <td><?= $teamStats->seasonDefenseGamesPlayed ?></td>
+            <td><?= $def['games'] ?></td>
+            <td><?= $def['games'] ?></td>
             <td class="sep-r-team"></td>
-            <td><?= $teamStats->seasonDefenseTotalFieldGoalsMade ?></td>
-            <td class="sep-r-weak"><?= $teamStats->seasonDefenseTotalFieldGoalsAttempted ?></td>
-            <td><?= $teamStats->seasonDefenseTotalFreeThrowsMade ?></td>
-            <td class="sep-r-weak"><?= $teamStats->seasonDefenseTotalFreeThrowsAttempted ?></td>
-            <td><?= $teamStats->seasonDefenseTotalThreePointersMade ?></td>
-            <td class="sep-r-team"><?= $teamStats->seasonDefenseTotalThreePointersAttempted ?></td>
-            <td><?= $teamStats->seasonDefenseTotalOffensiveRebounds ?></td>
-            <td><?= $teamStats->seasonDefenseTotalRebounds ?></td>
-            <td><?= $teamStats->seasonDefenseTotalAssists ?></td>
-            <td><?= $teamStats->seasonDefenseTotalSteals ?></td>
-            <td><?= $teamStats->seasonDefenseTotalTurnovers ?></td>
-            <td><?= $teamStats->seasonDefenseTotalBlocks ?></td>
-            <td><?= $teamStats->seasonDefenseTotalPersonalFouls ?></td>
-            <td><?= $teamStats->seasonDefenseTotalPoints ?></td>
+            <td><?= StatsFormatter::formatTotal($def['fgm']) ?></td>
+            <td class="sep-r-weak"><?= StatsFormatter::formatTotal($def['fga']) ?></td>
+            <td><?= StatsFormatter::formatTotal($def['ftm']) ?></td>
+            <td class="sep-r-weak"><?= StatsFormatter::formatTotal($def['fta']) ?></td>
+            <td><?= StatsFormatter::formatTotal($def['tgm']) ?></td>
+            <td class="sep-r-team"><?= StatsFormatter::formatTotal($def['tga']) ?></td>
+            <td><?= StatsFormatter::formatTotal($def['orb']) ?></td>
+            <td><?= StatsFormatter::formatTotal($def['reb']) ?></td>
+            <td><?= StatsFormatter::formatTotal($def['ast']) ?></td>
+            <td><?= StatsFormatter::formatTotal($def['stl']) ?></td>
+            <td><?= StatsFormatter::formatTotal($def['tvr']) ?></td>
+            <td><?= StatsFormatter::formatTotal($def['blk']) ?></td>
+            <td><?= StatsFormatter::formatTotal($def['pf']) ?></td>
+            <td><?= StatsFormatter::formatTotal($defPts) ?></td>
         </tr>
 <?php endif; ?>
     </tfoot>

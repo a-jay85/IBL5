@@ -35,6 +35,8 @@ class LoggerFactory implements LoggerFactoryInterface
 {
     private static ?self $instance = null;
 
+    private static int $slowQueryThresholdMs = 200;
+
     /** @var array<string, LoggerInterface> */
     private array $channels = [];
 
@@ -117,6 +119,10 @@ class LoggerFactory implements LoggerFactoryInterface
             new UserContextProcessor(),
         ];
 
+        self::$slowQueryThresholdMs = is_int($config['slow_query_threshold_ms'] ?? null)
+            ? $config['slow_query_threshold_ms']
+            : 200;
+
         return new self($handlers, $processors);
     }
 
@@ -125,6 +131,7 @@ class LoggerFactory implements LoggerFactoryInterface
      */
     public static function forTests(): self
     {
+        self::$slowQueryThresholdMs = 0;
         return new self([new NullHandler()]);
     }
 
@@ -174,6 +181,16 @@ class LoggerFactory implements LoggerFactoryInterface
     public static function reset(): void
     {
         self::$instance = null;
+        self::$slowQueryThresholdMs = 200;
+    }
+
+    /**
+     * Get the configured slow query threshold in milliseconds.
+     * Returns 0 if slow query logging is disabled.
+     */
+    public static function getSlowQueryThresholdMs(): int
+    {
+        return self::$slowQueryThresholdMs;
     }
 
     private static function parseLevel(string $name): Level

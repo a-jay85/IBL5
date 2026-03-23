@@ -128,4 +128,18 @@ class LoggerFactoryTest extends TestCase
 
         $this->assertCount(0, $logger->getProcessors());
     }
+
+    public function testFromConfigSetsSlowQueryThreshold(): void
+    {
+        LoggerFactory::fromConfig();
+
+        $this->assertSame(200, LoggerFactory::getSlowQueryThresholdMs());
+    }
+
+    public function testForTestsDisablesSlowQueryLogging(): void
+    {
+        LoggerFactory::forTests();
+
+        $this->assertSame(0, LoggerFactory::getSlowQueryThresholdMs());
+    }
 }

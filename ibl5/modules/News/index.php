@@ -22,8 +22,8 @@ get_lang($module_name);
 
 function theindex($new_topic = "0")
 {
-    global $db, $storyhome, $topicname, $topicimage, $topictext, $user, $prefix, $multilingual, $currentlang, $articlecomm, $sitename, $user_news, $userinfo;
-    if (is_user($user)) {getusrinfo($user);}
+    global $db, $storyhome, $topicname, $topicimage, $topictext, $user, $prefix, $multilingual, $currentlang, $articlecomm, $sitename, $user_news, $userinfo, $authService;
+    if (is_user($user)) {$userinfo = $authService->getUserInfo();}
     $new_topic = intval($new_topic);
     if ($multilingual == 1) {
         $querylang = "AND (alanguage='$currentlang' OR alanguage='')";
@@ -81,7 +81,12 @@ function theindex($new_topic = "0")
             $cattitle = \Utilities\HtmlSanitizer::safeHtmlOutput($row2['title']);
         }
         getTopics($s_sid);
-        formatTimestamp($time);
+        if (!is_numeric($time)) {
+            preg_match('/(\d{4})-(\d{1,2})-(\d{1,2}) (\d{1,2}):(\d{1,2}):(\d{1,2})/', $time, $dtParts);
+            $time = gmmktime($dtParts[4], $dtParts[5], $dtParts[6], $dtParts[2], $dtParts[3], $dtParts[1]);
+        }
+        $time -= date("Z");
+        $datetime = ucfirst(date(_DATESTRING, $time));
         $introcount = strlen($hometext);
         $fullcount = strlen($bodytext);
         $totalcount = $introcount + $fullcount;

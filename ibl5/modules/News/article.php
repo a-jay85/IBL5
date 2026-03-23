@@ -48,7 +48,8 @@ if (stristr($REQUEST_URI, "mainfile")) {
 $save = isset($save) ? (bool) $save : false;
 if ($save && is_user($user)) {
     cookiedecode($user);
-    getusrinfo($user);
+    global $authService;
+    $userinfo = $authService->getUserInfo();
 
     // Cast all user input to safe types
     $mode = isset($mode) && is_string($mode) ? substr($mode, 0, 20) : ($userinfo['umode'] ?? 'flat');
@@ -74,7 +75,7 @@ if ($save && is_user($user)) {
         }
     }
 
-    getusrinfo($user);
+    $userinfo = $authService->getUserInfo();
 }
 
 // Comment system removed - was deprecated and insecure
@@ -137,7 +138,12 @@ $pagetitle = "- $title";
 PageLayout\PageLayout::header();
 $artpage = 0;
 
-formatTimestamp($time);
+if (!is_numeric($time)) {
+    preg_match('/(\d{4})-(\d{1,2})-(\d{1,2}) (\d{1,2}):(\d{1,2}):(\d{1,2})/', $time, $dtParts);
+    $time = gmmktime($dtParts[4], $dtParts[5], $dtParts[6], $dtParts[2], $dtParts[3], $dtParts[1]);
+}
+$time -= date("Z");
+$datetime = ucfirst(date(_DATESTRING, $time));
 if (!empty($notes)) {
     $notes = "\n\n<b>" . _NOTE . "</b> <i>$notes</i>";
 } else {

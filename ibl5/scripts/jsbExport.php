@@ -84,7 +84,7 @@ use Utilities\HtmlSanitizer;
 
 $repository = new JsbExportRepository($mysqli_db);
 $service = new JsbExportService($repository);
-$season = new Season($mysqli_db);
+$season = new \Season\Season($mysqli_db);
 
 $basePath = __DIR__ . '/..';
 $plrInput = $basePath . '/IBL5.plr';

@@ -8,6 +8,7 @@ use StrengthOfSchedule\StrengthOfScheduleCalculator;
 use TeamSchedule\Contracts\TeamScheduleRepositoryInterface;
 use TeamSchedule\Contracts\TeamScheduleServiceInterface;
 use Team\Team;
+use Season\Season;
 
 /**
  * TeamScheduleService - Business logic for team schedule display
@@ -49,7 +50,7 @@ class TeamScheduleService implements TeamScheduleServiceInterface
      *
      * @return list<ScheduleGameRow>
      */
-    public function getProcessedSchedule(int $teamId, \Season $season): array
+    public function getProcessedSchedule(int $teamId, Season $season): array
     {
         $teamSchedule = $this->repository->getSchedule($teamId);
 

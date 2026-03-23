@@ -7,6 +7,7 @@ namespace Tests\Player;
 use PHPUnit\Framework\TestCase;
 use Player\PlayerContractValidator;
 use Player\PlayerData;
+use Season\Season;
 
 class PlayerContractValidatorTest extends TestCase
 {
@@ -329,7 +330,7 @@ class PlayerContractValidatorTest extends TestCase
 
     private function createMockSeason($endingYear)
     {
-        $season = $this->createStub(\Season::class);
+        $season = $this->createStub(Season::class);
         $season->endingYear = $endingYear;
         return $season;
     }

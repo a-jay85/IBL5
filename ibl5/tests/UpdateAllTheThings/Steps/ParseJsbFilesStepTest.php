@@ -9,16 +9,17 @@ use JsbParser\JsbImportService;
 use PHPUnit\Framework\TestCase;
 use Updater\Contracts\PipelineStepInterface;
 use Updater\Steps\ParseJsbFilesStep;
+use Season\Season;
 
 class ParseJsbFilesStepTest extends TestCase
 {
     private JsbImportService $stubService;
-    private \Season $stubSeason;
+    private Season $stubSeason;
 
     protected function setUp(): void
     {
         $this->stubService = $this->createStub(JsbImportService::class);
-        $this->stubSeason = $this->createStub(\Season::class);
+        $this->stubSeason = $this->createStub(Season::class);
     }
 
     public function testImplementsPipelineStepInterface(): void

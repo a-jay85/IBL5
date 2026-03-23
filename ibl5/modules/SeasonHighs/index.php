@@ -29,7 +29,7 @@ get_lang($module_name);
 global $mysqli_db;
 
 // Get current season info
-$season = new Season($mysqli_db);
+$season = new \Season\Season($mysqli_db);
 
 // Determine season phase (from request or current phase)
 $seasonPhase = isset($_GET['seasonPhase']) && !empty($_GET['seasonPhase'])

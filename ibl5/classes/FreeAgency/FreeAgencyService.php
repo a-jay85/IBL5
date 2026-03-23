@@ -9,6 +9,7 @@ use FreeAgency\Contracts\FreeAgencyRepositoryInterface;
 use FreeAgency\Contracts\FreeAgencyDemandRepositoryInterface;
 use Player\Player;
 use Team\Team;
+use Season\Season;
 
 /**
  * @see FreeAgencyServiceInterface
@@ -32,9 +33,9 @@ class FreeAgencyService implements FreeAgencyServiceInterface
     /**
      * @see FreeAgencyServiceInterface::getMainPageData()
      *
-     * @return array{capMetrics: array{totalSalaries: array<int, int>, softCapSpace: array<int, int>, hardCapSpace: array<int, int>, rosterSpots: array<int, int>}, team: Team, season: \Season, allOtherPlayers: list<array<string, mixed>>}
+     * @return array{capMetrics: array{totalSalaries: array<int, int>, softCapSpace: array<int, int>, hardCapSpace: array<int, int>, rosterSpots: array<int, int>}, team: Team, season: Season, allOtherPlayers: list<array<string, mixed>>}
      */
-    public function getMainPageData(Team $team, \Season $season): array
+    public function getMainPageData(Team $team, Season $season): array
     {
         $capCalculator = new FreeAgencyCapCalculator($this->mysqli_db, $team, $season);
         /** @var array{totalSalaries: array<int, int>, softCapSpace: array<int, int>, hardCapSpace: array<int, int>, rosterSpots: array<int, int>} $capMetrics */
@@ -55,7 +56,7 @@ class FreeAgencyService implements FreeAgencyServiceInterface
      *
      * @return array{player: Player, capMetrics: array{totalSalaries: array<int, int>, softCapSpace: array<int, int>, hardCapSpace: array<int, int>, rosterSpots: array<int, int>}, demands: array<string, int>, existingOffer: array<string, int>, amendedCapSpace: int, hasExistingOffer: bool, veteranMinimum: int, maxContract: int}
      */
-    public function getNegotiationData(int $playerID, Team $team, \Season $season): array
+    public function getNegotiationData(int $playerID, Team $team, Season $season): array
     {
         $player = Player::withPlayerID($this->mysqli_db, $playerID);
 

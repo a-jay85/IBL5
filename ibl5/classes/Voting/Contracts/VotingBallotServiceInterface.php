@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Voting\Contracts;
 
 use League\League;
+use Season\Season;
 
 /**
  * VotingBallotServiceInterface - Contract for voting ballot business logic
@@ -19,13 +20,13 @@ interface VotingBallotServiceInterface
      * Get ballot data for the current voting phase
      *
      * @param string $voterTeamName Voter's team name
-     * @param \Season $season Current season
+     * @param Season $season Current season
      * @param League $league League instance for candidate queries
      * @return list<BallotCategory> Categories with their candidates
      */
     public function getBallotData(
         string $voterTeamName,
-        \Season $season,
+        Season $season,
         League $league
     ): array;
 }

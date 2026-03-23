@@ -10,6 +10,7 @@ use Team\Contracts\TeamQueryRepositoryInterface;
 use UI\Components\TableViewSwitcher;
 use Waivers\Contracts\WaiversControllerInterface;
 use Team\Team;
+use Season\Season;
 
 /**
  * @see WaiversControllerInterface
@@ -65,7 +66,7 @@ class WaiversController implements WaiversControllerInterface
             return;
         }
 
-        $season = new \Season($this->db);
+        $season = new Season($this->db);
 
         if (!$season->areWaiversAllowed()) {
             $this->view->renderWaiversClosed();
@@ -190,7 +191,7 @@ class WaiversController implements WaiversControllerInterface
             return ['success' => false, 'error' => 'Player not found.'];
         }
 
-        $season = new \Season($this->db);
+        $season = new Season($this->db);
         /** @var array{hasExistingContract: bool, salary: int} $contractData */
         $contractData = $this->processor->determineContractData($player, $season);
         $playerSalary = $contractData['salary'];
@@ -263,7 +264,7 @@ class WaiversController implements WaiversControllerInterface
         $teamName = $this->commonRepository->getTeamnameFromUsername((string) ($userInfo['username'] ?? '')) ?? '';
         $team = Team::initialize($this->db, $teamName);
 
-        $season = new \Season($this->db);
+        $season = new Season($this->db);
         $players = $this->getPlayersForAction($team, $action);
 
         $openRosterSpots = 15 - count($this->teamQueryRepo->getHealthyAndInjuredPlayersOrderedByName($team->teamID, $season));
@@ -317,7 +318,7 @@ class WaiversController implements WaiversControllerInterface
      *
      * @param array<int, array<string, mixed>|Player> $result
      */
-    private function renderTableForDisplay(string $display, array $result, Team $team, \Season $season): string
+    private function renderTableForDisplay(string $display, array $result, Team $team, Season $season): string
     {
         switch ($display) {
             case 'total_s':
@@ -337,7 +338,7 @@ class WaiversController implements WaiversControllerInterface
     private function getPlayersForAction(Team $team, string $action): array
     {
         $league = new League($this->db);
-        $season = new \Season($this->db);
+        $season = new Season($this->db);
         $timeNow = time();
         /** @var list<string> $players */
         $players = [];

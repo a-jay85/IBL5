@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Player;
 
 use Player\Contracts\PlayerContractValidatorInterface;
+use Season\Season;
 
 /**
  * @see PlayerContractValidatorInterface
@@ -128,7 +129,7 @@ class PlayerContractValidator implements PlayerContractValidatorInterface
     /**
      * @see PlayerContractValidatorInterface::isPlayerFreeAgent()
      */
-    public function isPlayerFreeAgent(PlayerData $playerData, \Season $season): bool
+    public function isPlayerFreeAgent(PlayerData $playerData, Season $season): bool
     {
         $yearPlayerIsFreeAgent = ($playerData->draftYear ?? 0)
             + ($playerData->yearsOfExperience ?? 0)

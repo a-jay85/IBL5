@@ -10,6 +10,7 @@ use FreeAgency\FreeAgencyCapCalculator;
 use League\League;
 use Team\Contracts\TeamQueryRepositoryInterface;
 use Team\Team;
+use Season\Season;
 
 /**
  * Comprehensive tests for FreeAgencyCapCalculator
@@ -34,7 +35,7 @@ class FreeAgencyCapCalculatorTest extends TestCase
         $this->mockDb = new \MockDatabase();
         $this->mockTeamQueryRepo = $this->createMock(TeamQueryRepositoryInterface::class);
         $mockTeam = $this->createMockTeam();
-        $mockSeason = $this->createMock(\Season::class);
+        $mockSeason = $this->createMock(Season::class);
         $this->calculator = new FreeAgencyCapCalculator($this->mockDb, $mockTeam, $mockSeason, $this->mockTeamQueryRepo);
     }
 
@@ -70,7 +71,7 @@ class FreeAgencyCapCalculatorTest extends TestCase
     {
         // Arrange - Team with no players under contract
         $team = $this->createMockTeamEntity();
-        $mockSeason = $this->createMock(\Season::class);
+        $mockSeason = $this->createMock(Season::class);
         $mockTeamQueryRepo = $this->createMockTeamQueryRepo([], []);
         $calculator = new FreeAgencyCapCalculator($this->mockDb, $team, $mockSeason, $mockTeamQueryRepo);
 
@@ -106,7 +107,7 @@ class FreeAgencyCapCalculatorTest extends TestCase
         ];
 
         $team = $this->createMockTeamEntity();
-        $mockSeason = $this->createMock(\Season::class);
+        $mockSeason = $this->createMock(Season::class);
         $mockTeamQueryRepo = $this->createMockTeamQueryRepo($players, $offers);
         $calculator = new FreeAgencyCapCalculator($this->mockDb, $team, $mockSeason, $mockTeamQueryRepo);
 
@@ -182,7 +183,7 @@ class FreeAgencyCapCalculatorTest extends TestCase
     {
         // Arrange - Set up mock team with offer for specific player
         $team = $this->createMockTeamEntity();
-        $mockSeason = $this->createMock(\Season::class);
+        $mockSeason = $this->createMock(Season::class);
         $mockTeamQueryRepo = $this->createMockTeamQueryRepo([], []);
         $calculator = new FreeAgencyCapCalculator($this->mockDb, $team, $mockSeason, $mockTeamQueryRepo);
 

@@ -8,6 +8,7 @@ use Boxscore\Contracts\BoxscoreProcessorInterface;
 use League\LeagueContext;
 use Player\PlayerStats;
 use Utilities\UuidGenerator;
+use Season\Season;
 
 /**
  * BoxscoreProcessor - Orchestrates .sco file parsing and boxscore insertion
@@ -29,15 +30,15 @@ class BoxscoreProcessor implements BoxscoreProcessorInterface
 
     protected \mysqli $db;
     protected BoxscoreRepository $repository;
-    protected \Season $season;
+    protected Season $season;
     private ?LeagueContext $leagueContext;
 
-    public function __construct(\mysqli $db, ?BoxscoreRepository $repository = null, ?\Season $season = null, ?LeagueContext $leagueContext = null)
+    public function __construct(\mysqli $db, ?BoxscoreRepository $repository = null, ?Season $season = null, ?LeagueContext $leagueContext = null)
     {
         $this->db = $db;
         $this->leagueContext = $leagueContext;
         $this->repository = $repository ?? new BoxscoreRepository($db, $leagueContext);
-        $this->season = $season ?? new \Season($db);
+        $this->season = $season ?? new Season($db);
     }
 
     /**
@@ -147,7 +148,7 @@ class BoxscoreProcessor implements BoxscoreProcessorInterface
 
         // Check if regular season has progressed past All-Star Weekend
         $lastBoxScoreDate = $this->season->getLastBoxScoreDate();
-        $allStarCutoff = sprintf('%d-%02d-%02d', $operatingSeasonEndingYear, \Season::IBL_ALL_STAR_MONTH, \Season::IBL_ALL_STAR_BREAK_END_DAY);
+        $allStarCutoff = sprintf('%d-%02d-%02d', $operatingSeasonEndingYear, Season::IBL_ALL_STAR_MONTH, Season::IBL_ALL_STAR_BREAK_END_DAY);
 
         if ($lastBoxScoreDate === '' || $lastBoxScoreDate <= $allStarCutoff) {
             return [
@@ -326,7 +327,7 @@ class BoxscoreProcessor implements BoxscoreProcessorInterface
         $gameInfoLine = substr($line, 0, 58);
         $boxscoreGameInfo = Boxscore::withGameInfoLine($gameInfoLine, $seasonEndingYear, 'Regular Season/Playoffs');
         $boxscoreGameInfo->overrideGameContext(
-            sprintf('%d-%02d-%02d', $seasonEndingYear, \Season::IBL_ALL_STAR_MONTH, \Season::IBL_RISING_STARS_GAME_DAY),
+            sprintf('%d-%02d-%02d', $seasonEndingYear, Season::IBL_ALL_STAR_MONTH, Season::IBL_RISING_STARS_GAME_DAY),
             self::RISING_STARS_VISITOR_TID,
             self::RISING_STARS_HOME_TID,
             1,
@@ -363,7 +364,7 @@ class BoxscoreProcessor implements BoxscoreProcessorInterface
         int $seasonEndingYear,
         array &$messages,
     ): void {
-        $gameDate = sprintf('%d-%02d-%02d', $seasonEndingYear, \Season::IBL_ALL_STAR_MONTH, \Season::IBL_ALL_STAR_GAME_DAY);
+        $gameDate = sprintf('%d-%02d-%02d', $seasonEndingYear, Season::IBL_ALL_STAR_MONTH, Season::IBL_ALL_STAR_GAME_DAY);
 
         $gameInfoLine = substr($line, 0, 58);
         $boxscoreGameInfo = Boxscore::withGameInfoLine($gameInfoLine, $seasonEndingYear, 'Regular Season/Playoffs');

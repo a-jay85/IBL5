@@ -3,6 +3,8 @@
 declare(strict_types=1);
 
 namespace Utilities;
+use Season\Season;
+
 
 /**
  * DateParser - Parse dates from schedule files with season phase logic
@@ -49,21 +51,21 @@ class DateParser
 
         // Apply phase adjustments
         if ($phase === "Preseason") {
-            $beginningYear = \Season::IBL_PRESEASON_YEAR;
-            $endingYear = \Season::IBL_PRESEASON_YEAR + 1;
+            $beginningYear = Season::IBL_PRESEASON_YEAR;
+            $endingYear = Season::IBL_PRESEASON_YEAR + 1;
         } elseif ($phase === "HEAT") {
             if ($month === 11) {
-                $month = \Season::IBL_HEAT_MONTH;
+                $month = Season::IBL_HEAT_MONTH;
             }
         }
 
         // Olympics override
         if (strtolower($league) === 'olympics') {
-            $month = \Season::IBL_OLYMPICS_MONTH;
+            $month = Season::IBL_OLYMPICS_MONTH;
         }
 
         // Determine year based on month
-        if ($month < \Season::IBL_HEAT_MONTH) {
+        if ($month < Season::IBL_HEAT_MONTH) {
             $year = $endingYear;
         } else {
             $year = $beginningYear;

@@ -23,7 +23,7 @@ use LeagueStarters\LeagueStartersView;
 global $cookie, $mysqli_db;
 
 $commonRepository = new Services\CommonMysqliRepository($mysqli_db);
-$season = new Season($mysqli_db);
+$season = new \Season\Season($mysqli_db);
 
 $module_name = basename(dirname(__FILE__));
 get_lang($module_name);

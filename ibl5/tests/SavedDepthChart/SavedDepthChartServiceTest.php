@@ -7,6 +7,7 @@ namespace Tests\SavedDepthChart;
 use SavedDepthChart\Contracts\SavedDepthChartServiceInterface;
 use SavedDepthChart\SavedDepthChartService;
 use Tests\Integration\IntegrationTestCase;
+use Season\Season;
 
 /**
  * @covers \SavedDepthChart\SavedDepthChartService
@@ -201,7 +202,7 @@ class SavedDepthChartServiceTest extends IntegrationTestCase
             ],
         ]);
 
-        $season = new \Season($this->mockDb);
+        $season = new Season($this->mockDb);
         $result = $this->service->saveOnSubmit(1, 'testuser', 'My DC', [], [], 5, $season);
 
         $this->assertSame(5, $result);
@@ -222,7 +223,7 @@ class SavedDepthChartServiceTest extends IntegrationTestCase
             ],
         ]);
 
-        $season = new \Season($this->mockDb);
+        $season = new Season($this->mockDb);
         $result = $this->service->saveOnSubmit(1, 'testuser', null, [], [], 5, $season);
 
         $this->assertSame(5, $result);
@@ -247,7 +248,7 @@ class SavedDepthChartServiceTest extends IntegrationTestCase
             ],
         ]);
 
-        $season = new \Season($this->mockDb);
+        $season = new Season($this->mockDb);
         $result = $this->service->saveOnSubmit(1, 'testuser', null, [], [], 0, $season);
 
         $this->assertSame(10, $result);
@@ -269,7 +270,7 @@ class SavedDepthChartServiceTest extends IntegrationTestCase
             ],
         ]);
 
-        $season = new \Season($this->mockDb);
+        $season = new Season($this->mockDb);
         $result = $this->service->nameOrCreateActive(1, 'testuser', 'New Name', $season);
 
         $this->assertTrue($result['success']);
@@ -283,7 +284,7 @@ class SavedDepthChartServiceTest extends IntegrationTestCase
         // getLiveRosterSettings returns empty (no players)
         $this->mockDb->setMockData([]);
 
-        $season = new \Season($this->mockDb);
+        $season = new Season($this->mockDb);
         $result = $this->service->nameOrCreateActive(1, 'testuser', 'My DC', $season);
 
         $this->assertFalse($result['success']);

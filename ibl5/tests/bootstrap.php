@@ -59,7 +59,7 @@ class_alias('Tests\\Integration\\Mocks\\MockDatabaseResult', 'MockDatabaseResult
 class_alias('Tests\\Integration\\Mocks\\MockPreparedStatement', 'MockPreparedStatement');
 class_alias('Tests\\Integration\\Mocks\\MockMysqliResult', 'MockMysqliResult');
 class_alias('Tests\\Integration\\Mocks\\UI', 'UI');
-class_alias('Tests\\Integration\\Mocks\\Season', 'Season');
+class_alias('Tests\\Integration\\Mocks\\Season', 'Season\\Season');
 
 // Set up $_SERVER variables needed by config.php
 if (!isset($_SERVER['SERVER_NAME'])) {

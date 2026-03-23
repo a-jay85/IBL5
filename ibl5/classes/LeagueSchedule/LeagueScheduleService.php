@@ -8,6 +8,7 @@ use League\League;
 use LeagueSchedule\Contracts\LeagueScheduleRepositoryInterface;
 use LeagueSchedule\Contracts\LeagueScheduleServiceInterface;
 use StrengthOfSchedule\StrengthOfScheduleCalculator;
+use Season\Season;
 
 /**
  * LeagueScheduleService - Business logic for league-wide schedule display
@@ -44,7 +45,7 @@ class LeagueScheduleService implements LeagueScheduleServiceInterface
      * @return SchedulePageData
      */
     public function getSchedulePageData(
-        \Season $season,
+        Season $season,
         League $league,
         \Services\CommonMysqliRepository $commonRepo
     ): array {
@@ -130,7 +131,7 @@ class LeagueScheduleService implements LeagueScheduleServiceInterface
         if ($isPlayoffPhase) {
             foreach (array_keys($gamesByMonth) as $key) {
                 $monthTimestamp = strtotime($key . '-01');
-                if ($monthTimestamp !== false && (int)date('n', $monthTimestamp) === \Season::IBL_PLAYOFF_MONTH) {
+                if ($monthTimestamp !== false && (int)date('n', $monthTimestamp) === Season::IBL_PLAYOFF_MONTH) {
                     $playoffMonthKey = $key;
                     break;
                 }

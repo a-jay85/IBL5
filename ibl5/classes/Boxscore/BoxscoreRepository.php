@@ -8,6 +8,7 @@ use Boxscore\Contracts\BoxscoreRepositoryInterface;
 use League\League;
 use League\LeagueContext;
 
+use Season\Season;
 /**
  * BoxscoreRepository - Data access layer for boxscore management
  *
@@ -39,7 +40,7 @@ class BoxscoreRepository extends \BaseMysqliRepository implements BoxscoreReposi
      */
     public function deletePreseasonBoxScores(): bool
     {
-        $preseasonYear = \Season::IBL_PRESEASON_YEAR;
+        $preseasonYear = Season::IBL_PRESEASON_YEAR;
         $startDate = "{$preseasonYear}-11-01";
         $endDate = "{$preseasonYear}-11-30";
 
@@ -51,7 +52,7 @@ class BoxscoreRepository extends \BaseMysqliRepository implements BoxscoreReposi
      */
     public function deleteHeatBoxScores(int $seasonStartingYear): bool
     {
-        $heatMonth = str_pad((string) \Season::IBL_HEAT_MONTH, 2, '0', STR_PAD_LEFT);
+        $heatMonth = str_pad((string) Season::IBL_HEAT_MONTH, 2, '0', STR_PAD_LEFT);
         $startDate = "{$seasonStartingYear}-{$heatMonth}-01";
         $endDate = "{$seasonStartingYear}-{$heatMonth}-31";
 
@@ -64,8 +65,8 @@ class BoxscoreRepository extends \BaseMysqliRepository implements BoxscoreReposi
     public function deleteRegularSeasonAndPlayoffsBoxScores(int $seasonStartingYear): bool
     {
         $seasonEndingYear = $seasonStartingYear + 1;
-        $regularSeasonMonth = str_pad((string) \Season::IBL_REGULAR_SEASON_STARTING_MONTH, 2, '0', STR_PAD_LEFT);
-        $playoffMonth = str_pad((string) \Season::IBL_PLAYOFF_MONTH, 2, '0', STR_PAD_LEFT);
+        $regularSeasonMonth = str_pad((string) Season::IBL_REGULAR_SEASON_STARTING_MONTH, 2, '0', STR_PAD_LEFT);
+        $playoffMonth = str_pad((string) Season::IBL_PLAYOFF_MONTH, 2, '0', STR_PAD_LEFT);
 
         $startDate = "{$seasonStartingYear}-{$regularSeasonMonth}-01";
         $endDate = "{$seasonEndingYear}-{$playoffMonth}-30";

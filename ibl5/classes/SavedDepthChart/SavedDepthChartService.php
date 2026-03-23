@@ -6,6 +6,7 @@ namespace SavedDepthChart;
 
 use SavedDepthChart\Contracts\SavedDepthChartServiceInterface;
 use SavedDepthChart\Contracts\SavedDepthChartRepositoryInterface;
+use Season\Season;
 
 /**
  * @phpstan-import-type SavedDepthChartRow from Contracts\SavedDepthChartRepositoryInterface
@@ -37,7 +38,7 @@ class SavedDepthChartService implements SavedDepthChartServiceInterface
         array $rosterPlayers,
         array $postData,
         int $loadedDcId,
-        \Season $season
+        Season $season
     ): int {
         $snapshots = $this->buildAllSnapshots($rosterPlayers, $postData);
 
@@ -207,7 +208,7 @@ class SavedDepthChartService implements SavedDepthChartServiceInterface
      *
      * Shows phase, phase-specific sim range, date range, and win-loss record.
      */
-    public function buildCurrentLiveLabel(int $tid, \Season $season): string
+    public function buildCurrentLiveLabel(int $tid, Season $season): string
     {
         $currentPhaseSim = $season->getPhaseSpecificSimNumber();
 
@@ -262,7 +263,7 @@ class SavedDepthChartService implements SavedDepthChartServiceInterface
      * @see SavedDepthChartServiceInterface::getDropdownOptions()
      * @return list<array{id: int, label: string, isActive: bool}>
      */
-    public function getDropdownOptions(int $tid, \Season $season): array
+    public function getDropdownOptions(int $tid, Season $season): array
     {
         $savedDcs = $this->repository->getSavedDepthChartsForTeam($tid);
 
@@ -459,7 +460,7 @@ class SavedDepthChartService implements SavedDepthChartServiceInterface
      *
      * @param SavedDepthChartRow $dc
      */
-    private function buildDropdownLabel(array $dc, \Season $season, int $tid): string
+    private function buildDropdownLabel(array $dc, Season $season, int $tid): string
     {
         $parts = [];
 
@@ -518,7 +519,7 @@ class SavedDepthChartService implements SavedDepthChartServiceInterface
      * @see SavedDepthChartServiceInterface::nameOrCreateActive()
      * @return array{success: bool, id: int, name: string}|array{success: bool, error: string}
      */
-    public function nameOrCreateActive(int $tid, string $username, string $name, \Season $season): array
+    public function nameOrCreateActive(int $tid, string $username, string $name, Season $season): array
     {
         $activeDc = $this->repository->getActiveDepthChartForTeam($tid);
 

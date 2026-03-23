@@ -6,6 +6,7 @@ namespace Settings;
 
 use Settings\Contracts\SettingsServiceInterface;
 
+use Season\Season;
 /**
  * Typed boolean accessors for ibl_settings
  *
@@ -18,9 +19,9 @@ use Settings\Contracts\SettingsServiceInterface;
  */
 class SettingsService implements SettingsServiceInterface
 {
-    private \Season $season;
+    private Season $season;
 
-    public function __construct(\Season $season)
+    public function __construct(Season $season)
     {
         $this->season = $season;
     }

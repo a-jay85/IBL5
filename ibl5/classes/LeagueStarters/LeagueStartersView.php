@@ -9,6 +9,7 @@ use Player\Player;
 use UI\Components\TableViewSwitcher;
 use Utilities\HtmlSanitizer;
 use Team\Team;
+use Season\Season;
 
 /**
  * LeagueStartersView - HTML rendering for league starters
@@ -20,7 +21,7 @@ use Team\Team;
 class LeagueStartersView implements LeagueStartersViewInterface
 {
     private \mysqli $db;
-    private \Season $season;
+    private Season $season;
     private string $moduleName;
 
     /** @var array<string, string> Position labels */
@@ -36,10 +37,10 @@ class LeagueStartersView implements LeagueStartersViewInterface
      * Constructor
      *
      * @param \mysqli $db Database connection
-     * @param \Season $season Current season
+     * @param Season $season Current season
      * @param string $moduleName Module name
      */
-    public function __construct(\mysqli $db, \Season $season, string $moduleName)
+    public function __construct(\mysqli $db, Season $season, string $moduleName)
     {
         $this->db = $db;
         $this->season = $season;

@@ -10,6 +10,7 @@ use StrengthOfSchedule\StrengthOfScheduleCalculator;
 use Team\Contracts\TeamQueryRepositoryInterface;
 use TeamSchedule\Contracts\TeamScheduleRepositoryInterface;
 use Team\Team;
+use Season\Season;
 
 /**
  * NextSimService - Business logic for next simulation games
@@ -51,7 +52,7 @@ class NextSimService implements NextSimServiceInterface
      *
      * @return array<int, NextSimGameData>
      */
-    public function getNextSimGames(int $teamId, \Season $season): array
+    public function getNextSimGames(int $teamId, Season $season): array
     {
         $projectedGames = $this->teamScheduleRepository->getProjectedGamesNextSimResult(
             $teamId,

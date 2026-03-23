@@ -19,7 +19,7 @@ function userinfo($username)
 {
     global $user_prefix, $mysqli_db;
     $commonRepository = new \Services\CommonMysqliRepository($mysqli_db);
-    $season = new Season($mysqli_db);
+    $season = new \Season\Season($mysqli_db);
     $repository = new DraftRepository($mysqli_db);
     $view = new DraftView();
     $sharedRepository = new \Shared\SharedRepository($mysqli_db);

@@ -61,7 +61,7 @@ class NewsService
         
         $stmt = $this->db->prepare($query);
         if ($stmt === false) {
-            error_log("NewsService: Failed to prepare createNewsStory: " . $this->db->error);
+            \Logging\LoggerFactory::getChannel('db')->error('NewsService: Failed to prepare createNewsStory', ['error' => $this->db->error]);
             return false;
         }
         
@@ -83,13 +83,13 @@ class NewsService
         $query = "SELECT topicid FROM nuke_topics WHERE topicname = ?";
         $stmt = $this->db->prepare($query);
         if ($stmt === false) {
-            error_log("NewsService: Failed to prepare getTopicIDByTeamName: " . $this->db->error);
+            \Logging\LoggerFactory::getChannel('db')->error('NewsService: Failed to prepare getTopicIDByTeamName', ['error' => $this->db->error]);
             return null;
         }
         
         $stmt->bind_param('s', $teamName);
         if (!$stmt->execute()) {
-            error_log("NewsService: Failed to execute getTopicIDByTeamName: " . $stmt->error);
+            \Logging\LoggerFactory::getChannel('db')->error('NewsService: Failed to execute getTopicIDByTeamName', ['error' => $stmt->error]);
             $stmt->close();
             return null;
         }
@@ -121,13 +121,13 @@ class NewsService
         $query = "SELECT catid FROM nuke_stories_cat WHERE title = ?";
         $stmt = $this->db->prepare($query);
         if ($stmt === false) {
-            error_log("NewsService: Failed to prepare getCategoryIDByTitle: " . $this->db->error);
+            \Logging\LoggerFactory::getChannel('db')->error('NewsService: Failed to prepare getCategoryIDByTitle', ['error' => $this->db->error]);
             return null;
         }
 
         $stmt->bind_param('s', $categoryTitle);
         if (!$stmt->execute()) {
-            error_log("NewsService: Failed to execute getCategoryIDByTitle: " . $stmt->error);
+            \Logging\LoggerFactory::getChannel('db')->error('NewsService: Failed to execute getCategoryIDByTitle', ['error' => $stmt->error]);
             $stmt->close();
             return null;
         }
@@ -162,7 +162,7 @@ class NewsService
         
         $stmt = $this->db->prepare($query);
         if ($stmt === false) {
-            error_log("NewsService: Failed to prepare incrementCategoryCounter: " . $this->db->error);
+            \Logging\LoggerFactory::getChannel('db')->error('NewsService: Failed to prepare incrementCategoryCounter', ['error' => $this->db->error]);
             return false;
         }
         

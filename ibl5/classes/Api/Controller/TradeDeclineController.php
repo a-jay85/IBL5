@@ -79,7 +79,7 @@ class TradeDeclineController implements ControllerInterface
                     \Discord::sendDM($offeringGmDiscordId, $declineMessage);
                 } catch (\Exception $e) {
                     // Log but don't fail the decline
-                    error_log('Discord decline notification failed: ' . $e->getMessage());
+                    \Logging\LoggerFactory::getChannel('discord')->error('Discord decline notification failed', ['error' => $e->getMessage()]);
                 }
             }
         }

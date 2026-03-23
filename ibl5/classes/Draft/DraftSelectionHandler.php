@@ -71,7 +71,7 @@ class DraftSelectionHandler implements DraftSelectionHandlerInterface
             $this->db->commit();
         } catch (\Throwable $e) {
             $this->db->rollback();
-            error_log('Draft selection DB error: ' . $e->getMessage());
+            \Logging\LoggerFactory::getChannel('draft')->error('Draft selection DB error', ['error' => $e->getMessage()]);
             return $this->processor->getDatabaseErrorMessage();
         }
 
@@ -104,13 +104,13 @@ class DraftSelectionHandler implements DraftSelectionHandlerInterface
                 }
             }
         } catch (\Throwable $e) {
-            error_log('Draft next-pick lookup error: ' . $e->getMessage());
+            \Logging\LoggerFactory::getChannel('draft')->warning('Draft next-pick lookup error', ['error' => $e->getMessage()]);
         }
 
         try {
             \Discord::postToChannel('#general-chat', $message);
         } catch (\Throwable $e) {
-            error_log('Draft Discord #general-chat error: ' . $e->getMessage());
+            \Logging\LoggerFactory::getChannel('draft')->error('Draft Discord #general-chat error', ['error' => $e->getMessage()]);
         }
 
         $messageWithNextTeam = $this->processor->createNextTeamMessage(
@@ -122,7 +122,7 @@ class DraftSelectionHandler implements DraftSelectionHandlerInterface
         try {
             \Discord::postToChannel('#draft-picks', $messageWithNextTeam);
         } catch (\Throwable $e) {
-            error_log('Draft Discord #draft-picks error: ' . $e->getMessage());
+            \Logging\LoggerFactory::getChannel('draft')->error('Draft Discord #draft-picks error', ['error' => $e->getMessage()]);
         }
 
         return $this->processor->getSuccessMessage($message);

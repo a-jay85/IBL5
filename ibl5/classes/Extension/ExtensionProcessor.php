@@ -338,7 +338,7 @@ class ExtensionProcessor implements ExtensionProcessorInterface
 
             return 0;
         } catch (\Exception $e) {
-            error_log('ExtensionProcessor::calculateMoneyCommittedAtPosition failed: ' . $e->getMessage());
+            \Logging\LoggerFactory::getChannel('app')->warning('ExtensionProcessor::calculateMoneyCommittedAtPosition failed', ['error' => $e->getMessage()]);
             return 0;
         }
     }
@@ -379,7 +379,7 @@ class ExtensionProcessor implements ExtensionProcessorInterface
                 $stmt->close();
             }
         } catch (\Exception $e) {
-            error_log('ExtensionProcessor::getTeamTraditionData failed: ' . $e->getMessage());
+            \Logging\LoggerFactory::getChannel('app')->warning('ExtensionProcessor::getTeamTraditionData failed', ['error' => $e->getMessage()]);
         }
 
         return [

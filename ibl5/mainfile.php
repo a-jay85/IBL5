@@ -235,7 +235,7 @@ if (($_SESSION['demo_mode'] ?? false) === true && $_SERVER['REQUEST_METHOD'] ===
     exit;
 }
 
-require_once __DIR__ . "/includes/ipban.php";
+
 if (file_exists(__DIR__ . "/includes/custom_files/custom_mainfile.php")) {
     @include_once __DIR__ . "/includes/custom_files/custom_mainfile.php";
 }

@@ -11,8 +11,6 @@ class PageLayout
     public static function header(): void
     {
         // Populate $cookie/$user globals for all request types.
-        // online() does this for full page loads, but boosted requests
-        // skip online() — modules still need $cookie for team lookups.
         /** @var string $user */
         global $user;
         cookiedecode($user);
@@ -22,7 +20,6 @@ class PageLayout
             return;
         }
 
-        online();
         self::renderHead();
         if (isset($GLOBALS['mysqli_db']) && $GLOBALS['mysqli_db'] instanceof \mysqli) {
             (new \SiteStatistics\StatisticsRepository($GLOBALS['mysqli_db']))->recordHit();

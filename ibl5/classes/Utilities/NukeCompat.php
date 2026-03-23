@@ -161,13 +161,6 @@ class NukeCompat
         blocks($position);
     }
 
-    /**
-     * Track online users.
-     */
-    public function online(): void
-    {
-        online();
-    }
 
     /**
      * Output the theme header.

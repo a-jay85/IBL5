@@ -73,6 +73,16 @@ teardown_worktree() {
         env_flag="--env-file $REPO_ROOT/.env"
     fi
 
+    # Stop CSS watcher if running
+    local css_pid_file="$wt_path/.css-watch.pid"
+    if [ -f "$css_pid_file" ]; then
+        local css_pid
+        css_pid=$(cat "$css_pid_file")
+        kill "$css_pid" 2>/dev/null || true
+        rm -f "$css_pid_file" "$wt_path/.css-watch.log"
+        echo "  Stopped CSS watcher (PID $css_pid)"
+    fi
+
     echo "Stopping environment: $slug (worktree: $wt_name, project: $project)..."
     if [ "$REMOVE_VOLUMES" = true ]; then
         docker compose -f "$compose_file" $env_flag -p "$project" down -v

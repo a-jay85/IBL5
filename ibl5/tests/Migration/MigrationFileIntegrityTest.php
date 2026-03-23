@@ -109,4 +109,68 @@ final class MigrationFileIntegrityTest extends TestCase
             'Baseline schema must be the first migration in sort order'
         );
     }
+
+    /**
+     * Enforce convention: every CHANGE COLUMN IF EXISTS rename should have
+     * a corresponding SchemaAssertion for the destination column.
+     *
+     * This prevents silent no-ops from going undetected (the bug that caused
+     * the dc_canPlayInGame production outage).
+     */
+    public function testChangeColumnRenamesHaveSchemaAssertions(): void
+    {
+        $assertionsFile = dirname(__DIR__, 2) . '/config/schema-assertions.php';
+        self::assertFileExists($assertionsFile, 'Schema assertions config file must exist');
+
+        /** @var list<\Migration\SchemaAssertion> $assertions */
+        $assertions = require $assertionsFile;
+
+        $assertedColumns = [];
+        foreach ($assertions as $assertion) {
+            $assertedColumns[] = $assertion->toKey();
+        }
+
+        $files = glob($this->migrationsDir . '/*.sql') ?: [];
+        $uncovered = [];
+
+        foreach ($files as $file) {
+            $basename = basename($file);
+            // Skip baseline — it defines schema, not renames
+            if ($basename === '000_baseline_schema.sql') {
+                continue;
+            }
+
+            $content = file_get_contents($file);
+            if ($content === false) {
+                continue;
+            }
+
+            // Match: CHANGE COLUMN IF EXISTS `old_name` `new_name`
+            // or:    CHANGE COLUMN IF EXISTS old_name new_name
+            if (preg_match_all(
+                '/ALTER\s+TABLE\s+[`]?(\w+)[`]?\s+.*?CHANGE\s+COLUMN\s+IF\s+EXISTS\s+[`]?\w+[`]?\s+[`]?(\w+)[`]?/si',
+                $content,
+                $matches,
+                PREG_SET_ORDER
+            ) > 0) {
+                foreach ($matches as $match) {
+                    $table = $match[1];
+                    $destColumn = $match[2];
+                    $key = $table . '.' . $destColumn;
+
+                    if (!in_array($key, $assertedColumns, true)) {
+                        $uncovered[] = "{$key} (from {$basename})";
+                    }
+                }
+            }
+        }
+
+        self::assertSame(
+            [],
+            $uncovered,
+            "CHANGE COLUMN IF EXISTS renames without SchemaAssertions:\n  " .
+            implode("\n  ", $uncovered) .
+            "\n\nAdd SchemaAssertion entries in config/schema-assertions.php for these columns."
+        );
+    }
 }

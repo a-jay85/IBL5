@@ -237,6 +237,17 @@ class FreeAgencyProcessor implements FreeAgencyProcessorInterface
             $this->postOfferToDiscord($teamName, $player);
         }
 
+        if ($saved) {
+            \Logging\LoggerFactory::getChannel('audit')->info('fa_offer_submitted', [
+                'action' => 'fa_offer_submitted',
+                'player_id' => $player->playerID ?? 0,
+                'player_name' => $playerName,
+                'team_name' => $teamName,
+                'offer1' => $offerData['offer1'],
+                'offer_type' => $offerData['offerType'],
+            ]);
+        }
+
         return $saved;
     }
 

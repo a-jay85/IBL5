@@ -75,6 +75,14 @@ class DraftSelectionHandler implements DraftSelectionHandlerInterface
             return $this->processor->getDatabaseErrorMessage();
         }
 
+        \Logging\LoggerFactory::getChannel('audit')->info('player_drafted', [
+            'action' => 'player_drafted',
+            'player_name' => $playerName,
+            'team_name' => $teamName,
+            'round' => $draftRound,
+            'pick' => $draftPick,
+        ]);
+
         return $this->sendNotifications($teamName, $playerName, $draftRound, $draftPick);
     }
 

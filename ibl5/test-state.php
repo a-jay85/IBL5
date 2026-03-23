@@ -1,4 +1,4 @@
-<?php
+<?php // phpcs:ignore -- test-state endpoint for E2E testing
 
 declare(strict_types=1);
 

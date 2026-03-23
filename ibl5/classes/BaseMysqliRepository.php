@@ -187,6 +187,8 @@ abstract class BaseMysqliRepository
             throw new \RuntimeException($message, 1001);
         }
         // Prepare statement
+        $startTime = hrtime(true);
+
         /** @var \mysqli $db */
         $db = $this->db;
         $stmt = $db->prepare($query);
@@ -218,6 +220,19 @@ abstract class BaseMysqliRepository
             $this->logError($message, $query);
             $stmt->close();
             throw new \RuntimeException($message, 1003);
+        }
+
+        $thresholdMs = \Logging\LoggerFactory::getSlowQueryThresholdMs();
+        if ($thresholdMs > 0) {
+            $elapsedMs = (hrtime(true) - $startTime) / 1_000_000;
+            if ($elapsedMs >= $thresholdMs) {
+                \Logging\LoggerFactory::getChannel('perf')->warning('slow_query', [
+                    'action' => 'slow_query',
+                    'elapsed_ms' => round($elapsedMs, 1),
+                    'query' => substr($query, 0, 500),
+                    'repository' => static::class,
+                ]);
+            }
         }
 
         return $stmt;

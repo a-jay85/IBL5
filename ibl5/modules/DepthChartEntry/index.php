@@ -34,6 +34,12 @@ function submit()
 
     PageLayout\PageLayout::header();
 
+    if (!\Utilities\CsrfGuard::validateSubmittedToken('depth_chart')) {
+        echo '<strong class="ibl-form-error">Invalid or expired form submission. Please reload and try again.</strong>';
+        PageLayout\PageLayout::footer();
+        return;
+    }
+
     $handler = new DepthChartEntry\DepthChartEntrySubmissionHandler($mysqli_db);
     $handler->handleSubmission($_POST);
 

@@ -35,14 +35,25 @@ class ETagHandler
 
     /**
      * Check if the client sent an If-None-Match header matching the given ETag.
-     * If matched, this sends a 304 response and returns true.
+     * Uses weak comparison per RFC 7232 §2.3.2 — strips W/ prefix before comparing
+     * the opaque-tag. This handles mod_deflate converting strong ETags to weak ones.
      *
-     * @return bool True if the response was 304 (caller should stop), false otherwise
+     * @return bool True if ETags match (caller should return 304), false otherwise
      */
     public function matches(string $etag): bool
     {
         $ifNoneMatch = $_SERVER['HTTP_IF_NONE_MATCH'] ?? '';
-        return $ifNoneMatch === $etag;
+
+        return $this->stripWeakPrefix($ifNoneMatch) === $this->stripWeakPrefix($etag);
+    }
+
+    private function stripWeakPrefix(string $etag): string
+    {
+        if (str_starts_with($etag, 'W/')) {
+            return substr($etag, 2);
+        }
+
+        return $etag;
     }
 
     /**

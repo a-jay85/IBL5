@@ -45,11 +45,6 @@
     padding: var(--space-1) var(--space-2);
 }
 
-.ibl-input--lg {
-    font-size: 1.25rem;
-    padding: var(--space-3) var(--space-4);
-}
-
 /* ==========================================================================
    Labels
    ========================================================================== */
@@ -101,16 +96,14 @@
     cursor: not-allowed;
 }
 
-/* Primary button */
+/* Primary button (navy gradient) */
 .ibl-btn--primary {
-    background: var(--gradient-accent);
+    background: var(--gradient-navy-header);
     color: white;
-    box-shadow: 0 2px 6px rgb(249 115 22 / 0.3);
 }
 
 .ibl-btn--primary:hover:not(:disabled) {
-    background: linear-gradient(135deg, var(--accent-600), var(--accent-600));
-    box-shadow: 0 4px 12px rgb(249 115 22 / 0.4);
+    background: linear-gradient(135deg, var(--navy-700, #334155), var(--navy-800, #1e293b));
 }
 
 /* Secondary button */
@@ -145,14 +138,24 @@
     background: var(--gray-600);
 }
 
+/* Success button (accept actions) */
+.ibl-btn--success {
+    background: linear-gradient(135deg, var(--success-500, #22c55e), var(--success-600, #16a34a));
+    color: white;
+}
+
+.ibl-btn--success:hover:not(:disabled) {
+    background: linear-gradient(135deg, var(--success-400, #4ade80), var(--success-500, #22c55e));
+}
+
 /* Danger button (destructive actions) */
 .ibl-btn--danger {
-    background-color: var(--error-600);
+    background: linear-gradient(135deg, var(--error-500, #ef4444), var(--error-600, #dc2626));
     color: white;
 }
 
 .ibl-btn--danger:hover:not(:disabled) {
-    background-color: var(--error-500);
+    background: linear-gradient(135deg, var(--error-400, #f87171), var(--error-500, #ef4444));
 }
 
 /* Inline form — flows inline with surrounding content */
@@ -191,12 +194,6 @@
 
 .ibl-form-group {
     margin-bottom: var(--space-4);
-}
-
-.ibl-form-group--inline {
-    display: flex;
-    align-items: center;
-    gap: var(--space-3);
 }
 
 .ibl-form-help {
@@ -344,6 +341,21 @@
 .ibl-filter-form__submit:hover {
     transform: translateY(-1px);
     box-shadow: var(--shadow-md, 0 4px 6px -1px rgb(0 0 0 / 0.1));
+}
+
+/* ==========================================================================
+   Generic Link
+   ========================================================================== */
+
+.ibl-link {
+    color: var(--navy-700, #334155);
+    text-decoration: none;
+    font-weight: 500;
+    transition: color 150ms ease;
+}
+
+.ibl-link:hover {
+    color: var(--accent-500, #f97316);
 }
 
 } /* end @layer components */

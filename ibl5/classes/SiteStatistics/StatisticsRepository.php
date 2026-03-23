@@ -392,7 +392,7 @@ class StatisticsRepository extends \BaseMysqliRepository
 
     /**
      * Get total hits for a specific date
-     * 
+     *
      * @param int $year Year to get total for
      * @param int $month Month to get total for
      * @param int $date Day to get total for
@@ -401,18 +401,229 @@ class StatisticsRepository extends \BaseMysqliRepository
     public function getTotalHourlyHits(int $year, int $month, int $date): int
     {
         $row = $this->fetchOne(
-            "SELECT SUM(hits) as total FROM {$this->prefix}_stats_hour 
+            "SELECT SUM(hits) as total FROM {$this->prefix}_stats_hour
              WHERE year = ? AND month = ? AND date = ?",
             "iii",
             $year,
             $month,
             $date
         );
-        
+
         if ($row) {
             return intval($row['total']);
         }
-        
+
         return 0;
+    }
+
+    /**
+     * Record a page hit — replaces legacy includes/counter.php
+     *
+     * Detects browser/OS from User-Agent, increments counter rows,
+     * seeds time-series tables for new years/days, and increments
+     * year/month/date/hour hit counters.
+     */
+    public function recordHit(): void
+    {
+        $rawUA = $_SERVER['HTTP_USER_AGENT'] ?? '';
+        $userAgent = is_string($rawUA) ? $rawUA : '';
+
+        $browser = $this->detectBrowser($userAgent);
+        $os = $this->detectOS($userAgent);
+
+        // Increment counter rows (total hits, browser, OS)
+        $this->execute(
+            "UPDATE {$this->prefix}_counter SET count = count + 1 WHERE type = 'total' AND var = 'hits'"
+        );
+        $this->execute(
+            "UPDATE {$this->prefix}_counter SET count = count + 1 WHERE type = 'browser' AND var = ?",
+            "s",
+            $browser
+        );
+        $this->execute(
+            "UPDATE {$this->prefix}_counter SET count = count + 1 WHERE type = 'os' AND var = ?",
+            "s",
+            $os
+        );
+
+        // Current date/time parts
+        $nowYear = (int) date('Y');
+        $nowMonth = (int) date('n');
+        $nowDate = (int) date('j');
+        $nowHour = (int) date('G');
+
+        // Seed year/month/date rows if this is the first hit of a new year
+        $yearRow = $this->fetchOne(
+            "SELECT year FROM {$this->prefix}_stats_year WHERE year = ?",
+            "i",
+            $nowYear
+        );
+
+        if ($yearRow === null) {
+            $this->execute(
+                "INSERT INTO {$this->prefix}_stats_year (year, hits) VALUES (?, 0)",
+                "i",
+                $nowYear
+            );
+
+            for ($month = 1; $month <= 12; $month++) {
+                $this->execute(
+                    "INSERT INTO {$this->prefix}_stats_month (year, month, hits) VALUES (?, ?, 0)",
+                    "ii",
+                    $nowYear,
+                    $month
+                );
+
+                $daysInMonth = (int) date('t', mktime(0, 0, 0, $month, 1, $nowYear));
+                for ($day = 1; $day <= $daysInMonth; $day++) {
+                    $this->execute(
+                        "INSERT INTO {$this->prefix}_stats_date (year, month, date, hits) VALUES (?, ?, ?, 0)",
+                        "iii",
+                        $nowYear,
+                        $month,
+                        $day
+                    );
+                }
+            }
+        }
+
+        // Seed hour rows if this is the first hit of a new day
+        $hourRow = $this->fetchOne(
+            "SELECT hour FROM {$this->prefix}_stats_hour WHERE year = ? AND month = ? AND date = ? LIMIT 1",
+            "iii",
+            $nowYear,
+            $nowMonth,
+            $nowDate
+        );
+
+        if ($hourRow === null) {
+            for ($hour = 0; $hour <= 23; $hour++) {
+                $this->execute(
+                    "INSERT INTO {$this->prefix}_stats_hour (year, month, date, hour, hits) VALUES (?, ?, ?, ?, 0)",
+                    "iiii",
+                    $nowYear,
+                    $nowMonth,
+                    $nowDate,
+                    $hour
+                );
+            }
+        }
+
+        // Increment time-series counters
+        $this->execute(
+            "UPDATE {$this->prefix}_stats_year SET hits = hits + 1 WHERE year = ?",
+            "i",
+            $nowYear
+        );
+        $this->execute(
+            "UPDATE {$this->prefix}_stats_month SET hits = hits + 1 WHERE year = ? AND month = ?",
+            "ii",
+            $nowYear,
+            $nowMonth
+        );
+        $this->execute(
+            "UPDATE {$this->prefix}_stats_date SET hits = hits + 1 WHERE year = ? AND month = ? AND date = ?",
+            "iii",
+            $nowYear,
+            $nowMonth,
+            $nowDate
+        );
+        $this->execute(
+            "UPDATE {$this->prefix}_stats_hour SET hits = hits + 1 WHERE year = ? AND month = ? AND date = ? AND hour = ?",
+            "iiii",
+            $nowYear,
+            $nowMonth,
+            $nowDate,
+            $nowHour
+        );
+    }
+
+    /**
+     * Detect browser category from User-Agent string.
+     * Categories match existing nuke_counter rows — do not rename.
+     */
+    private function detectBrowser(string $userAgent): string
+    {
+        if (
+            (str_contains($userAgent, 'Nav')
+                || str_contains($userAgent, 'Gold')
+                || str_contains($userAgent, 'X11')
+                || str_contains($userAgent, 'Mozilla')
+                || str_contains($userAgent, 'Netscape'))
+            && !str_contains($userAgent, 'MSIE')
+            && !str_contains($userAgent, 'Konqueror')
+            && !str_contains($userAgent, 'Yahoo')
+            && !str_contains($userAgent, 'Firefox')
+        ) {
+            return 'Netscape';
+        }
+
+        if (str_contains($userAgent, 'Firefox')) {
+            return 'FireFox';
+        }
+        if (str_contains($userAgent, 'MSIE')) {
+            return 'MSIE';
+        }
+        if (str_contains($userAgent, 'Lynx')) {
+            return 'Lynx';
+        }
+        if (str_contains($userAgent, 'Opera')) {
+            return 'Opera';
+        }
+        if (str_contains($userAgent, 'WebTV')) {
+            return 'WebTV';
+        }
+        if (str_contains($userAgent, 'Konqueror')) {
+            return 'Konqueror';
+        }
+        if (
+            stripos($userAgent, 'bot') !== false
+            || str_contains($userAgent, 'Google')
+            || str_contains($userAgent, 'Slurp')
+            || str_contains($userAgent, 'Scooter')
+            || stripos($userAgent, 'Spider') !== false
+            || stripos($userAgent, 'Infoseek') !== false
+        ) {
+            return 'Bot';
+        }
+
+        return 'Other';
+    }
+
+    /**
+     * Detect OS category from User-Agent string.
+     * Categories match existing nuke_counter rows — do not rename.
+     */
+    private function detectOS(string $userAgent): string
+    {
+        if (str_contains($userAgent, 'Win')) {
+            return 'Windows';
+        }
+        if (str_contains($userAgent, 'Mac') || str_contains($userAgent, 'PPC')) {
+            return 'Mac';
+        }
+        if (str_contains($userAgent, 'Linux')) {
+            return 'Linux';
+        }
+        if (str_contains($userAgent, 'FreeBSD')) {
+            return 'FreeBSD';
+        }
+        if (str_contains($userAgent, 'SunOS')) {
+            return 'SunOS';
+        }
+        if (str_contains($userAgent, 'IRIX')) {
+            return 'IRIX';
+        }
+        if (str_contains($userAgent, 'BeOS')) {
+            return 'BeOS';
+        }
+        if (str_contains($userAgent, 'OS/2')) {
+            return 'OS/2';
+        }
+        if (str_contains($userAgent, 'AIX')) {
+            return 'AIX';
+        }
+
+        return 'Other';
     }
 }

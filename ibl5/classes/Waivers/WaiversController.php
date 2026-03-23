@@ -94,6 +94,11 @@ class WaiversController implements WaiversControllerInterface
 
         // PRG: Process POST submission, then redirect
         if (isset($_POST['Action']) && ($_POST['Action'] === 'add' || $_POST['Action'] === 'waive')) {
+            if (!\Utilities\CsrfGuard::validateSubmittedToken('waivers')) {
+                $postAction = is_string($_POST['Action']) ? $_POST['Action'] : 'add';
+                header('Location: modules.php?name=Waivers&action=' . rawurlencode($postAction) . '&error=' . rawurlencode('Invalid or expired form submission. Please try again.'));
+                exit;
+            }
             /** @var array<string, string> $postData */
             $postData = $_POST;
             $result = $this->processWaiverSubmission($postData);

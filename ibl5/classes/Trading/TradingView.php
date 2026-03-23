@@ -74,6 +74,7 @@ class TradingView implements TradingViewInterface
         ], $pageData['error'] ?? null);
         ?>
 <form name="Trade_Offer" method="post" action="/ibl5/modules/Trading/maketradeoffer.php">
+    <?= \Utilities\CsrfGuard::generateToken('trade_offer') ?>
     <input type="hidden" name="offeringTeam" value="<?= $userTeam ?>">
     <div class="trading-layout">
         <h2 class="ibl-title">Trading</h2>
@@ -511,6 +512,7 @@ $tradeConfig = [
     <div style="display: flex; justify-content: center; gap: 0.5rem; margin-bottom: 0.5rem;">
 <?php if ($offer['hasHammer']): ?>
         <form name="tradeaccept" method="post" action="/ibl5/modules/Trading/accepttradeoffer.php" style="margin: 0;">
+            <?= \Utilities\CsrfGuard::generateToken('trade_accept') ?>
             <input type="hidden" name="offer" value="<?= $offerId ?>">
             <button type="submit" class="ibl-btn ibl-btn--success" onclick="this.disabled=true;this.textContent='Submitting...'; this.form.submit();">Accept</button>
         </form>
@@ -518,6 +520,7 @@ $tradeConfig = [
         <span style="color: var(--gray-500); font-style: italic;">Awaiting Approval</span>
 <?php endif; ?>
         <form name="tradereject" method="post" action="/ibl5/modules/Trading/rejecttradeoffer.php" style="margin: 0;">
+            <?= \Utilities\CsrfGuard::generateToken('trade_reject') ?>
             <input type="hidden" name="offer" value="<?= $offerId ?>">
             <input type="hidden" name="teamRejecting" value="<?= $userTeam ?>">
             <input type="hidden" name="teamReceiving" value="<?= $oppositeTeam ?>">

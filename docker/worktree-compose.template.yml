@@ -8,7 +8,7 @@ services:
       E2E_TESTING: 1
     volumes:
       - {{WORKTREE_PATH}}/ibl5:/var/www/html/ibl5
-      - {{REPO_ROOT}}/ibl5/vendor:/var/www/html/ibl5/vendor
+      - vendor-{{SLUG}}-data:/var/www/html/ibl5/vendor
     depends_on:
       db-{{SLUG}}:
         condition: service_healthy
@@ -42,6 +42,7 @@ services:
 
 volumes:
   db-{{SLUG}}-data:
+  vendor-{{SLUG}}-data:
 
 networks:
   ibl5-proxy:

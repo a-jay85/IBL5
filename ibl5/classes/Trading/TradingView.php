@@ -15,8 +15,8 @@ use Season\Season;
 /**
  * @see TradingViewInterface
  *
- * @phpstan-import-type TradingPlayerRow from \Trading\Contracts\TradingRepositoryInterface
- * @phpstan-import-type TradingDraftPickRow from \Trading\Contracts\TradingRepositoryInterface
+ * @phpstan-import-type TradingPlayerRow from \Trading\Contracts\TradeFormRepositoryInterface
+ * @phpstan-import-type TradingDraftPickRow from \Trading\Contracts\TradeFormRepositoryInterface
  */
 class TradingView implements TradingViewInterface
 {

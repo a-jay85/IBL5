@@ -25,7 +25,7 @@ if ($offerId !== null) {
     $offerId = (int) $offerId;
 
     // Check if trade still exists (may have been accepted/declined via Discord)
-    $repository = new Trading\TradingRepository($mysqli_db);
+    $repository = new Trading\TradeOfferRepository($mysqli_db);
     $tradeRows = $repository->getTradesByOfferId($offerId);
 
     if ($tradeRows === []) {

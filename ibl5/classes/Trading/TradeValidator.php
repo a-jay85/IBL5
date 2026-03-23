@@ -6,6 +6,8 @@ namespace Trading;
 
 use League\League;
 use Trading\Contracts\TradeValidatorInterface;
+use Trading\Contracts\TradeAssetRepositoryInterface;
+use Trading\Contracts\TradeFormRepositoryInterface;
 use Team\Team;
 use Season\Season;
 
@@ -14,20 +16,22 @@ use Season\Season;
  *
  * Validates trade legality including minimum cash amounts, salary cap
  * compliance, and player tradability status.
- * 
+ *
  * @see TradeValidatorInterface
  */
 class TradeValidator implements TradeValidatorInterface
 {
     protected \mysqli $db;
-    protected TradingRepository $repository;
+    protected TradeAssetRepositoryInterface $assetRepository;
+    protected TradeFormRepositoryInterface $formRepository;
     protected \Shared\Contracts\SharedRepositoryInterface $sharedRepository;
     protected Season $season;
 
     public function __construct(\mysqli $db)
     {
         $this->db = $db;
-        $this->repository = new TradingRepository($db);
+        $this->assetRepository = new TradeAssetRepository($db);
+        $this->formRepository = new TradeFormRepository($db);
         $this->sharedRepository = new \Shared\SharedRepository($db);
         $this->season = new Season($db);
     }
@@ -101,8 +105,8 @@ class TradeValidator implements TradeValidatorInterface
             || $this->season->phase === "Draft"
             || $this->season->phase === "Free Agency";
 
-        $userCurrentRoster = $this->repository->getTeamPlayerCount($userTeamId, $isOffseason);
-        $partnerCurrentRoster = $this->repository->getTeamPlayerCount($partnerTeamId, $isOffseason);
+        $userCurrentRoster = $this->formRepository->getTeamPlayerCount($userTeamId, $isOffseason);
+        $partnerCurrentRoster = $this->formRepository->getTeamPlayerCount($partnerTeamId, $isOffseason);
 
         $userPostTradeRoster = $userCurrentRoster - $userPlayersSent + $partnerPlayersSent;
         $partnerPostTradeRoster = $partnerCurrentRoster - $partnerPlayersSent + $userPlayersSent;
@@ -128,7 +132,7 @@ class TradeValidator implements TradeValidatorInterface
      */
     public function canPlayerBeTraded(int $playerId): bool
     {
-        $player = $this->repository->getPlayerForTradeValidation($playerId);
+        $player = $this->assetRepository->getPlayerForTradeValidation($playerId);
 
         if ($player === null) {
             return false;

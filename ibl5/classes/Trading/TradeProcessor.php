@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace Trading;
 
 use Trading\Contracts\TradeProcessorInterface;
+use Trading\Contracts\TradeOfferRepositoryInterface;
+use Trading\Contracts\TradeAssetRepositoryInterface;
 use Trading\Contracts\TradeCashRepositoryInterface;
 use Trading\Contracts\TradeExecutionRepositoryInterface;
 use Season\Season;
@@ -18,15 +20,16 @@ use Discord\Discord;
  *
  * @see TradeProcessorInterface
  *
- * @phpstan-import-type TradeInfoRow from \Trading\Contracts\TradingRepositoryInterface
+ * @phpstan-import-type TradeInfoRow from \Trading\Contracts\TradeOfferRepositoryInterface
  * @phpstan-import-type TradeCashRow from \Trading\Contracts\TradeCashRepositoryInterface
- * @phpstan-import-type DraftPickRow from \Trading\Contracts\TradingRepositoryInterface
+ * @phpstan-import-type DraftPickRow from \Trading\Contracts\TradeAssetRepositoryInterface
  * @phpstan-import-type PlayerRow from \Services\CommonMysqliRepository
  */
 class TradeProcessor implements TradeProcessorInterface
 {
     protected \mysqli $db;
-    protected TradingRepository $repository;
+    protected TradeOfferRepositoryInterface $offerRepository;
+    protected TradeAssetRepositoryInterface $assetRepository;
     protected TradeCashRepositoryInterface $cashRepository;
     protected TradeExecutionRepositoryInterface $executionRepository;
     protected \Services\CommonMysqliRepository $commonRepository;
@@ -35,15 +38,19 @@ class TradeProcessor implements TradeProcessorInterface
     protected \Services\NewsService $newsService;
     protected ?Discord $discord;
 
-    public function __construct(\mysqli $db, ?TradingRepository $repository = null)
-    {
+    public function __construct(
+        \mysqli $db,
+        ?TradeOfferRepositoryInterface $offerRepository = null,
+        ?TradeAssetRepositoryInterface $assetRepository = null
+    ) {
         $this->db = $db;
-        $this->repository = $repository ?? new TradingRepository($db);
+        $this->offerRepository = $offerRepository ?? new TradeOfferRepository($db);
+        $this->assetRepository = $assetRepository ?? new TradeAssetRepository($db);
         $this->cashRepository = new TradeCashRepository($db);
         $this->executionRepository = new TradeExecutionRepository($db);
         $this->commonRepository = new \Services\CommonMysqliRepository($db);
         $this->season = new Season($db);
-        $this->cashHandler = new CashTransactionHandler($db, $this->repository, $this->cashRepository);
+        $this->cashHandler = new CashTransactionHandler($db, $this->assetRepository, $this->cashRepository);
         $this->newsService = new \Services\NewsService($db);
 
         // Initialize Discord with error handling
@@ -65,7 +72,7 @@ class TradeProcessor implements TradeProcessorInterface
 
         try {
             // Acquire exclusive row-level lock to prevent double-processing
-            $tradeRows = $this->repository->getTradesByOfferIdForUpdate($offerId);
+            $tradeRows = $this->offerRepository->getTradesByOfferIdForUpdate($offerId);
 
             if ($tradeRows === []) {
                 $this->db->rollback();
@@ -97,9 +104,9 @@ class TradeProcessor implements TradeProcessorInterface
 
             // Preserve trade_info rows for TRN export by marking them completed,
             // then clean up only the parent offer and cash rows.
-            $this->repository->markTradeInfoCompleted($offerId);
+            $this->offerRepository->markTradeInfoCompleted($offerId);
             $this->cashRepository->deleteTradeCashByOfferId($offerId);
-            $this->repository->deleteTradeOfferById($offerId);
+            $this->offerRepository->deleteTradeOfferById($offerId);
 
             $this->db->commit();
 
@@ -195,7 +202,7 @@ class TradeProcessor implements TradeProcessorInterface
     protected function processDraftPick(int $itemId, string $offeringTeamName, string $listeningTeamName): array
     {
         // Get pick details from repository
-        $pickData = $this->repository->getDraftPickById($itemId);
+        $pickData = $this->assetRepository->getDraftPickById($itemId);
 
         if ($pickData === null) {
             return ['success' => false, 'tradeLine' => ''];
@@ -210,7 +217,7 @@ class TradeProcessor implements TradeProcessorInterface
         $listeningTeamId = $this->commonRepository->getTidFromTeamname($listeningTeamName) ?? 0;
 
         // Update pick ownership using repository
-        $affectedRows = $this->repository->updateDraftPickOwnerById($itemId, $listeningTeamName, $listeningTeamId);
+        $affectedRows = $this->assetRepository->updateDraftPickOwnerById($itemId, $listeningTeamName, $listeningTeamId);
 
         // Queue structured data for deferred execution during certain season phases
         $this->queuePickTransfer($itemId, $listeningTeamName, $listeningTeamId, $tradeLine);
@@ -236,7 +243,7 @@ class TradeProcessor implements TradeProcessorInterface
         $listeningTeamId = $this->commonRepository->getTidFromTeamname($listeningTeamName) ?? 0;
 
         // Get full player data from repository
-        $playerData = $this->repository->getPlayerById($itemId);
+        $playerData = $this->assetRepository->getPlayerById($itemId);
 
         if ($playerData === null) {
             return ['success' => false, 'tradeLine' => ''];
@@ -247,7 +254,7 @@ class TradeProcessor implements TradeProcessorInterface
                     $playerData['name'] . " to the $listeningTeamName.<br>";
 
         // Update player team using repository
-        $affectedRows = $this->repository->updatePlayerTeam($itemId, $listeningTeamId);
+        $affectedRows = $this->assetRepository->updatePlayerTeam($itemId, $listeningTeamId);
 
         // Queue structured data for deferred execution during certain season phases
         $this->queuePlayerTransfer($itemId, $listeningTeamId, $tradeLine);

@@ -6,10 +6,11 @@ namespace Tests\Trading;
 
 use PHPUnit\Framework\TestCase;
 use Trading\CashTransactionHandler;
+use Trading\Contracts\TradeOfferRepositoryInterface;
+use Trading\Contracts\TradeAssetRepositoryInterface;
 use Trading\Contracts\TradeCashRepositoryInterface;
 use Trading\TradeOffer;
 use Trading\TradeValidator;
-use Trading\TradingRepository;
 use Season\Season;
 use Discord\Discord;
 
@@ -22,7 +23,8 @@ class TradeOfferTest extends TestCase
      * Create a TradeOffer with injected test doubles via anonymous subclass.
      */
     private function makeTradeOffer(
-        TradingRepository $repository,
+        TradeOfferRepositoryInterface $offerRepository,
+        TradeAssetRepositoryInterface $assetRepository,
         TradeValidator $validator,
         CashTransactionHandler $cashHandler,
         \Services\CommonMysqliRepository $commonRepo,
@@ -32,9 +34,10 @@ class TradeOfferTest extends TestCase
     ): TradeOffer {
         $cashRepoStub = $cashRepo ?? $this->createStub(TradeCashRepositoryInterface::class);
 
-        return new class ($repository, $validator, $cashHandler, $commonRepo, $season, $discord, $cashRepoStub) extends TradeOffer {
+        return new class ($offerRepository, $assetRepository, $validator, $cashHandler, $commonRepo, $season, $discord, $cashRepoStub) extends TradeOffer {
             public function __construct(
-                TradingRepository $repository,
+                TradeOfferRepositoryInterface $offerRepository,
+                TradeAssetRepositoryInterface $assetRepository,
                 TradeValidator $validator,
                 CashTransactionHandler $cashHandler,
                 \Services\CommonMysqliRepository $commonRepo,
@@ -48,7 +51,8 @@ class TradeOfferTest extends TestCase
                     {
                     }
                 };
-                $this->repository = $repository;
+                $this->offerRepository = $offerRepository;
+                $this->assetRepository = $assetRepository;
                 $this->cashRepository = $cashRepo;
                 $this->commonRepository = $commonRepo;
                 $this->season = $season;
@@ -81,32 +85,33 @@ class TradeOfferTest extends TestCase
     }
 
     /**
-     * @return array{TradingRepository&\PHPUnit\Framework\MockObject\MockObject, TradeValidator&\PHPUnit\Framework\MockObject\Stub, CashTransactionHandler&\PHPUnit\Framework\MockObject\Stub, \Services\CommonMysqliRepository&\PHPUnit\Framework\MockObject\Stub, Season&\PHPUnit\Framework\MockObject\Stub}
+     * @return array{TradeOfferRepositoryInterface&\PHPUnit\Framework\MockObject\MockObject, TradeAssetRepositoryInterface&\PHPUnit\Framework\MockObject\Stub, TradeValidator&\PHPUnit\Framework\MockObject\Stub, CashTransactionHandler&\PHPUnit\Framework\MockObject\Stub, \Services\CommonMysqliRepository&\PHPUnit\Framework\MockObject\Stub, Season&\PHPUnit\Framework\MockObject\Stub}
      */
     private function makeStubs(): array
     {
-        $repository = $this->createMock(TradingRepository::class);
+        $offerRepository = $this->createMock(TradeOfferRepositoryInterface::class);
+        $assetRepository = $this->createStub(TradeAssetRepositoryInterface::class);
         $validator = $this->createStub(TradeValidator::class);
         $cashHandler = $this->createStub(CashTransactionHandler::class);
         $commonRepo = $this->createStub(\Services\CommonMysqliRepository::class);
         $season = $this->createStub(Season::class);
 
-        return [$repository, $validator, $cashHandler, $commonRepo, $season];
+        return [$offerRepository, $assetRepository, $validator, $cashHandler, $commonRepo, $season];
     }
 
     // ── Cash validation ──────────────────────────────────────────
 
     public function testCreateTradeOfferFailsWhenCashValidationRejects(): void
     {
-        [$repository, $validator, $cashHandler, $commonRepo, $season] = $this->makeStubs();
+        [$offerRepository, $assetRepository, $validator, $cashHandler, $commonRepo, $season] = $this->makeStubs();
 
-        $repository->expects($this->once())->method('generateNextTradeOfferId')->willReturn(1);
+        $offerRepository->expects($this->once())->method('generateNextTradeOfferId')->willReturn(1);
         $validator->method('validateMinimumCashAmounts')->willReturn([
             'valid' => false,
             'error' => 'Cash too low',
         ]);
 
-        $offer = $this->makeTradeOffer($repository, $validator, $cashHandler, $commonRepo, $season);
+        $offer = $this->makeTradeOffer($offerRepository, $assetRepository, $validator, $cashHandler, $commonRepo, $season);
         $result = $offer->createTradeOffer($this->makeTradeData());
 
         $this->assertFalse($result['success']);
@@ -115,9 +120,9 @@ class TradeOfferTest extends TestCase
 
     public function testCreateTradeOfferPassesCashValidation(): void
     {
-        [$repository, $validator, $cashHandler, $commonRepo, $season] = $this->makeStubs();
+        [$offerRepository, $assetRepository, $validator, $cashHandler, $commonRepo, $season] = $this->makeStubs();
 
-        $repository->expects($this->once())->method('generateNextTradeOfferId')->willReturn(1);
+        $offerRepository->expects($this->once())->method('generateNextTradeOfferId')->willReturn(1);
         $validator->method('validateMinimumCashAmounts')->willReturn(['valid' => true, 'error' => null]);
         $validator->method('validateSalaryCaps')->willReturn([
             'valid' => false,
@@ -132,7 +137,7 @@ class TradeOfferTest extends TestCase
         $commonRepo->method('getTidFromTeamname')->willReturn(1);
         $cashHandler->method('hasCashInTrade')->willReturn(false);
 
-        $offer = $this->makeTradeOffer($repository, $validator, $cashHandler, $commonRepo, $season);
+        $offer = $this->makeTradeOffer($offerRepository, $assetRepository, $validator, $cashHandler, $commonRepo, $season);
         $result = $offer->createTradeOffer($this->makeTradeData());
 
         // Cash validation passed, but salary cap failed
@@ -144,9 +149,9 @@ class TradeOfferTest extends TestCase
 
     public function testCreateTradeOfferFailsOnCapExceeded(): void
     {
-        [$repository, $validator, $cashHandler, $commonRepo, $season] = $this->makeStubs();
+        [$offerRepository, $assetRepository, $validator, $cashHandler, $commonRepo, $season] = $this->makeStubs();
 
-        $repository->expects($this->once())->method('generateNextTradeOfferId')->willReturn(1);
+        $offerRepository->expects($this->once())->method('generateNextTradeOfferId')->willReturn(1);
         $validator->method('validateMinimumCashAmounts')->willReturn(['valid' => true, 'error' => null]);
         $validator->method('validateSalaryCaps')->willReturn([
             'valid' => false,
@@ -161,7 +166,7 @@ class TradeOfferTest extends TestCase
         $commonRepo->method('getTidFromTeamname')->willReturn(1);
         $cashHandler->method('hasCashInTrade')->willReturn(false);
 
-        $offer = $this->makeTradeOffer($repository, $validator, $cashHandler, $commonRepo, $season);
+        $offer = $this->makeTradeOffer($offerRepository, $assetRepository, $validator, $cashHandler, $commonRepo, $season);
         $result = $offer->createTradeOffer($this->makeTradeData());
 
         $this->assertFalse($result['success']);
@@ -170,9 +175,9 @@ class TradeOfferTest extends TestCase
 
     public function testCreateTradeOfferIncludesCapDataOnFailure(): void
     {
-        [$repository, $validator, $cashHandler, $commonRepo, $season] = $this->makeStubs();
+        [$offerRepository, $assetRepository, $validator, $cashHandler, $commonRepo, $season] = $this->makeStubs();
 
-        $repository->expects($this->once())->method('generateNextTradeOfferId')->willReturn(1);
+        $offerRepository->expects($this->once())->method('generateNextTradeOfferId')->willReturn(1);
         $validator->method('validateMinimumCashAmounts')->willReturn(['valid' => true, 'error' => null]);
         $capResult = [
             'valid' => false,
@@ -188,7 +193,7 @@ class TradeOfferTest extends TestCase
         $commonRepo->method('getTidFromTeamname')->willReturn(1);
         $cashHandler->method('hasCashInTrade')->willReturn(false);
 
-        $offer = $this->makeTradeOffer($repository, $validator, $cashHandler, $commonRepo, $season);
+        $offer = $this->makeTradeOffer($offerRepository, $assetRepository, $validator, $cashHandler, $commonRepo, $season);
         $result = $offer->createTradeOffer($this->makeTradeData());
 
         $this->assertFalse($result['success']);
@@ -199,9 +204,9 @@ class TradeOfferTest extends TestCase
 
     public function testCreateTradeOfferFailsOnRosterLimit(): void
     {
-        [$repository, $validator, $cashHandler, $commonRepo, $season] = $this->makeStubs();
+        [$offerRepository, $assetRepository, $validator, $cashHandler, $commonRepo, $season] = $this->makeStubs();
 
-        $repository->expects($this->once())->method('generateNextTradeOfferId')->willReturn(1);
+        $offerRepository->expects($this->once())->method('generateNextTradeOfferId')->willReturn(1);
         $validator->method('validateMinimumCashAmounts')->willReturn(['valid' => true, 'error' => null]);
         $validator->method('validateSalaryCaps')->willReturn([
             'valid' => true,
@@ -220,7 +225,7 @@ class TradeOfferTest extends TestCase
         $commonRepo->method('getTidFromTeamname')->willReturn(1);
         $cashHandler->method('hasCashInTrade')->willReturn(false);
 
-        $offer = $this->makeTradeOffer($repository, $validator, $cashHandler, $commonRepo, $season);
+        $offer = $this->makeTradeOffer($offerRepository, $assetRepository, $validator, $cashHandler, $commonRepo, $season);
         $result = $offer->createTradeOffer($this->makeTradeData());
 
         $this->assertFalse($result['success']);
@@ -229,13 +234,14 @@ class TradeOfferTest extends TestCase
 
     public function testCreateTradeOfferCountsUserPlayersSent(): void
     {
-        $repository = $this->createMock(TradingRepository::class);
+        $offerRepository = $this->createMock(TradeOfferRepositoryInterface::class);
+        $assetRepository = $this->createStub(TradeAssetRepositoryInterface::class);
         $validator = $this->createMock(TradeValidator::class);
         $cashHandler = $this->createStub(CashTransactionHandler::class);
         $commonRepo = $this->createStub(\Services\CommonMysqliRepository::class);
         $season = $this->createStub(Season::class);
 
-        $repository->expects($this->once())->method('generateNextTradeOfferId')->willReturn(1);
+        $offerRepository->expects($this->once())->method('generateNextTradeOfferId')->willReturn(1);
         $validator->expects($this->once())->method('validateMinimumCashAmounts')->willReturn(['valid' => true, 'error' => null]);
         $validator->expects($this->once())->method('validateSalaryCaps')->willReturn([
             'valid' => true,
@@ -266,11 +272,11 @@ class TradeOfferTest extends TestCase
             )
             ->willReturn(['valid' => true, 'errors' => []]);
 
-        $repository->method('insertTradeItem')->willReturn(1);
-        $repository->method('getDraftPickById')->willReturn(null);
-        $repository->method('getPlayerById')->willReturn(['name' => 'Player', 'pos' => 'PG']);
+        $offerRepository->method('insertTradeItem')->willReturn(1);
+        $assetRepository->method('getDraftPickById')->willReturn(null);
+        $assetRepository->method('getPlayerById')->willReturn(['name' => 'Player', 'pos' => 'PG']);
 
-        $offer = $this->makeTradeOffer($repository, $validator, $cashHandler, $commonRepo, $season, null);
+        $offer = $this->makeTradeOffer($offerRepository, $assetRepository, $validator, $cashHandler, $commonRepo, $season, null);
         $result = $offer->createTradeOffer($tradeData);
 
         $this->assertTrue($result['success']);
@@ -280,9 +286,9 @@ class TradeOfferTest extends TestCase
 
     public function testCreateTradeOfferCallsGenerateTradeOfferId(): void
     {
-        [$repository, $validator, $cashHandler, $commonRepo, $season] = $this->makeStubs();
+        [$offerRepository, $assetRepository, $validator, $cashHandler, $commonRepo, $season] = $this->makeStubs();
 
-        $repository->expects($this->once())->method('generateNextTradeOfferId')->willReturn(42);
+        $offerRepository->expects($this->once())->method('generateNextTradeOfferId')->willReturn(42);
         $validator->method('validateMinimumCashAmounts')->willReturn(['valid' => true, 'error' => null]);
         $validator->method('validateSalaryCaps')->willReturn([
             'valid' => true,
@@ -298,7 +304,7 @@ class TradeOfferTest extends TestCase
         $commonRepo->method('getTidFromTeamname')->willReturn(1);
         $cashHandler->method('hasCashInTrade')->willReturn(false);
 
-        $offer = $this->makeTradeOffer($repository, $validator, $cashHandler, $commonRepo, $season, null);
+        $offer = $this->makeTradeOffer($offerRepository, $assetRepository, $validator, $cashHandler, $commonRepo, $season, null);
         $result = $offer->createTradeOffer($this->makeTradeData());
 
         $this->assertTrue($result['success']);
@@ -307,9 +313,9 @@ class TradeOfferTest extends TestCase
 
     public function testCreateTradeOfferReturnsSuccessOnHappyPath(): void
     {
-        [$repository, $validator, $cashHandler, $commonRepo, $season] = $this->makeStubs();
+        [$offerRepository, $assetRepository, $validator, $cashHandler, $commonRepo, $season] = $this->makeStubs();
 
-        $repository->expects($this->once())->method('generateNextTradeOfferId')->willReturn(1);
+        $offerRepository->expects($this->once())->method('generateNextTradeOfferId')->willReturn(1);
         $validator->method('validateMinimumCashAmounts')->willReturn(['valid' => true, 'error' => null]);
         $validator->method('validateSalaryCaps')->willReturn([
             'valid' => true,
@@ -325,7 +331,7 @@ class TradeOfferTest extends TestCase
         $commonRepo->method('getTidFromTeamname')->willReturn(1);
         $cashHandler->method('hasCashInTrade')->willReturn(false);
 
-        $offer = $this->makeTradeOffer($repository, $validator, $cashHandler, $commonRepo, $season, null);
+        $offer = $this->makeTradeOffer($offerRepository, $assetRepository, $validator, $cashHandler, $commonRepo, $season, null);
         $result = $offer->createTradeOffer($this->makeTradeData());
 
         $this->assertTrue($result['success']);
@@ -335,9 +341,9 @@ class TradeOfferTest extends TestCase
 
     public function testCreateTradeOfferCallsInsertTradeItemPerCheckedItem(): void
     {
-        [$repository, $validator, $cashHandler, $commonRepo, $season] = $this->makeStubs();
+        [$offerRepository, $assetRepository, $validator, $cashHandler, $commonRepo, $season] = $this->makeStubs();
 
-        $repository->expects($this->once())->method('generateNextTradeOfferId')->willReturn(1);
+        $offerRepository->expects($this->once())->method('generateNextTradeOfferId')->willReturn(1);
         $validator->method('validateMinimumCashAmounts')->willReturn(['valid' => true, 'error' => null]);
         $validator->method('validateSalaryCaps')->willReturn([
             'valid' => true,
@@ -360,10 +366,10 @@ class TradeOfferTest extends TestCase
         $tradeData['index'] = [0 => '100', 1 => '200'];
         $tradeData['contract'] = [0 => '500', 1 => '600'];
 
-        $repository->expects($this->exactly(2))->method('insertTradeItem')->willReturn(1);
-        $repository->method('getPlayerById')->willReturn(['name' => 'Player', 'pos' => 'PG']);
+        $offerRepository->expects($this->exactly(2))->method('insertTradeItem')->willReturn(1);
+        $assetRepository->method('getPlayerById')->willReturn(['name' => 'Player', 'pos' => 'PG']);
 
-        $offer = $this->makeTradeOffer($repository, $validator, $cashHandler, $commonRepo, $season, null);
+        $offer = $this->makeTradeOffer($offerRepository, $assetRepository, $validator, $cashHandler, $commonRepo, $season, null);
         $result = $offer->createTradeOffer($tradeData);
 
         $this->assertTrue($result['success']);
@@ -373,9 +379,9 @@ class TradeOfferTest extends TestCase
 
     public function testCreateTradeOfferDoesNotNotifyOnFailure(): void
     {
-        [$repository, $validator, $cashHandler, $commonRepo, $season] = $this->makeStubs();
+        [$offerRepository, $assetRepository, $validator, $cashHandler, $commonRepo, $season] = $this->makeStubs();
 
-        $repository->expects($this->once())->method('generateNextTradeOfferId')->willReturn(1);
+        $offerRepository->expects($this->once())->method('generateNextTradeOfferId')->willReturn(1);
         $validator->method('validateMinimumCashAmounts')->willReturn([
             'valid' => false,
             'error' => 'Cash too low',
@@ -385,7 +391,7 @@ class TradeOfferTest extends TestCase
         $discord = $this->createMock(Discord::class);
         $discord->expects($this->never())->method($this->anything());
 
-        $offer = $this->makeTradeOffer($repository, $validator, $cashHandler, $commonRepo, $season, $discord);
+        $offer = $this->makeTradeOffer($offerRepository, $assetRepository, $validator, $cashHandler, $commonRepo, $season, $discord);
         $result = $offer->createTradeOffer($this->makeTradeData());
 
         $this->assertFalse($result['success']);
@@ -393,13 +399,14 @@ class TradeOfferTest extends TestCase
 
     public function testCreateTradeOfferSelfTradeZeroesCapSent(): void
     {
-        $repository = $this->createMock(TradingRepository::class);
+        $offerRepository = $this->createMock(TradeOfferRepositoryInterface::class);
+        $assetRepository = $this->createStub(TradeAssetRepositoryInterface::class);
         $validator = $this->createMock(TradeValidator::class);
         $cashHandler = $this->createStub(CashTransactionHandler::class);
         $commonRepo = $this->createStub(\Services\CommonMysqliRepository::class);
         $season = $this->createStub(Season::class);
 
-        $repository->expects($this->once())->method('generateNextTradeOfferId')->willReturn(1);
+        $offerRepository->expects($this->once())->method('generateNextTradeOfferId')->willReturn(1);
         $validator->expects($this->once())->method('validateMinimumCashAmounts')->willReturn(['valid' => true, 'error' => null]);
         $validator->expects($this->once())->method('getCurrentSeasonCashConsiderations')->willReturn([
             'cashSentToThem' => 0,
@@ -427,7 +434,7 @@ class TradeOfferTest extends TestCase
         $tradeData['offeringTeam'] = 'Lakers';
         $tradeData['listeningTeam'] = 'Lakers';
 
-        $offer = $this->makeTradeOffer($repository, $validator, $cashHandler, $commonRepo, $season, null);
+        $offer = $this->makeTradeOffer($offerRepository, $assetRepository, $validator, $cashHandler, $commonRepo, $season, null);
         $result = $offer->createTradeOffer($tradeData);
 
         $this->assertTrue($result['success']);
@@ -435,9 +442,9 @@ class TradeOfferTest extends TestCase
 
     public function testCreateTradeOfferNullDiscordSkipsNotification(): void
     {
-        [$repository, $validator, $cashHandler, $commonRepo, $season] = $this->makeStubs();
+        [$offerRepository, $assetRepository, $validator, $cashHandler, $commonRepo, $season] = $this->makeStubs();
 
-        $repository->expects($this->once())->method('generateNextTradeOfferId')->willReturn(1);
+        $offerRepository->expects($this->once())->method('generateNextTradeOfferId')->willReturn(1);
         $validator->method('validateMinimumCashAmounts')->willReturn(['valid' => true, 'error' => null]);
         $validator->method('validateSalaryCaps')->willReturn([
             'valid' => true,
@@ -454,7 +461,7 @@ class TradeOfferTest extends TestCase
         $cashHandler->method('hasCashInTrade')->willReturn(false);
 
         // Null discord — should not throw
-        $offer = $this->makeTradeOffer($repository, $validator, $cashHandler, $commonRepo, $season, null);
+        $offer = $this->makeTradeOffer($offerRepository, $assetRepository, $validator, $cashHandler, $commonRepo, $season, null);
         $result = $offer->createTradeOffer($this->makeTradeData());
 
         $this->assertTrue($result['success']);

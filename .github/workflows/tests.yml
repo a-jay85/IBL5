@@ -9,9 +9,6 @@ on:
   pull_request:
     branches: [ master, develop ]
     types: [opened, synchronize, reopened, ready_for_review]
-    paths:
-      - '**.php'
-      - 'ibl5/migrations/**.sql'
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -221,3 +218,12 @@ jobs:
     - name: Run PHPStan
       working-directory: ibl5
       run: composer run analyse
+
+  gate:
+    name: Tests and Analysis
+    if: always()
+    needs: [test, audit-php, audit-js, db-integration, phpstan]
+    runs-on: ubuntu-latest
+    steps:
+      - run: exit 1
+        if: contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled')

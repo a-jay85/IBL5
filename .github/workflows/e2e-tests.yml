@@ -574,3 +574,12 @@ jobs:
         env:
           REPO_TOKEN: ${{ github.token }}
         run: cml comment update --target=pr --publish /tmp/e2e-comment.md
+
+  gate:
+    name: E2E Tests
+    if: always()
+    needs: [e2e, api-e2e, e2e-shards]
+    runs-on: ubuntu-latest
+    steps:
+      - run: exit 1
+        if: contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled')

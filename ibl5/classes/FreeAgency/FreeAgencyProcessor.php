@@ -6,6 +6,7 @@ namespace FreeAgency;
 
 use FreeAgency\Contracts\FreeAgencyProcessorInterface;
 use Team\Team;
+use Season\Season;
 
 /**
  * @see FreeAgencyProcessorInterface
@@ -15,12 +16,12 @@ class FreeAgencyProcessor implements FreeAgencyProcessorInterface
     private \mysqli $mysqli_db;
     private FreeAgencyDemandCalculator $calculator;
     private FreeAgencyRepository $repository;
-    private \Season $season;
+    private Season $season;
 
     public function __construct(\mysqli $mysqli_db)
     {
         $this->mysqli_db = $mysqli_db;
-        $this->season = new \Season($mysqli_db);
+        $this->season = new Season($mysqli_db);
 
         $demandRepository = new FreeAgencyDemandRepository($this->mysqli_db);
         $this->calculator = new FreeAgencyDemandCalculator($demandRepository);
@@ -305,7 +306,7 @@ class FreeAgencyProcessor implements FreeAgencyProcessorInterface
     {
         /** @var \mysqli $mysqliDb */
         $mysqliDb = $this->mysqli_db;
-        $season = new \Season($mysqliDb);
+        $season = new Season($mysqliDb);
 
         if ($season->freeAgencyNotificationsState !== "On") {
             return;

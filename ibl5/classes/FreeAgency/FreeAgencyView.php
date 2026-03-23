@@ -11,6 +11,7 @@ use Team\Contracts\TeamQueryRepositoryInterface;
 use UI\TeamCellHelper;
 use Utilities\HtmlSanitizer;
 use Team\Team;
+use Season\Season;
 
 /**
  * @see FreeAgencyViewInterface
@@ -32,7 +33,7 @@ class FreeAgencyView implements FreeAgencyViewInterface
     /**
      * @see FreeAgencyViewInterface::render()
      *
-     * @param array{team: Team, season: \Season, capMetrics: CapMetrics, allOtherPlayers: list<PlayerRow>} $mainPageData
+     * @param array{team: Team, season: Season, capMetrics: CapMetrics, allOtherPlayers: list<PlayerRow>} $mainPageData
      */
     public function render(array $mainPageData, ?string $result = null): string
     {
@@ -67,11 +68,11 @@ class FreeAgencyView implements FreeAgencyViewInterface
      * Render players under contract table
      *
      * @param Team $team Team object
-     * @param \Season $season Season object
+     * @param Season $season Season object
      * @param CapMetrics $capMetrics Cap metrics from service
      * @return string HTML table
      */
-    private function renderPlayersUnderContract(Team $team, \Season $season, array $capMetrics): string
+    private function renderPlayersUnderContract(Team $team, Season $season, array $capMetrics): string
     {
         ob_start();
         ?>
@@ -155,7 +156,7 @@ class FreeAgencyView implements FreeAgencyViewInterface
      * @param CapMetrics $capMetrics Cap metrics from service
      * @return string HTML table
      */
-    private function renderContractOffers(Team $team, \Season $season, array $capMetrics): string
+    private function renderContractOffers(Team $team, Season $season, array $capMetrics): string
     {
         ob_start();
         ?>
@@ -209,11 +210,11 @@ class FreeAgencyView implements FreeAgencyViewInterface
      * Render team free agents table
      *
      * @param Team $team Team object
-     * @param \Season $season Season object
+     * @param Season $season Season object
      * @param CapMetrics $capMetrics Cap metrics from service
      * @return string HTML table
      */
-    private function renderTeamFreeAgents(Team $team, \Season $season, array $capMetrics): string
+    private function renderTeamFreeAgents(Team $team, Season $season, array $capMetrics): string
     {
         ob_start();
         ?>
@@ -267,11 +268,11 @@ class FreeAgencyView implements FreeAgencyViewInterface
      * Render other free agents table
      *
      * @param Team $team Team object
-     * @param \Season $season Season object
+     * @param Season $season Season object
      * @param list<PlayerRow> $allOtherPlayers Pre-fetched player rows from service
      * @return string HTML table
      */
-    private function renderOtherFreeAgents(Team $team, \Season $season, array $allOtherPlayers): string
+    private function renderOtherFreeAgents(Team $team, Season $season, array $allOtherPlayers): string
     {
         ob_start();
         ?>
@@ -338,7 +339,7 @@ class FreeAgencyView implements FreeAgencyViewInterface
      * @param Team $team Team object for name display
      * @return string HTML table header
      */
-    private function renderTableHeader(string $title, bool $showBirdRightsNote, Team $team, bool $showTeamColumn = true, bool $showOptionsColumn = true, ?\Season $season = null): string
+    private function renderTableHeader(string $title, bool $showBirdRightsNote, Team $team, bool $showTeamColumn = true, bool $showOptionsColumn = true, ?Season $season = null): string
     {
         $fullTitle = $title;
 

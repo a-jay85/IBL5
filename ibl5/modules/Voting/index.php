@@ -30,7 +30,7 @@ function userinfo(string $username): void
     global $mysqli_db;
 
     $commonRepository = new \Services\CommonMysqliRepository($mysqli_db);
-    $season = new \Season($mysqli_db);
+    $season = new \Season\Season($mysqli_db);
     $league = new \League\League($mysqli_db);
 
     $voterTeamName = $commonRepository->getTeamnameFromUsername($username) ?? '';

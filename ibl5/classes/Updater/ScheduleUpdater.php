@@ -11,9 +11,10 @@ use Utilities\SchFileParser;
 use Utilities\ScheduleHtmParser;
 use Utilities\DateParser;
 use Utilities\HtmlSanitizer;
+use Season\Season;
 
 class ScheduleUpdater extends \BaseMysqliRepository {
-    private \Season $season;
+    private Season $season;
 
     /** @var array<int, string> Team ID to name lookup (for logging) */
     private array $teamIdToNameMap = [];
@@ -39,7 +40,7 @@ class ScheduleUpdater extends \BaseMysqliRepository {
         12 => 'December',
     ];
 
-    public function __construct(\mysqli $db, \Season $season, ?LeagueContext $leagueContext = null) {
+    public function __construct(\mysqli $db, Season $season, ?LeagueContext $leagueContext = null) {
         parent::__construct($db, $leagueContext);
         $this->season = $season;
     }
@@ -63,8 +64,8 @@ class ScheduleUpdater extends \BaseMysqliRepository {
 
         // Handle Preseason year adjustments
         if ($this->season->phase === "Preseason") {
-            $this->season->beginningYear = \Season::IBL_PRESEASON_YEAR;
-            $this->season->endingYear = \Season::IBL_PRESEASON_YEAR + 1;
+            $this->season->beginningYear = Season::IBL_PRESEASON_YEAR;
+            $this->season->endingYear = Season::IBL_PRESEASON_YEAR + 1;
         }
 
         return DateParser::extractDate(
@@ -232,7 +233,7 @@ class ScheduleUpdater extends \BaseMysqliRepository {
             }
 
             // HEAT phase: only include games from the HEAT month
-            if ($this->season->phase === "HEAT" && $month !== \Season::IBL_HEAT_MONTH) {
+            if ($this->season->phase === "HEAT" && $month !== Season::IBL_HEAT_MONTH) {
                 continue;
             }
 

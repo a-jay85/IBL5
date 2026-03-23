@@ -6,6 +6,7 @@ namespace SavedDepthChart;
 
 use Utilities\HtmlSanitizer;
 use Team\Team;
+use Season\Season;
 
 /**
  * AJAX JSON endpoint handler for saved depth charts
@@ -61,7 +62,7 @@ class SavedDepthChartApiHandler
 
     private function handleList(int $tid): void
     {
-        $season = new \Season($this->db);
+        $season = new Season($this->db);
         $options = $this->service->getDropdownOptions($tid, $season);
 
         $depthCharts = [];
@@ -162,7 +163,7 @@ class SavedDepthChartApiHandler
         $statsHtml = '';
         if ($endDate !== null && $endDate !== '') {
             $team = Team::initialize($this->db, $tid);
-            $season = new \Season($this->db);
+            $season = new Season($this->db);
             $statsHtml = \UI\Tables\PeriodAverages::render($this->db, $team, $season, $startDate, $endDate);
         }
 
@@ -232,7 +233,7 @@ class SavedDepthChartApiHandler
             $newName = mb_substr($newName, 0, 100);
         }
 
-        $season = new \Season($this->db);
+        $season = new Season($this->db);
         $result = $this->service->nameOrCreateActive($tid, $username, $newName, $season);
 
         echo json_encode($result, JSON_THROW_ON_ERROR);

@@ -8,6 +8,7 @@ use PHPUnit\Framework\TestCase;
 use Trading\TradingService;
 use Trading\Contracts\TradingRepositoryInterface;
 use Trading\Contracts\TradeCashRepositoryInterface;
+use Season\Season;
 
 class TradingServiceTest extends TestCase
 {
@@ -571,9 +572,9 @@ class TradingServiceTest extends TestCase
         return new TradingService($stubRepo, $stubCommon, $this->mockDb, $stubCashRepo);
     }
 
-    private function createSeasonStub(string $phase): \Season
+    private function createSeasonStub(string $phase): Season
     {
-        $season = $this->createStub(\Season::class);
+        $season = $this->createStub(Season::class);
         $season->phase = $phase;
         $season->endingYear = 2025;
         $season->beginningYear = 2024;

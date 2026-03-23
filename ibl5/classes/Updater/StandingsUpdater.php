@@ -8,6 +8,7 @@ use League\LeagueContext;
 use Utilities\RecordParser;
 use Utilities\SeasonPhaseHelper;
 use Utilities\StandingsGrouper;
+use Season\Season;
 
 /**
  * Computes league standings from game results in ibl_schedule
@@ -43,9 +44,9 @@ class StandingsUpdater extends \BaseMysqliRepository {
         'Western'  => 'Western Conference Champions',
     ];
 
-    private \Season $season;
+    private Season $season;
 
-    public function __construct(\mysqli $db, \Season $season, ?LeagueContext $leagueContext = null) {
+    public function __construct(\mysqli $db, Season $season, ?LeagueContext $leagueContext = null) {
         parent::__construct($db, $leagueContext);
         $this->season = $season;
     }

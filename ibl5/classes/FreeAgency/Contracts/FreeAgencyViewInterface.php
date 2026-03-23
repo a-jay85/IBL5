@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace FreeAgency\Contracts;
 
 use Team\Team;
+use Season\Season;
 
 /**
  * Interface for rendering the Free Agency main page
@@ -15,7 +16,7 @@ use Team\Team;
  *
  * @phpstan-import-type PlayerRow from \Services\CommonMysqliRepository
  * @phpstan-type CapMetrics array{totalSalaries: array<int, int>, softCapSpace: array<int, int>, hardCapSpace: array<int, int>, rosterSpots: array<int, int>}
- * @phpstan-type MainPageData array{team: Team, season: \Season, capMetrics: CapMetrics, allOtherPlayers: list<PlayerRow>}
+ * @phpstan-type MainPageData array{team: Team, season: Season, capMetrics: CapMetrics, allOtherPlayers: list<PlayerRow>}
  */
 interface FreeAgencyViewInterface
 {

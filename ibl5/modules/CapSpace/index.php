@@ -24,7 +24,7 @@ use CapSpace\CapSpaceView;
 
 global $mysqli_db;
 
-$season = new Season($mysqli_db);
+$season = new \Season\Season($mysqli_db);
 
 $module_name = basename(dirname(__FILE__));
 get_lang($module_name);

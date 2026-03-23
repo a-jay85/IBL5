@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace NextSim\Contracts;
 
 use Team\Team;
+use Season\Season;
 
 /**
  * NextSimServiceInterface - Contract for next sim business logic
@@ -21,10 +22,10 @@ interface NextSimServiceInterface
      * Get processed next sim games for a team
      *
      * @param int $teamId Team ID
-     * @param \Season $season Current season
+     * @param Season $season Current season
      * @return array<int, NextSimGameData> Processed game data with opposing starters
      */
-    public function getNextSimGames(int $teamId, \Season $season): array;
+    public function getNextSimGames(int $teamId, Season $season): array;
 
     /**
      * Get user's starting lineup

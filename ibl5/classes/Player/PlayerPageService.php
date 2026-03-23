@@ -8,6 +8,7 @@ use League\League;
 use Player\Contracts\PlayerPageServiceInterface;
 use Player\Views\PlayerViewFactory;
 use Team\Team;
+use Season\Season;
 
 /**
  * @see PlayerPageServiceInterface
@@ -55,7 +56,7 @@ class PlayerPageService implements PlayerPageServiceInterface
         }
 
         /** @var Team $userTeam */
-        /** @var \Season $season */
+        /** @var Season $season */
         return $userTeam->name !== League::FREE_AGENTS_TEAM_NAME
             && $userTeam->hasUsedExtensionThisSeason === 0
             && $player->canRenegotiateContract()
@@ -78,7 +79,7 @@ class PlayerPageService implements PlayerPageServiceInterface
     public function canShowRookieOptionButton(Player $player, object $userTeam, object $season): bool
     {
         /** @var Team $userTeam */
-        /** @var \Season $season */
+        /** @var Season $season */
         return $userTeam->name !== League::FREE_AGENTS_TEAM_NAME
             && $player->canRookieOption($season->phase)
             && $player->teamID === $userTeam->teamID;

@@ -3,6 +3,8 @@
 declare(strict_types=1);
 
 namespace Trading\Contracts;
+use Season\Season;
+
 
 /**
  * Interface for rendering Trading module pages
@@ -37,10 +39,10 @@ interface TradingViewInterface
     /**
      * Render the "trades not allowed" message
      *
-     * @param \Season $season Season object for checking waiver status
+     * @param Season $season Season object for checking waiver status
      * @return string HTML message about trading being closed
      */
-    public function renderTradesClosed(\Season $season): string;
+    public function renderTradesClosed(Season $season): string;
 
     /**
      * Render team selection links for trading partner selection

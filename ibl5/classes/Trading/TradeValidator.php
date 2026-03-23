@@ -7,6 +7,7 @@ namespace Trading;
 use League\League;
 use Trading\Contracts\TradeValidatorInterface;
 use Team\Team;
+use Season\Season;
 
 /**
  * TradeValidator - Validates trade legality
@@ -21,14 +22,14 @@ class TradeValidator implements TradeValidatorInterface
     protected \mysqli $db;
     protected TradingRepository $repository;
     protected \Shared\Contracts\SharedRepositoryInterface $sharedRepository;
-    protected \Season $season;
+    protected Season $season;
 
     public function __construct(\mysqli $db)
     {
         $this->db = $db;
         $this->repository = new TradingRepository($db);
         $this->sharedRepository = new \Shared\SharedRepository($db);
-        $this->season = new \Season($db);
+        $this->season = new Season($db);
     }
 
     /**

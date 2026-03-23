@@ -8,6 +8,7 @@ use PHPUnit\Framework\Attributes\AllowMockObjectsWithoutExpectations;
 use PHPUnit\Framework\TestCase;
 use UI\Tables\Ratings;
 use Player\Player;
+use Season\Season;
 
 /**
  * RatingsTest - Tests for Ratings table rendering
@@ -86,7 +87,7 @@ class RatingsTest extends TestCase
     public function testEmptyPlayerList(): void
     {
         $mockDb = $this->createMock(\mysqli::class);
-        $mockSeason = $this->createMock(\Season::class);
+        $mockSeason = $this->createMock(Season::class);
         $mockSeason->lastSimEndDate = '2025-01-01';
 
         $team = $this->createMockTeam();
@@ -104,7 +105,7 @@ class RatingsTest extends TestCase
     public function testFirstPlayerHasData(): void
     {
         $mockDb = $this->createMock(\mysqli::class);
-        $mockSeason = $this->createMock(\Season::class);
+        $mockSeason = $this->createMock(Season::class);
         $mockSeason->lastSimEndDate = '2025-01-01';
 
         $team = $this->createMockTeam();

@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Boxscore;
 
 use JSB;
-use Season;
+use Season\Season;
 
 class Boxscore
 {

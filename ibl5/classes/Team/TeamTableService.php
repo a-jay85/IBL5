@@ -9,6 +9,7 @@ use Team\Contracts\TeamTableServiceInterface;
 use Team\Contracts\TeamRepositoryInterface;
 use UI\Components\TableViewDropdown;
 use UI\Components\TableViewSwitcher;
+use Season\Season;
 
 /**
  * @phpstan-import-type PlayerRow from \Services\CommonMysqliRepository
@@ -32,7 +33,7 @@ class TeamTableService implements TeamTableServiceInterface
      */
     public function getTableOutput(int $teamID, ?string $yr, string $display, ?string $split = null): string
     {
-        $season = new \Season($this->db);
+        $season = new Season($this->db);
 
         $isFreeAgency = $season->isOffseasonPhase();
 
@@ -140,7 +141,7 @@ class TeamTableService implements TeamTableServiceInterface
      */
     public function getRosterAndStarters(int $teamID): array
     {
-        $season = new \Season($this->db);
+        $season = new Season($this->db);
         $isFreeAgency = $season->isOffseasonPhase();
 
         if ($isFreeAgency) {
@@ -169,7 +170,7 @@ class TeamTableService implements TeamTableServiceInterface
      * @param list<PlayerRow>|list<array<string, mixed>> $result
      * @param list<int> $starterPids
      */
-    public function renderTableForDisplay(string $display, array $result, Team $team, ?string $yr, \Season $season, array $starterPids = [], ?string $split = null): string
+    public function renderTableForDisplay(string $display, array $result, Team $team, ?string $yr, Season $season, array $starterPids = [], ?string $split = null): string
     {
         $yrStr = $yr ?? '';
         switch ($display) {
@@ -197,7 +198,7 @@ class TeamTableService implements TeamTableServiceInterface
      *
      * @return array<string, array<string, string>>
      */
-    public function buildDropdownGroups(\Season $season): array
+    public function buildDropdownGroups(Season $season): array
     {
         $groups = [];
 
@@ -283,7 +284,7 @@ class TeamTableService implements TeamTableServiceInterface
      *
      * @param list<int> $starterPids
      */
-    private function renderSplitStats(Team $team, \Season $season, string $splitKey, array $starterPids): string
+    private function renderSplitStats(Team $team, Season $season, string $splitKey, array $starterPids): string
     {
         $splitRepo = new SplitStatsRepository($this->db);
         $teamID = $team->teamID;

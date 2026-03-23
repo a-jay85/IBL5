@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Module;
 
 use League\LeagueContext;
+use Season\Season;
 
 /**
  * ModuleAccessControl - Derives module availability from Season phase and settings
@@ -14,7 +15,7 @@ use League\LeagueContext;
  */
 class ModuleAccessControl
 {
-    private \Season $season;
+    private Season $season;
     private LeagueContext $leagueContext;
 
     /** @var array<string, string> */
@@ -41,7 +42,7 @@ class ModuleAccessControl
         'SeasonLeaderboards',
     ];
 
-    public function __construct(\Season $season, LeagueContext $leagueContext, \mysqli $db)
+    public function __construct(Season $season, LeagueContext $leagueContext, \mysqli $db)
     {
         $this->season = $season;
         $this->leagueContext = $leagueContext;

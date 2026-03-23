@@ -8,6 +8,7 @@ use PHPUnit\Framework\TestCase;
 use SeasonHighs\Contracts\SeasonHighsRepositoryInterface;
 use SeasonHighs\Contracts\SeasonHighsServiceInterface;
 use SeasonHighs\SeasonHighsService;
+use Season\Season;
 
 /**
  * @covers \SeasonHighs\SeasonHighsService
@@ -342,11 +343,11 @@ class SeasonHighsServiceTest extends TestCase
     }
 
     /**
-     * @return \Season&\PHPUnit\Framework\MockObject\Stub
+     * @return Season&\PHPUnit\Framework\MockObject\Stub
      */
-    private function createStubSeason(int $beginningYear, int $endingYear): \Season
+    private function createStubSeason(int $beginningYear, int $endingYear): Season
     {
-        $season = $this->createStub(\Season::class);
+        $season = $this->createStub(Season::class);
         $season->beginningYear = $beginningYear;
         $season->endingYear = $endingYear;
 

@@ -74,7 +74,7 @@ function themeheader()
     $showDraftLink = '';
     $isDraftOrderFinalized = false;
     if ($mysqli_db) {
-        $season = new \Season($mysqli_db);
+        $season = new \Season\Season($mysqli_db);
         $seasonPhase = $season->phase;
         $allowWaivers = $season->allowWaivers;
         $showDraftLink = $season->showDraftLink;

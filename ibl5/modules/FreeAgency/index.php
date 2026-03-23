@@ -35,7 +35,7 @@ function display()
 {
     global $mysqli_db, $cookie;
     $commonRepository = new Services\CommonMysqliRepository($mysqli_db);
-    $season = new Season($mysqli_db);
+    $season = new \Season\Season($mysqli_db);
 
     PageLayout\PageLayout::header();
 
@@ -71,7 +71,7 @@ function negotiate($pid)
     $teamID = $commonRepository->getTidFromTeamname($userTeamName) ?? 0;
 
     $team = \Team\Team::initialize($mysqli_db, $teamID);
-    $season = new Season($mysqli_db);
+    $season = new \Season\Season($mysqli_db);
 
     // Service assembles data, view renders it
     $repository = new FreeAgencyRepository($mysqli_db);

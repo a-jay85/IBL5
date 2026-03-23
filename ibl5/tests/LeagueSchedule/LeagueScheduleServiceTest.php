@@ -9,6 +9,7 @@ use LeagueSchedule\LeagueScheduleService;
 use LeagueSchedule\Contracts\LeagueScheduleServiceInterface;
 use League\League;
 use PHPUnit\Framework\TestCase;
+use Season\Season;
 
 class LeagueScheduleServiceTest extends TestCase
 {
@@ -26,7 +27,7 @@ class LeagueScheduleServiceTest extends TestCase
         $mockRepo->method('getAllGamesWithBoxScoreInfo')->willReturn([]);
         $mockRepo->method('getTeamRecords')->willReturn([]);
 
-        $season = $this->createStub(\Season::class);
+        $season = $this->createStub(Season::class);
         $season->projectedNextSimEndDate = new \DateTime('2025-11-15');
         $season->phase = 'Regular Season';
 
@@ -82,7 +83,7 @@ class LeagueScheduleServiceTest extends TestCase
             4 => '18-17',
         ]);
 
-        $season = $this->createStub(\Season::class);
+        $season = $this->createStub(Season::class);
         $season->projectedNextSimEndDate = new \DateTime('2025-10-15');
         $season->phase = 'Regular Season';
 
@@ -123,7 +124,7 @@ class LeagueScheduleServiceTest extends TestCase
         ]);
         $mockRepo->method('getTeamRecords')->willReturn([]);
 
-        $season = $this->createStub(\Season::class);
+        $season = $this->createStub(Season::class);
         $season->projectedNextSimEndDate = new \DateTime('2025-11-15');
         $season->phase = 'Regular Season';
 
@@ -169,7 +170,7 @@ class LeagueScheduleServiceTest extends TestCase
         ]);
         $mockRepo->method('getTeamRecords')->willReturn([]);
 
-        $season = $this->createStub(\Season::class);
+        $season = $this->createStub(Season::class);
         $season->projectedNextSimEndDate = new \DateTime('2025-10-15');
         $season->phase = 'Playoffs';
 
@@ -208,7 +209,7 @@ class LeagueScheduleServiceTest extends TestCase
         ]);
         $mockRepo->method('getTeamRecords')->willReturn([]);
 
-        $season = $this->createStub(\Season::class);
+        $season = $this->createStub(Season::class);
         $season->projectedNextSimEndDate = new \DateTime('2025-10-15');
         $season->phase = 'Regular Season';
 
@@ -232,7 +233,7 @@ class LeagueScheduleServiceTest extends TestCase
         $mockRepo->method('getAllGamesWithBoxScoreInfo')->willReturn([]);
         $mockRepo->method('getTeamRecords')->willReturn([]);
 
-        $season = $this->createStub(\Season::class);
+        $season = $this->createStub(Season::class);
         $season->projectedNextSimEndDate = new \DateTime('2025-11-15');
         $season->phase = 'Regular Season';
 

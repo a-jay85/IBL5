@@ -2,9 +2,6 @@ import { test, expect } from '../fixtures/public';
 import { assertNoPhpErrors } from '../helpers/php-errors';
 
 // Season Leaderboards — public, no authentication required.
-// Serial: trivia-on and trivia-off blocks set the same setting (Trivia Mode).
-test.describe.configure({ mode: 'serial' });
-
 // ---- Season Leaderboards: trivia off (normal) ----
 
 test.describe('Season Leaderboards flow', () => {

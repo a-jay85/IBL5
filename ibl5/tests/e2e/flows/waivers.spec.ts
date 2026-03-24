@@ -3,9 +3,6 @@ import { assertNoPhpErrors } from '../helpers/php-errors';
 
 // Waivers — authenticated page with explicit state control.
 // NOTE: NEVER submit a waiver claim — read-only assertions only.
-// Serial: open and closed blocks set the same setting (Allow Waiver Moves).
-test.describe.configure({ mode: 'serial' });
-
 test.describe('Waivers flow: closed', () => {
   test.beforeEach(async ({ appState, page }) => {
     // Phase must be Free Agency or Preseason for the toggle to matter —

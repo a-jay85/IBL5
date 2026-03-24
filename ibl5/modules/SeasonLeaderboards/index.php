@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 use SeasonLeaderboards\SeasonLeaderboardsRepository;
 use SeasonLeaderboards\SeasonLeaderboardsService;
 use SeasonLeaderboards\SeasonLeaderboardsView;

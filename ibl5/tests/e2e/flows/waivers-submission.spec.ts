@@ -45,17 +45,29 @@ test.describe('Waivers: add player', () => {
     expect(optionValue, 'Expected at least one player option with a value').toBeTruthy();
     await playerSelect.selectOption(optionValue!);
 
-    // Strip the onclick handler that disables the button and calls form.submit()
-    // programmatically — this races with Playwright's navigation tracking.
-    // Without it, the browser's native submit (via type="submit") works cleanly.
+    // Intercept the POST response to see what the server returns
+    const responsePromise = page.waitForResponse(
+      resp => resp.url().includes('modules.php') && resp.request().method() === 'POST'
+    );
+
+    // Strip onclick handler — it calls form.submit() programmatically which
+    // blocks the browser's native submit and races with Playwright.
     const submitBtn = form.locator('button[type="submit"], input[type="submit"]').first();
     await submitBtn.evaluate(btn => (btn as HTMLElement).removeAttribute('onclick'));
     await submitBtn.click();
+
+    const response = await responsePromise;
+    const status = response.status();
+    const location = response.headers()['location'] ?? 'none';
+
     await page.waitForLoadState('networkidle');
     const url = page.url();
 
-    // Verify redirect included result or error param
-    expect(url, `Expected result= or error= in URL, got: ${url}`).toMatch(/(result|error)=/);
+    // Diagnostic: log what the server returned
+    expect(
+      url,
+      `POST status=${status} location=${location} finalURL=${url}`,
+    ).toMatch(/(result|error)=/);
     await assertNoPhpErrors(page, 'after waiver add');
   });
 

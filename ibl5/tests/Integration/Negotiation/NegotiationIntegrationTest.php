@@ -122,6 +122,7 @@ class NegotiationIntegrationTest extends IntegrationTestCase
 
     private function setupSuccessfulNegotiationScenario(): void
     {
+        $this->mockDb->onQuery('ibl_settings', [['value' => 'Regular Season']]);
         $this->mockDb->setMockData([
             array_merge($this->getBaseNegotiationData(), [
                 // Player is on user's team
@@ -136,9 +137,6 @@ class NegotiationIntegrationTest extends IntegrationTestCase
                 'cy4' => 0,
                 'cy5' => 0,
                 'cy6' => 0,
-                // Free agency is not active
-                'title' => 'FreeAgency',
-                'active' => 0,
                 // Team performance
                 'Contract_Wins' => 50,
                 'Contract_Losses' => 32,
@@ -153,28 +151,24 @@ class NegotiationIntegrationTest extends IntegrationTestCase
 
     private function setupFreeAgencyActiveScenario(): void
     {
+        $this->mockDb->onQuery('ibl_settings', [['value' => 'Free Agency']]);
         $this->mockDb->setMockData([
             array_merge($this->getBaseNegotiationData(), [
                 // Player is on user's team
                 'tid' => 1,
                 'teamname' => 'Miami Cyclones',
-                // Free agency IS active
-                'title' => 'FreeAgency',
-                'active' => 1,
             ])
         ]);
     }
 
     private function setupPlayerOnDifferentTeamScenario(): void
     {
+        $this->mockDb->onQuery('ibl_settings', [['value' => 'Regular Season']]);
         $this->mockDb->setMockData([
             array_merge($this->getBaseNegotiationData(), [
                 // Player is on DIFFERENT team
                 'tid' => 5,
                 'teamname' => 'Miami Cyclones',
-                // Free agency not active
-                'title' => 'FreeAgency',
-                'active' => 0,
             ])
         ]);
     }

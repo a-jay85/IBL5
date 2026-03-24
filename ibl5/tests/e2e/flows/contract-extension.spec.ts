@@ -5,8 +5,6 @@ import { assertNoPhpErrors } from '../helpers/php-errors';
 // CI seed has extension-eligible player: pid=30 'Extension Vet' (cy=2, cyt=2 → final year).
 
 test.describe('Contract Extension flow', () => {
-  test.describe.configure({ mode: 'serial' });
-
   test('extension form renders for eligible player', async ({ appState, page }) => {
     await appState({ 'Current Season Phase': 'Regular Season', 'Current Season Ending Year': '2026' });
     await page.goto('modules.php?name=Player&pa=negotiate&pid=30');

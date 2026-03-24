@@ -27,16 +27,34 @@ if (!is_user($user)) {
     loginbox();
 }
 
-PageLayout\PageLayout::header();
-
 $opRaw = $_REQUEST['op'] ?? 'main';
 $op = is_string($opRaw) ? $opRaw : 'main';
 
 $repository = new ApiKeysRepository($mysqli_db);
 $service = new ApiKeysService($repository);
+
+// Handle POST-redirect operations before PageLayout::header() sends output,
+// so header('Location: ...') can actually redirect the browser.
+$userId = $authService->getUserId();
+
+if ($op === 'revoke' && $_SERVER['REQUEST_METHOD'] === 'POST' && $userId !== null) {
+    if (\Utilities\CsrfGuard::validateSubmittedToken('api_keys_revoke')) {
+        $service->revokeKeyForUser($userId);
+        header('Location: modules.php?name=ApiKeys');
+        return;
+    }
+}
+
+// Non-POST requests to generate/revoke redirect to main
+if (($op === 'generate' || $op === 'revoke') && $_SERVER['REQUEST_METHOD'] !== 'POST') {
+    header('Location: modules.php?name=ApiKeys');
+    return;
+}
+
+PageLayout\PageLayout::header();
+
 $view = new ApiKeysView();
 
-$userId = $authService->getUserId();
 if ($userId === null) {
     echo '<div class="ibl-alert ibl-alert--error">Unable to determine user identity.</div>';
     PageLayout\PageLayout::footer();
@@ -50,7 +68,8 @@ switch ($op) {
         break;
 
     case 'revoke':
-        handleRevoke($service, $userId);
+        // CSRF validation failed (POST handled above), show error
+        echo '<div class="ibl-alert ibl-alert--error">Invalid or expired form submission. Please try again.</div>';
         break;
 
     default:
@@ -75,15 +94,10 @@ function handleMain(ApiKeysService $service, ApiKeysView $view, int $userId): vo
 }
 
 /**
- * Generate a new API key (POST only)
+ * Generate a new API key (POST only, GET guard handled before PageLayout::header())
  */
 function handleGenerate(ApiKeysService $service, ApiKeysView $view, int $userId, \Auth\AuthService $authService): void
 {
-    if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
-        header('Location: modules.php?name=ApiKeys');
-        return;
-    }
-
     if (!\Utilities\CsrfGuard::validateSubmittedToken('api_keys_generate')) {
         echo '<div class="ibl-alert ibl-alert--error">Invalid or expired form submission. Please try again.</div>';
         return;
@@ -101,23 +115,4 @@ function handleGenerate(ApiKeysService $service, ApiKeysView $view, int $userId,
     } catch (\RuntimeException $e) {
         echo '<div class="ibl-alert ibl-alert--error">' . \Utilities\HtmlSanitizer::e($e->getMessage()) . '</div>';
     }
-}
-
-/**
- * Revoke the current API key (POST only)
- */
-function handleRevoke(ApiKeysService $service, int $userId): void
-{
-    if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
-        header('Location: modules.php?name=ApiKeys');
-        return;
-    }
-
-    if (!\Utilities\CsrfGuard::validateSubmittedToken('api_keys_revoke')) {
-        echo '<div class="ibl-alert ibl-alert--error">Invalid or expired form submission. Please try again.</div>';
-        return;
-    }
-
-    $service->revokeKeyForUser($userId);
-    header('Location: modules.php?name=ApiKeys');
 }

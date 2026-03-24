@@ -14,6 +14,7 @@
 import { describe, test, expect } from 'vitest';
 import {
   apiFetch,
+  API_KEY,
   AUTH_HEADERS,
   API_BASE,
   SEED_PLAYER_UUID,

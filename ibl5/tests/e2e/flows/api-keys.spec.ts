@@ -46,8 +46,9 @@ test.describe('API Keys flow', () => {
     const keyValue = await keyInput.inputValue();
     expect(keyValue).toMatch(/^ibl_[0-9a-f]{32}$/);
 
-    // IMPORTDATA formula should be visible
-    await expect(page.getByText('IMPORTDATA')).toBeVisible();
+    // IMPORTDATA formula should be in the second readonly input
+    const formulaInput = page.locator('input.ibl-input[readonly]').nth(1);
+    await expect(formulaInput).toHaveValue(/IMPORTDATA/);
 
     await assertNoPhpErrors(page, 'on ApiKeys generate page');
   });

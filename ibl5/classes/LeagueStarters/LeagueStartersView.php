@@ -62,17 +62,42 @@ class LeagueStartersView implements LeagueStartersViewInterface
         ];
 
         $baseUrl = 'modules.php?name=LeagueStarters';
-        $switcher = new TableViewSwitcher($tabDefinitions, $display, $baseUrl, $userTeam->color1, $userTeam->color2);
+        $apiUrl = 'modules.php?name=LeagueStarters&op=api';
+        $switcher = new TableViewSwitcher(
+            $tabDefinitions,
+            $display,
+            $baseUrl,
+            $userTeam->color1,
+            $userTeam->color2,
+            $apiUrl,
+            '#league-starters-tables',
+        );
 
         $html = '<div class="text-center"><h2 class="ibl-title">League Starters</h2></div>';
-        $html .= '<div class="space-y-4">';
+        $html .= $switcher->renderTabs();
+        $html .= '<div id="league-starters-tables">';
+        $html .= $this->renderTableContent($startersByPosition, $userTeam, $display);
+        $html .= '</div>';
+
+        return $html;
+    }
+
+    /**
+     * Render only the position tables for HTMX partial updates.
+     *
+     * @see LeagueStartersViewInterface::renderTableContent()
+     *
+     * @param array<string, array<int, Player>> $startersByPosition
+     */
+    public function renderTableContent(array $startersByPosition, Team $userTeam, string $display = 'ratings'): string
+    {
+        $html = '<div class="space-y-4">';
 
         foreach (self::POSITION_LABELS as $position => $label) {
             $labelSafe = HtmlSanitizer::safeHtmlOutput($label);
             $html .= '<div>';
             $html .= '<h2 class="ibl-table-title">' . $labelSafe . '</h2>';
-            $tableHtml = $this->renderTableForDisplay($display, $startersByPosition[$position], $userTeam);
-            $html .= $switcher->wrap($tableHtml);
+            $html .= $this->renderTableForDisplay($display, $startersByPosition[$position], $userTeam);
             $html .= '</div>';
         }
 

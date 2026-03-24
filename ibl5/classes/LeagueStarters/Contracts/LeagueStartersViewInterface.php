@@ -24,4 +24,14 @@ interface LeagueStartersViewInterface
      * @return string HTML output
      */
     public function render(array $startersByPosition, Team $userTeam, string $display = 'ratings'): string;
+
+    /**
+     * Render only the position tables for HTMX partial updates.
+     *
+     * @param array<string, array<int, \Player\Player>> $startersByPosition Starters organized by position
+     * @param Team $userTeam User's team for comparison
+     * @param string $display Active display tab key
+     * @return string HTML output (tables only, no tabs or wrapper)
+     */
+    public function renderTableContent(array $startersByPosition, Team $userTeam, string $display = 'ratings'): string;
 }

@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 use Trading\TradeOfferRepository;
 use Trading\TradeAssetRepository;
 use Trading\TradeFormRepository;

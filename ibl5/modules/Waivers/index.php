@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 if (!defined('MODULE_FILE')) {
     die("You can't access this file directly...");
 }

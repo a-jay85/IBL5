@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 use FreeAgency\FreeAgencyRepository;
 use FreeAgency\FreeAgencyDemandRepository;
 use FreeAgency\FreeAgencyService;
@@ -112,7 +114,7 @@ function deleteOffer()
     global $mysqli_db;
     $processor = new FreeAgencyProcessor($mysqli_db);
     $playerID = (int) ($_POST['playerID'] ?? 0);
-    $processor->deleteOffers($_POST['teamname'], $playerID);
+    $processor->deleteOffers((string) ($_POST['teamname'] ?? ''), $playerID);
     header('Location: modules.php?name=FreeAgency&result=deleted');
     exit;
 }

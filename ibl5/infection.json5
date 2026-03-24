@@ -8,7 +8,7 @@
             "*Controller*", "*Handler*",
             "*/Contracts/*",
             "SiteStatistics", "Bootstrap", "Database", "Auth", "Cache",
-            "JsbParser", "PlrParser", "Scripts", "Discord",
+            "Scripts", "Discord",
             "OneOnOneGame", "UI.php", "Game.php", "JSB.php"
         ]
     },

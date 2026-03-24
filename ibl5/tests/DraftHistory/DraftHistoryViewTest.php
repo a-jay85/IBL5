@@ -179,6 +179,39 @@ class DraftHistoryViewTest extends TestCase
         ], $overrides);
     }
 
+    public function testRenderYearTableReturnsTableWhenDataExists(): void
+    {
+        $html = $this->view->renderYearTable([self::createYearPick()]);
+
+        $this->assertStringContainsString('<table', $html);
+        $this->assertStringContainsString('</table>', $html);
+    }
+
+    public function testRenderYearTableReturnsNoDataMessageWhenEmpty(): void
+    {
+        $html = $this->view->renderYearTable([]);
+
+        $this->assertStringContainsString('select a draft year', $html);
+        $this->assertStringNotContainsString('<table', $html);
+    }
+
+    public function testRenderWrapsTableInContentDiv(): void
+    {
+        $html = $this->view->render(2024, 1988, 2024, [self::createYearPick()]);
+
+        $this->assertStringContainsString('id="draft-history-content"', $html);
+    }
+
+    public function testRenderSelectHasHtmxAttributes(): void
+    {
+        $html = $this->view->render(2024, 1988, 2024, []);
+
+        $this->assertStringContainsString('hx-get=', $html);
+        $this->assertStringContainsString('hx-target="#draft-history-content"', $html);
+        $this->assertStringContainsString('hx-swap="innerHTML"', $html);
+        $this->assertStringContainsString('name="year"', $html);
+    }
+
     /**
      * @return array{pid: int, name: string, pos: string, draftround: int, draftpickno: int, draftyear: int, college: string, retired: int}
      */

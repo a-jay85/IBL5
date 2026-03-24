@@ -47,15 +47,26 @@ class FranchiseRecordBookView
      */
     public function render(array $data): string
     {
-        // Build team lookup for colored team cells
-        $this->teamLookup = [];
-        foreach ($data['teams'] as $team) {
-            $this->teamLookup[(int) $team['teamid']] = $team;
-        }
-        $this->isTeamView = $data['team'] !== null;
+        $this->initState($data);
+
+        $html = $this->renderTeamSelector($data['teams'], $data['team']);
+        $html .= '<div id="record-book-content">';
+        $html .= $this->renderContent($data);
+        $html .= '</div>';
+
+        return $html;
+    }
+
+    /**
+     * Render the content area (title + record sections) for HTMX partial updates.
+     *
+     * @param RecordBookData $data
+     */
+    public function renderContent(array $data): string
+    {
+        $this->initState($data);
 
         $html = $this->renderTitle($data);
-        $html .= $this->renderTeamSelector($data['teams'], $data['team']);
 
         if ($data['singleSeason'] !== []) {
             $html .= '<h3 class="ibl-title record-book-section-title">Single-Season Records</h3>';
@@ -68,6 +79,20 @@ class FranchiseRecordBookView
         }
 
         return $html;
+    }
+
+    /**
+     * Initialize internal state from record book data.
+     *
+     * @param RecordBookData $data
+     */
+    private function initState(array $data): void
+    {
+        $this->teamLookup = [];
+        foreach ($data['teams'] as $team) {
+            $this->teamLookup[(int) $team['teamid']] = $team;
+        }
+        $this->isTeamView = $data['team'] !== null;
     }
 
     /**
@@ -102,7 +127,13 @@ class FranchiseRecordBookView
 <form method="get" class="record-book-team-selector">
     <input type="hidden" name="name" value="FranchiseRecordBook">
     <label for="record-book-team">Select Team:</label>
-    <select name="teamid" id="record-book-team" onchange="this.form.requestSubmit()">
+    <select name="teamid" id="record-book-team"
+        hx-get="modules.php?name=FranchiseRecordBook&amp;op=api"
+        hx-target="#record-book-content"
+        hx-swap="innerHTML"
+        hx-trigger="change"
+        hx-include="this"
+        onchange="if(window.htmx)return;this.form.requestSubmit()">
         <option value="0"<?= $selectedId === 0 ? ' selected' : '' ?>>League-Wide</option>
         <?php foreach ($teams as $team): ?>
         <?php

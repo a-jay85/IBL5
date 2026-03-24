@@ -35,30 +35,26 @@ test.describe('Franchise Record Book flow', () => {
     await expect(tables.first()).toBeVisible();
   });
 
-  test('selecting a team navigates to team view', async ({ page }) => {
+  test('selecting a team switches to team view via HTMX', async ({ page }) => {
     await page.goto('modules.php?name=FranchiseRecordBook');
 
     const teamSelect = page.locator('#record-book-team');
     await expect(teamSelect).toBeVisible();
 
-    // Select the first real team option (skip "All Teams" if present)
+    // Select the first real team option (skip "League-Wide" at index 0)
     const options = teamSelect.locator('option');
-    const optionCount = await options.count();
+    expect(await options.count()).toBeGreaterThan(1);
 
-    if (optionCount > 1) {
-      const teamValue = await options.nth(1).getAttribute('value');
-      // Team selector has onchange auto-submit
-      await Promise.all([
-        page.waitForNavigation(),
-        teamSelect.selectOption(teamValue!),
-      ]);
+    const teamValue = await options.nth(1).getAttribute('value');
+    const teamName = (await options.nth(1).textContent())?.trim() ?? '';
 
-      // Team view should show the team name in the title
-      const title = page.locator('.ibl-title').first();
-      await expect(title).toBeVisible();
-      const titleText = await title.textContent();
-      expect(titleText?.toLowerCase()).toContain('record book');
-    }
+    // HTMX swaps #record-book-content — wait for the content update
+    await teamSelect.selectOption(teamValue!);
+
+    // The title inside #record-book-content updates to show the team name
+    const title = page.locator('#record-book-content .ibl-title').first();
+    await expect(title).toContainText(teamName, { timeout: 10_000 });
+    await expect(title).toContainText(/Record Book/i);
   });
 
   test('team view uses narrower grid layout', async ({ page }) => {

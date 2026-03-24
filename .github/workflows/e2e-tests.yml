@@ -116,6 +116,14 @@ jobs:
       - name: Start Docker containers
         run: docker compose -f docker-compose.ci.yml up -d --wait
 
+      - name: Enable PHP error log file
+        run: |
+          docker compose -f docker-compose.ci.yml exec -T php sh -c \
+            "echo 'error_log = /tmp/php_errors.log' > /usr/local/etc/php/conf.d/zz-error-log.ini && \
+             echo 'log_errors = On' >> /usr/local/etc/php/conf.d/zz-error-log.ini && \
+             touch /tmp/php_errors.log && chmod 666 /tmp/php_errors.log && \
+             apache2ctl graceful"
+
       - name: Pull Playwright image (background)
         run: nohup docker pull mcr.microsoft.com/playwright:v1.58.2-jammy > /tmp/playwright-pull.log 2>&1 &
 
@@ -421,6 +429,14 @@ jobs:
       - name: Start Docker containers
         run: docker compose -f docker-compose.ci.yml up -d --wait
 
+      - name: Enable PHP error log file
+        run: |
+          docker compose -f docker-compose.ci.yml exec -T php sh -c \
+            "echo 'error_log = /tmp/php_errors.log' > /usr/local/etc/php/conf.d/zz-error-log.ini && \
+             echo 'log_errors = On' >> /usr/local/etc/php/conf.d/zz-error-log.ini && \
+             touch /tmp/php_errors.log && chmod 666 /tmp/php_errors.log && \
+             apache2ctl graceful"
+
       - name: Pull Playwright image (background)
         run: nohup docker pull mcr.microsoft.com/playwright:v1.58.2-jammy > /tmp/playwright-pull.log 2>&1 &
 
@@ -513,20 +529,14 @@ jobs:
           path: ibl5/test-results/
           retention-days: 1
 
-      - name: Dump Docker PHP error log
+      - name: Dump PHP error log
         if: failure()
         run: |
-          echo "=== Apache error log ==="
-          docker compose -f docker-compose.ci.yml exec -T php cat /var/log/apache2/error.log 2>/dev/null || echo "(no error.log found)"
+          echo "=== PHP error log ==="
+          docker compose -f docker-compose.ci.yml exec -T php cat /tmp/php_errors.log 2>/dev/null || echo "(no php_errors.log)"
           echo ""
-          echo "=== Application log ==="
-          docker compose -f docker-compose.ci.yml exec -T php cat /var/www/html/ibl5/logs/*.log 2>/dev/null | tail -50 || echo "(no app logs)"
-          echo ""
-          echo "=== POST requests in access log ==="
-          docker compose -f docker-compose.ci.yml exec -T php grep -i "POST" /var/log/apache2/access.log 2>/dev/null | tail -20 || echo "(no POST requests)"
-          echo ""
-          echo "=== 500 responses in access log ==="
-          docker compose -f docker-compose.ci.yml exec -T php grep '" 500 ' /var/log/apache2/access.log 2>/dev/null | tail -20 || echo "(no 500s)"
+          echo "=== Application log (last 30 lines) ==="
+          docker compose -f docker-compose.ci.yml exec -T php sh -c 'tail -30 /var/www/html/ibl5/logs/*.log 2>/dev/null' || echo "(no app logs)"
 
       - name: Stop Docker containers
         if: always()

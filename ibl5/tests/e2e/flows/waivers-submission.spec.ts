@@ -45,8 +45,12 @@ test.describe('Waivers: add player', () => {
     expect(optionValue, 'Expected at least one player option with a value').toBeTruthy();
     await playerSelect.selectOption(optionValue!);
 
-    // Submit the form and wait for navigation to settle
-    await form.evaluate(f => (f as HTMLFormElement).submit());
+    // Strip the onclick handler that disables the button and calls form.submit()
+    // programmatically — this races with Playwright's navigation tracking.
+    // Without it, the browser's native submit (via type="submit") works cleanly.
+    const submitBtn = form.locator('button[type="submit"], input[type="submit"]').first();
+    await submitBtn.evaluate(btn => (btn as HTMLElement).removeAttribute('onclick'));
+    await submitBtn.click();
     await page.waitForLoadState('networkidle');
     const url = page.url();
 

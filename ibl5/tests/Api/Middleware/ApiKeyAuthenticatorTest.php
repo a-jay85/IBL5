@@ -23,6 +23,7 @@ class ApiKeyAuthenticatorTest extends TestCase
     protected function tearDown(): void
     {
         unset($_SERVER['HTTP_X_API_KEY']);
+        unset($_GET['key']);
     }
 
     public function testReturnsNullWhenNoApiKeyHeader(): void
@@ -98,5 +99,57 @@ class ApiKeyAuthenticatorTest extends TestCase
             ->willReturn(null);
 
         $this->authenticator->authenticate();
+    }
+
+    public function testFallsBackToQueryParamWhenNoHeader(): void
+    {
+        unset($_SERVER['HTTP_X_API_KEY']);
+        $apiKey = 'ibl_querykey1234567890abcdef12345';
+        $_GET['key'] = $apiKey;
+
+        $this->mockRepo->expects($this->once())
+            ->method('findByHash')
+            ->with(hash('sha256', $apiKey))
+            ->willReturn(null);
+
+        $this->authenticator->authenticate();
+    }
+
+    public function testHeaderTakesPriorityOverQueryParam(): void
+    {
+        $headerKey = 'ibl_headerkey1234567890abcdef1234';
+        $queryKey = 'ibl_querykey1234567890abcdef12345';
+
+        $_SERVER['HTTP_X_API_KEY'] = $headerKey;
+        $_GET['key'] = $queryKey;
+
+        $this->mockRepo->expects($this->once())
+            ->method('findByHash')
+            ->with(hash('sha256', $headerKey))
+            ->willReturn(null);
+
+        $this->authenticator->authenticate();
+    }
+
+    public function testReturnsNullWhenQueryParamEmpty(): void
+    {
+        unset($_SERVER['HTTP_X_API_KEY']);
+        $_GET['key'] = '';
+
+        $this->mockRepo->expects($this->never())->method('findByHash');
+
+        $result = $this->authenticator->authenticate();
+        $this->assertNull($result);
+    }
+
+    public function testReturnsNullWhenNeitherHeaderNorQueryParam(): void
+    {
+        unset($_SERVER['HTTP_X_API_KEY']);
+        unset($_GET['key']);
+
+        $this->mockRepo->expects($this->never())->method('findByHash');
+
+        $result = $this->authenticator->authenticate();
+        $this->assertNull($result);
     }
 }

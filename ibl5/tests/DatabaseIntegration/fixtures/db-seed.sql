@@ -223,6 +223,15 @@ VALUES
   (28, 2025, 2026, 'Oklahoma City', 'Thunder')
 ON DUPLICATE KEY UPDATE team_name = VALUES(team_name);
 
+-- nuke_modules: Draft and Free_Agency entries
+INSERT INTO nuke_modules (title, custom_title, active, view, inmenu, mod_group, admins)
+VALUES ('Draft', 'Draft', 1, 0, 1, 0, '')
+ON DUPLICATE KEY UPDATE active = 1;
+
+INSERT INTO nuke_modules (title, custom_title, active, view, inmenu, mod_group, admins)
+VALUES ('Free_Agency', 'Free Agency', 1, 0, 1, 0, '')
+ON DUPLICATE KEY UPDATE active = 1;
+
 -- ASG voting rows for Metros and Stars
 INSERT INTO ibl_votes_ASG (teamid, team_city, team_name, East_F1)
 VALUES (1, 'New York', 'Metros', 'Some Player')

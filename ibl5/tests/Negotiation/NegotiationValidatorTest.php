@@ -20,11 +20,16 @@ class NegotiationValidatorTest extends TestCase
 {
     private $mockDb;
     private $validator;
+    private $mockSeason;
 
     protected function setUp(): void
     {
         $this->mockDb = new \MockDatabase();
-        $this->validator = new NegotiationValidator($this->mockDb);
+        $this->mockSeason = $this->createStub(\Season\Season::class);
+        $this->mockSeason->phase = 'Regular Season';
+        $this->mockSeason->endingYear = 2026;
+        $this->mockSeason->beginningYear = 2025;
+        $this->validator = new NegotiationValidator($this->mockDb, $this->mockSeason);
     }
 
     protected function tearDown(): void
@@ -158,9 +163,7 @@ class NegotiationValidatorTest extends TestCase
     public function testRejectsDuringFreeAgency()
     {
         // Arrange
-        $this->mockDb->setMockData([
-            ['value' => 'Free Agency']
-        ]);
+        $this->mockSeason->phase = 'Free Agency';
 
         // Act
         $result = $this->validator->validateFreeAgencyNotActive();
@@ -176,10 +179,7 @@ class NegotiationValidatorTest extends TestCase
      */
     public function testAcceptsWhenFreeAgencyNotActive()
     {
-        // Arrange
-        $this->mockDb->setMockData([
-            ['value' => 'Regular Season']
-        ]);
+        // Arrange — default phase is Regular Season (set in setUp)
 
         // Act
         $result = $this->validator->validateFreeAgencyNotActive();

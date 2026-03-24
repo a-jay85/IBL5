@@ -19,11 +19,13 @@ class NegotiationValidator implements NegotiationValidatorInterface
 {
     private NegotiationRepositoryInterface $repository;
     private PlayerContractValidator $contractValidator;
+    private \Season\Season $season;
 
-    public function __construct(\mysqli $db)
+    public function __construct(\mysqli $db, ?\Season\Season $season = null)
     {
         $this->repository = new NegotiationRepository($db);
         $this->contractValidator = new PlayerContractValidator();
+        $this->season = $season ?? new \Season\Season($db);
     }
 
     /**
@@ -50,9 +52,7 @@ class NegotiationValidator implements NegotiationValidatorInterface
      */
     public function validateFreeAgencyNotActive(): ValidationResult
     {
-        $isActive = $this->repository->isFreeAgencyActive();
-
-        if ($isActive) {
+        if ($this->season->phase === 'Free Agency') {
             return ValidationResult::failure('Sorry, the contract extension feature is not available during free agency.');
         }
 

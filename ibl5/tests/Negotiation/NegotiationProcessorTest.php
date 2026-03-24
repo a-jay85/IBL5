@@ -100,11 +100,15 @@ class NegotiationProcessorTest extends TestCase
 
     public function testProcessNegotiationReturnsHtmlOutput(): void
     {
-        $processor = new NegotiationProcessor($this->mockMysqliDb);
-        
+        $mockSeason = $this->createStub(\Season\Season::class);
+        $mockSeason->phase = 'Regular Season';
+        $mockSeason->endingYear = 2026;
+        $mockSeason->beginningYear = 2025;
+        $processor = new NegotiationProcessor($this->mockMysqliDb, $mockSeason);
+
         // Setup complete player data
         $this->mockDb->setMockData([$this->getCompletePlayerData()]);
-        
+
         $result = $processor->processNegotiation(1, 'Test Team', 'prefix');
         
         $this->assertIsString($result);
@@ -216,7 +220,6 @@ class NegotiationProcessorTest extends TestCase
             'college' => 'Test University',
             // Season info
             'Phase' => 'Regular Season',
-            'value' => 'Regular Season',
             'Beginning_Year' => 2024,
             'Ending_Year' => 2025,
         ], $overrides);

@@ -26,12 +26,17 @@ use Negotiation\NegotiationProcessor;
 class NegotiationIntegrationTest extends IntegrationTestCase
 {
     private NegotiationProcessor $processor;
+    private \Season\Season $mockSeason;
 
     protected function setUp(): void
     {
         parent::setUp();
-        $this->processor = new NegotiationProcessor($GLOBALS['mysqli_db']);
-        
+        $this->mockSeason = $this->createStub(\Season\Season::class);
+        $this->mockSeason->phase = 'Regular Season';
+        $this->mockSeason->endingYear = 2026;
+        $this->mockSeason->beginningYear = 2025;
+        $this->processor = new NegotiationProcessor($GLOBALS['mysqli_db'], $this->mockSeason);
+
         // Prevent any external calls during tests
         $_SERVER['SERVER_NAME'] = 'localhost';
     }
@@ -136,8 +141,6 @@ class NegotiationIntegrationTest extends IntegrationTestCase
                 'cy4' => 0,
                 'cy5' => 0,
                 'cy6' => 0,
-                // Free agency is not active
-                'value' => 'Regular Season',
                 // Team performance
                 'Contract_Wins' => 50,
                 'Contract_Losses' => 32,
@@ -152,13 +155,12 @@ class NegotiationIntegrationTest extends IntegrationTestCase
 
     private function setupFreeAgencyActiveScenario(): void
     {
+        $this->mockSeason->phase = 'Free Agency';
         $this->mockDb->setMockData([
             array_merge($this->getBaseNegotiationData(), [
                 // Player is on user's team
                 'tid' => 1,
                 'teamname' => 'Miami Cyclones',
-                // Free agency IS active
-                'value' => 'Free Agency',
             ])
         ]);
     }
@@ -170,8 +172,6 @@ class NegotiationIntegrationTest extends IntegrationTestCase
                 // Player is on DIFFERENT team
                 'tid' => 5,
                 'teamname' => 'Miami Cyclones',
-                // Free agency not active
-                'value' => 'Regular Season',
             ])
         ]);
     }

@@ -341,6 +341,74 @@ describe('API v1 — error handling', () => {
 });
 
 // ============================================================
+// CSV player export
+// ============================================================
+
+describe('API v1 — player export CSV', () => {
+  test('GET /players/export returns text/csv content type', async () => {
+    // Use raw fetch — apiFetch retries on non-JSON responses
+    const res = await fetch(`${API_BASE}/players/export`, {
+      headers: AUTH_HEADERS,
+    });
+
+    if (res.status === 401) {
+      // No valid API key configured — verify error structure
+      const body = await res.json();
+      expect(body).toHaveProperty('error');
+      return;
+    }
+
+    expect(res.status).toBe(200);
+    const ct = res.headers.get('content-type') ?? '';
+    expect(ct).toContain('text/csv');
+  });
+
+  test('CSV has header row with expected columns', async () => {
+    const res = await fetch(`${API_BASE}/players/export`, {
+      headers: AUTH_HEADERS,
+    });
+
+    if (res.status !== 200) return;
+
+    const text = await res.text();
+    // Strip BOM if present
+    const clean = text.replace(/^\uFEFF/, '');
+    const firstLine = clean.split('\n')[0] ?? '';
+    expect(firstLine).toContain('Name');
+    expect(firstLine).toContain('Position');
+    expect(firstLine).toContain('PPG');
+    expect(firstLine).toContain('Current Salary');
+    expect(firstLine).toContain('Year 6 Salary');
+  });
+
+  test('CSV has data rows beyond header', async () => {
+    const res = await fetch(`${API_BASE}/players/export`, {
+      headers: AUTH_HEADERS,
+    });
+
+    if (res.status !== 200) return;
+
+    const text = await res.text();
+    const clean = text.replace(/^\uFEFF/, '');
+    const lines = clean.split('\n').filter((l) => l.trim() !== '');
+    // At least header + 1 data row
+    expect(lines.length).toBeGreaterThan(1);
+  });
+
+  test('GET /players/export with ?key= param returns CSV', async () => {
+    const res = await fetch(`${API_BASE}/players/export?key=${API_KEY}`);
+
+    // Either 200 (key valid) or 401 (key not in DB)
+    expect([200, 401]).toContain(res.status);
+
+    if (res.status === 200) {
+      const ct = res.headers.get('content-type') ?? '';
+      expect(ct).toContain('text/csv');
+    }
+  });
+});
+
+// ============================================================
 // Query parameter authentication (for Google Sheets IMPORTDATA)
 // ============================================================
 

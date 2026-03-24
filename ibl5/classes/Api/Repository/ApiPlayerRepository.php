@@ -7,7 +7,7 @@ namespace Api\Repository;
 use Api\Pagination\Paginator;
 
 /**
- * @phpstan-type PlayerCurrentRow array{player_uuid: string, pid: int, name: string, position: string, age: int, htft: int, htin: int, experience: int, bird_rights: int, teamid: int|null, team_uuid: string|null, team_city: string|null, team_name: string|null, full_team_name: string|null, current_salary: int, year1_salary: int, year2_salary: int, games_played: int, minutes_played: int, field_goals_made: int, field_goals_attempted: int, free_throws_made: int, free_throws_attempted: int, three_pointers_made: int, three_pointers_attempted: int, offensive_rebounds: int, defensive_rebounds: int, assists: int, steals: int, turnovers: int, blocks: int, personal_fouls: int, points_per_game: float|null, fg_percentage: float|null, ft_percentage: float|null, three_pt_percentage: float|null, ...}
+ * @phpstan-type PlayerCurrentRow array{player_uuid: string, pid: int, name: string, nickname: string|null, position: string, age: int, htft: int, htin: int, active: int, retired: int, experience: int, bird_rights: int, teamid: int|null, team_uuid: string|null, team_city: string|null, team_name: string|null, owner_name: string|null, full_team_name: string|null, contract_year: int, current_salary: int, year1_salary: int, year2_salary: int, year3_salary: int, year4_salary: int, year5_salary: int, year6_salary: int, games_played: int, minutes_played: int, field_goals_made: int, field_goals_attempted: int, free_throws_made: int, free_throws_attempted: int, three_pointers_made: int, three_pointers_attempted: int, offensive_rebounds: int, defensive_rebounds: int, assists: int, steals: int, turnovers: int, blocks: int, personal_fouls: int, points_per_game: float|null, fg_percentage: float|null, ft_percentage: float|null, three_pt_percentage: float|null, ...}
  */
 class ApiPlayerRepository extends \BaseMysqliRepository
 {
@@ -88,6 +88,17 @@ class ApiPlayerRepository extends \BaseMysqliRepository
         $row = $this->fetchOne("SELECT COUNT(*) AS total FROM vw_player_current {$whereClause}", $types, ...$params);
 
         return $row !== null ? $row['total'] : 0;
+    }
+
+    /**
+     * Get all players for CSV export. No pagination.
+     *
+     * @return list<PlayerCurrentRow>
+     */
+    public function getAllPlayersForExport(): array
+    {
+        /** @var list<PlayerCurrentRow> */
+        return $this->fetchAll('SELECT * FROM vw_player_current ORDER BY name ASC', '');
     }
 
     /**

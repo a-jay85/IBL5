@@ -1,6 +1,10 @@
-# CSS Architecture Reference
+---
+paths:
+  - "**/design/**/*.css"
+  - "**/*View.php"
+---
 
-Auto-loads when editing `**/design/**/*.css` or `**/*View.php`.
+# CSS Architecture Reference
 
 ## Layer Hierarchy
 

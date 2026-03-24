@@ -11,29 +11,16 @@ Execute all phases below **sequentially in a single response**. Do NOT stop, ask
 
 ## Phase 3: Simplify
 
-Review all changed files (use `git diff --name-only HEAD~1` or compare against the base branch) for:
-
-1. **Reuse** — Is there existing code that does the same thing? Check for duplicate logic in `classes/`, utility methods in `Utilities\`, and common repository helpers in `CommonMysqliRepository`.
-2. **Quality** — Are there PHPStan violations, missing strict_types, missing type declarations, loose comparisons (`==`/`!=`), or missing `HtmlSanitizer::e()` on output?
-3. **Efficiency** — Unnecessary loops, redundant queries, over-engineering, or abstractions for one-time operations?
-
-Fix any issues found directly in the worktree files before proceeding.
+Review changed files (`git diff --name-only HEAD~1` or vs base branch) for reuse opportunities, CLAUDE.md mandatory-rule violations, and over-engineering. Fix issues directly before proceeding.
 
 ---
 
 ## Phase 4: Commit, Push & PR
 
-1. Stage all relevant changes: `git add -A` (or selectively stage only task-related files)
-2. Review staged changes: `git diff --staged`
-3. Create a commit with conventional format: `<type>: <short summary>` followed by `## Section` headers with bullet points
-4. Push the branch: `git push -u origin <branch-name>`
-5. Create a PR: `gh pr create --fill` (or with explicit `--title` and `--body`)
-
-**Stacked PRs:** If the current branch was created from another feature branch (not `master`), set `--base <parent-branch>` so the PR targets the parent branch instead of master.
-
-**Manual testing in PR description:** Always include a "Manual Testing" section. If automated tests (PHPUnit + Playwright) fully cover the changed behavior, write: `No manual testing needed — all changes are covered by unit and E2E tests.` Otherwise, list only steps that automated tests don't cover as a markdown checklist (`- [ ]`) — minimal, no redundancy with automated checks.
-
-**Model guidance:** Use Haiku agents for the commit message generation if delegating.
+1. Stage relevant changes, review with `git diff --staged`, commit (CLAUDE.md conventions), push, create PR
+2. **Stacked PRs:** If branched from a feature branch (not `master`), use `--base <parent-branch>`
+3. **Manual testing in PR description:** Include a "Manual Testing" section. If automated tests fully cover behavior, write: `No manual testing needed — all changes are covered by unit and E2E tests.` Otherwise, list only steps that automated tests don't cover as a markdown checklist (`- [ ]`)
+4. Use Haiku agents for commit message generation if delegating
 
 ---
 
@@ -61,104 +48,17 @@ Read the root `CLAUDE.md` and any directory-specific `CLAUDE.md` files for modif
 
 ### 5B: Code Review
 
-**Step 1 — Eligibility:** Use a Haiku agent to check if the PR is closed, draft, trivially simple, or already reviewed. Skip if any apply.
-
-**Step 2 — Five parallel Sonnet agents.** Each receives the filtered diff from 5A. No agent should call `gh pr diff`.
-
-| Agent | Task | Extra input |
-|-------|------|-------------|
-| 1. CLAUDE.md compliance | Audit changes against CLAUDE.md rules | CLAUDE.md content(s) |
-| 2. Bug detection | Shallow scan for obvious bugs (large bugs only, skip nitpicks) | Diff only |
-| 3. Git history | Check `git log --oneline -10 <file>` for up to 5 PHP files; stop early if concern found; skip non-PHP files | File list + diff |
-| 4. Previous PRs | Search `gh search prs` + `gh pr view` for related PR comments | File list only (NOT diff) |
-| 5. Code comments | Check compliance with guidance in code comments; only Read full files if comment is truncated at hunk edge | File list + diff |
-
-**Step 3 — Confidence scoring:** Collect all issues into a numbered list. Launch a single Haiku agent with the rubric:
-- **0:** False positive / pre-existing
-- **25:** Might be real, unverified; stylistic issue not in CLAUDE.md
-- **50:** Real but nitpicky or unlikely in practice
-- **75:** Very likely real, important, directly impacts functionality or called out in CLAUDE.md
-- **100:** Definitely real, frequent impact, evidence confirms
-
-Agent returns JSON: `[{"n": 1, "score": 75}, ...]`
-
-**Step 4 — Filter:** Keep only issues scoring >= 80.
-
-**Step 5 — Re-check:** `gh pr view --json state --jq '.state'` — skip comment if not OPEN.
-
-**Step 6 — Post comment:** Use `gh pr comment` with format:
-
-```
-### Code review
-
-Found N issues:
-
-1. <description> (CLAUDE.md says "<...>")
-<link to file with full SHA + line range>
-
-Generated with [Claude Code](https://claude.ai/code)
-<sub>If this code review was useful, please react with thumbs-up. Otherwise, react with thumbs-down.</sub>
-```
-
-Or if no issues: `No issues found. Checked for bugs and CLAUDE.md compliance.`
-
-**Link format:** `https://github.com/a-jay85/IBL5/blob/{FULL_SHA}/path/to/file#L{start}-L{end}` — always use the full SHA from PR metadata, never bash interpolation.
-
-**False positive examples (filter these out):** Pre-existing issues, linter/typecheck catches, pedantic nitpicks, general quality issues not in CLAUDE.md, silenced lint issues, intentional functionality changes, issues on unmodified lines.
+Execute the code review process defined in `.claude/commands/code-review.md` with these modifications:
+- **Skip Steps 1 and 2** — eligibility was checked and PR data was already fetched in 5A above
+- Pass the PR metadata, file list, filtered diff, and CLAUDE.md content(s) from 5A to each agent
+- No agent should call `gh pr diff`
 
 ### 5C: Security Audit
 
-**Step 1 — Eligibility:** Use a Haiku agent to check if the PR is closed, draft, has zero PHP files, or already has a `### Security audit` comment. Skip if any apply.
-
-**Step 2 — Pattern detection** on the PHP-only diff:
-
-```bash
-echo "SQL patterns:" && echo "$DIFF" | grep -c -E 'sql_query|prepare|fetchOne|fetchAll|query\(' || true
-echo "Superglobals:" && echo "$DIFF" | grep -c -E '\$_GET|\$_POST|\$_REQUEST|\$_COOKIE' || true
-echo "Output:" && echo "$DIFF" | grep -c -E 'echo |print |<\?=' || true
-echo "Forms:" && echo "$DIFF" | grep -c -E 'POST|PUT|DELETE|<form|action=' || true
-```
-
-Launch only relevant agents (count > 0), plus Agent 5 (Auth) always:
-
-| Agent | Category | Trigger |
-|-------|----------|---------|
-| 1 | SQL Injection | SQL patterns > 0 |
-| 2 | XSS / Output Encoding | Output > 0 |
-| 3 | Input Validation | Superglobals > 0 |
-| 4 | CSRF Protection | Forms > 0 |
-| 5 | Auth & Authorization | Always |
-
-Each Sonnet agent receives the PHP diff and returns findings with file, line, and description. See the project's `.claude/commands/security-audit.md` for the full vulnerable/secure pattern lists per category.
-
-**Step 3 — Confidence scoring:** Single Haiku agent scores 0-100 per finding:
-- **0:** False positive — code is secure
-- **25:** Suspicious but likely mitigated
-- **50:** Pattern present but requires specific conditions
-- **75:** Clearly present, no visible mitigation
-- **100:** Direct user input to SQL/HTML/state-change with zero sanitization
-
-IBL5-specific false positives to downgrade: `BaseMysqliRepository` methods, test files, typed params in strict_types, CLI echo, hardcoded SQL, `HtmlSanitizer` on different line, `ApiKeyAuthenticator` endpoints, GET-only handlers.
-
-**Step 4 — Filter:** Keep only findings scoring >= 75.
-
-**Step 5 — Post comment:** Use `gh pr comment` with format:
-
-```
-### Security audit
-
-Found N issue(s):
-
-**[SEVERITY]** Vulnerability type in `Class::method()` -- description
-<link with full SHA + line range>
-
-Generated with [Claude Code](https://claude.ai/code)
-<sub>If this security audit was useful, please react with thumbs-up. Otherwise, react with thumbs-down.</sub>
-```
-
-Severity: CRITICAL (SQLi, command injection), HIGH (XSS, missing auth, open redirect), MEDIUM (missing CSRF, input validation), LOW (best practice).
-
-Or if no issues: `No security issues found. Scanned for SQL injection, XSS, input validation, CSRF, and auth/authz vulnerabilities.`
+Execute the security audit process defined in `.claude/commands/security-audit.md` with these modifications:
+- **Skip Steps 1 and 2** — eligibility was checked and PR data was already fetched in 5A above
+- Use the PHP-only subset of the diff from 5A (filter with `awk` if not already PHP-only)
+- No agent should call `gh pr diff`
 
 ---
 
@@ -188,48 +88,9 @@ After both agents complete:
 
 ## Phase 6.5: Manual Testing Automation
 
-Replace manual testing steps with automated tests wherever possible. This maximizes auto-merge eligibility and reduces reviewer burden.
-
 **Skip this phase if** the PR description already says "No manual testing needed."
 
-### Step 1: Extract and review manual testing steps
-
-```bash
-gh pr view --json body --jq '.body' | sed -n '/## Manual Testing/,/^## /p'
-```
-
-For each manual testing step, determine whether it can be **sufficiently replaced** by a combination of Playwright E2E tests, PHPUnit integration tests, or unit tests. A step is replaceable if automated tests can verify the same behavior the manual step is checking. A step must stay manual only if it requires subjective human judgment (visual aesthetics, "does it look right?", production data comparison against iblhoops.net).
-
-### Step 2: Write tests for replaceable steps
-
-For each replaceable step, choose the right test type:
-
-- **E2E (Playwright):** Page navigation, UI interactions, form submissions, content assertions, mobile layout
-- **Integration (PHPUnit):** Database queries returning correct results, service methods producing expected output
-- **Unit (PHPUnit):** Calculations, validation logic, data transformations
-
-Write the tests. Run them directly from the worktree:
-```bash
-# PHPUnit
-cd <worktree>/ibl5 && vendor/bin/phpunit --filter "TestName"
-
-# Playwright (must run from worktree to pick up new test files)
-cd <worktree>/ibl5 && BASE_URL=http://<slug>.localhost/ibl5 \
-  IBL_TEST_USER=<test-user> IBL_TEST_PASS=<test-pass> \
-  bunx playwright test --grep "test name"
-```
-
-Fix until green. If a test cannot be made green after 2 attempts, reclassify the step as manual and move on.
-
-### Step 3: Update PR description
-
-After all new tests pass:
-
-1. Commit and push the new tests
-2. Remove the now-automated steps from the Manual Testing checklist
-3. If no manual steps remain, replace the entire section with:
-   `No manual testing needed — all changes are covered by unit and E2E tests.`
-4. Apply: `gh pr edit --body "<updated body>"`
+Otherwise, read and follow the instructions in `manual-testing-automation.md` (same directory as this skill).
 
 ---
 

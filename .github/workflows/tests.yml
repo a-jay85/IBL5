@@ -15,8 +15,35 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  changes:
+    name: Detect changes
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: read
+    outputs:
+      src: ${{ github.event_name == 'push' || steps.filter.outputs.src == 'true' }}
+    steps:
+      - uses: dorny/paths-filter@v3
+        id: filter
+        if: github.event_name == 'pull_request'
+        with:
+          filters: |
+            src:
+              - '**.php'
+              - 'ibl5/migrations/**.sql'
+              - 'ibl5/composer.json'
+              - 'ibl5/composer.lock'
+              - 'ibl5/phpunit.xml'
+              - 'ibl5/phpunit.db.xml'
+              - 'ibl5/phpstan.neon'
+              - 'ibl5/phpstan-rules/**'
+              - 'ibl5/tests/DatabaseIntegration/fixtures/**'
+              - '.github/workflows/tests.yml'
+
   test:
     name: PHPUnit Tests
+    needs: [changes]
+    if: needs.changes.outputs.src == 'true'
     runs-on: ubuntu-latest
     strategy:
       matrix:
@@ -89,6 +116,8 @@ jobs:
 
   audit-php:
     name: PHP Dependency Audit
+    needs: [changes]
+    if: needs.changes.outputs.src == 'true'
     runs-on: ubuntu-latest
 
     steps:
@@ -111,6 +140,8 @@ jobs:
 
   audit-js:
     name: JS Dependency Audit
+    needs: [changes]
+    if: needs.changes.outputs.src == 'true'
     runs-on: ubuntu-latest
 
     steps:
@@ -128,6 +159,8 @@ jobs:
 
   db-integration:
     name: Database Integration Tests
+    needs: [changes]
+    if: needs.changes.outputs.src == 'true'
     runs-on: ubuntu-latest
 
     services:
@@ -190,6 +223,8 @@ jobs:
 
   phpstan:
     name: PHPStan Analysis
+    needs: [changes]
+    if: needs.changes.outputs.src == 'true'
     runs-on: ubuntu-latest
 
     steps:
@@ -222,7 +257,7 @@ jobs:
   gate:
     name: Tests and Analysis
     if: always()
-    needs: [test, audit-php, audit-js, db-integration, phpstan]
+    needs: [changes, test, audit-php, audit-js, db-integration, phpstan]
     runs-on: ubuntu-latest
     steps:
       - run: exit 1

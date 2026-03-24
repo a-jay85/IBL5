@@ -675,6 +675,14 @@ test.describe('Trade submission: accept and reject', () => {
     await expect(page.locator('.ibl-alert--success')).toBeVisible();
     await assertNoPhpErrors(page, 'after accept');
 
+    // Verify browser back/forward works after form submission redirect
+    const acceptedUrl = page.url();
+    await page.goBack();
+    await page.waitForURL(/reviewtrade/, { timeout: 10000 });
+    await page.goForward();
+    await page.waitForURL(/trade_accepted/, { timeout: 10000 });
+    expect(page.url()).toBe(acceptedUrl);
+
     // Clean up offer A if it still exists
     if (setupDone && offerAId > 0) {
       await rejectOfferSafe(request, offerAId, offeringTeam, listeningTeam);

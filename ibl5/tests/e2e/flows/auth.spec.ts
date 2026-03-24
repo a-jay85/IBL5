@@ -1,5 +1,6 @@
 import { test, expect } from '../fixtures/public';
 import { assertNoPhpErrors } from '../helpers/php-errors';
+import { setNavMarker, assertNavMarkerGone } from '../helpers/htmx';
 
 // Login/Logout flow — uses public (unauthenticated) fixture throughout.
 // IMPORTANT: Do NOT use the auth fixture here. The logout test destroys the
@@ -65,6 +66,37 @@ test.describe('Login page', () => {
 
     // Should be on a different page now
     expect(page.url()).not.toContain('name=YourAccount');
+  });
+
+  test('login form performs full page reload (not HTMX boost)', async ({
+    page,
+  }) => {
+    const username = process.env.IBL_TEST_USER;
+    const password = process.env.IBL_TEST_PASS;
+
+    expect(username, 'IBL_TEST_USER must be set in .env.test').toBeTruthy();
+    expect(password, 'IBL_TEST_PASS must be set in .env.test').toBeTruthy();
+
+    await page.goto('modules.php?name=YourAccount');
+
+    // Mark nav before login — if it survives, HTMX boosted the form (wrong).
+    // If it's gone after login, a full page reload occurred (correct).
+    await setNavMarker(page);
+
+    const loginForm = page.locator('form', {
+      has: page.locator('#login-username'),
+    });
+    await loginForm.locator('#login-username').fill(username!);
+    await loginForm.locator('#login-password').fill(password!);
+    await loginForm.locator('button[type="submit"]').click();
+
+    await page.waitForURL(
+      (url) => !url.href.includes('name=YourAccount'),
+      { timeout: 10000 },
+    );
+
+    // Full page reload re-renders the entire DOM including nav — marker should be gone
+    await assertNavMarkerGone(page);
   });
 
   test('invalid credentials show error', async ({ page }) => {

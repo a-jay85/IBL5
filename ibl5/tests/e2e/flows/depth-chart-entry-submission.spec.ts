@@ -1,5 +1,6 @@
 import { test, expect } from '../fixtures/auth';
 import { assertNoPhpErrors } from '../helpers/php-errors';
+import { setNavMarker, assertNavMarkerPersists } from '../helpers/htmx';
 
 // Depth Chart submission flow — tests that interact with the form.
 // Serial: submission tests depend on form state.
@@ -55,6 +56,8 @@ test.describe('Depth Chart submission', () => {
     await expect(form).toBeVisible({ timeout: 15000 });
 
     // Submit the current depth chart (already valid from seed data)
+    await setNavMarker(page);
+
     const submitBtn = page.locator('.depth-chart-buttons .depth-chart-submit-btn');
     await expect(submitBtn).toBeVisible();
     await submitBtn.click();
@@ -69,6 +72,7 @@ test.describe('Depth Chart submission', () => {
     const hasError = body?.match(/must have|active players|position/i);
 
     expect(hasSuccess || hasError).toBeTruthy();
+    await assertNavMarkerPersists(page);
     await assertNoPhpErrors(page, 'after depth chart submission');
   });
 

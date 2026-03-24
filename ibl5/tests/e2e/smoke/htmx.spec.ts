@@ -1,5 +1,6 @@
 import { test, expect } from '@playwright/test';
 import { assertNoPhpErrors } from '../helpers/php-errors';
+import { setNavMarker, assertNavMarkerPersists } from '../helpers/htmx';
 
 // Public HTMX navigation tests — no authentication required.
 test.use({ storageState: { cookies: [], origins: [] } });
@@ -15,11 +16,7 @@ test.describe('HTMX hx-boost navigation', () => {
     const nav = page.locator('nav.fixed').first();
     await expect(nav).toBeVisible();
 
-    // Mark the nav with a data attribute so we can verify it wasn't re-rendered
-    await page.evaluate(() => {
-      const navEl = document.querySelector('nav.fixed');
-      if (navEl) navEl.setAttribute('data-htmx-marker', '1');
-    });
+    await setNavMarker(page);
 
     // Click a visible boosted link within site-content (exclude topic icon links
     // which are absolutely-positioned image links that may not render visibly)
@@ -31,12 +28,7 @@ test.describe('HTMX hx-boost navigation', () => {
     await contentLink.click();
     await page.waitForURL(/modules\.php/);
 
-    // Verify the nav marker persists (nav was NOT re-rendered)
-    const marker = await page.evaluate(() => {
-      const navEl = document.querySelector('nav.fixed');
-      return navEl?.getAttribute('data-htmx-marker');
-    });
-    expect(marker).toBe('1');
+    await assertNavMarkerPersists(page);
   });
 
   test('URL updates via pushState on boosted navigation', async ({ page }) => {
@@ -109,11 +101,7 @@ test.describe('HTMX hx-boost navigation', () => {
     // Navigate to Search page which has a public POST form
     await page.goto('modules.php?name=Search');
 
-    // Mark the nav to verify it persists (no full reload)
-    await page.evaluate(() => {
-      const navEl = document.querySelector('nav.fixed');
-      if (navEl) navEl.setAttribute('data-htmx-marker', '1');
-    });
+    await setNavMarker(page);
 
     // Fill in search query and submit the form
     const searchInput = page.locator('input[name="query"]').first();
@@ -125,17 +113,10 @@ test.describe('HTMX hx-boost navigation', () => {
     await expect(submitBtn).toBeVisible();
     await submitBtn.click();
 
-    // Wait for HTMX to swap content — the search renders results inline,
-    // so wait for the results content to appear in site-content
-    await expect(page.locator('#site-content').first()).toBeVisible({ timeout: 10000 });
-    // Wait for search results or "no results" message to render
-    await page.waitForTimeout(1000);
+    // Wait for HTMX to swap content — search renders results inline.
+    // The search form re-renders after swap, so wait for it to appear.
+    await expect(page.locator('.search-form').first()).toBeVisible({ timeout: 10000 });
 
-    // Verify the nav marker persists (nav was NOT re-rendered = no full page reload)
-    const marker = await page.evaluate(() => {
-      const navEl = document.querySelector('nav.fixed');
-      return navEl?.getAttribute('data-htmx-marker');
-    });
-    expect(marker).toBe('1');
+    await assertNavMarkerPersists(page);
   });
 });

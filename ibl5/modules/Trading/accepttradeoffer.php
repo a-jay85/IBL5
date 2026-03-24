@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 try {
     require __DIR__ . '/../../mainfile.php';
 } catch (Exception $e) {

@@ -97,10 +97,6 @@ class PageLayout
         echo "<title>" . \Utilities\HtmlSanitizer::e($sitename . ' ' . $pagetitle) . "</title>\n";
         echo '<meta name="google-site-verification" content="3y3xJYDHSYUitn7cbfFfI6C2BiK_q66dtRfykpzHW5w" />';
         echo "<script src=\"jslib/htmx.min.js\"></script>";
-        // Prevent hx-boost from intercepting forms (Phase 3 follow-up).
-        // MutationObserver marks forms with hx-boost="false" as they enter
-        // the DOM, before HTMX's DOMContentLoaded handler processes them.
-        echo '<script>new MutationObserver(function(ms){ms.forEach(function(m){m.addedNodes.forEach(function(n){if(n.nodeType===1){if(n.tagName==="FORM")n.setAttribute("hx-boost","false");if(n.querySelectorAll){var fs=n.querySelectorAll("form");for(var i=0;i<fs.length;i++)fs[i].setAttribute("hx-boost","false")}}})})}).observe(document.documentElement,{childList:true,subtree:true})</script>';
         echo "<script src=\"jslib/sorttable.js\"></script>";
         echo "<script src=\"jslib/responsive-tables.js\"></script>";
         echo "<script src=\"jslib/name-abbreviation.js\"></script>";

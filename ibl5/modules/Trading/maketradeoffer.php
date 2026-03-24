@@ -17,8 +17,7 @@ if (!isset($mysqli_db) || !($mysqli_db instanceof mysqli)) {
 }
 
 if (!\Utilities\CsrfGuard::validateSubmittedToken('trade_offer')) {
-    header('Location: /ibl5/modules.php?name=Trading&error=' . rawurlencode('Invalid or expired form submission. Please try again.'));
-    exit;
+    \Utilities\HtmxHelper::redirect('/ibl5/modules.php?name=Trading&error=' . rawurlencode('Invalid or expired form submission. Please try again.'));
 }
 
 // Prepare trade data from POST
@@ -61,7 +60,7 @@ try {
 }
 
 if ($result['success']) {
-    header('Location: /ibl5/modules.php?name=Trading&op=reviewtrade&result=offer_sent');
+    \Utilities\HtmxHelper::redirect('/ibl5/modules.php?name=Trading&op=reviewtrade&result=offer_sent');
 } else {
     // Store checked items and cash amounts in session so the form can restore them
     $checkedItems = [];
@@ -78,6 +77,5 @@ if ($result['success']) {
     ];
 
     $error = $result['error'] ?? ($result['errors'] ? implode('; ', $result['errors']) : 'Unknown error');
-    header('Location: /ibl5/modules.php?name=Trading&op=offertrade&partner=' . rawurlencode($tradeData['listeningTeam']) . '&error=' . rawurlencode($error));
+    \Utilities\HtmxHelper::redirect('/ibl5/modules.php?name=Trading&op=offertrade&partner=' . rawurlencode($tradeData['listeningTeam']) . '&error=' . rawurlencode($error));
 }
-exit;

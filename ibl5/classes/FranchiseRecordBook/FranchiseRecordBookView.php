@@ -102,7 +102,7 @@ class FranchiseRecordBookView
 <form method="get" class="record-book-team-selector">
     <input type="hidden" name="name" value="FranchiseRecordBook">
     <label for="record-book-team">Select Team:</label>
-    <select name="teamid" id="record-book-team" onchange="this.form.submit()">
+    <select name="teamid" id="record-book-team" onchange="this.form.requestSubmit()">
         <option value="0"<?= $selectedId === 0 ? ' selected' : '' ?>>League-Wide</option>
         <?php foreach ($teams as $team): ?>
         <?php

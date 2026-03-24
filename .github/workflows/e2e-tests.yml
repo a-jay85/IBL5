@@ -10,8 +10,37 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  changes:
+    name: Detect changes
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: read
+    outputs:
+      src: ${{ github.event.action == 'labeled' || steps.filter.outputs.src == 'true' }}
+    steps:
+      - uses: dorny/paths-filter@v3
+        id: filter
+        if: github.event.action != 'labeled'
+        with:
+          filters: |
+            src:
+              - '**.php'
+              - '**.ts'
+              - '**.js'
+              - '**.css'
+              - 'ibl5/design/**'
+              - 'ibl5/migrations/**.sql'
+              - 'Dockerfile'
+              - 'docker-compose*.yml'
+              - 'docker/**'
+              - 'ibl5/tests/e2e/**'
+              - '.github/workflows/e2e-tests.yml'
+              - '.github/scripts/**'
+
   e2e:
     name: Visual Regression
+    needs: [changes]
+    if: needs.changes.outputs.src == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 20
 
@@ -227,6 +256,8 @@ jobs:
 
   api-e2e:
     name: API E2E Tests (Vitest)
+    needs: [changes]
+    if: needs.changes.outputs.src == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 10
 
@@ -313,6 +344,8 @@ jobs:
 
   e2e-shards:
     name: E2E Tests (shard ${{ matrix.shard-index }}/${{ matrix.total-shards }})
+    needs: [changes]
+    if: needs.changes.outputs.src == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 20
     strategy:
@@ -486,8 +519,8 @@ jobs:
 
   merge-reports:
     name: Merge E2E Reports
-    needs: [e2e, e2e-shards, api-e2e]
-    if: always()
+    needs: [changes, e2e, e2e-shards, api-e2e]
+    if: always() && needs.changes.outputs.src == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 5
     permissions:
@@ -578,7 +611,7 @@ jobs:
   gate:
     name: E2E Tests
     if: always()
-    needs: [e2e, api-e2e, e2e-shards]
+    needs: [changes, e2e, api-e2e, e2e-shards]
     runs-on: ubuntu-latest
     steps:
       - run: exit 1

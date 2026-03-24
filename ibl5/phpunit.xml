@@ -165,6 +165,9 @@
         <testsuite name="API Module Tests">
             <directory>tests/Api</directory>
         </testsuite>
+        <testsuite name="ApiKeys Module Tests">
+            <directory>tests/ApiKeys</directory>
+        </testsuite>
         <testsuite name="TransactionHistory Module Tests">
             <directory>tests/TransactionHistory</directory>
         </testsuite>

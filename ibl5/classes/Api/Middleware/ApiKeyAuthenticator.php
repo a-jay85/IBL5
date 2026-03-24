@@ -40,16 +40,29 @@ class ApiKeyAuthenticator implements AuthenticatorInterface
     }
 
     /**
-     * Extract the API key from the X-API-Key header.
+     * Extract the API key from the request.
+     *
+     * Checks the X-API-Key header first, then falls back to the ?key= query parameter.
+     * The query param fallback is needed for Google Sheets IMPORTDATA() which cannot
+     * send custom HTTP headers.
+     *
+     * Security note: Keys in query params appear in server access logs. This is an
+     * acceptable trade-off for read-only export endpoints.
      */
     private function getApiKeyFromRequest(): ?string
     {
-        /** @var string $key */
-        $key = $_SERVER['HTTP_X_API_KEY'] ?? '';
-        if ($key === '') {
+        /** @var string $headerKey */
+        $headerKey = $_SERVER['HTTP_X_API_KEY'] ?? '';
+        if ($headerKey !== '') {
+            return $headerKey;
+        }
+
+        // Fallback for clients that cannot send custom headers (e.g., Google Sheets IMPORTDATA)
+        $queryKey = $_GET['key'] ?? '';
+        if (!is_string($queryKey) || $queryKey === '') {
             return null;
         }
 
-        return $key;
+        return $queryKey;
     }
 }

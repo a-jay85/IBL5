@@ -3,9 +3,6 @@ import type { Page } from '@playwright/test';
 import { assertNoPhpErrors } from '../helpers/php-errors';
 import { gotoWithRetry } from '../helpers/navigation';
 
-// Serial: trades-closed and trades-open blocks toggle the same setting.
-test.describe.configure({ mode: 'serial' });
-
 // ---------------------------------------------------------------------------
 // Shared constants & helpers
 // ---------------------------------------------------------------------------

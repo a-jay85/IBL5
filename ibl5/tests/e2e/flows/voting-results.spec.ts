@@ -3,8 +3,6 @@ import { assertNoPhpErrors } from '../helpers/php-errors';
 import { gotoWithRetry } from '../helpers/navigation';
 
 // VotingResults — authenticated (needs appState for phase control).
-// Serial mode: two describe blocks toggle the same setting.
-test.describe.configure({ mode: 'serial' });
 
 test.describe('Voting Results — Regular Season (ASG)', () => {
   test.beforeEach(async ({ appState, page }) => {

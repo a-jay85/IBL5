@@ -4,9 +4,6 @@ import { assertNoPhpErrors } from '../helpers/php-errors';
 // Phase-gating tests as unauthenticated (public) user.
 // The admin test user bypasses phase gates, so these tests use the public
 // fixture to verify that features are properly gated when disabled.
-// Serial mode: describe blocks toggle shared settings.
-test.describe.configure({ mode: 'serial' });
-
 test.describe('Trading disabled', () => {
   test('trading page shows disabled message when trades off', async ({
     appState,

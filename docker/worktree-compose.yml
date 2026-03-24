@@ -1,28 +1,28 @@
 services:
-  php-{{SLUG}}:
-    build: {{REPO_ROOT}}
-    container_name: ibl5-php-{{SLUG}}
+  php:
+    build: ${REPO_ROOT}
+    container_name: ibl5-php-${SLUG}
     restart: unless-stopped
     environment:
-      DB_HOST: db-{{SLUG}}
+      DB_HOST: db
       E2E_TESTING: 1
     volumes:
-      - {{WORKTREE_PATH}}/ibl5:/var/www/html/ibl5
-      - vendor-{{SLUG}}-data:/var/www/html/ibl5/vendor
+      - ${WORKTREE_PATH}/ibl5:/var/www/html/ibl5
+      - vendor-data:/var/www/html/ibl5/vendor
     depends_on:
-      db-{{SLUG}}:
+      db:
         condition: service_healthy
     labels:
       - traefik.enable=true
-      - traefik.http.routers.{{SLUG}}.rule=Host(`{{SLUG}}.localhost`)
-      - traefik.http.services.{{SLUG}}.loadbalancer.server.port=80
+      - traefik.http.routers.${SLUG}.rule=Host(`${SLUG}.localhost`)
+      - traefik.http.services.${SLUG}.loadbalancer.server.port=80
     networks:
       - default
       - ibl5-proxy
 
-  db-{{SLUG}}:
+  db:
     image: mariadb:10.6
-    container_name: ibl5-db-{{SLUG}}
+    container_name: ibl5-db-${SLUG}
     restart: unless-stopped
     environment:
       MARIADB_ROOT_PASSWORD: root
@@ -30,7 +30,7 @@ services:
       MARIADB_USER: ${DB_USER}
       MARIADB_PASSWORD: ${DB_PASS}
     volumes:
-      - db-{{SLUG}}-data:/var/lib/mysql
+      - db-data:/var/lib/mysql
     healthcheck:
       test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
       interval: 5s
@@ -41,8 +41,8 @@ services:
       - ibl5-proxy
 
 volumes:
-  db-{{SLUG}}-data:
-  vendor-{{SLUG}}-data:
+  db-data:
+  vendor-data:
 
 networks:
   ibl5-proxy:

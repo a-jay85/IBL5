@@ -150,7 +150,7 @@ bin/wt-down --all --volumes
 ### Adminer Access
 
 Connect to any worktree's database via Adminer at http://localhost:8082:
-- Server: `db-<slug>` (e.g., `db-my-feature`)
+- Server: `ibl5-db-<slug>` (e.g., `ibl5-db-my-feature`)
 - Username: `root`
 - Password: `root`
 

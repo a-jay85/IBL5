@@ -33,6 +33,11 @@ services:
       MARIADB_PASSWORD: ${DB_PASS}
     volumes:
       - ibl5-mariadb-data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
     networks:
       - default
       - ibl5-proxy
@@ -46,7 +51,8 @@ services:
     volumes:
       - ./ibl5:/var/www/html/ibl5
     depends_on:
-      - mariadb
+      mariadb:
+        condition: service_healthy
     labels:
       - traefik.enable=true
       - traefik.http.routers.main.rule=Host(`main.localhost`)

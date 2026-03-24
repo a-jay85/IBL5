@@ -19,11 +19,11 @@ printf "%-25s %-20s %-35s %s\n" "--------" "----" "---" "------"
 
 for wt in "$WORKTREES_DIR"/*/; do
     [ -d "$wt" ] || continue
-    compose_file="$wt/docker-compose.worktree.yml"
-    [ -f "$compose_file" ] || continue
+    slug_file="$wt/.wt-slug"
+    [ -f "$slug_file" ] || continue
 
     wt_name=$(basename "$wt")
-    slug=$(grep 'container_name: ibl5-php-' "$compose_file" 2>/dev/null | sed 's/.*ibl5-php-//' | tr -d ' ' || true)
+    slug=$(cat "$slug_file")
     [ -z "$slug" ] && continue
 
     found=true

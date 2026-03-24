@@ -188,64 +188,48 @@ After both agents complete:
 
 ## Phase 6.5: Manual Testing Automation
 
-Re-evaluate the PR's manual testing checklist and convert automatable steps into Playwright E2E tests. This maximizes auto-merge eligibility and reduces reviewer burden.
+Replace manual testing steps with automated tests wherever possible. This maximizes auto-merge eligibility and reduces reviewer burden.
 
 **Skip this phase if** the PR description already says "No manual testing needed."
 
-### Step 1: Extract manual testing steps
+### Step 1: Extract and review manual testing steps
 
 ```bash
 gh pr view --json body --jq '.body' | sed -n '/## Manual Testing/,/^## /p'
 ```
 
-Parse the checklist items into a numbered list.
+For each manual testing step, determine whether it can be **sufficiently replaced** by a combination of Playwright E2E tests, PHPUnit integration tests, or unit tests. A step is replaceable if automated tests can verify the same behavior the manual step is checking. A step must stay manual only if it requires subjective human judgment (visual aesthetics, "does it look right?", production data comparison against iblhoops.net).
 
-### Step 2: Classify each step
+### Step 2: Write tests for replaceable steps
 
-For each manual testing step, determine whether it can be automated with Playwright:
+For each replaceable step, choose the right test type:
 
-| Automatable — write an E2E test | Must stay manual |
-|---|---|
-| Navigate to page, assert element/content exists | Subjective visual aesthetics ("does it look right?") |
-| Click/interact → assert state change | Cross-browser rendering judgment |
-| Form submission → assert result page | Production data comparison (iblhoops.net) |
-| Table data presence and correctness | Performance "feel" (perceived speed) |
-| Mobile viewport layout (via `setViewportSize`) | Accessibility beyond ARIA/semantic checks |
-| Error states and edge-case flows | Auth flows requiring real user credentials |
-| URL routing and redirects | Anything requiring human sensory judgment |
+- **E2E (Playwright):** Page navigation, UI interactions, form submissions, content assertions, mobile layout
+- **Integration (PHPUnit):** Database queries returning correct results, service methods producing expected output
+- **Unit (PHPUnit):** Calculations, validation logic, data transformations
 
-### Step 3: Write E2E tests for automatable steps
+Write the tests. Run them directly from the worktree:
+```bash
+# PHPUnit
+cd <worktree>/ibl5 && vendor/bin/phpunit --filter "TestName"
 
-For each automatable step:
+# Playwright (must run from worktree to pick up new test files)
+cd <worktree>/ibl5 && BASE_URL=http://<slug>.localhost/ibl5 \
+  IBL_TEST_USER=<test-user> IBL_TEST_PASS=<test-pass> \
+  bunx playwright test --grep "test name"
+```
 
-1. Write a Playwright test in the appropriate `e2e/tests/` file (or create a new one if no suitable file exists)
-2. Follow existing E2E patterns — use `appState` fixtures, CI seed data, no `test.skip()`
-3. Run the new test directly from the worktree (not via `bin/e2e-wt.sh`, which runs from the main repo and won't pick up new test files in the worktree):
-   ```bash
-   cd <worktree>/ibl5 && BASE_URL=http://<slug>.localhost/ibl5 \
-     IBL_TEST_USER=<test-user> IBL_TEST_PASS=<test-pass> \
-     bunx playwright test --grep "test name"
-   ```
-4. Fix until green. If a test cannot be made green after 2 attempts, reclassify the step as manual and move on — do not burn cycles on flaky automation.
+Fix until green. If a test cannot be made green after 2 attempts, reclassify the step as manual and move on.
 
-### Step 4: Update PR description
+### Step 3: Update PR description
 
-After all new E2E tests pass:
+After all new tests pass:
 
-1. Commit and push the new E2E tests
-2. Build the updated PR body — remove automated steps from the Manual Testing checklist
-3. If no manual steps remain, replace the entire Manual Testing section with:
+1. Commit and push the new tests
+2. Remove the now-automated steps from the Manual Testing checklist
+3. If no manual steps remain, replace the entire section with:
    `No manual testing needed — all changes are covered by unit and E2E tests.`
-4. Apply the update:
-   ```bash
-   gh pr edit --body "<updated body>"
-   ```
-
-### Step 5: Re-evaluate (loop)
-
-Re-read the updated Manual Testing section. If any remaining steps are now indirectly covered by the tests just written (e.g., a step was "check X and Y" — X is now tested, and Y is also testable as a side effect), go back to Step 2.
-
-**Exit the loop when** every remaining step genuinely requires human judgment, or the section says "No manual testing needed."
+4. Apply: `gh pr edit --body "<updated body>"`
 
 ---
 

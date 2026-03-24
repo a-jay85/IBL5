@@ -19,6 +19,11 @@ declare(strict_types=1);
 /* And, if you use HTML code, please double check it.                     */
 /**************************************************************************/
 
+// Guard against multiple includes (e.g., in PHPUnit where modules are loaded repeatedly)
+if (defined('_ALLTOPICS')) {
+    return;
+}
+
 define("_ALLTOPICS", "All Topics");
 define("_NOCOMMENTS", "No Comments");
 define("_UCOMMENT", "Comment");

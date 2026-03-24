@@ -233,7 +233,6 @@ if (document.fonts && document.fonts.check("1em Barlow")) {
         themefooter();
         echo "</body>\n</html>";
         ob_end_flush();
-        die();
     }
 
     public static function renderPageGenerationTime(): void

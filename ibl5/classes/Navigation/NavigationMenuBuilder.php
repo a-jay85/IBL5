@@ -37,6 +37,7 @@ class NavigationMenuBuilder implements NavigationMenuBuilderInterface
                     ['label' => 'Schedule', 'url' => 'modules.php?name=Schedule'],
                     ['label' => 'Injuries', 'url' => 'modules.php?name=Injuries'],
                     ['label' => 'Player Database', 'url' => 'modules.php?name=PlayerDatabase'],
+                    ['label' => 'Player Export', 'url' => 'modules.php?name=PlayerExportGuide'],
                     $this->config->isDraftOrderFinalized
                         ? ['label' => 'Draft Order', 'url' => 'modules.php?name=ProjectedDraftOrder', 'badge' => 'FINAL']
                         : ['label' => 'Projected Draft Order', 'url' => 'modules.php?name=ProjectedDraftOrder'],

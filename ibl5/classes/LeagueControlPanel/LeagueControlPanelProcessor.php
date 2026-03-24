@@ -279,9 +279,9 @@ class LeagueControlPanelProcessor implements LeagueControlPanelProcessorInterfac
         }
 
         // Resolve season year from settings
-        $yearSetting = $this->repository->getSetting('Season Ending Year');
+        $yearSetting = $this->repository->getSetting('Current Season Ending Year');
         if ($yearSetting === null) {
-            return ['success' => false, 'message' => 'Season Ending Year setting not found.'];
+            return ['success' => false, 'message' => 'Current Season Ending Year setting not found.'];
         }
         $year = (int) $yearSetting;
 
@@ -318,9 +318,9 @@ class LeagueControlPanelProcessor implements LeagueControlPanelProcessorInterfac
             return ['success' => false, 'message' => 'Finals MVP name cannot be empty.'];
         }
 
-        $yearSetting = $this->repository->getSetting('Season Ending Year');
+        $yearSetting = $this->repository->getSetting('Current Season Ending Year');
         if ($yearSetting === null) {
-            return ['success' => false, 'message' => 'Season Ending Year setting not found.'];
+            return ['success' => false, 'message' => 'Current Season Ending Year setting not found.'];
         }
         $year = (int) $yearSetting;
 

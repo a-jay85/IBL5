@@ -387,7 +387,7 @@ class LeagueControlPanelProcessorTest extends TestCase
         $stub = $this->createStub(LeagueControlPanelRepositoryInterface::class);
         $stub->method('getSetting')->willReturnMap([
             ['Current Season Phase', 'Playoffs'],
-            ['Season Ending Year', null],
+            ['Current Season Ending Year', null],
         ]);
 
         $processor = new LeagueControlPanelProcessor($stub, $this->createStub(AwardGenerationServiceInterface::class));
@@ -402,7 +402,7 @@ class LeagueControlPanelProcessorTest extends TestCase
         $stub = $this->createStub(LeagueControlPanelRepositoryInterface::class);
         $stub->method('getSetting')->willReturnMap([
             ['Current Season Phase', 'Playoffs'],
-            ['Season Ending Year', '2026'],
+            ['Current Season Ending Year', '2026'],
         ]);
 
         $processor = new LeagueControlPanelProcessor($stub, $this->createStub(AwardGenerationServiceInterface::class));
@@ -419,7 +419,7 @@ class LeagueControlPanelProcessorTest extends TestCase
         $stub = $this->createStub(LeagueControlPanelRepositoryInterface::class);
         $stub->method('getSetting')->willReturnMap([
             ['Current Season Phase', 'Playoffs'],
-            ['Season Ending Year', '2026'],
+            ['Current Season Ending Year', '2026'],
         ]);
 
         $expectedPath = self::$tempRoot . '/Leaders.htm';
@@ -443,7 +443,7 @@ class LeagueControlPanelProcessorTest extends TestCase
         $stub = $this->createStub(LeagueControlPanelRepositoryInterface::class);
         $stub->method('getSetting')->willReturnMap([
             ['Current Season Phase', 'Draft'],
-            ['Season Ending Year', '2026'],
+            ['Current Season Ending Year', '2026'],
         ]);
 
         $awardStub = $this->createStub(AwardGenerationServiceInterface::class);
@@ -472,7 +472,7 @@ class LeagueControlPanelProcessorTest extends TestCase
     {
         $stub = $this->createStub(LeagueControlPanelRepositoryInterface::class);
         $stub->method('getSetting')->willReturnMap([
-            ['Season Ending Year', null],
+            ['Current Season Ending Year', null],
         ]);
 
         $processor = new LeagueControlPanelProcessor($stub, $this->createStub(AwardGenerationServiceInterface::class));
@@ -486,7 +486,7 @@ class LeagueControlPanelProcessorTest extends TestCase
     {
         $mock = $this->createMock(LeagueControlPanelRepositoryInterface::class);
         $mock->method('getSetting')->willReturnMap([
-            ['Season Ending Year', '2026'],
+            ['Current Season Ending Year', '2026'],
         ]);
         $mock->expects($this->once())
             ->method('upsertAward')

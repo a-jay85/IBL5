@@ -31,12 +31,12 @@ class LeagueControlPanelService implements LeagueControlPanelServiceInterface
             'Show Draft Link',
             'Free Agency Notifications',
             'Trivia Mode',
-            'Season Ending Year',
+            'Current Season Ending Year',
         ]);
 
         $simLengthInDays = $this->repository->getSimLengthInDays();
 
-        $seasonEndingYear = (int) ($settings['Season Ending Year'] ?? '0');
+        $seasonEndingYear = (int) ($settings['Current Season Ending Year'] ?? '0');
 
         return [
             'phase' => $settings['Current Season Phase'] ?? 'Preseason',

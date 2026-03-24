@@ -3,9 +3,11 @@ import { assertNoPhpErrors } from '../helpers/php-errors';
 
 // Finals MVP flow — sets Finals MVP for the current season year.
 // Uses auth fixture (admin access required for leagueControlPanel.php).
-// set_finals_mvp has no phase gate — works in any season phase.
+// The LCP reads settings from DB directly (not cookie overrides), so
+// the test uses the LCP's own Set Season Phase form to switch to Playoffs.
 // CI uses a fresh DB per run; local re-runs may need manual cleanup:
-//   DELETE FROM ibl_awards WHERE Award='IBL Finals MVP' AND year = <seed year>;
+//   DELETE FROM ibl_awards WHERE Award='IBL Finals MVP';
+//   UPDATE ibl_settings SET value='Free Agency' WHERE name='Current Season Phase';
 
 test.describe('LeagueControlPanel — Finals MVP flow', () => {
   test.describe.configure({ mode: 'serial' });
@@ -18,32 +20,51 @@ test.describe('LeagueControlPanel — Finals MVP flow', () => {
   });
 
   test('submits Finals MVP and hides input on reload', async ({ page }) => {
+    // Step 1: Set phase to Playoffs so awards controls appear
     await page.goto('leagueControlPanel.php');
-    await assertNoPhpErrors(page, 'before Finals MVP submission');
+    await assertNoPhpErrors(page, 'before phase change');
 
-    // Assert Finals MVP input is visible
+    const phaseSelect = page.locator('select[name="SeasonPhase"]');
+    await phaseSelect.selectOption('Playoffs');
+    const phaseButton = page.locator('button[value="set_season_phase"]');
+    await Promise.all([
+      page.waitForURL(/success=/),
+      phaseButton.click(),
+    ]);
+    await assertNoPhpErrors(page, 'after setting phase to Playoffs');
+
+    // Step 2: Assert Finals MVP input is visible
     const mvpInput = page.locator('input[name="finals_mvp_name"]');
     await expect(mvpInput).toBeVisible();
 
     const mvpButton = page.locator('button[value="set_finals_mvp"]');
     await expect(mvpButton).toBeVisible();
 
-    // Fill and submit
+    // Step 3: Fill and submit Finals MVP
     await mvpInput.fill('E2E Test MVP');
     await Promise.all([
       page.waitForURL(/success=/),
       mvpButton.click(),
     ]);
 
-    // Assert success flash message
+    // Step 4: Assert success flash message
     await assertNoPhpErrors(page, 'after Finals MVP submission');
     await expect(page.locator('.ibl-alert--success')).toBeVisible();
     const body = await page.locator('body').textContent();
     expect(body).toContain('E2E Test MVP');
 
-    // Reload and verify input is hidden (hasFinalsMvp is now true)
+    // Step 5: Reload and verify input is hidden (hasFinalsMvp is now true)
     await page.reload();
     await assertNoPhpErrors(page, 'after reload');
     await expect(page.locator('input[name="finals_mvp_name"]')).toHaveCount(0);
+
+    // Step 6: Restore phase to Free Agency (CI seed default)
+    const restoreSelect = page.locator('select[name="SeasonPhase"]');
+    await restoreSelect.selectOption('Free Agency');
+    const restoreButton = page.locator('button[value="set_season_phase"]');
+    await Promise.all([
+      page.waitForURL(/success=/),
+      restoreButton.click(),
+    ]);
   });
 });

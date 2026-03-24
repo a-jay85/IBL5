@@ -23,6 +23,14 @@ use FranchiseRecordBook\FranchiseRecordBookView;
 
 global $mysqli_db;
 
+// Route HTMX API requests (no PageLayout, returns HTML fragment only)
+$op = is_string($_GET['op'] ?? null) ? $_GET['op'] : '';
+if ($op === 'api') {
+    $handler = new FranchiseRecordBook\FranchiseRecordBookApiHandler($mysqli_db);
+    $handler->handle();
+    return;
+}
+
 PageLayout\PageLayout::header();
 
 // Initialize services

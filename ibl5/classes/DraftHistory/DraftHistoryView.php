@@ -28,16 +28,27 @@ class DraftHistoryView implements DraftHistoryViewInterface
     public function render(int $selectedYear, int $startYear, int $endYear, array $draftPicks): string
     {
         $output = $this->renderTitleWithYearSelect($startYear, $endYear, $selectedYear);
-
-        if ($draftPicks === []) {
-            $output .= $this->renderNoDataMessage();
-        } else {
-            $output .= $this->renderTableStart();
-            $output .= $this->renderTableRows($draftPicks);
-            $output .= $this->renderTableEnd();
-        }
+        $output .= '<div id="draft-history-content">';
+        $output .= $this->renderYearTable($draftPicks);
+        $output .= '</div>';
 
         return $output;
+    }
+
+    /**
+     * Render the draft table (or no-data message) for HTMX partial updates.
+     *
+     * @see DraftHistoryViewInterface::renderYearTable()
+     *
+     * @param list<DraftPickByYearRow> $draftPicks
+     */
+    public function renderYearTable(array $draftPicks): string
+    {
+        if ($draftPicks === []) {
+            return $this->renderNoDataMessage();
+        }
+
+        return $this->renderTableStart() . $this->renderTableRows($draftPicks) . $this->renderTableEnd();
     }
 
     /**
@@ -75,7 +86,13 @@ class DraftHistoryView implements DraftHistoryViewInterface
     private function renderTitleWithYearSelect(int $startYear, int $endYear, int $selectedYear): string
     {
         $output = '<h2 class="ibl-title">';
-        $output .= '<select id="draft-year-select" class="draft-year-select" aria-label="Draft year" onchange="window.location.href=\'./modules.php?name=DraftHistory&amp;year=\' + this.value">';
+        $output .= '<select id="draft-year-select" name="year" class="draft-year-select" aria-label="Draft year"'
+            . ' hx-get="modules.php?name=DraftHistory&amp;op=api"'
+            . ' hx-target="#draft-history-content"'
+            . ' hx-swap="innerHTML"'
+            . ' hx-trigger="change"'
+            . ' hx-include="this"'
+            . ' onchange="if(window.htmx)return;window.location.href=\'./modules.php?name=DraftHistory&amp;year=\'+this.value">';
 
         for ($year = $endYear; $year >= $startYear; $year--) {
             $selected = ($year === $selectedYear) ? ' selected' : '';

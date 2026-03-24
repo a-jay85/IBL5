@@ -134,3 +134,110 @@ test.describe('Draft History flow', () => {
     await assertNoPhpErrors(page, 'on Draft History page');
   });
 });
+
+test.describe('HTMX year switching', () => {
+  test.use({ actionTimeout: 15_000, navigationTimeout: 20_000 });
+
+  test('year dropdown swaps content without full page reload', async ({
+    page,
+  }) => {
+    await page.goto('modules.php?name=DraftHistory');
+
+    // Mark nav to verify it persists (proves no full reload)
+    await page.evaluate(() => {
+      const navEl = document.querySelector('nav.fixed');
+      if (navEl) navEl.setAttribute('data-htmx-marker', '1');
+    });
+
+    const yearValue = await getFirstDraftYear(page);
+    expect(yearValue).toBeTruthy();
+
+    await Promise.all([
+      page.waitForResponse(
+        (r) =>
+          r.url().includes('DraftHistory') &&
+          r.url().includes('op=api') &&
+          r.status() === 200,
+      ),
+      page.locator('#draft-year-select').selectOption(yearValue),
+    ]);
+
+    await expect(page.locator('#draft-history-content')).toBeVisible();
+
+    // Nav marker survived — no full page reload occurred
+    const marker = await page.evaluate(() =>
+      document.querySelector('nav.fixed')?.getAttribute('data-htmx-marker'),
+    );
+    expect(marker).toBe('1');
+  });
+
+  test('year change updates URL', async ({ page }) => {
+    await page.goto('modules.php?name=DraftHistory');
+
+    const yearValue = await getFirstDraftYear(page);
+    expect(yearValue).toBeTruthy();
+
+    await Promise.all([
+      page.waitForResponse(
+        (r) =>
+          r.url().includes('DraftHistory') &&
+          r.url().includes('op=api') &&
+          r.status() === 200,
+      ),
+      page.locator('#draft-year-select').selectOption(yearValue),
+    ]);
+
+    await page.waitForURL(new RegExp('year=' + yearValue));
+    expect(page.url()).toContain('year=' + yearValue);
+  });
+});
+
+test.describe('browser back/forward after HTMX year switch', () => {
+  test.use({ actionTimeout: 15_000, navigationTimeout: 20_000 });
+
+  test('back/forward works after year switch', async ({ page }) => {
+    await page.goto('modules.php?name=DraftHistory');
+
+    const yearValue = await getFirstDraftYear(page);
+    expect(yearValue).toBeTruthy();
+
+    await Promise.all([
+      page.waitForResponse(
+        (r) =>
+          r.url().includes('DraftHistory') &&
+          r.url().includes('op=api') &&
+          r.status() === 200,
+      ),
+      page.locator('#draft-year-select').selectOption(yearValue),
+    ]);
+
+    await page.waitForURL(new RegExp('year=' + yearValue));
+
+    await page.goBack();
+    await page.waitForURL(/DraftHistory/);
+    expect(page.url()).not.toContain('year=' + yearValue);
+
+    await page.goForward();
+    await page.waitForURL(new RegExp('year=' + yearValue));
+    expect(page.url()).toContain('year=' + yearValue);
+  });
+});
+
+test.describe('no-JS fallback', () => {
+  test.use({ javaScriptEnabled: false });
+
+  test('page renders correctly with JavaScript disabled', async ({ page }) => {
+    // With JS disabled, onchange can't fire — verify server-side rendering path
+    await page.goto('modules.php?name=DraftHistory');
+    const noData = page.locator('.draft-no-data');
+    const table = page.locator('.draft-history-table');
+    const noDataCount = await noData.count();
+    const tableCount = await table.count();
+    expect(noDataCount + tableCount).toBeGreaterThan(0);
+    await assertNoPhpErrors(page, 'on DraftHistory with JS disabled');
+
+    // Direct URL with year param also works
+    await page.goto('modules.php?name=DraftHistory&year=9999');
+    await assertNoPhpErrors(page, 'on DraftHistory year=9999 with JS disabled');
+  });
+});

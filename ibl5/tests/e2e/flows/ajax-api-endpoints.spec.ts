@@ -220,3 +220,160 @@ test.describe('Saved Depth Chart API', () => {
     expect(body).toHaveProperty('error');
   });
 });
+
+// ============================================================
+// LeagueStarters API (LeagueStarters&op=api)
+// Returns HTML position tables fragment for a given display mode
+// ============================================================
+
+test.describe('LeagueStarters API', () => {
+  test('ratings display returns HTML with table', async ({ request }) => {
+    const response = await request.get(
+      'modules.php?name=LeagueStarters&op=api&display=ratings',
+    );
+
+    const contentType = response.headers()['content-type'] ?? '';
+    expect(contentType, 'API endpoint must return HTML').toContain('text/html');
+    expect(response.status()).toBe(200);
+
+    const html = await response.text();
+    expect(html).toContain('<table');
+  });
+
+  test('all valid display modes return html', async ({ request }) => {
+    const modes = ['ratings', 'total_s', 'avg_s', 'per36mins'];
+
+    for (const mode of modes) {
+      const response = await request.get(
+        `modules.php?name=LeagueStarters&op=api&display=${mode}`,
+      );
+
+      expect(
+        response.status(),
+        `LeagueStarters API ${mode} should return 200`,
+      ).toBe(200);
+      const html = await response.text();
+      expect(
+        html.length,
+        `LeagueStarters API ${mode} should return non-empty html`,
+      ).toBeGreaterThan(0);
+    }
+  });
+
+  test('invalid display mode falls back to ratings', async ({ request }) => {
+    const response = await request.get(
+      'modules.php?name=LeagueStarters&op=api&display=invalid_mode',
+    );
+
+    expect(response.status()).toBe(200);
+    const html = await response.text();
+    expect(html).toContain('<table');
+  });
+
+  test('response includes HX-Push-Url header', async ({ request }) => {
+    const response = await request.get(
+      'modules.php?name=LeagueStarters&op=api&display=total_s',
+    );
+
+    const pushUrl = response.headers()['hx-push-url'] ?? '';
+    expect(pushUrl).toContain('display=total_s');
+  });
+});
+
+// ============================================================
+// DraftHistory API (DraftHistory&op=api)
+// Returns HTML draft table fragment for a given year
+// ============================================================
+
+test.describe('DraftHistory API', () => {
+  test('returns HTML response', async ({ request }) => {
+    const response = await request.get(
+      'modules.php?name=DraftHistory&op=api',
+    );
+
+    const contentType = response.headers()['content-type'] ?? '';
+    expect(contentType, 'API endpoint must return HTML').toContain('text/html');
+    expect(response.status()).toBe(200);
+  });
+
+  test('out-of-range year falls back gracefully', async ({ request }) => {
+    const response = await request.get(
+      'modules.php?name=DraftHistory&op=api&year=9999',
+    );
+
+    expect(response.status()).toBe(200);
+    const html = await response.text();
+    expect(html.length).toBeGreaterThan(0);
+  });
+
+  test('response includes HX-Push-Url header', async ({ request }) => {
+    const response = await request.get(
+      'modules.php?name=DraftHistory&op=api&year=2000',
+    );
+
+    const pushUrl = response.headers()['hx-push-url'] ?? '';
+    expect(pushUrl).toContain('year=');
+  });
+});
+
+// ============================================================
+// FranchiseRecordBook API (FranchiseRecordBook&op=api)
+// Returns HTML content fragment (title + record sections)
+// ============================================================
+
+test.describe('FranchiseRecordBook API', () => {
+  test('league-wide view returns HTML with title', async ({ request }) => {
+    const response = await request.get(
+      'modules.php?name=FranchiseRecordBook&op=api',
+    );
+
+    const contentType = response.headers()['content-type'] ?? '';
+    expect(contentType, 'API endpoint must return HTML').toContain('text/html');
+    expect(response.status()).toBe(200);
+
+    const html = await response.text();
+    expect(html).toContain('ibl-title');
+  });
+
+  test('team-specific view returns HTML', async ({ request }) => {
+    const response = await request.get(
+      'modules.php?name=FranchiseRecordBook&op=api&teamid=1',
+    );
+
+    expect(response.status()).toBe(200);
+    const html = await response.text();
+    expect(html.length).toBeGreaterThan(0);
+  });
+
+  test('invalid teamid falls back to league-wide', async ({ request }) => {
+    const response = await request.get(
+      'modules.php?name=FranchiseRecordBook&op=api&teamid=9999',
+    );
+
+    expect(response.status()).toBe(200);
+    const html = await response.text();
+    expect(html).toContain('League-Wide');
+  });
+
+  test('response includes HX-Push-Url header for team view', async ({
+    request,
+  }) => {
+    const response = await request.get(
+      'modules.php?name=FranchiseRecordBook&op=api&teamid=1',
+    );
+
+    const pushUrl = response.headers()['hx-push-url'] ?? '';
+    expect(pushUrl).toContain('teamid=1');
+  });
+
+  test('response includes HX-Push-Url header for league view', async ({
+    request,
+  }) => {
+    const response = await request.get(
+      'modules.php?name=FranchiseRecordBook&op=api',
+    );
+
+    const pushUrl = response.headers()['hx-push-url'] ?? '';
+    expect(pushUrl).toContain('FranchiseRecordBook');
+  });
+});

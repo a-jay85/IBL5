@@ -93,6 +93,70 @@ class FranchiseRecordBookViewTest extends TestCase
         $this->assertStringContainsString('Test Team', $html);
     }
 
+    public function testRenderContentReturnsTitle(): void
+    {
+        $data = [
+            'singleSeason' => ['ppg' => [], 'rpg' => [], 'apg' => [], 'spg' => [], 'bpg' => [], 'fg_pct' => [], 'ft_pct' => [], 'three_pct' => []],
+            'career' => ['pts' => [], 'trb' => [], 'ast' => [], 'stl' => [], 'blk' => [], 'fg_pct' => [], 'ft_pct' => [], 'three_pct' => []],
+            'team' => null,
+            'teams' => [self::makeTeam()],
+            'scope' => 'league',
+        ];
+
+        $html = $this->view->renderContent($data);
+
+        $this->assertStringContainsString('ibl-title', $html);
+        $this->assertStringContainsString('League-Wide', $html);
+    }
+
+    public function testRenderContentDoesNotContainSelector(): void
+    {
+        $data = [
+            'singleSeason' => ['ppg' => [], 'rpg' => [], 'apg' => [], 'spg' => [], 'bpg' => [], 'fg_pct' => [], 'ft_pct' => [], 'three_pct' => []],
+            'career' => ['pts' => [], 'trb' => [], 'ast' => [], 'stl' => [], 'blk' => [], 'fg_pct' => [], 'ft_pct' => [], 'three_pct' => []],
+            'team' => null,
+            'teams' => [self::makeTeam()],
+            'scope' => 'league',
+        ];
+
+        $html = $this->view->renderContent($data);
+
+        $this->assertStringNotContainsString('<select', $html);
+        $this->assertStringNotContainsString('record-book-team-selector', $html);
+    }
+
+    public function testRenderWrapsContentInTargetDiv(): void
+    {
+        $data = [
+            'singleSeason' => ['ppg' => [], 'rpg' => [], 'apg' => [], 'spg' => [], 'bpg' => [], 'fg_pct' => [], 'ft_pct' => [], 'three_pct' => []],
+            'career' => ['pts' => [], 'trb' => [], 'ast' => [], 'stl' => [], 'blk' => [], 'fg_pct' => [], 'ft_pct' => [], 'three_pct' => []],
+            'team' => null,
+            'teams' => [self::makeTeam()],
+            'scope' => 'league',
+        ];
+
+        $html = $this->view->render($data);
+
+        $this->assertStringContainsString('id="record-book-content"', $html);
+    }
+
+    public function testRenderSelectHasHtmxAttributes(): void
+    {
+        $data = [
+            'singleSeason' => ['ppg' => [], 'rpg' => [], 'apg' => [], 'spg' => [], 'bpg' => [], 'fg_pct' => [], 'ft_pct' => [], 'three_pct' => []],
+            'career' => ['pts' => [], 'trb' => [], 'ast' => [], 'stl' => [], 'blk' => [], 'fg_pct' => [], 'ft_pct' => [], 'three_pct' => []],
+            'team' => null,
+            'teams' => [self::makeTeam()],
+            'scope' => 'league',
+        ];
+
+        $html = $this->view->render($data);
+
+        $this->assertStringContainsString('hx-get=', $html);
+        $this->assertStringContainsString('hx-target="#record-book-content"', $html);
+        $this->assertStringContainsString('hx-swap="innerHTML"', $html);
+    }
+
     public function testSingleSeasonRecordWithNoTeamShowsEmptyCell(): void
     {
         $record = self::makeRecord('single_season', 0, null);

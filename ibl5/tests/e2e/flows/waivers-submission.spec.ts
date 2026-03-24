@@ -25,11 +25,6 @@ test.describe('Waivers: add player', () => {
     await expect(options.first()).toBeAttached();
   });
 
-  // TODO: Fix CI-only 500 error on waivers form POST.
-  // The form submission returns HTTP 500 with empty body in CI (Docker PHP-Apache).
-  // Works locally — likely a CI seed data or session issue. The old test masked this
-  // because waitForURL matched the pre-redirect URL immediately.
-  // Tracked: investigate Apache error log in CI for root cause.
   test('submit add: sign free agent', async ({ appState, page }) => {
     await appState({ 'Allow Waiver Moves': 'Yes', 'Current Season Ending Year': '2026' });
     await page.goto('modules.php?name=Waivers');
@@ -37,15 +32,42 @@ test.describe('Waivers: add player', () => {
     const form = page.locator('form[name="Waiver_Move"]');
     await expect(form).toBeVisible();
 
-    // Verify the form structure is correct (Action hidden field, player options)
     const actionInput = form.locator('input[name="Action"]');
     expect(await actionInput.inputValue(), 'Waivers must default to add form').toBe('add');
 
+    // Select the first available player (skip the placeholder option)
     const playerSelect = form.locator('select[name="Player_ID"]');
     const playerOption = playerSelect.locator('option[value]:not([value=""])').first();
     await expect(playerOption).toBeAttached({ timeout: 5000 });
+    const optionValue = await playerOption.getAttribute('value');
+    expect(optionValue, 'Expected at least one player option with a value').toBeTruthy();
+    await playerSelect.selectOption(optionValue!);
 
-    await assertNoPhpErrors(page, 'waivers add form');
+    // Capture POST response for diagnostics (CI returns 500 with empty body —
+    // the actual error is in Apache stderr, captured by "Dump Docker PHP logs" CI step)
+    const responsePromise = page.waitForResponse(
+      resp => resp.url().includes('modules.php') && resp.request().method() === 'POST',
+    );
+
+    // Strip onclick handler — it disables button + calls form.submit() which
+    // races with Playwright's navigation tracking
+    const submitBtn = form.locator('button[type="submit"], input[type="submit"]').first();
+    await submitBtn.evaluate(btn => (btn as HTMLElement).removeAttribute('onclick'));
+    await submitBtn.click();
+
+    const response = await responsePromise;
+    const postStatus = response.status();
+    const postBody = await response.text().catch(() => '');
+
+    await page.waitForLoadState('networkidle');
+    const url = page.url();
+    const bodySnippet = postBody.substring(0, 500).replace(/\s+/g, ' ').trim();
+
+    expect(
+      url,
+      `POST status=${postStatus} body=${bodySnippet}`,
+    ).toMatch(/(result|error)=/);
+    await assertNoPhpErrors(page, 'after waiver add');
   });
 
   test('success banner shows on successful add', async ({

@@ -45,11 +45,12 @@ test.describe('Waivers: add player', () => {
     expect(optionValue, 'Expected at least one player option with a value').toBeTruthy();
     await playerSelect.selectOption(optionValue!);
 
-    // Submit
-    await form.locator('button[type="submit"], input[type="submit"]').first().click();
-
-    // Should redirect with result param
-    await page.waitForURL(/modules\.php\?name=Waivers.*(result|error)=/, { timeout: 10000 });
+    // Submit — onclick handler calls form.submit() programmatically,
+    // so start waitForURL before the click to capture the navigation.
+    await Promise.all([
+      page.waitForURL(/modules\.php\?name=Waivers.*(result|error)=/, { timeout: 15000 }),
+      form.locator('button[type="submit"], input[type="submit"]').first().click(),
+    ]);
     const url = page.url();
 
     // Check for success or cap-related error

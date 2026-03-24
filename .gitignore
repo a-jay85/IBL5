@@ -53,7 +53,7 @@ test-results/
 **/playwright/.auth/
 ibl5/.env.test
 docker-compose.override.yml
-docker-compose.worktree.yml
+.wt-slug
 .e2e-active
 
 # OS-specific Playwright snapshots (baselines are OS-agnostic via Docker)

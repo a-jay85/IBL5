@@ -47,15 +47,14 @@ teardown_worktree() {
     local wt_path="$1"
     local wt_name
     wt_name=$(basename "$wt_path")
-    local compose_file="$wt_path/docker-compose.worktree.yml"
+    local slug_file="$wt_path/.wt-slug"
 
-    if [ ! -f "$compose_file" ]; then
+    if [ ! -f "$slug_file" ]; then
         return
     fi
 
-    # Extract project name from compose file (slug is in container names)
     local slug
-    slug=$(grep 'container_name: ibl5-php-' "$compose_file" | sed 's/.*ibl5-php-//' | tr -d ' ' || true)
+    slug=$(cat "$slug_file")
 
     if [ -z "$slug" ]; then
         echo "Warning: Could not determine slug for $wt_name, skipping"
@@ -83,14 +82,18 @@ teardown_worktree() {
         echo "  Stopped CSS watcher (PID $css_pid)"
     fi
 
+    # Export vars so Docker Compose can interpolate the static compose file
+    local static_compose="$REPO_ROOT/docker/worktree-compose.yml"
+    export SLUG="$slug" WORKTREE_PATH="$wt_path" REPO_ROOT
+
     echo "Stopping environment: $slug (worktree: $wt_name, project: $project)..."
     if [ "$REMOVE_VOLUMES" = true ]; then
-        docker compose -f "$compose_file" $env_flag -p "$project" down -v
+        docker compose -f "$static_compose" $env_flag -p "$project" down -v
     else
-        docker compose -f "$compose_file" $env_flag -p "$project" down
+        docker compose -f "$static_compose" $env_flag -p "$project" down
     fi
 
-    rm -f "$compose_file"
+    rm -f "$slug_file"
 
     # Restore vendor symlink so host-side tools (PHPStan, PHPUnit) work again.
     # wt-up replaces the symlink with an empty dir for Docker bind mounts;
@@ -115,7 +118,7 @@ if [ "$ALL" = true ]; then
     found=false
     for wt in "$WORKTREES_DIR"/*/; do
         [ -d "$wt" ] || continue
-        if [ -f "$wt/docker-compose.worktree.yml" ]; then
+        if [ -f "$wt/.wt-slug" ]; then
             found=true
             if ! check_uncommitted "$wt"; then
                 continue
@@ -206,10 +209,9 @@ if [ ! -d "$WORKTREE_PATH" ]; then
     exit 0
 fi
 
-COMPOSE_FILE="$WORKTREE_PATH/docker-compose.worktree.yml"
-if [ ! -f "$COMPOSE_FILE" ]; then
+if [ ! -f "$WORKTREE_PATH/.wt-slug" ]; then
     echo "No Docker environment found for worktree '$WORKTREE_NAME'."
-    echo "(No docker-compose.worktree.yml in $WORKTREE_PATH)"
+    echo "(No .wt-slug in $WORKTREE_PATH)"
     exit 0
 fi
 

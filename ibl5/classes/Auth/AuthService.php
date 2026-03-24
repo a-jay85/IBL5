@@ -60,7 +60,7 @@ class AuthService implements AuthServiceInterface
     private function getAuth(): Auth
     {
         if ($this->auth === null) {
-            $this->auth = new Auth(PdoConnection::getInstance(), null, 'auth_', true);
+            $this->auth = new Auth(PdoConnection::getInstance(), null, 'auth_', getenv('E2E_TESTING') !== '1');
         }
         return $this->auth;
     }

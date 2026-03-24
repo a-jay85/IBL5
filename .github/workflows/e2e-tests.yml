@@ -513,6 +513,10 @@ jobs:
           path: ibl5/test-results/
           retention-days: 1
 
+      - name: Dump Docker PHP logs
+        if: failure()
+        run: docker compose -f docker-compose.ci.yml logs php --tail=200 2>&1 | tail -100
+
       - name: Stop Docker containers
         if: always()
         run: docker compose -f docker-compose.ci.yml down

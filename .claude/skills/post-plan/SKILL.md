@@ -19,7 +19,7 @@ Review changed files (`git diff --name-only HEAD~1` or vs base branch) for reuse
 
 1. Stage relevant changes, review with `git diff --staged`, commit (CLAUDE.md conventions), push, create PR
 2. **Stacked PRs:** If branched from a feature branch (not `master`), use `--base <parent-branch>`
-3. **Manual testing in PR description:** Include a "Manual Testing" section. If automated tests fully cover behavior, write: `No manual testing needed — all changes are covered by unit and E2E tests.` Otherwise, list only steps that automated tests don't cover as a markdown checklist (`- [ ]`)
+3. **Manual testing in PR description:** Include a "Manual Testing" section. If automated tests fully cover behavior, write: `No manual testing needed — all changes are covered by unit and E2E tests.` Otherwise, list only steps that require subjective human judgment (visual aesthetics, production comparison). Do NOT list CLI commands, curl requests, or script invocations as manual steps — Phase 6.5 will execute those directly.
 4. Use Haiku agents for commit message generation if delegating
 
 ---

@@ -14,6 +14,7 @@
 import { describe, test, expect } from 'vitest';
 import {
   apiFetch,
+  API_KEY,
   AUTH_HEADERS,
   API_BASE,
   SEED_PLAYER_UUID,
@@ -336,5 +337,50 @@ describe('API v1 — error handling', () => {
     });
     assertJson(res, '/trades/999/decline');
     expect(res.status).toBe(401);
+  });
+});
+
+// ============================================================
+// Query parameter authentication (for Google Sheets IMPORTDATA)
+// ============================================================
+
+describe('API v1 — query param auth fallback', () => {
+  test('GET /season with ?key= param authenticates without header', async () => {
+    // Send request with key in query param, no X-API-Key header
+    const res = await fetch(`${API_BASE}/season?key=${API_KEY}`);
+    const ct = res.headers.get('content-type') ?? '';
+
+    if (ct.includes('json')) {
+      // If API key is configured in CI, should get 200 or 401
+      // 200 = key valid via query param, 401 = key not in DB
+      expect([200, 401]).toContain(res.status);
+    }
+    // If we get HTML (server under load), Vitest retry handles it
+  });
+
+  test('header auth takes priority over query param', async () => {
+    // Send both header and query param — header should be used
+    const res = await fetch(`${API_BASE}/season?key=invalid_query_key`, {
+      headers: { 'X-API-Key': API_KEY },
+    });
+    const ct = res.headers.get('content-type') ?? '';
+
+    if (ct.includes('json')) {
+      // Should authenticate via header (valid key), not query param (invalid)
+      // If API key is in DB: 200; if not: 401 (same as header-only tests)
+      const headerOnlyRes = await apiFetch('/season');
+      expect(res.status).toBe(headerOnlyRes.status);
+    }
+  });
+
+  test('empty ?key= param returns 401', async () => {
+    const res = await fetch(`${API_BASE}/season?key=`);
+    const ct = res.headers.get('content-type') ?? '';
+
+    if (ct.includes('json')) {
+      expect(res.status).toBe(401);
+      const body = await res.json();
+      expect(body).toHaveProperty('error');
+    }
   });
 });

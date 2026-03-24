@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 global $mysqli_db;
 
 // Sanitize input to prevent SQL injection

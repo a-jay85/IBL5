@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 use Player\Player;
 use Player\PlayerPageController;
 use Player\PlayerRepository;

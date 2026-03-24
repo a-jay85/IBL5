@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 use FreeAgency\FreeAgencyRepository;
 use FreeAgency\FreeAgencyDemandRepository;
 use FreeAgency\FreeAgencyService;

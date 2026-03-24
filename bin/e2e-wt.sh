@@ -104,7 +104,7 @@ fi
 docker exec \
     -e "E2E_USER=$IBL_TEST_USER" \
     -e "E2E_PASS=$IBL_TEST_PASS" \
-    -e "E2E_DB_HOST=db-$SLUG" \
+    -e "E2E_DB_HOST=db" \
     "$PHP_CONTAINER" php -r '
 $db = new mysqli(getenv("E2E_DB_HOST"), "root", "root", "iblhoops_ibl5");
 if ($db->connect_error) { fwrite(STDERR, "DB connection failed: " . $db->connect_error . "\n"); exit(1); }

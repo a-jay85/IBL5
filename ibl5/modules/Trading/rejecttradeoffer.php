@@ -12,8 +12,7 @@ try {
 global $mysqli_db;
 
 if (!\Utilities\CsrfGuard::validateSubmittedToken('trade_reject')) {
-    header('Location: /ibl5/modules.php?name=Trading&error=' . rawurlencode('Invalid or expired form submission. Please try again.'));
-    exit;
+    \Utilities\HtmxHelper::redirect('/ibl5/modules.php?name=Trading&error=' . rawurlencode('Invalid or expired form submission. Please try again.'));
 }
 
 if (!isset($_POST['offer']) || empty($_POST['offer'])) {
@@ -35,8 +34,7 @@ $repository = new Trading\TradeOfferRepository($mysqli_db);
 $tradeRows = $repository->getTradesByOfferId($offerId);
 
 if ($tradeRows === []) {
-    header('Location: /ibl5/modules.php?name=Trading&op=reviewtrade&result=already_processed');
-    exit;
+    \Utilities\HtmxHelper::redirect('/ibl5/modules.php?name=Trading&op=reviewtrade&result=already_processed');
 }
 
 // Delete trade offer
@@ -54,5 +52,4 @@ try {
     // The trade rejection itself has already succeeded
 }
 
-header('Location: /ibl5/modules.php?name=Trading&op=reviewtrade&result=trade_rejected');
-exit;
+\Utilities\HtmxHelper::redirect('/ibl5/modules.php?name=Trading&op=reviewtrade&result=trade_rejected');

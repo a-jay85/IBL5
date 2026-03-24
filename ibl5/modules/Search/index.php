@@ -41,8 +41,7 @@ global $prefix, $user_prefix, $mysqli_db, $module_name, $articlecomm;
 
 // Redirect if query is too short
 if ($query !== '' && strlen($query) < 3) {
-    header("Location: modules.php?name={$module_name}&qlen=1");
-    exit;
+    \Utilities\HtmxHelper::redirect("modules.php?name={$module_name}&qlen=1");
 }
 
 $pagetitle = "- " . _SEARCH;

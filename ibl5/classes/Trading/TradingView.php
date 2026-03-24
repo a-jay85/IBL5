@@ -514,7 +514,7 @@ $tradeConfig = [
         <form name="tradeaccept" method="post" action="/ibl5/modules/Trading/accepttradeoffer.php" style="margin: 0;">
             <?= \Utilities\CsrfGuard::generateToken('trade_accept') ?>
             <input type="hidden" name="offer" value="<?= $offerId ?>">
-            <button type="submit" class="ibl-btn ibl-btn--success" onclick="this.disabled=true;this.textContent='Submitting...'; this.form.submit();">Accept</button>
+            <button type="submit" class="ibl-btn ibl-btn--success">Accept</button>
         </form>
 <?php else: ?>
         <span style="color: var(--gray-500); font-style: italic;">Awaiting Approval</span>

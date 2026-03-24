@@ -7,8 +7,7 @@ require __DIR__ . '/../../mainfile.php';
 global $mysqli_db;
 
 if (!\Utilities\CsrfGuard::validateSubmittedToken('extension')) {
-    header('Location: /ibl5/index.php');
-    exit;
+    \Utilities\HtmxHelper::redirect('/ibl5/index.php');
 }
 
 // Collect input data
@@ -51,8 +50,7 @@ $commonRepo = new \Services\CommonMysqliRepository($mysqli_db);
 $tid = $commonRepo->getTidFromTeamname($teamName);
 
 if ($tid === null) {
-    header('Location: /ibl5/index.php');
-    exit;
+    \Utilities\HtmxHelper::redirect('/ibl5/index.php');
 }
 
 $redirectBase = '/ibl5/modules.php?name=Team&op=team&teamID=' . $tid . '&display=contracts';
@@ -65,5 +63,4 @@ if (!$result['success']) {
     $redirectUrl = $redirectBase . '&result=extension_rejected&msg=' . rawurlencode($result['message']);
 }
 
-header('Location: ' . $redirectUrl);
-exit;
+\Utilities\HtmxHelper::redirect($redirectUrl);

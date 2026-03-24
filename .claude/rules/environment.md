@@ -1,3 +1,9 @@
+---
+paths:
+  - "**/design/**/*.css"
+  - "**/IBLbot/**/*"
+---
+
 # Environment Commands
 
 ## CSS Development (Tailwind 4)

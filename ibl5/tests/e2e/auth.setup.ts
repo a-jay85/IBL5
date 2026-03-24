@@ -15,7 +15,10 @@ setup('authenticate', async ({ page, request }) => {
 
   // Clear auth throttling before login — repeated test runs accumulate
   // failed attempts that trigger "Too many login attempts" and block auth.
-  await request.delete('test-state.php?action=clear-throttle');
+  const throttleResp = await request.delete('test-state.php?action=clear-throttle');
+  if (!throttleResp.ok()) {
+    console.warn(`Failed to clear auth throttle (HTTP ${throttleResp.status()}) — login may fail if throttled`);
+  }
 
   await page.goto('modules.php?name=YourAccount');
   const loginForm = page.locator('form', { has: page.locator('#login-username') });

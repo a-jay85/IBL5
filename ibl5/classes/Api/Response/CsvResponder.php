@@ -13,9 +13,11 @@ class CsvResponder
      */
     public function send(array $rows, string $filename): void
     {
+        $safeFilename = preg_replace('/[^\w\-.]/', '_', $filename) ?? $filename;
+
         http_response_code(200);
         header('Content-Type: text/csv; charset=utf-8');
-        header('Content-Disposition: attachment; filename="' . $filename . '"');
+        header('Content-Disposition: attachment; filename="' . $safeFilename . '"');
         header('Access-Control-Allow-Origin: *');
         header('Access-Control-Allow-Methods: GET, POST, OPTIONS');
         header('Access-Control-Allow-Headers: X-API-Key, Content-Type');

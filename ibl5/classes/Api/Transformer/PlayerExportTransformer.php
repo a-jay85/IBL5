@@ -127,7 +127,14 @@ class PlayerExportTransformer
         $result = [];
         foreach (self::COLUMN_MAP as $col) {
             $value = $row[$col] ?? null;
-            $result[] = $value !== null ? (string) $value : '';
+            $str = $value !== null ? (string) $value : '';
+
+            // Prevent spreadsheet formula injection (OWASP)
+            if ($str !== '' && in_array($str[0], ['=', '+', '-', '@', "\t", "\r"], true)) {
+                $str = "'" . $str;
+            }
+
+            $result[] = $str;
         }
 
         return $result;

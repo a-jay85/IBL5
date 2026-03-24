@@ -1,9 +1,6 @@
 import { test, expect } from '../fixtures/auth';
 import { assertNoPhpErrors } from '../helpers/php-errors';
 
-// Serial: multiple describe blocks toggle Current Season Phase.
-test.describe.configure({ mode: 'serial' });
-
 const SCHEDULE_URL = 'modules.php?name=Schedule';
 
 // ============================================================

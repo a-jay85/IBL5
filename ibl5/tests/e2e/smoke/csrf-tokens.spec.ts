@@ -6,8 +6,6 @@ import { gotoWithRetry } from '../helpers/navigation';
  * Catches regressions where CsrfGuard::generateToken() calls are accidentally removed.
  */
 
-test.describe.configure({ mode: 'serial' });
-
 const CSRF_PROTECTED_PAGES: Array<{
   name: string;
   url: string;

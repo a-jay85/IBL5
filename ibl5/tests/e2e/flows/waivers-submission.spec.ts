@@ -37,13 +37,13 @@ test.describe('Waivers: add player', () => {
     const actionValue = await actionInput.inputValue();
     expect(actionValue, 'Waivers must default to add form').toBe('add');
 
-    // Select the first available player
+    // Select the first available player (skip the placeholder option)
     const playerSelect = form.locator('select[name="Player_ID"]');
-    const firstOption = playerSelect.locator('option').first();
-    const optionValue = await firstOption.getAttribute('value');
-    if (optionValue) {
-      await playerSelect.selectOption(optionValue);
-    }
+    const playerOption = playerSelect.locator('option[value]:not([value=""])').first();
+    await expect(playerOption).toBeAttached({ timeout: 5000 });
+    const optionValue = await playerOption.getAttribute('value');
+    expect(optionValue, 'Expected at least one player option with a value').toBeTruthy();
+    await playerSelect.selectOption(optionValue!);
 
     // Submit
     await form.locator('button[type="submit"], input[type="submit"]').first().click();

@@ -16,6 +16,15 @@ class RouterTest extends TestCase
         $this->router = new Router();
     }
 
+    public function testMatchesPlayersExport(): void
+    {
+        $result = $this->router->match('players/export', 'GET');
+
+        $this->assertNotNull($result);
+        $this->assertSame('Api\Controller\PlayerExportController', $result['controller']);
+        $this->assertSame([], $result['params']);
+    }
+
     public function testMatchesPlayersList(): void
     {
         $result = $this->router->match('players', 'GET');

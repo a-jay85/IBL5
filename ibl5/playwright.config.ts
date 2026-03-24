@@ -36,7 +36,7 @@ export default defineConfig({
   },
 
   use: {
-    baseURL: process.env.BASE_URL || 'http://main.localhost/ibl5/',
+    baseURL: (process.env.BASE_URL || 'http://main.localhost/ibl5/').replace(/\/?$/, '/'),
     actionTimeout: 10_000,
     navigationTimeout: 20_000,
     trace: 'on-first-retry',

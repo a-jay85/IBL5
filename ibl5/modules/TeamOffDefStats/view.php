@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 /**
  * League Stats Module - View Template
  *

@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 /************************************************************************/
 /* ibl College Scout Module added by Spencer Cooley                     */
 /* 3/22/2005                                                            */

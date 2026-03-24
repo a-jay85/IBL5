@@ -5,11 +5,9 @@ declare(strict_types=1);
 namespace Negotiation;
 
 use Negotiation\Contracts\NegotiationValidatorInterface;
-use Negotiation\Contracts\NegotiationRepositoryInterface;
 use Player\Player;
 use Player\PlayerContractValidator;
 use Player\PlayerData;
-use Services\CommonValidator;
 use Services\ValidationResult;
 
 /**
@@ -17,13 +15,11 @@ use Services\ValidationResult;
  */
 class NegotiationValidator implements NegotiationValidatorInterface
 {
-    private NegotiationRepositoryInterface $repository;
     private PlayerContractValidator $contractValidator;
     private \Season\Season $season;
 
     public function __construct(\mysqli $db, ?\Season\Season $season = null)
     {
-        $this->repository = new NegotiationRepository($db);
         $this->contractValidator = new PlayerContractValidator();
         $this->season = $season ?? new \Season\Season($db);
     }

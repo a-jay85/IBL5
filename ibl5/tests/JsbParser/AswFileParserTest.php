@@ -288,6 +288,30 @@ class AswFileParserTest extends TestCase
         }
     }
 
+    public function testZeroPlayerIdsAreFilteredFromRosters(): void
+    {
+        // Interleave zeros between real PIDs — the parser must exclude them
+        $lines = array_fill(0, AswFileParser::TOTAL_DATA_LINES, '0');
+        $lines[AswFileParser::ALLSTAR_1_START] = '1001';
+        $lines[AswFileParser::ALLSTAR_1_START + 1] = '0';
+        $lines[AswFileParser::ALLSTAR_1_START + 2] = '1002';
+
+        $content = implode("\r\n", $lines) . "\r\n";
+        if (strlen($content) < AswFileParser::FILE_SIZE) {
+            $content = str_pad($content, AswFileParser::FILE_SIZE);
+        }
+
+        $tmpFile = $this->writeTmpAswFile($content);
+
+        try {
+            $result = AswFileParser::parseFile($tmpFile);
+
+            $this->assertSame([1001, 1002], $result['rosters']['allstar_1']);
+        } finally {
+            unlink($tmpFile);
+        }
+    }
+
     public function testParseFileReturnsCorrectScoreValues(): void
     {
         $aswData = $this->buildAswFile(

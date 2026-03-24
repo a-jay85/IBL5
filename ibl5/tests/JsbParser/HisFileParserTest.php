@@ -144,6 +144,42 @@ class HisFileParserTest extends TestCase
         $this->assertSame('first round', $result['playoff_round_reached']);
     }
 
+    public function testParseTeamLineWithFinals(): void
+    {
+        $line = 'Heat (60-22) lose to the Clippers (62-20) 4 games to 2 in the finals (2001)';
+        $result = HisFileParser::parseTeamLine($line);
+
+        $this->assertNotNull($result);
+        $this->assertSame('Heat', $result['name']);
+        $this->assertSame(1, $result['made_playoffs']);
+        $this->assertSame(0, $result['won_championship']);
+        $this->assertSame('finals', $result['playoff_round_reached']);
+    }
+
+    public function testParseTeamLineWithSecondRound(): void
+    {
+        $line = 'Lakers (54-28) lose in the 2nd round (2001)';
+        $result = HisFileParser::parseTeamLine($line);
+
+        $this->assertNotNull($result);
+        $this->assertSame('Lakers', $result['name']);
+        $this->assertSame(1, $result['made_playoffs']);
+        $this->assertSame(0, $result['won_championship']);
+        $this->assertSame('second round', $result['playoff_round_reached']);
+    }
+
+    public function testParseTeamLineWithGenericPlayoff(): void
+    {
+        $line = 'Nets (45-37) make the Playoffs (2001)';
+        $result = HisFileParser::parseTeamLine($line);
+
+        $this->assertNotNull($result);
+        $this->assertSame('Nets', $result['name']);
+        $this->assertSame(1, $result['made_playoffs']);
+        $this->assertSame(0, $result['won_championship']);
+        $this->assertSame('first round', $result['playoff_round_reached']);
+    }
+
     public function testParseTeamLineNoPlayoffs(): void
     {
         $line = 'Celtics (24-58) (1988)';

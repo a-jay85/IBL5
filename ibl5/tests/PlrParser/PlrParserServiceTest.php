@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\PlrParser;
 
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use PlrParser\Contracts\PlrParserRepositoryInterface;
 use PlrParser\PlrParserService;
@@ -284,6 +285,45 @@ class PlrParserServiceTest extends TestCase
         $derived = $this->service->computeDerivedFields($raw, 0.0);
 
         $this->assertSame(0, $derived['ratingFOUL']);
+    }
+
+    public function testParsePlrLineAcceptsOrdinalExactly1440(): void
+    {
+        $line = $this->buildPlrLine(['ordinal' => 1440, 'pid' => 12345]);
+
+        $result = $this->service->parsePlrLine($line);
+
+        $this->assertNotNull($result);
+        $this->assertSame(1440, $result['ordinal']);
+    }
+
+    #[DataProvider('contractYearSalaryProvider')]
+    public function testComputeDerivedFieldsSalaryForContractYears3Through6(int $contractYear, int $expectedSalary): void
+    {
+        $raw = $this->buildRawParsedData([
+            'currentContractYear' => $contractYear,
+            'contractYear3' => 600,
+            'contractYear4' => 650,
+            'contractYear5' => 700,
+            'contractYear6' => 750,
+        ]);
+
+        $derived = $this->service->computeDerivedFields($raw, 0.1);
+
+        $this->assertSame($expectedSalary, $derived['currentSeasonSalary']);
+    }
+
+    /**
+     * @return array<string, array{int, int}>
+     */
+    public static function contractYearSalaryProvider(): array
+    {
+        return [
+            'contract year 3' => [3, 600],
+            'contract year 4' => [4, 650],
+            'contract year 5' => [5, 700],
+            'contract year 6' => [6, 750],
+        ];
     }
 
     public function testProcessPlrFileWithValidFile(): void

@@ -80,21 +80,6 @@ class NegotiationRepository extends BaseMysqliRepository implements NegotiationR
     }
 
     /**
-     * @see NegotiationRepositoryInterface::isFreeAgencyActive()
-     */
-    public function isFreeAgencyActive(): bool
-    {
-        /** @var array{value: string}|null $result */
-        $result = $this->fetchOne(
-            "SELECT value FROM ibl_settings WHERE name = ?",
-            "s",
-            "Current Season Phase"
-        );
-
-        return $result !== null && $result['value'] === 'Free Agency';
-    }
-
-    /**
      * @see NegotiationRepositoryInterface::getMarketMaximums()
      *
      * Results are cached in the `cache` table for 24 hours since values only change after sim updates.

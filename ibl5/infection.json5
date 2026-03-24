@@ -24,8 +24,8 @@
     },
     "testFramework": "phpunit",
     "testFrameworkOptions": "",
-    "minMsi": 60,
-    "minCoveredMsi": 70,
+    "minMsi": 75,
+    "minCoveredMsi": 90,
     "threads": 4,
     "logs": {
         "text": "infection.log",

@@ -167,6 +167,17 @@ class PlayerContractCalculatorTest extends TestCase
         $this->assertEquals(0, $result);
     }
 
+    public function testGetCurrentSeasonSalaryYear0WithNullSalaryReturnsZero(): void
+    {
+        $playerData = new PlayerData();
+        $playerData->contractCurrentYear = 0;
+        // contractYear1Salary is null — year 0 branch returns contractYear1Salary ?? 0
+
+        $result = $this->calculator->getCurrentSeasonSalary($playerData);
+
+        $this->assertSame(0, $result);
+    }
+
     public function testGetCurrentSeasonSalaryForYear6(): void
     {
         $playerData = new PlayerData();
@@ -297,16 +308,31 @@ class PlayerContractCalculatorTest extends TestCase
         $this->assertEquals([0, 0, 0, 0, 0, 0], $result);
     }
 
-    public function testGetFutureSalariesWithAllNullValues(): void
+    public function testGetFutureSalariesWithAllNullSalariesReturnsAllZeros(): void
     {
         $playerData = new PlayerData();
-        $playerData->contractCurrentYear = 1;
-        // All salary fields are null
+        $playerData->contractCurrentYear = 0;
+        // All salary fields are null — null coalescing defaults each to 0
 
         $result = $this->calculator->getFutureSalaries($playerData);
 
-        // Null values become null in array (not 0)
-        $this->assertCount(6, $result);
+        $this->assertSame([0, 0, 0, 0, 0, 0], $result);
+    }
+
+    public function testGetFutureSalariesWithNullContractCurrentYear(): void
+    {
+        $playerData = new PlayerData();
+        // contractCurrentYear null → defaults to 0 via null coalescing → slice at offset 0
+        $playerData->contractYear1Salary = 100;
+        $playerData->contractYear2Salary = 200;
+        $playerData->contractYear3Salary = 300;
+        $playerData->contractYear4Salary = 400;
+        $playerData->contractYear5Salary = 500;
+        $playerData->contractYear6Salary = 600;
+
+        $result = $this->calculator->getFutureSalaries($playerData);
+
+        $this->assertSame([100, 200, 300, 400, 500, 600], $result);
     }
 
     // ============================================
@@ -384,6 +410,59 @@ class PlayerContractCalculatorTest extends TestCase
         $result = $this->calculator->getRemainingContractArray($playerData);
 
         $this->assertEquals([1 => 2000], $result);
+    }
+
+    public function testGetRemainingContractArrayWithNullCurrentYear(): void
+    {
+        $playerData = new PlayerData();
+        // contractCurrentYear null → 0 via ??, then ternary maps 0 → 1
+        $playerData->contractTotalYears = 2;
+        $playerData->contractYear1Salary = 500;
+        $playerData->contractYear2Salary = 600;
+
+        $result = $this->calculator->getRemainingContractArray($playerData);
+
+        $this->assertSame([1 => 500, 2 => 600], $result);
+    }
+
+    public function testGetRemainingContractArrayWithNullTotalYears(): void
+    {
+        $playerData = new PlayerData();
+        $playerData->contractCurrentYear = 1;
+        // contractTotalYears null → 0 via ??, then ternary maps 0 → 1
+        $playerData->contractYear1Salary = 750;
+
+        $result = $this->calculator->getRemainingContractArray($playerData);
+
+        $this->assertSame([1 => 750], $result);
+    }
+
+    public function testGetRemainingContractArrayZeroCurrentYearDefaultsToOne(): void
+    {
+        $playerData = new PlayerData();
+        $playerData->contractCurrentYear = 0;
+        $playerData->contractTotalYears = 2;
+        $playerData->contractYear1Salary = 800;
+        $playerData->contractYear2Salary = 900;
+
+        $result = $this->calculator->getRemainingContractArray($playerData);
+
+        // contractCurrentYear 0 is treated as 1 via ternary fallback
+        $this->assertSame([1 => 800, 2 => 900], $result);
+    }
+
+    public function testGetRemainingContractArrayZeroTotalYearsDefaultsToOne(): void
+    {
+        $playerData = new PlayerData();
+        $playerData->contractCurrentYear = 1;
+        $playerData->contractTotalYears = 0;
+        $playerData->contractYear1Salary = 400;
+        $playerData->contractYear2Salary = 500;
+
+        $result = $this->calculator->getRemainingContractArray($playerData);
+
+        // contractTotalYears 0 is treated as 1 via ternary fallback
+        $this->assertSame([1 => 400], $result);
     }
 
     // ============================================

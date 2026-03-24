@@ -88,3 +88,129 @@ test.describe('League Starters flow', () => {
     }
   });
 });
+
+test.describe('HTMX tab switching', () => {
+  test.use({ actionTimeout: 15_000, navigationTimeout: 20_000 });
+
+  test.beforeEach(async ({ page }) => {
+    await gotoWithRetry(page, 'modules.php?name=LeagueStarters');
+  });
+
+  test('tab click swaps tables without full page reload', async ({ page }) => {
+    // Mark nav to verify it persists (proves no full reload)
+    await page.evaluate(() => {
+      const navEl = document.querySelector('nav.fixed');
+      if (navEl) navEl.setAttribute('data-htmx-marker', '1');
+    });
+
+    const tab = page.locator('.ibl-tab:not(.ibl-tab--active)').first();
+    await expect(tab).toBeVisible();
+
+    await Promise.all([
+      page.waitForResponse(
+        (r) =>
+          r.url().includes('LeagueStarters') &&
+          r.url().includes('op=api') &&
+          r.status() === 200,
+      ),
+      tab.click(),
+    ]);
+
+    await expect(
+      page.locator('#league-starters-tables .ibl-data-table').first(),
+    ).toBeVisible();
+
+    // Nav marker survived — no full page reload occurred
+    const marker = await page.evaluate(() =>
+      document.querySelector('nav.fixed')?.getAttribute('data-htmx-marker'),
+    );
+    expect(marker).toBe('1');
+  });
+
+  test('tab click updates URL', async ({ page }) => {
+    const tab = page.locator('.ibl-tab[data-display="avg_s"]');
+    await expect(tab).toBeVisible();
+
+    await Promise.all([
+      page.waitForResponse(
+        (r) =>
+          r.url().includes('LeagueStarters') &&
+          r.url().includes('op=api') &&
+          r.status() === 200,
+      ),
+      tab.click(),
+    ]);
+
+    await page.waitForURL(/display=avg_s/);
+    expect(page.url()).toContain('display=avg_s');
+  });
+
+  test('all display modes load via HTMX', async ({ page }) => {
+    const modes = ['total_s', 'avg_s', 'per36mins'];
+
+    for (const mode of modes) {
+      const tab = page.locator(`.ibl-tab[data-display="${mode}"]`);
+      await expect(tab).toBeVisible();
+
+      await Promise.all([
+        page.waitForResponse(
+          (r) =>
+            r.url().includes('LeagueStarters') &&
+            r.url().includes('op=api') &&
+            r.status() === 200,
+        ),
+        tab.click(),
+      ]);
+
+      await expect(
+        page.locator('#league-starters-tables .ibl-data-table').first(),
+      ).toBeVisible();
+      await assertNoPhpErrors(page, `after HTMX switch to ${mode}`);
+    }
+  });
+});
+
+test.describe('browser back/forward after HTMX tab switch', () => {
+  test.use({ actionTimeout: 15_000, navigationTimeout: 20_000 });
+
+  test('back/forward works after tab switch', async ({ page }) => {
+    await gotoWithRetry(page, 'modules.php?name=LeagueStarters');
+
+    const tab = page.locator('.ibl-tab[data-display="total_s"]');
+    await expect(tab).toBeVisible();
+
+    await Promise.all([
+      page.waitForResponse(
+        (r) =>
+          r.url().includes('LeagueStarters') &&
+          r.url().includes('op=api') &&
+          r.status() === 200,
+      ),
+      tab.click(),
+    ]);
+
+    await page.waitForURL(/display=total_s/);
+
+    await page.goBack();
+    await page.waitForURL(/LeagueStarters/);
+    expect(page.url()).not.toContain('display=total_s');
+
+    await page.goForward();
+    await page.waitForURL(/display=total_s/);
+    expect(page.url()).toContain('display=total_s');
+  });
+});
+
+test.describe('no-JS fallback', () => {
+  test.use({ javaScriptEnabled: false });
+
+  test('page renders correctly with JavaScript disabled', async ({ page }) => {
+    await page.goto('modules.php?name=LeagueStarters&display=total_s');
+    await expect(page.locator('.ibl-data-table').first()).toBeVisible();
+    await assertNoPhpErrors(page, 'on LeagueStarters with JS disabled');
+
+    // Tab links exist with href attributes (work as plain links without JS)
+    const tabLink = page.locator('.ibl-tab[href]').first();
+    await expect(tabLink).toBeAttached();
+  });
+});

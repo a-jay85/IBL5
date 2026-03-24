@@ -38,6 +38,7 @@ export async function assertSearchSubmitsTo(
 ): Promise<void> {
   await page.locator('input[name="query"]').fill(query);
   await page.locator('.ibl-search__btn').first().click();
-  await page.waitForLoadState('domcontentloaded');
+  // HTMX boost swaps content without full navigation — wait for URL change
+  await page.waitForURL(new RegExp(expectedUrlPart.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')), { timeout: 10000 });
   expect(page.url()).toContain(expectedUrlPart);
 }

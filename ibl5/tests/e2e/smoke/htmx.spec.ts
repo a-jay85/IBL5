@@ -120,12 +120,13 @@ test.describe('HTMX hx-boost navigation', () => {
     await expect(searchInput).toBeVisible();
     await searchInput.fill('basketball');
 
-    // Submit via button click (HTMX intercepts boosted form submission)
-    const submitBtn = page.locator('button[type="submit"], input[type="submit"]').first();
+    // Submit via the search button (HTMX intercepts boosted form submission)
+    const submitBtn = page.locator('.ibl-search__btn').first();
+    await expect(submitBtn).toBeVisible();
     await submitBtn.click();
 
-    // Wait for content to load
-    await expect(page.locator('#site-content').first()).toBeVisible({ timeout: 10000 });
+    // Wait for HTMX to swap content (URL changes via pushState)
+    await page.waitForURL(/name=Search.*query|query.*name=Search/, { timeout: 10000 });
 
     // Verify the nav marker persists (nav was NOT re-rendered = no full page reload)
     const marker = await page.evaluate(() => {

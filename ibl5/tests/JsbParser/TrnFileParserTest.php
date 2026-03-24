@@ -128,6 +128,39 @@ class TrnFileParserTest extends TestCase
     }
 
     /**
+     * Build a trade record with draft pick items (marker=1).
+     *
+     * @param int $month Transaction month
+     * @param int $day Transaction day
+     * @param int $year Transaction year
+     * @param list<array{draft_year: int, from_team: int, to_team: int}> $items Draft pick trade items
+     */
+    private function buildDraftPickTradeRecord(int $month, int $day, int $year, array $items): string
+    {
+        $record = str_repeat(' ', TrnFileParser::RECORD_SIZE);
+
+        // Common header
+        $record = substr_replace($record, str_pad((string) $month, 2, ' ', STR_PAD_LEFT), 17, 2);
+        $record = substr_replace($record, str_pad((string) $day, 2, ' ', STR_PAD_LEFT), 19, 2);
+        $record = substr_replace($record, str_pad((string) $year, 4, ' ', STR_PAD_LEFT), 21, 4);
+        $record = substr_replace($record, (string) TrnFileParser::TYPE_TRADE, 26, 1);
+
+        // Draft pick items starting at offset 27
+        $tradeOffset = 27;
+        foreach ($items as $item) {
+            // marker(1) + draft_year(6) + from_team(6) + to_team(6) = 19 bytes
+            $itemStr = '1'; // marker = draft pick
+            $itemStr .= str_pad((string) $item['draft_year'], 6, ' ', STR_PAD_LEFT);
+            $itemStr .= str_pad((string) $item['from_team'], 6, ' ', STR_PAD_LEFT);
+            $itemStr .= str_pad((string) $item['to_team'], 6, ' ', STR_PAD_LEFT);
+            $record = substr_replace($record, $itemStr, $tradeOffset, TrnFileParser::TRADE_ITEM_SIZE);
+            $tradeOffset += TrnFileParser::TRADE_ITEM_SIZE;
+        }
+
+        return $record;
+    }
+
+    /**
      * Write synthetic data to a temp file and return the path.
      */
     private function writeTmpTrnFile(string $data): string
@@ -278,6 +311,47 @@ class TrnFileParserTest extends TestCase
             $this->assertIsArray($waiver);
             $this->assertSame(8, $waiver['team_id']);
             $this->assertSame(9999, $waiver['pid']);
+        } finally {
+            unlink($tmpFile);
+        }
+    }
+
+    public function testParsesDraftPickTradeItems(): void
+    {
+        $tradeRecord = $this->buildDraftPickTradeRecord(3, 15, 2007, [
+            ['draft_year' => 2008, 'from_team' => 5, 'to_team' => 10],
+            ['draft_year' => 2009, 'from_team' => 10, 'to_team' => 5],
+        ]);
+        $trnData = $this->buildTrnFile(1, [$tradeRecord]);
+        $tmpFile = $this->writeTmpTrnFile($trnData);
+
+        try {
+            $result = TrnFileParser::parseFile($tmpFile);
+
+            $trades = array_filter(
+                $result['transactions'],
+                static fn (array $t): bool => $t['type'] === TrnFileParser::TYPE_TRADE
+                    && is_array($t['trade_items'])
+                    && $t['trade_items'] !== []
+            );
+
+            $this->assertNotEmpty($trades, 'Should find at least one trade record with draft pick items');
+
+            $trade = reset($trades);
+            $this->assertIsArray($trade);
+            $this->assertIsArray($trade['trade_items']);
+            $this->assertCount(2, $trade['trade_items']);
+
+            $item = $trade['trade_items'][0];
+            $this->assertSame(TrnFileParser::TRADE_MARKER_DRAFT_PICK, $item['marker']);
+            $this->assertSame(2008, $item['draft_year']);
+            $this->assertSame(5, $item['from_team']);
+            $this->assertSame(10, $item['to_team']);
+            $this->assertNull($item['player_id']);
+
+            $item2 = $trade['trade_items'][1];
+            $this->assertSame(TrnFileParser::TRADE_MARKER_DRAFT_PICK, $item2['marker']);
+            $this->assertSame(2009, $item2['draft_year']);
         } finally {
             unlink($tmpFile);
         }

@@ -106,6 +106,22 @@ jobs:
       working-directory: ibl5
       run: php bin/check-coverage coverage/clover.xml 70
 
+    - name: Check if threshold needs ratcheting
+      working-directory: ibl5
+      run: |
+        THRESHOLD=70
+        BUFFER=5
+        COVERAGE=$(php -r '
+          $xml = simplexml_load_file("coverage/clover.xml");
+          $m = $xml->xpath("/coverage/project/metrics")[0];
+          echo round((int)$m["coveredstatements"] / (int)$m["statements"] * 100, 2);
+        ')
+        GAP=$(echo "$COVERAGE - $THRESHOLD" | bc)
+        if (( $(echo "$GAP > $BUFFER" | bc -l) )); then
+          NEW_THRESHOLD=$(echo "$COVERAGE - 2" | bc | cut -d. -f1)
+          echo "::warning::Coverage is ${COVERAGE}%, threshold is ${THRESHOLD}%. Consider ratcheting to ${NEW_THRESHOLD}% in .github/workflows/tests.yml"
+        fi
+
     - name: Upload coverage report
       if: always()
       uses: actions/upload-artifact@v7

@@ -22,6 +22,14 @@ use LeagueStarters\LeagueStartersView;
 
 global $cookie, $mysqli_db;
 
+// Route HTMX API requests (no PageLayout, returns HTML fragment only)
+$op = is_string($_GET['op'] ?? null) ? $_GET['op'] : '';
+if ($op === 'api') {
+    $handler = new LeagueStarters\LeagueStartersApiHandler($mysqli_db);
+    $handler->handle();
+    return;
+}
+
 $commonRepository = new Services\CommonMysqliRepository($mysqli_db);
 $season = new \Season\Season($mysqli_db);
 
@@ -37,7 +45,11 @@ $view = new LeagueStartersView($mysqli_db, $season, $module_name);
 
 // Get starters by position
 $startersByPosition = $service->getAllStartersByPosition();
-$display = $_REQUEST['display'] ?? 'ratings';
+$display = 'ratings';
+if (isset($_REQUEST['display']) && is_string($_REQUEST['display'])
+    && in_array($_REQUEST['display'], ['ratings', 'total_s', 'avg_s', 'per36mins'], true)) {
+    $display = $_REQUEST['display'];
+}
 
 // Render header first (populates $cookie via cookiedecode())
 PageLayout\PageLayout::header();

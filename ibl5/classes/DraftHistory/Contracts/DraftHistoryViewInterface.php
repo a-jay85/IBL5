@@ -35,4 +35,12 @@ interface DraftHistoryViewInterface
      * @return string HTML output for the team draft history page
      */
     public function renderTeamHistory(Team $team, array $draftPicks): string;
+
+    /**
+     * Render the draft table (or no-data message) for HTMX partial updates.
+     *
+     * @param list<DraftPickByYearRow> $draftPicks Array of draft pick data
+     * @return string HTML table or no-data message
+     */
+    public function renderYearTable(array $draftPicks): string;
 }

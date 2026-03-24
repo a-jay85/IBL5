@@ -513,9 +513,20 @@ jobs:
           path: ibl5/test-results/
           retention-days: 1
 
-      - name: Dump Docker PHP logs
+      - name: Dump Docker PHP error log
         if: failure()
-        run: docker compose -f docker-compose.ci.yml logs php --tail=200 2>&1 | tail -100
+        run: |
+          echo "=== Apache error log ==="
+          docker compose -f docker-compose.ci.yml exec -T php cat /var/log/apache2/error.log 2>/dev/null || echo "(no error.log found)"
+          echo ""
+          echo "=== Application log ==="
+          docker compose -f docker-compose.ci.yml exec -T php cat /var/www/html/ibl5/logs/*.log 2>/dev/null | tail -50 || echo "(no app logs)"
+          echo ""
+          echo "=== POST requests in access log ==="
+          docker compose -f docker-compose.ci.yml exec -T php grep -i "POST" /var/log/apache2/access.log 2>/dev/null | tail -20 || echo "(no POST requests)"
+          echo ""
+          echo "=== 500 responses in access log ==="
+          docker compose -f docker-compose.ci.yml exec -T php grep '" 500 ' /var/log/apache2/access.log 2>/dev/null | tail -20 || echo "(no 500s)"
 
       - name: Stop Docker containers
         if: always()

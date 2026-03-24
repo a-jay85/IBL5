@@ -9,6 +9,7 @@
  * - Dropdown value decomposition for tab switching (split:key → display + split)
  * - Width constraint clearing before table content swaps
  * - Static file link interception to prevent hx-boost from breaking non-PHP links
+ * - Submit button disable/enable during boosted form submissions
  */
 (function () {
     'use strict';
@@ -58,6 +59,34 @@
             var wrapper = target.closest('.table-scroll-wrapper');
             if (wrapper) {
                 wrapper.style.maxWidth = '';
+            }
+        }
+    });
+
+    // Disable submit buttons during boosted form submissions to prevent
+    // double-submit. Re-enable after the request completes (success or error).
+    // Scoped to FORM elements only — does not affect tab/dropdown hx-get.
+    document.addEventListener('htmx:beforeRequest', function (evt) {
+        var elt = evt.detail.elt;
+        if (!elt || elt.tagName !== 'FORM') return;
+        var btns = elt.querySelectorAll('button[type="submit"], input[type="submit"]');
+        for (var i = 0; i < btns.length; i++) {
+            btns[i].disabled = true;
+            if (btns[i].tagName === 'BUTTON') {
+                btns[i].dataset.originalText = btns[i].textContent;
+                btns[i].textContent = 'Submitting\u2026';
+            }
+        }
+    });
+
+    document.addEventListener('htmx:afterRequest', function (evt) {
+        var elt = evt.detail.elt;
+        if (!elt || elt.tagName !== 'FORM') return;
+        var btns = elt.querySelectorAll('button[type="submit"], input[type="submit"]');
+        for (var i = 0; i < btns.length; i++) {
+            btns[i].disabled = false;
+            if (btns[i].tagName === 'BUTTON' && btns[i].dataset.originalText) {
+                btns[i].textContent = btns[i].dataset.originalText;
             }
         }
     });

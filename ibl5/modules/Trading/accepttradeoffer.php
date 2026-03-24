@@ -17,8 +17,7 @@ if (!isset($mysqli_db) || !($mysqli_db instanceof mysqli)) {
 }
 
 if (!\Utilities\CsrfGuard::validateSubmittedToken('trade_accept')) {
-    header('Location: /ibl5/modules.php?name=Trading&error=' . rawurlencode('Invalid or expired form submission. Please try again.'));
-    exit;
+    \Utilities\HtmxHelper::redirect('/ibl5/modules.php?name=Trading&error=' . rawurlencode('Invalid or expired form submission. Please try again.'));
 }
 
 $offerId = $_POST['offer'] ?? null;
@@ -31,8 +30,7 @@ if ($offerId !== null) {
     $tradeRows = $repository->getTradesByOfferId($offerId);
 
     if ($tradeRows === []) {
-        header('Location: /ibl5/modules.php?name=Trading&op=reviewtrade&result=already_processed');
-        exit;
+        \Utilities\HtmxHelper::redirect('/ibl5/modules.php?name=Trading&op=reviewtrade&result=already_processed');
     }
 
     try {
@@ -40,15 +38,14 @@ if ($offerId !== null) {
         $result = $tradeProcessor->processTrade($offerId);
 
         if ($result['success']) {
-            header('Location: /ibl5/modules.php?name=Trading&op=reviewtrade&result=trade_accepted');
+            \Utilities\HtmxHelper::redirect('/ibl5/modules.php?name=Trading&op=reviewtrade&result=trade_accepted');
         } else {
-            header('Location: /ibl5/modules.php?name=Trading&op=reviewtrade&result=accept_error&error=' . rawurlencode($result['error'] ?? 'Unknown error'));
+            \Utilities\HtmxHelper::redirect('/ibl5/modules.php?name=Trading&op=reviewtrade&result=accept_error&error=' . rawurlencode($result['error'] ?? 'Unknown error'));
         }
     } catch (Exception $e) {
         error_log("Failed to process trade: " . $e->getMessage());
-        header('Location: /ibl5/modules.php?name=Trading&op=reviewtrade&result=accept_error&error=' . rawurlencode($e->getMessage()));
+        \Utilities\HtmxHelper::redirect('/ibl5/modules.php?name=Trading&op=reviewtrade&result=accept_error&error=' . rawurlencode($e->getMessage()));
     }
 } else {
-    header('Location: /ibl5/modules.php?name=Trading&op=reviewtrade');
+    \Utilities\HtmxHelper::redirect('/ibl5/modules.php?name=Trading&op=reviewtrade');
 }
-exit;

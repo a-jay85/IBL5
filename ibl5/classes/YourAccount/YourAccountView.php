@@ -118,7 +118,7 @@ class YourAccountView
                 </div>
             <?php endif; ?>
 
-            <form action="modules.php?name=YourAccount" method="post">
+            <form action="modules.php?name=YourAccount" method="post" hx-boost="false">
                 <div class="ibl-form-group">
                     <label class="ibl-label" for="login-username">Username</label>
                     <div class="auth-input-wrapper">
@@ -178,7 +178,7 @@ class YourAccountView
             <p class="ibl-card__subtitle">Join the IBL community</p>
         </div>
         <div class="ibl-card__body">
-            <form action="modules.php?name=YourAccount" method="post">
+            <form action="modules.php?name=YourAccount" method="post" hx-boost="false">
                 <div class="ibl-form-group">
                     <label class="ibl-label ibl-label--required" for="register-username">Username</label>
                     <div class="auth-input-wrapper">
@@ -310,7 +310,7 @@ class YourAccountView
                 Enter your email address and we'll send you a link to reset your password.
             </div>
 
-            <form action="modules.php?name=YourAccount" method="post">
+            <form action="modules.php?name=YourAccount" method="post" hx-boost="false">
                 <div class="ibl-form-group">
                     <label class="ibl-label ibl-label--required" for="reset-email">Email Address</label>
                     <div class="auth-input-wrapper">
@@ -386,7 +386,7 @@ class YourAccountView
             <p class="ibl-card__subtitle">Enter your new password</p>
         </div>
         <div class="ibl-card__body">
-            <form action="modules.php?name=YourAccount" method="post">
+            <form action="modules.php?name=YourAccount" method="post" hx-boost="false">
                 <div class="ibl-form-group">
                     <label class="ibl-label ibl-label--required" for="reset-new-password">New Password</label>
                     <div class="auth-input-wrapper">

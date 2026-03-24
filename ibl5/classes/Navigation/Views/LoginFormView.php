@@ -48,7 +48,7 @@ class LoginFormView
         ob_start();
         ?>
         <div class="<?= $containerClass ?>">
-            <form action="modules.php?name=YourAccount" method="post" class="space-y-3">
+            <form action="modules.php?name=YourAccount" method="post" hx-boost="false" class="space-y-3">
                 <div>
                     <label for="<?= $idPrefix ?>-username" class="<?= $labelClass ?>">Username</label>
                     <div class="relative">

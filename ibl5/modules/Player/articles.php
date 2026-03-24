@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 global $mysqli_db;
 
 // Sanitize input to prevent SQL injection
@@ -27,9 +29,9 @@ $result = $stmt->get_result();
 echo "<small>";
 
 while ($row = $result->fetch_assoc()) {
-    $sid = htmlspecialchars($row['sid'], ENT_QUOTES, 'UTF-8');
-    $title = htmlspecialchars($row['title'], ENT_QUOTES, 'UTF-8');
-    $time = htmlspecialchars($row['time'], ENT_QUOTES, 'UTF-8');
+    $sid = htmlspecialchars((string) $row['sid'], ENT_QUOTES, 'UTF-8');
+    $title = htmlspecialchars($row['title'] ?? '', ENT_QUOTES, 'UTF-8');
+    $time = htmlspecialchars($row['time'] ?? '', ENT_QUOTES, 'UTF-8');
 
     echo "
 * <a href=\"modules.php?name=News&amp;file=article&amp;sid=$sid&amp;mode=&amp;order=0&amp;thold=0\">$title</a> ($time)<br>";

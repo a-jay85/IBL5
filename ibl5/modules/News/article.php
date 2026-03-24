@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 define('INDEX_FILE', true);
 /************************************************************************/
 /* PHP-NUKE: Web Portal System                                          */
@@ -140,7 +142,7 @@ $artpage = 0;
 
 if (!is_numeric($time)) {
     preg_match('/(\d{4})-(\d{1,2})-(\d{1,2}) (\d{1,2}):(\d{1,2}):(\d{1,2})/', $time, $dtParts);
-    $time = gmmktime($dtParts[4], $dtParts[5], $dtParts[6], $dtParts[2], $dtParts[3], $dtParts[1]);
+    $time = gmmktime((int) $dtParts[4], (int) $dtParts[5], (int) $dtParts[6], (int) $dtParts[2], (int) $dtParts[3], (int) $dtParts[1]);
 }
 $time -= date("Z");
 $datetime = ucfirst(date(_DATESTRING, $time));

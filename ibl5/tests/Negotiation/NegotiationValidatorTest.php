@@ -159,7 +159,7 @@ class NegotiationValidatorTest extends TestCase
     {
         // Arrange
         $this->mockDb->setMockData([
-            ['value' => 'Free Agency']
+            ['active' => 1]
         ]);
 
         // Act
@@ -178,7 +178,7 @@ class NegotiationValidatorTest extends TestCase
     {
         // Arrange
         $this->mockDb->setMockData([
-            ['value' => 'Regular Season']
+            ['active' => 0]
         ]);
 
         // Act

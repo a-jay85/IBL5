@@ -137,8 +137,7 @@ class NegotiationIntegrationTest extends IntegrationTestCase
                 'cy5' => 0,
                 'cy6' => 0,
                 // Free agency is not active
-                'title' => 'FreeAgency',
-                'active' => 0,
+                'value' => 'Regular Season',
                 // Team performance
                 'Contract_Wins' => 50,
                 'Contract_Losses' => 32,
@@ -159,8 +158,7 @@ class NegotiationIntegrationTest extends IntegrationTestCase
                 'tid' => 1,
                 'teamname' => 'Miami Cyclones',
                 // Free agency IS active
-                'title' => 'FreeAgency',
-                'active' => 1,
+                'value' => 'Free Agency',
             ])
         ]);
     }
@@ -173,8 +171,7 @@ class NegotiationIntegrationTest extends IntegrationTestCase
                 'tid' => 5,
                 'teamname' => 'Miami Cyclones',
                 // Free agency not active
-                'title' => 'FreeAgency',
-                'active' => 0,
+                'value' => 'Regular Season',
             ])
         ]);
     }

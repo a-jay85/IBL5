@@ -216,6 +216,7 @@ class NegotiationProcessorTest extends TestCase
             'college' => 'Test University',
             // Season info
             'Phase' => 'Regular Season',
+            'value' => 'Regular Season',
             'Beginning_Year' => 2024,
             'Ending_Year' => 2025,
         ], $overrides);

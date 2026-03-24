@@ -80,7 +80,7 @@ function rookieoption($pid)
     $formView = new RookieOptionFormView();
 
     // Load player
-    $player = Player::withPlayerID($mysqli_db, $pid);
+    $player = Player::withPlayerID($mysqli_db, (int) $pid);
 
     PageLayout\PageLayout::header();
 

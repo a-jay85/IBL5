@@ -76,8 +76,8 @@ function theindex($catid)
         }
         $time -= date("Z");
         $datetime = ucfirst(date(_DATESTRING, $time));
-        $introcount = strlen($hometext);
-        $fullcount = strlen($bodytext);
+        $introcount = strlen($hometext ?? '');
+        $fullcount = strlen($bodytext ?? '');
         $totalcount = $introcount + $fullcount;
         $c_count = $comments;
         $r_options = "";

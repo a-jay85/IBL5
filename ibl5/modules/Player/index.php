@@ -131,8 +131,7 @@ function processrookieoption()
 
     // Validate input
     if ($teamName === '' || $playerID === 0 || $extensionAmount === 0) {
-        header('Location: modules.php?name=Player&pa=rookieoption&pid=' . $playerID . '&from=' . rawurlencode($from) . '&error=' . rawurlencode('Invalid request. Missing required parameters.'));
-        exit;
+        \Utilities\HtmxHelper::redirect('modules.php?name=Player&pa=rookieoption&pid=' . $playerID . '&from=' . rawurlencode($from) . '&error=' . rawurlencode('Invalid request. Missing required parameters.'));
     }
 
     // Process rookie option using controller
@@ -146,15 +145,14 @@ function processrookieoption()
 
     if ($result['success'] && $from === 'fa') {
         // Came from Free Agency — redirect back there with result banner
-        header('Location: modules.php?name=FreeAgency&result=' . $resultParam);
+        \Utilities\HtmxHelper::redirect('modules.php?name=FreeAgency&result=' . $resultParam);
     } elseif ($result['success']) {
         // Came from Player page (or unknown) — redirect to player page with result banner
-        header('Location: modules.php?name=Player&pa=showpage&pid=' . $playerID . '&result=' . $resultParam);
+        \Utilities\HtmxHelper::redirect('modules.php?name=Player&pa=showpage&pid=' . $playerID . '&result=' . $resultParam);
     } else {
         // Error — redirect back to rookie option form with error
-        header('Location: modules.php?name=Player&pa=rookieoption&pid=' . $playerID . '&from=' . rawurlencode($from) . '&error=' . rawurlencode($result['message']));
+        \Utilities\HtmxHelper::redirect('modules.php?name=Player&pa=rookieoption&pid=' . $playerID . '&from=' . rawurlencode($from) . '&error=' . rawurlencode($result['message']));
     }
-    exit;
 }
 
 switch ($pa) {

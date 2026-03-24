@@ -104,4 +104,38 @@ test.describe('HTMX hx-boost navigation', () => {
       await assertNoPhpErrors(page, `on ${url}`);
     }
   });
+
+  test('boosted form submission swaps content without full page reload', async ({ page }) => {
+    // Navigate to Search page which has a public POST form
+    await page.goto('modules.php?name=Search');
+
+    // Mark the nav to verify it persists (no full reload)
+    await page.evaluate(() => {
+      const navEl = document.querySelector('nav.fixed');
+      if (navEl) navEl.setAttribute('data-htmx-marker', '1');
+    });
+
+    // Fill in search query and submit the form
+    const searchInput = page.locator('input[name="query"]').first();
+    await expect(searchInput).toBeVisible();
+    await searchInput.fill('basketball');
+
+    // Submit via the search button (HTMX intercepts boosted form submission)
+    const submitBtn = page.locator('.ibl-search__btn').first();
+    await expect(submitBtn).toBeVisible();
+    await submitBtn.click();
+
+    // Wait for HTMX to swap content — the search renders results inline,
+    // so wait for the results content to appear in site-content
+    await expect(page.locator('#site-content').first()).toBeVisible({ timeout: 10000 });
+    // Wait for search results or "no results" message to render
+    await page.waitForTimeout(1000);
+
+    // Verify the nav marker persists (nav was NOT re-rendered = no full page reload)
+    const marker = await page.evaluate(() => {
+      const navEl = document.querySelector('nav.fixed');
+      return navEl?.getAttribute('data-htmx-marker');
+    });
+    expect(marker).toBe('1');
+  });
 });

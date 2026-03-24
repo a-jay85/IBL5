@@ -7,8 +7,7 @@ require $_SERVER['DOCUMENT_ROOT'] . '/ibl5/mainfile.php';
 // Auth guard
 if (!is_user($user)) {
     $_SESSION['redirect_after_login_path'] = 'leagueControlPanel.php';
-    header('Location: modules.php?name=YourAccount');
-    exit;
+    \Utilities\HtmxHelper::redirect('modules.php?name=YourAccount');
 }
 
 if (!is_admin()) {
@@ -29,8 +28,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $result = $processor->dispatch($action, $_POST);
 
     $queryParam = $result['success'] ? 'success' : 'error';
-    header('Location: leagueControlPanel.php?' . $queryParam . '=' . rawurlencode($result['message']));
-    exit;
+    \Utilities\HtmxHelper::redirect('leagueControlPanel.php?' . $queryParam . '=' . rawurlencode($result['message']));
 }
 
 // GET → Service + View → render

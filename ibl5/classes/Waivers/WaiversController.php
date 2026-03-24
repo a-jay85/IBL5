@@ -97,8 +97,7 @@ class WaiversController implements WaiversControllerInterface
             $postAction = is_string($_POST['Action']) ? $_POST['Action'] : 'add';
 
             if (!\Utilities\CsrfGuard::validateSubmittedToken('waivers')) {
-                header('Location: modules.php?name=Waivers&action=' . rawurlencode($postAction) . '&error=' . rawurlencode('Invalid or expired form submission. Please try again.'));
-                exit;
+                \Utilities\HtmxHelper::redirect('modules.php?name=Waivers&action=' . rawurlencode($postAction) . '&error=' . rawurlencode('Invalid or expired form submission. Please try again.'));
             }
 
             try {
@@ -116,12 +115,11 @@ class WaiversController implements WaiversControllerInterface
 
             if ($result['success'] === true) {
                 $resultParam = $result['result'] ?? '';
-                header('Location: modules.php?name=Waivers&action=' . rawurlencode($postAction) . '&result=' . rawurlencode($resultParam));
+                \Utilities\HtmxHelper::redirect('modules.php?name=Waivers&action=' . rawurlencode($postAction) . '&result=' . rawurlencode($resultParam));
             } else {
                 $errorParam = $result['error'] ?? '';
-                header('Location: modules.php?name=Waivers&action=' . rawurlencode($postAction) . '&error=' . rawurlencode($errorParam));
+                \Utilities\HtmxHelper::redirect('modules.php?name=Waivers&action=' . rawurlencode($postAction) . '&error=' . rawurlencode($errorParam));
             }
-            exit;
         }
 
         // Display the waiver form (GET request)

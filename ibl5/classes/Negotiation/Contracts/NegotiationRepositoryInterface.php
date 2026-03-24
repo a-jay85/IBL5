@@ -39,13 +39,6 @@ interface NegotiationRepositoryInterface
     public function getTeamCapSpaceNextSeason(string $teamName): int;
 
     /**
-     * Check if the Free Agency module is currently active
-     * 
-     * @return bool True if free agency is active, false otherwise
-     */
-    public function isFreeAgencyActive(): bool;
-
-    /**
      * Get market maximum values for player rating categories
      *
      * Used for contract demand calculation - normalizes player ratings

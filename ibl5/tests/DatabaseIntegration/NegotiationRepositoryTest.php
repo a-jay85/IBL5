@@ -75,14 +75,6 @@ class NegotiationRepositoryTest extends DatabaseTestCase
         self::assertIsInt($capSpace);
     }
 
-    public function testIsFreeAgencyActiveReturnsBool(): void
-    {
-        // Reads existing seed data for module active status
-        $active = $this->repo->isFreeAgencyActive();
-
-        self::assertIsBool($active);
-    }
-
     public function testGetMarketMaximumsReturnsAllKeys(): void
     {
         $maximums = $this->repo->getMarketMaximums();

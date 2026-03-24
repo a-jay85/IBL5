@@ -15,7 +15,7 @@ SELECT
   p.pos AS position,
   p.htft,
   p.htin,
-  p.active,
+  p.dc_canPlayInGame,
   p.retired,
   p.exp AS experience,
   p.bird AS bird_rights,

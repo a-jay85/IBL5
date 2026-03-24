@@ -49,7 +49,7 @@ test.describe('Waivers: add player', () => {
     await form.locator('button[type="submit"], input[type="submit"]').first().click();
 
     // Should redirect with result param
-    await page.waitForURL(/modules\.php\?name=Waivers/, { timeout: 10000 });
+    await page.waitForURL(/modules\.php\?name=Waivers.*(result|error)=/, { timeout: 10000 });
     const url = page.url();
 
     // Check for success or cap-related error

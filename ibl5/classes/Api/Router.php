@@ -14,6 +14,7 @@ class Router implements RouterInterface
 
     /** @var array<string, string> GET route patterns to controller class names. Order matters: specific first. */
     private const GET_ROUTES = [
+        'players/export'          => Controller\PlayerExportController::class,
         'players/{uuid}/stats'    => Controller\PlayerStatsController::class,
         'players/{uuid}/history'  => Controller\PlayerHistoryController::class,
         'players/{uuid}'          => Controller\PlayerDetailController::class,

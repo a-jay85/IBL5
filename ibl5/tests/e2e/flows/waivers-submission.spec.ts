@@ -62,11 +62,13 @@ test.describe('Waivers: add player', () => {
 
     await page.waitForLoadState('networkidle');
     const url = page.url();
+    const body = await page.locator('body').textContent() ?? '';
+    const bodySnippet = body.substring(0, 500).replace(/\s+/g, ' ').trim();
 
     // Diagnostic: log what the server returned
     expect(
       url,
-      `POST status=${status} location=${location} finalURL=${url}`,
+      `POST status=${status} location=${location} body=${bodySnippet}`,
     ).toMatch(/(result|error)=/);
     await assertNoPhpErrors(page, 'after waiver add');
   });

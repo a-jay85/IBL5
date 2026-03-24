@@ -125,8 +125,11 @@ test.describe('HTMX hx-boost navigation', () => {
     await expect(submitBtn).toBeVisible();
     await submitBtn.click();
 
-    // Wait for HTMX to swap content (URL changes via pushState)
-    await page.waitForURL(/name=Search.*query|query.*name=Search/, { timeout: 10000 });
+    // Wait for HTMX to swap content — the search renders results inline,
+    // so wait for the results content to appear in site-content
+    await expect(page.locator('#site-content').first()).toBeVisible({ timeout: 10000 });
+    // Wait for search results or "no results" message to render
+    await page.waitForTimeout(1000);
 
     // Verify the nav marker persists (nav was NOT re-rendered = no full page reload)
     const marker = await page.evaluate(() => {

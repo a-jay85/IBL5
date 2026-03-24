@@ -49,6 +49,7 @@ jobs:
       - name: Pull latest code on server
         run: |
           ssh -p ${{ secrets.PORT }} -i ~/.ssh/id_deploy ${{ secrets.USERNAME }}@${{ secrets.HOST }} '
+            set -e
             cd www
             git fetch origin
             git reset --hard origin/production

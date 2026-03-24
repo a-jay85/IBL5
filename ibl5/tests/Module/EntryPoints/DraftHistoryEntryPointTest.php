@@ -43,7 +43,7 @@ class DraftHistoryEntryPointTest extends ModuleEntryPointTestCase
         $this->assertQueryExecuted('draftyear');
     }
 
-    public function testYearZeroDefaultsToLatestYear(): void
+    public function testYearZeroPassedThroughAsZero(): void
     {
         // (int)'0' === 0, but the code does: $year = isset($_REQUEST['year']) ? (int)$_REQUEST['year'] : $endYear
         // So $year = 0. The repository query runs with year=0 (no draft results).

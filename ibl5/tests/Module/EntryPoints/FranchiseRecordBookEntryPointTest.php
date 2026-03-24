@@ -74,7 +74,6 @@ class FranchiseRecordBookEntryPointTest extends ModuleEntryPointTestCase
         // The is_string() guard protects against array injection.
         // $_GET['teamid'] = ['1','2'] → is_string(array) === false → $teamId stays 0
         $this->mockDb->setMockData([]);
-        $_GET['teamid'] = ['1', '2'];
         $output = $this->runModule('FranchiseRecordBook', ['teamid' => ['1', '2']]);
 
         $this->assertNotEmpty($output);

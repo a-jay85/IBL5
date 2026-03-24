@@ -61,6 +61,11 @@ abstract class ModuleEntryPointTestCase extends IntegrationTestCase
         // Define theme function stubs in global namespace
         require_once __DIR__ . '/theme-stubs.php';
 
+        // Define language constants that Views may reference
+        if (!defined('_SEARCH')) {
+            define('_SEARCH', 'Search');
+        }
+
         // Set globals that modules expect
         $this->setDefaultGlobals();
     }

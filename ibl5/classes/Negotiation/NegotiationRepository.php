@@ -84,6 +84,12 @@ class NegotiationRepository extends BaseMysqliRepository implements NegotiationR
      */
     public function isFreeAgencyActive(): bool
     {
+        // E2E cookie overrides take precedence over DB
+        $overrides = \Utilities\TestCookieOverrides::getOverrides();
+        if (isset($overrides['Current Season Phase'])) {
+            return $overrides['Current Season Phase'] === 'Free Agency';
+        }
+
         /** @var array{value: string}|null $result */
         $result = $this->fetchOne(
             "SELECT value FROM ibl_settings WHERE name = ?",

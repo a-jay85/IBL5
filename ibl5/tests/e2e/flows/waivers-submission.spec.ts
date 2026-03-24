@@ -45,10 +45,20 @@ test.describe('Waivers: add player', () => {
     expect(optionValue, 'Expected at least one player option with a value').toBeTruthy();
     await playerSelect.selectOption(optionValue!);
 
-    // Intercept the POST response to see what the server returns
-    const responsePromise = page.waitForResponse(
-      resp => resp.url().includes('modules.php') && resp.request().method() === 'POST'
-    );
+    // Intercept the POST response body to capture PHP errors
+    let postBody = '';
+    let postStatus = 0;
+    await page.route('**/modules.php**', async (route) => {
+      const request = route.request();
+      if (request.method() === 'POST') {
+        const response = await route.fetch();
+        postStatus = response.status();
+        postBody = (await response.text()).substring(0, 1000);
+        await route.fulfill({ response });
+      } else {
+        await route.continue();
+      }
+    });
 
     // Strip onclick handler — it calls form.submit() programmatically which
     // blocks the browser's native submit and races with Playwright.
@@ -56,19 +66,13 @@ test.describe('Waivers: add player', () => {
     await submitBtn.evaluate(btn => (btn as HTMLElement).removeAttribute('onclick'));
     await submitBtn.click();
 
-    const response = await responsePromise;
-    const status = response.status();
-    const location = response.headers()['location'] ?? 'none';
-
     await page.waitForLoadState('networkidle');
     const url = page.url();
-    const body = await page.locator('body').textContent() ?? '';
-    const bodySnippet = body.substring(0, 500).replace(/\s+/g, ' ').trim();
 
     // Diagnostic: log what the server returned
     expect(
       url,
-      `POST status=${status} location=${location} body=${bodySnippet}`,
+      `POST status=${postStatus} postBody=${postBody.replace(/\s+/g, ' ').trim().substring(0, 500)}`,
     ).toMatch(/(result|error)=/);
     await assertNoPhpErrors(page, 'after waiver add');
   });

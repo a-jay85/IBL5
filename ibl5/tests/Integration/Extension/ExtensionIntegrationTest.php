@@ -15,10 +15,11 @@ use Extension\ExtensionProcessor;
  * - Failed extension scenarios
  * - Edge cases and special conditions
  * 
+ * @covers \Extension\ExtensionService
  * @covers \Extension\ExtensionProcessor
  * @covers \Extension\ExtensionValidator
  * @covers \Extension\ExtensionOfferEvaluator
- * @covers \Extension\ExtensionDatabaseOperations
+ * @covers \Extension\ExtensionRepository
  */
 class ExtensionIntegrationTest extends IntegrationTestCase
 {

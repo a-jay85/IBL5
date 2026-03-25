@@ -17,6 +17,7 @@ use Waivers\Contracts\WaiversViewInterface;
  * @see WaiversServiceInterface
  *
  * @phpstan-import-type WaiverFormData from WaiversServiceInterface
+ * @phpstan-import-type PlayerRow from \Services\CommonMysqliRepository
  */
 class WaiversService implements WaiversServiceInterface
 {
@@ -79,7 +80,12 @@ class WaiversService implements WaiversServiceInterface
         $players = [];
 
         foreach ($result as $playerRow) {
-            $player = Player::withPlrRow($this->db, $playerRow);
+            if ($playerRow instanceof Player) {
+                $player = $playerRow;
+            } else {
+                /** @var PlayerRow $playerRow */
+                $player = Player::withPlrRow($this->db, $playerRow);
+            }
             $contract = $this->processor->getPlayerContractDisplay($player, $season);
             $waitTime = '';
 

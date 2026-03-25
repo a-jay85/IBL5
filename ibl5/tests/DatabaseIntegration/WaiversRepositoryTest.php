@@ -81,7 +81,7 @@ class WaiversRepositoryTest extends DatabaseTestCase
 
     public function testSignPlayerFromWaiversWithExistingContractPreservesContractFields(): void
     {
-        $pid = 3;
+        $pid = 1;
 
         // Set known contract fields on the player
         $stmt = $this->db->prepare(

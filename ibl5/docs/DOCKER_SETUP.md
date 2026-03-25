@@ -118,10 +118,19 @@ Run multiple worktrees simultaneously, each with its own PHP-Apache container an
 bin/wt-up my-feature              # → http://my-feature.localhost/ibl5/
 
 # With test seed data
-bin/wt-up my-feature --seed       # Also imports ci-seed.sql
+bin/wt-up my-feature --seed       # Import ci-seed.sql (schema + CI seed)
+
+# With production seed data (default if no data flag)
+bin/wt-up my-feature --prod       # Import prod-seed.sql
+
+# Schema only, no seed data
+bin/wt-up my-feature --no-data
 
 # Use PR number as URL
 bin/wt-up my-feature --pr         # → http://pr-42.localhost/ibl5/
+
+# Reinstall vendor after composer.lock changes
+bin/wt-up my-feature --fresh-vendor
 ```
 
 ### Managing Environments
@@ -143,6 +152,7 @@ bin/wt-down --all --volumes
 ### How It Works
 
 - **Traefik** (port 80) routes by `Host` header — `main.localhost` goes to the main repo, `<slug>.localhost` goes to each worktree
+- A single static compose file (`docker/worktree-compose.yml`) is reused for all worktrees — Docker Compose interpolates `${SLUG}`, `${WORKTREE_PATH}`, and `${REPO_ROOT}` from exported environment variables (no per-worktree compose files are generated)
 - Each worktree gets its own MariaDB container with an isolated database
 - `*.localhost` resolves to `127.0.0.1` natively in Chrome and Firefox (RFC 6761)
 - **Safari** requires manual `/etc/hosts` entries (the script prints a reminder)

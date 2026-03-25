@@ -151,6 +151,31 @@ $this->mockDb->setMockData([['pid' => 1, 'name' => 'Player']]);
 
 `MockDatabase` extends `\mysqli` without a real connection. Accessing `$db->insert_id` (used by `BaseMysqliRepository::getLastInsertId()`) throws "object is already closed". Tests for code paths that INSERT and read `insert_id` (e.g., `createSavedDepthChart()`) cannot use MockDatabase — use DB integration tests instead.
 
+## Module Entry Point Tests
+
+For testing module `index.php` files end-to-end in PHPUnit, extend `ModuleEntryPointTestCase`:
+
+```php
+class ScheduleEntryPointTest extends ModuleEntryPointTestCase
+{
+    public function testHandlesInvalidTeamID(): void
+    {
+        $output = $this->runModule('Schedule', get: ['teamID' => 'abc']);
+        $this->assertStringContainsString('Schedule', $output);
+    }
+}
+```
+
+- Extend `Tests\Module\EntryPoints\ModuleEntryPointTestCase` (which extends `IntegrationTestCase`)
+- Use `$this->runModule('ModuleName', get: [...], post: [...])` to include the module's `index.php` and capture output
+- Use `$this->authenticateAs('username')` to simulate an authenticated user
+- Lives in `tests/Module/EntryPoints/`, registered under the "Module Tests" testsuite
+- The class handles double output buffering for `PageLayout::footer()`'s `ob_end_flush()` — do not wrap `runModule()` in your own `ob_start()`
+
+## Mutation Testing
+
+Mutation testing (Infection PHP) runs weekly + on-demand via the `mutation-test` PR label — NOT on every PR. Current thresholds: **100% MSI / 100% Covered MSI**. See `memory/ci-quality-gates.md` for full details.
+
 ## Completion Criteria
 
 **IMPORTANT:** Before considering ANY task involving PHP code complete:

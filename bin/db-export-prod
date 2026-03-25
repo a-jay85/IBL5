@@ -37,7 +37,7 @@ SKIP_REGEX="^(ibl_box_scores|ibl_box_scores_teams)$"
 
 # 1. Get list of all real tables (skip views — engine is NULL)
 ALL_TABLES=$(mariadb -h "$DB_HOST" --skip-ssl -u "$DB_USER" -p"$DB_PASS" "$DB_NAME" \
-    -N -e "SELECT table_name FROM information_schema.tables WHERE table_schema='$DB_NAME' AND engine IS NOT NULL ORDER BY table_name;" 2>/dev/null)
+    -N -e "SELECT table_name FROM information_schema.tables WHERE table_schema='$DB_NAME' AND engine IS NOT NULL ORDER BY table_name;")
 
 # 2. Build list of tables excluding box scores
 REGULAR_TABLES=""
@@ -51,15 +51,27 @@ mkdir -p "$(dirname "$OUTPUT")"
 
 # 3. Dump structure for ALL tables (including box scores) — no data
 #    Include --routines and --triggers here (only in this step)
+#    stderr is NOT suppressed — surface mariadb-dump errors instead of silently
+#    producing a header-only file (which was the root cause of missing CREATE TABLEs).
 echo "-- Dumping table structure..."
 mariadb-dump -h "$DB_HOST" --skip-ssl -u "$DB_USER" -p"$DB_PASS" \
-    $DUMP_OPTS --routines --triggers --no-data "$DB_NAME" > "$OUTPUT" 2>/dev/null
+    $DUMP_OPTS --routines --triggers --no-data "$DB_NAME" > "$OUTPUT"
+
+# Validate that the structure dump actually produced CREATE TABLE statements.
+# mariadb-dump writes a valid header even on connection/auth errors, so the file
+# can appear non-empty while containing zero DDL.
+if ! grep -q 'CREATE TABLE' "$OUTPUT"; then
+    echo "Error: Structure dump contains no CREATE TABLE statements." >&2
+    echo "Check database credentials and mariadb-dump connectivity." >&2
+    rm -f "$OUTPUT"
+    exit 1
+fi
 
 # 4. Dump data for regular tables (skip triggers — already in structure dump)
 echo "-- Dumping data for regular tables..."
 # shellcheck disable=SC2086
 mariadb-dump -h "$DB_HOST" --skip-ssl -u "$DB_USER" -p"$DB_PASS" \
-    $DUMP_OPTS --no-create-info --skip-triggers "$DB_NAME" $REGULAR_TABLES >> "$OUTPUT" 2>/dev/null
+    $DUMP_OPTS --no-create-info --skip-triggers "$DB_NAME" $REGULAR_TABLES >> "$OUTPUT"
 
 # 5. Dump filtered box score data (skip triggers — already in structure dump)
 for tbl in $BOX_TABLES; do
@@ -67,17 +79,17 @@ for tbl in $BOX_TABLES; do
     mariadb-dump -h "$DB_HOST" --skip-ssl -u "$DB_USER" -p"$DB_PASS" \
         $DUMP_OPTS --no-create-info --skip-triggers \
         --where="Date BETWEEN '${SEASON_START}' AND '${SEASON_END}'" \
-        "$DB_NAME" "$tbl" >> "$OUTPUT" 2>/dev/null
+        "$DB_NAME" "$tbl" >> "$OUTPUT"
 done
 
 # 6. Dump views (structure only — they have no data)
 echo "-- Dumping views..."
 VIEWS=$(mariadb -h "$DB_HOST" --skip-ssl -u "$DB_USER" -p"$DB_PASS" "$DB_NAME" \
-    -N -e "SELECT table_name FROM information_schema.tables WHERE table_schema='$DB_NAME' AND table_type='VIEW' ORDER BY table_name;" 2>/dev/null)
+    -N -e "SELECT table_name FROM information_schema.tables WHERE table_schema='$DB_NAME' AND table_type='VIEW' ORDER BY table_name;")
 if [ -n "$VIEWS" ]; then
     # shellcheck disable=SC2086
     mariadb-dump -h "$DB_HOST" --skip-ssl -u "$DB_USER" -p"$DB_PASS" \
-        $DUMP_OPTS "$DB_NAME" $VIEWS >> "$OUTPUT" 2>/dev/null
+        $DUMP_OPTS "$DB_NAME" $VIEWS >> "$OUTPUT"
 fi
 
 SIZE=$(du -h "$OUTPUT" | cut -f1)

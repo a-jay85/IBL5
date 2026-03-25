@@ -78,10 +78,11 @@ if ! docker network inspect ibl5-proxy &>/dev/null; then
     docker network create ibl5-proxy
 fi
 
-# Check if Traefik is running
+# Ensure Traefik is running (routes *.localhost to worktree containers)
 if ! docker ps --format '{{.Names}}' | grep -q '^ibl5-traefik$'; then
-    echo "Warning: Traefik is not running. Start it with: docker compose up -d"
-    echo "         (from $REPO_ROOT)"
+    echo "Starting Traefik..."
+    docker compose -f "$REPO_ROOT/docker-compose.yml" up -d \
+        || echo "Warning: Could not start Traefik. Start manually: docker compose up -d (from $REPO_ROOT)"
 fi
 
 # Ensure node_modules symlink exists for CSS tooling
@@ -197,9 +198,13 @@ if [ "$PROD_DB" = true ]; then
     # already exist from migrations above.
     PROD_SEED="$REPO_ROOT/ibl5/fixtures/prod-seed.sql"
     if [ ! -f "$PROD_SEED" ]; then
-        echo "Error: $PROD_SEED not found. Run bin/db-export-prod first." >&2
-        exit 1
+        echo "prod-seed.sql not found — falling back to ci-seed.sql..."
+        PROD_DB=false
+        SEED_DB=true
     fi
+fi
+
+if [ "$PROD_DB" = true ]; then
     echo "Importing prod-seed.sql..."
     # Strip DEFINER clauses — prod exports contain DEFINER=user@host that may
     # not match the Docker MariaDB user, causing ERROR 1449 on import.

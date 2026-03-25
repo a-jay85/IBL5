@@ -56,12 +56,13 @@ class FreeAgencyController implements FreeAgencyControllerInterface
     {
         /** @var array<int, string> $cookie */
         global $cookie;
+
+        \PageLayout\PageLayout::header(); // Must come first — populates $cookie via cookiedecode()
+
         $username = (string) ($cookie[1] ?? '');
         $teamName = $this->commonRepository->getTeamnameFromUsername($username) ?? '';
         $team = Team::initialize($this->db, $teamName);
         $season = new Season($this->db);
-
-        \PageLayout\PageLayout::header();
 
         $mainPageData = $this->service->getMainPageData($team, $season);
         $result = isset($_GET['result']) && is_string($_GET['result']) ? $_GET['result'] : null;

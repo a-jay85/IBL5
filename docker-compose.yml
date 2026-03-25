@@ -48,11 +48,17 @@ services:
     restart: unless-stopped
     environment:
       DB_HOST: mariadb
+      MAIL_TRANSPORT: smtp
+      MAIL_SMTP_HOST: mailpit
+      MAIL_SMTP_PORT: 1025
+      MAIL_SMTP_ENCRYPTION: ""
     volumes:
       - ./ibl5:/var/www/html/ibl5
     depends_on:
       mariadb:
         condition: service_healthy
+      mailpit:
+        condition: service_started
     labels:
       - traefik.enable=true
       - traefik.http.routers.main.rule=Host(`main.localhost`)

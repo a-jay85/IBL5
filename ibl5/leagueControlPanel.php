@@ -19,7 +19,8 @@ if (!is_admin()) {
 // Wire dependencies
 $repository = new LeagueControlPanel\LeagueControlPanelRepository($mysqli_db);
 $service    = new LeagueControlPanel\LeagueControlPanelService($repository);
-$votingResultsService = new Voting\VotingResultsService($mysqli_db);
+$votingRepository     = new Voting\VotingRepository($mysqli_db);
+$votingResultsService = new Voting\VotingResultsService($votingRepository);
 $awardGenerationService = new LeagueControlPanel\AwardGenerationService($repository, $votingResultsService);
 $processor  = new LeagueControlPanel\LeagueControlPanelProcessor($repository, $awardGenerationService);
 $view       = new LeagueControlPanel\LeagueControlPanelView();

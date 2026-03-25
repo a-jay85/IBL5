@@ -123,6 +123,16 @@ class PageLayout
         echo "<META NAME=\"REVISIT-AFTER\" CONTENT=\"1 DAYS\">\n";
         echo "<META NAME=\"RATING\" CONTENT=\"GENERAL\">\n";
 
+        // Open Graph meta tags (for LinkedIn, Facebook, etc.)
+        echo "<meta property=\"og:title\" content=\"IBL -- Internet Basketball League\">\n";
+        echo "<meta property=\"og:description\" content=\"" . \Utilities\HtmlSanitizer::e($slogan) . "\">\n";
+        echo "<meta property=\"og:type\" content=\"website\">\n";
+        echo "<meta property=\"og:url\" content=\"https://iblhoops.net/ibl5/index.php\">\n";
+        echo "<meta property=\"og:image\" content=\"https://iblhoops.net/ibl5/images/og-basketball.png\">\n";
+        echo "<meta property=\"og:image:width\" content=\"1200\">\n";
+        echo "<meta property=\"og:image:height\" content=\"630\">\n";
+        echo "<meta property=\"og:site_name\" content=\"IBL -- Internet Basketball League\">\n";
+
         // JavaScript functions (inlined from includes/javascript.php)
         $nameStr = is_string($name) ? $name : '';
         if (defined('MODULE_FILE') && file_exists("modules/" . $nameStr . "/copyright.php")) {

@@ -112,17 +112,19 @@ class VotingSubmissionService implements VotingSubmissionServiceInterface
             'Six_1', 'Six_2', 'Six_3',
             'ROY_1', 'ROY_2', 'ROY_3',
         ];
-        foreach ($playerFields as $field) {
-            if (str_contains($ballot[$field], $teamName)) {
-                $errors[] = 'Sorry, you cannot vote for your own player. Try again.';
+        if ($teamName !== '') {
+            foreach ($playerFields as $field) {
+                if (str_contains($ballot[$field], $teamName)) {
+                    $errors[] = 'Sorry, you cannot vote for your own player. Try again.';
+                }
             }
-        }
 
-        // GM category
-        $gmFields = ['GM_1', 'GM_2', 'GM_3'];
-        foreach ($gmFields as $field) {
-            if (str_contains($ballot[$field], $teamName)) {
-                $errors[] = 'Sorry, you cannot vote for yourself. Try again.';
+            // GM category
+            $gmFields = ['GM_1', 'GM_2', 'GM_3'];
+            foreach ($gmFields as $field) {
+                if (str_contains($ballot[$field], $teamName)) {
+                    $errors[] = 'Sorry, you cannot vote for yourself. Try again.';
+                }
             }
         }
     }
@@ -154,13 +156,11 @@ class VotingSubmissionService implements VotingSubmissionServiceInterface
             $v2 = $ballot["{$code}_2"];
             $v3 = $ballot["{$code}_3"];
 
-            if ($v1 !== '' && $v2 !== '' && $v1 === $v2) {
-                $errors[] = "Sorry, you have selected the same player for multiple {$label} slots. Try again.";
-            }
-            if ($v1 !== '' && $v3 !== '' && $v1 === $v3) {
-                $errors[] = "Sorry, you have selected the same player for multiple {$label} slots. Try again.";
-            }
-            if ($v2 !== '' && $v3 !== '' && $v2 === $v3) {
+            $hasDuplicate = ($v1 !== '' && $v2 !== '' && $v1 === $v2)
+                || ($v1 !== '' && $v3 !== '' && $v1 === $v3)
+                || ($v2 !== '' && $v3 !== '' && $v2 === $v3);
+
+            if ($hasDuplicate) {
                 $errors[] = "Sorry, you have selected the same player for multiple {$label} slots. Try again.";
             }
         }
@@ -174,6 +174,10 @@ class VotingSubmissionService implements VotingSubmissionServiceInterface
      */
     private function validateAsgSelfVotes(string $teamName, array $ballot, array &$errors): void
     {
+        if ($teamName === '') {
+            return;
+        }
+
         foreach (self::ASG_POSITIONS as $pos) {
             $prefix = $pos['prefix'];
             $court = str_contains($prefix, 'F') ? 'Frontcourt' : 'Backcourt';

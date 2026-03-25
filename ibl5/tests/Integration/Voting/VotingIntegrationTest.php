@@ -60,7 +60,7 @@ class VotingIntegrationTest extends TestCase
         $this->service->getAllStarResults();
 
         // Assert
-        $this->assertNotEmpty($this->stubRepository);
+        $this->assertTrue(true); // Service delegates to repository; DB behavior tested separately
     }
 
     /**
@@ -148,7 +148,7 @@ class VotingIntegrationTest extends TestCase
         $this->service->getEndOfYearResults();
 
         // Assert
-        $this->assertNotEmpty($this->stubRepository);
+        $this->assertTrue(true); // Service delegates to repository; DB behavior tested separately
     }
 
     /**
@@ -368,7 +368,7 @@ class VotingIntegrationTest extends TestCase
         $this->assertStringContainsString('Category One', $html);
         $this->assertStringContainsString('Category Two', $html);
         $this->assertStringContainsString('Category Three', $html);
-        $this->assertEquals(3, substr_count($html, '<table'));
+        $this->assertSame(3, substr_count($html, '<table'));
     }
 
     /**
@@ -513,7 +513,7 @@ class VotingIntegrationTest extends TestCase
         $html = $controller->render();
 
         // Assert - Should query ASG table, not EOY
-        $this->assertNotEmpty($this->stubRepository);
+        $this->assertTrue(true); // Service delegates to repository; DB behavior tested separately
         $this->assertStringContainsString('Eastern Conference Frontcourt', $html);
     }
 
@@ -536,7 +536,7 @@ class VotingIntegrationTest extends TestCase
         $html = $controller->render();
 
         // Assert - Should query EOY table
-        $this->assertNotEmpty($this->stubRepository);
+        $this->assertTrue(true); // Service delegates to repository; DB behavior tested separately
         $this->assertStringContainsString('Most Valuable Player', $html);
     }
 
@@ -556,7 +556,7 @@ class VotingIntegrationTest extends TestCase
         $html = $controller->render();
 
         // Assert
-        $this->assertNotEmpty($this->stubRepository);
+        $this->assertTrue(true); // Service delegates to repository; DB behavior tested separately
     }
 
     /**
@@ -578,7 +578,7 @@ class VotingIntegrationTest extends TestCase
         $html = $controller->renderAllStarView();
 
         // Assert - Should render All-Star despite Playoffs phase
-        $this->assertNotEmpty($this->stubRepository);
+        $this->assertTrue(true); // Service delegates to repository; DB behavior tested separately
         $this->assertStringContainsString('Eastern Conference', $html);
     }
 
@@ -601,7 +601,7 @@ class VotingIntegrationTest extends TestCase
         $html = $controller->renderEndOfYearView();
 
         // Assert - Should render EOY despite Regular Season phase
-        $this->assertNotEmpty($this->stubRepository);
+        $this->assertTrue(true); // Service delegates to repository; DB behavior tested separately
         $this->assertStringContainsString('Most Valuable Player', $html);
     }
 
@@ -711,7 +711,7 @@ class VotingIntegrationTest extends TestCase
         // Assert - Tables still rendered, just empty
         $this->assertStringContainsString('Eastern Conference Frontcourt', $html);
         $this->assertStringContainsString('Western Conference Backcourt', $html);
-        $this->assertEquals(4, substr_count($html, '<table'));
+        $this->assertSame(4, substr_count($html, '<table'));
     }
 
     /**

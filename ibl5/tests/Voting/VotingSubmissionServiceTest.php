@@ -203,6 +203,36 @@ final class VotingSubmissionServiceTest extends TestCase
         $this->assertFalse($result->hasErrors());
     }
 
+    public function testEoyEmptyTeamNameDoesNotTriggerSelfVoteErrors(): void
+    {
+        $ballot = self::validEoyBallot();
+
+        $repo = $this->createMock(VotingRepositoryInterface::class);
+        $repo->expects($this->once())->method('saveEoyVote');
+        $repo->expects($this->once())->method('markEoyVoteCast');
+
+        $service = new VotingSubmissionService($repo);
+        $result = $service->submitEoyVote('', $ballot);
+
+        $this->assertTrue($result->success);
+        $this->assertFalse($result->hasErrors());
+    }
+
+    public function testAsgEmptyTeamNameDoesNotTriggerSelfVoteErrors(): void
+    {
+        $ballot = self::validAsgBallot();
+
+        $repo = $this->createMock(VotingRepositoryInterface::class);
+        $repo->expects($this->once())->method('saveAsgVote');
+        $repo->expects($this->once())->method('markAsgVoteCast');
+
+        $service = new VotingSubmissionService($repo);
+        $result = $service->submitAsgVote('', $ballot, self::validAsgRawPost());
+
+        $this->assertTrue($result->success);
+        $this->assertFalse($result->hasErrors());
+    }
+
     public function testEoyErrorsPreventsRepositorySave(): void
     {
         $ballot = self::validEoyBallot();

@@ -20,6 +20,18 @@ class VotingRepository extends \BaseMysqliRepository implements VotingRepository
     private const EOY_TABLE = 'ibl_votes_EOY';
     public const BLANK_BALLOT_LABEL = '(No Selection Recorded)';
 
+    /** @var list<string> Allowlisted column names for dynamic SQL in vote queries */
+    private const ALLOWED_COLUMNS = [
+        'East_F1', 'East_F2', 'East_F3', 'East_F4',
+        'East_B1', 'East_B2', 'East_B3', 'East_B4',
+        'West_F1', 'West_F2', 'West_F3', 'West_F4',
+        'West_B1', 'West_B2', 'West_B3', 'West_B4',
+        'MVP_1', 'MVP_2', 'MVP_3',
+        'Six_1', 'Six_2', 'Six_3',
+        'ROY_1', 'ROY_2', 'ROY_3',
+        'GM_1', 'GM_2', 'GM_3',
+    ];
+
     /**
      * @see VotingRepositoryInterface::saveEoyVote()
      *
@@ -100,6 +112,8 @@ class VotingRepository extends \BaseMysqliRepository implements VotingRepository
      */
     public function fetchAllStarTotals(array $columns): array
     {
+        $this->validateColumns($columns);
+
         $selectStatements = [];
         foreach ($columns as $column) {
             $selectStatements[] = "SELECT {$column} AS name FROM " . self::ASG_TABLE;
@@ -121,6 +135,8 @@ class VotingRepository extends \BaseMysqliRepository implements VotingRepository
      */
     public function fetchEndOfYearTotals(array $columnsWithWeights): array
     {
+        $this->validateColumns(array_keys($columnsWithWeights));
+
         $selectStatements = [];
         foreach ($columnsWithWeights as $column => $score) {
             $selectStatements[] = "SELECT {$column} AS name, {$score} AS score FROM " . self::EOY_TABLE;
@@ -166,6 +182,20 @@ class VotingRepository extends \BaseMysqliRepository implements VotingRepository
     }
 
     // ==================== Private Helpers ====================
+
+    /**
+     * Validate that all column names are in the allowlist (defense-in-depth against SQL injection)
+     *
+     * @param list<string> $columns
+     */
+    private function validateColumns(array $columns): void
+    {
+        foreach ($columns as $column) {
+            if (!in_array($column, self::ALLOWED_COLUMNS, true)) {
+                throw new \InvalidArgumentException("Invalid vote column: {$column}");
+            }
+        }
+    }
 
     /**
      * Execute a parameterless vote aggregation query and normalize results

@@ -11,6 +11,8 @@ git rev-parse --git-dir > /dev/null 2>&1 || fail "Not a git repository"
 git rev-parse origin/master > /dev/null 2>&1 || fail "master branch not found on origin"
 git rev-parse origin/production > /dev/null 2>&1 || fail "production branch not found on origin"
 
+export SKIP_WT_CLEANUP=1
+
 git checkout master -q
 git pull origin master -q
 git push origin master -q 2>/dev/null || fail "push master"
@@ -22,10 +24,13 @@ git push origin production -q 2>/dev/null || fail "push production"
 
 git checkout master -q
 
-# Wait for GitHub to reflect recent changes
-sleep 5
-
 # Fetch all remotes and prune tracking branches
 git fetch --all --prune -q
+
+# Clean up merged worktrees (synchronous — hook was suppressed above)
+REPO_ROOT="$(git rev-parse --show-toplevel)"
+if [ -x "$REPO_ROOT/bin/wt-cleanup" ]; then
+    "$REPO_ROOT/bin/wt-cleanup" --all
+fi
 
 echo "Done. Pushed master and production."

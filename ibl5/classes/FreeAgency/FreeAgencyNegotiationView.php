@@ -90,6 +90,7 @@ class FreeAgencyNegotiationView implements FreeAgencyNegotiationViewInterface
         </div>
 
         <form name="FAOffer" method="post" action="modules.php?name=FreeAgency&pa=processoffer">
+            <?= \Utilities\CsrfGuard::generateToken('free_agency') ?>
             <div class="ibl-field-group">
                 <span class="ibl-label">Your Custom Offer:</span>
                 <div class="ibl-field-group__content">
@@ -123,6 +124,7 @@ class FreeAgencyNegotiationView implements FreeAgencyNegotiationViewInterface
 <?php if ($hasExistingOffer): ?>
 <div class="offer-delete-section">
     <form method="post" action="modules.php?name=FreeAgency&pa=deleteoffer">
+        <?= \Utilities\CsrfGuard::generateToken('free_agency') ?>
         <input type="hidden" name="teamname" value="<?= HtmlSanitizer::e($team->name) ?>">
         <input type="hidden" name="playerID" value="<?= (int) $player->playerID ?>">
         <button type="submit" class="ibl-btn ibl-btn--danger">Delete This Offer</button>

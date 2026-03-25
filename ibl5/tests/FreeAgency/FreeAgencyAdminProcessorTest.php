@@ -40,28 +40,25 @@ class FreeAgencyAdminProcessorTest extends TestCase
     }
 
     // ============================================
-    // executeSignings()
+    // executeSignings() — delegates to repository
     // ============================================
 
     public function testExecuteSigningsAllSucceed(): void
     {
         $signings = [
             $this->makeSigning(1, 10, 'Miami', 500, 600, 0, 0, 0, 0, 2, false, false),
-            $this->makeSigning(2, 11, 'Boston', 400, 0, 0, 0, 0, 0, 1, false, false),
         ];
 
         $mock = $this->createMock(FreeAgencyAdminRepositoryInterface::class);
-        $mock->method('updatePlayerContract')->willReturn(1);
         $mock->expects($this->once())
-            ->method('insertNewsStory')
-            ->with('FA Day 1', 'Home text', 'Body text')
-            ->willReturn(1);
+            ->method('executeSigningsTransactionally')
+            ->with($signings, 'FA Day 1', 'Home text', 'Body text')
+            ->willReturn(['successCount' => 3, 'errorCount' => 0]);
 
         $processor = new FreeAgencyAdminProcessor($mock, $this->mockDb);
         $result = $processor->executeSignings(1, $signings, 'FA Day 1', 'Home text', 'Body text');
 
         $this->assertTrue($result['success']);
-        // 2 contract updates + 1 news story = 3
         $this->assertSame(3, $result['successCount']);
         $this->assertSame(0, $result['errorCount']);
     }
@@ -70,13 +67,11 @@ class FreeAgencyAdminProcessorTest extends TestCase
     {
         $signings = [
             $this->makeSigning(1, 10, 'Miami', 500, 600, 0, 0, 0, 0, 2, false, false),
-            $this->makeSigning(2, 11, 'Boston', 400, 0, 0, 0, 0, 0, 1, false, false),
         ];
 
         $stub = $this->createStub(FreeAgencyAdminRepositoryInterface::class);
-        $stub->method('updatePlayerContract')
-            ->willReturnOnConsecutiveCalls(1, 0);
-        $stub->method('insertNewsStory')->willReturn(1);
+        $stub->method('executeSigningsTransactionally')
+            ->willReturn(['successCount' => 1, 'errorCount' => 1]);
 
         $processor = new FreeAgencyAdminProcessor($stub, $this->mockDb);
         $result = $processor->executeSignings(1, $signings, 'FA Day 1', 'Home text', 'Body text');
@@ -85,15 +80,17 @@ class FreeAgencyAdminProcessorTest extends TestCase
         $this->assertSame(1, $result['errorCount']);
     }
 
-    public function testExecuteSigningsSkipsNewsWhenTextEmpty(): void
+    public function testExecuteSigningsDelegatesEmptyNewsText(): void
     {
         $signings = [
             $this->makeSigning(1, 10, 'Miami', 500, 0, 0, 0, 0, 0, 1, false, false),
         ];
 
         $mock = $this->createMock(FreeAgencyAdminRepositoryInterface::class);
-        $mock->method('updatePlayerContract')->willReturn(1);
-        $mock->expects($this->never())->method('insertNewsStory');
+        $mock->expects($this->once())
+            ->method('executeSigningsTransactionally')
+            ->with($signings, 'FA Day 1', '', '')
+            ->willReturn(['successCount' => 1, 'errorCount' => 0]);
 
         $processor = new FreeAgencyAdminProcessor($mock, $this->mockDb);
         $result = $processor->executeSignings(1, $signings, 'FA Day 1', '', '');
@@ -112,36 +109,6 @@ class FreeAgencyAdminProcessorTest extends TestCase
         $this->assertFalse($result['success']);
         $this->assertSame(0, $result['successCount']);
         $this->assertStringContainsString('No operations', $result['message']);
-    }
-
-    public function testExecuteSigningsMarksMleUsed(): void
-    {
-        $signings = [
-            $this->makeSigning(1, 10, 'Miami', 500, 0, 0, 0, 0, 0, 1, true, false),
-        ];
-
-        $mock = $this->createMock(FreeAgencyAdminRepositoryInterface::class);
-        $mock->method('updatePlayerContract')->willReturn(1);
-        $mock->expects($this->once())->method('markMleUsed')->with('Miami');
-        $mock->expects($this->never())->method('markLleUsed');
-
-        $processor = new FreeAgencyAdminProcessor($mock, $this->mockDb);
-        $processor->executeSignings(1, $signings, 'FA Day 1', 'Home', 'Body');
-    }
-
-    public function testExecuteSigningsMarksLleUsed(): void
-    {
-        $signings = [
-            $this->makeSigning(1, 10, 'Boston', 300, 0, 0, 0, 0, 0, 1, false, true),
-        ];
-
-        $mock = $this->createMock(FreeAgencyAdminRepositoryInterface::class);
-        $mock->method('updatePlayerContract')->willReturn(1);
-        $mock->expects($this->never())->method('markMleUsed');
-        $mock->expects($this->once())->method('markLleUsed')->with('Boston');
-
-        $processor = new FreeAgencyAdminProcessor($mock, $this->mockDb);
-        $processor->executeSignings(1, $signings, 'FA Day 1', 'Home', 'Body');
     }
 
     // ============================================
@@ -207,6 +174,7 @@ class FreeAgencyAdminProcessorTest extends TestCase
         $this->assertCount(0, $result['signings']);
         $this->assertCount(0, $result['rejections']);
     }
+
 
     // ============================================
     // HELPERS

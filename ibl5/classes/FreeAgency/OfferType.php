@@ -91,4 +91,26 @@ class OfferType
             default => 'Unknown'
         };
     }
+
+    /**
+     * Calculate number of contract years from offer amounts
+     *
+     * Counts backwards from year 6; trailing zeros are excluded.
+     * Returns at least 1 (a valid offer always has year 1).
+     *
+     * @param array{offer1: int, offer2: int, offer3: int, offer4: int, offer5: int, offer6: int} $offers
+     */
+    public static function calculateYears(array $offers): int
+    {
+        $years = 6;
+        for ($i = 6; $i >= 1; $i--) {
+            $key = 'offer' . $i;
+            if ($offers[$key] === 0) {
+                $years = $i - 1;
+            } else {
+                break;
+            }
+        }
+        return max(1, $years);
+    }
 }

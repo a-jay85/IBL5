@@ -22,9 +22,9 @@ class FreeAgencyOfferValidator implements FreeAgencyOfferValidatorInterface
         'birdYears' => 0, 'offerType' => 0, 'vetmin' => 0,
         'year1Max' => 0, 'amendedCapSpaceYear1' => 0,
     ];
-    private ?object $team;
+    private ?Team $team;
 
-    public function __construct(?object $team = null)
+    public function __construct(?Team $team = null)
     {
         $this->team = $team;
     }
@@ -107,7 +107,7 @@ class FreeAgencyOfferValidator implements FreeAgencyOfferValidatorInterface
         }
 
         // Check if team has already used their MLE
-        $hasMLE = $this->getTeamProperty('hasMLE');
+        $hasMLE = $this->team->hasMLE;
         if ($hasMLE !== 1) {
             return [
                 'valid' => false,
@@ -131,7 +131,7 @@ class FreeAgencyOfferValidator implements FreeAgencyOfferValidatorInterface
         }
 
         // Check if team has already used their LLE
-        $hasLLE = $this->getTeamProperty('hasLLE');
+        $hasLLE = $this->team->hasLLE;
         if ($hasLLE !== 1) {
             return [
                 'valid' => false,
@@ -255,30 +255,4 @@ class FreeAgencyOfferValidator implements FreeAgencyOfferValidatorInterface
         return ['valid' => true];
     }
 
-    /**
-     * Get a property value from the team object (supports both Team and stdClass)
-     *
-     * @param string $property Property name to retrieve
-     * @return int Property value, or 0 if not found
-     */
-    private function getTeamProperty(string $property): int
-    {
-        if ($this->team instanceof Team) {
-            return match ($property) {
-                'hasMLE' => $this->team->hasMLE,
-                'hasLLE' => $this->team->hasLLE,
-                default => 0,
-            };
-        }
-
-        if ($this->team !== null) {
-            /** @var array<string, int> $vars */
-            $vars = get_object_vars($this->team);
-            if (array_key_exists($property, $vars)) {
-                return $vars[$property];
-            }
-        }
-
-        return 0;
-    }
 }

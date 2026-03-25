@@ -147,6 +147,7 @@ class FreeAgencyFormComponents implements FreeAgencyFormComponentsInterface
         ob_start();
         ?>
 <form name="FAOffer" method="post" action="modules.php?name=FreeAgency&pa=processoffer" class="ibl-form--inline">
+    <?= \Utilities\CsrfGuard::generateToken('free_agency') ?>
     <?= $this->renderHiddenFields($offers, $offerType) ?>
     <button type="submit" class="ibl-btn ibl-btn--sm ibl-btn--primary"<?= $testIdAttr ?>><?= (int) $offers[$finalYear - 1] ?></button>
 </form>

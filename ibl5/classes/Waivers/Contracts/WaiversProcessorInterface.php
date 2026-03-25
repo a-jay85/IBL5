@@ -105,4 +105,23 @@ interface WaiversProcessorInterface
      * - If no salary: hasExistingContract = false, return veteran minimum
      */
     public function determineContractData(array $playerData, Season $season): array;
+
+    /**
+     * Process dropping a player to waivers.
+     *
+     * Validates, writes to DB, creates news story, posts Discord notification, and audits.
+     *
+     * @return array{success: bool, result?: string, error?: string}
+     */
+    public function processDrop(?int $playerID, string $teamName, int $rosterSlots, int $totalSalary): array;
+
+    /**
+     * Process signing a player from waivers.
+     *
+     * Validates, determines contract, writes to DB, creates news story,
+     * sends email, posts Discord notification, and audits.
+     *
+     * @return array{success: bool, result?: string, error?: string}
+     */
+    public function processAdd(?int $playerID, string $teamName, int $healthyRosterSlots, int $totalSalary): array;
 }

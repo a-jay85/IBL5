@@ -16,7 +16,7 @@
 // Docker development with Mailpit (http://localhost:8025):
 // 'transport' => 'smtp',
 // 'smtp' => [
-//     'host' => 'mailpit',
+//     'host' => 'ibl5-mailpit',
 //     'port' => 1025,
 //     'encryption' => '',
 //     'username' => '',

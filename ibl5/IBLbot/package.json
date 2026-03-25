@@ -19,6 +19,9 @@
     "dotenv": "^16.4.7",
     "express": "^4.22.1"
   },
+  "overrides": {
+    "undici": "6.24.1"
+  },
   "devDependencies": {
     "@types/express": "^5.0.0",
     "@types/node": "^22.10.0",

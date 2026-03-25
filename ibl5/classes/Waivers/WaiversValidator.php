@@ -78,7 +78,7 @@ class WaiversValidator implements WaiversValidatorInterface
         }
         
         // If under 12 healthy players but over hard cap and player salary > vet min
-        if ($healthyRosterSlots > 3 && $newTotalSalary > League::HARD_CAP_MAX && $playerSalary > 103) {
+        if ($healthyRosterSlots > 3 && $newTotalSalary > League::HARD_CAP_MAX && $playerSalary > \ContractRules::getVeteranMinimumSalary(10)) {
             $this->errors[] = "You are over the hard cap and therefore can only sign players who are making veteran minimum!";
             return false;
         }

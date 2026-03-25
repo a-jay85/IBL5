@@ -7,19 +7,33 @@ namespace Tests\Waivers;
 use PHPUnit\Framework\Attributes\AllowMockObjectsWithoutExpectations;
 use PHPUnit\Framework\TestCase;
 use Waivers\WaiversProcessor;
+use Waivers\Contracts\WaiversRepositoryInterface;
+use Waivers\Contracts\WaiversValidatorInterface;
 use Player\Player;
 use Season\Season;
 
 #[AllowMockObjectsWithoutExpectations]
 class WaiversProcessorTest extends TestCase
 {
-    private $processor;
-    private $mockSeasonRegular;
-    private $mockSeasonFreeAgency;
-    
+    private WaiversProcessor $processor;
+    private Season $mockSeasonRegular;
+    private Season $mockSeasonFreeAgency;
+
     protected function setUp(): void
     {
-        $this->processor = new WaiversProcessor();
+        $repoStub = $this->createStub(WaiversRepositoryInterface::class);
+        $commonRepoStub = $this->createStub(\Services\CommonMysqliRepository::class);
+        $validatorStub = $this->createStub(WaiversValidatorInterface::class);
+        $newsServiceStub = $this->createStub(\Services\NewsService::class);
+        $dbStub = $this->createStub(\mysqli::class);
+
+        $this->processor = new WaiversProcessor(
+            $repoStub,
+            $commonRepoStub,
+            $validatorStub,
+            $newsServiceStub,
+            $dbStub
+        );
         
         // Create mock Season for regular season
         $this->mockSeasonRegular = $this->createMock(Season::class);

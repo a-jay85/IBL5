@@ -216,8 +216,12 @@ class ExtensionRepository extends \BaseMysqliRepository implements ExtensionRepo
         string $offerDetails
     ): void {
         $this->transactional(function () use ($playerName, $teamName, $offer, $currentSalary, $offerInMillions, $offerYears, $offerDetails): void {
-            $this->updatePlayerContract($playerName, $offer, $currentSalary);
-            $this->markExtensionUsedThisSeason($teamName);
+            if (!$this->updatePlayerContract($playerName, $offer, $currentSalary)) {
+                throw new \RuntimeException('Failed to update player contract');
+            }
+            if (!$this->markExtensionUsedThisSeason($teamName)) {
+                throw new \RuntimeException('Failed to mark extension used this season');
+            }
             $this->createAcceptedExtensionStory($playerName, $teamName, $offerInMillions, $offerYears, $offerDetails);
         });
     }

@@ -333,6 +333,12 @@ The E2E tests run in GitHub Actions via `.github/workflows/e2e-tests.yml`. Key d
 - **Bcrypt hashes contain `$` characters** that bash expands in unquoted heredocs (`<<EOF`). When writing CI steps that handle bcrypt hashes, use either: (a) single-quoted heredocs (`<<'EOF'`) with `getenv()` in PHP, or (b) pipe from PHP directly. Never store a bcrypt hash in a shell variable and use it in an unquoted heredoc.
 - **Secrets required:** `IBL_TEST_USER` and `IBL_TEST_PASS` must be configured as GitHub repository secrets.
 
+## Worktree & Environment Gotchas
+
+- **`bin/e2e-wt.sh` runs Playwright from the main repo, not the worktree.** TypeScript test changes in a worktree branch won't be picked up. To test worktree TS changes, run Playwright directly from the worktree's `ibl5/` dir with `BASE_URL`, `IBL_TEST_USER`, and `IBL_TEST_PASS` env vars.
+- **Rebuild CSS after switching branches.** `css:watch` may not detect source file changes from `git checkout`. Run `bunx @tailwindcss/cli -i design/input.css -o themes/IBL/style/style.css` after switching.
+- **E2E tests that submit login/registration forms can trigger auth throttling.** The `auth_users_throttling` table accumulates failed attempts. If `auth.setup.ts` fails with "Too many login attempts", clear: `DELETE FROM auth_users_throttling WHERE 1=1;`. CI is unaffected (fresh DB per run).
+
 ## Completion Criteria
 
 Before considering an E2E test task complete:

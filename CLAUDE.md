@@ -99,13 +99,6 @@ Every PHP file must have `declare(strict_types=1);` at the top (enforced by PHPS
 - Use `BasketballStats\StatsFormatter` for all stats — `number_format()` is banned by PHPStan custom rule `BanNumberFormatRule` (except inside StatsFormatter itself).
 - See `view-rendering.md` for HTML modernization and deprecated-tag replacement table.
 
-### PR Documentation Checklist
-After completing a module refactoring or significant feature, update these files:
-- `STRATEGIC_PRIORITIES.md` — mark module complete
-- `REFACTORING_HISTORY.md` — add entry for the work done
-- `ibl5/classes/ModuleName/README.md` — create module README
-- `ibl5/docs/DEVELOPMENT_GUIDE.md` — update module counts and status
-
 ### Production Validation
 After refactoring, compare output against iblhoops.net. Results must match exactly.
 

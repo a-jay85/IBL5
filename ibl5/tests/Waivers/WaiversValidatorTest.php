@@ -635,4 +635,11 @@ class WaiversValidatorTest extends TestCase
             'zero salary succeeds' => [6000, 0, 5, true],
         ];
     }
+
+    public function testOverCapAllowsExactVetMinThreshold(): void
+    {
+        $vetMin = \ContractRules::getVeteranMinimumSalary(10);
+        $result = $this->validator->validateAdd(100, 5, League::HARD_CAP_MAX + 1, $vetMin);
+        $this->assertTrue($result);
+    }
 }

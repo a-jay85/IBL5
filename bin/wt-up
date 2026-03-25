@@ -39,7 +39,7 @@ if [ -z "$WORKTREE_NAME" ]; then
     echo "Options:" >&2
     echo "  --pr       Use PR number as URL slug (e.g., pr-42.localhost)" >&2
     echo "  --seed     Import ci-seed.sql for test data (schema + CI seed)" >&2
-    echo "  --prod     Import prod-seed.sql (default if no data flag given)" >&2
+    echo "  --prod     Import prod-seed.sql data (default if no data flag given)" >&2
     echo "  --no-data  Schema only, no seed data" >&2
     echo "  --fresh-vendor  Remove vendor volume and reinstall (use after composer.lock changes)" >&2
     exit 1
@@ -183,8 +183,18 @@ echo "MariaDB is ready."
 DB_CONTAINER="ibl5-db-$SLUG"
 DB_CMD="mariadb -u root -proot iblhoops_ibl5"
 
+# Always run migrations first (idempotent — skips already-applied ones).
+# This ensures the full schema exists before any data import, matching the
+# CI pipeline order: baseline → migrations → seed data.
+# For --prod, this is critical: if prod-seed.sql was exported data-only
+# (missing CREATE TABLE statements), the tables must already exist.
+"$REPO_ROOT/bin/db-migrate" "$DB_CONTAINER" "$WORKTREE_PATH/ibl5/migrations"
+
 if [ "$PROD_DB" = true ]; then
-    # --prod: import the full production dump (structure + data included)
+    # --prod: overlay production data onto the migration-created schema.
+    # If prod-seed.sql contains CREATE TABLE statements (well-formed export),
+    # they harmlessly recreate existing tables. If it's data-only, the tables
+    # already exist from migrations above.
     PROD_SEED="$REPO_ROOT/ibl5/fixtures/prod-seed.sql"
     if [ ! -f "$PROD_SEED" ]; then
         echo "Error: $PROD_SEED not found. Run bin/db-export-prod first." >&2
@@ -195,26 +205,13 @@ if [ "$PROD_DB" = true ]; then
     # not match the Docker MariaDB user, causing ERROR 1449 on import.
     sed 's/ DEFINER=[^ ]* / /g' "$PROD_SEED" | db_exec_stdin "$DB_CONTAINER" $DB_CMD
 
-    # Backfill schema_migrations from the prod dump's 'migrations' table.
+    # Backfill schema_migrations so future db-migrate runs skip already-applied ones.
     # The prod dump tracks applied migrations in 'migrations' (id, migration, batch),
-    # but wt-up's runner uses 'schema_migrations' (version). Bridge the two so the
-    # runner skips already-applied migrations instead of re-running them.
+    # but db-migrate uses 'schema_migrations' (version). Bridge the two.
     echo "Backfilling schema_migrations from prod dump..."
     db_exec "$DB_CONTAINER" $DB_CMD \
-        -e "CREATE TABLE IF NOT EXISTS schema_migrations (version VARCHAR(255) PRIMARY KEY, applied_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP);"
-    db_exec "$DB_CONTAINER" $DB_CMD \
-        -e "INSERT IGNORE INTO schema_migrations (version) VALUES ('000_baseline_schema.sql');"
-    db_exec "$DB_CONTAINER" $DB_CMD \
         -e "INSERT IGNORE INTO schema_migrations (version) SELECT migration FROM migrations;" 2>/dev/null || true
-else
-    # Default: migrations handle schema creation (migration 000 is the baseline)
-    echo "Schema will be created by migrations below."
 fi
-
-# Always run migrations (idempotent — skips already-applied ones)
-# Migrations run BEFORE ci-seed to match CI pipeline order
-# (schema → migrations → seed), ensuring renamed columns exist.
-"$REPO_ROOT/bin/db-migrate" "$DB_CONTAINER" "$WORKTREE_PATH/ibl5/migrations"
 
 # Optionally seed with CI test data (after migrations so renamed columns exist)
 if [ "$SEED_DB" = true ]; then

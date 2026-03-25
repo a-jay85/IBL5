@@ -42,6 +42,14 @@ class FreeAgencyNegotiationView implements FreeAgencyNegotiationViewInterface
         $maxContract = $negotiationData['maxContract'];
         $team = $negotiationData['team'];
 
+        // Generate a single CSRF token for all forms on this page.
+        // The negotiate page has 16+ forms (custom, delete, quick-offer buttons).
+        // CsrfGuard's MAX_TOKENS=10 would evict the custom form's token if each
+        // form generated its own. One shared token avoids this.
+        $csrfToken = \Utilities\CsrfGuard::generateRawToken('free_agency');
+        $csrfHtml = '<input type="hidden" name="_csrf_token" value="' . $csrfToken . '">';
+        $this->formComponents->setCsrfHtml($csrfHtml);
+
         ob_start();
 
         echo '<h2 class="ibl-title">Free Agency</h2>';
@@ -90,6 +98,7 @@ class FreeAgencyNegotiationView implements FreeAgencyNegotiationViewInterface
         </div>
 
         <form name="FAOffer" method="post" action="modules.php?name=FreeAgency&pa=processoffer">
+            <?= $csrfHtml ?>
             <div class="ibl-field-group">
                 <span class="ibl-label">Your Custom Offer:</span>
                 <div class="ibl-field-group__content">
@@ -123,6 +132,7 @@ class FreeAgencyNegotiationView implements FreeAgencyNegotiationViewInterface
 <?php if ($hasExistingOffer): ?>
 <div class="offer-delete-section">
     <form method="post" action="modules.php?name=FreeAgency&pa=deleteoffer">
+        <?= $csrfHtml ?>
         <input type="hidden" name="teamname" value="<?= HtmlSanitizer::e($team->name) ?>">
         <input type="hidden" name="playerID" value="<?= (int) $player->playerID ?>">
         <button type="submit" class="ibl-btn ibl-btn--danger">Delete This Offer</button>

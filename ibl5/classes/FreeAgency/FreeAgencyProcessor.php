@@ -195,7 +195,7 @@ class FreeAgencyProcessor implements FreeAgencyProcessorInterface
         $teamName = $team->name;
 
         // Calculate perceived value
-        $yearsInOffer = $this->calculateYearsInOffer($offerData);
+        $yearsInOffer = OfferType::calculateYears($offerData);
         $offerAverage = $this->calculateOfferAverage($offerData, $yearsInOffer);
 
         $perceivedValue = $this->calculator->calculatePerceivedValue(
@@ -251,34 +251,6 @@ class FreeAgencyProcessor implements FreeAgencyProcessorInterface
         }
 
         return $saved;
-    }
-
-    /**
-     * Calculate number of years in an offer
-     *
-     * @param array{offer1: int, offer2: int, offer3: int, offer4: int, offer5: int, offer6: int, birdYears: int, offerType: int, vetmin: int, year1Max: int, amendedCapSpaceYear1: int} $offerData Offer data
-     * @return int Number of years
-     */
-    private function calculateYearsInOffer(array $offerData): int
-    {
-        $offers = [
-            1 => $offerData['offer1'],
-            2 => $offerData['offer2'],
-            3 => $offerData['offer3'],
-            4 => $offerData['offer4'],
-            5 => $offerData['offer5'],
-            6 => $offerData['offer6'],
-        ];
-
-        $years = 6;
-        for ($i = 6; $i >= 1; $i--) {
-            if ($offers[$i] === 0) {
-                $years = $i - 1;
-            } else {
-                break;
-            }
-        }
-        return max(1, $years);
     }
 
     /**

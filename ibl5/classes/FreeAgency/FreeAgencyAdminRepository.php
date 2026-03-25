@@ -180,4 +180,58 @@ class FreeAgencyAdminRepository extends BaseMysqliRepository implements FreeAgen
     {
         $this->execute("DELETE FROM ibl_fa_offers", "");
     }
+
+    /**
+     * @see FreeAgencyAdminRepositoryInterface::executeSigningsTransactionally()
+     */
+    public function executeSigningsTransactionally(
+        array $signings,
+        string $newsTitle,
+        string $newsHomeText,
+        string $newsBodyText
+    ): array {
+        return $this->transactional(function () use ($signings, $newsTitle, $newsHomeText, $newsBodyText): array {
+            $successCount = 0;
+            $errorCount = 0;
+
+            foreach ($signings as $signing) {
+                $affected = $this->updatePlayerContract(
+                    $signing['playerId'],
+                    $signing['teamId'],
+                    $signing['offerYears'],
+                    $signing['offers']['offer1'],
+                    $signing['offers']['offer2'],
+                    $signing['offers']['offer3'],
+                    $signing['offers']['offer4'],
+                    $signing['offers']['offer5'],
+                    $signing['offers']['offer6']
+                );
+
+                if ($affected > 0) {
+                    $successCount++;
+                } else {
+                    $errorCount++;
+                }
+
+                if ($signing['usedMle']) {
+                    $this->markMleUsed($signing['teamName']);
+                }
+
+                if ($signing['usedLle']) {
+                    $this->markLleUsed($signing['teamName']);
+                }
+            }
+
+            if ($successCount > 0 && $newsHomeText !== '' && $newsBodyText !== '') {
+                $affected = $this->insertNewsStory($newsTitle, $newsHomeText, $newsBodyText);
+                if ($affected > 0) {
+                    $successCount++;
+                } else {
+                    $errorCount++;
+                }
+            }
+
+            return ['successCount' => $successCount, 'errorCount' => $errorCount];
+        });
+    }
 }

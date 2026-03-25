@@ -49,6 +49,14 @@ mariadb -h 127.0.0.1 --skip-ssl -u root -proot iblhoops_ibl5
 
 **When to use `db-query`:** Use this script to explore the database schema, verify data after making changes, check record counts, and validate your work. This is the preferred method for Claude to query the local database since it's configured for auto-approval in the user's Claude Code settings.
 
+## Migration Runner
+
+```bash
+bin/db-migrate <db-container> <migrations-dir>
+```
+
+Runs pending SQL migrations against a Docker MariaDB container. Tracks applied migrations in `schema_migrations(version VARCHAR PRIMARY KEY)`. Idempotent — skips already-applied migrations. Used internally by `bin/wt-up` to apply migrations after seeding.
+
 ## MariaDB Strict Mode & Triggers
 
 - **NOT NULL columns without DEFAULT reject INSERTs before BEFORE INSERT triggers fire.** If a column is `NOT NULL` with no `DEFAULT`, MariaDB strict mode (enabled by default since 10.2) throws `Field 'x' doesn't have a default value` *before* any BEFORE INSERT trigger can auto-populate it. All uuid columns now have `DEFAULT (UUID())` (migration 065), so uuid is no longer an example of this problem. The rule still applies to other NOT NULL columns without defaults.

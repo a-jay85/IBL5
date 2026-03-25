@@ -34,6 +34,11 @@ class MyRepository extends BaseMysqliRepository
 
 **Note:** The `MySQL` class exists only for PHP-Nuke backward compatibility and should not be used in new code.
 
+## API Response Types
+
+- **JSON:** `Api\Response\JsonResponder` — standard API responses (Controller → JsonResponder)
+- **CSV:** `Api\Response\CsvResponder` — streaming CSV with UTF-8 BOM for Excel compatibility (Controller → Transformer → CsvResponder). See `PlayerExportController` for the canonical example.
+
 ## View Rendering Pattern
 Use output buffering with `HtmlSanitizer::e()` for XSS-safe output:
 ```php

@@ -154,4 +154,22 @@ class MailServiceTest extends TestCase
             putenv('MAIL_TRANSPORT');
         }
     }
+
+    public function testFromConfigInvalidPortFallsBackToDefault(): void
+    {
+        putenv('MAIL_TRANSPORT=smtp');
+        putenv('MAIL_SMTP_HOST=mailpit.local');
+        putenv('MAIL_SMTP_PORT=badvalue');
+
+        try {
+            $service = MailService::fromConfig();
+
+            // Invalid port should fall back to default (587), not (int)'badvalue' = 0
+            $this->assertSame('smtp', $service->getTransport());
+        } finally {
+            putenv('MAIL_TRANSPORT');
+            putenv('MAIL_SMTP_HOST');
+            putenv('MAIL_SMTP_PORT');
+        }
+    }
 }

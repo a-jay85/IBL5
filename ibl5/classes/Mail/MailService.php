@@ -119,7 +119,9 @@ class MailService implements MailServiceInterface
             'transport' => $transport,
             'smtp' => [
                 'host' => is_string($host) && $host !== '' ? $host : self::DEFAULT_CONFIG['smtp']['host'],
-                'port' => is_string($port) && $port !== '' ? (int) $port : self::DEFAULT_CONFIG['smtp']['port'],
+                'port' => is_string($port) && $port !== '' && (int) $port >= 1 && (int) $port <= 65535
+                    ? (int) $port
+                    : self::DEFAULT_CONFIG['smtp']['port'],
                 'encryption' => is_string($encryption) ? $encryption : self::DEFAULT_CONFIG['smtp']['encryption'],
                 'username' => is_string($username) && $username !== '' ? $username : self::DEFAULT_CONFIG['smtp']['username'],
                 'password' => is_string($password) && $password !== '' ? $password : self::DEFAULT_CONFIG['smtp']['password'],

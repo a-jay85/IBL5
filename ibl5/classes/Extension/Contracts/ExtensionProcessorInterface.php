@@ -12,7 +12,7 @@ use Team\Team;
  * Defines the main entry point for processing contract extension offers.
  * Orchestrates validation, evaluation, database operations, and notifications.
  *
- * @phpstan-import-type ExtensionOffer from ExtensionDatabaseOperationsInterface
+ * @phpstan-import-type ExtensionOffer from ExtensionRepositoryInterface
  *
  * @phpstan-type ExtensionData array{playerID?: int, player?: \Player\Player, teamName?: string, team?: Team, offer: ExtensionOffer, demands?: array{total: int, years: int}|ExtensionOffer|null}
  * @phpstan-type ExtensionSuccessResult array{success: true, accepted: bool, message: string, offerValue: float, demandValue: float, modifier: float, extensionYears: int, offerInMillions: float, offerDetails: string, discordNotificationSent: bool, discordChannel: string, refusalMessage?: string}

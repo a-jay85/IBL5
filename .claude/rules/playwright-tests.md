@@ -264,7 +264,7 @@ test.describe('Public module flow', () => {
 
 **Allowlisted settings:** `Current Season Phase`, `Current Season Ending Year`, `Allow Trades`, `Allow Waiver Moves`, `Show Draft Link`, `Trivia Mode`, `ASG Voting`, `EOY Voting`, `Free Agency Notifications`.
 
-**Serial mode:** When multiple `describe` blocks in the same file set the same setting to different values, use `test.describe.configure({ mode: 'serial' })` at the file level to prevent interleaving.
+**Serial mode:** Prefer splitting a spec file into read-only (`smoke/` or `flows/`) and submission (`flows/*-submission.spec.ts`) files rather than applying file-level `test.describe.configure({ mode: 'serial' })`. Use serial mode only within a single `describe` block where tests genuinely share state (e.g., a multi-step submission flow). See `voting.spec.ts` / `voting-submission.spec.ts` split as the canonical example.
 
 ## DO:
 1. Check for PHP errors on every page you visit in smoke tests
@@ -323,6 +323,11 @@ if (count > 0) { assertA(); } else { assertB(); }
 // BANNED — true-only guard (silently passes when absent)
 if (count > 0) { await expect(el).toBeVisible(); }
 ```
+
+## Shared Helpers
+
+- **`helpers/navigation.ts`**: `gotoWithRetry(page, url)` — retries up to 5 times with back-off when PHP's built-in server returns blank pages under parallel load. Use instead of bare `page.goto()` in parallel-load-sensitive tests (e.g., mobile tests).
+- **`smoke/htmx.spec.ts`**: Nav marker pattern — set `data-htmx-marker` on `nav.fixed` before an action, then check if the attribute persists to verify HTMX swap (no full reload). Only works for inline-rendering forms (search, depth chart), not forms that redirect via `HX-Redirect`.
 
 ## CI Workflow Notes
 

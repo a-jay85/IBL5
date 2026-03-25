@@ -12,6 +12,8 @@ use Season\Season;
  *
  * Assembles data needed by views from repositories, calculators, and domain objects.
  * Views receive pre-computed data arrays and never touch the database.
+ *
+ * @phpstan-import-type PlayerRow from \Services\CommonMysqliRepository
  */
 interface FreeAgencyServiceInterface
 {
@@ -31,7 +33,7 @@ interface FreeAgencyServiceInterface
      *     capMetrics: array{totalSalaries: array<int, int>, softCapSpace: array<int, int>, hardCapSpace: array<int, int>, rosterSpots: array<int, int>},
      *     team: Team,
      *     season: Season,
-     *     allOtherPlayers: list<array<string, mixed>>
+     *     allOtherPlayers: list<PlayerRow>
      * }
      */
     public function getMainPageData(Team $team, Season $season): array;

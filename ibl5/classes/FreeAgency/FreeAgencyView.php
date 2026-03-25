@@ -49,6 +49,8 @@ class FreeAgencyView implements FreeAgencyViewInterface
             'already_signed' => ['class' => 'ibl-alert--warning', 'message' => 'This player was previously signed to a team this Free Agency period.'],
             'rookie_option_success' => ['class' => 'ibl-alert--success', 'message' => 'Rookie option has been exercised successfully. The contract update is reflected on the team page.'],
             'email_failed' => ['class' => 'ibl-alert--warning', 'message' => 'Rookie option exercised, but the notification email failed to send. Please notify the commissioner.'],
+            'csrf_error' => ['class' => 'ibl-alert--error', 'message' => 'Your session expired or the form submission was invalid. Please try again.'],
+            'error' => ['class' => 'ibl-alert--error', 'message' => 'An unexpected error occurred. Please try again.'],
         ]);
         ?>
 <h2 class="ibl-title">Free Agency</h2>

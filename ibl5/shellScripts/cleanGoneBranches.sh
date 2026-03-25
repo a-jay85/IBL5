@@ -72,11 +72,8 @@ while IFS= read -r line; do
         fi
 
         echo "  WORKTREE $branch — tearing down..."
-        if [ -x "$REPO_ROOT/bin/wt-down" ]; then
-            "$REPO_ROOT/bin/wt-down" "$branch" --volumes --force 2>&1 | sed 's/^/    /'
-        fi
         if [ -x "$REPO_ROOT/bin/wt-remove" ]; then
-            "$REPO_ROOT/bin/wt-remove" --force "$branch" 2>&1 | sed 's/^/    /'
+            "$REPO_ROOT/bin/wt-remove" --force --volumes "$branch" 2>&1 | sed 's/^/    /'
         fi
     fi
 

@@ -25,7 +25,17 @@ if (!\Utilities\CsrfGuard::validateSubmittedToken('eoy_vote')) {
     return;
 }
 
-$teamName = is_string($_POST['teamname'] ?? null) ? $_POST['teamname'] : '';
+// Derive team identity from authenticated session, not POST (prevents spoofing)
+global $user, $cookie;
+if (!is_user($user)) {
+    echo 'You must be logged in to vote.';
+    PageLayout\PageLayout::footer();
+    return;
+}
+cookiedecode($user);
+$username = (string) ($cookie[1] ?? '');
+$commonRepository = new \Services\CommonMysqliRepository($mysqli_db);
+$teamName = $commonRepository->getTeamnameFromUsername($username) ?? '';
 
 /** @var array{MVP_1: string, MVP_2: string, MVP_3: string, Six_1: string, Six_2: string, Six_3: string, ROY_1: string, ROY_2: string, ROY_3: string, GM_1: string, GM_2: string, GM_3: string} $ballot */
 $ballot = [

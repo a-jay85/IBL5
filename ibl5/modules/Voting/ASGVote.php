@@ -25,7 +25,17 @@ if (!\Utilities\CsrfGuard::validateSubmittedToken('asg_vote')) {
     return;
 }
 
-$teamName = is_string($_POST['teamname'] ?? null) ? $_POST['teamname'] : '';
+// Derive team identity from authenticated session, not POST (prevents spoofing)
+global $user, $cookie;
+if (!is_user($user)) {
+    echo 'You must be logged in to vote.';
+    PageLayout\PageLayout::footer();
+    return;
+}
+cookiedecode($user);
+$username = (string) ($cookie[1] ?? '');
+$commonRepository = new \Services\CommonMysqliRepository($mysqli_db);
+$teamName = $commonRepository->getTeamnameFromUsername($username) ?? '';
 
 // Parse checkbox arrays (0-indexed from HTML) into typed ballot (1-indexed field names)
 $ecf = is_array($_POST['ECF'] ?? null) ? $_POST['ECF'] : [];

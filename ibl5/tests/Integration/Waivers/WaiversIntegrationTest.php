@@ -37,7 +37,12 @@ class WaiversIntegrationTest extends IntegrationTestCase
     {
         parent::setUp();
         $this->repository = new WaiversRepository($this->mockDb);
-        $this->processor = new WaiversProcessor();
+        $repoStub = $this->createStub(\Waivers\Contracts\WaiversRepositoryInterface::class);
+        $commonRepoStub = $this->createStub(\Services\CommonMysqliRepository::class);
+        $validatorStub = $this->createStub(\Waivers\Contracts\WaiversValidatorInterface::class);
+        $newsServiceStub = $this->createStub(\Services\NewsService::class);
+        $dbStub = $this->createStub(\mysqli::class);
+        $this->processor = new WaiversProcessor($repoStub, $commonRepoStub, $validatorStub, $newsServiceStub, $dbStub);
         $this->validator = new WaiversValidator();
 
         // Prevent Discord notifications during tests

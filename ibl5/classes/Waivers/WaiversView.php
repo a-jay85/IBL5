@@ -25,7 +25,7 @@ class WaiversView implements WaiversViewInterface
         int $healthyOpenRosterSpots,
         ?string $result = null,
         ?string $error = null
-    ): void {
+    ): string {
         $teamNameEscaped = \Utilities\HtmlSanitizer::safeHtmlOutput($teamName);
         $actionEscaped = \Utilities\HtmlSanitizer::safeHtmlOutput($action);
 
@@ -65,10 +65,7 @@ class WaiversView implements WaiversViewInterface
             </div>
         </form>
         <?php
-        $output = ob_get_clean();
-        if ($output !== false) {
-            echo $output;
-        }
+        return (string) ob_get_clean();
     }
 
     /**
@@ -95,10 +92,8 @@ class WaiversView implements WaiversViewInterface
     /**
      * @see WaiversViewInterface::renderWaiversClosed()
      */
-    public function renderWaiversClosed(): void
+    public function renderWaiversClosed(): string
     {
-        \PageLayout\PageLayout::header();
-        echo "Sorry, but players may not be added from or dropped to waivers at the present time.";
-        \PageLayout\PageLayout::footer();
+        return "Sorry, but players may not be added from or dropped to waivers at the present time.";
     }
 }

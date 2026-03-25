@@ -42,10 +42,9 @@ class WaiversViewTest extends TestCase
     // RENDER WAIVER FORM TESTS
     // ============================================
 
-    public function testRenderWaiverFormOutputsContent(): void
+    public function testRenderWaiverFormReturnsContent(): void
     {
-        ob_start();
-        $this->view->renderWaiverForm(
+        $output = $this->view->renderWaiverForm(
             'Test Team',
             1,
             'waive',
@@ -53,15 +52,13 @@ class WaiversViewTest extends TestCase
             5,
             5
         );
-        $output = ob_get_clean();
 
         $this->assertNotEmpty($output);
     }
 
     public function testRenderWaiverFormContainsTeamName(): void
     {
-        ob_start();
-        $this->view->renderWaiverForm(
+        $output = $this->view->renderWaiverForm(
             'Boston Celtics',
             1,
             'waive',
@@ -69,15 +66,13 @@ class WaiversViewTest extends TestCase
             5,
             5
         );
-        $output = ob_get_clean();
 
         $this->assertStringContainsString('Boston Celtics', $output);
     }
 
     public function testRenderWaiverFormContainsForm(): void
     {
-        ob_start();
-        $this->view->renderWaiverForm(
+        $output = $this->view->renderWaiverForm(
             'Test Team',
             1,
             'waive',
@@ -85,15 +80,13 @@ class WaiversViewTest extends TestCase
             5,
             5
         );
-        $output = ob_get_clean();
 
         $this->assertStringContainsString('<form', $output);
     }
 
     public function testRenderWaiverFormContainsRosterSpots(): void
     {
-        ob_start();
-        $this->view->renderWaiverForm(
+        $output = $this->view->renderWaiverForm(
             'Test Team',
             1,
             'waive',
@@ -101,7 +94,6 @@ class WaiversViewTest extends TestCase
             3,
             2
         );
-        $output = ob_get_clean();
 
         $this->assertStringContainsString('3 OPEN SPOTS', $output);
         $this->assertStringContainsString('2 HEALTHY SPOTS', $output);
@@ -109,8 +101,7 @@ class WaiversViewTest extends TestCase
 
     public function testRenderWaiverFormShowsErrorMessage(): void
     {
-        ob_start();
-        $this->view->renderWaiverForm(
+        $output = $this->view->renderWaiverForm(
             'Test Team',
             1,
             'waive',
@@ -120,7 +111,6 @@ class WaiversViewTest extends TestCase
             null,
             'Player cannot be dropped'
         );
-        $output = ob_get_clean();
 
         $this->assertStringContainsString('Player cannot be dropped', $output);
         $this->assertStringContainsString('ibl-alert--error', $output);
@@ -128,8 +118,7 @@ class WaiversViewTest extends TestCase
 
     public function testRenderWaiverFormShowsSuccessAddBanner(): void
     {
-        ob_start();
-        $this->view->renderWaiverForm(
+        $output = $this->view->renderWaiverForm(
             'Test Team',
             1,
             'add',
@@ -138,7 +127,6 @@ class WaiversViewTest extends TestCase
             5,
             'player_added'
         );
-        $output = ob_get_clean();
 
         $this->assertStringContainsString('ibl-alert--success', $output);
         $this->assertStringContainsString('Player successfully signed from waivers.', $output);
@@ -146,8 +134,7 @@ class WaiversViewTest extends TestCase
 
     public function testRenderWaiverFormShowsSuccessDropBanner(): void
     {
-        ob_start();
-        $this->view->renderWaiverForm(
+        $output = $this->view->renderWaiverForm(
             'Test Team',
             1,
             'waive',
@@ -156,7 +143,6 @@ class WaiversViewTest extends TestCase
             5,
             'player_dropped'
         );
-        $output = ob_get_clean();
 
         $this->assertStringContainsString('ibl-alert--success', $output);
         $this->assertStringContainsString('Player successfully dropped to waivers.', $output);
@@ -164,8 +150,7 @@ class WaiversViewTest extends TestCase
 
     public function testRenderWaiverFormEscapesTeamName(): void
     {
-        ob_start();
-        $this->view->renderWaiverForm(
+        $output = $this->view->renderWaiverForm(
             '<script>alert("xss")</script>',
             1,
             'waive',
@@ -173,15 +158,13 @@ class WaiversViewTest extends TestCase
             5,
             5
         );
-        $output = ob_get_clean();
 
         $this->assertStringNotContainsString('<script>', $output);
     }
 
     public function testRenderWaiverFormUsesDesignSystemClasses(): void
     {
-        ob_start();
-        $this->view->renderWaiverForm(
+        $output = $this->view->renderWaiverForm(
             'Test Team',
             1,
             'waive',
@@ -189,7 +172,6 @@ class WaiversViewTest extends TestCase
             5,
             5
         );
-        $output = ob_get_clean();
 
         $this->assertStringContainsString('ibl-card', $output);
         $this->assertStringContainsString('ibl-card__header', $output);
@@ -200,8 +182,7 @@ class WaiversViewTest extends TestCase
 
     public function testRenderWaiverFormNoCustomWaiversClasses(): void
     {
-        ob_start();
-        $this->view->renderWaiverForm(
+        $output = $this->view->renderWaiverForm(
             'Test Team',
             1,
             'waive',
@@ -209,12 +190,23 @@ class WaiversViewTest extends TestCase
             5,
             5
         );
-        $output = ob_get_clean();
 
         $this->assertStringNotContainsString('waivers-form-card', $output);
         $this->assertStringNotContainsString('waivers-form-header', $output);
         $this->assertStringNotContainsString('waivers-form-body', $output);
         $this->assertStringNotContainsString('waivers-select', $output);
         $this->assertStringNotContainsString('waivers-team-title', $output);
+    }
+
+    // ============================================
+    // RENDER WAIVERS CLOSED TESTS
+    // ============================================
+
+    public function testRenderWaiversClosedReturnsString(): void
+    {
+        $output = $this->view->renderWaiversClosed();
+
+        $this->assertIsString($output);
+        $this->assertStringContainsString('waivers', strtolower($output));
     }
 }

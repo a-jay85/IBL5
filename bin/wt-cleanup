@@ -64,8 +64,7 @@ cleanup_worktree() {
     fi
 
     echo "Cleaning: $wt_name (branch: $branch)..."
-    "$REPO_ROOT/bin/wt-down" "$wt_name" --volumes --force 2>/dev/null || true
-    "$REPO_ROOT/bin/wt-remove" --force "$wt_name" 2>/dev/null || true
+    "$REPO_ROOT/bin/wt-remove" --force --volumes "$wt_name" 2>/dev/null || true
     git -C "$REPO_ROOT" branch -d "$branch" 2>/dev/null || \
         echo "  Note: local branch '$branch' already deleted or not found"
     CLEANED=$((CLEANED + 1))

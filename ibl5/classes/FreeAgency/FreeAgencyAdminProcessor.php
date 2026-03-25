@@ -75,7 +75,10 @@ class FreeAgencyAdminProcessor implements FreeAgencyAdminProcessorInterface
             $random = $row['random'];
 
             // Calculate offer years and total
-            $offerYears = $this->calculateOfferYears($offer1, $offer2, $offer3, $offer4, $offer5, $offer6);
+            $offerYears = OfferType::calculateYears([
+                'offer1' => $offer1, 'offer2' => $offer2, 'offer3' => $offer3,
+                'offer4' => $offer4, 'offer5' => $offer5, 'offer6' => $offer6,
+            ]);
             $offerTotal = ($offer1 + $offer2 + $offer3 + $offer4 + $offer5 + $offer6) / 100;
 
             // Store all offers for display
@@ -199,58 +202,24 @@ class FreeAgencyAdminProcessor implements FreeAgencyAdminProcessorInterface
         string $newsHomeText,
         string $newsBodyText
     ): array {
-        $successCount = 0;
-        $errorCount = 0;
-
-        $this->db->begin_transaction();
-        try {
-            foreach ($signings as $signing) {
-                // Update player contract
-                $affected = $this->repository->updatePlayerContract(
-                    $signing['playerId'],
-                    $signing['teamId'],
-                    $signing['offerYears'],
-                    $signing['offers']['offer1'],
-                    $signing['offers']['offer2'],
-                    $signing['offers']['offer3'],
-                    $signing['offers']['offer4'],
-                    $signing['offers']['offer5'],
-                    $signing['offers']['offer6']
-                );
-
-                if ($affected > 0) {
-                    $successCount++;
-                } else {
-                    $errorCount++;
-                }
-
-                // Mark MLE as used if applicable
-                if ($signing['usedMle']) {
-                    $this->repository->markMleUsed($signing['teamName']);
-                }
-
-                // Mark LLE as used if applicable
-                if ($signing['usedLle']) {
-                    $this->repository->markLleUsed($signing['teamName']);
-                }
-            }
-
-            // Insert news story if there were signings
-            if ($successCount > 0 && $newsHomeText !== '' && $newsBodyText !== '') {
-                $affected = $this->repository->insertNewsStory($newsTitle, $newsHomeText, $newsBodyText);
-
-                if ($affected > 0) {
-                    $successCount++;
-                } else {
-                    $errorCount++;
-                }
-            }
-
-            $this->db->commit();
-        } catch (\Throwable $e) {
-            $this->db->rollback();
-            throw $e;
+        if ($signings === []) {
+            return [
+                'success' => false,
+                'successCount' => 0,
+                'errorCount' => 0,
+                'message' => 'No operations were executed.',
+            ];
         }
+
+        $counts = $this->repository->executeSigningsTransactionally(
+            $signings,
+            $newsTitle,
+            $newsHomeText,
+            $newsBodyText
+        );
+
+        $successCount = $counts['successCount'];
+        $errorCount = $counts['errorCount'];
 
         if ($errorCount === 0 && $successCount > 0) {
             return [
@@ -259,21 +228,14 @@ class FreeAgencyAdminProcessor implements FreeAgencyAdminProcessorInterface
                 'errorCount' => $errorCount,
                 'message' => "Successfully executed {$successCount} operations. Free agents have been assigned to teams.",
             ];
-        } elseif ($errorCount > 0) {
-            return [
-                'success' => false,
-                'successCount' => $successCount,
-                'errorCount' => $errorCount,
-                'message' => "Completed with errors: {$successCount} operations succeeded, {$errorCount} operations failed.",
-            ];
-        } else {
-            return [
-                'success' => false,
-                'successCount' => 0,
-                'errorCount' => 0,
-                'message' => 'No operations were executed.',
-            ];
         }
+
+        return [
+            'success' => false,
+            'successCount' => $successCount,
+            'errorCount' => $errorCount,
+            'message' => "Completed with errors: {$successCount} operations succeeded, {$errorCount} operations failed.",
+        ];
     }
 
     /**
@@ -290,36 +252,6 @@ class FreeAgencyAdminProcessor implements FreeAgencyAdminProcessorInterface
     }
 
     /**
-     * Calculate number of years in an offer
-     */
-    private function calculateOfferYears(
-        int $offer1,
-        int $offer2,
-        int $offer3,
-        int $offer4,
-        int $offer5,
-        int $offer6
-    ): int {
-        $years = 6;
-        if ($offer6 === 0) {
-            $years = 5;
-        }
-        if ($offer5 === 0) {
-            $years = 4;
-        }
-        if ($offer4 === 0) {
-            $years = 3;
-        }
-        if ($offer3 === 0) {
-            $years = 2;
-        }
-        if ($offer2 === 0) {
-            $years = 1;
-        }
-        return $years;
-    }
-
-    /**
      * Calculate day-adjusted demand value from pre-loaded demand data
      *
      * @param array{dem1: int, dem2: int, dem3: int, dem4: int, dem5: int, dem6: int}|null $demRow
@@ -330,33 +262,14 @@ class FreeAgencyAdminProcessor implements FreeAgencyAdminProcessorInterface
             return 0.0;
         }
 
-        $dem1 = $demRow['dem1'];
-        $dem2 = $demRow['dem2'];
-        $dem3 = $demRow['dem3'];
-        $dem4 = $demRow['dem4'];
-        $dem5 = $demRow['dem5'];
-        $dem6 = $demRow['dem6'];
-
-        // Calculate demand years
-        $demYears = 6;
-        if ($dem6 === 0) {
-            $demYears = 5;
-        }
-        if ($dem5 === 0) {
-            $demYears = 4;
-        }
-        if ($dem4 === 0) {
-            $demYears = 3;
-        }
-        if ($dem3 === 0) {
-            $demYears = 2;
-        }
-        if ($dem2 === 0) {
-            $demYears = 1;
-        }
+        $demYears = OfferType::calculateYears([
+            'offer1' => $demRow['dem1'], 'offer2' => $demRow['dem2'], 'offer3' => $demRow['dem3'],
+            'offer4' => $demRow['dem4'], 'offer5' => $demRow['dem5'], 'offer6' => $demRow['dem6'],
+        ]);
 
         // Calculate demands with day adjustment (demands decrease as days progress)
-        $totalDemand = $dem1 + $dem2 + $dem3 + $dem4 + $dem5 + $dem6;
+        $totalDemand = $demRow['dem1'] + $demRow['dem2'] + $demRow['dem3']
+                     + $demRow['dem4'] + $demRow['dem5'] + $demRow['dem6'];
         return ($totalDemand / $demYears) * ((11 - $day) / 10);
     }
 

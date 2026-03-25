@@ -13,6 +13,8 @@ use Season\Season;
 
 /**
  * @see FreeAgencyServiceInterface
+ *
+ * @phpstan-import-type PlayerRow from \Services\CommonMysqliRepository
  */
 class FreeAgencyService implements FreeAgencyServiceInterface
 {
@@ -33,7 +35,7 @@ class FreeAgencyService implements FreeAgencyServiceInterface
     /**
      * @see FreeAgencyServiceInterface::getMainPageData()
      *
-     * @return array{capMetrics: array{totalSalaries: array<int, int>, softCapSpace: array<int, int>, hardCapSpace: array<int, int>, rosterSpots: array<int, int>}, team: Team, season: Season, allOtherPlayers: list<array<string, mixed>>}
+     * @return array{capMetrics: array{totalSalaries: array<int, int>, softCapSpace: array<int, int>, hardCapSpace: array<int, int>, rosterSpots: array<int, int>}, team: Team, season: Season, allOtherPlayers: list<PlayerRow>}
      */
     public function getMainPageData(Team $team, Season $season): array
     {

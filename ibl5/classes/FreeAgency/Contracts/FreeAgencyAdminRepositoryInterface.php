@@ -118,4 +118,23 @@ interface FreeAgencyAdminRepositoryInterface
      * Clear all offers from the free agency offers table
      */
     public function clearAllOffers(): void;
+
+    /**
+     * Execute signings atomically within a transaction
+     *
+     * Updates player contracts, marks MLE/LLE as used, and inserts news stories
+     * within a single transaction using SAVEPOINT support.
+     *
+     * @param list<array{playerId: int, teamId: int, teamName: string, offers: array{offer1: int, offer2: int, offer3: int, offer4: int, offer5: int, offer6: int}, offerYears: int, usedMle: bool, usedLle: bool}> $signings
+     * @param string $newsTitle News article title
+     * @param string $newsHomeText News article summary text
+     * @param string $newsBodyText News article full body text
+     * @return array{successCount: int, errorCount: int}
+     */
+    public function executeSigningsTransactionally(
+        array $signings,
+        string $newsTitle,
+        string $newsHomeText,
+        string $newsBodyText
+    ): array;
 }

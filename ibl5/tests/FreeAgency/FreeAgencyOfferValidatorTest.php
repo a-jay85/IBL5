@@ -7,6 +7,7 @@ namespace Tests\FreeAgency;
 use PHPUnit\Framework\TestCase;
 use PHPUnit\Framework\Attributes\DataProvider;
 use FreeAgency\FreeAgencyOfferValidator;
+use Team\Team;
 
 /**
  * Tests for FreeAgencyOfferValidator
@@ -234,10 +235,7 @@ class FreeAgencyOfferValidatorTest extends TestCase
     public function testRejectsMLEOfferWhenTeamOutOfMLE(): void
     {
         // Arrange
-        $mockTeam = (object)[
-            'hasMLE' => 0, // Team has already used MLE
-            'hasLLE' => 1
-        ];
+        $mockTeam = $this->createMockTeam(0, 1); // hasMLE=0 (used), hasLLE=1
         $validator = new FreeAgencyOfferValidator($mockTeam);
         $offerData = $this->createValidOffer();
         $offerData['offerType'] = \FreeAgency\OfferType::MLE_1_YEAR; // MLE offer
@@ -258,10 +256,7 @@ class FreeAgencyOfferValidatorTest extends TestCase
     public function testRejectsLLEOfferWhenTeamOutOfLLE(): void
     {
         // Arrange
-        $mockTeam = (object)[
-            'hasMLE' => 1,
-            'hasLLE' => 0 // Team has already used LLE
-        ];
+        $mockTeam = $this->createMockTeam(1, 0); // hasMLE=1, hasLLE=0 (used)
         $validator = new FreeAgencyOfferValidator($mockTeam);
         $offerData = $this->createValidOffer();
         $offerData['offerType'] = \FreeAgency\OfferType::LOWER_LEVEL_EXCEPTION; // LLE offer
@@ -282,10 +277,7 @@ class FreeAgencyOfferValidatorTest extends TestCase
     public function testAcceptsMLEOfferWhenTeamHasMLE(): void
     {
         // Arrange
-        $mockTeam = (object)[
-            'hasMLE' => 1, // Team has MLE available
-            'hasLLE' => 1
-        ];
+        $mockTeam = $this->createMockTeam(1, 1); // hasMLE=1 (available), hasLLE=1
         $validator = new FreeAgencyOfferValidator($mockTeam);
         $offerData = $this->createValidOffer();
         $offerData['offerType'] = \FreeAgency\OfferType::MLE_1_YEAR; // MLE offer
@@ -304,10 +296,7 @@ class FreeAgencyOfferValidatorTest extends TestCase
     public function testAcceptsLLEOfferWhenTeamHasLLE(): void
     {
         // Arrange
-        $mockTeam = (object)[
-            'hasMLE' => 1,
-            'hasLLE' => 1 // Team has LLE available
-        ];
+        $mockTeam = $this->createMockTeam(1, 1); // hasMLE=1, hasLLE=1 (available)
         $validator = new FreeAgencyOfferValidator($mockTeam);
         $offerData = $this->createValidOffer();
         $offerData['offerType'] = \FreeAgency\OfferType::LOWER_LEVEL_EXCEPTION; // LLE offer
@@ -344,10 +333,7 @@ class FreeAgencyOfferValidatorTest extends TestCase
     public function testSkipsMLECheckWhenCustomOfferType(): void
     {
         // Arrange
-        $mockTeam = (object)[
-            'hasMLE' => 0, // Team out of MLE
-            'hasLLE' => 1
-        ];
+        $mockTeam = $this->createMockTeam(0, 1); // hasMLE=0 (out), hasLLE=1
         $validator = new FreeAgencyOfferValidator($mockTeam);
         $offerData = $this->createValidOffer();
         $offerData['offerType'] = 0; // Custom offer, not MLE
@@ -559,10 +545,7 @@ class FreeAgencyOfferValidatorTest extends TestCase
      */
     public function testAcceptsMLEWithIntOne(): void
     {
-        $mockTeam = (object)[
-            'hasMLE' => 1,
-            'hasLLE' => 1
-        ];
+        $mockTeam = $this->createMockTeam(1, 1);
         $validator = new FreeAgencyOfferValidator($mockTeam);
         $offerData = $this->createValidOffer();
         $offerData['offerType'] = \FreeAgency\OfferType::MLE_1_YEAR;
@@ -577,10 +560,7 @@ class FreeAgencyOfferValidatorTest extends TestCase
      */
     public function testRejectsMLEWithIntZero(): void
     {
-        $mockTeam = (object)[
-            'hasMLE' => 0,
-            'hasLLE' => 1
-        ];
+        $mockTeam = $this->createMockTeam(0, 1);
         $validator = new FreeAgencyOfferValidator($mockTeam);
         $offerData = $this->createValidOffer();
         $offerData['offerType'] = \FreeAgency\OfferType::MLE_1_YEAR;
@@ -596,10 +576,7 @@ class FreeAgencyOfferValidatorTest extends TestCase
      */
     public function testAcceptsLLEWithIntOne(): void
     {
-        $mockTeam = (object)[
-            'hasMLE' => 1,
-            'hasLLE' => 1
-        ];
+        $mockTeam = $this->createMockTeam(1, 1);
         $validator = new FreeAgencyOfferValidator($mockTeam);
         $offerData = $this->createValidOffer();
         $offerData['offerType'] = \FreeAgency\OfferType::LOWER_LEVEL_EXCEPTION;
@@ -614,10 +591,7 @@ class FreeAgencyOfferValidatorTest extends TestCase
      */
     public function testRejectsLLEWithIntZero(): void
     {
-        $mockTeam = (object)[
-            'hasMLE' => 1,
-            'hasLLE' => 0
-        ];
+        $mockTeam = $this->createMockTeam(1, 0);
         $validator = new FreeAgencyOfferValidator($mockTeam);
         $offerData = $this->createValidOffer();
         $offerData['offerType'] = \FreeAgency\OfferType::LOWER_LEVEL_EXCEPTION;
@@ -826,5 +800,16 @@ class FreeAgencyOfferValidatorTest extends TestCase
             '5 bird years, 12.5% raise valid' => [5, 1000, 1125, true],
             '5 bird years, 13% raise invalid' => [5, 1000, 1130, false],
         ];
+    }
+
+    /**
+     * Create a mock Team object with MLE/LLE flags
+     */
+    private function createMockTeam(int $hasMLE, int $hasLLE): Team
+    {
+        $team = $this->createStub(Team::class);
+        $team->hasMLE = $hasMLE;
+        $team->hasLLE = $hasLLE;
+        return $team;
     }
 }

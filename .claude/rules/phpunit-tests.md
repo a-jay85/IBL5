@@ -147,6 +147,10 @@ $this->mockDb->setMockData([['pid' => 1, 'name' => 'Player']]);
 
 **Legacy approach (still works):** `setMockData()` sets a single shared data pool for all unmatched SELECT queries. Old tests that include `'total' => N` in every row still function correctly — no migration needed.
 
+### MockDatabase `insert_id` Limitation
+
+`MockDatabase` extends `\mysqli` without a real connection. Accessing `$db->insert_id` (used by `BaseMysqliRepository::getLastInsertId()`) throws "object is already closed". Tests for code paths that INSERT and read `insert_id` (e.g., `createSavedDepthChart()`) cannot use MockDatabase — use DB integration tests instead.
+
 ## Completion Criteria
 
 **IMPORTANT:** Before considering ANY task involving PHP code complete:

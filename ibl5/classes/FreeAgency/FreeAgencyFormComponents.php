@@ -14,6 +14,7 @@ class FreeAgencyFormComponents implements FreeAgencyFormComponentsInterface
 {
     private string $teamName;
     private \Player\Player $player;
+    private string $csrfHtml = '';
 
     /**
      * Constructor
@@ -25,6 +26,18 @@ class FreeAgencyFormComponents implements FreeAgencyFormComponentsInterface
     {
         $this->teamName = $teamName;
         $this->player = $player;
+    }
+
+    /**
+     * Set pre-generated CSRF token HTML to be shared across all forms
+     *
+     * The negotiate page generates a single CSRF token and passes it here
+     * so all quick-offer button forms share the same token, avoiding the
+     * MAX_TOKENS=10 eviction issue from generating 16+ individual tokens.
+     */
+    public function setCsrfHtml(string $csrfHtml): void
+    {
+        $this->csrfHtml = $csrfHtml;
     }
 
     /**
@@ -147,7 +160,7 @@ class FreeAgencyFormComponents implements FreeAgencyFormComponentsInterface
         ob_start();
         ?>
 <form name="FAOffer" method="post" action="modules.php?name=FreeAgency&pa=processoffer" class="ibl-form--inline">
-    <?= \Utilities\CsrfGuard::generateToken('free_agency') ?>
+    <?= $this->csrfHtml ?>
     <?= $this->renderHiddenFields($offers, $offerType) ?>
     <button type="submit" class="ibl-btn ibl-btn--sm ibl-btn--primary"<?= $testIdAttr ?>><?= (int) $offers[$finalYear - 1] ?></button>
 </form>

@@ -7,8 +7,8 @@ paths: "**/*View.php"
 ## Canonical View Examples
 Reference these before building new Views:
 - `FreeAgency/FreeAgencyView.php` — complex tables with sticky columns, team colors, footer rows
-- `PlayerInfo/PlayerInfoView.php` — cards, stats grids, tabbed layouts
-- `ScoParser/ScoParserView.php` — custom component with dedicated CSS
+- `Player/Views/PlayerSeasonStatsView.php` — cards, stats grids, tabbed layouts
+- `Voting/VotingSubmissionView.php` — confirmation/error pages with CSS classes
 
 ## XSS Protection (MANDATORY)
 ALL dynamic content must use `HtmlSanitizer::e()` (short alias) or `HtmlSanitizer::safeHtmlOutput()`:

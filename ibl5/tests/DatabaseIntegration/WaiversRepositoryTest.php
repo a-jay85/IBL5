@@ -78,4 +78,53 @@ class WaiversRepositoryTest extends DatabaseTestCase
         self::assertSame(500, $row['cy1']);
         self::assertSame(1, $row['cyt']);
     }
+
+    public function testSignPlayerFromWaiversWithExistingContractPreservesContractFields(): void
+    {
+        $pid = 1;
+
+        // Set known contract fields on the player
+        $stmt = $this->db->prepare(
+            "UPDATE ibl_plr SET cy = 1, cyt = 3, cy1 = 500, cy2 = 550, cy3 = 600, cy4 = 0, cy5 = 0, cy6 = 0 WHERE pid = ?"
+        );
+        self::assertNotFalse($stmt);
+        $stmt->bind_param('i', $pid);
+        $stmt->execute();
+        $stmt->close();
+
+        // Drop to waivers first
+        $this->repo->dropPlayerToWaivers($pid, 1700000000);
+
+        // Sign with existing contract
+        $result = $this->repo->signPlayerFromWaivers(
+            $pid,
+            ['team_name' => 'Sharks', 'teamid' => 2],
+            ['hasExistingContract' => true, 'salary' => 500]
+        );
+
+        self::assertTrue($result);
+
+        // Verify DB state: contract fields preserved, roster fields updated
+        $stmt = $this->db->prepare(
+            "SELECT tid, ordinal, droptime, bird, cy, cyt, cy1, cy2, cy3 FROM ibl_plr WHERE pid = ?"
+        );
+        self::assertNotFalse($stmt);
+        $stmt->bind_param('i', $pid);
+        $stmt->execute();
+        $row = $stmt->get_result()->fetch_assoc();
+        $stmt->close();
+
+        self::assertNotNull($row);
+        // Roster fields updated
+        self::assertSame(2, $row['tid']);
+        self::assertSame(800, $row['ordinal']);
+        self::assertSame(0, $row['droptime']);
+        self::assertSame(0, $row['bird']);
+        // Contract fields preserved
+        self::assertSame(1, $row['cy']);
+        self::assertSame(3, $row['cyt']);
+        self::assertSame(500, $row['cy1']);
+        self::assertSame(550, $row['cy2']);
+        self::assertSame(600, $row['cy3']);
+    }
 }

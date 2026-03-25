@@ -32,7 +32,7 @@ interface WaiversViewInterface
      * @param int $healthyOpenRosterSpots Number of healthy open roster spots (0-15)
      * @param ?string $result PRG result key (e.g. 'player_added', 'player_dropped')
      * @param ?string $error PRG error message to display
-     * @return void Outputs HTML directly
+     * @return string Complete HTML form string
      *
      * **HTML Structure:**
      * - Result/error banner (if applicable) via ibl-alert
@@ -55,7 +55,7 @@ interface WaiversViewInterface
         int $healthyOpenRosterSpots,
         ?string $result = null,
         ?string $error = null
-    ): void;
+    ): string;
 
     /**
      * Builds player option HTML for dropdown selection
@@ -90,13 +90,7 @@ interface WaiversViewInterface
      * Displays a message indicating that waiver wire transactions are not
      * currently allowed based on the season phase.
      * 
-     * @return void Outputs HTML directly with Nuke header/footer
-     * 
-     * **HTML Structure:**
-     * - Nuke header
-     * - Top menu
-     * - "Waivers closed" message
-     * - Nuke footer
+     * @return string HTML message string
      */
-    public function renderWaiversClosed(): void;
+    public function renderWaiversClosed(): string;
 }

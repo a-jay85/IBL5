@@ -43,10 +43,10 @@ E2E tests do NOT auto-run via hooks — run manually. Requires Docker + `.env.te
 
 ## Architecture
 
-New features should follow the Repository-Service-View pattern. See `ibl5/scripts/scoParser.php` as the canonical refactored example.
+New features should follow the Repository-Service-View pattern. See `Waivers/` (Repository, Service, Processor, Validator, View, Controller) as the canonical refactored example.
 
 ### Interface-Driven Modules
-All 30 modules in `ibl5/classes/` follow Repository/Service/View pattern with interfaces in `Contracts/` subdirectories. See `php-classes.md` for structure details.
+The modules in `ibl5/classes/` follow Repository/Service/View pattern with interfaces in `Contracts/` subdirectories. See `php-classes.md` for structure details.
 
 ### Legacy (Non-IBL) Modules
 - **SiteStatistics:** A legacy PHP-Nuke module for tracking site visitor/page-view statistics. It is **not** basketball- or IBL-related and should be deprioritized against core IBL modules during refactoring or feature work.

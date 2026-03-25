@@ -9,6 +9,7 @@
 #   HEAT starts in October of year Y-1, playoffs end in June of year Y.
 #   So "2007" exports games from 2006-10-01 through 2007-06-30.
 #
+# Connection: reads REMOTE_* from .env for production, falls back to local Docker.
 # Output: ibl5/fixtures/prod-seed.sql (gitignored)
 
 set -euo pipefail
@@ -16,16 +17,44 @@ set -euo pipefail
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 OUTPUT="$REPO_ROOT/ibl5/fixtures/prod-seed.sql"
 
+# Source .env for database credentials
+ENV_FILE="$REPO_ROOT/.env"
+if [ -f "$ENV_FILE" ]; then
+    set -a
+    # shellcheck disable=SC1090
+    source "$ENV_FILE"
+    set +a
+fi
+
+# Determine connection mode: remote production or local Docker
+if [ -n "${REMOTE_HOST:-}" ] && [ "$REMOTE_HOST" != "localhost" ] && [ "$REMOTE_HOST" != "127.0.0.1" ]; then
+    DB_HOST="$REMOTE_HOST"
+    DB_PORT="${REMOTE_PORT:-3306}"
+    DB_USER_VAL="$REMOTE_USER"
+    DB_PASS_VAL="$REMOTE_PASSWORD"
+    DB_NAME="${REMOTE_DATABASE:-iblhoops_ibl5}"
+    EXTRA_OPTS="--compress"
+    echo "Mode: remote production ($DB_HOST:$DB_PORT)"
+else
+    # No remote credentials — exit silently if called from background hook
+    if [ -z "${REMOTE_HOST:-}" ]; then
+        exit 0
+    fi
+    DB_HOST="127.0.0.1"
+    DB_PORT="3306"
+    DB_USER_VAL="root"
+    DB_PASS_VAL="root"
+    DB_NAME="iblhoops_ibl5"
+    EXTRA_OPTS=""
+    echo "Mode: local Docker ($DB_HOST)"
+fi
+
 # Default to current calendar year
 SEASON_END_YEAR="${1:-$(date +%Y)}"
 SEASON_START="$((SEASON_END_YEAR - 1))-10-01"
 SEASON_END="${SEASON_END_YEAR}-06-30"
 
-DB_HOST="127.0.0.1"
-DB_USER="root"
-DB_PASS="root"
-DB_NAME="iblhoops_ibl5"
-DUMP_OPTS="--skip-ssl --single-transaction --skip-lock-tables"
+DUMP_OPTS="--skip-ssl --single-transaction --skip-lock-tables $EXTRA_OPTS"
 
 echo "Exporting production DB (box scores limited to ${SEASON_START} – ${SEASON_END})..."
 
@@ -35,9 +64,21 @@ BOX_TABLES="ibl_box_scores ibl_box_scores_teams"
 # Tables/views to skip entirely (exported separately or not needed)
 SKIP_REGEX="^(ibl_box_scores|ibl_box_scores_teams)$"
 
+# Helper: run a mariadb query
+db_query() {
+    MYSQL_PWD="$DB_PASS_VAL" mariadb -h "$DB_HOST" -P "$DB_PORT" --skip-ssl \
+        -u "$DB_USER_VAL" "$DB_NAME" -N -e "$1"
+}
+
+# Helper: run mariadb-dump with given args
+db_dump() {
+    # shellcheck disable=SC2086
+    MYSQL_PWD="$DB_PASS_VAL" mariadb-dump -h "$DB_HOST" -P "$DB_PORT" \
+        -u "$DB_USER_VAL" $DUMP_OPTS "$@"
+}
+
 # 1. Get list of all real tables (skip views — engine is NULL)
-ALL_TABLES=$(mariadb -h "$DB_HOST" --skip-ssl -u "$DB_USER" -p"$DB_PASS" "$DB_NAME" \
-    -N -e "SELECT table_name FROM information_schema.tables WHERE table_schema='$DB_NAME' AND engine IS NOT NULL ORDER BY table_name;")
+ALL_TABLES=$(db_query "SELECT table_name FROM information_schema.tables WHERE table_schema='$DB_NAME' AND engine IS NOT NULL ORDER BY table_name;")
 
 # 2. Build list of tables excluding box scores
 REGULAR_TABLES=""
@@ -54,8 +95,7 @@ mkdir -p "$(dirname "$OUTPUT")"
 #    stderr is NOT suppressed — surface mariadb-dump errors instead of silently
 #    producing a header-only file (which was the root cause of missing CREATE TABLEs).
 echo "-- Dumping table structure..."
-mariadb-dump -h "$DB_HOST" --skip-ssl -u "$DB_USER" -p"$DB_PASS" \
-    $DUMP_OPTS --routines --triggers --no-data "$DB_NAME" > "$OUTPUT"
+db_dump --routines --triggers --no-data "$DB_NAME" > "$OUTPUT"
 
 # Validate that the structure dump actually produced CREATE TABLE statements.
 # mariadb-dump writes a valid header even on connection/auth errors, so the file
@@ -70,27 +110,27 @@ fi
 # 4. Dump data for regular tables (skip triggers — already in structure dump)
 echo "-- Dumping data for regular tables..."
 # shellcheck disable=SC2086
-mariadb-dump -h "$DB_HOST" --skip-ssl -u "$DB_USER" -p"$DB_PASS" \
-    $DUMP_OPTS --no-create-info --skip-triggers "$DB_NAME" $REGULAR_TABLES >> "$OUTPUT"
+db_dump --no-create-info --skip-triggers "$DB_NAME" $REGULAR_TABLES >> "$OUTPUT"
 
 # 5. Dump filtered box score data (skip triggers — already in structure dump)
 for tbl in $BOX_TABLES; do
     echo "-- Dumping $tbl (season ${SEASON_END_YEAR} only)..."
-    mariadb-dump -h "$DB_HOST" --skip-ssl -u "$DB_USER" -p"$DB_PASS" \
-        $DUMP_OPTS --no-create-info --skip-triggers \
+    db_dump --no-create-info --skip-triggers \
         --where="Date BETWEEN '${SEASON_START}' AND '${SEASON_END}'" \
         "$DB_NAME" "$tbl" >> "$OUTPUT"
 done
 
 # 6. Dump views (structure only — they have no data)
 echo "-- Dumping views..."
-VIEWS=$(mariadb -h "$DB_HOST" --skip-ssl -u "$DB_USER" -p"$DB_PASS" "$DB_NAME" \
-    -N -e "SELECT table_name FROM information_schema.tables WHERE table_schema='$DB_NAME' AND table_type='VIEW' ORDER BY table_name;")
+VIEWS=$(db_query "SELECT table_name FROM information_schema.tables WHERE table_schema='$DB_NAME' AND table_type='VIEW' ORDER BY table_name;")
 if [ -n "$VIEWS" ]; then
     # shellcheck disable=SC2086
-    mariadb-dump -h "$DB_HOST" --skip-ssl -u "$DB_USER" -p"$DB_PASS" \
-        $DUMP_OPTS "$DB_NAME" $VIEWS >> "$OUTPUT"
+    db_dump "$DB_NAME" $VIEWS >> "$OUTPUT"
 fi
+
+# 7. Strip DEFINER clauses — prod exports contain DEFINER=user@host that may
+#    not match the Docker MariaDB user, causing ERROR 1449 on import.
+sed -i '' 's/ DEFINER=[^ ]* / /g' "$OUTPUT"
 
 SIZE=$(du -h "$OUTPUT" | cut -f1)
 echo ""

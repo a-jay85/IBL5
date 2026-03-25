@@ -51,12 +51,11 @@ class WaiversService implements WaiversServiceInterface
         $team = Team::initialize($this->db, $teamName);
         $season = new Season($this->db);
 
-        $players = $this->getPlayersForAction($team, $action, $season);
+        $tableData = $this->getTableResultAndStyle($team, $season, $action);
+        $players = $this->buildPlayerOptions($tableData['tableResult'], $action, $season);
 
         $openRosterSpots = 15 - count($this->teamQueryRepo->getHealthyAndInjuredPlayersOrderedByName($team->teamID, $season));
         $healthyOpenRosterSpots = 15 - count($this->teamQueryRepo->getHealthyPlayersOrderedByName($team->teamID, $season));
-
-        $tableData = $this->getTableResultAndStyle($team, $season, $action);
 
         return [
             'team' => $team,
@@ -70,22 +69,14 @@ class WaiversService implements WaiversServiceInterface
     }
 
     /**
+     * @param array<int, array<string, mixed>|\Player\Player> $result
      * @return list<string>
      */
-    private function getPlayersForAction(Team $team, string $action, Season $season): array
+    private function buildPlayerOptions(array $result, string $action, Season $season): array
     {
-        $league = new League($this->db);
         $timeNow = time();
         /** @var list<string> $players */
         $players = [];
-
-        if ($action === 'waive') {
-            $result = $this->teamQueryRepo->getHealthyAndInjuredPlayersOrderedByName($team->teamID);
-        } elseif ($season->isOffseasonPhase()) {
-            $result = $league->getFreeAgentsResult($season);
-        } else {
-            $result = $league->getWaivedPlayersResult();
-        }
 
         foreach ($result as $playerRow) {
             $player = Player::withPlrRow($this->db, $playerRow);

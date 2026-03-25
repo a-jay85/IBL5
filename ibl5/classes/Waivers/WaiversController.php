@@ -101,7 +101,7 @@ class WaiversController implements WaiversControllerInterface
                     'file' => $e->getFile(),
                     'line' => $e->getLine(),
                 ]);
-                $result = ['success' => false, 'error' => 'An unexpected error occurred: ' . $e->getMessage()];
+                $result = ['success' => false, 'error' => 'An unexpected error occurred. Please try again.'];
             }
 
             if ($result['success'] === true) {

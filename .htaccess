@@ -1,5 +1,12 @@
 RewriteEngine On
 
+# Redirect unauthorized domains to iblhoops.net
+# Prevents DNS-based mirroring (e.g., zeidconsulting.com pointing at our IP)
+RewriteCond %{HTTP_HOST} !^((www|ibl6)\.)?iblhoops\.net$ [NC]
+RewriteCond %{HTTP_HOST} !^(main\.)?localhost$ [NC]
+RewriteCond %{HTTP_HOST} !^127\.0\.0\.1$ [NC]
+RewriteRule ^ https://iblhoops.net%{REQUEST_URI} [R=301,L]
+
 # Redirect bare domain to /ibl5/
 RewriteCond %{REQUEST_URI} ^/?$
 RewriteRule ^$ /ibl5/index.php [R=301,L]

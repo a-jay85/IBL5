@@ -1684,7 +1684,9 @@ CREATE TABLE `ibl_one_on_one` (
   `winscore` int(11) NOT NULL DEFAULT 0 COMMENT 'Winner final score',
   `lossscore` int(11) NOT NULL DEFAULT 0 COMMENT 'Loser final score',
   `owner` varchar(25) NOT NULL DEFAULT '' COMMENT 'GM who submitted the matchup',
-  PRIMARY KEY (`gameid`)
+  PRIMARY KEY (`gameid`),
+  KEY `idx_winner` (`winner`),
+  KEY `idx_loser` (`loser`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 DROP TABLE IF EXISTS `ibl_playoff_career_avgs`;
@@ -2831,8 +2833,9 @@ CREATE TABLE `nuke_stats_hour` (
   `month` tinyint(4) NOT NULL DEFAULT 0,
   `date` tinyint(4) NOT NULL DEFAULT 0,
   `hour` tinyint(4) NOT NULL DEFAULT 0,
-  `hits` int(11) NOT NULL DEFAULT 0
-) ENGINE=MyISAM DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+  `hits` int(11) NOT NULL DEFAULT 0,
+  PRIMARY KEY (`year`, `month`, `date`, `hour`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 DROP TABLE IF EXISTS `nuke_stats_month`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;

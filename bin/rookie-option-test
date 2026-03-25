@@ -1,7 +1,7 @@
 #!/bin/bash
 
-# Rookie Option Test Data Setup Script
-# Sets up local test data so user "A-Jay" (Jazz, tid=13) can exercise a rookie option.
+# rookie-option-test
+# Sets up local Docker test data so user "A-Jay" (Jazz, tid=13) can exercise a rookie option.
 # Ensures three conditions are met:
 #   1. Season phase is "Free Agency", "Preseason", or "HEAT"
 #   2. At least one eligible Jazz player exists for rookie option
@@ -12,8 +12,8 @@ set -e
 # ============================================
 # Load credentials from .env
 # ============================================
-SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-ENV_FILE="${SCRIPT_DIR}/.env"
+REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+ENV_FILE="${REPO_ROOT}/.env"
 if [ ! -f "${ENV_FILE}" ]; then
   echo "FAILED: ${ENV_FILE} not found. Copy .env.example to .env and fill in credentials."
   exit 1
@@ -33,8 +33,7 @@ NC='\033[0m' # No Color
 # Configuration
 # ============================================
 MYSQL_CMD="mariadb"
-DB_USER="${LOCAL_USER}"
-DB_NAME="${LOCAL_DATABASE}"
+DB_NAME="iblhoops_ibl5"
 
 TEAM_NAME="Jazz"
 TEAM_ID=13
@@ -49,7 +48,7 @@ echo -e "${BLUE}  Rookie Option Test Data Setup${NC}"
 echo -e "${BLUE}========================================${NC}"
 echo ""
 
-if ! $MYSQL_CMD -h 127.0.0.1 --skip-ssl -u "${DB_USER}" -p"${LOCAL_PASSWORD}" -e "SELECT 1" > /dev/null 2>&1; then
+if ! MYSQL_PWD="${DB_PASS}" $MYSQL_CMD -h 127.0.0.1 --skip-ssl -u "${DB_USER}" -e "SELECT 1" > /dev/null 2>&1; then
     echo -e "${RED}ERROR: Cannot connect to MariaDB at 127.0.0.1${NC}"
     echo -e "${RED}Is Docker MariaDB running? Try: docker compose up -d${NC}"
     exit 1
@@ -62,7 +61,7 @@ echo ""
 # Helper Function
 # ============================================
 run_sql() {
-    MYSQL_PWD="${LOCAL_PASSWORD}" "${MYSQL_CMD}" \
+    MYSQL_PWD="${DB_PASS}" "${MYSQL_CMD}" \
         -h 127.0.0.1 --skip-ssl \
         --user="${DB_USER}" \
         "${DB_NAME}" \
@@ -154,7 +153,7 @@ if [ -n "${ELIGIBLE_PLAYERS}" ]; then
         echo ""
     fi
     echo -e "Open the Rookie Option page as A-Jay:"
-    echo -e "  ${BLUE}http://localhost:8888/ibl5/modules.php?name=Player&pa=rookieoption&pid=${FIRST_PID}${NC}"
+    echo -e "  ${BLUE}http://main.localhost/ibl5/modules.php?name=Player&pa=rookieoption&pid=${FIRST_PID}${NC}"
     exit 0
 fi
 
@@ -318,5 +317,5 @@ fi
 
 if [ -n "${URL_PID}" ]; then
     echo -e "Open the Rookie Option page as A-Jay:"
-    echo -e "  ${BLUE}http://localhost:8888/ibl5/modules.php?name=Player&pa=rookieoption&pid=${URL_PID}${NC}"
+    echo -e "  ${BLUE}http://main.localhost/ibl5/modules.php?name=Player&pa=rookieoption&pid=${URL_PID}${NC}"
 fi

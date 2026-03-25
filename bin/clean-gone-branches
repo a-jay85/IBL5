@@ -4,7 +4,7 @@ set -e
 # Clean up local branches whose remote tracking branch has been deleted ([gone]).
 # Also tears down associated worktrees and Docker environments if present.
 
-REPO_ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
+REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 source "$REPO_ROOT/bin/lib/wt-guards.sh"
 
 echo "Fetching origin..."

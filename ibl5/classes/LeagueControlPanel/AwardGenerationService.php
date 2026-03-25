@@ -8,6 +8,7 @@ use JsbParser\LeadersHtmParser;
 use LeagueControlPanel\Contracts\AwardGenerationServiceInterface;
 use LeagueControlPanel\Contracts\LeagueControlPanelRepositoryInterface;
 use Voting\Contracts\VotingResultsServiceInterface;
+use Voting\VotingRepository;
 use Voting\VotingResultsService;
 /**
  * Orchestrates generation of season awards from votes and JSB Leaders.htm data.
@@ -255,7 +256,7 @@ class AwardGenerationService implements AwardGenerationServiceInterface
     {
         $names = [];
         foreach ($voters as $voter) {
-            if ($voter['name'] === VotingResultsService::BLANK_BALLOT_LABEL) {
+            if ($voter['name'] === VotingRepository::BLANK_BALLOT_LABEL) {
                 continue;
             }
             $names[] = VotingResultsService::extractPlayerName($voter['name']);

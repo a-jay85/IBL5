@@ -2,13 +2,22 @@
 
 declare(strict_types=1);
 
+/**
+ * All-Star Vote Submission Handler
+ *
+ * Thin wrapper: CSRF check → parse POST → validate + save via service → render result via view.
+ *
+ * @see \Voting\VotingSubmissionService For validation and persistence
+ * @see \Voting\VotingSubmissionView For HTML rendering
+ */
+
 require __DIR__ . '/../../mainfile.php';
 
-use Utilities\HtmlSanitizer;
+use Voting\VotingRepository;
+use Voting\VotingSubmissionService;
+use Voting\VotingSubmissionView;
 
 PageLayout\PageLayout::header();
-
-echo "<HTML><HEAD><TITLE>ASG Voting Result</TITLE></HEAD><BODY>";
 
 if (!\Utilities\CsrfGuard::validateSubmittedToken('asg_vote')) {
     echo 'Invalid or expired form submission. Please go back and try again.';
@@ -16,126 +25,53 @@ if (!\Utilities\CsrfGuard::validateSubmittedToken('asg_vote')) {
     return;
 }
 
-$Team_Name = $_POST['teamname'] ?? '';
-$ECF1 = $_POST['ECF'][0] ?? '';
-$ECF2 = $_POST['ECF'][1] ?? '';
-$ECF3 = $_POST['ECF'][2] ?? '';
-$ECF4 = $_POST['ECF'][3] ?? '';
-$ECB1 = $_POST['ECB'][0] ?? '';
-$ECB2 = $_POST['ECB'][1] ?? '';
-$ECB3 = $_POST['ECB'][2] ?? '';
-$ECB4 = $_POST['ECB'][3] ?? '';
-$WCF1 = $_POST['WCF'][0] ?? '';
-$WCF2 = $_POST['WCF'][1] ?? '';
-$WCF3 = $_POST['WCF'][2] ?? '';
-$WCF4 = $_POST['WCF'][3] ?? '';
-$WCB1 = $_POST['WCB'][0] ?? '';
-$WCB2 = $_POST['WCB'][1] ?? '';
-$WCB3 = $_POST['WCB'][2] ?? '';
-$WCB4 = $_POST['WCB'][3] ?? '';
+$teamName = is_string($_POST['teamname'] ?? null) ? $_POST['teamname'] : '';
 
-echo "
-        Eastern Frontcourt: " . HtmlSanitizer::safeHtmlOutput($ECF1) . "<br>
-        Eastern Frontcourt: " . HtmlSanitizer::safeHtmlOutput($ECF2) . "<br>
-        Eastern Frontcourt: " . HtmlSanitizer::safeHtmlOutput($ECF3) . "<br>
-        Eastern Frontcourt: " . HtmlSanitizer::safeHtmlOutput($ECF4) . "<br>
-        <br>
-        Eastern Backcourt: " . HtmlSanitizer::safeHtmlOutput($ECB1) . "<br>
-        Eastern Backcourt: " . HtmlSanitizer::safeHtmlOutput($ECB2) . "<br>
-        Eastern Backcourt: " . HtmlSanitizer::safeHtmlOutput($ECB3) . "<br>
-        Eastern Backcourt: " . HtmlSanitizer::safeHtmlOutput($ECB4) . "<br>
-        <br>
-        Western Frontcourt: " . HtmlSanitizer::safeHtmlOutput($WCF1) . "<br>
-        Western Frontcourt: " . HtmlSanitizer::safeHtmlOutput($WCF2) . "<br>
-        Western Frontcourt: " . HtmlSanitizer::safeHtmlOutput($WCF3) . "<br>
-        Western Frontcourt: " . HtmlSanitizer::safeHtmlOutput($WCF4) . "<br>
-        <br>
-        Western Backcourt: " . HtmlSanitizer::safeHtmlOutput($WCB1) . "<br>
-        Western Backcourt: " . HtmlSanitizer::safeHtmlOutput($WCB2) . "<br>
-        Western Backcourt: " . HtmlSanitizer::safeHtmlOutput($WCB3) . "<br>
-        Western Backcourt: " . HtmlSanitizer::safeHtmlOutput($WCB4) . "<br>
-        <br>";
+// Parse checkbox arrays (0-indexed from HTML) into typed ballot (1-indexed field names)
+$ecf = is_array($_POST['ECF'] ?? null) ? $_POST['ECF'] : [];
+$ecb = is_array($_POST['ECB'] ?? null) ? $_POST['ECB'] : [];
+$wcf = is_array($_POST['WCF'] ?? null) ? $_POST['WCF'] : [];
+$wcb = is_array($_POST['WCB'] ?? null) ? $_POST['WCB'] : [];
 
-$positions = [
-    'WCF' => 'Western Frontcourt',
-    'WCB' => 'Western Backcourt',
-    'ECF' => 'Eastern Frontcourt',
-    'ECB' => 'Eastern Backcourt'
+/** @var array{East_F1: string, East_F2: string, East_F3: string, East_F4: string, East_B1: string, East_B2: string, East_B3: string, East_B4: string, West_F1: string, West_F2: string, West_F3: string, West_F4: string, West_B1: string, West_B2: string, West_B3: string, West_B4: string} $ballot */
+$ballot = [
+    'East_F1' => is_string($ecf[0] ?? null) ? $ecf[0] : '',
+    'East_F2' => is_string($ecf[1] ?? null) ? $ecf[1] : '',
+    'East_F3' => is_string($ecf[2] ?? null) ? $ecf[2] : '',
+    'East_F4' => is_string($ecf[3] ?? null) ? $ecf[3] : '',
+    'East_B1' => is_string($ecb[0] ?? null) ? $ecb[0] : '',
+    'East_B2' => is_string($ecb[1] ?? null) ? $ecb[1] : '',
+    'East_B3' => is_string($ecb[2] ?? null) ? $ecb[2] : '',
+    'East_B4' => is_string($ecb[3] ?? null) ? $ecb[3] : '',
+    'West_F1' => is_string($wcf[0] ?? null) ? $wcf[0] : '',
+    'West_F2' => is_string($wcf[1] ?? null) ? $wcf[1] : '',
+    'West_F3' => is_string($wcf[2] ?? null) ? $wcf[2] : '',
+    'West_F4' => is_string($wcf[3] ?? null) ? $wcf[3] : '',
+    'West_B1' => is_string($wcb[0] ?? null) ? $wcb[0] : '',
+    'West_B2' => is_string($wcb[1] ?? null) ? $wcb[1] : '',
+    'West_B3' => is_string($wcb[2] ?? null) ? $wcb[2] : '',
+    'West_B4' => is_string($wcb[3] ?? null) ? $wcb[3] : '',
 ];
 
-// VOTING FOR OWN PLAYERS
-foreach ($positions as $abbreviation => $label) {
-    for ($i = 1; $i <= 4; $i++) {
-        $varName = $abbreviation . $i;
-        if (strpos($$varName, $Team_Name) !== false) {
-            $court = (strpos($abbreviation, 'F') !== false) ? 'Frontcourt' : 'Backcourt';
-            echo "<font color='red'>Sorry, you cannot vote for your own player ($court: " . HtmlSanitizer::safeHtmlOutput($$varName) . ").<p>Please go back, unselect that player, select a different player not on your team, and try again.<br></font>";
-            PageLayout\PageLayout::footer();
-            exit;
-        }
-    }
-}
+// Raw post arrays for too-many-votes validation (count check)
+/** @var array<string, list<string>> $rawPostCategories */
+$rawPostCategories = [
+    'ECF' => array_values(array_filter($ecf, 'is_string')),
+    'ECB' => array_values(array_filter($ecb, 'is_string')),
+    'WCF' => array_values(array_filter($wcf, 'is_string')),
+    'WCB' => array_values(array_filter($wcb, 'is_string')),
+];
 
-// MISSING VOTES
-foreach ($positions as $abbreviation => $label) {
-    for ($i = 1; $i <= 4; $i++) {
-        $varName = $abbreviation . $i;
-        if (empty($$varName)) {
-            echo "<font color='red'>Sorry, you selected less than FOUR $label players.<p>Please go back, select FOUR players, and try again.<br></font>";
-            PageLayout\PageLayout::footer();
-            exit;
-        }
-    }
-}
+$repository = new VotingRepository($mysqli_db);
+$service = new VotingSubmissionService($repository);
+$view = new VotingSubmissionView();
 
-// TOO MANY VOTES
-foreach ($positions as $abbreviation => $label) {
-    if (isset($_POST[$abbreviation]) && count($_POST[$abbreviation]) > 4) {
-        echo "<font color='red'>Sorry, you selected more than four $label players.<p>Please go back, select FOUR players, and try again.</font>";
-        PageLayout\PageLayout::footer();
-        exit;
-    }
-}
+$result = $service->submitAsgVote($teamName, $ballot, $rawPostCategories);
 
-$stmt = $mysqli_db->prepare("UPDATE ibl_votes_ASG
-SET East_F1 = ?,
-    East_F2 = ?,
-    East_F3 = ?,
-    East_F4 = ?,
-    East_B1 = ?,
-    East_B2 = ?,
-    East_B3 = ?,
-    East_B4 = ?,
-    West_F1 = ?,
-    West_F2 = ?,
-    West_F3 = ?,
-    West_F4 = ?,
-    West_B1 = ?,
-    West_B2 = ?,
-    West_B3 = ?,
-    West_B4 = ?
-WHERE team_name = ?");
-
-$stmt->bind_param('sssssssssssssssss',
-    $ECF1, $ECF2, $ECF3, $ECF4,
-    $ECB1, $ECB2, $ECB3, $ECB4,
-    $WCF1, $WCF2, $WCF3, $WCF4,
-    $WCB1, $WCB2, $WCB3, $WCB4,
-    $Team_Name
-);
-
-if ($stmt->execute()) {
-    echo "</font><strong style=\"font-weight: bold;\">Thank you for voting - the " . HtmlSanitizer::safeHtmlOutput($Team_Name) . " vote has been recorded!</strong><p>";
-
-    $stmt->close();
-
-    $stmtUpdateTime = $mysqli_db->prepare("UPDATE ibl_team_info SET asg_vote = NOW() + INTERVAL 2 HOUR WHERE team_name = ?");
-    $stmtUpdateTime->bind_param('s', $Team_Name);
-    $stmtUpdateTime->execute();
-    $stmtUpdateTime->close();
+if ($result->hasErrors()) {
+    echo $view->renderErrors($result->errors);
 } else {
-    echo "There was an error recording your vote. Please contact the IBL Commissioner.<br>";
-    $stmt->close();
+    echo $view->renderAsgConfirmation($teamName, $ballot);
 }
 
 PageLayout\PageLayout::footer();

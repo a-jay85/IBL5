@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Tests\VotingResults;
 
 use PHPUnit\Framework\TestCase;
+use Voting\Contracts\VotingRepositoryInterface;
 use Voting\VotingResultsController;
 use Voting\VotingResultsService;
 use Voting\VotingResultsTableRenderer;
@@ -77,7 +78,16 @@ final class StubVotingResultsService extends VotingResultsService
 
     public function __construct()
     {
-        // Don't call parent constructor - we don't need a database for stub
+        $stubRepo = new class () implements VotingRepositoryInterface {
+            public function saveEoyVote(string $teamName, array $ballot): void {}
+            public function saveAsgVote(string $teamName, array $ballot): void {}
+            public function markEoyVoteCast(string $teamName): void {}
+            public function markAsgVoteCast(string $teamName): void {}
+            public function fetchAllStarTotals(array $columns): array { return []; }
+            public function fetchEndOfYearTotals(array $columnsWithWeights): array { return []; }
+            public function fetchPlayerIdsByNames(array $names): array { return []; }
+        };
+        parent::__construct($stubRepo);
     }
 
     public function getAllStarResults(): array

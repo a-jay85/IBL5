@@ -125,7 +125,7 @@ class PageLayout
 
         // Open Graph meta tags (for LinkedIn, Facebook, etc.)
         echo "<meta property=\"og:title\" content=\"IBL -- Internet Basketball League\">\n";
-        echo "<meta property=\"og:description\" content=\"" . \Utilities\HtmlSanitizer::e($slogan) . "\">\n";
+        echo "<meta property=\"og:description\" content=\"The Internet Basketball League (IBL) is an online fantasy basketball league powered by the Jump Shot Basketball simulation engine.\">\n";
         echo "<meta property=\"og:type\" content=\"website\">\n";
         echo "<meta property=\"og:url\" content=\"https://iblhoops.net/ibl5/index.php\">\n";
         echo "<meta property=\"og:image\" content=\"https://iblhoops.net/ibl5/images/og-basketball.png\">\n";

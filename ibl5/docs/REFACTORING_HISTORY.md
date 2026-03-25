@@ -10,6 +10,33 @@ This document tracks the history of module refactoring efforts in the IBL5 codeb
 
 ## Completed Refactorings
 
+### TradingRepository: God Class Split into 3 Sub-Repositories (March 23, 2026)
+
+**Summary:** Split the 24-method `TradingRepository` god class into 3 focused sub-repositories. Two sub-repositories (`TradeCashRepository`, `TradeExecutionRepository`) had already been extracted; this split handles the remaining 24 methods spanning offer lifecycle, asset lookups, roster mutations, validation queries, and trade form UI data.
+
+**Key Changes:**
+- `TradeOfferRepository` — 9 methods for offer lifecycle (create, accept, reject, expire, list)
+- `TradeAssetRepository` — 8 methods for asset lookups and roster mutations
+- `TradeValidationRepository` — 4 methods for validation queries
+- Removed 3 dead methods with no callers
+- Updated 8 callers to use the new focused repositories
+
+**PR:** #486
+
+---
+
+### Database: Drop nuke_modules Table (March 23, 2026)
+
+**Summary:** Dropped the legacy PHP-Nuke `nuke_modules` table after confirming all reads were replaced by `ModuleAccessControl` (which reads `ibl_settings` via `Season`). Removed 2 dead writes in `LeagueControlPanelRepository` and 1 live read in `modules.php`.
+
+**Key Changes:**
+- Deleted dead `UPDATE nuke_modules` in `setSeasonPhase()` and `setShowDraftLink()`
+- Replaced `modules.php` active-check query with `ModuleAccessControl`
+- Migration 074: `DROP TABLE IF EXISTS nuke_modules`
+- Removed `nuke_modules` INSERT from CI seed data
+
+---
+
 ### 31. LeagueControlPanel Module (March 2, 2026)
 
 **Summary:** Refactored admin LeagueControlPanel module from monolithic 353-line script to Repository-Service-Processor-View architecture with full security hardening and PRG pattern implementation.

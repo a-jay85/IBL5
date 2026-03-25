@@ -36,10 +36,11 @@ if [ -n "${REMOTE_HOST:-}" ] && [ "$REMOTE_HOST" != "localhost" ] && [ "$REMOTE_
     EXTRA_OPTS="--compress"
     echo "Mode: remote production ($DB_HOST:$DB_PORT)"
 else
-    # No remote credentials — exit silently if called from background hook
+    # REMOTE_HOST unset — exit silently (safe for background hook use)
     if [ -z "${REMOTE_HOST:-}" ]; then
         exit 0
     fi
+    # REMOTE_HOST is localhost/127.0.0.1 — use local Docker
     DB_HOST="127.0.0.1"
     DB_PORT="3306"
     DB_USER_VAL="root"
@@ -130,7 +131,7 @@ fi
 
 # 7. Strip DEFINER clauses — prod exports contain DEFINER=user@host that may
 #    not match the Docker MariaDB user, causing ERROR 1449 on import.
-sed -i '' 's/ DEFINER=[^ ]* / /g' "$OUTPUT"
+perl -pi -e 's/ DEFINER=[^ ]* / /g' "$OUTPUT"
 
 SIZE=$(du -h "$OUTPUT" | cut -f1)
 echo ""

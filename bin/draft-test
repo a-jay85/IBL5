@@ -33,7 +33,7 @@ NC='\033[0m' # No Color
 # Configuration
 # ============================================
 MYSQL_CMD="mariadb"
-DB_NAME="${REMOTE_DATABASE:-iblhoops_ibl5}"
+DB_NAME="iblhoops_ibl5"
 
 TEAM_NAME="Jazz"
 
@@ -45,7 +45,7 @@ echo -e "${BLUE}  Draft Test Data Setup${NC}"
 echo -e "${BLUE}========================================${NC}"
 echo ""
 
-if ! $MYSQL_CMD -h 127.0.0.1 --skip-ssl -u "${DB_USER}" -p"${DB_PASS}" -e "SELECT 1" > /dev/null 2>&1; then
+if ! MYSQL_PWD="${DB_PASS}" $MYSQL_CMD -h 127.0.0.1 --skip-ssl -u "${DB_USER}" -e "SELECT 1" > /dev/null 2>&1; then
     echo -e "${RED}ERROR: Cannot connect to MariaDB at 127.0.0.1${NC}"
     echo -e "${RED}Is Docker MariaDB running? Try: docker compose up -d${NC}"
     exit 1

@@ -196,8 +196,38 @@ class OfferTypeTest extends TestCase
             $trueCount = (int)$isMLE + (int)$isLLE + (int)$isVetMin;
             
             // At most one should be true (custom offers have all false)
-            $this->assertLessThanOrEqual(1, $trueCount, 
+            $this->assertLessThanOrEqual(1, $trueCount,
                 "Offer type $offerType should match at most one helper method");
         }
+    }
+
+    // ── calculateYears ───────────────────────────────────────────
+
+    #[\PHPUnit\Framework\Attributes\DataProvider('calculateYearsProvider')]
+    public function testCalculateYears(int $expected, int $o1, int $o2, int $o3, int $o4, int $o5, int $o6): void
+    {
+        $result = OfferType::calculateYears([
+            'offer1' => $o1, 'offer2' => $o2, 'offer3' => $o3,
+            'offer4' => $o4, 'offer5' => $o5, 'offer6' => $o6,
+        ]);
+        $this->assertSame($expected, $result);
+    }
+
+    /**
+     * @return array<string, array{int, int, int, int, int, int, int}>
+     */
+    public static function calculateYearsProvider(): array
+    {
+        return [
+            '1-year offer' => [1, 500, 0, 0, 0, 0, 0],
+            '2-year offer' => [2, 500, 550, 0, 0, 0, 0],
+            '3-year offer' => [3, 500, 550, 600, 0, 0, 0],
+            '4-year offer' => [4, 500, 550, 600, 650, 0, 0],
+            '5-year offer' => [5, 500, 550, 600, 650, 700, 0],
+            '6-year offer' => [6, 500, 550, 600, 650, 700, 750],
+            'all zeros returns 1' => [1, 0, 0, 0, 0, 0, 0],
+            'trailing zeros trimmed' => [3, 100, 200, 300, 0, 0, 0],
+            'vet min single year' => [1, 70, 0, 0, 0, 0, 0],
+        ];
     }
 }

@@ -12,7 +12,7 @@ set -e
 #   - Worktree branches synced from within the worktree (skipped if in active use)
 #   - After sync, rebases all worktree branches onto origin/master
 
-REPO_ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
+REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 source "$REPO_ROOT/bin/lib/wt-guards.sh"
 CURRENT=$(git branch --show-current)
 

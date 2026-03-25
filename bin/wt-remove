@@ -1,9 +1,10 @@
 #!/bin/bash
-# Remove a git worktree, using --force because symlinked files
-# (vendor/, config.php, .env.test, style.css) appear as untracked
-# changes and block normal removal.
+# Remove a git worktree and its Docker environment.
+# Tears down Docker containers first (if running), then removes the worktree.
+# Uses --force for git because symlinked files (vendor/, config.php, .env.test)
+# appear as untracked changes and block normal removal.
 #
-# Usage: bin/wt-remove <worktree-name> [--force]
+# Usage: bin/wt-remove <worktree-name> [--force] [--volumes]
 
 set -euo pipefail
 
@@ -13,16 +14,18 @@ REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 
 NAME=""
 FORCE=false
+VOLUMES=false
 for arg in "$@"; do
     case "$arg" in
         --force) FORCE=true ;;
+        --volumes) VOLUMES=true ;;
         -*) echo "Unknown option: $arg" >&2; exit 1 ;;
         *) NAME="$arg" ;;
     esac
 done
 
 if [ -z "$NAME" ]; then
-    echo "Usage: bin/wt-remove <worktree-name> [--force]" >&2
+    echo "Usage: bin/wt-remove <worktree-name> [--force] [--volumes]" >&2
     exit 1
 fi
 
@@ -49,6 +52,16 @@ if [ "$FORCE" != true ] && is_worktree_in_use "$WT_PATH"; then
     echo "Error: worktree '$NAME' is in active use (processes detected in directory)" >&2
     echo "Use --force to remove anyway." >&2
     exit 1
+fi
+
+# Tear down Docker environment if one exists (prevents orphaned containers)
+if [ -f "$WT_PATH/.wt-slug" ]; then
+    echo "Tearing down Docker environment..."
+    DOWN_FLAGS=""
+    [ "$VOLUMES" = true ] && DOWN_FLAGS="$DOWN_FLAGS --volumes"
+    [ "$FORCE" = true ] && DOWN_FLAGS="$DOWN_FLAGS --force"
+    # shellcheck disable=SC2086
+    "$REPO_ROOT/bin/wt-down" "$NAME" $DOWN_FLAGS || true
 fi
 
 echo "Removing worktree '$NAME'..."

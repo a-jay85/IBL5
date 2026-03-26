@@ -264,7 +264,15 @@ fi
 # Start browser-sync on the host, proxying the worktree's Docker URL.
 # Runs on a per-worktree port (3100+) to avoid collisions.
 # Uses host-side file watching (native FSEvents) for reliable change detection.
-BS_PORT=$((3100 + $(echo "$SLUG" | cksum | cut -d' ' -f1) % 100))
+# Port = 3000 + PR number (e.g., PR #533 → localhost:3533)
+# so the URL is predictable from the PR number alone.
+BS_PR_NUMBER=$(cd "$WORKTREE_PATH" && gh pr view --json number -q .number 2>/dev/null || true)
+if [ -n "$BS_PR_NUMBER" ]; then
+    BS_PORT=$((3000 + BS_PR_NUMBER))
+else
+    # No PR yet — fall back to hash-based port
+    BS_PORT=$((3100 + $(echo "$SLUG" | cksum | cut -d' ' -f1) % 900))
+fi
 echo "Starting browser-sync (port $BS_PORT)..."
 WT_IBL5="$WORKTREE_PATH/ibl5"
 (cd "$WT_IBL5" && exec bunx browser-sync start \

@@ -80,10 +80,10 @@ test.describe('Trading flow', () => {
     const href = await firstTeamLink.getAttribute('href');
     await page.goto(href!);
 
-    // Trade form should appear with two roster tables
+    // Trade form should appear with roster tables (2 player + 2 picks)
     await expect(page.locator('form[name="Trade_Offer"]')).toBeVisible();
     const rosterTables = page.locator('.trading-roster');
-    await expect(rosterTables).toHaveCount(2);
+    await expect(rosterTables).toHaveCount(4);
   });
 
   test('player checkboxes exist in roster tables', async ({ page }) => {
@@ -122,7 +122,7 @@ test.describe('Trade offer form structure', () => {
     await navigateToTradeForm(page);
   });
 
-  test('roster tables have team-colored styling and logo banners', async ({
+  test('roster tables have team-colored styling and collapsible details', async ({
     page,
   }) => {
     const rosters = page.locator('.trading-roster.team-table');
@@ -135,21 +135,34 @@ test.describe('Trade offer form structure', () => {
       // Each roster should have a team-color CSS variable set
       const style = await roster.getAttribute('style');
       expect(style).toContain('--team-color-primary');
-      // Logo banner image in thead
-      const banner = roster.locator('thead .team-logo-banner');
-      await expect(banner).toBeVisible();
+    }
+
+    // Logo should be in <summary>, not in <thead>
+    const details = page.locator('.trading-roster-details');
+    await expect(details).toHaveCount(2);
+    for (let i = 0; i < 2; i++) {
+      const summary = details.nth(i).locator('.trading-roster-details__summary');
+      await expect(summary).toBeVisible();
+      const logo = summary.locator('.trading-roster-details__logo');
+      await expect(logo).toBeVisible();
     }
   });
 
-  test('cash exchange section renders two team cards', async ({ page }) => {
-    const teamCards = page.locator('.team-card');
-    expect(await teamCards.count()).toBeGreaterThanOrEqual(2);
+  test('cash exchange section renders inside tab panels with number inputs', async ({
+    page,
+  }) => {
+    // Cash inputs live inside the "Cash" tab panel on each team's roster card
+    const cashTables = page.locator('.trading-cash-exchange');
+    await expect(cashTables).toHaveCount(2);
 
-    // Each card should have a title and at least one number input
+    // Click the Cash tab on both team details to make inputs visible
+    const details = page.locator('.trading-roster-details');
     for (let i = 0; i < 2; i++) {
-      const card = teamCards.nth(i);
-      await expect(card.locator('.team-card__title')).toBeVisible();
-      await expect(card.locator('input[type="number"]').first()).toBeVisible();
+      const cashTab = details.nth(i).locator('.ibl-tab[data-panel="cash"]');
+      await cashTab.click();
+      await expect(
+        details.nth(i).locator('.trading-cash-exchange input[type="number"]').first(),
+      ).toBeVisible();
     }
   });
 
@@ -218,8 +231,8 @@ test.describe('Trade offer form: roster preview interactions', () => {
     const preview = page.locator('#trade-roster-preview');
     await expect(preview).toBeHidden();
 
-    // Check one player from each roster table
-    const rosterTables = page.locator('.trading-roster');
+    // Check one player from each player roster table
+    const rosterTables = page.locator('.trading-roster.team-table');
     for (let i = 0; i < 2; i++) {
       const checkbox = rosterTables
         .nth(i)
@@ -255,8 +268,13 @@ test.describe('Trade offer form: roster preview interactions', () => {
   }) => {
     const preview = page.locator('#trade-roster-preview');
 
+    // Click the Cash tab to reveal number inputs (they're inside a tab panel)
+    const cashTab = page.locator('.trading-roster-details').first()
+      .locator('.ibl-tab[data-panel="cash"]');
+    await cashTab.click();
+
     // Fill a cash input (no checkboxes checked)
-    const cashInput = page.locator('input[type="number"]').first();
+    const cashInput = page.locator('.trading-cash-exchange input[type="number"]').first();
     await cashInput.fill('100');
     // Trigger the input event since fill alone may not fire it
     await cashInput.dispatchEvent('input');
@@ -325,8 +343,8 @@ test.describe('Trade offer form: roster preview interactions', () => {
 
     const preview = page.locator('#trade-roster-preview');
 
-    // Check one player from each roster
-    const rosterTables = page.locator('.trading-roster');
+    // Check one player from each player roster (use .team-table to skip picks tables)
+    const rosterTables = page.locator('.trading-roster.team-table');
     for (let i = 0; i < 2; i++) {
       const checkbox = rosterTables
         .nth(i)
@@ -412,7 +430,7 @@ test.describe('Trade offer form: cap warnings', () => {
     });
 
     // Check a player on the partner side to trigger updateCapWarnings
-    const partnerRoster = page.locator('.trading-roster').nth(1);
+    const partnerRoster = page.locator('.trading-roster.team-table').nth(1);
     const partnerCheckbox = partnerRoster
       .locator('input[type="checkbox"]')
       .first();
@@ -436,9 +454,9 @@ test.describe('Trade offer form: cap warnings', () => {
     );
     await expect(warningLogo).toBeVisible();
 
-    // Cap warning banner on the user team's roster header
+    // Cap warning banner on the user team's roster details summary
     const warningBanner = page.locator(
-      `.trading-roster[data-team-id="${config}"] thead tr:first-child th.cap-warning-banner`,
+      `.trading-roster-details:has(.trading-roster[data-team-id="${config}"]) .trading-roster-details__summary.cap-warning-banner`,
     );
     await expect(warningBanner).toBeVisible();
   });
@@ -685,5 +703,72 @@ test.describe('Trading: result banners', () => {
     );
     await expect(page.locator('.ibl-alert--error')).toBeVisible();
     await expect(page.locator('.ibl-alert--error')).toContainText('Test error');
+  });
+});
+
+// ===========================================================================
+// Trading — mobile viewport
+// ===========================================================================
+
+test.describe('Trading — mobile viewport', () => {
+  test.use({ viewport: { width: 375, height: 812 } });
+
+  test('trade form collapsible roster cards toggle on mobile', async ({
+    appState,
+    page,
+  }) => {
+    await appState({ 'Allow Trades': 'Yes' });
+    await navigateToTradeForm(page);
+
+    const details = page.locator('.trading-roster-details');
+    await expect(details).toHaveCount(2);
+
+    // Both should start open
+    for (let i = 0; i < 2; i++) {
+      await expect(details.nth(i)).toHaveAttribute('open', '');
+    }
+
+    // Collapse first roster by clicking its summary
+    const firstSummary = details.first().locator('.trading-roster-details__summary');
+    await firstSummary.click();
+
+    // First roster table should be hidden, second still open
+    await expect(details.first()).not.toHaveAttribute('open', '');
+    await expect(details.nth(1)).toHaveAttribute('open', '');
+
+    // Re-open first roster
+    await firstSummary.click();
+    await expect(details.first()).toHaveAttribute('open', '');
+  });
+
+  test('trade review uses semantic layout on mobile', async ({
+    appState,
+    page,
+  }) => {
+    await appState({ 'Allow Trades': 'Yes' });
+    await gotoWithRetry(page, 'modules.php?name=Trading&op=reviewtrade');
+
+    // Semantic layout should be present, not table layout
+    await expect(page.locator('.trading-layout__header')).toBeVisible();
+    await expect(page.locator('.trading-review-wrapper')).toBeVisible();
+    await expect(page.locator('table.trading-layout')).toHaveCount(0);
+  });
+
+  test('no PHP errors on trade form at mobile viewport', async ({
+    appState,
+    page,
+  }) => {
+    await appState({ 'Allow Trades': 'Yes' });
+    await navigateToTradeForm(page);
+    await assertNoPhpErrors(page);
+  });
+
+  test('no PHP errors on trade review at mobile viewport', async ({
+    appState,
+    page,
+  }) => {
+    await appState({ 'Allow Trades': 'Yes' });
+    await gotoWithRetry(page, 'modules.php?name=Trading&op=reviewtrade');
+    await assertNoPhpErrors(page);
   });
 });

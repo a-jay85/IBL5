@@ -267,10 +267,11 @@ fi
 # Traefik routes bs-SLUG.localhost → host.docker.internal:BS_PORT via file provider.
 BS_PORT=$((3100 + $(echo "$SLUG" | cksum | cut -d' ' -f1) % 100))
 echo "Starting browser-sync (port $BS_PORT)..."
-(cd "$WORKTREE_PATH/ibl5" && exec bunx browser-sync start \
+WT_IBL5="$WORKTREE_PATH/ibl5"
+(cd "$WT_IBL5" && exec bunx browser-sync start \
     --proxy "$SLUG.localhost" \
     --port "$BS_PORT" \
-    --files 'themes/IBL/style/style.css' 'classes/**/*.php' 'modules/**/*.php' \
+    --files "$WT_IBL5/themes/IBL/style/style.css,$WT_IBL5/classes/**/*.php,$WT_IBL5/modules/**/*.php" \
     --no-open --no-ui --no-ghost-mode) \
     > "$WORKTREE_PATH/.bs-sync.log" 2>&1 &
 echo $! > "$BS_PID_FILE"

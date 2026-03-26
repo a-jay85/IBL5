@@ -34,9 +34,10 @@ echo "Traefik route: http://bs-$SLUG.localhost/ibl5/"
 cleanup() { rm -f "$TRAEFIK_DYNAMIC/bs-$SLUG.yml"; }
 trap cleanup EXIT INT TERM
 
-cd "$REPO_ROOT/ibl5"
+IBL5="$REPO_ROOT/ibl5"
+cd "$IBL5"
 exec bunx browser-sync start \
     --proxy "$PROXY_HOST" \
     --port "$BS_PORT" \
-    --files 'themes/IBL/style/style.css' 'classes/**/*.php' 'modules/**/*.php' \
+    --files "$IBL5/themes/IBL/style/style.css,$IBL5/classes/**/*.php,$IBL5/modules/**/*.php" \
     --no-open --no-ui --no-ghost-mode

@@ -1821,7 +1821,8 @@ td.ibl-team-cell--colored {
 .trading-roster-details__summary {
     display: flex;
     align-items: center;
-    gap: 0.5rem;
+    justify-content: center;
+    position: relative;
     padding: 0.5rem 0.75rem;
     background: linear-gradient(135deg,
         var(--team-color-primary, #1e293b),
@@ -1848,7 +1849,8 @@ td.ibl-team-cell--colored {
 }
 
 .trading-roster-details__chevron {
-    margin-left: auto;
+    position: absolute;
+    right: 0.75rem;
     display: inline-block;
     width: 0.6em;
     height: 0.6em;
@@ -1856,7 +1858,6 @@ td.ibl-team-cell--colored {
     border-bottom: 2px solid currentColor;
     transform: rotate(45deg);
     transition: transform 0.2s ease;
-    flex-shrink: 0;
 }
 
 .trading-roster-details[open] > .trading-roster-details__summary .trading-roster-details__chevron {

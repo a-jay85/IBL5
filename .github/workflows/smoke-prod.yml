@@ -34,6 +34,10 @@ jobs:
     steps:
       - uses: actions/checkout@v6
 
+      - name: Wait for server stabilization after deploy
+        if: github.event_name == 'workflow_run'
+        run: sleep 15
+
       - name: Run smoke tests
         run: |
           chmod +x bin/smoke-prod

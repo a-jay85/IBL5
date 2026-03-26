@@ -44,6 +44,11 @@
 
 /* Rounded corners preserved at all sizes for cross-browser compatibility */
 
+/* Remove rounded corners from tabs inside leaders component */
+.leaders-tabbed .ibl-tabs {
+    border-radius: 0;
+}
+
 /* Header */
 .leaders-tabbed__header {
     background: var(--navy-800);

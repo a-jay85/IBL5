@@ -15,6 +15,16 @@ module.exports = {
       },
     ],
   },
+  // Inject in <head> so the script survives HTMX body swaps (hx-boost).
+  // Default injection before </body> gets removed when HTMX replaces body content.
+  snippetOptions: {
+    rule: {
+      match: /<head[^>]*>/i,
+      fn: function (snippet, match) {
+        return match + snippet;
+      },
+    },
+  },
   files: [
     "/watch/themes/**/*.css",
     "/watch/**/*.php",

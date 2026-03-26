@@ -308,16 +308,16 @@ test.describe('Trade submission: players-only (UI)', () => {
 
     expect(fd, 'CI seed must provide a trade partner with tradeable players on both sides').toBeTruthy();
 
-    // Page is already on the form — check one player from each roster
+    // Page is already on the form — check one player from each player roster
     const userCheckbox = page
-      .locator('.trading-roster')
+      .locator('.trading-roster.team-table')
       .first()
       .locator('input[type="checkbox"]')
       .first();
     await userCheckbox.check();
 
     const partnerCheckbox = page
-      .locator('.trading-roster')
+      .locator('.trading-roster.team-table')
       .nth(1)
       .locator('input[type="checkbox"]')
       .first();

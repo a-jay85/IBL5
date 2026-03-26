@@ -99,10 +99,10 @@
     color: white;
     font-family: var(--font-display, 'Barlow Condensed', -apple-system, BlinkMacSystemFont, sans-serif);
     font-weight: 600;
-    font-size: 1.25rem;
+    font-size: 1.2rem;
     text-transform: uppercase;
     letter-spacing: 0.03em;
-    line-height: 1.25rem;
+    line-height: 1.2rem;
     padding: 0.75rem 0.1rem;
     text-align: center;
     white-space: nowrap;
@@ -653,7 +653,6 @@ tr:has(.contract-hint-cell):focus-within .contract-hint-cell {
     }
 
     .ibl-data-table:not(.voting-form-table):not(.voting-results-table) td {
-        font-size: 1rem;
         padding: 0.375rem 0.25rem;
     }
 
@@ -1234,26 +1233,18 @@ td.ibl-team-cell--colored {
         min-width: 36px;
     }
 
-    /* Trading team select table fits on mobile — show full team name and link */
+    /* Trading team select — show team name (override global hide) but hide city */
     .trading-team-select .ibl-team-cell__text {
         display: inline;
     }
 
-    .trading-team-select .ibl-team-cell--colored {
-        text-align: left;
-        padding-left: 0.75rem;
-        padding-right: 0.75rem;
+    .trading-team-select .ibl-team-cell__city {
+        display: none;
     }
 
-    .trading-team-select .ibl-team-cell--colored .ibl-team-cell__name {
-        justify-content: flex-start;
-    }
-
-    .trading-team-select td.ibl-team-cell--colored,
-    .trading-team-select th.ibl-team-cell--colored {
-        width: auto;
-        min-width: auto;
-        max-width: none;
+    /* Re-sort by team name on mobile (desktop sorts by city) */
+    .trading-team-select td {
+        order: var(--mobile-order, 0);
     }
 }
 
@@ -1624,26 +1615,59 @@ td.ibl-team-cell--colored {
     max-width: 450px;
 }
 
-/* Team selection table with logos */
+/* Show partner team first (the team you're trading with) */
+.trading-layout__card:last-child {
+    order: -1;
+}
+
+/* Team selection table with logos — 2-column grid on all screen sizes */
 .trading-team-select {
-    min-width: 220px;
-    max-width: 280px;
     margin: 0 auto;
+}
+
+.trading-team-select thead {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    column-gap: 1px;
+}
+
+.trading-team-select tbody {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    column-gap: 1px;
+    background: var(--gray-100);
+}
+
+.trading-team-select tr {
+    display: contents;
+}
+
+.trading-team-select .ibl-team-cell--colored {
+    text-align: left;
+    padding-left: 0.75rem;
+    padding-right: 0.75rem;
+}
+
+.trading-team-select .ibl-team-cell--colored .ibl-team-cell__name {
+    justify-content: flex-start;
+}
+
+.trading-team-select td.ibl-team-cell--colored,
+.trading-team-select th.ibl-team-cell--colored {
+    width: auto;
+    min-width: auto;
+    max-width: none;
 }
 
 /* Roster tables for player/pick selection */
 .trading-roster {
     width: 100%;
-    table-layout: fixed;
+    table-layout: auto;
 }
 
 .trading-roster td {
     text-align: center;
     padding: 0.375rem 0.5rem;
-}
-
-.trading-roster td:nth-child(3) {
-    text-align: left;
 }
 
 .trading-roster td:nth-child(4) {
@@ -1663,6 +1687,11 @@ td.ibl-team-cell--colored {
     gap: 6px;
 }
 
+/* Draft pick link: inline so year/round/team stay on one line */
+.ibl-player-cell a.trading-roster__pick-link {
+    display: inline;
+}
+
 .trading-roster .draft-picks-list__notes {
     white-space: normal;
     overflow-wrap: break-word;
@@ -1676,6 +1705,266 @@ td.ibl-team-cell--colored {
     border: 1px solid var(--gray-300, #d1d5db);
     border-radius: var(--radius-sm, 0.25rem);
     text-align: right;
+}
+
+/* Trade offer cards */
+.trade-offer-card {
+    margin-bottom: 1rem;
+    padding: 1rem;
+    border: 1px solid var(--gray-200, #e5e7eb);
+    border-radius: var(--radius-md, 0.375rem);
+    background: white;
+    box-shadow: var(--shadow-sm, 0 1px 2px 0 rgb(0 0 0 / 0.05));
+}
+
+.trade-offer-card p {
+    margin: 0.25rem 0;
+}
+
+/* Trading button variants (base .ibl-btn defined in forms.css) */
+.ibl-btn--primary {
+    background: var(--gradient-navy-header);
+    color: white;
+}
+
+.ibl-btn--primary:hover {
+    background: linear-gradient(135deg, var(--navy-700, #334155), var(--navy-800, #1e293b));
+}
+
+/* Submit button uses site accent orange */
+.trading-layout__submit .ibl-btn--primary {
+    background: var(--gradient-accent);
+}
+
+.trading-layout__submit .ibl-btn--primary:hover:not(:disabled) {
+    background: linear-gradient(135deg, var(--accent-600), var(--accent-700, var(--accent-600)));
+}
+
+.ibl-btn--success {
+    background: linear-gradient(135deg, var(--success-500, #22c55e), var(--success-600, #16a34a));
+    color: white;
+}
+
+.ibl-btn--success:hover {
+    background: linear-gradient(135deg, var(--success-400, #4ade80), var(--success-500, #22c55e));
+}
+
+.ibl-btn--danger {
+    background: linear-gradient(135deg, var(--error-500, #ef4444), var(--error-600, #dc2626));
+    color: white;
+}
+
+.ibl-btn--danger:hover {
+    background: linear-gradient(135deg, var(--error-400, #f87171), var(--error-500, #ef4444));
+}
+
+/* Link styling for Trading */
+.ibl-link {
+    color: var(--navy-700, #334155);
+    text-decoration: none;
+    font-weight: 500;
+    transition: color 150ms ease;
+}
+
+.ibl-link:hover {
+    color: var(--accent-500, #f97316);
+}
+
+/* ---------- Trading layout: inline-style replacements ---------- */
+
+.trading-layout__submit {
+    text-align: center;
+    padding: 1rem;
+    position: sticky;
+    bottom: 0;
+    background: var(--page-bg, #eeeeee);
+    border-top: 1px solid var(--gray-200, #e5e7eb);
+    z-index: 10;
+}
+
+.trading-layout__header {
+    text-align: center;
+}
+
+.trading-review-wrapper {
+    max-width: 600px;
+    margin: 0 auto;
+}
+
+.trading-review-offers {
+    margin-bottom: var(--space-4);
+}
+
+.trade-offer-card__header {
+    margin-bottom: 0.5rem;
+}
+
+.trade-offer-card__actions {
+    display: flex;
+    justify-content: center;
+    gap: 0.5rem;
+    margin-bottom: 0.5rem;
+}
+
+.trade-offer-card__form {
+    margin: 0;
+}
+
+.trade-offer-card__awaiting {
+    color: var(--gray-500, #6b7280);
+    font-style: italic;
+}
+
+.trade-offer-card__notes {
+    margin-left: 1rem;
+    font-style: italic;
+    color: var(--gray-600, #4b5563);
+}
+
+.trade-offer-card__preview-wrap {
+    text-align: center;
+    margin-top: 0.5rem;
+}
+
+/* ---------- Collapsible roster details ---------- */
+
+.trading-roster-details {
+    border: none;
+}
+
+.trading-roster-details__summary {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+    padding: 0.5rem 0.75rem;
+    background: linear-gradient(90deg,
+        var(--team-color-primary, #1e293b),
+        color-mix(in srgb, var(--team-color-primary, #1e293b) 70%, black));
+    color: var(--team-color-secondary, white);
+    font-family: var(--font-display);
+    font-weight: 700;
+    font-size: 0.95rem;
+    letter-spacing: 0.025em;
+    cursor: pointer;
+    list-style: none;
+    border-radius: var(--radius-md) var(--radius-md) 0 0;
+    user-select: none;
+}
+
+.trading-roster-details__summary::-webkit-details-marker {
+    display: none;
+}
+
+.trading-roster-details__logo {
+    height: 32px;
+    width: auto;
+    object-fit: contain;
+}
+
+.trading-roster-details__chevron {
+    position: absolute;
+    right: 0.75rem;
+    display: inline-block;
+    width: 0.6em;
+    height: 0.6em;
+    border-right: 2px solid currentColor;
+    border-bottom: 2px solid currentColor;
+    transform: rotate(45deg);
+    transition: transform 0.2s ease;
+}
+
+.trading-roster-details[open] > .trading-roster-details__summary .trading-roster-details__chevron {
+    transform: rotate(-135deg);
+}
+
+/* Table inside details: summary provides the top visual edge */
+.trading-roster-details .ibl-data-table {
+    border-radius: 0 0 var(--radius-md) var(--radius-md);
+    border-top: none;
+    border-left: none;
+    border-right: none;
+}
+
+/* When one roster is collapsed and the other is open, stack vertically
+   so the expanded table gets full width instead of being squeezed to 50% */
+.team-cards-row:has(.trading-roster-details:not([open])):has(.trading-roster-details[open]) .trading-layout__card {
+    flex-basis: 100%;
+    max-width: 100%;
+}
+
+/* ---------- Roster details tabs & panels ---------- */
+
+.trading-roster-details .trading-roster-details__tabs {
+    border-radius: 0;
+}
+
+.trading-roster-details__panel {
+    display: none;
+}
+
+.trading-roster-details__panel--active {
+    display: block;
+}
+
+/* ---------- Checkbox tap targets ---------- */
+
+.trading-roster input[type="checkbox"] {
+    width: 20px;
+    height: 20px;
+    cursor: pointer;
+    accent-color: var(--accent-500, #f97316);
+}
+
+/* ---------- Trading mobile responsive ---------- */
+
+@media (max-width: 768px) {
+    /* Stack roster cards vertically so the open one gets full width */
+    .trading-layout__card {
+        flex-basis: 100%;
+        max-width: 100%;
+    }
+
+    /* Fixed submit bar on mobile — always at viewport bottom regardless of scroll */
+    .trading-layout__submit {
+        position: fixed;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        padding: var(--space-3) var(--space-4);
+    }
+
+    /* Offset form content so it's never hidden under the fixed bar */
+    .trading-layout {
+        padding-bottom: 4.5rem;
+    }
+
+    /* Roster table adjustments */
+    .trading-roster td:nth-child(1) {
+        width: 44px;
+        min-width: 44px;
+    }
+
+    .trading-roster td:nth-child(4) {
+        min-width: 40px;
+    }
+
+    /* Bigger checkbox tap area */
+    .trading-roster td:nth-child(1) {
+        padding: 0.5rem;
+    }
+
+    /* Team selection — full width on mobile */
+    .trading-team-select {
+        min-width: 0;
+        max-width: 100%;
+        width: 100%;
+    }
+
+    /* Cash exchange wider inputs */
+    .trading-cash-exchange input[type="number"] {
+        width: 100px;
+    }
 }
 
 /* ==========================================================================

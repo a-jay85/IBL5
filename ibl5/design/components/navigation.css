@@ -130,7 +130,6 @@
         border-radius: var(--radius-md);
     }
     .ibl-tab {
-        flex: 0 1 auto;
         padding: var(--space-1) var(--space-2);
         font-size: 0.85rem;
     }

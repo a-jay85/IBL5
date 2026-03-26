@@ -178,7 +178,7 @@ class Contracts
 <?php $hardCapMax = League::HARD_CAP_MAX; ?>
         <tr>
             <td></td>
-            <td>Cap Totals</td>
+            <td class="sticky-col">Cap Totals</td>
             <td></td>
             <td></td>
             <td class="sep-r-team"></td>

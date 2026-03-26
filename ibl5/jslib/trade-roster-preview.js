@@ -207,11 +207,11 @@
             partnerLogo.classList.toggle('cap-warning-logo', partnerOver);
         }
 
-        // 2) Red glow + tint on roster checklist logo banners
+        // 2) Red glow + tint on roster details summary banners
         var userBanner = form.querySelector(
-            '.trading-roster[data-team-id="' + config.userTeamId + '"] thead tr:first-child th');
+            '.trading-roster-details:has(.trading-roster[data-team-id="' + config.userTeamId + '"]) .trading-roster-details__summary');
         var partnerBanner = form.querySelector(
-            '.trading-roster[data-team-id="' + config.partnerTeamId + '"] thead tr:first-child th');
+            '.trading-roster-details:has(.trading-roster[data-team-id="' + config.partnerTeamId + '"]) .trading-roster-details__summary');
         if (userBanner) {
             userBanner.classList.toggle('cap-warning-banner', userOver);
         }
@@ -243,7 +243,10 @@
         var anyCash = hasAnyCash();
         var anyContent = anyPlayers || anyCash;
 
+        var wasHidden = panel.style.display === 'none';
         panel.style.display = anyContent ? '' : 'none';
+
+        // Preview panel appears in-place — no auto-scroll
 
         if (!anyContent) {
             container.innerHTML = '<div class="trade-roster-preview__empty">Select players to preview roster changes</div>';
@@ -498,6 +501,16 @@
                 currentDisplay = display;
                 updateActiveTab();
                 fetchRosterPreview();
+            }
+        });
+    }
+
+    // Details toggle — refresh responsive tables when roster expanded
+    var detailsElements = document.querySelectorAll('.trading-roster-details');
+    for (var d = 0; d < detailsElements.length; d++) {
+        detailsElements[d].addEventListener('toggle', function () {
+            if (this.open && typeof window.IBL_refreshResponsiveTables === 'function') {
+                window.IBL_refreshResponsiveTables();
             }
         });
     }

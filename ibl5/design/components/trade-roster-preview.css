@@ -82,6 +82,10 @@
     border-radius: 0;
 }
 
+.trade-roster-preview__tabs .ibl-tab {
+    padding-inline: 0.4rem;
+}
+
 .trade-roster-preview__logo {
     height: 40px;
     width: auto;
@@ -208,14 +212,31 @@
 .trade-roster-preview .table-scroll-wrapper {
     border-radius: 0 0 var(--radius-md) var(--radius-md);
     overflow: hidden;
+    margin-bottom: 0;
+}
+
+/* Strip inner chrome — panel provides all border-radius, so the scroll container
+   and caption must not clip the thead with their own rounded corners. */
+.trade-roster-preview .table-scroll-container {
+    border-radius: 0;
+}
+
+.trade-roster-preview .team-table-caption {
+    border-radius: 0;
 }
 
 /* ==========================================================================
    Cap Warning — over hard cap indicators on roster tables and preview tabs
    ========================================================================== */
 
-/* Red tint on roster checklist logo banner when team exceeds hard cap */
-.trading-roster thead th.cap-warning-banner img {
+/* Red tint on roster details summary when team exceeds hard cap */
+.trading-roster-details__summary.cap-warning-banner {
+    background: linear-gradient(135deg,
+        color-mix(in srgb, #dc2626 60%, var(--team-color-primary, #1e293b)),
+        color-mix(in srgb, #dc2626 40%, var(--team-color-primary, #1e293b)));
+}
+
+.trading-roster-details__summary.cap-warning-banner .trading-roster-details__logo {
     filter: grayscale(1) brightness(0.45) sepia(1) hue-rotate(-30deg) saturate(8);
 }
 
@@ -245,4 +266,12 @@
 /* Hide per-team dropdowns injected by API responses */
 .trade-roster-preview .team-table-caption .ibl-view-dropdown {
     display: none;
+}
+
+/* On mobile, the 5 roster-preview tabs need tighter padding to fit without scrolling */
+@media (max-width: 768px) {
+    .trade-roster-preview__tabs .ibl-tab {
+        padding: var(--space-1) 0.25rem;
+        font-size: 0.75rem;
+    }
 }

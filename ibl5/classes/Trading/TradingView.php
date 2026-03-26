@@ -113,6 +113,10 @@ class TradingView implements TradingViewInterface
                     </div>
                     <div class="trading-roster-details__panel" data-panel-id="picks">
                         <table class="ibl-data-table trading-roster" data-no-responsive>
+                            <colgroup>
+                                <col style="width: 50px;">
+                                <col>
+                            </colgroup>
                             <tbody>
                                 <?= $userPickRows['html'] ?>
                             </tbody>
@@ -163,6 +167,10 @@ class TradingView implements TradingViewInterface
                     </div>
                     <div class="trading-roster-details__panel" data-panel-id="picks">
                         <table class="ibl-data-table trading-roster" data-no-responsive>
+                            <colgroup>
+                                <col style="width: 50px;">
+                                <col>
+                            </colgroup>
                             <tbody>
                                 <?= $partnerPickRows['html'] ?>
                             </tbody>

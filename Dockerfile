@@ -8,7 +8,6 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 COPY docker/opcache.ini $PHP_INI_DIR/conf.d/opcache.ini
-COPY docker/error-reporting.ini $PHP_INI_DIR/conf.d/error-reporting.ini
 
 RUN a2enmod rewrite headers
 

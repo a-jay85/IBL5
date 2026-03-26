@@ -1824,7 +1824,7 @@ td.ibl-team-cell--colored {
     justify-content: center;
     position: relative;
     padding: 0.5rem 0.75rem;
-    background: linear-gradient(135deg,
+    background: linear-gradient(90deg,
         var(--team-color-primary, #1e293b),
         color-mix(in srgb, var(--team-color-primary, #1e293b) 70%, black));
     color: var(--team-color-secondary, white);
@@ -1864,9 +1864,18 @@ td.ibl-team-cell--colored {
     transform: rotate(-135deg);
 }
 
-/* Remove top border-radius on table when inside details (summary has it) */
+/* Table inside details: summary provides the top visual edge */
 .trading-roster-details .ibl-data-table {
     border-radius: 0 0 var(--radius-md) var(--radius-md);
+    border-top: none;
+    border-left: none;
+    border-right: none;
+}
+
+.trading-roster-details .ibl-data-table thead {
+    background: linear-gradient(90deg,
+        var(--team-color-primary, #1e293b),
+        color-mix(in srgb, var(--team-color-primary, #1e293b) 70%, black));
 }
 
 /* When one roster is collapsed and the other is open, stack vertically

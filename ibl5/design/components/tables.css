@@ -1771,6 +1771,11 @@ td.ibl-team-cell--colored {
 .trading-layout__submit {
     text-align: center;
     padding: 1rem;
+    position: sticky;
+    bottom: 0;
+    background: var(--page-bg, #eeeeee);
+    border-top: 1px solid var(--gray-200, #e5e7eb);
+    z-index: 10;
 }
 
 .trading-layout__header {
@@ -1908,14 +1913,9 @@ td.ibl-team-cell--colored {
         max-width: 100%;
     }
 
-    /* Sticky submit button */
+    /* Tighter submit padding on mobile */
     .trading-layout__submit {
-        position: sticky;
-        bottom: 0;
-        background: var(--page-bg, #eeeeee);
         padding: var(--space-3) var(--space-4);
-        border-top: 1px solid var(--gray-200, #e5e7eb);
-        z-index: 10;
     }
 
     /* Roster table adjustments */

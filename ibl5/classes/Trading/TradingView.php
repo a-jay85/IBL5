@@ -142,7 +142,7 @@ class TradingView implements TradingViewInterface
 <?= $this->renderRosterPreview($userTeamId, $partnerTeamId, $userTeam, $partnerTeam, $userColor1, $partnerColor1) ?>
         <div class="trading-layout__submit">
             <input type="hidden" name="fieldsCounter" value="<?= (int) $k ?>">
-            <button type="submit" class="ibl-btn ibl-btn--primary">Make Trade Offer</button>
+            <button type="submit" class="ibl-btn ibl-btn--primary" id="trade-submit-btn" disabled>Make Trade Offer</button>
         </div>
     </div>
 <?php
@@ -166,6 +166,7 @@ $tradeConfig = [
 ?>
 <script>window.IBL_TRADE_CONFIG = <?= json_encode($tradeConfig, JSON_HEX_TAG | JSON_THROW_ON_ERROR) ?>;</script>
 <script src="jslib/trade-roster-preview.js"></script>
+<script src="jslib/trade-submit-guard.js"></script>
 </form>
         <?php
         return (string) ob_get_clean();

@@ -78,11 +78,18 @@ if ! docker network inspect ibl5-proxy &>/dev/null; then
     docker network create ibl5-proxy
 fi
 
-# Ensure Traefik is running (routes *.localhost to worktree containers)
+# Ensure shared services are running (Traefik for routing, Mailpit for email capture)
+NEED_SHARED=false
 if ! docker ps --format '{{.Names}}' | grep -q '^ibl5-traefik$'; then
-    echo "Starting Traefik..."
+    NEED_SHARED=true
+fi
+if ! docker ps --format '{{.Names}}' | grep -q '^ibl5-mailpit$'; then
+    NEED_SHARED=true
+fi
+if [ "$NEED_SHARED" = true ]; then
+    echo "Starting shared services (Traefik, Mailpit)..."
     docker compose -f "$REPO_ROOT/docker-compose.yml" up -d \
-        || echo "Warning: Could not start Traefik. Start manually: docker compose up -d (from $REPO_ROOT)"
+        || echo "Warning: Could not start shared services. Start manually: docker compose up -d (from $REPO_ROOT)"
 fi
 
 # Ensure node_modules symlink exists for CSS tooling

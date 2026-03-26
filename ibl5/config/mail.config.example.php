@@ -11,17 +11,11 @@
  *   'smtp' - Send via SMTP (recommended for production)
  *   'mail' - Send via PHP's native mail() function
  *   'log'  - Write emails to error_log (safe for local development)
+ *
+ * Docker note: docker-compose.yml sets MAIL_TRANSPORT/MAIL_SMTP_HOST/MAIL_SMTP_PORT
+ * environment variables on the PHP container, which take priority over this file.
+ * Emails sent in Docker are captured by Mailpit at http://localhost:8025.
  */
-
-// Docker development with Mailpit (http://localhost:8025):
-// 'transport' => 'smtp',
-// 'smtp' => [
-//     'host' => 'ibl5-mailpit',
-//     'port' => 1025,
-//     'encryption' => '',
-//     'username' => '',
-//     'password' => '',
-// ],
 
 return [
     // Transport method: 'smtp', 'mail', or 'log'

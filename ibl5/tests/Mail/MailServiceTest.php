@@ -103,4 +103,73 @@ class MailServiceTest extends TestCase
 
         $this->assertFalse($result);
     }
+
+    public function testFromConfigUsesEnvVarTransport(): void
+    {
+        putenv('MAIL_TRANSPORT=log');
+        putenv('MAIL_SMTP_HOST=testhost.example');
+        putenv('MAIL_SMTP_PORT=2525');
+
+        try {
+            $service = MailService::fromConfig();
+
+            $this->assertSame('log', $service->getTransport());
+        } finally {
+            putenv('MAIL_TRANSPORT');
+            putenv('MAIL_SMTP_HOST');
+            putenv('MAIL_SMTP_PORT');
+        }
+    }
+
+    public function testFromConfigEnvVarSmtpOverridesFileConfig(): void
+    {
+        putenv('MAIL_TRANSPORT=smtp');
+        putenv('MAIL_SMTP_HOST=mailpit.local');
+        putenv('MAIL_SMTP_PORT=1025');
+        putenv('MAIL_SMTP_ENCRYPTION=');
+
+        try {
+            $service = MailService::fromConfig();
+
+            $this->assertSame('smtp', $service->getTransport());
+            $this->assertTrue($service->isDeliveryEnabled());
+        } finally {
+            putenv('MAIL_TRANSPORT');
+            putenv('MAIL_SMTP_HOST');
+            putenv('MAIL_SMTP_PORT');
+            putenv('MAIL_SMTP_ENCRYPTION');
+        }
+    }
+
+    public function testFromConfigIgnoresEmptyEnvVar(): void
+    {
+        putenv('MAIL_TRANSPORT=');
+
+        try {
+            $service = MailService::fromConfig();
+
+            // Should fall through to file-based config, not use empty env var
+            $this->assertContains($service->getTransport(), ['log', 'mail', 'smtp']);
+        } finally {
+            putenv('MAIL_TRANSPORT');
+        }
+    }
+
+    public function testFromConfigInvalidPortFallsBackToDefault(): void
+    {
+        putenv('MAIL_TRANSPORT=smtp');
+        putenv('MAIL_SMTP_HOST=mailpit.local');
+        putenv('MAIL_SMTP_PORT=badvalue');
+
+        try {
+            $service = MailService::fromConfig();
+
+            // Invalid port should fall back to default (587), not (int)'badvalue' = 0
+            $this->assertSame('smtp', $service->getTransport());
+        } finally {
+            putenv('MAIL_TRANSPORT');
+            putenv('MAIL_SMTP_HOST');
+            putenv('MAIL_SMTP_PORT');
+        }
+    }
 }

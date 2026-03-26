@@ -230,16 +230,6 @@ class TradingViewTest extends TestCase
     // TRADE REVIEW TESTS
     // ============================================
 
-    public function testRenderTradeReviewShowsNoOffersMessage(): void
-    {
-        $pageData = $this->createTradeReviewPageData();
-        $pageData['tradeOffers'] = [];
-
-        $html = $this->view->renderTradeReview($pageData);
-
-        $this->assertStringContainsString('No pending trade offers', $html);
-    }
-
     public function testRenderTradeReviewShowsTradeOfferCards(): void
     {
         $pageData = $this->createTradeReviewPageData();

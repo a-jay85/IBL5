@@ -1756,11 +1756,6 @@ td.ibl-team-cell--colored {
     margin-bottom: var(--space-4);
 }
 
-.trading-no-offers {
-    padding: 1rem;
-    text-align: center;
-}
-
 .trade-offer-card__header {
     margin-bottom: 0.5rem;
 }

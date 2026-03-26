@@ -203,9 +203,7 @@ $tradeConfig = [
 </div>
 <div class="trading-review-wrapper">
     <div class="trading-review-offers">
-<?php if ($tradeOffers === []): ?>
-        <p class="trading-no-offers">No pending trade offers.</p>
-<?php else: ?>
+<?php if ($tradeOffers !== []): ?>
     <?php foreach ($tradeOffers as $offerId => $offer):
         $preview = $offer['previewData'];
         $reviewConfigs[(int) $offerId] = [

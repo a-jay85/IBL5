@@ -82,6 +82,10 @@
     border-radius: 0;
 }
 
+.trade-roster-preview__tabs .ibl-tab {
+    padding-inline: 0.4rem;
+}
+
 .trade-roster-preview__logo {
     height: 40px;
     width: auto;

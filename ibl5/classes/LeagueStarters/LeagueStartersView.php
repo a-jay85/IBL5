@@ -56,9 +56,9 @@ class LeagueStartersView implements LeagueStartersViewInterface
     {
         $tabDefinitions = [
             'ratings' => 'Ratings',
-            'total_s' => 'Season Totals',
-            'avg_s' => 'Season Averages',
-            'per36mins' => 'Per 36 Minutes',
+            'total_s' => 'Totals',
+            'avg_s' => 'Averages',
+            'per36mins' => 'Per 36',
         ];
 
         $baseUrl = 'modules.php?name=LeagueStarters';

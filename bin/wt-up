@@ -137,7 +137,7 @@ nohup "${BUNX_PATH:-bunx}" @tailwindcss/cli \
 echo $! > "$CSS_PID_FILE"
 disown
 
-# Kill any existing browser-sync for this worktree
+# Kill any existing browser-sync for this worktree (PID file or port squatter)
 BS_PID_FILE="$WORKTREE_PATH/.bs-sync.pid"
 if [ -f "$BS_PID_FILE" ]; then
     OLD_BS_PID=$(cat "$BS_PID_FILE")
@@ -285,6 +285,14 @@ else
     # No PR yet — fall back to hash-based port
     BS_PORT=$((3100 + $(echo "$SLUG" | cksum | cut -d' ' -f1) % 900))
 fi
+# Kill anything already holding this port (e.g., a stale bin/bs-start process)
+PORT_PID=$(lsof -ti :"$BS_PORT" 2>/dev/null || true)
+if [ -n "$PORT_PID" ]; then
+    echo "Killing stale process on port $BS_PORT (PID $PORT_PID)..."
+    kill $PORT_PID 2>/dev/null || true
+    sleep 1
+fi
+
 echo "Starting browser-sync (port $BS_PORT)..."
 WT_IBL5="$WORKTREE_PATH/ibl5"
 (cd "$WT_IBL5" && exec bunx browser-sync start \

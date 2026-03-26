@@ -1731,6 +1731,15 @@ td.ibl-team-cell--colored {
     background: linear-gradient(135deg, var(--navy-700, #334155), var(--navy-800, #1e293b));
 }
 
+/* Submit button uses site accent orange */
+.trading-layout__submit .ibl-btn--primary {
+    background: var(--gradient-accent);
+}
+
+.trading-layout__submit .ibl-btn--primary:hover:not(:disabled) {
+    background: linear-gradient(135deg, var(--accent-600), var(--accent-700, var(--accent-600)));
+}
+
 .ibl-btn--success {
     background: linear-gradient(135deg, var(--success-500, #22c55e), var(--success-600, #16a34a));
     color: white;
@@ -1916,9 +1925,18 @@ td.ibl-team-cell--colored {
         max-width: 100%;
     }
 
-    /* Tighter submit padding on mobile */
+    /* Fixed submit bar on mobile — always at viewport bottom regardless of scroll */
     .trading-layout__submit {
+        position: fixed;
+        left: 0;
+        right: 0;
+        bottom: 0;
         padding: var(--space-3) var(--space-4);
+    }
+
+    /* Offset form content so it's never hidden under the fixed bar */
+    .trading-layout {
+        padding-bottom: 4.5rem;
     }
 
     /* Roster table adjustments */

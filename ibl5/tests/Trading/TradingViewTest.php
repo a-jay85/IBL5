@@ -87,7 +87,7 @@ class TradingViewTest extends TestCase
 
         $html = $this->view->renderTradeOfferForm($pageData);
 
-        $this->assertStringContainsString('Cash Exchange', $html);
+        $this->assertStringContainsString('data-panel="cash"', $html);
         $this->assertStringContainsString('userSendsCash', $html);
         $this->assertStringContainsString('partnerSendsCash', $html);
     }
@@ -141,18 +141,94 @@ class TradingViewTest extends TestCase
     }
 
     // ============================================
-    // TRADE REVIEW TESTS
+    // COLLAPSIBLE ROSTER DETAILS TESTS
     // ============================================
 
-    public function testRenderTradeReviewShowsNoOffersMessage(): void
+    public function testRenderTradeOfferFormUsesDetailsElements(): void
+    {
+        $pageData = $this->createTradeOfferPageData();
+
+        $html = $this->view->renderTradeOfferForm($pageData);
+
+        // Two collapsible <details> elements should wrap each roster
+        $this->assertSame(2, substr_count($html, '<details class="trading-roster-details"'));
+        $this->assertStringContainsString('trading-roster-details__summary', $html);
+        $this->assertStringContainsString('trading-roster-details__chevron', $html);
+    }
+
+    public function testRenderTradeOfferFormLogoInSummaryNotThead(): void
+    {
+        $pageData = $this->createTradeOfferPageData();
+
+        $html = $this->view->renderTradeOfferForm($pageData);
+
+        // Logo banner in <thead> should be gone
+        $this->assertStringNotContainsString('team-logo-banner', $html);
+        $this->assertStringNotContainsString('<th colspan="4">', $html);
+
+        // Logo should be in <summary> instead
+        $this->assertStringContainsString('trading-roster-details__logo', $html);
+    }
+
+    public function testRenderTradeOfferFormSubmitUsesClass(): void
+    {
+        $pageData = $this->createTradeOfferPageData();
+
+        $html = $this->view->renderTradeOfferForm($pageData);
+
+        $this->assertStringContainsString('class="trading-layout__submit"', $html);
+        // Should not have inline style on submit div
+        $this->assertStringNotContainsString('style="text-align: center; padding: 1rem;"', $html);
+    }
+
+    // ============================================
+    // TRADE REVIEW SEMANTIC LAYOUT TESTS
+    // ============================================
+
+    public function testRenderTradeReviewUsesSemanticLayout(): void
     {
         $pageData = $this->createTradeReviewPageData();
-        $pageData['tradeOffers'] = [];
 
         $html = $this->view->renderTradeReview($pageData);
 
-        $this->assertStringContainsString('No pending trade offers', $html);
+        // Old table layout should be gone
+        $this->assertStringNotContainsString('<table class="trading-layout"', $html);
+        $this->assertStringNotContainsString('style="margin: 0 auto;"', $html);
+
+        // New semantic classes should be present
+        $this->assertStringContainsString('trading-layout__header', $html);
+        $this->assertStringContainsString('trading-review-wrapper', $html);
+        $this->assertStringContainsString('trading-review-offers', $html);
     }
+
+    public function testRenderTradeOfferCardUsesClasses(): void
+    {
+        $pageData = $this->createTradeReviewPageData();
+        $pageData['tradeOffers'] = [
+            1 => $this->createTradeOfferWithPreview([
+                'items' => [
+                    ['type' => 'player', 'description' => 'Trade item.', 'notes' => 'Some note', 'from' => 'Lakers', 'to' => 'Celtics'],
+                ],
+            ]),
+        ];
+
+        $html = $this->view->renderTradeReview($pageData);
+
+        // New class names should be present
+        $this->assertStringContainsString('trade-offer-card__header', $html);
+        $this->assertStringContainsString('trade-offer-card__actions', $html);
+        $this->assertStringContainsString('trade-offer-card__notes', $html);
+        $this->assertStringContainsString('trade-offer-card__preview-wrap', $html);
+
+        // Old inline styles should be gone
+        $this->assertStringNotContainsString('style="margin-bottom: 0.5rem;"', $html);
+        $this->assertStringNotContainsString('style="display: flex; justify-content: center;', $html);
+        $this->assertStringNotContainsString('style="margin-left: 1rem; font-style: italic;', $html);
+    }
+
+    // ============================================
+    // TRADE REVIEW TESTS
+    // ============================================
 
     public function testRenderTradeReviewShowsTradeOfferCards(): void
     {
@@ -251,7 +327,8 @@ class TradingViewTest extends TestCase
 
         $html = $this->view->renderTradeReview($pageData);
 
-        $this->assertStringContainsString('Make Trade Offer To...', $html);
+        $this->assertStringContainsString('West', $html);
+        $this->assertStringContainsString('East', $html);
         $this->assertStringContainsString('Miami Heat', $html);
     }
 
@@ -443,7 +520,8 @@ class TradingViewTest extends TestCase
 
         $html = $this->view->renderTeamSelectionLinks($teams);
 
-        $this->assertStringContainsString('Make Trade Offer To...', $html);
+        $this->assertStringContainsString('West', $html);
+        $this->assertStringContainsString('East', $html);
         $this->assertStringContainsString('trading-team-select', $html);
     }
 
@@ -557,8 +635,8 @@ class TradingViewTest extends TestCase
 
         $this->assertStringContainsString('data-team-id="5"', $html);
         $this->assertStringContainsString('data-team-id="10"', $html);
-        $this->assertStringContainsString('images/logo/5.jpg', $html);
-        $this->assertStringContainsString('images/logo/10.jpg', $html);
+        $this->assertStringContainsString('images/logo/new5.png', $html);
+        $this->assertStringContainsString('images/logo/new10.png', $html);
     }
 
     public function testRenderTradeReviewNoScriptWhenNoOffers(): void

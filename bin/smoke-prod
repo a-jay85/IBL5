@@ -5,7 +5,7 @@
 # Default: https://www.iblhoops.net
 #
 # Checks 7 public URLs for:
-#   - HTTP 200 status
+#   - HTTP 200 status (retries once on 5xx after 10s)
 #   - Expected content in response body
 #   - Absence of PHP error messages
 #
@@ -30,6 +30,15 @@ check() {
     # Extract just the HTTP code (last 3 chars of output)
     status="${status: -3}"
     [[ "$status" =~ ^[0-9]+$ ]] || status="000"
+
+    # Retry once on 5xx — transient during deploys (autoloader regeneration)
+    if [ "$status" -ge 500 ] 2>/dev/null; then
+        echo "  RETRY: $name — HTTP $status, waiting 10s..."
+        sleep 10
+        status=$(curl -sS -w "%{http_code}" --max-time 30 -o "$TMPFILE" "$url" 2>/dev/null) || true
+        status="${status: -3}"
+        [[ "$status" =~ ^[0-9]+$ ]] || status="000"
+    fi
 
     # Check if status is in the accepted list (pipe-separated, e.g., "200|401")
     if ! echo "$accept" | grep -qw "$status"; then

@@ -267,3 +267,11 @@
 .trade-roster-preview .team-table-caption .ibl-view-dropdown {
     display: none;
 }
+
+/* On mobile, the 5 roster-preview tabs need tighter padding to fit without scrolling */
+@media (max-width: 768px) {
+    .trade-roster-preview__tabs .ibl-tab {
+        padding: var(--space-1) 0.25rem;
+        font-size: 0.75rem;
+    }
+}

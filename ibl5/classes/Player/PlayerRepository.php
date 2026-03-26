@@ -449,7 +449,7 @@ class PlayerRepository extends BaseMysqliRepository implements PlayerRepositoryI
     {
         /** @var list<array{year: int, pos: string, pid: int, name: string, team: string, games: int, minutes: int, fgm: int, fga: int, ftm: int, fta: int, tgm: int, tga: int, orb: int, reb: int, ast: int, stl: int, tvr: int, blk: int, pf: int, pts: int}> */
         return $this->fetchAll(
-            "SELECT * FROM ibl_playoff_stats WHERE name = ? ORDER BY year ASC",
+            self::buildPerSeasonStatsQuery(2),
             "s",
             $playerName
         );
@@ -463,10 +463,44 @@ class PlayerRepository extends BaseMysqliRepository implements PlayerRepositoryI
     {
         /** @var list<array{year: int, pos: string, pid: int, name: string, team: string, games: int, minutes: int, fgm: int, fga: int, ftm: int, fta: int, tgm: int, tga: int, orb: int, reb: int, ast: int, stl: int, tvr: int, blk: int, pf: int, pts: int}> */
         return $this->fetchAll(
-            "SELECT * FROM ibl_heat_stats WHERE name = ? ORDER BY year ASC",
+            self::buildPerSeasonStatsQuery(3),
             "s",
             $playerName
         );
+    }
+
+    /**
+     * Build inlined per-season stats query with predicate pushed before GROUP BY.
+     *
+     * Replaces SELECT from ibl_playoff_stats / ibl_heat_stats views.
+     */
+    private static function buildPerSeasonStatsQuery(int $gameType): string
+    {
+        return "SELECT bs.season_year AS year, MIN(bs.pos) AS pos, bs.pid, p.name,
+            fs.team_name AS team,
+            CAST(COUNT(*) AS SIGNED) AS games,
+            CAST(SUM(bs.gameMIN) AS SIGNED) AS minutes,
+            CAST(SUM(bs.calc_fg_made) AS SIGNED) AS fgm,
+            CAST(SUM(bs.game2GA + bs.game3GA) AS SIGNED) AS fga,
+            CAST(SUM(bs.gameFTM) AS SIGNED) AS ftm,
+            CAST(SUM(bs.gameFTA) AS SIGNED) AS fta,
+            CAST(SUM(bs.game3GM) AS SIGNED) AS tgm,
+            CAST(SUM(bs.game3GA) AS SIGNED) AS tga,
+            CAST(SUM(bs.gameORB) AS SIGNED) AS orb,
+            CAST(SUM(bs.calc_rebounds) AS SIGNED) AS reb,
+            CAST(SUM(bs.gameAST) AS SIGNED) AS ast,
+            CAST(SUM(bs.gameSTL) AS SIGNED) AS stl,
+            CAST(SUM(bs.gameTOV) AS SIGNED) AS tvr,
+            CAST(SUM(bs.gameBLK) AS SIGNED) AS blk,
+            CAST(SUM(bs.gamePF) AS SIGNED) AS pf,
+            CAST(SUM(bs.calc_points) AS SIGNED) AS pts
+        FROM ibl_box_scores bs
+        JOIN ibl_plr p ON bs.pid = p.pid
+        JOIN ibl_franchise_seasons fs ON bs.teamID = fs.franchise_id
+            AND bs.season_year = fs.season_ending_year
+        WHERE bs.game_type = {$gameType} AND p.name = ?
+        GROUP BY bs.pid, p.name, bs.season_year, fs.team_name
+        ORDER BY year ASC";
     }
 
     /**

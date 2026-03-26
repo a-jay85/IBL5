@@ -6,6 +6,10 @@ services:
     environment:
       DB_HOST: db
       E2E_TESTING: 1
+      MAIL_TRANSPORT: smtp
+      MAIL_SMTP_HOST: ibl5-mailpit
+      MAIL_SMTP_PORT: 1025
+      MAIL_SMTP_ENCRYPTION: ""
     volumes:
       - ${WORKTREE_PATH}/ibl5:/var/www/html/ibl5
       - vendor-data:/var/www/html/ibl5/vendor

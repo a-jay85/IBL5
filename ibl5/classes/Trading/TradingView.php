@@ -94,18 +94,10 @@ class TradingView implements TradingViewInterface
                         <table class="ibl-data-table trading-roster team-table" data-team-id="<?= $userTeamId ?>" style="<?= TableStyles::inlineVars($pageData['userTeamColor1'], $pageData['userTeamColor2']) ?>">
                             <colgroup>
                                 <col style="width: 50px;">
-                                <col style="width: 40px;">
                                 <col>
-                                <col style="width: 70px;">
+                                <col style="width: 40px;">
+                                <col style="width: 40px;">
                             </colgroup>
-                            <thead>
-                                <tr>
-                                    <th></th>
-                                    <th>Pos</th>
-                                    <th>Name</th>
-                                    <th>Salary</th>
-                                </tr>
-                            </thead>
                             <tbody>
                                 <?= $userPlayerRows['html'] ?>
                             </tbody>
@@ -148,18 +140,10 @@ class TradingView implements TradingViewInterface
                         <table class="ibl-data-table trading-roster team-table" data-team-id="<?= $partnerTeamId ?>" style="<?= TableStyles::inlineVars($pageData['partnerTeamColor1'], $pageData['partnerTeamColor2']) ?>">
                             <colgroup>
                                 <col style="width: 50px;">
-                                <col style="width: 40px;">
                                 <col>
-                                <col style="width: 70px;">
+                                <col style="width: 40px;">
+                                <col style="width: 40px;">
                             </colgroup>
-                            <thead>
-                                <tr>
-                                    <th></th>
-                                    <th>Pos</th>
-                                    <th>Name</th>
-                                    <th>Salary</th>
-                                </tr>
-                            </thead>
                             <tbody>
                                 <?= $partnerPlayerRows['html'] ?>
                             </tbody>
@@ -435,8 +419,8 @@ $tradeConfig = [
         <input type="hidden" name="check<?= $k ?>">
     </td>
 <?php endif; ?>
-    <td><?= $playerPosition ?></td>
     <td class="ibl-player-cell"><a href="./modules.php?name=Player&amp;pa=showpage&amp;pid=<?= $pid ?>"><?= $thumbnail ?><?= $playerName ?></a></td>
+    <td><?= $playerPosition ?></td>
     <td><?= $contractAmount ?></td>
 </tr>
             <?php

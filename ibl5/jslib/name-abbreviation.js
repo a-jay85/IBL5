@@ -12,7 +12,7 @@
 
     const MOBILE_BREAKPOINT = 768;
     /** Tables where names are always abbreviated (then selectively restored if they fit) */
-    const COMPACT_TABLE_SELECTOR = '.stat-table, .fa-table';
+    const COMPACT_TABLE_SELECTOR = '.stat-table, .fa-table, .trading-roster';
 
     /** Long team names mapped to shorter display forms */
     const TEAM_ABBREVIATIONS = {

@@ -208,6 +208,7 @@
 .trade-roster-preview .table-scroll-wrapper {
     border-radius: 0 0 var(--radius-md) var(--radius-md);
     overflow: hidden;
+    margin-bottom: 0;
 }
 
 /* ==========================================================================

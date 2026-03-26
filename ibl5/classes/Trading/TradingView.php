@@ -460,9 +460,9 @@ $tradeConfig = [
         ?>
 <div id="trade-roster-preview" class="trade-roster-preview" style="display: none; --preview-user-color: #<?= $safeUserColor ?>; --preview-partner-color: #<?= $safePartnerColor ?>;">
     <div class="trade-roster-preview__header">
-        <img src="images/logo/<?= $userTeamId ?>.jpg" alt="<?= $userTeam ?>" class="trade-roster-preview__logo trade-roster-preview__logo--active" data-team-id="<?= $userTeamId ?>">
+        <img src="images/logo/new<?= $userTeamId ?>.png" alt="<?= $userTeam ?>" class="trade-roster-preview__logo trade-roster-preview__logo--active" data-team-id="<?= $userTeamId ?>">
         <div class="trade-roster-preview__title">Roster Preview</div>
-        <img src="images/logo/<?= $partnerTeamId ?>.jpg" alt="<?= $partnerTeam ?>" class="trade-roster-preview__logo" data-team-id="<?= $partnerTeamId ?>">
+        <img src="images/logo/new<?= $partnerTeamId ?>.png" alt="<?= $partnerTeam ?>" class="trade-roster-preview__logo" data-team-id="<?= $partnerTeamId ?>">
     </div>
     <div class="trade-roster-preview__tabs ibl-tabs" role="tablist" style="--team-tab-bg-color: #<?= $safeUserColor ?>; --team-tab-active-color: #<?= $safeUserColor ?>">
         <button type="button" class="ibl-tab ibl-tab--active" data-display="ratings" role="tab">Ratings</button>
@@ -616,9 +616,9 @@ $tradeConfig = [
         ?>
 <div id="trade-review-preview-<?= $offerId ?>" class="trade-roster-preview" style="display: none; --preview-user-color: #<?= $safeFromColor ?>; --preview-partner-color: #<?= $safeToColor ?>;">
     <div class="trade-roster-preview__header">
-        <img src="images/logo/<?= $fromTeamId ?>.jpg" alt="From Team" class="trade-roster-preview__logo<?= $initialTeamId === $fromTeamId ? ' trade-roster-preview__logo--active' : '' ?>" data-team-id="<?= $fromTeamId ?>">
+        <img src="images/logo/new<?= $fromTeamId ?>.png" alt="From Team" class="trade-roster-preview__logo<?= $initialTeamId === $fromTeamId ? ' trade-roster-preview__logo--active' : '' ?>" data-team-id="<?= $fromTeamId ?>">
         <div class="trade-roster-preview__title">Roster Preview</div>
-        <img src="images/logo/<?= $toTeamId ?>.jpg" alt="To Team" class="trade-roster-preview__logo<?= $initialTeamId === $toTeamId ? ' trade-roster-preview__logo--active' : '' ?>" data-team-id="<?= $toTeamId ?>">
+        <img src="images/logo/new<?= $toTeamId ?>.png" alt="To Team" class="trade-roster-preview__logo<?= $initialTeamId === $toTeamId ? ' trade-roster-preview__logo--active' : '' ?>" data-team-id="<?= $toTeamId ?>">
     </div>
     <div class="trade-roster-preview__tabs ibl-tabs" role="tablist" style="--team-tab-bg-color: #<?= $initialColor ?>; --team-tab-active-color: #<?= $initialColor ?>">
         <button type="button" class="ibl-tab ibl-tab--active" data-display="ratings" role="tab">Ratings</button>

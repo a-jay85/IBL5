@@ -264,7 +264,6 @@ fi
 # Start browser-sync on the host, proxying the worktree's Docker URL.
 # Runs on a per-worktree port (3100+) to avoid collisions.
 # Uses host-side file watching (native FSEvents) for reliable change detection.
-# Traefik routes bs-SLUG.localhost → host.docker.internal:BS_PORT via file provider.
 BS_PORT=$((3100 + $(echo "$SLUG" | cksum | cut -d' ' -f1) % 100))
 echo "Starting browser-sync (port $BS_PORT)..."
 WT_IBL5="$WORKTREE_PATH/ibl5"
@@ -276,30 +275,13 @@ WT_IBL5="$WORKTREE_PATH/ibl5"
     > "$WORKTREE_PATH/.bs-sync.log" 2>&1 &
 echo $! > "$BS_PID_FILE"
 
-# Register browser-sync with Traefik so bs-SLUG.localhost routes to it
-TRAEFIK_DYNAMIC="$REPO_ROOT/docker/traefik-dynamic"
-mkdir -p "$TRAEFIK_DYNAMIC"
-cat > "$TRAEFIK_DYNAMIC/bs-$SLUG.yml" <<EOF
-http:
-  routers:
-    bs-$SLUG:
-      rule: "Host(\`bs-$SLUG.localhost\`)"
-      entryPoints: ["web"]
-      service: bs-$SLUG
-  services:
-    bs-$SLUG:
-      loadBalancer:
-        servers:
-          - url: "http://host.docker.internal:$BS_PORT"
-EOF
-
 echo ""
 echo "================================================"
 echo "  Worktree environment ready!"
 echo "================================================"
 echo ""
 echo "  URL:     http://$SLUG.localhost/ibl5/"
-echo "  Sync:    http://bs-$SLUG.localhost/ibl5/  (live reload)"
+echo "  Sync:    http://localhost:$BS_PORT/ibl5/  (live reload)"
 echo "  Adminer: http://localhost:8082 (server: ibl5-db-$SLUG)"
 echo "  DB CLI:  docker exec -it $DB_CONTAINER $DB_CMD"
 if [ -f "$CSS_PID_FILE" ]; then

@@ -34,14 +34,16 @@ for arg in "$@"; do
 done
 
 if [ -z "$WORKTREE_NAME" ]; then
-    echo "Usage: bin/wt-up <worktree-name> [--pr] [--seed] [--prod] [--no-data]" >&2
+    echo "Usage: bin/wt-up <worktree-name> [--pr] [--seed] [--prod] [--no-data] [--fresh-vendor]" >&2
     echo "" >&2
     echo "Options:" >&2
-    echo "  --pr       Use PR number as URL slug (e.g., pr-42.localhost)" >&2
-    echo "  --seed     Import ci-seed.sql for test data (schema + CI seed)" >&2
-    echo "  --prod     Import prod-seed.sql data (default if no data flag given)" >&2
-    echo "  --no-data  Schema only, no seed data" >&2
+    echo "  --pr            Use PR number as URL slug (e.g., pr-42.localhost)" >&2
+    echo "  --seed          Import ci-seed.sql for test data (schema + CI seed)" >&2
+    echo "  --prod          Import prod-seed.sql data (default if no data flag given)" >&2
+    echo "  --no-data       Schema only, no seed data" >&2
     echo "  --fresh-vendor  Remove vendor volume and reinstall (use after composer.lock changes)" >&2
+    echo "" >&2
+    echo "The DB volume is always purged to ensure a clean database." >&2
     exit 1
 fi
 
@@ -164,11 +166,17 @@ if [ -f "$REPO_ROOT/.env" ]; then
     ENV_FILE_FLAG="--env-file $REPO_ROOT/.env"
 fi
 
-# --fresh-vendor: remove vendor volume so entrypoint re-runs composer install.
-# DB volume is preserved — only vendor is reset.
-if [ "$FRESH_VENDOR" = true ]; then
-    echo "Removing vendor volume for fresh install..."
+# Always purge the DB volume so each wt-up starts with a clean database.
+# This prevents stale data from a previous run bleeding into the new environment.
+# Vendor volume is only purged with --fresh-vendor (e.g., after composer.lock changes).
+if docker compose -f "$COMPOSE_FILE" $ENV_FILE_FLAG -p "ibl5-$SLUG" ps -q 2>/dev/null | grep -q .; then
+    echo "Stopping existing environment..."
     docker compose -f "$COMPOSE_FILE" $ENV_FILE_FLAG -p "ibl5-$SLUG" down 2>/dev/null || true
+fi
+echo "Purging DB volume..."
+docker volume rm "ibl5-${SLUG}_db-data" 2>/dev/null || true
+if [ "$FRESH_VENDOR" = true ]; then
+    echo "Purging vendor volume for fresh install..."
     docker volume rm "ibl5-${SLUG}_vendor-data" 2>/dev/null || true
 fi
 

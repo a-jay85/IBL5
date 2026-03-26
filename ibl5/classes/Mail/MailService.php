@@ -69,13 +69,18 @@ class MailService implements MailServiceInterface
     }
 
     /**
-     * Create a MailService from the config file.
+     * Create a MailService from environment variables or config file.
      *
-     * Loads config/mail.config.php if it exists, falls back to
-     * config/mail.config.example.php, then to hardcoded log defaults.
+     * Priority: MAIL_TRANSPORT env var > config/mail.config.php > config/mail.config.example.php > defaults.
+     * Docker sets MAIL_TRANSPORT=smtp + MAIL_SMTP_HOST/PORT to auto-route to Mailpit.
      */
     public static function fromConfig(): self
     {
+        $envConfig = self::buildConfigFromEnv();
+        if ($envConfig !== null) {
+            return new self($envConfig);
+        }
+
         $configPath = self::resolveConfigDir() . '/mail.config.php';
         $examplePath = self::resolveConfigDir() . '/mail.config.example.php';
 
@@ -90,6 +95,40 @@ class MailService implements MailServiceInterface
         /** @var MailConfig $config */
 
         return new self($config);
+    }
+
+    /**
+     * Build config from MAIL_* environment variables, if MAIL_TRANSPORT is set.
+     *
+     * @return MailConfig|null Config array if MAIL_TRANSPORT is set, null otherwise.
+     */
+    private static function buildConfigFromEnv(): ?array
+    {
+        $transport = getenv('MAIL_TRANSPORT');
+        if (!is_string($transport) || $transport === '') {
+            return null;
+        }
+
+        $host = getenv('MAIL_SMTP_HOST');
+        $port = getenv('MAIL_SMTP_PORT');
+        $encryption = getenv('MAIL_SMTP_ENCRYPTION');
+        $username = getenv('MAIL_SMTP_USERNAME');
+        $password = getenv('MAIL_SMTP_PASSWORD');
+
+        return [
+            'transport' => $transport,
+            'smtp' => [
+                'host' => is_string($host) && $host !== '' ? $host : self::DEFAULT_CONFIG['smtp']['host'],
+                'port' => is_string($port) && $port !== '' && (int) $port >= 1 && (int) $port <= 65535
+                    ? (int) $port
+                    : self::DEFAULT_CONFIG['smtp']['port'],
+                'encryption' => is_string($encryption) ? $encryption : self::DEFAULT_CONFIG['smtp']['encryption'],
+                'username' => is_string($username) && $username !== '' ? $username : self::DEFAULT_CONFIG['smtp']['username'],
+                'password' => is_string($password) && $password !== '' ? $password : self::DEFAULT_CONFIG['smtp']['password'],
+            ],
+            'default_from_email' => self::DEFAULT_CONFIG['default_from_email'],
+            'default_from_name' => self::DEFAULT_CONFIG['default_from_name'],
+        ];
     }
 
     /** @see MailServiceInterface::send() */

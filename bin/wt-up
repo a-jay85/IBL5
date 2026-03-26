@@ -1,6 +1,6 @@
 #!/bin/bash
 # Start a Docker environment for a worktree with its own PHP-Apache + MariaDB.
-# Usage: bin/wt-up <worktree-name> [--pr] [--seed] [--prod] [--no-data] [--fresh-vendor]
+# Usage: bin/wt-up <worktree-name> [--pr] [--seed] [--prod] [--no-data]
 
 set -euo pipefail
 
@@ -10,7 +10,6 @@ USE_PR=false
 SEED_DB=false
 PROD_DB=false
 NO_DATA=false
-FRESH_VENDOR=false
 
 # Wrapper to suppress MariaDB "password on command line" warning
 db_exec() {
@@ -27,21 +26,19 @@ for arg in "$@"; do
         --seed) SEED_DB=true ;;
         --prod) PROD_DB=true ;;
         --no-data) NO_DATA=true ;;
-        --fresh-vendor) FRESH_VENDOR=true ;;
         -*) echo "Unknown option: $arg" >&2; exit 1 ;;
         *) WORKTREE_NAME="$arg" ;;
     esac
 done
 
 if [ -z "$WORKTREE_NAME" ]; then
-    echo "Usage: bin/wt-up <worktree-name> [--pr] [--seed] [--prod] [--no-data] [--fresh-vendor]" >&2
+    echo "Usage: bin/wt-up <worktree-name> [--pr] [--seed] [--prod] [--no-data]" >&2
     echo "" >&2
     echo "Options:" >&2
     echo "  --pr            Use PR number as URL slug (e.g., pr-42.localhost)" >&2
     echo "  --seed          Import ci-seed.sql for test data (schema + CI seed)" >&2
     echo "  --prod          Import prod-seed.sql data (default if no data flag given)" >&2
     echo "  --no-data       Schema only, no seed data" >&2
-    echo "  --fresh-vendor  Remove vendor volume and reinstall (use after composer.lock changes)" >&2
     echo "" >&2
     echo "The DB volume is always purged to ensure a clean database." >&2
     exit 1
@@ -128,13 +125,6 @@ echo "Starting CSS watcher..."
     > "$WORKTREE_PATH/.css-watch.log" 2>&1 &
 echo $! > "$CSS_PID_FILE"
 
-# Remove vendor symlink if present — named volume mounts over this path.
-# The symlink is created by wt-new for host-side tools; Docker doesn't need it.
-VENDOR_DIR="$WORKTREE_PATH/ibl5/vendor"
-if [ -L "$VENDOR_DIR" ]; then
-    rm "$VENDOR_DIR"
-fi
-
 # Copy config.php into worktree (can't use bind mount — VirtioFS fails on nested mounts)
 CONFIG_PHP="$WORKTREE_PATH/ibl5/config.php"
 if [ ! -s "$CONFIG_PHP" ] || [ -L "$CONFIG_PHP" ]; then
@@ -169,15 +159,10 @@ fi
 # Always tear down existing containers and purge the DB volume so each wt-up
 # starts with a clean database. docker volume rm silently fails if a container
 # (even a stopped one) still references the volume, so we must compose down first.
-# Vendor volume is only purged with --fresh-vendor (e.g., after composer.lock changes).
 echo "Removing existing environment..."
 docker compose -f "$COMPOSE_FILE" $ENV_FILE_FLAG -p "ibl5-$SLUG" down 2>/dev/null || true
 echo "Purging DB volume..."
 docker volume rm "ibl5-${SLUG}_db-data" 2>/dev/null || true
-if [ "$FRESH_VENDOR" = true ]; then
-    echo "Purging vendor volume for fresh install..."
-    docker volume rm "ibl5-${SLUG}_vendor-data" 2>/dev/null || true
-fi
 
 docker compose -f "$COMPOSE_FILE" $ENV_FILE_FLAG -p "ibl5-$SLUG" up -d --build
 
@@ -258,7 +243,7 @@ until docker exec "$PHP_CONTAINER" php /var/www/html/ibl5/bin/validate-schema &>
         docker exec "$PHP_CONTAINER" php /var/www/html/ibl5/bin/validate-schema 2>&1 || true
         echo ""
         echo "  The prod-seed may predate migrations that the code depends on."
-        echo "  Re-run with --fresh-vendor or manually apply the missing migration."
+        echo "  Manually apply the missing migration."
         echo ""
         break
     fi

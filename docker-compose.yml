@@ -74,6 +74,10 @@ services:
     ports:
       - "8025:8025"
       - "1025:1025"
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.mailpit.rule=Host(`mailpit.localhost`)
+      - traefik.http.services.mailpit.loadbalancer.server.port=8025
     networks:
       - default
       - ibl5-proxy

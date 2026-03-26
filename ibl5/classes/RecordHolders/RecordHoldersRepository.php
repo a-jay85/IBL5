@@ -70,7 +70,12 @@ class RecordHoldersRepository extends \BaseMysqliRepository implements RecordHol
      */
     public function getQuadrupleDoubles(): array
     {
-        $query = "SELECT
+        $query = "WITH _game_of_day AS (
+                SELECT Date, visitorTeamID, homeTeamID, MIN(gameOfThatDay) AS gameOfThatDay
+                FROM {$this->boxScoresTeamsTable}
+                GROUP BY Date, visitorTeamID, homeTeamID
+            )
+            SELECT
                 bs.pid,
                 p.name,
                 h.teamid AS tid,
@@ -90,11 +95,8 @@ class RecordHoldersRepository extends \BaseMysqliRepository implements RecordHol
             JOIN ibl_hist h ON h.pid = bs.pid AND h.year = (" . self::SEASON_YEAR_EXPRESSION . ")
             LEFT JOIN {$this->scheduleTable} sch ON sch.Date = bs.Date
                 AND sch.Visitor = bs.visitorTID AND sch.Home = bs.homeTID
-            LEFT JOIN (
-                SELECT Date, visitorTeamID, homeTeamID, MIN(gameOfThatDay) AS gameOfThatDay
-                FROM {$this->boxScoresTeamsTable}
-                GROUP BY Date, visitorTeamID, homeTeamID
-            ) bst ON bst.Date = bs.Date AND bst.visitorTeamID = bs.visitorTID AND bst.homeTeamID = bs.homeTID
+            LEFT JOIN _game_of_day bst ON bst.Date = bs.Date
+                AND bst.visitorTeamID = bs.visitorTID AND bst.homeTeamID = bs.homeTID
             LEFT JOIN {$this->teamInfoTable} opp ON opp.teamid = CASE
                 WHEN h.teamid = bs.visitorTID THEN bs.homeTID
                 ELSE bs.visitorTID END
@@ -240,7 +242,12 @@ class RecordHoldersRepository extends \BaseMysqliRepository implements RecordHol
      */
     public function getLargestMarginOfVictory(string $dateFilter): array
     {
-        $query = "SELECT
+        $query = "WITH _game_of_day AS (
+                SELECT Date, visitorTeamID, homeTeamID, MIN(gameOfThatDay) AS gameOfThatDay
+                FROM {$this->boxScoresTeamsTable}
+                GROUP BY Date, visitorTeamID, homeTeamID
+            )
+            SELECT
                 winner_t.teamid AS winner_tid,
                 winner_t.team_name AS winner_name,
                 loser_t.teamid AS loser_tid,
@@ -269,11 +276,8 @@ class RecordHoldersRepository extends \BaseMysqliRepository implements RecordHol
             JOIN {$this->teamInfoTable} loser_t ON loser_t.teamid = sub.loser_id
             LEFT JOIN {$this->scheduleTable} sch ON sch.Date = sub.Date
                 AND sch.Visitor = sub.visitorTeamID AND sch.Home = sub.homeTeamID
-            LEFT JOIN (
-                SELECT Date, visitorTeamID, homeTeamID, MIN(gameOfThatDay) AS gameOfThatDay
-                FROM {$this->boxScoresTeamsTable}
-                GROUP BY Date, visitorTeamID, homeTeamID
-            ) bst ON bst.Date = sub.Date AND bst.visitorTeamID = sub.visitorTeamID AND bst.homeTeamID = sub.homeTeamID
+            LEFT JOIN _game_of_day bst ON bst.Date = sub.Date
+                AND bst.visitorTeamID = sub.visitorTeamID AND bst.homeTeamID = sub.homeTeamID
             ORDER BY sub.margin DESC, sub.Date ASC
             LIMIT 5";
 
@@ -640,11 +644,8 @@ class RecordHoldersRepository extends \BaseMysqliRepository implements RecordHol
                 JOIN ibl_hist h ON h.pid = bs.pid AND h.year = (" . self::SEASON_YEAR_EXPRESSION . ")
                 LEFT JOIN {$this->scheduleTable} sch ON sch.Date = bs.Date
                     AND sch.Visitor = bs.visitorTID AND sch.Home = bs.homeTID
-                LEFT JOIN (
-                    SELECT Date, visitorTeamID, homeTeamID, MIN(gameOfThatDay) AS gameOfThatDay
-                    FROM {$this->boxScoresTeamsTable}
-                    GROUP BY Date, visitorTeamID, homeTeamID
-                ) bst ON bst.Date = bs.Date AND bst.visitorTeamID = bs.visitorTID AND bst.homeTeamID = bs.homeTID
+                LEFT JOIN _game_of_day bst ON bst.Date = bs.Date
+                    AND bst.visitorTeamID = bs.visitorTID AND bst.homeTeamID = bs.homeTID
                 LEFT JOIN {$this->teamInfoTable} opp ON opp.teamid = CASE
                     WHEN h.teamid = bs.visitorTID THEN bs.homeTID
                     ELSE bs.visitorTID END
@@ -655,7 +656,13 @@ class RecordHoldersRepository extends \BaseMysqliRepository implements RecordHol
                 LIMIT 5)";
         }
 
-        $query = implode("\nUNION ALL\n", $unions);
+        // CTE materializes gameOfThatDay lookup once instead of per UNION ALL branch
+        $cte = "WITH _game_of_day AS (
+            SELECT Date, visitorTeamID, homeTeamID, MIN(gameOfThatDay) AS gameOfThatDay
+            FROM {$this->boxScoresTeamsTable}
+            GROUP BY Date, visitorTeamID, homeTeamID
+        )\n";
+        $query = $cte . implode("\nUNION ALL\n", $unions);
         $rows = $this->fetchAll($query);
 
         /** @var array<string, list<PlayerSingleGameRecord>> $results */

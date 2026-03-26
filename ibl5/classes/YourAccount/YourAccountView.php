@@ -14,7 +14,7 @@ use Utilities\HtmlSanitizer;
  * All pages share a centered card layout using .auth-page > .auth-card.ibl-card
  * with the existing IBL5 design system components.
  */
-class YourAccountView
+class YourAccountView implements Contracts\YourAccountViewInterface
 {
     /**
      * Render the basketball logo icon shown above auth cards.
@@ -545,32 +545,4 @@ class YourAccountView
         return (string) ob_get_clean();
     }
 
-    /**
-     * Render a "user not found" error page for password reset.
-     */
-    public function renderUserNotFoundPage(): string
-    {
-        ob_start();
-        ?>
-<div class="auth-page">
-    <div class="auth-card ibl-card">
-        <div class="ibl-card__body">
-            <div class="auth-status">
-                <div class="auth-status__icon auth-status__icon--error">
-                    <?= $this->errorIcon() ?>
-                </div>
-                <div class="auth-status__title">User Not Found</div>
-                <div class="auth-status__message">
-                    Sorry, no user was found with that username. Please check your spelling and try again.
-                </div>
-                <div class="auth-status__action">
-                    <a href="modules.php?name=YourAccount&amp;op=pass_lost" class="ibl-btn ibl-btn--primary">Try Again</a>
-                </div>
-            </div>
-        </div>
-    </div>
-</div>
-        <?php
-        return (string) ob_get_clean();
-    }
 }

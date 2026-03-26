@@ -262,26 +262,69 @@ $tradeConfig = [
     public function renderTeamSelectionLinks(array $teams): string
     {
         /** @var list<array{name: string, city: string, fullName: string, teamid: int, color1: string, color2: string}> $teams */
+
+        // Split by conference
+        $western = [];
+        $eastern = [];
+        foreach ($teams as $team) {
+            if (in_array($team['teamid'], League::WESTERN_CONFERENCE_TEAMIDS, true)) {
+                $western[] = $team;
+            } else {
+                $eastern[] = $team;
+            }
+        }
+
+        // Compute mobile order (by team name) before sorting by city for desktop
+        $mobileOrder = [];
+        $byName = $western;
+        usort($byName, static fn(array $a, array $b): int => strcasecmp($a['name'], $b['name']));
+        foreach ($byName as $i => $team) {
+            $mobileOrder[$team['teamid']] = $i * 2; // even slots for West
+        }
+        $byName = $eastern;
+        usort($byName, static fn(array $a, array $b): int => strcasecmp($a['name'], $b['name']));
+        foreach ($byName as $i => $team) {
+            $mobileOrder[$team['teamid']] = $i * 2 + 1; // odd slots for East
+        }
+
+        // Sort by city for desktop display
+        usort($western, static fn(array $a, array $b): int => strcasecmp($a['city'], $b['city']));
+        usort($eastern, static fn(array $a, array $b): int => strcasecmp($a['city'], $b['city']));
+
+        // Interleave: West[0], East[0], West[1], East[1], ...
+        $interleaved = [];
+        $count = max(count($western), count($eastern));
+        for ($i = 0; $i < $count; $i++) {
+            if (isset($western[$i])) {
+                $interleaved[] = $western[$i];
+            }
+            if (isset($eastern[$i])) {
+                $interleaved[] = $eastern[$i];
+            }
+        }
+
         ob_start();
         ?>
 <table class="ibl-data-table trading-team-select">
     <thead>
         <tr>
-            <th>Make Trade Offer To...</th>
+            <th>West</th>
+            <th>East</th>
         </tr>
     </thead>
     <tbody>
-<?php foreach ($teams as $team): ?>
+<?php foreach ($interleaved as $team): ?>
         <?php
         $teamId = $team['teamid'];
         $teamName = HtmlSanitizer::safeHtmlOutput($team['name']);
-        $fullName = HtmlSanitizer::safeHtmlOutput($team['fullName']);
         $partnerUrl = 'modules.php?name=Trading&amp;op=offertrade&amp;partner=' . $teamName;
         $cityHtml = HtmlSanitizer::safeHtmlOutput($team['city']);
         $nameHtml = '<span class="ibl-team-cell__city">' . $cityHtml . ' </span>' . $teamName;
+        $cell = TeamCellHelper::renderTeamCell($teamId, $team['fullName'], $team['color1'], $team['color2'], '', $partnerUrl, $nameHtml);
+        $cell = str_replace('style="', 'style="--mobile-order: ' . $mobileOrder[$teamId] . '; ', $cell);
         ?>
         <tr>
-            <?= TeamCellHelper::renderTeamCell($teamId, $team['fullName'], $team['color1'], $team['color2'], '', $partnerUrl, $nameHtml) ?>
+            <?= $cell ?>
         </tr>
 <?php endforeach; ?>
     </tbody>

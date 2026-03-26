@@ -327,7 +327,8 @@ class TradingViewTest extends TestCase
 
         $html = $this->view->renderTradeReview($pageData);
 
-        $this->assertStringContainsString('Make Trade Offer To...', $html);
+        $this->assertStringContainsString('West', $html);
+        $this->assertStringContainsString('East', $html);
         $this->assertStringContainsString('Miami Heat', $html);
     }
 
@@ -519,7 +520,8 @@ class TradingViewTest extends TestCase
 
         $html = $this->view->renderTeamSelectionLinks($teams);
 
-        $this->assertStringContainsString('Make Trade Offer To...', $html);
+        $this->assertStringContainsString('West', $html);
+        $this->assertStringContainsString('East', $html);
         $this->assertStringContainsString('trading-team-select', $html);
     }
 

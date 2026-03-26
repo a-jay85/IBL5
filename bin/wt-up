@@ -125,6 +125,14 @@ echo "Starting CSS watcher..."
     > "$WORKTREE_PATH/.css-watch.log" 2>&1 &
 echo $! > "$CSS_PID_FILE"
 
+# Kill any existing browser-sync for this worktree
+BS_PID_FILE="$WORKTREE_PATH/.bs-sync.pid"
+if [ -f "$BS_PID_FILE" ]; then
+    OLD_BS_PID=$(cat "$BS_PID_FILE")
+    kill "$OLD_BS_PID" 2>/dev/null || true
+    rm -f "$BS_PID_FILE"
+fi
+
 # Copy config.php into worktree (can't use bind mount — VirtioFS fails on nested mounts)
 CONFIG_PHP="$WORKTREE_PATH/ibl5/config.php"
 if [ ! -s "$CONFIG_PHP" ] || [ -L "$CONFIG_PHP" ]; then
@@ -253,12 +261,35 @@ if [ "$RETRIES" -lt 2 ]; then
     echo "Schema validation passed."
 fi
 
+# Start browser-sync on the host, proxying the worktree's Docker URL.
+# Runs on a per-worktree port (3100+) to avoid collisions.
+# Uses host-side file watching (native FSEvents) for reliable change detection.
+# Port = 3000 + PR number (e.g., PR #533 → localhost:3533)
+# so the URL is predictable from the PR number alone.
+BS_PR_NUMBER=$(cd "$WORKTREE_PATH" && gh pr view --json number -q .number 2>/dev/null || true)
+if [ -n "$BS_PR_NUMBER" ]; then
+    BS_PORT=$((3000 + BS_PR_NUMBER))
+else
+    # No PR yet — fall back to hash-based port
+    BS_PORT=$((3100 + $(echo "$SLUG" | cksum | cut -d' ' -f1) % 900))
+fi
+echo "Starting browser-sync (port $BS_PORT)..."
+WT_IBL5="$WORKTREE_PATH/ibl5"
+(cd "$WT_IBL5" && exec bunx browser-sync start \
+    --proxy "$SLUG.localhost" \
+    --port "$BS_PORT" \
+    --files "$WT_IBL5/themes/IBL/style/style.css,$WT_IBL5/classes/**/*.php,$WT_IBL5/modules/**/*.php" \
+    --no-open --no-ui --no-ghost-mode) \
+    > "$WORKTREE_PATH/.bs-sync.log" 2>&1 &
+echo $! > "$BS_PID_FILE"
+
 echo ""
 echo "================================================"
 echo "  Worktree environment ready!"
 echo "================================================"
 echo ""
 echo "  URL:     http://$SLUG.localhost/ibl5/"
+echo "  Sync:    http://localhost:$BS_PORT/ibl5/  (live reload)"
 echo "  Adminer: http://localhost:8082 (server: ibl5-db-$SLUG)"
 echo "  DB CLI:  docker exec -it $DB_CONTAINER $DB_CMD"
 if [ -f "$CSS_PID_FILE" ]; then

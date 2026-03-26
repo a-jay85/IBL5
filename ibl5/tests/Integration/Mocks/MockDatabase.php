@@ -118,8 +118,10 @@ class MockDatabase extends \mysqli
         // Special handling for pythagorean stats queries (offense/defense stats)
         // Always intercept these queries to avoid returning standings data
         // The JOIN query uses aliases: off_fgm, off_ftm, off_tgm, def_fgm, def_ftm, def_tgm
+        // Detects both old view names and inlined queries that aggregate from ibl_box_scores_teams
         if (stripos($query, 'ibl_team_offense_stats') !== false ||
-            stripos($query, 'ibl_team_defense_stats') !== false) {
+            stripos($query, 'ibl_team_defense_stats') !== false ||
+            (stripos($query, 'off_fgm') !== false && stripos($query, 'def_fgm') !== false)) {
             if (!empty($this->mockPythagoreanData)) {
                 $data = $this->mockPythagoreanData;
                 // Translate base keys to aliased JOIN keys if needed

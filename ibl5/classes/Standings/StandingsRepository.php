@@ -162,12 +162,14 @@ class StandingsRepository extends \BaseMysqliRepository implements StandingsRepo
             "SELECT
                 tos.fgm AS off_fgm, tos.ftm AS off_ftm, tos.tgm AS off_tgm,
                 tds.fgm AS def_fgm, tds.ftm AS def_ftm, tds.tgm AS def_tgm
-            FROM ibl_team_offense_stats tos
-            JOIN ibl_team_defense_stats tds ON tos.teamID = tds.teamID AND tos.season_year = tds.season_year
-            WHERE tos.teamID = ? AND tos.season_year = ?",
-            "ii",
+            FROM (" . self::buildOffenseSubquery('bst.season_year = ? AND fs.franchise_id = ?') . ") tos
+            JOIN (" . self::buildDefenseSubquery('my.season_year = ? AND fs.franchise_id = ?') . ") tds
+                ON tos.teamID = tds.teamID AND tos.season_year = tds.season_year",
+            "iiii",
+            $seasonYear,
             $teamId,
-            $seasonYear
+            $seasonYear,
+            $teamId
         );
 
         if ($stats === null) {
@@ -222,10 +224,11 @@ class StandingsRepository extends \BaseMysqliRepository implements StandingsRepo
                 tos.teamID,
                 tos.fgm AS off_fgm, tos.ftm AS off_ftm, tos.tgm AS off_tgm,
                 tds.fgm AS def_fgm, tds.ftm AS def_ftm, tds.tgm AS def_tgm
-            FROM ibl_team_offense_stats tos
-            JOIN ibl_team_defense_stats tds ON tos.teamID = tds.teamID AND tos.season_year = tds.season_year
-            WHERE tos.season_year = ?",
-            "i",
+            FROM (" . self::buildOffenseSubquery('bst.season_year = ?') . ") tos
+            JOIN (" . self::buildDefenseSubquery('my.season_year = ?') . ") tds
+                ON tos.teamID = tds.teamID AND tos.season_year = tds.season_year",
+            "ii",
+            $seasonYear,
             $seasonYear
         );
 
@@ -276,5 +279,43 @@ class StandingsRepository extends \BaseMysqliRepository implements StandingsRepo
             'pointsScored' => $pointsScored,
             'pointsAllowed' => $pointsAllowed,
         ];
+    }
+
+    /**
+     * Build inlined offense stats subquery with filter pushed before GROUP BY.
+     */
+    private static function buildOffenseSubquery(string $filterClause): string
+    {
+        return "SELECT fs.franchise_id AS teamID, fs.team_name AS name, bst.season_year,
+            CAST(SUM(bst.game2GM + bst.game3GM) AS SIGNED) AS fgm,
+            CAST(SUM(bst.gameFTM) AS SIGNED) AS ftm,
+            CAST(SUM(bst.game3GM) AS SIGNED) AS tgm
+        FROM ibl_box_scores_teams bst
+        JOIN ibl_franchise_seasons fs
+            ON fs.team_name = bst.name AND fs.season_ending_year = bst.season_year
+        WHERE bst.game_type = 1 AND {$filterClause}
+        GROUP BY fs.franchise_id, fs.team_name, bst.season_year";
+    }
+
+    /**
+     * Build inlined defense stats subquery with filter pushed before GROUP BY.
+     */
+    private static function buildDefenseSubquery(string $filterClause): string
+    {
+        return "SELECT fs.franchise_id AS teamID, fs.team_name AS name, my.season_year,
+            CAST(SUM(opp.game2GM + opp.game3GM) AS SIGNED) AS fgm,
+            CAST(SUM(opp.gameFTM) AS SIGNED) AS ftm,
+            CAST(SUM(opp.game3GM) AS SIGNED) AS tgm
+        FROM ibl_box_scores_teams my
+        JOIN ibl_box_scores_teams opp
+            ON my.Date = opp.Date
+            AND my.visitorTeamID = opp.visitorTeamID
+            AND my.homeTeamID = opp.homeTeamID
+            AND my.gameOfThatDay = opp.gameOfThatDay
+            AND my.name <> opp.name
+        JOIN ibl_franchise_seasons fs
+            ON fs.team_name = my.name AND fs.season_ending_year = my.season_year
+        WHERE my.game_type = 1 AND {$filterClause}
+        GROUP BY fs.franchise_id, fs.team_name, my.season_year";
     }
 }

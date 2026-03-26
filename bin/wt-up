@@ -103,8 +103,14 @@ STYLE_CSS="$WORKTREE_PATH/ibl5/themes/IBL/style/style.css"
 if [ -L "$STYLE_CSS" ]; then
     rm "$STYLE_CSS"
 fi
+# Resolve bunx path now — backgrounded subshells may not inherit PATH (e.g. ~/.bun/bin)
+BUNX_PATH="$(command -v bunx)"
+if [ -z "$BUNX_PATH" ]; then
+    echo "Warning: bunx not found in PATH — skipping CSS build/watch"
+fi
+
 echo "Building CSS for worktree..."
-(cd "$WORKTREE_PATH/ibl5" && bunx @tailwindcss/cli -i design/input.css -o themes/IBL/style/style.css 2>/dev/null) || true
+(cd "$WORKTREE_PATH/ibl5" && "${BUNX_PATH:-bunx}" @tailwindcss/cli -i design/input.css -o themes/IBL/style/style.css 2>/dev/null) || true
 # Fallback: copy from main repo if build failed or produced empty file
 if [ ! -s "$STYLE_CSS" ]; then
     echo "CSS build failed or empty — copying from main repo..."
@@ -119,11 +125,17 @@ if [ -f "$CSS_PID_FILE" ]; then
     rm -f "$CSS_PID_FILE"
 fi
 
-# Start CSS watcher in background so source changes auto-rebuild
+# Start CSS watcher in background so source changes auto-rebuild.
+# nohup + disown: prevent SIGHUP death when the calling terminal/shell exits.
+# Absolute paths: no cd needed, avoids PATH/cwd issues in detached process.
 echo "Starting CSS watcher..."
-(cd "$WORKTREE_PATH/ibl5" && exec bunx @tailwindcss/cli -i design/input.css -o themes/IBL/style/style.css --watch=always) \
+nohup "${BUNX_PATH:-bunx}" @tailwindcss/cli \
+    -i "$WORKTREE_PATH/ibl5/design/input.css" \
+    -o "$WORKTREE_PATH/ibl5/themes/IBL/style/style.css" \
+    --watch=always \
     > "$WORKTREE_PATH/.css-watch.log" 2>&1 &
 echo $! > "$CSS_PID_FILE"
+disown
 
 # Kill any existing browser-sync for this worktree
 BS_PID_FILE="$WORKTREE_PATH/.bs-sync.pid"

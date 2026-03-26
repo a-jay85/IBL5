@@ -181,8 +181,10 @@ class TeamRepository extends \BaseMysqliRepository implements TeamRepositoryInte
     {
         /** @var list<WinLossRow> */
         return $this->fetchAll(
-            "SELECT year, currentname, namethatyear, wins, losses FROM ibl_team_win_loss WHERE currentname = ? ORDER BY year DESC",
-            "s",
+            self::buildWinLossQuery(1),
+            "sss",
+            $teamName,
+            $teamName,
             $teamName
         );
     }
@@ -195,10 +197,118 @@ class TeamRepository extends \BaseMysqliRepository implements TeamRepositoryInte
     {
         /** @var list<HEATWinLossRow> */
         return $this->fetchAll(
-            "SELECT year, currentname, namethatyear, wins, losses FROM ibl_heat_win_loss WHERE currentname = ? ORDER BY year DESC",
-            "s",
+            self::buildHeatWinLossQuery(),
+            "sss",
+            $teamName,
+            $teamName,
             $teamName
         );
+    }
+
+    /**
+     * Build inlined regular-season win/loss query with team filter pushed into CTE.
+     *
+     * Replaces SELECT from ibl_team_win_loss view which materializes ALL games
+     * before filtering by team.
+     */
+    private static function buildWinLossQuery(int $gameType): string
+    {
+        return "WITH unique_games AS (
+            SELECT Date, visitorTeamID, homeTeamID, gameOfThatDay,
+                (visitorQ1points + visitorQ2points + visitorQ3points + visitorQ4points
+                 + COALESCE(visitorOTpoints, 0)) AS visitor_total,
+                (homeQ1points + homeQ2points + homeQ3points + homeQ4points
+                 + COALESCE(homeOTpoints, 0)) AS home_total
+            FROM ibl_box_scores_teams
+            WHERE game_type = {$gameType}
+                AND (visitorTeamID = (SELECT teamid FROM ibl_team_info WHERE team_name = ?)
+                     OR homeTeamID = (SELECT teamid FROM ibl_team_info WHERE team_name = ?))
+            GROUP BY Date, visitorTeamID, homeTeamID, gameOfThatDay
+        ),
+        team_games AS (
+            SELECT visitorTeamID AS team_id, Date,
+                   IF(visitor_total > home_total, 1, 0) AS win,
+                   IF(visitor_total < home_total, 1, 0) AS loss
+            FROM unique_games
+            UNION ALL
+            SELECT homeTeamID AS team_id, Date,
+                   IF(home_total > visitor_total, 1, 0) AS win,
+                   IF(home_total < visitor_total, 1, 0) AS loss
+            FROM unique_games
+        )
+        SELECT
+            CASE WHEN MONTH(tg.Date) >= 10 THEN YEAR(tg.Date) + 1
+                 ELSE YEAR(tg.Date) END AS year,
+            ti.team_name AS currentname,
+            COALESCE(fs.team_name, ti.team_name) AS namethatyear,
+            CAST(SUM(tg.win)  AS UNSIGNED) AS wins,
+            CAST(SUM(tg.loss) AS UNSIGNED) AS losses
+        FROM team_games tg
+        JOIN ibl_team_info ti ON ti.teamid = tg.team_id
+        LEFT JOIN ibl_franchise_seasons fs
+            ON fs.franchise_id = tg.team_id
+            AND fs.season_ending_year = (
+                CASE WHEN MONTH(tg.Date) >= 10 THEN YEAR(tg.Date) + 1
+                     ELSE YEAR(tg.Date) END
+            )
+        WHERE tg.team_id = (SELECT teamid FROM ibl_team_info WHERE team_name = ?)
+        GROUP BY
+            tg.team_id,
+            CASE WHEN MONTH(tg.Date) >= 10 THEN YEAR(tg.Date) + 1 ELSE YEAR(tg.Date) END,
+            ti.team_name,
+            COALESCE(fs.team_name, ti.team_name)
+        ORDER BY year DESC";
+    }
+
+    /**
+     * Build inlined HEAT win/loss query with team filter pushed into CTE.
+     *
+     * Replaces SELECT from ibl_heat_win_loss view.
+     */
+    private static function buildHeatWinLossQuery(): string
+    {
+        return "WITH unique_games AS (
+            SELECT Date, visitorTeamID, homeTeamID, gameOfThatDay,
+                (visitorQ1points + visitorQ2points + visitorQ3points + visitorQ4points
+                 + COALESCE(visitorOTpoints, 0)) AS visitor_total,
+                (homeQ1points + homeQ2points + homeQ3points + homeQ4points
+                 + COALESCE(homeOTpoints, 0)) AS home_total
+            FROM ibl_box_scores_teams
+            WHERE game_type = 3
+                AND YEAR(Date) < 9000
+                AND (visitorTeamID = (SELECT teamid FROM ibl_team_info WHERE team_name = ?)
+                     OR homeTeamID = (SELECT teamid FROM ibl_team_info WHERE team_name = ?))
+            GROUP BY Date, visitorTeamID, homeTeamID, gameOfThatDay
+        ),
+        team_games AS (
+            SELECT visitorTeamID AS team_id, Date,
+                   IF(visitor_total > home_total, 1, 0) AS win,
+                   IF(visitor_total < home_total, 1, 0) AS loss
+            FROM unique_games
+            UNION ALL
+            SELECT homeTeamID AS team_id, Date,
+                   IF(home_total > visitor_total, 1, 0) AS win,
+                   IF(home_total < visitor_total, 1, 0) AS loss
+            FROM unique_games
+        )
+        SELECT
+            YEAR(tg.Date) AS year,
+            ti.team_name AS currentname,
+            COALESCE(fs.team_name, ti.team_name) AS namethatyear,
+            CAST(SUM(tg.win)  AS UNSIGNED) AS wins,
+            CAST(SUM(tg.loss) AS UNSIGNED) AS losses
+        FROM team_games tg
+        JOIN ibl_team_info ti ON ti.teamid = tg.team_id
+        LEFT JOIN ibl_franchise_seasons fs
+            ON fs.franchise_id = tg.team_id
+            AND fs.season_ending_year = (YEAR(tg.Date) + 1)
+        WHERE tg.team_id = (SELECT teamid FROM ibl_team_info WHERE team_name = ?)
+        GROUP BY
+            tg.team_id,
+            YEAR(tg.Date),
+            ti.team_name,
+            COALESCE(fs.team_name, ti.team_name)
+        ORDER BY year DESC";
     }
 
     /**

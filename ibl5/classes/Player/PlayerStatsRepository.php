@@ -97,7 +97,7 @@ class PlayerStatsRepository extends BaseMysqliRepository implements PlayerStatsR
     {
         /** @var list<array{year: int, pos: string, pid: int, name: string, team: string, games: int, minutes: int, fgm: int, fga: int, ftm: int, fta: int, tgm: int, tga: int, orb: int, reb: int, ast: int, stl: int, tvr: int, blk: int, pf: int, pts: int}> */
         return $this->fetchAll(
-            "SELECT * FROM ibl_playoff_stats WHERE name = ? ORDER BY year ASC",
+            self::buildPerSeasonStatsQuery(2),
             "s",
             $playerName
         );
@@ -125,7 +125,7 @@ class PlayerStatsRepository extends BaseMysqliRepository implements PlayerStatsR
     {
         /** @var CareerAveragesRow|null */
         return $this->fetchOne(
-            "SELECT * FROM ibl_playoff_career_avgs WHERE name = ?",
+            self::buildCareerAveragesQuery(2, 'p.name = ?'),
             "s",
             $playerName
         );
@@ -139,7 +139,7 @@ class PlayerStatsRepository extends BaseMysqliRepository implements PlayerStatsR
     {
         /** @var list<array{year: int, pos: string, pid: int, name: string, team: string, games: int, minutes: int, fgm: int, fga: int, ftm: int, fta: int, tgm: int, tga: int, orb: int, reb: int, ast: int, stl: int, tvr: int, blk: int, pf: int, pts: int}> */
         return $this->fetchAll(
-            "SELECT * FROM ibl_heat_stats WHERE name = ? ORDER BY year ASC",
+            self::buildPerSeasonStatsQuery(3),
             "s",
             $playerName
         );
@@ -167,7 +167,7 @@ class PlayerStatsRepository extends BaseMysqliRepository implements PlayerStatsR
     {
         /** @var CareerAveragesRow|null */
         return $this->fetchOne(
-            "SELECT * FROM ibl_heat_career_avgs WHERE name = ?",
+            self::buildCareerAveragesQuery(3, 'p.name = ?'),
             "s",
             $playerName
         );
@@ -221,7 +221,7 @@ class PlayerStatsRepository extends BaseMysqliRepository implements PlayerStatsR
     {
         /** @var CareerAveragesRow|null */
         return $this->fetchOne(
-            "SELECT * FROM ibl_season_career_avgs WHERE name = ?",
+            self::buildCareerAveragesQuery(1, 'p.name = ?'),
             "s",
             $playerName
         );
@@ -235,9 +235,84 @@ class PlayerStatsRepository extends BaseMysqliRepository implements PlayerStatsR
     {
         /** @var CareerAveragesRow|null */
         return $this->fetchOne(
-            "SELECT * FROM ibl_season_career_avgs WHERE pid = ?",
+            self::buildCareerAveragesQuery(1, 'bs.pid = ?'),
             "i",
             $playerID
         );
+    }
+
+    /**
+     * Build inlined career averages query with predicate pushed before GROUP BY.
+     *
+     * Replaces SELECT from ibl_season/playoff/heat_career_avgs views which
+     * block predicate pushdown due to GROUP BY.
+     */
+    private static function buildCareerAveragesQuery(int $gameType, string $filterClause): string
+    {
+        return "SELECT bs.pid, p.name,
+            CAST(COUNT(*) AS SIGNED) AS games,
+            ROUND(AVG(bs.gameMIN), 2) AS minutes,
+            ROUND(AVG(bs.calc_fg_made), 2) AS fgm,
+            ROUND(AVG(bs.game2GA + bs.game3GA), 2) AS fga,
+            CASE WHEN SUM(bs.game2GA + bs.game3GA) > 0
+                THEN ROUND(SUM(bs.calc_fg_made) / SUM(bs.game2GA + bs.game3GA), 3)
+                ELSE 0.000 END AS fgpct,
+            ROUND(AVG(bs.gameFTM), 2) AS ftm,
+            ROUND(AVG(bs.gameFTA), 2) AS fta,
+            CASE WHEN SUM(bs.gameFTA) > 0
+                THEN ROUND(SUM(bs.gameFTM) / SUM(bs.gameFTA), 3)
+                ELSE 0.000 END AS ftpct,
+            ROUND(AVG(bs.game3GM), 2) AS tgm,
+            ROUND(AVG(bs.game3GA), 2) AS tga,
+            CASE WHEN SUM(bs.game3GA) > 0
+                THEN ROUND(SUM(bs.game3GM) / SUM(bs.game3GA), 3)
+                ELSE 0.000 END AS tpct,
+            ROUND(AVG(bs.gameORB), 2) AS orb,
+            ROUND(AVG(bs.calc_rebounds), 2) AS reb,
+            ROUND(AVG(bs.gameAST), 2) AS ast,
+            ROUND(AVG(bs.gameSTL), 2) AS stl,
+            ROUND(AVG(bs.gameTOV), 2) AS tvr,
+            ROUND(AVG(bs.gameBLK), 2) AS blk,
+            ROUND(AVG(bs.gamePF), 2) AS pf,
+            ROUND(AVG(bs.calc_points), 2) AS pts,
+            p.retired
+        FROM ibl_box_scores bs
+        JOIN ibl_plr p ON bs.pid = p.pid
+        WHERE bs.game_type = {$gameType} AND {$filterClause}
+        GROUP BY bs.pid, p.name, p.retired";
+    }
+
+    /**
+     * Build inlined per-season stats query with predicate pushed before GROUP BY.
+     *
+     * Replaces SELECT from ibl_playoff_stats / ibl_heat_stats views.
+     */
+    private static function buildPerSeasonStatsQuery(int $gameType): string
+    {
+        return "SELECT bs.season_year AS year, MIN(bs.pos) AS pos, bs.pid, p.name,
+            fs.team_name AS team,
+            CAST(COUNT(*) AS SIGNED) AS games,
+            CAST(SUM(bs.gameMIN) AS SIGNED) AS minutes,
+            CAST(SUM(bs.calc_fg_made) AS SIGNED) AS fgm,
+            CAST(SUM(bs.game2GA + bs.game3GA) AS SIGNED) AS fga,
+            CAST(SUM(bs.gameFTM) AS SIGNED) AS ftm,
+            CAST(SUM(bs.gameFTA) AS SIGNED) AS fta,
+            CAST(SUM(bs.game3GM) AS SIGNED) AS tgm,
+            CAST(SUM(bs.game3GA) AS SIGNED) AS tga,
+            CAST(SUM(bs.gameORB) AS SIGNED) AS orb,
+            CAST(SUM(bs.calc_rebounds) AS SIGNED) AS reb,
+            CAST(SUM(bs.gameAST) AS SIGNED) AS ast,
+            CAST(SUM(bs.gameSTL) AS SIGNED) AS stl,
+            CAST(SUM(bs.gameTOV) AS SIGNED) AS tvr,
+            CAST(SUM(bs.gameBLK) AS SIGNED) AS blk,
+            CAST(SUM(bs.gamePF) AS SIGNED) AS pf,
+            CAST(SUM(bs.calc_points) AS SIGNED) AS pts
+        FROM ibl_box_scores bs
+        JOIN ibl_plr p ON bs.pid = p.pid
+        JOIN ibl_franchise_seasons fs ON bs.teamID = fs.franchise_id
+            AND bs.season_year = fs.season_ending_year
+        WHERE bs.game_type = {$gameType} AND p.name = ?
+        GROUP BY bs.pid, p.name, bs.season_year, fs.team_name
+        ORDER BY year ASC";
     }
 }

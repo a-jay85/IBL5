@@ -1,0 +1,6 @@
+FROM node:22-alpine
+RUN npm install -g browser-sync@3
+COPY docker/bs-config.cjs /app/bs-config.cjs
+WORKDIR /app
+EXPOSE 3000
+CMD ["browser-sync", "start", "--config", "bs-config.cjs"]

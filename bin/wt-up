@@ -259,6 +259,7 @@ echo "  Worktree environment ready!"
 echo "================================================"
 echo ""
 echo "  URL:     http://$SLUG.localhost/ibl5/"
+echo "  Sync:    http://bs-$SLUG.localhost/ibl5/  (live reload)"
 echo "  Adminer: http://localhost:8082 (server: ibl5-db-$SLUG)"
 echo "  DB CLI:  docker exec -it $DB_CONTAINER $DB_CMD"
 if [ -f "$CSS_PID_FILE" ]; then

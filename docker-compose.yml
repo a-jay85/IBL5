@@ -98,6 +98,24 @@ services:
       - default
       - ibl5-proxy
 
+  browsersync:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.browsersync
+    container_name: ibl5-browsersync
+    restart: unless-stopped
+    volumes:
+      - ./ibl5:/watch:ro
+    depends_on:
+      - php
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.browsersync.rule=Host(`sync.localhost`)
+      - traefik.http.services.browsersync.loadbalancer.server.port=3000
+    networks:
+      - default
+      - ibl5-proxy
+
 volumes:
   ibl5-mariadb-data:
 

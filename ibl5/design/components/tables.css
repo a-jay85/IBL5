@@ -1692,6 +1692,11 @@ td.ibl-team-cell--colored {
     gap: 6px;
 }
 
+/* Draft pick link: inline so year/round/team stay on one line */
+.ibl-player-cell a.trading-roster__pick-link {
+    display: inline;
+}
+
 .trading-roster .draft-picks-list__notes {
     white-space: normal;
     overflow-wrap: break-word;

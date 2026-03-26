@@ -1,20 +1,18 @@
 #!/bin/bash
-# Stop a worktree Docker environment.
-# Usage: bin/wt-down <worktree-name> [--volumes] [--force]
-#        bin/wt-down --all [--volumes] [--force]
+# Stop a worktree Docker environment and remove its volumes.
+# Usage: bin/wt-down <worktree-name> [--force]
+#        bin/wt-down --all [--force]
 
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 WORKTREE_NAME=""
-REMOVE_VOLUMES=false
 ALL=false
 FORCE=false
 
 # Parse arguments
 for arg in "$@"; do
     case "$arg" in
-        --volumes) REMOVE_VOLUMES=true ;;
         --all) ALL=true ;;
         --force) FORCE=true ;;
         -*) echo "Unknown option: $arg" >&2; exit 1 ;;
@@ -87,11 +85,7 @@ teardown_worktree() {
     export SLUG="$slug" WORKTREE_PATH="$wt_path" REPO_ROOT
 
     echo "Stopping environment: $slug (worktree: $wt_name, project: $project)..."
-    if [ "$REMOVE_VOLUMES" = true ]; then
-        docker compose -f "$static_compose" $env_flag -p "$project" down -v
-    else
-        docker compose -f "$static_compose" $env_flag -p "$project" down
-    fi
+    docker compose -f "$static_compose" $env_flag -p "$project" down -v
 
     rm -f "$slug_file"
 
@@ -134,13 +128,14 @@ if [ "$ALL" = true ]; then
 fi
 
 if [ -z "$WORKTREE_NAME" ]; then
-    echo "Usage: bin/wt-down <worktree-name> [--volumes] [--force]" >&2
-    echo "       bin/wt-down --all [--volumes] [--force]" >&2
+    echo "Usage: bin/wt-down <worktree-name> [--force]" >&2
+    echo "       bin/wt-down --all [--force]" >&2
     echo "" >&2
     echo "Options:" >&2
-    echo "  --volumes  Also remove the database volume" >&2
     echo "  --all      Tear down all worktree environments" >&2
     echo "  --force    Tear down even if worktree has uncommitted changes" >&2
+    echo "" >&2
+    echo "Volumes (database, vendor) are always removed." >&2
     exit 1
 fi
 
@@ -188,13 +183,11 @@ if [ ! -d "$WORKTREE_PATH" ]; then
                     docker rm "$c" 2>/dev/null || true
                 fi
             done
-            # Remove volume if requested
-            if [ "$REMOVE_VOLUMES" = true ]; then
-                for vol in $(docker volume ls --format '{{.Name}}' | grep "$slug" || true); do
-                    echo "  Removing volume: $vol"
-                    docker volume rm "$vol" 2>/dev/null || true
-                done
-            fi
+            # Remove volumes
+            for vol in $(docker volume ls --format '{{.Name}}' | grep "$slug" || true); do
+                echo "  Removing volume: $vol"
+                docker volume rm "$vol" 2>/dev/null || true
+            done
             # Remove network
             for net in $(docker network ls --format '{{.Name}}' | grep "$project" || true); do
                 docker network rm "$net" 2>/dev/null || true

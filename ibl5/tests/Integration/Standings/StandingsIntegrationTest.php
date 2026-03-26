@@ -253,8 +253,7 @@ class StandingsIntegrationTest extends IntegrationTestCase
         $this->repository->getTeamPythagoreanStats(5, 2025);
 
         // Assert
-        $this->assertQueryExecuted('ibl_team_offense_stats');
-        $this->assertQueryExecuted('ibl_team_defense_stats');
+        $this->assertQueryExecuted('ibl_box_scores_teams');
     }
 
     /**

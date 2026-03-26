@@ -7,8 +7,6 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && docker-php-ext-install mysqli pdo pdo_mysql mbstring opcache \
     && rm -rf /var/lib/apt/lists/*
 
-COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
-
 COPY docker/opcache.ini $PHP_INI_DIR/conf.d/opcache.ini
 
 RUN a2enmod rewrite headers

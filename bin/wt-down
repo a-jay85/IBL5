@@ -89,16 +89,6 @@ teardown_worktree() {
 
     rm -f "$slug_file"
 
-    # Restore vendor symlink so host-side tools (PHPStan, PHPUnit) work again.
-    # wt-up replaces the symlink with an empty dir for Docker bind mounts;
-    # without this restore, vendor/bin/* is missing after teardown.
-    local vendor_dir="$wt_path/ibl5/vendor"
-    if [ -d "$vendor_dir" ] && [ ! -L "$vendor_dir" ] && [ -d "$REPO_ROOT/ibl5/vendor/bin" ]; then
-        chmod -N "$vendor_dir" 2>/dev/null  # clear Docker's deny-delete ACL
-        rm -rf "$vendor_dir"
-        ln -sf "$REPO_ROOT/ibl5/vendor" "$vendor_dir"
-    fi
-
     echo "  Done."
 }
 
@@ -135,7 +125,7 @@ if [ -z "$WORKTREE_NAME" ]; then
     echo "  --all      Tear down all worktree environments" >&2
     echo "  --force    Tear down even if worktree has uncommitted changes" >&2
     echo "" >&2
-    echo "Volumes (database, vendor) are always removed." >&2
+    echo "The DB volume is always removed." >&2
     exit 1
 fi
 

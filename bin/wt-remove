@@ -1,8 +1,8 @@
 #!/bin/bash
 # Remove a git worktree and its Docker environment.
 # Tears down Docker containers first (if running), then removes the worktree.
-# Uses --force for git because symlinked files (vendor/, config.php, .env.test)
-# appear as untracked changes and block normal removal.
+# Uses --force for git because symlinked files (vendor, config.php, .env.test,
+# node_modules) appear as untracked changes and block normal removal.
 #
 # Usage: bin/wt-remove <worktree-name> [--force] [--volumes]
 

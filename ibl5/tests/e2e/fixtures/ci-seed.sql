@@ -25,7 +25,7 @@ INSERT INTO nuke_config (
   CensorMode, CensorReplace,
   copyright, Version_Num, gfx_chk, nuke_editor, display_errors
 ) VALUES (
-  'IBL5', 'http://localhost:8080/ibl5/', '', 'Internet Basketball League', '2026-01-01',
+  'IBL5', 'http://localhost:8080/', '', 'Internet Basketball League', '2026-01-01',
   'admin@example.com',
   0, 'IBL', 1,
   '', '', '',

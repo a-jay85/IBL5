@@ -246,10 +246,7 @@
         var wasHidden = panel.style.display === 'none';
         panel.style.display = anyContent ? '' : 'none';
 
-        // Scroll preview into view on mobile when first shown
-        if (anyContent && wasHidden && window.innerWidth <= 768) {
-            panel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-        }
+        // Preview panel appears in-place — no auto-scroll
 
         if (!anyContent) {
             container.innerHTML = '<div class="trade-roster-preview__empty">Select players to preview roster changes</div>';

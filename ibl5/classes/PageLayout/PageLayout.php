@@ -124,14 +124,27 @@ class PageLayout
         echo "<META NAME=\"RATING\" CONTENT=\"GENERAL\">\n";
 
         // Open Graph meta tags (for LinkedIn, Facebook, etc.)
-        echo "<meta property=\"og:title\" content=\"IBL -- Internet Basketball League\">\n";
-        echo "<meta property=\"og:description\" content=\"The Internet Basketball League (IBL) is an online fantasy basketball league powered by the Jump Shot Basketball simulation engine.\">\n";
+        $ogHost = is_string($_SERVER['HTTP_HOST'] ?? null) ? $_SERVER['HTTP_HOST'] : 'iblhoops.net';
+        $ogBaseUrl = "https://{$ogHost}/ibl5";
+        $ogTitle = "IBL \xe2\x80\x94 Internet Basketball League";
+        $ogDescription = 'The Internet Basketball League (IBL) is an online fantasy basketball league powered by the Jump Shot Basketball simulation engine.';
+        if ($ogHost === 'pre.iblhoops.net') {
+            $ogImage = "{$ogBaseUrl}/images/ibl/logocorner.jpg";
+            $ogImageWidth = '150';
+            $ogImageHeight = '150';
+        } else {
+            $ogImage = "{$ogBaseUrl}/images/og-basketball.png";
+            $ogImageWidth = '1200';
+            $ogImageHeight = '630';
+        }
+        echo "<meta property=\"og:title\" content=\"{$ogTitle}\">\n";
+        echo "<meta property=\"og:description\" content=\"{$ogDescription}\">\n";
         echo "<meta property=\"og:type\" content=\"website\">\n";
-        echo "<meta property=\"og:url\" content=\"https://iblhoops.net/ibl5/index.php\">\n";
-        echo "<meta property=\"og:image\" content=\"https://iblhoops.net/ibl5/images/og-basketball.png\">\n";
-        echo "<meta property=\"og:image:width\" content=\"1200\">\n";
-        echo "<meta property=\"og:image:height\" content=\"630\">\n";
-        echo "<meta property=\"og:site_name\" content=\"IBL -- Internet Basketball League\">\n";
+        echo "<meta property=\"og:url\" content=\"{$ogBaseUrl}/index.php\">\n";
+        echo "<meta property=\"og:image\" content=\"{$ogImage}\">\n";
+        echo "<meta property=\"og:image:width\" content=\"{$ogImageWidth}\">\n";
+        echo "<meta property=\"og:image:height\" content=\"{$ogImageHeight}\">\n";
+        echo "<meta property=\"og:site_name\" content=\"{$ogTitle}\">\n";
 
         // JavaScript functions (inlined from includes/javascript.php)
         $nameStr = is_string($name) ? $name : '';

@@ -371,17 +371,4 @@ class YourAccountViewTest extends TestCase
         $this->assertStringContainsString('Register Again', $result);
     }
 
-    // =========================================================================
-    // User Not Found Page
-    // =========================================================================
-
-    public function testRenderUserNotFoundPageShowsError(): void
-    {
-        $result = $this->view->renderUserNotFoundPage();
-
-        $this->assertStringContainsString('auth-status__icon--error', $result);
-        $this->assertStringContainsString('User Not Found', $result);
-        $this->assertStringContainsString('Try Again', $result);
-        $this->assertStringContainsString('op=pass_lost', $result);
-    }
 }

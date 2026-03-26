@@ -279,9 +279,11 @@ $tradeConfig = [
         $teamName = HtmlSanitizer::safeHtmlOutput($team['name']);
         $fullName = HtmlSanitizer::safeHtmlOutput($team['fullName']);
         $partnerUrl = 'modules.php?name=Trading&amp;op=offertrade&amp;partner=' . $teamName;
+        $cityHtml = HtmlSanitizer::safeHtmlOutput($team['city']);
+        $nameHtml = '<span class="ibl-team-cell__city">' . $cityHtml . ' </span>' . $teamName;
         ?>
         <tr>
-            <?= TeamCellHelper::renderTeamCell($teamId, $team['fullName'], $team['color1'], $team['color2'], '', $partnerUrl) ?>
+            <?= TeamCellHelper::renderTeamCell($teamId, $team['fullName'], $team['color1'], $team['color2'], '', $partnerUrl, $nameHtml) ?>
         </tr>
 <?php endforeach; ?>
     </tbody>

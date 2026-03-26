@@ -1234,9 +1234,13 @@ td.ibl-team-cell--colored {
         min-width: 36px;
     }
 
-    /* Trading team select table fits on mobile — show full team name and link */
+    /* Trading team select table fits on mobile — show team name only (hide city) */
     .trading-team-select .ibl-team-cell__text {
         display: inline;
+    }
+
+    .trading-team-select .ibl-team-cell__city {
+        display: none;
     }
 
     .trading-team-select .ibl-team-cell--colored {
@@ -1910,6 +1914,8 @@ td.ibl-team-cell--colored {
     .trading-team-select tbody {
         display: grid;
         grid-template-columns: 1fr 1fr;
+        column-gap: 1px;
+        background: var(--gray-100);
     }
 
     .trading-team-select tr {

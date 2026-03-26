@@ -215,6 +215,16 @@
     margin-bottom: 0;
 }
 
+/* Strip inner chrome — panel provides all border-radius, so the scroll container
+   and caption must not clip the thead with their own rounded corners. */
+.trade-roster-preview .table-scroll-container {
+    border-radius: 0;
+}
+
+.trade-roster-preview .team-table-caption {
+    border-radius: 0;
+}
+
 /* ==========================================================================
    Cap Warning — over hard cap indicators on roster tables and preview tabs
    ========================================================================== */

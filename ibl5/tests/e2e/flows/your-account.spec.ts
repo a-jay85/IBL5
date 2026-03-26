@@ -140,6 +140,36 @@ test.describe('Registration: duplicate username', () => {
   });
 });
 
+test.describe('Registration: successful submission', () => {
+  test('valid registration shows activation email sent page', async ({ page }) => {
+    await page.goto('modules.php?name=YourAccount&op=new_user');
+
+    // Use a unique username to avoid collisions across test runs
+    const uniqueSuffix = Date.now().toString(36);
+    const username = `e2e_reg_${uniqueSuffix}`;
+    const email = `${username}@test.example`;
+
+    await page.locator('#register-username').fill(username);
+    await page.locator('#register-email').fill(email);
+    await page.locator('#register-password').fill('testpass12345');
+    await page.locator('#register-password2').fill('testpass12345');
+
+    const submitBtn = page.locator('button[type="submit"]').filter({
+      hasText: /create account/i,
+    });
+
+    await Promise.all([
+      page.waitForNavigation(),
+      submitBtn.click(),
+    ]);
+
+    // Success page shows "Account Created" with activation email confirmation
+    await expect(page.locator('.auth-status__icon--success')).toBeVisible();
+    const body = await page.locator('body').textContent();
+    expect(body).toMatch(/account created|activation email/i);
+  });
+});
+
 test.describe('Forgot password page', () => {
   test('forgot password form renders', async ({ page }) => {
     await page.goto('modules.php?name=YourAccount&op=pass_lost');

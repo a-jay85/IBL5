@@ -2,498 +2,224 @@
 
 declare(strict_types=1);
 
-/************************************************************************/
-/* PHP-NUKE: Web Portal System                                          */
-/* ===========================                                          */
-/*                                                                      */
-/* Copyright (c) 2007 by Francisco Burzi                                */
-/* http://phpnuke.org                                                   */
-/*                                                                      */
-/* This program is free software. You can redistribute it and/or modify */
-/* it under the terms of the GNU General Public License as published by */
-/* the Free Software Foundation; either version 2 of the License.       */
-/************************************************************************/
-
 if (!defined('MODULE_FILE')) {
     die("You can't access this file directly...");
 }
 
 $module_name = basename(dirname(__FILE__));
 get_lang($module_name);
-$userpage = 1;
 
-if (isset($username) && (preg_match('/[^a-zA-Z0-9_-]/', $username))) {
+if (isset($username) && is_string($username) && preg_match('/[^a-zA-Z0-9_-]/', $username) === 1) {
     die("Illegal username...");
 }
 
-function userCheck($username, $user_email)
-{
-    $username = filter($username, "nohtml", 1);
-    $user_email = filter($user_email, "nohtml", 1);
-    global $stop, $user_prefix, $db, $mysqli_db;
-    if ((!$user_email) || (empty($user_email)) || (filter_var($user_email, FILTER_VALIDATE_EMAIL) === false)) {
-        $stop = _ERRORINVEMAIL;
-    }
+// Wire dependencies
+$repository = new \YourAccount\YourAccountRepository($mysqli_db);
+$commonRepository = new \Services\CommonMysqliRepository($mysqli_db);
+$service = new \YourAccount\YourAccountService(
+    $repository,
+    $authService,
+    $commonRepository,
+    \Mail\MailService::fromConfig(),
+    (string) ($nukeurl ?? ''),
+    (string) ($sitename ?? ''),
+    (string) ($adminmail ?? ''),
+    (int) ($minpass ?? 5),
+);
+$accountView = new \YourAccount\YourAccountView();
 
-    if (strrpos($user_email, ' ') > 0) {
-        $stop = _ERROREMAILSPACES;
-    }
-
-    if ((!$username) || (empty($username)) || (preg_match('/[^a-zA-Z0-9_-]/', $username))) {
-        $stop = _ERRORINVNICK;
-    }
-
-    if (strlen($username) > 25) {
-        $stop = _NICK2LONG;
-    }
-
-    if (preg_match('/^((root)|(adm)|(linux)|(webmaster)|(admin)|(god)|(administrator)|(administrador)|(nobody)|(anonymous)|(anonimo)|(an\x{00e1}nimo)|(operator)|(JackFromWales4u2))$/iu', $username)) {
-        $stop = _NAMERESERVED;
-    }
-
-    if (strrpos($username, ' ') > 0) {
-        $stop = _NICKNOSPACES;
-    }
-
-    $stmt = $mysqli_db->prepare("SELECT COUNT(*) FROM nuke_users WHERE username = ?");
-    $stmt->bind_param('s', $username);
-    $stmt->execute();
-    $usernameCount = $stmt->get_result()->fetch_row()[0];
-    $stmt->close();
-    if ($usernameCount > 0) {
-        $stop = _NICKTAKEN;
-    }
-
-    $stmt = $mysqli_db->prepare("SELECT COUNT(*) FROM nuke_users WHERE user_email = ?");
-    $stmt->bind_param('s', $user_email);
-    $stmt->execute();
-    $emailCount = $stmt->get_result()->fetch_row()[0];
-    $stmt->close();
-    if ($emailCount > 0) {
-        $stop = _EMAILREGISTERED;
-    }
-
-    return $stop;
+if (!isset($op) || !is_string($op)) {
+    $op = '';
 }
 
-function finishNewUser(): void
-{
-    global $adminmail, $sitename, $module_name, $nukeurl, $authService, $minpass;
+switch ($op) {
+    case 'logout':
+        $service->logout();
+        // Clear legacy cookie
+        setcookie('user', '', [
+            'expires' => 1,
+            'path' => '/',
+            'secure' => (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off'),
+            'httponly' => true,
+            'samesite' => 'Strict',
+        ]);
+        $user = '';
+        $cookie = '';
+        $_SESSION['flash_success'] = 'You have successfully logged out.';
+        header('Location: index.php');
+        exit;
 
-    // CSRF validation
-    if (!\Utilities\CsrfGuard::validateSubmittedToken('register')) {
-        Header("Location: modules.php?name=$module_name&op=new_user");
-        die();
-    }
-
-    PageLayout\PageLayout::header();
-    include "config.php";
-
-    $username = isset($_POST['username']) && is_string($_POST['username']) ? $_POST['username'] : '';
-    $user_email = isset($_POST['user_email']) && is_string($_POST['user_email']) ? $_POST['user_email'] : '';
-    $user_password = isset($_POST['user_password']) && is_string($_POST['user_password']) ? $_POST['user_password'] : '';
-    $user_password2 = isset($_POST['user_password2']) && is_string($_POST['user_password2']) ? $_POST['user_password2'] : '';
-
-    $username = substr(htmlspecialchars(str_replace("\'", "'", trim($username)), ENT_QUOTES, 'UTF-8'), 0, 25);
-    $username = rtrim($username, "\\");
-    $user_email = filter($user_email, "nohtml", 1);
-    $user_password = stripslashes($user_password);
-    $user_password2 = stripslashes($user_password2);
-
-    $accountView = new \YourAccount\YourAccountView();
-
-    // Password validation
-    if ($user_password === '' && $user_password2 === '') {
-        $user_password = substr(bin2hex(random_bytes(5)), 0, 10);
-    } elseif ($user_password !== $user_password2) {
-        echo $accountView->renderRegistrationErrorPage('The passwords you entered do not match.');
-        PageLayout\PageLayout::footer();
-        die();
-    } elseif (strlen($user_password) < (int) ($minpass ?? 5)) {
-        echo $accountView->renderRegistrationErrorPage("Your password must be at least " . (int) ($minpass ?? 5) . " characters long.");
-        PageLayout\PageLayout::footer();
-        die();
-    }
-
-    // Basic username validation (keep as safety net; delight-auth also validates uniqueness)
-    if ($username === '' || preg_match('/[^a-zA-Z0-9_-]/', $username) === 1) {
-        echo $accountView->renderRegistrationErrorPage('Invalid username. Only letters, numbers, underscores and hyphens are allowed.');
-        PageLayout\PageLayout::footer();
-        die();
-    }
-
-    try {
-        // Register via delight-im/auth with email verification callback
-        $authService->register($user_email, $user_password, $username, static function (string $selector, string $token) use ($sitename, $adminmail, $nukeurl, $module_name, $user_email, $username): void {
-            $baseUrl = str_replace('http://', 'https://', rtrim($nukeurl, '/'));
-            $finishlink = "$baseUrl/ibl5/modules.php?name=$module_name&op=confirm_email&selector=" . urlencode($selector) . "&token=" . urlencode($token);
-            $message = "" . _WELCOMETO . " $sitename!\n\n" . _YOUUSEDEMAIL . " ($user_email) " . _TOREGISTER . " $sitename.\n\n " . _TOFINISHUSER . "\n\n $finishlink\n\n " . _FOLLOWINGMEM . "\n\n" . _UNICKNAME . " $username";
-            $subject = "" . _ACTIVATIONSUB . "";
-            \Mail\MailService::fromConfig()->send($user_email, $subject, $message, $adminmail);
-        });
-
-        echo $accountView->renderRegistrationCompletePage($sitename);
-    } catch (\RuntimeException) {
-        $error = $authService->getLastError() ?? _ERROR;
-        echo $accountView->renderRegistrationErrorPage((string) $error);
-    }
-
-    PageLayout\PageLayout::footer();
-}
-
-function activate($username, $check_num)
-{
-    // Legacy activation route — redirect to confirm_email if selector/token params present
-    global $module_name;
-    if (isset($_GET['selector']) && isset($_GET['token'])) {
-        confirm_email();
-        return;
-    }
-
-    // Fallback for any remaining legacy activation links
-    PageLayout\PageLayout::header();
-    $accountView = new \YourAccount\YourAccountView();
-    echo $accountView->renderActivationErrorPage('expired');
-    PageLayout\PageLayout::footer();
-    die();
-}
-
-function confirm_email()
-{
-    global $authService, $module_name;
-    $selector = isset($_GET['selector']) ? trim($_GET['selector']) : '';
-    $token = isset($_GET['token']) ? trim($_GET['token']) : '';
-
-    if ($selector === '' || $token === '') {
-        PageLayout\PageLayout::header();
-        $accountView = new \YourAccount\YourAccountView();
-        echo $accountView->renderActivationErrorPage('mismatch');
-        PageLayout\PageLayout::footer();
-        die();
-    }
-
-    try {
-        $result = $authService->confirmEmail($selector, $token);
-        $confirmedUsername = $result['username'];
-        PageLayout\PageLayout::header();
-        $accountView = new \YourAccount\YourAccountView();
-        echo $accountView->renderActivationSuccessPage($confirmedUsername);
-        PageLayout\PageLayout::footer();
-    } catch (\RuntimeException) {
-        $error = $authService->getLastError() ?? 'expired';
-        PageLayout\PageLayout::header();
-        $accountView = new \YourAccount\YourAccountView();
-        echo $accountView->renderActivationErrorPage($error);
-        PageLayout\PageLayout::footer();
-    }
-    die();
-}
-
-/**
- * Redirect a logged-in user to their team page or the homepage.
- */
-function redirectLoggedInUser()
-{
-    global $mysqli_db, $cookie;
-    $username = strval($cookie[1] ?? '');
-    $commonRepository = new \Services\CommonMysqliRepository($mysqli_db);
-    $teamName = $commonRepository->getTeamnameFromUsername($username);
-    if ($teamName !== null && $teamName !== '' && $teamName !== 'Free Agents') {
-        $tid = $commonRepository->getTidFromTeamname($teamName);
-        if ($tid !== null && $tid > 0) {
-            header('Location: modules.php?name=Team&op=team&teamID=' . $tid);
-            exit;
+    case 'login':
+        if (!\Utilities\CsrfGuard::validateSubmittedToken('login')) {
+            header("Location: modules.php?name={$module_name}&stop=1");
+            die();
         }
-    }
-    header('Location: index.php');
-    exit;
-}
-
-function main($user)
-{
-    global $stop, $module_name;
-    if (!is_user($user)) {
-        PageLayout\PageLayout::header();
-
-        // Check for specific error from session (e.g., email not verified, throttled)
-        $errorMessage = null;
-        if (isset($_SESSION['login_error']) && is_string($_SESSION['login_error'])) {
-            $errorMessage = $_SESSION['login_error'];
-            unset($_SESSION['login_error']);
-        } elseif ($stop) {
-            $errorMessage = 'Login was incorrect. Please try again.';
+        $loginUsername = isset($username) && is_string($username) ? $username : '';
+        $loginPassword = isset($user_password) && is_string($user_password) ? stripslashes($user_password) : '';
+        $redirectQuery = $_POST['redirect_query'] ?? '';
+        if (is_string($redirectQuery) && $redirectQuery !== '') {
+            $_SESSION['redirect_after_login'] = $redirectQuery;
         }
-
-        $accountView = new \YourAccount\YourAccountView();
-        echo $accountView->renderLoginPage($errorMessage);
-        PageLayout\PageLayout::footer();
-    } elseif (is_user($user)) {
-        cookiedecode($user);
-        redirectLoggedInUser();
-    }
-}
-
-function new_user()
-{
-    global $user;
-    if (!is_user($user)) {
-        PageLayout\PageLayout::header();
-        $accountView = new \YourAccount\YourAccountView();
-        echo $accountView->renderRegisterPage();
-        PageLayout\PageLayout::footer();
-    } elseif (is_user($user)) {
-        cookiedecode($user);
-        redirectLoggedInUser();
-    }
-}
-
-function pass_lost()
-{
-    global $user;
-    if (!is_user($user)) {
-        PageLayout\PageLayout::header();
-        $accountView = new \YourAccount\YourAccountView();
-        echo $accountView->renderForgotPasswordPage();
-        PageLayout\PageLayout::footer();
-    } elseif (is_user($user)) {
-        cookiedecode($user);
-        redirectLoggedInUser();
-    }
-}
-
-function logout()
-{
-    global $prefix, $db, $user, $cookie, $redirect, $authService, $mysqli_db;
-    $r_username = $authService->getUsername();
-    // Clear session auth
-    $authService->logout();
-    // Clear legacy cookie (in case browser still has one)
-    setcookie("user", "", [
-        'expires' => 1,
-        'path' => '/',
-        'secure' => (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off'),
-        'httponly' => true,
-        'samesite' => 'Strict',
-    ]);
-    $user = "";
-    $cookie = "";
-    $_SESSION['flash_success'] = 'You have successfully logged out.';
-    Header("Location: index.php");
-    exit;
-}
-
-function reset_password_form()
-{
-    global $user, $module_name;
-    if (is_user($user)) {
-        Header("Location: modules.php?name=$module_name");
-        die();
-    }
-    $selector = isset($_GET['selector']) ? trim($_GET['selector']) : '';
-    $token = isset($_GET['token']) ? trim($_GET['token']) : '';
-    if ($selector === '' || $token === '') {
-        Header("Location: modules.php?name=$module_name&op=pass_lost");
-        die();
-    }
-    PageLayout\PageLayout::header();
-    $accountView = new \YourAccount\YourAccountView();
-    echo $accountView->renderResetPasswordPage($selector, $token);
-    PageLayout\PageLayout::footer();
-}
-
-function do_reset_password()
-{
-    global $authService, $module_name;
-
-    // CSRF validation
-    if (!\Utilities\CsrfGuard::validateSubmittedToken('reset_password')) {
-        Header("Location: modules.php?name=$module_name&op=pass_lost");
-        die();
-    }
-
-    $selector = isset($_POST['selector']) && is_string($_POST['selector']) ? trim($_POST['selector']) : '';
-    $token = isset($_POST['token']) && is_string($_POST['token']) ? trim($_POST['token']) : '';
-    $newPassword = isset($_POST['new_password']) && is_string($_POST['new_password']) ? $_POST['new_password'] : '';
-    $newPassword2 = isset($_POST['new_password2']) && is_string($_POST['new_password2']) ? $_POST['new_password2'] : '';
-
-    $accountView = new \YourAccount\YourAccountView();
-
-    if ($newPassword !== $newPassword2) {
-        PageLayout\PageLayout::header();
-        echo $accountView->renderPasswordResetErrorPage('The passwords you entered do not match. Please go back and try again.');
-        PageLayout\PageLayout::footer();
-        return;
-    }
-
-    try {
-        $authService->resetPassword($selector, $token, $newPassword);
-        PageLayout\PageLayout::header();
-        echo $accountView->renderPasswordResetSuccessPage();
-        PageLayout\PageLayout::footer();
-    } catch (\RuntimeException) {
-        $error = $authService->getLastError() ?? 'An error occurred while resetting your password.';
-        PageLayout\PageLayout::header();
-        echo $accountView->renderPasswordResetErrorPage((string) $error);
-        PageLayout\PageLayout::footer();
-    }
-}
-
-function mail_password()
-{
-    global $sitename, $adminmail, $nukeurl, $module_name, $authService;
-
-    // CSRF validation
-    if (!\Utilities\CsrfGuard::validateSubmittedToken('forgot_password')) {
-        Header("Location: modules.php?name=$module_name&op=pass_lost");
-        die();
-    }
-
-    $user_email = isset($_POST['user_email']) ? filter($_POST['user_email'], "nohtml", 1) : '';
-    $accountView = new \YourAccount\YourAccountView();
-    if ($user_email === '') {
-        PageLayout\PageLayout::header();
-        echo $accountView->renderPasswordResetErrorPage('Please enter your email address.');
-        PageLayout\PageLayout::footer();
-        return;
-    }
-
-    // Use delight-im/auth's built-in password reset with secure tokens
-    $authService->forgotPassword($user_email, static function (string $selector, string $token) use ($sitename, $adminmail, $nukeurl, $module_name, $user_email): void {
-        $baseUrl = str_replace('http://', 'https://', rtrim($nukeurl, '/'));
-        $resetLink = "$baseUrl/ibl5/modules.php?name=$module_name&op=reset_password&selector=" . urlencode($selector) . "&token=" . urlencode($token);
-        $message = "A password reset was requested for your account at $sitename.\n\n"
-            . "Click the link below to reset your password:\n\n$resetLink\n\n"
-            . "This link will expire in 6 hours.\n\n"
-            . "If you did not request this, you can safely ignore this email.";
-        $subject = "Password Reset - $sitename";
-        \Mail\MailService::fromConfig()->send($user_email, $subject, $message, $adminmail);
-    });
-
-    // Always show success message (don't reveal if email exists)
-    PageLayout\PageLayout::header();
-    $lastError = $authService->getLastError();
-    if ($lastError !== null) {
-        echo $accountView->renderPasswordResetErrorPage((string) $lastError);
-    } else {
-        echo $accountView->renderResetEmailSentPage();
-    }
-    PageLayout\PageLayout::footer();
-}
-
-function login($username, $user_password)
-{
-    global $authService, $user_prefix, $db, $mysqli_db, $module_name, $pm_login, $prefix;
-
-    // CSRF validation
-    if (!\Utilities\CsrfGuard::validateSubmittedToken('login')) {
-        Header("Location: modules.php?name=$module_name&stop=1");
-        die();
-    }
-
-    $user_password = stripslashes($user_password);
-
-    // Store redirect from nav login form before auth (persists for retry on failure)
-    $redirectQuery = $_POST['redirect_query'] ?? '';
-    if (is_string($redirectQuery) && $redirectQuery !== '') {
-        $_SESSION['redirect_after_login'] = $redirectQuery;
-    }
-
-    // Authenticate via AuthService (handles bcrypt + MD5 transitional upgrade)
-    $rememberMe = isset($_POST['remember_me']) && $_POST['remember_me'] === '1';
-    if ($authService->attempt($username, $user_password, $rememberMe)) {
-        $uname = $_SERVER['REMOTE_ADDR'];
-
-        // Record last IP
-        $stmtUpdateIp = $mysqli_db->prepare("UPDATE " . $prefix . "_users SET last_ip = ? WHERE username = ?");
-        $stmtUpdateIp->bind_param('ss', $uname, $username);
-        $stmtUpdateIp->execute();
-        $stmtUpdateIp->close();
-
-        // Redirect to the stored original URL, or the user's team page, or the homepage
-        $redirectUrl = buildRedirectUrl();
-        if ($redirectUrl !== null) {
-            Header("Location: " . $redirectUrl);
+        $rememberMe = isset($_POST['remember_me']) && $_POST['remember_me'] === '1';
+        $result = $service->attemptLogin($loginUsername, $loginPassword, $rememberMe, $_SERVER['REMOTE_ADDR']);
+        if ($result['success']) {
+            $redirectUrl = buildRedirectUrl() ?? $service->getTeamRedirectUrl($loginUsername) ?? 'index.php';
+            header('Location: ' . $redirectUrl);
         } else {
-            // Look up user's team and redirect there
-            $commonRepository = new \Services\CommonMysqliRepository($mysqli_db);
-            $teamName = $commonRepository->getTeamnameFromUsername($username);
-            if ($teamName !== null && $teamName !== '' && $teamName !== 'Free Agents') {
-                $tid = $commonRepository->getTidFromTeamname($teamName);
-                if ($tid !== null && $tid > 0) {
-                    Header("Location: modules.php?name=Team&op=team&teamID=" . $tid);
-                } else {
-                    Header("Location: index.php");
-                }
+            if ($result['error'] !== null) {
+                $_SESSION['login_error'] = $result['error'];
+                header("Location: modules.php?name={$module_name}");
             } else {
-                Header("Location: index.php");
+                header("Location: modules.php?name={$module_name}&stop=1");
             }
         }
         exit;
-    } else {
-        // Login failure — preserve specific error from AuthService (e.g., email not verified)
-        // Session redirect value persists automatically for retry
-        $specificError = $authService->getLastError();
-        if ($specificError !== null) {
-            $_SESSION['login_error'] = $specificError;
-            Header("Location: modules.php?name=$module_name");
-        } else {
-            Header("Location: modules.php?name=$module_name&stop=1");
+
+    case 'finish':
+        if (!\Utilities\CsrfGuard::validateSubmittedToken('register')) {
+            header("Location: modules.php?name={$module_name}&op=new_user");
+            die();
         }
-        exit;
-    }
-}
-
-if (!isset($hid)) {$hid = "";}
-if (!isset($url)) {$url = "";}
-if (!isset($bypass)) {$bypass = "";}
-if (!isset($op)) {$op = "";}
-
-switch ($op) {
-
-    case "logout":
-        logout();
+        $regUsername = isset($_POST['username']) && is_string($_POST['username']) ? $_POST['username'] : '';
+        $regUsername = substr(htmlspecialchars(str_replace("\'", "'", trim($regUsername)), ENT_QUOTES, 'UTF-8'), 0, 25);
+        $regUsername = rtrim($regUsername, '\\');
+        $regEmail = isset($_POST['user_email']) && is_string($_POST['user_email']) ? trim($_POST['user_email']) : '';
+        $regPw1 = isset($_POST['user_password']) && is_string($_POST['user_password']) ? stripslashes($_POST['user_password']) : '';
+        $regPw2 = isset($_POST['user_password2']) && is_string($_POST['user_password2']) ? stripslashes($_POST['user_password2']) : '';
+        $result = $service->registerUser($regUsername, $regEmail, $regPw1, $regPw2);
+        PageLayout\PageLayout::header();
+        if ($result['success']) {
+            echo $accountView->renderRegistrationCompletePage((string) ($sitename ?? ''));
+        } else {
+            echo $accountView->renderRegistrationErrorPage((string) $result['error']);
+        }
+        PageLayout\PageLayout::footer();
         break;
 
-    case "finish":
-        finishNewUser();
+    case 'mailpasswd':
+        if (!\Utilities\CsrfGuard::validateSubmittedToken('forgot_password')) {
+            header("Location: modules.php?name={$module_name}&op=pass_lost");
+            die();
+        }
+        $resetEmail = isset($_POST['user_email']) && is_string($_POST['user_email']) ? trim($_POST['user_email']) : '';
+        $result = $service->requestPasswordReset($resetEmail);
+        PageLayout\PageLayout::header();
+        if ($result['success']) {
+            echo $accountView->renderResetEmailSentPage();
+        } else {
+            echo $accountView->renderPasswordResetErrorPage((string) $result['error']);
+        }
+        PageLayout\PageLayout::footer();
         break;
 
-    case "mailpasswd":
-        mail_password();
+    case 'do_reset_password':
+        if (!\Utilities\CsrfGuard::validateSubmittedToken('reset_password')) {
+            header("Location: modules.php?name={$module_name}&op=pass_lost");
+            die();
+        }
+        $rpSelector = isset($_POST['selector']) && is_string($_POST['selector']) ? trim($_POST['selector']) : '';
+        $rpToken = isset($_POST['token']) && is_string($_POST['token']) ? trim($_POST['token']) : '';
+        $rpPw1 = isset($_POST['new_password']) && is_string($_POST['new_password']) ? $_POST['new_password'] : '';
+        $rpPw2 = isset($_POST['new_password2']) && is_string($_POST['new_password2']) ? $_POST['new_password2'] : '';
+        $result = $service->resetPassword($rpSelector, $rpToken, $rpPw1, $rpPw2);
+        PageLayout\PageLayout::header();
+        if ($result['success']) {
+            echo $accountView->renderPasswordResetSuccessPage();
+        } else {
+            echo $accountView->renderPasswordResetErrorPage((string) $result['error']);
+        }
+        PageLayout\PageLayout::footer();
         break;
 
-    case "login":
-        login($username, $user_password);
+    case 'pass_lost':
+        if (is_user($user)) {
+            $redirectUrl = $service->getTeamRedirectUrl((string) ($cookie[1] ?? ''));
+            header('Location: ' . ($redirectUrl ?? 'index.php'));
+            exit;
+        }
+        PageLayout\PageLayout::header();
+        echo $accountView->renderForgotPasswordPage();
+        PageLayout\PageLayout::footer();
         break;
 
-    case "pass_lost":
-        pass_lost();
+    case 'new_user':
+        if (is_user($user)) {
+            $redirectUrl = $service->getTeamRedirectUrl((string) ($cookie[1] ?? ''));
+            header('Location: ' . ($redirectUrl ?? 'index.php'));
+            exit;
+        }
+        PageLayout\PageLayout::header();
+        echo $accountView->renderRegisterPage();
+        PageLayout\PageLayout::footer();
         break;
 
-    case "new_user":
-        new_user();
+    case 'activate':
+        // Legacy activation route — redirect to confirm_email if selector/token present
+        if (isset($_GET['selector']) && isset($_GET['token'])) {
+            $ceSelector = is_string($_GET['selector']) ? trim($_GET['selector']) : '';
+            $ceToken = is_string($_GET['token']) ? trim($_GET['token']) : '';
+            $result = $service->confirmEmail($ceSelector, $ceToken);
+            PageLayout\PageLayout::header();
+            if ($result['success']) {
+                echo $accountView->renderActivationSuccessPage((string) $result['username']);
+            } else {
+                echo $accountView->renderActivationErrorPage((string) $result['error']);
+            }
+            PageLayout\PageLayout::footer();
+            die();
+        }
+        // Fallback for remaining legacy activation links
+        PageLayout\PageLayout::header();
+        echo $accountView->renderActivationErrorPage('expired');
+        PageLayout\PageLayout::footer();
         break;
 
-    case "activate":
-        activate($username, $check_num);
+    case 'confirm_email':
+        $ceSelector = isset($_GET['selector']) && is_string($_GET['selector']) ? trim($_GET['selector']) : '';
+        $ceToken = isset($_GET['token']) && is_string($_GET['token']) ? trim($_GET['token']) : '';
+        $result = $service->confirmEmail($ceSelector, $ceToken);
+        PageLayout\PageLayout::header();
+        if ($result['success']) {
+            echo $accountView->renderActivationSuccessPage((string) $result['username']);
+        } else {
+            echo $accountView->renderActivationErrorPage((string) $result['error']);
+        }
+        PageLayout\PageLayout::footer();
         break;
 
-    case "confirm_email":
-        confirm_email();
-        break;
-
-    case "reset_password":
-        reset_password_form();
-        break;
-
-    case "do_reset_password":
-        do_reset_password();
+    case 'reset_password':
+        if (is_user($user)) {
+            header("Location: modules.php?name={$module_name}");
+            die();
+        }
+        $rpSelector = isset($_GET['selector']) && is_string($_GET['selector']) ? trim($_GET['selector']) : '';
+        $rpToken = isset($_GET['token']) && is_string($_GET['token']) ? trim($_GET['token']) : '';
+        if ($rpSelector === '' || $rpToken === '') {
+            header("Location: modules.php?name={$module_name}&op=pass_lost");
+            die();
+        }
+        PageLayout\PageLayout::header();
+        echo $accountView->renderResetPasswordPage($rpSelector, $rpToken);
+        PageLayout\PageLayout::footer();
         break;
 
     default:
-        main($user);
+        if (!is_user($user)) {
+            PageLayout\PageLayout::header();
+            $errorMessage = null;
+            if (isset($_SESSION['login_error']) && is_string($_SESSION['login_error'])) {
+                $errorMessage = $_SESSION['login_error'];
+                unset($_SESSION['login_error']);
+            } elseif (isset($stop) && $stop !== '' && $stop !== false && $stop !== 0) {
+                $errorMessage = 'Login was incorrect. Please try again.';
+            }
+            echo $accountView->renderLoginPage($errorMessage);
+            PageLayout\PageLayout::footer();
+        } else {
+            cookiedecode($user);
+            $redirectUrl = $service->getTeamRedirectUrl((string) ($cookie[1] ?? ''));
+            header('Location: ' . ($redirectUrl ?? 'index.php'));
+            exit;
+        }
         break;
-
 }
-
-?>

@@ -166,13 +166,12 @@ if [ -f "$REPO_ROOT/.env" ]; then
     ENV_FILE_FLAG="--env-file $REPO_ROOT/.env"
 fi
 
-# Always purge the DB volume so each wt-up starts with a clean database.
-# This prevents stale data from a previous run bleeding into the new environment.
+# Always tear down existing containers and purge the DB volume so each wt-up
+# starts with a clean database. docker volume rm silently fails if a container
+# (even a stopped one) still references the volume, so we must compose down first.
 # Vendor volume is only purged with --fresh-vendor (e.g., after composer.lock changes).
-if docker compose -f "$COMPOSE_FILE" $ENV_FILE_FLAG -p "ibl5-$SLUG" ps -q 2>/dev/null | grep -q .; then
-    echo "Stopping existing environment..."
-    docker compose -f "$COMPOSE_FILE" $ENV_FILE_FLAG -p "ibl5-$SLUG" down 2>/dev/null || true
-fi
+echo "Removing existing environment..."
+docker compose -f "$COMPOSE_FILE" $ENV_FILE_FLAG -p "ibl5-$SLUG" down 2>/dev/null || true
 echo "Purging DB volume..."
 docker volume rm "ibl5-${SLUG}_db-data" 2>/dev/null || true
 if [ "$FRESH_VENDOR" = true ]; then

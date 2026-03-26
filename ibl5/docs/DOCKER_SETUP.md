@@ -129,9 +129,10 @@ bin/wt-up my-feature --no-data
 # Use PR number as URL
 bin/wt-up my-feature --pr         # → http://pr-42.localhost/ibl5/
 
-# Reinstall vendor after composer.lock changes
-bin/wt-up my-feature --fresh-vendor
 ```
+
+> **Vendor updates:** If `composer.lock` changes, run `cd ibl5 && composer install` on the host.
+> Docker picks up updated packages automatically via bind mount.
 
 ### Managing Environments
 

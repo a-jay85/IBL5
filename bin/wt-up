@@ -124,7 +124,7 @@ fi
 
 # Start CSS watcher in background so source changes auto-rebuild
 echo "Starting CSS watcher..."
-(cd "$WORKTREE_PATH/ibl5" && exec bunx @tailwindcss/cli -i design/input.css -o themes/IBL/style/style.css --watch) \
+(cd "$WORKTREE_PATH/ibl5" && exec bunx @tailwindcss/cli -i design/input.css -o themes/IBL/style/style.css --watch=always) \
     > "$WORKTREE_PATH/.css-watch.log" 2>&1 &
 echo $! > "$CSS_PID_FILE"
 

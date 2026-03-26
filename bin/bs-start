@@ -1,0 +1,42 @@
+#!/bin/bash
+# Start browser-sync for the main container with Traefik routing.
+# Usage: bin/bs-start [slug] [port]
+#   slug defaults to "main", port defaults to 3000
+#   Browse at http://bs-SLUG.localhost/ibl5/
+
+set -euo pipefail
+
+REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+SLUG="${1:-main}"
+BS_PORT="${2:-3000}"
+PROXY_HOST="${SLUG}.localhost"
+TRAEFIK_DYNAMIC="$REPO_ROOT/docker/traefik-dynamic"
+
+# Register with Traefik so bs-SLUG.localhost routes to this process
+mkdir -p "$TRAEFIK_DYNAMIC"
+cat > "$TRAEFIK_DYNAMIC/bs-$SLUG.yml" <<EOF
+http:
+  routers:
+    bs-$SLUG:
+      rule: "Host(\`bs-$SLUG.localhost\`)"
+      entryPoints: ["web"]
+      service: bs-$SLUG
+  services:
+    bs-$SLUG:
+      loadBalancer:
+        servers:
+          - url: "http://host.docker.internal:$BS_PORT"
+EOF
+
+echo "Traefik route: http://bs-$SLUG.localhost/ibl5/"
+
+# Clean up Traefik config on exit
+cleanup() { rm -f "$TRAEFIK_DYNAMIC/bs-$SLUG.yml"; }
+trap cleanup EXIT INT TERM
+
+cd "$REPO_ROOT/ibl5"
+exec bunx browser-sync start \
+    --proxy "$PROXY_HOST" \
+    --port "$BS_PORT" \
+    --files 'themes/IBL/style/style.css' 'classes/**/*.php' 'modules/**/*.php' \
+    --no-open --no-ui --no-ghost-mode

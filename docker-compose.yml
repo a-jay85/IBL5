@@ -11,12 +11,15 @@ services:
       - --providers.docker=true
       - --providers.docker.exposedbydefault=false
       - --providers.docker.network=ibl5-proxy
+      - --providers.file.directory=/etc/traefik/dynamic
+      - --providers.file.watch=true
       - --entrypoints.web.address=:80
     ports:
       - "80:80"
       - "8081:8080"
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
+      - ./docker/traefik-dynamic:/etc/traefik/dynamic:ro
     networks:
       - ibl5-proxy
 
@@ -94,24 +97,6 @@ services:
       - traefik.enable=true
       - traefik.http.routers.adminer.rule=Host(`adminer.localhost`)
       - traefik.http.services.adminer.loadbalancer.server.port=8080
-    networks:
-      - default
-      - ibl5-proxy
-
-  browsersync:
-    build:
-      context: .
-      dockerfile: docker/Dockerfile.browsersync
-    container_name: ibl5-browsersync
-    restart: unless-stopped
-    volumes:
-      - ./ibl5:/watch:ro
-    depends_on:
-      - php
-    labels:
-      - traefik.enable=true
-      - traefik.http.routers.browsersync.rule=Host(`sync.localhost`)
-      - traefik.http.services.browsersync.loadbalancer.server.port=3000
     networks:
       - default
       - ibl5-proxy

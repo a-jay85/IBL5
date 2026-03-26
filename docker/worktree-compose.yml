@@ -12,7 +12,7 @@ services:
       MAIL_SMTP_ENCRYPTION: ""
     volumes:
       - ${WORKTREE_PATH}/ibl5:/var/www/html/ibl5
-      - vendor-data:/var/www/html/ibl5/vendor
+      - ${REPO_ROOT}/ibl5/vendor:/var/www/html/ibl5/vendor:ro
     depends_on:
       db:
         condition: service_healthy
@@ -46,7 +46,6 @@ services:
 
 volumes:
   db-data:
-  vendor-data:
 
 networks:
   ibl5-proxy:

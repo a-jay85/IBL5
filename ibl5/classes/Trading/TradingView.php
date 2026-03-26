@@ -85,26 +85,46 @@ class TradingView implements TradingViewInterface
                         <img src="images/logo/<?= $userTeamId ?>.jpg" alt="<?= $userTeam ?>" class="trading-roster-details__logo">
                         <span class="trading-roster-details__chevron"></span>
                     </summary>
-                    <table class="ibl-data-table trading-roster team-table" data-team-id="<?= $userTeamId ?>" style="<?= TableStyles::inlineVars($pageData['userTeamColor1'], $pageData['userTeamColor2']) ?>">
-                        <colgroup>
-                            <col style="width: 50px;">
-                            <col style="width: 40px;">
-                            <col>
-                            <col style="width: 70px;">
-                        </colgroup>
-                        <thead>
-                            <tr>
-                                <th></th>
-                                <th>Pos</th>
-                                <th>Name</th>
-                                <th>Salary</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <?= $userPlayerRows['html'] ?>
-                            <?= $userPickRows['html'] ?>
-                        </tbody>
-                    </table>
+                    <div class="trading-roster-details__tabs ibl-tabs" role="tablist" style="--team-tab-bg-color: #<?= $userColor1 ?>; --team-tab-active-color: #<?= $userColor1 ?>">
+                        <button type="button" class="ibl-tab ibl-tab--active" data-panel="players" role="tab">Players</button>
+                        <button type="button" class="ibl-tab" data-panel="picks" role="tab">Picks</button>
+                        <button type="button" class="ibl-tab" data-panel="cash" role="tab">Cash</button>
+                    </div>
+                    <div class="trading-roster-details__panel trading-roster-details__panel--active" data-panel-id="players">
+                        <table class="ibl-data-table trading-roster team-table" data-team-id="<?= $userTeamId ?>" style="<?= TableStyles::inlineVars($pageData['userTeamColor1'], $pageData['userTeamColor2']) ?>">
+                            <colgroup>
+                                <col style="width: 50px;">
+                                <col style="width: 40px;">
+                                <col>
+                                <col style="width: 70px;">
+                            </colgroup>
+                            <thead>
+                                <tr>
+                                    <th></th>
+                                    <th>Pos</th>
+                                    <th>Name</th>
+                                    <th>Salary</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <?= $userPlayerRows['html'] ?>
+                            </tbody>
+                        </table>
+                    </div>
+                    <div class="trading-roster-details__panel" data-panel-id="picks">
+                        <table class="ibl-data-table trading-roster" data-no-responsive>
+                            <tbody>
+                                <?= $userPickRows['html'] ?>
+                            </tbody>
+                        </table>
+                    </div>
+                    <div class="trading-roster-details__panel" data-panel-id="cash">
+                        <table class="ibl-data-table trading-cash-exchange" data-no-responsive data-side="user">
+                            <tbody>
+<?= $this->renderCashRows('userSendsCash', $cashStartYear, $cashEndYear, $seasonEndingYear, $pageData['userTeam'], $previousFormData['userSendsCash'] ?? []) ?>
+                            </tbody>
+                        </table>
+                    </div>
                 </details>
             </div>
             <div class="trading-layout__card">
@@ -115,30 +135,49 @@ class TradingView implements TradingViewInterface
                         <img src="images/logo/<?= $partnerTeamId ?>.jpg" alt="<?= $partnerTeam ?>" class="trading-roster-details__logo">
                         <span class="trading-roster-details__chevron"></span>
                     </summary>
-                    <table class="ibl-data-table trading-roster team-table" data-team-id="<?= $partnerTeamId ?>" style="<?= TableStyles::inlineVars($pageData['partnerTeamColor1'], $pageData['partnerTeamColor2']) ?>">
-                        <colgroup>
-                            <col style="width: 50px;">
-                            <col style="width: 40px;">
-                            <col>
-                            <col style="width: 70px;">
-                        </colgroup>
-                        <thead>
-                            <tr>
-                                <th></th>
-                                <th>Pos</th>
-                                <th>Name</th>
-                                <th>Salary</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <?= $partnerPlayerRows['html'] ?>
-                            <?= $partnerPickRows['html'] ?>
-                        </tbody>
-                    </table>
+                    <div class="trading-roster-details__tabs ibl-tabs" role="tablist" style="--team-tab-bg-color: #<?= $partnerColor1 ?>; --team-tab-active-color: #<?= $partnerColor1 ?>">
+                        <button type="button" class="ibl-tab ibl-tab--active" data-panel="players" role="tab">Players</button>
+                        <button type="button" class="ibl-tab" data-panel="picks" role="tab">Picks</button>
+                        <button type="button" class="ibl-tab" data-panel="cash" role="tab">Cash</button>
+                    </div>
+                    <div class="trading-roster-details__panel trading-roster-details__panel--active" data-panel-id="players">
+                        <table class="ibl-data-table trading-roster team-table" data-team-id="<?= $partnerTeamId ?>" style="<?= TableStyles::inlineVars($pageData['partnerTeamColor1'], $pageData['partnerTeamColor2']) ?>">
+                            <colgroup>
+                                <col style="width: 50px;">
+                                <col style="width: 40px;">
+                                <col>
+                                <col style="width: 70px;">
+                            </colgroup>
+                            <thead>
+                                <tr>
+                                    <th></th>
+                                    <th>Pos</th>
+                                    <th>Name</th>
+                                    <th>Salary</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <?= $partnerPlayerRows['html'] ?>
+                            </tbody>
+                        </table>
+                    </div>
+                    <div class="trading-roster-details__panel" data-panel-id="picks">
+                        <table class="ibl-data-table trading-roster" data-no-responsive>
+                            <tbody>
+                                <?= $partnerPickRows['html'] ?>
+                            </tbody>
+                        </table>
+                    </div>
+                    <div class="trading-roster-details__panel" data-panel-id="cash">
+                        <table class="ibl-data-table trading-cash-exchange" data-no-responsive data-side="partner">
+                            <tbody>
+<?= $this->renderCashRows('partnerSendsCash', $cashStartYear, $cashEndYear, $seasonEndingYear, $pageData['partnerTeam'], $previousFormData['partnerSendsCash'] ?? []) ?>
+                            </tbody>
+                        </table>
+                    </div>
                 </details>
             </div>
         </div>
-<?= $this->renderCashExchange($seasonEndingYear, $seasonPhase, $cashStartYear, $cashEndYear, $userTeam, $partnerTeam, $userColor1, $userColor2, $partnerColor1, $partnerColor2, $previousFormData) ?>
 <?= $this->renderRosterPreview($userTeamId, $partnerTeamId, $userTeam, $partnerTeam, $userColor1, $partnerColor1) ?>
         <div class="trading-layout__submit">
             <input type="hidden" name="fieldsCounter" value="<?= (int) $k ?>">
@@ -165,6 +204,7 @@ $tradeConfig = [
 ];
 ?>
 <script>window.IBL_TRADE_CONFIG = <?= json_encode($tradeConfig, JSON_HEX_TAG | JSON_THROW_ON_ERROR) ?>;</script>
+<script src="jslib/trading-roster-tabs.js"></script>
 <script src="jslib/trade-roster-preview.js"></script>
 <script src="jslib/trade-submit-guard.js"></script>
 </form>
@@ -427,7 +467,6 @@ $tradeConfig = [
         <input type="hidden" name="type<?= $k ?>" value="0">
         <input type="checkbox" name="check<?= $k ?>"<?= $wasPickChecked ? ' checked' : '' ?>>
     </td>
-    <td></td>
     <td class="ibl-player-cell">
         <img src="images/logo/<?= $pickTeam ?>.png" alt="" class="ibl-team-cell__logo" width="24" height="24" loading="lazy">
         <div>
@@ -439,7 +478,6 @@ $tradeConfig = [
 <?php endif; ?>
         </div>
     </td>
-    <td></td>
 </tr>
             <?php
             $k++;
@@ -482,59 +520,25 @@ $tradeConfig = [
     }
 
     /**
-     * Render the cash exchange section of the trade form
+     * Render cash exchange table rows for one team
      *
-     * @param array{checkedItems: array<string, true>, userSendsCash: array<int, int>, partnerSendsCash: array<int, int>}|null $previousFormData
+     * @param array<int, int> $previousCash
      */
-    private function renderCashExchange(int $seasonEndingYear, string $seasonPhase, int $cashStartYear, int $cashEndYear, string $userTeam, string $partnerTeam, string $userColor1, string $userColor2, string $partnerColor1, string $partnerColor2, ?array $previousFormData = null): string
+    private function renderCashRows(string $prefix, int $startYear, int $endYear, int $seasonEndingYear, string $teamName, array $previousCash): string
     {
         ob_start();
-        ?>
-<div class="team-cards-row">
-    <div class="team-card" style="<?= TableStyles::inlineVars($userColor1, $userColor2) ?>">
-        <div class="team-card__header"><h3 class="team-card__title"><?= $userTeam ?> &mdash; Cash Exchange</h3></div>
-        <div class="team-card__body--flush">
-            <table class="ibl-data-table trading-cash-exchange" data-no-responsive data-side="user">
-                <tbody>
-<?php for ($i = $cashStartYear; $i <= $cashEndYear; $i++):
-    $yearLabel = ($seasonEndingYear - 2 + $i) . '-' . ($seasonEndingYear - 1 + $i);
-    $yearLabelEscaped = HtmlSanitizer::safeHtmlOutput($yearLabel);
-    $prevUserCash = $previousFormData['userSendsCash'][$i] ?? 0;
-?>
+        for ($i = $startYear; $i <= $endYear; $i++):
+            $yearLabel = ($seasonEndingYear - 2 + $i) . '-' . ($seasonEndingYear - 1 + $i);
+            $yearLabelEscaped = HtmlSanitizer::safeHtmlOutput($yearLabel);
+            $prevCash = $previousCash[$i] ?? 0;
+            ?>
                 <tr>
                     <td>
-                        <input type="number" name="userSendsCash<?= $i ?>" value="<?= $prevUserCash ?>" min="0" max="2000" aria-label="<?= $userTeam ?> cash for <?= $yearLabelEscaped ?>">
+                        <input type="number" name="<?= HtmlSanitizer::safeHtmlOutput($prefix) ?><?= $i ?>" value="<?= $prevCash ?>" min="0" max="2000" aria-label="<?= HtmlSanitizer::safeHtmlOutput($teamName) ?> cash for <?= $yearLabelEscaped ?>">
                         for <?= $yearLabelEscaped ?>
                     </td>
                 </tr>
-<?php endfor; ?>
-                </tbody>
-            </table>
-        </div>
-    </div>
-    <div class="team-card" style="<?= TableStyles::inlineVars($partnerColor1, $partnerColor2) ?>">
-        <div class="team-card__header"><h3 class="team-card__title"><?= $partnerTeam ?> &mdash; Cash Exchange</h3></div>
-        <div class="team-card__body--flush">
-            <table class="ibl-data-table trading-cash-exchange" data-no-responsive data-side="partner">
-                <tbody>
-<?php for ($i = $cashStartYear; $i <= $cashEndYear; $i++):
-    $yearLabel = ($seasonEndingYear - 2 + $i) . '-' . ($seasonEndingYear - 1 + $i);
-    $yearLabelEscaped = HtmlSanitizer::safeHtmlOutput($yearLabel);
-    $prevPartnerCash = $previousFormData['partnerSendsCash'][$i] ?? 0;
-?>
-                <tr>
-                    <td>
-                        <input type="number" name="partnerSendsCash<?= $i ?>" value="<?= $prevPartnerCash ?>" min="0" max="2000" aria-label="<?= $partnerTeam ?> cash for <?= $yearLabelEscaped ?>">
-                        for <?= $yearLabelEscaped ?>
-                    </td>
-                </tr>
-<?php endfor; ?>
-                </tbody>
-            </table>
-        </div>
-    </div>
-</div>
-        <?php
+        <?php endfor;
         return (string) ob_get_clean();
     }
 

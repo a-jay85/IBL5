@@ -87,7 +87,7 @@ class TradingViewTest extends TestCase
 
         $html = $this->view->renderTradeOfferForm($pageData);
 
-        $this->assertStringContainsString('Cash Exchange', $html);
+        $this->assertStringContainsString('data-panel="cash"', $html);
         $this->assertStringContainsString('userSendsCash', $html);
         $this->assertStringContainsString('partnerSendsCash', $html);
     }
@@ -635,8 +635,8 @@ class TradingViewTest extends TestCase
 
         $this->assertStringContainsString('data-team-id="5"', $html);
         $this->assertStringContainsString('data-team-id="10"', $html);
-        $this->assertStringContainsString('images/logo/5.jpg', $html);
-        $this->assertStringContainsString('images/logo/10.jpg', $html);
+        $this->assertStringContainsString('images/logo/new5.png', $html);
+        $this->assertStringContainsString('images/logo/new10.png', $html);
     }
 
     public function testRenderTradeReviewNoScriptWhenNoOffers(): void

@@ -1894,6 +1894,20 @@ td.ibl-team-cell--colored {
     max-width: 100%;
 }
 
+/* ---------- Roster details tabs & panels ---------- */
+
+.trading-roster-details .trading-roster-details__tabs {
+    border-radius: 0;
+}
+
+.trading-roster-details__panel {
+    display: none;
+}
+
+.trading-roster-details__panel--active {
+    display: block;
+}
+
 /* ---------- Checkbox tap targets ---------- */
 
 .trading-roster input[type="checkbox"] {

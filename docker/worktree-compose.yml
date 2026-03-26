@@ -44,6 +44,24 @@ services:
       - default
       - ibl5-proxy
 
+  browsersync:
+    build:
+      context: ${REPO_ROOT}
+      dockerfile: docker/Dockerfile.browsersync
+    container_name: ibl5-bs-${SLUG}
+    restart: unless-stopped
+    volumes:
+      - ${WORKTREE_PATH}/ibl5:/watch:ro
+    depends_on:
+      - php
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.bs-${SLUG}.rule=Host(`bs-${SLUG}.localhost`)
+      - traefik.http.services.bs-${SLUG}.loadbalancer.server.port=3000
+    networks:
+      - default
+      - ibl5-proxy
+
 volumes:
   db-data:
 

@@ -167,8 +167,10 @@ class TeamRepository extends \BaseMysqliRepository implements TeamRepositoryInte
     {
         /** @var list<TeamAwardRow> */
         return $this->fetchAll(
-            "SELECT * FROM vw_team_awards WHERE name LIKE ? ORDER BY year DESC",
-            "s",
+            self::buildTeamAccomplishmentsQuery(),
+            "sss",
+            $teamName,
+            $teamName,
             $teamName
         );
     }
@@ -309,6 +311,76 @@ class TeamRepository extends \BaseMysqliRepository implements TeamRepositoryInte
             ti.team_name,
             COALESCE(fs.team_name, ti.team_name)
         ORDER BY year DESC";
+    }
+
+    /**
+     * Build inlined team accomplishments query with name predicate pushed into each UNION branch.
+     *
+     * Replaces SELECT from vw_team_awards which materializes the full UNION before
+     * filtering. Predicate pushdown enables idx_name on ibl_team_awards (branch 1)
+     * and limits scanning in playoff/HEAT branches (2 and 3).
+     */
+    private static function buildTeamAccomplishmentsQuery(): string
+    {
+        return "SELECT year, name, Award, ID
+            FROM ibl_team_awards
+            WHERE name = ?
+
+            UNION ALL
+
+            SELECT psr.year, psr.winner AS name, 'IBL Champions' AS Award, 0 AS ID
+            FROM vw_playoff_series_results psr
+            WHERE psr.winner = ?
+              AND psr.round = (
+                  SELECT MAX(psr2.round)
+                  FROM vw_playoff_series_results psr2
+                  WHERE psr2.year = psr.year
+              )
+              AND (
+                  SELECT COUNT(*)
+                  FROM vw_playoff_series_results psr3
+                  WHERE psr3.year = psr.year
+                    AND psr3.round = (
+                        SELECT MAX(psr4.round)
+                        FROM vw_playoff_series_results psr4
+                        WHERE psr4.year = psr.year
+                    )
+              ) = 1
+
+            UNION ALL
+
+            SELECT hc.year, ti.team_name AS name, 'IBL HEAT Champions' AS Award, 0 AS ID
+            FROM (
+                SELECT
+                    YEAR(bst.Date) AS year,
+                    CASE
+                        WHEN (bst.homeQ1points + bst.homeQ2points + bst.homeQ3points + bst.homeQ4points
+                              + COALESCE(bst.homeOTpoints, 0))
+                           > (bst.visitorQ1points + bst.visitorQ2points + bst.visitorQ3points + bst.visitorQ4points
+                              + COALESCE(bst.visitorOTpoints, 0))
+                        THEN bst.homeTeamID
+                        ELSE bst.visitorTeamID
+                    END AS winner_tid
+                FROM ibl_box_scores_teams bst
+                JOIN (
+                    SELECT YEAR(Date) AS yr, MAX(Date) AS last_date
+                    FROM ibl_box_scores_teams
+                    WHERE game_type = 3
+                    GROUP BY YEAR(Date)
+                ) ld ON bst.Date = ld.last_date AND YEAR(bst.Date) = ld.yr
+                WHERE bst.game_type = 3
+                  AND bst.gameOfThatDay = (
+                      SELECT MIN(bst2.gameOfThatDay)
+                      FROM ibl_box_scores_teams bst2
+                      WHERE bst2.Date = ld.last_date
+                        AND bst2.game_type = 3
+                  )
+                GROUP BY YEAR(bst.Date)
+            ) hc
+            JOIN ibl_team_info ti ON ti.teamid = hc.winner_tid
+            WHERE ti.team_name = ?
+
+            ORDER BY year DESC";
     }
 
     /**

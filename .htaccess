@@ -1,5 +1,10 @@
 RewriteEngine On
 
+# Return 410 Gone for scanner probes and ad-network files
+RewriteRule ^(setup\.cgi|geoserver/|rdweb/) - [R=410,L]
+RewriteRule ^(wp|wordpress|blog|backup|old|new)/? - [R=410,L]
+RewriteRule ^(app-ads\.txt|sellers\.json)$ - [R=410,L]
+
 # Redirect bare domain to /ibl5/
 RewriteCond %{REQUEST_URI} ^/?$
 RewriteRule ^$ /ibl5/index.php [R=301,L]

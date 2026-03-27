@@ -1,0 +1,16 @@
+#!/usr/bin/env php
+<?php
+
+declare(strict_types=1);
+
+if (php_sapi_name() !== 'cli') {
+    http_response_code(403);
+    exit('This script must be run from the command line.');
+}
+
+$_SERVER['DOCUMENT_ROOT'] = dirname(__DIR__, 2);
+require $_SERVER['DOCUMENT_ROOT'] . '/ibl5/vendor/autoload.php';
+
+$count = \Cache\PageCache::purge();
+
+echo "Page cache purged: {$count} file(s) deleted.\n";

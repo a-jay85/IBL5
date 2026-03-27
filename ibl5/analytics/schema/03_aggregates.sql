@@ -161,11 +161,11 @@ CREATE OR REPLACE TABLE agg_playoff_predictor AS
 SELECT
     r.*,
     CASE
-        WHEN t.won_championship = 1 THEN 'champion'
+        WHEN r.won_championship = 1 THEN 'champion'
         WHEN t.playoff_round_reached = 'finals' THEN 'finals'
         WHEN t.playoff_round_reached = 'semi-finals' THEN 'semis'
         WHEN t.playoff_round_reached = 'quarter-finals' THEN 'quarters'
-        WHEN t.made_playoffs = 1 THEN 'first_round'
+        WHEN r.made_playoffs = 1 THEN 'first_round'
         ELSE 'missed'
     END AS playoff_outcome
 FROM agg_team_season_roster r

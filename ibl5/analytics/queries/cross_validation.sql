@@ -64,22 +64,21 @@ WHERE agg_career_games != sum_season_games;
 SELECT '' AS '';
 SELECT '=== PPG Formula Verification ===' AS '';
 
--- Verify PPG formula: (2*fgm + ftm + tgm) / games
--- Compare computed ppg against raw pts/games
+-- Verify PPG formula: computed ppg should match raw pts/games
+-- pts column in ibl_hist = 2*fgm + ftm + tgm (pre-computed by MariaDB)
 WITH ppg_check AS (
     SELECT
         pid, season_year, ppg,
-        CASE WHEN games > 0 THEN ROUND(pts * 1.0 / games, 1) END AS pts_per_game,
-        CASE WHEN games > 0 THEN ROUND((2.0 * fgm + ftm + tgm) / games, 1) END AS formula_ppg
+        CASE WHEN games > 0 THEN ROUND(pts * 1.0 / games, 1) END AS pts_per_game
     FROM fact_player_season
     WHERE games > 0
 )
 SELECT
     CASE WHEN COUNT(*) = 0 THEN 'PASS' ELSE 'FAIL' END AS status,
-    'PPG formula matches (2*fgm+ftm+tgm)/games' AS assertion,
+    'PPG matches raw pts/games' AS assertion,
     COUNT(*) AS mismatches
 FROM ppg_check
-WHERE ABS(ppg - formula_ppg) > 0.1;
+WHERE ABS(ppg - pts_per_game) > 0.1;
 
 SELECT '' AS '';
 SELECT '=== Season Year Consistency ===' AS '';

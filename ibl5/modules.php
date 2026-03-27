@@ -32,6 +32,37 @@ if (isset($name) && $name == $_REQUEST['name']) {
         exit;
     }
 
+    // Full-page cache for anonymous GET requests.
+    // Placed before ModuleAccessControl to skip DB queries entirely on cache hits.
+    // Auth check reads only $_SESSION — zero DB cost.
+    global $authService;
+    $pageCacheKey = null;
+    $hasFlash = isset($_SESSION['flash_success'])
+        && is_string($_SESSION['flash_success'])
+        && $_SESSION['flash_success'] !== '';
+
+    if (
+        $_SERVER['REQUEST_METHOD'] === 'GET'
+        && !$authService->isAuthenticated()
+        && !$hasFlash
+        && \Cache\PageCache::isCacheable($name)
+    ) {
+        $isBoosted = \Utilities\HtmxHelper::isBoostedRequest();
+        $rawUri = $_SERVER['REQUEST_URI'] ?? '';
+        $pageCacheKey = \Cache\PageCache::buildCacheKey(
+            is_string($rawUri) ? $rawUri : '',
+            $isBoosted
+        );
+        $cached = \Cache\PageCache::get($pageCacheKey);
+
+        if ($cached !== null) {
+            header('X-IBL-Cache: HIT');
+            echo $cached;
+            ob_end_flush();
+            exit;
+        }
+    }
+
     // Phase-based access control
     global $mysqli_db, $leagueContext;
     $season = new \Season\Season($mysqli_db);
@@ -69,6 +100,15 @@ if (isset($name) && $name == $_REQUEST['name']) {
 
         $modpath .= "modules/$name/" . $file . ".php";
         if (file_exists($modpath)) {
+            // On cache miss, capture output via ob callback for next request
+            if ($pageCacheKey !== null) {
+                $captureKey = $pageCacheKey;
+                $captureTtl = \Cache\PageCache::getTtl($name);
+                ob_start(static function (string $html) use ($captureKey, $captureTtl): string {
+                    \Cache\PageCache::set($captureKey, $html, $captureTtl);
+                    return $html;
+                });
+            }
             include $modpath;
         } else {
             PageLayout\PageLayout::header();

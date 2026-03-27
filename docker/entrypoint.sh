@@ -1,16 +1,30 @@
 #!/bin/sh
 # Pre-flight setup before Apache starts.
-# vendor/ is bind-mounted read-only from the host — no composer install needed.
+# Handles DB initialization, migrations, schema validation, and cache warming
+# so that `docker compose up -d` is the only command needed.
+
+set -e
 
 APP_DIR="/var/www/html/ibl5"
 LOGS_DIR="$APP_DIR/logs"
+DB_HOST="${DB_HOST:-mariadb}"
+DB_NAME="iblhoops_ibl5"
 
-# Ensure logs/ directory exists and is writable by www-data (Apache user).
+# Wrapper to suppress MariaDB "password on command line" warning.
+# --skip-ssl: Docker-internal connections don't use TLS.
+db_exec() {
+    mariadb -h "$DB_HOST" --skip-ssl -u root -proot "$DB_NAME" "$@" 2>&1 | grep -v '\[Warning\].*password' || true
+}
+
+# PHP CLI scripts (migrate, validate-schema) include config.php which reads
+# $_SERVER['SERVER_NAME']. Set it here so CLI context has it.
+export SERVER_NAME=localhost
+
+# ── Phase 1: Filesystem setup ───────────────────────────────────────────────
 mkdir -p "$LOGS_DIR"
 chown www-data:www-data "$LOGS_DIR"
 
 # Auto-create mail config for Docker (Mailpit SMTP) if none exists.
-# Only creates — never overwrites an existing config.
 MAIL_CONFIG="$APP_DIR/config/mail.config.php"
 if [ ! -f "$MAIL_CONFIG" ]; then
     cat > "$MAIL_CONFIG" << 'MAILCONF'
@@ -31,7 +45,48 @@ return [
     'default_from_name' => 'IBL',
 ];
 MAILCONF
-    echo "Created mail.config.php (Mailpit SMTP)."
+    echo "[entrypoint] Created mail.config.php (Mailpit SMTP)."
 fi
 
+# ── Phase 2: DB initialization (only on empty database) ─────────────────────
+TABLE_COUNT=$(db_exec -N -e "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema='$DB_NAME';" | tr -d '[:space:]')
+
+if [ "$TABLE_COUNT" = "0" ]; then
+    PROD_SEED="$APP_DIR/fixtures/prod-seed.sql"
+    if [ -f "$PROD_SEED" ]; then
+        echo "[entrypoint] Empty database detected. Importing prod-seed.sql..."
+        echo "[entrypoint] This may take 1-2 minutes for the 87MB dump."
+        # Strip DEFINER clauses — prod exports contain DEFINER=user@host that
+        # don't exist in Docker MariaDB, causing ERROR 1449 on import.
+        sed 's/ DEFINER=[^ ]* / /g' "$PROD_SEED" | db_exec
+        echo "[entrypoint] Prod-seed import complete."
+    else
+        echo "[entrypoint] WARNING: Empty database and no prod-seed.sql found."
+        echo "[entrypoint] The app will not work until data is imported."
+        echo "[entrypoint] Run: bin/db-migrate ibl5-mariadb ibl5/migrations"
+    fi
+else
+    echo "[entrypoint] Database has $TABLE_COUNT tables — skipping prod-seed import."
+fi
+
+# ── Phase 3: Migrations (always, idempotent) ────────────────────────────────
+echo "[entrypoint] Running pending migrations..."
+php "$APP_DIR/bin/migrate" 2>&1 || echo "[entrypoint] WARNING: Migration runner failed (non-fatal)."
+
+# ── Phase 4: Schema validation (warn-only) ──────────────────────────────────
+echo "[entrypoint] Validating schema..."
+php "$APP_DIR/bin/validate-schema" 2>&1 || echo "[entrypoint] WARNING: Schema validation failed. Check migrations."
+
+# ── Phase 5: Vendor check ───────────────────────────────────────────────────
+if [ ! -f "$APP_DIR/vendor/autoload.php" ]; then
+    echo "[entrypoint] WARNING: vendor/autoload.php not found."
+    echo "[entrypoint] Run 'composer install' on the host to install dependencies."
+fi
+
+# ── Phase 6: Cache warming (background, non-blocking) ───────────────────────
+echo "[entrypoint] Warming caches in background..."
+(php "$APP_DIR/bin/warm-cache" >> "$LOGS_DIR/warm-cache.log" 2>&1) &
+
+# ── Phase 7: Start Apache ───────────────────────────────────────────────────
+echo "[entrypoint] Starting Apache."
 exec "$@"

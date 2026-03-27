@@ -24,6 +24,9 @@ class JsbImportRepository extends \BaseMysqliRepository implements JsbImportRepo
     private string $plrTable;
     private string $teamInfoTable;
     private string $plbSnapshotsTable;
+    private string $draftResultsTable;
+    private string $retiredPlayersTable;
+    private string $hallOfFameTable;
 
     public function __construct(\mysqli $db, ?LeagueContext $leagueContext = null)
     {
@@ -36,6 +39,9 @@ class JsbImportRepository extends \BaseMysqliRepository implements JsbImportRepo
         $this->plrTable = $this->resolveTable('ibl_plr');
         $this->teamInfoTable = $this->resolveTable('ibl_team_info');
         $this->plbSnapshotsTable = $this->resolveTable('ibl_plb_snapshots');
+        $this->draftResultsTable = $this->resolveTable('ibl_jsb_draft_results');
+        $this->retiredPlayersTable = $this->resolveTable('ibl_jsb_retired_players');
+        $this->hallOfFameTable = $this->resolveTable('ibl_jsb_hall_of_fame');
     }
 
     /**
@@ -505,6 +511,73 @@ class JsbImportRepository extends \BaseMysqliRepository implements JsbImportRepo
             $record['dc_oi'],
             $record['dc_di'],
             $record['dc_bh']
+        );
+    }
+
+    /**
+     * @see JsbImportRepositoryInterface::upsertDraftResult()
+     */
+    public function upsertDraftResult(array $record): int
+    {
+        return $this->execute(
+            "INSERT INTO {$this->draftResultsTable}
+                (draft_year, round, pick, team_name, pos, player_name, pid)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+            ON DUPLICATE KEY UPDATE
+                team_name = VALUES(team_name),
+                pos = VALUES(pos),
+                player_name = VALUES(player_name),
+                pid = VALUES(pid)",
+            'iiisssi',
+            $record['draft_year'],
+            $record['round'],
+            $record['pick'],
+            $record['team_name'],
+            $record['pos'],
+            $record['player_name'],
+            $record['pid']
+        );
+    }
+
+    /**
+     * @see JsbImportRepositoryInterface::upsertRetiredPlayer()
+     */
+    public function upsertRetiredPlayer(array $record): int
+    {
+        return $this->execute(
+            "INSERT INTO {$this->retiredPlayersTable}
+                (jsb_pid, player_name, pid)
+            VALUES (?, ?, ?)
+            ON DUPLICATE KEY UPDATE
+                player_name = VALUES(player_name),
+                pid = VALUES(pid)",
+            'isi',
+            $record['jsb_pid'],
+            $record['player_name'],
+            $record['pid']
+        );
+    }
+
+    /**
+     * @see JsbImportRepositoryInterface::upsertHofInductee()
+     */
+    public function upsertHofInductee(array $record): int
+    {
+        return $this->execute(
+            "INSERT INTO {$this->hallOfFameTable}
+                (jsb_pid, player_name, pos, induction_year, pid)
+            VALUES (?, ?, ?, ?, ?)
+            ON DUPLICATE KEY UPDATE
+                player_name = VALUES(player_name),
+                pos = VALUES(pos),
+                induction_year = VALUES(induction_year),
+                pid = VALUES(pid)",
+            'issii',
+            $record['jsb_pid'],
+            $record['player_name'],
+            $record['pos'],
+            $record['induction_year'],
+            $record['pid']
         );
     }
 }

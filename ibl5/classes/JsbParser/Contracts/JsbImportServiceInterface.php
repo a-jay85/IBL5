@@ -100,4 +100,28 @@ interface JsbImportServiceInterface
         int $simNumber,
         string $sourceArchive,
     ): JsbImportResult;
+
+    /**
+     * Process a .dra file and upsert records into ibl_jsb_draft_results.
+     *
+     * @param string $filePath Path to the .dra file
+     * @return JsbImportResult Summary of import results
+     */
+    public function processDraFile(string $filePath): JsbImportResult;
+
+    /**
+     * Process a .ret file and upsert records into ibl_jsb_retired_players.
+     *
+     * @param string $filePath Path to the .ret file
+     * @return JsbImportResult Summary of import results
+     */
+    public function processRetFile(string $filePath): JsbImportResult;
+
+    /**
+     * Process a .hof file and upsert records into ibl_jsb_hall_of_fame.
+     *
+     * @param string $filePath Path to the .hof file
+     * @return JsbImportResult Summary of import results
+     */
+    public function processHofFile(string $filePath): JsbImportResult;
 }

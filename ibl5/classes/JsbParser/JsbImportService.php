@@ -739,7 +739,7 @@ class JsbImportService implements JsbImportServiceInterface
     /**
      * @see JsbImportServiceInterface::processRetFile()
      */
-    public function processRetFile(string $filePath): JsbImportResult
+    public function processRetFile(string $filePath, int $retirementYear): JsbImportResult
     {
         $result = new JsbImportResult();
 
@@ -758,6 +758,7 @@ class JsbImportService implements JsbImportServiceInterface
             try {
                 $affected = $this->repository->upsertRetiredPlayer([
                     'jsb_pid' => $entry['jsb_pid'],
+                    'retirement_year' => $retirementYear,
                     'player_name' => $entry['player_name'],
                     'pid' => $pid,
                 ]);

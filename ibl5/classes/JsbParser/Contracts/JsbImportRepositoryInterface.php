@@ -127,7 +127,7 @@ interface JsbImportRepositoryInterface
     /**
      * Upsert a retired player from .ret data.
      *
-     * @param array{jsb_pid: int, player_name: string, pid: int|null} $record
+     * @param array{jsb_pid: int, retirement_year: int, player_name: string, pid: int|null} $record
      * @return int Affected rows (1=inserted, 2=updated, 0=unchanged)
      */
     public function upsertRetiredPlayer(array $record): int;

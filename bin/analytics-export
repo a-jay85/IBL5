@@ -109,22 +109,15 @@ TABLES=(
     "ibl_team_awards"
     "ibl_schedule"
     "ibl_standings"
+    "ibl_plr_snapshots"
+    "ibl_plb_snapshots"
+    "ibl_sim_dates"
 )
 
 for table in "${TABLES[@]}"; do
     count=$(export_table "$table")
     echo "$table $count" >> "$COUNTS_FILE"
 done
-
-# Phase 2 dependent: ibl_plr_snapshots
-SNAPSHOTS_EXISTS=$(db_query "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema='$DB_NAME' AND table_name='ibl_plr_snapshots'")
-if [ "$SNAPSHOTS_EXISTS" -gt 0 ]; then
-    count=$(export_table "ibl_plr_snapshots")
-    echo "ibl_plr_snapshots $count" >> "$COUNTS_FILE"
-    echo "  (Phase 2: ibl_plr_snapshots included)"
-else
-    echo "  (Phase 2: ibl_plr_snapshots not found, skipping)"
-fi
 
 END_TIME=$(date +%s)
 ELAPSED=$((END_TIME - START_TIME))

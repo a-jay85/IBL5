@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\LeagueControlPanel;
 
+use LeagueControlPanel\Contracts\AwardGenerationServiceInterface;
 use LeagueControlPanel\Contracts\LeagueControlPanelProcessorInterface;
 use LeagueControlPanel\Contracts\LeagueControlPanelRepositoryInterface;
 use LeagueControlPanel\LeagueControlPanelProcessor;
@@ -14,10 +15,31 @@ use PHPUnit\Framework\TestCase;
  */
 class LeagueControlPanelProcessorTest extends TestCase
 {
+    private static string $tempRoot;
+
+    public static function setUpBeforeClass(): void
+    {
+        if (!defined('IBL5_ROOT')) {
+            $dir = sys_get_temp_dir() . '/lcp_processor_test_' . uniqid();
+            mkdir($dir);
+            define('IBL5_ROOT', $dir);
+        }
+        self::$tempRoot = (string) constant('IBL5_ROOT');
+    }
+
+    protected function tearDown(): void
+    {
+        $htm = self::$tempRoot . '/Leaders.htm';
+        if (file_exists($htm)) {
+            unlink($htm);
+        }
+    }
+
     public function testImplementsInterface(): void
     {
         $stub = $this->createStub(LeagueControlPanelRepositoryInterface::class);
-        $processor = new LeagueControlPanelProcessor($stub);
+        $awardStub = $this->createStub(AwardGenerationServiceInterface::class);
+        $processor = new LeagueControlPanelProcessor($stub, $awardStub);
 
         $this->assertInstanceOf(LeagueControlPanelProcessorInterface::class, $processor);
     }
@@ -60,7 +82,7 @@ class LeagueControlPanelProcessorTest extends TestCase
             ->method('setSeasonPhase')
             ->with('Regular Season');
 
-        $processor = new LeagueControlPanelProcessor($mock);
+        $processor = new LeagueControlPanelProcessor($mock, $this->createStub(AwardGenerationServiceInterface::class));
         $result = $processor->dispatch('set_season_phase', ['SeasonPhase' => 'Regular Season']);
 
         $this->assertTrue($result['success']);
@@ -106,7 +128,7 @@ class LeagueControlPanelProcessorTest extends TestCase
             ->method('setSimLengthInDays')
             ->with(7);
 
-        $processor = new LeagueControlPanelProcessor($mock);
+        $processor = new LeagueControlPanelProcessor($mock, $this->createStub(AwardGenerationServiceInterface::class));
         $result = $processor->dispatch('set_sim_length', ['SimLengthInDays' => '7']);
 
         $this->assertTrue($result['success']);
@@ -131,7 +153,7 @@ class LeagueControlPanelProcessorTest extends TestCase
             ->method('setAllowTrades')
             ->with('Yes');
 
-        $processor = new LeagueControlPanelProcessor($mock);
+        $processor = new LeagueControlPanelProcessor($mock, $this->createStub(AwardGenerationServiceInterface::class));
         $result = $processor->dispatch('set_allow_trades', ['Trades' => 'Yes']);
 
         $this->assertTrue($result['success']);
@@ -156,7 +178,7 @@ class LeagueControlPanelProcessorTest extends TestCase
             ->method('setAllowWaivers')
             ->with('No');
 
-        $processor = new LeagueControlPanelProcessor($mock);
+        $processor = new LeagueControlPanelProcessor($mock, $this->createStub(AwardGenerationServiceInterface::class));
         $result = $processor->dispatch('set_allow_waivers', ['Waivers' => 'No']);
 
         $this->assertTrue($result['success']);
@@ -180,7 +202,7 @@ class LeagueControlPanelProcessorTest extends TestCase
             ->method('setShowDraftLink')
             ->with('On');
 
-        $processor = new LeagueControlPanelProcessor($mock);
+        $processor = new LeagueControlPanelProcessor($mock, $this->createStub(AwardGenerationServiceInterface::class));
         $result = $processor->dispatch('set_show_draft_link', ['ShowDraftLink' => 'On']);
 
         $this->assertTrue($result['success']);
@@ -205,7 +227,7 @@ class LeagueControlPanelProcessorTest extends TestCase
             ->method('setFreeAgencyNotifications')
             ->with('On');
 
-        $processor = new LeagueControlPanelProcessor($mock);
+        $processor = new LeagueControlPanelProcessor($mock, $this->createStub(AwardGenerationServiceInterface::class));
         $result = $processor->dispatch('toggle_fa_notifications', ['FANotifs' => 'On']);
 
         $this->assertTrue($result['success']);
@@ -220,7 +242,7 @@ class LeagueControlPanelProcessorTest extends TestCase
         $mock->expects($this->once())
             ->method('activateTriviaMode');
 
-        $processor = new LeagueControlPanelProcessor($mock);
+        $processor = new LeagueControlPanelProcessor($mock, $this->createStub(AwardGenerationServiceInterface::class));
         $result = $processor->dispatch('activate_trivia', []);
 
         $this->assertTrue($result['success']);
@@ -233,7 +255,7 @@ class LeagueControlPanelProcessorTest extends TestCase
         $mock->expects($this->once())
             ->method('deactivateTriviaMode');
 
-        $processor = new LeagueControlPanelProcessor($mock);
+        $processor = new LeagueControlPanelProcessor($mock, $this->createStub(AwardGenerationServiceInterface::class));
         $result = $processor->dispatch('deactivate_trivia', []);
 
         $this->assertTrue($result['success']);
@@ -248,7 +270,7 @@ class LeagueControlPanelProcessorTest extends TestCase
         $mock->expects($this->once())
             ->method('resetAllContractExtensions');
 
-        $processor = new LeagueControlPanelProcessor($mock);
+        $processor = new LeagueControlPanelProcessor($mock, $this->createStub(AwardGenerationServiceInterface::class));
         $result = $processor->dispatch('reset_contract_extensions', []);
 
         $this->assertTrue($result['success']);
@@ -261,7 +283,7 @@ class LeagueControlPanelProcessorTest extends TestCase
         $mock->expects($this->once())
             ->method('resetAllMlesAndLles');
 
-        $processor = new LeagueControlPanelProcessor($mock);
+        $processor = new LeagueControlPanelProcessor($mock, $this->createStub(AwardGenerationServiceInterface::class));
         $result = $processor->dispatch('reset_mles_lles', []);
 
         $this->assertTrue($result['success']);
@@ -274,7 +296,7 @@ class LeagueControlPanelProcessorTest extends TestCase
         $mock->expects($this->once())
             ->method('resetAllStarVoting');
 
-        $processor = new LeagueControlPanelProcessor($mock);
+        $processor = new LeagueControlPanelProcessor($mock, $this->createStub(AwardGenerationServiceInterface::class));
         $result = $processor->dispatch('reset_asg_voting', []);
 
         $this->assertTrue($result['success']);
@@ -287,7 +309,7 @@ class LeagueControlPanelProcessorTest extends TestCase
         $mock->expects($this->once())
             ->method('resetEndOfYearVoting');
 
-        $processor = new LeagueControlPanelProcessor($mock);
+        $processor = new LeagueControlPanelProcessor($mock, $this->createStub(AwardGenerationServiceInterface::class));
         $result = $processor->dispatch('reset_eoy_voting', []);
 
         $this->assertTrue($result['success']);
@@ -300,7 +322,7 @@ class LeagueControlPanelProcessorTest extends TestCase
         $mock->expects($this->once())
             ->method('setWaiversToFreeAgents');
 
-        $processor = new LeagueControlPanelProcessor($mock);
+        $processor = new LeagueControlPanelProcessor($mock, $this->createStub(AwardGenerationServiceInterface::class));
         $result = $processor->dispatch('set_waivers_to_free_agents', []);
 
         $this->assertTrue($result['success']);
@@ -325,7 +347,7 @@ class LeagueControlPanelProcessorTest extends TestCase
         $mock->expects($this->once())
             ->method('setFreeAgencyFactorsForPfw');
 
-        $processor = new LeagueControlPanelProcessor($mock);
+        $processor = new LeagueControlPanelProcessor($mock, $this->createStub(AwardGenerationServiceInterface::class));
         $result = $processor->dispatch('set_fa_factors_pfw', ['current_phase' => 'Draft']);
 
         $this->assertTrue($result['success']);
@@ -338,15 +360,150 @@ class LeagueControlPanelProcessorTest extends TestCase
         $mock->expects($this->once())
             ->method('setFreeAgencyFactorsForPfw');
 
-        $processor = new LeagueControlPanelProcessor($mock);
+        $processor = new LeagueControlPanelProcessor($mock, $this->createStub(AwardGenerationServiceInterface::class));
         $result = $processor->dispatch('set_fa_factors_pfw', ['current_phase' => 'Free Agency']);
 
         $this->assertTrue($result['success']);
     }
 
+    // --- Generate Awards ---
+
+    public function testGenerateAwardsFailsOutsidePlayoffsOrDraft(): void
+    {
+        $stub = $this->createStub(LeagueControlPanelRepositoryInterface::class);
+        $stub->method('getSetting')->willReturnMap([
+            ['Current Season Phase', 'Regular Season'],
+        ]);
+
+        $processor = new LeagueControlPanelProcessor($stub, $this->createStub(AwardGenerationServiceInterface::class));
+        $result = $processor->dispatch('generate_awards', []);
+
+        $this->assertFalse($result['success']);
+        $this->assertStringContainsString('Playoffs or Draft', $result['message']);
+    }
+
+    public function testGenerateAwardsFailsWhenYearSettingMissing(): void
+    {
+        $stub = $this->createStub(LeagueControlPanelRepositoryInterface::class);
+        $stub->method('getSetting')->willReturnMap([
+            ['Current Season Phase', 'Playoffs'],
+            ['Current Season Ending Year', null],
+        ]);
+
+        $processor = new LeagueControlPanelProcessor($stub, $this->createStub(AwardGenerationServiceInterface::class));
+        $result = $processor->dispatch('generate_awards', []);
+
+        $this->assertFalse($result['success']);
+        $this->assertStringContainsString('Season Ending Year', $result['message']);
+    }
+
+    public function testGenerateAwardsFailsWhenLeadersHtmMissing(): void
+    {
+        $stub = $this->createStub(LeagueControlPanelRepositoryInterface::class);
+        $stub->method('getSetting')->willReturnMap([
+            ['Current Season Phase', 'Playoffs'],
+            ['Current Season Ending Year', '2026'],
+        ]);
+
+        $processor = new LeagueControlPanelProcessor($stub, $this->createStub(AwardGenerationServiceInterface::class));
+        $result = $processor->dispatch('generate_awards', []);
+
+        $this->assertFalse($result['success']);
+        $this->assertStringContainsString('Leaders.htm not found', $result['message']);
+    }
+
+    public function testGenerateAwardsSuccessDelegatesToService(): void
+    {
+        file_put_contents(self::$tempRoot . '/Leaders.htm', '<html></html>');
+
+        $stub = $this->createStub(LeagueControlPanelRepositoryInterface::class);
+        $stub->method('getSetting')->willReturnMap([
+            ['Current Season Phase', 'Playoffs'],
+            ['Current Season Ending Year', '2026'],
+        ]);
+
+        $expectedPath = self::$tempRoot . '/Leaders.htm';
+        $awardMock = $this->createMock(AwardGenerationServiceInterface::class);
+        $awardMock->expects($this->once())
+            ->method('generateSeasonAwards')
+            ->with(2026, $expectedPath)
+            ->willReturn(['success' => true, 'message' => 'Awards generated: 92 inserted, 0 skipped.', 'inserted' => 92, 'skipped' => 0]);
+
+        $processor = new LeagueControlPanelProcessor($stub, $awardMock);
+        $result = $processor->dispatch('generate_awards', []);
+
+        $this->assertTrue($result['success']);
+        $this->assertStringContainsString('Awards generated', $result['message']);
+    }
+
+    public function testGenerateAwardsSucceedsDuringDraft(): void
+    {
+        file_put_contents(self::$tempRoot . '/Leaders.htm', '<html></html>');
+
+        $stub = $this->createStub(LeagueControlPanelRepositoryInterface::class);
+        $stub->method('getSetting')->willReturnMap([
+            ['Current Season Phase', 'Draft'],
+            ['Current Season Ending Year', '2026'],
+        ]);
+
+        $awardStub = $this->createStub(AwardGenerationServiceInterface::class);
+        $awardStub->method('generateSeasonAwards')
+            ->willReturn(['success' => true, 'message' => 'Awards generated.', 'inserted' => 5, 'skipped' => 0]);
+
+        $processor = new LeagueControlPanelProcessor($stub, $awardStub);
+        $result = $processor->dispatch('generate_awards', []);
+
+        $this->assertTrue($result['success']);
+    }
+
+    // --- Set Finals MVP ---
+
+    public function testSetFinalsMvpFailsWhenNameEmpty(): void
+    {
+        $processor = $this->createProcessorWithStub();
+
+        $result = $processor->dispatch('set_finals_mvp', ['finals_mvp_name' => '']);
+
+        $this->assertFalse($result['success']);
+        $this->assertStringContainsString('cannot be empty', $result['message']);
+    }
+
+    public function testSetFinalsMvpFailsWhenYearSettingMissing(): void
+    {
+        $stub = $this->createStub(LeagueControlPanelRepositoryInterface::class);
+        $stub->method('getSetting')->willReturnMap([
+            ['Current Season Ending Year', null],
+        ]);
+
+        $processor = new LeagueControlPanelProcessor($stub, $this->createStub(AwardGenerationServiceInterface::class));
+        $result = $processor->dispatch('set_finals_mvp', ['finals_mvp_name' => 'James Harden']);
+
+        $this->assertFalse($result['success']);
+        $this->assertStringContainsString('Season Ending Year', $result['message']);
+    }
+
+    public function testSetFinalsMvpSuccessCallsUpsertAward(): void
+    {
+        $mock = $this->createMock(LeagueControlPanelRepositoryInterface::class);
+        $mock->method('getSetting')->willReturnMap([
+            ['Current Season Ending Year', '2026'],
+        ]);
+        $mock->expects($this->once())
+            ->method('upsertAward')
+            ->with(2026, 'IBL Finals MVP', 'James Harden');
+
+        $processor = new LeagueControlPanelProcessor($mock, $this->createStub(AwardGenerationServiceInterface::class));
+        $result = $processor->dispatch('set_finals_mvp', ['finals_mvp_name' => 'James Harden']);
+
+        $this->assertTrue($result['success']);
+        $this->assertStringContainsString('James Harden', $result['message']);
+        $this->assertStringContainsString('2026', $result['message']);
+    }
+
     private function createProcessorWithStub(): LeagueControlPanelProcessor
     {
         $stub = $this->createStub(LeagueControlPanelRepositoryInterface::class);
-        return new LeagueControlPanelProcessor($stub);
+        $awardStub = $this->createStub(AwardGenerationServiceInterface::class);
+        return new LeagueControlPanelProcessor($stub, $awardStub);
     }
 }

@@ -23,6 +23,7 @@ class JsbImportRepository extends \BaseMysqliRepository implements JsbImportRepo
     private string $rcbSeasonTable;
     private string $plrTable;
     private string $teamInfoTable;
+    private string $plbSnapshotsTable;
 
     public function __construct(\mysqli $db, ?LeagueContext $leagueContext = null)
     {
@@ -34,6 +35,7 @@ class JsbImportRepository extends \BaseMysqliRepository implements JsbImportRepo
         $this->rcbSeasonTable = $this->resolveTable('ibl_rcb_season_records');
         $this->plrTable = $this->resolveTable('ibl_plr');
         $this->teamInfoTable = $this->resolveTable('ibl_team_info');
+        $this->plbSnapshotsTable = $this->resolveTable('ibl_plb_snapshots');
     }
 
     /**
@@ -466,5 +468,43 @@ class JsbImportRepository extends \BaseMysqliRepository implements JsbImportRepo
         }
 
         return null;
+    }
+
+    /**
+     * @see JsbImportRepositoryInterface::upsertPlbSnapshot()
+     */
+    public function upsertPlbSnapshot(array $record): int
+    {
+        return $this->execute(
+            "INSERT INTO {$this->plbSnapshotsTable}
+                (season_year, sim_number, source_archive, tid, slot_index,
+                 pid, player_name, dc_minutes, dc_of, dc_df, dc_oi, dc_di, dc_bh)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ON DUPLICATE KEY UPDATE
+                season_year = VALUES(season_year),
+                sim_number = VALUES(sim_number),
+                pid = VALUES(pid),
+                player_name = VALUES(player_name),
+                dc_minutes = VALUES(dc_minutes),
+                dc_of = VALUES(dc_of),
+                dc_df = VALUES(dc_df),
+                dc_oi = VALUES(dc_oi),
+                dc_di = VALUES(dc_di),
+                dc_bh = VALUES(dc_bh)",
+            'iisiiisiiiiii',
+            $record['season_year'],
+            $record['sim_number'],
+            $record['source_archive'],
+            $record['tid'],
+            $record['slot_index'],
+            $record['pid'],
+            $record['player_name'],
+            $record['dc_minutes'],
+            $record['dc_of'],
+            $record['dc_df'],
+            $record['dc_oi'],
+            $record['dc_di'],
+            $record['dc_bh']
+        );
     }
 }

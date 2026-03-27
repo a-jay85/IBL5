@@ -17,12 +17,14 @@ class PlrParserRepository extends \BaseMysqliRepository implements PlrParserRepo
 {
     private string $plrTable;
     private string $histTable;
+    private string $snapshotsTable;
 
     public function __construct(\mysqli $db, ?LeagueContext $leagueContext = null)
     {
         parent::__construct($db, $leagueContext);
         $this->plrTable = $this->resolveTable('ibl_plr');
         $this->histTable = $this->resolveTable('ibl_hist');
+        $this->snapshotsTable = $this->resolveTable('ibl_plr_snapshots');
     }
 
     /**
@@ -471,4 +473,157 @@ class PlrParserRepository extends \BaseMysqliRepository implements PlrParserRepo
         );
     }
 
+    /**
+     * @see PlrParserRepositoryInterface::upsertSnapshot()
+     *
+     * @param array<string, int|string> $data
+     */
+    public function upsertSnapshot(array $data): int
+    {
+        $query = "INSERT INTO {$this->snapshotsTable}
+            (`pid`, `name`, `season_year`, `snapshot_phase`, `source_archive`,
+             `tid`, `age`, `pos`, `peak`, `htft`, `htin`, `wt`,
+             `oo`, `od`, `do`, `dd`, `po`, `pd`, `to`, `td`,
+             `r_fga`, `r_fgp`, `r_fta`, `r_ftp`, `r_tga`, `r_tgp`,
+             `r_orb`, `r_drb`, `r_ast`, `r_stl`, `r_to`, `r_blk`, `r_foul`,
+             `talent`, `skill`, `intangibles`, `clutch`, `consistency`,
+             `exp`, `bird`, `cy`, `cyt`,
+             `cy1`, `cy2`, `cy3`, `cy4`, `cy5`, `cy6`,
+             `PGDepth`, `SGDepth`, `SFDepth`, `PFDepth`, `CDepth`)
+        VALUES
+            (?, ?, ?, ?, ?,
+             ?, ?, ?, ?, ?, ?, ?,
+             ?, ?, ?, ?, ?, ?, ?, ?,
+             ?, ?, ?, ?, ?, ?,
+             ?, ?, ?, ?, ?, ?, ?,
+             ?, ?, ?, ?, ?,
+             ?, ?, ?, ?,
+             ?, ?, ?, ?, ?, ?,
+             ?, ?, ?, ?, ?)
+        ON DUPLICATE KEY UPDATE
+            `name` = VALUES(`name`),
+            `source_archive` = VALUES(`source_archive`),
+            `tid` = VALUES(`tid`),
+            `age` = VALUES(`age`),
+            `pos` = VALUES(`pos`),
+            `peak` = VALUES(`peak`),
+            `htft` = VALUES(`htft`),
+            `htin` = VALUES(`htin`),
+            `wt` = VALUES(`wt`),
+            `oo` = VALUES(`oo`),
+            `od` = VALUES(`od`),
+            `do` = VALUES(`do`),
+            `dd` = VALUES(`dd`),
+            `po` = VALUES(`po`),
+            `pd` = VALUES(`pd`),
+            `to` = VALUES(`to`),
+            `td` = VALUES(`td`),
+            `r_fga` = VALUES(`r_fga`),
+            `r_fgp` = VALUES(`r_fgp`),
+            `r_fta` = VALUES(`r_fta`),
+            `r_ftp` = VALUES(`r_ftp`),
+            `r_tga` = VALUES(`r_tga`),
+            `r_tgp` = VALUES(`r_tgp`),
+            `r_orb` = VALUES(`r_orb`),
+            `r_drb` = VALUES(`r_drb`),
+            `r_ast` = VALUES(`r_ast`),
+            `r_stl` = VALUES(`r_stl`),
+            `r_to` = VALUES(`r_to`),
+            `r_blk` = VALUES(`r_blk`),
+            `r_foul` = VALUES(`r_foul`),
+            `talent` = VALUES(`talent`),
+            `skill` = VALUES(`skill`),
+            `intangibles` = VALUES(`intangibles`),
+            `clutch` = VALUES(`clutch`),
+            `consistency` = VALUES(`consistency`),
+            `exp` = VALUES(`exp`),
+            `bird` = VALUES(`bird`),
+            `cy` = VALUES(`cy`),
+            `cyt` = VALUES(`cyt`),
+            `cy1` = VALUES(`cy1`),
+            `cy2` = VALUES(`cy2`),
+            `cy3` = VALUES(`cy3`),
+            `cy4` = VALUES(`cy4`),
+            `cy5` = VALUES(`cy5`),
+            `cy6` = VALUES(`cy6`),
+            `PGDepth` = VALUES(`PGDepth`),
+            `SGDepth` = VALUES(`SGDepth`),
+            `SFDepth` = VALUES(`SFDepth`),
+            `PFDepth` = VALUES(`PFDepth`),
+            `CDepth` = VALUES(`CDepth`)";
+
+        // 53 params: pid(i) name(s) season_year(i) snapshot_phase(s) source_archive(s)
+        // + tid(i) age(i) pos(s) peak(i) + remaining ints
+        // Total: 53 params — 4 strings (name, snapshot_phase, source_archive, pos) and 49 ints
+        $types = 'isis'        // pid, name, season_year, snapshot_phase
+            . 's'              // source_archive
+            . 'ii'             // tid, age
+            . 'si'             // pos, peak
+            . 'iii'            // htft, htin, wt
+            . 'iiiiiiii'       // oo..td
+            . 'iiiiii'         // r_fga..r_tgp
+            . 'iiiiiii'        // r_orb..r_foul
+            . 'iiiii'          // talent..consistency
+            . 'iiii'           // exp, bird, cy, cyt
+            . 'iiiiii'         // cy1..cy6
+            . 'iiiii';         // PGDepth..CDepth
+
+        return $this->execute(
+            $query,
+            $types,
+            (int) $data['pid'],
+            (string) $data['name'],
+            (int) $data['season_year'],
+            (string) $data['snapshot_phase'],
+            (string) $data['source_archive'],
+            (int) $data['tid'],
+            (int) $data['age'],
+            (string) $data['pos'],
+            (int) $data['peak'],
+            (int) $data['htft'],
+            (int) $data['htin'],
+            (int) $data['wt'],
+            (int) $data['oo'],
+            (int) $data['od'],
+            (int) $data['do'],
+            (int) $data['dd'],
+            (int) $data['po'],
+            (int) $data['pd'],
+            (int) $data['to'],
+            (int) $data['td'],
+            (int) $data['r_fga'],
+            (int) $data['r_fgp'],
+            (int) $data['r_fta'],
+            (int) $data['r_ftp'],
+            (int) $data['r_tga'],
+            (int) $data['r_tgp'],
+            (int) $data['r_orb'],
+            (int) $data['r_drb'],
+            (int) $data['r_ast'],
+            (int) $data['r_stl'],
+            (int) $data['r_to'],
+            (int) $data['r_blk'],
+            (int) $data['r_foul'],
+            (int) $data['talent'],
+            (int) $data['skill'],
+            (int) $data['intangibles'],
+            (int) $data['clutch'],
+            (int) $data['consistency'],
+            (int) $data['exp'],
+            (int) $data['bird'],
+            (int) $data['cy'],
+            (int) $data['cyt'],
+            (int) $data['cy1'],
+            (int) $data['cy2'],
+            (int) $data['cy3'],
+            (int) $data['cy4'],
+            (int) $data['cy5'],
+            (int) $data['cy6'],
+            (int) $data['PGDepth'],
+            (int) $data['SGDepth'],
+            (int) $data['SFDepth'],
+            (int) $data['PFDepth'],
+            (int) $data['CDepth'],
+        );
+    }
 }

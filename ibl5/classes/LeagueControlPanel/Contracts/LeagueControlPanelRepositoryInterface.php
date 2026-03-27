@@ -148,4 +148,33 @@ interface LeagueControlPanelRepositoryInterface
      * @return bool True on success
      */
     public function resetAllMlesAndLles(): bool;
+
+    /**
+     * Upsert an award row into ibl_awards.
+     *
+     * Uses INSERT ... ON DUPLICATE KEY UPDATE on (year, Award, name).
+     *
+     * @param int $year Season ending year
+     * @param string $award Award name (e.g., "Most Valuable Player (1st)")
+     * @param string $name Player name
+     * @return int Affected rows (1=inserted, 2=updated, 0=unchanged)
+     */
+    public function upsertAward(int $year, string $award, string $name): int;
+
+    /**
+     * Upsert a GM award row into ibl_gm_awards.
+     *
+     * @param int $year Season ending year
+     * @param string $name GM username
+     * @return int Affected rows (1=inserted, 2=updated, 0=unchanged)
+     */
+    public function upsertGmAward(int $year, string $name): int;
+
+    /**
+     * Check if a Finals MVP award exists for the given year.
+     *
+     * @param int $year Season ending year
+     * @return bool True if a Finals MVP exists
+     */
+    public function hasFinalsMvp(int $year): bool;
 }

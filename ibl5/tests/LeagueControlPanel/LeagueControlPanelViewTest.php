@@ -177,6 +177,75 @@ class LeagueControlPanelViewTest extends TestCase
         $this->assertStringContainsString('value="set_waivers_to_free_agents"', $html);
     }
 
+    // --- Awards Controls ---
+
+    public function testPlayoffsShowsGenerateAwardsButton(): void
+    {
+        $html = $this->renderWithDefaults([
+            'panelData' => self::createPanelData(['phase' => 'Playoffs']),
+        ]);
+
+        $this->assertStringContainsString('value="generate_awards"', $html);
+        $this->assertStringContainsString('Generate Season Awards', $html);
+    }
+
+    public function testDraftShowsGenerateAwardsButton(): void
+    {
+        $html = $this->renderWithDefaults([
+            'panelData' => self::createPanelData(['phase' => 'Draft']),
+        ]);
+
+        $this->assertStringContainsString('value="generate_awards"', $html);
+    }
+
+    public function testRegularSeasonDoesNotShowGenerateAwardsButton(): void
+    {
+        $html = $this->renderWithDefaults([
+            'panelData' => self::createPanelData(['phase' => 'Regular Season']),
+        ]);
+
+        $this->assertStringNotContainsString('value="generate_awards"', $html);
+    }
+
+    public function testFreeAgencyDoesNotShowGenerateAwardsButton(): void
+    {
+        $html = $this->renderWithDefaults([
+            'panelData' => self::createPanelData(['phase' => 'Free Agency']),
+        ]);
+
+        $this->assertStringNotContainsString('value="generate_awards"', $html);
+    }
+
+    public function testPlayoffsShowsFinalsMvpInputWhenNotSet(): void
+    {
+        $html = $this->renderWithDefaults([
+            'panelData' => self::createPanelData(['phase' => 'Playoffs', 'hasFinalsMvp' => false]),
+        ]);
+
+        $this->assertStringContainsString('name="finals_mvp_name"', $html);
+        $this->assertStringContainsString('value="set_finals_mvp"', $html);
+    }
+
+    public function testPlayoffsHidesFinalsMvpInputWhenAlreadySet(): void
+    {
+        $html = $this->renderWithDefaults([
+            'panelData' => self::createPanelData(['phase' => 'Playoffs', 'hasFinalsMvp' => true]),
+        ]);
+
+        $this->assertStringNotContainsString('name="finals_mvp_name"', $html);
+        $this->assertStringNotContainsString('value="set_finals_mvp"', $html);
+    }
+
+    public function testDraftShowsFinalsMvpInputWhenNotSet(): void
+    {
+        $html = $this->renderWithDefaults([
+            'panelData' => self::createPanelData(['phase' => 'Draft', 'hasFinalsMvp' => false]),
+        ]);
+
+        $this->assertStringContainsString('name="finals_mvp_name"', $html);
+        $this->assertStringContainsString('value="set_finals_mvp"', $html);
+    }
+
     public function testRenderXssProtectionOnPanelData(): void
     {
         $html = $this->renderWithDefaults([
@@ -219,7 +288,7 @@ class LeagueControlPanelViewTest extends TestCase
         $leagueConfig = $overrides['leagueConfig'] ?? ['short_name' => 'ibl', 'full_name' => 'Internet Basketball League'];
         /** @var string $currentLeague */
         $currentLeague = $overrides['currentLeague'] ?? 'ibl';
-        /** @var array{phase: string, allowTrades: string, allowWaivers: string, showDraftLink: string, freeAgencyNotifications: string, triviaMode: string, simLengthInDays: int, seasonEndingYear: int} $panelData */
+        /** @var array{phase: string, allowTrades: string, allowWaivers: string, showDraftLink: string, freeAgencyNotifications: string, triviaMode: string, simLengthInDays: int, seasonEndingYear: int, hasFinalsMvp: bool} $panelData */
         $panelData = $overrides['panelData'] ?? self::createPanelData();
         /** @var string|null $resultMessage */
         $resultMessage = array_key_exists('resultMessage', $overrides) ? $overrides['resultMessage'] : null;
@@ -231,11 +300,11 @@ class LeagueControlPanelViewTest extends TestCase
 
     /**
      * @param array<string, mixed> $overrides
-     * @return array{phase: string, allowTrades: string, allowWaivers: string, showDraftLink: string, freeAgencyNotifications: string, triviaMode: string, simLengthInDays: int, seasonEndingYear: int}
+     * @return array{phase: string, allowTrades: string, allowWaivers: string, showDraftLink: string, freeAgencyNotifications: string, triviaMode: string, simLengthInDays: int, seasonEndingYear: int, hasFinalsMvp: bool}
      */
     private static function createPanelData(array $overrides = []): array
     {
-        /** @var array{phase: string, allowTrades: string, allowWaivers: string, showDraftLink: string, freeAgencyNotifications: string, triviaMode: string, simLengthInDays: int, seasonEndingYear: int} */
+        /** @var array{phase: string, allowTrades: string, allowWaivers: string, showDraftLink: string, freeAgencyNotifications: string, triviaMode: string, simLengthInDays: int, seasonEndingYear: int, hasFinalsMvp: bool} */
         return array_merge([
             'phase' => 'Regular Season',
             'allowTrades' => 'Yes',
@@ -245,6 +314,7 @@ class LeagueControlPanelViewTest extends TestCase
             'triviaMode' => 'Off',
             'simLengthInDays' => 3,
             'seasonEndingYear' => 2026,
+            'hasFinalsMvp' => false,
         ], $overrides);
     }
 }

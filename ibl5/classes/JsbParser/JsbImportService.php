@@ -699,4 +699,110 @@ class JsbImportService implements JsbImportServiceInterface
             $this->nextTradeGroupId = 1;
         }
     }
+
+    /**
+     * @see JsbImportServiceInterface::processDraFile()
+     */
+    public function processDraFile(string $filePath): JsbImportResult
+    {
+        $result = new JsbImportResult();
+
+        try {
+            $parsed = DraFileParser::parseFile($filePath);
+        } catch (\RuntimeException $e) {
+            $result->addError('DRA parse failed: ' . $e->getMessage());
+            return $result;
+        }
+
+        foreach ($parsed as $draft) {
+            foreach ($draft['picks'] as $pick) {
+                try {
+                    $affected = $this->repository->upsertDraftResult([
+                        'draft_year' => $draft['draft_year'],
+                        'round' => $pick['round'],
+                        'pick' => $pick['pick'],
+                        'team_name' => $pick['team_name'],
+                        'pos' => $pick['pos'],
+                        'player_name' => $pick['player_name'],
+                        'pid' => null,
+                    ]);
+                    $this->recordUpsertResult($affected, $result);
+                } catch (\RuntimeException $e) {
+                    $result->addError('Draft upsert failed for ' . $pick['player_name'] . ': ' . $e->getMessage());
+                }
+            }
+        }
+
+        return $result;
+    }
+
+    /**
+     * @see JsbImportServiceInterface::processRetFile()
+     */
+    public function processRetFile(string $filePath): JsbImportResult
+    {
+        $result = new JsbImportResult();
+
+        try {
+            $parsed = RetFileParser::parseFile($filePath);
+        } catch (\RuntimeException $e) {
+            $result->addError('RET parse failed: ' . $e->getMessage());
+            return $result;
+        }
+
+        foreach ($parsed as $entry) {
+            $pid = $this->repository->getPlayerName($entry['jsb_pid']) !== null
+                ? $entry['jsb_pid']
+                : null;
+
+            try {
+                $affected = $this->repository->upsertRetiredPlayer([
+                    'jsb_pid' => $entry['jsb_pid'],
+                    'player_name' => $entry['player_name'],
+                    'pid' => $pid,
+                ]);
+                $this->recordUpsertResult($affected, $result);
+            } catch (\RuntimeException $e) {
+                $result->addError('Retired player upsert failed for ' . $entry['player_name'] . ': ' . $e->getMessage());
+            }
+        }
+
+        return $result;
+    }
+
+    /**
+     * @see JsbImportServiceInterface::processHofFile()
+     */
+    public function processHofFile(string $filePath): JsbImportResult
+    {
+        $result = new JsbImportResult();
+
+        try {
+            $parsed = HofFileParser::parseFile($filePath);
+        } catch (\RuntimeException $e) {
+            $result->addError('HOF parse failed: ' . $e->getMessage());
+            return $result;
+        }
+
+        foreach ($parsed as $entry) {
+            $pid = $this->repository->getPlayerName($entry['jsb_pid']) !== null
+                ? $entry['jsb_pid']
+                : null;
+
+            try {
+                $affected = $this->repository->upsertHofInductee([
+                    'jsb_pid' => $entry['jsb_pid'],
+                    'player_name' => $entry['player_name'],
+                    'pos' => $entry['pos'],
+                    'induction_year' => $entry['induction_year'],
+                    'pid' => $pid,
+                ]);
+                $this->recordUpsertResult($affected, $result);
+            } catch (\RuntimeException $e) {
+                $result->addError('HoF upsert failed for ' . $entry['player_name'] . ': ' . $e->getMessage());
+            }
+        }
+
+        return $result;
+    }
 }

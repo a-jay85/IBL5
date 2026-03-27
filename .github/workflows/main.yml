@@ -189,3 +189,36 @@ jobs:
               sleep 5
             done
           done
+
+  notify-deploy-failure:
+    name: Notify Deploy Failure
+    runs-on: ubuntu-latest
+    needs: build-and-deploy
+    if: ${{ always() && needs.build-and-deploy.result == 'failure' }}
+    timeout-minutes: 5
+
+    steps:
+      - name: Setup SSH
+        run: |
+          mkdir -p ~/.ssh
+          echo "$DEPLOY_KEY" > ~/.ssh/id_deploy
+          chmod 600 ~/.ssh/id_deploy
+          ssh-keyscan -p ${{ secrets.PORT }} ${{ secrets.HOST }} >> ~/.ssh/known_hosts 2>/dev/null
+        env:
+          DEPLOY_KEY: ${{ secrets.PRIVATE_KEY }}
+
+      - name: Send Discord DM
+        env:
+          OWNER_DISCORD_ID: ${{ secrets.OWNER_DISCORD_ID }}
+        run: |
+          RUN_URL="https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          SHORT_SHA="${{ github.sha }}"
+          SHORT_SHA="${SHORT_SHA:0:7}"
+          MSG=$(printf 'Production deploy FAILED for commit %s.\n\nCheck the run for details: %s' "$SHORT_SHA" "$RUN_URL")
+
+          PAYLOAD=$(jq -n --arg id "$OWNER_DISCORD_ID" --arg msg "$MSG" \
+            '{content: {receivingUserDiscordID: $id, message: $msg}}')
+
+          echo "$PAYLOAD" | ssh -p ${{ secrets.PORT }} -i ~/.ssh/id_deploy ${{ secrets.USERNAME }}@${{ secrets.HOST }} \
+            'curl -s --max-time 10 -X POST http://localhost:50000/discordDM -H "Content-Type: application/json" -d @-' \
+            || echo "IBLbot notification failed (bot may be down)"

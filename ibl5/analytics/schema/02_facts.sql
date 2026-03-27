@@ -228,6 +228,66 @@ SELECT
 FROM read_csv('data/ibl_jsb_allstar_rosters.csv', delim='\t', header=true, all_varchar=true,
     null_padding=true, ignore_errors=true, strict_mode=false, quote='');
 
+-- fact_plb_snapshots: Depth chart coaching decisions per player per sim
+-- 173K+ rows: 19 seasons x 28 teams x ~30 sims/season x ~11 active players
+-- DC settings: minutes target, offensive/defensive formation and instruction, ball handling
+CREATE OR REPLACE TABLE fact_plb_snapshots AS
+SELECT
+    TRY_CAST(id AS INTEGER)          AS id,
+    TRY_CAST(season_year AS INTEGER) AS season_year,
+    TRY_CAST(sim_number AS INTEGER)  AS sim_number,
+    source_archive,
+    TRY_CAST(tid AS INTEGER)         AS tid,
+    TRY_CAST(slot_index AS INTEGER)  AS slot_index,
+    TRY_CAST(pid AS INTEGER)         AS pid,
+    player_name,
+    TRY_CAST(dc_minutes AS INTEGER)  AS dc_minutes,
+    TRY_CAST(dc_of AS INTEGER)       AS dc_of,
+    TRY_CAST(dc_df AS INTEGER)       AS dc_df,
+    TRY_CAST(dc_oi AS INTEGER)       AS dc_oi,
+    TRY_CAST(dc_di AS INTEGER)       AS dc_di,
+    TRY_CAST(dc_bh AS INTEGER)       AS dc_bh
+FROM read_csv('data/ibl_plb_snapshots.csv', delim='\t', header=true, all_varchar=true,
+    null_padding=true, ignore_errors=true, strict_mode=false, quote='')
+WHERE TRY_CAST(pid AS INTEGER) IS NOT NULL;
+
+-- fact_plr_snapshots: Player ratings at game time
+-- Confirmed: zero drift between heat-end and end-of-season across all 19 seasons.
+-- heat-end phase = exact ratings JSB used for every game that season.
+CREATE OR REPLACE TABLE fact_plr_snapshots AS
+SELECT
+    TRY_CAST(pid AS INTEGER)         AS pid,
+    name,
+    TRY_CAST(season_year AS INTEGER) AS season_year,
+    snapshot_phase,
+    TRY_CAST(tid AS INTEGER)         AS tid,
+    TRY_CAST(age AS INTEGER)         AS age,
+    pos,
+    TRY_CAST(peak AS INTEGER)        AS peak,
+    -- Positional ratings (1-9 scale)
+    TRY_CAST(oo AS INTEGER) AS oo, TRY_CAST(od AS INTEGER) AS od,
+    TRY_CAST("do" AS INTEGER) AS "do", TRY_CAST(dd AS INTEGER) AS dd,
+    TRY_CAST(po AS INTEGER) AS po, TRY_CAST(pd AS INTEGER) AS pd,
+    TRY_CAST("to" AS INTEGER) AS "to", TRY_CAST(td AS INTEGER) AS td,
+    -- Stat ratings (0-99 scale)
+    TRY_CAST(r_fga AS INTEGER) AS r_fga, TRY_CAST(r_fgp AS INTEGER) AS r_fgp,
+    TRY_CAST(r_fta AS INTEGER) AS r_fta, TRY_CAST(r_ftp AS INTEGER) AS r_ftp,
+    TRY_CAST(r_tga AS INTEGER) AS r_tga, TRY_CAST(r_tgp AS INTEGER) AS r_tgp,
+    TRY_CAST(r_orb AS INTEGER) AS r_orb, TRY_CAST(r_drb AS INTEGER) AS r_drb,
+    TRY_CAST(r_ast AS INTEGER) AS r_ast, TRY_CAST(r_stl AS INTEGER) AS r_stl,
+    TRY_CAST(r_to AS INTEGER)  AS r_to,  TRY_CAST(r_blk AS INTEGER) AS r_blk,
+    TRY_CAST(r_foul AS INTEGER) AS r_foul,
+    -- Quality attributes
+    TRY_CAST(talent AS INTEGER)      AS talent,
+    TRY_CAST(skill AS INTEGER)       AS skill,
+    TRY_CAST(intangibles AS INTEGER) AS intangibles,
+    (TRY_CAST(talent AS INTEGER) + TRY_CAST(skill AS INTEGER) + TRY_CAST(intangibles AS INTEGER)) AS tsi_sum,
+    TRY_CAST(clutch AS INTEGER)      AS clutch,
+    TRY_CAST(consistency AS INTEGER) AS consistency,
+    TRY_CAST(exp AS INTEGER)         AS exp
+FROM read_csv('data/ibl_plr_snapshots.csv', delim='\t', header=true, all_varchar=true,
+    null_padding=true, ignore_errors=true, strict_mode=false, quote='');
+
 -- Summary
 SELECT 'fact_player_season' AS table_name, COUNT(*) AS row_count FROM fact_player_season
 UNION ALL SELECT 'fact_player_game', COUNT(*) FROM fact_player_game
@@ -237,4 +297,6 @@ UNION ALL SELECT 'fact_player_awards', COUNT(*) FROM fact_player_awards
 UNION ALL SELECT 'fact_team_awards', COUNT(*) FROM fact_team_awards
 UNION ALL SELECT 'fact_transactions', COUNT(*) FROM fact_transactions
 UNION ALL SELECT 'fact_allstar_rosters', COUNT(*) FROM fact_allstar_rosters
+UNION ALL SELECT 'fact_plb_snapshots', COUNT(*) FROM fact_plb_snapshots
+UNION ALL SELECT 'fact_plr_snapshots', COUNT(*) FROM fact_plr_snapshots
 ORDER BY table_name;

@@ -1,6 +1,89 @@
 -- 03_aggregates.sql: Pre-materialized analytical tables
 -- Run after 02_facts.sql
 
+-- fact_player_sim: Denormalized simulation validation table
+-- Pre-joins PLB coaching decisions + sim date windows + game box scores + player ratings.
+-- Grain: one row per (box_score_id, pid, sim_number) — each game gets the DC settings active.
+-- Join path: PLB -> sim_dates (via season offset) -> box_scores (date range) -> PLR (heat-end)
+CREATE OR REPLACE TABLE fact_player_sim AS
+WITH
+season_first_sim AS (
+    SELECT
+        CASE WHEN MONTH(sim_start_date) >= 10
+             THEN YEAR(sim_start_date) + 1
+             ELSE YEAR(sim_start_date)
+        END AS season_year,
+        MIN(global_sim) AS first_sim
+    FROM dim_sim_dates
+    GROUP BY 1
+),
+plb_deduped AS (
+    SELECT *
+    FROM fact_plb_snapshots
+    WHERE pid IS NOT NULL
+    QUALIFY ROW_NUMBER() OVER (
+        PARTITION BY pid, season_year, sim_number ORDER BY slot_index
+    ) = 1
+),
+plb_with_dates AS (
+    SELECT
+        plb.pid, plb.season_year, plb.sim_number,
+        plb.tid AS team_id,
+        sfs.first_sim + plb.sim_number - 1 AS global_sim,
+        sd.sim_start_date, sd.sim_end_date,
+        plb.dc_minutes, plb.dc_of, plb.dc_df,
+        plb.dc_oi, plb.dc_di, plb.dc_bh
+    FROM plb_deduped plb
+    JOIN season_first_sim sfs ON plb.season_year = sfs.season_year
+    JOIN dim_sim_dates sd ON sd.global_sim = sfs.first_sim + plb.sim_number - 1
+)
+SELECT
+    bs.id                AS box_score_id,
+    p.pid,
+    p.season_year,
+    p.sim_number,
+    p.global_sim,
+    p.team_id,
+    p.sim_start_date,
+    p.sim_end_date,
+    bs.game_date,
+    bs.game_type,
+    bs.game_type_label,
+    -- DC coaching settings
+    p.dc_minutes, p.dc_of, p.dc_df, p.dc_oi, p.dc_di, p.dc_bh,
+    -- Player identity
+    bs.name              AS player_name,
+    r.pos,
+    r.age,
+    r.peak,
+    r.age - r.peak       AS age_relative_to_peak,
+    -- Game stats
+    bs.minutes,
+    bs.fg2_made, bs.fg2_att,
+    bs.ft_made,  bs.ft_att,
+    bs.fg3_made, bs.fg3_att,
+    bs.orb, bs.drb,
+    bs.ast, bs.stl, bs.tov, bs.blk, bs.pf,
+    bs.points, bs.rebounds,
+    -- PLR positional ratings (1-9)
+    r.oo, r.od, r."do", r.dd, r.po, r.pd, r."to", r.td,
+    -- PLR stat ratings (0-99)
+    r.r_fga, r.r_fgp, r.r_fta, r.r_ftp,
+    r.r_tga, r.r_tgp, r.r_orb, r.r_drb,
+    r.r_ast, r.r_stl, r.r_to, r.r_blk, r.r_foul,
+    -- Quality attributes
+    r.tsi_sum, r.clutch, r.consistency
+FROM plb_with_dates p
+JOIN fact_player_game bs
+    ON bs.pid = p.pid
+    AND bs.team_id = p.team_id
+    AND bs.game_date BETWEEN p.sim_start_date AND p.sim_end_date
+    AND bs.game_type IN (1, 2)
+LEFT JOIN fact_plr_snapshots r
+    ON r.pid = p.pid
+    AND r.season_year = p.season_year
+    AND r.snapshot_phase = 'heat-end';
+
 -- agg_tsi_progression: Year-over-year rating changes per player
 -- Self-join fact_player_season on consecutive years to compute deltas.
 -- Replicates TSI analysis from tsi-progression-analysis.md.
@@ -172,7 +255,8 @@ LEFT JOIN fact_team_season t
     ON r.teamid = t.teamid AND r.season_year = t.season_year;
 
 -- Summary
-SELECT 'agg_tsi_progression' AS table_name, COUNT(*) AS row_count FROM agg_tsi_progression
+SELECT 'fact_player_sim' AS table_name, COUNT(*) AS row_count FROM fact_player_sim
+UNION ALL SELECT 'agg_tsi_progression', COUNT(*) FROM agg_tsi_progression
 UNION ALL SELECT 'agg_player_career', COUNT(*) FROM agg_player_career
 UNION ALL SELECT 'agg_draft_cohort', COUNT(*) FROM agg_draft_cohort
 UNION ALL SELECT 'agg_team_season_roster', COUNT(*) FROM agg_team_season_roster

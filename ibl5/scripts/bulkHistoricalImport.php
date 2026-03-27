@@ -58,7 +58,7 @@ require_once __DIR__ . '/../db/db.php';
 // ── Parse CLI options ───────────────────────────────────────────────────────
 $dryRun = in_array('--dry-run', $argv, true);
 
-$validTypes = ['car', 'his', 'trn', 'asw', 'rcb', 'sco'];
+$validTypes = ['car', 'his', 'trn', 'asw', 'awa', 'rcb', 'sco'];
 $fileTypeFilter = null;
 $seasonFilter = null;
 
@@ -213,7 +213,7 @@ function extractAndProcess(
 
 // ── Process each season ─────────────────────────────────────────────────────
 
-$fileTypes = $fileTypeFilter !== null ? [$fileTypeFilter] : ['trn', 'car', 'his', 'sco', 'asw', 'rcb'];
+$fileTypes = $fileTypeFilter !== null ? [$fileTypeFilter] : ['trn', 'car', 'his', 'sco', 'asw', 'awa', 'rcb'];
 
 foreach ($plan as $si => $season) {
     $sNum = $si + 1;
@@ -316,6 +316,49 @@ foreach ($plan as $si => $season) {
                 }
             });
 
+            continue;
+        }
+
+        // .awa needs both .awa and .car files from the same archive
+        if ($fileType === 'awa') {
+            echo "  .awa from " . basename($finalsArchive) . "\n";
+            $tmpDir = sys_get_temp_dir() . '/ibl5_import_' . bin2hex(random_bytes(8));
+            if (!mkdir($tmpDir, 0700, true)) {
+                echo "        ERROR: Could not create temp directory\n";
+                continue;
+            }
+
+            $awaPath = $extractor->extractSingleFile($finalsArchive, $extractor->jsbFilename('awa'), $tmpDir);
+            $carPath = $extractor->extractSingleFile($finalsArchive, $extractor->jsbFilename('car'), $tmpDir);
+
+            if ($awaPath === false) {
+                echo "        IBL5.awa not found in archive\n";
+            } elseif ($carPath === false) {
+                echo "        IBL5.car not found in archive (needed for .awa PID resolution)\n";
+                $extractor->cleanupTemp($awaPath);
+            } else {
+                try {
+                    $result = $jsbService->processAwaFile($awaPath, $carPath);
+                    echo "        {$result->summary()}\n";
+                    foreach ($result->messages as $msg) {
+                        echo "        {$msg}\n";
+                    }
+                    $totalInserted += $result->inserted;
+                    $totalUpdated += $result->updated;
+                    $totalSkipped += $result->skipped;
+                    $totalErrors += $result->errors;
+                    $filesProcessed++;
+                } catch (\Throwable $e) {
+                    echo "        ERROR: {$e->getMessage()}\n";
+                    $totalErrors++;
+                }
+                $extractor->cleanupTemp($awaPath);
+                $extractor->cleanupTemp($carPath);
+            }
+
+            if (is_dir($tmpDir)) {
+                rmdir($tmpDir);
+            }
             continue;
         }
 

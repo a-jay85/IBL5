@@ -158,7 +158,7 @@ class LeagueControlPanelView implements LeagueControlPanelViewInterface
     <div class="lcp-control-row">
         <a href="/ibl5/scripts/updateAllTheThings.php">Update All The Things</a>
     </div>
-    <div class="lcp-note">Upload .asw .car .his .lge .plr .rcb .sch .sco .trn before running</div>
+    <div class="lcp-note">Upload .asw .car .his .lge .plr .rcb .sch .sco .trn <strong>.awa</strong> (new!) before running</div>
     <?= $this->renderWaiversSelect($panelData) ?>
     <div class="lcp-control-row">
         <button type="submit" name="action" value="set_waivers_to_free_agents" class="ibl-btn ibl-btn--secondary ibl-btn--sm">Set all players on waivers to Free Agents and reset their Bird years</button>
@@ -183,7 +183,7 @@ class LeagueControlPanelView implements LeagueControlPanelViewInterface
     <div class="lcp-control-row">
         <a href="/ibl5/scripts/updateAllTheThings.php">Update All The Things</a>
     </div>
-    <div class="lcp-note">Upload .asw .car .his .lge .plr .rcb .sch .sco .trn before running</div>
+    <div class="lcp-note">Upload .asw .car .his .lge .plr .rcb .sch .sco .trn <strong>.awa</strong> (new!) before running</div>
 </section>
         <?php
         return (string) ob_get_clean();
@@ -201,7 +201,7 @@ class LeagueControlPanelView implements LeagueControlPanelViewInterface
     <div class="lcp-control-row">
         <a href="/ibl5/scripts/updateAllTheThings.php">Update All The Things</a>
     </div>
-    <div class="lcp-note">Upload .asw .car .his .lge .plr .rcb .sch .sco .trn before running</div>
+    <div class="lcp-note">Upload .asw .car .his .lge .plr .rcb .sch .sco .trn <strong>.awa</strong> (new!) before running</div>
     <div class="lcp-control-row">
         <input type="number" name="SimLengthInDays" min="1" max="180" size="3" value="<?= HtmlSanitizer::e((string) $panelData['simLengthInDays']) ?>" class="ibl-input ibl-input--sm" style="width: 5rem;">
         <button type="submit" name="action" value="set_sim_length" class="ibl-btn ibl-btn--secondary ibl-btn--sm">Set Sim Length in Days</button>
@@ -234,7 +234,7 @@ class LeagueControlPanelView implements LeagueControlPanelViewInterface
     <div class="lcp-control-row">
         <a href="/ibl5/scripts/updateAllTheThings.php">Update All The Things</a>
     </div>
-    <div class="lcp-note">Upload .asw .car .his .lge .plr .rcb .sch .sco .trn before running</div>
+    <div class="lcp-note">Upload .asw .car .his .lge .plr .rcb .sch .sco .trn <strong>.awa</strong> (new!) before running</div>
     <div class="lcp-control-row">
         <button type="submit" name="action" value="reset_eoy_voting" class="ibl-btn ibl-btn--secondary ibl-btn--sm">Reset End of the Year Voting</button>
     </div>

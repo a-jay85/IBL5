@@ -58,4 +58,11 @@ interface ArchiveExtractorInterface
      * "88-89" → 1989, "00-01" → 2001, "06-07" → 2007
      */
     public function seasonLabelToEndingYear(string $seasonLabel): int;
+
+    /**
+     * Build the JSB filename for a given extension.
+     *
+     * @param string $extension File extension without dot (e.g. 'plr', 'sco')
+     */
+    public function jsbFilename(string $extension): string;
 }

@@ -179,13 +179,13 @@ $filesProcessed = 0;
  * @param callable(string): void $processor Function that receives the extracted file path
  */
 function extractAndProcess(
-    BulkImport\ArchiveExtractor $extractor,
+    BulkImport\Contracts\ArchiveExtractorInterface $extractor,
     string $archivePath,
     string $jsbExtension,
     callable $processor,
 ): bool {
-    $tmpDir = sys_get_temp_dir() . '/ibl5_import_' . uniqid();
-    if (!mkdir($tmpDir, 0755, true)) {
+    $tmpDir = sys_get_temp_dir() . '/ibl5_import_' . bin2hex(random_bytes(8));
+    if (!mkdir($tmpDir, 0700, true)) {
         echo "        ERROR: Could not create temp directory\n";
         return false;
     }
@@ -242,7 +242,6 @@ foreach ($plan as $si => $season) {
         if ($fileType === 'sco') {
             // HEAT .sco
             if ($heatArchive !== null) {
-                $heatLabel = basename($heatArchive, '.' . pathinfo($heatArchive, PATHINFO_EXTENSION));
                 echo "  .sco (HEAT) from " . basename($heatArchive) . "\n";
                 extractAndProcess($extractor, $heatArchive, 'sco', function (string $path) use (
                     $boxscoreProcessor,

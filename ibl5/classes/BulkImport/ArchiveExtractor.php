@@ -197,7 +197,7 @@ final class ArchiveExtractor implements ArchiveExtractorInterface
             return false;
         }
 
-        $targetPath = $targetDir . '/' . $filename;
+        $targetPath = $targetDir . '/' . basename($filename);
         $stream = $zip->getStream($filename);
         if ($stream === false) {
             $zip->close();
@@ -221,7 +221,7 @@ final class ArchiveExtractor implements ArchiveExtractorInterface
 
     private function extractFromRar(string $archivePath, string $filename, string $targetDir): string|false
     {
-        $targetPath = $targetDir . '/' . $filename;
+        $targetPath = $targetDir . '/' . basename($filename);
 
         // Try unrar first, then 7z as fallback
         $unrarBin = $this->findBinary('unrar');

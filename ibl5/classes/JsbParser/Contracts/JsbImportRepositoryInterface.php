@@ -107,4 +107,12 @@ interface JsbImportRepositoryInterface
      * @return string|null Player name, or null if not found
      */
     public function getPlayerName(int $pid): ?string;
+
+    /**
+     * Upsert a depth chart snapshot from .plb data.
+     *
+     * @param array{season_year: int, sim_number: int, source_archive: string, tid: int, slot_index: int, pid: int|null, player_name: string|null, dc_minutes: int, dc_of: int, dc_df: int, dc_oi: int, dc_di: int, dc_bh: int} $record
+     * @return int Affected rows (1=inserted, 2=updated, 0=unchanged)
+     */
+    public function upsertPlbSnapshot(array $record): int;
 }

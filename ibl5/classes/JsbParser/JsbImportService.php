@@ -622,6 +622,72 @@ class JsbImportService implements JsbImportServiceInterface
     }
 
     /**
+     * @see JsbImportServiceInterface::processPlbFile()
+     */
+    public function processPlbFile(
+        string $filePath,
+        PlrOrdinalMap $map,
+        int $seasonYear,
+        int $simNumber,
+        string $sourceArchive,
+    ): JsbImportResult {
+        $result = new JsbImportResult();
+
+        try {
+            $parsed = PlbFileParser::parseFile($filePath);
+        } catch (\RuntimeException $e) {
+            $result->addError('PLB parse failed: ' . $e->getMessage());
+            return $result;
+        }
+
+        foreach ($parsed as $lineIndex => $slots) {
+            // .plb line index is 0-based; tid = lineIndex + 1 (1-based team ID)
+            $tid = $lineIndex + 1;
+
+            // Skip special teams (tid > 28 = rookies, all-stars, etc.)
+            if ($tid > 28) {
+                continue;
+            }
+
+            foreach ($slots as $slot) {
+                // Skip empty slots (zero minutes)
+                if ($slot['dc_minutes'] === 0) {
+                    $result->addSkipped();
+                    continue;
+                }
+
+                // Resolve player identity from ordinal map
+                $player = $map->getSlotPlayer($tid, $slot['slot_index']);
+                $pid = $player !== null ? $player['pid'] : null;
+                $playerName = $player !== null ? $player['name'] : null;
+
+                try {
+                    $affected = $this->repository->upsertPlbSnapshot([
+                        'season_year' => $seasonYear,
+                        'sim_number' => $simNumber,
+                        'source_archive' => $sourceArchive,
+                        'tid' => $tid,
+                        'slot_index' => $slot['slot_index'],
+                        'pid' => $pid,
+                        'player_name' => $playerName,
+                        'dc_minutes' => $slot['dc_minutes'],
+                        'dc_of' => $slot['dc_of'],
+                        'dc_df' => $slot['dc_df'],
+                        'dc_oi' => $slot['dc_oi'],
+                        'dc_di' => $slot['dc_di'],
+                        'dc_bh' => $slot['dc_bh'],
+                    ]);
+                    $this->recordUpsertResult($affected, $result);
+                } catch (\RuntimeException $e) {
+                    $result->addError('PLB upsert failed for tid=' . $tid . ' slot=' . $slot['slot_index'] . ': ' . $e->getMessage());
+                }
+            }
+        }
+
+        return $result;
+    }
+
+    /**
      * Initialize trade group ID counter from existing data.
      */
     private function initTradeGroupId(): void

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace JsbParser\Contracts;
 
 use JsbParser\JsbImportResult;
+use JsbParser\PlrOrdinalMap;
 use Season\Season;
 
 /**
@@ -81,4 +82,22 @@ interface JsbImportServiceInterface
      * @return JsbImportResult Summary of import results
      */
     public function processRcbFile(string $filePath, int $seasonYear, ?string $sourceLabel = null): JsbImportResult;
+
+    /**
+     * Process a .plb file and upsert depth chart snapshots into ibl_plb_snapshots.
+     *
+     * @param string $filePath Path to the .plb file
+     * @param PlrOrdinalMap $map Ordinal map for resolving player identity
+     * @param int $seasonYear Season ending year
+     * @param int $simNumber Archive sequence number
+     * @param string $sourceArchive Archive basename without extension
+     * @return JsbImportResult Summary of import results
+     */
+    public function processPlbFile(
+        string $filePath,
+        PlrOrdinalMap $map,
+        int $seasonYear,
+        int $simNumber,
+        string $sourceArchive,
+    ): JsbImportResult;
 }

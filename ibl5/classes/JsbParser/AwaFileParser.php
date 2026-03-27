@@ -7,23 +7,24 @@ namespace JsbParser;
 use JsbParser\Contracts\AwaFileParserInterface;
 
 /**
- * Parser for JSB .awa (Awards) binary files.
+ * Parser for JSB .awa (Awards) files.
  *
- * Extracts stat leader PIDs across multiple seasons from the binary format.
- * Each 1,000-byte block contains scoring, rebounding, assists, steals, and blocks
- * leaders for ranks 1-5.
+ * Extracts stat leader PIDs across multiple seasons from the fixed-width
+ * ASCII text format. Each 1,000-byte block contains scoring, rebounding,
+ * assists, steals, and blocks leaders for ranks 1-5. All numeric fields are
+ * stored as right-justified, space-padded ASCII (4 chars wide).
  *
  * @see AwaFileParserInterface
  */
 class AwaFileParser implements AwaFileParserInterface
 {
     public const BLOCK_SIZE = 1000;
-    public const TOTAL_BLOCKS = 50;
-    public const FILE_SIZE = 50000;
+
+    /** Width of each numeric field in the fixed-width ASCII format */
+    private const FIELD_WIDTH = 4;
 
     /** Byte offset of starting year in block 0 */
     private const STARTING_YEAR_OFFSET = 0;
-    private const STARTING_YEAR_WIDTH = 4;
 
     /** Byte offset to check if a block is active (position-4 PID) */
     private const ACTIVE_CHECK_OFFSET = 32;
@@ -83,17 +84,19 @@ class AwaFileParser implements AwaFileParserInterface
         }
 
         $fileSize = strlen($data);
-        if ($fileSize < self::FILE_SIZE) {
+        $minSize = self::BLOCK_SIZE * 2;
+        if ($fileSize < $minSize) {
             throw new \RuntimeException(
-                'Invalid .awa file: expected ' . self::FILE_SIZE . ' bytes, got ' . $fileSize
+                'Invalid .awa file: need at least ' . $minSize . ' bytes, got ' . $fileSize
             );
         }
 
         // Block 0: header — starting year
-        $startingYear = (int) trim(substr($data, self::STARTING_YEAR_OFFSET, self::STARTING_YEAR_WIDTH));
+        $startingYear = self::readAsciiInt($data, self::STARTING_YEAR_OFFSET);
 
+        $totalBlocks = intdiv($fileSize, self::BLOCK_SIZE);
         $seasons = [];
-        for ($i = 1; $i < self::TOTAL_BLOCKS; $i++) {
+        for ($i = 1; $i < $totalBlocks; $i++) {
             $blockData = substr($data, $i * self::BLOCK_SIZE, self::BLOCK_SIZE);
             $parsed = self::parseBlock($blockData, $i, $startingYear);
             if ($parsed !== null) {
@@ -116,8 +119,8 @@ class AwaFileParser implements AwaFileParserInterface
             return null;
         }
 
-        // Check if block is active — position-4 PID at offset 32 must be non-zero
-        $checkPid = self::readInt32($data, self::ACTIVE_CHECK_OFFSET);
+        // Check if block is active — PID field at offset 32 must be non-blank
+        $checkPid = self::readAsciiInt($data, self::ACTIVE_CHECK_OFFSET);
         if ($checkPid === 0) {
             return null;
         }
@@ -162,7 +165,7 @@ class AwaFileParser implements AwaFileParserInterface
     private static function parseSectionLeaders(string $data, int $sectionOffset, int $rank, array &$statLeaders): void
     {
         // Scoring leader PID is at section_start + 32
-        $scoringPid = self::readInt32($data, $sectionOffset + self::SCORING_PID_OFFSET);
+        $scoringPid = self::readAsciiInt($data, $sectionOffset + self::SCORING_PID_OFFSET);
         if ($scoringPid > 0) {
             $statLeaders['Scoring Leader'][] = ['rank' => $rank, 'pid' => $scoringPid];
         }
@@ -173,25 +176,25 @@ class AwaFileParser implements AwaFileParserInterface
         $chainBase = $sectionOffset + self::STAT_CHAIN_OFFSET;
 
         // Entry 0: scoring_stat(4) → reb_PID(4) → blank(2) → team(2)
-        $rebPid = self::readInt32($data, $chainBase + 4);
+        $rebPid = self::readAsciiInt($data, $chainBase + 4);
         if ($rebPid > 0) {
             $statLeaders['Rebounding Leader'][] = ['rank' => $rank, 'pid' => $rebPid];
         }
 
         // Entry 1: reb_stat(4) → ast_PID(4) → blank(2) → team(2)
-        $astPid = self::readInt32($data, $chainBase + self::CHAIN_ENTRY_SIZE + 4);
+        $astPid = self::readAsciiInt($data, $chainBase + self::CHAIN_ENTRY_SIZE + 4);
         if ($astPid > 0) {
             $statLeaders['Assists Leader'][] = ['rank' => $rank, 'pid' => $astPid];
         }
 
         // Entry 2: ast_stat(4) → stl_PID(4) → blank(2) → team(2)
-        $stlPid = self::readInt32($data, $chainBase + 2 * self::CHAIN_ENTRY_SIZE + 4);
+        $stlPid = self::readAsciiInt($data, $chainBase + 2 * self::CHAIN_ENTRY_SIZE + 4);
         if ($stlPid > 0) {
             $statLeaders['Steals Leader'][] = ['rank' => $rank, 'pid' => $stlPid];
         }
 
         // Entry 3: stl_stat(4) → blk_PID(4) → blank(2) → team(2)
-        $blkPid = self::readInt32($data, $chainBase + 3 * self::CHAIN_ENTRY_SIZE + 4);
+        $blkPid = self::readAsciiInt($data, $chainBase + 3 * self::CHAIN_ENTRY_SIZE + 4);
         if ($blkPid > 0) {
             $statLeaders['Blocks Leader'][] = ['rank' => $rank, 'pid' => $blkPid];
         }
@@ -207,7 +210,7 @@ class AwaFileParser implements AwaFileParserInterface
     private static function parseRank2Leaders(string $data, array &$statLeaders): void
     {
         // Scoring leader 2nd PID at offset 166
-        $scoringPid = self::readInt32($data, self::RANK2_SCORING_PID_OFFSET);
+        $scoringPid = self::readAsciiInt($data, self::RANK2_SCORING_PID_OFFSET);
         if ($scoringPid > 0) {
             $statLeaders['Scoring Leader'][] = ['rank' => 2, 'pid' => $scoringPid];
         }
@@ -217,46 +220,45 @@ class AwaFileParser implements AwaFileParserInterface
         $chainBase = self::RANK2_STAT_CHAIN_OFFSET;
 
         // Entry 0: team(2) + scoring_stat(4) → reb_PID(4) → blank(2)
-        $rebPid = self::readInt32($data, $chainBase + 6);
+        $rebPid = self::readAsciiInt($data, $chainBase + 6);
         if ($rebPid > 0) {
             $statLeaders['Rebounding Leader'][] = ['rank' => 2, 'pid' => $rebPid];
         }
 
         // Entry 1: team(2) + reb_stat(4) → ast_PID(4) → blank(2)
-        $astPid = self::readInt32($data, $chainBase + self::CHAIN_ENTRY_SIZE + 6);
+        $astPid = self::readAsciiInt($data, $chainBase + self::CHAIN_ENTRY_SIZE + 6);
         if ($astPid > 0) {
             $statLeaders['Assists Leader'][] = ['rank' => 2, 'pid' => $astPid];
         }
 
         // Entry 2: team(2) + ast_stat(4) → stl_PID(4) → blank(2)
-        $stlPid = self::readInt32($data, $chainBase + 2 * self::CHAIN_ENTRY_SIZE + 6);
+        $stlPid = self::readAsciiInt($data, $chainBase + 2 * self::CHAIN_ENTRY_SIZE + 6);
         if ($stlPid > 0) {
             $statLeaders['Steals Leader'][] = ['rank' => 2, 'pid' => $stlPid];
         }
 
         // Entry 3: team(2) + stl_stat(4) → blk_PID(4) → blank(2)
-        $blkPid = self::readInt32($data, $chainBase + 3 * self::CHAIN_ENTRY_SIZE + 6);
+        $blkPid = self::readAsciiInt($data, $chainBase + 3 * self::CHAIN_ENTRY_SIZE + 6);
         if ($blkPid > 0) {
             $statLeaders['Blocks Leader'][] = ['rank' => 2, 'pid' => $blkPid];
         }
     }
 
     /**
-     * Read a 4-byte little-endian unsigned integer from binary data.
+     * Read a right-justified, space-padded ASCII integer from fixed-width data.
      */
-    private static function readInt32(string $data, int $offset): int
+    private static function readAsciiInt(string $data, int $offset): int
     {
-        if ($offset + 4 > strlen($data)) {
+        if ($offset + self::FIELD_WIDTH > strlen($data)) {
             return 0;
         }
 
-        $unpacked = unpack('V', substr($data, $offset, 4));
-        if ($unpacked === false) {
+        $raw = substr($data, $offset, self::FIELD_WIDTH);
+        $trimmed = trim($raw);
+        if ($trimmed === '') {
             return 0;
         }
 
-        /** @var int $value */
-        $value = $unpacked[1];
-        return $value;
+        return (int) $trimmed;
     }
 }

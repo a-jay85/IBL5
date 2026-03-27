@@ -68,3 +68,81 @@ test.describe('LeagueControlPanel — Finals MVP flow', () => {
     ]);
   });
 });
+
+// Generate Season Awards — tests the button visibility and error path.
+// The LCP reads phase from the DB directly (not cookie overrides), so
+// phase must be set via form submission. CI uses a fresh DB per run;
+// local re-runs may need: UPDATE ibl_settings SET value='Free Agency' WHERE name='Current Season Phase';
+
+test.describe('LeagueControlPanel — Generate Season Awards', () => {
+  test.describe.configure({ mode: 'serial' });
+
+  test('generate_awards button visible in Playoffs', async ({ page }) => {
+    // Set phase to Playoffs via the LCP form
+    await page.goto('leagueControlPanel.php');
+    await assertNoPhpErrors(page, 'before phase change');
+
+    const phaseSelect = page.locator('select[name="SeasonPhase"]');
+    await phaseSelect.selectOption('Playoffs');
+    const phaseButton = page.locator('button[value="set_season_phase"]');
+    await Promise.all([
+      page.waitForURL(/success=/),
+      phaseButton.click(),
+    ]);
+    await assertNoPhpErrors(page, 'after setting phase to Playoffs');
+
+    await expect(
+      page.locator('button[value="generate_awards"]'),
+    ).toBeVisible();
+  });
+
+  test('generate_awards shows error when Leaders.htm absent', async ({
+    page,
+  }) => {
+    // Phase is already Playoffs from the previous test (serial mode)
+    await page.goto('leagueControlPanel.php');
+    await assertNoPhpErrors(page, 'before clicking generate awards');
+
+    const generateButton = page.locator('button[value="generate_awards"]');
+    await expect(generateButton).toBeVisible();
+
+    await Promise.all([
+      page.waitForURL(/error=/),
+      generateButton.click(),
+    ]);
+
+    await assertNoPhpErrors(page, 'after generate awards click');
+    await expect(page.locator('.ibl-alert--error')).toBeVisible();
+
+    const body = await page.locator('body').textContent();
+    expect(body).toContain('Leaders.htm');
+  });
+
+  test('generate_awards button absent in Regular Season', async ({
+    page,
+  }) => {
+    // Set phase to Regular Season
+    await page.goto('leagueControlPanel.php');
+    const phaseSelect = page.locator('select[name="SeasonPhase"]');
+    await phaseSelect.selectOption('Regular Season');
+    const phaseButton = page.locator('button[value="set_season_phase"]');
+    await Promise.all([
+      page.waitForURL(/success=/),
+      phaseButton.click(),
+    ]);
+
+    await expect(
+      page.locator('button[value="generate_awards"]'),
+    ).toHaveCount(0);
+
+    // Restore phase to Free Agency (CI seed default)
+    await page.goto('leagueControlPanel.php');
+    const restoreSelect = page.locator('select[name="SeasonPhase"]');
+    await restoreSelect.selectOption('Free Agency');
+    const restoreButton = page.locator('button[value="set_season_phase"]');
+    await Promise.all([
+      page.waitForURL(/success=/),
+      restoreButton.click(),
+    ]);
+  });
+});

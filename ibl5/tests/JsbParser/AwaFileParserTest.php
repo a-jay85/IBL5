@@ -23,11 +23,11 @@ class AwaFileParserTest extends TestCase
     {
         $tempFile = tempnam(sys_get_temp_dir(), 'awa_test');
         $this->assertIsString($tempFile);
-        file_put_contents($tempFile, str_repeat("\x00", 100));
+        file_put_contents($tempFile, str_repeat(' ', 100));
 
         try {
             $this->expectException(\RuntimeException::class);
-            $this->expectExceptionMessage('expected 50000');
+            $this->expectExceptionMessage('need at least 2000');
             AwaFileParser::parseFile($tempFile);
         } finally {
             unlink($tempFile);
@@ -36,7 +36,7 @@ class AwaFileParserTest extends TestCase
 
     public function testParseBlockReturnsNullForEmptyBlock(): void
     {
-        $data = str_repeat("\x00", AwaFileParser::BLOCK_SIZE);
+        $data = str_repeat(' ', AwaFileParser::BLOCK_SIZE);
         $result = AwaFileParser::parseBlock($data, 1, 2000);
         $this->assertNull($result);
     }
@@ -49,7 +49,7 @@ class AwaFileParserTest extends TestCase
 
     public function testParseBlockComputesYearCorrectly(): void
     {
-        $data = $this->buildBlockWithScoringLeader(42, 1); // Rank 1 scoring leader, PID 42
+        $data = $this->buildBlockWithScoringLeader(42, 1);
         $result = AwaFileParser::parseBlock($data, 3, 2000);
         $this->assertNotNull($result);
         $this->assertSame(2003, $result['year']);
@@ -83,7 +83,6 @@ class AwaFileParserTest extends TestCase
 
     public function testParseBlockExtractsRank3ScoringLeader(): void
     {
-        // Rank 3 = section 1, offset 268
         $data = $this->buildBlockWithScoringLeader(77, 3);
         $result = AwaFileParser::parseBlock($data, 1, 2000);
 
@@ -125,26 +124,22 @@ class AwaFileParserTest extends TestCase
 
     public function testParseBlockSortsLeadersByRank(): void
     {
-        // Build a block with rank 1, 3, 4, 5 scoring leaders and rank 2
-        $data = str_repeat("\x00", AwaFileParser::BLOCK_SIZE);
+        $data = str_repeat(' ', AwaFileParser::BLOCK_SIZE);
 
-        // Make block active
-        $data = $this->writeInt32($data, 32, 10);
-
-        // Rank 1: section 0, offset 0+32 = 32
-        $data = $this->writeInt32($data, 32, 10);
+        // Rank 1: section 0, offset 0+32 = 32 (also activates block)
+        $data = $this->writeAsciiInt($data, 32, 10);
 
         // Rank 3: section 1, offset 268+32 = 300
-        $data = $this->writeInt32($data, 300, 30);
+        $data = $this->writeAsciiInt($data, 300, 30);
 
         // Rank 4: section 2, offset 402+32 = 434
-        $data = $this->writeInt32($data, 434, 40);
+        $data = $this->writeAsciiInt($data, 434, 40);
 
         // Rank 5: section 3, offset 536+32 = 568
-        $data = $this->writeInt32($data, 568, 50);
+        $data = $this->writeAsciiInt($data, 568, 50);
 
         // Rank 2: offset 166
-        $data = $this->writeInt32($data, 166, 20);
+        $data = $this->writeAsciiInt($data, 166, 20);
 
         $result = AwaFileParser::parseBlock($data, 1, 2000);
         $this->assertNotNull($result);
@@ -156,17 +151,17 @@ class AwaFileParserTest extends TestCase
 
     public function testParseFileWithMultipleSeasons(): void
     {
-        $data = str_repeat("\x00", AwaFileParser::FILE_SIZE);
+        // 4 blocks = 4000 bytes (header + 3 season blocks)
+        $data = str_repeat(' ', 4000);
 
         // Block 0: starting year = 2000
-        $yearStr = str_pad('2000', 4, ' ', STR_PAD_LEFT);
-        $data = substr_replace($data, $yearStr, 0, 4);
+        $data = substr_replace($data, '2000', 0, 4);
 
         // Block 1: season 2001 with scoring leader PID=42
         $block1 = $this->buildBlockWithScoringLeader(42, 1);
         $data = substr_replace($data, $block1, AwaFileParser::BLOCK_SIZE, AwaFileParser::BLOCK_SIZE);
 
-        // Block 2: empty (should be skipped)
+        // Block 2: empty (spaces — should be skipped)
         // Block 3: season 2003 with scoring leader PID=99
         $block3 = $this->buildBlockWithScoringLeader(99, 1);
         $data = substr_replace($data, $block3, 3 * AwaFileParser::BLOCK_SIZE, AwaFileParser::BLOCK_SIZE);
@@ -186,15 +181,52 @@ class AwaFileParserTest extends TestCase
         }
     }
 
+    public function testParseFileSmallerThan50000Bytes(): void
+    {
+        // 3 blocks = 3000 bytes (valid — header + 2 season blocks)
+        $data = str_repeat(' ', 3000);
+        $data = substr_replace($data, '1988', 0, 4);
+
+        // Block 1: season 1989 with scoring leader PID=306
+        $block1 = $this->buildBlockWithScoringLeader(306, 1);
+        $data = substr_replace($data, $block1, AwaFileParser::BLOCK_SIZE, AwaFileParser::BLOCK_SIZE);
+
+        $tempFile = tempnam(sys_get_temp_dir(), 'awa_test');
+        $this->assertIsString($tempFile);
+        file_put_contents($tempFile, $data);
+
+        try {
+            $result = AwaFileParser::parseFile($tempFile);
+            $this->assertSame(1988, $result['starting_year']);
+            $this->assertCount(1, $result['seasons']);
+            $this->assertSame(1989, $result['seasons'][0]['year']);
+
+            $scoringLeaders = $result['seasons'][0]['stat_leaders']['Scoring Leader'];
+            $rank1 = $this->findRank($scoringLeaders, 1);
+            $this->assertNotNull($rank1);
+            $this->assertSame(306, $rank1['pid']);
+        } finally {
+            unlink($tempFile);
+        }
+    }
+
+    public function testParseBlockSkipsSpaceFilledBlocks(): void
+    {
+        // All spaces — should be treated as inactive (PID field is blank)
+        $data = str_repeat(' ', AwaFileParser::BLOCK_SIZE);
+        $result = AwaFileParser::parseBlock($data, 1, 2000);
+        $this->assertNull($result);
+    }
+
     /**
      * Build a block with a single scoring leader at the given rank.
      */
     private function buildBlockWithScoringLeader(int $pid, int $rank): string
     {
-        $data = str_repeat("\x00", AwaFileParser::BLOCK_SIZE);
+        $data = str_repeat(' ', AwaFileParser::BLOCK_SIZE);
 
-        // Make block active (PID at offset 32 must be non-zero)
-        $data = $this->writeInt32($data, 32, $pid);
+        // Make block active (PID at offset 32 must be non-blank)
+        $data = $this->writeAsciiInt($data, 32, $pid);
 
         $sectionMap = [1 => 0, 3 => 268, 4 => 402, 5 => 536];
         if ($rank === 2) {
@@ -202,7 +234,7 @@ class AwaFileParserTest extends TestCase
         }
 
         $sectionOffset = $sectionMap[$rank] ?? 0;
-        $data = $this->writeInt32($data, $sectionOffset + 32, $pid);
+        $data = $this->writeAsciiInt($data, $sectionOffset + 32, $pid);
 
         return $data;
     }
@@ -212,13 +244,13 @@ class AwaFileParserTest extends TestCase
      */
     private function buildBlockWithRank2ScoringLeader(int $pid): string
     {
-        $data = str_repeat("\x00", AwaFileParser::BLOCK_SIZE);
+        $data = str_repeat(' ', AwaFileParser::BLOCK_SIZE);
 
         // Make block active
-        $data = $this->writeInt32($data, 32, 1);
+        $data = $this->writeAsciiInt($data, 32, 1);
 
         // Rank 2 scoring PID at offset 166
-        $data = $this->writeInt32($data, 166, $pid);
+        $data = $this->writeAsciiInt($data, 166, $pid);
 
         return $data;
     }
@@ -230,22 +262,22 @@ class AwaFileParserTest extends TestCase
      */
     private function buildBlockWithStatChain(int $rank, array $chainData): string
     {
-        $data = str_repeat("\x00", AwaFileParser::BLOCK_SIZE);
+        $data = str_repeat(' ', AwaFileParser::BLOCK_SIZE);
 
         // Make block active
-        $data = $this->writeInt32($data, 32, $chainData['scoring_pid']);
+        $data = $this->writeAsciiInt($data, 32, $chainData['scoring_pid']);
 
         $sectionMap = [1 => 0, 3 => 268, 4 => 402, 5 => 536];
         $sectionOffset = $sectionMap[$rank] ?? 0;
 
         // Scoring PID
-        $data = $this->writeInt32($data, $sectionOffset + 32, $chainData['scoring_pid']);
+        $data = $this->writeAsciiInt($data, $sectionOffset + 32, $chainData['scoring_pid']);
 
         // Stat chain: entry 0 at section_start + 40
         // stat(4) + PID(4) + blank(2) + team(2)
         $chainBase = $sectionOffset + 40;
-        $data = $this->writeInt32($data, $chainBase, $chainData['scoring_stat']); // scoring stat
-        $data = $this->writeInt32($data, $chainBase + 4, $chainData['reb_pid']); // reb PID
+        $data = $this->writeAsciiInt($data, $chainBase, $chainData['scoring_stat']);
+        $data = $this->writeAsciiInt($data, $chainBase + 4, $chainData['reb_pid']);
 
         return $data;
     }
@@ -255,44 +287,44 @@ class AwaFileParserTest extends TestCase
      */
     private function buildBlockWithFullChain(int $rank, int $scoringPid, int $rebPid, int $astPid, int $stlPid, int $blkPid): string
     {
-        $data = str_repeat("\x00", AwaFileParser::BLOCK_SIZE);
+        $data = str_repeat(' ', AwaFileParser::BLOCK_SIZE);
 
         // Make block active
-        $data = $this->writeInt32($data, 32, $scoringPid);
+        $data = $this->writeAsciiInt($data, 32, $scoringPid);
 
         $sectionMap = [1 => 0, 3 => 268, 4 => 402, 5 => 536];
         $sectionOffset = $sectionMap[$rank] ?? 0;
 
         // Scoring PID
-        $data = $this->writeInt32($data, $sectionOffset + 32, $scoringPid);
+        $data = $this->writeAsciiInt($data, $sectionOffset + 32, $scoringPid);
 
         $chainBase = $sectionOffset + 40;
         // Entry 0: stat(4) + reb_PID(4) + blank(2) + team(2)
-        $data = $this->writeInt32($data, $chainBase, 3500);
-        $data = $this->writeInt32($data, $chainBase + 4, $rebPid);
+        $data = $this->writeAsciiInt($data, $chainBase, 3500);
+        $data = $this->writeAsciiInt($data, $chainBase + 4, $rebPid);
 
         // Entry 1: reb_stat(4) + ast_PID(4) + blank(2) + team(2)
-        $data = $this->writeInt32($data, $chainBase + 12, 1200);
-        $data = $this->writeInt32($data, $chainBase + 16, $astPid);
+        $data = $this->writeAsciiInt($data, $chainBase + 12, 1200);
+        $data = $this->writeAsciiInt($data, $chainBase + 16, $astPid);
 
         // Entry 2: ast_stat(4) + stl_PID(4) + blank(2) + team(2)
-        $data = $this->writeInt32($data, $chainBase + 24, 800);
-        $data = $this->writeInt32($data, $chainBase + 28, $stlPid);
+        $data = $this->writeAsciiInt($data, $chainBase + 24, 800);
+        $data = $this->writeAsciiInt($data, $chainBase + 28, $stlPid);
 
         // Entry 3: stl_stat(4) + blk_PID(4) + blank(2) + team(2)
-        $data = $this->writeInt32($data, $chainBase + 36, 200);
-        $data = $this->writeInt32($data, $chainBase + 40, $blkPid);
+        $data = $this->writeAsciiInt($data, $chainBase + 36, 200);
+        $data = $this->writeAsciiInt($data, $chainBase + 40, $blkPid);
 
         return $data;
     }
 
     /**
-     * Write a 4-byte little-endian integer into binary data.
+     * Write a right-justified, space-padded 4-char ASCII integer into data.
      */
-    private function writeInt32(string $data, int $offset, int $value): string
+    private function writeAsciiInt(string $data, int $offset, int $value): string
     {
-        $packed = pack('V', $value);
-        return substr_replace($data, $packed, $offset, 4);
+        $ascii = str_pad((string) $value, 4, ' ', STR_PAD_LEFT);
+        return substr_replace($data, $ascii, $offset, 4);
     }
 
     /**

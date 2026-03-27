@@ -14,6 +14,7 @@ declare(strict_types=1);
  *   php bulkPlrSnapshotImport.php --dry-run                 # List archives to process
  *   php bulkPlrSnapshotImport.php --season=00-01            # Single season
  *   php bulkPlrSnapshotImport.php --phase=heat-end          # Only HEAT-end snapshots
+ *   php bulkPlrSnapshotImport.php --phase=end-of-season    # Only end-of-season snapshots
  */
 
 // ── CLI-only guard ──────────────────────────────────────────────────────────
@@ -57,7 +58,7 @@ foreach ($argv as $arg) {
     }
     if (str_starts_with($arg, '--phase=')) {
         $phaseFilter = substr($arg, strlen('--phase='));
-        $validPhases = ['end-of-season', 'heat-end', 'preseason'];
+        $validPhases = ['end-of-season', 'heat-end'];
         if (!in_array($phaseFilter, $validPhases, true)) {
             echo "Invalid phase: {$phaseFilter}. Valid phases: " . implode(', ', $validPhases) . "\n";
             exit(1);

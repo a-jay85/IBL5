@@ -552,9 +552,9 @@ class PlrParserRepository extends \BaseMysqliRepository implements PlrParserRepo
             `PFDepth` = VALUES(`PFDepth`),
             `CDepth` = VALUES(`CDepth`)";
 
-        // 51 params: pid(i) name(s) season_year(i) snapshot_phase(s) source_archive(s)
+        // 53 params: pid(i) name(s) season_year(i) snapshot_phase(s) source_archive(s)
         // + tid(i) age(i) pos(s) peak(i) + remaining ints
-        // Total: 51 params — 4 strings (name, snapshot_phase, source_archive, pos) and 47 ints
+        // Total: 53 params — 4 strings (name, snapshot_phase, source_archive, pos) and 49 ints
         $types = 'isis'        // pid, name, season_year, snapshot_phase
             . 's'              // source_archive
             . 'ii'             // tid, age

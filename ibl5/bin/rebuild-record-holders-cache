@@ -51,7 +51,8 @@ if ($newDates !== []) {
 echo "Rebuilding cache...\n";
 
 $innerService = new \RecordHolders\RecordHoldersService($recordHoldersRepository);
-$cachedService = new \RecordHolders\CachedRecordHoldersService($innerService, $mysqli_db);
+$cache = new \Cache\DatabaseCache($mysqli_db);
+$cachedService = new \RecordHolders\CachedRecordHoldersService($innerService, $cache);
 $cachedService->rebuildCache();
 
 echo "Cache rebuilt successfully\n";

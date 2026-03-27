@@ -6,50 +6,50 @@
 CREATE OR REPLACE TABLE fact_player_season AS
 WITH hist_raw AS (
     SELECT
-        CAST(pid AS INTEGER) AS pid,
+        TRY_CAST(pid AS INTEGER) AS pid,
         name,
-        CAST(year AS INTEGER) AS season_year,
+        TRY_CAST(year AS INTEGER) AS season_year,
         team,
-        CAST(teamid AS INTEGER) AS teamid,
-        CAST(games AS INTEGER) AS games,
-        CAST(minutes AS INTEGER) AS minutes,
-        CAST(fgm AS INTEGER) AS fgm,
-        CAST(fga AS INTEGER) AS fga,
-        CAST(ftm AS INTEGER) AS ftm,
-        CAST(fta AS INTEGER) AS fta,
-        CAST(tgm AS INTEGER) AS tgm,
-        CAST(tga AS INTEGER) AS tga,
-        CAST(orb AS INTEGER) AS orb,
-        CAST(reb AS INTEGER) AS reb,
-        CAST(ast AS INTEGER) AS ast,
-        CAST(stl AS INTEGER) AS stl,
-        CAST(blk AS INTEGER) AS blk,
-        CAST(tvr AS INTEGER) AS tvr,
-        CAST(pf AS INTEGER) AS pf,
-        CAST(pts AS INTEGER) AS pts,
-        CAST(r_2ga AS INTEGER) AS r_2ga,
-        CAST(r_2gp AS INTEGER) AS r_2gp,
-        CAST(r_fta AS INTEGER) AS r_fta,
-        CAST(r_ftp AS INTEGER) AS r_ftp,
-        CAST(r_3ga AS INTEGER) AS r_3ga,
-        CAST(r_3gp AS INTEGER) AS r_3gp,
-        CAST(r_orb AS INTEGER) AS r_orb,
-        CAST(r_drb AS INTEGER) AS r_drb,
-        CAST(r_ast AS INTEGER) AS r_ast,
-        CAST(r_stl AS INTEGER) AS r_stl,
-        CAST(r_blk AS INTEGER) AS r_blk,
-        CAST(r_tvr AS INTEGER) AS r_tvr,
-        CAST(r_oo AS INTEGER)  AS r_oo,
-        CAST(r_do AS INTEGER)  AS r_do,
-        CAST(r_po AS INTEGER)  AS r_po,
-        CAST(r_to AS INTEGER)  AS r_to,
-        CAST(r_od AS INTEGER)  AS r_od,
-        CAST(r_dd AS INTEGER)  AS r_dd,
-        CAST(r_pd AS INTEGER)  AS r_pd,
-        CAST(r_td AS INTEGER)  AS r_td,
-        CAST(salary AS INTEGER) AS salary
+        TRY_CAST(teamid AS INTEGER) AS teamid,
+        TRY_CAST(games AS INTEGER) AS games,
+        TRY_CAST(minutes AS INTEGER) AS minutes,
+        TRY_CAST(fgm AS INTEGER) AS fgm,
+        TRY_CAST(fga AS INTEGER) AS fga,
+        TRY_CAST(ftm AS INTEGER) AS ftm,
+        TRY_CAST(fta AS INTEGER) AS fta,
+        TRY_CAST(tgm AS INTEGER) AS tgm,
+        TRY_CAST(tga AS INTEGER) AS tga,
+        TRY_CAST(orb AS INTEGER) AS orb,
+        TRY_CAST(reb AS INTEGER) AS reb,
+        TRY_CAST(ast AS INTEGER) AS ast,
+        TRY_CAST(stl AS INTEGER) AS stl,
+        TRY_CAST(blk AS INTEGER) AS blk,
+        TRY_CAST(tvr AS INTEGER) AS tvr,
+        TRY_CAST(pf AS INTEGER) AS pf,
+        TRY_CAST(pts AS INTEGER) AS pts,
+        TRY_CAST(r_2ga AS INTEGER) AS r_2ga,
+        TRY_CAST(r_2gp AS INTEGER) AS r_2gp,
+        TRY_CAST(r_fta AS INTEGER) AS r_fta,
+        TRY_CAST(r_ftp AS INTEGER) AS r_ftp,
+        TRY_CAST(r_3ga AS INTEGER) AS r_3ga,
+        TRY_CAST(r_3gp AS INTEGER) AS r_3gp,
+        TRY_CAST(r_orb AS INTEGER) AS r_orb,
+        TRY_CAST(r_drb AS INTEGER) AS r_drb,
+        TRY_CAST(r_ast AS INTEGER) AS r_ast,
+        TRY_CAST(r_stl AS INTEGER) AS r_stl,
+        TRY_CAST(r_blk AS INTEGER) AS r_blk,
+        TRY_CAST(r_tvr AS INTEGER) AS r_tvr,
+        TRY_CAST(r_oo AS INTEGER)  AS r_oo,
+        TRY_CAST(r_do AS INTEGER)  AS r_do,
+        TRY_CAST(r_po AS INTEGER)  AS r_po,
+        TRY_CAST(r_to AS INTEGER)  AS r_to,
+        TRY_CAST(r_od AS INTEGER)  AS r_od,
+        TRY_CAST(r_dd AS INTEGER)  AS r_dd,
+        TRY_CAST(r_pd AS INTEGER)  AS r_pd,
+        TRY_CAST(r_td AS INTEGER)  AS r_td,
+        TRY_CAST(salary AS INTEGER) AS salary
     FROM read_csv('data/ibl_hist.csv', delim='\t', header=true, all_varchar=true,
-        null_padding=true, ignore_errors=true)
+        null_padding=true, ignore_errors=true, strict_mode=false, quote='')
 )
 SELECT
     h.*,
@@ -89,144 +89,144 @@ LEFT JOIN dim_player_snapshot s ON h.pid = s.pid AND h.season_year = s.season_ye
 -- fact_player_game: Game-level player box scores
 CREATE OR REPLACE TABLE fact_player_game AS
 SELECT
-    CAST(id AS INTEGER) AS id,
-    CAST(Date AS DATE) AS game_date,
-    CAST(pid AS INTEGER) AS pid,
+    TRY_CAST(id AS INTEGER) AS id,
+    TRY_CAST(Date AS DATE) AS game_date,
+    TRY_CAST(pid AS INTEGER) AS pid,
     name,
     pos,
-    CAST(teamID AS INTEGER) AS team_id,
-    CAST(visitorTID AS INTEGER) AS visitor_tid,
-    CAST(homeTID AS INTEGER) AS home_tid,
-    CAST(gameMIN AS INTEGER) AS minutes,
-    CAST(game2GM AS INTEGER) AS fg2_made,
-    CAST(game2GA AS INTEGER) AS fg2_att,
-    CAST(gameFTM AS INTEGER) AS ft_made,
-    CAST(gameFTA AS INTEGER) AS ft_att,
-    CAST(game3GM AS INTEGER) AS fg3_made,
-    CAST(game3GA AS INTEGER) AS fg3_att,
-    CAST(gameORB AS INTEGER) AS orb,
-    CAST(gameDRB AS INTEGER) AS drb,
-    CAST(gameAST AS INTEGER) AS ast,
-    CAST(gameSTL AS INTEGER) AS stl,
-    CAST(gameTOV AS INTEGER) AS tov,
-    CAST(gameBLK AS INTEGER) AS blk,
-    CAST(gamePF AS INTEGER)  AS pf,
-    CAST(game_type AS INTEGER) AS game_type,
-    CAST(season_year AS INTEGER) AS season_year,
-    CAST(calc_points AS INTEGER) AS points,
-    CAST(calc_rebounds AS INTEGER) AS rebounds,
-    CAST(attendance AS INTEGER) AS attendance,
+    TRY_CAST(teamID AS INTEGER) AS team_id,
+    TRY_CAST(visitorTID AS INTEGER) AS visitor_tid,
+    TRY_CAST(homeTID AS INTEGER) AS home_tid,
+    TRY_CAST(gameMIN AS INTEGER) AS minutes,
+    TRY_CAST(game2GM AS INTEGER) AS fg2_made,
+    TRY_CAST(game2GA AS INTEGER) AS fg2_att,
+    TRY_CAST(gameFTM AS INTEGER) AS ft_made,
+    TRY_CAST(gameFTA AS INTEGER) AS ft_att,
+    TRY_CAST(game3GM AS INTEGER) AS fg3_made,
+    TRY_CAST(game3GA AS INTEGER) AS fg3_att,
+    TRY_CAST(gameORB AS INTEGER) AS orb,
+    TRY_CAST(gameDRB AS INTEGER) AS drb,
+    TRY_CAST(gameAST AS INTEGER) AS ast,
+    TRY_CAST(gameSTL AS INTEGER) AS stl,
+    TRY_CAST(gameTOV AS INTEGER) AS tov,
+    TRY_CAST(gameBLK AS INTEGER) AS blk,
+    TRY_CAST(gamePF AS INTEGER)  AS pf,
+    TRY_CAST(game_type AS INTEGER) AS game_type,
+    TRY_CAST(season_year AS INTEGER) AS season_year,
+    TRY_CAST(calc_points AS INTEGER) AS points,
+    TRY_CAST(calc_rebounds AS INTEGER) AS rebounds,
+    TRY_CAST(attendance AS INTEGER) AS attendance,
     -- Game type label
-    CASE CAST(game_type AS INTEGER)
+    CASE TRY_CAST(game_type AS INTEGER)
         WHEN 1 THEN 'regular'
         WHEN 2 THEN 'playoffs'
         WHEN 3 THEN 'preseason'
         ELSE 'other'
     END AS game_type_label
 FROM read_csv('data/ibl_box_scores.csv', delim='\t', header=true, all_varchar=true,
-    null_padding=true, ignore_errors=true);
+    null_padding=true, ignore_errors=true, strict_mode=false, quote='');
 
 -- fact_team_season: Team season records from JSB history
 CREATE OR REPLACE TABLE fact_team_season AS
 SELECT
-    CAST(id AS INTEGER) AS id,
-    CAST(season_year AS INTEGER) AS season_year,
+    TRY_CAST(id AS INTEGER) AS id,
+    TRY_CAST(season_year AS INTEGER) AS season_year,
     team_name,
-    CAST(teamid AS INTEGER) AS teamid,
-    CAST(wins AS INTEGER) AS wins,
-    CAST(losses AS INTEGER) AS losses,
-    CASE WHEN (CAST(wins AS INTEGER) + CAST(losses AS INTEGER)) > 0
-        THEN ROUND(CAST(wins AS INTEGER) * 1.0 / (CAST(wins AS INTEGER) + CAST(losses AS INTEGER)), 3)
+    TRY_CAST(teamid AS INTEGER) AS teamid,
+    TRY_CAST(wins AS INTEGER) AS wins,
+    TRY_CAST(losses AS INTEGER) AS losses,
+    CASE WHEN (TRY_CAST(wins AS INTEGER) + TRY_CAST(losses AS INTEGER)) > 0
+        THEN ROUND(TRY_CAST(wins AS INTEGER) * 1.0 / (TRY_CAST(wins AS INTEGER) + TRY_CAST(losses AS INTEGER)), 3)
     END AS win_pct,
-    CAST(made_playoffs AS INTEGER) AS made_playoffs,
+    TRY_CAST(made_playoffs AS INTEGER) AS made_playoffs,
     playoff_result,
     playoff_round_reached,
-    CAST(won_championship AS INTEGER) AS won_championship
+    TRY_CAST(won_championship AS INTEGER) AS won_championship
 FROM read_csv('data/ibl_jsb_history.csv', delim='\t', header=true, all_varchar=true,
-    null_padding=true, ignore_errors=true);
+    null_padding=true, ignore_errors=true, strict_mode=false, quote='');
 
 -- fact_team_game: Team-level game box scores
 CREATE OR REPLACE TABLE fact_team_game AS
 SELECT
-    CAST(id AS INTEGER) AS id,
-    CAST(Date AS DATE) AS game_date,
-    CAST(visitorTeamID AS INTEGER) AS visitor_tid,
-    CAST(homeTeamID AS INTEGER) AS home_tid,
-    CAST(game_type AS INTEGER) AS game_type,
-    CAST(season_year AS INTEGER) AS season_year,
-    CAST(attendance AS INTEGER) AS attendance,
-    CAST(capacity AS INTEGER) AS capacity,
+    TRY_CAST(id AS INTEGER) AS id,
+    TRY_CAST(Date AS DATE) AS game_date,
+    TRY_CAST(visitorTeamID AS INTEGER) AS visitor_tid,
+    TRY_CAST(homeTeamID AS INTEGER) AS home_tid,
+    TRY_CAST(game_type AS INTEGER) AS game_type,
+    TRY_CAST(season_year AS INTEGER) AS season_year,
+    TRY_CAST(attendance AS INTEGER) AS attendance,
+    TRY_CAST(capacity AS INTEGER) AS capacity,
     -- Quarter scores
-    CAST(visitorQ1points AS INTEGER) AS visitor_q1,
-    CAST(visitorQ2points AS INTEGER) AS visitor_q2,
-    CAST(visitorQ3points AS INTEGER) AS visitor_q3,
-    CAST(visitorQ4points AS INTEGER) AS visitor_q4,
-    CAST(visitorOTpoints AS INTEGER) AS visitor_ot,
-    CAST(homeQ1points AS INTEGER) AS home_q1,
-    CAST(homeQ2points AS INTEGER) AS home_q2,
-    CAST(homeQ3points AS INTEGER) AS home_q3,
-    CAST(homeQ4points AS INTEGER) AS home_q4,
-    CAST(homeOTpoints AS INTEGER) AS home_ot,
+    TRY_CAST(visitorQ1points AS INTEGER) AS visitor_q1,
+    TRY_CAST(visitorQ2points AS INTEGER) AS visitor_q2,
+    TRY_CAST(visitorQ3points AS INTEGER) AS visitor_q3,
+    TRY_CAST(visitorQ4points AS INTEGER) AS visitor_q4,
+    TRY_CAST(visitorOTpoints AS INTEGER) AS visitor_ot,
+    TRY_CAST(homeQ1points AS INTEGER) AS home_q1,
+    TRY_CAST(homeQ2points AS INTEGER) AS home_q2,
+    TRY_CAST(homeQ3points AS INTEGER) AS home_q3,
+    TRY_CAST(homeQ4points AS INTEGER) AS home_q4,
+    TRY_CAST(homeOTpoints AS INTEGER) AS home_ot,
     -- Totals
-    CAST(calc_points AS INTEGER) AS total_points,
-    CAST(calc_rebounds AS INTEGER) AS total_rebounds
+    TRY_CAST(calc_points AS INTEGER) AS total_points,
+    TRY_CAST(calc_rebounds AS INTEGER) AS total_rebounds
 FROM read_csv('data/ibl_box_scores_teams.csv', delim='\t', header=true, all_varchar=true,
-    null_padding=true, ignore_errors=true);
+    null_padding=true, ignore_errors=true, strict_mode=false, quote='');
 
 -- Awards tables
 CREATE OR REPLACE TABLE fact_player_awards AS
 SELECT
-    CAST(year AS INTEGER) AS season_year,
+    TRY_CAST(year AS INTEGER) AS season_year,
     Award AS award,
     name AS player_name
 FROM read_csv('data/ibl_awards.csv', delim='\t', header=true, all_varchar=true,
-    null_padding=true, ignore_errors=true);
+    null_padding=true, ignore_errors=true, strict_mode=false, quote='');
 
 CREATE OR REPLACE TABLE fact_team_awards AS
 SELECT
-    CAST(year AS INTEGER) AS season_year,
+    TRY_CAST(year AS INTEGER) AS season_year,
     name AS team_name,
     Award AS award
 FROM read_csv('data/ibl_team_awards.csv', delim='\t', header=true, all_varchar=true,
-    null_padding=true, ignore_errors=true);
+    null_padding=true, ignore_errors=true, strict_mode=false, quote='');
 
 -- Transactions
 CREATE OR REPLACE TABLE fact_transactions AS
 SELECT
-    CAST(id AS INTEGER) AS id,
-    CAST(season_year AS INTEGER) AS season_year,
-    CAST(transaction_month AS INTEGER) AS transaction_month,
-    CAST(transaction_day AS INTEGER) AS transaction_day,
-    CAST(transaction_type AS INTEGER) AS transaction_type,
-    CASE CAST(transaction_type AS INTEGER)
+    TRY_CAST(id AS INTEGER) AS id,
+    TRY_CAST(season_year AS INTEGER) AS season_year,
+    TRY_CAST(transaction_month AS INTEGER) AS transaction_month,
+    TRY_CAST(transaction_day AS INTEGER) AS transaction_day,
+    TRY_CAST(transaction_type AS INTEGER) AS transaction_type,
+    CASE TRY_CAST(transaction_type AS INTEGER)
         WHEN 1 THEN 'injury'
         WHEN 2 THEN 'trade'
         WHEN 3 THEN 'waiver_claim'
         WHEN 4 THEN 'waiver_release'
         ELSE 'unknown'
     END AS transaction_label,
-    CAST(pid AS INTEGER) AS pid,
+    TRY_CAST(pid AS INTEGER) AS pid,
     player_name,
-    CAST(from_teamid AS INTEGER) AS from_teamid,
-    CAST(to_teamid AS INTEGER) AS to_teamid,
-    CAST(injury_games_missed AS INTEGER) AS injury_games_missed,
+    TRY_CAST(from_teamid AS INTEGER) AS from_teamid,
+    TRY_CAST(to_teamid AS INTEGER) AS to_teamid,
+    TRY_CAST(injury_games_missed AS INTEGER) AS injury_games_missed,
     injury_description,
-    CAST(trade_group_id AS INTEGER) AS trade_group_id,
-    CAST(is_draft_pick AS INTEGER) AS is_draft_pick,
-    CAST(draft_pick_year AS INTEGER) AS draft_pick_year
+    TRY_CAST(trade_group_id AS INTEGER) AS trade_group_id,
+    TRY_CAST(is_draft_pick AS INTEGER) AS is_draft_pick,
+    TRY_CAST(draft_pick_year AS INTEGER) AS draft_pick_year
 FROM read_csv('data/ibl_jsb_transactions.csv', delim='\t', header=true, all_varchar=true,
-    null_padding=true, ignore_errors=true);
+    null_padding=true, ignore_errors=true, strict_mode=false, quote='');
 
 -- All-Star rosters
 CREATE OR REPLACE TABLE fact_allstar_rosters AS
 SELECT
-    CAST(season_year AS INTEGER) AS season_year,
+    TRY_CAST(season_year AS INTEGER) AS season_year,
     event_type,
-    CAST(roster_slot AS INTEGER) AS roster_slot,
-    CAST(pid AS INTEGER) AS pid,
+    TRY_CAST(roster_slot AS INTEGER) AS roster_slot,
+    TRY_CAST(pid AS INTEGER) AS pid,
     player_name
 FROM read_csv('data/ibl_jsb_allstar_rosters.csv', delim='\t', header=true, all_varchar=true,
-    null_padding=true, ignore_errors=true);
+    null_padding=true, ignore_errors=true, strict_mode=false, quote='');
 
 -- Summary
 SELECT 'fact_player_season' AS table_name, COUNT(*) AS row_count FROM fact_player_season

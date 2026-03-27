@@ -112,12 +112,11 @@ CREATE OR REPLACE TABLE agg_draft_cohort AS
 WITH player_first_season AS (
     SELECT
         pid,
-        MIN(season_year) AS first_season_year,
+        first_season AS first_season_year,
         career_ppg,
         career_seasons,
         tsi_sum
     FROM agg_player_career
-    GROUP BY pid, career_ppg, career_seasons, tsi_sum
 )
 SELECT
     first_season_year,

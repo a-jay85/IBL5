@@ -2,9 +2,10 @@
 # Full rebuild of the DuckDB analytics database.
 # Idempotent: deletes and recreates from scratch every time.
 #
-# Usage: bin/analytics-build [--writeback] [--skip-export]
+# Usage: bin/analytics-build [--writeback] [--skip-export] [--local]
 #   --writeback    After building, export writeback CSVs and import to MariaDB
 #   --skip-export  Skip the MariaDB → CSV export step (use existing CSVs)
+#   --local        Force local Docker connection (ignore REMOTE_* in .env)
 
 set -euo pipefail
 
@@ -16,11 +17,13 @@ DUCKDB="$ANALYTICS_DIR/duckdb"
 
 WRITEBACK=false
 SKIP_EXPORT=false
+FORCE_LOCAL=false
 
 for arg in "$@"; do
     case "$arg" in
         --writeback)   WRITEBACK=true ;;
         --skip-export) SKIP_EXPORT=true ;;
+        --local)       FORCE_LOCAL=true ;;
         *)             echo "Unknown argument: $arg" >&2; exit 1 ;;
     esac
 done
@@ -37,7 +40,12 @@ START_TIME=$(date +%s)
 # Step 1: Export MariaDB → CSV
 if [ "$SKIP_EXPORT" = false ]; then
     echo "=== Step 1: Exporting MariaDB → CSV ==="
-    "$REPO_ROOT/bin/analytics-export"
+    EXPORT_ARGS=""
+    if [ "$FORCE_LOCAL" = true ]; then
+        EXPORT_ARGS="--local"
+    fi
+    # shellcheck disable=SC2086
+    "$REPO_ROOT/bin/analytics-export" $EXPORT_ARGS
 else
     echo "=== Step 1: Skipping export (using existing CSVs) ==="
 fi
@@ -79,7 +87,7 @@ echo ""
 
 # Print table row counts
 "$DUCKDB" "$DB_FILE" -c "
-SELECT table_name, estimated_row_count
+SELECT table_name, estimated_size
 FROM duckdb_tables()
 WHERE schema_name = 'main'
 ORDER BY table_name;

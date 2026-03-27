@@ -12,20 +12,20 @@ SELECT '    Controlled for starting FGP 40-55' AS '';
 -- Development phase: far from peak (age_relative_to_peak <= -3)
 -- Controlled for starting FGP range 40-55
 SELECT
-    tsi_band,
-    ROUND(AVG(delta_r_2gp), 2) AS "Δ FGP/yr",
-    ROUND(AVG(delta_r_ftp), 2) AS "Δ FTP/yr",
-    ROUND(AVG(delta_r_ast), 2) AS "Δ AST/yr",
-    ROUND(AVG(delta_r_stl), 2) AS "Δ STL/yr",
+    p.tsi_band,
+    ROUND(AVG(p.delta_r_2gp), 2) AS "Δ FGP/yr",
+    ROUND(AVG(p.delta_r_ftp), 2) AS "Δ FTP/yr",
+    ROUND(AVG(p.delta_r_ast), 2) AS "Δ AST/yr",
+    ROUND(AVG(p.delta_r_stl), 2) AS "Δ STL/yr",
     COUNT(*) AS n
 FROM agg_tsi_progression p
 JOIN fact_player_season prev
     ON p.pid = prev.pid AND prev.season_year = p.season_year - 1
 WHERE p.development_phase = 'far_from_peak'
     AND prev.r_2gp BETWEEN 40 AND 55
-GROUP BY tsi_band
+GROUP BY p.tsi_band
 ORDER BY
-    CASE tsi_band WHEN 'low' THEN 1 WHEN 'mid' THEN 2 WHEN 'high' THEN 3 WHEN 'elite' THEN 4 END;
+    CASE p.tsi_band WHEN 'low' THEN 1 WHEN 'mid' THEN 2 WHEN 'high' THEN 3 WHEN 'elite' THEN 4 END;
 
 SELECT '' AS '';
 SELECT '=== TSI Progression: Near Peak (±2 years) ===' AS '';
@@ -33,18 +33,18 @@ SELECT '    Controlled for starting FGP 40-55' AS '';
 
 -- Near peak (age_relative_to_peak between -2 and 2)
 SELECT
-    tsi_band,
-    ROUND(AVG(delta_r_2gp), 2) AS "Δ FGP/yr",
-    ROUND(AVG(delta_r_ftp), 2) AS "Δ FTP/yr",
+    p.tsi_band,
+    ROUND(AVG(p.delta_r_2gp), 2) AS "Δ FGP/yr",
+    ROUND(AVG(p.delta_r_ftp), 2) AS "Δ FTP/yr",
     COUNT(*) AS n
 FROM agg_tsi_progression p
 JOIN fact_player_season prev
     ON p.pid = prev.pid AND prev.season_year = p.season_year - 1
 WHERE p.development_phase = 'near_peak'
     AND prev.r_2gp BETWEEN 40 AND 55
-GROUP BY tsi_band
+GROUP BY p.tsi_band
 ORDER BY
-    CASE tsi_band WHEN 'low' THEN 1 WHEN 'mid' THEN 2 WHEN 'high' THEN 3 WHEN 'elite' THEN 4 END;
+    CASE p.tsi_band WHEN 'low' THEN 1 WHEN 'mid' THEN 2 WHEN 'high' THEN 3 WHEN 'elite' THEN 4 END;
 
 SELECT '' AS '';
 SELECT '=== TSI Progression: Post Peak ===' AS '';

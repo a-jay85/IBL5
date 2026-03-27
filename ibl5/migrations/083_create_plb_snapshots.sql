@@ -1,0 +1,20 @@
+CREATE TABLE IF NOT EXISTS `ibl_plb_snapshots` (
+    `id`              INT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    `season_year`     SMALLINT UNSIGNED NOT NULL,
+    `sim_number`      SMALLINT UNSIGNED NOT NULL COMMENT 'Archive seq number (01-36)',
+    `source_archive`  VARCHAR(64) NOT NULL COMMENT 'Archive basename without extension',
+    `tid`             TINYINT UNSIGNED NOT NULL,
+    `slot_index`      TINYINT UNSIGNED NOT NULL COMMENT '0-indexed slot within team (0-29)',
+    `pid`             INT DEFAULT NULL COMMENT 'Resolved from HEAT-end .plr ordinal map',
+    `player_name`     VARCHAR(32) DEFAULT NULL,
+    `dc_minutes`      TINYINT UNSIGNED NOT NULL DEFAULT 0,
+    `dc_of`           TINYINT UNSIGNED NOT NULL DEFAULT 0 COMMENT 'Offensive formation',
+    `dc_df`           TINYINT UNSIGNED NOT NULL DEFAULT 0 COMMENT 'Defensive formation',
+    `dc_oi`           TINYINT NOT NULL DEFAULT 0 COMMENT 'Offensive instruction (signed)',
+    `dc_di`           TINYINT NOT NULL DEFAULT 0 COMMENT 'Defensive instruction (signed)',
+    `dc_bh`           TINYINT NOT NULL DEFAULT 0 COMMENT 'Ball handling (signed)',
+    `created_at`      TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE KEY `uq_archive_team_slot` (`source_archive`, `tid`, `slot_index`),
+    INDEX `idx_season_tid` (`season_year`, `tid`),
+    INDEX `idx_pid` (`pid`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

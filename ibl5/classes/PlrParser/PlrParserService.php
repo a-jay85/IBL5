@@ -276,9 +276,10 @@ class PlrParserService implements PlrParserServiceInterface
      *
      * @param array<string, int|string> $raw Raw parsed fields
      * @param float $maxFoulRatio Max foul ratio from pass 1
+     * @param int|null $endingYear Override season ending year (for bulk imports without Season dependency)
      * @return array<string, int|string|float> Complete data with derived fields
      */
-    public function computeDerivedFields(array $raw, float $maxFoulRatio): array
+    public function computeDerivedFields(array $raw, float $maxFoulRatio, ?int $endingYear = null): array
     {
         $season2GM = (int) $raw['season2GM'];
         $season3GM = (int) $raw['season3GM'];
@@ -329,7 +330,7 @@ class PlrParserService implements PlrParserServiceInterface
         $heightIN = $heightInches % 12;
 
         // Draft year
-        $draftYear = $this->season->endingYear - $exp;
+        $draftYear = ($endingYear ?? $this->season->endingYear) - $exp;
 
         // Foul rating
         $personalFoulsPerMinute = ($realLifePF > 0 && $realLifeMIN > 0)
@@ -362,17 +363,164 @@ class PlrParserService implements PlrParserServiceInterface
     }
 
     /**
+     * @see PlrParserServiceInterface::processPlrFileForYear()
+     */
+    public function processPlrFileForYear(
+        string $filePath,
+        int $endingYear,
+        PlrImportMode $mode,
+        ?string $snapshotPhase = null,
+        ?string $sourceArchive = null,
+    ): PlrParseResult {
+        $result = new PlrParseResult();
+
+        $maxFoulRatio = $this->calculateFoulBaseline($filePath);
+        $result->addMessage('Foul baseline calculated (max ratio: ' . \BasketballStats\StatsFormatter::formatWithDecimals($maxFoulRatio, 6) . ')');
+
+        $handle = fopen($filePath, 'rb');
+        if ($handle === false) {
+            $result->addMessage('ERROR: Could not open PLR file');
+            return $result;
+        }
+
+        while (!feof($handle)) {
+            $line = fgets($handle);
+            if ($line === false) {
+                break;
+            }
+
+            $parsed = $this->parsePlrLine($line);
+            if ($parsed === null) {
+                continue;
+            }
+
+            $derived = $this->computeDerivedFields($parsed, $maxFoulRatio, $endingYear);
+
+            match ($mode) {
+                PlrImportMode::Live => $this->processLivePlayer($derived, $result, $endingYear),
+                PlrImportMode::Snapshot => $this->processSnapshotPlayer($derived, $result, $endingYear, $snapshotPhase ?? '', $sourceArchive ?? ''),
+            };
+        }
+
+        fclose($handle);
+
+        return $result;
+    }
+
+    /**
+     * Process a player in Live mode: upsert into ibl_plr and ibl_hist.
+     *
+     * @param array<string, int|string|float> $derived
+     */
+    private function processLivePlayer(array $derived, PlrParseResult $result, int $endingYear): void
+    {
+        $this->repository->upsertPlayer($derived);
+        $result->playersUpserted++;
+
+        $histData = $this->buildHistoricalData($derived, $endingYear);
+        $this->repository->upsertHistoricalStats($histData);
+        $result->historyRowsUpserted++;
+    }
+
+    /**
+     * Process a player in Snapshot mode: upsert into ibl_plr_snapshots.
+     *
+     * @param array<string, int|string|float> $derived
+     */
+    private function processSnapshotPlayer(
+        array $derived,
+        PlrParseResult $result,
+        int $endingYear,
+        string $snapshotPhase,
+        string $sourceArchive,
+    ): void {
+        $snapshotData = $this->buildSnapshotData($derived, $endingYear, $snapshotPhase, $sourceArchive);
+        $this->repository->upsertSnapshot($snapshotData);
+        $result->playersUpserted++;
+    }
+
+    /**
+     * Build snapshot data record for ibl_plr_snapshots upsert.
+     *
+     * @param array<string, int|string|float> $derived Data with derived fields
+     * @return array<string, int|string> Snapshot record
+     */
+    private function buildSnapshotData(
+        array $derived,
+        int $endingYear,
+        string $snapshotPhase,
+        string $sourceArchive,
+    ): array {
+        return [
+            'pid' => (int) $derived['pid'],
+            'name' => (string) $derived['name'],
+            'season_year' => $endingYear,
+            'snapshot_phase' => $snapshotPhase,
+            'source_archive' => $sourceArchive,
+            'tid' => (int) $derived['tid'],
+            'age' => (int) $derived['age'],
+            'pos' => (string) $derived['pos'],
+            'peak' => (int) $derived['peak'],
+            'htft' => (int) $derived['heightFT'],
+            'htin' => (int) $derived['heightIN'],
+            'wt' => (int) $derived['weight'],
+            'oo' => (int) $derived['ratingOO'],
+            'od' => (int) $derived['ratingOD'],
+            'do' => (int) $derived['ratingDO'],
+            'dd' => (int) $derived['ratingDD'],
+            'po' => (int) $derived['ratingPO'],
+            'pd' => (int) $derived['ratingPD'],
+            'to' => (int) $derived['ratingTO'],
+            'td' => (int) $derived['ratingTD'],
+            'r_fga' => (int) $derived['rating2GA'],
+            'r_fgp' => (int) $derived['rating2GP'],
+            'r_fta' => (int) $derived['ratingFTA'],
+            'r_ftp' => (int) $derived['ratingFTP'],
+            'r_tga' => (int) $derived['rating3GA'],
+            'r_tgp' => (int) $derived['rating3GP'],
+            'r_orb' => (int) $derived['ratingORB'],
+            'r_drb' => (int) $derived['ratingDRB'],
+            'r_ast' => (int) $derived['ratingAST'],
+            'r_stl' => (int) $derived['ratingSTL'],
+            'r_to' => (int) $derived['ratingTVR'],
+            'r_blk' => (int) $derived['ratingBLK'],
+            'r_foul' => (int) $derived['ratingFOUL'],
+            'talent' => (int) $derived['talent'],
+            'skill' => (int) $derived['skill'],
+            'intangibles' => (int) $derived['intangibles'],
+            'clutch' => (int) $derived['clutch'],
+            'consistency' => (int) $derived['consistency'],
+            'exp' => (int) $derived['exp'],
+            'bird' => (int) $derived['bird'],
+            'cy' => (int) $derived['currentContractYear'],
+            'cyt' => (int) $derived['totalContractYears'],
+            'cy1' => (int) $derived['contractYear1'],
+            'cy2' => (int) $derived['contractYear2'],
+            'cy3' => (int) $derived['contractYear3'],
+            'cy4' => (int) $derived['contractYear4'],
+            'cy5' => (int) $derived['contractYear5'],
+            'cy6' => (int) $derived['contractYear6'],
+            'PGDepth' => (int) $derived['PGDepth'],
+            'SGDepth' => (int) $derived['SGDepth'],
+            'SFDepth' => (int) $derived['SFDepth'],
+            'PFDepth' => (int) $derived['PFDepth'],
+            'CDepth' => (int) $derived['CDepth'],
+        ];
+    }
+
+    /**
      * Build historical data record for ibl_hist upsert.
      *
      * @param array<string, int|string|float> $derived Data with derived fields
+     * @param int|null $endingYear Override season ending year
      * @return array<string, int|string|float> Historical stats record
      */
-    private function buildHistoricalData(array $derived): array
+    private function buildHistoricalData(array $derived, ?int $endingYear = null): array
     {
         return [
             'pid' => (int) $derived['pid'],
             'name' => (string) $derived['name'],
-            'year' => $this->season->endingYear,
+            'year' => $endingYear ?? $this->season->endingYear,
             'team' => (string) $derived['teamName'],
             'tid' => (int) $derived['tid'],
             'seasonGamesPlayed' => (int) $derived['seasonGamesPlayed'],

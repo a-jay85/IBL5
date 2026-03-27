@@ -25,4 +25,11 @@ interface PlrParserRepositoryInterface
      */
     public function upsertHistoricalStats(array $data): int;
 
+    /**
+     * Upsert a player rating snapshot into ibl_plr_snapshots.
+     *
+     * @param array<string, int|string> $data Column-value pairs for the snapshot
+     * @return int Number of affected rows
+     */
+    public function upsertSnapshot(array $data): int;
 }

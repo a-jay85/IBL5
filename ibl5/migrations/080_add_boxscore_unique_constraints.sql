@@ -15,11 +15,27 @@ DELETE b1 FROM ibl_box_scores_teams b1
      AND b1.name = b2.name
      AND b1.id < b2.id;
 
--- Add natural unique key for player box scores
+-- Add natural unique key for player box scores (idempotent)
 -- Includes teamID to handle All-Star games where a player can appear for both teams
-ALTER TABLE ibl_box_scores
-  ADD UNIQUE KEY uq_game_player (Date, pid, visitorTID, homeTID, gameOfThatDay, teamID);
+SET @exists = (SELECT COUNT(*) FROM information_schema.STATISTICS
+               WHERE TABLE_SCHEMA = DATABASE()
+                 AND TABLE_NAME = 'ibl_box_scores'
+                 AND INDEX_NAME = 'uq_game_player');
+SET @sql = IF(@exists = 0,
+              'ALTER TABLE ibl_box_scores ADD UNIQUE KEY uq_game_player (Date, pid, visitorTID, homeTID, gameOfThatDay, teamID)',
+              'SELECT 1');
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
 
--- Add natural unique key for team box scores
-ALTER TABLE ibl_box_scores_teams
-  ADD UNIQUE KEY uq_game_team (Date, visitorTeamID, homeTeamID, gameOfThatDay, name);
+-- Add natural unique key for team box scores (idempotent)
+SET @exists = (SELECT COUNT(*) FROM information_schema.STATISTICS
+               WHERE TABLE_SCHEMA = DATABASE()
+                 AND TABLE_NAME = 'ibl_box_scores_teams'
+                 AND INDEX_NAME = 'uq_game_team');
+SET @sql = IF(@exists = 0,
+              'ALTER TABLE ibl_box_scores_teams ADD UNIQUE KEY uq_game_team (Date, visitorTeamID, homeTeamID, gameOfThatDay, name)',
+              'SELECT 1');
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;

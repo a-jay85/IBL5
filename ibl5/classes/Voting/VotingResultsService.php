@@ -78,4 +78,20 @@ class VotingResultsService implements VotingResultsServiceInterface
 
         return $results;
     }
+
+    /**
+     * Extract the player name from a vote entry like "LeBron James, Sting".
+     *
+     * Strips the trailing ", TeamName" portion. If there is no comma, returns
+     * the full string (handles GM names and other non-player entries).
+     */
+    public static function extractPlayerName(string $voteName): string
+    {
+        $lastComma = strrpos($voteName, ',');
+        if ($lastComma === false) {
+            return trim($voteName);
+        }
+
+        return trim(substr($voteName, 0, $lastComma));
+    }
 }

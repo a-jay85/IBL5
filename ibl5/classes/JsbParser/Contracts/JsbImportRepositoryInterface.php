@@ -52,6 +52,16 @@ interface JsbImportRepositoryInterface
     public function upsertAllStarScore(array $record): int;
 
     /**
+     * Upsert an award row into ibl_awards from bulk import.
+     *
+     * @param int $year Season ending year
+     * @param string $award Award name (e.g., "Scoring Leader (1st)")
+     * @param string $name Player name
+     * @return int Affected rows (1=inserted, 2=updated, 0=unchanged)
+     */
+    public function upsertAward(int $year, string $award, string $name): int;
+
+    /**
      * Resolve a JSB team ID to a database teamid.
      *
      * @param int $jsbTeamId JSB engine team ID (0-28)

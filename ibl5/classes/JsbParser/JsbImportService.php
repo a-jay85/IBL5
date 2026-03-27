@@ -315,6 +315,71 @@ class JsbImportService implements JsbImportServiceInterface
         return $result;
     }
 
+    /** @var list<string> Rank suffixes for award names */
+    private const RANK_SUFFIXES = ['(1st)', '(2nd)', '(3rd)', '(4th)', '(5th)'];
+
+    /**
+     * @see JsbImportServiceInterface::processAwaFile()
+     */
+    public function processAwaFile(string $awaPath, string $carPath, ?int $filterYear = null): JsbImportResult
+    {
+        $result = new JsbImportResult();
+
+        try {
+            $awaParsed = AwaFileParser::parseFile($awaPath);
+        } catch (\RuntimeException $e) {
+            $result->addError('AWA parse failed: ' . $e->getMessage());
+            return $result;
+        }
+
+        // Build PID → name map from .car file
+        try {
+            $carParsed = CarFileParser::parseFile($carPath);
+        } catch (\RuntimeException $e) {
+            $result->addError('CAR parse failed (for AWA name resolution): ' . $e->getMessage());
+            return $result;
+        }
+
+        /** @var array<int, string> $pidNameMap */
+        $pidNameMap = [];
+        foreach ($carParsed['players'] as $player) {
+            $pidNameMap[$player['block_index']] = $player['name'];
+        }
+
+        foreach ($awaParsed['seasons'] as $season) {
+            if ($filterYear !== null && $season['year'] !== $filterYear) {
+                continue;
+            }
+
+            foreach ($season['stat_leaders'] as $category => $leaders) {
+                foreach ($leaders as $leader) {
+                    $playerName = $pidNameMap[$leader['pid']] ?? null;
+                    if ($playerName === null) {
+                        $result->addSkipped();
+                        continue;
+                    }
+
+                    $rankIndex = $leader['rank'] - 1;
+                    if ($rankIndex < 0 || $rankIndex >= 5) {
+                        $result->addSkipped();
+                        continue;
+                    }
+
+                    $awardName = $category . ' ' . self::RANK_SUFFIXES[$rankIndex];
+
+                    try {
+                        $affected = $this->repository->upsertAward($season['year'], $awardName, $playerName);
+                        $this->recordUpsertResult($affected, $result);
+                    } catch (\RuntimeException $e) {
+                        $result->addError('Award upsert failed for ' . $playerName . ': ' . $e->getMessage());
+                    }
+                }
+            }
+        }
+
+        return $result;
+    }
+
     /**
      * @see JsbImportServiceInterface::processRcbFile()
      */

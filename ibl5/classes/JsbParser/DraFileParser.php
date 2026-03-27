@@ -9,8 +9,8 @@ use JsbParser\Contracts\DraFileParserInterface;
 /**
  * Parser for JSB .dra (Draft Results) text files.
  *
- * Parses cumulative draft files containing multiple seasons of draft results.
- * Uses a state machine to track year headers, round/pick markers, and pick lines.
+ * Parses cumulative draft files containing multiple seasons of draft results
+ * with year headers, round/pick markers, and team:position player entries.
  */
 class DraFileParser implements DraFileParserInterface
 {

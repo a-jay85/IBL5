@@ -9,7 +9,7 @@ interface LeagueControlPanelServiceInterface
     /**
      * Get all panel data needed for the control panel form
      *
-     * @return array{phase: string, allowTrades: string, allowWaivers: string, showDraftLink: string, freeAgencyNotifications: string, triviaMode: string, simLengthInDays: int, seasonEndingYear: int}
+     * @return array{phase: string, allowTrades: string, allowWaivers: string, showDraftLink: string, freeAgencyNotifications: string, triviaMode: string, simLengthInDays: int, seasonEndingYear: int, hasFinalsMvp: bool}
      */
     public function getPanelData(): array;
 }

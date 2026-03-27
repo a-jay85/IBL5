@@ -60,6 +60,19 @@ interface JsbImportServiceInterface
     public function processAswFile(string $filePath, int $seasonYear): JsbImportResult;
 
     /**
+     * Process an .awa file and upsert stat leader awards into ibl_awards.
+     *
+     * Parses the binary .awa file, resolves PIDs to player names via a .car file,
+     * and inserts award rows like "Scoring Leader (1st)" through "(5th)".
+     *
+     * @param string $awaPath Path to the .awa file
+     * @param string $carPath Path to the .car file for PID→name resolution
+     * @param int|null $filterYear If set, only import awards for this season year
+     * @return JsbImportResult Summary of import results
+     */
+    public function processAwaFile(string $awaPath, string $carPath, ?int $filterYear = null): JsbImportResult;
+
+    /**
      * Process an .rcb file and upsert records into ibl_rcb_alltime_records and ibl_rcb_season_records.
      *
      * @param string $filePath Path to the .rcb file

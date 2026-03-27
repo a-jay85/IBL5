@@ -35,7 +35,7 @@ class LeagueControlPanelServiceTest extends TestCase
             'Show Draft Link' => 'On',
             'Free Agency Notifications' => 'Off',
             'Trivia Mode' => 'Off',
-            'Season Ending Year' => '2026',
+            'Current Season Ending Year' => '2026',
         ]);
         $stub->method('getSimLengthInDays')->willReturn(5);
 
@@ -75,7 +75,7 @@ class LeagueControlPanelServiceTest extends TestCase
     {
         $stub = $this->createStub(LeagueControlPanelRepositoryInterface::class);
         $stub->method('getBulkSettings')->willReturn([
-            'Season Ending Year' => '2025',
+            'Current Season Ending Year' => '2025',
         ]);
         $stub->method('getSimLengthInDays')->willReturn(3);
 

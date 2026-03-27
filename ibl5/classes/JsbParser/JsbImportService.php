@@ -343,7 +343,9 @@ class JsbImportService implements JsbImportServiceInterface
         /** @var array<int, string> $pidNameMap */
         $pidNameMap = [];
         foreach ($carParsed['players'] as $player) {
-            $pidNameMap[$player['block_index']] = $player['name'];
+            // .car stores names in CP1252; convert to UTF-8 for DB storage
+            $name = mb_convert_encoding($player['name'], 'UTF-8', 'Windows-1252');
+            $pidNameMap[$player['block_index']] = $name;
         }
 
         foreach ($awaParsed['seasons'] as $season) {

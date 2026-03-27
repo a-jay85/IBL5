@@ -51,6 +51,12 @@ fi
 # ── Phase 2: DB initialization (only on empty database) ─────────────────────
 TABLE_COUNT=$(db_exec -N -e "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema='$DB_NAME';" | tr -d '[:space:]')
 
+if ! echo "$TABLE_COUNT" | grep -qE '^[0-9]+$'; then
+    echo "[entrypoint] ERROR: Could not query table count (got: $TABLE_COUNT). Check DB connection."
+    echo "[entrypoint] Continuing without DB initialization..."
+    TABLE_COUNT="-1"
+fi
+
 if [ "$TABLE_COUNT" = "0" ]; then
     PROD_SEED="$APP_DIR/fixtures/prod-seed.sql"
     if [ -f "$PROD_SEED" ]; then
@@ -63,7 +69,7 @@ if [ "$TABLE_COUNT" = "0" ]; then
     else
         echo "[entrypoint] WARNING: Empty database and no prod-seed.sql found."
         echo "[entrypoint] The app will not work until data is imported."
-        echo "[entrypoint] Run: bin/db-migrate ibl5-mariadb ibl5/migrations"
+        echo "[entrypoint] Provide ibl5/fixtures/prod-seed.sql or run migrations manually."
     fi
 else
     echo "[entrypoint] Database has $TABLE_COUNT tables — skipping prod-seed import."
@@ -84,8 +90,10 @@ if [ ! -f "$APP_DIR/vendor/autoload.php" ]; then
 fi
 
 # ── Phase 6: Cache warming (background, non-blocking) ───────────────────────
-echo "[entrypoint] Warming caches in background..."
-(php "$APP_DIR/bin/warm-cache" >> "$LOGS_DIR/warm-cache.log" 2>&1) &
+if [ -f "$APP_DIR/vendor/autoload.php" ]; then
+    echo "[entrypoint] Warming caches in background..."
+    (php "$APP_DIR/bin/warm-cache" >> "$LOGS_DIR/warm-cache.log" 2>&1) &
+fi
 
 # ── Phase 7: Start Apache ───────────────────────────────────────────────────
 echo "[entrypoint] Starting Apache."

@@ -37,7 +37,7 @@ echo "\nWarming Record Holders cache...\n";
 
 $recordHoldersRepository = new \RecordHolders\RecordHoldersRepository($mysqli_db);
 $innerService = new \RecordHolders\RecordHoldersService($recordHoldersRepository);
-$cachedService = new \RecordHolders\CachedRecordHoldersService($innerService, $mysqli_db);
+$cachedService = new \RecordHolders\CachedRecordHoldersService($innerService, $dbCache);
 $cachedService->rebuildCache();
 
 echo "Record Holders cache warmed\n";

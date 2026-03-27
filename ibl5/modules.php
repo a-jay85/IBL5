@@ -56,9 +56,12 @@ if (isset($name) && $name == $_REQUEST['name']) {
         $cached = \Cache\PageCache::get($pageCacheKey);
 
         if ($cached !== null) {
+            header('Content-Type: text/html; charset=utf-8');
             header('X-IBL-Cache: HIT');
             echo $cached;
-            ob_end_flush();
+            if (ob_get_level() > 0) {
+                ob_end_flush();
+            }
             exit;
         }
     }

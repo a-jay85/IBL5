@@ -98,7 +98,19 @@ SELECT
     TRY_CAST(r_foul AS INTEGER) AS r_foul
 FROM read_csv('data/ibl_plr_snapshots.csv', delim='\t', header=true, all_varchar=true,
     null_padding=true, ignore_errors=true, strict_mode=false, quote='')
-WHERE snapshot_phase IN ('preseason', 'end-of-season');
+WHERE snapshot_phase IN ('heat-end', 'end-of-season');
+
+-- dim_sim_dates: Global simulation date windows (698 sims across 19 seasons)
+-- Maps PLB per-season sim_number to date ranges via season offset calculation.
+-- Column names have spaces (preserved from MariaDB schema) — double-quoted.
+CREATE OR REPLACE TABLE dim_sim_dates AS
+SELECT
+    TRY_CAST("Sim" AS INTEGER)        AS global_sim,
+    TRY_CAST("Start Date" AS DATE)    AS sim_start_date,
+    TRY_CAST("End Date" AS DATE)      AS sim_end_date
+FROM read_csv('data/ibl_sim_dates.csv', delim='\t', header=true, all_varchar=true,
+    null_padding=true, ignore_errors=true, strict_mode=false, quote='')
+WHERE TRY_CAST("Sim" AS INTEGER) IS NOT NULL;
 
 -- Summary
 SELECT 'dim_player' AS table_name, COUNT(*) AS row_count FROM dim_player
@@ -106,4 +118,5 @@ UNION ALL SELECT 'dim_team', COUNT(*) FROM dim_team
 UNION ALL SELECT 'dim_season', COUNT(*) FROM dim_season
 UNION ALL SELECT 'dim_franchise_seasons', COUNT(*) FROM dim_franchise_seasons
 UNION ALL SELECT 'dim_player_snapshot', COUNT(*) FROM dim_player_snapshot
+UNION ALL SELECT 'dim_sim_dates', COUNT(*) FROM dim_sim_dates
 ORDER BY table_name;

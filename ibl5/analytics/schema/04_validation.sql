@@ -116,4 +116,90 @@ SELECT
 FROM (SELECT COUNT(*) AS cnt FROM fact_player_season
       WHERE fg_pct IS NOT NULL AND (fg_pct < 0 OR fg_pct > 100));
 
+-- New table row count checks
+SELECT
+    CASE WHEN cnt > 0 THEN 'PASS' ELSE 'FAIL' END AS status,
+    'fact_plb_snapshots has rows' AS assertion,
+    cnt AS value
+FROM (SELECT COUNT(*) AS cnt FROM fact_plb_snapshots);
+
+SELECT
+    CASE WHEN cnt > 0 THEN 'PASS' ELSE 'FAIL' END AS status,
+    'fact_plr_snapshots has rows' AS assertion,
+    cnt AS value
+FROM (SELECT COUNT(*) AS cnt FROM fact_plr_snapshots);
+
+SELECT
+    CASE WHEN cnt > 0 THEN 'PASS' ELSE 'FAIL' END AS status,
+    'dim_sim_dates has rows' AS assertion,
+    cnt AS value
+FROM (SELECT COUNT(*) AS cnt FROM dim_sim_dates);
+
+SELECT
+    CASE WHEN cnt > 0 THEN 'PASS' ELSE 'FAIL' END AS status,
+    'fact_player_sim has rows' AS assertion,
+    cnt AS value
+FROM (SELECT COUNT(*) AS cnt FROM fact_player_sim);
+
+-- Structural: sim_dates should have exactly 698 rows
+SELECT
+    CASE WHEN cnt = 698 THEN 'PASS' ELSE 'FAIL' END AS status,
+    'dim_sim_dates has 698 sims' AS assertion,
+    cnt AS value
+FROM (SELECT COUNT(*) AS cnt FROM dim_sim_dates);
+
+-- No orphan PLB season_years
+SELECT
+    CASE WHEN cnt = 0 THEN 'PASS' ELSE 'FAIL' END AS status,
+    'no orphan PLB season_years' AS assertion,
+    cnt AS value
+FROM (
+    SELECT COUNT(DISTINCT p.season_year) AS cnt
+    FROM fact_plb_snapshots p
+    LEFT JOIN dim_season s ON p.season_year = s.season_year
+    WHERE s.season_year IS NULL
+);
+
+-- PLR heat-end and end-of-season counts should match (zero drift confirmed)
+SELECT
+    CASE WHEN ABS(cnt_heat - cnt_eos) = 0 THEN 'PASS' ELSE 'WARN' END AS status,
+    'PLR heat-end and end-of-season counts match' AS assertion,
+    ABS(cnt_heat - cnt_eos) AS value
+FROM (
+    SELECT
+        SUM(CASE WHEN snapshot_phase = 'heat-end'      THEN 1 ELSE 0 END) AS cnt_heat,
+        SUM(CASE WHEN snapshot_phase = 'end-of-season' THEN 1 ELSE 0 END) AS cnt_eos
+    FROM fact_plr_snapshots
+);
+
+-- DC settings sanity: dc_minutes should be 0-40
+SELECT
+    CASE WHEN cnt = 0 THEN 'PASS' ELSE 'FAIL' END AS status,
+    'dc_minutes in 0-40 range' AS assertion,
+    cnt AS value
+FROM (
+    SELECT COUNT(*) AS cnt FROM fact_plb_snapshots
+    WHERE dc_minutes < 0 OR dc_minutes > 40
+);
+
+-- DC settings sanity: dc_bh/oi/di should be -2 to 2
+SELECT
+    CASE WHEN cnt = 0 THEN 'PASS' ELSE 'FAIL' END AS status,
+    'dc_bh/oi/di in -2 to 2 range' AS assertion,
+    cnt AS value
+FROM (
+    SELECT COUNT(*) AS cnt FROM fact_plb_snapshots
+    WHERE dc_bh NOT BETWEEN -2 AND 2
+       OR dc_oi NOT BETWEEN -2 AND 2
+       OR dc_di NOT BETWEEN -2 AND 2
+);
+
+-- Spot check: 2007 sim_number 7 should map to 2006-11-09
+SELECT
+    CASE WHEN sd.sim_start_date = DATE '2006-11-09' THEN 'PASS' ELSE 'FAIL' END AS status,
+    '2007 sim 7 maps to 2006-11-09' AS assertion,
+    sd.sim_start_date AS value
+FROM dim_sim_dates sd
+WHERE sd.global_sim = 664 + 7 - 1;
+
 SELECT '=== VALIDATION COMPLETE ===' AS status;

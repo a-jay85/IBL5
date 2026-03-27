@@ -55,9 +55,8 @@ Rebuild is idempotent — deletes and recreates from scratch. Production export 
 | `dim_team` | 33 | Team master (city, name, colors) |
 | `dim_season` | 20 | Season years with labels ("06-07" format) |
 | `dim_franchise_seasons` | 512 | Historical team city/name per season |
-| `dim_player_snapshot` | 0* | Per-season TSI snapshots (Phase 2 dependent) |
-
-*Production doesn't have `ibl_plr_snapshots` yet. TSI data falls back to current `dim_player` values.
+| `dim_player_snapshot` | ~11K | Per-season TSI snapshots from PLR heat-end/end-of-season |
+| `dim_sim_dates` | 698 | Global simulation date windows (maps sim# to date ranges) |
 
 ### Facts (event-level data)
 | Table | Rows | Description |
@@ -70,17 +69,30 @@ Rebuild is idempotent — deletes and recreates from scratch. Production export 
 | `fact_team_awards` | 132 | Team awards by season |
 | `fact_transactions` | 5,561 | Trades, injuries, waivers |
 | `fact_allstar_rosters` | 1,140 | All-Star selections |
+| `fact_plb_snapshots` | ~171K | Depth chart settings per player per sim (19 seasons) |
+| `fact_plr_snapshots` | ~22K | Player ratings snapshots per season (exact game-time ratings) |
 
-### Aggregates (pre-computed analytics)
+### Aggregates / Denormalized (pre-computed analytics)
 | Table | Rows | Description |
 |-------|------|-------------|
+| `fact_player_sim` | ~500K | **Simulation validation workhorse** — PLB+sim_dates+box_scores+PLR pre-joined |
 | `agg_player_career` | 1,248 | Career totals, averages, peak season |
 | `agg_tsi_progression` | 5,520 | Year-over-year rating deltas by development phase |
 | `agg_draft_cohort` | 20 | Draft class trajectory comparison |
 | `agg_team_season_roster` | 562 | Roster composition metrics per team-season |
 | `agg_playoff_predictor` | 562 | Playoff prediction correlation data |
 
-## Named Queries (7 pre-built)
+### The `fact_player_sim` Table
+
+The key addition for simulation engine validation. Pre-joins four data sources:
+- **PLB snapshots** — depth chart coaching decisions (dc_bh, dc_oi, dc_of, dc_df, dc_di, dc_minutes)
+- **Sim date windows** — maps per-season sim_number to date ranges
+- **Box scores** — actual game stats produced under those DC settings
+- **PLR snapshots** — exact player ratings at game time (heat-end phase)
+
+Grain: one row per (box_score_id, pid, sim_number). Use for within-player paired analyses where DC settings change between consecutive sims while player ratings stay fixed.
+
+## Named Queries (15 pre-built)
 
 | File | Analysis |
 |------|----------|
@@ -91,6 +103,14 @@ Rebuild is idempotent — deletes and recreates from scratch. Production export 
 | `salary_efficiency.sql` | Points-per-dollar, salary vs production |
 | `playoff_predictors.sql` | What roster metrics predict playoff success |
 | `cross_validation.sql` | Data quality cross-checks |
+| `dc_bh_causal_effect.sql` | Within-player dc_bh paired analysis (AST, TOV, FGA) |
+| `dc_oi_volume_effect.sql` | Within-player dc_oi paired analysis (shot volume) |
+| `rating_to_stat_mapping.sql` | Rating→stat correlations by era + calibration targets |
+| `clutch_playoff_gradient.sql` | Clutch rating playoff vs regular season differentials |
+| `simulation_calibration_by_era.sql` | Per-season team-level calibration targets |
+| `dc_minutes_soft_target.sql` | Actual minutes vs dc_minutes target analysis |
+| `tsi_sensitivity_validation.sql` | TSI per-rating sensitivity coefficients validation |
+| `stat_production_development.sql` | DC→stat production→next-season development |
 
 ## Key Columns for Analysis
 
@@ -116,4 +136,19 @@ Rebuild is idempotent — deletes and recreates from scratch. Production export 
 | "What roster composition predicts playoff success?" | DuckDB |
 | "Which players are on waivers right now?" | MariaDB (current state) |
 
-**Rule of thumb:** Current state and writes → MariaDB. Historical analysis across seasons → DuckDB.
+| "How does dc_bh affect assists per 48 minutes?" | DuckDB (`fact_player_sim`) |
+| "Validate simulation engine calibration targets by era" | DuckDB |
+| "Does Clutch=3 really help in playoffs?" | DuckDB (`fact_player_sim` with exact ratings) |
+
+**Rule of thumb:** Current state and writes → MariaDB. Historical analysis across seasons → DuckDB. Simulation engine validation → DuckDB (`fact_player_sim`).
+
+## Local Data Sync
+
+Production box scores (589K rows) can be imported into local Docker for MariaDB-based queries:
+
+```bash
+bin/db-import-boxscores          # Import from existing analytics CSVs
+bin/db-import-boxscores --truncate  # Replace existing data
+```
+
+After import, `bin/analytics-export --local` exports everything (including PLB/PLR snapshots) from one source.

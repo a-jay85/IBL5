@@ -1,0 +1,156 @@
+#!/bin/bash
+# Import production box score CSVs into local Docker MariaDB.
+# Uses LOAD DATA LOCAL INFILE since box_scores are production-only.
+#
+# Prerequisites:
+#   - bin/analytics-export must have been run (CSVs must exist)
+#   - Local Docker MariaDB must be running
+#
+# Usage: bin/db-import-boxscores [--truncate]
+#   --truncate   TRUNCATE tables before import (default: skip if non-empty)
+
+set -euo pipefail
+
+REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+
+# Analytics CSVs are gitignored — they live in the main repo, not worktrees.
+# Use git to find the main worktree path.
+MAIN_WORKTREE="$(git -C "$REPO_ROOT" worktree list --porcelain | head -1 | sed 's/worktree //')"
+DATA_DIR="${MAIN_WORKTREE}/ibl5/analytics/data"
+
+# Fallback to current repo if detection fails
+if [ ! -d "$DATA_DIR" ]; then
+    DATA_DIR="$REPO_ROOT/ibl5/analytics/data"
+fi
+
+DB_HOST="127.0.0.1"
+DB_PORT="3306"
+DB_USER="root"
+DB_PASS="root"
+DB_NAME="iblhoops_ibl5"
+
+TRUNCATE=false
+for arg in "$@"; do
+    case "$arg" in
+        --truncate) TRUNCATE=true ;;
+        *)          echo "Unknown argument: $arg" >&2; exit 1 ;;
+    esac
+done
+
+# Helper: run a query
+db_query() {
+    MYSQL_PWD="$DB_PASS" mariadb -h "$DB_HOST" -P "$DB_PORT" --skip-ssl \
+        -u "$DB_USER" "$DB_NAME" -N -B -e "$1"
+}
+
+# Helper: run a LOAD DATA statement (needs --local-infile=1)
+db_load() {
+    MYSQL_PWD="$DB_PASS" mariadb -h "$DB_HOST" -P "$DB_PORT" --skip-ssl \
+        --local-infile=1 -u "$DB_USER" "$DB_NAME" -e "$1"
+}
+
+echo "=== Box Score Import: Production CSV → Local Docker ==="
+echo ""
+
+# Verify CSVs exist
+for csv in ibl_box_scores.csv ibl_box_scores_teams.csv; do
+    if [ ! -s "$DATA_DIR/$csv" ]; then
+        echo "Error: $DATA_DIR/$csv not found or empty." >&2
+        echo "Run 'bin/analytics-export' first to create CSVs from production." >&2
+        exit 1
+    fi
+done
+
+# Check current local row counts
+BS_COUNT=$(db_query "SELECT COUNT(*) FROM ibl_box_scores")
+BST_COUNT=$(db_query "SELECT COUNT(*) FROM ibl_box_scores_teams")
+
+if [ "$BS_COUNT" -gt 0 ] || [ "$BST_COUNT" -gt 0 ]; then
+    if [ "$TRUNCATE" = false ]; then
+        echo "Local tables already have data:"
+        echo "  ibl_box_scores:       $BS_COUNT rows"
+        echo "  ibl_box_scores_teams: $BST_COUNT rows"
+        echo ""
+        echo "Use --truncate to replace existing data."
+        exit 0
+    fi
+    echo "Truncating existing data..."
+    db_query "SET FOREIGN_KEY_CHECKS=0; TRUNCATE TABLE ibl_box_scores; TRUNCATE TABLE ibl_box_scores_teams; SET FOREIGN_KEY_CHECKS=1;"
+fi
+
+# Expected row counts from CSVs (line count minus header)
+BS_EXPECTED=$(( $(wc -l < "$DATA_DIR/ibl_box_scores.csv") - 1 ))
+BST_EXPECTED=$(( $(wc -l < "$DATA_DIR/ibl_box_scores_teams.csv") - 1 ))
+
+echo "Importing ibl_box_scores ($BS_EXPECTED rows)..."
+
+# CSV column order (37 cols):
+# id, Date, name, pos, pid, visitorTID, homeTID, gameMIN, game2GM, game2GA,
+# gameFTM, gameFTA, game3GM, game3GA, gameORB, gameDRB, gameAST, gameSTL,
+# gameTOV, gameBLK, gamePF, [game_type], [season_year], [calc_points],
+# [calc_rebounds], [calc_fg_made], created_at, updated_at, uuid,
+# gameOfThatDay, attendance, capacity, visitorWins, visitorLosses,
+# homeWins, homeLosses, teamID
+#
+# Brackets = STORED GENERATED columns → sink to @gen_* variables
+db_load "
+LOAD DATA LOCAL INFILE '$DATA_DIR/ibl_box_scores.csv'
+INTO TABLE ibl_box_scores
+FIELDS TERMINATED BY '\t'
+LINES TERMINATED BY '\n'
+IGNORE 1 LINES
+(id, Date, name, pos, pid, visitorTID, homeTID,
+ gameMIN, game2GM, game2GA, gameFTM, gameFTA, game3GM, game3GA,
+ gameORB, gameDRB, gameAST, gameSTL, gameTOV, gameBLK, gamePF,
+ @gen_game_type, @gen_season_year, @gen_calc_points, @gen_calc_rebounds, @gen_calc_fg_made,
+ created_at, updated_at, uuid,
+ gameOfThatDay, attendance, capacity,
+ visitorWins, visitorLosses, homeWins, homeLosses, teamID);
+"
+
+echo "Importing ibl_box_scores_teams ($BST_EXPECTED rows)..."
+
+# CSV column order (43 cols):
+# id, Date, name, gameOfThatDay, visitorTeamID, homeTeamID, attendance,
+# capacity, visitorWins, visitorLosses, homeWins, homeLosses,
+# visitorQ1points..visitorQ4points, visitorOTpoints,
+# homeQ1points..homeQ4points, homeOTpoints, gameMIN, game2GM, game2GA,
+# gameFTM, gameFTA, game3GM, game3GA, gameORB, gameDRB, gameAST, gameSTL,
+# gameTOV, gameBLK, gamePF, [game_type], [season_year], [calc_points],
+# [calc_rebounds], [calc_fg_made], created_at, updated_at
+db_load "
+LOAD DATA LOCAL INFILE '$DATA_DIR/ibl_box_scores_teams.csv'
+INTO TABLE ibl_box_scores_teams
+FIELDS TERMINATED BY '\t'
+LINES TERMINATED BY '\n'
+IGNORE 1 LINES
+(id, Date, name, gameOfThatDay, visitorTeamID, homeTeamID,
+ attendance, capacity, visitorWins, visitorLosses, homeWins, homeLosses,
+ visitorQ1points, visitorQ2points, visitorQ3points, visitorQ4points, visitorOTpoints,
+ homeQ1points, homeQ2points, homeQ3points, homeQ4points, homeOTpoints,
+ gameMIN, game2GM, game2GA, gameFTM, gameFTA, game3GM, game3GA,
+ gameORB, gameDRB, gameAST, gameSTL, gameTOV, gameBLK, gamePF,
+ @gen_game_type, @gen_season_year, @gen_calc_points, @gen_calc_rebounds, @gen_calc_fg_made,
+ created_at, updated_at);
+"
+
+# Verify
+BS_ACTUAL=$(db_query "SELECT COUNT(*) FROM ibl_box_scores")
+BST_ACTUAL=$(db_query "SELECT COUNT(*) FROM ibl_box_scores_teams")
+
+echo ""
+echo "=== Import Complete ==="
+echo "  ibl_box_scores:       $BS_ACTUAL rows (expected $BS_EXPECTED)"
+echo "  ibl_box_scores_teams: $BST_ACTUAL rows (expected $BST_EXPECTED)"
+
+ERRORS=0
+if [ "$BS_ACTUAL" -ne "$BS_EXPECTED" ]; then
+    echo "  WARNING: ibl_box_scores count mismatch!" >&2
+    ERRORS=1
+fi
+if [ "$BST_ACTUAL" -ne "$BST_EXPECTED" ]; then
+    echo "  WARNING: ibl_box_scores_teams count mismatch!" >&2
+    ERRORS=1
+fi
+
+exit $ERRORS

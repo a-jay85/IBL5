@@ -2,6 +2,7 @@ RewriteEngine On
 
 # Return 410 Gone for dead legacy paths — prevents bots from consuming workers
 RewriteRule ^ibl/IBL/.*\.htm$ - [R=410,L]
+RewriteCond %{HTTP_COOKIE} !PHPSESSID [NC]
 RewriteRule ^ibl/archive/.*\.htm$ - [R=410,L]
 RewriteRule ^iblforum/ - [R=410,L]
 RewriteRule ^online/team\.php$ - [R=410,L]

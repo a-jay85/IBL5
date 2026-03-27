@@ -115,4 +115,28 @@ interface JsbImportRepositoryInterface
      * @return int Affected rows (1=inserted, 2=updated, 0=unchanged)
      */
     public function upsertPlbSnapshot(array $record): int;
+
+    /**
+     * Upsert a draft result from .dra data.
+     *
+     * @param array{draft_year: int, round: int, pick: int, team_name: string, pos: string, player_name: string, pid: int|null} $record
+     * @return int Affected rows (1=inserted, 2=updated, 0=unchanged)
+     */
+    public function upsertDraftResult(array $record): int;
+
+    /**
+     * Upsert a retired player from .ret data.
+     *
+     * @param array{jsb_pid: int, player_name: string, pid: int|null} $record
+     * @return int Affected rows (1=inserted, 2=updated, 0=unchanged)
+     */
+    public function upsertRetiredPlayer(array $record): int;
+
+    /**
+     * Upsert a Hall of Fame inductee from .hof data.
+     *
+     * @param array{jsb_pid: int, player_name: string, pos: string, induction_year: int, pid: int|null} $record
+     * @return int Affected rows (1=inserted, 2=updated, 0=unchanged)
+     */
+    public function upsertHofInductee(array $record): int;
 }

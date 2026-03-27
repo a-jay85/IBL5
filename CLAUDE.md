@@ -66,6 +66,7 @@ Classes autoload from `ibl5/classes/`. Never use `require_once`.
 - **Native types enabled:** `MYSQLI_OPT_INT_AND_FLOAT_NATIVE` is set on `$mysqli_db`. See `core-coding.md` for type comparison rules.
 - **Docker:** `docker compose up -d` starts MariaDB + PHP-Apache (`http://main.localhost/ibl5/`). See `database-access.md` for connection details and `ibl5/docs/DOCKER_SETUP.md` for full setup.
 - **CLI MariaDB access:** `mariadb -h 127.0.0.1 --skip-ssl -u root -proot iblhoops_ibl5`. For quick queries, prefer the `./bin/db-query "SQL"` wrapper.
+- **DuckDB analytics:** Columnar OLAP layer over production data for cross-season analysis. See `duckdb-analytics.md` for tables, queries, and when to use it.
 
 ## Git & Commits
 

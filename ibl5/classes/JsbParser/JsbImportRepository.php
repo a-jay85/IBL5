@@ -546,13 +546,14 @@ class JsbImportRepository extends \BaseMysqliRepository implements JsbImportRepo
     {
         return $this->execute(
             "INSERT INTO {$this->retiredPlayersTable}
-                (jsb_pid, player_name, pid)
-            VALUES (?, ?, ?)
+                (jsb_pid, retirement_year, player_name, pid)
+            VALUES (?, ?, ?, ?)
             ON DUPLICATE KEY UPDATE
                 player_name = VALUES(player_name),
                 pid = VALUES(pid)",
-            'isi',
+            'iisi',
             $record['jsb_pid'],
+            $record['retirement_year'],
             $record['player_name'],
             $record['pid']
         );

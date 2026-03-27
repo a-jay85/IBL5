@@ -113,9 +113,10 @@ interface JsbImportServiceInterface
      * Process a .ret file and upsert records into ibl_jsb_retired_players.
      *
      * @param string $filePath Path to the .ret file
+     * @param int $retirementYear Season ending year when retirements occurred
      * @return JsbImportResult Summary of import results
      */
-    public function processRetFile(string $filePath): JsbImportResult;
+    public function processRetFile(string $filePath, int $retirementYear): JsbImportResult;
 
     /**
      * Process a .hof file and upsert records into ibl_jsb_hall_of_fame.

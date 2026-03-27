@@ -324,13 +324,13 @@ class TeamRepository extends \BaseMysqliRepository implements TeamRepositoryInte
     {
         return "SELECT year, name, Award, ID
             FROM ibl_team_awards
-            WHERE name LIKE ?
+            WHERE name = ?
 
             UNION ALL
 
             SELECT psr.year, psr.winner AS name, 'IBL Champions' AS Award, 0 AS ID
             FROM vw_playoff_series_results psr
-            WHERE psr.winner LIKE ?
+            WHERE psr.winner = ?
               AND psr.round = (
                   SELECT MAX(psr2.round)
                   FROM vw_playoff_series_results psr2
@@ -378,7 +378,7 @@ class TeamRepository extends \BaseMysqliRepository implements TeamRepositoryInte
                 GROUP BY YEAR(bst.Date)
             ) hc
             JOIN ibl_team_info ti ON ti.teamid = hc.winner_tid
-            WHERE ti.team_name LIKE ?
+            WHERE ti.team_name = ?
 
             ORDER BY year DESC";
     }

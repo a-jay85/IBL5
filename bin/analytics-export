@@ -1,0 +1,142 @@
+#!/bin/bash
+# Export MariaDB tables to CSV for DuckDB analytics.
+# Dumps tables to ibl5/analytics/data/*.csv with headers.
+#
+# Usage: bin/analytics-export
+#
+# Connection: reads REMOTE_* from .env for production, falls back to local Docker.
+# Output: ibl5/analytics/data/*.csv + export_manifest.json
+
+set -euo pipefail
+
+REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+DATA_DIR="$REPO_ROOT/ibl5/analytics/data"
+
+# Source .env for database credentials
+ENV_FILE="$REPO_ROOT/.env"
+if [ -f "$ENV_FILE" ]; then
+    set -a
+    # shellcheck disable=SC1090
+    source "$ENV_FILE"
+    set +a
+fi
+
+# Determine connection mode
+if [ -n "${REMOTE_HOST:-}" ] && [ "$REMOTE_HOST" != "localhost" ] && [ "$REMOTE_HOST" != "127.0.0.1" ]; then
+    DB_HOST="$REMOTE_HOST"
+    DB_PORT="${REMOTE_PORT:-3306}"
+    DB_USER_VAL="$REMOTE_USER"
+    DB_PASS_VAL="$REMOTE_PASSWORD"
+    DB_NAME="${REMOTE_DATABASE:-iblhoops_ibl5}"
+    EXTRA_OPTS="--compress"
+    echo "Mode: remote production ($DB_HOST:$DB_PORT)"
+else
+    DB_HOST="127.0.0.1"
+    DB_PORT="3306"
+    DB_USER_VAL="root"
+    DB_PASS_VAL="root"
+    DB_NAME="iblhoops_ibl5"
+    EXTRA_OPTS=""
+    echo "Mode: local Docker ($DB_HOST)"
+fi
+
+# Helper: run a mariadb query (tab-separated, no column names)
+db_query() {
+    # shellcheck disable=SC2086
+    MYSQL_PWD="$DB_PASS_VAL" mariadb -h "$DB_HOST" -P "$DB_PORT" --skip-ssl \
+        -u "$DB_USER_VAL" $EXTRA_OPTS "$DB_NAME" -N -B -e "$1"
+}
+
+# Helper: export a table to CSV with header row
+# Args: table_name [custom_query]
+export_table() {
+    local table="$1"
+    local query="${2:-SELECT * FROM \`$table\`}"
+    local outfile="$DATA_DIR/${table}.csv"
+
+    # Get column names for header
+    local header
+    header=$(MYSQL_PWD="$DB_PASS_VAL" mariadb -h "$DB_HOST" -P "$DB_PORT" --skip-ssl \
+        -u "$DB_USER_VAL" $EXTRA_OPTS "$DB_NAME" -B -e "$query LIMIT 0" 2>/dev/null | head -1)
+
+    # Export data (tab-separated)
+    echo "$header" > "$outfile"
+    MYSQL_PWD="$DB_PASS_VAL" mariadb -h "$DB_HOST" -P "$DB_PORT" --skip-ssl \
+        -u "$DB_USER_VAL" $EXTRA_OPTS "$DB_NAME" -N -B -e "$query" >> "$outfile"
+
+    local count
+    count=$(($(wc -l < "$outfile") - 1))
+    echo "  $table: $count rows" >&2
+    echo "$count"
+}
+
+mkdir -p "$DATA_DIR"
+
+echo ""
+echo "Exporting tables..."
+START_TIME=$(date +%s)
+
+# Track row counts for manifest
+declare -A COUNTS
+
+# Core tables
+TABLES=(
+    "ibl_plr"
+    "ibl_hist"
+    "ibl_box_scores"
+    "ibl_box_scores_teams"
+    "ibl_jsb_history"
+    "ibl_jsb_transactions"
+    "ibl_jsb_allstar_rosters"
+    "ibl_team_info"
+    "ibl_franchise_seasons"
+    "ibl_awards"
+    "ibl_team_awards"
+    "ibl_schedule"
+    "ibl_standings"
+)
+
+for table in "${TABLES[@]}"; do
+    count=$(export_table "$table")
+    COUNTS[$table]=$count
+done
+
+# Phase 2 dependent: ibl_plr_snapshots
+SNAPSHOTS_EXISTS=$(db_query "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema='$DB_NAME' AND table_name='ibl_plr_snapshots'")
+if [ "$SNAPSHOTS_EXISTS" -gt 0 ]; then
+    count=$(export_table "ibl_plr_snapshots")
+    COUNTS[ibl_plr_snapshots]=$count
+    echo "  (Phase 2: ibl_plr_snapshots included)"
+else
+    echo "  (Phase 2: ibl_plr_snapshots not found, skipping)"
+fi
+
+END_TIME=$(date +%s)
+ELAPSED=$((END_TIME - START_TIME))
+
+# Write manifest
+MANIFEST="$DATA_DIR/export_manifest.json"
+{
+    echo "{"
+    echo "  \"exported_at\": \"$(date -u +%Y-%m-%dT%H:%M:%SZ)\","
+    echo "  \"source\": \"$DB_HOST:$DB_PORT/$DB_NAME\","
+    echo "  \"elapsed_seconds\": $ELAPSED,"
+    echo "  \"tables\": {"
+    first=true
+    for table in "${!COUNTS[@]}"; do
+        if [ "$first" = true ]; then
+            first=false
+        else
+            echo ","
+        fi
+        printf "    \"%s\": %s" "$table" "${COUNTS[$table]}"
+    done
+    echo ""
+    echo "  }"
+    echo "}"
+} > "$MANIFEST"
+
+echo ""
+echo "Export complete in ${ELAPSED}s"
+echo "Output: $DATA_DIR/"
+echo "Manifest: $MANIFEST"

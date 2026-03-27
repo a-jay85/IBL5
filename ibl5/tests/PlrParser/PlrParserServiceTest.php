@@ -7,6 +7,7 @@ namespace Tests\PlrParser;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use PlrParser\Contracts\PlrParserRepositoryInterface;
+use PlrParser\PlrImportMode;
 use PlrParser\PlrParserService;
 use Season\Season;
 
@@ -562,6 +563,68 @@ class PlrParserServiceTest extends TestCase
         }
         file_put_contents($tmpFile, $line . "\n");
         return $tmpFile;
+    }
+
+    public function testComputeDerivedFieldsWithExplicitEndingYear(): void
+    {
+        $raw = $this->buildRawParsedData(['exp' => 3]);
+
+        $derived = $this->service->computeDerivedFields($raw, 0.1, 2000);
+
+        // draftYear = endingYear (2000) - exp (3) = 1997
+        $this->assertSame(1997, $derived['draftYear']);
+    }
+
+    public function testComputeDerivedFieldsWithExplicitEndingYearDoesNotAffectDefault(): void
+    {
+        $raw = $this->buildRawParsedData(['exp' => 3]);
+
+        // Without override, uses Season.endingYear = 2026
+        $derived = $this->service->computeDerivedFields($raw, 0.1);
+
+        $this->assertSame(2023, $derived['draftYear']);
+    }
+
+    public function testProcessPlrFileForYearSnapshotMode(): void
+    {
+        $tmpFile = $this->createFullPlrFile();
+
+        /** @var PlrParserRepositoryInterface&\PHPUnit\Framework\MockObject\MockObject $mockRepo */
+        $mockRepo = $this->createMock(PlrParserRepositoryInterface::class);
+        $mockRepo->expects($this->once())->method('upsertSnapshot');
+        $mockRepo->expects($this->never())->method('upsertPlayer');
+        $mockRepo->expects($this->never())->method('upsertHistoricalStats');
+
+        $service = new PlrParserService($mockRepo, $this->stubCommonRepo, $this->stubSeason);
+        $result = $service->processPlrFileForYear(
+            $tmpFile,
+            2001,
+            PlrImportMode::Snapshot,
+            'end-of-season',
+            '00-01_36_finals',
+        );
+
+        $this->assertSame(1, $result->playersUpserted);
+        $this->assertSame(0, $result->historyRowsUpserted);
+        unlink($tmpFile);
+    }
+
+    public function testProcessPlrFileForYearLiveMode(): void
+    {
+        $tmpFile = $this->createFullPlrFile();
+
+        /** @var PlrParserRepositoryInterface&\PHPUnit\Framework\MockObject\MockObject $mockRepo */
+        $mockRepo = $this->createMock(PlrParserRepositoryInterface::class);
+        $mockRepo->expects($this->once())->method('upsertPlayer');
+        $mockRepo->expects($this->once())->method('upsertHistoricalStats');
+        $mockRepo->expects($this->never())->method('upsertSnapshot');
+
+        $service = new PlrParserService($mockRepo, $this->stubCommonRepo, $this->stubSeason);
+        $result = $service->processPlrFileForYear($tmpFile, 2001, PlrImportMode::Live);
+
+        $this->assertSame(1, $result->playersUpserted);
+        $this->assertSame(1, $result->historyRowsUpserted);
+        unlink($tmpFile);
     }
 
     /**

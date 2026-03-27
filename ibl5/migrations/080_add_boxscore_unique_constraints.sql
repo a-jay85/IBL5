@@ -16,8 +16,9 @@ DELETE b1 FROM ibl_box_scores_teams b1
      AND b1.id < b2.id;
 
 -- Add natural unique key for player box scores
+-- Includes teamID to handle All-Star games where a player can appear for both teams
 ALTER TABLE ibl_box_scores
-  ADD UNIQUE KEY uq_game_player (Date, pid, visitorTID, homeTID, gameOfThatDay);
+  ADD UNIQUE KEY uq_game_player (Date, pid, visitorTID, homeTID, gameOfThatDay, teamID);
 
 -- Add natural unique key for team box scores
 ALTER TABLE ibl_box_scores_teams

@@ -82,8 +82,8 @@ class ExtractFromBackupStepTest extends TestCase
                 $callCount++;
                 return $callCount <= 10 ? '/tmp/IBL5.ext' : false;
             });
-        $this->stubExtractor->method('jsbFilename')
-            ->willReturnCallback(static fn (string $ext): string => 'IBL5.' . $ext);
+        // Note: extractFiles() builds filenames directly as filePrefix + ext,
+        // not via extractor->jsbFilename(). No jsbFilename stub needed.
 
         $step = new ExtractFromBackupStep(
             $this->stubLocator,
@@ -104,8 +104,8 @@ class ExtractFromBackupStepTest extends TestCase
             ->willReturn('/tmp/backups/25-26/25-26_15_reg-sim15.zip');
         $this->stubLocator->method('isProperlyNamed')->willReturn(true);
         $this->stubExtractor->method('extractSingleFile')->willReturn(false);
-        $this->stubExtractor->method('jsbFilename')
-            ->willReturnCallback(static fn (string $ext): string => 'IBL5.' . $ext);
+        // Note: extractFiles() builds filenames directly as filePrefix + ext,
+        // not via extractor->jsbFilename(). No jsbFilename stub needed.
 
         $step = new ExtractFromBackupStep(
             $this->stubLocator,
@@ -131,8 +131,8 @@ class ExtractFromBackupStepTest extends TestCase
 
         // All extractions fail (no files in archive)
         $this->stubExtractor->method('extractSingleFile')->willReturn(false);
-        $this->stubExtractor->method('jsbFilename')
-            ->willReturnCallback(static fn (string $ext): string => 'IBL5.' . $ext);
+        // Note: extractFiles() builds filenames directly as filePrefix + ext,
+        // not via extractor->jsbFilename(). No jsbFilename stub needed.
 
         $step = new ExtractFromBackupStep(
             $this->stubLocator,

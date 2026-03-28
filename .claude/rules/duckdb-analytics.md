@@ -55,7 +55,7 @@ Rebuild is idempotent — deletes and recreates from scratch. Production export 
 | `dim_team` | 33 | Team master (city, name, colors) |
 | `dim_season` | 20 | Season years with labels ("06-07" format) |
 | `dim_franchise_seasons` | 512 | Historical team city/name per season |
-| `dim_player_snapshot` | ~11K | Per-season TSI snapshots from PLR heat-end/end-of-season |
+| `dim_player_snapshot` | ~11K | Per-season TSI snapshots (heat-end only, 1 row per player-season) |
 | `dim_sim_dates` | 698 | Global simulation date windows (maps sim# to date ranges) |
 
 ### Facts (event-level data)

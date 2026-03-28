@@ -57,6 +57,7 @@ class UpdaterController implements UpdaterControllerInterface
     private function getStepProgressLabel(PipelineStepInterface $step): string
     {
         return match ($step->getLabel()) {
+            'Backup extracted' => 'Extracting files from backup archive...',
             'League config' => 'Importing league config (.lge)...',
             'Player file' => 'Parsing player file (.plr)...',
             'Schedule updated' => 'Updating schedule...',
@@ -67,6 +68,7 @@ class UpdaterController implements UpdaterControllerInterface
             'Boxscores processed' => 'Processing boxscores (.sco)...',
             'All-Star games processed' => 'Processing All-Star games...',
             'JSB files parsed' => 'Parsing JSB engine files...',
+            'End-of-season imports' => 'Running end-of-season imports (.dra, .ret, .hof, .awa, .plr)...',
             default => $step->getLabel() . '...',
         };
     }

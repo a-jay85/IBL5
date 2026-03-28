@@ -167,6 +167,13 @@ try {
     $jsbResolver = new JsbParser\PlayerIdResolver($mysqli_db, $leagueContext);
     $jsbService = new JsbParser\JsbImportService($jsbRepo, $jsbResolver);
 
+    // Step 0: Extract JSB files from latest backup archive
+    $archiveExtractor = new BulkImport\ArchiveExtractor();
+    $backupLocator = new BulkImport\BackupArchiveLocator($archiveExtractor);
+    $updaterService->addStep(new Updater\Steps\ExtractFromBackupStep(
+        $backupLocator, $archiveExtractor, $season, $basePath, $filePrefix,
+    ));
+
     $updaterService->addStep(new Updater\Steps\ImportLeagueConfigStep(
         $lgeRepo, $lgeService, $lgeView, $season->endingYear, $defaultLgePath,
     ));
@@ -197,6 +204,13 @@ try {
     }
 
     $updaterService->addStep(new Updater\Steps\ParseJsbFilesStep($jsbService, $basePath, $season, $filePrefix));
+
+    // IBL-only: End-of-season imports when champion exists
+    if (!$isOlympics) {
+        $updaterService->addStep(new Updater\Steps\EndOfSeasonImportStep(
+            $jsbRepo, $jsbService, $plrService, $season->endingYear, $basePath, $filePrefix,
+        ));
+    }
 
     $controller = new Updater\UpdaterController($updaterService, $view);
     $controller->run();

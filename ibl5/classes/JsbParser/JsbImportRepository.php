@@ -581,4 +581,25 @@ class JsbImportRepository extends \BaseMysqliRepository implements JsbImportRepo
             $record['pid']
         );
     }
+
+    /**
+     * @see JsbImportRepositoryInterface::hasChampionForSeason()
+     */
+    public function hasChampionForSeason(int $seasonYear): bool
+    {
+        $row = $this->fetchOne(
+            "SELECT COUNT(*) AS cnt FROM {$this->jsbHistoryTable}
+             WHERE season_year = ? AND won_championship = 1",
+            'i',
+            $seasonYear,
+        );
+
+        if ($row === null) {
+            return false;
+        }
+
+        $cnt = $row['cnt'];
+
+        return is_int($cnt) && $cnt > 0;
+    }
 }

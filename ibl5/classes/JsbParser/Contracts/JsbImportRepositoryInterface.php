@@ -139,4 +139,13 @@ interface JsbImportRepositoryInterface
      * @return int Affected rows (1=inserted, 2=updated, 0=unchanged)
      */
     public function upsertHofInductee(array $record): int;
+
+    /**
+     * Check if a champion has been determined for a given season.
+     *
+     * Queries ibl_jsb_history for won_championship = 1.
+     *
+     * @param int $seasonYear Season ending year (e.g. 2026)
+     */
+    public function hasChampionForSeason(int $seasonYear): bool;
 }

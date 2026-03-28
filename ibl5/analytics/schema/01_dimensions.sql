@@ -98,7 +98,7 @@ SELECT
     TRY_CAST(r_foul AS INTEGER) AS r_foul
 FROM read_csv('data/ibl_plr_snapshots.csv', delim='\t', header=true, all_varchar=true,
     null_padding=true, ignore_errors=true, strict_mode=false, quote='')
-WHERE snapshot_phase IN ('heat-end', 'end-of-season');
+WHERE snapshot_phase = 'heat-end';
 
 -- dim_sim_dates: Global simulation date windows (698 sims across 19 seasons)
 -- Maps PLB per-season sim_number to date ranges via season offset calculation.

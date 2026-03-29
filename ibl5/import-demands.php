@@ -43,6 +43,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_FILES['demands_csv'])) {
     } elseif (!is_uploaded_file($file['tmp_name'])) {
         $errorMessage = 'Invalid upload.';
     } else {
+        // Strip UTF-8 BOM if present (Excel/Google Sheets add it)
+        $raw = file_get_contents($file['tmp_name']);
+        if ($raw !== false && str_starts_with($raw, "\xEF\xBB\xBF")) {
+            file_put_contents($file['tmp_name'], substr($raw, 3));
+        }
+
         $handle = fopen($file['tmp_name'], 'r');
         if ($handle === false) {
             $errorMessage = 'Could not open uploaded file.';

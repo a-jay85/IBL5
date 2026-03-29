@@ -60,30 +60,50 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_FILES['demands_csv'])) {
                 $plrResult->free();
             }
 
-            // Read header row
-            $header = fgetcsv($handle);
-            if ($header === false || $header === [null]) {
+            // Read first row to detect whether it's a header or data
+            $firstRow = fgetcsv($handle);
+            if ($firstRow === false || $firstRow === [null]) {
                 $errorMessage = 'CSV file is empty or unreadable.';
             } else {
-                // Normalize header names
-                $header = array_map(fn (string $col): string => strtolower(trim($col)), $header);
+                $defaultCols = ['name', 'dem1', 'dem2', 'dem3', 'dem4', 'dem5', 'dem6'];
+                $normalizedFirst = array_map(fn (string $col): string => strtolower(trim($col)), $firstRow);
 
-                // Validate expected columns
-                $requiredCols = ['name', 'dem1', 'dem2', 'dem3', 'dem4', 'dem5', 'dem6'];
-                $missing = array_diff($requiredCols, $header);
-                if ($missing !== []) {
-                    $errorMessage = 'CSV is missing required columns: ' . implode(', ', $missing);
-                } else {
-                    // Map column positions
+                // Detect header: first column contains "name" (case-insensitive)
+                $hasHeader = ($normalizedFirst[0] ?? '') === 'name';
+
+                if ($hasHeader) {
+                    // Validate expected columns
+                    $missing = array_diff($defaultCols, $normalizedFirst);
+                    if ($missing !== []) {
+                        $errorMessage = 'CSV is missing required columns: ' . implode(', ', $missing);
+                    }
                     /** @var array<string, int> $colIndex */
-                    $colIndex = array_flip($header);
+                    $colIndex = array_flip($normalizedFirst);
+                } else {
+                    // No header — assume default column order
+                    if (count($firstRow) < 7) {
+                        $errorMessage = 'CSV has no header and fewer than 7 columns (expected: name, dem1-dem6).';
+                    }
+                    /** @var array<string, int> $colIndex */
+                    $colIndex = array_flip($defaultCols);
+                }
 
+                if ($errorMessage === '') {
                     // Parse all rows first, then import in a transaction
                     /** @var list<array{name: string, pid: int, dem1: int, dem2: int, dem3: int, dem4: int, dem5: int, dem6: int}> $rows */
                     $rows = [];
-                    $lineNum = 1; // header was line 1
+                    $lineNum = $hasHeader ? 1 : 0;
 
+                    // If no header, the first row is data — process it as a queued row
+                    /** @var list<list<string>> $pendingRows */
+                    $pendingRows = $hasHeader ? [] : [$firstRow];
+
+                    // Collect remaining rows from file after the first
                     while (($csvRow = fgetcsv($handle)) !== false) {
+                        $pendingRows[] = $csvRow;
+                    }
+
+                    foreach ($pendingRows as $csvRow) {
                         $lineNum++;
                         if ($csvRow === [null] || $csvRow === []) {
                             continue; // skip blank lines

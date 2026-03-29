@@ -9,11 +9,12 @@ use Utilities\HtmlSanitizer;
 /** @var mysqli $mysqli_db */
 
 $query = <<<'SQL'
-SELECT ordinal, name, age, teamname, pos, coach, loyalty, playingTime,
-       winner, tradition, security, exp, sta
-FROM ibl_plr
-WHERE retired = 0
-ORDER BY ordinal ASC
+SELECT p.ordinal, p.name, p.age, t.team_name AS teamname, p.pos, p.coach, p.loyalty, p.playingTime,
+       p.winner, p.tradition, p.security, p.exp, p.sta
+FROM ibl_plr p
+LEFT JOIN ibl_team_info t ON p.tid = t.teamid
+WHERE p.retired = 0
+ORDER BY p.ordinal ASC
 SQL;
 
 $result = $mysqli_db->query($query);

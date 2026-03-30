@@ -38,15 +38,18 @@ class FreeAgencyPreviewService implements FreeAgencyPreviewServiceInterface
         $freeAgents = [];
 
         foreach ($players as $player) {
-            $draftyear = $player['draftyear'];
-            $exp = $player['exp'];
-            $cy = $player['cy'];
-            $cyt = $player['cyt'];
+            $nextYear = ($player['cy'] ?? 0) + 1;
+            $nextYearSalary = match ($nextYear) {
+                1 => $player['cy1'],
+                2 => $player['cy2'],
+                3 => $player['cy3'],
+                4 => $player['cy4'],
+                5 => $player['cy5'],
+                6 => $player['cy6'],
+                default => 0,
+            };
 
-            // Calculate year of free agency
-            $yearOfFreeAgency = $draftyear + $exp + $cyt - $cy;
-
-            if ($yearOfFreeAgency === $seasonEndingYear) {
+            if ($nextYearSalary === 0) {
                 $freeAgents[] = [
                     'pid' => $player['pid'],
                     'tid' => $player['tid'],

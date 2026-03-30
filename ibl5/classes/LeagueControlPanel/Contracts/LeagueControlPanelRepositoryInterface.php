@@ -191,8 +191,8 @@ interface LeagueControlPanelRepositoryInterface
     /**
      * Delete buyouts and cash considerations whose remaining contract year salaries are all zero.
      *
-     * A record is "outdated" when every salary field from the current contract year onward is 0,
-     * meaning all obligations have been fulfilled and the placeholder can be safely removed.
+     * A record is "outdated" when every salary field for future contract years (after the current
+     * year) is 0, meaning no money is owed or received in any upcoming season.
      *
      * @return int Number of deleted rows
      */

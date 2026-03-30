@@ -177,4 +177,14 @@ interface LeagueControlPanelRepositoryInterface
      * @return bool True if a Finals MVP exists
      */
     public function hasFinalsMvp(int $year): bool;
+
+    /**
+     * Delete temporary draft player placeholders from ibl_plr.
+     *
+     * These are rows with pid >= 90000, created during the draft when a player
+     * is selected but before plrParser assigns permanent PIDs.
+     *
+     * @return int Number of deleted rows
+     */
+    public function deleteDraftPlaceholders(): int;
 }

@@ -1,8 +1,8 @@
 #!/bin/bash
-# Clean up worktrees whose branches have been merged to master.
-# Tears down Docker env, removes worktree, and deletes local branch.
+# Clean up worktrees, branches, and Docker containers.
+# Tears down Docker env, removes worktrees, deletes stale branches.
 #
-# Usage: bin/wt-cleanup [<worktree-name>] [--all] [--dry-run]
+# Usage: bin/cleanup [<worktree-name>] [--all] [--dry-run]
 
 set -euo pipefail
 

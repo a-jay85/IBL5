@@ -80,6 +80,16 @@ teardown_worktree() {
         echo "  Stopped CSS watcher (PID $css_pid)"
     fi
 
+    # Stop browser-sync if running
+    local bs_pid_file="$wt_path/.bs-sync.pid"
+    if [ -f "$bs_pid_file" ]; then
+        local bs_pid
+        bs_pid=$(cat "$bs_pid_file")
+        kill "$bs_pid" 2>/dev/null || true
+        rm -f "$bs_pid_file" "$wt_path/.bs-sync.log"
+        echo "  Stopped browser-sync (PID $bs_pid)"
+    fi
+
     # Export vars so Docker Compose can interpolate the static compose file
     local static_compose="$REPO_ROOT/docker/worktree-compose.yml"
     export SLUG="$slug" WORKTREE_PATH="$wt_path" REPO_ROOT

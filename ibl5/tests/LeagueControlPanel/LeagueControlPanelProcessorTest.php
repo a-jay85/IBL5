@@ -278,6 +278,22 @@ class LeagueControlPanelProcessorTest extends TestCase
         $this->assertStringContainsString('5 draft placeholder(s)', $result['message']);
     }
 
+    // --- Delete Outdated Buyouts/Cash ---
+
+    public function testDeleteOutdatedBuyoutsAndCash(): void
+    {
+        $mock = $this->createMock(LeagueControlPanelRepositoryInterface::class);
+        $mock->expects($this->once())
+            ->method('deleteOutdatedBuyoutsAndCash')
+            ->willReturn(3);
+
+        $processor = new LeagueControlPanelProcessor($mock, $this->createStub(AwardGenerationServiceInterface::class));
+        $result = $processor->dispatch('delete_outdated_buyouts_cash', []);
+
+        $this->assertTrue($result['success']);
+        $this->assertStringContainsString('3 outdated buyout/cash consideration(s)', $result['message']);
+    }
+
     // --- Reset actions ---
 
     public function testResetContractExtensions(): void

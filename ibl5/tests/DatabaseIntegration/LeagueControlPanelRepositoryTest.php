@@ -222,6 +222,108 @@ class LeagueControlPanelRepositoryTest extends DatabaseTestCase
         self::assertSame(0, $row['bird']);
     }
 
+    // ── deleteOutdatedBuyoutsAndCash ─────────────────────────────
+
+    public function testDeleteOutdatedBuyoutsAndCashDeletesFullyPaidBuyout(): void
+    {
+        // Buyout in final year with cy6=0 — all obligations fulfilled, should be deleted
+        $this->insertTestPlayer(200100040, '| Paid Off Buyout', [
+            'tid' => 1,
+            'cy' => 6,
+            'cyt' => 6,
+            'cy1' => 500,
+            'cy2' => 500,
+        ]);
+
+        $count = $this->repo->deleteOutdatedBuyoutsAndCash();
+
+        self::assertSame(1, $count);
+        self::assertNull($this->fetchPlayerByPid(200100040));
+    }
+
+    public function testDeleteOutdatedBuyoutsAndCashDeletesAllZeroCash(): void
+    {
+        // Cash consideration with all salary years at zero — should be deleted
+        $this->insertTestPlayer(200100041, '| Cash from Test', [
+            'tid' => 1,
+            'cy' => 1,
+            'cyt' => 1,
+            'cy1' => 0,
+            'cy2' => 0,
+        ]);
+
+        $count = $this->repo->deleteOutdatedBuyoutsAndCash();
+
+        self::assertSame(1, $count);
+        self::assertNull($this->fetchPlayerByPid(200100041));
+    }
+
+    public function testDeleteOutdatedBuyoutsAndCashPreservesActiveBuyout(): void
+    {
+        // Buyout with money still owed in current year — should NOT be deleted
+        $this->insertTestPlayer(200100042, '| Active Buyout', [
+            'tid' => 1,
+            'cy' => 2,
+            'cyt' => 4,
+            'cy1' => 0,
+            'cy2' => 300,
+        ]);
+
+        $count = $this->repo->deleteOutdatedBuyoutsAndCash();
+
+        self::assertSame(0, $count);
+        self::assertNotNull($this->fetchPlayerByPid(200100042));
+    }
+
+    public function testDeleteOutdatedBuyoutsAndCashPreservesActiveCashConsideration(): void
+    {
+        // Cash consideration with money owed in a future year — should NOT be deleted
+        $this->insertTestPlayer(200100043, '| Cash to Test', [
+            'tid' => 1,
+            'cy' => 1,
+            'cyt' => 3,
+            'cy1' => 0,
+            'cy2' => -500,
+        ]);
+
+        $count = $this->repo->deleteOutdatedBuyoutsAndCash();
+
+        self::assertSame(0, $count);
+        self::assertNotNull($this->fetchPlayerByPid(200100043));
+    }
+
+    public function testDeleteOutdatedBuyoutsAndCashDoesNotDeleteRegularPlayers(): void
+    {
+        // Regular player with zero salary — should NOT be deleted
+        $this->insertTestPlayer(200100044, 'Regular Player Zero', [
+            'tid' => 1,
+            'cy' => 1,
+            'cyt' => 1,
+            'cy1' => 0,
+            'cy2' => 0,
+        ]);
+
+        $count = $this->repo->deleteOutdatedBuyoutsAndCash();
+
+        self::assertSame(0, $count);
+        self::assertNotNull($this->fetchPlayerByPid(200100044));
+    }
+
+    /**
+     * @return array<string, mixed>|null
+     */
+    private function fetchPlayerByPid(int $pid): ?array
+    {
+        $stmt = $this->db->prepare("SELECT pid FROM ibl_plr WHERE pid = ?");
+        self::assertNotFalse($stmt);
+        $stmt->bind_param('i', $pid);
+        $stmt->execute();
+        $row = $stmt->get_result()->fetch_assoc();
+        $stmt->close();
+
+        return is_array($row) ? $row : null;
+    }
+
     // ── setFreeAgencyFactorsForPfw ──────────────────────────────
 
     public function testSetFreeAgencyFactorsForPfwUpdatesTeamInfo(): void

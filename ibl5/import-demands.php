@@ -49,6 +49,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_FILES['demands_csv'])) {
             file_put_contents($file['tmp_name'], substr($raw, 3));
         }
 
+        // Auto-detect delimiter: semicolon or comma
+        $firstLine = '';
+        $detectHandle = fopen($file['tmp_name'], 'r');
+        if ($detectHandle !== false) {
+            $firstLine = (string) fgets($detectHandle);
+            fclose($detectHandle);
+        }
+        $delimiter = str_contains($firstLine, ';') ? ';' : ',';
+
         $handle = fopen($file['tmp_name'], 'r');
         if ($handle === false) {
             $errorMessage = 'Could not open uploaded file.';
@@ -67,7 +76,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_FILES['demands_csv'])) {
             }
 
             // Read first row to detect whether it's a header or data
-            $firstRow = fgetcsv($handle);
+            $firstRow = fgetcsv($handle, 0, $delimiter, '"', '');
             if ($firstRow === false || $firstRow === [null]) {
                 $errorMessage = 'CSV file is empty or unreadable.';
             } else {
@@ -105,7 +114,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_FILES['demands_csv'])) {
                     $pendingRows = $hasHeader ? [] : [$firstRow];
 
                     // Collect remaining rows from file after the first
-                    while (($csvRow = fgetcsv($handle)) !== false) {
+                    while (($csvRow = fgetcsv($handle, 0, $delimiter, '"', '')) !== false) {
                         $pendingRows[] = $csvRow;
                     }
 
@@ -157,7 +166,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_FILES['demands_csv'])) {
 
                             foreach ($rows as $row) {
                                 $stmt->bind_param(
-                                    'siiiiiiii',
+                                    'siiiiiii',
                                     $row['name'],
                                     $row['pid'],
                                     $row['dem1'],

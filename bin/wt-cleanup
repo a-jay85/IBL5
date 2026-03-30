@@ -225,6 +225,47 @@ if [ "$ALL" = true ]; then
             CLEANED=$((CLEANED + 1))
         done
     fi
+
+    # Clean up bare local branches whose remote tracking ref is [gone].
+    # Worktree branches are already handled above; this catches branches
+    # that exist only as local refs (no worktree directory).
+    WORKTREE_BRANCHES=$(git -C "$REPO_ROOT" worktree list --porcelain \
+        | awk '/^branch / { sub(/^branch refs\/heads\//, ""); print }')
+
+    while IFS= read -r line; do
+        [[ -z "$line" ]] && continue
+        gone_branch=$(echo "$line" | sed 's/^[[:space:]]*[*+]*[[:space:]]*//' | awk '{print $1}')
+        [[ -z "$gone_branch" ]] && continue
+
+        # Skip protected branches
+        if [[ "$gone_branch" == "master" || "$gone_branch" == "main" || "$gone_branch" == "production" ]]; then
+            continue
+        fi
+
+        # Skip branches checked out in a worktree (handled by check_worktree above)
+        if echo "$WORKTREE_BRANCHES" | grep -qx "$gone_branch"; then
+            continue
+        fi
+
+        # Skip branches with an open PR
+        if command -v gh &>/dev/null; then
+            gone_pr_state=$(cd "$REPO_ROOT" && gh pr view "$gone_branch" --json state -q .state 2>/dev/null || true)
+            if [ "$gone_pr_state" = "OPEN" ]; then
+                gone_pr_num=$(cd "$REPO_ROOT" && gh pr view "$gone_branch" --json number -q .number 2>/dev/null || true)
+                echo "  SKIP bare branch $gone_branch: PR #$gone_pr_num still open"
+                SKIPPED=$((SKIPPED + 1))
+                continue
+            fi
+        fi
+
+        if [ "$DRY_RUN" = true ]; then
+            echo "  WOULD delete bare branch: $gone_branch"
+        else
+            git -C "$REPO_ROOT" branch -D "$gone_branch" >/dev/null 2>&1 || true
+            echo "  Deleted bare branch: $gone_branch"
+        fi
+        CLEANED=$((CLEANED + 1))
+    done < <(git -C "$REPO_ROOT" branch -v | grep '\[gone\]')
 else
     WT_PATH="$REPO_ROOT/worktrees/$TARGET_NAME"
     if [ ! -d "$WT_PATH" ]; then

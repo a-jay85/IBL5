@@ -164,6 +164,9 @@ class LeagueControlPanelView implements LeagueControlPanelViewInterface
         <button type="submit" name="action" value="set_waivers_to_free_agents" class="ibl-btn ibl-btn--secondary ibl-btn--sm">Set all players on waivers to Free Agents and reset their Bird years</button>
     </div>
     <div class="lcp-control-row">
+        <button type="submit" name="action" value="delete_outdated_buyouts_cash" class="ibl-btn ibl-btn--secondary ibl-btn--sm">Delete All Outdated Buyouts and Cash Considerations</button>
+    </div>
+    <div class="lcp-control-row">
         <button type="submit" name="action" value="reset_contract_extensions" class="ibl-btn ibl-btn--secondary ibl-btn--sm">Reset All Contract Extensions</button>
     </div>
     <div class="lcp-control-row">
@@ -273,6 +276,9 @@ class LeagueControlPanelView implements LeagueControlPanelViewInterface
     <div class="updater-section__label">Free Agency Operations</div>
     <div class="lcp-control-row">
         <button type="submit" name="action" value="delete_draft_placeholders" class="ibl-btn ibl-btn--secondary ibl-btn--sm">Delete Draft Player Placeholders</button>
+    </div>
+    <div class="lcp-control-row">
+        <button type="submit" name="action" value="delete_outdated_buyouts_cash" class="ibl-btn ibl-btn--secondary ibl-btn--sm">Delete All Outdated Buyouts and Cash Considerations</button>
     </div>
     <div class="lcp-control-row">
         <button type="submit" name="action" value="reset_contract_extensions" class="ibl-btn ibl-btn--secondary ibl-btn--sm">Reset All Contract Extensions</button>

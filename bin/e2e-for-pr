@@ -1,0 +1,124 @@
+#!/usr/bin/env bash
+# Map a PR's changed files to the minimal E2E test set.
+# Usage: bin/e2e-for-pr <worktree-name>
+#
+# Exit codes:
+#   0 + test paths on stdout → run only those tests
+#   0 + empty stdout         → skip E2E entirely (no relevant tests)
+#   2                        → run full suite (infrastructure changed or too many tests)
+
+set -euo pipefail
+
+WORKTREE_NAME="${1:-}"
+if [[ -z "$WORKTREE_NAME" ]]; then
+    echo "Usage: bin/e2e-for-pr <worktree-name>" >&2
+    exit 1
+fi
+
+# Always resolve to the main repo root, even when run from a worktree.
+REPO_ROOT="$(cd "$(dirname "$0")/.." && \
+    dirname "$(git rev-parse --path-format=absolute --git-common-dir)")"
+WORKTREE_PATH="$REPO_ROOT/worktrees/$WORKTREE_NAME"
+IBL5_DIR="$REPO_ROOT/ibl5"
+THRESHOLD="${E2E_THRESHOLD:-40}"
+
+if [[ ! -d "$WORKTREE_PATH" ]]; then
+    echo "Error: Worktree not found at $WORKTREE_PATH" >&2
+    exit 1
+fi
+
+# --- Get changed files against master ---
+CHANGED_FILES=$(git -C "$WORKTREE_PATH" diff --name-only origin/master...HEAD 2>/dev/null || true)
+
+if [[ -z "$CHANGED_FILES" ]]; then
+    exit 0
+fi
+
+# --- Full-suite trigger modules (broad blast radius) ---
+FULL_SUITE_MODULES="Navigation PageLayout UI Utilities Bootstrap League Module Settings Shared Database Services"
+
+# --- Temp file for collecting test paths (avoids bash 3.2 associative array limitation) ---
+TEST_COLLECTOR=$(mktemp)
+trap "rm -f $TEST_COLLECTOR" EXIT
+
+# --- Alias map function: class name → spec base name (for known mismatches) ---
+alias_for_module() {
+    case "$1" in
+        Extension) echo "contract-extension" ;;
+        *) return 1 ;;
+    esac
+}
+
+while IFS= read -r file; do
+    # --- Broad non-PHP triggers ---
+    if [[ "$file" == ibl5/config/* ]] || \
+       [[ "$file" == ibl5/index.php ]] || \
+       [[ "$file" == ibl5/.htaccess ]] || \
+       [[ "$file" == .htaccess ]]; then
+        exit 2
+    fi
+
+    # --- Top-level shared PHP classes ---
+    if [[ "$file" == ibl5/classes/BaseMysqliRepository.php ]] || \
+       [[ "$file" == ibl5/classes/ContractRules.php ]] || \
+       [[ "$file" == ibl5/classes/JSB.php ]] || \
+       [[ "$file" == ibl5/classes/CommonMysqliRepository.php ]]; then
+        exit 2
+    fi
+
+    # --- Module-level check for full-suite triggers ---
+    if [[ "$file" =~ ibl5/classes/([^/]+)/ ]]; then
+        MODULE="${BASH_REMATCH[1]}"
+        for infra in $FULL_SUITE_MODULES; do
+            if [[ "$MODULE" == "$infra" ]]; then
+                exit 2
+            fi
+        done
+
+        # --- Alias map: translate class name to spec base name ---
+        alias_kebab=$(alias_for_module "$MODULE" 2>/dev/null || true)
+        if [[ -n "$alias_kebab" ]]; then
+            for f in "$IBL5_DIR"/tests/e2e/*/${alias_kebab}.spec.ts \
+                     "$IBL5_DIR"/tests/e2e/*/${alias_kebab}-*.spec.ts; do
+                [[ -f "$f" ]] && echo "${f#"$IBL5_DIR/"}" >> "$TEST_COLLECTOR"
+            done
+        fi
+    fi
+
+    # --- Standard mapping via e2e-for-file ---
+    if [[ "$file" == *.php ]]; then
+        "$REPO_ROOT/bin/e2e-for-file" "$file" >> "$TEST_COLLECTOR" 2>/dev/null || true
+    fi
+
+    # --- Changed E2E test files: include directly ---
+    if [[ "$file" =~ ^ibl5/tests/e2e/.*\.spec\.ts$ ]]; then
+        echo "${file#ibl5/}" >> "$TEST_COLLECTOR"
+    fi
+
+done <<< "$CHANGED_FILES"
+
+# Deduplicate
+TESTS=$(sort -u "$TEST_COLLECTOR")
+
+# No mapped tests → skip E2E entirely
+if [[ -z "$TESTS" ]]; then
+    exit 0
+fi
+
+# Add cross-cutting specs when any flow tests are selected
+if echo "$TESTS" | grep -q '^tests/e2e/flows/'; then
+    for cc in \
+        "tests/e2e/flows/cross-module-navigation.spec.ts" \
+        "tests/e2e/flows/parameter-edge-cases.spec.ts"; do
+        [[ -f "$IBL5_DIR/$cc" ]] && echo "$cc"
+    done >> "$TEST_COLLECTOR"
+    TESTS=$(sort -u "$TEST_COLLECTOR")
+fi
+
+# Threshold guard — too many tests means full suite is safer
+TEST_COUNT=$(echo "$TESTS" | wc -l | tr -d ' ')
+if [[ "$TEST_COUNT" -ge "$THRESHOLD" ]]; then
+    exit 2
+fi
+
+echo "$TESTS"

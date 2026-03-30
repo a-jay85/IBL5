@@ -71,13 +71,17 @@ if (isset($name) && $name == $_REQUEST['name']) {
     $season = new \Season\Season($mysqli_db);
     $accessControl = new Module\ModuleAccessControl($season, $leagueContext, $mysqli_db);
 
-    if (!$accessControl->isModuleAccessible($name) && !is_admin()) {
+    $isModuleAccessible = $accessControl->isModuleAccessible($name);
+    if (!$isModuleAccessible && !is_admin()) {
         PageLayout\PageLayout::header();
         OpenTable();
         echo "<center>" . _MODULENOTACTIVE . "<br><br>" . _GOBACK . "</center>";
         CloseTable();
         PageLayout\PageLayout::footer();
     } else {
+        if (!$isModuleAccessible) {
+            $_SESSION['flash_warning'] = 'Admin mode: You can view this module, but it is currently closed to non-admin GMs.';
+        }
         if (!isset($file) or $file != $_REQUEST['file']) {
             $file = "index";
         }

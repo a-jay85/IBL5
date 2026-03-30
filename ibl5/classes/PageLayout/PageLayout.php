@@ -33,6 +33,15 @@ class PageLayout
             unset($_SESSION['flash_success']);
             echo '<div class="ibl-alert ibl-alert--success">' . $flashMessage . '</div>';
         }
+        if (
+            isset($_SESSION['flash_warning'])
+            && is_string($_SESSION['flash_warning'])
+            && $_SESSION['flash_warning'] !== ''
+        ) {
+            $flashWarning = \Utilities\HtmlSanitizer::safeHtmlOutput($_SESSION['flash_warning']);
+            unset($_SESSION['flash_warning']);
+            echo '<div class="ibl-alert ibl-alert--warning">' . $flashWarning . '</div>';
+        }
         if (defined('HOME_FILE')) {
             blocks("Center");
         }
@@ -55,6 +64,15 @@ class PageLayout
             $flashMessage = \Utilities\HtmlSanitizer::safeHtmlOutput($_SESSION['flash_success']);
             unset($_SESSION['flash_success']);
             echo '<div class="ibl-alert ibl-alert--success">' . $flashMessage . '</div>';
+        }
+        if (
+            isset($_SESSION['flash_warning'])
+            && is_string($_SESSION['flash_warning'])
+            && $_SESSION['flash_warning'] !== ''
+        ) {
+            $flashWarning = \Utilities\HtmlSanitizer::safeHtmlOutput($_SESSION['flash_warning']);
+            unset($_SESSION['flash_warning']);
+            echo '<div class="ibl-alert ibl-alert--warning">' . $flashWarning . '</div>';
         }
     }
 

@@ -271,6 +271,16 @@ class LeagueControlPanelRepository extends \BaseMysqliRepository implements Leag
     }
 
     /**
+     * @see LeagueControlPanelRepositoryInterface::deleteDraftPlaceholders()
+     */
+    public function deleteDraftPlaceholders(): int
+    {
+        $draftPidStart = 90000;
+
+        return $this->execute("DELETE FROM ibl_plr WHERE pid >= ?", "i", $draftPidStart);
+    }
+
+    /**
      * @see LeagueControlPanelRepositoryInterface::upsertAward()
      */
     public function upsertAward(int $year, string $award, string $name): int

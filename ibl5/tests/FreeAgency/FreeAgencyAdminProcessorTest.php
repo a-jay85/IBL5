@@ -7,36 +7,15 @@ namespace Tests\FreeAgency;
 use FreeAgency\Contracts\FreeAgencyAdminRepositoryInterface;
 use FreeAgency\FreeAgencyAdminProcessor;
 use PHPUnit\Framework\TestCase;
+use Tests\Integration\Mocks\MockDatabase;
 
 class FreeAgencyAdminProcessorTest extends TestCase
 {
-    private \mysqli $mockDb;
+    private MockDatabase $mockDb;
 
     protected function setUp(): void
     {
-        $this->mockDb = new class extends \mysqli {
-            public int $connect_errno = 0;
-            public ?string $connect_error = null;
-
-            public function __construct()
-            {
-            }
-
-            public function begin_transaction(int $flags = 0, ?string $name = null): bool
-            {
-                return true;
-            }
-
-            public function commit(int $flags = 0, ?string $name = null): bool
-            {
-                return true;
-            }
-
-            public function rollback(int $flags = 0, ?string $name = null): bool
-            {
-                return true;
-            }
-        };
+        $this->mockDb = new MockDatabase();
     }
 
     // ============================================
@@ -177,8 +156,287 @@ class FreeAgencyAdminProcessorTest extends TestCase
 
 
     // ============================================
+    // processDay() — successful signing (perceived value > demands)
+    // ============================================
+
+    public function testProcessDaySuccessfulSigning(): void
+    {
+        // Offer: 3yr deal, offer avg = (500+550+600)/3 = 550
+        // Demands: dem1=200, dem2=200, dem3=200 → total=600, years=3
+        // Day 1: demandValue = (600/3) * ((11-1)/10) = 200 * 1.0 = 200.0
+        // perceivedValue 800.0 > 200.0 → signing
+        $offer = $this->makeOfferRow('Star Player', 100, 'Miami', 1, 500, 550, 600, 0, 0, 0, 0, 0, 0, 0, 800.0);
+
+        $stub = $this->createStub(FreeAgencyAdminRepositoryInterface::class);
+        $stub->method('getAllOffersWithBirdYears')->willReturn([$offer]);
+        $stub->method('getPlayerDemandsBatch')->willReturn([
+            100 => ['dem1' => 200, 'dem2' => 200, 'dem3' => 200, 'dem4' => 0, 'dem5' => 0, 'dem6' => 0],
+        ]);
+
+        $this->configureMockDbForProcessDay();
+
+        $processor = new FreeAgencyAdminProcessor($stub, $this->mockDb);
+        $result = $processor->processDay(1);
+
+        $this->assertCount(1, $result['signings']);
+        $this->assertSame('Star Player', $result['signings'][0]['playerName']);
+        $this->assertSame(100, $result['signings'][0]['playerId']);
+        $this->assertSame('Miami', $result['signings'][0]['teamName']);
+        $this->assertSame(3, $result['signings'][0]['offerYears']);
+        $this->assertSame(16.5, $result['signings'][0]['offerTotal']);
+        $this->assertFalse($result['signings'][0]['usedMle']);
+        $this->assertFalse($result['signings'][0]['usedLle']);
+        $this->assertCount(0, $result['rejections']);
+        $this->assertCount(0, $result['autoRejections']);
+        $this->assertStringContainsString('accepts', $result['newsHomeText']);
+    }
+
+    // ============================================
+    // processDay() — rejection (demands/2 < perceived value <= demands)
+    // ============================================
+
+    public function testProcessDayRejectedOffer(): void
+    {
+        // Demands: dem1=200 → total=200, years=1
+        // Day 1: demandValue = (200/1) * 1.0 = 200.0
+        // perceivedValue 150.0: auto-reject threshold = 200/2 = 100
+        // 150 > 100 → not auto-rejected; 150 <= 200 → rejected
+        $offer = $this->makeOfferRow('Player B', 200, 'Chicago', 2, 400, 0, 0, 0, 0, 0, 0, 0, 0, 0, 150.0);
+
+        $stub = $this->createStub(FreeAgencyAdminRepositoryInterface::class);
+        $stub->method('getAllOffersWithBirdYears')->willReturn([$offer]);
+        $stub->method('getPlayerDemandsBatch')->willReturn([
+            200 => ['dem1' => 200, 'dem2' => 0, 'dem3' => 0, 'dem4' => 0, 'dem5' => 0, 'dem6' => 0],
+        ]);
+
+        $this->configureMockDbForProcessDay();
+
+        $processor = new FreeAgencyAdminProcessor($stub, $this->mockDb);
+        $result = $processor->processDay(1);
+
+        $this->assertCount(1, $result['rejections']);
+        $this->assertSame('Player B', $result['rejections'][0]['playerName']);
+        $this->assertSame('Best offer did not meet player demands', $result['rejections'][0]['reason']);
+        $this->assertCount(0, $result['signings']);
+        $this->assertCount(0, $result['autoRejections']);
+    }
+
+    // ============================================
+    // processDay() — multiple offers for same player
+    // ============================================
+
+    public function testProcessDayMultipleOffersSamePlayer(): void
+    {
+        // Two offers for same player (highest perceived value first, per ORDER BY)
+        // Only first should trigger signing decision
+        $offer1 = $this->makeOfferRow('Star Player', 100, 'Miami', 1, 500, 550, 600, 0, 0, 0, 0, 0, 0, 0, 800.0);
+        $offer2 = $this->makeOfferRow('Star Player', 100, 'Chicago', 2, 400, 450, 500, 0, 0, 0, 0, 0, 0, 0, 600.0);
+
+        $stub = $this->createStub(FreeAgencyAdminRepositoryInterface::class);
+        $stub->method('getAllOffersWithBirdYears')->willReturn([$offer1, $offer2]);
+        $stub->method('getPlayerDemandsBatch')->willReturn([
+            100 => ['dem1' => 200, 'dem2' => 200, 'dem3' => 200, 'dem4' => 0, 'dem5' => 0, 'dem6' => 0],
+        ]);
+
+        $this->configureMockDbForProcessDay();
+
+        $processor = new FreeAgencyAdminProcessor($stub, $this->mockDb);
+        $result = $processor->processDay(1);
+
+        $this->assertCount(1, $result['signings']);
+        $this->assertSame('Miami', $result['signings'][0]['teamName']);
+        $this->assertCount(2, $result['allOffers']);
+        $this->assertCount(0, $result['rejections']);
+    }
+
+    // ============================================
+    // processDay() — day adjustment affects demand threshold
+    // ============================================
+
+    public function testProcessDayDemandsDayAdjustment(): void
+    {
+        // Demands: dem1=2000 → total=2000, years=1
+        // perceivedValue = 500.0
+        //
+        // Day 1:  demandValue = (2000/1) * ((11-1)/10) = 2000
+        //         autoReject threshold = 2000/2 = 1000
+        //         500.0 <= 1000 → auto-reject
+        //
+        // Day 10: demandValue = (2000/1) * ((11-10)/10) = 200
+        //         autoReject threshold = 200/2 = 100
+        //         500.0 > 100 → not auto-reject; 500 > 200 → signing
+        $offer = $this->makeOfferRow('Player C', 300, 'Miami', 1, 400, 0, 0, 0, 0, 0, 0, 0, 0, 0, 500.0);
+
+        $stub = $this->createStub(FreeAgencyAdminRepositoryInterface::class);
+        $stub->method('getAllOffersWithBirdYears')->willReturn([$offer]);
+        $stub->method('getPlayerDemandsBatch')->willReturn([
+            300 => ['dem1' => 2000, 'dem2' => 0, 'dem3' => 0, 'dem4' => 0, 'dem5' => 0, 'dem6' => 0],
+        ]);
+
+        $this->configureMockDbForProcessDay();
+
+        // Day 1: auto-reject
+        $processor = new FreeAgencyAdminProcessor($stub, $this->mockDb);
+        $resultDay1 = $processor->processDay(1);
+        $this->assertCount(1, $resultDay1['autoRejections']);
+        $this->assertCount(0, $resultDay1['signings']);
+
+        // Day 10: signing (demands shrink to 10%)
+        $processor2 = new FreeAgencyAdminProcessor($stub, $this->mockDb);
+        $resultDay10 = $processor2->processDay(10);
+        $this->assertCount(1, $resultDay10['signings']);
+        $this->assertCount(0, $resultDay10['autoRejections']);
+    }
+
+    // ============================================
+    // processDay() — player with no demands
+    // ============================================
+
+    public function testProcessDayPlayerWithNoDemands(): void
+    {
+        // Player has no demands entry → calculateDemandValue(null, day) returns 0.0
+        // Any perceivedValue > 0 → signing
+        $offer = $this->makeOfferRow('No Demand Player', 400, 'Miami', 1, 100, 0, 0, 0, 0, 0, 0, 0, 0, 0, 50.0);
+
+        $stub = $this->createStub(FreeAgencyAdminRepositoryInterface::class);
+        $stub->method('getAllOffersWithBirdYears')->willReturn([$offer]);
+        $stub->method('getPlayerDemandsBatch')->willReturn([]); // empty — no demands for pid 400
+
+        $this->configureMockDbForProcessDay();
+
+        $processor = new FreeAgencyAdminProcessor($stub, $this->mockDb);
+        $result = $processor->processDay(1);
+
+        $this->assertCount(1, $result['signings']);
+        $this->assertSame('No Demand Player', $result['signings'][0]['playerName']);
+        $this->assertCount(0, $result['autoRejections']);
+    }
+
+    // ============================================
+    // processDay() — mixed outcomes (signing + rejection + auto-reject)
+    // ============================================
+
+    public function testProcessDayMixedOutcomes(): void
+    {
+        // Player A: perceivedValue=800 vs demands=200 → signing
+        // Player B: perceivedValue=150 vs demands=200 → rejection (150 > 100 threshold, but <= 200)
+        // Player C: perceivedValue=1 vs demands=2000 → auto-reject (1 <= 1000 threshold)
+        $offerA = $this->makeOfferRow('Player A', 100, 'Miami', 1, 500, 550, 600, 0, 0, 0, 0, 0, 0, 0, 800.0);
+        $offerB = $this->makeOfferRow('Player B', 200, 'Chicago', 2, 400, 0, 0, 0, 0, 0, 0, 0, 0, 0, 150.0);
+        $offerC = $this->makeOfferRow('Player C', 300, 'Boston', 3, 100, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1.0);
+
+        $stub = $this->createStub(FreeAgencyAdminRepositoryInterface::class);
+        $stub->method('getAllOffersWithBirdYears')->willReturn([$offerA, $offerB, $offerC]);
+        $stub->method('getPlayerDemandsBatch')->willReturn([
+            100 => ['dem1' => 200, 'dem2' => 200, 'dem3' => 200, 'dem4' => 0, 'dem5' => 0, 'dem6' => 0],
+            200 => ['dem1' => 200, 'dem2' => 0, 'dem3' => 0, 'dem4' => 0, 'dem5' => 0, 'dem6' => 0],
+            300 => ['dem1' => 2000, 'dem2' => 0, 'dem3' => 0, 'dem4' => 0, 'dem5' => 0, 'dem6' => 0],
+        ]);
+
+        $this->configureMockDbForProcessDay();
+
+        $processor = new FreeAgencyAdminProcessor($stub, $this->mockDb);
+        $result = $processor->processDay(1);
+
+        $this->assertCount(1, $result['signings']);
+        $this->assertSame('Player A', $result['signings'][0]['playerName']);
+        $this->assertCount(1, $result['rejections']);
+        $this->assertSame('Player B', $result['rejections'][0]['playerName']);
+        $this->assertCount(1, $result['autoRejections']);
+        $this->assertSame('Player C', $result['autoRejections'][0]['playerName']);
+        $this->assertCount(3, $result['allOffers']);
+    }
+
+    // ============================================
     // HELPERS
     // ============================================
+
+    /**
+     * Configure MockDatabase with team and player rows for processDay() tests.
+     * Team::initialize() and Player::withPlayerID() query the DB directly.
+     */
+    private function configureMockDbForProcessDay(): void
+    {
+        // Minimal team row for Team::initialize() — matched by ibl_team_info handler
+        $teamRow = [
+            'teamid' => 1,
+            'team_city' => 'Test City',
+            'team_name' => 'Test Team',
+            'color1' => '#000000',
+            'color2' => '#FFFFFF',
+            'arena' => 'Test Arena',
+            'capacity' => 20000,
+            'owner_name' => 'Owner',
+            'owner_email' => 'owner@test.com',
+            'discordID' => null,
+            'Used_Extension_This_Chunk' => 0,
+            'Used_Extension_This_Season' => 0,
+            'HasMLE' => 0,
+            'HasLLE' => 0,
+            'Contract_Wins' => 40,
+            'Contract_Losses' => 42,
+            'Contract_AvgW' => 40,
+            'Contract_AvgL' => 42,
+            'leagueRecord' => '40-42',
+        ];
+        $this->mockDb->setMockTeamData([$teamRow]);
+
+        // Minimal player row for Player::withPlayerID() — matched by pid filter
+        $playerRow = [
+            'pid' => 100,
+            'ordinal' => 1,
+            'name' => 'Test Player',
+            'nickname' => null,
+            'age' => 25,
+            'peak' => 28,
+            'tid' => 0,
+            'pos' => 'PF',
+            'sta' => 5,
+            'oo' => 50, 'od' => 50, 'do' => 50, 'dd' => 50,
+            'po' => 50, 'pd' => 50, 'to' => 50, 'td' => 50,
+            'Clutch' => 3, 'Consistency' => 3,
+            'PGDepth' => 0, 'SGDepth' => 0, 'SFDepth' => 0, 'PFDepth' => 5, 'CDepth' => 0,
+            'dc_PGDepth' => 0, 'dc_SGDepth' => 0, 'dc_SFDepth' => 0, 'dc_PFDepth' => 5, 'dc_CDepth' => 0,
+            'dc_canPlayInGame' => 1, 'dc_minutes' => 30,
+            'dc_of' => 0, 'dc_df' => 0, 'dc_oi' => 0, 'dc_di' => 0, 'dc_bh' => 0,
+            'active' => 1,
+            'talent' => 50, 'skill' => 50, 'intangibles' => 50, 'coach' => 0,
+            'loyalty' => 3, 'playingTime' => 3, 'winner' => 3, 'tradition' => 3, 'security' => 3,
+            'exp' => 5, 'bird' => 1,
+            'cy' => 0, 'cyt' => 0, 'cy1' => 0, 'cy2' => 0, 'cy3' => 0, 'cy4' => 0, 'cy5' => 0, 'cy6' => 0,
+            'fa_signing_flag' => 0,
+            'stats_gs' => 0, 'stats_gm' => 0, 'stats_min' => 0,
+            'stats_fgm' => 0, 'stats_fga' => 0, 'stats_ftm' => 0, 'stats_fta' => 0,
+            'stats_3gm' => 0, 'stats_3ga' => 0,
+            'stats_orb' => 0, 'stats_drb' => 0, 'stats_ast' => 0,
+            'stats_stl' => 0, 'stats_to' => 0, 'stats_blk' => 0, 'stats_pf' => 0,
+            'r_fga' => 50, 'r_fgp' => 50, 'r_fta' => 50, 'r_ftp' => 50,
+            'r_tga' => 50, 'r_tgp' => 50, 'r_orb' => 50, 'r_drb' => 50,
+            'r_ast' => 50, 'r_stl' => 50, 'r_to' => 50, 'r_blk' => 50, 'r_foul' => 50,
+            'draftround' => 1, 'draftedby' => 'MIA', 'draftedbycurrentname' => 'Miami',
+            'draftyear' => 2020, 'draftpickno' => 1,
+            'injured' => 0, 'htft' => 6, 'htin' => 8, 'wt' => 220,
+            'retired' => 0, 'college' => 'Test University',
+            'sh_pts' => 0, 'sh_reb' => 0, 'sh_ast' => 0, 'sh_stl' => 0, 'sh_blk' => 0,
+            's_dd' => 0, 's_td' => 0,
+            'sp_pts' => 0, 'sp_reb' => 0, 'sp_ast' => 0, 'sp_stl' => 0, 'sp_blk' => 0,
+            'ch_pts' => 0, 'ch_reb' => 0, 'ch_ast' => 0, 'ch_stl' => 0, 'ch_blk' => 0,
+            'c_dd' => 0, 'c_td' => 0,
+            'cp_pts' => 0, 'cp_reb' => 0, 'cp_ast' => 0, 'cp_stl' => 0, 'cp_blk' => 0,
+            'car_gm' => 0, 'car_min' => 0,
+            'car_fgm' => 0, 'car_fga' => 0, 'car_ftm' => 0, 'car_fta' => 0,
+            'car_tgm' => 0, 'car_tga' => 0,
+            'car_orb' => 0, 'car_drb' => 0, 'car_reb' => 0,
+            'car_ast' => 0, 'car_stl' => 0, 'car_to' => 0, 'car_blk' => 0,
+            'car_pf' => 0, 'car_pts' => 0,
+            'car_playoff_min' => 0, 'car_preseason_min' => 0,
+            'droptime' => 0,
+        ];
+        // Route player queries via onQuery (highest priority) — needed because
+        // PlayerRepository::loadByID() JOINs ibl_team_info, which would otherwise
+        // trigger MockDatabase's built-in team handler and return team data
+        $this->mockDb->onQuery('FROM ibl_plr', [$playerRow]);
+    }
 
     /**
      * @return array{playerId: int, teamId: int, teamName: string, offers: array{offer1: int, offer2: int, offer3: int, offer4: int, offer5: int, offer6: int}, offerYears: int, offerTotal: float, usedMle: bool, usedLle: bool}

@@ -15,7 +15,9 @@ if [[ -z "$WORKTREE_NAME" ]]; then
     exit 1
 fi
 
-REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+# Always resolve to the main repo root, even when run from a worktree.
+REPO_ROOT="$(cd "$(dirname "$0")/.." && \
+    dirname "$(git rev-parse --path-format=absolute --git-common-dir)")"
 WORKTREE_PATH="$REPO_ROOT/worktrees/$WORKTREE_NAME"
 IBL5_DIR="$REPO_ROOT/ibl5"
 THRESHOLD="${E2E_THRESHOLD:-40}"
@@ -35,20 +37,17 @@ fi
 # --- Full-suite trigger modules (broad blast radius) ---
 FULL_SUITE_MODULES="Navigation PageLayout UI Utilities Bootstrap League Module Settings Shared Database Services"
 
-# --- Alias map: class name → spec base name (for known mismatches) ---
-# Extension class produces kebab "extension" but spec is "contract-extension"
-declare -A ALIAS_MAP=(
-    ["Extension"]="contract-extension"
-)
+# --- Temp file for collecting test paths (avoids bash 3.2 associative array limitation) ---
+TEST_COLLECTOR=$(mktemp)
+trap "rm -f $TEST_COLLECTOR" EXIT
 
-# --- Cross-cutting specs always included when any flow test is selected ---
-CROSS_CUTTING_SPECS=(
-    "tests/e2e/flows/cross-module-navigation.spec.ts"
-    "tests/e2e/flows/parameter-edge-cases.spec.ts"
-)
-
-declare -A SEEN_TESTS
-FULL_SUITE=false
+# --- Alias map function: class name → spec base name (for known mismatches) ---
+alias_for_module() {
+    case "$1" in
+        Extension) echo "contract-extension" ;;
+        *) return 1 ;;
+    esac
+}
 
 while IFS= read -r file; do
     # --- Broad non-PHP triggers ---
@@ -56,8 +55,7 @@ while IFS= read -r file; do
        [[ "$file" == ibl5/index.php ]] || \
        [[ "$file" == ibl5/.htaccess ]] || \
        [[ "$file" == .htaccess ]]; then
-        FULL_SUITE=true
-        break
+        exit 2
     fi
 
     # --- Top-level shared PHP classes ---
@@ -65,8 +63,7 @@ while IFS= read -r file; do
        [[ "$file" == ibl5/classes/ContractRules.php ]] || \
        [[ "$file" == ibl5/classes/JSB.php ]] || \
        [[ "$file" == ibl5/classes/CommonMysqliRepository.php ]]; then
-        FULL_SUITE=true
-        break
+        exit 2
     fi
 
     # --- Module-level check for full-suite triggers ---
@@ -74,66 +71,54 @@ while IFS= read -r file; do
         MODULE="${BASH_REMATCH[1]}"
         for infra in $FULL_SUITE_MODULES; do
             if [[ "$MODULE" == "$infra" ]]; then
-                FULL_SUITE=true
-                break 2
+                exit 2
             fi
         done
 
         # --- Alias map: translate class name to spec base name ---
-        if [[ -n "${ALIAS_MAP[$MODULE]+x}" ]]; then
-            alias_kebab="${ALIAS_MAP[$MODULE]}"
+        alias_kebab=$(alias_for_module "$MODULE" 2>/dev/null || true)
+        if [[ -n "$alias_kebab" ]]; then
             for f in "$IBL5_DIR"/tests/e2e/*/${alias_kebab}.spec.ts \
                      "$IBL5_DIR"/tests/e2e/*/${alias_kebab}-*.spec.ts; do
-                [[ -f "$f" ]] && SEEN_TESTS["${f#"$IBL5_DIR/"}"]="1"
+                [[ -f "$f" ]] && echo "${f#"$IBL5_DIR/"}" >> "$TEST_COLLECTOR"
             done
         fi
     fi
 
     # --- Standard mapping via e2e-for-file ---
     if [[ "$file" == *.php ]]; then
-        while IFS= read -r test; do
-            [[ -n "$test" ]] && SEEN_TESTS["$test"]="1"
-        done < <("$REPO_ROOT/bin/e2e-for-file" "$file" 2>/dev/null || true)
+        "$REPO_ROOT/bin/e2e-for-file" "$file" >> "$TEST_COLLECTOR" 2>/dev/null || true
     fi
 
     # --- Changed E2E test files: include directly ---
     if [[ "$file" =~ ^ibl5/tests/e2e/.*\.spec\.ts$ ]]; then
-        relative="${file#ibl5/}"
-        SEEN_TESTS["$relative"]="1"
+        echo "${file#ibl5/}" >> "$TEST_COLLECTOR"
     fi
 
 done <<< "$CHANGED_FILES"
 
-if [[ "$FULL_SUITE" == true ]]; then
-    exit 2
-fi
+# Deduplicate
+TESTS=$(sort -u "$TEST_COLLECTOR")
 
 # No mapped tests → skip E2E entirely
-if [[ ${#SEEN_TESTS[@]} -eq 0 ]]; then
+if [[ -z "$TESTS" ]]; then
     exit 0
 fi
 
 # Add cross-cutting specs when any flow tests are selected
-HAS_FLOW=false
-for test in "${!SEEN_TESTS[@]}"; do
-    if [[ "$test" == tests/e2e/flows/* ]]; then
-        HAS_FLOW=true
-        break
-    fi
-done
-
-if [[ "$HAS_FLOW" == true ]]; then
-    for cc in "${CROSS_CUTTING_SPECS[@]}"; do
-        [[ -f "$IBL5_DIR/$cc" ]] && SEEN_TESTS["$cc"]="1"
-    done
+if echo "$TESTS" | grep -q '^tests/e2e/flows/'; then
+    for cc in \
+        "tests/e2e/flows/cross-module-navigation.spec.ts" \
+        "tests/e2e/flows/parameter-edge-cases.spec.ts"; do
+        [[ -f "$IBL5_DIR/$cc" ]] && echo "$cc"
+    done >> "$TEST_COLLECTOR"
+    TESTS=$(sort -u "$TEST_COLLECTOR")
 fi
 
 # Threshold guard — too many tests means full suite is safer
-if [[ ${#SEEN_TESTS[@]} -ge "$THRESHOLD" ]]; then
+TEST_COUNT=$(echo "$TESTS" | wc -l | tr -d ' ')
+if [[ "$TEST_COUNT" -ge "$THRESHOLD" ]]; then
     exit 2
 fi
 
-# Print deduplicated test file list
-for test in "${!SEEN_TESTS[@]}"; do
-    echo "$test"
-done | sort
+echo "$TESTS"

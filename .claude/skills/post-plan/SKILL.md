@@ -118,11 +118,15 @@ cd <worktree>/ibl5 && composer run analyse
 ```
 
 **Agent 2 — E2E (Playwright):**
-```bash
-bin/wt-down <worktree-name> --volumes
-bin/wt-up <worktree-name> --seed
-bin/e2e-wt.sh <worktree-name>
-```
+
+Steps:
+1. Run `bin/wt-down <worktree-name> --volumes` then `bin/wt-up <worktree-name> --seed`
+2. Run `bin/e2e-for-pr <worktree-name>` and capture both stdout and exit code
+3. Branch on the result:
+   - **Exit 0, empty stdout** → print "No E2E tests map to changed files — skipping E2E" and stop
+   - **Exit 2** → run full suite: `bin/e2e-wt.sh <worktree-name>`
+   - **Exit 0, test file list on stdout** → run targeted: `bin/e2e-wt.sh <worktree-name> <test-files-from-stdout>`
+
 Prompt MUST include: "Run these commands and report the summary output. Do NOT investigate, re-run, or diagnose individual test failures — just report the pass/fail counts and any error output."
 
 If either fails, fix in worktree, commit, push, and re-run the failing track.

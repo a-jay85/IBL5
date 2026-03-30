@@ -55,6 +55,7 @@ class LeagueControlPanelProcessor implements LeagueControlPanelProcessorInterfac
             'activate_trivia' => $this->activateTrivia(),
             'deactivate_trivia' => $this->deactivateTrivia(),
             'delete_draft_placeholders' => $this->deleteDraftPlaceholders(),
+            'delete_outdated_buyouts_cash' => $this->deleteOutdatedBuyoutsAndCash(),
             'reset_contract_extensions' => $this->resetContractExtensions(),
             'reset_mles_lles' => $this->resetMlesLles(),
             'reset_asg_voting' => $this->resetAsgVoting(),
@@ -199,6 +200,16 @@ class LeagueControlPanelProcessor implements LeagueControlPanelProcessorInterfac
         $count = $this->repository->deleteDraftPlaceholders();
 
         return ['success' => true, 'message' => 'Deleted ' . $count . ' draft placeholder(s) from ibl_plr.'];
+    }
+
+    /**
+     * @return array{success: bool, message: string}
+     */
+    public function deleteOutdatedBuyoutsAndCash(): array
+    {
+        $count = $this->repository->deleteOutdatedBuyoutsAndCash();
+
+        return ['success' => true, 'message' => 'Deleted ' . $count . ' outdated buyout/cash consideration(s) from ibl_plr.'];
     }
 
     /**

@@ -109,7 +109,7 @@ Both comments end with: `Generated with [Claude Code](https://claude.ai/code)` a
 
 ## Phase 6: Final Verification
 
-Run two parallel **Sonnet** agents:
+Run two parallel agents (**Sonnet** for PHPUnit+PHPStan, **Haiku** for E2E):
 
 **Agent 1 — PHPUnit + PHPStan:**
 ```bash
@@ -123,6 +123,7 @@ bin/wt-down <worktree-name> --volumes
 bin/wt-up <worktree-name> --seed
 bin/e2e-wt.sh <worktree-name>
 ```
+Prompt MUST include: "Run these commands and report the summary output. Do NOT investigate, re-run, or diagnose individual test failures — just report the pass/fail counts and any error output."
 
 If either fails, fix in worktree, commit, push, and re-run the failing track.
 

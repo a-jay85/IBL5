@@ -33,6 +33,9 @@ class PageLayout
             unset($_SESSION['flash_success']);
             echo '<div class="ibl-alert ibl-alert--success">' . $flashMessage . '</div>';
         }
+        if (defined('ADMIN_PHASE_GATE_NOTICE')) {
+            echo '<div class="ibl-alert ibl-alert--warning">Admin mode: You can view this module, but it is currently closed to non-admin GMs.</div>';
+        }
         if (defined('HOME_FILE')) {
             blocks("Center");
         }
@@ -55,6 +58,9 @@ class PageLayout
             $flashMessage = \Utilities\HtmlSanitizer::safeHtmlOutput($_SESSION['flash_success']);
             unset($_SESSION['flash_success']);
             echo '<div class="ibl-alert ibl-alert--success">' . $flashMessage . '</div>';
+        }
+        if (defined('ADMIN_PHASE_GATE_NOTICE')) {
+            echo '<div class="ibl-alert ibl-alert--warning">Admin mode: You can view this module, but it is currently closed to non-admin GMs.</div>';
         }
     }
 

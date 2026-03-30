@@ -38,7 +38,7 @@ class FreeAgencyPreviewService implements FreeAgencyPreviewServiceInterface
         $freeAgents = [];
 
         foreach ($players as $player) {
-            $nextYear = $player['cy'] + 1;
+            $nextYear = ($player['cy'] ?? 0) + 1;
             $nextYearSalary = match ($nextYear) {
                 1 => $player['cy1'],
                 2 => $player['cy2'],

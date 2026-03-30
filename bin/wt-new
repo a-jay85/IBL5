@@ -53,6 +53,7 @@ git -C "$REPO_ROOT" worktree add "$WT_ROOT" -b "$NAME" "$BASE_BRANCH"
 # Symlinks
 echo "Setting up symlinks..."
 ln -sf "$MAIN_IBL5/config.php" "$WT_IBL5/config.php"
+ln -sf "$MAIN_IBL5/.env" "$WT_IBL5/.env"
 ln -sf "$MAIN_IBL5/.env.test" "$WT_IBL5/.env.test"
 ln -sf "$MAIN_IBL5/vendor" "$WT_IBL5/vendor"
 ln -sf "$MAIN_IBL5/node_modules" "$WT_IBL5/node_modules"

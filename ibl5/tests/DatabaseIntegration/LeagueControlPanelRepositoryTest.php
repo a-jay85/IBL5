@@ -224,12 +224,12 @@ class LeagueControlPanelRepositoryTest extends DatabaseTestCase
 
     // ── deleteOutdatedBuyoutsAndCash ─────────────────────────────
 
-    public function testDeleteOutdatedBuyoutsAndCashDeletesExpiredBuyout(): void
+    public function testDeleteOutdatedBuyoutsAndCashDeletesFullyPaidBuyout(): void
     {
-        // Buyout with cy > cyt (contract expired) — should be deleted
-        $this->insertTestPlayer(200100040, '| Expired Buyout', [
+        // Buyout in final year with cy6=0 — all obligations fulfilled, should be deleted
+        $this->insertTestPlayer(200100040, '| Paid Off Buyout', [
             'tid' => 1,
-            'cy' => 7,
+            'cy' => 6,
             'cyt' => 6,
             'cy1' => 500,
             'cy2' => 500,

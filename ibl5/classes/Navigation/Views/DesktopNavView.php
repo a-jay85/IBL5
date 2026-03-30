@@ -137,7 +137,7 @@ class DesktopNavView
 
         ob_start();
         ?>
-        <div class="relative group">
+        <div class="relative group"<?= $includeLoginForm ? ' data-nav-login' : '' ?>>
             <button class="flex items-center gap-2 px-3 py-2.5 text-lg font-semibold font-display text-gray-300 hover:text-white transition-colors duration-200">
                 <?php if ($icon !== ''): ?>
                     <span class="text-accent-500 group-hover:text-accent-400 transition-colors"><?= $icon ?></span>

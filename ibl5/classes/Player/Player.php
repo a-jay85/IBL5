@@ -531,23 +531,10 @@ class Player implements PlayerInterface
 
     /**
      * @see PlayerInterface::isPlayerFreeAgent()
-     *
-     * @param int|Season $season Season object or ending year to check
      */
-    public function isPlayerFreeAgent(int|Season $season): bool
+    public function isPlayerFreeAgent(Season $season): bool
     {
-        if ($season instanceof Season) {
-            return $this->contractValidator->isPlayerFreeAgent($this->getPlayerData(), $season);
-        }
-
-        // For int argument, calculate directly: int represents the ending year
-        $playerData = $this->getPlayerData();
-        $yearPlayerIsFreeAgent = ($playerData->draftYear ?? 0)
-            + ($playerData->yearsOfExperience ?? 0)
-            + ($playerData->contractTotalYears ?? 0)
-            - ($playerData->contractCurrentYear ?? 0);
-
-        return $yearPlayerIsFreeAgent === $season;
+        return $this->contractValidator->isPlayerFreeAgent($this->getPlayerData(), $season);
     }
 
     /**

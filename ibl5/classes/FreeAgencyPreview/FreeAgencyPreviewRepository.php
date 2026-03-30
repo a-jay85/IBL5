@@ -26,6 +26,7 @@ class FreeAgencyPreviewRepository extends \BaseMysqliRepository implements FreeA
     public function getActivePlayers(): array
     {
         $query = "SELECT p.pid, p.tid, p.name, t.team_name AS teamname, p.pos, p.age, p.draftyear, p.exp, p.cy, p.cyt,
+                         p.cy1, p.cy2, p.cy3, p.cy4, p.cy5, p.cy6,
                          p.r_fga, p.r_fgp, p.r_fta, p.r_ftp, p.r_tga, p.r_tgp,
                          p.r_orb, p.r_drb, p.r_ast, p.r_stl, p.r_blk, p.r_to, p.r_foul,
                          p.oo, p.`do`, p.po, p.`to`, p.od, p.dd, p.pd, p.td,

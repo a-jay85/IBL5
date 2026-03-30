@@ -3,7 +3,8 @@
 # Box score tables are limited to a single season to keep the dump small.
 #
 # Usage: bin/db-export-prod [season-ending-year]
-#   season-ending-year  The calendar year the season's playoffs end (default: current year)
+#   season-ending-year  The calendar year the season's playoffs end
+#                       (default: auto-detected from ibl_settings)
 #
 # IBL seasons run October → June:
 #   HEAT starts in October of year Y-1, playoffs end in June of year Y.
@@ -50,8 +51,20 @@ else
     echo "Mode: local Docker ($DB_HOST)"
 fi
 
-# Default to current calendar year
-SEASON_END_YEAR="${1:-$(date +%Y)}"
+# Detect most recent season from the database (not wall-clock time).
+# ibl_settings stores "Current Season Ending Year" which is the calendar year
+# the current or most-recently-completed season's playoffs end in.
+if [ -n "${1:-}" ]; then
+    SEASON_END_YEAR="$1"
+else
+    SEASON_END_YEAR=$(MYSQL_PWD="$DB_PASS_VAL" mariadb -h "$DB_HOST" \
+        -P "$DB_PORT" --skip-ssl -u "$DB_USER_VAL" "$DB_NAME" -N -e \
+        "SELECT setting_value FROM ibl_settings WHERE setting_name='Current Season Ending Year';")
+    if [ -z "$SEASON_END_YEAR" ]; then
+        echo "Error: could not detect season from ibl_settings." >&2
+        exit 1
+    fi
+fi
 SEASON_START="$((SEASON_END_YEAR - 1))-10-01"
 SEASON_END="${SEASON_END_YEAR}-06-30"
 
@@ -78,20 +91,35 @@ db_dump() {
         -u "$DB_USER_VAL" $DUMP_OPTS "$@"
 }
 
-# 1. Get list of all real tables (skip views — engine is NULL)
-ALL_TABLES=$(db_query "SELECT table_name FROM information_schema.tables WHERE table_schema='$DB_NAME' AND engine IS NOT NULL ORDER BY table_name;")
+# 1. Fetch table and view lists in a single query (one round trip)
+TABLE_META=$(db_query "
+    SELECT CONCAT(IF(engine IS NOT NULL, 'T', 'V'), '|', table_name)
+    FROM information_schema.tables
+    WHERE table_schema='$DB_NAME'
+    ORDER BY table_name;
+")
 
-# 2. Build list of tables excluding box scores
+ALL_TABLES=""
 REGULAR_TABLES=""
-for t in $ALL_TABLES; do
-    if ! echo "$t" | grep -qE "$SKIP_REGEX"; then
-        REGULAR_TABLES="$REGULAR_TABLES $t"
+VIEWS=""
+for row in $TABLE_META; do
+    kind="${row%%|*}"
+    name="${row#*|}"
+    if [ "$kind" = "T" ]; then
+        ALL_TABLES="$ALL_TABLES $name"
+        if ! echo "$name" | grep -qE "$SKIP_REGEX"; then
+            REGULAR_TABLES="$REGULAR_TABLES $name"
+        fi
+    else
+        VIEWS="$VIEWS $name"
     fi
 done
 
 mkdir -p "$(dirname "$OUTPUT")"
+TMPDIR=$(mktemp -d)
+trap 'rm -rf "$TMPDIR"' EXIT
 
-# 3. Dump structure for ALL tables (including box scores) — no data
+# 2. Dump structure for ALL tables (including box scores) — no data
 #    Include --routines and --triggers here (only in this step)
 #    stderr is NOT suppressed — surface mariadb-dump errors instead of silently
 #    producing a header-only file (which was the root cause of missing CREATE TABLEs).
@@ -108,26 +136,46 @@ if ! grep -q 'CREATE TABLE' "$OUTPUT"; then
     exit 1
 fi
 
-# 4. Dump data for regular tables (skip triggers — already in structure dump)
+# 3. Dump data, views, and filtered box scores in parallel
+#    Each mariadb-dump opens a new connection, so parallelising saves round trips.
+PIDS=""
+
 echo "-- Dumping data for regular tables..."
 # shellcheck disable=SC2086
-db_dump --no-create-info --skip-triggers "$DB_NAME" $REGULAR_TABLES >> "$OUTPUT"
+db_dump --no-create-info --skip-triggers "$DB_NAME" $REGULAR_TABLES \
+    > "$TMPDIR/regular.sql" &
+PIDS="$PIDS $!"
 
-# 5. Dump filtered box score data (skip triggers — already in structure dump)
 for tbl in $BOX_TABLES; do
     echo "-- Dumping $tbl (season ${SEASON_END_YEAR} only)..."
     db_dump --no-create-info --skip-triggers \
         --where="Date BETWEEN '${SEASON_START}' AND '${SEASON_END}'" \
-        "$DB_NAME" "$tbl" >> "$OUTPUT"
+        "$DB_NAME" "$tbl" > "$TMPDIR/box_${tbl}.sql" &
+    PIDS="$PIDS $!"
 done
 
-# 6. Dump views (structure only — they have no data)
-echo "-- Dumping views..."
-VIEWS=$(db_query "SELECT table_name FROM information_schema.tables WHERE table_schema='$DB_NAME' AND table_type='VIEW' ORDER BY table_name;")
 if [ -n "$VIEWS" ]; then
+    echo "-- Dumping views..."
     # shellcheck disable=SC2086
-    db_dump "$DB_NAME" $VIEWS >> "$OUTPUT"
+    db_dump "$DB_NAME" $VIEWS > "$TMPDIR/views.sql" &
+    PIDS="$PIDS $!"
 fi
+
+# Wait for all background dumps; fail if any errored
+for pid in $PIDS; do
+    if ! wait "$pid"; then
+        echo "Error: a parallel dump job (PID $pid) failed." >&2
+        rm -f "$OUTPUT"
+        exit 1
+    fi
+done
+
+# 4. Concatenate in deterministic order: regular data → box scores → views
+cat "$TMPDIR/regular.sql" >> "$OUTPUT"
+for tbl in $BOX_TABLES; do
+    cat "$TMPDIR/box_${tbl}.sql" >> "$OUTPUT"
+done
+[ -f "$TMPDIR/views.sql" ] && cat "$TMPDIR/views.sql" >> "$OUTPUT"
 
 # 7. Strip DEFINER clauses — prod exports contain DEFINER=user@host that may
 #    not match the Docker MariaDB user, causing ERROR 1449 on import.

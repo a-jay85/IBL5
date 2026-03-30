@@ -39,21 +39,6 @@ class FreeAgencyAdminRepository extends BaseMysqliRepository implements FreeAgen
     }
 
     /**
-     * @see FreeAgencyAdminRepositoryInterface::getPlayerDemands()
-     *
-     * @return DemandRow|null
-     */
-    public function getPlayerDemands(int $playerID): ?array
-    {
-        /** @var DemandRow|null */
-        return $this->fetchOne(
-            "SELECT dem1, dem2, dem3, dem4, dem5, dem6 FROM ibl_demands WHERE pid = ?",
-            "i",
-            $playerID
-        );
-    }
-
-    /**
      * @see FreeAgencyAdminRepositoryInterface::getPlayerDemandsBatch()
      *
      * @return array<int, DemandRow>

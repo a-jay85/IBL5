@@ -47,14 +47,6 @@ interface FreeAgencyAdminRepositoryInterface
     public function getAllOffersWithBirdYears(): array;
 
     /**
-     * Get player demand values from the demands table
-     *
-     * @param int $playerID Player ID to look up
-     * @return DemandRow|null Demand row with dem1-dem6 fields, or null if not found
-     */
-    public function getPlayerDemands(int $playerID): ?array;
-
-    /**
      * Update a player's contract after signing
      *
      * Sets cy=0, assigns contract year salaries, contract years total, and team ID.

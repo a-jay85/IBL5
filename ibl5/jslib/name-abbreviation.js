@@ -12,7 +12,9 @@
 
     const MOBILE_BREAKPOINT = 768;
     /** Tables where names are always abbreviated (then selectively restored if they fit) */
-    const COMPACT_TABLE_SELECTOR = '.stat-table, .fa-table, .trading-roster';
+    const COMPACT_TABLE_SELECTOR = '.stat-table, .trading-roster';
+    /** Tables abbreviated on mobile only (not on desktop) */
+    const MOBILE_COMPACT_SELECTOR = '.fa-table';
 
     /** Long team names mapped to shorter display forms */
     const TEAM_ABBREVIATIONS = {
@@ -109,12 +111,13 @@
             }
 
             var inCompactTable = link.closest(COMPACT_TABLE_SELECTOR) !== null;
-            var shouldAbbreviate = isMobile || inCompactTable;
+            var inMobileCompactTable = link.closest(MOBILE_COMPACT_SELECTOR) !== null;
+            var shouldAbbreviate = isMobile ? (inCompactTable || inMobileCompactTable) : inCompactTable;
             var newName = shouldAbbreviate ? abbreviateName(link.dataset.fullName) : link.dataset.fullName;
 
             setLinkText(link, textNode, newName);
 
-            if (inCompactTable) {
+            if (shouldAbbreviate) {
                 compactLinks.push(link);
             }
         }

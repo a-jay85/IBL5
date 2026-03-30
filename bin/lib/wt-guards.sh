@@ -14,20 +14,21 @@ kill_infra_processes() {
         if [ -f "$pid_file" ]; then
             local pid
             pid=$(cat "$pid_file")
-            kill "$pid" 2>/dev/null || true
+            kill -9 "$pid" 2>/dev/null || true
             rm -f "$pid_file"
         fi
     done
 
-    # Kill any remaining browser-sync/node processes with CWD in this worktree.
-    # Catches orphaned processes whose PID files were already removed.
+    # Kill any remaining node processes (browser-sync, CSS watcher) with CWD
+    # in this worktree. lsof COMMAND column shows just "node", not the full path.
+    # Uses SIGKILL — these orphaned watchers ignore SIGTERM.
     local pids
     pids=$(lsof -d cwd 2>/dev/null \
         | grep "$wt_path" \
-        | awk '/browser-sync|\/node / { print $2 }' \
-        | sort -u)
+        | awk '/^node / { print $2 }' \
+        | sort -u || true)
     if [ -n "$pids" ]; then
-        echo "$pids" | xargs kill 2>/dev/null || true
+        echo "$pids" | xargs kill -9 2>/dev/null || true
     fi
 }
 

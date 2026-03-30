@@ -8,7 +8,7 @@ namespace Navigation;
  * Value object holding all configuration needed to render the navigation bar.
  * Replaces 10 constructor parameters with a single typed object.
  *
- * @phpstan-type NavLink array{label?: string, url?: string, external?: bool, badge?: string, rawHtml?: string}
+ * @phpstan-type NavLink array{label?: string, url?: string, external?: bool, noBoost?: bool, badge?: string, rawHtml?: string}
  * @phpstan-type NavMenuData array{links: list<NavLink>, icon?: string}
  * @phpstan-type NavTeamsData array<string, array<string, list<array{teamid: int, team_name: string, team_city: string}>>>
  */

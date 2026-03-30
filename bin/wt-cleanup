@@ -92,6 +92,10 @@ check_worktree() {
         return
     fi
 
+    # Kill infrastructure processes (browser-sync, CSS watcher) before checking.
+    # These are background watchers that should not block cleanup.
+    kill_infra_processes "$wt_path"
+
     # Never tear down a worktree that is actively in use
     if is_worktree_in_use "$wt_path"; then
         echo "  SKIP $wt_name: worktree is in active use (processes detected)"
@@ -172,6 +176,9 @@ if [ "$ALL" = true ]; then
             if git -C "$REPO_ROOT" worktree list --porcelain | grep -q "^worktree $dir$"; then
                 continue  # registered with git, already handled above
             fi
+
+            # Kill infrastructure processes before checking
+            kill_infra_processes "$dir"
 
             # Safety: skip if processes are using this directory
             if is_worktree_in_use "$dir"; then

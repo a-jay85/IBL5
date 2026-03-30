@@ -4,6 +4,33 @@
 # Usage: source "$(dirname "$0")/lib/wt-guards.sh"  (from bin/)
 #        source "$REPO_ROOT/bin/lib/wt-guards.sh"    (from elsewhere)
 
+# Kill infrastructure processes (browser-sync, CSS watcher) for a worktree.
+# These are background watchers started by wt-up that should not block cleanup.
+kill_infra_processes() {
+    local wt_path="${1%/}"
+
+    # Kill via PID files first (fast, reliable)
+    for pid_file in "$wt_path/.bs-sync.pid" "$wt_path/.css-watch.pid"; do
+        if [ -f "$pid_file" ]; then
+            local pid
+            pid=$(cat "$pid_file")
+            kill "$pid" 2>/dev/null || true
+            rm -f "$pid_file"
+        fi
+    done
+
+    # Kill any remaining browser-sync/node processes with CWD in this worktree.
+    # Catches orphaned processes whose PID files were already removed.
+    local pids
+    pids=$(lsof -d cwd 2>/dev/null \
+        | grep "$wt_path" \
+        | awk '/browser-sync|\/node / { print $2 }' \
+        | sort -u)
+    if [ -n "$pids" ]; then
+        echo "$pids" | xargs kill 2>/dev/null || true
+    fi
+}
+
 # Check if any process has its working directory inside the worktree.
 # Returns 0 (active) or 1 (safe to modify).
 is_worktree_in_use() {

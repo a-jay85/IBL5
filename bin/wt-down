@@ -75,7 +75,7 @@ teardown_worktree() {
     if [ -f "$css_pid_file" ]; then
         local css_pid
         css_pid=$(cat "$css_pid_file")
-        kill "$css_pid" 2>/dev/null || true
+        kill -9 "$css_pid" 2>/dev/null || true
         rm -f "$css_pid_file" "$wt_path/.css-watch.log"
         echo "  Stopped CSS watcher (PID $css_pid)"
     fi
@@ -85,7 +85,7 @@ teardown_worktree() {
     if [ -f "$bs_pid_file" ]; then
         local bs_pid
         bs_pid=$(cat "$bs_pid_file")
-        kill "$bs_pid" 2>/dev/null || true
+        kill -9 "$bs_pid" 2>/dev/null || true
         rm -f "$bs_pid_file" "$wt_path/.bs-sync.log"
         echo "  Stopped browser-sync (PID $bs_pid)"
     fi

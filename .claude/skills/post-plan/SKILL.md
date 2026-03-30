@@ -121,7 +121,12 @@ cd <worktree>/ibl5 && composer run analyse
 ```bash
 bin/wt-down <worktree-name> --volumes
 bin/wt-up <worktree-name> --seed
-bin/e2e-wt.sh <worktree-name>
+
+# Smart test selection — determines which E2E tests to run
+bin/e2e-for-pr <worktree-name>
+# Exit 0 + empty output → skip E2E ("No E2E tests map to changed files")
+# Exit 2             → full suite: bin/e2e-wt.sh <worktree-name>
+# Exit 0 + test list → targeted:   bin/e2e-wt.sh <worktree-name> <test-files...>
 ```
 Prompt MUST include: "Run these commands and report the summary output. Do NOT investigate, re-run, or diagnose individual test failures — just report the pass/fail counts and any error output."
 

@@ -1,0 +1,139 @@
+#!/usr/bin/env bash
+# Map a PR's changed files to the minimal E2E test set.
+# Usage: bin/e2e-for-pr <worktree-name>
+#
+# Exit codes:
+#   0 + test paths on stdout → run only those tests
+#   0 + empty stdout         → skip E2E entirely (no relevant tests)
+#   2                        → run full suite (infrastructure changed or too many tests)
+
+set -euo pipefail
+
+WORKTREE_NAME="${1:-}"
+if [[ -z "$WORKTREE_NAME" ]]; then
+    echo "Usage: bin/e2e-for-pr <worktree-name>" >&2
+    exit 1
+fi
+
+REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+WORKTREE_PATH="$REPO_ROOT/worktrees/$WORKTREE_NAME"
+IBL5_DIR="$REPO_ROOT/ibl5"
+THRESHOLD="${E2E_THRESHOLD:-40}"
+
+if [[ ! -d "$WORKTREE_PATH" ]]; then
+    echo "Error: Worktree not found at $WORKTREE_PATH" >&2
+    exit 1
+fi
+
+# --- Get changed files against master ---
+CHANGED_FILES=$(git -C "$WORKTREE_PATH" diff --name-only origin/master...HEAD 2>/dev/null || true)
+
+if [[ -z "$CHANGED_FILES" ]]; then
+    exit 0
+fi
+
+# --- Full-suite trigger modules (broad blast radius) ---
+FULL_SUITE_MODULES="Navigation PageLayout UI Utilities Bootstrap League Module Settings Shared Database Services"
+
+# --- Alias map: class name → spec base name (for known mismatches) ---
+# Extension class produces kebab "extension" but spec is "contract-extension"
+declare -A ALIAS_MAP=(
+    ["Extension"]="contract-extension"
+)
+
+# --- Cross-cutting specs always included when any flow test is selected ---
+CROSS_CUTTING_SPECS=(
+    "tests/e2e/flows/cross-module-navigation.spec.ts"
+    "tests/e2e/flows/parameter-edge-cases.spec.ts"
+)
+
+declare -A SEEN_TESTS
+FULL_SUITE=false
+
+while IFS= read -r file; do
+    # --- Broad non-PHP triggers ---
+    if [[ "$file" == ibl5/config/* ]] || \
+       [[ "$file" == ibl5/index.php ]] || \
+       [[ "$file" == ibl5/.htaccess ]] || \
+       [[ "$file" == .htaccess ]]; then
+        FULL_SUITE=true
+        break
+    fi
+
+    # --- Top-level shared PHP classes ---
+    if [[ "$file" == ibl5/classes/BaseMysqliRepository.php ]] || \
+       [[ "$file" == ibl5/classes/ContractRules.php ]] || \
+       [[ "$file" == ibl5/classes/JSB.php ]] || \
+       [[ "$file" == ibl5/classes/CommonMysqliRepository.php ]]; then
+        FULL_SUITE=true
+        break
+    fi
+
+    # --- Module-level check for full-suite triggers ---
+    if [[ "$file" =~ ibl5/classes/([^/]+)/ ]]; then
+        MODULE="${BASH_REMATCH[1]}"
+        for infra in $FULL_SUITE_MODULES; do
+            if [[ "$MODULE" == "$infra" ]]; then
+                FULL_SUITE=true
+                break 2
+            fi
+        done
+
+        # --- Alias map: translate class name to spec base name ---
+        if [[ -n "${ALIAS_MAP[$MODULE]+x}" ]]; then
+            alias_kebab="${ALIAS_MAP[$MODULE]}"
+            for f in "$IBL5_DIR"/tests/e2e/*/${alias_kebab}.spec.ts \
+                     "$IBL5_DIR"/tests/e2e/*/${alias_kebab}-*.spec.ts; do
+                [[ -f "$f" ]] && SEEN_TESTS["${f#"$IBL5_DIR/"}"]="1"
+            done
+        fi
+    fi
+
+    # --- Standard mapping via e2e-for-file ---
+    if [[ "$file" == *.php ]]; then
+        while IFS= read -r test; do
+            [[ -n "$test" ]] && SEEN_TESTS["$test"]="1"
+        done < <("$REPO_ROOT/bin/e2e-for-file" "$file" 2>/dev/null || true)
+    fi
+
+    # --- Changed E2E test files: include directly ---
+    if [[ "$file" =~ ^ibl5/tests/e2e/.*\.spec\.ts$ ]]; then
+        relative="${file#ibl5/}"
+        SEEN_TESTS["$relative"]="1"
+    fi
+
+done <<< "$CHANGED_FILES"
+
+if [[ "$FULL_SUITE" == true ]]; then
+    exit 2
+fi
+
+# No mapped tests → skip E2E entirely
+if [[ ${#SEEN_TESTS[@]} -eq 0 ]]; then
+    exit 0
+fi
+
+# Add cross-cutting specs when any flow tests are selected
+HAS_FLOW=false
+for test in "${!SEEN_TESTS[@]}"; do
+    if [[ "$test" == tests/e2e/flows/* ]]; then
+        HAS_FLOW=true
+        break
+    fi
+done
+
+if [[ "$HAS_FLOW" == true ]]; then
+    for cc in "${CROSS_CUTTING_SPECS[@]}"; do
+        [[ -f "$IBL5_DIR/$cc" ]] && SEEN_TESTS["$cc"]="1"
+    done
+fi
+
+# Threshold guard — too many tests means full suite is safer
+if [[ ${#SEEN_TESTS[@]} -ge "$THRESHOLD" ]]; then
+    exit 2
+fi
+
+# Print deduplicated test file list
+for test in "${!SEEN_TESTS[@]}"; do
+    echo "$test"
+done | sort

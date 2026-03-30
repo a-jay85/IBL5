@@ -1,0 +1,70 @@
+# Extra PHP containers for local E2E test sharding.
+# Shares the worktree's existing DB container via the ibl5-proxy network.
+#
+# Required env vars: SLUG, REPO_ROOT, WORKTREE_PATH
+# Usage: docker compose -f docker/shard-compose.yml -p ibl5-shards-${SLUG} up -d
+
+services:
+  shard-2:
+    build: ${REPO_ROOT}
+    container_name: ibl5-php-shard-2-${SLUG}
+    environment:
+      DB_HOST: ibl5-db-${SLUG}
+      E2E_TESTING: 1
+      MAIL_TRANSPORT: smtp
+      MAIL_SMTP_HOST: ibl5-mailpit
+      MAIL_SMTP_PORT: 1025
+      MAIL_SMTP_ENCRYPTION: ""
+    volumes:
+      - ${WORKTREE_PATH}/ibl5:/var/www/html/ibl5
+      - ${REPO_ROOT}/ibl5/vendor:/var/www/html/ibl5/vendor:ro
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.shard-2-${SLUG}.rule=Host(`shard-2-${SLUG}.localhost`)
+      - traefik.http.services.shard-2-${SLUG}.loadbalancer.server.port=80
+    networks:
+      - ibl5-proxy
+
+  shard-3:
+    build: ${REPO_ROOT}
+    container_name: ibl5-php-shard-3-${SLUG}
+    environment:
+      DB_HOST: ibl5-db-${SLUG}
+      E2E_TESTING: 1
+      MAIL_TRANSPORT: smtp
+      MAIL_SMTP_HOST: ibl5-mailpit
+      MAIL_SMTP_PORT: 1025
+      MAIL_SMTP_ENCRYPTION: ""
+    volumes:
+      - ${WORKTREE_PATH}/ibl5:/var/www/html/ibl5
+      - ${REPO_ROOT}/ibl5/vendor:/var/www/html/ibl5/vendor:ro
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.shard-3-${SLUG}.rule=Host(`shard-3-${SLUG}.localhost`)
+      - traefik.http.services.shard-3-${SLUG}.loadbalancer.server.port=80
+    networks:
+      - ibl5-proxy
+
+  shard-4:
+    build: ${REPO_ROOT}
+    container_name: ibl5-php-shard-4-${SLUG}
+    environment:
+      DB_HOST: ibl5-db-${SLUG}
+      E2E_TESTING: 1
+      MAIL_TRANSPORT: smtp
+      MAIL_SMTP_HOST: ibl5-mailpit
+      MAIL_SMTP_PORT: 1025
+      MAIL_SMTP_ENCRYPTION: ""
+    volumes:
+      - ${WORKTREE_PATH}/ibl5:/var/www/html/ibl5
+      - ${REPO_ROOT}/ibl5/vendor:/var/www/html/ibl5/vendor:ro
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.shard-4-${SLUG}.rule=Host(`shard-4-${SLUG}.localhost`)
+      - traefik.http.services.shard-4-${SLUG}.loadbalancer.server.port=80
+    networks:
+      - ibl5-proxy
+
+networks:
+  ibl5-proxy:
+    external: true

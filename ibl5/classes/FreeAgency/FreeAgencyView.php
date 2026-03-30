@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace FreeAgency;
 
-use FreeAgency\Contracts\FreeAgencyViewInterface;
 use Player\Player;
 use Player\PlayerImageHelper;
 use Team\Contracts\TeamQueryRepositoryInterface;
@@ -14,12 +13,10 @@ use Team\Team;
 use Season\Season;
 
 /**
- * @see FreeAgencyViewInterface
- *
  * @phpstan-import-type PlayerRow from \Services\CommonMysqliRepository
- * @phpstan-import-type CapMetrics from \FreeAgency\Contracts\FreeAgencyViewInterface
+ * @phpstan-type CapMetrics array{totalSalaries: array<int, int>, softCapSpace: array<int, int>, hardCapSpace: array<int, int>, rosterSpots: array<int, int>}
  */
-class FreeAgencyView implements FreeAgencyViewInterface
+class FreeAgencyView
 {
     private \mysqli $mysqli_db;
     private TeamQueryRepositoryInterface $teamQueryRepo;
@@ -31,8 +28,6 @@ class FreeAgencyView implements FreeAgencyViewInterface
     }
 
     /**
-     * @see FreeAgencyViewInterface::render()
-     *
      * @param array{team: Team, season: Season, capMetrics: CapMetrics, allOtherPlayers: list<PlayerRow>} $mainPageData
      */
     public function render(array $mainPageData, ?string $result = null): string

@@ -133,6 +133,82 @@ class FreeAgencyRepositoryTest extends DatabaseTestCase
         self::assertTrue($this->repo->isPlayerAlreadySigned(200020006));
     }
 
+    /**
+     * Verify float modifier survives round-trip to MariaDB.
+     * Original freeagentoffer.php stored modifier as a float (~0.8-1.2).
+     */
+    public function testSaveOfferPersistsFloatModifier(): void
+    {
+        $this->insertTestPlayer(200020009, 'FA FloatModTest');
+
+        $this->repo->saveOffer($this->buildOfferData(200020009, 1, [
+            'modifier' => 1.15,
+            'random' => 0,
+            'perceivedValue' => 1150.0,
+        ]));
+
+        $row = $this->fetchOfferRow(200020009, 1);
+        self::assertNotNull($row);
+        self::assertEqualsWithDelta(1.15, (float) $row['modifier'], 0.01,
+            'Float modifier should survive round-trip (not be truncated to int 1)');
+    }
+
+    /**
+     * Verify non-zero random survives round-trip to MariaDB.
+     * Original freeagentoffer.php stored random as int (-5 to +5).
+     */
+    public function testSaveOfferPersistsNonZeroRandom(): void
+    {
+        $this->insertTestPlayer(200020010, 'FA RandomTest');
+
+        $this->repo->saveOffer($this->buildOfferData(200020010, 1, [
+            'modifier' => 1.0,
+            'random' => 3,
+            'perceivedValue' => 1030.0,
+        ]));
+
+        $row = $this->fetchOfferRow(200020010, 1);
+        self::assertNotNull($row);
+        self::assertEqualsWithDelta(3.0, (float) $row['random'], 0.01,
+            'Non-zero random should survive round-trip (not be hardcoded to 0)');
+    }
+
+    /**
+     * Verify negative random also survives.
+     */
+    public function testSaveOfferPersistsNegativeRandom(): void
+    {
+        $this->insertTestPlayer(200020011, 'FA NegRandTest');
+
+        $this->repo->saveOffer($this->buildOfferData(200020011, 1, [
+            'modifier' => 0.95,
+            'random' => -5,
+            'perceivedValue' => 902.5,
+        ]));
+
+        $row = $this->fetchOfferRow(200020011, 1);
+        self::assertNotNull($row);
+        self::assertEqualsWithDelta(-5.0, (float) $row['random'], 0.01);
+        self::assertEqualsWithDelta(0.95, (float) $row['modifier'], 0.01,
+            'Sub-1.0 modifier should not be truncated to 0');
+    }
+
+    /**
+     * @return array<string, mixed>|null
+     */
+    private function fetchOfferRow(int $pid, int $tid): ?array
+    {
+        $stmt = $this->db->prepare(
+            "SELECT modifier, `random`, perceivedvalue FROM ibl_fa_offers WHERE pid = ? AND tid = ?"
+        );
+        $stmt->bind_param('ii', $pid, $tid);
+        $stmt->execute();
+        $result = $stmt->get_result();
+        $row = $result->fetch_assoc();
+        $stmt->close();
+        return $row !== false ? $row : null;
+    }
+
     public function testGetAllPlayersExcludingTeamExcludesCorrectTeam(): void
     {
         $this->insertTestPlayer(200020007, 'FA ExclTeam1', ['tid' => 1]);

@@ -241,6 +241,14 @@ class FreeAgencyOfferValidator implements FreeAgencyOfferValidatorInterface
                 ];
             }
 
+            // Check salary decrease (original: cannot decrease except to $0 termination)
+            if ($currentOffer > 0 && $previousOffer > 0 && $currentOffer < $previousOffer) {
+                return [
+                    'valid' => false,
+                    'error' => "Sorry, you cannot decrease salary in later years of a contract. You offered {$currentOffer} in year {$year}, which is less than you offered in year " . ($year - 1) . ", {$previousOffer}."
+                ];
+            }
+
             // Check raise amount
             if ($currentOffer > 0 && $previousOffer > 0 && $currentOffer > $previousOffer + $maxRaise) {
                 $legalOffer = $previousOffer + $maxRaise;

@@ -10,6 +10,8 @@ use Player\Player;
 
 /**
  * @see FreeAgencyDemandCalculatorInterface
+ *
+ * @phpstan-import-type CalculationResult from FreeAgencyDemandCalculatorInterface
  */
 class FreeAgencyDemandCalculator implements FreeAgencyDemandCalculatorInterface
 {
@@ -43,27 +45,19 @@ class FreeAgencyDemandCalculator implements FreeAgencyDemandCalculatorInterface
     }
 
     /**
-     * Calculate perceived value of an offer with team modifiers applied
-     * 
-     * @param int $offerAverage Average salary offered per year
-     * @param string $teamName Offering team name
-     * @param Player $player Player object with preferences
-     * @param int $yearsInOffer Number of years in the offer
-     * @return float Perceived value after modifiers
+     * @see FreeAgencyDemandCalculatorInterface::calculatePerceivedValue()
+     *
+     * @return CalculationResult
      */
     public function calculatePerceivedValue(
         int $offerAverage,
         string $teamName,
         Player $player,
         int $yearsInOffer
-    ): float {
-        // Get team performance data
+    ): array {
         $teamPerformance = $this->repository->getTeamPerformance($teamName);
-
-        // Calculate position salary
         $positionSalary = $this->calculatePositionSalary($teamName, $player);
 
-        // Calculate modifiers
         $modifier = $this->calculateModifier(
             $teamPerformance['wins'],
             $teamPerformance['losses'],
@@ -79,12 +73,15 @@ class FreeAgencyDemandCalculator implements FreeAgencyDemandCalculatorInterface
             $yearsInOffer,
             $positionSalary
         );
-        
-        // Apply random variance
+
         $random = $this->getRandomFactor();
         $modRandom = (self::RANDOM_VARIANCE_BASE + $random) / self::RANDOM_VARIANCE_BASE;
-        
-        return $offerAverage * $modifier * $modRandom;
+
+        return [
+            'modifier' => $modifier,
+            'random' => $random,
+            'perceivedValue' => $offerAverage * $modifier * $modRandom,
+        ];
     }
 
     /**

@@ -13,7 +13,7 @@ namespace FreeAgency\Contracts;
  * @phpstan-import-type PlayerRow from \Services\CommonMysqliRepository
  *
  * @phpstan-type OfferRow array{offer1: int, offer2: int, offer3: int, offer4: int, offer5: int, offer6: int}
- * @phpstan-type OfferData array{pid: int, tid: int, teamName: string, playerName: string, offer1: int, offer2: int, offer3: int, offer4: int, offer5: int, offer6: int, modifier: int, random: int, perceivedValue: float, mle: int, lle: int, offerType: int}
+ * @phpstan-type OfferData array{pid: int, tid: int, teamName: string, playerName: string, offer1: int, offer2: int, offer3: int, offer4: int, offer5: int, offer6: int, modifier: float, random: int, perceivedValue: float, mle: int, lle: int, offerType: int}
  */
 interface FreeAgencyRepositoryInterface
 {

@@ -192,7 +192,9 @@ class LeagueControlPanelRepository extends \BaseMysqliRepository implements Leag
     public function setWaiversToFreeAgents(): bool
     {
         $this->execute(
-            "UPDATE ibl_plr SET tid = " . League::FREE_AGENTS_TEAMID . ", bird = 0 WHERE retired <> 1 AND ordinal > " . \JSB::WAIVERS_ORDINAL
+            "UPDATE ibl_plr SET tid = " . League::FREE_AGENTS_TEAMID . ", bird = 0"
+            . " WHERE retired <> 1 AND ordinal > " . \JSB::WAIVERS_ORDINAL
+            . " AND name NOT LIKE '|%' AND name NOT LIKE '%Buyout%'"
         );
 
         return true;

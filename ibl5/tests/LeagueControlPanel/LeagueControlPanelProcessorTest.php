@@ -262,6 +262,22 @@ class LeagueControlPanelProcessorTest extends TestCase
         $this->assertStringContainsString('turned off', $result['message']);
     }
 
+    // --- Delete Draft Placeholders ---
+
+    public function testDeleteDraftPlaceholders(): void
+    {
+        $mock = $this->createMock(LeagueControlPanelRepositoryInterface::class);
+        $mock->expects($this->once())
+            ->method('deleteDraftPlaceholders')
+            ->willReturn(5);
+
+        $processor = new LeagueControlPanelProcessor($mock, $this->createStub(AwardGenerationServiceInterface::class));
+        $result = $processor->dispatch('delete_draft_placeholders', []);
+
+        $this->assertTrue($result['success']);
+        $this->assertStringContainsString('5 draft placeholder(s)', $result['message']);
+    }
+
     // --- Reset actions ---
 
     public function testResetContractExtensions(): void

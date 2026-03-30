@@ -135,12 +135,15 @@ test.describe('Depth Chart Entry: mobile card view', () => {
     await expect(footer.locator('.depth-chart-reset-btn')).toBeVisible();
   });
 
-  test('player names are abbreviated', async ({ page }) => {
-    // Names should be abbreviated on mobile (e.g., "B. Hurley" not "Bobby Hurley")
-    const firstCardName = page.locator('.dc-card__name').first();
-    const text = await firstCardName.textContent();
-    // Abbreviated names have a period after first initial
-    expect(text?.trim()).toMatch(/^[A-Z]\./);
+  test('short player name displays in full on mobile card', async ({ page }) => {
+    const card = page.locator('.dc-card__name[data-full-name="Test Player"]');
+    await expect(card).toHaveText('Test Player');
+  });
+
+  test('long player name displays in full on mobile card', async ({ page }) => {
+    // DC cards display full names even on mobile — abbreviation only applies to table links
+    const card = page.locator('.dc-card__name[data-full-name="Konstantinos Papadopoulos"]');
+    await expect(card).toHaveText('Konstantinos Papadopoulos');
   });
 
   test('saved DC dropdown fits within viewport', async ({ page }) => {

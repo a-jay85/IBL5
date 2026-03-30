@@ -1,0 +1,34 @@
+# Multi-stage build for IBL6 SvelteKit app.
+# Stage 1 builds the app; Stage 2 runs it with minimal footprint.
+
+# ── Stage 1: Build ───────────────────────────────────────────────────────────
+FROM node:22-alpine AS builder
+WORKDIR /app
+
+# Prisma generate needs a valid-looking DATABASE_URL and the schema file
+# at install time (postinstall hook runs prisma generate).
+ARG DATABASE_URL=mysql://placeholder:placeholder@localhost:3306/iblhoops_ibl5
+ENV DATABASE_URL=$DATABASE_URL
+
+# Copy package files + prisma schema (needed by postinstall: prisma generate)
+COPY IBL6/package*.json ./
+COPY IBL6/prisma ./prisma
+RUN npm ci
+
+# Copy source and build
+COPY IBL6/ .
+RUN npm run build
+
+# ── Stage 2: Runtime ─────────────────────────────────────────────────────────
+FROM node:22-alpine
+WORKDIR /app
+
+COPY --from=builder /app/build ./build
+COPY --from=builder /app/node_modules ./node_modules
+COPY --from=builder /app/package.json ./
+COPY --from=builder /app/prisma ./prisma
+
+EXPOSE 3001
+ENV PORT=3001
+
+CMD ["node", "build/index.js"]

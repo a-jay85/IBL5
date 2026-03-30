@@ -4,6 +4,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
         libonig-dev \
         curl \
         unzip \
+        default-mysql-client \
     && docker-php-ext-install mysqli pdo pdo_mysql mbstring opcache \
     && rm -rf /var/lib/apt/lists/*
 
@@ -27,6 +28,7 @@ RUN printf '<Directory /var/www/html>\n\
 RUN cp "$PHP_INI_DIR/php.ini-development" "$PHP_INI_DIR/php.ini"
 
 COPY docker/entrypoint.sh /usr/local/bin/entrypoint.sh
+RUN chmod +x /usr/local/bin/entrypoint.sh
 
 EXPOSE 80
 

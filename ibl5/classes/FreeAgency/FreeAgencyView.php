@@ -90,7 +90,7 @@ class FreeAgencyView implements FreeAgencyViewInterface
             <?php
             $player = Player::withPlrRow($this->mysqli_db, $playerRow);
 
-            if (!$player->isPlayerFreeAgent($season)):
+            if (!$player->isPlayerFreeAgent($season) || $player->isSalaryPlaceholder()):
                 $futureSalaries = $player->getFutureSalaries();
                 $playerName = $player->name ?? '';
                 if (($player->ordinal ?? 0) > \JSB::WAIVERS_ORDINAL) {
@@ -232,7 +232,7 @@ class FreeAgencyView implements FreeAgencyViewInterface
             <?php
             $player = Player::withPlrRow($this->mysqli_db, $playerRow);
 
-            if ($player->isPlayerFreeAgent($season)):
+            if ($player->isPlayerFreeAgent($season) && !$player->isSalaryPlaceholder()):
                 $demands = $player->getFreeAgencyDemands();
             ?>
         <tr>
@@ -288,7 +288,7 @@ class FreeAgencyView implements FreeAgencyViewInterface
         foreach ($allOtherPlayers as $playerRow):
             $player = Player::withPlrRow($this->mysqli_db, $playerRow);
 
-            if ($player->isPlayerFreeAgent($season)):
+            if ($player->isPlayerFreeAgent($season) && !$player->isSalaryPlaceholder()):
                 $demands = $player->getFreeAgencyDemands();
         ?>
         <tr>

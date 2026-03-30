@@ -538,6 +538,16 @@ class Player implements PlayerInterface
     }
 
     /**
+     * @see PlayerInterface::isSalaryPlaceholder()
+     */
+    public function isSalaryPlaceholder(): bool
+    {
+        $name = $this->name ?? '';
+
+        return str_starts_with($name, '|') || str_contains($name, 'Buyout');
+    }
+
+    /**
      * @see PlayerInterface::wasRookieOptioned()
      */
     public function wasRookieOptioned(): bool

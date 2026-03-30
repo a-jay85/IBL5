@@ -280,52 +280,70 @@ class PlayerContractValidatorTest extends TestCase
         $this->assertFalse($result, 'Players with exactly 4 years of experience (> 3) should not be eligible');
     }
 
-    public function testIsPlayerFreeAgentWhenFreeThisSeason()
+    public function testIsPlayerFreeAgentWhenNextYearSalaryIsZero(): void
     {
         $playerData = new PlayerData();
-        $playerData->draftYear = 2020;
-        $playerData->yearsOfExperience = 1;
-        $playerData->contractTotalYears = 2;
-        $playerData->contractCurrentYear = 1;
-        
-        // Free agent year = 2020 + 1 + 2 - 1 = 2022
+        $playerData->contractCurrentYear = 2;
+        $playerData->contractYear1Salary = 500;
+        $playerData->contractYear2Salary = 600;
+        $playerData->contractYear3Salary = 0;
+
         $season = $this->createMockSeason(2022);
-        
-        $result = $this->validator->isPlayerFreeAgent($playerData, $season);
-        
-        $this->assertTrue($result, 'Player should be free agent when calculation equals season ending year');
+
+        $this->assertTrue(
+            $this->validator->isPlayerFreeAgent($playerData, $season),
+            'Player with zero next-year salary should be a free agent'
+        );
     }
 
-    public function testIsPlayerFreeAgentWhenNotFreeThisSeason()
+    public function testIsPlayerNotFreeAgentWhenNextYearSalaryIsNonZero(): void
     {
         $playerData = new PlayerData();
-        $playerData->draftYear = 2020;
-        $playerData->yearsOfExperience = 1;
-        $playerData->contractTotalYears = 2;
-        $playerData->contractCurrentYear = 1;
-        
-        // Free agent year = 2020 + 1 + 2 - 1 = 2022, but season is 2023
-        $season = $this->createMockSeason(2023);
-        
-        $result = $this->validator->isPlayerFreeAgent($playerData, $season);
-        
-        $this->assertFalse($result, 'Player should not be free agent when calculation does not equal season ending year');
+        $playerData->contractCurrentYear = 2;
+        $playerData->contractYear1Salary = 500;
+        $playerData->contractYear2Salary = 600;
+        $playerData->contractYear3Salary = 700;
+
+        $season = $this->createMockSeason(2022);
+
+        $this->assertFalse(
+            $this->validator->isPlayerFreeAgent($playerData, $season),
+            'Player with non-zero next-year salary should not be a free agent'
+        );
     }
 
-    public function testIsPlayerFreeAgentWithRookieContract()
+    public function testIsPlayerFreeAgentWithAllZeroContractData(): void
     {
         $playerData = new PlayerData();
-        $playerData->draftYear = 2020;
-        $playerData->yearsOfExperience = 0;
-        $playerData->contractTotalYears = 3;
         $playerData->contractCurrentYear = 0;
-        
-        // Free agent year = 2020 + 0 + 3 - 0 = 2023
-        $season = $this->createMockSeason(2023);
-        
-        $result = $this->validator->isPlayerFreeAgent($playerData, $season);
-        
-        $this->assertTrue($result, 'Rookie should become free agent after contract expires');
+        $playerData->contractYear1Salary = 0;
+        $playerData->contractYear2Salary = 0;
+
+        $season = $this->createMockSeason(2007);
+
+        $this->assertTrue(
+            $this->validator->isPlayerFreeAgent($playerData, $season),
+            'Player with all-zero contract data should be a free agent'
+        );
+    }
+
+    public function testIsPlayerFreeAgentInFinalContractYear(): void
+    {
+        $playerData = new PlayerData();
+        $playerData->contractCurrentYear = 6;
+        $playerData->contractYear1Salary = 100;
+        $playerData->contractYear2Salary = 200;
+        $playerData->contractYear3Salary = 300;
+        $playerData->contractYear4Salary = 400;
+        $playerData->contractYear5Salary = 500;
+        $playerData->contractYear6Salary = 600;
+
+        $season = $this->createMockSeason(2022);
+
+        $this->assertTrue(
+            $this->validator->isPlayerFreeAgent($playerData, $season),
+            'Player in year 6 (max) should be a free agent since year 7 has no salary'
+        );
     }
 
     private function createMockSeason($endingYear)

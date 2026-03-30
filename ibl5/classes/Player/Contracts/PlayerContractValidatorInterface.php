@@ -69,15 +69,11 @@ interface PlayerContractValidatorInterface
 
     /**
      * Check if player becomes a free agent in the specified season
-     * 
-     * A player becomes a free agent when their contract expires.
-     * Free agency year is calculated as:
-     * draftYear + yearsOfExperience + contractTotalYears - contractCurrentYear
-     * 
-     * If this calculated year equals the season's ending year, the player becomes a free agent.
-     * 
+     *
+     * A player is a free agent when their next contract year salary is zero.
+     *
      * @param PlayerData $playerData The player to check
-     * @param Season $season Season object with endingYear property
+     * @param Season $season Season object (kept for interface compatibility)
      * @return bool True if player becomes free agent this season
      */
     public function isPlayerFreeAgent(PlayerData $playerData, Season $season): bool;

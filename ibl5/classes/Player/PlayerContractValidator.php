@@ -131,12 +131,9 @@ class PlayerContractValidator implements PlayerContractValidatorInterface
      */
     public function isPlayerFreeAgent(PlayerData $playerData, Season $season): bool
     {
-        $yearPlayerIsFreeAgent = ($playerData->draftYear ?? 0)
-            + ($playerData->yearsOfExperience ?? 0)
-            + ($playerData->contractTotalYears ?? 0)
-            - ($playerData->contractCurrentYear ?? 0);
+        $nextYear = ($playerData->contractCurrentYear ?? 0) + 1;
 
-        return $yearPlayerIsFreeAgent === $season->endingYear;
+        return $this->getContractYearSalary($playerData, $nextYear) === 0;
     }
 
     /**

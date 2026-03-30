@@ -31,53 +31,66 @@ class FreeAgencyPreviewServiceTest extends TestCase
         $this->assertInstanceOf(FreeAgencyPreviewServiceInterface::class, $this->service);
     }
 
-    public function testReturnsEmptyWhenNoPlayersMatchYear(): void
+    public function testExcludesPlayersWithNonZeroNextYearSalary(): void
     {
         $this->mockRepository->method('getActivePlayers')->willReturn([
-            self::createActivePlayer(['draftyear' => 2020, 'exp' => 3, 'cyt' => 3, 'cy' => 1]),
+            self::createActivePlayer(['cy' => 1, 'cy2' => 600]),
         ]);
 
-        // yearOfFreeAgency = 2020 + 3 + 3 - 1 = 2025
-        $result = $this->service->getUpcomingFreeAgents(2030);
+        $result = $this->service->getUpcomingFreeAgents(2025);
 
         $this->assertSame([], $result);
     }
 
-    public function testReturnsFreeAgentsMatchingEndingYear(): void
+    public function testIncludesPlayersWithZeroNextYearSalary(): void
     {
         $this->mockRepository->method('getActivePlayers')->willReturn([
-            self::createActivePlayer(['draftyear' => 2020, 'exp' => 3, 'cyt' => 3, 'cy' => 1, 'name' => 'Free Agent']),
+            self::createActivePlayer(['cy' => 2, 'cy3' => 0, 'name' => 'Free Agent']),
         ]);
 
-        // yearOfFreeAgency = 2020 + 3 + 3 - 1 = 2025
         $result = $this->service->getUpcomingFreeAgents(2025);
 
         $this->assertCount(1, $result);
         $this->assertSame('Free Agent', $result[0]['name']);
     }
 
-    public function testFiltersOutNonMatchingPlayers(): void
+    public function testFiltersOutPlayersUnderContract(): void
     {
         $this->mockRepository->method('getActivePlayers')->willReturn([
-            self::createActivePlayer(['draftyear' => 2020, 'exp' => 3, 'cyt' => 3, 'cy' => 1, 'name' => 'Matches']),
-            self::createActivePlayer(['draftyear' => 2018, 'exp' => 5, 'cyt' => 2, 'cy' => 0, 'name' => 'NoMatch']),
+            self::createActivePlayer(['cy' => 1, 'cy2' => 0, 'name' => 'Expiring']),
+            self::createActivePlayer(['cy' => 1, 'cy2' => 500, 'name' => 'UnderContract']),
         ]);
 
-        // Player 1: 2020+3+3-1 = 2025 (matches)
-        // Player 2: 2018+5+2-0 = 2025 (matches too)
         $result = $this->service->getUpcomingFreeAgents(2025);
 
-        $this->assertCount(2, $result);
+        $this->assertCount(1, $result);
+        $this->assertSame('Expiring', $result[0]['name']);
+    }
+
+    public function testIncludesPlayersWithAllZeroContractData(): void
+    {
+        $this->mockRepository->method('getActivePlayers')->willReturn([
+            self::createActivePlayer([
+                'cy' => 0,
+                'cy1' => 0,
+                'cy2' => 0,
+                'cy3' => 0,
+                'name' => 'No Contract',
+            ]),
+        ]);
+
+        $result = $this->service->getUpcomingFreeAgents(2025);
+
+        $this->assertCount(1, $result);
+        $this->assertSame('No Contract', $result[0]['name']);
     }
 
     public function testFreeAgentRowIncludesRatings(): void
     {
         $this->mockRepository->method('getActivePlayers')->willReturn([
             self::createActivePlayer([
-                'draftyear' => 2020,
-                'exp' => 3,
-                'cyt' => 2,
-                'cy' => 0,
+                'cy' => 2,
+                'cy3' => 0,
                 'r_fga' => 65,
                 'oo' => 70,
             ]),
@@ -93,10 +106,8 @@ class FreeAgencyPreviewServiceTest extends TestCase
     {
         $this->mockRepository->method('getActivePlayers')->willReturn([
             self::createActivePlayer([
-                'draftyear' => 2020,
-                'exp' => 3,
-                'cyt' => 2,
-                'cy' => 0,
+                'cy' => 2,
+                'cy3' => 0,
                 'team_city' => null,
                 'color1' => null,
                 'color2' => null,
@@ -120,11 +131,11 @@ class FreeAgencyPreviewServiceTest extends TestCase
     }
 
     /**
-     * @return array{pid: int, tid: int, name: string, teamname: string, pos: string, age: int, draftyear: int, exp: int, cy: int, cyt: int, r_fga: int, r_fgp: int, r_fta: int, r_ftp: int, r_tga: int, r_tgp: int, r_orb: int, r_drb: int, r_ast: int, r_stl: int, r_blk: int, r_to: int, r_foul: int, oo: int, do: int, po: int, to: int, od: int, dd: int, pd: int, td: int, loyalty: int, winner: int, playingTime: int, security: int, tradition: int, team_city: string|null, color1: string|null, color2: string|null}
+     * @return array{pid: int, tid: int, name: string, teamname: string, pos: string, age: int, draftyear: int, exp: int, cy: int, cyt: int, cy1: int, cy2: int, cy3: int, cy4: int, cy5: int, cy6: int, r_fga: int, r_fgp: int, r_fta: int, r_ftp: int, r_tga: int, r_tgp: int, r_orb: int, r_drb: int, r_ast: int, r_stl: int, r_blk: int, r_to: int, r_foul: int, oo: int, do: int, po: int, to: int, od: int, dd: int, pd: int, td: int, loyalty: int, winner: int, playingTime: int, security: int, tradition: int, team_city: string|null, color1: string|null, color2: string|null}
      */
     private static function createActivePlayer(array $overrides = []): array
     {
-        /** @var array{pid: int, tid: int, name: string, teamname: string, pos: string, age: int, draftyear: int, exp: int, cy: int, cyt: int, r_fga: int, r_fgp: int, r_fta: int, r_ftp: int, r_tga: int, r_tgp: int, r_orb: int, r_drb: int, r_ast: int, r_stl: int, r_blk: int, r_to: int, r_foul: int, oo: int, do: int, po: int, to: int, od: int, dd: int, pd: int, td: int, loyalty: int, winner: int, playingTime: int, security: int, tradition: int, team_city: string|null, color1: string|null, color2: string|null} */
+        /** @var array{pid: int, tid: int, name: string, teamname: string, pos: string, age: int, draftyear: int, exp: int, cy: int, cyt: int, cy1: int, cy2: int, cy3: int, cy4: int, cy5: int, cy6: int, r_fga: int, r_fgp: int, r_fta: int, r_ftp: int, r_tga: int, r_tgp: int, r_orb: int, r_drb: int, r_ast: int, r_stl: int, r_blk: int, r_to: int, r_foul: int, oo: int, do: int, po: int, to: int, od: int, dd: int, pd: int, td: int, loyalty: int, winner: int, playingTime: int, security: int, tradition: int, team_city: string|null, color1: string|null, color2: string|null} */
         return array_merge([
             'pid' => 1,
             'tid' => 1,
@@ -136,6 +147,12 @@ class FreeAgencyPreviewServiceTest extends TestCase
             'exp' => 3,
             'cy' => 1,
             'cyt' => 3,
+            'cy1' => 500,
+            'cy2' => 600,
+            'cy3' => 700,
+            'cy4' => 0,
+            'cy5' => 0,
+            'cy6' => 0,
             'r_fga' => 50,
             'r_fgp' => 50,
             'r_fta' => 50,

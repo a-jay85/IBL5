@@ -29,8 +29,8 @@ git fetch --all --prune -q
 
 # Clean up merged worktrees (synchronous — hook was suppressed above)
 REPO_ROOT="$(git rev-parse --show-toplevel)"
-if [ -x "$REPO_ROOT/bin/wt-cleanup" ]; then
-    "$REPO_ROOT/bin/wt-cleanup" --all
+if [ -x "$REPO_ROOT/bin/cleanup" ]; then
+    "$REPO_ROOT/bin/cleanup" --all
 fi
 
 echo "Done. Pushed master and production."

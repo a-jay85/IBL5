@@ -59,28 +59,6 @@ class FreeAgencyAdminRepositoryTest extends DatabaseTestCase
         self::assertSame([], $results);
     }
 
-    // ── getPlayerDemands ────────────────────────────────────────
-
-    public function testGetPlayerDemandsReturnsDemandRow(): void
-    {
-        $this->insertTestPlayer(200060002, 'FA Demand Player');
-        $this->insertDemandRow('FA Demand Player', 200060002, ['dem1' => 2000, 'dem3' => 1800]);
-
-        $result = $this->repo->getPlayerDemands(200060002);
-
-        self::assertNotNull($result);
-        self::assertSame(2000, $result['dem1']);
-        self::assertSame(1800, $result['dem3']);
-        self::assertSame(0, $result['dem2']);
-    }
-
-    public function testGetPlayerDemandsReturnsNullWhenNoDemand(): void
-    {
-        $result = $this->repo->getPlayerDemands(999999999);
-
-        self::assertNull($result);
-    }
-
     // ── getPlayerDemandsBatch ───────────────────────────────────
 
     public function testGetPlayerDemandsBatchReturnsMapKeyedByPid(): void

@@ -285,7 +285,7 @@ class FreeAgencyProcessor implements FreeAgencyProcessorInterface
     {
         /** @var \mysqli $mysqliDb */
         $mysqliDb = $this->mysqli_db;
-        $season = new Season($mysqliDb);
+        $season = $this->season;
 
         if ($season->freeAgencyNotificationsState !== "On") {
             return;

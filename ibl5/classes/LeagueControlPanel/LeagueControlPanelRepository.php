@@ -314,6 +314,23 @@ class LeagueControlPanelRepository extends \BaseMysqliRepository implements Leag
     }
 
     /**
+     * @see LeagueControlPanelRepositoryInterface::deleteOutdatedBuyoutsAndCash()
+     */
+    public function deleteOutdatedBuyoutsAndCash(): int
+    {
+        return $this->execute(
+            "DELETE FROM ibl_plr
+            WHERE (name LIKE '%Buyout%' OR name LIKE '%Cash%')
+              AND (cy > 1 OR cy1 = 0)
+              AND (cy > 2 OR cy2 = 0)
+              AND (cy > 3 OR cy3 = 0)
+              AND (cy > 4 OR cy4 = 0)
+              AND (cy > 5 OR cy5 = 0)
+              AND (cy > 6 OR cy6 = 0)"
+        );
+    }
+
+    /**
      * @see LeagueControlPanelRepositoryInterface::hasFinalsMvp()
      */
     public function hasFinalsMvp(int $year): bool

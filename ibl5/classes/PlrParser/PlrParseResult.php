@@ -10,7 +10,6 @@ namespace PlrParser;
 class PlrParseResult
 {
     public int $playersUpserted = 0;
-    public int $historyRowsUpserted = 0;
 
     /** @var list<string> */
     public array $messages = [];
@@ -25,16 +24,9 @@ class PlrParseResult
      */
     public function summary(): string
     {
-        $parts = [];
         if ($this->playersUpserted > 0) {
-            $parts[] = $this->playersUpserted . ' players upserted';
+            return $this->playersUpserted . ' players upserted';
         }
-        if ($this->historyRowsUpserted > 0) {
-            $parts[] = $this->historyRowsUpserted . ' history rows upserted';
-        }
-        if ($parts === []) {
-            return 'No changes';
-        }
-        return implode(', ', $parts);
+        return 'No changes';
     }
 }

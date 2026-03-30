@@ -123,7 +123,7 @@ class NavigationMenuBuilder implements NavigationMenuBuilderInterface
     {
         if ($this->config->isLoggedIn) {
             return [
-                ['label' => 'Logout', 'url' => 'modules.php?name=YourAccount&op=logout'],
+                ['label' => 'Logout', 'url' => 'modules.php?name=YourAccount&op=logout', 'noBoost' => true],
             ];
         }
 

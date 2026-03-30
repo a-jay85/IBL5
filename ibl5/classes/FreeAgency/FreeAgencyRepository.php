@@ -81,7 +81,7 @@ class FreeAgencyRepository extends BaseMysqliRepository implements FreeAgencyRep
                  (name, pid, team, tid, offer1, offer2, offer3, offer4, offer5, offer6,
                   modifier, random, perceivedvalue, mle, lle, offer_type)
                  VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-                "sisiiiiiiiiidiii",
+                "sisiiiiiiidddiii",
                 $offerData['playerName'],
                 $offerData['pid'],
                 $offerData['teamName'],

@@ -6,28 +6,105 @@ namespace Tests\FreeAgency;
 
 use PHPUnit\Framework\TestCase;
 use FreeAgency\FreeAgencyProcessor;
+use FreeAgency\Contracts\FreeAgencyDemandCalculatorInterface;
+use FreeAgency\Contracts\FreeAgencyRepositoryInterface;
+use Player\Player;
 
 /**
- * FreeAgencyProcessorTest - Tests for free agency offer processing
+ * Capturing repository stub — records what was passed to saveOffer().
+ */
+class CapturingRepository implements FreeAgencyRepositoryInterface
+{
+    /** @var array<string, mixed>|null */
+    public ?array $lastSavedOffer = null;
+    public bool $saveReturn = true;
+
+    public function getExistingOffer(int $tid, int $pid): ?array
+    {
+        return null;
+    }
+
+    public function deleteOffer(int $tid, int $pid): int
+    {
+        return 0;
+    }
+
+    public function saveOffer(array $offerData): bool
+    {
+        $this->lastSavedOffer = $offerData;
+        return $this->saveReturn;
+    }
+
+    public function getAllPlayersExcludingTeam(int $teamId): array
+    {
+        return [];
+    }
+
+    public function isPlayerAlreadySigned(int $playerId): bool
+    {
+        return false;
+    }
+}
+
+/**
+ * Stub calculator that returns known modifier/random/perceivedValue.
+ */
+class StubDemandCalculator implements FreeAgencyDemandCalculatorInterface
+{
+    private float $modifier;
+    private int $random;
+
+    public function __construct(float $modifier = 1.0, int $random = 0)
+    {
+        $this->modifier = $modifier;
+        $this->random = $random;
+    }
+
+    public function setRandomFactor(?int $factor): void
+    {
+        // no-op for stub
+    }
+
+    /**
+     * @return array{modifier: float, random: int, perceivedValue: float}
+     */
+    public function calculatePerceivedValue(
+        int $offerAverage,
+        string $teamName,
+        Player $player,
+        int $yearsInOffer
+    ): array {
+        $modRandom = (100 + $this->random) / 100;
+        return [
+            'modifier' => $this->modifier,
+            'random' => $this->random,
+            'perceivedValue' => $offerAverage * $this->modifier * $modRandom,
+        ];
+    }
+}
+
+/**
+ * Tests for FreeAgencyProcessor — verifying modifier and random are stored correctly.
  *
- * Tests the main processor workflow including:
- * - Offer submission validation
- * - Offer deletion
- * - Already-signed player checks
- * 
- * Note: Uses MockDatabase setMockData() which sets a single dataset for all queries.
- * Tests are designed to work within this constraint.
+ * The original freeagentoffer.php stored:
+ *   modifier = float (~0.8-1.2), the combined 5-factor modifier
+ *   random = int (-5 to +5), the random variance
+ *   perceivedValue = float, offerAvg * modifier * ((100 + random) / 100)
+ *
+ * Copilot's refactor broke this by:
+ *   modifier = (int)($perceivedValue / $offerAverage)  — cast to int, wrong formula
+ *   random = 0  — hardcoded
+ *
+ * These tests use DI stubs to verify exact values passed to the repository.
  */
 class FreeAgencyProcessorTest extends TestCase
 {
     private \MockDatabase $mockDb;
-    private FreeAgencyProcessor $processor;
 
     protected function setUp(): void
     {
         $this->mockDb = new \MockDatabase();
         $this->injectGlobalMockDb();
-        $this->processor = new FreeAgencyProcessor($this->mockDb);
     }
 
     protected function tearDown(): void
@@ -38,8 +115,8 @@ class FreeAgencyProcessorTest extends TestCase
     private function injectGlobalMockDb(): void
     {
         $mockDb = $this->mockDb;
-        
-        $GLOBALS['mysqli_db'] = new class($mockDb) {
+
+        $GLOBALS['mysqli_db'] = new class ($mockDb) {
             private \MockDatabase $mockDb;
             public int $connect_errno = 0;
             public ?string $connect_error = null;
@@ -66,98 +143,259 @@ class FreeAgencyProcessorTest extends TestCase
         };
     }
 
-    // ============================================
-    // OFFER DELETION TESTS
-    // ============================================
+    // ================================================================
+    // MODIFIER AND RANDOM STORAGE (THE CRITICAL BUG)
+    // ================================================================
 
-    public function testDeleteOffersExecutesDeleteQuery(): void
+    public function testSaveOfferPassesFloatModifierToRepository(): void
     {
-        // Setup complete player data to avoid undefined array key warnings
+        $capturingRepo = new CapturingRepository();
+        $calculator = new StubDemandCalculator(modifier: 1.15, random: 3);
+
+        $processor = new FreeAgencyProcessor(
+            $this->mockDb,
+            $calculator,
+            $capturingRepo,
+        );
+
         $this->mockDb->setMockData([$this->getCompletePlayerData()]);
 
-        $this->processor->deleteOffers('Test Team', 1);
+        $processor->processOfferSubmission($this->buildValidPost());
 
-        // Verify that a DELETE query was executed
-        $queries = $this->mockDb->getExecutedQueries();
-        $deleteQueries = array_filter($queries, fn($q) => stripos($q, 'DELETE') !== false);
-        
-        $this->assertNotEmpty($deleteQueries, 'Expected DELETE query to be executed');
+        $this->assertNotNull($capturingRepo->lastSavedOffer, 'Offer should have been saved');
+        $this->assertIsFloat($capturingRepo->lastSavedOffer['modifier']);
+        $this->assertEqualsWithDelta(1.15, $capturingRepo->lastSavedOffer['modifier'], 0.001);
     }
 
-    public function testDeleteOffersTargetsCorrectTable(): void
+    public function testSaveOfferPassesActualRandomToRepository(): void
     {
+        $capturingRepo = new CapturingRepository();
+        $calculator = new StubDemandCalculator(modifier: 1.0, random: 3);
+
+        $processor = new FreeAgencyProcessor(
+            $this->mockDb,
+            $calculator,
+            $capturingRepo,
+        );
+
         $this->mockDb->setMockData([$this->getCompletePlayerData()]);
 
-        $this->processor->deleteOffers('Test Team', 1);
+        $processor->processOfferSubmission($this->buildValidPost());
 
-        $queries = $this->mockDb->getExecutedQueries();
-        $faOfferQueries = array_filter($queries, fn($q) => stripos($q, 'ibl_fa_offers') !== false);
-        
-        $this->assertNotEmpty($faOfferQueries, 'Expected query targeting ibl_fa_offers table');
+        $this->assertNotNull($capturingRepo->lastSavedOffer);
+        $this->assertSame(3, $capturingRepo->lastSavedOffer['random']);
     }
 
-    public function testDeleteOffersReturnsResultArray(): void
+    public function testSaveOfferRandomIsNotHardcodedToZero(): void
     {
+        $capturingRepo = new CapturingRepository();
+        $calculator = new StubDemandCalculator(modifier: 1.0, random: -5);
+
+        $processor = new FreeAgencyProcessor(
+            $this->mockDb,
+            $calculator,
+            $capturingRepo,
+        );
+
         $this->mockDb->setMockData([$this->getCompletePlayerData()]);
 
-        $result = $this->processor->deleteOffers('Test Team', 1);
+        $processor->processOfferSubmission($this->buildValidPost());
 
-        $this->assertIsArray($result);
-        $this->assertArrayHasKey('success', $result);
-        $this->assertTrue($result['success']);
+        $this->assertNotNull($capturingRepo->lastSavedOffer);
+        $this->assertSame(-5, $capturingRepo->lastSavedOffer['random']);
     }
 
-    // ============================================
-    // CONSTRUCTOR AND INITIALIZATION TESTS
-    // ============================================
-
-    public function testProcessorAcceptsDatabaseInConstructor(): void
+    public function testSaveOfferModifierIsNotIntegerTruncated(): void
     {
-        $mockDb = new \MockDatabase();
-        $processor = new FreeAgencyProcessor($mockDb);
-        
+        $capturingRepo = new CapturingRepository();
+        // 0.95 would become 0 with (int) cast
+        $calculator = new StubDemandCalculator(modifier: 0.95, random: 0);
+
+        $processor = new FreeAgencyProcessor(
+            $this->mockDb,
+            $calculator,
+            $capturingRepo,
+        );
+
+        $this->mockDb->setMockData([$this->getCompletePlayerData()]);
+
+        $processor->processOfferSubmission($this->buildValidPost());
+
+        $this->assertNotNull($capturingRepo->lastSavedOffer);
+        $this->assertEqualsWithDelta(0.95, $capturingRepo->lastSavedOffer['modifier'], 0.001);
+    }
+
+    public function testSaveOfferPerceivedValueMatchesFormula(): void
+    {
+        $capturingRepo = new CapturingRepository();
+        $calculator = new StubDemandCalculator(modifier: 1.1, random: 3);
+
+        $processor = new FreeAgencyProcessor(
+            $this->mockDb,
+            $calculator,
+            $capturingRepo,
+        );
+
+        $this->mockDb->setMockData([$this->getCompletePlayerData()]);
+
+        $processor->processOfferSubmission($this->buildValidPost());
+
+        $this->assertNotNull($capturingRepo->lastSavedOffer);
+        $offer = $capturingRepo->lastSavedOffer;
+
+        // Offer average = 500 (single year offer of 500)
+        $expectedPV = 500 * 1.1 * ((100 + 3) / 100);
+        $this->assertEqualsWithDelta($expectedPV, $offer['perceivedValue'], 0.01);
+    }
+
+    public function testSaveOfferWithNeutralModifierAndZeroRandom(): void
+    {
+        $capturingRepo = new CapturingRepository();
+        $calculator = new StubDemandCalculator(modifier: 1.0, random: 0);
+
+        $processor = new FreeAgencyProcessor(
+            $this->mockDb,
+            $calculator,
+            $capturingRepo,
+        );
+
+        $this->mockDb->setMockData([$this->getCompletePlayerData()]);
+
+        $processor->processOfferSubmission($this->buildValidPost());
+
+        $this->assertNotNull($capturingRepo->lastSavedOffer);
+        $offer = $capturingRepo->lastSavedOffer;
+
+        // perceivedValue should equal offerAverage exactly
+        $this->assertEqualsWithDelta(500.0, $offer['perceivedValue'], 0.01);
+        $this->assertEqualsWithDelta(1.0, $offer['modifier'], 0.001);
+        $this->assertSame(0, $offer['random']);
+    }
+
+    // ================================================================
+    // CONSTRUCTOR COMPATIBILITY
+    // ================================================================
+
+    public function testProcessorAcceptsDatabaseOnlyInConstructor(): void
+    {
+        $processor = new FreeAgencyProcessor($this->mockDb);
         $this->assertInstanceOf(FreeAgencyProcessor::class, $processor);
     }
 
-    public function testProcessorCanBeInstantiatedMultipleTimes(): void
+    public function testProcessorAcceptsOptionalDIParams(): void
     {
-        $processor1 = new FreeAgencyProcessor($this->mockDb);
-        $processor2 = new FreeAgencyProcessor($this->mockDb);
-        
-        $this->assertInstanceOf(FreeAgencyProcessor::class, $processor1);
-        $this->assertInstanceOf(FreeAgencyProcessor::class, $processor2);
-        $this->assertNotSame($processor1, $processor2);
+        $calculator = new StubDemandCalculator();
+        $repository = new CapturingRepository();
+
+        $processor = new FreeAgencyProcessor($this->mockDb, $calculator, $repository);
+        $this->assertInstanceOf(FreeAgencyProcessor::class, $processor);
     }
 
-    // ============================================
-    // HELPER METHODS
-    // ============================================
+    // ================================================================
+    // OFFER DELETION
+    // ================================================================
+
+    public function testDeleteOffersReturnsSuccess(): void
+    {
+        $this->mockDb->setMockData([$this->getCompletePlayerData()]);
+
+        $processor = new FreeAgencyProcessor($this->mockDb);
+        $result = $processor->deleteOffers('Test Team', 1);
+
+        $this->assertIsArray($result);
+        $this->assertTrue($result['success']);
+    }
+
+    public function testDeleteOffersExecutesDeleteQuery(): void
+    {
+        $this->mockDb->setMockData([$this->getCompletePlayerData()]);
+
+        $processor = new FreeAgencyProcessor($this->mockDb);
+        $processor->deleteOffers('Test Team', 1);
+
+        $queries = $this->mockDb->getExecutedQueries();
+        $deleteQueries = array_filter($queries, static fn (string $q): bool => stripos($q, 'DELETE') !== false);
+        $this->assertNotEmpty($deleteQueries);
+    }
+
+    // ================================================================
+    // ALREADY-SIGNED REJECTION
+    // ================================================================
+
+    public function testRejectsOfferWhenPlayerAlreadySigned(): void
+    {
+        $this->mockDb->setMockData([array_merge($this->getCompletePlayerData(), [
+            'cy' => 0,
+            'cy1' => 500, // signed this FA period
+        ])]);
+
+        $capturingRepo = new CapturingRepository();
+        // Override isPlayerAlreadySigned to return true
+        $signingRepo = new class extends CapturingRepository {
+            public function isPlayerAlreadySigned(int $playerId): bool
+            {
+                return true;
+            }
+        };
+
+        $processor = new FreeAgencyProcessor(
+            $this->mockDb,
+            new StubDemandCalculator(),
+            $signingRepo,
+        );
+
+        $result = $processor->processOfferSubmission($this->buildValidPost());
+
+        $this->assertFalse($result['success']);
+        $this->assertSame('already_signed', $result['type']);
+        $this->assertNull($signingRepo->lastSavedOffer, 'Should not save offer for signed player');
+    }
+
+    // ================================================================
+    // HELPERS
+    // ================================================================
 
     /**
-     * Get complete player data with all required fields to avoid undefined array key warnings
+     * @return array<string, mixed>
+     */
+    private function buildValidPost(): array
+    {
+        return [
+            'teamname' => 'Test Team',
+            'playerID' => 1,
+            'offeryear1' => 500,
+            'offeryear2' => 0,
+            'offeryear3' => 0,
+            'offeryear4' => 0,
+            'offeryear5' => 0,
+            'offeryear6' => 0,
+            'offerType' => 0,
+        ];
+    }
+
+    /**
+     * @param array<string, mixed> $overrides
+     * @return array<string, mixed>
      */
     private function getCompletePlayerData(array $overrides = []): array
     {
         return array_merge([
-            // Basic fields
             'pid' => 1,
             'name' => 'Test Player',
             'firstname' => 'Test',
             'lastname' => 'Player',
             'nickname' => '',
-            'teamname' => 'Test Team',
-            'tid' => 1,
+            'teamname' => 'Free Agent',
+            'tid' => 0,
             'pos' => 'G',
             'position' => 'G',
             'age' => 25,
             'ordinal' => 1,
-            // Physical attributes
             'height' => 75,
             'weight' => 200,
             'htft' => 6,
             'htin' => 3,
             'wt' => 200,
-            // Contract fields
             'cy' => 0,
             'cyt' => 0,
             'cy1' => 0,
@@ -169,23 +407,20 @@ class FreeAgencyProcessorTest extends TestCase
             'exp' => 3,
             'bird' => 0,
             'bird_years' => 0,
-            // Status fields
             'retired' => 0,
             'injured' => 0,
             'signed' => 0,
             'droptime' => 0,
-            // Free agency preferences (snake_case and camelCase)
             'fa_loyalty' => 50,
             'fa_playing_time' => 50,
             'fa_play_for_winner' => 50,
             'fa_tradition' => 50,
             'fa_security' => 50,
-            'loyalty' => 50,
-            'playingTime' => 50,
-            'winner' => 50,
-            'tradition' => 50,
-            'security' => 50,
-            // Base rating fields (r_*)
+            'loyalty' => 3,
+            'playingTime' => 3,
+            'winner' => 3,
+            'tradition' => 3,
+            'security' => 3,
             'r_fga' => 50,
             'r_fgp' => 50,
             'r_fta' => 50,
@@ -207,7 +442,6 @@ class FreeAgencyProcessorTest extends TestCase
             'r_pss' => 50,
             'r_hnb' => 50,
             'r_ins' => 50,
-            // Position-based ratings
             'oo' => 50,
             'od' => 50,
             'do' => 50,
@@ -216,20 +450,45 @@ class FreeAgencyProcessorTest extends TestCase
             'pd' => 50,
             'to' => 50,
             'td' => 50,
-            // Other ratings
             'Clutch' => 50,
             'Consistency' => 50,
             'talent' => 50,
             'skill' => 50,
             'intangibles' => 50,
             'ovr' => 75,
-            // Draft fields
             'draftyear' => 2020,
             'draftround' => 1,
             'draftpickno' => 10,
             'draftedby' => 'Test Team',
             'draftedbycurrentname' => 'Test Team',
             'college' => 'Test University',
+            // Team info fields
+            'team_name' => 'Test Team',
+            'team_city' => 'Test City',
+            'teamid' => 1,
+            'color1' => '#000000',
+            'color2' => '#FFFFFF',
+            'arena' => 'Test Arena',
+            'capacity' => 20000,
+            'owner_name' => 'Test Owner',
+            'owner_email' => 'test@test.com',
+            'discordID' => null,
+            'Used_Extension_This_Chunk' => 0,
+            'Used_Extension_This_Season' => 0,
+            'Salary_Total' => 5000,
+            'Salary_Cap' => 8250,
+            'Tax_Line' => 10000,
+            'HasMLE' => 0,
+            'HasLLE' => 0,
+            'Contract_Wins' => 41,
+            'Contract_Losses' => 41,
+            'Contract_AvgW' => 500,
+            'Contract_AvgL' => 500,
+            'next_year_salary' => 0,
+            'money_committed_at_position' => 0,
+            // Season settings
+            'freeAgencyNotificationsState' => 'Off',
+            'Current Season Phase' => 'Free Agency',
         ], $overrides);
     }
 }

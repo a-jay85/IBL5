@@ -4,14 +4,10 @@ declare(strict_types=1);
 
 namespace FreeAgency;
 
-use FreeAgency\Contracts\FreeAgencyControllerInterface;
 use Team\Team;
 use Season\Season;
 
-/**
- * @see FreeAgencyControllerInterface
- */
-class FreeAgencyController implements FreeAgencyControllerInterface
+class FreeAgencyController
 {
     private \mysqli $db;
     private FreeAgencyRepository $repository;
@@ -35,7 +31,6 @@ class FreeAgencyController implements FreeAgencyControllerInterface
     }
 
     /**
-     * @see FreeAgencyControllerInterface::handleRequest()
      */
     public function handleRequest(mixed $user, string $action, int $pid): void
     {

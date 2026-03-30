@@ -9,7 +9,6 @@ namespace FreeAgency\Contracts;
  *
  * @phpstan-type TeamPerformanceRow array{wins: int, losses: int, tradWins: int, tradLosses: int}
  * @phpstan-type PlayerDemandsRow array{dem1: int, dem2: int, dem3: int, dem4: int, dem5: int, dem6: int}
- * @phpstan-type ContractYearRow array{cy: ?int, cy1: ?int, cy2: ?int, cy3: ?int, cy4: ?int, cy5: ?int, cy6: ?int}
  */
 interface FreeAgencyDemandRepositoryInterface
 {

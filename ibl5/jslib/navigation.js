@@ -135,10 +135,10 @@
             });
         });
 
-        // Desktop dropdown hover-to-stay
-        // Keeps dropdown visible via nav-hover class even when mouse leaves
-        // the group (e.g., to interact with browser auto-fill popups).
-        // Only clears when hovering a different menu, clicking outside, or Escape.
+        // Desktop dropdown hover-to-stay (Login only)
+        // Keeps the Login dropdown visible via nav-hover class even when mouse
+        // leaves (e.g., to interact with browser auto-fill popups).
+        // All other menus use pure CSS :hover and close naturally on mouse-out.
         desktopGroups.forEach(function(group) {
             group.addEventListener('mouseenter', function() {
                 desktopGroups.forEach(function(other) {
@@ -146,7 +146,9 @@
                         other.classList.remove('nav-hover');
                     }
                 });
-                group.classList.add('nav-hover');
+                if (group.hasAttribute('data-nav-login')) {
+                    group.classList.add('nav-hover');
+                }
             });
         });
 

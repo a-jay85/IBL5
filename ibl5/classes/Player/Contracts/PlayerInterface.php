@@ -161,13 +161,12 @@ interface PlayerInterface
     /**
      * Check if player becomes a free agent in the specified season
      *
-     * Calculates: draftYear + yearsOfExperience + contractTotalYears - contractCurrentYear
-     * If this equals the season's ending year, the player becomes a free agent.
+     * A player is a free agent when their next contract year salary is zero.
      *
-     * @param int|Season $season Season object or ending year to check
+     * @param Season $season Season object
      * @return bool True if player becomes free agent in this season
      */
-    public function isPlayerFreeAgent(int|Season $season): bool;
+    public function isPlayerFreeAgent(Season $season): bool;
 
     /**
      * Check if a player's rookie option was previously exercised

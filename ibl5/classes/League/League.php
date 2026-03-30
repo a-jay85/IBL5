@@ -154,10 +154,16 @@ class League extends BaseMysqliRepository
             "SELECT *
             FROM ibl_plr
             WHERE retired = 0
-              AND draftyear + exp + cyt - cy = ?
-            ORDER BY name ASC",
-            "i",
-            $season->endingYear
+              AND CASE COALESCE(cy, 0) + 1
+                  WHEN 1 THEN cy1
+                  WHEN 2 THEN cy2
+                  WHEN 3 THEN cy3
+                  WHEN 4 THEN cy4
+                  WHEN 5 THEN cy5
+                  WHEN 6 THEN cy6
+                  ELSE 0
+              END = 0
+            ORDER BY name ASC"
         );
     }
 

@@ -133,12 +133,17 @@ check_worktree() {
         fi
     fi
 
-    # Check 2: Direct ancestor of master AND remote branch is gone.
+    # Check 2: Direct ancestor of master AND remote branch was pushed then deleted.
     # merge-base alone is insufficient — a branch created from master tip with no
-    # new commits is also an ancestor. Requiring remote branch deletion confirms
-    # the merge is actually complete (remote branches are deleted after PR merge).
+    # new commits is also an ancestor. We need two additional signals:
+    #   a) Branch was previously pushed (has tracking config)
+    #   b) Remote branch is now gone (deleted after PR merge)
+    # A never-pushed branch has no tracking config, so it won't match.
     if [ "$is_merged" = false ]; then
-        if git -C "$REPO_ROOT" merge-base --is-ancestor "$branch" origin/master 2>/dev/null \
+        local was_tracked
+        was_tracked=$(git -C "$REPO_ROOT" config "branch.$branch.remote" 2>/dev/null || true)
+        if [ -n "$was_tracked" ] \
+           && git -C "$REPO_ROOT" merge-base --is-ancestor "$branch" origin/master 2>/dev/null \
            && ! git -C "$REPO_ROOT" rev-parse --verify "origin/$branch" &>/dev/null; then
             is_merged=true
         fi

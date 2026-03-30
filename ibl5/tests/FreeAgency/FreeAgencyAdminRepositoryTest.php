@@ -121,34 +121,6 @@ class FreeAgencyAdminRepositoryTest extends TestCase
     }
 
     // ============================================
-    // GET PLAYER DEMANDS TESTS
-    // ============================================
-
-    public function testGetPlayerDemandsReturnsDemandRow(): void
-    {
-        $repository = new FreeAgencyAdminRepository($this->mockMysqliDb);
-        $this->mockDb->onQuery('SELECT dem1, dem2, dem3, dem4, dem5, dem6 FROM ibl_demands', [
-            ['dem1' => 500, 'dem2' => 525, 'dem3' => 550, 'dem4' => 0, 'dem5' => 0, 'dem6' => 0],
-        ]);
-
-        $result = $repository->getPlayerDemands(100);
-
-        $this->assertIsArray($result);
-        $this->assertSame(500, $result['dem1']);
-        $this->assertSame(525, $result['dem2']);
-    }
-
-    public function testGetPlayerDemandsReturnsNullWhenNotFound(): void
-    {
-        $repository = new FreeAgencyAdminRepository($this->mockMysqliDb);
-        $this->mockDb->onQuery('SELECT dem1, dem2, dem3, dem4, dem5, dem6 FROM ibl_demands', []);
-
-        $result = $repository->getPlayerDemands(999);
-
-        $this->assertNull($result);
-    }
-
-    // ============================================
     // UPDATE PLAYER CONTRACT TESTS
     // ============================================
 

@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace FreeAgency;
 
-use FreeAgency\Contracts\FreeAgencyCapCalculatorInterface;
 use League\League;
 use Player\Player;
 use Team\Contracts\TeamQueryRepositoryInterface;
@@ -12,10 +11,9 @@ use Team\Team;
 use Season\Season;
 
 /**
- * @see FreeAgencyCapCalculatorInterface
  * @phpstan-import-type PlayerRow from \Services\CommonMysqliRepository
  */
-class FreeAgencyCapCalculator implements FreeAgencyCapCalculatorInterface
+class FreeAgencyCapCalculator
 {
     private \mysqli $mysqli_db;
     private Team $team;
@@ -150,24 +148,12 @@ class FreeAgencyCapCalculator implements FreeAgencyCapCalculatorInterface
     }
 
     /**
-     * @see FreeAgencyCapCalculatorInterface::calculateTeamCapMetrics()
+     * @return array{totalSalaries: array<int, int>, softCapSpace: array<int, int>, hardCapSpace: array<int, int>, rosterSpots: array<int, int>}
      */
     public function calculateTeamCapMetrics(?int $excludeOfferPid = null): array
     {
-        // Fetch roster and offers data once, convert results to arrays
-        $rosterResult = $this->teamQueryRepo->getRosterUnderContractOrderedByOrdinal($this->team->teamID);
-        $offersResult = $this->teamQueryRepo->getFreeAgencyOffers($this->team->teamID);
-        
-        // Convert mysqli_result to arrays
-        $rosterData = [];
-        foreach ($rosterResult as $row) {
-            $rosterData[] = $row;
-        }
-        
-        $offersData = [];
-        foreach ($offersResult as $row) {
-            $offersData[] = $row;
-        }
+        $rosterData = $this->teamQueryRepo->getRosterUnderContractOrderedByOrdinal($this->team->teamID);
+        $offersData = $this->teamQueryRepo->getFreeAgencyOffers($this->team->teamID);
         
         $totalSalaries = $this->calculateTotalSalaries($rosterData, $offersData, $excludeOfferPid);
         $rosterSpots = $this->calculateRosterSpots($rosterData, $offersData, $excludeOfferPid);

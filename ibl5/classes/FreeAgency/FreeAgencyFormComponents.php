@@ -4,13 +4,9 @@ declare(strict_types=1);
 
 namespace FreeAgency;
 
-use FreeAgency\Contracts\FreeAgencyFormComponentsInterface;
 use Utilities\HtmlSanitizer;
 
-/**
- * @see FreeAgencyFormComponentsInterface
- */
-class FreeAgencyFormComponents implements FreeAgencyFormComponentsInterface
+class FreeAgencyFormComponents
 {
     private string $teamName;
     private \Player\Player $player;
@@ -41,7 +37,7 @@ class FreeAgencyFormComponents implements FreeAgencyFormComponentsInterface
     }
 
     /**
-     * @see FreeAgencyFormComponentsInterface::renderPlayerRatings()
+     *renderPlayerRatings()
      */
     public function renderPlayerRatings(): string
     {
@@ -104,7 +100,7 @@ class FreeAgencyFormComponents implements FreeAgencyFormComponentsInterface
     }
 
     /**
-     * @see FreeAgencyFormComponentsInterface::renderDemandDisplay()
+     * @param array<string, int> $demands Player demands array with keys dem1-dem6
      */
     public function renderDemandDisplay(array $demands): string
     {
@@ -125,7 +121,7 @@ class FreeAgencyFormComponents implements FreeAgencyFormComponentsInterface
     }
 
     /**
-     * @see FreeAgencyFormComponentsInterface::renderOfferInputs()
+     * @param array<string, int> $prefills Existing offer amounts (keys: offer1-6)
      */
     public function renderOfferInputs(array $prefills): string
     {
@@ -194,7 +190,7 @@ class FreeAgencyFormComponents implements FreeAgencyFormComponentsInterface
     }
 
     /**
-     * @see FreeAgencyFormComponentsInterface::renderMaxContractButtons()
+     * @param array<int, int> $maxSalaries Max salaries for years 1-6, 0-indexed
      */
     public function renderMaxContractButtons(array $maxSalaries, int $birdYears = 0): string
     {
@@ -215,13 +211,12 @@ class FreeAgencyFormComponents implements FreeAgencyFormComponentsInterface
         return $this->renderButtonRow(
             $label,
             $contractOfferConfigs,
-            0,
             'quick-offer-max'
         );
     }
 
     /**
-     * @see FreeAgencyFormComponentsInterface::renderExceptionButtons()
+     *renderExceptionButtons()
      */
     public function renderExceptionButtons(string $exceptionType): string
     {
@@ -256,7 +251,6 @@ class FreeAgencyFormComponents implements FreeAgencyFormComponentsInterface
         echo $this->renderButtonRow(
             'Mid-Level Exception (click the button that corresponds to the final year you wish to offer):',
             $contractOfferConfigs,
-            0,
             'quick-offer-mle'
         );
     }
@@ -278,7 +272,6 @@ class FreeAgencyFormComponents implements FreeAgencyFormComponentsInterface
         echo $this->renderButtonRow(
             'Lower-Level Exception:',
             $contractOfferConfigs,
-            0,
             'quick-offer-lle'
         );
     }
@@ -300,7 +293,6 @@ class FreeAgencyFormComponents implements FreeAgencyFormComponentsInterface
         echo $this->renderButtonRow(
             'Veterans Exception:',
             $contractOfferConfigs,
-            0,
             'quick-offer-vetmin'
         );
     }
@@ -310,11 +302,10 @@ class FreeAgencyFormComponents implements FreeAgencyFormComponentsInterface
      *
      * @param string $label Label text for the row
      * @param array<array{offers: array<int>, offerType?: string}> $contractOfferConfigs Contract offer configurations by years
-     * @param int $fillCells Unused, kept for interface compatibility
      * @param string $testIdPrefix data-testid prefix for buttons (e.g. "quick-offer-mle"); year suffix appended for multi-button rows
      * @return string HTML flex row content
      */
-    private function renderButtonRow(string $label, array $contractOfferConfigs, int $fillCells = 0, string $testIdPrefix = ''): string
+    private function renderButtonRow(string $label, array $contractOfferConfigs, string $testIdPrefix = ''): string
     {
         $isSingleButton = count($contractOfferConfigs) === 1;
         ob_start();

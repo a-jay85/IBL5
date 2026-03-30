@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace FreeAgency;
 
+use FreeAgency\Contracts\FreeAgencyDemandCalculatorInterface;
 use FreeAgency\Contracts\FreeAgencyProcessorInterface;
+use FreeAgency\Contracts\FreeAgencyRepositoryInterface;
 use Team\Team;
 use Season\Season;
 use Discord\Discord;
@@ -15,18 +17,22 @@ use Discord\Discord;
 class FreeAgencyProcessor implements FreeAgencyProcessorInterface
 {
     private \mysqli $mysqli_db;
-    private FreeAgencyDemandCalculator $calculator;
-    private FreeAgencyRepository $repository;
+    private FreeAgencyDemandCalculatorInterface $calculator;
+    private FreeAgencyRepositoryInterface $repository;
     private Season $season;
 
-    public function __construct(\mysqli $mysqli_db)
-    {
+    public function __construct(
+        \mysqli $mysqli_db,
+        ?FreeAgencyDemandCalculatorInterface $calculator = null,
+        ?FreeAgencyRepositoryInterface $repository = null
+    ) {
         $this->mysqli_db = $mysqli_db;
         $this->season = new Season($mysqli_db);
 
-        $demandRepository = new FreeAgencyDemandRepository($this->mysqli_db);
-        $this->calculator = new FreeAgencyDemandCalculator($demandRepository);
-        $this->repository = new FreeAgencyRepository($this->mysqli_db);
+        $this->calculator = $calculator ?? new FreeAgencyDemandCalculator(
+            new FreeAgencyDemandRepository($this->mysqli_db)
+        );
+        $this->repository = $repository ?? new FreeAgencyRepository($this->mysqli_db);
     }
 
     /**
@@ -198,20 +204,20 @@ class FreeAgencyProcessor implements FreeAgencyProcessorInterface
         $yearsInOffer = OfferType::calculateYears($offerData);
         $offerAverage = $this->calculateOfferAverage($offerData, $yearsInOffer);
 
-        $perceivedValue = $this->calculator->calculatePerceivedValue(
+        $calcResult = $this->calculator->calculatePerceivedValue(
             $offerAverage,
             $teamName,
             $player,
             $yearsInOffer
         );
 
+        $modifier = $calcResult['modifier'];
+        $random = $calcResult['random'];
+        $perceivedValue = $calcResult['perceivedValue'];
+
         // Determine MLE/LLE flags
         $mle = OfferType::isMLE($offerData['offerType']) ? 1 : 0;
         $lle = OfferType::isLLE($offerData['offerType']) ? 1 : 0;
-
-        // Calculate modifier and random for storage (extract from perceived value calculation)
-        $modifier = (int) ($perceivedValue / $offerAverage); // Approximate
-        $random = 0; // Will be recalculated on acceptance
 
         $playerName = $player->name ?? '';
 

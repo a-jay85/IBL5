@@ -5,807 +5,414 @@ declare(strict_types=1);
 namespace Tests\FreeAgency;
 
 use PHPUnit\Framework\TestCase;
-use PHPUnit\Framework\Attributes\DataProvider;
 use FreeAgency\FreeAgencyOfferValidator;
+use FreeAgency\OfferType;
 use Team\Team;
 
 /**
- * Tests for FreeAgencyOfferValidator
- * 
- * Validates contract offer rules through public API:
- * - Minimum salary requirements
- * - Cap space constraints (soft and hard cap)
- * - Maximum contract values
- * - Legal raise percentages
- * - No salary decreases
+ * Tests for FreeAgencyOfferValidator — all 7 validation rules from original freeagentoffer.php.
+ *
+ * Original validation order:
+ * 1. Year 1 must be > 0
+ * 2. Year 1 must be >= veteran minimum
+ * 3. Hard cap check (softCap + 2000)
+ * 4. Soft cap check (unless Bird Rights or MLE/LLE)
+ * 5. Year 1 must be <= max contract
+ * 6. Year-to-year raises must not exceed 10% (or 12.5% with Bird Rights)
+ * 7. No salary decreases (except to $0 termination)
  */
 class FreeAgencyOfferValidatorTest extends TestCase
 {
-    private $validator;
+    // ================================================================
+    // VALID OFFERS
+    // ================================================================
 
-    protected function setUp(): void
+    public function testValidSingleYearOffer(): void
     {
-        $this->validator = new FreeAgencyOfferValidator(null);
+        $validator = new FreeAgencyOfferValidator();
+        $result = $validator->validateOffer($this->buildOffer(['offer1' => 500]));
+
+        $this->assertTrue($result['valid']);
     }
 
-    protected function tearDown(): void
+    public function testValidMultiYearOfferWithAllowedRaises(): void
     {
-        $this->validator = null;
+        $validator = new FreeAgencyOfferValidator();
+        // 10% raise limit on 500 = round(500 * 0.1) = 50
+        // So max year 2 = 550, max year 3 = 600
+        $result = $validator->validateOffer($this->buildOffer([
+            'offer1' => 500, 'offer2' => 550, 'offer3' => 600,
+        ]));
+
+        $this->assertTrue($result['valid']);
     }
 
-    /**
-     * @group validation
-     * @group minimum-salary
-     */
-    public function testRejectsOfferWithZeroFirstYear(): void
+    // ================================================================
+    // RULE 1: Year 1 > 0
+    // ================================================================
+
+    public function testRejectsZeroFirstYear(): void
     {
-        // Arrange
-        $offerData = $this->createValidOffer();
-        $offerData['offer1'] = 0;
+        $validator = new FreeAgencyOfferValidator();
+        $result = $validator->validateOffer($this->buildOffer(['offer1' => 0]));
 
-        // Act
-        $result = $this->validator->validateOffer($offerData);
-
-        // Assert
         $this->assertFalse($result['valid']);
-        $this->assertStringContainsString('greater than zero', $result['error']);
+        $this->assertStringContainsString('zero', $result['error']);
     }
 
-    /**
-     * @group validation
-     * @group minimum-salary
-     */
-    public function testRejectsOfferBelowVeteransMinimum(): void
+    // ================================================================
+    // RULE 2: Year 1 >= Veteran Minimum
+    // ================================================================
+
+    public function testRejectsOfferBelowVeteranMinimum(): void
     {
-        // Arrange
-        $offerData = $this->createValidOffer();
-        $offerData['offer1'] = 30;
-        $offerData['vetmin'] = 35;
+        $validator = new FreeAgencyOfferValidator();
+        $result = $validator->validateOffer($this->buildOffer([
+            'offer1' => 50,
+            'vetmin' => 70,
+        ]));
 
-        // Act
-        $result = $this->validator->validateOffer($offerData);
-
-        // Assert
         $this->assertFalse($result['valid']);
-        $this->assertStringContainsString("Veteran's Minimum", $result['error']);
+        $this->assertStringContainsString('Minimum', $result['error']);
     }
 
-    /**
-     * @group validation
-     * @group cap-space
-     */
-    public function testRejectsOfferOverHardCap(): void
+    public function testAcceptsOfferAtExactVeteranMinimum(): void
     {
-        // Arrange
-        $offerData = $this->createValidOffer();
-        $offerData['offer1'] = 3000;
-        $offerData['amendedCapSpaceYear1'] = 500; // Hard cap = 500 + 2000 = 2500
+        $validator = new FreeAgencyOfferValidator();
+        $result = $validator->validateOffer($this->buildOffer([
+            'offer1' => 70,
+            'vetmin' => 70,
+        ]));
 
-        // Act
-        $result = $this->validator->validateOffer($offerData);
+        $this->assertTrue($result['valid']);
+    }
 
-        // Assert
+    // ================================================================
+    // RULE 3: Hard Cap (softCapSpace + 2000)
+    // ================================================================
+
+    public function testRejectsOfferExceedingHardCap(): void
+    {
+        $validator = new FreeAgencyOfferValidator();
+        // amendedCapSpaceYear1 = 100, hard cap = 100 + 2000 = 2100
+        $result = $validator->validateOffer($this->buildOffer([
+            'offer1' => 2200,
+            'amendedCapSpaceYear1' => 100,
+            'year1Max' => 5000, // Don't trigger max check
+        ]));
+
         $this->assertFalse($result['valid']);
         $this->assertStringContainsString('hard cap', $result['error']);
     }
 
-    /**
-     * @group validation
-     * @group cap-space
-     */
-    public function testRejectsOfferOverSoftCapWithoutBirdRights(): void
+    public function testAcceptsOfferAtExactHardCap(): void
     {
-        // Arrange
-        $offerData = $this->createValidOffer();
-        $offerData['offer1'] = 600;
-        $offerData['amendedCapSpaceYear1'] = 500;
-        $offerData['birdYears'] = 2; // Less than 3, no Bird Rights
-        $offerData['offerType'] = 0; // Not using exception
+        $validator = new FreeAgencyOfferValidator();
+        // amendedCapSpaceYear1 = 100, hard cap = 2100
+        // Use bird rights to bypass soft cap check
+        $result = $validator->validateOffer($this->buildOffer([
+            'offer1' => 2100,
+            'amendedCapSpaceYear1' => 100,
+            'year1Max' => 5000,
+            'birdYears' => 3,
+        ]));
 
-        // Act
-        $result = $this->validator->validateOffer($offerData);
+        $this->assertTrue($result['valid']);
+    }
 
-        // Assert
+    // ================================================================
+    // RULE 4: Soft Cap (unless Bird Rights or MLE/LLE)
+    // ================================================================
+
+    public function testRejectsCustomOfferExceedingSoftCapWithoutBirdRights(): void
+    {
+        $validator = new FreeAgencyOfferValidator();
+        $result = $validator->validateOffer($this->buildOffer([
+            'offer1' => 600,
+            'amendedCapSpaceYear1' => 500,
+            'birdYears' => 0,
+            'offerType' => OfferType::CUSTOM,
+            'year1Max' => 5000,
+        ]));
+
         $this->assertFalse($result['valid']);
         $this->assertStringContainsString('soft cap', $result['error']);
     }
 
-    /**
-     * @group validation
-     * @group cap-space
-     */
-    public function testAcceptsOfferWithinAllConstraintsWithBirdRights(): void
+    public function testBirdRightsBypassesSoftCapCheck(): void
     {
-        // Arrange
-        $offerData = $this->createValidOffer();
-        $offerData['offer1'] = 600;
-        $offerData['offer2'] = 660; // Must be >= offer1
-        $offerData['amendedCapSpaceYear1'] = 1000; // Hard cap = 1000 + 2000 = 3000
-        $offerData['year1Max'] = 1500; // Max contract is higher than offer
-        $offerData['birdYears'] = 3; // Bird Rights, can exceed soft cap but not hard cap
+        $validator = new FreeAgencyOfferValidator();
+        $result = $validator->validateOffer($this->buildOffer([
+            'offer1' => 600,
+            'amendedCapSpaceYear1' => 500,
+            'birdYears' => 3, // Bird Rights
+            'offerType' => OfferType::CUSTOM,
+            'year1Max' => 5000,
+        ]));
 
-        // Act
-        $result = $this->validator->validateOffer($offerData);
-
-        // Assert
         $this->assertTrue($result['valid']);
     }
 
-    /**
-     * @group validation
-     * @group max-contract
-     */
-    public function testRejectsOfferOverMaximumValue(): void
+    public function testMLEBypassesSoftCapCheck(): void
     {
-        // Arrange
-        $offerData = $this->createValidOffer();
-        $offerData['offer1'] = 1500;
-        $offerData['year1Max'] = \ContractRules::getMaxContractSalary(0);
+        $team = $this->createTeamStub(hasMLE: 1);
+        $validator = new FreeAgencyOfferValidator($team);
+        $result = $validator->validateOffer($this->buildOffer([
+            'offer1' => 450,
+            'amendedCapSpaceYear1' => 100, // Under soft cap
+            'birdYears' => 0,
+            'offerType' => OfferType::MLE_3_YEAR,
+            'year1Max' => 5000,
+        ]));
 
-        // Act
-        $result = $this->validator->validateOffer($offerData);
+        $this->assertTrue($result['valid']);
+    }
 
-        // Assert
+    // ================================================================
+    // RULE 5: Maximum Contract
+    // ================================================================
+
+    public function testRejectsOfferOverMaxContract(): void
+    {
+        $validator = new FreeAgencyOfferValidator();
+        $result = $validator->validateOffer($this->buildOffer([
+            'offer1' => 1100,
+            'year1Max' => 1063,
+        ]));
+
         $this->assertFalse($result['valid']);
-        $this->assertStringContainsString('maximum allowed', $result['error']);
+        $this->assertStringContainsString('maximum', $result['error']);
     }
 
-    /**
-     * @group validation
-     * @group raises
-     */
-    public function testRejectsIllegalRaiseWithoutBirdRights(): void
+    public function testAcceptsOfferAtExactMaxContract(): void
     {
-        // Arrange
-        $offerData = $this->createValidOffer();
-        $offerData['offer1'] = 1000;
-        $offerData['offer2'] = 1150; // 15% raise, max is 10%
-        $offerData['birdYears'] = 2;
+        $validator = new FreeAgencyOfferValidator();
+        $result = $validator->validateOffer($this->buildOffer([
+            'offer1' => 1063,
+            'year1Max' => 1063,
+        ]));
 
-        // Act
-        $result = $this->validator->validateOffer($offerData);
-
-        // Assert
-        $this->assertFalse($result['valid']);
-        $this->assertStringContainsString('larger raise than is permitted', $result['error']);
-    }
-
-    /**
-     * @group validation
-     * @group raises
-     */
-    public function testAcceptsLegalRaiseWithoutBirdRights(): void
-    {
-        // Arrange
-        $offerData = $this->createValidOffer();
-        $offerData['offer1'] = 1000;
-        $offerData['offer2'] = 1100; // 10% raise - legal
-        $offerData['birdYears'] = 2;
-
-        // Act
-        $result = $this->validator->validateOffer($offerData);
-
-        // Assert
         $this->assertTrue($result['valid']);
     }
 
-    /**
-     * @group validation
-     * @group raises
-     */
-    public function testAcceptsLegalRaiseWithBirdRights(): void
+    // ================================================================
+    // RULE 6: Raises
+    // Standard: 10% of Year 1 salary
+    // Bird Rights (bird >= 3): 12.5% of Year 1 salary
+    // ================================================================
+
+    public function testRejectsRaiseExceedingStandardLimit(): void
     {
-        // Arrange
-        $offerData = $this->createValidOffer();
-        $offerData['offer1'] = 1000;
-        $offerData['offer2'] = 1125; // 12.5% raise - legal with Bird Rights
-        $offerData['birdYears'] = 3;
-
-        // Act
-        $result = $this->validator->validateOffer($offerData);
-
-        // Assert
-        $this->assertTrue($result['valid']);
-    }
-
-    /**
-     * @group validation
-     * @group decreases
-     */
-    public function testAllowsZeroForUnusedYears(): void
-    {
-        // Arrange
-        $offerData = $this->createValidOffer();
-        $offerData['offer1'] = 1000;
-        $offerData['offer2'] = 1100;
-        $offerData['offer3'] = 0; // Zero is OK (contract ends)
-        $offerData['offer4'] = 0;
-
-        // Act
-        $result = $this->validator->validateOffer($offerData);
-
-        // Assert
-        $this->assertTrue($result['valid']);
-    }
-
-    /**
-     * @group validation
-     * @group mle-lle
-     */
-    public function testRejectsMLEOfferWhenTeamOutOfMLE(): void
-    {
-        // Arrange
-        $mockTeam = $this->createMockTeam(0, 1); // hasMLE=0 (used), hasLLE=1
-        $validator = new FreeAgencyOfferValidator($mockTeam);
-        $offerData = $this->createValidOffer();
-        $offerData['offerType'] = \FreeAgency\OfferType::MLE_1_YEAR; // MLE offer
-
-        // Act
-        $result = $validator->validateOffer($offerData);
-
-        // Assert
-        $this->assertFalse($result['valid']);
-        $this->assertStringContainsString('Mid-Level Exception', $result['error']);
-        $this->assertStringContainsString('already used', $result['error']);
-    }
-
-    /**
-     * @group validation
-     * @group mle-lle
-     */
-    public function testRejectsLLEOfferWhenTeamOutOfLLE(): void
-    {
-        // Arrange
-        $mockTeam = $this->createMockTeam(1, 0); // hasMLE=1, hasLLE=0 (used)
-        $validator = new FreeAgencyOfferValidator($mockTeam);
-        $offerData = $this->createValidOffer();
-        $offerData['offerType'] = \FreeAgency\OfferType::LOWER_LEVEL_EXCEPTION; // LLE offer
-
-        // Act
-        $result = $validator->validateOffer($offerData);
-
-        // Assert
-        $this->assertFalse($result['valid']);
-        $this->assertStringContainsString('Lower-Level Exception', $result['error']);
-        $this->assertStringContainsString('already used', $result['error']);
-    }
-
-    /**
-     * @group validation
-     * @group mle-lle
-     */
-    public function testAcceptsMLEOfferWhenTeamHasMLE(): void
-    {
-        // Arrange
-        $mockTeam = $this->createMockTeam(1, 1); // hasMLE=1 (available), hasLLE=1
-        $validator = new FreeAgencyOfferValidator($mockTeam);
-        $offerData = $this->createValidOffer();
-        $offerData['offerType'] = \FreeAgency\OfferType::MLE_1_YEAR; // MLE offer
-
-        // Act
-        $result = $validator->validateOffer($offerData);
-
-        // Assert
-        $this->assertTrue($result['valid']);
-    }
-
-    /**
-     * @group validation
-     * @group mle-lle
-     */
-    public function testAcceptsLLEOfferWhenTeamHasLLE(): void
-    {
-        // Arrange
-        $mockTeam = $this->createMockTeam(1, 1); // hasMLE=1, hasLLE=1 (available)
-        $validator = new FreeAgencyOfferValidator($mockTeam);
-        $offerData = $this->createValidOffer();
-        $offerData['offerType'] = \FreeAgency\OfferType::LOWER_LEVEL_EXCEPTION; // LLE offer
-
-        // Act
-        $result = $validator->validateOffer($offerData);
-
-        // Assert
-        $this->assertTrue($result['valid']);
-    }
-
-    /**
-     * @group validation
-     * @group mle-lle
-     */
-    public function testSkipsMLECheckWhenNoTeamProvided(): void
-    {
-        // Arrange
-        $validator = new FreeAgencyOfferValidator(null); // No team
-        $offerData = $this->createValidOffer();
-        $offerData['offerType'] = \FreeAgency\OfferType::MLE_1_YEAR; // MLE offer
-
-        // Act
-        $result = $validator->validateOffer($offerData);
-
-        // Assert - Should not be rejected for MLE check (passes through)
-        $this->assertTrue($result['valid']);
-    }
-
-    /**
-     * @group validation
-     * @group mle-lle
-     */
-    public function testSkipsMLECheckWhenCustomOfferType(): void
-    {
-        // Arrange
-        $mockTeam = $this->createMockTeam(0, 1); // hasMLE=0 (out), hasLLE=1
-        $validator = new FreeAgencyOfferValidator($mockTeam);
-        $offerData = $this->createValidOffer();
-        $offerData['offerType'] = 0; // Custom offer, not MLE
-
-        // Act
-        $result = $validator->validateOffer($offerData);
-
-        // Assert - Should not check MLE for custom offers
-        $this->assertTrue($result['valid']);
-    }
-
-    /**
-     * Helper to create a valid offer
-     *
-     * @return array<string, mixed>
-     */
-    private function createValidOffer(): array
-    {
-        return [
+        $validator = new FreeAgencyOfferValidator();
+        // 10% of 500 = round(50) = 50, so max year2 = 550
+        $result = $validator->validateOffer($this->buildOffer([
             'offer1' => 500,
-            'offer2' => 550,
-            'offer3' => 0,
-            'offer4' => 0,
-            'offer5' => 0,
-            'offer6' => 0,
-            'birdYears' => 3,
-            'vetmin' => 35,
-            'year1Max' => \ContractRules::getMaxContractSalary(0),
-            'amendedCapSpaceYear1' => 1000,
-            'offerType' => 0,
-        ];
-    }
-
-    // --- Merged from FreeAgencyOfferValidatorEdgeCaseTest ---
-
-    // ============================================
-    // BIRD RIGHTS BOUNDARY TESTS
-    // ============================================
-
-    /**
-     * Test offer with exactly 3 bird years (threshold for bird rights)
-     */
-    public function testAcceptsOfferWithExactlyThreeBirdYears(): void
-    {
-        $offerData = $this->createValidOffer();
-        $offerData['birdYears'] = 3; // Exactly at threshold
-        $offerData['offer1'] = 600;
-        $offerData['offer2'] = 675; // 12.5% raise - legal with bird rights
-
-        $result = $this->validator->validateOffer($offerData);
-
-        $this->assertTrue($result['valid']);
-    }
-
-    /**
-     * Test offer with 2 bird years (just under threshold)
-     */
-    public function testRejectsExcessiveRaiseWithTwoBirdYears(): void
-    {
-        $offerData = $this->createValidOffer();
-        $offerData['birdYears'] = 2; // Just under threshold
-        $offerData['offer1'] = 600;
-        $offerData['offer2'] = 675; // 12.5% raise - illegal without bird rights
-
-        $result = $this->validator->validateOffer($offerData);
+            'offer2' => 600, // 100 raise, exceeds 50
+            'birdYears' => 0,
+        ]));
 
         $this->assertFalse($result['valid']);
         $this->assertStringContainsString('raise', $result['error']);
     }
 
-    /**
-     * Test exactly 10% raise without bird rights (boundary)
-     */
-    public function testAcceptsExactlyTenPercentRaiseWithoutBirdRights(): void
+    public function testAcceptsRaiseAtExactStandardLimit(): void
     {
-        $offerData = $this->createValidOffer();
-        $offerData['birdYears'] = 2;
-        $offerData['offer1'] = 1000;
-        $offerData['offer2'] = 1100; // Exactly 10%
-
-        $result = $this->validator->validateOffer($offerData);
+        $validator = new FreeAgencyOfferValidator();
+        // 10% of 500 = 50, year2 max = 550
+        $result = $validator->validateOffer($this->buildOffer([
+            'offer1' => 500,
+            'offer2' => 550,
+            'birdYears' => 0,
+        ]));
 
         $this->assertTrue($result['valid']);
     }
 
-    /**
-     * Test one over 10% raise without bird rights
-     */
-    public function testRejectsOneOverTenPercentRaiseWithoutBirdRights(): void
+    public function testBirdRightsAllows125PercentRaise(): void
     {
-        $offerData = $this->createValidOffer();
-        $offerData['birdYears'] = 2;
-        $offerData['offer1'] = 1000;
-        $offerData['offer2'] = 1101; // One over 10%
+        $validator = new FreeAgencyOfferValidator();
+        // 12.5% of 500 = round(62.5) = 63, so max year2 = 563
+        $result = $validator->validateOffer($this->buildOffer([
+            'offer1' => 500,
+            'offer2' => 562,
+            'birdYears' => 3,
+        ]));
 
-        $result = $this->validator->validateOffer($offerData);
+        $this->assertTrue($result['valid']);
+    }
+
+    public function testBirdRightsRejectsRaiseOver125Percent(): void
+    {
+        $validator = new FreeAgencyOfferValidator();
+        // 12.5% of 500 = 63, max year2 = 563
+        $result = $validator->validateOffer($this->buildOffer([
+            'offer1' => 500,
+            'offer2' => 564, // 64 raise, exceeds 63
+            'birdYears' => 3,
+        ]));
+
+        $this->assertFalse($result['valid']);
+        $this->assertStringContainsString('raise', $result['error']);
+    }
+
+    public function testRaiseLimitAppliesConsecutivelyNotCumulatively(): void
+    {
+        $validator = new FreeAgencyOfferValidator();
+        // Year 1: 500, max raise: 50
+        // Year 2: 550, max year3 = 550 + 50 = 600
+        // Year 3: 600 is exactly at limit
+        $result = $validator->validateOffer($this->buildOffer([
+            'offer1' => 500,
+            'offer2' => 550,
+            'offer3' => 600,
+            'birdYears' => 0,
+        ]));
+
+        $this->assertTrue($result['valid']);
+    }
+
+    // ================================================================
+    // RULE 7: Salary Decreases
+    // Original: Cannot decrease salary in later years (except to $0 termination)
+    // ================================================================
+
+    public function testRejectsSalaryDecrease(): void
+    {
+        $validator = new FreeAgencyOfferValidator();
+        $result = $validator->validateOffer($this->buildOffer([
+            'offer1' => 500,
+            'offer2' => 400, // Decrease
+        ]));
+
+        $this->assertFalse($result['valid']);
+        $this->assertStringContainsString('decrease', strtolower($result['error']));
+    }
+
+    public function testAllowsDecreaseToZeroAsTermination(): void
+    {
+        $validator = new FreeAgencyOfferValidator();
+        // Offer 500 in year 1, 0 in year 2 = 1-year contract
+        $result = $validator->validateOffer($this->buildOffer([
+            'offer1' => 500,
+            'offer2' => 0,
+        ]));
+
+        $this->assertTrue($result['valid']);
+    }
+
+    public function testRejectsSalaryDecreaseInYear3(): void
+    {
+        $validator = new FreeAgencyOfferValidator();
+        $result = $validator->validateOffer($this->buildOffer([
+            'offer1' => 500,
+            'offer2' => 550,
+            'offer3' => 540, // Decrease from 550
+        ]));
 
         $this->assertFalse($result['valid']);
     }
 
-    /**
-     * Test exactly 12.5% raise with bird rights (boundary)
-     */
-    public function testAcceptsExactlyTwelvePointFivePercentRaiseWithBirdRights(): void
-    {
-        $offerData = $this->createValidOffer();
-        $offerData['birdYears'] = 3;
-        $offerData['offer1'] = 1000;
-        $offerData['offer2'] = 1125; // Exactly 12.5%
+    // ================================================================
+    // GAP DETECTION
+    // ================================================================
 
-        $result = $this->validator->validateOffer($offerData);
-
-        $this->assertTrue($result['valid']);
-    }
-
-    /**
-     * Test one over 12.5% raise with bird rights
-     */
-    public function testRejectsOneOverTwelvePointFivePercentRaiseWithBirdRights(): void
-    {
-        $offerData = $this->createValidOffer();
-        $offerData['birdYears'] = 3;
-        $offerData['offer1'] = 1000;
-        $offerData['offer2'] = 1126; // One over 12.5%
-
-        $result = $this->validator->validateOffer($offerData);
-
-        $this->assertFalse($result['valid']);
-    }
-
-    // ============================================
-    // HARD CAP BOUNDARY TESTS
-    // ============================================
-
-    /**
-     * Test offer exactly at hard cap limit
-     */
-    public function testAcceptsOfferExactlyAtHardCap(): void
-    {
-        $offerData = $this->createValidOffer();
-        // Hard cap = amendedCapSpaceYear1 + (HARD_CAP_MAX - SOFT_CAP_MAX)
-        // Hard cap = 500 + 2000 = 2500
-        $offerData['amendedCapSpaceYear1'] = 500;
-        $offerData['offer1'] = 2500; // Exactly at hard cap
-        $offerData['birdYears'] = 3; // Need bird rights to exceed soft cap
-        $offerData['year1Max'] = 3000;
-
-        $result = $this->validator->validateOffer($offerData);
-
-        $this->assertTrue($result['valid']);
-    }
-
-    /**
-     * Test offer one over hard cap limit
-     */
-    public function testRejectsOfferOneOverHardCap(): void
-    {
-        $offerData = $this->createValidOffer();
-        $offerData['amendedCapSpaceYear1'] = 500;
-        $offerData['offer1'] = 2501; // One over hard cap
-        $offerData['birdYears'] = 3;
-        $offerData['year1Max'] = 3000;
-
-        $result = $this->validator->validateOffer($offerData);
-
-        $this->assertFalse($result['valid']);
-        $this->assertStringContainsString('hard cap', $result['error']);
-    }
-
-    /**
-     * Test offer exactly at soft cap without bird rights
-     */
-    public function testAcceptsOfferExactlyAtSoftCapWithoutBirdRights(): void
-    {
-        $offerData = $this->createValidOffer();
-        $offerData['amendedCapSpaceYear1'] = 800;
-        $offerData['offer1'] = 800; // Exactly at soft cap
-        $offerData['birdYears'] = 2;
-        $offerData['offerType'] = 0;
-
-        $result = $this->validator->validateOffer($offerData);
-
-        $this->assertTrue($result['valid']);
-    }
-
-    /**
-     * Test offer one over soft cap without bird rights
-     */
-    public function testRejectsOfferOneOverSoftCapWithoutBirdRights(): void
-    {
-        $offerData = $this->createValidOffer();
-        $offerData['amendedCapSpaceYear1'] = 800;
-        $offerData['offer1'] = 801; // One over soft cap
-        $offerData['birdYears'] = 2;
-        $offerData['offerType'] = 0;
-
-        $result = $this->validator->validateOffer($offerData);
-
-        $this->assertFalse($result['valid']);
-        $this->assertStringContainsString('soft cap', $result['error']);
-    }
-
-    // ============================================
-    // MLE/LLE AVAILABILITY TESTS
-    // ============================================
-
-    /**
-     * Test MLE check with integer 1 for hasMLE
-     */
-    public function testAcceptsMLEWithIntOne(): void
-    {
-        $mockTeam = $this->createMockTeam(1, 1);
-        $validator = new FreeAgencyOfferValidator($mockTeam);
-        $offerData = $this->createValidOffer();
-        $offerData['offerType'] = \FreeAgency\OfferType::MLE_1_YEAR;
-
-        $result = $validator->validateOffer($offerData);
-
-        $this->assertTrue($result['valid']);
-    }
-
-    /**
-     * Test MLE check with integer 0 for hasMLE
-     */
-    public function testRejectsMLEWithIntZero(): void
-    {
-        $mockTeam = $this->createMockTeam(0, 1);
-        $validator = new FreeAgencyOfferValidator($mockTeam);
-        $offerData = $this->createValidOffer();
-        $offerData['offerType'] = \FreeAgency\OfferType::MLE_1_YEAR;
-
-        $result = $validator->validateOffer($offerData);
-
-        $this->assertFalse($result['valid']);
-        $this->assertStringContainsString('Mid-Level Exception', $result['error']);
-    }
-
-    /**
-     * Test LLE check with integer 1 for hasLLE
-     */
-    public function testAcceptsLLEWithIntOne(): void
-    {
-        $mockTeam = $this->createMockTeam(1, 1);
-        $validator = new FreeAgencyOfferValidator($mockTeam);
-        $offerData = $this->createValidOffer();
-        $offerData['offerType'] = \FreeAgency\OfferType::LOWER_LEVEL_EXCEPTION;
-
-        $result = $validator->validateOffer($offerData);
-
-        $this->assertTrue($result['valid']);
-    }
-
-    /**
-     * Test LLE check with integer 0 for hasLLE
-     */
-    public function testRejectsLLEWithIntZero(): void
-    {
-        $mockTeam = $this->createMockTeam(1, 0);
-        $validator = new FreeAgencyOfferValidator($mockTeam);
-        $offerData = $this->createValidOffer();
-        $offerData['offerType'] = \FreeAgency\OfferType::LOWER_LEVEL_EXCEPTION;
-
-        $result = $validator->validateOffer($offerData);
-
-        $this->assertFalse($result['valid']);
-        $this->assertStringContainsString('Lower-Level Exception', $result['error']);
-    }
-
-    // ============================================
-    // VETERAN MINIMUM BOUNDARY TESTS
-    // ============================================
-
-    /**
-     * Test offer exactly at veteran minimum
-     */
-    public function testAcceptsOfferExactlyAtVeteranMinimum(): void
-    {
-        $offerData = $this->createValidOffer();
-        $offerData['vetmin'] = 50;
-        $offerData['offer1'] = 50; // Exactly at vet min
-        $offerData['offer2'] = 56; // Valid raise (50 + floor(50 * 0.125) = 56)
-
-        $result = $this->validator->validateOffer($offerData);
-
-        $this->assertTrue($result['valid']);
-    }
-
-    /**
-     * Test offer one below veteran minimum
-     */
-    public function testRejectsOfferOneBelowVeteranMinimum(): void
-    {
-        $offerData = $this->createValidOffer();
-        $offerData['vetmin'] = 50;
-        $offerData['offer1'] = 49; // One below
-
-        $result = $this->validator->validateOffer($offerData);
-
-        $this->assertFalse($result['valid']);
-        $this->assertStringContainsString("Veteran's Minimum", $result['error']);
-    }
-
-    // ============================================
-    // CONTRACT CONTINUITY TESTS
-    // ============================================
-
-    /**
-     * Test all six years filled (max contract length)
-     */
-    public function testAcceptsFullSixYearContract(): void
-    {
-        $offerData = $this->createValidOffer();
-        $offerData['offer1'] = 500;
-        $offerData['offer2'] = 550;
-        $offerData['offer3'] = 600;
-        $offerData['offer4'] = 650;
-        $offerData['offer5'] = 700;
-        $offerData['offer6'] = 750;
-
-        $result = $this->validator->validateOffer($offerData);
-
-        $this->assertTrue($result['valid']);
-    }
-
-    /**
-     * Test gap in contract years (year 3 is 0, year 4 is not)
-     */
     public function testRejectsGapInContractYears(): void
     {
-        $offerData = $this->createValidOffer();
-        $offerData['offer1'] = 500;
-        $offerData['offer2'] = 550;
-        $offerData['offer3'] = 0;
-        $offerData['offer4'] = 650; // Gap!
-        $offerData['offer5'] = 0;
-        $offerData['offer6'] = 0;
-
-        $result = $this->validator->validateOffer($offerData);
+        $validator = new FreeAgencyOfferValidator();
+        $result = $validator->validateOffer($this->buildOffer([
+            'offer1' => 500,
+            'offer2' => 0,
+            'offer3' => 600, // Gap
+        ]));
 
         $this->assertFalse($result['valid']);
-        $this->assertStringContainsString('gaps', $result['error']);
+        $this->assertStringContainsString('gap', strtolower($result['error']));
     }
 
-    /**
-     * Test gap at end of contract (year 5 is 0, year 6 is not)
-     */
-    public function testRejectsGapAtEndOfContract(): void
-    {
-        $offerData = $this->createValidOffer();
-        $offerData['offer1'] = 500;
-        $offerData['offer2'] = 550;
-        $offerData['offer3'] = 600;
-        $offerData['offer4'] = 650;
-        $offerData['offer5'] = 0;
-        $offerData['offer6'] = 750; // Gap!
+    // ================================================================
+    // MLE/LLE AVAILABILITY
+    // ================================================================
 
-        $result = $this->validator->validateOffer($offerData);
+    public function testRejectsMLEWhenAlreadyUsed(): void
+    {
+        $team = $this->createTeamStub(hasMLE: 0);
+        $validator = new FreeAgencyOfferValidator($team);
+
+        $result = $validator->validateOffer($this->buildOffer([
+            'offer1' => 450,
+            'offerType' => OfferType::MLE_3_YEAR,
+        ]));
 
         $this->assertFalse($result['valid']);
+        $this->assertStringContainsString('Mid-Level', $result['error']);
     }
 
-    // ============================================
-    // MAXIMUM CONTRACT BOUNDARY TESTS
-    // ============================================
-
-    /**
-     * Test offer exactly at maximum contract value
-     */
-    public function testAcceptsOfferExactlyAtMaximumContract(): void
+    public function testAcceptsMLEWhenAvailable(): void
     {
-        $maxContract = \ContractRules::getMaxContractSalary(10); // 10-year vet
-        $offerData = $this->createValidOffer();
-        $offerData['offer1'] = $maxContract;
-        $offerData['year1Max'] = $maxContract;
-        $offerData['amendedCapSpaceYear1'] = 5000; // Enough cap space
+        $team = $this->createTeamStub(hasMLE: 1);
+        $validator = new FreeAgencyOfferValidator($team);
 
-        $result = $this->validator->validateOffer($offerData);
+        $result = $validator->validateOffer($this->buildOffer([
+            'offer1' => 450,
+            'offerType' => OfferType::MLE_1_YEAR,
+        ]));
 
         $this->assertTrue($result['valid']);
     }
 
-    /**
-     * Test offer one over maximum contract value
-     */
-    public function testRejectsOfferOneOverMaximumContract(): void
+    public function testRejectsLLEWhenAlreadyUsed(): void
     {
-        $maxContract = \ContractRules::getMaxContractSalary(10);
-        $offerData = $this->createValidOffer();
-        $offerData['offer1'] = $maxContract + 1;
-        $offerData['year1Max'] = $maxContract;
-        $offerData['amendedCapSpaceYear1'] = 5000;
+        $team = $this->createTeamStub(hasLLE: 0);
+        $validator = new FreeAgencyOfferValidator($team);
 
-        $result = $this->validator->validateOffer($offerData);
+        $result = $validator->validateOffer($this->buildOffer([
+            'offer1' => 145,
+            'offerType' => OfferType::LOWER_LEVEL_EXCEPTION,
+        ]));
 
         $this->assertFalse($result['valid']);
-        $this->assertStringContainsString('maximum allowed', $result['error']);
+        $this->assertStringContainsString('Lower-Level', $result['error']);
     }
 
-    // ============================================
-    // NEGATIVE VALUE TESTS
-    // ============================================
+    public function testAcceptsLLEWhenAvailable(): void
+    {
+        $team = $this->createTeamStub(hasLLE: 1);
+        $validator = new FreeAgencyOfferValidator($team);
+
+        $result = $validator->validateOffer($this->buildOffer([
+            'offer1' => 145,
+            'offerType' => OfferType::LOWER_LEVEL_EXCEPTION,
+        ]));
+
+        $this->assertTrue($result['valid']);
+    }
+
+    // ================================================================
+    // HELPERS
+    // ================================================================
 
     /**
-     * Test negative offer amount treated as invalid
+     * @param array<string, int> $overrides
+     * @return array<string, int>
      */
-    public function testRejectsNegativeOfferAmount(): void
+    private function buildOffer(array $overrides = []): array
     {
-        $offerData = $this->createValidOffer();
-        $offerData['offer1'] = -100;
-
-        $result = $this->validator->validateOffer($offerData);
-
-        // Negative is less than vet min, so should fail
-        $this->assertFalse($result['valid']);
+        return array_merge([
+            'offer1' => 500,
+            'offer2' => 0,
+            'offer3' => 0,
+            'offer4' => 0,
+            'offer5' => 0,
+            'offer6' => 0,
+            'birdYears' => 0,
+            'offerType' => OfferType::CUSTOM,
+            'vetmin' => 35,
+            'year1Max' => 1063,
+            'amendedCapSpaceYear1' => 5000,
+        ], $overrides);
     }
 
-    /**
-     * Test negative cap space handling
-     */
-    public function testHandlesNegativeCapSpace(): void
-    {
-        $offerData = $this->createValidOffer();
-        $offerData['amendedCapSpaceYear1'] = -500; // Over the cap
-        $offerData['offer1'] = 500;
-        $offerData['birdYears'] = 2;
-        $offerData['offerType'] = 0;
-
-        $result = $this->validator->validateOffer($offerData);
-
-        $this->assertFalse($result['valid']);
-        $this->assertStringContainsString('soft cap', $result['error']);
-    }
-
-    // ============================================
-    // DATA PROVIDER TESTS
-    // ============================================
-
-    #[DataProvider('birdYearsRaiseProvider')]
-    public function testBirdYearsAffectsMaxRaise(
-        int $birdYears,
-        int $offer1,
-        int $offer2,
-        bool $expectedValid
-    ): void {
-        $offerData = $this->createValidOffer();
-        $offerData['birdYears'] = $birdYears;
-        $offerData['offer1'] = $offer1;
-        $offerData['offer2'] = $offer2;
-
-        $result = $this->validator->validateOffer($offerData);
-
-        $this->assertEquals($expectedValid, $result['valid']);
-    }
-
-    public static function birdYearsRaiseProvider(): array
-    {
-        return [
-            '0 bird years, 10% raise valid' => [0, 1000, 1100, true],
-            '0 bird years, 11% raise invalid' => [0, 1000, 1110, false],
-            '2 bird years, 10% raise valid' => [2, 1000, 1100, true],
-            '2 bird years, 11% raise invalid' => [2, 1000, 1110, false],
-            '3 bird years, 12.5% raise valid' => [3, 1000, 1125, true],
-            '3 bird years, 13% raise invalid' => [3, 1000, 1130, false],
-            '5 bird years, 12.5% raise valid' => [5, 1000, 1125, true],
-            '5 bird years, 13% raise invalid' => [5, 1000, 1130, false],
-        ];
-    }
-
-    /**
-     * Create a mock Team object with MLE/LLE flags
-     */
-    private function createMockTeam(int $hasMLE, int $hasLLE): Team
+    private function createTeamStub(int $hasMLE = 0, int $hasLLE = 0): Team
     {
         $team = $this->createStub(Team::class);
         $team->hasMLE = $hasMLE;

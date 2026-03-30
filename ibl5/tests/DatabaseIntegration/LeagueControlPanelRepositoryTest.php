@@ -258,15 +258,33 @@ class LeagueControlPanelRepositoryTest extends DatabaseTestCase
         self::assertNull($this->fetchPlayerByPid(200100041));
     }
 
+    public function testDeleteOutdatedBuyoutsAndCashDeletesCurrentYearOnlyCash(): void
+    {
+        // Cash with money only in current year (cy1) and no future years — should be deleted
+        $this->insertTestPlayer(200100045, '| Cash from Test Current', [
+            'tid' => 1,
+            'cy' => 1,
+            'cyt' => 1,
+            'cy1' => -500,
+            'cy2' => 0,
+        ]);
+
+        $count = $this->repo->deleteOutdatedBuyoutsAndCash();
+
+        self::assertSame(1, $count);
+        self::assertNull($this->fetchPlayerByPid(200100045));
+    }
+
     public function testDeleteOutdatedBuyoutsAndCashPreservesActiveBuyout(): void
     {
-        // Buyout with money still owed in current year — should NOT be deleted
+        // Buyout with money still owed in a future year — should NOT be deleted
         $this->insertTestPlayer(200100042, '| Active Buyout', [
             'tid' => 1,
             'cy' => 2,
             'cyt' => 4,
             'cy1' => 0,
             'cy2' => 300,
+            'cy3' => 300,
         ]);
 
         $count = $this->repo->deleteOutdatedBuyoutsAndCash();

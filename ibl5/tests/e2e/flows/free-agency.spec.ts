@@ -7,6 +7,8 @@ import { assertNoPhpErrors } from '../helpers/php-errors';
 //   pid=10: FA Guard on Metros (tid=1, exp=5, bird=4 — Bird Rights) → "Unsigned Free Agents"
 //   pid=11: FA Center pure FA (tid=0, exp=8, bird=0) → "All Other Free Agents"
 //   pid=12: FA Forward on Stars (tid=2, exp=3, bird=2) → "All Other Free Agents"
+// And 1 salary placeholder:
+//   pid=200000020: Cash from Trade on Metros (tid=1) → "Players Under Contract" (not FA tables)
 // Submission tests are in free-agency-submission.spec.ts.
 
 // Helper: scope form inputs to the visible custom offer form (not hidden quick-offer forms)
@@ -90,6 +92,23 @@ test.describe('Free Agency -- main page', () => {
   test('result=already_signed shows warning banner', async ({ page }) => {
     await page.goto('modules.php?name=FreeAgency&result=already_signed');
     await expect(page.locator('.ibl-alert--warning')).toBeVisible();
+  });
+
+  test('cash placeholder appears in Players Under Contract', async ({ page }) => {
+    // Name abbreviation JS turns "Cash from Trade" into "C.f. Trade" in .fa-table,
+    // storing the original in data-full-name. Use the attribute for a stable locator.
+    const underContract = page.locator('[aria-label="Players under contract"]');
+    await expect(underContract.locator('[data-full-name="Cash from Trade"]')).toBeVisible();
+  });
+
+  test('cash placeholder does not appear in Unsigned Free Agents', async ({ page }) => {
+    const unsigned = page.locator('[aria-label="Unsigned free agents"]');
+    await expect(unsigned.locator('[data-full-name="Cash from Trade"]')).not.toBeVisible();
+  });
+
+  test('cash placeholder does not appear in All Other Free Agents', async ({ page }) => {
+    const allOther = page.locator('.sticky-scroll-wrapper.page-sticky');
+    await expect(allOther.locator('[data-full-name="Cash from Trade"]')).not.toBeVisible();
   });
 
   test('no PHP errors on main page', async ({ page }) => {

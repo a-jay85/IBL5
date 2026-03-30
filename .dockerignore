@@ -6,4 +6,9 @@ ibl5/node_modules
 ibl5/tests
 ibl5/fixtures
 ibl5/vendor
+ibl5/IBLbot/node_modules
+ibl5/IBLbot/dist
+IBL6/node_modules
+IBL6/.svelte-kit
+IBL6/build
 *.md

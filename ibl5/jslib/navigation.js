@@ -135,20 +135,37 @@
             });
         });
 
-        // Close pinned dropdowns when clicking outside nav groups
+        // Desktop dropdown hover-to-stay
+        // Keeps dropdown visible via nav-hover class even when mouse leaves
+        // the group (e.g., to interact with browser auto-fill popups).
+        // Only clears when hovering a different menu, clicking outside, or Escape.
+        desktopGroups.forEach(function(group) {
+            group.addEventListener('mouseenter', function() {
+                desktopGroups.forEach(function(other) {
+                    if (other !== group) {
+                        other.classList.remove('nav-hover');
+                    }
+                });
+                group.classList.add('nav-hover');
+            });
+        });
+
+        // Close pinned/hovered dropdowns when clicking outside nav groups
         document.addEventListener('click', function(e) {
             if (!e.target.closest('.group')) {
                 desktopGroups.forEach(function(group) {
                     group.classList.remove('nav-pinned');
+                    group.classList.remove('nav-hover');
                 });
             }
         });
 
-        // Close pinned dropdowns on Escape
+        // Close pinned/hovered dropdowns on Escape
         document.addEventListener('keydown', function(e) {
             if (e.key === 'Escape') {
                 desktopGroups.forEach(function(group) {
                     group.classList.remove('nav-pinned');
+                    group.classList.remove('nav-hover');
                 });
             }
         });

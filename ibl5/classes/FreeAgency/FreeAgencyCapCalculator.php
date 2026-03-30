@@ -48,12 +48,12 @@ class FreeAgencyCapCalculator implements FreeAgencyCapCalculatorInterface
     {
         $totalSalaries = [0, 0, 0, 0, 0, 0];
 
-        // Add salaries from players under contract
+        // Add salaries from players under contract (including buyout/cash placeholders)
         foreach ($rosterData as $playerRow) {
             /** @var PlayerRow $playerRow */
             $player = Player::withPlrRow($this->mysqli_db, $playerRow);
 
-            if (!$player->isPlayerFreeAgent($this->season)) {
+            if (!$player->isPlayerFreeAgent($this->season) || $player->isSalaryPlaceholder()) {
                 $futureSalaries = $player->getFutureSalaries();
 
                 for ($year = 0; $year < 6; $year++) {
@@ -100,18 +100,14 @@ class FreeAgencyCapCalculator implements FreeAgencyCapCalculatorInterface
             5 => Team::ROSTER_SPOTS_MAX,
         ];
 
-        // Count players under contract
+        // Count players under contract (excluding buyout/cash placeholders from roster spots)
         foreach ($rosterData as $playerRow) {
             /** @var PlayerRow $playerRow */
             $player = Player::withPlrRow($this->mysqli_db, $playerRow);
-            
-            if (!$player->isPlayerFreeAgent($this->season)) {
-                // Exclude players whose name starts with '|'
-                $firstChar = substr($player->name ?? '', 0, 1);
-                if ($firstChar !== '|') {
-                    $futureSalaries = $player->getFutureSalaries();
-                    $this->decrementRosterSpotsForSalaries($rosterSpots, $futureSalaries);
-                }
+
+            if (!$player->isPlayerFreeAgent($this->season) && !$player->isSalaryPlaceholder()) {
+                $futureSalaries = $player->getFutureSalaries();
+                $this->decrementRosterSpotsForSalaries($rosterSpots, $futureSalaries);
             }
         }
 

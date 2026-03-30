@@ -89,6 +89,14 @@ interface PlayerInterface
     public function getShortBuyoutArray(): array;
 
     /**
+     * Check if this record is a salary placeholder (buyout or cash transaction)
+     *
+     * These records exist on team rosters for cap accounting but are not real players.
+     * Buyouts have names containing "Buyout"; cash transactions have names starting with "|".
+     */
+    public function isSalaryPlaceholder(): bool;
+
+    /**
      * Get remaining contract years and salaries
      *
      * Returns an array keyed by remaining contract year number (1, 2, 3, etc.)

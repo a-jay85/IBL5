@@ -114,16 +114,11 @@ check_worktree() {
     fi
 
     # Determine if branch has been merged to master.
-    # Two checks needed: merge-base handles regular merges, PR state handles squash merges
-    # (squash creates a new commit, so the branch tip is never an ancestor of master).
+    # Require positive evidence of merge completion — never rely on merge-base alone,
+    # because a freshly-created branch at master tip is trivially an ancestor.
     local is_merged=false
 
-    # Check 1: Direct ancestor (non-squash merges)
-    if git -C "$REPO_ROOT" merge-base --is-ancestor "$branch" origin/master 2>/dev/null; then
-        is_merged=true
-    fi
-
-    # Check 2: PR state (handles squash merges + guards against false positives)
+    # Check 1: PR state via GitHub CLI (handles squash merges)
     if command -v gh &>/dev/null; then
         local pr_state
         pr_state=$(cd "$REPO_ROOT" && gh pr view "$branch" --json state -q .state 2>/dev/null || true)
@@ -135,6 +130,17 @@ check_worktree() {
             echo "  SKIP $wt_name: PR #$pr_num still open"
             SKIPPED=$((SKIPPED + 1))
             return
+        fi
+    fi
+
+    # Check 2: Direct ancestor of master AND remote branch is gone.
+    # merge-base alone is insufficient — a branch created from master tip with no
+    # new commits is also an ancestor. Requiring remote branch deletion confirms
+    # the merge is actually complete (remote branches are deleted after PR merge).
+    if [ "$is_merged" = false ]; then
+        if git -C "$REPO_ROOT" merge-base --is-ancestor "$branch" origin/master 2>/dev/null \
+           && ! git -C "$REPO_ROOT" rev-parse --verify "origin/$branch" &>/dev/null; then
+            is_merged=true
         fi
     fi
 

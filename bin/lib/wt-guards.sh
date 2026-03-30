@@ -19,14 +19,23 @@ kill_infra_processes() {
         fi
     done
 
-    # Kill any remaining node processes (browser-sync, CSS watcher) with CWD
-    # in this worktree. lsof COMMAND column shows just "node", not the full path.
-    # Uses SIGKILL — these orphaned watchers ignore SIGTERM.
+    # Kill any remaining node processes with CWD in this worktree.
     local pids
     pids=$(lsof -d cwd 2>/dev/null \
         | grep "$wt_path" \
         | awk '/^node / { print $2 }' \
         | sort -u || true)
+    if [ -n "$pids" ]; then
+        echo "$pids" | xargs kill -9 2>/dev/null || true
+    fi
+
+    # Kill processes whose command line references this worktree path.
+    # CSS watchers started by wt-up use absolute paths in -i/-o flags but their
+    # CWD is wherever wt-up was called from, so lsof -d cwd misses them.
+    # After rm -rf deletes the worktree, the PID files are gone too, so the
+    # PID-file check above also misses them — they become unkillable zombies
+    # that recreate the output directory on every rebuild cycle.
+    pids=$(pgrep -f "$wt_path" 2>/dev/null || true)
     if [ -n "$pids" ]; then
         echo "$pids" | xargs kill -9 2>/dev/null || true
     fi

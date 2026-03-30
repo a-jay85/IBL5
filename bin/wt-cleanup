@@ -266,6 +266,67 @@ if [ "$ALL" = true ]; then
         fi
         CLEANED=$((CLEANED + 1))
     done < <(git -C "$REPO_ROOT" branch -v | grep '\[gone\]')
+
+    # Clean up orphaned Docker environments.
+    # Worktree Docker stacks use compose project name "ibl5-$SLUG".
+    # Find projects that don't belong to any active worktree.
+    if command -v docker &>/dev/null; then
+        # Collect slugs from all remaining worktrees' .wt-slug files
+        active_slugs=""
+        for wt_dir in "$REPO_ROOT"/worktrees/*/; do
+            [ -d "$wt_dir" ] || continue
+            if [ -f "$wt_dir/.wt-slug" ]; then
+                active_slugs="$active_slugs $(cat "$wt_dir/.wt-slug")"
+            fi
+        done
+
+        # Scan all Docker containers for worktree compose projects
+        while IFS= read -r project; do
+            [ -z "$project" ] && continue
+            # Skip main stack
+            [ "$project" = "ibl5" ] && continue
+            # Only process worktree projects (ibl5-* prefix)
+            [[ "$project" == ibl5-* ]] || continue
+
+            slug="${project#ibl5-}"
+
+            # Check if slug matches any active worktree
+            if echo "$active_slugs" | tr ' ' '\n' | grep -qx "$slug" 2>/dev/null; then
+                continue
+            fi
+
+            if [ "$DRY_RUN" = true ]; then
+                echo "  WOULD tear down Docker: $project"
+            else
+                echo "  Tearing down Docker: $project..."
+                # Stop and remove all containers in this project
+                containers=$(docker ps -a \
+                    --filter "label=com.docker.compose.project=$project" \
+                    --format '{{.ID}}')
+                if [ -n "$containers" ]; then
+                    echo "$containers" | xargs docker rm -f 2>/dev/null || true
+                fi
+                # Remove volumes
+                volumes=$(docker volume ls \
+                    --filter "label=com.docker.compose.project=$project" \
+                    --format '{{.Name}}')
+                if [ -n "$volumes" ]; then
+                    echo "$volumes" | xargs docker volume rm 2>/dev/null || true
+                fi
+                # Remove network
+                networks=$(docker network ls \
+                    --filter "label=com.docker.compose.project=$project" \
+                    --format '{{.Name}}')
+                if [ -n "$networks" ]; then
+                    echo "$networks" | xargs docker network rm 2>/dev/null || true
+                fi
+            fi
+            CLEANED=$((CLEANED + 1))
+        done < <(docker ps -a \
+            --filter 'label=com.docker.compose.project' \
+            --format '{{.Label "com.docker.compose.project"}}' \
+            | sort -u)
+    fi
 else
     WT_PATH="$REPO_ROOT/worktrees/$TARGET_NAME"
     if [ ! -d "$WT_PATH" ]; then

@@ -80,7 +80,7 @@ if (isset($name) && $name == $_REQUEST['name']) {
         PageLayout\PageLayout::footer();
     } else {
         if (!$isModuleAccessible) {
-            $_SESSION['flash_warning'] = 'Admin mode: You can view this module, but it is currently closed to non-admin GMs.';
+            define('ADMIN_PHASE_GATE_NOTICE', true);
         }
         if (!isset($file) or $file != $_REQUEST['file']) {
             $file = "index";

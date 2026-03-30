@@ -201,13 +201,15 @@ If nothing new was learned, skip silently. Do not announce "nothing to record."
 After all phases complete successfully, ensure the worktree's Docker environment is running so the user can visually verify the changes in the browser. The worktree persists until the PR merges to master, when a git hook cleans up automatically.
 
 1. `cd` to the repo root (not the worktree)
-2. Check if Docker env is already running:
-   `docker ps --format '{{.Names}}' | grep -q "^ibl5-php-<slug>$"`
-3. If NOT running: start it with `bin/wt-up <worktree-name> --prod`
-   - If `ibl5/fixtures/prod-seed.sql` doesn't exist, use `--seed` instead
+2. Tear down and restart with production data (Phase 6 left Docker running with CI seed data):
+   ```bash
+   bin/wt-down <worktree-name> --volumes
+   bin/wt-up <worktree-name> --prod
+   ```
+   - If `ibl5/fixtures/prod-seed.sql` doesn't exist, `wt-up` falls back to `--seed` automatically
    - If `wt-up` fails, warn but do not fail the workflow
-4. Print the preview URL: `http://<slug>.localhost/ibl5/`
-5. Do NOT run `wt-down`, `wt-remove`, or `git branch -D`
+3. Print the preview URL: `http://<slug>.localhost/ibl5/`
+4. Do NOT run `wt-remove` or `git branch -D`
 
 **Skip this phase if:**
 - The worktree was not created by Phase 1 (e.g., pre-existing worktree the user asked you to work in)

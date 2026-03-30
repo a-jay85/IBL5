@@ -311,6 +311,31 @@ INSERT INTO ibl_plr (
    65, 22, 88,
    'a0000000-0000-0000-0000-000000000012');
 
+-- Long-named player for depth chart mobile abbreviation test
+-- "Konstantinos Papadopoulos" is long enough to trigger abbreviation → "K. Papadopoulos"
+INSERT INTO ibl_plr (
+  pid, name, age, peak, tid, pos, ordinal,
+  sta, oo, od, `do`, dd, po, pd, `to`, td,
+  cy, cyt, cy1, cy2,
+  retired, exp, bird,
+  htft, htin, wt, college,
+  draftround, draftpickno, draftyear, draftedby, draftedbycurrentname,
+  stats_gm, stats_min, stats_fgm, stats_fga, stats_ftm, stats_fta,
+  stats_3gm, stats_3ga, stats_orb, stats_drb, stats_ast, stats_stl,
+  stats_to, stats_blk, stats_pf,
+  uuid
+) VALUES
+  (200000030, 'Konstantinos Papadopoulos', 27, 28, 1, 'C', 6,
+   80, 70, 65, 60, 55, 68, 64, 66, 61,
+   1, 2, 400, 440,
+   0, 4, 2,
+   7, 0, 240, 'Athens Academy',
+   2, 10, 2022, 'Metros', 'Metros',
+   41, 1200, 170, 380, 80, 100,
+   30, 90, 55, 150, 120, 35,
+   60, 30, 75,
+   'a0000000-0000-0000-0000-000000200030');
+
 -- Salary placeholder records for Free Agency placeholder filtering tests
 -- These records test that buyout/cash records appear in "Under Contract"
 -- and do NOT appear in "Unsigned Free Agents" or "All Other Free Agents".

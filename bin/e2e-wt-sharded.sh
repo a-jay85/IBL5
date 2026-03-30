@@ -51,9 +51,13 @@ if [[ -z "$WORKTREE_NAME" ]]; then
     exit 1
 fi
 
-# --- Fallback: 1 shard = just run e2e-wt.sh directly ---
+# --- Validate shard count ---
 if [[ "$SHARD_COUNT" -le 1 ]]; then
     exec "$REPO_ROOT/bin/e2e-wt.sh" "$WORKTREE_NAME" ${PW_EXTRA_ARGS[@]+"${PW_EXTRA_ARGS[@]}"}
+fi
+if [[ "$SHARD_COUNT" -gt 4 ]]; then
+    echo "Error: Maximum 4 shards supported (shard-compose.yml defines shard-2/3/4)." >&2
+    exit 1
 fi
 
 WORKTREE_PATH="$REPO_ROOT/worktrees/$WORKTREE_NAME"
@@ -174,12 +178,18 @@ if [[ "$SHARD_COUNT" -gt 1 ]]; then
     for i in $(seq 2 "$SHARD_COUNT"); do
         SHARD_CONTAINER="ibl5-php-shard-$i-$SLUG"
         echo "Waiting for $SHARD_CONTAINER..."
+        READY=false
         for attempt in $(seq 1 30); do
             if docker exec "$SHARD_CONTAINER" true 2>/dev/null; then
+                READY=true
                 break
             fi
             sleep 2
         done
+        if [[ "$READY" != true ]]; then
+            echo "Error: $SHARD_CONTAINER did not become ready after 60s." >&2
+            exit 1
+        fi
         docker exec "$SHARD_CONTAINER" sh -c \
             'rm -f /var/www/html/ibl5/.env.test && \
              cp /var/www/html/ibl5/.env.test.example /var/www/html/ibl5/.env.test'

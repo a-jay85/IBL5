@@ -95,18 +95,20 @@ test.describe('Free Agency -- main page', () => {
   });
 
   test('cash placeholder appears in Players Under Contract', async ({ page }) => {
+    // Name abbreviation JS turns "Cash from Trade" into "C.f. Trade" in .fa-table,
+    // storing the original in data-full-name. Use the attribute for a stable locator.
     const underContract = page.locator('[aria-label="Players under contract"]');
-    await expect(underContract.getByText('Cash from Trade')).toBeVisible();
+    await expect(underContract.locator('[data-full-name="Cash from Trade"]')).toBeVisible();
   });
 
   test('cash placeholder does not appear in Unsigned Free Agents', async ({ page }) => {
     const unsigned = page.locator('[aria-label="Unsigned free agents"]');
-    await expect(unsigned.getByText('Cash from Trade')).not.toBeVisible();
+    await expect(unsigned.locator('[data-full-name="Cash from Trade"]')).not.toBeVisible();
   });
 
   test('cash placeholder does not appear in All Other Free Agents', async ({ page }) => {
     const allOther = page.locator('.sticky-scroll-wrapper.page-sticky');
-    await expect(allOther.getByText('Cash from Trade')).not.toBeVisible();
+    await expect(allOther.locator('[data-full-name="Cash from Trade"]')).not.toBeVisible();
   });
 
   test('no PHP errors on main page', async ({ page }) => {

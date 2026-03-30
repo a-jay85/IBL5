@@ -214,33 +214,15 @@ if [ "$ALL" = true ]; then
             # Safe to remove
             if [ "$DRY_RUN" = true ]; then
                 echo "  WOULD remove orphan: $dir_name"
-                CLEANED=$((CLEANED + 1))
             else
                 # Tear down Docker if applicable
                 if [ -f "$dir/.wt-slug" ]; then
                     "$REPO_ROOT/bin/wt-down" "$dir_name" --force 2>/dev/null || true
                 fi
                 echo "  Removing orphan: $dir_name"
-
-                # Retry removal up to 3 times with short delays (handle file descriptor holdovers)
-                local removed=false
-                for attempt in 1 2 3; do
-                    if rm -rf "$dir" 2>/dev/null; then
-                        removed=true
-                        break
-                    fi
-                    if [ $attempt -lt 3 ]; then
-                        sleep 0.2
-                    fi
-                done
-
-                if [ "$removed" = true ]; then
-                    CLEANED=$((CLEANED + 1))
-                else
-                    echo "  ERROR: failed to remove $dir_name (3 attempts, possible held file descriptor)"
-                    SKIPPED=$((SKIPPED + 1))
-                fi
+                rm -rf "$dir"
             fi
+            CLEANED=$((CLEANED + 1))
         done
     fi
 else

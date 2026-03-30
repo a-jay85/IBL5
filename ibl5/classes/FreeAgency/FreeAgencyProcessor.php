@@ -29,8 +29,9 @@ class FreeAgencyProcessor implements FreeAgencyProcessorInterface
         $this->mysqli_db = $mysqli_db;
         $this->season = new Season($mysqli_db);
 
-        $demandRepository = new FreeAgencyDemandRepository($this->mysqli_db);
-        $this->calculator = $calculator ?? new FreeAgencyDemandCalculator($demandRepository);
+        $this->calculator = $calculator ?? new FreeAgencyDemandCalculator(
+            new FreeAgencyDemandRepository($this->mysqli_db)
+        );
         $this->repository = $repository ?? new FreeAgencyRepository($this->mysqli_db);
     }
 

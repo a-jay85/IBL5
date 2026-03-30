@@ -214,15 +214,20 @@ if [ "$ALL" = true ]; then
             # Safe to remove
             if [ "$DRY_RUN" = true ]; then
                 echo "  WOULD remove orphan: $dir_name"
+                CLEANED=$((CLEANED + 1))
             else
                 # Tear down Docker if applicable
                 if [ -f "$dir/.wt-slug" ]; then
                     "$REPO_ROOT/bin/wt-down" "$dir_name" --force 2>/dev/null || true
                 fi
                 echo "  Removing orphan: $dir_name"
-                rm -rf "$dir"
+                if rm -rf "$dir"; then
+                    CLEANED=$((CLEANED + 1))
+                else
+                    echo "  ERROR: failed to remove $dir_name"
+                    SKIPPED=$((SKIPPED + 1))
+                fi
             fi
-            CLEANED=$((CLEANED + 1))
         done
     fi
 else

@@ -4,14 +4,13 @@ declare(strict_types=1);
 
 namespace Tests\FreeAgency;
 
-use PHPUnit\Framework\Attributes\AllowMockObjectsWithoutExpectations;
 use PHPUnit\Framework\TestCase;
 use FreeAgency\FreeAgencyDemandCalculator;
 use FreeAgency\Contracts\FreeAgencyDemandRepositoryInterface;
 use Player\Player;
 
 /**
- * Mock repository class for testing without database dependencies
+ * Mock repository for testing without database dependencies.
  */
 class MockDemandRepository implements FreeAgencyDemandRepositoryInterface
 {
@@ -36,16 +35,18 @@ class MockDemandRepository implements FreeAgencyDemandRepositoryInterface
 }
 
 /**
- * Comprehensive tests for FreeAgencyDemandCalculator
- * 
- * Tests the calculation of perceived contract value based on:
- * - Team performance (wins/losses)
- * - Team tradition
- * - Player preferences (loyalty, security, playing time, winner, tradition) - Scale 1-5
- * - Position salary commitment
- * - Random variance
+ * Tests for FreeAgencyDemandCalculator — the perceived value formula.
+ *
+ * All tests are based on the ORIGINAL pre-refactor implementation in
+ * freeagentoffer.php (commit 188bd3f4c^). The formula is:
+ *
+ *   modifier = 1 + playForWinner + tradition + loyalty + security + playingTime
+ *   random = rand(5, -5)              // integer -5 to +5
+ *   modRandom = (100 + random) / 100  // 0.95 to 1.05
+ *   perceivedValue = offerAverage * modifier * modRandom
+ *
+ * The calculator MUST return all three components: modifier, random, perceivedValue.
  */
-#[AllowMockObjectsWithoutExpectations]
 class FreeAgencyDemandCalculatorTest extends TestCase
 {
     private MockDemandRepository $mockRepository;
@@ -57,501 +58,575 @@ class FreeAgencyDemandCalculatorTest extends TestCase
         $this->calculator = new FreeAgencyDemandCalculator($this->mockRepository);
     }
 
-    /**
-     * @group demand-calculator
-     * @group modifier
-     */
-    public function testCalculatePerceivedValueWithNeutralModifiers(): void
+    // ================================================================
+    // RETURN TYPE STRUCTURE
+    // ================================================================
+
+    public function testReturnsArrayWithModifierRandomAndPerceivedValue(): void
     {
-        // Arrange - Player with neutral preferences (all 1s mean no preference impact)
-        $player = $this->createPlayerWithPreferences(
-            playForWinner: 1,
-            tradition: 1,
-            loyalty: 1,
-            security: 1,
-            playingTime: 1
-        );
-
-        $this->mockRepository->teamPerformance = [
-            'wins' => 41,
-            'losses' => 41,
-            'tradWins' => 500,
-            'tradLosses' => 500,
-        ];
-
-        $this->mockRepository->positionSalaryCommitment = 1000;
-
-        // Act - Set random factor to 0 for deterministic testing
+        $this->setupNeutralTeam();
         $this->calculator->setRandomFactor(0);
-        
+
         $result = $this->calculator->calculatePerceivedValue(
             offerAverage: 1000,
             teamName: 'Test Team',
-            player: $player,
+            player: $this->createPlayer(),
             yearsInOffer: 1
         );
 
-        // Assert - With neutral preferences and no random variance, result should equal base offer
-        $this->assertEquals(1000.0, $result);
+        $this->assertIsArray($result);
+        $this->assertArrayHasKey('modifier', $result);
+        $this->assertArrayHasKey('random', $result);
+        $this->assertArrayHasKey('perceivedValue', $result);
+        $this->assertIsFloat($result['modifier']);
+        $this->assertIsInt($result['random']);
+        $this->assertIsFloat($result['perceivedValue']);
     }
 
-    /**
-     * @group demand-calculator
-     * @group play-for-winner
-     */
-    public function testPlayForWinnerFactorIncreasesValueForWinningTeam(): void
+    // ================================================================
+    // FORMULA IDENTITY: perceivedValue === offerAvg * modifier * modRandom
+    // ================================================================
+
+    public function testPerceivedValueEqualsOfferAverageTimesModifierTimesModRandom(): void
     {
-        // Arrange - Player who highly values winning (5/5)
-        $player = $this->createPlayerWithPreferences(
-            playForWinner: 5,
-            tradition: 1,
-            loyalty: 1,
-            security: 1,
-            playingTime: 1
-        );
+        $this->setupNeutralTeam();
+        $this->calculator->setRandomFactor(3);
 
-        $this->mockRepository->teamPerformance = [
-            'wins' => 60,  // Winning team
-            'losses' => 22,
-            'tradWins' => 500,
-            'tradLosses' => 500,
-        ];
-
-        $this->mockRepository->positionSalaryCommitment = 1000;
-
-        // Act - Set random factor to 0 for deterministic testing
-        $this->calculator->setRandomFactor(0);
-        
         $result = $this->calculator->calculatePerceivedValue(
             offerAverage: 1000,
-            teamName: 'Winning Team',
-            player: $player,
-            yearsInOffer: 1
+            teamName: 'Test Team',
+            player: $this->createPlayer(playForWinner: 3, loyalty: 3),
+            yearsInOffer: 3
         );
 
-        // Assert - Winning team should increase perceived value
-        // With differential of +38 wins and max preference (5-1=4),
-        // factor = 0.000153 * 38 * 4 = 0.023256
-        // So value should be ~2.3% higher than base
-        $this->assertGreaterThan(1000, $result);
+        $expected = 1000 * $result['modifier'] * ((100 + $result['random']) / 100);
+        $this->assertEqualsWithDelta($expected, $result['perceivedValue'], 0.001);
     }
 
-    /**
-     * @group demand-calculator
-     * @group play-for-winner
-     */
-    public function testPlayForWinnerFactorDecreasesValueForLosingTeam(): void
+    public function testFormulaIdentityHoldsWithNegativeRandom(): void
     {
-        // Arrange - Player who highly values winning (5/5)
-        $player = $this->createPlayerWithPreferences(
-            playForWinner: 5,
-            tradition: 1,
-            loyalty: 1,
-            security: 1,
-            playingTime: 1
+        $this->setupNeutralTeam();
+        $this->calculator->setRandomFactor(-5);
+
+        $result = $this->calculator->calculatePerceivedValue(
+            offerAverage: 800,
+            teamName: 'Test Team',
+            player: $this->createPlayer(playForWinner: 5),
+            yearsInOffer: 2
         );
 
-        $this->mockRepository->teamPerformance = [
-            'wins' => 20,  // Losing team
-            'losses' => 62,
-            'tradWins' => 500,
-            'tradLosses' => 500,
-        ];
+        $expected = 800 * $result['modifier'] * ((100 + $result['random']) / 100);
+        $this->assertEqualsWithDelta($expected, $result['perceivedValue'], 0.001);
+    }
 
-        $this->mockRepository->positionSalaryCommitment = 1000;
+    // ================================================================
+    // NEUTRAL BASELINE (all preferences = 1 → modifier = 1.0)
+    // ================================================================
 
-        // Act - Set random factor to 0 for deterministic testing
+    public function testNeutralPreferencesProduceModifierOfOne(): void
+    {
+        $this->setupNeutralTeam();
         $this->calculator->setRandomFactor(0);
-        
+
         $result = $this->calculator->calculatePerceivedValue(
             offerAverage: 1000,
-            teamName: 'Losing Team',
-            player: $player,
+            teamName: 'Test Team',
+            player: $this->createPlayer(),
             yearsInOffer: 1
         );
 
-        // Assert - Losing team should decrease perceived value
-        $this->assertLessThan(1000, $result);
+        $this->assertEqualsWithDelta(1.0, $result['modifier'], 0.0001);
+        $this->assertSame(0, $result['random']);
+        $this->assertEqualsWithDelta(1000.0, $result['perceivedValue'], 0.01);
     }
 
-    /**
-     * @group demand-calculator
-     * @group tradition
-     */
-    public function testTraditionFactorIncreasesValueForHistoricallySuccessfulTeam(): void
+    // ================================================================
+    // PLAY-FOR-WINNER FACTOR
+    // Original: 0.000153 * (teamWins - teamLosses) * (playerWinner - 1)
+    // ================================================================
+
+    public function testPlayForWinnerExactValue(): void
     {
-        // Arrange - Player who values tradition (5/5)
-        $player = $this->createPlayerWithPreferences(
-            playForWinner: 1,
-            tradition: 5,
-            loyalty: 1,
-            security: 1,
-            playingTime: 1
-        );
-
         $this->mockRepository->teamPerformance = [
-            'wins' => 41,
-            'losses' => 41,
-            'tradWins' => 700,  // Historically successful
-            'tradLosses' => 300,
+            'wins' => 60, 'losses' => 22,
+            'tradWins' => 500, 'tradLosses' => 500,
         ];
-
         $this->mockRepository->positionSalaryCommitment = 1000;
-
-        // Act - Set random factor to 0 for deterministic testing
         $this->calculator->setRandomFactor(0);
-        
+
         $result = $this->calculator->calculatePerceivedValue(
             offerAverage: 1000,
-            teamName: 'Historic Team',
-            player: $player,
+            teamName: 'Test Team',
+            player: $this->createPlayer(playForWinner: 5),
             yearsInOffer: 1
         );
 
-        // Assert - High tradition should increase perceived value
-        $this->assertGreaterThan(1000, $result);
+        // factor = 0.000153 * (60-22) * (5-1) = 0.000153 * 38 * 4 = 0.023256
+        // modifier = 1 + 0.023256 = 1.023256
+        $this->assertEqualsWithDelta(1.023256, $result['modifier'], 0.0001);
+        $this->assertEqualsWithDelta(1023.256, $result['perceivedValue'], 0.1);
     }
 
-    /**
-     * @group demand-calculator
-     * @group loyalty
-     */
+    public function testPlayForWinnerDecreasesForLosingTeam(): void
+    {
+        $this->mockRepository->teamPerformance = [
+            'wins' => 20, 'losses' => 62,
+            'tradWins' => 500, 'tradLosses' => 500,
+        ];
+        $this->mockRepository->positionSalaryCommitment = 1000;
+        $this->calculator->setRandomFactor(0);
+
+        $result = $this->calculator->calculatePerceivedValue(
+            offerAverage: 1000,
+            teamName: 'Test Team',
+            player: $this->createPlayer(playForWinner: 5),
+            yearsInOffer: 1
+        );
+
+        // factor = 0.000153 * (20-62) * (5-1) = 0.000153 * -42 * 4 = -0.025704
+        $this->assertEqualsWithDelta(1 - 0.025704, $result['modifier'], 0.0001);
+        $this->assertLessThan(1000.0, $result['perceivedValue']);
+    }
+
+    public function testPlayForWinnerNeutralWhenPreferenceIsOne(): void
+    {
+        $this->mockRepository->teamPerformance = [
+            'wins' => 60, 'losses' => 22,
+            'tradWins' => 500, 'tradLosses' => 500,
+        ];
+        $this->mockRepository->positionSalaryCommitment = 1000;
+        $this->calculator->setRandomFactor(0);
+
+        $result = $this->calculator->calculatePerceivedValue(
+            offerAverage: 1000,
+            teamName: 'Test Team',
+            player: $this->createPlayer(playForWinner: 1),
+            yearsInOffer: 1
+        );
+
+        // (playerWinner - 1) = 0, so factor = 0
+        $this->assertEqualsWithDelta(1.0, $result['modifier'], 0.0001);
+    }
+
+    // ================================================================
+    // TRADITION FACTOR
+    // Original: 0.000153 * (tradWins - tradLosses) * (playerTradition - 1)
+    // ================================================================
+
+    public function testTraditionExactValue(): void
+    {
+        $this->mockRepository->teamPerformance = [
+            'wins' => 41, 'losses' => 41,
+            'tradWins' => 700, 'tradLosses' => 300,
+        ];
+        $this->mockRepository->positionSalaryCommitment = 1000;
+        $this->calculator->setRandomFactor(0);
+
+        $result = $this->calculator->calculatePerceivedValue(
+            offerAverage: 1000,
+            teamName: 'Test Team',
+            player: $this->createPlayer(tradition: 5),
+            yearsInOffer: 1
+        );
+
+        // factor = 0.000153 * (700-300) * (5-1) = 0.000153 * 400 * 4 = 0.2448
+        $this->assertEqualsWithDelta(1.2448, $result['modifier'], 0.0001);
+        $this->assertGreaterThan(1000.0, $result['perceivedValue']);
+    }
+
+    // ================================================================
+    // LOYALTY FACTOR
+    // Original: staying = +0.025 * (playerLoyalty - 1)
+    //           leaving = -0.025 * (playerLoyalty - 1)
+    // ================================================================
+
     public function testLoyaltyBonusForStayingWithCurrentTeam(): void
     {
-        // Arrange - Loyal player staying with current team (5/5)
-        $player = $this->createPlayerWithPreferences(
-            playForWinner: 1,
-            tradition: 1,
-            loyalty: 5,  // Very loyal
-            security: 1,
-            playingTime: 1,
-            currentTeam: 'Current Team'
-        );
-
-        $this->mockRepository->teamPerformance = [
-            'wins' => 41,
-            'losses' => 41,
-            'tradWins' => 500,
-            'tradLosses' => 500,
-        ];
-
-        $this->mockRepository->positionSalaryCommitment = 1000;
-
-        // Act - Set random factor to 0 for deterministic testing
+        $this->setupNeutralTeam();
         $this->calculator->setRandomFactor(0);
-        
+
         $result = $this->calculator->calculatePerceivedValue(
             offerAverage: 1000,
             teamName: 'Current Team',
-            player: $player,
+            player: $this->createPlayer(loyalty: 5, currentTeam: 'Current Team'),
             yearsInOffer: 1
         );
 
-        // Assert - Loyalty bonus should increase perceived value
-        // Bonus = 0.025 * (5-1) = 0.1 = 10% increase
-        $this->assertGreaterThan(1000, $result);
+        // factor = +0.025 * (5-1) = +0.1
+        // modifier = 1 + 0.1 = 1.1
+        $this->assertEqualsWithDelta(1.1, $result['modifier'], 0.0001);
+        $this->assertEqualsWithDelta(1100.0, $result['perceivedValue'], 0.1);
     }
 
-    /**
-     * @group demand-calculator
-     * @group loyalty
-     */
     public function testLoyaltyPenaltyForLeavingCurrentTeam(): void
     {
-        // Arrange - Loyal player considering different team (5/5)
-        $player = $this->createPlayerWithPreferences(
-            playForWinner: 1,
-            tradition: 1,
-            loyalty: 5,  // Very loyal
-            security: 1,
-            playingTime: 1,
-            currentTeam: 'Current Team'
-        );
-
-        $this->mockRepository->teamPerformance = [
-            'wins' => 41,
-            'losses' => 41,
-            'tradWins' => 500,
-            'tradLosses' => 500,
-        ];
-
-        $this->mockRepository->positionSalaryCommitment = 1000;
-
-        // Act - Set random factor to 0 for deterministic testing
+        $this->setupNeutralTeam();
         $this->calculator->setRandomFactor(0);
-        
+
         $result = $this->calculator->calculatePerceivedValue(
             offerAverage: 1000,
             teamName: 'Different Team',
-            player: $player,
+            player: $this->createPlayer(loyalty: 5, currentTeam: 'Current Team'),
             yearsInOffer: 1
         );
 
-        // Assert - Loyalty penalty should decrease perceived value
-        $this->assertLessThan(1000, $result);
+        // factor = -0.025 * (5-1) = -0.1
+        // modifier = 1 - 0.1 = 0.9
+        $this->assertEqualsWithDelta(0.9, $result['modifier'], 0.0001);
+        $this->assertEqualsWithDelta(900.0, $result['perceivedValue'], 0.1);
     }
 
-    /**
-     * @group demand-calculator
-     * @group security
-     */
-    public function testSecurityFactorIncreasesValueForLongerContracts(): void
+    public function testLoyaltyNeutralWhenPreferenceIsOne(): void
     {
-        // Arrange - Player who values security (5/5)
-        $player = $this->createPlayerWithPreferences(
-            playForWinner: 1,
-            tradition: 1,
-            loyalty: 1,
-            security: 5,  // Values security
-            playingTime: 1
-        );
-
-        $this->mockRepository->teamPerformance = [
-            'wins' => 41,
-            'losses' => 41,
-            'tradWins' => 500,
-            'tradLosses' => 500,
-        ];
-
-        $this->mockRepository->positionSalaryCommitment = 1000;
-
-        // Act - Set random factor to 0 for deterministic testing
+        $this->setupNeutralTeam();
         $this->calculator->setRandomFactor(0);
-        
-        $resultLongContract = $this->calculator->calculatePerceivedValue(
-            offerAverage: 1000,
-            teamName: 'Test Team',
-            player: $player,
-            yearsInOffer: 6
-        );
 
-        $resultShortContract = $this->calculator->calculatePerceivedValue(
+        $result = $this->calculator->calculatePerceivedValue(
             offerAverage: 1000,
-            teamName: 'Test Team',
-            player: $player,
+            teamName: 'Different Team',
+            player: $this->createPlayer(loyalty: 1, currentTeam: 'Current Team'),
             yearsInOffer: 1
         );
 
-        // Assert - Longer contract should have higher perceived value
-        $this->assertGreaterThan($resultShortContract, $resultLongContract);
+        // (playerLoyalty - 1) = 0, so factor = 0
+        $this->assertEqualsWithDelta(1.0, $result['modifier'], 0.0001);
     }
 
-    /**
-     * @group demand-calculator
-     * @group playing-time
-     */
-    public function testPlayingTimeFactorIncreasesValueWhenLessSalaryCommitted(): void
+    // ================================================================
+    // SECURITY FACTOR
+    // Original: (0.01 * (yearsInOffer - 1) - 0.025) * (playerSecurity - 1)
+    // ================================================================
+
+    public function testSecurityExactValueFor6YearOffer(): void
     {
-        // Arrange - Player who values playing time (5/5)
-        $player = $this->createPlayerWithPreferences(
-            playForWinner: 1,
-            tradition: 1,
-            loyalty: 1,
-            security: 1,
-            playingTime: 5  // Values playing time
-        );
-
-        // Create separate calculators with different mock repositories
-        $mockRepositoryLowSalary = new MockDemandRepository();
-        $mockRepositoryLowSalary->teamPerformance = [
-            'wins' => 41,
-            'losses' => 41,
-            'tradWins' => 500,
-            'tradLosses' => 500,
-        ];
-        $mockRepositoryLowSalary->positionSalaryCommitment = 500;
-        
-        $calculatorLowSalary = new FreeAgencyDemandCalculator($mockRepositoryLowSalary);
-
-        $mockRepositoryHighSalary = new MockDemandRepository();
-        $mockRepositoryHighSalary->teamPerformance = [
-            'wins' => 41,
-            'losses' => 41,
-            'tradWins' => 500,
-            'tradLosses' => 500,
-        ];
-        $mockRepositoryHighSalary->positionSalaryCommitment = 1500;
-        
-        $calculatorHighSalary = new FreeAgencyDemandCalculator($mockRepositoryHighSalary);
-
-        // Act - Set random factor to 0 for deterministic testing
-        $calculatorLowSalary->setRandomFactor(0);
-        $calculatorHighSalary->setRandomFactor(0);
-        
-        $lowSalaryResult = $calculatorLowSalary->calculatePerceivedValue(
-            offerAverage: 1000,
-            teamName: 'Low Salary Team',
-            player: $player,
-            yearsInOffer: 1
-        );
-        
-        $highSalaryResult = $calculatorHighSalary->calculatePerceivedValue(
-            offerAverage: 1000,
-            teamName: 'High Salary Team',
-            player: $player,
-            yearsInOffer: 1
-        );
-
-        // Assert - Less money committed means more playing time opportunity
-        $this->assertGreaterThan($highSalaryResult, $lowSalaryResult);
-    }
-
-    /**
-     * @group demand-calculator
-     * @group position-salary
-     */
-    public function testPositionSalaryCappedAtMaximum(): void
-    {
-        // Arrange
-        $player = $this->createPlayerWithPreferences();
-
-        $this->mockRepository->teamPerformance = [
-            'wins' => 41,
-            'losses' => 41,
-            'tradWins' => 500,
-            'tradLosses' => 500,
-        ];
-
-        // Repository returns value over cap (2000)
-        $this->mockRepository->positionSalaryCommitment = 5000;
-
-        // Act - Set random factor to 0 for deterministic testing
+        $this->setupNeutralTeam();
         $this->calculator->setRandomFactor(0);
-        
+
         $result = $this->calculator->calculatePerceivedValue(
             offerAverage: 1000,
             teamName: 'Test Team',
-            player: $player,
+            player: $this->createPlayer(security: 5),
+            yearsInOffer: 6
+        );
+
+        // factor = (0.01 * (6-1) - 0.025) * (5-1) = (0.05 - 0.025) * 4 = 0.025 * 4 = 0.1
+        // modifier = 1 + 0.1 = 1.1
+        $this->assertEqualsWithDelta(1.1, $result['modifier'], 0.0001);
+    }
+
+    public function testSecurityNegativeFor1YearOffer(): void
+    {
+        $this->setupNeutralTeam();
+        $this->calculator->setRandomFactor(0);
+
+        $result = $this->calculator->calculatePerceivedValue(
+            offerAverage: 1000,
+            teamName: 'Test Team',
+            player: $this->createPlayer(security: 5),
             yearsInOffer: 1
         );
 
-        // Assert - Should still calculate (cap is applied internally)
-        $this->assertIsFloat($result);
-        $this->assertGreaterThan(0, $result);
+        // factor = (0.01 * (1-1) - 0.025) * (5-1) = (0 - 0.025) * 4 = -0.1
+        // modifier = 1 - 0.1 = 0.9
+        $this->assertEqualsWithDelta(0.9, $result['modifier'], 0.0001);
     }
 
-    /**
-     * @group demand-calculator
-     * @group random-variance
-     */
-    public function testRandomVarianceAffectsPerceivedValue(): void
+    public function testSecurityLongerContractsBeatShorterOnes(): void
     {
-        // Arrange
-        $player = $this->createPlayerWithPreferences();
+        $this->setupNeutralTeam();
+        $this->calculator->setRandomFactor(0);
 
+        $short = $this->calculator->calculatePerceivedValue(
+            offerAverage: 1000,
+            teamName: 'Test Team',
+            player: $this->createPlayer(security: 5),
+            yearsInOffer: 1
+        );
+
+        $long = $this->calculator->calculatePerceivedValue(
+            offerAverage: 1000,
+            teamName: 'Test Team',
+            player: $this->createPlayer(security: 5),
+            yearsInOffer: 6
+        );
+
+        $this->assertGreaterThan($short['perceivedValue'], $long['perceivedValue']);
+    }
+
+    // ================================================================
+    // PLAYING TIME FACTOR
+    // Original: -(0.0025 * positionSalary / 100 - 0.025) * (playerPlayingTime - 1)
+    // positionSalary capped at 2000
+    // ================================================================
+
+    public function testPlayingTimeExactValueWithLowSalary(): void
+    {
         $this->mockRepository->teamPerformance = [
-            'wins' => 41,
-            'losses' => 41,
-            'tradWins' => 500,
-            'tradLosses' => 500,
+            'wins' => 41, 'losses' => 41,
+            'tradWins' => 500, 'tradLosses' => 500,
         ];
+        $this->mockRepository->positionSalaryCommitment = 500;
+        $this->calculator->setRandomFactor(0);
 
+        $result = $this->calculator->calculatePerceivedValue(
+            offerAverage: 1000,
+            teamName: 'Test Team',
+            player: $this->createPlayer(playingTime: 5),
+            yearsInOffer: 1
+        );
+
+        // factor = -(0.0025 * 500 / 100 - 0.025) * (5-1) = -(0.0125 - 0.025) * 4 = -(-0.0125) * 4 = 0.05
+        // modifier = 1 + 0.05 = 1.05
+        $this->assertEqualsWithDelta(1.05, $result['modifier'], 0.0001);
+    }
+
+    public function testPlayingTimeExactValueWithHighSalary(): void
+    {
+        $this->mockRepository->teamPerformance = [
+            'wins' => 41, 'losses' => 41,
+            'tradWins' => 500, 'tradLosses' => 500,
+        ];
+        $this->mockRepository->positionSalaryCommitment = 1500;
+        $this->calculator->setRandomFactor(0);
+
+        $result = $this->calculator->calculatePerceivedValue(
+            offerAverage: 1000,
+            teamName: 'Test Team',
+            player: $this->createPlayer(playingTime: 5),
+            yearsInOffer: 1
+        );
+
+        // factor = -(0.0025 * 1500 / 100 - 0.025) * (5-1) = -(0.0375 - 0.025) * 4 = -0.0125 * 4 = -0.05
+        // modifier = 1 - 0.05 = 0.95
+        $this->assertEqualsWithDelta(0.95, $result['modifier'], 0.0001);
+    }
+
+    public function testPlayingTimeSalaryCappedAt2000(): void
+    {
+        $this->mockRepository->teamPerformance = [
+            'wins' => 41, 'losses' => 41,
+            'tradWins' => 500, 'tradLosses' => 500,
+        ];
+        $this->mockRepository->positionSalaryCommitment = 5000; // Exceeds 2000 cap
+        $this->calculator->setRandomFactor(0);
+
+        $result = $this->calculator->calculatePerceivedValue(
+            offerAverage: 1000,
+            teamName: 'Test Team',
+            player: $this->createPlayer(playingTime: 5),
+            yearsInOffer: 1
+        );
+
+        // Capped at 2000: factor = -(0.0025 * 2000 / 100 - 0.025) * (5-1) = -(0.05 - 0.025) * 4 = -0.1
+        // modifier = 1 - 0.1 = 0.9
+        $this->assertEqualsWithDelta(0.9, $result['modifier'], 0.0001);
+    }
+
+    public function testLessMoneyAtPositionMeansHigherValue(): void
+    {
+        $this->calculator->setRandomFactor(0);
+
+        // Low salary at position
+        $lowRepo = new MockDemandRepository();
+        $lowRepo->teamPerformance = [
+            'wins' => 41, 'losses' => 41,
+            'tradWins' => 500, 'tradLosses' => 500,
+        ];
+        $lowRepo->positionSalaryCommitment = 500;
+        $calcLow = new FreeAgencyDemandCalculator($lowRepo);
+        $calcLow->setRandomFactor(0);
+        $lowResult = $calcLow->calculatePerceivedValue(
+            offerAverage: 1000,
+            teamName: 'Test',
+            player: $this->createPlayer(playingTime: 5),
+            yearsInOffer: 1
+        );
+
+        // High salary at position
+        $highRepo = new MockDemandRepository();
+        $highRepo->teamPerformance = [
+            'wins' => 41, 'losses' => 41,
+            'tradWins' => 500, 'tradLosses' => 500,
+        ];
+        $highRepo->positionSalaryCommitment = 1500;
+        $calcHigh = new FreeAgencyDemandCalculator($highRepo);
+        $calcHigh->setRandomFactor(0);
+        $highResult = $calcHigh->calculatePerceivedValue(
+            offerAverage: 1000,
+            teamName: 'Test',
+            player: $this->createPlayer(playingTime: 5),
+            yearsInOffer: 1
+        );
+
+        $this->assertGreaterThan(
+            $highResult['perceivedValue'],
+            $lowResult['perceivedValue']
+        );
+    }
+
+    // ================================================================
+    // COMBINED FACTORS
+    // ================================================================
+
+    public function testCombinedFactorsAreAdditive(): void
+    {
+        $this->mockRepository->teamPerformance = [
+            'wins' => 60, 'losses' => 22,
+            'tradWins' => 500, 'tradLosses' => 500,
+        ];
         $this->mockRepository->positionSalaryCommitment = 1000;
+        $this->calculator->setRandomFactor(0);
 
-        // Act - Enable actual randomness by not setting random factor
-        // This test explicitly does NOT call setRandomFactor(0)
+        $result = $this->calculator->calculatePerceivedValue(
+            offerAverage: 1000,
+            teamName: 'Current Team',
+            player: $this->createPlayer(
+                playForWinner: 5,
+                loyalty: 5,
+                currentTeam: 'Current Team'
+            ),
+            yearsInOffer: 1
+        );
+
+        // playForWinner = 0.000153 * 38 * 4 = 0.023256
+        // loyalty staying = +0.025 * 4 = +0.1
+        // security 1yr = (0 - 0.025) * 0 = 0  (security preference = 1)
+        // playingTime = -(0.0025 * 1000 / 100 - 0.025) * 0 = 0  (playingTime preference = 1)
+        // modifier = 1 + 0.023256 + 0.1 = 1.123256
+        $this->assertEqualsWithDelta(1.123256, $result['modifier'], 0.001);
+    }
+
+    // ================================================================
+    // RANDOM VARIANCE
+    // ================================================================
+
+    public function testRandomFactorStoredInResult(): void
+    {
+        $this->setupNeutralTeam();
+        $this->calculator->setRandomFactor(3);
+
+        $result = $this->calculator->calculatePerceivedValue(
+            offerAverage: 1000,
+            teamName: 'Test Team',
+            player: $this->createPlayer(),
+            yearsInOffer: 1
+        );
+
+        $this->assertSame(3, $result['random']);
+    }
+
+    public function testNegativeRandomFactorStoredInResult(): void
+    {
+        $this->setupNeutralTeam();
+        $this->calculator->setRandomFactor(-5);
+
+        $result = $this->calculator->calculatePerceivedValue(
+            offerAverage: 1000,
+            teamName: 'Test Team',
+            player: $this->createPlayer(),
+            yearsInOffer: 1
+        );
+
+        $this->assertSame(-5, $result['random']);
+        // With modifier = 1.0 and random = -5: perceivedValue = 1000 * 1.0 * 0.95 = 950
+        $this->assertEqualsWithDelta(950.0, $result['perceivedValue'], 0.01);
+    }
+
+    public function testRandomVarianceProducesRange(): void
+    {
+        $this->setupNeutralTeam();
+        // Do NOT set random factor — let actual randomness run
+
         $results = [];
         for ($i = 0; $i < 100; $i++) {
             $results[] = $this->calculator->calculatePerceivedValue(
                 offerAverage: 1000,
                 teamName: 'Test Team',
-                player: $player,
+                player: $this->createPlayer(),
                 yearsInOffer: 1
             );
         }
 
-        // Assert - Results should vary due to randomness
-        $uniqueResults = array_unique($results);
-        $this->assertGreaterThan(1, count($uniqueResults), 'Random variance should produce different results');
+        $values = array_map(static fn (array $r): float => $r['perceivedValue'], $results);
+        $randoms = array_map(static fn (array $r): int => $r['random'], $results);
 
-        // All results should be within ±5% range
-        foreach ($results as $result) {
-            $this->assertGreaterThanOrEqual(950, $result);
-            $this->assertLessThanOrEqual(1050, $result);
+        // Should produce variance
+        $this->assertGreaterThan(1, count(array_unique($values)));
+
+        // All randoms must be -5 to +5
+        foreach ($randoms as $r) {
+            $this->assertGreaterThanOrEqual(-5, $r);
+            $this->assertLessThanOrEqual(5, $r);
+        }
+
+        // All perceived values within ±5% of base
+        foreach ($values as $v) {
+            $this->assertGreaterThanOrEqual(950.0, $v);
+            $this->assertLessThanOrEqual(1050.0, $v);
         }
     }
 
-    /**
-     * @group demand-calculator
-     * @group combined-factors
-     */
-    public function testCombinedFactorsMultiplyCorrectly(): void
+    public function testSetRandomFactorNullReEnablesRandomness(): void
     {
-        // Arrange - Player with multiple strong preferences (5/5)
-        $player = $this->createPlayerWithPreferences(
-            playForWinner: 5,  // Values winning
-            tradition: 1,
-            loyalty: 5,  // Very loyal
-            security: 1,
-            playingTime: 1,
-            currentTeam: 'Current Team'
-        );
+        $this->setupNeutralTeam();
+        $this->calculator->setRandomFactor(3);
+        $this->calculator->setRandomFactor(null);
 
-        // Winning team with current team loyalty bonus
-        $this->mockRepository->teamPerformance = [
-            'wins' => 60,
-            'losses' => 22,
-            'tradWins' => 500,
-            'tradLosses' => 500,
-        ];
+        // Should produce varied results now
+        $results = [];
+        for ($i = 0; $i < 50; $i++) {
+            $r = $this->calculator->calculatePerceivedValue(
+                offerAverage: 1000,
+                teamName: 'Test Team',
+                player: $this->createPlayer(),
+                yearsInOffer: 1
+            );
+            $results[] = $r['random'];
+        }
 
-        $this->mockRepository->positionSalaryCommitment = 1000;
-
-        // Act - Set random factor to 0 for deterministic testing
-        $this->calculator->setRandomFactor(0);
-        
-        $result = $this->calculator->calculatePerceivedValue(
-            offerAverage: 1000,
-            teamName: 'Current Team',
-            player: $player,
-            yearsInOffer: 1
-        );
-
-        // Assert - Multiple positive factors should compound
-        // Play-for-winner: ~2.3% + Loyalty: ~10% = ~12%+ increase
-        $this->assertGreaterThan(1100, $result); // At least 10% increase
+        // With actual randomness, we should see more than one unique value in 50 tries
+        $this->assertGreaterThan(1, count(array_unique($results)));
     }
 
-    /**
-     * @group demand-calculator
-     * @group edge-cases
-     */
+    // ================================================================
+    // EDGE CASES
+    // ================================================================
+
     public function testZeroWinsAndLossesDoesNotCauseDivisionByZero(): void
     {
-        // Arrange - Expansion team with no history
-        $player = $this->createPlayerWithPreferences();
-
         $this->mockRepository->teamPerformance = [
-            'wins' => 0,
-            'losses' => 0,
-            'tradWins' => 0,
-            'tradLosses' => 0,
+            'wins' => 0, 'losses' => 0,
+            'tradWins' => 0, 'tradLosses' => 0,
         ];
-
         $this->mockRepository->positionSalaryCommitment = 0;
-
-        // Act - Set random factor to 0 for deterministic testing
         $this->calculator->setRandomFactor(0);
-        
+
         $result = $this->calculator->calculatePerceivedValue(
             offerAverage: 1000,
             teamName: 'Expansion Team',
-            player: $player,
+            player: $this->createPlayer(),
             yearsInOffer: 1
         );
 
-        // Assert - Should calculate without errors
-        $this->assertIsFloat($result);
-        $this->assertGreaterThan(0, $result);
+        $this->assertIsArray($result);
+        $this->assertIsFloat($result['perceivedValue']);
+        $this->assertGreaterThan(0.0, $result['perceivedValue']);
     }
 
-    // Helper Methods
+    // ================================================================
+    // HELPERS
+    // ================================================================
 
-    /**
-     * Create a mock Player with specified free agency preferences
-     * All preferences are on a 1-5 scale
-     */
-    private function createPlayerWithPreferences(
+    private function setupNeutralTeam(): void
+    {
+        $this->mockRepository->teamPerformance = [
+            'wins' => 41, 'losses' => 41,
+            'tradWins' => 500, 'tradLosses' => 500,
+        ];
+        $this->mockRepository->positionSalaryCommitment = 1000;
+    }
+
+    private function createPlayer(
         int $playForWinner = 1,
         int $tradition = 1,
         int $loyalty = 1,
@@ -561,8 +636,8 @@ class FreeAgencyDemandCalculatorTest extends TestCase
         int $playerID = 1,
         string $currentTeam = 'Test Team'
     ): Player {
-        $player = $this->createMock(Player::class);
-        
+        $player = $this->createStub(Player::class);
+
         $player->freeAgencyPlayForWinner = $playForWinner;
         $player->freeAgencyTradition = $tradition;
         $player->freeAgencyLoyalty = $loyalty;

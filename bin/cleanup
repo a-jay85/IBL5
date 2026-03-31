@@ -226,46 +226,85 @@ if [ "$ALL" = true ]; then
         done
     fi
 
-    # Clean up bare local branches whose remote tracking ref is [gone].
-    # Worktree branches are already handled above; this catches branches
-    # that exist only as local refs (no worktree directory).
+    # Clean up bare local branches that are no longer needed.
+    # Three deletion signals (any one is sufficient):
+    #   1. PR is MERGED — work completed
+    #   2. PR is CLOSED — work abandoned
+    #   3. Remote tracking ref is [gone] — remote branch deleted
+    # Branches with no PR and a live (or no) remote are left alone.
     WORKTREE_BRANCHES=$(git -C "$REPO_ROOT" worktree list --porcelain \
         | awk '/^branch / { sub(/^branch refs\/heads\//, ""); print }')
 
+    # Build set of [gone] branches for quick lookup
+    GONE_BRANCHES=""
     while IFS= read -r line; do
         [[ -z "$line" ]] && continue
-        gone_branch=$(echo "$line" | sed 's/^[[:space:]]*[*+]*[[:space:]]*//' | awk '{print $1}')
-        [[ -z "$gone_branch" ]] && continue
+        gb=$(echo "$line" | sed 's/^[[:space:]]*[*+]*[[:space:]]*//' | awk '{print $1}')
+        GONE_BRANCHES="$GONE_BRANCHES $gb"
+    done < <(git -C "$REPO_ROOT" branch -v | grep '\[gone\]')
+
+    while IFS= read -r bare_branch; do
+        [[ -z "$bare_branch" ]] && continue
+        # Strip leading whitespace and * marker
+        bare_branch=$(echo "$bare_branch" | sed 's/^[[:space:]]*[*+]*[[:space:]]*//')
+        [[ -z "$bare_branch" ]] && continue
 
         # Skip protected branches
-        if [[ "$gone_branch" == "master" || "$gone_branch" == "main" || "$gone_branch" == "production" ]]; then
+        if [[ "$bare_branch" == "master" || "$bare_branch" == "main" || "$bare_branch" == "production" ]]; then
             continue
         fi
 
         # Skip branches checked out in a worktree (handled by check_worktree above)
-        if echo "$WORKTREE_BRANCHES" | grep -qx "$gone_branch"; then
+        if echo "$WORKTREE_BRANCHES" | grep -qx "$bare_branch"; then
             continue
         fi
 
-        # Skip branches with an open PR
+        # Determine if branch should be cleaned up
+        should_delete=false
+        delete_reason=""
+
+        # Check 1: PR state (most authoritative signal)
         if command -v gh &>/dev/null; then
-            gone_pr_state=$(cd "$REPO_ROOT" && gh pr view "$gone_branch" --json state -q .state 2>/dev/null || true)
-            if [ "$gone_pr_state" = "OPEN" ]; then
-                gone_pr_num=$(cd "$REPO_ROOT" && gh pr view "$gone_branch" --json number -q .number 2>/dev/null || true)
-                echo "  SKIP bare branch $gone_branch: PR #$gone_pr_num still open"
-                SKIPPED=$((SKIPPED + 1))
-                continue
+            bare_pr_state=$(cd "$REPO_ROOT" && gh pr view "$bare_branch" --json state -q .state 2>/dev/null || true)
+            case "$bare_pr_state" in
+                MERGED)
+                    should_delete=true
+                    delete_reason="PR merged"
+                    ;;
+                CLOSED)
+                    should_delete=true
+                    delete_reason="PR closed"
+                    ;;
+                OPEN)
+                    bare_pr_num=$(cd "$REPO_ROOT" && gh pr view "$bare_branch" --json number -q .number 2>/dev/null || true)
+                    echo "  SKIP bare branch $bare_branch: PR #$bare_pr_num still open"
+                    SKIPPED=$((SKIPPED + 1))
+                    continue
+                    ;;
+            esac
+        fi
+
+        # Check 2: Remote tracking ref is [gone] (no PR or gh unavailable)
+        if [ "$should_delete" = false ]; then
+            if echo " $GONE_BRANCHES " | grep -q " $bare_branch "; then
+                should_delete=true
+                delete_reason="remote branch deleted"
             fi
         fi
 
+        # No deletion signal — leave the branch alone
+        if [ "$should_delete" = false ]; then
+            continue
+        fi
+
         if [ "$DRY_RUN" = true ]; then
-            echo "  WOULD delete bare branch: $gone_branch"
+            echo "  WOULD delete bare branch: $bare_branch ($delete_reason)"
         else
-            git -C "$REPO_ROOT" branch -D "$gone_branch" >/dev/null 2>&1 || true
-            echo "  Deleted bare branch: $gone_branch"
+            git -C "$REPO_ROOT" branch -D "$bare_branch" >/dev/null 2>&1 || true
+            echo "  Deleted bare branch: $bare_branch ($delete_reason)"
         fi
         CLEANED=$((CLEANED + 1))
-    done < <(git -C "$REPO_ROOT" branch -v | grep '\[gone\]')
+    done < <(git -C "$REPO_ROOT" branch)
 
     # Clean up orphaned Docker environments.
     # Worktree Docker stacks use compose project name "ibl5-$SLUG".

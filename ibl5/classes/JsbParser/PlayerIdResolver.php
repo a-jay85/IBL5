@@ -11,9 +11,13 @@ use League\LeagueContext;
  *
  * Uses multiple matching strategies in priority order:
  * 1. Exact name match in ibl_plr for the given team and season
- * 2. Exact name match in ibl_hist for the same year + team
+ * 2. Exact name match in ibl_hist_archive for the same year + team
  * 3. Exact name match in ibl_plr without team constraint (for traded players)
  * 4. Fuzzy name match (Levenshtein ≤ 2) for encoding differences
+ *
+ * ibl_hist_archive is used instead of the ibl_hist VIEW because the VIEW
+ * aggregates 589K+ box score rows and cannot be indexed by name/team/year.
+ * ibl_hist_archive has idx_team_year and resolves the same lookup in O(log n).
  *
  * League-aware: resolves table names through LeagueContext when provided.
  */
@@ -33,7 +37,7 @@ class PlayerIdResolver
     {
         $this->db = $db;
         $this->plrTable = self::resolveTable($leagueContext, 'ibl_plr');
-        $this->histTable = self::resolveTable($leagueContext, 'ibl_hist');
+        $this->histTable = self::resolveTable($leagueContext, 'ibl_hist_archive');
     }
 
     private static function resolveTable(?LeagueContext $leagueContext, string $iblTableName): string
@@ -59,7 +63,7 @@ class PlayerIdResolver
             return $this->cache[$cacheKey];
         }
 
-        // Strategy 1: Exact match in ibl_hist (most reliable for historical data)
+        // Strategy 1: Exact match in ibl_hist_archive (fast indexed table; avoids slow ibl_hist VIEW)
         $pid = $this->findInHist($name, $team, $year);
         if ($pid !== null) {
             $this->cache[$cacheKey] = $pid;
@@ -75,7 +79,7 @@ class PlayerIdResolver
             }
         }
 
-        // Strategy 3: Exact name match in ibl_hist without team constraint
+        // Strategy 3: Exact name match in ibl_hist_archive without team constraint
         $pid = $this->findInHistByNameOnly($name, $year);
         if ($pid !== null) {
             $this->cache[$cacheKey] = $pid;
@@ -94,7 +98,7 @@ class PlayerIdResolver
     }
 
     /**
-     * Find pid in ibl_hist by exact name + team + year.
+     * Find pid in ibl_hist_archive by exact name + team + year.
      */
     private function findInHist(string $name, string $team, int $year): ?int
     {
@@ -138,7 +142,7 @@ class PlayerIdResolver
     }
 
     /**
-     * Find pid in ibl_hist by exact name + year (ignoring team for traded players).
+     * Find pid in ibl_hist_archive by exact name + year (ignoring team for traded players).
      */
     private function findInHistByNameOnly(string $name, int $year): ?int
     {

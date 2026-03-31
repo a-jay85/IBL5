@@ -9,11 +9,26 @@
 -- 1. Drop dependent views first
 DROP VIEW IF EXISTS `vw_career_totals`;
 
--- 2. Rename the table to archive and drop FKs (names must be globally unique in InnoDB)
+-- 2. Rename the table to archive
 DROP TABLE IF EXISTS `ibl_hist_archive`;
-ALTER TABLE `ibl_hist`
-  DROP FOREIGN KEY `fk_hist_player`,
-  DROP FOREIGN KEY `fk_hist_team`;
+
+-- Drop FKs if they exist (names must be globally unique in InnoDB).
+-- Production may have already dropped these in an earlier migration.
+SET @fk_player = (SELECT COUNT(*) FROM INFORMATION_SCHEMA.TABLE_CONSTRAINTS
+  WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'ibl_hist'
+  AND CONSTRAINT_NAME = 'fk_hist_player' AND CONSTRAINT_TYPE = 'FOREIGN KEY');
+SET @fk_team = (SELECT COUNT(*) FROM INFORMATION_SCHEMA.TABLE_CONSTRAINTS
+  WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'ibl_hist'
+  AND CONSTRAINT_NAME = 'fk_hist_team' AND CONSTRAINT_TYPE = 'FOREIGN KEY');
+
+SET @sql_player = IF(@fk_player > 0,
+  'ALTER TABLE `ibl_hist` DROP FOREIGN KEY `fk_hist_player`', 'SELECT 1');
+SET @sql_team = IF(@fk_team > 0,
+  'ALTER TABLE `ibl_hist` DROP FOREIGN KEY `fk_hist_team`', 'SELECT 1');
+
+PREPARE stmt1 FROM @sql_player; EXECUTE stmt1; DEALLOCATE PREPARE stmt1;
+PREPARE stmt2 FROM @sql_team;   EXECUTE stmt2; DEALLOCATE PREPARE stmt2;
+
 RENAME TABLE `ibl_hist` TO `ibl_hist_archive`;
 
 -- 3. Create VIEW ibl_hist — backward-compatible column names + bonus columns
@@ -144,14 +159,26 @@ SELECT
   ha.r_orb, ha.r_drb, ha.r_ast, ha.r_stl, ha.r_blk, ha.r_tvr,
   ha.r_oo, ha.r_do, ha.r_po, ha.r_to, ha.r_od, ha.r_dd, ha.r_pd, ha.r_td,
   ha.salary,
-  CAST(0 AS SIGNED) AS talent, CAST(0 AS SIGNED) AS skill,
-  CAST(0 AS SIGNED) AS intangibles, CAST(0 AS SIGNED) AS tsi_sum,
-  CAST(0 AS SIGNED) AS clutch, CAST(0 AS SIGNED) AS consistency,
-  CAST(0 AS SIGNED) AS age, CAST(0 AS SIGNED) AS peak,
-  CAST(0 AS SIGNED) AS cy1, CAST(0 AS SIGNED) AS cy2,
-  CAST(0 AS SIGNED) AS cy3, CAST(0 AS SIGNED) AS cy4,
-  CAST(0 AS SIGNED) AS cy5, CAST(0 AS SIGNED) AS cy6
+  -- Enrich archive rows with PLR snapshot data when available
+  CAST(COALESCE(ha_snap.talent, 0)      AS SIGNED) AS talent,
+  CAST(COALESCE(ha_snap.skill, 0)       AS SIGNED) AS skill,
+  CAST(COALESCE(ha_snap.intangibles, 0) AS SIGNED) AS intangibles,
+  CAST(COALESCE(ha_snap.talent + ha_snap.skill + ha_snap.intangibles, 0) AS SIGNED) AS tsi_sum,
+  CAST(COALESCE(ha_snap.clutch, 0)      AS SIGNED) AS clutch,
+  CAST(COALESCE(ha_snap.consistency, 0) AS SIGNED) AS consistency,
+  CAST(COALESCE(ha_snap.age, 0)         AS SIGNED) AS age,
+  CAST(COALESCE(ha_snap.peak, 0)        AS SIGNED) AS peak,
+  CAST(COALESCE(ha_snap.cy1, 0)         AS SIGNED) AS cy1,
+  CAST(COALESCE(ha_snap.cy2, 0)         AS SIGNED) AS cy2,
+  CAST(COALESCE(ha_snap.cy3, 0)         AS SIGNED) AS cy3,
+  CAST(COALESCE(ha_snap.cy4, 0)         AS SIGNED) AS cy4,
+  CAST(COALESCE(ha_snap.cy5, 0)         AS SIGNED) AS cy5,
+  CAST(COALESCE(ha_snap.cy6, 0)         AS SIGNED) AS cy6
 FROM ibl_hist_archive ha
+LEFT JOIN ibl_plr_snapshots ha_snap
+  ON ha.pid = ha_snap.pid
+  AND ha.`year` = ha_snap.season_year
+  AND ha_snap.snapshot_phase = 'end-of-season'
 WHERE NOT EXISTS (
   SELECT 1 FROM ibl_box_scores bs
   WHERE bs.pid = ha.pid AND bs.season_year = ha.`year` AND bs.game_type = 1

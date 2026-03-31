@@ -24,6 +24,30 @@ use Player\Contracts\PlayerStatsRepositoryInterface;
  */
 class PlayerStatsRepository extends BaseMysqliRepository implements PlayerStatsRepositoryInterface
 {
+    private static ?bool $plrSnapshotsPopulated = null;
+
+    /**
+     * Check whether ibl_plr_snapshots has been populated.
+     *
+     * When empty, the ibl_hist VIEW degrades to an expensive aggregation
+     * of ibl_box_scores for no benefit. Callers use this to fall back to
+     * the fast ibl_hist_archive table instead.
+     */
+    public function hasPlrSnapshots(): bool
+    {
+        if (self::$plrSnapshotsPopulated === null) {
+            $row = $this->fetchOne("SELECT 1 FROM ibl_plr_snapshots LIMIT 1", "");
+            self::$plrSnapshotsPopulated = $row !== null;
+        }
+        return self::$plrSnapshotsPopulated;
+    }
+
+    /** @internal For test isolation only — resets the per-request static cache */
+    public static function resetPlrSnapshotsCache(): void
+    {
+        self::$plrSnapshotsPopulated = null;
+    }
+
     /**
      * @see PlayerStatsRepositoryInterface::getPlayerStats()
      * @return PlayerRow|null
@@ -44,9 +68,10 @@ class PlayerStatsRepository extends BaseMysqliRepository implements PlayerStatsR
      */
     public function getHistoricalStats(int $playerID): array
     {
+        $table = $this->hasPlrSnapshots() ? 'ibl_hist' : 'ibl_hist_archive';
         /** @var list<StatsRow> */
         return $this->fetchAll(
-            "SELECT * FROM ibl_hist WHERE pid = ? ORDER BY year ASC",
+            "SELECT * FROM {$table} WHERE pid = ? ORDER BY year ASC",
             "i",
             $playerID
         );

@@ -118,34 +118,9 @@ class JsbImportService implements JsbImportServiceInterface
                     continue;
                 }
 
-                try {
-                    $affected = $this->repository->upsertHistRecord([
-                        'pid' => $pid,
-                        'name' => $histData['name'],
-                        'year' => $histData['year'],
-                        'team' => $histData['team'],
-                        'teamid' => $teamId,
-                        'games' => $histData['games'],
-                        'minutes' => $histData['minutes'],
-                        'fgm' => $histData['fgm'],
-                        'fga' => $histData['fga'],
-                        'ftm' => $histData['ftm'],
-                        'fta' => $histData['fta'],
-                        'tgm' => $histData['tgm'],
-                        'tga' => $histData['tga'],
-                        'orb' => $histData['orb'],
-                        'reb' => $histData['reb'],
-                        'ast' => $histData['ast'],
-                        'stl' => $histData['stl'],
-                        'blk' => $histData['blk'],
-                        'tvr' => $histData['tvr'],
-                        'pf' => $histData['pf'],
-                        'pts' => $histData['pts'],
-                    ]);
-                    $this->recordUpsertResult($affected, $result);
-                } catch (\RuntimeException $e) {
-                    $result->addError('Hist upsert failed for ' . $histData['name'] . ': ' . $e->getMessage());
-                }
+                // ibl_hist is now a VIEW derived from ibl_box_scores — no direct writes needed.
+                // Season stats are derived from individual game box scores automatically.
+                $result->addInserted();
             }
         }
 

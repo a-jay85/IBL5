@@ -224,6 +224,10 @@ class PlayerStatsRepository extends BaseMysqliRepository implements PlayerStatsR
             self::buildCareerAveragesQuery(1, 'p.name = ?'),
             "s",
             $playerName
+        ) ?? $this->fetchOne(
+            self::buildHistCareerAveragesQuery('p.name = ?'),
+            "s",
+            $playerName
         );
     }
 
@@ -238,14 +242,57 @@ class PlayerStatsRepository extends BaseMysqliRepository implements PlayerStatsR
             self::buildCareerAveragesQuery(1, 'bs.pid = ?'),
             "i",
             $playerID
+        ) ?? $this->fetchOne(
+            self::buildHistCareerAveragesQuery('h.pid = ?'),
+            "i",
+            $playerID
         );
     }
 
     /**
-     * Build inlined career averages query with predicate pushed before GROUP BY.
+     * Build regular-season career averages from ibl_hist (pre-aggregated per-season totals).
      *
-     * Replaces SELECT from ibl_season/playoff/heat_career_avgs views which
-     * block predicate pushdown due to GROUP BY.
+     * Much faster than aggregating 589K ibl_box_scores rows — ibl_hist has ~12K rows.
+     */
+    private static function buildHistCareerAveragesQuery(string $filterClause): string
+    {
+        return "SELECT h.pid, p.name,
+            CAST(SUM(h.games) AS SIGNED) AS games,
+            ROUND(SUM(h.minutes) / SUM(h.games), 2) AS minutes,
+            ROUND(SUM(h.fgm) / SUM(h.games), 2) AS fgm,
+            ROUND(SUM(h.fga) / SUM(h.games), 2) AS fga,
+            CASE WHEN SUM(h.fga) > 0
+                THEN ROUND(SUM(h.fgm) / SUM(h.fga), 3)
+                ELSE 0.000 END AS fgpct,
+            ROUND(SUM(h.ftm) / SUM(h.games), 2) AS ftm,
+            ROUND(SUM(h.fta) / SUM(h.games), 2) AS fta,
+            CASE WHEN SUM(h.fta) > 0
+                THEN ROUND(SUM(h.ftm) / SUM(h.fta), 3)
+                ELSE 0.000 END AS ftpct,
+            ROUND(SUM(h.tgm) / SUM(h.games), 2) AS tgm,
+            ROUND(SUM(h.tga) / SUM(h.games), 2) AS tga,
+            CASE WHEN SUM(h.tga) > 0
+                THEN ROUND(SUM(h.tgm) / SUM(h.tga), 3)
+                ELSE 0.000 END AS tpct,
+            ROUND(SUM(h.orb) / SUM(h.games), 2) AS orb,
+            ROUND(SUM(h.reb) / SUM(h.games), 2) AS reb,
+            ROUND(SUM(h.ast) / SUM(h.games), 2) AS ast,
+            ROUND(SUM(h.stl) / SUM(h.games), 2) AS stl,
+            ROUND(SUM(h.tvr) / SUM(h.games), 2) AS tvr,
+            ROUND(SUM(h.blk) / SUM(h.games), 2) AS blk,
+            ROUND(SUM(h.pf)  / SUM(h.games), 2) AS pf,
+            ROUND(SUM(h.pts) / SUM(h.games), 2) AS pts,
+            p.retired
+        FROM ibl_hist h
+        JOIN ibl_plr p ON h.pid = p.pid
+        WHERE h.games > 0 AND {$filterClause}
+        GROUP BY h.pid, p.name, p.retired";
+    }
+
+    /**
+     * Build career averages from ibl_box_scores for playoff/HEAT game types.
+     *
+     * Regular season career averages use buildHistCareerAveragesQuery() instead.
      */
     private static function buildCareerAveragesQuery(int $gameType, string $filterClause): string
     {

@@ -334,13 +334,11 @@ class PlrParserServiceTest extends TestCase
         /** @var PlrParserRepositoryInterface&\PHPUnit\Framework\MockObject\MockObject $mockRepo */
         $mockRepo = $this->createMock(PlrParserRepositoryInterface::class);
         $mockRepo->expects($this->once())->method('upsertPlayer');
-        $mockRepo->expects($this->once())->method('upsertHistoricalStats');
 
         $service = new PlrParserService($mockRepo, $this->stubCommonRepo, $this->stubSeason);
         $result = $service->processPlrFile($tmpFile);
 
         $this->assertSame(1, $result->playersUpserted);
-        $this->assertSame(1, $result->historyRowsUpserted);
         unlink($tmpFile);
     }
 
@@ -593,7 +591,6 @@ class PlrParserServiceTest extends TestCase
         $mockRepo = $this->createMock(PlrParserRepositoryInterface::class);
         $mockRepo->expects($this->once())->method('upsertSnapshot');
         $mockRepo->expects($this->never())->method('upsertPlayer');
-        $mockRepo->expects($this->never())->method('upsertHistoricalStats');
 
         $service = new PlrParserService($mockRepo, $this->stubCommonRepo, $this->stubSeason);
         $result = $service->processPlrFileForYear(
@@ -605,7 +602,6 @@ class PlrParserServiceTest extends TestCase
         );
 
         $this->assertSame(1, $result->playersUpserted);
-        $this->assertSame(0, $result->historyRowsUpserted);
         unlink($tmpFile);
     }
 
@@ -616,14 +612,12 @@ class PlrParserServiceTest extends TestCase
         /** @var PlrParserRepositoryInterface&\PHPUnit\Framework\MockObject\MockObject $mockRepo */
         $mockRepo = $this->createMock(PlrParserRepositoryInterface::class);
         $mockRepo->expects($this->once())->method('upsertPlayer');
-        $mockRepo->expects($this->once())->method('upsertHistoricalStats');
         $mockRepo->expects($this->never())->method('upsertSnapshot');
 
         $service = new PlrParserService($mockRepo, $this->stubCommonRepo, $this->stubSeason);
         $result = $service->processPlrFileForYear($tmpFile, 2001, PlrImportMode::Live);
 
         $this->assertSame(1, $result->playersUpserted);
-        $this->assertSame(1, $result->historyRowsUpserted);
         unlink($tmpFile);
     }
 

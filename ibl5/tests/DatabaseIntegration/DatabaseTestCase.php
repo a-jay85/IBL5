@@ -235,7 +235,10 @@ abstract class DatabaseTestCase extends TestCase
     }
 
     /**
-     * Insert a row into ibl_hist with sensible defaults.
+     * Insert a row into ibl_hist_archive with sensible defaults.
+     *
+     * ibl_hist is now a VIEW; the archive table accepts direct inserts and
+     * the VIEW's UNION ALL fallback makes these rows visible via ibl_hist.
      *
      * @param array<string, int|string> $overrides Column overrides
      */
@@ -266,7 +269,7 @@ abstract class DatabaseTestCase extends TestCase
             'salary' => 1500,
         ];
 
-        $this->insertRow('ibl_hist', array_merge($defaults, $overrides));
+        $this->insertRow('ibl_hist_archive', array_merge($defaults, $overrides));
     }
 
     /**

@@ -193,7 +193,10 @@ class FreeAgencyNegotiationView
 
         // Calculate raise percentage and example based on bird years (matching validator logic)
         $raisePercentage = \ContractRules::getMaxRaisePercentage($birdYears);
-        $raisePercentageDisplay = (int)($raisePercentage * 100);
+        $rawPercentage = $raisePercentage * 100;
+        $raisePercentageDisplay = ($rawPercentage === floor($rawPercentage))
+            ? (string) (int) $rawPercentage
+            : rtrim(rtrim(sprintf('%.1f', $rawPercentage), '0'), '.');
         $exampleSalary = 500;
         $exampleRaise = (int) round($exampleSalary * $raisePercentage);
 

@@ -202,7 +202,10 @@ class FreeAgencyFormComponents
         }
 
         $raisePercentage = \ContractRules::getMaxRaisePercentage($birdYears);
-        $raisePercentageDisplay = (int) round($raisePercentage * 100);
+        $rawPercentage = $raisePercentage * 100;
+        $raisePercentageDisplay = ($rawPercentage === floor($rawPercentage))
+            ? (string) (int) $rawPercentage
+            : rtrim(rtrim(sprintf('%.1f', $rawPercentage), '0'), '.');
         $hasBirdRights = \ContractRules::hasBirdRights($birdYears);
         $birdRightsText = $hasBirdRights ? ' with Bird Rights' : '';
 

@@ -29,18 +29,21 @@ class PlayerStatsRepositoryTest extends TestCase
 
     protected function setUp(): void
     {
+        // Reset static snapshot cache between tests
+        PlayerStatsRepository::resetPlrSnapshotsCache();
+
         // Create mock database connection
         $this->mockDb = $this->createMock(\mysqli::class);
         $this->mockStmt = $this->createMock(\mysqli_stmt::class);
         $this->mockResult = $this->createMock(\mysqli_result::class);
-        
+
         // Configure mock to return prepared statement
         $this->mockDb->method('prepare')->willReturn($this->mockStmt);
         $this->mockStmt->method('bind_param')->willReturn(true);
         $this->mockStmt->method('execute')->willReturn(true);
         $this->mockStmt->method('get_result')->willReturn($this->mockResult);
         $this->mockStmt->method('close')->willReturn(true);
-        
+
         // Create repository with mocked database
         $this->repository = new PlayerStatsRepository($this->mockDb);
     }
@@ -48,16 +51,17 @@ class PlayerStatsRepositoryTest extends TestCase
     public function testGetHistoricalStatsReturnsArrayOfStats(): void
     {
         // Configure mock to return test data
+        // First fetch_assoc is for hasPlrSnapshots() check (null = empty → use archive table)
         $testData = [
             ['year' => 2024, 'team' => 'TEST', 'games' => 82, 'pts' => 1500],
             ['year' => 2023, 'team' => 'TEST', 'games' => 80, 'pts' => 1400],
         ];
-        
+
         $this->mockResult->method('fetch_assoc')
-            ->willReturnOnConsecutiveCalls($testData[0], $testData[1], null);
-        
+            ->willReturnOnConsecutiveCalls(null, $testData[0], $testData[1], null);
+
         $result = $this->repository->getHistoricalStats(1);
-        
+
         $this->assertIsArray($result);
         $this->assertCount(2, $result);
     }

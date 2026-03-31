@@ -249,17 +249,30 @@ if ($isProduction) {
             echo "        ERROR: Could not create temp directory\n";
             return null;
         }
-        $extracted = $extractor->extractSingleFile($archive, 'IBL5.' . $fileType, $tmpDir);
-        if ($extracted === false) {
-            rmdir($tmpDir);
+        try {
+            $extracted = $extractor->extractSingleFile($archive, 'IBL5.' . $fileType, $tmpDir);
+            if ($extracted === false) {
+                rmdir($tmpDir);
+                return null;
+            }
+            // .awa processing also needs a companion .car for PID→name resolution.
+            // Extract it into the same temp dir so dirname($awaPath) . '/IBL5.car' resolves.
+            if ($fileType === 'awa') {
+                $extractor->extractSingleFile($archive, 'IBL5.car', $tmpDir);
+            }
+            return $extracted;
+        } catch (\Throwable $e) {
+            // Clean up tmpDir to prevent leak if extraction throws unexpectedly
+            foreach (glob($tmpDir . '/*') ?: [] as $file) {
+                if (is_file($file)) {
+                    unlink($file);
+                }
+            }
+            if (is_dir($tmpDir)) {
+                rmdir($tmpDir);
+            }
             return null;
         }
-        // .awa processing also needs a companion .car for PID→name resolution.
-        // Extract it into the same temp dir so dirname($awaPath) . '/IBL5.car' resolves.
-        if ($fileType === 'awa') {
-            $extractor->extractSingleFile($archive, 'IBL5.car', $tmpDir);
-        }
-        return $extracted;
     };
 
     $cleanupFile = static function (?string $path) use ($extractor): void {

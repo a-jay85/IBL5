@@ -102,15 +102,24 @@ class PageLayout
         }
         echo "<title>" . \Utilities\HtmlSanitizer::e($sitename . ' ' . $pagetitle) . "</title>\n";
         echo '<meta name="google-site-verification" content="3y3xJYDHSYUitn7cbfFfI6C2BiK_q66dtRfykpzHW5w" />';
-        echo "<script src=\"jslib/htmx.min.js\"></script>";
-        echo "<script src=\"jslib/sorttable.js\"></script>";
-        echo "<script src=\"jslib/responsive-tables.js\"></script>";
-        echo "<script src=\"jslib/name-abbreviation.js\"></script>";
-        echo "<script src=\"jslib/user-team-highlighter.js\"></script>";
-        echo "<script src=\"jslib/sticky-page-header.js\"></script>";
-        echo "<script src=\"jslib/contract-hint.js\"></script>";
-        echo "<script src=\"jslib/htmx-init.js\"></script>";
-        echo "<script src=\"jslib/local-time.js\"></script>";
+        $jsFiles = [
+            'jslib/htmx.min.js',
+            'jslib/sorttable.js',
+            'jslib/responsive-tables.js',
+            'jslib/name-abbreviation.js',
+            'jslib/user-team-highlighter.js',
+            'jslib/sticky-page-header.js',
+            'jslib/contract-hint.js',
+            'jslib/htmx-init.js',
+            'jslib/local-time.js',
+        ];
+        $iblRootPath = \Bootstrap\AppPaths::root();
+        foreach ($jsFiles as $jsFile) {
+            $fullPath = $iblRootPath . '/' . $jsFile;
+            $mtime = is_file($fullPath) ? filemtime($fullPath) : false;
+            $version = is_int($mtime) ? $mtime : 0;
+            echo "<script src=\"{$jsFile}?v={$version}\"></script>";
+        }
 
         // Meta tags (inlined from includes/meta.php)
         $charsetValue = defined('_CHARSET') ? \_CHARSET : null;

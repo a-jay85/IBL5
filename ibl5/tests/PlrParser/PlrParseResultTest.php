@@ -16,13 +16,12 @@ class PlrParseResultTest extends TestCase
         $this->assertSame('No changes', $result->summary());
     }
 
-    public function testSummaryWithAllCounters(): void
+    public function testSummaryWithPlayersUpserted(): void
     {
         $result = new PlrParseResult();
         $result->playersUpserted = 10;
-        $result->historyRowsUpserted = 10;
 
-        $this->assertSame('10 players upserted, 10 history rows upserted', $result->summary());
+        $this->assertSame('10 players upserted', $result->summary());
     }
 
     public function testSummaryWithPartialCounters(): void

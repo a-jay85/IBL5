@@ -129,7 +129,6 @@ class JsbImportServiceTest extends TestCase
         $this->stubRepo->method('resolveTeamIdByName')->willReturn(21);
         $mockResolver = $this->createMock(PlayerIdResolver::class);
         $mockResolver->expects($this->once())->method('resolve')->willReturn(12345);
-        $this->stubRepo->method('upsertHistRecord')->willReturn(1);
 
         try {
             $result = $this->makeService($mockResolver)->processCarFile($tmpFile, 2006);
@@ -159,7 +158,7 @@ class JsbImportServiceTest extends TestCase
         }
     }
 
-    public function testProcessCarFileCountsUpdatedRows(): void
+    public function testProcessCarFileCountsResolvedPlayers(): void
     {
         $seasonRecord = $this->buildSeasonRecord(2006);
         $playerBlock = $this->buildPlayerBlock(1, 100, 'Test Player', $seasonRecord);
@@ -169,12 +168,12 @@ class JsbImportServiceTest extends TestCase
         $this->stubRepo->method('resolveTeamIdByName')->willReturn(21);
         $mockResolver = $this->createMock(PlayerIdResolver::class);
         $mockResolver->expects($this->once())->method('resolve')->willReturn(12345);
-        $this->stubRepo->method('upsertHistRecord')->willReturn(2);
 
         try {
+            // ibl_hist is now a VIEW — processCarFile no longer writes to it.
+            // Each resolved player is counted as inserted for tracking purposes.
             $result = $this->makeService($mockResolver)->processCarFile($tmpFile, 2006);
-            $this->assertSame(0, $result->inserted);
-            $this->assertSame(1, $result->updated);
+            $this->assertSame(1, $result->inserted);
         } finally {
             unlink($tmpFile);
         }

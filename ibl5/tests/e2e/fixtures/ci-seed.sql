@@ -371,7 +371,7 @@ INSERT INTO ibl_demands (name, pid, dem1, dem2, dem3, dem4, dem5, dem6) VALUES
   ('FA Forward', 12, 400, 440, 480, 520, 560, 600);
 
 -- Free agent player history (needed for SeasonLeaderboards)
-INSERT INTO ibl_hist (
+INSERT INTO ibl_hist_archive (
   pid, name, year, team, teamid,
   games, minutes, fgm, fga, ftm, fta, tgm, tga,
   orb, reb, ast, stl, blk, tvr, pf, pts, salary
@@ -553,7 +553,7 @@ INSERT INTO ibl_box_scores (
 -- Player history (SeasonLeaderboards needs current-year stats)
 -- ============================================================
 
-INSERT INTO ibl_hist (
+INSERT INTO ibl_hist_archive (
   pid, name, year, team, teamid,
   games, minutes, fgm, fga, ftm, fta, tgm, tga,
   orb, reb, ast, stl, blk, tvr, pf, pts, salary
@@ -900,7 +900,7 @@ UPDATE ibl_plr SET dc_SGDepth = 1, SGDepth = 1 WHERE pid = 32;
 UPDATE ibl_plr SET dc_PFDepth = 1, PFDepth = 1 WHERE pid = 33;
 
 -- Player history for voting candidates (must have current year stats)
-INSERT INTO ibl_hist (
+INSERT INTO ibl_hist_archive (
   pid, name, year, team, teamid,
   games, minutes, fgm, fga, ftm, fta, tgm, tga,
   orb, reb, ast, stl, blk, tvr, pf, pts, salary
@@ -1061,7 +1061,7 @@ INSERT INTO ibl_plr (
    'a0000000-0000-0000-0000-000000000042');
 
 -- Rookie player history (for stats to show on ballot)
-INSERT INTO ibl_hist (
+INSERT INTO ibl_hist_archive (
   pid, name, year, team, teamid,
   games, minutes, fgm, fga, ftm, fta, tgm, tga,
   orb, reb, ast, stl, blk, tvr, pf, pts, salary

@@ -64,10 +64,6 @@ class PlrParserService implements PlrParserServiceInterface
 
             $this->repository->upsertPlayer($derived);
             $result->playersUpserted++;
-
-            $histData = $this->buildHistoricalData($derived);
-            $this->repository->upsertHistoricalStats($histData);
-            $result->historyRowsUpserted++;
         }
 
         fclose($handle);
@@ -397,7 +393,7 @@ class PlrParserService implements PlrParserServiceInterface
             $derived = $this->computeDerivedFields($parsed, $maxFoulRatio, $endingYear);
 
             match ($mode) {
-                PlrImportMode::Live => $this->processLivePlayer($derived, $result, $endingYear),
+                PlrImportMode::Live => $this->processLivePlayer($derived, $result),
                 PlrImportMode::Snapshot => $this->processSnapshotPlayer($derived, $result, $endingYear, $snapshotPhase ?? '', $sourceArchive ?? ''),
             };
         }
@@ -408,18 +404,14 @@ class PlrParserService implements PlrParserServiceInterface
     }
 
     /**
-     * Process a player in Live mode: upsert into ibl_plr and ibl_hist.
+     * Process a player in Live mode: upsert into ibl_plr.
      *
      * @param array<string, int|string|float> $derived
      */
-    private function processLivePlayer(array $derived, PlrParseResult $result, int $endingYear): void
+    private function processLivePlayer(array $derived, PlrParseResult $result): void
     {
         $this->repository->upsertPlayer($derived);
         $result->playersUpserted++;
-
-        $histData = $this->buildHistoricalData($derived, $endingYear);
-        $this->repository->upsertHistoricalStats($histData);
-        $result->historyRowsUpserted++;
     }
 
     /**
@@ -508,58 +500,4 @@ class PlrParserService implements PlrParserServiceInterface
         ];
     }
 
-    /**
-     * Build historical data record for ibl_hist upsert.
-     *
-     * @param array<string, int|string|float> $derived Data with derived fields
-     * @param int|null $endingYear Override season ending year
-     * @return array<string, int|string|float> Historical stats record
-     */
-    private function buildHistoricalData(array $derived, ?int $endingYear = null): array
-    {
-        return [
-            'pid' => (int) $derived['pid'],
-            'name' => (string) $derived['name'],
-            'year' => $endingYear ?? $this->season->endingYear,
-            'team' => (string) $derived['teamName'],
-            'tid' => (int) $derived['tid'],
-            'seasonGamesPlayed' => (int) $derived['seasonGamesPlayed'],
-            'seasonMIN' => (int) $derived['seasonMIN'],
-            'seasonFGM' => (int) $derived['seasonFGM'],
-            'seasonFGA' => (int) $derived['seasonFGA'],
-            'seasonFTM' => (int) $derived['seasonFTM'],
-            'seasonFTA' => (int) $derived['seasonFTA'],
-            'season3GM' => (int) $derived['season3GM'],
-            'season3GA' => (int) $derived['season3GA'],
-            'seasonORB' => (int) $derived['seasonORB'],
-            'seasonREB' => (int) $derived['seasonREB'],
-            'seasonAST' => (int) $derived['seasonAST'],
-            'seasonSTL' => (int) $derived['seasonSTL'],
-            'seasonBLK' => (int) $derived['seasonBLK'],
-            'seasonTVR' => (int) $derived['seasonTVR'],
-            'seasonPF' => (int) $derived['seasonPF'],
-            'seasonPTS' => (int) $derived['seasonPTS'],
-            'rating2GA' => (int) $derived['rating2GA'],
-            'rating2GP' => (int) $derived['rating2GP'],
-            'ratingFTA' => (int) $derived['ratingFTA'],
-            'ratingFTP' => (int) $derived['ratingFTP'],
-            'rating3GA' => (int) $derived['rating3GA'],
-            'rating3GP' => (int) $derived['rating3GP'],
-            'ratingORB' => (int) $derived['ratingORB'],
-            'ratingDRB' => (int) $derived['ratingDRB'],
-            'ratingAST' => (int) $derived['ratingAST'],
-            'ratingSTL' => (int) $derived['ratingSTL'],
-            'ratingBLK' => (int) $derived['ratingBLK'],
-            'ratingTVR' => (int) $derived['ratingTVR'],
-            'ratingOO' => (int) $derived['ratingOO'],
-            'ratingOD' => (int) $derived['ratingOD'],
-            'ratingDO' => (int) $derived['ratingDO'],
-            'ratingDD' => (int) $derived['ratingDD'],
-            'ratingPO' => (int) $derived['ratingPO'],
-            'ratingPD' => (int) $derived['ratingPD'],
-            'ratingTO' => (int) $derived['ratingTO'],
-            'ratingTD' => (int) $derived['ratingTD'],
-            'currentSeasonSalary' => (int) $derived['currentSeasonSalary'],
-        ];
-    }
 }

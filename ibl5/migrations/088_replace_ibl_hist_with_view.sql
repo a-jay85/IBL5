@@ -117,16 +117,33 @@ UNION ALL
 -- This provides backward compatibility during the transition period.
 SELECT
   ha.pid, ha.name, ha.`year`, ha.teamid, ha.team,
-  ha.games, ha.minutes, ha.fgm, ha.fga, ha.ftm, ha.fta,
-  ha.tgm, ha.tga, ha.orb, ha.reb, ha.ast, ha.stl,
-  ha.blk, ha.tvr, ha.pf, ha.pts,
+  CAST(ha.games   AS SIGNED) AS games,
+  CAST(ha.minutes AS SIGNED) AS minutes,
+  CAST(ha.fgm     AS SIGNED) AS fgm,
+  CAST(ha.fga     AS SIGNED) AS fga,
+  CAST(ha.ftm     AS SIGNED) AS ftm,
+  CAST(ha.fta     AS SIGNED) AS fta,
+  CAST(ha.tgm     AS SIGNED) AS tgm,
+  CAST(ha.tga     AS SIGNED) AS tga,
+  CAST(ha.orb     AS SIGNED) AS orb,
+  CAST(ha.reb     AS SIGNED) AS reb,
+  CAST(ha.ast     AS SIGNED) AS ast,
+  CAST(ha.stl     AS SIGNED) AS stl,
+  CAST(ha.blk     AS SIGNED) AS blk,
+  CAST(ha.tvr     AS SIGNED) AS tvr,
+  CAST(ha.pf      AS SIGNED) AS pf,
+  CAST(ha.pts     AS SIGNED) AS pts,
   ha.r_2ga, ha.r_2gp, ha.r_fta, ha.r_ftp, ha.r_3ga, ha.r_3gp,
   ha.r_orb, ha.r_drb, ha.r_ast, ha.r_stl, ha.r_blk, ha.r_tvr,
   ha.r_oo, ha.r_do, ha.r_po, ha.r_to, ha.r_od, ha.r_dd, ha.r_pd, ha.r_td,
   ha.salary,
-  0 AS talent, 0 AS skill, 0 AS intangibles, 0 AS tsi_sum,
-  0 AS clutch, 0 AS consistency, 0 AS age, 0 AS peak,
-  0 AS cy1, 0 AS cy2, 0 AS cy3, 0 AS cy4, 0 AS cy5, 0 AS cy6
+  CAST(0 AS SIGNED) AS talent, CAST(0 AS SIGNED) AS skill,
+  CAST(0 AS SIGNED) AS intangibles, CAST(0 AS SIGNED) AS tsi_sum,
+  CAST(0 AS SIGNED) AS clutch, CAST(0 AS SIGNED) AS consistency,
+  CAST(0 AS SIGNED) AS age, CAST(0 AS SIGNED) AS peak,
+  CAST(0 AS SIGNED) AS cy1, CAST(0 AS SIGNED) AS cy2,
+  CAST(0 AS SIGNED) AS cy3, CAST(0 AS SIGNED) AS cy4,
+  CAST(0 AS SIGNED) AS cy5, CAST(0 AS SIGNED) AS cy6
 FROM ibl_hist_archive ha
 WHERE NOT EXISTS (
   SELECT 1 FROM ibl_box_scores bs

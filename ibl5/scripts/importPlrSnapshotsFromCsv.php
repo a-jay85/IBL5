@@ -209,7 +209,7 @@ while (($line = fgets($handle)) !== false) {
     $cDepth = (int) ($fields[53] ?? '0');
 
     $stmt->bind_param(
-        'isissiisiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiii',
+        'isissiisiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiii',
         $pid, $name, $seasonYear, $snapshotPhase, $sourceArchive, $tid,
         $age, $pos, $peak, $htft, $htin, $wt,
         $oo, $od, $do_, $dd, $po, $pd, $to_, $td,

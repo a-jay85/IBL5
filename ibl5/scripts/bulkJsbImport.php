@@ -35,7 +35,20 @@ $_SERVER['PHP_SELF'] = 'bulkJsbImport.php';
 $_SERVER['SERVER_NAME'] = 'localhost';
 $_SERVER['SCRIPT_FILENAME'] = __FILE__;
 
-require_once __DIR__ . '/../autoloader.php';
+require_once __DIR__ . '/../vendor/autoload.php';
+
+// Worktree fix: vendor/ symlinks to main repo, so PSR-4 resolves classes/ there.
+// Register the local classes/ directory to pick up worktree-only classes.
+$localClassesDir = realpath(__DIR__ . '/../classes');
+if ($localClassesDir !== false) {
+    spl_autoload_register(static function (string $class) use ($localClassesDir): void {
+        $path = $localClassesDir . '/' . str_replace('\\', '/', $class) . '.php';
+        if (file_exists($path)) {
+            require_once $path;
+        }
+    });
+}
+
 require_once __DIR__ . '/../config.php';
 require_once __DIR__ . '/../db/db.php';
 

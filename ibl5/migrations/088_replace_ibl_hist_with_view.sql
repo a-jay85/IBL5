@@ -9,7 +9,10 @@
 -- 1. Drop dependent views first
 DROP VIEW IF EXISTS `vw_career_totals`;
 
--- 2. Rename the table to archive
+-- 2. Rename the table to archive and drop FKs (names must be globally unique in InnoDB)
+ALTER TABLE `ibl_hist`
+  DROP FOREIGN KEY `fk_hist_player`,
+  DROP FOREIGN KEY `fk_hist_team`;
 RENAME TABLE `ibl_hist` TO `ibl_hist_archive`;
 
 -- 3. Create VIEW ibl_hist — backward-compatible column names + bonus columns

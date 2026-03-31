@@ -91,6 +91,30 @@
         }
     });
 
+    // Re-initialize JS features after HTMX restores a page from its
+    // history cache (browser Back/Forward). htmx:afterSwap does NOT fire
+    // on history restore — only htmx:historyRestore does.
+    document.addEventListener('htmx:historyRestore', function () {
+        if (window.sorttable) {
+            window.sorttable.init();
+        }
+        if (typeof window.IBL_refreshResponsiveTables === 'function') {
+            window.IBL_refreshResponsiveTables();
+        }
+        if (typeof window.IBL_refreshUserTeamHighlighter === 'function') {
+            window.IBL_refreshUserTeamHighlighter();
+        }
+        if (typeof window.IBL_refreshNameAbbreviations === 'function') {
+            window.IBL_refreshNameAbbreviations();
+        }
+        if (typeof window.IBL_refreshStickyPageHeaders === 'function') {
+            window.IBL_refreshStickyPageHeaders();
+        }
+        if (typeof window.IBL_sizeContractHintLinks === 'function') {
+            window.IBL_sizeContractHintLinks();
+        }
+    });
+
     document.addEventListener('htmx:afterSwap', function (evt) {
         // Re-run sorttable on new .sortable tables (skips already-initialized
         // tables via data-sorttable attribute guard in makeSortable)

@@ -221,6 +221,10 @@ class PlayerStatsRepository extends BaseMysqliRepository implements PlayerStatsR
     {
         /** @var CareerAveragesRow|null */
         return $this->fetchOne(
+            self::buildCareerAveragesQuery(1, 'p.name = ?'),
+            "s",
+            $playerName
+        ) ?? $this->fetchOne(
             self::buildHistCareerAveragesQuery('p.name = ?'),
             "s",
             $playerName
@@ -235,6 +239,10 @@ class PlayerStatsRepository extends BaseMysqliRepository implements PlayerStatsR
     {
         /** @var CareerAveragesRow|null */
         return $this->fetchOne(
+            self::buildCareerAveragesQuery(1, 'bs.pid = ?'),
+            "i",
+            $playerID
+        ) ?? $this->fetchOne(
             self::buildHistCareerAveragesQuery('h.pid = ?'),
             "i",
             $playerID

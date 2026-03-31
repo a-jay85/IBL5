@@ -10,6 +10,7 @@
 DROP VIEW IF EXISTS `vw_career_totals`;
 
 -- 2. Rename the table to archive and drop FKs (names must be globally unique in InnoDB)
+DROP TABLE IF EXISTS `ibl_hist_archive`;
 ALTER TABLE `ibl_hist`
   DROP FOREIGN KEY `fk_hist_player`,
   DROP FOREIGN KEY `fk_hist_team`;

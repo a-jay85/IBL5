@@ -116,7 +116,7 @@ class FreeAgencyNegotiationView
         <h2 class="ibl-card__title">Quick Offer Presets</h2>
     </div>
     <div class="ibl-card__body">
-        <?= $this->renderOfferButtons($player) ?>
+        <?= $this->renderOfferButtons($player, $team) ?>
     </div>
 </div>
 
@@ -142,13 +142,16 @@ class FreeAgencyNegotiationView
      * Render all offer button sections (Max Contract, MLE, LLE, Vet Min)
      *
      * @param Player $player
+     * @param Team $team Team making the offer
      * @return string HTML content
      */
-    private function renderOfferButtons(Player $player): string
+    private function renderOfferButtons(Player $player, Team $team): string
     {
         // Calculate max contract salary and raises based on bird years
         $maxContract = \ContractRules::getMaxContractSalary($player->yearsOfExperience ?? 0);
-        $raisePercentage = \ContractRules::getMaxRaisePercentage($player->birdYears ?? 0);
+        // Only use player's bird years if offering team is player's current team
+        $birdYears = $player->teamName === $team->name ? ($player->birdYears ?? 0) : 0;
+        $raisePercentage = \ContractRules::getMaxRaisePercentage($birdYears);
         $maxRaise = (int) round($maxContract * $raisePercentage);
 
         $maxSalaries = [
@@ -161,7 +164,7 @@ class FreeAgencyNegotiationView
         ];
 
         ob_start();
-        echo $this->formComponents->renderMaxContractButtons($maxSalaries, $player->birdYears ?? 0);
+        echo $this->formComponents->renderMaxContractButtons($maxSalaries, $birdYears);
         echo $this->formComponents->renderExceptionButtons('MLE');
         echo $this->formComponents->renderExceptionButtons('LLE');
         echo $this->formComponents->renderExceptionButtons('VET');

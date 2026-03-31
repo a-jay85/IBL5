@@ -271,6 +271,27 @@ class FreeAgencyOfferValidatorTest extends TestCase
         $this->assertTrue($result['valid']);
     }
 
+    /**
+     * BUG REGRESSION TEST: Non-bird-rights team should NOT be able to offer 12.5% raises
+     *
+     * This test verifies the fix for the bug where GMs without Bird Rights could offer
+     * contracts with a 12.5% raise. The team must use the 10% standard raise limit.
+     */
+    public function testRejectsNonBirdRightsTeamOfferingAbove10PercentRaise(): void
+    {
+        $validator = new FreeAgencyOfferValidator();
+        // 10% of 500 = 50, so max year2 = 550
+        // But this offers 11% raise (555), which exceeds the 10% limit for non-BR teams
+        $result = $validator->validateOffer($this->buildOffer([
+            'offer1' => 500,
+            'offer2' => 555, // 11% raise (55), exceeds 10% limit (50)
+            'birdYears' => 0, // Explicitly no bird rights
+        ]));
+
+        $this->assertFalse($result['valid']);
+        $this->assertStringContainsString('raise', $result['error']);
+    }
+
     // ================================================================
     // RULE 7: Salary Decreases
     // Original: Cannot decrease salary in later years (except to $0 termination)

@@ -58,3 +58,6 @@ docker-compose.override.yml
 # OS-specific Playwright snapshots (baselines are OS-agnostic via Docker)
 ibl5/tests/e2e/**/*-darwin.png
 ibl5/tests/e2e/**/*-win32.png
+
+# Legacy spreadsheets (kept on disk, not in git)
+ibl5/spreadsheets/

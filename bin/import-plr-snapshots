@@ -1,0 +1,12 @@
+#!/bin/bash
+# Load PLR snapshots from analytics CSV into MariaDB.
+# Run once before deploying the ibl_hist VIEW migration.
+#
+# Usage: bin/import-plr-snapshots [--dry-run]
+
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+cd "$SCRIPT_DIR/../ibl5"
+
+php scripts/importPlrSnapshotsFromCsv.php "$@"

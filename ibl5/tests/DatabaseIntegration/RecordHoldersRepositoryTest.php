@@ -40,7 +40,7 @@ class RecordHoldersRepositoryTest extends DatabaseTestCase
         $this->insertTestPlayer($pid, 'QuadDouble Test');
 
         // Hist row for season year 2098 (Jan date → season_year = 2098)
-        $this->insertRow('ibl_hist', [
+        $this->insertRow('ibl_hist_archive', [
             'pid' => $pid,
             'name' => 'QuadDouble Test',
             'year' => 2098,
@@ -305,7 +305,7 @@ class RecordHoldersRepositoryTest extends DatabaseTestCase
         $pid = 200090402;
         $this->insertTestPlayer($pid, 'BatchPlayer Test');
 
-        $this->insertRow('ibl_hist', [
+        $this->insertRow('ibl_hist_archive', [
             'pid' => $pid,
             'name' => 'BatchPlayer Test',
             'year' => 2098,

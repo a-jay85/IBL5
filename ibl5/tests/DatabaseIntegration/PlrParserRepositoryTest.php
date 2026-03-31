@@ -8,7 +8,7 @@ use PlrParser\PlrParserRepository;
 
 /**
  * Tests PlrParserRepository against real MariaDB — massive upserts
- * into ibl_plr (121 params) and ibl_hist (42 params).
+ * into ibl_plr (121 params) and ibl_plr_snapshots.
  */
 class PlrParserRepositoryTest extends DatabaseTestCase
 {
@@ -65,55 +65,6 @@ class PlrParserRepositoryTest extends DatabaseTestCase
         self::assertNotNull($row);
         self::assertSame('PLR Updated', $row['name']);
         self::assertSame(30, $row['age']);
-    }
-
-    // ── upsertHistoricalStats ───────────────────────────────────
-
-    public function testUpsertHistoricalStatsInsertsNewRow(): void
-    {
-        $this->insertTestPlayer(200130003, 'PLR Hist Plyr');
-        $data = $this->buildHistData(200130003, 'PLR Hist Plyr', 2099);
-
-        $affected = $this->repo->upsertHistoricalStats($data);
-
-        self::assertGreaterThanOrEqual(1, $affected);
-
-        $stmt = $this->db->prepare('SELECT pts, games, team FROM ibl_hist WHERE pid = ? AND year = ?');
-        self::assertNotFalse($stmt);
-        $stmt->bind_param('ii', $pid, $year);
-        $pid = 200130003;
-        $year = 2099;
-        $stmt->execute();
-        $row = $stmt->get_result()->fetch_assoc();
-        $stmt->close();
-
-        self::assertNotNull($row);
-        self::assertSame(750, $row['pts']);
-        self::assertSame(50, $row['games']);
-        self::assertSame('Metros', $row['team']);
-    }
-
-    public function testUpsertHistoricalStatsUpdatesOnDuplicateKey(): void
-    {
-        $this->insertTestPlayer(200130004, 'PLR Hist Upd');
-        $data = $this->buildHistData(200130004, 'PLR Hist Upd', 2099);
-        $this->repo->upsertHistoricalStats($data);
-
-        // Same pid+name+year, different pts
-        $data2 = $this->buildHistData(200130004, 'PLR Hist Upd', 2099, ['seasonPTS' => 1200]);
-        $this->repo->upsertHistoricalStats($data2);
-
-        $stmt = $this->db->prepare('SELECT pts FROM ibl_hist WHERE pid = ? AND year = ?');
-        self::assertNotFalse($stmt);
-        $stmt->bind_param('ii', $pid, $year);
-        $pid = 200130004;
-        $year = 2099;
-        $stmt->execute();
-        $row = $stmt->get_result()->fetch_assoc();
-        $stmt->close();
-
-        self::assertNotNull($row);
-        self::assertSame(1200, $row['pts']);
     }
 
     // ── Data builders ───────────────────────────────────────────
@@ -175,38 +126,4 @@ class PlrParserRepositoryTest extends DatabaseTestCase
         return array_merge($defaults, $overrides);
     }
 
-    /**
-     * Build a complete 42-field data array for upsertHistoricalStats().
-     *
-     * @param array<string, int|string> $overrides
-     * @return array<string, int|string>
-     */
-    private function buildHistData(int $pid, string $name, int $year, array $overrides = []): array
-    {
-        $defaults = [
-            'pid' => $pid, 'name' => $name, 'year' => $year,
-            'team' => 'Metros', 'tid' => 1,
-            'seasonGamesPlayed' => 50, 'seasonMIN' => 1600,
-            'seasonFGM' => 300, 'seasonFGA' => 600,
-            'seasonFTM' => 100, 'seasonFTA' => 120,
-            'season3GM' => 50, 'season3GA' => 130,
-            'seasonORB' => 40, 'seasonREB' => 200,
-            'seasonAST' => 150, 'seasonSTL' => 50,
-            'seasonBLK' => 20, 'seasonTVR' => 80,
-            'seasonPF' => 100, 'seasonPTS' => 750,
-            'rating2GA' => 50, 'rating2GP' => 50,
-            'ratingFTA' => 50, 'ratingFTP' => 50,
-            'rating3GA' => 50, 'rating3GP' => 50,
-            'ratingORB' => 50, 'ratingDRB' => 50,
-            'ratingAST' => 50, 'ratingSTL' => 50,
-            'ratingBLK' => 50, 'ratingTVR' => 50,
-            'ratingOO' => 50, 'ratingOD' => 50,
-            'ratingDO' => 50, 'ratingDD' => 50,
-            'ratingPO' => 50, 'ratingPD' => 50,
-            'ratingTO' => 50, 'ratingTD' => 50,
-            'currentSeasonSalary' => 1500,
-        ];
-
-        return array_merge($defaults, $overrides);
-    }
 }

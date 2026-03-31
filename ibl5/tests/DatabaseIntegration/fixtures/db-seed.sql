@@ -179,8 +179,9 @@ INSERT INTO ibl_gm_tenures (franchise_id, gm_username, start_season_year, end_se
 VALUES (1, 'testgm', 2020, NULL, 0, 0)
 ON DUPLICATE KEY UPDATE gm_username = VALUES(gm_username);
 
--- Historical player stats (ibl_hist) for franchise history queries
-INSERT INTO ibl_hist (pid, name, year, team, teamid, games, minutes, fgm, fga, ftm, fta, tgm, tga, orb, reb, ast, stl, blk, tvr, pf, pts, salary)
+-- Historical player stats (ibl_hist_archive) for franchise history queries
+-- ibl_hist is now a VIEW; the archive table's UNION ALL fallback makes these rows visible.
+INSERT INTO ibl_hist_archive (pid, name, year, team, teamid, games, minutes, fgm, fga, ftm, fta, tgm, tga, orb, reb, ast, stl, blk, tvr, pf, pts, salary)
 VALUES (1, 'Test Player One', 2024, 'Metros', 1, 50, 1600, 300, 600, 100, 120, 50, 130, 40, 200, 150, 50, 20, 80, 100, 750, 1500)
 ON DUPLICATE KEY UPDATE games = VALUES(games);
 

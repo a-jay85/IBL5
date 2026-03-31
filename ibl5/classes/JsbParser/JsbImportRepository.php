@@ -106,59 +106,6 @@ class JsbImportRepository extends \BaseMysqliRepository implements JsbImportRepo
     private array $teamIdCache = [];
 
     /**
-     * @see JsbImportRepositoryInterface::upsertHistRecord()
-     */
-    public function upsertHistRecord(array $record): int
-    {
-        return $this->execute(
-            "INSERT INTO {$this->histTable}
-                (pid, name, year, team, teamid, games, minutes, fgm, fga, ftm, fta, tgm, tga, orb, reb, ast, stl, blk, tvr, pf, pts)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            ON DUPLICATE KEY UPDATE
-                team = VALUES(team),
-                teamid = VALUES(teamid),
-                games = VALUES(games),
-                minutes = VALUES(minutes),
-                fgm = VALUES(fgm),
-                fga = VALUES(fga),
-                ftm = VALUES(ftm),
-                fta = VALUES(fta),
-                tgm = VALUES(tgm),
-                tga = VALUES(tga),
-                orb = VALUES(orb),
-                reb = VALUES(reb),
-                ast = VALUES(ast),
-                stl = VALUES(stl),
-                blk = VALUES(blk),
-                tvr = VALUES(tvr),
-                pf = VALUES(pf),
-                pts = VALUES(pts)",
-            'isisiiiiiiiiiiiiiiiii',
-            $record['pid'],
-            $record['name'],
-            $record['year'],
-            $record['team'],
-            $record['teamid'],
-            $record['games'],
-            $record['minutes'],
-            $record['fgm'],
-            $record['fga'],
-            $record['ftm'],
-            $record['fta'],
-            $record['tgm'],
-            $record['tga'],
-            $record['orb'],
-            $record['reb'],
-            $record['ast'],
-            $record['stl'],
-            $record['blk'],
-            $record['tvr'],
-            $record['pf'],
-            $record['pts']
-        );
-    }
-
-    /**
      * @see JsbImportRepositoryInterface::upsertTransaction()
      */
     public function upsertTransaction(array $record): int

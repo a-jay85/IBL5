@@ -16,14 +16,12 @@ use PlrParser\Contracts\PlrParserRepositoryInterface;
 class PlrParserRepository extends \BaseMysqliRepository implements PlrParserRepositoryInterface
 {
     private string $plrTable;
-    private string $histTable;
     private string $snapshotsTable;
 
     public function __construct(\mysqli $db, ?LeagueContext $leagueContext = null)
     {
         parent::__construct($db, $leagueContext);
         $this->plrTable = $this->resolveTable('ibl_plr');
-        $this->histTable = $this->resolveTable('ibl_hist');
         $this->snapshotsTable = $this->resolveTable('ibl_plr_snapshots');
     }
 
@@ -349,127 +347,6 @@ class PlrParserRepository extends \BaseMysqliRepository implements PlrParserRepo
             (int) $data['draftYear'],
             0, // retired
             (int) $data['ratingFOUL'],
-        );
-    }
-
-    /**
-     * @see PlrParserRepositoryInterface::upsertHistoricalStats()
-     *
-     * @param array<string, int|string|float> $data
-     */
-    public function upsertHistoricalStats(array $data): int
-    {
-        $query = "INSERT INTO {$this->histTable}
-            (`pid`, `name`, `year`, `team`, `teamid`,
-             `games`, `minutes`, `fgm`, `fga`, `ftm`, `fta`, `tgm`, `tga`,
-             `orb`, `reb`, `ast`, `stl`, `blk`, `tvr`, `pf`, `pts`,
-             `r_2ga`, `r_2gp`, `r_fta`, `r_ftp`, `r_3ga`, `r_3gp`,
-             `r_orb`, `r_drb`, `r_ast`, `r_stl`, `r_blk`, `r_tvr`,
-             `r_oo`, `r_od`, `r_do`, `r_dd`, `r_po`, `r_pd`, `r_to`, `r_td`,
-             `salary`)
-        VALUES
-            (?, ?, ?, ?, ?,
-             ?, ?, ?, ?, ?, ?, ?, ?,
-             ?, ?, ?, ?, ?, ?, ?, ?,
-             ?, ?, ?, ?, ?, ?,
-             ?, ?, ?, ?, ?, ?,
-             ?, ?, ?, ?, ?, ?, ?, ?,
-             ?)
-        ON DUPLICATE KEY UPDATE
-            `team` = VALUES(`team`),
-            `teamid` = VALUES(`teamid`),
-            `games` = VALUES(`games`),
-            `minutes` = VALUES(`minutes`),
-            `fgm` = VALUES(`fgm`),
-            `fga` = VALUES(`fga`),
-            `ftm` = VALUES(`ftm`),
-            `fta` = VALUES(`fta`),
-            `tgm` = VALUES(`tgm`),
-            `tga` = VALUES(`tga`),
-            `orb` = VALUES(`orb`),
-            `reb` = VALUES(`reb`),
-            `ast` = VALUES(`ast`),
-            `stl` = VALUES(`stl`),
-            `blk` = VALUES(`blk`),
-            `tvr` = VALUES(`tvr`),
-            `pf` = VALUES(`pf`),
-            `pts` = VALUES(`pts`),
-            `r_2ga` = VALUES(`r_2ga`),
-            `r_2gp` = VALUES(`r_2gp`),
-            `r_fta` = VALUES(`r_fta`),
-            `r_ftp` = VALUES(`r_ftp`),
-            `r_3ga` = VALUES(`r_3ga`),
-            `r_3gp` = VALUES(`r_3gp`),
-            `r_orb` = VALUES(`r_orb`),
-            `r_drb` = VALUES(`r_drb`),
-            `r_ast` = VALUES(`r_ast`),
-            `r_stl` = VALUES(`r_stl`),
-            `r_blk` = VALUES(`r_blk`),
-            `r_tvr` = VALUES(`r_tvr`),
-            `r_oo` = VALUES(`r_oo`),
-            `r_od` = VALUES(`r_od`),
-            `r_do` = VALUES(`r_do`),
-            `r_dd` = VALUES(`r_dd`),
-            `r_po` = VALUES(`r_po`),
-            `r_pd` = VALUES(`r_pd`),
-            `r_to` = VALUES(`r_to`),
-            `r_td` = VALUES(`r_td`),
-            `salary` = VALUES(`salary`)";
-
-        // 42 params: pid(i) name(s) year(i) team(s) teamid(i) + 37 ints
-        $types = 'isisi'     // pid, name, year, team, teamid
-            . 'iiiiiiii'     // games, minutes, fgm, fga, ftm, fta, tgm, tga (8)
-            . 'iiiiiiii'     // orb, reb, ast, stl, blk, tvr, pf, pts (8)
-            . 'iiiiii'       // r_2ga..r_3gp
-            . 'iiiiii'       // r_orb..r_tvr
-            . 'iiiiiiii'     // r_oo..r_td
-            . 'i';           // salary
-
-        return $this->execute(
-            $query,
-            $types,
-            (int) $data['pid'],
-            (string) $data['name'],
-            (int) $data['year'],
-            (string) $data['team'],
-            (int) $data['tid'],
-            (int) $data['seasonGamesPlayed'],
-            (int) $data['seasonMIN'],
-            (int) $data['seasonFGM'],
-            (int) $data['seasonFGA'],
-            (int) $data['seasonFTM'],
-            (int) $data['seasonFTA'],
-            (int) $data['season3GM'],
-            (int) $data['season3GA'],
-            (int) $data['seasonORB'],
-            (int) $data['seasonREB'],
-            (int) $data['seasonAST'],
-            (int) $data['seasonSTL'],
-            (int) $data['seasonBLK'],
-            (int) $data['seasonTVR'],
-            (int) $data['seasonPF'],
-            (int) $data['seasonPTS'],
-            (int) $data['rating2GA'],
-            (int) $data['rating2GP'],
-            (int) $data['ratingFTA'],
-            (int) $data['ratingFTP'],
-            (int) $data['rating3GA'],
-            (int) $data['rating3GP'],
-            (int) $data['ratingORB'],
-            (int) $data['ratingDRB'],
-            (int) $data['ratingAST'],
-            (int) $data['ratingSTL'],
-            (int) $data['ratingBLK'],
-            (int) $data['ratingTVR'],
-            (int) $data['ratingOO'],
-            (int) $data['ratingOD'],
-            (int) $data['ratingDO'],
-            (int) $data['ratingDD'],
-            (int) $data['ratingPO'],
-            (int) $data['ratingPD'],
-            (int) $data['ratingTO'],
-            (int) $data['ratingTD'],
-            (int) $data['currentSeasonSalary'],
         );
     }
 

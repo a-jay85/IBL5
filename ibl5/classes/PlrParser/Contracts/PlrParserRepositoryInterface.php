@@ -18,14 +18,6 @@ interface PlrParserRepositoryInterface
     public function upsertPlayer(array $data): int;
 
     /**
-     * Upsert a historical stats record into ibl_hist.
-     *
-     * @param array<string, int|string|float> $data Column-value pairs for historical stats
-     * @return int Number of affected rows
-     */
-    public function upsertHistoricalStats(array $data): int;
-
-    /**
      * Upsert a player rating snapshot into ibl_plr_snapshots.
      *
      * @param array<string, int|string> $data Column-value pairs for the snapshot

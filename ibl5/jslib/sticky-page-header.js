@@ -153,6 +153,18 @@
 
   window.IBL_refreshStickyPageHeaders = init;
 
+  // Clean up clones before HTMX snapshots the page for history cache —
+  // otherwise the clone HTML is saved in the snapshot and becomes an
+  // orphan (no scroll listeners) when the page is restored via Back.
+  document.addEventListener('htmx:beforeHistorySave', function () {
+    teardown();
+  });
+
+  // Re-initialize after bfcache restore (non-HTMX back/forward navigation).
+  window.addEventListener('pageshow', function (evt) {
+    if (evt.persisted) init();
+  });
+
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', init);
   } else {

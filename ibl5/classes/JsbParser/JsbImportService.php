@@ -12,7 +12,7 @@ use Season\Season;
  * Orchestrator service for JSB file parsing and database import.
  *
  * Coordinates parsing of .car, .trn, .his, and .asw files, resolves player/team IDs,
- * and stores results in the database. Handles stat conversion for ibl_hist compatibility.
+ * and stores results in the database. Season stats flow from ibl_box_scores via the ibl_hist VIEW.
  */
 class JsbImportService implements JsbImportServiceInterface
 {

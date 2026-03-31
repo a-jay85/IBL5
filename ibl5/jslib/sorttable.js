@@ -47,7 +47,8 @@ window.sorttable = {
       }
     }
 
-    var headerCells = table.tHead.rows[0].cells;
+    var headerRow = table.tHead.rows[table.tHead.rows.length - 1];
+    var headerCells = headerRow.cells;
     for (var i = 0; i < headerCells.length; i++) {
       var th = headerCells[i];
       th.setAttribute('role', 'columnheader');

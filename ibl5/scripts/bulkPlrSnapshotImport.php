@@ -9,6 +9,10 @@ declare(strict_types=1);
  * snapshots in ibl_plr_snapshots. Each snapshot captures ratings, contract
  * state, and identity at a specific point in the season.
  *
+ * Environment auto-detection:
+ *   - fullLeagueBackups/backups/ exists → local mode (archives from dev extraction)
+ *   - backups/ exists                   → production mode (zip archives on server)
+ *
  * Usage:
  *   php bulkPlrSnapshotImport.php                           # All seasons
  *   php bulkPlrSnapshotImport.php --dry-run                 # List archives to process
@@ -66,12 +70,25 @@ foreach ($argv as $arg) {
     }
 }
 
-// ── Scan backups directory ──────────────────────────────────────────────────
-$backupsDir = dirname(__DIR__) . '/fullLeagueBackups/backups';
-if (!is_dir($backupsDir)) {
-    echo "Backups directory not found at: {$backupsDir}\n";
+// ── Environment auto-detection ──────────────────────────────────────────────
+// Local dev: fullLeagueBackups/backups/ has season subdirs with archives
+// Production: backups/ has season subdirs with archives (same structure)
+$localDir = dirname(__DIR__) . '/fullLeagueBackups/backups';
+$prodDir  = dirname(__DIR__) . '/backups';
+
+if (is_dir($localDir)) {
+    $backupsDir = $localDir;
+    $mode = 'local';
+} elseif (is_dir($prodDir)) {
+    $backupsDir = $prodDir;
+    $mode = 'production';
+} else {
+    echo "No backup directory found.\n";
+    echo "  Expected: fullLeagueBackups/backups/ (local) or backups/ (production)\n";
     exit(1);
 }
+
+echo sprintf("Mode: %s (source: %s)\n", $mode, $backupsDir);
 
 $extractor = new BulkImport\ArchiveExtractor();
 

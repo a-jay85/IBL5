@@ -1,0 +1,114 @@
+#!/bin/bash
+# Outputs files edited by this Claude Code instance that have actual git changes.
+# Uses /tmp/claude-edited-files-$PPID.txt written by PostToolUse hook.
+#
+# Usage:
+#   bin/tracked-files [--ppid <pid>] [--warnings]
+#
+# --ppid <pid>   Override the process ID (default: $PPID)
+# --warnings     Print only warnings to stdout (for separate capture)
+#
+# Normal mode: tracked files to stdout, warnings to stderr
+# --warnings mode: warnings to stdout, no file list
+
+set -euo pipefail
+
+PID="$PPID"
+WARNINGS_ONLY=false
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --ppid) PID="$2"; shift 2 ;;
+    --warnings) WARNINGS_ONLY=true; shift ;;
+    *) shift ;;
+  esac
+done
+
+TRACKING="/tmp/claude-edited-files-${PID}.txt"
+GIT_ROOT=$(git rev-parse --show-toplevel 2>/dev/null) || { echo "Not in a git repository" >&2; exit 1; }
+BRANCH=$(git branch --show-current 2>/dev/null || echo "detached")
+
+warn() {
+  if $WARNINGS_ONLY; then
+    echo "WARNING: $1"
+  else
+    echo "WARNING: $1" >&2
+  fi
+}
+
+# Check: on master in main repo?
+if [[ "$BRANCH" == "master" && "$GIT_ROOT" != */worktrees/* ]]; then
+  warn "On master branch in main repo. Consider creating a worktree: bin/wt-new <name>"
+fi
+
+# No tracking file = no tracked edits
+if [ ! -f "$TRACKING" ]; then
+  warn "No tracking file found for PID $PID"
+  exit 0
+fi
+
+# Get all files with actual git changes (unstaged + staged + untracked new)
+CHANGED=$(
+  git diff --name-only HEAD 2>/dev/null
+  git diff --name-only --cached 2>/dev/null
+  git ls-files --others --exclude-standard 2>/dev/null
+)
+CHANGED_SORTED=$(echo "$CHANGED" | sort -u)
+
+# Read tracking file, convert to relative paths, dedupe, intersect with changed
+TRACKED_REL=()
+MISMATCHED=()
+
+while IFS= read -r abs_path; do
+  [ -z "$abs_path" ] && continue
+  # Convert absolute path to relative
+  rel="${abs_path#"$GIT_ROOT/"}"
+  # If the path didn't change, it's outside this git root
+  if [[ "$rel" == "$abs_path" ]]; then
+    MISMATCHED+=("$abs_path")
+    continue
+  fi
+  TRACKED_REL+=("$rel")
+done < <(sort -u "$TRACKING")
+
+# Warn about files belonging to a different git root
+if [ ${#MISMATCHED[@]} -gt 0 ]; then
+  warn "Wrong directory? These tracked files don't belong to $GIT_ROOT:"
+  for f in "${MISMATCHED[@]}"; do
+    warn "  $f"
+  done
+fi
+
+# Write tracked relative paths to a temp file for grep matching
+TRACKED_TMP=$(mktemp)
+printf '%s\n' "${TRACKED_REL[@]+"${TRACKED_REL[@]}"}" | sort -u > "$TRACKED_TMP"
+
+# Find intersection: tracked AND changed
+COMMITTED_FILES=()
+SKIPPED_CHANGES=()
+
+while IFS= read -r rel; do
+  [ -z "$rel" ] && continue
+  if grep -qxF "$rel" "$TRACKED_TMP" 2>/dev/null; then
+    COMMITTED_FILES+=("$rel")
+  else
+    SKIPPED_CHANGES+=("$rel")
+  fi
+done <<< "$CHANGED_SORTED"
+
+rm -f "$TRACKED_TMP"
+
+# Warn about changes not tracked by this instance
+if [ ${#SKIPPED_CHANGES[@]} -gt 0 ]; then
+  warn "Changed files NOT tracked by this instance (another instance or manual edit):"
+  for f in "${SKIPPED_CHANGES[@]}"; do
+    warn "  $f"
+  done
+fi
+
+# Output the files to commit
+if ! $WARNINGS_ONLY; then
+  for f in "${COMMITTED_FILES[@]+"${COMMITTED_FILES[@]}"}"; do
+    echo "$f"
+  done
+fi

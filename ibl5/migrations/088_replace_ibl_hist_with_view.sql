@@ -18,8 +18,8 @@ SELECT
   stats.pid,
   p.name,
   stats.season_year                                        AS `year`,
-  COALESCE(snap.tid, 0)                                    AS teamid,
-  COALESCE(fs.team_name, '')                               AS team,
+  COALESCE(snap.tid, p.tid, 0)                             AS teamid,
+  COALESCE(fs.team_name, fs_fallback.team_name, '')        AS team,
   stats.games,
   stats.minutes,
   stats.fgm,
@@ -110,6 +110,9 @@ LEFT JOIN ibl_plr_snapshots snap
 LEFT JOIN ibl_franchise_seasons fs
   ON snap.tid = fs.franchise_id
   AND stats.season_year = fs.season_ending_year
+LEFT JOIN ibl_franchise_seasons fs_fallback
+  ON p.tid = fs_fallback.franchise_id
+  AND stats.season_year = fs_fallback.season_ending_year
 
 UNION ALL
 

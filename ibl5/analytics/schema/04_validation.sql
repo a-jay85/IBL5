@@ -160,16 +160,20 @@ FROM (
     WHERE s.season_year IS NULL
 );
 
--- PLR heat-end and end-of-season counts should match (zero drift confirmed)
+-- PLR snapshot phase coverage: each season should have at least one HEAT-phase snapshot
 SELECT
-    CASE WHEN ABS(cnt_heat - cnt_eos) = 0 THEN 'PASS' ELSE 'WARN' END AS status,
-    'PLR heat-end and end-of-season counts match' AS assertion,
-    ABS(cnt_heat - cnt_eos) AS value
+    CASE WHEN cnt = 0 THEN 'PASS' ELSE 'WARN' END AS status,
+    'All seasons have HEAT-phase PLR snapshots' AS assertion,
+    cnt AS value
 FROM (
-    SELECT
-        SUM(CASE WHEN snapshot_phase = 'heat-end'      THEN 1 ELSE 0 END) AS cnt_heat,
-        SUM(CASE WHEN snapshot_phase = 'end-of-season' THEN 1 ELSE 0 END) AS cnt_eos
-    FROM fact_plr_snapshots
+    SELECT COUNT(*) AS cnt
+    FROM dim_season ds
+    LEFT JOIN (
+        SELECT DISTINCT season_year
+        FROM fact_plr_snapshots
+        WHERE snapshot_phase IN ('heat-end', 'heat-finals', 'post-heat', 'heat-wb', 'heat-lb')
+    ) h ON ds.season_year = h.season_year
+    WHERE h.season_year IS NULL
 );
 
 -- DC settings sanity: dc_minutes should be 0-40

@@ -286,6 +286,91 @@ final class ArchiveExtractorTest extends TestCase
         }
     }
 
+    // ── findAllArchives ──────────────────────────────────────────────────────
+
+    public function testFindAllArchivesReturnsSortedBySequence(): void
+    {
+        $tmpDir = sys_get_temp_dir() . '/ibl5_findall_test_' . uniqid();
+        mkdir($tmpDir, 0755, true);
+
+        try {
+            // Create archives out of order
+            foreach ([
+                '00-01_15_reg-sim10.zip',
+                '00-01_06_reg-sim01.zip',
+                '00-01_33_finals.zip',
+                '00-01_05_heat-end.zip',
+            ] as $name) {
+                $zip = new ZipArchive();
+                $zip->open($tmpDir . '/' . $name, ZipArchive::CREATE);
+                $zip->addFromString('dummy', '');
+                $zip->close();
+            }
+
+            $result = $this->extractor->findAllArchives($tmpDir);
+
+            self::assertCount(4, $result);
+            // Verify sorted by sequence
+            self::assertSame(5, $result[0]['seq']);
+            self::assertSame('heat-end', $result[0]['phase']);
+            self::assertSame(6, $result[1]['seq']);
+            self::assertSame(15, $result[2]['seq']);
+            self::assertSame(33, $result[3]['seq']);
+            self::assertSame('finals', $result[3]['phase']);
+            // Verify all required keys present
+            self::assertSame('00-01', $result[0]['season']);
+            self::assertSame(2001, $result[0]['ending_year']);
+            self::assertStringEndsWith('00-01_05_heat-end.zip', $result[0]['path']);
+        } finally {
+            array_map('unlink', glob($tmpDir . '/*') ?: []);
+            rmdir($tmpDir);
+        }
+    }
+
+    public function testFindAllArchivesSkipsUnparseableNames(): void
+    {
+        $tmpDir = sys_get_temp_dir() . '/ibl5_findall_skip_' . uniqid();
+        mkdir($tmpDir, 0755, true);
+
+        try {
+            foreach ([
+                '00-01_06_reg-sim01.zip',
+                'IBL5HEAT00RR1.zip',       // Unparseable
+                'random.zip',               // Unparseable
+            ] as $name) {
+                $zip = new ZipArchive();
+                $zip->open($tmpDir . '/' . $name, ZipArchive::CREATE);
+                $zip->addFromString('dummy', '');
+                $zip->close();
+            }
+
+            $result = $this->extractor->findAllArchives($tmpDir);
+
+            self::assertCount(1, $result);
+            self::assertSame('reg-sim01', $result[0]['phase']);
+        } finally {
+            array_map('unlink', glob($tmpDir . '/*') ?: []);
+            rmdir($tmpDir);
+        }
+    }
+
+    public function testFindAllArchivesReturnsEmptyForEmptyDir(): void
+    {
+        $tmpDir = sys_get_temp_dir() . '/ibl5_findall_empty_' . uniqid();
+        mkdir($tmpDir, 0755, true);
+
+        try {
+            self::assertSame([], $this->extractor->findAllArchives($tmpDir));
+        } finally {
+            rmdir($tmpDir);
+        }
+    }
+
+    public function testFindAllArchivesReturnsEmptyForNonexistentDir(): void
+    {
+        self::assertSame([], $this->extractor->findAllArchives('/tmp/does_not_exist_' . uniqid()));
+    }
+
     // ── jsbFilename ─────────────────────────────────────────────────────────
 
     public function testJsbFilename(): void

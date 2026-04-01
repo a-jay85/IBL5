@@ -25,8 +25,13 @@ WITH player_year AS (
         COALESCE(s.peak, p.peak) AS peak
     FROM fact_player_season f
     LEFT JOIN dim_player p ON f.pid = p.pid
-    LEFT JOIN fact_plr_snapshots s ON f.pid = s.pid AND f.season_year = s.season_year
-        AND s.snapshot_phase = 'heat-end'
+    LEFT JOIN (
+        SELECT * FROM fact_plr_snapshots
+        WHERE snapshot_phase IN ('heat-end', 'heat-finals', 'post-heat', 'heat-wb', 'heat-lb')
+        QUALIFY ROW_NUMBER() OVER (PARTITION BY pid, season_year ORDER BY
+            CASE snapshot_phase WHEN 'heat-end' THEN 1 WHEN 'heat-finals' THEN 2
+            WHEN 'post-heat' THEN 3 WHEN 'heat-wb' THEN 4 WHEN 'heat-lb' THEN 5 END) = 1
+    ) s ON f.pid = s.pid AND f.season_year = s.season_year
     WHERE f.games > 0 AND f.r_2gp BETWEEN 40 AND 55
 ),
 deltas AS (
@@ -93,8 +98,13 @@ WITH deltas AS (
     FROM fact_player_season curr
     JOIN fact_player_season prev ON curr.pid = prev.pid AND curr.season_year = prev.season_year + 1
     LEFT JOIN dim_player p ON curr.pid = p.pid
-    LEFT JOIN fact_plr_snapshots s ON curr.pid = s.pid AND curr.season_year = s.season_year
-        AND s.snapshot_phase = 'heat-end'
+    LEFT JOIN (
+        SELECT * FROM fact_plr_snapshots
+        WHERE snapshot_phase IN ('heat-end', 'heat-finals', 'post-heat', 'heat-wb', 'heat-lb')
+        QUALIFY ROW_NUMBER() OVER (PARTITION BY pid, season_year ORDER BY
+            CASE snapshot_phase WHEN 'heat-end' THEN 1 WHEN 'heat-finals' THEN 2
+            WHEN 'post-heat' THEN 3 WHEN 'heat-wb' THEN 4 WHEN 'heat-lb' THEN 5 END) = 1
+    ) s ON curr.pid = s.pid AND curr.season_year = s.season_year
     WHERE curr.games > 0 AND prev.games > 0
       AND curr.r_2gp BETWEEN 40 AND 55
       AND COALESCE(s.peak, p.peak) IS NOT NULL AND COALESCE(s.peak, p.peak) > 0

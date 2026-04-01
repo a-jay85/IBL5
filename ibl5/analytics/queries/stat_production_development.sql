@@ -38,8 +38,12 @@ rating_deltas AS (
     JOIN fact_plr_snapshots next
         ON curr.pid = next.pid
         AND next.season_year = curr.season_year + 1
-    WHERE curr.snapshot_phase = 'heat-end'
-      AND next.snapshot_phase = 'heat-end'
+    WHERE curr.snapshot_phase IN ('heat-end', 'heat-finals', 'post-heat', 'heat-wb', 'heat-lb')
+      AND next.snapshot_phase IN ('heat-end', 'heat-finals', 'post-heat', 'heat-wb', 'heat-lb')
+    QUALIFY ROW_NUMBER() OVER (PARTITION BY curr.pid, curr.season_year ORDER BY
+        CASE curr.snapshot_phase WHEN 'heat-end' THEN 1 WHEN 'heat-finals' THEN 2 WHEN 'post-heat' THEN 3 WHEN 'heat-wb' THEN 4 WHEN 'heat-lb' THEN 5 END,
+        CASE next.snapshot_phase WHEN 'heat-end' THEN 1 WHEN 'heat-finals' THEN 2 WHEN 'post-heat' THEN 3 WHEN 'heat-wb' THEN 4 WHEN 'heat-lb' THEN 5 END
+    ) = 1
 )
 SELECT
     ss.primary_dc_bh AS dc_bh,
@@ -83,7 +87,12 @@ rating_deltas AS (
     FROM fact_plr_snapshots curr
     JOIN fact_plr_snapshots next
         ON curr.pid = next.pid AND next.season_year = curr.season_year + 1
-    WHERE curr.snapshot_phase = 'heat-end' AND next.snapshot_phase = 'heat-end'
+    WHERE curr.snapshot_phase IN ('heat-end', 'heat-finals', 'post-heat', 'heat-wb', 'heat-lb')
+      AND next.snapshot_phase IN ('heat-end', 'heat-finals', 'post-heat', 'heat-wb', 'heat-lb')
+    QUALIFY ROW_NUMBER() OVER (PARTITION BY curr.pid, curr.season_year ORDER BY
+        CASE curr.snapshot_phase WHEN 'heat-end' THEN 1 WHEN 'heat-finals' THEN 2 WHEN 'post-heat' THEN 3 WHEN 'heat-wb' THEN 4 WHEN 'heat-lb' THEN 5 END,
+        CASE next.snapshot_phase WHEN 'heat-end' THEN 1 WHEN 'heat-finals' THEN 2 WHEN 'post-heat' THEN 3 WHEN 'heat-wb' THEN 4 WHEN 'heat-lb' THEN 5 END
+    ) = 1
 )
 SELECT
     ss.primary_dc_oi AS dc_oi,

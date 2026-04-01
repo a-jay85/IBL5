@@ -422,6 +422,8 @@ class PlrParserServiceTest extends TestCase
             'realLifeTVR' => 150,
             'realLifeBLK' => 30,
             'realLifePF' => 100,
+            'unk_112' => 0, 'unk_114' => 0, 'unk_116' => 0, 'unk_118' => 0,
+            'unk_120' => 0, 'unk_122' => 0, 'unk_124' => 0, 'unk_126' => 0,
             'clutch' => 50,
             'consistency' => 50,
             'PGDepth' => 1,
@@ -430,6 +432,7 @@ class PlrParserServiceTest extends TestCase
             'PFDepth' => 0,
             'CDepth' => 0,
             'canPlayInGame' => 1,
+            'unk_138' => 0,
             'injuryDaysLeft' => 0,
             'seasonGamesStarted' => 40,
             'seasonGamesPlayed' => 40,
@@ -447,6 +450,14 @@ class PlrParserServiceTest extends TestCase
             'seasonTVR' => 75,
             'seasonBLK' => 15,
             'seasonPF' => 50,
+            'playoffSeasonGP' => 0, 'playoffSeasonMIN' => 0,
+            'playoffSeason2GM' => 0, 'playoffSeason2GA' => 0,
+            'playoffSeasonFTM' => 0, 'playoffSeasonFTA' => 0,
+            'playoffSeason3GM' => 0, 'playoffSeason3GA' => 0,
+            'playoffSeasonORB' => 0, 'playoffSeasonDRB' => 0,
+            'playoffSeasonAST' => 0, 'playoffSeasonSTL' => 0,
+            'playoffSeasonTVR' => 0, 'playoffSeasonBLK' => 0,
+            'playoffSeasonPF' => 0,
             'talent' => 50,
             'skill' => 50,
             'intangibles' => 50,
@@ -460,15 +471,18 @@ class PlrParserServiceTest extends TestCase
             'bird' => 3,
             'currentContractYear' => 2,
             'totalContractYears' => 4,
+            'unk_294' => 0, 'unk_296' => 0,
             'contractYear1' => 500,
             'contractYear2' => 550,
             'contractYear3' => 600,
             'contractYear4' => 650,
             'contractYear5' => 0,
             'contractYear6' => 0,
+            'unk_322' => 0, 'unk_324' => 0,
             'draftRound' => 1,
             'draftPickNumber' => 15,
             'freeAgentSigningFlag' => 0,
+            'unk_331' => 0, 'unk_333' => 0, 'unk_335' => 0, 'unk_337' => 0, 'unk_339' => 0,
             'seasonHighPTS' => 35,
             'seasonHighREB' => 12,
             'seasonHighAST' => 10,
@@ -508,6 +522,11 @@ class PlrParserServiceTest extends TestCase
             'careerTVR' => 750,
             'careerBLK' => 150,
             'careerPF' => 600,
+            'unk_512' => 0, 'unk_514' => 0, 'unk_516' => 0, 'unk_518' => 0,
+            'unk_520' => 0, 'unk_522' => 0, 'unk_524' => 0, 'unk_526' => 0,
+            'unk_528' => 0, 'unk_530' => 0, 'unk_532' => 0, 'unk_534' => 0,
+            'unk_536' => 0, 'unk_538' => 0, 'unk_540' => 0, 'unk_542' => 0,
+            'unk_544' => 0, 'unk_546' => 0, 'unk_548' => 0,
             'heightInches' => 75,
             'weight' => 195,
             'rating2GA' => 500,
@@ -591,6 +610,53 @@ class PlrParserServiceTest extends TestCase
         $mockRepo = $this->createMock(PlrParserRepositoryInterface::class);
         $mockRepo->expects($this->once())->method('upsertSnapshot');
         $mockRepo->expects($this->never())->method('upsertPlayer');
+
+        $service = new PlrParserService($mockRepo, $this->stubCommonRepo, $this->stubSeason);
+        $result = $service->processPlrFileForYear(
+            $tmpFile,
+            2001,
+            PlrImportMode::Snapshot,
+            'end-of-season',
+            '00-01_36_finals',
+        );
+
+        $this->assertSame(1, $result->playersUpserted);
+        unlink($tmpFile);
+    }
+
+    public function testSnapshotDataIncludesAllFieldCategories(): void
+    {
+        $tmpFile = $this->createFullPlrFile();
+
+        /** @var PlrParserRepositoryInterface&\PHPUnit\Framework\MockObject\MockObject $mockRepo */
+        $mockRepo = $this->createMock(PlrParserRepositoryInterface::class);
+        $mockRepo->expects($this->once())
+            ->method('upsertSnapshot')
+            ->with($this->callback(static function (array $data): bool {
+                // Season stats
+                return array_key_exists('stats_gs', $data)
+                    && array_key_exists('stats_pts', $data)
+                    // Playoff stats
+                    && array_key_exists('po_stats_gm', $data)
+                    // Career stats
+                    && array_key_exists('car_gm', $data)
+                    && array_key_exists('car_pts', $data)
+                    // Season highs
+                    && array_key_exists('sh_pts', $data)
+                    // Real-life stats
+                    && array_key_exists('rl_gp', $data)
+                    // Preferences
+                    && array_key_exists('coach', $data)
+                    && array_key_exists('winner', $data)
+                    // Draft info
+                    && array_key_exists('draftround', $data)
+                    // Derived
+                    && array_key_exists('salary', $data)
+                    && array_key_exists('draftyear', $data)
+                    // Unknown gaps
+                    && array_key_exists('unk_112', $data)
+                    && array_key_exists('unk_548', $data);
+            }));
 
         $service = new PlrParserService($mockRepo, $this->stubCommonRepo, $this->stubSeason);
         $result = $service->processPlrFileForYear(

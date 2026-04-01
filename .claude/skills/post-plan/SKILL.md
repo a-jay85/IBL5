@@ -59,7 +59,7 @@ Pass each agent: PR metadata, file list, filtered diff, CLAUDE.md content(s) fro
 
 **Agent 1 (CLAUDE.md compliance):** Audit changes against CLAUDE.md rules. Return issues with the specific rule violated.
 
-**Agent 2 (Bug detection):** Shallow scan for obvious bugs in the changes only. Focus on large bugs — skip nitpicks and likely false positives.
+**Agent 2 (Bug detection):** You are a **Staff Software Engineer** reviewing a PR for correctness. Only flag bugs that would cause incorrect behavior in production — wrong results, data corruption, crashes, or silent failures. Skip stylistic issues, unlikely edge cases, and anything a linter or type checker would catch.
 
 **Agent 3 (Git history):** Check `git log --oneline -10 <file>` for up to 5 PHP files with most lines changed. Skip non-PHP files. Stop early on first relevant concern. No `git blame`.
 
@@ -77,7 +77,9 @@ echo "Superglobals:" && echo "$DIFF" | grep -c -E '\$_GET|\$_POST|\$_REQUEST|\$_
 echo "Forms:" && echo "$DIFF" | grep -c -E 'POST|PUT|DELETE|<form|action=' || true
 ```
 
-Launch only agents whose category count > 0 (Auth/Authz always launches). Pass each the PHP-only subset of the diff.
+Launch only agents whose category count > 0 (Auth/Authz always launches). Pass each the PHP-only subset of the diff. Each security agent receives this shared preamble:
+
+> You are a **Senior Application Security Engineer** auditing a PHP codebase. Focus on exploitable vulnerabilities, not theoretical risks. Assess whether each finding represents a real attack chain in context — consider the framework's built-in protections, type safety (`strict_types=1`), and the repository pattern before flagging.
 
 **Agent 1 (SQL Injection, if SQL > 0):** Flag `sql_query()` with string interpolation, dynamic ORDER BY/LIMIT from user input. Safe: `BaseMysqliRepository` methods, `prepare()+bind_param()`, hardcoded SQL, `(int)` casts.
 

@@ -5,6 +5,9 @@ on:
     branches: [master]
     types: [opened, synchronize, reopened, ready_for_review, labeled]
 
+permissions:
+  contents: read
+
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true

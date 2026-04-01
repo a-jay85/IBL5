@@ -14,15 +14,16 @@ use Season\Season;
  * Extracted from the Team entity class to separate query concerns from entity state.
  *
  * @phpstan-import-type PlayerRow from \Services\CommonMysqliRepository
+ * @phpstan-import-type CashConsiderationRow from \Trading\Contracts\CashConsiderationRepositoryInterface
  * @phpstan-type DraftPickRow array{pickid: int, ownerofpick: string, owner_tid: int, teampick: string, teampick_tid: int, year: string, round: string, notes: ?string, created_at: string, updated_at: string}
  * @phpstan-type FreeAgencyOfferRow array{pid: int, tid: int, team: string, name: string, offer1: int, offer2: int, offer3: int, offer4: int, offer5: int, offer6: int, ...}
  */
 interface TeamQueryRepositoryInterface
 {
     /**
-     * Get buyout players for a team
+     * Get buyout entries for a team from ibl_cash_considerations
      *
-     * @return list<PlayerRow> Array of buyout player rows
+     * @return list<CashConsiderationRow> Array of buyout rows
      */
     public function getBuyouts(int $teamId): array;
 

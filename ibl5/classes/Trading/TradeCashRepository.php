@@ -10,15 +10,13 @@ use Trading\Contracts\TradeCashRepositoryInterface;
 /**
  * TradeCashRepository - Database operations for cash transactions in trades
  *
- * Handles all cash-related database queries including cash transaction records,
- * cash player records, and cash trade offer storage.
+ * Handles all cash-related database queries including cash transaction records
+ * and cash trade offer storage.
  *
  * @see TradeCashRepositoryInterface For method contracts
  * @see BaseMysqliRepository For base class documentation and error codes
  *
  * @phpstan-import-type TradeCashRow from \Trading\Contracts\TradeCashRepositoryInterface
- * @phpstan-import-type CashPlayerData from \Trading\Contracts\TradeCashRepositoryInterface
- * @phpstan-import-type TradingPlayerRow from \Trading\Contracts\TradeCashRepositoryInterface
  */
 class TradeCashRepository extends BaseMysqliRepository implements TradeCashRepositoryInterface
 {
@@ -48,33 +46,6 @@ class TradeCashRepository extends BaseMysqliRepository implements TradeCashRepos
     }
 
     /**
-     * @see TradeCashRepositoryInterface::insertCashPlayerRecord()
-     */
-    public function insertCashPlayerRecord(array $data): int
-    {
-        return $this->execute(
-            "INSERT INTO `ibl_plr`
-                (`ordinal`, `pid`, `name`, `tid`, `exp`, `cy`, `cyt`, `cy1`, `cy2`, `cy3`, `cy4`, `cy5`, `cy6`, `retired`)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-            "iisiiiiiiiiiii",
-            $data['ordinal'],
-            $data['pid'],
-            $data['name'],
-            $data['tid'],
-            $data['exp'],
-            $data['cy'],
-            $data['cyt'],
-            $data['cy1'],
-            $data['cy2'],
-            $data['cy3'],
-            $data['cy4'],
-            $data['cy5'],
-            $data['cy6'],
-            $data['retired']
-        );
-    }
-
-    /**
      * @see TradeCashRepositoryInterface::insertCashTradeOffer()
      */
     public function insertCashTradeOffer(int $tradeOfferId, string $sendingTeam, string $receivingTeam, int $cy1, int $cy2, int $cy3, int $cy4, int $cy5, int $cy6): int
@@ -93,22 +64,6 @@ class TradeCashRepository extends BaseMysqliRepository implements TradeCashRepos
             $cy4,
             $cy5,
             $cy6
-        );
-    }
-
-    /**
-     * @see TradeCashRepositoryInterface::getTeamCashRecordsForSalary()
-     */
-    public function getTeamCashRecordsForSalary(int $teamId): array
-    {
-        /** @var list<TradingPlayerRow> */
-        return $this->fetchAll(
-            "SELECT pos, name, pid, ordinal, cy, cy1, cy2, cy3, cy4, cy5, cy6
-             FROM ibl_plr
-             WHERE tid = ? AND retired = 0 AND name LIKE '|%'
-             ORDER BY ordinal ASC",
-            "i",
-            $teamId
         );
     }
 

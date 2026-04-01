@@ -180,7 +180,6 @@ class League extends BaseMysqliRepository
             FROM ibl_plr
             WHERE ordinal > ?
               AND retired = 0
-              AND name NOT LIKE '%|%'
               AND name != '(no starter)'
             ORDER BY name ASC",
             "i",

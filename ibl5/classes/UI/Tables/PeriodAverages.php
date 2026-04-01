@@ -87,7 +87,6 @@ class PeriodAverages
             AND bs.gameMIN > 0
             AND p.tid = ?
             AND p.retired = 0
-            AND p.name NOT LIKE '%|%'
             {$pidFilterClause}
         GROUP  BY p.name, bs.pos, bs.pid
         ORDER  BY p.name ASC";

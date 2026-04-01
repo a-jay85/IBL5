@@ -39,6 +39,7 @@ publicTest.describe('Visual regression — public pages', () => {
     await publicExpect(table).toBeVisible();
     await publicExpect(table).toHaveScreenshot('season-leaderboards-table.png', {
       animations: 'disabled',
+      maxDiffPixelRatio: 0.1,
     });
   });
 

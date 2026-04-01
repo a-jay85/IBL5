@@ -188,6 +188,11 @@ class TeamTableService implements TeamTableServiceInterface
             case 'playoffs':
                 return \UI\Tables\PeriodAverages::render($this->db, $team, $season, $season->playoffsStartDate, $season->playoffsEndDate, $starterPids);
             case 'contracts':
+                $cashRepo = new \Trading\CashConsiderationRepository($this->db);
+                $cashRows = $cashRepo->getTeamCashConsiderations($team->teamID ?? 0);
+                foreach ($cashRows as $cashRow) {
+                    $result[] = self::cashConsiderationToRosterRow($cashRow);
+                }
                 return \UI\Tables\Contracts::render($this->db, $result, $team, $season, $starterPids);
             case 'split':
                 return $this->renderSplitStats($team, $season, $split ?? 'home', $starterPids);
@@ -295,5 +300,53 @@ class TeamTableService implements TeamTableServiceInterface
         $splitLabel = $splitRepo->getSplitLabel($splitKey);
 
         return \UI\Tables\SplitStats::render($rows, $team, $splitLabel, $starterPids);
+    }
+
+    /**
+     * Convert a cash consideration row to the PlayerRow-compatible format
+     * expected by Contracts::render().
+     *
+     * @param array<string, mixed> $cashRow Row from ibl_cash_considerations
+     * @return array<string, mixed>
+     */
+    public static function cashConsiderationToRosterRow(array $cashRow): array
+    {
+        return [
+            'pid' => 0,
+            'name' => '| ' . (is_string($cashRow['label'] ?? null) ? $cashRow['label'] : ''),
+            'nickname' => '',
+            'ordinal' => 100000,
+            'tid' => $cashRow['tid'] ?? 0,
+            'pos' => '',
+            'age' => null,
+            'peak' => null,
+            'color1' => null,
+            'color2' => null,
+            'oo' => 0, 'od' => 0, 'do' => 0, 'dd' => 0,
+            'po' => 0, 'pd' => 0, 'to' => 0, 'td' => 0,
+            'Clutch' => null, 'Consistency' => null,
+            'talent' => 0, 'skill' => 0, 'intangibles' => 0,
+            'loyalty' => null, 'playingTime' => null, 'winner' => null,
+            'tradition' => null, 'security' => null,
+            'exp' => 1, 'bird' => null,
+            'cy' => $cashRow['cy'] ?? 1,
+            'cyt' => $cashRow['cyt'] ?? 1,
+            'cy1' => $cashRow['cy1'] ?? 0,
+            'cy2' => $cashRow['cy2'] ?? 0,
+            'cy3' => $cashRow['cy3'] ?? 0,
+            'cy4' => $cashRow['cy4'] ?? 0,
+            'cy5' => $cashRow['cy5'] ?? 0,
+            'cy6' => $cashRow['cy6'] ?? 0,
+            'retired' => 0,
+            'droptime' => 0,
+            'injured' => null,
+            'htft' => 0, 'htin' => 0, 'wt' => 0,
+            'draftyear' => 0, 'draftround' => 0, 'draftpickno' => 0,
+            'draftedby' => '', 'draftedbycurrentname' => '', 'college' => '',
+            'r_fga' => 0, 'r_fgp' => 0, 'r_fta' => 0, 'r_ftp' => 0,
+            'r_tga' => 0, 'r_tgp' => 0, 'r_orb' => 0, 'r_drb' => 0,
+            'r_ast' => 0, 'r_stl' => 0, 'r_to' => 0, 'r_blk' => 0, 'r_foul' => 0,
+            'isCashRow' => true,
+        ];
     }
 }

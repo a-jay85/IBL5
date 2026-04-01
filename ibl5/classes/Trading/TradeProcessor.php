@@ -9,6 +9,7 @@ use Trading\Contracts\TradeOfferRepositoryInterface;
 use Trading\Contracts\TradeAssetRepositoryInterface;
 use Trading\Contracts\TradeCashRepositoryInterface;
 use Trading\Contracts\TradeExecutionRepositoryInterface;
+use Trading\Contracts\CashConsiderationRepositoryInterface;
 use Season\Season;
 use Discord\Discord;
 
@@ -31,6 +32,7 @@ class TradeProcessor implements TradeProcessorInterface
     protected TradeOfferRepositoryInterface $offerRepository;
     protected TradeAssetRepositoryInterface $assetRepository;
     protected TradeCashRepositoryInterface $cashRepository;
+    protected CashConsiderationRepositoryInterface $cashConsiderationRepository;
     protected TradeExecutionRepositoryInterface $executionRepository;
     protected \Services\CommonMysqliRepository $commonRepository;
     protected Season $season;
@@ -47,10 +49,11 @@ class TradeProcessor implements TradeProcessorInterface
         $this->offerRepository = $offerRepository ?? new TradeOfferRepository($db);
         $this->assetRepository = $assetRepository ?? new TradeAssetRepository($db);
         $this->cashRepository = new TradeCashRepository($db);
+        $this->cashConsiderationRepository = new CashConsiderationRepository($db);
         $this->executionRepository = new TradeExecutionRepository($db);
         $this->commonRepository = new \Services\CommonMysqliRepository($db);
         $this->season = new Season($db);
-        $this->cashHandler = new CashTransactionHandler($db, $this->assetRepository, $this->cashRepository);
+        $this->cashHandler = new CashTransactionHandler($db, $this->cashConsiderationRepository, $this->cashRepository);
         $this->newsService = new \Services\NewsService($db);
 
         // Initialize Discord with error handling
@@ -168,8 +171,6 @@ class TradeProcessor implements TradeProcessorInterface
      */
     protected function processCashTransaction(int $itemId, string $offeringTeamName, string $listeningTeamName, int $offerId): array
     {
-        $uniquePid = $this->cashHandler->generateUniquePid($itemId);
-
         // Get cash details from cash repository
         $cashDetails = $this->cashRepository->getCashTransactionByOffer($offerId, $offeringTeamName);
 
@@ -186,7 +187,7 @@ class TradeProcessor implements TradeProcessorInterface
             6 => $cashDetails['cy6'] ?? 0,
         ];
 
-        return $this->cashHandler->createCashTransaction($uniquePid, $offeringTeamName, $listeningTeamName, $cashYear, $this->season->endingYear);
+        return $this->cashHandler->createCashTransaction($offeringTeamName, $listeningTeamName, $cashYear, $this->season->endingYear, $offerId);
     }
 
     /**

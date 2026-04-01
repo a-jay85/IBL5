@@ -10,6 +10,7 @@ use Trading\Contracts\TradeOfferRepositoryInterface;
 use Trading\Contracts\TradeAssetRepositoryInterface;
 use Trading\Contracts\TradeFormRepositoryInterface;
 use Trading\Contracts\TradeCashRepositoryInterface;
+use Trading\Contracts\CashConsiderationRepositoryInterface;
 use Season\Season;
 
 /**
@@ -29,6 +30,7 @@ class TradingService implements TradingServiceInterface
     private TradeAssetRepositoryInterface $assetRepository;
     private TradeFormRepositoryInterface $formRepository;
     private TradeCashRepositoryInterface $cashRepository;
+    private CashConsiderationRepositoryInterface $cashConsiderationRepository;
     private \Services\CommonMysqliRepository $commonRepository;
     private \mysqli $mysqli_db;
 
@@ -44,6 +46,7 @@ class TradingService implements TradingServiceInterface
         $this->assetRepository = $assetRepository;
         $this->formRepository = $formRepository;
         $this->cashRepository = $cashRepository ?? new TradeCashRepository($mysqli_db);
+        $this->cashConsiderationRepository = new CashConsiderationRepository($mysqli_db);
         $this->commonRepository = $commonRepository;
         $this->mysqli_db = $mysqli_db;
     }
@@ -69,12 +72,12 @@ class TradingService implements TradingServiceInterface
 
         $userPlayers = $this->formRepository->getTeamPlayersForTrading($userTeamId);
         $userPicks = $this->formRepository->getTeamDraftPicksForTrading($userTeamId);
-        $userCashRecords = $this->cashRepository->getTeamCashRecordsForSalary($userTeamId);
+        $userCashRecords = $this->cashConsiderationRepository->getTeamCashForSalary($userTeamId);
         $userFutureSalary = $this->calculateFutureSalaries([...$userPlayers, ...$userCashRecords], $season);
 
         $partnerPlayers = $this->formRepository->getTeamPlayersForTrading($partnerTeamId);
         $partnerPicks = $this->formRepository->getTeamDraftPicksForTrading($partnerTeamId);
-        $partnerCashRecords = $this->cashRepository->getTeamCashRecordsForSalary($partnerTeamId);
+        $partnerCashRecords = $this->cashConsiderationRepository->getTeamCashForSalary($partnerTeamId);
         $partnerFutureSalary = $this->calculateFutureSalaries([...$partnerPlayers, ...$partnerCashRecords], $season);
 
         // Calculate cash exchange year range

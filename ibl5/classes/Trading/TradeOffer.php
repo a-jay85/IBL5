@@ -8,6 +8,7 @@ use Trading\Contracts\TradeOfferInterface;
 use Trading\Contracts\TradeOfferRepositoryInterface;
 use Trading\Contracts\TradeAssetRepositoryInterface;
 use Trading\Contracts\TradeCashRepositoryInterface;
+use Trading\Contracts\CashConsiderationRepositoryInterface;
 use Season\Season;
 use Discord\Discord;
 
@@ -30,6 +31,7 @@ class TradeOffer implements TradeOfferInterface
     protected TradeOfferRepositoryInterface $offerRepository;
     protected TradeAssetRepositoryInterface $assetRepository;
     protected TradeCashRepositoryInterface $cashRepository;
+    protected CashConsiderationRepositoryInterface $cashConsiderationRepository;
     protected \Services\CommonMysqliRepository $commonRepository;
     protected Season $season;
     protected CashTransactionHandler $cashHandler;
@@ -45,9 +47,10 @@ class TradeOffer implements TradeOfferInterface
         $this->offerRepository = $offerRepository ?? new TradeOfferRepository($db);
         $this->assetRepository = $assetRepository ?? new TradeAssetRepository($db);
         $this->cashRepository = new TradeCashRepository($db);
+        $this->cashConsiderationRepository = new CashConsiderationRepository($db);
         $this->commonRepository = new \Services\CommonMysqliRepository($db);
         $this->season = new Season($db);
-        $this->cashHandler = new CashTransactionHandler($db, $this->assetRepository, $this->cashRepository);
+        $this->cashHandler = new CashTransactionHandler($db, $this->cashConsiderationRepository, $this->cashRepository);
         $this->validator = new TradeValidator($db);
 
         // Initialize Discord with error handling (may fail if column doesn't exist)
@@ -230,9 +233,9 @@ class TradeOffer implements TradeOfferInterface
     }
 
     /**
-     * Sum current-season salary from cash transaction records for a team
+     * Sum current-season salary from cash consideration records for a team
      *
-     * Cash records (names starting with '|') are excluded from form hidden fields
+     * Cash entries (trades, buyouts) are excluded from form hidden fields
      * but still affect the team's salary cap. This computes their current-year
      * impact using the same contract-year logic as the form.
      *
@@ -241,25 +244,29 @@ class TradeOffer implements TradeOfferInterface
      */
     private function sumCashRecordSalaries(int $teamId): int
     {
-        $cashRecords = $this->cashRepository->getTeamCashRecordsForSalary($teamId);
+        $cashRecords = $this->cashConsiderationRepository->getTeamCashForSalary($teamId);
         $isOffseason = $this->season->phase === 'Playoffs'
             || $this->season->phase === 'Draft'
             || $this->season->phase === 'Free Agency';
 
         $total = 0;
         foreach ($cashRecords as $record) {
-            $cy = $record['cy'] ?? 0;
-            $cy = is_int($cy) ? $cy : 0;
+            $cy = $record['cy'] ?? 1;
             if ($isOffseason) {
                 $cy++;
             }
             if ($cy === 0) {
                 $cy = 1;
             }
-            if ($cy < 7) {
-                $cyValue = $record["cy{$cy}"] ?? 0;
-                $total += is_int($cyValue) ? $cyValue : 0;
-            }
+            $total += match ($cy) {
+                1 => $record['cy1'],
+                2 => $record['cy2'],
+                3 => $record['cy3'],
+                4 => $record['cy4'],
+                5 => $record['cy5'],
+                6 => $record['cy6'],
+                default => 0,
+            };
         }
 
         return $total;

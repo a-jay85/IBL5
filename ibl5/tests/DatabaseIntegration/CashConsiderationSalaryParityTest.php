@@ -209,6 +209,83 @@ class CashConsiderationSalaryParityTest extends DatabaseTestCase
     }
 
     /**
+     * Executes createCashTransaction() against real DB and verifies:
+     * 1. Paired rows land in ibl_cash_considerations (positive + negative)
+     * 2. No rows are created in ibl_plr
+     * 3. Labels, amounts, and counterparty references are correct
+     */
+    public function testCashTransactionInsertsIntoCashTableNotPlr(): void
+    {
+        $team1 = $this->getFirstTeam();
+        $team2Row = $this->fetchAll(
+            "SELECT teamid, team_name FROM ibl_team_info WHERE teamid = 2"
+        )[0] ?? null;
+        self::assertNotNull($team2Row);
+        $team2 = ['teamid' => (int) $team2Row['teamid'], 'team_name' => (string) $team2Row['team_name']];
+
+        // Snapshot ibl_plr row count before
+        $plrCountBefore = (int) ($this->fetchAll(
+            "SELECT COUNT(*) AS cnt FROM ibl_plr"
+        )[0]['cnt'] ?? 0);
+
+        $cashCountBefore = (int) ($this->fetchAll(
+            "SELECT COUNT(*) AS cnt FROM ibl_cash_considerations"
+        )[0]['cnt'] ?? 0);
+
+        // Execute a cash transaction through the real handler
+        $handler = new \Trading\CashTransactionHandler($this->db);
+        $result = $handler->createCashTransaction(
+            $team1['team_name'],
+            $team2['team_name'],
+            [1 => 500, 2 => 300, 3 => 0, 4 => 0, 5 => 0, 6 => 0],
+            2026,
+            99999  // fake trade offer ID
+        );
+
+        self::assertTrue($result['success'], 'Cash transaction should succeed');
+
+        // Verify two new rows in ibl_cash_considerations
+        $cashCountAfter = (int) ($this->fetchAll(
+            "SELECT COUNT(*) AS cnt FROM ibl_cash_considerations"
+        )[0]['cnt'] ?? 0);
+        self::assertSame($cashCountBefore + 2, $cashCountAfter, 'Should insert exactly 2 cash rows');
+
+        // Verify NO new rows in ibl_plr
+        $plrCountAfter = (int) ($this->fetchAll(
+            "SELECT COUNT(*) AS cnt FROM ibl_plr"
+        )[0]['cnt'] ?? 0);
+        self::assertSame($plrCountBefore, $plrCountAfter, 'No rows should be added to ibl_plr');
+
+        // Verify the positive entry (sending team)
+        $positiveRows = $this->fetchAll(
+            "SELECT * FROM ibl_cash_considerations
+             WHERE tid = {$team1['teamid']} AND trade_offer_id = 99999"
+        );
+        self::assertCount(1, $positiveRows);
+        $pos = $positiveRows[0];
+        self::assertSame('cash', $pos['type']);
+        self::assertSame("Cash to {$team2['team_name']}", $pos['label']);
+        self::assertSame($team2['teamid'], (int) $pos['counterparty_tid']);
+        self::assertSame(500, (int) $pos['cy1']);
+        self::assertSame(300, (int) $pos['cy2']);
+        self::assertSame(2, (int) $pos['cyt']);
+
+        // Verify the negative entry (receiving team)
+        $negativeRows = $this->fetchAll(
+            "SELECT * FROM ibl_cash_considerations
+             WHERE tid = {$team2['teamid']} AND trade_offer_id = 99999"
+        );
+        self::assertCount(1, $negativeRows);
+        $neg = $negativeRows[0];
+        self::assertSame('cash', $neg['type']);
+        self::assertSame("Cash from {$team1['team_name']}", $neg['label']);
+        self::assertSame($team1['teamid'], (int) $neg['counterparty_tid']);
+        self::assertSame(-500, (int) $neg['cy1']);
+        self::assertSame(-300, (int) $neg['cy2']);
+        self::assertSame(2, (int) $neg['cyt']);
+    }
+
+    /**
      * Helper to run raw SQL and return all rows.
      *
      * @return list<array<string, mixed>>

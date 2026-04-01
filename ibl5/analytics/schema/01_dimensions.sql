@@ -98,7 +98,14 @@ SELECT
     TRY_CAST(r_foul AS INTEGER) AS r_foul
 FROM read_csv('data/ibl_plr_snapshots.csv', delim='\t', header=true, all_varchar=true,
     null_padding=true, ignore_errors=true, strict_mode=false, quote='')
-WHERE snapshot_phase = 'heat-end';
+WHERE snapshot_phase IN ('heat-end', 'heat-finals', 'post-heat', 'heat-wb', 'heat-lb')
+QUALIFY ROW_NUMBER() OVER (
+    PARTITION BY TRY_CAST(pid AS INTEGER), TRY_CAST(season_year AS INTEGER)
+    ORDER BY CASE snapshot_phase
+        WHEN 'heat-end' THEN 1 WHEN 'heat-finals' THEN 2
+        WHEN 'post-heat' THEN 3 WHEN 'heat-wb' THEN 4
+        WHEN 'heat-lb' THEN 5 END
+) = 1;
 
 -- dim_sim_dates: Global simulation date windows (698 sims across 19 seasons)
 -- Maps PLB per-season sim_number to date ranges via season offset calculation.

@@ -60,6 +60,13 @@ interface ArchiveExtractorInterface
     public function seasonLabelToEndingYear(string $seasonLabel): int;
 
     /**
+     * Find all parseable archives in a season directory, sorted by sequence number.
+     *
+     * @return list<array{path: string, season: string, seq: int, phase: string, ending_year: int}>
+     */
+    public function findAllArchives(string $seasonDir): array;
+
+    /**
      * Build the JSB filename for a given extension.
      *
      * @param string $extension File extension without dot (e.g. 'plr', 'sco')

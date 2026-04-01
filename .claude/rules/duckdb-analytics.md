@@ -147,8 +147,10 @@ Grain: one row per (box_score_id, pid, sim_number). Use for within-player paired
 Production box scores (589K rows) can be imported into local Docker for MariaDB-based queries:
 
 ```bash
-bin/db-import-boxscores          # Import from existing analytics CSVs
-bin/db-import-boxscores --truncate  # Replace existing data
+bin/db-import-boxscores                    # Import from existing analytics CSVs
+bin/db-import-boxscores --truncate         # Replace existing data
+bin/db-import-boxscores --remote           # Pull directly from production MariaDB
+bin/db-import-boxscores --remote --truncate  # Replace with fresh production data
 ```
 
 After import, `bin/analytics-export --local` exports everything (including PLB/PLR snapshots) from one source.

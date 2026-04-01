@@ -127,15 +127,18 @@ fi
 
 # Start CSS watcher in background so source changes auto-rebuild.
 # nohup + disown: prevent SIGHUP death when the calling terminal/shell exits.
-# Absolute paths: no cd needed, avoids PATH/cwd issues in detached process.
+# CWD must be the worktree's ibl5/ dir — Tailwind 4 auto-detects source files
+# relative to CWD/project root. Without this, the watcher scans the main repo
+# instead of the worktree, producing CSS that misses worktree-specific classes.
 echo "Starting CSS watcher..."
+(cd "$WORKTREE_PATH/ibl5" && \
 nohup "${BUNX_PATH:-bunx}" @tailwindcss/cli \
-    -i "$WORKTREE_PATH/ibl5/design/input.css" \
-    -o "$WORKTREE_PATH/ibl5/themes/IBL/style/style.css" \
+    -i design/input.css \
+    -o themes/IBL/style/style.css \
     --watch=always \
     > "$WORKTREE_PATH/.css-watch.log" 2>&1 &
 echo $! > "$CSS_PID_FILE"
-disown
+disown)
 
 # Kill any existing browser-sync for this worktree (PID file or port squatter)
 BS_PID_FILE="$WORKTREE_PATH/.bs-sync.pid"

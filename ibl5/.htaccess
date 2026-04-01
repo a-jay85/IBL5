@@ -33,6 +33,20 @@ Deny from 170.106.0.0/16
 Deny from 154.22.0.77
 # 88.216.210.17 — aggressive crawler, hundreds req/sec to dead legacy URLs (2026-03-26)
 Deny from 88.216.210.17
+# Meta external agent — ignores robots.txt, hammers historical pages causing 500s (2026-03-31)
+Deny from 57.141.20.0/24
+# 24.144.106.66 — WordPress wlwmanifest.xml/xmlrpc scanner (2026-03-31)
+Deny from 24.144.106.66
+# Palo Alto Cortex Xpanse — vulnerability scanner (2026-03-31)
+Deny from 198.235.24.0/24
+# Credential probing bots — rotating IPs hitting Your_Account & Depth_Chart_Entry (2026-03-31)
+Deny from 23.236.243.0/24
+Deny from 45.158.194.0/24
+Deny from 152.89.128.0/24
+
+# Block meta-externalagent by User-Agent (catches IPs outside the /24 above)
+RewriteCond %{HTTP_USER_AGENT} meta-externalagent [NC]
+RewriteRule ^ - [F,L]
 
 # Ensure directory index resolves to index.php (not IBLbot Express)
 DirectoryIndex index.php

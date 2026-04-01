@@ -40,7 +40,7 @@ class JsbImportService implements JsbImportServiceInterface
     public function processCurrentSeason(string $basePath, Season $season, string $filePrefix = 'IBL5'): JsbImportResult
     {
         $result = new JsbImportResult();
-        $seasonYear = $season->beginningYear;
+        $seasonYear = $season->endingYear;
 
         // Process .trn first (trade data helps with player ID resolution)
         $trnPath = $basePath . '/' . $filePrefix . '.trn';

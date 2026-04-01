@@ -2605,9 +2605,15 @@ td.ibl-team-cell--colored {
     border-right: 2px solid var(--gray-200, #e5e7eb);
 }
 
-/* FA tables: logo-only team cell (same treatment as mobile globally) */
+/* FA tables: logo-only team cell — visually hidden but copyable to clipboard */
 .fa-table .ibl-team-cell__text {
-    display: none;
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    clip-path: inset(50%);
+    white-space: nowrap;
 }
 
 .fa-table td.ibl-team-cell--colored {

@@ -89,8 +89,10 @@ if [ ! -f "$APP_DIR/vendor/autoload.php" ]; then
     echo "[entrypoint] Run 'composer install' on the host to install dependencies."
 fi
 
-# ── Phase 6: Cache warming (background, non-blocking) ───────────────────────
+# ── Phase 6: Purge stale page cache and warm caches ─────────────────────────
 if [ -f "$APP_DIR/vendor/autoload.php" ]; then
+    echo "[entrypoint] Purging page cache..."
+    php -r "require '$APP_DIR/vendor/autoload.php'; Cache\PageCache::purge();" 2>/dev/null || true
     echo "[entrypoint] Warming caches in background..."
     (php "$APP_DIR/bin/warm-cache" >> "$LOGS_DIR/warm-cache.log" 2>&1) &
 fi

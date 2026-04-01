@@ -17,7 +17,7 @@ class DatabaseConnection {
 				user: dbConfig.mysql.user,
 				password: dbConfig.mysql.password,
 				waitForConnections: true,
-				connectionLimit: 10,
+				connectionLimit: 3,
 				queueLimit: 0
 			});
 

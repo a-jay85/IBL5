@@ -19,7 +19,7 @@ git push origin master -q 2>/dev/null || fail "push master"
 
 git checkout production -q
 git pull origin production -q
-git merge origin/master --no-edit -q || fail "merge master into production (conflicts?)"
+git merge --ff-only origin/master -q || fail "fast-forward failed — production has diverged from master (cherry-pick the production-only commits onto master first)"
 git push origin production -q 2>/dev/null || fail "push production"
 
 git checkout master -q

@@ -101,14 +101,18 @@ class CashConsiderationRepository extends BaseMysqliRepository implements CashCo
      */
     public function deleteExpiredCashConsiderations(): int
     {
+        // Delete entries where all contract years are exhausted.
+        // cy > N means year N is in the past; cyN = 0 means no obligation.
+        // Note: cy is TINYINT UNSIGNED DEFAULT 1, so cy >= 1 is always true;
+        // must use cy > 1 (not cy >= 1) for year 1 guard.
         return $this->execute(
             "DELETE FROM ibl_cash_considerations
-             WHERE (cy >= 1 OR cy1 = 0)
-               AND (cy >= 2 OR cy2 = 0)
-               AND (cy >= 3 OR cy3 = 0)
-               AND (cy >= 4 OR cy4 = 0)
-               AND (cy >= 5 OR cy5 = 0)
-               AND (cy >= 6 OR cy6 = 0)"
+             WHERE (cy > 1 OR cy1 = 0)
+               AND (cy > 2 OR cy2 = 0)
+               AND (cy > 3 OR cy3 = 0)
+               AND (cy > 4 OR cy4 = 0)
+               AND (cy > 5 OR cy5 = 0)
+               AND (cy > 6 OR cy6 = 0)"
         );
     }
 }

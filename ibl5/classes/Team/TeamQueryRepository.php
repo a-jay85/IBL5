@@ -424,10 +424,14 @@ class TeamQueryRepository extends \BaseMysqliRepository implements TeamQueryRepo
      */
     public function canAddBuyoutWithoutExceedingBuyoutLimit(int $teamId, int $buyoutValue): bool
     {
+        $season = new Season($this->db);
         $buyoutsResult = $this->getBuyouts($teamId);
         $totalCurrentSeasonBuyouts = 0;
         foreach ($buyoutsResult as $buyout) {
             $cy = $buyout['cy'];
+            if ($season->isOffseasonPhase()) {
+                $cy++;
+            }
             if ($cy === 0) {
                 $cy = 1;
             }

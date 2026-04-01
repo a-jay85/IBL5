@@ -66,14 +66,25 @@ class FreeAgencyCapCalculator
         }
 
         // Add cash considerations (trades, buyouts) for the team
+        // Must apply the same cy-based offset as player contracts
+        $isOffseason = $this->season->isOffseasonPhase();
         $cashRows = $this->cashConsiderationRepo->getTeamCashForSalary($this->team->teamID);
         foreach ($cashRows as $cashRow) {
-            $totalSalaries[0] += $cashRow['cy1'];
-            $totalSalaries[1] += $cashRow['cy2'];
-            $totalSalaries[2] += $cashRow['cy3'];
-            $totalSalaries[3] += $cashRow['cy4'];
-            $totalSalaries[4] += $cashRow['cy5'];
-            $totalSalaries[5] += $cashRow['cy6'];
+            $cy = $cashRow['cy'] ?? 1;
+            if ($isOffseason) {
+                $cy++;
+            }
+            if ($cy === 0) {
+                $cy = 1;
+            }
+            $salaryFields = [1 => $cashRow['cy1'], 2 => $cashRow['cy2'], 3 => $cashRow['cy3'],
+                             4 => $cashRow['cy4'], 5 => $cashRow['cy5'], 6 => $cashRow['cy6']];
+            $slot = 0;
+            while ($cy <= 6 && $slot < 6) {
+                $totalSalaries[$slot] += $salaryFields[$cy] ?? 0;
+                $cy++;
+                $slot++;
+            }
         }
 
         // Add salaries from contract offers

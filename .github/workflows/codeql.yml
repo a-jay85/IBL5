@@ -7,6 +7,7 @@ on:
       - '**/*.tsx'
       - '**/*.js'
       - '**/*.jsx'
+      - '.github/workflows/*.yml'
   pull_request:
     types: [opened, synchronize, reopened, ready_for_review]
     paths:
@@ -14,6 +15,7 @@ on:
       - '**/*.tsx'
       - '**/*.js'
       - '**/*.jsx'
+      - '.github/workflows/*.yml'
 
 permissions:
   contents: read

@@ -4,7 +4,7 @@
 -- fact_player_sim: Denormalized simulation validation table
 -- Pre-joins PLB coaching decisions + sim date windows + game box scores + player ratings.
 -- Grain: one row per (box_score_id, pid, sim_number) — each game gets the DC settings active.
--- Join path: PLB -> sim_dates (via season offset) -> box_scores (date range) -> PLR (heat-end)
+-- Join path: PLB -> sim_dates (via season offset) -> box_scores (date range) -> PLR (canonical HEAT phase)
 CREATE OR REPLACE TABLE fact_player_sim AS
 WITH
 season_first_sim AS (
@@ -79,10 +79,18 @@ JOIN fact_player_game bs
     AND bs.team_id = p.team_id
     AND bs.game_date BETWEEN p.sim_start_date AND p.sim_end_date
     AND bs.game_type IN (1, 2)
-LEFT JOIN fact_plr_snapshots r
-    ON r.pid = p.pid
-    AND r.season_year = p.season_year
-    AND r.snapshot_phase = 'heat-end';
+LEFT JOIN (
+    SELECT *
+    FROM fact_plr_snapshots
+    WHERE snapshot_phase IN ('heat-end', 'heat-finals', 'post-heat', 'heat-wb', 'heat-lb')
+    QUALIFY ROW_NUMBER() OVER (
+        PARTITION BY pid, season_year
+        ORDER BY CASE snapshot_phase
+            WHEN 'heat-end' THEN 1 WHEN 'heat-finals' THEN 2
+            WHEN 'post-heat' THEN 3 WHEN 'heat-wb' THEN 4
+            WHEN 'heat-lb' THEN 5 END
+    ) = 1
+) r ON r.pid = p.pid AND r.season_year = p.season_year;
 
 -- agg_tsi_progression: Year-over-year rating changes per player
 -- Self-join fact_player_season on consecutive years to compute deltas.

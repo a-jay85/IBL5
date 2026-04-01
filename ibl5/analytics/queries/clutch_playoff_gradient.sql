@@ -1,5 +1,5 @@
 -- clutch_playoff_gradient.sql: Clutch rating x game type stat differentials
--- Uses exact game-time ratings from heat-end PLR snapshots (not current ibl_plr proxy).
+-- Uses exact game-time ratings from canonical HEAT-phase PLR snapshots (not current ibl_plr proxy).
 -- Plan reference: Clutch=1 scoring -6.7% in playoffs, Clutch=3 +3.3%.
 --
 -- Usage: duckdb data/ibl_analytics.duckdb < queries/clutch_playoff_gradient.sql

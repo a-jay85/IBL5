@@ -151,6 +151,32 @@ final class ArchiveExtractor implements ArchiveExtractorInterface
         return $endPart >= 50 ? 1900 + $endPart : 2000 + $endPart;
     }
 
+    /** @see ArchiveExtractorInterface::findAllArchives() */
+    public function findAllArchives(string $seasonDir): array
+    {
+        $archives = $this->listArchives($seasonDir);
+        $result = [];
+
+        foreach ($archives as $path) {
+            $parsed = $this->parseArchiveName(basename($path));
+            if ($parsed === null) {
+                continue;
+            }
+
+            $result[] = [
+                'path' => $path,
+                'season' => $parsed['season'],
+                'seq' => $parsed['seq'],
+                'phase' => $parsed['phase'],
+                'ending_year' => $parsed['ending_year'],
+            ];
+        }
+
+        usort($result, static fn (array $a, array $b): int => $a['seq'] <=> $b['seq']);
+
+        return $result;
+    }
+
     /**
      * Build the JSB filename for a given extension.
      *

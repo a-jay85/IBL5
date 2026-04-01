@@ -5,6 +5,11 @@
 -- game highs, real-life stats, preference weights, draft info, derived fields,
 -- playoff stats (speculative, from offset gap 208-267), and raw unknown gap data.
 
+-- Fix collation mismatch: ibl_plr_snapshots was created as latin1_swedish_ci
+-- while all other tables use utf8mb4_unicode_ci. This causes 'Illegal mix of
+-- collations' errors in UNION queries (e.g., the ibl_hist VIEW).
+ALTER TABLE `ibl_plr_snapshots` CONVERT TO CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+
 -- Season stats (regular season, from offsets 144-207)
 ALTER TABLE `ibl_plr_snapshots`
   ADD COLUMN `ordinal`          SMALLINT UNSIGNED NOT NULL DEFAULT 0,

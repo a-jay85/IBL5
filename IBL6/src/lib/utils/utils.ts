@@ -1,13 +1,9 @@
 /**
- * Serialize Prisma data by converting BigInt values to numbers and Dates to ISO strings
+ * Serialize data by converting Date objects to ISO strings for SvelteKit load functions
  */
-export function serializePrismaData<T>(data: T): T {
+export function serializeData<T>(data: T): T {
 	if (data === null || data === undefined) {
 		return data;
-	}
-
-	if (typeof data === 'bigint') {
-		return Number(data) as T;
 	}
 
 	if (data instanceof Date) {
@@ -15,13 +11,13 @@ export function serializePrismaData<T>(data: T): T {
 	}
 
 	if (Array.isArray(data)) {
-		return data.map((item) => serializePrismaData(item)) as T;
+		return data.map((item) => serializeData(item)) as T;
 	}
 
 	if (typeof data === 'object') {
 		const serialized: any = {};
 		for (const [key, value] of Object.entries(data)) {
-			serialized[key] = serializePrismaData(value);
+			serialized[key] = serializeData(value);
 		}
 		return serialized as T;
 	}

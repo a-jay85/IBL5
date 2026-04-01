@@ -353,154 +353,114 @@ class PlrParserRepository extends \BaseMysqliRepository implements PlrParserRepo
     /**
      * @see PlrParserRepositoryInterface::upsertSnapshot()
      *
-     * @param array<string, int|string> $data
+     * @param array<string, int|string> $data Full PLR snapshot data (column names as keys)
      */
     public function upsertSnapshot(array $data): int
     {
-        $query = "INSERT INTO {$this->snapshotsTable}
-            (`pid`, `name`, `season_year`, `snapshot_phase`, `source_archive`,
-             `tid`, `age`, `pos`, `peak`, `htft`, `htin`, `wt`,
-             `oo`, `od`, `do`, `dd`, `po`, `pd`, `to`, `td`,
-             `r_fga`, `r_fgp`, `r_fta`, `r_ftp`, `r_tga`, `r_tgp`,
-             `r_orb`, `r_drb`, `r_ast`, `r_stl`, `r_to`, `r_blk`, `r_foul`,
-             `talent`, `skill`, `intangibles`, `clutch`, `consistency`,
-             `exp`, `bird`, `cy`, `cyt`,
-             `cy1`, `cy2`, `cy3`, `cy4`, `cy5`, `cy6`,
-             `PGDepth`, `SGDepth`, `SFDepth`, `PFDepth`, `CDepth`)
-        VALUES
-            (?, ?, ?, ?, ?,
-             ?, ?, ?, ?, ?, ?, ?,
-             ?, ?, ?, ?, ?, ?, ?, ?,
-             ?, ?, ?, ?, ?, ?,
-             ?, ?, ?, ?, ?, ?, ?,
-             ?, ?, ?, ?, ?,
-             ?, ?, ?, ?,
-             ?, ?, ?, ?, ?, ?,
-             ?, ?, ?, ?, ?)
-        ON DUPLICATE KEY UPDATE
-            `name` = VALUES(`name`),
-            `source_archive` = VALUES(`source_archive`),
-            `tid` = VALUES(`tid`),
-            `age` = VALUES(`age`),
-            `pos` = VALUES(`pos`),
-            `peak` = VALUES(`peak`),
-            `htft` = VALUES(`htft`),
-            `htin` = VALUES(`htin`),
-            `wt` = VALUES(`wt`),
-            `oo` = VALUES(`oo`),
-            `od` = VALUES(`od`),
-            `do` = VALUES(`do`),
-            `dd` = VALUES(`dd`),
-            `po` = VALUES(`po`),
-            `pd` = VALUES(`pd`),
-            `to` = VALUES(`to`),
-            `td` = VALUES(`td`),
-            `r_fga` = VALUES(`r_fga`),
-            `r_fgp` = VALUES(`r_fgp`),
-            `r_fta` = VALUES(`r_fta`),
-            `r_ftp` = VALUES(`r_ftp`),
-            `r_tga` = VALUES(`r_tga`),
-            `r_tgp` = VALUES(`r_tgp`),
-            `r_orb` = VALUES(`r_orb`),
-            `r_drb` = VALUES(`r_drb`),
-            `r_ast` = VALUES(`r_ast`),
-            `r_stl` = VALUES(`r_stl`),
-            `r_to` = VALUES(`r_to`),
-            `r_blk` = VALUES(`r_blk`),
-            `r_foul` = VALUES(`r_foul`),
-            `talent` = VALUES(`talent`),
-            `skill` = VALUES(`skill`),
-            `intangibles` = VALUES(`intangibles`),
-            `clutch` = VALUES(`clutch`),
-            `consistency` = VALUES(`consistency`),
-            `exp` = VALUES(`exp`),
-            `bird` = VALUES(`bird`),
-            `cy` = VALUES(`cy`),
-            `cyt` = VALUES(`cyt`),
-            `cy1` = VALUES(`cy1`),
-            `cy2` = VALUES(`cy2`),
-            `cy3` = VALUES(`cy3`),
-            `cy4` = VALUES(`cy4`),
-            `cy5` = VALUES(`cy5`),
-            `cy6` = VALUES(`cy6`),
-            `PGDepth` = VALUES(`PGDepth`),
-            `SGDepth` = VALUES(`SGDepth`),
-            `SFDepth` = VALUES(`SFDepth`),
-            `PFDepth` = VALUES(`PFDepth`),
-            `CDepth` = VALUES(`CDepth`)";
+        // Column names in insertion order. Reserved words (do, to) need backtick quoting.
+        $columns = self::SNAPSHOT_COLUMNS;
+        $stringColumns = ['name', 'snapshot_phase', 'source_archive', 'pos'];
+        $uniqueKeyColumns = ['pid', 'season_year', 'snapshot_phase'];
 
-        // 53 params: pid(i) name(s) season_year(i) snapshot_phase(s) source_archive(s)
-        // + tid(i) age(i) pos(s) peak(i) + remaining ints
-        // Total: 53 params — 4 strings (name, snapshot_phase, source_archive, pos) and 49 ints
-        $types = 'isis'        // pid, name, season_year, snapshot_phase
-            . 's'              // source_archive
-            . 'ii'             // tid, age
-            . 'si'             // pos, peak
-            . 'iii'            // htft, htin, wt
-            . 'iiiiiiii'       // oo..td
-            . 'iiiiii'         // r_fga..r_tgp
-            . 'iiiiiii'        // r_orb..r_foul
-            . 'iiiii'          // talent..consistency
-            . 'iiii'           // exp, bird, cy, cyt
-            . 'iiiiii'         // cy1..cy6
-            . 'iiiii';         // PGDepth..CDepth
+        $quotedCols = array_map(static fn (string $c): string => '`' . $c . '`', $columns);
+        $colList = implode(', ', $quotedCols);
+        $placeholders = implode(', ', array_fill(0, count($columns), '?'));
 
-        return $this->execute(
-            $query,
-            $types,
-            (int) $data['pid'],
-            (string) $data['name'],
-            (int) $data['season_year'],
-            (string) $data['snapshot_phase'],
-            (string) $data['source_archive'],
-            (int) $data['tid'],
-            (int) $data['age'],
-            (string) $data['pos'],
-            (int) $data['peak'],
-            (int) $data['htft'],
-            (int) $data['htin'],
-            (int) $data['wt'],
-            (int) $data['oo'],
-            (int) $data['od'],
-            (int) $data['do'],
-            (int) $data['dd'],
-            (int) $data['po'],
-            (int) $data['pd'],
-            (int) $data['to'],
-            (int) $data['td'],
-            (int) $data['r_fga'],
-            (int) $data['r_fgp'],
-            (int) $data['r_fta'],
-            (int) $data['r_ftp'],
-            (int) $data['r_tga'],
-            (int) $data['r_tgp'],
-            (int) $data['r_orb'],
-            (int) $data['r_drb'],
-            (int) $data['r_ast'],
-            (int) $data['r_stl'],
-            (int) $data['r_to'],
-            (int) $data['r_blk'],
-            (int) $data['r_foul'],
-            (int) $data['talent'],
-            (int) $data['skill'],
-            (int) $data['intangibles'],
-            (int) $data['clutch'],
-            (int) $data['consistency'],
-            (int) $data['exp'],
-            (int) $data['bird'],
-            (int) $data['cy'],
-            (int) $data['cyt'],
-            (int) $data['cy1'],
-            (int) $data['cy2'],
-            (int) $data['cy3'],
-            (int) $data['cy4'],
-            (int) $data['cy5'],
-            (int) $data['cy6'],
-            (int) $data['PGDepth'],
-            (int) $data['SGDepth'],
-            (int) $data['SFDepth'],
-            (int) $data['PFDepth'],
-            (int) $data['CDepth'],
-        );
+        $updateClauses = [];
+        foreach ($columns as $col) {
+            if (in_array($col, $uniqueKeyColumns, true)) {
+                continue;
+            }
+            $updateClauses[] = '`' . $col . '` = VALUES(`' . $col . '`)';
+        }
+
+        $query = "INSERT INTO {$this->snapshotsTable} ({$colList})
+            VALUES ({$placeholders})
+            ON DUPLICATE KEY UPDATE " . implode(', ', $updateClauses);
+
+        $types = '';
+        $values = [];
+        foreach ($columns as $col) {
+            if (in_array($col, $stringColumns, true)) {
+                $types .= 's';
+                $values[] = (string) $data[$col];
+            } else {
+                $types .= 'i';
+                $values[] = (int) $data[$col];
+            }
+        }
+
+        return $this->execute($query, $types, ...$values);
     }
+
+    /**
+     * Column names for ibl_plr_snapshots upsert, in insertion order.
+     *
+     * @var list<string>
+     */
+    private const SNAPSHOT_COLUMNS = [
+        // Identity & metadata
+        'pid', 'name', 'season_year', 'snapshot_phase', 'source_archive',
+        'ordinal',
+        // Physical & position
+        'tid', 'age', 'pos', 'peak', 'htft', 'htin', 'wt',
+        // Positional ratings (1-9)
+        'oo', 'od', 'do', 'dd', 'po', 'pd', 'to', 'td',
+        // Stat ratings (0-99)
+        'r_fga', 'r_fgp', 'r_fta', 'r_ftp', 'r_tga', 'r_tgp',
+        'r_orb', 'r_drb', 'r_ast', 'r_stl', 'r_to', 'r_blk', 'r_foul',
+        // TSI attributes
+        'talent', 'skill', 'intangibles', 'clutch', 'consistency',
+        // Contract
+        'exp', 'bird', 'cy', 'cyt',
+        'cy1', 'cy2', 'cy3', 'cy4', 'cy5', 'cy6',
+        // Depth chart
+        'PGDepth', 'SGDepth', 'SFDepth', 'PFDepth', 'CDepth',
+        // Season stats (regular season)
+        'stats_gs', 'stats_gm', 'stats_min', 'stats_fgm', 'stats_fga',
+        'stats_ftm', 'stats_fta', 'stats_3gm', 'stats_3ga',
+        'stats_orb', 'stats_drb', 'stats_ast', 'stats_stl', 'stats_to', 'stats_blk', 'stats_pf',
+        'stats_reb', 'stats_pts',
+        // Playoff season stats (speculative — offset gap 208-267)
+        'po_stats_gm', 'po_stats_min', 'po_stats_2gm', 'po_stats_2ga',
+        'po_stats_ftm', 'po_stats_fta', 'po_stats_3gm', 'po_stats_3ga',
+        'po_stats_orb', 'po_stats_drb', 'po_stats_ast', 'po_stats_stl',
+        'po_stats_tvr', 'po_stats_blk', 'po_stats_pf',
+        // Career stats
+        'car_gm', 'car_min', 'car_fgm', 'car_fga', 'car_ftm', 'car_fta',
+        'car_tgm', 'car_tga', 'car_orb', 'car_drb', 'car_reb',
+        'car_ast', 'car_stl', 'car_to', 'car_blk', 'car_pf', 'car_pts',
+        // Season highs
+        'sh_pts', 'sh_reb', 'sh_ast', 'sh_stl', 'sh_blk', 's_dd', 's_td',
+        // Playoff highs
+        'sp_pts', 'sp_reb', 'sp_ast', 'sp_stl', 'sp_blk',
+        // Career season highs
+        'ch_pts', 'ch_reb', 'ch_ast', 'ch_stl', 'ch_blk', 'c_dd', 'c_td',
+        // Career playoff highs
+        'cp_pts', 'cp_reb', 'cp_ast', 'cp_stl', 'cp_blk',
+        // Real-life stats
+        'rl_gp', 'rl_min', 'rl_fgm', 'rl_fga', 'rl_ftm', 'rl_fta',
+        'rl_3gm', 'rl_3ga', 'rl_orb', 'rl_drb', 'rl_ast', 'rl_stl',
+        'rl_tvr', 'rl_blk', 'rl_pf',
+        // Preferences
+        'coach', 'loyalty', 'playingTime', 'winner', 'tradition', 'security',
+        // Draft info
+        'draftround', 'draftpickno', 'fa_signing_flag',
+        // Other
+        'dc_canPlayInGame', 'injured',
+        // Derived
+        'draftyear', 'salary',
+        // Unknown gaps
+        'unk_112', 'unk_114', 'unk_116', 'unk_118',
+        'unk_120', 'unk_122', 'unk_124', 'unk_126',
+        'unk_138',
+        'unk_294', 'unk_296',
+        'unk_322', 'unk_324',
+        'unk_331', 'unk_333', 'unk_335', 'unk_337', 'unk_339',
+        'unk_512', 'unk_514', 'unk_516', 'unk_518',
+        'unk_520', 'unk_522', 'unk_524', 'unk_526',
+        'unk_528', 'unk_530', 'unk_532', 'unk_534',
+        'unk_536', 'unk_538', 'unk_540', 'unk_542',
+        'unk_544', 'unk_546', 'unk_548',
+    ];
 }

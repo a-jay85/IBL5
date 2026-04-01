@@ -5,10 +5,10 @@ declare(strict_types=1);
 /**
  * Bulk JSB File Import Script
  *
- * Scans for JSB engine files (.car, .his, .trn, .asw, .awa) and processes
+ * Scans for JSB engine files (.car, .his, .trn, .asw, .awa, .rcb) and processes
  * them through JsbImportService to populate database tables.
  *
- * Import order: .trn → .car → .his → .asw → .awa
+ * Import order: .trn → .car → .his → .asw → .awa → .rcb
  * (Trade data from .trn helps PlayerIdResolver handle mid-season moves in .car)
  *
  * Environment auto-detection:
@@ -22,6 +22,7 @@ declare(strict_types=1);
  *   php bulkJsbImport.php --file-type=his     # Only process .his files
  *   php bulkJsbImport.php --file-type=trn     # Only process .trn files
  *   php bulkJsbImport.php --file-type=asw     # Only process .asw files
+ *   php bulkJsbImport.php --file-type=rcb     # Only process .rcb files
  */
 
 // ── CLI-only guard ──────────────────────────────────────────────────────────
@@ -58,7 +59,7 @@ require_once __DIR__ . '/../db/db.php';
 $dryRun = in_array('--dry-run', $argv, true);
 
 $fileTypeFilter = null;
-$validTypes = ['car', 'his', 'trn', 'asw', 'awa'];
+$validTypes = ['car', 'his', 'trn', 'asw', 'awa', 'rcb'];
 foreach ($argv as $arg) {
     if (str_starts_with($arg, '--file-type=')) {
         $fileTypeFilter = substr($arg, strlen('--file-type='));
@@ -212,13 +213,13 @@ if ($parseErrors !== []) {
 // ── Dry run: list files and exit ────────────────────────────────────────────
 if ($dryRun) {
     echo str_pad('Directory/Season', 40) . str_pad('Year', 8) . str_pad('Phase', 25);
-    echo str_pad('.car', 5) . str_pad('.his', 5) . str_pad('.trn', 5) . str_pad('.asw', 5) . ".awa\n";
-    echo str_repeat('-', 95) . "\n";
+    echo str_pad('.car', 5) . str_pad('.his', 5) . str_pad('.trn', 5) . str_pad('.asw', 5) . str_pad('.awa', 5) . ".rcb\n";
+    echo str_repeat('-', 100) . "\n";
 
     foreach ($entries as $entry) {
         if ($isProduction) {
             $archive = $extractor->findLastArchive($entry['path']);
-            $car = $his = $trn = $asw = $awa = '-';
+            $car = $his = $trn = $asw = $awa = $rcb = '-';
             if ($archive !== null) {
                 $zip = new ZipArchive();
                 if ($zip->open($archive) === true) {
@@ -227,6 +228,7 @@ if ($dryRun) {
                     $trn = $zip->locateName('IBL5.trn') !== false ? 'Y' : '-';
                     $asw = $zip->locateName('IBL5.asw') !== false ? 'Y' : '-';
                     $awa = $zip->locateName('IBL5.awa') !== false ? 'Y' : '-';
+                    $rcb = $zip->locateName('IBL5.rcb') !== false ? 'Y' : '-';
                     $zip->close();
                 }
             }
@@ -236,12 +238,13 @@ if ($dryRun) {
             $trn = file_exists($entry['path'] . '/IBL5.trn') ? 'Y' : '-';
             $asw = file_exists($entry['path'] . '/IBL5.asw') ? 'Y' : '-';
             $awa = file_exists($entry['path'] . '/IBL5.awa') ? 'Y' : '-';
+            $rcb = file_exists($entry['path'] . '/IBL5.rcb') ? 'Y' : '-';
         }
 
         echo str_pad($entry['dir'], 40)
             . str_pad((string) $entry['year'], 8)
             . str_pad($entry['phase'], 25)
-            . str_pad($car, 5) . str_pad($his, 5) . str_pad($trn, 5) . str_pad($asw, 5) . $awa . "\n";
+            . str_pad($car, 5) . str_pad($his, 5) . str_pad($trn, 5) . str_pad($asw, 5) . str_pad($awa, 5) . $rcb . "\n";
     }
 
     echo sprintf("\nTotal: %d directories ready for processing.\n", count($entries));
@@ -325,7 +328,7 @@ $totalSkipped  = 0;
 $totalErrors   = 0;
 $filesProcessed = 0;
 
-$fileTypes = $fileTypeFilter !== null ? [$fileTypeFilter] : ['trn', 'car', 'his', 'asw', 'awa'];
+$fileTypes = $fileTypeFilter !== null ? [$fileTypeFilter] : ['trn', 'car', 'his', 'asw', 'awa', 'rcb'];
 
 foreach ($fileTypes as $fileType) {
     echo "\n" . str_repeat('=', 50) . "\n";
@@ -359,6 +362,7 @@ foreach ($fileTypes as $fileType) {
                 'trn' => $service->processTrnFile($filePath, $sourceLabel),
                 'asw' => $service->processAswFile($filePath, $entry['year']),
                 'awa' => $service->processAwaFile($filePath, dirname($filePath) . '/IBL5.car'),
+                'rcb' => $service->processRcbFile($filePath, $entry['year'], $sourceLabel),
                 default => throw new \RuntimeException("Unknown file type: {$fileType}"),
             };
 

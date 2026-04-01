@@ -251,9 +251,8 @@ FROM read_csv('data/ibl_plb_snapshots.csv', delim='\t', header=true, all_varchar
     null_padding=true, ignore_errors=true, strict_mode=false, quote='')
 WHERE TRY_CAST(pid AS INTEGER) IS NOT NULL;
 
--- fact_plr_snapshots: Player ratings at game time
--- Confirmed: zero drift between heat-end and end-of-season across all 19 seasons.
--- heat-end phase = exact ratings JSB used for every game that season.
+-- fact_plr_snapshots: Player ratings snapshots at every archived point in the season.
+-- Includes all phases (preseason, heat, regular season sims, playoffs, finals).
 CREATE OR REPLACE TABLE fact_plr_snapshots AS
 SELECT
     TRY_CAST(pid AS INTEGER)         AS pid,

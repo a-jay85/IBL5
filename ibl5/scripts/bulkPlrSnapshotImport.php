@@ -5,20 +5,18 @@ declare(strict_types=1);
 /**
  * Bulk PLR Snapshot Import Script
  *
- * Extracts .plr files from end-of-season archives and stores player rating
- * snapshots in ibl_plr_snapshots. Each snapshot captures ratings, contract
- * state, and identity at a specific point in the season.
+ * Extracts .plr files from ALL archives and stores player rating snapshots
+ * in ibl_plr_snapshots. Each snapshot captures ratings, contract state, and
+ * identity at a specific point in the season (one per archive/sim).
  *
  * Environment auto-detection:
  *   - fullLeagueBackups/backups/ exists → local mode (archives from dev extraction)
  *   - backups/ exists                   → production mode (zip archives on server)
  *
  * Usage:
- *   php bulkPlrSnapshotImport.php                           # All seasons
+ *   php bulkPlrSnapshotImport.php                           # All seasons, all archives
  *   php bulkPlrSnapshotImport.php --dry-run                 # List archives to process
  *   php bulkPlrSnapshotImport.php --season=00-01            # Single season
- *   php bulkPlrSnapshotImport.php --phase=heat-end          # Only HEAT-end snapshots
- *   php bulkPlrSnapshotImport.php --phase=end-of-season    # Only end-of-season snapshots
  */
 
 // ── CLI-only guard ──────────────────────────────────────────────────────────
@@ -54,19 +52,10 @@ require_once __DIR__ . '/../db/db.php';
 // ── Parse CLI options ───────────────────────────────────────────────────────
 $dryRun = in_array('--dry-run', $argv, true);
 $seasonFilter = null;
-$phaseFilter = null;
 
 foreach ($argv as $arg) {
     if (str_starts_with($arg, '--season=')) {
         $seasonFilter = substr($arg, strlen('--season='));
-    }
-    if (str_starts_with($arg, '--phase=')) {
-        $phaseFilter = substr($arg, strlen('--phase='));
-        $validPhases = ['end-of-season', 'heat-end'];
-        if (!in_array($phaseFilter, $validPhases, true)) {
-            echo "Invalid phase: {$phaseFilter}. Valid phases: " . implode(', ', $validPhases) . "\n";
-            exit(1);
-        }
     }
 }
 
@@ -121,38 +110,20 @@ foreach ($seasonDirs as $dirPath) {
         continue;
     }
 
-    $endingYear = $extractor->seasonLabelToEndingYear($seasonLabel);
-    if ($endingYear === 0) {
-        echo "  WARNING: Cannot parse season label '{$seasonLabel}', skipping\n";
+    $archives = $extractor->findAllArchives($dirPath);
+    if ($archives === []) {
+        echo "  WARNING: No parseable archives in '{$seasonLabel}', skipping\n";
         continue;
     }
 
-    // End-of-season snapshot (last archive)
-    if ($phaseFilter === null || $phaseFilter === 'end-of-season') {
-        $finalsArchive = $extractor->findLastArchive($dirPath);
-        if ($finalsArchive !== null) {
-            $plan[] = [
-                'season' => $seasonLabel,
-                'ending_year' => $endingYear,
-                'archive' => $finalsArchive,
-                'phase' => 'end-of-season',
-                'season_dir' => $dirPath,
-            ];
-        }
-    }
-
-    // HEAT-end snapshot
-    if ($phaseFilter === null || $phaseFilter === 'heat-end') {
-        $heatArchive = $extractor->findHeatEndArchive($dirPath);
-        if ($heatArchive !== null) {
-            $plan[] = [
-                'season' => $seasonLabel,
-                'ending_year' => $endingYear,
-                'archive' => $heatArchive,
-                'phase' => 'heat-end',
-                'season_dir' => $dirPath,
-            ];
-        }
+    foreach ($archives as $archive) {
+        $plan[] = [
+            'season' => $archive['season'],
+            'ending_year' => $archive['ending_year'],
+            'archive' => $archive['path'],
+            'phase' => $archive['phase'],
+            'season_dir' => $dirPath,
+        ];
     }
 }
 

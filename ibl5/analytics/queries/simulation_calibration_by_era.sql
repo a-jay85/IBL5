@@ -61,7 +61,17 @@ SELECT
     ROUND(AVG(r_to), 1)  AS avg_r_to,
     ROUND(AVG(r_foul), 1) AS avg_r_foul,
     ROUND(AVG(tsi_sum), 1) AS avg_tsi
-FROM fact_plr_snapshots
-WHERE snapshot_phase = 'heat-end'
+FROM (
+    SELECT *
+    FROM fact_plr_snapshots
+    WHERE snapshot_phase IN ('heat-end', 'heat-finals', 'post-heat', 'heat-wb', 'heat-lb')
+    QUALIFY ROW_NUMBER() OVER (
+        PARTITION BY pid, season_year
+        ORDER BY CASE snapshot_phase
+            WHEN 'heat-end' THEN 1 WHEN 'heat-finals' THEN 2
+            WHEN 'post-heat' THEN 3 WHEN 'heat-wb' THEN 4
+            WHEN 'heat-lb' THEN 5 END
+    ) = 1
+)
 GROUP BY season_year
 ORDER BY season_year;

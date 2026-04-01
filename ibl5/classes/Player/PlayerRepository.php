@@ -434,23 +434,11 @@ class PlayerRepository extends BaseMysqliRepository implements PlayerRepositoryI
      */
     public function getHistoricalStats(int $playerID): array
     {
-        $table = $this->hasPlrSnapshotsPopulated() ? 'ibl_hist' : 'ibl_hist_archive';
         return $this->fetchAll(
-            "SELECT * FROM {$table} WHERE pid = ? ORDER BY year ASC",
+            "SELECT * FROM ibl_hist WHERE pid = ? ORDER BY year ASC",
             "i",
             $playerID
         );
-    }
-
-    private static ?bool $plrSnapshotsPopulated = null;
-
-    private function hasPlrSnapshotsPopulated(): bool
-    {
-        if (self::$plrSnapshotsPopulated === null) {
-            $row = $this->fetchOne("SELECT 1 FROM ibl_plr_snapshots LIMIT 1", "");
-            self::$plrSnapshotsPopulated = $row !== null;
-        }
-        return self::$plrSnapshotsPopulated;
     }
 
     /**

@@ -29,9 +29,6 @@ class PlayerStatsRepositoryTest extends TestCase
 
     protected function setUp(): void
     {
-        // Reset static snapshot cache between tests
-        PlayerStatsRepository::resetPlrSnapshotsCache();
-
         // Create mock database connection
         $this->mockDb = $this->createMock(\mysqli::class);
         $this->mockStmt = $this->createMock(\mysqli_stmt::class);
@@ -50,15 +47,13 @@ class PlayerStatsRepositoryTest extends TestCase
 
     public function testGetHistoricalStatsReturnsArrayOfStats(): void
     {
-        // Configure mock to return test data
-        // First fetch_assoc is for hasPlrSnapshots() check (null = empty → use archive table)
         $testData = [
             ['year' => 2024, 'team' => 'TEST', 'games' => 82, 'pts' => 1500],
             ['year' => 2023, 'team' => 'TEST', 'games' => 80, 'pts' => 1400],
         ];
 
         $this->mockResult->method('fetch_assoc')
-            ->willReturnOnConsecutiveCalls(null, $testData[0], $testData[1], null);
+            ->willReturnOnConsecutiveCalls($testData[0], $testData[1], null);
 
         $result = $this->repository->getHistoricalStats(1);
 

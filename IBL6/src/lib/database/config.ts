@@ -1,13 +1,11 @@
 import { dev } from '$app/environment';
 import dotenv from 'dotenv';
 
-if (dev) {
-	const result = dotenv.config();
+const result = dotenv.config();
 
-	if (result.error) {
-		console.warn('Could not load .env file:', result.error.message);
-		console.warn('Using system environment variables or defaults');
-	}
+if (result.error && dev) {
+	console.warn('Could not load .env file:', result.error.message);
+	console.warn('Using system environment variables or defaults');
 }
 
 export const dbConfig = {

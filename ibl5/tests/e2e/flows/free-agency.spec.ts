@@ -7,8 +7,8 @@ import { assertNoPhpErrors } from '../helpers/php-errors';
 //   pid=10: FA Guard on Metros (tid=1, exp=5, bird=4 — Bird Rights) → "Unsigned Free Agents"
 //   pid=11: FA Center pure FA (tid=0, exp=8, bird=0) → "All Other Free Agents"
 //   pid=12: FA Forward on Stars (tid=2, exp=3, bird=2) → "All Other Free Agents"
-// And 1 salary placeholder:
-//   pid=200000020: Cash from Trade on Metros (tid=1) → "Players Under Contract" (not FA tables)
+// And 1 cash consideration (ibl_cash_considerations table):
+//   Cash from Trade on Metros (tid=1) → "Players Under Contract" (not FA tables)
 // Submission tests are in free-agency-submission.spec.ts.
 
 // Helper: scope form inputs to the visible custom offer form (not hidden quick-offer forms)

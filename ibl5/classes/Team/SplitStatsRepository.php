@@ -84,7 +84,6 @@ class SplitStatsRepository extends \BaseMysqliRepository implements SplitStatsRe
             AND bs.gameMIN > 0
             AND p.tid = ?
             AND p.retired = 0
-            AND p.name NOT LIKE '%|%'
             AND bs.game_type = 1
             " . $splitCondition['where'] . "
         GROUP BY p.name, bs.pos, bs.pid

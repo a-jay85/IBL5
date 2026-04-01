@@ -48,9 +48,9 @@ class OneOnOneGameRepositoryTest extends DatabaseTestCase
         self::assertNotContains('DB Test Retired Player', $names);
     }
 
-    public function testGetActivePlayersExcludesPipePrefixedPlayers(): void
+    public function testGetActivePlayersIncludesNormalPlayers(): void
     {
-        $this->insertTestPlayer(200000051, '|DB Test Pipe Player', [
+        $this->insertTestPlayer(200000051, 'DB Test Active Player', [
             'retired' => 0,
             'tid' => 1,
         ]);
@@ -58,7 +58,7 @@ class OneOnOneGameRepositoryTest extends DatabaseTestCase
         $players = $this->repo->getActivePlayers();
         $names = array_column($players, 'name');
 
-        self::assertNotContains('|DB Test Pipe Player', $names);
+        self::assertContains('DB Test Active Player', $names);
     }
 
     public function testGetActivePlayersExcludesNoStarter(): void

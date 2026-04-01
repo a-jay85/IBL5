@@ -226,20 +226,21 @@ class FreeAgencyCapCalculatorTest extends TestCase
      * @group cap-calculator
      * @group placeholder
      */
-    public function testCashPlaceholderSalaryIncludedInTotals(): void
+    public function testCashConsiderationSalaryIncludedInTotals(): void
     {
-        $players = [
-            $this->createPlaceholderPlayerRow('|Cash from Trade', 300),
-        ];
+        // Cash entries live in ibl_cash_considerations, not ibl_plr
+        $this->mockDb->onQuery('ibl_cash_considerations', [
+            ['cy' => 1, 'cy1' => 300, 'cy2' => 0, 'cy3' => 0, 'cy4' => 0, 'cy5' => 0, 'cy6' => 0],
+        ]);
 
         $team = $this->createMockTeamEntity();
         $mockSeason = $this->createStub(Season::class);
-        $mockTeamQueryRepo = $this->createMockTeamQueryRepo($players, []);
+        $mockTeamQueryRepo = $this->createMockTeamQueryRepo([], []);
         $calculator = new FreeAgencyCapCalculator($this->mockDb, $team, $mockSeason, $mockTeamQueryRepo);
 
         $result = $calculator->calculateTeamCapMetrics();
 
-        $this->assertSame(300, $result['totalSalaries'][0], 'Placeholder salary should be counted in year 1');
+        $this->assertSame(300, $result['totalSalaries'][0], 'Cash consideration salary should be counted in year 1');
         $this->assertSame(0, $result['totalSalaries'][1], 'No salary in year 2');
     }
 
@@ -247,16 +248,17 @@ class FreeAgencyCapCalculatorTest extends TestCase
      * @group cap-calculator
      * @group placeholder
      */
-    public function testPlaceholderDoesNotConsumeRosterSpot(): void
+    public function testCashConsiderationDoesNotConsumeRosterSpot(): void
     {
-        $players = [
-            $this->createPlaceholderPlayerRow('|Cash from Trade', 300),
-            $this->createPlaceholderPlayerRow('Test Buyout Record', 200),
-        ];
+        // Cash entries are in ibl_cash_considerations, not in the roster
+        $this->mockDb->onQuery('ibl_cash_considerations', [
+            ['cy' => 1, 'cy1' => 300, 'cy2' => 0, 'cy3' => 0, 'cy4' => 0, 'cy5' => 0, 'cy6' => 0],
+            ['cy' => 1, 'cy1' => 200, 'cy2' => 0, 'cy3' => 0, 'cy4' => 0, 'cy5' => 0, 'cy6' => 0],
+        ]);
 
         $team = $this->createMockTeamEntity();
         $mockSeason = $this->createStub(Season::class);
-        $mockTeamQueryRepo = $this->createMockTeamQueryRepo($players, []);
+        $mockTeamQueryRepo = $this->createMockTeamQueryRepo([], []);
         $calculator = new FreeAgencyCapCalculator($this->mockDb, $team, $mockSeason, $mockTeamQueryRepo);
 
         $result = $calculator->calculateTeamCapMetrics();
@@ -265,7 +267,7 @@ class FreeAgencyCapCalculatorTest extends TestCase
             $this->assertSame(
                 Team::ROSTER_SPOTS_MAX,
                 $result['rosterSpots'][$i],
-                "Placeholders should not consume roster spots in year " . ($i + 1)
+                "Cash considerations should not consume roster spots in year " . ($i + 1)
             );
         }
     }
@@ -274,10 +276,14 @@ class FreeAgencyCapCalculatorTest extends TestCase
      * @group cap-calculator
      * @group placeholder
      */
-    public function testMixOfPlaceholderAndRealPlayerCalculatesCorrectly(): void
+    public function testMixOfCashAndRealPlayerCalculatesCorrectly(): void
     {
+        // Cash entry contributes to salary via ibl_cash_considerations
+        $this->mockDb->onQuery('ibl_cash_considerations', [
+            ['cy' => 1, 'cy1' => 300, 'cy2' => 0, 'cy3' => 0, 'cy4' => 0, 'cy5' => 0, 'cy6' => 0],
+        ]);
+
         $players = [
-            $this->createPlaceholderPlayerRow('|Cash from Trade', 300),
             TestDataFactory::createPlayer([
                 'name' => 'Real Player',
                 'cy' => 0,
@@ -303,8 +309,8 @@ class FreeAgencyCapCalculatorTest extends TestCase
         $result = $calculator->calculateTeamCapMetrics();
 
         // Both salaries counted
-        $this->assertSame(800, $result['totalSalaries'][0], 'Year 1: 300 placeholder + 500 real');
-        $this->assertSame(550, $result['totalSalaries'][1], 'Year 2: 0 placeholder + 550 real');
+        $this->assertSame(800, $result['totalSalaries'][0], 'Year 1: 300 cash + 500 real');
+        $this->assertSame(550, $result['totalSalaries'][1], 'Year 2: 0 cash + 550 real');
 
         // Only real player consumes roster spot
         $this->assertSame(Team::ROSTER_SPOTS_MAX - 1, $result['rosterSpots'][0]);
@@ -313,33 +319,6 @@ class FreeAgencyCapCalculatorTest extends TestCase
     }
 
     // Helper Methods
-
-    /**
-     * Create a placeholder player row for cap calculator tests
-     *
-     * Uses cy=0 so the placeholder is "under contract" (cy1 > 0 means not a free agent).
-     *
-     * @return array<string, mixed>
-     */
-    private function createPlaceholderPlayerRow(string $name, int $salary): array
-    {
-        return TestDataFactory::createPlayer([
-            'name' => $name,
-            'cy' => 0,
-            'cy1' => $salary,
-            'cy2' => 0,
-            'cy3' => 0,
-            'cy4' => 0,
-            'cy5' => 0,
-            'cy6' => 0,
-            'cyt' => 1,
-            'loyalty' => 0,
-            'playingTime' => 0,
-            'winner' => 0,
-            'tradition' => 0,
-            'security' => 0,
-        ]);
-    }
 
     /**
      * Create a basic mock team with no players or offers (used by setUp)

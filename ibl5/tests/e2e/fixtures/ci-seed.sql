@@ -336,33 +336,12 @@ INSERT INTO ibl_plr (
    60, 30, 75,
    'a0000000-0000-0000-0000-000000200030');
 
--- Salary placeholder records for Free Agency placeholder filtering tests
--- These records test that buyout/cash records appear in "Under Contract"
--- and do NOT appear in "Unsigned Free Agents" or "All Other Free Agents".
--- cy=1,cy1=300,cy2=0 makes isPlayerFreeAgent()=true (zero next-year salary)
--- but isSalaryPlaceholder()=true overrides that for correct table placement.
-INSERT INTO ibl_plr (
-  pid, name, age, peak, tid, pos, ordinal,
-  sta, oo, od, `do`, dd, po, pd, `to`, td,
-  cy, cyt, cy1, cy2,
-  retired, exp, bird,
-  htft, htin, wt, college,
-  draftround, draftpickno, draftyear, draftedby, draftedbycurrentname,
-  stats_gm, stats_min, stats_fgm, stats_fga, stats_ftm, stats_fta,
-  stats_3gm, stats_3ga, stats_orb, stats_drb, stats_ast, stats_stl,
-  stats_to, stats_blk, stats_pf,
-  uuid
-) VALUES
-  (200000020, '|Cash from Trade', 0, 0, 1, '', 200,
-   0, 0, 0, 0, 0, 0, 0, 0, 0,
-   1, 1, 300, 0,
-   0, 0, 0,
-   0, 0, 0, '',
-   0, 0, 2026, '', '',
-   0, 0, 0, 0, 0, 0,
-   0, 0, 0, 0, 0, 0,
-   0, 0, 0,
-   'a0000000-0000-0000-0000-000000200020');
+-- Cash consideration record for Free Agency placeholder filtering tests.
+-- Cash entries live in ibl_cash_considerations (not ibl_plr) since migration 095.
+-- Tests verify that cash rows appear in "Under Contract" and do NOT appear
+-- in "Unsigned Free Agents" or "All Other Free Agents".
+INSERT INTO ibl_cash_considerations (tid, type, label, cy, cyt, cy1, cy2)
+VALUES (1, 'cash', 'Cash from Trade', 1, 1, 300, 0);
 
 -- Free agent demands
 INSERT INTO ibl_demands (name, pid, dem1, dem2, dem3, dem4, dem5, dem6) VALUES

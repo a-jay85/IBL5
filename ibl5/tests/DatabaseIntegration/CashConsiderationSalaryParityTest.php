@@ -1,0 +1,225 @@
+<?php
+
+declare(strict_types=1);
+
+namespace Tests\DatabaseIntegration;
+
+use Services\CommonMysqliRepository;
+use Trading\CashConsiderationRepository;
+
+/**
+ * Verifies that cash considerations in ibl_cash_considerations are correctly
+ * included in salary totals via vw_current_salary.
+ *
+ * Migration 095 moved cash/buyout entries from ibl_plr to ibl_cash_considerations
+ * and updated vw_current_salary with a UNION ALL. These tests ensure the UNION
+ * produces correct salary sums — catching regressions if the view definition,
+ * table structure, or salary calculation logic diverges.
+ */
+class CashConsiderationSalaryParityTest extends DatabaseTestCase
+{
+    private CommonMysqliRepository $commonRepo;
+    private CashConsiderationRepository $cashRepo;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+        $this->commonRepo = new CommonMysqliRepository($this->db);
+        $this->cashRepo = new CashConsiderationRepository($this->db);
+    }
+
+    /**
+     * Helper: get the first real franchise from ibl_team_info.
+     *
+     * @return array{teamid: int, team_name: string}
+     */
+    private function getFirstTeam(): array
+    {
+        $row = $this->fetchAll("SELECT teamid, team_name FROM ibl_team_info WHERE teamid = 1")[0] ?? null;
+        self::assertNotNull($row, 'Expected at least one team in ibl_team_info');
+        return ['teamid' => (int) $row['teamid'], 'team_name' => (string) $row['team_name']];
+    }
+
+    public function testViewCurrentSalaryIncludesCashConsiderations(): void
+    {
+        $team = $this->getFirstTeam();
+        $teamName = $team['team_name'];
+
+        $salaryBefore = $this->commonRepo->getTeamTotalSalary($teamName);
+
+        // Insert a cash consideration for this team
+        $this->cashRepo->insertCashConsideration([
+            'tid' => $team['teamid'],
+
+            'type' => 'cash',
+            'label' => 'Test Cash Entry',
+            'cy' => 1,
+            'cyt' => 1,
+            'cy1' => 500,
+            'cy2' => 0,
+            'cy3' => 0,
+            'cy4' => 0,
+            'cy5' => 0,
+            'cy6' => 0,
+        ]);
+
+        $salaryAfter = $this->commonRepo->getTeamTotalSalary($teamName);
+
+        // The cash entry's current_salary (cy=1 → cy1=500) must be included
+        self::assertSame($salaryBefore + 500, $salaryAfter);
+    }
+
+    public function testViewNextYearSalaryIncludesCashConsiderations(): void
+    {
+        $team = $this->getFirstTeam();
+        $teamName = $team['team_name'];
+
+        $nextYearBefore = $this->commonRepo->getTeamNextYearSalary($teamName);
+
+        // cy=1, cyt=2: current year is cy1, next year is cy2
+        $this->cashRepo->insertCashConsideration([
+            'tid' => $team['teamid'],
+
+            'type' => 'cash',
+            'label' => 'Test Multi-Year Cash',
+            'cy' => 1,
+            'cyt' => 2,
+            'cy1' => 300,
+            'cy2' => 400,
+            'cy3' => 0,
+            'cy4' => 0,
+            'cy5' => 0,
+            'cy6' => 0,
+        ]);
+
+        $nextYearAfter = $this->commonRepo->getTeamNextYearSalary($teamName);
+
+        // next_year_salary: cy=1 → cy2=400
+        self::assertSame($nextYearBefore + 400, $nextYearAfter);
+    }
+
+    public function testNegativeCashReducesTeamSalary(): void
+    {
+        $team = $this->getFirstTeam();
+        $teamName = $team['team_name'];
+
+        $salaryBefore = $this->commonRepo->getTeamTotalSalary($teamName);
+
+        // Negative cash = incoming cash from a trade partner (reduces cap hit)
+        $this->cashRepo->insertCashConsideration([
+            'tid' => $team['teamid'],
+
+            'type' => 'cash',
+            'label' => 'Test Incoming Cash',
+            'cy' => 1,
+            'cyt' => 1,
+            'cy1' => -200,
+            'cy2' => 0,
+            'cy3' => 0,
+            'cy4' => 0,
+            'cy5' => 0,
+            'cy6' => 0,
+        ]);
+
+        $salaryAfter = $this->commonRepo->getTeamTotalSalary($teamName);
+
+        self::assertSame($salaryBefore - 200, $salaryAfter);
+    }
+
+    public function testBuyoutIncludedInTeamSalary(): void
+    {
+        $team = $this->getFirstTeam();
+        $teamName = $team['team_name'];
+
+        $salaryBefore = $this->commonRepo->getTeamTotalSalary($teamName);
+
+        $this->cashRepo->insertCashConsideration([
+            'tid' => $team['teamid'],
+
+            'type' => 'buyout',
+            'label' => 'Test Buyout',
+            'cy' => 1,
+            'cyt' => 1,
+            'cy1' => 350,
+            'cy2' => 0,
+            'cy3' => 0,
+            'cy4' => 0,
+            'cy5' => 0,
+            'cy6' => 0,
+        ]);
+
+        $salaryAfter = $this->commonRepo->getTeamTotalSalary($teamName);
+
+        self::assertSame($salaryBefore + 350, $salaryAfter);
+    }
+
+    /**
+     * Verifies that for every team with cash considerations, the view's
+     * SUM equals ibl_plr SUM + ibl_cash_considerations SUM. This catches
+     * any UNION logic errors (wrong cy mapping, missing columns, etc.).
+     */
+    public function testViewSalaryEqualsPlrPlusCashForAllTeams(): void
+    {
+        /** @var list<array{tid: int, plr_salary: int, cash_salary: int, view_salary: int}> $rows */
+        $rows = $this->fetchAll("
+            WITH plr_totals AS (
+                SELECT tid,
+                       SUM(CASE cy WHEN 1 THEN cy1 WHEN 2 THEN cy2 WHEN 3 THEN cy3
+                                    WHEN 4 THEN cy4 WHEN 5 THEN cy5 WHEN 6 THEN cy6 ELSE 0 END) AS plr_salary
+                FROM ibl_plr WHERE retired = 0 AND tid BETWEEN 1 AND 28
+                GROUP BY tid
+            ),
+            cash_totals AS (
+                SELECT tid,
+                       SUM(CASE cy WHEN 1 THEN cy1 WHEN 2 THEN cy2 WHEN 3 THEN cy3
+                                    WHEN 4 THEN cy4 WHEN 5 THEN cy5 WHEN 6 THEN cy6 ELSE 0 END) AS cash_salary
+                FROM ibl_cash_considerations WHERE tid BETWEEN 1 AND 28
+                GROUP BY tid
+            ),
+            view_totals AS (
+                SELECT tid, SUM(current_salary) AS view_salary
+                FROM vw_current_salary WHERE tid BETWEEN 1 AND 28
+                GROUP BY tid
+            )
+            SELECT t.teamid AS tid,
+                   COALESCE(p.plr_salary, 0) AS plr_salary,
+                   COALESCE(c.cash_salary, 0) AS cash_salary,
+                   COALESCE(v.view_salary, 0) AS view_salary
+            FROM ibl_team_info t
+            LEFT JOIN plr_totals p ON t.teamid = p.tid
+            LEFT JOIN cash_totals c ON t.teamid = c.tid
+            LEFT JOIN view_totals v ON t.teamid = v.tid
+            WHERE t.teamid BETWEEN 1 AND 28
+        ");
+
+        self::assertNotEmpty($rows, 'Expected team salary data');
+
+        foreach ($rows as $row) {
+            $tid = (int) $row['tid'];
+            $plr = (int) $row['plr_salary'];
+            $cash = (int) $row['cash_salary'];
+            $view = (int) $row['view_salary'];
+            $expected = $plr + $cash;
+            self::assertSame(
+                $expected,
+                $view,
+                "Team {$tid}: plr({$plr}) + cash({$cash}) != view({$view})"
+            );
+        }
+    }
+
+    /**
+     * Helper to run raw SQL and return all rows.
+     *
+     * @return list<array<string, mixed>>
+     */
+    private function fetchAll(string $sql): array
+    {
+        $result = $this->db->query($sql);
+        if ($result === false) {
+            self::fail('Query failed: ' . $this->db->error);
+        }
+        /** @var list<array<string, mixed>> */
+        return $result->fetch_all(MYSQLI_ASSOC);
+    }
+}

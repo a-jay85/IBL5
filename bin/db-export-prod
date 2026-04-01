@@ -2,7 +2,8 @@
 # Export production database for use in worktree Docker environments.
 # Box score tables are limited to a single season to keep the dump small.
 #
-# Usage: bin/db-export-prod [season-ending-year]
+# Usage: bin/db-export-prod [--all-seasons] [season-ending-year]
+#   --all-seasons       Export ALL box score data (not just one season)
 #   season-ending-year  The calendar year the season's playoffs end
 #                       (default: auto-detected from ibl_settings)
 #
@@ -51,6 +52,13 @@ else
     echo "Mode: local Docker ($DB_HOST)"
 fi
 
+# Parse flags
+ALL_SEASONS=false
+if [ "${1:-}" = "--all-seasons" ]; then
+    ALL_SEASONS=true
+    shift
+fi
+
 # Detect most recent season from the database (not wall-clock time).
 # ibl_settings stores "Current Season Ending Year" which is the calendar year
 # the current or most-recently-completed season's playoffs end in.
@@ -70,7 +78,11 @@ SEASON_END="${SEASON_END_YEAR}-06-30"
 
 DUMP_OPTS="--skip-ssl --single-transaction --skip-lock-tables $EXTRA_OPTS"
 
-echo "Exporting production DB (box scores limited to ${SEASON_START} – ${SEASON_END})..."
+if [ "$ALL_SEASONS" = true ]; then
+    echo "Exporting production DB (ALL box scores)..."
+else
+    echo "Exporting production DB (box scores limited to ${SEASON_START} – ${SEASON_END})..."
+fi
 
 # Tables to export with season-filtered box scores
 BOX_TABLES="ibl_box_scores ibl_box_scores_teams"
@@ -147,10 +159,16 @@ db_dump --no-create-info --skip-triggers "$DB_NAME" $REGULAR_TABLES \
 PIDS="$PIDS $!"
 
 for tbl in $BOX_TABLES; do
-    echo "-- Dumping $tbl (season ${SEASON_END_YEAR} only)..."
-    db_dump --no-create-info --skip-triggers \
-        --where="Date BETWEEN '${SEASON_START}' AND '${SEASON_END}'" \
-        "$DB_NAME" "$tbl" > "$TMPDIR/box_${tbl}.sql" &
+    if [ "$ALL_SEASONS" = true ]; then
+        echo "-- Dumping $tbl (all seasons)..."
+        db_dump --no-create-info --skip-triggers \
+            "$DB_NAME" "$tbl" > "$TMPDIR/box_${tbl}.sql" &
+    else
+        echo "-- Dumping $tbl (season ${SEASON_END_YEAR} only)..."
+        db_dump --no-create-info --skip-triggers \
+            --where="Date BETWEEN '${SEASON_START}' AND '${SEASON_END}'" \
+            "$DB_NAME" "$tbl" > "$TMPDIR/box_${tbl}.sql" &
+    fi
     PIDS="$PIDS $!"
 done
 
@@ -184,4 +202,8 @@ perl -pi -e 's/ DEFINER=[^ ]* / /g' "$OUTPUT"
 SIZE=$(du -h "$OUTPUT" | cut -f1)
 echo ""
 echo "Done: $OUTPUT ($SIZE)"
-echo "Season: Oct ${SEASON_START%%-*} – Jun ${SEASON_END_YEAR} (HEAT through playoffs)"
+if [ "$ALL_SEASONS" = true ]; then
+    echo "Box scores: ALL seasons"
+else
+    echo "Season: Oct ${SEASON_START%%-*} – Jun ${SEASON_END_YEAR} (HEAT through playoffs)"
+fi

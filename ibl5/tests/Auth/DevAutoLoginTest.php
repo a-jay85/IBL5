@@ -137,6 +137,7 @@ class DevAutoLoginTest extends TestCase
             'localhost' => ['localhost'],
             'loopback IP' => ['127.0.0.1'],
             'main.localhost' => ['main.localhost'],
+            'worktree subdomain' => ['dev-auto-login.localhost'],
         ];
     }
 

@@ -21,9 +21,6 @@ use Logging\LoggerFactory;
  */
 final class DevAutoLogin
 {
-    /** @var list<string> */
-    private const ALLOWED_HOSTS = ['localhost', '127.0.0.1', 'main.localhost'];
-
     private const ENV_VAR_NAME = 'DEV_AUTO_LOGIN';
 
     public static function tryAutoLogin(\mysqli $db): void
@@ -33,9 +30,9 @@ final class DevAutoLogin
             return;
         }
 
-        // Guard 2: only on localhost
+        // Guard 2: only on localhost (exact match or *.localhost subdomains for worktrees)
         $serverName = $_SERVER['SERVER_NAME'] ?? null;
-        if (!is_string($serverName) || !in_array($serverName, self::ALLOWED_HOSTS, true)) {
+        if (!is_string($serverName) || !self::isLocalhost($serverName)) {
             return;
         }
 
@@ -109,5 +106,15 @@ final class DevAutoLogin
         }
 
         return null;
+    }
+
+    private static function isLocalhost(string $serverName): bool
+    {
+        if ($serverName === 'localhost' || $serverName === '127.0.0.1') {
+            return true;
+        }
+
+        // Accept *.localhost subdomains (e.g., main.localhost, dev-auto-login.localhost)
+        return str_ends_with($serverName, '.localhost');
     }
 }

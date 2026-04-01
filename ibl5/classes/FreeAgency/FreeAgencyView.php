@@ -128,6 +128,31 @@ class FreeAgencyView
         </tr>
             <?php endif; ?>
         <?php endforeach; ?>
+        <?php
+        // Append cash considerations and buyouts from dedicated table
+        $cashRepo = new \Trading\CashConsiderationRepository($this->mysqli_db);
+        $cashRows = $cashRepo->getTeamCashConsiderations($team->teamID);
+        foreach ($cashRows as $cashRow):
+            $cashPlayerRow = \Team\TeamTableService::cashConsiderationToRosterRow($cashRow);
+            /** @phpstan-ignore argument.type (cashConsiderationToRosterRow produces a PlayerRow-shaped array) */
+            $cashPlayer = Player::withPlrRow($this->mysqli_db, $cashPlayerRow);
+            $cashFutureSalaries = $cashPlayer->getFutureSalaries();
+            $cashLabel = is_string($cashRow['label'] ?? null) ? $cashRow['label'] : '';
+        ?>
+        <tr>
+            <td></td>
+            <?= PlayerImageHelper::renderFlexiblePlayerCell(0, '| ' . $cashLabel) ?>
+            <td>0</td>
+            <?= $this->renderPlayerRatings($cashPlayer) ?>
+            <td class="col-salary"><?= $cashFutureSalaries[0] ?></td>
+            <td class="col-salary"><?= $cashFutureSalaries[1] ?></td>
+            <td class="col-salary"><?= $cashFutureSalaries[2] ?></td>
+            <td class="col-salary"><?= $cashFutureSalaries[3] ?></td>
+            <td class="col-salary"><?= $cashFutureSalaries[4] ?></td>
+            <td class="col-salary"><?= $cashFutureSalaries[5] ?></td>
+            <?= $this->renderPlayerPreferences($cashPlayer) ?>
+        </tr>
+        <?php endforeach; ?>
     </tbody>
     <tfoot>
         <tr>

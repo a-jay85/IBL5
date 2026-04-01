@@ -41,11 +41,8 @@ class PlayerRegularSeasonAveragesView implements PlayerRegularSeasonAveragesView
     {
         $historicalStats = $this->repository->getHistoricalStats($playerID);
 
-        if ($this->repository->hasPlrSnapshots()) {
-            $careerAverages = $this->repository->getSeasonCareerAveragesById($playerID);
-        } else {
-            $careerAverages = self::computeCareerAveragesFromHistory($historicalStats);
-        }
+        $careerAverages = $this->repository->getSeasonCareerAveragesById($playerID)
+            ?? self::computeCareerAveragesFromHistory($historicalStats);
 
         ob_start();
         ?>

@@ -6,6 +6,7 @@ namespace LeagueControlPanel;
 
 use League\League;
 use LeagueControlPanel\Contracts\LeagueControlPanelRepositoryInterface;
+use Trading\CashConsiderationRepository;
 
 /**
  * @see LeagueControlPanelRepositoryInterface
@@ -194,7 +195,6 @@ class LeagueControlPanelRepository extends \BaseMysqliRepository implements Leag
         $this->execute(
             "UPDATE ibl_plr SET tid = " . League::FREE_AGENTS_TEAMID . ", bird = 0"
             . " WHERE retired <> 1 AND ordinal > " . \JSB::WAIVERS_ORDINAL
-            . " AND name NOT LIKE '|%' AND name NOT LIKE '%Buyout%'"
         );
 
         return true;
@@ -318,16 +318,8 @@ class LeagueControlPanelRepository extends \BaseMysqliRepository implements Leag
      */
     public function deleteOutdatedBuyoutsAndCash(): int
     {
-        return $this->execute(
-            "DELETE FROM ibl_plr
-            WHERE (name LIKE '%|%Buyout%' OR name LIKE '%|%Cash%')
-              AND (cy >= 1 OR cy1 = 0)
-              AND (cy >= 2 OR cy2 = 0)
-              AND (cy >= 3 OR cy3 = 0)
-              AND (cy >= 4 OR cy4 = 0)
-              AND (cy >= 5 OR cy5 = 0)
-              AND (cy >= 6 OR cy6 = 0)"
-        );
+        $cashRepo = new CashConsiderationRepository($this->db);
+        return $cashRepo->deleteExpiredCashConsiderations();
     }
 
     /**

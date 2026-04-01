@@ -222,8 +222,8 @@ class TradeIntegrationTest extends IntegrationTestCase
         $this->assertStringContainsString('Warriors', $result['storytext']);
         $this->assertStringContainsString('Spurs', $result['storytext']);
 
-        // Verify two INSERT queries for positive and negative cash entries
-        $this->assertEquals(2, $this->countQueriesMatching('INSERT INTO `ibl_plr`'));
+        // Verify two INSERT queries for positive and negative cash entries in ibl_cash_considerations
+        $this->assertEquals(2, $this->countQueriesMatching('INSERT INTO ibl_cash_considerations'));
     }
 
     // ========== MULTI-ASSET TRADES ==========
@@ -510,11 +510,11 @@ class TradeIntegrationTest extends IntegrationTestCase
         // Assert
         $this->assertTrue($result['success']);
 
-        // Cash creates two INSERT INTO ibl_plr records: one positive (for sender), one negative (for receiver)
-        $insertCount = $this->countQueriesMatching('INSERT INTO `ibl_plr`');
-        $this->assertSame(2, $insertCount, 'Cash trade should create exactly 2 special player records');
+        // Cash creates two INSERT INTO ibl_cash_considerations records: one positive (sender) and one negative (receiver)
+        $insertCount = $this->countQueriesMatching('INSERT INTO ibl_cash_considerations');
+        $this->assertSame(2, $insertCount, 'Cash trade should create exactly 2 cash consideration records');
 
-        // Verify the pipe-prefix naming convention for cash entries (| <B>Cash to/from ...)
+        // Verify the label convention for cash entries
         $this->assertQueryExecuted('Cash to');
         $this->assertQueryExecuted('Cash from');
     }

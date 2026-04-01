@@ -9,6 +9,8 @@ use Player\Player;
 use Team\Contracts\TeamQueryRepositoryInterface;
 use Team\Team;
 use Season\Season;
+use Trading\CashConsiderationRepository;
+use Trading\Contracts\CashConsiderationRepositoryInterface;
 
 /**
  * @phpstan-import-type PlayerRow from \Services\CommonMysqliRepository
@@ -19,19 +21,22 @@ class FreeAgencyCapCalculator
     private Team $team;
     private Season $season;
     private TeamQueryRepositoryInterface $teamQueryRepo;
+    private CashConsiderationRepositoryInterface $cashConsiderationRepo;
 
     /**
      * @param \mysqli $mysqli_db Database connection
      * @param Team $team Team entity
      * @param Season $season Season entity
      * @param TeamQueryRepositoryInterface|null $teamQueryRepo Team query repository (created internally if not provided)
+     * @param CashConsiderationRepositoryInterface|null $cashConsiderationRepo Cash consideration repository (created internally if not provided)
      */
-    public function __construct(\mysqli $mysqli_db, Team $team, Season $season, ?TeamQueryRepositoryInterface $teamQueryRepo = null)
+    public function __construct(\mysqli $mysqli_db, Team $team, Season $season, ?TeamQueryRepositoryInterface $teamQueryRepo = null, ?CashConsiderationRepositoryInterface $cashConsiderationRepo = null)
     {
         $this->mysqli_db = $mysqli_db;
         $this->team = $team;
         $this->season = $season;
         $this->teamQueryRepo = $teamQueryRepo ?? new \Team\TeamQueryRepository($mysqli_db);
+        $this->cashConsiderationRepo = $cashConsiderationRepo ?? new CashConsiderationRepository($mysqli_db);
     }
 
     /**
@@ -46,17 +51,39 @@ class FreeAgencyCapCalculator
     {
         $totalSalaries = [0, 0, 0, 0, 0, 0];
 
-        // Add salaries from players under contract (including buyout/cash placeholders)
+        // Add salaries from players under contract
         foreach ($rosterData as $playerRow) {
             /** @var PlayerRow $playerRow */
             $player = Player::withPlrRow($this->mysqli_db, $playerRow);
 
-            if (!$player->isPlayerFreeAgent($this->season) || $player->isSalaryPlaceholder()) {
+            if (!$player->isPlayerFreeAgent($this->season)) {
                 $futureSalaries = $player->getFutureSalaries();
 
                 for ($year = 0; $year < 6; $year++) {
                     $totalSalaries[$year] += $futureSalaries[$year];
                 }
+            }
+        }
+
+        // Add cash considerations (trades, buyouts) for the team
+        // Must apply the same cy-based offset as player contracts
+        $isOffseason = $this->season->isOffseasonPhase();
+        $cashRows = $this->cashConsiderationRepo->getTeamCashForSalary($this->team->teamID);
+        foreach ($cashRows as $cashRow) {
+            $cy = $cashRow['cy'] ?? 1;
+            if ($isOffseason) {
+                $cy++;
+            }
+            if ($cy === 0) {
+                $cy = 1;
+            }
+            $salaryFields = [1 => $cashRow['cy1'], 2 => $cashRow['cy2'], 3 => $cashRow['cy3'],
+                             4 => $cashRow['cy4'], 5 => $cashRow['cy5'], 6 => $cashRow['cy6']];
+            $slot = 0;
+            while ($cy <= 6 && $slot < 6) {
+                $totalSalaries[$slot] += $salaryFields[$cy] ?? 0;
+                $cy++;
+                $slot++;
             }
         }
 
@@ -98,12 +125,12 @@ class FreeAgencyCapCalculator
             5 => Team::ROSTER_SPOTS_MAX,
         ];
 
-        // Count players under contract (excluding buyout/cash placeholders from roster spots)
+        // Count players under contract
         foreach ($rosterData as $playerRow) {
             /** @var PlayerRow $playerRow */
             $player = Player::withPlrRow($this->mysqli_db, $playerRow);
 
-            if (!$player->isPlayerFreeAgent($this->season) && !$player->isSalaryPlaceholder()) {
+            if (!$player->isPlayerFreeAgent($this->season)) {
                 $futureSalaries = $player->getFutureSalaries();
                 $this->decrementRosterSpotsForSalaries($rosterSpots, $futureSalaries);
             }

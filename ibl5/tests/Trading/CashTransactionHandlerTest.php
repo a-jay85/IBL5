@@ -220,25 +220,6 @@ class CashTransactionHandlerTest extends TestCase
     private $legacyMockDb = null;
 
     /**
-     * @group pid-generation
-     */
-    public function testGeneratesUniquePidWhenRequestedPidIsAvailable(): void
-    {
-        // Arrange
-        $requestedPid = 99999;
-        $this->legacyMockDb = new \MockDatabase();
-        // Mock repository to return null (PID doesn't exist)
-        $this->legacyMockDb->setMockData([]);
-        $cashHandler = new \Trading\CashTransactionHandler($this->legacyMockDb);
-
-        // Act
-        $result = $cashHandler->generateUniquePid($requestedPid);
-
-        // Assert
-        $this->assertEquals($requestedPid, $result);
-    }
-
-    /**
      * @group contract-calculations
      */
     #[DataProvider('contractYearScenarios')]
@@ -283,14 +264,13 @@ class CashTransactionHandlerTest extends TestCase
     public function testCreatesCashTransactionWithProperStoryText(): void
     {
         // Arrange
-        $itemId = 12345;
         $fromTeamName = 'Los Angeles Lakers';
         $toTeamName = 'Boston Celtics';
         $cashYear = [1 => 100, 2 => 200, 3 => 0, 4 => 0, 5 => 0, 6 => 0];
         $seasonEndingYear = 2007;
 
         // Act
-        $result = $this->createLegacyMockCashHandler()->createCashTransaction($itemId, $fromTeamName, $toTeamName, $cashYear, $seasonEndingYear);
+        $result = $this->createLegacyMockCashHandler()->createCashTransaction($fromTeamName, $toTeamName, $cashYear, $seasonEndingYear);
 
         // Assert
         $this->assertTrue($result['success'], 'Cash transaction should succeed');
@@ -436,7 +416,6 @@ class CashTransactionHandlerTest extends TestCase
         // This is an integration-style test that combines multiple operations
 
         // Arrange
-        $itemId = 54321;
         $fromTeamName = 'San Antonio Spurs';
         $toTeamName = 'Portland Trail Blazers';
         $cashYear = [1 => 250, 2 => 275, 3 => 300, 4 => 0, 5 => 0, 6 => 0];
@@ -447,7 +426,7 @@ class CashTransactionHandlerTest extends TestCase
         // Act - Test the complete workflow
         $contractYears = $cashHandler->calculateContractTotalYears($cashYear);
         $hasCash = $cashHandler->hasCashInTrade($cashYear);
-        $transactionResult = $cashHandler->createCashTransaction($itemId, $fromTeamName, $toTeamName, $cashYear, $seasonEndingYear);
+        $transactionResult = $cashHandler->createCashTransaction($fromTeamName, $toTeamName, $cashYear, $seasonEndingYear);
 
         // Assert - Verify the complete workflow
         $this->assertEquals(3, $contractYears, 'Should calculate 3 contract years');

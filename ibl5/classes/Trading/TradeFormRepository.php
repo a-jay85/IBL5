@@ -43,7 +43,7 @@ class TradeFormRepository extends BaseMysqliRepository implements TradeFormRepos
         return $this->fetchAll(
             "SELECT pos, name, pid, ordinal, cy, cy1, cy2, cy3, cy4, cy5, cy6
              FROM ibl_plr
-             WHERE tid = ? AND retired = 0 AND name NOT LIKE '|%'
+             WHERE tid = ? AND retired = 0
              ORDER BY ordinal ASC",
             "i",
             $teamId
@@ -80,7 +80,7 @@ class TradeFormRepository extends BaseMysqliRepository implements TradeFormRepos
      */
     public function getTeamPlayerCount(int $teamId, bool $isOffseason = false): int
     {
-        $sql = "SELECT COUNT(*) AS cnt FROM ibl_plr WHERE tid = ? AND retired = 0 AND ordinal <= 960 AND name NOT LIKE '|%'";
+        $sql = "SELECT COUNT(*) AS cnt FROM ibl_plr WHERE tid = ? AND retired = 0 AND ordinal <= 960";
 
         if ($isOffseason) {
             // During offseason, exclude players whose contracts have expired.

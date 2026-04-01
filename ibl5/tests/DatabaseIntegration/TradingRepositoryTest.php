@@ -304,16 +304,14 @@ class TradingRepositoryTest extends DatabaseTestCase
 
     // ── Team players/picks for trading UI ───────────────────────
 
-    public function testGetTeamPlayersForTradingExcludesPipeNames(): void
+    public function testGetTeamPlayersForTradingReturnsTeamPlayers(): void
     {
         $this->insertTestPlayer(200030112, 'Trade UI Plr', ['tid' => 5, 'ordinal' => 100]);
-        $this->insertTestPlayer(200030113, '|Cash Trade', ['tid' => 5, 'ordinal' => 200]);
 
         $players = $this->formRepo->getTeamPlayersForTrading(5);
 
         $names = array_column($players, 'name');
         self::assertContains('Trade UI Plr', $names);
-        self::assertNotContains('|Cash Trade', $names);
     }
 
     public function testGetTeamDraftPicksForTradingReturnsPicks(): void

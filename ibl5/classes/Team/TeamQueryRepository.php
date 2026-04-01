@@ -8,6 +8,8 @@ use League\League;
 use Player\Player;
 use Team\Contracts\TeamQueryRepositoryInterface;
 use Season\Season;
+use Trading\CashConsiderationRepository;
+use Trading\Contracts\CashConsiderationRepositoryInterface;
 
 /**
  * TeamQueryRepository - Query methods for team-related data
@@ -16,6 +18,7 @@ use Season\Season;
  * Extends BaseMysqliRepository for standardized database access via fetchAll/fetchOne.
  *
  * @phpstan-import-type PlayerRow from \Services\CommonMysqliRepository
+ * @phpstan-import-type CashConsiderationRow from \Trading\Contracts\CashConsiderationRepositoryInterface
  * @phpstan-import-type DraftPickRow from TeamQueryRepositoryInterface
  * @phpstan-import-type FreeAgencyOfferRow from TeamQueryRepositoryInterface
  *
@@ -24,24 +27,22 @@ use Season\Season;
  */
 class TeamQueryRepository extends \BaseMysqliRepository implements TeamQueryRepositoryInterface
 {
+    private CashConsiderationRepositoryInterface $cashConsiderationRepo;
+
+    public function __construct(\mysqli $db, ?\League\LeagueContext $leagueContext = null, ?CashConsiderationRepositoryInterface $cashConsiderationRepo = null)
+    {
+        parent::__construct($db, $leagueContext);
+        $this->cashConsiderationRepo = $cashConsiderationRepo ?? new CashConsiderationRepository($db);
+    }
+
     /**
      * @see TeamQueryRepositoryInterface::getBuyouts()
      *
-     * @return list<PlayerRow>
+     * @return list<CashConsiderationRow>
      */
     public function getBuyouts(int $teamId): array
     {
-        /** @var list<PlayerRow> */
-        return $this->fetchAll(
-            "SELECT p.*, t.team_name AS teamname, t.color1, t.color2
-            FROM ibl_plr p
-            LEFT JOIN ibl_team_info t ON p.tid = t.teamid
-            WHERE p.tid = ?
-              AND p.name LIKE '%Buyout%'
-            ORDER BY p.name ASC",
-            "i",
-            $teamId
-        );
+        return $this->cashConsiderationRepo->getTeamBuyouts($teamId);
     }
 
     /**
@@ -342,6 +343,35 @@ class TeamQueryRepository extends \BaseMysqliRepository implements TeamQueryRepo
             }
         }
 
+        // Add cash considerations (trades, buyouts) for the team
+        $cashRows = $this->cashConsiderationRepo->getTeamCashForSalary($teamId);
+
+        foreach ($cashRows as $cashRow) {
+            $yearUnderContract = $cashRow['cy'];
+            if ($season->isOffseasonPhase()) {
+                $yearUnderContract++;
+            }
+
+            $i = 1;
+            while ($yearUnderContract <= 6) {
+                $key = "year" . $i;
+                if (!isset($salaryCapSpent[$key])) {
+                    $salaryCapSpent[$key] = 0;
+                }
+                $salaryCapSpent[$key] += match ($yearUnderContract) {
+                    1 => $cashRow['cy1'],
+                    2 => $cashRow['cy2'],
+                    3 => $cashRow['cy3'],
+                    4 => $cashRow['cy4'],
+                    5 => $cashRow['cy5'],
+                    6 => $cashRow['cy6'],
+                    default => 0,
+                };
+                $yearUnderContract++;
+                $i++;
+            }
+        }
+
         return $salaryCapSpent;
     }
 
@@ -394,8 +424,27 @@ class TeamQueryRepository extends \BaseMysqliRepository implements TeamQueryRepo
      */
     public function canAddBuyoutWithoutExceedingBuyoutLimit(int $teamId, int $buyoutValue): bool
     {
+        $season = new Season($this->db);
         $buyoutsResult = $this->getBuyouts($teamId);
-        $totalCurrentSeasonBuyouts = $this->getTotalCurrentSeasonSalaries($buyoutsResult);
+        $totalCurrentSeasonBuyouts = 0;
+        foreach ($buyoutsResult as $buyout) {
+            $cy = $buyout['cy'];
+            if ($season->isOffseasonPhase()) {
+                $cy++;
+            }
+            if ($cy === 0) {
+                $cy = 1;
+            }
+            $totalCurrentSeasonBuyouts += match ($cy) {
+                1 => $buyout['cy1'],
+                2 => $buyout['cy2'],
+                3 => $buyout['cy3'],
+                4 => $buyout['cy4'],
+                5 => $buyout['cy5'],
+                6 => $buyout['cy6'],
+                default => 0,
+            };
+        }
         $projectedTotalCurrentSeasonBuyouts = $totalCurrentSeasonBuyouts + $buyoutValue;
         $buyoutLimit = League::HARD_CAP_MAX * Team::BUYOUT_PERCENTAGE_MAX;
 

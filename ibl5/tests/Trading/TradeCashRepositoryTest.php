@@ -10,8 +10,7 @@ use Trading\TradeCashRepository;
 /**
  * TradeCashRepositoryTest - Tests for TradeCashRepository database operations
  *
- * Tests cash transaction operations: cash player records,
- * cash trade offers, team cash salary records, and bulk clear.
+ * Tests cash transaction operations: cash trade offers, team cash salary records, and bulk clear.
  */
 class TradeCashRepositoryTest extends TestCase
 {
@@ -114,66 +113,6 @@ class TradeCashRepositoryTest extends TestCase
         $result = $repository->getCashTransactionByOffer(999, 'Nobody');
 
         $this->assertNull($result);
-    }
-
-    // ============================================
-    // INSERT CASH PLAYER RECORD TESTS
-    // ============================================
-
-    public function testInsertCashPlayerRecordExecutesInsert(): void
-    {
-        $repository = new TradeCashRepository($this->mockMysqliDb);
-
-        $data = [
-            'ordinal' => 999,
-            'pid' => 9999,
-            'name' => '|Cash',
-            'tid' => 1,
-            'teamname' => 'Miami',
-            'exp' => 0,
-            'cy' => 0,
-            'cyt' => 'cash',
-            'cy1' => 100,
-            'cy2' => 0,
-            'cy3' => 0,
-            'cy4' => 0,
-            'cy5' => 0,
-            'cy6' => 0,
-            'retired' => 0,
-        ];
-
-        $result = $repository->insertCashPlayerRecord($data);
-
-        $this->assertIsInt($result);
-    }
-
-    // ============================================
-    // GET TEAM CASH RECORDS FOR SALARY TESTS
-    // ============================================
-
-    public function testGetTeamCashRecordsForSalaryReturnsResults(): void
-    {
-        $repository = new TradeCashRepository($this->mockMysqliDb);
-        $this->mockDb->setMockData([
-            ['pos' => '', 'name' => '|Cash From Trade', 'pid' => 9999, 'ordinal' => 999, 'cy' => 0, 'cy1' => 100, 'cy2' => 0, 'cy3' => 0, 'cy4' => 0, 'cy5' => 0, 'cy6' => 0],
-        ]);
-
-        $result = $repository->getTeamCashRecordsForSalary(1);
-
-        $this->assertIsArray($result);
-        $this->assertCount(1, $result);
-        $this->assertSame('|Cash From Trade', $result[0]['name']);
-    }
-
-    public function testGetTeamCashRecordsForSalaryReturnsEmptyArray(): void
-    {
-        $repository = new TradeCashRepository($this->mockMysqliDb);
-        $this->mockDb->setMockData([]);
-
-        $result = $repository->getTeamCashRecordsForSalary(1);
-
-        $this->assertIsArray($result);
-        $this->assertEmpty($result);
     }
 
     // ============================================

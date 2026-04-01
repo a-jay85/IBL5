@@ -11,8 +11,6 @@ namespace Trading\Contracts;
  * Extracted from the original TradingRepositoryInterface to follow single-responsibility principle.
  *
  * @phpstan-type TradeCashRow array{tradeOfferID: int, sendingTeam: string, receivingTeam: string, cy1: ?int, cy2: ?int, cy3: ?int, cy4: ?int, cy5: ?int, cy6: ?int}
- * @phpstan-type CashPlayerData array{ordinal: int, pid: int, name: string, tid: int, exp: int, cy: int, cyt: int, cy1: int, cy2: int, cy3: int, cy4: int, cy5: int, cy6: int, retired: int}
- * @phpstan-type TradingPlayerRow array{pos: string, name: string, pid: int, ordinal: ?int, cy: ?int, cy1: ?int, cy2: ?int, cy3: ?int, cy4: ?int, cy5: ?int, cy6: ?int}
  */
 interface TradeCashRepositoryInterface
 {
@@ -24,14 +22,6 @@ interface TradeCashRepositoryInterface
      * @return TradeCashRow|null Cash details with cy1-cy6 fields, or null if not found
      */
     public function getCashTransactionByOffer(int $offerId, string $sendingTeam): ?array;
-
-    /**
-     * Insert a cash player record (positive or negative cash transaction)
-     *
-     * @param CashPlayerData $data Associative array with keys: ordinal, pid, name, tid, exp, cy, cyt, cy1-cy6, retired
-     * @return int Number of affected rows
-     */
-    public function insertCashPlayerRecord(array $data): int;
 
     /**
      * Insert cash trade offer into ibl_trade_cash
@@ -48,17 +38,6 @@ interface TradeCashRepositoryInterface
      * @return int Number of affected rows
      */
     public function insertCashTradeOffer(int $tradeOfferId, string $sendingTeam, string $receivingTeam, int $cy1, int $cy2, int $cy3, int $cy4, int $cy5, int $cy6): int;
-
-    /**
-     * Get cash placeholder records for a team's salary calculation
-     *
-     * Returns cash transaction records (names starting with '|') that affect
-     * a team's salary cap totals but should not appear in the trading roster.
-     *
-     * @param int $teamId Team ID
-     * @return list<TradingPlayerRow> Cash placeholder rows with contract year data
-     */
-    public function getTeamCashRecordsForSalary(int $teamId): array;
 
     /**
      * Clear all trade cash data

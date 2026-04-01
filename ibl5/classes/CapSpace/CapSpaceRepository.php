@@ -42,8 +42,7 @@ class CapSpaceRepository extends \BaseMysqliRepository implements CapSpaceReposi
             "SELECT cy, cyt FROM ibl_plr
              WHERE retired = 0
                AND tid = ?
-               AND cy <> cyt
-               AND name NOT LIKE '%|%'",
+               AND cy <> cyt",
             "i",
             $teamId
         );

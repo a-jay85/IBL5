@@ -93,57 +93,6 @@ class TradeCashRepositoryTest extends DatabaseTestCase
         self::assertSame(200, $remaining['cy1']);
     }
 
-    // ── Cash player record (inserts into ibl_plr) ───────────────
-
-    public function testInsertCashPlayerRecordInsertsIntoPLR(): void
-    {
-        $this->repo->insertCashPlayerRecord([
-            'ordinal' => 999,
-            'pid' => 200032001,
-            'name' => '|Cash TestPlr',
-            'tid' => 3,
-            'exp' => 0,
-            'cy' => 1,
-            'cyt' => 1,
-            'cy1' => 500,
-            'cy2' => 0,
-            'cy3' => 0,
-            'cy4' => 0,
-            'cy5' => 0,
-            'cy6' => 0,
-            'retired' => 0,
-        ]);
-
-        $stmt = $this->db->prepare("SELECT name, tid, cy1 FROM ibl_plr WHERE pid = ?");
-        self::assertNotFalse($stmt);
-        $pid = 200032001;
-        $stmt->bind_param('i', $pid);
-        $stmt->execute();
-        $row = $stmt->get_result()->fetch_assoc();
-        $stmt->close();
-
-        self::assertNotNull($row);
-        self::assertSame('|Cash TestPlr', $row['name']);
-        self::assertSame(3, $row['tid']);
-        self::assertSame(500, $row['cy1']);
-    }
-
-    // ── Pipe-prefixed salary records ────────────────────────────
-
-    public function testGetTeamCashRecordsForSalaryReturnsOnlyPipePrefixed(): void
-    {
-        // Regular player — should NOT appear
-        $this->insertTestPlayer(200032002, 'Regular Player', ['tid' => 8, 'ordinal' => 100]);
-        // Cash player (pipe-prefixed) — should appear
-        $this->insertTestPlayer(200032003, '|Cash Salary', ['tid' => 8, 'ordinal' => 200]);
-
-        $records = $this->repo->getTeamCashRecordsForSalary(8);
-
-        $names = array_column($records, 'name');
-        self::assertContains('|Cash Salary', $names);
-        self::assertNotContains('Regular Player', $names);
-    }
-
     // ── Clear all trade cash ────────────────────────────────────
 
     public function testClearTradeCashRemovesAllRows(): void

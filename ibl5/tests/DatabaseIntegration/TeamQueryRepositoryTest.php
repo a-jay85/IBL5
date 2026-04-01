@@ -23,30 +23,36 @@ class TeamQueryRepositoryTest extends DatabaseTestCase
 
     // --- Buyouts ---
 
-    public function testGetBuyoutsReturnsPlayersWithBuyoutInName(): void
+    public function testGetBuyoutsReturnsBuyoutRowsFromCashConsiderations(): void
     {
-        $this->insertTestPlayer(200000101, 'Test Buyout Player', [
-            'cy' => 1,
-            'cyt' => 1,
-            'cy1' => 500,
-        ]);
+        $stmt = $this->db->prepare(
+            "INSERT INTO ibl_cash_considerations (tid, type, label, cy, cyt, cy1) VALUES (?, 'buyout', ?, ?, ?, ?)"
+        );
+        self::assertNotFalse($stmt);
+        $label = 'Test Buyout';
+        $cy = 1;
+        $cyt = 1;
+        $cy1 = 500;
+        $stmt->bind_param('isiii', ...[ self::TEST_TID, $label, $cy, $cyt, $cy1 ]);
+        $stmt->execute();
+        $stmt->close();
 
         $result = $this->repo->getBuyouts(self::TEST_TID);
 
         $found = false;
-        foreach ($result as $player) {
-            if ($player['pid'] === 200000101) {
+        foreach ($result as $row) {
+            if ($row['label'] === 'Test Buyout') {
                 $found = true;
-                self::assertSame('Test Buyout Player', $player['name']);
+                self::assertSame(500, $row['cy1']);
                 break;
             }
         }
-        self::assertTrue($found, 'Buyout player should be found');
+        self::assertTrue($found, 'Buyout row should be found in ibl_cash_considerations');
     }
 
     public function testGetBuyoutsReturnsEmptyForTeamWithNoBuyouts(): void
     {
-        // Team 99 doesn't exist in production — no buyout players
+        // Team ID 9999 has no buyouts
         $result = $this->repo->getBuyouts(9999);
 
         self::assertSame([], $result);

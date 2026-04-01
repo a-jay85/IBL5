@@ -651,6 +651,7 @@ class TradingServiceTest extends TestCase
             ['id' => 1001, 'cnt' => 10],
             ['name' => 'Test Player', 'pos' => 'PG', 'cnt' => 10]
         ]);
+        $db->onQuery('ibl_cash_considerations', []);
         $_SERVER['SERVER_NAME'] = 'localhost';
 
         $tradeOffer = new \Trading\TradeOffer($db);
@@ -715,6 +716,7 @@ class TradingServiceTest extends TestCase
             ['id' => 1001, 'cnt' => 10],
             ['name' => 'Test Player', 'pos' => 'PG', 'cnt' => 10]
         ]);
+        $db->onQuery('ibl_cash_considerations', []);
         $_SERVER['SERVER_NAME'] = 'localhost';
 
         $tradeOffer = new \Trading\TradeOffer($db);

@@ -9,6 +9,7 @@ use Trading\CashTransactionHandler;
 use Trading\Contracts\TradeOfferRepositoryInterface;
 use Trading\Contracts\TradeAssetRepositoryInterface;
 use Trading\Contracts\TradeCashRepositoryInterface;
+use Trading\Contracts\CashConsiderationRepositoryInterface;
 use Trading\TradeOffer;
 use Trading\TradeValidator;
 use Season\Season;
@@ -31,10 +32,12 @@ class TradeOfferTest extends TestCase
         Season $season,
         ?Discord $discord = null,
         ?TradeCashRepositoryInterface $cashRepo = null,
+        ?CashConsiderationRepositoryInterface $cashConsiderationRepo = null,
     ): TradeOffer {
         $cashRepoStub = $cashRepo ?? $this->createStub(TradeCashRepositoryInterface::class);
+        $cashConsiderationRepoStub = $cashConsiderationRepo ?? $this->createStub(CashConsiderationRepositoryInterface::class);
 
-        return new class ($offerRepository, $assetRepository, $validator, $cashHandler, $commonRepo, $season, $discord, $cashRepoStub) extends TradeOffer {
+        return new class ($offerRepository, $assetRepository, $validator, $cashHandler, $commonRepo, $season, $discord, $cashRepoStub, $cashConsiderationRepoStub) extends TradeOffer {
             public function __construct(
                 TradeOfferRepositoryInterface $offerRepository,
                 TradeAssetRepositoryInterface $assetRepository,
@@ -44,6 +47,7 @@ class TradeOfferTest extends TestCase
                 Season $season,
                 ?Discord $discord,
                 TradeCashRepositoryInterface $cashRepo,
+                CashConsiderationRepositoryInterface $cashConsiderationRepo,
             ) {
                 // Skip parent constructor — inject directly
                 $this->db = new class extends \mysqli {
@@ -54,6 +58,7 @@ class TradeOfferTest extends TestCase
                 $this->offerRepository = $offerRepository;
                 $this->assetRepository = $assetRepository;
                 $this->cashRepository = $cashRepo;
+                $this->cashConsiderationRepository = $cashConsiderationRepo;
                 $this->commonRepository = $commonRepo;
                 $this->season = $season;
                 $this->cashHandler = $cashHandler;

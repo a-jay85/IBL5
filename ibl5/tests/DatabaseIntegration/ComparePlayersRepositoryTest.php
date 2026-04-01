@@ -32,15 +32,13 @@ class ComparePlayersRepositoryTest extends DatabaseTestCase
         self::assertContains('Compare Plyr 1', $names);
     }
 
-    public function testGetAllPlayerNamesExcludesPipeAndNoStarter(): void
+    public function testGetAllPlayerNamesExcludesNoStarterAndZeroOrdinal(): void
     {
-        $this->insertTestPlayer(200090002, '|Pipe Player', ['ordinal' => 1]);
         $this->insertTestPlayer(200090003, '(no starter)', ['ordinal' => 1]);
         $this->insertTestPlayer(200090004, 'Zero Ordinal', ['ordinal' => 0]);
 
         $names = $this->repo->getAllPlayerNames();
 
-        self::assertNotContains('|Pipe Player', $names);
         self::assertNotContains('(no starter)', $names);
         self::assertNotContains('Zero Ordinal', $names);
     }

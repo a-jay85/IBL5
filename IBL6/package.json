@@ -5,10 +5,9 @@
 	"type": "module",
 	"scripts": {
 		"dev": "vite dev",
-		"build": "prisma generate && vite build",
+		"build": "vite build",
 		"preview": "vite preview",
 		"prepare": "svelte-kit sync || echo ''",
-		"postinstall": "prisma generate",
 		"check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
 		"check:watch": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --watch",
 		"format": "prettier --write .",
@@ -20,7 +19,6 @@
 	"devDependencies": {
 		"@eslint/compat": "^1.2.5",
 		"@eslint/js": "^9.18.0",
-		"@faker-js/faker": "^10.0.0",
 		"@playwright/test": "^1.56.1",
 		"@sveltejs/kit": "^2.53.4",
 		"@sveltejs/vite-plugin-svelte": "^6.0.0",
@@ -36,7 +34,6 @@
 		"prettier": "^3.4.2",
 		"prettier-plugin-svelte": "^3.3.3",
 		"prettier-plugin-tailwindcss": "^0.6.11",
-		"prisma": "^6.15.0",
 		"svelte": "^5.53.5",
 		"svelte-check": "^4.0.0",
 		"tailwindcss": "^4.1.12",
@@ -51,11 +48,9 @@
 		"effect": "^3.20.0"
 	},
 	"dependencies": {
-		"@prisma/client": "^6.15.0",
 		"@sveltejs/adapter-node": "^5.5.3",
 		"daisyui": "^5.0.54",
 		"dotenv": "^17.2.2",
-		"firebase": "^12.2.1",
 		"mysql2": "^3.14.5"
 	}
 }

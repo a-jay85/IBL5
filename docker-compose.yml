@@ -105,7 +105,11 @@ services:
     container_name: ibl5-ibl6
     restart: unless-stopped
     environment:
-      DATABASE_URL: mysql://root:root@mariadb:3306/iblhoops_ibl5
+      DB_HOST: mariadb
+      DB_PORT: "3306"
+      DB_NAME: iblhoops_ibl5
+      DB_USER: root
+      DB_PASSWORD: root
       NODE_ENV: production
       PORT: "3001"
     depends_on:

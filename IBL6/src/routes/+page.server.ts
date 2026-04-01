@@ -1,83 +1,34 @@
 import type { PageServerLoad } from './$types';
-import { prisma } from '$lib/database/prisma';
+import { query } from '$lib/database/connection';
 import { error } from '@sveltejs/kit';
-import { serializePrismaData } from '$lib/utils/utils';
+import { serializeData } from '$lib/utils/utils';
 
 export const load: PageServerLoad = async () => {
 	try {
-		// Load games with proper error handling
-		console.log('🏀 Fetching recent games...');
-		const games = await prisma.boxGame.findMany({
-			include: {
-				awayTeam: {
-					select: {
-						teamid: true,
-						city: true,
-						name: true,
-						color1: true,
-						color2: true
-					}
-				},
-				homeTeam: {
-					select: {
-						teamid: true,
-						city: true,
-						name: true,
-						color1: true,
-						color2: true
-					}
-				}
-			},
-			orderBy: {
-				date: 'desc'
-			},
-			take: 25
-		});
-		console.log(`📊 Found ${games.length} recent games`);
+		const games = await query(`
+			SELECT g.Date as date, g.gameOfThatDay,
+				away.team_city AS away_city, away.team_name AS away_name,
+				home.team_city AS home_city, home.team_name AS home_name
+			FROM ibl_box_scores_teams g
+			LEFT JOIN ibl_team_info away ON g.visitorTeamID = away.teamid
+			LEFT JOIN ibl_team_info home ON g.homeTeamID = home.teamid
+			ORDER BY g.Date DESC
+			LIMIT 25
+		`);
 
-		// Load teams
-		console.log('👥 Fetching teams...');
-		const teams = await prisma.team.findMany({
-			select: {
-				teamid: true,
-				city: true,
-				name: true,
-				color1: true,
-				color2: true
-			},
-			orderBy: {
-				name: 'asc'
-			}
-		});
-		console.log(`🏆 Found ${teams.length} teams`);
+		const formattedGames = games.map((g) => ({
+			date: g.date,
+			gameOfThatDay: g.gameOfThatDay,
+			awayTeam: { city: g.away_city, name: g.away_name },
+			homeTeam: { city: g.home_city, name: g.home_name }
+		}));
 
-		// Load players with pagination (limit to avoid large payload)
-		console.log('🏃 Fetching players...');
-		const ibl_players = await prisma.iblPlayer.findMany({
-			select: {
-				pid: true,
-				name: true,
-				teamId: true,
-				pos: true
-			},
-			take: 100, // Limit to avoid large payload
-			orderBy: {
-				name: 'asc'
-			}
-		});
-		console.log(`👨‍💼 Found ${ibl_players.length} players`);
-
-		// Serialize data to handle BigInt and Date objects
 		return {
-			games: serializePrismaData(games),
-			teams: serializePrismaData(teams),
-			ibl_players: serializePrismaData(ibl_players)
+			games: serializeData(formattedGames)
 		};
-	} catch (err: any) {
-		console.error('❌ Error fetching homepage data:', err);
-		console.error('❌ Error details:', err.message);
-
-		// Throw proper SvelteKit error instead of silently returning empty arrays
-		throw error(500, `Failed to load homepage data: ${err.message}`);
+	} catch (err: unknown) {
+		const message = err instanceof Error ? err.message : String(err);
+		console.error('Error fetching homepage data:', message);
+		throw error(500, `Failed to load homepage data: ${message}`);
 	}
 };

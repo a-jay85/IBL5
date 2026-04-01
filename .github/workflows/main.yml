@@ -175,9 +175,6 @@ jobs:
 
             echo "Installing production dependencies..."
             npm ci --omit=dev
-
-            echo "Generating Prisma client..."
-            npx prisma generate
           '
 
       - name: Start IBL6
@@ -186,7 +183,7 @@ jobs:
           ssh -p ${{ secrets.PORT }} -i ~/.ssh/id_deploy ${{ secrets.USERNAME }}@${{ secrets.HOST }} '
             cd www/IBL6
             mkdir -p logs
-            setsid env PORT=3001 node build/index.js > logs/ibl6.log 2>&1 < /dev/null &
+            setsid env PORT=3001 UV_THREADPOOL_SIZE=2 node --max-old-space-size=128 build/index.js > logs/ibl6.log 2>&1 < /dev/null &
             echo $! > ibl6.pid
             sleep 1
             echo "IBL6 started (PID: $(cat ibl6.pid))"

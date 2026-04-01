@@ -31,6 +31,16 @@ $cachedRepository->rebuildCache();
 
 echo "Career Leaderboards cache warmed (8 table keys)\n";
 
+// --- Season Leaderboards ---
+
+echo "\nWarming Season Leaderboards cache...\n";
+
+$innerSeasonRepo = new \SeasonLeaderboards\SeasonLeaderboardsRepository($mysqli_db);
+$cachedSeasonRepo = new \SeasonLeaderboards\CachedSeasonLeaderboardsRepository($innerSeasonRepo, $dbCache);
+$cachedSeasonRepo->rebuildCache();
+
+echo "Season Leaderboards cache warmed (leaders, years, teams)\n";
+
 // --- Record Holders ---
 
 echo "\nWarming Record Holders cache...\n";

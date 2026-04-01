@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use SeasonLeaderboards\CachedSeasonLeaderboardsRepository;
 use SeasonLeaderboards\SeasonLeaderboardsRepository;
 use SeasonLeaderboards\SeasonLeaderboardsService;
 use SeasonLeaderboards\SeasonLeaderboardsView;
@@ -16,7 +17,9 @@ get_lang($module_name);
 $pagetitle = "Season Stats";
 
 // Initialize classes
-$repository = new SeasonLeaderboardsRepository($mysqli_db);
+$dbCache = new \Cache\DatabaseCache($mysqli_db);
+$innerRepository = new SeasonLeaderboardsRepository($mysqli_db);
+$repository = new CachedSeasonLeaderboardsRepository($innerRepository, $dbCache);
 $service = new SeasonLeaderboardsService();
 $view = new SeasonLeaderboardsView($service);
 

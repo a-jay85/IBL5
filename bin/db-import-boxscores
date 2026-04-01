@@ -1,12 +1,14 @@
 #!/bin/bash
-# Import production box score CSVs into local Docker MariaDB.
-# Uses LOAD DATA LOCAL INFILE since box_scores are production-only.
+# Import production box scores into local Docker MariaDB.
 #
-# Prerequisites:
-#   - bin/analytics-export must have been run (CSVs must exist)
-#   - Local Docker MariaDB must be running
+# Two modes:
+#   CSV mode (default): Uses LOAD DATA LOCAL INFILE from analytics CSVs.
+#     Prerequisites: bin/analytics-export must have been run first.
+#   Remote mode (--remote): Pulls directly from production MariaDB via mariadb-dump.
+#     Prerequisites: .env with REMOTE_* credentials.
 #
-# Usage: bin/db-import-boxscores [--truncate]
+# Usage: bin/db-import-boxscores [--remote] [--truncate]
+#   --remote     Pull directly from production MariaDB (skip CSV step)
 #   --truncate   TRUNCATE tables before import (default: skip if non-empty)
 
 set -euo pipefail
@@ -23,6 +25,7 @@ if [ ! -d "$DATA_DIR" ]; then
     DATA_DIR="$REPO_ROOT/ibl5/analytics/data"
 fi
 
+# Local Docker connection (import target)
 DB_HOST="127.0.0.1"
 DB_PORT="3306"
 DB_USER="root"
@@ -30,14 +33,16 @@ DB_PASS="root"
 DB_NAME="iblhoops_ibl5"
 
 TRUNCATE=false
+REMOTE=false
 for arg in "$@"; do
     case "$arg" in
         --truncate) TRUNCATE=true ;;
+        --remote)   REMOTE=true ;;
         *)          echo "Unknown argument: $arg" >&2; exit 1 ;;
     esac
 done
 
-# Helper: run a query
+# Helper: run a query against local Docker
 db_query() {
     MYSQL_PWD="$DB_PASS" mariadb -h "$DB_HOST" -P "$DB_PORT" --skip-ssl \
         -u "$DB_USER" "$DB_NAME" -N -B -e "$1"
@@ -49,17 +54,36 @@ db_load() {
         --local-infile=1 -u "$DB_USER" "$DB_NAME" -e "$1"
 }
 
-echo "=== Box Score Import: Production CSV → Local Docker ==="
-echo ""
-
-# Verify CSVs exist
-for csv in ibl_box_scores.csv ibl_box_scores_teams.csv; do
-    if [ ! -s "$DATA_DIR/$csv" ]; then
-        echo "Error: $DATA_DIR/$csv not found or empty." >&2
-        echo "Run 'bin/analytics-export' first to create CSVs from production." >&2
+# Source .env for remote credentials when --remote is used
+if [ "$REMOTE" = true ]; then
+    ENV_FILE="$MAIN_WORKTREE/.env"
+    if [ ! -f "$ENV_FILE" ]; then
+        ENV_FILE="$REPO_ROOT/.env"
+    fi
+    if [ ! -f "$ENV_FILE" ]; then
+        echo "Error: .env not found. Required for --remote mode." >&2
         exit 1
     fi
-done
+    set -a
+    # shellcheck disable=SC1090
+    source "$ENV_FILE"
+    set +a
+
+    if [ -z "${REMOTE_HOST:-}" ] || [ "$REMOTE_HOST" = "localhost" ] || [ "$REMOTE_HOST" = "127.0.0.1" ]; then
+        echo "Error: REMOTE_HOST in .env is empty or points to localhost." >&2
+        echo "Use CSV mode (without --remote) for local imports." >&2
+        exit 1
+    fi
+
+    REMOTE_PORT="${REMOTE_PORT:-3306}"
+    REMOTE_DATABASE="${REMOTE_DATABASE:-iblhoops_ibl5}"
+
+    echo "=== Box Score Import: Production MariaDB → Local Docker ==="
+    echo "  Source: $REMOTE_HOST:$REMOTE_PORT/$REMOTE_DATABASE"
+else
+    echo "=== Box Score Import: Production CSV → Local Docker ==="
+fi
+echo ""
 
 # Check current local row counts
 BS_COUNT=$(db_query "SELECT COUNT(*) FROM ibl_box_scores")
@@ -78,22 +102,69 @@ if [ "$BS_COUNT" -gt 0 ] || [ "$BST_COUNT" -gt 0 ]; then
     db_query "SET FOREIGN_KEY_CHECKS=0; TRUNCATE TABLE ibl_box_scores; TRUNCATE TABLE ibl_box_scores_teams; SET FOREIGN_KEY_CHECKS=1;"
 fi
 
-# Expected row counts from CSVs (line count minus header)
-BS_EXPECTED=$(( $(wc -l < "$DATA_DIR/ibl_box_scores.csv") - 1 ))
-BST_EXPECTED=$(( $(wc -l < "$DATA_DIR/ibl_box_scores_teams.csv") - 1 ))
+TABLES="ibl_box_scores ibl_box_scores_teams"
 
-echo "Importing ibl_box_scores ($BS_EXPECTED rows)..."
+if [ "$REMOTE" = true ]; then
+    # ── Remote mode: mariadb-dump from production → pipe into local ──
+    # mariadb-dump automatically skips STORED GENERATED columns in INSERT output.
 
-# CSV column order (37 cols):
-# id, Date, name, pos, pid, visitorTID, homeTID, gameMIN, game2GM, game2GA,
-# gameFTM, gameFTA, game3GM, game3GA, gameORB, gameDRB, gameAST, gameSTL,
-# gameTOV, gameBLK, gamePF, [game_type], [season_year], [calc_points],
-# [calc_rebounds], [calc_fg_made], created_at, updated_at, uuid,
-# gameOfThatDay, attendance, capacity, visitorWins, visitorLosses,
-# homeWins, homeLosses, teamID
-#
-# Brackets = STORED GENERATED columns → sink to @gen_* variables
-db_load "
+    # Get expected row counts from production
+    BS_EXPECTED=$(MYSQL_PWD="$REMOTE_PASSWORD" mariadb \
+        -h "$REMOTE_HOST" -P "$REMOTE_PORT" --skip-ssl --compress \
+        -u "$REMOTE_USER" "$REMOTE_DATABASE" -N -B \
+        -e "SELECT COUNT(*) FROM ibl_box_scores")
+    BST_EXPECTED=$(MYSQL_PWD="$REMOTE_PASSWORD" mariadb \
+        -h "$REMOTE_HOST" -P "$REMOTE_PORT" --skip-ssl --compress \
+        -u "$REMOTE_USER" "$REMOTE_DATABASE" -N -B \
+        -e "SELECT COUNT(*) FROM ibl_box_scores_teams")
+
+    echo "Dumping from production and importing locally..."
+    echo "  ibl_box_scores:       $BS_EXPECTED rows"
+    echo "  ibl_box_scores_teams: $BST_EXPECTED rows"
+    echo ""
+
+    # Dump both tables and pipe into local MariaDB
+    {
+        echo "SET FOREIGN_KEY_CHECKS=0;"
+        MYSQL_PWD="$REMOTE_PASSWORD" mariadb-dump \
+            -h "$REMOTE_HOST" -P "$REMOTE_PORT" --skip-ssl --compress \
+            -u "$REMOTE_USER" \
+            --no-create-info --skip-triggers --skip-add-locks \
+            --skip-lock-tables \
+            "$REMOTE_DATABASE" $TABLES
+        echo "SET FOREIGN_KEY_CHECKS=1;"
+    } | MYSQL_PWD="$DB_PASS" mariadb \
+        -h "$DB_HOST" -P "$DB_PORT" --skip-ssl \
+        -u "$DB_USER" "$DB_NAME"
+
+else
+    # ── CSV mode: LOAD DATA from local analytics CSVs ──
+
+    # Verify CSVs exist
+    for csv in ibl_box_scores.csv ibl_box_scores_teams.csv; do
+        if [ ! -s "$DATA_DIR/$csv" ]; then
+            echo "Error: $DATA_DIR/$csv not found or empty." >&2
+            echo "Run 'bin/analytics-export' first to create CSVs from production." >&2
+            exit 1
+        fi
+    done
+
+    # Expected row counts from CSVs (line count minus header)
+    BS_EXPECTED=$(( $(wc -l < "$DATA_DIR/ibl_box_scores.csv") - 1 ))
+    BST_EXPECTED=$(( $(wc -l < "$DATA_DIR/ibl_box_scores_teams.csv") - 1 ))
+
+    echo "Importing ibl_box_scores ($BS_EXPECTED rows)..."
+
+    # CSV column order (37 cols):
+    # id, Date, name, pos, pid, visitorTID, homeTID, gameMIN, game2GM, game2GA,
+    # gameFTM, gameFTA, game3GM, game3GA, gameORB, gameDRB, gameAST, gameSTL,
+    # gameTOV, gameBLK, gamePF, [game_type], [season_year], [calc_points],
+    # [calc_rebounds], [calc_fg_made], created_at, updated_at, uuid,
+    # gameOfThatDay, attendance, capacity, visitorWins, visitorLosses,
+    # homeWins, homeLosses, teamID
+    #
+    # Brackets = STORED GENERATED columns → sink to @gen_* variables
+    db_load "
 LOAD DATA LOCAL INFILE '$DATA_DIR/ibl_box_scores.csv'
 INTO TABLE ibl_box_scores
 FIELDS TERMINATED BY '\t'
@@ -108,17 +179,17 @@ IGNORE 1 LINES
  visitorWins, visitorLosses, homeWins, homeLosses, teamID);
 "
 
-echo "Importing ibl_box_scores_teams ($BST_EXPECTED rows)..."
+    echo "Importing ibl_box_scores_teams ($BST_EXPECTED rows)..."
 
-# CSV column order (43 cols):
-# id, Date, name, gameOfThatDay, visitorTeamID, homeTeamID, attendance,
-# capacity, visitorWins, visitorLosses, homeWins, homeLosses,
-# visitorQ1points..visitorQ4points, visitorOTpoints,
-# homeQ1points..homeQ4points, homeOTpoints, gameMIN, game2GM, game2GA,
-# gameFTM, gameFTA, game3GM, game3GA, gameORB, gameDRB, gameAST, gameSTL,
-# gameTOV, gameBLK, gamePF, [game_type], [season_year], [calc_points],
-# [calc_rebounds], [calc_fg_made], created_at, updated_at
-db_load "
+    # CSV column order (43 cols):
+    # id, Date, name, gameOfThatDay, visitorTeamID, homeTeamID, attendance,
+    # capacity, visitorWins, visitorLosses, homeWins, homeLosses,
+    # visitorQ1points..visitorQ4points, visitorOTpoints,
+    # homeQ1points..homeQ4points, homeOTpoints, gameMIN, game2GM, game2GA,
+    # gameFTM, gameFTA, game3GM, game3GA, gameORB, gameDRB, gameAST, gameSTL,
+    # gameTOV, gameBLK, gamePF, [game_type], [season_year], [calc_points],
+    # [calc_rebounds], [calc_fg_made], created_at, updated_at
+    db_load "
 LOAD DATA LOCAL INFILE '$DATA_DIR/ibl_box_scores_teams.csv'
 INTO TABLE ibl_box_scores_teams
 FIELDS TERMINATED BY '\t'
@@ -133,6 +204,7 @@ IGNORE 1 LINES
  @gen_game_type, @gen_season_year, @gen_calc_points, @gen_calc_rebounds, @gen_calc_fg_made,
  created_at, updated_at);
 "
+fi
 
 # Verify
 BS_ACTUAL=$(db_query "SELECT COUNT(*) FROM ibl_box_scores")

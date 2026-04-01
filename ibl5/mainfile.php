@@ -213,6 +213,11 @@ $authService = new \Auth\AuthService($mysqli_db);
 // Attempt to restore session from "remember me" cookie for returning users
 $authService->tryRememberMe();
 
+// Dev-only auto-login: bypasses login forms on localhost when DEV_AUTO_LOGIN is set in .env.test
+if (!$authService->isAuthenticated()) {
+    \Auth\DevAutoLogin::tryAutoLogin($mysqli_db);
+}
+
 // Populate legacy $user global so modules.php and other code that calls
 // base64_decode($user) continues to work during the migration period.
 $user = '';

@@ -184,10 +184,6 @@ jobs:
         if: ${{ !cancelled() }}
         run: |
           ssh -p ${{ secrets.PORT }} -i ~/.ssh/id_deploy ${{ secrets.USERNAME }}@${{ secrets.HOST }} '
-            # Kill any stale processes before starting
-            pkill -9 -f "node build/index[.]js" 2>/dev/null || true
-            sleep 1
-
             cd www/IBL6
             mkdir -p logs
             setsid env PORT=3001 node build/index.js > logs/ibl6.log 2>&1 < /dev/null &

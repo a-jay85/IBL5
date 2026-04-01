@@ -147,11 +147,50 @@ If either fails, fix in worktree, commit, push, and re-run the failing track.
 
 **Skip if** PR description says "No manual testing needed."
 
-1. Extract manual testing steps: `gh pr view --json body --jq '.body' | sed -n '/## Manual Testing/,/^## /p'`
-2. Classify each step: **CLI-executable** (commands Claude can run), **test-replaceable** (automatable with PHPUnit/Playwright), or **truly manual** (subjective human judgment)
-3. Run CLI-executable steps directly in the worktree. Fix failures, commit.
-4. Write tests for test-replaceable steps (E2E for UI, PHPUnit for logic). Fix until green; reclassify as truly manual after 2 failed attempts.
-5. Update PR description: remove verified/automated steps. If none remain, replace section with `No manual testing needed — all changes are covered by automated tests.` Apply: `gh pr edit --body "<updated>"`
+### Step 1: Extract
+
+```bash
+gh pr view --json body --jq '.body' | sed -n '/## Manual Testing/,/^## /p'
+```
+
+### Step 2: Sonnet Review Gate
+
+Launch a **single Sonnet agent** with this prompt (substitute the extracted steps and file list):
+
+> You are a **Principal Automation Engineering Architect** reviewing manual testing steps from a PR. Your job: eliminate every step that can be replaced by automated verification. Be aggressive — manual testing is expensive and error-prone. Only steps requiring subjective human judgment (visual aesthetics, UX feel, production data comparison) should survive.
+>
+> **PR manual testing steps:**
+> {extracted steps from Step 1}
+>
+> **Changed files:** {file list from Phase 5A}
+>
+> Classify each step into exactly one category:
+>
+> | Category | Description | Action |
+> |----------|-------------|--------|
+> | **CLI-executable** | A command or script Claude can run directly (curl, bin/db-query, grep output) | Opus runs it |
+> | **PHPUnit-replaceable** | Unit/integration test can assert the behavior (DB state, service output, calculation) | Opus writes PHPUnit test |
+> | **API-test-replaceable** | HTTP request/response can be verified programmatically (endpoint returns correct JSON/HTML, status codes, headers) | Opus writes integration or API test |
+> | **E2E-replaceable** | Browser interaction needed (form submit, page navigation, HTMX swap, DOM state) | Opus writes Playwright test |
+> | **Truly manual** | Requires subjective human judgment that no automated test can replicate (visual aesthetics, "does this look right", production comparison) | Stays in PR description |
+>
+> For each step, return a JSON array:
+> ```json
+> [
+>   {"step": "original step text", "category": "cli-executable|phpunit|api-test|e2e|truly-manual", "rationale": "why this category", "test_hint": "what the test should assert (omit for cli-executable and truly-manual)"}
+> ]
+> ```
+>
+> **Bias toward automation.** If a step says "verify X works" or "check that Y returns Z", that is automatable — not manual. "Compare against production" is truly manual only if it requires visual judgment; if it's comparing data values, write an assertion.
+
+### Step 3: Execute findings
+
+Using the Sonnet agent's classifications:
+
+1. **CLI-executable:** Run directly in the worktree. Fix failures, commit.
+2. **PHPUnit/API-test/E2E-replaceable:** Write the appropriate test type. Fix until green; reclassify as truly manual after 2 failed attempts.
+3. **Truly manual:** Keep in PR description.
+4. **Update PR:** Remove verified/automated steps. If none remain, replace section with `No manual testing needed — all changes are covered by automated tests.` Apply: `gh pr edit --body "<updated>"`
 
 ---
 

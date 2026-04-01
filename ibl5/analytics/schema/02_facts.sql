@@ -264,6 +264,9 @@ SELECT
     TRY_CAST(age AS INTEGER)         AS age,
     pos,
     TRY_CAST(peak AS INTEGER)        AS peak,
+    -- Physical
+    TRY_CAST(htft AS INTEGER) AS htft, TRY_CAST(htin AS INTEGER) AS htin,
+    TRY_CAST(wt AS INTEGER) AS wt,
     -- Positional ratings (1-9 scale)
     TRY_CAST(oo AS INTEGER) AS oo, TRY_CAST(od AS INTEGER) AS od,
     TRY_CAST("do" AS INTEGER) AS "do", TRY_CAST(dd AS INTEGER) AS dd,
@@ -284,7 +287,89 @@ SELECT
     (TRY_CAST(talent AS INTEGER) + TRY_CAST(skill AS INTEGER) + TRY_CAST(intangibles AS INTEGER)) AS tsi_sum,
     TRY_CAST(clutch AS INTEGER)      AS clutch,
     TRY_CAST(consistency AS INTEGER) AS consistency,
-    TRY_CAST(exp AS INTEGER)         AS exp
+    TRY_CAST(exp AS INTEGER)         AS exp,
+    -- Contract
+    TRY_CAST(bird AS INTEGER) AS bird,
+    TRY_CAST(cy AS INTEGER) AS cy, TRY_CAST(cyt AS INTEGER) AS cyt,
+    TRY_CAST(cy1 AS INTEGER) AS cy1, TRY_CAST(cy2 AS INTEGER) AS cy2,
+    TRY_CAST(cy3 AS INTEGER) AS cy3, TRY_CAST(cy4 AS INTEGER) AS cy4,
+    TRY_CAST(cy5 AS INTEGER) AS cy5, TRY_CAST(cy6 AS INTEGER) AS cy6,
+    -- Depth chart positions
+    TRY_CAST(PGDepth AS INTEGER) AS PGDepth, TRY_CAST(SGDepth AS INTEGER) AS SGDepth,
+    TRY_CAST(SFDepth AS INTEGER) AS SFDepth, TRY_CAST(PFDepth AS INTEGER) AS PFDepth,
+    TRY_CAST(CDepth AS INTEGER) AS CDepth,
+    -- Season stats
+    TRY_CAST(ordinal AS INTEGER) AS ordinal,
+    TRY_CAST(stats_gs AS INTEGER) AS stats_gs, TRY_CAST(stats_gm AS INTEGER) AS stats_gm,
+    TRY_CAST(stats_min AS INTEGER) AS stats_min,
+    TRY_CAST(stats_fgm AS INTEGER) AS stats_fgm, TRY_CAST(stats_fga AS INTEGER) AS stats_fga,
+    TRY_CAST(stats_ftm AS INTEGER) AS stats_ftm, TRY_CAST(stats_fta AS INTEGER) AS stats_fta,
+    TRY_CAST(stats_3gm AS INTEGER) AS stats_3gm, TRY_CAST(stats_3ga AS INTEGER) AS stats_3ga,
+    TRY_CAST(stats_orb AS INTEGER) AS stats_orb, TRY_CAST(stats_drb AS INTEGER) AS stats_drb,
+    TRY_CAST(stats_ast AS INTEGER) AS stats_ast, TRY_CAST(stats_stl AS INTEGER) AS stats_stl,
+    TRY_CAST(stats_to AS INTEGER) AS stats_to, TRY_CAST(stats_blk AS INTEGER) AS stats_blk,
+    TRY_CAST(stats_pf AS INTEGER) AS stats_pf,
+    TRY_CAST(stats_reb AS INTEGER) AS stats_reb, TRY_CAST(stats_pts AS INTEGER) AS stats_pts,
+    -- Playoff stats
+    TRY_CAST(po_stats_gm AS INTEGER) AS po_stats_gm, TRY_CAST(po_stats_min AS INTEGER) AS po_stats_min,
+    TRY_CAST(po_stats_2gm AS INTEGER) AS po_stats_2gm, TRY_CAST(po_stats_2ga AS INTEGER) AS po_stats_2ga,
+    TRY_CAST(po_stats_ftm AS INTEGER) AS po_stats_ftm, TRY_CAST(po_stats_fta AS INTEGER) AS po_stats_fta,
+    TRY_CAST(po_stats_3gm AS INTEGER) AS po_stats_3gm, TRY_CAST(po_stats_3ga AS INTEGER) AS po_stats_3ga,
+    TRY_CAST(po_stats_orb AS INTEGER) AS po_stats_orb, TRY_CAST(po_stats_drb AS INTEGER) AS po_stats_drb,
+    TRY_CAST(po_stats_ast AS INTEGER) AS po_stats_ast, TRY_CAST(po_stats_stl AS INTEGER) AS po_stats_stl,
+    TRY_CAST(po_stats_tvr AS INTEGER) AS po_stats_tvr, TRY_CAST(po_stats_blk AS INTEGER) AS po_stats_blk,
+    TRY_CAST(po_stats_pf AS INTEGER) AS po_stats_pf,
+    -- Career stats
+    TRY_CAST(car_gm AS INTEGER) AS car_gm, TRY_CAST(car_min AS INTEGER) AS car_min,
+    TRY_CAST(car_fgm AS INTEGER) AS car_fgm, TRY_CAST(car_fga AS INTEGER) AS car_fga,
+    TRY_CAST(car_ftm AS INTEGER) AS car_ftm, TRY_CAST(car_fta AS INTEGER) AS car_fta,
+    TRY_CAST(car_tgm AS INTEGER) AS car_tgm, TRY_CAST(car_tga AS INTEGER) AS car_tga,
+    TRY_CAST(car_orb AS INTEGER) AS car_orb, TRY_CAST(car_drb AS INTEGER) AS car_drb,
+    TRY_CAST(car_reb AS INTEGER) AS car_reb, TRY_CAST(car_ast AS INTEGER) AS car_ast,
+    TRY_CAST(car_stl AS INTEGER) AS car_stl, TRY_CAST(car_to AS INTEGER) AS car_to,
+    TRY_CAST(car_blk AS INTEGER) AS car_blk, TRY_CAST(car_pf AS INTEGER) AS car_pf,
+    TRY_CAST(car_pts AS INTEGER) AS car_pts,
+    -- Season highs
+    TRY_CAST(sh_pts AS INTEGER) AS sh_pts, TRY_CAST(sh_reb AS INTEGER) AS sh_reb,
+    TRY_CAST(sh_ast AS INTEGER) AS sh_ast, TRY_CAST(sh_stl AS INTEGER) AS sh_stl,
+    TRY_CAST(sh_blk AS INTEGER) AS sh_blk,
+    TRY_CAST(s_dd AS INTEGER) AS s_dd, TRY_CAST(s_td AS INTEGER) AS s_td,
+    -- Playoff highs
+    TRY_CAST(sp_pts AS INTEGER) AS sp_pts, TRY_CAST(sp_reb AS INTEGER) AS sp_reb,
+    TRY_CAST(sp_ast AS INTEGER) AS sp_ast, TRY_CAST(sp_stl AS INTEGER) AS sp_stl,
+    TRY_CAST(sp_blk AS INTEGER) AS sp_blk,
+    -- Career season highs
+    TRY_CAST(ch_pts AS INTEGER) AS ch_pts, TRY_CAST(ch_reb AS INTEGER) AS ch_reb,
+    TRY_CAST(ch_ast AS INTEGER) AS ch_ast, TRY_CAST(ch_stl AS INTEGER) AS ch_stl,
+    TRY_CAST(ch_blk AS INTEGER) AS ch_blk,
+    TRY_CAST(c_dd AS INTEGER) AS c_dd, TRY_CAST(c_td AS INTEGER) AS c_td,
+    -- Career playoff highs
+    TRY_CAST(cp_pts AS INTEGER) AS cp_pts, TRY_CAST(cp_reb AS INTEGER) AS cp_reb,
+    TRY_CAST(cp_ast AS INTEGER) AS cp_ast, TRY_CAST(cp_stl AS INTEGER) AS cp_stl,
+    TRY_CAST(cp_blk AS INTEGER) AS cp_blk,
+    -- Real-life stats
+    TRY_CAST(rl_gp AS INTEGER) AS rl_gp, TRY_CAST(rl_min AS INTEGER) AS rl_min,
+    TRY_CAST(rl_fgm AS INTEGER) AS rl_fgm, TRY_CAST(rl_fga AS INTEGER) AS rl_fga,
+    TRY_CAST(rl_ftm AS INTEGER) AS rl_ftm, TRY_CAST(rl_fta AS INTEGER) AS rl_fta,
+    TRY_CAST(rl_3gm AS INTEGER) AS rl_3gm, TRY_CAST(rl_3ga AS INTEGER) AS rl_3ga,
+    TRY_CAST(rl_orb AS INTEGER) AS rl_orb, TRY_CAST(rl_drb AS INTEGER) AS rl_drb,
+    TRY_CAST(rl_ast AS INTEGER) AS rl_ast, TRY_CAST(rl_stl AS INTEGER) AS rl_stl,
+    TRY_CAST(rl_tvr AS INTEGER) AS rl_tvr, TRY_CAST(rl_blk AS INTEGER) AS rl_blk,
+    TRY_CAST(rl_pf AS INTEGER) AS rl_pf,
+    -- Preference weights
+    TRY_CAST(coach AS INTEGER) AS coach, TRY_CAST(loyalty AS INTEGER) AS loyalty,
+    TRY_CAST(playingTime AS INTEGER) AS playingTime, TRY_CAST(winner AS INTEGER) AS winner,
+    TRY_CAST(tradition AS INTEGER) AS tradition, TRY_CAST(security AS INTEGER) AS security,
+    -- Draft info
+    TRY_CAST(draftround AS INTEGER) AS draftround,
+    TRY_CAST(draftpickno AS INTEGER) AS draftpickno,
+    TRY_CAST(fa_signing_flag AS INTEGER) AS fa_signing_flag,
+    -- Other fields
+    TRY_CAST(dc_canPlayInGame AS INTEGER) AS dc_canPlayInGame,
+    TRY_CAST(injured AS INTEGER) AS injured,
+    -- Derived fields
+    TRY_CAST(draftyear AS INTEGER) AS draftyear,
+    TRY_CAST(salary AS INTEGER) AS salary
 FROM read_csv('data/ibl_plr_snapshots.csv', delim='\t', header=true, all_varchar=true,
     null_padding=true, ignore_errors=true, strict_mode=false, quote='');
 

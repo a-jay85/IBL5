@@ -106,6 +106,13 @@ jobs:
             killall lsphp && echo "OPcache flushed (lsphp workers killed)" || echo "No lsphp processes found"
           '
 
+      - name: Purge page cache
+        run: |
+          ssh -p ${{ secrets.PORT }} -i ~/.ssh/id_deploy ${{ secrets.USERNAME }}@${{ secrets.HOST }} '
+            cd www/ibl5
+            php -r "require \"vendor/autoload.php\"; echo \"Purged \" . Cache\PageCache::purge() . \" cached pages\" . PHP_EOL;"
+          '
+
       - name: Check for IBLbot changes
         id: iblbot-changes
         run: |

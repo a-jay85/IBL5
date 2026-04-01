@@ -226,115 +226,96 @@ class LeagueControlPanelRepositoryTest extends DatabaseTestCase
 
     public function testDeleteOutdatedBuyoutsAndCashDeletesFullyPaidBuyout(): void
     {
-        // Buyout in final year with cy6=0 — all obligations fulfilled, should be deleted
-        $this->insertTestPlayer(200100040, '| Paid Off Buyout', [
-            'tid' => 1,
-            'cy' => 6,
-            'cyt' => 6,
-            'cy1' => 500,
-            'cy2' => 500,
-        ]);
+        // Buyout in final year with all future years zero — all obligations fulfilled, should be deleted
+        $id = $this->insertCashConsideration(['cy' => 6, 'cy1' => 500, 'cy2' => 500]);
 
         $count = $this->repo->deleteOutdatedBuyoutsAndCash();
 
         self::assertSame(1, $count);
-        self::assertNull($this->fetchPlayerByPid(200100040));
+        self::assertNull($this->fetchCashConsiderationById($id));
     }
 
     public function testDeleteOutdatedBuyoutsAndCashDeletesAllZeroCash(): void
     {
         // Cash consideration with all salary years at zero — should be deleted
-        $this->insertTestPlayer(200100041, '| Cash from Test', [
-            'tid' => 1,
-            'cy' => 1,
-            'cyt' => 1,
-            'cy1' => 0,
-            'cy2' => 0,
-        ]);
+        $id = $this->insertCashConsideration(['cy' => 1, 'cy1' => 0]);
 
         $count = $this->repo->deleteOutdatedBuyoutsAndCash();
 
         self::assertSame(1, $count);
-        self::assertNull($this->fetchPlayerByPid(200100041));
+        self::assertNull($this->fetchCashConsiderationById($id));
     }
 
     public function testDeleteOutdatedBuyoutsAndCashDeletesCurrentYearOnlyCash(): void
     {
         // Cash with money only in current year (cy1) and no future years — should be deleted
-        $this->insertTestPlayer(200100045, '| Cash from Test Current', [
-            'tid' => 1,
-            'cy' => 1,
-            'cyt' => 1,
-            'cy1' => -500,
-            'cy2' => 0,
-        ]);
+        $id = $this->insertCashConsideration(['cy' => 1, 'cy1' => -500, 'cy2' => 0]);
 
         $count = $this->repo->deleteOutdatedBuyoutsAndCash();
 
         self::assertSame(1, $count);
-        self::assertNull($this->fetchPlayerByPid(200100045));
+        self::assertNull($this->fetchCashConsiderationById($id));
     }
 
     public function testDeleteOutdatedBuyoutsAndCashPreservesActiveBuyout(): void
     {
         // Buyout with money still owed in a future year — should NOT be deleted
-        $this->insertTestPlayer(200100042, '| Active Buyout', [
-            'tid' => 1,
-            'cy' => 2,
-            'cyt' => 4,
-            'cy1' => 0,
-            'cy2' => 300,
-            'cy3' => 300,
-        ]);
+        $id = $this->insertCashConsideration(['cy' => 2, 'cy1' => 0, 'cy2' => 300, 'cy3' => 300]);
 
         $count = $this->repo->deleteOutdatedBuyoutsAndCash();
 
         self::assertSame(0, $count);
-        self::assertNotNull($this->fetchPlayerByPid(200100042));
+        self::assertNotNull($this->fetchCashConsiderationById($id));
     }
 
     public function testDeleteOutdatedBuyoutsAndCashPreservesActiveCashConsideration(): void
     {
         // Cash consideration with money owed in a future year — should NOT be deleted
-        $this->insertTestPlayer(200100043, '| Cash to Test', [
-            'tid' => 1,
-            'cy' => 1,
-            'cyt' => 3,
-            'cy1' => 0,
-            'cy2' => -500,
-        ]);
+        $id = $this->insertCashConsideration(['cy' => 1, 'cy1' => 0, 'cy2' => -500]);
 
         $count = $this->repo->deleteOutdatedBuyoutsAndCash();
 
         self::assertSame(0, $count);
-        self::assertNotNull($this->fetchPlayerByPid(200100043));
+        self::assertNotNull($this->fetchCashConsiderationById($id));
     }
 
-    public function testDeleteOutdatedBuyoutsAndCashDoesNotDeleteRegularPlayers(): void
+    /**
+     * Insert a row into ibl_cash_considerations (tid=1, type='buyout') with given cy fields.
+     * Returns the AUTO_INCREMENT id.
+     *
+     * @param array<string, int> $fields cy, cy1..cy6 overrides
+     */
+    private function insertCashConsideration(array $fields): int
     {
-        // Regular player with zero salary — should NOT be deleted
-        $this->insertTestPlayer(200100044, 'Regular Player Zero', [
-            'tid' => 1,
-            'cy' => 1,
-            'cyt' => 1,
-            'cy1' => 0,
-            'cy2' => 0,
-        ]);
+        $cy  = $fields['cy']  ?? 1;
+        $cy1 = $fields['cy1'] ?? 0;
+        $cy2 = $fields['cy2'] ?? 0;
+        $cy3 = $fields['cy3'] ?? 0;
+        $cy4 = $fields['cy4'] ?? 0;
+        $cy5 = $fields['cy5'] ?? 0;
+        $cy6 = $fields['cy6'] ?? 0;
 
-        $count = $this->repo->deleteOutdatedBuyoutsAndCash();
+        $stmt = $this->db->prepare(
+            "INSERT INTO ibl_cash_considerations (tid, type, label, cy, cyt, cy1, cy2, cy3, cy4, cy5, cy6)"
+            . " VALUES (1, 'buyout', 'Test Buyout', ?, 6, ?, ?, ?, ?, ?, ?)"
+        );
+        self::assertNotFalse($stmt);
+        $stmt->bind_param('iiiiiii', $cy, $cy1, $cy2, $cy3, $cy4, $cy5, $cy6);
+        $stmt->execute();
+        $id = (int) $this->db->insert_id;
+        $stmt->close();
 
-        self::assertSame(0, $count);
-        self::assertNotNull($this->fetchPlayerByPid(200100044));
+        return $id;
     }
 
     /**
      * @return array<string, mixed>|null
      */
-    private function fetchPlayerByPid(int $pid): ?array
+    private function fetchCashConsiderationById(int $id): ?array
     {
-        $stmt = $this->db->prepare("SELECT pid FROM ibl_plr WHERE pid = ?");
+        $stmt = $this->db->prepare("SELECT id FROM ibl_cash_considerations WHERE id = ?");
         self::assertNotFalse($stmt);
-        $stmt->bind_param('i', $pid);
+        $stmt->bind_param('i', $id);
         $stmt->execute();
         $row = $stmt->get_result()->fetch_assoc();
         $stmt->close();

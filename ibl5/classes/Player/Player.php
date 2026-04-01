@@ -542,9 +542,10 @@ class Player implements PlayerInterface
      */
     public function isSalaryPlaceholder(): bool
     {
-        $name = $this->name ?? '';
-
-        return str_starts_with($name, '|') || str_contains($name, 'Buyout');
+        // Cash and buyout entries are no longer stored in ibl_plr.
+        // They live in ibl_cash_considerations. No player loaded from
+        // ibl_plr can be a salary placeholder.
+        return false;
     }
 
     /**

@@ -102,10 +102,18 @@ class TradeRosterPreviewApiHandler
                 }
             }
 
-            // Append synthetic cash rows when viewing contracts
+            // Append cash rows when viewing contracts
             if ($display === 'contracts') {
-                $cashRows = $this->buildCashRows($teamID);
-                foreach ($cashRows as $cashRow) {
+                // Existing cash entries from the database
+                $cashRepo = new CashConsiderationRepository($this->db);
+                $existingCash = $cashRepo->getTeamCashConsiderations($teamID);
+                foreach ($existingCash as $cashRow) {
+                    $roster[] = \Team\TeamTableService::cashConsiderationToRosterRow($cashRow);
+                }
+
+                // Synthetic cash rows for the in-progress trade
+                $tradeCashRows = $this->buildCashRows($teamID);
+                foreach ($tradeCashRows as $cashRow) {
                     $roster[] = $cashRow;
                 }
             }

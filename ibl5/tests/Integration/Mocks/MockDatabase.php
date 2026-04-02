@@ -140,7 +140,9 @@ class MockDatabase extends \mysqli
 
         // Special handling for market maximums query (bulk MAX from ibl_plr)
         // Returns sensible defaults so tests don't produce undefined-key warnings
-        if (stripos($query, 'MAX(') !== false && stripos($query, 'ibl_plr') !== false) {
+        // Exclude queries that use ibl_plr only in a LEFT JOIN subquery (e.g., FranchiseRecordBook)
+        if (stripos($query, 'MAX(') !== false && stripos($query, 'ibl_plr') !== false
+            && stripos($query, 'ibl_rcb') === false) {
             // If mock data has the correct aliased keys, use it directly
             if (!empty($this->mockData) && isset($this->mockData[0]['fga'])) {
                 return new MockDatabaseResult($this->mockData);

@@ -34,6 +34,9 @@
         var containers = document.querySelectorAll('.offer-salary-row--inputs[data-raise-percentage]');
         for (var i = 0; i < containers.length; i++) {
             var container = containers[i];
+            if (container.dataset.hintsInit) continue;
+            container.dataset.hintsInit = '1';
+
             var firstInput = container.querySelector('input[type="number"]');
             if (!firstInput) continue;
 
@@ -51,4 +54,7 @@
     } else {
         init();
     }
+
+    // Re-run after HTMX swaps new content in (boosted navigation)
+    document.addEventListener('htmx:afterSettle', init);
 })();

@@ -83,9 +83,18 @@ class FreeAgencyController
         $negotiationData = $this->service->getNegotiationData($pid, $team, $season);
         $negotiationData['team'] = $team;
 
+        $error = isset($_GET['error']) && is_string($_GET['error']) ? $_GET['error'] : null;
+
+        // On validation error redirect, restore submitted offer values into form
+        if ($error !== null) {
+            $submittedOffer = $this->extractSubmittedOfferFromQuery();
+            if ($submittedOffer !== null) {
+                $negotiationData['existingOffer'] = $submittedOffer;
+            }
+        }
+
         $formComponents = new FreeAgencyFormComponents($team->name, $negotiationData['player']);
         $negotiationView = new FreeAgencyNegotiationView($formComponents);
-        $error = isset($_GET['error']) && is_string($_GET['error']) ? $_GET['error'] : null;
         echo $negotiationView->render($negotiationData, $error);
 
         \PageLayout\PageLayout::footer();
@@ -117,8 +126,34 @@ class FreeAgencyController
         } elseif ($result['type'] === 'already_signed') {
             \Utilities\HtmxHelper::redirect('modules.php?name=FreeAgency&result=already_signed');
         } else {
-            \Utilities\HtmxHelper::redirect('modules.php?name=FreeAgency&pa=negotiate&pid=' . $pid . '&error=' . rawurlencode($result['message']));
+            $offerParams = '';
+            for ($i = 1; $i <= 6; $i++) {
+                $raw = $postData['offeryear' . $i] ?? '';
+                $value = is_numeric($raw) ? (int) $raw : 0;
+                $offerParams .= '&offer' . $i . '=' . $value;
+            }
+            \Utilities\HtmxHelper::redirect('modules.php?name=FreeAgency&pa=negotiate&pid=' . $pid . '&error=' . rawurlencode($result['message']) . $offerParams);
         }
+    }
+
+    /**
+     * Extract submitted offer values from GET parameters (PRG validation error redirect)
+     *
+     * @return array<string, int>|null Offer values keyed as offer1-offer6, or null if not present
+     */
+    private function extractSubmittedOfferFromQuery(): ?array
+    {
+        if (!isset($_GET['offer1'])) {
+            return null;
+        }
+
+        $offer = [];
+        for ($i = 1; $i <= 6; $i++) {
+            $key = 'offer' . $i;
+            $raw = $_GET[$key] ?? null;
+            $offer[$key] = is_numeric($raw) ? (int) $raw : 0;
+        }
+        return $offer;
     }
 
     private function deleteOffer(): void

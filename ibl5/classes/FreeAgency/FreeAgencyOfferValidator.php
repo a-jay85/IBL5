@@ -207,10 +207,7 @@ class FreeAgencyOfferValidator implements FreeAgencyOfferValidatorInterface
      */
     private function validateRaisesAndContinuity(): array
     {
-        // Determine max raise percentage
-        $raisePercentage = \ContractRules::getMaxRaisePercentage($this->offerData['birdYears']);
-
-        $maxRaise = (int) round($this->offerData['offer1'] * $raisePercentage);
+        $maxRaise = \ContractRules::calculateMaxRaise($this->offerData['offer1'], $this->offerData['birdYears']);
         $contractEnded = false;
 
         // Build array of offer values for easy indexed access

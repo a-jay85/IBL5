@@ -96,6 +96,34 @@ $repo = $this->createMock(RepositoryInterface::class);
 $repo->expects($this->once())->method('save')->with($entity);
 ```
 
+### Shared setUp() pattern — use stubs + buildService helper
+
+When `setUp()` creates mocks shared across all tests, **every** test that doesn't call `expects()` on **every** mock generates a PHPUnit notice. For services with 3+ dependencies where different tests exercise different subsets, create all stubs in `setUp()` and use a `buildService()` helper with nullable overrides:
+
+```php
+protected function setUp(): void
+{
+    $this->stubRepo = $this->createStub(RepoInterface::class);
+    $this->stubAuth = $this->createStub(AuthInterface::class);
+    $this->service = $this->buildService();
+}
+
+private function buildService(
+    RepoInterface|null $repo = null,
+    AuthInterface|null $auth = null,
+): MyService {
+    return new MyService($repo ?? $this->stubRepo, $auth ?? $this->stubAuth);
+}
+
+public function testSaveDelegates(): void
+{
+    $mockRepo = $this->createMock(RepoInterface::class);
+    $mockRepo->expects($this->once())->method('save');
+    $this->service = $this->buildService(repo: $mockRepo);
+    // ...
+}
+```
+
 ## Repository Write Methods
 
 `BaseMysqliRepository::getAffectedRows()` is a protected method that can be overridden in test subclasses to control the return value of `execute()`. This enables direct unit testing of repository write methods without needing a real database.

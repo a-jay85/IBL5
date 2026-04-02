@@ -5,11 +5,12 @@ declare(strict_types=1);
 /**
  * Bulk JSB File Import Script
  *
- * Scans for JSB engine files (.car, .his, .trn, .asw, .awa, .rcb) and processes
- * them through JsbImportService to populate database tables.
+ * Scans for JSB engine files (.car, .his, .trn, .asw, .awa, .rcb, .sco) and processes
+ * them through JsbImportService (or BoxscoreProcessor for .sco) to populate database tables.
  *
- * Import order: .trn → .car → .his → .asw → .awa → .rcb
+ * Import order: .trn → .car → .his → .asw → .awa → .rcb → .sco
  * (Trade data from .trn helps PlayerIdResolver handle mid-season moves in .car)
+ * (.sco uses both HEAT-end and season-end archives per season for full box score coverage)
  *
  * Environment auto-detection:
  *   - fullLeagueBackups/ exists → local mode (pre-extracted directories)
@@ -23,6 +24,7 @@ declare(strict_types=1);
  *   php bulkJsbImport.php --file-type=trn     # Only process .trn files
  *   php bulkJsbImport.php --file-type=asw     # Only process .asw files
  *   php bulkJsbImport.php --file-type=rcb     # Only process .rcb files
+ *   php bulkJsbImport.php --file-type=sco     # Only process .sco files (box scores)
  */
 
 // ── CLI-only guard ──────────────────────────────────────────────────────────
@@ -59,7 +61,7 @@ require_once __DIR__ . '/../db/db.php';
 $dryRun = in_array('--dry-run', $argv, true);
 
 $fileTypeFilter = null;
-$validTypes = ['car', 'his', 'trn', 'asw', 'awa', 'rcb'];
+$validTypes = ['car', 'his', 'trn', 'asw', 'awa', 'rcb', 'sco'];
 foreach ($argv as $arg) {
     if (str_starts_with($arg, '--file-type=')) {
         $fileTypeFilter = substr($arg, strlen('--file-type='));
@@ -133,6 +135,45 @@ if ($isProduction) {
     usort($entries, static function (array $a, array $b): int {
         return $a['year'] <=> $b['year'];
     });
+
+    // Build $scoEntries: two entries per season (HEAT + season-end) for .sco processing
+    $scoEntries = [];
+    foreach ($seasonDirs as $dirPath) {
+        $label = basename($dirPath);
+        $year  = $extractor->seasonLabelToEndingYear($label);
+        if ($year === 0) {
+            continue;
+        }
+
+        $heatArchive = $extractor->findHeatEndArchive($dirPath);
+        if ($heatArchive !== null) {
+            $scoEntries[] = [
+                'path'        => $dirPath,
+                'dir'         => $label,
+                'year'        => $year,
+                'phase'       => 'HEAT',
+                'archivePath' => $heatArchive,
+            ];
+        }
+
+        $seasonEndArchive = $extractor->findLastArchive($dirPath);
+        if ($seasonEndArchive !== null) {
+            $scoEntries[] = [
+                'path'        => $dirPath,
+                'dir'         => $label,
+                'year'        => $year,
+                'phase'       => 'Regular Season/Playoffs',
+                'archivePath' => $seasonEndArchive,
+            ];
+        }
+    }
+    usort($scoEntries, static function (array $a, array $b): int {
+        if ($a['year'] !== $b['year']) {
+            return $a['year'] <=> $b['year'];
+        }
+        $phaseOrder = ['HEAT' => 0, 'Regular Season/Playoffs' => 1];
+        return ($phaseOrder[$a['phase']] ?? 9) <=> ($phaseOrder[$b['phase']] ?? 9);
+    });
 } else {
     // ── Local: pre-extracted directories in fullLeagueBackups/ ─────────────
 
@@ -161,7 +202,7 @@ if ($isProduction) {
 
         // Check for JSB files
         $hasJsbFiles = false;
-        foreach (['IBL5.car', 'IBL5.his', 'IBL5.trn', 'IBL5.asw', 'IBL5.awa'] as $jsbFile) {
+        foreach (['IBL5.car', 'IBL5.his', 'IBL5.trn', 'IBL5.asw', 'IBL5.awa', 'IBL5.sco'] as $jsbFile) {
             if (file_exists($dirPath . '/' . $jsbFile)) {
                 $hasJsbFiles = true;
                 break;
@@ -193,7 +234,13 @@ if ($isProduction) {
         return $aOrder <=> $bOrder;
     });
 
-    // Deduplicate: prefer season-end snapshot per year
+    // Capture pre-dedup entries for .sco (needs both HEAT + season-end per year)
+    $scoEntries = array_values(array_filter(
+        $entries,
+        static fn (array $e): bool => $e['phase'] !== 'Preseason',
+    ));
+
+    // Deduplicate: prefer season-end snapshot per year (for non-.sco types)
     $deduped = [];
     foreach ($entries as $entry) {
         $deduped[$entry['year']] = $entry;
@@ -213,13 +260,13 @@ if ($parseErrors !== []) {
 // ── Dry run: list files and exit ────────────────────────────────────────────
 if ($dryRun) {
     echo str_pad('Directory/Season', 40) . str_pad('Year', 8) . str_pad('Phase', 25);
-    echo str_pad('.car', 5) . str_pad('.his', 5) . str_pad('.trn', 5) . str_pad('.asw', 5) . str_pad('.awa', 5) . ".rcb\n";
-    echo str_repeat('-', 100) . "\n";
+    echo str_pad('.car', 5) . str_pad('.his', 5) . str_pad('.trn', 5) . str_pad('.asw', 5) . str_pad('.awa', 5) . str_pad('.rcb', 5) . ".sco\n";
+    echo str_repeat('-', 105) . "\n";
 
     foreach ($entries as $entry) {
         if ($isProduction) {
             $archive = $extractor->findLastArchive($entry['path']);
-            $car = $his = $trn = $asw = $awa = $rcb = '-';
+            $car = $his = $trn = $asw = $awa = $rcb = $sco = '-';
             if ($archive !== null) {
                 $zip = new ZipArchive();
                 if ($zip->open($archive) === true) {
@@ -229,6 +276,7 @@ if ($dryRun) {
                     $asw = $zip->locateName('IBL5.asw') !== false ? 'Y' : '-';
                     $awa = $zip->locateName('IBL5.awa') !== false ? 'Y' : '-';
                     $rcb = $zip->locateName('IBL5.rcb') !== false ? 'Y' : '-';
+                    $sco = $zip->locateName('IBL5.sco') !== false ? 'Y' : '-';
                     $zip->close();
                 }
             }
@@ -239,15 +287,20 @@ if ($dryRun) {
             $asw = file_exists($entry['path'] . '/IBL5.asw') ? 'Y' : '-';
             $awa = file_exists($entry['path'] . '/IBL5.awa') ? 'Y' : '-';
             $rcb = file_exists($entry['path'] . '/IBL5.rcb') ? 'Y' : '-';
+            $sco = file_exists($entry['path'] . '/IBL5.sco') ? 'Y' : '-';
         }
 
         echo str_pad($entry['dir'], 40)
             . str_pad((string) $entry['year'], 8)
             . str_pad($entry['phase'], 25)
-            . str_pad($car, 5) . str_pad($his, 5) . str_pad($trn, 5) . str_pad($asw, 5) . str_pad($awa, 5) . $rcb . "\n";
+            . str_pad($car, 5) . str_pad($his, 5) . str_pad($trn, 5) . str_pad($asw, 5) . str_pad($awa, 5) . str_pad($rcb, 5) . $sco . "\n";
     }
 
-    echo sprintf("\nTotal: %d directories ready for processing.\n", count($entries));
+    echo sprintf("\nTotal: %d directories ready for processing", count($entries));
+    if (count($scoEntries) !== count($entries)) {
+        echo sprintf(" (%d entries for .sco — includes HEAT + season-end)", count($scoEntries));
+    }
+    echo ".\n";
     exit(0);
 }
 
@@ -321,6 +374,7 @@ if ($isProduction) {
 $repository = new JsbParser\JsbImportRepository($mysqli_db);
 $resolver   = new JsbParser\PlayerIdResolver($mysqli_db);
 $service    = new JsbParser\JsbImportService($repository, $resolver);
+$boxscoreProcessor = new Boxscore\BoxscoreProcessor($mysqli_db);
 
 $totalInserted = 0;
 $totalUpdated  = 0;
@@ -328,12 +382,102 @@ $totalSkipped  = 0;
 $totalErrors   = 0;
 $filesProcessed = 0;
 
-$fileTypes = $fileTypeFilter !== null ? [$fileTypeFilter] : ['trn', 'car', 'his', 'asw', 'awa', 'rcb'];
+$fileTypes = $fileTypeFilter !== null ? [$fileTypeFilter] : ['trn', 'car', 'his', 'asw', 'awa', 'rcb', 'sco'];
 
 foreach ($fileTypes as $fileType) {
     echo "\n" . str_repeat('=', 50) . "\n";
     echo "Processing .{$fileType} files\n";
     echo str_repeat('=', 50) . "\n\n";
+
+    // .sco files use BoxscoreProcessor and need both HEAT + season-end archives
+    if ($fileType === 'sco') {
+        foreach ($scoEntries as $i => $entry) {
+            $num = $i + 1;
+
+            // Production: extract from specific archive carried in entry
+            // Local: use the standard file path resolver
+            if ($isProduction && isset($entry['archivePath'])) {
+                $filePath = (static function (string $archivePath) use ($extractor): ?string {
+                    $tmpDir = sys_get_temp_dir() . '/ibl5_sco_' . bin2hex(random_bytes(8));
+                    if (!mkdir($tmpDir, 0700, true)) {
+                        return null;
+                    }
+                    try {
+                        $extracted = $extractor->extractSingleFile($archivePath, 'IBL5.sco', $tmpDir);
+                        if ($extracted === false) {
+                            rmdir($tmpDir);
+                            return null;
+                        }
+                        return $extracted;
+                    } catch (\Throwable) {
+                        foreach (glob($tmpDir . '/*') ?: [] as $file) {
+                            if (is_file($file)) {
+                                unlink($file);
+                            }
+                        }
+                        if (is_dir($tmpDir)) {
+                            rmdir($tmpDir);
+                        }
+                        return null;
+                    }
+                })($entry['archivePath']);
+            } else {
+                $filePath = $getFilePath($entry['path'], 'sco');
+            }
+
+            if ($filePath === null) {
+                continue;
+            }
+
+            echo sprintf(
+                "[%d/%d] %s (%d %s) — .sco\n",
+                $num,
+                count($scoEntries),
+                $entry['dir'],
+                $entry['year'],
+                $entry['phase']
+            );
+
+            try {
+                // Process regular games
+                $scoResult = $boxscoreProcessor->processScoFile(
+                    $filePath,
+                    $entry['year'],
+                    $entry['phase'],
+                    skipSimDates: true,
+                );
+                $result = JsbParser\JsbImportResult::fromScoResult($scoResult);
+
+                // Process All-Star games (only in season-end archives)
+                if ($entry['phase'] === 'Regular Season/Playoffs') {
+                    $allStarResult = $boxscoreProcessor->processAllStarGames($filePath, $entry['year']);
+                    if (isset($allStarResult['messages'])) {
+                        foreach ($allStarResult['messages'] as $msg) {
+                            $result->addMessage("All-Star: {$msg}");
+                        }
+                    }
+                }
+
+                echo "        {$result->summary()}\n";
+
+                foreach ($result->messages as $msg) {
+                    echo "        {$msg}\n";
+                }
+
+                $totalInserted  += $result->inserted;
+                $totalUpdated   += $result->updated;
+                $totalSkipped   += $result->skipped;
+                $totalErrors    += $result->errors;
+                $filesProcessed++;
+            } catch (\Throwable $e) {
+                echo "        ERROR: {$e->getMessage()}\n";
+                $totalErrors++;
+            } finally {
+                $cleanupFile($filePath);
+            }
+        }
+        continue; // Skip the normal $entries loop for .sco
+    }
 
     foreach ($entries as $i => $entry) {
         $num      = $i + 1;

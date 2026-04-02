@@ -44,6 +44,26 @@ class JsbImportResult
     }
 
     /**
+     * Create a JsbImportResult from a BoxscoreProcessor::processScoFile() result array.
+     *
+     * @param array{success: bool, gamesInserted: int, gamesUpdated: int, gamesSkipped: int, linesProcessed: int, messages: list<string>, error?: string} $scoResult
+     */
+    public static function fromScoResult(array $scoResult): self
+    {
+        $result = new self();
+        $result->inserted = $scoResult['gamesInserted'];
+        $result->updated = $scoResult['gamesUpdated'];
+        $result->skipped = $scoResult['gamesSkipped'];
+        if (isset($scoResult['error'])) {
+            $result->addError($scoResult['error']);
+        }
+        foreach ($scoResult['messages'] as $msg) {
+            $result->addMessage($msg);
+        }
+        return $result;
+    }
+
+    /**
      * Merge another result into this one.
      */
     public function merge(self $other): void

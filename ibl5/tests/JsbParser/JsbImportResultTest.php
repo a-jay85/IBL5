@@ -113,4 +113,59 @@ class JsbImportResultTest extends TestCase
 
         $this->assertSame('No changes', $result->summary());
     }
+
+    public function testFromScoResultMapsFields(): void
+    {
+        $scoResult = [
+            'success' => true,
+            'gamesInserted' => 5,
+            'gamesUpdated' => 3,
+            'gamesSkipped' => 10,
+            'linesProcessed' => 200,
+            'messages' => [],
+        ];
+
+        $result = JsbImportResult::fromScoResult($scoResult);
+
+        $this->assertSame(5, $result->inserted);
+        $this->assertSame(3, $result->updated);
+        $this->assertSame(10, $result->skipped);
+        $this->assertSame(0, $result->errors);
+    }
+
+    public function testFromScoResultWithError(): void
+    {
+        $scoResult = [
+            'success' => false,
+            'gamesInserted' => 0,
+            'gamesUpdated' => 0,
+            'gamesSkipped' => 0,
+            'linesProcessed' => 0,
+            'messages' => ['Parsing started'],
+            'error' => 'Failed to open .sco file',
+        ];
+
+        $result = JsbImportResult::fromScoResult($scoResult);
+
+        $this->assertSame(1, $result->errors);
+        $this->assertStringContainsString('Failed to open .sco file', $result->messages[0]);
+    }
+
+    public function testFromScoResultPreservesMessages(): void
+    {
+        $scoResult = [
+            'success' => true,
+            'gamesInserted' => 1,
+            'gamesUpdated' => 0,
+            'gamesSkipped' => 0,
+            'linesProcessed' => 32,
+            'messages' => ['Parsing .sco file...', 'Games inserted: 1'],
+        ];
+
+        $result = JsbImportResult::fromScoResult($scoResult);
+
+        $this->assertCount(2, $result->messages);
+        $this->assertSame('Parsing .sco file...', $result->messages[0]);
+        $this->assertSame('Games inserted: 1', $result->messages[1]);
+    }
 }

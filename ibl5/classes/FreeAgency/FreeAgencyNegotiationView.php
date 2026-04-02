@@ -37,6 +37,10 @@ class FreeAgencyNegotiationView
         $maxContract = $negotiationData['maxContract'];
         $team = $negotiationData['team'];
 
+        // Bird years are 0 unless the offering team is the player's current team
+        $birdYears = $player->teamName === $team->name ? ($player->birdYears ?? 0) : 0;
+        $raisePercentage = \ContractRules::getMaxRaisePercentage($birdYears);
+
         // Generate a single CSRF token for all forms on this page.
         // The negotiate page has 16+ forms (custom, delete, quick-offer buttons).
         // CsrfGuard's MAX_TOKENS=10 would evict the custom form's token if each
@@ -97,7 +101,7 @@ class FreeAgencyNegotiationView
             <div class="ibl-field-group">
                 <span class="ibl-label">Your Custom Offer:</span>
                 <div class="ibl-field-group__content">
-                    <?= $this->formComponents->renderOfferInputs($existingOffer) ?>
+                    <?= $this->formComponents->renderOfferInputs($existingOffer, $raisePercentage) ?>
                 </div>
             </div>
 
@@ -121,7 +125,7 @@ class FreeAgencyNegotiationView
 </div>
 
 <?php // Card 4: Notes & Reminders ?>
-<?= $this->renderNotesReminders($maxContract, $veteranMinimum, $amendedCapSpace, $capMetrics, $player->birdYears ?? 0) ?>
+<?= $this->renderNotesReminders($maxContract, $veteranMinimum, $amendedCapSpace, $capMetrics, $birdYears) ?>
 
 <?php // Delete Offer (conditional) ?>
 <?php if ($hasExistingOffer): ?>
@@ -152,7 +156,7 @@ class FreeAgencyNegotiationView
         // Only use player's bird years if offering team is player's current team
         $birdYears = $player->teamName === $team->name ? ($player->birdYears ?? 0) : 0;
         $raisePercentage = \ContractRules::getMaxRaisePercentage($birdYears);
-        $maxRaise = (int) round($maxContract * $raisePercentage);
+        $maxRaise = \ContractRules::calculateMaxRaise($maxContract, $birdYears);
 
         $maxSalaries = [
             0 => $maxContract,
@@ -198,7 +202,7 @@ class FreeAgencyNegotiationView
             ? (string) (int) $rawPercentage
             : rtrim(rtrim(sprintf('%.1f', $rawPercentage), '0'), '.');
         $exampleSalary = 500;
-        $exampleRaise = (int) round($exampleSalary * $raisePercentage);
+        $exampleRaise = \ContractRules::calculateMaxRaise($exampleSalary, $birdYears);
 
         $hasBirdRights = \ContractRules::hasBirdRights($birdYears);
         if ($hasBirdRights) {

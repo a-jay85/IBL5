@@ -38,7 +38,7 @@ class FreeAgencyOfferValidatorTest extends TestCase
     public function testValidMultiYearOfferWithAllowedRaises(): void
     {
         $validator = new FreeAgencyOfferValidator();
-        // 10% raise limit on 500 = round(500 * 0.1) = 50
+        // 10% raise limit on 500 = floor(500 * 0.1) = 50
         // So max year 2 = 550, max year 3 = 600
         $result = $validator->validateOffer($this->buildOffer([
             'offer1' => 500, 'offer2' => 550, 'offer3' => 600,
@@ -231,7 +231,7 @@ class FreeAgencyOfferValidatorTest extends TestCase
     public function testBirdRightsAllows125PercentRaise(): void
     {
         $validator = new FreeAgencyOfferValidator();
-        // 12.5% of 500 = round(62.5) = 63, so max year2 = 563
+        // 12.5% of 500 = floor(62.5) = 62, so max year2 = 562
         $result = $validator->validateOffer($this->buildOffer([
             'offer1' => 500,
             'offer2' => 562,
@@ -244,10 +244,10 @@ class FreeAgencyOfferValidatorTest extends TestCase
     public function testBirdRightsRejectsRaiseOver125Percent(): void
     {
         $validator = new FreeAgencyOfferValidator();
-        // 12.5% of 500 = 63, max year2 = 563
+        // 12.5% of 500 = floor(62.5) = 62, max year2 = 562
         $result = $validator->validateOffer($this->buildOffer([
             'offer1' => 500,
-            'offer2' => 564, // 64 raise, exceeds 63
+            'offer2' => 563, // 63 raise, exceeds 62
             'birdYears' => 3,
         ]));
 

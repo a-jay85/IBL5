@@ -122,12 +122,13 @@ class FreeAgencyFormComponents
 
     /**
      * @param array<string, int> $prefills Existing offer amounts (keys: offer1-6)
+     * @param float $raisePercentage Max raise percentage for JS hint calculation
      */
-    public function renderOfferInputs(array $prefills): string
+    public function renderOfferInputs(array $prefills, float $raisePercentage = 0.10): string
     {
         ob_start();
         ?>
-<div class="offer-salary-row offer-salary-row--inputs">
+<div class="offer-salary-row offer-salary-row--inputs" data-raise-percentage="<?= $raisePercentage ?>">
     <?php for ($i = 1; $i <= 6; $i++): ?>
     <div class="offer-salary-cell">
         <label for="offeryear<?= $i ?>" class="ibl-label ibl-label--sm">Yr <?= $i ?></label>

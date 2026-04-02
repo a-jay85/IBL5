@@ -26,8 +26,7 @@ class CommonContractValidator implements CommonContractValidatorInterface
      */
     public function validateRaises(array $offer, int $birdYears): array
     {
-        $maxRaisePercentage = \ContractRules::getMaxRaisePercentage($birdYears);
-        $maxIncrease = (int) floor(($offer['year1'] ?? 0) * $maxRaisePercentage);
+        $maxIncrease = \ContractRules::calculateMaxRaise($offer['year1'] ?? 0, $birdYears);
         
         $years = ['year1', 'year2', 'year3', 'year4', 'year5', 'year6'];
         

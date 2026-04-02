@@ -13,32 +13,40 @@ use YourAccount\YourAccountService;
 
 class YourAccountServiceTest extends TestCase
 {
-    /** @var YourAccountRepositoryInterface&\PHPUnit\Framework\MockObject\MockObject */
-    private YourAccountRepositoryInterface $mockRepository;
+    /** @var YourAccountRepositoryInterface&\PHPUnit\Framework\MockObject\Stub */
+    private YourAccountRepositoryInterface $stubRepository;
 
-    /** @var AuthServiceInterface&\PHPUnit\Framework\MockObject\MockObject */
-    private AuthServiceInterface $mockAuthService;
+    /** @var AuthServiceInterface&\PHPUnit\Framework\MockObject\Stub */
+    private AuthServiceInterface $stubAuthService;
 
     /** @var CommonMysqliRepository&\PHPUnit\Framework\MockObject\Stub */
     private CommonMysqliRepository $stubCommonRepository;
 
-    /** @var MailServiceInterface&\PHPUnit\Framework\MockObject\MockObject */
-    private MailServiceInterface $mockMailService;
+    /** @var MailServiceInterface&\PHPUnit\Framework\MockObject\Stub */
+    private MailServiceInterface $stubMailService;
 
     private YourAccountService $service;
 
     protected function setUp(): void
     {
-        $this->mockRepository = $this->createMock(YourAccountRepositoryInterface::class);
-        $this->mockAuthService = $this->createMock(AuthServiceInterface::class);
+        $this->stubRepository = $this->createStub(YourAccountRepositoryInterface::class);
+        $this->stubAuthService = $this->createStub(AuthServiceInterface::class);
         $this->stubCommonRepository = $this->createStub(CommonMysqliRepository::class);
-        $this->mockMailService = $this->createMock(MailServiceInterface::class);
+        $this->stubMailService = $this->createStub(MailServiceInterface::class);
 
-        $this->service = new YourAccountService(
-            $this->mockRepository,
-            $this->mockAuthService,
+        $this->service = $this->buildService();
+    }
+
+    private function buildService(
+        YourAccountRepositoryInterface|null $repository = null,
+        AuthServiceInterface|null $authService = null,
+        MailServiceInterface|null $mailService = null,
+    ): YourAccountService {
+        return new YourAccountService(
+            $repository ?? $this->stubRepository,
+            $authService ?? $this->stubAuthService,
             $this->stubCommonRepository,
-            $this->mockMailService,
+            $mailService ?? $this->stubMailService,
             'https://iblhoops.net',
             'IBL Hoops',
             'admin@iblhoops.net',
@@ -50,15 +58,18 @@ class YourAccountServiceTest extends TestCase
 
     public function testAttemptLoginSuccessCallsHousekeeping(): void
     {
-        $this->mockAuthService->expects($this->once())
+        $mockAuth = $this->createMock(AuthServiceInterface::class);
+        $mockAuth->expects($this->once())
             ->method('attempt')
             ->with('testuser', 'pass123', false)
             ->willReturn(true);
 
-        $this->mockRepository->expects($this->once())
+        $mockRepo = $this->createMock(YourAccountRepositoryInterface::class);
+        $mockRepo->expects($this->once())
             ->method('updateLastLoginIp')
             ->with('testuser', '10.0.0.1');
 
+        $this->service = $this->buildService(repository: $mockRepo, authService: $mockAuth);
         $result = $this->service->attemptLogin('testuser', 'pass123', false, '10.0.0.1');
 
         $this->assertTrue($result['success']);
@@ -67,23 +78,27 @@ class YourAccountServiceTest extends TestCase
 
     public function testAttemptLoginPassesRememberMeFlag(): void
     {
-        $this->mockAuthService->expects($this->once())
+        $mockAuth = $this->createMock(AuthServiceInterface::class);
+        $mockAuth->expects($this->once())
             ->method('attempt')
             ->with('testuser', 'pass123', true)
             ->willReturn(true);
 
+        $this->service = $this->buildService(authService: $mockAuth);
         $this->service->attemptLogin('testuser', 'pass123', true, '10.0.0.1');
     }
 
     public function testAttemptLoginFailureReturnsError(): void
     {
-        $this->mockAuthService->expects($this->once())
+        $mockAuth = $this->createMock(AuthServiceInterface::class);
+        $mockAuth->expects($this->once())
             ->method('attempt')
             ->willReturn(false);
 
-        $this->mockAuthService->method('getLastError')
+        $mockAuth->method('getLastError')
             ->willReturn('Please verify your email address.');
 
+        $this->service = $this->buildService(authService: $mockAuth);
         $result = $this->service->attemptLogin('testuser', 'wrongpass', false, '10.0.0.1');
 
         $this->assertFalse($result['success']);
@@ -92,13 +107,15 @@ class YourAccountServiceTest extends TestCase
 
     public function testAttemptLoginFailureReturnsNullErrorWhenGeneric(): void
     {
-        $this->mockAuthService->expects($this->once())
+        $mockAuth = $this->createMock(AuthServiceInterface::class);
+        $mockAuth->expects($this->once())
             ->method('attempt')
             ->willReturn(false);
 
-        $this->mockAuthService->method('getLastError')
+        $mockAuth->method('getLastError')
             ->willReturn(null);
 
+        $this->service = $this->buildService(authService: $mockAuth);
         $result = $this->service->attemptLogin('testuser', 'wrongpass', false, '10.0.0.1');
 
         $this->assertFalse($result['success']);
@@ -107,10 +124,12 @@ class YourAccountServiceTest extends TestCase
 
     public function testAttemptLoginFailureDoesNotCallHousekeeping(): void
     {
-        $this->mockAuthService->method('attempt')->willReturn(false);
+        $this->stubAuthService->method('attempt')->willReturn(false);
 
-        $this->mockRepository->expects($this->never())->method('updateLastLoginIp');
+        $mockRepo = $this->createMock(YourAccountRepositoryInterface::class);
+        $mockRepo->expects($this->never())->method('updateLastLoginIp');
 
+        $this->service = $this->buildService(repository: $mockRepo);
         $this->service->attemptLogin('testuser', 'wrongpass', false, '10.0.0.1');
     }
 
@@ -118,7 +137,8 @@ class YourAccountServiceTest extends TestCase
 
     public function testRegisterUserSuccessSendsEmail(): void
     {
-        $this->mockAuthService->expects($this->once())
+        $mockAuth = $this->createMock(AuthServiceInterface::class);
+        $mockAuth->expects($this->once())
             ->method('register')
             ->willReturnCallback(function (string $email, string $password, string $username, ?callable $callback): int {
                 $this->assertSame('user@test.com', $email);
@@ -129,7 +149,8 @@ class YourAccountServiceTest extends TestCase
                 return 1;
             });
 
-        $this->mockMailService->expects($this->once())
+        $mockMail = $this->createMock(MailServiceInterface::class);
+        $mockMail->expects($this->once())
             ->method('send')
             ->with(
                 'user@test.com',
@@ -138,6 +159,7 @@ class YourAccountServiceTest extends TestCase
                 'admin@iblhoops.net',
             );
 
+        $this->service = $this->buildService(authService: $mockAuth, mailService: $mockMail);
         $result = $this->service->registerUser('newuser', 'user@test.com', 'password1', 'password1');
 
         $this->assertTrue($result['success']);
@@ -146,13 +168,15 @@ class YourAccountServiceTest extends TestCase
 
     public function testRegisterUserAutoGeneratesPasswordWhenBothBlank(): void
     {
-        $this->mockAuthService->expects($this->once())
+        $mockAuth = $this->createMock(AuthServiceInterface::class);
+        $mockAuth->expects($this->once())
             ->method('register')
             ->willReturnCallback(function (string $email, string $password, string $username, ?callable $callback): int {
                 $this->assertSame(10, strlen($password));
                 return 1;
             });
 
+        $this->service = $this->buildService(authService: $mockAuth);
         $result = $this->service->registerUser('newuser', 'user@test.com', '', '');
 
         $this->assertTrue($result['success']);
@@ -160,8 +184,10 @@ class YourAccountServiceTest extends TestCase
 
     public function testRegisterUserPasswordMismatchReturnsError(): void
     {
-        $this->mockAuthService->expects($this->never())->method('register');
+        $mockAuth = $this->createMock(AuthServiceInterface::class);
+        $mockAuth->expects($this->never())->method('register');
 
+        $this->service = $this->buildService(authService: $mockAuth);
         $result = $this->service->registerUser('newuser', 'user@test.com', 'pass1', 'pass2');
 
         $this->assertFalse($result['success']);
@@ -170,8 +196,10 @@ class YourAccountServiceTest extends TestCase
 
     public function testRegisterUserPasswordTooShortReturnsError(): void
     {
-        $this->mockAuthService->expects($this->never())->method('register');
+        $mockAuth = $this->createMock(AuthServiceInterface::class);
+        $mockAuth->expects($this->never())->method('register');
 
+        $this->service = $this->buildService(authService: $mockAuth);
         $result = $this->service->registerUser('newuser', 'user@test.com', 'ab', 'ab');
 
         $this->assertFalse($result['success']);
@@ -180,8 +208,10 @@ class YourAccountServiceTest extends TestCase
 
     public function testRegisterUserEmptyUsernameReturnsError(): void
     {
-        $this->mockAuthService->expects($this->never())->method('register');
+        $mockAuth = $this->createMock(AuthServiceInterface::class);
+        $mockAuth->expects($this->never())->method('register');
 
+        $this->service = $this->buildService(authService: $mockAuth);
         $result = $this->service->registerUser('', 'user@test.com', 'password1', 'password1');
 
         $this->assertFalse($result['success']);
@@ -190,8 +220,10 @@ class YourAccountServiceTest extends TestCase
 
     public function testRegisterUserInvalidCharsInUsernameReturnsError(): void
     {
-        $this->mockAuthService->expects($this->never())->method('register');
+        $mockAuth = $this->createMock(AuthServiceInterface::class);
+        $mockAuth->expects($this->never())->method('register');
 
+        $this->service = $this->buildService(authService: $mockAuth);
         $result = $this->service->registerUser('user name!', 'user@test.com', 'password1', 'password1');
 
         $this->assertFalse($result['success']);
@@ -200,8 +232,10 @@ class YourAccountServiceTest extends TestCase
 
     public function testRegisterUserUsernameTooLongReturnsError(): void
     {
-        $this->mockAuthService->expects($this->never())->method('register');
+        $mockAuth = $this->createMock(AuthServiceInterface::class);
+        $mockAuth->expects($this->never())->method('register');
 
+        $this->service = $this->buildService(authService: $mockAuth);
         $longName = str_repeat('a', 26);
         $result = $this->service->registerUser($longName, 'user@test.com', 'password1', 'password1');
 
@@ -211,13 +245,15 @@ class YourAccountServiceTest extends TestCase
 
     public function testRegisterUserAuthServiceExceptionReturnsError(): void
     {
-        $this->mockAuthService->expects($this->once())
+        $mockAuth = $this->createMock(AuthServiceInterface::class);
+        $mockAuth->expects($this->once())
             ->method('register')
             ->willThrowException(new \RuntimeException('Duplicate email'));
 
-        $this->mockAuthService->method('getLastError')
+        $mockAuth->method('getLastError')
             ->willReturn('Email already registered');
 
+        $this->service = $this->buildService(authService: $mockAuth);
         $result = $this->service->registerUser('newuser', 'user@test.com', 'password1', 'password1');
 
         $this->assertFalse($result['success']);
@@ -226,12 +262,14 @@ class YourAccountServiceTest extends TestCase
 
     public function testRegisterUserAuthServiceExceptionFallsBackToGenericError(): void
     {
-        $this->mockAuthService->expects($this->once())
+        $mockAuth = $this->createMock(AuthServiceInterface::class);
+        $mockAuth->expects($this->once())
             ->method('register')
             ->willThrowException(new \RuntimeException('error'));
 
-        $this->mockAuthService->method('getLastError')->willReturn(null);
+        $mockAuth->method('getLastError')->willReturn(null);
 
+        $this->service = $this->buildService(authService: $mockAuth);
         $result = $this->service->registerUser('newuser', 'user@test.com', 'password1', 'password1');
 
         $this->assertFalse($result['success']);
@@ -240,7 +278,8 @@ class YourAccountServiceTest extends TestCase
 
     public function testRegisterUserVerificationEmailContainsLink(): void
     {
-        $this->mockAuthService->expects($this->once())
+        $mockAuth = $this->createMock(AuthServiceInterface::class);
+        $mockAuth->expects($this->once())
             ->method('register')
             ->willReturnCallback(function (string $email, string $password, string $username, ?callable $callback): int {
                 if ($callback !== null) {
@@ -249,7 +288,8 @@ class YourAccountServiceTest extends TestCase
                 return 1;
             });
 
-        $this->mockMailService->expects($this->once())
+        $mockMail = $this->createMock(MailServiceInterface::class);
+        $mockMail->expects($this->once())
             ->method('send')
             ->with(
                 $this->anything(),
@@ -263,6 +303,7 @@ class YourAccountServiceTest extends TestCase
                 $this->anything(),
             );
 
+        $this->service = $this->buildService(authService: $mockAuth, mailService: $mockMail);
         $this->service->registerUser('newuser', 'user@test.com', 'password1', 'password1');
     }
 
@@ -270,11 +311,13 @@ class YourAccountServiceTest extends TestCase
 
     public function testConfirmEmailSuccessReturnsUsername(): void
     {
-        $this->mockAuthService->expects($this->once())
+        $mockAuth = $this->createMock(AuthServiceInterface::class);
+        $mockAuth->expects($this->once())
             ->method('confirmEmail')
             ->with('sel123', 'tok456')
             ->willReturn(['username' => 'confirmeduser']);
 
+        $this->service = $this->buildService(authService: $mockAuth);
         $result = $this->service->confirmEmail('sel123', 'tok456');
 
         $this->assertTrue($result['success']);
@@ -284,8 +327,10 @@ class YourAccountServiceTest extends TestCase
 
     public function testConfirmEmailEmptySelectorReturnsError(): void
     {
-        $this->mockAuthService->expects($this->never())->method('confirmEmail');
+        $mockAuth = $this->createMock(AuthServiceInterface::class);
+        $mockAuth->expects($this->never())->method('confirmEmail');
 
+        $this->service = $this->buildService(authService: $mockAuth);
         $result = $this->service->confirmEmail('', 'tok456');
 
         $this->assertFalse($result['success']);
@@ -294,8 +339,10 @@ class YourAccountServiceTest extends TestCase
 
     public function testConfirmEmailEmptyTokenReturnsError(): void
     {
-        $this->mockAuthService->expects($this->never())->method('confirmEmail');
+        $mockAuth = $this->createMock(AuthServiceInterface::class);
+        $mockAuth->expects($this->never())->method('confirmEmail');
 
+        $this->service = $this->buildService(authService: $mockAuth);
         $result = $this->service->confirmEmail('sel123', '');
 
         $this->assertFalse($result['success']);
@@ -304,13 +351,15 @@ class YourAccountServiceTest extends TestCase
 
     public function testConfirmEmailFailureReturnsError(): void
     {
-        $this->mockAuthService->expects($this->once())
+        $mockAuth = $this->createMock(AuthServiceInterface::class);
+        $mockAuth->expects($this->once())
             ->method('confirmEmail')
             ->willThrowException(new \RuntimeException('expired'));
 
-        $this->mockAuthService->method('getLastError')
+        $mockAuth->method('getLastError')
             ->willReturn('expired');
 
+        $this->service = $this->buildService(authService: $mockAuth);
         $result = $this->service->confirmEmail('sel123', 'tok456');
 
         $this->assertFalse($result['success']);
@@ -322,15 +371,17 @@ class YourAccountServiceTest extends TestCase
 
     public function testRequestPasswordResetSuccessSendsEmail(): void
     {
-        $this->mockAuthService->expects($this->once())
+        $mockAuth = $this->createMock(AuthServiceInterface::class);
+        $mockAuth->expects($this->once())
             ->method('forgotPassword')
             ->willReturnCallback(function (string $email, callable $callback): void {
                 $callback('sel-reset', 'tok-reset');
             });
 
-        $this->mockAuthService->method('getLastError')->willReturn(null);
+        $mockAuth->method('getLastError')->willReturn(null);
 
-        $this->mockMailService->expects($this->once())
+        $mockMail = $this->createMock(MailServiceInterface::class);
+        $mockMail->expects($this->once())
             ->method('send')
             ->with(
                 'user@test.com',
@@ -343,6 +394,7 @@ class YourAccountServiceTest extends TestCase
                 'admin@iblhoops.net',
             );
 
+        $this->service = $this->buildService(authService: $mockAuth, mailService: $mockMail);
         $result = $this->service->requestPasswordReset('user@test.com');
 
         $this->assertTrue($result['success']);
@@ -351,8 +403,10 @@ class YourAccountServiceTest extends TestCase
 
     public function testRequestPasswordResetEmptyEmailReturnsError(): void
     {
-        $this->mockAuthService->expects($this->never())->method('forgotPassword');
+        $mockAuth = $this->createMock(AuthServiceInterface::class);
+        $mockAuth->expects($this->never())->method('forgotPassword');
 
+        $this->service = $this->buildService(authService: $mockAuth);
         $result = $this->service->requestPasswordReset('');
 
         $this->assertFalse($result['success']);
@@ -361,12 +415,14 @@ class YourAccountServiceTest extends TestCase
 
     public function testRequestPasswordResetRateLimitedReturnsError(): void
     {
-        $this->mockAuthService->expects($this->once())
+        $mockAuth = $this->createMock(AuthServiceInterface::class);
+        $mockAuth->expects($this->once())
             ->method('forgotPassword');
 
-        $this->mockAuthService->method('getLastError')
+        $mockAuth->method('getLastError')
             ->willReturn('Too many requests. Please try again later.');
 
+        $this->service = $this->buildService(authService: $mockAuth);
         $result = $this->service->requestPasswordReset('user@test.com');
 
         $this->assertFalse($result['success']);
@@ -377,10 +433,12 @@ class YourAccountServiceTest extends TestCase
 
     public function testResetPasswordSuccessReturnsSuccess(): void
     {
-        $this->mockAuthService->expects($this->once())
+        $mockAuth = $this->createMock(AuthServiceInterface::class);
+        $mockAuth->expects($this->once())
             ->method('resetPassword')
             ->with('sel123', 'tok456', 'newpass');
 
+        $this->service = $this->buildService(authService: $mockAuth);
         $result = $this->service->resetPassword('sel123', 'tok456', 'newpass', 'newpass');
 
         $this->assertTrue($result['success']);
@@ -389,8 +447,10 @@ class YourAccountServiceTest extends TestCase
 
     public function testResetPasswordMismatchReturnsError(): void
     {
-        $this->mockAuthService->expects($this->never())->method('resetPassword');
+        $mockAuth = $this->createMock(AuthServiceInterface::class);
+        $mockAuth->expects($this->never())->method('resetPassword');
 
+        $this->service = $this->buildService(authService: $mockAuth);
         $result = $this->service->resetPassword('sel123', 'tok456', 'pass1', 'pass2');
 
         $this->assertFalse($result['success']);
@@ -399,13 +459,15 @@ class YourAccountServiceTest extends TestCase
 
     public function testResetPasswordAuthServiceExceptionReturnsError(): void
     {
-        $this->mockAuthService->expects($this->once())
+        $mockAuth = $this->createMock(AuthServiceInterface::class);
+        $mockAuth->expects($this->once())
             ->method('resetPassword')
             ->willThrowException(new \RuntimeException('Token expired'));
 
-        $this->mockAuthService->method('getLastError')
+        $mockAuth->method('getLastError')
             ->willReturn('This reset link has expired.');
 
+        $this->service = $this->buildService(authService: $mockAuth);
         $result = $this->service->resetPassword('sel123', 'tok456', 'newpass', 'newpass');
 
         $this->assertFalse($result['success']);
@@ -414,12 +476,14 @@ class YourAccountServiceTest extends TestCase
 
     public function testResetPasswordAuthServiceExceptionFallsBackToGenericError(): void
     {
-        $this->mockAuthService->expects($this->once())
+        $mockAuth = $this->createMock(AuthServiceInterface::class);
+        $mockAuth->expects($this->once())
             ->method('resetPassword')
             ->willThrowException(new \RuntimeException('error'));
 
-        $this->mockAuthService->method('getLastError')->willReturn(null);
+        $mockAuth->method('getLastError')->willReturn(null);
 
+        $this->service = $this->buildService(authService: $mockAuth);
         $result = $this->service->resetPassword('sel123', 'tok456', 'newpass', 'newpass');
 
         $this->assertFalse($result['success']);
@@ -430,8 +494,10 @@ class YourAccountServiceTest extends TestCase
 
     public function testLogoutCallsAuthService(): void
     {
-        $this->mockAuthService->expects($this->once())->method('logout');
+        $mockAuth = $this->createMock(AuthServiceInterface::class);
+        $mockAuth->expects($this->once())->method('logout');
 
+        $this->service = $this->buildService(authService: $mockAuth);
         $this->service->logout();
     }
 

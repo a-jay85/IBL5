@@ -25,6 +25,10 @@
     "lighthouse": "bunx @lhci/cli autorun",
     "smoke:prod": "cd .. && bin/smoke-prod"
   },
+  "overrides": {
+    "lodash": "4.18.1",
+    "lodash-es": "4.18.1"
+  },
   "devDependencies": {
     "@axe-core/playwright": "^4.11.1",
     "@lhci/cli": "^0.15.1",

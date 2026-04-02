@@ -101,8 +101,24 @@ class ContractRules
     public const LLE_OFFER = 145;
 
     /**
+     * Calculate the maximum annual raise amount for a contract
+     *
+     * Uses floor() to guarantee the returned value never exceeds the allowed raise.
+     * All raise calculations (validators, preset buttons, display hints) MUST use
+     * this method to avoid off-by-one rounding inconsistencies.
+     *
+     * @param int $yearOneOffer First year salary amount
+     * @param int $birdYears Number of consecutive years with current team
+     * @return int Maximum raise amount per year
+     */
+    public static function calculateMaxRaise(int $yearOneOffer, int $birdYears): int
+    {
+        return (int) floor($yearOneOffer * self::getMaxRaisePercentage($birdYears));
+    }
+
+    /**
      * Get the maximum raise percentage for a player
-     * 
+     *
      * @param int $birdYears Number of consecutive years with current team
      * @return float Maximum raise percentage (0.10 or 0.125)
      */

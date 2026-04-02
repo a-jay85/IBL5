@@ -43,14 +43,14 @@ class NegotiationViewHelper implements NegotiationViewHelperInterface
         // Calculate max raises
         $birdYears = $player->birdYears ?? 0;
         $raisePercentage = \ContractRules::getMaxRaisePercentage($birdYears);
-        $maxRaise = (int) round($maxYearOneSalary * $raisePercentage);
+        $maxRaise = \ContractRules::calculateMaxRaise($maxYearOneSalary, $birdYears);
         $rawPercentage = $raisePercentage * 100;
         $raisePercentageDisplay = ($rawPercentage === floor($rawPercentage))
             ? (string) (int) $rawPercentage
             : rtrim(rtrim(sprintf('%.1f', $rawPercentage), '0'), '.');
         $hasBirdRights = \ContractRules::hasBirdRights($birdYears);
         $exampleSalary = 500;
-        $exampleRaise = (int) round($exampleSalary * $raisePercentage);
+        $exampleRaise = \ContractRules::calculateMaxRaise($exampleSalary, $birdYears);
 
         ob_start();
 

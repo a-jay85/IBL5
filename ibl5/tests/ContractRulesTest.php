@@ -345,8 +345,7 @@ class ContractRulesTest extends TestCase
     {
         // Arrange
         $maxContract = 1275; // 7-9 years experience
-        $raisePercentage = 0.125; // Bird rights
-        $maxRaise = (int) round($maxContract * $raisePercentage);
+        $maxRaise = ContractRules::calculateMaxRaise($maxContract, 3);
 
         // Act - Calculate salaries like renderOfferButtons does
         $year1 = $maxContract;
@@ -356,7 +355,7 @@ class ContractRulesTest extends TestCase
 
         // Assert - Verify calculations
         $this->assertEquals(1275, $year1);
-        $this->assertEquals(1275 + 159, $year2); // 1275 * 0.125 = 159.375 rounds to 159
+        $this->assertEquals(1275 + 159, $year2); // 1275 * 0.125 = 159.375 floors to 159
         $this->assertEquals(1275 + (159 * 2), $year3);
         $this->assertEquals(1275 + (159 * 3), $year4);
     }
@@ -370,8 +369,7 @@ class ContractRulesTest extends TestCase
     {
         // Arrange
         $maxContract = 1063; // 0-6 years experience
-        $raisePercentage = 0.10; // No Bird rights
-        $maxRaise = (int) round($maxContract * $raisePercentage);
+        $maxRaise = ContractRules::calculateMaxRaise($maxContract, 0);
 
         // Act - Calculate salaries like renderOfferButtons does
         $year1 = $maxContract;
@@ -381,7 +379,7 @@ class ContractRulesTest extends TestCase
 
         // Assert - Verify calculations
         $this->assertEquals(1063, $year1);
-        $this->assertEquals(1063 + 106, $year2); // 1063 * 0.10 = 106.3 rounds to 106
+        $this->assertEquals(1063 + 106, $year2); // 1063 * 0.10 = 106.3 floors to 106
         $this->assertEquals(1063 + (106 * 2), $year3);
         $this->assertEquals(1063 + (106 * 3), $year4);
     }
@@ -394,27 +392,17 @@ class ContractRulesTest extends TestCase
      */
     public function testRaiseCalculationConsistency(): void
     {
-        // Both classes should use the same logic:
-        // maxRaise = (int) round(firstYearOffer * raisePercentage)
+        // All raise calculations use ContractRules::calculateMaxRaise()
 
         // Test with Bird rights
-        $firstYearOffer = 1000;
-        $birdYears = 3;
-        $raisePercentage = ContractRules::getMaxRaisePercentage($birdYears);
-
-        $maxRaiseNegotiationHelper = (int) round($firstYearOffer * $raisePercentage);
-
-        // Assert - Should be 125 (1000 * 0.125 = 125)
-        $this->assertEquals(125, $maxRaiseNegotiationHelper);
+        $maxRaise = ContractRules::calculateMaxRaise(1000, 3);
+        // Assert - Should be 125 (floor(1000 * 0.125) = 125)
+        $this->assertEquals(125, $maxRaise);
 
         // Test without Bird rights
-        $birdYears = 2;
-        $raisePercentage = ContractRules::getMaxRaisePercentage($birdYears);
-
-        $maxRaiseNegotiationHelper = (int) round($firstYearOffer * $raisePercentage);
-
-        // Assert - Should be 100 (1000 * 0.10 = 100)
-        $this->assertEquals(100, $maxRaiseNegotiationHelper);
+        $maxRaise = ContractRules::calculateMaxRaise(1000, 2);
+        // Assert - Should be 100 (floor(1000 * 0.10) = 100)
+        $this->assertEquals(100, $maxRaise);
     }
 
     /**
@@ -437,8 +425,7 @@ class ContractRulesTest extends TestCase
 
         // Act - Calculate like renderOfferButtons does
         $maxContract = ContractRules::getMaxContractSalary($yearsOfExperience);
-        $raisePercentage = ContractRules::getMaxRaisePercentage($birdYears);
-        $maxRaise = (int) round($maxContract * $raisePercentage);
+        $maxRaise = ContractRules::calculateMaxRaise($maxContract, $birdYears);
 
         // Build salary array with 0-based indexing (after fix)
         $maxSalaries = [
@@ -455,7 +442,7 @@ class ContractRulesTest extends TestCase
 
         // Assert - First year should be 1451, not 1632
         $this->assertEquals(1451, $maxContract);
-        $this->assertEquals(181, $maxRaise); // 1451 * 0.125 = 181.375 rounds to 181
+        $this->assertEquals(181, $maxRaise); // floor(1451 * 0.125) = floor(181.375) = 181
         $this->assertEquals([1451], $oneYearOffer);
         $this->assertEquals(1451, $oneYearOffer[0]);
     }

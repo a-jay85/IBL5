@@ -6,17 +6,17 @@ paths: ibl5/tests/**/*.php
 
 ## PHPUnit 13+ Syntax
 ```bash
-# CORRECT commands
-vendor/bin/phpunit tests/Module/
-vendor/bin/phpunit --filter testMethodName
-vendor/bin/phpunit --display-all-issues     # Show ALL issues (deprecations, warnings, etc.)
+# CORRECT commands (bin/test works from any CWD; vendor/bin/phpunit requires CWD=ibl5/)
+bin/test                                    # Full suite
+bin/test --filter testMethodName            # Single test
+bin/test --display-all-issues               # Show ALL issues (deprecations, warnings, etc.)
 
 # Token-saving: When just checking if tests pass (not debugging)
-vendor/bin/phpunit | tail -n 3              # Show only final summary lines
+bin/test | tail -n 3                        # Show only final summary lines
 
 # WRONG - These options don't exist in PHPUnit 13.x
-vendor/bin/phpunit -v
-vendor/bin/phpunit --verbose
+bin/test -v
+bin/test --verbose
 ```
 
 ## Display Issue Details
@@ -208,7 +208,7 @@ Mutation testing (Infection PHP) runs weekly + on-demand via the `mutation-test`
 
 **IMPORTANT:** Before considering ANY task involving PHP code complete:
 
-1. **Run the FULL test suite**: `vendor/bin/phpunit` — never use `--testsuite` or `--filter` as the final verification. Changes in one module frequently break tests in other modules (shared mocks, interfaces, base classes).
+1. **Run the FULL test suite**: `bin/test` — never use `--testsuite` or `--filter` as the final verification. Changes in one module frequently break tests in other modules (shared mocks, interfaces, base classes).
 2. **Verify clean output**: The final line must show `OK (X tests, Y assertions)` with NO warnings, failures, or errors
 3. **Check for warnings**: If output shows `OK, but there were issues!`, run `--display-all-issues` and FIX the warnings
 4. **Don't silence warnings**: Resolve root causes instead of suppressing warnings (unless truly necessary)
@@ -220,12 +220,3 @@ Requirements:
 - No skipped tests
 - All public methods tested
 
-## Post-Task Documentation Update
-
-After completing any PHPUnit task (adding tests, fixing tests, etc.):
-
-1. Run `vendor/bin/phpunit` and note the final test count
-2. Update these files with new test count and coverage percentage:
-   - `ibl5/docs/DEVELOPMENT_GUIDE.md` - Status line and relevant sections
-   - `ibl5/docs/STRATEGIC_PRIORITIES.md` - Progress section (if significantly changed)
-3. If adding integration tests, document them in the "Recent Updates" section of `DEVELOPMENT_GUIDE.md`

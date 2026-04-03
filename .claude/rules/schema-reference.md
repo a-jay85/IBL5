@@ -8,7 +8,7 @@ paths: ibl5/migrations/000_baseline_schema.sql
 
 | Category | Tables |
 |----------|--------|
-| Players | `ibl_plr` (main), `ibl_hist` (history), `ibl_plr_chunk` (stats) |
+| Players | `ibl_plr` (main), `ibl_hist` (VIEW — stats from snapshots + archive), `ibl_plr_snapshots` (per-season ratings/stats), `ibl_hist_archive` (indexed history) |
 | Teams | `ibl_team_info`, `ibl_standings` |
 | Games | `ibl_schedule`, `ibl_box_scores`, `ibl_box_scores_teams` |
 | Contracts | `ibl_fa_offers`, `ibl_trade_*` tables |
@@ -22,7 +22,7 @@ paths: ibl5/migrations/000_baseline_schema.sql
 | Players | `ibl_plr` | `pid`, `tid`, `name`, `cy`, `cy1-cy6` |
 | Teams | `ibl_team_info` | `teamid`, `team_name`, `gm_username` |
 | Users | `nuke_users` | `username` (legacy — `user_ibl_team` being phased out) |
-| History | `ibl_hist` | Historical player stats |
+| History | `ibl_hist` (VIEW) | Historical player stats (sources from `ibl_plr_snapshots` + `ibl_hist_archive` fallback) |
 | Schedule | `ibl_schedule` | Game schedule |
 
 ## Common Query Patterns
@@ -49,8 +49,7 @@ $query = "SELECT * FROM vw_player_current WHERE uuid = ?";
 - **UUIDs:** 5 critical tables for secure public IDs
 - **Views:** `vw_player_current`, `vw_team_standings`, `vw_game_schedule`, `vw_player_stats_summary`, `vw_trade_history`, `vw_team_awards`, `vw_franchise_summary`
 
-## Foreign Key Relationships (24)
-- `ibl_hist.pid` -> `ibl_plr.pid`
+## Foreign Key Relationships
 - `ibl_draft_picks.tid` -> `ibl_team_info.teamid`
 - `ibl_box_scores.gameid` -> `ibl_schedule.Date`
 

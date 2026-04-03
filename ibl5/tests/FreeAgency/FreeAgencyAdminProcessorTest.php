@@ -250,6 +250,81 @@ class FreeAgencyAdminProcessorTest extends TestCase
     }
 
     // ============================================
+    // processDay() — Discord text: offer sorting and acceptance/rejection placement
+    // ============================================
+
+    public function testProcessDayDiscordOffersAlphabeticalWithAcceptanceAtEnd(): void
+    {
+        // Three offers for same player, ordered by perceived value descending (repo ORDER BY).
+        // Miami wins (highest). Alphabetical order: Boston < Chicago < Miami.
+        $offerMiami = $this->makeOfferRow('Star Player', 100, 'Miami', 1, 500, 550, 600, 0, 0, 0, 0, 0, 0, 0, 800.0);
+        $offerChicago = $this->makeOfferRow('Star Player', 100, 'Chicago', 2, 400, 450, 500, 0, 0, 0, 0, 0, 0, 0, 600.0);
+        $offerBoston = $this->makeOfferRow('Star Player', 100, 'Boston', 3, 300, 350, 400, 0, 0, 0, 0, 0, 0, 0, 500.0);
+
+        $stub = $this->createStub(FreeAgencyAdminRepositoryInterface::class);
+        $stub->method('getAllOffersWithBirdYears')->willReturn([$offerMiami, $offerChicago, $offerBoston]);
+        $stub->method('getPlayerDemandsBatch')->willReturn([
+            100 => ['dem1' => 200, 'dem2' => 200, 'dem3' => 200, 'dem4' => 0, 'dem5' => 0, 'dem6' => 0],
+        ]);
+
+        $this->configureMockDbForProcessDay();
+
+        $processor = new FreeAgencyAdminProcessor($stub, $this->mockDb);
+        $result = $processor->processDay(1);
+
+        $discord = $result['discordText'];
+
+        // Offers sorted alphabetically by team name
+        $bostonPos = strpos($discord, 'Boston - ');
+        $chicagoPos = strpos($discord, 'Chicago - ');
+        $miamiPos = strpos($discord, 'Miami - ');
+        $this->assertNotFalse($bostonPos);
+        $this->assertNotFalse($chicagoPos);
+        $this->assertNotFalse($miamiPos);
+        $this->assertLessThan($chicagoPos, $bostonPos, 'Boston should appear before Chicago');
+        $this->assertLessThan($miamiPos, $chicagoPos, 'Chicago should appear before Miami');
+
+        // Acceptance line appears after all offer lines
+        $acceptsPos = strpos($discord, 'Star Player accepts');
+        $this->assertNotFalse($acceptsPos);
+        $this->assertGreaterThan($miamiPos, $acceptsPos, 'Acceptance line should appear after all offers');
+    }
+
+    public function testProcessDayDiscordOffersAlphabeticalWithRejectionAtEnd(): void
+    {
+        // Two offers for same player, both below demands → first is rejected (not auto-rejected).
+        // Demands: dem1=800 → day 1 demandValue = 800. perceivedValue 600 > 400 threshold, ≤ 800 → rejected.
+        // Alphabetical order: Chicago < Miami.
+        $offerMiami = $this->makeOfferRow('Player B', 200, 'Miami', 1, 400, 0, 0, 0, 0, 0, 0, 0, 0, 0, 600.0);
+        $offerChicago = $this->makeOfferRow('Player B', 200, 'Chicago', 2, 300, 0, 0, 0, 0, 0, 0, 0, 0, 0, 500.0);
+
+        $stub = $this->createStub(FreeAgencyAdminRepositoryInterface::class);
+        $stub->method('getAllOffersWithBirdYears')->willReturn([$offerMiami, $offerChicago]);
+        $stub->method('getPlayerDemandsBatch')->willReturn([
+            200 => ['dem1' => 800, 'dem2' => 0, 'dem3' => 0, 'dem4' => 0, 'dem5' => 0, 'dem6' => 0],
+        ]);
+
+        $this->configureMockDbForProcessDay();
+
+        $processor = new FreeAgencyAdminProcessor($stub, $this->mockDb);
+        $result = $processor->processDay(1);
+
+        $discord = $result['discordText'];
+
+        // Offers sorted alphabetically
+        $chicagoPos = strpos($discord, 'Chicago - ');
+        $miamiPos = strpos($discord, 'Miami - ');
+        $this->assertNotFalse($chicagoPos);
+        $this->assertNotFalse($miamiPos);
+        $this->assertLessThan($miamiPos, $chicagoPos, 'Chicago should appear before Miami');
+
+        // REJECTED appears after all offer lines
+        $rejectedPos = strpos($discord, '**REJECTED**');
+        $this->assertNotFalse($rejectedPos);
+        $this->assertGreaterThan($miamiPos, $rejectedPos, 'REJECTED should appear after all offers');
+    }
+
+    // ============================================
     // processDay() — day adjustment affects demand threshold
     // ============================================
 

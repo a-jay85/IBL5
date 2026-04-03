@@ -47,6 +47,10 @@ class FreeAgencyAdminProcessor implements FreeAgencyAdminProcessorInterface
         $discordText = '';
 
         $processedPlayers = [];
+        $pendingHeader = '';
+        $pendingAcceptanceLine = '';
+        /** @var array<int, array{teamName: string, line: string}> */
+        $pendingOfferLines = [];
 
         // Pre-load all demands in a single batch query to avoid N+1
         $playerIds = array_values(array_unique(array_map(
@@ -126,6 +130,12 @@ class FreeAgencyAdminProcessor implements FreeAgencyAdminProcessorInterface
 
             // Only process first (highest value) offer per player
             if (!isset($processedPlayers[$playerName])) {
+                // Flush previous player's buffered offer lines (sorted by team name)
+                $discordText .= $this->flushPlayerOfferLines($pendingHeader, $pendingOfferLines, $pendingAcceptanceLine);
+                $pendingHeader = '';
+                $pendingAcceptanceLine = '';
+                $pendingOfferLines = [];
+
                 $processedPlayers[$playerName] = true;
 
                 // Get team info for IDs
@@ -133,8 +143,14 @@ class FreeAgencyAdminProcessor implements FreeAgencyAdminProcessorInterface
                 $player = Player::withPlayerID($this->db, $playerId);
                 $playerTeam = Team::initialize($this->db, $player->teamName ?? '');
 
-                // Build Discord text
-                $discordText .= "**" . strtoupper("{$playerName}, {$playerTeam->city} {$player->teamName}") . "** <@!{$playerTeam->discordID}>\n";
+                // Buffer Discord header
+                $pendingHeader = "**" . strtoupper("{$playerName}, {$playerTeam->city} {$player->teamName}") . "** <@!{$playerTeam->discordID}>\n";
+
+                $offeringTeamDiscordId = (string) ($offeringTeam->discordID ?? '');
+                $pendingOfferLines[] = [
+                    'teamName' => $offeringTeamName,
+                    'line' => $this->buildOfferLine($offeringTeamName, $offer1, $offer2, $offer3, $offer4, $offer5, $offer6, $offeringTeamDiscordId),
+                ];
 
                 if ($perceivedValue > $demands) {
                     // Offer accepted
@@ -159,27 +175,28 @@ class FreeAgencyAdminProcessor implements FreeAgencyAdminProcessorInterface
 
                     $outcomeText = "{$playerName} accepts the {$offeringTeamName} offer of a {$offerYears}-year deal worth a total of {$offerTotal} million dollars.";
                     $newsHomeText .= $outcomeText . "<br>\n";
-                    $offeringTeamDiscordId = (string) ($offeringTeam->discordID ?? '');
-                    $discordText .= $this->buildOfferLine($offeringTeamName, $offer1, $offer2, $offer3, $offer4, $offer5, $offer6, $offeringTeamDiscordId);
-                    $discordText .= $outcomeText . " <@!{$offeringTeamDiscordId}>\n\n";
+                    $pendingAcceptanceLine = $outcomeText . " <@!{$offeringTeamDiscordId}>\n\n";
                 } else {
                     // Offer rejected
                     $rejections[] = [
                         'playerName' => $playerName,
                         'reason' => 'Best offer did not meet player demands',
                     ];
-                    $offeringTeamDiscordId = (string) ($offeringTeam->discordID ?? '');
-                    $discordText .= $this->buildOfferLine($offeringTeamName, $offer1, $offer2, $offer3, $offer4, $offer5, $offer6, $offeringTeamDiscordId);
-                    $discordText .= "**REJECTED**\n\n";
+                    $pendingAcceptanceLine = "**REJECTED**\n\n";
                 }
             } else {
-                // Additional offer for already-processed player - add to Discord text
+                // Additional offer for already-processed player - buffer for sorting
                 $offeringTeam = Team::initialize($this->db, $offeringTeamName);
-                // Only add if offer wasn't auto-rejected
                 $offeringTeamDiscordId = (string) ($offeringTeam->discordID ?? '');
-                $discordText .= $this->buildOfferLine($offeringTeamName, $offer1, $offer2, $offer3, $offer4, $offer5, $offer6, $offeringTeamDiscordId);
+                $pendingOfferLines[] = [
+                    'teamName' => $offeringTeamName,
+                    'line' => $this->buildOfferLine($offeringTeamName, $offer1, $offer2, $offer3, $offer4, $offer5, $offer6, $offeringTeamDiscordId),
+                ];
             }
         }
+
+        // Flush last player's buffered offer lines
+        $discordText .= $this->flushPlayerOfferLines($pendingHeader, $pendingOfferLines, $pendingAcceptanceLine);
 
         return [
             'signings' => $signings,
@@ -271,6 +288,28 @@ class FreeAgencyAdminProcessor implements FreeAgencyAdminProcessorInterface
         $totalDemand = $demRow['dem1'] + $demRow['dem2'] + $demRow['dem3']
                      + $demRow['dem4'] + $demRow['dem5'] + $demRow['dem6'];
         return ($totalDemand / $demYears) * ((11 - $day) / 10);
+    }
+
+    /**
+     * Flush buffered offer lines for a player, sorted by team name.
+     *
+     * @param array<int, array{teamName: string, line: string}> $offerLines
+     */
+    private function flushPlayerOfferLines(string $header, array $offerLines, string $acceptanceLine): string
+    {
+        if ($header === '') {
+            return '';
+        }
+
+        usort($offerLines, static fn (array $a, array $b): int => strcasecmp($a['teamName'], $b['teamName']));
+
+        $text = $header;
+        foreach ($offerLines as $entry) {
+            $text .= $entry['line'];
+        }
+        $text .= $acceptanceLine;
+
+        return $text;
     }
 
     /**

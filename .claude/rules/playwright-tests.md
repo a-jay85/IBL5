@@ -349,7 +349,7 @@ The E2E tests run in GitHub Actions via `.github/workflows/e2e-tests.yml`. Key d
 Before considering an E2E test task complete:
 
 1. **Run the full E2E suite**: `cd ibl5 && bun run test:e2e`
-2. **Verify all tests pass** (season-phase skips are expected, not failures)
+2. **Verify all tests pass** — no skips, no silent passes
 3. **No `.only`** in any spec file
 4. **PHP error coverage** — every smoke file includes PHP error pattern checks
 5. **Correct auth pattern** — public tests use empty storageState, authenticated tests import from fixtures/auth

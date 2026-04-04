@@ -17,192 +17,69 @@ interface DepthChartEntryViewInterface
 {
     /**
      * Render team logo image centered on page
-     * 
+     *
      * @param int $teamID Team ID used to locate logo file (images/logo/{teamID}.jpg)
-     * @return void Echoes HTML image tag
-     * 
-     * **HTML Output:**
-     * `<div class="depth-chart-logo"><img src="images/logo/{teamID}.jpg"></div>`
-     * 
-     * **Important Behaviors:**
-     * - Directly echoes HTML (does not buffer)
-     * - Team ID is embedded directly (already validated as int)
-     * - Image path is relative to web root
-     * - Includes line break after centered container
      */
     public function renderTeamLogo(int $teamID): void;
 
     /**
-     * Render position depth dropdown options (0-5)
-     * 
-     * @param int $selectedValue Currently selected value to mark SELECTED in output
-     * @return void Echoes option tags
-     * 
-     * **Option Values and Labels:**
-     * - 0 => 'No'
-     * - 1 => '1st'
-     * - 2 => '2nd'
-     * - 3 => '3rd'
-     * - 4 => '4th'
-     * - 5 => 'ok'
-     * 
-     * **HTML Output:**
-     * `<option value="{value}"{SELECTED if matches}>{label}</option>` for each value
-     * 
-     * **Important Behaviors:**
-     * - Directly echoes option tags (caller wraps in select element)
-     * - Only one option receives SELECTED attribute
-     * - Uses loose equality (==) for comparison (safe for ints)
+     * Render role priority dropdown options (0 to max)
+     *
+     * Unified for all 5 role slots. Value 0 displays as "—" (not assigned),
+     * values 1+ display as their numeric value.
+     *
+     * @param int $selectedValue Currently selected value
+     * @param int $maxValue Maximum option value (2 for BH/DI/OI, 3 for DF/OF)
      */
-    public function renderPositionOptions(int $selectedValue): void;
-
-    /**
-     * Render offensive/defensive focus dropdown options (0-3)
-     * 
-     * @param int $selectedValue Currently selected value to mark SELECTED in output
-     * @return void Echoes option tags
-     * 
-     * **Option Values and Labels:**
-     * - 0 => 'Auto'
-     * - 1 => 'Outside'
-     * - 2 => 'Drive'
-     * - 3 => 'Post'
-     * 
-     * **Important Behaviors:**
-     * - Directly echoes option tags (caller wraps in select element)
-     * - Only one option receives SELECTED attribute
-     * - Uses loose equality (==) for comparison
-     */
-    public function renderOffDefOptions(int $selectedValue): void;
-
-    /**
-     * Render OI/DI/BH setting dropdown options (-2 to 2)
-     * 
-     * @param int $selectedValue Currently selected value to mark SELECTED in output
-     * @return void Echoes option tags
-     * 
-     * **Option Values and Display Labels:**
-     * - -2 => '-2'
-     * - -1 => '-1'
-     * - 0 => '-' (special display for neutral)
-     * - 1 => '1'
-     * - 2 => '2'
-     * 
-     * **Important Behaviors:**
-     * - Directly echoes option tags (caller wraps in select element)
-     * - Only one option receives SELECTED attribute
-     * - Neutral value (0) displays as '-' for clarity
-     */
-    public function renderSettingOptions(int $selectedValue): void;
+    public function renderRolePriorityOptions(int $selectedValue, int $maxValue): void;
 
     /**
      * Render active/inactive dropdown options (0 or 1)
-     * 
-     * @param int $selectedValue Currently selected value (1 or 0)
-     * @return void Echoes option tags
-     * 
-     * **Option Values and Labels:**
-     * - 1 => 'Yes'
-     * - 0 => 'No'
-     * 
-     * **Important Behaviors:**
-     * - Directly echoes option tags (caller wraps in select element)
-     * - Only one option receives SELECTED attribute
+     *
+     * @param int $selectedValue Currently selected value (1=Yes, 0=No)
      */
     public function renderActiveOptions(int $selectedValue): void;
 
     /**
-     * Render minutes dropdown options (0 to staminaCap)
-     * 
-     * @param int $selectedValue Currently selected value to mark SELECTED
-     * @param int $staminaCap Maximum minutes based on player stamina (typically 40)
-     * @return void Echoes option tags
-     * 
-     * **Option Values and Labels:**
-     * - 0 => 'Auto' (special label for automatic minute assignment)
-     * - 1-{staminaCap} => Numeric value as label
-     * 
-     * **Important Behaviors:**
-     * - Directly echoes option tags (caller wraps in select element)
-     * - First option is always 'Auto' (value 0)
-     * - Generates {staminaCap} numeric options
-     * - Only one option receives SELECTED attribute
+     * Render the help section explaining how depth charts work.
+     * Uses a collapsible <details>/<summary> element, collapsed by default.
      */
-    public function renderMinutesOptions(int $selectedValue, int $staminaCap): void;
+    public function renderHelpSection(): void;
+
+    /**
+     * Render the empty container for the live lineup preview grid.
+     * JavaScript populates this based on current form values.
+     */
+    public function renderLineupPreview(): void;
 
     /**
      * Render complete depth chart form header with table structure
-     * 
+     *
+     * Renders an 8-column table: Pos, Player, Active, PG, SG, SF, PF, C.
+     * The PG-C columns are role slot assignments (mapped to BH/DI/OI/DF/OF form fields).
+     *
      * @param string $teamName Team name to embed in hidden form field
-     * @param int $teamID Team ID (not used in output, kept for consistency)
-     * @param array<string> $slotNames Array of 5 position slot names (e.g., ['PG', 'SG', 'SF', 'PF', 'C'])
-     * @return void Echoes HTML form and table header
-     * 
-     * **HTML Output:**
-     * - Form element with POST method to modules.php?name=DepthChartEntry&op=submit
-     * - Hidden Team_Name field with team name value
-     * - Table with 14 columns (Position, Player, 5 slots, Active, Min, OF, DF, OI, DI, BH)
-     * - Header row with column labels
-     * - Form is NOT closed (caller adds rows, then closes with renderFormFooter)
-     * 
-     * **Important Behaviors:**
-     * - Creates opening tags only (form, table, header row)
-     * - Team name is directly embedded in hidden field
-     * - Slot names from parameter are used as column headers
-     * - Table is ready for player rows to be added
+     * @param int $teamID Team ID
+     * @param array<string> $slotNames Array of 5 position slot names (kept for interface compat)
      */
     public function renderFormHeader(string $teamName, int $teamID, array $slotNames): void;
 
     /**
      * Render a single player row in the depth chart form
-     * 
-     * @param PlayerRow $player Player data from database
-     * @param int $depthCount Row counter/ordinal used in form field names (Name{depthCount}, pg{depthCount}, etc.)
-     * @return void Echoes HTML table row with player data and form controls
-     * 
-     * **HTML Output:**
-     * - Single table row with 14 cells
-     * - Player position in first cell
-     * - Player name as hyperlink to player page
-     * - Dropdown selects for each position slot
-     * - Dropdown selects for active, minutes, and settings
-     * - Player name and injury status in hidden fields
-     * 
-     * **Important Behaviors:**
-     * - Directly echoes HTML (called repeatedly to build table rows)
-     * - Player name is HTML-escaped via HtmlSanitizer::safeHtmlOutput()
-     * - All dropdown values are prefilled with player's current settings
-     * - Minute ceiling is capped at 40 (stamina + 40, then max 40)
-     * - Renders dropdowns for all 5 position slots (even if not eligible)
-     * - Hidden fields preserve player metadata for submission processing
+     *
+     * Renders an 8-cell row: Pos, Player (with hidden fields for dead fields),
+     * Active select, and 5 role slot selects. Position depth columns (pg-c) and
+     * minutes are rendered as hidden inputs with value 0.
+     *
+     * Player array must include 'quality_score' key (float) for the lineup preview.
+     *
+     * @param PlayerRow $player Player data from database (with quality_score added)
+     * @param int $depthCount Row counter for form field names
      */
     public function renderPlayerRow(array $player, int $depthCount): void;
 
     /**
      * Render complete form footer with reset button, submit button, and JavaScript
-     * 
-     * @return void Echoes HTML table row, JavaScript, buttons, and closing tags
-     * 
-     * **HTML Output:**
-     * - JavaScript resetDepthChart() function
-     * - Table footer row with two buttons in a single cell
-     * - Reset button: Calls JavaScript, resets all dropdowns to defaults
-     * - Submit button: Submits form to modules.php?name=DepthChartEntry&op=submit
-     * - Closing </table> and desktop wrapper div (does NOT close </form>)
-     *
-     * **JavaScript Behavior:**
-     * - resetDepthChart() confirms before resetting
-     * - Sets default values for each field type:
-     *   - active fields: Default 1 (Yes)
-     *   - Position fields (pg-c): Default 0 (No)
-     *   - Other fields: Default 0 (Auto or neutral)
-     *
-     * **Important Behaviors:**
-     * - Provides user-friendly interface for form submission
-     * - JavaScript confirmation prevents accidental resets
-     * - Includes custom styling for buttons
-     * - Closes table and desktop wrapper, but NOT the form element
-     * - The form is closed by renderMobileView() which follows this method
      */
     public function renderFormFooter(): void;
 
@@ -215,33 +92,15 @@ interface DepthChartEntryViewInterface
     public function renderSavedDepthChartDropdown(array $options, string $currentLiveLabel): void;
 
     /**
-     * Render depth chart submission result page with success or error status
-     * 
+     * Render depth chart submission result page
+     *
+     * Shows submitted values in a confirmation table with columns:
+     * Name, Active, PG, SG, SF, PF, C (role slot values).
+     *
      * @param string $teamName Team name displayed at top of result
-     * @param list<ProcessedPlayerData> $playerData Player data submitted (for display in confirmation table)
-     * @param bool $success True if submission succeeded, false for error display
-     * @param string $errorHtml Error messages HTML (if $success is false, displayed instead of success message)
-     * @return void Echoes HTML result page
-     * 
-     * **HTML Output (Success):**
-     * - Centered confirmation message
-     * - Table showing submitted depth chart with all player data
-     * 
-     * **HTML Output (Failure):**
-     * - Centered error heading
-     * - Error messages (from $errorHtml parameter)
-     * - Table showing submitted depth chart (for reference)
-     * 
-     * **Table Columns:**
-     * - Name
-     * - All position slots (from JSB::PLAYER_POSITIONS)
-     * - Active, Min, OF, DF, OI, DI, BH
-     * 
-     * **Important Behaviors:**
-     * - Success/failure determined solely by $success parameter
-     * - Displays $errorHtml directly (assumed to be pre-formatted)
-     * - Shows complete depth chart data for user verification
-     * - Uses legacy HTML elements (font, b, center) for backward compatibility
+     * @param list<ProcessedPlayerData> $playerData Player data submitted
+     * @param bool $success True if submission succeeded
+     * @param string $errorHtml Error messages HTML (if $success is false)
      */
     public function renderSubmissionResult(
         string $teamName,
@@ -253,16 +112,11 @@ interface DepthChartEntryViewInterface
     /**
      * Render mobile card view for all players
      *
-     * Renders a card-based layout optimized for mobile viewports. Each player
-     * is rendered as a card with photo, position badge, name, active toggle,
-     * position slot selects, and game settings selects.
-     *
-     * All inputs are rendered with the `disabled` attribute by default.
-     * JavaScript enables them on mobile viewports and disables the desktop
-     * table inputs, ensuring only one set of inputs submits.
+     * Renders a card-based layout with a single 5-column role slot grid per card.
+     * All inputs are rendered disabled; JavaScript enables them on mobile viewports.
      *
      * @param list<PlayerRow> $players All players on the team roster
-     * @param array<string> $slotNames Position slot names (e.g., ['PG', 'SG', 'SF', 'PF', 'C'])
+     * @param array<string> $slotNames Position slot names (kept for interface compat)
      */
     public function renderMobileView(array $players, array $slotNames): void;
 }

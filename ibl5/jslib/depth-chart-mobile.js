@@ -117,6 +117,9 @@
         if (typeof window.IBL_recalculateDepthChartGlows === 'function') {
             window.IBL_recalculateDepthChartGlows();
         }
+        if (typeof window.IBL_recalculateLineupPreview === 'function') {
+            window.IBL_recalculateLineupPreview();
+        }
     }
 
     function onResize() {
@@ -153,6 +156,9 @@
                     }
                     if (typeof window.IBL_recalculateDepthChartGlows === 'function') {
                         window.IBL_recalculateDepthChartGlows();
+                    }
+                    if (typeof window.IBL_recalculateLineupPreview === 'function') {
+                        window.IBL_recalculateLineupPreview();
                     }
                 });
             })(checkboxes[i]);

@@ -83,6 +83,9 @@
                     if (typeof window.IBL_recalculateDepthChartGlows === 'function') {
                         window.IBL_recalculateDepthChartGlows();
                     }
+                    if (typeof window.IBL_recalculateLineupPreview === 'function') {
+                        window.IBL_recalculateLineupPreview();
+                    }
                 })
                 .catch(function (err) {
                     if (loadingEl) loadingEl.style.display = 'none';
@@ -136,18 +139,18 @@
                 if (!pidInput) continue;
                 var depthCount = pidInput.name.replace('pid', '');
 
-                setSelectValue(form, 'pg' + depthCount, player.dc_PGDepth);
-                setSelectValue(form, 'sg' + depthCount, player.dc_SGDepth);
-                setSelectValue(form, 'sf' + depthCount, player.dc_SFDepth);
-                setSelectValue(form, 'pf' + depthCount, player.dc_PFDepth);
-                setSelectValue(form, 'c' + depthCount, player.dc_CDepth);
+                // Position depth and minutes are dead fields — hidden inputs always 0
+                // (Legacy saved DCs may have ordinal values; we ignore them)
+
+                // Active status
                 setSelectValue(form, 'canPlayInGame' + depthCount, player.dc_canPlayInGame);
-                setSelectValue(form, 'min' + depthCount, player.dc_minutes);
-                setSelectValue(form, 'OF' + depthCount, player.dc_of);
-                setSelectValue(form, 'DF' + depthCount, player.dc_df);
-                setSelectValue(form, 'OI' + depthCount, player.dc_oi);
-                setSelectValue(form, 'DI' + depthCount, player.dc_di);
-                setSelectValue(form, 'BH' + depthCount, player.dc_bh);
+
+                // Role slot values (clamp negatives to 0 for legacy saved DCs)
+                setSelectValue(form, 'OF' + depthCount, Math.max(0, player.dc_of));
+                setSelectValue(form, 'DF' + depthCount, Math.max(0, player.dc_df));
+                setSelectValue(form, 'OI' + depthCount, Math.max(0, player.dc_oi));
+                setSelectValue(form, 'DI' + depthCount, Math.max(0, player.dc_di));
+                setSelectValue(form, 'BH' + depthCount, Math.max(0, player.dc_bh));
 
                 // Mark traded players
                 if (!player.isOnCurrentRoster) {

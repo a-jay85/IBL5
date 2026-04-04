@@ -62,4 +62,97 @@
 }
 
 
+
+/* ==========================================================================
+   Help Section (collapsible)
+   ========================================================================== */
+
+.dc-help-section {
+    max-width: 600px;
+    margin: 0 auto var(--space-4);
+    border: 1px solid var(--gray-200);
+    border-radius: var(--radius-md);
+    background: var(--gray-50);
+}
+
+.dc-help-section summary {
+    padding: var(--space-2) var(--space-3);
+    font-weight: 600;
+    cursor: pointer;
+    color: var(--navy-800);
+}
+
+.dc-help-section__content {
+    padding: 0 var(--space-3) var(--space-3);
+    font-size: 0.875rem;
+    line-height: 1.5;
+    color: var(--gray-700);
+}
+
+.dc-help-section__content p {
+    margin: 0 0 var(--space-2);
+}
+
+.dc-help-table {
+    font-size: 0.8125rem;
+    margin-bottom: var(--space-2);
+}
+
+/* ==========================================================================
+   Lineup Preview Grid
+   ========================================================================== */
+
+.dc-lineup-preview {
+    max-width: 600px;
+    margin: 0 auto var(--space-4);
+}
+
+.dc-lineup-preview__title {
+    font-weight: 600;
+    font-size: 0.875rem;
+    text-align: center;
+    margin-bottom: var(--space-2);
+    color: var(--navy-800);
+}
+
+.dc-lineup-preview table {
+    width: 100%;
+}
+
+.dc-lineup-preview td {
+    text-align: center;
+    padding: var(--space-1) var(--space-2);
+    font-size: 0.8125rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 0;
+}
+
+.dc-lineup-preview thead th {
+    text-align: center;
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+}
+
+.dc-lineup-preview__row-label {
+    font-size: 0.6875rem;
+    font-weight: 600;
+    color: var(--gray-400);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    text-align: left;
+    width: 4em;
+}
+
+.dc-lineup-preview__starter {
+    font-weight: 600;
+}
+
+.dc-lineup-preview__empty {
+    color: var(--gray-300);
+}
+
+
 } /* end @layer components */

@@ -14,36 +14,37 @@ test.describe('Depth Chart submission', () => {
     const form = page.locator('.depth-chart-form');
     await expect(form).toBeVisible({ timeout: 15000 });
 
-    // Position selects should be pre-populated with current assignments
-    const pgSelects = page.locator('select[name^="pg"]');
-    await expect(pgSelects.first()).toBeVisible();
+    // Role slot selects (BH = PG column) should be present and visible
+    const bhSelects = page.locator('select[name^="BH"]');
+    await expect(bhSelects.first()).toBeVisible();
 
-    // At least one should have a non-zero value (starter)
-    let hasStarter = false;
-    const count = await pgSelects.count();
+    // Active selects should be pre-populated — at least one player is active
+    const activeSelects = page.locator('select[name^="canPlayInGame"]');
+    let hasActive = false;
+    const count = await activeSelects.count();
     for (let i = 0; i < count; i++) {
-      const val = await pgSelects.nth(i).inputValue();
-      if (val !== '0') {
-        hasStarter = true;
+      const val = await activeSelects.nth(i).inputValue();
+      if (val === '1') {
+        hasActive = true;
         break;
       }
     }
-    expect(hasStarter).toBe(true);
+    expect(hasActive).toBe(true);
   });
 
-  test('change a position assignment', async ({ page }) => {
+  test('change a role slot assignment', async ({ page }) => {
     const form = page.locator('.depth-chart-form');
     await expect(form).toBeVisible({ timeout: 15000 });
 
-    // Find a PG select with value "0" and change it to "2" (backup)
-    const pgSelects = page.locator('select[name^="pg"]');
-    const count = await pgSelects.count();
+    // Find a BH (PG role slot) select with value "0" and change it to "2" (backup)
+    const bhSelects = page.locator('select[name^="BH"]');
+    const count = await bhSelects.count();
 
     for (let i = 0; i < count; i++) {
-      const val = await pgSelects.nth(i).inputValue();
+      const val = await bhSelects.nth(i).inputValue();
       if (val === '0') {
-        await pgSelects.nth(i).selectOption('2');
-        const newVal = await pgSelects.nth(i).inputValue();
+        await bhSelects.nth(i).selectOption('2');
+        const newVal = await bhSelects.nth(i).inputValue();
         expect(newVal).toBe('2');
         break;
       }
@@ -90,9 +91,9 @@ test.describe('Depth Chart submission', () => {
     const optCount = await options.count();
     expect(optCount, 'Saved DC dropdown should have at least 2 options').toBeGreaterThanOrEqual(2);
 
-    // Record current value of first PG select
-    const pgSelect = page.locator('select[name^="pg"]').first();
-    const originalValue = await pgSelect.inputValue();
+    // Record current value of first BH (PG role slot) select
+    const bhSelect = page.locator('select[name^="BH"]').first();
+    const originalValue = await bhSelect.inputValue();
 
     // Select the second option (first saved config)
     await dropdown.selectOption({ index: 1 });

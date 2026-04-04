@@ -37,13 +37,15 @@ test.describe('Depth Chart Entry flow', () => {
     await expect(playerRows.first()).toBeVisible();
   });
 
-  test('position selects have options', async ({ page }) => {
+  test('role slot selects have options', async ({ page }) => {
     const form = page.locator('.depth-chart-form');
     await expect(form).toBeVisible({ timeout: 15000 });
 
-    const posSelect = page.locator('select[name^="pg"]').first();
-    await expect(posSelect).toBeVisible();
-    const options = posSelect.locator('option');
+    // Position selects (pg/sg/sf/pf/c) are now hidden inputs; role slot
+    // selects use field names BH, DI, OI, DF, OF for PG/SG/SF/PF/C columns.
+    const roleSelect = page.locator('select[name^="BH"]').first();
+    await expect(roleSelect).toBeVisible();
+    const options = roleSelect.locator('option');
     await expect(options.first()).toBeAttached();
   });
 

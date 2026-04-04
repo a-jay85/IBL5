@@ -77,25 +77,22 @@ test.describe('Depth Chart Entry: mobile card view', () => {
     await toggle.click();
   });
 
-  test('position selects are enabled on mobile', async ({ page }) => {
-    const pgSelects = page.locator('.dc-mobile-cards select[name^="pg"]');
-    await expect(pgSelects.first()).toBeEnabled();
+  test('role slot selects are enabled on mobile', async ({ page }) => {
+    // Position selects (pg/sg/sf/pf/c) are now hidden inputs; role slot
+    // selects use field names BH, DI, OI, DF, OF for PG/SG/SF/PF/C columns.
+    const bhSelects = page.locator('.dc-mobile-cards select[name^="BH"]');
+    await expect(bhSelects.first()).toBeEnabled();
   });
 
-  test('position grid has 5 columns per card', async ({ page }) => {
-    const firstGrid = page.locator('.dc-card__pos-grid').first();
+  test('settings grid has 5 columns per card', async ({ page }) => {
+    // The old pos-grid is gone; a single settings-grid holds all 5 role slots.
+    const firstGrid = page.locator('.dc-card__settings-grid').first();
     const fields = firstGrid.locator('.dc-card__field');
     await expect(fields).toHaveCount(5);
   });
 
-  test('settings grid has 6 columns per card', async ({ page }) => {
-    const firstGrid = page.locator('.dc-card__settings-grid').first();
-    const fields = firstGrid.locator('.dc-card__field');
-    await expect(fields).toHaveCount(6);
-  });
-
   test('changing a card select triggers glow', async ({ page }) => {
-    const firstSelect = page.locator('.dc-mobile-cards select[name^="pg"]').first();
+    const firstSelect = page.locator('.dc-mobile-cards select[name^="BH"]').first();
     const originalValue = await firstSelect.inputValue();
 
     // Find a different value
@@ -168,8 +165,8 @@ test.describe('DCE mobile: saved depth chart loading', () => {
     const optCount = await options.count();
     expect(optCount, 'Saved DC dropdown should have at least 2 options').toBeGreaterThanOrEqual(2);
 
-    // Record current value of first mobile PG select
-    const mobileSelect = page.locator('.dc-mobile-cards select[name^="pg"]').first();
+    // Record current value of first mobile BH (PG role slot) select
+    const mobileSelect = page.locator('.dc-mobile-cards select[name^="BH"]').first();
     await expect(mobileSelect).toBeEnabled();
     const originalValue = await mobileSelect.inputValue();
 
@@ -187,7 +184,7 @@ test.describe('DCE mobile: saved depth chart loading', () => {
 
     // Mobile card selects should reflect the loaded config
     // Verify at least one select value differs from original (saved configs differ from live)
-    const mobileSelects = page.locator('.dc-mobile-cards select[name^="pg"]');
+    const mobileSelects = page.locator('.dc-mobile-cards select[name^="BH"]');
     const selectCount = await mobileSelects.count();
     let anyChanged = false;
     for (let i = 0; i < selectCount; i++) {
@@ -236,8 +233,8 @@ test.describe('DCE mobile: resize sync', () => {
     await page.goto('modules.php?name=DepthChartEntry');
     await page.waitForLoadState('networkidle');
 
-    // Change a value on mobile card
-    const mobileSelect = page.locator('.dc-mobile-cards select[name^="pg"]').first();
+    // Change a value on mobile card (BH = PG role slot)
+    const mobileSelect = page.locator('.dc-mobile-cards select[name^="BH"]').first();
     await expect(mobileSelect).toBeEnabled();
     const originalValue = await mobileSelect.inputValue();
     const newValue = originalValue === '0' ? '1' : '0';
@@ -248,7 +245,7 @@ test.describe('DCE mobile: resize sync', () => {
     await page.waitForTimeout(200); // debounce
 
     // Desktop table should now show the changed value
-    const desktopSelect = page.locator('.depth-chart-table select[name^="pg"]').first();
+    const desktopSelect = page.locator('.depth-chart-table select[name^="BH"]').first();
     await expect(desktopSelect).toBeEnabled();
     const desktopValue = await desktopSelect.inputValue();
     expect(desktopValue).toBe(newValue);

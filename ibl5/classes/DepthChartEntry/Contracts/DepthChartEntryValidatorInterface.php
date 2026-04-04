@@ -20,18 +20,13 @@ interface DepthChartEntryValidatorInterface
     /**
      * Validate a complete depth chart submission against all business rules
      * 
-     * Performs comprehensive validation based on season phase:
-     * 
+     * Performs validation based on season phase:
+     *
      * **Regular Season Requirements:**
      * - Exactly 12 active players in lineup
-     * - At least 3 players per position slot
-     * 
+     *
      * **Playoff Requirements:**
      * - 10-12 active players in lineup (flexible)
-     * - At least 2 players per position slot
-     * 
-     * **All Phases:**
-     * - No player can be starting (depth = 1) at multiple positions
      * 
      * All errors are collected internally and can be retrieved via getErrors() or getErrorMessagesHtml().
      * 

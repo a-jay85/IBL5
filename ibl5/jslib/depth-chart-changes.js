@@ -6,26 +6,14 @@
  * to any select whose current value differs from the original.
  *
  * Glow intensity scales with the magnitude of the change:
- *   - Position fields (pg, sg, sf, pf, c): distance along 1st→2nd→3rd→4th→ok→No spectrum
- *   - Intensity fields (OI, DI, BH): absolute numeric difference (max 4)
- *   - Minutes (min): proportional to difference, ceil(diff/8) capped at 5
- *   - Categorical (OF, DF, canPlayInGame): always level 1
+ *   - Role slot fields (BH, DI, OI, OF, DF): absolute numeric difference (max 2 or 3)
+ *   - Categorical (canPlayInGame): always level 1
  *
  * Exposes window.IBL_recalculateDepthChartGlows() for use after loading a saved
  * depth chart or resetting the form.
  */
 (function () {
     'use strict';
-
-    /** Map of position form values to ordinal positions for distance calculation */
-    var POSITION_ORDINALS = {
-        '1': 0,  // 1st
-        '2': 1,  // 2nd
-        '3': 2,  // 3rd
-        '4': 3,  // 4th
-        '5': 4,  // ok
-        '0': 5   // No
-    };
 
     var GLOW_CLASSES = ['dc-glow-1', 'dc-glow-2', 'dc-glow-3', 'dc-glow-4', 'dc-glow-5'];
 
@@ -34,7 +22,7 @@
 
     /**
      * Strip trailing digits from a select name to determine field type.
-     * "pg12" → "pg", "OI3" → "OI", "canPlayInGame5" → "canPlayInGame", "min7" → "min"
+     * "BH3" → "BH", "canPlayInGame5" → "canPlayInGame"
      */
     function getFieldPrefix(name) {
         return name.replace(/\d+$/, '');
@@ -48,34 +36,15 @@
             return 0;
         }
 
-        // Position fields: distance along ordinal spectrum
-        if (fieldPrefix === 'pg' || fieldPrefix === 'sg' || fieldPrefix === 'sf' ||
-            fieldPrefix === 'pf' || fieldPrefix === 'c') {
-            var origOrd = POSITION_ORDINALS[original];
-            var currOrd = POSITION_ORDINALS[current];
-            if (origOrd === undefined || currOrd === undefined) {
-                return 1;
-            }
-            var distance = Math.abs(origOrd - currOrd);
-            return Math.min(distance, 5);
-        }
-
-        // Intensity fields (OI, DI, BH): absolute numeric difference (range -2 to +2, max diff = 4)
-        if (fieldPrefix === 'OI' || fieldPrefix === 'DI' || fieldPrefix === 'BH') {
+        // Role slot fields (BH, DI, OI, OF, DF): absolute numeric difference
+        if (fieldPrefix === 'BH' || fieldPrefix === 'DI' || fieldPrefix === 'OI' ||
+            fieldPrefix === 'OF' || fieldPrefix === 'DF') {
             var diff = Math.abs(parseInt(current, 10) - parseInt(original, 10));
-            return Math.min(diff, 5);
+            // Scale: max diff is 3 (for OF/DF), map to glow 1-3
+            return Math.min(Math.max(diff, 1), 5);
         }
 
-        // Minutes: proportional, ceil(diff/8) capped at 5
-        if (fieldPrefix === 'min') {
-            var minDiff = Math.abs(parseInt(current, 10) - parseInt(original, 10));
-            if (minDiff === 0) {
-                return 0;
-            }
-            return Math.min(Math.ceil(minDiff / 8), 5);
-        }
-
-        // Categorical fields (OF, DF, canPlayInGame): always level 1
+        // Categorical fields (canPlayInGame): always level 1
         return 1;
     }
 
@@ -183,11 +152,6 @@
     }
 
     // Recalculate glows on every pageshow (fires after DOMContentLoaded).
-    // Covers two back-button scenarios:
-    //   1. bfcache (persisted=true): JS state preserved, DOMContentLoaded skipped
-    //   2. No bfcache (Chrome): JS re-executes, but the browser may restore form
-    //      values after DOMContentLoaded — pageshow fires after restoration.
-    // On initial load this is a harmless no-op (form matches server defaults).
     window.addEventListener('pageshow', function () {
         recalculateAll();
     });

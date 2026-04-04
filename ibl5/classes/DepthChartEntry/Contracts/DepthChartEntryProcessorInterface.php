@@ -26,16 +26,19 @@ interface DepthChartEntryProcessorInterface
      * 1. Loop through POST data for players 1 to maxPlayers
      * 2. For each player, sanitize and validate all 13 depth chart fields
      * 3. Count active players (where canPlayInGame=1)
-     * 4. Count non-injured players at each position (where pos_N > 0 and not injured)
-     * 5. Detect if any player is starting (depth=1) at multiple positions
-     * 
+     *
+     * Position depth columns (pg-c) and minutes are dead fields in JSB — they arrive
+     * as 0 from hidden form inputs. Position depth counting and starter detection
+     * are no longer performed; pos_1-pos_5, hasStarterAtMultiplePositions, and
+     * nameOfProblemStarter are always returned as zero/false/empty for backward compat.
+     *
      * **Sanitization Rules Applied:**
      * - Player names: trim whitespace, remove HTML tags via strip_tags()
-     * - Depth values (pg-c): clamped to 0-5 range
+     * - Depth values (pg-c): clamped to 0-5 range (dead field, always 0)
      * - Can Play In Game: normalized to 0 or 1
-     * - Minutes: clamped to 0-40 range
+     * - Minutes: clamped to 0-40 range (dead field, always 0)
      * - Focus values (OF/DF): clamped to 0-3 range
-     * - Settings (OI/DI/BH): clamped to -2 to 2 range
+     * - Settings (OI/DI/BH): clamped to 0-2 range (negatives are dead in JSB)
      * - Injury flag: converted to int (0 or 1)
      * 
      * @param array<string, mixed> $postData Raw POST data from form submission ($_POST)
@@ -44,9 +47,7 @@ interface DepthChartEntryProcessorInterface
      * 
      * **Important Behaviors:**
      * - Empty POST data results in empty playerData array
-     * - Position counts exclude injured players (injury != 0)
      * - Active count includes all active players regardless of injury status
-     * - Only the first player with multiple starting positions is recorded
      * - All sanitization happens during processing (no invalid values returned)
      */
     public function processSubmission(array $postData, int $maxPlayers = 15): array;

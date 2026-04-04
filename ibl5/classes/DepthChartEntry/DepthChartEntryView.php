@@ -16,6 +16,18 @@ use Utilities\HtmlSanitizer;
 class DepthChartEntryView implements DepthChartEntryViewInterface
 {
     /**
+     * Role slot display labels mapped to their HTML form field names.
+     * PG slot = dc_bh (form field BH), SG slot = dc_di (form field DI), etc.
+     */
+    private const ROLE_SLOTS = [
+        ['label' => 'PG', 'field' => 'BH', 'dbKey' => 'dc_bh', 'max' => 2],
+        ['label' => 'SG', 'field' => 'DI', 'dbKey' => 'dc_di', 'max' => 2],
+        ['label' => 'SF', 'field' => 'OI', 'dbKey' => 'dc_oi', 'max' => 2],
+        ['label' => 'PF', 'field' => 'DF', 'dbKey' => 'dc_df', 'max' => 3],
+        ['label' => 'C',  'field' => 'OF', 'dbKey' => 'dc_of', 'max' => 3],
+    ];
+
+    /**
      * @see DepthChartEntryViewInterface::renderTeamLogo()
      */
     public function renderTeamLogo(int $teamID): void
@@ -31,54 +43,15 @@ class DepthChartEntryView implements DepthChartEntryViewInterface
     }
 
     /**
-     * @see DepthChartEntryViewInterface::renderPositionOptions()
+     * Render role priority dropdown options (0 to max).
+     * Unified for all 5 role slots: BH/DI/OI use max=2, DF/OF use max=3.
      */
-    public function renderPositionOptions(int $selectedValue): void
+    public function renderRolePriorityOptions(int $selectedValue, int $maxValue): void
     {
-        $options = [
-            0 => 'No',
-            1 => '1st',
-            2 => '2nd',
-            3 => '3rd',
-            4 => '4th',
-            5 => 'ok'
-        ];
-
-        foreach ($options as $value => $label) {
-            $selected = ($selectedValue === $value) ? ' SELECTED' : '';
-            echo "<option value=\"$value\"$selected>$label</option>";
-        }
-    }
-
-    /**
-     * @see DepthChartEntryViewInterface::renderOffDefOptions()
-     */
-    public function renderOffDefOptions(int $selectedValue): void
-    {
-        $options = [
-            0 => 'Auto',
-            1 => 'Outside',
-            2 => 'Drive',
-            3 => 'Post'
-        ];
-
-        foreach ($options as $value => $label) {
-            $selected = ($selectedValue === $value) ? ' SELECTED' : '';
-            echo "<option value=\"$value\"$selected>$label</option>";
-        }
-    }
-
-    /**
-     * @see DepthChartEntryViewInterface::renderSettingOptions()
-     */
-    public function renderSettingOptions(int $selectedValue): void
-    {
-        $options = [2, 1, 0, -1, -2];
-
-        foreach ($options as $value) {
-            $selected = ($selectedValue === $value) ? ' SELECTED' : '';
-            $label = ($value === 0) ? '-' : $value;
-            echo "<option value=\"$value\"$selected>$label</option>";
+        for ($i = 0; $i <= $maxValue; $i++) {
+            $selected = ($selectedValue === $i) ? ' SELECTED' : '';
+            $label = ($i === 0) ? '&mdash;' : (string) $i;
+            echo "<option value=\"{$i}\"{$selected}>{$label}</option>";
         }
     }
 
@@ -95,16 +68,39 @@ class DepthChartEntryView implements DepthChartEntryViewInterface
     }
 
     /**
-     * @see DepthChartEntryViewInterface::renderMinutesOptions()
+     * Render the help section explaining how depth charts work.
      */
-    public function renderMinutesOptions(int $selectedValue, int $staminaCap): void
+    public function renderHelpSection(): void
     {
-        echo '<option value="0"' . ($selectedValue === 0 ? ' SELECTED' : '') . '>Auto</option>';
+        echo '<details class="dc-help-section">
+<summary>How Depth Charts Work</summary>
+<div class="dc-help-section__content">
+<p>Assign players to role slots (PG through C) to control who starts and who subs in.
+The engine selects the highest-quality assigned player for each slot as the starter.
+Remaining assigned players form the bench, with higher values subbing in first.</p>
+<table class="ibl-data-table dc-help-table">
+<thead><tr><th>Slot</th><th>Play Style</th></tr></thead>
+<tbody>
+<tr><td>PG</td><td>Outside shots &amp; drives (perimeter-heavy)</td></tr>
+<tr><td>SG</td><td>Mostly perimeter, some inside</td></tr>
+<tr><td>SF</td><td>Balanced inside/outside</td></tr>
+<tr><td>PF</td><td>Mostly inside, some outside</td></tr>
+<tr><td>C</td><td>Heavily inside/post-oriented</td></tr>
+</tbody>
+</table>
+<p>Set slot values to &mdash; (0) for deep bench players. A player\'s inherent position
+(Pos column) is used as a fallback when no slot is assigned.</p>
+</div>
+</details>';
+    }
 
-        for ($i = 1; $i <= $staminaCap; $i++) {
-            $selected = ($selectedValue === $i) ? ' SELECTED' : '';
-            echo "<option value=\"$i\"$selected>$i</option>";
-        }
+    /**
+     * Render the empty container for the live lineup preview grid.
+     * JavaScript populates this based on current form values.
+     */
+    public function renderLineupPreview(): void
+    {
+        echo '<div id="dc-lineup-preview" class="dc-lineup-preview"></div>';
     }
 
     /**
@@ -113,11 +109,6 @@ class DepthChartEntryView implements DepthChartEntryViewInterface
     public function renderFormHeader(string $teamLogo, int $teamID, array $slotNames): void
     {
         $teamLogoEscaped = HtmlSanitizer::safeHtmlOutput($teamLogo);
-        $slot0 = HtmlSanitizer::safeHtmlOutput($slotNames[0]);
-        $slot1 = HtmlSanitizer::safeHtmlOutput($slotNames[1]);
-        $slot2 = HtmlSanitizer::safeHtmlOutput($slotNames[2]);
-        $slot3 = HtmlSanitizer::safeHtmlOutput($slotNames[3]);
-        $slot4 = HtmlSanitizer::safeHtmlOutput($slotNames[4]);
         echo '<form name="DepthChartEntry" method="post" action="modules.php?name=DepthChartEntry&amp;op=submit" class="depth-chart-form">
             ' . \Utilities\CsrfGuard::generateToken('depth_chart') . '
             <input type="hidden" name="Team_Name" value="' . $teamLogoEscaped . '">
@@ -128,19 +119,14 @@ class DepthChartEntryView implements DepthChartEntryViewInterface
                 <tr>
                     <th>Pos</th>
                     <th>Player</th>
-                    <th>' . $slot0 . '</th>
-                    <th>' . $slot1 . '</th>
-                    <th>' . $slot2 . '</th>
-                    <th>' . $slot3 . '</th>
-                    <th>' . $slot4 . '</th>
-                    <th>active?</th>
-                    <th>min</th>
-                    <th>OF</th>
-                    <th>DF</th>
-                    <th>OI</th>
-                    <th>DI</th>
-                    <th>BH</th>
-                </tr>
+                    <th>Active</th>';
+
+        foreach (self::ROLE_SLOTS as $slot) {
+            $labelHtml = HtmlSanitizer::safeHtmlOutput($slot['label']);
+            echo '<th>' . $labelHtml . '</th>';
+        }
+
+        echo '          </tr>
             </thead>
             <tbody>';
     }
@@ -158,77 +144,47 @@ class DepthChartEntryView implements DepthChartEntryViewInterface
 
         $player_name_html = HtmlSanitizer::safeHtmlOutput($player_name);
 
-        $player_staminacap = ($player['sta'] ?? 0) + 40;
-        if ($player_staminacap > 40) {
-            $player_staminacap = 40;
-        }
+        /** @var float $qualityScore */
+        $qualityScore = $player['quality_score'] ?? 0.0;
 
-        echo "<tr data-pid=\"{$player_pid}\">
+        echo "<tr data-pid=\"{$player_pid}\" data-quality=\"{$qualityScore}\" data-pos=\"{$player_pos}\">
             <td>{$player_pos}</td>
             <td nowrap>
                 <input type=\"hidden\" name=\"pid{$depthCount}\" value=\"{$player_pid}\">
                 <input type=\"hidden\" name=\"Injury{$depthCount}\" value=\"{$player_inj}\">
                 <input type=\"hidden\" name=\"Name{$depthCount}\" value=\"{$player_name_html}\">
+                <input type=\"hidden\" name=\"pg{$depthCount}\" value=\"0\">
+                <input type=\"hidden\" name=\"sg{$depthCount}\" value=\"0\">
+                <input type=\"hidden\" name=\"sf{$depthCount}\" value=\"0\">
+                <input type=\"hidden\" name=\"pf{$depthCount}\" value=\"0\">
+                <input type=\"hidden\" name=\"c{$depthCount}\" value=\"0\">
+                <input type=\"hidden\" name=\"min{$depthCount}\" value=\"0\">
                 <a href=\"./modules.php?name=Player&pa=showpage&pid={$player_pid}\">{$player_name_html}</a>
             </td>";
 
-        $positions = ['pg', 'sg', 'sf', 'pf', 'c'];
-        foreach ($positions as $posKey) {
-            $this->renderPositionCell($player, $posKey, $depthCount);
-        }
-
+        // Active status
         $dcActive = $player['dc_canPlayInGame'] ?? 0;
-        $dcMinutes = $player['dc_minutes'] ?? 0;
-        $dcOf = $player['dc_of'] ?? 0;
-        $dcDf = $player['dc_df'] ?? 0;
-        $dcOi = $player['dc_oi'] ?? 0;
-        $dcDi = $player['dc_di'] ?? 0;
-        $dcBh = $player['dc_bh'] ?? 0;
-
         echo "<td><select name=\"canPlayInGame{$depthCount}\" aria-label=\"Active status for {$player_name_html}\">";
         $this->renderActiveOptions($dcActive);
         echo "</select></td>";
 
-        echo "<td><select name=\"min{$depthCount}\" aria-label=\"Minutes for {$player_name_html}\">";
-        $this->renderMinutesOptions($dcMinutes, $player_staminacap);
-        echo "</select></td>";
+        // Role slot columns (PG/SG/SF/PF/C mapped to BH/DI/OI/DF/OF form fields)
+        foreach (self::ROLE_SLOTS as $slot) {
+            /** @var int $dcValue */
+            $dcValue = $player[$slot['dbKey']] ?? 0;
+            // Clamp negative legacy values to 0
+            if ($dcValue < 0) {
+                $dcValue = 0;
+            }
+            $fieldName = $slot['field'] . $depthCount;
+            $ariaLabel = $slot['label'] . ' slot for ' . $player_name_html;
 
-        echo "<td><select name=\"OF{$depthCount}\" aria-label=\"Offense for {$player_name_html}\">";
-        $this->renderOffDefOptions($dcOf);
-        echo "</select></td>";
+            echo "<td><select name=\"{$fieldName}\" aria-label=\"{$ariaLabel}\">";
+            $this->renderRolePriorityOptions($dcValue, $slot['max']);
+            echo "</select></td>";
+        }
 
-        echo "<td><select name=\"DF{$depthCount}\" aria-label=\"Defense for {$player_name_html}\">";
-        $this->renderOffDefOptions($dcDf);
-        echo "</select></td>";
-
-        echo "<td><select name=\"OI{$depthCount}\" aria-label=\"Offensive intensity for {$player_name_html}\">";
-        $this->renderSettingOptions($dcOi);
-        echo "</select></td>";
-
-        echo "<td><select name=\"DI{$depthCount}\" aria-label=\"Defensive intensity for {$player_name_html}\">";
-        $this->renderSettingOptions($dcDi);
-        echo "</select></td>";
-
-        echo "<td><select name=\"BH{$depthCount}\" aria-label=\"Ball handling for {$player_name_html}\">";
-        $this->renderSettingOptions($dcBh);
-        echo "</select></td></tr>";
-    }
-
-    /**
-     * @param PlayerRow $player
-     */
-    private function renderPositionCell(array $player, string $posKey, int $depthCount): void
-    {
-        $fieldName = $posKey . $depthCount;
-        $dcField = 'dc_' . strtoupper($posKey) . 'Depth';
-        /** @var int $currentValue */
-        $currentValue = $player[$dcField];
-
-        $posLabel = strtoupper($posKey);
-        $playerNameHtml = HtmlSanitizer::safeHtmlOutput($player['name']);
-        echo "<td><select name=\"{$fieldName}\" aria-label=\"{$posLabel} depth for {$playerNameHtml}\">";
-        $this->renderPositionOptions($currentValue);
-        echo "</select></td>";
+        echo "</tr>";
     }
 
     /**
@@ -242,28 +198,22 @@ function resetDepthChart() {
     if (!confirm('Are you sure you want to reset all fields to their default values? This will discard any changes you have made.')) {
         return false;
     }
-    
+
     var form = document.forms['DepthChartEntry'];
     if (!form) return;
-    
+
     var selects = form.getElementsByTagName('select');
-    
+
     for (var i = 0; i < selects.length; i++) {
         var select = selects[i];
         var name = select.name;
-        
+
         var defaultValue = '0';
-        
+
         if (name.match(/^canPlayInGame\d+$/)) {
             defaultValue = '1';
-        } else if (name.match(/^(pg|sg|sf|pf|c)\d+$/)) {
-            defaultValue = '0';
-        } else if (name.match(/^(min|OF|DF)\d+$/)) {
-            defaultValue = '0';
-        } else if (name.match(/^(OI|DI|BH)\d+$/)) {
-            defaultValue = '0';
         }
-        
+
         select.value = defaultValue;
     }
 
@@ -278,6 +228,9 @@ function resetDepthChart() {
     if (typeof window.IBL_recalculateDepthChartGlows === 'function') {
         window.IBL_recalculateDepthChartGlows();
     }
+    if (typeof window.IBL_recalculateLineupPreview === 'function') {
+        window.IBL_recalculateLineupPreview();
+    }
 
     return false;
 }
@@ -288,7 +241,7 @@ JAVASCRIPT;
         echo '</tbody>
             <tfoot>
                 <tr>
-                    <td colspan="14" class="depth-chart-buttons">
+                    <td colspan="8" class="depth-chart-buttons">
                         <input type="button" value="Reset" onclick="resetDepthChart();" class="depth-chart-reset-btn">
                         <input type="submit" value="Submit Depth Chart" class="depth-chart-submit-btn">
                     </td>
@@ -341,35 +294,26 @@ JAVASCRIPT;
         $teamNameHtml = HtmlSanitizer::safeHtmlOutput($teamName);
         echo $teamNameHtml . ' Depth Chart Submission<br><table class="ibl-data-table">';
         echo '<thead><tr>
-            <th>Name</th>';
-        foreach (\JSB::PLAYER_POSITIONS as $position) {
-            $posHtml = HtmlSanitizer::safeHtmlOutput($position);
-            echo '<th>' . $posHtml . '</th>';
+            <th>Name</th>
+            <th>Active</th>';
+
+        foreach (self::ROLE_SLOTS as $slot) {
+            $labelHtml = HtmlSanitizer::safeHtmlOutput($slot['label']);
+            echo '<th>' . $labelHtml . '</th>';
         }
-        echo '<th>Active</th>
-            <th>Min</th>
-            <th>OF</th>
-            <th>DF</th>
-            <th>OI</th>
-            <th>DI</th>
-            <th>BH</th>
-        </tr></thead><tbody>';
+
+        echo '</tr></thead><tbody>';
 
         foreach ($playerData as $player) {
             $nameHtml = HtmlSanitizer::safeHtmlOutput($player['name']);
             echo '<tr>
-                <td>' . $nameHtml . '</td>';
-            foreach (\JSB::PLAYER_POSITIONS as $position) {
-                $posKey = strtolower($position);
-                echo '<td>' . $player[$posKey] . '</td>';
-            }
-            echo '<td>' . $player['canPlayInGame'] . '</td>
-                <td>' . $player['min'] . '</td>
-                <td>' . $player['of'] . '</td>
-                <td>' . $player['df'] . '</td>
-                <td>' . $player['oi'] . '</td>
-                <td>' . $player['di'] . '</td>
+                <td>' . $nameHtml . '</td>
+                <td>' . $player['canPlayInGame'] . '</td>
                 <td>' . $player['bh'] . '</td>
+                <td>' . $player['di'] . '</td>
+                <td>' . $player['oi'] . '</td>
+                <td>' . $player['df'] . '</td>
+                <td>' . $player['of'] . '</td>
             </tr>';
         }
 
@@ -387,7 +331,7 @@ JAVASCRIPT;
 
         $depthCount = 1;
         foreach ($players as $player) {
-            $this->renderMobilePlayerCard($player, $depthCount, $slotNames);
+            $this->renderMobilePlayerCard($player, $depthCount);
             $depthCount++;
         }
 
@@ -403,9 +347,8 @@ JAVASCRIPT;
      *
      * @param array<string, mixed> $player Player data from database
      * @param int $depthCount Row counter for form field names
-     * @param array<string> $slotNames Position slot names
      */
-    private function renderMobilePlayerCard(array $player, int $depthCount, array $slotNames): void
+    private function renderMobilePlayerCard(array $player, int $depthCount): void
     {
         /** @var int $pid */
         $pid = $player['pid'];
@@ -423,14 +366,10 @@ JAVASCRIPT;
         $dcActive = $player['dc_canPlayInGame'] ?? 0;
         $checkedAttr = ($dcActive === 1) ? ' checked' : '';
 
-        /** @var int $sta */
-        $sta = $player['sta'] ?? 0;
-        $staminaCap = $sta + 40;
-        if ($staminaCap > 40) {
-            $staminaCap = 40;
-        }
+        /** @var float $qualityScore */
+        $qualityScore = $player['quality_score'] ?? 0.0;
 
-        echo "<div class=\"dc-card\" data-pid=\"{$pid}\">";
+        echo "<div class=\"dc-card\" data-pid=\"{$pid}\" data-quality=\"{$qualityScore}\" data-pos=\"{$pos}\">";
 
         // Header: photo + pos badge + name + active toggle
         echo '<div class="dc-card__header">';
@@ -442,6 +381,12 @@ JAVASCRIPT;
         echo "<input type=\"hidden\" name=\"pid{$depthCount}\" value=\"{$pid}\" disabled>";
         echo "<input type=\"hidden\" name=\"Injury{$depthCount}\" value=\"{$injured}\" disabled>";
         echo "<input type=\"hidden\" name=\"Name{$depthCount}\" value=\"{$nameHtml}\" disabled>";
+        echo "<input type=\"hidden\" name=\"pg{$depthCount}\" value=\"0\" disabled>";
+        echo "<input type=\"hidden\" name=\"sg{$depthCount}\" value=\"0\" disabled>";
+        echo "<input type=\"hidden\" name=\"sf{$depthCount}\" value=\"0\" disabled>";
+        echo "<input type=\"hidden\" name=\"pf{$depthCount}\" value=\"0\" disabled>";
+        echo "<input type=\"hidden\" name=\"c{$depthCount}\" value=\"0\" disabled>";
+        echo "<input type=\"hidden\" name=\"min{$depthCount}\" value=\"0\" disabled>";
 
         // Active checkbox toggle
         echo "<label class=\"dc-card__active-toggle\" aria-label=\"Active status for {$nameHtml}\">";
@@ -451,86 +396,25 @@ JAVASCRIPT;
         echo '</label>';
         echo '</div>';
 
-        // Body
+        // Body — single role slots grid (5 columns)
         echo '<div class="dc-card__body">';
+        echo '<div class="dc-card__settings-grid">';
 
-        // Position slots grid (5 columns)
-        echo '<div class="dc-card__pos-grid">';
-        $positions = ['pg', 'sg', 'sf', 'pf', 'c'];
-        foreach ($positions as $idx => $posKey) {
-            $dcField = 'dc_' . strtoupper($posKey) . 'Depth';
-            /** @var int $currentValue */
-            $currentValue = $player[$dcField];
-            $label = $slotNames[$idx] ?? strtoupper($posKey);
-            $labelHtml = HtmlSanitizer::safeHtmlOutput($label);
+        foreach (self::ROLE_SLOTS as $slot) {
+            /** @var int $dcValue */
+            $dcValue = $player[$slot['dbKey']] ?? 0;
+            if ($dcValue < 0) {
+                $dcValue = 0;
+            }
+            $fieldName = $slot['field'] . $depthCount;
+            $labelHtml = HtmlSanitizer::safeHtmlOutput($slot['label']);
 
             echo "<div class=\"dc-card__field\">";
             echo "<span class=\"dc-card__field-label\">{$labelHtml}</span>";
-            echo "<select name=\"{$posKey}{$depthCount}\" aria-label=\"{$labelHtml} depth for {$nameHtml}\" disabled>";
-            $this->renderPositionOptions($currentValue);
+            echo "<select name=\"{$fieldName}\" aria-label=\"{$labelHtml} slot for {$nameHtml}\" disabled>";
+            $this->renderRolePriorityOptions($dcValue, $slot['max']);
             echo '</select></div>';
         }
-        echo '</div>';
-
-        echo '<hr class="dc-card__divider">';
-
-        // Settings grid (6 columns)
-        echo '<div class="dc-card__settings-grid">';
-
-        /** @var int $dcMinutes */
-        $dcMinutes = $player['dc_minutes'] ?? 0;
-        /** @var int $dcOf */
-        $dcOf = $player['dc_of'] ?? 0;
-        /** @var int $dcDf */
-        $dcDf = $player['dc_df'] ?? 0;
-        /** @var int $dcOi */
-        $dcOi = $player['dc_oi'] ?? 0;
-        /** @var int $dcDi */
-        $dcDi = $player['dc_di'] ?? 0;
-        /** @var int $dcBh */
-        $dcBh = $player['dc_bh'] ?? 0;
-
-        // Minutes
-        echo "<div class=\"dc-card__field\">";
-        echo '<span class="dc-card__field-label">Min</span>';
-        echo "<select name=\"min{$depthCount}\" aria-label=\"Minutes for {$nameHtml}\" disabled>";
-        $this->renderMinutesOptions($dcMinutes, $staminaCap);
-        echo '</select></div>';
-
-        // OF
-        echo "<div class=\"dc-card__field\">";
-        echo '<span class="dc-card__field-label">OF</span>';
-        echo "<select name=\"OF{$depthCount}\" aria-label=\"Offense for {$nameHtml}\" disabled>";
-        $this->renderOffDefOptions($dcOf);
-        echo '</select></div>';
-
-        // DF
-        echo "<div class=\"dc-card__field\">";
-        echo '<span class="dc-card__field-label">DF</span>';
-        echo "<select name=\"DF{$depthCount}\" aria-label=\"Defense for {$nameHtml}\" disabled>";
-        $this->renderOffDefOptions($dcDf);
-        echo '</select></div>';
-
-        // OI
-        echo "<div class=\"dc-card__field\">";
-        echo '<span class="dc-card__field-label">OI</span>';
-        echo "<select name=\"OI{$depthCount}\" aria-label=\"Offensive intensity for {$nameHtml}\" disabled>";
-        $this->renderSettingOptions($dcOi);
-        echo '</select></div>';
-
-        // DI
-        echo "<div class=\"dc-card__field\">";
-        echo '<span class="dc-card__field-label">DI</span>';
-        echo "<select name=\"DI{$depthCount}\" aria-label=\"Defensive intensity for {$nameHtml}\" disabled>";
-        $this->renderSettingOptions($dcDi);
-        echo '</select></div>';
-
-        // BH
-        echo "<div class=\"dc-card__field\">";
-        echo '<span class="dc-card__field-label">BH</span>';
-        echo "<select name=\"BH{$depthCount}\" aria-label=\"Ball handling for {$nameHtml}\" disabled>";
-        $this->renderSettingOptions($dcBh);
-        echo '</select></div>';
 
         echo '</div>'; // end settings grid
         echo '</div>'; // end body

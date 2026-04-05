@@ -147,14 +147,8 @@ Remaining assigned players form the bench, with higher values subbing in first.<
         /** @var float $qualityScore */
         $qualityScore = $player['quality_score'] ?? 0.0;
 
-        $qualityDebug = '';
-        $serverName = $_SERVER['SERVER_NAME'] ?? '';
-        if (is_string($serverName) && str_contains($serverName, 'localhost')) {
-            $qualityDebug = ' <small>(' . $qualityScore . ')</small>';
-        }
-
         echo "<tr data-pid=\"{$player_pid}\" data-quality=\"{$qualityScore}\" data-pos=\"{$player_pos}\">
-            <td>{$player_pos}{$qualityDebug}</td>
+            <td>{$player_pos}<span class=\"dc-quality-debug\"></span></td>
             <td nowrap>
                 <input type=\"hidden\" name=\"pid{$depthCount}\" value=\"{$player_pid}\">
                 <input type=\"hidden\" name=\"Injury{$depthCount}\" value=\"{$player_inj}\">
@@ -187,7 +181,7 @@ Remaining assigned players form the bench, with higher values subbing in first.<
 
             echo "<td><select name=\"{$fieldName}\" aria-label=\"{$ariaLabel}\">";
             $this->renderRolePriorityOptions($dcValue, $slot['max']);
-            echo "</select></td>";
+            echo "</select><span class=\"dc-score-debug\"></span></td>";
         }
 
         echo "</tr>";

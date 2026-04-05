@@ -11,7 +11,8 @@
  *   Per pass, candidates collected via TWO paths into ONE list:
  *     BONUS PATH (dc > 0): any position, score = quality + (10 - dc) * 240
  *     FALLBACK PATH (dc ≤ 0): position must match slot, score = raw quality
- *   Candidates sorted: quality DESC, then dc ASC (dc=1 before dc=2).
+ *   Candidates sorted in TWO passes: score DESC, then dc ASC among dc>0 only
+ *   (dc=1 strictly dominates dc=2 regardless of score).
  *   First candidate selected, removed from pool for subsequent passes.
  *   Bench: remaining candidates in same sorted order.
  */
@@ -98,8 +99,8 @@
      *   Per pass, candidates collected from two paths into ONE list:
      *     BONUS (dc > 0): any position, score = effectiveQuality + (10-dc)*240
      *     FALLBACK (dc ≤ 0, position matches): score = effectiveQuality (no bonus)
-     *   Sort: bonus (dc>0) before fallback (dc=0), then score DESC, dc ASC tiebreaker.
-     *   If no candidates: roster-order default (first untaken player).
+     *   Two-pass sort: score DESC, then dc ASC among dc>0 only (overrides quality).
+     *   dc=1 strictly dominates dc=2. If no candidates: roster-order default.
      *
      * Step 4: Backup Selection — FUNDAMENTALLY DIFFERENT from starters:
      *   - POSITION MATCHING ONLY — no dc > 0 override for backups
@@ -141,14 +142,21 @@
                 }
             }
 
-            // Sort: bonus (dc>0) before fallback (dc=0),
-            //        score DESC, dc ASC tiebreaker
+            // Two-pass sort matching JSB's two separate bubble sorts
+            // (lines 91751-91863 in decompiled binary):
+            // Pass 1: score descending — bonus-path scores (quality + bonus)
+            //         naturally sort ahead of fallback scores (raw quality)
             candidates.sort(function (a, b) {
-                var aBonus = a.dc > 0 ? 1 : 0;
-                var bBonus = b.dc > 0 ? 1 : 0;
-                if (aBonus !== bBonus) return bBonus - aBonus;
-                if (b.score !== a.score) return b.score - a.score;
-                return a.dc - b.dc;
+                return b.score - a.score;
+            });
+            // Pass 2: dc ascending among dc>0 only — OVERRIDES quality.
+            // dc=1 strictly dominates dc=2 regardless of score difference.
+            // dc=0 candidates are left in place (behind all dc>0).
+            candidates.sort(function (a, b) {
+                if (a.dc > 0 && b.dc > 0) {
+                    return a.dc - b.dc;
+                }
+                return 0;
             });
 
             var starter = null;

@@ -143,10 +143,15 @@
                 }
             }
 
-            // Sort: dc ASC (dc=1 before dc=2), then score DESC within same dc
+            // Sort: bonus players (dc > 0) before fallback (dc = 0).
+            // Within bonus: dc ASC (dc=1 before dc=2 before dc=3).
+            // Within same dc: score DESC.
             candidates.sort(function (a, b) {
-                if (a.dc !== b.dc) return a.dc - b.dc;
-                return b.score - a.score;
+                var aBonus = a.dc > 0 ? 1 : 0;
+                var bBonus = b.dc > 0 ? 1 : 0;
+                if (aBonus !== bBonus) return bBonus - aBonus; // bonus first
+                if (a.dc !== b.dc) return a.dc - b.dc;        // dc ASC within bonus
+                return b.score - a.score;                      // score DESC within same dc
             });
 
             var starter = null;
@@ -198,8 +203,11 @@
                 }
             }
 
-            // Same sort: dc ASC, then score DESC
+            // Same sort: bonus first, dc ASC within bonus, score DESC within same dc
             bCandidates.sort(function (a, b2) {
+                var aBonus = a.dc > 0 ? 1 : 0;
+                var bBonus = b2.dc > 0 ? 1 : 0;
+                if (aBonus !== bBonus) return bBonus - aBonus;
                 if (a.dc !== b2.dc) return a.dc - b2.dc;
                 return b2.score - a.score;
             });

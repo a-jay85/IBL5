@@ -56,6 +56,19 @@ class DepthChartEntryView implements DepthChartEntryViewInterface
     }
 
     /**
+     * Render minutes dropdown options (0=Auto to staminaCap).
+     */
+    public function renderMinutesOptions(int $selectedValue, int $staminaCap): void
+    {
+        echo '<option value="0"' . ($selectedValue === 0 ? ' SELECTED' : '') . '>Auto</option>';
+
+        for ($i = 1; $i <= $staminaCap; $i++) {
+            $selected = ($selectedValue === $i) ? ' SELECTED' : '';
+            echo "<option value=\"$i\"$selected>$i</option>";
+        }
+    }
+
+    /**
      * @see DepthChartEntryViewInterface::renderActiveOptions()
      */
     public function renderActiveOptions(int $selectedValue): void
@@ -119,7 +132,8 @@ Remaining assigned players form the bench, with higher values subbing in first.<
                 <tr>
                     <th>Pos</th>
                     <th>Player</th>
-                    <th>Active</th>';
+                    <th>Active</th>
+                    <th>Min</th>';
 
         foreach (self::ROLE_SLOTS as $slot) {
             $labelHtml = HtmlSanitizer::safeHtmlOutput($slot['label']);
@@ -158,7 +172,6 @@ Remaining assigned players form the bench, with higher values subbing in first.<
                 <input type=\"hidden\" name=\"sf{$depthCount}\" value=\"0\">
                 <input type=\"hidden\" name=\"pf{$depthCount}\" value=\"0\">
                 <input type=\"hidden\" name=\"c{$depthCount}\" value=\"0\">
-                <input type=\"hidden\" name=\"min{$depthCount}\" value=\"0\">
                 <a href=\"./modules.php?name=Player&pa=showpage&pid={$player_pid}\">{$player_name_html}</a>
             </td>";
 
@@ -166,6 +179,16 @@ Remaining assigned players form the bench, with higher values subbing in first.<
         $dcActive = $player['dc_canPlayInGame'] ?? 0;
         echo "<td><select name=\"canPlayInGame{$depthCount}\" aria-label=\"Active status for {$player_name_html}\">";
         $this->renderActiveOptions($dcActive);
+        echo "</select></td>";
+
+        // Minutes
+        $dcMinutes = $player['dc_minutes'] ?? 0;
+        $staminaCap = ($player['sta'] ?? 0) + 40;
+        if ($staminaCap > 40) {
+            $staminaCap = 40;
+        }
+        echo "<td><select name=\"min{$depthCount}\" aria-label=\"Minutes for {$player_name_html}\">";
+        $this->renderMinutesOptions($dcMinutes, $staminaCap);
         echo "</select></td>";
 
         // Role slot columns (PG/SG/SF/PF/C mapped to BH/DI/OI/DF/OF form fields)
@@ -241,7 +264,7 @@ JAVASCRIPT;
         echo '</tbody>
             <tfoot>
                 <tr>
-                    <td colspan="8" class="depth-chart-buttons">
+                    <td colspan="9" class="depth-chart-buttons">
                         <input type="button" value="Reset" onclick="resetDepthChart();" class="depth-chart-reset-btn">
                         <input type="submit" value="Submit Depth Chart" class="depth-chart-submit-btn">
                     </td>
@@ -386,8 +409,6 @@ JAVASCRIPT;
         echo "<input type=\"hidden\" name=\"sf{$depthCount}\" value=\"0\" disabled>";
         echo "<input type=\"hidden\" name=\"pf{$depthCount}\" value=\"0\" disabled>";
         echo "<input type=\"hidden\" name=\"c{$depthCount}\" value=\"0\" disabled>";
-        echo "<input type=\"hidden\" name=\"min{$depthCount}\" value=\"0\" disabled>";
-
         // Active checkbox toggle
         echo "<label class=\"dc-card__active-toggle\" aria-label=\"Active status for {$nameHtml}\">";
         echo "<input type=\"hidden\" name=\"canPlayInGame{$depthCount}\" value=\"0\" disabled>";
@@ -396,9 +417,24 @@ JAVASCRIPT;
         echo '</label>';
         echo '</div>';
 
-        // Body — single role slots grid (5 columns)
+        // Body — minutes + role slots grid (6 columns)
         echo '<div class="dc-card__body">';
         echo '<div class="dc-card__settings-grid">';
+
+        // Minutes
+        /** @var int $dcMinutes */
+        $dcMinutes = $player['dc_minutes'] ?? 0;
+        /** @var int $sta */
+        $sta = $player['sta'] ?? 0;
+        $staminaCap = $sta + 40;
+        if ($staminaCap > 40) {
+            $staminaCap = 40;
+        }
+        echo "<div class=\"dc-card__field\">";
+        echo '<span class="dc-card__field-label">Min</span>';
+        echo "<select name=\"min{$depthCount}\" aria-label=\"Minutes for {$nameHtml}\" disabled>";
+        $this->renderMinutesOptions($dcMinutes, $staminaCap);
+        echo '</select></div>';
 
         foreach (self::ROLE_SLOTS as $slot) {
             /** @var int $dcValue */

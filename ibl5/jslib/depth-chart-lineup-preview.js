@@ -59,6 +59,14 @@
             var activeSel = form.querySelector('select[name="canPlayInGame' + idx + '"]');
             var active = activeSel ? activeSel.value === '1' : true;
 
+            // Read dc_minutes — multiplied into quality per JSB formula
+            var minSel = form.querySelector('select[name="min' + idx + '"]');
+            var dcMinutes = minSel ? parseInt(minSel.value, 10) : 0;
+
+            // Effective quality = baseQuality × (dc_minutes + 100)
+            // This matches JSB's quality multiplier (line 5723 in PLR loader)
+            var effectiveQuality = quality * (dcMinutes + 100);
+
             // Read dc values for each slot
             var dcValues = {};
             for (var s = 0; s < SLOTS.length; s++) {
@@ -69,7 +77,9 @@
             players.push({
                 pid: pid,
                 name: name,
-                quality: quality,
+                baseQuality: quality,
+                quality: effectiveQuality,
+                dcMinutes: dcMinutes,
                 pos: pos,
                 active: active,
                 dc: dcValues,
@@ -264,10 +274,16 @@
             var quality = parseFloat(row.getAttribute('data-quality') || '0');
             var idx = i + 1;
 
-            // Update quality in Pos cell
+            // Read minutes for this player
+            var minSel = form.querySelector('select[name="min' + idx + '"]');
+            var dcMin = minSel ? parseInt(minSel.value, 10) : 0;
+            var minMultiplier = dcMin + 100;
+            var effectiveQuality = quality * minMultiplier;
+
+            // Update quality in Pos cell: base × (min+100) = effective
             var qualitySpan = row.querySelector('.dc-quality-debug');
             if (qualitySpan) {
-                qualitySpan.textContent = ' (' + quality.toFixed(1) + ')';
+                qualitySpan.textContent = ' (' + quality.toFixed(1) + '×' + minMultiplier + '=' + Math.round(effectiveQuality) + ')';
             }
 
             // Update effective score next to each role slot select
@@ -280,7 +296,7 @@
                 var dc = parseInt(sel.value, 10);
                 if (dc > 0) {
                     var bonus = (10 - dc) * 240;
-                    var effective = quality + bonus;
+                    var effective = effectiveQuality + bonus;
                     scoreSpan.textContent = Math.round(effective);
                 } else {
                     scoreSpan.textContent = '';

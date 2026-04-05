@@ -45,6 +45,7 @@ class DepthChartEntryViewTest extends TestCase
             'dc_oi' => 0,
             'dc_di' => 0,
             'dc_bh' => 0,
+            'quality_score' => 0.0,
         ];
     }
 
@@ -65,11 +66,12 @@ class DepthChartEntryViewTest extends TestCase
         $this->assertStringContainsString('depth-chart-table', $output);
         $this->assertStringContainsString('<th>Pos</th>', $output);
         $this->assertStringContainsString('<th>Player</th>', $output);
+        $this->assertStringContainsString('<th>Active</th>', $output);
         $this->assertStringContainsString('<th>PG</th>', $output);
+        $this->assertStringContainsString('<th>SG</th>', $output);
+        $this->assertStringContainsString('<th>SF</th>', $output);
+        $this->assertStringContainsString('<th>PF</th>', $output);
         $this->assertStringContainsString('<th>C</th>', $output);
-        $this->assertStringContainsString('<th>active?</th>', $output);
-        $this->assertStringContainsString('<th>min</th>', $output);
-        $this->assertStringContainsString('<th>BH</th>', $output);
     }
 
     public function testRenderPlayerRowOutputsCorrectFieldNames(): void
@@ -121,9 +123,8 @@ class DepthChartEntryViewTest extends TestCase
         $this->assertStringContainsString('&lt;script&gt;', $output);
     }
 
-    public function testRenderPlayerRowStaminaCapAt40(): void
+    public function testRenderPlayerRowMinutesIsHiddenZero(): void
     {
-        // sta=5 → staminaCap = 5 + 40 = 45, clamped to 40
         $player = $this->buildTestPlayer();
         $player['sta'] = 5;
 
@@ -131,9 +132,9 @@ class DepthChartEntryViewTest extends TestCase
         $this->view->renderPlayerRow($player, 1);
         $output = (string) ob_get_clean();
 
-        $this->assertStringContainsString('value="40"', $output);
-        $this->assertStringNotContainsString('value="41"', $output);
-        $this->assertStringNotContainsString('value="45"', $output);
+        // Minutes is now a hidden input fixed at 0 (no longer a dropdown)
+        $this->assertStringContainsString('name="min1" value="0"', $output);
+        $this->assertMatchesRegularExpression('/type="hidden"[^>]*name="min1"/', $output);
     }
 
     // =====================================================================
@@ -163,9 +164,8 @@ class DepthChartEntryViewTest extends TestCase
         $this->assertStringContainsString('document.forms[\'DepthChartEntry\']', $output);
         $this->assertStringContainsString('confirm(', $output);
         $this->assertStringContainsString('canPlayInGame', $output);
-        $this->assertStringContainsString('pg|sg|sf|pf|c', $output);
-        $this->assertStringContainsString('min|OF|DF', $output);
-        $this->assertStringContainsString('OI|DI|BH', $output);
+        $this->assertStringContainsString('getElementsByTagName(\'select\')', $output);
+        $this->assertStringContainsString('dc-card__active-cb', $output);
     }
 
     public function testResetButtonIsButtonType(): void
@@ -315,9 +315,10 @@ class DepthChartEntryViewTest extends TestCase
         $this->view->renderMobileView($players, ['PG', 'SG', 'SF', 'PF', 'C']);
         $output = (string) ob_get_clean();
 
-        $this->assertStringContainsString('dc-card__pos-grid', $output);
+        // Single settings grid for 5 role slots (no separate pos-grid or divider)
         $this->assertStringContainsString('dc-card__settings-grid', $output);
-        $this->assertStringContainsString('dc-card__divider', $output);
+        $this->assertStringNotContainsString('dc-card__pos-grid', $output);
+        $this->assertStringNotContainsString('dc-card__divider', $output);
     }
 
     public function testRenderMobileViewHasSubmitAndResetButtons(): void

@@ -45,7 +45,7 @@ class DepthChartEntryProcessorTest extends TestCase
             'OF2' => '0',
             'DF2' => '0',
             'OI2' => '1',
-            'DI2' => '-1',
+            'DI2' => '0',
             'BH2' => '0',
             'Injury2' => '0'
         ];
@@ -54,7 +54,7 @@ class DepthChartEntryProcessorTest extends TestCase
         
         $this->assertEquals(2, count($result['playerData']));
         $this->assertEquals(2, $result['activePlayers']);
-        $this->assertEquals(2, $result['pos_1']);  // Two players at PG
+        $this->assertEquals(0, $result['pos_1']);  // Position depth counting removed
         $this->assertFalse($result['hasStarterAtMultiplePositions']);
     }
     
@@ -79,8 +79,8 @@ class DepthChartEntryProcessorTest extends TestCase
         
         $result = $this->processor->processSubmission($postData, 15);
         
-        $this->assertTrue($result['hasStarterAtMultiplePositions']);
-        $this->assertEquals('Player One', $result['nameOfProblemStarter']);
+        $this->assertFalse($result['hasStarterAtMultiplePositions']);
+        $this->assertEquals('', $result['nameOfProblemStarter']);
     }
     
     public function testExcludesInjuredPlayersFromPositionCount()
@@ -150,7 +150,7 @@ class DepthChartEntryProcessorTest extends TestCase
             'OF1' => '10',  // Out of range (should be capped at 3)
             'DF1' => '-5',  // Out of range (should be 0)
             'OI1' => '10',  // Out of range (should be capped at 2)
-            'DI1' => '-10',  // Out of range (should be capped at -2)
+            'DI1' => '-10',  // Out of range (should be clamped to 0)
             'BH1' => '5',  // Out of range (should be capped at 2)
             'Injury1' => '0'
         ];
@@ -175,9 +175,9 @@ class DepthChartEntryProcessorTest extends TestCase
         $this->assertEquals(3, $result['playerData'][0]['of']);
         $this->assertEquals(0, $result['playerData'][0]['df']);
         
-        // Setting values should be capped between -2 and 2
+        // Setting values should be capped between 0 and 2
         $this->assertEquals(2, $result['playerData'][0]['oi']);
-        $this->assertEquals(-2, $result['playerData'][0]['di']);
+        $this->assertEquals(0, $result['playerData'][0]['di']);
         $this->assertEquals(2, $result['playerData'][0]['bh']);
     }
     
@@ -254,12 +254,12 @@ class DepthChartEntryProcessorTest extends TestCase
 
         $result = $this->processor->processSubmission($postData, 15);
 
-        // Each position should have 1 player
-        $this->assertEquals(1, $result['pos_1']);
-        $this->assertEquals(1, $result['pos_2']);
-        $this->assertEquals(1, $result['pos_3']);
-        $this->assertEquals(1, $result['pos_4']);
-        $this->assertEquals(1, $result['pos_5']);
+        // Position depth counting removed — always returns 0
+        $this->assertEquals(0, $result['pos_1']);
+        $this->assertEquals(0, $result['pos_2']);
+        $this->assertEquals(0, $result['pos_3']);
+        $this->assertEquals(0, $result['pos_4']);
+        $this->assertEquals(0, $result['pos_5']);
     }
 
     // --- Merged from DepthChartEntryDataConsistencyTest ---
@@ -286,11 +286,11 @@ class DepthChartEntryProcessorTest extends TestCase
             'dc_CDepth' => 0,
             'dc_canPlayInGame' => 1,
             'dc_minutes' => 30,
-            'dc_of' => 2,      // Drive
-            'dc_df' => 1,      // Outside
-            'dc_oi' => -1,     // Negative intensity
-            'dc_di' => 2,      // Positive intensity
-            'dc_bh' => 0       // Neutral
+            'dc_of' => 2,      // Role slot C priority 2
+            'dc_df' => 1,      // Role slot PF priority 1
+            'dc_oi' => 1,      // Role slot SF priority 1
+            'dc_di' => 2,      // Role slot SG priority 2
+            'dc_bh' => 0       // Role slot PG unassigned
         ];
 
         ob_start();
@@ -305,9 +305,8 @@ class DepthChartEntryProcessorTest extends TestCase
         $this->assertStringContainsString('name="BH1"', $html);
 
         // Verify the correct values are selected
-        $this->assertStringContainsString('value="2" SELECTED', $html, 'OF should have value 2 selected');
-        $this->assertStringContainsString('value="1" SELECTED', $html, 'DF should have value 1 selected');
-        $this->assertStringContainsString('value="-1" SELECTED', $html, 'OI should have value -1 selected');
+        $this->assertStringContainsString('value="2" SELECTED', $html, 'OF (C slot) should have value 2 selected');
+        $this->assertStringContainsString('value="1" SELECTED', $html, 'DF (PF slot) should have value 1 selected');
         // Note: value="2" will match both OF and DI, so we check the pattern more carefully
         $matches = [];
         preg_match_all('/value="2" SELECTED/', $html, $matches);
@@ -326,15 +325,15 @@ class DepthChartEntryProcessorTest extends TestCase
                 'input' => ['OF1' => '3', 'DF1' => '2', 'OI1' => '2', 'DI1' => '1', 'BH1' => '1'],
                 'expected' => ['of' => 3, 'df' => 2, 'oi' => 2, 'di' => 1, 'bh' => 1]
             ],
-            // Test case 2: All negative values
+            // Test case 2: Negative values clamp to 0
             [
                 'input' => ['OF1' => '0', 'DF1' => '0', 'OI1' => '-2', 'DI1' => '-2', 'BH1' => '-2'],
-                'expected' => ['of' => 0, 'df' => 0, 'oi' => -2, 'di' => -2, 'bh' => -2]
+                'expected' => ['of' => 0, 'df' => 0, 'oi' => 0, 'di' => 0, 'bh' => 0]
             ],
-            // Test case 3: Mixed values
+            // Test case 3: Mixed values (negatives clamp to 0)
             [
                 'input' => ['OF1' => '1', 'DF1' => '3', 'OI1' => '-1', 'DI1' => '0', 'BH1' => '2'],
-                'expected' => ['of' => 1, 'df' => 3, 'oi' => -1, 'di' => 0, 'bh' => 2]
+                'expected' => ['of' => 1, 'df' => 3, 'oi' => 0, 'di' => 0, 'bh' => 2]
             ],
             // Test case 4: Zero values
             [
@@ -442,11 +441,11 @@ class DepthChartEntryProcessorTest extends TestCase
             'dc_CDepth' => 0,
             'dc_canPlayInGame' => 1,
             'dc_minutes' => 35,
-            'dc_of' => 1,   // Outside
-            'dc_df' => 3,   // Post
-            'dc_oi' => -2,  // Minimum
-            'dc_di' => 1,   // Positive
-            'dc_bh' => 0    // Neutral
+            'dc_of' => 1,   // C slot priority 1
+            'dc_df' => 3,   // PF slot priority 3
+            'dc_oi' => 2,   // SF slot priority 2
+            'dc_di' => 1,   // SG slot priority 1
+            'dc_bh' => 0    // PG slot unassigned
         ];
 
         // Step 2: Form displays these values (capture HTML)
@@ -466,7 +465,7 @@ class DepthChartEntryProcessorTest extends TestCase
             'min1' => '35',
             'OF1' => '1',
             'DF1' => '3',
-            'OI1' => '-2',
+            'OI1' => '2',
             'DI1' => '1',
             'BH1' => '0',
             'Injury1' => '0'
@@ -491,12 +490,12 @@ class DepthChartEntryProcessorTest extends TestCase
         // Processed data should match POST data
         $this->assertEquals(1, $processedPlayer['of'], 'Processed OF should be 1');
         $this->assertEquals(3, $processedPlayer['df'], 'Processed DF should be 3');
-        $this->assertEquals(-2, $processedPlayer['oi'], 'Processed OI should be -2');
+        $this->assertEquals(2, $processedPlayer['oi'], 'Processed OI should be 2');
         $this->assertEquals(1, $processedPlayer['di'], 'Processed DI should be 1');
         $this->assertEquals(0, $processedPlayer['bh'], 'Processed BH should be 0');
 
         // CSV should match processed data
-        $this->assertStringContainsString('Round Trip Player,0,1,0,0,0,1,35,1,3,-2,1,0', $csv, 'CSV should match processed data exactly');
+        $this->assertStringContainsString('Round Trip Player,0,1,0,0,0,1,35,1,3,2,1,0', $csv, 'CSV should match processed data exactly');
 
         // The key test: if we load the form again with the processed data as if it came from database,
         // it should show the same selected values
@@ -527,7 +526,7 @@ class DepthChartEntryProcessorTest extends TestCase
         // The reloaded form should show the same selected values
         $this->assertStringContainsString('value="1" SELECTED', $reloadedFormHtml, 'OF=1 should be selected on reload');
         $this->assertStringContainsString('value="3" SELECTED', $reloadedFormHtml, 'DF=3 should be selected on reload');
-        $this->assertStringContainsString('value="-2" SELECTED', $reloadedFormHtml, 'OI=-2 should be selected on reload');
+        $this->assertStringContainsString('value="2" SELECTED', $reloadedFormHtml, 'OI=2 should be selected on reload');
         // Note: Both OF and DI have value 1, so we just check that value="1" SELECTED exists
         $this->assertStringContainsString('value="0" SELECTED', $reloadedFormHtml, 'BH=0 should be selected on reload');
     }
@@ -566,9 +565,10 @@ class DepthChartEntryProcessorTest extends TestCase
         $html = ob_get_clean();
 
         // Count how many times "value=\"0\" SELECTED" appears
-        // Should be 9 times: 4 position fields (PG,SG,SF,PF with depth 0) + 5 settings fields (OF,DF,OI,DI,BH)
+        // Should be 5 times: the 5 role slot selects (BH,DI,OI,DF,OF) all at 0
+        // Position fields are now hidden inputs, not selects
         $count = substr_count($html, 'value="0" SELECTED');
-        $this->assertEquals(9, $count, 'Position fields and settings fields with value 0 should be selected');
+        $this->assertEquals(5, $count, 'Role slot fields with value 0 should be selected');
 
         // More specifically, verify that the settings fields have value 0
         // Check for the specific pattern of settings dropdowns with value 0 selected
@@ -622,8 +622,8 @@ class DepthChartEntryProcessorTest extends TestCase
         $this->assertStringContainsString('Test Player', $confirmationHtml);
 
         // Verify each value appears in the HTML in the correct context
-        $this->assertMatchesRegularExpression('/<td>1<\/td>/', $confirmationHtml, 'PG value 1 should appear');
-        $this->assertMatchesRegularExpression('/<td>30<\/td>/', $confirmationHtml, 'Min value 30 should appear');
+        // Confirmation page now shows: Name, Active, PG(BH), SG(DI), SF(OI), PF(DF), C(OF)
+        $this->assertMatchesRegularExpression('/<td>1<\/td>/', $confirmationHtml, 'Active or DF value 1 should appear');
         $this->assertMatchesRegularExpression('/<td>2<\/td>/', $confirmationHtml, 'OF or DI value 2 should appear');
         $this->assertMatchesRegularExpression('/<td>-1<\/td>/', $confirmationHtml, 'OI value -1 should appear');
     }
@@ -647,9 +647,9 @@ class DepthChartEntryProcessorTest extends TestCase
             'min1' => '35',
             'OF1' => '3',
             'DF1' => '2',
-            'OI1' => '-2',
+            'OI1' => '2',
             'DI1' => '1',
-            'BH1' => '-1',
+            'BH1' => '0',
             'Injury1' => '0'
         ];
 
@@ -685,12 +685,10 @@ class DepthChartEntryProcessorTest extends TestCase
         );
         $this->assertStringContainsString($expectedCsvLine, $csvContent, 'CSV should contain exact values from processed data');
 
-        // Verify confirmation page contains all these values
+        // Verify confirmation page contains key values in table cells
+        // Confirmation page shows: Name, Active, BH, DI, OI, DF, OF
         $valuesToCheck = [
-            $player['pg'],
-            $player['sg'],
             $player['canPlayInGame'],
-            $player['min'],
             $player['of'],
             $player['df'],
             $player['oi'],
@@ -712,15 +710,15 @@ class DepthChartEntryProcessorTest extends TestCase
         $this->assertArrayHasKey('di', $player);
         $this->assertArrayHasKey('bh', $player);
 
-        // Verify the values match what was submitted
+        // Verify the values match what was submitted (negatives clamped to 0)
         $this->assertEquals(2, $player['pg']);
         $this->assertEquals(1, $player['sg']);
         $this->assertEquals(35, $player['min']);
         $this->assertEquals(3, $player['of']);
         $this->assertEquals(2, $player['df']);
-        $this->assertEquals(-2, $player['oi']);
+        $this->assertEquals(2, $player['oi']);
         $this->assertEquals(1, $player['di']);
-        $this->assertEquals(-1, $player['bh']);
+        $this->assertEquals(0, $player['bh']);
     }
 
     /**

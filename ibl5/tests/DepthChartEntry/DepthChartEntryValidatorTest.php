@@ -94,46 +94,6 @@ class DepthChartEntryValidatorTest extends TestCase
         $this->assertEquals('active_players_max', $this->validator->getErrors()[0]['type']);
     }
     
-    public function testFailsValidationWithInsufficientPositionDepth()
-    {
-        $depthChartData = [
-            'activePlayers' => 12,
-            'pos_1' => 2,  // Insufficient for Regular Season
-            'pos_2' => 3,
-            'pos_3' => 3,
-            'pos_4' => 3,
-            'pos_5' => 3,
-            'hasStarterAtMultiplePositions' => false,
-            'nameOfProblemStarter' => ''
-        ];
-        
-        $result = $this->validator->validate($depthChartData, 'Regular Season');
-        
-        $this->assertFalse($result);
-        $this->assertNotEmpty($this->validator->getErrors());
-        $this->assertEquals('position_depth', $this->validator->getErrors()[0]['type']);
-    }
-    
-    public function testFailsValidationWithMultipleStartingPositions()
-    {
-        $depthChartData = [
-            'activePlayers' => 12,
-            'pos_1' => 3,
-            'pos_2' => 3,
-            'pos_3' => 3,
-            'pos_4' => 3,
-            'pos_5' => 3,
-            'hasStarterAtMultiplePositions' => true,
-            'nameOfProblemStarter' => 'John Doe'
-        ];
-        
-        $result = $this->validator->validate($depthChartData, 'Regular Season');
-        
-        $this->assertFalse($result);
-        $this->assertNotEmpty($this->validator->getErrors());
-        $this->assertEquals('multiple_starting_positions', $this->validator->getErrors()[0]['type']);
-    }
-    
     public function testReturnsFormattedErrorMessages()
     {
         $depthChartData = [
@@ -154,30 +114,25 @@ class DepthChartEntryValidatorTest extends TestCase
         $this->assertStringContainsString('at least 12 active players', $errorHtml);
     }
     
-    public function testValidatesMultipleErrorsAtOnce()
+    public function testValidatesActivePlayerCountOnly()
     {
         $depthChartData = [
-            'activePlayers' => 8,  // Too few
-            'pos_1' => 1,  // Insufficient for Regular Season
-            'pos_2' => 1,  // Insufficient for Regular Season
+            'activePlayers' => 8,  // Too few for Regular Season (min 12)
+            'pos_1' => 1,
+            'pos_2' => 1,
             'pos_3' => 3,
             'pos_4' => 3,
             'pos_5' => 3,
             'hasStarterAtMultiplePositions' => true,
             'nameOfProblemStarter' => 'John Doe'
         ];
-        
+
         $result = $this->validator->validate($depthChartData, 'Regular Season');
-        
+
         $this->assertFalse($result);
         $errors = $this->validator->getErrors();
-        $this->assertGreaterThanOrEqual(3, count($errors)); // At least 3 errors
-        
-        // Check for specific error types
-        $errorTypes = array_column($errors, 'type');
-        $this->assertContains('active_players_min', $errorTypes);
-        $this->assertContains('position_depth', $errorTypes);
-        $this->assertContains('multiple_starting_positions', $errorTypes);
+        $this->assertCount(1, $errors);
+        $this->assertEquals('active_players_min', $errors[0]['type']);
     }
     
     public function testEdgeCaseExactlyAtMinimumRequirements()
@@ -237,25 +192,22 @@ class DepthChartEntryValidatorTest extends TestCase
         $this->assertEmpty($this->validator->getErrors());
     }
     
-    public function testValidatesEachPositionIndependently()
+    public function testPassesValidationRegardlessOfPositionDepth()
     {
         $depthChartData = [
             'activePlayers' => 12,
             'pos_1' => 3,
             'pos_2' => 3,
-            'pos_3' => 1,  // Only pos_3 is insufficient
+            'pos_3' => 1,  // Low position depth is no longer validated
             'pos_4' => 3,
             'pos_5' => 3,
             'hasStarterAtMultiplePositions' => false,
             'nameOfProblemStarter' => ''
         ];
-        
+
         $result = $this->validator->validate($depthChartData, 'Regular Season');
-        
-        $this->assertFalse($result);
-        $errors = $this->validator->getErrors();
-        $this->assertEquals(1, count($errors));
-        $this->assertEquals('position_depth', $errors[0]['type']);
-        $this->assertStringContainsString('SF', $errors[0]['message']);
+
+        $this->assertTrue($result);
+        $this->assertEmpty($this->validator->getErrors());
     }
 }

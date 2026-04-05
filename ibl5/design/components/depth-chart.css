@@ -62,4 +62,124 @@
 }
 
 
+
+/* ==========================================================================
+   Help Section (collapsible)
+   ========================================================================== */
+
+.dc-help-section {
+    max-width: 600px;
+    margin: 0 auto var(--space-4);
+    border: 1px solid var(--gray-200);
+    border-radius: var(--radius-md);
+    background: var(--gray-50);
+}
+
+.dc-help-section summary {
+    padding: var(--space-2) var(--space-3);
+    font-weight: 600;
+    cursor: pointer;
+    color: var(--navy-800);
+}
+
+.dc-help-section__content {
+    padding: 0 var(--space-3) var(--space-3);
+    font-size: 0.875rem;
+    line-height: 1.5;
+    color: var(--gray-700);
+}
+
+.dc-help-section__content p {
+    margin: 0 0 var(--space-2);
+}
+
+.dc-help-table {
+    font-size: 0.8125rem;
+    margin-bottom: var(--space-2);
+}
+
+/* ==========================================================================
+   Lineup Preview Grid
+   ========================================================================== */
+
+.dc-lineup-preview {
+    max-width: 600px;
+    margin: 0 auto var(--space-4);
+}
+
+.dc-lineup-preview__title {
+    font-weight: 600;
+    font-size: 0.875rem;
+    text-align: center;
+    margin-bottom: var(--space-2);
+    color: var(--navy-800);
+}
+
+.dc-lineup-preview table {
+    width: 100%;
+    table-layout: fixed;
+}
+
+.dc-lineup-preview td {
+    text-align: center;
+    padding: var(--space-1) var(--space-2);
+    font-size: 0.8125rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.dc-lineup-preview thead th {
+    text-align: center;
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+}
+
+.dc-lineup-preview td.dc-lineup-preview__row-label,
+.dc-lineup-preview th.dc-lineup-preview__row-label {
+    font-size: 0.6875rem;
+    font-weight: 600;
+    color: var(--gray-400);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    text-align: left;
+    width: 4.5em;
+    overflow: visible;
+    white-space: nowrap;
+    text-overflow: clip;
+}
+
+.dc-lineup-preview__starter {
+    font-weight: 600;
+}
+
+.dc-lineup-preview__empty {
+    color: var(--gray-300);
+}
+
+
+
+/* ==========================================================================
+   Debug Score Annotations (localhost only, populated by JS)
+   ========================================================================== */
+
+.dc-quality-debug {
+    display: block;
+    font-size: 0.625rem;
+    color: var(--gray-400);
+    line-height: 1;
+}
+
+.dc-score-debug {
+    display: block;
+    font-size: 0.5625rem;
+    color: var(--color-accent-500);
+    font-weight: 600;
+    line-height: 1;
+    min-height: 0.75em;
+    text-align: center;
+}
+
+
 } /* end @layer components */

@@ -199,10 +199,18 @@ class DepthChartEntryController implements DepthChartEntryControllerInterface
     /**
      * Compute the dVar58 in-game quality score for lineup selection.
      *
-     * Uses the structural form from the decompiled binary with calibrated constants.
-     * The exact DAT_ constants are unresolved, so we use estimates informed by
-     * the +0x340 formula (which has known constants). The relative ordering of
-     * players matters more than absolute values.
+     * Exact formula from decompiled JSB 5.60 (FUN_004cfa50, lines 90899-90908).
+     * All constants resolved from binary .rdata section:
+     *
+     * dVar58 = (TERM_A + TERM_B + TERM_C) / GP
+     *
+     * TERM_A (defense):  (OD + DD + PD + TD − 20) × 0.25 × GS × (1/48)
+     * TERM_B (production): (AST×0.8 + ORB×(2/3) + (DRB−ORB)×(1/3) + STL − TVR + BLK) × 0.75
+     * TERM_C (scoring):  ((FTM−2GM)×(1/6) + (MIN + FTA − (2GA−MIN)×(2/3) + 2GM − FTM×0.5)) × 1.5
+     *
+     * Note: 3-point stats are entirely absent from dVar58 (offset +0x160 loaded but unused).
+     * Note: dc_minutes multiplier (×(dc_minutes+100)) is applied client-side since minutes
+     * is a dynamic form input.
      *
      * @param array<string, mixed> $player Player row from ibl_plr
      */
@@ -253,21 +261,19 @@ class DepthChartEntryController implements DepthChartEntryControllerInterface
         /** @var int $td */
         $td = $player['td'] ?? 5;
 
-        // 2pt FGM = total FGM - 3PM
+        // 2pt FGM/FGA (JSB uses 2pt stats directly, 3pt stats absent from dVar58)
         $twoPtMade = $fgm - $tpm;
-        // 2pt FGA = total FGA - 3PA
         $twoPtAtt = $fga - $tpa;
 
-        // TERM_A (defense): weighted by games started
-        $defenseSum = $od + $dd + $pd + $td;
-        $termA = ($defenseSum - 20) * 0.25 * $gs * 0.05;
+        // TERM_A (defense): (OD+DD+PD+TD-20) × 0.25 × GS × (1/48)
+        $termA = ($od + $dd + $pd + $td - 20) * 0.25 * $gs / 48.0;
 
-        // TERM_B (production): separate ORB/DRB weights
-        $termB = ($ast * 0.8 + ($orb * 0.5 + ($drb - $orb) * 0.3 + $stl) - $tvr + $blk) * 0.75;
+        // TERM_B (production): (AST×0.8 + ORB×(2/3) + (DRB-ORB)×(1/3) + STL - TVR + BLK) × 0.75
+        $termB = ($ast * 0.8 + $orb * (2.0 / 3.0) + ($drb - $orb) * (1.0 / 3.0) + $stl - $tvr + $blk) * 0.75;
 
-        // TERM_C (scoring): MIN appears in scoring term per dVar58 structure
-        $termC = (($ftm - $twoPtMade) * 0.15
-            + (($min + $fta - ($twoPtAtt - $min) * 0.5) + $twoPtMade - $ftm * 0.3)) * 1.5;
+        // TERM_C (scoring): ((FTM-2GM)×(1/6) + (MIN + FTA - (2GA-MIN)×(2/3) + 2GM - FTM×0.5)) × 1.5
+        $termC = (($ftm - $twoPtMade) / 6.0
+            + ($min + $fta - ($twoPtAtt - $min) * (2.0 / 3.0) + $twoPtMade - $ftm * 0.5)) * 1.5;
 
         return round(($termA + $termB + $termC) / $gp, 2);
     }

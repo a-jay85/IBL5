@@ -246,6 +246,55 @@
     }
 
     /**
+     * Update the debug score annotations in the form.
+     * Shows base quality in the Pos cell and effective score (quality + bonus)
+     * next to each role slot select where dc > 0.
+     * Only renders on localhost.
+     */
+    function updateScoreDebug(players) {
+        if (!isLocalhost()) return;
+
+        var form = document.forms['DepthChartEntry'];
+        if (!form) return;
+
+        var rows = form.querySelectorAll('.depth-chart-table tbody tr[data-pid]');
+
+        for (var i = 0; i < rows.length; i++) {
+            var row = rows[i];
+            var quality = parseFloat(row.getAttribute('data-quality') || '0');
+            var idx = i + 1;
+
+            // Update quality in Pos cell
+            var qualitySpan = row.querySelector('.dc-quality-debug');
+            if (qualitySpan) {
+                qualitySpan.textContent = ' (' + quality.toFixed(1) + ')';
+            }
+
+            // Update effective score next to each role slot select
+            for (var s = 0; s < SLOTS.length; s++) {
+                var sel = form.querySelector('select[name="' + SLOTS[s].field + idx + '"]');
+                if (!sel) continue;
+                var scoreSpan = sel.parentNode.querySelector('.dc-score-debug');
+                if (!scoreSpan) continue;
+
+                var dc = parseInt(sel.value, 10);
+                if (dc > 0) {
+                    var bonus = (10 - dc) * 240;
+                    var effective = quality + bonus;
+                    scoreSpan.textContent = Math.round(effective);
+                } else {
+                    scoreSpan.textContent = '';
+                }
+            }
+        }
+    }
+
+    function isLocalhost() {
+        var h = window.location.hostname;
+        return h === 'localhost' || h === '127.0.0.1' || h.indexOf('.localhost') !== -1;
+    }
+
+    /**
      * Recalculate and re-render the lineup preview.
      */
     function recalculate() {
@@ -253,6 +302,7 @@
         if (players.length === 0) return;
         var lineup = selectLineup(players);
         renderPreview(lineup);
+        updateScoreDebug(players);
     }
 
     // Expose globally for reset button and saved DC loading

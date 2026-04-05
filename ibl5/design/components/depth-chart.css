@@ -159,4 +159,27 @@
 }
 
 
+
+/* ==========================================================================
+   Debug Score Annotations (localhost only, populated by JS)
+   ========================================================================== */
+
+.dc-quality-debug {
+    display: block;
+    font-size: 0.625rem;
+    color: var(--gray-400);
+    line-height: 1;
+}
+
+.dc-score-debug {
+    display: block;
+    font-size: 0.5625rem;
+    color: var(--color-accent-500);
+    font-weight: 600;
+    line-height: 1;
+    min-height: 0.75em;
+    text-align: center;
+}
+
+
 } /* end @layer components */

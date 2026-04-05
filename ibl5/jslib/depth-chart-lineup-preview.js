@@ -102,6 +102,12 @@
      * First candidate selected, removed from pool.
      *
      * Bench: remaining candidates in same sorted order (up to BACKUP_ROWS per slot).
+     *
+     * Slot fallback (lines 91356-91547, 91897-91899):
+     * If both bonus and fallback paths produce no candidates, the engine fills
+     * the slot with the first available player from the roster (internal ordering).
+     * This "roster-order default" gives the GM no control — the player gets the
+     * slot's shot weights which will likely mismatch their ODPT profile.
      */
     function selectLineup(players) {
         var activePlayers = players.filter(function (p) { return p.active; });
@@ -137,14 +143,26 @@
                 }
             }
 
-            // Sort: quality/score DESC first, then dc ASC (dc=1 before dc=2)
-            // dc sort is final so lower dc wins within comparable quality
+            // Sort: dc ASC (dc=1 before dc=2), then score DESC within same dc
             candidates.sort(function (a, b) {
-                if (a.dc !== b.dc) return a.dc - b.dc;  // dc ASC (lower dc = higher priority)
-                return b.score - a.score;                // score DESC within same dc
+                if (a.dc !== b.dc) return a.dc - b.dc;
+                return b.score - a.score;
             });
 
-            var starter = candidates.length > 0 ? candidates[0].player : null;
+            var starter = null;
+            if (candidates.length > 0) {
+                starter = candidates[0].player;
+            } else {
+                // Tier 3: roster-order default — first available player
+                // (JSB fills empty slots from +0x4c80 which defaults to roster index 0)
+                for (var f = 0; f < activePlayers.length; f++) {
+                    if (!taken[activePlayers[f].pid]) {
+                        starter = activePlayers[f];
+                        break;
+                    }
+                }
+            }
+
             if (starter) {
                 taken[starter.pid] = true;
             }

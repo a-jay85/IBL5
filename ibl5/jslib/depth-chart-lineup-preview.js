@@ -30,7 +30,7 @@
         { label: 'C',  field: 'OF', fallbackPos: 'C'  }
     ];
 
-    var BACKUP_ROWS = 2;
+    var BACKUP_ROWS = 1; // JSB fills 1 backup per slot (position-match only)
 
     /**
      * Collect all player data from the desktop table rows.
@@ -91,31 +91,29 @@
     }
 
     /**
-     * Run the 5-pass lineup selection algorithm.
+     * Run the lineup selection algorithm per the Implementation Spec
+     * in DEPTH_CHART_STRATEGY_GUIDE.md.
      *
-     * Per the decompiled code (00_MASTER_REFERENCE.md, lines 688-716):
-     * Each pass builds a SINGLE candidate list from two paths:
-     *   BONUS: dc > 0, any position, score = quality + (10-dc)*240
-     *   FALLBACK: dc ≤ 0, position must match slot, score = raw quality
-     * Candidates sorted: first by quality DESC, then by dc ASC.
-     * dc sort is final, so dc=1 beats dc=2 regardless of quality.
-     * First candidate selected, removed from pool.
+     * Step 3: Starter Selection (5-Pass Algorithm)
+     *   Per pass, candidates collected from two paths into ONE list:
+     *     BONUS (dc > 0): any position, score = effectiveQuality + (10-dc)*240
+     *     FALLBACK (dc ≤ 0, position matches): score = effectiveQuality (no bonus)
+     *   Sort: bonus (dc>0) before fallback (dc=0), then score DESC, dc ASC tiebreaker.
+     *   If no candidates: roster-order default (first untaken player).
      *
-     * Bench: remaining candidates in same sorted order (up to BACKUP_ROWS per slot).
-     *
-     * Slot fallback (lines 91356-91547, 91897-91899):
-     * If both bonus and fallback paths produce no candidates, the engine fills
-     * the slot with the first available player from the roster (internal ordering).
-     * This "roster-order default" gives the GM no control — the player gets the
-     * slot's shot weights which will likely mismatch their ODPT profile.
+     * Step 4: Backup Selection — FUNDAMENTALLY DIFFERENT from starters:
+     *   - POSITION MATCHING ONLY — no dc > 0 override for backups
+     *   - Highest-quality position-matching non-starter wins
+     *   - If no match: self-backup (starter backs up own slot)
+     *   - 1 backup per slot, greedy pool removal
      */
     function selectLineup(players) {
         var activePlayers = players.filter(function (p) { return p.active; });
-        var taken = {};  // pid → true for players already selected as starters
+        var taken = {};  // pid → true for players selected as starters
 
         var starters = [];
 
-        // 5 passes for starters
+        // === Step 3: Starter Selection (5 passes) ===
         for (var pass = 0; pass < SLOTS.length; pass++) {
             var slot = SLOTS[pass];
             var fieldKey = slot.field;
@@ -143,25 +141,21 @@
                 }
             }
 
-            // Sort: bonus players (dc > 0) before fallback (dc = 0).
-            // Within bonus: score DESC primary, dc ASC tiebreaker.
-            // The bonus formula (quality + (10-dc)*240) already gives dc=1 a
-            // 240-point advantage over dc=2. The dc ASC tiebreaker only matters
-            // when scores are equal — it does NOT override a higher score.
+            // Sort: bonus (dc>0) before fallback (dc=0),
+            //        score DESC, dc ASC tiebreaker
             candidates.sort(function (a, b) {
                 var aBonus = a.dc > 0 ? 1 : 0;
                 var bBonus = b.dc > 0 ? 1 : 0;
-                if (aBonus !== bBonus) return bBonus - aBonus; // bonus first
-                if (b.score !== a.score) return b.score - a.score; // score DESC
-                return a.dc - b.dc;                            // dc ASC tiebreaker
+                if (aBonus !== bBonus) return bBonus - aBonus;
+                if (b.score !== a.score) return b.score - a.score;
+                return a.dc - b.dc;
             });
 
             var starter = null;
             if (candidates.length > 0) {
                 starter = candidates[0].player;
             } else {
-                // Tier 3: roster-order default — first available player
-                // (JSB fills empty slots from +0x4c80 which defaults to roster index 0)
+                // Roster-order default: first untaken player
                 for (var f = 0; f < activePlayers.length; f++) {
                     if (!taken[activePlayers[f].pid]) {
                         starter = activePlayers[f];
@@ -176,48 +170,36 @@
             starters.push(starter);
         }
 
-        // Bench roster: per slot, remaining candidates in same sorted order
+        // === Step 4: Backup Selection ===
+        // POSITION MATCHING ONLY — no dc > 0 override.
+        // Highest-quality position-matching non-starter wins.
+        // Self-backup if no match (starter backs up own slot).
         var benchTaken = {};
         var bench = [];
 
         for (var b = 0; b < SLOTS.length; b++) {
             var bSlot = SLOTS[b];
-            var bFieldKey = bSlot.field;
-            var bCandidates = [];
+            var bestBackup = null;
+            var bestQuality = -Infinity;
 
             for (var k = 0; k < activePlayers.length; k++) {
                 var bp = activePlayers[k];
                 if (taken[bp.pid] || benchTaken[bp.pid]) continue;
+                if (!matchesPosition(bp.pos, bSlot.fallbackPos)) continue;
 
-                var bdc = bp.dc[bFieldKey];
-                if (bdc > 0) {
-                    bCandidates.push({
-                        player: bp,
-                        score: bp.quality + (10 - bdc) * 240,
-                        dc: bdc
-                    });
-                } else if (matchesPosition(bp.pos, bSlot.fallbackPos)) {
-                    bCandidates.push({
-                        player: bp,
-                        score: bp.quality,
-                        dc: 0
-                    });
+                if (bp.quality > bestQuality) {
+                    bestQuality = bp.quality;
+                    bestBackup = bp;
                 }
             }
 
-            // Same sort: bonus first, score DESC, dc ASC tiebreaker
-            bCandidates.sort(function (a, b2) {
-                var aBonus = a.dc > 0 ? 1 : 0;
-                var bBonus = b2.dc > 0 ? 1 : 0;
-                if (aBonus !== bBonus) return bBonus - aBonus;
-                if (b2.score !== a.score) return b2.score - a.score;
-                return a.dc - b2.dc;
-            });
-
             var slotBench = [];
-            for (var m = 0; m < Math.min(bCandidates.length, BACKUP_ROWS); m++) {
-                slotBench.push(bCandidates[m].player);
-                benchTaken[bCandidates[m].player.pid] = true;
+            if (bestBackup) {
+                slotBench.push(bestBackup);
+                benchTaken[bestBackup.pid] = true;
+            } else if (starters[b]) {
+                // Self-backup: starter backs up own slot
+                slotBench.push(starters[b]);
             }
             bench.push(slotBench);
         }

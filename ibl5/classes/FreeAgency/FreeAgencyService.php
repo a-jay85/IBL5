@@ -70,7 +70,9 @@ class FreeAgencyService implements FreeAgencyServiceInterface
 
         $existingOffer = $this->getExistingOffer($team->teamID, $player->playerID ?? 0);
 
-        $amendedCapSpace = $capMetrics['softCapSpace'][0] + $existingOffer['offer1'];
+        // calculateTeamCapMetrics() already excludes this player's existing offer,
+        // so softCapSpace[0] is the true available cap space for a new/replacement offer.
+        $amendedCapSpace = $capMetrics['softCapSpace'][0];
         $hasExistingOffer = $existingOffer['offer1'] > 0;
 
         $veteranMinimum = \ContractRules::getVeteranMinimumSalary($player->yearsOfExperience ?? 0);

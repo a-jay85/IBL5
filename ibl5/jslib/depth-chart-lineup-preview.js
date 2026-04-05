@@ -6,14 +6,14 @@
  *
  * Updates live whenever a role slot select or active toggle changes.
  *
- * Algorithm (from decompiled JSB 5.60):
- *   Pass 1 (PG): dc_bh > 0 players, score = quality + (10 - dc) * 240
- *   Pass 2 (SG): dc_di > 0 players
- *   Pass 3 (SF): dc_oi > 0 players
- *   Pass 4 (PF): dc_df > 0 players
- *   Pass 5 (C):  dc_of > 0 players
- *   Fallback: if no dc > 0, select by position match on raw quality
- *   Bench: remaining dc > 0 players sorted by dc DESC, then quality DESC
+ * Algorithm (from decompiled JSB 5.60, 00_MASTER_REFERENCE.md):
+ *   5 sequential passes (dc_bh→dc_di→dc_oi→dc_df→dc_of), each selects ONE player.
+ *   Per pass, candidates collected via TWO paths into ONE list:
+ *     BONUS PATH (dc > 0): any position, score = quality + (10 - dc) * 240
+ *     FALLBACK PATH (dc ≤ 0): position must match slot, score = raw quality
+ *   Candidates sorted: quality DESC, then dc ASC (dc=1 before dc=2).
+ *   First candidate selected, removed from pool for subsequent passes.
+ *   Bench: remaining candidates in same sorted order.
  */
 (function () {
     'use strict';
@@ -93,13 +93,19 @@
     /**
      * Run the 5-pass lineup selection algorithm.
      *
-     * Returns an object with:
-     *   starters: array of 5 player objects (or null for unfilled slots)
-     *   bench: array of 5 arrays, each containing up to BACKUP_ROWS player objects
+     * Per the decompiled code (00_MASTER_REFERENCE.md, lines 688-716):
+     * Each pass builds a SINGLE candidate list from two paths:
+     *   BONUS: dc > 0, any position, score = quality + (10-dc)*240
+     *   FALLBACK: dc ≤ 0, position must match slot, score = raw quality
+     * Candidates sorted: first by quality DESC, then by dc ASC.
+     * dc sort is final, so dc=1 beats dc=2 regardless of quality.
+     * First candidate selected, removed from pool.
+     *
+     * Bench: remaining candidates in same sorted order (up to BACKUP_ROWS per slot).
      */
     function selectLineup(players) {
         var activePlayers = players.filter(function (p) { return p.active; });
-        var taken = {};  // pid → true for players already assigned
+        var taken = {};  // pid → true for players already selected as starters
 
         var starters = [];
 
@@ -107,71 +113,83 @@
         for (var pass = 0; pass < SLOTS.length; pass++) {
             var slot = SLOTS[pass];
             var fieldKey = slot.field;
-            var bestPlayer = null;
-            var bestScore = -Infinity;
+            var candidates = [];
 
-            // Bonus path: dc > 0 players
             for (var i = 0; i < activePlayers.length; i++) {
                 var p = activePlayers[i];
                 if (taken[p.pid]) continue;
+
                 var dc = p.dc[fieldKey];
                 if (dc > 0) {
-                    var score = p.quality + (10 - dc) * 240;
-                    if (score > bestScore) {
-                        bestScore = score;
-                        bestPlayer = p;
-                    }
+                    // Bonus path: any position, adjusted score
+                    candidates.push({
+                        player: p,
+                        score: p.quality + (10 - dc) * 240,
+                        dc: dc
+                    });
+                } else if (matchesPosition(p.pos, slot.fallbackPos)) {
+                    // Fallback path: position must match, raw quality
+                    candidates.push({
+                        player: p,
+                        score: p.quality,
+                        dc: 0
+                    });
                 }
             }
 
-            // Fallback path: position match, raw quality
-            if (!bestPlayer) {
-                for (var j = 0; j < activePlayers.length; j++) {
-                    var fp = activePlayers[j];
-                    if (taken[fp.pid]) continue;
-                    if (matchesPosition(fp.pos, slot.fallbackPos)) {
-                        if (fp.quality > bestScore) {
-                            bestScore = fp.quality;
-                            bestPlayer = fp;
-                        }
-                    }
-                }
-            }
+            // Sort: quality/score DESC first, then dc ASC (dc=1 before dc=2)
+            // dc sort is final so lower dc wins within comparable quality
+            candidates.sort(function (a, b) {
+                if (a.dc !== b.dc) return a.dc - b.dc;  // dc ASC (lower dc = higher priority)
+                return b.score - a.score;                // score DESC within same dc
+            });
 
-            if (bestPlayer) {
-                taken[bestPlayer.pid] = true;
+            var starter = candidates.length > 0 ? candidates[0].player : null;
+            if (starter) {
+                taken[starter.pid] = true;
             }
-            starters.push(bestPlayer);
+            starters.push(starter);
         }
 
-        // Bench roster: for each slot, find remaining dc > 0 players
-        var benchTaken = {};  // pid → true for players already assigned as backup
+        // Bench roster: per slot, remaining candidates in same sorted order
+        var benchTaken = {};
         var bench = [];
 
         for (var b = 0; b < SLOTS.length; b++) {
             var bSlot = SLOTS[b];
             var bFieldKey = bSlot.field;
-            var candidates = [];
+            var bCandidates = [];
 
             for (var k = 0; k < activePlayers.length; k++) {
                 var bp = activePlayers[k];
                 if (taken[bp.pid] || benchTaken[bp.pid]) continue;
+
                 var bdc = bp.dc[bFieldKey];
                 if (bdc > 0) {
-                    candidates.push({ player: bp, dc: bdc });
+                    bCandidates.push({
+                        player: bp,
+                        score: bp.quality + (10 - bdc) * 240,
+                        dc: bdc
+                    });
+                } else if (matchesPosition(bp.pos, bSlot.fallbackPos)) {
+                    bCandidates.push({
+                        player: bp,
+                        score: bp.quality,
+                        dc: 0
+                    });
                 }
             }
 
-            // Sort by dc DESC, then quality DESC
-            candidates.sort(function (a, b2) {
-                if (b2.dc !== a.dc) return b2.dc - a.dc;
-                return b2.player.quality - a.player.quality;
+            // Same sort: dc ASC, then score DESC
+            bCandidates.sort(function (a, b2) {
+                if (a.dc !== b2.dc) return a.dc - b2.dc;
+                return b2.score - a.score;
             });
 
             var slotBench = [];
-            for (var m = 0; m < Math.min(candidates.length, BACKUP_ROWS); m++) {
-                slotBench.push(candidates[m].player);
-                benchTaken[candidates[m].player.pid] = true;
+            for (var m = 0; m < Math.min(bCandidates.length, BACKUP_ROWS); m++) {
+                slotBench.push(bCandidates[m].player);
+                benchTaken[bCandidates[m].player.pid] = true;
             }
             bench.push(slotBench);
         }

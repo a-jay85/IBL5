@@ -50,7 +50,7 @@ class DepthChartEntryView implements DepthChartEntryViewInterface
     {
         for ($i = 0; $i <= $maxValue; $i++) {
             $selected = ($selectedValue === $i) ? ' SELECTED' : '';
-            $label = ($i === 0) ? '&mdash;' : (string) $i;
+            $label = ($i === 0) ? '&mdash;' : '#' . $i;
             echo "<option value=\"{$i}\"{$selected}>{$label}</option>";
         }
     }

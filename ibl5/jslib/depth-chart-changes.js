@@ -36,12 +36,17 @@
             return 0;
         }
 
-        // Role slot fields (BH, DI, OI, OF, DF): absolute numeric difference
+        // Role slot fields (BH, DI, OI, OF, DF): intensity inversely proportional
+        // to value — #1 (highest bonus) gets strongest glow, #3 gets weakest
         if (fieldPrefix === 'BH' || fieldPrefix === 'DI' || fieldPrefix === 'OI' ||
             fieldPrefix === 'OF' || fieldPrefix === 'DF') {
-            var diff = Math.abs(parseInt(current, 10) - parseInt(original, 10));
-            // Scale: max diff is 3 (for OF/DF), map to glow 1-3
-            return Math.min(Math.max(diff, 1), 5);
+            var val = parseInt(current, 10);
+            if (val === 0) {
+                // Changed from assigned to unassigned
+                return 1;
+            }
+            // val=1 → glow 3 (strongest), val=2 → glow 2, val=3 → glow 1 (weakest)
+            return Math.max(4 - val, 1);
         }
 
         // Categorical fields (canPlayInGame): always level 1

@@ -144,14 +144,16 @@
             }
 
             // Sort: bonus players (dc > 0) before fallback (dc = 0).
-            // Within bonus: dc ASC (dc=1 before dc=2 before dc=3).
-            // Within same dc: score DESC.
+            // Within bonus: score DESC primary, dc ASC tiebreaker.
+            // The bonus formula (quality + (10-dc)*240) already gives dc=1 a
+            // 240-point advantage over dc=2. The dc ASC tiebreaker only matters
+            // when scores are equal — it does NOT override a higher score.
             candidates.sort(function (a, b) {
                 var aBonus = a.dc > 0 ? 1 : 0;
                 var bBonus = b.dc > 0 ? 1 : 0;
                 if (aBonus !== bBonus) return bBonus - aBonus; // bonus first
-                if (a.dc !== b.dc) return a.dc - b.dc;        // dc ASC within bonus
-                return b.score - a.score;                      // score DESC within same dc
+                if (b.score !== a.score) return b.score - a.score; // score DESC
+                return a.dc - b.dc;                            // dc ASC tiebreaker
             });
 
             var starter = null;
@@ -203,13 +205,13 @@
                 }
             }
 
-            // Same sort: bonus first, dc ASC within bonus, score DESC within same dc
+            // Same sort: bonus first, score DESC, dc ASC tiebreaker
             bCandidates.sort(function (a, b2) {
                 var aBonus = a.dc > 0 ? 1 : 0;
                 var bBonus = b2.dc > 0 ? 1 : 0;
                 if (aBonus !== bBonus) return bBonus - aBonus;
-                if (a.dc !== b2.dc) return a.dc - b2.dc;
-                return b2.score - a.score;
+                if (b2.score !== a.score) return b2.score - a.score;
+                return a.dc - b2.dc;
             });
 
             var slotBench = [];

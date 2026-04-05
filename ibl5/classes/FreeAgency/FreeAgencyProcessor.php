@@ -122,11 +122,10 @@ class FreeAgencyProcessor implements FreeAgencyProcessorInterface
         $capCalculator = new FreeAgencyCapCalculator($this->mysqli_db, $team, $this->season);
         $capMetrics = $capCalculator->calculateTeamCapMetrics($player->playerID);
 
-        // Get existing offer to calculate amended cap space
-        $existingOfferRow = $this->repository->getExistingOffer($team->teamID, $player->playerID ?? 0);
-        $existingOfferYear1 = $existingOfferRow !== null ? ($existingOfferRow['offer1'] ?? 0) : 0;
+        // calculateTeamCapMetrics() already excludes this player's existing offer,
+        // so softCapSpace[0] is the true available cap space for a new/replacement offer.
         /** @var array{softCapSpace: array<int, int>, hardCapSpace: array<int, int>, totalSalaries: array<int, int>, rosterSpots: array<int, int>} $capMetrics */
-        $amendedCapSpaceYear1 = $capMetrics['softCapSpace'][0] + $existingOfferYear1;
+        $amendedCapSpaceYear1 = $capMetrics['softCapSpace'][0];
 
         $rawOfferType = $postData['offerType'] ?? 0;
         $offerType = is_numeric($rawOfferType) ? (int) $rawOfferType : 0;

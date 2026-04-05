@@ -246,8 +246,48 @@ class FreeAgencyServiceTest extends TestCase
         $result = $service->getNegotiationData(1, $team, $season);
 
         $this->assertTrue($result['hasExistingOffer']);
-        // amendedCapSpace = softCapSpace[0] + existingOffer['offer1']
-        $this->assertSame(League::SOFT_CAP_MAX + 500, $result['amendedCapSpace']);
+        // calculateTeamCapMetrics() already excludes this player's offer,
+        // so amendedCapSpace equals softCapSpace[0] without double-counting
+        $this->assertSame(League::SOFT_CAP_MAX, $result['amendedCapSpace']);
+    }
+
+    /**
+     * Regression: updating an existing offer must not inflate cap space.
+     *
+     * Before the fix, amendedCapSpace was softCapSpace[0] + existingOffer['offer1'].
+     * Since calculateTeamCapMetrics() already excludes the player's offer,
+     * adding it back double-counted — allowing offers above the soft cap.
+     */
+    public function testAmendedCapSpaceDoesNotInflateWhenExistingOfferPresent(): void
+    {
+        $existingOffer1 = 784;
+        $this->stubRepo->method('getExistingOffer')->willReturn([
+            'offer1' => $existingOffer1, 'offer2' => 0, 'offer3' => 0,
+            'offer4' => 0, 'offer5' => 0, 'offer6' => 0,
+        ]);
+        $this->stubDemandRepo->method('getPlayerDemands')->willReturn([
+            'dem1' => 0, 'dem2' => 0, 'dem3' => 0, 'dem4' => 0, 'dem5' => 0, 'dem6' => 0,
+        ]);
+
+        $this->mockDb->setMockData([$this->getBasePlayerData()]);
+
+        $service = new FreeAgencyService($this->stubRepo, $this->stubDemandRepo, $this->mockDb);
+
+        $team = $this->createStub(Team::class);
+        $team->name = 'Test Team';
+        $team->teamID = 1;
+
+        $season = $this->createStub(\Season\Season::class);
+
+        $result = $service->getNegotiationData(1, $team, $season);
+
+        // Before fix: SOFT_CAP_MAX + 784 (inflated). After fix: SOFT_CAP_MAX (correct).
+        $this->assertSame(League::SOFT_CAP_MAX, $result['amendedCapSpace']);
+        $this->assertNotSame(
+            League::SOFT_CAP_MAX + $existingOffer1,
+            $result['amendedCapSpace'],
+            'amendedCapSpace must not be inflated by the existing offer amount'
+        );
     }
 
     // ── Helpers ──────────────────────────────────────────────────

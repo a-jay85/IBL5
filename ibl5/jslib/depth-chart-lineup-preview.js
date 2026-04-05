@@ -190,7 +190,7 @@
 
         var html = '<div class="dc-lineup-preview__title">Projected Lineup</div>';
         html += '<table class="ibl-data-table dc-lineup-preview-table"><thead><tr>';
-        html += '<th></th>';
+        html += '<th class="dc-lineup-preview__row-label"></th>';
         for (var h = 0; h < SLOTS.length; h++) {
             html += '<th>' + SLOTS[h].label + '</th>';
         }

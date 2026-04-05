@@ -117,6 +117,7 @@
 
 .dc-lineup-preview table {
     width: 100%;
+    table-layout: fixed;
 }
 
 .dc-lineup-preview td {
@@ -126,7 +127,6 @@
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
-    max-width: 0;
 }
 
 .dc-lineup-preview thead th {
@@ -136,14 +136,18 @@
     letter-spacing: 0.04em;
 }
 
-.dc-lineup-preview__row-label {
+.dc-lineup-preview td.dc-lineup-preview__row-label,
+.dc-lineup-preview th.dc-lineup-preview__row-label {
     font-size: 0.6875rem;
     font-weight: 600;
     color: var(--gray-400);
     text-transform: uppercase;
     letter-spacing: 0.04em;
     text-align: left;
-    width: 4em;
+    width: 4.5em;
+    overflow: visible;
+    white-space: nowrap;
+    text-overflow: clip;
 }
 
 .dc-lineup-preview__starter {

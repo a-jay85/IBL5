@@ -1,20 +1,113 @@
 /**
  * Depth Chart Lineup Preview
  *
- * Implements JSB's 5-pass lineup selection algorithm to show GMs a projected
- * starting lineup and bench based on their current depth chart settings.
+ * Implements JSB 5.60's lineup selection algorithm (FUN_004cfa50) to show GMs
+ * a projected starting lineup and one bench player per slot based on the
+ * current depth chart form values. Updates live as the GM edits the form.
  *
- * Updates live whenever a role slot select or active toggle changes.
+ * 100% faithful to the verified decompiled algorithm documented in:
+ *   - DEPTH_CHART_STRATEGY_GUIDE.md "Implementation Spec: Lineup Projection Engine"
+ *   - 00_MASTER_REFERENCE.md "Starter selection / Backup selection"
  *
- * Algorithm (from decompiled JSB 5.60, 00_MASTER_REFERENCE.md):
- *   5 sequential passes (dc_bh→dc_di→dc_oi→dc_df→dc_of), each selects ONE player.
- *   Per pass, candidates collected via TWO paths into ONE list:
- *     BONUS PATH (dc > 0): any position, score = quality + (10 - dc) * 240
- *     FALLBACK PATH (dc ≤ 0): position must match slot, score = raw quality
- *   Candidates sorted in TWO passes: score DESC, then dc ASC among dc>0 only
- *   (dc=1 strictly dominates dc=2 regardless of score).
- *   First candidate selected, removed from pool for subsequent passes.
- *   Bench: remaining candidates in same sorted order.
+ * Source line citations (from `jsb560_decompiled.c` / earlier `per_possession_update_RAW.c`):
+ *   - Reads dc_minutes from player struct +0xd3c at line 90870
+ *   - Candidate score formula at lines 91697-91733
+ *   - Two-pass bubble sort at lines 91751-91863
+ *   - Backup selection (position-only) at lines 91562-91634 / 1148-1211
+ *   - Self-backup state at line 1183 / 1475-1476
+ *
+ * STARTER SELECTION (5 sequential passes — BH→DI→OI→DF→OF, slots PG/SG/SF/PF/C):
+ *
+ *   Per pass, scan all not-yet-taken active players and assign to ONE list of
+ *   candidates via the matching scoring branch:
+ *
+ *     BRANCH A — BONUS path (dc > 0 AND dc < 5):
+ *       dc_minutes ≥ 12 → score = dc_minutes + 192
+ *       dc_minutes < 12 → score = dc_minutes + 144
+ *       Position is irrelevant (dc > 0 overrides position).
+ *
+ *     BRANCH B — DC>=5 path (dc > 0 AND dc ≥ 5, e.g. auto-fill):
+ *       score = dc_minutes (no bonus)
+ *       Position is irrelevant. Reachable only via auto-fill at dc=6
+ *       (line 91710 — see "Auto-Fill Behavior" in the strategy guide) or
+ *       legacy/imported data; the form's max input is 3.
+ *
+ *     BRANCH C — POSITION fallback (dc ≤ 0, position must match slot):
+ *       dc_minutes ≥ 12 → score = dc_minutes + 48
+ *       dc_minutes < 12 → score = dc_minutes (no bonus)
+ *       dc values of -2, -1, and 0 are all identical (code only checks dc > 0).
+ *
+ *   The "duplicate-bonus" branch (dc > 0 AND already in another slot →
+ *   dc_minutes + 96, line 91710) is dead code in the actual binary because
+ *   greedy pool removal evicts already-taken players before the scoring step,
+ *   so we mirror that here by skipping `taken[p.pid]` early.
+ *
+ *   After collection, candidates are sorted in TWO separate passes (matching
+ *   JSB's two bubble sorts at lines 91751-91788 and 91789-91863):
+ *     Pass 1: score DESC
+ *     Pass 2: dc ASC, but ONLY swap when BOTH compared candidates have dc > 0.
+ *             dc = 0 candidates are left in their pass-1 positions, so they
+ *             stay behind every dc > 0 candidate.
+ *   Net effect: dc=1 strictly dominates dc=2 (regardless of score), and any
+ *   dc > 0 candidate strictly dominates any dc = 0 candidate (min gap = 96).
+ *   Within the same dc value, higher dc_minutes wins (tiebreak via pass 1).
+ *
+ *   The first candidate is selected, marked as taken, and removed from the
+ *   pool for all later passes. If no candidates exist, the engine falls back
+ *   to its preliminary (dVar58-based) selection — we don't have season stats
+ *   client-side, so we approximate with roster-order default (matches the
+ *   spec's reference Python pseudocode in the strategy guide).
+ *
+ * BACKUP SELECTION (one backup per slot, runs AFTER starters are picked):
+ *
+ *   Fundamentally different from starter selection — POSITION MATCH ONLY.
+ *   There is NO dc > 0 override for backups. A center with dc_df > 0 can
+ *   START at PF via the bonus path, but cannot BACK UP that PF slot.
+ *
+ *   For each slot, scan all non-starter active players whose position string
+ *   matches the slot's fallback position. Highest dc_minutes wins (tiebreak
+ *   by roster order). Greedy pool removal: a player chosen as backup for one
+ *   slot cannot back up other slots.
+ *
+ *   If no position-matching non-starter exists, the lineup-memory backup
+ *   pointer points back to the starter (self-backup, verified at
+ *   per_possession_update_RAW.c:1183). At runtime FUN_004db520's bench-scan
+ *   fallback bypasses this self-backup state — the player is NOT locked on
+ *   court — so the preview replaces the self-backup cell with the result of
+ *   benchScanFallback() and renders it in italic so the GM can tell which
+ *   slots are using the structured backup vs the runtime bench scan.
+ *
+ * BENCH-SCAN FALLBACK (FUN_004db520, jsb560_decompiled.c:95513-95630):
+ *
+ *   Triggered ONLY for slots whose lineup-memory backup is self (i.e. no
+ *   position-matching non-starter exists). At runtime the per-slot ladder
+ *   {preliminary, sort1, sort2, sort3, backup} cycles through the same
+ *   self-backed pid and the slot output stays 0, so the dispatcher falls
+ *   through to a 3-pass scan over the team's 15-pid roster array starting
+ *   from `param_1[+0x33f8]` (team 1) or `+0x33fc` (team 2):
+ *     Pass 1 (95513-95548) — strict: position match + PF<6 + +0x138<4 + not on court
+ *     Pass 2 (95553-95580) — relaxed: drop the position-match requirement
+ *     Pass 3 (95594-95630) — very relaxed: allow PF≥6 in some branches
+ *
+ *   Game-start preview assumptions: every active player has PF=0 and
+ *   +0x138=0, so eligibility collapses to "active && not on court" and
+ *   passes 1-2 are the only ones that fire (pass 3 is unreachable until a
+ *   player reaches 6 fouls, which can't happen at game start).
+ *
+ *   Roster iteration order: walks DOM rows in order, which mirrors the
+ *   ibl_plr `ORDER BY ordinal ASC` from the Repository. `ibl_plr.ordinal`
+ *   IS JSB's roster-array ordinal (the order written to the PLR file at
+ *   the last sim load). Caveat: if the GM has changed dc_minutes since
+ *   that load, JSB's PLR-load-time roster sort `quality = (dc_minutes + 100)
+ *   × Σ(ratings) × scale` (FUN_0040af90 line 5723) will re-rank on next
+ *   load and the displayed bench scan may diverge from actual runtime
+ *   behavior. The full FUN_0040af90 body is not yet decompiled, so we
+ *   cannot recompute the live sort here.
+ *
+ *   Non-reservation: at runtime the dispatcher does NOT reserve bench
+ *   bodies across slots — two self-backed slots could pull the same body
+ *   in successive sub events. We mirror that here, so two self-backed
+ *   slots in the preview can show the same bench-scan pick.
  */
 (function () {
     'use strict';
@@ -35,7 +128,7 @@
 
     /**
      * Collect all player data from the desktop table rows.
-     * Returns an array of player objects with pid, name, quality, pos, and
+     * Returns an array of player objects with pid, name, dcMinutes, pos, and
      * current dc values + active status read from the form.
      */
     function collectPlayers() {
@@ -48,7 +141,6 @@
         for (var i = 0; i < rows.length; i++) {
             var row = rows[i];
             var pid = row.getAttribute('data-pid');
-            var quality = parseFloat(row.getAttribute('data-quality') || '0');
             var pos = row.getAttribute('data-pos') || '';
 
             // Read player name from the hidden Name input
@@ -60,13 +152,9 @@
             var activeSel = form.querySelector('select[name="canPlayInGame' + idx + '"]');
             var active = activeSel ? activeSel.value === '1' : true;
 
-            // Read dc_minutes — multiplied into quality per JSB formula
+            // Read dc_minutes — THIS IS the candidate quality per JSB line 90870
             var minSel = form.querySelector('select[name="min' + idx + '"]');
             var dcMinutes = minSel ? parseInt(minSel.value, 10) : 0;
-
-            // Effective quality = baseQuality × (dc_minutes + 100)
-            // This matches JSB's quality multiplier (line 5723 in PLR loader)
-            var effectiveQuality = quality * (dcMinutes + 100);
 
             // Read dc values for each slot
             var dcValues = {};
@@ -78,8 +166,6 @@
             players.push({
                 pid: pid,
                 name: name,
-                baseQuality: quality,
-                quality: effectiveQuality,
                 dcMinutes: dcMinutes,
                 pos: pos,
                 active: active,
@@ -92,29 +178,29 @@
     }
 
     /**
-     * Run the lineup selection algorithm per the Implementation Spec
-     * in DEPTH_CHART_STRATEGY_GUIDE.md.
+     * Score constants — must match JSB 5.60 exactly. See file header for the
+     * full algorithm description and source line citations.
+     */
+    var DC_MIN_THRESHOLD = 12;   // dc_minutes threshold for the higher bonus tier
+    var BONUS_DC_HIGH    = 192;  // dc > 0, dc < 5, dc_minutes >= 12
+    var BONUS_DC_LOW     = 144;  // dc > 0, dc < 5, dc_minutes <  12
+    var BONUS_POS_HIGH   = 48;   // dc <= 0, position match, dc_minutes >= 12
+    var BONUS_POS_LOW    = 0;    // dc <= 0, position match, dc_minutes <  12
+
+    /**
+     * Run the lineup selection algorithm. See the file header for the full
+     * algorithm description, scoring branches, and JSB source line citations.
      *
-     * Step 3: Starter Selection (5-Pass Algorithm)
-     *   Per pass, candidates collected from two paths into ONE list:
-     *     BONUS (dc > 0): any position, score = effectiveQuality + (10-dc)*240
-     *     FALLBACK (dc ≤ 0, position matches): score = effectiveQuality (no bonus)
-     *   Two-pass sort: score DESC, then dc ASC among dc>0 only (overrides quality).
-     *   dc=1 strictly dominates dc=2. If no candidates: roster-order default.
-     *
-     * Step 4: Backup Selection — FUNDAMENTALLY DIFFERENT from starters:
-     *   - POSITION MATCHING ONLY — no dc > 0 override for backups
-     *   - Highest-quality position-matching non-starter wins
-     *   - If no match: self-backup (starter backs up own slot)
-     *   - 1 backup per slot, greedy pool removal
+     * Returns { starters: Player[5], bench: Player[5][1] } where bench[i] is
+     * a single-element array containing slot i's backup (or self-backup).
      */
     function selectLineup(players) {
         var activePlayers = players.filter(function (p) { return p.active; });
-        var taken = {};  // pid → true for players selected as starters
+        var taken = {};  // pid → true for players already selected as starters
 
         var starters = [];
 
-        // === Step 3: Starter Selection (5 passes) ===
+        // === Starter Selection (5 passes — BH→DI→OI→DF→OF) ===
         for (var pass = 0; pass < SLOTS.length; pass++) {
             var slot = SLOTS[pass];
             var fieldKey = slot.field;
@@ -122,36 +208,62 @@
 
             for (var i = 0; i < activePlayers.length; i++) {
                 var p = activePlayers[i];
+                // Greedy pool removal — mirrors JSB's check that the player is
+                // not already in another lineup slot. This makes the binary's
+                // "duplicate bonus 96" branch (line 91710) dead code, so we
+                // omit it here for the same reason.
                 if (taken[p.pid]) continue;
 
                 var dc = p.dc[fieldKey];
-                if (dc > 0) {
-                    // Bonus path: any position, adjusted score
+
+                if (dc > 0 && dc < 5) {
+                    // BRANCH A — BONUS path: any position, dc_minutes + bonus
+                    var bonusA = p.dcMinutes >= DC_MIN_THRESHOLD
+                        ? BONUS_DC_HIGH
+                        : BONUS_DC_LOW;
                     candidates.push({
                         player: p,
-                        score: p.quality + (10 - dc) * 240,
+                        score: p.dcMinutes + bonusA,
                         dc: dc
                     });
-                } else if (matchesPosition(p.pos, slot.fallbackPos)) {
-                    // Fallback path: position must match, raw quality
+                } else if (dc >= 5) {
+                    // BRANCH B — DC>=5 path: any position, no bonus.
+                    // Unreachable from valid form input (max dc = 3) but kept
+                    // for spec fidelity / legacy data / auto-fill at dc=6.
                     candidates.push({
                         player: p,
-                        score: p.quality,
+                        score: p.dcMinutes,
+                        dc: dc
+                    });
+                } else if (dc <= 0 && matchesPosition(p.pos, slot.fallbackPos)) {
+                    // BRANCH C — POSITION fallback: dc must be ≤ 0 AND position
+                    // string must match the slot's fallback position.
+                    var bonusC = p.dcMinutes >= DC_MIN_THRESHOLD
+                        ? BONUS_POS_HIGH
+                        : BONUS_POS_LOW;
+                    candidates.push({
+                        player: p,
+                        score: p.dcMinutes + bonusC,
                         dc: 0
                     });
                 }
+                // Else: dc <= 0 with position mismatch — not eligible this pass.
             }
 
-            // Two-pass sort matching JSB's two separate bubble sorts
-            // (lines 91751-91863 in decompiled binary):
-            // Pass 1: score descending — bonus-path scores (quality + bonus)
-            //         naturally sort ahead of fallback scores (raw quality)
+            // Two-pass sort, matching JSB's two separate bubble sorts at
+            // jsb560_decompiled.c lines 91751-91788 (Pass 1) and 91789-91863
+            // (Pass 2). JS Array.sort is stable since ES2019, so applying the
+            // sorts sequentially is equivalent to JSB's bubble-sort behavior.
+            //
+            // Pass 1: score DESC (within each dc tier, higher score wins).
             candidates.sort(function (a, b) {
                 return b.score - a.score;
             });
-            // Pass 2: dc ascending among dc>0 only — OVERRIDES quality.
-            // dc=1 strictly dominates dc=2 regardless of score difference.
-            // dc=0 candidates are left in place (behind all dc>0).
+            // Pass 2: dc ASC, BUT only swap when both compared candidates
+            // have dc > 0. When either side has dc = 0, return 0 to preserve
+            // the pass-1 ordering — leaving dc = 0 candidates strictly behind
+            // every dc > 0 candidate (since dc > 0 scores are always ≥ 144
+            // and dc = 0 scores are always ≤ 96).
             candidates.sort(function (a, b) {
                 if (a.dc > 0 && b.dc > 0) {
                     return a.dc - b.dc;
@@ -163,7 +275,11 @@
             if (candidates.length > 0) {
                 starter = candidates[0].player;
             } else {
-                // Roster-order default: first untaken player
+                // No viable candidate — JSB falls back to its preliminary
+                // (dVar58-based) selection. We don't have season stats client
+                // side, so we use the spec's reference fallback (roster-order
+                // default — first untaken active player). See the strategy
+                // guide's Python pseudocode in "Complete Lineup Selection".
                 for (var f = 0; f < activePlayers.length; f++) {
                     if (!taken[activePlayers[f].pid]) {
                         starter = activePlayers[f];
@@ -178,36 +294,53 @@
             starters.push(starter);
         }
 
-        // === Step 4: Backup Selection ===
-        // POSITION MATCHING ONLY — no dc > 0 override.
-        // Highest-quality position-matching non-starter wins.
-        // Self-backup if no match (starter backs up own slot).
+        // === Backup Selection (one backup per slot) ===
+        // POSITION MATCH ONLY — no dc > 0 override. Greedy pool removal.
+        // Highest dc_minutes wins (tiebreak by roster order). When no
+        // position-matching non-starter exists, lineup memory has +0x4ca0 ==
+        // +0x4c80 (self-backup), so we instead route to FUN_004db520's
+        // bench-scan fallback (see benchScanFallback() below) and mark the
+        // resulting entry with viaBenchScan: true so the renderer can
+        // italicize it.
+        //
+        // Bench entries are { player, viaBenchScan } objects.
         var benchTaken = {};
         var bench = [];
 
-        for (var b = 0; b < SLOTS.length; b++) {
-            var bSlot = SLOTS[b];
+        for (var bSlotIdx = 0; bSlotIdx < SLOTS.length; bSlotIdx++) {
+            var bSlot = SLOTS[bSlotIdx];
             var bestBackup = null;
-            var bestQuality = -Infinity;
+            var bestMinutes = -Infinity;
 
             for (var k = 0; k < activePlayers.length; k++) {
                 var bp = activePlayers[k];
                 if (taken[bp.pid] || benchTaken[bp.pid]) continue;
                 if (!matchesPosition(bp.pos, bSlot.fallbackPos)) continue;
 
-                if (bp.quality > bestQuality) {
-                    bestQuality = bp.quality;
+                // Backup ranking is by dc_minutes (no bonus, no dc override).
+                if (bp.dcMinutes > bestMinutes) {
+                    bestMinutes = bp.dcMinutes;
                     bestBackup = bp;
                 }
             }
 
             var slotBench = [];
             if (bestBackup) {
-                slotBench.push(bestBackup);
+                slotBench.push({ player: bestBackup, viaBenchScan: false });
                 benchTaken[bestBackup.pid] = true;
-            } else if (starters[b]) {
-                // Self-backup: starter backs up own slot
-                slotBench.push(starters[b]);
+            } else if (starters[bSlotIdx]) {
+                // Self-backup case → run FUN_004db520's bench-scan fallback.
+                // Non-reservation: do NOT mark benchTaken — engine doesn't
+                // reserve, and two self-backed slots may show the same pick.
+                var benchScanPick = benchScanFallback(bSlot, starters, activePlayers);
+                if (benchScanPick) {
+                    slotBench.push({ player: benchScanPick, viaBenchScan: true });
+                } else {
+                    // Bench scan exhausted (only happens if every active
+                    // player is already on court). Fall back to the
+                    // lineup-memory self-backup as a last resort.
+                    slotBench.push({ player: starters[bSlotIdx], viaBenchScan: false });
+                }
             }
             bench.push(slotBench);
         }
@@ -216,14 +349,70 @@
     }
 
     /**
-     * Check if a player's position matches a slot's fallback position.
-     * Handles compound positions like 'G' (PG or SG), 'F' (SF or PF), 'GF' (any guard/forward).
+     * Model FUN_004db520's bench-scan fallback (jsb560_decompiled.c:95513-95630).
+     *
+     * Walks the team's 15-pid roster array in roster-array order (= DOM order
+     * = ibl_plr.ordinal, which IS JSB's ordinal per maintainer confirmation)
+     * and runs up to two passes:
+     *
+     *   Pass 1 — strict (lines 95513-95548):
+     *     position match + PF<6 + +0x138<4 + not on court
+     *   Pass 2 — relaxed (lines 95553-95580):
+     *     drop the position-match requirement
+     *
+     * Pass 3 (lines 95594-95630, allow PF≥6 in some branches) is unreachable
+     * at preview time because game-start state has PF=0 for every player.
+     *
+     * Game-start eligibility collapses to "active && not on court" — every
+     * active player satisfies PF<6 and +0x138<4 trivially.
+     *
+     * Returns the first eligible Player, or null if every active player is
+     * already on court (only possible with ≤5 active players on the roster).
+     */
+    function benchScanFallback(slot, starters, activePlayers) {
+        var onCourt = {};
+        for (var s = 0; s < starters.length; s++) {
+            if (starters[s]) onCourt[starters[s].pid] = true;
+        }
+
+        // Pass 1 — strict: position match required
+        for (var i = 0; i < activePlayers.length; i++) {
+            var p = activePlayers[i];
+            if (onCourt[p.pid]) continue;
+            if (matchesPosition(p.pos, slot.fallbackPos)) return p;
+        }
+
+        // Pass 2 — relaxed: drop position match
+        for (var j = 0; j < activePlayers.length; j++) {
+            var q = activePlayers[j];
+            if (onCourt[q.pid]) continue;
+            return q;
+        }
+
+        return null;
+    }
+
+    /**
+     * Check if a player's position string matches a slot's fallback position.
+     * Compound positions expand per the spec table in DEPTH_CHART_STRATEGY_GUIDE.md
+     * "Position Matching":
+     *   PG/SG/SF/PF/C → match self only
+     *   G  → {PG, SG}
+     *   F  → {SF, PF}
+     *   GF → {PG, SG, SF, PF} (NOT C)
      */
     function matchesPosition(playerPos, slotPos) {
         if (playerPos === slotPos) return true;
-        if (playerPos === 'G' && (slotPos === 'PG' || slotPos === 'SG')) return true;
-        if (playerPos === 'F' && (slotPos === 'SF' || slotPos === 'PF')) return true;
-        if (playerPos === 'GF') return slotPos !== 'C';
+        if (playerPos === 'G') {
+            return slotPos === 'PG' || slotPos === 'SG';
+        }
+        if (playerPos === 'F') {
+            return slotPos === 'SF' || slotPos === 'PF';
+        }
+        if (playerPos === 'GF') {
+            return slotPos === 'PG' || slotPos === 'SG'
+                || slotPos === 'SF' || slotPos === 'PF';
+        }
         return false;
     }
 
@@ -254,14 +443,28 @@
         }
         html += '</tr>';
 
-        // Bench rows
+        // Bench rows. Bench entries are { player, viaBenchScan } objects.
+        // viaBenchScan = true means the slot was self-backed in lineup memory
+        // and FUN_004db520's bench-scan fallback picked this player at runtime;
+        // we render those in italic via .dc-lineup-preview__bench-scan and
+        // attach a tooltip explaining the source.
         for (var row = 0; row < BACKUP_ROWS; row++) {
             var label = row === 0 ? '1st' : '2nd';
             html += '<tr><td class="dc-lineup-preview__row-label">' + label + '</td>';
             for (var c = 0; c < SLOTS.length; c++) {
-                var benchPlayer = lineup.bench[c][row];
-                if (benchPlayer) {
-                    html += '<td>' + escapeHtml(abbreviateName(benchPlayer.name)) + '</td>';
+                var benchEntry = lineup.bench[c][row];
+                if (benchEntry) {
+                    var cellAttrs = '';
+                    if (benchEntry.viaBenchScan) {
+                        cellAttrs = ' class="dc-lineup-preview__bench-scan"'
+                            + ' title="Bench-scan fallback: this slot has no'
+                            + ' position-matching backup, so the in-game'
+                            + ' substitution dispatcher picks this player from'
+                            + ' the team roster instead."';
+                    }
+                    html += '<td' + cellAttrs + '>'
+                        + escapeHtml(abbreviateName(benchEntry.player.name))
+                        + '</td>';
                 } else {
                     html += '<td class="dc-lineup-preview__empty">&mdash;</td>';
                 }
@@ -293,9 +496,8 @@
 
     /**
      * Update the debug score annotations in the form.
-     * Shows base quality in the Pos cell and effective score (quality + bonus)
-     * next to each role slot select where dc > 0.
-     * Only renders on localhost.
+     * Shows the candidate score next to each role slot select, computed per
+     * the same scoring branches as selectLineup(). Only renders on localhost.
      */
     function updateScoreDebug(players) {
         if (!isLocalhost()) return;
@@ -306,37 +508,32 @@
         var rows = form.querySelectorAll('.depth-chart-table tbody tr[data-pid]');
 
         for (var i = 0; i < rows.length; i++) {
-            var row = rows[i];
-            var quality = parseFloat(row.getAttribute('data-quality') || '0');
             var idx = i + 1;
+            var row = rows[i];
+            var pos = row.getAttribute('data-pos') || '';
 
-            // Read minutes for this player
             var minSel = form.querySelector('select[name="min' + idx + '"]');
             var dcMin = minSel ? parseInt(minSel.value, 10) : 0;
-            var minMultiplier = dcMin + 100;
-            var effectiveQuality = quality * minMultiplier;
 
-            // Update quality in Pos cell: base × (min+100) = effective
-            var qualitySpan = row.querySelector('.dc-quality-debug');
-            if (qualitySpan) {
-                qualitySpan.textContent = ' (' + quality.toFixed(1) + '×' + minMultiplier + '=' + Math.round(effectiveQuality) + ')';
-            }
-
-            // Update effective score next to each role slot select
             for (var s = 0; s < SLOTS.length; s++) {
-                var sel = form.querySelector('select[name="' + SLOTS[s].field + idx + '"]');
+                var slot = SLOTS[s];
+                var sel = form.querySelector('select[name="' + slot.field + idx + '"]');
                 if (!sel) continue;
                 var scoreSpan = sel.parentNode.querySelector('.dc-score-debug');
                 if (!scoreSpan) continue;
 
                 var dc = parseInt(sel.value, 10);
-                if (dc > 0) {
-                    var bonus = (10 - dc) * 240;
-                    var effective = effectiveQuality + bonus;
-                    scoreSpan.textContent = Math.round(effective);
-                } else {
-                    scoreSpan.textContent = '';
+                var score = null;
+
+                if (dc > 0 && dc < 5) {
+                    score = dcMin + (dcMin >= DC_MIN_THRESHOLD ? BONUS_DC_HIGH : BONUS_DC_LOW);
+                } else if (dc >= 5) {
+                    score = dcMin;
+                } else if (dc <= 0 && matchesPosition(pos, slot.fallbackPos)) {
+                    score = dcMin + (dcMin >= DC_MIN_THRESHOLD ? BONUS_POS_HIGH : BONUS_POS_LOW);
                 }
+
+                scoreSpan.textContent = score === null ? '' : String(score);
             }
         }
     }

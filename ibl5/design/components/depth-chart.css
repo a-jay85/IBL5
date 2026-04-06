@@ -154,6 +154,21 @@
     font-weight: 600;
 }
 
+/*
+ * Bench-scan fallback marker — used when a slot is self-backed in lineup
+ * memory and FUN_004db520's runtime bench-scan fallback would supply the
+ * actual replacement. Italic + softer color so the GM can tell at a glance
+ * which subs come from the structured backup vs the runtime fallback.
+ *
+ * The selector is scoped to `.dc-lineup-preview td` (specificity 0,2,1) so
+ * it beats `.ibl-data-table td` (0,1,1), which sets a darker color on every
+ * data-table cell.
+ */
+.dc-lineup-preview td.dc-lineup-preview__bench-scan {
+    font-style: italic;
+    color: var(--gray-500);
+}
+
 .dc-lineup-preview__empty {
     color: var(--gray-300);
 }
@@ -163,13 +178,6 @@
 /* ==========================================================================
    Debug Score Annotations (localhost only, populated by JS)
    ========================================================================== */
-
-.dc-quality-debug {
-    display: block;
-    font-size: 0.625rem;
-    color: var(--gray-400);
-    line-height: 1;
-}
 
 .dc-score-debug {
     display: block;

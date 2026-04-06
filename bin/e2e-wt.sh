@@ -74,13 +74,6 @@ PHP_CONTAINER="ibl5-php-$SLUG"
 DB_CONTAINER="ibl5-db-$SLUG"
 echo "Detected slug: $SLUG (containers: $PHP_CONTAINER, $DB_CONTAINER)"
 
-# --- Fix .env.test inside Docker ---
-# The worktree symlink points to a host path that doesn't exist inside the container.
-# Copy .env.test.example as a real file so test-state.php can read E2E_TESTING=1.
-echo "Fixing .env.test inside Docker container..."
-docker exec "$PHP_CONTAINER" sh -c \
-    'rm -f /var/www/html/ibl5/.env.test && cp /var/www/html/ibl5/.env.test.example /var/www/html/ibl5/.env.test'
-
 # --- Create test user (idempotent) ---
 echo "Ensuring test user exists..."
 

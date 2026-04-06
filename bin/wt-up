@@ -155,6 +155,13 @@ if [ ! -s "$CONFIG_PHP" ] || [ -L "$CONFIG_PHP" ]; then
     cp "$REPO_ROOT/ibl5/config.php" "$CONFIG_PHP" 2>/dev/null || true
 fi
 
+# Copy .env.test into worktree (absolute symlink target doesn't exist inside Docker)
+ENV_TEST="$WORKTREE_PATH/ibl5/.env.test"
+if [ ! -s "$ENV_TEST" ] || [ -L "$ENV_TEST" ]; then
+    [ -L "$ENV_TEST" ] && rm "$ENV_TEST"
+    cp "$REPO_ROOT/ibl5/.env.test" "$ENV_TEST" 2>/dev/null || true
+fi
+
 # Use the static compose file with Docker Compose variable interpolation.
 # No sed templating — ${SLUG}, ${WORKTREE_PATH}, ${REPO_ROOT} are exported as env vars.
 COMPOSE_FILE="$REPO_ROOT/docker/worktree-compose.yml"

@@ -146,6 +146,48 @@ Remaining assigned players form the bench, with higher values subbing in first.<
     }
 
     /**
+     * Compute the JSB production composite used by FUN_0040af90's roster sort.
+     *
+     * Per the verified formula at jsb560_decompiled.c:5723-5728 and the field
+     * offset table in 00_MASTER_REFERENCE.md "Season Stats (0x60C-0x640+)":
+     *
+     *   production = 2 × FGM_2pt + 3 × FGM_3pt + FTM + ORB + DRB + AST + STL + BLK
+     *
+     * `ibl_plr` stores TOTAL FGM (2pt + 3pt combined) in `stats_fgm` and 3pt
+     * FGM separately in `stats_3gm`, so the JSB-side `2 × FGM_2pt + 3 × FGM_3pt`
+     * simplifies to `2 × stats_fgm + stats_3gm` (the algebra:
+     * `2(stats_fgm − stats_3gm) + 3 × stats_3gm = 2 × stats_fgm + stats_3gm`).
+     *
+     * The result is the inner production sum only — the
+     * `(dc_minutes + 100) ×` multiplier is applied client-side so it stays
+     * live as the GM edits dc_minutes. The global scale `_DAT_00669ab8` is a
+     * constant and doesn't affect sort order.
+     *
+     * @param PlayerRow $player
+     */
+    private function computeJsbProduction(array $player): int
+    {
+        /** @var int $fgm */
+        $fgm = $player['stats_fgm'] ?? 0;
+        /** @var int $tgm */
+        $tgm = $player['stats_3gm'] ?? 0;
+        /** @var int $ftm */
+        $ftm = $player['stats_ftm'] ?? 0;
+        /** @var int $orb */
+        $orb = $player['stats_orb'] ?? 0;
+        /** @var int $drb */
+        $drb = $player['stats_drb'] ?? 0;
+        /** @var int $ast */
+        $ast = $player['stats_ast'] ?? 0;
+        /** @var int $stl */
+        $stl = $player['stats_stl'] ?? 0;
+        /** @var int $blk */
+        $blk = $player['stats_blk'] ?? 0;
+
+        return 2 * $fgm + $tgm + $ftm + $orb + $drb + $ast + $stl + $blk;
+    }
+
+    /**
      * @see DepthChartEntryViewInterface::renderPlayerRow()
      * @param PlayerRow $player
      */
@@ -155,14 +197,12 @@ Remaining assigned players form the bench, with higher values subbing in first.<
         $player_pos = $player['pos'];
         $player_name = $player['name'];
         $player_inj = $player['injured'] ?? 0;
+        $jsbProduction = $this->computeJsbProduction($player);
 
         $player_name_html = HtmlSanitizer::safeHtmlOutput($player_name);
 
-        /** @var float $qualityScore */
-        $qualityScore = $player['quality_score'] ?? 0.0;
-
-        echo "<tr data-pid=\"{$player_pid}\" data-quality=\"{$qualityScore}\" data-pos=\"{$player_pos}\">
-            <td>{$player_pos}<span class=\"dc-quality-debug\"></span></td>
+        echo "<tr data-pid=\"{$player_pid}\" data-pos=\"{$player_pos}\" data-jsb-production=\"{$jsbProduction}\">
+            <td>{$player_pos}</td>
             <td nowrap>
                 <input type=\"hidden\" name=\"pid{$depthCount}\" value=\"{$player_pid}\">
                 <input type=\"hidden\" name=\"Injury{$depthCount}\" value=\"{$player_inj}\">
@@ -380,6 +420,7 @@ JAVASCRIPT;
         $name = $player['name'];
         /** @var int $injured */
         $injured = $player['injured'] ?? 0;
+        $jsbProduction = $this->computeJsbProduction($player);
 
         $nameHtml = HtmlSanitizer::safeHtmlOutput($name);
         $posHtml = HtmlSanitizer::safeHtmlOutput($pos);
@@ -389,10 +430,7 @@ JAVASCRIPT;
         $dcActive = $player['dc_canPlayInGame'] ?? 0;
         $checkedAttr = ($dcActive === 1) ? ' checked' : '';
 
-        /** @var float $qualityScore */
-        $qualityScore = $player['quality_score'] ?? 0.0;
-
-        echo "<div class=\"dc-card\" data-pid=\"{$pid}\" data-quality=\"{$qualityScore}\" data-pos=\"{$pos}\">";
+        echo "<div class=\"dc-card\" data-pid=\"{$pid}\" data-pos=\"{$pos}\" data-jsb-production=\"{$jsbProduction}\">";
 
         // Header: photo + pos badge + name + active toggle
         echo '<div class="dc-card__header">';

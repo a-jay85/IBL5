@@ -123,18 +123,67 @@ class DepthChartEntryViewTest extends TestCase
         $this->assertStringContainsString('&lt;script&gt;', $output);
     }
 
-    public function testRenderPlayerRowMinutesIsHiddenZero(): void
+    public function testRenderPlayerRowMinutesIsSelectDropdown(): void
     {
         $player = $this->buildTestPlayer();
         $player['sta'] = 5;
+        $player['dc_minutes'] = 30;
 
         ob_start();
         $this->view->renderPlayerRow($player, 1);
         $output = (string) ob_get_clean();
 
-        // Minutes is now a hidden input fixed at 0 (no longer a dropdown)
-        $this->assertStringContainsString('name="min1" value="0"', $output);
-        $this->assertMatchesRegularExpression('/type="hidden"[^>]*name="min1"/', $output);
+        // Minutes is rendered as a <select> dropdown with the current
+        // dc_minutes option pre-selected. The 'Auto' option (value 0) is
+        // always present.
+        $this->assertMatchesRegularExpression('/<select[^>]*name="min1"/', $output);
+        $this->assertStringContainsString('<option value="30" SELECTED>30</option>', $output);
+        $this->assertStringContainsString('Auto', $output);
+    }
+
+    public function testRenderPlayerRowEmitsJsbProductionAttribute(): void
+    {
+        // The data-jsb-production attribute exposes the inner sum of
+        // FUN_0040af90's roster sort formula (verified at
+        // jsb560_decompiled.c:5723-5728), pre-computed PHP-side from ibl_plr
+        // stat columns. The lineup-preview JS reads this attribute and
+        // applies the (dc_minutes + 100) × production multiplier to compute
+        // the live JSB roster ordering used by FUN_004db520's bench-scan
+        // fallback.
+        $player = $this->buildTestPlayer();
+        $player['stats_fgm'] = 100;   // total FGM (= 2pt + 3pt)
+        $player['stats_3gm'] = 20;    // 3pt FGM
+        $player['stats_ftm'] = 50;
+        $player['stats_orb'] = 10;
+        $player['stats_drb'] = 30;
+        $player['stats_ast'] = 40;
+        $player['stats_stl'] = 15;
+        $player['stats_blk'] = 5;
+
+        ob_start();
+        $this->view->renderPlayerRow($player, 1);
+        $output = (string) ob_get_clean();
+
+        // Expected production = 2 × stats_fgm + stats_3gm + stats_ftm
+        //                     + stats_orb + stats_drb + stats_ast
+        //                     + stats_stl + stats_blk
+        //                     = 200 + 20 + 50 + 10 + 30 + 40 + 15 + 5
+        //                     = 370
+        $this->assertStringContainsString('data-jsb-production="370"', $output);
+    }
+
+    public function testRenderPlayerRowJsbProductionDefaultsToZero(): void
+    {
+        // When stat fields are missing from the player array, computeJsbProduction
+        // should default each one to 0 and emit data-jsb-production="0".
+        $player = $this->buildTestPlayer();
+        // (intentionally do not set any stats_* fields)
+
+        ob_start();
+        $this->view->renderPlayerRow($player, 1);
+        $output = (string) ob_get_clean();
+
+        $this->assertStringContainsString('data-jsb-production="0"', $output);
     }
 
     // =====================================================================

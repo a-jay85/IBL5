@@ -94,15 +94,21 @@
  *   passes 1-2 are the only ones that fire (pass 3 is unreachable until a
  *   player reaches 6 fouls, which can't happen at game start).
  *
- *   Roster iteration order: walks DOM rows in order, which mirrors the
- *   ibl_plr `ORDER BY ordinal ASC` from the Repository. `ibl_plr.ordinal`
- *   IS JSB's roster-array ordinal (the order written to the PLR file at
- *   the last sim load). Caveat: if the GM has changed dc_minutes since
- *   that load, JSB's PLR-load-time roster sort `quality = (dc_minutes + 100)
- *   × Σ(ratings) × scale` (FUN_0040af90 line 5723) will re-rank on next
- *   load and the displayed bench scan may diverge from actual runtime
- *   behavior. The full FUN_0040af90 body is not yet decompiled, so we
- *   cannot recompute the live sort here.
+ *   Roster iteration order: walks players sorted by JSB's load-time roster
+ *   sort formula `quality = (dc_minutes + 100) × production_composite`
+ *   (FUN_0040af90, jsb560_decompiled.c:5723-5728), where production_composite
+ *   = `2 × FGM_2pt + 3 × FGM_3pt + FTM + ORB + DRB + AST + STL + BLK`. This
+ *   IS the array `+0x33f8`/`+0x33fc` that the bench scan walks at runtime
+ *   (verified at the call site jsb560_decompiled.c:109230-109244, where the
+ *   team-roster bases are written immediately before FUN_0040af90 is called).
+ *
+ *   The production composite is pre-computed PHP-side from `ibl_plr` stat
+ *   columns and exposed via the `data-jsb-production` attribute on each row.
+ *   The `(dc_minutes + 100)` multiplier is applied here in JS so the sort
+ *   updates live when the GM edits the dc_minutes select — meaning the bench
+ *   scan reflects what JSB will compute on its NEXT PLR load, not just what
+ *   it computed at the last sim. The global scale `_DAT_00669ab8` is omitted
+ *   because it's a positive monotonic constant that doesn't affect ordering.
  *
  *   Non-reservation: at runtime the dispatcher does NOT reserve bench
  *   bodies across slots — two self-backed slots could pull the same body
@@ -143,6 +149,12 @@
             var pid = row.getAttribute('data-pid');
             var pos = row.getAttribute('data-pos') || '';
 
+            // jsbProduction is the inner sum of FUN_0040af90's roster sort
+            // formula (jsb560_decompiled.c:5723-5728), pre-computed PHP-side
+            // from ibl_plr stat columns. Used by benchScanFallback() to
+            // produce a live JSB roster ordering as the GM edits dc_minutes.
+            var jsbProduction = parseInt(row.getAttribute('data-jsb-production') || '0', 10);
+
             // Read player name from the hidden Name input
             var nameInput = row.querySelector('input[name^="Name"]');
             var name = nameInput ? nameInput.value : '?';
@@ -170,11 +182,28 @@
                 pos: pos,
                 active: active,
                 dc: dcValues,
+                jsbProduction: jsbProduction,
                 index: idx
             });
         }
 
         return players;
+    }
+
+    /**
+     * Compute the JSB roster-sort quality for a player, matching FUN_0040af90's
+     * formula at jsb560_decompiled.c:5723-5728:
+     *
+     *   quality = (dc_minutes + 100) × production_composite
+     *
+     * The production_composite (inner sum) is pre-computed PHP-side and
+     * exposed via the `data-jsb-production` attribute. The `(dc_minutes + 100)`
+     * multiplier is applied here so the sort updates live when the GM edits
+     * the dc_minutes select. The global scale `_DAT_00669ab8` is omitted
+     * because it's a positive monotonic constant that doesn't affect ordering.
+     */
+    function jsbRosterQuality(player) {
+        return (player.dcMinutes + 100) * player.jsbProduction;
     }
 
     /**
@@ -351,9 +380,9 @@
     /**
      * Model FUN_004db520's bench-scan fallback (jsb560_decompiled.c:95513-95630).
      *
-     * Walks the team's 15-pid roster array in roster-array order (= DOM order
-     * = ibl_plr.ordinal, which IS JSB's ordinal per maintainer confirmation)
-     * and runs up to two passes:
+     * Walks the team's 15-pid roster array in JSB's load-time sort order
+     * (FUN_0040af90, formula at jsb560_decompiled.c:5723-5728) and runs up
+     * to two passes:
      *
      *   Pass 1 — strict (lines 95513-95548):
      *     position match + PF<6 + +0x138<4 + not on court
@@ -366,6 +395,12 @@
      * Game-start eligibility collapses to "active && not on court" — every
      * active player satisfies PF<6 and +0x138<4 trivially.
      *
+     * Roster order: sorted by JSB quality DESC via jsbRosterQuality(), which
+     * applies the `(dc_minutes + 100) × production_composite` formula. This
+     * is the order JSB would compute on its NEXT PLR load given the current
+     * dc_minutes values, so changes the GM makes immediately shift the
+     * bench-scan ordering.
+     *
      * Returns the first eligible Player, or null if every active player is
      * already on court (only possible with ≤5 active players on the roster).
      */
@@ -375,16 +410,28 @@
             if (starters[s]) onCourt[starters[s].pid] = true;
         }
 
+        // Build a JSB-quality-sorted copy of the active player list. We sort
+        // a copy (not the original) so other consumers of activePlayers still
+        // see the DOM/ordinal order. Sort key: jsbRosterQuality() DESC; ties
+        // broken by DOM/ordinal order via the .index field, matching JSB's
+        // stable bubble sort which preserves input order on equal keys.
+        var rosterSorted = activePlayers.slice().sort(function (a, b) {
+            var qa = jsbRosterQuality(a);
+            var qb = jsbRosterQuality(b);
+            if (qb !== qa) return qb - qa;
+            return a.index - b.index;
+        });
+
         // Pass 1 — strict: position match required
-        for (var i = 0; i < activePlayers.length; i++) {
-            var p = activePlayers[i];
+        for (var i = 0; i < rosterSorted.length; i++) {
+            var p = rosterSorted[i];
             if (onCourt[p.pid]) continue;
             if (matchesPosition(p.pos, slot.fallbackPos)) return p;
         }
 
         // Pass 2 — relaxed: drop position match
-        for (var j = 0; j < activePlayers.length; j++) {
-            var q = activePlayers[j];
+        for (var j = 0; j < rosterSorted.length; j++) {
+            var q = rosterSorted[j];
             if (onCourt[q.pid]) continue;
             return q;
         }

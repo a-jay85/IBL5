@@ -425,4 +425,172 @@ class DepthChartEntryViewTest extends TestCase
         $this->assertStringContainsString('depth-chart-submit-btn', $output);
         $this->assertStringContainsString('depth-chart-reset-btn', $output);
     }
+
+    // =====================================================================
+    // renderSubmissionResult — confirmation page after form submission
+    // =====================================================================
+
+    /**
+     * Build a ProcessedPlayerData row matching the
+     * DepthChartEntryProcessorInterface @phpstan-type shape.
+     *
+     * @return array{
+     *     name: string, pg: int, sg: int, sf: int, pf: int, c: int,
+     *     canPlayInGame: int, min: int, of: int, df: int, oi: int, di: int,
+     *     bh: int, injury: int
+     * }
+     */
+    private function buildProcessedPlayer(
+        string $name = 'Test Player',
+        int $canPlayInGame = 1,
+        int $bh = 0,
+        int $di = 0,
+        int $oi = 0,
+        int $df = 0,
+        int $of = 0,
+        int $min = 0,
+    ): array {
+        return [
+            'name' => $name,
+            'pg' => 0,
+            'sg' => 0,
+            'sf' => 0,
+            'pf' => 0,
+            'c' => 0,
+            'canPlayInGame' => $canPlayInGame,
+            'min' => $min,
+            'of' => $of,
+            'df' => $df,
+            'oi' => $oi,
+            'di' => $di,
+            'bh' => $bh,
+            'injury' => 0,
+        ];
+    }
+
+    public function testRenderSubmissionResultSuccessShowsConfirmationBanner(): void
+    {
+        $players = [$this->buildProcessedPlayer()];
+
+        ob_start();
+        $this->view->renderSubmissionResult('Metros', $players, true);
+        $output = (string) ob_get_clean();
+
+        $this->assertStringContainsString(
+            'depth chart has been submitted and e-mailed successfully',
+            $output,
+        );
+        $this->assertStringContainsString('Metros Depth Chart Submission', $output);
+    }
+
+    public function testRenderSubmissionResultFailureShowsErrorHtml(): void
+    {
+        $players = [$this->buildProcessedPlayer()];
+
+        ob_start();
+        $this->view->renderSubmissionResult(
+            'Metros',
+            $players,
+            false,
+            '<div class="error">Must have 12 active players.</div>',
+        );
+        $output = (string) ob_get_clean();
+
+        $this->assertStringContainsString('lineup has', $output);
+        $this->assertStringContainsString('not</strong> been submitted', $output);
+        $this->assertStringContainsString('Must have 12 active players.', $output);
+    }
+
+    public function testRenderSubmissionResultHasAllRoleSlotHeaders(): void
+    {
+        ob_start();
+        $this->view->renderSubmissionResult('Metros', [], true);
+        $output = (string) ob_get_clean();
+
+        // Relabeled columns per the redesign: PG/SG/SF/PF/C map to
+        // bh/di/oi/df/of respectively. Verify the confirmation table echoes
+        // the form's column headers so the GM can cross-check what was saved.
+        $this->assertStringContainsString('<th>Name</th>', $output);
+        $this->assertStringContainsString('<th>Active</th>', $output);
+        $this->assertStringContainsString('<th>PG</th>', $output);
+        $this->assertStringContainsString('<th>SG</th>', $output);
+        $this->assertStringContainsString('<th>SF</th>', $output);
+        $this->assertStringContainsString('<th>PF</th>', $output);
+        $this->assertStringContainsString('<th>C</th>', $output);
+    }
+
+    public function testRenderSubmissionResultEmitsSubmittedValuesInCorrectColumns(): void
+    {
+        // Two players with distinct, non-trivial values per column so the
+        // assertions can't pass by accident on a default-zero row.
+        $players = [
+            $this->buildProcessedPlayer(
+                name: 'Player One',
+                canPlayInGame: 1,
+                bh: 1,  // PG column
+                di: 2,  // SG column
+                oi: 0,  // SF column
+                df: 0,  // PF column
+                of: 0,  // C column
+            ),
+            $this->buildProcessedPlayer(
+                name: 'Player Two',
+                canPlayInGame: 0,
+                bh: 0,
+                di: 0,
+                oi: 3,
+                df: 1,
+                of: 2,
+            ),
+        ];
+
+        ob_start();
+        $this->view->renderSubmissionResult('Metros', $players, true);
+        $output = (string) ob_get_clean();
+
+        // Both player names present
+        $this->assertStringContainsString('Player One', $output);
+        $this->assertStringContainsString('Player Two', $output);
+
+        // Extract the two <tr> bodies from the confirmation table and verify
+        // each contains the exact values submitted. Using regex keeps the
+        // test resilient to whitespace noise in the view's heredoc-style
+        // echo while still asserting per-cell positioning.
+        $this->assertMatchesRegularExpression(
+            '/<tr>\s*<td>Player One<\/td>\s*<td>1<\/td>\s*<td>1<\/td>\s*<td>2<\/td>\s*<td>0<\/td>\s*<td>0<\/td>\s*<td>0<\/td>\s*<\/tr>/',
+            $output,
+            'Player One row should be: Active=1, PG=1, SG=2, SF=0, PF=0, C=0',
+        );
+        $this->assertMatchesRegularExpression(
+            '/<tr>\s*<td>Player Two<\/td>\s*<td>0<\/td>\s*<td>0<\/td>\s*<td>0<\/td>\s*<td>3<\/td>\s*<td>1<\/td>\s*<td>2<\/td>\s*<\/tr>/',
+            $output,
+            'Player Two row should be: Active=0, PG=0, SG=0, SF=0, PF=3, PF=1, C=2',
+        );
+    }
+
+    public function testRenderSubmissionResultEscapesTeamName(): void
+    {
+        ob_start();
+        $this->view->renderSubmissionResult('<script>alert(1)</script>', [], true);
+        $output = (string) ob_get_clean();
+
+        $this->assertStringNotContainsString('<script>alert(1)</script>', $output);
+        $this->assertStringContainsString('&lt;script&gt;', $output);
+    }
+
+    public function testRenderSubmissionResultEscapesPlayerName(): void
+    {
+        $players = [
+            $this->buildProcessedPlayer(name: "O'Brien <script>alert(1)</script>"),
+        ];
+
+        ob_start();
+        $this->view->renderSubmissionResult('Metros', $players, true);
+        $output = (string) ob_get_clean();
+
+        $this->assertStringNotContainsString('<script>alert(1)</script>', $output);
+        $this->assertStringContainsString('&lt;script&gt;', $output);
+        // HtmlSanitizer uses ENT_HTML5, so `'` becomes `&apos;` (not `&#039;`).
+        $this->assertStringContainsString('O&apos;Brien', $output);
+    }
 }

@@ -52,11 +52,20 @@ test.describe('Depth Chart submission', () => {
     }
   });
 
-  test('submit depth chart successfully', async ({ page }) => {
+  test('submit depth chart successfully and confirmation shows submitted values', async ({
+    page,
+  }) => {
     const form = page.locator('.depth-chart-form');
     await expect(form).toBeVisible({ timeout: 15000 });
 
-    // Submit the current depth chart (already valid from seed data)
+    // Set a distinctive BH (PG) value on the first player row so we can
+    // verify the confirmation page echoes back exactly what was POSTed.
+    // We don't rely on seed values because the confirmation table column
+    // order (Name, Active, PG, SG, SF, PF, C) is what we want to assert.
+    const firstBh = page.locator('select[name^="BH"]').first();
+    await firstBh.selectOption('1');
+
+    // Submit the current depth chart
     const submitBtn = page.locator('.depth-chart-buttons .depth-chart-submit-btn');
     await expect(submitBtn).toBeVisible();
     await submitBtn.click();
@@ -64,13 +73,39 @@ test.describe('Depth Chart submission', () => {
     await page.waitForLoadState('domcontentloaded');
     const body = await page.locator('body').textContent();
 
-    // Success or validation error should appear
+    // Success or validation error banner should appear. The confirmation
+    // table is rendered in both branches.
     const hasSuccess = body?.match(
       /submitted.*successfully|thank you|depth chart has been/i,
     );
     const hasError = body?.match(/must have|active players|position/i);
-
     expect(hasSuccess || hasError).toBeTruthy();
+
+    // Confirmation table structure: Name, Active, PG, SG, SF, PF, C columns.
+    // Locator scopes to the "Depth Chart Submission" heading so we don't
+    // hit an unrelated .ibl-data-table elsewhere on the page.
+    const confirmationRegion = page
+      .locator('body')
+      .filter({ hasText: /Depth Chart Submission/i });
+    const confirmationTable = confirmationRegion.locator('table.ibl-data-table').last();
+    await expect(confirmationTable).toBeVisible();
+
+    const headers = await confirmationTable.locator('thead th').allInnerTexts();
+    expect(headers.map((h) => h.trim())).toEqual([
+      'Name',
+      'Active',
+      'PG',
+      'SG',
+      'SF',
+      'PF',
+      'C',
+    ]);
+
+    // At least one player row should be rendered.
+    const bodyRows = confirmationTable.locator('tbody tr');
+    const rowCount = await bodyRows.count();
+    expect(rowCount).toBeGreaterThan(0);
+
     await assertNoPhpErrors(page, 'after depth chart submission');
   });
 

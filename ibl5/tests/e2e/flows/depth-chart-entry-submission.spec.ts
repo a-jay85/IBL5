@@ -18,13 +18,14 @@ test.describe('Depth Chart submission', () => {
     const bhSelects = page.locator('select[name^="BH"]');
     await expect(bhSelects.first()).toBeVisible();
 
-    // Active selects should be pre-populated — at least one player is active
-    const activeSelects = page.locator('select[name^="canPlayInGame"]');
+    // Active checkboxes should be pre-populated — at least one player is active.
+    // The desktop `.dc-active-cb` class disambiguates from the mobile
+    // `.dc-card__active-cb` which shares the canPlayInGame name prefix.
+    const activeCheckboxes = page.locator('input[type="checkbox"].dc-active-cb[name^="canPlayInGame"]');
+    const count = await activeCheckboxes.count();
     let hasActive = false;
-    const count = await activeSelects.count();
     for (let i = 0; i < count; i++) {
-      const val = await activeSelects.nth(i).inputValue();
-      if (val === '1') {
+      if (await activeCheckboxes.nth(i).isChecked()) {
         hasActive = true;
         break;
       }

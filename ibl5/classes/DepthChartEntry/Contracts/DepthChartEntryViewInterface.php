@@ -34,13 +34,6 @@ interface DepthChartEntryViewInterface
     public function renderRolePriorityOptions(int $selectedValue, int $maxValue): void;
 
     /**
-     * Render active/inactive dropdown options (0 or 1)
-     *
-     * @param int $selectedValue Currently selected value (1=Yes, 0=No)
-     */
-    public function renderActiveOptions(int $selectedValue): void;
-
-    /**
      * Render the help section explaining how depth charts work.
      * Uses a collapsible <details>/<summary> element, collapsed by default.
      */
@@ -68,8 +61,8 @@ interface DepthChartEntryViewInterface
      * Render a single player row in the depth chart form
      *
      * Renders an 8-cell row: Pos, Player (with hidden fields for dead fields),
-     * Active select, and 5 role slot selects. Position depth columns (pg-c) and
-     * minutes are rendered as hidden inputs with value 0.
+     * Active checkbox, Minutes number input (0-40), and 5 role slot selects.
+     * Position depth columns (pg-c) are rendered as hidden inputs with value 0.
      *
      * Player array must include 'quality_score' key (float) for the lineup preview.
      *

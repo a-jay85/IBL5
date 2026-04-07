@@ -65,37 +65,6 @@ class DepthChartEntryView implements DepthChartEntryViewInterface
     }
 
     /**
-     * Render minutes dropdown options (0 to staminaCap).
-     *
-     * Value 0 is a literal "play as little as possible" setting — the JSB
-     * simulator does NOT auto-determine minutes from it. dc_minutes=0 sorts
-     * the player to the bottom of every lineup/quality path; the player only
-     * enters via the bench-scan fallback when no other position match exists.
-     * Effectively DNP-CD.
-     */
-    public function renderMinutesOptions(int $selectedValue, int $staminaCap): void
-    {
-        echo '<option value="0"' . ($selectedValue === 0 ? ' SELECTED' : '') . '>0</option>';
-
-        for ($i = 1; $i <= $staminaCap; $i++) {
-            $selected = ($selectedValue === $i) ? ' SELECTED' : '';
-            echo "<option value=\"$i\"$selected>$i</option>";
-        }
-    }
-
-    /**
-     * @see DepthChartEntryViewInterface::renderActiveOptions()
-     */
-    public function renderActiveOptions(int $selectedValue): void
-    {
-        if ($selectedValue === 1) {
-            echo '<option value="1" SELECTED>Yes</option><option value="0">No</option>';
-        } else {
-            echo '<option value="1">Yes</option><option value="0" SELECTED>No</option>';
-        }
-    }
-
-    /**
      * Render the help section explaining how depth charts work.
      */
     public function renderHelpSection(): void
@@ -255,21 +224,23 @@ the earlier slot in that order claims them.</p>
                 <a href=\"./modules.php?name=Player&pa=showpage&pid={$player_pid}\">{$player_name_html}</a>
             </td>";
 
-        // Active status
+        // Active status — hidden input submits "0" when checkbox is unchecked;
+        // the checkbox submits "1" when checked. Two fields share the same
+        // name so the form posts the right value regardless of checkbox state.
+        /** @var int $dcActive */
         $dcActive = $player['dc_canPlayInGame'] ?? 0;
-        echo "<td><select name=\"canPlayInGame{$depthCount}\" aria-label=\"Active status for {$player_name_html}\">";
-        $this->renderActiveOptions($dcActive);
-        echo "</select></td>";
+        $activeCheckedAttr = ($dcActive === 1) ? ' checked' : '';
+        echo "<td class=\"dc-active-cell\">";
+        echo "<input type=\"hidden\" name=\"canPlayInGame{$depthCount}\" value=\"0\">";
+        echo "<input type=\"checkbox\" name=\"canPlayInGame{$depthCount}\" value=\"1\" class=\"dc-active-cb\"{$activeCheckedAttr} aria-label=\"Active status for {$player_name_html}\">";
+        echo "</td>";
 
-        // Minutes
+        // Minutes — number input constrained to 0-40 with native browser
+        // stepper. The server sanitizes to the same 0-40 range in
+        // DepthChartEntryProcessor::sanitizeMinutesValue().
+        /** @var int $dcMinutes */
         $dcMinutes = $player['dc_minutes'] ?? 0;
-        $staminaCap = ($player['sta'] ?? 0) + 40;
-        if ($staminaCap > 40) {
-            $staminaCap = 40;
-        }
-        echo "<td><select name=\"min{$depthCount}\" aria-label=\"Minutes for {$player_name_html}\">";
-        $this->renderMinutesOptions($dcMinutes, $staminaCap);
-        echo "</select></td>";
+        echo "<td class=\"dc-minutes-cell\"><input type=\"number\" name=\"min{$depthCount}\" value=\"{$dcMinutes}\" min=\"0\" max=\"40\" step=\"1\" class=\"dc-minutes-input\" aria-label=\"Minutes for {$player_name_html}\"></td>";
 
         // Role slot columns (PG/SG/SF/PF/C mapped to BH/DI/OI/DF/OF form fields)
         foreach (self::ROLE_SLOTS as $slot) {
@@ -305,26 +276,25 @@ function resetDepthChart() {
     var form = document.forms['DepthChartEntry'];
     if (!form) return;
 
+    // Reset role slot selects (BH/DI/OI/DF/OF) to 0
     var selects = form.getElementsByTagName('select');
-
     for (var i = 0; i < selects.length; i++) {
-        var select = selects[i];
-        var name = select.name;
-
-        var defaultValue = '0';
-
-        if (name.match(/^canPlayInGame\d+$/)) {
-            defaultValue = '1';
-        }
-
-        select.value = defaultValue;
+        selects[i].value = '0';
     }
 
-    // Also reset mobile card checkboxes
-    var checkboxes = form.querySelectorAll('.dc-card__active-cb');
-    for (var j = 0; j < checkboxes.length; j++) {
-        checkboxes[j].checked = true;
-        var card = checkboxes[j].closest('.dc-card');
+    // Reset minutes number inputs to 0
+    var minInputs = form.querySelectorAll('input[type="number"][name^="min"]');
+    for (var j = 0; j < minInputs.length; j++) {
+        minInputs[j].value = '0';
+    }
+
+    // Reset active checkboxes (canPlayInGame) to checked — both desktop
+    // (.dc-active-cb) and mobile (.dc-card__active-cb) are covered by the
+    // name prefix selector.
+    var activeCheckboxes = form.querySelectorAll('input[type="checkbox"][name^="canPlayInGame"]');
+    for (var k = 0; k < activeCheckboxes.length; k++) {
+        activeCheckboxes[k].checked = true;
+        var card = activeCheckboxes[k].closest('.dc-card');
         if (card) card.classList.remove('dc-card--inactive');
     }
 
@@ -499,20 +469,13 @@ JAVASCRIPT;
         echo '<div class="dc-card__body">';
         echo '<div class="dc-card__settings-grid">';
 
-        // Minutes
+        // Minutes — number input constrained to 0-40 with native stepper.
         /** @var int $dcMinutes */
         $dcMinutes = $player['dc_minutes'] ?? 0;
-        /** @var int $sta */
-        $sta = $player['sta'] ?? 0;
-        $staminaCap = $sta + 40;
-        if ($staminaCap > 40) {
-            $staminaCap = 40;
-        }
         echo "<div class=\"dc-card__field\">";
         echo '<span class="dc-card__field-label">Min</span>';
-        echo "<select name=\"min{$depthCount}\" aria-label=\"Minutes for {$nameHtml}\" disabled>";
-        $this->renderMinutesOptions($dcMinutes, $staminaCap);
-        echo '</select></div>';
+        echo "<input type=\"number\" name=\"min{$depthCount}\" value=\"{$dcMinutes}\" min=\"0\" max=\"40\" step=\"1\" class=\"dc-minutes-input\" aria-label=\"Minutes for {$nameHtml}\" disabled>";
+        echo '</div>';
 
         foreach (self::ROLE_SLOTS as $slot) {
             /** @var int $dcValue */

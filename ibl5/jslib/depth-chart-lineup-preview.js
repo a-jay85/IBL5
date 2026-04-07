@@ -206,14 +206,17 @@
             var nameInput = row.querySelector('input[name^="Name"]');
             var name = nameInput ? nameInput.value : '?';
 
-            // Read active status
+            // Read active status (checkbox — desktop class .dc-active-cb,
+            // mobile class .dc-card__active-cb; both share the canPlayInGame
+            // name prefix and the type attribute selector hits both)
             var idx = i + 1;
-            var activeSel = form.querySelector('select[name="canPlayInGame' + idx + '"]');
-            var active = activeSel ? activeSel.value === '1' : true;
+            var activeCb = form.querySelector('input[type="checkbox"][name="canPlayInGame' + idx + '"]');
+            var active = activeCb ? activeCb.checked : true;
 
-            // Read dc_minutes — THIS IS the candidate quality per JSB line 90870
-            var minSel = form.querySelector('select[name="min' + idx + '"]');
-            var dcMinutes = minSel ? parseInt(minSel.value, 10) : 0;
+            // Read dc_minutes from the number input — THIS IS the candidate
+            // quality per JSB line 90870
+            var minInput = form.querySelector('input[type="number"][name="min' + idx + '"]');
+            var dcMinutes = minInput ? parseInt(minInput.value, 10) || 0 : 0;
 
             // Read dc values for each slot
             var dcValues = {};
@@ -781,8 +784,8 @@
             var row = rows[i];
             var pos = row.getAttribute('data-pos') || '';
 
-            var minSel = form.querySelector('select[name="min' + idx + '"]');
-            var dcMin = minSel ? parseInt(minSel.value, 10) : 0;
+            var minInput = form.querySelector('input[type="number"][name="min' + idx + '"]');
+            var dcMin = minInput ? parseInt(minInput.value, 10) || 0 : 0;
 
             for (var s = 0; s < SLOTS.length; s++) {
                 var slot = SLOTS[s];

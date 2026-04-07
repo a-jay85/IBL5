@@ -139,18 +139,18 @@
                 if (!pidInput) continue;
                 var depthCount = pidInput.name.replace('pid', '');
 
-                // Position depth and minutes are dead fields — hidden inputs always 0
-                // (Legacy saved DCs may have ordinal values; we ignore them)
+                // Position depth columns (pg/sg/sf/pf/c) are dead hidden inputs — ignore
 
-                // Active status
-                setSelectValue(form, 'canPlayInGame' + depthCount, player.dc_canPlayInGame);
+                // Active status (checkbox) + minutes (number input, clamped to 0-40)
+                setFieldValue(form, 'canPlayInGame' + depthCount, player.dc_canPlayInGame);
+                setFieldValue(form, 'min' + depthCount, Math.max(0, Math.min(40, player.dc_minutes)));
 
                 // Role slot values (clamp negatives to 0 for legacy saved DCs)
-                setSelectValue(form, 'OF' + depthCount, Math.max(0, player.dc_of));
-                setSelectValue(form, 'DF' + depthCount, Math.max(0, player.dc_df));
-                setSelectValue(form, 'OI' + depthCount, Math.max(0, player.dc_oi));
-                setSelectValue(form, 'DI' + depthCount, Math.max(0, player.dc_di));
-                setSelectValue(form, 'BH' + depthCount, Math.max(0, player.dc_bh));
+                setFieldValue(form, 'OF' + depthCount, Math.max(0, player.dc_of));
+                setFieldValue(form, 'DF' + depthCount, Math.max(0, player.dc_df));
+                setFieldValue(form, 'OI' + depthCount, Math.max(0, player.dc_oi));
+                setFieldValue(form, 'DI' + depthCount, Math.max(0, player.dc_di));
+                setFieldValue(form, 'BH' + depthCount, Math.max(0, player.dc_bh));
 
                 // Mark traded players
                 if (!player.isOnCurrentRoster) {
@@ -167,10 +167,11 @@
                         }
                     }
 
-                    // Disable selects for traded players
-                    var tradedSelects = row.querySelectorAll('select');
-                    for (var ts = 0; ts < tradedSelects.length; ts++) {
-                        tradedSelects[ts].disabled = true;
+                    // Disable form fields for traded players (selects, minutes
+                    // number input, active checkbox)
+                    var tradedFields = row.querySelectorAll('select, input[type="number"], input[type="checkbox"]');
+                    for (var ts = 0; ts < tradedFields.length; ts++) {
+                        tradedFields[ts].disabled = true;
                     }
                 }
 
@@ -210,19 +211,42 @@
             }
         }
 
-        function setSelectValue(form, name, value) {
-            var sel = form.elements[name];
-            if (!sel) return;
-            if (sel.tagName === 'SELECT') {
-                sel.value = String(value);
-            } else if (sel.length) {
-                // Multiple elements share this name (desktop + mobile views)
-                for (var i = 0; i < sel.length; i++) {
-                    if (sel[i].tagName === 'SELECT') {
-                        sel[i].value = String(value);
-                    }
-                }
+        /**
+         * Apply a value to every form field sharing the given name. Handles
+         * SELECT (role slots), INPUT[type=number] (minutes), and
+         * INPUT[type=checkbox] (canPlayInGame). Hidden inputs sharing the
+         * canPlayInGame name are intentionally left alone — they always carry
+         * "0" so the form still posts 0 when the checkbox is unchecked.
+         */
+        function setFieldValue(form, name, value) {
+            var el = form.elements[name];
+            if (!el) return;
+
+            // RadioNodeList when multiple elements share the name (desktop +
+            // mobile selects/checkboxes, or checkbox + its sibling hidden field)
+            var items = (typeof el.length === 'number' && !el.tagName) ? el : [el];
+            for (var i = 0; i < items.length; i++) {
+                applyFieldValue(items[i], value);
             }
+        }
+
+        function applyFieldValue(field, value) {
+            if (field.tagName === 'SELECT') {
+                field.value = String(value);
+                return;
+            }
+            if (field.tagName !== 'INPUT') {
+                return;
+            }
+            if (field.type === 'checkbox') {
+                field.checked = (Number(value) === 1);
+                return;
+            }
+            if (field.type === 'number' || field.type === 'text') {
+                field.value = String(value);
+            }
+            // Intentionally skip type="hidden" — those are the canPlayInGame
+            // unchecked-fallback fields and must stay at "0".
         }
 
         function showStats(data) {

@@ -123,24 +123,63 @@ class DepthChartEntryViewTest extends TestCase
         $this->assertStringContainsString('&lt;script&gt;', $output);
     }
 
-    public function testRenderPlayerRowMinutesIsSelectDropdown(): void
+    public function testRenderPlayerRowMinutesIsNumberInput(): void
     {
         $player = $this->buildTestPlayer();
-        $player['sta'] = 5;
         $player['dc_minutes'] = 30;
 
         ob_start();
         $this->view->renderPlayerRow($player, 1);
         $output = (string) ob_get_clean();
 
-        // Minutes is rendered as a <select> dropdown with the current
-        // dc_minutes option pre-selected. The 0 option (literal "play as
-        // little as possible" — JSB does not auto-determine minutes from
-        // dc_minutes=0; see DepthChartEntryView::renderMinutesOptions docblock)
-        // is always present.
-        $this->assertMatchesRegularExpression('/<select[^>]*name="min1"/', $output);
-        $this->assertStringContainsString('<option value="30" SELECTED>30</option>', $output);
-        $this->assertStringContainsString('<option value="0">0</option>', $output);
+        // Minutes is rendered as a <input type="number"> with a native stepper,
+        // constrained to 0-40 (matching DepthChartEntryProcessor::sanitizeMinutesValue).
+        // The server sanitizer clamps the submitted value to the same range.
+        $this->assertMatchesRegularExpression(
+            '/<input type="number" name="min1"[^>]*value="30"[^>]*min="0"[^>]*max="40"[^>]*step="1"/',
+            $output
+        );
+        // No <select> markup for the minutes field
+        $this->assertDoesNotMatchRegularExpression('/<select[^>]*name="min1"/', $output);
+    }
+
+    public function testRenderPlayerRowActiveIsCheckbox(): void
+    {
+        $player = $this->buildTestPlayer();
+        $player['dc_canPlayInGame'] = 1;
+
+        ob_start();
+        $this->view->renderPlayerRow($player, 1);
+        $output = (string) ob_get_clean();
+
+        // Active is rendered as a checkbox + sibling hidden input so the form
+        // submits "0" when unchecked and "1" when checked.
+        $this->assertMatchesRegularExpression(
+            '/<input type="hidden" name="canPlayInGame1" value="0"/',
+            $output
+        );
+        $this->assertMatchesRegularExpression(
+            '/<input type="checkbox" name="canPlayInGame1" value="1"[^>]*class="dc-active-cb"[^>]*checked/',
+            $output
+        );
+        // No <select> markup for the active field
+        $this->assertDoesNotMatchRegularExpression('/<select[^>]*name="canPlayInGame1"/', $output);
+    }
+
+    public function testRenderPlayerRowActiveCheckboxNotCheckedWhenInactive(): void
+    {
+        $player = $this->buildTestPlayer();
+        $player['dc_canPlayInGame'] = 0;
+
+        ob_start();
+        $this->view->renderPlayerRow($player, 1);
+        $output = (string) ob_get_clean();
+
+        // The checkbox should NOT have the "checked" attribute when inactive
+        $this->assertDoesNotMatchRegularExpression(
+            '/<input type="checkbox" name="canPlayInGame1"[^>]*checked/',
+            $output
+        );
     }
 
     public function testRenderPlayerRowEmitsJsbProductionAttribute(): void
@@ -214,9 +253,11 @@ class DepthChartEntryViewTest extends TestCase
         $this->assertStringContainsString('function resetDepthChart()', $output);
         $this->assertStringContainsString('document.forms[\'DepthChartEntry\']', $output);
         $this->assertStringContainsString('confirm(', $output);
-        $this->assertStringContainsString('canPlayInGame', $output);
+        // Reset handles all three field types: selects (role slots), number
+        // inputs (minutes), and checkboxes (canPlayInGame).
         $this->assertStringContainsString('getElementsByTagName(\'select\')', $output);
-        $this->assertStringContainsString('dc-card__active-cb', $output);
+        $this->assertStringContainsString('input[type="number"][name^="min"]', $output);
+        $this->assertStringContainsString('input[type="checkbox"][name^="canPlayInGame"]', $output);
     }
 
     public function testResetButtonIsButtonType(): void
@@ -292,10 +333,10 @@ class DepthChartEntryViewTest extends TestCase
         $this->assertGreaterThan(0, $selectCount);
         $this->assertSame($selectCount, $disabledSelectCount, 'All selects must have disabled attribute');
 
-        // All hidden/checkbox inputs should have the disabled attribute
+        // All hidden/checkbox/number inputs should have the disabled attribute
         // (excludes footer button/submit inputs which should NOT be disabled)
-        $formInputCount = preg_match_all('/<input\s+type="(hidden|checkbox)"/', $output);
-        $disabledFormInputCount = preg_match_all('/<input\s+type="(hidden|checkbox)"[^>]+disabled/', $output);
+        $formInputCount = preg_match_all('/<input\s+type="(hidden|checkbox|number)"/', $output);
+        $disabledFormInputCount = preg_match_all('/<input\s+type="(hidden|checkbox|number)"[^>]+disabled/', $output);
         $this->assertGreaterThan(0, $formInputCount);
         $this->assertSame($formInputCount, $disabledFormInputCount, 'All form inputs must have disabled attribute');
     }

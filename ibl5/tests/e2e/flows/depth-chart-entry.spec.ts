@@ -49,19 +49,30 @@ test.describe('Depth Chart Entry flow', () => {
     await expect(options.first()).toBeAttached();
   });
 
-  test('active selects have valid values', async ({ page }) => {
+  test('active checkboxes render as form controls', async ({ page }) => {
     const form = page.locator('.depth-chart-form');
     await expect(form).toBeVisible({ timeout: 15000 });
 
-    const activeSelects = page.locator('select[name^="canPlayInGame"]');
-    await expect(activeSelects.first()).toBeVisible();
+    // Active field is a checkbox (not a select) as of the depth-chart-redesign
+    // refactor. Use the desktop `.dc-active-cb` class to disambiguate from the
+    // mobile `.dc-card__active-cb` which shares the name prefix.
+    const activeCheckboxes = page.locator('input[type="checkbox"].dc-active-cb[name^="canPlayInGame"]');
+    await expect(activeCheckboxes.first()).toBeAttached();
+    // At least one player in the seed should have `checked` pre-set.
+    const count = await activeCheckboxes.count();
+    expect(count).toBeGreaterThan(0);
+  });
 
-    const count = await activeSelects.count();
-    // Each active select should have a value of "1" or "0"
-    for (let i = 0; i < Math.min(count, 3); i++) {
-      const value = await activeSelects.nth(i).inputValue();
-      expect(['0', '1']).toContain(value);
-    }
+  test('minutes renders as number input 0-40', async ({ page }) => {
+    const form = page.locator('.depth-chart-form');
+    await expect(form).toBeVisible({ timeout: 15000 });
+
+    const minInputs = page.locator('input[type="number"][name^="min"]');
+    await expect(minInputs.first()).toBeAttached();
+    // The server constrains the input to 0-40 via min/max attributes.
+    await expect(minInputs.first()).toHaveAttribute('min', '0');
+    await expect(minInputs.first()).toHaveAttribute('max', '40');
+    await expect(minInputs.first()).toHaveAttribute('step', '1');
   });
 
   test('reset button prompts confirmation', async ({ page }) => {

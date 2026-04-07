@@ -2089,6 +2089,30 @@ td.ibl-team-cell--colored {
     font-size: 0.875rem;
 }
 
+/* Minutes number input — matches the role-slot select's size/appearance.
+   The native browser stepper sits to the right of the digits. */
+.depth-chart-table input[type="number"].dc-minutes-input {
+    padding: 0.25rem;
+    border: 1px solid var(--gray-300);
+    border-radius: var(--radius-sm);
+    font-size: 0.875rem;
+    width: 4rem;
+    text-align: center;
+}
+
+/* Active checkbox cell — centered, generously sized to keep the hit target
+   finger-friendly on touch devices without overwhelming the row. */
+.depth-chart-table td.dc-active-cell {
+    text-align: center;
+}
+
+.depth-chart-table input[type="checkbox"].dc-active-cb {
+    width: 1.125rem;
+    height: 1.125rem;
+    cursor: pointer;
+    accent-color: var(--color-accent-500, #f97316);
+}
+
 /* ==========================================================================
    Draft Pick Locator Table
 

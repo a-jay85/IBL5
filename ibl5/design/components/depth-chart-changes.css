@@ -1,7 +1,13 @@
 /**
  * Depth Chart Change Detection - Orange Glow + Background
  *
- * Highlights <select> elements whose values differ from the live database values.
+ * Highlights form fields whose values differ from the live database values.
+ * Applies to:
+ *   - <select> elements (role slots PG/SG/SF/PF/C)
+ *   - <input type="number"> elements (minutes target)
+ *   - <input type="checkbox"> elements (active toggle) — outline-only since
+ *     checkboxes are too small for background fills
+ *
  * Five intensity levels scale with the magnitude of the change, using the
  * design system's accent orange (--color-accent-500: #f97316).
  *
@@ -33,37 +39,44 @@
 }
 
 /* Base transition for smooth appearance across all properties */
-.depth-chart-form select {
+.depth-chart-form select,
+.depth-chart-form input[type="number"],
+.depth-chart-form input[type="checkbox"] {
     transition: box-shadow 0.25s ease,
                 background-color 0.25s ease,
-                border-color 0.25s ease;
+                border-color 0.25s ease,
+                outline 0.25s ease;
 }
 
 /* Level 1 – detectable hint (categorical change, small numeric diff)
    Background: warm cream — ~4% darker than white for luminance-based detection
    Border: soft orange-brown, visible shift from default gray-300 */
-.depth-chart-form select.dc-glow-1 {
+.depth-chart-form select.dc-glow-1,
+.depth-chart-form input[type="number"].dc-glow-1 {
     background-color: var(--dc-glow-bg-1);
     border-color: var(--dc-glow-border-1);
     box-shadow: 0 0 4px 1px rgba(249, 115, 22, 0.3);
 }
 
 /* Level 2 – noticeable change */
-.depth-chart-form select.dc-glow-2 {
+.depth-chart-form select.dc-glow-2,
+.depth-chart-form input[type="number"].dc-glow-2 {
     background-color: var(--dc-glow-bg-2);
     border-color: var(--dc-glow-border-2);
     box-shadow: 0 0 6px 2px rgba(249, 115, 22, 0.4);
 }
 
 /* Level 3 – moderate change */
-.depth-chart-form select.dc-glow-3 {
+.depth-chart-form select.dc-glow-3,
+.depth-chart-form input[type="number"].dc-glow-3 {
     background-color: var(--dc-glow-bg-3);
     border-color: var(--dc-glow-border-3);
     box-shadow: 0 0 8px 3px rgba(249, 115, 22, 0.5);
 }
 
 /* Level 4 – significant change */
-.depth-chart-form select.dc-glow-4 {
+.depth-chart-form select.dc-glow-4,
+.depth-chart-form input[type="number"].dc-glow-4 {
     background-color: var(--dc-glow-bg-4);
     border-color: var(--dc-glow-border-4);
     box-shadow: 0 0 10px 3px rgba(249, 115, 22, 0.65);
@@ -71,10 +84,19 @@
 
 /* Level 5 – maximum change (e.g. position No → 1st)
    Deep amber background with bold orange border and strong glow */
-.depth-chart-form select.dc-glow-5 {
+.depth-chart-form select.dc-glow-5,
+.depth-chart-form input[type="number"].dc-glow-5 {
     background-color: var(--dc-glow-bg-5);
     border-color: var(--dc-glow-border-5);
     box-shadow: 0 0 14px 4px rgba(249, 115, 22, 0.85);
+}
+
+/* Checkbox glow — categorical (level 1 only). Checkboxes are too small for
+   background fills, so we use an outline + glow ring instead. */
+.depth-chart-form input[type="checkbox"].dc-glow-1 {
+    outline: 2px solid var(--dc-glow-border-2);
+    outline-offset: 2px;
+    box-shadow: 0 0 6px 2px rgba(249, 115, 22, 0.5);
 }
 
 } /* end @layer components */

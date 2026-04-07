@@ -79,26 +79,38 @@ class DepthChartEntryController implements DepthChartEntryControllerInterface
         $currentLiveLabel = $savedDcService->buildCurrentLiveLabel($teamID, $season);
         $this->view->renderSavedDepthChartDropdown($dropdownOptions, $currentLiveLabel);
 
+        $this->view->renderHelpSection();
+
         $playersResult = $this->repository->getPlayersOnTeam($teamID);
+
+        // Compute quality scores and inject into player arrays
+        $playersWithQuality = array_map(
+            static function (array $player): array {
+                $player['quality_score'] = self::computeQualityScore($player);
+                return $player;
+            },
+            $playersResult
+        );
 
         // Collect current roster PIDs for JS config
         $currentRosterPids = array_map(
             static fn(array $p): int => $p['pid'],
-            $playersResult
+            $playersWithQuality
         );
 
         $slotNames = \JSB::PLAYER_POSITIONS;
 
+        $this->view->renderLineupPreview();
         $this->view->renderFormHeader($teamName, $teamID, $slotNames);
 
         $depthCount = 1;
-        foreach ($playersResult as $player) {
+        foreach ($playersWithQuality as $player) {
             $this->view->renderPlayerRow($player, $depthCount);
             $depthCount++;
         }
 
         $this->view->renderFormFooter();
-        $this->view->renderMobileView($playersResult, $slotNames);
+        $this->view->renderMobileView($playersWithQuality, $slotNames);
 
         echo '<div class="table-scroll-wrapper"><div class="table-scroll-container" tabindex="0" role="region" aria-label="Player ratings">';
         echo $this->getTableOutput($teamID, $display, $split);
@@ -112,6 +124,7 @@ class DepthChartEntryController implements DepthChartEntryControllerInterface
         ], JSON_THROW_ON_ERROR);
         echo '<script>window.IBL_DEPTH_CHART_CONFIG = ' . $jsConfig . ';</script>';
         echo '<script src="jslib/depth-chart-changes.js"></script>';
+        echo '<script src="jslib/depth-chart-lineup-preview.js"></script>';
         echo '<script src="jslib/saved-depth-charts.js"></script>';
         echo '<script src="jslib/depth-chart-mobile.js"></script>';
 
@@ -181,5 +194,87 @@ class DepthChartEntryController implements DepthChartEntryControllerInterface
     {
         $teamName = $this->commonRepository->getTeamnameFromUsername($username);
         return $teamName ?? '';
+    }
+
+    /**
+     * Compute the dVar58 in-game quality score for lineup selection.
+     *
+     * Exact formula from decompiled JSB 5.60 (FUN_004cfa50, lines 90899-90908).
+     * All constants resolved from binary .rdata section:
+     *
+     * dVar58 = (TERM_A + TERM_B + TERM_C) / GP
+     *
+     * TERM_A (defense):  (OD + DD + PD + TD − 20) × 0.25 × GS × (1/48)
+     * TERM_B (production): (AST×0.8 + ORB×(2/3) + (DRB−ORB)×(1/3) + STL − TVR + BLK) × 0.75
+     * TERM_C (scoring):  ((FTM−2GM)×(1/6) + (MIN + FTA − (2GA−MIN)×(2/3) + 2GM − FTM×0.5)) × 1.5
+     *
+     * Note: 3-point stats are entirely absent from dVar58 (offset +0x160 loaded but unused).
+     * Note: dc_minutes multiplier (×(dc_minutes+100)) is applied client-side since minutes
+     * is a dynamic form input.
+     *
+     * @param array<string, mixed> $player Player row from ibl_plr
+     */
+    private static function computeQualityScore(array $player): float
+    {
+        /** @var int $gp */
+        $gp = $player['stats_gm'] ?? 0;
+        if ($gp === 0) {
+            return 0.0;
+        }
+
+        /** @var int $gs */
+        $gs = $player['stats_gs'] ?? 0;
+        /** @var int $min */
+        $min = $player['stats_min'] ?? 0;
+        /** @var int $fgm */
+        $fgm = $player['stats_fgm'] ?? 0;
+        /** @var int $fga */
+        $fga = $player['stats_fga'] ?? 0;
+        /** @var int $ftm */
+        $ftm = $player['stats_ftm'] ?? 0;
+        /** @var int $fta */
+        $fta = $player['stats_fta'] ?? 0;
+        /** @var int $tpm */
+        $tpm = $player['stats_3gm'] ?? 0;
+        /** @var int $tpa */
+        $tpa = $player['stats_3ga'] ?? 0;
+        /** @var int $orb */
+        $orb = $player['stats_orb'] ?? 0;
+        /** @var int $drb */
+        $drb = $player['stats_drb'] ?? 0;
+        /** @var int $ast */
+        $ast = $player['stats_ast'] ?? 0;
+        /** @var int $stl */
+        $stl = $player['stats_stl'] ?? 0;
+        /** @var int $tvr */
+        $tvr = $player['stats_to'] ?? 0;
+        /** @var int $blk */
+        $blk = $player['stats_blk'] ?? 0;
+
+        // ODPT defense ratings (1-9 scale)
+        /** @var int $od */
+        $od = $player['od'] ?? 5;
+        /** @var int $dd */
+        $dd = $player['dd'] ?? 5;
+        /** @var int $pd */
+        $pd = $player['pd'] ?? 5;
+        /** @var int $td */
+        $td = $player['td'] ?? 5;
+
+        // 2pt FGM/FGA (JSB uses 2pt stats directly, 3pt stats absent from dVar58)
+        $twoPtMade = $fgm - $tpm;
+        $twoPtAtt = $fga - $tpa;
+
+        // TERM_A (defense): (OD+DD+PD+TD-20) × 0.25 × GS × (1/48)
+        $termA = ($od + $dd + $pd + $td - 20) * 0.25 * $gs / 48.0;
+
+        // TERM_B (production): (AST×0.8 + ORB×(2/3) + (DRB-ORB)×(1/3) + STL - TVR + BLK) × 0.75
+        $termB = ($ast * 0.8 + $orb * (2.0 / 3.0) + ($drb - $orb) * (1.0 / 3.0) + $stl - $tvr + $blk) * 0.75;
+
+        // TERM_C (scoring): ((FTM-2GM)×(1/6) + (MIN + FTA - (2GA-MIN)×(2/3) + 2GM - FTM×0.5)) × 1.5
+        $termC = (($ftm - $twoPtMade) / 6.0
+            + ($min + $fta - ($twoPtAtt - $min) * (2.0 / 3.0) + $twoPtMade - $ftm * 0.5)) * 1.5;
+
+        return round(($termA + $termB + $termC) / $gp, 2);
     }
 }

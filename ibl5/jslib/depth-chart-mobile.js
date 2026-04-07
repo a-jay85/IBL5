@@ -39,13 +39,18 @@
     }
 
     /**
-     * Sync select values from source container to target container.
-     * Handles select↔select and select↔checkbox mapping for canPlayInGame.
+     * Sync form values from source container to target container.
+     * Fields in both views share names, so we sync:
+     *   - <select> role slots (BH/DI/OI/DF/OF)
+     *   - <input type="number"> minutes (min<N>)
+     *   - <input type="checkbox"> canPlayInGame<N>
+     * The sibling hidden <input> for canPlayInGame is untouched — it always
+     * carries "0" as the unchecked-fallback value.
      */
     function syncValues(source, target) {
         if (!source || !target) return;
 
-        // Sync all selects by name
+        // Role slot selects
         var sourceSelects = source.querySelectorAll('select[name]');
         for (var i = 0; i < sourceSelects.length; i++) {
             var sel = sourceSelects[i];
@@ -55,24 +60,24 @@
             }
         }
 
-        // Sync desktop canPlayInGame selects → mobile checkboxes
-        var checkboxes = target.querySelectorAll('.dc-card__active-cb');
-        for (var j = 0; j < checkboxes.length; j++) {
-            var cb = checkboxes[j];
-            var srcSel = source.querySelector('select[name="' + cb.name + '"]');
-            if (srcSel) {
-                cb.checked = (srcSel.value === '1');
-                updateCardOpacity(cb);
+        // Minutes number inputs
+        var sourceNumInputs = source.querySelectorAll('input[type="number"][name]');
+        for (var n = 0; n < sourceNumInputs.length; n++) {
+            var numInput = sourceNumInputs[n];
+            var targetNumInput = target.querySelector('input[type="number"][name="' + numInput.name + '"]');
+            if (targetNumInput) {
+                targetNumInput.value = numInput.value;
             }
         }
 
-        // Sync mobile checkboxes → desktop canPlayInGame selects
-        var sourceCheckboxes = source.querySelectorAll('.dc-card__active-cb');
+        // Active checkboxes
+        var sourceCheckboxes = source.querySelectorAll('input[type="checkbox"][name^="canPlayInGame"]');
         for (var k = 0; k < sourceCheckboxes.length; k++) {
             var srcCb = sourceCheckboxes[k];
-            var targetSelForCb = target.querySelector('select[name="' + srcCb.name + '"]');
-            if (targetSelForCb) {
-                targetSelForCb.value = srcCb.checked ? '1' : '0';
+            var targetCb = target.querySelector('input[type="checkbox"][name="' + srcCb.name + '"]');
+            if (targetCb) {
+                targetCb.checked = srcCb.checked;
+                updateCardOpacity(targetCb);
             }
         }
     }
@@ -117,6 +122,9 @@
         if (typeof window.IBL_recalculateDepthChartGlows === 'function') {
             window.IBL_recalculateDepthChartGlows();
         }
+        if (typeof window.IBL_recalculateLineupPreview === 'function') {
+            window.IBL_recalculateLineupPreview();
+        }
     }
 
     function onResize() {
@@ -138,34 +146,42 @@
         lastMobile = isMobile();
         applyView(lastMobile);
 
-        // Active checkbox toggle listeners
+        // Active checkbox toggle listeners — sync mobile cb → desktop cb
         var checkboxes = mobileEl.querySelectorAll('.dc-card__active-cb');
         for (var i = 0; i < checkboxes.length; i++) {
             (function (cb) {
                 updateCardOpacity(cb);
                 cb.addEventListener('change', function () {
                     updateCardOpacity(cb);
-                    // Sync to desktop select
                     var desktop = getDesktopContainer();
                     if (desktop) {
-                        var sel = desktop.querySelector('select[name="' + cb.name + '"]');
-                        if (sel) sel.value = cb.checked ? '1' : '0';
+                        var deskCb = desktop.querySelector('input[type="checkbox"][name="' + cb.name + '"]');
+                        if (deskCb) deskCb.checked = cb.checked;
                     }
                     if (typeof window.IBL_recalculateDepthChartGlows === 'function') {
                         window.IBL_recalculateDepthChartGlows();
+                    }
+                    if (typeof window.IBL_recalculateLineupPreview === 'function') {
+                        window.IBL_recalculateLineupPreview();
                     }
                 });
             })(checkboxes[i]);
         }
 
-        // Card select change listeners — sync to desktop immediately
+        // Card field change listeners — sync role slot selects and minutes
+        // number inputs to desktop immediately. Checkboxes are handled by
+        // the dedicated loop above.
         mobileEl.addEventListener('change', function (e) {
             var target = e.target;
-            if (target.tagName !== 'SELECT') return;
+            if (!target.name) return;
             var desktop = getDesktopContainer();
-            if (desktop) {
+            if (!desktop) return;
+            if (target.tagName === 'SELECT') {
                 var sel = desktop.querySelector('select[name="' + target.name + '"]');
                 if (sel) sel.value = target.value;
+            } else if (target.tagName === 'INPUT' && target.type === 'number') {
+                var numInput = desktop.querySelector('input[type="number"][name="' + target.name + '"]');
+                if (numInput) numInput.value = target.value;
             }
         });
 

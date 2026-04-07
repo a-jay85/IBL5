@@ -62,4 +62,185 @@
 }
 
 
+
+/* ==========================================================================
+   Help Section (collapsible)
+   ========================================================================== */
+
+.dc-help-section {
+    max-width: 600px;
+    margin: 0 auto var(--space-4);
+    border: 1px solid var(--gray-200);
+    border-radius: var(--radius-md);
+    background: var(--gray-50);
+}
+
+.dc-help-section summary {
+    padding: var(--space-2) var(--space-3);
+    font-weight: 600;
+    cursor: pointer;
+    color: var(--navy-800);
+}
+
+.dc-help-section__content {
+    padding: 0 var(--space-3) var(--space-3);
+    font-size: 0.875rem;
+    line-height: 1.5;
+    color: var(--gray-700);
+}
+
+.dc-help-section__content p {
+    margin: 0 0 var(--space-2);
+}
+
+.dc-help-section__content ol,
+.dc-help-section__content ul {
+    list-style: none;
+    padding-left: 0;
+    margin-bottom: var(--space-2);
+}
+
+.dc-help-section__content li {
+    margin-bottom: var(--space-1);
+}
+
+.dc-help-table {
+    font-size: 0.8125rem;
+    margin-bottom: var(--space-2);
+}
+
+/* ==========================================================================
+   Lineup Preview Grid
+   ========================================================================== */
+
+/*
+ * Container sizes to parent; a horizontal scrollbar kicks in when the grid
+ * is wider than the viewport (narrow mobile) so nothing is ever truncated.
+ * The inner table is auto-layout and shrink-wraps to content, then centers
+ * horizontally within the container when there's surplus space.
+ */
+.dc-lineup-preview {
+    max-width: 100%;
+    margin: 0 auto var(--space-4);
+    overflow-x: auto;
+}
+
+.dc-lineup-preview__title {
+    font-weight: 600;
+    font-size: 0.875rem;
+    text-align: center;
+    margin-bottom: var(--space-2);
+    color: var(--navy-800);
+}
+
+/*
+ * `width: auto + margin: auto` centers the shrink-wrapped table inside
+ * .dc-lineup-preview when the grid is narrower than the container. When
+ * the grid is wider than the viewport, the parent's `overflow-x: auto`
+ * provides a horizontal scrollbar instead of truncating cells.
+ */
+.dc-lineup-preview table {
+    width: auto;
+    margin: 0 auto;
+    table-layout: auto;
+}
+
+/*
+ * Cells are sized to content (because table-layout: auto) and never wrap,
+ * so both the abbreviated name and the minute-share annotation always
+ * render on a single line with no ellipsis.
+ */
+.dc-lineup-preview td {
+    text-align: center;
+    padding: var(--space-1) var(--space-2);
+    font-size: 0.8125rem;
+    white-space: nowrap;
+}
+
+/*
+ * Row labels ("Starter", "1st", "2nd", "3rd") in the first column of each
+ * body row — styled smaller/gray/left-aligned so they read as tier labels
+ * rather than data. Scoped to td only so the empty corner <th> still
+ * inherits the default .ibl-data-table dark navy header styling and
+ * visually matches the form table's header row.
+ */
+.dc-lineup-preview td.dc-lineup-preview__row-label {
+    font-size: 0.6875rem;
+    font-weight: 600;
+    color: var(--gray-400);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    text-align: left;
+    width: 4.5em;
+    overflow: visible;
+    white-space: nowrap;
+    text-overflow: clip;
+}
+
+.dc-lineup-preview__starter {
+    font-weight: 600;
+}
+
+/*
+ * Predicted minute share annotation rendered after each player name in the
+ * lineup grid — e.g. "D. Howard 36m". Muted + smaller so the eye still lands
+ * on the player name and the minutes read as secondary metadata.
+ *
+ * Specificity is scoped to `.dc-lineup-preview td` (0,2,1) so it beats
+ * `.ibl-data-table td` (0,1,1) which sets a darker color on every data-table
+ * cell.
+ */
+.dc-lineup-preview td .dc-lineup-preview__mins {
+    font-size: 0.6875rem;
+    font-weight: 400;
+    color: var(--gray-500);
+    margin-left: 0.125rem;
+    position: relative;
+    top: 2px;
+}
+
+/*
+ * Add 2px inline padding to player-name cells (starter + bench) in the
+ * Projected Lineup table. Specificity (0,2,1) beats `.ibl-data-table td`
+ * (0,1,1), which would otherwise win on source order.
+ */
+.dc-lineup-preview td.ibl-player-cell {
+    padding-inline: calc(0.1rem + 2px);
+}
+
+/*
+ * Bench-scan fallback marker — used when a slot is self-backed in lineup
+ * memory and FUN_004db520's runtime bench-scan fallback would supply the
+ * actual replacement. Italic + softer color so the GM can tell at a glance
+ * which subs come from the structured backup vs the runtime fallback.
+ *
+ * The selector is scoped to `.dc-lineup-preview td` (specificity 0,2,1) so
+ * it beats `.ibl-data-table td` (0,1,1), which sets a darker color on every
+ * data-table cell.
+ */
+.dc-lineup-preview td.dc-lineup-preview__bench-scan {
+    font-style: italic;
+    color: var(--gray-500);
+}
+
+.dc-lineup-preview__empty {
+    color: var(--gray-300);
+}
+
+
+
+/* ==========================================================================
+   Debug Score Annotations
+   ========================================================================== */
+
+/*
+ * Populated by updateScoreDebug() in depth-chart-lineup-preview.js on
+ * localhost only. Hidden from normal users — kept in the DOM so developers
+ * can toggle visibility with DevTools when auditing the scoring branches.
+ */
+.dc-score-debug {
+    display: none;
+}
+
+
 } /* end @layer components */

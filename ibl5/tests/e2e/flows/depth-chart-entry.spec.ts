@@ -95,11 +95,16 @@ test.describe('Depth Chart Entry flow', () => {
     const form = page.locator('.depth-chart-form');
     await expect(form).toBeVisible({ timeout: 15000 });
 
-    // Mutate form state so reset has something to revert.
-    const firstBh = page.locator('select[name^="BH"]').first();
+    // Mutate form state so reset has something to revert. Desktop and mobile
+    // cards share the same input names (name="BH1" etc.), so every locator
+    // must scope to `.depth-chart-table` to avoid strict-mode violations
+    // against the mobile card's disabled duplicates.
+    const firstBh = page.locator('.depth-chart-table select[name^="BH"]').first();
     await firstBh.selectOption('1');
 
-    const firstMin = page.locator('input[type="number"][name^="min"]').first();
+    const firstMin = page
+      .locator('.depth-chart-table input[type="number"][name^="min"]')
+      .first();
     await firstMin.fill('25');
 
     const firstActive = page
@@ -151,7 +156,7 @@ test.describe('Depth Chart Entry flow', () => {
     expect(uncheckedActive).toBe(0);
   });
 
-  test('lineup preview re-renders when a role slot value changes', async ({
+  test('lineup preview recalculates when a role slot value changes', async ({
     page,
   }) => {
     const form = page.locator('.depth-chart-form');
@@ -161,32 +166,49 @@ test.describe('Depth Chart Entry flow', () => {
     await expect(preview.locator('.dc-lineup-preview__title')).toContainText(
       /projected lineup/i,
     );
-
-    // Ensure the initial render has finished (starters row exists).
     await expect(preview.locator('.dc-lineup-preview-table')).toBeVisible();
-    const htmlBefore = await preview.innerHTML();
-    expect(htmlBefore.length).toBeGreaterThan(0);
 
-    // Find the first BH select currently at value "0" (fallback path) and
-    // bump it to "1" (bonus path). This jumps the player across scoring
-    // branches — 0 → 1 guarantees a rescored candidate list and a visibly
-    // different preview, whereas dc=1 vs dc=2 may produce identical output
-    // when no other dc>0 candidates exist to reorder.
-    const targetBhName = await page.evaluate(() => {
-      const bh = Array.from(
-        document.querySelectorAll<HTMLSelectElement>('select[name^="BH"]'),
-      ).find((s) => s.value === '0');
-      return bh ? bh.name : null;
+    // Install a MutationObserver on the preview container. depth-chart-lineup-
+    // preview.js re-renders via `container.innerHTML = html`, which replaces
+    // the entire childList subtree — the observer fires even when the new
+    // HTML is byte-identical, so we get a clean "recalculate happened"
+    // signal without depending on the BH change producing a visible diff.
+    // (For many rosters a BH=0→1 promotion produces identical output
+    // because the new candidate's score doesn't beat the incumbents.)
+    await page.evaluate(() => {
+      const container = document.getElementById('dc-lineup-preview');
+      if (!container) return;
+      const w = window as typeof window & {
+        __ibl_preview_mutations?: number;
+        __ibl_preview_observer?: MutationObserver;
+      };
+      w.__ibl_preview_mutations = 0;
+      w.__ibl_preview_observer?.disconnect();
+      const observer = new MutationObserver(() => {
+        w.__ibl_preview_mutations = (w.__ibl_preview_mutations ?? 0) + 1;
+      });
+      observer.observe(container, { childList: true, subtree: true });
+      w.__ibl_preview_observer = observer;
     });
-    expect(targetBhName, 'roster must have at least one BH=0 row').not.toBeNull();
 
-    await page.locator(`select[name="${targetBhName}"]`).selectOption('1');
+    // Change a desktop BH select (scoped to `.depth-chart-table` to avoid
+    // strict-mode collisions with the mobile card duplicates). Any change
+    // triggers the delegated form listener in depth-chart-lineup-preview.js.
+    const firstBh = page.locator('.depth-chart-table select[name^="BH"]').first();
+    const originalBh = await firstBh.inputValue();
+    await firstBh.selectOption(originalBh === '0' ? '1' : '0');
 
     await expect
-      .poll(async () => (await preview.innerHTML()) !== htmlBefore, {
-        timeout: 3000,
-      })
-      .toBe(true);
+      .poll(
+        async () =>
+          page.evaluate(
+            () =>
+              (window as typeof window & { __ibl_preview_mutations?: number })
+                .__ibl_preview_mutations ?? 0,
+          ),
+        { timeout: 3000 },
+      )
+      .toBeGreaterThan(0);
   });
 
   test('lineup preview minute shares update when dc_minutes changes', async ({
@@ -197,32 +219,48 @@ test.describe('Depth Chart Entry flow', () => {
 
     const preview = page.locator('#dc-lineup-preview');
     await expect(preview.locator('.dc-lineup-preview-table')).toBeVisible();
-
-    // Promote a fallback (BH=0) player to the PG slot via bonus path (BH=1).
-    // This guarantees the player is a starter with a .dc-lineup-preview__mins
-    // cell tied to them, so mutating their min input produces an observable
-    // change in the minute-share annotations.
-    const target = await page.evaluate(() => {
-      const bh = Array.from(
-        document.querySelectorAll<HTMLSelectElement>('select[name^="BH"]'),
-      ).find((s) => s.value === '0');
-      if (!bh) return null;
-      return { bhName: bh.name, suffix: bh.name.replace('BH', '') };
-    });
-    expect(target, 'roster must have at least one BH=0 row').not.toBeNull();
-
-    await page.locator(`select[name="${target!.bhName}"]`).selectOption('1');
-
-    // Wait for the preview to reflect the BH promotion before snapshotting.
     await expect(preview.locator('.dc-lineup-preview__starter').first()).toBeVisible();
-    const minsBefore = await preview.locator('.dc-lineup-preview__mins').allInnerTexts();
+
+    // Target the FIRST starter in the preview: since they're rendered with a
+    // .dc-lineup-preview__mins annotation, mutating their min input is
+    // guaranteed to change that annotation. We resolve the starter's pid
+    // from the preview link href, look up their row in the desktop table,
+    // and read the matching minN input name. This avoids the failure mode
+    // where we change a bench player's min and see no rendered diff.
+    const target = await page.evaluate(() => {
+      const starterCell = document.querySelector<HTMLTableCellElement>(
+        '#dc-lineup-preview .dc-lineup-preview__starter',
+      );
+      if (!starterCell) return null;
+      const link = starterCell.querySelector<HTMLAnchorElement>('a[href*="pid="]');
+      if (!link) return null;
+      const pidMatch = link.getAttribute('href')?.match(/pid=(\d+)/);
+      if (!pidMatch) return null;
+      const pid = pidMatch[1];
+      const row = document.querySelector(
+        `.depth-chart-table tr[data-pid="${pid}"]`,
+      );
+      if (!row) return null;
+      const pidInput = row.querySelector<HTMLInputElement>('input[name^="pid"]');
+      if (!pidInput) return null;
+      return { pid, suffix: pidInput.name.replace('pid', '') };
+    });
+    expect(target, 'preview should render at least one starter').not.toBeNull();
+
+    const minsBefore = await preview
+      .locator('.dc-lineup-preview__mins')
+      .allInnerTexts();
     expect(minsBefore.length).toBeGreaterThan(0);
 
-    // Change THIS player's dc_minutes input (not just the first one — the
-    // first min input belongs to a player we haven't promoted, so its
-    // changes may not affect any currently-rendered slot).
-    const minInput = page.locator(`input[type="number"][name="min${target!.suffix}"]`);
-    await minInput.fill('17');
+    // Change this starter's dc_minutes input to a distinctly different value
+    // and dispatch 'change' explicitly — the preview listens on both 'input'
+    // and 'change', but fill() only fires 'input' for number inputs.
+    const minInput = page.locator(
+      `.depth-chart-table input[type="number"][name="min${target!.suffix}"]`,
+    );
+    const origMin = await minInput.inputValue();
+    const newMin = origMin === '17' ? '19' : '17';
+    await minInput.fill(newMin);
     await minInput.dispatchEvent('change');
 
     await expect
@@ -272,8 +310,10 @@ test.describe('Depth Chart Entry flow', () => {
     // Mock the saved-DC load endpoint with deterministic values tied to the
     // real pids so we can assert exact form-field population. This isolates
     // the client-side populateForm() logic from seed-data variability.
+    // The URL shape is: modules.php?name=DepthChartEntry&op=api&action=load&id=N
+    // (apiBaseUrl is wired in DepthChartEntryController.php).
     await page.route(
-      '**/modules.php*name=DepthChartEntry*op=dc-api*action=load**',
+      '**/modules.php?name=DepthChartEntry&op=api&action=load**',
       async (route) => {
         await route.fulfill({
           status: 200,
@@ -289,7 +329,9 @@ test.describe('Depth Chart Entry flow', () => {
                 dc_minutes: 34,
                 dc_bh: 1,
                 dc_di: 2,
-                dc_oi: 3,
+                // BH/DI/OI selects clamp to max=2 (see renderRolePriorityOptions),
+                // so we use 2 here — any value >2 would silently drop to blank.
+                dc_oi: 2,
                 dc_df: 0,
                 dc_of: 0,
                 isOnCurrentRoster: true,
@@ -318,20 +360,29 @@ test.describe('Depth Chart Entry flow', () => {
     const dropdown = page.locator('#saved-dc-select');
     await dropdown.selectOption({ index: 1 });
 
-    // Poll until the form reflects the mocked payload.
+    // Poll until the form reflects the mocked payload. We query the desktop
+    // `.depth-chart-table` directly rather than `form.elements.namedItem()`
+    // because the mobile cards duplicate every input name, which makes
+    // namedItem() return a RadioNodeList (no .value accessor for selects).
     await expect
       .poll(
         async () => {
           return await page.evaluate(
             (counts: { p1: string; p2: string }) => {
-              const form = document.forms.namedItem('DepthChartEntry');
-              if (!form) return null;
+              const table = document.querySelector('.depth-chart-table');
+              if (!table) return null;
               const val = (name: string) =>
-                (form.elements.namedItem(name) as HTMLInputElement | null)
-                  ?.value ?? null;
+                (
+                  table.querySelector<
+                    HTMLInputElement | HTMLSelectElement
+                  >(`[name="${name}"]`)
+                )?.value ?? null;
               const cb = (name: string) =>
-                (form.elements.namedItem(name) as HTMLInputElement | null)
-                  ?.checked ?? null;
+                (
+                  table.querySelector<HTMLInputElement>(
+                    `input[type="checkbox"][name="${name}"]`,
+                  )
+                )?.checked ?? null;
               return {
                 p1_bh: val(`BH${counts.p1}`),
                 p1_di: val(`DI${counts.p1}`),
@@ -352,7 +403,7 @@ test.describe('Depth Chart Entry flow', () => {
       .toEqual({
         p1_bh: '1',
         p1_di: '2',
-        p1_oi: '3',
+        p1_oi: '2',
         p1_min: '34',
         p1_active: true,
         p2_df: '1',

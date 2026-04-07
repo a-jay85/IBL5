@@ -58,11 +58,13 @@ test.describe('Depth Chart submission', () => {
     const form = page.locator('.depth-chart-form');
     await expect(form).toBeVisible({ timeout: 15000 });
 
-    // Set a distinctive BH (PG) value on the first player row so we can
-    // verify the confirmation page echoes back exactly what was POSTed.
-    // We don't rely on seed values because the confirmation table column
-    // order (Name, Active, PG, SG, SF, PF, C) is what we want to assert.
-    const firstBh = page.locator('select[name^="BH"]').first();
+    // Set a distinctive BH (PG) value on the first desktop player row so we
+    // can verify the confirmation page echoes back exactly what was POSTed.
+    // Scoping to `.depth-chart-table` avoids colliding with the mobile
+    // card duplicates that share the same input names.
+    const firstBh = page
+      .locator('.depth-chart-table select[name^="BH"]')
+      .first();
     await firstBh.selectOption('1');
 
     // Submit the current depth chart
@@ -90,7 +92,10 @@ test.describe('Depth Chart submission', () => {
     const confirmationTable = confirmationRegion.locator('table.ibl-data-table').last();
     await expect(confirmationTable).toBeVisible();
 
-    const headers = await confirmationTable.locator('thead th').allInnerTexts();
+    // Use textContent (raw source text) instead of innerText — the table's
+    // CSS applies text-transform: uppercase, which would turn "Name" into
+    // "NAME" for allInnerTexts() but leaves allTextContents() untouched.
+    const headers = await confirmationTable.locator('thead th').allTextContents();
     expect(headers.map((h) => h.trim())).toEqual([
       'Name',
       'Active',

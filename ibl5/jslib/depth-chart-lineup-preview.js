@@ -58,24 +58,50 @@
  *   client-side, so we approximate with roster-order default (matches the
  *   spec's reference Python pseudocode in the strategy guide).
  *
- * BACKUP SELECTION (one backup per slot, runs AFTER starters are picked):
+ * BACKUP SELECTION — JSB DISPATCHER LADDER MODEL:
  *
- *   Fundamentally different from starter selection — POSITION MATCH ONLY.
- *   There is NO dc > 0 override for backups. A center with dc_df > 0 can
- *   START at PF via the bonus path, but cannot BACK UP that PF slot.
+ *   At runtime, when a sub trigger fires for slot N, FUN_004db520 walks the
+ *   per-slot ladder {preliminary, sort1, sort2, sort3, +0x4ca0 backup} and
+ *   picks the first eligible (not on-court, not in foul trouble, etc.)
+ *   candidate. sort1/sort2/sort3 (offsets +0x4cc0/+0x4ce0/+0x4d00, stride
+ *   0x20) are the 2nd/3rd/4th-best non-starter candidates from the SAME
+ *   per-slot dc_minutes-based candidate sort that picks the starter — not
+ *   from a separate position-match scan.
  *
- *   For each slot, scan all non-starter active players whose position string
- *   matches the slot's fallback position. Highest dc_minutes wins (tiebreak
- *   by roster order). Greedy pool removal: a player chosen as backup for one
- *   slot cannot back up other slots.
+ *   Verified at per_possession_update_RAW.c:1441-1477: the candidate-pick
+ *   loop iterates `piVar43 = (int *)(iVar40 + 0x4cc0); piVar43 += 8;`
+ *   (i.e. sort1, sort2, sort3 ... at stride 0x20) and assigns the first
+ *   non-taken candidate to +0x4da0 (the final starter), with +0x4c80
+ *   (preliminary) as the last fallback at line 1476.
  *
- *   If no position-matching non-starter exists, the lineup-memory backup
- *   pointer points back to the starter (self-backup, verified at
- *   per_possession_update_RAW.c:1183). At runtime FUN_004db520's bench-scan
- *   fallback bypasses this self-backup state — the player is NOT locked on
- *   court — so the preview replaces the self-backup cell with the result of
- *   benchScanFallback() and renders it in italic so the GM can tell which
- *   slots are using the structured backup vs the runtime bench scan.
+ *   So for the preview's "next sub" display we model:
+ *
+ *     For each slot, take its FULL sorted candidate list from the starter
+ *     selection pass, drop the starter (index 0), filter out any candidates
+ *     who became starters of OTHER slots (greedy by on-court state at
+ *     runtime), and take the first BACKUP_ROWS as successive backups.
+ *
+ *     Per-slot candidate lists are NOT greedy across slots — the same
+ *     player may appear as sort1 of multiple slots if they qualify for
+ *     each slot's bonus or fallback path. At runtime the dispatcher's
+ *     "not on court" check handles cross-slot conflicts naturally; we
+ *     mirror that here with non-reservation across slots.
+ *
+ *   FALLBACK CHAIN — when the per-slot candidate list runs out:
+ *
+ *     1. +0x4ca0 position-match backup (verified at
+ *        per_possession_update_RAW.c:1147-1211): scan all active non-starter
+ *        non-already-displayed players whose position string matches the
+ *        slot's fallback position, pick highest dc_minutes. NO dc > 0
+ *        override — strictly position string. Greedy across slot rows
+ *        (each player can fill at most one fallback row total).
+ *
+ *     2. FUN_004db520 bench-scan fallback (jsb560_decompiled.c:95513-95630):
+ *        when even position-match is exhausted, walk the JSB-quality-sorted
+ *        roster and pick the first non-on-court player (Pass 1 strict pos
+ *        match, Pass 2 relaxed). Marked italic in the display via
+ *        viaBenchScan: true so the GM can tell which subs come from the
+ *        per-slot ladder vs the runtime fallback.
  *
  * BENCH-SCAN FALLBACK (FUN_004db520, jsb560_decompiled.c:95513-95630):
  *
@@ -130,7 +156,11 @@
         { label: 'C',  field: 'OF', fallbackPos: 'C'  }
     ];
 
-    var BACKUP_ROWS = 1; // JSB fills 1 backup per slot (position-match only)
+    // The dispatcher walks sort1, sort2, sort3, +0x4ca0 backup, etc. (5
+    // ladder positions in total). We display the top 2 layers as "1st" and
+    // "2nd" backup rows. Increasing this value would render additional rows
+    // for sort3, +0x4ca0 backup, and bench-scan fallback in turn.
+    var BACKUP_ROWS = 2;
 
     /**
      * Collect all player data from the desktop table rows.
@@ -228,6 +258,14 @@
         var taken = {};  // pid → true for players already selected as starters
 
         var starters = [];
+        // Per-slot sorted candidate lists from the starter selection pass.
+        // slotCandidates[i] holds the same array that JSB stores at the
+        // per-slot scratch buffer, sorted by score DESC then dc ASC. Index 0
+        // is the slot's starter; indexes 1..N correspond to JSB's sort1,
+        // sort2, sort3, ... fields at offsets +0x4cc0/+0x4ce0/+0x4d00/...
+        // (stride 0x20). The dispatcher walks these at runtime starting from
+        // sort1 — see per_possession_update_RAW.c:1441-1477.
+        var slotCandidates = [];
 
         // === Starter Selection (5 passes — BH→DI→OI→DF→OF) ===
         for (var pass = 0; pass < SLOTS.length; pass++) {
@@ -300,6 +338,10 @@
                 return 0;
             });
 
+            // Save the sorted candidate list for this slot — used below by
+            // the backup display to extract sort1, sort2, sort3, etc.
+            slotCandidates.push(candidates);
+
             var starter = null;
             if (candidates.length > 0) {
                 starter = candidates[0].player;
@@ -323,14 +365,19 @@
             starters.push(starter);
         }
 
-        // === Backup Selection (one backup per slot) ===
-        // POSITION MATCH ONLY — no dc > 0 override. Greedy pool removal.
-        // Highest dc_minutes wins (tiebreak by roster order). When no
-        // position-matching non-starter exists, lineup memory has +0x4ca0 ==
-        // +0x4c80 (self-backup), so we instead route to FUN_004db520's
-        // bench-scan fallback (see benchScanFallback() below) and mark the
-        // resulting entry with viaBenchScan: true so the renderer can
-        // italicize it.
+        // === Backup Selection — JSB DISPATCHER LADDER MODEL ===
+        //
+        // For each slot, walk its per-slot sorted candidate list (sort1,
+        // sort2, sort3 ...) skipping any candidate who is now on court
+        // (a starter of any slot). Take the first BACKUP_ROWS non-on-court
+        // candidates as successive backups. If the per-slot list is exhausted
+        // before BACKUP_ROWS is reached, fall through to:
+        //   - position-match backup (+0x4ca0 equivalent), then
+        //   - bench-scan fallback (FUN_004db520, marked italic).
+        //
+        // The position-match fallback chain is greedy across slot rows
+        // (benchTaken set). The bench-scan fallback is non-reservation
+        // (matches engine semantics — verified earlier).
         //
         // Bench entries are { player, viaBenchScan } objects.
         var benchTaken = {};
@@ -338,39 +385,80 @@
 
         for (var bSlotIdx = 0; bSlotIdx < SLOTS.length; bSlotIdx++) {
             var bSlot = SLOTS[bSlotIdx];
-            var bestBackup = null;
-            var bestMinutes = -Infinity;
+            var slotBench = [];
 
-            for (var k = 0; k < activePlayers.length; k++) {
-                var bp = activePlayers[k];
-                if (taken[bp.pid] || benchTaken[bp.pid]) continue;
-                if (!matchesPosition(bp.pos, bSlot.fallbackPos)) continue;
-
-                // Backup ranking is by dc_minutes (no bonus, no dc override).
-                if (bp.dcMinutes > bestMinutes) {
-                    bestMinutes = bp.dcMinutes;
-                    bestBackup = bp;
+            // Layer 1: walk the per-slot sorted candidate list (sort1, sort2, ...).
+            // Skip the starter (index 0) and any candidate who is on court
+            // as a starter of another slot.
+            var slotList = slotCandidates[bSlotIdx];
+            for (var ci = 1; ci < slotList.length && slotBench.length < BACKUP_ROWS; ci++) {
+                var cp = slotList[ci].player;
+                if (taken[cp.pid]) continue;
+                // Also skip if already chosen as a backup row for this slot
+                // (greedy within slot — same player can't be 1st AND 2nd
+                // backup for the same slot).
+                var alreadyInSlot = false;
+                for (var ai = 0; ai < slotBench.length; ai++) {
+                    if (slotBench[ai].player.pid === cp.pid) {
+                        alreadyInSlot = true;
+                        break;
+                    }
                 }
+                if (alreadyInSlot) continue;
+                slotBench.push({ player: cp, viaBenchScan: false });
             }
 
-            var slotBench = [];
-            if (bestBackup) {
-                slotBench.push({ player: bestBackup, viaBenchScan: false });
-                benchTaken[bestBackup.pid] = true;
-            } else if (starters[bSlotIdx]) {
-                // Self-backup case → run FUN_004db520's bench-scan fallback.
-                // Non-reservation: do NOT mark benchTaken — engine doesn't
-                // reserve, and two self-backed slots may show the same pick.
-                var benchScanPick = benchScanFallback(bSlot, starters, activePlayers);
+            // Layer 2: position-match backup (+0x4ca0 equivalent), greedy
+            // across slot rows. Only used when the per-slot ladder is
+            // exhausted before BACKUP_ROWS.
+            while (slotBench.length < BACKUP_ROWS) {
+                var inSlotBench = {};
+                for (var sb = 0; sb < slotBench.length; sb++) {
+                    inSlotBench[slotBench[sb].player.pid] = true;
+                }
+
+                var bestBackup = null;
+                var bestMinutes = -Infinity;
+                for (var k = 0; k < activePlayers.length; k++) {
+                    var bp = activePlayers[k];
+                    if (taken[bp.pid] || benchTaken[bp.pid]) continue;
+                    if (inSlotBench[bp.pid]) continue;
+                    if (!matchesPosition(bp.pos, bSlot.fallbackPos)) continue;
+                    if (bp.dcMinutes > bestMinutes) {
+                        bestMinutes = bp.dcMinutes;
+                        bestBackup = bp;
+                    }
+                }
+
+                if (bestBackup) {
+                    slotBench.push({ player: bestBackup, viaBenchScan: false });
+                    benchTaken[bestBackup.pid] = true;
+                    continue;
+                }
+
+                // Layer 3: bench-scan fallback (FUN_004db520). Walks the
+                // JSB-quality-sorted roster and picks the first non-on-court
+                // candidate not already shown for this slot. Non-reservation
+                // across slots — matches engine semantics.
+                var benchScanPick = benchScanFallback(
+                    bSlot, starters, activePlayers, inSlotBench
+                );
                 if (benchScanPick) {
                     slotBench.push({ player: benchScanPick, viaBenchScan: true });
-                } else {
-                    // Bench scan exhausted (only happens if every active
-                    // player is already on court). Fall back to the
-                    // lineup-memory self-backup as a last resort.
-                    slotBench.push({ player: starters[bSlotIdx], viaBenchScan: false });
+                    continue;
                 }
+
+                // Layer 4 (last resort): self-backup. Only happens if every
+                // active player is on court and the bench scan returns null.
+                if (starters[bSlotIdx]) {
+                    slotBench.push({
+                        player: starters[bSlotIdx],
+                        viaBenchScan: false
+                    });
+                }
+                break;  // can't go any deeper
             }
+
             bench.push(slotBench);
         }
 
@@ -401,14 +489,20 @@
      * dc_minutes values, so changes the GM makes immediately shift the
      * bench-scan ordering.
      *
+     * The optional `excludePids` parameter is a `{pid: true}` map of players
+     * already shown for the current slot's earlier backup rows; they're
+     * filtered out so the same body doesn't appear twice in the same column.
+     *
      * Returns the first eligible Player, or null if every active player is
-     * already on court (only possible with ≤5 active players on the roster).
+     * already on court / excluded (only possible with ≤5 active players on
+     * the roster).
      */
-    function benchScanFallback(slot, starters, activePlayers) {
+    function benchScanFallback(slot, starters, activePlayers, excludePids) {
         var onCourt = {};
         for (var s = 0; s < starters.length; s++) {
             if (starters[s]) onCourt[starters[s].pid] = true;
         }
+        var exclude = excludePids || {};
 
         // Build a JSB-quality-sorted copy of the active player list. We sort
         // a copy (not the original) so other consumers of activePlayers still
@@ -425,14 +519,14 @@
         // Pass 1 — strict: position match required
         for (var i = 0; i < rosterSorted.length; i++) {
             var p = rosterSorted[i];
-            if (onCourt[p.pid]) continue;
+            if (onCourt[p.pid] || exclude[p.pid]) continue;
             if (matchesPosition(p.pos, slot.fallbackPos)) return p;
         }
 
         // Pass 2 — relaxed: drop position match
         for (var j = 0; j < rosterSorted.length; j++) {
             var q = rosterSorted[j];
-            if (onCourt[q.pid]) continue;
+            if (onCourt[q.pid] || exclude[q.pid]) continue;
             return q;
         }
 
@@ -491,12 +585,14 @@
         html += '</tr>';
 
         // Bench rows. Bench entries are { player, viaBenchScan } objects.
-        // viaBenchScan = true means the slot was self-backed in lineup memory
-        // and FUN_004db520's bench-scan fallback picked this player at runtime;
-        // we render those in italic via .dc-lineup-preview__bench-scan and
-        // attach a tooltip explaining the source.
+        // viaBenchScan = true means this slot's per-slot candidate ladder
+        // (sort1/sort2/sort3) AND its position-match backup chain were both
+        // exhausted, so FUN_004db520's bench-scan fallback supplied the
+        // body. We render those in italic via .dc-lineup-preview__bench-scan
+        // and attach a tooltip explaining the source.
+        var ROW_LABELS = ['1st', '2nd', '3rd', '4th', '5th'];
         for (var row = 0; row < BACKUP_ROWS; row++) {
-            var label = row === 0 ? '1st' : '2nd';
+            var label = ROW_LABELS[row] || (row + 1) + 'th';
             html += '<tr><td class="dc-lineup-preview__row-label">' + label + '</td>';
             for (var c = 0; c < SLOTS.length; c++) {
                 var benchEntry = lineup.bench[c][row];
@@ -505,9 +601,9 @@
                     if (benchEntry.viaBenchScan) {
                         cellAttrs = ' class="dc-lineup-preview__bench-scan"'
                             + ' title="Bench-scan fallback: this slot has no'
-                            + ' position-matching backup, so the in-game'
-                            + ' substitution dispatcher picks this player from'
-                            + ' the team roster instead."';
+                            + ' more candidates in its per-slot ladder, so the'
+                            + ' in-game substitution dispatcher walks the team'
+                            + ' roster and picks this player instead."';
                     }
                     html += '<td' + cellAttrs + '>'
                         + escapeHtml(abbreviateName(benchEntry.player.name))

@@ -65,11 +65,17 @@ class DepthChartEntryView implements DepthChartEntryViewInterface
     }
 
     /**
-     * Render minutes dropdown options (0=Auto to staminaCap).
+     * Render minutes dropdown options (0 to staminaCap).
+     *
+     * Value 0 is a literal "play as little as possible" setting — the JSB
+     * simulator does NOT auto-determine minutes from it. dc_minutes=0 sorts
+     * the player to the bottom of every lineup/quality path; the player only
+     * enters via the bench-scan fallback when no other position match exists.
+     * Effectively DNP-CD.
      */
     public function renderMinutesOptions(int $selectedValue, int $staminaCap): void
     {
-        echo '<option value="0"' . ($selectedValue === 0 ? ' SELECTED' : '') . '>Auto</option>';
+        echo '<option value="0"' . ($selectedValue === 0 ? ' SELECTED' : '') . '>0</option>';
 
         for ($i = 1; $i <= $staminaCap; $i++) {
             $selected = ($selectedValue === $i) ? ' SELECTED' : '';
@@ -97,28 +103,33 @@ class DepthChartEntryView implements DepthChartEntryViewInterface
         echo '<details class="dc-help-section">
 <summary>How Depth Charts Work</summary>
 <div class="dc-help-section__content">
-<p>Each row in the table is one of your players. The five columns <strong>PG SG SF PF C</strong>
-are the five lineup slots you fill. For each slot, tell the sim who you want to play there:</p>
+<ol>
+<li>Each row in the table is one of your players.</li>
+<li>The five columns – <strong>PG SG SF PF C</strong> – are the five lineup slots you fill.</li>
+<li>For each slot, tell the sim who you want to play there:</li>
+<p>
 <table class="ibl-data-table dc-help-table">
-<thead><tr><th>Dropdown</th><th>Meaning</th></tr></thead>
+<thead><tr><th>Option</th><th>Meaning</th></tr></thead>
 <tbody>
-<tr><td><strong>S</strong></td><td>Starter &mdash; this player tips off the game in this slot</td></tr>
-<tr><td><strong>#2</strong></td><td>Main backup &mdash; first sub off the bench for this slot</td></tr>
-<tr><td><strong>#3</strong></td><td>Secondary backup &mdash; second sub off the bench for this slot</td></tr>
-<tr><td><strong>&mdash;</strong></td><td>Not assigned to this slot (use for deep bench)</td></tr>
+<tr><td><strong>S</strong></td><td>Starter</td></tr>
+<tr><td><strong>#2</strong></td><td>Main backup</td></tr>
+<tr><td><strong>#3</strong></td><td>Second backup</td></tr>
+<tr><td><strong>&mdash;</strong></td><td>N/A (use for deep bench)</td></tr>
 </tbody>
 </table>
+</p>
 <p><strong>To put a player in the slot you want:</strong></p>
 <ol>
-<li>Set <strong>one</strong> player\'s column to <strong>S</strong> for each of the five slots (PG, SG, SF, PF, C).</li>
-<li>Pick your backups: set <strong>#2</strong> on the player you want subbing in first, and <strong>#3</strong>
-on the player after that. You can pick different backups for each slot.</li>
-<li>Set the <strong>Min</strong> column to control how long each player is on the floor.
-Starters usually want 30&ndash;40; bench players want lower numbers.</li>
-<li>Leave everything else as <strong>&mdash;</strong>. Those players will only come in if everyone
-above them is unavailable.</li>
+<li>Set <strong>one</strong> player to <strong>S</strong> for each position.</li>
+<li>Set <strong>#2</strong> on the player you want subbing in first.</li>
+<li>Set <strong>#3</strong> on the player after that.</li>
+<li>You can pick different backups for each slot.</li>
+<li>Set <strong>Min</strong> to control how long each player is on the floor.</li>
+<li>Starters usually want 30&ndash;40; bench players want lower numbers.</li>
+<li>Leave everything else as <strong>&mdash;</strong>.</li>
+<li>Those players will only come in if everyone above them is unavailable.</li>
 </ol>
-<p><strong>About the Projected Lineup grid above:</strong> it shows exactly who the sim
+<p><strong>Projected Lineup:</strong> this shows exactly who the sim
 will use and roughly how many minutes each player gets per game, updated live as you
 edit the form. If a name appears in <em>italic gray</em>, it means you didn&rsquo;t assign
 enough players to that slot, so the sim is falling back on a bench body automatically

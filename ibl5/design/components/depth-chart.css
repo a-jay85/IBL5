@@ -93,6 +93,17 @@
     margin: 0 0 var(--space-2);
 }
 
+.dc-help-section__content ol,
+.dc-help-section__content ul {
+    list-style: none;
+    padding-left: 0;
+    margin-bottom: var(--space-2);
+}
+
+.dc-help-section__content li {
+    margin-bottom: var(--space-1);
+}
+
 .dc-help-table {
     font-size: 0.8125rem;
     margin-bottom: var(--space-2);

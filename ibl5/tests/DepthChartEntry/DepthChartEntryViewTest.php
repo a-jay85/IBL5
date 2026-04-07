@@ -134,11 +134,13 @@ class DepthChartEntryViewTest extends TestCase
         $output = (string) ob_get_clean();
 
         // Minutes is rendered as a <select> dropdown with the current
-        // dc_minutes option pre-selected. The 'Auto' option (value 0) is
-        // always present.
+        // dc_minutes option pre-selected. The 0 option (literal "play as
+        // little as possible" — JSB does not auto-determine minutes from
+        // dc_minutes=0; see DepthChartEntryView::renderMinutesOptions docblock)
+        // is always present.
         $this->assertMatchesRegularExpression('/<select[^>]*name="min1"/', $output);
         $this->assertStringContainsString('<option value="30" SELECTED>30</option>', $output);
-        $this->assertStringContainsString('Auto', $output);
+        $this->assertStringContainsString('<option value="0">0</option>', $output);
     }
 
     public function testRenderPlayerRowEmitsJsbProductionAttribute(): void

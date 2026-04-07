@@ -123,9 +123,15 @@ will use and roughly how many minutes each player gets per game, updated live as
 edit the form. If a name appears in <em>italic gray</em>, it means you didn&rsquo;t assign
 enough players to that slot, so the sim is falling back on a bench body automatically
 &mdash; add a <strong>#2</strong> or <strong>#3</strong> to the player you actually want there.</p>
-<p><strong>Tip:</strong> a player can be the starter at one slot and a backup at another
-&mdash; set <strong>S</strong> in one column and <strong>#2</strong> in another. The sim will place
-them wherever they&rsquo;re needed first.</p>
+<p><strong>Note:</strong> a starter only plays their one slot. A player you set to
+<strong>S</strong> at PG <em>won&rsquo;t</em> also fill in as an SG backup &mdash; once the sim picks
+them as a starter, they&rsquo;re locked to that slot and removed from every other slot&rsquo;s
+ladder. If you want one bench body to cover multiple slots, set <strong>#2</strong> or
+<strong>#3</strong> on them in several columns and leave <strong>S</strong> off &mdash; then they&rsquo;ll
+appear as a backup in each slot&rsquo;s ladder.</p>
+<p>The sim fills slots in order <strong>PG &rarr; SG &rarr; SF &rarr; PF &rarr; C</strong>,
+so if two slots both have a viable <strong>S</strong> pick that includes the same player,
+the earlier slot in that order claims them.</p>
 </div>
 </details>';
     }

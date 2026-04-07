@@ -90,8 +90,8 @@ class DepthChartEntryView implements DepthChartEntryViewInterface
 <p><strong>To put a player in the slot you want:</strong></p>
 <ol>
 <li>Set <strong>one</strong> player to <strong>S</strong> for each position.</li>
-<li>Set <strong>#2</strong> for the player you want subbing in first.</li>
-<li>Set <strong>#3</strong> for the player(s) after that.</li>
+<li>Set <strong>#2</strong> for players you want to sub in first.</li>
+<li>Set <strong>#3</strong> for player(s) after that.</li>
 <li>You can pick different backups for each slot.</li>
 <li>Set <strong>Min</strong> to control how long each player is on the floor.</li>
 <li>Starters usually want 30&ndash;40; bench players want lower numbers.</li>
@@ -99,7 +99,7 @@ class DepthChartEntryView implements DepthChartEntryViewInterface
 </ol>
 <p><strong>Projected Lineup:</strong><br></p>
 <p>If a name appears in <em>italic gray</em>, it means you didn&rsquo;t assign
-enough players to that slot, so the sim is falling back on a bench body automatically.
+enough players to that slot, so the sim is falling back on a backup automatically.
 <br>Add a <strong>#2</strong> or <strong>#3</strong> to the player you actually want there.</p>
 <p><strong>Note:</strong> a starter only plays their <strong>one</strong> slot –
 starters are locked to that slot and removed from every other slot&rsquo;s

@@ -195,6 +195,17 @@
     font-weight: 400;
     color: var(--gray-500);
     margin-left: 0.125rem;
+    position: relative;
+    top: 2px;
+}
+
+/*
+ * Add 2px inline padding to player-name cells (starter + bench) in the
+ * Projected Lineup table. Specificity (0,2,1) beats `.ibl-data-table td`
+ * (0,1,1), which would otherwise win on source order.
+ */
+.dc-lineup-preview td.ibl-player-cell {
+    padding-inline: calc(0.1rem + 2px);
 }
 
 /*

@@ -133,6 +133,43 @@ test.describe('Sortable table functionality', () => {
     });
   });
 
+  test.describe('HTMX history restore', () => {
+    // Regression for sortable tables losing their click handlers after
+    // browser Back navigation restores a page from HTMX history cache.
+    // HTMX serializes the DOM (including data-sorttable attributes) but
+    // event listeners are lost — the init guard in sorttable.makeSortable
+    // used to skip re-attachment, leaving cached sort state visible but
+    // columns unclickable until a full refresh.
+    test('sortable re-attaches click handlers after browser back', async ({ page }) => {
+      await page.goto('modules.php?name=Standings');
+      const firstTable = page.locator('table.sortable').first();
+      await expect(firstTable).toHaveAttribute('data-sorttable', 'true');
+
+      // Establish a sort on the first visit.
+      const col3 = firstTable.locator('thead th:nth-child(3)');
+      await col3.click();
+      await expect(col3).toHaveClass(/sorttable_sorted_reverse/);
+
+      // Navigate to another page via a boosted link so HTMX caches
+      // Standings into history state.
+      const boostedLink = page.locator('#site-content a[href*="modules.php?name="]').first();
+      await boostedLink.click();
+      await page.waitForLoadState('networkidle');
+
+      // Browser back — triggers htmx:historyRestore (NOT htmx:afterSwap).
+      await page.goBack();
+      await page.waitForLoadState('networkidle');
+
+      // Verify a DIFFERENT column now responds to clicks. Before the fix,
+      // the init guard skipped re-attachment and this click was a no-op.
+      const restoredTable = page.locator('table.sortable').first();
+      const col4 = restoredTable.locator('thead th:nth-child(4)');
+      await col4.click();
+      await expect(col4).toHaveClass(/sorttable_sorted_reverse/);
+      await expect(col4).toHaveAttribute('aria-sort', 'descending');
+    });
+  });
+
   test.describe('No console errors', () => {
     test('no JS console errors on page with sortable tables', async ({ page }) => {
       const errors: string[] = [];

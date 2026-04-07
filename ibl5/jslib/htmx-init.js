@@ -96,6 +96,13 @@
     // on history restore — only htmx:historyRestore does.
     document.addEventListener('htmx:historyRestore', function () {
         if (window.sorttable) {
+            // HTMX serializes the DOM (including data-sorttable attributes)
+            // into its history cache, but JS event listeners are lost on
+            // restore. Clear the init guard so listeners get reattached.
+            var cachedTables = document.querySelectorAll('table.sortable[data-sorttable]');
+            for (var t = 0; t < cachedTables.length; t++) {
+                cachedTables[t].removeAttribute('data-sorttable');
+            }
             window.sorttable.init();
         }
         if (typeof window.IBL_refreshResponsiveTables === 'function') {

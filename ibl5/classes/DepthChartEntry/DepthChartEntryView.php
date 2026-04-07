@@ -396,7 +396,7 @@ JAVASCRIPT;
 
     /**
      * @see DepthChartEntryViewInterface::renderMobileView()
-     * @param list<array<string, mixed>> $players
+     * @param list<PlayerRow> $players
      * @param array<string> $slotNames
      */
     public function renderMobileView(array $players, array $slotNames): void
@@ -419,7 +419,7 @@ JAVASCRIPT;
     /**
      * Render a single mobile card for a player
      *
-     * @param array<string, mixed> $player Player data from database
+     * @param PlayerRow $player Player data from database
      * @param int $depthCount Row counter for form field names
      */
     private function renderMobilePlayerCard(array $player, int $depthCount): void

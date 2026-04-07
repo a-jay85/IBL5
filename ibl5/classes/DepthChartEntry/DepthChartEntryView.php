@@ -141,15 +141,15 @@ the earlier slot in that order claims them.</p>
                 <tr>
                     <th>Pos</th>
                     <th>Player</th>
-                    <th>Active</th>
-                    <th>Min</th>';
+                    <th>Active</th>';
 
         foreach (self::ROLE_SLOTS as $slot) {
             $labelHtml = HtmlSanitizer::safeHtmlOutput($slot['label']);
             echo '<th>' . $labelHtml . '</th>';
         }
 
-        echo '          </tr>
+        echo '              <th>Min</th>
+                </tr>
             </thead>
             <tbody>';
     }
@@ -210,9 +210,11 @@ the earlier slot in that order claims them.</p>
 
         $player_name_html = HtmlSanitizer::safeHtmlOutput($player_name);
 
+        $thumbnail = \Player\PlayerImageHelper::renderThumbnail($player_pid);
+
         echo "<tr data-pid=\"{$player_pid}\" data-pos=\"{$player_pos}\" data-jsb-production=\"{$jsbProduction}\">
             <td>{$player_pos}</td>
-            <td nowrap>
+            <td class=\"ibl-player-cell\">
                 <input type=\"hidden\" name=\"pid{$depthCount}\" value=\"{$player_pid}\">
                 <input type=\"hidden\" name=\"Injury{$depthCount}\" value=\"{$player_inj}\">
                 <input type=\"hidden\" name=\"Name{$depthCount}\" value=\"{$player_name_html}\">
@@ -221,7 +223,7 @@ the earlier slot in that order claims them.</p>
                 <input type=\"hidden\" name=\"sf{$depthCount}\" value=\"0\">
                 <input type=\"hidden\" name=\"pf{$depthCount}\" value=\"0\">
                 <input type=\"hidden\" name=\"c{$depthCount}\" value=\"0\">
-                <a href=\"./modules.php?name=Player&pa=showpage&pid={$player_pid}\">{$player_name_html}</a>
+                <a href=\"./modules.php?name=Player&amp;pa=showpage&amp;pid={$player_pid}\">{$thumbnail}{$player_name_html}</a>
             </td>";
 
         // Active status — hidden input submits "0" when checkbox is unchecked;
@@ -234,13 +236,6 @@ the earlier slot in that order claims them.</p>
         echo "<input type=\"hidden\" name=\"canPlayInGame{$depthCount}\" value=\"0\">";
         echo "<input type=\"checkbox\" name=\"canPlayInGame{$depthCount}\" value=\"1\" class=\"dc-active-cb\"{$activeCheckedAttr} aria-label=\"Active status for {$player_name_html}\">";
         echo "</td>";
-
-        // Minutes — number input constrained to 0-40 with native browser
-        // stepper. The server sanitizes to the same 0-40 range in
-        // DepthChartEntryProcessor::sanitizeMinutesValue().
-        /** @var int $dcMinutes */
-        $dcMinutes = $player['dc_minutes'] ?? 0;
-        echo "<td class=\"dc-minutes-cell\"><input type=\"number\" name=\"min{$depthCount}\" value=\"{$dcMinutes}\" min=\"0\" max=\"40\" step=\"1\" class=\"dc-minutes-input\" aria-label=\"Minutes for {$player_name_html}\"></td>";
 
         // Role slot columns (PG/SG/SF/PF/C mapped to BH/DI/OI/DF/OF form fields)
         foreach (self::ROLE_SLOTS as $slot) {
@@ -257,6 +252,13 @@ the earlier slot in that order claims them.</p>
             $this->renderRolePriorityOptions($dcValue, $slot['max']);
             echo "</select><span class=\"dc-score-debug\"></span></td>";
         }
+
+        // Minutes — number input constrained to 0-40 with native browser
+        // stepper. The server sanitizes to the same 0-40 range in
+        // DepthChartEntryProcessor::sanitizeMinutesValue().
+        /** @var int $dcMinutes */
+        $dcMinutes = $player['dc_minutes'] ?? 0;
+        echo "<td class=\"dc-minutes-cell\"><input type=\"number\" name=\"min{$depthCount}\" value=\"{$dcMinutes}\" min=\"0\" max=\"40\" step=\"1\" class=\"dc-minutes-input\" aria-label=\"Minutes for {$player_name_html}\"></td>";
 
         echo "</tr>";
     }

@@ -2100,15 +2100,17 @@ td.ibl-team-cell--colored {
     text-align: center;
 }
 
-/* Active checkbox cell — centered, generously sized to keep the hit target
-   finger-friendly on touch devices without overwhelming the row. */
+/* Active checkbox cell — centered horizontally and vertically. */
 .depth-chart-table td.dc-active-cell {
     text-align: center;
+    vertical-align: middle;
 }
 
 .depth-chart-table input[type="checkbox"].dc-active-cb {
+    display: block;
     width: 1.125rem;
     height: 1.125rem;
+    margin: 0 auto;
     cursor: pointer;
     accent-color: var(--color-accent-500, #f97316);
 }

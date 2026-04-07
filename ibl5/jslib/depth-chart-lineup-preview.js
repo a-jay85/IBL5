@@ -687,15 +687,17 @@
         html += '</tr></thead><tbody>';
 
         // Starters row
-        html += '<tr><td class="dc-lineup-preview__row-label">Starter</td>';
+        html += '<tr><td class="dc-lineup-preview__row-label">Starting</td>';
         for (var s = 0; s < SLOTS.length; s++) {
             var starter = lineup.starters[s];
             if (starter) {
                 var mins = (slotMinutes[s] && slotMinutes[s][starter.pid]) || 0;
-                html += '<td class="dc-lineup-preview__starter">'
+                html += '<td class="dc-lineup-preview__starter ibl-player-cell">'
+                    + '<a href="./modules.php?name=Player&amp;pa=showpage&amp;pid=' + starter.pid + '">'
+                    + '<img src="./images/player/' + starter.pid + '.jpg" alt="" class="ibl-player-photo" width="24" height="24" loading="lazy" onerror="this.style.display=\'none\'">'
                     + escapeHtml(abbreviateName(starter.name))
                     + renderMinutes(mins)
-                    + '</td>';
+                    + '</a></td>';
             } else {
                 html += '<td class="dc-lineup-preview__empty">&mdash;</td>';
             }
@@ -708,26 +710,29 @@
         // exhausted, so FUN_004db520's bench-scan fallback supplied the
         // body. We render those in italic via .dc-lineup-preview__bench-scan
         // and attach a tooltip explaining the source.
-        var ROW_LABELS = ['1st', '2nd', '3rd', '4th', '5th'];
+        var ROW_LABELS = ['2nd', '3rd', '4th', '5th'];
         for (var row = 0; row < BACKUP_ROWS; row++) {
             var label = ROW_LABELS[row] || (row + 1) + 'th';
             html += '<tr><td class="dc-lineup-preview__row-label">' + label + '</td>';
             for (var c = 0; c < SLOTS.length; c++) {
                 var benchEntry = lineup.bench[c][row];
                 if (benchEntry) {
-                    var cellAttrs = '';
+                    var cellClass = 'ibl-player-cell';
+                    var cellExtra = '';
                     if (benchEntry.viaBenchScan) {
-                        cellAttrs = ' class="dc-lineup-preview__bench-scan"'
-                            + ' title="Bench-scan fallback: this slot has no'
+                        cellClass += ' dc-lineup-preview__bench-scan';
+                        cellExtra = ' title="Bench-scan fallback: this slot has no'
                             + ' more candidates in its per-slot ladder, so the'
                             + ' in-game substitution dispatcher walks the team'
                             + ' roster and picks this player instead."';
                     }
                     var benchMins = (slotMinutes[c] && slotMinutes[c][benchEntry.player.pid]) || 0;
-                    html += '<td' + cellAttrs + '>'
+                    html += '<td class="' + cellClass + '"' + cellExtra + '>'
+                        + '<a href="./modules.php?name=Player&amp;pa=showpage&amp;pid=' + benchEntry.player.pid + '">'
+                        + '<img src="./images/player/' + benchEntry.player.pid + '.jpg" alt="" class="ibl-player-photo" width="24" height="24" loading="lazy" onerror="this.style.display=\'none\'">'
                         + escapeHtml(abbreviateName(benchEntry.player.name))
                         + renderMinutes(benchMins)
-                        + '</td>';
+                        + '</a></td>';
                 } else {
                     html += '<td class="dc-lineup-preview__empty">&mdash;</td>';
                 }

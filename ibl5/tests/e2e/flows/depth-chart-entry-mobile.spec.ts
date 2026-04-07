@@ -84,11 +84,12 @@ test.describe('Depth Chart Entry: mobile card view', () => {
     await expect(bhSelects.first()).toBeEnabled();
   });
 
-  test('settings grid has 5 columns per card', async ({ page }) => {
-    // The old pos-grid is gone; a single settings-grid holds all 5 role slots.
+  test('settings grid has 6 columns per card', async ({ page }) => {
+    // The old pos-grid is gone; a single settings-grid holds the Min column
+    // followed by all 5 role slots (BH/DI/OI/DF/OF) for 6 fields total.
     const firstGrid = page.locator('.dc-card__settings-grid').first();
     const fields = firstGrid.locator('.dc-card__field');
-    await expect(fields).toHaveCount(5);
+    await expect(fields).toHaveCount(6);
   });
 
   test('changing a card select triggers glow', async ({ page }) => {

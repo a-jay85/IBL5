@@ -40,6 +40,9 @@ depthcharts
 !/IBL6
 .htaccess
 
+# Logs
+*.log
+
 # Coverage & mutation reports
 ibl5/coverage/
 ibl5/infection.log

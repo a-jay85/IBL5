@@ -207,6 +207,34 @@ class DepthChartEntryProcessorTest extends TestCase
         $this->assertEquals(0, $result['playerData'][0]['injury']);
     }
     
+    public function testBlankMinutesSubmissionIsConvertedToZero()
+    {
+        // A blank <input type="number"> POSTs as an empty string. The processor
+        // must coerce this to 0 so the depth chart writes a numeric value
+        // rather than null/empty. The reset button intentionally leaves the
+        // minutes field blank, so this code path matters in normal use.
+        $postData = [
+            'Name1' => 'Player One',
+            'pg1' => '0',
+            'sg1' => '0',
+            'sf1' => '0',
+            'pf1' => '0',
+            'c1' => '0',
+            'canPlayInGame1' => '1',
+            'min1' => '',  // blank minutes — reset state
+            'OF1' => '0',
+            'DF1' => '0',
+            'OI1' => '0',
+            'DI1' => '0',
+            'BH1' => '0',
+            'Injury1' => '0'
+        ];
+
+        $result = $this->processor->processSubmission($postData, 15);
+
+        $this->assertSame(0, $result['playerData'][0]['min']);
+    }
+
     public function testGeneratesCsvWithSpecialCharacters()
     {
         $playerData = [

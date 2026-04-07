@@ -284,10 +284,12 @@ function resetDepthChart() {
         selects[i].value = '0';
     }
 
-    // Reset minutes number inputs to 0
+    // Reset minutes number inputs to blank — the server's extractIntValue()
+    // converts blank → 0 on submit, so this leaves the GM with an empty
+    // field they can type into rather than a stale "0" they have to clear.
     var minInputs = form.querySelectorAll('input[type="number"][name^="min"]');
     for (var j = 0; j < minInputs.length; j++) {
-        minInputs[j].value = '0';
+        minInputs[j].value = '';
     }
 
     // Reset active checkboxes (canPlayInGame) to checked — both desktop

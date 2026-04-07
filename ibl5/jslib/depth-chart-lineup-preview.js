@@ -872,11 +872,28 @@
         // Initial render
         recalculate();
 
-        // Listen for changes on role slot selects and active selects
+        // Listen for changes to any depth-chart input that feeds the
+        // projection: role slot selects (SELECT), the minutes number input,
+        // and the active-status checkbox. The minutes input also fires on
+        // 'input' so the preview updates live as the GM types or clicks the
+        // native stepper, not just on blur.
+        function isTrackedTarget(target) {
+            if (!target) return false;
+            if (target.tagName === 'SELECT') return true;
+            if (target.tagName !== 'INPUT') return false;
+            var type = target.type;
+            if (type === 'number') return true;
+            if (type === 'checkbox') return true;
+            return false;
+        }
         form.addEventListener('change', function (e) {
+            if (isTrackedTarget(e.target)) recalculate();
+        });
+        form.addEventListener('input', function (e) {
             var target = e.target;
-            if (target.tagName !== 'SELECT') return;
-            recalculate();
+            if (target && target.tagName === 'INPUT' && target.type === 'number') {
+                recalculate();
+            }
         });
     }
 

@@ -22,6 +22,8 @@
 
     var GLOW_CLASSES = ['dc-glow-1', 'dc-glow-2', 'dc-glow-3', 'dc-glow-4', 'dc-glow-5'];
     var ROLE_SLOT_PREFIXES = { BH: 1, DI: 1, OI: 1, OF: 1, DF: 1 };
+    var MIN_FIELD_RE = /^min\d+$/;
+    var MINUTES_MAX = 40;
 
     /** @type {Object.<string, string>} Original (live) values keyed by field name */
     var originalValues = {};
@@ -56,6 +58,26 @@
 
         // Categorical fields (canPlayInGame, min): always level 1
         return 1;
+    }
+
+    /**
+     * Clamp a minutes number input to [0, MINUTES_MAX]. Empty string is left
+     * alone — the server's extractIntValue() converts blank → 0 on submit, and
+     * the reset button intentionally clears minutes to blank.
+     */
+    function clampMinutes(input) {
+        if (input.value === '') {
+            return;
+        }
+        var num = parseInt(input.value, 10);
+        if (isNaN(num) || num < 0) {
+            input.value = '0';
+        } else if (num > MINUTES_MAX) {
+            input.value = String(MINUTES_MAX);
+        } else if (String(num) !== input.value) {
+            // Normalize "07" → "7", "30.5" → "30"
+            input.value = String(num);
+        }
     }
 
     /**
@@ -200,9 +222,16 @@
         // Delegate change events at the form level so we catch all tracked
         // field types with a single listener.
         form.addEventListener('change', function (e) {
-            if (isTrackedField(e.target)) {
-                updateGlow(e.target);
+            var target = e.target;
+            if (!isTrackedField(target)) {
+                return;
             }
+            // Clamp minutes inputs to [0, 40] before computing the glow so the
+            // glow reflects the clamped (canonical) value.
+            if (target.type === 'number' && MIN_FIELD_RE.test(target.name)) {
+                clampMinutes(target);
+            }
+            updateGlow(target);
         });
     }
 

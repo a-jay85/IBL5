@@ -2,8 +2,22 @@
  * Depth Chart Lineup Preview
  *
  * Implements JSB 5.60's lineup selection algorithm (FUN_004cfa50) to show GMs
- * a projected starting lineup and one bench player per slot based on the
- * current depth chart form values. Updates live as the GM edits the form.
+ * a projected starting lineup, ranked bench ladder (sort1/sort2/sort3), and a
+ * per-cell predicted minute share based on the current depth chart form
+ * values. Updates live as the GM edits the form.
+ *
+ * Two stages feed the rendered grid:
+ *   1. selectLineup()       — produces the starter + per-slot candidate
+ *                             ladder exactly as JSB's FUN_004cfa50 would.
+ *   2. computeMinuteShares()— walks each slot's displayed ladder and
+ *                             allocates the 48-minute budget top-down using
+ *                             dc_minutes as a soft cap per player, tracking
+ *                             cross-slot totals so no player exceeds their
+ *                             dc_minutes target across the full game.
+ *
+ * Each column in the rendered grid sums to 48m. A player appearing in
+ * multiple slots has their dc_minutes budget drawn down in the earliest
+ * slot that claims them.
  *
  * 100% faithful to the verified decompiled algorithm documented in:
  *   - DEPTH_CHART_STRATEGY_GUIDE.md "Implementation Spec: Lineup Projection Engine"
@@ -157,10 +171,13 @@
     ];
 
     // The dispatcher walks sort1, sort2, sort3, +0x4ca0 backup, etc. (5
-    // ladder positions in total). We display the top 2 layers as "1st" and
-    // "2nd" backup rows. Increasing this value would render additional rows
-    // for sort3, +0x4ca0 backup, and bench-scan fallback in turn.
-    var BACKUP_ROWS = 2;
+    // ladder positions in total). We display the top 3 layers as "1st",
+    // "2nd", and "3rd" backup rows — together with the starter row that
+    // gives the GM the full per-slot ladder JSB will cycle through during
+    // a game, which is also the set over which computeMinuteShares()
+    // distributes the 48-minute budget. Increase this to surface additional
+    // layers (+0x4ca0 backup, bench-scan fallback) in the preview.
+    var BACKUP_ROWS = 3;
 
     /**
      * Collect all player data from the desktop table rows.
@@ -534,6 +551,94 @@
     }
 
     /**
+     * Per-slot minute share model — distributes the 48-minute budget of each
+     * slot across its displayed ladder (starter + BACKUP_ROWS bench picks)
+     * using dc_minutes as a soft cap per player, mirroring JSB's runtime sub
+     * dispatcher behavior:
+     *
+     *   1. The starter plays until their accumulated minutes hit dc_minutes.
+     *   2. Sub dispatcher walks sort1/sort2/sort3 (bench rows 1..N), picking
+     *      the first non-on-court, non-exhausted candidate.
+     *   3. Each candidate plays up to `dc_minutes - already_allocated` more
+     *      minutes, where `already_allocated` counts minutes they consumed
+     *      in EARLIER slots (because a player can't be on court in two slots
+     *      at once).
+     *   4. If the displayed ladder runs out before the 48-minute budget is
+     *      exhausted, the remainder is charged to the last displayed entry
+     *      — matching the dispatcher's "preliminary as last fallback" behavior
+     *      at per_possession_update_RAW.c:1476.
+     *
+     * Slot processing order (PG→SG→SF→PF→C) matches the starter selection
+     * pass order. It affects where dual-eligible players are placed: whichever
+     * slot pass claims them first gets their minutes. This is a deliberate
+     * simplification of JSB's event-driven dispatcher — the engine would place
+     * them wherever the first chronological sub event falls, which we can't
+     * model statically. The sequential model matches starter selection's own
+     * greedy pool removal and gives a stable, deterministic preview.
+     *
+     * Returns an array parallel to SLOTS where each entry is a
+     * `{ pid: minutes }` map — the minutes this slot contributes to that
+     * player's total. Total across all slots for one pid will never exceed
+     * that player's dc_minutes (unless the dump-to-last clause assigns them
+     * leftover from a fully-exhausted ladder, in which case it can exceed
+     * slightly — matches the engine's actual overtime behavior).
+     */
+    function computeMinuteShares(lineup) {
+        var allocatedTotal = {};  // pid -> total minutes allocated across all slots so far
+        var slotMinutes = [];     // slotIdx -> { pid: minutes }
+
+        for (var slotIdx = 0; slotIdx < SLOTS.length; slotIdx++) {
+            var slotAlloc = {};
+            var remaining = 48;
+
+            // Build the displayed ladder: starter + bench entries (sort1/2/3).
+            // We only charge minutes against what the preview actually shows,
+            // so the numbers the GM sees always add up to 48 per slot.
+            var ladder = [];
+            if (lineup.starters[slotIdx]) {
+                ladder.push(lineup.starters[slotIdx]);
+            }
+            var slotBench = lineup.bench[slotIdx] || [];
+            for (var b = 0; b < slotBench.length; b++) {
+                ladder.push(slotBench[b].player);
+            }
+
+            for (var li = 0; li < ladder.length; li++) {
+                var p = ladder[li];
+                var already = allocatedTotal[p.pid] || 0;
+                var budget = Math.max(0, p.dcMinutes - already);
+                var play = Math.min(budget, remaining);
+                if (play > 0) {
+                    slotAlloc[p.pid] = (slotAlloc[p.pid] || 0) + play;
+                    allocatedTotal[p.pid] = already + play;
+                    remaining -= play;
+                    if (remaining <= 0) break;
+                } else if (!(p.pid in slotAlloc)) {
+                    // Record zero so the cell still renders "0m" — this
+                    // visibly signals the dc_minutes trap (e.g. a dc=1
+                    // starter with dc_minutes=1 already spent in another slot).
+                    slotAlloc[p.pid] = 0;
+                }
+            }
+
+            // Ladder exhausted before 48 min — dump remainder into the last
+            // displayed entry. This matches JSB's runtime behavior where the
+            // dispatcher falls back to the preliminary/self-backup candidate
+            // when every sort1..sortN candidate is unavailable, and that
+            // candidate plays the rest of the game's minutes in that slot.
+            if (remaining > 0 && ladder.length > 0) {
+                var last = ladder[ladder.length - 1];
+                slotAlloc[last.pid] = (slotAlloc[last.pid] || 0) + remaining;
+                allocatedTotal[last.pid] = (allocatedTotal[last.pid] || 0) + remaining;
+            }
+
+            slotMinutes.push(slotAlloc);
+        }
+
+        return slotMinutes;
+    }
+
+    /**
      * Check if a player's position string matches a slot's fallback position.
      * Compound positions expand per the spec table in DEPTH_CHART_STRATEGY_GUIDE.md
      * "Position Matching":
@@ -559,8 +664,14 @@
 
     /**
      * Render the lineup preview into the container element.
+     *
+     * Each populated cell renders the abbreviated player name and a small
+     * "Nm" minute-share annotation from `slotMinutes` — the output of
+     * computeMinuteShares(). Minutes across the 4 rows of one column always
+     * sum to 48 (the slot's full budget), so the GM can read each column as
+     * a minute-distribution breakdown for that role.
      */
-    function renderPreview(lineup) {
+    function renderPreview(lineup, slotMinutes) {
         var container = document.getElementById('dc-lineup-preview');
         if (!container) return;
 
@@ -577,7 +688,11 @@
         for (var s = 0; s < SLOTS.length; s++) {
             var starter = lineup.starters[s];
             if (starter) {
-                html += '<td class="dc-lineup-preview__starter">' + escapeHtml(abbreviateName(starter.name)) + '</td>';
+                var mins = (slotMinutes[s] && slotMinutes[s][starter.pid]) || 0;
+                html += '<td class="dc-lineup-preview__starter">'
+                    + escapeHtml(abbreviateName(starter.name))
+                    + renderMinutes(mins)
+                    + '</td>';
             } else {
                 html += '<td class="dc-lineup-preview__empty">&mdash;</td>';
             }
@@ -605,8 +720,10 @@
                             + ' in-game substitution dispatcher walks the team'
                             + ' roster and picks this player instead."';
                     }
+                    var benchMins = (slotMinutes[c] && slotMinutes[c][benchEntry.player.pid]) || 0;
                     html += '<td' + cellAttrs + '>'
                         + escapeHtml(abbreviateName(benchEntry.player.name))
+                        + renderMinutes(benchMins)
                         + '</td>';
                 } else {
                     html += '<td class="dc-lineup-preview__empty">&mdash;</td>';
@@ -617,6 +734,15 @@
 
         html += '</tbody></table>';
         container.innerHTML = html;
+    }
+
+    /**
+     * Format a minute-share annotation. Rendered as a subdued span after the
+     * abbreviated name so the eye still lands on the player, with the
+     * predicted share as secondary information.
+     */
+    function renderMinutes(mins) {
+        return ' <span class="dc-lineup-preview__mins">' + mins + 'm</span>';
     }
 
     /**
@@ -693,7 +819,8 @@
         var players = collectPlayers();
         if (players.length === 0) return;
         var lineup = selectLineup(players);
-        renderPreview(lineup);
+        var slotMinutes = computeMinuteShares(lineup);
+        renderPreview(lineup, slotMinutes);
         updateScoreDebug(players);
     }
 

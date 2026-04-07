@@ -102,9 +102,16 @@
    Lineup Preview Grid
    ========================================================================== */
 
+/*
+ * Container sizes to parent; a horizontal scrollbar kicks in when the grid
+ * is wider than the viewport (narrow mobile) so nothing is ever truncated.
+ * The inner table is auto-layout and shrink-wraps to content, then centers
+ * horizontally within the container when there's surplus space.
+ */
 .dc-lineup-preview {
-    max-width: 600px;
+    max-width: 100%;
     margin: 0 auto var(--space-4);
+    overflow-x: auto;
 }
 
 .dc-lineup-preview__title {
@@ -115,18 +122,28 @@
     color: var(--navy-800);
 }
 
+/*
+ * `width: auto + margin: auto` centers the shrink-wrapped table inside
+ * .dc-lineup-preview when the grid is narrower than the container. When
+ * the grid is wider than the viewport, the parent's `overflow-x: auto`
+ * provides a horizontal scrollbar instead of truncating cells.
+ */
 .dc-lineup-preview table {
-    width: 100%;
-    table-layout: fixed;
+    width: auto;
+    margin: 0 auto;
+    table-layout: auto;
 }
 
+/*
+ * Cells are sized to content (because table-layout: auto) and never wrap,
+ * so both the abbreviated name and the minute-share annotation always
+ * render on a single line with no ellipsis.
+ */
 .dc-lineup-preview td {
     text-align: center;
     padding: var(--space-1) var(--space-2);
     font-size: 0.8125rem;
     white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
 }
 
 .dc-lineup-preview thead th {
@@ -152,6 +169,22 @@
 
 .dc-lineup-preview__starter {
     font-weight: 600;
+}
+
+/*
+ * Predicted minute share annotation rendered after each player name in the
+ * lineup grid — e.g. "D. Howard 36m". Muted + smaller so the eye still lands
+ * on the player name and the minutes read as secondary metadata.
+ *
+ * Specificity is scoped to `.dc-lineup-preview td` (0,2,1) so it beats
+ * `.ibl-data-table td` (0,1,1) which sets a darker color on every data-table
+ * cell.
+ */
+.dc-lineup-preview td .dc-lineup-preview__mins {
+    font-size: 0.6875rem;
+    font-weight: 400;
+    color: var(--gray-500);
+    margin-left: 0.125rem;
 }
 
 /*

@@ -14,47 +14,60 @@ test.describe('Depth Chart submission', () => {
     const form = page.locator('.depth-chart-form');
     await expect(form).toBeVisible({ timeout: 15000 });
 
-    // Position selects should be pre-populated with current assignments
-    const pgSelects = page.locator('select[name^="pg"]');
-    await expect(pgSelects.first()).toBeVisible();
+    // Role slot selects (BH = PG column) should be present and visible
+    const bhSelects = page.locator('select[name^="BH"]');
+    await expect(bhSelects.first()).toBeVisible();
 
-    // At least one should have a non-zero value (starter)
-    let hasStarter = false;
-    const count = await pgSelects.count();
+    // Active checkboxes should be pre-populated — at least one player is active.
+    // The desktop `.dc-active-cb` class disambiguates from the mobile
+    // `.dc-card__active-cb` which shares the canPlayInGame name prefix.
+    const activeCheckboxes = page.locator('input[type="checkbox"].dc-active-cb[name^="canPlayInGame"]');
+    const count = await activeCheckboxes.count();
+    let hasActive = false;
     for (let i = 0; i < count; i++) {
-      const val = await pgSelects.nth(i).inputValue();
-      if (val !== '0') {
-        hasStarter = true;
+      if (await activeCheckboxes.nth(i).isChecked()) {
+        hasActive = true;
         break;
       }
     }
-    expect(hasStarter).toBe(true);
+    expect(hasActive).toBe(true);
   });
 
-  test('change a position assignment', async ({ page }) => {
+  test('change a role slot assignment', async ({ page }) => {
     const form = page.locator('.depth-chart-form');
     await expect(form).toBeVisible({ timeout: 15000 });
 
-    // Find a PG select with value "0" and change it to "2" (backup)
-    const pgSelects = page.locator('select[name^="pg"]');
-    const count = await pgSelects.count();
+    // Find a BH (PG role slot) select with value "0" and change it to "2" (backup)
+    const bhSelects = page.locator('select[name^="BH"]');
+    const count = await bhSelects.count();
 
     for (let i = 0; i < count; i++) {
-      const val = await pgSelects.nth(i).inputValue();
+      const val = await bhSelects.nth(i).inputValue();
       if (val === '0') {
-        await pgSelects.nth(i).selectOption('2');
-        const newVal = await pgSelects.nth(i).inputValue();
+        await bhSelects.nth(i).selectOption('2');
+        const newVal = await bhSelects.nth(i).inputValue();
         expect(newVal).toBe('2');
         break;
       }
     }
   });
 
-  test('submit depth chart successfully', async ({ page }) => {
+  test('submit depth chart successfully and confirmation shows submitted values', async ({
+    page,
+  }) => {
     const form = page.locator('.depth-chart-form');
     await expect(form).toBeVisible({ timeout: 15000 });
 
-    // Submit the current depth chart (already valid from seed data)
+    // Set a distinctive BH (PG) value on the first desktop player row so we
+    // can verify the confirmation page echoes back exactly what was POSTed.
+    // Scoping to `.depth-chart-table` avoids colliding with the mobile
+    // card duplicates that share the same input names.
+    const firstBh = page
+      .locator('.depth-chart-table select[name^="BH"]')
+      .first();
+    await firstBh.selectOption('1');
+
+    // Submit the current depth chart
     const submitBtn = page.locator('.depth-chart-buttons .depth-chart-submit-btn');
     await expect(submitBtn).toBeVisible();
     await submitBtn.click();
@@ -62,13 +75,42 @@ test.describe('Depth Chart submission', () => {
     await page.waitForLoadState('domcontentloaded');
     const body = await page.locator('body').textContent();
 
-    // Success or validation error should appear
+    // Success or validation error banner should appear. The confirmation
+    // table is rendered in both branches.
     const hasSuccess = body?.match(
       /submitted.*successfully|thank you|depth chart has been/i,
     );
     const hasError = body?.match(/must have|active players|position/i);
-
     expect(hasSuccess || hasError).toBeTruthy();
+
+    // Confirmation table structure: Name, Active, PG, SG, SF, PF, C columns.
+    // Locator scopes to the "Depth Chart Submission" heading so we don't
+    // hit an unrelated .ibl-data-table elsewhere on the page.
+    const confirmationRegion = page
+      .locator('body')
+      .filter({ hasText: /Depth Chart Submission/i });
+    const confirmationTable = confirmationRegion.locator('table.ibl-data-table').last();
+    await expect(confirmationTable).toBeVisible();
+
+    // Use textContent (raw source text) instead of innerText — the table's
+    // CSS applies text-transform: uppercase, which would turn "Name" into
+    // "NAME" for allInnerTexts() but leaves allTextContents() untouched.
+    const headers = await confirmationTable.locator('thead th').allTextContents();
+    expect(headers.map((h) => h.trim())).toEqual([
+      'Name',
+      'Active',
+      'PG',
+      'SG',
+      'SF',
+      'PF',
+      'C',
+    ]);
+
+    // At least one player row should be rendered.
+    const bodyRows = confirmationTable.locator('tbody tr');
+    const rowCount = await bodyRows.count();
+    expect(rowCount).toBeGreaterThan(0);
+
     await assertNoPhpErrors(page, 'after depth chart submission');
   });
 
@@ -90,9 +132,9 @@ test.describe('Depth Chart submission', () => {
     const optCount = await options.count();
     expect(optCount, 'Saved DC dropdown should have at least 2 options').toBeGreaterThanOrEqual(2);
 
-    // Record current value of first PG select
-    const pgSelect = page.locator('select[name^="pg"]').first();
-    const originalValue = await pgSelect.inputValue();
+    // Record current value of first BH (PG role slot) select
+    const bhSelect = page.locator('select[name^="BH"]').first();
+    const originalValue = await bhSelect.inputValue();
 
     // Select the second option (first saved config)
     await dropdown.selectOption({ index: 1 });

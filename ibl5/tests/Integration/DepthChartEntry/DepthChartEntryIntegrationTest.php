@@ -16,10 +16,10 @@ use DepthChartEntry\DepthChartEntryValidator;
  * Tests end-to-end scenarios combining processing, validation,
  * and database persistence:
  * - Successful depth chart submission workflows
- * - Validation failures (active players, position depth, multiple starters)
+ * - Validation failures (active player count)
  * - Season phase-specific rules (Regular Season vs Playoffs)
  * - Database update operations
- * - Form data processing and sanitization
+ * - Form data processing and sanitization (settings clamped to [0, 2])
  *
  * @covers \DepthChartEntry\DepthChartEntryRepository
  * @covers \DepthChartEntry\DepthChartEntryProcessor
@@ -109,7 +109,7 @@ class DepthChartEntryIntegrationTest extends IntegrationTestCase
             'min1' => '32',
             'OF1' => '2',
             'DF1' => '1',
-            'OI1' => '-1',
+            'OI1' => '1',
             'DI1' => '2',
             'BH1' => '0',
             'Injury1' => '0'
@@ -132,7 +132,7 @@ class DepthChartEntryIntegrationTest extends IntegrationTestCase
         $this->assertEquals(32, $playerData['min']);
         $this->assertEquals(2, $playerData['of']);
         $this->assertEquals(1, $playerData['df']);
-        $this->assertEquals(-1, $playerData['oi']);
+        $this->assertEquals(1, $playerData['oi']);
         $this->assertEquals(2, $playerData['di']);
         $this->assertEquals(0, $playerData['bh']);
 
@@ -240,26 +240,19 @@ class DepthChartEntryIntegrationTest extends IntegrationTestCase
      * @group depthchart
      * @group validation-failure
      */
-    public function testWorkflowFailsWithInsufficientPositionDepth(): void
+    public function testWorkflowPassesWithReducedPositionDepth(): void
     {
-        // Arrange - Valid active count but only 2 PG depth (need 3)
+        // Arrange - Valid active count but only 2 PG depth
+        // Position depth validation has been removed, so this should pass
         $postData = $this->createPostDataWithInsufficientPositionDepth('PG');
 
         // Act
         $result = $this->processor->processSubmission($postData, 15);
         $isValid = $this->validator->validate($result, 'Regular Season');
 
-        // Assert
-        $this->assertFalse($isValid);
-        $errors = $this->validator->getErrors();
-        $hasPositionError = false;
-        foreach ($errors as $error) {
-            if ($error['type'] === 'position_depth') {
-                $hasPositionError = true;
-                $this->assertStringContainsString('at least 3 players', $error['message']);
-            }
-        }
-        $this->assertTrue($hasPositionError, 'Should have position depth error');
+        // Assert - No position depth validation, so it passes
+        $this->assertTrue($isValid);
+        $this->assertEmpty($this->validator->getErrors());
     }
 
     /**
@@ -267,27 +260,22 @@ class DepthChartEntryIntegrationTest extends IntegrationTestCase
      * @group depthchart
      * @group validation-failure
      */
-    public function testWorkflowFailsWithMultipleStartingPositions(): void
+    public function testWorkflowPassesWithMultipleStartingPositions(): void
     {
         // Arrange - One player starting at both PG and SG
+        // Multiple-starter validation has been removed, so this should pass
         $postData = $this->createPostDataWithMultipleStarter();
 
         // Act
         $result = $this->processor->processSubmission($postData, 15);
         $isValid = $this->validator->validate($result, 'Regular Season');
 
-        // Assert
-        $this->assertFalse($isValid);
-        $errors = $this->validator->getErrors();
-        $hasMultipleStarterError = false;
-        foreach ($errors as $error) {
-            if ($error['type'] === 'multiple_starting_positions') {
-                $hasMultipleStarterError = true;
-                $this->assertStringContainsString('more than one position', $error['message']);
-            }
-        }
-        $this->assertTrue($hasMultipleStarterError, 'Should have multiple starter error');
-        $this->assertEquals('Multi Starter', $result['nameOfProblemStarter']);
+        // Assert - No multiple-starter validation
+        $this->assertTrue($isValid);
+        $this->assertEmpty($this->validator->getErrors());
+        // Starter detection removed — always returns defaults
+        $this->assertFalse($result['hasStarterAtMultiplePositions']);
+        $this->assertEquals('', $result['nameOfProblemStarter']);
     }
 
     /**
@@ -566,7 +554,7 @@ class DepthChartEntryIntegrationTest extends IntegrationTestCase
             'OF1' => '10',      // Should clamp to 3
             'DF1' => '-10',     // Should clamp to 0
             'OI1' => '10',      // Should clamp to 2
-            'DI1' => '-10',     // Should clamp to -2
+            'DI1' => '-10',     // Should clamp to 0 (negative clamped to 0)
             'BH1' => '0',
             'Injury1' => '0'
         ];
@@ -583,7 +571,7 @@ class DepthChartEntryIntegrationTest extends IntegrationTestCase
         $this->assertEquals(3, $player['of'], 'OF should clamp to 3');
         $this->assertEquals(0, $player['df'], 'DF should clamp to 0');
         $this->assertEquals(2, $player['oi'], 'OI should clamp to 2');
-        $this->assertEquals(-2, $player['di'], 'DI should clamp to -2');
+        $this->assertEquals(0, $player['di'], 'DI should clamp to 0 (range is [0, 2])');
     }
 
     /**
@@ -591,17 +579,17 @@ class DepthChartEntryIntegrationTest extends IntegrationTestCase
      * @group depthchart
      * @group sanitization
      */
-    public function testProcessorHandlesNegativeIntensityValues(): void
+    public function testProcessorClampsNegativeSettingValuesToZero(): void
     {
-        // Arrange
+        // Arrange - Negative setting values now clamp to 0 (range is [0, 2])
         $postData = [
             'Name1' => 'Test',
             'pg1' => '1', 'sg1' => '0', 'sf1' => '0', 'pf1' => '0', 'c1' => '0',
             'canPlayInGame1' => '1', 'min1' => '30',
             'OF1' => '2', 'DF1' => '1',
-            'OI1' => '-2',  // Valid negative
-            'DI1' => '-1',  // Valid negative
-            'BH1' => '-2',  // Valid negative
+            'OI1' => '-2',  // Clamped to 0
+            'DI1' => '-1',  // Clamped to 0
+            'BH1' => '-2',  // Clamped to 0
             'Injury1' => '0'
         ];
         $this->mockDb->setAffectedRows(1);
@@ -611,14 +599,13 @@ class DepthChartEntryIntegrationTest extends IntegrationTestCase
         $player = $result['playerData'][0];
         $this->repository->updatePlayerDepthChart($player['name'], $player);
 
-        // Assert - Negative values preserved
-        $this->assertEquals(-2, $player['oi']);
-        $this->assertEquals(-1, $player['di']);
-        $this->assertEquals(-2, $player['bh']);
+        // Assert - Negative values clamped to 0
+        $this->assertEquals(0, $player['oi']);
+        $this->assertEquals(0, $player['di']);
+        $this->assertEquals(0, $player['bh']);
 
-        // Assert - Negative values in query
-        $this->assertQueryExecuted('-2');
-        $this->assertQueryExecuted('-1');
+        // Assert - Database update still executed
+        $this->assertQueryExecuted('UPDATE ibl_plr');
     }
 
     // ========== ERROR ACCUMULATION ==========
@@ -628,25 +615,21 @@ class DepthChartEntryIntegrationTest extends IntegrationTestCase
      * @group depthchart
      * @group errors
      */
-    public function testValidatorAccumulatesMultipleErrors(): void
+    public function testValidatorReportsActivePlayerError(): void
     {
-        // Arrange - Data with multiple issues
+        // Arrange - Data with too few active players
         $postData = $this->createPostDataWithMultipleIssues();
 
         // Act
         $result = $this->processor->processSubmission($postData, 15);
         $isValid = $this->validator->validate($result, 'Regular Season');
 
-        // Assert
+        // Assert - Only active player count validation remains
         $this->assertFalse($isValid);
         $errors = $this->validator->getErrors();
 
-        // Should have multiple errors
-        $this->assertGreaterThan(1, count($errors), 'Should accumulate multiple errors');
-
-        // Check error types are present
-        $errorTypes = array_column($errors, 'type');
-        $this->assertContains('active_players_min', $errorTypes);
+        $this->assertCount(1, $errors, 'Should have active player error');
+        $this->assertEquals('active_players_min', $errors[0]['type']);
     }
 
     /**

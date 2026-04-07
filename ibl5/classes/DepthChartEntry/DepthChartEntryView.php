@@ -76,7 +76,7 @@ class DepthChartEntryView implements DepthChartEntryViewInterface
 <li>Each row in the table is one of your players.</li>
 <li>The five columns – <strong>PG SG SF PF C</strong> – are the five lineup slots you fill.</li>
 <li>For each slot, tell the sim who you want to play there:</li>
-<p>
+</ol>
 <table class="ibl-data-table dc-help-table">
 <thead><tr><th>Option</th><th>Meaning</th></tr></thead>
 <tbody>
@@ -90,25 +90,22 @@ class DepthChartEntryView implements DepthChartEntryViewInterface
 <p><strong>To put a player in the slot you want:</strong></p>
 <ol>
 <li>Set <strong>one</strong> player to <strong>S</strong> for each position.</li>
-<li>Set <strong>#2</strong> on the player you want subbing in first.</li>
-<li>Set <strong>#3</strong> on the player after that.</li>
+<li>Set <strong>#2</strong> for the player you want subbing in first.</li>
+<li>Set <strong>#3</strong> for the player(s) after that.</li>
 <li>You can pick different backups for each slot.</li>
 <li>Set <strong>Min</strong> to control how long each player is on the floor.</li>
 <li>Starters usually want 30&ndash;40; bench players want lower numbers.</li>
-<li>Leave everything else as <strong>&mdash;</strong>.</li>
-<li>Those players will only come in if everyone above them is unavailable.</li>
+<li>Players with 0 minutes will only come in if everyone above them is unavailable.</li>
 </ol>
-<p><strong>Projected Lineup:</strong> this shows exactly who the sim
-will use and roughly how many minutes each player gets per game, updated live as you
-edit the form. If a name appears in <em>italic gray</em>, it means you didn&rsquo;t assign
-enough players to that slot, so the sim is falling back on a bench body automatically
-&mdash; add a <strong>#2</strong> or <strong>#3</strong> to the player you actually want there.</p>
-<p><strong>Note:</strong> a starter only plays their one slot. A player you set to
-<strong>S</strong> at PG <em>won&rsquo;t</em> also fill in as an SG backup &mdash; once the sim picks
-them as a starter, they&rsquo;re locked to that slot and removed from every other slot&rsquo;s
-ladder. If you want one bench body to cover multiple slots, set <strong>#2</strong> or
-<strong>#3</strong> on them in several columns and leave <strong>S</strong> off &mdash; then they&rsquo;ll
-appear as a backup in each slot&rsquo;s ladder.</p>
+<p><strong>Projected Lineup:</strong><br></p>
+<p>If a name appears in <em>italic gray</em>, it means you didn&rsquo;t assign
+enough players to that slot, so the sim is falling back on a bench body automatically.
+<br>Add a <strong>#2</strong> or <strong>#3</strong> to the player you actually want there.</p>
+<p><strong>Note:</strong> a starter only plays their <strong>one</strong> slot –
+starters are locked to that slot and removed from every other slot&rsquo;s
+ladder. If you want one backup to cover multiple slots, set <strong>#2</strong> or
+<strong>#3</strong> on them in several columns and leave <strong>S</strong> off &mdash;
+then they&rsquo;ll appear as a backup in each slot&rsquo;s ladder.</p>
 <p>The sim fills slots in order <strong>PG &rarr; SG &rarr; SF &rarr; PF &rarr; C</strong>,
 so if two slots both have a viable <strong>S</strong> pick that includes the same player,
 the earlier slot in that order claims them.</p>

@@ -19,9 +19,13 @@
  * multiple slots has their dc_minutes budget drawn down in the earliest
  * slot that claims them.
  *
- * 100% faithful to the verified decompiled algorithm documented in:
+ * 100% faithful to the verified decompiled algorithm documented in JSB 5.60
+ * (strategy guide last revised 2026-04-06):
  *   - DEPTH_CHART_STRATEGY_GUIDE.md "Implementation Spec: Lineup Projection Engine"
- *   - 00_MASTER_REFERENCE.md "Starter selection / Backup selection"
+ *     (Step 3: Starter Selection, Step 4: Backup Selection, Step 5: Substitution Engine)
+ *   - 00_MASTER_REFERENCE.md "Starter selection / Backup selection" and the
+ *     "Substitution Dispatcher (FUN_004db520) — VERIFIED FROM CODE" section
+ *     (FUN_004db520 body NOW RECOVERED at jsb560_decompiled.c:94696-95733).
  *
  * Source line citations (from `jsb560_decompiled.c` / earlier `per_possession_update_RAW.c`):
  *   - Reads dc_minutes from player struct +0xd3c at line 90870
@@ -29,6 +33,10 @@
  *   - Two-pass bubble sort at lines 91751-91863
  *   - Backup selection (position-only) at lines 91562-91634 / 1148-1211
  *   - Self-backup state at line 1183 / 1475-1476
+ *   - FUN_004db520 in-game substitution dispatcher body at jsb560_decompiled.c:94696-95733
+ *   - FUN_0040af90 PLR roster sort body at jsb560_decompiled.c:5652-5843 (formula 5723-5728)
+ *   - FUN_0057e510 random injury / forced-rest roller body at jsb560_decompiled.c:171738-171765
+ *     (writes the +0x138 forced-rest duration that the bench-scan eligibility check reads)
  *
  * STARTER SELECTION (5 sequential passes — BH→DI→OI→DF→OF, slots PG/SG/SF/PF/C):
  *
@@ -117,22 +125,44 @@
  *        viaBenchScan: true so the GM can tell which subs come from the
  *        per-slot ladder vs the runtime fallback.
  *
- * BENCH-SCAN FALLBACK (FUN_004db520, jsb560_decompiled.c:95513-95630):
+ * BENCH-SCAN FALLBACK (FUN_004db520, jsb560_decompiled.c:95500-95630):
  *
- *   Triggered ONLY for slots whose lineup-memory backup is self (i.e. no
- *   position-matching non-starter exists). At runtime the per-slot ladder
- *   {preliminary, sort1, sort2, sort3, backup} cycles through the same
- *   self-backed pid and the slot output stays 0, so the dispatcher falls
- *   through to a 3-pass scan over the team's 15-pid roster array starting
- *   from `param_1[+0x33f8]` (team 1) or `+0x33fc` (team 2):
+ *   At runtime the dispatcher reaches the bench scan whenever a slot's
+ *   per-slot ladder {preliminary, sort1, sort2, sort3, backup} fails to
+ *   produce a usable starter — i.e. every ladder candidate is filtered out
+ *   by one of the dispatcher's three "should sub" triggers (verified at
+ *   jsb560_decompiled.c:95082-95093):
+ *     1. Foul trouble — Threshold Set B (Q1≥2, Q2≥3, Q3≥4, Q4-early≥5,
+ *        Q4-late/OT only PF==6) at lines 95085-95093. NOTE: this is the
+ *        higher of the two foul-trouble tables — FUN_004e4450's Set A
+ *        (used by defender_selector to reduce defensive load) is NOT
+ *        called by FUN_004db520. The two tables are independent.
+ *     2. Forced-out flag — *(int *)(player + 0x24) < 0
+ *     3. Random injury — *(int *)(player + 0x138) > 0
+ *   ...or all ladder candidates resolve to the same self-backed pid and
+ *   the slot scratch output stays 0.
+ *
+ *   Bench scan implementation — 3 passes over the team's 15-pid roster
+ *   array starting from `param_1[+0x33f8]` (team 1) or `+0x33fc` (team 2):
  *     Pass 1 (95513-95548) — strict: position match + PF<6 + +0x138<4 + not on court
  *     Pass 2 (95553-95580) — relaxed: drop the position-match requirement
  *     Pass 3 (95594-95630) — very relaxed: allow PF≥6 in some branches
  *
- *   Game-start preview assumptions: every active player has PF=0 and
- *   +0x138=0, so eligibility collapses to "active && not on court" and
- *   passes 1-2 are the only ones that fire (pass 3 is unreachable until a
- *   player reaches 6 fouls, which can't happen at game start).
+ *   Note on +0x138 (verified at jsb560_decompiled.c:95520-95525): this
+ *   field is dual-use. Between games it's the conditioning counter
+ *   (decrements by 3 per game). During gameplay FUN_0057e510 (body at
+ *   jsb560_decompiled.c:171738-171765) writes a random forced-rest
+ *   duration value (1-160 ticks) that the dispatcher reads as the
+ *   "force out" trigger. Either way, +0x138 ≥ 4 blocks the bench scan
+ *   from picking the player.
+ *
+ *   Game-start preview assumptions: every active player has PF=0,
+ *   +0x138=0, and +0x24=0, so the foul-trouble / forced-out / injury
+ *   triggers can never fire. Eligibility collapses to "active && not on
+ *   court", which means the only path to the bench scan at preview time
+ *   is the self-backup case. Passes 1-2 are the only ones that fire (pass
+ *   3 is unreachable until a player reaches 6 fouls, which can't happen
+ *   at game start).
  *
  *   Roster iteration order: walks players sorted by JSB's load-time roster
  *   sort formula `quality = (dc_minutes + 100) × production_composite`

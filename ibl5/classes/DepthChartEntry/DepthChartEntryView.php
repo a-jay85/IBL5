@@ -97,21 +97,35 @@ class DepthChartEntryView implements DepthChartEntryViewInterface
         echo '<details class="dc-help-section">
 <summary>How Depth Charts Work</summary>
 <div class="dc-help-section__content">
-<p>Assign players to role slots (PG through C) to control who starts and who subs in.
-The engine selects the highest-quality assigned player for each slot as the starter.
-Remaining assigned players form the bench, with higher values subbing in first.</p>
+<p>Each row in the table is one of your players. The five columns <strong>PG SG SF PF C</strong>
+are the five lineup slots you fill. For each slot, tell the sim who you want to play there:</p>
 <table class="ibl-data-table dc-help-table">
-<thead><tr><th>Slot</th><th>Play Style</th></tr></thead>
+<thead><tr><th>Dropdown</th><th>Meaning</th></tr></thead>
 <tbody>
-<tr><td>PG</td><td>Outside shots &amp; drives (perimeter-heavy)</td></tr>
-<tr><td>SG</td><td>Mostly perimeter, some inside</td></tr>
-<tr><td>SF</td><td>Balanced inside/outside</td></tr>
-<tr><td>PF</td><td>Mostly inside, some outside</td></tr>
-<tr><td>C</td><td>Heavily inside/post-oriented</td></tr>
+<tr><td><strong>S</strong></td><td>Starter &mdash; this player tips off the game in this slot</td></tr>
+<tr><td><strong>#2</strong></td><td>Main backup &mdash; first sub off the bench for this slot</td></tr>
+<tr><td><strong>#3</strong></td><td>Secondary backup &mdash; second sub off the bench for this slot</td></tr>
+<tr><td><strong>&mdash;</strong></td><td>Not assigned to this slot (use for deep bench)</td></tr>
 </tbody>
 </table>
-<p>Set slot values to &mdash; (0) for deep bench players. A player\'s inherent position
-(Pos column) is used as a fallback when no slot is assigned.</p>
+<p><strong>To put a player in the slot you want:</strong></p>
+<ol>
+<li>Set <strong>one</strong> player\'s column to <strong>S</strong> for each of the five slots (PG, SG, SF, PF, C).</li>
+<li>Pick your backups: set <strong>#2</strong> on the player you want subbing in first, and <strong>#3</strong>
+on the player after that. You can pick different backups for each slot.</li>
+<li>Set the <strong>Min</strong> column to control how long each player is on the floor.
+Starters usually want 30&ndash;40; bench players want lower numbers.</li>
+<li>Leave everything else as <strong>&mdash;</strong>. Those players will only come in if everyone
+above them is unavailable.</li>
+</ol>
+<p><strong>About the Projected Lineup grid above:</strong> it shows exactly who the sim
+will use and roughly how many minutes each player gets per game, updated live as you
+edit the form. If a name appears in <em>italic gray</em>, it means you didn&rsquo;t assign
+enough players to that slot, so the sim is falling back on a bench body automatically
+&mdash; add a <strong>#2</strong> or <strong>#3</strong> to the player you actually want there.</p>
+<p><strong>Tip:</strong> a player can be the starter at one slot and a backup at another
+&mdash; set <strong>S</strong> in one column and <strong>#2</strong> in another. The sim will place
+them wherever they&rsquo;re needed first.</p>
 </div>
 </details>';
     }

@@ -146,6 +146,26 @@
     white-space: nowrap;
 }
 
+/*
+ * Row labels ("Starter", "1st", "2nd", "3rd") in the first column of each
+ * body row — styled smaller/gray/left-aligned so they read as tier labels
+ * rather than data. Scoped to td only so the empty corner <th> still
+ * inherits the default .ibl-data-table dark navy header styling and
+ * visually matches the form table's header row.
+ */
+.dc-lineup-preview td.dc-lineup-preview__row-label {
+    font-size: 0.6875rem;
+    font-weight: 600;
+    color: var(--gray-400);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    text-align: left;
+    width: 4.5em;
+    overflow: visible;
+    white-space: nowrap;
+    text-overflow: clip;
+}
+
 .dc-lineup-preview__starter {
     font-weight: 600;
 }

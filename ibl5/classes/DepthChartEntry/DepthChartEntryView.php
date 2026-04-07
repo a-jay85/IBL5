@@ -45,12 +45,21 @@ class DepthChartEntryView implements DepthChartEntryViewInterface
     /**
      * Render role priority dropdown options (0 to max).
      * Unified for all 5 role slots: BH/DI/OI use max=2, DF/OF use max=3.
+     *
+     * Label convention:
+     *   0 → "—"  (unassigned; falls back to player's position string)
+     *   1 → "S"  (starter; JSB's dc=1 pass-2 sort strictly dominates dc=2+)
+     *   2+ → "#N" (successive backups in the per-slot ladder)
      */
     public function renderRolePriorityOptions(int $selectedValue, int $maxValue): void
     {
         for ($i = 0; $i <= $maxValue; $i++) {
             $selected = ($selectedValue === $i) ? ' SELECTED' : '';
-            $label = ($i === 0) ? '&mdash;' : '#' . $i;
+            $label = match (true) {
+                $i === 0 => '&mdash;',
+                $i === 1 => 'S',
+                default  => '#' . $i,
+            };
             echo "<option value=\"{$i}\"{$selected}>{$label}</option>";
         }
     }

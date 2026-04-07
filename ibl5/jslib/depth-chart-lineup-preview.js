@@ -677,14 +677,14 @@
 
         var html = '<div class="dc-lineup-preview__title">Projected Lineup</div>';
         html += '<table class="ibl-data-table dc-lineup-preview-table"><thead><tr>';
-        html += '<th class="dc-lineup-preview__row-label"></th>';
+        html += '<th></th>';
         for (var h = 0; h < SLOTS.length; h++) {
             html += '<th>' + SLOTS[h].label + '</th>';
         }
         html += '</tr></thead><tbody>';
 
         // Starters row
-        html += '<tr><td class="dc-lineup-preview__row-label">Start</td>';
+        html += '<tr><td>Starter</td>';
         for (var s = 0; s < SLOTS.length; s++) {
             var starter = lineup.starters[s];
             if (starter) {
@@ -708,7 +708,7 @@
         var ROW_LABELS = ['1st', '2nd', '3rd', '4th', '5th'];
         for (var row = 0; row < BACKUP_ROWS; row++) {
             var label = ROW_LABELS[row] || (row + 1) + 'th';
-            html += '<tr><td class="dc-lineup-preview__row-label">' + label + '</td>';
+            html += '<tr><td>' + label + '</td>';
             for (var c = 0; c < SLOTS.length; c++) {
                 var benchEntry = lineup.bench[c][row];
                 if (benchEntry) {

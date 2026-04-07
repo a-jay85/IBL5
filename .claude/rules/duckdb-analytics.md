@@ -1,3 +1,11 @@
+---
+paths:
+  - "**/analytics/**"
+  - "**/bin/analytics-*"
+  - "**/bin/db-import-boxscores"
+  - "**/*.duckdb"
+---
+
 # DuckDB Analytics Layer
 
 ## Why DuckDB

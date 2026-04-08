@@ -144,26 +144,23 @@ test.describe('Depth Chart Entry: mobile card view', () => {
     await expect(valueLabel).toHaveText(labelFor(afterUp));
   });
 
-  test('changing a card select triggers glow', async ({ page }) => {
-    const firstSelect = page.locator('.dc-mobile-cards select[name^="BH"]').first();
-    const originalValue = await firstSelect.inputValue();
+  test('changing a card role slot triggers glow', async ({ page }) => {
+    // Tapping a stepper arrow cycles the hidden <select> and dispatches
+    // a bubbling change event — the glow highlighter in
+    // depth-chart-changes.js listens for that on the form.
+    const firstCard = page.locator('.dc-card').first();
+    const pgField = firstCard.locator('.dc-card__field').nth(1);
+    const downArrow = pgField.locator('.dc-card__stepper-arrow--down');
+    const upArrow = pgField.locator('.dc-card__stepper-arrow--up');
 
-    // Find a different value
-    const options = firstSelect.locator('option');
-    const count = await options.count();
-    for (let i = 0; i < count; i++) {
-      const val = await options.nth(i).getAttribute('value');
-      if (val !== originalValue) {
-        await firstSelect.selectOption(val!);
-        break;
-      }
-    }
+    await downArrow.click();
 
-    // Glow should appear on the changed select
+    // Glow should appear somewhere inside the mobile cards container now
+    // that a slot value differs from its initial snapshot.
     await expect(page.locator('.dc-mobile-cards [class*="dc-glow-"]').first()).toBeAttached();
 
-    // Revert
-    await firstSelect.selectOption(originalValue);
+    // Revert so no other test inherits a changed state.
+    await upArrow.click();
   });
 
   test('nav bar stays fixed when scrolling', async ({ page }) => {
@@ -371,12 +368,18 @@ test.describe('DCE mobile: resize sync', () => {
     await page.goto('modules.php?name=DepthChartEntry');
     await page.waitForLoadState('networkidle');
 
-    // Change a value on mobile card (BH = PG role slot)
-    const mobileSelect = page.locator('.dc-mobile-cards select[name^="BH"]').first();
+    // Change the first card's PG (BH) slot by tapping the stepper down
+    // arrow. The underlying <select> is display:none on mobile, so we
+    // can't call selectOption() on it — we drive the stepper UI instead.
+    const firstCard = page.locator('.dc-card').first();
+    const pgField = firstCard.locator('.dc-card__field').nth(1);
+    const mobileSelect = pgField.locator('select');
     await expect(mobileSelect).toBeEnabled();
+
     const originalValue = await mobileSelect.inputValue();
-    const newValue = originalValue === '0' ? '1' : '0';
-    await mobileSelect.selectOption(newValue);
+    await pgField.locator('.dc-card__stepper-arrow--down').click();
+    const newValue = await mobileSelect.inputValue();
+    expect(newValue).not.toBe(originalValue);
 
     // Switch to desktop
     await page.setViewportSize({ width: 1280, height: 900 });

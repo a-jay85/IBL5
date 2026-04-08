@@ -226,4 +226,69 @@
 }
 
 
+/* ==========================================================================
+   Lineup Preview — Mobile Swapped-Axes Overrides
+   ==========================================================================
+ *
+ * At narrow viewports the lineup preview renders a second table with
+ * positions on the Y-axis and depth tiers (Starting/2nd/3rd/4th) on the
+ * X-axis, so the starting lineup sits in the leftmost data column and is
+ * always visible without horizontal scrolling. These rules:
+ *   1. Hide the desktop table and show the mobile table.
+ *   2. Tighten photos, padding, and font-size so all 4 data columns fit.
+ *
+ * IMPORTANT specificity note: tables.css's `.ibl-data-table td` rule
+ * (applied at (0,1,1)) and its mobile-breakpoint rule
+ * `.ibl-data-table:not(.voting-form-table):not(.voting-results-table) td`
+ * (specificity (0,3,1)) both target our table. To win we:
+ *   - Chain two classes on the table itself for the non-responsive rules.
+ *   - Keep these rules in depth-chart-mobile.css (imported after
+ *     tables.css in design/input.css) so equal-specificity conflicts
+ *     resolve in our favor via source order.
+ */
+@media (max-width: 768px) {
+    .dc-lineup-preview-table--desktop {
+        display: none;
+    }
+
+    .dc-lineup-preview-table--mobile {
+        display: table;
+    }
+
+    /* Position labels (PG/SG/SF/PF/C) — tight column, centered. */
+    .dc-lineup-preview-table--mobile td.dc-lineup-preview__row-label {
+        width: 2em;
+        text-align: center;
+    }
+
+    /*
+     * Cell sizing overrides. Selector chains 3 classes on the table
+     * (.dc-lineup-preview-table + .dc-lineup-preview-table--mobile +
+     * .ibl-data-table) so the specificity is (0,3,1) — tied with
+     * tables.css's mobile-breakpoint rule
+     * `.ibl-data-table:not(.voting-form-table):not(.voting-results-table) td`.
+     * Source order breaks the tie: this file is imported after tables.css
+     * in design/input.css, so our rules win.
+     */
+    .dc-lineup-preview-table.dc-lineup-preview-table--mobile.ibl-data-table td {
+        font-size: 0.6875rem;
+        padding: 0.1875rem 0.1875rem;
+    }
+
+    .dc-lineup-preview-table.dc-lineup-preview-table--mobile.ibl-data-table td.ibl-player-cell {
+        padding-inline: 0.1875rem;
+    }
+
+    .dc-lineup-preview-table--mobile .ibl-player-photo {
+        width: 16px;
+        height: 16px;
+    }
+
+    .dc-lineup-preview-table--mobile td .dc-lineup-preview__mins {
+        margin-left: 0.0625rem;
+        font-size: 0.5625rem;
+    }
+}
+
+
 } /* end @layer components */

@@ -151,6 +151,91 @@ test.describe('Depth Chart Entry: mobile card view', () => {
     expect(box).not.toBeNull();
     expect(box!.width).toBeLessThanOrEqual(375);
   });
+
+  test('lineup preview uses swapped-axes mobile layout', async ({ page }) => {
+    // On mobile the Projected Lineup table flips axes so the five positions
+    // run down the Y-axis and the Starting/2nd/3rd/4th depth tiers run
+    // across the X-axis. The desktop variant is hidden by CSS.
+    const preview = page.locator('#dc-lineup-preview');
+    await expect(preview).toBeVisible();
+
+    const mobileTable = preview.locator('.dc-lineup-preview-table--mobile');
+    const desktopTable = preview.locator('.dc-lineup-preview-table--desktop');
+    await expect(mobileTable).toBeVisible();
+    await expect(desktopTable).not.toBeVisible();
+
+    // Row labels (column 0 of each tbody row) should list the five positions
+    // in PG→C order.
+    const rowLabels = mobileTable.locator('tbody tr td.dc-lineup-preview__row-label');
+    await expect(rowLabels).toHaveCount(5);
+    await expect(rowLabels.nth(0)).toHaveText('PG');
+    await expect(rowLabels.nth(1)).toHaveText('SG');
+    await expect(rowLabels.nth(2)).toHaveText('SF');
+    await expect(rowLabels.nth(3)).toHaveText('PF');
+    await expect(rowLabels.nth(4)).toHaveText('C');
+
+    // Column headers should lead with the empty row-label corner, then the
+    // depth tiers left-to-right — "Starting" first so the user never has to
+    // scroll horizontally to see the starting lineup.
+    const headers = mobileTable.locator('thead th');
+    await expect(headers).toHaveCount(5);
+    await expect(headers.nth(1)).toHaveText('Starting');
+    await expect(headers.nth(2)).toHaveText('2nd');
+    await expect(headers.nth(3)).toHaveText('3rd');
+    await expect(headers.nth(4)).toHaveText('4th');
+  });
+
+  test('lineup preview mobile cells link to player pages', async ({ page }) => {
+    // Every populated cell in the mobile preview must wrap its content in
+    // an <a href="modules.php?name=Player&pa=showpage&pid=..."> so the GM
+    // can tap through to a player page from the projection.
+    const mobileTable = page.locator('.dc-lineup-preview-table--mobile');
+    await expect(mobileTable).toBeVisible();
+
+    const firstLink = mobileTable.locator('td.ibl-player-cell a[href]').first();
+    await expect(firstLink).toBeVisible();
+    const href = await firstLink.getAttribute('href');
+    expect(href).toMatch(/modules\.php\?name=Player.*pa=showpage.*pid=\d+/);
+  });
+
+  test('lineup preview mobile names use last-name-only by default', async ({
+    page,
+  }) => {
+    // Mobile uses last-name-only to save horizontal space. Seed data for the
+    // logged-in team has no same-last-name collisions in its projection,
+    // so every cell should render a single word (no "F. Last" abbreviation).
+    // Any cell with a ". " substring would indicate the disambiguation
+    // fallback fired — which is valid when two distinct players share a
+    // last name — so we assert the majority (≥60%) are bare last names as
+    // a regression guard against reverting to always-abbreviated format.
+    const mobileTable = page.locator('.dc-lineup-preview-table--mobile');
+    await expect(mobileTable).toBeVisible();
+
+    const cellLinks = mobileTable.locator('td.ibl-player-cell a[href]');
+    const count = await cellLinks.count();
+    expect(count).toBeGreaterThan(0);
+
+    let lastNameOnly = 0;
+    for (let i = 0; i < count; i++) {
+      // Strip the trailing minute annotation by reading only the first
+      // text node (the anchor's direct text) — renderMinutes() wraps the
+      // "Nm" suffix in a nested <span>, so the anchor's own textContent
+      // up to the <span> is just the display name.
+      const text = await cellLinks.nth(i).evaluate((el) => {
+        for (const node of Array.from(el.childNodes)) {
+          if (node.nodeType === Node.TEXT_NODE) {
+            const s = (node.textContent ?? '').trim();
+            if (s) return s;
+          }
+        }
+        return '';
+      });
+      if (text && !text.includes('. ')) lastNameOnly++;
+    }
+    // Require a clear majority to be bare last names so a regression to
+    // "F. Last" everywhere would trip this test.
+    expect(lastNameOnly / count).toBeGreaterThan(0.6);
+  });
 });
 
 test.describe('DCE mobile: saved depth chart loading', () => {

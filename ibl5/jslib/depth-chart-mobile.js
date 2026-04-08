@@ -95,6 +95,37 @@
         }
     }
 
+    /**
+     * Label for a given role-slot value. Mirrors the PHP match in
+     * DepthChartEntryView::renderMobilePlayerCard() so the JS-rendered
+     * stepper labels stay in sync with the PHP-rendered initial labels.
+     */
+    function stepperLabel(value) {
+        if (value === 0) return '\u2014';
+        if (value === 1) return 'S';
+        return '#' + value;
+    }
+
+    /**
+     * Refresh every .dc-card__stepper-value label from its sibling <select>.
+     * Called after any code path that mutates select values outside the
+     * stepper click handler — resetDepthChart(), saved-DC loader, and the
+     * breakpoint-crossing sync in applyView().
+     */
+    function syncStepperLabels(container) {
+        if (!container) return;
+        var steppers = container.querySelectorAll('.dc-card__stepper');
+        for (var i = 0; i < steppers.length; i++) {
+            var field = steppers[i].closest('.dc-card__field');
+            if (!field) continue;
+            var select = field.querySelector('select');
+            if (!select) continue;
+            var label = steppers[i].querySelector('.dc-card__stepper-value');
+            if (!label) continue;
+            label.textContent = stepperLabel(parseInt(select.value, 10) || 0);
+        }
+    }
+
     var lastMobile = null;
 
     /**
@@ -118,6 +149,11 @@
             if (desktop) desktop.removeAttribute('aria-hidden');
             if (mobileEl) mobileEl.setAttribute('aria-hidden', 'true');
         }
+
+        // Keep the mobile stepper labels in lock-step with the (possibly
+        // just-synced) underlying selects. Safe on desktop too — no-op if
+        // the mobile container is absent.
+        syncStepperLabels(mobileEl);
 
         if (typeof window.IBL_recalculateDepthChartGlows === 'function') {
             window.IBL_recalculateDepthChartGlows();
@@ -185,6 +221,32 @@
             }
         });
 
+        // Stepper arrow taps — cycle the sibling <select>'s value with
+        // wrap-around and dispatch a change event so every existing
+        // change-listener (desktop sync above, depth-chart-changes glow
+        // highlighter, depth-chart-lineup-preview) fires normally.
+        mobileEl.addEventListener('click', function (e) {
+            var arrow = e.target.closest('.dc-card__stepper-arrow');
+            if (!arrow || !mobileEl.contains(arrow)) return;
+            var field = arrow.closest('.dc-card__field');
+            if (!field) return;
+            var select = field.querySelector('select');
+            if (!select) return;
+            var optionCount = select.options.length;
+            if (optionCount < 2) return;
+            var current = parseInt(select.value, 10) || 0;
+            var next;
+            if (arrow.classList.contains('dc-card__stepper-arrow--up')) {
+                next = (current - 1 + optionCount) % optionCount;
+            } else {
+                next = (current + 1) % optionCount;
+            }
+            select.value = String(next);
+            var label = field.querySelector('.dc-card__stepper-value');
+            if (label) label.textContent = stepperLabel(next);
+            select.dispatchEvent(new Event('change', { bubbles: true }));
+        });
+
         // Debounced resize handler
         var resizeTimer;
         window.addEventListener('resize', function () {
@@ -203,5 +265,11 @@
     window.IBL_applyDepthChartMobileView = function () {
         lastMobile = isMobile();
         applyView(lastMobile);
+    };
+
+    // Exposed so the inline resetDepthChart() script in the View can refresh
+    // the visible stepper labels after clearing every <select> to 0.
+    window.IBL_syncDepthChartStepperLabels = function () {
+        syncStepperLabels(getMobileContainer());
     };
 })();

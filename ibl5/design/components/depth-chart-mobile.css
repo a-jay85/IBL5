@@ -150,16 +150,77 @@
     white-space: nowrap;
 }
 
-.dc-card__field select {
+/* The underlying <select> is kept in the DOM for form submission and for
+ * the desktop↔mobile JS sync layer, but is never shown to the mobile user —
+ * the stepper arrows above/below it are the visible, tappable control. */
+.dc-card__field-select {
+    display: none;
+}
+
+.dc-card__stepper {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
     width: 100%;
-    padding: 4px 2px;
-    text-align: center;
     border: 1px solid var(--gray-200);
     border-radius: var(--radius-sm);
-    font-size: 0.8125rem;
+    overflow: hidden;
     background: white;
-    -webkit-appearance: none;
-    appearance: none;
+}
+
+.dc-card__stepper-arrow {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 24px;
+    padding: 0;
+    border: 0;
+    background: var(--gray-50);
+    cursor: pointer;
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
+}
+
+.dc-card__stepper-arrow:active {
+    background: var(--gray-100);
+}
+
+.dc-card__stepper-arrow:focus-visible {
+    outline: 2px solid var(--color-accent-500);
+    outline-offset: -2px;
+}
+
+.dc-card__stepper-arrow::before {
+    content: '';
+    display: block;
+    width: 0;
+    height: 0;
+    border-left: 5px solid transparent;
+    border-right: 5px solid transparent;
+}
+
+.dc-card__stepper-arrow--up::before {
+    border-bottom: 6px solid var(--gray-600);
+}
+
+.dc-card__stepper-arrow--down::before {
+    border-top: 6px solid var(--gray-600);
+}
+
+.dc-card__stepper-value {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 22px;
+    padding: 2px 0;
+    font-size: 0.8125rem;
+    font-weight: 600;
+    color: var(--navy-900);
+    background: white;
+    border-top: 1px solid var(--gray-200);
+    border-bottom: 1px solid var(--gray-200);
+    -webkit-user-select: none;
+    user-select: none;
 }
 
 

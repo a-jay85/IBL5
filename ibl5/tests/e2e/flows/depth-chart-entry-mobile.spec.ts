@@ -91,6 +91,59 @@ test.describe('Depth Chart Entry: mobile card view', () => {
     await expect(fields).toHaveCount(6);
   });
 
+  test('position stepper cycles through options on tap', async ({ page }) => {
+    // The mobile position control is a vertical stepper (up-arrow / value
+    // label / down-arrow) over a visually hidden <select>. Tapping the
+    // arrows should cycle through the role-priority options, wrap around
+    // at the bounds, and keep the underlying <select> in sync so form
+    // submission and the desktop-sync path still work.
+    const firstCard = page.locator('.dc-card').first();
+    // Field 0 is "Min"; field 1 is the PG (BH) slot — first stepper on the card.
+    const pgField = firstCard.locator('.dc-card__field').nth(1);
+
+    const stepper = pgField.locator('.dc-card__stepper');
+    const valueLabel = pgField.locator('.dc-card__stepper-value');
+    const downArrow = pgField.locator('.dc-card__stepper-arrow--down');
+    const upArrow = pgField.locator('.dc-card__stepper-arrow--up');
+    const hiddenSelect = pgField.locator('select');
+
+    // Visual contract: the stepper is tappable; the underlying <select>
+    // stays in the DOM for form submission but must not be rendered.
+    await expect(stepper).toBeVisible();
+    await expect(downArrow).toBeVisible();
+    await expect(upArrow).toBeVisible();
+    await expect(hiddenSelect).toBeAttached();
+    await expect(hiddenSelect).toBeHidden();
+
+    const optionCount = await hiddenSelect.locator('option').count();
+    expect(optionCount).toBeGreaterThanOrEqual(3);
+
+    // Mirror the PHP label convention: 0 → em dash, 1 → "S", N → "#N".
+    const labelFor = (v: number) => (v === 0 ? '—' : v === 1 ? 'S' : `#${v}`);
+
+    const startValue = Number(await hiddenSelect.inputValue());
+
+    // Tap down once: value should advance and the label should follow.
+    await downArrow.click();
+    const afterDown = (startValue + 1) % optionCount;
+    await expect(hiddenSelect).toHaveValue(String(afterDown));
+    await expect(valueLabel).toHaveText(labelFor(afterDown));
+
+    // Wrap: tap down (optionCount - 1) more times — should land back on
+    // the original value, proving the cycle is closed.
+    for (let i = 0; i < optionCount - 1; i++) {
+      await downArrow.click();
+    }
+    await expect(hiddenSelect).toHaveValue(String(startValue));
+    await expect(valueLabel).toHaveText(labelFor(startValue));
+
+    // Tap up once: value should decrement, wrapping at 0 → last option.
+    await upArrow.click();
+    const afterUp = (startValue - 1 + optionCount) % optionCount;
+    await expect(hiddenSelect).toHaveValue(String(afterUp));
+    await expect(valueLabel).toHaveText(labelFor(afterUp));
+  });
+
   test('changing a card select triggers glow', async ({ page }) => {
     const firstSelect = page.locator('.dc-mobile-cards select[name^="BH"]').first();
     const originalValue = await firstSelect.inputValue();

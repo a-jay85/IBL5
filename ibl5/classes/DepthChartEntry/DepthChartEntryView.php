@@ -281,6 +281,12 @@ function resetDepthChart() {
         selects[i].value = '0';
     }
 
+    // Mirror the reset into the mobile stepper labels, which are a sibling
+    // UI layer over the hidden <select>s.
+    if (typeof window.IBL_syncDepthChartStepperLabels === 'function') {
+        window.IBL_syncDepthChartStepperLabels();
+    }
+
     // Reset minutes number inputs to blank — the server's extractIntValue()
     // converts blank → 0 on submit, so this leaves the GM with an empty
     // field they can type into rather than a stale "0" they have to clear.
@@ -486,10 +492,21 @@ JAVASCRIPT;
             }
             $fieldName = $slot['field'] . $depthCount;
             $labelHtml = HtmlSanitizer::safeHtmlOutput($slot['label']);
+            $valueLabel = match (true) {
+                $dcValue === 0 => '&mdash;',
+                $dcValue === 1 => 'S',
+                default        => '#' . $dcValue,
+            };
+            $slotAria = $labelHtml . ' slot for ' . $nameHtml;
 
             echo "<div class=\"dc-card__field\">";
             echo "<span class=\"dc-card__field-label\">{$labelHtml}</span>";
-            echo "<select name=\"{$fieldName}\" aria-label=\"{$labelHtml} slot for {$nameHtml}\" disabled>";
+            echo '<div class="dc-card__stepper">';
+            echo "<button type=\"button\" class=\"dc-card__stepper-arrow dc-card__stepper-arrow--up\" aria-label=\"Previous {$slotAria}\"></button>";
+            echo "<span class=\"dc-card__stepper-value\" aria-live=\"polite\">{$valueLabel}</span>";
+            echo "<button type=\"button\" class=\"dc-card__stepper-arrow dc-card__stepper-arrow--down\" aria-label=\"Next {$slotAria}\"></button>";
+            echo '</div>';
+            echo "<select name=\"{$fieldName}\" class=\"dc-card__field-select\" aria-label=\"{$slotAria}\" disabled>";
             $this->renderRolePriorityOptions($dcValue, $slot['max']);
             echo '</select></div>';
         }

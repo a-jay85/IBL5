@@ -1,15 +1,17 @@
 ---
 name: post-plan
-description: Single orchestrator for post-plan Phases 3-9. Runs simplify, commit/push/PR, code review, security audit, verification, CI monitoring, retrospective, and worktree teardown as one uninterrupted sequence.
+description: Single orchestrator for the post-plan workflow. Runs diff classification, simplify, commit/push/PR, code review, security audit, verification, CI monitoring, retrospective, and worktree teardown as one uninterrupted sequence.
 ---
 
-# Post-Plan Orchestrator (Phases 3-9)
+# Post-Plan Orchestrator
 
 Execute all phases below **sequentially in a single response**. Do NOT stop, ask for input, or return control between phases.
 
+Phase numbers below are local to this skill. The variables computed in Phase 2 (`HAS_PHP`, `NON_CODE_ONLY`, `DOCS_ONLY`, `CSS_ONLY`, `MIGRATION_ONLY`, `HAS_MODIFIED`, `HAS_COMMENTS_IN_DIFF`, `DIFF`, etc.) are consulted by every downstream phase to gate sub-agent launches — never recompute them locally.
+
 ---
 
-## Phase 0: Clear Plan Gate
+## Phase 1: Clear Plan Gate
 
 Remove the plan workflow gate so that commits and edits within this skill are not blocked by PreToolUse hooks:
 
@@ -19,7 +21,78 @@ rm -f /tmp/claude-plan-active-$PPID
 
 ---
 
+## Phase 2: Classify Diff
+
+Run this bash block once. It computes classification flags from `gh pr diff --name-only` and writes the filtered diff to `/tmp/post-plan-diff-$PPID` (same `$PPID` pattern Phase 1 uses — stable across Bash tool calls in the session). Every later phase consults these flags and reads the diff file — do not recompute.
+
+```bash
+DIFF_FILE=/tmp/post-plan-diff-$PPID
+
+# Changed file list (deleted files excluded — nothing to review)
+FILES=$(gh pr diff --name-only 2>/dev/null)
+
+# Per-type counts (grep -cE, default 0 if no match)
+COUNT_TOTAL=$(echo "$FILES" | grep -c . || true)
+COUNT_PHP=$(echo "$FILES" | grep -cE '\.php$' || true)
+COUNT_CSS=$(echo "$FILES" | grep -cE '\.css$|^ibl5/design/' || true)
+COUNT_MD=$(echo "$FILES" | grep -cE '\.md$' || true)
+COUNT_MIGRATION=$(echo "$FILES" | grep -cE '^ibl5/migrations/.*\.sql$' || true)
+COUNT_TEST=$(echo "$FILES" | grep -cE '^ibl5/tests/|\.test\.(ts|js|php)$|\.spec\.(ts|js)$' || true)
+COUNT_LOCK=$(echo "$FILES" | grep -cE '(composer|package|bun)\.lock$' || true)
+COUNT_SNAPSHOT=$(echo "$FILES" | grep -cE '__snapshots__/|\.snap$' || true)
+COUNT_NON_CODE=$(( COUNT_MD + COUNT_LOCK + COUNT_SNAPSHOT ))
+
+# Derived flags (true/false strings for readable gates downstream)
+HAS_PHP=$([ "$COUNT_PHP" -gt 0 ] && echo true || echo false)
+HAS_CSS=$([ "$COUNT_CSS" -gt 0 ] && echo true || echo false)
+HAS_MIGRATION=$([ "$COUNT_MIGRATION" -gt 0 ] && echo true || echo false)
+HAS_TEST=$([ "$COUNT_TEST" -gt 0 ] && echo true || echo false)
+
+# "X-only" means every file in $FILES matches that category
+DOCS_ONLY=$([ "$COUNT_TOTAL" -gt 0 ] && [ "$COUNT_MD" -eq "$COUNT_TOTAL" ] && echo true || echo false)
+CSS_ONLY=$([ "$COUNT_TOTAL" -gt 0 ] && [ "$COUNT_CSS" -eq "$COUNT_TOTAL" ] && echo true || echo false)
+MIGRATION_ONLY=$([ "$COUNT_TOTAL" -gt 0 ] && [ "$COUNT_MIGRATION" -eq "$COUNT_TOTAL" ] && echo true || echo false)
+TEST_ONLY=$([ "$COUNT_TOTAL" -gt 0 ] && [ "$COUNT_TEST" -eq "$COUNT_TOTAL" ] && echo true || echo false)
+NON_CODE_ONLY=$([ "$COUNT_TOTAL" -gt 0 ] && [ "$COUNT_NON_CODE" -eq "$COUNT_TOTAL" ] && echo true || echo false)
+
+# "Has modified (not added) files" — gates Phase 5B Agent 4 (previous PRs)
+MODIFIED_COUNT=$(git diff --diff-filter=M --name-only origin/master...HEAD 2>/dev/null | grep -c . || true)
+HAS_MODIFIED=$([ "$MODIFIED_COUNT" -gt 0 ] && echo true || echo false)
+
+# Filtered diff -> temp file (single awk pass stripping migrations, lockfiles, snapshots)
+gh pr diff | awk '
+  /^diff --git.*(migrations\/|composer\.lock|package-lock\.json|bun\.lock|__snapshots__\/|\.snap$)/ {skip=1; next}
+  /^diff --git/ {skip=0}
+  skip==0 {print}
+' > "$DIFF_FILE"
+
+# Fallback: if filtered diff is still > 100KB, shrink via gh api with the same exclusions
+if [ "$(wc -c < "$DIFF_FILE")" -gt 102400 ]; then
+  PR_NUM=$(gh pr view --json number --jq '.number')
+  gh api "repos/a-jay85/IBL5/pulls/$PR_NUM/files" --paginate \
+    --jq '.[] | select(.filename | test("migrations/|composer\\.lock|package-lock\\.json|bun\\.lock|__snapshots__/|\\.snap$") | not) | "--- " + .filename + " ---\n" + (.patch // "(binary or too large)")' \
+    > "$DIFF_FILE"
+fi
+
+# Code-comment detection on added lines only (gates Phase 5B Agent 5)
+COMMENT_COUNT=$(grep -cE '^\+[[:space:]]*(//|#|/\*|\*)' "$DIFF_FILE" || true)
+HAS_COMMENTS_IN_DIFF=$([ "$COMMENT_COUNT" -gt 0 ] && echo true || echo false)
+
+# Classification summary for the run log (Claude reads these and remembers them for later phases)
+echo "=== Diff classification ==="
+echo "  total=$COUNT_TOTAL php=$COUNT_PHP css=$COUNT_CSS md=$COUNT_MD migration=$COUNT_MIGRATION test=$COUNT_TEST lock=$COUNT_LOCK snapshot=$COUNT_SNAPSHOT"
+echo "  DOCS_ONLY=$DOCS_ONLY CSS_ONLY=$CSS_ONLY MIGRATION_ONLY=$MIGRATION_ONLY TEST_ONLY=$TEST_ONLY NON_CODE_ONLY=$NON_CODE_ONLY"
+echo "  HAS_PHP=$HAS_PHP HAS_CSS=$HAS_CSS HAS_MODIFIED=$HAS_MODIFIED HAS_COMMENTS_IN_DIFF=$HAS_COMMENTS_IN_DIFF"
+echo "  DIFF_FILE=$DIFF_FILE ($(wc -c < "$DIFF_FILE") bytes)"
+```
+
+Each Bash tool call runs in a fresh shell, so the classification flags are **not** bash state you can reference later — they're output Claude records from this block's stdout and applies as gates in later phases. The filtered diff is bridged via `$DIFF_FILE` (same `$PPID` across calls).
+
+---
+
 ## Phase 3: Simplify
+
+**Skip if** `$NON_CODE_ONLY` or `$MIGRATION_ONLY` (nothing reviewable).
 
 Review changed files (`git diff --name-only HEAD~1` or vs base branch) for reuse opportunities, CLAUDE.md mandatory-rule violations, and over-engineering. Fix issues directly before proceeding.
 
@@ -29,7 +102,7 @@ Review changed files (`git diff --name-only HEAD~1` or vs base branch) for reuse
 
 1. Stage relevant changes, review with `git diff --staged`, commit (CLAUDE.md conventions), push, create PR
 2. **Stacked PRs:** If branched from a feature branch (not `master`), use `--base <parent-branch>`
-3. **Manual testing in PR description:** Include a "Manual Testing" section. If automated tests fully cover behavior, write: `No manual testing needed — all changes are covered by unit and E2E tests.` Otherwise, list only steps requiring subjective human judgment (visual aesthetics, production comparison). Do NOT list CLI commands or script invocations — Phase 6.5 executes those.
+3. **Manual testing in PR description:** Include a "Manual Testing" section. If automated tests fully cover behavior, write: `No manual testing needed — all changes are covered by unit and E2E tests.` Otherwise, list only steps requiring subjective human judgment (visual aesthetics, production comparison). Do NOT list CLI commands or script invocations — Phase 7 executes those.
 4. Use Haiku agents for commit message generation if delegating
 
 ---
@@ -44,40 +117,49 @@ Run these commands yourself (not via agents):
 
 ```bash
 gh pr view --json number,headRefOid,headRefName,baseRefName,title,body,author
-gh pr diff --name-only
-DIFF=$(gh pr diff | awk '/^diff --git.*migrations\//{skip=1} /^diff --git/{skip=0} skip==0{print}')
-echo "$DIFF"
+cat /tmp/post-plan-diff-$PPID   # filtered diff written by Phase 2 (already < 100KB after the fallback)
 ```
 
-If diff > 100KB, use `gh api "repos/a-jay85/IBL5/pulls/{N}/files" --paginate --jq '.[] | select(.filename | test("migrations/") | not) | "--- " + .filename + " ---\n" + (.patch // "(binary or too large)")'`
+Capture the `cat` output — that is `$DIFF` for every sub-agent prompt below. No sub-agent calls `gh pr diff`.
 
-Read root `CLAUDE.md` and any directory-specific `CLAUDE.md` files for modified directories.
+Read root `CLAUDE.md`. If `! $NON_CODE_ONLY`, also read directory-specific `CLAUDE.md` files for modified directories.
 
-### 5B: Code Review — 5 parallel Sonnet agents
+### 5B: Code Review — up to 5 parallel Sonnet agents
 
-Pass each agent: PR metadata, file list, filtered diff, CLAUDE.md content(s) from 5A. **No agent calls `gh pr diff`.**
+Pass each agent: PR metadata, file list, filtered `$DIFF`, CLAUDE.md content(s) from 5A. **No agent calls `gh pr diff`.**
+
+**Launch gates** (consult Phase 2 variables — skip the launch entirely, don't let the agent exit early):
+
+- Agent 1: skip if `$NON_CODE_ONLY`
+- Agent 2: skip if `$NON_CODE_ONLY` or `$MIGRATION_ONLY`
+- Agent 3: skip if `! $HAS_PHP`
+- Agent 4: skip if `$NON_CODE_ONLY` or `! $HAS_MODIFIED`
+- Agent 5: skip if `$NON_CODE_ONLY` or `! $HAS_COMMENTS_IN_DIFF`
 
 **Agent 1 (CLAUDE.md compliance):** Audit changes against CLAUDE.md rules. Return issues with the specific rule violated.
 
 **Agent 2 (Bug detection):** You are a **Staff Software Engineer** reviewing a PR for correctness. Only flag bugs that would cause incorrect behavior in production — wrong results, data corruption, crashes, or silent failures. Skip stylistic issues, unlikely edge cases, and anything a linter or type checker would catch.
 
-**Agent 3 (Git history):** Check `git log --oneline -10 <file>` for up to 5 PHP files with most lines changed. Skip non-PHP files. Stop early on first relevant concern. No `git blame`.
+**Agent 3 (Git history):** Check `git log --oneline -10 <file>` for up to 5 PHP files with most lines changed. Stop early on first relevant concern. No `git blame`.
 
-**Agent 4 (Previous PRs):** Use `gh search prs` and `gh pr view` to find prior PRs touching these files. Check for comments that also apply here.
+**Agent 4 (Previous PRs):** Use `gh search prs` and `gh pr view` to find prior PRs touching the modified (not added) files. Check for comments that also apply here.
 
 **Agent 5 (Code comments):** Check if changes comply with code comments visible in diff context. Only Read full file if a comment appears truncated at a hunk edge.
 
 ### 5C: Security Audit — conditional Sonnet agents
 
-Detect patterns in the diff:
+**Skip entire 5C if** `! $HAS_PHP`. CSS, markdown, migrations, and lockfile bumps cannot introduce SQLi/XSS/auth vulnerabilities.
+
+Detect patterns on **added lines in `*.php` files only** (prevents markdown code blocks and deleted lines from triggering false positives):
 ```bash
-echo "SQL:" && echo "$DIFF" | grep -c -E 'sql_query|prepare|fetchOne|fetchAll|query\(' || true
-echo "Output:" && echo "$DIFF" | grep -c -E 'echo |print |<\?=' || true
-echo "Superglobals:" && echo "$DIFF" | grep -c -E '\$_GET|\$_POST|\$_REQUEST|\$_COOKIE' || true
-echo "Forms:" && echo "$DIFF" | grep -c -E 'POST|PUT|DELETE|<form|action=' || true
+PHP_ADDED=$(git diff origin/master...HEAD -- '*.php' | grep -E '^\+' | grep -v '^\+\+\+')
+echo "SQL:"          && echo "$PHP_ADDED" | grep -c -E 'sql_query|prepare|fetchOne|fetchAll|query\(' || true
+echo "Output:"       && echo "$PHP_ADDED" | grep -c -E 'echo |print |<\?=' || true
+echo "Superglobals:" && echo "$PHP_ADDED" | grep -c -E '\$_GET|\$_POST|\$_REQUEST|\$_COOKIE' || true
+echo "Forms:"        && echo "$PHP_ADDED" | grep -c -E 'POST|PUT|DELETE|<form|action=' || true
 ```
 
-Launch only agents whose category count > 0 (Auth/Authz always launches). Pass each the PHP-only subset of the diff. Each security agent receives this shared preamble:
+Launch only agents whose category count > 0. Agent 5 (Auth/Authz) launches unconditionally once this section runs (gated by `$HAS_PHP` at the top). Pass each agent the PHP-only subset of `$DIFF`. Each security agent receives this shared preamble:
 
 > You are a **Senior Application Security Engineer** auditing a PHP codebase. Focus on exploitable vulnerabilities, not theoretical risks. Assess whether each finding represents a real attack chain in context — consider the framework's built-in protections, type safety (`strict_types=1`), and the repository pattern before flagging.
 
@@ -89,11 +171,15 @@ Launch only agents whose category count > 0 (Auth/Authz always launches). Pass e
 
 **Agent 4 (CSRF, if Forms > 0):** Flag POST/PUT/DELETE handlers without `CsrfGuard::validateSubmittedToken()`. Safe: GET-only endpoints, `ApiKeyAuthenticator` handlers.
 
-**Agent 5 (Auth/Authz, always):** Flag state-changing endpoints without `is_user()`/`is_admin()`/`ApiKeyAuthenticator`. Safe: read-only public pages, already-guarded endpoints.
+**Agent 5 (Auth/Authz):** Flag state-changing endpoints without `is_user()`/`is_admin()`/`ApiKeyAuthenticator`. Safe: read-only public pages, already-guarded endpoints. (Launches whenever 5C runs — the `$HAS_PHP` gate at the top of 5C already ensures there's PHP to audit.)
 
 ### 5D: Score, filter, and post
 
-Combine ALL issues from 5B and 5C into one numbered list. Launch a **single Haiku agent** to score each 0-100:
+Combine ALL issues from 5B and 5C into one numbered list.
+
+**Skip the scoring agent if the combined list is empty** — jump straight to posting "No issues found." comments in the two `gh pr comment` steps below.
+
+Otherwise launch a **single Haiku agent** to score each 0-100:
 
 > **Rubric:** 0=false positive, 25=suspicious but mitigated, 50=real but minor, 75=verified and important, 100=certain and frequent.
 >
@@ -121,9 +207,9 @@ Both comments end with: `Generated with [Claude Code](https://claude.ai/code)` a
 
 ## Phase 6: Final Verification
 
-Run two parallel agents (**Sonnet** for PHPUnit+PHPStan, **Haiku** for E2E):
+Run parallel agents (**Sonnet** for PHPUnit+PHPStan, **Haiku** for E2E):
 
-**Agent 1 — PHPUnit + PHPStan:**
+**Agent 1 — PHPUnit + PHPStan:** **Skip if** `! $HAS_PHP`. The PostToolUse hook already ran both during edits, and a PHP-less diff cannot regress either suite.
 ```bash
 cd <worktree>/ibl5 && vendor/bin/phpunit --no-progress --no-output --testdox-summary | tail -n 3
 cd <worktree>/ibl5 && composer run analyse
@@ -145,15 +231,18 @@ If either fails, fix in worktree, commit, push, and re-run the failing track.
 
 ---
 
-## Phase 6.5: Manual Testing Automation
+## Phase 7: Manual Testing Automation
 
 **Skip if** PR description says "No manual testing needed."
 
 ### Step 1: Extract
 
 ```bash
-gh pr view --json body --jq '.body' | sed -n '/## Manual Testing/,/^## /p'
+EXTRACTED=$(gh pr view --json body --jq '.body' | sed -n '/## Manual Testing/,/^## /p')
+echo "$EXTRACTED"
 ```
+
+**Also skip Phase 7 entirely if `$EXTRACTED` is empty or whitespace-only** — the section is absent or was already cleared. Do not launch the Sonnet review gate on empty input.
 
 ### Step 2: Sonnet Review Gate
 
@@ -196,18 +285,18 @@ Using the Sonnet agent's classifications:
 
 ---
 
-## Phase 7: CI Monitoring
+## Phase 8: CI Monitoring
 
 **BLOCKING GATE — loop until CI is green or 3 fix-push-retry cycles exhausted.**
 
 1. **Wait for checks:** Poll `gh pr checks <pr> --json name,state 2>/dev/null | jq 'length'` up to 4 times with 15s waits. If count stays 0, warn user and stop.
 2. **Block until complete:** `gh pr checks <pr> --watch` (Bash timeout 600000). Falls back to polling `--json name,state,conclusion` every 30s on timeout.
-3. **If all passed** -> Phase 7.5
+3. **If all passed** -> Phase 9
 4. **If any failed:** Get failed checks (`jq '[.[] | select(.conclusion == "failure")]'`), download logs (`gh run view <id> --log-failed`), run the 3-step CI failure checklist (is file in my diff? is failing line my change? did it fail on parent?), fix, commit, push, loop back to step 1. After 3 iterations, escalate to user.
 
 ---
 
-## Phase 7.5: Auto-Merge
+## Phase 9: Auto-Merge
 
 All three conditions must be true: (1) CI passed, (2) PR says "No manual testing needed", (3) no review/audit findings scored >= 80.
 
@@ -217,13 +306,13 @@ If not: report which condition(s) blocked. User merges manually.
 
 ---
 
-## Phase 8: Retrospective
+## Phase 10: Retrospective
 
 Save to memory only if something was learned that would **prevent a bug** in a future session and isn't already in MEMORY.md, CLAUDE.md, or `.claude/rules/`. Read the target memory file first to avoid duplicates. If nothing qualifies, skip silently.
 
 ---
 
-## Phase 9: Worktree Preview Environment
+## Phase 11: Worktree Preview Environment
 
 **Skip if** worktree was pre-existing or earlier phases left uncommitted fixes.
 

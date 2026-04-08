@@ -57,15 +57,14 @@ test.describe('Depth Chart Entry: mobile card view', () => {
     expect(await toggles.count()).toBeGreaterThan(0);
   });
 
-  test('active toggle changes card opacity', async ({ page }) => {
+  test('active checkbox changes card opacity', async ({ page }) => {
     const firstCard = page.locator('.dc-card').first();
     const checkbox = firstCard.locator('.dc-card__active-cb');
-    const toggle = firstCard.locator('.dc-card__active-toggle');
 
     const wasChecked = await checkbox.isChecked();
 
-    // Click the visible toggle label (checkbox is visually hidden)
-    await toggle.click();
+    // Click the native checkbox directly (visible, styled with orange accent)
+    await checkbox.click();
 
     if (wasChecked) {
       await expect(firstCard).toHaveClass(/dc-card--inactive/);
@@ -74,7 +73,7 @@ test.describe('Depth Chart Entry: mobile card view', () => {
     }
 
     // Toggle back
-    await toggle.click();
+    await checkbox.click();
   });
 
   test('role slot selects are enabled on mobile', async ({ page }) => {

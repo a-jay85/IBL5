@@ -458,12 +458,12 @@ JAVASCRIPT;
         echo "<input type=\"hidden\" name=\"sf{$depthCount}\" value=\"0\" disabled>";
         echo "<input type=\"hidden\" name=\"pf{$depthCount}\" value=\"0\" disabled>";
         echo "<input type=\"hidden\" name=\"c{$depthCount}\" value=\"0\" disabled>";
-        // Active checkbox toggle
-        echo "<label class=\"dc-card__active-toggle\" aria-label=\"Active status for {$nameHtml}\">";
+        // Active checkbox — native checkbox styled with an orange accent to
+        // match the desktop view. Hidden input submits "0" when unchecked; the
+        // checkbox submits "1" when checked. Both share the same field name so
+        // the form posts the right value regardless of checkbox state.
         echo "<input type=\"hidden\" name=\"canPlayInGame{$depthCount}\" value=\"0\" disabled>";
-        echo "<input type=\"checkbox\" name=\"canPlayInGame{$depthCount}\" value=\"1\" class=\"dc-card__active-cb\"{$checkedAttr} disabled>";
-        echo '<span class="dc-card__active-pill">Active</span>';
-        echo '</label>';
+        echo "<input type=\"checkbox\" name=\"canPlayInGame{$depthCount}\" value=\"1\" class=\"dc-card__active-cb\"{$checkedAttr} aria-label=\"Active status for {$nameHtml}\" disabled>";
         echo '</div>';
 
         // Body — minutes + role slots grid (6 columns)

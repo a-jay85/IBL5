@@ -138,7 +138,7 @@ echo ""
 echo "Running E2E tests against $BASE_URL"
 echo ""
 
-cd "$REPO_ROOT/ibl5"
+cd "$WORKTREE_PATH/ibl5"
 BASE_URL="$BASE_URL" \
 IBL_TEST_USER="$IBL_TEST_USER" \
 IBL_TEST_PASS="$IBL_TEST_PASS" \

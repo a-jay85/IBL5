@@ -21,6 +21,14 @@ setup('authenticate', async ({ page, request }) => {
   }
 
   await page.goto('modules.php?name=YourAccount');
+
+  // Check if already authenticated (e.g., DEV_AUTO_LOGIN redirected away from YourAccount)
+  if (!page.url().includes('name=YourAccount')) {
+    // Already logged in via dev auto-login or previous redirect
+    await page.context().storageState({ path: authFile });
+    return;
+  }
+
   const loginForm = page.locator('form', { has: page.locator('#login-username') });
   await loginForm.locator('#login-username').fill(username);
   await loginForm.locator('#login-password').fill(password);

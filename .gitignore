@@ -43,6 +43,9 @@ depthcharts
 # Logs
 *.log
 
+# Dev watcher PID files (browser-sync, CSS watcher)
+*.pid
+
 # Coverage & mutation reports
 ibl5/coverage/
 ibl5/infection.log

@@ -84,8 +84,9 @@ test.describe('Depth Chart Entry: mobile card view', () => {
   });
 
   test('settings grid has 6 columns per card', async ({ page }) => {
-    // The old pos-grid is gone; a single settings-grid holds the Min column
-    // followed by all 5 role slots (BH/DI/OI/DF/OF) for 6 fields total.
+    // The old pos-grid is gone; a single settings-grid holds all 5 role
+    // slots (BH/DI/OI/DF/OF = PG/SG/SF/PF/C) followed by the Min column
+    // on the right edge, for 6 fields total.
     const firstGrid = page.locator('.dc-card__settings-grid').first();
     const fields = firstGrid.locator('.dc-card__field');
     await expect(fields).toHaveCount(6);
@@ -98,8 +99,9 @@ test.describe('Depth Chart Entry: mobile card view', () => {
     // at the bounds, and keep the underlying <select> in sync so form
     // submission and the desktop-sync path still work.
     const firstCard = page.locator('.dc-card').first();
-    // Field 0 is "Min"; field 1 is the PG (BH) slot — first stepper on the card.
-    const pgField = firstCard.locator('.dc-card__field').nth(1);
+    // Field 0 is the PG (BH) slot — first stepper on the card. The "Min"
+    // column now sits at the far right (field index 5).
+    const pgField = firstCard.locator('.dc-card__field').nth(0);
 
     const stepper = pgField.locator('.dc-card__stepper');
     const valueLabel = pgField.locator('.dc-card__stepper-value');
@@ -144,12 +146,68 @@ test.describe('Depth Chart Entry: mobile card view', () => {
     await expect(valueLabel).toHaveText(labelFor(afterUp));
   });
 
+  test('minutes stepper increments and clamps at 0/40', async ({ page }) => {
+    // The Min column (rightmost field, nth(5)) is a number input wrapped
+    // in the same stepper chrome as the role slots. Up arrow increments
+    // (more minutes), down arrow decrements (fewer minutes) — the opposite
+    // direction from the role slot stepper because minutes is a numeric
+    // quantity rather than a depth-chart rank. The value is clamped to
+    // the input's [min, max] attributes (0-40) instead of wrapping.
+    const firstCard = page.locator('.dc-card').first();
+    const minField = firstCard.locator('.dc-card__field').nth(5);
+    const minInput = minField.locator('input[type="number"]');
+    const upArrow = minField.locator('.dc-card__stepper-arrow--up');
+    const downArrow = minField.locator('.dc-card__stepper-arrow--down');
+
+    // Stepper chrome is present and the input sits inside it.
+    await expect(minField.locator('.dc-card__stepper')).toBeVisible();
+    await expect(upArrow).toBeVisible();
+    await expect(downArrow).toBeVisible();
+    await expect(minInput).toBeVisible();
+
+    // The mobile view enables its inputs via JS on init.
+    await expect(minInput).toBeEnabled();
+
+    // Drive to a known midrange value so we can test both directions
+    // without depending on seed data.
+    await minInput.fill('20');
+    await minInput.dispatchEvent('change');
+    await expect(minInput).toHaveValue('20');
+
+    // Up increments.
+    await upArrow.click();
+    await expect(minInput).toHaveValue('21');
+
+    // Down decrements.
+    await downArrow.click();
+    await downArrow.click();
+    await expect(minInput).toHaveValue('19');
+
+    // Clamp at the ceiling.
+    await minInput.fill('40');
+    await minInput.dispatchEvent('change');
+    await upArrow.click();
+    await expect(minInput).toHaveValue('40');
+
+    // Clamp at the floor.
+    await minInput.fill('0');
+    await minInput.dispatchEvent('change');
+    await downArrow.click();
+    await expect(minInput).toHaveValue('0');
+
+    // Revert so no other test inherits a changed state. The stepper up
+    // arrow path fires the same change event the typed-value path fires,
+    // so the desktop<->mobile sync and glow highlighter stay coherent.
+    await minInput.fill('40');
+    await minInput.dispatchEvent('change');
+  });
+
   test('changing a card role slot triggers glow', async ({ page }) => {
     // Tapping a stepper arrow cycles the hidden <select> and dispatches
     // a bubbling change event — the glow highlighter in
     // depth-chart-changes.js listens for that on the form.
     const firstCard = page.locator('.dc-card').first();
-    const pgField = firstCard.locator('.dc-card__field').nth(1);
+    const pgField = firstCard.locator('.dc-card__field').nth(0);
     const downArrow = pgField.locator('.dc-card__stepper-arrow--down');
     const upArrow = pgField.locator('.dc-card__stepper-arrow--up');
 
@@ -372,7 +430,7 @@ test.describe('DCE mobile: resize sync', () => {
     // arrow. The underlying <select> is display:none on mobile, so we
     // can't call selectOption() on it — we drive the stepper UI instead.
     const firstCard = page.locator('.dc-card').first();
-    const pgField = firstCard.locator('.dc-card__field').nth(1);
+    const pgField = firstCard.locator('.dc-card__field').nth(0);
     const mobileSelect = pgField.locator('select');
     await expect(mobileSelect).toBeEnabled();
 

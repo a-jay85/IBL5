@@ -221,30 +221,55 @@
             }
         });
 
-        // Stepper arrow taps — cycle the sibling <select>'s value with
-        // wrap-around and dispatch a change event so every existing
-        // change-listener (desktop sync above, depth-chart-changes glow
-        // highlighter, depth-chart-lineup-preview) fires normally.
+        // Stepper arrow taps — dispatch on the kind of field. Role slots
+        // have a hidden <select> whose options are cycled with wrap-around
+        // (up=promote toward starter, down=demote). The MIN column has a
+        // number input that is clamped between its [min,max] attributes
+        // and stepped one unit at a time (up=more minutes, down=fewer —
+        // conventional direction for a numeric quantity). In both cases
+        // we dispatch a bubbling change event so existing listeners
+        // (desktop sync, depth-chart-changes glow highlighter,
+        // depth-chart-lineup-preview) fire normally.
         mobileEl.addEventListener('click', function (e) {
             var arrow = e.target.closest('.dc-card__stepper-arrow');
             if (!arrow || !mobileEl.contains(arrow)) return;
             var field = arrow.closest('.dc-card__field');
             if (!field) return;
+            var isUp = arrow.classList.contains('dc-card__stepper-arrow--up');
+
             var select = field.querySelector('select');
-            if (!select) return;
-            var optionCount = select.options.length;
-            if (optionCount < 2) return;
-            var current = parseInt(select.value, 10) || 0;
-            var next;
-            if (arrow.classList.contains('dc-card__stepper-arrow--up')) {
-                next = (current - 1 + optionCount) % optionCount;
-            } else {
-                next = (current + 1) % optionCount;
+            if (select) {
+                var optionCount = select.options.length;
+                if (optionCount < 2) return;
+                var current = parseInt(select.value, 10) || 0;
+                var next;
+                if (isUp) {
+                    next = (current - 1 + optionCount) % optionCount;
+                } else {
+                    next = (current + 1) % optionCount;
+                }
+                select.value = String(next);
+                var label = field.querySelector('.dc-card__stepper-value');
+                if (label) label.textContent = stepperLabel(next);
+                select.dispatchEvent(new Event('change', { bubbles: true }));
+                return;
             }
-            select.value = String(next);
-            var label = field.querySelector('.dc-card__stepper-value');
-            if (label) label.textContent = stepperLabel(next);
-            select.dispatchEvent(new Event('change', { bubbles: true }));
+
+            var numInput = field.querySelector('input[type="number"]');
+            if (numInput) {
+                var minAttr = parseInt(numInput.min, 10);
+                var maxAttr = parseInt(numInput.max, 10);
+                if (isNaN(minAttr)) minAttr = 0;
+                if (isNaN(maxAttr)) maxAttr = 40;
+                var currentNum = parseInt(numInput.value, 10);
+                if (isNaN(currentNum)) currentNum = 0;
+                var nextNum = isUp ? currentNum + 1 : currentNum - 1;
+                if (nextNum < minAttr) nextNum = minAttr;
+                if (nextNum > maxAttr) nextNum = maxAttr;
+                if (nextNum === currentNum) return;
+                numInput.value = String(nextNum);
+                numInput.dispatchEvent(new Event('change', { bubbles: true }));
+            }
         });
 
         // Debounced resize handler

@@ -223,6 +223,46 @@
     user-select: none;
 }
 
+/* Minutes field sits in the rightmost grid column (to the right of C).
+ * The input is wrapped in the same .dc-card__stepper chrome as the role
+ * slots so the up/down arrows above/below it increment/decrement the
+ * minutes value. Styling the input as .dc-card__stepper-input mirrors
+ * the visual footprint of .dc-card__stepper-value so both column types
+ * line up across the row without any explicit vertical-centering hacks —
+ * the stepper wrapper takes care of it. */
+.dc-card__stepper-input {
+    display: block;
+    width: 100%;
+    min-height: 22px;
+    padding: 2px 0;
+    margin: 0;
+    border: 0;
+    border-top: 1px solid var(--gray-200);
+    border-bottom: 1px solid var(--gray-200);
+    border-radius: 0;
+    background: white;
+    font-size: 0.8125rem;
+    font-weight: 600;
+    color: var(--navy-900);
+    text-align: center;
+    /* Hide browser-native spinner controls — our own arrow buttons drive
+     * increment/decrement, and the native spinners compete for space in
+     * the narrow grid column. */
+    -moz-appearance: textfield;
+    appearance: textfield;
+}
+
+.dc-card__stepper-input::-webkit-outer-spin-button,
+.dc-card__stepper-input::-webkit-inner-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+}
+
+.dc-card__stepper-input:focus {
+    outline: 2px solid var(--color-accent-500);
+    outline-offset: -2px;
+}
+
 
 /* === Mobile Footer === */
 

@@ -472,17 +472,12 @@ JAVASCRIPT;
         echo "<input type=\"checkbox\" name=\"canPlayInGame{$depthCount}\" value=\"1\" class=\"dc-card__active-cb\"{$checkedAttr} aria-label=\"Active status for {$nameHtml}\" disabled>";
         echo '</div>';
 
-        // Body — minutes + role slots grid (6 columns)
+        // Body — role slots + minutes grid (6 columns). Min sits on the
+        // right of the Center column so the PG→C axis reads left-to-right
+        // uninterrupted; the Min input is vertically aligned with the C
+        // stepper's value element via .dc-card__field--min in CSS.
         echo '<div class="dc-card__body">';
         echo '<div class="dc-card__settings-grid">';
-
-        // Minutes — number input constrained to 0-40 with native stepper.
-        /** @var int $dcMinutes */
-        $dcMinutes = $player['dc_minutes'] ?? 0;
-        echo "<div class=\"dc-card__field\">";
-        echo '<span class="dc-card__field-label">Min</span>';
-        echo "<input type=\"number\" name=\"min{$depthCount}\" value=\"{$dcMinutes}\" min=\"0\" max=\"40\" step=\"1\" class=\"dc-minutes-input\" aria-label=\"Minutes for {$nameHtml}\" disabled>";
-        echo '</div>';
 
         foreach (self::ROLE_SLOTS as $slot) {
             /** @var int $dcValue */
@@ -510,6 +505,23 @@ JAVASCRIPT;
             $this->renderRolePriorityOptions($dcValue, $slot['max']);
             echo '</select></div>';
         }
+
+        // Minutes — number input constrained to 0-40, rendered as the 6th
+        // (rightmost) column. Visually wrapped in the same stepper chrome as
+        // the role slots so taps on the up/down arrows increment/decrement
+        // the minutes value. The input itself remains editable so the GM
+        // can still type a precise value directly.
+        /** @var int $dcMinutes */
+        $dcMinutes = $player['dc_minutes'] ?? 0;
+        $minAria = 'Minutes for ' . $nameHtml;
+        echo '<div class="dc-card__field dc-card__field--min">';
+        echo '<span class="dc-card__field-label">Min</span>';
+        echo '<div class="dc-card__stepper">';
+        echo "<button type=\"button\" class=\"dc-card__stepper-arrow dc-card__stepper-arrow--up\" aria-label=\"Increase {$minAria}\"></button>";
+        echo "<input type=\"number\" name=\"min{$depthCount}\" value=\"{$dcMinutes}\" min=\"0\" max=\"40\" step=\"1\" class=\"dc-minutes-input dc-card__stepper-input\" aria-label=\"{$minAria}\" disabled>";
+        echo "<button type=\"button\" class=\"dc-card__stepper-arrow dc-card__stepper-arrow--down\" aria-label=\"Decrease {$minAria}\"></button>";
+        echo '</div>';
+        echo '</div>';
 
         echo '</div>'; // end settings grid
         echo '</div>'; // end body

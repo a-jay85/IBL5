@@ -493,6 +493,7 @@ JAVASCRIPT;
                 default        => '#' . $dcValue,
             };
             $slotAria = $labelHtml . ' slot for ' . $nameHtml;
+            $slotAriaRaw = $slot['label'] . ' slot for ' . $name;
 
             echo "<div class=\"dc-card__field\">";
             echo "<span class=\"dc-card__field-label\">{$labelHtml}</span>";
@@ -501,7 +502,9 @@ JAVASCRIPT;
             echo "<span class=\"dc-card__stepper-value\" aria-live=\"polite\">{$valueLabel}</span>";
             echo "<button type=\"button\" class=\"dc-card__stepper-arrow dc-card__stepper-arrow--down\" aria-label=\"Next {$slotAria}\"></button>";
             echo '</div>';
-            echo "<select name=\"{$fieldName}\" class=\"dc-card__field-select\" aria-label=\"{$slotAria}\" disabled>";
+            echo '<select name="' . HtmlSanitizer::e($fieldName)
+                . '" class="dc-card__field-select" aria-label="'
+                . HtmlSanitizer::e($slotAriaRaw) . '" disabled>';
             $this->renderRolePriorityOptions($dcValue, $slot['max']);
             echo '</select></div>';
         }
@@ -513,13 +516,18 @@ JAVASCRIPT;
         // can still type a precise value directly.
         /** @var int $dcMinutes */
         $dcMinutes = $player['dc_minutes'] ?? 0;
-        $minAria = 'Minutes for ' . $nameHtml;
+        $minAriaRaw = 'Minutes for ' . $name;
         echo '<div class="dc-card__field dc-card__field--min">';
         echo '<span class="dc-card__field-label">Min</span>';
         echo '<div class="dc-card__stepper">';
-        echo "<button type=\"button\" class=\"dc-card__stepper-arrow dc-card__stepper-arrow--up\" aria-label=\"Increase {$minAria}\"></button>";
-        echo "<input type=\"number\" name=\"min{$depthCount}\" value=\"{$dcMinutes}\" min=\"0\" max=\"40\" step=\"1\" class=\"dc-minutes-input dc-card__stepper-input\" aria-label=\"{$minAria}\" disabled>";
-        echo "<button type=\"button\" class=\"dc-card__stepper-arrow dc-card__stepper-arrow--down\" aria-label=\"Decrease {$minAria}\"></button>";
+        echo '<button type="button" class="dc-card__stepper-arrow dc-card__stepper-arrow--up" aria-label="Increase '
+            . HtmlSanitizer::e($minAriaRaw) . '"></button>';
+        echo '<input type="number" name="min' . HtmlSanitizer::e($depthCount)
+            . '" value="' . HtmlSanitizer::e($dcMinutes)
+            . '" min="0" max="40" step="1" class="dc-minutes-input dc-card__stepper-input" aria-label="'
+            . HtmlSanitizer::e($minAriaRaw) . '" disabled>';
+        echo '<button type="button" class="dc-card__stepper-arrow dc-card__stepper-arrow--down" aria-label="Decrease '
+            . HtmlSanitizer::e($minAriaRaw) . '"></button>';
         echo '</div>';
         echo '</div>';
 

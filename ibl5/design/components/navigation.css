@@ -107,7 +107,7 @@
     border-color: var(--team-tab-bg-color);
 }
 
-/* Discord action link: text on desktop, symbol-only on mobile. */
+/* Action link icons: hidden on desktop, shown on mobile (see media query below). */
 .team-action-link__icon {
     display: none;
 }
@@ -128,33 +128,50 @@
     }
 
     /*
-     * Discord symbol button (mobile only).
-     * Brand compliance: white symbol on Discord Blurple (#5865f2) approved pairing,
-     * clearspace ~1/3 of symbol width (symbol is ~32px wide at 24px tall → ~11px
-     * padding via var(--space-3)), mechanically centered, no glow/shadow/tilt.
+     * Mobile action buttons: swap text for icon, render as a square-ish chip.
+     * Trade / Schedule / Draft History use team colors; Discord overrides below.
+     * Padding var(--space-3) gives ~12px clearspace around a 24px icon — this
+     * also satisfies the Discord symbol's 1/3-of-width clearspace requirement.
+     */
+    .team-action-link {
+        padding: var(--space-3);
+        justify-content: center;
+        line-height: 0;
+        background: var(--team-tab-bg-color);
+        border-color: color-mix(in srgb, var(--team-tab-bg-color) 60%, black);
+    }
+
+    .team-action-link:hover,
+    .team-action-link:focus-visible {
+        background: color-mix(in srgb, var(--team-tab-bg-color) 80%, black);
+        border-color: var(--team-tab-bg-color);
+    }
+
+    .team-action-link .team-action-link__text {
+        display: none;
+    }
+
+    .team-action-link .team-action-link__icon {
+        display: block;
+        height: 24px;
+        width: 32px;
+        object-fit: contain;
+    }
+
+    /*
+     * Discord override: white symbol on Discord Blurple (#5865f2) approved
+     * pairing. All other sizing/padding inherits from the base rule above so
+     * the four buttons form a visually consistent row.
      */
     .team-action-link--discord {
         background: #5865f2;
         border-color: #4752c4;
-        padding: var(--space-3);
-        justify-content: center;
-        line-height: 0;
     }
 
     .team-action-link--discord:hover,
     .team-action-link--discord:focus-visible {
         background: #4752c4;
         border-color: #5865f2;
-    }
-
-    .team-action-link--discord .team-action-link__text {
-        display: none;
-    }
-
-    .team-action-link--discord .team-action-link__icon {
-        display: block;
-        height: 24px;
-        width: auto;
     }
 }
 

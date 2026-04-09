@@ -428,7 +428,7 @@ class DepthChartEntryViewTest extends TestCase
 
     public function testRenderMobileViewRendersStepperForEachRoleSlot(): void
     {
-        // Two players × five role slots = ten stepper pairs.
+        // Two players × six steppers (five role slots + Min) = twelve pairs.
         $players = [$this->buildTestPlayer(1, 'Alice'), $this->buildTestPlayer(2, 'Bob')];
 
         ob_start();
@@ -438,8 +438,8 @@ class DepthChartEntryViewTest extends TestCase
         $upCount = preg_match_all('/dc-card__stepper-arrow--up/', $output);
         $downCount = preg_match_all('/dc-card__stepper-arrow--down/', $output);
 
-        $this->assertSame(10, $upCount, 'One up arrow per player per role slot');
-        $this->assertSame(10, $downCount, 'One down arrow per player per role slot');
+        $this->assertSame(12, $upCount, 'One up arrow per player per role slot and Min');
+        $this->assertSame(12, $downCount, 'One down arrow per player per role slot and Min');
     }
 
     public function testRenderMobileViewStepperInitialLabelMatchesDcValue(): void

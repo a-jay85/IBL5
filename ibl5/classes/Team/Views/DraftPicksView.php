@@ -31,7 +31,7 @@ class DraftPicksView
 
             $output .= '<li class="draft-picks-list__item">'
                 . "<a href=\"modules.php?name=Team&amp;op=team&amp;teamID=$teamID\">"
-                . "<img class=\"draft-picks-list__logo\" src=\"images/logo/$teamName.png\" height=\"33\" width=\"33\" alt=\"$teamName\"></a>"
+                . "<img class=\"draft-picks-list__logo\" src=\"images/logo/$teamName.png\" height=\"24\" width=\"24\" alt=\"$teamName\"></a>"
                 . '<div class="draft-picks-list__info">'
                 . "<a href=\"modules.php?name=Team&amp;op=team&amp;teamID=$teamID\">$year R$round $city $teamName</a>";
 

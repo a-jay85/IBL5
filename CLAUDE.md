@@ -58,7 +58,7 @@ The modules in `ibl5/classes/` follow Repository/Service/View pattern with inter
 - **Controller:** Request handling (where applicable)
 
 ### Class Autoloading
-Classes autoload from `ibl5/classes/`. Never use `require_once`.
+Classes autoload from `ibl5/classes/`. `require_once`/`require`/`include` in `classes/**` is enforced-banned by PHPStan rule `BanRequireOnceRule` (`ibl.requireOnce`).
 
 ### Database
 - Schema: `ibl5/migrations/000_baseline_schema.sql` - **always verify table/column names here** (check subsequent migrations for alterations)
@@ -85,7 +85,7 @@ When modifying HTML output, selectors, or user-facing text in View classes, run 
 ## Mandatory Rules
 
 ### XSS Protection
-Use `Utilities\HtmlSanitizer::safeHtmlOutput()` (or its short alias `HtmlSanitizer::e()`) on ALL output (database results, user input, error messages). Both methods accept `mixed` and return `string` — no type annotations needed at call sites. Prefer `e()` in View templates for brevity.
+Views must wrap dynamic output in `HtmlSanitizer::e()` (short alias) or `HtmlSanitizer::safeHtmlOutput()`. Both accept `mixed` and return `string`. Enforced by PHPStan rule `RequireEscapedOutputRule` (`ibl.unescapedOutput`) — see `_review-rubric.md` for the full list of safe expression patterns (casts, literals, whitelisted helpers).
 
 ### Type Safety (Strict Types)
 Every PHP file must have `declare(strict_types=1);` at the top (enforced by PHPStan custom rule `RequireStrictTypesRule`). Additional requirements:
@@ -96,9 +96,9 @@ Every PHP file must have `declare(strict_types=1);` at the top (enforced by PHPS
 - **Null handling:** Use nullable types (`?string`) and null coalescing (`??`) appropriately
 
 ### CSS & HTML Rules
-- All CSS must go in `ibl5/design/components/`. Never write `<style>` blocks or CSS-generating methods in PHP class files.
-- Use `BasketballStats\StatsFormatter` for all stats — `number_format()` is banned by PHPStan custom rule `BanNumberFormatRule` (except inside StatsFormatter itself).
-- See `view-rendering.md` for HTML modernization and deprecated-tag replacement table.
+- All CSS must go in `ibl5/design/components/`. Inline `<style>` blocks and `style="..."` attributes in PHP string literals are enforced-banned by `BanInlineCssRule` (`ibl.inlineCss`); exception: `style="--..."` CSS custom properties are allowed.
+- Deprecated HTML tags (`<b>`, `<i>`, `<center>`, `<font>`, `<u>`) are enforced-banned by `BanDeprecatedHtmlTagsRule` (`ibl.deprecatedHtmlTag`).
+- Use `BasketballStats\StatsFormatter` for all stats — `number_format()` is banned by `BanNumberFormatRule` (`ibl.bannedNumberFormat`) except inside StatsFormatter itself.
 
 ### Production Validation
 After refactoring, compare output against iblhoops.net. Results must match exactly.

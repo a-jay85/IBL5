@@ -29,7 +29,7 @@ final class BanInlineCssRule implements Rule
 
     /**
      * @param String_ $node
-     * @return list<\PHPStan\Rules\RuleError>
+     * @return list<\PHPStan\Rules\IdentifierRuleError>
      */
     public function processNode(Node $node, Scope $scope): array
     {
@@ -54,8 +54,11 @@ final class BanInlineCssRule implements Rule
             ];
         }
 
-        // Detect style="..." attribute (but allow style="--..." CSS custom properties)
-        if (preg_match('/\sstyle="(?!--)/i', $value) === 1) {
+        // Detect style="..." or style='...' attribute (but allow style="--..." and
+        // style='--...' CSS custom properties). Matches at start of string, after
+        // whitespace, or after `>` so we catch style= without a preceding space
+        // (e.g. an attributes-only string literal that starts with `style=`).
+        if (preg_match('/(?:^|[\s>])style=["\'](?!--)/i', $value) === 1) {
             return [
                 RuleErrorBuilder::message(
                     'Inline `style="..."` attributes are banned in PHP. Move CSS to '

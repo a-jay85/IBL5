@@ -6,6 +6,7 @@ parameters:
     level: max
     paths:
         - classes
+        - phpstan-rules
     excludePaths:
         - classes/SiteStatistics
         - classes/Bootstrap/LegacyFunctions.php

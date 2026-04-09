@@ -6,6 +6,7 @@ namespace PHPStanRules;
 
 use PhpParser\Node;
 use PhpParser\Node\Expr\ArrayDimFetch;
+use PhpParser\Node\Expr\Assign;
 use PhpParser\Node\Expr\StaticCall;
 use PhpParser\Node\Expr\Variable;
 use PhpParser\Node\Identifier;
@@ -40,7 +41,7 @@ final class PageLayoutHeaderBeforeCookieRule implements Rule
 
     /**
      * @param ClassMethod $node
-     * @return list<\PHPStan\Rules\RuleError>
+     * @return list<\PHPStan\Rules\IdentifierRuleError>
      */
     public function processNode(Node $node, Scope $scope): array
     {
@@ -81,8 +82,27 @@ final class PageLayoutHeaderBeforeCookieRule implements Rule
                 }
             }
 
-            // Check if this statement contains $cookie[...] array access
+            // Check if this statement contains $cookie[...] array reads. Collect
+            // assignment targets first so we can exclude `$cookie[x] = value` writes
+            // from the read set — writing to $cookie before header() is harmless
+            // because header() overwrites the superglobal.
             if (!$sawHeaderCall) {
+                /** @var list<ArrayDimFetch> $writeTargets */
+                $writeTargets = [];
+                $assignments = $nodeFinder->findInstanceOf($stmt, Assign::class);
+                foreach ($assignments as $assign) {
+                    if (!$assign instanceof Assign) {
+                        continue;
+                    }
+                    if ($assign->var instanceof ArrayDimFetch
+                        && $assign->var->var instanceof Variable
+                        && is_string($assign->var->var->name)
+                        && $assign->var->var->name === 'cookie'
+                    ) {
+                        $writeTargets[] = $assign->var;
+                    }
+                }
+
                 $cookieReads = $nodeFinder->find($stmt, static function (Node $inner): bool {
                     if (!$inner instanceof ArrayDimFetch) {
                         return false;
@@ -93,6 +113,13 @@ final class PageLayoutHeaderBeforeCookieRule implements Rule
                         && $var->name === 'cookie';
                 });
                 foreach ($cookieReads as $cookieRead) {
+                    if (!$cookieRead instanceof ArrayDimFetch) {
+                        continue;
+                    }
+                    // Skip if this ArrayDimFetch is a write target, not a read
+                    if (in_array($cookieRead, $writeTargets, true)) {
+                        continue;
+                    }
                     $errors[] = RuleErrorBuilder::message(
                         '$cookie[...] is read before PageLayout::header() in the same '
                         . 'method. PageLayout::header() populates $cookie with auth and '

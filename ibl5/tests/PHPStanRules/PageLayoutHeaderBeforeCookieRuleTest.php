@@ -65,4 +65,14 @@ final class PageLayoutHeaderBeforeCookieRuleTest extends RuleTestCase
             ],
         );
     }
+
+    public function testAllowsCookieWriteBeforeHeader(): void
+    {
+        // Writing to $cookie before header() is harmless because header() overwrites
+        // the superglobal. Only reads-before-header are a bug.
+        $this->analyse(
+            [__DIR__ . '/Fixtures/classes/CookieWriteBeforeHeader.php'],
+            [],
+        );
+    }
 }

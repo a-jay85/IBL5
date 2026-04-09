@@ -30,14 +30,12 @@ use PHPStan\Rules\RuleErrorBuilder;
  */
 final class RequireMeaningfulAssertionsRule implements Rule
 {
-    /** @var list<string> */
     private const TRIVIAL_SINGLE_ARG_ASSERTIONS = [
         'assertTrue' => 'true',
         'assertFalse' => 'false',
         'assertNull' => 'null',
     ];
 
-    /** @var list<string> */
     private const EQUALITY_ASSERTIONS = [
         'assertEquals',
         'assertSame',
@@ -52,7 +50,7 @@ final class RequireMeaningfulAssertionsRule implements Rule
 
     /**
      * @param ClassMethod $node
-     * @return list<\PHPStan\Rules\RuleError>
+     * @return list<\PHPStan\Rules\IdentifierRuleError>
      */
     public function processNode(Node $node, Scope $scope): array
     {
@@ -99,7 +97,8 @@ final class RequireMeaningfulAssertionsRule implements Rule
             // assertTrue(true), assertFalse(false), assertNull(null)
             if (isset(self::TRIVIAL_SINGLE_ARG_ASSERTIONS[$methodName])) {
                 $expected = self::TRIVIAL_SINGLE_ARG_ASSERTIONS[$methodName];
-                if ($this->isConstFetchWithName($call->args[0] ?? null, $expected)) {
+                $firstArg = $call->args[0] ?? null;
+                if ($firstArg instanceof Arg && $this->isConstFetchWithName($firstArg, $expected)) {
                     $errors[] = RuleErrorBuilder::message(
                         'Trivial assertion `' . $methodName . '(' . $expected . ')` '
                         . 'always passes and does not test anything. Delete the call '
@@ -113,7 +112,12 @@ final class RequireMeaningfulAssertionsRule implements Rule
 
             // assertEquals/Same/NotEquals/NotSame with identical literal arguments
             if (in_array($methodName, self::EQUALITY_ASSERTIONS, true)) {
-                if (count($call->args) >= 2 && $this->argsAreIdenticalLiterals($call->args[0], $call->args[1])) {
+                $arg0 = $call->args[0] ?? null;
+                $arg1 = $call->args[1] ?? null;
+                if ($arg0 instanceof Arg
+                    && $arg1 instanceof Arg
+                    && $this->argsAreIdenticalLiterals($arg0, $arg1)
+                ) {
                     $errors[] = RuleErrorBuilder::message(
                         'Equality assertion `' . $methodName . '()` is called with '
                         . 'two identical literal arguments. This assertion is trivially '
@@ -130,11 +134,8 @@ final class RequireMeaningfulAssertionsRule implements Rule
         return $errors;
     }
 
-    private function isConstFetchWithName(?Arg $arg, string $name): bool
+    private function isConstFetchWithName(Arg $arg, string $name): bool
     {
-        if ($arg === null) {
-            return false;
-        }
         if (!$arg->value instanceof ConstFetch) {
             return false;
         }

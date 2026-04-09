@@ -10,7 +10,7 @@
 # Active burn-downs (introduced 2026-04-08 by the feedback-loop Tier 1 mega-PR):
 #   - ibl.unescapedOutput     (RequireEscapedOutputRule)           ~1156 entries
 #   - ibl.rawSuperglobal      (BanRawSuperglobalsRule)             ~10 entries
-#   - ibl.inlineCss           (BanInlineCssRule)                   ~32 entries
+#   - ibl.inlineCss           (BanInlineCssRule)                   ~33 entries
 #   - ibl.deprecatedHtmlTag   (BanDeprecatedHtmlTagsRule)          ~4 entries
 #   - ibl.requireOnce         (BanRequireOnceRule)                 ~12 entries
 #   - ibl.cookieBeforeHeader  (PageLayoutHeaderBeforeCookieRule)   ~6 entries
@@ -493,6 +493,12 @@ parameters:
 			identifier: ibl.deprecatedHtmlTag
 			count: 2
 			path: classes/Trading/TradeOffer.php
+
+		-
+			rawMessage: 'Inline `style="..."` attributes are banned in PHP. Move CSS to ibl5/design/components/. Exception: `style="--foo: ..."` CSS custom properties are allowed.'
+			identifier: ibl.inlineCss
+			count: 1
+			path: classes/Trading/TradingView.php
 
 		-
 			rawMessage: 'Unescaped output in View. Wrap the expression in HtmlSanitizer::e() (or another whitelisted safe helper), or cast it to (int)/(float)/(bool) if it is numeric.'

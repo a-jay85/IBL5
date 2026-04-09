@@ -348,11 +348,12 @@
     flex-wrap: wrap;
     justify-content: center;
     gap: var(--space-4);
-    margin-bottom: var(--space-4);
+    margin: 0 auto var(--space-4);
+    max-width: 1115px; /* matches .franchise-history-wrapper max-width */
 }
 
 .team-cards-row > .team-card {
-    flex: 0 1 360px;
+    flex: 1 1 calc((1115px - 2 * var(--space-4)) / 3);
     margin-bottom: 0;
 }
 

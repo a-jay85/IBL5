@@ -126,18 +126,21 @@ class TeamView implements TeamViewInterface
         $color1 = \UI\TableStyles::sanitizeColor($team->color1);
         $color2 = \UI\TableStyles::sanitizeColor($team->color2);
 
+        $discordInner = '<span class="team-action-link__text">Discord</span>'
+            . '<img src="./' . $imagesPath . 'discord-symbol-white.svg" alt="Discord" class="team-action-link__icon">';
+
         $tradeButton = '';
         $discordButton = '';
         if ($userTeamName !== '') {
             if ($isOwnTeam) {
                 $tradeButton = '<a href="modules.php?name=Trading&amp;op=reviewtrade" class="team-action-link">Trade</a>';
-                $discordButton = '<a href="https://discord.com/channels/' . Discord::getGuildID() . '" class="team-action-link" target="_blank" rel="noopener noreferrer">Discord</a>';
+                $discordButton = '<a href="https://discord.com/channels/' . Discord::getGuildID() . '" class="team-action-link team-action-link--discord" target="_blank" rel="noopener noreferrer">' . $discordInner . '</a>';
             } else {
                 $partnerParam = \Utilities\HtmlSanitizer::safeHtmlOutput($team->name);
                 $tradeButton = '<a href="modules.php?name=Trading&amp;op=offertrade&amp;partner=' . urlencode($team->name) . '" class="team-action-link">Trade</a>';
                 if ($team->discordID !== null) {
                     $discordIDSafe = \Utilities\HtmlSanitizer::safeHtmlOutput((string) $team->discordID);
-                    $discordButton = '<a href="https://discord.com/users/' . $discordIDSafe . '" class="team-action-link" target="_blank" rel="noopener noreferrer">Discord</a>';
+                    $discordButton = '<a href="https://discord.com/users/' . $discordIDSafe . '" class="team-action-link team-action-link--discord" target="_blank" rel="noopener noreferrer">' . $discordInner . '</a>';
                 }
             }
         }

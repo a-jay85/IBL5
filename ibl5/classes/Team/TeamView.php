@@ -126,18 +126,27 @@ class TeamView implements TeamViewInterface
         $color1 = \UI\TableStyles::sanitizeColor($team->color1);
         $color2 = \UI\TableStyles::sanitizeColor($team->color2);
 
+        $tradeInner = '<span class="team-action-link__text">Trade</span>'
+            . '<img src="./' . $imagesPath . 'trade-icon.svg" alt="Trade" class="team-action-link__icon">';
+        $scheduleInner = '<span class="team-action-link__text">Schedule</span>'
+            . '<img src="./' . $imagesPath . 'schedule-icon.svg" alt="Schedule" class="team-action-link__icon">';
+        $draftHistoryInner = '<span class="team-action-link__text">Draft History</span>'
+            . '<img src="./' . $imagesPath . 'draft-history-icon.svg" alt="Draft History" class="team-action-link__icon">';
+        $discordInner = '<span class="team-action-link__text">Discord</span>'
+            . '<img src="./' . $imagesPath . 'discord-symbol-white.svg" alt="Discord" class="team-action-link__icon">';
+
         $tradeButton = '';
         $discordButton = '';
         if ($userTeamName !== '') {
             if ($isOwnTeam) {
-                $tradeButton = '<a href="modules.php?name=Trading&amp;op=reviewtrade" class="team-action-link">Trade</a>';
-                $discordButton = '<a href="https://discord.com/channels/' . Discord::getGuildID() . '" class="team-action-link" target="_blank" rel="noopener noreferrer">Discord</a>';
+                $tradeButton = '<a href="modules.php?name=Trading&amp;op=reviewtrade" class="team-action-link">' . $tradeInner . '</a>';
+                $discordButton = '<a href="https://discord.com/channels/' . Discord::getGuildID() . '" class="team-action-link team-action-link--discord" target="_blank" rel="noopener noreferrer">' . $discordInner . '</a>';
             } else {
                 $partnerParam = \Utilities\HtmlSanitizer::safeHtmlOutput($team->name);
-                $tradeButton = '<a href="modules.php?name=Trading&amp;op=offertrade&amp;partner=' . urlencode($team->name) . '" class="team-action-link">Trade</a>';
+                $tradeButton = '<a href="modules.php?name=Trading&amp;op=offertrade&amp;partner=' . urlencode($team->name) . '" class="team-action-link">' . $tradeInner . '</a>';
                 if ($team->discordID !== null) {
                     $discordIDSafe = \Utilities\HtmlSanitizer::safeHtmlOutput((string) $team->discordID);
-                    $discordButton = '<a href="https://discord.com/users/' . $discordIDSafe . '" class="team-action-link" target="_blank" rel="noopener noreferrer">Discord</a>';
+                    $discordButton = '<a href="https://discord.com/users/' . $discordIDSafe . '" class="team-action-link team-action-link--discord" target="_blank" rel="noopener noreferrer">' . $discordInner . '</a>';
                 }
             }
         }
@@ -146,11 +155,11 @@ class TeamView implements TeamViewInterface
         ?>
 <div class="team-banner-row" style="--team-tab-bg-color: #<?= $color1 ?>; --team-tab-active-color: #<?= $color2 ?>;">
     <?= $tradeButton ?>
-    <a href="modules.php?name=Schedule&amp;teamID=<?= $teamID ?>" class="team-action-link">Schedule</a>
+    <a href="modules.php?name=Schedule&amp;teamID=<?= $teamID ?>" class="team-action-link"><?= $scheduleInner ?></a>
     <div class="team-banner-logo">
         <img src="./<?= $imagesPath ?>logo/<?= $teamID ?>.jpg" alt="<?= HtmlSanitizer::e($team->name ?? '') ?> logo">
     </div>
-    <a href="modules.php?name=DraftHistory&amp;teamID=<?= $teamID ?>" class="team-action-link">Draft History</a>
+    <a href="modules.php?name=DraftHistory&amp;teamID=<?= $teamID ?>" class="team-action-link"><?= $draftHistoryInner ?></a>
     <?= $discordButton ?>
 </div>
         <?php

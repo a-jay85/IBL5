@@ -107,7 +107,12 @@
     border-color: var(--team-tab-bg-color);
 }
 
-@media (max-width: 768px) {
+/* Action link icons: hidden on desktop, shown on mobile (see media query below). */
+.team-action-link__icon {
+    display: none;
+}
+
+@media (max-width: 1023px) {
     .team-banner-row {
         flex-wrap: wrap;
     }
@@ -115,11 +120,57 @@
     .team-banner-row > .team-banner-logo {
         order: -1;
         flex-basis: 100%;
-        margin-bottom: 1rem;
     }
 
     .team-banner-row > .team-banner-logo img {
         margin: 0 auto;
+    }
+
+    /*
+     * Mobile action buttons: swap text for icon, render as a square-ish chip.
+     * Trade / Schedule / Draft History use team colors; Discord overrides below.
+     * Padding var(--space-3) gives ~12px clearspace around a 24px icon — this
+     * also satisfies the Discord symbol's 1/3-of-width clearspace requirement.
+     */
+    .team-action-link {
+        padding: var(--space-3);
+        justify-content: center;
+        line-height: 0;
+        background: var(--team-tab-bg-color);
+        border-color: color-mix(in srgb, var(--team-tab-bg-color) 60%, black);
+    }
+
+    .team-action-link:hover,
+    .team-action-link:focus-visible {
+        background: color-mix(in srgb, var(--team-tab-bg-color) 80%, black);
+        border-color: var(--team-tab-bg-color);
+    }
+
+    .team-action-link .team-action-link__text {
+        display: none;
+    }
+
+    .team-action-link .team-action-link__icon {
+        display: block;
+        height: 24px;
+        width: 32px;
+        object-fit: contain;
+    }
+
+    /*
+     * Discord override: white symbol on Discord Blurple (#5865f2) approved
+     * pairing. All other sizing/padding inherits from the base rule above so
+     * the four buttons form a visually consistent row.
+     */
+    .team-action-link--discord {
+        background: #5865f2;
+        border-color: #4752c4;
+    }
+
+    .team-action-link--discord:hover,
+    .team-action-link--discord:focus-visible {
+        background: #4752c4;
+        border-color: #5865f2;
     }
 }
 
@@ -650,14 +701,6 @@ span.nav-dropdown-item a:hover {
     opacity: 1;
     /* Opening: X fades IN only after the logo has fully faded out. */
     transition-delay: 160ms;
-}
-
-/* Hide per-page team-logo banners on mobile — team logo is now in the
-   hamburger so the on-page banner is redundant and wastes vertical space. */
-@media (max-width: 1023px) {
-    .team-banner-logo {
-        display: none;
-    }
 }
 
 /* ==========================================================================

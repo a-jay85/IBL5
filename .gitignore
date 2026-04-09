@@ -67,3 +67,19 @@ ibl5/tests/e2e/**/*-win32.png
 
 # Legacy spreadsheets (kept on disk, not in git)
 ibl5/spreadsheets/
+
+# JSB sim files — source of truth is ibl5/backups/{season}/*.zip
+# (extracted at runtime by ExtractFromBackupStep)
+ibl5/*.lge
+ibl5/*.plr
+ibl5/*.sco
+ibl5/*.car
+ibl5/*.trn
+ibl5/*.his
+ibl5/*.asw
+ibl5/*.rcb
+ibl5/*.awa
+ibl5/*.dra
+ibl5/*.ret
+ibl5/*.hof
+ibl5/*.plb

@@ -281,6 +281,12 @@ function resetDepthChart() {
         selects[i].value = '0';
     }
 
+    // Mirror the reset into the mobile stepper labels, which are a sibling
+    // UI layer over the hidden <select>s.
+    if (typeof window.IBL_syncDepthChartStepperLabels === 'function') {
+        window.IBL_syncDepthChartStepperLabels();
+    }
+
     // Reset minutes number inputs to blank — the server's extractIntValue()
     // converts blank → 0 on submit, so this leaves the GM with an empty
     // field they can type into rather than a stale "0" they have to clear.
@@ -458,25 +464,20 @@ JAVASCRIPT;
         echo "<input type=\"hidden\" name=\"sf{$depthCount}\" value=\"0\" disabled>";
         echo "<input type=\"hidden\" name=\"pf{$depthCount}\" value=\"0\" disabled>";
         echo "<input type=\"hidden\" name=\"c{$depthCount}\" value=\"0\" disabled>";
-        // Active checkbox toggle
-        echo "<label class=\"dc-card__active-toggle\" aria-label=\"Active status for {$nameHtml}\">";
+        // Active checkbox — native checkbox styled with an orange accent to
+        // match the desktop view. Hidden input submits "0" when unchecked; the
+        // checkbox submits "1" when checked. Both share the same field name so
+        // the form posts the right value regardless of checkbox state.
         echo "<input type=\"hidden\" name=\"canPlayInGame{$depthCount}\" value=\"0\" disabled>";
-        echo "<input type=\"checkbox\" name=\"canPlayInGame{$depthCount}\" value=\"1\" class=\"dc-card__active-cb\"{$checkedAttr} disabled>";
-        echo '<span class="dc-card__active-pill">Active</span>';
-        echo '</label>';
+        echo "<input type=\"checkbox\" name=\"canPlayInGame{$depthCount}\" value=\"1\" class=\"dc-card__active-cb\"{$checkedAttr} aria-label=\"Active status for {$nameHtml}\" disabled>";
         echo '</div>';
 
-        // Body — minutes + role slots grid (6 columns)
+        // Body — role slots + minutes grid (6 columns). Min sits on the
+        // right of the Center column so the PG→C axis reads left-to-right
+        // uninterrupted; the Min input is vertically aligned with the C
+        // stepper's value element via .dc-card__field--min in CSS.
         echo '<div class="dc-card__body">';
         echo '<div class="dc-card__settings-grid">';
-
-        // Minutes — number input constrained to 0-40 with native stepper.
-        /** @var int $dcMinutes */
-        $dcMinutes = $player['dc_minutes'] ?? 0;
-        echo "<div class=\"dc-card__field\">";
-        echo '<span class="dc-card__field-label">Min</span>';
-        echo "<input type=\"number\" name=\"min{$depthCount}\" value=\"{$dcMinutes}\" min=\"0\" max=\"40\" step=\"1\" class=\"dc-minutes-input\" aria-label=\"Minutes for {$nameHtml}\" disabled>";
-        echo '</div>';
 
         foreach (self::ROLE_SLOTS as $slot) {
             /** @var int $dcValue */
@@ -486,13 +487,49 @@ JAVASCRIPT;
             }
             $fieldName = $slot['field'] . $depthCount;
             $labelHtml = HtmlSanitizer::safeHtmlOutput($slot['label']);
+            $valueLabel = match (true) {
+                $dcValue === 0 => '&mdash;',
+                $dcValue === 1 => 'S',
+                default        => '#' . $dcValue,
+            };
+            $slotAria = $labelHtml . ' slot for ' . $nameHtml;
+            $slotAriaRaw = $slot['label'] . ' slot for ' . $name;
 
             echo "<div class=\"dc-card__field\">";
             echo "<span class=\"dc-card__field-label\">{$labelHtml}</span>";
-            echo "<select name=\"{$fieldName}\" aria-label=\"{$labelHtml} slot for {$nameHtml}\" disabled>";
+            echo '<div class="dc-card__stepper">';
+            echo "<button type=\"button\" class=\"dc-card__stepper-arrow dc-card__stepper-arrow--up\" aria-label=\"Previous {$slotAria}\"></button>";
+            echo "<span class=\"dc-card__stepper-value\" aria-live=\"polite\">{$valueLabel}</span>";
+            echo "<button type=\"button\" class=\"dc-card__stepper-arrow dc-card__stepper-arrow--down\" aria-label=\"Next {$slotAria}\"></button>";
+            echo '</div>';
+            echo '<select name="' . HtmlSanitizer::e($fieldName)
+                . '" class="dc-card__field-select" aria-label="'
+                . HtmlSanitizer::e($slotAriaRaw) . '" disabled>';
             $this->renderRolePriorityOptions($dcValue, $slot['max']);
             echo '</select></div>';
         }
+
+        // Minutes — number input constrained to 0-40, rendered as the 6th
+        // (rightmost) column. Visually wrapped in the same stepper chrome as
+        // the role slots so taps on the up/down arrows increment/decrement
+        // the minutes value. The input itself remains editable so the GM
+        // can still type a precise value directly.
+        /** @var int $dcMinutes */
+        $dcMinutes = $player['dc_minutes'] ?? 0;
+        $minAriaRaw = 'Minutes for ' . $name;
+        echo '<div class="dc-card__field dc-card__field--min">';
+        echo '<span class="dc-card__field-label">Min</span>';
+        echo '<div class="dc-card__stepper">';
+        echo '<button type="button" class="dc-card__stepper-arrow dc-card__stepper-arrow--up" aria-label="Increase '
+            . HtmlSanitizer::e($minAriaRaw) . '"></button>';
+        echo '<input type="number" name="min' . HtmlSanitizer::e($depthCount)
+            . '" value="' . HtmlSanitizer::e($dcMinutes)
+            . '" min="0" max="40" step="1" class="dc-minutes-input dc-card__stepper-input" aria-label="'
+            . HtmlSanitizer::e($minAriaRaw) . '" disabled>';
+        echo '<button type="button" class="dc-card__stepper-arrow dc-card__stepper-arrow--down" aria-label="Decrease '
+            . HtmlSanitizer::e($minAriaRaw) . '"></button>';
+        echo '</div>';
+        echo '</div>';
 
         echo '</div>'; // end settings grid
         echo '</div>'; // end body

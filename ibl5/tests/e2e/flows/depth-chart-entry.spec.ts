@@ -166,7 +166,12 @@ test.describe('Depth Chart Entry flow', () => {
     await expect(preview.locator('.dc-lineup-preview__title')).toContainText(
       /projected lineup/i,
     );
-    await expect(preview.locator('.dc-lineup-preview-table')).toBeVisible();
+    // The renderer now emits two tables (desktop + mobile swapped-axes).
+    // Target the desktop table explicitly so the locator matches exactly
+    // one element under Playwright strict mode at the default viewport.
+    await expect(
+      preview.locator('.dc-lineup-preview-table--desktop'),
+    ).toBeVisible();
 
     // Install a MutationObserver on the preview container. depth-chart-lineup-
     // preview.js re-renders via `container.innerHTML = html`, which replaces
@@ -218,8 +223,12 @@ test.describe('Depth Chart Entry flow', () => {
     await expect(form).toBeVisible({ timeout: 15000 });
 
     const preview = page.locator('#dc-lineup-preview');
-    await expect(preview.locator('.dc-lineup-preview-table')).toBeVisible();
-    await expect(preview.locator('.dc-lineup-preview__starter').first()).toBeVisible();
+    await expect(
+      preview.locator('.dc-lineup-preview-table--desktop'),
+    ).toBeVisible();
+    await expect(
+      preview.locator('.dc-lineup-preview-table--desktop .dc-lineup-preview__starter').first(),
+    ).toBeVisible();
 
     // Install a MutationObserver on the preview container — depth-chart-
     // lineup-preview.js re-renders via `container.innerHTML = html`, which

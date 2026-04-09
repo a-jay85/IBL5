@@ -426,6 +426,87 @@ class DepthChartEntryViewTest extends TestCase
         $this->assertStringContainsString('depth-chart-reset-btn', $output);
     }
 
+    public function testRenderMobileViewRendersStepperForEachRoleSlot(): void
+    {
+        // Two players × six steppers (five role slots + Min) = twelve pairs.
+        $players = [$this->buildTestPlayer(1, 'Alice'), $this->buildTestPlayer(2, 'Bob')];
+
+        ob_start();
+        $this->view->renderMobileView($players, ['PG', 'SG', 'SF', 'PF', 'C']);
+        $output = (string) ob_get_clean();
+
+        $upCount = preg_match_all('/dc-card__stepper-arrow--up/', $output);
+        $downCount = preg_match_all('/dc-card__stepper-arrow--down/', $output);
+
+        $this->assertSame(12, $upCount, 'One up arrow per player per role slot and Min');
+        $this->assertSame(12, $downCount, 'One down arrow per player per role slot and Min');
+    }
+
+    public function testRenderMobileViewStepperInitialLabelMatchesDcValue(): void
+    {
+        $player = $this->buildTestPlayer();
+        $player['dc_bh'] = 1; // PG slot → starter label "S"
+        $player['dc_df'] = 2; // PF slot → backup label "#2"
+
+        ob_start();
+        $this->view->renderMobileView([$player], ['PG', 'SG', 'SF', 'PF', 'C']);
+        $output = (string) ob_get_clean();
+
+        // Initial labels are rendered server-side so stepper values are
+        // correct before any JS runs. &mdash; is the unassigned label.
+        $this->assertMatchesRegularExpression(
+            '/dc-card__stepper-value[^>]*>S</',
+            $output,
+            'PG slot with dc_bh=1 should render initial label "S"'
+        );
+        $this->assertMatchesRegularExpression(
+            '/dc-card__stepper-value[^>]*>#2</',
+            $output,
+            'PF slot with dc_df=2 should render initial label "#2"'
+        );
+        $this->assertMatchesRegularExpression(
+            '/dc-card__stepper-value[^>]*>&mdash;</',
+            $output,
+            'Unassigned slots should render the em-dash label'
+        );
+    }
+
+    public function testRenderMobileViewStepperButtonsHaveAriaLabels(): void
+    {
+        $player = $this->buildTestPlayer(99, 'Unique Player');
+
+        ob_start();
+        $this->view->renderMobileView([$player], ['PG', 'SG', 'SF', 'PF', 'C']);
+        $output = (string) ob_get_clean();
+
+        // aria-labels include direction + slot + player name so screen
+        // readers announce the action and its target.
+        $this->assertStringContainsString('aria-label="Previous PG slot for Unique Player"', $output);
+        $this->assertStringContainsString('aria-label="Next PG slot for Unique Player"', $output);
+        $this->assertStringContainsString('aria-label="Previous C slot for Unique Player"', $output);
+        $this->assertStringContainsString('aria-label="Next C slot for Unique Player"', $output);
+    }
+
+    public function testRenderMobileViewStepperButtonsAreTypeButton(): void
+    {
+        $players = [$this->buildTestPlayer()];
+
+        ob_start();
+        $this->view->renderMobileView($players, ['PG', 'SG', 'SF', 'PF', 'C']);
+        $output = (string) ob_get_clean();
+
+        // Every stepper arrow must be type="button" so tapping one never
+        // submits the depth-chart form.
+        $arrowMatches = preg_match_all('/<button[^>]*class="[^"]*dc-card__stepper-arrow[^"]*"[^>]*>/', $output);
+        $typeButtonArrowMatches = preg_match_all(
+            '/<button[^>]*type="button"[^>]*class="[^"]*dc-card__stepper-arrow[^"]*"[^>]*>/',
+            $output
+        );
+
+        $this->assertGreaterThan(0, $arrowMatches);
+        $this->assertSame($arrowMatches, $typeButtonArrowMatches);
+    }
+
     // =====================================================================
     // renderSubmissionResult — confirmation page after form submission
     // =====================================================================

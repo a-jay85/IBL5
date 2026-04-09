@@ -696,20 +696,46 @@
     }
 
     /**
+     * Depth-tier labels shared by both renderings. Index 0 is the starter;
+     * indexes 1..BACKUP_ROWS map to JSB's per-slot ladder (sort1/sort2/sort3).
+     */
+    var DEPTH_LABELS = ['Starting', '2nd', '3rd', '4th', '5th'];
+
+    /**
      * Render the lineup preview into the container element.
      *
-     * Each populated cell renders the abbreviated player name and a small
-     * "Nm" minute-share annotation from `slotMinutes` — the output of
-     * computeMinuteShares(). Minutes across the 4 rows of one column always
-     * sum to 48 (the slot's full budget), so the GM can read each column as
-     * a minute-distribution breakdown for that role.
+     * Emits two tables into the same container — a desktop layout with
+     * positions across the X-axis (and depth tiers down the Y-axis) and a
+     * mobile layout with the axes swapped. CSS media queries in
+     * `depth-chart.css` show exactly one at a time. The mobile layout puts
+     * the starting lineup in the leftmost column so the most important
+     * data is always visible without horizontal scrolling, and it uses more
+     * of the device's vertical space for the depth ladder.
+     *
+     * Each populated cell shows the player's photo, a display name, and a
+     * small "Nm" minute-share annotation from `slotMinutes` — the output of
+     * computeMinuteShares(). Minutes across all 4 depth tiers of one slot
+     * always sum to 48 (the slot's full budget).
      */
     function renderPreview(lineup, slotMinutes) {
         var container = document.getElementById('dc-lineup-preview');
         if (!container) return;
 
+        var lastNameFreq = buildLastNameFrequency(lineup);
+
         var html = '<div class="dc-lineup-preview__title">Projected Lineup</div>';
-        html += '<table class="ibl-data-table dc-lineup-preview-table"><thead><tr>';
+        html += renderPreviewDesktopTable(lineup, slotMinutes);
+        html += renderPreviewMobileTable(lineup, slotMinutes, lastNameFreq);
+        container.innerHTML = html;
+    }
+
+    /**
+     * Desktop rendering — positions on the X-axis, depth tier on the Y-axis.
+     * Names use the "F. Last" abbreviation so the column width stays tight
+     * and the full-name-with-initial reads clearly at desktop sizes.
+     */
+    function renderPreviewDesktopTable(lineup, slotMinutes) {
+        var html = '<table class="ibl-data-table dc-lineup-preview-table dc-lineup-preview-table--desktop"><thead><tr>';
         html += '<th></th>';
         for (var h = 0; h < SLOTS.length; h++) {
             html += '<th>' + SLOTS[h].label + '</th>';
@@ -717,61 +743,190 @@
         html += '</tr></thead><tbody>';
 
         // Starters row
-        html += '<tr><td class="dc-lineup-preview__row-label">Starting</td>';
+        html += '<tr><td class="dc-lineup-preview__row-label">' + DEPTH_LABELS[0] + '</td>';
         for (var s = 0; s < SLOTS.length; s++) {
             var starter = lineup.starters[s];
-            if (starter) {
-                var mins = (slotMinutes[s] && slotMinutes[s][starter.pid]) || 0;
-                html += '<td class="dc-lineup-preview__starter ibl-player-cell">'
-                    + '<a href="./modules.php?name=Player&amp;pa=showpage&amp;pid=' + starter.pid + '">'
-                    + '<img src="./images/player/' + starter.pid + '.jpg" alt="" class="ibl-player-photo" width="24" height="24" loading="lazy" onerror="this.style.display=\'none\'">'
-                    + escapeHtml(abbreviateName(starter.name))
-                    + renderMinutes(mins)
-                    + '</a></td>';
-            } else {
-                html += '<td class="dc-lineup-preview__empty">&mdash;</td>';
-            }
+            html += renderPlayerCell({
+                player: starter,
+                viaBenchScan: false,
+                mins: playerMinutesIn(slotMinutes, s, starter),
+                displayName: starter ? abbreviateName(starter.name) : '',
+                isStarter: true
+            });
         }
         html += '</tr>';
 
-        // Bench rows. Bench entries are { player, viaBenchScan } objects.
-        // viaBenchScan = true means this slot's per-slot candidate ladder
-        // (sort1/sort2/sort3) AND its position-match backup chain were both
-        // exhausted, so FUN_004db520's bench-scan fallback supplied the
-        // body. We render those in italic via .dc-lineup-preview__bench-scan
-        // and attach a tooltip explaining the source.
-        var ROW_LABELS = ['2nd', '3rd', '4th', '5th'];
+        // Bench rows. Bench entries are { player, viaBenchScan } objects —
+        // see renderPlayerCell() for the bench-scan styling + tooltip.
         for (var row = 0; row < BACKUP_ROWS; row++) {
-            var label = ROW_LABELS[row] || (row + 1) + 'th';
+            var label = DEPTH_LABELS[row + 1] || ((row + 2) + 'th');
             html += '<tr><td class="dc-lineup-preview__row-label">' + label + '</td>';
             for (var c = 0; c < SLOTS.length; c++) {
                 var benchEntry = lineup.bench[c][row];
-                if (benchEntry) {
-                    var cellClass = 'ibl-player-cell';
-                    var cellExtra = '';
-                    if (benchEntry.viaBenchScan) {
-                        cellClass += ' dc-lineup-preview__bench-scan';
-                        cellExtra = ' title="Bench-scan fallback: this slot has no'
-                            + ' more candidates in its per-slot ladder, so the'
-                            + ' in-game substitution dispatcher walks the team'
-                            + ' roster and picks this player instead."';
-                    }
-                    var benchMins = (slotMinutes[c] && slotMinutes[c][benchEntry.player.pid]) || 0;
-                    html += '<td class="' + cellClass + '"' + cellExtra + '>'
-                        + '<a href="./modules.php?name=Player&amp;pa=showpage&amp;pid=' + benchEntry.player.pid + '">'
-                        + '<img src="./images/player/' + benchEntry.player.pid + '.jpg" alt="" class="ibl-player-photo" width="24" height="24" loading="lazy" onerror="this.style.display=\'none\'">'
-                        + escapeHtml(abbreviateName(benchEntry.player.name))
-                        + renderMinutes(benchMins)
-                        + '</a></td>';
-                } else {
-                    html += '<td class="dc-lineup-preview__empty">&mdash;</td>';
-                }
+                var benchPlayer = benchEntry ? benchEntry.player : null;
+                html += renderPlayerCell({
+                    player: benchPlayer,
+                    viaBenchScan: benchEntry ? benchEntry.viaBenchScan : false,
+                    mins: playerMinutesIn(slotMinutes, c, benchPlayer),
+                    displayName: benchPlayer ? abbreviateName(benchPlayer.name) : '',
+                    isStarter: false
+                });
             }
             html += '</tr>';
         }
 
         html += '</tbody></table>';
-        container.innerHTML = html;
+        return html;
+    }
+
+    /**
+     * Mobile rendering — positions on the Y-axis, depth tier on the X-axis
+     * (swapped from desktop). The starting lineup occupies the leftmost
+     * data column so it's visible in the viewport without horizontal
+     * scrolling. Names show last-name-only to save horizontal space, with
+     * a fallback to "F. Last" when two distinct players in the projected
+     * lineup share the same last name (disambiguation computed by
+     * buildLastNameFrequency() and applied via mobileDisplayName()).
+     */
+    function renderPreviewMobileTable(lineup, slotMinutes, lastNameFreq) {
+        var html = '<table class="ibl-data-table dc-lineup-preview-table dc-lineup-preview-table--mobile"><thead><tr>';
+        html += '<th></th>';
+        for (var d = 0; d <= BACKUP_ROWS; d++) {
+            html += '<th>' + (DEPTH_LABELS[d] || ((d + 1) + 'th')) + '</th>';
+        }
+        html += '</tr></thead><tbody>';
+
+        for (var sIdx = 0; sIdx < SLOTS.length; sIdx++) {
+            html += '<tr><td class="dc-lineup-preview__row-label">' + SLOTS[sIdx].label + '</td>';
+
+            // Starter column (leftmost — most important data, always visible)
+            var starter = lineup.starters[sIdx];
+            html += renderPlayerCell({
+                player: starter,
+                viaBenchScan: false,
+                mins: playerMinutesIn(slotMinutes, sIdx, starter),
+                displayName: starter ? mobileDisplayName(starter, lastNameFreq) : '',
+                isStarter: true
+            });
+
+            // Bench columns (2nd / 3rd / 4th)
+            for (var row = 0; row < BACKUP_ROWS; row++) {
+                var benchEntry = lineup.bench[sIdx][row];
+                var benchPlayer = benchEntry ? benchEntry.player : null;
+                html += renderPlayerCell({
+                    player: benchPlayer,
+                    viaBenchScan: benchEntry ? benchEntry.viaBenchScan : false,
+                    mins: playerMinutesIn(slotMinutes, sIdx, benchPlayer),
+                    displayName: benchPlayer ? mobileDisplayName(benchPlayer, lastNameFreq) : '',
+                    isStarter: false
+                });
+            }
+
+            html += '</tr>';
+        }
+
+        html += '</tbody></table>';
+        return html;
+    }
+
+    /**
+     * Return the minute share that slot `slotIdx` contributes to `player`,
+     * or 0 when `player` is null or the slot has no entry for that pid.
+     */
+    function playerMinutesIn(slotMinutes, slotIdx, player) {
+        if (!player || !slotMinutes[slotIdx]) return 0;
+        return slotMinutes[slotIdx][player.pid] || 0;
+    }
+
+    /**
+     * Render a single <td> for the lineup preview. Shared by the desktop
+     * and mobile renderers so the cell markup (photo, link, bench-scan
+     * italic + tooltip, empty placeholder, minute-share annotation) lives
+     * in one place.
+     *
+     * opts = { player, viaBenchScan, mins, displayName, isStarter }
+     *
+     * `viaBenchScan = true` means this slot's per-slot candidate ladder
+     * (sort1/sort2/sort3) AND its position-match backup chain were both
+     * exhausted, so FUN_004db520's bench-scan fallback supplied the body.
+     * Those cells render italic via .dc-lineup-preview__bench-scan and
+     * carry a tooltip explaining the source.
+     */
+    function renderPlayerCell(opts) {
+        if (!opts.player) {
+            return '<td class="dc-lineup-preview__empty">&mdash;</td>';
+        }
+        var cellClass = 'ibl-player-cell';
+        if (opts.isStarter) cellClass += ' dc-lineup-preview__starter';
+        var cellExtra = '';
+        if (opts.viaBenchScan) {
+            cellClass += ' dc-lineup-preview__bench-scan';
+            cellExtra = ' title="Bench-scan fallback: this slot has no'
+                + ' more candidates in its per-slot ladder, so the'
+                + ' in-game substitution dispatcher walks the team'
+                + ' roster and picks this player instead."';
+        }
+        return '<td class="' + cellClass + '"' + cellExtra + '>'
+            + '<a href="./modules.php?name=Player&amp;pa=showpage&amp;pid=' + opts.player.pid + '">'
+            + '<img src="./images/player/' + opts.player.pid + '.jpg" alt="" class="ibl-player-photo" width="24" height="24" loading="lazy" onerror="this.style.display=\'none\'">'
+            + escapeHtml(opts.displayName)
+            + renderMinutes(opts.mins)
+            + '</a></td>';
+    }
+
+    /**
+     * Extract the last-name portion of a player's display name, matching
+     * the "First Last..." split used by abbreviateName() — i.e. everything
+     * after the first space. "James Harden" → "Harden"; "James Harden Jr."
+     * → "Harden Jr.". Single-word names are returned unchanged.
+     */
+    function extractLastName(name) {
+        var parts = name.split(' ');
+        if (parts.length < 2) return name;
+        return parts.slice(1).join(' ');
+    }
+
+    /**
+     * Build a frequency map of last names across every distinct player in
+     * the projected lineup (starters + bench, deduped by pid). The mobile
+     * renderer uses this to decide whether a cell can show last-name-only
+     * or must fall back to "F. Last" because another distinct player in
+     * the preview shares the same last name.
+     */
+    function buildLastNameFrequency(lineup) {
+        var freq = {};
+        var seen = {};
+        var all = [];
+        for (var i = 0; i < lineup.starters.length; i++) {
+            if (lineup.starters[i]) all.push(lineup.starters[i]);
+        }
+        for (var j = 0; j < lineup.bench.length; j++) {
+            var slotBench = lineup.bench[j] || [];
+            for (var k = 0; k < slotBench.length; k++) {
+                all.push(slotBench[k].player);
+            }
+        }
+        for (var m = 0; m < all.length; m++) {
+            var p = all[m];
+            if (seen[p.pid]) continue;
+            seen[p.pid] = true;
+            var key = extractLastName(p.name).toLowerCase();
+            freq[key] = (freq[key] || 0) + 1;
+        }
+        return freq;
+    }
+
+    /**
+     * Pick a display name for the mobile preview. Uses last-name-only to
+     * save horizontal space, falling back to "F. Last" when another
+     * distinct player in the lineup shares the same last name.
+     */
+    function mobileDisplayName(player, lastNameFreq) {
+        var lname = extractLastName(player.name);
+        if ((lastNameFreq[lname.toLowerCase()] || 0) > 1) {
+            return abbreviateName(player.name);
+        }
+        return lname;
     }
 
     /**

@@ -107,7 +107,18 @@ switch ($op) {
             header('Content-Type: application/json; charset=utf-8');
             echo json_encode(['html' => ''], JSON_THROW_ON_ERROR);
         } else {
-            $handler = new Trading\TradeRosterPreviewApiHandler($mysqli_db);
+            global $cookie;
+            cookiedecode($user);
+            $loggedInUsername = strval($cookie[1] ?? '');
+            $loggedInTeamID = 0;
+            if ($loggedInUsername !== '') {
+                $commonRepo = new \Services\CommonMysqliRepository($mysqli_db);
+                $loggedInTeamName = $commonRepo->getTeamnameFromUsername($loggedInUsername);
+                if ($loggedInTeamName !== null) {
+                    $loggedInTeamID = $commonRepo->getTidFromTeamname($loggedInTeamName) ?? 0;
+                }
+            }
+            $handler = new Trading\TradeRosterPreviewApiHandler($mysqli_db, $loggedInTeamID);
             $handler->handle();
         }
         break;

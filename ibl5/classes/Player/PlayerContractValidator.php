@@ -21,9 +21,18 @@ class PlayerContractValidator implements PlayerContractValidatorInterface
     /**
      * @see PlayerContractValidatorInterface::canRenegotiateContract()
      */
-    public function canRenegotiateContract(PlayerData $playerData): bool
+    public function canRenegotiateContract(PlayerData $playerData, ?Season $season = null): bool
     {
         $currentYear = $playerData->contractCurrentYear ?? 0;
+
+        // During the Draft and Free Agency phases, evaluate eligibility from the
+        // incoming season's perspective — contractCurrentYear will advance by one
+        // when the new season officially starts. Any contract extension used in the
+        // past season is disregarded, since the Used_Extension_This_Season flag also
+        // resets at season rollover.
+        if ($season !== null && $season->isOffseasonPhase()) {
+            $currentYear++;
+        }
 
         // Check if player was rookie optioned and is currently in the rookie option year
         if ($this->wasRookieOptioned($playerData)) {

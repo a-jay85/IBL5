@@ -27,12 +27,17 @@ class Contracts
      * @param Season $season Season object
      * @param list<int> $starterPids Starter player IDs
      * @param list<int> $excludeFromCapPids PIDs to exclude from cap total sums (e.g. outgoing trade players)
+     * @param bool $showActionLinks When false, Rookie Option / Contract Extension eligibility markers still render but are not clickable links (used when previewing another GM's roster in the Trading module)
      * @return string HTML table
      */
-    public static function render(\mysqli $db, iterable $result, Team $team, Season $season, array $starterPids = [], array $excludeFromCapPids = []): string
+    public static function render(\mysqli $db, iterable $result, Team $team, Season $season, array $starterPids = [], array $excludeFromCapPids = [], bool $showActionLinks = true): string
     {
         $isFreeAgency = $season->isOffseasonPhase();
-        $isExtensionPhase = in_array($season->phase, ['Preseason', 'Regular Season', 'Playoffs'], true);
+        // Contract extensions are only actionable during in-season phases. During
+        // Draft and Free Agency, the eligibility marker still renders (so GMs can
+        // see who will be eligible next season) but it renders as a non-clickable
+        // span rather than a hyperlink to the negotiation form.
+        $isExtensionActionablePhase = in_array($season->phase, ['Preseason', 'HEAT', 'Regular Season', 'Playoffs'], true);
 
         if ($isFreeAgency) {
             $season->endingYear++;
@@ -127,14 +132,24 @@ class Contracts
     <tbody>
 <?php foreach ($playerRows as $row):
     $player = $row['player'];
-    $hasRookieOption = $player->canRookieOption($season->phase);
-    $hasExtension = !$hasRookieOption && $player->canRenegotiateContract();
+    $isCashPlayer = $row['isCashRow'] || str_contains($player->name ?? '', '|');
+    $hasRookieOption = !$isCashPlayer && $player->canRookieOption($season->phase);
+    // Pass $season so eligibility reflects the incoming season's state during Draft / Free Agency.
+    $hasExtension = !$isCashPlayer && !$hasRookieOption && $player->canRenegotiateContract($season);
+
+    $hintActionUrl = '';
+    $hintActionLabel = '';
+    $renderHintAsLink = false;
+    if ($hasRookieOption) {
+        $hintActionUrl = 'modules.php?name=Player&amp;pa=rookieoption&amp;pid=' . (int)$player->playerID . '&amp;from=team';
+        $hintActionLabel = 'Rookie Option';
+        $renderHintAsLink = $showActionLinks;
+    } elseif ($hasExtension) {
+        $hintActionUrl = 'modules.php?name=Player&amp;pa=negotiate&amp;pid=' . (int)$player->playerID;
+        $hintActionLabel = 'Contract Extension';
+        $renderHintAsLink = $showActionLinks && $isExtensionActionablePhase;
+    }
 ?>
-        <?php
-        $isCashPlayer = $row['isCashRow'] || str_contains($player->name ?? '', '|');
-        $hasRookieOption = !$isCashPlayer && $player->canRookieOption($season->phase);
-        $hasExtension = !$isCashPlayer && !$hasRookieOption && $isExtensionPhase && $player->canRenegotiateContract();
-        ?>
         <tr<?= $row['isCashRow'] ? ' data-cash-row' : '' ?>>
             <td><?= HtmlSanitizer::e($player->position ?? '') ?></td>
             <?= PlayerImageHelper::renderPlayerCell((int)$player->playerID, $player->decoratedName ?? '', $starterPids, $player->nameStatusClass) ?>
@@ -142,16 +157,8 @@ class Contracts
             <td><?= (int)$player->yearsOfExperience ?></td>
             <td class="sep-r-team"><?= (int)$player->birdYears ?></td>
             <td class="col-salary"><?= $row['con1'] ?></td>
-            <?php if ($hasRookieOption): ?>
-            <?php $actionUrl = 'modules.php?name=Player&amp;pa=rookieoption&amp;pid=' . (int)$player->playerID . '&amp;from=team'; $actionLabel = 'Rookie Option'; ?>
-            <td class="col-salary contract-hint-cell" tabindex="0"><?= $row['con2'] === 0 ? '0*' : $row['con2'] ?><a href="<?= $actionUrl ?>" class="contract-hint-link" data-no-abbreviate><?= $actionLabel ?></a></td>
-            <td class="col-salary contract-hint-cell" tabindex="0"><?= $row['con3'] ?></td>
-            <td class="col-salary contract-hint-cell" tabindex="0"><?= $row['con4'] ?></td>
-            <td class="col-salary contract-hint-cell" tabindex="0"><?= $row['con5'] ?></td>
-            <td class="col-salary contract-hint-cell sep-r-team" tabindex="0"><?= $row['con6'] ?></td>
-            <?php elseif ($hasExtension): ?>
-            <?php $actionUrl = 'modules.php?name=Player&amp;pa=negotiate&amp;pid=' . (int)$player->playerID; $actionLabel = 'Contract Extension'; ?>
-            <td class="col-salary contract-hint-cell" tabindex="0"><?= $row['con2'] === 0 ? '0*' : $row['con2'] ?><a href="<?= $actionUrl ?>" class="contract-hint-link" data-no-abbreviate><?= $actionLabel ?></a></td>
+            <?php if ($hasRookieOption || $hasExtension): ?>
+            <td class="col-salary contract-hint-cell" tabindex="0"><?= $row['con2'] === 0 ? '0*' : $row['con2'] ?><?php if ($renderHintAsLink): ?><a href="<?= $hintActionUrl ?>" class="contract-hint-link" data-no-abbreviate><?= $hintActionLabel ?></a><?php else: ?><span class="contract-hint-link" data-no-abbreviate><?= $hintActionLabel ?></span><?php endif; ?></td>
             <td class="col-salary contract-hint-cell" tabindex="0"><?= $row['con3'] ?></td>
             <td class="col-salary contract-hint-cell" tabindex="0"><?= $row['con4'] ?></td>
             <td class="col-salary contract-hint-cell" tabindex="0"><?= $row['con5'] ?></td>

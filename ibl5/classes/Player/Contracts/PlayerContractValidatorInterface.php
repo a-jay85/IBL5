@@ -17,20 +17,26 @@ interface PlayerContractValidatorInterface
 {
     /**
      * Check if a player can renegotiate their contract
-     * 
+     *
      * A player can renegotiate if:
      * - They're in their final contract year (contractCurrentYear >= 6), OR
      * - The next year has no salary (eligible for renegotiation), AND
      * - They were NOT rookie optioned in the current year
-     * 
+     *
      * Players who were rookie optioned cannot renegotiate during the rookie option year.
      * First round picks can't renegotiate in year 4 (rookie option year).
      * Second round picks can't renegotiate in year 3 (rookie option year).
-     * 
+     *
+     * When `$season` is provided and the season is in an offseason phase
+     * (Draft or Free Agency), eligibility is evaluated from the incoming
+     * season's perspective: the effective contractCurrentYear is shifted by
+     * one, and any contract extension used in the past season is disregarded.
+     *
      * @param PlayerData $playerData The player to check
+     * @param Season|null $season Optional season context; when in offseason phase, shifts evaluation to the incoming season
      * @return bool True if player can renegotiate
      */
-    public function canRenegotiateContract(PlayerData $playerData): bool;
+    public function canRenegotiateContract(PlayerData $playerData, ?Season $season = null): bool;
 
     /**
      * Check if a player is eligible for rookie option

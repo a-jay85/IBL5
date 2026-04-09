@@ -6,6 +6,9 @@
  * team pages (Ratings, Contracts, Splits, etc.).
  */
 
+@layer components {
+
+
 /* ==========================================================================
    Trade Offer Card — constrain width so it doesn't expand when the wider
    roster-preview panel is revealed inside the same table cell.
@@ -275,3 +278,5 @@
         font-size: 0.75rem;
     }
 }
+
+} /* end @layer components */

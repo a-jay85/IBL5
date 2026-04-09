@@ -508,9 +508,9 @@ class Player implements PlayerInterface
     /**
      * @see PlayerInterface::canRenegotiateContract()
      */
-    public function canRenegotiateContract(): bool
+    public function canRenegotiateContract(?Season $season = null): bool
     {
-        return $this->contractValidator->canRenegotiateContract($this->getPlayerData());
+        return $this->contractValidator->canRenegotiateContract($this->getPlayerData(), $season);
     }
 
     /**

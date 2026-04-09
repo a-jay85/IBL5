@@ -249,6 +249,10 @@
 <testsuite name="Logging Module Tests">
             <directory>tests/Logging</directory>
         </testsuite>
+        <testsuite name="PHPStan Rules Tests">
+            <directory>tests/PHPStanRules</directory>
+            <exclude>tests/PHPStanRules/Fixtures</exclude>
+        </testsuite>
     </testsuites>
     <!-- Database Integration Tests (tests/DatabaseIntegration/) are NOT registered
          as a suite. They require a running MariaDB and env vars:

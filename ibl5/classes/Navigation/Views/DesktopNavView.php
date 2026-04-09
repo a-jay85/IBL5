@@ -258,7 +258,7 @@ class DesktopNavView
         ?>
         <div class="px-4 py-3 border-t border-white/10 bg-black/20">
             <div class="block text-base font-semibold tracking-widest uppercase text-gray-500 mb-2">Signed in as <?= HtmlSanitizer::e($username) ?></div>
-            <a href="modules.php?name=YourAccount&amp;op=logout" class="block w-full text-center bg-white/10 text-white text-sm font-medium border border-white/20 rounded-lg px-3 py-2 cursor-pointer hover:bg-white/15 hover:border-white/30 transition-all">Logout</a>
+            <a href="modules.php?name=YourAccount&amp;op=logout" hx-boost="false" class="block w-full text-center bg-white/10 text-white text-sm font-medium border border-white/20 rounded-lg px-3 py-2 cursor-pointer hover:bg-white/15 hover:border-white/30 transition-all">Logout</a>
         </div>
         <?php
         return (string) ob_get_clean();

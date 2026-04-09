@@ -112,7 +112,7 @@
     display: none;
 }
 
-@media (max-width: 768px) {
+@media (max-width: 1023px) {
     .team-banner-row {
         flex-wrap: wrap;
     }
@@ -120,7 +120,6 @@
     .team-banner-row > .team-banner-logo {
         order: -1;
         flex-basis: 100%;
-        margin-bottom: 1rem;
     }
 
     .team-banner-row > .team-banner-logo img {
@@ -702,14 +701,6 @@ span.nav-dropdown-item a:hover {
     opacity: 1;
     /* Opening: X fades IN only after the logo has fully faded out. */
     transition-delay: 160ms;
-}
-
-/* Hide per-page team-logo banners on mobile — team logo is now in the
-   hamburger so the on-page banner is redundant and wastes vertical space. */
-@media (max-width: 1023px) {
-    .team-banner-logo {
-        display: none;
-    }
 }
 
 /* ==========================================================================

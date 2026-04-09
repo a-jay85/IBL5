@@ -1,6 +1,14 @@
 module.exports = {
   proxy: {
     target: "php:80",
+    // Preserve the client's Host header (e.g. localhost:3000) instead of
+    // rewriting it to the target (php:80). Apache derives SERVER_NAME from
+    // the Host header, and DevAutoLogin only fires when SERVER_NAME matches
+    // localhost/127.0.0.1/*.localhost — rewriting to "php" silently breaks
+    // auto-login, so the user sees a logged-out view through the proxy.
+    proxyOptions: {
+      changeOrigin: false,
+    },
     proxyRes: [
       function (proxyRes) {
         // Relax CSP connect-src so the browser-sync WebSocket can connect.

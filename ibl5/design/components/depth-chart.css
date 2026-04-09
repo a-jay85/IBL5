@@ -227,6 +227,22 @@
     color: var(--gray-300);
 }
 
+/*
+ * Dual-rendering view toggle — the JS renderer emits both a desktop table
+ * (positions as columns, depth tiers as rows) and a mobile table with
+ * swapped axes. CSS hides one at a time so layout transitions follow
+ * viewport resize without requiring a JS re-render. Default state hides
+ * the mobile table; the breakpoint in depth-chart-mobile.css flips
+ * visibility at 768px (matching the .dc-mobile-cards breakpoint) and
+ * also tightens cell sizing so all four depth tiers fit without pushing
+ * the starting column partway offscreen. We keep the narrow-viewport
+ * overrides in depth-chart-mobile.css so they load AFTER tables.css's
+ * own mobile table rules and therefore win on source order.
+ */
+.dc-lineup-preview-table--mobile {
+    display: none;
+}
+
 
 
 /* ==========================================================================

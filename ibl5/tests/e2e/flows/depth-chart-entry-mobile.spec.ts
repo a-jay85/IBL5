@@ -57,15 +57,14 @@ test.describe('Depth Chart Entry: mobile card view', () => {
     expect(await toggles.count()).toBeGreaterThan(0);
   });
 
-  test('active toggle changes card opacity', async ({ page }) => {
+  test('active checkbox changes card opacity', async ({ page }) => {
     const firstCard = page.locator('.dc-card').first();
     const checkbox = firstCard.locator('.dc-card__active-cb');
-    const toggle = firstCard.locator('.dc-card__active-toggle');
 
     const wasChecked = await checkbox.isChecked();
 
-    // Click the visible toggle label (checkbox is visually hidden)
-    await toggle.click();
+    // Click the native checkbox directly (visible, styled with orange accent)
+    await checkbox.click();
 
     if (wasChecked) {
       await expect(firstCard).toHaveClass(/dc-card--inactive/);
@@ -74,7 +73,7 @@ test.describe('Depth Chart Entry: mobile card view', () => {
     }
 
     // Toggle back
-    await toggle.click();
+    await checkbox.click();
   });
 
   test('role slot selects are enabled on mobile', async ({ page }) => {
@@ -85,33 +84,141 @@ test.describe('Depth Chart Entry: mobile card view', () => {
   });
 
   test('settings grid has 6 columns per card', async ({ page }) => {
-    // The old pos-grid is gone; a single settings-grid holds the Min column
-    // followed by all 5 role slots (BH/DI/OI/DF/OF) for 6 fields total.
+    // The old pos-grid is gone; a single settings-grid holds all 5 role
+    // slots (BH/DI/OI/DF/OF = PG/SG/SF/PF/C) followed by the Min column
+    // on the right edge, for 6 fields total.
     const firstGrid = page.locator('.dc-card__settings-grid').first();
     const fields = firstGrid.locator('.dc-card__field');
     await expect(fields).toHaveCount(6);
   });
 
-  test('changing a card select triggers glow', async ({ page }) => {
-    const firstSelect = page.locator('.dc-mobile-cards select[name^="BH"]').first();
-    const originalValue = await firstSelect.inputValue();
+  test('position stepper cycles through options on tap', async ({ page }) => {
+    // The mobile position control is a vertical stepper (up-arrow / value
+    // label / down-arrow) over a visually hidden <select>. Tapping the
+    // arrows should cycle through the role-priority options, wrap around
+    // at the bounds, and keep the underlying <select> in sync so form
+    // submission and the desktop-sync path still work.
+    const firstCard = page.locator('.dc-card').first();
+    // Field 0 is the PG (BH) slot — first stepper on the card. The "Min"
+    // column now sits at the far right (field index 5).
+    const pgField = firstCard.locator('.dc-card__field').nth(0);
 
-    // Find a different value
-    const options = firstSelect.locator('option');
-    const count = await options.count();
-    for (let i = 0; i < count; i++) {
-      const val = await options.nth(i).getAttribute('value');
-      if (val !== originalValue) {
-        await firstSelect.selectOption(val!);
-        break;
-      }
+    const stepper = pgField.locator('.dc-card__stepper');
+    const valueLabel = pgField.locator('.dc-card__stepper-value');
+    const downArrow = pgField.locator('.dc-card__stepper-arrow--down');
+    const upArrow = pgField.locator('.dc-card__stepper-arrow--up');
+    const hiddenSelect = pgField.locator('select');
+
+    // Visual contract: the stepper is tappable; the underlying <select>
+    // stays in the DOM for form submission but must not be rendered.
+    await expect(stepper).toBeVisible();
+    await expect(downArrow).toBeVisible();
+    await expect(upArrow).toBeVisible();
+    await expect(hiddenSelect).toBeAttached();
+    await expect(hiddenSelect).toBeHidden();
+
+    const optionCount = await hiddenSelect.locator('option').count();
+    expect(optionCount).toBeGreaterThanOrEqual(3);
+
+    // Mirror the PHP label convention: 0 → em dash, 1 → "S", N → "#N".
+    const labelFor = (v: number) => (v === 0 ? '—' : v === 1 ? 'S' : `#${v}`);
+
+    const startValue = Number(await hiddenSelect.inputValue());
+
+    // Tap down once: value should advance and the label should follow.
+    await downArrow.click();
+    const afterDown = (startValue + 1) % optionCount;
+    await expect(hiddenSelect).toHaveValue(String(afterDown));
+    await expect(valueLabel).toHaveText(labelFor(afterDown));
+
+    // Wrap: tap down (optionCount - 1) more times — should land back on
+    // the original value, proving the cycle is closed.
+    for (let i = 0; i < optionCount - 1; i++) {
+      await downArrow.click();
     }
+    await expect(hiddenSelect).toHaveValue(String(startValue));
+    await expect(valueLabel).toHaveText(labelFor(startValue));
 
-    // Glow should appear on the changed select
+    // Tap up once: value should decrement, wrapping at 0 → last option.
+    await upArrow.click();
+    const afterUp = (startValue - 1 + optionCount) % optionCount;
+    await expect(hiddenSelect).toHaveValue(String(afterUp));
+    await expect(valueLabel).toHaveText(labelFor(afterUp));
+  });
+
+  test('minutes stepper increments and clamps at 0/40', async ({ page }) => {
+    // The Min column (rightmost field, nth(5)) is a number input wrapped
+    // in the same stepper chrome as the role slots. Up arrow increments
+    // (more minutes), down arrow decrements (fewer minutes) — the opposite
+    // direction from the role slot stepper because minutes is a numeric
+    // quantity rather than a depth-chart rank. The value is clamped to
+    // the input's [min, max] attributes (0-40) instead of wrapping.
+    const firstCard = page.locator('.dc-card').first();
+    const minField = firstCard.locator('.dc-card__field').nth(5);
+    const minInput = minField.locator('input[type="number"]');
+    const upArrow = minField.locator('.dc-card__stepper-arrow--up');
+    const downArrow = minField.locator('.dc-card__stepper-arrow--down');
+
+    // Stepper chrome is present and the input sits inside it.
+    await expect(minField.locator('.dc-card__stepper')).toBeVisible();
+    await expect(upArrow).toBeVisible();
+    await expect(downArrow).toBeVisible();
+    await expect(minInput).toBeVisible();
+
+    // The mobile view enables its inputs via JS on init.
+    await expect(minInput).toBeEnabled();
+
+    // Drive to a known midrange value so we can test both directions
+    // without depending on seed data.
+    await minInput.fill('20');
+    await minInput.dispatchEvent('change');
+    await expect(minInput).toHaveValue('20');
+
+    // Up increments.
+    await upArrow.click();
+    await expect(minInput).toHaveValue('21');
+
+    // Down decrements.
+    await downArrow.click();
+    await downArrow.click();
+    await expect(minInput).toHaveValue('19');
+
+    // Clamp at the ceiling.
+    await minInput.fill('40');
+    await minInput.dispatchEvent('change');
+    await upArrow.click();
+    await expect(minInput).toHaveValue('40');
+
+    // Clamp at the floor.
+    await minInput.fill('0');
+    await minInput.dispatchEvent('change');
+    await downArrow.click();
+    await expect(minInput).toHaveValue('0');
+
+    // Revert so no other test inherits a changed state. The stepper up
+    // arrow path fires the same change event the typed-value path fires,
+    // so the desktop<->mobile sync and glow highlighter stay coherent.
+    await minInput.fill('40');
+    await minInput.dispatchEvent('change');
+  });
+
+  test('changing a card role slot triggers glow', async ({ page }) => {
+    // Tapping a stepper arrow cycles the hidden <select> and dispatches
+    // a bubbling change event — the glow highlighter in
+    // depth-chart-changes.js listens for that on the form.
+    const firstCard = page.locator('.dc-card').first();
+    const pgField = firstCard.locator('.dc-card__field').nth(0);
+    const downArrow = pgField.locator('.dc-card__stepper-arrow--down');
+    const upArrow = pgField.locator('.dc-card__stepper-arrow--up');
+
+    await downArrow.click();
+
+    // Glow should appear somewhere inside the mobile cards container now
+    // that a slot value differs from its initial snapshot.
     await expect(page.locator('.dc-mobile-cards [class*="dc-glow-"]').first()).toBeAttached();
 
-    // Revert
-    await firstSelect.selectOption(originalValue);
+    // Revert so no other test inherits a changed state.
+    await upArrow.click();
   });
 
   test('nav bar stays fixed when scrolling', async ({ page }) => {
@@ -150,6 +257,91 @@ test.describe('Depth Chart Entry: mobile card view', () => {
     const box = await dropdown.boundingBox();
     expect(box).not.toBeNull();
     expect(box!.width).toBeLessThanOrEqual(375);
+  });
+
+  test('lineup preview uses swapped-axes mobile layout', async ({ page }) => {
+    // On mobile the Projected Lineup table flips axes so the five positions
+    // run down the Y-axis and the Starting/2nd/3rd/4th depth tiers run
+    // across the X-axis. The desktop variant is hidden by CSS.
+    const preview = page.locator('#dc-lineup-preview');
+    await expect(preview).toBeVisible();
+
+    const mobileTable = preview.locator('.dc-lineup-preview-table--mobile');
+    const desktopTable = preview.locator('.dc-lineup-preview-table--desktop');
+    await expect(mobileTable).toBeVisible();
+    await expect(desktopTable).not.toBeVisible();
+
+    // Row labels (column 0 of each tbody row) should list the five positions
+    // in PG→C order.
+    const rowLabels = mobileTable.locator('tbody tr td.dc-lineup-preview__row-label');
+    await expect(rowLabels).toHaveCount(5);
+    await expect(rowLabels.nth(0)).toHaveText('PG');
+    await expect(rowLabels.nth(1)).toHaveText('SG');
+    await expect(rowLabels.nth(2)).toHaveText('SF');
+    await expect(rowLabels.nth(3)).toHaveText('PF');
+    await expect(rowLabels.nth(4)).toHaveText('C');
+
+    // Column headers should lead with the empty row-label corner, then the
+    // depth tiers left-to-right — "Starting" first so the user never has to
+    // scroll horizontally to see the starting lineup.
+    const headers = mobileTable.locator('thead th');
+    await expect(headers).toHaveCount(5);
+    await expect(headers.nth(1)).toHaveText('Starting');
+    await expect(headers.nth(2)).toHaveText('2nd');
+    await expect(headers.nth(3)).toHaveText('3rd');
+    await expect(headers.nth(4)).toHaveText('4th');
+  });
+
+  test('lineup preview mobile cells link to player pages', async ({ page }) => {
+    // Every populated cell in the mobile preview must wrap its content in
+    // an <a href="modules.php?name=Player&pa=showpage&pid=..."> so the GM
+    // can tap through to a player page from the projection.
+    const mobileTable = page.locator('.dc-lineup-preview-table--mobile');
+    await expect(mobileTable).toBeVisible();
+
+    const firstLink = mobileTable.locator('td.ibl-player-cell a[href]').first();
+    await expect(firstLink).toBeVisible();
+    const href = await firstLink.getAttribute('href');
+    expect(href).toMatch(/modules\.php\?name=Player.*pa=showpage.*pid=\d+/);
+  });
+
+  test('lineup preview mobile names use last-name-only by default', async ({
+    page,
+  }) => {
+    // Mobile uses last-name-only to save horizontal space. Seed data for the
+    // logged-in team has no same-last-name collisions in its projection,
+    // so every cell should render a single word (no "F. Last" abbreviation).
+    // Any cell with a ". " substring would indicate the disambiguation
+    // fallback fired — which is valid when two distinct players share a
+    // last name — so we assert the majority (≥60%) are bare last names as
+    // a regression guard against reverting to always-abbreviated format.
+    const mobileTable = page.locator('.dc-lineup-preview-table--mobile');
+    await expect(mobileTable).toBeVisible();
+
+    const cellLinks = mobileTable.locator('td.ibl-player-cell a[href]');
+    const count = await cellLinks.count();
+    expect(count).toBeGreaterThan(0);
+
+    let lastNameOnly = 0;
+    for (let i = 0; i < count; i++) {
+      // Strip the trailing minute annotation by reading only the first
+      // text node (the anchor's direct text) — renderMinutes() wraps the
+      // "Nm" suffix in a nested <span>, so the anchor's own textContent
+      // up to the <span> is just the display name.
+      const text = await cellLinks.nth(i).evaluate((el) => {
+        for (const node of Array.from(el.childNodes)) {
+          if (node.nodeType === Node.TEXT_NODE) {
+            const s = (node.textContent ?? '').trim();
+            if (s) return s;
+          }
+        }
+        return '';
+      });
+      if (text && !text.includes('. ')) lastNameOnly++;
+    }
+    // Require a clear majority to be bare last names so a regression to
+    // "F. Last" everywhere would trip this test.
+    expect(lastNameOnly / count).toBeGreaterThan(0.6);
   });
 });
 
@@ -234,12 +426,18 @@ test.describe('DCE mobile: resize sync', () => {
     await page.goto('modules.php?name=DepthChartEntry');
     await page.waitForLoadState('networkidle');
 
-    // Change a value on mobile card (BH = PG role slot)
-    const mobileSelect = page.locator('.dc-mobile-cards select[name^="BH"]').first();
+    // Change the first card's PG (BH) slot by tapping the stepper down
+    // arrow. The underlying <select> is display:none on mobile, so we
+    // can't call selectOption() on it — we drive the stepper UI instead.
+    const firstCard = page.locator('.dc-card').first();
+    const pgField = firstCard.locator('.dc-card__field').nth(0);
+    const mobileSelect = pgField.locator('select');
     await expect(mobileSelect).toBeEnabled();
+
     const originalValue = await mobileSelect.inputValue();
-    const newValue = originalValue === '0' ? '1' : '0';
-    await mobileSelect.selectOption(newValue);
+    await pgField.locator('.dc-card__stepper-arrow--down').click();
+    const newValue = await mobileSelect.inputValue();
+    expect(newValue).not.toBe(originalValue);
 
     // Switch to desktop
     await page.setViewportSize({ width: 1280, height: 900 });

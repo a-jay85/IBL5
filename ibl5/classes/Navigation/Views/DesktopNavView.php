@@ -39,6 +39,12 @@ class DesktopNavView
      */
     public function render(array $menus, ?array $myTeamMenu, array $accountMenu): string
     {
+        // When the My Team dropdown is present, fold Logout into its footer
+        // section (styled like the Season dropdown's league switcher) and
+        // suppress the standalone Account dropdown. Guests and logged-in
+        // users without a team still see the Account/Login dropdown.
+        $mergeAccountIntoMyTeam = $myTeamMenu !== null;
+
         ob_start();
         ?>
                     <!-- Desktop Navigation (right-aligned) -->
@@ -59,24 +65,33 @@ class DesktopNavView
                             <?php endif; ?>
 
                             <?php if ($myTeamMenu !== null): ?>
-                                <?= $this->renderDropdown('My Team', $myTeamMenu) ?>
+                                <?= $this->renderDropdown(
+                                    'My Team',
+                                    $myTeamMenu,
+                                    false,
+                                    false,
+                                    false,
+                                    $mergeAccountIntoMyTeam
+                                ) ?>
                             <?php endif; ?>
                         </div>
 
-                        <!-- Divider -->
-                        <div class="w-px h-6 bg-white/10 mx-2"></div>
+                        <?php if (!$mergeAccountIntoMyTeam): ?>
+                            <!-- Divider -->
+                            <div class="w-px h-6 bg-white/10 mx-2"></div>
 
-                        <!-- Account dropdown (right-aligned to stay within viewport) -->
-                        <?= $this->renderDropdown(
-                            $this->config->isLoggedIn ? ($this->config->username ?? 'Account') : 'Login',
-                            [
-                                'icon' => '<svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/></svg>',
-                                'links' => $accountMenu,
-                            ],
-                            !$this->config->isLoggedIn,
-                            false,
-                            true
-                        ) ?>
+                            <!-- Account dropdown (right-aligned to stay within viewport) -->
+                            <?= $this->renderDropdown(
+                                $this->config->isLoggedIn ? ($this->config->username ?? 'Account') : 'Login',
+                                [
+                                    'icon' => '<svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/></svg>',
+                                    'links' => $accountMenu,
+                                ],
+                                !$this->config->isLoggedIn,
+                                false,
+                                true
+                            ) ?>
+                        <?php endif; ?>
 
                         <!-- Mobile view toggle (visible only in forced desktop mode) -->
                         <button id="mobile-view-toggle" class="hidden w-10 h-10 flex items-center justify-center text-white hover:bg-white/10 rounded-lg transition-colors ml-1" aria-label="Switch to mobile view" title="Switch to mobile view">
@@ -127,7 +142,7 @@ class DesktopNavView
      *
      * @param NavMenuData $data
      */
-    private function renderDropdown(string $title, array $data, bool $includeLoginForm = false, bool $includeLeagueSwitcher = false, bool $alignRight = false): string
+    private function renderDropdown(string $title, array $data, bool $includeLoginForm = false, bool $includeLeagueSwitcher = false, bool $alignRight = false, bool $includeLogoutFooter = false): string
     {
         $links = $data['links'];
         $icon = $data['icon'] ?? '';
@@ -160,6 +175,10 @@ class DesktopNavView
 
                     <?php if ($includeLeagueSwitcher): ?>
                         <?= $this->renderLeagueSwitcher() ?>
+                    <?php endif; ?>
+
+                    <?php if ($includeLogoutFooter): ?>
+                        <?= $this->renderLogoutFooter() ?>
                     <?php endif; ?>
                 </div>
             </div>
@@ -221,6 +240,25 @@ class DesktopNavView
                 </select>
                 <svg class="absolute right-2 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
             </div>
+        </div>
+        <?php
+        return (string) ob_get_clean();
+    }
+
+    /**
+     * Render the "Signed in as ... / Logout" footer for the My Team dropdown.
+     * Mirrors the structure of renderLeagueSwitcher() so both footers share
+     * the same visual weight at the bottom of a dropdown panel.
+     */
+    private function renderLogoutFooter(): string
+    {
+        $username = $this->config->username ?? '';
+
+        ob_start();
+        ?>
+        <div class="px-4 py-3 border-t border-white/10 bg-black/20">
+            <div class="block text-base font-semibold tracking-widest uppercase text-gray-500 mb-2">Signed in as <?= HtmlSanitizer::e($username) ?></div>
+            <a href="modules.php?name=YourAccount&amp;op=logout" class="block w-full text-center bg-white/10 text-white text-sm font-medium border border-white/20 rounded-lg px-3 py-2 cursor-pointer hover:bg-white/15 hover:border-white/30 transition-all">Logout</a>
         </div>
         <?php
         return (string) ob_get_clean();

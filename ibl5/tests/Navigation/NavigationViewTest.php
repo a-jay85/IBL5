@@ -121,4 +121,54 @@ class NavigationViewTest extends TestCase
         $this->assertStringContainsString('nav-bar-bg', $html);
         $this->assertStringContainsString('nav-grain', $html);
     }
+
+    // --- Hamburger Team Logo Tests ---
+
+    public function testHamburgerShowsTeamLogoForLoggedInUserWithTeam(): void
+    {
+        $html = $this->renderNav('Regular Season', 'Off', loggedIn: true);
+
+        // Team logo replaces the 3-bar hamburger for logged-in users with a team
+        $this->assertStringContainsString('id="nav-hamburger-logo"', $html);
+        $this->assertStringContainsString('/ibl5/images/logo/new1.png', $html);
+        // Close (X) icon is layered on top and cross-fades in when menu opens
+        $this->assertStringContainsString('id="nav-hamburger-close"', $html);
+        // The original 3-span hamburger should NOT be rendered in this mode
+        $this->assertStringNotContainsString('id="hamburger-top"', $html);
+    }
+
+    public function testHamburgerShowsSpansForLoggedOutUser(): void
+    {
+        $html = $this->renderNav('Regular Season', 'Off', loggedIn: false);
+
+        // Guests keep the 3-span hamburger
+        $this->assertStringContainsString('id="hamburger-top"', $html);
+        $this->assertStringContainsString('id="hamburger-middle"', $html);
+        $this->assertStringContainsString('id="hamburger-bottom"', $html);
+        // No team logo
+        $this->assertStringNotContainsString('id="nav-hamburger-logo"', $html);
+    }
+
+    // --- Account Merge Tests ---
+
+    public function testLogoutFooterPresentForLoggedInUserWithTeam(): void
+    {
+        $html = $this->renderNav('Regular Season', 'Off', loggedIn: true);
+
+        // Logout is folded into the My Team dropdown footer as "Signed in as {user}"
+        $this->assertStringContainsString('Signed in as', $html);
+        $this->assertStringContainsString('TestUser', $html);
+        $this->assertStringContainsString('modules.php?name=YourAccount&amp;op=logout', $html);
+    }
+
+    public function testLoginDropdownPresentForLoggedOutUser(): void
+    {
+        $html = $this->renderNav('Regular Season', 'Off', loggedIn: false);
+
+        // Guests still see the standalone Login dropdown with Sign Up / Forgot Password
+        $this->assertStringContainsString('Sign Up', $html);
+        $this->assertStringContainsString('Forgot Password', $html);
+        // And no logout footer
+        $this->assertStringNotContainsString('Signed in as', $html);
+    }
 }

@@ -6,7 +6,6 @@
   "scripts": {
     "css:watch": "bunx @tailwindcss/cli -i design/input.css -o themes/IBL/style/style.css --watch",
     "css:build": "bunx @tailwindcss/cli -i design/input.css -o themes/IBL/style/style.css --minify",
-    "sync": "cd .. && bin/bs-start",
     "test:api": "bunx vitest run --config vitest.api.config.ts",
     "test:e2e": "bunx playwright test",
     "test:e2e:serial": "bunx playwright test --workers=1 --retries=2",

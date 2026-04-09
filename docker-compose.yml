@@ -123,6 +123,21 @@ services:
       - default
       - ibl5-proxy
 
+  browsersync:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.browsersync
+    container_name: ibl5-browsersync
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./ibl5:/watch:ro
+    depends_on:
+      - php
+    networks:
+      - default
+
 volumes:
   ibl5-mariadb-data:
 

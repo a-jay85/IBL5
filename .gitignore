@@ -71,6 +71,8 @@ ibl5/spreadsheets/
 # JSB sim files — source of truth is ibl5/backups/{season}/*.zip
 # (extracted at runtime by ExtractFromBackupStep)
 ibl5/*.lge
+# Exception: IBL5.lge is used as a fixture by LgeFileParser/LeagueConfig tests
+!ibl5/IBL5.lge
 ibl5/*.plr
 ibl5/*.sco
 ibl5/*.car

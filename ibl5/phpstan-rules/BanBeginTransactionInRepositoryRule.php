@@ -26,7 +26,7 @@ final class BanBeginTransactionInRepositoryRule implements Rule
 
     /**
      * @param MethodCall $node
-     * @return list<\PHPStan\Rules\RuleError>
+     * @return list<\PHPStan\Rules\IdentifierRuleError>
      */
     public function processNode(Node $node, Scope $scope): array
     {
@@ -48,8 +48,18 @@ final class BanBeginTransactionInRepositoryRule implements Rule
             return [];
         }
 
-        // Only flag in BaseMysqliRepository subclasses
-        if (!$classReflection->isSubclassOf('BaseMysqliRepository')) {
+        // Only flag in BaseMysqliRepository subclasses. Walk the parent chain
+        // manually rather than calling the deprecated isSubclassOf(string) API.
+        $parent = $classReflection->getParentClass();
+        $isSubclass = false;
+        while ($parent !== null) {
+            if ($parent->getName() === 'BaseMysqliRepository') {
+                $isSubclass = true;
+                break;
+            }
+            $parent = $parent->getParentClass();
+        }
+        if (!$isSubclass) {
             return [];
         }
 

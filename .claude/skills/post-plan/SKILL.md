@@ -94,7 +94,7 @@ Each Bash tool call runs in a fresh shell, so the classification flags are **not
 
 **Skip if** `$NON_CODE_ONLY` or `$MIGRATION_ONLY` (nothing reviewable).
 
-Review changed files (`git diff --name-only HEAD~1` or vs base branch) for reuse opportunities, CLAUDE.md mandatory-rule violations, and over-engineering. Fix issues directly before proceeding.
+Review changed files (`git diff --name-only HEAD~1` or vs base branch) for reuse opportunities and over-engineering. Mandatory CLAUDE.md rules are enforced by PHPStan custom rules (see `.claude/commands/_review-rubric.md` for the full list) — assume they hold and focus on judgment-level issues like duplication, awkward abstractions, and dead code.
 
 ---
 
@@ -109,7 +109,7 @@ Review changed files (`git diff --name-only HEAD~1` or vs base branch) for reuse
 
 ## Phase 5: Code Review + Security Audit
 
-All instructions are self-contained below. Do NOT read `code-review.md` or `security-audit.md`.
+Agent definitions and scoring rubric live in shared include files under `.claude/commands/` so this skill, `/code-review`, and `/security-audit` all share one source of truth. Read them as instructed below — do NOT inline the definitions or duplicate them.
 
 ### 5A: Fetch PR data (shared by both)
 
@@ -126,70 +126,39 @@ Read root `CLAUDE.md`. If `! $NON_CODE_ONLY`, also read directory-specific `CLAU
 
 ### 5B: Code Review — up to 5 parallel Sonnet agents
 
+**Read** `.claude/commands/_review-agents.md` — the canonical agent definitions (5 agents: CLAUDE.md judgment review, bug detection, git history, previous PRs, code comments).
+
 Pass each agent: PR metadata, file list, filtered `$DIFF`, CLAUDE.md content(s) from 5A. **No agent calls `gh pr diff`.**
 
 **Launch gates** (consult Phase 2 variables — skip the launch entirely, don't let the agent exit early):
 
-- Agent 1: skip if `$NON_CODE_ONLY`
-- Agent 2: skip if `$NON_CODE_ONLY` or `$MIGRATION_ONLY`
-- Agent 3: skip if `! $HAS_PHP`
-- Agent 4: skip if `$NON_CODE_ONLY` or `! $HAS_MODIFIED`
-- Agent 5: skip if `$NON_CODE_ONLY` or `! $HAS_COMMENTS_IN_DIFF`
-
-**Agent 1 (CLAUDE.md compliance):** Audit changes against CLAUDE.md rules. Return issues with the specific rule violated.
-
-**Agent 2 (Bug detection):** You are a **Staff Software Engineer** reviewing a PR for correctness. Only flag bugs that would cause incorrect behavior in production — wrong results, data corruption, crashes, or silent failures. Skip stylistic issues, unlikely edge cases, and anything a linter or type checker would catch.
-
-**Agent 3 (Git history):** Check `git log --oneline -10 <file>` for up to 5 PHP files with most lines changed. Stop early on first relevant concern. No `git blame`.
-
-**Agent 4 (Previous PRs):** Use `gh search prs` and `gh pr view` to find prior PRs touching the modified (not added) files. Check for comments that also apply here.
-
-**Agent 5 (Code comments):** Check if changes comply with code comments visible in diff context. Only Read full file if a comment appears truncated at a hunk edge.
+- Agent 1 (CLAUDE.md judgment review): skip if `$NON_CODE_ONLY`
+- Agent 2 (Bug detection): skip if `$NON_CODE_ONLY` or `$MIGRATION_ONLY`
+- Agent 3 (Git history): skip if `! $HAS_PHP`
+- Agent 4 (Previous PRs): skip if `$NON_CODE_ONLY` or `! $HAS_MODIFIED`
+- Agent 5 (Code comments): skip if `$NON_CODE_ONLY` or `! $HAS_COMMENTS_IN_DIFF`
 
 ### 5C: Security Audit — conditional Sonnet agents
 
-**Skip entire 5C if** `! $HAS_PHP`. CSS, markdown, migrations, and lockfile bumps cannot introduce SQLi/XSS/auth vulnerabilities.
+**Skip entire 5C if** `! $HAS_PHP`. CSS, markdown, migrations, and lockfile bumps cannot introduce SQLi/CSRF/auth vulnerabilities.
 
-Detect patterns on **added lines in `*.php` files only** (prevents markdown code blocks and deleted lines from triggering false positives):
-```bash
-PHP_ADDED=$(git diff origin/master...HEAD -- '*.php' | grep -E '^\+' | grep -v '^\+\+\+')
-echo "SQL:"          && echo "$PHP_ADDED" | grep -c -E 'sql_query|prepare|fetchOne|fetchAll|query\(' || true
-echo "Output:"       && echo "$PHP_ADDED" | grep -c -E 'echo |print |<\?=' || true
-echo "Superglobals:" && echo "$PHP_ADDED" | grep -c -E '\$_GET|\$_POST|\$_REQUEST|\$_COOKIE' || true
-echo "Forms:"        && echo "$PHP_ADDED" | grep -c -E 'POST|PUT|DELETE|<form|action=' || true
-```
+**Read** `.claude/commands/_security-agents.md` — the canonical security agent definitions and pattern-detection bash block.
 
-Launch only agents whose category count > 0. Agent 5 (Auth/Authz) launches unconditionally once this section runs (gated by `$HAS_PHP` at the top). Pass each agent the PHP-only subset of `$DIFF`. Each security agent receives this shared preamble:
+Run the pattern-detection block from that file to get SQL and Forms category counts, then launch only the relevant agents (SQL Injection if SQL > 0; CSRF Protection if Forms > 0; Auth/Authz unconditionally). Pass each agent the PHP-only subset of `$DIFF`.
 
-> You are a **Senior Application Security Engineer** auditing a PHP codebase. Focus on exploitable vulnerabilities, not theoretical risks. Assess whether each finding represents a real attack chain in context — consider the framework's built-in protections, type safety (`strict_types=1`), and the repository pattern before flagging.
-
-**Agent 1 (SQL Injection, if SQL > 0):** Flag `sql_query()` with string interpolation, dynamic ORDER BY/LIMIT from user input. Safe: `BaseMysqliRepository` methods, `prepare()+bind_param()`, hardcoded SQL, `(int)` casts.
-
-**Agent 2 (XSS, if Output > 0):** Flag `echo $var` without `HtmlSanitizer::safeHtmlOutput()`. Safe: `json_encode()`, `(int)` casts, CLI scripts, hardcoded strings, HtmlSanitizer on different line.
-
-**Agent 3 (Input Validation, if Superglobals > 0):** Flag direct superglobal use without `filter_input()` or whitelist validation. Safe: typed params in `strict_types=1`.
-
-**Agent 4 (CSRF, if Forms > 0):** Flag POST/PUT/DELETE handlers without `CsrfGuard::validateSubmittedToken()`. Safe: GET-only endpoints, `ApiKeyAuthenticator` handlers.
-
-**Agent 5 (Auth/Authz):** Flag state-changing endpoints without `is_user()`/`is_admin()`/`ApiKeyAuthenticator`. Safe: read-only public pages, already-guarded endpoints. (Launches whenever 5C runs — the `$HAS_PHP` gate at the top of 5C already ensures there's PHP to audit.)
+**XSS and Input Validation are NOT audited here** — they're deterministically enforced by `RequireEscapedOutputRule` and `BanRawSuperglobalsRule` (run in PostToolUse and CI).
 
 ### 5D: Score, filter, and post
+
+**Read** `.claude/commands/_review-rubric.md` — the canonical rubric, thresholds (`< 80` for code review, `< 75` for security), Automatic-Zero rule list, and IBL5 false-positive list.
 
 Combine ALL issues from 5B and 5C into one numbered list.
 
 **Skip the scoring agent if the combined list is empty** — jump straight to posting "No issues found." comments in the two `gh pr comment` steps below.
 
-Otherwise launch a **single Haiku agent** to score each 0-100:
+Otherwise launch a **single Haiku agent**, pass it the issues list plus the full contents of `_review-rubric.md`, and instruct it to return JSON scores per that rubric. Parse the response and assign scores back to each issue.
 
-> **Rubric:** 0=false positive, 25=suspicious but mitigated, 50=real but minor, 75=verified and important, 100=certain and frequent.
->
-> **IBL5 false positives (score 0-25):** BaseMysqliRepository variables (already parameterized), test files, typed ints in strict_types, CLI echo, hardcoded sql_query strings, HtmlSanitizer on different line, ApiKeyAuthenticator endpoints (CSRF exempt), GET-only handlers, pre-existing issues, issues a linter/typechecker/CI would catch, changes in functionality that are likely intentional.
->
-> For CLAUDE.md issues: verify the rule is actually stated in CLAUDE.md.
->
-> Return ONLY valid JSON: `[{"n": 1, "score": 75}, ...]`
-
-**Filter:** Code review issues < 80 are dropped. Security findings < 75 are dropped.
+**Filter** per the thresholds in `_review-rubric.md`.
 
 **Re-check PR state:** `gh pr view --json state --jq '.state'` — skip posting if not `OPEN`.
 
@@ -197,7 +166,7 @@ Otherwise launch a **single Haiku agent** to score each 0-100:
 
 Code review format: `### Code review\n\nFound N issues:\n\n1. <description> (CLAUDE.md says "<rule>")\n\n<link>` — or `No issues found. Checked for bugs and CLAUDE.md compliance.`
 
-Security audit format: `### Security audit\n\nFound N issue(s):\n\n**[SEVERITY]** Type in \`Class::method()\` — description\n\n<link>` — or `No security issues found.` Severity: CRITICAL (SQLi/CMDi), HIGH (XSS/missing auth/open redirect), MEDIUM (CSRF/input validation), LOW (best practice).
+Security audit format: `### Security audit\n\nFound N issue(s):\n\n**[SEVERITY]** Type in \`Class::method()\` — description\n\n<link>` — or `No security issues found. Scanned for SQL injection, CSRF, and auth/authz vulnerabilities. (XSS and input validation are enforced by PHPStan custom rules.)` Severity: CRITICAL (SQLi/CMDi), HIGH (missing auth/open redirect), MEDIUM (CSRF/missing auth on non-critical endpoints), LOW (best practice).
 
 **Link format:** `https://github.com/a-jay85/IBL5/blob/{FULL_SHA}/path/to/file#L{start}-L{end}` — expand SHA beforehand, never use bash interpolation in the comment. Include 1 line of context before/after.
 
@@ -308,7 +277,9 @@ If not: report which condition(s) blocked. User merges manually.
 
 ## Phase 10: Retrospective
 
-Save to memory only if something was learned that would **prevent a bug** in a future session and isn't already in MEMORY.md, CLAUDE.md, or `.claude/rules/`. Read the target memory file first to avoid duplicates. If nothing qualifies, skip silently.
+Before saving any memory, ask: **"Can this be a PHPStan rule instead?"** If the mistake is mechanical and deterministic, it belongs in `ibl5/phpstan-rules/` as a new custom rule — open a TODO comment in the plan file rather than a memory entry. Memories are for things a linter cannot express (architectural judgment, environment quirks, incident context).
+
+Save to memory only if something was learned that would **prevent a bug** in a future session AND cannot be mechanized AND isn't already in MEMORY.md, CLAUDE.md, `.claude/rules/`, or an existing PHPStan rule. Read the target memory file first to avoid duplicates. If nothing qualifies, skip silently.
 
 ---
 

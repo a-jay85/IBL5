@@ -48,7 +48,7 @@ class DesktopNavView
         ob_start();
         ?>
                     <!-- Desktop Navigation (right-aligned) -->
-                    <div class="hidden lg:flex items-center ml-auto">
+                    <div class="hidden lg:flex items-center ml-auto self-stretch">
                         <?php foreach ($menus as $title => $menu): ?>
                             <?= $this->renderDropdown(
                                 $title,
@@ -59,7 +59,7 @@ class DesktopNavView
                         <?php endforeach; ?>
 
                         <!-- Teams + My Team wrapper (positioning context for Teams mega-menu) -->
-                        <div class="relative flex items-center">
+                        <div class="relative flex items-center self-stretch">
                             <?php if ($this->config->teamsData !== null): ?>
                                 <?= $this->teamsDropdownView->renderDesktop($this->config->teamsData) ?>
                             <?php endif; ?>
@@ -70,9 +70,8 @@ class DesktopNavView
                                     $myTeamMenu,
                                     false,
                                     false,
-                                    false,
-                                    $mergeAccountIntoMyTeam,
-                                    true
+                                    true,
+                                    $mergeAccountIntoMyTeam
                                 ) ?>
                             <?php endif; ?>
                         </div>
@@ -143,19 +142,17 @@ class DesktopNavView
      *
      * @param NavMenuData $data
      */
-    private function renderDropdown(string $title, array $data, bool $includeLoginForm = false, bool $includeLeagueSwitcher = false, bool $alignRight = false, bool $includeLogoutFooter = false, bool $viewportRightAlign = false): string
+    private function renderDropdown(string $title, array $data, bool $includeLoginForm = false, bool $includeLeagueSwitcher = false, bool $alignRight = false, bool $includeLogoutFooter = false): string
     {
         $links = $data['links'];
         $icon = $data['icon'] ?? '';
 
         $minWidth = $includeLoginForm ? 'min-w-[280px]' : 'min-w-[220px]';
-        $dropdownPosition = $viewportRightAlign
-            ? 'fixed right-0 top-[72px]'
-            : ('absolute ' . ($alignRight ? 'right-0' : 'left-0') . ' top-full pt-1');
+        $dropdownPosition = 'absolute ' . ($alignRight ? 'right-0' : 'left-0') . ' top-full -translate-y-1';
 
         ob_start();
         ?>
-        <div class="relative group"<?= $includeLoginForm ? ' data-nav-login' : '' ?>>
+        <div class="relative group self-stretch flex items-center"<?= $includeLoginForm ? ' data-nav-login' : '' ?>>
             <button class="flex items-center gap-2 px-3 py-2.5 text-lg font-semibold font-display text-gray-300 hover:text-white transition-colors duration-200">
                 <?php if ($icon !== ''): ?>
                     <span class="text-accent-500 group-hover:text-accent-400 transition-colors"><?= $icon ?></span>
@@ -165,7 +162,7 @@ class DesktopNavView
             </button>
 
             <div class="<?= $dropdownPosition ?> opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50">
-                <div class="<?= $minWidth ?> bg-navy-800/95 backdrop-blur-xl rounded-lg shadow-2xl shadow-black/30 border border-white/10 overflow-hidden">
+                <div class="<?= $minWidth ?> bg-navy-800/95 backdrop-blur-xl rounded-b-lg shadow-2xl shadow-black/30 border border-white/10 overflow-hidden">
                     <?php if ($includeLoginForm): ?>
                         <?= $this->loginFormView->render('desktop', $this->config->requestUri) ?>
                     <?php endif; ?>

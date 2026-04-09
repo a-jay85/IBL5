@@ -49,16 +49,20 @@ class NavigationView
         ob_start();
         ?>
         <!-- Navigation Bar -->
-        <nav class="fixed top-0 left-0 right-0 z-50 nav-grain">
+        <nav class="fixed top-0 left-0 right-0 z-50 nav-grain h-[72px]">
             <!-- Background - solid opaque navy matching menus -->
             <div class="absolute inset-0 nav-bar-bg"></div>
-            <!-- Bottom accent line -->
-            <div class="absolute bottom-0 left-0 right-0 h-[1px] bg-gradient-to-r from-transparent via-accent-500/50 to-transparent"></div>
+            <!-- Bottom cover: opaque strip at nav's bottom edge, stacked ABOVE
+                 dropdown panels (which use z-50) so the dropdowns' top edges
+                 appear tucked behind the nav bar instead of rendering on top. -->
+            <div class="absolute left-0 right-0 bottom-0 h-2 nav-bar-bg z-[60] pointer-events-none"></div>
+            <!-- Bottom accent line (above cover) -->
+            <div class="absolute bottom-0 left-0 right-0 h-[1px] z-[61] bg-gradient-to-r from-transparent via-accent-500/50 to-transparent"></div>
 
             <?= $this->desktopNavView->renderDevSwitch() ?>
 
-            <div class="relative max-w-7xl mx-auto px-4 sm:px-6">
-                <div class="flex items-center justify-between">
+            <div class="relative max-w-7xl mx-auto px-4 sm:px-6 h-full">
+                <div class="flex items-center justify-between h-full">
                     <!-- Logo -->
                     <a href="index.php" class="flex items-center gap-3 py-2 group">
                         <div class="relative">

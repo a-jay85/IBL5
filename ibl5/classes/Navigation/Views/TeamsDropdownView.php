@@ -31,8 +31,8 @@ class TeamsDropdownView
                 <svg class="w-3 h-3 opacity-50 group-hover:opacity-100 transition-all duration-200 group-hover:translate-y-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
             </button>
 
-            <div class="absolute -right-2 top-full pt-1 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50">
-                <div class="w-max bg-navy-800/95 backdrop-blur-xl rounded-lg shadow-2xl shadow-black/30 border border-white/10 overflow-hidden">
+            <div class="absolute -right-2 top-full -translate-y-1 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50">
+                <div class="w-max bg-navy-800/95 backdrop-blur-xl rounded-b-lg shadow-2xl shadow-black/30 border border-white/10 overflow-hidden">
                     <div class="grid grid-cols-2 gap-x-4 p-4">
                         <?php
                         $conferenceOrder = ['Western', 'Eastern'];

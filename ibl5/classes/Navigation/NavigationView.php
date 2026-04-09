@@ -57,7 +57,7 @@ class NavigationView
                  appear tucked behind the nav bar instead of rendering on top. -->
             <div class="absolute left-0 right-0 bottom-0 h-2 nav-bar-bg z-[60] pointer-events-none"></div>
             <!-- Bottom accent line (above cover) -->
-            <div class="absolute bottom-0 left-0 right-0 h-[1px] z-[61] bg-gradient-to-r from-transparent via-accent-500/50 to-transparent"></div>
+            <div class="absolute bottom-0 left-0 right-0 h-[1px] z-[61] bg-accent-500"></div>
 
             <?= $this->desktopNavView->renderDevSwitch() ?>
 

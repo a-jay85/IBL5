@@ -623,7 +623,8 @@ span.nav-dropdown-item a:hover {
     width: 28px;
     height: 28px;
     object-fit: contain;
-    transition: opacity 200ms ease;
+    /* Closed state: delay fading back IN until the X has fully faded out. */
+    transition: opacity 160ms ease 160ms;
 }
 
 .nav-hamburger-close-icon {
@@ -635,15 +636,20 @@ span.nav-dropdown-item a:hover {
     transform: translate(-50%, -50%);
     opacity: 0;
     pointer-events: none;
-    transition: opacity 200ms ease;
+    /* Closed state: no delay — X fades OUT first when closing. */
+    transition: opacity 160ms ease;
 }
 
 #nav-hamburger[aria-expanded="true"] .nav-team-logo-hamburger {
     opacity: 0;
+    /* Opening: logo fades OUT immediately, no delay. */
+    transition-delay: 0ms;
 }
 
 #nav-hamburger[aria-expanded="true"] .nav-hamburger-close-icon {
     opacity: 1;
+    /* Opening: X fades IN only after the logo has fully faded out. */
+    transition-delay: 160ms;
 }
 
 /* Hide per-page team-logo banners on mobile — team logo is now in the

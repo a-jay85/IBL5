@@ -71,7 +71,8 @@ class DesktopNavView
                                     false,
                                     false,
                                     false,
-                                    $mergeAccountIntoMyTeam
+                                    $mergeAccountIntoMyTeam,
+                                    true
                                 ) ?>
                             <?php endif; ?>
                         </div>
@@ -142,13 +143,15 @@ class DesktopNavView
      *
      * @param NavMenuData $data
      */
-    private function renderDropdown(string $title, array $data, bool $includeLoginForm = false, bool $includeLeagueSwitcher = false, bool $alignRight = false, bool $includeLogoutFooter = false): string
+    private function renderDropdown(string $title, array $data, bool $includeLoginForm = false, bool $includeLeagueSwitcher = false, bool $alignRight = false, bool $includeLogoutFooter = false, bool $viewportRightAlign = false): string
     {
         $links = $data['links'];
         $icon = $data['icon'] ?? '';
 
         $minWidth = $includeLoginForm ? 'min-w-[280px]' : 'min-w-[220px]';
-        $alignment = $alignRight ? 'right-0' : 'left-0';
+        $dropdownPosition = $viewportRightAlign
+            ? 'fixed right-0 top-[72px]'
+            : ('absolute ' . ($alignRight ? 'right-0' : 'left-0') . ' top-full pt-1');
 
         ob_start();
         ?>
@@ -161,7 +164,7 @@ class DesktopNavView
                 <svg class="w-3 h-3 opacity-50 group-hover:opacity-100 transition-all duration-200 group-hover:translate-y-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
             </button>
 
-            <div class="absolute <?= $alignment ?> top-full pt-1 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50">
+            <div class="<?= $dropdownPosition ?> opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50">
                 <div class="<?= $minWidth ?> bg-navy-800/95 backdrop-blur-xl rounded-lg shadow-2xl shadow-black/30 border border-white/10 overflow-hidden">
                     <?php if ($includeLoginForm): ?>
                         <?= $this->loginFormView->render('desktop', $this->config->requestUri) ?>

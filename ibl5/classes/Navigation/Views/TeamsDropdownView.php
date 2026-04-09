@@ -32,8 +32,8 @@ class TeamsDropdownView
             </button>
 
             <div class="absolute -right-2 top-full pt-1 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50">
-                <div class="min-w-[580px] bg-navy-800/95 backdrop-blur-xl rounded-lg shadow-2xl shadow-black/30 border border-white/10 overflow-hidden">
-                    <div class="grid grid-cols-2 gap-x-8 p-4">
+                <div class="w-max bg-navy-800/95 backdrop-blur-xl rounded-lg shadow-2xl shadow-black/30 border border-white/10 overflow-hidden">
+                    <div class="grid grid-cols-2 gap-x-4 p-4">
                         <?php
                         $conferenceOrder = ['Western', 'Eastern'];
                         foreach ($conferenceOrder as $conference):

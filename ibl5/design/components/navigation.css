@@ -612,6 +612,49 @@ span.nav-dropdown-item a:hover {
 }
 
 /* ==========================================================================
+   Mobile Hamburger Team Logo (logged-in with team)
+   Replaces the 3-bar hamburger with the user's team logo. An X (close) icon
+   is layered on top and cross-fades in when the mobile menu is open. The
+   cross-fade is driven by the #nav-hamburger[aria-expanded] attribute which
+   navigation.js already toggles, so no extra JS is needed.
+   ========================================================================== */
+
+.nav-team-logo-hamburger {
+    width: 28px;
+    height: 28px;
+    object-fit: contain;
+    transition: opacity 200ms ease;
+}
+
+.nav-hamburger-close-icon {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 22px;
+    height: 22px;
+    transform: translate(-50%, -50%);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 200ms ease;
+}
+
+#nav-hamburger[aria-expanded="true"] .nav-team-logo-hamburger {
+    opacity: 0;
+}
+
+#nav-hamburger[aria-expanded="true"] .nav-hamburger-close-icon {
+    opacity: 1;
+}
+
+/* Hide per-page team-logo banners on mobile — team logo is now in the
+   hamburger so the on-page banner is redundant and wastes vertical space. */
+@media (max-width: 1023px) {
+    .team-banner-logo {
+        display: none;
+    }
+}
+
+/* ==========================================================================
    Grain Texture Overlay (Nav Background Effect)
    ========================================================================== */
 

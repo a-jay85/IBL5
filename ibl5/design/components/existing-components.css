@@ -19,6 +19,13 @@
     margin: 0 auto 1rem;
 }
 
+/* Hide on mobile — team logo is now in the nav hamburger button */
+@media (max-width: 1023px) {
+    .team-logo-banner {
+        display: none;
+    }
+}
+
 .underline {
     text-decoration: underline;
 }

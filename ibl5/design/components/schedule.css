@@ -385,14 +385,10 @@
     border-radius: var(--radius-md);
 }
 
-/* Mobile adjustments for team banner */
-@media (max-width: 640px) {
+/* Hide on mobile — team logo is now in the nav hamburger button */
+@media (max-width: 1023px) {
     .schedule-team-banner {
-        padding: 4px;
-        margin-bottom: var(--space-3);
-        border-radius: var(--radius-md);
-        margin-left: auto;
-        margin-right: auto;
+        display: none;
     }
 }
 

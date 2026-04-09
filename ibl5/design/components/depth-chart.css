@@ -18,6 +18,13 @@
     margin: 0 auto;
 }
 
+/* Hide on mobile — team logo is now in the nav hamburger button */
+@media (max-width: 1023px) {
+    .depth-chart-logo {
+        display: none;
+    }
+}
+
 /* Allow horizontal page scrolling on Depth Chart Entry so users can pan/zoom.
    Desktop only — on mobile, overflow on <html> creates a scroll container
    that captures position:fixed elements (nav scrolls with content). The

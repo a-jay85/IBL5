@@ -20,12 +20,14 @@ use Navigation\Views\TeamsDropdownView;
  */
 class NavigationView
 {
+    private NavigationConfig $config;
     private NavigationMenuBuilderInterface $menuBuilder;
     private DesktopNavView $desktopNavView;
     private MobileNavView $mobileNavView;
 
     public function __construct(NavigationConfig $config, ?NavigationMenuBuilderInterface $menuBuilder = null)
     {
+        $this->config = $config;
         $this->menuBuilder = $menuBuilder ?? new NavigationMenuBuilder($config);
 
         $loginFormView = new LoginFormView();
@@ -42,6 +44,7 @@ class NavigationView
         $menus = $this->menuBuilder->getMenuStructure();
         $myTeamMenu = $this->menuBuilder->getMyTeamMenu();
         $accountMenu = $this->menuBuilder->getAccountMenu();
+        $showTeamLogoHamburger = $this->config->isLoggedIn && $this->config->teamId !== null;
 
         ob_start();
         ?>
@@ -83,11 +86,18 @@ class NavigationView
                             <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 17.25v1.007a3 3 0 01-.879 2.122L7.5 21h9l-.621-.621A3 3 0 0115 18.257V17.25m6-12V15a2.25 2.25 0 01-2.25 2.25H5.25A2.25 2.25 0 013 15V5.25A2.25 2.25 0 015.25 3h13.5A2.25 2.25 0 0121 5.25z"/></svg>
                         </button>
                         <button id="nav-hamburger" class="relative w-10 h-10 flex items-center justify-center text-white hover:bg-white/10 rounded-lg transition-colors" aria-label="Toggle menu" aria-expanded="false">
-                            <div class="w-5 h-4 flex flex-col justify-between">
-                                <span class="block h-0.5 w-full bg-current rounded-full transition-transform origin-center" id="hamburger-top"></span>
-                                <span class="block h-0.5 w-full bg-current rounded-full transition-opacity" id="hamburger-middle"></span>
-                                <span class="block h-0.5 w-full bg-current rounded-full transition-transform origin-center" id="hamburger-bottom"></span>
-                            </div>
+                            <?php if ($showTeamLogoHamburger): ?>
+                                <img id="nav-hamburger-logo" src="/ibl5/images/logo/new<?= (int) $this->config->teamId ?>.png" alt="" class="nav-team-logo-hamburger">
+                                <svg id="nav-hamburger-close" class="nav-hamburger-close-icon" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true">
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/>
+                                </svg>
+                            <?php else: ?>
+                                <div class="w-5 h-4 flex flex-col justify-between">
+                                    <span class="block h-0.5 w-full bg-current rounded-full transition-transform origin-center" id="hamburger-top"></span>
+                                    <span class="block h-0.5 w-full bg-current rounded-full transition-opacity" id="hamburger-middle"></span>
+                                    <span class="block h-0.5 w-full bg-current rounded-full transition-transform origin-center" id="hamburger-bottom"></span>
+                                </div>
+                            <?php endif; ?>
                         </button>
                     </div>
                 </div>

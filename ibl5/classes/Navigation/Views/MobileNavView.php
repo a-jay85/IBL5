@@ -41,6 +41,11 @@ class MobileNavView
     {
         $index = 2;
 
+        // When the My Team accordion is present, fold Logout into its footer
+        // section and suppress the standalone Account accordion. Guests and
+        // logged-in users without a team still see the Account/Login section.
+        $mergeAccountIntoMyTeam = $myTeamMenu !== null;
+
         ob_start();
         ?>
         <!-- Mobile menu overlay -->
@@ -71,7 +76,14 @@ class MobileNavView
 
                 <!-- My Team section first for thumb reachability (if user has a team) -->
                 <?php if ($myTeamMenu !== null): ?>
-                    <?= $this->renderDropdown('My Team', $myTeamMenu, $index++) ?>
+                    <?= $this->renderDropdown(
+                        'My Team',
+                        $myTeamMenu,
+                        $index++,
+                        false,
+                        false,
+                        $mergeAccountIntoMyTeam
+                    ) ?>
                 <?php endif; ?>
 
                 <!-- Teams mega-menu -->
@@ -90,16 +102,18 @@ class MobileNavView
                     ) ?>
                 <?php endforeach; ?>
 
-                <!-- Account section -->
-                <?= $this->renderDropdown(
-                    $this->config->isLoggedIn ? 'Account' : 'Login',
-                    [
-                        'icon' => '<svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/></svg>',
-                        'links' => $accountMenu,
-                    ],
-                    $index++,
-                    !$this->config->isLoggedIn
-                ) ?>
+                <?php if (!$mergeAccountIntoMyTeam): ?>
+                    <!-- Account section -->
+                    <?= $this->renderDropdown(
+                        $this->config->isLoggedIn ? 'Account' : 'Login',
+                        [
+                            'icon' => '<svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/></svg>',
+                            'links' => $accountMenu,
+                        ],
+                        $index++,
+                        !$this->config->isLoggedIn
+                    ) ?>
+                <?php endif; ?>
             </div>
         </nav>
         <?php
@@ -111,7 +125,7 @@ class MobileNavView
      *
      * @param NavMenuData $data
      */
-    private function renderDropdown(string $title, array $data, int $index, bool $includeLoginForm = false, bool $includeLeagueSwitcher = false): string
+    private function renderDropdown(string $title, array $data, int $index, bool $includeLoginForm = false, bool $includeLeagueSwitcher = false, bool $includeLogoutFooter = false): string
     {
         $links = $data['links'];
         $icon = $data['icon'] ?? '';
@@ -162,6 +176,10 @@ class MobileNavView
                 <?php if ($includeLeagueSwitcher): ?>
                     <?= $this->renderLeagueSwitcher() ?>
                 <?php endif; ?>
+
+                <?php if ($includeLogoutFooter): ?>
+                    <?= $this->renderLogoutFooter() ?>
+                <?php endif; ?>
             </div>
         </div>
         <?php
@@ -187,6 +205,25 @@ class MobileNavView
                 </select>
                 <svg class="absolute right-2 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
             </div>
+        </div>
+        <?php
+        return (string) ob_get_clean();
+    }
+
+    /**
+     * Render the "{username} / Logout" footer for the mobile My Team
+     * accordion. Mirrors renderLeagueSwitcher() styling so both footers share
+     * the same visual weight at the bottom of an accordion panel.
+     */
+    private function renderLogoutFooter(): string
+    {
+        $username = $this->config->username ?? '';
+
+        ob_start();
+        ?>
+        <div class="px-5 py-3 border-t border-white/10 mt-1">
+            <div class="block text-base font-semibold tracking-widest uppercase text-gray-500 mb-2"><?= HtmlSanitizer::e($username) ?></div>
+            <a href="modules.php?name=YourAccount&amp;op=logout" hx-boost="false" class="block w-full text-center bg-white/10 text-white text-sm font-medium border border-white/20 rounded-xl px-3 py-2.5 cursor-pointer hover:bg-white/15 hover:border-white/30 transition-all">Logout</a>
         </div>
         <?php
         return (string) ob_get_clean();

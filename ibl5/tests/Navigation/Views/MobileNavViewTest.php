@@ -91,4 +91,64 @@ class MobileNavViewTest extends TestCase
 
         $this->assertStringNotContainsString('Welcome back', $html);
     }
+
+    // --- Account Merge Tests ---
+
+    /**
+     * @return array{links: list<array{label: string, url: string}>, icon: string}
+     */
+    private function sampleMyTeamMenu(): array
+    {
+        return [
+            'icon' => '<img src="/ibl5/images/logo/new1.png" alt="Team Logo">',
+            'links' => [
+                ['label' => 'Team Page', 'url' => 'modules.php?name=Team&op=team&teamID=1'],
+            ],
+        ];
+    }
+
+    public function testLogoutFooterAppearsInMyTeamAccordion(): void
+    {
+        $view = $this->createView(isLoggedIn: true, username: 'A-Jay');
+        $html = $view->render(
+            [],
+            $this->sampleMyTeamMenu(),
+            [['label' => 'Logout', 'url' => 'modules.php?name=YourAccount&op=logout', 'noBoost' => true]],
+        );
+
+        $this->assertStringContainsString('A-Jay', $html);
+        $this->assertStringContainsString('modules.php?name=YourAccount&amp;op=logout', $html);
+    }
+
+    public function testAccountAccordionSuppressedWhenMyTeamMenuPresent(): void
+    {
+        $view = $this->createView(isLoggedIn: true, username: 'A-Jay');
+        $html = $view->render(
+            [],
+            $this->sampleMyTeamMenu(),
+            [['label' => 'Logout', 'url' => 'modules.php?name=YourAccount&op=logout', 'noBoost' => true]],
+        );
+
+        // "Account" (as an accordion button label) should not appear —
+        // logout lives inside the My Team accordion footer.
+        $this->assertStringNotContainsString('>Account<', $html);
+    }
+
+    public function testAccountAccordionRenderedForGuest(): void
+    {
+        $view = $this->createView(isLoggedIn: false, username: null, teamId: null);
+        $html = $view->render(
+            [],
+            null,
+            [
+                ['label' => 'Sign Up', 'url' => 'modules.php?name=YourAccount&op=new_user'],
+                ['label' => 'Forgot Password', 'url' => 'modules.php?name=YourAccount&op=pass_lost'],
+            ],
+        );
+
+        $this->assertStringContainsString('Login', $html);
+        $this->assertStringContainsString('Sign Up', $html);
+        // Guests never see the logout footer
+        $this->assertStringNotContainsString('modules.php?name=YourAccount&amp;op=logout', $html);
+    }
 }

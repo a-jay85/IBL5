@@ -384,7 +384,7 @@ test.describe('Trade offer form: roster preview interactions', () => {
     );
     const count = Math.min(await checkboxes.count(), 3);
     for (let i = 0; i < count; i++) {
-      await checkboxes.nth(i).check({ force: true });
+      await checkboxes.nth(i).check();
     }
 
     // Wait for debounce (300ms) + fetch to complete

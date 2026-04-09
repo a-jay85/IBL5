@@ -16,6 +16,7 @@
     "test:e2e:isolated": "./bin/e2e-local.sh",
     "test:e2e:visual": "./bin/visual-regression.sh",
     "test:e2e:visual:update": "./bin/visual-regression.sh --update-snapshots",
+    "lint:e2e": "bunx eslint tests/e2e playwright.config.ts",
     "docker:up": "cd .. && docker compose up -d",
     "docker:down": "cd .. && docker compose down",
     "docker:logs": "cd .. && docker compose logs -f php",
@@ -35,7 +36,10 @@
     "@playwright/test": "^1.56.0",
     "@tailwindcss/cli": "^4.0.0",
     "browser-sync": "^3.0.4",
+    "eslint": "^10.2.0",
+    "eslint-plugin-playwright": "^2.10.1",
     "tailwindcss": "^4.0.0",
+    "typescript-eslint": "^8.58.1",
     "vitest": "^4.1.0"
   }
 }

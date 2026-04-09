@@ -1,0 +1,46 @@
+name: ESLint
+
+on:
+  pull_request:
+    branches: [master]
+    paths:
+      - 'ibl5/tests/e2e/**'
+      - 'ibl5/playwright.config.ts'
+      - 'ibl5/eslint.config.js'
+      - 'ibl5/package.json'
+      - 'ibl5/bun.lock'
+      - '.github/workflows/eslint.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  eslint:
+    name: ESLint (e2e specs)
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+
+      - name: Cache node_modules
+        uses: actions/cache@v5
+        with:
+          path: ibl5/node_modules
+          key: ${{ runner.os }}-bun-${{ hashFiles('ibl5/bun.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-bun-
+
+      - name: Install JS dependencies
+        working-directory: ibl5
+        run: bun install
+
+      - name: Run ESLint
+        working-directory: ibl5
+        run: bun run lint:e2e

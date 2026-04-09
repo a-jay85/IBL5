@@ -358,10 +358,8 @@ test.describe('DCE mobile: saved depth chart loading', () => {
     const optCount = await options.count();
     expect(optCount, 'Saved DC dropdown should have at least 2 options').toBeGreaterThanOrEqual(2);
 
-    // Record current value of first mobile BH (PG role slot) select
-    const mobileSelect = page.locator('.dc-mobile-cards select[name^="BH"]').first();
-    await expect(mobileSelect).toBeEnabled();
-    const originalValue = await mobileSelect.inputValue();
+    // Ensure mobile cards are ready before loading a saved config
+    await expect(page.locator('.dc-mobile-cards select[name^="BH"]').first()).toBeEnabled();
 
     // Select the second option (first saved config)
     await dropdown.selectOption({ index: 1 });
@@ -376,18 +374,7 @@ test.describe('DCE mobile: saved depth chart loading', () => {
     }
 
     // Mobile card selects should reflect the loaded config
-    // Verify at least one select value differs from original (saved configs differ from live)
-    const mobileSelects = page.locator('.dc-mobile-cards select[name^="BH"]');
-    const selectCount = await mobileSelects.count();
-    let anyChanged = false;
-    for (let i = 0; i < selectCount; i++) {
-      const val = await mobileSelects.nth(i).inputValue();
-      if (i === 0 && val !== originalValue) {
-        anyChanged = true;
-        break;
-      }
-    }
-    // Even if values happen to match, the AJAX succeeded — verify no PHP errors
+    // The AJAX success is verified by assertNoPhpErrors — values may match live
     await assertNoPhpErrors(page, 'after loading saved DC on mobile');
   });
 });

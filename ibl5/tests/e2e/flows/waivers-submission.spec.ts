@@ -98,9 +98,6 @@ test.describe('Waivers: waive player', () => {
     await appState({ 'Allow Waiver Moves': 'Yes' });
     await page.goto('modules.php?name=Waivers');
 
-    // Look for the waive section — may be a separate form or same form with different Action
-    const body = await page.locator('body').textContent();
-
     // The page should have some form for waiving
     // Verify roster info is visible
     await expect(page.locator('.ibl-card').first()).toBeVisible();

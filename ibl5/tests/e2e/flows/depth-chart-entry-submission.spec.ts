@@ -132,9 +132,8 @@ test.describe('Depth Chart submission', () => {
     const optCount = await options.count();
     expect(optCount, 'Saved DC dropdown should have at least 2 options').toBeGreaterThanOrEqual(2);
 
-    // Record current value of first BH (PG role slot) select
-    const bhSelect = page.locator('select[name^="BH"]').first();
-    const originalValue = await bhSelect.inputValue();
+    // Ensure first BH select is ready before loading a saved config
+    await expect(page.locator('select[name^="BH"]').first()).toBeEnabled();
 
     // Select the second option (first saved config)
     await dropdown.selectOption({ index: 1 });

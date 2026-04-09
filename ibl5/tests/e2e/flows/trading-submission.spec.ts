@@ -291,7 +291,7 @@ async function collectAllOfferIds(page: Page): Promise<Set<number>> {
 // ---------------------------------------------------------------------------
 
 test.describe('Trade submission: players-only (UI)', () => {
-  let createdOfferIds: number[] = [];
+  const createdOfferIds: number[] = [];
 
   test('submit a player-for-player trade via the form', async ({
     appState,

@@ -8,6 +8,8 @@ Each agent receives: filtered PR diff, file list, PR metadata, and root CLAUDE.m
 
 **Assume PHPStan `level: max` + `phpstan-strict-rules` + the custom rules listed in `_review-rubric.md` are satisfied.** Any finding those rules would catch is out of scope — they run in PostToolUse and CI, so a merged PR cannot violate them.
 
+**Playwright `.spec.ts` files are lint-enforced by `bun run lint:e2e` (CI job `ESLint (e2e specs)`).** Reviewers should not duplicate `playwright/*` or `@typescript-eslint/*` rule checks — the preset already covers missing `await`, `{ force: true }`, `waitForTimeout`, `networkidle`, web-first assertions, etc.
+
 ---
 
 ## Agent 1: CLAUDE.md judgment review

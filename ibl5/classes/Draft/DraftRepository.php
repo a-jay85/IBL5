@@ -168,7 +168,7 @@ class DraftRepository extends \BaseMysqliRepository implements DraftRepositoryIn
         );
         
         if ($row !== null) {
-            return $row['drafted'] === '1' || $row['drafted'] === 1;
+            return $row['drafted'] === 1;
         }
 
         return false;

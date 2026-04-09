@@ -97,17 +97,7 @@ class DraftRepositoryTest extends TestCase
 
     public function testIsPlayerAlreadyDraftedReturnsTrueWhenDrafted()
     {
-        $this->mockDb->setMockData([
-            ['drafted' => '1']
-        ]);
-
-        $result = $this->repository->isPlayerAlreadyDrafted('John Doe');
-
-        $this->assertTrue($result);
-    }
-
-    public function testIsPlayerAlreadyDraftedReturnsTrueWhenDraftedInteger()
-    {
+        // ibl_draft_class.drafted is INT(11); native types return PHP int.
         $this->mockDb->setMockData([
             ['drafted' => 1]
         ]);

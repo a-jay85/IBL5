@@ -1,10 +1,15 @@
 <?php
 /**
  * PHPUnit Bootstrap for IBL5 Tests
- * 
+ *
  * This bootstrap file sets up the testing environment for all IBL5 tests
  * without requiring the full IBL5 application context.
  */
+
+// PHPStan RuleTestCase boots the full PHPStan container per analyse() call.
+// Its reflection/signature map needs ~256MB+ headroom — raise the limit so
+// the PHPStanRules test suite can run alongside the rest of the suite.
+ini_set('memory_limit', '1G');
 
 // Define that we're running in PHPUnit - prevents Discord HTTP calls, etc.
 if (!defined('PHPUNIT_RUNNING')) {
@@ -21,17 +26,28 @@ require_once __DIR__ . '/../vendor/autoload.php';
 
 // In git worktrees, vendor/ is symlinked to the main repo. Composer resolves $baseDir
 // through the symlink, so it loads classes from the main repo instead of the worktree.
-// Prepend the worktree's classes/ and tests/ directories so modified files are used.
+// Prepend the worktree's classes/, tests/, and phpstan-rules/ directories so modified
+// files are used.
 if (is_link(__DIR__ . '/../vendor')) {
     $worktreeClasses = realpath(__DIR__ . '/../classes');
     $worktreeTests = realpath(__DIR__ . '/../tests');
-    if ($worktreeClasses !== false || $worktreeTests !== false) {
+    $worktreePhpstanRules = realpath(__DIR__ . '/../phpstan-rules');
+    if ($worktreeClasses !== false || $worktreeTests !== false || $worktreePhpstanRules !== false) {
         // Register a prepend autoloader that checks the worktree's directories first
-        spl_autoload_register(static function (string $class) use ($worktreeClasses, $worktreeTests): void {
+        spl_autoload_register(static function (string $class) use ($worktreeClasses, $worktreeTests, $worktreePhpstanRules): void {
             // Check Tests\ namespace in worktree tests/ dir
             if ($worktreeTests !== false && str_starts_with($class, 'Tests\\')) {
                 $relative = substr($class, 6); // Strip 'Tests\' prefix
                 $file = $worktreeTests . '/' . str_replace('\\', '/', $relative) . '.php';
+                if (file_exists($file)) {
+                    require $file;
+                    return;
+                }
+            }
+            // Check PHPStanRules\ namespace in worktree phpstan-rules/ dir
+            if ($worktreePhpstanRules !== false && str_starts_with($class, 'PHPStanRules\\')) {
+                $relative = substr($class, 13); // Strip 'PHPStanRules\' prefix
+                $file = $worktreePhpstanRules . '/' . str_replace('\\', '/', $relative) . '.php';
                 if (file_exists($file)) {
                     require $file;
                     return;

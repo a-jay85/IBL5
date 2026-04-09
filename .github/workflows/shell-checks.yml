@@ -1,0 +1,107 @@
+name: Shell Checks
+
+on:
+  push:
+    branches: [ master, develop ]
+    paths:
+      - 'bin/**'
+      - 'ibl5/bin/**'
+      - '.github/workflows/shell-checks.yml'
+  pull_request:
+    branches: [ master, develop ]
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - 'bin/**'
+      - 'ibl5/bin/**'
+      - '.github/workflows/shell-checks.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  shellcheck:
+    name: ShellCheck (bash 3.2 compat)
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Install shellcheck
+        run: sudo apt-get update && sudo apt-get install -y shellcheck
+
+      - name: Run shellcheck on bin/**
+        run: |
+          set -e
+          # Find shell scripts: files with .sh extension OR bash/sh shebang
+          mapfile -t scripts < <(
+            {
+              find bin ibl5/bin -type f -name '*.sh' 2>/dev/null || true
+              find bin ibl5/bin -type f -not -name '*.sh' 2>/dev/null \
+                | while read -r f; do
+                    head -c 40 "$f" 2>/dev/null | grep -qE '^#!(/usr)?/bin/(ba)?sh' && echo "$f"
+                  done
+            } | sort -u
+          )
+
+          if [ ${#scripts[@]} -eq 0 ]; then
+            echo "No shell scripts found — nothing to check."
+            exit 0
+          fi
+
+          echo "Checking ${#scripts[@]} shell scripts with --severity=warning..."
+          printf '  %s\n' "${scripts[@]}"
+          echo ""
+
+          # --severity=warning catches SC3044 (declare -A unsupported in bash 3.2)
+          # and other portability issues. -s bash targets bash specifically; scripts
+          # must work in bash 3.2 (macOS default shell).
+          #
+          # Excludes for pre-existing warnings, tracked as burn-down debt:
+          #   SC2034 — unused variables (3 occurrences in bin/codebase-audit,
+          #            bin/lib/wt-guards.sh, bin/sim-files-update)
+          #   SC1090 — non-const source (bin/sim-files-update:23, dynamic env file)
+          #   SC2207 — array splitting suggestion (ibl5/bin/run-migrations-ci.sh:20,
+          #            CI-only script, suggestion uses bash 4 mapfile)
+          # Bash portability checks (SC3xxx) remain fully enforced.
+          shellcheck --severity=warning --shell=bash \
+            --exclude=SC2034,SC1090,SC2207 \
+            "${scripts[@]}"
+
+  host-mariadb-guard:
+    name: Host mariadb grep guard
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Grep for host mariadb invocations outside bin/db-query
+        run: |
+          set -e
+          # Worktrees run a separate dockerized MariaDB per worktree. Calling the host
+          # `mariadb` client with -h 127.0.0.1 bypasses worktree isolation and will read
+          # or mutate the wrong database. Only bin/db-query is allowed to do this because
+          # it hands off to docker exec internally.
+          offenders=$(
+            grep -rEn '^[[:space:]]*mariadb[[:space:]]+(-h[[:space:]]*127|-u[[:space:]]*root)' \
+              bin/ ibl5/bin/ 2>/dev/null \
+              | grep -v -E '(bin/db-query|\.md|shell-checks\.yml)' \
+              || true
+          )
+
+          if [ -n "$offenders" ]; then
+            echo "FAIL: direct host mariadb invocations found in shell scripts."
+            echo ""
+            echo "$offenders"
+            echo ""
+            echo "Worktrees have isolated dockerized MariaDB instances. Use bin/db-query"
+            echo "or 'docker exec <container> mariadb ...' instead of calling the host client."
+            exit 1
+          fi
+
+          echo "OK: no host mariadb invocations found outside bin/db-query."

@@ -26,7 +26,7 @@ final class BanNumberFormatRule implements Rule
 
     /**
      * @param FuncCall $node
-     * @return list<\PHPStan\Rules\RuleError>
+     * @return list<\PHPStan\Rules\IdentifierRuleError>
      */
     public function processNode(Node $node, Scope $scope): array
     {

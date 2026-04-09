@@ -6,6 +6,7 @@ parameters:
     level: max
     paths:
         - classes
+        - phpstan-rules
     excludePaths:
         - classes/SiteStatistics
         - classes/Bootstrap/LegacyFunctions.php
@@ -29,5 +30,33 @@ services:
             - phpstan.rules.rule
     -
         class: PHPStanRules\BanBeginTransactionInRepositoryRule
+        tags:
+            - phpstan.rules.rule
+    -
+        class: PHPStanRules\RequireEscapedOutputRule
+        tags:
+            - phpstan.rules.rule
+    -
+        class: PHPStanRules\BanRawSuperglobalsRule
+        tags:
+            - phpstan.rules.rule
+    -
+        class: PHPStanRules\BanInlineCssRule
+        tags:
+            - phpstan.rules.rule
+    -
+        class: PHPStanRules\BanDeprecatedHtmlTagsRule
+        tags:
+            - phpstan.rules.rule
+    -
+        class: PHPStanRules\BanRequireOnceRule
+        tags:
+            - phpstan.rules.rule
+    -
+        class: PHPStanRules\RequireMeaningfulAssertionsRule
+        tags:
+            - phpstan.rules.rule
+    -
+        class: PHPStanRules\PageLayoutHeaderBeforeCookieRule
         tags:
             - phpstan.rules.rule

@@ -93,13 +93,9 @@ Need a data table?
 
 ## Inline Style Policy
 
-### The ONLY allowed inline styles
-- **CSS custom properties** on containers: `style="--team-color-primary: #1a2e5a;"` (dynamic values from PHP)
-- **Row-level dynamic styles**: `style="--team-row-hover-bg: ..."` (computed per-team)
+Enforced by `BanInlineCssRule` (`ibl.inlineCss`). The rule allows `style="--..."` CSS custom properties (for dynamic per-element values like team colors) and bans everything else. If no suitable class exists, create one in `ibl5/design/components/` — do not work around the rule with a literal `style="color: ..."`.
 
-All other visual styling (layout, typography, colors, spacing) **must** use CSS classes defined in `design/components/`. If no suitable class exists, create one — do not use an inline `style` attribute.
-
-### Common card modifier classes (use these, don't reinvent via inline styles)
+### Common card modifier classes (use these instead of inline styles)
 | Class | Purpose |
 |-------|---------|
 | `.team-card__body--flush` | Zero padding |

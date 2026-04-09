@@ -116,7 +116,7 @@ class MobileNavViewTest extends TestCase
             [['label' => 'Logout', 'url' => 'modules.php?name=YourAccount&op=logout', 'noBoost' => true]],
         );
 
-        $this->assertStringContainsString('Signed in as', $html);
+        $this->assertStringContainsString('A-Jay', $html);
         $this->assertStringContainsString('modules.php?name=YourAccount&amp;op=logout', $html);
     }
 
@@ -148,6 +148,7 @@ class MobileNavViewTest extends TestCase
 
         $this->assertStringContainsString('Login', $html);
         $this->assertStringContainsString('Sign Up', $html);
-        $this->assertStringNotContainsString('Signed in as', $html);
+        // Guests never see the logout footer
+        $this->assertStringNotContainsString('modules.php?name=YourAccount&amp;op=logout', $html);
     }
 }

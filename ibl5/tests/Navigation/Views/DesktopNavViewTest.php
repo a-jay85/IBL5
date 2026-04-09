@@ -133,7 +133,6 @@ class DesktopNavViewTest extends TestCase
             [['label' => 'Logout', 'url' => 'modules.php?name=YourAccount&op=logout', 'noBoost' => true]],
         );
 
-        $this->assertStringContainsString('Signed in as', $html);
         $this->assertStringContainsString('A-Jay', $html);
         // Logout link inside the footer
         $this->assertStringContainsString('modules.php?name=YourAccount&amp;op=logout', $html);
@@ -149,7 +148,7 @@ class DesktopNavViewTest extends TestCase
         );
 
         // Username must not appear as a standalone dropdown button label; it
-        // should only appear inside the "Signed in as {user}" footer.
+        // should only appear inside the My Team dropdown logout footer.
         $this->assertSame(1, substr_count($html, 'A-Jay'));
         // No account-dropdown divider either
         $this->assertStringNotContainsString('w-px h-6 bg-white/10 mx-2', $html);
@@ -170,6 +169,7 @@ class DesktopNavViewTest extends TestCase
         $this->assertStringContainsString('Login', $html);
         $this->assertStringContainsString('Sign Up', $html);
         $this->assertStringContainsString('Forgot Password', $html);
-        $this->assertStringNotContainsString('Signed in as', $html);
+        // Guests never see the logout footer
+        $this->assertStringNotContainsString('modules.php?name=YourAccount&amp;op=logout', $html);
     }
 }

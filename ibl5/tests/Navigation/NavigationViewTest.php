@@ -155,8 +155,7 @@ class NavigationViewTest extends TestCase
     {
         $html = $this->renderNav('Regular Season', 'Off', loggedIn: true);
 
-        // Logout is folded into the My Team dropdown footer as "Signed in as {user}"
-        $this->assertStringContainsString('Signed in as', $html);
+        // Logout is folded into the My Team dropdown footer with "{user}" above a Logout link
         $this->assertStringContainsString('TestUser', $html);
         $this->assertStringContainsString('modules.php?name=YourAccount&amp;op=logout', $html);
     }
@@ -169,6 +168,6 @@ class NavigationViewTest extends TestCase
         $this->assertStringContainsString('Sign Up', $html);
         $this->assertStringContainsString('Forgot Password', $html);
         // And no logout footer
-        $this->assertStringNotContainsString('Signed in as', $html);
+        $this->assertStringNotContainsString('modules.php?name=YourAccount&amp;op=logout', $html);
     }
 }

@@ -211,7 +211,7 @@ class MobileNavView
     }
 
     /**
-     * Render the "Signed in as ... / Logout" footer for the mobile My Team
+     * Render the "{username} / Logout" footer for the mobile My Team
      * accordion. Mirrors renderLeagueSwitcher() styling so both footers share
      * the same visual weight at the bottom of an accordion panel.
      */
@@ -222,7 +222,7 @@ class MobileNavView
         ob_start();
         ?>
         <div class="px-5 py-3 border-t border-white/10 mt-1">
-            <div class="block text-base font-semibold tracking-widest uppercase text-gray-500 mb-2">Signed in as <?= HtmlSanitizer::e($username) ?></div>
+            <div class="block text-base font-semibold tracking-widest uppercase text-gray-500 mb-2"><?= HtmlSanitizer::e($username) ?></div>
             <a href="modules.php?name=YourAccount&amp;op=logout" hx-boost="false" class="block w-full text-center bg-white/10 text-white text-sm font-medium border border-white/20 rounded-xl px-3 py-2.5 cursor-pointer hover:bg-white/15 hover:border-white/30 transition-all">Logout</a>
         </div>
         <?php

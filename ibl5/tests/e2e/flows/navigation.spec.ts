@@ -32,17 +32,15 @@ test.describe('Navigation bar (authenticated, desktop)', () => {
     await expect(teamPageLink).toBeVisible();
   });
 
-  test('account dropdown shows logout link', async ({ page }) => {
+  test('my team dropdown shows logout footer', async ({ page }) => {
     await page.goto('index.php');
     const nav = desktopNav(page);
 
-    // Find the last dropdown button (account) and click to pin open
-    const accountBtn = nav.locator('.relative.group > button').last();
-    await accountBtn.click();
+    // Logout is now folded into the My Team dropdown footer for
+    // logged-in users with a team — no standalone Account dropdown.
+    await nav.getByRole('button', { name: 'My Team' }).click();
 
-    const logoutLink = nav.locator('.nav-dropdown-item', {
-      hasText: 'Logout',
-    }).first();
+    const logoutLink = nav.locator('a', { hasText: 'Logout' }).first();
     await expect(logoutLink).toBeVisible();
   });
 
@@ -92,17 +90,27 @@ test.describe('Navigation bar (authenticated, mobile viewport)', () => {
     ).toBeVisible();
   });
 
-  test('account section shows Account instead of Login', async ({ page }) => {
+  test('my team accordion shows logout footer instead of separate account section', async ({ page }) => {
     await page.goto('index.php');
     const mobileMenu = await openMobileMenu(page);
 
+    // For logged-in users with a team, neither the Account nor Login
+    // accordion button is present — logout lives inside the My Team
+    // accordion footer instead.
     await expect(
-      mobileMenu.locator('.mobile-dropdown-btn', { hasText: 'Account' }).first(),
-    ).toBeVisible();
-
+      mobileMenu.locator('.mobile-dropdown-btn', { hasText: 'Account' }),
+    ).not.toBeAttached();
     await expect(
       mobileMenu.locator('.mobile-dropdown-btn', { hasText: 'Login' }),
     ).not.toBeAttached();
+
+    await mobileMenu.locator('.mobile-dropdown-btn', {
+      hasText: 'My Team',
+    }).first().click();
+
+    await expect(
+      mobileMenu.locator('a', { hasText: 'Logout' }).first(),
+    ).toBeVisible();
   });
 
   test('mobile team section expands to show team links', async ({ page }) => {

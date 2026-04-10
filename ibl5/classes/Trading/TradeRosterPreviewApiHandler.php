@@ -34,9 +34,17 @@ class TradeRosterPreviewApiHandler
 
     private \mysqli $db;
 
-    public function __construct(\mysqli $db)
+    /**
+     * The logged-in user's team ID, used to decide whether eligibility action
+     * links (Rookie Option / Contract Extension) are clickable. When viewing
+     * another GM's roster the links render as non-clickable labels.
+     */
+    private int $loggedInTeamID;
+
+    public function __construct(\mysqli $db, int $loggedInTeamID = 0)
     {
         $this->db = $db;
+        $this->loggedInTeamID = $loggedInTeamID;
     }
 
     public function handle(): void
@@ -131,7 +139,12 @@ class TradeRosterPreviewApiHandler
                 }
             }
 
-            $tableHtml = $this->renderTable($display, $roster, $team, $season, $starterPids, $rosterPids, $split, $teamTableService, $removePids);
+            // Only expose clickable eligibility links when rendering the
+            // logged-in user's own roster. Opponent rosters in the trade
+            // preview render the markers as non-clickable labels.
+            $showActionLinks = $this->loggedInTeamID !== 0 && $teamID === $this->loggedInTeamID;
+
+            $tableHtml = $this->renderTable($display, $roster, $team, $season, $starterPids, $rosterPids, $split, $teamTableService, $removePids, $showActionLinks);
 
             // Wrap with dropdown
             $dropdownGroups = $teamTableService->buildDropdownGroups($season);
@@ -497,12 +510,13 @@ class TradeRosterPreviewApiHandler
      * @param list<int> $starterPids Starter PIDs from original roster
      * @param list<int> $rosterPids All PIDs in the modified roster (for aggregate queries)
      * @param list<int> $removePids Outgoing player PIDs to exclude from cap totals
+     * @param bool $showActionLinks When false, Contracts table hides clickable eligibility links
      */
-    private function renderTable(string $display, array $roster, Team $team, Season $season, array $starterPids, array $rosterPids, ?string $split, TeamTableService $teamTableService, array $removePids = []): string
+    private function renderTable(string $display, array $roster, Team $team, Season $season, array $starterPids, array $rosterPids, ?string $split, TeamTableService $teamTableService, array $removePids = [], bool $showActionLinks = true): string
     {
         switch ($display) {
             case 'contracts':
-                return \UI\Tables\Contracts::render($this->db, $roster, $team, $season, $starterPids, $removePids);
+                return \UI\Tables\Contracts::render($this->db, $roster, $team, $season, $starterPids, $removePids, $showActionLinks);
             case 'chunk':
                 return \UI\Tables\PeriodAverages::render($this->db, $team, $season, null, null, $starterPids, $rosterPids);
             case 'playoffs':

@@ -334,6 +334,13 @@
 
                     // Classify and reorder trade-involved player rows
                     classifyAndReorderTradeRows(container, addPids, removePids);
+
+                    // Re-size contract hint links (Rookie Option / Contract
+                    // Extension labels) so they span the 5 hint cells and
+                    // their text stays center-aligned after roster swaps.
+                    if (typeof window.IBL_sizeContractHintLinks === 'function') {
+                        window.IBL_sizeContractHintLinks();
+                    }
                 } else {
                     container.innerHTML = '<div class="trade-roster-preview__empty">No data available</div>';
                 }

@@ -405,13 +405,21 @@
     z-index: 0;
     background-color: inherit;
     color: var(--accent-700, #c2410c);
-    text-decoration-line: underline;
+    text-decoration-line: none;
     font-weight: 600;
     white-space: nowrap;
     align-items: center;
     justify-content: center;
     text-align: center;
     /* width set by contract-hint.js */
+}
+
+/* Underline only the clickable (anchor) variant; the non-clickable <span>
+   variant (used when viewing another GM's roster or during Draft/Free Agency)
+   displays the label without underline to signal it's not actionable. */
+.ibl-data-table a.contract-hint-link,
+.ibl-data-table a.contract-hint-link:visited {
+    text-decoration-line: underline;
 }
 
 /* Desktop: reveal link and hide zeros on hover */

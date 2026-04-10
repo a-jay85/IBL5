@@ -136,9 +136,14 @@ interface PlayerInterface
      * - The next year has no salary (gap year), AND
      * - They were NOT rookie optioned in the current year
      *
+     * When `$season` is provided and the season is in an offseason phase
+     * (Draft or Free Agency), eligibility is evaluated from the incoming
+     * season's perspective so the UI can preview next season's state.
+     *
+     * @param Season|null $season Optional season context
      * @return bool True if player can renegotiate
      */
-    public function canRenegotiateContract(): bool;
+    public function canRenegotiateContract(?Season $season = null): bool;
 
     /**
      * Check if player is eligible for rookie option

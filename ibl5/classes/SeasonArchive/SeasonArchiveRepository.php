@@ -101,9 +101,9 @@ class SeasonArchiveRepository extends BaseMysqliRepository implements SeasonArch
     {
         /** @var list<GmAwardWithTeamRow> */
         return $this->fetchAll(
-            "SELECT ga.year, ga.Award, ga.name AS gm_username, ti.team_name, ga.table_ID
+            "SELECT ga.year, ga.Award, ga.name AS gm_display_name, ti.team_name, ga.table_ID
             FROM ibl_gm_awards ga
-            JOIN ibl_gm_tenures gt ON ga.name = gt.gm_username
+            JOIN ibl_gm_tenures gt ON ga.name = gt.gm_display_name
                 AND ga.year >= gt.start_season_year
                 AND (gt.end_season_year IS NULL OR ga.year <= gt.end_season_year)
             JOIN {$this->teamInfoTable} ti ON gt.franchise_id = ti.teamid
@@ -118,7 +118,7 @@ class SeasonArchiveRepository extends BaseMysqliRepository implements SeasonArch
     {
         /** @var list<GmTenureWithTeamRow> */
         return $this->fetchAll(
-            "SELECT gt.gm_username, gt.start_season_year, gt.end_season_year, ti.team_name
+            "SELECT gt.gm_display_name, gt.start_season_year, gt.end_season_year, ti.team_name
             FROM ibl_gm_tenures gt
             JOIN {$this->teamInfoTable} ti ON gt.franchise_id = ti.teamid
             ORDER BY gt.start_season_year ASC"

@@ -7,6 +7,7 @@ namespace Tests\FreeAgency;
 use PHPUnit\Framework\TestCase;
 use FreeAgency\FreeAgencyOfferValidator;
 use FreeAgency\OfferType;
+use FreeAgency\Contracts\FreeAgencyRepositoryInterface;
 use Team\Team;
 
 /**
@@ -409,6 +410,141 @@ class FreeAgencyOfferValidatorTest extends TestCase
     }
 
     // ================================================================
+    // PENDING MLE/LLE OFFERS (ONE-AT-A-TIME RULE)
+    //
+    // Bug fix: a GM could submit multiple pending MLE/LLE offers because
+    // the `HasMLE` / `HasLLE` flags on ibl_team_info only clear when admin
+    // processes signings. The validator must also consult the pending
+    // offers in ibl_fa_offers to enforce the "one pending offer at a time"
+    // rule. Pending offers to the current player are excluded so a team
+    // can still overwrite their own existing offer to the same player.
+    // ================================================================
+
+    public function testRejectsMLEWhenTeamAlreadyHasPendingMLEOfferToDifferentPlayer(): void
+    {
+        $team = $this->createTeamStub(hasMLE: 1, teamID: 7);
+        $repository = $this->createRepositoryStub(pendingMle: true);
+        $validator = new FreeAgencyOfferValidator($team, $repository, playerId: 99);
+
+        $result = $validator->validateOffer($this->buildOffer([
+            'offer1' => 450,
+            'offerType' => OfferType::MLE_1_YEAR,
+        ]));
+
+        $this->assertFalse($result['valid']);
+        $this->assertStringContainsString('pending Mid-Level Exception offer', $result['error']);
+    }
+
+    public function testAcceptsMLEOverwriteToSamePlayer(): void
+    {
+        // Repository excludes the current player when checking — so a team
+        // overwriting its own pending MLE offer to the same player is legal.
+        $team = $this->createTeamStub(hasMLE: 1, teamID: 7);
+        $repository = $this->createRepositoryStub(pendingMle: false);
+        $validator = new FreeAgencyOfferValidator($team, $repository, playerId: 42);
+
+        $result = $validator->validateOffer($this->buildOffer([
+            'offer1' => 450,
+            'offerType' => OfferType::MLE_2_YEAR,
+            'offer2' => 495,
+        ]));
+
+        $this->assertTrue($result['valid']);
+    }
+
+    public function testRejectsLLEWhenTeamAlreadyHasPendingLLEOfferToDifferentPlayer(): void
+    {
+        $team = $this->createTeamStub(hasLLE: 1, teamID: 3);
+        $repository = $this->createRepositoryStub(pendingLle: true);
+        $validator = new FreeAgencyOfferValidator($team, $repository, playerId: 501);
+
+        $result = $validator->validateOffer($this->buildOffer([
+            'offer1' => 145,
+            'offerType' => OfferType::LOWER_LEVEL_EXCEPTION,
+        ]));
+
+        $this->assertFalse($result['valid']);
+        $this->assertStringContainsString('pending Lower-Level Exception offer', $result['error']);
+    }
+
+    public function testAcceptsLLEOverwriteToSamePlayer(): void
+    {
+        $team = $this->createTeamStub(hasLLE: 1, teamID: 3);
+        $repository = $this->createRepositoryStub(pendingLle: false);
+        $validator = new FreeAgencyOfferValidator($team, $repository, playerId: 501);
+
+        $result = $validator->validateOffer($this->buildOffer([
+            'offer1' => 145,
+            'offerType' => OfferType::LOWER_LEVEL_EXCEPTION,
+        ]));
+
+        $this->assertTrue($result['valid']);
+    }
+
+    public function testPendingMLEDoesNotBlockLLEOffer(): void
+    {
+        // MLE and LLE are independent exceptions. A pending MLE must not
+        // block a LLE offer (and vice versa in the inverse test below).
+        $team = $this->createTeamStub(hasMLE: 1, hasLLE: 1, teamID: 7);
+        $repository = $this->createRepositoryStub(pendingMle: true, pendingLle: false);
+        $validator = new FreeAgencyOfferValidator($team, $repository, playerId: 88);
+
+        $result = $validator->validateOffer($this->buildOffer([
+            'offer1' => 145,
+            'offerType' => OfferType::LOWER_LEVEL_EXCEPTION,
+        ]));
+
+        $this->assertTrue($result['valid']);
+    }
+
+    public function testPendingLLEDoesNotBlockMLEOffer(): void
+    {
+        $team = $this->createTeamStub(hasMLE: 1, hasLLE: 1, teamID: 7);
+        $repository = $this->createRepositoryStub(pendingMle: false, pendingLle: true);
+        $validator = new FreeAgencyOfferValidator($team, $repository, playerId: 88);
+
+        $result = $validator->validateOffer($this->buildOffer([
+            'offer1' => 450,
+            'offerType' => OfferType::MLE_1_YEAR,
+        ]));
+
+        $this->assertTrue($result['valid']);
+    }
+
+    public function testAcceptedMLEBlocksAnyFurtherMLEOfferRegardlessOfPendingCheck(): void
+    {
+        // Rule 2: once an MLE has been consumed (hasMLE=0), no new MLE offer
+        // is allowed for the remainder of the FA phase — even if the pending
+        // offers table is empty.
+        $team = $this->createTeamStub(hasMLE: 0, teamID: 7);
+        $repository = $this->createRepositoryStub(pendingMle: false);
+        $validator = new FreeAgencyOfferValidator($team, $repository, playerId: 1);
+
+        $result = $validator->validateOffer($this->buildOffer([
+            'offer1' => 450,
+            'offerType' => OfferType::MLE_1_YEAR,
+        ]));
+
+        $this->assertFalse($result['valid']);
+        $this->assertStringContainsString('already used', $result['error']);
+    }
+
+    public function testAcceptedLLEBlocksAnyFurtherLLEOfferRegardlessOfPendingCheck(): void
+    {
+        $team = $this->createTeamStub(hasLLE: 0, teamID: 7);
+        $repository = $this->createRepositoryStub(pendingLle: false);
+        $validator = new FreeAgencyOfferValidator($team, $repository, playerId: 1);
+
+        $result = $validator->validateOffer($this->buildOffer([
+            'offer1' => 145,
+            'offerType' => OfferType::LOWER_LEVEL_EXCEPTION,
+        ]));
+
+        $this->assertFalse($result['valid']);
+        $this->assertStringContainsString('already used', $result['error']);
+    }
+
+    // ================================================================
     // HELPERS
     // ================================================================
 
@@ -433,11 +569,23 @@ class FreeAgencyOfferValidatorTest extends TestCase
         ], $overrides);
     }
 
-    private function createTeamStub(int $hasMLE = 0, int $hasLLE = 0): Team
+    private function createTeamStub(int $hasMLE = 0, int $hasLLE = 0, int $teamID = 1): Team
     {
         $team = $this->createStub(Team::class);
         $team->hasMLE = $hasMLE;
         $team->hasLLE = $hasLLE;
+        $team->teamID = $teamID;
         return $team;
+    }
+
+    /**
+     * @return FreeAgencyRepositoryInterface&\PHPUnit\Framework\MockObject\Stub
+     */
+    private function createRepositoryStub(bool $pendingMle = false, bool $pendingLle = false): FreeAgencyRepositoryInterface
+    {
+        $repository = $this->createStub(FreeAgencyRepositoryInterface::class);
+        $repository->method('hasPendingMleOffer')->willReturn($pendingMle);
+        $repository->method('hasPendingLleOffer')->willReturn($pendingLle);
+        return $repository;
     }
 }

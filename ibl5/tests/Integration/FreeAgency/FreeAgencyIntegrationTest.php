@@ -32,9 +32,20 @@ class FreeAgencyIntegrationTest extends IntegrationTestCase
     {
         parent::setUp();
         $this->processor = new FreeAgencyProcessor($this->mockDb);
-        
+
         // Prevent Discord notifications during tests
         $_SERVER['SERVER_NAME'] = 'localhost';
+
+        // By default the team has no pending MLE/LLE offers. Without these
+        // routes, the legacy setMockData() pool would return the player row
+        // for FreeAgencyRepository::hasPendingMleOffer() / hasPendingLleOffer(),
+        // causing every MLE/LLE flow in these tests to incorrectly report
+        // "you already have a pending offer" and fail. MockPreparedStatement
+        // substitutes "?" with bound values before dispatching, so the
+        // pattern matches on the unique "MLE = 1" / "LLE = 1" predicate
+        // rather than on the raw bind placeholders.
+        $this->mockDb->onQuery('FROM ibl_fa_offers[\s\S]*?MLE = 1', []);
+        $this->mockDb->onQuery('FROM ibl_fa_offers[\s\S]*?LLE = 1', []);
     }
 
     protected function tearDown(): void
@@ -382,6 +393,69 @@ class FreeAgencyIntegrationTest extends IntegrationTestCase
         $this->assertIsArray($result);
         $this->assertFalse($result['success']);
         $this->assertSame('validation_error', $result['type']);
+        $this->assertQueryNotExecuted('INSERT INTO ibl_fa_offers');
+    }
+
+    /**
+     * @group integration
+     * @group validation-failures
+     *
+     * Regression test: GMs could previously submit multiple pending MLE
+     * offers because validation only consulted `ibl_team_info.HasMLE`
+     * (cleared on signing), ignoring already-pending offers in
+     * `ibl_fa_offers`. The validator now queries both.
+     */
+    public function testMLEOfferRejectedWhenTeamHasPendingMLEOfferToAnotherPlayer(): void
+    {
+        // Arrange — team has MLE available but already has a pending MLE
+        // offer to a different player sitting in ibl_fa_offers.
+        $this->setupMLEOfferScenario();
+        $this->mockDb->onQuery('FROM ibl_fa_offers[\s\S]*?MLE = 1', [
+            ['pid' => 999], // existing pending MLE offer to player #999
+        ]);
+
+        $postData = [
+            'teamname' => 'Miami Cyclones',
+            'playerID' => 1, // different player
+            'offerType' => 3, // 3-year MLE
+        ];
+
+        // Act
+        $result = $this->processor->processOfferSubmission($postData);
+
+        // Assert
+        $this->assertFalse($result['success']);
+        $this->assertSame('validation_error', $result['type']);
+        $this->assertStringContainsString('pending Mid-Level Exception offer', $result['message']);
+        $this->assertQueryNotExecuted('INSERT INTO ibl_fa_offers');
+    }
+
+    /**
+     * @group integration
+     * @group validation-failures
+     */
+    public function testLLEOfferRejectedWhenTeamHasPendingLLEOfferToAnotherPlayer(): void
+    {
+        // Arrange — team has LLE available but already has a pending LLE
+        // offer to a different player.
+        $this->setupLLEOfferScenario();
+        $this->mockDb->onQuery('FROM ibl_fa_offers[\s\S]*?LLE = 1', [
+            ['pid' => 999],
+        ]);
+
+        $postData = [
+            'teamname' => 'Miami Cyclones',
+            'playerID' => 1,
+            'offerType' => 7, // LLE
+        ];
+
+        // Act
+        $result = $this->processor->processOfferSubmission($postData);
+
+        // Assert
+        $this->assertFalse($result['success']);
+        $this->assertSame('validation_error', $result['type']);
+        $this->assertStringContainsString('pending Lower-Level Exception offer', $result['message']);
         $this->assertQueryNotExecuted('INSERT INTO ibl_fa_offers');
     }
 

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace FreeAgency;
 
 use FreeAgency\Contracts\FreeAgencyOfferValidatorInterface;
+use FreeAgency\Contracts\FreeAgencyRepositoryInterface;
 use League\League;
 use Team\Team;
 
@@ -23,10 +24,17 @@ class FreeAgencyOfferValidator implements FreeAgencyOfferValidatorInterface
         'year1Max' => 0, 'amendedCapSpaceYear1' => 0,
     ];
     private ?Team $team;
+    private ?FreeAgencyRepositoryInterface $repository;
+    private int $playerId;
 
-    public function __construct(?Team $team = null)
-    {
+    public function __construct(
+        ?Team $team = null,
+        ?FreeAgencyRepositoryInterface $repository = null,
+        int $playerId = 0
+    ) {
         $this->team = $team;
+        $this->repository = $repository;
+        $this->playerId = $playerId;
     }
 
     /**
@@ -97,6 +105,14 @@ class FreeAgencyOfferValidator implements FreeAgencyOfferValidatorInterface
     /**
      * Validate MLE (Mid-Level Exception) availability
      *
+     * Two rules enforced, in order:
+     * 1. The team's MLE for this FA period has not already been consumed by
+     *    an accepted signing (`ibl_team_info.HasMLE = 0`).
+     * 2. The team does not already have a pending MLE offer outstanding to
+     *    a different player in `ibl_fa_offers`. A GM may only hold one
+     *    pending MLE offer at any given time — they must rescind the prior
+     *    offer before making a new one to a different player.
+     *
      * @return array{valid: bool, error?: string}
      */
     private function validateMLEAvailability(): array
@@ -106,7 +122,7 @@ class FreeAgencyOfferValidator implements FreeAgencyOfferValidatorInterface
             return ['valid' => true];
         }
 
-        // Check if team has already used their MLE
+        // Rule 1: MLE already consumed by an accepted signing this FA period
         $hasMLE = $this->team->hasMLE;
         if ($hasMLE !== 1) {
             return [
@@ -115,11 +131,26 @@ class FreeAgencyOfferValidator implements FreeAgencyOfferValidatorInterface
             ];
         }
 
+        // Rule 2: Team already has a pending MLE offer to another player
+        if (
+            $this->repository !== null
+            && $this->repository->hasPendingMleOffer($this->team->teamID, $this->playerId)
+        ) {
+            return [
+                'valid' => false,
+                'error' => "Sorry, your team already has a pending Mid-Level Exception offer to another player. Rescind that offer on the Free Agency page before making a new MLE offer."
+            ];
+        }
+
         return ['valid' => true];
     }
 
     /**
      * Validate LLE (Lower-Level Exception) availability
+     *
+     * @see self::validateMLEAvailability() for the two-rule structure
+     * (consumed-flag check + pending-offer check). Same rules, applied to
+     * the Lower-Level Exception.
      *
      * @return array{valid: bool, error?: string}
      */
@@ -130,12 +161,23 @@ class FreeAgencyOfferValidator implements FreeAgencyOfferValidatorInterface
             return ['valid' => true];
         }
 
-        // Check if team has already used their LLE
+        // Rule 1: LLE already consumed by an accepted signing this FA period
         $hasLLE = $this->team->hasLLE;
         if ($hasLLE !== 1) {
             return [
                 'valid' => false,
                 'error' => "Sorry, your team has already used the Lower-Level Exception this free agency period. You cannot make another LLE offer."
+            ];
+        }
+
+        // Rule 2: Team already has a pending LLE offer to another player
+        if (
+            $this->repository !== null
+            && $this->repository->hasPendingLleOffer($this->team->teamID, $this->playerId)
+        ) {
+            return [
+                'valid' => false,
+                'error' => "Sorry, your team already has a pending Lower-Level Exception offer to another player. Rescind that offer on the Free Agency page before making a new LLE offer."
             ];
         }
 

@@ -18,6 +18,8 @@ class CapturingRepository implements FreeAgencyRepositoryInterface
     /** @var array<string, mixed>|null */
     public ?array $lastSavedOffer = null;
     public bool $saveReturn = true;
+    public bool $pendingMleExists = false;
+    public bool $pendingLleExists = false;
 
     public function getExistingOffer(int $tid, int $pid): ?array
     {
@@ -43,6 +45,16 @@ class CapturingRepository implements FreeAgencyRepositoryInterface
     public function isPlayerAlreadySigned(int $playerId): bool
     {
         return false;
+    }
+
+    public function hasPendingMleOffer(int $tid, int $excludePid): bool
+    {
+        return $this->pendingMleExists;
+    }
+
+    public function hasPendingLleOffer(int $tid, int $excludePid): bool
+    {
+        return $this->pendingLleExists;
     }
 }
 
@@ -316,6 +328,62 @@ class FreeAgencyProcessorTest extends TestCase
         $queries = $this->mockDb->getExecutedQueries();
         $deleteQueries = array_filter($queries, static fn (string $q): bool => stripos($q, 'DELETE') !== false);
         $this->assertNotEmpty($deleteQueries);
+    }
+
+    // ================================================================
+    // PENDING MLE/LLE REJECTION (ONE-AT-A-TIME RULE)
+    // ================================================================
+
+    public function testRejectsMLEOfferWhenRepositoryReportsPendingMLEOffer(): void
+    {
+        $this->mockDb->setMockData([$this->getCompletePlayerData([
+            'HasMLE' => 1,
+            'HasLLE' => 1,
+        ])]);
+
+        $capturingRepo = new CapturingRepository();
+        $capturingRepo->pendingMleExists = true;
+
+        $processor = new FreeAgencyProcessor(
+            $this->mockDb,
+            new StubDemandCalculator(),
+            $capturingRepo,
+        );
+
+        $result = $processor->processOfferSubmission(array_merge($this->buildValidPost(), [
+            'offerType' => 1, // 1-year MLE
+        ]));
+
+        $this->assertFalse($result['success']);
+        $this->assertSame('validation_error', $result['type']);
+        $this->assertStringContainsString('pending Mid-Level Exception offer', $result['message']);
+        $this->assertNull($capturingRepo->lastSavedOffer, 'Second pending MLE must not be saved');
+    }
+
+    public function testRejectsLLEOfferWhenRepositoryReportsPendingLLEOffer(): void
+    {
+        $this->mockDb->setMockData([$this->getCompletePlayerData([
+            'HasMLE' => 1,
+            'HasLLE' => 1,
+        ])]);
+
+        $capturingRepo = new CapturingRepository();
+        $capturingRepo->pendingLleExists = true;
+
+        $processor = new FreeAgencyProcessor(
+            $this->mockDb,
+            new StubDemandCalculator(),
+            $capturingRepo,
+        );
+
+        $result = $processor->processOfferSubmission(array_merge($this->buildValidPost(), [
+            'offerType' => 7, // LLE
+        ]));
+
+        $this->assertFalse($result['success']);
+        $this->assertSame('validation_error', $result['type']);
+        $this->assertStringContainsString('pending Lower-Level Exception offer', $result['message']);
+        $this->assertNull($capturingRepo->lastSavedOffer, 'Second pending LLE must not be saved');
     }
 
     // ================================================================

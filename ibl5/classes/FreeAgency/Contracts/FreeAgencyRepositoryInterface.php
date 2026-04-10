@@ -69,4 +69,30 @@ interface FreeAgencyRepositoryInterface
      * @return bool True if player was already signed this free agency period
      */
     public function isPlayerAlreadySigned(int $playerId): bool;
+
+    /**
+     * Check whether a team already has a pending MLE offer to a different player
+     *
+     * Returns true if `ibl_fa_offers` contains any row for this team where
+     * the MLE column is set and pid differs from `$excludePid`. Used to enforce
+     * the rule that a GM may only have one pending Mid-Level Exception offer
+     * outstanding at any time. `$excludePid` lets a team overwrite their own
+     * existing MLE offer to the same player without tripping the check.
+     *
+     * @param int $tid Offering team's ID
+     * @param int $excludePid Player ID to ignore (the player being offered to now)
+     * @return bool True if a pending MLE offer already exists to another player
+     */
+    public function hasPendingMleOffer(int $tid, int $excludePid): bool;
+
+    /**
+     * Check whether a team already has a pending LLE offer to a different player
+     *
+     * @see self::hasPendingMleOffer() for semantics — same rule, LLE column.
+     *
+     * @param int $tid Offering team's ID
+     * @param int $excludePid Player ID to ignore (the player being offered to now)
+     * @return bool True if a pending LLE offer already exists to another player
+     */
+    public function hasPendingLleOffer(int $tid, int $excludePid): bool;
 }

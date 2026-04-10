@@ -144,4 +144,40 @@ class FreeAgencyRepository extends BaseMysqliRepository implements FreeAgencyRep
 
         return ($currentContractYear === 0 && $year1Contract !== 0);
     }
+
+    /**
+     * @see FreeAgencyRepositoryInterface::hasPendingMleOffer()
+     */
+    public function hasPendingMleOffer(int $tid, int $excludePid): bool
+    {
+        /** @var array{pid: int}|null $row */
+        $row = $this->fetchOne(
+            "SELECT pid FROM ibl_fa_offers
+             WHERE tid = ? AND MLE = 1 AND pid <> ?
+             LIMIT 1",
+            "ii",
+            $tid,
+            $excludePid
+        );
+
+        return $row !== null;
+    }
+
+    /**
+     * @see FreeAgencyRepositoryInterface::hasPendingLleOffer()
+     */
+    public function hasPendingLleOffer(int $tid, int $excludePid): bool
+    {
+        /** @var array{pid: int}|null $row */
+        $row = $this->fetchOne(
+            "SELECT pid FROM ibl_fa_offers
+             WHERE tid = ? AND LLE = 1 AND pid <> ?
+             LIMIT 1",
+            "ii",
+            $tid,
+            $excludePid
+        );
+
+        return $row !== null;
+    }
 }

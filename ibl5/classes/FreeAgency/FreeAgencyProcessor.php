@@ -65,8 +65,11 @@ class FreeAgencyProcessor implements FreeAgencyProcessorInterface
         // Parse offer data (reuse team object to avoid duplicate DB query)
         $offerData = $this->parseOfferData($player, $postData, $team);
 
-        // Create validator with team data for MLE/LLE checks
-        $validator = new FreeAgencyOfferValidator($team);
+        // Create validator with team + repository for MLE/LLE checks.
+        // Repository + playerID are used to enforce the "one pending MLE/LLE
+        // offer at a time" rule — pending offers to the current player are
+        // excluded so overwriting your own existing offer remains legal.
+        $validator = new FreeAgencyOfferValidator($team, $this->repository, $playerID);
 
         // Validate the offer
         $validationResult = $validator->validateOffer($offerData);

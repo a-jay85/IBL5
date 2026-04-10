@@ -34,24 +34,12 @@ oneonone();
 
 function oneonone(): void
 {
-    global $prefix, $mysqli_db, $user, $cookie;
-    
+    global $mysqli_db, $user, $cookie;
+
     PageLayout\PageLayout::header();
     cookiedecode($user);
 
-    // Get current user info
-    $stmt = $mysqli_db->prepare("SELECT * FROM " . $prefix . "_users WHERE username = ?");
-    $stmt->bind_param('s', $cookie[1]);
-    $stmt->execute();
-    $result = $stmt->get_result();
-    $userinfo = $result->fetch_assoc();
-    $stmt->close();
-
-    if (is_array($userinfo) && isset($userinfo['username'])) {
-        $ownerplaying = stripslashes(check_html($userinfo['username'], "nohtml"));
-    } else {
-        $ownerplaying = '';
-    }
+    $ownerplaying = is_string($cookie[1] ?? null) ? $cookie[1] : '';
 
     // Get form inputs
     $player1 = isset($_POST['pid1']) ? (int) $_POST['pid1'] : null;

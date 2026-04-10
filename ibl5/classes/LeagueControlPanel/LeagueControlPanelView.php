@@ -241,6 +241,9 @@ class LeagueControlPanelView implements LeagueControlPanelViewInterface
     <div class="lcp-control-row">
         <button type="submit" name="action" value="reset_eoy_voting" class="ibl-btn ibl-btn--secondary ibl-btn--sm">Reset End of the Year Voting</button>
     </div>
+    <div class="lcp-control-row">
+        <a href="/ibl5/import-demands.php">Free Agency Demands CSV Uploader</a>
+    </div>
     <?= $this->renderTradesSelect($panelData) ?>
     <?= $this->renderDraftLinkSelect($panelData) ?>
     <?= $this->renderAwardsControls($panelData) ?>
@@ -291,6 +294,9 @@ class LeagueControlPanelView implements LeagueControlPanelViewInterface
     </div>
     <div class="lcp-control-row">
         <a href="/ibl5/scripts/tradition.php">Set Free Agency factors for Tradition</a>
+    </div>
+    <div class="lcp-control-row">
+        <a href="/ibl5/import-demands.php">Free Agency Demands CSV Uploader</a>
     </div>
     <?= $this->renderFaNotificationsSelect($panelData) ?>
     <?= $this->renderWaiversSelect($panelData) ?>

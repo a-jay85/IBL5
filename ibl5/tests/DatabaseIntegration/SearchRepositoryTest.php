@@ -8,8 +8,8 @@ use Search\SearchRepository;
 
 /**
  * Tests SearchRepository against real MariaDB — story, comment, and user
- * searches across nuke_* tables (read-only queries), plus topic,
- * category, and author lookups.
+ * searches across nuke_stories/auth_users tables (read-only queries),
+ * plus topic, category, and author lookups.
  * All methods here are read-only. Tests rely on CI seed data.
  */
 class SearchRepositoryTest extends DatabaseTestCase
@@ -85,7 +85,7 @@ class SearchRepositoryTest extends DatabaseTestCase
 
     public function testSearchUsersFindsMatchingUsers(): void
     {
-        // CI seed has nuke_users with username 'testgm'
+        // CI seed has auth_users with username 'testgm'
         $result = $this->repo->searchUsers('testgm');
 
         self::assertNotEmpty($result['results']);

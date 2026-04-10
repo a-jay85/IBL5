@@ -1220,7 +1220,7 @@ INSERT INTO ibl_plr (
 ON DUPLICATE KEY UPDATE name = VALUES(name), cy = VALUES(cy), cyt = VALUES(cyt);
 
 -- ============================================================
--- NOTE: Test user (nuke_users + auth_users) is created by the
+-- NOTE: Test user (auth_users) is created by the
 -- workflow via PHP bcrypt hash at runtime — not seeded here.
 -- ============================================================
 

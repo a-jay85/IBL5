@@ -74,7 +74,7 @@ interface AuthServiceInterface
     /**
      * Get the full user info row for the authenticated user
      *
-     * @return array<string, mixed>|null User row from nuke_users or null if not authenticated
+     * @return array<string, mixed>|null User row from auth_users or null if not authenticated
      */
     public function getUserInfo(): ?array;
 
@@ -119,7 +119,7 @@ interface AuthServiceInterface
     /**
      * Confirm a user's email via selector/token and sign them in
      *
-     * On success, also creates the nuke_users profile for site-wide compatibility.
+     * On success, signs the user in via delight-auth.
      *
      * @param string $selector The selector from the confirmation URL
      * @param string $token The token from the confirmation URL
@@ -140,7 +140,7 @@ interface AuthServiceInterface
     /**
      * Reset a user's password using the selector/token from the reset email
      *
-     * Also updates the password in nuke_users for backward compatibility.
+     * Resets the password in auth_users via delight-auth.
      *
      * @param string $selector The selector from the reset URL
      * @param string $token The token from the reset URL

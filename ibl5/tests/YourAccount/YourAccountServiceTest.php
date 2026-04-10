@@ -8,14 +8,10 @@ use Auth\Contracts\AuthServiceInterface;
 use Mail\Contracts\MailServiceInterface;
 use PHPUnit\Framework\TestCase;
 use Services\CommonMysqliRepository;
-use YourAccount\Contracts\YourAccountRepositoryInterface;
 use YourAccount\YourAccountService;
 
 class YourAccountServiceTest extends TestCase
 {
-    /** @var YourAccountRepositoryInterface&\PHPUnit\Framework\MockObject\Stub */
-    private YourAccountRepositoryInterface $stubRepository;
-
     /** @var AuthServiceInterface&\PHPUnit\Framework\MockObject\Stub */
     private AuthServiceInterface $stubAuthService;
 
@@ -29,7 +25,6 @@ class YourAccountServiceTest extends TestCase
 
     protected function setUp(): void
     {
-        $this->stubRepository = $this->createStub(YourAccountRepositoryInterface::class);
         $this->stubAuthService = $this->createStub(AuthServiceInterface::class);
         $this->stubCommonRepository = $this->createStub(CommonMysqliRepository::class);
         $this->stubMailService = $this->createStub(MailServiceInterface::class);
@@ -38,12 +33,10 @@ class YourAccountServiceTest extends TestCase
     }
 
     private function buildService(
-        YourAccountRepositoryInterface|null $repository = null,
         AuthServiceInterface|null $authService = null,
         MailServiceInterface|null $mailService = null,
     ): YourAccountService {
         return new YourAccountService(
-            $repository ?? $this->stubRepository,
             $authService ?? $this->stubAuthService,
             $this->stubCommonRepository,
             $mailService ?? $this->stubMailService,
@@ -56,7 +49,7 @@ class YourAccountServiceTest extends TestCase
 
     // ─── Login ───────────────────────────────────────────────────────
 
-    public function testAttemptLoginSuccessCallsHousekeeping(): void
+    public function testAttemptLoginSuccessReturnsTrue(): void
     {
         $mockAuth = $this->createMock(AuthServiceInterface::class);
         $mockAuth->expects($this->once())
@@ -64,12 +57,7 @@ class YourAccountServiceTest extends TestCase
             ->with('testuser', 'pass123', false)
             ->willReturn(true);
 
-        $mockRepo = $this->createMock(YourAccountRepositoryInterface::class);
-        $mockRepo->expects($this->once())
-            ->method('updateLastLoginIp')
-            ->with('testuser', '10.0.0.1');
-
-        $this->service = $this->buildService(repository: $mockRepo, authService: $mockAuth);
+        $this->service = $this->buildService(authService: $mockAuth);
         $result = $this->service->attemptLogin('testuser', 'pass123', false, '10.0.0.1');
 
         $this->assertTrue($result['success']);
@@ -122,15 +110,14 @@ class YourAccountServiceTest extends TestCase
         $this->assertNull($result['error']);
     }
 
-    public function testAttemptLoginFailureDoesNotCallHousekeeping(): void
+    public function testAttemptLoginFailureReturnsFalse(): void
     {
         $this->stubAuthService->method('attempt')->willReturn(false);
 
-        $mockRepo = $this->createMock(YourAccountRepositoryInterface::class);
-        $mockRepo->expects($this->never())->method('updateLastLoginIp');
+        $this->service = $this->buildService();
+        $result = $this->service->attemptLogin('testuser', 'wrongpass', false, '10.0.0.1');
 
-        $this->service = $this->buildService(repository: $mockRepo);
-        $this->service->attemptLogin('testuser', 'wrongpass', false, '10.0.0.1');
+        $this->assertFalse($result['success']);
     }
 
     // ─── Registration ────────────────────────────────────────────────

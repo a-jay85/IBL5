@@ -47,7 +47,7 @@ if ($query !== '' && strlen($query) < 3) {
 $pagetitle = "- " . _SEARCH;
 
 // Initialize services
-$service = new SearchRepository($mysqli_db, $prefix, $user_prefix);
+$service = new SearchRepository($mysqli_db, $prefix);
 $view = new SearchView();
 
 // Get topic context for header display

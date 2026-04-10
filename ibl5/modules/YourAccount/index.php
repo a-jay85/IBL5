@@ -14,10 +14,8 @@ if (isset($username) && is_string($username) && preg_match('/[^a-zA-Z0-9_-]/', $
 }
 
 // Wire dependencies
-$repository = new \YourAccount\YourAccountRepository($mysqli_db);
 $commonRepository = new \Services\CommonMysqliRepository($mysqli_db);
 $service = new \YourAccount\YourAccountService(
-    $repository,
     $authService,
     $commonRepository,
     \Mail\MailService::fromConfig(),

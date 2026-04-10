@@ -8,7 +8,6 @@ use Auth\Contracts\AuthServiceInterface;
 use League\League;
 use Mail\Contracts\MailServiceInterface;
 use Services\CommonMysqliRepository;
-use YourAccount\Contracts\YourAccountRepositoryInterface;
 use YourAccount\Contracts\YourAccountServiceInterface;
 
 /**
@@ -19,7 +18,6 @@ class YourAccountService implements YourAccountServiceInterface
     private const MAX_USERNAME_LENGTH = 25;
     private const AUTO_PASSWORD_LENGTH = 10;
 
-    private YourAccountRepositoryInterface $repository;
     private AuthServiceInterface $authService;
     private CommonMysqliRepository $commonRepository;
     private MailServiceInterface $mailService;
@@ -29,7 +27,6 @@ class YourAccountService implements YourAccountServiceInterface
     private int $minPasswordLength;
 
     public function __construct(
-        YourAccountRepositoryInterface $repository,
         AuthServiceInterface $authService,
         CommonMysqliRepository $commonRepository,
         MailServiceInterface $mailService,
@@ -38,7 +35,6 @@ class YourAccountService implements YourAccountServiceInterface
         string $adminEmail,
         int $minPasswordLength = 5,
     ) {
-        $this->repository = $repository;
         $this->authService = $authService;
         $this->commonRepository = $commonRepository;
         $this->mailService = $mailService;
@@ -54,8 +50,6 @@ class YourAccountService implements YourAccountServiceInterface
     public function attemptLogin(string $username, string $password, bool $rememberMe, string $clientIp): array
     {
         if ($this->authService->attempt($username, $password, $rememberMe)) {
-            $this->repository->updateLastLoginIp($username, $clientIp);
-
             return ['success' => true, 'error' => null];
         }
 

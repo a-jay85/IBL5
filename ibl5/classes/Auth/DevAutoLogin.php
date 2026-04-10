@@ -42,8 +42,8 @@ final class DevAutoLogin
             return;
         }
 
-        // Look up user_id from nuke_users
-        $stmt = $db->prepare('SELECT user_id FROM nuke_users WHERE username = ? LIMIT 1');
+        // Look up user ID from auth_users
+        $stmt = $db->prepare('SELECT id AS user_id FROM auth_users WHERE username = ? LIMIT 1');
         if ($stmt === false) {
             return;
         }

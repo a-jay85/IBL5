@@ -28,7 +28,7 @@ if (($authService->getUsername() ?? '') === 'ibl_demo') {
 }
 
 // Look up demo user
-$demoUser = $mysqli_db->prepare("SELECT user_id FROM nuke_users WHERE username = 'ibl_demo' LIMIT 1");
+$demoUser = $mysqli_db->prepare("SELECT id AS user_id FROM auth_users WHERE username = 'ibl_demo' LIMIT 1");
 $demoUser->execute();
 $result = $demoUser->get_result();
 $row = $result->fetch_assoc();

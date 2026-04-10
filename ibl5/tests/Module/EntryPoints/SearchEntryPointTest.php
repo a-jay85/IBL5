@@ -88,7 +88,7 @@ class SearchEntryPointTest extends ModuleEntryPointTestCase
         ]);
 
         $this->assertNotEmpty($output);
-        $this->assertQueryExecuted('nuke_users');
+        $this->assertQueryExecuted('auth_users');
     }
 
     public function testNonNumericMinParamCastsToZero(): void

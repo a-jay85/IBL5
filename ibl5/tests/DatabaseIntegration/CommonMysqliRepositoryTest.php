@@ -102,20 +102,13 @@ class CommonMysqliRepositoryTest extends DatabaseTestCase
 
     public function testGetUserByUsernameReturnsRow(): void
     {
-        $this->insertRow('nuke_users', [
-            'username' => 'db_inttest_usr',
-            'user_email' => 'test2@test.com',
-            'user_ibl_team' => 'Metros',
-            'user_password' => 'x',
-            'user_avatar' => '',
-            'bio' => '',
-            'ublock' => '',
-        ]);
-
-        $user = $this->repo->getUserByUsername('db_inttest_usr');
+        // testgm user is seeded in auth_users by db-seed.sql
+        $user = $this->repo->getUserByUsername('testgm');
 
         self::assertNotNull($user);
-        self::assertSame('db_inttest_usr', $user['username']);
+        self::assertSame('testgm', $user['username']);
+        self::assertArrayHasKey('user_id', $user);
+        self::assertArrayHasKey('user_email', $user);
     }
 
     // ── getUsernameFromTeamname ──────────────────────────────────

@@ -38,7 +38,7 @@ $themePath = (is_dir("themes/{$ThemeSel}/images/topics/"))
 
 // Initialize services
 $service = new TopicsRepository($mysqli_db, $prefix);
-$searchRepo = new SearchRepository($mysqli_db, $prefix, $user_prefix);
+$searchRepo = new SearchRepository($mysqli_db, $prefix);
 $view = new TopicsView();
 
 // Get topics data

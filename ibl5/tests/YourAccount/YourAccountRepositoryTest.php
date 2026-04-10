@@ -4,23 +4,15 @@ declare(strict_types=1);
 
 namespace Tests\YourAccount;
 
-use Tests\Integration\IntegrationTestCase;
+use PHPUnit\Framework\TestCase;
 use YourAccount\YourAccountRepository;
 
-class YourAccountRepositoryTest extends IntegrationTestCase
+class YourAccountRepositoryTest extends TestCase
 {
-    private YourAccountRepository $repository;
-
-    protected function setUp(): void
+    public function testRepositoryCanBeInstantiated(): void
     {
-        parent::setUp();
-        $this->repository = new YourAccountRepository($GLOBALS['mysqli_db']);
-    }
-
-    public function testUpdateLastLoginIpExecutesQuery(): void
-    {
-        $this->repository->updateLastLoginIp('testuser', '10.0.0.1');
-
-        $this->assertQueryExecuted('nuke_users');
+        $stub = $this->createStub(\mysqli::class);
+        $repo = new YourAccountRepository($stub);
+        $this->assertInstanceOf(YourAccountRepository::class, $repo);
     }
 }

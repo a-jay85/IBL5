@@ -19,7 +19,7 @@ interface ApiKeysRepositoryInterface
     /**
      * Insert a new API key linked to a user.
      *
-     * @param int $userId User ID from nuke_users
+     * @param int $userId User ID from auth_users
      * @param string $keyHash SHA-256 hash of the raw API key
      * @param string $keyPrefix First 8 characters of the raw key (for display)
      * @param string $ownerName Human-readable owner name (username)

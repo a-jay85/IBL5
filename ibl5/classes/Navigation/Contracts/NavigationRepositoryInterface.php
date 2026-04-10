@@ -13,7 +13,7 @@ interface NavigationRepositoryInterface
 {
     /**
      * Resolve a user's team ID from their username.
-     * Looks up the team name from nuke_users, then the team ID from ibl_team_info.
+     * Looks up the team ID from ibl_team_info via gm_username.
      */
     public function resolveTeamId(string $username): ?int;
 

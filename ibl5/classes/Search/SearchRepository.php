@@ -22,7 +22,7 @@ use Search\Contracts\SearchRepositoryInterface;
  *
  * @phpstan-type StoryDbRow array{sid: int, aid: string, informant: string, title: string, time: string, hometext: string, bodytext: string, comments: int, topic: int, topictext: string|null}
  * @phpstan-type CommentDbRow array{tid: int, sid: int, subject: string, date: string, name: string, article_title: string|null, reply_count: int}
- * @phpstan-type UserDbRow array{user_id: int, username: string, name: string}
+ * @phpstan-type UserDbRow array{user_id: int, username: string}
  * @phpstan-type TopicDbRow array{topicid: int, topictext: string}
  * @phpstan-type CategoryDbRow array{catid: int, title: string}
  * @phpstan-type AuthorDbRow array{aid: string}
@@ -32,22 +32,17 @@ use Search\Contracts\SearchRepositoryInterface;
  */
 class SearchRepository extends BaseMysqliRepository implements SearchRepositoryInterface
 {
-    /** @var string Database table prefix */
+    /** @var string Database table prefix for nuke_stories/nuke_topics */
     private string $prefix;
-
-    /** @var string User table prefix */
-    private string $userPrefix;
 
     /**
      * @param \mysqli $db Active mysqli connection
-     * @param string $prefix Database table prefix (default: 'nuke')
-     * @param string $userPrefix User table prefix (default: 'nuke')
+     * @param string $prefix Database table prefix for stories/topics (default: 'nuke')
      */
-    public function __construct(\mysqli $db, string $prefix = 'nuke', string $userPrefix = 'nuke')
+    public function __construct(\mysqli $db, string $prefix = 'nuke')
     {
         parent::__construct($db);
         $this->prefix = $prefix;
-        $this->userPrefix = $userPrefix;
     }
 
     /**
@@ -154,14 +149,14 @@ class SearchRepository extends BaseMysqliRepository implements SearchRepositoryI
         }
 
         $likeQuery = '%' . $query . '%';
-        $sql = "SELECT user_id, username, name
-                FROM {$this->userPrefix}_users
-                WHERE (username LIKE ? OR name LIKE ? OR bio LIKE ?)
+        $sql = "SELECT id AS user_id, username
+                FROM auth_users
+                WHERE username LIKE ?
                 ORDER BY username ASC
                 LIMIT ?, ?";
 
         /** @var list<UserDbRow> $rows */
-        $rows = $this->fetchAll($sql, 'sssii', $likeQuery, $likeQuery, $likeQuery, $offset, $limit + 1);
+        $rows = $this->fetchAll($sql, 'sii', $likeQuery, $offset, $limit + 1);
         $hasMore = count($rows) > $limit;
 
         if ($hasMore) {
@@ -173,7 +168,7 @@ class SearchRepository extends BaseMysqliRepository implements SearchRepositoryI
             $results[] = [
                 'userId' => $row['user_id'],
                 'username' => $row['username'],
-                'name' => $row['name'],
+                'name' => $row['username'],
             ];
         }
 

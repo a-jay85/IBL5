@@ -48,9 +48,9 @@ INSERT INTO ibl_plr (pid, name, age, tid, pos, sta, exp, bird, cy, cyt, cy1, cy2
 VALUES (2, 'Test Player Two', 22, 0, 'SF', 75, 1, 0, 0, 0, 0, 0, 0, 1000, 0, 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb')
 ON DUPLICATE KEY UPDATE name = VALUES(name);
 
--- Users: one GM mapped to Metros
-INSERT INTO nuke_users (user_id, username, user_email, user_ibl_team, name, user_password, date_started, user_avatar, bio, ublock)
-VALUES (1, 'testgm', 'test@example.com', 'Metros', 'Test GM', 'hashed', '2020', '', '', '')
+-- Users: one GM mapped to Metros (via auth_users + ibl_team_info.gm_username)
+INSERT INTO auth_users (id, email, password, username, status, verified, resettable, roles_mask, registered, last_login, force_logout)
+VALUES (1, 'test@example.com', '$2y$12$placeholder_hash_for_tests_only..', 'testgm', 0, 1, 1, 0, UNIX_TIMESTAMP(), NULL, 0)
 ON DUPLICATE KEY UPDATE username = VALUES(username);
 
 -- Settings: commonly read by services

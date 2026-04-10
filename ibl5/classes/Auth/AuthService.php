@@ -20,16 +20,10 @@ use Delight\Auth\UnknownUsernameException;
 use Delight\Auth\UserAlreadyExistsException;
 
 /**
- * AuthService - Session-based user authentication with bcrypt password hashing
+ * AuthService - Session-based user authentication via delight-im/auth
  *
- * Replaces legacy PHP-Nuke MD5/base64-cookie auth with:
- * - bcrypt password hashing via password_hash() (cost 12)
- * - PHP native sessions as the source of truth
- * - Transparent MD5-to-bcrypt migration on first login
- * - Backward-compatible getCookieArray() for legacy $cookie[] references
- *
- *
- * @phpstan-type UserRow array{user_id: int, username: string, user_password: string, storynum: int, umode: string, uorder: int, thold: int, noscore: int, ublockon: int, theme: string, commentmax: int, user_email: string, user_regdate: string, name: string}
+ * All authentication is handled by delight-auth (auth_users table).
+ * Backward-compatible getCookieArray() for legacy $cookie[] references.
  */
 class AuthService implements AuthServiceInterface
 {
@@ -70,27 +64,11 @@ class AuthService implements AuthServiceInterface
         $this->lastError = null;
         $rememberDuration = $rememberMe ? self::REMEMBER_DURATION_SECONDS : null;
 
-        // 1. Try delight-auth first (handles users registered via the new flow)
         try {
             $this->getAuth()->loginWithUsername($username, $password, $rememberDuration);
-
-            // Delight-auth login succeeded — look up nuke_users row for session
-            $nukeUserId = $this->getNukeUserId($username);
-            if ($nukeUserId === null) {
-                return false;
-            }
-
-            $this->startSession($nukeUserId, $username);
-
-            // Sync password hash to nuke_users so future logins can use the faster legacy path
-            $this->syncPasswordToNukeUsers($username, $password);
-
+            $this->startSession($this->getAuth()->getUserId(), $username);
             return true;
-        } catch (UnknownUsernameException) {
-            // Not in delight-auth — fall through to legacy nuke_users path
-        } catch (InvalidPasswordException) {
-            // User IS in delight-auth but password is wrong — do NOT fall through to legacy
-            // path, otherwise an old synced hash in nuke_users could accept a stale password
+        } catch (UnknownUsernameException | InvalidPasswordException) {
             return false;
         } catch (EmailNotVerifiedException) {
             $this->lastError = "Please verify your email address.\nCheck your inbox or spam folder for a confirmation link.";
@@ -99,59 +77,8 @@ class AuthService implements AuthServiceInterface
             $this->lastError = "Too many login attempts.\nPlease try again later.";
             return false;
         } catch (AuthError) {
-            // Unexpected auth error — fall through to legacy path
-        } catch (\Error $e) {
-            // Delight-auth classes not available (e.g. Composer autoloader not loaded) —
-            // fall through to legacy path so login still works
-        }
-
-        // 2. Legacy nuke_users fallback (bcrypt / MD5 transitional)
-        $stmt = $this->db->prepare(
-            'SELECT user_id, username, user_password FROM nuke_users WHERE username = ?'
-        );
-        if ($stmt === false) {
             return false;
         }
-        $stmt->bind_param('s', $username);
-        $stmt->execute();
-        $result = $stmt->get_result();
-        if ($result === false) {
-            $stmt->close();
-            return false;
-        }
-        /** @var array{user_id: int, username: string, user_password: string}|null $row */
-        $row = $result->fetch_assoc();
-        $stmt->close();
-
-        if ($row === null) {
-            return false;
-        }
-
-        $storedHash = $row['user_password'];
-
-        // Skip rows with delight-auth placeholder — these must authenticate via delight-auth
-        if (str_starts_with($storedHash, 'delight-auth:')) {
-            return false;
-        }
-
-        // 2a. Try bcrypt verification
-        if (password_verify($password, $storedHash)) {
-            // Re-hash if cost parameters have changed
-            if (password_needs_rehash($storedHash, PASSWORD_BCRYPT, ['cost' => self::BCRYPT_COST])) {
-                $this->syncPasswordToNukeUsers($row['username'], $password);
-            }
-            $this->startSession($row['user_id'], $row['username']);
-            return true;
-        }
-
-        // 2b. MD5 transitional fallback — upgrade hash on success
-        if ($storedHash !== '' && md5($password) === $storedHash) {
-            $this->syncPasswordToNukeUsers($row['username'], $password);
-            $this->startSession($row['user_id'], $row['username']);
-            return true;
-        }
-
-        return false;
     }
 
     public function isAuthenticated(): bool
@@ -234,7 +161,6 @@ class AuthService implements AuthServiceInterface
             return null;
         }
 
-        // Return cached info if available and username matches
         if ($this->cachedUserInfo !== null) {
             $cachedUsername = $this->cachedUserInfo['username'] ?? '';
             \assert(is_string($cachedUsername));
@@ -248,7 +174,7 @@ class AuthService implements AuthServiceInterface
             return null;
         }
 
-        $stmt = $this->db->prepare('SELECT * FROM nuke_users WHERE username = ?');
+        $stmt = $this->db->prepare('SELECT id AS user_id, username, email AS user_email FROM auth_users WHERE username = ?');
         if ($stmt === false) {
             return null;
         }
@@ -267,32 +193,40 @@ class AuthService implements AuthServiceInterface
             return null;
         }
 
+        // Legacy defaults for News module backward compat (comment system removed)
+        $row['storynum'] = 10;
+        $row['umode'] = '';
+        $row['uorder'] = 0;
+        $row['thold'] = 0;
+
         $this->cachedUserInfo = $row;
         return $this->cachedUserInfo;
     }
 
     public function getCookieArray(): ?array
     {
-        $userInfo = $this->getUserInfo();
-        if ($userInfo === null) {
+        if (!$this->isAuthenticated()) {
             return null;
         }
 
-        /** @var array{user_id: int, username: string, user_password: string, storynum: int|string, umode: string, uorder: int|string, thold: int|string, noscore: int|string, ublockon: int|string, theme: string, commentmax: int|string} $userInfo */
+        $userId = $this->getUserId();
+        $username = $this->getUsername();
+        if ($userId === null || $username === null) {
+            return null;
+        }
 
-        // Match the legacy cookie format: uid:username:password:storynum:umode:uorder:thold:noscore:ublockon:theme:commentmax
         return [
-            (int) $userInfo['user_id'],
-            $userInfo['username'],
-            $userInfo['user_password'],
-            (string) $userInfo['storynum'],
-            (string) $userInfo['umode'],
-            (string) $userInfo['uorder'],
-            (string) $userInfo['thold'],
-            (string) $userInfo['noscore'],
-            (string) $userInfo['ublockon'],
-            (string) $userInfo['theme'],
-            (string) $userInfo['commentmax'],
+            $userId,    // [0] user_id
+            $username,  // [1] username
+            '',         // [2] password (no longer exposed)
+            '10',       // [3] storynum (legacy default)
+            '',         // [4] umode
+            '0',        // [5] uorder
+            '0',        // [6] thold
+            '0',        // [7] noscore
+            '0',        // [8] ublockon
+            '',         // [9] theme
+            '4096',     // [10] commentmax
         ];
     }
 
@@ -321,12 +255,7 @@ class AuthService implements AuthServiceInterface
             return false;
         }
 
-        $nukeUserId = $this->getNukeUserId($username);
-        if ($nukeUserId === null) {
-            return false;
-        }
-
-        $this->startSession($nukeUserId, $username);
+        $this->startSession($auth->getUserId(), $username);
         return true;
     }
 
@@ -406,16 +335,7 @@ class AuthService implements AuthServiceInterface
 
         try {
             $this->getAuth()->confirmEmailAndSignIn($selector, $token);
-
-            // Create nuke_users profile so the rest of the site sees this user
-            $authUserId = $this->getAuth()->getUserId();
             $authUsername = $this->getAuth()->getUsername();
-            $authEmail = $this->getAuth()->getEmail();
-
-            if ($authUsername !== null && $authEmail !== null) {
-                $this->createNukeUserProfile($authUserId, $authUsername, $authEmail);
-            }
-
             return ['username' => $authUsername ?? 'User'];
         } catch (InvalidSelectorTokenPairException) {
             $this->fail('mismatch');
@@ -454,18 +374,7 @@ class AuthService implements AuthServiceInterface
         $this->lastError = null;
 
         try {
-            /** @var array<string, string> $resetData */
-            $resetData = $this->getAuth()->resetPassword($selector, $token, $newPassword);
-
-            // Also update password in nuke_users for backward compat
-            $newHash = $this->hashPassword($newPassword);
-            $stmt = $this->db->prepare('UPDATE nuke_users SET user_password = ? WHERE user_email = ?');
-            if ($stmt !== false) {
-                $email = $resetData['email'];
-                $stmt->bind_param('ss', $newHash, $email);
-                $stmt->execute();
-                $stmt->close();
-            }
+            $this->getAuth()->resetPassword($selector, $token, $newPassword);
         } catch (InvalidSelectorTokenPairException) {
             $this->fail('This password reset link is invalid. Please request a new one.');
         } catch (TokenExpiredException) {
@@ -499,82 +408,5 @@ class AuthService implements AuthServiceInterface
         throw new \RuntimeException($message, 0, $previous);
     }
 
-    /**
-     * Create a nuke_users profile for a newly confirmed user.
-     *
-     * This allows the rest of the site (which queries nuke_users) to see the user.
-     */
-    private function createNukeUserProfile(int $authUserId, string $username, string $email): void
-    {
-        // Check if profile already exists
-        $checkStmt = $this->db->prepare('SELECT user_id FROM nuke_users WHERE username = ?');
-        if ($checkStmt === false) {
-            return;
-        }
-        $checkStmt->bind_param('s', $username);
-        $checkStmt->execute();
-        $checkResult = $checkStmt->get_result();
-        if ($checkResult !== false && $checkResult->num_rows > 0) {
-            $checkStmt->close();
-            return; // Profile already exists
-        }
-        $checkStmt->close();
-
-        $regdate = date('M d, Y');
-        $defaultTheme = '';
-        $stmt = $this->db->prepare(
-            'INSERT INTO nuke_users (username, user_email, user_regdate, user_password, theme, user_lang, user_avatar, bio, ublock) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)'
-        );
-        if ($stmt === false) {
-            return;
-        }
-        // Store a placeholder bcrypt hash — the real password is managed by delight-auth
-        $placeholderHash = 'delight-auth:' . $authUserId;
-        $language = 'english';
-        $emptyText = '';
-        $stmt->bind_param('sssssssss', $username, $email, $regdate, $placeholderHash, $defaultTheme, $language, $emptyText, $emptyText, $emptyText);
-        $stmt->execute();
-        $stmt->close();
-    }
-
-    /**
-     * Update the bcrypt hash in nuke_users for a given user.
-     *
-     * Used for both MD5-to-bcrypt upgrades and delight-auth sync.
-     */
-    private function syncPasswordToNukeUsers(string $username, string $plaintext): void
-    {
-        $newHash = $this->hashPassword($plaintext);
-        $stmt = $this->db->prepare('UPDATE nuke_users SET user_password = ? WHERE username = ?');
-        if ($stmt === false) {
-            return;
-        }
-        $stmt->bind_param('ss', $newHash, $username);
-        $stmt->execute();
-        $stmt->close();
-    }
-
-    /**
-     * Look up the nuke_users user_id for a given username.
-     */
-    private function getNukeUserId(string $username): ?int
-    {
-        $stmt = $this->db->prepare('SELECT user_id FROM nuke_users WHERE username = ?');
-        if ($stmt === false) {
-            return null;
-        }
-        $stmt->bind_param('s', $username);
-        $stmt->execute();
-        $result = $stmt->get_result();
-        if ($result === false) {
-            $stmt->close();
-            return null;
-        }
-        /** @var array{user_id: int}|null $row */
-        $row = $result->fetch_assoc();
-        $stmt->close();
-
-        return $row !== null ? $row['user_id'] : null;
-    }
 
 }

@@ -175,9 +175,9 @@ INSERT INTO ibl_banners (year, currentname, bannername, bannertype)
 VALUES (2024, 'Metros', 'Metros', 1);
 
 -- GM tenure for Metros franchise
-INSERT INTO ibl_gm_tenures (franchise_id, gm_username, start_season_year, end_season_year, is_mid_season_start, is_mid_season_end)
+INSERT INTO ibl_gm_tenures (franchise_id, gm_display_name, start_season_year, end_season_year, is_mid_season_start, is_mid_season_end)
 VALUES (1, 'testgm', 2020, NULL, 0, 0)
-ON DUPLICATE KEY UPDATE gm_username = VALUES(gm_username);
+ON DUPLICATE KEY UPDATE gm_display_name = VALUES(gm_display_name);
 
 -- Historical player stats (ibl_hist_archive) for franchise history queries
 -- ibl_hist is now a VIEW; the archive table's UNION ALL fallback makes these rows visible.

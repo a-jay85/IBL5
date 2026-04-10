@@ -19,7 +19,7 @@ class AwardsViewTest extends TestCase
     public function testGmHistoryRendersBothSections(): void
     {
         $tenures = [
-            ['id' => 1, 'franchise_id' => 1, 'gm_username' => 'JohnGM', 'start_season_year' => 2020, 'end_season_year' => null, 'is_mid_season_start' => 0, 'is_mid_season_end' => 0],
+            ['id' => 1, 'franchise_id' => 1, 'gm_display_name' => 'JohnGM', 'start_season_year' => 2020, 'end_season_year' => null, 'is_mid_season_start' => 0, 'is_mid_season_end' => 0],
         ];
         $awards = [
             ['year' => 2022, 'Award' => 'GM of the Year', 'name' => 'JohnGM', 'table_ID' => 1],
@@ -42,7 +42,7 @@ class AwardsViewTest extends TestCase
     public function testGmHistoryRendersOnlyTenuresWhenNoAwards(): void
     {
         $tenures = [
-            ['id' => 1, 'franchise_id' => 1, 'gm_username' => 'JohnGM', 'start_season_year' => 2020, 'end_season_year' => 2023, 'is_mid_season_start' => 0, 'is_mid_season_end' => 0],
+            ['id' => 1, 'franchise_id' => 1, 'gm_display_name' => 'JohnGM', 'start_season_year' => 2020, 'end_season_year' => 2023, 'is_mid_season_start' => 0, 'is_mid_season_end' => 0],
         ];
 
         $html = $this->view->renderGmHistory($tenures, []);

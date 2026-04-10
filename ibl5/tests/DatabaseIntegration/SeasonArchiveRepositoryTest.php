@@ -164,7 +164,7 @@ class SeasonArchiveRepositoryTest extends DatabaseTestCase
         // Production DB has GM awards data
         self::assertNotEmpty($result);
         $first = $result[0];
-        self::assertArrayHasKey('gm_username', $first);
+        self::assertArrayHasKey('gm_display_name', $first);
         self::assertArrayHasKey('team_name', $first);
         self::assertArrayHasKey('year', $first);
         self::assertArrayHasKey('Award', $first);
@@ -176,7 +176,7 @@ class SeasonArchiveRepositoryTest extends DatabaseTestCase
 
         self::assertNotEmpty($result);
         $first = $result[0];
-        self::assertArrayHasKey('gm_username', $first);
+        self::assertArrayHasKey('gm_display_name', $first);
         self::assertArrayHasKey('team_name', $first);
         self::assertArrayHasKey('start_season_year', $first);
     }

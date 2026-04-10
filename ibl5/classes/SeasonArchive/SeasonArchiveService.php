@@ -283,7 +283,7 @@ class SeasonArchiveService implements SeasonArchiveServiceInterface
     {
         foreach ($gmAwards as $award) {
             if ($award['Award'] === 'GM of the Year' && $award['year'] === $year) {
-                return ['name' => $award['gm_username'], 'team' => $award['team_name']];
+                return ['name' => $award['gm_display_name'], 'team' => $award['team_name']];
             }
         }
 
@@ -320,9 +320,9 @@ class SeasonArchiveService implements SeasonArchiveServiceInterface
             $conference = $teamConferences[$award['team_name']] ?? '';
 
             if ($conference === 'Eastern') {
-                $east[] = $award['gm_username'];
+                $east[] = $award['gm_display_name'];
             } elseif ($conference === 'Western') {
-                $west[] = $award['gm_username'];
+                $west[] = $award['gm_display_name'];
             }
         }
 
@@ -358,7 +358,7 @@ class SeasonArchiveService implements SeasonArchiveServiceInterface
                 continue;
             }
 
-            return $tenure['gm_username'];
+            return $tenure['gm_display_name'];
         }
 
         return '';

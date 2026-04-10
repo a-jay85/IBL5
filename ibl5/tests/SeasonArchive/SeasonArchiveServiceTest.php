@@ -171,8 +171,8 @@ class SeasonArchiveServiceTest extends TestCase
         $this->mockRepository->method('getPlayoffResultsByYear')->willReturn([]);
         $this->mockRepository->method('getTeamAwardsByYear')->willReturn([]);
         $this->mockRepository->method('getAllGmAwardsWithTeams')->willReturn([
-            ['year' => 1990, 'Award' => 'GM of the Year', 'gm_username' => 'Ross Gates', 'team_name' => 'Bulls', 'table_ID' => 8],
-            ['year' => 1993, 'Award' => 'GM of the Year', 'gm_username' => 'Ross Gates', 'team_name' => 'Bulls', 'table_ID' => 9],
+            ['year' => 1990, 'Award' => 'GM of the Year', 'gm_display_name' => 'Ross Gates', 'team_name' => 'Bulls', 'table_ID' => 8],
+            ['year' => 1993, 'Award' => 'GM of the Year', 'gm_display_name' => 'Ross Gates', 'team_name' => 'Bulls', 'table_ID' => 9],
         ]);
         $this->mockRepository->method('getAllGmTenuresWithTeams')->willReturn([]);
         $this->mockRepository->method('getHeatWinLossByYear')->willReturn([]);
@@ -192,7 +192,7 @@ class SeasonArchiveServiceTest extends TestCase
         $this->mockRepository->method('getPlayoffResultsByYear')->willReturn([]);
         $this->mockRepository->method('getTeamAwardsByYear')->willReturn([]);
         $this->mockRepository->method('getAllGmAwardsWithTeams')->willReturn([
-            ['year' => 1990, 'Award' => 'GM of the Year', 'gm_username' => 'Ross Gates', 'team_name' => 'Bulls', 'table_ID' => 8],
+            ['year' => 1990, 'Award' => 'GM of the Year', 'gm_display_name' => 'Ross Gates', 'team_name' => 'Bulls', 'table_ID' => 8],
         ]);
         $this->mockRepository->method('getAllGmTenuresWithTeams')->willReturn([]);
         $this->mockRepository->method('getHeatWinLossByYear')->willReturn([]);
@@ -396,8 +396,8 @@ class SeasonArchiveServiceTest extends TestCase
         $mockRepo->method('getPlayoffResultsByYear')->willReturn([]);
         $mockRepo->method('getTeamAwardsByYear')->willReturn([]);
         $mockRepo->method('getAllGmAwardsWithTeams')->willReturn([
-            ['year' => 1990, 'Award' => 'ASG Head Coach', 'gm_username' => 'Ross Gates', 'team_name' => 'Bulls', 'table_ID' => 1],
-            ['year' => 1990, 'Award' => 'ASG Head Coach', 'gm_username' => 'Brandon Tomyoy', 'team_name' => 'Clippers', 'table_ID' => 2],
+            ['year' => 1990, 'Award' => 'ASG Head Coach', 'gm_display_name' => 'Ross Gates', 'team_name' => 'Bulls', 'table_ID' => 1],
+            ['year' => 1990, 'Award' => 'ASG Head Coach', 'gm_display_name' => 'Brandon Tomyoy', 'team_name' => 'Clippers', 'table_ID' => 2],
         ]);
         $mockRepo->method('getAllGmTenuresWithTeams')->willReturn([]);
         $mockRepo->method('getHeatWinLossByYear')->willReturn([]);
@@ -425,8 +425,8 @@ class SeasonArchiveServiceTest extends TestCase
         $mockRepo->method('getPlayoffResultsByYear')->willReturn([]);
         $mockRepo->method('getTeamAwardsByYear')->willReturn([]);
         $mockRepo->method('getAllGmAwardsWithTeams')->willReturn([
-            ['year' => 2003, 'Award' => 'ASG Co-Head Coach', 'gm_username' => 'RJ Lilley', 'team_name' => 'Grizzlies', 'table_ID' => 1],
-            ['year' => 2003, 'Award' => 'ASG Head Coach', 'gm_username' => 'Mel Baltazar', 'team_name' => 'Sting', 'table_ID' => 2],
+            ['year' => 2003, 'Award' => 'ASG Co-Head Coach', 'gm_display_name' => 'RJ Lilley', 'team_name' => 'Grizzlies', 'table_ID' => 1],
+            ['year' => 2003, 'Award' => 'ASG Head Coach', 'gm_display_name' => 'Mel Baltazar', 'team_name' => 'Sting', 'table_ID' => 2],
         ]);
         $mockRepo->method('getAllGmTenuresWithTeams')->willReturn([]);
         $mockRepo->method('getHeatWinLossByYear')->willReturn([]);
@@ -476,8 +476,8 @@ class SeasonArchiveServiceTest extends TestCase
         $mockRepo->method('getTeamAwardsByYear')->willReturn([]);
         $mockRepo->method('getAllGmAwardsWithTeams')->willReturn([]);
         $mockRepo->method('getAllGmTenuresWithTeams')->willReturn([
-            ['gm_username' => 'Brandon Tomyoy', 'start_season_year' => 1988, 'end_season_year' => null, 'team_name' => 'Clippers'],
-            ['gm_username' => 'Ross Gates', 'start_season_year' => 1988, 'end_season_year' => null, 'team_name' => 'Bulls'],
+            ['gm_display_name' => 'Brandon Tomyoy', 'start_season_year' => 1988, 'end_season_year' => null, 'team_name' => 'Clippers'],
+            ['gm_display_name' => 'Ross Gates', 'start_season_year' => 1988, 'end_season_year' => null, 'team_name' => 'Bulls'],
         ]);
         $mockRepo->method('getHeatWinLossByYear')->willReturn([]);
         $mockRepo->method('getTeamColors')->willReturn([]);
@@ -502,8 +502,8 @@ class SeasonArchiveServiceTest extends TestCase
         $mockRepo->method('getTeamAwardsByYear')->willReturn([]);
         $mockRepo->method('getAllGmAwardsWithTeams')->willReturn([]);
         $mockRepo->method('getAllGmTenuresWithTeams')->willReturn([
-            ['gm_username' => 'Tony (Tek)', 'start_season_year' => 1988, 'end_season_year' => 1999, 'team_name' => 'Lakers'],
-            ['gm_username' => 'Andre Ivarsson', 'start_season_year' => 1999, 'end_season_year' => null, 'team_name' => 'Lakers'],
+            ['gm_display_name' => 'Tony (Tek)', 'start_season_year' => 1988, 'end_season_year' => 1999, 'team_name' => 'Lakers'],
+            ['gm_display_name' => 'Andre Ivarsson', 'start_season_year' => 1999, 'end_season_year' => null, 'team_name' => 'Lakers'],
         ]);
         $mockRepo->method('getHeatWinLossByYear')->willReturn([]);
         $mockRepo->method('getTeamColors')->willReturn([]);

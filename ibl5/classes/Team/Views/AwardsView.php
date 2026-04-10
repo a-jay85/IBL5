@@ -62,7 +62,7 @@ class AwardsView
             $start = $tenure['start_season_year'];
             $end = $tenure['end_season_year'];
             $endLabel = $end === null ? 'Present' : (string) $end;
-            $username = HtmlSanitizer::e($tenure['gm_username']);
+            $username = HtmlSanitizer::e($tenure['gm_display_name']);
             $output .= "<li><span class=\"award-year\">$start-$endLabel</span> $username</li>";
         }
 

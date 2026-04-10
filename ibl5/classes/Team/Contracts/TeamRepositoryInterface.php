@@ -18,7 +18,7 @@ namespace Team\Contracts;
  *
  * @phpstan-type PowerRow array{tid: int, team_name: string, leagueRecord: string, wins: int, losses: int, pct: float|string, conference: string, division: string, confRecord: string, divRecord: string, divGB: float|string|null, homeRecord: string, awayRecord: string, gamesUnplayed: int, ranking: float, last_win: int, last_loss: int, streak_type: string, streak: int, sos: float|string, remaining_sos: float|string}
  * @phpstan-type BannerRow array{year: int, currentname: string, bannername: string, bannertype: int}
- * @phpstan-type GMTenureRow array{id: int, franchise_id: int, gm_username: string, start_season_year: int, end_season_year: int|null, is_mid_season_start: int, is_mid_season_end: int}
+ * @phpstan-type GMTenureRow array{id: int, franchise_id: int, gm_display_name: string, start_season_year: int, end_season_year: int|null, is_mid_season_start: int, is_mid_season_end: int}
  * @phpstan-type GMAwardRow array{year: int, Award: string, name: string, table_ID: int}
  * @phpstan-type TeamAwardRow array{year: int, name: string, Award: string, ID: int}
  * @phpstan-type WinLossRow array{year: int, currentname: string, namethatyear: string, wins: int, losses: int}

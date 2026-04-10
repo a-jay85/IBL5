@@ -37,4 +37,7 @@ return [
     new SchemaAssertion('ibl_team_info', 'gm_username'),
     new SchemaAssertion('ibl_settings', 'name'),
     new SchemaAssertion('ibl_settings', 'value'),
+
+    // Migration 099: gm_username → gm_display_name (column stores display names, not usernames)
+    new SchemaAssertion('ibl_gm_tenures', 'gm_display_name'),
 ];

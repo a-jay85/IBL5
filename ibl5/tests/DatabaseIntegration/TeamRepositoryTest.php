@@ -127,7 +127,7 @@ class TeamRepositoryTest extends DatabaseTestCase
         // Insert a test tenure within the transaction
         $this->insertRow('ibl_gm_tenures', [
             'franchise_id' => 1,
-            'gm_username' => 'test_tenure_gm',
+            'gm_display_name' => 'test_tenure_gm',
             'start_season_year' => 2098,
             'end_season_year' => 2099,
             'is_mid_season_start' => 0,
@@ -140,7 +140,7 @@ class TeamRepositoryTest extends DatabaseTestCase
         // Find our inserted tenure
         $found = false;
         foreach ($tenures as $tenure) {
-            if ($tenure['gm_username'] === 'test_tenure_gm') {
+            if ($tenure['gm_display_name'] === 'test_tenure_gm') {
                 self::assertSame(2098, $tenure['start_season_year']);
                 $found = true;
                 break;

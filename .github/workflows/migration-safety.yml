@@ -219,7 +219,7 @@ jobs:
         # ibl_trades was removed — it never existed; the actual trade table is ibl_trade_info.
         REQUIRED_TABLES=(
           ibl_plr ibl_team_info ibl_schedule ibl_box_scores
-          ibl_hist nuke_users nuke_stories auth_users ibl_settings
+          ibl_hist nuke_stories auth_users ibl_settings
           ibl_draft ibl_draft_picks ibl_demands ibl_awards
           ibl_trade_info ibl_standings
         )
@@ -247,7 +247,6 @@ jobs:
           "ibl_plr:pid,name,tid,pos,uuid"
           "ibl_team_info:teamid,team_city,team_name,uuid"
           "ibl_schedule:Date,Year,Visitor,Home,uuid"
-          "nuke_users:user_id,username,user_email,user_ibl_team"
           "ibl_settings:name,value"
           "ibl_draft_picks:pickid,ownerofpick,owner_tid,year,round"
           "ibl_trade_info:id,tradeofferid,itemid,trade_from,trade_to"

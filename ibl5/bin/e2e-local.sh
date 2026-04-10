@@ -110,10 +110,6 @@ $t = time();
 $stmt->bind_param('sssi', $email, $hash, $user, $t);
 $stmt->execute();
 
-$stmt = $db->prepare("INSERT INTO nuke_users (username, user_email, user_ibl_team, user_password, name, user_avatar, bio, ublock, theme, user_regdate) VALUES (?, ?, 'Metros', ?, 'E2E Test User', '', '', '', '', NOW())");
-$stmt->bind_param('sss', $user, $email, $hash);
-$stmt->execute();
-
 $stmt = $db->prepare("UPDATE ibl_team_info SET gm_username = ? WHERE team_name = 'Metros'");
 $stmt->bind_param('s', $user);
 $stmt->execute();

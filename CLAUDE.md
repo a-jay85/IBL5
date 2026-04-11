@@ -111,3 +111,6 @@ After refactoring, compare output against iblhoops.net. Results must match exact
 ### Doc Freshness
 Every repo-tracked `.md` that an agent may read is validated by `bin/check-docs` (CI workflow `doc-freshness.yml`). Frontmatter must carry a `description` and a `last_verified` date no older than 60 days. See `.claude/rules/doc-freshness.md` for the schema and the dead-reference rules.
 
+### Architecture Decisions
+Load-bearing decisions are captured as ADRs in `ibl5/docs/decisions/`. PRs that touch mechanical-enforcement surfaces (new PHPStan rule, new `.claude/rules/*.md`, new CI workflow, destructive migration, new `bin/` script ≥ 50 lines, new composer dependency) must add an ADR or a bypass marker — enforced by `bin/adr-check` (CI workflow `adr-required.yml`). See `ibl5/docs/decisions/README.md` for the policy.
+

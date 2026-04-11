@@ -6,6 +6,8 @@ last_verified: 2026-04-11
 
 # PHPUnit Testing Rules
 
+> **Why this exists:** [ADR-0001](../../ibl5/docs/decisions/0001-interface-driven-architecture.md) explains why tests mock `Contracts/` interfaces rather than concrete classes — that split is the entire point of the architecture.
+
 ## PHPUnit 13+ Syntax
 ```bash
 # CORRECT commands (bin/test works from any CWD; vendor/bin/phpunit requires CWD=ibl5/)

@@ -1,0 +1,274 @@
+#!/usr/bin/env php
+<?php
+
+declare(strict_types=1);
+
+/**
+ * bin/adr-check — decision-trigger CI gate for IBL5.
+ * Policy lives in ibl5/docs/decisions/README.md ("When an ADR is Required").
+ *
+ * Exits 0 when either no triggers fire, or triggers fire and the diff adds an
+ * ADR, or the PR body carries a bypass marker. Exits 1 when a trigger fires
+ * without either resolution. Exits 2 on usage error.
+ */
+
+const TRIGGER_DESCRIPTIONS = [
+    'phpstan-rule' => 'new PHPStan custom rule (mechanical enforcement is a decision)',
+    'agent-rule' => 'new .claude/rules/*.md file (operational convention for agents)',
+    'ci-workflow' => 'new .github/workflows/*.yml workflow (process decision)',
+    'destructive-migration' => 'migration containing DROP TABLE/COLUMN/INDEX (irreversible schema change)',
+    'new-tool-script' => 'new bin/ helper script of at least 50 lines (new developer tool)',
+    'new-dependency' => 'new entry under require/require-dev in ibl5/composer.json (runtime dependency)',
+];
+
+const BYPASS_REGEX = '/<!--\s*no-adr:\s*(.+?)\s*-->/s';
+const BYPASS_MIN_LENGTH = 15;
+const MIN_TOOL_SCRIPT_LINES = 50;
+
+function usage(): string
+{
+    return <<<USAGE
+Usage: bin/adr-check [options]
+
+Decision-trigger gate: refuses to pass when a diff adds mechanical-enforcement
+surfaces without also adding an ADR (or a bypass marker in the PR body).
+
+Modes:
+  --staged           Scan staged changes via `git diff --cached`. Default.
+  --pr               Scan the current PR against origin/master. Fetches the
+                     PR body via `gh pr view` for bypass marker detection.
+
+Options:
+  --bypass-from-stdin   Read the PR body from stdin (for local testing).
+                        Overrides any automatic fetch.
+  --help, -h            Show this message.
+
+Exit 0 on pass, 1 on failure, 2 on usage error.
+
+USAGE;
+}
+
+function runCmd(string $cmd): array
+{
+    $output = [];
+    $exit = 0;
+    exec($cmd . ' 2>/dev/null', $output, $exit);
+    return [$output, $exit];
+}
+
+function gitDiffRange(string $mode): string
+{
+    return $mode === 'pr' ? 'origin/master...HEAD' : '--cached';
+}
+
+/** @return list<string> */
+function diffNames(string $mode, string $filter): array
+{
+    $range = gitDiffRange($mode);
+    [$lines] = runCmd(sprintf('git diff %s --name-only --diff-filter=%s', escapeshellarg($range), escapeshellarg($filter)));
+    return array_values(array_filter($lines, static fn (string $line): bool => $line !== ''));
+}
+
+/** @return list<string> */
+function diffAddedLines(string $mode, string $file): array
+{
+    $range = gitDiffRange($mode);
+    [$lines] = runCmd(sprintf('git diff %s -- %s', escapeshellarg($range), escapeshellarg($file)));
+    $added = [];
+    foreach ($lines as $line) {
+        if (str_starts_with($line, '+') && !str_starts_with($line, '+++')) {
+            $added[] = substr($line, 1);
+        }
+    }
+    return $added;
+}
+
+/**
+ * Read the full contents of a file from the git object store (index for --staged,
+ * HEAD for --pr). Returns [line_count, first_line].
+ */
+function newSideFileInfo(string $mode, string $file): array
+{
+    $rev = $mode === 'pr' ? 'HEAD' : '';
+    [$lines] = runCmd(sprintf('git show %s -- %s', escapeshellarg($rev . ':' . $file), escapeshellarg($file)));
+    $first = $lines[0] ?? '';
+    return [count($lines), $first];
+}
+
+/** @return list<array{type: string, file: string}> */
+function detectTriggers(string $mode): array
+{
+    $triggers = [];
+    $added = diffNames($mode, 'A');
+    $modified = diffNames($mode, 'M');
+
+    foreach ($added as $file) {
+        if (preg_match('#^ibl5/phpstan-rules/.+\.php$#', $file) === 1) {
+            $triggers[] = ['type' => 'phpstan-rule', 'file' => $file];
+            continue;
+        }
+        if (preg_match('#^\.claude/rules/.+\.md$#', $file) === 1) {
+            $triggers[] = ['type' => 'agent-rule', 'file' => $file];
+            continue;
+        }
+        if (preg_match('#^\.github/workflows/.+\.ya?ml$#', $file) === 1) {
+            $triggers[] = ['type' => 'ci-workflow', 'file' => $file];
+            continue;
+        }
+        if (preg_match('#^bin/[^/]+$#', $file) === 1) {
+            [$lineCount, $firstLine] = newSideFileInfo($mode, $file);
+            if (str_starts_with($firstLine, '#!') && $lineCount >= MIN_TOOL_SCRIPT_LINES) {
+                $triggers[] = ['type' => 'new-tool-script', 'file' => $file];
+            }
+            continue;
+        }
+    }
+
+    $candidates = array_unique(array_merge($added, $modified));
+    foreach ($candidates as $file) {
+        if (preg_match('#^ibl5/migrations/.+\.sql$#', $file) !== 1) {
+            continue;
+        }
+        // Strip /* ... */ block comments (multi-line) from the added blob before scanning,
+        // so DROP TABLE inside a commented-out block doesn't fire the trigger.
+        $addedBlob = implode("\n", diffAddedLines($mode, $file));
+        $cleaned = (string) preg_replace('#/\*.*?\*/#s', '', $addedBlob);
+        foreach (preg_split('/\r?\n/', $cleaned) ?: [] as $line) {
+            $trimmed = ltrim($line);
+            if ($trimmed === '' || str_starts_with($trimmed, '--')) {
+                continue;
+            }
+            if (preg_match('/\b(DROP\s+TABLE|DROP\s+COLUMN|DROP\s+INDEX)\b/i', $trimmed) === 1) {
+                $triggers[] = ['type' => 'destructive-migration', 'file' => $file];
+                break;
+            }
+        }
+    }
+
+    foreach ($modified as $file) {
+        if ($file !== 'ibl5/composer.json') {
+            continue;
+        }
+        foreach (diffAddedLines($mode, $file) as $line) {
+            if (preg_match('#"[a-z0-9._-]+/[a-z0-9._-]+"\s*:\s*"#i', $line) === 1) {
+                $triggers[] = ['type' => 'new-dependency', 'file' => $file];
+                break;
+            }
+        }
+    }
+
+    return $triggers;
+}
+
+function hasAddedAdr(string $mode): bool
+{
+    foreach (diffNames($mode, 'A') as $file) {
+        if (preg_match('#^ibl5/docs/decisions/(\d{4})-.+\.md$#', $file, $m) === 1 && $m[1] !== '0000') {
+            return true;
+        }
+    }
+    return false;
+}
+
+function fetchPrBody(string $mode, bool $fromStdin): ?string
+{
+    if ($fromStdin) {
+        $body = stream_get_contents(STDIN);
+        return $body === false ? null : $body;
+    }
+    if ($mode !== 'pr') {
+        return null;
+    }
+    // GitHub Actions checks out a detached merge commit for pull_request events, so
+    // `gh pr view` without arguments cannot infer the PR. The workflow passes the
+    // number via PR_NUMBER env. Fall back to inference when PR_NUMBER is absent
+    // (local `--pr` usage on a branch checkout).
+    $prNumber = getenv('PR_NUMBER');
+    $cmd = 'gh pr view';
+    if (is_string($prNumber) && $prNumber !== '') {
+        $cmd .= ' ' . escapeshellarg($prNumber);
+    }
+    $cmd .= ' --json body --jq .body';
+    [$lines, $exit] = runCmd($cmd);
+    if ($exit !== 0 || $lines === []) {
+        return null;
+    }
+    return implode("\n", $lines);
+}
+
+function extractBypassReason(?string $body): ?string
+{
+    if ($body === null || $body === '' || $body === 'null') {
+        return null;
+    }
+    if (preg_match(BYPASS_REGEX, $body, $m) !== 1) {
+        return null;
+    }
+    $reason = trim($m[1]);
+    if (strlen($reason) < BYPASS_MIN_LENGTH) {
+        return null;
+    }
+    return $reason;
+}
+
+// --- main ---
+
+$opts = ['mode' => 'staged', 'bypass_from_stdin' => false];
+foreach (array_slice($argv, 1) as $arg) {
+    switch ($arg) {
+        case '--staged':
+            $opts['mode'] = 'staged';
+            break;
+        case '--pr':
+            $opts['mode'] = 'pr';
+            break;
+        case '--bypass-from-stdin':
+            $opts['bypass_from_stdin'] = true;
+            break;
+        case '--help':
+        case '-h':
+            echo usage();
+            exit(0);
+        default:
+            fwrite(STDERR, "unknown flag: {$arg}\n");
+            fwrite(STDERR, usage());
+            exit(2);
+    }
+}
+
+$triggers = detectTriggers($opts['mode']);
+if ($triggers === []) {
+    echo "No decision-trigger surfaces touched. ADR not required.\n";
+    exit(0);
+}
+
+$adrAdded = hasAddedAdr($opts['mode']);
+$bypassReason = extractBypassReason(fetchPrBody($opts['mode'], $opts['bypass_from_stdin']));
+
+echo "Decision-trigger surfaces detected:\n";
+foreach ($triggers as $t) {
+    $desc = TRIGGER_DESCRIPTIONS[$t['type']] ?? $t['type'];
+    echo sprintf("  - [%s] %s — %s\n", $t['type'], $t['file'], $desc);
+}
+echo "\n";
+
+if ($adrAdded) {
+    echo "PASS: diff adds a new ADR under ibl5/docs/decisions/.\n";
+    exit(0);
+}
+
+if ($bypassReason !== null) {
+    echo "PASS (bypass): {$bypassReason}\n";
+    exit(0);
+}
+
+echo "FAIL: the diff touches decision-trigger surfaces without an accompanying ADR.\n";
+echo "\n";
+echo "Resolve by either:\n";
+echo "  1. Create an ADR: `bin/next-adr \"kebab-title\"` and fill in the template.\n";
+echo "     The new file must be added in this same PR under ibl5/docs/decisions/.\n";
+echo "  2. Add a bypass marker to the PR body (HTML comment):\n";
+echo "     <!-- no-adr: reason at least 15 characters long -->\n";
+echo "\n";
+echo "See ibl5/docs/decisions/README.md for the full policy.\n";
+exit(1);

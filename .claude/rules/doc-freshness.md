@@ -18,6 +18,7 @@ CI validates every `.md` under these roots:
 - `.claude/skills/**/SKILL.md`
 - `.claude/commands/*.md`
 - `ibl5/docs/*.md` (non-archive)
+- `ibl5/docs/decisions/*.md` (ADRs — also integrity-checked for bidirectional `Supersedes` / `Superseded by` links across files)
 
 **Out of scope:** `.archive/**`, `ibl5/docs/archive/**`, `worktrees/**`, and any `.md` inside `vendor/` or `node_modules/`. User memory (`~/.claude/projects/.../memory/*.md`) is not repo-tracked; `bin/check-docs --include-memory` sweeps it locally but CI never does.
 

@@ -2,10 +2,12 @@
 # Full rebuild of the DuckDB analytics database.
 # Idempotent: deletes and recreates from scratch every time.
 #
-# Usage: bin/analytics-build [--writeback] [--skip-export] [--local]
+# Usage: bin/analytics-build [--writeback] [--skip-export] [--local | --my-cnf]
 #   --writeback    After building, export writeback CSVs and import to MariaDB
 #   --skip-export  Skip the MariaDB → CSV export step (use existing CSVs)
 #   --local        Force local Docker connection (ignore REMOTE_* in .env)
+#   --my-cnf       Use ~/.my.cnf for credentials (for running on prod, where
+#                  neither root/root local Docker nor REMOTE_* in .env applies)
 
 set -euo pipefail
 
@@ -18,15 +20,22 @@ DUCKDB="$ANALYTICS_DIR/duckdb"
 WRITEBACK=false
 SKIP_EXPORT=false
 FORCE_LOCAL=false
+USE_MY_CNF=false
 
 for arg in "$@"; do
     case "$arg" in
         --writeback)   WRITEBACK=true ;;
         --skip-export) SKIP_EXPORT=true ;;
         --local)       FORCE_LOCAL=true ;;
+        --my-cnf)      USE_MY_CNF=true ;;
         *)             echo "Unknown argument: $arg" >&2; exit 1 ;;
     esac
 done
+
+if [ "$USE_MY_CNF" = true ] && [ "$FORCE_LOCAL" = true ]; then
+    echo "Error: --my-cnf and --local are mutually exclusive" >&2
+    exit 1
+fi
 
 # Verify DuckDB binary exists
 if [ ! -x "$DUCKDB" ]; then
@@ -43,6 +52,8 @@ if [ "$SKIP_EXPORT" = false ]; then
     EXPORT_ARGS=""
     if [ "$FORCE_LOCAL" = true ]; then
         EXPORT_ARGS="--local"
+    elif [ "$USE_MY_CNF" = true ]; then
+        EXPORT_ARGS="--my-cnf"
     fi
     # shellcheck disable=SC2086
     "$REPO_ROOT/bin/analytics-export" $EXPORT_ARGS

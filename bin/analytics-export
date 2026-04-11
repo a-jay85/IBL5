@@ -2,10 +2,12 @@
 # Export MariaDB tables to CSV for DuckDB analytics.
 # Dumps tables to ibl5/analytics/data/*.csv with headers.
 #
-# Usage: bin/analytics-export [--local]
-#   --local  Force local Docker connection (ignore REMOTE_* in .env)
+# Usage: bin/analytics-export [--local | --my-cnf]
+#   --local   Force local Docker connection (ignore REMOTE_* in .env)
+#   --my-cnf  Use ~/.my.cnf for credentials (for running on prod, where
+#             neither root/root local Docker nor REMOTE_* in .env applies)
 #
-# Connection: reads REMOTE_* from .env for production, falls back to local Docker.
+# Connection priority: --my-cnf > --local > REMOTE_* in .env > local Docker.
 # Output: ibl5/analytics/data/*.csv + export_manifest.json
 
 set -euo pipefail
@@ -14,30 +16,56 @@ REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 DATA_DIR="$REPO_ROOT/ibl5/analytics/data"
 
 FORCE_LOCAL=false
+USE_MY_CNF=false
 for arg in "$@"; do
     case "$arg" in
-        --local) FORCE_LOCAL=true ;;
-        *)       echo "Unknown argument: $arg" >&2; exit 1 ;;
+        --local)  FORCE_LOCAL=true ;;
+        --my-cnf) USE_MY_CNF=true ;;
+        *)        echo "Unknown argument: $arg" >&2; exit 1 ;;
     esac
 done
 
-# Source .env for database credentials (skip if --local)
+if [ "$USE_MY_CNF" = true ] && [ "$FORCE_LOCAL" = true ]; then
+    echo "Error: --my-cnf and --local are mutually exclusive" >&2
+    exit 1
+fi
+
+# Source .env for database credentials (skip if --local or --my-cnf)
 ENV_FILE="$REPO_ROOT/.env"
-if [ -f "$ENV_FILE" ] && [ "$FORCE_LOCAL" = false ]; then
+if [ -f "$ENV_FILE" ] && [ "$FORCE_LOCAL" = false ] && [ "$USE_MY_CNF" = false ]; then
     set -a
     # shellcheck disable=SC1090
     source "$ENV_FILE"
     set +a
 fi
 
-# Determine connection mode
-if [ "$FORCE_LOCAL" = false ] && [ -n "${REMOTE_HOST:-}" ] && [ "$REMOTE_HOST" != "localhost" ] && [ "$REMOTE_HOST" != "127.0.0.1" ]; then
+# Determine connection mode. CONN_ARGS is the per-invocation argument array
+# passed to every mariadb call; DB_PASS_VAL is exported via MYSQL_PWD only
+# when not using --my-cnf (which reads credentials from the config file).
+CONN_ARGS=()
+if [ "$USE_MY_CNF" = true ]; then
+    MY_CNF_PATH="$HOME/.my.cnf"
+    if [ ! -f "$MY_CNF_PATH" ]; then
+        echo "Error: --my-cnf specified but $MY_CNF_PATH does not exist" >&2
+        exit 1
+    fi
+    DB_HOST="localhost"
+    DB_PORT="3306"
+    DB_USER_VAL="(.my.cnf)"
+    DB_PASS_VAL=""
+    DB_NAME="${REMOTE_DATABASE:-iblhoops_ibl5}"
+    EXTRA_OPTS=""
+    # --defaults-file MUST be the first argument to mariadb
+    CONN_ARGS=("--defaults-file=$MY_CNF_PATH" "--skip-ssl")
+    echo "Mode: .my.cnf ($MY_CNF_PATH → $DB_NAME)"
+elif [ "$FORCE_LOCAL" = false ] && [ -n "${REMOTE_HOST:-}" ] && [ "$REMOTE_HOST" != "localhost" ] && [ "$REMOTE_HOST" != "127.0.0.1" ]; then
     DB_HOST="$REMOTE_HOST"
     DB_PORT="${REMOTE_PORT:-3306}"
     DB_USER_VAL="$REMOTE_USER"
     DB_PASS_VAL="$REMOTE_PASSWORD"
     DB_NAME="${REMOTE_DATABASE:-iblhoops_ibl5}"
     EXTRA_OPTS="--compress"
+    CONN_ARGS=("-h" "$DB_HOST" "-P" "$DB_PORT" "--skip-ssl" "-u" "$DB_USER_VAL")
     echo "Mode: remote production ($DB_HOST:$DB_PORT)"
 else
     DB_HOST="127.0.0.1"
@@ -46,14 +74,14 @@ else
     DB_PASS_VAL="root"
     DB_NAME="iblhoops_ibl5"
     EXTRA_OPTS=""
+    CONN_ARGS=("-h" "$DB_HOST" "-P" "$DB_PORT" "--skip-ssl" "-u" "$DB_USER_VAL")
     echo "Mode: local Docker ($DB_HOST)"
 fi
 
 # Helper: run a mariadb query (tab-separated, no column names)
 db_query() {
     # shellcheck disable=SC2086
-    MYSQL_PWD="$DB_PASS_VAL" mariadb -h "$DB_HOST" -P "$DB_PORT" --skip-ssl \
-        -u "$DB_USER_VAL" $EXTRA_OPTS "$DB_NAME" -N -B -e "$1"
+    MYSQL_PWD="$DB_PASS_VAL" mariadb "${CONN_ARGS[@]}" $EXTRA_OPTS "$DB_NAME" -N -B -e "$1"
 }
 
 # Helper: export a table to CSV with header row
@@ -65,15 +93,13 @@ export_table() {
 
     # Export data with header (-B includes column names as first row)
     # shellcheck disable=SC2086
-    MYSQL_PWD="$DB_PASS_VAL" mariadb -h "$DB_HOST" -P "$DB_PORT" --skip-ssl \
-        -u "$DB_USER_VAL" $EXTRA_OPTS "$DB_NAME" -B -e "$query" > "$outfile"
+    MYSQL_PWD="$DB_PASS_VAL" mariadb "${CONN_ARGS[@]}" $EXTRA_OPTS "$DB_NAME" -B -e "$query" > "$outfile"
 
     # If file is empty (table had 0 rows, MariaDB omits header), write header from SHOW COLUMNS
     if [ ! -s "$outfile" ]; then
         # Get column names and join with tabs
         # shellcheck disable=SC2086
-        MYSQL_PWD="$DB_PASS_VAL" mariadb -h "$DB_HOST" -P "$DB_PORT" --skip-ssl \
-            -u "$DB_USER_VAL" $EXTRA_OPTS "$DB_NAME" -N -B \
+        MYSQL_PWD="$DB_PASS_VAL" mariadb "${CONN_ARGS[@]}" $EXTRA_OPTS "$DB_NAME" -N -B \
             -e "SELECT COLUMN_NAME FROM information_schema.COLUMNS WHERE TABLE_SCHEMA='$DB_NAME' AND TABLE_NAME='$table' ORDER BY ORDINAL_POSITION" \
             | paste -s -d'	' - > "$outfile"
     fi

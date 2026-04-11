@@ -1,3 +1,8 @@
+---
+description: Worktree setup and /post-plan workflow rules for multi-step implementation work.
+last_verified: 2026-04-11
+---
+
 # Workflow Continuity Rule
 
 ## Phase 1: Worktree Setup

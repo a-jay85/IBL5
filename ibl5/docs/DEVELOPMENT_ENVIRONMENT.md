@@ -1,3 +1,8 @@
+---
+description: Docker setup, dependency caching, and database connection details.
+last_verified: 2026-04-11
+---
+
 # IBL5 Development Environment Setup
 
 **Purpose:** Environment setup, dependency caching, and database connection for Copilot Agent.

@@ -1,3 +1,8 @@
+---
+description: Post-refactoring roadmap and priority queue.
+last_verified: 2026-04-11
+---
+
 # Strategic Development Priorities for IBL5
 
 **Last Updated:** March 25, 2026

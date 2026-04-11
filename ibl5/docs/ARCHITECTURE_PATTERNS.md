@@ -1,3 +1,8 @@
+---
+description: Canonical interface-driven Repository/Service/View patterns for new modules.
+last_verified: 2026-04-11
+---
+
 # IBL5 Architecture Patterns
 
 **Purpose:** Comprehensive interface-driven architecture patterns for module refactoring.  
@@ -165,7 +170,7 @@ class PlayerDatabaseValidator implements PlayerDatabaseValidatorInterface
 
 **CRITICAL: IBL5 supports TWO different database implementations:**
 
-### 1. Legacy MySQL Abstraction Layer (`ibl5/classes/MySQL.php`)
+### 1. Legacy MySQL Abstraction Layer (`ibl5/classes/Database/MySQL.php`)
 - Provides phpBB-style abstraction layer over mysqli
 - Methods: `sql_query()`, `sql_fetch_assoc()`, `sql_escape_string()`, etc.
 - Does NOT have prepared statements built-in

@@ -1,3 +1,8 @@
+---
+description: Complete timeline of the 30-module interface-driven refactoring.
+last_verified: 2026-04-11
+---
+
 # IBL5 Refactoring History
 
 This document tracks the history of module refactoring efforts in the IBL5 codebase, documenting architectural improvements, security fixes, and modernization progress.
@@ -661,7 +666,7 @@ $stmt->bind_param('ss', $searchTerm, $searchTerm);
 - StatsFormatter - Consistent number formatting with zero-division handling
 - StatsSanitizer - Safe type conversion and input sanitization
 
-**Documentation:** `ibl5/classes/Statistics/README.md`
+**Source:** `ibl5/classes/BasketballStats/StatsFormatter.php`
 
 **Usage:** Integrated into TeamStats, PlayerStats, UI, Leaderboards, Season Leaders
 
@@ -787,7 +792,6 @@ All IBL5 modules (31 total) have been refactored to the interface-driven archite
 
 
 ### Component Documentation
-- [Statistics README](../classes/Statistics/README.md) - StatsFormatter usage
 - [Player README](../classes/Player/README.md) - Player module architecture
 - [DepthChartEntry SECURITY](../classes/DepthChartEntry/SECURITY.md) - Security patterns
 - [ComparePlayers README](../classes/ComparePlayers/README.md) - Compare module architecture

@@ -1,3 +1,8 @@
+---
+description: Index of all IBL5 project documentation.
+last_verified: 2026-04-11
+---
+
 # IBL5 Documentation Index
 
 This directory is the primary home for all project documentation.
@@ -16,7 +21,7 @@ This directory is the primary home for all project documentation.
 | [DEVELOPMENT_GUIDE.md](DEVELOPMENT_GUIDE.md) | Development standards, priorities, and workflow |
 | [DATABASE_GUIDE.md](DATABASE_GUIDE.md) | Schema reference and query patterns |
 | [API_GUIDE.md](API_GUIDE.md) | REST API design and development (planned) |
-| [DEVELOPMENT_ENVIRONMENT.md](DEVELOPMENT_ENVIRONMENT.md) | MAMP setup, dependency caching, database connection |
+| [DEVELOPMENT_ENVIRONMENT.md](DEVELOPMENT_ENVIRONMENT.md) | Docker setup, dependency caching, database connection |
 | [DOCUMENTATION_STANDARDS.md](DOCUMENTATION_STANDARDS.md) | Documentation organization and lifecycle |
 | [TESTING_STANDARDS.md](TESTING_STANDARDS.md) | Testing philosophy and conventions |
 
@@ -26,7 +31,6 @@ This directory is the primary home for all project documentation.
 |----------|-------------|
 | [REFACTORING_HISTORY.md](REFACTORING_HISTORY.md) | Complete timeline of all 30 module refactorings |
 | [STRATEGIC_PRIORITIES.md](STRATEGIC_PRIORITIES.md) | Post-refactoring roadmap and next priorities |
-| [STATISTICS_FORMATTING_GUIDE.md](STATISTICS_FORMATTING_GUIDE.md) | StatsFormatter and StatsSanitizer usage |
 
 ## Component Documentation
 

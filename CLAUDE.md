@@ -1,3 +1,8 @@
+---
+description: Root Claude Code instructions for IBL5: commands, mandatory rules, and architecture pointers.
+last_verified: 2026-04-11
+---
+
 # CLAUDE.md
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
@@ -102,4 +107,7 @@ Every PHP file must have `declare(strict_types=1);` at the top (enforced by PHPS
 
 ### Production Validation
 After refactoring, compare output against iblhoops.net. Results must match exactly.
+
+### Doc Freshness
+Every repo-tracked `.md` that an agent may read is validated by `bin/check-docs` (CI workflow `doc-freshness.yml`). Frontmatter must carry a `description` and a `last_verified` date no older than 60 days. See `.claude/rules/doc-freshness.md` for the schema and the dead-reference rules.
 

@@ -1,5 +1,7 @@
 ---
+description: Playwright E2E testing rules, Docker requirements, and actionability pitfalls.
 paths: ibl5/tests/e2e/**/*.ts
+last_verified: 2026-04-11
 ---
 
 # Playwright E2E Testing Rules

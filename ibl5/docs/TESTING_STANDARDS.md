@@ -1,3 +1,8 @@
+---
+description: Testing philosophy, conventions, and requirements for IBL5.
+last_verified: 2026-04-11
+---
+
 # IBL5 Testing Standards
 
 **Purpose:** Comprehensive testing guidelines for PHPUnit 13+ in the IBL5 codebase.  
@@ -201,7 +206,7 @@ private InterfaceName $mockObject;
 
 **After writing test files, you MUST:**
 
-1. **Verify test directory structure** - Tests should be in `ibl5/tests/ModuleName/`
+1. **Verify test directory structure** - Tests should be in `ibl5/tests/<ModuleName>/`
 2. **Add test suite to phpunit.xml** - Register the directory or individual test files
 3. **Update testsuite name** - Use descriptive names (e.g., "Player Module Tests", "FreeAgency Module Tests")
 4. **Verify tests are discoverable** - Run `vendor/bin/phpunit --list-suites` to confirm registration

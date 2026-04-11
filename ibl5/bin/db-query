@@ -1,0 +1,37 @@
+#!/bin/bash
+# Wrapper script for querying the local Docker MariaDB database.
+# Usage: ibl5/bin/db-query "SELECT * FROM ibl_plr LIMIT 5"
+#
+# NOTE: In interactive shells (terminal), bash expands `!` inside double quotes
+# (history expansion). If running manually, use <> instead of != in SQL,
+# or use single quotes: ./bin/db-query 'SELECT * FROM t WHERE col != ""'
+
+if [ -z "$1" ]; then
+    echo "Usage: $0 \"SQL QUERY\"" >&2
+    exit 1
+fi
+
+# Resolve symlinks to find the real script location
+SOURCE="$0"
+while [ -L "$SOURCE" ]; do
+    DIR="$(cd "$(dirname "$SOURCE")" && pwd)"
+    SOURCE="$(readlink "$SOURCE")"
+    [[ "$SOURCE" != /* ]] && SOURCE="$DIR/$SOURCE"
+done
+SCRIPT_DIR="$(cd "$(dirname "$SOURCE")" && pwd)"
+CONFIG="$SCRIPT_DIR/../config.php"
+
+if [ ! -f "$CONFIG" ]; then
+    echo "Error: config.php not found at $CONFIG" >&2
+    exit 1
+fi
+
+DB_USER=$(php -r "error_reporting(0); include '$CONFIG'; echo \$dbuname;" 2>/dev/null)
+DB_PASS=$(php -r "error_reporting(0); include '$CONFIG'; echo \$dbpass;" 2>/dev/null)
+DB_NAME=$(php -r "error_reporting(0); include '$CONFIG'; echo \$dbname;" 2>/dev/null)
+
+mariadb -h 127.0.0.1 --skip-ssl \
+    -u "$DB_USER" -p"$DB_PASS" \
+    --table \
+    "$DB_NAME" \
+    -e "$1"

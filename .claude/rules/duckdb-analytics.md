@@ -1,9 +1,11 @@
 ---
+description: DuckDB columnar OLAP layer for cross-season analytics; tables, queries, and when to use it.
 paths:
   - "**/analytics/**"
   - "**/bin/analytics-*"
   - "**/bin/db-import-boxscores"
   - "**/*.duckdb"
+last_verified: 2026-04-11
 ---
 
 # DuckDB Analytics Layer

@@ -1,5 +1,7 @@
 ---
+description: Canonical database schema reference derived from migrations.
 paths: ibl5/migrations/000_baseline_schema.sql
+last_verified: 2026-04-11
 ---
 
 # Database Schema Reference

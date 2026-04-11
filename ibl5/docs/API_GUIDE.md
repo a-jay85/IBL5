@@ -1,3 +1,8 @@
+---
+description: REST API design and endpoint specifications (planned).
+last_verified: 2026-04-11
+---
+
 # API Development Guide
 
 **Status:** Database is API-Ready ✅ | **API Endpoints:** Not Yet Implemented

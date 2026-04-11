@@ -1,3 +1,8 @@
+---
+description: Dev auto-login setup: localhost sessions are pre-authenticated via DEV_AUTO_LOGIN; do not navigate to login forms.
+last_verified: 2026-04-11
+---
+
 # Browser Auto-Login
 
 On localhost (`main.localhost`, `localhost`, `127.0.0.1`), dev auto-login is active.

@@ -1,3 +1,8 @@
+---
+description: Documentation organization and lifecycle rules.
+last_verified: 2026-04-11
+---
+
 # IBL5 Documentation Standards
 
 **Purpose:** Documentation organization, lifecycle, and standards for the IBL5 codebase.  
@@ -27,7 +32,6 @@
 - **Location**: Next to the code they document
 - Examples:
   - `ibl5/classes/Player/README.md` - Player module architecture
-  - `ibl5/classes/Statistics/README.md` - StatsFormatter usage
   - `ibl5/classes/DepthChartEntry/SECURITY.md` - Security patterns
   - `ibl5/tests/Trading/README.md` - Trading test documentation
 - **When to create**: When refactoring a module or creating a new class
@@ -55,7 +59,7 @@
 - Create detailed completion summary initially
 - After review, consolidate key points into `ibl5/docs/REFACTORING_HISTORY.md`
 - Move detailed summary to `.archive/`
-- Create component README in module directory (`ibl5/classes/Module/README.md`)
+- Create component README in module directory (`ibl5/classes/<Module>/README.md`)
 
 **2. Strategic Planning:**
 - Create in `ibl5/docs/` directory
@@ -132,7 +136,7 @@
 
 3. **Is this about a specific class or module?**
    - Create README.md in that module's directory
-   - Example: `ibl5/classes/YourModule/README.md`
+   - Example: `ibl5/classes/<YourModule>/README.md`
 
 4. **Is this an essential technical guide?**
    - Only add to root if truly essential
@@ -163,7 +167,7 @@
 
 **2. After PR Merge**:
 - Add key points to `ibl5/docs/REFACTORING_HISTORY.md` under "Completed Refactorings"
-- Create `ibl5/classes/FreeAgency/README.md` for component architecture
+- Create a component README at `ibl5/classes/<FreeAgency>/README.md` for component architecture
 - Move `FREE_AGENCY_REFACTORING_SUMMARY.md` to `ibl5/docs/archive/` or `.archive/`
 - Update `ibl5/docs/README.md` index
 - Update `ibl5/docs/DEVELOPMENT_GUIDE.md` to mark FreeAgency as complete
@@ -183,7 +187,7 @@
 
 1. ✅ Update `STRATEGIC_PRIORITIES.md` - Mark module as complete with brief summary
 2. ✅ Update `REFACTORING_HISTORY.md` - Add entry to "Completed Refactorings" section
-3. ✅ Create component README.md - In `ibl5/classes/ModuleName/README.md`
+3. ✅ Create component README.md - In `ibl5/classes/<ModuleName>/README.md`
 4. ✅ Update documentation cross-references - Fix any links in related docs
 5. ✅ Verify all links work - Test internal documentation links before finalizing
 
@@ -191,7 +195,7 @@
 
 - [ ] `STRATEGIC_PRIORITIES.md` updated with module completion summary
 - [ ] `REFACTORING_HISTORY.md` updated with detailed refactoring section
-- [ ] Component README.md created in `ibl5/classes/ModuleName/`
+- [ ] Component README.md created in `ibl5/classes/<ModuleName>/`
 - [ ] `ibl5/docs/DEVELOPMENT_GUIDE.md` updated (refactoring count, status)
 - [ ] `ibl5/docs/README.md` updated if new docs created
 - [ ] All internal documentation links verified and working

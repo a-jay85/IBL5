@@ -1,3 +1,8 @@
+---
+description: Common repository helpers and gotchas for IBL5 PHP code.
+last_verified: 2026-04-11
+---
+
 # Core Coding Reference
 
 Quick reference for frequently-used patterns not covered in CLAUDE.md.

@@ -245,6 +245,15 @@ if [ "$PROD_DB" = true ]; then
     echo "Backfilling schema_migrations from prod dump..."
     db_exec "$DB_CONTAINER" $DB_CMD \
         -e "INSERT IGNORE INTO schema_migrations (version) SELECT migration FROM migrations;" 2>/dev/null || true
+
+    # Replay any local migrations newer than the prod dump's cutoff.
+    # The prod-seed import above DROP-and-recreated every table, rolling the schema
+    # back to whatever was frozen at export time. Any migration that landed locally
+    # after the export has its file on disk but no matching row in schema_migrations
+    # (the backfill above only copied what prod had applied), so db-migrate will
+    # run it now. Idempotent — migrations already in schema_migrations are skipped.
+    echo "Replaying migrations not yet applied to prod seed..."
+    "$REPO_ROOT/bin/db-migrate" "$DB_CONTAINER" "$WORKTREE_PATH/ibl5/migrations"
 fi
 
 # Optionally seed with CI test data (after migrations so renamed columns exist)

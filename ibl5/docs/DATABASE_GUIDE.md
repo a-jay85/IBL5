@@ -1,3 +1,8 @@
+---
+description: Schema reference and query patterns for IBL5 database work.
+last_verified: 2026-04-11
+---
+
 # IBL5 Database Guide
 
 **Last Updated:** February 12, 2026

@@ -1,6 +1,7 @@
 ---
 allowed-tools: Bash(bin/codebase-audit), Bash(bin/codebase-audit:*), Bash(cat:*), Bash(head:*), Bash(tail:*), Bash(wc:*), Bash(grep:*), Bash(touch:*)
 description: Run codebase hygiene audit and triage findings
+last_verified: 2026-04-11
 ---
 
 Run the codebase audit and triage findings into actionable buckets.

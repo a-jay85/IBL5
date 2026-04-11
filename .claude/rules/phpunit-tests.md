@@ -1,5 +1,7 @@
 ---
+description: PHPUnit testing rules: bin/test wrapper, output parsing, behavior-focused patterns.
 paths: ibl5/tests/**/*.php
+last_verified: 2026-04-11
 ---
 
 # PHPUnit Testing Rules

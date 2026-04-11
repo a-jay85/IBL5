@@ -1,0 +1,352 @@
+#!/usr/bin/env php
+<?php
+
+declare(strict_types=1);
+
+/**
+ * bin/check-docs — Living Documentation Principle enforcement.
+ * Policy lives in .claude/rules/doc-freshness.md.
+ */
+
+const STALENESS_DAYS = 60;
+
+const IN_SCOPE_GLOBS = [
+    'CLAUDE.md',
+    'README.md',
+    '.claude/rules/*.md',
+    '.claude/skills/*/SKILL.md',
+    '.claude/commands/*.md',
+    'ibl5/docs/*.md',
+];
+
+const EXCLUDED_RELATIVE_FRAGMENTS = [
+    '.archive/',
+    'ibl5/docs/archive/',
+    'worktrees/',
+    'vendor/',
+    'node_modules/',
+];
+
+const REFERENCE_PREFIXES = [
+    'bin/',
+    'ibl5/',
+    '.claude/',
+    '.github/',
+    'docs/',
+    'migrations/',
+];
+
+// Paths that are intentionally local-only, user-managed, or generated at runtime.
+// Keep this list tiny — prefer fixing references over extending the allowlist.
+const REFERENCE_ALLOWLIST = [
+    '.claude/settings.json',
+    '.claude/settings.local.json',
+    'ibl5/analytics/data/ibl_analytics.duckdb',
+];
+
+function usage(): string
+{
+    return <<<USAGE
+Usage: bin/check-docs [options]
+
+Enforces the Living Documentation policy defined in
+.claude/rules/doc-freshness.md. Validates YAML frontmatter
+(description, last_verified), staleness (60-day max), and
+dead repo-path references on every in-scope markdown file.
+
+Options:
+  --fix-dates        Bump last_verified to today on every scanned file.
+                     Use only for reviewed batch re-verification.
+  --include-memory   Also scan ~/.claude/projects/.../memory/*.md.
+                     Off in CI.
+  --verbose, -v      Show passing files too.
+  --help, -h         Show this message.
+
+Exit 0 on success, 1 on any validation failure.
+
+USAGE;
+}
+
+function repoRoot(): string
+{
+    $dir = __DIR__;
+    while ($dir !== '/' && !is_dir($dir . '/.git') && !is_file($dir . '/.git')) {
+        $dir = dirname($dir);
+    }
+    if ($dir === '/') {
+        fwrite(STDERR, "error: could not locate repo root\n");
+        exit(1);
+    }
+    return $dir;
+}
+
+/** @return list<string> */
+function collectFiles(string $root, bool $includeMemory): array
+{
+    $files = [];
+    foreach (IN_SCOPE_GLOBS as $glob) {
+        $matches = glob($root . '/' . $glob);
+        if ($matches === false) {
+            continue;
+        }
+        foreach ($matches as $path) {
+            $files[] = $path;
+        }
+    }
+    if ($includeMemory) {
+        $home = getenv('HOME');
+        if (is_string($home) && $home !== '') {
+            $memory = $home . '/.claude/projects/-Users-ajaynicolas-Documents-GitHub-IBL5/memory';
+            if (is_dir($memory)) {
+                $matches = glob($memory . '/*.md');
+                if ($matches !== false) {
+                    foreach ($matches as $path) {
+                        $files[] = $path;
+                    }
+                }
+            }
+        }
+    }
+    $prefix = $root . '/';
+    $filtered = array_filter($files, static function (string $path) use ($prefix): bool {
+        $rel = str_starts_with($path, $prefix) ? substr($path, strlen($prefix)) : $path;
+        foreach (EXCLUDED_RELATIVE_FRAGMENTS as $frag) {
+            if (str_starts_with($rel, $frag)) {
+                return false;
+            }
+        }
+        return true;
+    });
+    return array_values($filtered);
+}
+
+/** @return array<string, string>|null */
+function parseFrontmatter(string $content): ?array
+{
+    if (!str_starts_with($content, "---\n") && !str_starts_with($content, "---\r\n")) {
+        return null;
+    }
+    $offset = str_starts_with($content, "---\r\n") ? 5 : 4;
+    $end = strpos($content, "\n---", $offset);
+    if ($end === false) {
+        return null;
+    }
+    $yaml = substr($content, $offset, $end - $offset);
+    $fields = [];
+    foreach (preg_split('/\r?\n/', $yaml) ?: [] as $line) {
+        if (preg_match('/^([a-zA-Z_][a-zA-Z0-9_]*):\s*(.*)$/', $line, $m) === 1) {
+            $key = $m[1];
+            $value = trim($m[2]);
+            if (strlen($value) >= 2 && ($value[0] === '"' || $value[0] === "'") && $value[strlen($value) - 1] === $value[0]) {
+                $value = substr($value, 1, -1);
+            }
+            $fields[$key] = $value;
+        }
+    }
+    return $fields;
+}
+
+/** @return list<string> */
+function scanReferences(string $content, string $repoRoot): array
+{
+    $tokens = [];
+
+    if (preg_match_all('/\[[^\]]*\]\(([^)\s]+)\)/', $content, $m) > 0) {
+        foreach ($m[1] as $target) {
+            $tokens[] = $target;
+        }
+    }
+    if (preg_match_all('/`([^`\n]+)`/', $content, $m) > 0) {
+        foreach ($m[1] as $span) {
+            $tokens[] = $span;
+        }
+    }
+
+    $issues = [];
+    foreach (array_unique($tokens) as $token) {
+        $parts = preg_split('/[\s#?]/', $token, 2);
+        $token = is_array($parts) && isset($parts[0]) ? $parts[0] : '';
+        if ($token === '') {
+            continue;
+        }
+        $isRepoPath = false;
+        foreach (REFERENCE_PREFIXES as $prefix) {
+            if (str_starts_with($token, $prefix)) {
+                $isRepoPath = true;
+                break;
+            }
+        }
+        if (!$isRepoPath) {
+            continue;
+        }
+        if (preg_match('/[\*\?\[\]\{\}<>]/', $token) === 1) {
+            continue;
+        }
+        if (preg_match('/^[A-Za-z0-9._\/-]+$/', $token) !== 1) {
+            continue;
+        }
+        if (in_array($token, REFERENCE_ALLOWLIST, true)) {
+            continue;
+        }
+        $fullPath = $repoRoot . '/' . $token;
+        if (file_exists($fullPath)) {
+            continue;
+        }
+        // Local config pattern: foo.bar.php is gitignored, foo.bar.example.php is tracked.
+        // If an ".example." sibling exists for the same stem, treat as allowed template reference.
+        $ext = pathinfo($fullPath, PATHINFO_EXTENSION);
+        if ($ext !== '') {
+            $dir = dirname($fullPath);
+            $stem = pathinfo($fullPath, PATHINFO_FILENAME);
+            $exampleSibling = $dir . '/' . $stem . '.example.' . $ext;
+            if (file_exists($exampleSibling)) {
+                continue;
+            }
+        }
+        $issues[] = $token;
+    }
+    return array_values(array_unique($issues));
+}
+
+/** @return list<string> */
+function checkFile(string $path, string $repoRoot, \DateTimeImmutable $today): array
+{
+    if (!is_file($path)) {
+        return ['broken symlink or missing file'];
+    }
+    $content = file_get_contents($path);
+    if ($content === false) {
+        return ['read error'];
+    }
+    $fm = parseFrontmatter($content);
+    $issues = [];
+    if ($fm === null) {
+        return ['missing frontmatter block'];
+    }
+    if (!isset($fm['description']) || $fm['description'] === '') {
+        $issues[] = 'missing or empty `description`';
+    }
+    if (!isset($fm['last_verified'])) {
+        $issues[] = 'missing `last_verified`';
+    } else {
+        $lv = $fm['last_verified'];
+        if (preg_match('/^\d{4}-\d{2}-\d{2}$/', $lv) !== 1) {
+            $issues[] = sprintf('`last_verified` not ISO date: %s', $lv);
+        } else {
+            $verified = \DateTimeImmutable::createFromFormat('!Y-m-d', $lv);
+            if ($verified === false) {
+                $issues[] = sprintf('`last_verified` unparseable: %s', $lv);
+            } elseif ($verified > $today) {
+                $issues[] = sprintf('`last_verified` in the future: %s', $lv);
+            } else {
+                $diff = $today->diff($verified);
+                $age = (int) $diff->days;
+                if ($age > STALENESS_DAYS) {
+                    $issues[] = sprintf('stale: last_verified %s is %d days old (max %d)', $lv, $age, STALENESS_DAYS);
+                }
+            }
+        }
+    }
+
+    foreach (scanReferences($content, $repoRoot) as $deadRef) {
+        $issues[] = sprintf('dead reference: `%s`', $deadRef);
+    }
+
+    return $issues;
+}
+
+/** @param list<string> $files */
+function fixDates(array $files, \DateTimeImmutable $today): int
+{
+    $updated = 0;
+    $dateStr = $today->format('Y-m-d');
+    foreach ($files as $path) {
+        if (!is_file($path)) {
+            continue;
+        }
+        $content = file_get_contents($path);
+        if ($content === false) {
+            continue;
+        }
+        if (preg_match('/^(---\r?\n)(.*?)(\r?\n---\r?\n)/s', $content, $m) !== 1) {
+            continue;
+        }
+        $head = $m[1];
+        $body = $m[2];
+        $tail = $m[3];
+        $rest = substr($content, strlen($m[0]));
+        if (preg_match('/^last_verified:\s*.*$/m', $body) === 1) {
+            $body = (string) preg_replace('/^last_verified:\s*.*$/m', 'last_verified: ' . $dateStr, $body);
+        } else {
+            $body .= "\nlast_verified: " . $dateStr;
+        }
+        file_put_contents($path, $head . $body . $tail . $rest);
+        $updated++;
+    }
+    return $updated;
+}
+
+// --- main ---
+
+$opts = ['fix_dates' => false, 'include_memory' => false, 'verbose' => false];
+foreach (array_slice($argv, 1) as $arg) {
+    switch ($arg) {
+        case '--fix-dates':
+            $opts['fix_dates'] = true;
+            break;
+        case '--include-memory':
+            $opts['include_memory'] = true;
+            break;
+        case '--verbose':
+        case '-v':
+            $opts['verbose'] = true;
+            break;
+        case '--help':
+        case '-h':
+            echo usage();
+            exit(0);
+        default:
+            fwrite(STDERR, "unknown flag: {$arg}\n");
+            fwrite(STDERR, usage());
+            exit(2);
+    }
+}
+
+$root = repoRoot();
+$today = new \DateTimeImmutable('today');
+$files = collectFiles($root, $opts['include_memory']);
+sort($files);
+
+if ($opts['fix_dates']) {
+    $n = fixDates($files, $today);
+    echo "bumped last_verified on {$n} files\n";
+    exit(0);
+}
+
+$failures = 0;
+$passed = 0;
+foreach ($files as $path) {
+    $rel = substr($path, strlen($root) + 1);
+    $issues = checkFile($path, $root, $today);
+    if ($issues === []) {
+        $passed++;
+        if ($opts['verbose']) {
+            echo "ok   {$rel}\n";
+        }
+        continue;
+    }
+    $failures++;
+    echo "FAIL {$rel}\n";
+    foreach ($issues as $i) {
+        echo "     - {$i}\n";
+    }
+}
+
+$total = count($files);
+if ($failures === 0) {
+    echo "\n{$total} docs verified.\n";
+    exit(0);
+}
+
+echo "\n{$failures} of {$total} docs failed.\n";
+exit(1);

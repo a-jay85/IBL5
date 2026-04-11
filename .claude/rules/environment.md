@@ -1,7 +1,9 @@
 ---
+description: Environment setup: CSS build, IBLbot, and environment-specific gotchas.
 paths:
   - "**/design/**/*.css"
   - "**/IBLbot/**/*"
+last_verified: 2026-04-11
 ---
 
 # Environment Commands

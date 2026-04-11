@@ -1,3 +1,8 @@
+---
+description: Shared review rubric and false-positive filter used by /code-review, /security-audit, and /post-plan.
+last_verified: 2026-04-11
+---
+
 # Review Rubric and False-Positive Filter (shared)
 
 Source of truth for confidence scoring. Used by `/code-review` Step 4, `/security-audit` Step 5, and `/post-plan` Phase 5D. Do not edit without updating all three callers.

@@ -1,5 +1,7 @@
 ---
+description: Interface-driven PHP class standards, XSS rules, and PHPStan gotchas for ibl5/classes.
 paths: ibl5/classes/**/*.php
+last_verified: 2026-04-11
 ---
 
 # PHP Class Development Rules

@@ -1,5 +1,7 @@
 ---
+description: Auto-generated module map of ibl5/classes/ with file counts, roles, and cross-module dependencies.
 paths: ibl5/classes/**/*.php
+last_verified: 2026-04-11
 ---
 
 # Codebase Module Map

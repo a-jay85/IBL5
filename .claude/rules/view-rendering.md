@@ -1,5 +1,7 @@
 ---
+description: HTML View class standards: output buffering, HtmlSanitizer::e(), and structural conventions.
 paths: "**/*View.php"
+last_verified: 2026-04-11
 ---
 
 # View Rendering Rules

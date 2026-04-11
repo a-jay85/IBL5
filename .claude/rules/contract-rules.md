@@ -1,4 +1,5 @@
 ---
+description: Business rules for player contracts, free agency, and negotiation flows.
 paths:
   - "ibl5/classes/Extension/**/*"
   - "ibl5/classes/FreeAgency/**/*"
@@ -6,6 +7,7 @@ paths:
   - "ibl5/classes/Negotiation/**/*"
   - "ibl5/classes/Waivers/**/*"
   - "ibl5/classes/ContractList/**/*"
+last_verified: 2026-04-11
 ---
 
 # IBL Contract Rules (CBA)

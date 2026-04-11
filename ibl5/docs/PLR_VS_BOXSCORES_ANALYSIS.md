@@ -1,3 +1,8 @@
+---
+description: Analysis comparing PLR snapshots against boxscore tables.
+last_verified: 2026-04-11
+---
+
 # PLR Snapshots vs Box Scores: Data Accuracy Analysis
 
 Comparison of cumulative player statistics in `ibl_plr_snapshots` against aggregated per-game statistics in `ibl_box_scores` across all 19 IBL seasons (1989-2007).

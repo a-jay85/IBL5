@@ -1,6 +1,7 @@
 ---
 name: refactoring-workflow
 description: IBL5 module refactoring using interface-driven architecture pattern with Repository/Service/View separation. Use when refactoring legacy PHP-Nuke modules to modern PHP.
+last_verified: 2026-04-11
 ---
 
 # IBL5 Module Refactoring Workflow
@@ -9,7 +10,7 @@ Refactor PHP-Nuke legacy modules to modern PHP with interface-driven architectur
 
 ## Architecture Pattern
 
-Extract each module into `ibl5/classes/ModuleName/`:
+Extract each module into `ibl5/classes/<ModuleName>/`:
 
 ```
 Module/

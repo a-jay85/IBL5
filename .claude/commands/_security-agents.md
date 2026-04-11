@@ -1,3 +1,8 @@
+---
+description: Shared security-audit agent definitions used by /security-audit and /post-plan.
+last_verified: 2026-04-11
+---
+
 # Security Audit Agents (shared definitions)
 
 Source of truth for security-audit agent prompts. Used by `/security-audit` Step 4 and `/post-plan` Phase 5C. Do not edit without updating both callers.

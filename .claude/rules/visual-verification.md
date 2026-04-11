@@ -1,9 +1,11 @@
 ---
+description: When and how to run visual regression checks for View/CSS changes.
 paths:
   - "**/*View.php"
   - "**/design/**/*.css"
   - "**/themes/**/*.php"
   - "**/themes/**/*.html"
+last_verified: 2026-04-11
 ---
 
 # Visual Verification Required (MANDATORY)

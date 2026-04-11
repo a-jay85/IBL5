@@ -1,3 +1,8 @@
+---
+description: Docker Compose setup for local PHP-Apache + MariaDB stack.
+last_verified: 2026-04-11
+---
+
 # Docker Development Setup
 
 The entire IBL5 dev stack runs via Docker Compose: PHP-Apache, MariaDB, Mailpit (email testing), and Adminer (DB browser).
@@ -45,14 +50,7 @@ The site is available at **http://main.localhost/ibl5/**.
 
 ## Port 80 Conflict
 
-If MAMP is running, stop it before starting Docker (both use port 80). To switch back to MAMP:
-
-```bash
-docker compose down   # or: bun run docker:down
-# Then start MAMP
-```
-
-The `config.php` change (`getenv('DB_HOST') ?: '127.0.0.1'`) ensures both environments work without editing config files.
+If another web server is bound to port 80, stop it before `docker compose up -d`. The `config.php` change (`getenv('DB_HOST') ?: '127.0.0.1'`) keeps the codebase portable between environments without editing config files.
 
 ## Development Workflow
 
@@ -77,7 +75,7 @@ docker compose exec php php -m | grep OPcache
 
 ## Email Testing with Mailpit
 
-To capture outgoing emails in Mailpit, update `ibl5/config/mail.config.php`:
+To capture outgoing emails in Mailpit, update your local `ibl5/config/mail.config.php` (copy from `ibl5/config/mail.config.example.php` if it does not exist — the real file is gitignored):
 
 ```php
 'transport' => 'smtp',

@@ -1,3 +1,8 @@
+---
+description: Shared code-review agent definitions used by /code-review and /post-plan.
+last_verified: 2026-04-11
+---
+
 # Code Review Agents (shared definitions)
 
 Source of truth for code-review agent prompts. Used by `/code-review` Step 3, and `/post-plan` Phase 5B. Do not edit without updating both callers.

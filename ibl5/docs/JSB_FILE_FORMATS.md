@@ -1,3 +1,8 @@
+---
+description: Jump Shot Basketball binary file format specifications.
+last_verified: 2026-04-11
+---
+
 # Jump Shot Basketball (JSB) Engine File Format Specifications
 
 Reverse-engineered specifications for the binary and text data files produced by the Jump Shot Basketball simulation engine.

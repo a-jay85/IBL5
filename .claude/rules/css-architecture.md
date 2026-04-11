@@ -1,7 +1,9 @@
 ---
+description: CSS architecture: all styles live in ibl5/design/components/; inline CSS is banned.
 paths:
   - "**/design/**/*.css"
   - "**/*View.php"
+last_verified: 2026-04-11
 ---
 
 # CSS Architecture Reference

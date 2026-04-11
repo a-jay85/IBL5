@@ -1,8 +1,13 @@
+---
+description: Development standards, priorities, and workflow for IBL5.
+last_verified: 2026-04-11
+---
+
 # Development Guide
 
 **Status:** 31/31 total modules refactored (100% complete) ✅ • 4393 tests • ~80% coverage • Goal: 80% ✅
 
-> 📘 **Progressive Loading:** Detailed workflows are in `.claude/rules/` and `.github/skills/`. See [SKILLS_GUIDE.md](.github/SKILLS_GUIDE.md).
+> 📘 **Progressive Loading:** Detailed workflows are in `.claude/rules/` and `.claude/skills/`. See [SKILLS_GUIDE.md](.github/SKILLS_GUIDE.md).
 
 ---
 
@@ -427,7 +432,7 @@
 - `phpunit-tests.md` → `ibl5/tests/**/*.php`
 - `view-rendering.md` → `**/*View.php`
 
-**Task-Discovery** (`.github/skills/`): Auto-load when task matches
+**Task-Discovery** (`.claude/skills/`): Auto-load when task matches
 - `refactoring-workflow/` - Module refactoring with templates
 - `security-audit/` - XSS/SQL injection patterns
 - `phpunit-testing/` - Test patterns and mocking

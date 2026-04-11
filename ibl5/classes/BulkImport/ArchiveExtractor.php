@@ -47,6 +47,28 @@ final class ArchiveExtractor implements ArchiveExtractorInterface
 
     public function detectFormat(string $archivePath): string
     {
+        // Prefer magic bytes over extension: a handful of historical backups
+        // have `.zip` extensions but are actually RAR v5 files, and ZipArchive
+        // rejects them with no useful diagnostic (the importer just reports
+        // "IBL5.plr not found").
+        $fh = @fopen($archivePath, 'rb');
+        if ($fh !== false) {
+            $magic = fread($fh, 7);
+            fclose($fh);
+
+            if (is_string($magic)) {
+                // RAR v4/v5 signature: "Rar!\x1A\x07"
+                if (str_starts_with($magic, "Rar!\x1A\x07")) {
+                    return 'rar';
+                }
+                // ZIP local-file header "PK\x03\x04" or empty-archive "PK\x05\x06"
+                if (str_starts_with($magic, "PK\x03\x04") || str_starts_with($magic, "PK\x05\x06")) {
+                    return 'zip';
+                }
+            }
+        }
+
+        // Unreadable or unknown magic: fall back to extension guess.
         $ext = strtolower(pathinfo($archivePath, PATHINFO_EXTENSION));
 
         return $ext === 'rar' ? 'rar' : 'zip';
@@ -270,6 +292,23 @@ final class ArchiveExtractor implements ArchiveExtractorInterface
             $cmd = sprintf(
                 '%s e -so %s %s > %s 2>/dev/null',
                 escapeshellarg($sevenZipBin),
+                escapeshellarg($archivePath),
+                escapeshellarg($filename),
+                escapeshellarg($targetPath)
+            );
+            exec($cmd, $output, $exitCode);
+            if ($exitCode === 0 && file_exists($targetPath) && filesize($targetPath) > 0) {
+                return $targetPath;
+            }
+        }
+
+        // libarchive's bsdtar handles RAR v5 natively and ships with macOS.
+        // Useful as a fallback on dev workstations where unrar/7z aren't installed.
+        $bsdtarBin = $this->findBinary('bsdtar');
+        if ($bsdtarBin !== null) {
+            $cmd = sprintf(
+                '%s -xOf %s %s > %s 2>/dev/null',
+                escapeshellarg($bsdtarBin),
                 escapeshellarg($archivePath),
                 escapeshellarg($filename),
                 escapeshellarg($targetPath)

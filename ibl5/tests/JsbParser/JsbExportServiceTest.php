@@ -6,8 +6,8 @@ namespace Tests\JsbParser;
 
 use JsbParser\Contracts\JsbExportRepositoryInterface;
 use JsbParser\JsbExportService;
-use JsbParser\PlrFieldSerializer;
-use JsbParser\PlrFileWriter;
+use PlrParser\PlrFieldSerializer;
+use PlrParser\PlrFileWriter;
 use JsbParser\TrnFileParser;
 use PHPUnit\Framework\TestCase;
 

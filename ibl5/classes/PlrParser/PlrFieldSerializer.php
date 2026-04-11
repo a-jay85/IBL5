@@ -2,9 +2,9 @@
 
 declare(strict_types=1);
 
-namespace JsbParser;
+namespace PlrParser;
 
-use JsbParser\Contracts\PlrFieldSerializerInterface;
+use PlrParser\Contracts\PlrFieldSerializerInterface;
 
 /**
  * Serializes PHP values into fixed-width JSB .plr field format.

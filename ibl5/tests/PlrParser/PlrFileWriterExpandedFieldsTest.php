@@ -2,15 +2,15 @@
 
 declare(strict_types=1);
 
-namespace Tests\JsbParser;
+namespace Tests\PlrParser;
 
-use JsbParser\PlrFieldSerializer;
-use JsbParser\PlrFileWriter;
+use PlrParser\PlrFieldSerializer;
+use PlrParser\PlrFileWriter;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 
 /**
- * @covers \JsbParser\PlrFileWriter
+ * @covers \PlrParser\PlrFileWriter
  *
  * Guards the season-stat entries that were added to FIELD_MAP for PlrReconstructionService.
  * These guards exist so a rogue copy-paste can't silently reintroduce an offset collision

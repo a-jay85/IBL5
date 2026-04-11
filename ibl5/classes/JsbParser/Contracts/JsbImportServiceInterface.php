@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace JsbParser\Contracts;
 
 use JsbParser\JsbImportResult;
-use JsbParser\PlrOrdinalMap;
+use PlrParser\PlrOrdinalMap;
 use Season\Season;
 
 /**

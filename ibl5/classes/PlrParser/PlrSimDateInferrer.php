@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace PlrParser;
 
-use JsbParser\PlrFileWriter;
+use PlrParser\PlrFileWriter;
 use PlrParser\Contracts\PlrBoxScoreRepositoryInterface;
 use PlrParser\Contracts\PlrSimDateInferrerInterface;
 

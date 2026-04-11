@@ -201,7 +201,7 @@ foreach ($plan as $si => $season) {
     $year = $season['ending_year'];
 
     // Phase 1: Build PlrOrdinalMap from HEAT-end archive
-    $map = JsbParser\PlrOrdinalMap::empty();
+    $map = PlrParser\PlrOrdinalMap::empty();
 
     if ($season['heat_archive'] !== null) {
         $tmpDir = sys_get_temp_dir() . '/ibl5_plb_' . bin2hex(random_bytes(8));
@@ -209,7 +209,7 @@ foreach ($plan as $si => $season) {
             $plrPath = $extractor->extractSingleFile($season['heat_archive'], $extractor->jsbFilename('plr'), $tmpDir);
             if ($plrPath !== false) {
                 try {
-                    $map = JsbParser\PlrOrdinalMap::fromPlrFile($plrPath);
+                    $map = PlrParser\PlrOrdinalMap::fromPlrFile($plrPath);
                     echo sprintf("  PLR ordinal map: %d players from %s\n", $map->count(), basename($season['heat_archive']));
                 } catch (\Throwable $e) {
                     echo "  WARNING: PLR parse failed: {$e->getMessage()}\n";

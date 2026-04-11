@@ -2,9 +2,9 @@
 
 declare(strict_types=1);
 
-namespace JsbParser;
+namespace PlrParser;
 
-use JsbParser\Contracts\PlrFileWriterInterface;
+use PlrParser\Contracts\PlrFileWriterInterface;
 
 /**
  * Read-modify-write engine for JSB .plr (Player) files.

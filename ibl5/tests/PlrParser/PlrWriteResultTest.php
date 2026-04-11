@@ -2,13 +2,13 @@
 
 declare(strict_types=1);
 
-namespace Tests\JsbParser;
+namespace Tests\PlrParser;
 
-use JsbParser\PlrWriteResult;
+use PlrParser\PlrWriteResult;
 use PHPUnit\Framework\TestCase;
 
 /**
- * @covers \JsbParser\PlrWriteResult
+ * @covers \PlrParser\PlrWriteResult
  */
 class PlrWriteResultTest extends TestCase
 {

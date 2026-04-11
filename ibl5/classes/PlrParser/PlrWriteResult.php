@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace JsbParser;
+namespace PlrParser;
 
 /**
  * Value object for PLR/TRN export operation results.

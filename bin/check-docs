@@ -214,14 +214,18 @@ function scanReferences(string $content, string $repoRoot): array
         if (file_exists($fullPath)) {
             continue;
         }
-        // Local config pattern: foo.bar.php is gitignored, foo.bar.example.php is tracked.
-        // If an ".example." sibling exists for the same stem, treat as allowed template reference.
+        // Local config pattern: gitignored local files whose template is tracked alongside them.
+        // Accept both the project's trailing suffix convention (`config.php` → `config.php.example`,
+        // `.env.test` → `.env.test.example`) and the middle-insertion variant
+        // (`foo.bar.php` → `foo.bar.example.php`) that some projects prefer.
+        if (file_exists($fullPath . '.example')) {
+            continue;
+        }
         $ext = pathinfo($fullPath, PATHINFO_EXTENSION);
         if ($ext !== '') {
             $dir = dirname($fullPath);
             $stem = pathinfo($fullPath, PATHINFO_FILENAME);
-            $exampleSibling = $dir . '/' . $stem . '.example.' . $ext;
-            if (file_exists($exampleSibling)) {
+            if (file_exists($dir . '/' . $stem . '.example.' . $ext)) {
                 continue;
             }
         }

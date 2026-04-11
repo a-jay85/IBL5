@@ -284,11 +284,14 @@ function checkFile(string $path, string $repoRoot, \DateTimeImmutable $today): a
 
 /**
  * Verify ADR bidirectional Supersedes / Superseded-by integrity.
- * If ADR-X has Status: "Superseded by ADR-Y", then ADR-Y must exist and
- * ADR-Y's "## Supersedes" section must reference ADR-X. Referenced ADRs
- * must exist in either direction.
  *
- * @return list<string> diagnostics keyed by relative ADR path
+ * Forward: if ADR-X has `Status: Superseded by ADR-Y`, then ADR-Y must exist
+ * and ADR-Y's `## Supersedes` section must reference ADR-X.
+ *
+ * Reverse: if ADR-Y's `## Supersedes` section references ADR-X, then ADR-X
+ * must exist and ADR-X's `Status` line must say `Superseded by ADR-Y`.
+ *
+ * @return list<string> diagnostic lines, each naming the offending ADR path.
  */
 function checkAdrTransitions(string $repoRoot): array
 {
@@ -361,6 +364,17 @@ function checkAdrTransitions(string $repoRoot): array
         foreach ($claim['supersedes'] as $y) {
             if (!isset($byNum[$y])) {
                 $issues[] = sprintf('%s: ## Supersedes references ADR-%s, but it does not exist', $rel, $y);
+                continue;
+            }
+            $yClaim = $claims[$y] ?? ['supersededBy' => null];
+            if ($yClaim['supersededBy'] !== $num) {
+                $issues[] = sprintf(
+                    '%s: ## Supersedes references ADR-%s, but ADR-%s Status line does not say "Superseded by ADR-%s"',
+                    $rel,
+                    $y,
+                    $y,
+                    $num
+                );
             }
         }
     }

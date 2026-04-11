@@ -43,5 +43,5 @@ Controllers, Processors, and Validators are added as additional sibling classes 
 - `ibl5/docs/ARCHITECTURE_PATTERNS.md` — the how-to (structure, interface standards, reference implementations).
 - `ibl5/docs/REFACTORING_HISTORY.md` — the what-changed timeline for all 30 modules.
 - `ibl5/classes/Waivers/` — canonical example cited in CLAUDE.md.
-- `ibl5/classes/Player/` — the largest module, 30 interfaces + 35 classes + 205 tests.
+- `ibl5/classes/Player/` — the largest module, used as the stress test for the pattern at scale.
 - `.claude/rules/php-classes.md` — the rules file that codifies the convention for agents.

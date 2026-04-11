@@ -21,7 +21,8 @@ const TRIGGER_DESCRIPTIONS = [
     'new-dependency' => 'new entry under require/require-dev in ibl5/composer.json (runtime dependency)',
 ];
 
-const BYPASS_REGEX = '/<!--\s*no-adr:\s*(.{15,}?)\s*-->/s';
+const BYPASS_REGEX = '/<!--\s*no-adr:\s*(.+?)\s*-->/s';
+const BYPASS_MIN_LENGTH = 15;
 const MIN_TOOL_SCRIPT_LINES = 50;
 
 function usage(): string
@@ -82,7 +83,10 @@ function diffAddedLines(string $mode, string $file): array
     return $added;
 }
 
-/** Returns line count and first line of the file in the diff's "new" side. */
+/**
+ * Read the full contents of a file from the git object store (index for --staged,
+ * HEAD for --pr). Returns [line_count, first_line].
+ */
 function newSideFileInfo(string $mode, string $file): array
 {
     $rev = $mode === 'pr' ? 'HEAD' : '';
@@ -125,9 +129,13 @@ function detectTriggers(string $mode): array
         if (preg_match('#^ibl5/migrations/.+\.sql$#', $file) !== 1) {
             continue;
         }
-        foreach (diffAddedLines($mode, $file) as $line) {
+        // Strip /* ... */ block comments (multi-line) from the added blob before scanning,
+        // so DROP TABLE inside a commented-out block doesn't fire the trigger.
+        $addedBlob = implode("\n", diffAddedLines($mode, $file));
+        $cleaned = (string) preg_replace('#/\*.*?\*/#s', '', $addedBlob);
+        foreach (preg_split('/\r?\n/', $cleaned) ?: [] as $line) {
             $trimmed = ltrim($line);
-            if (str_starts_with($trimmed, '--')) {
+            if ($trimmed === '' || str_starts_with($trimmed, '--')) {
                 continue;
             }
             if (preg_match('/\b(DROP\s+TABLE|DROP\s+COLUMN|DROP\s+INDEX)\b/i', $trimmed) === 1) {
@@ -171,7 +179,17 @@ function fetchPrBody(string $mode, bool $fromStdin): ?string
     if ($mode !== 'pr') {
         return null;
     }
-    [$lines, $exit] = runCmd('gh pr view --json body --jq .body');
+    // GitHub Actions checks out a detached merge commit for pull_request events, so
+    // `gh pr view` without arguments cannot infer the PR. The workflow passes the
+    // number via PR_NUMBER env. Fall back to inference when PR_NUMBER is absent
+    // (local `--pr` usage on a branch checkout).
+    $prNumber = getenv('PR_NUMBER');
+    $cmd = 'gh pr view';
+    if (is_string($prNumber) && $prNumber !== '') {
+        $cmd .= ' ' . escapeshellarg($prNumber);
+    }
+    $cmd .= ' --json body --jq .body';
+    [$lines, $exit] = runCmd($cmd);
     if ($exit !== 0 || $lines === []) {
         return null;
     }
@@ -180,13 +198,17 @@ function fetchPrBody(string $mode, bool $fromStdin): ?string
 
 function extractBypassReason(?string $body): ?string
 {
-    if ($body === null || $body === '') {
+    if ($body === null || $body === '' || $body === 'null') {
         return null;
     }
-    if (preg_match(BYPASS_REGEX, $body, $m) === 1) {
-        return trim($m[1]);
+    if (preg_match(BYPASS_REGEX, $body, $m) !== 1) {
+        return null;
     }
-    return null;
+    $reason = trim($m[1]);
+    if (strlen($reason) < BYPASS_MIN_LENGTH) {
+        return null;
+    }
+    return $reason;
 }
 
 // --- main ---

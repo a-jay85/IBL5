@@ -31,10 +31,9 @@ class PlrSimDateInferrer implements PlrSimDateInferrerInterface
             return null;
         }
 
-        $cumulative = $this->boxScoreRepository->cumulativeStatsForPlayerByDate(
+        $cumulative = $this->boxScoreRepository->cumulativeRegularSeasonStatsByDate(
             $reference['pid'],
             $seasonYear,
-            PlrBoxScoreRepositoryInterface::GAME_TYPE_REGULAR_SEASON,
         );
 
         foreach ($cumulative as $row) {

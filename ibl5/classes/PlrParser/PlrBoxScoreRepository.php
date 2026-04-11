@@ -25,18 +25,6 @@ class PlrBoxScoreRepository extends \BaseMysqliRepository implements PlrBoxScore
     }
 
     /**
-     * @see PlrBoxScoreRepositoryInterface::sumRegularSeasonStatsThroughDate()
-     */
-    public function sumRegularSeasonStatsThroughDate(int $seasonYear, string $endDate): array
-    {
-        return $this->sumStatsByGameTypeThroughDate(
-            $seasonYear,
-            self::GAME_TYPE_REGULAR_SEASON,
-            $endDate,
-        );
-    }
-
-    /**
      * @see PlrBoxScoreRepositoryInterface::sumStatsByGameTypeThroughDate()
      */
     public function sumStatsByGameTypeThroughDate(int $seasonYear, int $gameType, string $endDate): array
@@ -173,9 +161,9 @@ class PlrBoxScoreRepository extends \BaseMysqliRepository implements PlrBoxScore
     }
 
     /**
-     * @see PlrBoxScoreRepositoryInterface::cumulativeStatsForPlayerByDate()
+     * @see PlrBoxScoreRepositoryInterface::cumulativeRegularSeasonStatsByDate()
      */
-    public function cumulativeStatsForPlayerByDate(int $pid, int $seasonYear, int $gameType): array
+    public function cumulativeRegularSeasonStatsByDate(int $pid, int $seasonYear): array
     {
         $sql = "
             SELECT
@@ -196,13 +184,13 @@ class PlrBoxScoreRepository extends \BaseMysqliRepository implements PlrBoxScore
                 SUM(gameBLK) AS blk,
                 SUM(gamePF) AS pf
             FROM {$this->boxScoresTable}
-            WHERE pid = ? AND season_year = ? AND game_type = ?
+            WHERE pid = ? AND season_year = ? AND game_type = 1
             GROUP BY Date
             ORDER BY Date
         ";
 
         /** @var list<array{date: string, gp: int|null, min: int|null, two_gm: int|null, two_ga: int|null, ftm: int|null, fta: int|null, three_gm: int|null, three_ga: int|null, orb: int|null, drb: int|null, ast: int|null, stl: int|null, tov: int|null, blk: int|null, pf: int|null}> $rows */
-        $rows = $this->fetchAll($sql, 'iii', $pid, $seasonYear, $gameType);
+        $rows = $this->fetchAll($sql, 'ii', $pid, $seasonYear);
 
         $cumulative = [
             'gp' => 0, 'min' => 0, 'two_gm' => 0, 'two_ga' => 0,

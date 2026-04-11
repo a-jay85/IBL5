@@ -156,8 +156,10 @@ exit($result->hasErrors() ? 1 : 0);
 function findBackupsDir(): ?string
 {
     $candidates = [
+        // Local dev: worktrees and the main checkout both land here
         dirname(__DIR__) . '/fullLeagueBackups/backups',
-        '/Users/ajaynicolas/Documents/GitHub/IBL5/ibl5/fullLeagueBackups/backups',
+        // Production: archives live alongside the web root
+        dirname(__DIR__) . '/backups',
     ];
     foreach ($candidates as $dir) {
         if (is_dir($dir)) {
@@ -221,7 +223,7 @@ function runSnapshotMode(
     echo "  base end date: {$baseEnd}\n";
 
     // Count steps from base zip to target zip by enumerating the directory
-    $steps = countStepsBetweenZips($backupsDir . '/' . $seasonDir, $priorZipPath, $zipName);
+    $steps = countZipSlotsBetween($backupsDir . '/' . $seasonDir, $priorZipPath, $zipName);
     if ($steps < 1) {
         fwrite(STDERR, "Unexpected zip ordering: base={$priorZipPath} target={$zipName}\n");
         @unlink($basePlr);
@@ -293,11 +295,18 @@ function extractPlrFromZip(string $zipPath): ?string
     return $tmp;
 }
 
-function countStepsBetweenZips(string $seasonDirPath, string $baseZipPath, string $targetZipName): int
+/**
+ * Count zip-archive slots between base and target within the same season directory.
+ *
+ * Returns the number of sorted-filename positions to advance from the base zip to the
+ * target zip. This equals the number of ibl_sim_dates rows to step forward IFF each
+ * archive corresponds to exactly one sim — which holds for mid-season archives in
+ * practice (`reg-sim06.zip`, `playoffs-rd1-gm4-7.zip`, etc.). Preseason archives break
+ * the equivalence; callers targeting early-season snapshots should double-check the
+ * inferred target date against `ibl_sim_dates` before trusting the reconstruction.
+ */
+function countZipSlotsBetween(string $seasonDirPath, string $baseZipPath, string $targetZipName): int
 {
-    // Count sim increments between base and target. Since not every zip corresponds to a
-    // sim (some are preseason), we can't count zips — but in practice, mid-season archives
-    // are 1-per-sim, so zip-count ≈ sim-count. Start with a 1-to-1 mapping; tighten later.
     $zips = glob($seasonDirPath . '/*.zip');
     if ($zips === false) return -1;
     sort($zips, SORT_STRING);
@@ -321,10 +330,6 @@ function printResult(PlrParser\PlrReconstructionResult $result): void
     foreach ($result->messages as $msg) echo "  " . $msg . "\n";
     echo "  Players updated:   " . $result->playersUpdated . "\n";
     echo "  Players unchanged: " . $result->playersUnchanged . "\n";
-    if ($result->warnings !== []) {
-        echo "  Warnings:\n";
-        foreach ($result->warnings as $w) echo "    - " . $w . "\n";
-    }
     if ($result->hasErrors()) {
         echo "  Errors:\n";
         foreach ($result->errors as $e) echo "    ! " . $e . "\n";

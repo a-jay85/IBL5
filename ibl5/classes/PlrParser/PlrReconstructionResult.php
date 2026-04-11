@@ -14,14 +14,10 @@ class PlrReconstructionResult
 {
     public int $playersUpdated = 0;
     public int $playersUnchanged = 0;
-    public int $playersMissingFromCar = 0;
     public int $bytesWritten = 0;
 
     /** @var list<string> */
     public array $messages = [];
-
-    /** @var list<string> */
-    public array $warnings = [];
 
     /** @var list<string> */
     public array $errors = [];
@@ -29,11 +25,6 @@ class PlrReconstructionResult
     public function addMessage(string $message): void
     {
         $this->messages[] = $message;
-    }
-
-    public function addWarning(string $warning): void
-    {
-        $this->warnings[] = $warning;
     }
 
     public function addError(string $error): void

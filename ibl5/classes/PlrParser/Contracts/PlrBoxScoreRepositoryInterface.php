@@ -17,16 +17,6 @@ interface PlrBoxScoreRepositoryInterface
     public const GAME_TYPE_PLAYOFFS = 2;
 
     /**
-     * Sum regular-season box scores per pid for a given season, through an end date.
-     *
-     * Thin convenience wrapper over {@see sumStatsByGameTypeThroughDate()} with
-     * `game_type = GAME_TYPE_REGULAR_SEASON`.
-     *
-     * @return array<int, array{gp: int, min: int, two_gm: int, two_ga: int, ftm: int, fta: int, three_gm: int, three_ga: int, orb: int, drb: int, ast: int, stl: int, tov: int, blk: int, pf: int}>
-     */
-    public function sumRegularSeasonStatsThroughDate(int $seasonYear, string $endDate): array;
-
-    /**
      * Sum box-score stats per pid for a specific game type, through an end date.
      *
      * @param int $gameType Either GAME_TYPE_REGULAR_SEASON or GAME_TYPE_PLAYOFFS
@@ -53,14 +43,15 @@ interface PlrBoxScoreRepositoryInterface
     public function latestGameDate(int $seasonYear, int $gameType): ?string;
 
     /**
-     * Cumulative per-date running totals for a single pid across the season window.
+     * Cumulative per-date regular-season running totals for a single pid.
      *
      * Powers date-inference: given a base .plr's season stats for a known-active player,
      * walk this list until the cumulative totals match; that date is the base's "as of".
+     * Hardcoded to `game_type = 1` — playoff-mode inference is not supported.
      *
      * @return list<array{date: string, gp: int, min: int, two_gm: int, two_ga: int, ftm: int, fta: int, three_gm: int, three_ga: int, orb: int, drb: int, ast: int, stl: int, tov: int, blk: int, pf: int}>
      */
-    public function cumulativeStatsForPlayerByDate(int $pid, int $seasonYear, int $gameType): array;
+    public function cumulativeRegularSeasonStatsByDate(int $pid, int $seasonYear): array;
 
     /**
      * All `ibl_sim_dates` End Date values that fall within a season window.

@@ -94,7 +94,7 @@ done
 
 # Root-level loose files
 echo ""
-echo "**Root files:** $(ls "$CLASSES_DIR"/*.php 2>/dev/null | xargs -I{} basename {} .php | tr '\n' ' ' | sed 's/ $//')"
+echo "**Root files:** $(find "$CLASSES_DIR" -maxdepth 1 -name '*.php' -print0 2>/dev/null | xargs -0 -I{} basename {} .php | tr '\n' ' ' | sed 's/ $//')"
 
 # Section B: Dependencies (from collected data)
 echo ""

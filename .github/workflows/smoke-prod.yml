@@ -46,14 +46,19 @@ jobs:
         if: github.event_name == 'workflow_run'
         env:
           GH_TOKEN: ${{ github.token }}
+          EXPECTED_SHA: ${{ github.event.workflow_run.head_sha }}
+          REPO: ${{ github.repository }}
         run: |
-          EXPECTED="${{ github.event.workflow_run.head_sha }}"
-          ACTUAL=$(gh api "repos/${{ github.repository }}/commits/production" --jq .sha)
-          if [ "$EXPECTED" != "$ACTUAL" ]; then
-            echo "::notice::Stale smoke run — workflow_run sha=$EXPECTED but production tip=$ACTUAL. Skipping."
+          if ! ACTUAL=$(gh api "repos/${REPO}/commits/production" --jq .sha 2>&1); then
+            echo "::warning::Guard API call failed ($ACTUAL) — proceeding with smoke anyway"
+            echo "stale=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          if [ "$EXPECTED_SHA" != "$ACTUAL" ]; then
+            echo "::notice::Stale smoke run — workflow_run sha=$EXPECTED_SHA but production tip=$ACTUAL. Skipping."
             echo "stale=true" >> "$GITHUB_OUTPUT"
           else
-            echo "Fresh — production tip matches workflow_run sha ($EXPECTED)"
+            echo "Fresh — production tip matches workflow_run sha ($EXPECTED_SHA)"
             echo "stale=false" >> "$GITHUB_OUTPUT"
           fi
 

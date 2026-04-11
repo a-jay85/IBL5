@@ -21,7 +21,8 @@ permissions:
   contents: read
 
 concurrency:
-  group: production-smoke
+  # Shared with main.yml so a new deploy can't race an in-flight smoke run.
+  group: production-deploy
   cancel-in-progress: false
 
 jobs:

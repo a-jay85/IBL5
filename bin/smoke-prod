@@ -4,8 +4,8 @@
 # Usage: bin/smoke-prod [base_url]
 # Default: https://www.iblhoops.net
 #
-# Checks 7 public URLs for:
-#   - HTTP 200 status (retries once on 5xx after 10s)
+# Checks 8 public URLs for:
+#   - HTTP 200 status (retries once on any unexpected status after 10s)
 #   - Expected content in response body
 #   - Absence of PHP error messages
 #
@@ -31,8 +31,9 @@ check() {
     status="${status: -3}"
     [[ "$status" =~ ^[0-9]+$ ]] || status="000"
 
-    # Retry once on 5xx — transient during deploys (autoloader regeneration)
-    if [ "$status" -ge 500 ] 2>/dev/null; then
+    # Retry once on any unexpected status — transient during deploys,
+    # LSCache purge windows, or brief LiteSpeed WAF blips.
+    if ! echo "$accept" | grep -qw "$status"; then
         echo "  RETRY: $name — HTTP $status, waiting 10s..."
         sleep 10
         status=$(curl -sS -w "%{http_code}" --max-time 30 -o "$TMPFILE" "$url" 2>/dev/null) || true
@@ -78,6 +79,7 @@ check "Player page"  "$BASE/ibl5/modules.php?name=Player&pa=showpage&pid=1" "pla
 check "Login page"   "$BASE/ibl5/modules.php?name=YourAccount"              "Sign In"
 check "API routing"   "$BASE/ibl5/api/v1/season"                             "" "200|401"
 check "CSS asset"    "$BASE/ibl5/themes/IBL/style/style.css"                ""
+check "IBL6 app"     "https://ibl6.iblhoops.net/"                           ""
 
 echo ""
 echo "Results: $PASS passed, $FAIL failed"

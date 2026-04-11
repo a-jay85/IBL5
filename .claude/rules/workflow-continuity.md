@@ -5,6 +5,8 @@ last_verified: 2026-04-11
 
 # Workflow Continuity Rule
 
+> **Why this exists:** [ADR-0004](../../ibl5/docs/decisions/0004-docker-only-dev-environment.md) explains why every worktree runs its own isolated Docker stack; MAMP and native PHP setups are unsupported.
+
 ## Phase 1: Worktree Setup
 
 Before implementation, create a worktree unless one already exists for this task:

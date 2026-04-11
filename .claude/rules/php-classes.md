@@ -6,6 +6,8 @@ last_verified: 2026-04-11
 
 # PHP Class Development Rules
 
+> **Why this exists:** [ADR-0001](../../ibl5/docs/decisions/0001-interface-driven-architecture.md) explains why every module uses Repository/Service/View with `Contracts/` interfaces. [ADR-0005](../../ibl5/docs/decisions/0005-strict-types-enforcement.md) explains the `declare(strict_types=1)` mandate and PHPStan level `max` + strict-rules floor.
+
 ## Interface Standards
 - Method signatures with full PHPDoc
 - `@see InterfaceName::methodName()` instead of duplicating docblocks
@@ -59,6 +61,9 @@ public function renderTable(array $data): string
 ```
 
 ## Statistics Formatting
+
+> **Why this exists:** [ADR-0003](../../ibl5/docs/decisions/0003-statsformatter-mandate.md) explains why `StatsFormatter` is the single source of truth and `number_format()` is banned by `BanNumberFormatRule`.
+
 Use `BasketballStats\StatsFormatter` — `number_format()` is banned by PHPStan:
 - `formatPercentage($made, $attempted)` - FG%, 3P% (3 decimals)
 - `formatPerGameAverage($total, $games)` - PPG, APG (1 decimal)

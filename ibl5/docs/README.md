@@ -24,6 +24,7 @@ This directory is the primary home for all project documentation.
 | [DEVELOPMENT_ENVIRONMENT.md](DEVELOPMENT_ENVIRONMENT.md) | Docker setup, dependency caching, database connection |
 | [DOCUMENTATION_STANDARDS.md](DOCUMENTATION_STANDARDS.md) | Documentation organization and lifecycle |
 | [TESTING_STANDARDS.md](TESTING_STANDARDS.md) | Testing philosophy and conventions |
+| [decisions/README.md](decisions/README.md) | Architecture Decision Records (ADRs) — why each load-bearing decision was made |
 
 ## Project Status
 

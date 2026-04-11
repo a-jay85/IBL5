@@ -17,6 +17,7 @@ const IN_SCOPE_GLOBS = [
     '.claude/skills/*/SKILL.md',
     '.claude/commands/*.md',
     'ibl5/docs/*.md',
+    'ibl5/docs/decisions/*.md',
 ];
 
 const EXCLUDED_RELATIVE_FRAGMENTS = [
@@ -281,6 +282,91 @@ function checkFile(string $path, string $repoRoot, \DateTimeImmutable $today): a
     return $issues;
 }
 
+/**
+ * Verify ADR bidirectional Supersedes / Superseded-by integrity.
+ * If ADR-X has Status: "Superseded by ADR-Y", then ADR-Y must exist and
+ * ADR-Y's "## Supersedes" section must reference ADR-X. Referenced ADRs
+ * must exist in either direction.
+ *
+ * @return list<string> diagnostics keyed by relative ADR path
+ */
+function checkAdrTransitions(string $repoRoot): array
+{
+    $adrDir = $repoRoot . '/ibl5/docs/decisions';
+    if (!is_dir($adrDir)) {
+        return [];
+    }
+    $files = glob($adrDir . '/[0-9][0-9][0-9][0-9]-*.md') ?: [];
+    if ($files === []) {
+        return [];
+    }
+
+    $byNum = [];
+    foreach ($files as $path) {
+        if (!is_file($path)) {
+            continue;
+        }
+        $base = basename($path);
+        if (preg_match('/^(\d{4})-/', $base, $m) !== 1) {
+            continue;
+        }
+        if ($m[1] === '0000') {
+            continue;
+        }
+        $byNum[$m[1]] = $path;
+    }
+
+    $claims = [];
+    foreach ($byNum as $num => $path) {
+        $content = file_get_contents($path);
+        if ($content === false) {
+            continue;
+        }
+        $claim = ['supersededBy' => null, 'supersedes' => []];
+        if (preg_match('/^\*\*Status:\*\*\s*Superseded by ADR-(\d{4})/m', $content, $m) === 1) {
+            $claim['supersededBy'] = $m[1];
+        }
+        $section = '';
+        if (preg_match('/^## Supersedes\s*\r?\n(.+?)^## /ms', $content, $m) === 1) {
+            $section = $m[1];
+        } elseif (preg_match('/^## Supersedes\s*\r?\n(.+)/ms', $content, $m) === 1) {
+            $section = $m[1];
+        }
+        if ($section !== '' && preg_match_all('/ADR-(\d{4})/', $section, $mm) > 0) {
+            $claim['supersedes'] = array_values(array_unique($mm[1]));
+        }
+        $claims[$num] = $claim;
+    }
+
+    $issues = [];
+    foreach ($claims as $num => $claim) {
+        $rel = substr($byNum[$num], strlen($repoRoot) + 1);
+        if ($claim['supersededBy'] !== null) {
+            $y = $claim['supersededBy'];
+            if (!isset($byNum[$y])) {
+                $issues[] = sprintf('%s: claims Superseded by ADR-%s, but ADR-%s does not exist', $rel, $y, $y);
+            } else {
+                $yClaim = $claims[$y] ?? ['supersedes' => []];
+                if (!in_array($num, $yClaim['supersedes'], true)) {
+                    $issues[] = sprintf(
+                        "%s: claims Superseded by ADR-%s, but ADR-%s's ## Supersedes section does not reference ADR-%s",
+                        $rel,
+                        $y,
+                        $y,
+                        $num
+                    );
+                }
+            }
+        }
+        foreach ($claim['supersedes'] as $y) {
+            if (!isset($byNum[$y])) {
+                $issues[] = sprintf('%s: ## Supersedes references ADR-%s, but it does not exist', $rel, $y);
+            }
+        }
+    }
+    return $issues;
+}
+
 /** @param list<string> $files */
 function fixDates(array $files, \DateTimeImmutable $today): int
 {
@@ -368,11 +454,20 @@ foreach ($files as $path) {
     }
 }
 
+$transitionIssues = checkAdrTransitions($root);
+if ($transitionIssues !== []) {
+    echo "FAIL ADR transition integrity\n";
+    foreach ($transitionIssues as $issue) {
+        echo "     - {$issue}\n";
+    }
+    $failures++;
+}
+
 $total = count($files);
 if ($failures === 0) {
     echo "\n{$total} docs verified.\n";
     exit(0);
 }
 
-echo "\n{$failures} of {$total} docs failed.\n";
+echo "\n{$failures} failure(s) across {$total} docs plus ADR transitions.\n";
 exit(1);

@@ -1,0 +1,80 @@
+#!/bin/bash
+# Create the next ADR file by number, copying 0000-template.md and slugging the title.
+#
+# Usage: bin/next-adr "kebab-title"
+#
+# Checks both the current worktree AND the canonical main repo to avoid
+# numbering collisions when multiple worktrees are adding ADRs concurrently
+# (same defense bin/next-migration uses).
+
+set -euo pipefail
+
+if [ $# -ne 1 ] || [ -z "$1" ]; then
+    echo "Usage: $0 \"kebab-title\"" >&2
+    exit 2
+fi
+
+SLUG="$1"
+
+# Validate slug: lowercase letters, digits, hyphens. No spaces, no uppercase.
+if ! printf '%s' "$SLUG" | grep -qE '^[a-z0-9]+(-[a-z0-9]+)*$'; then
+    echo "Error: slug must be kebab-case (lowercase letters, digits, hyphens)." >&2
+    echo "       Got: $SLUG" >&2
+    exit 2
+fi
+
+WORKTREE_DIR="$(cd "$(dirname "$0")/.." && pwd)/ibl5/docs/decisions"
+CANONICAL_DIR="/Users/ajaynicolas/Documents/GitHub/IBL5/ibl5/docs/decisions"
+
+get_max() {
+    local dir="$1"
+    if [ ! -d "$dir" ]; then
+        return 0
+    fi
+    # List NNNN-*.md files, extract numeric prefix, skip 0000 (template), find max.
+    # `|| true` absorbs the empty-pipeline case under `set -o pipefail`.
+    (
+        ls "$dir"/[0-9][0-9][0-9][0-9]-*.md 2>/dev/null \
+            | sed 's/.*\///' \
+            | grep -oE '^[0-9]+' \
+            | grep -v '^0000$' \
+            | sort -n \
+            | tail -1
+    ) || true
+}
+
+MAX_WT=$(get_max "$WORKTREE_DIR")
+MAX_CANON=$(get_max "$CANONICAL_DIR")
+
+MAX="${MAX_WT:-0}"
+if [ -n "$MAX_CANON" ] && [ "$MAX_CANON" -gt "$MAX" ] 2>/dev/null; then
+    MAX=$MAX_CANON
+fi
+
+NEXT=$((10#$MAX + 1))
+PADDED=$(printf "%04d" "$NEXT")
+
+TEMPLATE="$WORKTREE_DIR/0000-template.md"
+if [ ! -f "$TEMPLATE" ]; then
+    echo "Error: template not found at $TEMPLATE" >&2
+    exit 1
+fi
+
+# Reject slug reuse: an existing ADR with the same slug (any number) is a collision.
+# This catches the common case of invoking next-adr twice with the same title.
+EXISTING=$(ls "$WORKTREE_DIR"/[0-9][0-9][0-9][0-9]-"${SLUG}".md 2>/dev/null | head -1 || true)
+if [ -n "$EXISTING" ]; then
+    echo "Error: an ADR with slug '${SLUG}' already exists at ${EXISTING}." >&2
+    echo "       Pick a distinct kebab-title." >&2
+    exit 1
+fi
+
+TARGET="$WORKTREE_DIR/${PADDED}-${SLUG}.md"
+
+if [ -e "$TARGET" ]; then
+    echo "Error: $TARGET already exists — choose a different slug." >&2
+    exit 1
+fi
+
+cp "$TEMPLATE" "$TARGET"
+echo "$TARGET"

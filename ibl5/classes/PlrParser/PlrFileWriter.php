@@ -113,7 +113,7 @@ class PlrFileWriter implements PlrFileWriterInterface
         'previousTeamIndex' => [self::OFFSET_PREVIOUS_TEAM_INDEX, self::WIDTH_PREVIOUS_TEAM_INDEX],
 
         // Season stats (offsets 144-207) — used by PlrReconstructionService.
-        // Offsets and names mirror PlrParser\PlrParserService::parsePlrLine()
+        // Offsets and names mirror PlrParser\PlrLineParser::parse()
         // so reader and writer stay in sync.
         'seasonGamesStarted' => [144, self::WIDTH_SEASON_STAT],
         'seasonGamesPlayed' => [148, self::WIDTH_SEASON_STAT],

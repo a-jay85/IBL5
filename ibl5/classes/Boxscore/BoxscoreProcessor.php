@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Boxscore;
 
 use Boxscore\Contracts\BoxscoreProcessorInterface;
+use JsbParser\ScoFileParser;
 use League\LeagueContext;
 use Player\PlayerStats;
 use Utilities\UuidGenerator;
@@ -68,7 +69,7 @@ class BoxscoreProcessor implements BoxscoreProcessorInterface
             ];
         }
 
-        fseek($scoFile, 1000000);
+        fseek($scoFile, ScoFileParser::HEADER_OFFSET_BYTES);
 
         $gamesInserted = 0;
         $gamesUpdated = 0;
@@ -77,12 +78,12 @@ class BoxscoreProcessor implements BoxscoreProcessorInterface
         $league = $this->leagueContext !== null ? $this->leagueContext->getCurrentLeague() : 'ibl';
 
         while (!feof($scoFile)) {
-            $line = fgets($scoFile, 2001);
+            $line = fgets($scoFile, ScoFileParser::RECORD_SIZE + 1);
             if ($line === false) {
                 break;
             }
 
-            $gameInfoLine = substr($line, 0, 58);
+            $gameInfoLine = ScoFileParser::extractGameInfo($line);
             $boxscoreGameInfo = Boxscore::withGameInfoLine($gameInfoLine, $operatingSeasonEndingYear, $operatingSeasonPhase, $league);
 
             $upsertAction = $this->processGameUpsert($boxscoreGameInfo);
@@ -169,19 +170,19 @@ class BoxscoreProcessor implements BoxscoreProcessorInterface
         fseek($scoFile, 0);
 
         // Block 0: Rising Stars Game (bytes 0–1999)
-        $risingStarsLine = fgets($scoFile, 2001);
+        $risingStarsLine = fgets($scoFile, ScoFileParser::RECORD_SIZE + 1);
         // Block 1: All-Star Game (bytes 2000–3999)
-        $allStarLine = fgets($scoFile, 2001);
+        $allStarLine = fgets($scoFile, ScoFileParser::RECORD_SIZE + 1);
 
         fclose($scoFile);
 
         // Process Rising Stars Game
-        if ($risingStarsLine !== false && trim(substr($risingStarsLine, 0, 58)) !== '') {
+        if ($risingStarsLine !== false && trim(ScoFileParser::extractGameInfo($risingStarsLine)) !== '') {
             $this->processRisingStarsGame($risingStarsLine, $operatingSeasonEndingYear, $messages);
         }
 
         // Process All-Star Game (inserted with default placeholder names)
-        if ($allStarLine !== false && trim(substr($allStarLine, 0, 58)) !== '') {
+        if ($allStarLine !== false && trim(ScoFileParser::extractGameInfo($allStarLine)) !== '') {
             $this->processAllStarGame($allStarLine, $operatingSeasonEndingYear, $messages);
         }
 
@@ -209,9 +210,8 @@ class BoxscoreProcessor implements BoxscoreProcessorInterface
         $gameLinesProcessed = 0;
         $visitorTeamTotalSeen = false;
 
-        for ($i = 0; $i < 30; $i++) {
-            $x = $i * 53;
-            $playerInfoLine = substr($line, 58 + $x, 53);
+        for ($i = 0; $i < ScoFileParser::PLAYER_SLOT_COUNT; $i++) {
+            $playerInfoLine = ScoFileParser::extractPlayerSlot($line, $i);
             /** @var PlayerStats $playerStats */
             $playerStats = PlayerStats::withBoxscoreInfoLine($this->db, $playerInfoLine);
 
@@ -273,9 +273,9 @@ class BoxscoreProcessor implements BoxscoreProcessorInterface
                     $gameLinesProcessed++;
                 } else {
                     $playerUuid = UuidGenerator::generateUuid();
-                    // Determine player's team ID based on position in 30-player array
-                    // Players 0-14 are visitors, players 15-29 are home team
-                    $playerTeamID = $i < 15 ? $boxscoreGameInfo->visitorTeamID : $boxscoreGameInfo->homeTeamID;
+                    $playerTeamID = ScoFileParser::isHomeTeamSlot($i)
+                        ? $boxscoreGameInfo->homeTeamID
+                        : $boxscoreGameInfo->visitorTeamID;
                     $this->repository->insertPlayerBoxscore(
                         $boxscoreGameInfo->gameDate,
                         $playerUuid,
@@ -324,7 +324,7 @@ class BoxscoreProcessor implements BoxscoreProcessorInterface
      */
     private function processRisingStarsGame(string $line, int $seasonEndingYear, array &$messages): void
     {
-        $gameInfoLine = substr($line, 0, 58);
+        $gameInfoLine = ScoFileParser::extractGameInfo($line);
         $boxscoreGameInfo = Boxscore::withGameInfoLine($gameInfoLine, $seasonEndingYear, 'Regular Season/Playoffs');
         $boxscoreGameInfo->overrideGameContext(
             sprintf('%d-%02d-%02d', $seasonEndingYear, Season::IBL_ALL_STAR_MONTH, Season::IBL_RISING_STARS_GAME_DAY),
@@ -366,7 +366,7 @@ class BoxscoreProcessor implements BoxscoreProcessorInterface
     ): void {
         $gameDate = sprintf('%d-%02d-%02d', $seasonEndingYear, Season::IBL_ALL_STAR_MONTH, Season::IBL_ALL_STAR_GAME_DAY);
 
-        $gameInfoLine = substr($line, 0, 58);
+        $gameInfoLine = ScoFileParser::extractGameInfo($line);
         $boxscoreGameInfo = Boxscore::withGameInfoLine($gameInfoLine, $seasonEndingYear, 'Regular Season/Playoffs');
         $boxscoreGameInfo->overrideGameContext(
             $gameDate,

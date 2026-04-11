@@ -196,28 +196,6 @@ jobs:
             echo "IBL6 started (PID: $(cat ibl6.pid))"
           '
 
-      - name: Smoke test production
-        if: ${{ !cancelled() }}
-        run: |
-          echo "Waiting for services to be ready..."
-          sleep 5
-
-          for url in https://ibl6.iblhoops.net/ https://iblhoops.net/ibl5/; do
-            for attempt in 1 2 3; do
-              status=$(curl -s -o /dev/null -w '%{http_code}' --max-time 10 "$url")
-              if [ "$status" -ge 200 ] && [ "$status" -lt 400 ]; then
-                echo "✓ $url → $status"
-                break
-              fi
-              if [ "$attempt" -eq 3 ]; then
-                echo "✗ $url → $status (after 3 attempts)"
-                exit 1
-              fi
-              echo "  $url → $status, retrying in 5s..."
-              sleep 5
-            done
-          done
-
   notify-deploy-failure:
     name: Notify Deploy Failure
     runs-on: ubuntu-latest

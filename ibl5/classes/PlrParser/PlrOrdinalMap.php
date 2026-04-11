@@ -41,7 +41,7 @@ final class PlrOrdinalMap
      * Build an ordinal map from a .plr file.
      *
      * Reads only the 3 fields needed (ordinal, name, pid) from each line.
-     * This is intentional minimal duplication of PlrParserService::parsePlrLine() —
+     * This is intentional minimal duplication of PlrLineParser::parse() —
      * only 3 of 70+ fields are needed, and constructing a full PlrParserService
      * requires DB dependencies not needed here.
      *

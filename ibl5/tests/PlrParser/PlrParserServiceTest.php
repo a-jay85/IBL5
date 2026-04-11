@@ -8,6 +8,7 @@ use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use PlrParser\Contracts\PlrParserRepositoryInterface;
 use PlrParser\PlrImportMode;
+use PlrParser\PlrLineParser;
 use PlrParser\PlrParserService;
 use Season\Season;
 
@@ -75,7 +76,7 @@ class PlrParserServiceTest extends TestCase
         $line = substr_replace($line, '   1', 0, 4);    // ordinal = 1
         $line = substr_replace($line, '000000', 38, 6);  // pid = 0
 
-        $result = $this->service->parsePlrLine($line);
+        $result = PlrLineParser::parse($line);
 
         $this->assertNull($result);
     }
@@ -86,7 +87,7 @@ class PlrParserServiceTest extends TestCase
         $line = substr_replace($line, '1441', 0, 4);    // ordinal = 1441
         $line = substr_replace($line, '000001', 38, 6);  // pid = 1
 
-        $result = $this->service->parsePlrLine($line);
+        $result = PlrLineParser::parse($line);
 
         $this->assertNull($result);
     }
@@ -103,7 +104,7 @@ class PlrParserServiceTest extends TestCase
             'pos' => 'PG',
         ]);
 
-        $result = $this->service->parsePlrLine($line);
+        $result = PlrLineParser::parse($line);
 
         $this->assertNotNull($result);
         $this->assertSame(1, $result['ordinal']);
@@ -126,7 +127,7 @@ class PlrParserServiceTest extends TestCase
         $cp1252Name = str_pad("Ren\xE9 Test", 32);
         $line = substr_replace($line, $cp1252Name, 4, 32);
 
-        $result = $this->service->parsePlrLine($line);
+        $result = PlrLineParser::parse($line);
 
         $this->assertNotNull($result);
         $this->assertSame('René Test', $result['name']);
@@ -292,7 +293,7 @@ class PlrParserServiceTest extends TestCase
     {
         $line = $this->buildPlrLine(['ordinal' => 1440, 'pid' => 12345]);
 
-        $result = $this->service->parsePlrLine($line);
+        $result = PlrLineParser::parse($line);
 
         $this->assertNotNull($result);
         $this->assertSame(1440, $result['ordinal']);

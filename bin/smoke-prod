@@ -18,6 +18,13 @@ PASS=0
 FAIL=0
 ERRORS=""
 
+# Identify ourselves — the default curl UA can get classified as a bot by
+# LiteSpeed mod_security and produce a blanket 415 ban on the runner IP.
+USER_AGENT="IBL5-smoke/1.0 (+https://github.com/a-jay85/IBL5)"
+
+# Space requests apart so we stay under the LiteSpeed per-IP WAF threshold.
+INTERCHECK_DELAY="${SMOKE_INTERCHECK_DELAY:-1}"
+
 TMPFILE=$(mktemp)
 trap 'rm -f "$TMPFILE"' EXIT
 
@@ -26,7 +33,7 @@ check() {
 
     # Single request: capture body to temp file + status code
     local status
-    status=$(curl -sS -w "%{http_code}" --max-time 30 -o "$TMPFILE" "$url" 2>/dev/null) || true
+    status=$(curl -sS -w "%{http_code}" --max-time 30 -A "$USER_AGENT" -o "$TMPFILE" "$url" 2>/dev/null) || true
     # Extract just the HTTP code (last 3 chars of output)
     status="${status: -3}"
     [[ "$status" =~ ^[0-9]+$ ]] || status="000"
@@ -36,7 +43,7 @@ check() {
     if ! echo "$accept" | grep -qw "$status"; then
         echo "  RETRY: $name — HTTP $status, waiting 10s..."
         sleep 10
-        status=$(curl -sS -w "%{http_code}" --max-time 30 -o "$TMPFILE" "$url" 2>/dev/null) || true
+        status=$(curl -sS -w "%{http_code}" --max-time 30 -A "$USER_AGENT" -o "$TMPFILE" "$url" 2>/dev/null) || true
         status="${status: -3}"
         [[ "$status" =~ ^[0-9]+$ ]] || status="000"
     fi
@@ -73,12 +80,19 @@ echo "Smoke testing $BASE ..."
 echo ""
 
 check "Homepage"     "$BASE/ibl5/index.php"                                 "IBL"
+sleep "$INTERCHECK_DELAY"
 check "Standings"    "$BASE/ibl5/modules.php?name=Standings"                "Standings"
+sleep "$INTERCHECK_DELAY"
 check "Team page"    "$BASE/ibl5/modules.php?name=Team&op=team&teamID=1"    "team"
+sleep "$INTERCHECK_DELAY"
 check "Player page"  "$BASE/ibl5/modules.php?name=Player&pa=showpage&pid=1" "player"
+sleep "$INTERCHECK_DELAY"
 check "Login page"   "$BASE/ibl5/modules.php?name=YourAccount"              "Sign In"
-check "API routing"   "$BASE/ibl5/api/v1/season"                             "" "200|401"
+sleep "$INTERCHECK_DELAY"
+check "API routing"  "$BASE/ibl5/api/v1/season"                             "" "200|401"
+sleep "$INTERCHECK_DELAY"
 check "CSS asset"    "$BASE/ibl5/themes/IBL/style/style.css"                ""
+sleep "$INTERCHECK_DELAY"
 check "IBL6 app"     "https://ibl6.iblhoops.net/"                           ""
 
 echo ""

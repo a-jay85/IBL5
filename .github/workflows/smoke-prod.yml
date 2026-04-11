@@ -38,11 +38,31 @@ jobs:
     steps:
       - uses: actions/checkout@v6
 
-      - name: Wait for server stabilization after deploy
+      # Back-to-back deploys each fire a workflow_run. The earlier smoke is
+      # then stale AND burns requests against LiteSpeed's per-IP WAF counter,
+      # which can trip a ban that makes the later smoke fail with blanket 415s.
+      - name: Skip if production tip has advanced past this SHA
+        id: guard
         if: github.event_name == 'workflow_run'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          EXPECTED="${{ github.event.workflow_run.head_sha }}"
+          ACTUAL=$(gh api "repos/${{ github.repository }}/commits/production" --jq .sha)
+          if [ "$EXPECTED" != "$ACTUAL" ]; then
+            echo "::notice::Stale smoke run — workflow_run sha=$EXPECTED but production tip=$ACTUAL. Skipping."
+            echo "stale=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "Fresh — production tip matches workflow_run sha ($EXPECTED)"
+            echo "stale=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Wait for server stabilization after deploy
+        if: github.event_name == 'workflow_run' && steps.guard.outputs.stale != 'true'
         run: sleep 15
 
       - name: Run smoke tests
+        if: steps.guard.outputs.stale != 'true'
         run: |
           chmod +x bin/smoke-prod
           bin/smoke-prod "${{ github.event.inputs.base_url || 'https://www.iblhoops.net' }}"

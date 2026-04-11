@@ -14,15 +14,19 @@ require $_SERVER['DOCUMENT_ROOT'] . '/ibl5/vendor/autoload.php';
 // Fallback PSR-4 loader rooted at the container's /ibl5/classes path.
 // When this script is invoked via `docker exec php ...` on macOS, Docker
 // Desktop's VirtioFS exposes bind-mount source paths through realpath(),
-// so composer's generated autoloader computes $baseDir to a host path
+// so composer's generated autoloader computes $baseDir from the included
+// autoload_psr4.php's __DIR__ — which resolves to a host path
 // (e.g. /Users/<me>/.../ibl5) that doesn't exist inside the container —
-// every PSR-4 lookup then fails with "Class not found". Registering a
-// second autoloader here (run after composer's) resolves classes the
-// broken mapping drops, while leaving normal host-side execution unchanged.
+// and every PSR-4 lookup fails with "Class not found". This fallback
+// avoids that trap because $_SERVER['DOCUMENT_ROOT'] is computed from the
+// top-level script's __DIR__, which PHP does not realpath-resolve on
+// direct invocation, so it stays /var/www/html. Registered after
+// composer's loader, so it only fires on the misses, leaving normal
+// host-side execution unchanged.
 spl_autoload_register(static function (string $class): void {
     $path = $_SERVER['DOCUMENT_ROOT'] . '/ibl5/classes/' . str_replace('\\', '/', $class) . '.php';
     if (is_file($path)) {
-        require $path;
+        require_once $path;
     }
 });
 
@@ -39,7 +43,7 @@ include $_SERVER['DOCUMENT_ROOT'] . '/ibl5/config.php';
 $mysqli_db = new \mysqli();
 $mysqli_db->options(MYSQLI_OPT_INT_AND_FLOAT_NATIVE, true);
 if (!$mysqli_db->real_connect($dbhost, $dbuname, $dbpass, $dbname)) {
-    fwrite(STDERR, "Failed to connect to MariaDB: {$mysqli_db->connect_error}\n");
+    fwrite(STDERR, "Failed to connect to MariaDB ({$mysqli_db->connect_errno}): {$mysqli_db->connect_error}\n");
     exit(2);
 }
 $mysqli_db->set_charset('utf8mb4');

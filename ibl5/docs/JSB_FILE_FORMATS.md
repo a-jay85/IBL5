@@ -12,6 +12,7 @@ Reverse-engineered specifications for the binary and text data files produced by
 ## Table of Contents
 
 - [IBL5.car — Career Statistics](#ibl5car--career-statistics)
+- [IBL5.plr — Player Records](#ibl5plr--player-records)
 - [IBL5.his — Historical Results](#ibl5his--historical-results)
 - [IBL5.rcb — Record Book](#ibl5rcb--record-book)
 - [IBL5.trn — Transactions](#ibl5trn--transactions)
@@ -79,6 +80,272 @@ Season records follow immediately after the header. Remaining block space (after
 | 98–99 | 2 | Spaces | Trailing padding |
 
 **Important:** 3GM is a separate counting stat from 2GM. They do not overlap. Points = `2GM * 2 + FTM + 3GM * 3`.
+
+**Important:** `.car` does **not** update mid-season. Every mid-season snapshot in a given season has byte-identical `.car` contents (verified via MD5 across the 06-07 sim05 / sim06 / sim07 archives). The `.car` regenerates only at season end — a player's most recent season row is always the *last completed* season, never the in-progress one. For rebuilding mid-season `.plr` snapshots use `ibl_box_scores` instead; see `classes/PlrParser/PlrReconstructionService.php`.
+
+---
+
+## IBL5.plr — Player Records
+
+**Size:** 998,788 bytes | **Format:** Fixed-width text with CRLF line endings | **Encoding:** CP1252 (Windows-1252)
+
+### File Structure
+
+The file is a sequence of **607-byte records** separated by CRLF. Each record is one player *or* team-summary row. There are ~1603 total lines per snapshot, split into:
+
+| Region | Lines | Content |
+|--------|-------|---------|
+| Player records | 1440 slots | One per active/retired/prospect player; identified by `pid` at offset 38 |
+| Team-summary rows | ~60 rows | Per-franchise totals, `pid=0`, team name at offset 4 |
+| Padding | ~885 rows | Empty slots for future player growth |
+
+Players are identified by the **`pid` at offset 38** (database primary key), not the `ordinal` at offset 0. The ordinal is a display/roster index that tops out at 1440.
+
+### Player Record Layout (607 bytes)
+
+Field offsets and widths below are the authoritative spec used by `classes/PlrParser/PlrParserService.php` (reader) and `classes/JsbParser/PlrFileWriter.php` (writer). Keep those two in sync with this table.
+
+#### Identification (0-51)
+
+| Offset | Width | Type | Field |
+|--------|-------|------|-------|
+| 0 | 4 | int | Ordinal (1-1440 for active player slots) |
+| 4 | 32 | string | Player name (left-justified, CP1252, space-padded) |
+| 36 | 2 | int | Age |
+| 38 | 6 | int | `pid` — database primary key |
+| 44 | 2 | int | `tid` — team ID |
+| 46 | 4 | int | Peak rating |
+| 50 | 2 | string | Position (`PG`, `SG`, `SF`, `PF`, ` C`) |
+
+#### Real-Life / Previous Season Stats (52-111)
+
+Backing for the JSB simulation engine's "real-life" tendencies — these are the reference stats used by the engine when simulating games, independent of the in-game season totals.
+
+| Offset | Width | Field |
+|--------|-------|-------|
+| 52 | 4 | `realLifeGP` |
+| 56 | 4 | `realLifeMIN` |
+| 60 | 4 | `realLifeFGM` |
+| 64 | 4 | `realLifeFGA` |
+| 68 | 4 | `realLifeFTM` |
+| 72 | 4 | `realLifeFTA` |
+| 76 | 4 | `realLife3GM` |
+| 80 | 4 | `realLife3GA` |
+| 84 | 4 | `realLifeORB` |
+| 88 | 4 | `realLifeDRB` |
+| 92 | 4 | `realLifeAST` |
+| 96 | 4 | `realLifeSTL` |
+| 100 | 4 | `realLifeTVR` |
+| 104 | 4 | `realLifeBLK` |
+| 108 | 4 | `realLifePF` |
+
+#### Unknown region (112-127)
+
+16 bytes of unmapped data. Not parsed or written by any code today.
+
+#### Clutch / Consistency / Depth Chart (128-140)
+
+| Offset | Width | Field |
+|--------|-------|-------|
+| 128 | 2 | `clutch` |
+| 130 | 2 | `consistency` |
+| 132 | 1 | `PGDepth` |
+| 133 | 1 | `SGDepth` |
+| 134 | 1 | `SFDepth` |
+| 135 | 1 | `PFDepth` |
+| 136 | 1 | `CDepth` |
+| 137 | 1 | `canPlayInGame` |
+| 138 | 2 | Unknown |
+| 140 | 4 | `injuryDaysLeft` |
+
+#### Season Stats (144-207) — reconstructed from `ibl_box_scores`
+
+All width 4. Overwritten by `PlrReconstructionService` using `SUM(...) WHERE game_type = 1`.
+
+| Offset | Field | Source |
+|--------|-------|--------|
+| 144 | `seasonGamesStarted` | Not reconstructable from box scores; preserved from base snapshot |
+| 148 | `seasonGamesPlayed` | `SUM(CASE WHEN gameMIN > 0 THEN 1 ELSE 0 END)` |
+| 152 | `seasonMIN` | `SUM(gameMIN)` |
+| 156 | `season2GM` | `SUM(game2GM)` |
+| 160 | `season2GA` | `SUM(game2GA)` |
+| 164 | `seasonFTM` | `SUM(gameFTM)` |
+| 168 | `seasonFTA` | `SUM(gameFTA)` |
+| 172 | `season3GM` | `SUM(game3GM)` |
+| 176 | `season3GA` | `SUM(game3GA)` |
+| 180 | `seasonORB` | `SUM(gameORB)` |
+| 184 | `seasonDRB` | `SUM(gameDRB)` |
+| 188 | `seasonAST` | `SUM(gameAST)` |
+| 192 | `seasonSTL` | `SUM(gameSTL)` |
+| 196 | `seasonTVR` | `SUM(gameTOV)` — note the rename: box scores use `TOV`, `.plr` uses `TVR` |
+| 200 | `seasonBLK` | `SUM(gameBLK)` |
+| 204 | `seasonPF` | `SUM(gamePF)` |
+
+**DNP gotcha:** `ibl_box_scores` stores DNP rows with `gameMIN = 0`. Those must be excluded from `seasonGamesPlayed` but still contribute 0 to every counting stat — use `SUM(CASE WHEN gameMIN > 0 THEN 1 ELSE 0 END)` not `COUNT(*)`.
+
+#### Playoff Season Stats (208-267)
+
+Same structure as regular-season stats; reconstructed from `game_type = 2`.
+
+| Offset | Field |
+|--------|-------|
+| 208 | `playoffSeasonGP` |
+| 212 | `playoffSeasonMIN` |
+| 216 | `playoffSeason2GM` |
+| 220 | `playoffSeason2GA` |
+| 224 | `playoffSeasonFTM` |
+| 228 | `playoffSeasonFTA` |
+| 232 | `playoffSeason3GM` |
+| 236 | `playoffSeason3GA` |
+| 240 | `playoffSeasonORB` |
+| 244 | `playoffSeasonDRB` |
+| 248 | `playoffSeasonAST` |
+| 252 | `playoffSeasonSTL` |
+| 256 | `playoffSeasonTVR` |
+| 260 | `playoffSeasonBLK` |
+| 264 | `playoffSeasonPF` |
+
+#### Attributes / Morale / Contracts (268-329)
+
+| Offset | Width | Field |
+|--------|-------|-------|
+| 268 | 2 | `talent` |
+| 270 | 2 | `skill` |
+| 272 | 2 | `intangibles` |
+| 274 | 2 | `coach` |
+| 276 | 2 | `loyalty` |
+| 278 | 2 | `playingTime` |
+| 280 | 2 | `playForWinner` |
+| 282 | 2 | `tradition` |
+| 284 | 2 | `security` |
+| 286 | 2 | `exp` |
+| 288 | 2 | `bird` |
+| 290 | 2 | `currentContractYear` (`cy`) |
+| 292 | 2 | `totalContractYears` (`cyt`) |
+| 294 | 4 | Unknown |
+| 298 | 4 | Contract salary year 1 (`cy1`) |
+| 302 | 4 | `cy2` |
+| 306 | 4 | `cy3` |
+| 310 | 4 | `cy4` |
+| 314 | 4 | `cy5` |
+| 318 | 4 | `cy6` |
+| 322 | 4 | Unknown |
+| 326 | 2 | `draftRound` |
+| 328 | 2 | `draftPickNumber` |
+
+#### Derived Team Fields (330-340)
+
+Auto-updated by `PlrFileWriter::applyDerivedTidFields()` whenever `tid` changes.
+
+| Offset | Width | Field |
+|--------|-------|-------|
+| 330 | 1 | `freeAgentSigningFlag` |
+| 331 | 2 | `contractOwnedBy` (equals tid) |
+| 333 | 2 | `currentTeamIndex` (tid − 1, or −1 for free agents) |
+| 335 | 2 | `previousTeamIndex` (previous tid − 1) |
+| 337 | 4 | Unknown |
+
+#### Single-Season Highs (341-363)
+
+Width 2 each. Derivable from `MAX(...)` over `ibl_box_scores` for the season window.
+
+| Offset | Field |
+|--------|-------|
+| 341 | `seasonHighPTS` |
+| 343 | `seasonHighREB` |
+| 345 | `seasonHighAST` |
+| 347 | `seasonHighSTL` |
+| 349 | `seasonHighBLK` |
+| 351 | `seasonHighDoubleDoubles` |
+| 353 | `seasonHighTripleDoubles` |
+| 355 | `seasonPlayoffHighPTS` |
+| 357 | `seasonPlayoffHighREB` |
+| 359 | `seasonPlayoffHighAST` |
+| 361 | `seasonPlayoffHighSTL` |
+| 363 | `seasonPlayoffHighBLK` |
+
+#### Career Best Highs (365-435)
+
+Width 6 each. Monotonic: `new = max(base_career_best, current_season_high)`.
+
+| Offset | Field |
+|--------|-------|
+| 365 | `careerSeasonHighPTS` |
+| 371 | `careerSeasonHighREB` |
+| 377 | `careerSeasonHighAST` |
+| 383 | `careerSeasonHighSTL` |
+| 389 | `careerSeasonHighBLK` |
+| 395 | `careerSeasonHighDoubleDoubles` |
+| 401 | `careerSeasonHighTripleDoubles` |
+| 407 | `careerPlayoffHighPTS` |
+| 413 | `careerPlayoffHighREB` |
+| 419 | `careerPlayoffHighAST` |
+| 425 | `careerPlayoffHighSTL` |
+| 431 | `careerPlayoffHighBLK` |
+
+#### Career Totals (437-511)
+
+Width 5 each. Monotonic within a season: `career_new[X] = career_base[X] + max(0, season_new[X] - season_base[X])`.
+
+| Offset | Field |
+|--------|-------|
+| 437 | `careerGP` |
+| 442 | `careerMIN` |
+| 447 | `career2GM` |
+| 452 | `career2GA` |
+| 457 | `careerFTM` |
+| 462 | `careerFTA` |
+| 467 | `career3GM` |
+| 472 | `career3GA` |
+| 477 | `careerORB` |
+| 482 | `careerDRB` |
+| 487 | `careerAST` |
+| 492 | `careerSTL` |
+| 497 | `careerTVR` |
+| 502 | `careerBLK` |
+| 507 | `careerPF` |
+
+#### Unknown region (512-549)
+
+38 bytes of unmapped data.
+
+#### Height / Weight / Ratings (550-606)
+
+| Offset | Width | Field |
+|--------|-------|-------|
+| 550 | 2 | `heightInches` |
+| 552 | 3 | `weight` |
+| 555 | 3 | `rating2GA` |
+| 558 | 3 | `rating2GP` |
+| 561 | 3 | `ratingFTA` |
+| 564 | 3 | `ratingFTP` |
+| 567 | 3 | `rating3GA` |
+| 570 | 3 | `rating3GP` |
+| 573 | 3 | `ratingORB` |
+| 576 | 3 | `ratingDRB` |
+| 579 | 3 | `ratingAST` |
+| 582 | 3 | `ratingSTL` |
+| 585 | 3 | `ratingTVR` |
+| 588 | 3 | `ratingBLK` |
+| 591 | 2 | `ratingOO` (offense-offense) |
+| 593 | 2 | `ratingDO` |
+| 595 | 2 | `ratingPO` |
+| 597 | 2 | `ratingTO` |
+| 599 | 2 | `ratingOD` |
+| 601 | 2 | `ratingDD` |
+| 603 | 2 | `ratingPD` |
+| 605 | 2 | `ratingTD` |
+
+### Team-Summary Rows (ordinal ≥ 1441)
+
+Lines with `ordinal ≥ 1441` and `pid = 0` store per-team totals. **The layout is currently unknown** — no reader or writer in the codebase parses them. The first 28 rows (1441-1468) are the 28 franchises; a second block (1471 onward) appears to be a secondary team-totals section (possibly opponent-allowed stats). Reverse-engineering is tracked as a follow-up.
+
+### Encoding Notes
+
+- **Right-justified integers** with space padding (never zero-padded). `4` in a 4-byte field is `"   4"`, not `"0004"`.
+- **Left-justified strings** with space padding (player names, team names).
+- **CP1252** for non-ASCII characters (accented names). Readers must `iconv('CP1252', 'UTF-8//IGNORE', $raw)` before display.
+- **CRLF** line endings between records. Each record is *exactly* 607 bytes — `PlrFileWriter::applyChangesToRecord()` asserts length invariance.
 
 ---
 

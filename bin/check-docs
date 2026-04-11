@@ -57,8 +57,9 @@ dead repo-path references on every in-scope markdown file.
 Options:
   --fix-dates        Bump last_verified to today on every scanned file.
                      Use only for reviewed batch re-verification.
-  --include-memory   Also scan ~/.claude/projects/.../memory/*.md.
-                     Off in CI.
+  --include-memory   Also scan Claude Code memory for this repo
+                     (auto-derived from the main repo path; works from
+                     worktrees). Off in CI.
   --verbose, -v      Show passing files too.
   --help, -h         Show this message.
 
@@ -80,6 +81,30 @@ function repoRoot(): string
     return $dir;
 }
 
+/**
+ * Derive Claude Code's memory dir for this repo. Works from worktrees by resolving
+ * the main repo path (memory is keyed to the main repo, not per-worktree).
+ * Returns null if HOME is unset or the slug cannot be built.
+ */
+function memoryDirForRepo(string $repoRoot): ?string
+{
+    $home = getenv('HOME');
+    if (!is_string($home) || $home === '') {
+        return null;
+    }
+    $mainRepo = $repoRoot;
+    $gitMarker = $repoRoot . '/.git';
+    if (is_file($gitMarker)) {
+        $content = file_get_contents($gitMarker);
+        if ($content !== false && preg_match('/gitdir:\s*(\S+)/', $content, $m) === 1) {
+            // $m[1] is <main>/.git/worktrees/<name> — three dirnames back to <main>.
+            $mainRepo = dirname($m[1], 3);
+        }
+    }
+    $slug = '-' . str_replace('/', '-', ltrim($mainRepo, '/'));
+    return $home . '/.claude/projects/' . $slug . '/memory';
+}
+
 /** @return list<string> */
 function collectFiles(string $root, bool $includeMemory): array
 {
@@ -94,15 +119,12 @@ function collectFiles(string $root, bool $includeMemory): array
         }
     }
     if ($includeMemory) {
-        $home = getenv('HOME');
-        if (is_string($home) && $home !== '') {
-            $memory = $home . '/.claude/projects/-Users-ajaynicolas-Documents-GitHub-IBL5/memory';
-            if (is_dir($memory)) {
-                $matches = glob($memory . '/*.md');
-                if ($matches !== false) {
-                    foreach ($matches as $path) {
-                        $files[] = $path;
-                    }
+        $memory = memoryDirForRepo($root);
+        if ($memory !== null && is_dir($memory)) {
+            $matches = glob($memory . '/*.md');
+            if ($matches !== false) {
+                foreach ($matches as $path) {
+                    $files[] = $path;
                 }
             }
         }

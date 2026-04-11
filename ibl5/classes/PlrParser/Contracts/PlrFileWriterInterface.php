@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace JsbParser\Contracts;
+namespace PlrParser\Contracts;
 
 /**
  * Interface for read-modify-write operations on JSB .plr (Player) files.

@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace Tests\PlrParser;
 
-use JsbParser\PlrFieldSerializer;
-use JsbParser\PlrFileWriter;
+use PlrParser\PlrFieldSerializer;
+use PlrParser\PlrFileWriter;
 use PHPUnit\Framework\TestCase;
 use PlrParser\Contracts\PlrBoxScoreRepositoryInterface;
 use PlrParser\PlrReconstructionService;

@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace JsbParser;
+namespace PlrParser;
 
 /**
  * Value object mapping .plr ordinals to player identity (pid, name).

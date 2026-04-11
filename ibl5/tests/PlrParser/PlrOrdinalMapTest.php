@@ -2,13 +2,13 @@
 
 declare(strict_types=1);
 
-namespace Tests\JsbParser;
+namespace Tests\PlrParser;
 
-use JsbParser\PlrOrdinalMap;
+use PlrParser\PlrOrdinalMap;
 use PHPUnit\Framework\TestCase;
 
 /**
- * @covers \JsbParser\PlrOrdinalMap
+ * @covers \PlrParser\PlrOrdinalMap
  */
 class PlrOrdinalMapTest extends TestCase
 {

@@ -6,6 +6,8 @@ namespace JsbParser;
 
 use JsbParser\Contracts\JsbExportRepositoryInterface;
 use JsbParser\Contracts\JsbExportServiceInterface;
+use PlrParser\PlrFileWriter;
+use PlrParser\PlrWriteResult;
 
 /**
  * Orchestrator for JSB file export operations.

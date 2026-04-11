@@ -2,14 +2,14 @@
 
 declare(strict_types=1);
 
-namespace Tests\JsbParser;
+namespace Tests\PlrParser;
 
-use JsbParser\PlrFieldSerializer;
-use JsbParser\PlrFileWriter;
+use PlrParser\PlrFieldSerializer;
+use PlrParser\PlrFileWriter;
 use PHPUnit\Framework\TestCase;
 
 /**
- * @covers \JsbParser\PlrFileWriter
+ * @covers \PlrParser\PlrFileWriter
  */
 class PlrFileWriterTest extends TestCase
 {

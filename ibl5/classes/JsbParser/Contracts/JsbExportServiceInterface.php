@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace JsbParser\Contracts;
 
-use JsbParser\PlrWriteResult;
+use PlrParser\PlrWriteResult;
 
 /**
  * Interface for the JSB file export orchestrator.

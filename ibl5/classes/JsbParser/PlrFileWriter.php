@@ -76,6 +76,17 @@ class PlrFileWriter implements PlrFileWriterInterface
     public const OFFSET_PREVIOUS_TEAM_INDEX = 335;
     public const WIDTH_PREVIOUS_TEAM_INDEX = 2;
 
+    // Season-stat block (offsets 144-207, 4 bytes each) — used by PlrReconstructionService
+    public const WIDTH_SEASON_STAT = 4;
+    // Playoff season stats (offsets 208-267, 4 bytes each)
+    public const WIDTH_PLAYOFF_SEASON_STAT = 4;
+    // Single-season highs (offsets 341-363, 2 bytes each)
+    public const WIDTH_SEASON_HIGH = 2;
+    // Career best highs (offsets 365-435, 6 bytes each)
+    public const WIDTH_CAREER_HIGH = 6;
+    // Career totals (offsets 437-511, 5 bytes each)
+    public const WIDTH_CAREER_STAT = 5;
+
     /**
      * Map of field names to [offset, width] pairs for all changeable fields.
      *
@@ -102,6 +113,91 @@ class PlrFileWriter implements PlrFileWriterInterface
         'contractOwnedBy' => [self::OFFSET_CONTRACT_OWNED_BY, self::WIDTH_CONTRACT_OWNED_BY],
         'currentTeamIndex' => [self::OFFSET_CURRENT_TEAM_INDEX, self::WIDTH_CURRENT_TEAM_INDEX],
         'previousTeamIndex' => [self::OFFSET_PREVIOUS_TEAM_INDEX, self::WIDTH_PREVIOUS_TEAM_INDEX],
+
+        // Season stats (offsets 144-207) — used by PlrReconstructionService.
+        // Offsets and names mirror PlrParser\PlrParserService::parsePlrLine()
+        // so reader and writer stay in sync.
+        'seasonGamesStarted' => [144, self::WIDTH_SEASON_STAT],
+        'seasonGamesPlayed' => [148, self::WIDTH_SEASON_STAT],
+        'seasonMIN' => [152, self::WIDTH_SEASON_STAT],
+        'season2GM' => [156, self::WIDTH_SEASON_STAT],
+        'season2GA' => [160, self::WIDTH_SEASON_STAT],
+        'seasonFTM' => [164, self::WIDTH_SEASON_STAT],
+        'seasonFTA' => [168, self::WIDTH_SEASON_STAT],
+        'season3GM' => [172, self::WIDTH_SEASON_STAT],
+        'season3GA' => [176, self::WIDTH_SEASON_STAT],
+        'seasonORB' => [180, self::WIDTH_SEASON_STAT],
+        'seasonDRB' => [184, self::WIDTH_SEASON_STAT],
+        'seasonAST' => [188, self::WIDTH_SEASON_STAT],
+        'seasonSTL' => [192, self::WIDTH_SEASON_STAT],
+        'seasonTVR' => [196, self::WIDTH_SEASON_STAT],
+        'seasonBLK' => [200, self::WIDTH_SEASON_STAT],
+        'seasonPF' => [204, self::WIDTH_SEASON_STAT],
+
+        // Playoff season stats (offsets 208-267) — reconstructed from game_type=2 box scores.
+        'playoffSeasonGP' => [208, self::WIDTH_PLAYOFF_SEASON_STAT],
+        'playoffSeasonMIN' => [212, self::WIDTH_PLAYOFF_SEASON_STAT],
+        'playoffSeason2GM' => [216, self::WIDTH_PLAYOFF_SEASON_STAT],
+        'playoffSeason2GA' => [220, self::WIDTH_PLAYOFF_SEASON_STAT],
+        'playoffSeasonFTM' => [224, self::WIDTH_PLAYOFF_SEASON_STAT],
+        'playoffSeasonFTA' => [228, self::WIDTH_PLAYOFF_SEASON_STAT],
+        'playoffSeason3GM' => [232, self::WIDTH_PLAYOFF_SEASON_STAT],
+        'playoffSeason3GA' => [236, self::WIDTH_PLAYOFF_SEASON_STAT],
+        'playoffSeasonORB' => [240, self::WIDTH_PLAYOFF_SEASON_STAT],
+        'playoffSeasonDRB' => [244, self::WIDTH_PLAYOFF_SEASON_STAT],
+        'playoffSeasonAST' => [248, self::WIDTH_PLAYOFF_SEASON_STAT],
+        'playoffSeasonSTL' => [252, self::WIDTH_PLAYOFF_SEASON_STAT],
+        'playoffSeasonTVR' => [256, self::WIDTH_PLAYOFF_SEASON_STAT],
+        'playoffSeasonBLK' => [260, self::WIDTH_PLAYOFF_SEASON_STAT],
+        'playoffSeasonPF' => [264, self::WIDTH_PLAYOFF_SEASON_STAT],
+
+        // Single-season highs (offsets 341-353) — MAX(...) over box scores.
+        'seasonHighPTS' => [341, self::WIDTH_SEASON_HIGH],
+        'seasonHighREB' => [343, self::WIDTH_SEASON_HIGH],
+        'seasonHighAST' => [345, self::WIDTH_SEASON_HIGH],
+        'seasonHighSTL' => [347, self::WIDTH_SEASON_HIGH],
+        'seasonHighBLK' => [349, self::WIDTH_SEASON_HIGH],
+        'seasonHighDoubleDoubles' => [351, self::WIDTH_SEASON_HIGH],
+        'seasonHighTripleDoubles' => [353, self::WIDTH_SEASON_HIGH],
+
+        // Single-season playoff highs (offsets 355-363) — MAX(...) with game_type=2.
+        'seasonPlayoffHighPTS' => [355, self::WIDTH_SEASON_HIGH],
+        'seasonPlayoffHighREB' => [357, self::WIDTH_SEASON_HIGH],
+        'seasonPlayoffHighAST' => [359, self::WIDTH_SEASON_HIGH],
+        'seasonPlayoffHighSTL' => [361, self::WIDTH_SEASON_HIGH],
+        'seasonPlayoffHighBLK' => [363, self::WIDTH_SEASON_HIGH],
+
+        // Career best highs (offsets 365-435) — monotonic: max(base_career_best, current_season_high).
+        'careerSeasonHighPTS' => [365, self::WIDTH_CAREER_HIGH],
+        'careerSeasonHighREB' => [371, self::WIDTH_CAREER_HIGH],
+        'careerSeasonHighAST' => [377, self::WIDTH_CAREER_HIGH],
+        'careerSeasonHighSTL' => [383, self::WIDTH_CAREER_HIGH],
+        'careerSeasonHighBLK' => [389, self::WIDTH_CAREER_HIGH],
+        'careerSeasonHighDoubleDoubles' => [395, self::WIDTH_CAREER_HIGH],
+        'careerSeasonHighTripleDoubles' => [401, self::WIDTH_CAREER_HIGH],
+        'careerPlayoffHighPTS' => [407, self::WIDTH_CAREER_HIGH],
+        'careerPlayoffHighREB' => [413, self::WIDTH_CAREER_HIGH],
+        'careerPlayoffHighAST' => [419, self::WIDTH_CAREER_HIGH],
+        'careerPlayoffHighSTL' => [425, self::WIDTH_CAREER_HIGH],
+        'careerPlayoffHighBLK' => [431, self::WIDTH_CAREER_HIGH],
+
+        // Career totals (offsets 437-511) — monotonic within season:
+        // career_new[X] = career_base[X] + max(0, season_new[X] - season_base[X]).
+        'careerGP' => [437, self::WIDTH_CAREER_STAT],
+        'careerMIN' => [442, self::WIDTH_CAREER_STAT],
+        'career2GM' => [447, self::WIDTH_CAREER_STAT],
+        'career2GA' => [452, self::WIDTH_CAREER_STAT],
+        'careerFTM' => [457, self::WIDTH_CAREER_STAT],
+        'careerFTA' => [462, self::WIDTH_CAREER_STAT],
+        'career3GM' => [467, self::WIDTH_CAREER_STAT],
+        'career3GA' => [472, self::WIDTH_CAREER_STAT],
+        'careerORB' => [477, self::WIDTH_CAREER_STAT],
+        'careerDRB' => [482, self::WIDTH_CAREER_STAT],
+        'careerAST' => [487, self::WIDTH_CAREER_STAT],
+        'careerSTL' => [492, self::WIDTH_CAREER_STAT],
+        'careerTVR' => [497, self::WIDTH_CAREER_STAT],
+        'careerBLK' => [502, self::WIDTH_CAREER_STAT],
+        'careerPF' => [507, self::WIDTH_CAREER_STAT],
     ];
 
     /**

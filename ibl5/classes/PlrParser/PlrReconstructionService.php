@@ -271,10 +271,11 @@ class PlrReconstructionService implements PlrReconstructionServiceInterface
     /**
      * Derive seasonGamesStarted heuristically since box scores carry no starter signal.
      *
-     * Three branches:
-     *   1. Pure bench (base.gs == 0): new.gs = 0
+     * Four branches in priority order:
+     *   1. Pure bench (base.gs == 0): new.gs = 0 (returned as no-op — base already has 0)
      *   2. Pure starter (base.gs == base.gp && base.gp > 0): new.gs = new.gp
-     *   3. Mixed: pro-rate by base's starter rate, rounded to nearest
+     *   3. Bad base data (base.gp <= 0 && base.gs > 0): zero out, the heuristic can't pro-rate
+     *   4. Mixed roster role (default): pro-rate by base's starter rate, rounded to nearest
      *
      * @param array<string, int> $priorChanges
      * @return array<string, int>

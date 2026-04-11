@@ -80,12 +80,10 @@ class PlrFileWriter implements PlrFileWriterInterface
     public const WIDTH_SEASON_STAT = 4;
     // Playoff season stats (offsets 208-267, 4 bytes each)
     public const WIDTH_PLAYOFF_SEASON_STAT = 4;
-    // Single-season highs (offsets 341-363, 2 bytes each)
+    // Single-season highs (offsets 341-364, 2 bytes each)
     public const WIDTH_SEASON_HIGH = 2;
-    // Career best highs (offsets 365-435, 6 bytes each)
+    // Career best highs (offsets 365-436, 6 bytes each)
     public const WIDTH_CAREER_HIGH = 6;
-    // Career totals (offsets 437-511, 5 bytes each)
-    public const WIDTH_CAREER_STAT = 5;
 
     /**
      * Map of field names to [offset, width] pairs for all changeable fields.
@@ -151,7 +149,7 @@ class PlrFileWriter implements PlrFileWriterInterface
         'playoffSeasonBLK' => [260, self::WIDTH_PLAYOFF_SEASON_STAT],
         'playoffSeasonPF' => [264, self::WIDTH_PLAYOFF_SEASON_STAT],
 
-        // Single-season highs (offsets 341-353) — MAX(...) over box scores.
+        // Single-season highs (offsets 341-354) — MAX(...) over box scores.
         'seasonHighPTS' => [341, self::WIDTH_SEASON_HIGH],
         'seasonHighREB' => [343, self::WIDTH_SEASON_HIGH],
         'seasonHighAST' => [345, self::WIDTH_SEASON_HIGH],
@@ -160,14 +158,14 @@ class PlrFileWriter implements PlrFileWriterInterface
         'seasonHighDoubleDoubles' => [351, self::WIDTH_SEASON_HIGH],
         'seasonHighTripleDoubles' => [353, self::WIDTH_SEASON_HIGH],
 
-        // Single-season playoff highs (offsets 355-363) — MAX(...) with game_type=2.
+        // Single-season playoff highs (offsets 355-364) — MAX(...) with game_type=2.
         'seasonPlayoffHighPTS' => [355, self::WIDTH_SEASON_HIGH],
         'seasonPlayoffHighREB' => [357, self::WIDTH_SEASON_HIGH],
         'seasonPlayoffHighAST' => [359, self::WIDTH_SEASON_HIGH],
         'seasonPlayoffHighSTL' => [361, self::WIDTH_SEASON_HIGH],
         'seasonPlayoffHighBLK' => [363, self::WIDTH_SEASON_HIGH],
 
-        // Career best highs (offsets 365-435) — monotonic: max(base_career_best, current_season_high).
+        // Career best highs (offsets 365-436) — monotonic: max(base_career_best, current_season_high).
         'careerSeasonHighPTS' => [365, self::WIDTH_CAREER_HIGH],
         'careerSeasonHighREB' => [371, self::WIDTH_CAREER_HIGH],
         'careerSeasonHighAST' => [377, self::WIDTH_CAREER_HIGH],
@@ -181,23 +179,12 @@ class PlrFileWriter implements PlrFileWriterInterface
         'careerPlayoffHighSTL' => [425, self::WIDTH_CAREER_HIGH],
         'careerPlayoffHighBLK' => [431, self::WIDTH_CAREER_HIGH],
 
-        // Career totals (offsets 437-511) — monotonic within season:
-        // career_new[X] = career_base[X] + max(0, season_new[X] - season_base[X]).
-        'careerGP' => [437, self::WIDTH_CAREER_STAT],
-        'careerMIN' => [442, self::WIDTH_CAREER_STAT],
-        'career2GM' => [447, self::WIDTH_CAREER_STAT],
-        'career2GA' => [452, self::WIDTH_CAREER_STAT],
-        'careerFTM' => [457, self::WIDTH_CAREER_STAT],
-        'careerFTA' => [462, self::WIDTH_CAREER_STAT],
-        'career3GM' => [467, self::WIDTH_CAREER_STAT],
-        'career3GA' => [472, self::WIDTH_CAREER_STAT],
-        'careerORB' => [477, self::WIDTH_CAREER_STAT],
-        'careerDRB' => [482, self::WIDTH_CAREER_STAT],
-        'careerAST' => [487, self::WIDTH_CAREER_STAT],
-        'careerSTL' => [492, self::WIDTH_CAREER_STAT],
-        'careerTVR' => [497, self::WIDTH_CAREER_STAT],
-        'careerBLK' => [502, self::WIDTH_CAREER_STAT],
-        'careerPF' => [507, self::WIDTH_CAREER_STAT],
+        // Career totals (offsets 437-511) are intentionally **not** in FIELD_MAP. See
+        // PlrReconstructionService docblock: the .plr format freezes career totals at
+        // season start, so reconstruction preserves them from the base byte-for-byte.
+        // If an end-of-season reconstruction mode is ever added, the 15 career-total
+        // entries live in JSB_FILE_FORMATS.md under "Career Totals" for the writer to
+        // register at that time.
     ];
 
     /**

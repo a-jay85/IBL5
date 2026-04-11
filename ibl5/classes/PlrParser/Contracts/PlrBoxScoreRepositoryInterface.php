@@ -27,9 +27,14 @@ interface PlrBoxScoreRepositoryInterface
     /**
      * Per-pid single-game maximums and double/triple-double counts for a season window.
      *
-     * Used to reconstruct the season-highs block (offsets 341-363 in .plr). Double-double =
-     * exactly 2 of {points>=10, rebounds>=10, assists>=10, steals>=10, blocks>=10}; triple+
-     * = 3 or more. Both counts exclude DNP rows.
+     * Used to reconstruct the single-season highs block in .plr: regular-season highs
+     * (offsets 341-354) when called with `game_type = 1`, and playoff highs (355-364) when
+     * called with `game_type = 2`. Double/triple-double counts are populated on both passes
+     * but only written into the .plr for the regular-season pass — the format has no slots
+     * for playoff double/triple counts.
+     *
+     * Double-double = exactly 2 of {points>=10, rebounds>=10, assists>=10, steals>=10,
+     * blocks>=10}; triple+ = 3 or more. Both counts exclude DNP rows (gameMIN = 0).
      *
      * @return array<int, array{high_pts: int, high_reb: int, high_ast: int, high_stl: int, high_blk: int, doubles: int, triples: int}>
      */

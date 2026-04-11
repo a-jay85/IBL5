@@ -299,10 +299,19 @@ function extractPlrFromZip(string $zipPath): ?string
  * Count zip-archive slots between base and target within the same season directory.
  *
  * Returns the number of sorted-filename positions to advance from the base zip to the
- * target zip. This equals the number of ibl_sim_dates rows to step forward IFF each
- * archive corresponds to exactly one sim — which holds for mid-season archives in
- * practice (`reg-sim06.zip`, `playoffs-rd1-gm4-7.zip`, etc.). Preseason archives break
- * the equivalence; callers targeting early-season snapshots should double-check the
+ * target zip, counting **all** zips between them — including zips that lack `IBL5.plr`.
+ * This equals the number of ibl_sim_dates rows to step forward IFF each archive
+ * corresponds to exactly one sim, which holds for mid-season archives in practice
+ * (`reg-sim06.zip`, `playoffs-rd1-gm4-7.zip`, etc.).
+ *
+ * Known caveats where the 1-to-1 equivalence breaks:
+ *   - Preseason zips (training camp, heat rounds) don't correspond to box-score sims.
+ *     Targeting an early-season snapshot makes the step count too large.
+ *   - `findNearestPriorPlrZip()` may skip over intermediate zips that lack `IBL5.plr`
+ *     (e.g. another missing-.plr snapshot in the same season). Those skipped slots are
+ *     still counted here, because they were still real sims.
+ *
+ * Callers targeting early-season or stacked-missing snapshots should sanity-check the
  * inferred target date against `ibl_sim_dates` before trusting the reconstruction.
  */
 function countZipSlotsBetween(string $seasonDirPath, string $baseZipPath, string $targetZipName): int

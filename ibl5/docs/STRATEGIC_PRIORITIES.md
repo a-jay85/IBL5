@@ -36,7 +36,7 @@ The baseline schema still defines ~20 `nuke_*` tables. Nine DROP migrations have
 
 **Remaining work:**
 - Audit and drop remaining `nuke_*` tables where code references are dead
-- Migrate live `nuke_stories` / `nuke_users` reads to IBL-native equivalents
+- Migrate live `nuke_stories` reads to IBL-native equivalents (`nuke_users` dropped — PRs #599, #600, migration 102)
 - Remove PHP-Nuke framework functions still called from bootstrap (`mainfile.php`)
 - Goal: eliminate `nuke_*` dependency entirely so the schema only contains `ibl_*` and `auth_*` tables
 

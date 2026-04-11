@@ -112,17 +112,6 @@ $stmt = $db->prepare("INSERT INTO auth_users (email, password, username, status,
 $stmt->bind_param("sssi", $email, $hash, $user, $time);
 $stmt->execute();
 
-// nuke_users — check if exists first (username is the key)
-$check = $db->prepare("SELECT user_id FROM nuke_users WHERE username = ?");
-$check->bind_param("s", $user);
-$check->execute();
-$result = $check->get_result();
-if ($result->num_rows === 0) {
-    $stmt2 = $db->prepare("INSERT INTO nuke_users (username, user_email, user_ibl_team, user_password, name, user_avatar, bio, ublock, theme, user_regdate) VALUES (?, ?, \"Metros\", ?, \"E2E Test User\", \"\", \"\", \"\", \"\", NOW())");
-    $stmt2->bind_param("sss", $user, $email, $hash);
-    $stmt2->execute();
-}
-
 // Assign team
 $stmt3 = $db->prepare("UPDATE ibl_team_info SET gm_username = ? WHERE team_name = \"Metros\"");
 $stmt3->bind_param("s", $user);

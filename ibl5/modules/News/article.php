@@ -47,38 +47,7 @@ if (stristr($REQUEST_URI, "mainfile")) {
 }
 
 // Handle user preference save (uses prepared statement)
-$save = isset($save) ? (bool) $save : false;
-if ($save && is_user($user)) {
-    cookiedecode($user);
-    global $authService;
-    $userinfo = $authService->getUserInfo();
-
-    // Cast all user input to safe types
-    $mode = isset($mode) && is_string($mode) ? substr($mode, 0, 20) : ($userinfo['umode'] ?? 'flat');
-    $order = isset($order) && is_numeric($order) ? (int) $order : ($userinfo['uorder'] ?? 0);
-    $thold = isset($thold) && is_numeric($thold) ? (int) $thold : ($userinfo['thold'] ?? 0);
-    $userId = isset($cookie[0]) && is_numeric($cookie[0]) ? (int) $cookie[0] : 0;
-
-    // Whitelist valid mode values
-    $validModes = ['flat', 'nested', 'nocomments', 'thread'];
-    if (!in_array($mode, $validModes, true)) {
-        $mode = 'flat';
-    }
-
-    // Use prepared statement for user preference update
-    if ($userId > 0) {
-        $stmt = $mysqli_db->prepare(
-            "UPDATE " . $user_prefix . "_users SET umode = ?, uorder = ?, thold = ? WHERE uid = ?"
-        );
-        if ($stmt !== false) {
-            $stmt->bind_param('siii', $mode, $order, $thold, $userId);
-            $stmt->execute();
-            $stmt->close();
-        }
-    }
-
-    $userinfo = $authService->getUserInfo();
-}
+// Legacy comment preference saving removed — comment system was deprecated
 
 // Comment system removed - was deprecated and insecure
 // The "Reply" operation and comments.php include have been removed

@@ -163,10 +163,6 @@ jobs:
           $stmt->bind_param('sssi', $email, $hash, $user, $time);
           $stmt->execute();
 
-          $stmt = $db->prepare("INSERT INTO nuke_users (username, user_email, user_ibl_team, user_password, name, user_avatar, bio, ublock, theme, user_regdate) VALUES (?, ?, 'Metros', ?, 'CI Test User', '', '', '', '', NOW())");
-          $stmt->bind_param('sss', $user, $email, $hash);
-          $stmt->execute();
-
           $stmt = $db->prepare("UPDATE ibl_team_info SET gm_username = ? WHERE team_name = 'Metros'");
           $stmt->bind_param('s', $user);
           $stmt->execute();
@@ -474,10 +470,6 @@ jobs:
           $stmt = $db->prepare("INSERT INTO auth_users (email, password, username, status, verified, resettable, roles_mask, registered, force_logout) VALUES (?, ?, ?, 0, 1, 1, 1, ?, 0)");
           $time = time();
           $stmt->bind_param('sssi', $email, $hash, $user, $time);
-          $stmt->execute();
-
-          $stmt = $db->prepare("INSERT INTO nuke_users (username, user_email, user_ibl_team, user_password, name, user_avatar, bio, ublock, theme, user_regdate) VALUES (?, ?, 'Metros', ?, 'CI Test User', '', '', '', '', NOW())");
-          $stmt->bind_param('sss', $user, $email, $hash);
           $stmt->execute();
 
           $stmt = $db->prepare("UPDATE ibl_team_info SET gm_username = ? WHERE team_name = 'Metros'");

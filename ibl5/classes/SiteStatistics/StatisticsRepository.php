@@ -13,15 +13,13 @@ namespace SiteStatistics;
 class StatisticsRepository extends \BaseMysqliRepository
 {
     private string $prefix;
-    private string $userPrefix;
 
     public function __construct(\mysqli $db)
     {
         parent::__construct($db);
-        
-        global $prefix, $user_prefix;
+
+        global $prefix;
         $this->prefix = $prefix;
-        $this->userPrefix = $user_prefix;
     }
 
     /**
@@ -179,7 +177,7 @@ class StatisticsRepository extends \BaseMysqliRepository
         /** @var array{users: int, stories: int}|null $row */
         $row = $this->fetchOne(
             "SELECT
-                (SELECT COUNT(*) FROM {$this->userPrefix}_users) AS users,
+                (SELECT COUNT(*) FROM auth_users) AS users,
                 (SELECT COUNT(*) FROM {$this->prefix}_stories) AS stories"
         );
 

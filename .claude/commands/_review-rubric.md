@@ -1,6 +1,6 @@
 ---
 description: Shared review rubric and false-positive filter used by /code-review, /security-audit, and /post-plan.
-last_verified: 2026-04-11
+last_verified: 2026-04-12
 ---
 
 # Review Rubric and False-Positive Filter (shared)
@@ -14,7 +14,9 @@ Source of truth for confidence scoring. Used by `/code-review` Step 4, `/securit
 | Code review | **80** |
 | Security audit | **75** |
 
-## Scoring rubric (Haiku scoring agent prompt)
+## Scoring scale (0-100)
+
+When the parent command passes issues to the Haiku scoring agent, pass **this section and the Thresholds table above** — not the full Automatic Zero or false-positive lists below. Review agents have already filtered those categories; the scoring agent only needs the scale.
 
 Score each finding 0-100 using the rubric below:
 

@@ -3,7 +3,7 @@ allowed-tools: Bash(gh pr diff:*), Bash(gh pr view:*), Bash(gh pr comment:*),
   Bash(gh api:*), Bash(git rev-parse:*)
 description: Token-efficient security audit for pull requests
 model: sonnet
-last_verified: 2026-04-11
+last_verified: 2026-04-12
 ---
 
 Perform a security audit on the given pull request. This command optimizes token usage by fetching the diff once and distributing it to specialized security agents.
@@ -60,7 +60,7 @@ Run the pattern-detection block from that file to get SQL and Forms category cou
 
 **Read** `.claude/commands/_review-rubric.md` for the canonical rubric, thresholds, Automatic-Zero rule list, and IBL5 false-positive list.
 
-Collect all findings from Step 3 into a numbered list. Launch a **single Haiku agent**, pass it the findings plus the full contents of `_review-rubric.md`, and instruct it to return JSON scores per the rubric.
+Collect all findings from Step 3 into a numbered list. Launch a **single Haiku agent**, pass it the findings plus the **Scoring scale and Thresholds sections** from `_review-rubric.md` (not the full Automatic Zero or false-positive lists — review agents have already filtered those). Instruct it to return JSON scores per the rubric.
 
 Parse the JSON response and assign scores back to each finding.
 
@@ -117,7 +117,7 @@ Generated with [Claude Code](https://claude.ai/code)
 
 ### Security audit
 
-No security issues found. Scanned for SQL injection, CSRF, and auth/authz vulnerabilities. (XSS and input validation are enforced by PHPStan custom rules.)
+No security issues found. \<brief evidence per category that launched, e.g. "SQL: all queries use prepared statements via fetchOne()/fetchAll(). CSRF: token validated via CsrfGuard::validateSubmittedToken() on line N. Auth: is\_user() guard on state-changing endpoints."\> (XSS and input validation are enforced by PHPStan custom rules.)
 
 Generated with [Claude Code](https://claude.ai/code)
 

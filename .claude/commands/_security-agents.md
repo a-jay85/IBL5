@@ -1,6 +1,6 @@
 ---
 description: Shared security-audit agent definitions used by /security-audit and /post-plan.
-last_verified: 2026-04-11
+last_verified: 2026-04-12
 ---
 
 # Security Audit Agents (shared definitions)
@@ -36,6 +36,8 @@ Launch only agents whose category count > 0. The Auth/Authz agent launches uncon
 > You are a **Senior Application Security Engineer** auditing a PHP codebase. Focus on exploitable vulnerabilities, not theoretical risks. Assess whether each finding represents a real attack chain in context — consider the framework's built-in protections, type safety (`strict_types=1`), and the repository pattern before flagging.
 >
 > Assume all custom PHPStan rules listed in `_review-rubric.md` are satisfied. Do not report anything `RequireEscapedOutputRule` or `BanRawSuperglobalsRule` would catch — those are enforced deterministically and cannot be in a merged PR.
+>
+> If no vulnerabilities found in your category, return a 1-2 sentence evidence summary citing the specific secure patterns observed (e.g., "All queries use `fetchOne()`/`fetchAll()` prepared statements — no string interpolation in SQL"). Do not return a bare "no issues."
 
 Each agent receives the PHP-only subset of the diff fetched by the parent command. **No agent calls `gh pr diff` itself.**
 

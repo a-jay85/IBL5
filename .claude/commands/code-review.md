@@ -4,7 +4,7 @@ allowed-tools: Bash(gh pr diff:*), Bash(gh pr view:*), Bash(gh pr comment:*),
   Bash(git log:*), Bash(git rev-parse:*), Bash(git show:*)
 description: Token-efficient code review for pull requests
 model: sonnet
-last_verified: 2026-04-11
+last_verified: 2026-04-12
 ---
 
 Provide a code review for the given pull request. This command optimizes token usage by fetching the diff once and distributing only what each agent needs.
@@ -56,9 +56,9 @@ Store all of these results — they will be passed as context to agents below.
 
 ## Step 3: Launch parallel Sonnet agents
 
-**Read** `.claude/commands/_review-agents.md` for the canonical agent definitions. It defines 5 agents (CLAUDE.md judgment review, bug detection, git history, previous PRs, code comments).
+**Read** `.claude/commands/_review-agents.md` for the canonical agent definitions. It defines up to 6 agents (architectural fitness, bug detection, git history, previous PRs, code comments, database performance).
 
-Launch all 5 agents in parallel. Each agent receives:
+Launch applicable agents in parallel (consult `_review-agents.md` for each agent's focus; skip Agent 6 if no PHP files changed). Each agent receives:
 - The filtered diff from Step 2c
 - The file list from Step 2b
 - The CLAUDE.md content(s) from Steps 2d/2e
@@ -69,7 +69,7 @@ Launch all 5 agents in parallel. Each agent receives:
 
 **Read** `.claude/commands/_review-rubric.md` for the canonical rubric, thresholds, Automatic-Zero rule list, and IBL5 false-positive list.
 
-Collect all issues found in Step 3 into a numbered list. Launch a **single Haiku agent**, pass it the issues list plus the full contents of `_review-rubric.md`, and instruct it to return JSON scores per the rubric.
+Collect all issues found in Step 3 into a numbered list. Launch a **single Haiku agent**, pass it the issues list plus the **Scoring scale and Thresholds sections** from `_review-rubric.md` (not the full Automatic Zero or false-positive lists — review agents have already filtered those). Instruct it to return JSON scores per the rubric.
 
 Parse the JSON response and assign scores back to each issue.
 
@@ -124,7 +124,7 @@ Generated with [Claude Code](https://claude.ai/code)
 
 ### Code review
 
-No issues found. Checked for bugs and CLAUDE.md compliance.
+No issues found. \<1-2 sentence evidence summary assembled from agent responses, e.g. "Architecture follows Repository/Service/View split. Native-type comparisons consistent with schema. No bind\_param mismatches in modified files."\>
 
 Generated with [Claude Code](https://claude.ai/code)
 

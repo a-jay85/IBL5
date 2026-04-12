@@ -1,7 +1,7 @@
 ---
 name: post-plan
 description: Single orchestrator for the post-plan workflow. Runs diff classification, simplify, commit/push/PR, code review, security audit, verification, CI monitoring, retrospective, and worktree teardown as one uninterrupted sequence.
-last_verified: 2026-04-11
+last_verified: 2026-04-12
 ---
 
 # Post-Plan Orchestrator
@@ -79,11 +79,14 @@ fi
 COMMENT_COUNT=$(grep -cE '^\+[[:space:]]*(//|#|/\*|\*)' "$DIFF_FILE" || true)
 HAS_COMMENTS_IN_DIFF=$([ "$COMMENT_COUNT" -gt 0 ] && echo true || echo false)
 
+# PHP lines changed (gates Phase 5B Agents 3-4 size threshold)
+LINES_PHP_CHANGED=$(git diff origin/master...HEAD -- '*.php' | grep -cE '^\+[^+]' || true)
+
 # Classification summary for the run log (Claude reads these and remembers them for later phases)
 echo "=== Diff classification ==="
 echo "  total=$COUNT_TOTAL php=$COUNT_PHP css=$COUNT_CSS md=$COUNT_MD migration=$COUNT_MIGRATION test=$COUNT_TEST lock=$COUNT_LOCK snapshot=$COUNT_SNAPSHOT"
 echo "  DOCS_ONLY=$DOCS_ONLY CSS_ONLY=$CSS_ONLY MIGRATION_ONLY=$MIGRATION_ONLY TEST_ONLY=$TEST_ONLY NON_CODE_ONLY=$NON_CODE_ONLY"
-echo "  HAS_PHP=$HAS_PHP HAS_CSS=$HAS_CSS HAS_MODIFIED=$HAS_MODIFIED HAS_COMMENTS_IN_DIFF=$HAS_COMMENTS_IN_DIFF"
+echo "  HAS_PHP=$HAS_PHP HAS_CSS=$HAS_CSS HAS_MODIFIED=$HAS_MODIFIED HAS_COMMENTS_IN_DIFF=$HAS_COMMENTS_IN_DIFF LINES_PHP_CHANGED=$LINES_PHP_CHANGED"
 echo "  DIFF_FILE=$DIFF_FILE ($(wc -c < "$DIFF_FILE") bytes)"
 ```
 
@@ -125,19 +128,20 @@ Capture the `cat` output — that is `$DIFF` for every sub-agent prompt below. N
 
 Read root `CLAUDE.md`. If `! $NON_CODE_ONLY`, also read directory-specific `CLAUDE.md` files for modified directories.
 
-### 5B: Code Review — up to 5 parallel Sonnet agents
+### 5B: Code Review — up to 6 parallel Sonnet agents
 
-**Read** `.claude/commands/_review-agents.md` — the canonical agent definitions (5 agents: CLAUDE.md judgment review, bug detection, git history, previous PRs, code comments).
+**Read** `.claude/commands/_review-agents.md` — the canonical agent definitions (6 agents: architectural fitness, bug detection, git history, previous PRs, code comments, database performance).
 
 Pass each agent: PR metadata, file list, filtered `$DIFF`, CLAUDE.md content(s) from 5A. **No agent calls `gh pr diff`.**
 
 **Launch gates** (consult Phase 2 variables — skip the launch entirely, don't let the agent exit early):
 
-- Agent 1 (CLAUDE.md judgment review): skip if `$NON_CODE_ONLY`
+- Agent 1 (Architectural fitness): skip if `$NON_CODE_ONLY`
 - Agent 2 (Bug detection): skip if `$NON_CODE_ONLY` or `$MIGRATION_ONLY`
-- Agent 3 (Git history): skip if `! $HAS_PHP`
-- Agent 4 (Previous PRs): skip if `$NON_CODE_ONLY` or `! $HAS_MODIFIED`
+- Agent 3 (Git history): skip if `! $HAS_PHP` or `$LINES_PHP_CHANGED <= 50`
+- Agent 4 (Previous PRs): skip if `$NON_CODE_ONLY` or `! $HAS_MODIFIED` or `$LINES_PHP_CHANGED <= 50`
 - Agent 5 (Code comments): skip if `$NON_CODE_ONLY` or `! $HAS_COMMENTS_IN_DIFF`
+- Agent 6 (Database performance): skip if `! $HAS_PHP`
 
 ### 5C: Security Audit — conditional Sonnet agents
 
@@ -157,7 +161,7 @@ Combine ALL issues from 5B and 5C into one numbered list.
 
 **Skip the scoring agent if the combined list is empty** — jump straight to posting "No issues found." comments in the two `gh pr comment` steps below.
 
-Otherwise launch a **single Haiku agent**, pass it the issues list plus the full contents of `_review-rubric.md`, and instruct it to return JSON scores per that rubric. Parse the response and assign scores back to each issue.
+Otherwise launch a **single Haiku agent**, pass it the issues list plus the **Scoring scale and Thresholds sections** from `_review-rubric.md` (not the full Automatic Zero or false-positive lists — review agents have already filtered those). Instruct it to return JSON scores per that rubric. Parse the response and assign scores back to each issue.
 
 **Filter** per the thresholds in `_review-rubric.md`.
 
@@ -165,9 +169,13 @@ Otherwise launch a **single Haiku agent**, pass it the issues list plus the full
 
 **Post two `gh pr comment` entries** (code review + security audit) using full SHA from 5A.
 
-Code review format: `### Code review\n\nFound N issues:\n\n1. <description> (CLAUDE.md says "<rule>")\n\n<link>` — or `No issues found. Checked for bugs and CLAUDE.md compliance.`
+Code review format (issues found): `### Code review\n\nFound N issues:\n\n1. <description> (CLAUDE.md says "<rule>")\n\n<link>`
 
-Security audit format: `### Security audit\n\nFound N issue(s):\n\n**[SEVERITY]** Type in \`Class::method()\` — description\n\n<link>` — or `No security issues found. Scanned for SQL injection, CSRF, and auth/authz vulnerabilities. (XSS and input validation are enforced by PHPStan custom rules.)` Severity: CRITICAL (SQLi/CMDi), HIGH (missing auth/open redirect), MEDIUM (CSRF/missing auth on non-critical endpoints), LOW (best practice).
+Code review format (no issues): `### Code review\n\nNo issues found.` followed by a 1-2 sentence evidence summary assembled from agent responses (e.g., "Architecture follows Repository/Service/View split. Native-type comparisons consistent with schema. No bind_param mismatches in modified files.").
+
+Security audit format (issues found): `### Security audit\n\nFound N issue(s):\n\n**[SEVERITY]** Type in \`Class::method()\` — description\n\n<link>` Severity: CRITICAL (SQLi/CMDi), HIGH (missing auth/open redirect), MEDIUM (CSRF/missing auth on non-critical endpoints), LOW (best practice).
+
+Security audit format (no issues): `### Security audit\n\nNo security issues found.` followed by brief evidence per category that launched (e.g., "SQL: all queries use prepared statements. CSRF: token validated on line N. Auth: guard present on state-changing endpoints.") and `(XSS and input validation are enforced by PHPStan custom rules.)`
 
 **Link format:** `https://github.com/a-jay85/IBL5/blob/{FULL_SHA}/path/to/file#L{start}-L{end}` — expand SHA beforehand, never use bash interpolation in the comment. Include 1 line of context before/after.
 
@@ -218,7 +226,7 @@ echo "$EXTRACTED"
 
 Launch a **single Sonnet agent** with this prompt (substitute the extracted steps and file list):
 
-> You are a **Principal Automation Engineering Architect** reviewing manual testing steps from a PR. Your job: eliminate every step that can be replaced by automated verification. Be aggressive — manual testing is expensive and error-prone. Only steps requiring subjective human judgment (visual aesthetics, UX feel, production data comparison) should survive.
+> You are a **Senior QA Automation Engineer** reviewing manual testing steps from a PR. Your job: eliminate every step that can be replaced by automated verification. Be aggressive — manual testing is expensive and error-prone. Only steps requiring subjective human judgment (visual aesthetics, UX feel, production data comparison) should survive.
 >
 > **PR manual testing steps:**
 > {extracted steps from Step 1}

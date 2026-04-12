@@ -1,6 +1,8 @@
 RewriteEngine On
 
 # Return 410 Gone for dead legacy paths — prevents bots from consuming workers
+# IBL: allow access for users with a session cookie, 410 for cookieless bots
+RewriteCond %{HTTP_COOKIE} !PHPSESSID [NC]
 RewriteRule ^ibl/IBL/.*\.htm$ - [R=410,L]
 # Archive: allow access for users with a session cookie, 410 for cookieless bots
 RewriteCond %{HTTP_COOKIE} !PHPSESSID [NC]

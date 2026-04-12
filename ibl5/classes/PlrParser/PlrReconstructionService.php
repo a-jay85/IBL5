@@ -215,6 +215,62 @@ class PlrReconstructionService implements PlrReconstructionServiceInterface
         $result->addMessage('Updated ' . $result->playersUpdated . ' player records');
         $result->addMessage('Left ' . $result->playersUnchanged . ' player records unchanged');
 
+        // Pass 4 — franchise team-row reconstruction (regular-season + playoff totals)
+        $teamRegularByTid = $this->boxScoreRepository->sumTeamRegularSeasonStatsThroughDate(
+            $seasonYear,
+            $targetEndDate,
+        );
+        $teamPlayoffByTid = $this->boxScoreRepository->sumTeamPlayoffStatsThroughDate(
+            $seasonYear,
+            $targetEndDate,
+        );
+        $result->addMessage(sprintf(
+            'Loaded team box-score aggregates: %d regular / %d playoff teams',
+            count($teamRegularByTid),
+            count($teamPlayoffByTid),
+        ));
+
+        foreach ($lines as $lineIndex => $line) {
+            $lineLen = strlen($line);
+            if ($lineLen < PlrTeamRowLayout::FRANCHISE_ROW_MIN_LENGTH
+                || $lineLen > PlrTeamRowLayout::FRANCHISE_ROW_MAX_LENGTH
+            ) {
+                continue;
+            }
+
+            $ordinal = (int) trim(substr($line, PlrFileWriter::OFFSET_ORDINAL, PlrFileWriter::WIDTH_ORDINAL));
+            if (!PlrTeamRowLayout::isFranchiseOrdinal($ordinal)) {
+                continue;
+            }
+
+            $teamId = $ordinal - PlrTeamRowLayout::FIRST_TEAM_ORDINAL + 1;
+            $regularStats = $teamRegularByTid[$teamId] ?? null;
+            $playoffStats = $teamPlayoffByTid[$teamId] ?? null;
+
+            if ($regularStats === null && $playoffStats === null) {
+                $result->teamsUnchanged++;
+                continue;
+            }
+
+            $newRow = $line;
+            if ($regularStats !== null) {
+                $newRow = PlrTeamRowReconstructor::applyRegularSeasonStats($newRow, $regularStats);
+            }
+            if ($playoffStats !== null) {
+                $newRow = PlrTeamRowReconstructor::applyPlayoffSeasonStats($newRow, $playoffStats);
+            }
+
+            if ($newRow === $line) {
+                $result->teamsUnchanged++;
+            } else {
+                $lines[$lineIndex] = $newRow;
+                $result->teamsUpdated++;
+            }
+        }
+
+        $result->addMessage('Updated ' . $result->teamsUpdated . ' team rows');
+        $result->addMessage('Left ' . $result->teamsUnchanged . ' team rows unchanged');
+
         $output = PlrFileWriter::assembleFile($lines);
         if (strlen($output) !== $inputSize) {
             $result->addError('Output size (' . strlen($output)

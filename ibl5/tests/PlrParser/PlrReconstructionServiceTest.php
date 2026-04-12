@@ -6,6 +6,7 @@ namespace Tests\PlrParser;
 
 use PlrParser\PlrFieldSerializer;
 use PlrParser\PlrFileWriter;
+use PlrParser\PlrTeamRowLayout;
 use PHPUnit\Framework\TestCase;
 use PlrParser\Contracts\PlrBoxScoreRepositoryInterface;
 use PlrParser\PlrReconstructionService;
@@ -354,12 +355,16 @@ class PlrReconstructionServiceTest extends TestCase
      * @param array<int, array{gp: int, min: int, two_gm: int, two_ga: int, ftm: int, fta: int, three_gm: int, three_ga: int, orb: int, drb: int, ast: int, stl: int, tov: int, blk: int, pf: int}> $playoffs
      * @param array<int, array{high_pts: int, high_reb: int, high_ast: int, high_stl: int, high_blk: int, doubles: int, triples: int}> $regularHighs
      * @param array<int, array{high_pts: int, high_reb: int, high_ast: int, high_stl: int, high_blk: int, doubles: int, triples: int}> $playoffHighs
+     * @param array<int, array{gp: int, gpAlt: int, twoGM: int, twoGA: int, ftm: int, fta: int, threeGM: int, threeGA: int, orb: int, drb: int, ast: int, stl: int, tov: int, blk: int, pf: int}> $teamStats
+     * @param array<int, array{gp: int, gpAlt: int, twoGM: int, twoGA: int, ftm: int, fta: int, threeGM: int, threeGA: int, orb: int, drb: int, ast: int, stl: int, tov: int, blk: int, pf: int}> $teamPlayoffStats
      */
     private function stubRepo(
         array $regular,
         array $playoffs = [],
         array $regularHighs = [],
         array $playoffHighs = [],
+        array $teamStats = [],
+        array $teamPlayoffStats = [],
     ): PlrBoxScoreRepositoryInterface {
         $repo = $this->createStub(PlrBoxScoreRepositoryInterface::class);
         $repo->method('sumStatsByGameTypeThroughDate')->willReturnCallback(
@@ -376,7 +381,121 @@ class PlrReconstructionServiceTest extends TestCase
                     : $playoffHighs;
             },
         );
+        $repo->method('sumTeamRegularSeasonStatsThroughDate')->willReturn($teamStats);
+        $repo->method('sumTeamPlayoffStatsThroughDate')->willReturn($teamPlayoffStats);
         return $repo;
+    }
+
+    public function testReconstructUpdatesTeamRowsFromTeamBoxScores(): void
+    {
+        $player = $this->buildPlayerRecord(
+            ordinal: 1,
+            pid: self::LEBRON_PID,
+            name: 'LeBron James',
+            seasonStats: $this->zeroSeasonStats(),
+        );
+        $teamRow = $this->buildTeamRecord(ordinal: 1441, stats: [
+            'gp' => 0, 'gpAlt' => 0, 'twoGM' => 0, 'twoGA' => 0,
+            'ftm' => 0, 'fta' => 0, 'threeGM' => 0, 'threeGA' => 0,
+            'orb' => 0, 'drb' => 0, 'ast' => 0, 'stl' => 0,
+            'tov' => 0, 'blk' => 0, 'pf' => 0,
+        ]);
+        $this->writeBaseFile([$player, $teamRow]);
+
+        $teamBoxScores = [
+            1 => [
+                'gp' => 18, 'gpAlt' => 18, 'twoGM' => 420, 'twoGA' => 900,
+                'ftm' => 180, 'fta' => 230, 'threeGM' => 100, 'threeGA' => 280,
+                'orb' => 90, 'drb' => 310, 'ast' => 250, 'stl' => 80,
+                'tov' => 120, 'blk' => 50, 'pf' => 200,
+            ],
+        ];
+        $repo = $this->stubRepo(
+            regular: [self::LEBRON_PID => $this->statsArray(gp: 18, min: 600, twoGm: 0, twoGa: 0, ftm: 0, fta: 0, threeGm: 0, threeGa: 0, orb: 0, drb: 0, ast: 0, stl: 0, tov: 0, blk: 0, pf: 0)],
+            teamStats: $teamBoxScores,
+        );
+
+        $service = new PlrReconstructionService($repo);
+        $result = $service->reconstruct($this->baseFile, 2007, '2006-12-20', $this->outputFile);
+
+        $this->assertSame(1, $result->teamsUpdated);
+        $this->assertSame(0, $result->teamsUnchanged);
+
+        $actual = $this->readPlayerLine($this->outputFile, 1);
+        $this->assertSame(607, strlen($actual), 'team row length preserved');
+        $this->assertSame(18, (int) trim(substr($actual, 148, 4)), 'team gp');
+        $this->assertSame(420, (int) trim(substr($actual, 156, 4)), 'team twoGM');
+        $this->assertSame(100, (int) trim(substr($actual, 172, 4)), 'team threeGM');
+        $this->assertSame(200, (int) trim(substr($actual, 204, 4)), 'team pf');
+    }
+
+    public function testReconstructPreservesTeamRowBytesOutsideKnownFields(): void
+    {
+        $player = $this->buildPlayerRecord(
+            ordinal: 1,
+            pid: self::LEBRON_PID,
+            name: 'LeBron James',
+            seasonStats: $this->zeroSeasonStats(),
+        );
+        $teamRow = $this->buildTeamRecord(ordinal: 1441, stats: [
+            'gp' => 0, 'gpAlt' => 0, 'twoGM' => 0, 'twoGA' => 0,
+            'ftm' => 0, 'fta' => 0, 'threeGM' => 0, 'threeGA' => 0,
+            'orb' => 0, 'drb' => 0, 'ast' => 0, 'stl' => 0,
+            'tov' => 0, 'blk' => 0, 'pf' => 0,
+        ]);
+        // Plant recognizable bytes outside the validated stat range
+        $teamRow = substr_replace($teamRow, 'XY', 300, 2);
+        $teamRow = substr_replace($teamRow, 'ZW', 550, 2);
+        $this->writeBaseFile([$player, $teamRow]);
+
+        $repo = $this->stubRepo(
+            regular: [self::LEBRON_PID => $this->zeroSeasonStats()],
+            teamStats: [1 => [
+                'gp' => 5, 'gpAlt' => 5, 'twoGM' => 10, 'twoGA' => 20,
+                'ftm' => 3, 'fta' => 5, 'threeGM' => 2, 'threeGA' => 8,
+                'orb' => 4, 'drb' => 12, 'ast' => 8, 'stl' => 3,
+                'tov' => 5, 'blk' => 2, 'pf' => 7,
+            ]],
+        );
+
+        $service = new PlrReconstructionService($repo);
+        $service->reconstruct($this->baseFile, 2007, '2006-12-20', $this->outputFile);
+
+        $actual = $this->readPlayerLine($this->outputFile, 1);
+        $this->assertSame('XY', substr($actual, 300, 2), 'byte 300-301 preserved');
+        $this->assertSame('ZW', substr($actual, 550, 2), 'byte 550-551 preserved');
+    }
+
+    public function testTeamRowWithNoBoxScoresIsCountedAsUnchanged(): void
+    {
+        $player = $this->buildPlayerRecord(
+            ordinal: 1,
+            pid: self::LEBRON_PID,
+            name: 'LeBron James',
+            seasonStats: $this->zeroSeasonStats(),
+        );
+        $teamRow = $this->buildTeamRecord(ordinal: 1441, stats: [
+            'gp' => 10, 'gpAlt' => 10, 'twoGM' => 50, 'twoGA' => 100,
+            'ftm' => 20, 'fta' => 25, 'threeGM' => 15, 'threeGA' => 40,
+            'orb' => 10, 'drb' => 30, 'ast' => 20, 'stl' => 8,
+            'tov' => 12, 'blk' => 5, 'pf' => 18,
+        ]);
+        $this->writeBaseFile([$player, $teamRow]);
+
+        // No team stats provided — team row should be unchanged
+        $repo = $this->stubRepo(
+            regular: [self::LEBRON_PID => $this->zeroSeasonStats()],
+            teamStats: [],
+        );
+
+        $service = new PlrReconstructionService($repo);
+        $result = $service->reconstruct($this->baseFile, 2007, '2006-12-20', $this->outputFile);
+
+        $this->assertSame(0, $result->teamsUpdated);
+        $this->assertSame(1, $result->teamsUnchanged);
+
+        $actual = $this->readPlayerLine($this->outputFile, 1);
+        $this->assertSame(10, (int) trim(substr($actual, 148, 4)), 'team gp preserved');
     }
 
     /**
@@ -541,5 +660,34 @@ class PlrReconstructionServiceTest extends TestCase
     private function zeroSeasonStats(): array
     {
         return $this->statsArray(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0);
+    }
+
+    /**
+     * Build a 607-byte franchise team-summary record for testing.
+     *
+     * @param array{gp: int, gpAlt: int, twoGM: int, twoGA: int, ftm: int, fta: int, threeGM: int, threeGA: int, orb: int, drb: int, ast: int, stl: int, tov: int, blk: int, pf: int} $stats
+     */
+    private function buildTeamRecord(int $ordinal, array $stats): string
+    {
+        $record = str_repeat(' ', PlrTeamRowLayout::FRANCHISE_ROW_MIN_LENGTH);
+
+        // Ordinal at offset 0, width 4
+        $record = substr_replace($record, PlrFieldSerializer::formatInt($ordinal, 4), 0, 4);
+        // pid=0 at offset 38, width 6
+        $record = substr_replace($record, PlrFieldSerializer::formatInt(0, 6), 38, 6);
+
+        // Write stats at their validated offsets
+        foreach (PlrTeamRowLayout::REGULAR_SEASON_FIELD_MAP as $field => [$offset, $width]) {
+            if (isset($stats[$field])) {
+                $record = substr_replace(
+                    $record,
+                    PlrFieldSerializer::formatInt($stats[$field], $width),
+                    $offset,
+                    $width,
+                );
+            }
+        }
+
+        return $record;
     }
 }

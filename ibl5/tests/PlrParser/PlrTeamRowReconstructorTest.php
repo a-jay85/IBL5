@@ -36,7 +36,7 @@ class PlrTeamRowReconstructorTest extends TestCase
             'pf' => 288,
         ]);
 
-        $this->assertSame(PlrTeamRowLayout::FRANCHISE_ROW_LENGTH, strlen($reconstructed));
+        $this->assertSame(PlrTeamRowLayout::FRANCHISE_ROW_MAX_LENGTH, strlen($reconstructed));
         $this->assertSame('  18', substr($reconstructed, 148, 4));
         $this->assertSame('  18', substr($reconstructed, 152, 4));
         $this->assertSame(' 689', substr($reconstructed, 156, 4));
@@ -85,10 +85,24 @@ class PlrTeamRowReconstructorTest extends TestCase
         $this->assertSame(' 999', substr($reconstructed, 156, 4));
     }
 
-    public function testRejectsNonFranchiseRowLength(): void
+    public function testAcceptsBoth607And608ByteRows(): void
+    {
+        $row607 = str_repeat(' ', 607);
+        $row608 = str_repeat(' ', 608);
+
+        $result607 = PlrTeamRowReconstructor::applyRegularSeasonStats($row607, ['gp' => 1]);
+        $result608 = PlrTeamRowReconstructor::applyRegularSeasonStats($row608, ['gp' => 1]);
+
+        $this->assertSame(607, strlen($result607));
+        $this->assertSame(608, strlen($result608));
+        $this->assertSame('   1', substr($result607, 148, 4));
+        $this->assertSame('   1', substr($result608, 148, 4));
+    }
+
+    public function testRejectsRowLengthOutsideRange(): void
     {
         $this->expectException(\InvalidArgumentException::class);
-        PlrTeamRowReconstructor::applyRegularSeasonStats(str_repeat(' ', 607), ['gp' => 1]);
+        PlrTeamRowReconstructor::applyRegularSeasonStats(str_repeat(' ', 606), ['gp' => 1]);
     }
 
     public function testRejectsValueWiderThanFieldWidth(): void
@@ -111,6 +125,6 @@ class PlrTeamRowReconstructorTest extends TestCase
 
     private function buildSyntheticRow(): string
     {
-        return str_repeat(' ', PlrTeamRowLayout::FRANCHISE_ROW_LENGTH);
+        return str_repeat(' ', PlrTeamRowLayout::FRANCHISE_ROW_MAX_LENGTH);
     }
 }

@@ -14,6 +14,8 @@ class PlrReconstructionResult
 {
     public int $playersUpdated = 0;
     public int $playersUnchanged = 0;
+    public int $teamsUpdated = 0;
+    public int $teamsUnchanged = 0;
     public int $bytesWritten = 0;
 
     /** @var list<string> */

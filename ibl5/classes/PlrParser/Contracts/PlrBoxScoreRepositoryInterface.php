@@ -59,6 +59,27 @@ interface PlrBoxScoreRepositoryInterface
     public function cumulativeRegularSeasonStatsByDate(int $pid, int $seasonYear): array;
 
     /**
+     * Sum team box-score stats for regular season through an end date.
+     *
+     * Aggregates from ibl_box_scores_teams using ROW_NUMBER deduplication
+     * (rn=1 = visitor row, rn=2 = home row). Returns stats keyed by team ID (1-28),
+     * with keys matching PlrTeamRowLayout::REGULAR_SEASON_FIELD_MAP.
+     *
+     * @return array<int, array{gp: int, gpAlt: int, twoGM: int, twoGA: int, ftm: int, fta: int, threeGM: int, threeGA: int, orb: int, drb: int, ast: int, stl: int, tov: int, blk: int, pf: int}>
+     */
+    public function sumTeamRegularSeasonStatsThroughDate(int $seasonYear, string $endDate): array;
+
+    /**
+     * Sum team box-score stats for playoffs through an end date.
+     *
+     * Same deduplication pattern as sumTeamRegularSeasonStatsThroughDate() but
+     * for game_type=2. Keys match PlrTeamRowLayout::PLAYOFF_SEASON_FIELD_MAP.
+     *
+     * @return array<int, array{gp: int, gpAlt: int, twoGM: int, twoGA: int, ftm: int, fta: int, threeGM: int, threeGA: int, orb: int, drb: int, ast: int, stl: int, tov: int, blk: int, pf: int}>
+     */
+    public function sumTeamPlayoffStatsThroughDate(int $seasonYear, string $endDate): array;
+
+    /**
      * All `ibl_sim_dates` End Date values that fall within a season window.
      *
      * Used to step from a known base end date to the next sim's end date.

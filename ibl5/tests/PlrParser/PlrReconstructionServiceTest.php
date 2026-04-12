@@ -663,7 +663,7 @@ class PlrReconstructionServiceTest extends TestCase
     }
 
     /**
-     * Build a 608-byte franchise team-summary record for testing.
+     * Build a 607-byte franchise team-summary record for testing.
      *
      * @param array{gp: int, gpAlt: int, twoGM: int, twoGA: int, ftm: int, fta: int, threeGM: int, threeGA: int, orb: int, drb: int, ast: int, stl: int, tov: int, blk: int, pf: int} $stats
      */

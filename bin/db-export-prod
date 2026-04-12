@@ -78,16 +78,16 @@ SEASON_END="${SEASON_END_YEAR}-06-30"
 
 DUMP_OPTS="--skip-ssl --single-transaction --skip-lock-tables $EXTRA_OPTS"
 
-if [ "$ALL_SEASONS" = true ]; then
-    echo "Exporting production DB (ALL box scores)..."
-else
-    echo "Exporting production DB (box scores limited to ${SEASON_START} – ${SEASON_END})..."
-fi
+echo "Exporting production DB (excluding box scores — use db-import-boxscores)..."
 
-# Tables to export with season-filtered box scores
-BOX_TABLES="ibl_box_scores ibl_box_scores_teams"
+# Box score tables are excluded from the main dump because they contain STORED
+# GENERATED columns (game_type, season_year, calc_*) that mariadb-dump includes
+# in INSERT values. Docker MariaDB 10.6 rejects these with ERROR 1906, causing
+# the entire INSERT batch to fail silently under --force. Use the dedicated
+# bin/db-import-boxscores script which handles generated columns correctly.
+BOX_TABLES=""
 
-# Tables/views to skip entirely (exported separately or not needed)
+# Tables/views to skip entirely (box scores handled by db-import-boxscores)
 SKIP_REGEX="^(ibl_box_scores|ibl_box_scores_teams)$"
 
 # Helper: run a mariadb query
@@ -147,6 +147,14 @@ if ! grep -q 'CREATE TABLE' "$OUTPUT"; then
     rm -f "$OUTPUT"
     exit 1
 fi
+# Check that the dump completed — mariadb-dump writes a trailer comment.
+# A missing trailer means the connection was interrupted mid-output.
+if ! grep -q '^-- Dump completed' "$OUTPUT"; then
+    echo "Error: Structure dump appears truncated (no 'Dump completed' marker)." >&2
+    echo "The remote connection may have been interrupted. Re-run the export." >&2
+    rm -f "$OUTPUT"
+    exit 1
+fi
 
 # 3. Dump data, views, and filtered box scores in parallel
 #    Each mariadb-dump opens a new connection, so parallelising saves round trips.
@@ -189,11 +197,38 @@ for pid in $PIDS; do
 done
 
 # 4. Concatenate in deterministic order: regular data → box scores → views
-cat "$TMPDIR/regular.sql" >> "$OUTPUT"
+#    Each mariadb-dump invocation writes its own preamble (sandbox comment, SET
+#    @OLD_* statements) and postamble (Dump completed trailer). Strip them from
+#    appended files to prevent duplicate session-variable resets and, critically,
+#    a corrupted line if the structure dump lacks a trailing newline.
+strip_dump_wrapper() {
+    sed -E \
+        -e '/^\/\*M!999999/d' \
+        -e '/^-- MariaDB dump/d' \
+        -e '/^-- Host:/d' \
+        -e '/^-- -+$/d' \
+        -e '/^-- Server version/d' \
+        -e '/^-- Dump completed/d' \
+        -e '/^\/\*![0-9]+ SET @OLD_/d' \
+        -e '/^\/\*![0-9]+ SET TIME_ZONE=@OLD/d' \
+        -e '/^\/\*![0-9]+ SET SQL_MODE=@OLD/d' \
+        -e '/^\/\*![0-9]+ SET CHARACTER_SET/d' \
+        -e '/^\/\*![0-9]+ SET character_set_client/d' \
+        -e '/^\/\*![0-9]+ SET UNIQUE_CHECKS=@OLD/d' \
+        -e '/^\/\*![0-9]+ SET FOREIGN_KEY_CHECKS=@OLD/d' \
+        -e '/^\/\*M!100616 SET NOTE_VERBOSITY=@OLD/d' \
+        "$1"
+}
+
+# Ensure the structure dump ends with a newline — guards against truncated
+# output from a flaky remote connection splicing the next file mid-line.
+[ -s "$OUTPUT" ] && [ "$(tail -c 1 "$OUTPUT" | wc -l)" -eq 0 ] && echo >> "$OUTPUT"
+
+strip_dump_wrapper "$TMPDIR/regular.sql" >> "$OUTPUT"
 for tbl in $BOX_TABLES; do
-    cat "$TMPDIR/box_${tbl}.sql" >> "$OUTPUT"
+    strip_dump_wrapper "$TMPDIR/box_${tbl}.sql" >> "$OUTPUT"
 done
-[ -f "$TMPDIR/views.sql" ] && cat "$TMPDIR/views.sql" >> "$OUTPUT"
+[ -f "$TMPDIR/views.sql" ] && strip_dump_wrapper "$TMPDIR/views.sql" >> "$OUTPUT"
 
 # 5. Strip DEFINER clauses — prod exports contain DEFINER=user@host that may
 #    not match the Docker MariaDB user, causing ERROR 1449 on import.
@@ -202,8 +237,7 @@ perl -pi -e 's/ DEFINER=[^ ]* / /g' "$OUTPUT"
 SIZE=$(du -h "$OUTPUT" | cut -f1)
 echo ""
 echo "Done: $OUTPUT ($SIZE)"
-if [ "$ALL_SEASONS" = true ]; then
-    echo "Box scores: ALL seasons"
-else
-    echo "Season: Oct ${SEASON_START%%-*} – Jun ${SEASON_END_YEAR} (HEAT through playoffs)"
-fi
+echo ""
+echo "Box scores (ibl_box_scores, ibl_box_scores_teams) are NOT included."
+echo "Import them separately after loading the seed:"
+echo "  bin/db-import-boxscores --remote"

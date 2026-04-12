@@ -15,12 +15,14 @@ use PlrParser\Contracts\PlrBoxScoreRepositoryInterface;
 class PlrBoxScoreRepository extends \BaseMysqliRepository implements PlrBoxScoreRepositoryInterface
 {
     private string $boxScoresTable;
+    private string $boxScoresTeamsTable;
     private string $simDatesTable;
 
     public function __construct(\mysqli $db, ?LeagueContext $leagueContext = null)
     {
         parent::__construct($db, $leagueContext);
         $this->boxScoresTable = $this->resolveTable('ibl_box_scores');
+        $this->boxScoresTeamsTable = $this->resolveTable('ibl_box_scores_teams');
         $this->simDatesTable = $this->resolveTable('ibl_sim_dates');
     }
 
@@ -218,6 +220,104 @@ class PlrBoxScoreRepository extends \BaseMysqliRepository implements PlrBoxScore
             $result[] = array_merge(['date' => $row['date']], $cumulative);
         }
         return $result;
+    }
+
+    /**
+     * @see PlrBoxScoreRepositoryInterface::sumTeamRegularSeasonStatsThroughDate()
+     */
+    public function sumTeamRegularSeasonStatsThroughDate(int $seasonYear, string $endDate): array
+    {
+        return $this->sumTeamStatsByGameType($seasonYear, 1, $endDate);
+    }
+
+    /**
+     * @see PlrBoxScoreRepositoryInterface::sumTeamPlayoffStatsThroughDate()
+     */
+    public function sumTeamPlayoffStatsThroughDate(int $seasonYear, string $endDate): array
+    {
+        return $this->sumTeamStatsByGameType($seasonYear, 2, $endDate);
+    }
+
+    /**
+     * Common team-stats aggregation for any game type.
+     *
+     * ibl_box_scores_teams stores two rows per game: visitor stats (lower id),
+     * home stats (higher id). ROW_NUMBER deduplicates so each team's own stats
+     * are counted exactly once. The `name` column is unreliable — team identity
+     * comes from visitorTeamID/homeTeamID cross-referenced with row order.
+     *
+     * @return array<int, array{gp: int, gpAlt: int, twoGM: int, twoGA: int, ftm: int, fta: int, threeGM: int, threeGA: int, orb: int, drb: int, ast: int, stl: int, tov: int, blk: int, pf: int}>
+     */
+    private function sumTeamStatsByGameType(int $seasonYear, int $gameType, string $endDate): array
+    {
+        $sql = "
+            WITH ranked AS (
+                SELECT *,
+                    ROW_NUMBER() OVER (
+                        PARTITION BY Date, gameOfThatDay, visitorTeamID, homeTeamID
+                        ORDER BY id
+                    ) AS rn
+                FROM {$this->boxScoresTeamsTable}
+                WHERE season_year = ?
+                  AND game_type = ?
+                  AND Date <= ?
+            )
+            SELECT
+                team_id,
+                COUNT(*) AS gp,
+                COUNT(*) AS gpAlt,
+                SUM(game2GM) AS twoGM,
+                SUM(game2GA) AS twoGA,
+                SUM(gameFTM) AS ftm,
+                SUM(gameFTA) AS fta,
+                SUM(game3GM) AS threeGM,
+                SUM(game3GA) AS threeGA,
+                SUM(gameORB) AS orb,
+                SUM(gameDRB) AS drb,
+                SUM(gameAST) AS ast,
+                SUM(gameSTL) AS stl,
+                SUM(gameTOV) AS tov,
+                SUM(gameBLK) AS blk,
+                SUM(gamePF) AS pf
+            FROM (
+                SELECT visitorTeamID AS team_id,
+                       game2GM, game2GA, gameFTM, gameFTA, game3GM, game3GA,
+                       gameORB, gameDRB, gameAST, gameSTL, gameTOV, gameBLK, gamePF
+                FROM ranked WHERE rn = 1
+                UNION ALL
+                SELECT homeTeamID AS team_id,
+                       game2GM, game2GA, gameFTM, gameFTA, game3GM, game3GA,
+                       gameORB, gameDRB, gameAST, gameSTL, gameTOV, gameBLK, gamePF
+                FROM ranked WHERE rn = 2
+            ) AS team_stats
+            GROUP BY team_id
+        ";
+
+        /** @var list<array{team_id: int, gp: int|null, gpAlt: int|null, twoGM: int|null, twoGA: int|null, ftm: int|null, fta: int|null, threeGM: int|null, threeGA: int|null, orb: int|null, drb: int|null, ast: int|null, stl: int|null, tov: int|null, blk: int|null, pf: int|null}> $rows */
+        $rows = $this->fetchAll($sql, 'iis', $seasonYear, $gameType, $endDate);
+
+        $byTeamId = [];
+        foreach ($rows as $row) {
+            $byTeamId[$row['team_id']] = [
+                'gp' => (int) ($row['gp'] ?? 0),
+                'gpAlt' => (int) ($row['gpAlt'] ?? 0),
+                'twoGM' => (int) ($row['twoGM'] ?? 0),
+                'twoGA' => (int) ($row['twoGA'] ?? 0),
+                'ftm' => (int) ($row['ftm'] ?? 0),
+                'fta' => (int) ($row['fta'] ?? 0),
+                'threeGM' => (int) ($row['threeGM'] ?? 0),
+                'threeGA' => (int) ($row['threeGA'] ?? 0),
+                'orb' => (int) ($row['orb'] ?? 0),
+                'drb' => (int) ($row['drb'] ?? 0),
+                'ast' => (int) ($row['ast'] ?? 0),
+                'stl' => (int) ($row['stl'] ?? 0),
+                'tov' => (int) ($row['tov'] ?? 0),
+                'blk' => (int) ($row['blk'] ?? 0),
+                'pf' => (int) ($row['pf'] ?? 0),
+            ];
+        }
+
+        return $byTeamId;
     }
 
     /**

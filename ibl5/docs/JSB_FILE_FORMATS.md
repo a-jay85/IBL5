@@ -103,7 +103,7 @@ Players are identified by the **`pid` at offset 38** (database primary key), not
 
 ### Player Record Layout (607 bytes)
 
-Field offsets and widths below are the authoritative spec used by `classes/PlrParser/PlrParserService.php` (reader) and `classes/JsbParser/PlrFileWriter.php` (writer). Keep those two in sync with this table.
+Field offsets and widths below are the authoritative spec used by `classes/PlrParser/PlrParserService.php` (reader) and `classes/PlrParser/PlrFileWriter.php` (writer). Keep those two in sync with this table.
 
 #### Identification (0-51)
 
@@ -338,14 +338,49 @@ Width 5 each. Monotonic within a season: `career_new[X] = career_base[X] + max(0
 
 ### Team-Summary Rows (ordinal ≥ 1441)
 
-Lines with `ordinal ≥ 1441` and `pid = 0` store per-team totals. **The layout is currently unknown** — no reader or writer in the codebase parses them. The first 28 rows (1441-1468) are the 28 franchises; a second block (1471 onward) appears to be a secondary team-totals section (possibly opponent-allowed stats). Reverse-engineering is tracked as a follow-up.
+Lines with `ordinal ≥ 1441` and `pid = 0` store per-team totals. The first 28 rows (ordinals 1441-1468) are the 28 franchises (**607-608 bytes each** — the trailing tail block contains variable-width fields); a second block (1471 onward) appears to be a secondary team-totals section (possibly opponent-allowed stats).
+
+Franchise rows are indexed by position: ordinal 1441 = team ID 1, ordinal 1468 = team ID 28 (matching `ibl_team_info` row order). The embedded team name is sometimes stale in older snapshots — use ordinal-based identity instead.
+
+**Validated regular-season field map** (see `classes/PlrParser/PlrTeamRowLayout.php` for the authoritative constant):
+
+| Offset | Width | Field | Description |
+|--------|-------|-------|-------------|
+| 148 | 4 | `gp` | Games played |
+| 152 | 4 | `gpAlt` | Games played (duplicate; purpose unconfirmed) |
+| 156 | 4 | `twoGM` | 2-point field goals made |
+| 160 | 4 | `twoGA` | 2-point field goals attempted |
+| 164 | 4 | `ftm` | Free throws made |
+| 168 | 4 | `fta` | Free throws attempted |
+| 172 | 4 | `threeGM` | 3-point field goals made |
+| 176 | 4 | `threeGA` | 3-point field goals attempted |
+| 180 | 4 | `orb` | Offensive rebounds |
+| 184 | 4 | `drb` | Defensive rebounds |
+| 188 | 4 | `ast` | Assists |
+| 192 | 4 | `stl` | Steals |
+| 196 | 4 | `tov` | Turnovers |
+| 200 | 4 | `blk` | Blocks |
+| 204 | 4 | `pf` | Personal fouls |
+
+**Validated playoff-season field map** (same 15 fields at offsets 208-267, see `PlrTeamRowLayout::PLAYOFF_SEASON_FIELD_MAP`):
+
+| Offset | Width | Field | Description |
+|--------|-------|-------|-------------|
+| 208 | 4 | `gp` | Playoff games played |
+| 212 | 4 | `gpAlt` | Playoff games played (duplicate) |
+| 216-264 | 4 each | (same 13 stat fields as regular-season) | Playoff cumulative totals |
+
+**Still unknown** (preserved byte-for-byte on writeback):
+- Bytes 0-147: static team metadata
+- Bytes 320-511: suspected streak/record/opponent-allowed totals
+- Bytes 540-606/607: trailing tail block (variable-width fields cause 607-or-608-byte rows)
 
 ### Encoding Notes
 
 - **Right-justified integers** with space padding (never zero-padded). `4` in a 4-byte field is `"   4"`, not `"0004"`.
 - **Left-justified strings** with space padding (player names, team names).
 - **CP1252** for non-ASCII characters (accented names). Readers must `iconv('CP1252', 'UTF-8//IGNORE', $raw)` before display.
-- **CRLF** line endings between records. Each record is *exactly* 607 bytes — `PlrFileWriter::applyChangesToRecord()` asserts length invariance.
+- **CRLF** line endings between records. Player records are *exactly* 607 bytes; franchise team rows are 607-608 bytes (variable trailing tail). `PlrFileWriter::applyChangesToRecord()` asserts length invariance.
 
 ---
 

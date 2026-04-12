@@ -21,7 +21,7 @@ services:
       - ibl5-proxy
 
   mariadb:
-    image: mariadb:10.6
+    image: mariadb:10.11
     container_name: ibl5-mariadb
     restart: unless-stopped
     ports:

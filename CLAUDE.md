@@ -1,6 +1,6 @@
 ---
 description: Root Claude Code instructions for IBL5: commands, mandatory rules, and architecture pointers.
-last_verified: 2026-04-11
+last_verified: 2026-04-12
 ---
 
 # CLAUDE.md
@@ -11,7 +11,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-IBL5 is an Internet Basketball League fantasy basketball site powered by Jump Shot Basketball simulation engine. PHP 8+ with MariaDB 10.6, using interface-driven architecture.
+IBL5 is an Internet Basketball League fantasy basketball site powered by Jump Shot Basketball simulation engine. PHP 8+ with MariaDB 10.11, using interface-driven architecture.
 
 ## Commands
 

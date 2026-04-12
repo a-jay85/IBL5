@@ -7,7 +7,7 @@ networks:
 
 services:
   mariadb:
-    image: mariadb:10.6
+    image: mariadb:10.11
     environment:
       MARIADB_ROOT_PASSWORD: root
       MARIADB_DATABASE: ibl5

@@ -1,6 +1,6 @@
 ---
-description: Frontmatter schema, 60-day staleness policy, and dead-reference rules enforced by bin/check-docs
-last_verified: 2026-04-11
+description: Frontmatter schema, 60-day staleness policy, on-touch verification rule, and dead-reference rules enforced by bin/check-docs
+last_verified: 2026-04-12
 paths: "**/*.md"
 ---
 
@@ -56,6 +56,10 @@ Fields not listed here are tolerated but ignored. Do not add fields without upda
 Bumping `last_verified` without actually re-reading the doc defeats the entire point of the policy. Treat it as an affirmation, not a checkbox.
 
 Use `bin/check-docs --fix-dates` only when doing a deliberate, reviewed batch re-verification — never as a silencing shortcut.
+
+### On-Touch Rule
+
+When editing any in-scope `.md` file, verify its content still matches reality, confirm the `description` field accurately reflects the content, and bump `last_verified` to today — all in the same edit.
 
 ## Dead-Reference Rule
 

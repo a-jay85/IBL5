@@ -25,7 +25,7 @@ services:
       - ibl5-proxy
 
   db:
-    image: mariadb:10.6
+    image: mariadb:10.11
     container_name: ibl5-db-${SLUG}
     restart: unless-stopped
     environment:

@@ -1,6 +1,6 @@
 ---
 description: IBL5 project overview: tech stack, quick start, and docs index.
-last_verified: 2026-04-11
+last_verified: 2026-04-12
 ---
 
 # IBL5 - Internet Basketball League
@@ -9,8 +9,8 @@ A fantasy basketball league website powered by the Jump Shot Basketball simulati
 
 ## Tech Stack
 
-- **Backend:** PHP 8.3, MariaDB 10.6
-- **Local Dev:** Docker (Apache/PHP + MariaDB 10.6)
+- **Backend:** PHP 8.3, MariaDB 10.11
+- **Local Dev:** Docker (Apache/PHP + MariaDB 10.11)
 - **Testing:** PHPUnit 12, PHPStan (level max + strict-rules + bleedingEdge)
 - **CI/CD:** GitHub Actions
 - **Frontend:** Tailwind CSS 4, vanilla JS

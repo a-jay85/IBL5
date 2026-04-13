@@ -420,6 +420,25 @@ class TrnFileParserTest extends TestCase
         }
     }
 
+    public function testParseRecordRemapsJsbPlayoffMonthToIblPlayoffMonth(): void
+    {
+        $record = $this->buildInjuryRecord(10, 5, 2006, 1234, 5, 3, 'Playoff injury');
+        $result = TrnFileParser::parseRecord($record, 0);
+
+        $this->assertNotNull($result);
+        $this->assertSame(\Season\Season::IBL_PLAYOFF_MONTH, $result['month']);
+        $this->assertSame(5, $result['day']);
+    }
+
+    public function testParseRecordDoesNotRemapNonPlayoffMonths(): void
+    {
+        $record = $this->buildInjuryRecord(11, 3, 2006, 5678, 12, 8, 'Regular season injury');
+        $result = TrnFileParser::parseRecord($record, 0);
+
+        $this->assertNotNull($result);
+        $this->assertSame(11, $result['month']);
+    }
+
     public function testInjuryGamesMissedAreReasonable(): void
     {
         $injury1 = $this->buildInjuryRecord(10, 1, 2006, 1000, 5, 5, 'Minor bruise');

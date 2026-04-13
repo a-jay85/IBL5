@@ -7,8 +7,8 @@ namespace Tests\DatabaseIntegration;
 use Shared\SharedRepository;
 
 /**
- * Tests SharedRepository against real MariaDB — team award counts via
- * vw_team_awards, draft pick ownership lookups, and contract extension resets.
+ * Tests SharedRepository against real MariaDB — draft pick ownership lookups
+ * and contract extension resets.
  */
 class SharedRepositoryTest extends DatabaseTestCase
 {
@@ -18,26 +18,6 @@ class SharedRepositoryTest extends DatabaseTestCase
     {
         parent::setUp();
         $this->repo = new SharedRepository($this->db);
-    }
-
-    // ── getNumberOfTitles ───────────────────────────────────────
-
-    public function testGetNumberOfTitlesCountsMatchingAwards(): void
-    {
-        $this->insertTeamAwardRow('Metros', 'Eastern Division Champion', 2097);
-        $this->insertTeamAwardRow('Metros', 'Eastern Division Champion', 2098);
-
-        $result = $this->repo->getNumberOfTitles('Metros', 'Division');
-
-        // At least our 2 inserted rows (may include pre-existing production data)
-        self::assertGreaterThanOrEqual(2, $result);
-    }
-
-    public function testGetNumberOfTitlesReturnsZeroForNoMatches(): void
-    {
-        $result = $this->repo->getNumberOfTitles('NoSuchTeam9999', 'Division');
-
-        self::assertSame(0, $result);
     }
 
     // ── getCurrentOwnerOfDraftPick ──────────────────────────────

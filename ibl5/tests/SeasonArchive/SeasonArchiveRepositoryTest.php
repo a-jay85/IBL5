@@ -74,9 +74,9 @@ class SeasonArchiveRepositoryTest extends TestCase
         $this->assertIsString($sourceCode);
 
         $this->assertStringContainsString(
-            'vw_team_awards',
+            'ibl_team_awards',
             $sourceCode,
-            'Repository must query vw_team_awards view'
+            'Repository must query ibl_team_awards table'
         );
     }
 

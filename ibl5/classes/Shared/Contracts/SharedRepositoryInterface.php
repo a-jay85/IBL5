@@ -8,7 +8,6 @@ namespace Shared\Contracts;
  * SharedRepositoryInterface - Data repository for common IBL operations
  *
  * Provides access to shared data operations used across multiple modules:
- * - Team awards and title counts
  * - Draft pick ownership tracking
  * - Contract extension management
  *
@@ -16,15 +15,6 @@ namespace Shared\Contracts;
  */
 interface SharedRepositoryInterface
 {
-    /**
-     * Gets the number of a specific award won by a team
-     *
-     * @param string $teamName Team name to look up
-     * @param string $titleName Award name to search for
-     * @return int Number of awards matching the criteria
-     */
-    public function getNumberOfTitles(string $teamName, string $titleName): int;
-
     /**
      * Gets the current owner of a specific draft pick
      *

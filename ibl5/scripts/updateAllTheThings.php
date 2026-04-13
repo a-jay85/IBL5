@@ -208,8 +208,16 @@ try {
     // IBL-only: End-of-season imports when champion exists
     if (!$isOlympics) {
         $updaterService->addStep(new Updater\Steps\EndOfSeasonImportStep(
-            $jsbRepo, $jsbService, $plrService, $season->endingYear, $basePath, $filePrefix,
+            $jsbRepo, $jsbService, $season->endingYear, $basePath, $filePrefix,
         ));
+    }
+
+    // IBL-only: snapshot player stats + refresh materialized ibl_hist table
+    if (!$isOlympics) {
+        $updaterService->addStep(new Updater\Steps\SnapshotPlrStep(
+            $plrService, $jsbRepo, $season->endingYear, $defaultPlrPath,
+        ));
+        $updaterService->addStep(new Updater\Steps\RefreshIblHistStep($mysqli_db));
     }
 
     $controller = new Updater\UpdaterController($updaterService, $view);

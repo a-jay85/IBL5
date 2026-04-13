@@ -8,8 +8,6 @@ use JsbParser\Contracts\JsbImportRepositoryInterface;
 use JsbParser\JsbImportResult;
 use JsbParser\JsbImportService;
 use PHPUnit\Framework\TestCase;
-use PlrParser\Contracts\PlrParserServiceInterface;
-use PlrParser\PlrParseResult;
 use Updater\Contracts\PipelineStepInterface;
 use Updater\Steps\EndOfSeasonImportStep;
 
@@ -17,13 +15,11 @@ class EndOfSeasonImportStepTest extends TestCase
 {
     private JsbImportRepositoryInterface $stubRepo;
     private JsbImportService $stubService;
-    private PlrParserServiceInterface $stubPlrService;
 
     protected function setUp(): void
     {
         $this->stubRepo = $this->createStub(JsbImportRepositoryInterface::class);
         $this->stubService = $this->createStub(JsbImportService::class);
-        $this->stubPlrService = $this->createStub(PlrParserServiceInterface::class);
     }
 
     private function createStep(string $basePath = '/tmp'): EndOfSeasonImportStep
@@ -31,7 +27,6 @@ class EndOfSeasonImportStepTest extends TestCase
         return new EndOfSeasonImportStep(
             $this->stubRepo,
             $this->stubService,
-            $this->stubPlrService,
             2026,
             $basePath,
             'IBL5',
@@ -70,14 +65,10 @@ class EndOfSeasonImportStepTest extends TestCase
         $this->stubService->method('processHofFile')->willReturn($jsbResult);
         $this->stubService->method('processAwaFile')->willReturn($jsbResult);
 
-        $plrResult = new PlrParseResult();
-        $plrResult->playersUpserted = 5;
-        $this->stubPlrService->method('processPlrFileForYear')->willReturn($plrResult);
-
         // Use a temp dir with actual files
         $tmpDir = sys_get_temp_dir() . '/eos-test-' . uniqid();
         mkdir($tmpDir, 0777, true);
-        foreach (['dra', 'ret', 'hof', 'awa', 'car', 'plr'] as $ext) {
+        foreach (['dra', 'ret', 'hof', 'awa', 'car'] as $ext) {
             touch($tmpDir . '/IBL5.' . $ext);
         }
 
@@ -85,7 +76,6 @@ class EndOfSeasonImportStepTest extends TestCase
             $step = new EndOfSeasonImportStep(
                 $this->stubRepo,
                 $this->stubService,
-                $this->stubPlrService,
                 2026,
                 $tmpDir,
                 'IBL5',
@@ -132,7 +122,6 @@ class EndOfSeasonImportStepTest extends TestCase
             $step = new EndOfSeasonImportStep(
                 $this->stubRepo,
                 $this->stubService,
-                $this->stubPlrService,
                 2026,
                 $tmpDir,
                 'IBL5',

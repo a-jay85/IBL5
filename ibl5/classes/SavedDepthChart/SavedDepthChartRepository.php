@@ -146,7 +146,7 @@ class SavedDepthChartRepository extends \BaseMysqliRepository implements SavedDe
     {
         /** @var list<SavedDepthChartRow> */
         return $this->fetchAll(
-            "SELECT * FROM {$this->headerTable} WHERE tid = ? ORDER BY created_at DESC",
+            "SELECT * FROM {$this->headerTable} WHERE tid = ? ORDER BY created_at DESC, id DESC",
             "i",
             $tid
         );
@@ -246,7 +246,7 @@ class SavedDepthChartRepository extends \BaseMysqliRepository implements SavedDe
     {
         /** @var SavedDepthChartRow|null */
         return $this->fetchOne(
-            "SELECT * FROM {$this->headerTable} WHERE tid = ? ORDER BY created_at DESC LIMIT 1",
+            "SELECT * FROM {$this->headerTable} WHERE tid = ? ORDER BY created_at DESC, id DESC LIMIT 1",
             "i",
             $tid
         );
@@ -279,7 +279,7 @@ class SavedDepthChartRepository extends \BaseMysqliRepository implements SavedDe
     {
         /** @var SavedDepthChartRow|null */
         return $this->fetchOne(
-            "SELECT * FROM {$this->headerTable} WHERE tid = ? AND is_active = 1 ORDER BY updated_at DESC LIMIT 1",
+            "SELECT * FROM {$this->headerTable} WHERE tid = ? AND is_active = 1 ORDER BY updated_at DESC, id DESC LIMIT 1",
             "i",
             $tid
         );

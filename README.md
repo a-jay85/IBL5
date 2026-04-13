@@ -1,5 +1,5 @@
 ---
-description: IBL5 project overview: tech stack, quick start, and docs index.
+description: "IBL5 project overview: tech stack, quick start, and docs index."
 last_verified: 2026-04-12
 ---
 

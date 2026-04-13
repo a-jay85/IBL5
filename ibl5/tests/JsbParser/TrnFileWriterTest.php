@@ -212,6 +212,30 @@ class TrnFileWriterTest extends TestCase
         }
     }
 
+    public function testPlayoffMonthRoundTrip(): void
+    {
+        // Write with IBL playoff month (6), which Writer converts to JSB month (10) in binary
+        $record = TrnFileWriter::buildInjuryRecord(6, 15, 2006, 1234, 5, 3, 'Playoff injury');
+        $data = TrnFileWriter::generate([$record]);
+
+        $tmpFile = $this->writeTmpFile($data);
+        try {
+            $result = TrnFileParser::parseFile($tmpFile);
+
+            $injuries = array_values(array_filter(
+                $result['transactions'],
+                static fn (array $t): bool => $t['type'] === TrnFileParser::TYPE_INJURY
+            ));
+
+            $this->assertCount(1, $injuries);
+            // Writer converts 6→10, Parser converts 10→6: round-trip preserves the value
+            $this->assertSame(\Season\Season::IBL_PLAYOFF_MONTH, $injuries[0]['month']);
+            $this->assertSame(15, $injuries[0]['day']);
+        } finally {
+            unlink($tmpFile);
+        }
+    }
+
     public function testEmptyFileGeneration(): void
     {
         $data = TrnFileWriter::generate([]);

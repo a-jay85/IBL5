@@ -32,6 +32,16 @@ class TrnFileParser implements TrnFileParserInterface
     public const TYPE_WAIVER_CLAIM = 3;
     public const TYPE_WAIVER_RELEASE = 4;
 
+    /**
+     * JSB encodes playoff transactions with month=10 internally.
+     * This does NOT correspond to IBL calendar October (Season::IBL_HEAT_MONTH).
+     * During parsing, this value is remapped to Season::IBL_PLAYOFF_MONTH (6).
+     *
+     * This is a simple value remap, unrelated to SchFileParser::dateSlotToMonthDay()
+     * which converts positional month offsets (0=Oct, 1=Nov...) via modular arithmetic.
+     */
+    public const JSB_PLAYOFF_MONTH = 10;
+
     // Trade item markers
     public const TRADE_MARKER_PLAYER = 0;
     public const TRADE_MARKER_DRAFT_PICK = 1;
@@ -100,6 +110,11 @@ class TrnFileParser implements TrnFileParserInterface
         $day = (int) $dayStr;
         $year = ((int) $yearStr) + 1; // JSB stores season beginning year; convert to ending year
         $type = (int) $typeStr;
+
+        // Remap JSB's internal playoff month encoding to IBL calendar month
+        if ($month === self::JSB_PLAYOFF_MONTH) {
+            $month = \Season\Season::IBL_PLAYOFF_MONTH;
+        }
 
         if ($month === 0 || $year === 0 || $type === 0) {
             return null;

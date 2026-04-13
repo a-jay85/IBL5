@@ -47,6 +47,18 @@ class TrnFileWriter implements TrnFileWriterInterface
     }
 
     /**
+     * Convert IBL calendar month to JSB binary format month.
+     * Reverses the parse-time remap of JSB_PLAYOFF_MONTH → IBL_PLAYOFF_MONTH.
+     */
+    private static function toJsbMonth(int $month): int
+    {
+        if ($month === \Season\Season::IBL_PLAYOFF_MONTH) {
+            return TrnFileParser::JSB_PLAYOFF_MONTH;
+        }
+        return $month;
+    }
+
+    /**
      * @see TrnFileWriterInterface::buildInjuryRecord()
      */
     public static function buildInjuryRecord(
@@ -61,7 +73,7 @@ class TrnFileWriter implements TrnFileWriterInterface
         $record = str_repeat(' ', TrnFileParser::RECORD_SIZE);
 
         // Common header at offsets 17-26
-        $record = substr_replace($record, str_pad((string) $month, 2, ' ', STR_PAD_LEFT), 17, 2);
+        $record = substr_replace($record, str_pad((string) self::toJsbMonth($month), 2, ' ', STR_PAD_LEFT), 17, 2);
         $record = substr_replace($record, str_pad((string) $day, 2, ' ', STR_PAD_LEFT), 19, 2);
         $record = substr_replace($record, str_pad((string) $year, 4, ' ', STR_PAD_LEFT), 21, 4);
         $record = substr_replace($record, (string) TrnFileParser::TYPE_INJURY, 26, 1);
@@ -83,7 +95,7 @@ class TrnFileWriter implements TrnFileWriterInterface
         $record = str_repeat(' ', TrnFileParser::RECORD_SIZE);
 
         // Common header
-        $record = substr_replace($record, str_pad((string) $month, 2, ' ', STR_PAD_LEFT), 17, 2);
+        $record = substr_replace($record, str_pad((string) self::toJsbMonth($month), 2, ' ', STR_PAD_LEFT), 17, 2);
         $record = substr_replace($record, str_pad((string) $day, 2, ' ', STR_PAD_LEFT), 19, 2);
         $record = substr_replace($record, str_pad((string) $year, 4, ' ', STR_PAD_LEFT), 21, 4);
         $record = substr_replace($record, (string) TrnFileParser::TYPE_TRADE, 26, 1);
@@ -127,7 +139,7 @@ class TrnFileWriter implements TrnFileWriterInterface
         $record = str_repeat(' ', TrnFileParser::RECORD_SIZE);
 
         // Common header
-        $record = substr_replace($record, str_pad((string) $month, 2, ' ', STR_PAD_LEFT), 17, 2);
+        $record = substr_replace($record, str_pad((string) self::toJsbMonth($month), 2, ' ', STR_PAD_LEFT), 17, 2);
         $record = substr_replace($record, str_pad((string) $day, 2, ' ', STR_PAD_LEFT), 19, 2);
         $record = substr_replace($record, str_pad((string) $year, 4, ' ', STR_PAD_LEFT), 21, 4);
         $record = substr_replace($record, (string) $type, 26, 1);

@@ -1,7 +1,7 @@
 ---
 name: post-plan
 description: Single orchestrator for the post-plan workflow. Runs diff classification, simplify, commit/push/PR, code review, security audit, verification, CI monitoring, retrospective, and worktree teardown as one uninterrupted sequence.
-last_verified: 2026-04-12
+last_verified: 2026-04-13
 ---
 
 # Post-Plan Orchestrator
@@ -24,13 +24,23 @@ rm -f /tmp/claude-plan-active-$PPID
 
 ## Phase 2: Classify Diff
 
-Run this bash block once. It computes classification flags from `gh pr diff --name-only` and writes the filtered diff to `/tmp/post-plan-diff-$PPID` (same `$PPID` pattern Phase 1 uses — stable across Bash tool calls in the session). Every later phase consults these flags and reads the diff file — do not recompute.
+Run this bash block once. It computes classification flags and writes the filtered diff to `/tmp/post-plan-diff-$PPID` (same `$PPID` pattern Phase 1 uses — stable across Bash tool calls in the session). Uses `gh pr diff` when a PR exists (correct base for stacked PRs), falls back to `git diff origin/master...HEAD` pre-PR. Every later phase consults these flags and reads the diff file — do not recompute.
 
 ```bash
 DIFF_FILE=/tmp/post-plan-diff-$PPID
 
+# Detect whether a PR exists for this branch
+HAS_PR=false
+if gh pr diff --name-only &>/dev/null; then
+    HAS_PR=true
+fi
+
 # Changed file list (deleted files excluded — nothing to review)
-FILES=$(gh pr diff --name-only 2>/dev/null)
+if $HAS_PR; then
+    FILES=$(gh pr diff --name-only)
+else
+    FILES=$(git diff --name-only origin/master...HEAD)
+fi
 
 # Per-type counts (grep -cE, default 0 if no match)
 COUNT_TOTAL=$(echo "$FILES" | grep -c . || true)
@@ -61,14 +71,19 @@ MODIFIED_COUNT=$(git diff --diff-filter=M --name-only origin/master...HEAD 2>/de
 HAS_MODIFIED=$([ "$MODIFIED_COUNT" -gt 0 ] && echo true || echo false)
 
 # Filtered diff -> temp file (single awk pass stripping migrations, lockfiles, snapshots)
-gh pr diff | awk '
+DIFF_AWK='
   /^diff --git.*(migrations\/|composer\.lock|package-lock\.json|bun\.lock|__snapshots__\/|\.snap$)/ {skip=1; next}
   /^diff --git/ {skip=0}
   skip==0 {print}
-' > "$DIFF_FILE"
+'
+if $HAS_PR; then
+    gh pr diff | awk "$DIFF_AWK" > "$DIFF_FILE"
+else
+    git diff origin/master...HEAD | awk "$DIFF_AWK" > "$DIFF_FILE"
+fi
 
-# Fallback: if filtered diff is still > 100KB, shrink via gh api with the same exclusions
-if [ "$(wc -c < "$DIFF_FILE")" -gt 102400 ]; then
+# Fallback: if filtered diff is still > 100KB and a PR exists, shrink via gh api
+if [ "$(wc -c < "$DIFF_FILE")" -gt 102400 ] && $HAS_PR; then
   PR_NUM=$(gh pr view --json number --jq '.number')
   gh api "repos/a-jay85/IBL5/pulls/$PR_NUM/files" --paginate \
     --jq '.[] | select(.filename | test("migrations/|composer\\.lock|package-lock\\.json|bun\\.lock|__snapshots__/|\\.snap$") | not) | "--- " + .filename + " ---\n" + (.patch // "(binary or too large)")' \

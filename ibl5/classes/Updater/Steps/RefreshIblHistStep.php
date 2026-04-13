@@ -33,8 +33,12 @@ final class RefreshIblHistStep implements PipelineStepInterface
         $this->db->begin_transaction();
 
         try {
-            $this->db->query('DELETE FROM ibl_hist');
-            $this->db->query('INSERT INTO ibl_hist ' . self::SELECT_SQL);
+            if ($this->db->query('DELETE FROM ibl_hist') === false) {
+                throw new \RuntimeException('DELETE failed: ' . $this->db->error);
+            }
+            if ($this->db->query('INSERT INTO ibl_hist ' . self::SELECT_SQL) === false) {
+                throw new \RuntimeException('INSERT failed: ' . $this->db->error);
+            }
             $rowCount = $this->db->affected_rows;
             $this->db->commit();
         } catch (\Throwable $e) {

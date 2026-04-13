@@ -16,9 +16,10 @@ OUTPUT="$REPO_ROOT/.claude/rules/codebase-map.md"
 # Third-party / built-in namespaces to exclude from dependency graph
 EXCLUDE_NS="Delight|Monolog|PHPMailer|Psr|ZipArchive|SplFileObject|DateTimeImmutable|DateTime|RuntimeException|InvalidArgumentException|LogicException|Override|JsonSerializable|Stringable|BackedEnum|UnitEnum|ValueError|Fiber|WeakMap"
 
-# Temp file for dependency lines (collected during first pass)
+# Temp files
 DEP_LINES=$(mktemp)
-trap 'rm -f "$DEP_LINES"' EXIT
+NEW_OUTPUT=$(mktemp)
+trap 'rm -f "$DEP_LINES" "$NEW_OUTPUT"' EXIT
 
 TODAY=$(date +%Y-%m-%d)
 
@@ -120,4 +121,14 @@ When working in a module, use targeted paths instead of broad searches:
 - Check the dependency list above to identify related modules
 FOOTER
 
-} > "$OUTPUT"
+} > "$NEW_OUTPUT"
+
+# Only update the file if there are real content changes (not just the date)
+if [ -f "$OUTPUT" ]; then
+    # Compare with the date line normalized out
+    strip_date() { sed 's/^last_verified: .*/last_verified: NORMALIZED/' "$1"; }
+    if diff -q <(strip_date "$OUTPUT") <(strip_date "$NEW_OUTPUT") >/dev/null 2>&1; then
+        exit 0
+    fi
+fi
+cp "$NEW_OUTPUT" "$OUTPUT"

@@ -157,6 +157,51 @@ class SeasonArchiveRepositoryTest extends DatabaseTestCase
         self::assertArrayHasKey('Award', $first);
     }
 
+    public function testGetTeamAwardsByYearSortsHierarchically(): void
+    {
+        // Insert out of hierarchy order to prove the query sorts, not insertion order.
+        $this->insertRow('ibl_team_awards', [
+            'year' => 2097,
+            'name' => 'Team A',
+            'Award' => 'IBL Draft Lottery Winners',
+        ]);
+        $this->insertRow('ibl_team_awards', [
+            'year' => 2097,
+            'name' => 'Team B',
+            'Award' => 'Pacific Division Champions',
+        ]);
+        $this->insertRow('ibl_team_awards', [
+            'year' => 2097,
+            'name' => 'Team C',
+            'Award' => 'Atlantic Division Champions',
+        ]);
+        $this->insertRow('ibl_team_awards', [
+            'year' => 2097,
+            'name' => 'Team D',
+            'Award' => 'Western Conference Champions',
+        ]);
+        $this->insertRow('ibl_team_awards', [
+            'year' => 2097,
+            'name' => 'Team E',
+            'Award' => 'Eastern Conference Champions',
+        ]);
+
+        $result = $this->repo->getTeamAwardsByYear(2097);
+
+        $awards = [];
+        foreach ($result as $row) {
+            $awards[] = $row['Award'];
+        }
+
+        self::assertSame([
+            'Eastern Conference Champions',
+            'Western Conference Champions',
+            'Atlantic Division Champions',
+            'Pacific Division Champions',
+            'IBL Draft Lottery Winners',
+        ], $awards);
+    }
+
     public function testGetAllGmAwardsWithTeamsReturnsJoinedRows(): void
     {
         $result = $this->repo->getAllGmAwardsWithTeams();

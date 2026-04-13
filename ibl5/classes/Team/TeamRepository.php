@@ -365,8 +365,29 @@ class TeamRepository extends \BaseMysqliRepository implements TeamRepositoryInte
             JOIN ibl_team_info ti ON ti.teamid = hc.winner_tid
             WHERE hc.rn = 1 AND ti.team_name = ?
 
-            ORDER BY year DESC";
+            ORDER BY year DESC, " . self::AWARD_HIERARCHY_CASE . ", Award ASC";
     }
+
+    /**
+     * Hierarchical award ordering used by accomplishments queries.
+     *
+     * Orders awards from hardest to easiest to win so team-history displays are
+     * deterministic (avoids flaky e2e tests when multiple awards share a year):
+     * IBL Champions → IBL HEAT Champions → Conference Champions (alpha) →
+     * Division Champions (alpha) → IBL Draft Lottery Winners → everything else.
+     */
+    private const AWARD_HIERARCHY_CASE = "CASE Award
+                WHEN 'IBL Champions' THEN 1
+                WHEN 'IBL HEAT Champions' THEN 2
+                WHEN 'Eastern Conference Champions' THEN 3
+                WHEN 'Western Conference Champions' THEN 4
+                WHEN 'Atlantic Division Champions' THEN 5
+                WHEN 'Central Division Champions' THEN 6
+                WHEN 'Midwest Division Champions' THEN 7
+                WHEN 'Pacific Division Champions' THEN 8
+                WHEN 'IBL Draft Lottery Winners' THEN 9
+                ELSE 10
+            END";
 
     /**
      * @see TeamRepositoryInterface::getPlayoffResults()

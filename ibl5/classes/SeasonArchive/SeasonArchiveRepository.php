@@ -144,8 +144,31 @@ class SeasonArchiveRepository extends BaseMysqliRepository implements SeasonArch
                 WHERE bst.game_type = 3 AND YEAR(bst.Date) = ?
             ) hc
             JOIN ibl_team_info ti ON ti.teamid = hc.winner_tid
-            WHERE hc.rn = 1";
+            WHERE hc.rn = 1
+
+            ORDER BY " . self::AWARD_HIERARCHY_CASE . ", Award ASC, name ASC";
     }
+
+    /**
+     * Hierarchical award ordering used by team-award queries.
+     *
+     * Orders awards from hardest to easiest to win so season-archive displays are
+     * deterministic (avoids flaky e2e tests when a year has multiple awards):
+     * IBL Champions → IBL HEAT Champions → Conference Champions (alpha) →
+     * Division Champions (alpha) → IBL Draft Lottery Winners → everything else.
+     */
+    private const AWARD_HIERARCHY_CASE = "CASE Award
+                WHEN 'IBL Champions' THEN 1
+                WHEN 'IBL HEAT Champions' THEN 2
+                WHEN 'Eastern Conference Champions' THEN 3
+                WHEN 'Western Conference Champions' THEN 4
+                WHEN 'Atlantic Division Champions' THEN 5
+                WHEN 'Central Division Champions' THEN 6
+                WHEN 'Midwest Division Champions' THEN 7
+                WHEN 'Pacific Division Champions' THEN 8
+                WHEN 'IBL Draft Lottery Winners' THEN 9
+                ELSE 10
+            END";
 
     /**
      * @see SeasonArchiveRepositoryInterface::getAllGmAwardsWithTeams()

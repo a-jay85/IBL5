@@ -18,6 +18,9 @@ use Logging\LoggerFactory;
  * 1. Session is not already authenticated
  * 2. SERVER_NAME is localhost/127.0.0.1/main.localhost
  * 3. DEV_AUTO_LOGIN env var or .env.test entry is set to a non-empty username
+ *
+ * The caller (mainfile.php) also checks for the _no_auto_login cookie
+ * which E2E tests set to opt out of auto-authentication.
  */
 final class DevAutoLogin
 {

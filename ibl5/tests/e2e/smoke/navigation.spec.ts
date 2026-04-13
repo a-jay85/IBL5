@@ -1,11 +1,12 @@
 import { test, expect } from '@playwright/test';
 import { assertNoPhpErrors } from '../helpers/php-errors';
 import { desktopNav, openMobileMenu } from '../helpers/navigation';
+import { publicStorageState } from '../helpers/public-storage-state';
 
 // Public navigation tests — no authentication required.
 // The navigation bar renders on every page via themeheader().
 
-test.use({ storageState: { cookies: [], origins: [] } });
+test.use({ storageState: publicStorageState() });
 
 test.describe('Navigation bar smoke tests (public)', () => {
   test('nav bar is visible on homepage', async ({ page }) => {

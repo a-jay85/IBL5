@@ -1,7 +1,7 @@
 ---
 description: Playwright E2E testing rules, Docker requirements, and actionability pitfalls.
 paths: ibl5/tests/e2e/**/*.ts
-last_verified: 2026-04-11
+last_verified: 2026-04-13
 ---
 
 # Playwright E2E Testing Rules
@@ -54,9 +54,10 @@ This runs with `--workers=1 --retries=2` (CI-matching retries, single worker). U
 ### Public smoke test
 ```typescript
 import { test, expect } from '@playwright/test';
+import { publicStorageState } from '../helpers/public-storage-state';
 
 // Public pages — no authentication required.
-test.use({ storageState: { cookies: [], origins: [] } });
+test.use({ storageState: publicStorageState() });
 
 const PHP_ERROR_PATTERNS = [
   'Fatal error',
@@ -135,7 +136,7 @@ test.describe('Public module flow', () => {
 
 | Scenario | Import from | Extra setup |
 |----------|-------------|-------------|
-| Public page (no state control) | `@playwright/test` | `test.use({ storageState: { cookies: [], origins: [] } })` |
+| Public page (no state control) | `@playwright/test` | `import { publicStorageState } from '../helpers/public-storage-state'; test.use({ storageState: publicStorageState() })` |
 | Public page (with state control) | `../fixtures/public` | None (uses cookie-based appState) |
 | Authenticated page | `../fixtures/auth` | None (uses stored auth state + cookie-based appState) |
 
@@ -271,7 +272,7 @@ test.describe('Public module flow', () => {
 ## DO:
 1. Check for PHP errors on every page you visit in smoke tests
 2. Use the auth fixture for authenticated tests
-3. Use `storageState: { cookies: [], origins: [] }` for public tests
+3. Use `publicStorageState()` from `helpers/public-storage-state` for public tests (prevents DevAutoLogin)
 4. Use `appState` fixture (from `../fixtures/auth` or `../fixtures/public`) to set required state — always include `'Current Season Ending Year': '2026'` when tests depend on CI seed data
 5. Use stable CSS classes or accessible roles for locators
 6. Keep smoke tests fast — one assertion per test, no complex interactions

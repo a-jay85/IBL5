@@ -213,8 +213,10 @@ $authService = new \Auth\AuthService($mysqli_db);
 // Attempt to restore session from "remember me" cookie for returning users
 $authService->tryRememberMe();
 
-// Dev-only auto-login: bypasses login forms on localhost when DEV_AUTO_LOGIN is set in .env.test
-if (!$authService->isAuthenticated()) {
+// Dev-only auto-login: bypasses login forms on localhost when DEV_AUTO_LOGIN is set in .env.test.
+// E2E tests set _no_auto_login cookie to opt out (tests that need unauthenticated state).
+$noAutoLogin = isset($_COOKIE['_no_auto_login']) && $_COOKIE['_no_auto_login'] === '1';
+if (!$authService->isAuthenticated() && !$noAutoLogin) {
     \Auth\DevAutoLogin::tryAutoLogin($mysqli_db);
 }
 

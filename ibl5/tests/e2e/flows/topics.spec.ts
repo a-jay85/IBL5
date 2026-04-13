@@ -6,9 +6,10 @@ import {
   assertSearchTypeRadiosPresent,
   assertSearchSubmitsTo,
 } from '../helpers/search-form-assertions';
+import { publicStorageState } from '../helpers/public-storage-state';
 
 // Topics — public page, no authentication required.
-test.use({ storageState: { cookies: [], origins: [] } });
+test.use({ storageState: publicStorageState() });
 
 test.describe('Topics flow', () => {
   test.beforeEach(async ({ page }) => {

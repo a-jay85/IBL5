@@ -1,11 +1,12 @@
 import { test, expect } from '@playwright/test';
 import { assertNoPhpErrors } from '../helpers/php-errors';
+import { publicStorageState } from '../helpers/public-storage-state';
 
 // SiteStatistics — legacy PHP-Nuke visitor stats module.
 // This module requires the lang-SiteStatistics.php language file and
 // nuke_counter/nuke_stats_* tables with data. In CI, seed data provides this.
 // Locally it may return 500 if the language file is missing.
-test.use({ storageState: { cookies: [], origins: [] } });
+test.use({ storageState: publicStorageState() });
 
 const SITE_STATS_PAGES = [
   { name: 'main stats', url: 'modules.php?name=SiteStatistics' },

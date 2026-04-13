@@ -1,10 +1,11 @@
 import { test, expect } from '@playwright/test';
 import { test as publicTest, expect as publicExpect } from '../fixtures/public';
 import { assertNoPhpErrors } from '../helpers/php-errors';
+import { publicStorageState } from '../helpers/public-storage-state';
 
 // Team page — public, no authentication required.
 // Current-season teams use a dropdown (.ibl-view-select), not tabs.
-test.use({ storageState: { cookies: [], origins: [] } });
+test.use({ storageState: publicStorageState() });
 
 test.describe('Team page flow', () => {
   test.beforeEach(async ({ page }) => {
@@ -148,13 +149,15 @@ test.describe('Team page: dropdown content changes', () => {
     const dropdown = page.locator('.ibl-view-select').first();
     await dropdown.selectOption('contracts');
     await expect(page.locator('th.col-salary').first()).toBeVisible({ timeout: 10000 });
-    await expect(page).toHaveURL(/display=contracts/);
+    // HX-Push-Url fires after HTMX swap — allow extra time for pushState
+    await expect(page).toHaveURL(/display=contracts/, { timeout: 10000 });
   });
 
   test('browser back restores previous view after dropdown switch', async ({ page }) => {
     const dropdown = page.locator('.ibl-view-select').first();
     await dropdown.selectOption('contracts');
     await expect(page.locator('th.col-salary').first()).toBeVisible({ timeout: 10000 });
+    await expect(page).toHaveURL(/display=contracts/, { timeout: 10000 });
 
     await page.goBack();
 

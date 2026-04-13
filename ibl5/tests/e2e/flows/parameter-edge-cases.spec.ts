@@ -1,8 +1,9 @@
 import { test, expect } from '@playwright/test';
 import { assertNoPhpErrors } from '../helpers/php-errors';
+import { publicStorageState } from '../helpers/public-storage-state';
 
 // Parameter edge cases — verify graceful handling of missing/invalid query parameters.
-test.use({ storageState: { cookies: [], origins: [] } });
+test.use({ storageState: publicStorageState() });
 
 test.describe('Parameter edge cases', () => {
   test('Team module without teamID shows no PHP errors', async ({ page }) => {

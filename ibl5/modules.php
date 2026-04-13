@@ -41,10 +41,24 @@ if (isset($name) && $name == $_REQUEST['name']) {
         && is_string($_SESSION['flash_success'])
         && $_SESSION['flash_success'] !== '';
 
+    // Non-boosted HTMX requests (op=api) return partial HTML with custom
+    // response headers (HX-Push-Url etc.) that the cache cannot preserve.
+    $isHtmxPartial = \Utilities\HtmxHelper::isHtmxRequest()
+        && !\Utilities\HtmxHelper::isBoostedRequest();
+
+    // E2E tests use per-request cookie overrides (_test_overrides) that
+    // change page content. Cached responses ignore these overrides.
+    // Also skip cache entirely during E2E runs (_no_auto_login signals
+    // a Playwright test context) to avoid cross-worker cache pollution.
+    $isE2eTesting = (isset($_COOKIE['_test_overrides']) && $_COOKIE['_test_overrides'] !== '')
+        || (isset($_COOKIE['_no_auto_login']) && $_COOKIE['_no_auto_login'] === '1');
+
     if (
         $_SERVER['REQUEST_METHOD'] === 'GET'
         && !$authService->isAuthenticated()
         && !$hasFlash
+        && !$isHtmxPartial
+        && !$isE2eTesting
         && \Cache\PageCache::isCacheable($name)
     ) {
         $isBoosted = \Utilities\HtmxHelper::isBoostedRequest();

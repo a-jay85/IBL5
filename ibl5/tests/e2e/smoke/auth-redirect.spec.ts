@@ -1,11 +1,12 @@
 import { test, expect } from '@playwright/test';
+import { publicStorageState } from '../helpers/public-storage-state';
 
 // Auth redirect smoke tests — verify all auth-required modules redirect
 // unauthenticated users to the login page (YourAccount module).
 //
 // These modules call loginbox() which does a JS redirect to YourAccount.
 // Some modules also require specific season phase settings to be accessible.
-test.use({ storageState: { cookies: [], origins: [] } });
+test.use({ storageState: publicStorageState() });
 
 // Modules that require authentication and call loginbox()
 // Note: Some require specific phase to avoid "module not active" before auth check

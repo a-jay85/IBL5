@@ -1,7 +1,8 @@
 import { test, expect } from '@playwright/test';
 import { openMobileMenu, gotoWithRetry } from '../helpers/navigation';
+import { publicStorageState } from '../helpers/public-storage-state';
 
-test.use({ storageState: { cookies: [], origins: [] } });
+test.use({ storageState: publicStorageState() });
 test.use({ viewport: { width: 375, height: 812 } });
 
 test.describe('Mobile nav interaction tests', () => {

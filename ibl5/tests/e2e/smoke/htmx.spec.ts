@@ -1,8 +1,9 @@
 import { test, expect } from '@playwright/test';
 import { assertNoPhpErrors } from '../helpers/php-errors';
+import { publicStorageState } from '../helpers/public-storage-state';
 
 // Public HTMX navigation tests — no authentication required.
-test.use({ storageState: { cookies: [], origins: [] } });
+test.use({ storageState: publicStorageState() });
 
 // HTMX tests need click-based navigation (not goto) to verify boost behavior.
 // Increase timeouts since link clicks can be slow under parallel worker load.

@@ -1,9 +1,10 @@
 import { test, expect } from '@playwright/test';
 import { assertNoPhpErrors } from '../helpers/php-errors';
 import { gotoWithRetry } from '../helpers/navigation';
+import { publicStorageState } from '../helpers/public-storage-state';
 
 // Public pages — no authentication required.
-test.use({ storageState: { cookies: [], origins: [] } });
+test.use({ storageState: publicStorageState() });
 
 const PAGES = [
   { name: 'schedule', url: 'modules.php?name=Schedule', selector: '.schedule-container, .ibl-data-table, table' },

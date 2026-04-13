@@ -13,6 +13,8 @@ class DevAutoLoginTest extends TestCase
     private string $originalServerName;
     /** @var string|false */
     private string|false $originalEnvVar;
+    /** @var array<string, string> */
+    private array $originalCookies;
 
     protected function setUp(): void
     {
@@ -26,8 +28,10 @@ class DevAutoLoginTest extends TestCase
             ? $_SERVER['SERVER_NAME']
             : '';
         $this->originalEnvVar = getenv('DEV_AUTO_LOGIN');
+        $this->originalCookies = $_COOKIE;
 
         unset($_SESSION['auth_user_id'], $_SESSION['auth_username']);
+        unset($_COOKIE['_no_auto_login']);
         putenv('DEV_AUTO_LOGIN');
     }
 
@@ -36,6 +40,7 @@ class DevAutoLoginTest extends TestCase
         unset($_SESSION['auth_user_id'], $_SESSION['auth_username']);
 
         $_SERVER['SERVER_NAME'] = $this->originalServerName;
+        $_COOKIE = $this->originalCookies;
 
         if ($this->originalEnvVar !== false) {
             putenv('DEV_AUTO_LOGIN=' . $this->originalEnvVar);

@@ -1,0 +1,92 @@
+You are executing the IBL5 nightly autonomous workflow. No human is present — you must never ask questions or wait for input. You have full tool access.
+
+## Step 1: Check the Queue
+
+NIGHTLY_DIR is: $HOME/.claude/projects/-Users-ajaynicolas-Documents-GitHub-IBL5/nightly
+
+List files in $NIGHTLY_DIR/queue/. If the directory is empty (no .md files), write a one-line report to $NIGHTLY_DIR/reports/YYYY-MM-DD-no-queue.md (using today's date) saying "No plan queued for tonight." and STOP immediately.
+
+If multiple files exist, pick the OLDEST by modification time (ls -1tr | head -1). Process exactly ONE plan per night.
+
+Read the plan file. If it is a symlink, follow it to read the original content.
+
+## Step 2: Validate the Plan
+
+The plan must have:
+- A clear title (first # heading)
+- Actionable implementation steps — not just analysis questions or vague goals
+
+If the plan is ambiguous, incomplete, or you cannot determine what specific code changes to make:
+1. Move the symlink to $NIGHTLY_DIR/skipped/ : mv $NIGHTLY_DIR/queue/<filename> $NIGHTLY_DIR/skipped/
+2. Write a report to $NIGHTLY_DIR/reports/YYYY-MM-DD-skipped-<slug>.md explaining exactly WHY the plan was skipped
+3. Do NOT attempt partial work
+4. STOP
+
+## Step 3: Derive the Slug
+
+Extract a kebab-case slug from the plan title for the worktree name. Example: "Optimize vw_team_awards Slow Queries" becomes "optimize-vw-team-awards". Max 50 characters, lowercase, alphanumeric and hyphens only.
+
+## Step 4: Set Up the Worktree
+
+Run these commands in sequence. Stop on any failure:
+
+```bash
+cd /Users/ajaynicolas/Documents/GitHub/IBL5
+git checkout master
+git pull origin master
+bin/wt-new <slug>
+```
+
+If bin/wt-new fails (e.g., branch/worktree already exists), write an error report to $NIGHTLY_DIR/reports/YYYY-MM-DD-error-<slug>.md, move the plan symlink to $NIGHTLY_DIR/skipped/, and STOP.
+
+## Step 5: Implement the Plan
+
+Work in worktrees/<slug>/ibl5/. Read CLAUDE.md for all project rules. Follow the plan step by step.
+
+Key rules (from CLAUDE.md):
+- Every PHP file needs declare(strict_types=1)
+- Use === and !== (never == or !=)
+- Wrap dynamic output in HtmlSanitizer::e()
+- All CSS goes in ibl5/design/components/
+- Run the full test suite (bin/test) after PHP changes
+- Run PHPStan (cd worktrees/<slug>/ibl5 && composer run analyse) after PHP changes
+- Verify table/column names against migrations before writing queries
+
+If implementation requires information you do not have — external resources, unclear requirements, missing context — do NOT guess. Move the plan to skipped/ with a report explaining what information is needed, and STOP.
+
+## Step 6: Run /post-plan
+
+After all implementation is complete and tests pass, invoke /post-plan using the Skill tool and let it run to completion. Do NOT invoke /simplify, /commit, /code-review, or /security-audit separately — /post-plan orchestrates all of them.
+
+/post-plan will handle: code review, security audit, commit, push, PR creation, CI monitoring, and auto-merge evaluation.
+
+## Step 7: Report and Clean Up
+
+After /post-plan completes successfully:
+1. Move the plan symlink from queue/ to done/: mv $NIGHTLY_DIR/queue/<filename> $NIGHTLY_DIR/done/
+2. Write a completion report to $NIGHTLY_DIR/reports/YYYY-MM-DD-done-<slug>.md containing:
+   - Plan title
+   - Branch name
+   - PR URL (get from: gh pr view --json url --jq '.url')
+   - Summary of changes made
+   - Code review findings summary
+   - Security audit findings summary
+   - CI status at completion time
+   - Any issues encountered during implementation
+
+## Error Handling
+
+If ANY step fails after worktree creation (Step 4):
+1. Write a detailed error report to $NIGHTLY_DIR/reports/YYYY-MM-DD-error-<slug>.md
+2. Move the plan symlink to $NIGHTLY_DIR/skipped/ (not done/)
+3. Do NOT delete the worktree — preserve it for morning debugging
+4. STOP — do not attempt recovery or the next plan
+
+## Hard Rules
+
+- Process exactly 1 plan per night
+- NEVER use the AskUserQuestion tool — it will block waiting for a human who is not there
+- NEVER use the ExitPlanMode tool — you are not in plan mode
+- If you encounter ANY ambiguity about requirements, skip and report — do not guess
+- All CLAUDE.md project rules apply at all times
+- Work only in worktrees, never modify files on the master branch directly

@@ -1,5 +1,11 @@
 RewriteEngine On
 
+# Custom error pages
+ErrorDocument 403 /ibl5/error-pages/403.html
+ErrorDocument 404 /ibl5/error-pages/404.html
+ErrorDocument 500 /ibl5/error-pages/500.html
+ErrorDocument 503 /ibl5/error-pages/503.html
+
 # Return 410 Gone for scanner probes and ad-network files
 RewriteRule ^(setup\.cgi|geoserver/|rdweb/) - [R=410,L]
 RewriteRule ^(wp|wordpress|blog|backup|old|new)/? - [R=410,L]

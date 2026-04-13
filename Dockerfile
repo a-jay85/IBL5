@@ -22,7 +22,12 @@ RUN printf '<Directory /var/www/html>\n\
     RewriteEngine On\n\
     RewriteRule ^api/v1/(.*)$ api.php?route=$1 [QSA,L]\n\
     DirectoryIndex index.php\n\
-</Directory>\n' > /etc/apache2/conf-available/ibl5.conf \
+</Directory>\n\
+\n\
+ErrorDocument 403 /ibl5/error-pages/403.html\n\
+ErrorDocument 404 /ibl5/error-pages/404.html\n\
+ErrorDocument 500 /ibl5/error-pages/500.html\n\
+ErrorDocument 503 /ibl5/error-pages/503.html\n' > /etc/apache2/conf-available/ibl5.conf \
     && a2enconf ibl5
 
 RUN cp "$PHP_INI_DIR/php.ini-development" "$PHP_INI_DIR/php.ini"

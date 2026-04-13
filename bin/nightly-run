@@ -1,0 +1,33 @@
+#!/bin/bash
+# Wrapper script for the IBL5 nightly autonomous workflow.
+# Called by launchd at 00:03 daily. Runs claude -p in headless mode
+# with the nightly prompt, capturing output to a timestamped log.
+#
+# To test manually: bin/nightly-run
+# To force-trigger via launchd: launchctl start com.ibl5.nightly-claude
+
+set -euo pipefail
+
+# launchd runs with minimal env — ensure our tools are findable
+export PATH="/usr/local/bin:/opt/homebrew/bin:$HOME/.bun/bin:$PATH"
+
+# Signal to /post-plan that we're running headless (skips Phase 11:
+# Worktree Preview Environment — no human present to verify)
+export CLAUDE_HEADLESS=1
+
+REPO="/Users/ajaynicolas/Documents/GitHub/IBL5"
+LOG_DIR="$HOME/.claude/projects/-Users-ajaynicolas-Documents-GitHub-IBL5/nightly/logs"
+mkdir -p "$LOG_DIR"
+LOG="$LOG_DIR/$(date +%Y-%m-%d).log"
+
+cd "$REPO"
+
+echo "=== Nightly run starting at $(date) ===" >> "$LOG"
+
+claude -p "$(cat bin/nightly-prompt)" \
+  --dangerously-skip-permissions \
+  --model opus \
+  --name "nightly-$(date +%Y-%m-%d)" \
+  >> "$LOG" 2>&1
+
+echo "=== Nightly run finished at $(date) ===" >> "$LOG"

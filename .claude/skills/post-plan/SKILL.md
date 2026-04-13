@@ -309,7 +309,7 @@ Save to memory only if something was learned that would **prevent a bug** in a f
 
 ## Phase 11: Worktree Preview Environment
 
-**Skip if** worktree was pre-existing or earlier phases left uncommitted fixes.
+**Skip if** worktree was pre-existing, earlier phases left uncommitted fixes, or `$CLAUDE_HEADLESS` is set (nightly autonomous mode — no human present to verify).
 
 1. Tear down and restart with production data:
    ```bash

@@ -1,0 +1,77 @@
+#!/bin/bash
+# Queue a plan for nightly autonomous execution.
+#
+# Creates a symlink in the nightly queue pointing to the original plan
+# in ~/.claude/plans/. The original plan stays in place; the symlink
+# is what gets moved to done/ or skipped/ after execution.
+#
+# Usage:
+#   bin/nightly-queue <plan-slug-or-filename>
+#   bin/nightly-queue                          # show current queue
+#
+# Examples:
+#   bin/nightly-queue velvet-brewing-starlight
+#   bin/nightly-queue velvet-brewing-starlight.md
+#   bin/nightly-queue ~/.claude/plans/velvet-brewing-starlight.md
+
+set -euo pipefail
+
+NIGHTLY_DIR="$HOME/.claude/projects/-Users-ajaynicolas-Documents-GitHub-IBL5/nightly"
+PLANS_DIR="$HOME/.claude/plans"
+QUEUE_DIR="$NIGHTLY_DIR/queue"
+
+mkdir -p "$QUEUE_DIR"
+
+show_queue() {
+    echo "Nightly queue (oldest first = next to run):"
+    local found=0
+    for f in "$QUEUE_DIR"/*.md; do
+        [ -e "$f" ] || continue
+        found=1
+        local name
+        name=$(basename "$f")
+        local target
+        target=$(readlink "$f" 2>/dev/null || echo "(not a symlink)")
+        local title
+        title=$(head -1 "$f" 2>/dev/null | sed 's/^# //')
+        printf "  %-40s %s\n" "$name" "$title"
+    done
+    if [ "$found" -eq 0 ]; then
+        echo "  (empty)"
+    fi
+}
+
+if [ $# -eq 0 ]; then
+    show_queue
+    exit 0
+fi
+
+INPUT="$1"
+
+# Resolve the plan file path
+if [ -f "$INPUT" ]; then
+    SOURCE=$(cd "$(dirname "$INPUT")" && pwd)/$(basename "$INPUT")
+elif [ -f "$PLANS_DIR/$INPUT" ]; then
+    SOURCE="$PLANS_DIR/$INPUT"
+elif [ -f "$PLANS_DIR/${INPUT}.md" ]; then
+    SOURCE="$PLANS_DIR/${INPUT}.md"
+else
+    echo "Error: Plan not found: $INPUT" >&2
+    echo "Looked in:" >&2
+    echo "  $INPUT" >&2
+    echo "  $PLANS_DIR/$INPUT" >&2
+    echo "  $PLANS_DIR/${INPUT}.md" >&2
+    exit 1
+fi
+
+FILENAME=$(basename "$SOURCE")
+
+if [ -e "$QUEUE_DIR/$FILENAME" ]; then
+    echo "Error: $FILENAME is already queued." >&2
+    exit 1
+fi
+
+ln -s "$SOURCE" "$QUEUE_DIR/$FILENAME"
+echo "Queued: $FILENAME -> $(readlink "$QUEUE_DIR/$FILENAME")"
+echo ""
+show_queue

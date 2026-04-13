@@ -1,6 +1,6 @@
 ---
 description: Root Claude Code instructions for IBL5: commands, mandatory rules, and architecture pointers.
-last_verified: 2026-04-12
+last_verified: 2026-04-13
 ---
 
 # CLAUDE.md
@@ -72,6 +72,10 @@ Classes autoload from `ibl5/classes/`. `require_once`/`require`/`include` in `cl
 - **Docker:** `docker compose up -d` starts MariaDB + PHP-Apache (`http://main.localhost/ibl5/`). See `database-access.md` for connection details and `ibl5/docs/DOCKER_SETUP.md` for full setup.
 - **CLI MariaDB access:** `mariadb -h 127.0.0.1 --skip-ssl -u root -proot iblhoops_ibl5`. For quick queries, prefer the `./bin/db-query "SQL"` wrapper.
 - **DuckDB analytics:** Columnar OLAP layer over production data for cross-season analysis. See `duckdb-analytics.md` for tables, queries, and when to use it.
+
+## Nightly Queue
+
+Queue a plan for overnight autonomous execution: `bin/nightly-queue <plan-slug>`. See `.claude/rules/nightly-workflow.md`.
 
 ## Git & Commits
 

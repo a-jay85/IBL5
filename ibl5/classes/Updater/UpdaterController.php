@@ -68,7 +68,9 @@ class UpdaterController implements UpdaterControllerInterface
             'Boxscores processed' => 'Processing boxscores (.sco)...',
             'All-Star games processed' => 'Processing All-Star games...',
             'JSB files parsed' => 'Parsing JSB engine files...',
-            'End-of-season imports' => 'Running end-of-season imports (.dra, .ret, .hof, .awa, .plr)...',
+            'End-of-season imports' => 'Running end-of-season imports (.dra, .ret, .hof, .awa)...',
+            'Player snapshot' => 'Snapshotting player stats...',
+            'ibl_hist refreshed' => 'Refreshing historical stats table...',
             default => $step->getLabel() . '...',
         };
     }

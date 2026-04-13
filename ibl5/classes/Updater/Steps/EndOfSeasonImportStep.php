@@ -7,17 +7,17 @@ namespace Updater\Steps;
 use JsbParser\Contracts\JsbImportRepositoryInterface;
 use JsbParser\JsbImportResult;
 use JsbParser\JsbImportService;
-use PlrParser\Contracts\PlrParserServiceInterface;
-use PlrParser\PlrImportMode;
 use Updater\Contracts\PipelineStepInterface;
 use Updater\StepResult;
 
 /**
- * Step 12: End-of-season imports (.dra, .ret, .hof, .awa, .plr snapshot).
+ * Step 12: End-of-season imports (.dra, .ret, .hof, .awa).
  *
  * Runs after ParseJsbFilesStep. Checks if a champion has been determined
  * for the current season. If so, processes additional JSB files that are
  * only meaningful at season end. Skipped when no champion exists yet.
+ *
+ * PLR snapshot creation was moved to SnapshotPlrStep (ADR-0006).
  *
  * IBL-only — Olympics league does not use this step.
  */
@@ -26,7 +26,6 @@ final class EndOfSeasonImportStep implements PipelineStepInterface
     public function __construct(
         private readonly JsbImportRepositoryInterface $jsbRepo,
         private readonly JsbImportService $jsbService,
-        private readonly PlrParserServiceInterface $plrService,
         private readonly int $seasonEndingYear,
         private readonly string $basePath,
         private readonly string $filePrefix,
@@ -52,7 +51,6 @@ final class EndOfSeasonImportStep implements PipelineStepInterface
         $this->importRet($result, $messages);
         $this->importHof($result, $messages);
         $this->importAwa($result, $messages);
-        $this->importPlrSnapshot($messages);
 
         return StepResult::success(
             $this->getLabel(),
@@ -121,26 +119,6 @@ final class EndOfSeasonImportStep implements PipelineStepInterface
         $awaResult = $this->jsbService->processAwaFile($awaPath, $carPath, $this->seasonEndingYear);
         $result->merge($awaResult);
         $messages[] = 'AWA: ' . $awaResult->summary();
-    }
-
-    /**
-     * @param list<string> $messages
-     */
-    private function importPlrSnapshot(array &$messages): void
-    {
-        $path = $this->filePath('plr');
-        if (!file_exists($path)) {
-            return;
-        }
-
-        $plrResult = $this->plrService->processPlrFileForYear(
-            $path,
-            $this->seasonEndingYear,
-            PlrImportMode::Snapshot,
-            'end-of-season',
-            'current-season',
-        );
-        $messages[] = 'PLR snapshot: ' . $plrResult->summary();
     }
 
     private function filePath(string $extension): string

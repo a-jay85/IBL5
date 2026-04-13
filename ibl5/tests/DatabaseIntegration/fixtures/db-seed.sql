@@ -179,10 +179,16 @@ INSERT INTO ibl_gm_tenures (franchise_id, gm_display_name, start_season_year, en
 VALUES (1, 'testgm', 2020, NULL, 0, 0)
 ON DUPLICATE KEY UPDATE gm_display_name = VALUES(gm_display_name);
 
--- Historical player stats via ibl_plr_snapshots (ibl_hist is a VIEW over this table)
+-- Historical player stats via ibl_plr_snapshots (source of truth for RefreshIblHistStep)
 INSERT INTO ibl_plr_snapshots (pid, name, season_year, snapshot_phase, source_archive, tid, stats_gm, stats_min, stats_fgm, stats_fga, stats_ftm, stats_fta, stats_3gm, stats_3ga, stats_orb, stats_reb, stats_ast, stats_stl, stats_blk, stats_to, stats_pf, stats_pts)
 VALUES (1, 'Test Player One', 2024, 'finals', 'db-seed', 1, 50, 1600, 300, 600, 100, 120, 50, 130, 40, 200, 150, 50, 20, 80, 100, 750)
 ON DUPLICATE KEY UPDATE stats_gm = VALUES(stats_gm);
+
+-- Materialized ibl_hist table (CI seeds AFTER migrations, so migration 109's INSERT finds empty snapshots.
+-- This direct insert ensures seed data is visible to DB integration tests.)
+INSERT INTO ibl_hist (pid, name, `year`, teamid, team, games, minutes, fgm, fga, ftm, fta, tgm, tga, orb, reb, ast, stl, blk, tvr, pf, pts)
+VALUES (1, 'Test Player One', 2024, 1, '', 50, 1600, 300, 600, 100, 120, 50, 130, 40, 200, 150, 50, 20, 80, 100, 750)
+ON DUPLICATE KEY UPDATE games = VALUES(games);
 
 -- ============================================================
 -- Franchise seasons: historical row + all 28 teams for current season

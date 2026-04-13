@@ -194,6 +194,12 @@ docker compose -f "$COMPOSE_FILE" $ENV_FILE_FLAG -p "ibl5-$SLUG" down 2>/dev/nul
 echo "Purging DB volume..."
 docker volume rm "ibl5-${SLUG}_db-data" 2>/dev/null || true
 
+# When using --seed or --no-data, skip the entrypoint's auto prod-seed import —
+# wt-up handles data seeding explicitly after migrations.
+if [ "$SEED_DB" = true ] || [ "$NO_DATA" = true ]; then
+    export SKIP_PROD_SEED=1
+fi
+
 docker compose -f "$COMPOSE_FILE" $ENV_FILE_FLAG -p "ibl5-$SLUG" up -d --build
 
 # Wait for MariaDB to be healthy

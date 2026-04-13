@@ -1,8 +1,9 @@
 import { test, expect } from '@playwright/test';
 import { assertNoPhpErrors } from '../helpers/php-errors';
+import { publicStorageState } from '../helpers/public-storage-state';
 
 // Error page smoke tests — verify graceful handling of invalid requests.
-test.use({ storageState: { cookies: [], origins: [] } });
+test.use({ storageState: publicStorageState() });
 
 test.describe('Error page smoke tests', () => {
   test('invalid module name shows error message without PHP errors', async ({ page }) => {

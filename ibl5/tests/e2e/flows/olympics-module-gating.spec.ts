@@ -1,9 +1,10 @@
 import { test, expect } from '@playwright/test';
 import { assertNoPhpErrors } from '../helpers/php-errors';
+import { publicStorageState } from '../helpers/public-storage-state';
 
 // Verify IBL-only modules are gated in Olympics context.
 // These modules should show "not available" message and not crash.
-test.use({ storageState: { cookies: [], origins: [] } });
+test.use({ storageState: publicStorageState() });
 
 const IBL_ONLY_MODULES = [
   'Trading',

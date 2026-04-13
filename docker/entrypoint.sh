@@ -57,7 +57,7 @@ if ! echo "$TABLE_COUNT" | grep -qE '^[0-9]+$'; then
     TABLE_COUNT="-1"
 fi
 
-if [ "$TABLE_COUNT" = "0" ]; then
+if [ "$TABLE_COUNT" = "0" ] && [ "${SKIP_PROD_SEED:-}" != "1" ]; then
     PROD_SEED="$APP_DIR/fixtures/prod-seed.sql"
     if [ -f "$PROD_SEED" ]; then
         echo "[entrypoint] Empty database detected. Importing prod-seed.sql..."

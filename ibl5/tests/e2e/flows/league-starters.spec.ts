@@ -1,9 +1,10 @@
 import { test, expect } from '@playwright/test';
 import { assertNoPhpErrors } from '../helpers/php-errors';
 import { gotoWithRetry } from '../helpers/navigation';
+import { publicStorageState } from '../helpers/public-storage-state';
 
 // League Starters — public page showing starting lineups by position.
-test.use({ storageState: { cookies: [], origins: [] } });
+test.use({ storageState: publicStorageState() });
 
 test.describe('League Starters flow', () => {
   test.beforeEach(async ({ page }) => {

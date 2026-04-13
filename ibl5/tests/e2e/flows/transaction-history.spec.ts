@@ -1,11 +1,12 @@
 import { test, expect } from '@playwright/test';
 import { assertNoPhpErrors } from '../helpers/php-errors';
+import { publicStorageState } from '../helpers/public-storage-state';
 
 // Transaction History — public page, no authentication required.
 // NOTE: The form hidden field uses name=Transaction_History but the module
 // directory is TransactionHistory. We use direct URL navigation for filtering
 // to avoid that mismatch.
-test.use({ storageState: { cookies: [], origins: [] } });
+test.use({ storageState: publicStorageState() });
 
 const BASE = 'modules.php?name=TransactionHistory';
 

@@ -1,8 +1,9 @@
 import { test, expect } from '@playwright/test';
 import { assertNoPhpErrors } from '../helpers/php-errors';
+import { publicStorageState } from '../helpers/public-storage-state';
 
 // Record Holders — public page, no authentication required.
-test.use({ storageState: { cookies: [], origins: [] } });
+test.use({ storageState: publicStorageState() });
 
 test.describe('Record Holders flow', () => {
   // RecordHolders runs 17+ queries on cache miss — increase timeout

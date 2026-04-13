@@ -1,8 +1,9 @@
 import { test, expect } from '@playwright/test';
 import { assertNoPhpErrors } from '../helpers/php-errors';
+import { publicStorageState } from '../helpers/public-storage-state';
 
 // Team Offense/Defense Stats — public page, no authentication required.
-test.use({ storageState: { cookies: [], origins: [] } });
+test.use({ storageState: publicStorageState() });
 
 test.describe('Team Stats flow', () => {
   test.beforeEach(async ({ page }) => {

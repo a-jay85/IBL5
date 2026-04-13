@@ -14,10 +14,11 @@ use Logging\LoggerFactory;
  * without requiring login form interaction. This is especially useful
  * for browser-based verification via Chrome DevTools MCP.
  *
- * Safety: three independent guards must ALL pass:
+ * Safety: four independent guards must ALL pass:
  * 1. Session is not already authenticated
- * 2. SERVER_NAME is localhost/127.0.0.1/main.localhost
- * 3. DEV_AUTO_LOGIN env var or .env.test entry is set to a non-empty username
+ * 2. _no_auto_login cookie is not set (E2E tests use this to test unauthenticated flows)
+ * 3. SERVER_NAME is localhost/127.0.0.1/main.localhost
+ * 4. DEV_AUTO_LOGIN env var or .env.test entry is set to a non-empty username
  */
 final class DevAutoLogin
 {
@@ -30,13 +31,18 @@ final class DevAutoLogin
             return;
         }
 
-        // Guard 2: only on localhost (exact match or *.localhost subdomains for worktrees)
+        // Guard 2: E2E test opt-out — tests that need unauthenticated state set this cookie
+        if (isset($_COOKIE['_no_auto_login']) && $_COOKIE['_no_auto_login'] === '1') {
+            return;
+        }
+
+        // Guard 3: only on localhost (exact match or *.localhost subdomains for worktrees)
         $serverName = $_SERVER['SERVER_NAME'] ?? null;
         if (!is_string($serverName) || !self::isLocalhost($serverName)) {
             return;
         }
 
-        // Guard 3: DEV_AUTO_LOGIN must be set to a non-empty username
+        // Guard 4: DEV_AUTO_LOGIN must be set to a non-empty username
         $username = self::getAutoLoginUsername();
         if ($username === null) {
             return;

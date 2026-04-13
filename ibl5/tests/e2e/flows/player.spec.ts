@@ -1,8 +1,9 @@
 import { test, expect } from '@playwright/test';
 import { assertNoPhpErrors } from '../helpers/php-errors';
+import { publicStorageState } from '../helpers/public-storage-state';
 
 // Player page — public, no authentication required.
-test.use({ storageState: { cookies: [], origins: [] } });
+test.use({ storageState: publicStorageState() });
 
 test.describe('Player page flow — active player', () => {
   test.beforeEach(async ({ page }) => {

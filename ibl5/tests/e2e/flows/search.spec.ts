@@ -5,10 +5,11 @@ import {
   assertFilterDropdownsPresent,
   assertSearchTypeRadiosPresent,
 } from '../helpers/search-form-assertions';
+import { publicStorageState } from '../helpers/public-storage-state';
 
 // Search — public page, no authentication required.
 // Uses POST-based search form with filter dropdowns.
-test.use({ storageState: { cookies: [], origins: [] } });
+test.use({ storageState: publicStorageState() });
 
 test.describe('Search flow', () => {
   test.beforeEach(async ({ page }) => {

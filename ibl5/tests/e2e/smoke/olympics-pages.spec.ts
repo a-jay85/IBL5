@@ -1,9 +1,10 @@
 import { test, expect } from '@playwright/test';
 import { assertNoPhpErrors } from '../helpers/php-errors';
+import { publicStorageState } from '../helpers/public-storage-state';
 
 // Olympics public pages — verify league-context table resolution works.
 // These pages append ?league=olympics to switch to Olympics context.
-test.use({ storageState: { cookies: [], origins: [] } });
+test.use({ storageState: publicStorageState() });
 
 const OLYMPICS_URLS = [
   'modules.php?name=Team&op=team&teamID=1&league=olympics',

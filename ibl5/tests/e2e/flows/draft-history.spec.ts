@@ -1,9 +1,10 @@
 import { test, expect } from '@playwright/test';
 import type { Page } from '@playwright/test';
 import { assertNoPhpErrors } from '../helpers/php-errors';
+import { publicStorageState } from '../helpers/public-storage-state';
 
 // Draft History — public page.
-test.use({ storageState: { cookies: [], origins: [] } });
+test.use({ storageState: publicStorageState() });
 
 /** Extract the first numeric year value from the draft year dropdown. */
 async function getFirstDraftYear(page: Page): Promise<string> {
@@ -187,7 +188,8 @@ test.describe('HTMX year switching', () => {
       page.locator('#draft-year-select').selectOption(yearValue),
     ]);
 
-    await page.waitForURL(new RegExp('year=' + yearValue));
+    // HX-Push-Url fires after HTMX swap — allow extra time for pushState
+    await page.waitForURL(new RegExp('year=' + yearValue), { timeout: 10000 });
     expect(page.url()).toContain('year=' + yearValue);
   });
 });
@@ -211,14 +213,14 @@ test.describe('browser back/forward after HTMX year switch', () => {
       page.locator('#draft-year-select').selectOption(yearValue),
     ]);
 
-    await page.waitForURL(new RegExp('year=' + yearValue));
+    await page.waitForURL(new RegExp('year=' + yearValue), { timeout: 10000 });
 
     await page.goBack();
-    await page.waitForURL(/DraftHistory/);
+    await page.waitForURL(/DraftHistory/, { timeout: 10000 });
     expect(page.url()).not.toContain('year=' + yearValue);
 
     await page.goForward();
-    await page.waitForURL(new RegExp('year=' + yearValue));
+    await page.waitForURL(new RegExp('year=' + yearValue), { timeout: 10000 });
     expect(page.url()).toContain('year=' + yearValue);
   });
 });

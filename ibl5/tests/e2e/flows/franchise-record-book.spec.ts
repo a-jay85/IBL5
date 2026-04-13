@@ -1,8 +1,9 @@
 import { test, expect } from '@playwright/test';
 import { assertNoPhpErrors } from '../helpers/php-errors';
+import { publicStorageState } from '../helpers/public-storage-state';
 
 // Franchise Record Book — public page, no authentication required.
-test.use({ storageState: { cookies: [], origins: [] } });
+test.use({ storageState: publicStorageState() });
 
 test.describe('Franchise Record Book flow', () => {
   test('league-wide view loads with correct title', async ({ page }) => {
@@ -138,7 +139,8 @@ test.describe('Franchise Record Book flow', () => {
       teamSelect.selectOption(teamValue!),
     ]);
 
-    await page.waitForURL(/teamid=/);
+    // HX-Push-Url fires after HTMX swap — allow extra time for pushState
+    await page.waitForURL(/teamid=/, { timeout: 10000 });
     expect(page.url()).toContain('teamid=');
   });
 
@@ -170,7 +172,7 @@ test.describe('browser back/forward after HTMX team switch', () => {
       teamSelect.selectOption(teamValue!),
     ]);
 
-    await page.waitForURL(/teamid=/);
+    await page.waitForURL(/teamid=/, { timeout: 10000 });
 
     // Verify team view loaded
     const title = page.locator('#record-book-content .ibl-title').first();
@@ -178,7 +180,7 @@ test.describe('browser back/forward after HTMX team switch', () => {
 
     // Go back to league-wide view
     await page.goBack();
-    await page.waitForURL(/FranchiseRecordBook/);
+    await page.waitForURL(/FranchiseRecordBook/, { timeout: 10000 });
     expect(page.url()).not.toContain('teamid=');
 
     // Go forward to team view

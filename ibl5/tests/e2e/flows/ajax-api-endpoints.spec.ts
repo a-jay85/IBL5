@@ -194,10 +194,11 @@ test.describe('Saved Depth Chart API', () => {
   });
 
   test('unauthenticated request returns 401', async ({ request }) => {
-    // Use a fresh request context without auth cookies
+    // Use a fresh request context: strip auth cookies, set _no_auto_login
+    // to prevent DevAutoLogin from auto-authenticating the request
     const response = await request.get(
       'modules.php?name=DepthChartEntry&op=api&action=list',
-      { headers: { Cookie: '' } },
+      { headers: { Cookie: '_no_auto_login=1' } },
     );
 
     const contentType = response.headers()['content-type'] ?? '';

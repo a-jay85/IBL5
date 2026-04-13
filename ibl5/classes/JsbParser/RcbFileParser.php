@@ -332,7 +332,7 @@ class RcbFileParser implements RcbFileParserInterface
         $carBlockId = (int) trim(substr($data, 33, 5));
         $statRaw = (int) trim(substr($data, 38, 6));
         $teamOfRecord = (int) trim(substr($data, 44, 2));
-        $seasonYear = (int) trim(substr($data, 46, 4));
+        $seasonYear = ((int) trim(substr($data, 46, 4))) + 1; // JSB stores beginning year; convert to ending
 
         // Empty slots: JSB fills unused ranking positions with recycled memory.
         // Valid entries always have nonzero stat values and alphabetic-only names.
@@ -417,7 +417,7 @@ class RcbFileParser implements RcbFileParserInterface
 
         $carBlockId = (int) trim(substr($data, 33, 5));
         $statValue = (int) trim(substr($data, 38, 3));
-        $seasonYear = (int) trim(substr($data, 41, 4));
+        $seasonYear = ((int) trim(substr($data, 41, 4))) + 1; // JSB stores beginning year; convert to ending
 
         // Empty slots: JSB fills unused ranking positions with recycled memory.
         // Valid entries always have nonzero stat values and alphabetic-only names.

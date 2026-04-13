@@ -128,7 +128,7 @@ class RcbFileParserTest extends TestCase
         $this->assertSame(3851, $result['car_block_id']);
         $this->assertSame(3611, $result['stat_raw']);
         $this->assertSame(19, $result['team_of_record']);
-        $this->assertSame(2005, $result['season_year']);
+        $this->assertSame(2006, $result['season_year']);
     }
 
     public function testParseAlltimeCareerEntry(): void
@@ -154,7 +154,7 @@ class RcbFileParserTest extends TestCase
         $this->assertSame('PG', $result['player_position']);
         $this->assertSame(3851, $result['car_block_id']);
         $this->assertSame(73, $result['stat_value']);
-        $this->assertSame(2006, $result['season_year']);
+        $this->assertSame(2007, $result['season_year']);
     }
 
     public function testParseEmptySingleSeasonEntryReturnsNull(): void
@@ -285,7 +285,7 @@ class RcbFileParserTest extends TestCase
             $this->assertSame(36.11, $record['stat_value']);
             $this->assertSame(3611, $record['stat_raw']);
             $this->assertSame(19, $record['team_of_record']);
-            $this->assertSame(2005, $record['season_year']);
+            $this->assertSame(2006, $record['season_year']);
         } finally {
             unlink($tmpFile);
         }
@@ -409,7 +409,7 @@ class RcbFileParserTest extends TestCase
             $this->assertSame('Stephen Curry', $record['player_name']);
             $this->assertSame('PG', $record['player_position']);
             $this->assertSame(73, $record['stat_value']);
-            $this->assertSame(2006, $record['season_year']);
+            $this->assertSame(2007, $record['season_year']);
         } finally {
             unlink($tmpFile);
         }

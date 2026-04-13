@@ -77,7 +77,7 @@ class TrnFileWriterTest extends TestCase
             $this->assertSame('Torn ACL', $injuries[0]['injury_description']);
             $this->assertSame(11, $injuries[0]['month']);
             $this->assertSame(3, $injuries[0]['day']);
-            $this->assertSame(2006, $injuries[0]['year']);
+            $this->assertSame(2007, $injuries[0]['year']); // Writer stores 2006 (beginning year), parser returns 2006+1=2007 (ending year)
         } finally {
             unlink($tmpFile);
         }

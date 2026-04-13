@@ -316,9 +316,8 @@ class TeamRepository extends \BaseMysqliRepository implements TeamRepositoryInte
     /**
      * Build inlined team accomplishments query with name predicate pushed into each UNION branch.
      *
-     * Replaces SELECT from vw_team_awards which materializes the full UNION before
-     * filtering. Predicate pushdown enables idx_name on ibl_team_awards (branch 1)
-     * and limits scanning in playoff/HEAT branches (2 and 3).
+     * Uses window functions instead of correlated subqueries to avoid
+     * re-materializing vw_playoff_series_results per row.
      */
     private static function buildTeamAccomplishmentsQuery(): string
     {
@@ -328,24 +327,19 @@ class TeamRepository extends \BaseMysqliRepository implements TeamRepositoryInte
 
             UNION ALL
 
-            SELECT psr.year, psr.winner AS name, 'IBL Champions' AS Award, 0 AS ID
-            FROM vw_playoff_series_results psr
-            WHERE psr.winner = ?
-              AND psr.round = (
-                  SELECT MAX(psr2.round)
-                  FROM vw_playoff_series_results psr2
-                  WHERE psr2.year = psr.year
-              )
-              AND (
-                  SELECT COUNT(*)
-                  FROM vw_playoff_series_results psr3
-                  WHERE psr3.year = psr.year
-                    AND psr3.round = (
-                        SELECT MAX(psr4.round)
-                        FROM vw_playoff_series_results psr4
-                        WHERE psr4.year = psr.year
-                    )
-              ) = 1
+            SELECT ranked.year, ranked.name, 'IBL Champions' AS Award, 0 AS ID
+            FROM (
+                SELECT
+                    psr.year,
+                    psr.winner AS name,
+                    psr.round,
+                    MAX(psr.round) OVER (PARTITION BY psr.year) AS max_round,
+                    COUNT(*) OVER (PARTITION BY psr.year, psr.round) AS series_in_round
+                FROM vw_playoff_series_results psr
+            ) ranked
+            WHERE ranked.round = ranked.max_round
+              AND ranked.series_in_round = 1
+              AND ranked.name = ?
 
             UNION ALL
 
@@ -360,28 +354,40 @@ class TeamRepository extends \BaseMysqliRepository implements TeamRepositoryInte
                               + COALESCE(bst.visitorOTpoints, 0))
                         THEN bst.homeTeamID
                         ELSE bst.visitorTeamID
-                    END AS winner_tid
+                    END AS winner_tid,
+                    ROW_NUMBER() OVER (
+                        PARTITION BY YEAR(bst.Date)
+                        ORDER BY bst.Date DESC, bst.gameOfThatDay ASC
+                    ) AS rn
                 FROM ibl_box_scores_teams bst
-                JOIN (
-                    SELECT YEAR(Date) AS yr, MAX(Date) AS last_date
-                    FROM ibl_box_scores_teams
-                    WHERE game_type = 3
-                    GROUP BY YEAR(Date)
-                ) ld ON bst.Date = ld.last_date AND YEAR(bst.Date) = ld.yr
                 WHERE bst.game_type = 3
-                  AND bst.gameOfThatDay = (
-                      SELECT MIN(bst2.gameOfThatDay)
-                      FROM ibl_box_scores_teams bst2
-                      WHERE bst2.Date = ld.last_date
-                        AND bst2.game_type = 3
-                  )
-                GROUP BY YEAR(bst.Date)
             ) hc
             JOIN ibl_team_info ti ON ti.teamid = hc.winner_tid
-            WHERE ti.team_name = ?
+            WHERE hc.rn = 1 AND ti.team_name = ?
 
-            ORDER BY year DESC";
+            ORDER BY year DESC, " . self::AWARD_HIERARCHY_CASE . ", Award ASC";
     }
+
+    /**
+     * Hierarchical award ordering used by accomplishments queries.
+     *
+     * Orders awards from hardest to easiest to win so team-history displays are
+     * deterministic (avoids flaky e2e tests when multiple awards share a year):
+     * IBL Champions → IBL HEAT Champions → Conference Champions (alpha) →
+     * Division Champions (alpha) → IBL Draft Lottery Winners → everything else.
+     */
+    private const AWARD_HIERARCHY_CASE = "CASE Award
+                WHEN 'IBL Champions' THEN 1
+                WHEN 'IBL HEAT Champions' THEN 2
+                WHEN 'Eastern Conference Champions' THEN 3
+                WHEN 'Western Conference Champions' THEN 4
+                WHEN 'Atlantic Division Champions' THEN 5
+                WHEN 'Central Division Champions' THEN 6
+                WHEN 'Midwest Division Champions' THEN 7
+                WHEN 'Pacific Division Champions' THEN 8
+                WHEN 'IBL Draft Lottery Winners' THEN 9
+                ELSE 10
+            END";
 
     /**
      * @see TeamRepositoryInterface::getPlayoffResults()

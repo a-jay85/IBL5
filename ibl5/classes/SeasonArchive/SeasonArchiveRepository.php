@@ -88,11 +88,87 @@ class SeasonArchiveRepository extends BaseMysqliRepository implements SeasonArch
     {
         /** @var list<TeamAwardRow> */
         return $this->fetchAll(
-            "SELECT year, name, Award, ID FROM vw_team_awards WHERE year = ?",
-            "i",
+            self::buildTeamAwardsByYearQuery(),
+            "iii",
+            $year,
+            $year,
             $year
         );
     }
+
+    /**
+     * Inlined team awards query with year predicate pushed into each UNION branch.
+     *
+     * Uses window functions instead of correlated subqueries.
+     */
+    private static function buildTeamAwardsByYearQuery(): string
+    {
+        return "SELECT year, name, Award, ID
+            FROM ibl_team_awards
+            WHERE year = ?
+
+            UNION ALL
+
+            SELECT ranked.year, ranked.name, 'IBL Champions' AS Award, 0 AS ID
+            FROM (
+                SELECT
+                    psr.year,
+                    psr.winner AS name,
+                    psr.round,
+                    MAX(psr.round) OVER (PARTITION BY psr.year) AS max_round,
+                    COUNT(*) OVER (PARTITION BY psr.year, psr.round) AS series_in_round
+                FROM vw_playoff_series_results psr
+                WHERE psr.year = ?
+            ) ranked
+            WHERE ranked.round = ranked.max_round AND ranked.series_in_round = 1
+
+            UNION ALL
+
+            SELECT hc.year, ti.team_name AS name, 'IBL HEAT Champions' AS Award, 0 AS ID
+            FROM (
+                SELECT
+                    YEAR(bst.Date) AS year,
+                    CASE
+                        WHEN (bst.homeQ1points + bst.homeQ2points + bst.homeQ3points + bst.homeQ4points
+                              + COALESCE(bst.homeOTpoints, 0))
+                           > (bst.visitorQ1points + bst.visitorQ2points + bst.visitorQ3points + bst.visitorQ4points
+                              + COALESCE(bst.visitorOTpoints, 0))
+                        THEN bst.homeTeamID
+                        ELSE bst.visitorTeamID
+                    END AS winner_tid,
+                    ROW_NUMBER() OVER (
+                        PARTITION BY YEAR(bst.Date)
+                        ORDER BY bst.Date DESC, bst.gameOfThatDay ASC
+                    ) AS rn
+                FROM ibl_box_scores_teams bst
+                WHERE bst.game_type = 3 AND YEAR(bst.Date) = ?
+            ) hc
+            JOIN ibl_team_info ti ON ti.teamid = hc.winner_tid
+            WHERE hc.rn = 1
+
+            ORDER BY " . self::AWARD_HIERARCHY_CASE . ", Award ASC, name ASC";
+    }
+
+    /**
+     * Hierarchical award ordering used by team-award queries.
+     *
+     * Orders awards from hardest to easiest to win so season-archive displays are
+     * deterministic (avoids flaky e2e tests when a year has multiple awards):
+     * IBL Champions → IBL HEAT Champions → Conference Champions (alpha) →
+     * Division Champions (alpha) → IBL Draft Lottery Winners → everything else.
+     */
+    private const AWARD_HIERARCHY_CASE = "CASE Award
+                WHEN 'IBL Champions' THEN 1
+                WHEN 'IBL HEAT Champions' THEN 2
+                WHEN 'Eastern Conference Champions' THEN 3
+                WHEN 'Western Conference Champions' THEN 4
+                WHEN 'Atlantic Division Champions' THEN 5
+                WHEN 'Central Division Champions' THEN 6
+                WHEN 'Midwest Division Champions' THEN 7
+                WHEN 'Pacific Division Champions' THEN 8
+                WHEN 'IBL Draft Lottery Winners' THEN 9
+                ELSE 10
+            END";
 
     /**
      * @see SeasonArchiveRepositoryInterface::getAllGmAwardsWithTeams()

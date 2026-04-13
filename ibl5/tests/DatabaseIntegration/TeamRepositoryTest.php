@@ -290,6 +290,52 @@ class TeamRepositoryTest extends DatabaseTestCase
         self::assertSame([], $this->repo->getTeamAccomplishments('ZZ_Nonexistent_Batch9'));
     }
 
+    public function testGetTeamAccomplishmentsSortsHierarchicallyWithinYear(): void
+    {
+        // Insert out of hierarchy order to prove the query sorts, not the fixture.
+        $this->insertTeamAwardRow('B9TestTeam', 'IBL Draft Lottery Winners', 2097);
+        $this->insertTeamAwardRow('B9TestTeam', 'Pacific Division Champions', 2097);
+        $this->insertTeamAwardRow('B9TestTeam', 'Atlantic Division Champions', 2097);
+        $this->insertTeamAwardRow('B9TestTeam', 'Western Conference Champions', 2097);
+        $this->insertTeamAwardRow('B9TestTeam', 'Eastern Conference Champions', 2097);
+
+        $result = $this->repo->getTeamAccomplishments('B9TestTeam');
+
+        $awards = [];
+        foreach ($result as $row) {
+            if ((int) $row['year'] === 2097) {
+                $awards[] = $row['Award'];
+            }
+        }
+
+        self::assertSame([
+            'Eastern Conference Champions',
+            'Western Conference Champions',
+            'Atlantic Division Champions',
+            'Pacific Division Champions',
+            'IBL Draft Lottery Winners',
+        ], $awards);
+    }
+
+    public function testGetTeamAccomplishmentsSortsYearDescendingFirst(): void
+    {
+        $this->insertTeamAwardRow('B9TestTeam', 'Atlantic Division Champions', 2095);
+        $this->insertTeamAwardRow('B9TestTeam', 'IBL Draft Lottery Winners', 2096);
+
+        $result = $this->repo->getTeamAccomplishments('B9TestTeam');
+
+        $years = [];
+        foreach ($result as $row) {
+            $year = (int) $row['year'];
+            if ($year === 2095 || $year === 2096) {
+                $years[] = $year;
+            }
+        }
+
+        // 2096 rows must come before 2095 rows regardless of hierarchy tier.
+        self::assertSame([2096, 2095], $years);
+    }
+
     // ── getHEATHistory ──────────────────────────────────────────
 
     public function testGetHEATHistoryReturnsArrayWithExpectedShape(): void

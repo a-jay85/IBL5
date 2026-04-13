@@ -829,17 +829,11 @@ class RecordHoldersRepository extends \BaseMysqliRepository implements RecordHol
      */
     public function getMostTitlesByType(string $titlePattern): array
     {
-        $query = "SELECT
-                name AS team_name,
-                COUNT(*) AS count,
-                GROUP_CONCAT(year ORDER BY year ASC SEPARATOR ', ') AS years
-            FROM vw_team_awards
-            WHERE Award LIKE ?
-            GROUP BY name
-            ORDER BY count DESC, name ASC
-            LIMIT 5";
-
-        $rows = $this->fetchAll($query, 's', '%' . $titlePattern . '%');
+        $rows = $this->fetchAll(
+            self::buildMostTitlesByTypeQuery(),
+            's',
+            '%' . $titlePattern . '%'
+        );
 
         // Find the max count to include ties
         $maxCount = 0;
@@ -864,6 +858,65 @@ class RecordHoldersRepository extends \BaseMysqliRepository implements RecordHol
         }
 
         return $records;
+    }
+
+    /**
+     * Inlined team awards query with optimized Champions/HEAT branches.
+     *
+     * Uses window functions instead of correlated subqueries.
+     */
+    private static function buildMostTitlesByTypeQuery(): string
+    {
+        return "SELECT
+                name AS team_name,
+                COUNT(*) AS count,
+                GROUP_CONCAT(year ORDER BY year ASC SEPARATOR ', ') AS years
+            FROM (
+                SELECT year, name, Award
+                FROM ibl_team_awards
+
+                UNION ALL
+
+                SELECT ranked.year, ranked.name, 'IBL Champions' AS Award
+                FROM (
+                    SELECT
+                        psr.year,
+                        psr.winner AS name,
+                        psr.round,
+                        MAX(psr.round) OVER (PARTITION BY psr.year) AS max_round,
+                        COUNT(*) OVER (PARTITION BY psr.year, psr.round) AS series_in_round
+                    FROM vw_playoff_series_results psr
+                ) ranked
+                WHERE ranked.round = ranked.max_round AND ranked.series_in_round = 1
+
+                UNION ALL
+
+                SELECT hc.year, ti.team_name AS name, 'IBL HEAT Champions' AS Award
+                FROM (
+                    SELECT
+                        YEAR(bst.Date) AS year,
+                        CASE
+                            WHEN (bst.homeQ1points + bst.homeQ2points + bst.homeQ3points + bst.homeQ4points
+                                  + COALESCE(bst.homeOTpoints, 0))
+                               > (bst.visitorQ1points + bst.visitorQ2points + bst.visitorQ3points + bst.visitorQ4points
+                                  + COALESCE(bst.visitorOTpoints, 0))
+                            THEN bst.homeTeamID
+                            ELSE bst.visitorTeamID
+                        END AS winner_tid,
+                        ROW_NUMBER() OVER (
+                            PARTITION BY YEAR(bst.Date)
+                            ORDER BY bst.Date DESC, bst.gameOfThatDay ASC
+                        ) AS rn
+                    FROM ibl_box_scores_teams bst
+                    WHERE bst.game_type = 3
+                ) hc
+                JOIN ibl_team_info ti ON ti.teamid = hc.winner_tid
+                WHERE hc.rn = 1
+            ) all_awards
+            WHERE Award LIKE ?
+            GROUP BY name
+            ORDER BY count DESC, name ASC
+            LIMIT 5";
     }
 
     /**

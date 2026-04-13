@@ -13,7 +13,6 @@ use Shared\Contracts\SharedRepositoryInterface;
  * prepared statements for security and reliability.
  *
  * Responsibilities:
- * - Team awards and title tracking
  * - Draft pick ownership
  * - Contract extension management
  *
@@ -26,28 +25,6 @@ class SharedRepository extends \BaseMysqliRepository implements SharedRepository
     {
         parent::__construct($db, $leagueContext);
         $this->teamInfoTable = $this->resolveTable('ibl_team_info');
-    }
-
-    /**
-     * Gets the number of a specific award won by a team
-     *
-     * Uses COUNT aggregation to efficiently get the number of matching awards.
-     *
-     * @param string $teamName Team name to look up
-     * @param string $titleName Award name to search for (uses LIKE pattern)
-     * @return int Number of awards matching the criteria
-     */
-    public function getNumberOfTitles(string $teamName, string $titleName): int
-    {
-        /** @var array{count: int}|null $result */
-        $result = $this->fetchOne(
-            "SELECT COUNT(name) as count FROM vw_team_awards WHERE name = ? AND Award LIKE ?",
-            "ss",
-            $teamName,
-            "%{$titleName}%"
-        );
-
-        return $result !== null ? $result['count'] : 0;
     }
 
     /**

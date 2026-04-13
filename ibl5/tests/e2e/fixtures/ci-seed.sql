@@ -170,6 +170,14 @@ INSERT INTO ibl_franchise_seasons (franchise_id, season_year, season_ending_year
   (27, 2025, 2026, 'Utah',          'Jazz'),
   (28, 2025, 2026, 'Oklahoma City', 'Thunder');
 
+-- Historical franchise seasons for snapshot years 2024-2025
+-- (ibl_hist refresh JOIN needs matching season_ending_year for team names)
+INSERT INTO ibl_franchise_seasons (franchise_id, season_year, season_ending_year, team_city, team_name) VALUES
+  ( 1, 2024, 2025, 'New York',     'Metros'),
+  ( 2, 2024, 2025, 'Los Angeles',  'Stars'),
+  ( 1, 2023, 2024, 'New York',     'Metros'),
+  ( 2, 2023, 2024, 'Los Angeles',  'Stars');
+
 -- ============================================================
 -- Players
 --   pid=1,2: active on Metros (tid=1) for Compare Players + trading

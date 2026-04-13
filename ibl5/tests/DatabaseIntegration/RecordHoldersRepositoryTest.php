@@ -39,31 +39,8 @@ class RecordHoldersRepositoryTest extends DatabaseTestCase
         $pid = 200090401;
         $this->insertTestPlayer($pid, 'QuadDouble Test');
 
-        // Hist row for season year 2098 (Jan date → season_year = 2098)
-        $this->insertRow('ibl_hist_archive', [
-            'pid' => $pid,
-            'name' => 'QuadDouble Test',
-            'year' => 2098,
-            'team' => 'Metros',
-            'teamid' => 1,
-            'games' => 50,
-            'minutes' => 1600,
-            'fgm' => 300,
-            'fga' => 600,
-            'ftm' => 100,
-            'fta' => 120,
-            'tgm' => 50,
-            'tga' => 130,
-            'orb' => 40,
-            'reb' => 200,
-            'ast' => 150,
-            'stl' => 50,
-            'blk' => 20,
-            'tvr' => 80,
-            'pf' => 100,
-            'pts' => 750,
-            'salary' => 1500,
-        ]);
+        // Snapshot row for season year 2098 (Jan date → season_year = 2098)
+        $this->insertHistRow($pid, 'QuadDouble Test', 2098);
 
         // calc_points = 7*2 + 3 + 2*3 = 23 ≥ 10 ✓
         // calc_rebounds = 5 + 5 = 10 ≥ 10 ✓
@@ -305,30 +282,7 @@ class RecordHoldersRepositoryTest extends DatabaseTestCase
         $pid = 200090402;
         $this->insertTestPlayer($pid, 'BatchPlayer Test');
 
-        $this->insertRow('ibl_hist_archive', [
-            'pid' => $pid,
-            'name' => 'BatchPlayer Test',
-            'year' => 2098,
-            'team' => 'Metros',
-            'teamid' => 1,
-            'games' => 50,
-            'minutes' => 1600,
-            'fgm' => 300,
-            'fga' => 600,
-            'ftm' => 100,
-            'fta' => 120,
-            'tgm' => 50,
-            'tga' => 130,
-            'orb' => 40,
-            'reb' => 200,
-            'ast' => 150,
-            'stl' => 50,
-            'blk' => 20,
-            'tvr' => 80,
-            'pf' => 100,
-            'pts' => 750,
-            'salary' => 1500,
-        ]);
+        $this->insertHistRow($pid, 'BatchPlayer Test', 2098);
 
         $this->insertPlayerBoxscoreRow(
             '2098-01-15', $pid, 'BatchPlayer Test', 'PG', 2, 1, 1,

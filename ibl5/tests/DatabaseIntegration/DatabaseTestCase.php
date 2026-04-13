@@ -235,10 +235,11 @@ abstract class DatabaseTestCase extends TestCase
     }
 
     /**
-     * Insert a row into ibl_hist_archive with sensible defaults.
+     * Insert a row into ibl_plr_snapshots with sensible defaults.
      *
-     * ibl_hist is now a VIEW; the archive table accepts direct inserts and
-     * the VIEW's UNION ALL fallback makes these rows visible via ibl_hist.
+     * ibl_hist is a VIEW over ibl_plr_snapshots; inserting here makes data
+     * visible via the VIEW. Uses snapshot_phase = 'finals' and stats_gm > 0
+     * so the VIEW's primary branch picks up the row.
      *
      * @param array<string, int|string> $overrides Column overrides
      */
@@ -247,29 +248,44 @@ abstract class DatabaseTestCase extends TestCase
         $defaults = [
             'pid' => $pid,
             'name' => $name,
-            'year' => $year,
-            'team' => 'Metros',
-            'teamid' => 1,
-            'games' => 50,
-            'minutes' => 1600,
-            'fgm' => 300,
-            'fga' => 600,
-            'ftm' => 100,
-            'fta' => 120,
-            'tgm' => 50,
-            'tga' => 130,
-            'orb' => 40,
-            'reb' => 200,
-            'ast' => 150,
-            'stl' => 50,
-            'blk' => 20,
-            'tvr' => 80,
-            'pf' => 100,
-            'pts' => 750,
-            'salary' => 1500,
+            'season_year' => $year,
+            'snapshot_phase' => 'finals',
+            'source_archive' => 'test-fixture',
+            'tid' => $overrides['teamid'] ?? 1,
+            'stats_gm' => $overrides['games'] ?? 50,
+            'stats_min' => $overrides['minutes'] ?? 1600,
+            'stats_fgm' => $overrides['fgm'] ?? 300,
+            'stats_fga' => $overrides['fga'] ?? 600,
+            'stats_ftm' => $overrides['ftm'] ?? 100,
+            'stats_fta' => $overrides['fta'] ?? 120,
+            'stats_3gm' => $overrides['tgm'] ?? 50,
+            'stats_3ga' => $overrides['tga'] ?? 130,
+            'stats_orb' => $overrides['orb'] ?? 40,
+            'stats_reb' => $overrides['reb'] ?? 200,
+            'stats_ast' => $overrides['ast'] ?? 150,
+            'stats_stl' => $overrides['stl'] ?? 50,
+            'stats_blk' => $overrides['blk'] ?? 20,
+            'stats_to' => $overrides['tvr'] ?? 80,
+            'stats_pf' => $overrides['pf'] ?? 100,
+            'stats_pts' => $overrides['pts'] ?? 750,
         ];
 
-        $this->insertRow('ibl_hist_archive', array_merge($defaults, $overrides));
+        // Remove archive-specific keys that callers might pass
+        unset(
+            $defaults['teamid'], $defaults['games'], $defaults['minutes'],
+            $defaults['fgm'], $defaults['fga'], $defaults['ftm'], $defaults['fta'],
+            $defaults['tgm'], $defaults['tga'], $defaults['orb'], $defaults['reb'],
+            $defaults['ast'], $defaults['stl'], $defaults['blk'], $defaults['tvr'],
+            $defaults['pf'], $defaults['pts'], $defaults['salary'], $defaults['team'],
+        );
+
+        // Strip archive-only keys from overrides before merging
+        $snapshotOverrides = array_diff_key($overrides, array_flip([
+            'team', 'teamid', 'games', 'minutes', 'fgm', 'fga', 'ftm', 'fta',
+            'tgm', 'tga', 'orb', 'reb', 'ast', 'stl', 'blk', 'tvr', 'pf', 'pts', 'salary',
+        ]));
+
+        $this->insertRow('ibl_plr_snapshots', array_merge($defaults, $snapshotOverrides));
     }
 
     /**

@@ -241,31 +241,8 @@ class TeamRepositoryTest extends DatabaseTestCase
 
     public function testGetHistoricalRosterReturnsRows(): void
     {
-        // Insert a test hist row in the transaction
-        $this->insertRow('ibl_hist_archive', [
-            'pid' => 1,
-            'name' => 'Test Hist Player',
-            'year' => 2098,
-            'team' => 'TestTeam',
-            'teamid' => 1,
-            'games' => 50,
-            'minutes' => 1600,
-            'fgm' => 300,
-            'fga' => 600,
-            'ftm' => 100,
-            'fta' => 120,
-            'tgm' => 50,
-            'tga' => 130,
-            'orb' => 40,
-            'reb' => 200,
-            'ast' => 150,
-            'stl' => 50,
-            'blk' => 20,
-            'tvr' => 80,
-            'pf' => 100,
-            'pts' => 750,
-            'salary' => 1500,
-        ]);
+        // Insert a test snapshot row (visible via ibl_hist VIEW)
+        $this->insertHistRow(1, 'Test Hist Player', 2098);
 
         $roster = $this->repo->getHistoricalRoster(1, '2098');
 

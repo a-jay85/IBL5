@@ -198,7 +198,7 @@ class LeagueContext
             'ibl_league_config' => 'ibl_olympics_league_config',
             'ibl_plr' => 'ibl_olympics_plr',
             'ibl_hist' => 'ibl_olympics_hist',
-            'ibl_hist_archive' => 'ibl_olympics_hist',
+            'ibl_plr_snapshots' => 'ibl_olympics_plr_snapshots',
             'ibl_jsb_history' => 'ibl_olympics_jsb_history',
             'ibl_jsb_transactions' => 'ibl_olympics_jsb_transactions',
             'ibl_rcb_alltime_records' => 'ibl_olympics_rcb_alltime_records',

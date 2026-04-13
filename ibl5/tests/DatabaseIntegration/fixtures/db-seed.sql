@@ -179,11 +179,10 @@ INSERT INTO ibl_gm_tenures (franchise_id, gm_display_name, start_season_year, en
 VALUES (1, 'testgm', 2020, NULL, 0, 0)
 ON DUPLICATE KEY UPDATE gm_display_name = VALUES(gm_display_name);
 
--- Historical player stats (ibl_hist_archive) for franchise history queries
--- ibl_hist is now a VIEW; the archive table's UNION ALL fallback makes these rows visible.
-INSERT INTO ibl_hist_archive (pid, name, year, team, teamid, games, minutes, fgm, fga, ftm, fta, tgm, tga, orb, reb, ast, stl, blk, tvr, pf, pts, salary)
-VALUES (1, 'Test Player One', 2024, 'Metros', 1, 50, 1600, 300, 600, 100, 120, 50, 130, 40, 200, 150, 50, 20, 80, 100, 750, 1500)
-ON DUPLICATE KEY UPDATE games = VALUES(games);
+-- Historical player stats via ibl_plr_snapshots (ibl_hist is a VIEW over this table)
+INSERT INTO ibl_plr_snapshots (pid, name, season_year, snapshot_phase, source_archive, tid, stats_gm, stats_min, stats_fgm, stats_fga, stats_ftm, stats_fta, stats_3gm, stats_3ga, stats_orb, stats_reb, stats_ast, stats_stl, stats_blk, stats_to, stats_pf, stats_pts)
+VALUES (1, 'Test Player One', 2024, 'finals', 'db-seed', 1, 50, 1600, 300, 600, 100, 120, 50, 130, 40, 200, 150, 50, 20, 80, 100, 750)
+ON DUPLICATE KEY UPDATE stats_gm = VALUES(stats_gm);
 
 -- ============================================================
 -- Franchise seasons: historical row + all 28 teams for current season

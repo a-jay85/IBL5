@@ -11,9 +11,9 @@ use PHPUnit\Framework\TestCase;
  * Tests for PlayerIdResolver's multi-strategy fallback chain and caching.
  *
  * Strategy order:
- * 1. ibl_hist_archive by name + team + year
+ * 1. ibl_plr_snapshots by name + tid + year
  * 2. ibl_plr by name + tid
- * 3. ibl_hist_archive by name + year only (traded players)
+ * 3. ibl_plr_snapshots by name + year only (traded players)
  * 4. ibl_plr by name only
  */
 class PlayerIdResolverTest extends TestCase
@@ -72,15 +72,15 @@ class PlayerIdResolverTest extends TestCase
     }
 
     // ============================================
-    // STRATEGY 1: ibl_hist_archive by name + team + year
+    // STRATEGY 1: ibl_plr_snapshots by name + tid + year
     // ============================================
 
-    public function testStrategy1FindsPlayerInHistByNameTeamYear(): void
+    public function testStrategy1FindsPlayerInSnapshotsByNameTidYear(): void
     {
-        $this->mockDb->onQuery('SELECT pid FROM ibl_hist_archive WHERE name.*AND team.*AND year', [['pid' => 42]]);
+        $this->mockDb->onQuery('SELECT pid FROM ibl_plr_snapshots WHERE name.*AND tid.*AND season_year', [['pid' => 42]]);
 
         $resolver = new PlayerIdResolver($this->mockMysqliDb);
-        $result = $resolver->resolve('John Smith', 'Miami', 2025);
+        $result = $resolver->resolve('John Smith', 'Miami', 2025, 5);
 
         $this->assertSame(42, $result);
     }
@@ -92,7 +92,7 @@ class PlayerIdResolverTest extends TestCase
     public function testStrategy2FindsPlayerInPlrByNameAndTeam(): void
     {
         // Strategy 1 misses, strategy 2 hits
-        $this->mockDb->onQuery('SELECT pid FROM ibl_hist_archive WHERE name.*AND team.*AND year', []);
+        $this->mockDb->onQuery('SELECT pid FROM ibl_plr_snapshots WHERE name.*AND tid.*AND season_year', []);
         $this->mockDb->onQuery('SELECT pid FROM ibl_plr WHERE name.*AND tid', [['pid' => 77]]);
 
         $resolver = new PlayerIdResolver($this->mockMysqliDb);
@@ -102,15 +102,15 @@ class PlayerIdResolverTest extends TestCase
     }
 
     // ============================================
-    // STRATEGY 3: ibl_hist_archive by name + year only
+    // STRATEGY 3: ibl_plr_snapshots by name + year only
     // ============================================
 
-    public function testStrategy3FindsPlayerInHistByNameAndYearOnly(): void
+    public function testStrategy3FindsPlayerInSnapshotsByNameAndYearOnly(): void
     {
         // Strategies 1-2 miss, strategy 3 hits (traded player)
-        $this->mockDb->onQuery('SELECT pid FROM ibl_hist_archive WHERE name.*AND team.*AND year', []);
+        $this->mockDb->onQuery('SELECT pid FROM ibl_plr_snapshots WHERE name.*AND tid.*AND season_year', []);
         $this->mockDb->onQuery('SELECT pid FROM ibl_plr WHERE name.*AND tid', []);
-        $this->mockDb->onQuery('SELECT pid FROM ibl_hist_archive WHERE name.*AND year.*LIMIT', [['pid' => 99]]);
+        $this->mockDb->onQuery('SELECT pid FROM ibl_plr_snapshots WHERE name.*AND season_year.*LIMIT', [['pid' => 99]]);
 
         $resolver = new PlayerIdResolver($this->mockMysqliDb);
         $result = $resolver->resolve('Traded Player', 'OldTeam', 2025, 7);
@@ -125,9 +125,9 @@ class PlayerIdResolverTest extends TestCase
     public function testStrategy4FindsPlayerInPlrByNameOnly(): void
     {
         // Strategies 1-3 miss, strategy 4 hits
-        $this->mockDb->onQuery('SELECT pid FROM ibl_hist_archive WHERE name.*AND team.*AND year', []);
+        $this->mockDb->onQuery('SELECT pid FROM ibl_plr_snapshots WHERE name.*AND tid.*AND season_year', []);
         $this->mockDb->onQuery('SELECT pid FROM ibl_plr WHERE name.*AND tid', []);
-        $this->mockDb->onQuery('SELECT pid FROM ibl_hist_archive WHERE name.*AND year.*LIMIT', []);
+        $this->mockDb->onQuery('SELECT pid FROM ibl_plr_snapshots WHERE name.*AND season_year.*LIMIT', []);
         $this->mockDb->onQuery('SELECT pid FROM ibl_plr WHERE name.*LIMIT', [['pid' => 101]]);
 
         $resolver = new PlayerIdResolver($this->mockMysqliDb);
@@ -143,7 +143,7 @@ class PlayerIdResolverTest extends TestCase
     public function testEarlierStrategyPreventsLaterStrategies(): void
     {
         // Strategy 1 hits — strategies 2-4 should never be reached
-        $this->mockDb->onQuery('SELECT pid FROM ibl_hist_archive WHERE name.*AND team.*AND year', [['pid' => 1]]);
+        $this->mockDb->onQuery('SELECT pid FROM ibl_plr_snapshots WHERE name.*AND tid.*AND season_year', [['pid' => 1]]);
         // If strategy 2 were reached, it would return a different pid
         $this->mockDb->onQuery('SELECT pid FROM ibl_plr WHERE name.*AND tid', [['pid' => 999]]);
 
@@ -160,9 +160,9 @@ class PlayerIdResolverTest extends TestCase
     public function testReturnsNullWhenNoStrategyMatches(): void
     {
         // All strategies miss
-        $this->mockDb->onQuery('SELECT pid FROM ibl_hist_archive WHERE name.*AND team.*AND year', []);
+        $this->mockDb->onQuery('SELECT pid FROM ibl_plr_snapshots WHERE name.*AND tid.*AND season_year', []);
         $this->mockDb->onQuery('SELECT pid FROM ibl_plr WHERE name.*AND tid', []);
-        $this->mockDb->onQuery('SELECT pid FROM ibl_hist_archive WHERE name.*AND year.*LIMIT', []);
+        $this->mockDb->onQuery('SELECT pid FROM ibl_plr_snapshots WHERE name.*AND season_year.*LIMIT', []);
         $this->mockDb->onQuery('SELECT pid FROM ibl_plr WHERE name.*LIMIT', []);
 
         $resolver = new PlayerIdResolver($this->mockMysqliDb);
@@ -177,28 +177,28 @@ class PlayerIdResolverTest extends TestCase
 
     public function testCacheHitReturnsCachedResult(): void
     {
-        $this->mockDb->onQuery('SELECT pid FROM ibl_hist_archive WHERE name.*AND team.*AND year', [['pid' => 50]]);
+        $this->mockDb->onQuery('SELECT pid FROM ibl_plr_snapshots WHERE name.*AND tid.*AND season_year', [['pid' => 50]]);
 
         $resolver = new PlayerIdResolver($this->mockMysqliDb);
 
         // First call resolves via strategy 1
-        $first = $resolver->resolve('Cached Player', 'TeamX', 2025);
+        $first = $resolver->resolve('Cached Player', 'TeamX', 2025, 1);
         $this->assertSame(50, $first);
 
         // Change mock data — if cache works, we should still get 50
         $this->mockDb->clearQueryPatterns();
-        $this->mockDb->onQuery('SELECT pid FROM ibl_hist_archive WHERE name.*AND team.*AND year', [['pid' => 999]]);
+        $this->mockDb->onQuery('SELECT pid FROM ibl_plr_snapshots WHERE name.*AND tid.*AND season_year', [['pid' => 999]]);
 
-        $second = $resolver->resolve('Cached Player', 'TeamX', 2025);
+        $second = $resolver->resolve('Cached Player', 'TeamX', 2025, 1);
         $this->assertSame(50, $second);
     }
 
     public function testNullResultsAreCached(): void
     {
         // All strategies miss
-        $this->mockDb->onQuery('SELECT pid FROM ibl_hist_archive WHERE name.*AND team.*AND year', []);
+        $this->mockDb->onQuery('SELECT pid FROM ibl_plr_snapshots WHERE name.*AND tid.*AND season_year', []);
         $this->mockDb->onQuery('SELECT pid FROM ibl_plr WHERE name.*AND tid', []);
-        $this->mockDb->onQuery('SELECT pid FROM ibl_hist_archive WHERE name.*AND year.*LIMIT', []);
+        $this->mockDb->onQuery('SELECT pid FROM ibl_plr_snapshots WHERE name.*AND season_year.*LIMIT', []);
         $this->mockDb->onQuery('SELECT pid FROM ibl_plr WHERE name.*LIMIT', []);
 
         $resolver = new PlayerIdResolver($this->mockMysqliDb);
@@ -208,7 +208,7 @@ class PlayerIdResolverTest extends TestCase
 
         // Now strategy 1 would return a result — but cache should still return null
         $this->mockDb->clearQueryPatterns();
-        $this->mockDb->onQuery('SELECT pid FROM ibl_hist_archive WHERE name.*AND team.*AND year', [['pid' => 123]]);
+        $this->mockDb->onQuery('SELECT pid FROM ibl_plr_snapshots WHERE name.*AND tid.*AND season_year', [['pid' => 123]]);
 
         $second = $resolver->resolve('Ghost', 'Nowhere', 2025, 99);
         $this->assertNull($second);
@@ -216,19 +216,19 @@ class PlayerIdResolverTest extends TestCase
 
     public function testClearCacheResetsCache(): void
     {
-        $this->mockDb->onQuery('SELECT pid FROM ibl_hist_archive WHERE name.*AND team.*AND year', [['pid' => 10]]);
+        $this->mockDb->onQuery('SELECT pid FROM ibl_plr_snapshots WHERE name.*AND tid.*AND season_year', [['pid' => 10]]);
 
         $resolver = new PlayerIdResolver($this->mockMysqliDb);
 
-        $first = $resolver->resolve('Clearing', 'TeamY', 2025);
+        $first = $resolver->resolve('Clearing', 'TeamY', 2025, 2);
         $this->assertSame(10, $first);
 
         // Clear cache and change mock data
         $resolver->clearCache();
         $this->mockDb->clearQueryPatterns();
-        $this->mockDb->onQuery('SELECT pid FROM ibl_hist_archive WHERE name.*AND team.*AND year', [['pid' => 20]]);
+        $this->mockDb->onQuery('SELECT pid FROM ibl_plr_snapshots WHERE name.*AND tid.*AND season_year', [['pid' => 20]]);
 
-        $second = $resolver->resolve('Clearing', 'TeamY', 2025);
+        $second = $resolver->resolve('Clearing', 'TeamY', 2025, 2);
         $this->assertSame(20, $second);
     }
 }

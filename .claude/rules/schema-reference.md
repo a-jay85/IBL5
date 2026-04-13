@@ -1,7 +1,7 @@
 ---
 description: Canonical database schema reference derived from migrations.
 paths: ibl5/migrations/000_baseline_schema.sql
-last_verified: 2026-04-11
+last_verified: 2026-04-12
 ---
 
 # Database Schema Reference
@@ -10,7 +10,7 @@ last_verified: 2026-04-11
 
 | Category | Tables |
 |----------|--------|
-| Players | `ibl_plr` (main), `ibl_hist` (VIEW — stats from snapshots + archive), `ibl_plr_snapshots` (per-season ratings/stats), `ibl_hist_archive` (indexed history) |
+| Players | `ibl_plr` (main), `ibl_hist` (VIEW over `ibl_plr_snapshots`), `ibl_plr_snapshots` (per-season ratings/stats) |
 | Teams | `ibl_team_info`, `ibl_standings` |
 | Games | `ibl_schedule`, `ibl_box_scores`, `ibl_box_scores_teams` |
 | Contracts | `ibl_fa_offers`, `ibl_trade_*` tables |
@@ -24,7 +24,7 @@ last_verified: 2026-04-11
 | Players | `ibl_plr` | `pid`, `tid`, `name`, `cy`, `cy1-cy6` |
 | Teams | `ibl_team_info` | `teamid`, `team_name`, `gm_username` |
 | Users | `nuke_users` | `username` (legacy — `user_ibl_team` being phased out) |
-| History | `ibl_hist` (VIEW) | Historical player stats (sources from `ibl_plr_snapshots` + `ibl_hist_archive` fallback) |
+| History | `ibl_hist` (VIEW) | Historical player stats (sourced from `ibl_plr_snapshots`) |
 | Schedule | `ibl_schedule` | Game schedule |
 
 ## Common Query Patterns

@@ -350,20 +350,20 @@ INSERT INTO ibl_demands (name, pid, dem1, dem2, dem3, dem4, dem5, dem6) VALUES
   ('FA Forward', 12, 400, 440, 480, 520, 560, 600);
 
 -- Free agent player history (needed for SeasonLeaderboards)
-INSERT INTO ibl_hist_archive (
-  pid, name, year, team, teamid,
-  games, minutes, fgm, fga, ftm, fta, tgm, tga,
-  orb, reb, ast, stl, blk, tvr, pf, pts, salary
+INSERT INTO ibl_plr_snapshots (
+  pid, name, season_year, snapshot_phase, source_archive, tid,
+  stats_gm, stats_min, stats_fgm, stats_fga, stats_ftm, stats_fta, stats_3gm, stats_3ga,
+  stats_orb, stats_reb, stats_ast, stats_stl, stats_blk, stats_to, stats_pf, stats_pts
 ) VALUES
-  (10, 'FA Guard', 2026, 'Metros', 1,
+  (10, 'FA Guard', 2026, 'finals', 'ci-seed', 1,
    41, 1260, 208, 460, 104, 125, 62, 155,
-   40, 160, 180, 50, 20, 80, 90, 620, 0),
-  (11, 'FA Center', 2026, 'Stars', 2,
+   40, 160, 180, 50, 20, 80, 90, 620),
+  (11, 'FA Center', 2026, 'finals', 'ci-seed', 2,
    41, 1260, 174, 390, 86, 106, 38, 115,
-   50, 180, 150, 45, 25, 70, 85, 530, 0),
-  (12, 'FA Forward', 2026, 'Stars', 2,
+   50, 180, 150, 45, 25, 70, 85, 530),
+  (12, 'FA Forward', 2026, 'finals', 'ci-seed', 2,
    41, 1260, 196, 432, 98, 119, 47, 134,
-   45, 185, 160, 48, 22, 65, 88, 565, 0);
+   45, 185, 160, 48, 22, 65, 88, 565);
 
 -- Team MLE/LLE flags: Metros have both exceptions available
 UPDATE ibl_team_info SET HasMLE = 1, HasLLE = 1 WHERE teamid = 1;
@@ -532,40 +532,40 @@ INSERT INTO ibl_box_scores (
 -- Player history (SeasonLeaderboards needs current-year stats)
 -- ============================================================
 
-INSERT INTO ibl_hist_archive (
-  pid, name, year, team, teamid,
-  games, minutes, fgm, fga, ftm, fta, tgm, tga,
-  orb, reb, ast, stl, blk, tvr, pf, pts, salary
+INSERT INTO ibl_plr_snapshots (
+  pid, name, season_year, snapshot_phase, source_archive, tid,
+  stats_gm, stats_min, stats_fgm, stats_fga, stats_ftm, stats_fta, stats_3gm, stats_3ga,
+  stats_orb, stats_reb, stats_ast, stats_stl, stats_blk, stats_to, stats_pf, stats_pts
 ) VALUES
-  (1, 'Test Player', 2026, 'Metros', 1,
+  (1, 'Test Player', 2026, 'finals', 'ci-seed', 1,
    41, 1260, 200, 450, 100, 120, 60, 150,
-   40, 160, 180, 50, 20, 80, 90, 620, 800),
-  (2, 'Test Player Two', 2026, 'Metros', 1,
+   40, 160, 180, 50, 20, 80, 90, 620),
+  (2, 'Test Player Two', 2026, 'finals', 'ci-seed', 1,
    41, 1260, 180, 400, 90, 110, 40, 120,
-   50, 180, 150, 45, 25, 70, 85, 530, 600),
-  (3, 'Retired Legend', 2025, 'Stars', 2,
+   50, 180, 150, 45, 25, 70, 85, 530),
+  (3, 'Retired Legend', 2025, 'finals', 'ci-seed', 2,
    41, 1300, 250, 500, 150, 180, 30, 100,
-   80, 220, 100, 40, 50, 60, 100, 710, 2000),
-  (4, 'Stars Guard', 2026, 'Stars', 2,
+   80, 220, 100, 40, 50, 60, 100, 710),
+  (4, 'Stars Guard', 2026, 'finals', 'ci-seed', 2,
    41, 1300, 210, 460, 110, 130, 65, 160,
-   35, 145, 200, 55, 15, 75, 80, 660, 1800),
-  (5, 'Stars Forward', 2026, 'Stars', 2,
+   35, 145, 200, 55, 15, 75, 80, 660),
+  (5, 'Stars Forward', 2026, 'finals', 'ci-seed', 2,
    41, 1260, 190, 420, 95, 115, 45, 130,
-   45, 185, 160, 48, 22, 65, 88, 565, 1400),
-  (6, 'Phoenixes Guard', 2026, 'Phoenixes', 14,
+   45, 185, 160, 48, 22, 65, 88, 565),
+  (6, 'Phoenixes Guard', 2026, 'finals', 'ci-seed', 14,
    41, 1260, 225, 490, 113, 135, 60, 155,
-   38, 153, 190, 52, 18, 72, 82, 615, 1700),
-  (7, 'Phoenixes Center', 2026, 'Phoenixes', 14,
+   38, 153, 190, 52, 18, 72, 82, 615),
+  (7, 'Phoenixes Center', 2026, 'finals', 'ci-seed', 14,
    41, 1300, 220, 480, 115, 135, 20, 60,
-   60, 220, 100, 40, 35, 60, 95, 610, 1300),
+   60, 220, 100, 40, 35, 60, 95, 610),
   -- RecordHolders: full-season row (games >= 50 threshold for season averages)
-  (3, 'Retired Legend', 2024, 'Stars', 2,
+  (3, 'Retired Legend', 2024, 'finals', 'ci-seed', 2,
    55, 1800, 320, 650, 200, 240, 40, 130,
-   100, 280, 130, 50, 60, 70, 120, 920, 2200),
+   100, 280, 130, 50, 60, 70, 120, 920),
   -- PlayerMovement: pid=4 played for Metros (tid=1) in 2025, now on Stars (tid=2)
-  (4, 'Stars Guard', 2025, 'Metros', 1,
+  (4, 'Stars Guard', 2025, 'finals', 'ci-seed', 1,
    41, 1280, 200, 440, 100, 120, 60, 150,
-   30, 140, 190, 50, 12, 70, 78, 620, 1600);
+   30, 140, 190, 50, 12, 70, 78, 620);
 
 -- ============================================================
 -- Draft picks (DraftHistory page)
@@ -879,38 +879,38 @@ UPDATE ibl_plr SET dc_SGDepth = 1, SGDepth = 1 WHERE pid = 32;
 UPDATE ibl_plr SET dc_PFDepth = 1, PFDepth = 1 WHERE pid = 33;
 
 -- Player history for voting candidates (must have current year stats)
-INSERT INTO ibl_hist_archive (
-  pid, name, year, team, teamid,
-  games, minutes, fgm, fga, ftm, fta, tgm, tga,
-  orb, reb, ast, stl, blk, tvr, pf, pts, salary
+INSERT INTO ibl_plr_snapshots (
+  pid, name, season_year, snapshot_phase, source_archive, tid,
+  stats_gm, stats_min, stats_fgm, stats_fga, stats_ftm, stats_fta, stats_3gm, stats_3ga,
+  stats_orb, stats_reb, stats_ast, stats_stl, stats_blk, stats_to, stats_pf, stats_pts
 ) VALUES
-  (30, 'Spurs Guard', 2026, 'Spurs', 10,
+  (30, 'Spurs Guard', 2026, 'finals', 'ci-seed', 10,
    41, 1260, 218, 475, 106, 128, 65, 160,
-   40, 160, 180, 50, 20, 80, 90, 620, 500),
-  (31, 'Flames Forward', 2026, 'Flames', 9,
+   40, 160, 180, 50, 20, 80, 90, 620),
+  (31, 'Flames Forward', 2026, 'finals', 'ci-seed', 9,
    41, 1260, 186, 414, 93, 112, 43, 126,
-   45, 185, 160, 48, 22, 65, 88, 565, 600),
-  (32, 'Minutemen Guard', 2026, 'Minutemen', 5,
+   45, 185, 160, 48, 22, 65, 88, 565),
+  (32, 'Minutemen Guard', 2026, 'finals', 'ci-seed', 5,
    41, 1260, 191, 432, 98, 117, 53, 136,
-   35, 145, 185, 50, 15, 70, 80, 600, 700),
-  (33, 'Royals Forward', 2026, 'Royals', 12,
+   35, 145, 185, 50, 15, 70, 80, 600),
+  (33, 'Royals Forward', 2026, 'finals', 'ci-seed', 12,
    41, 1300, 210, 460, 105, 125, 30, 80,
-   50, 200, 120, 42, 30, 60, 90, 590, 800),
-  (20, 'Metros PG', 2026, 'Metros', 1,
+   50, 200, 120, 42, 30, 60, 90, 590),
+  (20, 'Metros PG', 2026, 'finals', 'ci-seed', 1,
    41, 1260, 230, 500, 110, 132, 66, 162,
-   30, 130, 200, 55, 10, 75, 80, 620, 300),
-  (21, 'Metros SF', 2026, 'Metros', 1,
+   30, 130, 200, 55, 10, 75, 80, 620),
+  (21, 'Metros SF', 2026, 'finals', 'ci-seed', 1,
    41, 1260, 178, 396, 88, 108, 40, 120,
-   35, 155, 140, 45, 20, 65, 85, 530, 200),
-  (22, 'Metros Center', 2026, 'Metros', 1,
+   35, 155, 140, 45, 20, 65, 85, 530),
+  (22, 'Metros Center', 2026, 'finals', 'ci-seed', 1,
    41, 1300, 255, 545, 125, 150, 25, 72,
-   60, 220, 100, 40, 35, 60, 95, 610, 300),
-  (23, 'Cougars Guard', 2026, 'Cougars', 3,
+   60, 220, 100, 40, 35, 60, 95, 610),
+  (23, 'Cougars Guard', 2026, 'finals', 'ci-seed', 3,
    41, 1260, 195, 440, 100, 120, 55, 140,
-   35, 145, 185, 50, 15, 70, 80, 600, 1300),
-  (24, 'Cougars Forward', 2026, 'Cougars', 3,
+   35, 145, 185, 50, 15, 70, 80, 600),
+  (24, 'Cougars Forward', 2026, 'finals', 'ci-seed', 3,
    41, 1300, 210, 460, 105, 125, 45, 130,
-   45, 185, 160, 48, 22, 65, 88, 565, 1500);
+   45, 185, 160, 48, 22, 65, 88, 565);
 
 -- ============================================================
 -- Played schedule games (covers win/loss, streak, record, score display)
@@ -1040,20 +1040,20 @@ INSERT INTO ibl_plr (
    'a0000000-0000-0000-0000-000000000042');
 
 -- Rookie player history (for stats to show on ballot)
-INSERT INTO ibl_hist_archive (
-  pid, name, year, team, teamid,
-  games, minutes, fgm, fga, ftm, fta, tgm, tga,
-  orb, reb, ast, stl, blk, tvr, pf, pts, salary
+INSERT INTO ibl_plr_snapshots (
+  pid, name, season_year, snapshot_phase, source_archive, tid,
+  stats_gm, stats_min, stats_fgm, stats_fga, stats_ftm, stats_fta, stats_3gm, stats_3ga,
+  stats_orb, stats_reb, stats_ast, stats_stl, stats_blk, stats_to, stats_pf, stats_pts
 ) VALUES
-  (40, 'Rookie Guard', 2026, 'Diesels', 4,
+  (40, 'Rookie Guard', 2026, 'finals', 'ci-seed', 4,
    41, 1260, 168, 396, 77, 96, 46, 122,
-   30, 130, 170, 45, 12, 70, 75, 540, 300),
-  (41, 'Rookie Wing', 2026, 'Pioneers', 11,
+   30, 130, 170, 45, 12, 70, 75, 540),
+  (41, 'Rookie Wing', 2026, 'finals', 'ci-seed', 11,
    41, 1260, 170, 400, 75, 95, 40, 110,
-   35, 145, 140, 40, 18, 60, 80, 495, 250),
-  (42, 'Rookie Big', 2026, 'Blues', 15,
+   35, 145, 140, 40, 18, 60, 80, 495),
+  (42, 'Rookie Big', 2026, 'finals', 'ci-seed', 15,
    41, 1300, 200, 440, 90, 110, 15, 40,
-   55, 205, 80, 35, 30, 55, 90, 540, 200);
+   55, 205, 80, 35, 30, 55, 90, 540);
 
 -- ============================================================
 -- API Key for E2E tests

@@ -357,7 +357,7 @@ class LeagueContextTest extends TestCase
 
         $this->assertSame('ibl_olympics_plr', $this->leagueContext->getTableName('ibl_plr'));
         $this->assertSame('ibl_olympics_hist', $this->leagueContext->getTableName('ibl_hist'));
-        $this->assertSame('ibl_olympics_hist', $this->leagueContext->getTableName('ibl_hist_archive'));
+        $this->assertSame('ibl_olympics_plr_snapshots', $this->leagueContext->getTableName('ibl_plr_snapshots'));
         $this->assertSame('ibl_olympics_jsb_history', $this->leagueContext->getTableName('ibl_jsb_history'));
         $this->assertSame('ibl_olympics_jsb_transactions', $this->leagueContext->getTableName('ibl_jsb_transactions'));
         $this->assertSame('ibl_olympics_rcb_alltime_records', $this->leagueContext->getTableName('ibl_rcb_alltime_records'));
@@ -423,7 +423,7 @@ class LeagueContextTest extends TestCase
         // JSB import tables
         $this->assertSame('ibl_olympics_plr', $context->getTableName('ibl_plr'));
         $this->assertSame('ibl_olympics_hist', $context->getTableName('ibl_hist'));
-        $this->assertSame('ibl_olympics_hist', $context->getTableName('ibl_hist_archive'));
+        $this->assertSame('ibl_olympics_plr_snapshots', $context->getTableName('ibl_plr_snapshots'));
         $this->assertSame('ibl_olympics_jsb_history', $context->getTableName('ibl_jsb_history'));
         $this->assertSame('ibl_olympics_jsb_transactions', $context->getTableName('ibl_jsb_transactions'));
         $this->assertSame('ibl_olympics_rcb_alltime_records', $context->getTableName('ibl_rcb_alltime_records'));

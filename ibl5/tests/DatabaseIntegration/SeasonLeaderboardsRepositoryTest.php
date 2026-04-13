@@ -155,7 +155,7 @@ class SeasonLeaderboardsRepositoryTest extends DatabaseTestCase
 
     public function testGetYearsReturnsEmptyWhenNoHistData(): void
     {
-        $this->db->query("DELETE FROM ibl_hist_archive");
+        $this->db->query("DELETE FROM ibl_plr_snapshots");
 
         $years = $this->repo->getYears();
 

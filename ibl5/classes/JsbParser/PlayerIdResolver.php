@@ -10,14 +10,10 @@ use League\LeagueContext;
  * Resolves player names from .car files to database PIDs.
  *
  * Uses multiple matching strategies in priority order:
- * 1. Exact name match in ibl_plr for the given team and season
- * 2. Exact name match in ibl_hist_archive for the same year + team
- * 3. Exact name match in ibl_plr without team constraint (for traded players)
- * 4. Fuzzy name match (Levenshtein ≤ 2) for encoding differences
- *
- * ibl_hist_archive is used instead of the ibl_hist VIEW because the VIEW
- * aggregates 589K+ box score rows and cannot be indexed by name/team/year.
- * ibl_hist_archive has idx_team_year and resolves the same lookup in O(log n).
+ * 1. Exact name match in ibl_plr_snapshots for the given team and season
+ * 2. Exact name match in ibl_plr by name + team ID
+ * 3. Exact name match in ibl_plr_snapshots for the same year (ignoring team, for traded players)
+ * 4. Exact name match in ibl_plr by name only
  *
  * League-aware: resolves table names through LeagueContext when provided.
  */
@@ -25,7 +21,7 @@ class PlayerIdResolver
 {
     private \mysqli $db;
     private string $plrTable;
-    private string $histTable;
+    private string $snapshotTable;
 
     /**
      * Cache of resolved name+team+year → pid.
@@ -37,7 +33,7 @@ class PlayerIdResolver
     {
         $this->db = $db;
         $this->plrTable = self::resolveTable($leagueContext, 'ibl_plr');
-        $this->histTable = self::resolveTable($leagueContext, 'ibl_hist_archive');
+        $this->snapshotTable = self::resolveTable($leagueContext, 'ibl_plr_snapshots');
     }
 
     private static function resolveTable(?LeagueContext $leagueContext, string $iblTableName): string
@@ -63,11 +59,13 @@ class PlayerIdResolver
             return $this->cache[$cacheKey];
         }
 
-        // Strategy 1: Exact match in ibl_hist_archive (fast indexed table; avoids slow ibl_hist VIEW)
-        $pid = $this->findInHist($name, $team, $year);
-        if ($pid !== null) {
-            $this->cache[$cacheKey] = $pid;
-            return $pid;
+        // Strategy 1: Exact match in ibl_plr_snapshots by name + tid + year
+        if ($teamId !== null) {
+            $pid = $this->findInSnapshots($name, $teamId, $year);
+            if ($pid !== null) {
+                $this->cache[$cacheKey] = $pid;
+                return $pid;
+            }
         }
 
         // Strategy 2: Exact match in ibl_plr by name + team ID
@@ -79,14 +77,14 @@ class PlayerIdResolver
             }
         }
 
-        // Strategy 3: Exact name match in ibl_hist_archive without team constraint
-        $pid = $this->findInHistByNameOnly($name, $year);
+        // Strategy 3: Exact name match in ibl_plr_snapshots by name + year (ignoring team)
+        $pid = $this->findInSnapshotsByNameOnly($name, $year);
         if ($pid !== null) {
             $this->cache[$cacheKey] = $pid;
             return $pid;
         }
 
-        // Strategy 4: Exact name match in ibl_plr without team constraint
+        // Strategy 4: Exact name match in ibl_plr by name only
         $pid = $this->findInPlrByNameOnly($name);
         if ($pid !== null) {
             $this->cache[$cacheKey] = $pid;
@@ -98,18 +96,18 @@ class PlayerIdResolver
     }
 
     /**
-     * Find pid in ibl_hist_archive by exact name + team + year.
+     * Find pid in ibl_plr_snapshots by exact name + tid + year.
      */
-    private function findInHist(string $name, string $team, int $year): ?int
+    private function findInSnapshots(string $name, int $teamId, int $year): ?int
     {
         $stmt = $this->db->prepare(
-            "SELECT pid FROM {$this->histTable} WHERE name = ? AND team = ? AND year = ? LIMIT 1"
+            "SELECT pid FROM {$this->snapshotTable} WHERE name = ? AND tid = ? AND season_year = ? LIMIT 1"
         );
         if ($stmt === false) {
             return null;
         }
 
-        $stmt->bind_param('ssi', $name, $team, $year);
+        $stmt->bind_param('sii', $name, $teamId, $year);
         $stmt->execute();
         $result = $stmt->get_result();
         /** @var array{pid: int}|null $row */
@@ -142,12 +140,12 @@ class PlayerIdResolver
     }
 
     /**
-     * Find pid in ibl_hist_archive by exact name + year (ignoring team for traded players).
+     * Find pid in ibl_plr_snapshots by exact name + year (ignoring team for traded players).
      */
-    private function findInHistByNameOnly(string $name, int $year): ?int
+    private function findInSnapshotsByNameOnly(string $name, int $year): ?int
     {
         $stmt = $this->db->prepare(
-            "SELECT pid FROM {$this->histTable} WHERE name = ? AND year = ? LIMIT 1"
+            "SELECT pid FROM {$this->snapshotTable} WHERE name = ? AND season_year = ? LIMIT 1"
         );
         if ($stmt === false) {
             return null;

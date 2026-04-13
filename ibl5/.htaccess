@@ -1,3 +1,10 @@
+# Exempt smoke-test runner from ModSecurity WAF — GH Actions IPs rotate so
+# we scope the bypass to our own UA instead of maintaining an IP allowlist.
+<IfModule mod_security2.c>
+    SecRule REQUEST_HEADERS:User-Agent "@beginsWith IBL5-smoke/" \
+        "id:1900001,phase:1,pass,nolog,ctl:ruleEngine=Off"
+</IfModule>
+
 RewriteEngine On
 
 # Return 410 Gone for dead legacy paths — prevents bots from consuming workers

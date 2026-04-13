@@ -91,7 +91,7 @@ class HisFileParser implements HisFileParserInterface
         $wins = (int) $matches[2];
         $losses = (int) $matches[3];
         $playoffText = trim($matches[4]);
-        $year = (int) $matches[5];
+        $year = ((int) $matches[5]) + 1; // JSB stores season beginning year; convert to ending year
 
         $madePlayoffs = 0;
         $playoffRoundReached = '';

@@ -98,7 +98,7 @@ class TrnFileParser implements TrnFileParserInterface
 
         $month = (int) $monthStr;
         $day = (int) $dayStr;
-        $year = (int) $yearStr;
+        $year = ((int) $yearStr) + 1; // JSB stores season beginning year; convert to ending year
         $type = (int) $typeStr;
 
         if ($month === 0 || $year === 0 || $type === 0) {

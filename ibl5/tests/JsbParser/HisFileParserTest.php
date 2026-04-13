@@ -75,8 +75,8 @@ class HisFileParserTest extends TestCase
             $result = HisFileParser::parseFile($tmpFile);
 
             $this->assertCount(12, $result);
-            $this->assertSame(1988, $result[0]['year']);
-            $this->assertSame(1999, $result[11]['year']);
+            $this->assertSame(1989, $result[0]['year']);
+            $this->assertSame(2000, $result[11]['year']);
         } finally {
             unlink($tmpFile);
         }
@@ -91,7 +91,7 @@ class HisFileParserTest extends TestCase
         $this->assertSame('Clippers', $result['name']);
         $this->assertSame(62, $result['wins']);
         $this->assertSame(20, $result['losses']);
-        $this->assertSame(1988, $result['year']);
+        $this->assertSame(1989, $result['year']);
         $this->assertSame(1, $result['made_playoffs']);
         $this->assertSame(1, $result['won_championship']);
         $this->assertSame('championship', $result['playoff_round_reached']);

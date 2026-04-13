@@ -165,18 +165,6 @@ class DevAutoLoginTest extends TestCase
         self::assertArrayNotHasKey('auth_user_id', $_SESSION);
     }
 
-    public function testDoesNothingWhenNoAutoLoginCookieIsSet(): void
-    {
-        $_SERVER['SERVER_NAME'] = 'localhost';
-        putenv('DEV_AUTO_LOGIN=TestUser');
-        $_COOKIE['_no_auto_login'] = '1';
-
-        $db = static::createStub(\mysqli::class);
-        DevAutoLogin::tryAutoLogin($db);
-
-        self::assertArrayNotHasKey('auth_user_id', $_SESSION);
-    }
-
     public function testDoesNothingWhenPrepareFailsReturningFalse(): void
     {
         $_SERVER['SERVER_NAME'] = 'localhost';

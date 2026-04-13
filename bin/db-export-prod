@@ -224,11 +224,20 @@ strip_dump_wrapper() {
 # output from a flaky remote connection splicing the next file mid-line.
 [ -s "$OUTPUT" ] && [ "$(tail -c 1 "$OUTPUT" | wc -l)" -eq 0 ] && echo >> "$OUTPUT"
 
+# The structure dump's postamble restores FOREIGN_KEY_CHECKS=@OLD (=1).
+# Data inserts follow in alphabetical table order, so tables with FK references
+# (e.g. ibl_cash_considerations → ibl_team_info) may be inserted before their
+# referenced tables. Re-disable FK checks for the data section.
+echo '/*!40014 SET FOREIGN_KEY_CHECKS=0 */;' >> "$OUTPUT"
+
 strip_dump_wrapper "$TMPDIR/regular.sql" >> "$OUTPUT"
 for tbl in $BOX_TABLES; do
     strip_dump_wrapper "$TMPDIR/box_${tbl}.sql" >> "$OUTPUT"
 done
 [ -f "$TMPDIR/views.sql" ] && strip_dump_wrapper "$TMPDIR/views.sql" >> "$OUTPUT"
+
+# Re-enable FK checks at the end so the imported DB is in a normal state
+echo '/*!40014 SET FOREIGN_KEY_CHECKS=1 */;' >> "$OUTPUT"
 
 # 5. Strip DEFINER clauses — prod exports contain DEFINER=user@host that may
 #    not match the Docker MariaDB user, causing ERROR 1449 on import.

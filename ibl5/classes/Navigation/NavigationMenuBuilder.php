@@ -55,7 +55,7 @@ class NavigationMenuBuilder implements NavigationMenuBuilderInterface
                     ['label' => 'League Starters', 'url' => 'modules.php?name=LeagueStarters', 'badge' => 'NEW'],
                     ['label' => 'Compare Players', 'url' => 'modules.php?name=ComparePlayers'],
                     ['label' => 'Season Highs', 'url' => 'modules.php?name=SeasonHighs'],
-                    ['label' => 'Series Records', 'url' => 'modules.php?name=SeriesRecords'],
+                    ['label' => 'Head-to-Head Records', 'url' => 'modules.php?name=HeadToHeadRecords'],
                     ['label' => 'Team Off/Def Stats', 'url' => 'modules.php?name=TeamOffDefStats'],
                 ],
             ],

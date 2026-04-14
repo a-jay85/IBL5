@@ -9,7 +9,7 @@
 set -euo pipefail
 
 # launchd runs with minimal env — ensure our tools are findable
-export PATH="/usr/local/bin:/opt/homebrew/bin:$HOME/.bun/bin:/Applications/cmux.app/Contents/Resources/bin:$PATH"
+export PATH="/usr/local/bin:/opt/homebrew/bin:$HOME/.bun/bin:$HOME/.local/bin:/Applications/cmux.app/Contents/Resources/bin:$PATH"
 
 # Signal to /post-plan that we're running headless (skips Phase 11:
 # Worktree Preview Environment — no human present to verify)

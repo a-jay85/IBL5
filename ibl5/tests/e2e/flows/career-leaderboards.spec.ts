@@ -61,14 +61,33 @@ test.describe('Career Leaderboards flow', () => {
   });
 
   test('include/exclude retirees toggle changes results', async ({ page }) => {
+    // Raise display limit so the single seeded retiree is not truncated below
+    // the default top-N cutoff (default ranks would leave both counts equal).
+    // Wait for the HTMX-boosted POST response between submissions — otherwise
+    // the row count reads the previous render.
+    await page.locator('input[name="display"]').fill('500');
     await page.locator('select[name="active"]').selectOption('0');
-    await page.locator('.ibl-filter-form__submit').click();
+    await Promise.all([
+      page.waitForResponse((r) => r.url().includes('CareerLeaderboards') && r.request().method() === 'POST'),
+      page.locator('.ibl-filter-form__submit').click(),
+    ]);
     await expect(page.locator('.ibl-data-table').first()).toBeVisible();
     const withRetireesCount = await page.locator('.ibl-data-table').first().locator('tbody tr').count();
 
+    await page.locator('input[name="display"]').fill('500');
     await page.locator('select[name="active"]').selectOption('1');
-    await page.locator('.ibl-filter-form__submit').click();
+    await Promise.all([
+      page.waitForResponse((r) => r.url().includes('CareerLeaderboards') && r.request().method() === 'POST'),
+      page.locator('.ibl-filter-form__submit').click(),
+    ]);
     await expect(page.locator('.ibl-data-table').first()).toBeVisible();
+    // Poll the row count to let HTMX finish the swap before we read.
+    await expect
+      .poll(
+        async () =>
+          page.locator('.ibl-data-table').first().locator('tbody tr').count(),
+      )
+      .toBeLessThan(withRetireesCount);
     const withoutRetireesCount = await page.locator('.ibl-data-table').first().locator('tbody tr').count();
 
     expect(withRetireesCount).toBeGreaterThan(0);

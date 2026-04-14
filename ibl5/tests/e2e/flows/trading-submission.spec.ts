@@ -649,7 +649,10 @@ test.describe('Trade submission: accept and reject', () => {
       rejectBtn.click(),
     ]);
 
-    await expect(page.locator('.ibl-alert--warning')).toBeVisible();
+    // Scope by text — admin phase-gate notice may share .ibl-alert--warning.
+    await expect(
+      page.locator('.ibl-alert--warning').filter({ hasText: 'already' }),
+    ).toBeVisible();
   });
 
   test('accept offer via UI', async ({ appState, page, request }) => {

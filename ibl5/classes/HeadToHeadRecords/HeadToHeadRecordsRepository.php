@@ -54,7 +54,7 @@ class HeadToHeadRecordsRepository extends \BaseMysqliRepository implements HeadT
         $seasonFiltered = ($scope === 'current');
 
         $sql = $this->buildActiveTeamsPairsQuery($gameTypeFilter, $seasonFiltered, $currentSeasonYear);
-        $params = $seasonFiltered ? ['i', $currentSeasonYear] : [''];
+        $params = $seasonFiltered ? ['ii', $currentSeasonYear, $currentSeasonYear] : [''];
 
         /** @var list<array{self: int, opponent: int, wins: int, losses: int}> $rows */
         $rows = $this->fetchAll($sql, ...$params);

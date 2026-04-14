@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace Standings;
 
 use League\League;
-use SeriesRecords\Contracts\SeriesRecordsServiceInterface;
 use Standings\Contracts\StandingsRepositoryInterface;
 use Standings\Contracts\StandingsViewInterface;
 use UI\TeamCellHelper;
@@ -27,7 +26,6 @@ use UI\TeamCellHelper;
 class StandingsView implements StandingsViewInterface
 {
     private StandingsRepositoryInterface $repository;
-    private SeriesRecordsServiceInterface $seriesRecordsService;
     private int $seasonYear;
 
     /** @var array<int, StreakRow>|null Pre-loaded streak data keyed by team ID */
@@ -40,20 +38,15 @@ class StandingsView implements StandingsViewInterface
     private ?array $seriesMatrix = null;
 
     /**
-     * Constructor
-     *
      * @param StandingsRepositoryInterface $repository Standings data repository
      * @param int $seasonYear Season ending year (e.g. 2025 for the 2024-25 season)
-     * @param SeriesRecordsServiceInterface $seriesRecordsService Series records service for H2H data
      */
     public function __construct(
         StandingsRepositoryInterface $repository,
-        int $seasonYear,
-        SeriesRecordsServiceInterface $seriesRecordsService
+        int $seasonYear
     ) {
         $this->repository = $repository;
         $this->seasonYear = $seasonYear;
-        $this->seriesRecordsService = $seriesRecordsService;
     }
 
     /**
@@ -64,7 +57,7 @@ class StandingsView implements StandingsViewInterface
         // Pre-load all streak, Pythagorean, and H2H data in bulk queries
         $this->allStreakData = $this->repository->getAllStreakData();
         $this->allPythagoreanStats = $this->repository->getAllPythagoreanStats($this->seasonYear);
-        $this->seriesMatrix = $this->seriesRecordsService->buildSeriesMatrix(
+        $this->seriesMatrix = $this->buildSeriesMatrix(
             $this->repository->getSeriesRecords()
         );
 
@@ -110,7 +103,7 @@ class StandingsView implements StandingsViewInterface
             $this->allPythagoreanStats = $this->repository->getAllPythagoreanStats($this->seasonYear);
         }
         if ($this->seriesMatrix === null) {
-            $this->seriesMatrix = $this->seriesRecordsService->buildSeriesMatrix(
+            $this->seriesMatrix = $this->buildSeriesMatrix(
                 $this->repository->getSeriesRecords()
             );
         }
@@ -612,6 +605,27 @@ class StandingsView implements StandingsViewInterface
      * Check if a team has any clinch status (playoffs, division, conference, or league)
      *
      * @param StandingsRow $team Team standings data
+     */
+    /**
+     * @param list<array{self: int, opponent: int, wins: int, losses: int}> $records
+     * @return array<int, array<int, array{wins: int, losses: int}>>
+     */
+    private function buildSeriesMatrix(array $records): array
+    {
+        /** @var array<int, array<int, array{wins: int, losses: int}>> $matrix */
+        $matrix = [];
+        foreach ($records as $record) {
+            $matrix[$record['self']][$record['opponent']] = [
+                'wins' => $record['wins'],
+                'losses' => $record['losses'],
+            ];
+        }
+
+        return $matrix;
+    }
+
+    /**
+     * @param StandingsRow $team
      */
     private function hasClinchStatus(array $team): bool
     {

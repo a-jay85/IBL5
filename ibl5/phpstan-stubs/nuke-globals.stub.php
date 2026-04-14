@@ -45,7 +45,7 @@ define('_UCOMMENT', '');
 define('_UCOMMENTS', '');
 define('_WEEK', '');
 define('_WEEKS', '');
-// SeriesRecords / Waivers
+// HeadToHeadRecords / Waivers
 define('_LOGININCOR', '');
 define('_USERREGLOGIN', '');
 // MySQL.php

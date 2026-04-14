@@ -18,7 +18,7 @@ const PAGES = [
   { name: 'league starters', url: 'modules.php?name=LeagueStarters', selector: '.ibl-data-table, table' },
   { name: 'compare players', url: 'modules.php?name=ComparePlayers', selector: 'input[name="Player1"], input[name="player1"]' },
   { name: 'season highs', url: 'modules.php?name=SeasonHighs', selector: '.ibl-data-table, table, .ibl-title' },
-  { name: 'series records', url: 'modules.php?name=SeriesRecords', selector: '.ibl-data-table, table, .ibl-title' },
+  { name: 'head-to-head records', url: 'modules.php?name=HeadToHeadRecords', selector: '.ibl-data-table, table, .ibl-title, .h2h-empty-state' },
   { name: 'franchise history', url: 'modules.php?name=FranchiseHistory', selector: '.ibl-data-table, table, .ibl-title' },
   { name: 'activity tracker', url: 'modules.php?name=ActivityTracker', selector: '.ibl-data-table, table, .ibl-title' },
 ];

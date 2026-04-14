@@ -96,8 +96,8 @@
             <file>tests/SeasonTest.php</file>
             <file>tests/TeamTest.php</file>
         </testsuite>
-        <testsuite name="SeriesRecords Module Tests">
-            <directory>tests/SeriesRecords</directory>
+        <testsuite name="HeadToHeadRecords Module Tests">
+            <directory>tests/HeadToHeadRecords</directory>
         </testsuite>
         <testsuite name="OneOnOneGame Module Tests">
             <directory>tests/OneOnOneGame</directory>

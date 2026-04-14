@@ -6,7 +6,7 @@ namespace Tests\Standings;
 
 use PHPUnit\Framework\Attributes\AllowMockObjectsWithoutExpectations;
 use PHPUnit\Framework\TestCase;
-use SeriesRecords\SeriesRecordsService;
+
 use Standings\StandingsRepository;
 use Standings\StandingsView;
 use Standings\Contracts\StandingsRepositoryInterface;
@@ -29,7 +29,7 @@ class StandingsViewTest extends TestCase
     {
         $this->mockRepository = $this->createMock(StandingsRepositoryInterface::class);
         $this->mockRepository->method('getSeriesRecords')->willReturn([]);
-        $this->view = new StandingsView($this->mockRepository, 2025, new SeriesRecordsService());
+        $this->view = new StandingsView($this->mockRepository, 2025);
     }
 
     /**
@@ -719,7 +719,7 @@ class StandingsViewTest extends TestCase
         ];
 
         $mock = $this->createMockWithH2H($teamData, $seriesRecords);
-        $view = new StandingsView($mock, 2025, new SeriesRecordsService());
+        $view = new StandingsView($mock, 2025);
         $result = $view->renderRegion('Western');
 
         // Grizzlies (3-2 H2H) should appear before Lakers (2-3 H2H)
@@ -752,7 +752,7 @@ class StandingsViewTest extends TestCase
         ];
 
         $mock = $this->createMockWithH2H($teamData, $seriesRecords);
-        $view = new StandingsView($mock, 2025, new SeriesRecordsService());
+        $view = new StandingsView($mock, 2025);
         $result = $view->renderRegion('Midwest');
 
         // Mavericks (6-3, .667) > Warriors (4-3, .571) > Jazz (2-6, .250)
@@ -780,7 +780,7 @@ class StandingsViewTest extends TestCase
         ];
 
         $mock = $this->createMockWithH2H($teamData, $seriesRecords);
-        $view = new StandingsView($mock, 2025, new SeriesRecordsService());
+        $view = new StandingsView($mock, 2025);
         $result = $view->renderRegion('Eastern');
 
         // TeamA should still be first despite worse H2H (different GB)
@@ -805,7 +805,7 @@ class StandingsViewTest extends TestCase
         ];
 
         $mock = $this->createMockWithH2H($teamData, $seriesRecords);
-        $view = new StandingsView($mock, 2025, new SeriesRecordsService());
+        $view = new StandingsView($mock, 2025);
         $result = $view->renderRegion('Eastern');
 
         // Both have equal H2H (.500), so original order preserved
@@ -853,7 +853,7 @@ class StandingsViewTest extends TestCase
         ];
 
         $mock = $this->createMockWithH2H($teamData, $seriesRecords);
-        $view = new StandingsView($mock, 2025, new SeriesRecordsService());
+        $view = new StandingsView($mock, 2025);
         $result = $view->renderRegion('Atlantic');
 
         $winnerPos = strpos($result, 'Winner');

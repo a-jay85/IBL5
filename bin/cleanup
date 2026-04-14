@@ -359,11 +359,62 @@ if [ "$ALL" = true ]; then
                 if [ -n "$networks" ]; then
                     echo "$networks" | xargs docker network rm 2>/dev/null || true
                 fi
+                # Remove built images (php, browsersync)
+                for img in "$project-php" "$project-browsersync"; do
+                    if docker image inspect "$img" &>/dev/null; then
+                        docker rmi "$img" 2>/dev/null || true
+                    fi
+                done
             fi
             CLEANED=$((CLEANED + 1))
         done < <(docker ps -a \
             --filter 'label=com.docker.compose.project' \
             --format '{{.Label "com.docker.compose.project"}}' \
+            | sort -u)
+
+        # Second pass: sweep orphaned images whose containers/volumes were
+        # already torn down but whose images linger (each ~834MB for php,
+        # ~318MB for browsersync — they add up fast).
+        while IFS= read -r img; do
+            [ -z "$img" ] && continue
+            # Extract slug: ibl5-<slug>-(php|browsersync) -> <slug>
+            slug=$(echo "$img" | sed -E 's/^ibl5-(.+)-(php|browsersync)$/\1/')
+            [ "$slug" = "$img" ] && continue
+            # Skip if slug belongs to an active worktree
+            if echo "$active_slugs" | tr ' ' '\n' | grep -qx "$slug" 2>/dev/null; then
+                continue
+            fi
+            if [ "$DRY_RUN" = true ]; then
+                echo "  WOULD remove orphaned image: $img"
+            else
+                echo "  Removing orphaned image: $img"
+                docker rmi "$img" 2>/dev/null || true
+            fi
+            CLEANED=$((CLEANED + 1))
+        done < <(docker images --format '{{.Repository}}' \
+            | grep -E '^ibl5-.+-(php|browsersync)$' \
+            | sort -u)
+
+        # Third pass: sweep orphaned volumes (pattern: ibl5-<slug>_<suffix>).
+        # DB volumes are typically multi-GB so these accumulate quickly.
+        while IFS= read -r vol; do
+            [ -z "$vol" ] && continue
+            # Extract slug: ibl5-<slug>_<suffix> -> <slug>
+            slug=$(echo "$vol" | sed -E 's/^ibl5-(.+)_[^_]+$/\1/')
+            [ "$slug" = "$vol" ] && continue
+            # Skip if slug belongs to an active worktree
+            if echo "$active_slugs" | tr ' ' '\n' | grep -qx "$slug" 2>/dev/null; then
+                continue
+            fi
+            if [ "$DRY_RUN" = true ]; then
+                echo "  WOULD remove orphaned volume: $vol"
+            else
+                echo "  Removing orphaned volume: $vol"
+                docker volume rm "$vol" 2>/dev/null || true
+            fi
+            CLEANED=$((CLEANED + 1))
+        done < <(docker volume ls --format '{{.Name}}' \
+            | grep -E '^ibl5-.+_.+$' \
             | sort -u)
     fi
 else

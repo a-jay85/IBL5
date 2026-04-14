@@ -95,7 +95,9 @@ teardown_worktree() {
     export SLUG="$slug" WORKTREE_PATH="$wt_path" REPO_ROOT
 
     echo "Stopping environment: $slug (worktree: $wt_name, project: $project)..."
-    docker compose -f "$static_compose" $env_flag -p "$project" down -v
+    # --rmi local removes images built by compose (php, browsersync) while
+    # preserving pinned images like mariadb:10.11 shared across worktrees.
+    docker compose -f "$static_compose" $env_flag -p "$project" down -v --rmi local
 
     rm -f "$slug_file"
 
@@ -191,6 +193,14 @@ if [ ! -d "$WORKTREE_PATH" ]; then
             # Remove network
             for net in $(docker network ls --format '{{.Name}}' | grep "$project" || true); do
                 docker network rm "$net" 2>/dev/null || true
+            done
+            # Remove built images (php, browsersync) — mariadb is a pinned
+            # shared image and won't match these tags.
+            for img in "$project-php" "$project-browsersync"; do
+                if docker image inspect "$img" &>/dev/null; then
+                    echo "  Removing image: $img"
+                    docker rmi "$img" 2>/dev/null || true
+                fi
             done
             echo "  Done."
         fi

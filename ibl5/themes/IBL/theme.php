@@ -138,9 +138,11 @@ function themeindex($aid, $informant, $time, $title, $counter, $topic, $thetext,
 
     $articleClass = $isTransaction ? 'news-article news-article--transaction' : 'news-article';
 
+    $topicLinkLabel = $safeTopictext !== '' ? $safeTopictext : 'View topic';
+
     $topicIconHtml = '';
     if (!empty($t_image) && file_exists($t_image)) {
-        $topicIconHtml = '<a href="modules.php?name=News&amp;new_topic=' . (int)$topic . '" class="news-article__topic-icon-link"><img src="' . \Utilities\HtmlSanitizer::safeHtmlOutput($t_image) . '" alt="' . $safeTopictext . '" class="news-article__topic-icon" loading="lazy"></a>';
+        $topicIconHtml = '<a href="modules.php?name=News&amp;new_topic=' . (int)$topic . '" class="news-article__topic-icon-link" aria-label="' . $topicLinkLabel . '"><img src="' . \Utilities\HtmlSanitizer::safeHtmlOutput($t_image) . '" alt="' . $safeTopictext . '" class="news-article__topic-icon" loading="lazy"></a>';
     }
 
     echo '<article class="' . $articleClass . '">
@@ -182,7 +184,7 @@ function themeindex($aid, $informant, $time, $title, $counter, $topic, $thetext,
     echo '</div>
         <footer class="news-article__footer">
             <div>' . $morelink . '</div>
-            <a href="modules.php?name=News&amp;new_topic=' . (int)$topic . '" class="news-article__link">
+            <a href="modules.php?name=News&amp;new_topic=' . (int)$topic . '" class="news-article__link" aria-label="' . $topicLinkLabel . '">
                 ' . $safeTopictext . '
                 <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
             </a>
@@ -223,9 +225,11 @@ function themearticle($aid, $informant, $datetime, $title, $thetext, $topic, $to
         }
     }
 
+    $topicLinkLabel = $safeTopictext !== '' ? $safeTopictext : 'View topic';
+
     $topicIconHtml = '';
     if (!empty($t_image) && file_exists($t_image)) {
-        $topicIconHtml = '<a href="modules.php?name=News&amp;new_topic=' . (int)$topic . '" class="news-article__topic-icon-link"><img src="' . \Utilities\HtmlSanitizer::safeHtmlOutput($t_image) . '" alt="' . $safeTopictext . '" class="news-article__topic-icon" loading="lazy"></a>';
+        $topicIconHtml = '<a href="modules.php?name=News&amp;new_topic=' . (int)$topic . '" class="news-article__topic-icon-link" aria-label="' . $topicLinkLabel . '"><img src="' . \Utilities\HtmlSanitizer::safeHtmlOutput($t_image) . '" alt="' . $safeTopictext . '" class="news-article__topic-icon" loading="lazy"></a>';
     }
 
     echo '<article class="news-article" style="max-width: 900px;">
@@ -250,7 +254,7 @@ function themearticle($aid, $informant, $datetime, $title, $thetext, $topic, $to
 
     echo '</div>
         <footer class="news-article__footer">
-            <a href="modules.php?name=News&amp;new_topic=' . (int)$topic . '" class="news-article__link">
+            <a href="modules.php?name=News&amp;new_topic=' . (int)$topic . '" class="news-article__link" aria-label="' . _TOPIC . ': ' . $topicLinkLabel . '">
                 <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1 0-5H20"/></svg>
                 ' . _TOPIC . ': ' . $safeTopictext . '
             </a>

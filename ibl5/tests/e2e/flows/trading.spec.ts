@@ -690,8 +690,14 @@ test.describe('Trading: result banners', () => {
       page,
       'modules.php?name=Trading&op=reviewtrade&result=already_processed',
     );
-    await expect(page.locator('.ibl-alert--warning')).toBeVisible();
-    await expect(page.locator('.ibl-alert--warning')).toContainText(
+    // Scope by text — the admin phase-gate notice ("Admin mode: …") shares
+    // the .ibl-alert--warning class and bleeds in when a prior parallel test
+    // switched the shared session to Olympics (Trading is IBL-only).
+    const banner = page.locator('.ibl-alert--warning').filter({
+      hasText: 'already been accepted',
+    });
+    await expect(banner).toBeVisible();
+    await expect(banner).toContainText(
       'already been accepted, declined, or withdrawn',
     );
   });

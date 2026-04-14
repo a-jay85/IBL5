@@ -69,7 +69,7 @@ class HeadToHeadRecordsRepository extends \BaseMysqliRepository implements HeadT
      */
     private function buildActiveTeamsPairsQuery(string $gameTypeFilter, bool $seasonFiltered, int $currentSeasonYear): string
     {
-        $seasonClause = $seasonFiltered ? 'AND r.season_year = ?' : '';
+        $seasonClause = $seasonFiltered ? 'AND bst.season_year = ?' : '';
 
         return "SELECT
                 r.team_id AS self,

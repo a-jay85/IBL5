@@ -264,8 +264,8 @@ class StandingsRepository extends \BaseMysqliRepository implements StandingsRepo
                     GROUP BY b2.Date, b2.gameOfThatDay, b2.visitorTeamID, b2.homeTeamID
                 )
                 AND bst.game_type = 1
-                AND bst.visitorTeamID BETWEEN 1 AND 28
-                AND bst.homeTeamID BETWEEN 1 AND 28
+                AND bst.visitorTeamID BETWEEN 1 AND " . League::MAX_REAL_TEAMID . "
+                AND bst.homeTeamID BETWEEN 1 AND " . League::MAX_REAL_TEAMID . "
                 UNION ALL
                 SELECT bst.homeTeamID AS team_id, bst.visitorTeamID AS opponent_id,
                     CASE WHEN (bst.homeQ1points + bst.homeQ2points + bst.homeQ3points + bst.homeQ4points + COALESCE(bst.homeOTpoints, 0))
@@ -278,8 +278,8 @@ class StandingsRepository extends \BaseMysqliRepository implements StandingsRepo
                     GROUP BY b2.Date, b2.gameOfThatDay, b2.visitorTeamID, b2.homeTeamID
                 )
                 AND bst.game_type = 1
-                AND bst.visitorTeamID BETWEEN 1 AND 28
-                AND bst.homeTeamID BETWEEN 1 AND 28
+                AND bst.visitorTeamID BETWEEN 1 AND " . League::MAX_REAL_TEAMID . "
+                AND bst.homeTeamID BETWEEN 1 AND " . League::MAX_REAL_TEAMID . "
             ) r
             GROUP BY r.team_id, r.opponent_id
             ORDER BY r.team_id, r.opponent_id",

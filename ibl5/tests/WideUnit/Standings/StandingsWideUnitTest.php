@@ -5,9 +5,8 @@ declare(strict_types=1);
 namespace Tests\WideUnit\Standings;
 
 use PHPUnit\Framework\Attributes\AllowMockObjectsWithoutExpectations;
-use SeriesRecords\SeriesRecordsService;
-use Tests\WideUnit\WideUnitTestCase;
-use Tests\WideUnit\Mocks\TestDataFactory;
+use Tests\Integration\IntegrationTestCase;
+use Tests\Integration\Mocks\TestDataFactory;
 use Standings\StandingsRepository;
 use League\League;
 use Standings\StandingsView;
@@ -35,11 +34,8 @@ class StandingsWideUnitTest extends WideUnitTestCase
     protected function setUp(): void
     {
         parent::setUp();
-        // Route series records query to empty result so standings rows
-        // don't leak into buildSeriesMatrix() causing undefined key warnings
-        $this->mockDb->onQuery('vw_series_records', []);
         $this->repository = new StandingsRepository($GLOBALS['mysqli_db']);
-        $this->view = new StandingsView($this->repository, 2025, new SeriesRecordsService());
+        $this->view = new StandingsView($this->repository, 2025);
     }
 
     protected function tearDown(): void

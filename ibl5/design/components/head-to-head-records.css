@@ -1,0 +1,69 @@
+@layer components {
+    .h2h-table td,
+    .h2h-table th {
+        padding: 4px 6px;
+        font-size: 0.85rem;
+        white-space: nowrap;
+    }
+
+    .h2h-winning {
+        background-color: #88ff88;
+    }
+
+    .h2h-losing {
+        background-color: #ff8888;
+    }
+
+    .h2h-tied {
+        background-color: #bbbbbb;
+    }
+
+    .h2h-diag {
+        background-color: #666666;
+    }
+
+    .h2h-empty {
+        color: #999;
+    }
+
+    .h2h-row-label {
+        font-weight: normal;
+        text-align: left;
+        min-width: 100px;
+    }
+
+    .h2h-gm-header {
+        display: inline-block;
+        writing-mode: vertical-rl;
+        text-orientation: mixed;
+        transform: rotate(180deg);
+        max-height: 100px;
+        overflow: hidden;
+        font-size: 0.75rem;
+    }
+
+    .h2h-empty-state {
+        padding: 2rem;
+        text-align: center;
+        color: #666;
+    }
+
+    .h2h-tooltip {
+        position: absolute;
+        bottom: 100%;
+        left: 50%;
+        transform: translateX(-50%);
+        background: #333;
+        color: #fff;
+        padding: 2px 6px;
+        border-radius: 3px;
+        font-size: 0.75rem;
+        white-space: nowrap;
+        pointer-events: none;
+        z-index: 10;
+    }
+
+    .h2h-table td {
+        position: relative;
+    }
+}

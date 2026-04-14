@@ -9,14 +9,14 @@
 set -euo pipefail
 
 # launchd runs with minimal env — ensure our tools are findable
-export PATH="/usr/local/bin:/opt/homebrew/bin:$HOME/.bun/bin:$PATH"
+export PATH="/usr/local/bin:/opt/homebrew/bin:$HOME/.bun/bin:/Applications/cmux.app/Contents/Resources/bin:$PATH"
 
 # Signal to /post-plan that we're running headless (skips Phase 11:
 # Worktree Preview Environment — no human present to verify)
 export CLAUDE_HEADLESS=1
 
 REPO="/Users/ajaynicolas/GitHub/IBL5"
-LOG_DIR="$HOME/.claude/projects/-Users-ajaynicolas-Documents-GitHub-IBL5/nightly/logs"
+LOG_DIR="$HOME/.claude/projects/-Users-ajaynicolas-GitHub-IBL5/nightly/logs"
 mkdir -p "$LOG_DIR"
 LOG="$LOG_DIR/$(date +%Y-%m-%d).log"
 

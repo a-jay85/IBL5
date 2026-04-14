@@ -2,7 +2,7 @@ You are executing the IBL5 nightly autonomous workflow. No human is present — 
 
 ## Step 1: Check the Queue
 
-NIGHTLY_DIR is: $HOME/.claude/projects/-Users-ajaynicolas-Documents-GitHub-IBL5/nightly
+NIGHTLY_DIR is: $HOME/.claude/projects/-Users-ajaynicolas-GitHub-IBL5/nightly
 
 List files in $NIGHTLY_DIR/queue/. If the directory is empty (no .md files), write a one-line report to $NIGHTLY_DIR/reports/YYYY-MM-DD-no-queue.md (using today's date) saying "No plan queued for tonight." and STOP immediately.
 
@@ -16,9 +16,11 @@ The plan must have:
 - A clear title (first # heading)
 - Actionable implementation steps — not just analysis questions or vague goals
 
-If the plan is ambiguous, incomplete, or you cannot determine what specific code changes to make:
+Scope is NEVER grounds to skip. Large file counts, multi-module cascades, migrations, ADRs, doc updates, and visual verification are all in-bounds — attempt the full plan. If you run out of session budget, commit and push what you have and let /post-plan open a draft PR; do not pre-emptively skip on size.
+
+Skip ONLY when the plan is genuinely ambiguous: unclear requirements, missing external context, or you cannot determine what specific code changes to make. In that case:
 1. Move the symlink to $NIGHTLY_DIR/skipped/ : mv $NIGHTLY_DIR/queue/<filename> $NIGHTLY_DIR/skipped/
-2. Write a report to $NIGHTLY_DIR/reports/YYYY-MM-DD-skipped-<slug>.md explaining exactly WHY the plan was skipped
+2. Write a report to $NIGHTLY_DIR/reports/YYYY-MM-DD-skipped-<slug>.md explaining exactly WHY the plan was skipped (must cite a specific ambiguity, not scope/size)
 3. Do NOT attempt partial work
 4. STOP
 
@@ -31,7 +33,7 @@ Extract a kebab-case slug from the plan title for the worktree name. Example: "O
 Run these commands in sequence. Stop on any failure:
 
 ```bash
-cd /Users/ajaynicolas/Documents/GitHub/IBL5
+cd /Users/ajaynicolas/GitHub/IBL5
 git checkout master
 git pull origin master
 bin/wt-new <slug>

@@ -15,7 +15,7 @@ export PATH="/usr/local/bin:/opt/homebrew/bin:$HOME/.bun/bin:$PATH"
 # Worktree Preview Environment — no human present to verify)
 export CLAUDE_HEADLESS=1
 
-REPO="/Users/ajaynicolas/Documents/GitHub/IBL5"
+REPO="/Users/ajaynicolas/GitHub/IBL5"
 LOG_DIR="$HOME/.claude/projects/-Users-ajaynicolas-Documents-GitHub-IBL5/nightly/logs"
 mkdir -p "$LOG_DIR"
 LOG="$LOG_DIR/$(date +%Y-%m-%d).log"

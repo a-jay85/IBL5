@@ -237,7 +237,7 @@ Implements the IBL5 Database Optimization Audit:
 - `vw_current_salary` - Salary resolution (replaces CASE pattern in 5 repositories)
 - `vw_team_total_score` - Game totals from quarter scores
 - `vw_career_totals` - Regular season career totals from ibl_hist
-- `vw_series_records` - Head-to-head records (replaces 4-way UNION ALL)
+- ~~`vw_series_records`~~ - Dropped in migration 111 (replaced by HeadToHeadRecords module queries)
 
 **Part 6 - Fix Column Types:**
 - `ibl_team_win_loss.year/wins/losses`: varchar → smallint unsigned
@@ -258,7 +258,7 @@ Implements the IBL5 Database Optimization Audit:
 - `NegotiationRepository`: Salary methods use `vw_current_salary`, `getMarketMaximums()` cached in `cache` table
 - `FreeAgencyDemandRepository::getPositionSalaryCommitment()` → uses `vw_current_salary`
 - `RecordHoldersRepository`: Uses `vw_team_total_score`, removes CAST() workarounds
-- `SeriesRecordsRepository::getSeriesRecords()` → uses `vw_series_records`
+- `StandingsRepository::getSeriesRecords()` → queries `ibl_box_scores_teams` directly (vw_series_records dropped in migration 111)
 - `SeasonArchiveRepository::getTeamAwardsByYear()` → uses `= ?` instead of `LIKE ?`
 - PHPStan type annotations updated for new column types
 

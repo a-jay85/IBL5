@@ -250,7 +250,39 @@ class StandingsRepository extends \BaseMysqliRepository implements StandingsRepo
     {
         /** @var list<SeriesRecordRow> */
         return $this->fetchAll(
-            "SELECT self, opponent, wins, losses FROM vw_series_records ORDER BY self, opponent",
+            "SELECT r.team_id AS self, r.opponent_id AS opponent,
+                    SUM(r.is_win) AS wins, SUM(1 - r.is_win) AS losses
+            FROM (
+                SELECT bst.visitorTeamID AS team_id, bst.homeTeamID AS opponent_id,
+                    CASE WHEN (bst.visitorQ1points + bst.visitorQ2points + bst.visitorQ3points + bst.visitorQ4points + COALESCE(bst.visitorOTpoints, 0))
+                              > (bst.homeQ1points + bst.homeQ2points + bst.homeQ3points + bst.homeQ4points + COALESCE(bst.homeOTpoints, 0))
+                         THEN 1 ELSE 0 END AS is_win
+                FROM ibl_box_scores_teams bst
+                WHERE bst.id IN (
+                    SELECT MIN(b2.id) FROM ibl_box_scores_teams b2
+                    WHERE b2.game_type = 1
+                    GROUP BY b2.Date, b2.gameOfThatDay, b2.visitorTeamID, b2.homeTeamID
+                )
+                AND bst.game_type = 1
+                AND bst.visitorTeamID BETWEEN 1 AND " . League::MAX_REAL_TEAMID . "
+                AND bst.homeTeamID BETWEEN 1 AND " . League::MAX_REAL_TEAMID . "
+                UNION ALL
+                SELECT bst.homeTeamID AS team_id, bst.visitorTeamID AS opponent_id,
+                    CASE WHEN (bst.homeQ1points + bst.homeQ2points + bst.homeQ3points + bst.homeQ4points + COALESCE(bst.homeOTpoints, 0))
+                              > (bst.visitorQ1points + bst.visitorQ2points + bst.visitorQ3points + bst.visitorQ4points + COALESCE(bst.visitorOTpoints, 0))
+                         THEN 1 ELSE 0 END AS is_win
+                FROM ibl_box_scores_teams bst
+                WHERE bst.id IN (
+                    SELECT MIN(b2.id) FROM ibl_box_scores_teams b2
+                    WHERE b2.game_type = 1
+                    GROUP BY b2.Date, b2.gameOfThatDay, b2.visitorTeamID, b2.homeTeamID
+                )
+                AND bst.game_type = 1
+                AND bst.visitorTeamID BETWEEN 1 AND " . League::MAX_REAL_TEAMID . "
+                AND bst.homeTeamID BETWEEN 1 AND " . League::MAX_REAL_TEAMID . "
+            ) r
+            GROUP BY r.team_id, r.opponent_id
+            ORDER BY r.team_id, r.opponent_id",
             ""
         );
     }

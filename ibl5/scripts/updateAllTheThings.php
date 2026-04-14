@@ -233,5 +233,11 @@ try {
     flush();
 }
 
+exec(sprintf(
+    'nohup %s %s/bin/warm-cache > /dev/null 2>&1 &',
+    escapeshellarg(PHP_BINARY),
+    escapeshellarg(dirname(__DIR__))
+));
+
 echo $view->renderPageClose();
 flush();

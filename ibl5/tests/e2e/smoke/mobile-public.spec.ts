@@ -29,7 +29,7 @@ const PAGES = [
   { name: 'league starters', url: 'modules.php?name=LeagueStarters', selector: '.ibl-data-table, table', hasWideTables: true },
   { name: 'compare players', url: 'modules.php?name=ComparePlayers', selector: 'input[name="Player1"], input[name="player1"]', hasWideTables: false },
   { name: 'season highs', url: 'modules.php?name=SeasonHighs', selector: '.ibl-data-table, table, .ibl-title', hasWideTables: false, skipOverflow: true },
-  { name: 'series records', url: 'modules.php?name=SeriesRecords', selector: '.ibl-data-table, table, .ibl-title', hasWideTables: false },
+  { name: 'head-to-head records', url: 'modules.php?name=HeadToHeadRecords', selector: '.ibl-data-table, table, .ibl-title, .h2h-empty-state', hasWideTables: false },
   { name: 'franchise history', url: 'modules.php?name=FranchiseHistory', selector: '.ibl-data-table, table, .ibl-title', hasWideTables: false },
   { name: 'activity tracker', url: 'modules.php?name=ActivityTracker', selector: '.ibl-data-table, table, .ibl-title', hasWideTables: true },
   { name: 'record holders', url: 'modules.php?name=RecordHolders', selector: '.ibl-title, .ibl-data-table, table', hasWideTables: false },

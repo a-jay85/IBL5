@@ -1,6 +1,6 @@
 ---
 description: Schema reference and query patterns for IBL5 database work.
-last_verified: 2026-04-11
+last_verified: 2026-04-14
 ---
 
 # IBL5 Database Guide
@@ -48,7 +48,7 @@ last_verified: 2026-04-11
    - `vw_playoff_series_results` - Playoff series outcomes derived from box scores
    - `vw_current_salary` - Salary resolution (replaces CASE pattern)
    - `vw_career_totals` - Regular season career totals
-   - `vw_series_records` - Head-to-head records
+   - ~~`vw_series_records`~~ - Dropped in migration 111 (replaced by HeadToHeadRecords queries against `ibl_box_scores_teams`)
    - Plus 15 additional views for stats, win/loss, and schedule data
 
 ### Foreign Key Relationships (24)

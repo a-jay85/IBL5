@@ -37,7 +37,7 @@ Affects ALL data tables site-wide:
 - Standings, League Stats, Season Leaders, Draft History
 - Contact List, Compare Players, Contract List, Injuries
 - All-Star Appearances, Leaderboards, Player Search
-- Transaction History, Series Records, Franchise History
+- Transaction History, Head-to-Head Records, Franchise History
 - Free Agency, Free Agency Preview, Record Holders, Player Awards
 - Cap Info, Draft Pick Locator, Depth Chart, Voting
 - Trading rosters, One-on-One, Team page tables
@@ -64,7 +64,7 @@ Affects ALL data tables site-wide:
 
 - DraftPickLocatorView
 - CapSpaceView
-- SeriesRecordsView
+- HeadToHeadRecordsView
 - FranchiseHistoryView
 - FreeAgencyPreviewView
 

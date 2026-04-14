@@ -52,6 +52,17 @@ $cachedService->rebuildCache();
 
 echo "Record Holders cache warmed\n";
 
+// --- Head-to-Head Records ---
+
+echo "\nWarming Head-to-Head Records cache...\n";
+
+$season = new \Season\Season($mysqli_db);
+$innerH2hRepo = new \HeadToHeadRecords\HeadToHeadRecordsRepository($mysqli_db);
+$cachedH2hRepo = new \HeadToHeadRecords\CachedHeadToHeadRecordsRepository($innerH2hRepo, $dbCache);
+$cachedH2hRepo->rebuildCache($season->endingYear);
+
+echo "HeadToHeadRecords cache warmed (24 keys)\n";
+
 // --- Done ---
 
 echo "\nAll caches warmed successfully at " . date('Y-m-d H:i:s') . "\n";

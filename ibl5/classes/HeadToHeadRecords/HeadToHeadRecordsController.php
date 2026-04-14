@@ -136,8 +136,7 @@ class HeadToHeadRecordsController
 
         foreach ($axis as $entry) {
             $match = match ($dimension) {
-                'active_teams' => $entry['franchise_id'] === $franchiseId,
-                'all_time_teams' => $entry['franchise_id'] === $franchiseId,
+                'active_teams', 'all_time_teams' => $entry['franchise_id'] === $franchiseId,
                 'gms' => $entry['key'] === $username,
             };
 

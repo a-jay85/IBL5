@@ -82,21 +82,5 @@ class CachedHeadToHeadRecordsRepositoryTest extends TestCase
         $repo->invalidateCache();
     }
 
-    public function testGetPairsForActiveTeamsDelegatesToInner(): void
-    {
-        $expected = [['self' => 1, 'opponent' => 2, 'wins' => 5, 'losses' => 3]];
 
-        $inner = $this->createMock(HeadToHeadRecordsRepositoryInterface::class);
-        $inner->expects($this->once())
-            ->method('getPairsForActiveTeams')
-            ->with(2026)
-            ->willReturn($expected);
-
-        $cache = $this->createStub(DatabaseCacheInterface::class);
-        $repo = new CachedHeadToHeadRecordsRepository($inner, $cache);
-
-        $result = $repo->getPairsForActiveTeams(2026);
-
-        self::assertSame($expected, $result);
-    }
 }

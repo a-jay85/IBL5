@@ -24,12 +24,4 @@ interface HeadToHeadRecordsRepositoryInterface
      * @return MatrixPayload
      */
     public function getMatrix(string $scope, string $dimension, string $phase, int $currentSeasonYear): array;
-
-    /**
-     * Get current-season head-to-head pairs for active teams (all phases).
-     * Used by Standings for H2H tie-breaking.
-     *
-     * @return list<array{self: int, opponent: int, wins: int, losses: int}>
-     */
-    public function getPairsForActiveTeams(int $currentSeasonYear): array;
 }

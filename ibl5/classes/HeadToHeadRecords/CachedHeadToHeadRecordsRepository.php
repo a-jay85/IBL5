@@ -61,16 +61,6 @@ class CachedHeadToHeadRecordsRepository implements HeadToHeadRecordsRepositoryIn
     }
 
     /**
-     * @see HeadToHeadRecordsRepositoryInterface::getPairsForActiveTeams()
-     *
-     * @return list<array{self: int, opponent: int, wins: int, losses: int}>
-     */
-    public function getPairsForActiveTeams(int $currentSeasonYear): array
-    {
-        return $this->inner->getPairsForActiveTeams($currentSeasonYear);
-    }
-
-    /**
      * Rebuild all 24 cache entries (2 scopes x 3 dimensions x 4 phases).
      */
     public function rebuildCache(int $currentSeasonYear): void

@@ -43,20 +43,6 @@ class HeadToHeadRecordsRepository extends \BaseMysqliRepository implements HeadT
     }
 
     /**
-     * @see HeadToHeadRecordsRepositoryInterface::getPairsForActiveTeams()
-     *
-     * @return list<array{self: int, opponent: int, wins: int, losses: int}>
-     */
-    public function getPairsForActiveTeams(int $currentSeasonYear): array
-    {
-        $gameTypeFilter = 'IN (1, 2, 3)';
-        $sql = $this->buildActiveTeamsPairsQuery($gameTypeFilter, true, $currentSeasonYear);
-
-        /** @var list<array{self: int, opponent: int, wins: int, losses: int}> */
-        return $this->fetchAll($sql, 'i', $currentSeasonYear);
-    }
-
-    /**
      * @param Scope $scope
      * @param Phase $phase
      * @return MatrixPayload

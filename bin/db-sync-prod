@@ -210,8 +210,8 @@ fi
 echo ""
 echo "=== Sync Complete ==="
 docker exec "$DB_CONTAINER" mariadb -uroot -proot iblhoops_ibl5 -N -B -e "
-SELECT CONCAT('  ibl_team_info:       ', COUNT(*), ' rows') FROM ibl_team_info;
-SELECT CONCAT('  ibl_player_info:     ', COUNT(*), ' rows') FROM ibl_player_info;
-SELECT CONCAT('  ibl_box_scores:      ', COUNT(*), ' rows') FROM ibl_box_scores;
+SELECT CONCAT('  ibl_team_info:        ', COUNT(*), ' rows') FROM ibl_team_info;
+SELECT CONCAT('  ibl_plr:              ', COUNT(*), ' rows') FROM ibl_plr;
+SELECT CONCAT('  ibl_box_scores:       ', COUNT(*), ' rows') FROM ibl_box_scores;
 SELECT CONCAT('  ibl_box_scores_teams: ', COUNT(*), ' rows') FROM ibl_box_scores_teams;
 " 2> >(grep -v '\[Warning\].*password' >&2) || true

@@ -1,0 +1,217 @@
+#!/bin/bash
+# Sync production database directly into a running worktree's Docker MariaDB.
+# No prod-seed.sql intermediate — streams mariadb-dump → docker exec stdin.
+#
+# Usage: bin/db-sync-prod [worktree-name]
+#
+# Target resolution (in order):
+#   1. <worktree-name> argument → worktrees/<name>/.wt-slug
+#   2. CWD inside worktrees/<name>/... → that worktree
+#   3. Sole running ibl5-db-* container
+#
+# Prereqs: .env with REMOTE_* creds; target container already running (bin/wt-up).
+
+set -euo pipefail
+
+REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+WORKTREE_ARG="${1:-}"
+
+# Load .env for REMOTE_* creds
+ENV_FILE="$REPO_ROOT/.env"
+if [ ! -f "$ENV_FILE" ]; then
+    echo "Error: $ENV_FILE not found — REMOTE_* credentials required." >&2
+    exit 1
+fi
+set -a
+# shellcheck disable=SC1090
+source "$ENV_FILE"
+set +a
+
+if [ -z "${REMOTE_HOST:-}" ] || [ "$REMOTE_HOST" = "localhost" ] || [ "$REMOTE_HOST" = "127.0.0.1" ]; then
+    echo "Error: REMOTE_HOST must point to production (got: ${REMOTE_HOST:-<unset>})." >&2
+    exit 1
+fi
+
+REMOTE_PORT="${REMOTE_PORT:-3306}"
+REMOTE_DATABASE="${REMOTE_DATABASE:-iblhoops_ibl5}"
+
+# Resolve target slug + worktree path
+SLUG=""
+WORKTREE_PATH=""
+
+resolve_from_wt_name() {
+    local name="$1"
+    local slug_file="$REPO_ROOT/worktrees/$name/.wt-slug"
+    if [ ! -f "$slug_file" ]; then
+        return 1
+    fi
+    SLUG="$(cat "$slug_file")"
+    WORKTREE_PATH="$REPO_ROOT/worktrees/$name"
+}
+
+resolve_from_slug() {
+    local target_slug="$1"
+    SLUG="$target_slug"
+    for wt in "$REPO_ROOT"/worktrees/*/; do
+        [ -f "$wt/.wt-slug" ] || continue
+        if [ "$(cat "$wt/.wt-slug")" = "$target_slug" ]; then
+            WORKTREE_PATH="${wt%/}"
+            return
+        fi
+    done
+}
+
+if [ -n "$WORKTREE_ARG" ]; then
+    if ! resolve_from_wt_name "$WORKTREE_ARG"; then
+        echo "Error: No worktree named '$WORKTREE_ARG' (missing $REPO_ROOT/worktrees/$WORKTREE_ARG/.wt-slug)." >&2
+        echo "Start it first: bin/wt-up $WORKTREE_ARG" >&2
+        exit 1
+    fi
+elif [[ "$PWD" == "$REPO_ROOT/worktrees/"* ]]; then
+    wt_rel="${PWD#"$REPO_ROOT/worktrees/"}"
+    wt_name="${wt_rel%%/*}"
+    if ! resolve_from_wt_name "$wt_name"; then
+        echo "Error: CWD is in worktrees/$wt_name but .wt-slug is missing. Start it: bin/wt-up $wt_name" >&2
+        exit 1
+    fi
+else
+    running=$(docker ps --format '{{.Names}}' | grep -E '^ibl5-db-' || true)
+    count=$(printf '%s\n' "$running" | grep -c . || true)
+    if [ "$count" = "1" ]; then
+        resolve_from_slug "${running#ibl5-db-}"
+    else
+        echo "Error: Could not determine target. Pass worktree name: bin/db-sync-prod <worktree-name>" >&2
+        if [ -n "$running" ]; then
+            echo "Running containers:" >&2
+            printf '  %s\n' $running >&2
+        fi
+        exit 1
+    fi
+fi
+
+DB_CONTAINER="ibl5-db-$SLUG"
+if ! docker ps --format '{{.Names}}' | grep -q "^${DB_CONTAINER}$"; then
+    echo "Error: Container $DB_CONTAINER is not running. Start it: bin/wt-up <worktree-name>" >&2
+    exit 1
+fi
+
+echo "=== DB Sync: Production → $DB_CONTAINER ==="
+echo "  Source: $REMOTE_HOST:$REMOTE_PORT/$REMOTE_DATABASE"
+echo "  Target: $DB_CONTAINER"
+[ -n "$WORKTREE_PATH" ] && echo "  Worktree: $WORKTREE_PATH"
+echo ""
+
+remote_query() {
+    MYSQL_PWD="$REMOTE_PASSWORD" mariadb \
+        -h "$REMOTE_HOST" -P "$REMOTE_PORT" --skip-ssl --compress \
+        -u "$REMOTE_USER" "$REMOTE_DATABASE" -N -B -e "$1"
+}
+
+remote_dump() {
+    MYSQL_PWD="$REMOTE_PASSWORD" mariadb-dump \
+        -h "$REMOTE_HOST" -P "$REMOTE_PORT" \
+        -u "$REMOTE_USER" \
+        --skip-ssl --compress --single-transaction --skip-lock-tables \
+        "$@"
+}
+
+# Detect STORED GENERATED column tables — their data needs dedicated column-list
+# INSERTs (mariadb-dump emits those with --no-create-info) to avoid ERROR 1906.
+GENERATED_TABLES=$(remote_query "
+    SELECT DISTINCT table_name
+    FROM information_schema.columns
+    WHERE table_schema='$REMOTE_DATABASE'
+      AND extra LIKE '%GENERATED%'
+    ORDER BY table_name;
+")
+
+# Fetch table + view list in one round trip
+TABLE_META=$(remote_query "
+    SELECT CONCAT(IF(engine IS NOT NULL, 'T', 'V'), '|', table_name)
+    FROM information_schema.tables
+    WHERE table_schema='$REMOTE_DATABASE'
+    ORDER BY table_name;
+")
+
+GEN_RE=""
+for t in $GENERATED_TABLES; do
+    GEN_RE="${GEN_RE:+$GEN_RE|}$t"
+done
+
+REGULAR_TABLES=""
+VIEWS=""
+for row in $TABLE_META; do
+    kind="${row%%|*}"
+    name="${row#*|}"
+    if [ "$kind" = "T" ]; then
+        if [ -n "$GEN_RE" ] && echo "$name" | grep -qE "^($GEN_RE)$"; then
+            continue
+        fi
+        REGULAR_TABLES="$REGULAR_TABLES $name"
+    else
+        VIEWS="$VIEWS $name"
+    fi
+done
+
+echo "Dumping prod → $DB_CONTAINER..."
+if [ -n "$GENERATED_TABLES" ]; then
+    echo "  Generated-column tables:$(printf ' %s' $GENERATED_TABLES)"
+fi
+echo ""
+
+# Stream everything into the container in one pipeline.
+# DEFINER clauses are stripped on-the-fly (prod contains DEFINER=user@host
+# that doesn't exist on Docker MariaDB's root user → ERROR 1449).
+# FOREIGN_KEY_CHECKS=0 wraps the whole import since inserts run in alpha
+# table order, which doesn't respect FK dependency order.
+set -o pipefail
+{
+    echo "SET FOREIGN_KEY_CHECKS=0;"
+
+    echo "-- [db-sync-prod] schema for all tables"
+    remote_dump --routines --triggers --no-data "$REMOTE_DATABASE"
+
+    echo "-- [db-sync-prod] data for regular tables"
+    # shellcheck disable=SC2086
+    remote_dump --no-create-info --skip-triggers --skip-add-locks \
+        "$REMOTE_DATABASE" $REGULAR_TABLES
+
+    if [ -n "$GENERATED_TABLES" ]; then
+        echo "-- [db-sync-prod] data for generated-column tables"
+        # shellcheck disable=SC2086
+        remote_dump --no-create-info --skip-triggers --skip-add-locks \
+            "$REMOTE_DATABASE" $GENERATED_TABLES
+    fi
+
+    if [ -n "$VIEWS" ]; then
+        echo "-- [db-sync-prod] views"
+        # shellcheck disable=SC2086
+        remote_dump "$REMOTE_DATABASE" $VIEWS
+    fi
+
+    echo "SET FOREIGN_KEY_CHECKS=1;"
+} \
+    | perl -pe 's/ DEFINER=\S+ / /g' \
+    | docker exec -i "$DB_CONTAINER" mariadb -uroot -proot iblhoops_ibl5
+
+echo ""
+echo "Backfilling schema_migrations from prod dump..."
+docker exec "$DB_CONTAINER" mariadb -uroot -proot iblhoops_ibl5 \
+    -e "INSERT IGNORE INTO schema_migrations (version) SELECT migration FROM migrations;" \
+    2> >(grep -v '\[Warning\].*password' >&2) || true
+
+if [ -n "$WORKTREE_PATH" ] && [ -d "$WORKTREE_PATH/ibl5/migrations" ]; then
+    echo ""
+    echo "Replaying migrations not yet applied to prod..."
+    "$REPO_ROOT/bin/db-migrate" "$DB_CONTAINER" "$WORKTREE_PATH/ibl5/migrations"
+fi
+
+# Verify row counts on a couple of canonical tables
+echo ""
+echo "=== Sync Complete ==="
+docker exec "$DB_CONTAINER" mariadb -uroot -proot iblhoops_ibl5 -N -B -e "
+SELECT CONCAT('  ibl_team_info:       ', COUNT(*), ' rows') FROM ibl_team_info;
+SELECT CONCAT('  ibl_player_info:     ', COUNT(*), ' rows') FROM ibl_player_info;
+SELECT CONCAT('  ibl_box_scores:      ', COUNT(*), ' rows') FROM ibl_box_scores;
+SELECT CONCAT('  ibl_box_scores_teams: ', COUNT(*), ' rows') FROM ibl_box_scores_teams;
+" 2> >(grep -v '\[Warning\].*password' >&2) || true

@@ -167,9 +167,11 @@ final class SeasonLeaderboardsServiceTest extends TestCase
     {
         $options = $this->service->getSortOptions();
 
-        $this->assertCount(20, $options);
-        $this->assertEquals('PPG', $options[0]);
-        $this->assertEquals('REB', $options[1]);
-        $this->assertEquals('MIN', $options[19]);
+        $this->assertCount(21, $options);
+        $this->assertArrayHasKey('PPG', $options);
+        $this->assertArrayHasKey('DREB', $options);
+        $this->assertArrayHasKey('MIN', $options);
+        $this->assertSame('PPG', $options['PPG']);
+        $this->assertSame('FG%', $options['FGP']);
     }
 }

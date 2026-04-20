@@ -26,7 +26,7 @@ interface CareerLeaderboardsViewInterface
      *
      * **Form Fields:**
      * - boards_type: Dropdown with 8 board type options
-     * - sort_cat: Dropdown with 19 sort category options
+     * - sort_cat: Dropdown with 20 sort category options
      * - active: Yes/No dropdown for including retirees
      * - display: Number input for record limit
      * - submitted: Hidden field set to "1"
@@ -48,7 +48,7 @@ interface CareerLeaderboardsViewInterface
      *
      * **Columns:**
      * Rank, Name, Games, Minutes, FGM, FGA, FG%, FTM, FTA, FT%,
-     * 3GM, 3GA, 3P%, ORB, REB, AST, STL, TVR, BLK, FOULS, PTS
+     * 3GM, 3GA, 3P%, ORB, DRB, REB, AST, STL, TVR, BLK, FOULS, PTS
      *
      * **Styling:**
      * - Class: sortable (for JavaScript table sorting)

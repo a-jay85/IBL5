@@ -20,7 +20,7 @@ use CareerLeaderboards\Contracts\CareerLeaderboardsRepositoryInterface;
  */
 class CachedCareerLeaderboardsRepository implements CareerLeaderboardsRepositoryInterface
 {
-    private const CACHE_KEY_PREFIX = 'career_leaderboards:';
+    private const CACHE_KEY_PREFIX = 'career_leaderboards:v2:';
     private const TTL_SECONDS = 86400; // 24 hours
 
     private const VALID_TABLES = [

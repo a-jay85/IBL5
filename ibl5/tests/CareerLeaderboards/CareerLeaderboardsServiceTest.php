@@ -52,6 +52,9 @@ final class CareerLeaderboardsServiceTest extends TestCase
         $this->assertEquals('500', $stats['fgm']);
         $this->assertEquals('1,000', $stats['fga']);
         
+        // Check defensive rebounds (reb - orb = 500 - 100 = 400)
+        $this->assertEquals('400', $stats['drb']);
+
         // Check percentages (0-1 range with 3 decimals)
         $this->assertEquals('0.500', $stats['fgp']); // 500/1000
         $this->assertEquals('0.800', $stats['ftp']); // 200/250
@@ -97,6 +100,9 @@ final class CareerLeaderboardsServiceTest extends TestCase
         $this->assertEquals('6.10', $stats['fgm']);
         $this->assertEquals('12.20', $stats['fga']);
         
+        // Check defensive rebounds (reb - orb = 6.1 - 1.2 = 4.9)
+        $this->assertEquals('4.90', $stats['drb']);
+
         // Check percentages (pre-calculated in db, formatted with decimals)
         $this->assertEquals('0.500', $stats['fgp']);
         $this->assertEquals('0.800', $stats['ftp']);
@@ -190,7 +196,9 @@ final class CareerLeaderboardsServiceTest extends TestCase
         $sortCategories = $this->service->getSortCategories();
 
         $this->assertIsArray($sortCategories);
-        $this->assertCount(19, $sortCategories);
+        $this->assertCount(20, $sortCategories);
+        $this->assertArrayHasKey('drb', $sortCategories);
+        $this->assertEquals('Defensive Rebounds', $sortCategories['drb']);
         $this->assertArrayHasKey('pts', $sortCategories);
         $this->assertEquals('Points', $sortCategories['pts']);
         $this->assertArrayHasKey('fgpct', $sortCategories);

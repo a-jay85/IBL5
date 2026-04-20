@@ -28,10 +28,9 @@ interface SeasonLeaderboardsRepositoryInterface
      * @param int $limit Maximum number of records to return (0 for unlimited)
      * @return LeaderboardResult Result with rows and count
      *
-     * **Sort Options:**
-     * 1=PPG, 2=REB, 3=OREB, 4=AST, 5=STL, 6=BLK, 7=TO, 8=FOUL,
-     * 9=QA, 10=FGM, 11=FGA, 12=FG%, 13=FTM, 14=FTA, 15=FT%,
-     * 16=TGM, 17=TGA, 18=TG%, 19=GAMES, 20=MIN
+     * **Sort Options (string keys):**
+     * PPG, REB, OREB, DREB, AST, STL, BLK, TO, FOUL,
+     * QA, FGM, FGA, FGP, FTM, FTA, FTP, TGM, TGA, TGP, GAMES, MIN
      *
      * **Behaviors:**
      * - Filters out null names

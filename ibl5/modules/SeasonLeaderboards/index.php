@@ -27,7 +27,7 @@ $view = new SeasonLeaderboardsView($service);
 $filters = [
     'year' => $_POST['year'] ?? '',
     'team' => (int)($_POST['team'] ?? 0),
-    'sortby' => $_POST['sortby'] ?? '1',
+    'sortby' => $_POST['sortby'] ?? 'PPG',
     'limit' => $_POST['limit'] ?? ''
 ];
 

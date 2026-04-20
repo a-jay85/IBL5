@@ -40,7 +40,7 @@ class CareerLeaderboardsRepository extends \BaseMysqliRepository implements Care
     private const VALID_SORT_COLUMNS = [
         'pts', 'games', 'minutes', 'fgm', 'fga', 'fgpct', 
         'ftm', 'fta', 'ftpct', 'tgm', 'tga', 'tpct',
-        'orb', 'reb', 'ast', 'stl', 'tvr', 'blk', 'pf'
+        'orb', 'drb', 'reb', 'ast', 'stl', 'tvr', 'blk', 'pf'
     ];
 
     public function __construct(\mysqli $db)
@@ -95,6 +95,7 @@ class CareerLeaderboardsRepository extends \BaseMysqliRepository implements Care
                 sum(h.tgm) as tgm,
                 sum(h.tga) as tga,
                 sum(h.orb) as orb,
+                sum(h.reb) - sum(h.orb) as drb,
                 sum(h.reb) as reb,
                 sum(h.ast) as ast,
                 sum(h.stl) as stl,
@@ -120,6 +121,15 @@ class CareerLeaderboardsRepository extends \BaseMysqliRepository implements Care
 
         /** @var list<CareerStatsRow> $rows */
         $rows = $this->fetchAll($query);
+
+        // Enrich rows missing drb (Olympics stored tables lack the column)
+        foreach ($rows as $idx => $currentRow) {
+            if (!array_key_exists('drb', $currentRow)) {
+                $reb = is_string($currentRow['reb']) ? (float) $currentRow['reb'] : $currentRow['reb'];
+                $orb = is_string($currentRow['orb']) ? (float) $currentRow['orb'] : $currentRow['orb'];
+                $rows[$idx]['drb'] = $reb - $orb;
+            }
+        }
 
         return [
             'results' => $rows,

@@ -27,7 +27,7 @@ final class CachedCareerLeaderboardsRepositoryTest extends TestCase
         $repository = new CachedCareerLeaderboardsRepository($mockInner, $this->cache);
 
         $rows = $this->createSampleRows();
-        $this->cache->set('career_leaderboards:ibl_hist', $rows, 86400);
+        $this->cache->set('career_leaderboards:v2:ibl_hist', $rows, 86400);
 
         $mockInner->expects($this->never())->method('getLeaderboards');
 
@@ -53,7 +53,7 @@ final class CachedCareerLeaderboardsRepositoryTest extends TestCase
         $this->assertSame(3, $result['count']);
 
         // Verify the data was cached
-        $cached = $this->cache->get('career_leaderboards:ibl_hist');
+        $cached = $this->cache->get('career_leaderboards:v2:ibl_hist');
         $this->assertNotNull($cached);
     }
 
@@ -67,7 +67,7 @@ final class CachedCareerLeaderboardsRepositoryTest extends TestCase
             ['pid' => 2, 'name' => 'Mid Scorer', 'pts' => 100, 'ast' => 200, 'games' => 80, 'retired' => 0],
             ['pid' => 3, 'name' => 'High Scorer', 'pts' => 200, 'ast' => 100, 'games' => 60, 'retired' => 0],
         ];
-        $this->cache->set('career_leaderboards:ibl_hist', $rows, 86400);
+        $this->cache->set('career_leaderboards:v2:ibl_hist', $rows, 86400);
 
         // Sort by assists
         $result = $repository->getLeaderboards('ibl_hist', 'ast', 0, 0);
@@ -87,7 +87,7 @@ final class CachedCareerLeaderboardsRepositoryTest extends TestCase
             ['pid' => 2, 'name' => 'Retired Player', 'pts' => 300, 'games' => 200, 'retired' => 1],
             ['pid' => 3, 'name' => 'Another Active', 'pts' => 150, 'games' => 80, 'retired' => 0],
         ];
-        $this->cache->set('career_leaderboards:ibl_hist', $rows, 86400);
+        $this->cache->set('career_leaderboards:v2:ibl_hist', $rows, 86400);
 
         $result = $repository->getLeaderboards('ibl_hist', 'pts', 1, 0);
 
@@ -102,7 +102,7 @@ final class CachedCareerLeaderboardsRepositoryTest extends TestCase
         $repository = new CachedCareerLeaderboardsRepository($stubInner, $this->cache);
 
         $rows = $this->createSampleRows();
-        $this->cache->set('career_leaderboards:ibl_hist', $rows, 86400);
+        $this->cache->set('career_leaderboards:v2:ibl_hist', $rows, 86400);
 
         $result = $repository->getLeaderboards('ibl_hist', 'pts', 0, 2);
 
@@ -115,7 +115,7 @@ final class CachedCareerLeaderboardsRepositoryTest extends TestCase
         $repository = new CachedCareerLeaderboardsRepository($stubInner, $this->cache);
 
         $rows = $this->createSampleRows();
-        $this->cache->set('career_leaderboards:ibl_hist', $rows, 86400);
+        $this->cache->set('career_leaderboards:v2:ibl_hist', $rows, 86400);
 
         $result = $repository->getLeaderboards('ibl_hist', 'pts', 0, 0);
 
@@ -160,7 +160,7 @@ final class CachedCareerLeaderboardsRepositoryTest extends TestCase
             'ibl_allstar_career_totals', 'ibl_allstar_career_avgs',
         ];
         foreach ($tables as $table) {
-            $this->assertNotNull($this->cache->get('career_leaderboards:' . $table));
+            $this->assertNotNull($this->cache->get('career_leaderboards:v2:' . $table));
         }
     }
 
@@ -179,13 +179,13 @@ final class CachedCareerLeaderboardsRepositoryTest extends TestCase
             'ibl_allstar_career_totals', 'ibl_allstar_career_avgs',
         ];
         foreach ($tables as $table) {
-            $this->cache->set('career_leaderboards:' . $table, [['pid' => 1]], 86400);
+            $this->cache->set('career_leaderboards:v2:' . $table, [['pid' => 1]], 86400);
         }
 
         $repository->invalidateCache();
 
         foreach ($tables as $table) {
-            $this->assertNull($this->cache->get('career_leaderboards:' . $table));
+            $this->assertNull($this->cache->get('career_leaderboards:v2:' . $table));
         }
     }
 
@@ -200,7 +200,7 @@ final class CachedCareerLeaderboardsRepositoryTest extends TestCase
             ['pid' => 3, 'name' => 'Active High', 'pts' => 300, 'games' => 100, 'retired' => 0],
             ['pid' => 4, 'name' => 'Active Mid', 'pts' => 200, 'games' => 80, 'retired' => 0],
         ];
-        $this->cache->set('career_leaderboards:ibl_season_career_avgs', $rows, 86400);
+        $this->cache->set('career_leaderboards:v2:ibl_season_career_avgs', $rows, 86400);
 
         // Active only, sorted by pts, limit 2
         $result = $repository->getLeaderboards('ibl_season_career_avgs', 'pts', 1, 2);

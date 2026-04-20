@@ -24,7 +24,7 @@ class CareerLeaderboardsView implements CareerLeaderboardsViewInterface
         'fgm' => 'fgm',     'fga' => 'fga',       'fgpct' => 'fgp',
         'ftm' => 'ftm',     'fta' => 'fta',       'ftpct' => 'ftp',
         'tgm' => 'tgm',     'tga' => 'tga',       'tpct' => 'tgp',
-        'orb' => 'orb',     'reb' => 'reb',       'ast' => 'ast',
+        'orb' => 'orb',     'drb' => 'drb',       'reb' => 'reb',       'ast' => 'ast',
         'stl' => 'stl',     'tvr' => 'tvr',       'blk' => 'blk',
         'pf' => 'pf',
     ];
@@ -126,6 +126,7 @@ class CareerLeaderboardsView implements CareerLeaderboardsViewInterface
             <th<?= $this->sortAttr('tga') ?>>3GA</th>
             <th<?= $this->sortAttr('tgp') ?>>3P%</th>
             <th<?= $this->sortAttr('orb') ?>>ORB</th>
+            <th<?= $this->sortAttr('drb') ?>>DRB</th>
             <th<?= $this->sortAttr('reb') ?>>REB</th>
             <th<?= $this->sortAttr('ast') ?>>AST</th>
             <th<?= $this->sortAttr('stl') ?>>STL</th>
@@ -168,6 +169,7 @@ class CareerLeaderboardsView implements CareerLeaderboardsViewInterface
     <td<?= $this->sortAttr('tga') ?>><?= HtmlSanitizer::e($stats['tga']) ?></td>
     <td<?= $this->sortAttr('tgp') ?>><?= HtmlSanitizer::e($stats['tgp']) ?></td>
     <td<?= $this->sortAttr('orb') ?>><?= HtmlSanitizer::e($stats['orb']) ?></td>
+    <td<?= $this->sortAttr('drb') ?>><?= HtmlSanitizer::e($stats['drb']) ?></td>
     <td<?= $this->sortAttr('reb') ?>><?= HtmlSanitizer::e($stats['reb']) ?></td>
     <td<?= $this->sortAttr('ast') ?>><?= HtmlSanitizer::e($stats['ast']) ?></td>
     <td<?= $this->sortAttr('stl') ?>><?= HtmlSanitizer::e($stats['stl']) ?></td>

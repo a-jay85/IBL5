@@ -10,7 +10,7 @@ namespace CareerLeaderboards\Contracts;
  * Handles data transformation and calculations for career statistics.
  *
  * @phpstan-import-type CareerStatsRow from CareerLeaderboardsRepositoryInterface
- * @phpstan-type FormattedPlayerStats array{pid: int, name: string, games: string|float, minutes: string, fgm: string, fga: string, fgp: string, ftm: string, fta: string, ftp: string, tgm: string, tga: string, tgp: string, orb: string, reb: string, ast: string, stl: string, tvr: string, blk: string, pf: string, pts: string}
+ * @phpstan-type FormattedPlayerStats array{pid: int, name: string, games: string|float, minutes: string, fgm: string, fga: string, fgp: string, ftm: string, fta: string, ftp: string, tgm: string, tga: string, tgp: string, orb: string, drb: string, reb: string, ast: string, stl: string, tvr: string, blk: string, pf: string, pts: string}
  */
 interface CareerLeaderboardsServiceInterface
 {

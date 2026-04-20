@@ -128,6 +128,25 @@ final class CachedSeasonLeaderboardsRepositoryTest extends TestCase
         $this->assertSame(1, $result['results'][2]['pid']); // 200/80 = 2.5
     }
 
+    public function testSortsByDefensiveReboundsPerGame(): void
+    {
+        $stubInner = $this->createStub(SeasonLeaderboardsRepositoryInterface::class);
+        $repository = new CachedSeasonLeaderboardsRepository($stubInner, $this->cache);
+
+        $rows = [
+            $this->createRow(1, 'Low DREB', 2024, 1, 80, 800, orb: 50, reb: 200),  // dreb=150, /80=1.875
+            $this->createRow(2, 'High DREB', 2024, 2, 80, 800, orb: 50, reb: 600), // dreb=550, /80=6.875
+            $this->createRow(3, 'Mid DREB', 2024, 3, 80, 800, orb: 100, reb: 500), // dreb=400, /80=5.0
+        ];
+        $this->cache->set('season_leaderboards:leaders', $rows, 86400);
+
+        $result = $repository->getSeasonLeaders(['sortby' => 'DREB']);
+
+        $this->assertSame(2, $result['results'][0]['pid']); // 6.875
+        $this->assertSame(3, $result['results'][1]['pid']); // 5.0
+        $this->assertSame(1, $result['results'][2]['pid']); // 1.875
+    }
+
     public function testSortsByFgPct(): void
     {
         $stubInner = $this->createStub(SeasonLeaderboardsRepositoryInterface::class);

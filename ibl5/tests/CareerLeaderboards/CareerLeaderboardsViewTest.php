@@ -78,6 +78,17 @@ final class CareerLeaderboardsViewTest extends TestCase
         $this->assertStringContainsString('>FGA<', $html);
         $this->assertStringContainsString('>FG%<', $html);
         $this->assertStringContainsString('>PTS<', $html);
+
+        // DRB column appears between ORB and REB
+        $this->assertStringContainsString('>DRB<', $html);
+        $orbPos = strpos($html, '>ORB<');
+        $drbPos = strpos($html, '>DRB<');
+        $rebPos = strpos($html, '>REB<');
+        $this->assertNotFalse($orbPos);
+        $this->assertNotFalse($drbPos);
+        $this->assertNotFalse($rebPos);
+        $this->assertGreaterThan($orbPos, $drbPos);
+        $this->assertGreaterThan($drbPos, $rebPos);
     }
 
     public function testRenderPlayerRowCreatesValidHtml(): void

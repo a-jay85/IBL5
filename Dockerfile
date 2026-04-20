@@ -1,11 +1,10 @@
 FROM php:8.5-apache
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
-        libonig-dev \
         curl \
         unzip \
         default-mysql-client \
-    && docker-php-ext-install mysqli pdo pdo_mysql mbstring opcache \
+    && docker-php-ext-install mysqli pdo_mysql \
     && rm -rf /var/lib/apt/lists/*
 
 COPY docker/opcache.ini $PHP_INI_DIR/conf.d/opcache.ini

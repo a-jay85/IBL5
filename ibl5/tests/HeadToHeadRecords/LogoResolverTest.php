@@ -21,37 +21,35 @@ class LogoResolverTest extends TestCase
         self::assertSame('images/logo/new1.png', $result);
     }
 
-    public function testResolvesEraSpecificJpgWhenExists(): void
+    public function testResolvesEraSpecificPngWhenExists(): void
     {
         $tmpDir = sys_get_temp_dir() . '/logo_test_' . uniqid() . '/';
         mkdir($tmpDir . 'images/logo', 0777, true);
-        touch($tmpDir . 'images/logo/16(Kings).jpg');
+        touch($tmpDir . 'images/logo/new16(Kings).png');
 
         $resolver = new LogoResolver($tmpDir);
 
         $result = $resolver->resolve(16, 'Kings');
 
-        self::assertSame('images/logo/16(Kings).jpg', $result);
+        self::assertSame('images/logo/new16(Kings).png', $result);
 
-        unlink($tmpDir . 'images/logo/16(Kings).jpg');
+        unlink($tmpDir . 'images/logo/new16(Kings).png');
         rmdir($tmpDir . 'images/logo');
         rmdir($tmpDir . 'images');
         rmdir($tmpDir);
     }
 
-    public function testResolvesFranchiseFallbackJpgWhenNoEraFile(): void
+    public function testFallsBackToFranchisePngWhenNoEraFile(): void
     {
         $tmpDir = sys_get_temp_dir() . '/logo_test_' . uniqid() . '/';
         mkdir($tmpDir . 'images/logo', 0777, true);
-        touch($tmpDir . 'images/logo/16.jpg');
 
         $resolver = new LogoResolver($tmpDir);
 
         $result = $resolver->resolve(16, 'Kings');
 
-        self::assertSame('images/logo/16.jpg', $result);
+        self::assertSame('images/logo/new16.png', $result);
 
-        unlink($tmpDir . 'images/logo/16.jpg');
         rmdir($tmpDir . 'images/logo');
         rmdir($tmpDir . 'images');
         rmdir($tmpDir);

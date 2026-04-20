@@ -52,8 +52,8 @@ class HeadToHeadRecordsViewTest extends TestCase
     {
         $payload = [
             'axis' => [
-                ['key' => 1, 'label' => 'Warriors', 'logo' => 'images/logo/new1.png', 'franchise_id' => 1],
-                ['key' => 2, 'label' => 'Metros', 'logo' => 'images/logo/new2.png', 'franchise_id' => 2],
+                ['key' => 1, 'label' => 'Warriors', 'logo' => 'images/logo/new1.png', 'franchise_id' => 1, 'color1' => '', 'color2' => ''],
+                ['key' => 2, 'label' => 'Metros', 'logo' => 'images/logo/new2.png', 'franchise_id' => 2, 'color1' => '', 'color2' => ''],
             ],
             'matrix' => [
                 1 => [2 => ['wins' => 5, 'losses' => 3]],
@@ -74,7 +74,7 @@ class HeadToHeadRecordsViewTest extends TestCase
     {
         $payload = [
             'axis' => [
-                ['key' => 1, 'label' => 'Warriors', 'logo' => '', 'franchise_id' => 1],
+                ['key' => 1, 'label' => 'Warriors', 'logo' => '', 'franchise_id' => 1, 'color1' => '', 'color2' => ''],
             ],
             'matrix' => [],
         ];
@@ -88,8 +88,8 @@ class HeadToHeadRecordsViewTest extends TestCase
     {
         $payload = [
             'axis' => [
-                ['key' => 1, 'label' => 'Warriors', 'logo' => '', 'franchise_id' => 1],
-                ['key' => 2, 'label' => 'Metros', 'logo' => '', 'franchise_id' => 2],
+                ['key' => 1, 'label' => 'Warriors', 'logo' => '', 'franchise_id' => 1, 'color1' => '', 'color2' => ''],
+                ['key' => 2, 'label' => 'Metros', 'logo' => '', 'franchise_id' => 2, 'color1' => '', 'color2' => ''],
             ],
             'matrix' => [],
         ];
@@ -104,8 +104,8 @@ class HeadToHeadRecordsViewTest extends TestCase
     {
         $payload = [
             'axis' => [
-                ['key' => 1, 'label' => 'Warriors', 'logo' => '', 'franchise_id' => 1],
-                ['key' => 2, 'label' => 'Metros', 'logo' => '', 'franchise_id' => 2],
+                ['key' => 1, 'label' => 'Warriors', 'logo' => '', 'franchise_id' => 1, 'color1' => '', 'color2' => ''],
+                ['key' => 2, 'label' => 'Metros', 'logo' => '', 'franchise_id' => 2, 'color1' => '', 'color2' => ''],
             ],
             'matrix' => [
                 1 => [2 => ['wins' => 5, 'losses' => 3]],
@@ -123,8 +123,8 @@ class HeadToHeadRecordsViewTest extends TestCase
     {
         $payload = [
             'axis' => [
-                ['key' => 1, 'label' => 'Warriors', 'logo' => '', 'franchise_id' => 1],
-                ['key' => 2, 'label' => 'Metros', 'logo' => '', 'franchise_id' => 2],
+                ['key' => 1, 'label' => 'Warriors', 'logo' => '', 'franchise_id' => 1, 'color1' => '', 'color2' => ''],
+                ['key' => 2, 'label' => 'Metros', 'logo' => '', 'franchise_id' => 2, 'color1' => '', 'color2' => ''],
             ],
             'matrix' => [
                 1 => [2 => ['wins' => 5, 'losses' => 5]],
@@ -140,8 +140,8 @@ class HeadToHeadRecordsViewTest extends TestCase
     {
         $payload = [
             'axis' => [
-                ['key' => 1, 'label' => 'A', 'logo' => '', 'franchise_id' => 1],
-                ['key' => 2, 'label' => 'B', 'logo' => '', 'franchise_id' => 2],
+                ['key' => 1, 'label' => 'A', 'logo' => '', 'franchise_id' => 1, 'color1' => '', 'color2' => ''],
+                ['key' => 2, 'label' => 'B', 'logo' => '', 'franchise_id' => 2, 'color1' => '', 'color2' => ''],
             ],
             'matrix' => [
                 1 => [2 => ['wins' => 5, 'losses' => 3]],
@@ -168,16 +168,39 @@ class HeadToHeadRecordsViewTest extends TestCase
     {
         $payload = [
             'axis' => [
-                ['key' => 'A-Jay', 'label' => 'A-Jay', 'logo' => '', 'franchise_id' => 0],
-                ['key' => 'Bob', 'label' => 'Bob', 'logo' => '', 'franchise_id' => 0],
+                ['key' => 'A-Jay', 'label' => 'A-Jay', 'logo' => '', 'franchise_id' => 0, 'color1' => '', 'color2' => ''],
+                ['key' => 'Bob', 'label' => 'Bob', 'logo' => '', 'franchise_id' => 0, 'color1' => '', 'color2' => ''],
             ],
             'matrix' => [
                 'A-Jay' => ['Bob' => ['wins' => 10, 'losses' => 5]],
             ],
         ];
 
-        $html = $this->view->renderMatrix($payload, []);
+        $html = $this->view->renderMatrix($payload, [], 'gms');
 
+        self::assertStringContainsString('h2h-gm-col-header', $html);
+        self::assertStringContainsString('h2h-gm-header', $html);
+        self::assertStringContainsString('A-Jay', $html);
+        self::assertStringNotContainsString('h2h-gm-col-logo', $html);
+    }
+
+    public function testRenderMatrixGmDimensionShowsLogoAndNameForActiveGm(): void
+    {
+        $payload = [
+            'axis' => [
+                ['key' => 'A-Jay', 'label' => 'A-Jay', 'logo' => 'images/logo/new13.png', 'franchise_id' => 13, 'color1' => 'FF0000', 'color2' => 'FFFFFF'],
+                ['key' => 'Bob', 'label' => 'Bob', 'logo' => '', 'franchise_id' => 0, 'color1' => '', 'color2' => ''],
+            ],
+            'matrix' => [
+                'A-Jay' => ['Bob' => ['wins' => 10, 'losses' => 5]],
+            ],
+        ];
+
+        $html = $this->view->renderMatrix($payload, [], 'gms');
+
+        self::assertStringContainsString('h2h-gm-col-header', $html);
+        self::assertStringContainsString('h2h-gm-col-logo', $html);
+        self::assertStringContainsString('images/logo/new13.png', $html);
         self::assertStringContainsString('h2h-gm-header', $html);
         self::assertStringContainsString('A-Jay', $html);
     }

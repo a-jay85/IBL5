@@ -17,7 +17,7 @@ class CachedHeadToHeadRecordsRepositoryTest extends TestCase
     public function testGetMatrixReturnsCachedResultOnHit(): void
     {
         $expected = [
-            'axis' => [['key' => 1, 'label' => 'Warriors', 'logo' => '', 'franchise_id' => 1]],
+            'axis' => [['key' => 1, 'label' => 'Warriors', 'logo' => '', 'franchise_id' => 1, 'color1' => '', 'color2' => '']],
             'matrix' => [],
         ];
 
@@ -38,7 +38,7 @@ class CachedHeadToHeadRecordsRepositoryTest extends TestCase
     public function testGetMatrixCallsInnerOnCacheMiss(): void
     {
         $expected = [
-            'axis' => [['key' => 1, 'label' => 'Warriors', 'logo' => '', 'franchise_id' => 1]],
+            'axis' => [['key' => 1, 'label' => 'Warriors', 'logo' => '', 'franchise_id' => 1, 'color1' => '', 'color2' => '']],
             'matrix' => [],
         ];
 

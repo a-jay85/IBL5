@@ -16,14 +16,9 @@ class LogoResolver
 
     public function resolve(int $franchiseId, string $teamName): string
     {
-        $eraSpecific = 'images/logo/' . $franchiseId . '(' . $teamName . ').jpg';
+        $eraSpecific = 'images/logo/new' . $franchiseId . '(' . $teamName . ').png';
         if (file_exists($this->basePath . $eraSpecific)) {
             return $eraSpecific;
-        }
-
-        $fallback = 'images/logo/' . $franchiseId . '.jpg';
-        if (file_exists($this->basePath . $fallback)) {
-            return $fallback;
         }
 
         return 'images/logo/new' . $franchiseId . '.png';

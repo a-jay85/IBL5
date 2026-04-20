@@ -8,6 +8,7 @@ use HeadToHeadRecords\Contracts\HeadToHeadRecordsRepositoryInterface;
 use Services\CommonMysqliRepository;
 
 /**
+ * @phpstan-import-type AxisEntry from HeadToHeadRecordsRepositoryInterface
  * @phpstan-import-type Dimension from HeadToHeadRecordsRepositoryInterface
  * @phpstan-import-type Phase from HeadToHeadRecordsRepositoryInterface
  * @phpstan-import-type Scope from HeadToHeadRecordsRepositoryInterface
@@ -77,7 +78,7 @@ class HeadToHeadRecordsController
 
         echo '<h2 class="ibl-title">Head-to-Head Records</h2>';
         echo $this->view->renderFilterForm($scope, $dimension, $phase);
-        echo $this->view->renderMatrix($payload, $userMatchKeys);
+        echo $this->view->renderMatrix($payload, $userMatchKeys, $dimension);
         echo $this->view->renderTapTooltipScript();
 
         \PageLayout\PageLayout::footer();
@@ -122,7 +123,7 @@ class HeadToHeadRecordsController
 
     /**
      * @param Dimension $dimension
-     * @param list<array{key: string|int, label: string, logo: string, franchise_id: int}> $axis
+     * @param list<AxisEntry> $axis
      * @return list<string|int>
      */
     private function resolveUserMatchKeys(string $dimension, string $username, int $franchiseId, array $axis): array

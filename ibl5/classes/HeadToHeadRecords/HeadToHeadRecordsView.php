@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace HeadToHeadRecords;
 
 use HeadToHeadRecords\Contracts\HeadToHeadRecordsRepositoryInterface;
+use UI\TableStyles;
 use Utilities\HtmlSanitizer;
 
 /**
@@ -64,8 +65,9 @@ class HeadToHeadRecordsView
     /**
      * @param MatrixPayload $payload
      * @param list<string|int> $userMatchKeys axis keys that match the logged-in user
+     * @param Dimension $dimension
      */
-    public function renderMatrix(array $payload, array $userMatchKeys): string
+    public function renderMatrix(array $payload, array $userMatchKeys, string $dimension = 'active_teams'): string
     {
         $axis = $payload['axis'];
         $matrix = $payload['matrix'];
@@ -87,9 +89,7 @@ class HeadToHeadRecordsView
     <?php
         $isUserCol = isset($userKeySet[$entry['key']]);
         $safeLabel = HtmlSanitizer::e($entry['label']);
-        $headerContent = $entry['logo'] !== ''
-            ? '<img src="' . HtmlSanitizer::e($entry['logo']) . '" width="40" height="40" alt="' . $safeLabel . '">'
-            : '<span class="h2h-gm-header">' . $safeLabel . '</span>';
+        $headerContent = $this->renderColumnHeader($entry, $safeLabel, $dimension);
         if ($isUserCol) {
             $headerContent = '<strong>' . $headerContent . '</strong>';
         }
@@ -101,11 +101,9 @@ class HeadToHeadRecordsView
 <?php foreach ($axis as $rowEntry):
     $rowKey = $rowEntry['key'];
     $isUserRow = isset($userKeySet[$rowKey]);
-    $safeRowLabel = HtmlSanitizer::e($rowEntry['label']);
-    $rowLabel = $isUserRow ? '<strong>' . $safeRowLabel . '</strong>' : $safeRowLabel;
 ?>
 <tr>
-    <td class="sticky-col h2h-row-label"><?= $rowLabel; ?></td>
+    <?= $this->renderRowLabelCell($rowEntry, $isUserRow); ?>
     <?php foreach ($axis as $colEntry):
         $colKey = $colEntry['key'];
         $isUserCell = $isUserRow || isset($userKeySet[$colKey]);
@@ -140,6 +138,61 @@ class HeadToHeadRecordsView
 </div>
         <?php
         return (string) ob_get_clean();
+    }
+
+    /**
+     * @param AxisEntry $entry
+     * @param Dimension $dimension
+     */
+    private function renderColumnHeader(array $entry, string $safeLabel, string $dimension): string
+    {
+        if ($dimension === 'gms') {
+            $nameHtml = '<span class="h2h-gm-header">' . $safeLabel . '</span>';
+            $logoHtml = $entry['logo'] !== ''
+                ? '<img src="' . HtmlSanitizer::e($entry['logo']) . '" width="24" height="24" alt="" class="h2h-gm-col-logo">'
+                : '';
+            return '<span class="h2h-gm-col-header">' . $nameHtml . $logoHtml . '</span>';
+        }
+
+        if ($entry['logo'] !== '') {
+            return '<img src="' . HtmlSanitizer::e($entry['logo']) . '" width="40" height="40" alt="' . $safeLabel . '">';
+        }
+
+        return '<span class="h2h-gm-header">' . $safeLabel . '</span>';
+    }
+
+    /**
+     * @param AxisEntry $entry
+     */
+    private function renderRowLabelCell(array $entry, bool $isUserRow): string
+    {
+        $safeLabel = HtmlSanitizer::e($entry['label']);
+        $labelHtml = $isUserRow ? '<strong>' . $safeLabel . '</strong>' : $safeLabel;
+
+        if ($entry['color1'] === '') {
+            return '<td class="sticky-col h2h-row-label">' . $labelHtml . '</td>';
+        }
+
+        $color1 = TableStyles::sanitizeColor($entry['color1']);
+        $color2 = TableStyles::sanitizeColor($entry['color2']);
+        $safeLogo = HtmlSanitizer::e($entry['logo']);
+        $franchiseId = $entry['franchise_id'];
+        $href = $franchiseId > 0
+            ? 'modules.php?name=Team&amp;op=team&amp;teamID=' . $franchiseId
+            : '';
+
+        $logoHtml = $entry['logo'] !== ''
+            ? '<img src="' . $safeLogo . '" alt="" class="ibl-team-cell__logo" width="24" height="24" loading="lazy">'
+            : '';
+        $innerHtml = $logoHtml . '<span class="ibl-team-cell__text">' . $labelHtml . '</span>';
+
+        $body = $href !== ''
+            ? '<a href="' . $href . '" class="ibl-team-cell__name" aria-label="' . $safeLabel . '">' . $innerHtml . '</a>'
+            : '<span class="ibl-team-cell__name">' . $innerHtml . '</span>';
+
+        return '<td class="sticky-col h2h-row-label h2h-row-label--colored ibl-team-cell--colored" style="--h2h-row-bg: #' . $color1 . '; --h2h-row-fg: #' . $color2 . ';">'
+            . $body
+            . '</td>';
     }
 
     public function renderTapTooltipScript(): string

@@ -143,15 +143,20 @@ class HeadToHeadRecordsRepository extends \BaseMysqliRepository implements HeadT
             ? $this->fetchAll($axisSql, 'i', $currentSeasonYear)
             : $this->fetchAll($axisSql, '');
 
+        $colorMap = $this->getColorsForTriplets($axisRows);
+
         /** @var list<AxisEntry> $axis */
         $axis = [];
         foreach ($axisRows as $row) {
             $key = $row['franchise_id'] . ':' . $row['team_city'] . ' ' . $row['team_name'];
+            $colors = $colorMap[$key] ?? ['color1' => '', 'color2' => ''];
             $axis[] = [
                 'key' => $key,
                 'label' => $row['team_city'] . ' ' . $row['team_name'],
                 'logo' => $this->logoResolver->resolve($row['franchise_id'], $row['team_name']),
                 'franchise_id' => $row['franchise_id'],
+                'color1' => $colors['color1'],
+                'color2' => $colors['color2'],
             ];
         }
 
@@ -252,14 +257,31 @@ class HeadToHeadRecordsRepository extends \BaseMysqliRepository implements HeadT
             ? $this->fetchAll($axisSql, 'i', $currentSeasonYear)
             : $this->fetchAll($axisSql, '');
 
+        $singleFranchiseMap = $this->getSingleFranchiseGmColors();
+        $activeMap = $this->getActiveGmFranchises();
+
         /** @var list<AxisEntry> $axis */
         $axis = [];
         foreach ($axisRows as $row) {
+            $gmName = $row['gm_display_name'];
+            $branding = $singleFranchiseMap[$gmName] ?? null;
+            $activeFranchiseId = $activeMap[$gmName] ?? null;
+
+            if ($activeFranchiseId !== null) {
+                $logo = 'images/logo/new' . $activeFranchiseId . '.png';
+            } elseif ($branding !== null) {
+                $logo = $this->logoResolver->resolve($branding['franchise_id'], $branding['team_name']);
+            } else {
+                $logo = '';
+            }
+
             $axis[] = [
-                'key' => $row['gm_display_name'],
-                'label' => $row['gm_display_name'],
-                'logo' => '',
-                'franchise_id' => 0,
+                'key' => $gmName,
+                'label' => $gmName,
+                'logo' => $logo,
+                'franchise_id' => $activeFranchiseId ?? ($branding['franchise_id'] ?? 0),
+                'color1' => $branding['color1'] ?? '',
+                'color2' => $branding['color2'] ?? '',
             ];
         }
 
@@ -342,9 +364,9 @@ class HeadToHeadRecordsRepository extends \BaseMysqliRepository implements HeadT
      */
     private function getActiveTeamsAxis(): array
     {
-        /** @var list<array{teamid: int, team_city: string, team_name: string}> $teams */
+        /** @var list<array{teamid: int, team_city: string, team_name: string, color1: string, color2: string}> $teams */
         $teams = $this->fetchAll(
-            "SELECT teamid, team_city, team_name FROM ibl_team_info
+            "SELECT teamid, team_city, team_name, color1, color2 FROM ibl_team_info
              WHERE teamid BETWEEN 1 AND " . League::MAX_REAL_TEAMID . "
              ORDER BY teamid ASC",
             ''
@@ -358,10 +380,123 @@ class HeadToHeadRecordsRepository extends \BaseMysqliRepository implements HeadT
                 'label' => $team['team_name'],
                 'logo' => 'images/logo/new' . $team['teamid'] . '.png',
                 'franchise_id' => $team['teamid'],
+                'color1' => $team['color1'],
+                'color2' => $team['color2'],
             ];
         }
 
         return $axis;
+    }
+
+    /**
+     * @return array<string, int> gm_display_name => franchise_id for GMs with active tenures
+     */
+    private function getActiveGmFranchises(): array
+    {
+        /** @var list<array{gm_display_name: string, franchise_id: int}> $rows */
+        $rows = $this->fetchAll(
+            "SELECT gm_display_name, franchise_id FROM ibl_gm_tenures WHERE end_season_year IS NULL",
+            ''
+        );
+
+        /** @var array<string, int> $map */
+        $map = [];
+        foreach ($rows as $row) {
+            $map[$row['gm_display_name']] = $row['franchise_id'];
+        }
+
+        return $map;
+    }
+
+    /**
+     * Find GMs whose entire IBL tenure has been with exactly one franchise and
+     * return that franchise's branding (team_name, colors). Used to color the
+     * GM row labels in the H2H matrix.
+     *
+     * @return array<string, array{franchise_id: int, team_name: string, color1: string, color2: string}>
+     */
+    private function getSingleFranchiseGmColors(): array
+    {
+        $sql = "SELECT gt.gm_display_name, gt.franchise_id,
+                       COALESCE(ti.team_name, tih.team_name, '') AS team_name,
+                       COALESCE(ti.color1, tih.color1, '') AS color1,
+                       COALESCE(ti.color2, tih.color2, '') AS color2
+                FROM (
+                    SELECT gm_display_name, MIN(franchise_id) AS franchise_id
+                    FROM ibl_gm_tenures
+                    GROUP BY gm_display_name
+                    HAVING COUNT(DISTINCT franchise_id) = 1
+                ) gt
+                LEFT JOIN ibl_team_info ti ON ti.teamid = gt.franchise_id
+                LEFT JOIN ibl_team_info_history tih ON tih.franchise_id = gt.franchise_id";
+
+        /** @var list<array{gm_display_name: string, franchise_id: int, team_name: string, color1: string, color2: string}> $rows */
+        $rows = $this->fetchAll($sql, '');
+
+        /** @var array<string, array{franchise_id: int, team_name: string, color1: string, color2: string}> $map */
+        $map = [];
+        foreach ($rows as $row) {
+            $map[$row['gm_display_name']] = [
+                'franchise_id' => $row['franchise_id'],
+                'team_name' => $row['team_name'],
+                'color1' => $row['color1'],
+                'color2' => $row['color2'],
+            ];
+        }
+
+        return $map;
+    }
+
+    /**
+     * Fetch color pairs for (franchise_id, team_city, team_name) triplets from
+     * ibl_team_info (active franchises) falling back to ibl_team_info_history
+     * (inactive franchises) when the active row doesn't match the historical
+     * city/name for this era.
+     *
+     * @param list<array{franchise_id: int, team_city: string, team_name: string}> $triplets
+     * @return array<string, array{color1: string, color2: string}> keyed by "franchise_id:team_city team_name"
+     */
+    private function getColorsForTriplets(array $triplets): array
+    {
+        if ($triplets === []) {
+            return [];
+        }
+
+        $placeholders = implode(',', array_fill(0, count($triplets), '(?, ?, ?)'));
+        $types = str_repeat('iss', count($triplets));
+
+        /** @var list<int|string> $params */
+        $params = [];
+        foreach ($triplets as $t) {
+            $params[] = $t['franchise_id'];
+            $params[] = $t['team_city'];
+            $params[] = $t['team_name'];
+        }
+
+        $sql = "SELECT franchise_id, team_city, team_name, color1, color2 FROM (
+                    SELECT teamid AS franchise_id, team_city, team_name, color1, color2, 1 AS priority
+                    FROM ibl_team_info
+                    UNION ALL
+                    SELECT franchise_id, team_city, team_name, color1, color2, 2 AS priority
+                    FROM ibl_team_info_history
+                ) combined
+                WHERE (franchise_id, team_city, team_name) IN ({$placeholders})
+                ORDER BY priority ASC";
+
+        /** @var list<array{franchise_id: int, team_city: string, team_name: string, color1: string, color2: string}> $rows */
+        $rows = $this->fetchAll($sql, $types, ...$params);
+
+        /** @var array<string, array{color1: string, color2: string}> $map */
+        $map = [];
+        foreach ($rows as $row) {
+            $key = $row['franchise_id'] . ':' . $row['team_city'] . ' ' . $row['team_name'];
+            // First row wins due to `ORDER BY priority ASC` — ibl_team_info takes precedence.
+            if (!isset($map[$key])) {
+                $map[$key] = ['color1' => $row['color1'], 'color2' => $row['color2']];
+            }
+        }
+
+        return $map;
     }
 
     /**

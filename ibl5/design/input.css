@@ -91,6 +91,7 @@
 @import './components/ratings-diff.css';
 @import './components/htmx.css';
 @import './components/debug.css';
+@import './components/head-to-head-records.css';
 
 /* Site-wide layout wrapper (replaces legacy themeheader table) */
 @layer components {

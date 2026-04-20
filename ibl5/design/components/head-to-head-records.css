@@ -32,14 +32,54 @@
         min-width: 100px;
     }
 
+    /* Team-colored row labels (matches the legacy SeriesRecords Y-axis look).
+       Colors are supplied per-element via --h2h-row-bg / --h2h-row-fg custom
+       properties set in the View. */
+    .h2h-row-label--colored {
+        background-color: var(--h2h-row-bg);
+    }
+
+    .h2h-row-label--colored .ibl-team-cell__name {
+        color: var(--h2h-row-fg);
+    }
+
+    .h2h-row-label--colored .ibl-team-cell__name:hover {
+        opacity: 0.85;
+    }
+
     .h2h-gm-header {
         display: inline-block;
         writing-mode: vertical-rl;
-        text-orientation: mixed;
+        text-orientation: sideways;
         transform: rotate(180deg);
         max-height: 100px;
         overflow: hidden;
         font-size: 0.75rem;
+        white-space: nowrap;
+    }
+
+    .h2h-gm-col-header {
+        display: inline-flex;
+        flex-direction: column;
+        align-items: center;
+    }
+
+    .h2h-gm-col-logo {
+        margin-top: 4px;
+        flex-shrink: 0;
+        width: 28px;
+        height: 28px;
+        object-fit: contain;
+    }
+
+    .h2h-table th:has(.h2h-gm-col-header) {
+        vertical-align: bottom;
+        height: 1px;
+    }
+
+    .h2h-table th:has(.h2h-gm-col-header) .h2h-gm-col-header {
+        height: 100%;
+        justify-content: flex-end;
     }
 
     .h2h-empty-state {

@@ -1,6 +1,6 @@
 {
     "require": {
-        "php": ">=8.4",
+        "php": ">=8.5",
         "phpmailer/phpmailer": "^7.0",
         "delight-im/auth": "^9.0",
         "monolog/monolog": "^3.0"

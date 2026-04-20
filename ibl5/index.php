@@ -15,7 +15,9 @@ require_once __DIR__ . '/mainfile.php';
 global $prefix, $db;
 
 $modpath = '';
-define('MODULE_FILE', true);
+if (!defined('MODULE_FILE')) {
+    define('MODULE_FILE', true);
+}
 $_SERVER['PHP_SELF'] = "modules.php";
 $name = 'News';
 define('HOME_FILE', true);

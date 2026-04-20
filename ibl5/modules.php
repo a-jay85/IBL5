@@ -12,7 +12,9 @@
 /* the Free Software Foundation; either version 2 of the License.       */
 /************************************************************************/
 
-define('MODULE_FILE', true);
+if (!defined('MODULE_FILE')) {
+    define('MODULE_FILE', true);
+}
 require_once __DIR__ . '/mainfile.php';
 
 if (isset($name) && $name == $_REQUEST['name']) {

@@ -27,7 +27,8 @@
   },
   "overrides": {
     "lodash": "4.18.1",
-    "lodash-es": "4.18.1"
+    "lodash-es": "4.18.1",
+    "tmp": "0.2.5"
   },
   "devDependencies": {
     "@axe-core/playwright": "^4.11.1",

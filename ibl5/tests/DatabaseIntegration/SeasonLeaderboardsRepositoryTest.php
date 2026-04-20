@@ -90,7 +90,7 @@ class SeasonLeaderboardsRepositoryTest extends DatabaseTestCase
             'pts' => 500, 'fgm' => 150, 'ftm' => 50, 'tgm' => 50, 'games' => 50,
         ]);
 
-        $result = $this->repo->getSeasonLeaders(['sortby' => '1'], 0);
+        $result = $this->repo->getSeasonLeaders(['sortby' => 'PPG'], 0);
         $rows = $result['results'];
 
         $highIdx = null;

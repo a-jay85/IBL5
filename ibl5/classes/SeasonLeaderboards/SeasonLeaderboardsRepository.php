@@ -50,7 +50,7 @@ class SeasonLeaderboardsRepository extends \BaseMysqliRepository implements Seas
             $where->add('h.teamid = ?', 'i', $teamId);
         }
 
-        $sortBy = $this->getSortColumn((string) ($filters['sortby'] ?? '1'));
+        $sortBy = $this->getSortColumn((string) ($filters['sortby'] ?? 'PPG'));
 
         // NOTE: $sortBy is validated in getSortColumn() against a strict whitelist
         $query = "SELECT h.*, t.team_city, t.color1, t.color2
@@ -102,41 +102,41 @@ class SeasonLeaderboardsRepository extends \BaseMysqliRepository implements Seas
 
     /**
      * Map sort option to database column/expression for ORDER BY clause
-     * 
+     *
      * SECURITY NOTE: This method acts as a whitelist for ORDER BY expressions.
-     * All possible sort options (1-20) are mapped to pre-defined SQL expressions.
+     * All sort options are mapped to pre-defined SQL expressions.
      * String concatenation in ORDER BY clauses is acceptable because values come
      * from this strict whitelist, not user input.
-     * 
-     * @param string $sortBy Sort option identifier (1-20)
+     *
+     * @param string $sortBy Sort option identifier (PPG, REB, OREB, DREB, etc.)
      * @return string SQL expression for sorting
      */
     private function getSortColumn(string $sortBy): string
     {
         $sortMap = [
-            '1' => '((2*`fgm`+`ftm`+`tgm`)/`games`)', // PPG
-            '2' => '((reb)/`games`)',                   // REB
-            '3' => '((orb)/`games`)',                   // OREB
-            '4' => '((ast)/`games`)',                   // AST
-            '5' => '((stl)/`games`)',                   // STL
-            '6' => '((blk)/`games`)',                   // BLK
-            '7' => '((tvr)/`games`)',                   // TO
-            '8' => '((pf)/`games`)',                    // FOUL
-            '9' => '((((2*fgm+ftm+tgm)+reb+(2*ast)+(2*stl)+(2*blk))-((fga-fgm)+(fta-ftm)+tvr+pf))/games)', // QA
-            '10' => '((fgm)/`games`)',                  // FGM
-            '11' => '((fga)/`games`)',                  // FGA
-            '12' => '(fgm/fga)',                        // FG%
-            '13' => '((ftm)/`games`)',                  // FTM
-            '14' => '((fta)/`games`)',                  // FTA
-            '15' => '(ftm/fta)',                        // FT%
-            '16' => '((tgm)/`games`)',                  // TGM
-            '17' => '((tga)/`games`)',                  // TGA
-            '18' => '(tgm/tga)',                        // TG%
-            '19' => '(games)',                          // GAMES
-            '20' => '((min)/`games`)',                  // MIN
+            'PPG' => '((2*`fgm`+`ftm`+`tgm`)/`games`)',
+            'REB' => '((`reb`)/`games`)',
+            'OREB' => '((`orb`)/`games`)',
+            'DREB' => '((`reb`-`orb`)/`games`)',
+            'AST' => '((`ast`)/`games`)',
+            'STL' => '((`stl`)/`games`)',
+            'BLK' => '((`blk`)/`games`)',
+            'TO' => '((`tvr`)/`games`)',
+            'FOUL' => '((`pf`)/`games`)',
+            'QA' => '((((2*fgm+ftm+tgm)+reb+(2*ast)+(2*stl)+(2*blk))-((fga-fgm)+(fta-ftm)+tvr+pf))/games)',
+            'FGM' => '((`fgm`)/`games`)',
+            'FGA' => '((`fga`)/`games`)',
+            'FGP' => '(fgm/fga)',
+            'FTM' => '((`ftm`)/`games`)',
+            'FTA' => '((`fta`)/`games`)',
+            'FTP' => '(ftm/fta)',
+            'TGM' => '((`tgm`)/`games`)',
+            'TGA' => '((`tga`)/`games`)',
+            'TGP' => '(tgm/tga)',
+            'GAMES' => '(games)',
+            'MIN' => '((`minutes`)/`games`)',
         ];
-        
-        // Default to PPG if invalid sort option
-        return $sortMap[$sortBy] ?? $sortMap['1'];
+
+        return $sortMap[$sortBy] ?? $sortMap['PPG'];
     }
 }

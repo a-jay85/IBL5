@@ -42,6 +42,7 @@ class CareerLeaderboardsService implements CareerLeaderboardsServiceInterface
             $tga = StatsFormatter::formatAverage($row['tga']);
             $tgp = StatsFormatter::formatPercentageWithDecimals($row['tpct'] ?? null, 1, 3);
             $orb = StatsFormatter::formatAverage($row['orb']);
+            $drb = StatsFormatter::formatAverage((float) $row['reb'] - (float) $row['orb']);
             $reb = StatsFormatter::formatAverage($row['reb']);
             $ast = StatsFormatter::formatAverage($row['ast']);
             $stl = StatsFormatter::formatAverage($row['stl']);
@@ -63,6 +64,7 @@ class CareerLeaderboardsService implements CareerLeaderboardsServiceInterface
             $tga = StatsFormatter::formatTotal($row['tga']);
             $tgp = StatsFormatter::formatPercentage($row['tgm'], $row['tga']);
             $orb = StatsFormatter::formatTotal($row['orb']);
+            $drb = StatsFormatter::formatTotal((int) $row['reb'] - (int) $row['orb']);
             $reb = StatsFormatter::formatTotal($row['reb']);
             $ast = StatsFormatter::formatTotal($row['ast']);
             $stl = StatsFormatter::formatTotal($row['stl']);
@@ -87,6 +89,7 @@ class CareerLeaderboardsService implements CareerLeaderboardsServiceInterface
             'tga' => $tga,
             'tgp' => $tgp,
             'orb' => $orb,
+            'drb' => $drb,
             'reb' => $reb,
             'ast' => $ast,
             'stl' => $stl,
@@ -141,6 +144,7 @@ class CareerLeaderboardsService implements CareerLeaderboardsServiceInterface
             'tga' => 'Three-Pointers Attempted',
             'tpct' => '3P Percentage (avgs only)',
             'orb' => 'Offensive Rebounds',
+            'drb' => 'Defensive Rebounds',
             'reb' => 'Total Rebounds',
             'ast' => 'Assists',
             'stl' => 'Steals',

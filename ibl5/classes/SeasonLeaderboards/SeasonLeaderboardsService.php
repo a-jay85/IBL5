@@ -66,6 +66,7 @@ class SeasonLeaderboardsService implements SeasonLeaderboardsServiceInterface
         $tgmpg = StatsFormatter::formatPerGameAverage($tgm, $games);
         $tgapg = StatsFormatter::formatPerGameAverage($tga, $games);
         $orbpg = StatsFormatter::formatPerGameAverage($orb, $games);
+        $drebpg = StatsFormatter::formatPerGameAverage($reb - $orb, $games);
         $rpg = StatsFormatter::formatPerGameAverage($reb, $games);
         $apg = StatsFormatter::formatPerGameAverage($ast, $games);
         $spg = StatsFormatter::formatPerGameAverage($stl, $games);
@@ -113,6 +114,7 @@ class SeasonLeaderboardsService implements SeasonLeaderboardsServiceInterface
             'tgmpg' => $tgmpg,
             'tgapg' => $tgapg,
             'orbpg' => $orbpg,
+            'drebpg' => $drebpg,
             'rpg' => $rpg,
             'apg' => $apg,
             'spg' => $spg,
@@ -157,14 +159,17 @@ class SeasonLeaderboardsService implements SeasonLeaderboardsServiceInterface
     /**
      * @see SeasonLeaderboardsServiceInterface::getSortOptions()
      *
-     * @return list<string>
+     * @return array<string, string>
      */
     public function getSortOptions(): array
     {
         return [
-            "PPG", "REB", "OREB", "AST", "STL", "BLK", "TO", "FOUL", 
-            "QA", "FGM", "FGA", "FG%", "FTM", "FTA", "FT%", 
-            "TGM", "TGA", "TG%", "GAMES", "MIN"
+            'PPG' => 'PPG', 'REB' => 'REB', 'OREB' => 'OREB', 'DREB' => 'DREB',
+            'AST' => 'AST', 'STL' => 'STL', 'BLK' => 'BLK', 'TO' => 'TO',
+            'FOUL' => 'FOUL', 'QA' => 'QA', 'FGM' => 'FGM', 'FGA' => 'FGA',
+            'FGP' => 'FG%', 'FTM' => 'FTM', 'FTA' => 'FTA', 'FTP' => 'FT%',
+            'TGM' => 'TGM', 'TGA' => 'TGA', 'TGP' => 'TG%', 'GAMES' => 'GAMES',
+            'MIN' => 'MIN',
         ];
     }
 }

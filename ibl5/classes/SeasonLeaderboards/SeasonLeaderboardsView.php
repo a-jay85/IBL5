@@ -24,11 +24,12 @@ class SeasonLeaderboardsView implements SeasonLeaderboardsViewInterface
     private string $activeSortColumn = 'ppg';
 
     private const SORT_TO_COLUMN = [
-        '1' => 'ppg',    '2' => 'rpg',    '3' => 'orbpg',  '4' => 'apg',
-        '5' => 'spg',    '6' => 'bpg',    '7' => 'tpg',    '8' => 'fpg',
-        '9' => 'qa',     '10' => 'fgmpg', '11' => 'fgapg', '12' => 'fgp',
-        '13' => 'ftmpg', '14' => 'ftapg', '15' => 'ftp',   '16' => 'tgmpg',
-        '17' => 'tgapg', '18' => 'tgp',   '19' => 'games', '20' => 'mpg',
+        'PPG' => 'ppg',    'REB' => 'rpg',     'OREB' => 'orbpg',  'DREB' => 'drebpg',
+        'AST' => 'apg',    'STL' => 'spg',     'BLK' => 'bpg',     'TO' => 'tpg',
+        'FOUL' => 'fpg',   'QA' => 'qa',       'FGM' => 'fgmpg',   'FGA' => 'fgapg',
+        'FGP' => 'fgp',    'FTM' => 'ftmpg',   'FTA' => 'ftapg',   'FTP' => 'ftp',
+        'TGM' => 'tgmpg',  'TGA' => 'tgapg',   'TGP' => 'tgp',     'GAMES' => 'games',
+        'MIN' => 'mpg',
     ];
 
     public function __construct(SeasonLeaderboardsService $service)
@@ -57,7 +58,7 @@ class SeasonLeaderboardsView implements SeasonLeaderboardsViewInterface
     {
         $selectedTeam = (int) ($currentFilters['team'] ?? 0);
         $selectedYear = (string) ($currentFilters['year'] ?? '');
-        $selectedSort = (string) ($currentFilters['sortby'] ?? '1');
+        $selectedSort = (string) ($currentFilters['sortby'] ?? 'PPG');
         $limitValue = (string) ($currentFilters['limit'] ?? '');
 
         ob_start();
@@ -140,11 +141,9 @@ class SeasonLeaderboardsView implements SeasonLeaderboardsViewInterface
     {
         $html = '';
         $sortOptions = $this->service->getSortOptions();
-        $i = 1;
-        foreach ($sortOptions as $label) {
-            $selected = ($i === (int)$selectedSort) ? ' selected' : '';
-            $html .= '<option value="' . $i . '"' . $selected . '>' . HtmlSanitizer::e($label) . '</option>' . "\n";
-            $i++;
+        foreach ($sortOptions as $key => $label) {
+            $selected = ($key === $selectedSort) ? ' selected' : '';
+            $html .= '<option value="' . HtmlSanitizer::e($key) . '"' . $selected . '>' . HtmlSanitizer::e($label) . '</option>' . "\n";
         }
         return $html;
     }
@@ -176,6 +175,7 @@ class SeasonLeaderboardsView implements SeasonLeaderboardsViewInterface
             <th<?= $this->sortAttr('tgapg') ?>>tga</th>
             <th<?= $this->sortAttr('tgp') ?>>tg%</th>
             <th<?= $this->sortAttr('orbpg') ?>>orb</th>
+            <th<?= $this->sortAttr('drebpg') ?>>dreb</th>
             <th<?= $this->sortAttr('rpg') ?>>reb</th>
             <th<?= $this->sortAttr('apg') ?>>ast</th>
             <th<?= $this->sortAttr('spg') ?>>stl</th>
@@ -221,6 +221,7 @@ class SeasonLeaderboardsView implements SeasonLeaderboardsViewInterface
     <td<?= $this->sortAttr('tgapg') ?>><?= $stats['tgapg'] ?></td>
     <td<?= $this->sortAttr('tgp') ?>><?= $stats['tgp'] ?></td>
     <td<?= $this->sortAttr('orbpg') ?>><?= $stats['orbpg'] ?></td>
+    <td<?= $this->sortAttr('drebpg') ?>><?= $stats['drebpg'] ?></td>
     <td<?= $this->sortAttr('rpg') ?>><?= $stats['rpg'] ?></td>
     <td<?= $this->sortAttr('apg') ?>><?= $stats['apg'] ?></td>
     <td<?= $this->sortAttr('spg') ?>><?= $stats['spg'] ?></td>

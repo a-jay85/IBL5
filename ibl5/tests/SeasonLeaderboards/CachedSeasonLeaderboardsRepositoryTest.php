@@ -27,7 +27,7 @@ final class CachedSeasonLeaderboardsRepositoryTest extends TestCase
 
         $mockInner->expects($this->never())->method('getSeasonLeaders');
 
-        $result = $repository->getSeasonLeaders(['sortby' => '1'], 0);
+        $result = $repository->getSeasonLeaders(['sortby' => 'PPG'], 0);
 
         $this->assertSame(3, $result['count']);
     }
@@ -44,7 +44,7 @@ final class CachedSeasonLeaderboardsRepositoryTest extends TestCase
             ->with([], 0)
             ->willReturn(['results' => $rows, 'count' => 3]);
 
-        $result = $repository->getSeasonLeaders(['sortby' => '1'], 0);
+        $result = $repository->getSeasonLeaders(['sortby' => 'PPG'], 0);
 
         $this->assertSame(3, $result['count']);
         $this->assertNotNull($this->cache->get('season_leaderboards:leaders'));
@@ -62,7 +62,7 @@ final class CachedSeasonLeaderboardsRepositoryTest extends TestCase
         ];
         $this->cache->set('season_leaderboards:leaders', $rows, 86400);
 
-        $result = $repository->getSeasonLeaders(['year' => '2024', 'sortby' => '1']);
+        $result = $repository->getSeasonLeaders(['year' => '2024', 'sortby' => 'PPG']);
 
         $this->assertSame(2, $result['count']);
         $pids = array_column($result['results'], 'pid');
@@ -82,7 +82,7 @@ final class CachedSeasonLeaderboardsRepositoryTest extends TestCase
         ];
         $this->cache->set('season_leaderboards:leaders', $rows, 86400);
 
-        $result = $repository->getSeasonLeaders(['team' => 5, 'sortby' => '1']);
+        $result = $repository->getSeasonLeaders(['team' => 5, 'sortby' => 'PPG']);
 
         $this->assertSame(2, $result['count']);
         $pids = array_column($result['results'], 'pid');
@@ -102,7 +102,7 @@ final class CachedSeasonLeaderboardsRepositoryTest extends TestCase
         ];
         $this->cache->set('season_leaderboards:leaders', $rows, 86400);
 
-        $result = $repository->getSeasonLeaders(['sortby' => '1']);
+        $result = $repository->getSeasonLeaders(['sortby' => 'PPG']);
 
         $this->assertSame(2, $result['results'][0]['pid']); // High Scorer: (2*500+200+100)/80 = 16.25
         $this->assertSame(3, $result['results'][1]['pid']); // Mid Scorer: (2*350+150+75)/80 = 11.5625
@@ -121,11 +121,30 @@ final class CachedSeasonLeaderboardsRepositoryTest extends TestCase
         ];
         $this->cache->set('season_leaderboards:leaders', $rows, 86400);
 
-        $result = $repository->getSeasonLeaders(['sortby' => '2']);
+        $result = $repository->getSeasonLeaders(['sortby' => 'REB']);
 
         $this->assertSame(2, $result['results'][0]['pid']); // 600/80 = 7.5
         $this->assertSame(3, $result['results'][1]['pid']); // 400/80 = 5.0
         $this->assertSame(1, $result['results'][2]['pid']); // 200/80 = 2.5
+    }
+
+    public function testSortsByDefensiveReboundsPerGame(): void
+    {
+        $stubInner = $this->createStub(SeasonLeaderboardsRepositoryInterface::class);
+        $repository = new CachedSeasonLeaderboardsRepository($stubInner, $this->cache);
+
+        $rows = [
+            $this->createRow(1, 'Low DREB', 2024, 1, 80, 800, orb: 50, reb: 200),  // dreb=150, /80=1.875
+            $this->createRow(2, 'High DREB', 2024, 2, 80, 800, orb: 50, reb: 600), // dreb=550, /80=6.875
+            $this->createRow(3, 'Mid DREB', 2024, 3, 80, 800, orb: 100, reb: 500), // dreb=400, /80=5.0
+        ];
+        $this->cache->set('season_leaderboards:leaders', $rows, 86400);
+
+        $result = $repository->getSeasonLeaders(['sortby' => 'DREB']);
+
+        $this->assertSame(2, $result['results'][0]['pid']); // 6.875
+        $this->assertSame(3, $result['results'][1]['pid']); // 5.0
+        $this->assertSame(1, $result['results'][2]['pid']); // 1.875
     }
 
     public function testSortsByFgPct(): void
@@ -140,7 +159,7 @@ final class CachedSeasonLeaderboardsRepositoryTest extends TestCase
         ];
         $this->cache->set('season_leaderboards:leaders', $rows, 86400);
 
-        $result = $repository->getSeasonLeaders(['sortby' => '12']);
+        $result = $repository->getSeasonLeaders(['sortby' => 'FGP']);
 
         $this->assertSame(2, $result['results'][0]['pid']); // 400/600 = .667
         $this->assertSame(3, $result['results'][1]['pid']); // 300/600 = .500
@@ -159,7 +178,7 @@ final class CachedSeasonLeaderboardsRepositoryTest extends TestCase
         ];
         $this->cache->set('season_leaderboards:leaders', $rows, 86400);
 
-        $result = $repository->getSeasonLeaders(['sortby' => '19']);
+        $result = $repository->getSeasonLeaders(['sortby' => 'GAMES']);
 
         $this->assertSame(2, $result['results'][0]['pid']); // 82 games
         $this->assertSame(3, $result['results'][1]['pid']); // 60 games
@@ -190,7 +209,7 @@ final class CachedSeasonLeaderboardsRepositoryTest extends TestCase
 
         $this->cache->set('season_leaderboards:leaders', $this->createSampleRows(), 86400);
 
-        $result = $repository->getSeasonLeaders(['sortby' => '1'], 2);
+        $result = $repository->getSeasonLeaders(['sortby' => 'PPG'], 2);
 
         $this->assertSame(2, $result['count']);
     }
@@ -202,7 +221,7 @@ final class CachedSeasonLeaderboardsRepositoryTest extends TestCase
 
         $this->cache->set('season_leaderboards:leaders', $this->createSampleRows(), 86400);
 
-        $result = $repository->getSeasonLeaders(['sortby' => '1'], 0);
+        $result = $repository->getSeasonLeaders(['sortby' => 'PPG'], 0);
 
         $this->assertSame(3, $result['count']);
     }
@@ -221,7 +240,7 @@ final class CachedSeasonLeaderboardsRepositoryTest extends TestCase
         $this->cache->set('season_leaderboards:leaders', $rows, 86400);
 
         // Year 2024, sorted by PPG, limit 2
-        $result = $repository->getSeasonLeaders(['year' => '2024', 'sortby' => '1'], 2);
+        $result = $repository->getSeasonLeaders(['year' => '2024', 'sortby' => 'PPG'], 2);
 
         $this->assertSame(2, $result['count']);
         $this->assertSame(2, $result['results'][0]['pid']); // Highest PPG in 2024
@@ -318,7 +337,7 @@ final class CachedSeasonLeaderboardsRepositoryTest extends TestCase
         ];
         $this->cache->set('season_leaderboards:leaders', $rows, 86400);
 
-        $result = $repository->getSeasonLeaders(['sortby' => '1']);
+        $result = $repository->getSeasonLeaders(['sortby' => 'PPG']);
 
         $this->assertSame(2, $result['results'][0]['pid']); // Has games sorts first
         $this->assertSame(1, $result['results'][1]['pid']); // Zero games gets 0.0

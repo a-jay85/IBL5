@@ -48,7 +48,7 @@ test.describe('Season Leaderboards flow', () => {
     await expect(table).toBeVisible();
     const defaultSortedText = await table.locator('th.sorted-col').first().textContent();
 
-    await page.locator('select[name="sortby"]').selectOption('2');
+    await page.locator('select[name="sortby"]').selectOption('REB');
     await page.locator('.ibl-filter-form__submit').click();
 
     await expect(page.locator('.ibl-data-table').first()).toBeVisible();

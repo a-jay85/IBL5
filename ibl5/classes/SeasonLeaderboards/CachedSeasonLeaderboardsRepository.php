@@ -73,7 +73,7 @@ class CachedSeasonLeaderboardsRepository implements SeasonLeaderboardsRepository
         }
 
         // Sort by the requested stat DESC
-        $sortBy = (string) ($filters['sortby'] ?? '1');
+        $sortBy = (string) ($filters['sortby'] ?? 'PPG');
         usort($rows, static function (array $a, array $b) use ($sortBy): int {
             $aVal = self::getSortValue($a, $sortBy);
             $bVal = self::getSortValue($b, $sortBy);
@@ -160,7 +160,7 @@ class CachedSeasonLeaderboardsRepository implements SeasonLeaderboardsRepository
     private static function getSortValue(array $row, string $sortBy): float
     {
         $games = $row['games'];
-        if ($games === 0 && $sortBy !== '19') {
+        if ($games === 0 && $sortBy !== 'GAMES') {
             return 0.0;
         }
 
@@ -172,27 +172,28 @@ class CachedSeasonLeaderboardsRepository implements SeasonLeaderboardsRepository
         $tga = $row['tga'];
 
         return match ($sortBy) {
-            '1' => (2 * $fgm + $ftm + $tgm) / $games,                          // PPG
-            '2' => $row['reb'] / $games,                                         // RPG
-            '3' => $row['orb'] / $games,                                         // OREB
-            '4' => $row['ast'] / $games,                                         // AST
-            '5' => $row['stl'] / $games,                                         // STL
-            '6' => $row['blk'] / $games,                                         // BLK
-            '7' => $row['tvr'] / $games,                                         // TO
-            '8' => $row['pf'] / $games,                                          // FOUL
-            '9' => self::computeQaPerGame($row, $games),                         // QA
-            '10' => $fgm / $games,                                               // FGM/G
-            '11' => $fga / $games,                                               // FGA/G
-            '12' => $fga > 0 ? $fgm / $fga : 0.0,                               // FG%
-            '13' => $ftm / $games,                                               // FTM/G
-            '14' => $fta / $games,                                               // FTA/G
-            '15' => $fta > 0 ? $ftm / $fta : 0.0,                               // FT%
-            '16' => $tgm / $games,                                               // 3GM/G
-            '17' => $tga / $games,                                               // 3GA/G
-            '18' => $tga > 0 ? $tgm / $tga : 0.0,                               // 3G%
-            '19' => (float) $games,                                              // GAMES
-            '20' => $row['minutes'] / $games,                                    // MIN/G
-            default => (2 * $fgm + $ftm + $tgm) / $games,                       // PPG fallback
+            'PPG' => (2 * $fgm + $ftm + $tgm) / $games,
+            'REB' => $row['reb'] / $games,
+            'OREB' => $row['orb'] / $games,
+            'DREB' => ($row['reb'] - $row['orb']) / $games,
+            'AST' => $row['ast'] / $games,
+            'STL' => $row['stl'] / $games,
+            'BLK' => $row['blk'] / $games,
+            'TO' => $row['tvr'] / $games,
+            'FOUL' => $row['pf'] / $games,
+            'QA' => self::computeQaPerGame($row, $games),
+            'FGM' => $fgm / $games,
+            'FGA' => $fga / $games,
+            'FGP' => $fga > 0 ? $fgm / $fga : 0.0,
+            'FTM' => $ftm / $games,
+            'FTA' => $fta / $games,
+            'FTP' => $fta > 0 ? $ftm / $fta : 0.0,
+            'TGM' => $tgm / $games,
+            'TGA' => $tga / $games,
+            'TGP' => $tga > 0 ? $tgm / $tga : 0.0,
+            'GAMES' => (float) $games,
+            'MIN' => $row['minutes'] / $games,
+            default => (2 * $fgm + $ftm + $tgm) / $games,
         };
     }
 

@@ -56,6 +56,9 @@ final class SeasonLeaderboardsServiceTest extends TestCase
         $this->assertEquals('5.0', $stats['fgmpg']); // 50/10
         $this->assertEquals('13.5', $stats['ppg']); // 135/10
 
+        // Check defensive rebounds per game: (80-30)/10 = 5.0
+        $this->assertEquals('5.0', $stats['drebpg']);
+
         // Check percentages (0-1 range with 3 decimals)
         $this->assertEquals('0.500', $stats['fgp']); // 50/100
         $this->assertEquals('0.800', $stats['ftp']); // 20/25
@@ -167,9 +170,11 @@ final class SeasonLeaderboardsServiceTest extends TestCase
     {
         $options = $this->service->getSortOptions();
 
-        $this->assertCount(20, $options);
-        $this->assertEquals('PPG', $options[0]);
-        $this->assertEquals('REB', $options[1]);
-        $this->assertEquals('MIN', $options[19]);
+        $this->assertCount(21, $options);
+        $this->assertArrayHasKey('PPG', $options);
+        $this->assertArrayHasKey('DREB', $options);
+        $this->assertArrayHasKey('MIN', $options);
+        $this->assertSame('PPG', $options['PPG']);
+        $this->assertSame('FG%', $options['FGP']);
     }
 }

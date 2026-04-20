@@ -247,7 +247,9 @@ if (file_exists(__DIR__ . "/includes/custom_files/custom_mainfile.php")) {
     @include_once __DIR__ . "/includes/custom_files/custom_mainfile.php";
 }
 
-define('NUKE_FILE', true);
+if (!defined('NUKE_FILE')) {
+    define('NUKE_FILE', true);
+}
 $row = $db->sql_fetchrow($db->sql_query("SELECT * FROM " . $prefix . "_config"));
 $sitename = filter($row['sitename'], "nohtml");
 $nukeurl = filter($row['nukeurl'], "nohtml");

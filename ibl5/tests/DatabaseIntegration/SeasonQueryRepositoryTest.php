@@ -75,8 +75,8 @@ class SeasonQueryRepositoryTest extends DatabaseTestCase
         $dates = $this->repo->getLastSimDatesArray();
 
         self::assertArrayHasKey('Sim', $dates);
-        self::assertArrayHasKey('Start Date', $dates);
-        self::assertArrayHasKey('End Date', $dates);
+        self::assertArrayHasKey('start_date', $dates);
+        self::assertArrayHasKey('end_date', $dates);
     }
 
     public function testSetLastSimDatesArrayInsertsRow(): void
@@ -87,7 +87,7 @@ class SeasonQueryRepositoryTest extends DatabaseTestCase
         self::assertSame(1, $affected);
 
         // Verify via direct query
-        $stmt = $this->db->prepare("SELECT `Start Date`, `End Date` FROM ibl_sim_dates WHERE Sim = 9999999");
+        $stmt = $this->db->prepare("SELECT start_date, end_date FROM ibl_sim_dates WHERE Sim = 9999999");
         self::assertNotFalse($stmt);
         $stmt->execute();
         $result = $stmt->get_result();
@@ -95,8 +95,8 @@ class SeasonQueryRepositoryTest extends DatabaseTestCase
         $stmt->close();
 
         self::assertNotNull($row);
-        self::assertSame('2099-01-01', $row['Start Date']);
-        self::assertSame('2099-01-07', $row['End Date']);
+        self::assertSame('2099-01-01', $row['start_date']);
+        self::assertSame('2099-01-07', $row['end_date']);
     }
 
     public function testGetLastRegularSeasonGameDateReturnsStringOrNull(): void

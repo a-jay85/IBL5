@@ -65,10 +65,10 @@ class PlayerSimStatsView implements PlayerSimStatsViewInterface
     </tr>
         <?php
         foreach ($simDates as $simDate) {
-            /** @var array{Sim: int, 'Start Date': string, 'End Date': string} $simDate */
+            /** @var array{Sim: int, start_date: string, end_date: string} $simDate */
             $simNumber = $simDate['Sim'];
-            $simStartDate = $simDate['Start Date'];
-            $simEndDate = $simDate['End Date'];
+            $simStartDate = $simDate['start_date'];
+            $simEndDate = $simDate['end_date'];
 
             $boxScores = $this->repository->getBoxScoresBetweenDates($playerID, $simStartDate, $simEndDate);
             $numberOfGames = count($boxScores);

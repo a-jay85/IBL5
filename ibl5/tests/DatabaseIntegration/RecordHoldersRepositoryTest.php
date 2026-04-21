@@ -399,8 +399,8 @@ class RecordHoldersRepositoryTest extends DatabaseTestCase
         // Insert sim date range
         $this->insertRow('ibl_sim_dates', [
             'Sim' => 90001,
-            'Start Date' => '2098-01-10',
-            'End Date' => '2098-01-20',
+            'start_date' => '2098-01-10',
+            'end_date' => '2098-01-20',
         ]);
 
         // Insert boxscore within the sim date range
@@ -419,8 +419,8 @@ class RecordHoldersRepositoryTest extends DatabaseTestCase
     {
         $this->insertRow('ibl_sim_dates', [
             'Sim' => 90002,
-            'Start Date' => '2098-02-10',
-            'End Date' => '2098-02-20',
+            'start_date' => '2098-02-10',
+            'end_date' => '2098-02-20',
         ]);
 
         $pid = 200090403;

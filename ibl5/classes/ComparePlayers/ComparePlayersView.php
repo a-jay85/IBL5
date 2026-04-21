@@ -15,7 +15,7 @@ use Utilities\HtmlSanitizer;
  * Uses the IBL5 design system with ibl-filter-form for search
  * and ibl-data-table for comparison tables.
  *
- * @phpstan-type ComparePlayerRow array{pid: int, name: string, pos: string, age: ?int, tid: int, teamname: ?string, color1: ?string, color2: ?string, team_city: ?string, r_fga: ?int, r_fgp: ?int, r_fta: ?int, r_ftp: ?int, r_tga: ?int, r_tgp: ?int, r_orb: ?int, r_drb: ?int, r_ast: ?int, r_stl: ?int, r_to: ?int, r_blk: ?int, r_foul: ?int, oo: ?int, do: ?int, po: ?int, to: ?int, od: ?int, dd: ?int, pd: ?int, td: ?int, stats_gm: ?int, stats_gs: ?int, stats_min: ?int, stats_fgm: ?int, stats_fga: ?int, stats_ftm: ?int, stats_fta: ?int, stats_3gm: ?int, stats_3ga: ?int, stats_orb: ?int, stats_drb: ?int, stats_ast: ?int, stats_stl: ?int, stats_to: ?int, stats_blk: ?int, stats_pf: ?int, car_gm: ?int, car_min: ?int, car_fgm: ?int, car_fga: ?int, car_ftm: ?int, car_fta: ?int, car_tgm: ?int, car_tga: ?int, car_orb: ?int, car_drb: ?int, car_reb: ?int, car_ast: ?int, car_stl: ?int, car_to: ?int, car_blk: ?int, car_pf: ?int, car_pts: ?int}
+ * @phpstan-type ComparePlayerRow array{pid: int, name: string, pos: string, age: ?int, tid: int, teamname: ?string, color1: ?string, color2: ?string, team_city: ?string, r_fga: ?int, r_fgp: ?int, r_fta: ?int, r_ftp: ?int, r_tga: ?int, r_tgp: ?int, r_orb: ?int, r_drb: ?int, r_ast: ?int, r_stl: ?int, r_tvr: ?int, r_blk: ?int, r_foul: ?int, oo: ?int, r_drive_off: ?int, po: ?int, r_trans_off: ?int, od: ?int, dd: ?int, pd: ?int, td: ?int, stats_gm: ?int, stats_gs: ?int, stats_min: ?int, stats_fgm: ?int, stats_fga: ?int, stats_ftm: ?int, stats_fta: ?int, stats_3gm: ?int, stats_3ga: ?int, stats_orb: ?int, stats_drb: ?int, stats_ast: ?int, stats_stl: ?int, stats_to: ?int, stats_blk: ?int, stats_pf: ?int, car_gm: ?int, car_min: ?int, car_fgm: ?int, car_fga: ?int, car_ftm: ?int, car_fta: ?int, car_tgm: ?int, car_tga: ?int, car_orb: ?int, car_drb: ?int, car_reb: ?int, car_ast: ?int, car_stl: ?int, car_to: ?int, car_blk: ?int, car_pf: ?int, car_pts: ?int}
  *
  * @see ComparePlayersViewInterface
  */
@@ -135,13 +135,13 @@ class ComparePlayersView implements ComparePlayersViewInterface
         $output .= '<td>' . (int)$player['r_drb'] . '</td>';
         $output .= '<td>' . (int)$player['r_ast'] . '</td>';
         $output .= '<td>' . (int)$player['r_stl'] . '</td>';
-        $output .= '<td>' . (int)$player['r_to'] . '</td>';
+        $output .= '<td>' . (int)$player['r_tvr'] . '</td>';
         $output .= '<td>' . (int)$player['r_blk'] . '</td>';
         $output .= '<td>' . (int)$player['r_foul'] . '</td>';
         $output .= '<td>' . (int)$player['oo'] . '</td>';
-        $output .= '<td>' . (int)$player['do'] . '</td>';
+        $output .= '<td>' . (int)$player['r_drive_off'] . '</td>';
         $output .= '<td>' . (int)$player['po'] . '</td>';
-        $output .= '<td>' . (int)$player['to'] . '</td>';
+        $output .= '<td>' . (int)$player['r_trans_off'] . '</td>';
         $output .= '<td>' . (int)$player['od'] . '</td>';
         $output .= '<td>' . (int)$player['dd'] . '</td>';
         $output .= '<td>' . (int)$player['pd'] . '</td>';

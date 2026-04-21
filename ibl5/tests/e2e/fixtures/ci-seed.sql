@@ -55,7 +55,7 @@ INSERT INTO ibl_settings (name, value) VALUES
   ('Sim Length in Days',            '7')
 ON DUPLICATE KEY UPDATE value = VALUES(value);
 
-INSERT INTO ibl_sim_dates (`Sim`, `Start Date`, `End Date`) VALUES
+INSERT INTO ibl_sim_dates (Sim, start_date, end_date) VALUES
   (689, '2026-03-01', '2026-03-07');
 
 -- ============================================================

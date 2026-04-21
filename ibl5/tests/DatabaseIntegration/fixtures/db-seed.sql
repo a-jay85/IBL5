@@ -309,9 +309,9 @@ VALUES ('test_seed_key', 'test_value', 0)
 ON DUPLICATE KEY UPDATE `value` = VALUES(`value`);
 
 -- Sim dates: needed by RecordHolders getUnannouncedGameDates()
-INSERT INTO ibl_sim_dates (Sim, `Start Date`, `End Date`)
+INSERT INTO ibl_sim_dates (Sim, start_date, end_date)
 VALUES (1, '2025-01-10', '2025-01-20')
-ON DUPLICATE KEY UPDATE `Start Date` = VALUES(`Start Date`);
+ON DUPLICATE KEY UPDATE start_date = VALUES(start_date);
 
 -- Team awards: needed by vw_team_awards and SeasonArchive
 INSERT INTO ibl_team_awards (year, name, Award)

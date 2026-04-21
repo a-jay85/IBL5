@@ -108,14 +108,14 @@ class SeasonQueryRepositoryTest extends TestCase
     public function testGetLastSimDatesArrayReturnsData(): void
     {
         $this->mockDb->setMockData([
-            ['Sim' => 10, 'Start Date' => '2025-01-01', 'End Date' => '2025-01-07'],
+            ['Sim' => 10, 'start_date' => '2025-01-01', 'end_date' => '2025-01-07'],
         ]);
 
         $result = $this->repository->getLastSimDatesArray();
 
         $this->assertSame(10, $result['Sim']);
-        $this->assertSame('2025-01-01', $result['Start Date']);
-        $this->assertSame('2025-01-07', $result['End Date']);
+        $this->assertSame('2025-01-01', $result['start_date']);
+        $this->assertSame('2025-01-07', $result['end_date']);
     }
 
     public function testGetLastSimDatesArrayReturnsDefaultsWhenNoData(): void
@@ -125,8 +125,8 @@ class SeasonQueryRepositoryTest extends TestCase
         $result = $this->repository->getLastSimDatesArray();
 
         $this->assertSame(0, $result['Sim']);
-        $this->assertSame('', $result['Start Date']);
-        $this->assertSame('', $result['End Date']);
+        $this->assertSame('', $result['start_date']);
+        $this->assertSame('', $result['end_date']);
     }
 
     // ============================================

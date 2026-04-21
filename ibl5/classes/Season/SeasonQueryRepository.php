@@ -121,25 +121,23 @@ class SeasonQueryRepository extends \BaseMysqliRepository implements SeasonQuery
      * Get last sim dates array
      *
      * Returns the most recent simulation date range from ibl_sim_dates.
-     * Note: 'Start Date' and 'End Date' columns are DATE type in schema.
      *
-     * @return array{Sim: int, 'Start Date': string, 'End Date': string}
+     * @return array{Sim: int, start_date: string, end_date: string}
      */
     public function getLastSimDatesArray(): array
     {
-        /** @var array{Sim: int, 'Start Date': string, 'End Date': string}|null $result */
+        /** @var array{Sim: int, start_date: string, end_date: string}|null $result */
         $result = $this->fetchOne(
-            "SELECT * FROM ibl_sim_dates ORDER BY sim DESC LIMIT 1"
+            "SELECT Sim, start_date, end_date FROM ibl_sim_dates ORDER BY Sim DESC LIMIT 1"
         );
 
-        return $result ?? ['Sim' => 0, 'Start Date' => '', 'End Date' => ''];
+        return $result ?? ['Sim' => 0, 'start_date' => '', 'end_date' => ''];
     }
 
     /**
      * Set last sim dates array
      *
      * Inserts a new simulation date range into ibl_sim_dates.
-     * Note: 'Start Date' and 'End Date' columns are DATE type in schema.
      *
      * @param string $newSimNumber New sim number
      * @param string $newSimStartDate New sim start date (YYYY-MM-DD format)

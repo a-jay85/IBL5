@@ -671,4 +671,63 @@ class DepthChartEntryViewTest extends TestCase
         // HtmlSanitizer uses ENT_HTML5, so `'` becomes `&apos;` (not `&#039;`).
         $this->assertStringContainsString('O&apos;Brien', $output);
     }
+
+    public function testPositionDepthSelectsShowCorrectOptionLabels(): void
+    {
+        $player = $this->buildTestPlayer();
+        $player['dc_SFDepth'] = 3;
+
+        ob_start();
+        $this->view->renderPlayerRow($player, 1);
+        $output = (string) ob_get_clean();
+
+        $expectedLabels = ['No', '1st', '2nd', '3rd', '4th', 'ok'];
+
+        foreach (['pg', 'sg', 'sf', 'pf', 'c'] as $field) {
+            preg_match('/<select name="' . $field . '1"[^>]*>(.*?)<\/select>/s', $output, $matches);
+            $this->assertNotEmpty($matches, "Position depth select for {$field} not found");
+            $selectHtml = $matches[1];
+
+            foreach ($expectedLabels as $i => $label) {
+                $this->assertMatchesRegularExpression(
+                    '/value="' . $i . '"[^>]*>' . preg_quote($label, '/') . '<\/option>/',
+                    $selectHtml,
+                    "Position {$field}: option {$i} should have label '{$label}'"
+                );
+            }
+        }
+    }
+
+    public function testPositionDepthSelectsHaveSixOptions(): void
+    {
+        $player = $this->buildTestPlayer();
+
+        ob_start();
+        $this->view->renderPlayerRow($player, 1);
+        $output = (string) ob_get_clean();
+
+        preg_match('/<select name="pg1"[^>]*>(.*?)<\/select>/s', $output, $matches);
+        $this->assertNotEmpty($matches);
+        $optionCount = substr_count($matches[1], '<option');
+        $this->assertSame(6, $optionCount, 'Position depth should have exactly 6 options (No/1st/2nd/3rd/4th/ok)');
+    }
+
+    public function testPositionDepthSelectPreselectsCorrectValue(): void
+    {
+        $player = $this->buildTestPlayer();
+        $player['dc_SFDepth'] = 1;
+        $player['dc_PGDepth'] = 0;
+
+        ob_start();
+        $this->view->renderPlayerRow($player, 1);
+        $output = (string) ob_get_clean();
+
+        preg_match('/<select name="sf1"[^>]*>(.*?)<\/select>/s', $output, $matches);
+        $this->assertNotEmpty($matches);
+        $this->assertMatchesRegularExpression('/value="1" SELECTED[^>]*>1st<\/option>/', $matches[1]);
+
+        preg_match('/<select name="pg1"[^>]*>(.*?)<\/select>/s', $output, $matches);
+        $this->assertNotEmpty($matches);
+        $this->assertMatchesRegularExpression('/value="0" SELECTED[^>]*>No<\/option>/', $matches[1]);
+    }
 }

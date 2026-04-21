@@ -728,4 +728,69 @@ class DepthChartEntryProcessorTest extends TestCase
         // CSV also shows numeric values
         $this->assertStringContainsString('Human Readable Test,1,2,3,0,4,1,30,0,0,0,0,0', $csv);
     }
+
+    public function testPositionDepthValuesAppearInCorrectCsvColumns(): void
+    {
+        $cases = [
+            ['pg', 1, 1],
+            ['sg', 2, 2],
+            ['sf', 1, 3],
+            ['pf', 3, 4],
+            ['c', 5, 5],
+        ];
+
+        foreach ($cases as [$positionField, $depthValue, $expectedColumn]) {
+            $postData = [
+                'Name1' => 'Kevin Martin',
+                'pg1' => '0',
+                'sg1' => '0',
+                'sf1' => '0',
+                'pf1' => '0',
+                'c1' => '0',
+                'canPlayInGame1' => '1',
+                'min1' => '40',
+                'Injury1' => '0',
+            ];
+            $postData[$positionField . '1'] = (string) $depthValue;
+
+            $result = $this->processor->processSubmission($postData, 15);
+            $csv = $this->processor->generateCsvContent($result['playerData']);
+
+            $lines = explode("\n", trim($csv));
+            $this->assertCount(2, $lines);
+
+            $dataColumns = str_getcsv($lines[1], ',', '"', '');
+            $this->assertSame(
+                (string) $depthValue,
+                $dataColumns[$expectedColumn],
+                "Position {$positionField} depth value should appear in CSV column {$expectedColumn}"
+            );
+        }
+    }
+
+    public function testFormSubmissionToCSvRoundTripPreservesPositionDepth(): void
+    {
+        $postData = [
+            'Name1' => 'Kevin Martin',
+            'pg1' => '0',
+            'sg1' => '0',
+            'sf1' => '1',
+            'pf1' => '0',
+            'c1' => '0',
+            'canPlayInGame1' => '1',
+            'min1' => '40',
+            'Injury1' => '0',
+        ];
+
+        $result = $this->processor->processSubmission($postData, 15);
+
+        $this->assertSame(1, $result['playerData'][0]['sf']);
+        $this->assertSame(0, $result['playerData'][0]['pg']);
+
+        $csv = $this->processor->generateCsvContent($result['playerData']);
+        $this->assertStringContainsString('Kevin Martin,0,0,1,0,0,1,40,0,0,0,0,0', $csv);
+
+        $headerColumns = str_getcsv(explode("\n", $csv)[0], ',', '"', '');
+        $this->assertSame('SF', $headerColumns[3]);
+    }
 }

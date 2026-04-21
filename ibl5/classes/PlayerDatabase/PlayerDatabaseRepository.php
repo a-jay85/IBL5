@@ -40,7 +40,9 @@ class PlayerDatabaseRepository extends BaseMysqliRepository implements PlayerDat
         'r_ast' => 'r_ast',
         'r_stl' => 'r_stl',
         'r_blk' => 'r_blk',
-        'r_to' => 'r_to',
+        // Filter keys match the form-field names (legacy user-facing API);
+        // values are the post-rename DB column names.
+        'r_to' => 'r_tvr',
         'r_foul' => 'r_foul',
         'Clutch' => 'Clutch',
         'Consistency' => 'Consistency',
@@ -48,9 +50,9 @@ class PlayerDatabaseRepository extends BaseMysqliRepository implements PlayerDat
         'skill' => 'skill',
         'intangibles' => 'intangibles',
         'oo' => 'oo',
-        'do' => '`do`',
+        'do' => 'r_drive_off',
         'po' => 'po',
-        'to' => '`to`',
+        'to' => 'r_trans_off',
         'od' => 'od',
         'dd' => 'dd',
         'pd' => 'pd',

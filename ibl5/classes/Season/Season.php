@@ -111,8 +111,8 @@ class Season
 
         $arrayLastSimDates = $this->queryRepo->getLastSimDatesArray();
         $this->lastSimNumber = $arrayLastSimDates["Sim"];
-        $this->lastSimStartDate = $arrayLastSimDates["Start Date"];
-        $this->lastSimEndDate = $arrayLastSimDates["End Date"];
+        $this->lastSimStartDate = $arrayLastSimDates["start_date"];
+        $this->lastSimEndDate = $arrayLastSimDates["end_date"];
 
         $this->projectedNextSimEndDate = $this->getProjectedNextSimEndDate($this->lastSimEndDate);
 

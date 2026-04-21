@@ -272,7 +272,7 @@ final class OneOnOneGameEngineTest extends TestCase
             'pid' => rand(1, 1000),
             'name' => $name,
             'oo' => 50,
-            'do' => 50,
+            'r_drive_off' => 50,
             'po' => 50,
             'od' => 50,
             'dd' => 50,
@@ -285,7 +285,7 @@ final class OneOnOneGameEngineTest extends TestCase
             'r_orb' => 30,
             'r_drb' => 50,
             'r_stl' => 40,
-            'r_to' => 50,
+            'r_tvr' => 50,
             'r_blk' => 30,
             'r_foul' => 50,
         ];

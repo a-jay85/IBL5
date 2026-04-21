@@ -122,8 +122,8 @@ class DraftRepositoryTest extends DatabaseTestCase
     public function testCreatePlayerFromDraftClassInsertsNewPlayer(): void
     {
         $this->insertDraftClassRow('B10 Draft Prospect', 'PG', [
-            'oo' => 70, 'od' => 65, 'po' => 50, 'to' => 55,
-            'do' => 60, 'dd' => 68, 'pd' => 45, 'td' => 52,
+            'oo' => 70, 'od' => 65, 'po' => 50, 'r_trans_off' => 55,
+            'r_drive_off' => 60, 'dd' => 68, 'pd' => 45, 'td' => 52,
             'age' => 22, 'talent' => 80, 'skill' => 75, 'intangibles' => 70,
         ]);
 

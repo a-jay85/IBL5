@@ -367,14 +367,14 @@ class OneOnOneGameEngine implements OneOnOneGameEngineInterface
         }
 
         // Check for steal
-        if ($this->checkSteal($defenseData['r_stl'], $offenseData['r_to'])) {
+        if ($this->checkSteal($defenseData['r_stl'], $offenseData['r_tvr'])) {
             return self::RESULT_STEAL;
         }
 
         // Select shot type
         $shotType = $this->selectShotType(
             $offenseData['oo'],
-            $offenseData['do'],
+            $offenseData['r_drive_off'],
             $offenseData['po'],
             $offenseData['r_fga'],
             $offenseData['r_tga']
@@ -431,11 +431,11 @@ class OneOnOneGameEngine implements OneOnOneGameEngineInterface
                     return self::RESULT_BLOCKED_DRIVE;
                 }
                 if ($this->checkFoul($foul, $fta)) {
-                    return $this->checkShot($fgp - self::FOUL_DIFFICULTY, $offenseData['do'], $defenseData['dd'])
+                    return $this->checkShot($fgp - self::FOUL_DIFFICULTY, $offenseData['r_drive_off'], $defenseData['dd'])
                         ? self::RESULT_MADE_DRIVE
                         : self::RESULT_FOUL;
                 }
-                return $this->checkShot($fgp, $offenseData['do'], $defenseData['dd'])
+                return $this->checkShot($fgp, $offenseData['r_drive_off'], $defenseData['dd'])
                     ? self::RESULT_MADE_DRIVE
                     : self::RESULT_MISSED_DRIVE;
 

@@ -151,9 +151,9 @@ class MockDatabase extends \mysqli
             $defaults = [
                 'fga' => 1, 'fgp' => 1, 'fta' => 1, 'ftp' => 1,
                 'tga' => 1, 'tgp' => 1, 'orb' => 1, 'drb' => 1,
-                'ast' => 1, 'stl' => 1, 'r_to' => 1, 'blk' => 1,
-                'foul' => 1, 'oo' => 1, 'od' => 1, 'do' => 1,
-                'dd' => 1, 'po' => 1, 'pd' => 1, 'td' => 1,
+                'ast' => 1, 'stl' => 1, 'r_tvr' => 1, 'blk' => 1,
+                'foul' => 1, 'oo' => 1, 'od' => 1, 'r_drive_off' => 1,
+                'dd' => 1, 'po' => 1, 'pd' => 1, 'r_trans_off' => 1, 'td' => 1,
             ];
             return new MockDatabaseResult([$defaults]);
         }

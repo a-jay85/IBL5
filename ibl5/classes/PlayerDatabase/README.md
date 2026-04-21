@@ -57,8 +57,7 @@ tests/PlayerDatabase/
 ### Repository (`PlayerDatabaseRepository`)
 - **100% prepared statements** - No direct SQL injection possible
 - **Dynamic query building** - Builds WHERE clauses based on provided filters
-- **Column whitelist** - Maps parameter names to safe database column names
-- **Reserved word handling** - Properly escapes `do` and `to` column names
+- **Column whitelist** - Maps legacy form-field names (`do`, `to`, `r_to`) to the post-rename DB columns (`r_drive_off`, `r_trans_off`, `r_tvr`). Legacy filter URLs continue to work without backticks.
 
 ### Service (`PlayerDatabaseService`)
 - **Orchestrates search workflow** - Validates input, calls repository, transforms data
@@ -106,7 +105,7 @@ if ($searchResult['count'] > 0) {
 | `college` | String | `LIKE` | College name (partial match) |
 | `exp`, `exp_max` | Integer | Range | Years of experience |
 | `bird`, `bird_max` | Integer | Range | Bird years |
-| `oo`, `do`, `po`, `to` | Integer | `>=` | Offensive ratings |
+| `oo`, `do`, `po`, `to` | Integer | `>=` | Offensive ratings (filter keys; mapped to DB columns `oo`, `r_drive_off`, `po`, `r_trans_off`) |
 | `od`, `dd`, `pd`, `td` | Integer | `>=` | Defensive ratings |
 | `talent`, `skill` | Integer | `>=` | Attribute ratings |
 | `r_fga`, `r_fgp`, etc. | Integer | `>=` | Shooting ratings |

@@ -61,7 +61,7 @@ interface PlayerStatsRepositoryInterface
      * and their corresponding date ranges.
      * 
      * @param int $limit Maximum number of sim records to return (default 20)
-     * @return array<array<string, mixed>> Array of sim date records with keys: Sim, 'Start Date', 'End Date'
+     * @return array<array<string, mixed>> Array of sim date records with keys: Sim, start_date, end_date
      */
     public function getSimDates(int $limit = 20): array;
 

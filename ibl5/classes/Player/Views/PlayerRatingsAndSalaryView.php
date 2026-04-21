@@ -80,18 +80,18 @@ class PlayerRatingsAndSalaryView implements PlayerRatingsAndSalaryViewInterface
     </tr>
         <?php
         foreach ($historicalStats as $row) {
-            /** @var array{pid: int, name: string, year: int, team: string, teamid: int, games: int, minutes: int, fgm: int, fga: int, ftm: int, fta: int, tgm: int, tga: int, orb: int, reb: int, ast: int, stl: int, blk: int, tvr: int, pf: int, pts: int, r_2ga: int, r_2gp: int, r_fta: int, r_ftp: int, r_3ga: int, r_3gp: int, r_orb: int, r_drb: int, r_ast: int, r_stl: int, r_blk: int, r_tvr: int, r_oo: int, r_do: int, r_po: int, r_to: int, r_od: int, r_dd: int, r_pd: int, r_td: int, salary: int, talent: int, skill: int, intangibles: int, clutch: int, consistency: int} $row */
+            /** @var array{pid: int, name: string, year: int, team: string, teamid: int, games: int, minutes: int, fgm: int, fga: int, ftm: int, fta: int, tgm: int, tga: int, orb: int, reb: int, ast: int, stl: int, blk: int, tvr: int, pf: int, pts: int, r_2ga: int, r_2gp: int, r_fta: int, r_ftp: int, r_3ga: int, r_3gp: int, r_orb: int, r_drb: int, r_ast: int, r_stl: int, r_blk: int, r_tvr: int, r_oo: int, r_drive_off: int, r_po: int, r_trans_off: int, r_od: int, r_dd: int, r_pd: int, r_td: int, salary: int, talent: int, skill: int, intangibles: int, clutch: int, consistency: int} $row */
             $r_oo = $row['r_oo'];
-            $r_do = $row['r_do'];
+            $r_drive_off = $row['r_drive_off'];
             $r_po = $row['r_po'];
-            $r_to = $row['r_to'];
+            $r_trans_off = $row['r_trans_off'];
             $r_od = $row['r_od'];
             $r_dd = $row['r_dd'];
             $r_pd = $row['r_pd'];
             $r_td = $row['r_td'];
             $salary = $row['salary'];
 
-            $r_Off = $r_oo + $r_do + $r_po + $r_to;
+            $r_Off = $r_oo + $r_drive_off + $r_po + $r_trans_off;
             $r_Def = $r_od + $r_dd + $r_pd + $r_td;
             $talent = $row['talent'];
             $skill = $row['skill'];
@@ -116,9 +116,9 @@ class PlayerRatingsAndSalaryView implements PlayerRatingsAndSalaryViewInterface
         <td><?= $row['r_blk'] ?></td>
         <td><?= $row['r_tvr'] ?></td>
         <td><?= $r_oo ?></td>
-        <td><?= $r_do ?></td>
+        <td><?= $r_drive_off ?></td>
         <td><?= $r_po ?></td>
-        <td><?= $r_to ?></td>
+        <td><?= $r_trans_off ?></td>
         <td><?= $r_od ?></td>
         <td><?= $r_dd ?></td>
         <td><?= $r_pd ?></td>

@@ -419,9 +419,9 @@ class NegotiationDemandCalculatorTest extends TestCase
             [
                 'fga' => $maxValue, 'fgp' => $maxValue, 'fta' => $maxValue, 'ftp' => $maxValue,
                 'tga' => $maxValue, 'tgp' => $maxValue, 'orb' => $maxValue, 'drb' => $maxValue,
-                'ast' => $maxValue, 'stl' => $maxValue, 'r_to' => $maxValue, 'blk' => $maxValue,
-                'foul' => $maxValue, 'oo' => $maxValue, 'od' => $maxValue, 'do' => $maxValue,
-                'dd' => $maxValue, 'po' => $maxValue, 'pd' => $maxValue, 'to_off' => $maxValue,
+                'ast' => $maxValue, 'stl' => $maxValue, 'r_tvr' => $maxValue, 'blk' => $maxValue,
+                'foul' => $maxValue, 'oo' => $maxValue, 'od' => $maxValue, 'r_drive_off' => $maxValue,
+                'dd' => $maxValue, 'po' => $maxValue, 'pd' => $maxValue, 'r_trans_off' => $maxValue,
                 'td' => $maxValue,
             ]
         ]);

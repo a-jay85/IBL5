@@ -66,7 +66,7 @@ class BoxscoreProcessorTest extends TestCase
         $this->mockDb->setReturnTrue(true);
         $this->mockDb->setMockData([
             ['name' => 'Current Season Phase', 'value' => 'Regular Season'],
-            ['Sim' => 1, 'Start Date' => '2025-01-01', 'End Date' => '2025-01-07'],
+            ['Sim' => 1, 'start_date' => '2025-01-01', 'end_date' => '2025-01-07'],
         ]);
 
         $processor = new BoxscoreProcessor($this->mockDb);
@@ -79,7 +79,7 @@ class BoxscoreProcessorTest extends TestCase
         $this->mockDb->setReturnTrue(true);
         $this->mockDb->setMockData([
             ['name' => 'Current Season Phase', 'value' => 'Regular Season'],
-            ['Sim' => 1, 'Start Date' => '2025-01-01', 'End Date' => '2025-01-07'],
+            ['Sim' => 1, 'start_date' => '2025-01-01', 'end_date' => '2025-01-07'],
         ]);
 
         $processor = new BoxscoreProcessor($this->mockDb);
@@ -104,7 +104,7 @@ class BoxscoreProcessorTest extends TestCase
         $this->mockDb->setReturnTrue(true);
         $this->mockDb->setMockData([
             ['name' => 'Current Season Phase', 'value' => 'Preseason'],
-            ['Sim' => 0, 'Start Date' => '', 'End Date' => ''],
+            ['Sim' => 0, 'start_date' => '', 'end_date' => ''],
         ]);
 
         $processor = new BoxscoreProcessor($this->mockDb);
@@ -130,7 +130,7 @@ class BoxscoreProcessorTest extends TestCase
         $this->mockDb->setReturnTrue(true);
         $this->mockDb->setMockData([
             ['name' => 'Current Season Phase', 'value' => 'Regular Season'],
-            ['Sim' => 1, 'Start Date' => '2025-01-01', 'End Date' => '2025-01-07'],
+            ['Sim' => 1, 'start_date' => '2025-01-01', 'end_date' => '2025-01-07'],
         ]);
 
         $processor = new BoxscoreProcessor($this->mockDb);
@@ -151,7 +151,7 @@ class BoxscoreProcessorTest extends TestCase
         $this->mockDb->setReturnTrue(true);
         $this->mockDb->setMockData([
             ['name' => 'Current Season Phase', 'value' => 'Preseason'],
-            ['Sim' => 0, 'Start Date' => '', 'End Date' => ''],
+            ['Sim' => 0, 'start_date' => '', 'end_date' => ''],
         ]);
 
         $processor = new BoxscoreProcessor($this->mockDb);
@@ -170,7 +170,7 @@ class BoxscoreProcessorTest extends TestCase
         $this->mockDb->setReturnTrue(true);
         $this->mockDb->setMockData([
             ['name' => 'Current Season Phase', 'value' => 'Regular Season'],
-            ['Sim' => 1, 'Start Date' => '2025-01-01', 'End Date' => '2025-01-07'],
+            ['Sim' => 1, 'start_date' => '2025-01-01', 'end_date' => '2025-01-07'],
         ]);
 
         $leagueContext = $this->createStub(\League\LeagueContext::class);
@@ -184,7 +184,7 @@ class BoxscoreProcessorTest extends TestCase
         $this->mockDb->setReturnTrue(true);
         $this->mockDb->setMockData([
             ['name' => 'Current Season Phase', 'value' => 'Regular Season'],
-            ['Sim' => 1, 'Start Date' => '2025-01-01', 'End Date' => '2025-01-07'],
+            ['Sim' => 1, 'start_date' => '2025-01-01', 'end_date' => '2025-01-07'],
         ]);
 
         $olympicsContext = $this->createStub(\League\LeagueContext::class);

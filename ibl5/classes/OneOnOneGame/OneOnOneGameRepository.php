@@ -44,9 +44,9 @@ class OneOnOneGameRepository extends BaseMysqliRepository implements OneOnOneGam
         /** @var PlayerGameData|null */
         return $this->fetchOne(
             "SELECT pid, name,
-                    oo, `do`, po, od, dd, pd,
+                    oo, r_drive_off, po, od, dd, pd,
                     r_fga, r_fgp, r_fta, r_tga, r_tgp,
-                    r_orb, r_drb, r_stl, r_to, r_blk, r_foul
+                    r_orb, r_drb, r_stl, r_tvr, r_blk, r_foul
              FROM ibl_plr
              WHERE pid = ?",
             "i",

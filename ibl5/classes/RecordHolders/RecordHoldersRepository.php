@@ -961,7 +961,7 @@ class RecordHoldersRepository extends \BaseMysqliRepository implements RecordHol
         // Get the latest sim's date range from ibl_sim_dates
         /** @var array{start_date: string, end_date: string}|null $latestSim */
         $latestSim = $this->fetchOne(
-            "SELECT `Start Date` AS start_date, `End Date` AS end_date FROM ibl_sim_dates ORDER BY Sim DESC LIMIT 1"
+            "SELECT start_date, end_date FROM ibl_sim_dates ORDER BY Sim DESC LIMIT 1"
         );
 
         if ($latestSim === null) {

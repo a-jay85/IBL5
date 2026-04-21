@@ -136,16 +136,16 @@ class PlayerRepository extends BaseMysqliRepository implements PlayerRepositoryI
         $playerData->ratingDefensiveRebounds = $plrRow['r_drb'];
         $playerData->ratingAssists = $plrRow['r_ast'];
         $playerData->ratingSteals = $plrRow['r_stl'];
-        $playerData->ratingTurnovers = $plrRow['r_to'];
+        $playerData->ratingTurnovers = $plrRow['r_tvr'];
         $playerData->ratingBlocks = $plrRow['r_blk'];
         $playerData->ratingFouls = $plrRow['r_foul'];
         $playerData->ratingOutsideOffense = $plrRow['oo'];
         $playerData->ratingOutsideDefense = $plrRow['od'];
-        $playerData->ratingDriveOffense = $plrRow['do'];
+        $playerData->ratingDriveOffense = $plrRow['r_drive_off'];
         $playerData->ratingDriveDefense = $plrRow['dd'];
         $playerData->ratingPostOffense = $plrRow['po'];
         $playerData->ratingPostDefense = $plrRow['pd'];
-        $playerData->ratingTransitionOffense = $plrRow['to'];
+        $playerData->ratingTransitionOffense = $plrRow['r_trans_off'];
         $playerData->ratingTransitionDefense = $plrRow['td'];
         $playerData->ratingClutch = $plrRow['Clutch'];
         $playerData->ratingConsistency = $plrRow['Consistency'];
@@ -283,7 +283,7 @@ class PlayerRepository extends BaseMysqliRepository implements PlayerRepositoryI
     /**
      * Map rating fields from historical player row (different column names than current)
      *
-     * @param array{r_2ga: ?int, r_2gp: ?int, r_fta: ?int, r_ftp: ?int, r_3ga: ?int, r_3gp: ?int, r_orb: ?int, r_drb: ?int, r_ast: ?int, r_stl: ?int, r_blk: ?int, r_tvr: ?int, r_oo: ?int, r_od: ?int, r_do: ?int, r_dd: ?int, r_po: ?int, r_pd: ?int, r_to: ?int, r_td: ?int, ...} $plrRow
+     * @param array{r_2ga: ?int, r_2gp: ?int, r_fta: ?int, r_ftp: ?int, r_3ga: ?int, r_3gp: ?int, r_orb: ?int, r_drb: ?int, r_ast: ?int, r_stl: ?int, r_blk: ?int, r_tvr: ?int, r_oo: ?int, r_od: ?int, r_drive_off: ?int, r_dd: ?int, r_po: ?int, r_pd: ?int, r_trans_off: ?int, r_td: ?int, ...} $plrRow
      */
     private function mapRatingsFromHistoricalRow(PlayerData $playerData, array $plrRow): void
     {
@@ -301,11 +301,11 @@ class PlayerRepository extends BaseMysqliRepository implements PlayerRepositoryI
         $playerData->ratingTurnovers = $plrRow['r_tvr'] ?? null;
         $playerData->ratingOutsideOffense = $plrRow['r_oo'] ?? null;
         $playerData->ratingOutsideDefense = $plrRow['r_od'] ?? null;
-        $playerData->ratingDriveOffense = $plrRow['r_do'] ?? null;
+        $playerData->ratingDriveOffense = $plrRow['r_drive_off'] ?? null;
         $playerData->ratingDriveDefense = $plrRow['r_dd'] ?? null;
         $playerData->ratingPostOffense = $plrRow['r_po'] ?? null;
         $playerData->ratingPostDefense = $plrRow['r_pd'] ?? null;
-        $playerData->ratingTransitionOffense = $plrRow['r_to'] ?? null;
+        $playerData->ratingTransitionOffense = $plrRow['r_trans_off'] ?? null;
         $playerData->ratingTransitionDefense = $plrRow['r_td'] ?? null;
     }
 
@@ -415,15 +415,12 @@ class PlayerRepository extends BaseMysqliRepository implements PlayerRepositoryI
     /**
      * Get all sim dates ordered by sim number
      *
-     * Returns all simulation date ranges from ibl_sim_dates table.
-     * Note: 'Start Date' and 'End Date' columns are DATE type in schema.
-     *
-     * @return array<int, array<string, mixed>> Array of sim date records
+     * @return array<int, array<string, mixed>> Array of sim date records (keys: Sim, start_date, end_date)
      */
     public function getAllSimDates(): array
     {
         return $this->fetchAll(
-            "SELECT * FROM ibl_sim_dates ORDER BY sim ASC",
+            "SELECT Sim, start_date, end_date FROM ibl_sim_dates ORDER BY Sim ASC",
             ""
         );
     }

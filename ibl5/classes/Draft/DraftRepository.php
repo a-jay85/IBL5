@@ -122,8 +122,8 @@ class DraftRepository extends \BaseMysqliRepository implements DraftRepositoryIn
         $oo = $draftClassPlayer['oo'];
         $od = $draftClassPlayer['od'];
         $po = $draftClassPlayer['po'];
-        $to = $draftClassPlayer['to'];
-        $do = $draftClassPlayer['do'];
+        $to = $draftClassPlayer['r_trans_off'];
+        $do = $draftClassPlayer['r_drive_off'];
         $dd = $draftClassPlayer['dd'];
         $pd = $draftClassPlayer['pd'];
         $td = $draftClassPlayer['td'];
@@ -138,7 +138,7 @@ class DraftRepository extends \BaseMysqliRepository implements DraftRepositoryIn
         $affected = $this->execute(
             "INSERT INTO ibl_plr (
                 pid, name, age, tid, pos,
-                sta, oo, od, po, `to`, `do`, dd, pd, td,
+                sta, oo, od, po, r_trans_off, r_drive_off, dd, pd, td,
                 talent, skill, intangibles,
                 dc_canPlayInGame, bird, exp, cy, cyt, retired
             ) VALUES (

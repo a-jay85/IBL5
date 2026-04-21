@@ -82,11 +82,11 @@ class FreeAgencyPreviewViewTest extends TestCase
     }
 
     /**
-     * @return array{pid: int, tid: int, name: string, teamname: string, team_city: string, color1: string, color2: string, pos: string, age: int, r_fga: int, r_fgp: int, r_fta: int, r_ftp: int, r_tga: int, r_tgp: int, r_orb: int, r_drb: int, r_ast: int, r_stl: int, r_blk: int, r_to: int, r_foul: int, oo: int, do: int, po: int, to: int, od: int, dd: int, pd: int, td: int, loyalty: int, winner: int, playingTime: int, security: int, tradition: int}
+     * @return array{pid: int, tid: int, name: string, teamname: string, team_city: string, color1: string, color2: string, pos: string, age: int, r_fga: int, r_fgp: int, r_fta: int, r_ftp: int, r_tga: int, r_tgp: int, r_orb: int, r_drb: int, r_ast: int, r_stl: int, r_blk: int, r_tvr: int, r_foul: int, oo: int, r_drive_off: int, po: int, r_trans_off: int, od: int, dd: int, pd: int, td: int, loyalty: int, winner: int, playingTime: int, security: int, tradition: int}
      */
     private static function createFreeAgent(array $overrides = []): array
     {
-        /** @var array{pid: int, tid: int, name: string, teamname: string, team_city: string, color1: string, color2: string, pos: string, age: int, r_fga: int, r_fgp: int, r_fta: int, r_ftp: int, r_tga: int, r_tgp: int, r_orb: int, r_drb: int, r_ast: int, r_stl: int, r_blk: int, r_to: int, r_foul: int, oo: int, do: int, po: int, to: int, od: int, dd: int, pd: int, td: int, loyalty: int, winner: int, playingTime: int, security: int, tradition: int} */
+        /** @var array{pid: int, tid: int, name: string, teamname: string, team_city: string, color1: string, color2: string, pos: string, age: int, r_fga: int, r_fgp: int, r_fta: int, r_ftp: int, r_tga: int, r_tgp: int, r_orb: int, r_drb: int, r_ast: int, r_stl: int, r_blk: int, r_tvr: int, r_foul: int, oo: int, r_drive_off: int, po: int, r_trans_off: int, od: int, dd: int, pd: int, td: int, loyalty: int, winner: int, playingTime: int, security: int, tradition: int} */
         return array_merge([
             'pid' => 1,
             'tid' => 1,
@@ -108,12 +108,12 @@ class FreeAgencyPreviewViewTest extends TestCase
             'r_ast' => 50,
             'r_stl' => 50,
             'r_blk' => 50,
-            'r_to' => 50,
+            'r_tvr' => 50,
             'r_foul' => 50,
             'oo' => 50,
-            'do' => 50,
+            'r_drive_off' => 50,
             'po' => 50,
-            'to' => 50,
+            'r_trans_off' => 50,
             'od' => 50,
             'dd' => 50,
             'pd' => 50,

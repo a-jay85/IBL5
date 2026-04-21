@@ -322,8 +322,8 @@ class TeamTableService implements TeamTableServiceInterface
             'peak' => null,
             'color1' => null,
             'color2' => null,
-            'oo' => 0, 'od' => 0, 'do' => 0, 'dd' => 0,
-            'po' => 0, 'pd' => 0, 'to' => 0, 'td' => 0,
+            'oo' => 0, 'od' => 0, 'r_drive_off' => 0, 'dd' => 0,
+            'po' => 0, 'pd' => 0, 'r_trans_off' => 0, 'td' => 0,
             'Clutch' => null, 'Consistency' => null,
             'talent' => 0, 'skill' => 0, 'intangibles' => 0,
             'loyalty' => null, 'playingTime' => null, 'winner' => null,
@@ -345,7 +345,7 @@ class TeamTableService implements TeamTableServiceInterface
             'draftedby' => '', 'draftedbycurrentname' => '', 'college' => '',
             'r_fga' => 0, 'r_fgp' => 0, 'r_fta' => 0, 'r_ftp' => 0,
             'r_tga' => 0, 'r_tgp' => 0, 'r_orb' => 0, 'r_drb' => 0,
-            'r_ast' => 0, 'r_stl' => 0, 'r_to' => 0, 'r_blk' => 0, 'r_foul' => 0,
+            'r_ast' => 0, 'r_stl' => 0, 'r_tvr' => 0, 'r_blk' => 0, 'r_foul' => 0,
             'isCashRow' => true,
         ];
     }

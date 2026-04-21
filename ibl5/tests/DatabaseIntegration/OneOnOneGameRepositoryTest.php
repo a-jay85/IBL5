@@ -100,9 +100,9 @@ class OneOnOneGameRepositoryTest extends DatabaseTestCase
     public function testGetPlayerForGameReturnsPlayerData(): void
     {
         $this->insertTestPlayer(200000053, 'DB Test Game Player', [
-            'oo' => 70, 'do' => 60, 'po' => 65, 'od' => 55, 'dd' => 50, 'pd' => 45,
+            'oo' => 70, 'r_drive_off' => 60, 'po' => 65, 'od' => 55, 'dd' => 50, 'pd' => 45,
             'r_fga' => 80, 'r_fgp' => 50, 'r_fta' => 70, 'r_tga' => 40, 'r_tgp' => 35,
-            'r_orb' => 30, 'r_drb' => 60, 'r_stl' => 25, 'r_to' => 20, 'r_blk' => 15, 'r_foul' => 18,
+            'r_orb' => 30, 'r_drb' => 60, 'r_stl' => 25, 'r_tvr' => 20, 'r_blk' => 15, 'r_foul' => 18,
         ]);
 
         $player = $this->repo->getPlayerForGame(200000053);
@@ -111,7 +111,7 @@ class OneOnOneGameRepositoryTest extends DatabaseTestCase
         self::assertSame(200000053, $player['pid']);
         self::assertSame('DB Test Game Player', $player['name']);
         self::assertSame(70, $player['oo']);
-        self::assertSame(60, $player['do']);
+        self::assertSame(60, $player['r_drive_off']);
         self::assertSame(50, $player['r_fgp']);
     }
 

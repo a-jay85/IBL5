@@ -94,7 +94,9 @@ SELECT
     TRY_CAST(r_tga AS INTEGER) AS r_tga, TRY_CAST(r_tgp AS INTEGER) AS r_tgp,
     TRY_CAST(r_orb AS INTEGER) AS r_orb, TRY_CAST(r_drb AS INTEGER) AS r_drb,
     TRY_CAST(r_ast AS INTEGER) AS r_ast, TRY_CAST(r_stl AS INTEGER) AS r_stl,
-    TRY_CAST(r_to AS INTEGER)  AS r_to,  TRY_CAST(r_blk AS INTEGER) AS r_blk,
+    -- Migration 113: MariaDB column renamed r_to → r_tvr. Kept output name r_to
+    -- for downstream-query compatibility.
+    TRY_CAST(r_tvr AS INTEGER) AS r_to,  TRY_CAST(r_blk AS INTEGER) AS r_blk,
     TRY_CAST(r_foul AS INTEGER) AS r_foul
 FROM read_csv('data/ibl_plr_snapshots.csv', delim='\t', header=true, all_varchar=true,
     null_padding=true, ignore_errors=true, strict_mode=false, quote='')
@@ -109,12 +111,12 @@ QUALIFY ROW_NUMBER() OVER (
 
 -- dim_sim_dates: Global simulation date windows (698 sims across 19 seasons)
 -- Maps PLB per-season sim_number to date ranges via season offset calculation.
--- Column names have spaces (preserved from MariaDB schema) — double-quoted.
+-- Migration 113: MariaDB columns renamed `Start Date` → start_date, `End Date` → end_date.
 CREATE OR REPLACE TABLE dim_sim_dates AS
 SELECT
     TRY_CAST("Sim" AS INTEGER)        AS global_sim,
-    TRY_CAST("Start Date" AS DATE)    AS sim_start_date,
-    TRY_CAST("End Date" AS DATE)      AS sim_end_date
+    TRY_CAST(start_date AS DATE)      AS sim_start_date,
+    TRY_CAST(end_date   AS DATE)      AS sim_end_date
 FROM read_csv('data/ibl_sim_dates.csv', delim='\t', header=true, all_varchar=true,
     null_padding=true, ignore_errors=true, strict_mode=false, quote='')
 WHERE TRY_CAST("Sim" AS INTEGER) IS NOT NULL;

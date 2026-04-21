@@ -48,7 +48,7 @@ class FreeAgencyPreviewRepositoryTest extends DatabaseTestCase
 
         // Tendency fields
         self::assertArrayHasKey('oo', $first);
-        self::assertArrayHasKey('do', $first);
+        self::assertArrayHasKey('r_drive_off', $first);
 
         // FA preference fields
         self::assertArrayHasKey('loyalty', $first);

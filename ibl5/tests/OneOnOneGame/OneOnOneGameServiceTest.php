@@ -189,7 +189,7 @@ final class OneOnOneGameServiceTest extends TestCase
             'pid' => $pid,
             'name' => $name,
             'oo' => 50,
-            'do' => 50,
+            'r_drive_off' => 50,
             'po' => 50,
             'od' => 50,
             'dd' => 50,
@@ -202,7 +202,7 @@ final class OneOnOneGameServiceTest extends TestCase
             'r_orb' => 30,
             'r_drb' => 50,
             'r_stl' => 40,
-            'r_to' => 50,
+            'r_tvr' => 50,
             'r_blk' => 30,
             'r_foul' => 50,
         ];

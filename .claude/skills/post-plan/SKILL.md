@@ -1,7 +1,7 @@
 ---
 name: post-plan
 description: Single orchestrator for the post-plan workflow. Runs diff classification, simplify, commit/push/PR, code review, security audit, verification, CI monitoring, retrospective, and worktree teardown as one uninterrupted sequence.
-last_verified: 2026-04-14
+last_verified: 2026-04-21
 ---
 
 # Post-Plan Orchestrator
@@ -121,7 +121,7 @@ Review changed files (`git diff --name-only HEAD~1` or vs base branch) for reuse
 
 1. Stage relevant changes, review with `git diff --staged`, commit (CLAUDE.md conventions), push, create PR
 2. **Stacked PRs:** If branched from a feature branch (not `master`), use `--base <parent-branch>`
-3. **Manual testing in PR description:** Include a "Manual Testing" section. If automated tests fully cover behavior, write: `No manual testing needed — all changes are covered by unit and E2E tests.` Otherwise, list only steps requiring subjective human judgment (visual aesthetics, production comparison). Do NOT list CLI commands or script invocations — Phase 7 executes those.
+3. **Manual testing in PR description:** Include a "Manual Testing" section. If automated tests fully cover behavior, write: `No manual testing needed — all changes are covered by unit and E2E tests.` Otherwise, list only steps requiring subjective human judgment on new or redesigned UI/UX ("does this look/feel good?", "does this flow work well?"). Production comparison and "does output still match?" are visual-regression-replaceable, not manual. Do NOT list CLI commands or script invocations — Phase 7 executes those.
 4. Use Haiku agents for commit message generation if delegating
 
 ---
@@ -243,7 +243,7 @@ echo "$EXTRACTED"
 
 Launch a **single Sonnet agent** with this prompt (substitute the extracted steps and file list):
 
-> You are a **Senior QA Automation Engineer** reviewing manual testing steps from a PR. Your job: eliminate every step that can be replaced by automated verification. Be aggressive — manual testing is expensive and error-prone. Only steps requiring subjective human judgment (visual aesthetics, UX feel, production data comparison) should survive.
+> You are a **Senior QA Automation Engineer** reviewing manual testing steps from a PR. Your job: eliminate every step that can be replaced by automated verification. Be aggressive — manual testing is expensive and error-prone. Only steps requiring subjective human judgment on **new or redesigned** UI/UX should survive ("does this look/feel good?", "does this flow work well?").
 >
 > **PR manual testing steps:**
 > {extracted steps from Step 1}
@@ -258,16 +258,17 @@ Launch a **single Sonnet agent** with this prompt (substitute the extracted step
 > | **PHPUnit-replaceable** | Unit/integration test can assert the behavior (DB state, service output, calculation) | Opus writes PHPUnit test |
 > | **API-test-replaceable** | HTTP request/response can be verified programmatically (endpoint returns correct JSON/HTML, status codes, headers) | Opus writes integration or API test |
 > | **E2E-replaceable** | Browser interaction needed (form submit, page navigation, HTMX swap, DOM state) | Opus writes Playwright test |
-> | **Truly manual** | Requires subjective human judgment that no automated test can replicate (visual aesthetics, "does this look right", production comparison) | Stays in PR description |
+> | **Visual-regression-replaceable** | "Does output still match?" / production comparison where UI/UX was not intentionally redesigned | Opus writes Playwright visual-regression test or screenshot diff |
+> | **Truly manual** | Requires subjective human judgment on **new or redesigned** UI/UX that no automated test can replicate ("does this look/feel good?", "does this new flow work well?") | Stays in PR description |
 >
 > For each step, return a JSON array:
 > ```json
 > [
->   {"step": "original step text", "category": "cli-executable|phpunit|api-test|e2e|truly-manual", "rationale": "why this category", "test_hint": "what the test should assert (omit for cli-executable and truly-manual)"}
+>   {"step": "original step text", "category": "cli-executable|phpunit|api-test|e2e|visual-regression|truly-manual", "rationale": "why this category", "test_hint": "what the test should assert (omit for cli-executable and truly-manual)"}
 > ]
 > ```
 >
-> **Bias toward automation.** If a step says "verify X works" or "check that Y returns Z", that is automatable — not manual. "Compare against production" is truly manual only if it requires visual judgment; if it's comparing data values, write an assertion.
+> **Bias toward automation.** If a step says "verify X works" or "check that Y returns Z", that is automatable — not manual. "Compare against production" is visual-regression-replaceable (screenshot diff) unless UI/UX was intentionally redesigned — it is NOT truly manual. Only subjective judgment on new/redesigned UI/UX is truly manual.
 
 ### Step 3: Execute findings
 

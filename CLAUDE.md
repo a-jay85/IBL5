@@ -32,7 +32,7 @@ bin/test | tail -3
 cd ibl5 && composer run analyse
 ```
 
-**Note:** PHPStan and the **full** PHPUnit test suite run automatically via PostToolUse hooks after every Edit/Write — no need to run them manually between edits. If your changes introduce new errors above the baseline, fix them before proceeding. The only exception: errors clearly caused by another Claude instance's simultaneous changes to files you did not touch — those may be ignored.
+**Note:** PHPStan and the **full** PHPUnit test suite run automatically via PostToolUse hooks when a task is marked completed (TaskUpdate → `completed`). They only fire when PHP files have been modified (checked via `git diff`). If your changes introduce new errors above the baseline, fix them before proceeding. The only exception: errors clearly caused by another Claude instance's simultaneous changes to files you did not touch — those may be ignored.
 
 **Full test suite rule:** Always run the **full** PHPUnit test suite (no `--testsuite` or `--filter` flags) after making PHP changes and before considering any task complete. Changes in one module frequently break tests in other modules (e.g., updating a shared mock, interface, or base class). Only use `--testsuite` or `--filter` when actively debugging a specific failing test — then re-run the full suite once it passes.
 

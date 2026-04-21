@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace DepthChartEntry;
 
 use DepthChartEntry\Contracts\DepthChartEntryValidatorInterface;
-use Utilities\HtmlSanitizer;
 
 /**
  * @phpstan-import-type ProcessedSubmission from Contracts\DepthChartEntryProcessorInterface
@@ -47,7 +46,7 @@ class DepthChartEntryValidator implements DepthChartEntryValidatorInterface
         if ($depthChartData['hasStarterAtMultiplePositions']) {
             $this->errors[] = [
                 'type' => 'multiple_starting_positions',
-                'message' => HtmlSanitizer::safeHtmlOutput($depthChartData['nameOfProblemStarter']) . ' is set as starter (1st) at multiple positions.',
+                'message' => $depthChartData['nameOfProblemStarter'] . ' is set as starter (1st) at multiple positions.',
                 'detail' => 'Please press the "Back" button on your browser and set this player as 1st at only one position.'
             ];
         }

@@ -78,10 +78,10 @@ class NegotiationDemandCalculatorTest extends TestCase
     /**
      * Pin exact demand values for known inputs to catch arithmetic mutations.
      *
-     * With 21 player ratings all=50, market maxes all=100 (19 matching keys):
-     * rawScore = 19 × 50 = 950; adjusted = 950 - 700 = 250
-     * avgDemands = 250 × 3 = 750; totalDemands = 750 × 5 = 3750
-     * baseDemands = 3750 / 6 = 625; maxRaise = floor(625 × 0.10) = 62
+     * With 21 player ratings all=50, market maxes all=100 (21 matching keys):
+     * rawScore = 21 × 50 = 1050; adjusted = 1050 - 700 = 350
+     * avgDemands = 350 × 3 = 1050; totalDemands = 1050 × 5 = 5250
+     * baseDemands = 5250 / 6 = 875; maxRaise = floor(875 × 0.10) = 87
      * modifier = 1.10 (loyalty 0.05 + playingTime 0.05 from preferences=3)
      */
     public function testCalculateDemandsReturnsExactValuesForAveragePlayer(): void
@@ -96,15 +96,15 @@ class NegotiationDemandCalculatorTest extends TestCase
         $this->assertEqualsWithDelta(1.10, $demands['modifier'], 0.001);
 
         // Assert exact year demands (after modifier division + rounding)
-        $this->assertEquals(682, $demands['year1']);
-        $this->assertEquals(750, $demands['year2']);
-        $this->assertEquals(818, $demands['year3']);
-        $this->assertEquals(886, $demands['year4']);
-        $this->assertEquals(955, $demands['year5']);
+        $this->assertEquals(795, $demands['year1']);
+        $this->assertEquals(875, $demands['year2']);
+        $this->assertEquals(954, $demands['year3']);
+        $this->assertEquals(1033, $demands['year4']);
+        $this->assertEquals(1112, $demands['year5']);
         $this->assertEquals(0, $demands['year6']);
 
         // Assert total and years
-        $this->assertEquals(4091, $demands['total']);
+        $this->assertEquals(4769, $demands['total']);
         $this->assertSame(5, $demands['years']);
     }
 
@@ -421,7 +421,8 @@ class NegotiationDemandCalculatorTest extends TestCase
                 'tga' => $maxValue, 'tgp' => $maxValue, 'orb' => $maxValue, 'drb' => $maxValue,
                 'ast' => $maxValue, 'stl' => $maxValue, 'r_to' => $maxValue, 'blk' => $maxValue,
                 'foul' => $maxValue, 'oo' => $maxValue, 'od' => $maxValue, 'do' => $maxValue,
-                'dd' => $maxValue, 'po' => $maxValue, 'pd' => $maxValue, 'td' => $maxValue,
+                'dd' => $maxValue, 'po' => $maxValue, 'pd' => $maxValue, 'to_off' => $maxValue,
+                'td' => $maxValue,
             ]
         ]);
     }

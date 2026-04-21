@@ -81,8 +81,8 @@ class NegotiationRepositoryTest extends DatabaseTestCase
 
         $expectedKeys = [
             'fga', 'fgp', 'fta', 'ftp', 'tga', 'tgp',
-            'orb', 'drb', 'ast', 'stl', 'to', 'blk',
-            'foul', 'oo', 'od', 'do', 'dd', 'po', 'pd', 'td',
+            'orb', 'drb', 'ast', 'stl', 'tov', 'blk',
+            'foul', 'oo', 'od', 'do', 'dd', 'po', 'pd', 'to', 'td',
         ];
 
         foreach ($expectedKeys as $key) {

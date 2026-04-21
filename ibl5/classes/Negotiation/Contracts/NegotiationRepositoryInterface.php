@@ -44,7 +44,7 @@ interface NegotiationRepositoryInterface
      * Used for contract demand calculation - normalizes player ratings
      * against league-wide maximums.
      *
-     * @return array{fga: int, fgp: int, fta: int, ftp: int, tga: int, tgp: int, orb: int, drb: int, ast: int, stl: int, to: int, blk: int, foul: int, oo: int, od: int, do: int, dd: int, po: int, pd: int, td: int}
+     * @return array{fga: int, fgp: int, fta: int, ftp: int, tga: int, tgp: int, orb: int, drb: int, ast: int, stl: int, tov: int, blk: int, foul: int, oo: int, od: int, do: int, dd: int, po: int, pd: int, to: int, td: int}
      */
     public function getMarketMaximums(): array;
 }

@@ -84,7 +84,7 @@ class NegotiationRepository extends BaseMysqliRepository implements NegotiationR
      *
      * Results are cached in the `cache` table for 24 hours since values only change after sim updates.
      *
-     * @return array{fga: int, fgp: int, fta: int, ftp: int, tga: int, tgp: int, orb: int, drb: int, ast: int, stl: int, to: int, blk: int, foul: int, oo: int, od: int, do: int, dd: int, po: int, pd: int, td: int}
+     * @return array{fga: int, fgp: int, fta: int, ftp: int, tga: int, tgp: int, orb: int, drb: int, ast: int, stl: int, tov: int, blk: int, foul: int, oo: int, od: int, do: int, dd: int, po: int, pd: int, to: int, td: int}
      */
     public function getMarketMaximums(): array
     {
@@ -103,11 +103,11 @@ class NegotiationRepository extends BaseMysqliRepository implements NegotiationR
     private const MARKET_MAX_TTL = 86400; // 24 hours
 
     /**
-     * @return array{fga: int, fgp: int, fta: int, ftp: int, tga: int, tgp: int, orb: int, drb: int, ast: int, stl: int, to: int, blk: int, foul: int, oo: int, od: int, do: int, dd: int, po: int, pd: int, td: int}
+     * @return array{fga: int, fgp: int, fta: int, ftp: int, tga: int, tgp: int, orb: int, drb: int, ast: int, stl: int, tov: int, blk: int, foul: int, oo: int, od: int, do: int, dd: int, po: int, pd: int, to: int, td: int}
      */
     private function computeMarketMaximums(): array
     {
-        /** @var array{fga: int|null, fgp: int|null, fta: int|null, ftp: int|null, tga: int|null, tgp: int|null, orb: int|null, drb: int|null, ast: int|null, stl: int|null, r_to: int|null, blk: int|null, foul: int|null, oo: int|null, od: int|null, do: int|null, dd: int|null, po: int|null, pd: int|null, td: int|null}|null $result */
+        /** @var array{fga: int|null, fgp: int|null, fta: int|null, ftp: int|null, tga: int|null, tgp: int|null, orb: int|null, drb: int|null, ast: int|null, stl: int|null, r_to: int|null, blk: int|null, foul: int|null, oo: int|null, od: int|null, do: int|null, dd: int|null, po: int|null, pd: int|null, to_off: int|null, td: int|null}|null $result */
         $result = $this->fetchOne(
             "SELECT
                 MAX(`r_fga`) AS fga,
@@ -129,6 +129,7 @@ class NegotiationRepository extends BaseMysqliRepository implements NegotiationR
                 MAX(`dd`) AS dd,
                 MAX(`po`) AS po,
                 MAX(`pd`) AS pd,
+                MAX(`to`) AS to_off,
                 MAX(`td`) AS td
             FROM ibl_plr"
         );
@@ -137,9 +138,9 @@ class NegotiationRepository extends BaseMysqliRepository implements NegotiationR
             return [
                 'fga' => 1, 'fgp' => 1, 'fta' => 1, 'ftp' => 1,
                 'tga' => 1, 'tgp' => 1, 'orb' => 1, 'drb' => 1,
-                'ast' => 1, 'stl' => 1, 'to' => 1, 'blk' => 1,
+                'ast' => 1, 'stl' => 1, 'tov' => 1, 'blk' => 1,
                 'foul' => 1, 'oo' => 1, 'od' => 1, 'do' => 1,
-                'dd' => 1, 'po' => 1, 'pd' => 1, 'td' => 1,
+                'dd' => 1, 'po' => 1, 'pd' => 1, 'to' => 1, 'td' => 1,
             ];
         }
 
@@ -158,7 +159,7 @@ class NegotiationRepository extends BaseMysqliRepository implements NegotiationR
             'drb' => $ensurePositive($result['drb']),
             'ast' => $ensurePositive($result['ast']),
             'stl' => $ensurePositive($result['stl']),
-            'to' => $ensurePositive($result['r_to']),
+            'tov' => $ensurePositive($result['r_to'] ?? null),
             'blk' => $ensurePositive($result['blk']),
             'foul' => $ensurePositive($result['foul']),
             'oo' => $ensurePositive($result['oo']),
@@ -167,12 +168,13 @@ class NegotiationRepository extends BaseMysqliRepository implements NegotiationR
             'dd' => $ensurePositive($result['dd']),
             'po' => $ensurePositive($result['po']),
             'pd' => $ensurePositive($result['pd']),
+            'to' => $ensurePositive($result['to_off'] ?? null),
             'td' => $ensurePositive($result['td']),
         ];
     }
 
     /**
-     * @return array{fga: int, fgp: int, fta: int, ftp: int, tga: int, tgp: int, orb: int, drb: int, ast: int, stl: int, to: int, blk: int, foul: int, oo: int, od: int, do: int, dd: int, po: int, pd: int, td: int}|null
+     * @return array{fga: int, fgp: int, fta: int, ftp: int, tga: int, tgp: int, orb: int, drb: int, ast: int, stl: int, tov: int, blk: int, foul: int, oo: int, od: int, do: int, dd: int, po: int, pd: int, to: int, td: int}|null
      */
     private function readMarketMaximumsCache(): ?array
     {
@@ -197,12 +199,12 @@ class NegotiationRepository extends BaseMysqliRepository implements NegotiationR
             return null;
         }
 
-        /** @var array{fga: int, fgp: int, fta: int, ftp: int, tga: int, tgp: int, orb: int, drb: int, ast: int, stl: int, to: int, blk: int, foul: int, oo: int, od: int, do: int, dd: int, po: int, pd: int, td: int} $decoded */
+        /** @var array{fga: int, fgp: int, fta: int, ftp: int, tga: int, tgp: int, orb: int, drb: int, ast: int, stl: int, tov: int, blk: int, foul: int, oo: int, od: int, do: int, dd: int, po: int, pd: int, to: int, td: int} $decoded */
         return $decoded;
     }
 
     /**
-     * @param array{fga: int, fgp: int, fta: int, ftp: int, tga: int, tgp: int, orb: int, drb: int, ast: int, stl: int, to: int, blk: int, foul: int, oo: int, od: int, do: int, dd: int, po: int, pd: int, td: int} $maximums
+     * @param array{fga: int, fgp: int, fta: int, ftp: int, tga: int, tgp: int, orb: int, drb: int, ast: int, stl: int, tov: int, blk: int, foul: int, oo: int, od: int, do: int, dd: int, po: int, pd: int, to: int, td: int} $maximums
      */
     private function writeMarketMaximumsCache(array $maximums): void
     {

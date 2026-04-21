@@ -76,17 +76,15 @@ test.describe('Depth Chart Entry: mobile card view', () => {
     await checkbox.click();
   });
 
-  test('role slot selects are enabled on mobile', async ({ page }) => {
-    // Position selects (pg/sg/sf/pf/c) are now hidden inputs; role slot
-    // selects use field names BH, DI, OI, DF, OF for PG/SG/SF/PF/C columns.
-    const bhSelects = page.locator('.dc-mobile-cards select[name^="BH"]');
-    await expect(bhSelects.first()).toBeEnabled();
+  test('position depth selects are enabled on mobile', async ({ page }) => {
+    // Position depth selects use field names pg, sg, sf, pf, c.
+    const pgSelects = page.locator('.dc-mobile-cards select[name^="pg"]');
+    await expect(pgSelects.first()).toBeEnabled();
   });
 
   test('settings grid has 6 columns per card', async ({ page }) => {
-    // The old pos-grid is gone; a single settings-grid holds all 5 role
-    // slots (BH/DI/OI/DF/OF = PG/SG/SF/PF/C) followed by the Min column
-    // on the right edge, for 6 fields total.
+    // The settings-grid holds all 5 position depth fields (pg/sg/sf/pf/c)
+    // followed by the Min column on the right edge, for 6 fields total.
     const firstGrid = page.locator('.dc-card__settings-grid').first();
     const fields = firstGrid.locator('.dc-card__field');
     await expect(fields).toHaveCount(6);
@@ -95,11 +93,11 @@ test.describe('Depth Chart Entry: mobile card view', () => {
   test('position stepper cycles through options on tap', async ({ page }) => {
     // The mobile position control is a vertical stepper (up-arrow / value
     // label / down-arrow) over a visually hidden <select>. Tapping the
-    // arrows should cycle through the role-priority options, wrap around
+    // arrows should cycle through the position depth options, wrap around
     // at the bounds, and keep the underlying <select> in sync so form
     // submission and the desktop-sync path still work.
     const firstCard = page.locator('.dc-card').first();
-    // Field 0 is the PG (BH) slot — first stepper on the card. The "Min"
+    // Field 0 is the PG (pg) depth — first stepper on the card. The "Min"
     // column now sits at the far right (field index 5).
     const pgField = firstCard.locator('.dc-card__field').nth(0);
 
@@ -118,10 +116,12 @@ test.describe('Depth Chart Entry: mobile card view', () => {
     await expect(hiddenSelect).toBeHidden();
 
     const optionCount = await hiddenSelect.locator('option').count();
-    expect(optionCount).toBeGreaterThanOrEqual(3);
+    expect(optionCount).toBeGreaterThanOrEqual(6);
 
-    // Mirror the PHP label convention: 0 → em dash, 1 → "S", N → "#N".
-    const labelFor = (v: number) => (v === 0 ? '—' : v === 1 ? 'S' : `#${v}`);
+    // Mirror the PHP label convention: 0 → "No", 1 → "1st", 2 → "2nd",
+    // 3 → "3rd", 4 → "4th", 5 → "ok".
+    const depthLabels = ['No', '1st', '2nd', '3rd', '4th', 'ok'];
+    const labelFor = (v: number) => depthLabels[v] ?? String(v);
 
     const startValue = Number(await hiddenSelect.inputValue());
 
@@ -148,9 +148,9 @@ test.describe('Depth Chart Entry: mobile card view', () => {
 
   test('minutes stepper increments and clamps at 0/40', async ({ page }) => {
     // The Min column (rightmost field, nth(5)) is a number input wrapped
-    // in the same stepper chrome as the role slots. Up arrow increments
+    // in the same stepper chrome as the position depths. Up arrow increments
     // (more minutes), down arrow decrements (fewer minutes) — the opposite
-    // direction from the role slot stepper because minutes is a numeric
+    // direction from the position depth stepper because minutes is a numeric
     // quantity rather than a depth-chart rank. The value is clamped to
     // the input's [min, max] attributes (0-40) instead of wrapping.
     const firstCard = page.locator('.dc-card').first();
@@ -202,7 +202,7 @@ test.describe('Depth Chart Entry: mobile card view', () => {
     await minInput.dispatchEvent('change');
   });
 
-  test('changing a card role slot triggers glow', async ({ page }) => {
+  test('changing a card position depth triggers glow', async ({ page }) => {
     // Tapping a stepper arrow cycles the hidden <select> and dispatches
     // a bubbling change event — the glow highlighter in
     // depth-chart-changes.js listens for that on the form.
@@ -359,7 +359,7 @@ test.describe('DCE mobile: saved depth chart loading', () => {
     expect(optCount, 'Saved DC dropdown should have at least 2 options').toBeGreaterThanOrEqual(2);
 
     // Ensure mobile cards are ready before loading a saved config
-    await expect(page.locator('.dc-mobile-cards select[name^="BH"]').first()).toBeEnabled();
+    await expect(page.locator('.dc-mobile-cards select[name^="pg"]').first()).toBeEnabled();
 
     // Select the second option (first saved config)
     await dropdown.selectOption({ index: 1 });
@@ -413,7 +413,7 @@ test.describe('DCE mobile: resize sync', () => {
     await page.goto('modules.php?name=DepthChartEntry');
     await page.waitForLoadState('networkidle');
 
-    // Change the first card's PG (BH) slot by tapping the stepper down
+    // Change the first card's PG (pg) depth by tapping the stepper down
     // arrow. The underlying <select> is display:none on mobile, so we
     // can't call selectOption() on it — we drive the stepper UI instead.
     const firstCard = page.locator('.dc-card').first();
@@ -431,7 +431,7 @@ test.describe('DCE mobile: resize sync', () => {
     await page.waitForTimeout(200); // debounce
 
     // Desktop table should now show the changed value
-    const desktopSelect = page.locator('.depth-chart-table select[name^="BH"]').first();
+    const desktopSelect = page.locator('.depth-chart-table select[name^="pg"]').first();
     await expect(desktopSelect).toBeEnabled();
     const desktopValue = await desktopSelect.inputValue();
     expect(desktopValue).toBe(newValue);

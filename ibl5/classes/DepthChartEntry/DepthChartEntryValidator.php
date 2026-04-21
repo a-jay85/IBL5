@@ -28,9 +28,11 @@ class DepthChartEntryValidator implements DepthChartEntryValidatorInterface
         if ($phase === 'Playoffs') {
             $minActivePlayers = 10;
             $maxActivePlayers = 12;
+            $minPerPosition = 2;
         } else {
             $minActivePlayers = 12;
             $maxActivePlayers = 12;
+            $minPerPosition = 3;
         }
 
         $this->validateActivePlayerCount(
@@ -38,6 +40,16 @@ class DepthChartEntryValidator implements DepthChartEntryValidatorInterface
             $minActivePlayers,
             $maxActivePlayers
         );
+
+        $this->validatePositionDepth($depthChartData, $minPerPosition);
+
+        if ($depthChartData['hasStarterAtMultiplePositions']) {
+            $this->errors[] = [
+                'type' => 'multiple_starting_positions',
+                'message' => $depthChartData['nameOfProblemStarter'] . ' is set as starter (1st) at multiple positions.',
+                'detail' => 'Please press the "Back" button on your browser and set this player as 1st at only one position.'
+            ];
+        }
 
         return $this->errors === [];
     }
@@ -58,6 +70,27 @@ class DepthChartEntryValidator implements DepthChartEntryValidatorInterface
                 'message' => "You can't have more than $max active players in your lineup; you have $activePlayers.",
                 'detail' => "Please press the \"Back\" button on your browser and deactivate " . ($activePlayers - $max) . " player(s)."
             ];
+        }
+    }
+
+    /**
+     * @param ProcessedSubmission $depthChartData
+     */
+    private function validatePositionDepth(array $depthChartData, int $minPerPosition): void
+    {
+        $positionNames = ['PG', 'SG', 'SF', 'PF', 'C'];
+        $positionKeys = ['pos_1', 'pos_2', 'pos_3', 'pos_4', 'pos_5'];
+
+        foreach ($positionKeys as $index => $key) {
+            $count = $depthChartData[$key];
+            if ($count < $minPerPosition) {
+                $posName = $positionNames[$index];
+                $this->errors[] = [
+                    'type' => 'position_depth',
+                    'message' => "You need at least $minPerPosition non-injured players assigned to {$posName}; you have $count.",
+                    'detail' => "Please press the \"Back\" button on your browser and assign more players to the {$posName} position."
+                ];
+            }
         }
     }
     

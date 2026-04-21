@@ -139,18 +139,16 @@
                 if (!pidInput) continue;
                 var depthCount = pidInput.name.replace('pid', '');
 
-                // Position depth columns (pg/sg/sf/pf/c) are dead hidden inputs — ignore
-
                 // Active status (checkbox) + minutes (number input, clamped to 0-40)
                 setFieldValue(form, 'canPlayInGame' + depthCount, player.dc_canPlayInGame);
                 setFieldValue(form, 'min' + depthCount, Math.max(0, Math.min(40, player.dc_minutes)));
 
-                // Role slot values (clamp negatives to 0 for legacy saved DCs)
-                setFieldValue(form, 'OF' + depthCount, Math.max(0, player.dc_of));
-                setFieldValue(form, 'DF' + depthCount, Math.max(0, player.dc_df));
-                setFieldValue(form, 'OI' + depthCount, Math.max(0, player.dc_oi));
-                setFieldValue(form, 'DI' + depthCount, Math.max(0, player.dc_di));
-                setFieldValue(form, 'BH' + depthCount, Math.max(0, player.dc_bh));
+                // Position depth values (clamp to 0-5)
+                setFieldValue(form, 'pg' + depthCount, Math.max(0, Math.min(5, player.dc_PGDepth)));
+                setFieldValue(form, 'sg' + depthCount, Math.max(0, Math.min(5, player.dc_SGDepth)));
+                setFieldValue(form, 'sf' + depthCount, Math.max(0, Math.min(5, player.dc_SFDepth)));
+                setFieldValue(form, 'pf' + depthCount, Math.max(0, Math.min(5, player.dc_PFDepth)));
+                setFieldValue(form, 'c' + depthCount, Math.max(0, Math.min(5, player.dc_CDepth)));
 
                 // Mark traded players
                 if (!player.isOnCurrentRoster) {
@@ -213,7 +211,7 @@
 
         /**
          * Apply a value to every form field sharing the given name. Handles
-         * SELECT (role slots), INPUT[type=number] (minutes), and
+         * SELECT (position depth), INPUT[type=number] (minutes), and
          * INPUT[type=checkbox] (canPlayInGame). Hidden inputs sharing the
          * canPlayInGame name are intentionally left alone — they always carry
          * "0" so the form still posts 0 when the checkbox is unchecked.

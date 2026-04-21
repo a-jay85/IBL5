@@ -89,11 +89,12 @@ class DepthChartEntryViewTest extends TestCase
         $this->assertStringContainsString('name="c1"', $output);
         $this->assertStringContainsString('name="canPlayInGame1"', $output);
         $this->assertStringContainsString('name="min1"', $output);
-        $this->assertStringContainsString('name="OF1"', $output);
-        $this->assertStringContainsString('name="DF1"', $output);
-        $this->assertStringContainsString('name="OI1"', $output);
-        $this->assertStringContainsString('name="DI1"', $output);
-        $this->assertStringContainsString('name="BH1"', $output);
+        // Role fields (OF, DF, OI, DI, BH) are no longer rendered
+        $this->assertStringNotContainsString('name="OF1"', $output);
+        $this->assertStringNotContainsString('name="DF1"', $output);
+        $this->assertStringNotContainsString('name="OI1"', $output);
+        $this->assertStringNotContainsString('name="DI1"', $output);
+        $this->assertStringNotContainsString('name="BH1"', $output);
     }
 
     public function testRenderPlayerRowContainsHiddenFields(): void
@@ -356,11 +357,12 @@ class DepthChartEntryViewTest extends TestCase
         $this->assertStringContainsString('name="c1"', $output);
         $this->assertStringContainsString('name="canPlayInGame1"', $output);
         $this->assertStringContainsString('name="min1"', $output);
-        $this->assertStringContainsString('name="OF1"', $output);
-        $this->assertStringContainsString('name="DF1"', $output);
-        $this->assertStringContainsString('name="OI1"', $output);
-        $this->assertStringContainsString('name="DI1"', $output);
-        $this->assertStringContainsString('name="BH1"', $output);
+        // Role fields (OF, DF, OI, DI, BH) are no longer rendered
+        $this->assertStringNotContainsString('name="OF1"', $output);
+        $this->assertStringNotContainsString('name="DF1"', $output);
+        $this->assertStringNotContainsString('name="OI1"', $output);
+        $this->assertStringNotContainsString('name="DI1"', $output);
+        $this->assertStringNotContainsString('name="BH1"', $output);
     }
 
     public function testRenderMobileViewActiveCheckboxChecked(): void
@@ -445,29 +447,29 @@ class DepthChartEntryViewTest extends TestCase
     public function testRenderMobileViewStepperInitialLabelMatchesDcValue(): void
     {
         $player = $this->buildTestPlayer();
-        $player['dc_bh'] = 1; // PG slot → starter label "S"
-        $player['dc_df'] = 2; // PF slot → backup label "#2"
+        $player['dc_PGDepth'] = 1; // PG depth → starter label "1st"
+        $player['dc_SFDepth'] = 2; // SF depth → backup label "2nd"
 
         ob_start();
         $this->view->renderMobileView([$player], ['PG', 'SG', 'SF', 'PF', 'C']);
         $output = (string) ob_get_clean();
 
         // Initial labels are rendered server-side so stepper values are
-        // correct before any JS runs. &mdash; is the unassigned label.
+        // correct before any JS runs. "No" is the unassigned label.
         $this->assertMatchesRegularExpression(
-            '/dc-card__stepper-value[^>]*>S</',
+            '/dc-card__stepper-value[^>]*>1st</',
             $output,
-            'PG slot with dc_bh=1 should render initial label "S"'
+            'PG slot with depth=1 should render initial label "1st"'
         );
         $this->assertMatchesRegularExpression(
-            '/dc-card__stepper-value[^>]*>#2</',
+            '/dc-card__stepper-value[^>]*>2nd</',
             $output,
-            'PF slot with dc_df=2 should render initial label "#2"'
+            'SF slot with depth=2 should render initial label "2nd"'
         );
         $this->assertMatchesRegularExpression(
-            '/dc-card__stepper-value[^>]*>&mdash;</',
+            '/dc-card__stepper-value[^>]*>No</',
             $output,
-            'Unassigned slots should render the em-dash label'
+            'Unassigned slots should render the "No" label'
         );
     }
 
@@ -479,12 +481,12 @@ class DepthChartEntryViewTest extends TestCase
         $this->view->renderMobileView([$player], ['PG', 'SG', 'SF', 'PF', 'C']);
         $output = (string) ob_get_clean();
 
-        // aria-labels include direction + slot + player name so screen
+        // aria-labels include direction + position + player name so screen
         // readers announce the action and its target.
-        $this->assertStringContainsString('aria-label="Previous PG slot for Unique Player"', $output);
-        $this->assertStringContainsString('aria-label="Next PG slot for Unique Player"', $output);
-        $this->assertStringContainsString('aria-label="Previous C slot for Unique Player"', $output);
-        $this->assertStringContainsString('aria-label="Next C slot for Unique Player"', $output);
+        $this->assertStringContainsString('aria-label="Previous PG depth for Unique Player"', $output);
+        $this->assertStringContainsString('aria-label="Next PG depth for Unique Player"', $output);
+        $this->assertStringContainsString('aria-label="Previous C depth for Unique Player"', $output);
+        $this->assertStringContainsString('aria-label="Next C depth for Unique Player"', $output);
     }
 
     public function testRenderMobileViewStepperButtonsAreTypeButton(): void
@@ -582,15 +584,13 @@ class DepthChartEntryViewTest extends TestCase
         $this->assertStringContainsString('Must have 12 active players.', $output);
     }
 
-    public function testRenderSubmissionResultHasAllRoleSlotHeaders(): void
+    public function testRenderSubmissionResultHasAllPositionHeaders(): void
     {
         ob_start();
         $this->view->renderSubmissionResult('Metros', [], true);
         $output = (string) ob_get_clean();
 
-        // Relabeled columns per the redesign: PG/SG/SF/PF/C map to
-        // bh/di/oi/df/of respectively. Verify the confirmation table echoes
-        // the form's column headers so the GM can cross-check what was saved.
+        // Confirmation table shows position depth columns matching the form
         $this->assertStringContainsString('<th>Name</th>', $output);
         $this->assertStringContainsString('<th>Active</th>', $output);
         $this->assertStringContainsString('<th>PG</th>', $output);
@@ -598,31 +598,29 @@ class DepthChartEntryViewTest extends TestCase
         $this->assertStringContainsString('<th>SF</th>', $output);
         $this->assertStringContainsString('<th>PF</th>', $output);
         $this->assertStringContainsString('<th>C</th>', $output);
+        $this->assertStringContainsString('<th>Min</th>', $output);
     }
 
     public function testRenderSubmissionResultEmitsSubmittedValuesInCorrectColumns(): void
     {
-        // Two players with distinct, non-trivial values per column so the
+        // Two players with distinct, non-trivial position depth values so the
         // assertions can't pass by accident on a default-zero row.
+        // Columns: Name, Active, PG, SG, SF, PF, C, Min
         $players = [
-            $this->buildProcessedPlayer(
-                name: 'Player One',
-                canPlayInGame: 1,
-                bh: 1,  // PG column
-                di: 2,  // SG column
-                oi: 0,  // SF column
-                df: 0,  // PF column
-                of: 0,  // C column
-            ),
-            $this->buildProcessedPlayer(
-                name: 'Player Two',
-                canPlayInGame: 0,
-                bh: 0,
-                di: 0,
-                oi: 3,
-                df: 1,
-                of: 2,
-            ),
+            [
+                'name' => 'Player One',
+                'pg' => 1, 'sg' => 2, 'sf' => 0, 'pf' => 0, 'c' => 3,
+                'canPlayInGame' => 1, 'min' => 30,
+                'of' => 0, 'df' => 0, 'oi' => 0, 'di' => 0, 'bh' => 0,
+                'injury' => 0,
+            ],
+            [
+                'name' => 'Player Two',
+                'pg' => 0, 'sg' => 0, 'sf' => 3, 'pf' => 1, 'c' => 2,
+                'canPlayInGame' => 0, 'min' => 25,
+                'of' => 0, 'df' => 0, 'oi' => 0, 'di' => 0, 'bh' => 0,
+                'injury' => 0,
+            ],
         ];
 
         ob_start();
@@ -634,18 +632,17 @@ class DepthChartEntryViewTest extends TestCase
         $this->assertStringContainsString('Player Two', $output);
 
         // Extract the two <tr> bodies from the confirmation table and verify
-        // each contains the exact values submitted. Using regex keeps the
-        // test resilient to whitespace noise in the view's heredoc-style
-        // echo while still asserting per-cell positioning.
+        // each contains the exact values submitted.
+        // Columns: Name, Active, PG, SG, SF, PF, C, Min
         $this->assertMatchesRegularExpression(
-            '/<tr>\s*<td>Player One<\/td>\s*<td>1<\/td>\s*<td>1<\/td>\s*<td>2<\/td>\s*<td>0<\/td>\s*<td>0<\/td>\s*<td>0<\/td>\s*<\/tr>/',
+            '/<tr>\s*<td>Player One<\/td>\s*<td>1<\/td>\s*<td>1<\/td>\s*<td>2<\/td>\s*<td>0<\/td>\s*<td>0<\/td>\s*<td>3<\/td>\s*<td>30<\/td>\s*<\/tr>/',
             $output,
-            'Player One row should be: Active=1, PG=1, SG=2, SF=0, PF=0, C=0',
+            'Player One row should be: Active=1, PG=1, SG=2, SF=0, PF=0, C=3, Min=30',
         );
         $this->assertMatchesRegularExpression(
-            '/<tr>\s*<td>Player Two<\/td>\s*<td>0<\/td>\s*<td>0<\/td>\s*<td>0<\/td>\s*<td>3<\/td>\s*<td>1<\/td>\s*<td>2<\/td>\s*<\/tr>/',
+            '/<tr>\s*<td>Player Two<\/td>\s*<td>0<\/td>\s*<td>0<\/td>\s*<td>0<\/td>\s*<td>3<\/td>\s*<td>1<\/td>\s*<td>2<\/td>\s*<td>25<\/td>\s*<\/tr>/',
             $output,
-            'Player Two row should be: Active=0, PG=0, SG=0, SF=0, PF=3, PF=1, C=2',
+            'Player Two row should be: Active=0, PG=0, SG=0, SF=3, PF=1, C=2, Min=25',
         );
     }
 
@@ -673,5 +670,64 @@ class DepthChartEntryViewTest extends TestCase
         $this->assertStringContainsString('&lt;script&gt;', $output);
         // HtmlSanitizer uses ENT_HTML5, so `'` becomes `&apos;` (not `&#039;`).
         $this->assertStringContainsString('O&apos;Brien', $output);
+    }
+
+    public function testPositionDepthSelectsShowCorrectOptionLabels(): void
+    {
+        $player = $this->buildTestPlayer();
+        $player['dc_SFDepth'] = 3;
+
+        ob_start();
+        $this->view->renderPlayerRow($player, 1);
+        $output = (string) ob_get_clean();
+
+        $expectedLabels = ['No', '1st', '2nd', '3rd', '4th', 'ok'];
+
+        foreach (['pg', 'sg', 'sf', 'pf', 'c'] as $field) {
+            preg_match('/<select name="' . $field . '1"[^>]*>(.*?)<\/select>/s', $output, $matches);
+            $this->assertNotEmpty($matches, "Position depth select for {$field} not found");
+            $selectHtml = $matches[1];
+
+            foreach ($expectedLabels as $i => $label) {
+                $this->assertMatchesRegularExpression(
+                    '/value="' . $i . '"[^>]*>' . preg_quote($label, '/') . '<\/option>/',
+                    $selectHtml,
+                    "Position {$field}: option {$i} should have label '{$label}'"
+                );
+            }
+        }
+    }
+
+    public function testPositionDepthSelectsHaveSixOptions(): void
+    {
+        $player = $this->buildTestPlayer();
+
+        ob_start();
+        $this->view->renderPlayerRow($player, 1);
+        $output = (string) ob_get_clean();
+
+        preg_match('/<select name="pg1"[^>]*>(.*?)<\/select>/s', $output, $matches);
+        $this->assertNotEmpty($matches);
+        $optionCount = substr_count($matches[1], '<option');
+        $this->assertSame(6, $optionCount, 'Position depth should have exactly 6 options (No/1st/2nd/3rd/4th/ok)');
+    }
+
+    public function testPositionDepthSelectPreselectsCorrectValue(): void
+    {
+        $player = $this->buildTestPlayer();
+        $player['dc_SFDepth'] = 1;
+        $player['dc_PGDepth'] = 0;
+
+        ob_start();
+        $this->view->renderPlayerRow($player, 1);
+        $output = (string) ob_get_clean();
+
+        preg_match('/<select name="sf1"[^>]*>(.*?)<\/select>/s', $output, $matches);
+        $this->assertNotEmpty($matches);
+        $this->assertMatchesRegularExpression('/value="1" SELECTED[^>]*>1st<\/option>/', $matches[1]);
+
+        preg_match('/<select name="pg1"[^>]*>(.*?)<\/select>/s', $output, $matches);
+        $this->assertNotEmpty($matches);
+        $this->assertMatchesRegularExpression('/value="0" SELECTED[^>]*>No<\/option>/', $matches[1]);
     }
 }

@@ -60,24 +60,19 @@ class DepthChartEntryRepositoryTest extends TestCase
             'c' => 0,
             'canPlayInGame' => 1,
             'min' => 30,
-            'of' => 2,
-            'df' => 1,
-            'oi' => 1,
-            'di' => -1,
-            'bh' => 0,
         ];
-        
+
         // Set affected rows to 1 to simulate successful update
         $this->mockDb->setAffectedRows(1);
-        
+
         $result = $this->repository->updatePlayerDepthChart($playerName, $depthChartValues);
 
         $this->assertTrue($result);
-        
+
         // Verify the query was executed
         $queries = $this->mockDb->getExecutedQueries();
         $this->assertNotEmpty($queries);
-        
+
         // Verify the UPDATE statement contains all the expected fields
         $lastQuery = end($queries);
         $this->assertStringContainsString('UPDATE ibl_plr SET', $lastQuery);
@@ -88,11 +83,12 @@ class DepthChartEntryRepositoryTest extends TestCase
         $this->assertStringContainsString('dc_CDepth', $lastQuery);
         $this->assertStringContainsString('dc_canPlayInGame', $lastQuery);
         $this->assertStringContainsString('dc_minutes', $lastQuery);
-        $this->assertStringContainsString('dc_of', $lastQuery);
-        $this->assertStringContainsString('dc_df', $lastQuery);
-        $this->assertStringContainsString('dc_oi', $lastQuery);
-        $this->assertStringContainsString('dc_di', $lastQuery);
-        $this->assertStringContainsString('dc_bh', $lastQuery);
+        // Role columns are hardcoded to 0 in SQL, not bound as parameters
+        $this->assertStringContainsString('dc_of = 0', $lastQuery);
+        $this->assertStringContainsString('dc_df = 0', $lastQuery);
+        $this->assertStringContainsString('dc_oi = 0', $lastQuery);
+        $this->assertStringContainsString('dc_di = 0', $lastQuery);
+        $this->assertStringContainsString('dc_bh = 0', $lastQuery);
         $this->assertStringContainsString("WHERE name = '$playerName'", $lastQuery);
     }
 
@@ -109,11 +105,6 @@ class DepthChartEntryRepositoryTest extends TestCase
             'c' => 0,
             'canPlayInGame' => 1,
             'min' => 30,
-            'of' => 0,
-            'df' => 0,
-            'oi' => 0,
-            'di' => 0,
-            'bh' => 0,
         ];
         
         // Set affected rows to 0 to simulate no change (values already match)
@@ -138,11 +129,6 @@ class DepthChartEntryRepositoryTest extends TestCase
             'c' => '0',
             'canPlayInGame' => '1',
             'min' => '30',
-            'of' => '2',
-            'df' => '1',
-            'oi' => '1',
-            'di' => '-1',
-            'bh' => '0',
         ];
         
         $this->mockDb->setAffectedRows(1);
@@ -152,35 +138,34 @@ class DepthChartEntryRepositoryTest extends TestCase
         $this->assertTrue($result);
     }
 
-    public function testUpdatePlayerDepthChartHandlesNegativeValues(): void
+    public function testUpdatePlayerDepthChartHardcodesRoleSlotsToZero(): void
     {
-        // Test that negative values for oi, di, bh are handled correctly
+        // Role slots (of, df, oi, di, bh) are now hardcoded to 0 in SQL
         $playerName = 'Test Player';
         $depthChartValues = [
-            'pg' => 0,
-            'sg' => 0,
+            'pg' => 1,
+            'sg' => 2,
             'sf' => 0,
             'pf' => 0,
-            'c' => 0,
+            'c' => 3,
             'canPlayInGame' => 1,
             'min' => 30,
-            'of' => 0,
-            'df' => 0,
-            'oi' => -2,  // Negative value
-            'di' => -2,  // Negative value
-            'bh' => -2,  // Negative value
         ];
-        
+
         $this->mockDb->setAffectedRows(1);
-        
+
         $result = $this->repository->updatePlayerDepthChart($playerName, $depthChartValues);
 
         $this->assertTrue($result);
-        
-        // Verify negative values are in the query
+
+        // Verify role columns are hardcoded to 0 in the query
         $queries = $this->mockDb->getExecutedQueries();
         $lastQuery = end($queries);
-        $this->assertStringContainsString('-2', $lastQuery);
+        $this->assertStringContainsString('dc_of = 0', $lastQuery);
+        $this->assertStringContainsString('dc_df = 0', $lastQuery);
+        $this->assertStringContainsString('dc_oi = 0', $lastQuery);
+        $this->assertStringContainsString('dc_di = 0', $lastQuery);
+        $this->assertStringContainsString('dc_bh = 0', $lastQuery);
     }
 
     public function testUpdateTeamHistorySuccessfullyUpdatesTimestamps(): void
@@ -250,11 +235,12 @@ class DepthChartEntryRepositoryTest extends TestCase
     /**
      * Verifies the exact mapping between processed array keys and database column names.
      * Documents the required field-to-column correspondence for the UPDATE query.
+     * Role columns (dc_of, dc_df, dc_oi, dc_di, dc_bh) are hardcoded to 0 in SQL.
      */
     public function testDatabaseUpdateQueryMapsFieldsCorrectly()
     {
-        // The processed data uses these lowercase keys
-        $processedPlayerData = [
+        // The processed data uses these lowercase keys for bound parameters
+        $boundFields = [
             'pg' => 1,
             'sg' => 2,
             'sf' => 0,
@@ -262,93 +248,56 @@ class DepthChartEntryRepositoryTest extends TestCase
             'c' => 0,
             'canPlayInGame' => 1,
             'min' => 30,
-            'of' => 2,
-            'df' => 1,
-            'oi' => -1,
-            'di' => 2,
-            'bh' => 0
         ];
 
-        // The database has these column names (from schema)
-        $expectedDatabaseColumns = [
-            'dc_PGDepth',  // Should get value from $processedPlayerData['pg']
-            'dc_SGDepth',  // Should get value from $processedPlayerData['sg']
-            'dc_SFDepth',  // Should get value from $processedPlayerData['sf']
-            'dc_PFDepth',  // Should get value from $processedPlayerData['pf']
-            'dc_CDepth',   // Should get value from $processedPlayerData['c']
-            'dc_canPlayInGame',   // Should get value from $processedPlayerData['canPlayInGame']
-            'dc_minutes',  // Should get value from $processedPlayerData['min']
-            'dc_of',       // Should get value from $processedPlayerData['of']
-            'dc_df',       // Should get value from $processedPlayerData['df']
-            'dc_oi',       // Should get value from $processedPlayerData['oi']
-            'dc_di',       // Should get value from $processedPlayerData['di']
-            'dc_bh'        // Should get value from $processedPlayerData['bh']
+        // The database columns that receive bound parameter values
+        $boundDatabaseColumns = [
+            'dc_PGDepth',        // from $processedPlayerData['pg']
+            'dc_SGDepth',        // from $processedPlayerData['sg']
+            'dc_SFDepth',        // from $processedPlayerData['sf']
+            'dc_PFDepth',        // from $processedPlayerData['pf']
+            'dc_CDepth',         // from $processedPlayerData['c']
+            'dc_canPlayInGame',  // from $processedPlayerData['canPlayInGame']
+            'dc_minutes',        // from $processedPlayerData['min']
         ];
 
-        // Verify the expected columns match the processed data keys
-        $this->assertEquals(12, count($expectedDatabaseColumns), 'Should have 12 database columns to update');
-        $this->assertEquals(12, count($processedPlayerData), 'Should have 12 fields in processed data');
+        // Hardcoded columns (always 0 in SQL, not bound)
+        $hardcodedColumns = ['dc_of', 'dc_df', 'dc_oi', 'dc_di', 'dc_bh'];
 
-        // This documents the mapping that SHOULD exist in the code
-        $expectedMapping = [
-            'pg' => 'dc_PGDepth',
-            'sg' => 'dc_SGDepth',
-            'sf' => 'dc_SFDepth',
-            'pf' => 'dc_PFDepth',
-            'c' => 'dc_CDepth',
-            'canPlayInGame' => 'dc_canPlayInGame',
-            'min' => 'dc_minutes',
-            'of' => 'dc_of',
-            'df' => 'dc_df',
-            'oi' => 'dc_oi',
-            'di' => 'dc_di',
-            'bh' => 'dc_bh'
-        ];
+        $this->assertEquals(7, count($boundDatabaseColumns), 'Should have 7 bound database columns');
+        $this->assertEquals(7, count($boundFields), 'Should have 7 bound fields');
+        $this->assertEquals(5, count($hardcodedColumns), 'Should have 5 hardcoded columns');
 
-        // Verify all keys in processed data have a corresponding database column
-        foreach ($processedPlayerData as $key => $value) {
-            $this->assertArrayHasKey($key, $expectedMapping, "Processed data key '$key' should have a database column mapping");
-        }
-
-        // The bind_param order in the code should match this exact sequence
-        $expectedBindParamTypes = 'iiiiiiiiiiiis'; // 12 integers + 1 string (player name)
+        // The bind_param order: 7 integers + 1 string (player name) = "iiiiiiis"
+        $expectedBindParamTypes = 'iiiiiiis';
         $expectedBindParamValues = [
-            $processedPlayerData['pg'],      // position 1: dc_PGDepth
-            $processedPlayerData['sg'],      // position 2: dc_SGDepth
-            $processedPlayerData['sf'],      // position 3: dc_SFDepth
-            $processedPlayerData['pf'],      // position 4: dc_PFDepth
-            $processedPlayerData['c'],       // position 5: dc_CDepth
-            $processedPlayerData['canPlayInGame'],  // position 6: dc_canPlayInGame
-            $processedPlayerData['min'],     // position 7: dc_minutes
-            $processedPlayerData['of'],      // position 8: dc_of
-            $processedPlayerData['df'],      // position 9: dc_df
-            $processedPlayerData['oi'],      // position 10: dc_oi
-            $processedPlayerData['di'],      // position 11: dc_di
-            $processedPlayerData['bh'],      // position 12: dc_bh
-            'Test Player'                     // position 13: name (WHERE clause)
+            $boundFields['pg'],             // position 1: dc_PGDepth
+            $boundFields['sg'],             // position 2: dc_SGDepth
+            $boundFields['sf'],             // position 3: dc_SFDepth
+            $boundFields['pf'],             // position 4: dc_PFDepth
+            $boundFields['c'],              // position 5: dc_CDepth
+            $boundFields['canPlayInGame'],  // position 6: dc_canPlayInGame
+            $boundFields['min'],            // position 7: dc_minutes
+            'Test Player'                   // position 8: name (WHERE clause)
         ];
 
-        $this->assertEquals(13, count($expectedBindParamValues), 'Should have 13 bind parameters (12 updates + 1 WHERE)');
-        $this->assertEquals(13, strlen($expectedBindParamTypes), 'Bind param type string should have 13 characters');
+        $this->assertEquals(8, count($expectedBindParamValues), 'Should have 8 bind parameters (7 updates + 1 WHERE)');
+        $this->assertEquals(8, strlen($expectedBindParamTypes), 'Bind param type string should have 8 characters');
 
         // Verify the values are what we expect
         $this->assertEquals(1, $expectedBindParamValues[0], 'First param should be pg value');
         $this->assertEquals(2, $expectedBindParamValues[1], 'Second param should be sg value');
         $this->assertEquals(30, $expectedBindParamValues[6], 'Seventh param should be min value');
-        $this->assertEquals(2, $expectedBindParamValues[7], 'Eighth param should be of value');
-        $this->assertEquals(1, $expectedBindParamValues[8], 'Ninth param should be df value');
-        $this->assertEquals(-1, $expectedBindParamValues[9], 'Tenth param should be oi value');
-        $this->assertEquals(2, $expectedBindParamValues[10], 'Eleventh param should be di value');
-        $this->assertEquals(0, $expectedBindParamValues[11], 'Twelfth param should be bh value');
+        $this->assertEquals('Test Player', $expectedBindParamValues[7], 'Eighth param should be player name');
     }
 
     /**
-     * Tests that negative values for intensity settings are preserved correctly.
-     * OF/DF are unsigned but OI/DI/BH must support negative values.
+     * Tests that role columns are hardcoded to 0 — they no longer receive bound values.
      */
-    public function testNegativeIntensityValuesArePreservedInDatabaseUpdate()
+    public function testRoleColumnsAreHardcodedToZeroInSql()
     {
-        $processedPlayerData = [
+        // The processed data no longer includes of/df/oi/di/bh as bound params
+        $depthChartValues = [
             'pg' => 0,
             'sg' => 0,
             'sf' => 0,
@@ -356,21 +305,21 @@ class DepthChartEntryRepositoryTest extends TestCase
             'c' => 1,
             'canPlayInGame' => 1,
             'min' => 20,
-            'of' => 0,     // unsigned: 0-3
-            'df' => 0,     // unsigned: 0-3
-            'oi' => -2,    // signed: -2 to 2
-            'di' => -1,    // signed: -2 to 2
-            'bh' => -2     // signed: -2 to 2
         ];
 
-        // Verify that negative values are maintained
-        $this->assertEquals(-2, $processedPlayerData['oi']);
-        $this->assertEquals(-1, $processedPlayerData['di']);
-        $this->assertEquals(-2, $processedPlayerData['bh']);
+        $this->mockDb->setAffectedRows(1);
 
-        // These values should be passed directly to the database without modification
-        // The database columns dc_oi, dc_di, dc_bh are defined as tinyint (signed)
-        // so they can store negative values
+        $result = $this->repository->updatePlayerDepthChart('Test Player', $depthChartValues);
+        $this->assertTrue($result);
+
+        // Verify the SQL hardcodes role columns to 0
+        $queries = $this->mockDb->getExecutedQueries();
+        $lastQuery = end($queries);
+        $this->assertStringContainsString('dc_of = 0', $lastQuery);
+        $this->assertStringContainsString('dc_df = 0', $lastQuery);
+        $this->assertStringContainsString('dc_oi = 0', $lastQuery);
+        $this->assertStringContainsString('dc_di = 0', $lastQuery);
+        $this->assertStringContainsString('dc_bh = 0', $lastQuery);
     }
 
     /**
@@ -378,27 +327,23 @@ class DepthChartEntryRepositoryTest extends TestCase
      */
     public function testCompleteDataFlowFromFormToDatabase()
     {
-        // Step 1: User submits form with these POST values
+        // Step 1: User submits form with these POST values (all lowercase)
         $postFieldNames = [
-            'pg1' => '1',      // lowercase position field
-            'sg1' => '2',      // lowercase position field
+            'pg1' => '1',
+            'sg1' => '2',
             'sf1' => '0',
             'pf1' => '0',
             'c1' => '0',
-            'canPlayInGame1' => '1',   // lowercase
-            'min1' => '30',     // lowercase
-            'OF1' => '2',       // UPPERCASE
-            'DF1' => '1',       // UPPERCASE
-            'OI1' => '-1',      // UPPERCASE with negative value
-            'DI1' => '2',       // UPPERCASE
-            'BH1' => '0'        // UPPERCASE
+            'canPlayInGame1' => '1',
+            'min1' => '30',
         ];
 
         // Step 2: Processor converts POST to processed array with lowercase keys
-        $processedKeys = ['pg', 'sg', 'sf', 'pf', 'c', 'canPlayInGame', 'min', 'of', 'df', 'oi', 'di', 'bh'];
+        // Role fields (of, df, oi, di, bh) are hardcoded to 0 by the processor
+        $processedBoundKeys = ['pg', 'sg', 'sf', 'pf', 'c', 'canPlayInGame', 'min'];
 
-        // Step 3: Repository maps processed array to database columns
-        $databaseColumns = [
+        // Step 3: Repository maps bound fields to database columns; role columns hardcoded to 0
+        $boundDatabaseColumns = [
             'dc_PGDepth',
             'dc_SGDepth',
             'dc_SFDepth',
@@ -406,38 +351,34 @@ class DepthChartEntryRepositoryTest extends TestCase
             'dc_CDepth',
             'dc_canPlayInGame',
             'dc_minutes',
-            'dc_of',
-            'dc_df',
-            'dc_oi',
-            'dc_di',
-            'dc_bh'
         ];
+        $hardcodedColumns = ['dc_of', 'dc_df', 'dc_oi', 'dc_di', 'dc_bh'];
 
         // Verify the counts match
-        $this->assertEquals(count($processedKeys), count($databaseColumns), 'Number of processed keys should match database columns');
+        $this->assertEquals(count($processedBoundKeys), count($boundDatabaseColumns), 'Number of bound keys should match bound database columns');
+        $this->assertEquals(5, count($hardcodedColumns), 'Should have 5 hardcoded columns');
 
-        // Verify the mapping chain (documented for reference)
+        // Verify the mapping chain for position depth fields
         $completeChain = [
             'pg' => ['POST' => 'pg1', 'processed' => 'pg', 'database' => 'dc_PGDepth'],
-            'of' => ['POST' => 'OF1', 'processed' => 'of', 'database' => 'dc_of'],
-            'df' => ['POST' => 'DF1', 'processed' => 'df', 'database' => 'dc_df'],
-            'oi' => ['POST' => 'OI1', 'processed' => 'oi', 'database' => 'dc_oi'],
-            'di' => ['POST' => 'DI1', 'processed' => 'di', 'database' => 'dc_di'],
-            'bh' => ['POST' => 'BH1', 'processed' => 'bh', 'database' => 'dc_bh']
+            'sg' => ['POST' => 'sg1', 'processed' => 'sg', 'database' => 'dc_SGDepth'],
+            'sf' => ['POST' => 'sf1', 'processed' => 'sf', 'database' => 'dc_SFDepth'],
+            'pf' => ['POST' => 'pf1', 'processed' => 'pf', 'database' => 'dc_PFDepth'],
+            'c' => ['POST' => 'c1', 'processed' => 'c', 'database' => 'dc_CDepth'],
         ];
 
-        // This chain documents how data flows through the system
-        $this->assertCount(6, $completeChain, 'Should have documented chain for 6 key fields');
+        $this->assertCount(5, $completeChain, 'Should have documented chain for 5 position depth fields');
     }
 
     /**
      * Regression test: Ensure that the order of parameters in bind_param
      * matches the order of columns in the UPDATE statement.
+     * Role columns (dc_of through dc_bh) are hardcoded to 0 and not bound.
      */
     public function testBindParamOrderMatchesUpdateStatementOrder()
     {
-        // The UPDATE statement has columns in this order:
-        $updateColumnOrder = [
+        // The UPDATE statement has bound columns in this order:
+        $boundColumnOrder = [
             1 => 'dc_PGDepth',
             2 => 'dc_SGDepth',
             3 => 'dc_SFDepth',
@@ -445,11 +386,6 @@ class DepthChartEntryRepositoryTest extends TestCase
             5 => 'dc_CDepth',
             6 => 'dc_canPlayInGame',
             7 => 'dc_minutes',
-            8 => 'dc_of',
-            9 => 'dc_df',
-            10 => 'dc_oi',
-            11 => 'dc_di',
-            12 => 'dc_bh'
         ];
 
         // The bind_param call should pass values in this EXACT same order
@@ -461,18 +397,14 @@ class DepthChartEntryRepositoryTest extends TestCase
             5 => 'c',
             6 => 'canPlayInGame',
             7 => 'min',
-            8 => 'of',
-            9 => 'df',
-            10 => 'oi',
-            11 => 'di',
-            12 => 'bh'
         ];
 
         // If these orders don't match, data will be stored in wrong columns
-        $this->assertCount(12, $updateColumnOrder);
-        $this->assertCount(12, $bindParamOrder);
+        $this->assertCount(7, $boundColumnOrder);
+        $this->assertCount(7, $bindParamOrder);
 
         // This test documents the critical requirement:
-        // The Nth value in bind_param must correspond to the Nth column in UPDATE statement
+        // The Nth value in bind_param must correspond to the Nth bound column in UPDATE statement
+        // Role columns (dc_of, dc_df, dc_oi, dc_di, dc_bh) are hardcoded to 0 in SQL
     }
 }

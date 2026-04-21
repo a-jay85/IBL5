@@ -23,6 +23,13 @@ class DepthChartEntryProcessor implements DepthChartEntryProcessorInterface
     {
         $activePlayers = 0;
         $playerData = [];
+        $pos1 = 0;
+        $pos2 = 0;
+        $pos3 = 0;
+        $pos4 = 0;
+        $pos5 = 0;
+        $hasStarterAtMultiplePositions = false;
+        $nameOfProblemStarter = '';
 
         for ($i = 1; $i <= $maxPlayers; $i++) {
             if (!isset($postData['Name' . $i])) {
@@ -42,11 +49,11 @@ class DepthChartEntryProcessor implements DepthChartEntryProcessorInterface
                 'c' => $this->sanitizeDepthValue($this->extractIntValue($postData, 'c' . $i)),
                 'canPlayInGame' => $this->sanitizeActiveValue($this->extractIntValue($postData, 'canPlayInGame' . $i)),
                 'min' => $this->sanitizeMinutesValue($this->extractIntValue($postData, 'min' . $i)),
-                'of' => $this->sanitizeFocusValue($this->extractIntValue($postData, 'OF' . $i)),
-                'df' => $this->sanitizeFocusValue($this->extractIntValue($postData, 'DF' . $i)),
-                'oi' => $this->sanitizeSettingValue($this->extractIntValue($postData, 'OI' . $i)),
-                'di' => $this->sanitizeSettingValue($this->extractIntValue($postData, 'DI' . $i)),
-                'bh' => $this->sanitizeSettingValue($this->extractIntValue($postData, 'BH' . $i)),
+                'of' => 0,
+                'df' => 0,
+                'oi' => 0,
+                'di' => 0,
+                'bh' => 0,
                 'injury' => $injury
             ];
 
@@ -55,18 +62,57 @@ class DepthChartEntryProcessor implements DepthChartEntryProcessorInterface
             if ($player['canPlayInGame'] === 1) {
                 $activePlayers++;
             }
+
+            if ($injury === 0) {
+                if ($player['pg'] > 0) {
+                    $pos1++;
+                }
+                if ($player['sg'] > 0) {
+                    $pos2++;
+                }
+                if ($player['sf'] > 0) {
+                    $pos3++;
+                }
+                if ($player['pf'] > 0) {
+                    $pos4++;
+                }
+                if ($player['c'] > 0) {
+                    $pos5++;
+                }
+            }
+
+            $startCount = 0;
+            if ($player['pg'] === 1) {
+                $startCount++;
+            }
+            if ($player['sg'] === 1) {
+                $startCount++;
+            }
+            if ($player['sf'] === 1) {
+                $startCount++;
+            }
+            if ($player['pf'] === 1) {
+                $startCount++;
+            }
+            if ($player['c'] === 1) {
+                $startCount++;
+            }
+            if ($startCount > 1) {
+                $hasStarterAtMultiplePositions = true;
+                $nameOfProblemStarter = $player['name'];
+            }
         }
 
         return [
             'playerData' => $playerData,
             'activePlayers' => $activePlayers,
-            'pos_1' => 0,
-            'pos_2' => 0,
-            'pos_3' => 0,
-            'pos_4' => 0,
-            'pos_5' => 0,
-            'hasStarterAtMultiplePositions' => false,
-            'nameOfProblemStarter' => ''
+            'pos_1' => $pos1,
+            'pos_2' => $pos2,
+            'pos_3' => $pos3,
+            'pos_4' => $pos4,
+            'pos_5' => $pos5,
+            'hasStarterAtMultiplePositions' => $hasStarterAtMultiplePositions,
+            'nameOfProblemStarter' => $nameOfProblemStarter
         ];
     }
     
@@ -107,15 +153,6 @@ class DepthChartEntryProcessor implements DepthChartEntryProcessorInterface
         return max(0, min(40, $value));
     }
 
-    private function sanitizeFocusValue(int $value): int
-    {
-        return max(0, min(3, $value));
-    }
-
-    private function sanitizeSettingValue(int $value): int
-    {
-        return max(0, min(2, $value));
-    }
     
     /**
      * @see DepthChartEntryProcessorInterface::generateCsvContent()

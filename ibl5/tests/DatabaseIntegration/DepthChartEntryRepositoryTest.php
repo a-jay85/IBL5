@@ -62,11 +62,6 @@ class DepthChartEntryRepositoryTest extends DatabaseTestCase
             'c' => 0,
             'canPlayInGame' => 1,
             'min' => 32,
-            'of' => 5,
-            'df' => 4,
-            'oi' => 3,
-            'di' => 2,
-            'bh' => 1,
         ];
 
         $result = $this->repo->updatePlayerDepthChart('DC Update Plyr', $depthChartValues);
@@ -93,11 +88,12 @@ class DepthChartEntryRepositoryTest extends DatabaseTestCase
         self::assertSame(0, $row['dc_CDepth']);
         self::assertSame(1, $row['dc_canPlayInGame']);
         self::assertSame(32, $row['dc_minutes']);
-        self::assertSame(5, $row['dc_of']);
-        self::assertSame(4, $row['dc_df']);
-        self::assertSame(3, $row['dc_oi']);
-        self::assertSame(2, $row['dc_di']);
-        self::assertSame(1, $row['dc_bh']);
+        // Role columns are hardcoded to 0 in the SQL
+        self::assertSame(0, $row['dc_of']);
+        self::assertSame(0, $row['dc_df']);
+        self::assertSame(0, $row['dc_oi']);
+        self::assertSame(0, $row['dc_di']);
+        self::assertSame(0, $row['dc_bh']);
     }
 
     public function testUpdatePlayerDepthChartReturnsTrueOnSuccess(): void
@@ -106,8 +102,7 @@ class DepthChartEntryRepositoryTest extends DatabaseTestCase
 
         $result = $this->repo->updatePlayerDepthChart('DC Success Plyr', [
             'pg' => 1, 'sg' => 0, 'sf' => 0, 'pf' => 0, 'c' => 0,
-            'canPlayInGame' => 1, 'min' => 20, 'of' => 3, 'df' => 3,
-            'oi' => 2, 'di' => 2, 'bh' => 1,
+            'canPlayInGame' => 1, 'min' => 20,
         ]);
 
         self::assertTrue($result);

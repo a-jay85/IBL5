@@ -41,7 +41,7 @@
     /**
      * Sync form values from source container to target container.
      * Fields in both views share names, so we sync:
-     *   - <select> role slots (BH/DI/OI/DF/OF)
+     *   - <select> position depth slots (pg/sg/sf/pf/c)
      *   - <input type="number"> minutes (min<N>)
      *   - <input type="checkbox"> canPlayInGame<N>
      * The sibling hidden <input> for canPlayInGame is untouched — it always
@@ -95,15 +95,10 @@
         }
     }
 
-    /**
-     * Label for a given role-slot value. Mirrors the PHP match in
-     * DepthChartEntryView::renderMobilePlayerCard() so the JS-rendered
-     * stepper labels stay in sync with the PHP-rendered initial labels.
-     */
+    var DEPTH_LABELS = ['No', '1st', '2nd', '3rd', '4th', 'ok'];
+
     function stepperLabel(value) {
-        if (value === 0) return '\u2014';
-        if (value === 1) return 'S';
-        return '#' + value;
+        return DEPTH_LABELS[value] || 'No';
     }
 
     /**
@@ -204,7 +199,7 @@
             })(checkboxes[i]);
         }
 
-        // Card field change listeners — sync role slot selects and minutes
+        // Card field change listeners — sync position depth selects and minutes
         // number inputs to desktop immediately. Checkboxes are handled by
         // the dedicated loop above.
         mobileEl.addEventListener('change', function (e) {
@@ -221,8 +216,8 @@
             }
         });
 
-        // Stepper arrow taps — dispatch on the kind of field. Role slots
-        // have a hidden <select> whose options are cycled with wrap-around
+        // Stepper arrow taps — dispatch on the kind of field. Position depth
+        // slots have a hidden <select> whose options are cycled with wrap-around
         // (up=promote toward starter, down=demote). The MIN column has a
         // number input that is clamped between its [min,max] attributes
         // and stepped one unit at a time (up=more minutes, down=fewer —

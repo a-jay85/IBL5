@@ -37,15 +37,14 @@ test.describe('Depth Chart Entry flow', () => {
     await expect(playerRows.first()).toBeVisible();
   });
 
-  test('role slot selects have options', async ({ page }) => {
+  test('position depth selects have options', async ({ page }) => {
     const form = page.locator('.depth-chart-form');
     await expect(form).toBeVisible({ timeout: 15000 });
 
-    // Position selects (pg/sg/sf/pf/c) are now hidden inputs; role slot
-    // selects use field names BH, DI, OI, DF, OF for PG/SG/SF/PF/C columns.
-    const roleSelect = page.locator('select[name^="BH"]').first();
-    await expect(roleSelect).toBeVisible();
-    const options = roleSelect.locator('option');
+    // Position depth selects use field names pg, sg, sf, pf, c.
+    const depthSelect = page.locator('select[name^="pg"]').first();
+    await expect(depthSelect).toBeVisible();
+    const options = depthSelect.locator('option');
     await expect(options.first()).toBeAttached();
   });
 
@@ -96,11 +95,11 @@ test.describe('Depth Chart Entry flow', () => {
     await expect(form).toBeVisible({ timeout: 15000 });
 
     // Mutate form state so reset has something to revert. Desktop and mobile
-    // cards share the same input names (name="BH1" etc.), so every locator
+    // cards share the same input names (name="pg1" etc.), so every locator
     // must scope to `.depth-chart-table` to avoid strict-mode violations
     // against the mobile card's disabled duplicates.
-    const firstBh = page.locator('.depth-chart-table select[name^="BH"]').first();
-    await firstBh.selectOption('1');
+    const firstPg = page.locator('.depth-chart-table select[name^="pg"]').first();
+    await firstPg.selectOption('1');
 
     const firstMin = page
       .locator('.depth-chart-table input[type="number"][name^="min"]')
@@ -122,7 +121,7 @@ test.describe('Depth Chart Entry flow', () => {
 
     await page.locator('.depth-chart-buttons .depth-chart-reset-btn').click();
 
-    // All role slot selects should now be 0.
+    // All position depth selects should now be 0.
     const nonZeroSelects = await page.evaluate(() => {
       const form = document.forms.namedItem('DepthChartEntry');
       if (!form) return -1;
@@ -156,7 +155,7 @@ test.describe('Depth Chart Entry flow', () => {
     expect(uncheckedActive).toBe(0);
   });
 
-  test('lineup preview recalculates when a role slot value changes', async ({
+  test('lineup preview recalculates when a position depth value changes', async ({
     page,
   }) => {
     const form = page.locator('.depth-chart-form');
@@ -177,8 +176,8 @@ test.describe('Depth Chart Entry flow', () => {
     // preview.js re-renders via `container.innerHTML = html`, which replaces
     // the entire childList subtree — the observer fires even when the new
     // HTML is byte-identical, so we get a clean "recalculate happened"
-    // signal without depending on the BH change producing a visible diff.
-    // (For many rosters a BH=0→1 promotion produces identical output
+    // signal without depending on the pg change producing a visible diff.
+    // (For many rosters a pg=0→1 promotion produces identical output
     // because the new candidate's score doesn't beat the incumbents.)
     await page.evaluate(() => {
       const container = document.getElementById('dc-lineup-preview');
@@ -196,12 +195,12 @@ test.describe('Depth Chart Entry flow', () => {
       w.__ibl_preview_observer = observer;
     });
 
-    // Change a desktop BH select (scoped to `.depth-chart-table` to avoid
+    // Change a desktop pg select (scoped to `.depth-chart-table` to avoid
     // strict-mode collisions with the mobile card duplicates). Any change
     // triggers the delegated form listener in depth-chart-lineup-preview.js.
-    const firstBh = page.locator('.depth-chart-table select[name^="BH"]').first();
-    const originalBh = await firstBh.inputValue();
-    await firstBh.selectOption(originalBh === '0' ? '1' : '0');
+    const firstPg = page.locator('.depth-chart-table select[name^="pg"]').first();
+    const originalPg = await firstPg.inputValue();
+    await firstPg.selectOption(originalPg === '0' ? '1' : '0');
 
     await expect
       .poll(
@@ -239,7 +238,7 @@ test.describe('Depth Chart Entry flow', () => {
     // any rendered annotation (e.g. starter is also the dump-to-last entry
     // when bench-scan can't fill 3 backups), the recalculate still fires and
     // the wiring is what we're verifying. The number-input listener is on a
-    // separate code path from the role-slot SELECT listener covered above.
+    // separate code path from the position-depth SELECT listener covered above.
     await page.evaluate(() => {
       const container = document.getElementById('dc-lineup-preview');
       if (!container) return;
@@ -332,13 +331,13 @@ test.describe('Depth Chart Entry flow', () => {
                 pos: 'SG',
                 dc_canPlayInGame: 1,
                 dc_minutes: 34,
-                dc_bh: 1,
-                dc_di: 2,
-                // BH/DI/OI selects clamp to max=2 (see renderRolePriorityOptions),
-                // so we use 2 here — any value >2 would silently drop to blank.
-                dc_oi: 2,
-                dc_df: 0,
-                dc_of: 0,
+                dc_PGDepth: 1,
+                dc_SGDepth: 2,
+                // Position depth selects go up to 5 (No/1st/2nd/3rd/4th/ok),
+                // so we use 3 here to test a midrange value.
+                dc_SFDepth: 3,
+                dc_PFDepth: 0,
+                dc_CDepth: 0,
                 isOnCurrentRoster: true,
               },
               {
@@ -347,11 +346,11 @@ test.describe('Depth Chart Entry flow', () => {
                 pos: 'PF',
                 dc_canPlayInGame: 0,
                 dc_minutes: 18,
-                dc_bh: 0,
-                dc_di: 0,
-                dc_oi: 0,
-                dc_df: 1,
-                dc_of: 2,
+                dc_PGDepth: 0,
+                dc_SGDepth: 0,
+                dc_SFDepth: 0,
+                dc_PFDepth: 1,
+                dc_CDepth: 2,
                 isOnCurrentRoster: true,
               },
             ],
@@ -389,13 +388,13 @@ test.describe('Depth Chart Entry flow', () => {
                   )
                 )?.checked ?? null;
               return {
-                p1_bh: val(`BH${counts.p1}`),
-                p1_di: val(`DI${counts.p1}`),
-                p1_oi: val(`OI${counts.p1}`),
+                p1_pg: val(`pg${counts.p1}`),
+                p1_sg: val(`sg${counts.p1}`),
+                p1_sf: val(`sf${counts.p1}`),
                 p1_min: val(`min${counts.p1}`),
                 p1_active: cb(`canPlayInGame${counts.p1}`),
-                p2_df: val(`DF${counts.p2}`),
-                p2_of: val(`OF${counts.p2}`),
+                p2_pf: val(`pf${counts.p2}`),
+                p2_c: val(`c${counts.p2}`),
                 p2_min: val(`min${counts.p2}`),
                 p2_active: cb(`canPlayInGame${counts.p2}`),
               };
@@ -406,13 +405,13 @@ test.describe('Depth Chart Entry flow', () => {
         { timeout: 5000 },
       )
       .toEqual({
-        p1_bh: '1',
-        p1_di: '2',
-        p1_oi: '2',
+        p1_pg: '1',
+        p1_sg: '2',
+        p1_sf: '3',
         p1_min: '34',
         p1_active: true,
-        p2_df: '1',
-        p2_of: '2',
+        p2_pf: '1',
+        p2_c: '2',
         p2_min: '18',
         p2_active: false,
       });

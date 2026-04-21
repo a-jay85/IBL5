@@ -15,16 +15,12 @@ use Utilities\HtmlSanitizer;
  */
 class DepthChartEntryView implements DepthChartEntryViewInterface
 {
-    /**
-     * Role slot display labels mapped to their HTML form field names.
-     * PG slot = dc_bh (form field BH), SG slot = dc_di (form field DI), etc.
-     */
-    private const ROLE_SLOTS = [
-        ['label' => 'PG', 'field' => 'BH', 'dbKey' => 'dc_bh', 'max' => 2],
-        ['label' => 'SG', 'field' => 'DI', 'dbKey' => 'dc_di', 'max' => 2],
-        ['label' => 'SF', 'field' => 'OI', 'dbKey' => 'dc_oi', 'max' => 2],
-        ['label' => 'PF', 'field' => 'DF', 'dbKey' => 'dc_df', 'max' => 3],
-        ['label' => 'C',  'field' => 'OF', 'dbKey' => 'dc_of', 'max' => 3],
+    private const POSITION_SLOTS = [
+        ['label' => 'PG', 'field' => 'pg', 'dbKey' => 'dc_PGDepth'],
+        ['label' => 'SG', 'field' => 'sg', 'dbKey' => 'dc_SGDepth'],
+        ['label' => 'SF', 'field' => 'sf', 'dbKey' => 'dc_SFDepth'],
+        ['label' => 'PF', 'field' => 'pf', 'dbKey' => 'dc_PFDepth'],
+        ['label' => 'C',  'field' => 'c',  'dbKey' => 'dc_CDepth'],
     ];
 
     /**
@@ -43,24 +39,22 @@ class DepthChartEntryView implements DepthChartEntryViewInterface
     }
 
     /**
-     * Render role priority dropdown options (0 to max).
-     * Unified for all 5 role slots: BH/DI/OI use max=2, DF/OF use max=3.
+     * Render position depth dropdown options (0-5).
      *
      * Label convention:
-     *   0 → "—"  (unassigned; falls back to player's position string)
-     *   1 → "S"  (starter; JSB's dc=1 pass-2 sort strictly dominates dc=2+)
-     *   2+ → "#N" (successive backups in the per-slot ladder)
+     *   0 → "No"  (not assigned to this position)
+     *   1 → "1st" (starter — highest lineup priority)
+     *   2 → "2nd" (first backup)
+     *   3 → "3rd" (second backup)
+     *   4 → "4th" (third backup)
+     *   5 → "ok"  (emergency depth)
      */
-    public function renderRolePriorityOptions(int $selectedValue, int $maxValue): void
+    public function renderPositionDepthOptions(int $selectedValue): void
     {
-        for ($i = 0; $i <= $maxValue; $i++) {
+        $labels = ['No', '1st', '2nd', '3rd', '4th', 'ok'];
+        for ($i = 0; $i <= 5; $i++) {
             $selected = ($selectedValue === $i) ? ' SELECTED' : '';
-            $label = match (true) {
-                $i === 0 => '&mdash;',
-                $i === 1 => 'S',
-                default  => '#' . $i,
-            };
-            echo "<option value=\"{$i}\"{$selected}>{$label}</option>";
+            echo "<option value=\"{$i}\"{$selected}>{$labels[$i]}</option>";
         }
     }
 
@@ -74,40 +68,40 @@ class DepthChartEntryView implements DepthChartEntryViewInterface
 <div class="dc-help-section__content">
 <ol>
 <li>Each row in the table is one of your players.</li>
-<li>The five columns – <strong>PG SG SF PF C</strong> – are the five lineup slots you fill.</li>
-<li>For each slot, tell the sim who you want to play there:</li>
+<li>The five columns &ndash; <strong>PG SG SF PF C</strong> &ndash; are the five lineup slots you fill.</li>
+<li>For each slot, set the player&rsquo;s depth priority:</li>
 </ol>
 <table class="ibl-data-table dc-help-table">
 <thead><tr><th>Option</th><th>Meaning</th></tr></thead>
 <tbody>
-<tr><td><strong>S</strong></td><td>Starter</td></tr>
-<tr><td><strong>#2</strong></td><td>Main backup</td></tr>
-<tr><td><strong>#3</strong></td><td>Second backup</td></tr>
-<tr><td><strong>&mdash;</strong></td><td>N/A (use for deep bench)</td></tr>
+<tr><td><strong>1st</strong></td><td>Starter (highest lineup priority)</td></tr>
+<tr><td><strong>2nd</strong></td><td>First backup</td></tr>
+<tr><td><strong>3rd</strong></td><td>Second backup</td></tr>
+<tr><td><strong>4th</strong></td><td>Third backup</td></tr>
+<tr><td><strong>ok</strong></td><td>Emergency depth</td></tr>
+<tr><td><strong>No</strong></td><td>Not assigned to this position</td></tr>
 </tbody>
 </table>
-</p>
-<p><strong>To put a player in the slot you want:</strong></p>
+<p><strong>To set your lineup:</strong></p>
 <ol>
-<li>Set <strong>one</strong> player to <strong>S</strong> for each position.</li>
-<li>Set <strong>#2</strong> for players you want to sub in first.</li>
-<li>Set <strong>#3</strong> for player(s) after that.</li>
-<li>You can pick different backups for each slot.</li>
+<li>Set <strong>one</strong> player to <strong>1st</strong> for each position.</li>
+<li>Set <strong>2nd</strong> for players you want to sub in first.</li>
+<li>Set <strong>3rd</strong>/<strong>4th</strong> for deeper backups.</li>
+<li>A player can back up multiple positions (e.g. 2nd at PG and 3rd at SG).</li>
 <li>Set <strong>Min</strong> to control how long each player is on the floor.</li>
 <li>Starters usually want 30&ndash;40; bench players want lower numbers.</li>
-<li>Players with 0 minutes will only come in if everyone above them is unavailable.</li>
 </ol>
 <p><strong>Projected Lineup:</strong><br></p>
 <p>If a name appears in <em>italic gray</em>, it means you didn&rsquo;t assign
 enough players to that slot, so the sim is falling back on a backup automatically.
-<br>Add a <strong>#2</strong> or <strong>#3</strong> to the player you actually want there.</p>
-<p><strong>Note:</strong> a starter only plays their <strong>one</strong> slot –
+<br>Add a <strong>2nd</strong> or <strong>3rd</strong> to the player you actually want there.</p>
+<p><strong>Note:</strong> a starter (1st) only plays their <strong>one</strong> slot &ndash;
 starters are locked to that slot and removed from every other slot&rsquo;s
-ladder. If you want one backup to cover multiple slots, set <strong>#2</strong> or
-<strong>#3</strong> on them in several columns and leave <strong>S</strong> off &mdash;
+ladder. If you want one backup to cover multiple slots, set <strong>2nd</strong> or
+<strong>3rd</strong> on them in several columns and leave <strong>1st</strong> off &mdash;
 then they&rsquo;ll appear as a backup in each slot&rsquo;s ladder.</p>
 <p>The sim fills slots in order <strong>PG &rarr; SG &rarr; SF &rarr; PF &rarr; C</strong>,
-so if two slots both have a viable <strong>S</strong> pick that includes the same player,
+so if two slots both have a viable <strong>1st</strong> pick that includes the same player,
 the earlier slot in that order claims them.</p>
 </div>
 </details>';
@@ -140,7 +134,7 @@ the earlier slot in that order claims them.</p>
                     <th>Player</th>
                     <th>Active</th>';
 
-        foreach (self::ROLE_SLOTS as $slot) {
+        foreach (self::POSITION_SLOTS as $slot) {
             $labelHtml = HtmlSanitizer::safeHtmlOutput($slot['label']);
             echo '<th>' . $labelHtml . '</th>';
         }
@@ -215,11 +209,6 @@ the earlier slot in that order claims them.</p>
                 <input type=\"hidden\" name=\"pid{$depthCount}\" value=\"{$player_pid}\">
                 <input type=\"hidden\" name=\"Injury{$depthCount}\" value=\"{$player_inj}\">
                 <input type=\"hidden\" name=\"Name{$depthCount}\" value=\"{$player_name_html}\">
-                <input type=\"hidden\" name=\"pg{$depthCount}\" value=\"0\">
-                <input type=\"hidden\" name=\"sg{$depthCount}\" value=\"0\">
-                <input type=\"hidden\" name=\"sf{$depthCount}\" value=\"0\">
-                <input type=\"hidden\" name=\"pf{$depthCount}\" value=\"0\">
-                <input type=\"hidden\" name=\"c{$depthCount}\" value=\"0\">
                 <a href=\"./modules.php?name=Player&amp;pa=showpage&amp;pid={$player_pid}\">{$thumbnail}{$player_name_html}</a>
             </td>";
 
@@ -234,19 +223,20 @@ the earlier slot in that order claims them.</p>
         echo "<input type=\"checkbox\" name=\"canPlayInGame{$depthCount}\" value=\"1\" class=\"dc-active-cb\"{$activeCheckedAttr} aria-label=\"Active status for {$player_name_html}\">";
         echo "</td>";
 
-        // Role slot columns (PG/SG/SF/PF/C mapped to BH/DI/OI/DF/OF form fields)
-        foreach (self::ROLE_SLOTS as $slot) {
+        foreach (self::POSITION_SLOTS as $slot) {
             /** @var int $dcValue */
             $dcValue = $player[$slot['dbKey']] ?? 0;
-            // Clamp negative legacy values to 0
             if ($dcValue < 0) {
                 $dcValue = 0;
             }
+            if ($dcValue > 5) {
+                $dcValue = 5;
+            }
             $fieldName = $slot['field'] . $depthCount;
-            $ariaLabel = $slot['label'] . ' slot for ' . $player_name_html;
+            $ariaLabel = $slot['label'] . ' depth for ' . $player_name_html;
 
             echo "<td><select name=\"{$fieldName}\" aria-label=\"{$ariaLabel}\">";
-            $this->renderRolePriorityOptions($dcValue, $slot['max']);
+            $this->renderPositionDepthOptions($dcValue);
             echo "</select><span class=\"dc-score-debug\"></span></td>";
         }
 
@@ -275,7 +265,7 @@ function resetDepthChart() {
     var form = document.forms['DepthChartEntry'];
     if (!form) return;
 
-    // Reset role slot selects (BH/DI/OI/DF/OF) to 0
+    // Reset position depth selects to 0
     var selects = form.getElementsByTagName('select');
     for (var i = 0; i < selects.length; i++) {
         selects[i].value = '0';
@@ -377,23 +367,24 @@ JAVASCRIPT;
             <th>Name</th>
             <th>Active</th>';
 
-        foreach (self::ROLE_SLOTS as $slot) {
+        foreach (self::POSITION_SLOTS as $slot) {
             $labelHtml = HtmlSanitizer::safeHtmlOutput($slot['label']);
             echo '<th>' . $labelHtml . '</th>';
         }
 
-        echo '</tr></thead><tbody>';
+        echo '<th>Min</th></tr></thead><tbody>';
 
         foreach ($playerData as $player) {
             $nameHtml = HtmlSanitizer::safeHtmlOutput($player['name']);
             echo '<tr>
                 <td>' . $nameHtml . '</td>
                 <td>' . $player['canPlayInGame'] . '</td>
-                <td>' . $player['bh'] . '</td>
-                <td>' . $player['di'] . '</td>
-                <td>' . $player['oi'] . '</td>
-                <td>' . $player['df'] . '</td>
-                <td>' . $player['of'] . '</td>
+                <td>' . $player['pg'] . '</td>
+                <td>' . $player['sg'] . '</td>
+                <td>' . $player['sf'] . '</td>
+                <td>' . $player['pf'] . '</td>
+                <td>' . $player['c'] . '</td>
+                <td>' . $player['min'] . '</td>
             </tr>';
         }
 
@@ -455,15 +446,9 @@ JAVASCRIPT;
         echo "<span class=\"dc-card__pos-badge\">{$posHtml}</span>";
         echo "<a href=\"./modules.php?name=Player&amp;pa=showpage&amp;pid={$pid}\" class=\"dc-card__name\">{$nameHtml}</a>";
 
-        // Hidden fields (disabled — JS enables on mobile)
         echo "<input type=\"hidden\" name=\"pid{$depthCount}\" value=\"{$pid}\" disabled>";
         echo "<input type=\"hidden\" name=\"Injury{$depthCount}\" value=\"{$injured}\" disabled>";
         echo "<input type=\"hidden\" name=\"Name{$depthCount}\" value=\"{$nameHtml}\" disabled>";
-        echo "<input type=\"hidden\" name=\"pg{$depthCount}\" value=\"0\" disabled>";
-        echo "<input type=\"hidden\" name=\"sg{$depthCount}\" value=\"0\" disabled>";
-        echo "<input type=\"hidden\" name=\"sf{$depthCount}\" value=\"0\" disabled>";
-        echo "<input type=\"hidden\" name=\"pf{$depthCount}\" value=\"0\" disabled>";
-        echo "<input type=\"hidden\" name=\"c{$depthCount}\" value=\"0\" disabled>";
         // Active checkbox — native checkbox styled with an orange accent to
         // match the desktop view. Hidden input submits "0" when unchecked; the
         // checkbox submits "1" when checked. Both share the same field name so
@@ -479,21 +464,21 @@ JAVASCRIPT;
         echo '<div class="dc-card__body">';
         echo '<div class="dc-card__settings-grid">';
 
-        foreach (self::ROLE_SLOTS as $slot) {
+        $depthLabels = ['No', '1st', '2nd', '3rd', '4th', 'ok'];
+        foreach (self::POSITION_SLOTS as $slot) {
             /** @var int $dcValue */
             $dcValue = $player[$slot['dbKey']] ?? 0;
             if ($dcValue < 0) {
                 $dcValue = 0;
             }
+            if ($dcValue > 5) {
+                $dcValue = 5;
+            }
             $fieldName = $slot['field'] . $depthCount;
             $labelHtml = HtmlSanitizer::safeHtmlOutput($slot['label']);
-            $valueLabel = match (true) {
-                $dcValue === 0 => '&mdash;',
-                $dcValue === 1 => 'S',
-                default        => '#' . $dcValue,
-            };
-            $slotAria = $labelHtml . ' slot for ' . $nameHtml;
-            $slotAriaRaw = $slot['label'] . ' slot for ' . $name;
+            $valueLabel = $depthLabels[$dcValue];
+            $slotAria = $labelHtml . ' depth for ' . $nameHtml;
+            $slotAriaRaw = $slot['label'] . ' depth for ' . $name;
 
             echo "<div class=\"dc-card__field\">";
             echo "<span class=\"dc-card__field-label\">{$labelHtml}</span>";
@@ -505,7 +490,7 @@ JAVASCRIPT;
             echo '<select name="' . HtmlSanitizer::e($fieldName)
                 . '" class="dc-card__field-select" aria-label="'
                 . HtmlSanitizer::e($slotAriaRaw) . '" disabled>';
-            $this->renderRolePriorityOptions($dcValue, $slot['max']);
+            $this->renderPositionDepthOptions($dcValue);
             echo '</select></div>';
         }
 

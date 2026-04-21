@@ -14,9 +14,9 @@ test.describe('Depth Chart submission', () => {
     const form = page.locator('.depth-chart-form');
     await expect(form).toBeVisible({ timeout: 15000 });
 
-    // Role slot selects (BH = PG column) should be present and visible
-    const bhSelects = page.locator('select[name^="BH"]');
-    await expect(bhSelects.first()).toBeVisible();
+    // Position depth selects (pg = PG column) should be present and visible
+    const pgSelects = page.locator('select[name^="pg"]');
+    await expect(pgSelects.first()).toBeVisible();
 
     // Active checkboxes should be pre-populated — at least one player is active.
     // The desktop `.dc-active-cb` class disambiguates from the mobile
@@ -33,19 +33,19 @@ test.describe('Depth Chart submission', () => {
     expect(hasActive).toBe(true);
   });
 
-  test('change a role slot assignment', async ({ page }) => {
+  test('change a position depth assignment', async ({ page }) => {
     const form = page.locator('.depth-chart-form');
     await expect(form).toBeVisible({ timeout: 15000 });
 
-    // Find a BH (PG role slot) select with value "0" and change it to "2" (backup)
-    const bhSelects = page.locator('select[name^="BH"]');
-    const count = await bhSelects.count();
+    // Find a pg (PG position depth) select with value "0" and change it to "2" (2nd)
+    const pgSelects = page.locator('select[name^="pg"]');
+    const count = await pgSelects.count();
 
     for (let i = 0; i < count; i++) {
-      const val = await bhSelects.nth(i).inputValue();
+      const val = await pgSelects.nth(i).inputValue();
       if (val === '0') {
-        await bhSelects.nth(i).selectOption('2');
-        const newVal = await bhSelects.nth(i).inputValue();
+        await pgSelects.nth(i).selectOption('2');
+        const newVal = await pgSelects.nth(i).inputValue();
         expect(newVal).toBe('2');
         break;
       }
@@ -58,14 +58,14 @@ test.describe('Depth Chart submission', () => {
     const form = page.locator('.depth-chart-form');
     await expect(form).toBeVisible({ timeout: 15000 });
 
-    // Set a distinctive BH (PG) value on the first desktop player row so we
+    // Set a distinctive pg (PG) value on the first desktop player row so we
     // can verify the confirmation page echoes back exactly what was POSTed.
     // Scoping to `.depth-chart-table` avoids colliding with the mobile
     // card duplicates that share the same input names.
-    const firstBh = page
-      .locator('.depth-chart-table select[name^="BH"]')
+    const firstPg = page
+      .locator('.depth-chart-table select[name^="pg"]')
       .first();
-    await firstBh.selectOption('1');
+    await firstPg.selectOption('1');
 
     // Submit the current depth chart
     const submitBtn = page.locator('.depth-chart-buttons .depth-chart-submit-btn');
@@ -104,6 +104,7 @@ test.describe('Depth Chart submission', () => {
       'SF',
       'PF',
       'C',
+      'Min',
     ]);
 
     // At least one player row should be rendered.
@@ -132,8 +133,8 @@ test.describe('Depth Chart submission', () => {
     const optCount = await options.count();
     expect(optCount, 'Saved DC dropdown should have at least 2 options').toBeGreaterThanOrEqual(2);
 
-    // Ensure first BH select is ready before loading a saved config
-    await expect(page.locator('select[name^="BH"]').first()).toBeEnabled();
+    // Ensure first pg select is ready before loading a saved config
+    await expect(page.locator('select[name^="pg"]').first()).toBeEnabled();
 
     // Select the second option (first saved config)
     await dropdown.selectOption({ index: 1 });

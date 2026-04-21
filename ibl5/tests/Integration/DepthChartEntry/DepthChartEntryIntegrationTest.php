@@ -107,11 +107,6 @@ class DepthChartEntryIntegrationTest extends IntegrationTestCase
             'c1' => '0',
             'canPlayInGame1' => '1',
             'min1' => '32',
-            'OF1' => '2',
-            'DF1' => '1',
-            'OI1' => '1',
-            'DI1' => '2',
-            'BH1' => '0',
             'Injury1' => '0'
         ];
         $this->mockDb->setAffectedRows(1);
@@ -130,17 +125,18 @@ class DepthChartEntryIntegrationTest extends IntegrationTestCase
         $this->assertEquals(0, $playerData['c']);
         $this->assertEquals(1, $playerData['canPlayInGame']);
         $this->assertEquals(32, $playerData['min']);
-        $this->assertEquals(2, $playerData['of']);
-        $this->assertEquals(1, $playerData['df']);
-        $this->assertEquals(1, $playerData['oi']);
-        $this->assertEquals(2, $playerData['di']);
+        // Role fields hardcoded to 0
+        $this->assertEquals(0, $playerData['of']);
+        $this->assertEquals(0, $playerData['df']);
+        $this->assertEquals(0, $playerData['oi']);
+        $this->assertEquals(0, $playerData['di']);
         $this->assertEquals(0, $playerData['bh']);
 
         // Assert - Database update succeeded and included correct data
         $this->assertTrue($updateResult);
         $this->assertQueryExecuted('UPDATE ibl_plr');
         $this->assertQueryExecuted('dc_PGDepth');
-        $this->assertQueryExecuted('dc_of');
+        $this->assertQueryExecuted('dc_of = 0');
         $this->assertQueryExecuted("name = 'John Smith'");
     }
 
@@ -240,19 +236,21 @@ class DepthChartEntryIntegrationTest extends IntegrationTestCase
      * @group depthchart
      * @group validation-failure
      */
-    public function testWorkflowPassesWithReducedPositionDepth(): void
+    public function testWorkflowFailsWithReducedPositionDepth(): void
     {
-        // Arrange - Valid active count but only 2 PG depth
-        // Position depth validation has been removed, so this should pass
+        // Arrange - Valid active count but only 2 PG depth (need 3 for regular season)
         $postData = $this->createPostDataWithInsufficientPositionDepth('PG');
 
         // Act
         $result = $this->processor->processSubmission($postData, 15);
         $isValid = $this->validator->validate($result, 'Regular Season');
 
-        // Assert - No position depth validation, so it passes
-        $this->assertTrue($isValid);
-        $this->assertEmpty($this->validator->getErrors());
+        // Assert - Position depth validation catches insufficient PG depth
+        $this->assertFalse($isValid);
+        $errors = $this->validator->getErrors();
+        $this->assertNotEmpty($errors);
+        $this->assertEquals('position_depth', $errors[0]['type']);
+        $this->assertStringContainsString('PG', $errors[0]['message']);
     }
 
     /**
@@ -260,22 +258,24 @@ class DepthChartEntryIntegrationTest extends IntegrationTestCase
      * @group depthchart
      * @group validation-failure
      */
-    public function testWorkflowPassesWithMultipleStartingPositions(): void
+    public function testWorkflowFailsWithMultipleStartingPositions(): void
     {
         // Arrange - One player starting at both PG and SG
-        // Multiple-starter validation has been removed, so this should pass
         $postData = $this->createPostDataWithMultipleStarter();
 
         // Act
         $result = $this->processor->processSubmission($postData, 15);
         $isValid = $this->validator->validate($result, 'Regular Season');
 
-        // Assert - No multiple-starter validation
-        $this->assertTrue($isValid);
-        $this->assertEmpty($this->validator->getErrors());
-        // Starter detection removed — always returns defaults
-        $this->assertFalse($result['hasStarterAtMultiplePositions']);
-        $this->assertEquals('', $result['nameOfProblemStarter']);
+        // Assert - Multiple-starter validation catches the issue
+        $this->assertFalse($isValid);
+        $errors = $this->validator->getErrors();
+        $this->assertNotEmpty($errors);
+        // Find the multiple_starting_positions error
+        $multiStarterErrors = array_filter($errors, static fn (array $e): bool => $e['type'] === 'multiple_starting_positions');
+        $this->assertNotEmpty($multiStarterErrors, 'Should have a multiple_starting_positions error');
+        $this->assertTrue($result['hasStarterAtMultiplePositions']);
+        $this->assertEquals('Multi Starter', $result['nameOfProblemStarter']);
     }
 
     /**
@@ -433,7 +433,6 @@ class DepthChartEntryIntegrationTest extends IntegrationTestCase
         $depthChartValues = [
             'pg' => 1, 'sg' => 2, 'sf' => 3, 'pf' => 4, 'c' => 5,
             'canPlayInGame' => 1, 'min' => 35,
-            'of' => 2, 'df' => 1, 'oi' => -1, 'di' => 2, 'bh' => 0
         ];
         $this->mockDb->setAffectedRows(1);
 
@@ -445,7 +444,7 @@ class DepthChartEntryIntegrationTest extends IntegrationTestCase
         $queries = $this->getExecutedQueries();
         $lastQuery = end($queries);
 
-        // Verify all fields are in the query
+        // Verify bound fields are in the query
         $this->assertStringContainsString('dc_PGDepth', $lastQuery);
         $this->assertStringContainsString('dc_SGDepth', $lastQuery);
         $this->assertStringContainsString('dc_SFDepth', $lastQuery);
@@ -453,11 +452,12 @@ class DepthChartEntryIntegrationTest extends IntegrationTestCase
         $this->assertStringContainsString('dc_CDepth', $lastQuery);
         $this->assertStringContainsString('dc_canPlayInGame', $lastQuery);
         $this->assertStringContainsString('dc_minutes', $lastQuery);
-        $this->assertStringContainsString('dc_of', $lastQuery);
-        $this->assertStringContainsString('dc_df', $lastQuery);
-        $this->assertStringContainsString('dc_oi', $lastQuery);
-        $this->assertStringContainsString('dc_di', $lastQuery);
-        $this->assertStringContainsString('dc_bh', $lastQuery);
+        // Role columns are hardcoded to 0 in SQL
+        $this->assertStringContainsString('dc_of = 0', $lastQuery);
+        $this->assertStringContainsString('dc_df = 0', $lastQuery);
+        $this->assertStringContainsString('dc_oi = 0', $lastQuery);
+        $this->assertStringContainsString('dc_di = 0', $lastQuery);
+        $this->assertStringContainsString('dc_bh = 0', $lastQuery);
     }
 
     /**
@@ -472,7 +472,6 @@ class DepthChartEntryIntegrationTest extends IntegrationTestCase
         $depthChartValues = [
             'pg' => 0, 'sg' => 0, 'sf' => 0, 'pf' => 0, 'c' => 0,
             'canPlayInGame' => 1, 'min' => 0,
-            'of' => 0, 'df' => 0, 'oi' => 0, 'di' => 0, 'bh' => 0
         ];
         $this->mockDb->setAffectedRows(0); // No rows affected
 
@@ -492,9 +491,9 @@ class DepthChartEntryIntegrationTest extends IntegrationTestCase
     {
         // Arrange
         $players = [
-            ['name' => 'Player 1', 'pg' => 1, 'sg' => 0, 'sf' => 0, 'pf' => 0, 'c' => 0, 'canPlayInGame' => 1, 'min' => 30, 'of' => 0, 'df' => 0, 'oi' => 0, 'di' => 0, 'bh' => 0],
-            ['name' => 'Player 2', 'pg' => 0, 'sg' => 1, 'sf' => 0, 'pf' => 0, 'c' => 0, 'canPlayInGame' => 1, 'min' => 28, 'of' => 0, 'df' => 0, 'oi' => 0, 'di' => 0, 'bh' => 0],
-            ['name' => 'Player 3', 'pg' => 0, 'sg' => 0, 'sf' => 1, 'pf' => 0, 'c' => 0, 'canPlayInGame' => 1, 'min' => 32, 'of' => 0, 'df' => 0, 'oi' => 0, 'di' => 0, 'bh' => 0],
+            ['name' => 'Player 1', 'pg' => 1, 'sg' => 0, 'sf' => 0, 'pf' => 0, 'c' => 0, 'canPlayInGame' => 1, 'min' => 30],
+            ['name' => 'Player 2', 'pg' => 0, 'sg' => 1, 'sf' => 0, 'pf' => 0, 'c' => 0, 'canPlayInGame' => 1, 'min' => 28],
+            ['name' => 'Player 3', 'pg' => 0, 'sg' => 0, 'sf' => 1, 'pf' => 0, 'c' => 0, 'canPlayInGame' => 1, 'min' => 32],
         ];
         $this->mockDb->setAffectedRows(1);
 
@@ -551,11 +550,6 @@ class DepthChartEntryIntegrationTest extends IntegrationTestCase
             'sf1' => '3', 'pf1' => '0', 'c1' => '0',
             'canPlayInGame1' => '999', // Should normalize to 0 (not 1)
             'min1' => '100',    // Should clamp to 40
-            'OF1' => '10',      // Should clamp to 3
-            'DF1' => '-10',     // Should clamp to 0
-            'OI1' => '10',      // Should clamp to 2
-            'DI1' => '-10',     // Should clamp to 0 (negative clamped to 0)
-            'BH1' => '0',
             'Injury1' => '0'
         ];
 
@@ -568,10 +562,11 @@ class DepthChartEntryIntegrationTest extends IntegrationTestCase
         $this->assertEquals(0, $player['sg'], 'SG depth should clamp to 0');
         $this->assertEquals(0, $player['canPlayInGame'], 'Active should be 0 or 1');
         $this->assertEquals(40, $player['min'], 'Minutes should clamp to 40');
-        $this->assertEquals(3, $player['of'], 'OF should clamp to 3');
-        $this->assertEquals(0, $player['df'], 'DF should clamp to 0');
-        $this->assertEquals(2, $player['oi'], 'OI should clamp to 2');
-        $this->assertEquals(0, $player['di'], 'DI should clamp to 0 (range is [0, 2])');
+        // Role fields hardcoded to 0 regardless of input
+        $this->assertEquals(0, $player['of'], 'OF should always be 0');
+        $this->assertEquals(0, $player['df'], 'DF should always be 0');
+        $this->assertEquals(0, $player['oi'], 'OI should always be 0');
+        $this->assertEquals(0, $player['di'], 'DI should always be 0');
     }
 
     /**
@@ -579,17 +574,13 @@ class DepthChartEntryIntegrationTest extends IntegrationTestCase
      * @group depthchart
      * @group sanitization
      */
-    public function testProcessorClampsNegativeSettingValuesToZero(): void
+    public function testProcessorHardcodesRoleFieldsToZero(): void
     {
-        // Arrange - Negative setting values now clamp to 0 (range is [0, 2])
+        // Arrange - Role fields (OF/DF/OI/DI/BH) are always 0 regardless of input
         $postData = [
             'Name1' => 'Test',
             'pg1' => '1', 'sg1' => '0', 'sf1' => '0', 'pf1' => '0', 'c1' => '0',
             'canPlayInGame1' => '1', 'min1' => '30',
-            'OF1' => '2', 'DF1' => '1',
-            'OI1' => '-2',  // Clamped to 0
-            'DI1' => '-1',  // Clamped to 0
-            'BH1' => '-2',  // Clamped to 0
             'Injury1' => '0'
         ];
         $this->mockDb->setAffectedRows(1);
@@ -599,7 +590,9 @@ class DepthChartEntryIntegrationTest extends IntegrationTestCase
         $player = $result['playerData'][0];
         $this->repository->updatePlayerDepthChart($player['name'], $player);
 
-        // Assert - Negative values clamped to 0
+        // Assert - Role fields always 0
+        $this->assertEquals(0, $player['of']);
+        $this->assertEquals(0, $player['df']);
         $this->assertEquals(0, $player['oi']);
         $this->assertEquals(0, $player['di']);
         $this->assertEquals(0, $player['bh']);
@@ -615,21 +608,23 @@ class DepthChartEntryIntegrationTest extends IntegrationTestCase
      * @group depthchart
      * @group errors
      */
-    public function testValidatorReportsActivePlayerError(): void
+    public function testValidatorReportsMultipleErrors(): void
     {
-        // Arrange - Data with too few active players
+        // Arrange - Data with too few active players and insufficient position depth
         $postData = $this->createPostDataWithMultipleIssues();
 
         // Act
         $result = $this->processor->processSubmission($postData, 15);
         $isValid = $this->validator->validate($result, 'Regular Season');
 
-        // Assert - Only active player count validation remains
+        // Assert - Multiple validation errors
         $this->assertFalse($isValid);
         $errors = $this->validator->getErrors();
 
-        $this->assertCount(1, $errors, 'Should have active player error');
+        // Should have active_players_min + position_depth errors for positions below 3
+        $this->assertNotEmpty($errors);
         $this->assertEquals('active_players_min', $errors[0]['type']);
+        // Additional position_depth errors may follow depending on depth distribution
     }
 
     /**

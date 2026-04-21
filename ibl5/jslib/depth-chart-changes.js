@@ -6,12 +6,12 @@
  * to any field whose current value differs from the original.
  *
  * Tracked fields:
- *   - <select>          role slots BH/DI/OI/DF/OF (+ saved-DC dropdown is excluded)
+ *   - <select>          position depth slots pg/sg/sf/pf/c (+ saved-DC dropdown is excluded)
  *   - <input type=number> minutes target (min<N>)
  *   - <input type=checkbox> active toggle (canPlayInGame<N>)
  *
  * Glow intensity scales with the magnitude of the change:
- *   - Role slot fields (BH/DI/OI/DF/OF): inversely proportional to value
+ *   - Position depth fields (pg/sg/sf/pf/c): proportional to value (1st=strongest)
  *   - Categorical (canPlayInGame, minutes): always level 1
  *
  * Exposes window.IBL_recalculateDepthChartGlows() for use after loading a saved
@@ -21,7 +21,7 @@
     'use strict';
 
     var GLOW_CLASSES = ['dc-glow-1', 'dc-glow-2', 'dc-glow-3', 'dc-glow-4', 'dc-glow-5'];
-    var ROLE_SLOT_PREFIXES = { BH: 1, DI: 1, OI: 1, OF: 1, DF: 1 };
+    var POSITION_DEPTH_PREFIXES = { pg: 1, sg: 1, sf: 1, pf: 1, c: 1 };
     var MIN_FIELD_RE = /^min\d+$/;
     var MINUTES_MAX = 40;
 
@@ -30,7 +30,7 @@
 
     /**
      * Strip trailing digits from a field name to determine field type.
-     * "BH3" → "BH", "canPlayInGame5" → "canPlayInGame", "min2" → "min"
+     * "pg3" → "pg", "canPlayInGame5" → "canPlayInGame", "min2" → "min"
      */
     function getFieldPrefix(name) {
         return name.replace(/\d+$/, '');
@@ -44,19 +44,15 @@
             return 0;
         }
 
-        // Role slot fields (BH, DI, OI, OF, DF): intensity inversely proportional
-        // to value — #1 (highest bonus) gets strongest glow, #3 gets weakest
-        if (ROLE_SLOT_PREFIXES[fieldPrefix]) {
+        if (POSITION_DEPTH_PREFIXES[fieldPrefix]) {
             var val = parseInt(current, 10);
             if (val === 0) {
-                // Changed from assigned to unassigned
                 return 1;
             }
-            // val=1 → glow 3 (strongest), val=2 → glow 2, val=3 → glow 1 (weakest)
-            return Math.max(4 - val, 1);
+            // val=1 (starter) → glow 5 (strongest), val=5 → glow 1 (weakest)
+            return Math.max(6 - val, 1);
         }
 
-        // Categorical fields (canPlayInGame, min): always level 1
         return 1;
     }
 
@@ -153,7 +149,7 @@
     }
 
     /**
-     * Return all tracked fields within the form: role slot selects, minutes
+     * Return all tracked fields within the form: position depth selects, minutes
      * number inputs, and canPlayInGame checkboxes. Hidden inputs (including
      * the canPlayInGame unchecked-fallback) are excluded.
      */

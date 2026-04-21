@@ -23,15 +23,14 @@ interface DepthChartEntryViewInterface
     public function renderTeamLogo(int $teamID): void;
 
     /**
-     * Render role priority dropdown options (0 to max)
+     * Render position depth dropdown options (0-5)
      *
-     * Unified for all 5 role slots. Value 0 displays as "—" (not assigned),
-     * values 1+ display as their numeric value.
+     * Options: No(0), 1st(1), 2nd(2), 3rd(3), 4th(4), ok(5).
+     * Maps directly to JSB lineup priority (lower = higher priority).
      *
-     * @param int $selectedValue Currently selected value
-     * @param int $maxValue Maximum option value (2 for BH/DI/OI, 3 for DF/OF)
+     * @param int $selectedValue Currently selected depth value (0-5)
      */
-    public function renderRolePriorityOptions(int $selectedValue, int $maxValue): void;
+    public function renderPositionDepthOptions(int $selectedValue): void;
 
     /**
      * Render the help section explaining how depth charts work.
@@ -48,8 +47,8 @@ interface DepthChartEntryViewInterface
     /**
      * Render complete depth chart form header with table structure
      *
-     * Renders an 8-column table: Pos, Player, Active, PG, SG, SF, PF, C.
-     * The PG-C columns are role slot assignments (mapped to BH/DI/OI/DF/OF form fields).
+     * Renders an 8-column table: Pos, Player, Active, PG, SG, SF, PF, C, Min.
+     * The PG-C columns are position depth assignments (0-5 priority).
      *
      * @param string $teamName Team name to embed in hidden form field
      * @param int $teamID Team ID
@@ -60,9 +59,8 @@ interface DepthChartEntryViewInterface
     /**
      * Render a single player row in the depth chart form
      *
-     * Renders an 8-cell row: Pos, Player (with hidden fields for dead fields),
-     * Active checkbox, Minutes number input (0-40), and 5 role slot selects.
-     * Position depth columns (pg-c) are rendered as hidden inputs with value 0.
+     * Renders an 8-cell row: Pos, Player, Active checkbox, 5 position depth
+     * selects (PG/SG/SF/PF/C with 0-5 options), and Minutes number input (0-40).
      *
      * Player array must include 'quality_score' key (float) for the lineup preview.
      *
@@ -88,7 +86,7 @@ interface DepthChartEntryViewInterface
      * Render depth chart submission result page
      *
      * Shows submitted values in a confirmation table with columns:
-     * Name, Active, PG, SG, SF, PF, C (role slot values).
+     * Name, Active, PG, SG, SF, PF, C, Min (position depth values).
      *
      * @param string $teamName Team name displayed at top of result
      * @param list<ProcessedPlayerData> $playerData Player data submitted
@@ -105,7 +103,7 @@ interface DepthChartEntryViewInterface
     /**
      * Render mobile card view for all players
      *
-     * Renders a card-based layout with a single 5-column role slot grid per card.
+     * Renders a card-based layout with position depth steppers (0-5) per card.
      * All inputs are rendered disabled; JavaScript enables them on mobile viewports.
      *
      * @param list<PlayerRow> $players All players on the team roster

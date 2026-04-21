@@ -189,15 +189,15 @@
     'use strict';
 
     /**
-     * The 5 role slots, mapping display label to form field prefix and
-     * the position used for fallback matching.
+     * The 5 position depth slots, mapping display label to form field prefix
+     * and the position used for fallback matching.
      */
     var SLOTS = [
-        { label: 'PG', field: 'BH', fallbackPos: 'PG' },
-        { label: 'SG', field: 'DI', fallbackPos: 'SG' },
-        { label: 'SF', field: 'OI', fallbackPos: 'SF' },
-        { label: 'PF', field: 'DF', fallbackPos: 'PF' },
-        { label: 'C',  field: 'OF', fallbackPos: 'C'  }
+        { label: 'PG', field: 'pg', fallbackPos: 'PG' },
+        { label: 'SG', field: 'sg', fallbackPos: 'SG' },
+        { label: 'SF', field: 'sf', fallbackPos: 'SF' },
+        { label: 'PF', field: 'pf', fallbackPos: 'PF' },
+        { label: 'C',  field: 'c',  fallbackPos: 'C'  }
     ];
 
     // The dispatcher walks sort1, sort2, sort3, +0x4ca0 backup, etc. (5

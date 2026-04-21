@@ -47,32 +47,24 @@ class DepthChartEntryRepository extends \BaseMysqliRepository implements DepthCh
         $c = $depthChartValues['c'];
         $active = $depthChartValues['canPlayInGame'];
         $min = $depthChartValues['min'];
-        $of = $depthChartValues['of'];
-        $df = $depthChartValues['df'];
-        $oi = $depthChartValues['oi'];
-        $di = $depthChartValues['di'];
-        $bh = $depthChartValues['bh'];
-        
-        // Use a single UPDATE statement to update all depth chart columns at once
-        // This is more efficient and handles the case where values don't change
-        // (MySQL returns 0 affected rows when updating to the same value, which is not an error)
+
         try {
             $this->execute(
-                "UPDATE ibl_plr SET 
-                    dc_PGDepth = ?, 
-                    dc_SGDepth = ?, 
-                    dc_SFDepth = ?, 
-                    dc_PFDepth = ?, 
-                    dc_CDepth = ?, 
+                "UPDATE ibl_plr SET
+                    dc_PGDepth = ?,
+                    dc_SGDepth = ?,
+                    dc_SFDepth = ?,
+                    dc_PFDepth = ?,
+                    dc_CDepth = ?,
                     dc_canPlayInGame = ?,
-                    dc_minutes = ?, 
-                    dc_of = ?, 
-                    dc_df = ?, 
-                    dc_oi = ?, 
-                    dc_di = ?, 
-                    dc_bh = ? 
+                    dc_minutes = ?,
+                    dc_of = 0,
+                    dc_df = 0,
+                    dc_oi = 0,
+                    dc_di = 0,
+                    dc_bh = 0
                 WHERE name = ?",
-                "iiiiiiiiiiiis",
+                "iiiiiiis",
                 $pg,
                 $sg,
                 $sf,
@@ -80,19 +72,11 @@ class DepthChartEntryRepository extends \BaseMysqliRepository implements DepthCh
                 $c,
                 $active,
                 $min,
-                $of,
-                $df,
-                $oi,
-                $di,
-                $bh,
                 $playerName
             );
-            
-            // Success: the query executed without throwing an exception
-            // Note: We don't check affected_rows because it returns 0 when values don't change
+
             return true;
         } catch (\RuntimeException $e) {
-            // If an exception was thrown, the query failed (e.g., player doesn't exist)
             return false;
         }
     }

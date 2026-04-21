@@ -34,18 +34,27 @@ function submit()
 {
     global $mysqli_db;
 
-    PageLayout\PageLayout::header();
-
+    // CSRF failure stays inline — no in-flight edits to preserve, and
+    // "Please reload and try again" is already the correct instruction.
+    // Every other outcome (success, validation fail, empty team name)
+    // takes the PRG path below so Back never lands on a stale form with
+    // a consumed token.
     if (!\Utilities\CsrfGuard::validateSubmittedToken('depth_chart')) {
+        PageLayout\PageLayout::header();
         echo '<strong class="ibl-form-error">Invalid or expired form submission. Please reload and try again.</strong>';
         PageLayout\PageLayout::footer();
         return;
     }
 
     $handler = new DepthChartEntry\DepthChartEntrySubmissionHandler($mysqli_db);
-    $handler->handleSubmission($_POST);
+    $success = $handler->handleSubmission($_POST);
 
-    PageLayout\PageLayout::footer();
+    if ($success && !isset($_SESSION['flash_success'])) {
+        $_SESSION['flash_success'] = 'Depth chart saved and e-mailed successfully.';
+    }
+    // Failure flash (errors_html + post_data) was stashed by the handler
+    // under `_ibl_depth_chart_flash` for the redirected GET to consume.
+    \Utilities\HtmxHelper::redirect('modules.php?name=DepthChartEntry');
 }
 
 function tabApi()

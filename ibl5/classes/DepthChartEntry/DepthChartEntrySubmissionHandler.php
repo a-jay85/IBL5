@@ -20,7 +20,6 @@ class DepthChartEntrySubmissionHandler implements DepthChartEntrySubmissionHandl
     private DepthChartEntryRepository $repository;
     private DepthChartEntryProcessor $processor;
     private DepthChartEntryValidator $validator;
-    private DepthChartEntryView $view;
     private SavedDepthChartService $savedDcService;
 
     public function __construct(\mysqli $db)
@@ -29,7 +28,6 @@ class DepthChartEntrySubmissionHandler implements DepthChartEntrySubmissionHandl
         $this->repository = new DepthChartEntryRepository($db);
         $this->processor = new DepthChartEntryProcessor();
         $this->validator = new DepthChartEntryValidator();
-        $this->view = new DepthChartEntryView();
         $this->savedDcService = new SavedDepthChartService($db);
     }
 
@@ -37,7 +35,7 @@ class DepthChartEntrySubmissionHandler implements DepthChartEntrySubmissionHandl
      * @see DepthChartEntrySubmissionHandlerInterface::handleSubmission()
      * @param array<string, mixed> $postData
      */
-    public function handleSubmission(array $postData): void
+    public function handleSubmission(array $postData): bool
     {
         $season = new Season($this->db);
 
@@ -46,29 +44,48 @@ class DepthChartEntrySubmissionHandler implements DepthChartEntrySubmissionHandl
         $teamName = $this->sanitizeInput($rawTeamName);
 
         if ($teamName === '') {
-            echo '<strong class="ibl-form-error">Error: Missing required team information.</strong>';
-            return;
+            $this->stashFailure(
+                '<strong class="ibl-form-error">Error: Missing required team information.</strong>',
+                $postData
+            );
+            return false;
         }
 
         /** @var ProcessedSubmission $processedData */
         $processedData = $this->processor->processSubmission($postData);
 
-        $isValid = $this->validator->validate($processedData, $season->phase);
-
-        if (!$isValid) {
-            $errorHtml = $this->validator->getErrorMessagesHtml();
-            $this->view->renderSubmissionResult($teamName, $processedData['playerData'], false, $errorHtml);
-            return;
+        if (!$this->validator->validate($processedData, $season->phase)) {
+            $this->stashFailure($this->validator->getErrorMessagesHtml(), $postData);
+            return false;
         }
 
         $this->saveDepthChart($processedData['playerData'], $teamName);
 
-        $this->saveDepthChartFile($teamName, $processedData['playerData']);
+        $fileOk = $this->saveDepthChartFile($teamName, $processedData['playerData']);
 
-        // Save depth chart snapshot
         $this->saveDepthChartSnapshot($teamName, $postData, $season);
 
-        $this->view->renderSubmissionResult($teamName, $processedData['playerData'], true);
+        if (!$fileOk) {
+            $_SESSION['flash_success'] = 'Depth chart saved, but the file/email could not be sent. Please contact the commissioner.';
+        }
+
+        return true;
+    }
+
+    /**
+     * Stash the submission failure for the redirected GET to re-render.
+     *
+     * Key: `$_SESSION['_ibl_depth_chart_flash']` — module-scoped so it doesn't
+     * collide with the generic `flash_success` PageLayout already renders.
+     *
+     * @param array<string, mixed> $postData
+     */
+    private function stashFailure(string $errorsHtml, array $postData): void
+    {
+        $_SESSION['_ibl_depth_chart_flash'] = [
+            'errors_html' => $errorsHtml,
+            'post_data' => $postData,
+        ];
     }
 
     private function sanitizeInput(string $input): string
@@ -142,19 +159,22 @@ class DepthChartEntrySubmissionHandler implements DepthChartEntrySubmissionHandl
 
     /**
      * @param list<ProcessedPlayerData> $playerData
+     * @return bool True when file was written and email sent.
      */
-    private function saveDepthChartFile(string $teamName, array $playerData): void
+    private function saveDepthChartFile(string $teamName, array $playerData): bool
     {
+        $logger = \Logging\LoggerFactory::getChannel('app');
+
         $safeTeamName = preg_replace('/[^a-zA-Z0-9_\-\s]/', '', $teamName);
         if ($safeTeamName === null) {
-            echo '<strong class="ibl-form-error">Invalid team name for file creation.</strong>';
-            return;
+            $logger->warning('DepthChartFile: invalid team name (regex null)', ['team' => $teamName]);
+            return false;
         }
         $safeTeamName = str_replace(['..', '/', '\\'], '', $safeTeamName);
 
         if ($safeTeamName === '') {
-            echo '<strong class="ibl-form-error">Invalid team name for file creation.</strong>';
-            return;
+            $logger->warning('DepthChartFile: sanitized team name is empty', ['team' => $teamName]);
+            return false;
         }
 
         $csvContent = $this->processor->generateCsvContent($playerData);
@@ -172,11 +192,13 @@ class DepthChartEntrySubmissionHandler implements DepthChartEntrySubmissionHandl
             $bytesWritten = file_put_contents($filename, $convertedContent);
             if ($bytesWritten !== false && $bytesWritten > 0) {
                 \Mail\MailService::fromConfig()->send('ibldepthcharts@gmail.com', $teamName . " Depth Chart", $convertedContent, 'ibldepthcharts@gmail.com');
-            } else {
-                echo '<strong class="ibl-form-error">Depth chart failed to save properly; please contact the commissioner.</strong>';
+                return true;
             }
-        } else {
-            echo '<strong class="ibl-form-error">Invalid file path detected. Please contact the commissioner.</strong>';
+            $logger->error('DepthChartFile: write failed', ['team' => $teamName, 'path' => $filename]);
+            return false;
         }
+
+        $logger->error('DepthChartFile: path traversal guard rejected write', ['team' => $teamName, 'path' => $filename]);
+        return false;
     }
 }

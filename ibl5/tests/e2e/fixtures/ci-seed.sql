@@ -443,7 +443,62 @@ INSERT INTO ibl_plr (
    41, 1300, 210, 460, 105, 125,
    45, 130, 45, 140, 160, 48,
    65, 22, 88,
-   'a0000000-0000-0000-0000-000000000024');
+   'a0000000-0000-0000-0000-000000000024'),
+  -- Metros backup players (pid 25-29). The validator requires 12 active
+  -- players and ≥3 assignments per position in Regular Season. Without
+  -- these five, Metros has 7 players / 1-per-position and every depth-
+  -- chart submission fails validation, which prevents E2E tests from
+  -- exercising the success-path Post-Redirect-Get flow.
+  (25, 'Metros Backup PG', 24, 27, 1, 'PG', 6,
+   75, 70, 65, 60, 55, 67, 63, 65, 60,
+   1, 2, 100, 110,
+   0, 2,
+   6, 2, 185, 'Backup U',
+   2, 20, 2024, 'Metros', 'Metros',
+   30, 600, 100, 230, 50, 60,
+   30, 80, 20, 60, 90, 25,
+   40, 10, 60,
+   'a0000000-0000-0000-0000-000000000025'),
+  (26, 'Metros Backup SF', 25, 27, 1, 'SF', 7,
+   74, 69, 64, 59, 54, 66, 62, 64, 59,
+   1, 2, 100, 110,
+   0, 2,
+   6, 6, 210, 'Backup U',
+   2, 25, 2024, 'Metros', 'Metros',
+   30, 600, 95, 220, 45, 55,
+   20, 60, 30, 80, 70, 20,
+   40, 15, 65,
+   'a0000000-0000-0000-0000-000000000026'),
+  (27, 'Metros Utility', 26, 28, 1, 'PF', 8,
+   76, 71, 66, 61, 56, 68, 64, 66, 61,
+   1, 2, 120, 130,
+   0, 3,
+   6, 9, 225, 'Utility U',
+   2, 30, 2023, 'Metros', 'Metros',
+   35, 800, 120, 280, 60, 72,
+   15, 45, 40, 110, 80, 25,
+   50, 30, 75,
+   'a0000000-0000-0000-0000-000000000027'),
+  (28, 'Metros Backup SF2', 23, 26, 1, 'SF', 9,
+   73, 68, 63, 58, 53, 65, 61, 63, 58,
+   1, 1, 80, 88,
+   0, 1,
+   6, 5, 205, 'Rookie U',
+   2, 40, 2025, 'Metros', 'Metros',
+   20, 360, 60, 145, 30, 36,
+   15, 45, 15, 50, 45, 15,
+   25, 10, 45,
+   'a0000000-0000-0000-0000-000000000028'),
+  (29, 'Metros Backup PF', 27, 28, 1, 'PF', 10,
+   77, 72, 67, 62, 57, 69, 65, 67, 62,
+   1, 3, 140, 155,
+   0, 4,
+   6, 8, 230, 'Backup U',
+   1, 18, 2022, 'Metros', 'Metros',
+   40, 1100, 150, 330, 70, 84,
+   30, 90, 50, 140, 95, 30,
+   55, 35, 85,
+   'a0000000-0000-0000-0000-000000000029');
 
 -- ============================================================
 -- Placeholder player for LeagueStarters module
@@ -480,12 +535,25 @@ INSERT INTO ibl_plr (
 -- Depth chart starters (NextSim needs dc_*Depth=1 and *Depth=1)
 -- ============================================================
 
--- Metros (tid=1): 5 distinct starters
+-- Metros (tid=1): 5 distinct starters + depth so every position has ≥3
+-- active assignments. The submit-path E2E tests need a default team that
+-- passes Regular-Season validation (12 active, 3 per position) without
+-- per-test form manipulation.
 UPDATE ibl_plr SET dc_PGDepth = 1, PGDepth = 1 WHERE pid = 20;
 UPDATE ibl_plr SET dc_SGDepth = 1, SGDepth = 1 WHERE pid = 1;
 UPDATE ibl_plr SET dc_SFDepth = 1, SFDepth = 1 WHERE pid = 21;
 UPDATE ibl_plr SET dc_PFDepth = 1, PFDepth = 1 WHERE pid = 2;
 UPDATE ibl_plr SET dc_CDepth  = 1, CDepth  = 1 WHERE pid = 22;
+-- FA Guard (pid=10) covers SG depth 2
+UPDATE ibl_plr SET dc_SGDepth = 2 WHERE pid = 10;
+-- Konstantinos Papadopoulos (pid=200000030) covers C depth 2
+UPDATE ibl_plr SET dc_CDepth = 2 WHERE pid = 200000030;
+-- Backups cover the remaining ≥3 slots: PG, SG, SF, PF, C all hit 3
+UPDATE ibl_plr SET dc_PGDepth = 2, dc_SGDepth = 3 WHERE pid = 25;
+UPDATE ibl_plr SET dc_SFDepth = 2 WHERE pid = 26;
+UPDATE ibl_plr SET dc_PFDepth = 2, dc_PGDepth = 3, dc_CDepth = 3 WHERE pid = 27;
+UPDATE ibl_plr SET dc_SFDepth = 3 WHERE pid = 28;
+UPDATE ibl_plr SET dc_PFDepth = 3 WHERE pid = 29;
 
 -- Stars (tid=2): pid=4 covers PG/SG/PF, pid=5 covers SF/C
 UPDATE ibl_plr SET dc_PGDepth = 1, PGDepth = 1, dc_SGDepth = 1, SGDepth = 1, dc_PFDepth = 1, PFDepth = 1 WHERE pid = 4;

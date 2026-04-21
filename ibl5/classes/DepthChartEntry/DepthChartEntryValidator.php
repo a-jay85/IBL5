@@ -47,7 +47,7 @@ class DepthChartEntryValidator implements DepthChartEntryValidatorInterface
             $this->errors[] = [
                 'type' => 'multiple_starting_positions',
                 'message' => $depthChartData['nameOfProblemStarter'] . ' is set as starter (1st) at multiple positions.',
-                'detail' => 'Please press the "Back" button on your browser and set this player as 1st at only one position.'
+                'detail' => 'Set this player as 1st at only one position and resubmit.'
             ];
         }
 
@@ -60,7 +60,7 @@ class DepthChartEntryValidator implements DepthChartEntryValidatorInterface
             $this->errors[] = [
                 'type' => 'active_players_min',
                 'message' => "You must have at least $min active players in your lineup; you have $activePlayers.",
-                'detail' => "Please press the \"Back\" button on your browser and activate " . ($min - $activePlayers) . " player(s)."
+                'detail' => 'Activate ' . ($min - $activePlayers) . ' more player(s) below and resubmit.',
             ];
         }
 
@@ -68,7 +68,7 @@ class DepthChartEntryValidator implements DepthChartEntryValidatorInterface
             $this->errors[] = [
                 'type' => 'active_players_max',
                 'message' => "You can't have more than $max active players in your lineup; you have $activePlayers.",
-                'detail' => "Please press the \"Back\" button on your browser and deactivate " . ($activePlayers - $max) . " player(s)."
+                'detail' => 'Deactivate ' . ($activePlayers - $max) . ' player(s) below and resubmit.',
             ];
         }
     }
@@ -88,7 +88,7 @@ class DepthChartEntryValidator implements DepthChartEntryValidatorInterface
                 $this->errors[] = [
                     'type' => 'position_depth',
                     'message' => "You need at least $minPerPosition non-injured players assigned to {$posName}; you have $count.",
-                    'detail' => "Please press the \"Back\" button on your browser and assign more players to the {$posName} position."
+                    'detail' => "Assign more players to the {$posName} position below and resubmit.",
                 ];
             }
         }

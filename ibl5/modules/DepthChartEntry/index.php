@@ -49,7 +49,7 @@ function submit()
     $handler = new DepthChartEntry\DepthChartEntrySubmissionHandler($mysqli_db);
     $success = $handler->handleSubmission($_POST);
 
-    if ($success) {
+    if ($success && !isset($_SESSION['flash_success'])) {
         $_SESSION['flash_success'] = 'Depth chart saved and e-mailed successfully.';
     }
     // Failure flash (errors_html + post_data) was stashed by the handler

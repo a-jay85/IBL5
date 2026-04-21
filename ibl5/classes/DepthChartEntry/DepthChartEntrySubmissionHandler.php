@@ -61,9 +61,13 @@ class DepthChartEntrySubmissionHandler implements DepthChartEntrySubmissionHandl
 
         $this->saveDepthChart($processedData['playerData'], $teamName);
 
-        $this->saveDepthChartFile($teamName, $processedData['playerData']);
+        $fileOk = $this->saveDepthChartFile($teamName, $processedData['playerData']);
 
         $this->saveDepthChartSnapshot($teamName, $postData, $season);
+
+        if (!$fileOk) {
+            $_SESSION['flash_success'] = 'Depth chart saved, but the file/email could not be sent. Please contact the commissioner.';
+        }
 
         return true;
     }
@@ -155,21 +159,22 @@ class DepthChartEntrySubmissionHandler implements DepthChartEntrySubmissionHandl
 
     /**
      * @param list<ProcessedPlayerData> $playerData
+     * @return bool True when file was written and email sent.
      */
-    private function saveDepthChartFile(string $teamName, array $playerData): void
+    private function saveDepthChartFile(string $teamName, array $playerData): bool
     {
         $logger = \Logging\LoggerFactory::getChannel('app');
 
         $safeTeamName = preg_replace('/[^a-zA-Z0-9_\-\s]/', '', $teamName);
         if ($safeTeamName === null) {
             $logger->warning('DepthChartFile: invalid team name (regex null)', ['team' => $teamName]);
-            return;
+            return false;
         }
         $safeTeamName = str_replace(['..', '/', '\\'], '', $safeTeamName);
 
         if ($safeTeamName === '') {
             $logger->warning('DepthChartFile: sanitized team name is empty', ['team' => $teamName]);
-            return;
+            return false;
         }
 
         $csvContent = $this->processor->generateCsvContent($playerData);
@@ -187,11 +192,13 @@ class DepthChartEntrySubmissionHandler implements DepthChartEntrySubmissionHandl
             $bytesWritten = file_put_contents($filename, $convertedContent);
             if ($bytesWritten !== false && $bytesWritten > 0) {
                 \Mail\MailService::fromConfig()->send('ibldepthcharts@gmail.com', $teamName . " Depth Chart", $convertedContent, 'ibldepthcharts@gmail.com');
-            } else {
-                $logger->error('DepthChartFile: write failed', ['team' => $teamName, 'path' => $filename]);
+                return true;
             }
-        } else {
-            $logger->error('DepthChartFile: path traversal guard rejected write', ['team' => $teamName, 'path' => $filename]);
+            $logger->error('DepthChartFile: write failed', ['team' => $teamName, 'path' => $filename]);
+            return false;
         }
+
+        $logger->error('DepthChartFile: path traversal guard rejected write', ['team' => $teamName, 'path' => $filename]);
+        return false;
     }
 }

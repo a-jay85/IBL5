@@ -9,7 +9,6 @@ use Utilities\HtmlSanitizer;
 
 /**
  * @phpstan-import-type PlayerRow from \Services\CommonMysqliRepository
- * @phpstan-import-type ProcessedPlayerData from Contracts\DepthChartEntryProcessorInterface
  *
  * @see DepthChartEntryViewInterface
  */
@@ -342,53 +341,6 @@ JAVASCRIPT;
         echo '</div>';
         echo '<div id="saved-dc-loading" class="saved-dc-loading" style="display:none;">Loading...</div>';
         echo '</div>';
-    }
-
-    /**
-     * @see DepthChartEntryViewInterface::renderSubmissionResult()
-     * @param list<ProcessedPlayerData> $playerData
-     */
-    public function renderSubmissionResult(
-        string $teamName,
-        array $playerData,
-        bool $success,
-        string $errorHtml = ''
-    ): void {
-        if (!$success) {
-            echo '<div class="text-center"><span class="underline">Your lineup has <strong>not</strong> been submitted:</span></div><br>';
-            echo $errorHtml;
-        } else {
-            echo '<div class="text-center"><span class="underline">Your depth chart has been submitted and e-mailed successfully. Thank you.</span></div><p>';
-        }
-
-        $teamNameHtml = HtmlSanitizer::safeHtmlOutput($teamName);
-        echo $teamNameHtml . ' Depth Chart Submission<br><table class="ibl-data-table">';
-        echo '<thead><tr>
-            <th>Name</th>
-            <th>Active</th>';
-
-        foreach (self::POSITION_SLOTS as $slot) {
-            $labelHtml = HtmlSanitizer::safeHtmlOutput($slot['label']);
-            echo '<th>' . $labelHtml . '</th>';
-        }
-
-        echo '<th>Min</th></tr></thead><tbody>';
-
-        foreach ($playerData as $player) {
-            $nameHtml = HtmlSanitizer::safeHtmlOutput($player['name']);
-            echo '<tr>
-                <td>' . $nameHtml . '</td>
-                <td>' . $player['canPlayInGame'] . '</td>
-                <td>' . $player['pg'] . '</td>
-                <td>' . $player['sg'] . '</td>
-                <td>' . $player['sf'] . '</td>
-                <td>' . $player['pf'] . '</td>
-                <td>' . $player['c'] . '</td>
-                <td>' . $player['min'] . '</td>
-            </tr>';
-        }
-
-        echo '</tbody></table>';
     }
 
     /**

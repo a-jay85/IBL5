@@ -6,47 +6,30 @@ namespace DepthChartEntry\Contracts;
 
 /**
  * DepthChartEntrySubmissionHandlerInterface - Contract for depth chart submission orchestration
- * 
+ *
  * Orchestrates the complete depth chart submission workflow:
  * processing user input, validating against business rules,
- * persisting to database, and generating confirmations.
+ * and persisting to database. Emits no direct output — the caller
+ * uses the return value + `$_SESSION['_ibl_depth_chart_flash']` to
+ * drive a Post-Redirect-Get response.
  */
 interface DepthChartEntrySubmissionHandlerInterface
 {
     /**
-     * Handle complete depth chart form submission
-     * 
-     * Orchestrates the full submission workflow:
-     * 1. Extract and sanitize team name from POST data
-     * 2. Process raw form data into structured depth chart
-     * 3. Validate against current season phase requirements
-     * 4. If valid: Save to database, generate CSV file, send email confirmation
-     * 5. If invalid: Display error messages with submitted data for correction
-     * 6. Render result page (success or error) with confirmation table
-     * 
-     * **Workflow Steps:**
-     * - Team name validation (required, sanitized)
-     * - Data processing via DepthChartEntryProcessor
-     * - Business rule validation via DepthChartEntryValidator
-     * - Database updates via DepthChartEntryRepository (if valid)
-     * - CSV file generation and email (if valid)
-     * - HTML result page rendering
-     * 
-     * **Error Handling:**
-     * - Team name missing: Early exit with error message
-     * - Validation failures: Display errors with submitted data table
-     * - Database errors: Logged implicitly via repository (caller handles display)
-     * - File write errors: Error message echoed to output
-     * 
-     * @param array<string, mixed> $postData Raw POST data from form submission ($_POST)
-     * @return void Renders HTML response (success or error page)
-     * 
-     * **Important Behaviors:**
-     * - Does NOT return value (renders directly to output)
-     * - All error messages output directly to stdout
-     * - Uses Season object to determine phase requirements
-     * - Sends email only if not on localhost
-     * - File operations validate path to prevent directory traversal
+     * Handle complete depth chart form submission.
+     *
+     * Flow:
+     * 1. Validate `Team_Name` is present.
+     * 2. Process raw form data via DepthChartEntryProcessor.
+     * 3. Validate against current season phase via DepthChartEntryValidator.
+     * 4. On success: save to DB, write CSV file, email confirmation, snapshot.
+     * 5. On failure: stash `$_SESSION['_ibl_depth_chart_flash']` with `errors_html`
+     *    and the raw `post_data` so the next GET can re-render the form
+     *    pre-populated with the user's in-flight edits.
+     *
+     * @param array<string, mixed> $postData Raw POST data from form submission ($_POST).
+     * @return bool True on success (caller should flash_success + redirect).
+     *              False on any failure — flash is stashed for the redirected GET.
      */
-    public function handleSubmission(array $postData): void;
+    public function handleSubmission(array $postData): bool;
 }

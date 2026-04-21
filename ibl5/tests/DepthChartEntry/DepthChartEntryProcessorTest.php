@@ -544,16 +544,15 @@ class DepthChartEntryProcessorTest extends TestCase
         $this->assertMatchesRegularExpression('/<select name="c\d+"[^>]*>.*?value="1" SELECTED/s', $html, 'C should have value 1 selected');
     }
 
-    // --- Merged from DepthChartEntryConfirmationTest ---
+    // --- CSV + processed-data consistency (confirmation-page assertions
+    // removed along with DepthChartEntryView::renderSubmissionResult; PRG
+    // flow no longer renders a result table) ---
 
     /**
-     * Test that the confirmation page displays the same values that will be in the CSV.
-     * Tests DepthChartEntryView::renderSubmissionResult() output.
+     * The CSV export columns match the processed player record exactly.
      */
-    public function testConfirmationPageMatchesCsvExport()
+    public function testCsvExportPreservesPlayerValues(): void
     {
-        $view = new DepthChartEntryView();
-
         $playerData = [
             [
                 'name' => 'Test Player',
@@ -568,39 +567,22 @@ class DepthChartEntryProcessorTest extends TestCase
                 'df' => 0,
                 'oi' => 0,
                 'di' => 0,
-                'bh' => 0
-            ]
+                'bh' => 0,
+            ],
         ];
 
-        // Generate confirmation page HTML
-        ob_start();
-        $view->renderSubmissionResult('Test Team', $playerData, true);
-        $confirmationHtml = ob_get_clean();
-
-        // Generate CSV
         $csv = $this->processor->generateCsvContent($playerData);
 
-        // The CSV should contain these exact values
         $this->assertStringContainsString('Test Player,1,2,0,3,0,1,30,0,0,0,0,0', $csv);
-
-        // The confirmation page should also display these same values
-        $this->assertStringContainsString('Test Player', $confirmationHtml);
-
-        // Verify position depth values appear in the confirmation table
-        $this->assertMatchesRegularExpression('/<td>1<\/td>/', $confirmationHtml, 'PG value 1 should appear');
-        $this->assertMatchesRegularExpression('/<td>2<\/td>/', $confirmationHtml, 'SG value 2 should appear');
-        $this->assertMatchesRegularExpression('/<td>3<\/td>/', $confirmationHtml, 'PF value 3 should appear');
-        $this->assertMatchesRegularExpression('/<td>30<\/td>/', $confirmationHtml, 'Min value 30 should appear');
     }
 
     /**
-     * Test that all three outputs (confirmation, CSV, database) would receive the same data
+     * processSubmission → generateCsvContent round-trip: the processed
+     * record feeds the CSV unchanged, so whatever the user submitted is
+     * what gets written to disk / emailed.
      */
-    public function testAllThreeOutputsReceiveSameProcessedData()
+    public function testProcessedSubmissionRoundTripsIntoCsv(): void
     {
-        $view = new DepthChartEntryView();
-
-        // Simulate form submission
         $postData = [
             'Name1' => 'Consistency Test Player',
             'pg1' => '2',
@@ -610,24 +592,13 @@ class DepthChartEntryProcessorTest extends TestCase
             'c1' => '4',
             'canPlayInGame1' => '1',
             'min1' => '35',
-            'Injury1' => '0'
+            'Injury1' => '0',
         ];
 
-        // Process the submission
         $result = $this->processor->processSubmission($postData, 15);
         $processedData = $result['playerData'];
-
-        // Generate all three outputs
-        $csvContent = $this->processor->generateCsvContent($processedData);
-
-        ob_start();
-        $view->renderSubmissionResult('Test Team', $processedData, true);
-        $confirmationHtml = ob_get_clean();
-
-        // Extract the values from processed data
         $player = $processedData[0];
 
-        // Verify CSV contains these exact values
         $expectedCsvLine = sprintf(
             'Consistency Test Player,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d',
             $player['pg'],
@@ -641,92 +612,25 @@ class DepthChartEntryProcessorTest extends TestCase
             $player['df'],
             $player['oi'],
             $player['di'],
-            $player['bh']
+            $player['bh'],
         );
-        $this->assertStringContainsString($expectedCsvLine, $csvContent, 'CSV should contain exact values from processed data');
+        $this->assertStringContainsString(
+            $expectedCsvLine,
+            $this->processor->generateCsvContent($processedData),
+            'CSV should contain exact values from processed data',
+        );
 
-        // Verify confirmation page contains key values in table cells
-        // Confirmation page shows: Name, Active, PG, SG, SF, PF, C, Min
-        $valuesToCheck = [
-            $player['canPlayInGame'],
-            $player['pg'],
-            $player['sg'],
-            $player['sf'],
-            $player['c'],
-            $player['min'],
-        ];
-
-        foreach ($valuesToCheck as $value) {
-            // Each value should appear in a table cell
-            $this->assertStringContainsString("<td>$value</td>", $confirmationHtml, "Confirmation page should contain value $value");
-        }
-
-        // The database would receive the same array via updatePlayerDepthChart($player['name'], $player)
-        $this->assertArrayHasKey('pg', $player);
-        $this->assertArrayHasKey('sg', $player);
-        $this->assertArrayHasKey('of', $player);
-        $this->assertArrayHasKey('df', $player);
-
-        // Verify the position depth values match what was submitted
-        $this->assertEquals(2, $player['pg']);
-        $this->assertEquals(1, $player['sg']);
-        $this->assertEquals(3, $player['sf']);
-        $this->assertEquals(4, $player['c']);
-        $this->assertEquals(35, $player['min']);
-        // Role fields always 0
-        $this->assertEquals(0, $player['of']);
-        $this->assertEquals(0, $player['df']);
-        $this->assertEquals(0, $player['oi']);
-        $this->assertEquals(0, $player['di']);
-        $this->assertEquals(0, $player['bh']);
-    }
-
-    /**
-     * Test that the confirmation page and CSV show numeric position depth values.
-     */
-    public function testUserSeesNumericCodesInConfirmationAndCsv()
-    {
-        $view = new DepthChartEntryView();
-
-        $playerData = [
-            [
-                'name' => 'Human Readable Test',
-                'pg' => 1,
-                'sg' => 2,
-                'sf' => 3,
-                'pf' => 0,
-                'c' => 4,
-                'canPlayInGame' => 1,
-                'min' => 30,
-                'of' => 0,
-                'df' => 0,
-                'oi' => 0,
-                'di' => 0,
-                'bh' => 0
-            ]
-        ];
-
-        // Generate confirmation page
-        ob_start();
-        $view->renderSubmissionResult('Test Team', $playerData, true);
-        $confirmationHtml = ob_get_clean();
-
-        // Generate CSV
-        $csv = $this->processor->generateCsvContent($playerData);
-
-        // The confirmation page shows NUMERIC VALUES for position depth
-        $this->assertStringContainsString('<td>1</td>', $confirmationHtml, 'Confirmation shows numeric value 1 for PG');
-        $this->assertStringContainsString('<td>2</td>', $confirmationHtml, 'Confirmation shows numeric value 2 for SG');
-        $this->assertStringContainsString('<td>3</td>', $confirmationHtml, 'Confirmation shows numeric value 3 for SF');
-        $this->assertStringContainsString('<td>4</td>', $confirmationHtml, 'Confirmation shows numeric value 4 for C');
-        $this->assertStringContainsString('<td>30</td>', $confirmationHtml, 'Confirmation shows numeric value 30 for Min');
-
-        // Confirmation should NOT contain human-readable labels
-        $this->assertStringNotContainsString('1st', $confirmationHtml);
-        $this->assertStringNotContainsString('2nd', $confirmationHtml);
-
-        // CSV also shows numeric values
-        $this->assertStringContainsString('Human Readable Test,1,2,3,0,4,1,30,0,0,0,0,0', $csv);
+        // Processed values match input POST
+        $this->assertSame(2, $player['pg']);
+        $this->assertSame(1, $player['sg']);
+        $this->assertSame(3, $player['sf']);
+        $this->assertSame(4, $player['c']);
+        $this->assertSame(35, $player['min']);
+        $this->assertSame(0, $player['of']);
+        $this->assertSame(0, $player['df']);
+        $this->assertSame(0, $player['oi']);
+        $this->assertSame(0, $player['di']);
+        $this->assertSame(0, $player['bh']);
     }
 
     public function testPositionDepthValuesAppearInCorrectCsvColumns(): void

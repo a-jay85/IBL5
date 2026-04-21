@@ -11,7 +11,6 @@ namespace DepthChartEntry\Contracts;
  * Uses output buffering for form rendering, direct echo for option rendering.
  *
  * @phpstan-import-type PlayerRow from \Services\CommonMysqliRepository
- * @phpstan-import-type ProcessedPlayerData from DepthChartEntryProcessorInterface
  */
 interface DepthChartEntryViewInterface
 {
@@ -81,24 +80,6 @@ interface DepthChartEntryViewInterface
      * @param string $currentLiveLabel Label for the "Current (Live)" entry
      */
     public function renderSavedDepthChartDropdown(array $options, string $currentLiveLabel): void;
-
-    /**
-     * Render depth chart submission result page
-     *
-     * Shows submitted values in a confirmation table with columns:
-     * Name, Active, PG, SG, SF, PF, C, Min (position depth values).
-     *
-     * @param string $teamName Team name displayed at top of result
-     * @param list<ProcessedPlayerData> $playerData Player data submitted
-     * @param bool $success True if submission succeeded
-     * @param string $errorHtml Error messages HTML (if $success is false)
-     */
-    public function renderSubmissionResult(
-        string $teamName,
-        array $playerData,
-        bool $success,
-        string $errorHtml = ''
-    ): void;
 
     /**
      * Render mobile card view for all players

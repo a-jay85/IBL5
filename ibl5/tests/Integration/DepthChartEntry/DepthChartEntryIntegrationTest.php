@@ -671,7 +671,9 @@ class DepthChartEntryIntegrationTest extends IntegrationTestCase
         $this->assertStringContainsString('color: red', $html);
         $this->assertStringContainsString('<strong', $html);
         $this->assertStringContainsString('</strong>', $html);
-        $this->assertStringContainsString('Back', $html); // User instruction
+        // The copy now tells the user to fix the error in the re-rendered
+        // form below (PRG + form-state hydration), not to press Back.
+        $this->assertStringContainsString('resubmit', $html);
     }
 
     // ========== HELPER METHODS ==========

@@ -64,6 +64,24 @@ class DepthChartEntryController implements DepthChartEntryControllerInterface
 
         $season = new Season($this->db);
 
+        // Consume the PRG failure flash if present. Stashed by the submission
+        // handler (`_ibl_depth_chart_flash`) on validation failure or empty
+        // team name so the redirected GET can (1) surface validator errors
+        // above the form and (2) re-populate fields from the user's submitted
+        // POST rather than the DB — preserving in-flight edits.
+        $flashErrorsHtml = '';
+        $override = [];
+        if (isset($_SESSION['_ibl_depth_chart_flash']) && is_array($_SESSION['_ibl_depth_chart_flash'])) {
+            $flash = $_SESSION['_ibl_depth_chart_flash'];
+            unset($_SESSION['_ibl_depth_chart_flash']);
+            if (isset($flash['errors_html']) && is_string($flash['errors_html'])) {
+                $flashErrorsHtml = $flash['errors_html'];
+            }
+            if (isset($flash['post_data']) && is_array($flash['post_data'])) {
+                $override = self::buildFormOverride($flash['post_data']);
+            }
+        }
+
         $teamName = $this->getUserTeamName($username);
         $teamID = $this->commonRepository->getTidFromTeamname($teamName) ?? 0;
         $team = Team::initialize($this->db, $teamID);
@@ -71,6 +89,11 @@ class DepthChartEntryController implements DepthChartEntryControllerInterface
         \PageLayout\PageLayout::header();
 
         echo '<h2 class="ibl-title">Depth Chart Entry</h2>';
+
+        if ($flashErrorsHtml !== '') {
+            echo '<div class="ibl-alert ibl-alert--error">' . $flashErrorsHtml . '</div>';
+        }
+
         $this->view->renderTeamLogo($teamID);
 
         // Render saved depth chart dropdown
@@ -83,10 +106,16 @@ class DepthChartEntryController implements DepthChartEntryControllerInterface
 
         $playersResult = $this->repository->getPlayersOnTeam($teamID);
 
-        // Compute quality scores and inject into player arrays
+        // Compute quality scores and apply any flash override so the form
+        // re-renders with the user's last submitted values after a validation
+        // failure, not the stale DB values.
         $playersWithQuality = array_map(
-            static function (array $player): array {
+            static function (array $player) use ($override): array {
                 $player['quality_score'] = self::computeQualityScore($player);
+                $pid = $player['pid'];
+                if (isset($override[$pid])) {
+                    $player = array_merge($player, $override[$pid]);
+                }
                 return $player;
             },
             $playersResult
@@ -276,5 +305,90 @@ class DepthChartEntryController implements DepthChartEntryControllerInterface
             + ($min + $fta - ($twoPtAtt - $min) * (2.0 / 3.0) + $twoPtMade - $ftm * 0.5)) * 1.5;
 
         return round(($termA + $termB + $termC) / $gp, 2);
+    }
+
+    /**
+     * Build a PID-keyed override map from a submission's raw POST data.
+     *
+     * Called after a validation-failure redirect so `displayForm()` can
+     * re-render the form pre-populated with the user's submitted values
+     * instead of the DB values. The same clamps the view applies at render
+     * time (0–5 depth, 0–40 minutes, 0/1 canPlayInGame) are applied here
+     * so malformed POST input cannot escape into the rendered markup.
+     *
+     * Form field names use the convention `{field}{N}` where N is the
+     * 1-based row index (pid1, pg1, sg1, …, min1, canPlayInGame1).
+     *
+     * Public for unit-test access; there is no architectural reason to
+     * hide a pure static helper with no dependencies.
+     *
+     * Accepts `array<array-key, mixed>` — after round-tripping through the
+     * session, PHPStan loses the narrower `array<string, mixed>` shape, and
+     * internal lookups go through string literals anyway.
+     *
+     * @param array<array-key, mixed> $postData Raw $_POST payload.
+     * @return array<int, array{dc_PGDepth: int, dc_SGDepth: int, dc_SFDepth: int, dc_PFDepth: int, dc_CDepth: int, dc_canPlayInGame: int, dc_minutes: int}>
+     *         Keyed by player PID. Values use the same `dc_*` keys the view reads
+     *         from the player row, so the caller can `array_merge` directly.
+     */
+    public static function buildFormOverride(array $postData): array
+    {
+        $override = [];
+
+        for ($i = 1; $i <= 15; $i++) {
+            $pidKey = 'pid' . $i;
+            if (!isset($postData[$pidKey])) {
+                continue;
+            }
+            $pid = self::intFromPost($postData[$pidKey]);
+            if ($pid <= 0) {
+                continue;
+            }
+
+            $override[$pid] = [
+                'dc_PGDepth' => self::clampDepth(self::intFromPost($postData['pg' . $i] ?? 0)),
+                'dc_SGDepth' => self::clampDepth(self::intFromPost($postData['sg' . $i] ?? 0)),
+                'dc_SFDepth' => self::clampDepth(self::intFromPost($postData['sf' . $i] ?? 0)),
+                'dc_PFDepth' => self::clampDepth(self::intFromPost($postData['pf' . $i] ?? 0)),
+                'dc_CDepth' => self::clampDepth(self::intFromPost($postData['c' . $i] ?? 0)),
+                'dc_canPlayInGame' => self::intFromPost($postData['canPlayInGame' . $i] ?? 0) === 1 ? 1 : 0,
+                'dc_minutes' => self::clampMinutes(self::intFromPost($postData['min' . $i] ?? 0)),
+            ];
+        }
+
+        return $override;
+    }
+
+    private static function intFromPost(mixed $value): int
+    {
+        if (is_int($value)) {
+            return $value;
+        }
+        if (is_string($value) && is_numeric($value)) {
+            return (int) $value;
+        }
+        return 0;
+    }
+
+    private static function clampDepth(int $value): int
+    {
+        if ($value < 0) {
+            return 0;
+        }
+        if ($value > 5) {
+            return 5;
+        }
+        return $value;
+    }
+
+    private static function clampMinutes(int $value): int
+    {
+        if ($value < 0) {
+            return 0;
+        }
+        if ($value > 40) {
+            return 40;
+        }
+        return $value;
     }
 }

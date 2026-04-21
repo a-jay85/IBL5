@@ -1,8 +1,23 @@
 import { test, expect } from '../fixtures/auth';
 import { assertNoPhpErrors } from '../helpers/php-errors';
 
-// Depth Chart submission flow — tests that interact with the form.
-// Serial: submission tests depend on form state.
+// Depth Chart submission flow — these tests mutate shared DB state via form
+// POSTs, so they run serially. They collectively exercise the Post-Redirect-
+// Get (PRG) implementation behind the fix for the "Invalid or expired form
+// submission" regression that users hit after submit → back → resubmit.
+//
+// Seed dependency: the Metros roster (tid=1) must start with 12 active
+// players covering every position (PG/SG/SF/PF/C) at depth ≥3. CI provisions
+// this via ci-seed.sql on every run. Locally, run `bin/wt-up <name> --seed`
+// before executing the full suite.
+//
+// Parallel-spec caveat: Playwright runs at `workers: 4, fullyParallel: true`
+// and `extension.spec.ts` / `trading.spec.ts` mutate the Metros roster
+// (moving players onto or off tid=1) while these tests are mid-flight.
+// `retries: 2` in CI absorbs those transient races; persistent failures
+// here usually point to a real regression, not pollution.
+// TODO: isolate these tests onto a dedicated test user + team that no
+// other spec touches, so the suite stops depending on retry luck.
 test.describe.configure({ mode: 'serial' });
 
 test.describe('Depth Chart submission', () => {
@@ -52,67 +67,224 @@ test.describe('Depth Chart submission', () => {
     }
   });
 
-  test('submit depth chart successfully and confirmation shows submitted values', async ({
-    page,
-  }) => {
-    const form = page.locator('.depth-chart-form');
-    await expect(form).toBeVisible({ timeout: 15000 });
+  test('submit redirects back to module URL with success flash and fresh form', async ({ page }) => {
+    await expect(page.locator('.depth-chart-form')).toBeVisible({ timeout: 15000 });
 
-    // Set a distinctive pg (PG) value on the first desktop player row so we
-    // can verify the confirmation page echoes back exactly what was POSTed.
-    // Scoping to `.depth-chart-table` avoids colliding with the mobile
-    // card duplicates that share the same input names.
+    // Distinctive but non-starter value (3 = "3rd backup") so we don't
+    // create a "starter at multiple positions" validation failure for a
+    // player who may already be a 1st at another position in the seed.
     const firstPg = page
       .locator('.depth-chart-table select[name^="pg"]')
       .first();
-    await firstPg.selectOption('1');
+    await firstPg.selectOption('3');
 
-    // Submit the current depth chart
-    const submitBtn = page.locator('.depth-chart-buttons .depth-chart-submit-btn');
-    await expect(submitBtn).toBeVisible();
-    await submitBtn.click();
+    await page.locator('.depth-chart-buttons .depth-chart-submit-btn').click();
 
-    await page.waitForLoadState('domcontentloaded');
-    const body = await page.locator('body').textContent();
+    // PRG: URL lands back at the module base — no `&op=submit` artifact.
+    await expect(page).toHaveURL(/modules\.php\?name=DepthChartEntry(?!.*op=submit)/);
 
-    // Success or validation error banner should appear. The confirmation
-    // table is rendered in both branches.
-    const hasSuccess = body?.match(
-      /submitted.*successfully|thank you|depth chart has been/i,
-    );
-    const hasError = body?.match(/must have|active players|position/i);
-    expect(hasSuccess || hasError).toBeTruthy();
+    // Flash success visible with expected copy.
+    await expect(page.locator('.ibl-alert--success')).toBeVisible();
+    await expect(page.locator('.ibl-alert--success')).toContainText(/saved/i);
 
-    // Confirmation table structure: Name, Active, PG, SG, SF, PF, C columns.
-    // Locator scopes to the "Depth Chart Submission" heading so we don't
-    // hit an unrelated .ibl-data-table elsewhere on the page.
-    const confirmationRegion = page
-      .locator('body')
-      .filter({ hasText: /Depth Chart Submission/i });
-    const confirmationTable = confirmationRegion.locator('table.ibl-data-table').last();
-    await expect(confirmationTable).toBeVisible();
+    // Form is still visible (fresh GET re-renders it).
+    await expect(page.locator('.depth-chart-form')).toBeVisible();
 
-    // Use textContent (raw source text) instead of innerText — the table's
-    // CSS applies text-transform: uppercase, which would turn "Name" into
-    // "NAME" for allInnerTexts() but leaves allTextContents() untouched.
-    const headers = await confirmationTable.locator('thead th').allTextContents();
-    expect(headers.map((h) => h.trim())).toEqual([
-      'Name',
-      'Active',
-      'PG',
-      'SG',
-      'SF',
-      'PF',
-      'C',
-      'Min',
-    ]);
-
-    // At least one player row should be rendered.
-    const bodyRows = confirmationTable.locator('tbody tr');
-    const rowCount = await bodyRows.count();
-    expect(rowCount).toBeGreaterThan(0);
+    // Submitted value persisted — the fresh GET reads from DB.
+    await expect(
+      page.locator('.depth-chart-table select[name^="pg"]').first(),
+    ).toHaveValue('3');
 
     await assertNoPhpErrors(page, 'after depth chart submission');
+  });
+
+  test('CSRF token rotates across submit', async ({ page }) => {
+    // Tokens are single-use + regenerated on every page render, so a fresh
+    // GET after PRG must produce a different `_csrf_token` value.
+    const tokenBefore = await page
+      .locator('input[name="_csrf_token"]')
+      .first()
+      .getAttribute('value');
+    expect(tokenBefore).toMatch(/^[a-f0-9]{64}$/);
+
+    // Benign non-starter change: toggle between 3rd and 4th. Both are
+    // non-"1st" so they never trigger the multi-starter validation rule.
+    const firstPg = page
+      .locator('.depth-chart-table select[name^="pg"]')
+      .first();
+    const before = await firstPg.inputValue();
+    await firstPg.selectOption(before === '3' ? '4' : '3');
+
+    await page.locator('.depth-chart-buttons .depth-chart-submit-btn').click();
+    await expect(page.locator('.ibl-alert--success')).toBeVisible();
+
+    const tokenAfter = await page
+      .locator('input[name="_csrf_token"]')
+      .first()
+      .getAttribute('value');
+    expect(tokenAfter).toMatch(/^[a-f0-9]{64}$/);
+    expect(tokenAfter).not.toBe(tokenBefore);
+  });
+
+  test('back-to-depth-chart after submit still allows resubmit (regression)', async ({ page }) => {
+    // Exact repro from production: submit succeeds, user navigates away,
+    // comes back to the depth chart, edits, and resubmits. Without the PRG
+    // fix this second submit produced "Invalid or expired form submission"
+    // because the browser restored a stale form whose single-use token had
+    // already been consumed server-side.
+    await expect(page.locator('.depth-chart-form')).toBeVisible({ timeout: 15000 });
+
+    // First submit — non-starter value so we pass validation.
+    const firstPg = page
+      .locator('.depth-chart-table select[name^="pg"]')
+      .first();
+    await firstPg.selectOption('3');
+    await page.locator('.depth-chart-buttons .depth-chart-submit-btn').click();
+    await expect(page.locator('.ibl-alert--success')).toBeVisible();
+
+    // Leave the depth chart page and come back — minimal reliable repro of
+    // the "user returns to the form later" pattern.
+    await page.goto('modules.php?name=Standings');
+    await page.goto('modules.php?name=DepthChartEntry');
+    await expect(page.locator('.depth-chart-form')).toBeVisible({ timeout: 15000 });
+
+    // Resubmit with a different non-starter value — must succeed.
+    await page
+      .locator('.depth-chart-table select[name^="pg"]')
+      .first()
+      .selectOption('4');
+    await page.locator('.depth-chart-buttons .depth-chart-submit-btn').click();
+
+    await expect(page.locator('.ibl-alert--success')).toBeVisible();
+    await expect(page.getByText(/Invalid or expired/i)).not.toBeVisible();
+  });
+
+  test('validation failure preserves submitted form values and renders fresh token', async ({
+    page,
+    appState,
+  }) => {
+    // Regular season requires exactly 12 active players. Deactivating one
+    // drops to 11 → validator emits "at least 12 active players" error.
+    await appState({
+      'Current Season Phase': 'Regular Season',
+      'Current Season Ending Year': '2026',
+    });
+    await page.goto('modules.php?name=DepthChartEntry');
+    await expect(page.locator('.depth-chart-form')).toBeVisible({ timeout: 15000 });
+
+    // Uncheck the first currently-active checkbox and remember its row.
+    const activeCheckboxes = page.locator('input[type="checkbox"].dc-active-cb[name^="canPlayInGame"]');
+    const cbCount = await activeCheckboxes.count();
+    let uncheckedIndex = -1;
+    for (let i = 0; i < cbCount; i++) {
+      if (await activeCheckboxes.nth(i).isChecked()) {
+        await activeCheckboxes.nth(i).uncheck();
+        uncheckedIndex = i;
+        break;
+      }
+    }
+    expect(uncheckedIndex).toBeGreaterThanOrEqual(0);
+
+    // Distinctive non-starter value so we can verify the form re-renders
+    // with POST, not DB. The first form row is already a starter at some
+    // position in the seed, so avoid '1' to prevent a secondary multi-
+    // starter validation error from overwriting the active-count message.
+    const firstPg = page
+      .locator('.depth-chart-table select[name^="pg"]')
+      .first();
+    await firstPg.selectOption('4');
+
+    await page.locator('.depth-chart-buttons .depth-chart-submit-btn').click();
+
+    // PRG: lands back at module base.
+    await expect(page).toHaveURL(/modules\.php\?name=DepthChartEntry(?!.*op=submit)/);
+
+    // Validator error banner.
+    await expect(page.locator('.ibl-alert--error')).toBeVisible();
+    await expect(page.locator('.ibl-alert--error')).toContainText(
+      /at least 12 active players/i,
+    );
+
+    // In-flight edit preserved: PG value from POST, not DB.
+    await expect(
+      page.locator('.depth-chart-table select[name^="pg"]').first(),
+    ).toHaveValue('4');
+
+    // The unchecked box stays unchecked (POST value overrides DB value).
+    await expect(
+      page
+        .locator('input[type="checkbox"].dc-active-cb[name^="canPlayInGame"]')
+        .nth(uncheckedIndex),
+    ).not.toBeChecked();
+
+    // Token is fresh (64-char hex — see CsrfGuard::generateToken).
+    const token = await page
+      .locator('input[name="_csrf_token"]')
+      .first()
+      .getAttribute('value');
+    expect(token).toMatch(/^[a-f0-9]{64}$/);
+  });
+
+  test('validation failure → fix → resubmit succeeds on the same visit', async ({
+    page,
+    appState,
+  }) => {
+    await appState({
+      'Current Season Phase': 'Regular Season',
+      'Current Season Ending Year': '2026',
+    });
+    await page.goto('modules.php?name=DepthChartEntry');
+    await expect(page.locator('.depth-chart-form')).toBeVisible({ timeout: 15000 });
+
+    // Uncheck → submit → error (setup).
+    const activeCheckboxes = page.locator('input[type="checkbox"].dc-active-cb[name^="canPlayInGame"]');
+    const cbCount = await activeCheckboxes.count();
+    for (let i = 0; i < cbCount; i++) {
+      if (await activeCheckboxes.nth(i).isChecked()) {
+        await activeCheckboxes.nth(i).uncheck();
+        break;
+      }
+    }
+    await page.locator('.depth-chart-buttons .depth-chart-submit-btn').click();
+    await expect(page.locator('.ibl-alert--error')).toBeVisible();
+
+    // Recheck the first unchecked active box to restore the valid count.
+    const reloadedCheckboxes = page.locator('input[type="checkbox"].dc-active-cb[name^="canPlayInGame"]');
+    const reloadedCount = await reloadedCheckboxes.count();
+    for (let i = 0; i < reloadedCount; i++) {
+      if (!(await reloadedCheckboxes.nth(i).isChecked())) {
+        await reloadedCheckboxes.nth(i).check();
+        break;
+      }
+    }
+
+    // Resubmit — must now pass validation with the fresh token.
+    await page.locator('.depth-chart-buttons .depth-chart-submit-btn').click();
+
+    await expect(page.locator('.ibl-alert--success')).toBeVisible();
+    await expect(page.locator('.ibl-alert--error')).not.toBeVisible();
+  });
+
+  test('CSRF failure shows inline error without redirecting', async ({ page }) => {
+    await expect(page.locator('.depth-chart-form')).toBeVisible({ timeout: 15000 });
+
+    // Blank the CSRF token field so server-side validation fails.
+    await page.evaluate(() => {
+      const el = document.querySelector('input[name="_csrf_token"]');
+      if (el instanceof HTMLInputElement) {
+        el.value = '';
+      }
+    });
+
+    await page.locator('.depth-chart-buttons .depth-chart-submit-btn').click();
+
+    // CSRF-fail path deliberately does NOT redirect — the user needs to
+    // reload manually, and the inline message tells them so.
+    await expect(page.locator('.ibl-form-error')).toBeVisible();
+    await expect(page.locator('.ibl-form-error')).toContainText(/Invalid or expired/i);
+
+    // URL still carries &op=submit (no redirect).
+    await expect(page).toHaveURL(/op=submit/);
   });
 
   test('saved depth chart dropdown has options', async ({ page }) => {
@@ -120,8 +292,11 @@ test.describe('Depth Chart submission', () => {
     await expect(dropdown).toBeVisible();
 
     const options = dropdown.locator('option');
-    // Should have at least 3: "Current Live" + 2 saved configs from seed
-    expect(await options.count()).toBeGreaterThanOrEqual(3);
+    // "Current (Live)" + at least one saved config from seed. The exact
+    // count fluctuates within this serial describe because prior submit
+    // tests may update the active saved DC to match live settings, which
+    // SavedDepthChartService then hides from the dropdown.
+    expect(await options.count()).toBeGreaterThanOrEqual(2);
   });
 
   test('loading saved depth chart updates form', async ({ page }) => {

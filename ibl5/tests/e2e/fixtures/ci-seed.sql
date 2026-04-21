@@ -189,7 +189,7 @@ INSERT INTO ibl_franchise_seasons (franchise_id, season_year, season_ending_year
 
 INSERT INTO ibl_plr (
   pid, name, age, peak, tid, pos, ordinal,
-  sta, oo, od, `do`, dd, po, pd, `to`, td,
+  sta, oo, od, r_drive_off, dd, po, pd, r_trans_off, r_tvr,
   cy, cyt, cy1, cy2,
   retired, exp,
   htft, htin, wt, college,
@@ -278,7 +278,7 @@ INSERT INTO ibl_plr (
 
 INSERT INTO ibl_plr (
   pid, name, age, peak, tid, pos, ordinal,
-  sta, oo, od, `do`, dd, po, pd, `to`, td,
+  sta, oo, od, r_drive_off, dd, po, pd, r_trans_off, td,
   cy, cyt, cy1, cy2,
   retired, exp, bird,
   htft, htin, wt, college,
@@ -323,7 +323,7 @@ INSERT INTO ibl_plr (
 -- "Konstantinos Papadopoulos" is long enough to trigger abbreviation → "K. Papadopoulos"
 INSERT INTO ibl_plr (
   pid, name, age, peak, tid, pos, ordinal,
-  sta, oo, od, `do`, dd, po, pd, `to`, td,
+  sta, oo, od, r_drive_off, dd, po, pd, r_trans_off, td,
   cy, cyt, cy1, cy2,
   retired, exp, bird,
   htft, htin, wt, college,
@@ -384,7 +384,7 @@ UPDATE ibl_team_info SET HasMLE = 1, HasLLE = 1 WHERE teamid = 1;
 
 INSERT INTO ibl_plr (
   pid, name, age, peak, tid, pos, ordinal,
-  sta, oo, od, `do`, dd, po, pd, `to`, td,
+  sta, oo, od, r_drive_off, dd, po, pd, r_trans_off, r_tvr,
   cy, cyt, cy1, cy2,
   retired, exp,
   htft, htin, wt, college,
@@ -510,7 +510,7 @@ INSERT INTO ibl_plr (
 -- ============================================================
 INSERT INTO ibl_plr (
   pid, name, age, peak, tid, pos, ordinal,
-  sta, oo, od, `do`, dd, po, pd, `to`, td,
+  sta, oo, od, r_drive_off, dd, po, pd, r_trans_off, r_tvr,
   cy, cyt, cy1, cy2,
   retired, exp,
   htft, htin, wt, college,
@@ -826,7 +826,7 @@ ON DUPLICATE KEY UPDATE title = VALUES(title);
 -- 4 undrafted + 2 already drafted
 -- ============================================================
 
-INSERT INTO ibl_draft_class (name, pos, age, team, fga, fgp, fta, ftp, tga, tgp, orb, drb, ast, stl, tvr, blk, oo, `do`, po, `to`, od, dd, pd, td, talent, skill, intangibles, drafted, sta) VALUES
+INSERT INTO ibl_draft_class (name, pos, age, team, fga, fgp, fta, ftp, tga, tgp, orb, drb, ast, stl, tvr, blk, oo, r_drive_off, po, r_trans_off, od, dd, pd, td, talent, skill, intangibles, drafted, sta) VALUES
   ('Prospect Guard',    'PG', 19, 'Duke',       60, 55, 50, 70, 40, 45, 30, 40, 65, 50, 45, 20, 60, 55, 40, 50, 55, 50, 40, 45, 70, 65, 60, 0, 75),
   ('Prospect Wing',     'SF', 20, 'Kentucky',   55, 50, 45, 65, 35, 40, 40, 50, 50, 45, 40, 30, 55, 50, 50, 45, 50, 55, 45, 50, 65, 60, 55, 0, 70),
   ('Prospect Big',      'C',  21, 'Gonzaga',    50, 55, 55, 60, 20, 30, 55, 60, 35, 30, 35, 55, 45, 40, 60, 35, 45, 40, 60, 40, 60, 55, 65, 0, 80),
@@ -893,7 +893,7 @@ UPDATE ibl_team_info SET owner_name = 'GM Thunder'  WHERE teamid = 28;
 
 INSERT INTO ibl_plr (
   pid, name, age, peak, tid, pos, ordinal,
-  sta, oo, od, `do`, dd, po, pd, `to`, td,
+  sta, oo, od, r_drive_off, dd, po, pd, r_trans_off, r_tvr,
   cy, cyt, cy1, cy2,
   retired, exp,
   htft, htin, wt, college,
@@ -1074,7 +1074,7 @@ INSERT INTO nuke_stories (catid, aid, title, time, hometext, bodytext, topic, ih
 
 INSERT INTO ibl_plr (
   pid, name, age, peak, tid, pos, ordinal,
-  sta, oo, od, `do`, dd, po, pd, `to`, td,
+  sta, oo, od, r_drive_off, dd, po, pd, r_trans_off, r_tvr,
   cy, cyt, cy1, cy2,
   retired, exp,
   htft, htin, wt, college,
@@ -1244,7 +1244,7 @@ INSERT INTO nuke_stories (catid, aid, title, time, hometext, bodytext, topic, ih
 
 INSERT INTO ibl_plr (
   pid, name, age, peak, tid, pos, ordinal,
-  sta, oo, od, `do`, dd, po, pd, `to`, td,
+  sta, oo, od, r_drive_off, dd, po, pd, r_trans_off, td,
   cy, cyt, cy1,
   retired, exp,
   htft, htin, wt, college,
@@ -1273,7 +1273,7 @@ ON DUPLICATE KEY UPDATE name = VALUES(name), draftyear = VALUES(draftyear);
 
 INSERT INTO ibl_plr (
   pid, name, age, peak, tid, pos, ordinal,
-  sta, oo, od, `do`, dd, po, pd, `to`, td,
+  sta, oo, od, r_drive_off, dd, po, pd, r_trans_off, r_tvr,
   cy, cyt, cy1, cy2,
   retired, exp,
   htft, htin, wt, college,
@@ -1324,9 +1324,9 @@ SELECT
   CAST(COALESCE(snap.r_tga, 0) AS SIGNED) AS r_3ga, CAST(COALESCE(snap.r_tgp, 0) AS SIGNED) AS r_3gp,
   CAST(COALESCE(snap.r_orb, 0) AS SIGNED) AS r_orb, CAST(COALESCE(snap.r_drb, 0) AS SIGNED) AS r_drb,
   CAST(COALESCE(snap.r_ast, 0) AS SIGNED) AS r_ast, CAST(COALESCE(snap.r_stl, 0) AS SIGNED) AS r_stl,
-  CAST(COALESCE(snap.r_blk, 0) AS SIGNED) AS r_blk, CAST(COALESCE(snap.r_to,  0) AS SIGNED) AS r_tvr,
-  CAST(COALESCE(snap.oo, 0) AS SIGNED) AS r_oo, CAST(COALESCE(snap.`do`, 0) AS SIGNED) AS r_do,
-  CAST(COALESCE(snap.po, 0) AS SIGNED) AS r_po, CAST(COALESCE(snap.`to`, 0) AS SIGNED) AS r_to,
+  CAST(COALESCE(snap.r_blk, 0) AS SIGNED) AS r_blk, CAST(COALESCE(snap.r_tvr,  0) AS SIGNED) AS r_tvr,
+  CAST(COALESCE(snap.oo, 0) AS SIGNED) AS r_oo, CAST(COALESCE(snap.r_drive_off, 0) AS SIGNED) AS r_drive_off,
+  CAST(COALESCE(snap.po, 0) AS SIGNED) AS r_po, CAST(COALESCE(snap.r_trans_off, 0) AS SIGNED) AS r_trans_off,
   CAST(COALESCE(snap.od, 0) AS SIGNED) AS r_od, CAST(COALESCE(snap.dd, 0) AS SIGNED) AS r_dd,
   CAST(COALESCE(snap.pd, 0) AS SIGNED) AS r_pd, CAST(COALESCE(snap.td, 0) AS SIGNED) AS r_td,
   CAST(COALESCE(CASE snap.cy

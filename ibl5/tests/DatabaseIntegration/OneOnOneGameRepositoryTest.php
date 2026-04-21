@@ -111,7 +111,7 @@ class OneOnOneGameRepositoryTest extends DatabaseTestCase
         self::assertSame(200000053, $player['pid']);
         self::assertSame('DB Test Game Player', $player['name']);
         self::assertSame(70, $player['oo']);
-        self::assertSame(60, $player['do']);
+        self::assertSame(60, $player['r_drive_off']);
         self::assertSame(50, $player['r_fgp']);
     }
 

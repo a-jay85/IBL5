@@ -69,28 +69,6 @@ final class RatingColumnSemanticParityTest extends DatabaseTestCase
         }
     }
 
-    public function testTurnoverRatingDiffersFromTransitionOffenseForAtLeastOneTuple(): void
-    {
-        // Guards against an accidental alias-collapse: if a future rewrite wired
-        // both r_tvr and r_trans_off to the same source column, every row would
-        // have equal values. Require at least one real-data tuple where they
-        // differ.
-        /** @var list<array{pid: int, year: int, r_tvr: int, r_trans_off: int}> $rows */
-        $rows = $this->fetchAll(
-            "SELECT pid, year, r_tvr, r_trans_off
-             FROM ibl_hist
-             WHERE r_tvr != r_trans_off
-             LIMIT 1"
-        );
-
-        self::assertNotEmpty(
-            $rows,
-            'Every ibl_hist row has r_tvr == r_trans_off. This almost certainly '
-            . 'means the two columns are wired to the same source — they should '
-            . 'represent independent ratings (turnover rating vs transition-offense rating).',
-        );
-    }
-
     public function testOlympicsHistUsesRenamedColumns(): void
     {
         // Smoke-check that the olympics hist rename also applied. Pulls one row

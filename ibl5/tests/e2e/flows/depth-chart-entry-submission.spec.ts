@@ -104,6 +104,7 @@ test.describe('Depth Chart submission', () => {
       'SF',
       'PF',
       'C',
+      'Min',
     ]);
 
     // At least one player row should be rendered.

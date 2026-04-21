@@ -14,7 +14,7 @@ use Player\PlayerData;
  *
  * @phpstan-import-type PlayerRow from \Services\CommonMysqliRepository
  *
- * @phpstan-type HistoricalPlayerRow array{pid: ?int, year: ?int, name: ?string, team: ?string, teamid: ?int, salary: ?int, r_2ga: ?int, r_2gp: ?int, r_fta: ?int, r_ftp: ?int, r_3ga: ?int, r_3gp: ?int, r_orb: ?int, r_drb: ?int, r_ast: ?int, r_stl: ?int, r_blk: ?int, r_tvr: ?int, r_oo: ?int, r_od: ?int, r_do: ?int, r_dd: ?int, r_po: ?int, r_pd: ?int, r_to: ?int, r_td: ?int, ...}
+ * @phpstan-type HistoricalPlayerRow array{pid: ?int, year: ?int, name: ?string, team: ?string, teamid: ?int, salary: ?int, r_2ga: ?int, r_2gp: ?int, r_fta: ?int, r_ftp: ?int, r_3ga: ?int, r_3gp: ?int, r_orb: ?int, r_drb: ?int, r_ast: ?int, r_stl: ?int, r_blk: ?int, r_tvr: ?int, r_oo: ?int, r_od: ?int, r_drive_off: ?int, r_dd: ?int, r_po: ?int, r_pd: ?int, r_trans_off: ?int, r_td: ?int, ...}
  * @phpstan-type AwardRow array{year: int, name: string, Award: string}
  * @phpstan-type PlayerNewsRow array{sid: int, title: string, time: string}
  * @phpstan-type OneOnOneWinRow array{gameid: int, winner: string, loser: string, winscore: int, lossscore: int, loser_pid: ?int}

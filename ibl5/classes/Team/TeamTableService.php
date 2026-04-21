@@ -345,7 +345,7 @@ class TeamTableService implements TeamTableServiceInterface
             'draftedby' => '', 'draftedbycurrentname' => '', 'college' => '',
             'r_fga' => 0, 'r_fgp' => 0, 'r_fta' => 0, 'r_ftp' => 0,
             'r_tga' => 0, 'r_tgp' => 0, 'r_orb' => 0, 'r_drb' => 0,
-            'r_ast' => 0, 'r_stl' => 0, 'r_to' => 0, 'r_blk' => 0, 'r_foul' => 0,
+            'r_ast' => 0, 'r_stl' => 0, 'r_tvr' => 0, 'r_blk' => 0, 'r_foul' => 0,
             'isCashRow' => true,
         ];
     }

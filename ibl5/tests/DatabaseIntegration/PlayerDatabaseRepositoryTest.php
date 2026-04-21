@@ -153,8 +153,8 @@ class PlayerDatabaseRepositoryTest extends DatabaseTestCase
 
     public function testReservedWordColumnFilterDo(): void
     {
-        $this->insertTestPlayer(200100017, 'PDB DoHigh', ['do' => 85]);
-        $this->insertTestPlayer(200100018, 'PDB DoLow', ['do' => 20]);
+        $this->insertTestPlayer(200100017, 'PDB DoHigh', ['r_drive_off' => 85]);
+        $this->insertTestPlayer(200100018, 'PDB DoLow', ['r_drive_off' => 20]);
 
         $result = $this->repo->searchPlayers($this->buildParams([
             'search_name' => 'PDB Do',
@@ -169,8 +169,8 @@ class PlayerDatabaseRepositoryTest extends DatabaseTestCase
 
     public function testReservedWordColumnFilterTo(): void
     {
-        $this->insertTestPlayer(200100019, 'PDB ToHigh', ['to' => 75]);
-        $this->insertTestPlayer(200100020, 'PDB ToLow', ['to' => 10]);
+        $this->insertTestPlayer(200100019, 'PDB ToHigh', ['r_trans_off' => 75]);
+        $this->insertTestPlayer(200100020, 'PDB ToLow', ['r_trans_off' => 10]);
 
         $result = $this->repo->searchPlayers($this->buildParams([
             'search_name' => 'PDB To',
@@ -292,9 +292,9 @@ class PlayerDatabaseRepositoryTest extends DatabaseTestCase
             'bird_max' => null,
             'college' => null,
             'oo' => null,
-            'do' => null,
+            'r_drive_off' => null,
             'po' => null,
-            'to' => null,
+            'r_trans_off' => null,
             'od' => null,
             'dd' => null,
             'pd' => null,
@@ -315,7 +315,7 @@ class PlayerDatabaseRepositoryTest extends DatabaseTestCase
             'r_ast' => null,
             'r_stl' => null,
             'r_blk' => null,
-            'r_to' => null,
+            'r_tvr' => null,
             'r_foul' => null,
         ];
 

@@ -149,7 +149,7 @@ class SeasonQueryRepository extends \BaseMysqliRepository implements SeasonQuery
     public function setLastSimDatesArray(string $newSimNumber, string $newSimStartDate, string $newSimEndDate): int
     {
         return $this->execute(
-            "INSERT INTO ibl_sim_dates (`Sim`, `Start Date`, `End Date`) VALUES (?, ?, ?)",
+            "INSERT INTO ibl_sim_dates (Sim, start_date, end_date) VALUES (?, ?, ?)",
             "sss",
             $newSimNumber,
             $newSimStartDate,
@@ -235,8 +235,8 @@ class SeasonQueryRepository extends \BaseMysqliRepository implements SeasonQuery
      * Calculate phase-specific sim number for any sim/phase/season combination
      *
      * Counts sims within the phase's date range up to the given overall sim number.
-     * Uses `End Date` (not `Start Date`) because the first sim of a phase can have
-     * a Start Date in the prior phase's month.
+     * Uses end_date (not start_date) because the first sim of a phase can have
+     * a start_date in the prior phase's month.
      *
      * @param int $overallSimNumber The overall sim number to calculate for
      * @param string $phase The season phase
@@ -268,7 +268,7 @@ class SeasonQueryRepository extends \BaseMysqliRepository implements SeasonQuery
 
         /** @var array{cnt: int}|null $result */
         $result = $this->fetchOne(
-            "SELECT COUNT(*) AS cnt FROM ibl_sim_dates WHERE `End Date` BETWEEN ? AND ? AND Sim <= ?",
+            "SELECT COUNT(*) AS cnt FROM ibl_sim_dates WHERE end_date BETWEEN ? AND ? AND Sim <= ?",
             "ssi",
             $phaseStartDate,
             $phaseEndDate,

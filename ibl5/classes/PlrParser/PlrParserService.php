@@ -307,11 +307,11 @@ class PlrParserService implements PlrParserServiceInterface
             // Positional ratings (1-9)
             'oo' => (int) $derived['ratingOO'],
             'od' => (int) $derived['ratingOD'],
-            'do' => (int) $derived['ratingDO'],
+            'r_drive_off' => (int) $derived['ratingDO'],
             'dd' => (int) $derived['ratingDD'],
             'po' => (int) $derived['ratingPO'],
             'pd' => (int) $derived['ratingPD'],
-            'to' => (int) $derived['ratingTO'],
+            'r_trans_off' => (int) $derived['ratingTO'],
             'td' => (int) $derived['ratingTD'],
             // Stat ratings (0-99)
             'r_fga' => (int) $derived['rating2GA'],
@@ -324,7 +324,7 @@ class PlrParserService implements PlrParserServiceInterface
             'r_drb' => (int) $derived['ratingDRB'],
             'r_ast' => (int) $derived['ratingAST'],
             'r_stl' => (int) $derived['ratingSTL'],
-            'r_to' => (int) $derived['ratingTVR'],
+            'r_tvr' => (int) $derived['ratingTVR'],
             'r_blk' => (int) $derived['ratingBLK'],
             'r_foul' => (int) $derived['ratingFOUL'],
             // TSI attributes

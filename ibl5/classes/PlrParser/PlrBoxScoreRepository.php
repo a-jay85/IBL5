@@ -332,8 +332,8 @@ class PlrBoxScoreRepository extends \BaseMysqliRepository implements PlrBoxScore
 
         /** @var list<array{end_date: string}> $rows */
         $rows = $this->fetchAll(
-            "SELECT `End Date` AS end_date FROM {$this->simDatesTable}
-             WHERE `End Date` BETWEEN ? AND ? ORDER BY Sim",
+            "SELECT end_date FROM {$this->simDatesTable}
+             WHERE end_date BETWEEN ? AND ? ORDER BY Sim",
             'ss',
             $start,
             $end,

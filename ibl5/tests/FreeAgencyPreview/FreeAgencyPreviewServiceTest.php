@@ -131,11 +131,11 @@ class FreeAgencyPreviewServiceTest extends TestCase
     }
 
     /**
-     * @return array{pid: int, tid: int, name: string, teamname: string, pos: string, age: int, draftyear: int, exp: int, cy: int, cyt: int, cy1: int, cy2: int, cy3: int, cy4: int, cy5: int, cy6: int, r_fga: int, r_fgp: int, r_fta: int, r_ftp: int, r_tga: int, r_tgp: int, r_orb: int, r_drb: int, r_ast: int, r_stl: int, r_blk: int, r_to: int, r_foul: int, oo: int, do: int, po: int, to: int, od: int, dd: int, pd: int, td: int, loyalty: int, winner: int, playingTime: int, security: int, tradition: int, team_city: string|null, color1: string|null, color2: string|null}
+     * @return array{pid: int, tid: int, name: string, teamname: string, pos: string, age: int, draftyear: int, exp: int, cy: int, cyt: int, cy1: int, cy2: int, cy3: int, cy4: int, cy5: int, cy6: int, r_fga: int, r_fgp: int, r_fta: int, r_ftp: int, r_tga: int, r_tgp: int, r_orb: int, r_drb: int, r_ast: int, r_stl: int, r_blk: int, r_tvr: int, r_foul: int, oo: int, r_drive_off: int, po: int, r_trans_off: int, od: int, dd: int, pd: int, td: int, loyalty: int, winner: int, playingTime: int, security: int, tradition: int, team_city: string|null, color1: string|null, color2: string|null}
      */
     private static function createActivePlayer(array $overrides = []): array
     {
-        /** @var array{pid: int, tid: int, name: string, teamname: string, pos: string, age: int, draftyear: int, exp: int, cy: int, cyt: int, cy1: int, cy2: int, cy3: int, cy4: int, cy5: int, cy6: int, r_fga: int, r_fgp: int, r_fta: int, r_ftp: int, r_tga: int, r_tgp: int, r_orb: int, r_drb: int, r_ast: int, r_stl: int, r_blk: int, r_to: int, r_foul: int, oo: int, do: int, po: int, to: int, od: int, dd: int, pd: int, td: int, loyalty: int, winner: int, playingTime: int, security: int, tradition: int, team_city: string|null, color1: string|null, color2: string|null} */
+        /** @var array{pid: int, tid: int, name: string, teamname: string, pos: string, age: int, draftyear: int, exp: int, cy: int, cyt: int, cy1: int, cy2: int, cy3: int, cy4: int, cy5: int, cy6: int, r_fga: int, r_fgp: int, r_fta: int, r_ftp: int, r_tga: int, r_tgp: int, r_orb: int, r_drb: int, r_ast: int, r_stl: int, r_blk: int, r_tvr: int, r_foul: int, oo: int, r_drive_off: int, po: int, r_trans_off: int, od: int, dd: int, pd: int, td: int, loyalty: int, winner: int, playingTime: int, security: int, tradition: int, team_city: string|null, color1: string|null, color2: string|null} */
         return array_merge([
             'pid' => 1,
             'tid' => 1,
@@ -164,12 +164,12 @@ class FreeAgencyPreviewServiceTest extends TestCase
             'r_ast' => 50,
             'r_stl' => 50,
             'r_blk' => 50,
-            'r_to' => 50,
+            'r_tvr' => 50,
             'r_foul' => 50,
             'oo' => 50,
-            'do' => 50,
+            'r_drive_off' => 50,
             'po' => 50,
-            'to' => 50,
+            'r_trans_off' => 50,
             'od' => 50,
             'dd' => 50,
             'pd' => 50,

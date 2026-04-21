@@ -13,7 +13,7 @@ use OneOnOneGame\OneOnOneGameResult;
  * between two players. The engine handles all game mechanics including
  * shot selection, shooting, blocking, stealing, fouls, and rebounds.
  *
- * @phpstan-type PlayerGameData array{pid: int, name: string, oo: int, do: int, po: int, od: int, dd: int, pd: int, r_fga: int, r_fgp: int, r_fta: int, r_tga: int, r_tgp: int, r_orb: int, r_drb: int, r_stl: int, r_to: int, r_blk: int, r_foul: int}
+ * @phpstan-type PlayerGameData array{pid: int, name: string, oo: int, r_drive_off: int, po: int, od: int, dd: int, pd: int, r_fga: int, r_fgp: int, r_fta: int, r_tga: int, r_tgp: int, r_orb: int, r_drb: int, r_stl: int, r_tvr: int, r_blk: int, r_foul: int}
  */
 interface OneOnOneGameEngineInterface
 {

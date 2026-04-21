@@ -152,9 +152,9 @@ class DraftView implements DraftViewInterface
             <td>' . (int) $player['tvr'] . '</td>
             <td>' . (int) $player['blk'] . '</td>
             <td>' . (int) $player['oo'] . '</td>
-            <td>' . (int) $player['do'] . '</td>
+            <td>' . (int) $player['r_drive_off'] . '</td>
             <td>' . (int) $player['po'] . '</td>
-            <td>' . (int) $player['to'] . '</td>
+            <td>' . (int) $player['r_trans_off'] . '</td>
             <td>' . (int) $player['od'] . '</td>
             <td>' . (int) $player['dd'] . '</td>
             <td>' . (int) $player['pd'] . '</td>

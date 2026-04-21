@@ -60,3 +60,7 @@ services:
         class: PHPStanRules\PageLayoutHeaderBeforeCookieRule
         tags:
             - phpstan.rules.rule
+    -
+        class: PHPStanRules\BanReservedWordColumnsRule
+        tags:
+            - phpstan.rules.rule

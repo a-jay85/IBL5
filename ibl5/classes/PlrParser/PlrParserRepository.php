@@ -34,7 +34,7 @@ class PlrParserRepository extends \BaseMysqliRepository implements PlrParserRepo
     {
         $query = "INSERT INTO {$this->plrTable}
             (`ordinal`, `name`, `age`, `pid`, `tid`, `peak`, `pos`,
-             `oo`, `od`, `do`, `dd`, `po`, `pd`, `to`, `td`,
+             `oo`, `od`, `r_drive_off`, `dd`, `po`, `pd`, `r_trans_off`, `td`,
              `Clutch`, `Consistency`,
              `PGDepth`, `SGDepth`, `SFDepth`, `PFDepth`, `CDepth`, `dc_canPlayInGame`,
              `stats_gs`, `stats_gm`, `stats_min`, `stats_fgm`, `stats_fga`,
@@ -51,7 +51,7 @@ class PlrParserRepository extends \BaseMysqliRepository implements PlrParserRepo
              `car_tgm`, `car_tga`, `car_orb`, `car_drb`, `car_reb`,
              `car_ast`, `car_stl`, `car_to`, `car_blk`, `car_pf`, `car_pts`,
              `r_fga`, `r_fgp`, `r_fta`, `r_ftp`, `r_tga`, `r_tgp`,
-             `r_orb`, `r_drb`, `r_ast`, `r_stl`, `r_to`, `r_blk`,
+             `r_orb`, `r_drb`, `r_ast`, `r_stl`, `r_tvr`, `r_blk`,
              `draftround`, `draftpickno`, `injured`,
              `htft`, `htin`, `wt`, `draftyear`, `retired`, `r_foul`)
         VALUES
@@ -85,11 +85,11 @@ class PlrParserRepository extends \BaseMysqliRepository implements PlrParserRepo
             `pos` = VALUES(`pos`),
             `oo` = VALUES(`oo`),
             `od` = VALUES(`od`),
-            `do` = VALUES(`do`),
+            `r_drive_off` = VALUES(`r_drive_off`),
             `dd` = VALUES(`dd`),
             `po` = VALUES(`po`),
             `pd` = VALUES(`pd`),
-            `to` = VALUES(`to`),
+            `r_trans_off` = VALUES(`r_trans_off`),
             `td` = VALUES(`td`),
             `Clutch` = VALUES(`Clutch`),
             `Consistency` = VALUES(`Consistency`),
@@ -186,7 +186,7 @@ class PlrParserRepository extends \BaseMysqliRepository implements PlrParserRepo
             `r_drb` = VALUES(`r_drb`),
             `r_ast` = VALUES(`r_ast`),
             `r_stl` = VALUES(`r_stl`),
-            `r_to` = VALUES(`r_to`),
+            `r_tvr` = VALUES(`r_tvr`),
             `r_blk` = VALUES(`r_blk`),
             `draftround` = VALUES(`draftround`),
             `draftpickno` = VALUES(`draftpickno`),
@@ -202,7 +202,7 @@ class PlrParserRepository extends \BaseMysqliRepository implements PlrParserRepo
         // + remaining int columns, then at the end retired(i) r_foul(i)
         // Total: 121 params — 2 strings (name, pos) and 119 ints
         $types = 'isiiiis'   // ordinal, name, age, pid, tid, peak, pos
-            . 'iiiiiiii'     // oo, od, do, dd, po, pd, to, td
+            . 'iiiiiiii'     // oo, od, r_drive_off, dd, po, pd, r_trans_off, td
             . 'ii'           // Clutch, Consistency
             . 'iiiiii'       // PGDepth..CDepth, canPlayInGame → dc_canPlayInGame
             . 'iiiii'        // stats_gs..stats_fga
@@ -357,7 +357,7 @@ class PlrParserRepository extends \BaseMysqliRepository implements PlrParserRepo
      */
     public function upsertSnapshot(array $data): int
     {
-        // Column names in insertion order. Reserved words (do, to) need backtick quoting.
+        // Column names in insertion order.
         $columns = self::SNAPSHOT_COLUMNS;
         $stringColumns = ['name', 'snapshot_phase', 'source_archive', 'pos'];
         $uniqueKeyColumns = ['pid', 'season_year', 'snapshot_phase'];
@@ -405,10 +405,10 @@ class PlrParserRepository extends \BaseMysqliRepository implements PlrParserRepo
         // Physical & position
         'tid', 'age', 'pos', 'peak', 'htft', 'htin', 'wt',
         // Positional ratings (1-9)
-        'oo', 'od', 'do', 'dd', 'po', 'pd', 'to', 'td',
+        'oo', 'od', 'r_drive_off', 'dd', 'po', 'pd', 'r_trans_off', 'td',
         // Stat ratings (0-99)
         'r_fga', 'r_fgp', 'r_fta', 'r_ftp', 'r_tga', 'r_tgp',
-        'r_orb', 'r_drb', 'r_ast', 'r_stl', 'r_to', 'r_blk', 'r_foul',
+        'r_orb', 'r_drb', 'r_ast', 'r_stl', 'r_tvr', 'r_blk', 'r_foul',
         // TSI attributes
         'talent', 'skill', 'intangibles', 'clutch', 'consistency',
         // Contract

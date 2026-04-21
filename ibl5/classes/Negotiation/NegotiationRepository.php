@@ -107,30 +107,30 @@ class NegotiationRepository extends BaseMysqliRepository implements NegotiationR
      */
     private function computeMarketMaximums(): array
     {
-        /** @var array{fga: int|null, fgp: int|null, fta: int|null, ftp: int|null, tga: int|null, tgp: int|null, orb: int|null, drb: int|null, ast: int|null, stl: int|null, r_to: int|null, blk: int|null, foul: int|null, oo: int|null, od: int|null, do: int|null, dd: int|null, po: int|null, pd: int|null, to_off: int|null, td: int|null}|null $result */
+        /** @var array{fga: int|null, fgp: int|null, fta: int|null, ftp: int|null, tga: int|null, tgp: int|null, orb: int|null, drb: int|null, ast: int|null, stl: int|null, r_tvr: int|null, blk: int|null, foul: int|null, oo: int|null, od: int|null, r_drive_off: int|null, dd: int|null, po: int|null, pd: int|null, r_trans_off: int|null, td: int|null}|null $result */
         $result = $this->fetchOne(
             "SELECT
-                MAX(`r_fga`) AS fga,
-                MAX(`r_fgp`) AS fgp,
-                MAX(`r_fta`) AS fta,
-                MAX(`r_ftp`) AS ftp,
-                MAX(`r_tga`) AS tga,
-                MAX(`r_tgp`) AS tgp,
-                MAX(`r_orb`) AS orb,
-                MAX(`r_drb`) AS drb,
-                MAX(`r_ast`) AS ast,
-                MAX(`r_stl`) AS stl,
-                MAX(`r_to`) AS r_to,
-                MAX(`r_blk`) AS blk,
-                MAX(`r_foul`) AS foul,
-                MAX(`oo`) AS oo,
-                MAX(`od`) AS od,
-                MAX(`do`) AS `do`,
-                MAX(`dd`) AS dd,
-                MAX(`po`) AS po,
-                MAX(`pd`) AS pd,
-                MAX(`to`) AS to_off,
-                MAX(`td`) AS td
+                MAX(r_fga)         AS fga,
+                MAX(r_fgp)         AS fgp,
+                MAX(r_fta)         AS fta,
+                MAX(r_ftp)         AS ftp,
+                MAX(r_tga)         AS tga,
+                MAX(r_tgp)         AS tgp,
+                MAX(r_orb)         AS orb,
+                MAX(r_drb)         AS drb,
+                MAX(r_ast)         AS ast,
+                MAX(r_stl)         AS stl,
+                MAX(r_tvr)         AS r_tvr,
+                MAX(r_blk)         AS blk,
+                MAX(r_foul)        AS foul,
+                MAX(oo)            AS oo,
+                MAX(od)            AS od,
+                MAX(r_drive_off)   AS r_drive_off,
+                MAX(dd)            AS dd,
+                MAX(po)            AS po,
+                MAX(pd)            AS pd,
+                MAX(r_trans_off)   AS r_trans_off,
+                MAX(td)            AS td
             FROM ibl_plr"
         );
 
@@ -159,16 +159,16 @@ class NegotiationRepository extends BaseMysqliRepository implements NegotiationR
             'drb' => $ensurePositive($result['drb']),
             'ast' => $ensurePositive($result['ast']),
             'stl' => $ensurePositive($result['stl']),
-            'tov' => $ensurePositive($result['r_to'] ?? null),
+            'tov' => $ensurePositive($result['r_tvr'] ?? null),
             'blk' => $ensurePositive($result['blk']),
             'foul' => $ensurePositive($result['foul']),
             'oo' => $ensurePositive($result['oo']),
             'od' => $ensurePositive($result['od']),
-            'do' => $ensurePositive($result['do']),
+            'do' => $ensurePositive($result['r_drive_off'] ?? null),
             'dd' => $ensurePositive($result['dd']),
             'po' => $ensurePositive($result['po']),
             'pd' => $ensurePositive($result['pd']),
-            'to' => $ensurePositive($result['to_off'] ?? null),
+            'to' => $ensurePositive($result['r_trans_off'] ?? null),
             'td' => $ensurePositive($result['td']),
         ];
     }

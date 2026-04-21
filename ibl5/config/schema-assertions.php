@@ -40,4 +40,28 @@ return [
 
     // Migration 099: gm_username → gm_display_name (column stores display names, not usernames)
     new SchemaAssertion('ibl_gm_tenures', 'gm_display_name'),
+
+    // Migration 113: reserved-word + r_to meaning-flip renames.
+    // `to`/`do` were SQL reserved words (transition and drive offense ratings).
+    // `r_to` previously meant turnover rating in live/snapshot tables but
+    // transition-offense rating in ibl_hist (silently re-aliased by the view).
+    // After the rename: r_trans_off = transition offense rating, r_drive_off =
+    // drive offense rating, r_tvr = turnover rating — uniform across all layers.
+    new SchemaAssertion('ibl_plr', 'r_trans_off'),
+    new SchemaAssertion('ibl_plr', 'r_drive_off'),
+    new SchemaAssertion('ibl_plr', 'r_tvr'),
+    new SchemaAssertion('ibl_plr_snapshots', 'r_trans_off'),
+    new SchemaAssertion('ibl_plr_snapshots', 'r_drive_off'),
+    new SchemaAssertion('ibl_plr_snapshots', 'r_tvr'),
+    new SchemaAssertion('ibl_olympics_plr', 'r_trans_off'),
+    new SchemaAssertion('ibl_olympics_plr', 'r_drive_off'),
+    new SchemaAssertion('ibl_olympics_plr', 'r_tvr'),
+    new SchemaAssertion('ibl_draft_class', 'r_trans_off'),
+    new SchemaAssertion('ibl_draft_class', 'r_drive_off'),
+    new SchemaAssertion('ibl_hist', 'r_trans_off'),
+    new SchemaAssertion('ibl_hist', 'r_drive_off'),
+    new SchemaAssertion('ibl_olympics_hist', 'r_trans_off'),
+    new SchemaAssertion('ibl_olympics_hist', 'r_drive_off'),
+    new SchemaAssertion('ibl_sim_dates', 'start_date'),
+    new SchemaAssertion('ibl_sim_dates', 'end_date'),
 ];

@@ -1,5 +1,5 @@
 #!/bin/bash
-# Sync production database directly into a running worktree's Docker MariaDB.
+# Sync production database directly into a running Docker MariaDB container.
 # No prod-seed.sql intermediate — streams mariadb-dump → docker exec stdin.
 #
 # Usage: bin/db-sync-prod [worktree-name]
@@ -7,9 +7,9 @@
 # Target resolution (in order):
 #   1. <worktree-name> argument → worktrees/<name>/.wt-slug
 #   2. CWD inside worktrees/<name>/... → that worktree
-#   3. Sole running ibl5-db-* container
+#   3. No argument, not in worktree → main ibl5-mariadb container
 #
-# Prereqs: .env with REMOTE_* creds; target container already running (bin/wt-up).
+# Prereqs: .env with REMOTE_* creds; target container already running.
 
 set -euo pipefail
 
@@ -49,18 +49,6 @@ resolve_from_wt_name() {
     WORKTREE_PATH="$REPO_ROOT/worktrees/$name"
 }
 
-resolve_from_slug() {
-    local target_slug="$1"
-    SLUG="$target_slug"
-    for wt in "$REPO_ROOT"/worktrees/*/; do
-        [ -f "$wt/.wt-slug" ] || continue
-        if [ "$(cat "$wt/.wt-slug")" = "$target_slug" ]; then
-            WORKTREE_PATH="${wt%/}"
-            return
-        fi
-    done
-}
-
 if [ -n "$WORKTREE_ARG" ]; then
     if ! resolve_from_wt_name "$WORKTREE_ARG"; then
         echo "Error: No worktree named '$WORKTREE_ARG' (missing $REPO_ROOT/worktrees/$WORKTREE_ARG/.wt-slug)." >&2
@@ -75,23 +63,24 @@ elif [[ "$PWD" == "$REPO_ROOT/worktrees/"* ]]; then
         exit 1
     fi
 else
-    running=$(docker ps --format '{{.Names}}' | grep -E '^ibl5-db-' || true)
-    count=$(printf '%s\n' "$running" | grep -c . || true)
-    if [ "$count" = "1" ]; then
-        resolve_from_slug "${running#ibl5-db-}"
-    else
-        echo "Error: Could not determine target. Pass worktree name: bin/db-sync-prod <worktree-name>" >&2
-        if [ -n "$running" ]; then
-            echo "Running containers:" >&2
-            printf '  %s\n' $running >&2
-        fi
-        exit 1
-    fi
+    # Default: main Docker stack container
+    SLUG=""
+    WORKTREE_PATH="$REPO_ROOT"
 fi
 
-DB_CONTAINER="ibl5-db-$SLUG"
+if [ -n "$SLUG" ]; then
+    DB_CONTAINER="ibl5-db-$SLUG"
+else
+    DB_CONTAINER="ibl5-mariadb"
+fi
+
 if ! docker ps --format '{{.Names}}' | grep -q "^${DB_CONTAINER}$"; then
-    echo "Error: Container $DB_CONTAINER is not running. Start it: bin/wt-up <worktree-name>" >&2
+    echo "Error: Container $DB_CONTAINER is not running." >&2
+    if [ -n "$SLUG" ]; then
+        echo "Start it: bin/wt-up <worktree-name>" >&2
+    else
+        echo "Start it: docker compose up -d" >&2
+    fi
     exit 1
 fi
 

@@ -210,7 +210,7 @@ class JsbImportRepositoryTest extends DatabaseTestCase
     {
         $affected = $this->repo->upsertRcbAlltimeRecord([
             'scope' => 'league',
-            'team_id' => 0,
+            'teamid' => 0,
             'record_type' => 'single_season',
             'stat_category' => 'ppg',
             'ranking' => 99,
@@ -235,7 +235,7 @@ class JsbImportRepositoryTest extends DatabaseTestCase
         $affected = $this->repo->upsertRcbSeasonRecord([
             'season_year' => 2099,
             'scope' => 'league',
-            'team_id' => 0,
+            'teamid' => 0,
             'context' => 'home',
             'stat_category' => 'pts',
             'ranking' => 99,

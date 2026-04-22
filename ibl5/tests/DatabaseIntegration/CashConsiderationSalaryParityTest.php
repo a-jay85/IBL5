@@ -265,7 +265,7 @@ class CashConsiderationSalaryParityTest extends DatabaseTestCase
         $pos = $positiveRows[0];
         self::assertSame('cash', $pos['type']);
         self::assertSame("Cash to {$team2['team_name']}", $pos['label']);
-        self::assertSame($team2['teamid'], (int) $pos['counterparty_tid']);
+        self::assertSame($team2['teamid'], (int) $pos['counterparty_teamid']);
         self::assertSame(500, (int) $pos['cy1']);
         self::assertSame(300, (int) $pos['cy2']);
         self::assertSame(2, (int) $pos['cyt']);
@@ -279,7 +279,7 @@ class CashConsiderationSalaryParityTest extends DatabaseTestCase
         $neg = $negativeRows[0];
         self::assertSame('cash', $neg['type']);
         self::assertSame("Cash from {$team1['team_name']}", $neg['label']);
-        self::assertSame($team1['teamid'], (int) $neg['counterparty_tid']);
+        self::assertSame($team1['teamid'], (int) $neg['counterparty_teamid']);
         self::assertSame(-500, (int) $neg['cy1']);
         self::assertSame(-300, (int) $neg['cy2']);
         self::assertSame(2, (int) $neg['cyt']);

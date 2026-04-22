@@ -178,7 +178,7 @@ class RatingsDiffViewTest extends TestCase
         $html = $this->view->render(2025, [$row]);
 
         self::assertStringContainsString('delta-up', $html);
-        self::assertStringContainsString('+5', $html);
+        self::assertStringContainsString('(+5)', $html);
     }
 
     public function test_it_renders_a_delta_down_span_for_negative_deltas(): void
@@ -187,16 +187,17 @@ class RatingsDiffViewTest extends TestCase
         $html = $this->view->render(2025, [$row]);
 
         self::assertStringContainsString('delta-down', $html);
-        self::assertStringContainsString('-8', $html);
+        self::assertStringContainsString('(-8)', $html);
     }
 
-    public function test_it_renders_a_delta_zero_span_for_zero_deltas(): void
+    public function test_it_renders_no_delta_span_for_zero_deltas(): void
     {
-        // All deltas are 0 (after == before == 50 for every field)
         $row  = $this->buildRatingRow(1, 'Player A', 0);
         $html = $this->view->render(2025, [$row]);
 
-        self::assertStringContainsString('delta-zero', $html);
+        self::assertStringNotContainsString('delta-zero', $html);
+        self::assertStringNotContainsString('delta-up', $html);
+        self::assertStringNotContainsString('delta-down', $html);
     }
 
     // ---------------------------------------------------------------------------

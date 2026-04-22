@@ -16,6 +16,12 @@
   .ratings-diff-table .delta-zero {
     color: #888;
   }
+  .ratings-diff-table .rating-cell--up {
+    background-color: #d4edda;
+  }
+  .ratings-diff-table .rating-cell--down {
+    background-color: #f8d7da;
+  }
   .ratings-diff-table .badge-new {
     display: inline-block;
     padding: 0.1em 0.5em;

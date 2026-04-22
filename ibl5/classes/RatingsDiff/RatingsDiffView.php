@@ -21,27 +21,27 @@ class RatingsDiffView implements RatingsDiffViewInterface
      * @var array<string, string>
      */
     private const FIELD_LABELS = [
-        'oo'          => 'OO',
-        'od'          => 'OD',
-        'r_drive_off' => 'DrO',
-        'dd'          => 'DD',
-        'po'          => 'PO',
-        'pd'          => 'PD',
-        'r_trans_off' => 'TrO',
-        'td'          => 'TD',
-        'r_fga'       => 'FGa',
-        'r_fgp'       => 'FG%',
-        'r_fta'       => 'FTa',
-        'r_ftp'       => 'FT%',
-        'r_3ga'       => '3Pa',
-        'r_3gp'       => '3P%',
-        'r_orb'       => 'OR',
-        'r_drb'       => 'DR',
-        'r_ast'       => 'A',
-        'r_stl'       => 'S',
-        'r_tvr'       => 'TO',
-        'r_blk'       => 'Bl',
-        'r_foul'      => 'PF',
+        'r_fga'       => '2ga',
+        'r_fgp'       => '2g%',
+        'r_fta'       => 'fta',
+        'r_ftp'       => 'ft%',
+        'r_3ga'       => '3ga',
+        'r_3gp'       => '3g%',
+        'r_orb'       => 'orb',
+        'r_drb'       => 'drb',
+        'r_ast'       => 'ast',
+        'r_stl'       => 'stl',
+        'r_tvr'       => 'tvr',
+        'r_blk'       => 'blk',
+        'r_foul'      => 'foul',
+        'oo'          => 'oo',
+        'r_drive_off' => 'do',
+        'po'          => 'po',
+        'r_trans_off' => 'to',
+        'od'          => 'od',
+        'dd'          => 'dd',
+        'pd'          => 'pd',
+        'td'          => 'td',
     ];
 
     // Fixed columns before the per-rating columns: Player, Team, Pos, Max Δ = 4
@@ -136,7 +136,8 @@ class RatingsDiffView implements RatingsDiffViewInterface
             $delta = $row->deltas[$field] ?? null;
             if ($delta !== null) {
                 $sortKey = ($delta->delta !== null) ? $delta->delta : 0;
-                $html .= '<td class="rating-cell" sorttable_customkey="' . HtmlSanitizer::e($sortKey) . '">'
+                $cellClass = $this->cellClass($delta->delta);
+                $html .= '<td class="' . $cellClass . '" sorttable_customkey="' . HtmlSanitizer::e($sortKey) . '">'
                     . HtmlSanitizer::e($delta->after)
                     . $this->buildDeltaSpan($delta->delta)
                     . '</td>';
@@ -171,21 +172,23 @@ class RatingsDiffView implements RatingsDiffViewInterface
         return $html;
     }
 
-    /**
-     * Builds the delta span HTML: +N (green), -N (red), 0 (gray), or empty for null.
-     */
+    private function cellClass(?int $delta): string
+    {
+        if ($delta === null || $delta === 0) {
+            return 'rating-cell';
+        }
+
+        return $delta > 0 ? 'rating-cell rating-cell--up' : 'rating-cell rating-cell--down';
+    }
+
     private function buildDeltaSpan(?int $delta): string
     {
-        if ($delta === null) {
+        if ($delta === null || $delta === 0) {
             return '';
         }
 
-        if ($delta === 0) {
-            return '<span class="delta delta-zero">0</span>';
-        }
-
         $cssClass  = $delta > 0 ? 'delta-up' : 'delta-down';
-        $formatted = sprintf('%+d', $delta);
-        return '<span class="delta ' . $cssClass . '">' . HtmlSanitizer::e($formatted) . '</span>';
+        $formatted = sprintf('(%+d)', $delta);
+        return ' <span class="delta ' . $cssClass . '">' . HtmlSanitizer::e($formatted) . '</span>';
     }
 }

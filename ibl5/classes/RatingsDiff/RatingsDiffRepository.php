@@ -63,7 +63,7 @@ SELECT
     s.r_trans_off AS s_r_trans_off,                 s.td          AS s_td,
     s.r_fga   AS s_r_fga,   s.r_fgp   AS s_r_fgp,
     s.r_fta   AS s_r_fta,   s.r_ftp   AS s_r_ftp,
-    s.r_3ga   AS s_r_tga,   s.r_3gp   AS s_r_tgp,
+    s.r_3ga   AS s_r_3ga,   s.r_3gp   AS s_r_3gp,
     s.r_orb   AS s_r_orb,   s.r_drb   AS s_r_drb,
     s.r_ast   AS s_r_ast,   s.r_stl   AS s_r_stl,
     s.r_tvr   AS s_r_tvr,   s.r_blk   AS s_r_blk,  s.r_foul AS s_r_foul

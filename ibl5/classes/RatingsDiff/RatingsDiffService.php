@@ -23,9 +23,9 @@ class RatingsDiffService implements Contracts\RatingsDiffServiceInterface
      * @var list<string>
      */
     public const RATED_FIELDS = [
-        'oo', 'od', 'r_drive_off', 'dd', 'po', 'pd', 'r_trans_off', 'td',
         'r_fga', 'r_fgp', 'r_fta', 'r_ftp', 'r_3ga', 'r_3gp',
         'r_orb', 'r_drb', 'r_ast', 'r_stl', 'r_tvr', 'r_blk', 'r_foul',
+        'oo', 'r_drive_off', 'po', 'r_trans_off', 'od', 'dd', 'pd', 'td',
     ];
 
     public function __construct(

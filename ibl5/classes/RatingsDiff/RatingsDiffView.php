@@ -137,7 +137,8 @@ class RatingsDiffView implements RatingsDiffViewInterface
             if ($delta !== null) {
                 $sortKey = ($delta->delta !== null) ? $delta->delta : 0;
                 $cellClass = $this->cellClass($delta->delta);
-                $html .= '<td class="' . $cellClass . '" sorttable_customkey="' . HtmlSanitizer::e($sortKey) . '">'
+                $styleAttr = $this->intensityStyle($delta->delta);
+                $html .= '<td class="' . $cellClass . '"' . $styleAttr . ' sorttable_customkey="' . HtmlSanitizer::e($sortKey) . '">'
                     . HtmlSanitizer::e($delta->after)
                     . $this->buildDeltaSpan($delta->delta)
                     . '</td>';
@@ -179,6 +180,17 @@ class RatingsDiffView implements RatingsDiffViewInterface
         }
 
         return $delta > 0 ? 'rating-cell rating-cell--up' : 'rating-cell rating-cell--down';
+    }
+
+    private function intensityStyle(?int $delta): string
+    {
+        if ($delta === null || $delta === 0) {
+            return '';
+        }
+
+        $alpha = min(abs($delta) / 30, 1.0) * 0.40;
+        $alpha = max(0.06, round($alpha, 2));
+        return ' style="--di: ' . $alpha . '"';
     }
 
     private function buildDeltaSpan(?int $delta): string

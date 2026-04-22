@@ -17,10 +17,10 @@
     color: #888;
   }
   .ratings-diff-table .rating-cell--up {
-    background-color: #d4edda;
+    background-color: rgba(40, 167, 69, var(--di, 0.15));
   }
   .ratings-diff-table .rating-cell--down {
-    background-color: #f8d7da;
+    background-color: rgba(220, 53, 69, var(--di, 0.15));
   }
   .ratings-diff-table .badge-new {
     display: inline-block;

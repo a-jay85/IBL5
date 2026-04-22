@@ -310,7 +310,7 @@ class ComparePlayersViewTest extends TestCase
             'car_ftm' => 1500,
             'car_fta' => 1900,
             'car_tgm' => 800,
-            'car_3ga' => 2200,
+            'car_tga' => 2200,
             'car_orb' => 600,
             'car_drb' => 2500,
             'car_reb' => 3100,

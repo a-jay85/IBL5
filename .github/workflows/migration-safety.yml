@@ -244,13 +244,13 @@ jobs:
       run: |
         # Verify key columns that the application depends on
         CHECKS=(
-          "ibl_plr:pid,name,tid,pos,uuid"
+          "ibl_plr:pid,name,teamid,pos,uuid"
           "ibl_team_info:teamid,team_city,team_name,uuid"
           "ibl_schedule:Date,Year,Visitor,Home,uuid"
           "ibl_settings:name,value"
-          "ibl_draft_picks:pickid,ownerofpick,owner_tid,year,round"
+          "ibl_draft_picks:pickid,ownerofpick,owner_teamid,year,round"
           "ibl_trade_info:id,tradeofferid,itemid,trade_from,trade_to"
-          "ibl_standings:tid,team_name,wins,losses,pct"
+          "ibl_standings:teamid,team_name,wins,losses,pct"
         )
 
         FAIL=0

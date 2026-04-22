@@ -500,7 +500,7 @@ class FreeAgencyAdminProcessorTest extends TestCase
             'cp_pts' => 0, 'cp_reb' => 0, 'cp_ast' => 0, 'cp_stl' => 0, 'cp_blk' => 0,
             'car_gm' => 0, 'car_min' => 0,
             'car_fgm' => 0, 'car_fga' => 0, 'car_ftm' => 0, 'car_fta' => 0,
-            'car_tgm' => 0, 'car_3ga' => 0,
+            'car_tgm' => 0, 'car_tga' => 0,
             'car_orb' => 0, 'car_drb' => 0, 'car_reb' => 0,
             'car_ast' => 0, 'car_stl' => 0, 'car_to' => 0, 'car_blk' => 0,
             'car_pf' => 0, 'car_pts' => 0,

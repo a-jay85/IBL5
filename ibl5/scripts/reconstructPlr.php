@@ -59,7 +59,7 @@ require_once __DIR__ . '/../db/db.php';
 
 /** @var \mysqli $mysqli_db */
 
-// ── Known missing snapshots (surveyed across fullLeagueBackups/backups/) ────
+// ── Known missing snapshots (surveyed across backups/) ─────────────────────
 // Each entry: [season_dir, zip_basename]. The reconstructor auto-finds the
 // nearest prior .plr within the same season directory.
 const KNOWN_MISSING_SNAPSHOTS = [
@@ -97,10 +97,9 @@ foreach ($argv as $arg) {
     }
 }
 
-$backupsDir = findBackupsDir();
-if ($backupsDir === null) {
-    fwrite(STDERR, "No fullLeagueBackups/backups directory found. Checked: "
-        . dirname(__DIR__) . "/fullLeagueBackups/backups and /Users/ajaynicolas/Documents/GitHub/IBL5/ibl5/fullLeagueBackups/backups\n");
+$backupsDir = dirname(__DIR__) . '/backups';
+if (!is_dir($backupsDir)) {
+    fwrite(STDERR, "No backups directory found at: {$backupsDir}\n");
     exit(2);
 }
 
@@ -152,22 +151,6 @@ printResult($result);
 exit($result->hasErrors() ? 1 : 0);
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
-
-function findBackupsDir(): ?string
-{
-    $candidates = [
-        // Local dev: worktrees and the main checkout both land here
-        dirname(__DIR__) . '/fullLeagueBackups/backups',
-        // Production: archives live alongside the web root
-        dirname(__DIR__) . '/backups',
-    ];
-    foreach ($candidates as $dir) {
-        if (is_dir($dir)) {
-            return $dir;
-        }
-    }
-    return null;
-}
 
 /**
  * Run reconstruction in snapshot mode: auto-infer base + target dates.

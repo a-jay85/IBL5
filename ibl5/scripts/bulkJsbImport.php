@@ -10,9 +10,7 @@ declare(strict_types=1);
  * .ret, .hof, .lge (cumulative — final archive per season), and .plr, .plb
  * (snapshot — every archive per season).
  *
- * Environment auto-detection:
- *   - fullLeagueBackups/ exists → local mode (pre-extracted directories + archives)
- *   - backups/ exists           → production mode (zip archives via ArchiveExtractor)
+ * Reads season archives from backups/ (zip files organized by season label).
  *
  * Usage:
  *   php bulkJsbImport.php                          # All types, all seasons
@@ -96,24 +94,16 @@ if ($fileTypeFilter !== null) {
     $fileTypes = JsbFileType::sortedByImportOrder();
 }
 
-// ── Environment auto-detection ──────────────────────────────────────────────
-$localDir = dirname(__DIR__) . '/fullLeagueBackups';
-$prodDir  = dirname(__DIR__) . '/backups';
+// ── Locate backups directory ────────────────────────────────────────────────
+$backupsDir = dirname(__DIR__) . '/backups';
 
-if (is_dir($localDir)) {
-    $isProduction = false;
-    $backupsDir = $localDir;
-} elseif (is_dir($prodDir)) {
-    $isProduction = true;
-    $backupsDir = $prodDir;
-} else {
-    echo "No backup directory found (expected fullLeagueBackups/ or backups/).\n";
+if (!is_dir($backupsDir)) {
+    echo "No backup directory found (expected backups/).\n";
     exit(1);
 }
 
-$mode = $isProduction ? 'production' : 'local';
 $typeLabel = $fileTypeFilter ?? 'all (' . count($fileTypes) . ' types)';
-echo sprintf("Mode: %s | Types: %s | Source: %s\n", $mode, $typeLabel, $backupsDir);
+echo sprintf("Types: %s | Source: %s\n", $typeLabel, $backupsDir);
 
 if ($verify) {
     echo "VERIFY MODE: Files will be parsed but no changes will be committed.\n";
@@ -136,7 +126,7 @@ $handler = new FileTypeHandler($jsbService, $boxscoreProcessor, $plrService, $lg
 $runner = new BulkImportRunner($extractor, $handler, $resolver, $mysqli_db);
 
 // ── Run ─────────────────────────────────────────────────────────────────────
-$summary = $runner->run($backupsDir, $isProduction, $fileTypes, $dryRun, $verify, $seasonFilter);
+$summary = $runner->run($backupsDir, $fileTypes, $dryRun, $verify, $seasonFilter);
 
 if (!$dryRun) {
     $title = $verify ? 'VERIFICATION COMPLETE' : 'BULK IMPORT COMPLETE';

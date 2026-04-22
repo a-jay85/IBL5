@@ -32,7 +32,6 @@ final class BulkImportRunner
      */
     public function run(
         string $backupsDir,
-        bool $isProduction,
         array $fileTypes,
         bool $dryRun,
         bool $verify,
@@ -45,7 +44,7 @@ final class BulkImportRunner
             echo "Processing " . $fileType->label() . ($verify ? ' (verify)' : '') . "\n";
             echo str_repeat('=', 50) . "\n\n";
 
-            $entries = $this->buildEntries($fileType, $backupsDir, $isProduction, $seasonFilter);
+            $entries = $this->buildEntriesFromArchives($fileType, $backupsDir, $seasonFilter);
 
             if ($entries === []) {
                 echo "  No entries found\n";
@@ -57,28 +56,10 @@ final class BulkImportRunner
                 continue;
             }
 
-            $this->processEntries($fileType, $entries, $verify, $isProduction, $summary);
+            $this->processEntries($fileType, $entries, $verify, $summary);
         }
 
         return $summary;
-    }
-
-    /**
-     * Build the list of entries to process for a given file type.
-     *
-     * @return list<ImportEntry>
-     */
-    private function buildEntries(
-        JsbFileType $fileType,
-        string $backupsDir,
-        bool $isProduction,
-        ?string $seasonFilter,
-    ): array {
-        if ($isProduction) {
-            return $this->buildEntriesFromArchives($fileType, $backupsDir, $seasonFilter);
-        }
-
-        return $this->buildEntriesFromLocalDirs($fileType, $backupsDir, $seasonFilter);
     }
 
     /**
@@ -181,100 +162,6 @@ final class BulkImportRunner
     }
 
     /**
-     * Build entries from local pre-extracted directories.
-     * Structure: fullLeagueBackups/{dirName}/IBL5.ext
-     *
-     * @return list<ImportEntry>
-     */
-    private function buildEntriesFromLocalDirs(
-        JsbFileType $fileType,
-        string $backupsDir,
-        ?string $seasonFilter,
-    ): array {
-        // For archive-based local imports (snapshot types and archive-aware processing),
-        // use the backups/ subdirectory which has the standard archive structure
-        $archiveDir = $backupsDir . '/backups';
-        if ($fileType->iterationMode() === 'snapshot' && is_dir($archiveDir)) {
-            return $this->buildEntriesFromArchives($fileType, $archiveDir, $seasonFilter);
-        }
-
-        // .sco also benefits from archive-based processing for HEAT + finals
-        if ($fileType === JsbFileType::Sco && is_dir($archiveDir)) {
-            return $this->buildEntriesFromArchives($fileType, $archiveDir, $seasonFilter);
-        }
-
-        // Pre-extracted directories
-        /** @var list<string>|false $dirs */
-        $dirs = glob($backupsDir . '/*', GLOB_ONLYDIR);
-        if ($dirs === false || $dirs === []) {
-            return [];
-        }
-
-        /** @var list<ImportEntry> $entries */
-        $entries = [];
-
-        foreach ($dirs as $dirPath) {
-            $dirName = basename($dirPath);
-
-            // Skip the backups/ subdirectory (handled separately)
-            if ($dirName === 'backups') {
-                continue;
-            }
-
-            $parsed = self::parseFolderName($dirName);
-            if ($parsed['year'] === null || $parsed['phase'] === null) {
-                continue;
-            }
-
-            if ($seasonFilter !== null) {
-                // Convert year to season label for comparison
-                $startYear = $parsed['year'] - 1;
-                $endDigits = substr((string) $parsed['year'], 2);
-                $startDigits = substr((string) $startYear, 2);
-                $label = $startDigits . '-' . $endDigits;
-                if ($label !== $seasonFilter) {
-                    continue;
-                }
-            }
-
-            $filePath = $dirPath . '/IBL5.' . $fileType->value;
-            if (!file_exists($filePath)) {
-                continue;
-            }
-
-            $entries[] = new ImportEntry(
-                path: $dirPath,
-                label: $dirName,
-                year: $parsed['year'],
-                phase: $parsed['phase'],
-                archivePath: null,
-                sourceLabel: $dirName,
-            );
-        }
-
-        // Sort by year, then phase priority
-        usort($entries, static function (ImportEntry $a, ImportEntry $b): int {
-            if ($a->year !== $b->year) {
-                return $a->year <=> $b->year;
-            }
-            $phaseOrder = ['Preseason' => 0, 'HEAT' => 1, 'Regular Season/Playoffs' => 2];
-            return ($phaseOrder[$a->phase] ?? 9) <=> ($phaseOrder[$b->phase] ?? 9);
-        });
-
-        // Deduplicate: for cumulative types, keep only the last entry per year
-        if ($fileType->iterationMode() === 'cumulative' && $fileType !== JsbFileType::Sco) {
-            /** @var array<int, ImportEntry> $deduped */
-            $deduped = [];
-            foreach ($entries as $entry) {
-                $deduped[$entry->year] = $entry;
-            }
-            return array_values($deduped);
-        }
-
-        return $entries;
-    }
-
-    /**
      * Process all entries for a file type.
      *
      * @param list<ImportEntry> $entries
@@ -283,7 +170,6 @@ final class BulkImportRunner
         JsbFileType $fileType,
         array $entries,
         bool $verify,
-        bool $isProduction,
         BulkImportSummary $summary,
     ): void {
         // .plb needs a PlrOrdinalMap per season, built from the HEAT .plr
@@ -553,39 +439,5 @@ final class BulkImportRunner
         }
 
         echo sprintf("\nTotal: %d entries for %s\n", count($entries), $fileType->label());
-    }
-
-    /**
-     * Extract season ending year and phase from a pre-extracted directory name.
-     *
-     * Handles legacy naming like "IBL0607HEATend", "IBL0102Sim15", etc.
-     *
-     * @return array{year: int|null, phase: string|null}
-     */
-    public static function parseFolderName(string $name): array
-    {
-        $year = null;
-        $phase = null;
-
-        if (preg_match('/(\d{2})(\d{2})/', $name, $yearMatch) === 1) {
-            $endPart = (int) $yearMatch[2];
-            $year = $endPart >= 50 ? 1900 + $endPart : 2000 + $endPart;
-        }
-
-        $lower = strtolower($name);
-        if (str_contains($lower, 'preseason')) {
-            $phase = 'Preseason';
-        } elseif (str_contains($lower, 'heat')) {
-            $phase = 'HEAT';
-        } elseif (
-            str_contains($lower, 'playoff')
-            || str_contains($lower, 'finals')
-            || str_contains($lower, 'season')
-            || preg_match('/sim\d*/i', $name) === 1
-        ) {
-            $phase = 'Regular Season/Playoffs';
-        }
-
-        return ['year' => $year, 'phase' => $phase];
     }
 }

@@ -43,7 +43,7 @@ test.describe('Projected Draft Order flow', () => {
   });
 
   test('team cells link to team pages', async ({ page }) => {
-    const teamLinks = page.locator('.projected-draft-order-table a[href*="teamID="], .ibl-data-table a[href*="teamID="]');
+    const teamLinks = page.locator('.projected-draft-order-table a[href*="teamid="], .ibl-data-table a[href*="teamid="]');
     const count = await teamLinks.count();
     expect(count).toBeGreaterThanOrEqual(1);
 

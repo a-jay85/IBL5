@@ -9,7 +9,7 @@ test.use({ storageState: publicStorageState() });
 
 test.describe('Team page flow', () => {
   test.beforeEach(async ({ page }) => {
-    await page.goto('modules.php?name=Team&op=team&teamID=1');
+    await page.goto('modules.php?name=Team&op=team&teamid=1');
   });
 
   test('default view loads with roster table', async ({ page }) => {
@@ -60,7 +60,7 @@ test.describe('Team page flow', () => {
   test('multiple teams render without errors', async ({ page }) => {
     const teamIDs = [1, 5, 10, 15];
     for (const teamID of teamIDs) {
-      await page.goto(`modules.php?name=Team&op=team&teamID=${teamID}`);
+      await page.goto(`modules.php?name=Team&op=team&teamid=${teamID}`);
       await assertNoPhpErrors(page, `on team ${teamID}`);
     }
   });
@@ -72,7 +72,7 @@ test.describe('Team page flow', () => {
 
 test.describe('Team page: additional display modes', () => {
   test.beforeEach(async ({ page }) => {
-    await page.goto('modules.php?name=Team&op=team&teamID=1');
+    await page.goto('modules.php?name=Team&op=team&teamid=1');
   });
 
   test('dropdown switches to per36mins', async ({ page }) => {
@@ -92,7 +92,7 @@ test.describe('Team page: additional display modes', () => {
 publicTest.describe('Team page: playoffs display mode', () => {
   publicTest('dropdown switches to playoffs', async ({ appState, page }) => {
     await appState({ 'Current Season Phase': 'Playoffs' });
-    await page.goto('modules.php?name=Team&op=team&teamID=1');
+    await page.goto('modules.php?name=Team&op=team&teamid=1');
     const dropdown = page.locator('.ibl-view-select').first();
     await dropdown.selectOption('playoffs');
     await publicExpect(page.locator('.ibl-data-table, table').first()).toBeVisible();
@@ -105,7 +105,7 @@ publicTest.describe('Team page: playoffs display mode', () => {
 
 test.describe('Team page: dropdown content changes', () => {
   test.beforeEach(async ({ page }) => {
-    await page.goto('modules.php?name=Team&op=team&teamID=1');
+    await page.goto('modules.php?name=Team&op=team&teamid=1');
   });
 
   test('switching to contracts shows salary columns', async ({ page }) => {
@@ -192,7 +192,7 @@ test.describe('Team page: dropdown content changes', () => {
 
 test.describe('Team page: error and banner states', () => {
   test('invalid teamID shows error', async ({ page }) => {
-    await page.goto('modules.php?name=Team&op=team&teamID=999');
+    await page.goto('modules.php?name=Team&op=team&teamid=999');
     await expect(page.locator('.ibl-alert--error')).toBeVisible();
     await expect(page.locator('.ibl-alert--error')).toContainText(
       'Team not found.',
@@ -201,7 +201,7 @@ test.describe('Team page: error and banner states', () => {
 
   test('extension_accepted banner renders', async ({ page }) => {
     await page.goto(
-      'modules.php?name=Team&op=team&teamID=1&result=extension_accepted&msg=Player+agreed',
+      'modules.php?name=Team&op=team&teamid=1&result=extension_accepted&msg=Player+agreed',
     );
     const successBanner = page.locator('.ibl-alert--success');
     await expect(successBanner).toBeVisible();
@@ -215,7 +215,7 @@ test.describe('Team page: error and banner states', () => {
 
 test.describe('Team page: historical year view', () => {
   test('historical year view renders with year in title', async ({ page }) => {
-    await page.goto('modules.php?name=Team&op=team&teamID=1&yr=2024');
+    await page.goto('modules.php?name=Team&op=team&teamid=1&yr=2024');
     await expect(page.locator('.ibl-data-table, table').first()).toBeVisible();
     await assertNoPhpErrors(page, 'on historical year view');
   });

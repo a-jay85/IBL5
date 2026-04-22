@@ -7,7 +7,7 @@ import { publicStorageState } from '../helpers/public-storage-state';
 test.use({ storageState: publicStorageState() });
 
 const OLYMPICS_URLS = [
-  'modules.php?name=Team&op=team&teamID=1&league=olympics',
+  'modules.php?name=Team&op=team&teamid=1&league=olympics',
   'modules.php?name=Standings&league=olympics',
   'modules.php?name=SeasonLeaderboards&league=olympics',
   'modules.php?name=Player&pa=showpage&pid=1&league=olympics',
@@ -22,7 +22,7 @@ test.describe('Olympics page smoke tests', () => {
   });
 
   test('team page loads in Olympics context', async ({ page }) => {
-    await page.goto('modules.php?name=Team&op=team&teamID=1&league=olympics');
+    await page.goto('modules.php?name=Team&op=team&teamid=1&league=olympics');
     const body = await page.locator('body').textContent();
     expect(body?.length).toBeGreaterThan(100);
   });

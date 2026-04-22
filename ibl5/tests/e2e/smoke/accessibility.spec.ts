@@ -20,7 +20,7 @@ const publicPages: Array<{ name: string; url: string }> = [
   { name: 'draft history', url: 'modules.php?name=DraftHistory' },
   { name: 'cap space', url: 'modules.php?name=CapSpace' },
   { name: 'player page', url: 'modules.php?name=Player&pa=showpage&pid=1' },
-  { name: 'team page', url: 'modules.php?name=Team&op=team&teamID=1' },
+  { name: 'team page', url: 'modules.php?name=Team&op=team&teamid=1' },
   { name: 'activity tracker', url: 'modules.php?name=ActivityTracker' },
   { name: 'all-star appearances', url: 'modules.php?name=AllStarAppearances' },
   { name: 'award history', url: 'modules.php?name=AwardHistory' },
@@ -48,7 +48,7 @@ const publicPages: Array<{ name: string; url: string }> = [
   { name: 'news index', url: 'modules.php?name=News' },
   { name: 'news categories', url: 'modules.php?name=News&file=categories' },
   { name: 'news article', url: 'modules.php?name=News&file=article&sid=1' },
-  { name: 'team schedule', url: 'modules.php?name=Schedule&teamID=1' },
+  { name: 'team schedule', url: 'modules.php?name=Schedule&teamid=1' },
 ];
 
 publicTest.describe('Public page accessibility', () => {

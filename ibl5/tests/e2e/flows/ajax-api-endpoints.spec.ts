@@ -42,7 +42,7 @@ async function fetchJson(
 test.describe('DCE Tab API', () => {
   test('ratings display returns HTML with table', async ({ request }) => {
     const response = await request.get(
-      'modules.php?name=DepthChartEntry&op=tab-api&teamID=1&display=ratings',
+      'modules.php?name=DepthChartEntry&op=tab-api&teamid=1&display=ratings',
     );
 
     const contentType = response.headers()['content-type'] ?? '';
@@ -58,7 +58,7 @@ test.describe('DCE Tab API', () => {
 
     for (const mode of modes) {
       const response = await request.get(
-        `modules.php?name=DepthChartEntry&op=tab-api&teamID=1&display=${mode}`,
+        `modules.php?name=DepthChartEntry&op=tab-api&teamid=1&display=${mode}`,
       );
 
       expect(response.status(), `${mode} should return 200`).toBe(200);
@@ -69,7 +69,7 @@ test.describe('DCE Tab API', () => {
 
   test('invalid display mode falls back to ratings', async ({ request }) => {
     const response = await request.get(
-      'modules.php?name=DepthChartEntry&op=tab-api&teamID=1&display=invalid_mode',
+      'modules.php?name=DepthChartEntry&op=tab-api&teamid=1&display=invalid_mode',
     );
 
     expect(response.status()).toBe(200);
@@ -79,7 +79,7 @@ test.describe('DCE Tab API', () => {
 
   test('response includes HX-Push-Url header', async ({ request }) => {
     const response = await request.get(
-      'modules.php?name=DepthChartEntry&op=tab-api&teamID=1&display=contracts',
+      'modules.php?name=DepthChartEntry&op=tab-api&teamid=1&display=contracts',
     );
 
     const pushUrl = response.headers()['hx-push-url'] ?? '';
@@ -98,7 +98,7 @@ test.describe('NextSim Tab API', () => {
 
     for (const pos of positions) {
       const response = await request.get(
-        `modules.php?name=DepthChartEntry&op=nextsim-api&teamID=1&position=${pos}`,
+        `modules.php?name=DepthChartEntry&op=nextsim-api&teamid=1&position=${pos}`,
       );
 
       const contentType = response.headers()['content-type'] ?? '';
@@ -111,7 +111,7 @@ test.describe('NextSim Tab API', () => {
 
   test('invalid position falls back to PG', async ({ request }) => {
     const response = await request.get(
-      'modules.php?name=DepthChartEntry&op=nextsim-api&teamID=1&position=XX',
+      'modules.php?name=DepthChartEntry&op=nextsim-api&teamid=1&position=XX',
     );
 
     const contentType = response.headers()['content-type'] ?? '';
@@ -128,7 +128,7 @@ test.describe('NextSim Tab API', () => {
 test.describe('Team API', () => {
   test('ratings display returns HTML with table', async ({ request }) => {
     const response = await request.get(
-      'modules.php?name=Team&op=api&teamID=1&display=ratings',
+      'modules.php?name=Team&op=api&teamid=1&display=ratings',
     );
 
     const contentType = response.headers()['content-type'] ?? '';
@@ -144,7 +144,7 @@ test.describe('Team API', () => {
 
     for (const mode of modes) {
       const response = await request.get(
-        `modules.php?name=Team&op=api&teamID=1&display=${mode}`,
+        `modules.php?name=Team&op=api&teamid=1&display=${mode}`,
       );
 
       expect(response.status(), `Team API ${mode} should return 200`).toBe(200);
@@ -155,17 +155,17 @@ test.describe('Team API', () => {
 
   test('response includes HX-Push-Url header', async ({ request }) => {
     const response = await request.get(
-      'modules.php?name=Team&op=api&teamID=1&display=contracts',
+      'modules.php?name=Team&op=api&teamid=1&display=contracts',
     );
 
     const pushUrl = response.headers()['hx-push-url'] ?? '';
     expect(pushUrl).toContain('display=contracts');
-    expect(pushUrl).toContain('teamID=1');
+    expect(pushUrl).toContain('teamid=1');
   });
 
   test('invalid teamID returns error response', async ({ request }) => {
     const response = await request.get(
-      'modules.php?name=Team&op=api&teamID=99999&display=ratings',
+      'modules.php?name=Team&op=api&teamid=99999&display=ratings',
     );
 
     // Invalid teamID currently returns 500 (Team::initialize fails).

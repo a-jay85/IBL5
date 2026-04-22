@@ -31,14 +31,14 @@ test.describe('Parameter edge cases', () => {
   });
 
   test('DraftHistory with invalid teamID shows no PHP errors', async ({ page }) => {
-    await page.goto('modules.php?name=DraftHistory&teamID=999');
+    await page.goto('modules.php?name=DraftHistory&teamid=999');
     await assertNoPhpErrors(page, 'on DraftHistory with invalid teamID');
     // Should either show empty state or all teams
   });
 
   test('Team module with out-of-range teamID shows error alert', async ({ page }) => {
-    await page.goto('modules.php?name=Team&op=team&teamID=-1');
-    await assertNoPhpErrors(page, 'on Team with teamID=-1');
+    await page.goto('modules.php?name=Team&op=team&teamid=-1');
+    await assertNoPhpErrors(page, 'on Team with teamid=-1');
 
     // Should show error alert for invalid team
     const alert = page.locator('.ibl-alert--error');
@@ -47,9 +47,9 @@ test.describe('Parameter edge cases', () => {
   });
 
   test('Team module with string teamID renders without PHP errors', async ({ page }) => {
-    // "abc" casts to (int) 0 → free agents page (teamID=0 is valid)
-    await page.goto('modules.php?name=Team&op=team&teamID=abc');
-    await assertNoPhpErrors(page, 'on Team with teamID=abc');
+    // "abc" casts to (int) 0 → free agents page (teamid=0 is valid)
+    await page.goto('modules.php?name=Team&op=team&teamid=abc');
+    await assertNoPhpErrors(page, 'on Team with teamid=abc');
     const body = await page.locator('body').textContent();
     expect(body?.length).toBeGreaterThan(0);
   });
@@ -64,7 +64,7 @@ test.describe('Parameter edge cases', () => {
   });
 
   test('Standings with unexpected parameters shows no PHP errors', async ({ page }) => {
-    await page.goto('modules.php?name=Standings&foo=bar&teamID=999');
+    await page.goto('modules.php?name=Standings&foo=bar&teamid=999');
     await assertNoPhpErrors(page, 'on Standings with unexpected params');
     // Should still render standings normally
     const table = page.locator('.ibl-data-table');

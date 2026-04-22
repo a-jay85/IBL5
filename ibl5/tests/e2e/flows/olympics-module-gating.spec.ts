@@ -41,7 +41,7 @@ test.describe('Olympics module gating', () => {
   });
 
   test('Team page renders in Olympics context', async ({ page }) => {
-    await page.goto('modules.php?name=Team&op=team&teamID=1&league=olympics');
+    await page.goto('modules.php?name=Team&op=team&teamid=1&league=olympics');
     await assertNoPhpErrors(page, 'on Team page in Olympics');
 
     const body = await page.locator('body').textContent();

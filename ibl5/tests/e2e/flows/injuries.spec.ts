@@ -75,7 +75,7 @@ test.describe('Injuries flow', () => {
   });
 
   test('team name cells link to team pages', async ({ page }) => {
-    const teamLinks = page.locator('.injuries-table a[href*="teamID="]');
+    const teamLinks = page.locator('.injuries-table a[href*="teamid="]');
     const count = await teamLinks.count();
     expect(count).toBeGreaterThanOrEqual(1);
 

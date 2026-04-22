@@ -22,7 +22,7 @@ interface RatingsDiffServiceInterface
      *
      * @return list<RatingRow>
      */
-    public function getDiffs(?int $overrideYear = null, ?int $filterTid = null): array;
+    public function getDiffs(?int $overrideYear = null, ?int $filterTid = null, string $filterStatus = ''): array;
 
     /**
      * Returns the resolved baseline year (overrideYear if provided, else the

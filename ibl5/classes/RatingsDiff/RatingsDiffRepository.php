@@ -49,7 +49,7 @@ class RatingsDiffRepository extends BaseMysqliRepository implements RatingsDiffR
      *
      * @return list<array<string, mixed>>
      */
-    public function getDiffRows(int $baselineYear, ?int $filterTid = null): array
+    public function getDiffRows(int $baselineYear, ?int $filterTid = null, string $filterStatus = ''): array
     {
         $sql = <<<'SQL'
 SELECT
@@ -75,6 +75,12 @@ LEFT JOIN ibl_plr_snapshots s
       AND s.snapshot_phase = 'end-of-season'
 WHERE p.retired = 0
 SQL;
+
+        if ($filterStatus === 'signed') {
+            $sql .= ' AND p.teamid > 0';
+        } elseif ($filterStatus === 'fa') {
+            $sql .= ' AND p.teamid = 0';
+        }
 
         if ($filterTid !== null) {
             $sql .= ' AND p.teamid = ?';

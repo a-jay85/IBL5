@@ -170,8 +170,8 @@ class RatingsDiffViewTest extends TestCase
         $row  = $this->buildRatingRow(1, '<script>alert(1)</script>', 5);
         $html = $this->view->render(2025, [$row]);
 
-        self::assertStringContainsString('&lt;script&gt;', $html);
-        self::assertStringNotContainsString('<script>', $html);
+        self::assertStringContainsString('&lt;script&gt;alert(1)&lt;/script&gt;', $html);
+        self::assertStringNotContainsString('<script>alert(1)</script>', $html);
     }
 
     // ---------------------------------------------------------------------------

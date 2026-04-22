@@ -27,10 +27,14 @@ $filterTid = null;
 if (isset($_GET['tid']) && is_string($_GET['tid']) && ctype_digit($_GET['tid'])) {
     $filterTid = (int) $_GET['tid'];
 }
+$filterStatus = '';
+if (isset($_GET['status']) && is_string($_GET['status']) && in_array($_GET['status'], ['signed', 'fa'], true)) {
+    $filterStatus = $_GET['status'];
+}
 
 $baselineYear = $service->getBaselineYear($overrideYear);
-$rows = $service->getDiffs($overrideYear, $filterTid);
+$rows = $service->getDiffs($overrideYear, $filterTid, $filterStatus);
 
 \PageLayout\PageLayout::header();
-echo $view->render($baselineYear, $rows);
+echo $view->render($baselineYear, $rows, $filterStatus);
 \PageLayout\PageLayout::footer();

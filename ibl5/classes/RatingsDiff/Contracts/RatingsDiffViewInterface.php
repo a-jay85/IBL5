@@ -18,5 +18,5 @@ interface RatingsDiffViewInterface
      *
      * @param list<RatingRow> $rows
      */
-    public function render(?int $baselineYear, array $rows): string;
+    public function render(?int $baselineYear, array $rows, string $filterStatus = ''): string;
 }

@@ -54,19 +54,19 @@ class RatingsDiffView implements RatingsDiffViewInterface
      *
      * @param list<RatingRow> $rows
      */
-    public function render(?int $baselineYear, array $rows): string
+    public function render(?int $baselineYear, array $rows, string $filterStatus = ''): string
     {
         if ($baselineYear === null || $rows === []) {
             return '<div class="ibl-card"><p>No prior-season baseline found. This page is meaningful after at least one <code>end-of-season</code> snapshot has been captured.</p></div>';
         }
 
-        return $this->renderTable($baselineYear, $rows);
+        return $this->renderTable($baselineYear, $rows, $filterStatus);
     }
 
     /**
      * @param list<RatingRow> $rows
      */
-    private function renderTable(int $baselineYear, array $rows): string
+    private function renderTable(int $baselineYear, array $rows, string $filterStatus): string
     {
         $totalCols = self::FIXED_COL_COUNT + count(RatingsDiffService::RATED_FIELDS);
 
@@ -87,6 +87,7 @@ class RatingsDiffView implements RatingsDiffViewInterface
         $html .= '<p>Live player ratings vs their end-of-season ratings from '
             . HtmlSanitizer::e($baselineYear)
             . '. Sorted by largest single rating change.</p>';
+        $html .= $this->renderStatusFilter($filterStatus);
 
         $html .= '<div class="table-scroll-wrapper"><div class="table-scroll-container">';
         $html .= '<table class="sortable ibl-data-table responsive-table ratings-diff-table">';
@@ -119,6 +120,34 @@ class RatingsDiffView implements RatingsDiffViewInterface
 
         $html .= '</table>';
         $html .= '</div></div>';
+
+        return $html;
+    }
+
+    private function renderStatusFilter(string $filterStatus): string
+    {
+        $options = [
+            ''       => 'All Players',
+            'signed' => 'Signed Players',
+            'fa'     => 'Free Agents',
+        ];
+
+        $html = '<div class="ratings-diff-filter">';
+        $html .= '<label for="ratings-diff-status">Show: </label>';
+        $html .= '<select id="ratings-diff-status">';
+        foreach ($options as $value => $label) {
+            $selected = ($filterStatus === $value) ? ' selected' : '';
+            $html .= '<option value="' . HtmlSanitizer::e($value) . '"' . $selected . '>'
+                . HtmlSanitizer::e($label) . '</option>';
+        }
+        $html .= '</select>';
+        $html .= '</div>';
+
+        $html .= '<script>document.getElementById("ratings-diff-status").addEventListener("change",function(){'
+            . 'var u=new URLSearchParams(location.search);'
+            . 'if(this.value)u.set("status",this.value);else u.delete("status");'
+            . 'location.search=u;'
+            . '});</script>';
 
         return $html;
     }

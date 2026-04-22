@@ -1,4 +1,12 @@
 @layer components {
+  .ratings-diff-filter {
+    margin-bottom: 0.75rem;
+  }
+  .ratings-diff-filter select {
+    padding: 0.25rem 0.5rem;
+    border-radius: 0.25rem;
+    border: 1px solid #ccc;
+  }
   .ratings-diff-table .rating-cell {
     white-space: nowrap;
   }

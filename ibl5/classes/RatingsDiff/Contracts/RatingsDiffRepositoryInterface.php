@@ -22,5 +22,5 @@ interface RatingsDiffRepositoryInterface
      *
      * @return list<array<string, mixed>>
      */
-    public function getDiffRows(int $baselineYear, ?int $filterTid = null): array;
+    public function getDiffRows(int $baselineYear, ?int $filterTid = null, string $filterStatus = ''): array;
 }

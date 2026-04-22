@@ -38,14 +38,14 @@ class RatingsDiffService implements Contracts\RatingsDiffServiceInterface
      *
      * @return list<RatingRow>
      */
-    public function getDiffs(?int $overrideYear = null, ?int $filterTid = null): array
+    public function getDiffs(?int $overrideYear = null, ?int $filterTid = null, string $filterStatus = ''): array
     {
         $baselineYear = $overrideYear ?? $this->repository->getLatestEndOfSeasonYear();
         if ($baselineYear === null) {
             return [];
         }
 
-        $dbRows = $this->repository->getDiffRows($baselineYear, $filterTid);
+        $dbRows = $this->repository->getDiffRows($baselineYear, $filterTid, $filterStatus);
 
         /** @var list<RatingRow> $realRows */
         $realRows = [];

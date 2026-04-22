@@ -82,8 +82,8 @@ class PeriodAverages
         FROM   ibl_box_scores bs
         JOIN   ibl_plr p ON bs.pid = p.pid
         WHERE  bs.date BETWEEN ? AND ?
-            AND ( bs.hometid = ?
-                OR bs.visitortid = ? )
+            AND ( bs.home_teamid = ?
+                OR bs.visitor_teamid = ? )
             AND bs.gameMIN > 0
             AND p.teamid = ?
             AND p.retired = 0

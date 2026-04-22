@@ -1,0 +1,34 @@
+@layer components {
+  .ratings-diff-table .rating-cell {
+    white-space: nowrap;
+  }
+  .ratings-diff-table .delta {
+    margin-left: 0.35em;
+    font-size: 0.85em;
+    font-weight: 600;
+  }
+  .ratings-diff-table .delta-up {
+    color: #1b7f2e; /* green */
+  }
+  .ratings-diff-table .delta-down {
+    color: #b2331f; /* red */
+  }
+  .ratings-diff-table .delta-zero {
+    color: #888;
+  }
+  .ratings-diff-table .badge-new {
+    display: inline-block;
+    padding: 0.1em 0.5em;
+    background: #ddd;
+    color: #333;
+    border-radius: 0.25em;
+    font-size: 0.8em;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+  }
+  .ratings-diff-table .ratings-separator td {
+    padding: 0;
+    height: 0.75em;
+    background: transparent;
+  }
+}

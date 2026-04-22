@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace RatingsDiff;
 
+use Player\PlayerImageHelper;
 use RatingsDiff\Contracts\RatingsDiffViewInterface;
+use UI\TeamCellHelper;
 use Utilities\HtmlSanitizer;
 
 /**
@@ -92,7 +94,7 @@ class RatingsDiffView implements RatingsDiffViewInterface
         // thead
         $html .= '<thead><tr>';
         $html .= '<th class="sticky-col">Player</th>';
-        $html .= '<th>Team</th>';
+        $html .= '<th class="ibl-team-cell--colored">Team</th>';
         $html .= '<th>Pos</th>';
         $html .= '<th>Max &#916;</th>';
         foreach (RatingsDiffService::RATED_FIELDS as $field) {
@@ -125,9 +127,10 @@ class RatingsDiffView implements RatingsDiffViewInterface
      */
     private function buildRealRow(RatingRow $row): string
     {
+        $safeName = HtmlSanitizer::e($row->name);
         $html  = '<tr>';
-        $html .= '<td class="sticky-col">' . HtmlSanitizer::e($row->name) . '</td>';
-        $html .= '<td>' . HtmlSanitizer::e($row->teamName ?? '') . '</td>';
+        $html .= PlayerImageHelper::renderPlayerCell($row->pid, $safeName);
+        $html .= TeamCellHelper::renderTeamCellOrFreeAgent($row->teamid, $row->teamName ?? '', $row->teamColor1, $row->teamColor2);
         $html .= '<td>' . HtmlSanitizer::e($row->pos) . '</td>';
         $html .= '<td sorttable_customkey="' . HtmlSanitizer::e($row->maxAbsDelta) . '">'
             . HtmlSanitizer::e($row->maxAbsDelta) . '</td>';
@@ -156,9 +159,10 @@ class RatingsDiffView implements RatingsDiffViewInterface
      */
     private function buildNewRow(RatingRow $row): string
     {
+        $safeName = HtmlSanitizer::e($row->name);
         $html  = '<tr>';
-        $html .= '<td class="sticky-col">' . HtmlSanitizer::e($row->name) . '</td>';
-        $html .= '<td>' . HtmlSanitizer::e($row->teamName ?? '') . '</td>';
+        $html .= PlayerImageHelper::renderPlayerCell($row->pid, $safeName);
+        $html .= TeamCellHelper::renderTeamCellOrFreeAgent($row->teamid, $row->teamName ?? '', $row->teamColor1, $row->teamColor2);
         $html .= '<td>' . HtmlSanitizer::e($row->pos) . '</td>';
         // -9999999 keeps NEW rows at the bottom when any column is JS-sorted.
         $html .= '<td sorttable_customkey="-9999999"><span class="badge-new">NEW</span></td>';

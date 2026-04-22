@@ -18,6 +18,8 @@ final class RatingRow
         public readonly string $pos,
         public readonly int $teamid,
         public readonly ?string $teamName,
+        public readonly string $teamColor1,
+        public readonly string $teamColor2,
         public readonly array $deltas,
         public readonly int $maxAbsDelta,
         public readonly int $sumAbsDelta,

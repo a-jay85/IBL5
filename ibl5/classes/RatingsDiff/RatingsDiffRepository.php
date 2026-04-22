@@ -54,7 +54,7 @@ class RatingsDiffRepository extends BaseMysqliRepository implements RatingsDiffR
         $sql = <<<'SQL'
 SELECT
     p.pid, p.name, p.pos, p.teamid,
-    t.team_name,
+    t.team_name, t.color1, t.color2,
     p.oo, p.od, p.r_drive_off, p.dd, p.po, p.pd, p.r_trans_off, p.td,
     p.r_fga, p.r_fgp, p.r_fta, p.r_ftp, p.r_3ga, p.r_3gp,
     p.r_orb, p.r_drb, p.r_ast, p.r_stl, p.r_tvr, p.r_blk, p.r_foul,

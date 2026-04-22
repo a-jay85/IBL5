@@ -59,6 +59,8 @@ class RatingsDiffViewTest extends TestCase
             pos: $pos,
             teamid: $teamid,
             teamName: $teamName,
+            teamColor1: 'FF0000',
+            teamColor2: 'FFFFFF',
             deltas: $deltas,
             maxAbsDelta: $isNew ? 0 : $maxAbs,
             sumAbsDelta: $sumAbs,
@@ -93,6 +95,8 @@ class RatingsDiffViewTest extends TestCase
             pos: 'PG',
             teamid: 1,
             teamName: 'Test Team',
+            teamColor1: 'FF0000',
+            teamColor2: 'FFFFFF',
             deltas: $deltas,
             maxAbsDelta: $maxAbs,
             sumAbsDelta: $maxAbs,
@@ -260,13 +264,13 @@ class RatingsDiffViewTest extends TestCase
     // No forbidden inline styles
     // ---------------------------------------------------------------------------
 
-    public function test_it_does_not_contain_inline_style_attributes_except_css_custom_properties(): void
+    public function test_it_does_not_contain_inline_style_attributes_except_allowed_patterns(): void
     {
         $row  = $this->buildRatingRow(1, 'Player A', 5);
         $html = $this->view->render(2025, [$row]);
 
-        // Regex: style=" followed by anything that is NOT "--" (CSS custom property)
-        $forbidden = (bool) preg_match('/style="(?!--)/', $html);
+        // Allow: CSS custom properties (--), team cell colors (background-color/color from TeamCellHelper)
+        $forbidden = (bool) preg_match('/style="(?!--|background-color: #|color: #)/', $html);
         self::assertFalse($forbidden, 'Output contains a forbidden inline style="..." attribute');
     }
 }

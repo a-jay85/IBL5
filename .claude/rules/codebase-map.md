@@ -140,7 +140,7 @@ PlayerDatabase -> BaseMysqliRepository Player Services UI Utilities
 PlayerMovement -> Player UI
 PlrParser -> League Season
 ProjectedDraftOrder -> League UI Utilities
-RatingsDiff -> BaseMysqliRepository Utilities
+RatingsDiff -> BaseMysqliRepository Player UI Utilities
 RecordHolders -> Cache Discord League Player UI Utilities
 RookieOption -> Discord Player Season Services Shared Utilities
 SavedDepthChart -> Season Team Utilities

@@ -95,7 +95,9 @@ class RatingsDiffService implements Contracts\RatingsDiffServiceInterface
         $name     = is_string($row['name'] ?? null) ? $row['name'] : '';
         $pos      = is_string($row['pos'] ?? null) ? $row['pos'] : '';
         $teamid      = $this->readInt($row, 'teamid');
-        $teamName = is_string($row['team_name'] ?? null) ? $row['team_name'] : null;
+        $teamName   = is_string($row['team_name'] ?? null) ? $row['team_name'] : null;
+        $teamColor1 = is_string($row['color1'] ?? null) ? $row['color1'] : 'FFFFFF';
+        $teamColor2 = is_string($row['color2'] ?? null) ? $row['color2'] : '000000';
 
         // Use s_oo as the discriminator: if null, the player has no snapshot (LEFT JOIN miss)
         $isNewPlayer = ($this->readIntOrNull($row, 's_oo') === null);
@@ -127,6 +129,8 @@ class RatingsDiffService implements Contracts\RatingsDiffServiceInterface
             pos: $pos,
             teamid: $teamid,
             teamName: $teamName,
+            teamColor1: $teamColor1,
+            teamColor2: $teamColor2,
             deltas: $deltas,
             maxAbsDelta: $maxAbsDelta,
             sumAbsDelta: $sumAbsDelta,

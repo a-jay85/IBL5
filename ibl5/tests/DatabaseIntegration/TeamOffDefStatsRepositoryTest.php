@@ -25,7 +25,7 @@ class TeamOffDefStatsRepositoryTest extends DatabaseTestCase
 
     /**
      * Insert team boxscore data that the offense/defense VIEWs will pick up.
-     * The VIEWs aggregate by teamID and season_year (derived from game_type = 1 regular season dates).
+     * The VIEWs aggregate by teamid and season_year (derived from game_type = 1 regular season dates).
      * Regular season dates: Nov-May (not June/October).
      */
     private function insertTeamStatsFixture(): void
@@ -33,7 +33,7 @@ class TeamOffDefStatsRepositoryTest extends DatabaseTestCase
         // Franchise season row needed for VIEW JOIN
         $this->insertFranchiseSeasonRow(1, 2099, 'Metros');
 
-        // Home game for Metros (tid=1) vs Enforcers (tid=2) in regular season
+        // Home game for Metros (teamid=1) vs Enforcers (teamid=2) in regular season
         // Date in January 2099 = regular season (game_type=1)
         // name column is varchar(16) — use short team name
         $this->insertTeamBoxscoreRow('2099-01-15', 'Metros', 1, 2, 1);
@@ -125,12 +125,12 @@ class TeamOffDefStatsRepositoryTest extends DatabaseTestCase
             self::assertArrayHasKey('defense', $result);
 
             $offense = $result['offense'];
-            self::assertArrayHasKey('teamID', $offense);
+            self::assertArrayHasKey('teamid', $offense);
             self::assertArrayHasKey('games', $offense);
             self::assertArrayHasKey('fgm', $offense);
 
             $defense = $result['defense'];
-            self::assertArrayHasKey('teamID', $defense);
+            self::assertArrayHasKey('teamid', $defense);
             self::assertArrayHasKey('games', $defense);
             self::assertArrayHasKey('fgm', $defense);
         } else {

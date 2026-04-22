@@ -12,7 +12,7 @@ namespace RecordHolders\Contracts;
  * @phpstan-type PlayerSingleGameRecord array{
  *     pid: int,
  *     name: string,
- *     tid: int,
+ *     teamid: int,
  *     team_name: string,
  *     date: string,
  *     BoxID: int,
@@ -34,7 +34,7 @@ namespace RecordHolders\Contracts;
  * @phpstan-type QuadrupleDoubleRecord array{
  *     pid: int,
  *     name: string,
- *     tid: int,
+ *     teamid: int,
  *     team_name: string,
  *     date: string,
  *     BoxID: int,
@@ -55,7 +55,7 @@ namespace RecordHolders\Contracts;
  * }
  *
  * @phpstan-type TeamSingleGameRecord array{
- *     tid: int,
+ *     teamid: int,
  *     team_name: string,
  *     date: string,
  *     BoxID: int,
@@ -66,7 +66,7 @@ namespace RecordHolders\Contracts;
  * }
  *
  * @phpstan-type TeamHalfRecord array{
- *     tid: int,
+ *     teamid: int,
  *     team_name: string,
  *     date: string,
  *     BoxID: int,

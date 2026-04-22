@@ -43,7 +43,7 @@ class TradeFormRepository extends BaseMysqliRepository implements TradeFormRepos
         return $this->fetchAll(
             "SELECT pos, name, pid, ordinal, cy, cy1, cy2, cy3, cy4, cy5, cy6
              FROM ibl_plr
-             WHERE tid = ? AND retired = 0
+             WHERE teamid = ? AND retired = 0
              ORDER BY ordinal ASC",
             "i",
             $teamId
@@ -57,9 +57,9 @@ class TradeFormRepository extends BaseMysqliRepository implements TradeFormRepos
     {
         /** @var list<TradingDraftPickRow> */
         return $this->fetchAll(
-            "SELECT dp.*, dp.teampick_tid AS teampick_id
+            "SELECT dp.*, dp.teampick_teamid AS teampick_id
              FROM ibl_draft_picks dp
-             WHERE dp.owner_tid = ?
+             WHERE dp.owner_teamid = ?
              ORDER BY dp.year, dp.round ASC",
             "i",
             $teamId
@@ -80,7 +80,7 @@ class TradeFormRepository extends BaseMysqliRepository implements TradeFormRepos
      */
     public function getTeamPlayerCount(int $teamId, bool $isOffseason = false): int
     {
-        $sql = "SELECT COUNT(*) AS cnt FROM ibl_plr WHERE tid = ? AND retired = 0 AND ordinal <= 960";
+        $sql = "SELECT COUNT(*) AS cnt FROM ibl_plr WHERE teamid = ? AND retired = 0 AND ordinal <= 960";
 
         if ($isOffseason) {
             // During offseason, exclude players whose contracts have expired.

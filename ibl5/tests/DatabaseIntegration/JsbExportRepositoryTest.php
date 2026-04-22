@@ -25,7 +25,7 @@ class JsbExportRepositoryTest extends DatabaseTestCase
     public function testGetAllPlayerChangeableFieldsReturnsKeyedByPid(): void
     {
         $this->insertTestPlayer(200000060, 'DB Test Export Player', [
-            'tid' => 1,
+            'teamid' => 1,
             'bird' => 3,
             'cy' => 2,
             'cyt' => 4,
@@ -46,7 +46,7 @@ class JsbExportRepositoryTest extends DatabaseTestCase
 
         self::assertSame(200000060, $player['pid']);
         self::assertSame('DB Test Export Player', $player['name']);
-        self::assertSame(1, $player['tid']);
+        self::assertSame(1, $player['teamid']);
         // COALESCE preserves native int for tinyint(1) and int columns, but returns
         // string for tinyint(3) unsigned (cy, cyt). The repo's is_int() narrowing
         // converts string results to 0. This tests the actual repository behavior.
@@ -86,7 +86,7 @@ class JsbExportRepositoryTest extends DatabaseTestCase
             'pid' => 200000062,
             'name' => 'DB Test Null Contract',
             'age' => 25,
-            'tid' => 1,
+            'teamid' => 1,
             'pos' => 'SF',
             'sta' => 80,
             'exp' => 3,

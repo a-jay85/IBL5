@@ -39,10 +39,10 @@ class LeagueScheduleRepository extends \BaseMysqliRepository implements LeagueSc
                   bst.gameOfThatDay
                   FROM {$this->scheduleTable} s
                   LEFT JOIN (
-                      SELECT Date, visitorTeamID, homeTeamID, MIN(gameOfThatDay) AS gameOfThatDay
+                      SELECT Date, visitor_teamid, home_teamid, MIN(gameOfThatDay) AS gameOfThatDay
                       FROM {$this->boxScoresTeamsTable}
-                      GROUP BY Date, visitorTeamID, homeTeamID
-                  ) bst ON bst.Date = s.Date AND bst.visitorTeamID = s.Visitor AND bst.homeTeamID = s.Home
+                      GROUP BY Date, visitor_teamid, home_teamid
+                  ) bst ON bst.Date = s.Date AND bst.visitor_teamid = s.Visitor AND bst.home_teamid = s.Home
                   ORDER BY s.Date ASC, s.SchedID ASC";
 
         /** @var list<ScheduleRow> $rows */
@@ -62,17 +62,17 @@ class LeagueScheduleRepository extends \BaseMysqliRepository implements LeagueSc
     public function getTeamRecords(): array
     {
         $rows = $this->fetchAll(
-            "SELECT tid, leagueRecord FROM {$this->standingsTable} ORDER BY tid ASC"
+            "SELECT teamid, leagueRecord FROM {$this->standingsTable} ORDER BY teamid ASC"
         );
 
         /** @var array<int, string> $records */
         $records = [];
         foreach ($rows as $row) {
-            /** @var int $tid */
-            $tid = $row['tid'];
+            /** @var int $teamid */
+            $teamid = $row['teamid'];
             /** @var string $leagueRecord */
             $leagueRecord = $row['leagueRecord'];
-            $records[$tid] = $leagueRecord;
+            $records[$teamid] = $leagueRecord;
         }
 
         return $records;

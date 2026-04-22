@@ -96,8 +96,8 @@ function api($user)
         return;
     }
 
-    $tid = $commonRepo->getTidFromTeamname($teamName) ?? 0;
-    if ($tid === 0) {
+    $teamid = $commonRepo->getTidFromTeamname($teamName) ?? 0;
+    if ($teamid === 0) {
         header('Content-Type: application/json; charset=utf-8');
         http_response_code(403);
         echo json_encode(['error' => 'Team not found']);
@@ -118,7 +118,7 @@ function api($user)
     }
 
     $handler = new SavedDepthChart\SavedDepthChartApiHandler($mysqli_db);
-    $handler->handle($action, $tid, $username, $params);
+    $handler->handle($action, $teamid, $username, $params);
 }
 
 switch ($op) {

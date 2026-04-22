@@ -23,17 +23,17 @@ class DraftPicksView
         $output = '<ul class="draft-picks-list">';
 
         foreach ($draftPicks as $pick) {
-            $teamID = $pick['originalTeamID'];
+            $teamid = $pick['originalTeamID'];
             $city = HtmlSanitizer::e($pick['originalTeamCity']);
             $teamName = HtmlSanitizer::e($pick['originalTeamName']);
             $year = HtmlSanitizer::e($pick['year']);
             $round = $pick['round'];
 
             $output .= '<li class="draft-picks-list__item">'
-                . "<a href=\"modules.php?name=Team&amp;op=team&amp;teamID=$teamID\">"
+                . "<a href=\"modules.php?name=Team&amp;op=team&amp;teamid=$teamid\">"
                 . "<img class=\"draft-picks-list__logo\" src=\"images/logo/$teamName.png\" height=\"24\" width=\"24\" alt=\"$teamName\"></a>"
                 . '<div class="draft-picks-list__info">'
-                . "<a href=\"modules.php?name=Team&amp;op=team&amp;teamID=$teamID\">$year R$round $city $teamName</a>";
+                . "<a href=\"modules.php?name=Team&amp;op=team&amp;teamid=$teamid\">$year R$round $city $teamName</a>";
 
             if ($pick['notes'] !== null && $pick['notes'] !== '') {
                 $notesSafe = HtmlSanitizer::e($pick['notes']);

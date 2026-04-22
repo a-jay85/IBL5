@@ -53,8 +53,8 @@ class TradingRepositoryTest extends DatabaseTestCase
 
     public function testGetPlayersByIdsWithMultipleIds(): void
     {
-        $this->insertTestPlayer(200030101, 'Trade Batch P1', ['tid' => 1]);
-        $this->insertTestPlayer(200030102, 'Trade Batch P2', ['tid' => 2]);
+        $this->insertTestPlayer(200030101, 'Trade Batch P1', ['teamid' => 1]);
+        $this->insertTestPlayer(200030102, 'Trade Batch P2', ['teamid' => 2]);
 
         $result = $this->assetRepo->getPlayersByIds([200030101, 200030102]);
 
@@ -109,7 +109,7 @@ class TradingRepositoryTest extends DatabaseTestCase
     public function testInsertTradeItemAndRetrieveByOfferId(): void
     {
         $offerId = $this->insertTradeOfferRow();
-        $this->insertTestPlayer(200030103, 'Trade Item Plr', ['tid' => 1]);
+        $this->insertTestPlayer(200030103, 'Trade Item Plr', ['teamid' => 1]);
 
         $this->offerRepo->insertTradeItem($offerId, 200030103, TradeItemType::Player, 'Metros', 'Sharks', 'Metros');
 
@@ -182,13 +182,13 @@ class TradingRepositoryTest extends DatabaseTestCase
 
     public function testGetTeamPlayerCountRegularSeason(): void
     {
-        // Use a team ID unlikely to have seed players: tid=3
-        // First count existing players on tid=3
+        // Use a team ID unlikely to have seed players: teamid=3
+        // First count existing players on teamid=3
         $baseline = $this->formRepo->getTeamPlayerCount(3);
 
-        $this->insertTestPlayer(200030104, 'Trade Count P1', ['tid' => 3, 'ordinal' => 100]);
-        $this->insertTestPlayer(200030105, 'Trade Count P2', ['tid' => 3, 'ordinal' => 200]);
-        $this->insertTestPlayer(200030106, 'Trade Count P3', ['tid' => 3, 'ordinal' => 300]);
+        $this->insertTestPlayer(200030104, 'Trade Count P1', ['teamid' => 3, 'ordinal' => 100]);
+        $this->insertTestPlayer(200030105, 'Trade Count P2', ['teamid' => 3, 'ordinal' => 200]);
+        $this->insertTestPlayer(200030106, 'Trade Count P3', ['teamid' => 3, 'ordinal' => 300]);
 
         $count = $this->formRepo->getTeamPlayerCount(3);
 
@@ -199,7 +199,7 @@ class TradingRepositoryTest extends DatabaseTestCase
     {
         // Player with cy=1, cyt=1 — next year is cy+1=2, cy2=0 → expired
         $this->insertTestPlayer(200030107, 'Trade Expired', [
-            'tid' => 4,
+            'teamid' => 4,
             'ordinal' => 100,
             'cy' => 1,
             'cyt' => 1,
@@ -212,7 +212,7 @@ class TradingRepositoryTest extends DatabaseTestCase
         // The expired player should not be counted (cy2=0 means no salary next year)
         // Insert a non-expired player for comparison
         $this->insertTestPlayer(200030108, 'Trade Active', [
-            'tid' => 4,
+            'teamid' => 4,
             'ordinal' => 200,
             'cy' => 1,
             'cyt' => 3,
@@ -243,14 +243,14 @@ class TradingRepositoryTest extends DatabaseTestCase
 
     public function testUpdatePlayerTeamAndVerify(): void
     {
-        $this->insertTestPlayer(200030109, 'Trade Update P', ['tid' => 1]);
+        $this->insertTestPlayer(200030109, 'Trade Update P', ['teamid' => 1]);
 
         $affected = $this->assetRepo->updatePlayerTeam(200030109, 5);
         self::assertSame(1, $affected);
 
         $player = $this->assetRepo->getPlayerById(200030109);
         self::assertNotNull($player);
-        self::assertSame(5, $player['tid']);
+        self::assertSame(5, $player['teamid']);
     }
 
     public function testUpdateDraftPickOwnerByIdUpdatesFields(): void
@@ -263,20 +263,20 @@ class TradingRepositoryTest extends DatabaseTestCase
         $pick = $this->assetRepo->getDraftPickById($pickId);
         self::assertNotNull($pick);
         self::assertSame('Sharks', $pick['ownerofpick']);
-        self::assertSame(2, $pick['owner_tid']);
+        self::assertSame(2, $pick['owner_teamid']);
     }
 
     // ── Single player/pick fetch ────────────────────────────────
 
     public function testGetPlayerByIdReturnsRow(): void
     {
-        $this->insertTestPlayer(200030110, 'Trade Fetch P', ['tid' => 2]);
+        $this->insertTestPlayer(200030110, 'Trade Fetch P', ['teamid' => 2]);
 
         $player = $this->assetRepo->getPlayerById(200030110);
 
         self::assertNotNull($player);
         self::assertSame('Trade Fetch P', $player['name']);
-        self::assertSame(2, $player['tid']);
+        self::assertSame(2, $player['teamid']);
     }
 
     public function testGetDraftPickByIdReturnsRow(): void
@@ -306,7 +306,7 @@ class TradingRepositoryTest extends DatabaseTestCase
 
     public function testGetTeamPlayersForTradingReturnsTeamPlayers(): void
     {
-        $this->insertTestPlayer(200030112, 'Trade UI Plr', ['tid' => 5, 'ordinal' => 100]);
+        $this->insertTestPlayer(200030112, 'Trade UI Plr', ['teamid' => 5, 'ordinal' => 100]);
 
         $players = $this->formRepo->getTeamPlayersForTrading(5);
 
@@ -316,7 +316,7 @@ class TradingRepositoryTest extends DatabaseTestCase
 
     public function testGetTeamDraftPicksForTradingReturnsPicks(): void
     {
-        $pickId = $this->insertDraftPickRow(6, 6, 2033, 1, ['ownerofpick' => 'Metros', 'owner_tid' => 6]);
+        $pickId = $this->insertDraftPickRow(6, 6, 2033, 1, ['ownerofpick' => 'Metros', 'owner_teamid' => 6]);
 
         $picks = $this->formRepo->getTeamDraftPicksForTrading(6);
 

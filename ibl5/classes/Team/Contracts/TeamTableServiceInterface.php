@@ -22,13 +22,13 @@ interface TeamTableServiceInterface
     /**
      * Render the table output (tabs/dropdown + table HTML) for a given display mode
      *
-     * @param int $teamID Team ID (>0 = specific team, 0 = free agents, -1 = entire league)
+     * @param int $teamid Team ID (>0 = specific team, 0 = free agents, -1 = entire league)
      * @param ?string $yr Historical year parameter (null if current season)
      * @param string $display Active display tab (e.g., 'ratings', 'contracts', 'split')
      * @param ?string $split Split stats key when display is 'split' (e.g. 'home', 'road')
      * @return string Complete table HTML with tab/dropdown navigation
      */
-    public function getTableOutput(int $teamID, ?string $yr, string $display, ?string $split = null): string;
+    public function getTableOutput(int $teamid, ?string $yr, string $display, ?string $split = null): string;
 
     /**
      * Render the appropriate table HTML based on display type
@@ -63,8 +63,8 @@ interface TeamTableServiceInterface
     /**
      * Get roster data and starter PIDs for a team
      *
-     * @param int $teamID Team ID (>0 = specific team)
+     * @param int $teamid Team ID (>0 = specific team)
      * @return array{roster: list<array<string, mixed>>, starterPids: list<int>}
      */
-    public function getRosterAndStarters(int $teamID): array;
+    public function getRosterAndStarters(int $teamid): array;
 }

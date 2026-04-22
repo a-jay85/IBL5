@@ -10,8 +10,8 @@ namespace PlrParser;
  * Built once per season from the HEAT-end .plr file. Used by the PLB import
  * flow to resolve depth chart slot positions to actual players.
  *
- * Ordinal math: ordinal = (tid - 1) * 30 + slotIndex + 1
- * where tid is 1-based (team 1 = ordinals 1-30, team 2 = 31-60, etc.)
+ * Ordinal math: ordinal = (teamid - 1) * 30 + slotIndex + 1
+ * where teamid is 1-based (team 1 = ordinals 1-30, team 2 = 31-60, etc.)
  */
 final class PlrOrdinalMap
 {
@@ -102,13 +102,13 @@ final class PlrOrdinalMap
     /**
      * Look up the player at a given team/slot position.
      *
-     * @param int $tid 1-based team ID (1-32)
+     * @param int $teamid 1-based team ID (1-32)
      * @param int $slotIndex 0-based slot within team (0-29)
      * @return array{pid: int, name: string}|null Player info or null if not found
      */
-    public function getSlotPlayer(int $tid, int $slotIndex): ?array
+    public function getSlotPlayer(int $teamid, int $slotIndex): ?array
     {
-        $ordinal = ($tid - 1) * self::SLOTS_PER_TEAM + $slotIndex + 1;
+        $ordinal = ($teamid - 1) * self::SLOTS_PER_TEAM + $slotIndex + 1;
 
         return $this->map[$ordinal] ?? null;
     }

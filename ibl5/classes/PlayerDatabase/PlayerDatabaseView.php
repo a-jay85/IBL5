@@ -65,8 +65,8 @@ class PlayerDatabaseView implements PlayerDatabaseViewInterface
         $r_fgp = $str($params['r_fgp'] ?? null);
         $r_fta = $str($params['r_fta'] ?? null);
         $r_ftp = $str($params['r_ftp'] ?? null);
-        $r_tga = $str($params['r_tga'] ?? null);
-        $r_tgp = $str($params['r_tgp'] ?? null);
+        $r_3ga = $str($params['r_3ga'] ?? null);
+        $r_3gp = $str($params['r_3gp'] ?? null);
         $r_orb = $str($params['r_orb'] ?? null);
         $r_drb = $str($params['r_drb'] ?? null);
         $r_ast = $str($params['r_ast'] ?? null);
@@ -164,12 +164,12 @@ class PlayerDatabaseView implements PlayerDatabaseViewInterface
                 <input id="r_ftp" type="text" name="r_ftp" style="width: 3.5rem;" value="<?= HtmlSanitizer::e($r_ftp) ?>">
             </div>
             <div class="ibl-filter-form__group">
-                <label class="ibl-filter-form__label" for="r_tga">3ga:</label>
-                <input id="r_tga" type="text" name="r_tga" style="width: 3.5rem;" value="<?= HtmlSanitizer::e($r_tga) ?>">
+                <label class="ibl-filter-form__label" for="r_3ga">3ga:</label>
+                <input id="r_3ga" type="text" name="r_3ga" style="width: 3.5rem;" value="<?= HtmlSanitizer::e($r_3ga) ?>">
             </div>
             <div class="ibl-filter-form__group">
-                <label class="ibl-filter-form__label" for="r_tgp">3gp:</label>
-                <input id="r_tgp" type="text" name="r_tgp" style="width: 3.5rem;" value="<?= HtmlSanitizer::e($r_tgp) ?>">
+                <label class="ibl-filter-form__label" for="r_3gp">3gp:</label>
+                <input id="r_3gp" type="text" name="r_3gp" style="width: 3.5rem;" value="<?= HtmlSanitizer::e($r_3gp) ?>">
             </div>
         </div>
         <div class="ibl-filter-form__row">
@@ -383,13 +383,13 @@ function resetPlayerDatabase() {
 </tr>
             <?php
         } else {
-            $teamID = (int) $player->teamID;
+            $teamid = (int) $player->teamid;
             ?>
 <tr>
     <td><?= HtmlSanitizer::e($position) ?></td>
     <?= PlayerImageHelper::renderFlexiblePlayerCell($pid, $playerName) ?>
     <td><?= $player->age !== null ? (string) $player->age : '' ?></td>
-    <?= TeamCellHelper::renderTeamCellOrFreeAgent($teamID, $player->teamName ?? '', $player->teamColor1 ?? 'FFFFFF', $player->teamColor2 ?? '000000') ?>
+    <?= TeamCellHelper::renderTeamCellOrFreeAgent($teamid, $player->teamName ?? '', $player->teamColor1 ?? 'FFFFFF', $player->teamColor2 ?? '000000') ?>
     <td><?= (int) $player->yearsOfExperience ?></td>
     <td><?= (int) $player->birdYears ?></td>
     <td><?= (int) $player->ratingFieldGoalAttempts ?></td>

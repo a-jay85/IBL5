@@ -123,7 +123,7 @@ class TradeAssetRepository extends BaseMysqliRepository implements TradeAssetRep
     public function updatePlayerTeam(int $playerId, int $newTeamId): int
     {
         return $this->execute(
-            "UPDATE ibl_plr SET tid = ? WHERE pid = ?",
+            "UPDATE ibl_plr SET teamid = ? WHERE pid = ?",
             "ii",
             $newTeamId,
             $playerId
@@ -136,7 +136,7 @@ class TradeAssetRepository extends BaseMysqliRepository implements TradeAssetRep
     public function updateDraftPickOwnerById(int $pickId, string $newOwner, int $newOwnerId): int
     {
         return $this->execute(
-            "UPDATE ibl_draft_picks SET ownerofpick = ?, owner_tid = ? WHERE pickid = ?",
+            "UPDATE ibl_draft_picks SET ownerofpick = ?, owner_teamid = ? WHERE pickid = ?",
             "sii",
             $newOwner,
             $newOwnerId,

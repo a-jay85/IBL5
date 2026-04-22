@@ -49,10 +49,10 @@ interface DepthChartEntryControllerInterface
      * Returns the TableViewDropdown-wrapped table HTML (dropdown + table) for use
      * by both the full page render and the AJAX tab-switching API.
      *
-     * @param int $teamID Team ID
+     * @param int $teamid Team ID
      * @param string $display Display mode (ratings, total_s, avg_s, per36mins, chunk, playoffs, contracts, split)
      * @param ?string $split Split stats key when display is 'split' (e.g. 'home', 'road')
      * @return string HTML output
      */
-    public function getTableOutput(int $teamID, string $display, ?string $split = null): string;
+    public function getTableOutput(int $teamid, string $display, ?string $split = null): string;
 }

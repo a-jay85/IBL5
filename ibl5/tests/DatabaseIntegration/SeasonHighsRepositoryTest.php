@@ -67,7 +67,7 @@ class SeasonHighsRepositoryTest extends DatabaseTestCase
     {
         $this->insertTestPlayer(200090302, 'Home Filter Test', ['pos' => 'SG', 'ordinal' => 2]);
 
-        // Player at home: teamID=1 = homeTID=1
+        // Player at home: teamid=1 = home_teamid=1
         $this->insertPlayerBoxscoreRow(
             '2098-01-15', 200090302, 'Home Filter Test', 'SG', 2, 1, 1,
             minutes: 30, points2m: 8, points2a: 15,
@@ -97,7 +97,7 @@ class SeasonHighsRepositoryTest extends DatabaseTestCase
     {
         $this->insertTestPlayer(200090303, 'Away Filter Test', ['pos' => 'SF', 'ordinal' => 3]);
 
-        // Player at home (teamID=1 = homeTID=1), so 'away' should exclude
+        // Player at home (teamid=1 = home_teamid=1), so 'away' should exclude
         $this->insertPlayerBoxscoreRow(
             '2098-01-15', 200090303, 'Away Filter Test', 'SF', 2, 1, 1,
         );

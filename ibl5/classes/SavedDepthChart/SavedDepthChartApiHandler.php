@@ -30,27 +30,27 @@ class SavedDepthChartApiHandler
      * Handle an API request
      *
      * @param string $action The action to perform (list, load, rename, rename-active)
-     * @param int $tid The team ID (already authorized)
+     * @param int $teamid The team ID (already authorized)
      * @param string $username The authenticated username
      * @param array<string, mixed> $params Request parameters
      */
-    public function handle(string $action, int $tid, string $username, array $params): void
+    public function handle(string $action, int $teamid, string $username, array $params): void
     {
         header('Content-Type: application/json; charset=utf-8');
 
         try {
             switch ($action) {
                 case 'list':
-                    $this->handleList($tid);
+                    $this->handleList($teamid);
                     break;
                 case 'load':
-                    $this->handleLoad($tid, $params);
+                    $this->handleLoad($teamid, $params);
                     break;
                 case 'rename':
-                    $this->handleRename($tid, $params);
+                    $this->handleRename($teamid, $params);
                     break;
                 case 'rename-active':
-                    $this->handleRenameActive($tid, $username, $params);
+                    $this->handleRenameActive($teamid, $username, $params);
                     break;
                 default:
                     $this->sendError('Unknown action', 400);
@@ -60,13 +60,13 @@ class SavedDepthChartApiHandler
         }
     }
 
-    private function handleList(int $tid): void
+    private function handleList(int $teamid): void
     {
         $season = new Season($this->db);
-        $options = $this->service->getDropdownOptions($tid, $season);
+        $options = $this->service->getDropdownOptions($teamid, $season);
 
         $depthCharts = [];
-        $savedDcs = $this->repository->getSavedDepthChartsForTeam($tid);
+        $savedDcs = $this->repository->getSavedDepthChartsForTeam($teamid);
 
         foreach ($savedDcs as $dc) {
             $depthCharts[] = [
@@ -81,7 +81,7 @@ class SavedDepthChartApiHandler
             ];
         }
 
-        $currentLiveLabel = $this->service->buildCurrentLiveLabel($tid, $season);
+        $currentLiveLabel = $this->service->buildCurrentLiveLabel($teamid, $season);
 
         echo json_encode([
             'depthCharts' => $depthCharts,
@@ -93,7 +93,7 @@ class SavedDepthChartApiHandler
     /**
      * @param array<string, mixed> $params
      */
-    private function handleLoad(int $tid, array $params): void
+    private function handleLoad(int $teamid, array $params): void
     {
         $rawId = $params['id'] ?? 0;
         $dcId = is_int($rawId) ? $rawId : (is_string($rawId) && is_numeric($rawId) ? (int) $rawId : 0);
@@ -104,16 +104,16 @@ class SavedDepthChartApiHandler
 
         // Get current roster PIDs
         $commonRepo = new \Services\CommonMysqliRepository($this->db);
-        $teamName = $commonRepo->getTeamnameFromTeamID($tid) ?? '';
+        $teamName = $commonRepo->getTeamnameFromTeamID($teamid) ?? '';
 
         $depthChartRepo = new \DepthChartEntry\DepthChartEntryRepository($this->db);
-        $rosterPlayers = ($tid > 0) ? $depthChartRepo->getPlayersOnTeam($tid) : [];
+        $rosterPlayers = ($teamid > 0) ? $depthChartRepo->getPlayersOnTeam($teamid) : [];
         $currentRosterPids = array_map(
             static fn(array $p): int => $p['pid'],
             $rosterPlayers
         );
 
-        $loaded = $this->service->loadSavedDepthChart($dcId, $tid, $currentRosterPids);
+        $loaded = $this->service->loadSavedDepthChart($dcId, $teamid, $currentRosterPids);
         if ($loaded === null) {
             $this->sendError('Depth chart not found', 404);
             return;
@@ -162,7 +162,7 @@ class SavedDepthChartApiHandler
         $endDate = $dc['sim_end_date'];
         $statsHtml = '';
         if ($endDate !== null && $endDate !== '') {
-            $team = Team::initialize($this->db, $tid);
+            $team = Team::initialize($this->db, $teamid);
             $season = new Season($this->db);
             $statsHtml = \UI\Tables\PeriodAverages::render($this->db, $team, $season, $startDate, $endDate);
         }
@@ -188,7 +188,7 @@ class SavedDepthChartApiHandler
     /**
      * @param array<string, mixed> $params
      */
-    private function handleRename(int $tid, array $params): void
+    private function handleRename(int $teamid, array $params): void
     {
         $rawId = $params['id'] ?? 0;
         $dcId = is_int($rawId) ? $rawId : (is_string($rawId) && is_numeric($rawId) ? (int) $rawId : 0);
@@ -210,7 +210,7 @@ class SavedDepthChartApiHandler
             $newName = mb_substr($newName, 0, 100);
         }
 
-        $success = $this->repository->updateName($dcId, $tid, $newName);
+        $success = $this->repository->updateName($dcId, $teamid, $newName);
 
         echo json_encode(['success' => $success, 'name' => $newName], JSON_THROW_ON_ERROR);
     }
@@ -218,7 +218,7 @@ class SavedDepthChartApiHandler
     /**
      * @param array<string, mixed> $params
      */
-    private function handleRenameActive(int $tid, string $username, array $params): void
+    private function handleRenameActive(int $teamid, string $username, array $params): void
     {
         $rawNameValue = $params['name'] ?? '';
         $rawName = is_string($rawNameValue) ? $rawNameValue : '';
@@ -234,7 +234,7 @@ class SavedDepthChartApiHandler
         }
 
         $season = new Season($this->db);
-        $result = $this->service->nameOrCreateActive($tid, $username, $newName, $season);
+        $result = $this->service->nameOrCreateActive($teamid, $username, $newName, $season);
 
         echo json_encode($result, JSON_THROW_ON_ERROR);
     }

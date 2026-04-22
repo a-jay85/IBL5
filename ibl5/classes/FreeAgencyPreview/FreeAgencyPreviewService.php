@@ -52,7 +52,7 @@ class FreeAgencyPreviewService implements FreeAgencyPreviewServiceInterface
             if ($nextYearSalary === 0) {
                 $freeAgents[] = [
                     'pid' => $player['pid'],
-                    'tid' => $player['tid'],
+                    'teamid' => $player['teamid'],
                     'name' => $player['name'],
                     'teamname' => $player['teamname'],
                     'team_city' => $player['team_city'] ?? '',
@@ -64,8 +64,8 @@ class FreeAgencyPreviewService implements FreeAgencyPreviewServiceInterface
                     'r_fgp' => $player['r_fgp'],
                     'r_fta' => $player['r_fta'],
                     'r_ftp' => $player['r_ftp'],
-                    'r_tga' => $player['r_tga'],
-                    'r_tgp' => $player['r_tgp'],
+                    'r_3ga' => $player['r_3ga'],
+                    'r_3gp' => $player['r_3gp'],
                     'r_orb' => $player['r_orb'],
                     'r_drb' => $player['r_drb'],
                     'r_ast' => $player['r_ast'],

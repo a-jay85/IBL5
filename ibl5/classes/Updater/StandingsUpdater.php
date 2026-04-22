@@ -16,7 +16,7 @@ use Season\Season;
  * then populates the ibl_standings table.
  *
  * @phpstan-type TeamStanding array{
- *     tid: int,
+ *     teamid: int,
  *     teamName: string,
  *     conference: string,
  *     division: string,
@@ -127,7 +127,7 @@ class StandingsUpdater extends \BaseMysqliRepository {
     /**
      * Fetch conference/division mapping from league config table for the current season
      *
-     * @return array<int, TeamMapping> Map of tid → {conference, division, teamName}
+     * @return array<int, TeamMapping> Map of teamid → {conference, division, teamName}
      */
     protected function fetchTeamMap(): array
     {
@@ -191,9 +191,9 @@ class StandingsUpdater extends \BaseMysqliRepository {
         /** @var array<int, TeamStanding> $standings */
         $standings = [];
 
-        foreach ($teamMap as $tid => $info) {
-            $standings[$tid] = [
-                'tid' => $tid,
+        foreach ($teamMap as $teamid => $info) {
+            $standings[$teamid] = [
+                'teamid' => $teamid,
                 'teamName' => $info['teamName'],
                 'conference' => $info['conference'],
                 'division' => $info['division'],
@@ -355,7 +355,7 @@ class StandingsUpdater extends \BaseMysqliRepository {
 
             $this->execute(
                 "INSERT INTO {$standingsTable} (
-                    tid, team_name, leagueRecord, wins, losses, pct, gamesUnplayed,
+                    teamid, team_name, leagueRecord, wins, losses, pct, gamesUnplayed,
                     conference, confGB, confRecord,
                     division, divGB, divRecord,
                     homeRecord, awayRecord,
@@ -392,7 +392,7 @@ class StandingsUpdater extends \BaseMysqliRepository {
                     clinchedPlayoffs = NULL,
                     clinchedLeague = NULL",
                 "issiidisdssdsssiiiiiiii",
-                $team['tid'],
+                $team['teamid'],
                 $team['teamName'],
                 $leagueRecord,
                 $team['wins'],
@@ -430,7 +430,7 @@ class StandingsUpdater extends \BaseMysqliRepository {
         list($grouping, $groupingGB, $groupingMagicNumber) = $this->assignGroupingsFor($region);
 
         $teams = $this->fetchAll(
-            "SELECT tid, team_name, homeWins, homeLosses, awayWins, awayLosses
+            "SELECT teamid, team_name, homeWins, homeLosses, awayWins, awayLosses
             FROM {$standingsTable}
             WHERE {$grouping} = ?
             ORDER BY pct DESC",
@@ -442,14 +442,14 @@ class StandingsUpdater extends \BaseMysqliRepository {
         $numTeams = count($teams);
 
         for ($i = 0; $i < $numTeams; $i++) {
-            /** @var array{tid: int, team_name: string, homeWins: int, homeLosses: int, awayWins: int, awayLosses: int} $teamRow */
+            /** @var array{teamid: int, team_name: string, homeWins: int, homeLosses: int, awayWins: int, awayLosses: int} $teamRow */
             $teamRow = $teams[$i];
-            $teamID = $teamRow['tid'];
+            $teamid = $teamRow['teamid'];
             $teamName = $teamRow['team_name'];
             $teamTotalWins = $teamRow['homeWins'] + $teamRow['awayWins'];
 
             if ($i + 1 !== $numTeams) {
-                /** @var array{tid: int, team_name: string, homeWins: int, homeLosses: int, awayWins: int, awayLosses: int} $belowTeamRow */
+                /** @var array{teamid: int, team_name: string, homeWins: int, homeLosses: int, awayWins: int, awayLosses: int} $belowTeamRow */
                 $belowTeamRow = $teams[$i + 1];
                 $belowTeamTotalLosses = $belowTeamRow['homeLosses'] + $belowTeamRow['awayLosses'];
             } else {
@@ -458,7 +458,7 @@ class StandingsUpdater extends \BaseMysqliRepository {
 
             $magicNumber = 82 + 1 - $teamTotalWins - $belowTeamTotalLosses;
 
-            $log .= $this->updateTeamMagicNumber($teamID, $teamName, $magicNumber, $groupingMagicNumber);
+            $log .= $this->updateTeamMagicNumber($teamid, $teamName, $magicNumber, $groupingMagicNumber);
         }
 
         \UI\DebugOutput::display($log, "{$region} Magic Number Update Log");
@@ -469,15 +469,15 @@ class StandingsUpdater extends \BaseMysqliRepository {
         }
     }
 
-    private function updateTeamMagicNumber(int $teamID, string $teamName, int $magicNumber, string $groupingMagicNumber): string {
+    private function updateTeamMagicNumber(int $teamid, string $teamName, int $magicNumber, string $groupingMagicNumber): string {
         $standingsTable = $this->resolveTable('ibl_standings');
         $log = '';
 
         $this->execute(
-            "UPDATE {$standingsTable} SET {$groupingMagicNumber} = ? WHERE tid = ?",
+            "UPDATE {$standingsTable} SET {$groupingMagicNumber} = ? WHERE teamid = ?",
             "ii",
             $magicNumber,
-            $teamID
+            $teamid
         );
 
         $log .= "Updated {$groupingMagicNumber} for {$teamName} to {$magicNumber}<br>";
@@ -490,9 +490,9 @@ class StandingsUpdater extends \BaseMysqliRepository {
         list($grouping, $groupingGB, $groupingMagicNumber) = $this->assignGroupingsFor($region);
         echo "<p>Checking if the {$region} {$grouping} has been clinched...<br>";
 
-        /** @var list<array{tid: int, team_name: string, wins: int}> $topTeams */
+        /** @var list<array{teamid: int, team_name: string, wins: int}> $topTeams */
         $topTeams = $this->fetchAll(
-            "SELECT tid, team_name, homeWins + awayWins AS wins
+            "SELECT teamid, team_name, homeWins + awayWins AS wins
             FROM {$standingsTable}
             WHERE {$grouping} = ?
             ORDER BY wins DESC
@@ -510,8 +510,8 @@ class StandingsUpdater extends \BaseMysqliRepository {
 
         // Head-to-head tiebreaker when tied in wins
         if ($first['wins'] === $second['wins']) {
-            $winnerId = $this->getHeadToHeadWinner($first['tid'], $second['tid']);
-            if ($winnerId === $second['tid']) {
+            $winnerId = $this->getHeadToHeadWinner($first['teamid'], $second['teamid']);
+            if ($winnerId === $second['teamid']) {
                 [$first, $second] = [$second, $first];
             }
         }
@@ -568,9 +568,9 @@ class StandingsUpdater extends \BaseMysqliRepository {
         $standingsTable = $this->resolveTable('ibl_standings');
         echo '<p>Checking if any team has clinched the best league record...<br>';
 
-        /** @var list<array{tid: int, team_name: string, wins: int}> $topTeams */
+        /** @var list<array{teamid: int, team_name: string, wins: int}> $topTeams */
         $topTeams = $this->fetchAll(
-            "SELECT tid, team_name, homeWins + awayWins AS wins
+            "SELECT teamid, team_name, homeWins + awayWins AS wins
             FROM {$standingsTable}
             ORDER BY wins DESC
             LIMIT 2",
@@ -586,8 +586,8 @@ class StandingsUpdater extends \BaseMysqliRepository {
 
         // Head-to-head tiebreaker when tied in wins
         if ($first['wins'] === $second['wins']) {
-            $winnerId = $this->getHeadToHeadWinner($first['tid'], $second['tid']);
-            if ($winnerId === $second['tid']) {
+            $winnerId = $this->getHeadToHeadWinner($first['teamid'], $second['teamid']);
+            if ($winnerId === $second['teamid']) {
                 [$first, $second] = [$second, $first];
             }
         }
@@ -665,7 +665,7 @@ class StandingsUpdater extends \BaseMysqliRepository {
      *
      * @param int $tid1 First team ID
      * @param int $tid2 Second team ID
-     * @return int The tid of the team that won the head-to-head series
+     * @return int The teamid of the team that won the head-to-head series
      */
     private function getHeadToHeadWinner(int $tid1, int $tid2): int {
         $scheduleTable = $this->resolveTable('ibl_schedule');

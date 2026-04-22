@@ -23,7 +23,7 @@ class LeagueStartersRepositoryTest extends DatabaseTestCase
     public function testGetAllStartersReturnsStarterPlayers(): void
     {
         // Insert a starter (PGDepth=1)
-        $this->insertTestPlayer(200140001, 'Starter PG', ['tid' => 1, 'PGDepth' => 1]);
+        $this->insertTestPlayer(200140001, 'Starter PG', ['teamid' => 1, 'PGDepth' => 1]);
 
         $starters = $this->repo->getAllStartersWithTeamData();
 
@@ -34,10 +34,10 @@ class LeagueStartersRepositoryTest extends DatabaseTestCase
     public function testGetAllStartersExcludesNonStarters(): void
     {
         // Insert a starter to guarantee non-empty results
-        $this->insertTestPlayer(200140004, 'Starter Guard', ['tid' => 1, 'PGDepth' => 1]);
+        $this->insertTestPlayer(200140004, 'Starter Guard', ['teamid' => 1, 'PGDepth' => 1]);
         // Insert a non-starter (all depths = 0)
         $this->insertTestPlayer(200140002, 'Bench Player', [
-            'tid' => 1, 'PGDepth' => 0, 'SGDepth' => 0, 'SFDepth' => 0, 'PFDepth' => 0, 'CDepth' => 0,
+            'teamid' => 1, 'PGDepth' => 0, 'SGDepth' => 0, 'SFDepth' => 0, 'PFDepth' => 0, 'CDepth' => 0,
         ]);
 
         $starters = $this->repo->getAllStartersWithTeamData();
@@ -50,7 +50,7 @@ class LeagueStartersRepositoryTest extends DatabaseTestCase
 
     public function testGetAllStartersIncludesTeamData(): void
     {
-        $this->insertTestPlayer(200140003, 'Starter SG', ['tid' => 1, 'SGDepth' => 1]);
+        $this->insertTestPlayer(200140003, 'Starter SG', ['teamid' => 1, 'SGDepth' => 1]);
 
         $starters = $this->repo->getAllStartersWithTeamData();
 

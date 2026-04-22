@@ -15,12 +15,12 @@ interface SplitStatsRepositoryInterface
     /**
      * Get per-game averages for a team's players filtered by a split criterion
      *
-     * @param int $teamID Team ID (must be > 0)
+     * @param int $teamid Team ID (must be > 0)
      * @param int $seasonEndingYear The ending year of the current season
      * @param string $splitKey A validated split key (e.g. 'home', 'road', 'wins', 'month_11', 'vs_5')
      * @return list<SplitStatsRow> Player rows with per-game averages
      */
-    public function getSplitStats(int $teamID, int $seasonEndingYear, string $splitKey): array;
+    public function getSplitStats(int $teamid, int $seasonEndingYear, string $splitKey): array;
 
     /**
      * Get all valid split key strings for parameter validation

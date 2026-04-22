@@ -220,7 +220,7 @@ class CapSpaceServiceTest extends TestCase
     private function createMockTeamWithMleLle(int $hasMLE, int $hasLLE): Team
     {
         $mockTeam = $this->createMock(Team::class);
-        $mockTeam->teamID = 1;
+        $mockTeam->teamid = 1;
         $mockTeam->name = 'Test Team';
         $mockTeam->city = 'Test City';
         $mockTeam->color1 = '000000';

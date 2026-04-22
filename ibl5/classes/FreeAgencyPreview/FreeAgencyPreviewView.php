@@ -106,14 +106,14 @@ class FreeAgencyPreviewView implements FreeAgencyPreviewViewInterface
 
         foreach ($freeAgents as $player) {
             $pid = $player['pid'];
-            $tid = $player['tid'];
+            $teamid = $player['teamid'];
             $pos = HtmlSanitizer::safeHtmlOutput($player['pos']);
             $age = $player['age'];
 
             $playerCell = PlayerImageHelper::renderFlexiblePlayerCell($pid, $player['name'], 'sticky-col');
-            $teamCell = TeamCellHelper::renderTeamCellOrFreeAgent($tid, $player['teamname'], $player['color1'], $player['color2']);
+            $teamCell = TeamCellHelper::renderTeamCellOrFreeAgent($teamid, $player['teamname'], $player['color1'], $player['color2']);
 
-            $output .= "<tr data-team-id=\"{$tid}\">"
+            $output .= "<tr data-team-id=\"{$teamid}\">"
                 . $playerCell
                 . $teamCell
                 . "<td class=\"fa-preview-pos-col\">{$pos}</td>"
@@ -122,8 +122,8 @@ class FreeAgencyPreviewView implements FreeAgencyPreviewViewInterface
                 . "<td>{$player['r_fgp']}</td>"
                 . "<td>{$player['r_fta']}</td>"
                 . "<td>{$player['r_ftp']}</td>"
-                . "<td>{$player['r_tga']}</td>"
-                . "<td>{$player['r_tgp']}</td>"
+                . "<td>{$player['r_3ga']}</td>"
+                . "<td>{$player['r_3gp']}</td>"
                 . "<td>{$player['r_orb']}</td>"
                 . "<td>{$player['r_drb']}</td>"
                 . "<td>{$player['r_ast']}</td>"

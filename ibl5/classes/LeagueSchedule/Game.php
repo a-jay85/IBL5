@@ -11,8 +11,8 @@ class Game
     public int $boxScoreID;
     public int $gameOfThatDay;
 
-    public int $visitorTeamID;
-    public int $homeTeamID;
+    public int $visitor_teamid;
+    public int $home_teamid;
 
     public int $visitorScore;
     public int $homeScore;
@@ -33,25 +33,25 @@ class Game
         $this->boxScoreID = $scheduleRow['BoxID'];
         $this->gameOfThatDay = (int) ($scheduleRow['gameOfThatDay'] ?? 0);
 
-        $this->visitorTeamID = $scheduleRow['Visitor'];
-        $this->homeTeamID = $scheduleRow['Home'];
+        $this->visitor_teamid = $scheduleRow['Visitor'];
+        $this->home_teamid = $scheduleRow['Home'];
 
         $this->visitorScore = $scheduleRow['VScore'];
         $this->homeScore = $scheduleRow['HScore'];
 
         $this->isUnplayed = ($this->visitorScore === $this->homeScore);
-        $this->winningTeamID = $this->visitorScore > $this->homeScore ? $this->visitorTeamID : $this->homeTeamID;
+        $this->winningTeamID = $this->visitorScore > $this->homeScore ? $this->visitor_teamid : $this->home_teamid;
     }
 
     public function getOpposingTeamID(int $userTeamID): int
     {
-        $this->opposingTeamID = $this->visitorTeamID === $userTeamID ? $this->homeTeamID : $this->visitorTeamID;
+        $this->opposingTeamID = $this->visitor_teamid === $userTeamID ? $this->home_teamid : $this->visitor_teamid;
         return $this->opposingTeamID;
     }
 
     public function getUserTeamLocationPrefix(int $userTeamID): string
     {
-        $this->userTeamLocationPrefix = $this->visitorTeamID === $userTeamID ? "@" : "vs";
+        $this->userTeamLocationPrefix = $this->visitor_teamid === $userTeamID ? "@" : "vs";
         return $this->userTeamLocationPrefix;
     }
 }

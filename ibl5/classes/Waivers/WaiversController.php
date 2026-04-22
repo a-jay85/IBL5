@@ -159,7 +159,7 @@ class WaiversController implements WaiversControllerInterface
 
         echo $this->view->renderWaiverForm(
             $formData['team']->name,
-            $formData['team']->teamID,
+            $formData['team']->teamid,
             $action,
             $formData['players'],
             $formData['openRosterSpots'],

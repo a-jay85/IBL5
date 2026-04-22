@@ -32,22 +32,22 @@ class TeamScheduleRepository extends \BaseMysqliRepository implements TeamSchedu
      *
      * @return list<ScheduleRow>
      */
-    public function getSchedule(int $teamID): array
+    public function getSchedule(int $teamid): array
     {
         /** @var list<ScheduleRow> */
         return $this->fetchAll(
             "SELECT s.*, bst.gameOfThatDay
             FROM {$this->scheduleTable} s
             LEFT JOIN (
-                SELECT Date, visitorTeamID, homeTeamID, MIN(gameOfThatDay) AS gameOfThatDay
+                SELECT Date, visitor_teamid, home_teamid, MIN(gameOfThatDay) AS gameOfThatDay
                 FROM {$this->boxScoresTeamsTable}
-                GROUP BY Date, visitorTeamID, homeTeamID
-            ) bst ON bst.Date = s.Date AND bst.visitorTeamID = s.Visitor AND bst.homeTeamID = s.Home
+                GROUP BY Date, visitor_teamid, home_teamid
+            ) bst ON bst.Date = s.Date AND bst.visitor_teamid = s.Visitor AND bst.home_teamid = s.Home
             WHERE s.Visitor = ? OR s.Home = ?
             ORDER BY s.Date ASC",
             'ii',
-            $teamID,
-            $teamID
+            $teamid,
+            $teamid
         );
     }
 
@@ -56,7 +56,7 @@ class TeamScheduleRepository extends \BaseMysqliRepository implements TeamSchedu
      *
      * @return list<ProjectedGameRow>
      */
-    public function getProjectedGamesNextSimResult(int $teamID, string $lastSimEndDate, string $projectedNextSimEndDate): array
+    public function getProjectedGamesNextSimResult(int $teamid, string $lastSimEndDate, string $projectedNextSimEndDate): array
     {
         /** @var list<ProjectedGameRow> */
         return $this->fetchAll(
@@ -65,8 +65,8 @@ class TeamScheduleRepository extends \BaseMysqliRepository implements TeamSchedu
                AND Date BETWEEN ADDDATE(?, 1) AND ?
              ORDER BY Date ASC",
             'iiss',
-            $teamID,
-            $teamID,
+            $teamid,
+            $teamid,
             $lastSimEndDate,
             $projectedNextSimEndDate
         );

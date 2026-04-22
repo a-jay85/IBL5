@@ -68,7 +68,7 @@ class InjuriesViewTest extends TestCase
                 'position' => 'PG',
                 'daysRemaining' => 5,
                 'returnDate' => '2025-02-10',
-                'teamID' => 1,
+                'teamid' => 1,
                 'teamCity' => 'Boston',
                 'teamName' => 'Celtics',
                 'teamColor1' => '007A33',
@@ -93,7 +93,7 @@ class InjuriesViewTest extends TestCase
                 'position' => 'PG',
                 'daysRemaining' => 5,
                 'returnDate' => '2025-02-10',
-                'teamID' => 1,
+                'teamid' => 1,
                 'teamCity' => 'Boston',
                 'teamName' => 'Celtics',
                 'teamColor1' => '007A33',
@@ -105,7 +105,7 @@ class InjuriesViewTest extends TestCase
                 'position' => 'C',
                 'daysRemaining' => 10,
                 'returnDate' => '2025-02-15',
-                'teamID' => 2,
+                'teamid' => 2,
                 'teamCity' => 'Los Angeles',
                 'teamName' => 'Lakers',
                 'teamColor1' => '552583',
@@ -130,7 +130,7 @@ class InjuriesViewTest extends TestCase
                 'position' => 'PG',
                 'daysRemaining' => 5,
                 'returnDate' => '2025-02-10',
-                'teamID' => 1,
+                'teamid' => 1,
                 'teamCity' => 'Boston',
                 'teamName' => 'Celtics',
                 'teamColor1' => '007A33',
@@ -142,7 +142,7 @@ class InjuriesViewTest extends TestCase
                 'position' => 'C',
                 'daysRemaining' => 10,
                 'returnDate' => '2025-02-15',
-                'teamID' => 2,
+                'teamid' => 2,
                 'teamCity' => 'Los Angeles',
                 'teamName' => 'Lakers',
                 'teamColor1' => '552583',
@@ -165,7 +165,7 @@ class InjuriesViewTest extends TestCase
                 'position' => 'PG',
                 'daysRemaining' => 5,
                 'returnDate' => '2025-02-10',
-                'teamID' => 1,
+                'teamid' => 1,
                 'teamCity' => 'Test<script>',
                 'teamName' => 'Team&Name',
                 'teamColor1' => '000000',
@@ -192,7 +192,7 @@ class InjuriesViewTest extends TestCase
                 'position' => 'PG',
                 'daysRemaining' => 5,
                 'returnDate' => '2025-02-10',
-                'teamID' => 1,
+                'teamid' => 1,
                 'teamCity' => 'Boston',
                 'teamName' => 'Celtics',
                 'teamColor1' => '007A33',
@@ -215,7 +215,7 @@ class InjuriesViewTest extends TestCase
                 'position' => 'PG',
                 'daysRemaining' => 5,
                 'returnDate' => '2025-02-10',
-                'teamID' => 42,
+                'teamid' => 42,
                 'teamCity' => 'Boston',
                 'teamName' => 'Celtics',
                 'teamColor1' => '007A33',
@@ -225,7 +225,7 @@ class InjuriesViewTest extends TestCase
 
         $result = $this->view->render($injuredPlayers);
 
-        $this->assertStringContainsString('teamID=42', $result);
+        $this->assertStringContainsString('teamid=42', $result);
         $this->assertStringContainsString('modules.php?name=Team', $result);
     }
 
@@ -238,7 +238,7 @@ class InjuriesViewTest extends TestCase
                 'position' => 'PG',
                 'daysRemaining' => 5,
                 'returnDate' => '2025-02-10',
-                'teamID' => 1,
+                'teamid' => 1,
                 'teamCity' => 'Boston',
                 'teamName' => 'Celtics',
                 'teamColor1' => '007A33',

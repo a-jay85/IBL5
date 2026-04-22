@@ -41,7 +41,7 @@ $REQUEST_URI = $_SERVER['REQUEST_URI'] ?? '';
 if (stristr($REQUEST_URI, "mainfile")) {
     Header("Location: modules.php?name=$module_name&file=article&sid=$sid");
     exit;
-} elseif ($sid === 0 && !isset($tid)) {
+} elseif ($sid === 0 && !isset($teamid)) {
     Header("Location: index.php");
     exit;
 }

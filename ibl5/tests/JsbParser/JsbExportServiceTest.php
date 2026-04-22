@@ -33,7 +33,7 @@ class JsbExportServiceTest extends TestCase
     private function buildSyntheticRecord(
         int $ordinal = 1,
         int $pid = 12345,
-        int $tid = 5,
+        int $teamid = 5,
         int $bird = 3,
         string $name = 'Test Player',
         int $cy = 2,
@@ -51,7 +51,7 @@ class JsbExportServiceTest extends TestCase
         $record = substr_replace($record, PlrFieldSerializer::formatInt($ordinal, 4), 0, 4);
         $record = substr_replace($record, str_pad($name, 32), 4, 32);
         $record = substr_replace($record, PlrFieldSerializer::formatInt($pid, 6), 38, 6);
-        $record = substr_replace($record, PlrFieldSerializer::formatInt($tid, 2), 44, 2);
+        $record = substr_replace($record, PlrFieldSerializer::formatInt($teamid, 2), 44, 2);
         $record = substr_replace($record, PlrFieldSerializer::formatInt($bird, 2), 288, 2);
         $record = substr_replace($record, PlrFieldSerializer::formatInt($cy, 2), 290, 2);
         $record = substr_replace($record, PlrFieldSerializer::formatInt($cyt, 2), 292, 2);
@@ -62,8 +62,8 @@ class JsbExportServiceTest extends TestCase
         $record = substr_replace($record, PlrFieldSerializer::formatInt($cy5, 4), 314, 4);
         $record = substr_replace($record, PlrFieldSerializer::formatInt($cy6, 4), 318, 4);
         $record = substr_replace($record, PlrFieldSerializer::formatInt($faSigningFlag, 1), 330, 1);
-        $record = substr_replace($record, PlrFieldSerializer::formatInt($tid, 2), 331, 2);
-        $currentIndex = $tid === 0 ? -1 : $tid - 1;
+        $record = substr_replace($record, PlrFieldSerializer::formatInt($teamid, 2), 331, 2);
+        $currentIndex = $teamid === 0 ? -1 : $teamid - 1;
         $record = substr_replace($record, PlrFieldSerializer::formatInt($currentIndex, 2), 333, 2);
         $record = substr_replace($record, PlrFieldSerializer::formatInt($currentIndex, 2), 335, 2);
 
@@ -96,7 +96,7 @@ class JsbExportServiceTest extends TestCase
             12345 => [
                 'pid' => 12345,
                 'name' => 'Test Player',
-                'tid' => 5,
+                'teamid' => 5,
                 'bird' => 3,
                 'cy' => 2,
                 'cyt' => 2,
@@ -133,7 +133,7 @@ class JsbExportServiceTest extends TestCase
             12345 => [
                 'pid' => 12345,
                 'name' => 'Test Player',
-                'tid' => 10,
+                'teamid' => 10,
                 'bird' => 3,
                 'cy' => 2,
                 'cyt' => 2,
@@ -156,7 +156,7 @@ class JsbExportServiceTest extends TestCase
             $this->assertSame(12345, $change['pid']);
             $tidChange = array_filter(
                 $change['changes'],
-                static fn (array $c): bool => $c['field'] === 'tid'
+                static fn (array $c): bool => $c['field'] === 'teamid'
             );
             $this->assertCount(1, $tidChange);
         } finally {
@@ -178,7 +178,7 @@ class JsbExportServiceTest extends TestCase
             12345 => [
                 'pid' => 12345,
                 'name' => 'Test Player',
-                'tid' => 5,
+                'teamid' => 5,
                 'bird' => 5,
                 'cy' => 3,
                 'cyt' => 3,
@@ -215,7 +215,7 @@ class JsbExportServiceTest extends TestCase
             12345 => [
                 'pid' => 12345,
                 'name' => 'Other Player',
-                'tid' => 10,
+                'teamid' => 10,
                 'bird' => 3,
                 'cy' => 2,
                 'cyt' => 2,

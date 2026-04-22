@@ -16,7 +16,7 @@ namespace Team\Contracts;
  * @phpstan-import-type TeamInfoRow from \Services\CommonMysqliRepository
  * @phpstan-import-type PlayerRow from \Services\CommonMysqliRepository
  *
- * @phpstan-type PowerRow array{tid: int, team_name: string, leagueRecord: string, wins: int, losses: int, pct: float|string, conference: string, division: string, confRecord: string, divRecord: string, divGB: float|string|null, homeRecord: string, awayRecord: string, gamesUnplayed: int, ranking: float, last_win: int, last_loss: int, streak_type: string, streak: int, sos: float|string, remaining_sos: float|string}
+ * @phpstan-type PowerRow array{teamid: int, team_name: string, leagueRecord: string, wins: int, losses: int, pct: float|string, conference: string, division: string, confRecord: string, divRecord: string, divGB: float|string|null, homeRecord: string, awayRecord: string, gamesUnplayed: int, ranking: float, last_win: int, last_loss: int, streak_type: string, streak: int, sos: float|string, remaining_sos: float|string}
  * @phpstan-type BannerRow array{year: int, currentname: string, bannername: string, bannertype: int}
  * @phpstan-type GMTenureRow array{id: int, franchise_id: int, gm_display_name: string, start_season_year: int, end_season_year: int|null, is_mid_season_start: int, is_mid_season_end: int}
  * @phpstan-type GMAwardRow array{year: int, Award: string, name: string, table_ID: int}
@@ -32,10 +32,10 @@ interface TeamRepositoryInterface
     /**
      * Get team information by team ID
      *
-     * @param int $teamID Team ID from ibl_team_info
+     * @param int $teamid Team ID from ibl_team_info
      * @return TeamInfoRow|null Team data or null if not found
      */
-    public function getTeam(int $teamID): ?array;
+    public function getTeam(int $teamid): ?array;
 
     /**
      * Get team power ranking data
@@ -119,18 +119,18 @@ interface TeamRepositoryInterface
     /**
      * Get free agency roster for a team (expiring contracts only)
      *
-     * @param int $teamID Team ID
+     * @param int $teamid Team ID
      * @return list<PlayerRow> Player rows ordered by ordinal, then name
      */
-    public function getFreeAgencyRoster(int $teamID): array;
+    public function getFreeAgencyRoster(int $teamid): array;
 
     /**
      * Get current season roster for a team
      *
-     * @param int $teamID Team ID
+     * @param int $teamid Team ID
      * @return list<PlayerRow> Player rows ordered by ordinal, then name
      */
-    public function getRosterUnderContract(int $teamID): array;
+    public function getRosterUnderContract(int $teamid): array;
 
     /**
      * Get free agents available for signing
@@ -150,11 +150,11 @@ interface TeamRepositoryInterface
     /**
      * Get historical roster for a team in a specific season
      *
-     * @param int $teamID Team ID
+     * @param int $teamid Team ID
      * @param string $year Season year (e.g., "2023", "2024")
      * @return list<HistRow> Player rows ordered by name ASC
      */
-    public function getHistoricalRoster(int $teamID, string $year): array;
+    public function getHistoricalRoster(int $teamid, string $year): array;
 
     /**
      * Get all franchise seasons for a franchise

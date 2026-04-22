@@ -69,7 +69,7 @@ class PlayerTransformerTest extends TestCase
 
         $this->assertSame('abc-123-def', $result['uuid']);
         $this->assertSame(123, $result['pid']);
-        $this->assertArrayNotHasKey('tid', $result);
+        $this->assertArrayNotHasKey('teamid', $result);
         $this->assertArrayNotHasKey('teamid', $result);
     }
 

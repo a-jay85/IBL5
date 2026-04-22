@@ -68,7 +68,7 @@ class InjuriesView implements InjuriesViewInterface
      *     position: string,
      *     daysRemaining: int,
      *     returnDate: ?string,
-     *     teamID: int,
+     *     teamid: int,
      *     teamCity: string,
      *     teamName: string,
      *     teamColor1: string,
@@ -96,7 +96,7 @@ class InjuriesView implements InjuriesViewInterface
      *     position: string,
      *     daysRemaining: int,
      *     returnDate: ?string,
-     *     teamID: int,
+     *     teamid: int,
      *     teamCity: string,
      *     teamName: string,
      *     teamColor1: string,
@@ -107,7 +107,7 @@ class InjuriesView implements InjuriesViewInterface
     private function renderPlayerRow(array $player): string
     {
         $playerID = $player['playerID'];
-        $teamID = $player['teamID'];
+        $teamid = $player['teamid'];
         $position = HtmlSanitizer::safeHtmlOutput($player['position']);
         $daysRemaining = $player['daysRemaining'];
         $returnDate = $player['returnDate'] ?? '';
@@ -116,9 +116,9 @@ class InjuriesView implements InjuriesViewInterface
             : (string) $daysRemaining;
 
         $playerCell = PlayerImageHelper::renderFlexiblePlayerCell($playerID, $player['name']);
-        $teamCell = TeamCellHelper::renderTeamCell($teamID, $player['teamName'], $player['teamColor1'], $player['teamColor2']);
+        $teamCell = TeamCellHelper::renderTeamCell($teamid, $player['teamName'], $player['teamColor1'], $player['teamColor2']);
 
-        return "<tr data-team-id=\"{$teamID}\">"
+        return "<tr data-team-id=\"{$teamid}\">"
             . "<td>{$position}</td>"
             . $playerCell
             . $teamCell

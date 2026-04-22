@@ -182,8 +182,8 @@ class PlrParserService implements PlrParserServiceInterface
             : 0;
 
         // Team name for historical stats
-        $tid = (int) $raw['tid'];
-        $teamName = $this->commonRepository->getTeamnameFromTeamID($tid) ?? '';
+        $teamid = (int) $raw['teamid'];
+        $teamName = $this->commonRepository->getTeamnameFromTeamID($teamid) ?? '';
 
         return array_merge($raw, [
             'seasonFGM' => $seasonFGM,
@@ -297,7 +297,7 @@ class PlrParserService implements PlrParserServiceInterface
             'source_archive' => $sourceArchive,
             'ordinal' => (int) $derived['ordinal'],
             // Physical & position
-            'tid' => (int) $derived['tid'],
+            'teamid' => (int) $derived['teamid'],
             'age' => (int) $derived['age'],
             'pos' => (string) $derived['pos'],
             'peak' => (int) $derived['peak'],
@@ -318,8 +318,8 @@ class PlrParserService implements PlrParserServiceInterface
             'r_fgp' => (int) $derived['rating2GP'],
             'r_fta' => (int) $derived['ratingFTA'],
             'r_ftp' => (int) $derived['ratingFTP'],
-            'r_tga' => (int) $derived['rating3GA'],
-            'r_tgp' => (int) $derived['rating3GP'],
+            'r_3ga' => (int) $derived['rating3GA'],
+            'r_3gp' => (int) $derived['rating3GP'],
             'r_orb' => (int) $derived['ratingORB'],
             'r_drb' => (int) $derived['ratingDRB'],
             'r_ast' => (int) $derived['ratingAST'],
@@ -364,7 +364,7 @@ class PlrParserService implements PlrParserServiceInterface
             'stats_drb' => (int) $derived['seasonDRB'],
             'stats_ast' => (int) $derived['seasonAST'],
             'stats_stl' => (int) $derived['seasonSTL'],
-            'stats_to' => (int) $derived['seasonTVR'],
+            'stats_tvr' => (int) $derived['seasonTVR'],
             'stats_blk' => (int) $derived['seasonBLK'],
             'stats_pf' => (int) $derived['seasonPF'],
             'stats_reb' => (int) $derived['seasonREB'],

@@ -206,17 +206,17 @@ class SeasonHighsViewTest extends TestCase
     }
 
     /**
-     * @return array{name: string, date: string, value: int, pid?: int, tid?: int, teamname?: string, color1?: string, color2?: string, boxId?: int, gameOfThatDay?: int}
+     * @return array{name: string, date: string, value: int, pid?: int, teamid?: int, teamname?: string, color1?: string, color2?: string, boxId?: int, gameOfThatDay?: int}
      */
     private static function createHighEntry(array $overrides = []): array
     {
-        /** @var array{name: string, date: string, value: int, pid?: int, tid?: int, teamname?: string, color1?: string, color2?: string, boxId?: int, gameOfThatDay?: int} */
+        /** @var array{name: string, date: string, value: int, pid?: int, teamid?: int, teamname?: string, color1?: string, color2?: string, boxId?: int, gameOfThatDay?: int} */
         return array_merge([
             'name' => 'Test Player',
             'date' => '2024-12-15',
             'value' => 30,
             'pid' => 1,
-            'tid' => 1,
+            'teamid' => 1,
             'teamname' => 'Hawks',
             'color1' => 'FF0000',
             'color2' => '000000',

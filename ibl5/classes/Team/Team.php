@@ -19,7 +19,7 @@ use League\League;
  */
 class Team extends \BaseMysqliRepository
 {
-    public int $teamID;
+    public int $teamid;
 
     public string $city;
     public string $name;
@@ -97,7 +97,7 @@ class Team extends \BaseMysqliRepository
                      ibl_standings.leagueRecord
                 FROM ibl_team_info
                     LEFT JOIN ibl_standings
-                    ON ibl_team_info.teamid = ibl_standings.tid
+                    ON ibl_team_info.teamid = ibl_standings.teamid
                 WHERE ibl_team_info.teamid = ?
                 LIMIT 1";
             /** @var TeamWithStandingsRow|null $teamRow */
@@ -107,7 +107,7 @@ class Team extends \BaseMysqliRepository
                      ibl_standings.leagueRecord
                 FROM ibl_team_info
                     LEFT JOIN ibl_standings
-                    ON ibl_team_info.teamid = ibl_standings.tid
+                    ON ibl_team_info.teamid = ibl_standings.teamid
                 WHERE ibl_team_info.team_name = ?
                 LIMIT 1";
             /** @var TeamWithStandingsRow|null $teamRow */
@@ -130,7 +130,7 @@ class Team extends \BaseMysqliRepository
      */
     protected function fill(array $teamRow): void
     {
-        $this->teamID = $teamRow['teamid'];
+        $this->teamid = $teamRow['teamid'];
 
         $this->city = $teamRow['team_city'];
         $this->name = $teamRow['team_name'];

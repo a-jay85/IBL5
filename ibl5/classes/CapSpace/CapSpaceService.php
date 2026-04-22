@@ -71,7 +71,7 @@ class CapSpaceService
      */
     protected function processTeamCapData(Team $team, Season $season): array
     {
-        $salaryCapSpent = $this->teamQueryRepo->getSalaryCapArray($team->name, $team->teamID, $season);
+        $salaryCapSpent = $this->teamQueryRepo->getSalaryCapArray($team->name, $team->teamid, $season);
         $freeAgencySlots = 15;
 
         // Calculate available salary for each year
@@ -85,7 +85,7 @@ class CapSpaceService
         ];
 
         // Get salary by position — fetch all players under contract once, partition by position
-        $allPlayers = $this->teamQueryRepo->getAllPlayersUnderContract($team->teamID);
+        $allPlayers = $this->teamQueryRepo->getAllPlayersUnderContract($team->teamid);
         /** @var array<string, list<PlayerRow>> $playersByPosition */
         $playersByPosition = [];
         foreach ($allPlayers as $playerRow) {
@@ -100,14 +100,14 @@ class CapSpaceService
         }
 
         // Calculate roster slots used
-        $contractData = $this->repository->getPlayersUnderContractAfterSeason($team->teamID);
+        $contractData = $this->repository->getPlayersUnderContractAfterSeason($team->teamid);
 
         // Calculate FA slots from roster - players with contracts beyond current season take up slots
         $freeAgencySlots = $freeAgencySlots - count($contractData);
 
         return [
             'team' => $team,
-            'teamId' => $team->teamID,
+            'teamId' => $team->teamid,
             'teamName' => $team->name,
             'teamCity' => $team->city,
             'color1' => $team->color1,

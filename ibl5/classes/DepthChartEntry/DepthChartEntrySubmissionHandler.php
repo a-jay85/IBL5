@@ -114,8 +114,8 @@ class DepthChartEntrySubmissionHandler implements DepthChartEntrySubmissionHandl
     {
         try {
             $commonRepo = new \Services\CommonMysqliRepository($this->db);
-            $tid = $commonRepo->getTidFromTeamname($teamName) ?? 0;
-            if ($tid === 0) {
+            $teamid = $commonRepo->getTidFromTeamname($teamName) ?? 0;
+            if ($teamid === 0) {
                 return;
             }
 
@@ -126,7 +126,7 @@ class DepthChartEntrySubmissionHandler implements DepthChartEntrySubmissionHandl
             }
 
             // Get roster players for snapshot (fresh from DB since they were just updated)
-            $rosterPlayers = $this->repository->getPlayersOnTeam($tid);
+            $rosterPlayers = $this->repository->getPlayersOnTeam($teamid);
 
             $loadedDcId = 0;
             $rawLoadedDcId = $postData['loaded_dc_id'] ?? '0';
@@ -143,7 +143,7 @@ class DepthChartEntrySubmissionHandler implements DepthChartEntrySubmissionHandl
             }
 
             $this->savedDcService->saveOnSubmit(
-                $tid,
+                $teamid,
                 $username,
                 $dcName,
                 $rosterPlayers,

@@ -34,7 +34,7 @@ class CapSpaceRepositoryTest extends DatabaseTestCase
     public function testGetPlayersUnderContractAfterSeasonReturnsMatchingPlayers(): void
     {
         // cy=1, cyt=3 → cy != cyt, so player is under contract after this season
-        $this->insertTestPlayer(200100001, 'CapSpace Under', ['tid' => 1, 'cy' => 1, 'cyt' => 3]);
+        $this->insertTestPlayer(200100001, 'CapSpace Under', ['teamid' => 1, 'cy' => 1, 'cyt' => 3]);
 
         $players = $this->repo->getPlayersUnderContractAfterSeason(1);
 
@@ -52,9 +52,9 @@ class CapSpaceRepositoryTest extends DatabaseTestCase
     public function testGetPlayersUnderContractAfterSeasonExcludesExpiringContracts(): void
     {
         // Insert a non-expiring player to guarantee the result is non-empty
-        $this->insertTestPlayer(200100003, 'CapSpace Active', ['tid' => 1, 'cy' => 1, 'cyt' => 3]);
+        $this->insertTestPlayer(200100003, 'CapSpace Active', ['teamid' => 1, 'cy' => 1, 'cyt' => 3]);
         // Insert an expiring player (cy=3, cyt=3) — should NOT be returned
-        $this->insertTestPlayer(200100002, 'CapSpace Expirn', ['tid' => 1, 'cy' => 3, 'cyt' => 3]);
+        $this->insertTestPlayer(200100002, 'CapSpace Expirn', ['teamid' => 1, 'cy' => 3, 'cyt' => 3]);
 
         $players = $this->repo->getPlayersUnderContractAfterSeason(1);
 
@@ -76,7 +76,7 @@ class CapSpaceRepositoryTest extends DatabaseTestCase
     {
         // SQL has AND name NOT LIKE '%|%' — pipe-name players should be excluded
         $this->insertTestPlayer(200100005, 'Cap|PipeName', [
-            'tid' => 1,
+            'teamid' => 1,
             'cy' => 1,
             'cyt' => 3,
             'cy1' => 1500,

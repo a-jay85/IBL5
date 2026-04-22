@@ -5,10 +5,10 @@ declare(strict_types=1);
 namespace ProjectedDraftOrder\Contracts;
 
 /**
- * @phpstan-type StandingsRow array{tid: int, team_name: string, wins: int, losses: int, pct: float, conference: string, division: string, confWins: int|null, confLosses: int|null, divWins: int|null, divLosses: int|null, clinchedDivision: int|null, color1: string, color2: string}
+ * @phpstan-type StandingsRow array{teamid: int, team_name: string, wins: int, losses: int, pct: float, conference: string, division: string, confWins: int|null, confLosses: int|null, divWins: int|null, divLosses: int|null, clinchedDivision: int|null, color1: string, color2: string}
  * @phpstan-type GameRow array{Visitor: int, VScore: int, Home: int, HScore: int}
  * @phpstan-type PickOwnershipRow array{ownerofpick: string, teampick: string, round: int, notes: string|null}
- * @phpstan-type PointDifferentialRow array{tid: int, pointsFor: float, pointsAgainst: float}
+ * @phpstan-type PointDifferentialRow array{teamid: int, pointsFor: float, pointsAgainst: float}
  * @see \ProjectedDraftOrder\ProjectedDraftOrderRepository
  */
 interface ProjectedDraftOrderRepositoryInterface
@@ -49,14 +49,14 @@ interface ProjectedDraftOrderRepositoryInterface
     /**
      * Save the final draft order (both rounds) to ibl_draft and mark as finalized.
      *
-     * @param list<array{round: int, pick: int, team: string, tid: int}> $picks
+     * @param list<array{round: int, pick: int, team: string, teamid: int}> $picks
      */
     public function saveFinalDraftOrder(int $year, array $picks): void;
 
     /**
      * Fetch saved draft order from ibl_draft for a given year and round.
      *
-     * @return list<array{pick: int, team: string, tid: int, player: string}>
+     * @return list<array{pick: int, team: string, teamid: int, player: string}>
      */
     public function getFinalDraftOrder(int $year, int $round = 1): array;
 

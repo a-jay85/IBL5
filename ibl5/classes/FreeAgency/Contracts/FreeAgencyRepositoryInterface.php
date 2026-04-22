@@ -13,27 +13,27 @@ namespace FreeAgency\Contracts;
  * @phpstan-import-type PlayerRow from \Services\CommonMysqliRepository
  *
  * @phpstan-type OfferRow array{offer1: int, offer2: int, offer3: int, offer4: int, offer5: int, offer6: int}
- * @phpstan-type OfferData array{pid: int, tid: int, teamName: string, playerName: string, offer1: int, offer2: int, offer3: int, offer4: int, offer5: int, offer6: int, modifier: float, random: int, perceivedValue: float, mle: int, lle: int, offerType: int}
+ * @phpstan-type OfferData array{pid: int, teamid: int, teamName: string, playerName: string, offer1: int, offer2: int, offer3: int, offer4: int, offer5: int, offer6: int, modifier: float, random: int, perceivedValue: float, mle: int, lle: int, offerType: int}
  */
 interface FreeAgencyRepositoryInterface
 {
     /**
      * Get an existing offer for a player from a team
      *
-     * @param int $tid Team ID making the offer
+     * @param int $teamid Team ID making the offer
      * @param int $pid Player ID receiving the offer
      * @return OfferRow|null Offer data with keys: offer1-6, or null if no offer exists
      */
-    public function getExistingOffer(int $tid, int $pid): ?array;
+    public function getExistingOffer(int $teamid, int $pid): ?array;
 
     /**
      * Delete an offer from a team to a player
      *
-     * @param int $tid Team ID making the offer
+     * @param int $teamid Team ID making the offer
      * @param int $pid Player ID receiving the offer
      * @return int Number of rows deleted (0 or 1)
      */
-    public function deleteOffer(int $tid, int $pid): int;
+    public function deleteOffer(int $teamid, int $pid): int;
 
     /**
      * Save a new offer to the database
@@ -79,20 +79,20 @@ interface FreeAgencyRepositoryInterface
      * outstanding at any time. `$excludePid` lets a team overwrite their own
      * existing MLE offer to the same player without tripping the check.
      *
-     * @param int $tid Offering team's ID
+     * @param int $teamid Offering team's ID
      * @param int $excludePid Player ID to ignore (the player being offered to now)
      * @return bool True if a pending MLE offer already exists to another player
      */
-    public function hasPendingMleOffer(int $tid, int $excludePid): bool;
+    public function hasPendingMleOffer(int $teamid, int $excludePid): bool;
 
     /**
      * Check whether a team already has a pending LLE offer to a different player
      *
      * @see self::hasPendingMleOffer() for semantics — same rule, LLE column.
      *
-     * @param int $tid Offering team's ID
+     * @param int $teamid Offering team's ID
      * @param int $excludePid Player ID to ignore (the player being offered to now)
      * @return bool True if a pending LLE offer already exists to another player
      */
-    public function hasPendingLleOffer(int $tid, int $excludePid): bool;
+    public function hasPendingLleOffer(int $teamid, int $excludePid): bool;
 }

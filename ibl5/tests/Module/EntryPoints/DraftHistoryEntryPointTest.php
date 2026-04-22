@@ -9,7 +9,7 @@ use Tests\Integration\Mocks\TestDataFactory;
 /**
  * Integration tests for modules/DraftHistory/index.php entry point.
  *
- * Exercises (int) $_GET['teamID'] and (int) $_REQUEST['year'] type-casting boundaries.
+ * Exercises (int) $_GET['teamid'] and (int) $_REQUEST['year'] type-casting boundaries.
  */
 class DraftHistoryEntryPointTest extends ModuleEntryPointTestCase
 {
@@ -78,7 +78,7 @@ class DraftHistoryEntryPointTest extends ModuleEntryPointTestCase
     {
         $this->mockDb->setMockTeamData([self::fullTeamData(['teamid' => 3, 'team_name' => 'TestTeam'])]);
         $this->mockDb->setMockData([]);
-        $output = $this->runModule('DraftHistory', ['teamID' => '3']);
+        $output = $this->runModule('DraftHistory', ['teamid' => '3']);
 
         $this->assertNotEmpty($output);
         $this->assertQueryExecuted('ibl_team_info');
@@ -86,10 +86,10 @@ class DraftHistoryEntryPointTest extends ModuleEntryPointTestCase
 
     public function testTeamIdTakesPriorityOverYear(): void
     {
-        // When both teamID and year are set, teamID path wins (checked first)
+        // When both teamid and year are set, teamid path wins (checked first)
         $this->mockDb->setMockTeamData([self::fullTeamData(['teamid' => 3, 'team_name' => 'TestTeam'])]);
         $this->mockDb->setMockData([]);
-        $output = $this->runModule('DraftHistory', ['teamID' => '3', 'year' => '2020']);
+        $output = $this->runModule('DraftHistory', ['teamid' => '3', 'year' => '2020']);
 
         $this->assertNotEmpty($output);
         $this->assertQueryExecuted('ibl_team_info');
@@ -98,10 +98,10 @@ class DraftHistoryEntryPointTest extends ModuleEntryPointTestCase
     public function testTeamIdZeroShowsYearView(): void
     {
         $this->mockDb->setMockData([]);
-        $output = $this->runModule('DraftHistory', ['teamID' => '0']);
+        $output = $this->runModule('DraftHistory', ['teamid' => '0']);
 
         $this->assertNotEmpty($output);
-        // teamID=0 fails > 0 guard, falls to year view
+        // teamid=0 fails > 0 guard, falls to year view
         $this->assertQueryExecuted('draftyear');
     }
 }

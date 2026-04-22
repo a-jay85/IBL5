@@ -34,7 +34,7 @@ interface TradeFormRepositoryInterface
      *
      * Returns all draft picks owned by a team, ordered by year and round.
      *
-     * @param int $teamId Team ID (owner_tid value)
+     * @param int $teamId Team ID (owner_teamid value)
      * @return list<TradingDraftPickRow> Draft pick rows with teampick team ID
      */
     public function getTeamDraftPicksForTrading(int $teamId): array;

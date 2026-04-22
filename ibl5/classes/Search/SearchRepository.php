@@ -21,7 +21,7 @@ use Search\Contracts\SearchRepositoryInterface;
  * @phpstan-import-type TopicInfoRow from Contracts\SearchRepositoryInterface
  *
  * @phpstan-type StoryDbRow array{sid: int, aid: string, informant: string, title: string, time: string, hometext: string, bodytext: string, comments: int, topic: int, topictext: string|null}
- * @phpstan-type CommentDbRow array{tid: int, sid: int, subject: string, date: string, name: string, article_title: string|null, reply_count: int}
+ * @phpstan-type CommentDbRow array{teamid: int, sid: int, subject: string, date: string, name: string, article_title: string|null, reply_count: int}
  * @phpstan-type UserDbRow array{user_id: int, username: string}
  * @phpstan-type TopicDbRow array{topicid: int, topictext: string}
  * @phpstan-type CategoryDbRow array{catid: int, title: string}

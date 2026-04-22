@@ -45,7 +45,7 @@ class CardBaseStyles
      *
      * This HTML is identical between front and back trading cards.
      *
-     * @param array{name: string, nickname: string, position: string, teamName: string, teamID: int, age: string, height: string, weight: string, college: string, draftYear: int, draftRound: string, draftPick: string, draftTeam: string, imageUrl: string} $playerData Sanitized player data from preparePlayerData()
+     * @param array{name: string, nickname: string, position: string, teamName: string, teamid: int, age: string, height: string, weight: string, college: string, draftYear: int, draftRound: string, draftPick: string, draftTeam: string, imageUrl: string} $playerData Sanitized player data from preparePlayerData()
      * @return string HTML for the common card top section
      */
     public static function renderCardTop(array $playerData): string
@@ -57,7 +57,7 @@ class CardBaseStyles
         $name = $playerData['name'];
         $position = $playerData['position'];
         $imageUrl = HtmlSanitizer::safeHtmlOutput($playerData['imageUrl']);
-        $teamID = $playerData['teamID'];
+        $teamid = $playerData['teamid'];
         $teamName = $playerData['teamName'];
         $age = $playerData['age'];
         $height = $playerData['height'];
@@ -69,11 +69,11 @@ class CardBaseStyles
         $draftYear = $playerData['draftYear'];
 
         $teamLogoHtml = '';
-        if ($teamID > 0) {
+        if ($teamid > 0) {
             $safeTeamName = HtmlSanitizer::safeHtmlOutput($teamName);
             $teamLogoHtml = '<div class="card-team-logo">'
-                . '<a href="modules.php?name=Team&amp;op=team&amp;teamID=' . $teamID . '" aria-label="' . $safeTeamName . '">'
-                . '<img src="images/logo/new' . $teamID . '.png"'
+                . '<a href="modules.php?name=Team&amp;op=team&amp;teamid=' . $teamid . '" aria-label="' . $safeTeamName . '">'
+                . '<img src="images/logo/new' . $teamid . '.png"'
                 . ' alt="" width="83" height="83" loading="lazy">'
                 . '</a></div>';
         }
@@ -98,7 +98,7 @@ class CardBaseStyles
         <div class="quick-stats">
             <div class="stats-grid">
                 <span class="label">Team</span>
-                <a href="modules.php?name=Team&op=team&teamID={$teamID}">{$teamName}</a>
+                <a href="modules.php?name=Team&op=team&teamid={$teamid}">{$teamName}</a>
 
                 <span class="label">Age</span>
                 <span class="value">{$age}</span>
@@ -129,7 +129,7 @@ HTML;
      *
      * @param Player $player The player object
      * @param int $playerID The player's ID
-     * @return array{name: string, nickname: string, position: string, teamName: string, teamID: int, age: string, height: string, weight: string, college: string, draftYear: int, draftRound: string, draftPick: string, draftTeam: string, imageUrl: string} Sanitized data ready for rendering
+     * @return array{name: string, nickname: string, position: string, teamName: string, teamid: int, age: string, height: string, weight: string, college: string, draftYear: int, draftRound: string, draftPick: string, draftTeam: string, imageUrl: string} Sanitized data ready for rendering
      */
     public static function preparePlayerData(Player $player, int $playerID): array
     {
@@ -150,7 +150,7 @@ HTML;
             'nickname' => $nickname,
             'position' => $position,
             'teamName' => $teamName,
-            'teamID' => $player->teamID ?? 0,
+            'teamid' => $player->teamid ?? 0,
             'age' => $age,
             'height' => $height,
             'weight' => $weight,
@@ -167,13 +167,13 @@ HTML;
      * Get color scheme for a player's team
      *
      * @param \mysqli|null $db Database connection
-     * @param int $teamID Team ID
+     * @param int $teamid Team ID
      * @return array{primary: string, secondary: string, gradient_start: string, gradient_mid: string, gradient_end: string, border: string, border_rgb: string, accent: string, text: string, text_muted: string} Color scheme array
      */
-    public static function getColorSchemeForTeam(?\mysqli $db, int $teamID): array
+    public static function getColorSchemeForTeam(?\mysqli $db, int $teamid): array
     {
-        if ($db !== null && $teamID > 0) {
-            $teamColors = TeamColorHelper::getTeamColors($db, $teamID);
+        if ($db !== null && $teamid > 0) {
+            $teamColors = TeamColorHelper::getTeamColors($db, $teamid);
             return TeamColorHelper::generateColorScheme($teamColors['color1'], $teamColors['color2']);
         }
         return TeamColorHelper::getDefaultColorScheme();

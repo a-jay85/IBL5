@@ -47,7 +47,7 @@ class TeamService implements TeamServiceInterface
      * @see TeamServiceInterface::getTeamPageData()
      * @return TeamPageData
      */
-    public function getTeamPageData(int $teamID, ?string $yr, string $display, string $userTeamName = '', ?string $split = null): array
+    public function getTeamPageData(int $teamid, ?string $yr, string $display, string $userTeamName = '', ?string $split = null): array
     {
         global $leagueContext;
         /** @var \League\LeagueContext $leagueContext */
@@ -56,14 +56,14 @@ class TeamService implements TeamServiceInterface
         /** @var string $imagesPath */
         $imagesPath = $leagueConfig['images_path'];
 
-        $team = Team::initialize($this->db, $teamID);
+        $team = Team::initialize($this->db, $teamid);
 
         $insertyear = ($yr !== null && $yr !== '') ? "&yr=$yr" : "";
 
         $tableService = new TeamTableService($this->db, $this->repository);
-        $tableOutput = $tableService->getTableOutput($teamID, $yr, $display, $split);
+        $tableOutput = $tableService->getTableOutput($teamid, $yr, $display, $split);
 
-        $isActualTeam = ($teamID !== 0);
+        $isActualTeam = ($teamid !== 0);
 
         $draftPicksTable = '';
         if ($isActualTeam) {
@@ -85,7 +85,7 @@ class TeamService implements TeamServiceInterface
         }
 
         return [
-            'teamID' => $teamID,
+            'teamid' => $teamid,
             'team' => $team,
             'imagesPath' => $imagesPath,
             'yr' => $yr,
@@ -131,7 +131,7 @@ class TeamService implements TeamServiceInterface
         $currentSeasonCard = $sidebarView->renderCurrentSeasonCard($currentSeasonHtml, $teamColorStyle);
 
         // Awards card — combines GM History and Team Accomplishments
-        $tenures = $this->repository->getGMTenures($team->teamID);
+        $tenures = $this->repository->getGMTenures($team->teamid);
         $gmAwards = $this->repository->getGMAwards($team->ownerName);
         $teamAccomplishments = $this->repository->getTeamAccomplishments($team->name);
 
@@ -189,7 +189,7 @@ class TeamService implements TeamServiceInterface
             }
         }
 
-        $franchiseSeasons = $this->repository->getFranchiseSeasons($team->teamID);
+        $franchiseSeasons = $this->repository->getFranchiseSeasons($team->teamid);
         $fka = $this->buildFormerlyKnownAs($franchiseSeasons, $team->city, $team->name);
 
         return [
@@ -450,7 +450,7 @@ class TeamService implements TeamServiceInterface
             'records' => $records,
             'totalWins' => $totalWins,
             'totalLosses' => $totalLosses,
-            'teamID' => $team->teamID,
+            'teamid' => $team->teamid,
         ];
     }
 
@@ -462,7 +462,7 @@ class TeamService implements TeamServiceInterface
     private function prepareDraftPicksData(Team $team): array
     {
         $teamQueryRepo = new TeamQueryRepository($this->db);
-        $resultPicks = $teamQueryRepo->getDraftPicks($team->teamID);
+        $resultPicks = $teamQueryRepo->getDraftPicks($team->teamid);
 
         $league = new League($this->db);
         $allTeamsResult = $league->getAllTeamsResult();
@@ -482,7 +482,7 @@ class TeamService implements TeamServiceInterface
             $draftPick = new \Draft\DraftPick($draftPickRow);
 
             $draftPicks[] = [
-                'originalTeamID' => $teamsArray[$draftPick->originalTeam]->teamID,
+                'originalTeamID' => $teamsArray[$draftPick->originalTeam]->teamid,
                 'originalTeamCity' => $teamsArray[$draftPick->originalTeam]->city,
                 'originalTeamName' => $draftPick->originalTeam,
                 'year' => (string) $draftPick->year,

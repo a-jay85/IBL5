@@ -22,7 +22,7 @@ class CashConsiderationRepository extends BaseMysqliRepository implements CashCo
      */
     public function insertCashConsideration(array $data): int
     {
-        $counterpartyTid = $data['counterparty_tid'] ?? null;
+        $counterpartyTid = $data['counterparty_teamid'] ?? null;
         $tradeOfferId = $data['trade_offer_id'] ?? null;
 
         // Build conditional SQL for nullable columns (bind_param has no NULL type)
@@ -30,11 +30,11 @@ class CashConsiderationRepository extends BaseMysqliRepository implements CashCo
         $tradeOfferSql = $tradeOfferId !== null ? '?' : 'NULL';
 
         $sql = "INSERT INTO ibl_cash_considerations
-                    (tid, type, label, counterparty_tid, trade_offer_id, cy, cyt, cy1, cy2, cy3, cy4, cy5, cy6)
+                    (teamid, type, label, counterparty_teamid, trade_offer_id, cy, cyt, cy1, cy2, cy3, cy4, cy5, cy6)
                  VALUES (?, ?, ?, {$counterpartySql}, {$tradeOfferSql}, ?, ?, ?, ?, ?, ?, ?, ?)";
 
         $types = 'iss';
-        $params = [$data['tid'], $data['type'], $data['label']];
+        $params = [$data['teamid'], $data['type'], $data['label']];
 
         if ($counterpartyTid !== null) {
             $types .= 'i';
@@ -62,7 +62,7 @@ class CashConsiderationRepository extends BaseMysqliRepository implements CashCo
     {
         /** @var list<CashConsiderationRow> */
         return $this->fetchAll(
-            "SELECT * FROM ibl_cash_considerations WHERE tid = ? ORDER BY label ASC",
+            "SELECT * FROM ibl_cash_considerations WHERE teamid = ? ORDER BY label ASC",
             "i",
             $teamId
         );
@@ -75,7 +75,7 @@ class CashConsiderationRepository extends BaseMysqliRepository implements CashCo
     {
         /** @var list<CashConsiderationRow> */
         return $this->fetchAll(
-            "SELECT * FROM ibl_cash_considerations WHERE tid = ? AND type = 'buyout' ORDER BY label ASC",
+            "SELECT * FROM ibl_cash_considerations WHERE teamid = ? AND type = 'buyout' ORDER BY label ASC",
             "i",
             $teamId
         );
@@ -90,7 +90,7 @@ class CashConsiderationRepository extends BaseMysqliRepository implements CashCo
         return $this->fetchAll(
             "SELECT cy, cy1, cy2, cy3, cy4, cy5, cy6
              FROM ibl_cash_considerations
-             WHERE tid = ?",
+             WHERE teamid = ?",
             "i",
             $teamId
         );

@@ -430,7 +430,7 @@ class JsbImportRepository extends \BaseMysqliRepository implements JsbImportRepo
     {
         return $this->execute(
             "INSERT INTO {$this->plbSnapshotsTable}
-                (season_year, sim_number, source_archive, tid, slot_index,
+                (season_year, sim_number, source_archive, teamid, slot_index,
                  pid, player_name, dc_minutes, dc_of, dc_df, dc_oi, dc_di, dc_bh)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ON DUPLICATE KEY UPDATE
@@ -448,7 +448,7 @@ class JsbImportRepository extends \BaseMysqliRepository implements JsbImportRepo
             $record['season_year'],
             $record['sim_number'],
             $record['source_archive'],
-            $record['tid'],
+            $record['teamid'],
             $record['slot_index'],
             $record['pid'],
             $record['player_name'],

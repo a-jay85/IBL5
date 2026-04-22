@@ -354,7 +354,6 @@ class DraftIntegrationTest extends IntegrationTestCase
                 'drafted' => 0,
                 // Team info
                 'teamid' => 1,
-                'tid' => 1,
                 // Draft class player data
                 'name' => 'John Prospect',
                 'pos' => 'SG',
@@ -417,8 +416,8 @@ class DraftIntegrationTest extends IntegrationTestCase
             'r_fgp' => 55,
             'r_fta' => 55,
             'r_ftp' => 55,
-            'r_tga' => 55,
-            'r_tgp' => 55,
+            'r_3ga' => 55,
+            'r_3gp' => 55,
             'r_orb' => 55,
             'r_drb' => 55,
             'r_ast' => 55,

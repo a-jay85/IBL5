@@ -37,7 +37,7 @@ class TeamApiHandler
     {
         header('Content-Type: text/html; charset=utf-8');
 
-        $teamID = isset($_GET['teamID']) && is_string($_GET['teamID']) ? (int) $_GET['teamID'] : 0;
+        $teamid = isset($_GET['teamid']) && is_string($_GET['teamid']) ? (int) $_GET['teamid'] : 0;
 
         $display = 'ratings';
         if (isset($_GET['display']) && is_string($_GET['display'])) {
@@ -70,7 +70,7 @@ class TeamApiHandler
         }
 
         // Emit HX-Push-Url so HTMX pushes the user-friendly URL
-        $pushUrl = 'modules.php?name=Team&op=team&teamID=' . $teamID . '&display=' . $display;
+        $pushUrl = 'modules.php?name=Team&op=team&teamid=' . $teamid . '&display=' . $display;
         if ($split !== null) {
             $pushUrl .= '&split=' . $split;
         }
@@ -79,6 +79,6 @@ class TeamApiHandler
         }
         header('HX-Push-Url: ' . $pushUrl);
 
-        echo $this->tableService->getTableOutput($teamID, $yr, $display, $split);
+        echo $this->tableService->getTableOutput($teamid, $yr, $display, $split);
     }
 }

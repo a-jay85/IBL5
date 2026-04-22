@@ -49,7 +49,7 @@ class TeamsDropdownView
                                     <?php if ($divIndex > 0): ?><div class="mt-3"></div><?php endif; ?>
                                     <div class="uppercase font-display text-xs tracking-wider text-gray-400 mb-1.5"><?= HtmlSanitizer::e($division) ?></div>
                                     <?php foreach ($teams as $team): ?>
-                                        <a href="modules.php?name=Team&amp;op=team&amp;teamID=<?= $team['teamid'] ?>" hx-boost="true" hx-target="#site-content" hx-swap="innerHTML show:window:top" hx-indicator="#site-content" class="nav-dropdown-item flex items-center gap-2 px-2 py-1.5 text-sm font-display text-gray-300 hover:text-white hover:bg-white/5 rounded transition-all duration-150">
+                                        <a href="modules.php?name=Team&amp;op=team&amp;teamid=<?= $team['teamid'] ?>" hx-boost="true" hx-target="#site-content" hx-swap="innerHTML show:window:top" hx-indicator="#site-content" class="nav-dropdown-item flex items-center gap-2 px-2 py-1.5 text-sm font-display text-gray-300 hover:text-white hover:bg-white/5 rounded transition-all duration-150">
                                             <span class="inline-flex items-center justify-center nav-team-logo-container"><img src="images/logo/new<?= $team['teamid'] ?>.png" alt="" class="nav-team-logo-img" loading="lazy"></span>
                                             <span><?= HtmlSanitizer::e($team['team_city'] . ' ' . $team['team_name']) ?></span>
                                         </a>
@@ -131,7 +131,7 @@ class TeamsDropdownView
                             <div class="uppercase font-display text-xs tracking-wider text-gray-400"><?= HtmlSanitizer::e($division) ?></div>
                         </div>
                         <?php foreach ($teams as $team): ?>
-                            <a href="modules.php?name=Team&amp;op=team&amp;teamID=<?= $team['teamid'] ?>" hx-boost="true" hx-target="#site-content" hx-swap="innerHTML show:window:top" hx-indicator="#site-content" class="flex items-center gap-2.5 px-5 py-2.5 pl-10 text-base font-display text-gray-400 hover:text-white hover:bg-white/5 border-l-2 border-transparent hover:border-accent-500 transition-all">
+                            <a href="modules.php?name=Team&amp;op=team&amp;teamid=<?= $team['teamid'] ?>" hx-boost="true" hx-target="#site-content" hx-swap="innerHTML show:window:top" hx-indicator="#site-content" class="flex items-center gap-2.5 px-5 py-2.5 pl-10 text-base font-display text-gray-400 hover:text-white hover:bg-white/5 border-l-2 border-transparent hover:border-accent-500 transition-all">
                                 <span class="inline-flex items-center justify-center nav-team-logo-container"><img src="images/logo/new<?= $team['teamid'] ?>.png" alt="" class="nav-team-logo-img" loading="lazy"></span>
                                 <span><?= HtmlSanitizer::e($team['team_city'] . ' ' . $team['team_name']) ?></span>
                             </a>

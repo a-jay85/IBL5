@@ -33,8 +33,8 @@ class PlayerDatabaseRepository extends BaseMysqliRepository implements PlayerDat
         'r_fgp' => 'r_fgp',
         'r_fta' => 'r_fta',
         'r_ftp' => 'r_ftp',
-        'r_tga' => 'r_tga',
-        'r_tgp' => 'r_tgp',
+        'r_3ga' => 'r_3ga',
+        'r_3gp' => 'r_3gp',
         'r_orb' => 'r_orb',
         'r_drb' => 'r_drb',
         'r_ast' => 'r_ast',
@@ -101,7 +101,7 @@ class PlayerDatabaseRepository extends BaseMysqliRepository implements PlayerDat
         $greaterThanFilters = [
             'Clutch', 'Consistency', 'talent', 'skill', 'intangibles',
             'oo', 'do', 'po', 'to', 'od', 'dd', 'pd', 'td',
-            'r_fga', 'r_fgp', 'r_fta', 'r_ftp', 'r_tga', 'r_tgp',
+            'r_fga', 'r_fgp', 'r_fta', 'r_ftp', 'r_3ga', 'r_3gp',
             'r_orb', 'r_drb', 'r_ast', 'r_stl', 'r_blk', 'r_to', 'r_foul'
         ];
 
@@ -116,7 +116,7 @@ class PlayerDatabaseRepository extends BaseMysqliRepository implements PlayerDat
         $whereClause = $qc->toWhereClause();
         $query = "SELECT ibl_plr.*, ibl_team_info.team_name AS teamname, ibl_team_info.color1, ibl_team_info.color2
             FROM ibl_plr
-            LEFT JOIN ibl_team_info ON ibl_plr.tid = ibl_team_info.teamid
+            LEFT JOIN ibl_team_info ON ibl_plr.teamid = ibl_team_info.teamid
             WHERE $whereClause
             ORDER BY ibl_plr.retired ASC, ibl_plr.ordinal ASC";
 

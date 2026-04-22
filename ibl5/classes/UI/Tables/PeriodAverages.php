@@ -43,7 +43,7 @@ class PeriodAverages
             $endDate = $endDate->format('Y-m-d');
         }
 
-        $teamID = (int)$team->teamID;
+        $teamid = (int)$team->teamid;
 
         // Use prepared statement for date filtering
         // Build optional PID filter clause
@@ -85,7 +85,7 @@ class PeriodAverages
             AND ( bs.hometid = ?
                 OR bs.visitortid = ? )
             AND bs.gameMIN > 0
-            AND p.tid = ?
+            AND p.teamid = ?
             AND p.retired = 0
             {$pidFilterClause}
         GROUP  BY p.name, bs.pos, bs.pid
@@ -98,7 +98,7 @@ class PeriodAverages
         }
 
         $types = 'sssii' . $pidFilterTypes;
-        $params = [$startDate, $endDate, $teamID, $teamID, $teamID, ...$pidFilterParams];
+        $params = [$startDate, $endDate, $teamid, $teamid, $teamid, ...$pidFilterParams];
         $stmt->bind_param($types, ...$params);
         if (!$stmt->execute()) {
             throw new \Exception('Execute failed: ' . $stmt->error);

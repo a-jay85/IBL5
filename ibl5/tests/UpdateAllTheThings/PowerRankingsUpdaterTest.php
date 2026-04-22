@@ -19,9 +19,9 @@ class TestablePowerRankingsUpdater extends PowerRankingsUpdater
         return $this->determineMonth();
     }
 
-    public function publicCalculateTeamStats(array $games, int $tid): array
+    public function publicCalculateTeamStats(array $games, int $teamid): array
     {
-        return $this->calculateTeamStats($games, $tid);
+        return $this->calculateTeamStats($games, $teamid);
     }
 }
 

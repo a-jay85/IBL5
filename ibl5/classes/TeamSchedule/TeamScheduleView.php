@@ -45,7 +45,7 @@ class TeamScheduleView implements TeamScheduleViewInterface
     {
         $color1 = HtmlSanitizer::safeHtmlOutput($team->color1);
         $color2 = HtmlSanitizer::safeHtmlOutput($team->color2);
-        $teamId = $team->teamID;
+        $teamId = $team->teamid;
         $teamName = HtmlSanitizer::safeHtmlOutput($team->name);
 
         // Organize games by month and date
@@ -218,8 +218,8 @@ class TeamScheduleView implements TeamScheduleViewInterface
         }
 
         $gameId = 'team-game-' . $game->boxScoreID;
-        $visitorTeamId = $game->visitorTeamID;
-        $homeTeamId = $game->homeTeamID;
+        $visitorTeamId = $game->visitor_teamid;
+        $homeTeamId = $game->home_teamid;
         $boxScoreUrl = \Utilities\BoxScoreUrlBuilder::buildUrl($game->date, $game->gameOfThatDay, $game->boxScoreID);
 
         // Determine which team is visitor/home
@@ -239,8 +239,8 @@ class TeamScheduleView implements TeamScheduleViewInterface
             $homeRecord = $opposingTeam->seasonRecord ?? '';
         }
 
-        $visitorUrl = 'modules.php?name=Team&amp;op=team&amp;teamID=' . $visitorTeamId;
-        $homeUrl = 'modules.php?name=Team&amp;op=team&amp;teamID=' . $homeTeamId;
+        $visitorUrl = 'modules.php?name=Team&amp;op=team&amp;teamid=' . $visitorTeamId;
+        $homeUrl = 'modules.php?name=Team&amp;op=team&amp;teamid=' . $homeTeamId;
 
         $html = '<div class="' . $gameClass . '" id="' . $gameId . '">';
 

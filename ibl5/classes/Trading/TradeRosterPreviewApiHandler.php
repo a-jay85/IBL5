@@ -51,8 +51,8 @@ class TradeRosterPreviewApiHandler
     {
         header('Content-Type: application/json; charset=utf-8');
 
-        $teamID = $this->validateTeamID();
-        if ($teamID === 0) {
+        $teamid = $this->validateTeamID();
+        if ($teamid === 0) {
             echo json_encode(['html' => ''], JSON_THROW_ON_ERROR);
             return;
         }
@@ -93,7 +93,7 @@ class TradeRosterPreviewApiHandler
             $teamTableService = new TeamTableService($this->db, $teamRepository);
 
             // Get the base roster and starters
-            $rosterData = $teamTableService->getRosterAndStarters($teamID);
+            $rosterData = $teamTableService->getRosterAndStarters($teamid);
             /** @var list<array<string, mixed>> $roster */
             $roster = $rosterData['roster'];
             /** @var list<int> $starterPids */
@@ -114,19 +114,19 @@ class TradeRosterPreviewApiHandler
             if ($display === 'contracts') {
                 // Existing cash entries from the database
                 $cashRepo = new CashConsiderationRepository($this->db);
-                $existingCash = $cashRepo->getTeamCashConsiderations($teamID);
+                $existingCash = $cashRepo->getTeamCashConsiderations($teamid);
                 foreach ($existingCash as $cashRow) {
                     $roster[] = \Team\TeamTableService::cashConsiderationToRosterRow($cashRow);
                 }
 
                 // Synthetic cash rows for the in-progress trade
-                $tradeCashRows = $this->buildCashRows($teamID);
+                $tradeCashRows = $this->buildCashRows($teamid);
                 foreach ($tradeCashRows as $cashRow) {
                     $roster[] = $cashRow;
                 }
             }
 
-            $team = Team::initialize($this->db, $teamID);
+            $team = Team::initialize($this->db, $teamid);
             $season = new Season($this->db);
 
             // Build PID list for aggregate views
@@ -142,14 +142,14 @@ class TradeRosterPreviewApiHandler
             // Only expose clickable eligibility links when rendering the
             // logged-in user's own roster. Opponent rosters in the trade
             // preview render the markers as non-clickable labels.
-            $showActionLinks = $this->loggedInTeamID !== 0 && $teamID === $this->loggedInTeamID;
+            $showActionLinks = $this->loggedInTeamID !== 0 && $teamid === $this->loggedInTeamID;
 
             $tableHtml = $this->renderTable($display, $roster, $team, $season, $starterPids, $rosterPids, $split, $teamTableService, $removePids, $showActionLinks);
 
             // Wrap with dropdown
             $dropdownGroups = $teamTableService->buildDropdownGroups($season);
             $activeValue = ($display === 'split' && $split !== null) ? 'split:' . $split : $display;
-            $teamData = $teamRepository->getTeam($teamID);
+            $teamData = $teamRepository->getTeam($teamid);
             $color1 = is_string($teamData['color1'] ?? null) ? $teamData['color1'] : '000000';
             $color2 = is_string($teamData['color2'] ?? null) ? $teamData['color2'] : 'FFFFFF';
             $dropdown = new TableViewDropdown($dropdownGroups, $activeValue, '', $color1, $color2);
@@ -166,15 +166,15 @@ class TradeRosterPreviewApiHandler
     }
 
     /**
-     * Validate teamID query parameter
+     * Validate teamid query parameter
      */
     private function validateTeamID(): int
     {
-        if (!isset($_GET['teamID']) || !is_string($_GET['teamID'])) {
+        if (!isset($_GET['teamid']) || !is_string($_GET['teamid'])) {
             return 0;
         }
 
-        $raw = $_GET['teamID'];
+        $raw = $_GET['teamid'];
         if (!ctype_digit($raw) || $raw === '0') {
             return 0;
         }
@@ -420,14 +420,14 @@ class TradeRosterPreviewApiHandler
             'name' => $label,
             'nickname' => '',
             'ordinal' => 100000,
-            'tid' => $teamId,
+            'teamid' => $teamId,
             'pos' => '',
             'age' => null,
             'color1' => null,
             'color2' => null,
             // Ratings (all zero, matching DB cash rows)
             'r_fga' => 0, 'r_fgp' => 0, 'r_fta' => 0, 'r_ftp' => 0,
-            'r_tga' => 0, 'r_tgp' => 0, 'r_orb' => 0, 'r_drb' => 0,
+            'r_3ga' => 0, 'r_3gp' => 0, 'r_orb' => 0, 'r_drb' => 0,
             'r_ast' => 0, 'r_stl' => 0, 'r_tvr' => 0, 'r_blk' => 0, 'r_foul' => 0,
             'oo' => 0, 'od' => 0, 'r_drive_off' => 0, 'dd' => 0,
             'po' => 0, 'pd' => 0, 'r_trans_off' => 0, 'td' => 0,
@@ -524,7 +524,7 @@ class TradeRosterPreviewApiHandler
             case 'split':
                 $splitRepo = new \Team\SplitStatsRepository($this->db);
                 $splitKey = $split ?? 'home';
-                $rows = $splitRepo->getSplitStats($team->teamID, $season->endingYear, $splitKey);
+                $rows = $splitRepo->getSplitStats($team->teamid, $season->endingYear, $splitKey);
                 $rows = array_values(array_filter($rows, static fn (array $r): bool => in_array($r['pid'], $rosterPids, true)));
                 $splitLabel = $splitRepo->getSplitLabel($splitKey);
                 return \UI\Tables\SplitStats::render($rows, $team, $splitLabel, $starterPids);

@@ -170,12 +170,12 @@ class YourAccountService implements YourAccountServiceInterface
             return null;
         }
 
-        $tid = $this->commonRepository->getTidFromTeamname($teamName);
-        if ($tid === null || $tid <= 0) {
+        $teamid = $this->commonRepository->getTidFromTeamname($teamName);
+        if ($teamid === null || $teamid <= 0) {
             return null;
         }
 
-        return 'modules.php?name=Team&op=team&teamID=' . $tid;
+        return 'modules.php?name=Team&op=team&teamid=' . $teamid;
     }
 
     /**

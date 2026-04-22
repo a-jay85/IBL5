@@ -327,7 +327,7 @@ class FreeAgencyCapCalculatorTest extends TestCase
     {
         $team = $this->createMock(Team::class);
         $team->name = 'Test Team';
-        $team->teamID = 1;
+        $team->teamid = 1;
 
         $this->mockTeamQueryRepo->method('getRosterUnderContractOrderedByOrdinal')
             ->willReturn([]);
@@ -344,7 +344,7 @@ class FreeAgencyCapCalculatorTest extends TestCase
     {
         $team = $this->createMock(Team::class);
         $team->name = 'Test Team';
-        $team->teamID = 1;
+        $team->teamid = 1;
         return $team;
     }
 

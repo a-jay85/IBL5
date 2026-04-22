@@ -65,7 +65,7 @@ class CapSpaceViewTest extends TestCase
     {
         $teams = [
             [
-                'teamID' => 1,
+                'teamid' => 1,
                 'teamId' => 1,
                 'teamCity' => 'Test<script>',
                 'teamName' => 'Team&Name',

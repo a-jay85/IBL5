@@ -12,7 +12,7 @@ use ContractList\Contracts\ContractListRepositoryInterface;
  *
  * Calculates contract year values and cap totals.
  *
- * @phpstan-type ProcessedContract array{pid: int, name: string, pos: string, teamname: string, tid: int, team_city: string, color1: string, color2: string, bird: string, con1: int, con2: int, con3: int, con4: int, con5: int, con6: int}
+ * @phpstan-type ProcessedContract array{pid: int, name: string, pos: string, teamname: string, teamid: int, team_city: string, color1: string, color2: string, bird: string, con1: int, con2: int, con3: int, con4: int, con5: int, con6: int}
  * @phpstan-type CapTotals array{cap1: float, cap2: float, cap3: float, cap4: float, cap5: float, cap6: float}
  * @phpstan-type AvgCaps array{acap1: float, acap2: float, acap3: float, acap4: float, acap5: float, acap6: float}
  * @phpstan-type ContractCalculations array{contracts: list<ProcessedContract>, capTotals: CapTotals, avgCaps: AvgCaps}
@@ -54,7 +54,7 @@ class ContractListService implements ContractListServiceInterface
                 'name' => $player['name'],
                 'pos' => $player['pos'],
                 'teamname' => $player['teamname'],
-                'tid' => $player['tid'] ?? 0,
+                'teamid' => $player['teamid'] ?? 0,
                 'team_city' => $player['team_city'] ?? '',
                 'color1' => $player['color1'] ?? 'FFFFFF',
                 'color2' => $player['color2'] ?? '000000',

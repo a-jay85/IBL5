@@ -116,7 +116,7 @@ class SavedDepthChartServiceTest extends IntegrationTestCase
             [
                 // SavedDepthChartRow fields
                 'id' => 1,
-                'tid' => 1,
+                'teamid' => 1,
                 'username' => 'testuser',
                 'name' => 'Test DC',
                 'phase' => 'Regular Season',
@@ -164,7 +164,7 @@ class SavedDepthChartServiceTest extends IntegrationTestCase
     {
         $this->mockDb->setMockData([
             [
-                'id' => 1, 'tid' => 1, 'username' => 'testuser', 'name' => null,
+                'id' => 1, 'teamid' => 1, 'username' => 'testuser', 'name' => null,
                 'phase' => 'Regular Season', 'season_year' => 2024,
                 'sim_start_date' => '2024-01-01', 'sim_end_date' => null,
                 'sim_number_start' => 1, 'sim_number_end' => null,
@@ -193,7 +193,7 @@ class SavedDepthChartServiceTest extends IntegrationTestCase
         // getSavedDepthChartById returns existing DC
         $this->mockDb->setMockData([
             [
-                'id' => 5, 'tid' => 1, 'username' => 'testuser', 'name' => 'My DC',
+                'id' => 5, 'teamid' => 1, 'username' => 'testuser', 'name' => 'My DC',
                 'phase' => 'Regular Season', 'season_year' => 2024,
                 'sim_start_date' => '2024-01-01', 'sim_end_date' => null,
                 'sim_number_start' => 1, 'sim_number_end' => null,
@@ -214,7 +214,7 @@ class SavedDepthChartServiceTest extends IntegrationTestCase
         // DC exists but is_active = 0
         $this->mockDb->setMockData([
             [
-                'id' => 5, 'tid' => 1, 'username' => 'testuser', 'name' => 'Inactive DC',
+                'id' => 5, 'teamid' => 1, 'username' => 'testuser', 'name' => 'Inactive DC',
                 'phase' => 'Regular Season', 'season_year' => 2024,
                 'sim_start_date' => '2024-01-01', 'sim_end_date' => null,
                 'sim_number_start' => 1, 'sim_number_end' => null,
@@ -239,7 +239,7 @@ class SavedDepthChartServiceTest extends IntegrationTestCase
         $this->mockDb->onQuery('SELECT.*FROM ibl_saved_depth_charts WHERE id', []);
         $this->mockDb->setMockData([
             [
-                'id' => 10, 'tid' => 1, 'username' => 'testuser', 'name' => null,
+                'id' => 10, 'teamid' => 1, 'username' => 'testuser', 'name' => null,
                 'phase' => 'Regular Season', 'season_year' => 2024,
                 'sim_start_date' => '2024-01-01', 'sim_end_date' => null,
                 'sim_number_start' => 1, 'sim_number_end' => null,
@@ -261,7 +261,7 @@ class SavedDepthChartServiceTest extends IntegrationTestCase
         // getActiveDepthChartForTeam returns an active DC
         $this->mockDb->setMockData([
             [
-                'id' => 7, 'tid' => 1, 'username' => 'testuser', 'name' => 'Old Name',
+                'id' => 7, 'teamid' => 1, 'username' => 'testuser', 'name' => 'Old Name',
                 'phase' => 'Regular Season', 'season_year' => 2024,
                 'sim_start_date' => '2024-01-01', 'sim_end_date' => null,
                 'sim_number_start' => 1, 'sim_number_end' => null,

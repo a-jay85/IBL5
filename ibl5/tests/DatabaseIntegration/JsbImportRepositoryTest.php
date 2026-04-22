@@ -267,9 +267,9 @@ class JsbImportRepositoryTest extends DatabaseTestCase
         // 'Hornets' → 'Sting' resolves (CI seed uses 'Spurs' for teamid=10)
         $stmt = $this->db->prepare('UPDATE ibl_team_info SET team_name = ? WHERE teamid = ?');
         self::assertNotFalse($stmt);
-        $stmt->bind_param('si', $name, $tid);
+        $stmt->bind_param('si', $name, $teamid);
         $name = 'Sting';
-        $tid = 10;
+        $teamid = 10;
         $stmt->execute();
         $stmt->close();
 

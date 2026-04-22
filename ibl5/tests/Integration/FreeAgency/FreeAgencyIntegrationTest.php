@@ -558,7 +558,7 @@ class FreeAgencyIntegrationTest extends IntegrationTestCase
                 'HasMLE' => 0,
                 'HasLLE' => 0,
                 // Player is not signed
-                'tid' => 0,
+                'teamid' => 0,
                 'teamname' => 'Free Agent',
                 // Season settings
                 'freeAgencyNotificationsState' => 'Off',
@@ -577,7 +577,7 @@ class FreeAgencyIntegrationTest extends IntegrationTestCase
                 'HasMLE' => 1,
                 'HasLLE' => 0,
                 // Over cap but can use MLE
-                'tid' => 0,
+                'teamid' => 0,
                 'teamname' => 'Free Agent',
                 'freeAgencyNotificationsState' => 'Off',
             ])
@@ -594,7 +594,7 @@ class FreeAgencyIntegrationTest extends IntegrationTestCase
                 'Tax_Line' => 10000,
                 'HasMLE' => 0,
                 'HasLLE' => 1,
-                'tid' => 0,
+                'teamid' => 0,
                 'teamname' => 'Free Agent',
                 'freeAgencyNotificationsState' => 'Off',
             ])
@@ -611,7 +611,7 @@ class FreeAgencyIntegrationTest extends IntegrationTestCase
                 'Tax_Line' => 10000,
                 'HasMLE' => 0,
                 'HasLLE' => 0,
-                'tid' => 0,
+                'teamid' => 0,
                 'teamname' => 'Free Agent',
                 'freeAgencyNotificationsState' => 'Off',
             ])
@@ -623,7 +623,7 @@ class FreeAgencyIntegrationTest extends IntegrationTestCase
         $this->mockDb->setMockData([
             array_merge($this->getBaseFreeAgentData(), [
                 // Player is already on a team (signed)
-                'tid' => 5,
+                'teamid' => 5,
                 'teamname' => 'New York Knights',
                 'Salary_Total' => 5000,
                 'Salary_Cap' => 8250,
@@ -645,7 +645,7 @@ class FreeAgencyIntegrationTest extends IntegrationTestCase
                 'Tax_Line' => 10000,
                 'HasMLE' => 0,
                 'HasLLE' => 0,
-                'tid' => 0,
+                'teamid' => 0,
                 'teamname' => 'Free Agent',
                 'freeAgencyNotificationsState' => 'Off',
             ])
@@ -657,7 +657,7 @@ class FreeAgencyIntegrationTest extends IntegrationTestCase
         $this->mockDb->setMockData([
             array_merge($this->getBaseFreeAgentData(), [
                 // Player is on the offering team (required for Bird Rights)
-                'tid' => 1,
+                'teamid' => 1,
                 'teamname' => 'Miami Cyclones',
                 'bird_years' => 3,
                 'bird' => 3,
@@ -685,7 +685,7 @@ class FreeAgencyIntegrationTest extends IntegrationTestCase
                 'Tax_Line' => 10000,
                 'HasMLE' => 0, // MLE already used
                 'HasLLE' => 0,
-                'tid' => 0,
+                'teamid' => 0,
                 'teamname' => 'Free Agent',
                 'freeAgencyNotificationsState' => 'Off',
             ])
@@ -703,7 +703,7 @@ class FreeAgencyIntegrationTest extends IntegrationTestCase
                 'offer4' => 0,
                 'offer5' => 0,
                 'offer6' => 0,
-                'tid' => 0,
+                'teamid' => 0,
                 'teamname' => 'Free Agent',
             ])
         ]);
@@ -717,7 +717,7 @@ class FreeAgencyIntegrationTest extends IntegrationTestCase
         return array_merge(TestDataFactory::createPlayer([
             'pid' => 1,
             'name' => 'Test FreeAgent',
-            'tid' => 0,
+            'teamid' => 0,
             'teamname' => 'Free Agent',
             'exp' => 5,
             'bird_years' => 0,

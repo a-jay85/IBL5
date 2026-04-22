@@ -57,11 +57,11 @@ interface DraftViewInterface
      * @param int $draftRound The current draft round
      * @param int $draftPick The current draft pick number
      * @param int $seasonYear The draft season year (for header display)
-     * @param int $tid The team ID (for logo image lookup)
+     * @param int $teamid The team ID (for logo image lookup)
      * @return string HTML formatted draft interface
      *
      * IMPORTANT BEHAVIORS:
-     *  - Displays team logo at top (from images/logo/{tid}.jpg)
+     *  - Displays team logo at top (from images/logo/{teamid}.jpg)
      *  - Shows season year and welcome message in table header
      *  - Renders player table via renderPlayerTable (shows draft radio, name, stats for all players)
      *  - Shows Draft button ONLY if:
@@ -91,7 +91,7 @@ interface DraftViewInterface
      *  // Includes all players from $players array
      *  // Shows submit button (user owns pick)
      */
-    public function renderDraftInterface(array $players, string $teamLogo, string $pickOwner, int $draftRound, int $draftPick, int $seasonYear, int $tid): string;
+    public function renderDraftInterface(array $players, string $teamLogo, string $pickOwner, int $draftRound, int $draftPick, int $seasonYear, int $teamid): string;
 
     /**
      * Render the player table for draft selection

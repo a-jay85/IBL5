@@ -100,7 +100,7 @@ INSERT INTO ibl_team_info (teamid, team_city, team_name, color1, color2, uuid) V
 
 -- Divisions must match League::DIVISION_NAMES = ['Atlantic', 'Central', 'Midwest', 'Pacific']
 -- 7 teams per division: Atlantic & Central (Eastern), Midwest & Pacific (Western)
-INSERT INTO ibl_standings (tid, team_name, pct, leagueRecord, wins, losses, conference, division) VALUES
+INSERT INTO ibl_standings (teamid, team_name, pct, leagueRecord, wins, losses, conference, division) VALUES
   ( 1, 'Metros',       0.500, '20-20', 20, 20, 'Eastern',  'Atlantic'),
   ( 2, 'Stars',        0.500, '20-20', 20, 20, 'Western',  'Pacific'),
   ( 3, 'Cougars',      0.500, '20-20', 20, 20, 'Eastern',  'Central'),
@@ -132,9 +132,9 @@ INSERT INTO ibl_standings (tid, team_name, pct, leagueRecord, wins, losses, conf
 
 -- Clinch indicators for standings E2E tests
 -- Y = clinched playoff berth, X = clinched division, W = clinched conference
-UPDATE ibl_standings SET clinchedPlayoffs = 1 WHERE tid = 1;
-UPDATE ibl_standings SET clinchedDivision = 1 WHERE tid = 2;
-UPDATE ibl_standings SET clinchedConference = 1 WHERE tid = 3;
+UPDATE ibl_standings SET clinchedPlayoffs = 1 WHERE teamid = 1;
+UPDATE ibl_standings SET clinchedDivision = 1 WHERE teamid = 2;
+UPDATE ibl_standings SET clinchedConference = 1 WHERE teamid = 3;
 
 -- ============================================================
 -- Franchise seasons (required by trigger FK; 1 row per franchise)
@@ -188,7 +188,7 @@ INSERT INTO ibl_franchise_seasons (franchise_id, season_year, season_ending_year
 -- ============================================================
 
 INSERT INTO ibl_plr (
-  pid, name, age, peak, tid, pos, ordinal,
+  pid, name, age, peak, teamid, pos, ordinal,
   sta, oo, od, r_drive_off, dd, po, pd, r_trans_off, r_tvr,
   cy, cyt, cy1, cy2,
   retired, exp,
@@ -196,7 +196,7 @@ INSERT INTO ibl_plr (
   draftround, draftpickno, draftyear, draftedby, draftedbycurrentname,
   stats_gm, stats_min, stats_fgm, stats_fga, stats_ftm, stats_fta,
   stats_3gm, stats_3ga, stats_orb, stats_drb, stats_ast, stats_stl,
-  stats_to, stats_blk, stats_pf,
+  stats_tvr, stats_blk, stats_pf,
   uuid
 ) VALUES
   (1, 'Test Player', 28, 28, 1, 'SG', 1,
@@ -277,7 +277,7 @@ INSERT INTO ibl_plr (
 -- ============================================================
 
 INSERT INTO ibl_plr (
-  pid, name, age, peak, tid, pos, ordinal,
+  pid, name, age, peak, teamid, pos, ordinal,
   sta, oo, od, r_drive_off, dd, po, pd, r_trans_off, td,
   cy, cyt, cy1, cy2,
   retired, exp, bird,
@@ -285,7 +285,7 @@ INSERT INTO ibl_plr (
   draftround, draftpickno, draftyear, draftedby, draftedbycurrentname,
   stats_gm, stats_min, stats_fgm, stats_fga, stats_ftm, stats_fta,
   stats_3gm, stats_3ga, stats_orb, stats_drb, stats_ast, stats_stl,
-  stats_to, stats_blk, stats_pf,
+  stats_tvr, stats_blk, stats_pf,
   uuid
 ) VALUES
   (10, 'FA Guard', 26, 28, 1, 'SG', 3,
@@ -322,7 +322,7 @@ INSERT INTO ibl_plr (
 -- Long-named player for depth chart mobile abbreviation test
 -- "Konstantinos Papadopoulos" is long enough to trigger abbreviation → "K. Papadopoulos"
 INSERT INTO ibl_plr (
-  pid, name, age, peak, tid, pos, ordinal,
+  pid, name, age, peak, teamid, pos, ordinal,
   sta, oo, od, r_drive_off, dd, po, pd, r_trans_off, td,
   cy, cyt, cy1, cy2,
   retired, exp, bird,
@@ -330,7 +330,7 @@ INSERT INTO ibl_plr (
   draftround, draftpickno, draftyear, draftedby, draftedbycurrentname,
   stats_gm, stats_min, stats_fgm, stats_fga, stats_ftm, stats_fta,
   stats_3gm, stats_3ga, stats_orb, stats_drb, stats_ast, stats_stl,
-  stats_to, stats_blk, stats_pf,
+  stats_tvr, stats_blk, stats_pf,
   uuid
 ) VALUES
   (200000030, 'Konstantinos Papadopoulos', 27, 28, 1, 'C', 6,
@@ -348,7 +348,7 @@ INSERT INTO ibl_plr (
 -- Cash entries live in ibl_cash_considerations (not ibl_plr) since migration 095.
 -- Tests verify that cash rows appear in "Under Contract" and do NOT appear
 -- in "Unsigned Free Agents" or "All Other Free Agents".
-INSERT INTO ibl_cash_considerations (tid, type, label, cy, cyt, cy1, cy2)
+INSERT INTO ibl_cash_considerations (teamid, type, label, cy, cyt, cy1, cy2)
 VALUES (1, 'cash', 'Cash from Trade', 1, 1, 300, 0);
 
 -- Free agent demands
@@ -359,9 +359,9 @@ INSERT INTO ibl_demands (name, pid, dem1, dem2, dem3, dem4, dem5, dem6) VALUES
 
 -- Free agent player history (needed for SeasonLeaderboards)
 INSERT INTO ibl_plr_snapshots (
-  pid, name, season_year, snapshot_phase, source_archive, tid,
+  pid, name, season_year, snapshot_phase, source_archive, teamid,
   stats_gm, stats_min, stats_fgm, stats_fga, stats_ftm, stats_fta, stats_3gm, stats_3ga,
-  stats_orb, stats_reb, stats_ast, stats_stl, stats_blk, stats_to, stats_pf, stats_pts
+  stats_orb, stats_reb, stats_ast, stats_stl, stats_blk, stats_tvr, stats_pf, stats_pts
 ) VALUES
   (10, 'FA Guard', 2026, 'finals', 'ci-seed', 1,
    41, 1260, 208, 460, 104, 125, 62, 155,
@@ -383,7 +383,7 @@ UPDATE ibl_team_info SET HasMLE = 1, HasLLE = 1 WHERE teamid = 1;
 -- ============================================================
 
 INSERT INTO ibl_plr (
-  pid, name, age, peak, tid, pos, ordinal,
+  pid, name, age, peak, teamid, pos, ordinal,
   sta, oo, od, r_drive_off, dd, po, pd, r_trans_off, r_tvr,
   cy, cyt, cy1, cy2,
   retired, exp,
@@ -391,7 +391,7 @@ INSERT INTO ibl_plr (
   draftround, draftpickno, draftyear, draftedby, draftedbycurrentname,
   stats_gm, stats_min, stats_fgm, stats_fga, stats_ftm, stats_fta,
   stats_3gm, stats_3ga, stats_orb, stats_drb, stats_ast, stats_stl,
-  stats_to, stats_blk, stats_pf,
+  stats_tvr, stats_blk, stats_pf,
   uuid
 ) VALUES
   (20, 'Metros PG', 27, 28, 1, 'PG', 3,
@@ -509,7 +509,7 @@ INSERT INTO ibl_plr (
 -- the page under CI's PHP built-in server.
 -- ============================================================
 INSERT INTO ibl_plr (
-  pid, name, age, peak, tid, pos, ordinal,
+  pid, name, age, peak, teamid, pos, ordinal,
   sta, oo, od, r_drive_off, dd, po, pd, r_trans_off, r_tvr,
   cy, cyt, cy1, cy2,
   retired, exp,
@@ -517,7 +517,7 @@ INSERT INTO ibl_plr (
   draftround, draftpickno, draftyear, draftedby, draftedbycurrentname,
   stats_gm, stats_min, stats_fgm, stats_fga, stats_ftm, stats_fta,
   stats_3gm, stats_3ga, stats_orb, stats_drb, stats_ast, stats_stl,
-  stats_to, stats_blk, stats_pf,
+  stats_tvr, stats_blk, stats_pf,
   uuid
 ) VALUES
   (4040404, 'No Starter', 0, 0, 0, 'C', 0,
@@ -572,7 +572,7 @@ UPDATE ibl_plr SET dc_PFDepth = 1, PFDepth = 1, dc_CDepth = 1, CDepth = 1 WHERE 
 -- Need at least 1 saved config so #saved-dc-select has >= 2 options
 -- ============================================================
 
-INSERT INTO ibl_saved_depth_charts (id, tid, username, name, phase, season_year, sim_start_date, sim_number_start, is_active) VALUES
+INSERT INTO ibl_saved_depth_charts (id, teamid, username, name, phase, season_year, sim_start_date, sim_number_start, is_active) VALUES
   (1, 1, 'A-Jay', 'Offensive Config', 'Free Agency', 2026, '2026-03-01', 689, 0),
   (2, 1, 'A-Jay', 'Defensive Config', 'Free Agency', 2026, '2026-03-01', 689, 0);
 
@@ -590,7 +590,7 @@ INSERT INTO ibl_saved_depth_chart_players (depth_chart_id, pid, player_name, ord
 -- Generated columns (game_type, season_year, calc_*) are computed automatically.
 -- game_type=1 (regular season) when month is not 6 (playoffs), 10, or 0.
 INSERT INTO ibl_box_scores (
-  `Date`, pid, name, pos, visitorTID, homeTID, teamID,
+  `Date`, pid, name, pos, visitor_teamid, home_teamid, teamid,
   gameMIN, game2GM, game2GA, gameFTM, gameFTA, game3GM, game3GA,
   gameORB, gameDRB, gameAST, gameSTL, gameTOV, gameBLK, gamePF,
   `uuid`
@@ -609,9 +609,9 @@ INSERT INTO ibl_box_scores (
 -- ============================================================
 
 INSERT INTO ibl_plr_snapshots (
-  pid, name, season_year, snapshot_phase, source_archive, tid,
+  pid, name, season_year, snapshot_phase, source_archive, teamid,
   stats_gm, stats_min, stats_fgm, stats_fga, stats_ftm, stats_fta, stats_3gm, stats_3ga,
-  stats_orb, stats_reb, stats_ast, stats_stl, stats_blk, stats_to, stats_pf, stats_pts
+  stats_orb, stats_reb, stats_ast, stats_stl, stats_blk, stats_tvr, stats_pf, stats_pts
 ) VALUES
   (1, 'Test Player', 2026, 'finals', 'ci-seed', 1,
    41, 1260, 200, 450, 100, 120, 60, 150,
@@ -647,7 +647,7 @@ INSERT INTO ibl_plr_snapshots (
 -- Draft picks (DraftHistory page)
 -- ============================================================
 
-INSERT INTO ibl_draft_picks (ownerofpick, owner_tid, teampick, teampick_tid, year, round) VALUES
+INSERT INTO ibl_draft_picks (ownerofpick, owner_teamid, teampick, teampick_teamid, year, round) VALUES
   ('Metros',    1,  'Metros',    1,  2026, 1),
   ('Stars',     2,  'Stars',     2,  2026, 1),
   ('Phoenixes', 14, 'Phoenixes', 14, 2026, 1);
@@ -655,7 +655,7 @@ INSERT INTO ibl_draft_picks (ownerofpick, owner_tid, teampick, teampick_tid, yea
 -- Franchise Record Book data (tables created by migration 037c_create_rcb_tables.sql)
 
 -- League single-season records (scope=league, team_id=0)
-INSERT INTO ibl_rcb_alltime_records (scope, team_id, record_type, stat_category, ranking, player_name, pid, stat_value, stat_raw, team_of_record, season_year) VALUES
+INSERT INTO ibl_rcb_alltime_records (scope, teamid, record_type, stat_category, ranking, player_name, pid, stat_value, stat_raw, team_of_record, season_year) VALUES
   ('league', 0, 'single_season', 'ppg', 1, 'Test Player',     1, 15.5000, 155, 1, 2026),
   ('league', 0, 'single_season', 'ppg', 2, 'Test Player Two', 2, 13.9474, 139, 1, 2026),
   ('league', 0, 'single_season', 'rpg', 1, 'Test Player Two', 2, 4.7368,  47,  1, 2026),
@@ -664,7 +664,7 @@ INSERT INTO ibl_rcb_alltime_records (scope, team_id, record_type, stat_category,
   ('league', 0, 'single_season', 'apg', 2, 'Test Player Two', 2, 3.9474,  39,  1, 2026);
 
 -- Team single-season records for team_id=1 (Metros)
-INSERT INTO ibl_rcb_alltime_records (scope, team_id, record_type, stat_category, ranking, player_name, pid, stat_value, stat_raw, team_of_record, season_year) VALUES
+INSERT INTO ibl_rcb_alltime_records (scope, teamid, record_type, stat_category, ranking, player_name, pid, stat_value, stat_raw, team_of_record, season_year) VALUES
   ('team', 1, 'single_season', 'ppg', 1, 'Test Player',     1, 15.5000, 155, 1, 2026),
   ('team', 1, 'single_season', 'ppg', 2, 'Test Player Two', 2, 13.9474, 139, 1, 2026),
   ('team', 1, 'single_season', 'rpg', 1, 'Test Player Two', 2, 4.7368,  47,  1, 2026),
@@ -709,7 +709,7 @@ INSERT INTO ibl_olympics_team_info (teamid, team_city, team_name, color1, color2
   (3, 'Spain',  'Bulls',   'AA151B', 'F1BF00', 'd0000000-0000-0000-0000-000000000003'),
   (4, 'France', 'Coqs',    '002395', 'ED2939', 'd0000000-0000-0000-0000-000000000004');
 
-INSERT INTO ibl_olympics_standings (tid, team_name, pct, leagueRecord, wins, losses, conference, division) VALUES
+INSERT INTO ibl_olympics_standings (teamid, team_name, pct, leagueRecord, wins, losses, conference, division) VALUES
   (1, 'Eagles', 0.750, '3-1', 3, 1, 'Group A', ''),
   (2, 'Maple',  0.500, '2-2', 2, 2, 'Group A', ''),
   (3, 'Bulls',  0.500, '2-2', 2, 2, 'Group B', ''),
@@ -779,7 +779,7 @@ INSERT INTO nuke_stories (catid, aid, title, time, hometext, bodytext, topic) VA
 -- Saved depth chart configs (for depth-chart-changes.spec.ts)
 -- ============================================================
 
-INSERT INTO ibl_saved_depth_charts (id, tid, username, name, phase, season_year, sim_start_date, sim_number_start, is_active) VALUES
+INSERT INTO ibl_saved_depth_charts (id, teamid, username, name, phase, season_year, sim_start_date, sim_number_start, is_active) VALUES
   (1, 1, 'A-Jay', 'Offensive Config', 'Free Agency', 2026, '2026-03-01', 689, 0),
   (2, 1, 'A-Jay', 'Defensive Config', 'Free Agency', 2026, '2026-03-01', 689, 0)
 ON DUPLICATE KEY UPDATE name = VALUES(name);
@@ -843,7 +843,7 @@ UPDATE ibl_draft_class SET team = 'Cougars' WHERE name = 'Already Drafted PF';
 -- Only need a few picks; pick 1 has empty player (on the clock)
 -- ============================================================
 
-INSERT INTO ibl_draft (year, team, tid, player, round, pick, uuid) VALUES
+INSERT INTO ibl_draft (year, team, teamid, player, round, pick, uuid) VALUES
   (2026, 'Metros',    1,  '', 1, 1, 'draft-uuid-r1p01'),
   (2026, 'Stars',     2,  '', 1, 2, 'draft-uuid-r1p02'),
   (2026, 'Cougars',   3,  '', 1, 3, 'draft-uuid-r1p03'),
@@ -892,7 +892,7 @@ UPDATE ibl_team_info SET owner_name = 'GM Thunder'  WHERE teamid = 28;
 -- ============================================================
 
 INSERT INTO ibl_plr (
-  pid, name, age, peak, tid, pos, ordinal,
+  pid, name, age, peak, teamid, pos, ordinal,
   sta, oo, od, r_drive_off, dd, po, pd, r_trans_off, r_tvr,
   cy, cyt, cy1, cy2,
   retired, exp,
@@ -900,7 +900,7 @@ INSERT INTO ibl_plr (
   draftround, draftpickno, draftyear, draftedby, draftedbycurrentname,
   stats_gm, stats_min, stats_fgm, stats_fga, stats_ftm, stats_fta,
   stats_3gm, stats_3ga, stats_orb, stats_drb, stats_ast, stats_stl,
-  stats_to, stats_blk, stats_pf,
+  stats_tvr, stats_blk, stats_pf,
   uuid
 ) VALUES
   -- Spurs PG (Western/Midwest backcourt)
@@ -956,9 +956,9 @@ UPDATE ibl_plr SET dc_PFDepth = 1, PFDepth = 1 WHERE pid = 33;
 
 -- Player history for voting candidates (must have current year stats)
 INSERT INTO ibl_plr_snapshots (
-  pid, name, season_year, snapshot_phase, source_archive, tid,
+  pid, name, season_year, snapshot_phase, source_archive, teamid,
   stats_gm, stats_min, stats_fgm, stats_fga, stats_ftm, stats_fta, stats_3gm, stats_3ga,
-  stats_orb, stats_reb, stats_ast, stats_stl, stats_blk, stats_to, stats_pf, stats_pts
+  stats_orb, stats_reb, stats_ast, stats_stl, stats_blk, stats_tvr, stats_pf, stats_pts
 ) VALUES
   (30, 'Spurs Guard', 2026, 'finals', 'ci-seed', 10,
    41, 1260, 218, 475, 106, 128, 65, 160,
@@ -1011,7 +1011,7 @@ ON DUPLICATE KEY UPDATE VScore=VALUES(VScore);
 -- Box score row for IBL6 URL path (gameOfThatDay > 0)
 -- ============================================================
 
-INSERT INTO ibl_box_scores_teams (Date, visitorTeamID, homeTeamID, gameOfThatDay, name) VALUES
+INSERT INTO ibl_box_scores_teams (Date, visitor_teamid, home_teamid, gameOfThatDay, name) VALUES
   ('2026-02-20', 1, 2, 1, 'Metros')
 ON DUPLICATE KEY UPDATE gameOfThatDay=VALUES(gameOfThatDay);
 
@@ -1019,7 +1019,7 @@ ON DUPLICATE KEY UPDATE gameOfThatDay=VALUES(gameOfThatDay);
 -- Power rankings (covers SOS tier dots, SOS summary)
 -- ============================================================
 
-INSERT INTO ibl_power (TeamID, ranking, last_win, last_loss, streak_type, streak, sos, remaining_sos, sos_rank, remaining_sos_rank) VALUES
+INSERT INTO ibl_power (teamid, ranking, last_win, last_loss, streak_type, streak, sos, remaining_sos, sos_rank, remaining_sos_rank) VALUES
   (1, 72.0, 7, 3, 'W', 3, 0.510, 0.523, 5, 4),
   (2, 58.0, 6, 4, 'W', 1, 0.490, 0.480, 12, 14),
   (3, 47.0, 5, 5, 'L', 2, 0.505, 0.498, 8, 9),
@@ -1073,7 +1073,7 @@ INSERT INTO nuke_stories (catid, aid, title, time, hometext, bodytext, topic, ih
 -- ============================================================
 
 INSERT INTO ibl_plr (
-  pid, name, age, peak, tid, pos, ordinal,
+  pid, name, age, peak, teamid, pos, ordinal,
   sta, oo, od, r_drive_off, dd, po, pd, r_trans_off, r_tvr,
   cy, cyt, cy1, cy2,
   retired, exp,
@@ -1081,7 +1081,7 @@ INSERT INTO ibl_plr (
   draftround, draftpickno, draftyear, draftedby, draftedbycurrentname,
   stats_gm, stats_min, stats_fgm, stats_fga, stats_ftm, stats_fta,
   stats_3gm, stats_3ga, stats_orb, stats_drb, stats_ast, stats_stl,
-  stats_to, stats_blk, stats_pf,
+  stats_tvr, stats_blk, stats_pf,
   uuid
 ) VALUES
   (40, 'Rookie Guard', 20, 25, 4, 'PG', 1,
@@ -1117,9 +1117,9 @@ INSERT INTO ibl_plr (
 
 -- Rookie player history (for stats to show on ballot)
 INSERT INTO ibl_plr_snapshots (
-  pid, name, season_year, snapshot_phase, source_archive, tid,
+  pid, name, season_year, snapshot_phase, source_archive, teamid,
   stats_gm, stats_min, stats_fgm, stats_fga, stats_ftm, stats_fta, stats_3gm, stats_3ga,
-  stats_orb, stats_reb, stats_ast, stats_stl, stats_blk, stats_to, stats_pf, stats_pts
+  stats_orb, stats_reb, stats_ast, stats_stl, stats_blk, stats_tvr, stats_pf, stats_pts
 ) VALUES
   (40, 'Rookie Guard', 2026, 'finals', 'ci-seed', 4,
    41, 1260, 168, 396, 77, 96, 46, 122,
@@ -1219,7 +1219,7 @@ ON DUPLICATE KEY UPDATE
 -- Round 2 draft picks (ProjectedDraftOrder round separator tests)
 -- ============================================================
 
-INSERT INTO ibl_draft_picks (ownerofpick, owner_tid, teampick, teampick_tid, year, round) VALUES
+INSERT INTO ibl_draft_picks (ownerofpick, owner_teamid, teampick, teampick_teamid, year, round) VALUES
   ('Metros',    1,  'Metros',    1,  2026, 2),
   ('Stars',     2,  'Stars',     2,  2026, 2),
   ('Phoenixes', 14, 'Phoenixes', 14, 2026, 2)
@@ -1243,7 +1243,7 @@ INSERT INTO nuke_stories (catid, aid, title, time, hometext, bodytext, topic, ih
 -- ============================================================
 
 INSERT INTO ibl_plr (
-  pid, name, age, peak, tid, pos, ordinal,
+  pid, name, age, peak, teamid, pos, ordinal,
   sta, oo, od, r_drive_off, dd, po, pd, r_trans_off, td,
   cy, cyt, cy1,
   retired, exp,
@@ -1251,7 +1251,7 @@ INSERT INTO ibl_plr (
   draftround, draftpickno, draftyear, draftedby, draftedbycurrentname,
   stats_gm, stats_min, stats_fgm, stats_fga, stats_ftm, stats_fta,
   stats_3gm, stats_3ga, stats_orb, stats_drb, stats_ast, stats_stl,
-  stats_to, stats_blk, stats_pf,
+  stats_tvr, stats_blk, stats_pf,
   uuid
 ) VALUES
   (31, 'Draft Rookie 2026', 20, 25, 2, 'PG', 5,
@@ -1272,7 +1272,7 @@ ON DUPLICATE KEY UPDATE name = VALUES(name), draftyear = VALUES(draftyear);
 -- ============================================================
 
 INSERT INTO ibl_plr (
-  pid, name, age, peak, tid, pos, ordinal,
+  pid, name, age, peak, teamid, pos, ordinal,
   sta, oo, od, r_drive_off, dd, po, pd, r_trans_off, r_tvr,
   cy, cyt, cy1, cy2,
   retired, exp,
@@ -1280,7 +1280,7 @@ INSERT INTO ibl_plr (
   draftround, draftpickno, draftyear, draftedby, draftedbycurrentname,
   stats_gm, stats_min, stats_fgm, stats_fga, stats_ftm, stats_fta,
   stats_3gm, stats_3ga, stats_orb, stats_drb, stats_ast, stats_stl,
-  stats_to, stats_blk, stats_pf,
+  stats_tvr, stats_blk, stats_pf,
   uuid
 ) VALUES
   (30, 'Extension Vet', 30, 30, 1, 'SG', 6,
@@ -1308,7 +1308,7 @@ ON DUPLICATE KEY UPDATE name = VALUES(name), cy = VALUES(cy), cyt = VALUES(cyt);
 DELETE FROM ibl_hist;
 INSERT INTO ibl_hist
 SELECT
-  snap.pid, snap.name, snap.season_year AS `year`, snap.tid AS teamid,
+  snap.pid, snap.name, snap.season_year AS `year`, snap.teamid AS teamid,
   COALESCE(fs.team_name, '') AS team,
   CAST(snap.stats_gm - snap.phantom_games AS SIGNED) AS games,
   CAST(snap.stats_min AS SIGNED) AS minutes,
@@ -1317,11 +1317,11 @@ SELECT
   CAST(snap.stats_3gm AS SIGNED) AS tgm, CAST(snap.stats_3ga AS SIGNED) AS tga,
   CAST(snap.stats_orb AS SIGNED) AS orb, CAST(snap.stats_reb AS SIGNED) AS reb,
   CAST(snap.stats_ast AS SIGNED) AS ast, CAST(snap.stats_stl AS SIGNED) AS stl,
-  CAST(snap.stats_blk AS SIGNED) AS blk, CAST(snap.stats_to  AS SIGNED) AS tvr,
+  CAST(snap.stats_blk AS SIGNED) AS blk, CAST(snap.stats_tvr AS SIGNED) AS tvr,
   CAST(snap.stats_pf  AS SIGNED) AS pf,  CAST(snap.stats_pts AS SIGNED) AS pts,
   CAST(COALESCE(snap.r_fga, 0) AS SIGNED) AS r_2ga, CAST(COALESCE(snap.r_fgp, 0) AS SIGNED) AS r_2gp,
   CAST(COALESCE(snap.r_fta, 0) AS SIGNED) AS r_fta, CAST(COALESCE(snap.r_ftp, 0) AS SIGNED) AS r_ftp,
-  CAST(COALESCE(snap.r_tga, 0) AS SIGNED) AS r_3ga, CAST(COALESCE(snap.r_tgp, 0) AS SIGNED) AS r_3gp,
+  CAST(COALESCE(snap.r_3ga, 0) AS SIGNED) AS r_3ga, CAST(COALESCE(snap.r_3gp, 0) AS SIGNED) AS r_3gp,
   CAST(COALESCE(snap.r_orb, 0) AS SIGNED) AS r_orb, CAST(COALESCE(snap.r_drb, 0) AS SIGNED) AS r_drb,
   CAST(COALESCE(snap.r_ast, 0) AS SIGNED) AS r_ast, CAST(COALESCE(snap.r_stl, 0) AS SIGNED) AS r_stl,
   CAST(COALESCE(snap.r_blk, 0) AS SIGNED) AS r_blk, CAST(COALESCE(snap.r_tvr,  0) AS SIGNED) AS r_tvr,
@@ -1360,7 +1360,7 @@ FROM (
   ) AS rn FROM ibl_plr_snapshots s WHERE s.stats_gm > 0
 ) snap
 LEFT JOIN ibl_franchise_seasons fs
-  ON snap.tid = fs.franchise_id AND snap.season_year = fs.season_ending_year
+  ON snap.teamid = fs.franchise_id AND snap.season_year = fs.season_ending_year
 WHERE snap.rn = 1;
 
 -- ============================================================

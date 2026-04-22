@@ -204,7 +204,7 @@ class PlayerDatabaseRepositoryTest extends DatabaseTestCase
 
     public function testResultIncludesTeamnameFromLeftJoin(): void
     {
-        $this->insertTestPlayer(200100001, 'PDB TeamJoin', ['tid' => 1]);
+        $this->insertTestPlayer(200100001, 'PDB TeamJoin', ['teamid' => 1]);
 
         $result = $this->repo->searchPlayers($this->buildParams(['search_name' => 'PDB TeamJoin']));
 
@@ -308,8 +308,8 @@ class PlayerDatabaseRepositoryTest extends DatabaseTestCase
             'r_fgp' => null,
             'r_fta' => null,
             'r_ftp' => null,
-            'r_tga' => null,
-            'r_tgp' => null,
+            'r_3ga' => null,
+            'r_3gp' => null,
             'r_orb' => null,
             'r_drb' => null,
             'r_ast' => null,

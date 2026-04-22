@@ -106,10 +106,10 @@ class SeasonLeaderboardsView implements SeasonLeaderboardsViewInterface
     {
         $html = '<option value="0">All</option>' . "\n";
         foreach ($teams as $team) {
-            $tid = $team['TeamID'];
+            $teamid = $team['teamid'];
             $teamName = $team['Team'];
-            $selected = ($selectedTeam === $tid) ? ' selected' : '';
-            $html .= '<option value="' . $tid . '"' . $selected . '>' . HtmlSanitizer::e($teamName) . '</option>' . "\n";
+            $selected = ($selectedTeam === $teamid) ? ' selected' : '';
+            $html .= '<option value="' . $teamid . '"' . $selected . '>' . HtmlSanitizer::e($teamName) . '</option>' . "\n";
         }
         return $html;
     }

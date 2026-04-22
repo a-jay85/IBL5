@@ -77,7 +77,7 @@ class SeasonLeaderboardsRepository extends \BaseMysqliRepository implements Seas
     {
         /** @var list<TeamRow> $rows */
         $rows = $this->fetchAll(
-            "SELECT teamid AS TeamID, team_name AS Team FROM {$this->teamInfoTable} WHERE teamid BETWEEN 1 AND " . League::MAX_REAL_TEAMID . " ORDER BY teamid ASC"
+            "SELECT teamid AS teamid, team_name AS Team FROM {$this->teamInfoTable} WHERE teamid BETWEEN 1 AND " . League::MAX_REAL_TEAMID . " ORDER BY teamid ASC"
         );
         return $rows;
     }

@@ -139,9 +139,9 @@ class MockDatabaseTest extends TestCase
         $this->mockDb->onQuery('SELECT COUNT', [['total' => 42]]);
 
         // Prepared statements go through sql_query() internally via MockPreparedStatement
-        $stmt = $this->mockDb->prepare('SELECT COUNT(*) AS total FROM ibl_plr WHERE tid = ?');
-        $tid = 5;
-        $stmt->bind_param('i', $tid);
+        $stmt = $this->mockDb->prepare('SELECT COUNT(*) AS total FROM ibl_plr WHERE teamid = ?');
+        $teamid = 5;
+        $stmt->bind_param('i', $teamid);
         $stmt->execute();
         $result = $stmt->get_result();
 

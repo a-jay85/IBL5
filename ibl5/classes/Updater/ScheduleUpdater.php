@@ -151,10 +151,10 @@ class ScheduleUpdater extends \BaseMysqliRepository {
                 continue;
             }
 
-            $visitorTID = $this->teamNameToIdMap[$game['visitor']] ?? null;
-            $homeTID = $this->teamNameToIdMap[$game['home']] ?? null;
+            $visitor_teamid = $this->teamNameToIdMap[$game['visitor']] ?? null;
+            $home_teamid = $this->teamNameToIdMap[$game['home']] ?? null;
 
-            if ($visitorTID === null || $homeTID === null) {
+            if ($visitor_teamid === null || $home_teamid === null) {
                 $log .= "Unknown team in playoff game: {$game['visitor']} @ {$game['home']}<br>";
                 continue;
             }
@@ -173,9 +173,9 @@ class ScheduleUpdater extends \BaseMysqliRepository {
                 $fullDate['year'],
                 $boxId,
                 $fullDate['date'],
-                $visitorTID,
+                $visitor_teamid,
                 $game['visitor_score'],
-                $homeTID,
+                $home_teamid,
                 $game['home_score'],
                 $uuid
             );
@@ -244,15 +244,15 @@ class ScheduleUpdater extends \BaseMysqliRepository {
                 $boxID = self::UNPLAYED_BOX_ID;
             }
 
-            $visitorTID = $game['visitor'];
-            $homeTID = $game['home'];
+            $visitor_teamid = $game['visitor'];
+            $home_teamid = $game['home'];
             $vScore = $game['visitor_score'];
             $hScore = $game['home_score'];
 
             $uuid = UuidGenerator::generateUuid();
 
-            $visitorName = $this->getTeamNameById($visitorTID);
-            $homeName = $this->getTeamNameById($homeTID);
+            $visitorName = $this->getTeamNameById($visitor_teamid);
+            $homeName = $this->getTeamNameById($home_teamid);
 
             try {
                 $this->execute(
@@ -270,9 +270,9 @@ class ScheduleUpdater extends \BaseMysqliRepository {
                     $year,
                     $boxID,
                     $date,
-                    $visitorTID,
+                    $visitor_teamid,
                     $vScore,
-                    $homeTID,
+                    $home_teamid,
                     $hScore,
                     $uuid
                 );

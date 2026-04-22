@@ -172,7 +172,7 @@ class TeamScheduleViewTest extends TestCase
             ->getMock();
 
         // Set public properties directly - these exist on Team class
-        $team->teamID = 1;
+        $team->teamid = 1;
         $team->name = 'Test Team';
         $team->color1 = $color1;
         $team->color2 = $color2;
@@ -198,12 +198,12 @@ class TeamScheduleViewTest extends TestCase
         $game->homeScore = 98;
         $game->boxScoreID = 12345;
         $game->gameOfThatDay = 3;
-        $game->visitorTeamID = 1;  // User's team is visitor
-        $game->homeTeamID = 2;     // Opponent is home team
+        $game->visitor_teamid = 1;  // User's team is visitor
+        $game->home_teamid = 2;     // Opponent is home team
 
         // Create mock opposing Team object
         $opposingTeam = new \stdClass();
-        $opposingTeam->teamID = 2;
+        $opposingTeam->teamid = 2;
         $opposingTeam->name = 'Boston';
         $opposingTeam->seasonRecord = '10-5';  // Added for opponent record display
 

@@ -82,7 +82,7 @@ class SeasonAverages
 ?>
         <tr>
 <?php if ($moduleName === "LeagueStarters"):
-    echo TeamCellHelper::renderTeamCellOrFreeAgent($player->teamID ?? 0, $player->teamName ?? '', $player->teamColor1 ?? 'FFFFFF', $player->teamColor2 ?? '000000');
+    echo TeamCellHelper::renderTeamCellOrFreeAgent($player->teamid ?? 0, $player->teamName ?? '', $player->teamColor1 ?? 'FFFFFF', $player->teamColor2 ?? '000000');
 endif; ?>
             <td><?= HtmlSanitizer::e($player->position ?? '') ?></td>
             <?= PlayerImageHelper::renderPlayerCell($player->playerID ?? 0, $player->decoratedName ?? '', $starterPids, $player->nameStatusClass) ?>

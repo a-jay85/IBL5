@@ -17,7 +17,7 @@ class FranchiseHistoryViewTest extends TestCase
     }
 
     /**
-     * @return array{records: list<array{year: int, label: string, wins: int, losses: int, urlYear: int, isBest: bool}>, totalWins: int, totalLosses: int, teamID: int}
+     * @return array{records: list<array{year: int, label: string, wins: int, losses: int, urlYear: int, isBest: bool}>, totalWins: int, totalLosses: int, teamid: int}
      */
     private function buildWinLossData(): array
     {
@@ -28,7 +28,7 @@ class FranchiseHistoryViewTest extends TestCase
             ],
             'totalWins' => 90,
             'totalLosses' => 30,
-            'teamID' => 5,
+            'teamid' => 5,
         ];
     }
 
@@ -38,7 +38,7 @@ class FranchiseHistoryViewTest extends TestCase
 
         $this->assertStringContainsString('<strong><a href=', $html);
         // The best record (50-10) should be bolded
-        $this->assertStringContainsString('<strong><a href="./modules.php?name=Team&amp;op=team&amp;teamID=5&amp;yr=2024">2023-2024 Heat</a>', $html);
+        $this->assertStringContainsString('<strong><a href="./modules.php?name=Team&amp;op=team&amp;teamid=5&amp;yr=2024">2023-2024 Heat</a>', $html);
     }
 
     public function testRegularSeasonShowsTotals(): void
@@ -57,7 +57,7 @@ class FranchiseHistoryViewTest extends TestCase
             ],
             'totalWins' => 3,
             'totalLosses' => 1,
-            'teamID' => 5,
+            'teamid' => 5,
         ];
 
         $html = $this->view->renderHeat($data);

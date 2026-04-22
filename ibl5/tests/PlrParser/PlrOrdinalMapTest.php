@@ -58,7 +58,7 @@ class PlrOrdinalMapTest extends TestCase
 
     public function testGetSlotPlayerReturnsCorrectPlayer(): void
     {
-        // tid=1, slot=0 → ordinal = (1-1)*30 + 0 + 1 = 1
+        // teamid=1, slot=0 → ordinal = (1-1)*30 + 0 + 1 = 1
         $content = $this->buildPlrLine(1, 'John Smith', 12345) . "\n";
 
         file_put_contents($this->tmpFile, $content);
@@ -72,7 +72,7 @@ class PlrOrdinalMapTest extends TestCase
 
     public function testOrdinalCalculation(): void
     {
-        // tid=3, slot=4 → ordinal = (3-1)*30 + 4 + 1 = 65
+        // teamid=3, slot=4 → ordinal = (3-1)*30 + 4 + 1 = 65
         $content = $this->buildPlrLine(65, 'Mid Roster', 99999) . "\n";
 
         file_put_contents($this->tmpFile, $content);
@@ -91,7 +91,7 @@ class PlrOrdinalMapTest extends TestCase
         file_put_contents($this->tmpFile, $content);
         $map = PlrOrdinalMap::fromPlrFile($this->tmpFile);
 
-        // tid=2, slot=0 → ordinal=31, which is not in the file
+        // teamid=2, slot=0 → ordinal=31, which is not in the file
         $this->assertNull($map->getSlotPlayer(2, 0));
     }
 

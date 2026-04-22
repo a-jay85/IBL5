@@ -47,13 +47,13 @@ $result = $processor->processExtension($extensionData);
 
 // Look up team ID for redirect
 $commonRepo = new \Services\CommonMysqliRepository($mysqli_db);
-$tid = $commonRepo->getTidFromTeamname($teamName);
+$teamid = $commonRepo->getTidFromTeamname($teamName);
 
-if ($tid === null) {
+if ($teamid === null) {
     \Utilities\HtmxHelper::redirect('/ibl5/index.php');
 }
 
-$redirectBase = '/ibl5/modules.php?name=Team&op=team&teamID=' . $tid . '&display=contracts';
+$redirectBase = '/ibl5/modules.php?name=Team&op=team&teamid=' . $teamid . '&display=contracts';
 
 if (!$result['success']) {
     $redirectUrl = $redirectBase . '&result=extension_error&msg=' . rawurlencode($result['error']);

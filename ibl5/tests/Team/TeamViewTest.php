@@ -36,7 +36,7 @@ class TeamViewTest extends TestCase
         }
 
         return array_merge([
-            'teamID' => 1,
+            'teamid' => 1,
             'team' => $team,
             'imagesPath' => 'images/',
             'yr' => null,
@@ -110,7 +110,7 @@ class TeamViewTest extends TestCase
         $team->discordID = null;
 
         $output = $this->view->render($this->createPageData([
-            'teamID' => 0,
+            'teamid' => 0,
             'team' => $team,
             'isActualTeam' => false,
         ]));
@@ -137,7 +137,7 @@ class TeamViewTest extends TestCase
         $team->discordID = null;
 
         $output = $this->view->render($this->createPageData([
-            'teamID' => 0,
+            'teamid' => 0,
             'team' => $team,
             'isActualTeam' => false,
         ]));

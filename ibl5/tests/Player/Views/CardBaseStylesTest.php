@@ -15,16 +15,16 @@ use Player\Views\TeamColorHelper;
 class CardBaseStylesTest extends TestCase
 {
     /**
-     * @return array{name: string, nickname: string, position: string, teamName: string, teamID: int, age: string, height: string, weight: string, college: string, draftYear: int, draftRound: string, draftPick: string, draftTeam: string, imageUrl: string}
+     * @return array{name: string, nickname: string, position: string, teamName: string, teamid: int, age: string, height: string, weight: string, college: string, draftYear: int, draftRound: string, draftPick: string, draftTeam: string, imageUrl: string}
      */
-    private function createPlayerData(int $teamID = 7, string $teamName = 'Miami'): array
+    private function createPlayerData(int $teamid = 7, string $teamName = 'Miami'): array
     {
         return [
             'name' => 'Test Player',
             'nickname' => 'T.P.',
             'position' => 'SG',
             'teamName' => $teamName,
-            'teamID' => $teamID,
+            'teamid' => $teamid,
             'age' => '25',
             'height' => '6\'4"',
             'weight' => '200',
@@ -45,7 +45,7 @@ class CardBaseStylesTest extends TestCase
 
         $this->assertStringContainsString('card-team-logo', $html);
         $this->assertStringContainsString('images/logo/new7.png', $html);
-        $this->assertStringContainsString('href="modules.php?name=Team&amp;op=team&amp;teamID=7"', $html);
+        $this->assertStringContainsString('href="modules.php?name=Team&amp;op=team&amp;teamid=7"', $html);
     }
 
     public function testRenderCardTopOmitsTeamLogoForFreeAgent(): void

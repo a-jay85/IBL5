@@ -238,7 +238,7 @@ class PlayerStats implements PlayerStatsInterface
         $this->seasonTotalRebounds = $this->seasonOffensiveRebounds + $this->seasonDefensiveRebounds;
         $this->seasonAssists = (int) ($plrRow['stats_ast'] ?? 0);
         $this->seasonSteals = (int) ($plrRow['stats_stl'] ?? 0);
-        $this->seasonTurnovers = (int) ($plrRow['stats_to'] ?? 0);
+        $this->seasonTurnovers = (int) ($plrRow['stats_tvr'] ?? 0);
         $this->seasonBlocks = (int) ($plrRow['stats_blk'] ?? 0);
         $this->seasonPersonalFouls = (int) ($plrRow['stats_pf'] ?? 0);
         $this->seasonPoints = StatsFormatter::calculatePoints($this->seasonFieldGoalsMade, $this->seasonFreeThrowsMade, $this->seasonThreePointersMade);

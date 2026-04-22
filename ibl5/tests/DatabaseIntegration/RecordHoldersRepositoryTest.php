@@ -102,7 +102,7 @@ class RecordHoldersRepositoryTest extends DatabaseTestCase
 
         self::assertNotEmpty($result);
         $first = $result[0];
-        self::assertArrayHasKey('tid', $first);
+        self::assertArrayHasKey('teamid', $first);
         self::assertArrayHasKey('team_name', $first);
         self::assertArrayHasKey('value', $first);
         self::assertGreaterThan(0, $first['value']);
@@ -178,8 +178,8 @@ class RecordHoldersRepositoryTest extends DatabaseTestCase
                 'Date' => $date,
                 'name' => $name,
                 'gameOfThatDay' => 1,
-                'visitorTeamID' => 2,
-                'homeTeamID' => 1,
+                'visitor_teamid' => 2,
+                'home_teamid' => 1,
                 'attendance' => 10000,
                 'capacity' => 15000,
                 'visitorWins' => 0,

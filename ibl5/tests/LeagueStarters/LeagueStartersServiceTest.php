@@ -160,7 +160,7 @@ class LeagueStartersServiceTest extends TestCase
         ]);
 
         $this->mockDb->onQuery('SELECT[\s\S]*ibl_plr[\s\S]*pid', [
-            TestDataFactory::createPlayer(['pid' => 4040404, 'tid' => 0, 'name' => 'Placeholder', 'loyalty' => 0, 'playingTime' => 0, 'winner' => 0, 'tradition' => 0, 'security' => 0]),
+            TestDataFactory::createPlayer(['pid' => 4040404, 'teamid' => 0, 'name' => 'Placeholder', 'loyalty' => 0, 'playingTime' => 0, 'winner' => 0, 'tradition' => 0, 'security' => 0]),
         ]);
 
         $service = new LeagueStartersService($this->mockMysqliDb, $this->mockLeague, $mockRepo);
@@ -183,7 +183,7 @@ class LeagueStartersServiceTest extends TestCase
         ]);
 
         $this->mockDb->onQuery('SELECT[\s\S]*ibl_plr[\s\S]*pid', [
-            TestDataFactory::createPlayer(['pid' => 4040404, 'tid' => 0, 'name' => 'Placeholder', 'loyalty' => 0, 'playingTime' => 0, 'winner' => 0, 'tradition' => 0, 'security' => 0]),
+            TestDataFactory::createPlayer(['pid' => 4040404, 'teamid' => 0, 'name' => 'Placeholder', 'loyalty' => 0, 'playingTime' => 0, 'winner' => 0, 'tradition' => 0, 'security' => 0]),
         ]);
 
         $service = new LeagueStartersService($this->mockMysqliDb, $this->mockLeague, $mockRepo);
@@ -207,7 +207,7 @@ class LeagueStartersServiceTest extends TestCase
         ]);
 
         $this->mockDb->onQuery('SELECT[\s\S]*ibl_plr[\s\S]*pid', [
-            TestDataFactory::createPlayer(['pid' => 4040404, 'tid' => 0, 'name' => 'Placeholder', 'loyalty' => 0, 'playingTime' => 0, 'winner' => 0, 'tradition' => 0, 'security' => 0]),
+            TestDataFactory::createPlayer(['pid' => 4040404, 'teamid' => 0, 'name' => 'Placeholder', 'loyalty' => 0, 'playingTime' => 0, 'winner' => 0, 'tradition' => 0, 'security' => 0]),
         ]);
 
         $service = new LeagueStartersService($this->mockMysqliDb, $this->mockLeague, $mockRepo);
@@ -240,11 +240,11 @@ class LeagueStartersServiceTest extends TestCase
     /**
      * @return array<string, mixed>
      */
-    private function makeStarterRow(int $pid, int $tid, string $position, string $teamname): array
+    private function makeStarterRow(int $pid, int $teamid, string $position, string $teamname): array
     {
         $row = TestDataFactory::createPlayer([
             'pid' => $pid,
-            'tid' => $tid,
+            'teamid' => $teamid,
             'teamname' => $teamname,
             'color1' => '#000000',
             'color2' => '#FFFFFF',

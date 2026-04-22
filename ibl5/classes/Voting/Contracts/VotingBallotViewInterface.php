@@ -23,7 +23,7 @@ interface VotingBallotViewInterface
      *
      * @param string $formAction Form action URL
      * @param string $voterTeamName Voter's team name
-     * @param int $tid Voter's team ID
+     * @param int $teamid Voter's team ID
      * @param string $phase Season phase
      * @param list<BallotCategory> $categories Ballot categories with candidates
      * @return string HTML output
@@ -31,7 +31,7 @@ interface VotingBallotViewInterface
     public function renderBallotForm(
         string $formAction,
         string $voterTeamName,
-        int $tid,
+        int $teamid,
         string $phase,
         array $categories
     ): string;

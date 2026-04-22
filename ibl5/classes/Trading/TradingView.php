@@ -462,7 +462,7 @@ $tradeConfig = [
     <td class="ibl-player-cell">
         <img src="images/logo/<?= $pickTeam ?>.png" alt="" class="ibl-team-cell__logo" width="24" height="24" loading="lazy">
         <div>
-            <?= $pickYear ?> R<?= $pickRound ?> <a href="./modules.php?name=Team&amp;op=team&amp;teamID=<?= $pickTeamId ?>" class="trading-roster__pick-link"><?= $pickTeam ?></a>
+            <?= $pickYear ?> R<?= $pickRound ?> <a href="./modules.php?name=Team&amp;op=team&amp;teamid=<?= $pickTeamId ?>" class="trading-roster__pick-link"><?= $pickTeam ?></a>
 <?php if ($pickNotes !== null && $pickNotes !== ''):
     $pickNotesEscaped = HtmlSanitizer::safeHtmlOutput($pickNotes);
 ?>

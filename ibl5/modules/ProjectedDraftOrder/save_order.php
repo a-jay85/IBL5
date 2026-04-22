@@ -60,10 +60,10 @@ if (count(array_unique($intOrder)) !== 12) {
 }
 
 // Validate all team IDs are within valid range
-foreach ($intOrder as $tid) {
-    if ($tid < 1 || $tid > \League\League::MAX_REAL_TEAMID) {
+foreach ($intOrder as $teamid) {
+    if ($teamid < 1 || $teamid > \League\League::MAX_REAL_TEAMID) {
         http_response_code(400);
-        echo json_encode(['success' => false, 'error' => 'Invalid team ID: ' . $tid]);
+        echo json_encode(['success' => false, 'error' => 'Invalid team ID: ' . $teamid]);
         return;
     }
 }

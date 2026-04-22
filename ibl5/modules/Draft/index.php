@@ -29,7 +29,7 @@ function userinfo($username)
     PageLayout\PageLayout::header();
 
     $teamlogo = $commonRepository->getTeamnameFromUsername($username) ?? '';
-    $tid = $commonRepository->getTidFromTeamname($teamlogo);
+    $teamid = $commonRepository->getTidFromTeamname($teamlogo);
 
     // Get current draft pick information
     $currentPick = $repository->getCurrentDraftPick();
@@ -38,7 +38,7 @@ function userinfo($username)
     $draft_round = $currentPick['round'] ?? null;
     $draft_pick = $currentPick['pick'] ?? null;
 
-    $draft_tid = $currentPick['tid'] ?? 0;
+    $draft_tid = $currentPick['teamid'] ?? 0;
 
     $pickOwner = null;
     if ($draft_round !== null && $draft_tid !== 0) {
@@ -49,7 +49,7 @@ function userinfo($username)
     $players = $repository->getAllDraftClassPlayers();
 
     // Render the draft interface
-    echo $view->renderDraftInterface($players, $teamlogo, $pickOwner, $draft_round, $draft_pick, $season->endingYear, $tid);
+    echo $view->renderDraftInterface($players, $teamlogo, $pickOwner, $draft_round, $draft_pick, $season->endingYear, $teamid);
 
     PageLayout\PageLayout::footer();
 }

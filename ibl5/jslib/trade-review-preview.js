@@ -208,7 +208,7 @@
         container.innerHTML = '<div class="trade-roster-preview__loading">Loading</div>';
 
         var url = cfg.rosterPreviewApiBaseUrl
-            + '&teamID=' + encodeURIComponent(state.currentTeamId)
+            + '&teamid=' + encodeURIComponent(state.currentTeamId)
             + '&addPids=' + encodeURIComponent(addPids.join(','))
             + '&removePids=' + encodeURIComponent(removePids.join(','))
             + '&display=' + encodeURIComponent(state.currentDisplay);

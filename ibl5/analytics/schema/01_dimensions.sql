@@ -26,7 +26,8 @@ SELECT
         WHEN 4 THEN TRY_CAST(cy4 AS INTEGER) WHEN 5 THEN TRY_CAST(cy5 AS INTEGER) WHEN 6 THEN TRY_CAST(cy6 AS INTEGER)
         ELSE 0
     END AS current_salary,
-    TRY_CAST(tid AS INTEGER) AS tid,
+    -- Migration 114: MariaDB column renamed tid → teamid.
+    TRY_CAST(teamid AS INTEGER) AS teamid,
     TRY_CAST(draftround AS INTEGER) AS draftround,
     TRY_CAST(draftyear AS INTEGER) AS draftyear,
     TRY_CAST(draftpickno AS INTEGER) AS draftpickno
@@ -75,7 +76,8 @@ SELECT
     name,
     TRY_CAST(season_year AS INTEGER) AS season_year,
     snapshot_phase,
-    TRY_CAST(tid AS INTEGER) AS tid,
+    -- Migration 114: MariaDB column renamed tid → teamid.
+    TRY_CAST(teamid AS INTEGER) AS teamid,
     TRY_CAST(age AS INTEGER) AS age,
     pos,
     TRY_CAST(peak AS INTEGER) AS peak,
@@ -91,7 +93,8 @@ SELECT
     END AS tsi_band,
     TRY_CAST(r_fga AS INTEGER) AS r_fga, TRY_CAST(r_fgp AS INTEGER) AS r_fgp,
     TRY_CAST(r_fta AS INTEGER) AS r_fta, TRY_CAST(r_ftp AS INTEGER) AS r_ftp,
-    TRY_CAST(r_tga AS INTEGER) AS r_tga, TRY_CAST(r_tgp AS INTEGER) AS r_tgp,
+    -- Migration 114: MariaDB columns renamed r_tga → r_3ga, r_tgp → r_3gp. Kept output aliases r_tga/r_tgp.
+    TRY_CAST(r_3ga AS INTEGER) AS r_tga, TRY_CAST(r_3gp AS INTEGER) AS r_tgp,
     TRY_CAST(r_orb AS INTEGER) AS r_orb, TRY_CAST(r_drb AS INTEGER) AS r_drb,
     TRY_CAST(r_ast AS INTEGER) AS r_ast, TRY_CAST(r_stl AS INTEGER) AS r_stl,
     -- Migration 113: MariaDB column renamed r_to → r_tvr. Kept output name r_to

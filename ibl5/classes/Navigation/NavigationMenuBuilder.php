@@ -166,13 +166,13 @@ class NavigationMenuBuilder implements NavigationMenuBuilderInterface
         $teamId = $this->config->teamId;
         /** @var list<NavLink> $links */
         $links = [
-            ['label' => 'Team Page', 'url' => 'modules.php?name=Team&op=team&teamID=' . $teamId],
-            ['label' => 'Schedule', 'url' => 'modules.php?name=Schedule&teamID=' . $teamId],
+            ['label' => 'Team Page', 'url' => 'modules.php?name=Team&op=team&teamid=' . $teamId],
+            ['label' => 'Schedule', 'url' => 'modules.php?name=Schedule&teamid=' . $teamId],
             ['label' => 'Next Sim', 'url' => 'modules.php?name=NextSim', 'badge' => 'NEW'],
             ['label' => 'Depth Chart Entry', 'url' => 'modules.php?name=DepthChartEntry'],
             ['label' => 'Trading', 'url' => 'modules.php?name=Trading&op=reviewtrade'],
             ['label' => 'Voting', 'url' => 'modules.php?name=Voting'],
-            ['label' => 'Draft History', 'url' => 'modules.php?name=DraftHistory&teamID=' . $teamId],
+            ['label' => 'Draft History', 'url' => 'modules.php?name=DraftHistory&teamid=' . $teamId],
         ];
 
         if ($this->areWaiversAllowed()) {

@@ -47,7 +47,7 @@ class ComparePlayersRepositoryTest extends DatabaseTestCase
 
     public function testGetPlayerByNameReturnsPlayerWithTeamColors(): void
     {
-        $this->insertTestPlayer(200090005, 'Compare Lookup', ['tid' => 1]);
+        $this->insertTestPlayer(200090005, 'Compare Lookup', ['teamid' => 1]);
 
         $result = $this->repo->getPlayerByName('Compare Lookup');
 

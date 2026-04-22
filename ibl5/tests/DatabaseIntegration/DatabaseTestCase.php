@@ -104,8 +104,8 @@ abstract class DatabaseTestCase extends TestCase
             'Date' => $date,
             'name' => $name,
             'gameOfThatDay' => $gameOfDay,
-            'visitorTeamID' => $visitorTid,
-            'homeTeamID' => $homeTid,
+            'visitor_teamid' => $visitorTid,
+            'home_teamid' => $homeTid,
             'attendance' => 10000,
             'capacity' => 15000,
             'visitorWins' => 20,
@@ -174,9 +174,9 @@ abstract class DatabaseTestCase extends TestCase
             'name' => $name,
             'pos' => $pos,
             'pid' => $pid,
-            'visitorTID' => $visitorTid,
-            'homeTID' => $homeTid,
-            'teamID' => $teamId,
+            'visitor_teamid' => $visitorTid,
+            'home_teamid' => $homeTid,
+            'teamid' => $teamId,
             'gameMIN' => $minutes,
             'game2GM' => $points2m,
             'game2GA' => $points2a,
@@ -216,7 +216,7 @@ abstract class DatabaseTestCase extends TestCase
             'pid' => $pid,
             'name' => $name,
             'age' => 27,
-            'tid' => 1,
+            'teamid' => 1,
             'pos' => 'PG',
             'sta' => 80,
             'exp' => 5,
@@ -287,17 +287,17 @@ abstract class DatabaseTestCase extends TestCase
 
     /**
      * Insert a draft row into ibl_draft.
-     * FK on tid → ibl_team_info requires a valid team ID.
+     * FK on teamid → ibl_team_info requires a valid team ID.
      *
      * @param array<string, int|string> $overrides
      */
-    protected function insertDraftRow(int $year, int $round, int $pick, int $tid, string $player = '', array $overrides = []): int
+    protected function insertDraftRow(int $year, int $round, int $pick, int $teamid, string $player = '', array $overrides = []): int
     {
         $defaults = [
             'year' => $year,
             'round' => $round,
             'pick' => $pick,
-            'tid' => $tid,
+            'teamid' => $teamid,
             'team' => 'Metros',
             'player' => $player,
             'uuid' => sprintf('draft-%04d-%d-%02d-%s', $year, $round, $pick, bin2hex(random_bytes(4))),
@@ -322,8 +322,8 @@ abstract class DatabaseTestCase extends TestCase
             'fgp' => 50,
             'fta' => 50,
             'ftp' => 50,
-            'tga' => 50,
-            'tgp' => 50,
+            'r_3ga' => 50,
+            'r_3gp' => 50,
             'orb' => 50,
             'drb' => 50,
             'ast' => 50,
@@ -350,7 +350,7 @@ abstract class DatabaseTestCase extends TestCase
 
     /**
      * Insert a draft pick ownership row into ibl_draft_picks.
-     * FK on owner_tid and teampick_tid → ibl_team_info.
+     * FK on owner_teamid and teampick_teamid → ibl_team_info.
      *
      * @param array<string, int|string> $overrides
      */
@@ -358,9 +358,9 @@ abstract class DatabaseTestCase extends TestCase
     {
         $defaults = [
             'ownerofpick' => 'Metros',
-            'owner_tid' => $ownerTid,
+            'owner_teamid' => $ownerTid,
             'teampick' => 'Metros',
-            'teampick_tid' => $teampickTid,
+            'teampick_teamid' => $teampickTid,
             'year' => $year,
             'round' => $round,
         ];
@@ -477,13 +477,13 @@ abstract class DatabaseTestCase extends TestCase
      *
      * @param array<string, int|float|string> $overrides Column overrides
      */
-    protected function insertFaOfferRow(int $pid, int $tid, string $playerName, string $teamName, array $overrides = []): int
+    protected function insertFaOfferRow(int $pid, int $teamid, string $playerName, string $teamName, array $overrides = []): int
     {
         $defaults = [
             'name' => $playerName,
             'pid' => $pid,
             'team' => $teamName,
-            'tid' => $tid,
+            'teamid' => $teamid,
             'offer1' => 1500,
             'offer2' => 0,
             'offer3' => 0,

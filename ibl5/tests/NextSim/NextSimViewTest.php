@@ -35,7 +35,7 @@ class NextSimViewTest extends TestCase
         $this->view = new NextSimView($mockSeason);
 
         $this->userTeam = $this->createStub(Team::class);
-        $this->userTeam->teamID = 1;
+        $this->userTeam->teamid = 1;
         $this->userTeam->city = 'Test';
         $this->userTeam->name = 'Team';
         $this->userTeam->color1 = 'FF0000';
@@ -213,7 +213,7 @@ class NextSimViewTest extends TestCase
     private function createGameData(): array
     {
         $oppTeam = $this->createStub(Team::class);
-        $oppTeam->teamID = 2;
+        $oppTeam->teamid = 2;
         $oppTeam->city = 'Rival';
         $oppTeam->name = 'Foes';
         $oppTeam->color1 = '00FF00';

@@ -61,7 +61,7 @@ interface ComparePlayersRepositoryInterface
      *  Current Ratings (r_* prefix):
      *   - r_fga, r_fgp: 2-point attempt/percentage ratings (int)
      *   - r_fta, r_ftp: Free throw attempt/percentage ratings (int)
-     *   - r_tga, r_tgp: 3-point attempt/percentage ratings (int)
+     *   - r_3ga, r_3gp: 3-point attempt/percentage ratings (int)
      *   - r_orb, r_drb: Rebound ratings (int)
      *   - r_ast, r_stl, r_to, r_blk, r_foul: Other stat ratings (int)
      * 
@@ -76,7 +76,7 @@ interface ComparePlayersRepositoryInterface
      *   - stats_ftm, stats_fta: Free throws made/attempted (int)
      *   - stats_3gm, stats_3ga: 3-pointers made/attempted (int)
      *   - stats_orb, stats_drb: Offensive/defensive rebounds (int)
-     *   - stats_ast, stats_stl, stats_to, stats_blk, stats_pf: Other stats (int)
+     *   - stats_ast, stats_stl, stats_tvr, stats_blk, stats_pf: Other stats (int)
      * 
      *  Career Stats (car_* prefix):
      *   - car_gm: Career games (int)

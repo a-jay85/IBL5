@@ -68,7 +68,7 @@ interface FreeAgencyAdminProcessorInterface
      * Execute the signings for a processed day
      *
      * Applies all winning signings to the database:
-     * - Updates player contracts (cy, cy1-cy6, teamname, tid, cyt)
+     * - Updates player contracts (cy, cy1-cy6, teamname, teamid, cyt)
      * - Marks MLE/LLE as used for teams
      * - Inserts news story
      *

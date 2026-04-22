@@ -116,7 +116,7 @@ class DepthChartEntryControllerTest extends TestCase
         $params = $method->getParameters();
 
         $this->assertCount(3, $params);
-        $this->assertSame('teamID', $params[0]->getName());
+        $this->assertSame('teamid', $params[0]->getName());
         $this->assertSame('display', $params[1]->getName());
         $this->assertSame('split', $params[2]->getName());
         $this->assertTrue($params[2]->isOptional());

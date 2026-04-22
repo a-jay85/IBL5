@@ -74,7 +74,7 @@ class StandingsRepository extends \BaseMysqliRepository implements StandingsRepo
         $columns = $this->getGroupingColumns($region);
 
         $query = "SELECT
-            s.tid,
+            s.teamid,
             s.team_name,
             s.leagueRecord,
             s.pct,
@@ -95,7 +95,7 @@ class StandingsRepository extends \BaseMysqliRepository implements StandingsRepo
             t.color1,
             t.color2
             FROM {$this->standingsTable} s
-            JOIN {$this->teamInfoTable} t ON s.tid = t.teamid
+            JOIN {$this->teamInfoTable} t ON s.teamid = t.teamid
             WHERE s.{$columns['grouping']} = ?
             ORDER BY s.{$columns['gbColumn']} ASC,
                 (COALESCE(s.clinchedLeague, 0) * 4
@@ -118,7 +118,7 @@ class StandingsRepository extends \BaseMysqliRepository implements StandingsRepo
         /** @var list<BulkStandingsRow> */
         return $this->fetchAll(
             "SELECT
-                s.tid, s.team_name, s.leagueRecord, s.pct,
+                s.teamid, s.team_name, s.leagueRecord, s.pct,
                 s.confGB, s.divGB,
                 s.confRecord, s.divRecord, s.homeRecord, s.awayRecord,
                 s.gamesUnplayed,
@@ -130,7 +130,7 @@ class StandingsRepository extends \BaseMysqliRepository implements StandingsRepo
                 s.conference, s.division,
                 t.color1, t.color2
             FROM {$this->standingsTable} s
-            JOIN {$this->teamInfoTable} t ON s.tid = t.teamid",
+            JOIN {$this->teamInfoTable} t ON s.teamid = t.teamid",
             ""
         );
     }
@@ -144,7 +144,7 @@ class StandingsRepository extends \BaseMysqliRepository implements StandingsRepo
     {
         /** @var StreakRow|null */
         return $this->fetchOne(
-            "SELECT last_win, last_loss, streak_type, streak, ranking, sos, remaining_sos, sos_rank, remaining_sos_rank FROM {$this->powerTable} WHERE TeamID = ?",
+            "SELECT last_win, last_loss, streak_type, streak, ranking, sos, remaining_sos, sos_rank, remaining_sos_rank FROM {$this->powerTable} WHERE teamid = ?",
             "i",
             $teamId
         );
@@ -164,7 +164,7 @@ class StandingsRepository extends \BaseMysqliRepository implements StandingsRepo
                 tds.fgm AS def_fgm, tds.ftm AS def_ftm, tds.tgm AS def_tgm
             FROM (" . self::buildOffenseSubquery('bst.season_year = ? AND fs.franchise_id = ?') . ") tos
             JOIN (" . self::buildDefenseSubquery('my.season_year = ? AND fs.franchise_id = ?') . ") tds
-                ON tos.teamID = tds.teamID AND tos.season_year = tds.season_year",
+                ON tos.teamid = tds.teamid AND tos.season_year = tds.season_year",
             "iiii",
             $seasonYear,
             $teamId,
@@ -186,16 +186,16 @@ class StandingsRepository extends \BaseMysqliRepository implements StandingsRepo
      */
     public function getAllStreakData(): array
     {
-        /** @var list<array{TeamID: int, last_win: int, last_loss: int, streak_type: string, streak: int, ranking: int, sos: float|string, remaining_sos: float|string, sos_rank: int, remaining_sos_rank: int}> $rows */
+        /** @var list<array{teamid: int, last_win: int, last_loss: int, streak_type: string, streak: int, ranking: int, sos: float|string, remaining_sos: float|string, sos_rank: int, remaining_sos_rank: int}> $rows */
         $rows = $this->fetchAll(
-            "SELECT TeamID, last_win, last_loss, streak_type, streak, ranking, sos, remaining_sos, sos_rank, remaining_sos_rank FROM {$this->powerTable}",
+            "SELECT teamid, last_win, last_loss, streak_type, streak, ranking, sos, remaining_sos, sos_rank, remaining_sos_rank FROM {$this->powerTable}",
             ""
         );
 
         /** @var array<int, StreakRow> $result */
         $result = [];
         foreach ($rows as $row) {
-            $result[$row['TeamID']] = [
+            $result[$row['teamid']] = [
                 'last_win' => $row['last_win'],
                 'last_loss' => $row['last_loss'],
                 'streak_type' => $row['streak_type'],
@@ -218,15 +218,15 @@ class StandingsRepository extends \BaseMysqliRepository implements StandingsRepo
      */
     public function getAllPythagoreanStats(int $seasonYear): array
     {
-        /** @var list<array{teamID: int, off_fgm: int, off_ftm: int, off_tgm: int, def_fgm: int, def_ftm: int, def_tgm: int}> $rows */
+        /** @var list<array{teamid: int, off_fgm: int, off_ftm: int, off_tgm: int, def_fgm: int, def_ftm: int, def_tgm: int}> $rows */
         $rows = $this->fetchAll(
             "SELECT
-                tos.teamID,
+                tos.teamid,
                 tos.fgm AS off_fgm, tos.ftm AS off_ftm, tos.tgm AS off_tgm,
                 tds.fgm AS def_fgm, tds.ftm AS def_ftm, tds.tgm AS def_tgm
             FROM (" . self::buildOffenseSubquery('bst.season_year = ?') . ") tos
             JOIN (" . self::buildDefenseSubquery('my.season_year = ?') . ") tds
-                ON tos.teamID = tds.teamID AND tos.season_year = tds.season_year",
+                ON tos.teamid = tds.teamid AND tos.season_year = tds.season_year",
             "ii",
             $seasonYear,
             $seasonYear
@@ -235,7 +235,7 @@ class StandingsRepository extends \BaseMysqliRepository implements StandingsRepo
         /** @var array<int, PythagoreanStats> $result */
         $result = [];
         foreach ($rows as $row) {
-            $result[$row['teamID']] = $this->calculatePythagoreanStats($row);
+            $result[$row['teamid']] = $this->calculatePythagoreanStats($row);
         }
 
         return $result;
@@ -286,7 +286,7 @@ class StandingsRepository extends \BaseMysqliRepository implements StandingsRepo
      */
     private static function buildOffenseSubquery(string $filterClause): string
     {
-        return "SELECT fs.franchise_id AS teamID, fs.team_name AS name, bst.season_year,
+        return "SELECT fs.franchise_id AS teamid, fs.team_name AS name, bst.season_year,
             CAST(SUM(bst.game2GM + bst.game3GM) AS SIGNED) AS fgm,
             CAST(SUM(bst.gameFTM) AS SIGNED) AS ftm,
             CAST(SUM(bst.game3GM) AS SIGNED) AS tgm
@@ -302,15 +302,15 @@ class StandingsRepository extends \BaseMysqliRepository implements StandingsRepo
      */
     private static function buildDefenseSubquery(string $filterClause): string
     {
-        return "SELECT fs.franchise_id AS teamID, fs.team_name AS name, my.season_year,
+        return "SELECT fs.franchise_id AS teamid, fs.team_name AS name, my.season_year,
             CAST(SUM(opp.game2GM + opp.game3GM) AS SIGNED) AS fgm,
             CAST(SUM(opp.gameFTM) AS SIGNED) AS ftm,
             CAST(SUM(opp.game3GM) AS SIGNED) AS tgm
         FROM ibl_box_scores_teams my
         JOIN ibl_box_scores_teams opp
             ON my.Date = opp.Date
-            AND my.visitorTeamID = opp.visitorTeamID
-            AND my.homeTeamID = opp.homeTeamID
+            AND my.visitor_teamid = opp.visitor_teamid
+            AND my.home_teamid = opp.home_teamid
             AND my.gameOfThatDay = opp.gameOfThatDay
             AND my.name <> opp.name
         JOIN ibl_franchise_seasons fs

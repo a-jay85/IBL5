@@ -64,7 +64,7 @@ class SeriesRecordsViewTest extends TestCase
 
         $this->assertStringContainsString('<td', $result);
         $this->assertStringContainsString('Bulls', $result);
-        $this->assertStringContainsString('teamID=5', $result);
+        $this->assertStringContainsString('teamid=5', $result);
         $this->assertStringNotContainsString('<strong>', $result);
     }
 

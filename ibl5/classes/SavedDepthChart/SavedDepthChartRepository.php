@@ -31,7 +31,7 @@ class SavedDepthChartRepository extends \BaseMysqliRepository implements SavedDe
      * @see SavedDepthChartRepositoryInterface::createSavedDepthChart()
      */
     public function createSavedDepthChart(
-        int $tid,
+        int $teamid,
         string $username,
         ?string $name,
         string $phase,
@@ -42,10 +42,10 @@ class SavedDepthChartRepository extends \BaseMysqliRepository implements SavedDe
         if ($name !== null) {
             $this->execute(
                 "INSERT INTO {$this->headerTable}
-                    (tid, username, name, phase, season_year, sim_start_date, sim_number_start, is_active)
+                    (teamid, username, name, phase, season_year, sim_start_date, sim_number_start, is_active)
                  VALUES (?, ?, ?, ?, ?, ?, ?, 1)",
                 "isssisi",
-                $tid,
+                $teamid,
                 $username,
                 $name,
                 $phase,
@@ -56,10 +56,10 @@ class SavedDepthChartRepository extends \BaseMysqliRepository implements SavedDe
         } else {
             $this->execute(
                 "INSERT INTO {$this->headerTable}
-                    (tid, username, phase, season_year, sim_start_date, sim_number_start, is_active)
+                    (teamid, username, phase, season_year, sim_start_date, sim_number_start, is_active)
                  VALUES (?, ?, ?, ?, ?, ?, 1)",
                 "issisi",
-                $tid,
+                $teamid,
                 $username,
                 $phase,
                 $seasonYear,
@@ -108,32 +108,32 @@ class SavedDepthChartRepository extends \BaseMysqliRepository implements SavedDe
     /**
      * @see SavedDepthChartRepositoryInterface::deactivateForTeam()
      */
-    public function deactivateForTeam(int $tid, string $simEndDate, int $simNumberEnd): void
+    public function deactivateForTeam(int $teamid, string $simEndDate, int $simNumberEnd): void
     {
         $this->execute(
             "UPDATE {$this->headerTable}
              SET is_active = 0, sim_end_date = ?, sim_number_end = ?
-             WHERE tid = ? AND is_active = 1",
+             WHERE teamid = ? AND is_active = 1",
             "sii",
             $simEndDate,
             $simNumberEnd,
-            $tid
+            $teamid
         );
     }
 
     /**
      * @see SavedDepthChartRepositoryInterface::deactivateOthersForTeam()
      */
-    public function deactivateOthersForTeam(int $tid, int $excludeId, string $simEndDate, int $simNumberEnd): void
+    public function deactivateOthersForTeam(int $teamid, int $excludeId, string $simEndDate, int $simNumberEnd): void
     {
         $this->execute(
             "UPDATE {$this->headerTable}
              SET is_active = 0, sim_end_date = ?, sim_number_end = ?
-             WHERE tid = ? AND is_active = 1 AND id != ?",
+             WHERE teamid = ? AND is_active = 1 AND id != ?",
             "siii",
             $simEndDate,
             $simNumberEnd,
-            $tid,
+            $teamid,
             $excludeId
         );
     }
@@ -142,13 +142,13 @@ class SavedDepthChartRepository extends \BaseMysqliRepository implements SavedDe
      * @see SavedDepthChartRepositoryInterface::getSavedDepthChartsForTeam()
      * @return list<SavedDepthChartRow>
      */
-    public function getSavedDepthChartsForTeam(int $tid): array
+    public function getSavedDepthChartsForTeam(int $teamid): array
     {
         /** @var list<SavedDepthChartRow> */
         return $this->fetchAll(
-            "SELECT * FROM {$this->headerTable} WHERE tid = ? ORDER BY created_at DESC, id DESC",
+            "SELECT * FROM {$this->headerTable} WHERE teamid = ? ORDER BY created_at DESC, id DESC",
             "i",
-            $tid
+            $teamid
         );
     }
 
@@ -156,14 +156,14 @@ class SavedDepthChartRepository extends \BaseMysqliRepository implements SavedDe
      * @see SavedDepthChartRepositoryInterface::getSavedDepthChartById()
      * @return SavedDepthChartRow|null
      */
-    public function getSavedDepthChartById(int $id, int $tid): ?array
+    public function getSavedDepthChartById(int $id, int $teamid): ?array
     {
         /** @var SavedDepthChartRow|null */
         return $this->fetchOne(
-            "SELECT * FROM {$this->headerTable} WHERE id = ? AND tid = ? LIMIT 1",
+            "SELECT * FROM {$this->headerTable} WHERE id = ? AND teamid = ? LIMIT 1",
             "ii",
             $id,
-            $tid
+            $teamid
         );
     }
 
@@ -184,14 +184,14 @@ class SavedDepthChartRepository extends \BaseMysqliRepository implements SavedDe
     /**
      * @see SavedDepthChartRepositoryInterface::updateName()
      */
-    public function updateName(int $id, int $tid, string $newName): bool
+    public function updateName(int $id, int $teamid, string $newName): bool
     {
         $affected = $this->execute(
-            "UPDATE {$this->headerTable} SET name = ? WHERE id = ? AND tid = ?",
+            "UPDATE {$this->headerTable} SET name = ? WHERE id = ? AND teamid = ?",
             "sii",
             $newName,
             $id,
-            $tid
+            $teamid
         );
         return $affected > 0;
     }
@@ -227,13 +227,13 @@ class SavedDepthChartRepository extends \BaseMysqliRepository implements SavedDe
     /**
      * @see SavedDepthChartRepositoryInterface::reactivate()
      */
-    public function reactivate(int $id, int $tid): bool
+    public function reactivate(int $id, int $teamid): bool
     {
         $affected = $this->execute(
-            "UPDATE {$this->headerTable} SET is_active = 1 WHERE id = ? AND tid = ?",
+            "UPDATE {$this->headerTable} SET is_active = 1 WHERE id = ? AND teamid = ?",
             "ii",
             $id,
-            $tid
+            $teamid
         );
         return $affected > 0;
     }
@@ -242,13 +242,13 @@ class SavedDepthChartRepository extends \BaseMysqliRepository implements SavedDe
      * @see SavedDepthChartRepositoryInterface::getMostRecentDepthChart()
      * @return SavedDepthChartRow|null
      */
-    public function getMostRecentDepthChart(int $tid): ?array
+    public function getMostRecentDepthChart(int $teamid): ?array
     {
         /** @var SavedDepthChartRow|null */
         return $this->fetchOne(
-            "SELECT * FROM {$this->headerTable} WHERE tid = ? ORDER BY created_at DESC, id DESC LIMIT 1",
+            "SELECT * FROM {$this->headerTable} WHERE teamid = ? ORDER BY created_at DESC, id DESC LIMIT 1",
             "i",
-            $tid
+            $teamid
         );
     }
 
@@ -256,17 +256,17 @@ class SavedDepthChartRepository extends \BaseMysqliRepository implements SavedDe
      * @see SavedDepthChartRepositoryInterface::getLiveRosterSettings()
      * @return list<array{pid: int, name: string, ordinal: int, dc_PGDepth: int, dc_SGDepth: int, dc_SFDepth: int, dc_PFDepth: int, dc_CDepth: int, dc_canPlayInGame: int, dc_minutes: int, dc_of: int, dc_df: int, dc_oi: int, dc_di: int, dc_bh: int}>
      */
-    public function getLiveRosterSettings(int $tid): array
+    public function getLiveRosterSettings(int $teamid): array
     {
         /** @var list<array{pid: int, name: string, ordinal: int, dc_PGDepth: int, dc_SGDepth: int, dc_SFDepth: int, dc_PFDepth: int, dc_CDepth: int, dc_canPlayInGame: int, dc_minutes: int, dc_of: int, dc_df: int, dc_oi: int, dc_di: int, dc_bh: int}> */
         return $this->fetchAll(
             "SELECT pid, name, ordinal, dc_PGDepth, dc_SGDepth, dc_SFDepth, dc_PFDepth, dc_CDepth,
                     dc_canPlayInGame, dc_minutes, dc_of, dc_df, dc_oi, dc_di, dc_bh
              FROM {$this->plrTable}
-             WHERE tid = ? AND retired = '0' AND ordinal <= ?
+             WHERE teamid = ? AND retired = '0' AND ordinal <= ?
              ORDER BY ordinal ASC",
             "ii",
-            $tid,
+            $teamid,
             \JSB::WAIVERS_ORDINAL
         );
     }
@@ -275,13 +275,13 @@ class SavedDepthChartRepository extends \BaseMysqliRepository implements SavedDe
      * @see SavedDepthChartRepositoryInterface::getActiveDepthChartForTeam()
      * @return SavedDepthChartRow|null
      */
-    public function getActiveDepthChartForTeam(int $tid): ?array
+    public function getActiveDepthChartForTeam(int $teamid): ?array
     {
         /** @var SavedDepthChartRow|null */
         return $this->fetchOne(
-            "SELECT * FROM {$this->headerTable} WHERE tid = ? AND is_active = 1 ORDER BY updated_at DESC, id DESC LIMIT 1",
+            "SELECT * FROM {$this->headerTable} WHERE teamid = ? AND is_active = 1 ORDER BY updated_at DESC, id DESC LIMIT 1",
             "i",
-            $tid
+            $teamid
         );
     }
 }

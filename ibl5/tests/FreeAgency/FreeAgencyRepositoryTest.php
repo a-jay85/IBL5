@@ -168,7 +168,7 @@ class FreeAgencyRepositoryTest extends TestCase
         $repository = new FreeAgencyRepository($this->mockMysqliDb);
 
         $offerData = [
-            'tid' => 1,
+            'teamid' => 1,
             'pid' => 100,
             'playerName' => 'Test Player',
             'teamName' => 'Miami',

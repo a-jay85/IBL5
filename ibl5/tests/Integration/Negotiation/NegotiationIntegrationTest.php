@@ -130,7 +130,7 @@ class NegotiationIntegrationTest extends IntegrationTestCase
         $this->mockDb->setMockData([
             array_merge($this->getBaseNegotiationData(), [
                 // Player is on user's team
-                'tid' => 1,
+                'teamid' => 1,
                 'teamname' => 'Miami Cyclones',
                 // Player is eligible for renegotiation (in last year of contract)
                 'cy' => 2,
@@ -159,7 +159,7 @@ class NegotiationIntegrationTest extends IntegrationTestCase
         $this->mockDb->setMockData([
             array_merge($this->getBaseNegotiationData(), [
                 // Player is on user's team
-                'tid' => 1,
+                'teamid' => 1,
                 'teamname' => 'Miami Cyclones',
             ])
         ]);
@@ -170,7 +170,7 @@ class NegotiationIntegrationTest extends IntegrationTestCase
         $this->mockDb->setMockData([
             array_merge($this->getBaseNegotiationData(), [
                 // Player is on DIFFERENT team
-                'tid' => 5,
+                'teamid' => 5,
                 'teamname' => 'Miami Cyclones',
             ])
         ]);
@@ -184,7 +184,7 @@ class NegotiationIntegrationTest extends IntegrationTestCase
         return array_merge(TestDataFactory::createPlayer([
             'pid' => 1,
             'name' => 'Test Player',
-            'tid' => 1,
+            'teamid' => 1,
             'teamname' => 'Miami Cyclones',
             'position' => 'SG',
             'exp' => 5,

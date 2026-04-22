@@ -21,7 +21,7 @@ class TeamView implements TeamViewInterface
      */
     public function render(array $pageData): string
     {
-        $teamID = $pageData['teamID'];
+        $teamid = $pageData['teamid'];
         $team = $pageData['team'];
         $imagesPath = \Utilities\HtmlSanitizer::safeHtmlOutput($pageData['imagesPath']);
         $yr = $pageData['yr'];
@@ -53,8 +53,8 @@ class TeamView implements TeamViewInterface
             : "";
 
         $bannerHtml = $isActualTeam
-            ? $this->renderTeamBanner($teamID, $team, $imagesPath, $userTeamName, $isOwnTeam)
-            : "<div class=\"team-logo-fallback\"><img src=\"./{$imagesPath}logo/{$teamID}.jpg\" alt=\"\"></div>";
+            ? $this->renderTeamBanner($teamid, $team, $imagesPath, $userTeamName, $isOwnTeam)
+            : "<div class=\"team-logo-fallback\"><img src=\"./{$imagesPath}logo/{$teamid}.jpg\" alt=\"\"></div>";
 
         ob_start();
         ?>
@@ -120,7 +120,7 @@ class TeamView implements TeamViewInterface
      *
      * @param Team $team Team object with color1, color2, name, discordID properties
      */
-    private function renderTeamBanner(int $teamID, object $team, string $imagesPath, string $userTeamName, bool $isOwnTeam): string
+    private function renderTeamBanner(int $teamid, object $team, string $imagesPath, string $userTeamName, bool $isOwnTeam): string
     {
         /** @var Team $team */
         $color1 = \UI\TableStyles::sanitizeColor($team->color1);
@@ -155,11 +155,11 @@ class TeamView implements TeamViewInterface
         ?>
 <div class="team-banner-row" style="--team-tab-bg-color: #<?= $color1 ?>; --team-tab-active-color: #<?= $color2 ?>;">
     <?= $tradeButton ?>
-    <a href="modules.php?name=Schedule&amp;teamID=<?= $teamID ?>" class="team-action-link"><?= $scheduleInner ?></a>
+    <a href="modules.php?name=Schedule&amp;teamid=<?= $teamid ?>" class="team-action-link"><?= $scheduleInner ?></a>
     <div class="team-banner-logo">
-        <img src="./<?= $imagesPath ?>logo/<?= $teamID ?>.jpg" alt="<?= HtmlSanitizer::e($team->name ?? '') ?> logo">
+        <img src="./<?= $imagesPath ?>logo/<?= $teamid ?>.jpg" alt="<?= HtmlSanitizer::e($team->name ?? '') ?> logo">
     </div>
-    <a href="modules.php?name=DraftHistory&amp;teamID=<?= $teamID ?>" class="team-action-link"><?= $draftHistoryInner ?></a>
+    <a href="modules.php?name=DraftHistory&amp;teamid=<?= $teamid ?>" class="team-action-link"><?= $draftHistoryInner ?></a>
     <?= $discordButton ?>
 </div>
         <?php

@@ -377,7 +377,7 @@ class SeasonArchiveViewTest extends TestCase
         $this->assertStringContainsString('ibl-team-cell--colored', $result);
         $this->assertStringContainsString('ibl-team-cell__logo', $result);
         $this->assertStringContainsString('ibl-team-cell__name', $result);
-        $this->assertStringContainsString('teamID=5', $result);
+        $this->assertStringContainsString('teamid=5', $result);
         $this->assertStringContainsString('new5.png', $result);
     }
 
@@ -432,7 +432,7 @@ class SeasonArchiveViewTest extends TestCase
         $result = $this->view->renderSeasonDetail($seasonData);
 
         $this->assertStringContainsString('Ross Gates', $result);
-        $this->assertStringContainsString('teamID=3', $result);
+        $this->assertStringContainsString('teamid=3', $result);
         $this->assertStringContainsString('Bulls', $result);
     }
 
@@ -451,8 +451,8 @@ class SeasonArchiveViewTest extends TestCase
         $this->assertStringContainsString('ibl-team-cell--colored', $result);
         $this->assertStringContainsString('C8102E', $result);
         $this->assertStringContainsString('CE1141', $result);
-        $this->assertStringContainsString('teamID=5', $result);
-        $this->assertStringContainsString('teamID=12', $result);
+        $this->assertStringContainsString('teamid=5', $result);
+        $this->assertStringContainsString('teamid=12', $result);
         $this->assertStringContainsString('new5.png', $result);
         $this->assertStringContainsString('new12.png', $result);
     }
@@ -506,7 +506,7 @@ class SeasonArchiveViewTest extends TestCase
         $result = $this->view->renderSeasonDetail($seasonData);
 
         $this->assertStringContainsString('ibl-team-cell--colored', $result);
-        $this->assertStringContainsString('teamID=5', $result);
+        $this->assertStringContainsString('teamid=5', $result);
     }
 
     /**

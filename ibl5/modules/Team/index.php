@@ -13,13 +13,13 @@ $pagetitle = "- Team Pages";
 
 global $mysqli_db;
 
-$teamID = isset($teamID) ? (int) $teamID : 0;
+$teamid = isset($teamid) ? (int) $teamid : 0;
 
 $controller = new Team\TeamController($mysqli_db);
 
 switch ($op) {
     case "team":
-        $controller->displayTeamPage($teamID);
+        $controller->displayTeamPage($teamid);
         break;
 
     case "api":

@@ -75,8 +75,8 @@ class TeamOffDefStatsRepository extends \BaseMysqliRepository implements TeamOff
                 tds.blk AS defense_blk,
                 tds.pf AS defense_pf
             FROM ibl_team_info ti
-            LEFT JOIN (" . self::buildOffenseSubquery('bst.season_year = ?') . ") tos ON ti.teamid = tos.teamID
-            LEFT JOIN (" . self::buildDefenseSubquery('my.season_year = ?') . ") tds ON ti.teamid = tds.teamID
+            LEFT JOIN (" . self::buildOffenseSubquery('bst.season_year = ?') . ") tos ON ti.teamid = tos.teamid
+            LEFT JOIN (" . self::buildDefenseSubquery('my.season_year = ?') . ") tds ON ti.teamid = tds.teamid
             WHERE ti.teamid BETWEEN 1 AND " . League::MAX_REAL_TEAMID . "
             ORDER BY ti.team_city
         ";
@@ -136,19 +136,19 @@ class TeamOffDefStatsRepository extends \BaseMysqliRepository implements TeamOff
         /** @var array<string, int|string|null>|null $row */
         $row = $this->fetchOne(
             "SELECT
-                tos.teamID AS tos_teamID, tos.name AS tos_name,
+                tos.teamid AS tos_teamID, tos.name AS tos_name,
                 tos.games AS tos_games, tos.fgm AS tos_fgm, tos.fga AS tos_fga,
                 tos.ftm AS tos_ftm, tos.fta AS tos_fta, tos.tgm AS tos_tgm, tos.tga AS tos_tga,
                 tos.orb AS tos_orb, tos.reb AS tos_reb, tos.ast AS tos_ast, tos.stl AS tos_stl,
                 tos.tvr AS tos_tvr, tos.blk AS tos_blk, tos.pf AS tos_pf,
-                tds.teamID AS tds_teamID, tds.name AS tds_name,
+                tds.teamid AS tds_teamID, tds.name AS tds_name,
                 tds.games AS tds_games, tds.fgm AS tds_fgm, tds.fga AS tds_fga,
                 tds.ftm AS tds_ftm, tds.fta AS tds_fta, tds.tgm AS tds_tgm, tds.tga AS tds_tga,
                 tds.orb AS tds_orb, tds.reb AS tds_reb, tds.ast AS tds_ast, tds.stl AS tds_stl,
                 tds.tvr AS tds_tvr, tds.blk AS tds_blk, tds.pf AS tds_pf
             FROM (" . self::buildOffenseSubquery('bst.season_year = ? AND fs.team_name = ?') . ") tos
             JOIN (" . self::buildDefenseSubquery('my.season_year = ? AND fs.team_name = ?') . ") tds
-                ON tos.teamID = tds.teamID AND tos.season_year = tds.season_year
+                ON tos.teamid = tds.teamid AND tos.season_year = tds.season_year
             LIMIT 1",
             "isis",
             $seasonYear,
@@ -163,7 +163,7 @@ class TeamOffDefStatsRepository extends \BaseMysqliRepository implements TeamOff
 
         /** @var TeamOffenseStatsRow $offense */
         $offense = [
-            'teamID' => (int) $row['tos_teamID'],
+            'teamid' => (int) $row['tos_teamID'],
             'name' => (string) $row['tos_name'],
             'games' => (int) $row['tos_games'],
             'fgm' => (int) $row['tos_fgm'],
@@ -183,7 +183,7 @@ class TeamOffDefStatsRepository extends \BaseMysqliRepository implements TeamOff
 
         /** @var TeamDefenseStatsRow $defense */
         $defense = [
-            'teamID' => (int) $row['tds_teamID'],
+            'teamid' => (int) $row['tds_teamID'],
             'name' => (string) $row['tds_name'],
             'games' => (int) $row['tds_games'],
             'fgm' => (int) $row['tds_fgm'],
@@ -212,7 +212,7 @@ class TeamOffDefStatsRepository extends \BaseMysqliRepository implements TeamOff
      */
     private static function buildOffenseSubquery(string $filterClause): string
     {
-        return "SELECT fs.franchise_id AS teamID, fs.team_name AS name, bst.season_year,
+        return "SELECT fs.franchise_id AS teamid, fs.team_name AS name, bst.season_year,
             CAST(COUNT(*) AS SIGNED) AS games,
             CAST(SUM(bst.game2GM + bst.game3GM) AS SIGNED) AS fgm,
             CAST(SUM(bst.game2GA + bst.game3GA) AS SIGNED) AS fga,
@@ -242,7 +242,7 @@ class TeamOffDefStatsRepository extends \BaseMysqliRepository implements TeamOff
      */
     private static function buildDefenseSubquery(string $filterClause): string
     {
-        return "SELECT fs.franchise_id AS teamID, fs.team_name AS name, my.season_year,
+        return "SELECT fs.franchise_id AS teamid, fs.team_name AS name, my.season_year,
             CAST(COUNT(*) AS SIGNED) AS games,
             CAST(SUM(opp.game2GM + opp.game3GM) AS SIGNED) AS fgm,
             CAST(SUM(opp.game2GA + opp.game3GA) AS SIGNED) AS fga,
@@ -260,8 +260,8 @@ class TeamOffDefStatsRepository extends \BaseMysqliRepository implements TeamOff
         FROM ibl_box_scores_teams my
         JOIN ibl_box_scores_teams opp
             ON my.Date = opp.Date
-            AND my.visitorTeamID = opp.visitorTeamID
-            AND my.homeTeamID = opp.homeTeamID
+            AND my.visitor_teamid = opp.visitor_teamid
+            AND my.home_teamid = opp.home_teamid
             AND my.gameOfThatDay = opp.gameOfThatDay
             AND my.name <> opp.name
         JOIN ibl_franchise_seasons fs

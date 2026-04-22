@@ -25,8 +25,8 @@ namespace Draft\Contracts;
  *     fgp: int,
  *     fta: int,
  *     ftp: int,
- *     tga: int,
- *     tgp: int,
+ *     r_3ga: int,
+ *     r_3gp: int,
  *     orb: int,
  *     drb: int,
  *     ast: int,
@@ -53,7 +53,7 @@ namespace Draft\Contracts;
  *     color2: string|null
  * }
  *
- * @phpstan-type DraftPickRow = array{team: string, tid: int, round: int, pick: int}
+ * @phpstan-type DraftPickRow = array{team: string, teamid: int, round: int, pick: int}
  */
 interface DraftRepositoryInterface
 {
@@ -162,7 +162,7 @@ interface DraftRepositoryInterface
      *  - May affect MAX(pid) calculations for next draft pick PID
      *
      * Database Dependencies:
-     *  - Requires team to exist in ibl_team_info (retrieves tid)
+     *  - Requires team to exist in ibl_team_info (retrieves teamid)
      *  - Requires player to exist in ibl_draft_class (retrieves ratings)
      *
      * Examples:

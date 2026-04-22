@@ -113,9 +113,9 @@ class PlayerStatsFlipCardView
         PlayerRegularSeasonTotalsView $totalsView,
         int $playerID,
         ?\mysqli $db = null,
-        int $teamID = 0
+        int $teamid = 0
     ): string {
-        $colorScheme = CardBaseStyles::getColorSchemeForTeam($db, $teamID);
+        $colorScheme = CardBaseStyles::getColorSchemeForTeam($db, $teamid);
         return self::render(
             $averagesView->renderAverages($playerID),
             $totalsView->renderTotals($playerID),
@@ -133,9 +133,9 @@ class PlayerStatsFlipCardView
         PlayerPlayoffTotalsView $totalsView,
         string $playerName,
         ?\mysqli $db = null,
-        int $teamID = 0
+        int $teamid = 0
     ): string {
-        $colorScheme = CardBaseStyles::getColorSchemeForTeam($db, $teamID);
+        $colorScheme = CardBaseStyles::getColorSchemeForTeam($db, $teamid);
         return self::render(
             $averagesView->renderAverages($playerName),
             $totalsView->renderTotals($playerName),
@@ -153,9 +153,9 @@ class PlayerStatsFlipCardView
         PlayerOlympicTotalsView $totalsView,
         int $playerID,
         ?\mysqli $db = null,
-        int $teamID = 0
+        int $teamid = 0
     ): string {
-        $colorScheme = CardBaseStyles::getColorSchemeForTeam($db, $teamID);
+        $colorScheme = CardBaseStyles::getColorSchemeForTeam($db, $teamid);
         return self::render(
             $averagesView->renderAverages($playerID),
             $totalsView->renderTotals($playerID),
@@ -173,9 +173,9 @@ class PlayerStatsFlipCardView
         PlayerHeatTotalsView $totalsView,
         string $playerName,
         ?\mysqli $db = null,
-        int $teamID = 0
+        int $teamid = 0
     ): string {
-        $colorScheme = CardBaseStyles::getColorSchemeForTeam($db, $teamID);
+        $colorScheme = CardBaseStyles::getColorSchemeForTeam($db, $teamid);
         return self::render(
             $averagesView->renderAverages($playerName),
             $totalsView->renderTotals($playerName),

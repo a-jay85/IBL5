@@ -49,7 +49,7 @@ class CashConsiderationSalaryParityTest extends DatabaseTestCase
 
         // Insert a cash consideration for this team
         $this->cashRepo->insertCashConsideration([
-            'tid' => $team['teamid'],
+            'teamid' => $team['teamid'],
 
             'type' => 'cash',
             'label' => 'Test Cash Entry',
@@ -78,7 +78,7 @@ class CashConsiderationSalaryParityTest extends DatabaseTestCase
 
         // cy=1, cyt=2: current year is cy1, next year is cy2
         $this->cashRepo->insertCashConsideration([
-            'tid' => $team['teamid'],
+            'teamid' => $team['teamid'],
 
             'type' => 'cash',
             'label' => 'Test Multi-Year Cash',
@@ -107,7 +107,7 @@ class CashConsiderationSalaryParityTest extends DatabaseTestCase
 
         // Negative cash = incoming cash from a trade partner (reduces cap hit)
         $this->cashRepo->insertCashConsideration([
-            'tid' => $team['teamid'],
+            'teamid' => $team['teamid'],
 
             'type' => 'cash',
             'label' => 'Test Incoming Cash',
@@ -134,7 +134,7 @@ class CashConsiderationSalaryParityTest extends DatabaseTestCase
         $salaryBefore = $this->commonRepo->getTeamTotalSalary($teamName);
 
         $this->cashRepo->insertCashConsideration([
-            'tid' => $team['teamid'],
+            'teamid' => $team['teamid'],
 
             'type' => 'buyout',
             'label' => 'Test Buyout',
@@ -160,42 +160,42 @@ class CashConsiderationSalaryParityTest extends DatabaseTestCase
      */
     public function testViewSalaryEqualsPlrPlusCashForAllTeams(): void
     {
-        /** @var list<array{tid: int, plr_salary: int, cash_salary: int, view_salary: int}> $rows */
+        /** @var list<array{teamid: int, plr_salary: int, cash_salary: int, view_salary: int}> $rows */
         $rows = $this->fetchAll("
             WITH plr_totals AS (
-                SELECT tid,
+                SELECT teamid,
                        SUM(CASE cy WHEN 1 THEN cy1 WHEN 2 THEN cy2 WHEN 3 THEN cy3
                                     WHEN 4 THEN cy4 WHEN 5 THEN cy5 WHEN 6 THEN cy6 ELSE 0 END) AS plr_salary
-                FROM ibl_plr WHERE retired = 0 AND tid BETWEEN 1 AND 28
-                GROUP BY tid
+                FROM ibl_plr WHERE retired = 0 AND teamid BETWEEN 1 AND 28
+                GROUP BY teamid
             ),
             cash_totals AS (
-                SELECT tid,
+                SELECT teamid,
                        SUM(CASE cy WHEN 1 THEN cy1 WHEN 2 THEN cy2 WHEN 3 THEN cy3
                                     WHEN 4 THEN cy4 WHEN 5 THEN cy5 WHEN 6 THEN cy6 ELSE 0 END) AS cash_salary
-                FROM ibl_cash_considerations WHERE tid BETWEEN 1 AND 28
-                GROUP BY tid
+                FROM ibl_cash_considerations WHERE teamid BETWEEN 1 AND 28
+                GROUP BY teamid
             ),
             view_totals AS (
-                SELECT tid, SUM(current_salary) AS view_salary
-                FROM vw_current_salary WHERE tid BETWEEN 1 AND 28
-                GROUP BY tid
+                SELECT teamid, SUM(current_salary) AS view_salary
+                FROM vw_current_salary WHERE teamid BETWEEN 1 AND 28
+                GROUP BY teamid
             )
-            SELECT t.teamid AS tid,
+            SELECT t.teamid AS teamid,
                    COALESCE(p.plr_salary, 0) AS plr_salary,
                    COALESCE(c.cash_salary, 0) AS cash_salary,
                    COALESCE(v.view_salary, 0) AS view_salary
             FROM ibl_team_info t
-            LEFT JOIN plr_totals p ON t.teamid = p.tid
-            LEFT JOIN cash_totals c ON t.teamid = c.tid
-            LEFT JOIN view_totals v ON t.teamid = v.tid
+            LEFT JOIN plr_totals p ON t.teamid = p.teamid
+            LEFT JOIN cash_totals c ON t.teamid = c.teamid
+            LEFT JOIN view_totals v ON t.teamid = v.teamid
             WHERE t.teamid BETWEEN 1 AND 28
         ");
 
         self::assertNotEmpty($rows, 'Expected team salary data');
 
         foreach ($rows as $row) {
-            $tid = (int) $row['tid'];
+            $teamid = (int) $row['teamid'];
             $plr = (int) $row['plr_salary'];
             $cash = (int) $row['cash_salary'];
             $view = (int) $row['view_salary'];
@@ -203,7 +203,7 @@ class CashConsiderationSalaryParityTest extends DatabaseTestCase
             self::assertSame(
                 $expected,
                 $view,
-                "Team {$tid}: plr({$plr}) + cash({$cash}) != view({$view})"
+                "Team {$teamid}: plr({$plr}) + cash({$cash}) != view({$view})"
             );
         }
     }
@@ -259,7 +259,7 @@ class CashConsiderationSalaryParityTest extends DatabaseTestCase
         // Verify the positive entry (sending team)
         $positiveRows = $this->fetchAll(
             "SELECT * FROM ibl_cash_considerations
-             WHERE tid = {$team1['teamid']} AND trade_offer_id = 99999"
+             WHERE teamid = {$team1['teamid']} AND trade_offer_id = 99999"
         );
         self::assertCount(1, $positiveRows);
         $pos = $positiveRows[0];
@@ -273,7 +273,7 @@ class CashConsiderationSalaryParityTest extends DatabaseTestCase
         // Verify the negative entry (receiving team)
         $negativeRows = $this->fetchAll(
             "SELECT * FROM ibl_cash_considerations
-             WHERE tid = {$team2['teamid']} AND trade_offer_id = 99999"
+             WHERE teamid = {$team2['teamid']} AND trade_offer_id = 99999"
         );
         self::assertCount(1, $negativeRows);
         $neg = $negativeRows[0];

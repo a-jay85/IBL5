@@ -31,7 +31,7 @@ interface TradeProcessorInterface
      * IMPORTANT BEHAVIORS:
      *  - Fetches all trade items from ibl_trade_info table
      *  - Processes each item: player transfers, pick transfers, cash transactions
-     *  - For players: Updates tid in ibl_plr
+     *  - For players: Updates teamid in ibl_plr
      *  - For picks: Updates ownerofpick in ibl_draft_picks
      *  - For cash: Creates cash transaction records via CashTransactionHandler
      *  - Creates news story with category ID 2, topic ID 31

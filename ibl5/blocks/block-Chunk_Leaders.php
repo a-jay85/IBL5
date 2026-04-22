@@ -27,15 +27,15 @@ FROM (
         players.name,
         boxes.pid,
         t.team_name AS teamname,
-        players.tid,
+        players.teamid,
         CAST(FORMAT((2 * SUM(boxes.game2GM) + SUM(boxes.gameFTM) + 3 * SUM(boxes.game3GM)) / COUNT(players.name), 1) AS DECIMAL(3,1)) AS stat_value,
         'Points' AS stat_type,
         ROW_NUMBER() OVER (ORDER BY (2 * SUM(boxes.game2GM) + SUM(boxes.gameFTM) + 3 * SUM(boxes.game3GM)) / COUNT(players.name) DESC) AS rn
     FROM ibl_box_scores boxes
     INNER JOIN ibl_plr players USING(pid)
-    INNER JOIN ibl_team_info t ON players.tid = t.teamid
+    INNER JOIN ibl_team_info t ON players.teamid = t.teamid
     WHERE boxes.Date BETWEEN '$lastSimStartDate' AND '$lastSimEndDate'
-    GROUP BY players.name, boxes.pid, t.team_name, players.tid
+    GROUP BY players.name, boxes.pid, t.team_name, players.teamid
 
     UNION ALL
 
@@ -43,15 +43,15 @@ FROM (
         players.name,
         boxes.pid,
         t.team_name AS teamname,
-        players.tid,
+        players.teamid,
         CAST(FORMAT((SUM(boxes.gameORB) + SUM(boxes.gameDRB)) / COUNT(players.name), 1) AS DECIMAL(3,1)) AS stat_value,
         'Rebounds' AS stat_type,
         ROW_NUMBER() OVER (ORDER BY (SUM(boxes.gameORB) + SUM(boxes.gameDRB)) / COUNT(players.name) DESC) AS rn
     FROM ibl_box_scores boxes
     INNER JOIN ibl_plr players USING(pid)
-    INNER JOIN ibl_team_info t ON players.tid = t.teamid
+    INNER JOIN ibl_team_info t ON players.teamid = t.teamid
     WHERE boxes.Date BETWEEN '$lastSimStartDate' AND '$lastSimEndDate'
-    GROUP BY players.name, boxes.pid, t.team_name, players.tid
+    GROUP BY players.name, boxes.pid, t.team_name, players.teamid
 
     UNION ALL
 
@@ -59,15 +59,15 @@ FROM (
         players.name,
         boxes.pid,
         t.team_name AS teamname,
-        players.tid,
+        players.teamid,
         CAST(FORMAT(SUM(boxes.gameAST) / COUNT(players.name), 1) AS DECIMAL(3,1)) AS stat_value,
         'Assists' AS stat_type,
         ROW_NUMBER() OVER (ORDER BY SUM(boxes.gameAST) / COUNT(players.name) DESC) AS rn
     FROM ibl_box_scores boxes
     INNER JOIN ibl_plr players USING(pid)
-    INNER JOIN ibl_team_info t ON players.tid = t.teamid
+    INNER JOIN ibl_team_info t ON players.teamid = t.teamid
     WHERE boxes.Date BETWEEN '$lastSimStartDate' AND '$lastSimEndDate'
-    GROUP BY players.name, boxes.pid, t.team_name, players.tid
+    GROUP BY players.name, boxes.pid, t.team_name, players.teamid
 
     UNION ALL
 
@@ -75,15 +75,15 @@ FROM (
         players.name,
         boxes.pid,
         t.team_name AS teamname,
-        players.tid,
+        players.teamid,
         CAST(FORMAT(SUM(boxes.gameSTL) / COUNT(players.name), 1) AS DECIMAL(3,1)) AS stat_value,
         'Steals' AS stat_type,
         ROW_NUMBER() OVER (ORDER BY SUM(boxes.gameSTL) / COUNT(players.name) DESC) AS rn
     FROM ibl_box_scores boxes
     INNER JOIN ibl_plr players USING(pid)
-    INNER JOIN ibl_team_info t ON players.tid = t.teamid
+    INNER JOIN ibl_team_info t ON players.teamid = t.teamid
     WHERE boxes.Date BETWEEN '$lastSimStartDate' AND '$lastSimEndDate'
-    GROUP BY players.name, boxes.pid, t.team_name, players.tid
+    GROUP BY players.name, boxes.pid, t.team_name, players.teamid
 
     UNION ALL
 
@@ -91,15 +91,15 @@ FROM (
         players.name,
         boxes.pid,
         t.team_name AS teamname,
-        players.tid,
+        players.teamid,
         CAST(FORMAT(SUM(boxes.gameBLK) / COUNT(players.name), 1) AS DECIMAL(3,1)) AS stat_value,
         'Blocks' AS stat_type,
         ROW_NUMBER() OVER (ORDER BY SUM(boxes.gameBLK) / COUNT(players.name) DESC) AS rn
     FROM ibl_box_scores boxes
     INNER JOIN ibl_plr players USING(pid)
-    INNER JOIN ibl_team_info t ON players.tid = t.teamid
+    INNER JOIN ibl_team_info t ON players.teamid = t.teamid
     WHERE boxes.Date BETWEEN '$lastSimStartDate' AND '$lastSimEndDate'
-    GROUP BY players.name, boxes.pid, t.team_name, players.tid
+    GROUP BY players.name, boxes.pid, t.team_name, players.teamid
 ) t
 WHERE rn <= 5
 ORDER BY FIELD(stat_type, 'Points', 'Rebounds', 'Assists', 'Steals', 'Blocks'), rn;";
@@ -157,7 +157,7 @@ foreach ($categories as $index => $category) {
     // Leader (first player)
     $leader = $players[0];
     $leaderPid = $leader['pid'];
-    $leaderTid = $leader['tid'];
+    $leaderTid = $leader['teamid'];
     $leaderName = HtmlSanitizer::safeHtmlOutput($leader['name']);
     $leaderTeam = HtmlSanitizer::safeHtmlOutput($leader['teamname']);
     $leaderValue = HtmlSanitizer::safeHtmlOutput($leader['stat_value']);
@@ -175,7 +175,7 @@ foreach ($categories as $index => $category) {
     $content .= '</div>
             <div class="leaders-tabbed__leader-info">
                 <a href="modules.php?name=Player&pa=showpage&pid=' . $leaderPid . '" class="leaders-tabbed__leader-name">' . $leaderName . '</a>
-                <a href="modules.php?name=Team&op=team&teamID=' . $leaderTid . '" class="leaders-tabbed__leader-team">' . $leaderTeam . '</a>
+                <a href="modules.php?name=Team&op=team&teamid=' . $leaderTid . '" class="leaders-tabbed__leader-team">' . $leaderTeam . '</a>
             </div>
             <div class="leaders-tabbed__leader-value">' . $leaderValue . '</div>
         </div>
@@ -185,13 +185,13 @@ foreach ($categories as $index => $category) {
     for ($i = 1; $i < count($players); $i++) {
         $player = $players[$i];
         $pid = $player['pid'];
-        $tid = $player['tid'];
+        $teamid = $player['teamid'];
         $name = HtmlSanitizer::safeHtmlOutput($player['name']);
         $team = HtmlSanitizer::safeHtmlOutput($player['teamname']);
         $value = HtmlSanitizer::safeHtmlOutput($player['stat_value']);
         $rank = $i + 1;
 
-        $teamLogo = $tid ? '<img src="./' . HtmlSanitizer::safeHtmlOutput($imagesPath) . 'logo/new' . $tid . '.png" alt="' . $team . '" class="leaders-tabbed__runner-logo" loading="lazy">' : '';
+        $teamLogo = $teamid ? '<img src="./' . HtmlSanitizer::safeHtmlOutput($imagesPath) . 'logo/new' . $teamid . '.png" alt="' . $team . '" class="leaders-tabbed__runner-logo" loading="lazy">' : '';
 
         $content .= '<li class="leaders-tabbed__runner">
             <span class="leaders-tabbed__runner-rank">#' . $rank . '</span>

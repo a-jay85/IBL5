@@ -116,7 +116,7 @@ class TeamOffDefStatsViewTest extends TestCase
 
         $result = $this->view->render($data);
 
-        $this->assertStringContainsString('modules.php?name=Team&amp;op=team&amp;teamID=1', $result);
+        $this->assertStringContainsString('modules.php?name=Team&amp;op=team&amp;teamid=1', $result);
     }
 
     /**

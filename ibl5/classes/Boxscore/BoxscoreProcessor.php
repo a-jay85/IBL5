@@ -238,8 +238,8 @@ class BoxscoreProcessor implements BoxscoreProcessorInterface
                         $boxscoreGameInfo->gameDate,
                         $name,
                         $boxscoreGameInfo->gameOfThatDay,
-                        $boxscoreGameInfo->visitorTeamID,
-                        $boxscoreGameInfo->homeTeamID,
+                        $boxscoreGameInfo->visitor_teamid,
+                        $boxscoreGameInfo->home_teamid,
                         (int) $boxscoreGameInfo->attendance,
                         (int) $boxscoreGameInfo->capacity,
                         (int) $boxscoreGameInfo->visitorWins,
@@ -274,16 +274,16 @@ class BoxscoreProcessor implements BoxscoreProcessorInterface
                 } else {
                     $playerUuid = UuidGenerator::generateUuid();
                     $playerTeamID = ScoFileParser::isHomeTeamSlot($i)
-                        ? $boxscoreGameInfo->homeTeamID
-                        : $boxscoreGameInfo->visitorTeamID;
+                        ? $boxscoreGameInfo->home_teamid
+                        : $boxscoreGameInfo->visitor_teamid;
                     $this->repository->insertPlayerBoxscore(
                         $boxscoreGameInfo->gameDate,
                         $playerUuid,
                         $name,
                         $playerStats->position,
                         (int) $playerStats->playerID,
-                        $boxscoreGameInfo->visitorTeamID,
-                        $boxscoreGameInfo->homeTeamID,
+                        $boxscoreGameInfo->visitor_teamid,
+                        $boxscoreGameInfo->home_teamid,
                         $boxscoreGameInfo->gameOfThatDay,
                         (int) $boxscoreGameInfo->attendance,
                         (int) $boxscoreGameInfo->capacity,
@@ -439,8 +439,8 @@ class BoxscoreProcessor implements BoxscoreProcessorInterface
     {
         $existingGame = $this->repository->findTeamBoxscore(
             $boxscoreGameInfo->gameDate,
-            $boxscoreGameInfo->visitorTeamID,
-            $boxscoreGameInfo->homeTeamID,
+            $boxscoreGameInfo->visitor_teamid,
+            $boxscoreGameInfo->home_teamid,
             $boxscoreGameInfo->gameOfThatDay
         );
 
@@ -452,11 +452,11 @@ class BoxscoreProcessor implements BoxscoreProcessorInterface
         $scoresMatch = $boxscoreGameInfo->scoresMatchDatabase($existingGame);
 
         if ($scoresMatch) {
-            // Scores match — but re-import if player records have NULL teamID
+            // Scores match — but re-import if player records have NULL teamid
             $hasNullTeamId = $this->repository->hasNullTeamIdPlayerBoxscores(
                 $boxscoreGameInfo->gameDate,
-                $boxscoreGameInfo->visitorTeamID,
-                $boxscoreGameInfo->homeTeamID
+                $boxscoreGameInfo->visitor_teamid,
+                $boxscoreGameInfo->home_teamid
             );
 
             if (!$hasNullTeamId) {
@@ -464,17 +464,17 @@ class BoxscoreProcessor implements BoxscoreProcessorInterface
             }
         }
 
-        // Scores differ or player records need teamID fix — delete old records, then re-insert
+        // Scores differ or player records need teamid fix — delete old records, then re-insert
         $this->repository->deleteTeamBoxscoresByGame(
             $boxscoreGameInfo->gameDate,
-            $boxscoreGameInfo->visitorTeamID,
-            $boxscoreGameInfo->homeTeamID,
+            $boxscoreGameInfo->visitor_teamid,
+            $boxscoreGameInfo->home_teamid,
             $boxscoreGameInfo->gameOfThatDay
         );
         $this->repository->deletePlayerBoxscoresByGame(
             $boxscoreGameInfo->gameDate,
-            $boxscoreGameInfo->visitorTeamID,
-            $boxscoreGameInfo->homeTeamID
+            $boxscoreGameInfo->visitor_teamid,
+            $boxscoreGameInfo->home_teamid
         );
 
         return 'update';

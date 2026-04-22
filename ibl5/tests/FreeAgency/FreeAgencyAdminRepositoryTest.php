@@ -97,8 +97,8 @@ class FreeAgencyAdminRepositoryTest extends TestCase
     {
         $repository = new FreeAgencyAdminRepository($this->mockMysqliDb);
         $this->mockDb->setMockData([
-            ['name' => 'Player One', 'pid' => 1, 'team' => 'Miami', 'tid' => 1, 'offer1' => 500, 'offer2' => 525, 'offer3' => 0, 'offer4' => 0, 'offer5' => 0, 'offer6' => 0, 'bird' => 3, 'MLE' => 0, 'LLE' => 0, 'random' => 5, 'perceivedvalue' => 1025.0],
-            ['name' => 'Player Two', 'pid' => 2, 'team' => 'Chicago', 'tid' => 2, 'offer1' => 400, 'offer2' => 0, 'offer3' => 0, 'offer4' => 0, 'offer5' => 0, 'offer6' => 0, 'bird' => 0, 'MLE' => 1, 'LLE' => 0, 'random' => 3, 'perceivedvalue' => 400.0],
+            ['name' => 'Player One', 'pid' => 1, 'team' => 'Miami', 'teamid' => 1, 'offer1' => 500, 'offer2' => 525, 'offer3' => 0, 'offer4' => 0, 'offer5' => 0, 'offer6' => 0, 'bird' => 3, 'MLE' => 0, 'LLE' => 0, 'random' => 5, 'perceivedvalue' => 1025.0],
+            ['name' => 'Player Two', 'pid' => 2, 'team' => 'Chicago', 'teamid' => 2, 'offer1' => 400, 'offer2' => 0, 'offer3' => 0, 'offer4' => 0, 'offer5' => 0, 'offer6' => 0, 'bird' => 0, 'MLE' => 1, 'LLE' => 0, 'random' => 3, 'perceivedvalue' => 400.0],
         ]);
 
         $result = $repository->getAllOffersWithBirdYears();

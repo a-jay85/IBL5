@@ -30,7 +30,7 @@ return [
 
     // High-usage baseline columns (referenced by many repositories)
     new SchemaAssertion('ibl_plr', 'pid'),
-    new SchemaAssertion('ibl_plr', 'tid'),
+    new SchemaAssertion('ibl_plr', 'teamid'),
     new SchemaAssertion('ibl_plr', 'name'),
     new SchemaAssertion('ibl_team_info', 'teamid'),
     new SchemaAssertion('ibl_team_info', 'team_name'),
@@ -64,4 +64,47 @@ return [
     new SchemaAssertion('ibl_olympics_hist', 'r_drive_off'),
     new SchemaAssertion('ibl_sim_dates', 'start_date'),
     new SchemaAssertion('ibl_sim_dates', 'end_date'),
+
+    // Migration 114: Tier 2 cross-table column-naming unification.
+    // Turnovers (live layer): stats_to → stats_tvr
+    new SchemaAssertion('ibl_plr', 'stats_tvr'),
+    new SchemaAssertion('ibl_plr_snapshots', 'stats_tvr'),
+    new SchemaAssertion('ibl_olympics_plr', 'stats_tvr'),
+    // 3-pointer ratings: r_tga/r_tgp (live + olympics_plr) and bare tga/tgp
+    // (ibl_draft_class) → r_3ga/r_3gp, matching ibl_hist canonical.
+    new SchemaAssertion('ibl_plr', 'r_3ga'),
+    new SchemaAssertion('ibl_plr', 'r_3gp'),
+    new SchemaAssertion('ibl_plr_snapshots', 'r_3ga'),
+    new SchemaAssertion('ibl_plr_snapshots', 'r_3gp'),
+    new SchemaAssertion('ibl_olympics_plr', 'r_3ga'),
+    new SchemaAssertion('ibl_olympics_plr', 'r_3gp'),
+    new SchemaAssertion('ibl_draft_class', 'r_3ga'),
+    new SchemaAssertion('ibl_draft_class', 'r_3gp'),
+    // Team-id unified to lowercase `teamid` (or {prefix}_teamid for compounds).
+    new SchemaAssertion('ibl_olympics_plr', 'teamid'),
+    new SchemaAssertion('ibl_plr_snapshots', 'teamid'),
+    new SchemaAssertion('ibl_draft', 'teamid'),
+    new SchemaAssertion('ibl_fa_offers', 'teamid'),
+    new SchemaAssertion('ibl_cash_considerations', 'teamid'),
+    new SchemaAssertion('ibl_standings', 'teamid'),
+    new SchemaAssertion('ibl_olympics_standings', 'teamid'),
+    new SchemaAssertion('ibl_saved_depth_charts', 'teamid'),
+    new SchemaAssertion('ibl_olympics_saved_depth_charts', 'teamid'),
+    new SchemaAssertion('ibl_plb_snapshots', 'teamid'),
+    new SchemaAssertion('ibl_power', 'teamid'),
+    new SchemaAssertion('ibl_olympics_power', 'teamid'),
+    new SchemaAssertion('ibl_rcb_alltime_records', 'teamid'),
+    new SchemaAssertion('ibl_rcb_season_records', 'teamid'),
+    new SchemaAssertion('ibl_box_scores', 'teamid'),
+    new SchemaAssertion('ibl_box_scores', 'home_teamid'),
+    new SchemaAssertion('ibl_box_scores', 'visitor_teamid'),
+    new SchemaAssertion('ibl_box_scores_teams', 'home_teamid'),
+    new SchemaAssertion('ibl_box_scores_teams', 'visitor_teamid'),
+    new SchemaAssertion('ibl_olympics_box_scores', 'teamid'),
+    new SchemaAssertion('ibl_olympics_box_scores', 'home_teamid'),
+    new SchemaAssertion('ibl_olympics_box_scores', 'visitor_teamid'),
+    new SchemaAssertion('ibl_olympics_box_scores_teams', 'home_teamid'),
+    new SchemaAssertion('ibl_olympics_box_scores_teams', 'visitor_teamid'),
+    new SchemaAssertion('ibl_draft_picks', 'owner_teamid'),
+    new SchemaAssertion('ibl_draft_picks', 'teampick_teamid'),
 ];

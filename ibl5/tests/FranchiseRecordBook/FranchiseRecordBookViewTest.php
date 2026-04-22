@@ -20,7 +20,7 @@ class FranchiseRecordBookViewTest extends TestCase
     }
 
     /**
-     * @return array{id: int, scope: string, team_id: int, record_type: string, stat_category: string, ranking: int, player_name: string, car_block_id: int|null, pid: int|null, stat_value: string, stat_raw: int, team_of_record: int|null, season_year: int|null, career_total: int|null}
+     * @return array{id: int, scope: string, teamid: int, record_type: string, stat_category: string, ranking: int, player_name: string, car_block_id: int|null, pid: int|null, stat_value: string, stat_raw: int, team_of_record: int|null, season_year: int|null, career_total: int|null}
      */
     private static function makeRecord(
         string $recordType = 'career',
@@ -30,7 +30,7 @@ class FranchiseRecordBookViewTest extends TestCase
         return [
             'id' => 1,
             'scope' => 'league',
-            'team_id' => 0,
+            'teamid' => 0,
             'record_type' => $recordType,
             'stat_category' => 'pts',
             'ranking' => 1,

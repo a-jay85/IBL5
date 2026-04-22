@@ -34,7 +34,7 @@ class PlayerData
     public ?int $historicalYear = null;
 
     /** @var int|null Team ID (0 for free agents) */
-    public ?int $teamID = null;
+    public ?int $teamid = null;
 
     /** @var string|null Team name */
     public ?string $teamName = null;

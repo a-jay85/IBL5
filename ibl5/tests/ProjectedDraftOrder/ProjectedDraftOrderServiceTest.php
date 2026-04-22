@@ -189,8 +189,8 @@ class ProjectedDraftOrderServiceTest extends TestCase
     {
         $standings = $this->buildTiedStandingsWithSameConfRecords();
         $pointDiffs = [
-            ['tid' => 101, 'pointsFor' => 8000.0, 'pointsAgainst' => 8500.0], // -500
-            ['tid' => 102, 'pointsFor' => 8200.0, 'pointsAgainst' => 8100.0], // +100
+            ['teamid' => 101, 'pointsFor' => 8000.0, 'pointsAgainst' => 8500.0], // -500
+            ['teamid' => 102, 'pointsFor' => 8200.0, 'pointsAgainst' => 8100.0], // +100
         ];
 
         $this->stubRepository->method('getAllTeamsWithStandings')->willReturn($standings);
@@ -452,7 +452,7 @@ class ProjectedDraftOrderServiceTest extends TestCase
 
         $savedPicks = [];
         for ($i = 1; $i <= 28; $i++) {
-            $savedPicks[] = ['pick' => $i, 'team' => 'Team' . $i, 'tid' => $i, 'player' => ''];
+            $savedPicks[] = ['pick' => $i, 'team' => 'Team' . $i, 'teamid' => $i, 'player' => ''];
         }
         $this->stubRepository->method('getFinalDraftOrder')->willReturn($savedPicks);
 
@@ -505,7 +505,7 @@ class ProjectedDraftOrderServiceTest extends TestCase
                         return false;
                     }
                     // First pick should be round 1, last original lottery team
-                    if ($picks[0]['round'] !== 1 || $picks[0]['tid'] !== $reversedLottery[0] || $picks[0]['pick'] !== 1) {
+                    if ($picks[0]['round'] !== 1 || $picks[0]['teamid'] !== $reversedLottery[0] || $picks[0]['pick'] !== 1) {
                         return false;
                     }
                     // Pick 13 should be round 1 from projected order (unchanged)
@@ -542,7 +542,7 @@ class ProjectedDraftOrderServiceTest extends TestCase
         $firstTeamTid = $lotteryTids[0];
         $firstTeamRow = null;
         foreach ($standings as $row) {
-            if ($row['tid'] === $firstTeamTid) {
+            if ($row['teamid'] === $firstTeamTid) {
                 $firstTeamRow = $row;
                 break;
             }
@@ -576,7 +576,7 @@ class ProjectedDraftOrderServiceTest extends TestCase
         $firstTeamTid = $lotteryTids[0];
         $firstTeamName = '';
         foreach ($standings as $row) {
-            if ($row['tid'] === $firstTeamTid) {
+            if ($row['teamid'] === $firstTeamTid) {
                 $firstTeamName = $row['team_name'];
                 break;
             }
@@ -625,7 +625,7 @@ class ProjectedDraftOrderServiceTest extends TestCase
      * Eastern: Atlantic (teams 1-7), Central (teams 8-14)
      * Western: Midwest (teams 15-21), Pacific (teams 22-28)
      *
-     * @return list<array{tid: int, team_name: string, wins: int, losses: int, pct: float, conference: string, division: string, confWins: int|null, confLosses: int|null, divWins: int|null, divLosses: int|null, clinchedDivision: int|null, color1: string, color2: string}>
+     * @return list<array{teamid: int, team_name: string, wins: int, losses: int, pct: float, conference: string, division: string, confWins: int|null, confLosses: int|null, divWins: int|null, divLosses: int|null, clinchedDivision: int|null, color1: string, color2: string}>
      */
     private function buildFullLeagueStandings(): array
     {
@@ -635,19 +635,19 @@ class ProjectedDraftOrderServiceTest extends TestCase
             'Western' => ['Midwest', 'Pacific'],
         ];
 
-        $tid = 1;
+        $teamid = 1;
         foreach ($conferences as $conf => $divisions) {
             foreach ($divisions as $div) {
                 for ($i = 0; $i < 7; $i++) {
-                    $wins = 82 - (($tid - 1) * 3);
+                    $wins = 82 - (($teamid - 1) * 3);
                     if ($wins < 0) {
                         $wins = 0;
                     }
                     $losses = 82 - $wins;
                     $pct = $wins > 0 ? round($wins / 82.0, 3) : 0.0;
                     $teams[] = [
-                        'tid' => $tid,
-                        'team_name' => 'Team' . $tid,
+                        'teamid' => $teamid,
+                        'team_name' => 'Team' . $teamid,
                         'wins' => $wins,
                         'losses' => $losses,
                         'pct' => $pct,
@@ -658,10 +658,10 @@ class ProjectedDraftOrderServiceTest extends TestCase
                         'divWins' => null,
                         'divLosses' => null,
                         'clinchedDivision' => null,
-                        'color1' => 'AA' . str_pad((string) $tid, 4, '0', STR_PAD_LEFT),
-                        'color2' => 'BB' . str_pad((string) $tid, 4, '0', STR_PAD_LEFT),
+                        'color1' => 'AA' . str_pad((string) $teamid, 4, '0', STR_PAD_LEFT),
+                        'color2' => 'BB' . str_pad((string) $teamid, 4, '0', STR_PAD_LEFT),
                     ];
-                    $tid++;
+                    $teamid++;
                 }
             }
         }
@@ -672,12 +672,12 @@ class ProjectedDraftOrderServiceTest extends TestCase
     /**
      * Build standings where a division winner has a worse record than some wild card teams.
      *
-     * @return list<array{tid: int, team_name: string, wins: int, losses: int, pct: float, conference: string, division: string, confWins: int|null, confLosses: int|null, divWins: int|null, divLosses: int|null, clinchedDivision: int|null, color1: string, color2: string}>
+     * @return list<array{teamid: int, team_name: string, wins: int, losses: int, pct: float, conference: string, division: string, confWins: int|null, confLosses: int|null, divWins: int|null, divLosses: int|null, clinchedDivision: int|null, color1: string, color2: string}>
      */
     private function buildStandingsWithWeakDivisionWinner(): array
     {
         $teams = [];
-        $tid = 1;
+        $teamid = 1;
 
         // Eastern Atlantic: WeakDivWinner at 30-52 but best in division
         $atlanticRecords = [
@@ -691,7 +691,7 @@ class ProjectedDraftOrderServiceTest extends TestCase
         ];
 
         foreach ($atlanticRecords as $rec) {
-            $teams[] = $this->makeStandingsRow($tid++, $rec['name'], $rec['wins'], $rec['losses'], 'Eastern', 'Atlantic', $rec['clinchedDivision']);
+            $teams[] = $this->makeStandingsRow($teamid++, $rec['name'], $rec['wins'], $rec['losses'], 'Eastern', 'Atlantic', $rec['clinchedDivision']);
         }
 
         // Eastern Central: Strong division
@@ -706,14 +706,14 @@ class ProjectedDraftOrderServiceTest extends TestCase
         ];
 
         foreach ($centralRecords as $rec) {
-            $teams[] = $this->makeStandingsRow($tid++, $rec['name'], $rec['wins'], $rec['losses'], 'Eastern', 'Central');
+            $teams[] = $this->makeStandingsRow($teamid++, $rec['name'], $rec['wins'], $rec['losses'], 'Eastern', 'Central');
         }
 
         // Western: 14 teams with middling records
         foreach (['Midwest', 'Pacific'] as $div) {
             for ($i = 0; $i < 7; $i++) {
                 $wins = 50 - ($i * 5);
-                $teams[] = $this->makeStandingsRow($tid++, $div . 'T' . ($i + 1), $wins, 82 - $wins, 'Western', $div);
+                $teams[] = $this->makeStandingsRow($teamid++, $div . 'T' . ($i + 1), $wins, 82 - $wins, 'Western', $div);
             }
         }
 
@@ -723,16 +723,16 @@ class ProjectedDraftOrderServiceTest extends TestCase
     /**
      * Build two tied non-playoff teams for head-to-head tiebreaker testing.
      *
-     * @return list<array{tid: int, team_name: string, wins: int, losses: int, pct: float, conference: string, division: string, confWins: int|null, confLosses: int|null, divWins: int|null, divLosses: int|null, clinchedDivision: int|null, color1: string, color2: string}>
+     * @return list<array{teamid: int, team_name: string, wins: int, losses: int, pct: float, conference: string, division: string, confWins: int|null, confLosses: int|null, divWins: int|null, divLosses: int|null, clinchedDivision: int|null, color1: string, color2: string}>
      */
     private function buildTiedStandings(): array
     {
         $teams = [];
-        $tid = 1;
+        $teamid = 1;
 
         // Eastern Atlantic: first 5 are strong playoff teams
         for ($i = 0; $i < 5; $i++) {
-            $teams[] = $this->makeStandingsRow($tid++, 'EATop' . ($i + 1), 60 - ($i * 3), 22 + ($i * 3), 'Eastern', 'Atlantic');
+            $teams[] = $this->makeStandingsRow($teamid++, 'EATop' . ($i + 1), 60 - ($i * 3), 22 + ($i * 3), 'Eastern', 'Atlantic');
         }
         // Two tied weak teams (will be non-playoff)
         $teams[] = $this->makeStandingsRow(101, 'TeamA', 25, 57, 'Eastern', 'Atlantic');
@@ -740,14 +740,14 @@ class ProjectedDraftOrderServiceTest extends TestCase
 
         // Eastern Central: 7 strong teams
         for ($i = 0; $i < 7; $i++) {
-            $teams[] = $this->makeStandingsRow($tid++, 'ECTop' . ($i + 1), 55 - ($i * 3), 27 + ($i * 3), 'Eastern', 'Central');
+            $teams[] = $this->makeStandingsRow($teamid++, 'ECTop' . ($i + 1), 55 - ($i * 3), 27 + ($i * 3), 'Eastern', 'Central');
         }
 
         // Western: 14 teams
         foreach (['Midwest', 'Pacific'] as $div) {
             for ($i = 0; $i < 7; $i++) {
                 $wins = 50 - ($i * 5);
-                $teams[] = $this->makeStandingsRow($tid++, $div . 'T' . ($i + 1), $wins, 82 - $wins, 'Western', $div);
+                $teams[] = $this->makeStandingsRow($teamid++, $div . 'T' . ($i + 1), $wins, 82 - $wins, 'Western', $div);
             }
         }
 
@@ -757,15 +757,15 @@ class ProjectedDraftOrderServiceTest extends TestCase
     /**
      * Build two tied non-playoff teams with different conference records.
      *
-     * @return list<array{tid: int, team_name: string, wins: int, losses: int, pct: float, conference: string, division: string, confWins: int|null, confLosses: int|null, divWins: int|null, divLosses: int|null, clinchedDivision: int|null, color1: string, color2: string}>
+     * @return list<array{teamid: int, team_name: string, wins: int, losses: int, pct: float, conference: string, division: string, confWins: int|null, confLosses: int|null, divWins: int|null, divLosses: int|null, clinchedDivision: int|null, color1: string, color2: string}>
      */
     private function buildTiedStandingsWithConfRecords(): array
     {
         $teams = [];
-        $tid = 1;
+        $teamid = 1;
 
         for ($i = 0; $i < 5; $i++) {
-            $teams[] = $this->makeStandingsRow($tid++, 'EATop' . ($i + 1), 60 - ($i * 3), 22 + ($i * 3), 'Eastern', 'Atlantic');
+            $teams[] = $this->makeStandingsRow($teamid++, 'EATop' . ($i + 1), 60 - ($i * 3), 22 + ($i * 3), 'Eastern', 'Atlantic');
         }
         $teamA = $this->makeStandingsRow(101, 'TeamA', 25, 57, 'Eastern', 'Atlantic');
         $teamA['confWins'] = 10;
@@ -777,13 +777,13 @@ class ProjectedDraftOrderServiceTest extends TestCase
         $teams[] = $teamB;
 
         for ($i = 0; $i < 7; $i++) {
-            $teams[] = $this->makeStandingsRow($tid++, 'ECTop' . ($i + 1), 55 - ($i * 3), 27 + ($i * 3), 'Eastern', 'Central');
+            $teams[] = $this->makeStandingsRow($teamid++, 'ECTop' . ($i + 1), 55 - ($i * 3), 27 + ($i * 3), 'Eastern', 'Central');
         }
 
         foreach (['Midwest', 'Pacific'] as $div) {
             for ($i = 0; $i < 7; $i++) {
                 $wins = 50 - ($i * 5);
-                $teams[] = $this->makeStandingsRow($tid++, $div . 'T' . ($i + 1), $wins, 82 - $wins, 'Western', $div);
+                $teams[] = $this->makeStandingsRow($teamid++, $div . 'T' . ($i + 1), $wins, 82 - $wins, 'Western', $div);
             }
         }
 
@@ -793,15 +793,15 @@ class ProjectedDraftOrderServiceTest extends TestCase
     /**
      * Like buildTiedStandingsWithConfRecords but both teams have identical conf records.
      *
-     * @return list<array{tid: int, team_name: string, wins: int, losses: int, pct: float, conference: string, division: string, confWins: int|null, confLosses: int|null, divWins: int|null, divLosses: int|null, clinchedDivision: int|null, color1: string, color2: string}>
+     * @return list<array{teamid: int, team_name: string, wins: int, losses: int, pct: float, conference: string, division: string, confWins: int|null, confLosses: int|null, divWins: int|null, divLosses: int|null, clinchedDivision: int|null, color1: string, color2: string}>
      */
     private function buildTiedStandingsWithSameConfRecords(): array
     {
         $teams = [];
-        $tid = 1;
+        $teamid = 1;
 
         for ($i = 0; $i < 5; $i++) {
-            $teams[] = $this->makeStandingsRow($tid++, 'EATop' . ($i + 1), 60 - ($i * 3), 22 + ($i * 3), 'Eastern', 'Atlantic');
+            $teams[] = $this->makeStandingsRow($teamid++, 'EATop' . ($i + 1), 60 - ($i * 3), 22 + ($i * 3), 'Eastern', 'Atlantic');
         }
         $teamA = $this->makeStandingsRow(101, 'TeamA', 25, 57, 'Eastern', 'Atlantic');
         $teamA['confWins'] = 15;
@@ -813,13 +813,13 @@ class ProjectedDraftOrderServiceTest extends TestCase
         $teams[] = $teamB;
 
         for ($i = 0; $i < 7; $i++) {
-            $teams[] = $this->makeStandingsRow($tid++, 'ECTop' . ($i + 1), 55 - ($i * 3), 27 + ($i * 3), 'Eastern', 'Central');
+            $teams[] = $this->makeStandingsRow($teamid++, 'ECTop' . ($i + 1), 55 - ($i * 3), 27 + ($i * 3), 'Eastern', 'Central');
         }
 
         foreach (['Midwest', 'Pacific'] as $div) {
             for ($i = 0; $i < 7; $i++) {
                 $wins = 50 - ($i * 5);
-                $teams[] = $this->makeStandingsRow($tid++, $div . 'T' . ($i + 1), $wins, 82 - $wins, 'Western', $div);
+                $teams[] = $this->makeStandingsRow($teamid++, $div . 'T' . ($i + 1), $wins, 82 - $wins, 'Western', $div);
             }
         }
 
@@ -829,12 +829,12 @@ class ProjectedDraftOrderServiceTest extends TestCase
     /**
      * Build 28 teams all with 0-0 record.
      *
-     * @return list<array{tid: int, team_name: string, wins: int, losses: int, pct: float, conference: string, division: string, confWins: int|null, confLosses: int|null, divWins: int|null, divLosses: int|null, clinchedDivision: int|null, color1: string, color2: string}>
+     * @return list<array{teamid: int, team_name: string, wins: int, losses: int, pct: float, conference: string, division: string, confWins: int|null, confLosses: int|null, divWins: int|null, divLosses: int|null, clinchedDivision: int|null, color1: string, color2: string}>
      */
     private function buildZeroGameStandings(): array
     {
         $teams = [];
-        $tid = 1;
+        $teamid = 1;
         $conferences = [
             'Eastern' => ['Atlantic', 'Central'],
             'Western' => ['Midwest', 'Pacific'],
@@ -843,8 +843,8 @@ class ProjectedDraftOrderServiceTest extends TestCase
         foreach ($conferences as $conf => $divisions) {
             foreach ($divisions as $div) {
                 for ($i = 0; $i < 7; $i++) {
-                    $teams[] = $this->makeStandingsRow($tid, 'T' . str_pad((string) $tid, 2, '0', STR_PAD_LEFT), 0, 0, $conf, $div);
-                    $tid++;
+                    $teams[] = $this->makeStandingsRow($teamid, 'T' . str_pad((string) $teamid, 2, '0', STR_PAD_LEFT), 0, 0, $conf, $div);
+                    $teamid++;
                 }
             }
         }
@@ -855,30 +855,30 @@ class ProjectedDraftOrderServiceTest extends TestCase
     /**
      * Build standings with two tied playoff teams for testing playoff tiebreaker direction.
      *
-     * @return list<array{tid: int, team_name: string, wins: int, losses: int, pct: float, conference: string, division: string, confWins: int|null, confLosses: int|null, divWins: int|null, divLosses: int|null, clinchedDivision: int|null, color1: string, color2: string}>
+     * @return list<array{teamid: int, team_name: string, wins: int, losses: int, pct: float, conference: string, division: string, confWins: int|null, confLosses: int|null, divWins: int|null, divLosses: int|null, clinchedDivision: int|null, color1: string, color2: string}>
      */
     private function buildTiedPlayoffTeams(): array
     {
         $teams = [];
-        $tid = 1;
+        $teamid = 1;
 
         // Eastern Atlantic: Two tied playoff-quality teams
         $teams[] = $this->makeStandingsRow(201, 'PlayoffA', 50, 32, 'Eastern', 'Atlantic');
         $teams[] = $this->makeStandingsRow(202, 'PlayoffB', 50, 32, 'Eastern', 'Atlantic');
         for ($i = 0; $i < 5; $i++) {
-            $teams[] = $this->makeStandingsRow($tid++, 'EAFill' . ($i + 1), 45 - ($i * 5), 37 + ($i * 5), 'Eastern', 'Atlantic');
+            $teams[] = $this->makeStandingsRow($teamid++, 'EAFill' . ($i + 1), 45 - ($i * 5), 37 + ($i * 5), 'Eastern', 'Atlantic');
         }
 
         // Eastern Central: 7 teams
         for ($i = 0; $i < 7; $i++) {
-            $teams[] = $this->makeStandingsRow($tid++, 'ECFill' . ($i + 1), 55 - ($i * 4), 27 + ($i * 4), 'Eastern', 'Central');
+            $teams[] = $this->makeStandingsRow($teamid++, 'ECFill' . ($i + 1), 55 - ($i * 4), 27 + ($i * 4), 'Eastern', 'Central');
         }
 
         // Western: 14 teams
         foreach (['Midwest', 'Pacific'] as $div) {
             for ($i = 0; $i < 7; $i++) {
                 $wins = 50 - ($i * 5);
-                $teams[] = $this->makeStandingsRow($tid++, $div . 'Fill' . ($i + 1), $wins, 82 - $wins, 'Western', $div);
+                $teams[] = $this->makeStandingsRow($teamid++, $div . 'Fill' . ($i + 1), $wins, 82 - $wins, 'Western', $div);
             }
         }
 
@@ -888,16 +888,16 @@ class ProjectedDraftOrderServiceTest extends TestCase
     /**
      * Build 28-team standings with three tied non-playoff teams (25-57) in Eastern Atlantic.
      *
-     * @return list<array{tid: int, team_name: string, wins: int, losses: int, pct: float, conference: string, division: string, confWins: int|null, confLosses: int|null, divWins: int|null, divLosses: int|null, clinchedDivision: int|null, color1: string, color2: string}>
+     * @return list<array{teamid: int, team_name: string, wins: int, losses: int, pct: float, conference: string, division: string, confWins: int|null, confLosses: int|null, divWins: int|null, divLosses: int|null, clinchedDivision: int|null, color1: string, color2: string}>
      */
     private function buildThreeWayTiedStandings(): array
     {
         $teams = [];
-        $tid = 1;
+        $teamid = 1;
 
         // Eastern Atlantic: 4 strong playoff teams + 3 tied weak teams
         for ($i = 0; $i < 4; $i++) {
-            $teams[] = $this->makeStandingsRow($tid++, 'EATop' . ($i + 1), 60 - ($i * 3), 22 + ($i * 3), 'Eastern', 'Atlantic');
+            $teams[] = $this->makeStandingsRow($teamid++, 'EATop' . ($i + 1), 60 - ($i * 3), 22 + ($i * 3), 'Eastern', 'Atlantic');
         }
         $teams[] = $this->makeStandingsRow(301, 'TiedTeamA', 25, 57, 'Eastern', 'Atlantic');
         $teams[] = $this->makeStandingsRow(302, 'TiedTeamB', 25, 57, 'Eastern', 'Atlantic');
@@ -905,14 +905,14 @@ class ProjectedDraftOrderServiceTest extends TestCase
 
         // Eastern Central: 7 strong teams
         for ($i = 0; $i < 7; $i++) {
-            $teams[] = $this->makeStandingsRow($tid++, 'ECTop' . ($i + 1), 55 - ($i * 3), 27 + ($i * 3), 'Eastern', 'Central');
+            $teams[] = $this->makeStandingsRow($teamid++, 'ECTop' . ($i + 1), 55 - ($i * 3), 27 + ($i * 3), 'Eastern', 'Central');
         }
 
         // Western: 14 teams
         foreach (['Midwest', 'Pacific'] as $div) {
             for ($i = 0; $i < 7; $i++) {
                 $wins = 50 - ($i * 5);
-                $teams[] = $this->makeStandingsRow($tid++, $div . 'T' . ($i + 1), $wins, 82 - $wins, 'Western', $div);
+                $teams[] = $this->makeStandingsRow($teamid++, $div . 'T' . ($i + 1), $wins, 82 - $wins, 'Western', $div);
             }
         }
 
@@ -920,10 +920,10 @@ class ProjectedDraftOrderServiceTest extends TestCase
     }
 
     /**
-     * @return array{tid: int, team_name: string, wins: int, losses: int, pct: float, conference: string, division: string, confWins: int|null, confLosses: int|null, divWins: int|null, divLosses: int|null, clinchedDivision: int|null, color1: string, color2: string}
+     * @return array{teamid: int, team_name: string, wins: int, losses: int, pct: float, conference: string, division: string, confWins: int|null, confLosses: int|null, divWins: int|null, divLosses: int|null, clinchedDivision: int|null, color1: string, color2: string}
      */
     private function makeStandingsRow(
-        int $tid,
+        int $teamid,
         string $name,
         int $wins,
         int $losses,
@@ -935,7 +935,7 @@ class ProjectedDraftOrderServiceTest extends TestCase
         $pct = $total > 0 ? round($wins / $total, 3) : 0.0;
 
         return [
-            'tid' => $tid,
+            'teamid' => $teamid,
             'team_name' => $name,
             'wins' => $wins,
             'losses' => $losses,
@@ -947,8 +947,8 @@ class ProjectedDraftOrderServiceTest extends TestCase
             'divWins' => null,
             'divLosses' => null,
             'clinchedDivision' => $clinchedDivision,
-            'color1' => 'AA' . str_pad((string) $tid, 4, '0', STR_PAD_LEFT),
-            'color2' => 'BB' . str_pad((string) $tid, 4, '0', STR_PAD_LEFT),
+            'color1' => 'AA' . str_pad((string) $teamid, 4, '0', STR_PAD_LEFT),
+            'color2' => 'BB' . str_pad((string) $teamid, 4, '0', STR_PAD_LEFT),
         ];
     }
 }

@@ -27,7 +27,7 @@ class TeamCellHelperTest extends TestCase
     {
         $result = TeamCellHelper::renderTeamCell(5, 'Chicago', 'FF0000', '000000');
 
-        $this->assertStringContainsString('modules.php?name=Team&amp;op=team&amp;teamID=5', $result);
+        $this->assertStringContainsString('modules.php?name=Team&amp;op=team&amp;teamid=5', $result);
     }
 
     public function testRenderTeamCellWithExtraClasses(): void
@@ -103,21 +103,21 @@ class TeamCellHelperTest extends TestCase
     {
         $result = TeamCellHelper::teamPageUrl(5);
 
-        $this->assertSame('modules.php?name=Team&amp;op=team&amp;teamID=5', $result);
+        $this->assertSame('modules.php?name=Team&amp;op=team&amp;teamid=5', $result);
     }
 
     public function testTeamPageUrlWithYear(): void
     {
         $result = TeamCellHelper::teamPageUrl(5, 2024);
 
-        $this->assertSame('modules.php?name=Team&amp;op=team&amp;teamID=5&amp;yr=2024', $result);
+        $this->assertSame('modules.php?name=Team&amp;op=team&amp;teamid=5&amp;yr=2024', $result);
     }
 
     public function testTeamPageUrlWithNullYear(): void
     {
         $result = TeamCellHelper::teamPageUrl(5, null);
 
-        $this->assertSame('modules.php?name=Team&amp;op=team&amp;teamID=5', $result);
+        $this->assertSame('modules.php?name=Team&amp;op=team&amp;teamid=5', $result);
     }
 
     public function testRenderTeamCellStripsHashFromColors(): void

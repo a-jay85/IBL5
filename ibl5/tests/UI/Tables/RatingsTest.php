@@ -76,7 +76,7 @@ class RatingsTest extends TestCase
         $team = new \stdClass();
         $team->color1 = 'FF0000';
         $team->color2 = '0000FF';
-        $team->teamID = 1;
+        $team->teamid = 1;
 
         return $team;
     }

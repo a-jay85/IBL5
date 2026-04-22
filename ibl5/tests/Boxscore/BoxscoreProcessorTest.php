@@ -213,8 +213,8 @@ class BoxscoreProcessorTest extends TestCase
         $line = sprintf('%02d', $monthOffset)  // month offset from Oct
               . sprintf('%02d', $dayOffset)     // day offset (0-indexed)
               . '00'                            // game of that day
-              . '00'                            // visitor team (0-indexed → tid 1)
-              . '01'                            // home team (0-indexed → tid 2)
+              . '00'                            // visitor team (0-indexed → teamid 1)
+              . '01'                            // home team (0-indexed → teamid 2)
               . '18000'                         // attendance
               . '20000'                         // capacity
               . '1005'                          // visitor wins/losses
@@ -304,7 +304,7 @@ class BoxscoreProcessorTest extends TestCase
             'homeQ4points' => 30, 'homeOTpoints' => 0,
         ]]);
         // hasNullTeamIdPlayerBoxscores returns false (cnt=0)
-        $mockDb->onQuery('(?s)COUNT.*teamID IS NULL', [['cnt' => 0]]);
+        $mockDb->onQuery('(?s)COUNT.*teamid IS NULL', [['cnt' => 0]]);
 
         $repository = new BoxscoreRepository($mockDb);
         $season = new Season($mockDb);
@@ -348,7 +348,7 @@ class BoxscoreProcessorTest extends TestCase
             'homeQ4points' => 30, 'homeOTpoints' => 0,
         ]]);
         // hasNullTeamIdPlayerBoxscores returns true (cnt=1)
-        $mockDb->onQuery('(?s)COUNT.*teamID IS NULL', [['cnt' => 1]]);
+        $mockDb->onQuery('(?s)COUNT.*teamid IS NULL', [['cnt' => 1]]);
 
         $repository = new BoxscoreRepository($mockDb);
         $season = new Season($mockDb);
@@ -500,7 +500,7 @@ class BoxscoreProcessorTest extends TestCase
             'homeQ1points' => 22, 'homeQ2points' => 31, 'homeQ3points' => 25,
             'homeQ4points' => 30, 'homeOTpoints' => 0,
         ]]);
-        $mockDb->onQuery('(?s)COUNT.*teamID IS NULL', [['cnt' => 0]]);
+        $mockDb->onQuery('(?s)COUNT.*teamid IS NULL', [['cnt' => 0]]);
 
         $repository = new BoxscoreRepository($mockDb);
         $seasonStub = $this->createStub(Season::class);

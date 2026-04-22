@@ -71,11 +71,11 @@ class LeagueStartersService implements LeagueStartersServiceInterface
             'C' => 'CDepth',
         ];
 
-        /** @var array<int, array<string, Player>> $starterMap tid => [position => Player] */
+        /** @var array<int, array<string, Player>> $starterMap teamid => [position => Player] */
         $starterMap = [];
         foreach ($starterRows as $row) {
-            $tid = $row['tid'];
-            if (!is_int($tid)) {
+            $teamid = $row['teamid'];
+            if (!is_int($teamid)) {
                 continue;
             }
             $teamname = is_string($row['teamname']) ? $row['teamname'] : '';
@@ -86,7 +86,7 @@ class LeagueStartersService implements LeagueStartersServiceInterface
                 if (($row[$column] ?? 0) !== 1) {
                     continue;
                 }
-                if (isset($starterMap[$tid][$position])) {
+                if (isset($starterMap[$teamid][$position])) {
                     continue;
                 }
                 /** @var PlayerRow $row */
@@ -94,7 +94,7 @@ class LeagueStartersService implements LeagueStartersServiceInterface
                 $player->teamName = $teamname;
                 $player->teamColor1 = $color1;
                 $player->teamColor2 = $color2;
-                $starterMap[$tid][$position] = $player;
+                $starterMap[$teamid][$position] = $player;
             }
         }
 
@@ -103,8 +103,8 @@ class LeagueStartersService implements LeagueStartersServiceInterface
             $team = Team::initialize($this->db, $teamRow);
 
             foreach ($positions as $position) {
-                if (isset($starterMap[$team->teamID][$position])) {
-                    $player = $starterMap[$team->teamID][$position];
+                if (isset($starterMap[$team->teamid][$position])) {
+                    $player = $starterMap[$team->teamid][$position];
                     $player->teamCity = $team->city;
                 } else {
                     $player = clone $this->getOrLoadPlaceholder();

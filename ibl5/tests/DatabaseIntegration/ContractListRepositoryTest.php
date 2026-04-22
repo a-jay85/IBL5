@@ -24,7 +24,7 @@ class ContractListRepositoryTest extends DatabaseTestCase
 
     public function testGetActivePlayerContractsReturnsNonEmptyList(): void
     {
-        $this->insertTestPlayer(200110001, 'Contract Plyr', ['tid' => 1, 'retired' => 0]);
+        $this->insertTestPlayer(200110001, 'Contract Plyr', ['teamid' => 1, 'retired' => 0]);
 
         $contracts = $this->repo->getActivePlayerContracts();
 
@@ -33,7 +33,7 @@ class ContractListRepositoryTest extends DatabaseTestCase
 
     public function testGetActivePlayerContractsIncludesContractFields(): void
     {
-        $this->insertTestPlayer(200110002, 'Contract Fields', ['tid' => 1, 'retired' => 0]);
+        $this->insertTestPlayer(200110002, 'Contract Fields', ['teamid' => 1, 'retired' => 0]);
 
         $contracts = $this->repo->getActivePlayerContracts();
 

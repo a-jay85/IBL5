@@ -25,13 +25,13 @@ class FreeAgencyRepositoryTest extends DatabaseTestCase
      * @param array<string, int|float|string> $overrides
      * @return array<string, int|float|string>
      */
-    private function buildOfferData(int $pid, int $tid, array $overrides = []): array
+    private function buildOfferData(int $pid, int $teamid, array $overrides = []): array
     {
         return array_merge([
             'playerName' => 'FA TestPlayer',
             'pid' => $pid,
             'teamName' => 'Metros',
-            'tid' => $tid,
+            'teamid' => $teamid,
             'offer1' => 1500,
             'offer2' => 1600,
             'offer3' => 1700,
@@ -196,12 +196,12 @@ class FreeAgencyRepositoryTest extends DatabaseTestCase
     /**
      * @return array<string, mixed>|null
      */
-    private function fetchOfferRow(int $pid, int $tid): ?array
+    private function fetchOfferRow(int $pid, int $teamid): ?array
     {
         $stmt = $this->db->prepare(
-            "SELECT modifier, `random`, perceivedvalue FROM ibl_fa_offers WHERE pid = ? AND tid = ?"
+            "SELECT modifier, `random`, perceivedvalue FROM ibl_fa_offers WHERE pid = ? AND teamid = ?"
         );
-        $stmt->bind_param('ii', $pid, $tid);
+        $stmt->bind_param('ii', $pid, $teamid);
         $stmt->execute();
         $result = $stmt->get_result();
         $row = $result->fetch_assoc();
@@ -211,8 +211,8 @@ class FreeAgencyRepositoryTest extends DatabaseTestCase
 
     public function testGetAllPlayersExcludingTeamExcludesCorrectTeam(): void
     {
-        $this->insertTestPlayer(200020007, 'FA ExclTeam1', ['tid' => 1]);
-        $this->insertTestPlayer(200020008, 'FA ExclTeam2', ['tid' => 2]);
+        $this->insertTestPlayer(200020007, 'FA ExclTeam1', ['teamid' => 1]);
+        $this->insertTestPlayer(200020008, 'FA ExclTeam2', ['teamid' => 2]);
 
         $players = $this->repo->getAllPlayersExcludingTeam(1);
 

@@ -12,9 +12,9 @@ namespace SeasonLeaderboards\Contracts;
  * @phpstan-type LeaderboardFilters array{year?: string, team?: int|string, sortby?: string, limit?: int|string}
  * @phpstan-type HistRow array{pid: int, name: string, year: int, team: string, teamid: int, games: int, minutes: int, fgm: int, fga: int, ftm: int, fta: int, tgm: int, tga: int, orb: int, reb: int, ast: int, stl: int, tvr: int, blk: int, pf: int, team_city: string|null, color1: string|null, color2: string|null}
  * @phpstan-type LeaderboardResult array{results: list<HistRow>, count: int}
- * @phpstan-type TeamRow array{TeamID: int, Team: string}
+ * @phpstan-type TeamRow array{teamid: int, Team: string}
  *
- * Note: TeamRow is populated from ibl_team_info (teamid AS TeamID, team_name AS Team)
+ * Note: TeamRow is populated from ibl_team_info (teamid AS teamid, team_name AS Team)
  */
 interface SeasonLeaderboardsRepositoryInterface
 {
@@ -47,12 +47,12 @@ interface SeasonLeaderboardsRepositoryInterface
      * @return list<TeamRow> Array of team rows
      *
      * **Returned Columns:**
-     * - TeamID
+     * - teamid
      * - Team (name)
      *
      * **Behaviors:**
-     * - Only returns TeamID 1-32 (excludes special entries)
-     * - Ordered by TeamID ASC
+     * - Only returns teamid 1-32 (excludes special entries)
+     * - Ordered by teamid ASC
      */
     public function getTeams(): array;
 

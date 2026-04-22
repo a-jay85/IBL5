@@ -49,7 +49,7 @@ class PlayerIdResolver
      * @param string $name Player name from .car file
      * @param string $team Team name from .car file
      * @param int $year Season year
-     * @param int|null $teamId Resolved team ID (when available, enables tid-based ibl_plr lookup)
+     * @param int|null $teamId Resolved team ID (when available, enables teamid-based ibl_plr lookup)
      * @return int|null Database pid, or null if not found
      */
     public function resolve(string $name, string $team, int $year, ?int $teamId = null): ?int
@@ -59,7 +59,7 @@ class PlayerIdResolver
             return $this->cache[$cacheKey];
         }
 
-        // Strategy 1: Exact match in ibl_plr_snapshots by name + tid + year
+        // Strategy 1: Exact match in ibl_plr_snapshots by name + teamid + year
         if ($teamId !== null) {
             $pid = $this->findInSnapshots($name, $teamId, $year);
             if ($pid !== null) {
@@ -96,12 +96,12 @@ class PlayerIdResolver
     }
 
     /**
-     * Find pid in ibl_plr_snapshots by exact name + tid + year.
+     * Find pid in ibl_plr_snapshots by exact name + teamid + year.
      */
     private function findInSnapshots(string $name, int $teamId, int $year): ?int
     {
         $stmt = $this->db->prepare(
-            "SELECT pid FROM {$this->snapshotTable} WHERE name = ? AND tid = ? AND season_year = ? LIMIT 1"
+            "SELECT pid FROM {$this->snapshotTable} WHERE name = ? AND teamid = ? AND season_year = ? LIMIT 1"
         );
         if ($stmt === false) {
             return null;
@@ -123,7 +123,7 @@ class PlayerIdResolver
     private function findInPlr(string $name, int $teamId): ?int
     {
         $stmt = $this->db->prepare(
-            "SELECT pid FROM {$this->plrTable} WHERE name = ? AND tid = ? LIMIT 1"
+            "SELECT pid FROM {$this->plrTable} WHERE name = ? AND teamid = ? LIMIT 1"
         );
         if ($stmt === false) {
             return null;

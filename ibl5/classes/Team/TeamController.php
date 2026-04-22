@@ -46,7 +46,7 @@ class TeamController implements TeamControllerInterface
     /**
      * @see TeamControllerInterface::displayTeamPage()
      */
-    public function displayTeamPage(int $teamID): void
+    public function displayTeamPage(int $teamid): void
     {
         // Validate and sanitize year parameter
         $yr = null;
@@ -99,7 +99,7 @@ class TeamController implements TeamControllerInterface
         }
 
         try {
-            $pageData = $this->service->getTeamPageData($teamID, $yr, $display, $userTeamName, $split);
+            $pageData = $this->service->getTeamPageData($teamid, $yr, $display, $userTeamName, $split);
             $pageData['extensionResult'] = isset($_GET['result']) && is_string($_GET['result']) ? $_GET['result'] : null;
             $pageData['extensionMsg'] = isset($_GET['msg']) && is_string($_GET['msg']) ? $_GET['msg'] : null;
         } catch (\RuntimeException $e) {

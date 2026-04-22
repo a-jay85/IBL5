@@ -225,7 +225,7 @@ class FreeAgencyProcessor implements FreeAgencyProcessorInterface
 
         $saved = $this->repository->saveOffer([
             'pid' => $player->playerID ?? 0,
-            'tid' => $team->teamID,
+            'teamid' => $team->teamid,
             'teamName' => $teamName,
             'playerName' => $playerName,
             'offer1' => $offerData['offer1'],
@@ -314,9 +314,9 @@ _**{$player->teamName}** GM <@!$playerTeamDiscordID> could not be reached for co
     public function deleteOffers(string $teamName, int $playerID): array
     {
         $commonRepo = new \Services\CommonMysqliRepository($this->mysqli_db);
-        $tid = $commonRepo->getTidFromTeamname($teamName) ?? 0;
+        $teamid = $commonRepo->getTidFromTeamname($teamName) ?? 0;
 
-        $this->repository->deleteOffer($tid, $playerID);
+        $this->repository->deleteOffer($teamid, $playerID);
 
         return ['success' => true];
     }

@@ -20,7 +20,7 @@ interface JsbExportRepositoryInterface
      * @return array<int, array{
      *     pid: int,
      *     name: string,
-     *     tid: int,
+     *     teamid: int,
      *     bird: int,
      *     cy: int,
      *     cyt: int,

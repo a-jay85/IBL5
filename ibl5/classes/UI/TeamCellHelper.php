@@ -70,7 +70,7 @@ class TeamCellHelper implements TeamCellHelperInterface
      */
     public static function teamPageUrl(int $teamId, ?int $year = null): string
     {
-        $url = 'modules.php?name=Team&amp;op=team&amp;teamID=' . $teamId;
+        $url = 'modules.php?name=Team&amp;op=team&amp;teamid=' . $teamId;
         if ($year !== null) {
             $url .= '&amp;yr=' . $year;
         }

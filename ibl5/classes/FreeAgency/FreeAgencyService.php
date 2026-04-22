@@ -43,7 +43,7 @@ class FreeAgencyService implements FreeAgencyServiceInterface
         /** @var array{totalSalaries: array<int, int>, softCapSpace: array<int, int>, hardCapSpace: array<int, int>, rosterSpots: array<int, int>} $capMetrics */
         $capMetrics = $capCalculator->calculateTeamCapMetrics();
 
-        $allOtherPlayers = $this->repository->getAllPlayersExcludingTeam($team->teamID);
+        $allOtherPlayers = $this->repository->getAllPlayersExcludingTeam($team->teamid);
 
         return [
             'capMetrics' => $capMetrics,
@@ -68,7 +68,7 @@ class FreeAgencyService implements FreeAgencyServiceInterface
 
         $demands = $this->demandRepository->getPlayerDemands($player->playerID ?? 0);
 
-        $existingOffer = $this->getExistingOffer($team->teamID, $player->playerID ?? 0);
+        $existingOffer = $this->getExistingOffer($team->teamid, $player->playerID ?? 0);
 
         // calculateTeamCapMetrics() already excludes this player's existing offer,
         // so softCapSpace[0] is the true available cap space for a new/replacement offer.
@@ -93,9 +93,9 @@ class FreeAgencyService implements FreeAgencyServiceInterface
     /**
      * @see FreeAgencyServiceInterface::getExistingOffer()
      */
-    public function getExistingOffer(int $tid, int $pid): array
+    public function getExistingOffer(int $teamid, int $pid): array
     {
-        $offer = $this->repository->getExistingOffer($tid, $pid);
+        $offer = $this->repository->getExistingOffer($teamid, $pid);
 
         if ($offer === null) {
             return [

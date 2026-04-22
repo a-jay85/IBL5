@@ -68,7 +68,7 @@ class PlayerPageController
         }
 
         // Generate team color scheme
-        $teamColors = TeamColorHelper::getTeamColors($this->mysqliDb, $player->teamID ?? 0);
+        $teamColors = TeamColorHelper::getTeamColors($this->mysqliDb, $player->teamid ?? 0);
         $colorScheme = TeamColorHelper::generateColorScheme($teamColors['color1'], $teamColors['color2']);
 
         // Trading card

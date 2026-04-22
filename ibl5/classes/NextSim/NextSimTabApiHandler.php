@@ -27,7 +27,7 @@ class NextSimTabApiHandler
     {
         header('Content-Type: text/html; charset=utf-8');
 
-        $teamID = isset($_GET['teamID']) && is_string($_GET['teamID']) ? (int) $_GET['teamID'] : 0;
+        $teamid = isset($_GET['teamid']) && is_string($_GET['teamid']) ? (int) $_GET['teamid'] : 0;
 
         $position = 'PG';
         if (isset($_GET['position']) && is_string($_GET['position'])) {
@@ -38,22 +38,22 @@ class NextSimTabApiHandler
         }
 
         $season = new Season($this->db);
-        $team = Team::initialize($this->db, $teamID);
+        $team = Team::initialize($this->db, $teamid);
 
         // Load power rankings for SOS tier indicators
         $standingsRepo = new StandingsRepository($this->db);
         $allStreakData = $standingsRepo->getAllStreakData();
         /** @var array<int, float> $teamPowerRankings */
         $teamPowerRankings = [];
-        foreach ($allStreakData as $tid => $data) {
-            $teamPowerRankings[$tid] = (float) $data['ranking'];
+        foreach ($allStreakData as $rankedTeamid => $data) {
+            $teamPowerRankings[$rankedTeamid] = (float) $data['ranking'];
         }
 
         $teamScheduleRepository = new TeamScheduleRepository($this->db);
         $service = new NextSimService($this->db, $teamScheduleRepository, $teamPowerRankings);
         $view = new NextSimView($season);
 
-        $games = $service->getNextSimGames($teamID, $season);
+        $games = $service->getNextSimGames($teamid, $season);
         $userStarters = $service->getUserStartingLineup($team);
 
         echo $view->renderTabbedPositionTable($games, $position, $team, $userStarters);

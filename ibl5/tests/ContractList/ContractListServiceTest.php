@@ -141,17 +141,17 @@ class ContractListServiceTest extends TestCase
     }
 
     /**
-     * @return array{pid: int, name: string, pos: string, teamname: string, tid: int, cy: int, cyt: int, cy1: int, cy2: int, cy3: int, cy4: int, cy5: int, cy6: int, bird: string, team_city: string|null, color1: string|null, color2: string|null}
+     * @return array{pid: int, name: string, pos: string, teamname: string, teamid: int, cy: int, cyt: int, cy1: int, cy2: int, cy3: int, cy4: int, cy5: int, cy6: int, bird: string, team_city: string|null, color1: string|null, color2: string|null}
      */
     private static function createPlayerContract(array $overrides = []): array
     {
-        /** @var array{pid: int, name: string, pos: string, teamname: string, tid: int, cy: int, cyt: int, cy1: int, cy2: int, cy3: int, cy4: int, cy5: int, cy6: int, bird: string, team_city: string|null, color1: string|null, color2: string|null} */
+        /** @var array{pid: int, name: string, pos: string, teamname: string, teamid: int, cy: int, cyt: int, cy1: int, cy2: int, cy3: int, cy4: int, cy5: int, cy6: int, bird: string, team_city: string|null, color1: string|null, color2: string|null} */
         return array_merge([
             'pid' => 1,
             'name' => 'Test Player',
             'pos' => 'G',
             'teamname' => 'Hawks',
-            'tid' => 1,
+            'teamid' => 1,
             'cy' => 1,
             'cyt' => 3,
             'cy1' => 500,

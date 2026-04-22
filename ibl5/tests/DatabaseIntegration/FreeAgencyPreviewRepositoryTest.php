@@ -24,7 +24,7 @@ class FreeAgencyPreviewRepositoryTest extends DatabaseTestCase
 
     public function testGetActivePlayersReturnsNonEmptyList(): void
     {
-        $this->insertTestPlayer(200120001, 'FA Preview Plyr', ['tid' => 1, 'retired' => 0]);
+        $this->insertTestPlayer(200120001, 'FA Preview Plyr', ['teamid' => 1, 'retired' => 0]);
 
         $players = $this->repo->getActivePlayers();
 
@@ -33,7 +33,7 @@ class FreeAgencyPreviewRepositoryTest extends DatabaseTestCase
 
     public function testGetActivePlayersIncludesRatingsAndPreferences(): void
     {
-        $this->insertTestPlayer(200120002, 'FA Preview Rate', ['tid' => 1, 'retired' => 0]);
+        $this->insertTestPlayer(200120002, 'FA Preview Rate', ['teamid' => 1, 'retired' => 0]);
 
         $players = $this->repo->getActivePlayers();
 

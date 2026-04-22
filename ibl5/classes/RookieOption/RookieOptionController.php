@@ -63,7 +63,7 @@ class RookieOptionController implements RookieOptionControllerInterface
         }
 
         // Get team ID for redirect link
-        $teamID = $commonRepository->getTidFromTeamname($teamName) ?? 0;
+        $teamid = $commonRepository->getTidFromTeamname($teamName) ?? 0;
 
         // Send Discord notification
         $playerName = $player->name ?? 'Unknown';
@@ -85,7 +85,7 @@ class RookieOptionController implements RookieOptionControllerInterface
             'type' => 'rookie_option_success',
             'message' => 'Rookie option exercised successfully.',
             'playerID' => $playerID,
-            'teamID' => $teamID,
+            'teamid' => $teamid,
             'emailSuccess' => $emailSuccess,
         ];
     }

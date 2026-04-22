@@ -89,7 +89,7 @@ interface PlayerDatabaseViewInterface
      * All string output (name, team, college) is escaped with HtmlSanitizer::e().
      * All numeric values output as-is (no escaping needed).
      * Links use href="modules.php?name=Player&amp;pa=showpage&amp;pid=PID" (note &amp;)
-     * Team links use href="team.php?tid=TID"
+     * Team links use href="team.php?teamid=TID"
      * 
      * @param PlayerData $player Player object with all statistics and attributes
      * @param int $rowIndex Zero-based row index (used for alternating background colors)

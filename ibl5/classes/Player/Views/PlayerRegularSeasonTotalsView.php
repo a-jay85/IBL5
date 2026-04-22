@@ -118,7 +118,7 @@ class PlayerRegularSeasonTotalsView implements PlayerRegularSeasonTotalsViewInte
             ?>
     <tr>
         <td><?= $year ?></td>
-        <td><a href="modules.php?name=Team&op=team&teamID=<?= $teamId ?>&yr=<?= $year ?>"><?= $team ?></a></td>
+        <td><a href="modules.php?name=Team&op=team&teamid=<?= $teamId ?>&yr=<?= $year ?>"><?= $team ?></a></td>
         <td><?= $gm ?></td>
         <td><?= $min ?></td>
         <td><?= $fgm ?>-<?= $fga ?></td>

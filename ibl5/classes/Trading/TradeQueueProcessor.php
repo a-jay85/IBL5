@@ -134,7 +134,7 @@ class TradeQueueProcessor
      * Execute a pick transfer operation
      *
      * Resolves new_owner_id from params if available, otherwise falls back to
-     * looking up the tid from the team name string. This handles pre-migration
+     * looking up the teamid from the team name string. This handles pre-migration
      * queued trades that only have the team name, not the team ID.
      *
      * @param array<string, mixed> $params Parameters from queue
@@ -159,7 +159,7 @@ class TradeQueueProcessor
         $pickId = (int) $rawPickId;
         $newOwner = $rawNewOwner;
 
-        // Resolve new_owner_id: use params if available, otherwise look up tid from team name
+        // Resolve new_owner_id: use params if available, otherwise look up teamid from team name
         $rawNewOwnerId = $params['new_owner_id'] ?? null;
         if ($rawNewOwnerId !== null) {
             $newOwnerId = is_int($rawNewOwnerId) ? $rawNewOwnerId : (is_string($rawNewOwnerId) ? (int) $rawNewOwnerId : 0);

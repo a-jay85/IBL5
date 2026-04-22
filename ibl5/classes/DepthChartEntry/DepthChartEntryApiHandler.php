@@ -34,7 +34,7 @@ class DepthChartEntryApiHandler
     {
         header('Content-Type: text/html; charset=utf-8');
 
-        $teamID = isset($_GET['teamID']) && is_string($_GET['teamID']) ? (int) $_GET['teamID'] : 0;
+        $teamid = isset($_GET['teamid']) && is_string($_GET['teamid']) ? (int) $_GET['teamid'] : 0;
 
         $display = 'ratings';
         if (isset($_GET['display']) && is_string($_GET['display'])) {
@@ -66,6 +66,6 @@ class DepthChartEntryApiHandler
         header('HX-Push-Url: ' . $pushUrl);
 
         $controller = new DepthChartEntryController($this->db);
-        echo $controller->getTableOutput($teamID, $display, $split);
+        echo $controller->getTableOutput($teamid, $display, $split);
     }
 }

@@ -99,7 +99,7 @@ class PlrParserServiceTest extends TestCase
             'name' => 'John Smith',
             'age' => 25,
             'pid' => 12345,
-            'tid' => 5,
+            'teamid' => 5,
             'peak' => 28,
             'pos' => 'PG',
         ]);
@@ -111,7 +111,7 @@ class PlrParserServiceTest extends TestCase
         $this->assertSame('John Smith', $result['name']);
         $this->assertSame(25, $result['age']);
         $this->assertSame(12345, $result['pid']);
-        $this->assertSame(5, $result['tid']);
+        $this->assertSame(5, $result['teamid']);
         $this->assertSame(28, $result['peak']);
         $this->assertSame('PG', $result['pos']);
     }
@@ -380,8 +380,8 @@ class PlrParserServiceTest extends TestCase
         $pid = $overrides['pid'] ?? 1;
         $line = substr_replace($line, str_pad((string) $pid, 6, '0', STR_PAD_LEFT), 38, 6);
 
-        $tid = $overrides['tid'] ?? 1;
-        $line = substr_replace($line, str_pad((string) $tid, 2, ' ', STR_PAD_LEFT), 44, 2);
+        $teamid = $overrides['teamid'] ?? 1;
+        $line = substr_replace($line, str_pad((string) $teamid, 2, ' ', STR_PAD_LEFT), 44, 2);
 
         $peak = $overrides['peak'] ?? 28;
         $line = substr_replace($line, str_pad((string) $peak, 4, ' ', STR_PAD_LEFT), 46, 4);
@@ -405,7 +405,7 @@ class PlrParserServiceTest extends TestCase
             'name' => 'Test Player',
             'age' => 25,
             'pid' => 1,
-            'tid' => 1,
+            'teamid' => 1,
             'peak' => 28,
             'pos' => 'PG',
             'realLifeGP' => 82,
@@ -703,7 +703,7 @@ class PlrParserServiceTest extends TestCase
         $line = substr_replace($line, str_pad('Test Player', 32), 4, 32);
         $line = substr_replace($line, '25', 36, 2);         // age
         $line = substr_replace($line, '000001', 38, 6);     // pid = 1
-        $line = substr_replace($line, ' 1', 44, 2);         // tid = 1
+        $line = substr_replace($line, ' 1', 44, 2);         // teamid = 1
         $line = substr_replace($line, '  28', 46, 4);       // peak
         $line = substr_replace($line, 'PG', 50, 2);         // pos
         $line = substr_replace($line, '1000', 56, 4);       // realLifeMIN

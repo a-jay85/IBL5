@@ -29,7 +29,7 @@ class TableViewSwitcherTest extends TestCase
         $switcher = new TableViewSwitcher(
             $this->defaultTabs,
             'ratings',
-            'modules.php?name=Team&op=team&teamID=1',
+            'modules.php?name=Team&op=team&teamid=1',
             'FF0000',
             '0000FF'
         );
@@ -48,7 +48,7 @@ class TableViewSwitcherTest extends TestCase
         $switcher = new TableViewSwitcher(
             $this->defaultTabs,
             'ratings',
-            'modules.php?name=Team&op=team&teamID=1',
+            'modules.php?name=Team&op=team&teamid=1',
             'FF0000',
             '0000FF'
         );
@@ -64,7 +64,7 @@ class TableViewSwitcherTest extends TestCase
         $switcher = new TableViewSwitcher(
             $this->defaultTabs,
             'total_s',
-            'modules.php?name=Team&op=team&teamID=1',
+            'modules.php?name=Team&op=team&teamid=1',
             'FF0000',
             '0000FF'
         );
@@ -83,16 +83,16 @@ class TableViewSwitcherTest extends TestCase
         $switcher = new TableViewSwitcher(
             $this->defaultTabs,
             'ratings',
-            'modules.php?name=Team&op=team&teamID=1',
+            'modules.php?name=Team&op=team&teamid=1',
             'FF0000',
             '0000FF'
         );
 
         $result = $switcher->renderTabs();
 
-        $this->assertStringContainsString('modules.php?name=Team&amp;op=team&amp;teamID=1&amp;display=ratings', $result);
-        $this->assertStringContainsString('modules.php?name=Team&amp;op=team&amp;teamID=1&amp;display=total_s', $result);
-        $this->assertStringContainsString('modules.php?name=Team&amp;op=team&amp;teamID=1&amp;display=avg_s', $result);
+        $this->assertStringContainsString('modules.php?name=Team&amp;op=team&amp;teamid=1&amp;display=ratings', $result);
+        $this->assertStringContainsString('modules.php?name=Team&amp;op=team&amp;teamid=1&amp;display=total_s', $result);
+        $this->assertStringContainsString('modules.php?name=Team&amp;op=team&amp;teamid=1&amp;display=avg_s', $result);
     }
 
     public function testTeamColorsAppearAsCssCustomProperties(): void
@@ -258,7 +258,7 @@ class TableViewSwitcherTest extends TestCase
         $switcher = new TableViewSwitcher(
             $this->defaultTabs,
             'ratings',
-            'modules.php?name=Team&op=team&teamID=1',
+            'modules.php?name=Team&op=team&teamid=1',
             'FF0000',
             '0000FF'
         );
@@ -276,16 +276,16 @@ class TableViewSwitcherTest extends TestCase
         $switcher = new TableViewSwitcher(
             $this->defaultTabs,
             'ratings',
-            'modules.php?name=Team&op=team&teamID=1',
+            'modules.php?name=Team&op=team&teamid=1',
             'FF0000',
             '0000FF',
-            'modules.php?name=Team&op=api&teamID=1'
+            'modules.php?name=Team&op=api&teamid=1'
         );
 
         $result = $switcher->renderTabs();
 
-        $this->assertStringContainsString('hx-get="modules.php?name=Team&amp;op=api&amp;teamID=1&amp;display=ratings"', $result);
-        $this->assertStringContainsString('hx-get="modules.php?name=Team&amp;op=api&amp;teamID=1&amp;display=total_s"', $result);
+        $this->assertStringContainsString('hx-get="modules.php?name=Team&amp;op=api&amp;teamid=1&amp;display=ratings"', $result);
+        $this->assertStringContainsString('hx-get="modules.php?name=Team&amp;op=api&amp;teamid=1&amp;display=total_s"', $result);
         $this->assertStringContainsString('hx-target="closest .table-scroll-container"', $result);
         $this->assertStringContainsString('hx-swap="innerHTML"', $result);
     }
@@ -295,16 +295,16 @@ class TableViewSwitcherTest extends TestCase
         $switcher = new TableViewSwitcher(
             ['ratings' => 'Ratings'],
             'ratings',
-            'modules.php?name=Team&op=team&teamID=5',
+            'modules.php?name=Team&op=team&teamid=5',
             'FF0000',
             '0000FF',
-            'modules.php?name=Team&op=api&teamID=5'
+            'modules.php?name=Team&op=api&teamid=5'
         );
 
         $result = $switcher->renderTabs();
 
         $this->assertStringContainsString(
-            'hx-push-url="modules.php?name=Team&amp;op=team&amp;teamID=5&amp;display=ratings"',
+            'hx-push-url="modules.php?name=Team&amp;op=team&amp;teamid=5&amp;display=ratings"',
             $result
         );
     }
@@ -317,7 +317,7 @@ class TableViewSwitcherTest extends TestCase
             'modules.php?name=NextSim',
             'FF0000',
             '0000FF',
-            'modules.php?name=DepthChartEntry&op=nextsim-api&teamID=1',
+            'modules.php?name=DepthChartEntry&op=nextsim-api&teamid=1',
             'closest .nextsim-tab-container',
             'position',
             false
@@ -326,7 +326,7 @@ class TableViewSwitcherTest extends TestCase
         $result = $switcher->renderTabs();
 
         $this->assertStringNotContainsString('hx-push-url', $result);
-        $this->assertStringContainsString('hx-get="modules.php?name=DepthChartEntry&amp;op=nextsim-api&amp;teamID=1&amp;position=PG"', $result);
+        $this->assertStringContainsString('hx-get="modules.php?name=DepthChartEntry&amp;op=nextsim-api&amp;teamid=1&amp;position=PG"', $result);
         $this->assertStringContainsString('hx-target="closest .nextsim-tab-container"', $result);
     }
 
@@ -338,7 +338,7 @@ class TableViewSwitcherTest extends TestCase
             'modules.php?name=NextSim',
             'FF0000',
             '0000FF',
-            'modules.php?name=DepthChartEntry&op=nextsim-api&teamID=1',
+            'modules.php?name=DepthChartEntry&op=nextsim-api&teamid=1',
             'closest .nextsim-tab-container',
             'position'
         );
@@ -348,6 +348,6 @@ class TableViewSwitcherTest extends TestCase
         $this->assertStringContainsString('&amp;position=PG"', $result);
         $this->assertStringContainsString('&amp;position=SG"', $result);
         // hx-get should use position param, not display param
-        $this->assertStringNotContainsString('hx-get="modules.php?name=DepthChartEntry&amp;op=nextsim-api&amp;teamID=1&amp;display=', $result);
+        $this->assertStringNotContainsString('hx-get="modules.php?name=DepthChartEntry&amp;op=nextsim-api&amp;teamid=1&amp;display=', $result);
     }
 }

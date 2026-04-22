@@ -106,8 +106,8 @@ class LeagueScheduleRepositoryTest extends DatabaseTestCase
         $records = $this->repo->getTeamRecords();
 
         self::assertIsArray($records);
-        foreach ($records as $tid => $record) {
-            self::assertIsInt($tid);
+        foreach ($records as $teamid => $record) {
+            self::assertIsInt($teamid);
             self::assertIsString($record);
             break;
         }

@@ -55,8 +55,8 @@ class WaiversService implements WaiversServiceInterface
         $tableData = $this->getTableResultAndStyle($team, $season, $action);
         $players = $this->buildPlayerOptions($tableData['tableResult'], $action, $season);
 
-        $openRosterSpots = 15 - count($this->teamQueryRepo->getHealthyAndInjuredPlayersOrderedByName($team->teamID, $season));
-        $healthyOpenRosterSpots = 15 - count($this->teamQueryRepo->getHealthyPlayersOrderedByName($team->teamID, $season));
+        $openRosterSpots = 15 - count($this->teamQueryRepo->getHealthyAndInjuredPlayersOrderedByName($team->teamid, $season));
+        $healthyOpenRosterSpots = 15 - count($this->teamQueryRepo->getHealthyPlayersOrderedByName($team->teamid, $season));
 
         return [
             'team' => $team,
@@ -115,7 +115,7 @@ class WaiversService implements WaiversServiceInterface
 
         if ($action === 'waive') {
             return [
-                'tableResult' => $this->teamQueryRepo->getHealthyAndInjuredPlayersOrderedByName($team->teamID, $season),
+                'tableResult' => $this->teamQueryRepo->getHealthyAndInjuredPlayersOrderedByName($team->teamid, $season),
                 'styleTeam' => $team,
             ];
         }

@@ -464,7 +464,7 @@ class FreeAgencyAdminProcessorTest extends TestCase
             'nickname' => null,
             'age' => 25,
             'peak' => 28,
-            'tid' => 0,
+            'teamid' => 0,
             'pos' => 'PF',
             'sta' => 5,
             'oo' => 50, 'od' => 50, 'r_drive_off' => 50, 'dd' => 50,
@@ -484,9 +484,9 @@ class FreeAgencyAdminProcessorTest extends TestCase
             'stats_fgm' => 0, 'stats_fga' => 0, 'stats_ftm' => 0, 'stats_fta' => 0,
             'stats_3gm' => 0, 'stats_3ga' => 0,
             'stats_orb' => 0, 'stats_drb' => 0, 'stats_ast' => 0,
-            'stats_stl' => 0, 'stats_to' => 0, 'stats_blk' => 0, 'stats_pf' => 0,
+            'stats_stl' => 0, 'stats_tvr' => 0, 'stats_blk' => 0, 'stats_pf' => 0,
             'r_fga' => 50, 'r_fgp' => 50, 'r_fta' => 50, 'r_ftp' => 50,
-            'r_tga' => 50, 'r_tgp' => 50, 'r_orb' => 50, 'r_drb' => 50,
+            'r_3ga' => 50, 'r_3gp' => 50, 'r_orb' => 50, 'r_drb' => 50,
             'r_ast' => 50, 'r_stl' => 50, 'r_tvr' => 50, 'r_blk' => 50, 'r_foul' => 50,
             'draftround' => 1, 'draftedby' => 'MIA', 'draftedbycurrentname' => 'Miami',
             'draftyear' => 2020, 'draftpickno' => 1,
@@ -500,7 +500,7 @@ class FreeAgencyAdminProcessorTest extends TestCase
             'cp_pts' => 0, 'cp_reb' => 0, 'cp_ast' => 0, 'cp_stl' => 0, 'cp_blk' => 0,
             'car_gm' => 0, 'car_min' => 0,
             'car_fgm' => 0, 'car_fga' => 0, 'car_ftm' => 0, 'car_fta' => 0,
-            'car_tgm' => 0, 'car_tga' => 0,
+            'car_tgm' => 0, 'car_3ga' => 0,
             'car_orb' => 0, 'car_drb' => 0, 'car_reb' => 0,
             'car_ast' => 0, 'car_stl' => 0, 'car_to' => 0, 'car_blk' => 0,
             'car_pf' => 0, 'car_pts' => 0,
@@ -550,13 +550,13 @@ class FreeAgencyAdminProcessorTest extends TestCase
     }
 
     /**
-     * @return array{name: string, pid: int, team: string, tid: int, offer1: int, offer2: int, offer3: int, offer4: int, offer5: int, offer6: int, bird: int, MLE: int, LLE: int, random: int, perceivedvalue: float}
+     * @return array{name: string, pid: int, team: string, teamid: int, offer1: int, offer2: int, offer3: int, offer4: int, offer5: int, offer6: int, bird: int, MLE: int, LLE: int, random: int, perceivedvalue: float}
      */
     private function makeOfferRow(
         string $name,
         int $pid,
         string $team,
-        int $tid,
+        int $teamid,
         int $offer1,
         int $offer2,
         int $offer3,
@@ -573,7 +573,7 @@ class FreeAgencyAdminProcessorTest extends TestCase
             'name' => $name,
             'pid' => $pid,
             'team' => $team,
-            'tid' => $tid,
+            'teamid' => $teamid,
             'offer1' => $offer1,
             'offer2' => $offer2,
             'offer3' => $offer3,

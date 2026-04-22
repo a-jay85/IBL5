@@ -50,7 +50,7 @@ class PlayerRepository extends BaseMysqliRepository implements PlayerRepositoryI
         $plrRow = $this->fetchOne(
             "SELECT p.*, t.team_name AS teamname, t.color1, t.color2
              FROM ibl_plr p
-             LEFT JOIN ibl_team_info t ON p.tid = t.teamid
+             LEFT JOIN ibl_team_info t ON p.teamid = t.teamid
              WHERE p.pid = ? LIMIT 1",
             "i",
             $playerID
@@ -108,7 +108,7 @@ class PlayerRepository extends BaseMysqliRepository implements PlayerRepositoryI
         $playerData->name = stripslashes($plrRow['name']);
         $playerData->nickname = $this->getOptionalStrippedValue($plrRow, 'nickname');
         $playerData->age = $plrRow['age'];
-        $playerData->teamID = $plrRow['tid'];
+        $playerData->teamid = $plrRow['teamid'];
         $playerData->teamName = isset($plrRow['teamname']) ? stripslashes($plrRow['teamname']) : null;
         /** @var string|null $color1 */
         $color1 = $plrRow['color1'] ?? null;
@@ -130,8 +130,8 @@ class PlayerRepository extends BaseMysqliRepository implements PlayerRepositoryI
         $playerData->ratingFieldGoalPercentage = $plrRow['r_fgp'];
         $playerData->ratingFreeThrowAttempts = $plrRow['r_fta'];
         $playerData->ratingFreeThrowPercentage = $plrRow['r_ftp'];
-        $playerData->ratingThreePointAttempts = $plrRow['r_tga'];
-        $playerData->ratingThreePointPercentage = $plrRow['r_tgp'];
+        $playerData->ratingThreePointAttempts = $plrRow['r_3ga'];
+        $playerData->ratingThreePointPercentage = $plrRow['r_3gp'];
         $playerData->ratingOffensiveRebounds = $plrRow['r_orb'];
         $playerData->ratingDefensiveRebounds = $plrRow['r_drb'];
         $playerData->ratingAssists = $plrRow['r_ast'];
@@ -259,7 +259,7 @@ class PlayerRepository extends BaseMysqliRepository implements PlayerRepositoryI
         $playerData->name = $name !== null ? stripslashes($name) : null;
         $team = $plrRow['team'] ?? null;
         $playerData->teamName = $team !== null ? stripslashes($team) : null;
-        $playerData->teamID = $plrRow['teamid'] ?? null;
+        $playerData->teamid = $plrRow['teamid'] ?? null;
 
         // Ratings from historical row (note different column names)
         $this->mapRatingsFromHistoricalRow($playerData, $plrRow);
@@ -493,7 +493,7 @@ class PlayerRepository extends BaseMysqliRepository implements PlayerRepositoryI
             CAST(SUM(bs.calc_points) AS SIGNED) AS pts
         FROM ibl_box_scores bs
         JOIN ibl_plr p ON bs.pid = p.pid
-        JOIN ibl_franchise_seasons fs ON bs.teamID = fs.franchise_id
+        JOIN ibl_franchise_seasons fs ON bs.teamid = fs.franchise_id
             AND bs.season_year = fs.season_ending_year
         WHERE bs.game_type = {$gameType} AND p.name = ?
         GROUP BY bs.pid, p.name, bs.season_year, fs.team_name

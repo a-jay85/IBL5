@@ -50,7 +50,7 @@ class WaiversRepository extends BaseMysqliRepository implements WaiversRepositor
      */
     public function signPlayerFromWaivers(int $playerID, array $team, array $contractData): bool
     {
-        $teamID = $team['teamid'];
+        $teamid = $team['teamid'];
 
         try {
             if (!$contractData['hasExistingContract']) {
@@ -59,16 +59,16 @@ class WaiversRepository extends BaseMysqliRepository implements WaiversRepositor
                 $query = "UPDATE ibl_plr
                           SET `ordinal` = '800', `bird` = 0, `cy` = 0, `cyt` = 1,
                               `cy1` = ?, `cy2` = 0, `cy3` = 0, `cy4` = 0, `cy5` = 0,
-                              `cy6` = 0, `tid` = ?, `droptime` = 0
+                              `cy6` = 0, `teamid` = ?, `droptime` = 0
                           WHERE `pid` = ? LIMIT 1";
-                $affectedRows = $this->execute($query, 'iii', $salary, $teamID, $playerID);
+                $affectedRows = $this->execute($query, 'iii', $salary, $teamid, $playerID);
             } else {
                 // Keep existing contract
                 $query = "UPDATE ibl_plr
-                          SET `ordinal` = '800', `bird` = 0, `tid` = ?,
+                          SET `ordinal` = '800', `bird` = 0, `teamid` = ?,
                               `droptime` = 0
                           WHERE `pid` = ? LIMIT 1";
-                $affectedRows = $this->execute($query, 'ii', $teamID, $playerID);
+                $affectedRows = $this->execute($query, 'ii', $teamid, $playerID);
             }
 
             return $affectedRows > 0;

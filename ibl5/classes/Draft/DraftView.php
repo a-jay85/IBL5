@@ -34,12 +34,12 @@ class DraftView implements DraftViewInterface
      *
      * @param list<DraftClassPlayerRow> $players
      */
-    public function renderDraftInterface(array $players, string $teamLogo, ?string $pickOwner, ?int $draftRound, ?int $draftPick, int $seasonYear, int $tid): string
+    public function renderDraftInterface(array $players, string $teamLogo, ?string $pickOwner, ?int $draftRound, ?int $draftPick, int $seasonYear, int $teamid): string
     {
         $html = '';
         $html .= '<div class="draft-container">';
         $html .= '<h2 class="ibl-title">Draft</h2>';
-        $html .= '<img src="images/logo/' . $tid . '.jpg" alt="Team Logo" class="team-logo-banner">';
+        $html .= '<img src="images/logo/' . $teamid . '.jpg" alt="Team Logo" class="team-logo-banner">';
 
         $html .= "<form name='draft_form' action='/ibl5/modules/Draft/draft_selection.php' method='POST'>";
         $safeTeamLogo = HtmlSanitizer::safeHtmlOutput($teamLogo);
@@ -143,8 +143,8 @@ class DraftView implements DraftViewInterface
             <td>' . (int) $player['fgp'] . '</td>
             <td>' . (int) $player['fta'] . '</td>
             <td>' . (int) $player['ftp'] . '</td>
-            <td>' . (int) $player['tga'] . '</td>
-            <td>' . (int) $player['tgp'] . '</td>
+            <td>' . (int) $player['r_3ga'] . '</td>
+            <td>' . (int) $player['r_3gp'] . '</td>
             <td>' . (int) $player['orb'] . '</td>
             <td>' . (int) $player['drb'] . '</td>
             <td>' . (int) $player['ast'] . '</td>

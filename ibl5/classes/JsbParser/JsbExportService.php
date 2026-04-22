@@ -28,7 +28,7 @@ class JsbExportService implements JsbExportServiceInterface
      * @var array<string, string>
      */
     private const DB_TO_PLR_FIELD_MAP = [
-        'tid' => 'tid',
+        'teamid' => 'teamid',
         'bird' => 'bird',
         'cy' => 'cy',
         'cyt' => 'cyt',
@@ -231,7 +231,7 @@ class JsbExportService implements JsbExportServiceInterface
      * Compare database values to file values and build change set.
      *
      * @param string $line The current player record from the .plr file
-     * @param array{pid: int, name: string, tid: int, bird: int, cy: int, cyt: int, cy1: int, cy2: int, cy3: int, cy4: int, cy5: int, cy6: int, fa_signing_flag: int} $dbPlayer
+     * @param array{pid: int, name: string, teamid: int, bird: int, cy: int, cyt: int, cy1: int, cy2: int, cy3: int, cy4: int, cy5: int, cy6: int, fa_signing_flag: int} $dbPlayer
      * @return array<string, int> Map of PlrFileWriter field name → new value (only fields that differ)
      */
     private function buildChangeSet(string $line, array $dbPlayer): array

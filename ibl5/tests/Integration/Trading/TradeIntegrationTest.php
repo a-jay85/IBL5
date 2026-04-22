@@ -60,8 +60,8 @@ class TradeIntegrationTest extends IntegrationTestCase
             ['itemid' => 1002, 'itemtype' => '1', 'trade_from' => 'Celtics', 'trade_to' => 'Lakers'],
         ]);
         $this->mockDb->setMockData([
-            ['pid' => 1001, 'pos' => 'PG', 'name' => 'Player One', 'tid' => 1],
-            ['pid' => 1002, 'pos' => 'SG', 'name' => 'Player Two', 'tid' => 2],
+            ['pid' => 1001, 'pos' => 'PG', 'name' => 'Player One', 'teamid' => 1],
+            ['pid' => 1002, 'pos' => 'SG', 'name' => 'Player Two', 'teamid' => 2],
         ]);
 
         // Act
@@ -101,9 +101,9 @@ class TradeIntegrationTest extends IntegrationTestCase
         $expectedText = "The Bulls send SF Michael Jordan to the Heat.";
         $this->assertStringContainsString($expectedText, $result['storytext']);
 
-        // Verify UPDATE query sets tid
+        // Verify UPDATE query sets teamid
         $this->assertQueryExecuted('UPDATE ibl_plr');
-        $this->assertQueryExecuted('tid');
+        $this->assertQueryExecuted('teamid');
     }
 
     // ========== DRAFT PICK TRANSFER SCENARIOS ==========
@@ -405,8 +405,8 @@ class TradeIntegrationTest extends IntegrationTestCase
             ['itemid' => 2002, 'itemtype' => '1', 'trade_from' => 'Pacers', 'trade_to' => 'Hawks'],
         ]);
         $this->mockDb->setMockData([
-            ['pid' => 2001, 'pos' => 'PF', 'name' => 'Dominique Wilkins', 'tid' => 3],
-            ['pid' => 2002, 'pos' => 'SG', 'name' => 'Reggie Miller', 'tid' => 4],
+            ['pid' => 2001, 'pos' => 'PF', 'name' => 'Dominique Wilkins', 'teamid' => 3],
+            ['pid' => 2002, 'pos' => 'SG', 'name' => 'Reggie Miller', 'teamid' => 4],
         ]);
 
         // Act
@@ -419,8 +419,8 @@ class TradeIntegrationTest extends IntegrationTestCase
         $updateCount = $this->countQueriesMatching('UPDATE ibl_plr');
         $this->assertGreaterThanOrEqual(2, $updateCount, 'Should execute at least 2 UPDATE ibl_plr queries');
 
-        // Verify that the UPDATE queries set tid
-        $this->assertQueryExecuted('tid');
+        // Verify that the UPDATE queries set teamid
+        $this->assertQueryExecuted('teamid');
     }
 
     // ========== PICK-FOR-PICK TRANSFER ==========
@@ -559,8 +559,8 @@ class TradeIntegrationTest extends IntegrationTestCase
             ['itemid' => 7001, 'itemtype' => '0', 'trade_from' => 'Pistons', 'trade_to' => 'Bucks'],
         ]);
         $this->mockDb->setMockData([
-            ['pid' => 6001, 'pos' => 'PF', 'name' => 'Giannis Antetokounmpo', 'tid' => 5],
-            ['pid' => 6002, 'pos' => 'C', 'name' => 'Jalen Duren', 'tid' => 6],
+            ['pid' => 6001, 'pos' => 'PF', 'name' => 'Giannis Antetokounmpo', 'teamid' => 5],
+            ['pid' => 6002, 'pos' => 'C', 'name' => 'Jalen Duren', 'teamid' => 6],
             [
                 'pickid' => 7001,
                 'year' => 2026,
@@ -605,8 +605,8 @@ class TradeIntegrationTest extends IntegrationTestCase
             ['itemid' => 8002, 'itemtype' => '1', 'trade_from' => 'Pelicans', 'trade_to' => 'Grizzlies'],
         ]);
         $this->mockDb->setMockData([
-            ['pid' => 8001, 'pos' => 'PG', 'name' => 'Ja Morant', 'tid' => 7],
-            ['pid' => 8002, 'pos' => 'SF', 'name' => 'Brandon Ingram', 'tid' => 8],
+            ['pid' => 8001, 'pos' => 'PG', 'name' => 'Ja Morant', 'teamid' => 7],
+            ['pid' => 8002, 'pos' => 'SF', 'name' => 'Brandon Ingram', 'teamid' => 8],
         ]);
 
         // Act

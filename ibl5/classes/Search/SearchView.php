@@ -368,7 +368,7 @@ class SearchView implements SearchViewInterface
         $output = '<div class="search-results__list">';
 
         foreach ($results as $index => $result) {
-            $tid = $result['tid'];
+            $teamid = $result['teamid'];
             $sid = $result['sid'];
             $subject = HtmlSanitizer::safeHtmlOutput($result['subject']);
             $date = $this->nukeCompat->formatLocalTime($result['date']);
@@ -379,7 +379,7 @@ class SearchView implements SearchViewInterface
 
             $output .= '<div class="search-result" style="animation-delay: ' . $delay . 'ms">';
             $output .= '<div class="search-result__header">';
-            $output .= '<a href="modules.php?name=News&amp;file=article&amp;thold=-1&amp;mode=flat&amp;order=1&amp;sid=' . $sid . '#' . $tid . '" class="search-result__title">' . $subject . '</a>';
+            $output .= '<a href="modules.php?name=News&amp;file=article&amp;thold=-1&amp;mode=flat&amp;order=1&amp;sid=' . $sid . '#' . $teamid . '" class="search-result__title">' . $subject . '</a>';
             $output .= '</div>';
 
             $output .= '<div class="search-result__meta">';

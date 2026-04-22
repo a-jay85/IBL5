@@ -15,8 +15,8 @@ use Season\Season;
  *
  * @phpstan-import-type PlayerRow from \Services\CommonMysqliRepository
  * @phpstan-import-type CashConsiderationRow from \Trading\Contracts\CashConsiderationRepositoryInterface
- * @phpstan-type DraftPickRow array{pickid: int, ownerofpick: string, owner_tid: int, teampick: string, teampick_tid: int, year: string, round: string, notes: ?string, created_at: string, updated_at: string}
- * @phpstan-type FreeAgencyOfferRow array{pid: int, tid: int, team: string, name: string, offer1: int, offer2: int, offer3: int, offer4: int, offer5: int, offer6: int, ...}
+ * @phpstan-type DraftPickRow array{pickid: int, ownerofpick: string, owner_teamid: int, teampick: string, teampick_teamid: int, year: string, round: string, notes: ?string, created_at: string, updated_at: string}
+ * @phpstan-type FreeAgencyOfferRow array{pid: int, teamid: int, team: string, name: string, offer1: int, offer2: int, offer3: int, offer4: int, offer5: int, offer6: int, ...}
  */
 interface TeamQueryRepositoryInterface
 {

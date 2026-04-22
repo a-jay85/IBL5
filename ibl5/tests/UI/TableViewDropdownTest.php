@@ -157,7 +157,7 @@ class TableViewDropdownTest extends TestCase
         $dropdown = $this->createDropdownWithHtmx();
         $html = $dropdown->renderDropdown();
 
-        $this->assertStringContainsString('hx-get="modules.php?name=Team&amp;op=api&amp;teamID=1"', $html);
+        $this->assertStringContainsString('hx-get="modules.php?name=Team&amp;op=api&amp;teamid=1"', $html);
         $this->assertStringContainsString('hx-target="closest .table-scroll-container"', $html);
         $this->assertStringContainsString('hx-swap="innerHTML"', $html);
         $this->assertStringContainsString('hx-trigger="change"', $html);
@@ -220,7 +220,7 @@ class TableViewDropdownTest extends TestCase
             '/team.php?id=1',
             'FF0000',
             '0000FF',
-            'modules.php?name=Team&op=api&teamID=1'
+            'modules.php?name=Team&op=api&teamid=1'
         );
     }
 }

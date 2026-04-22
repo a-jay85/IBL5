@@ -122,8 +122,8 @@ class BoxscoreRepositoryTest extends DatabaseTestCase
             'Date' => '2025-02-15',
             'name' => 'Team West',
             'gameOfThatDay' => 1,
-            'visitorTeamID' => 50,
-            'homeTeamID' => 51,
+            'visitor_teamid' => 50,
+            'home_teamid' => 51,
             'attendance' => 20000,
             'capacity' => 20000,
             'visitorWins' => 0,
@@ -158,8 +158,8 @@ class BoxscoreRepositoryTest extends DatabaseTestCase
             'Date' => '2025-02-15',
             'name' => 'Team East',
             'gameOfThatDay' => 1,
-            'visitorTeamID' => 50,
-            'homeTeamID' => 51,
+            'visitor_teamid' => 50,
+            'home_teamid' => 51,
             'attendance' => 20000,
             'capacity' => 20000,
             'visitorWins' => 0,
@@ -211,8 +211,8 @@ class BoxscoreRepositoryTest extends DatabaseTestCase
             'Date' => '2025-02-16',
             'name' => 'Team Away',
             'gameOfThatDay' => 1,
-            'visitorTeamID' => 50,
-            'homeTeamID' => 51,
+            'visitor_teamid' => 50,
+            'home_teamid' => 51,
             'attendance' => 20000,
             'capacity' => 20000,
             'visitorWins' => 0,
@@ -263,7 +263,7 @@ class BoxscoreRepositoryTest extends DatabaseTestCase
 
     public function testHasNullTeamIdReturnsFalseWhenAllHaveTeamId(): void
     {
-        $this->insertTestPlayer(200010030, 'BS NullTid', ['tid' => 1]);
+        $this->insertTestPlayer(200010030, 'BS NullTid', ['teamid' => 1]);
         $this->insertPlayerBoxscoreRow(
             '2025-04-01', 200010030, 'BS NullTid', 'PG', 2, 1, 1
         );
@@ -276,17 +276,17 @@ class BoxscoreRepositoryTest extends DatabaseTestCase
     public function testHasNullTeamIdReturnsTrueWhenNullExists(): void
     {
         // Create the player first (FK constraint requires it)
-        $this->insertTestPlayer(200010031, 'BS NullTidPlr', ['tid' => 1]);
+        $this->insertTestPlayer(200010031, 'BS NullTidPlr', ['teamid' => 1]);
 
-        // Insert a player boxscore with NULL teamID manually
+        // Insert a player boxscore with NULL teamid manually
         $this->insertRow('ibl_box_scores', [
             'Date' => '2025-04-02',
             'name' => 'BS NullTidPlr',
             'pos' => 'PG',
             'pid' => 200010031,
-            'visitorTID' => 2,
-            'homeTID' => 1,
-            // teamID intentionally omitted — will be NULL
+            'visitor_teamid' => 2,
+            'home_teamid' => 1,
+            // teamid intentionally omitted — will be NULL
             'gameMIN' => 30,
             'game2GM' => 5,
             'game2GA' => 10,
@@ -331,8 +331,8 @@ class BoxscoreRepositoryTest extends DatabaseTestCase
             'Date' => '2025-02-20',
             'name' => 'Team Away',
             'gameOfThatDay' => 1,
-            'visitorTeamID' => 50,
-            'homeTeamID' => 51,
+            'visitor_teamid' => 50,
+            'home_teamid' => 51,
             'attendance' => 20000, 'capacity' => 20000,
             'visitorWins' => 0, 'visitorLosses' => 0, 'homeWins' => 0, 'homeLosses' => 0,
             'visitorQ1points' => 25, 'visitorQ2points' => 25, 'visitorQ3points' => 25, 'visitorQ4points' => 25, 'visitorOTpoints' => 0,
@@ -352,7 +352,7 @@ class BoxscoreRepositoryTest extends DatabaseTestCase
         self::assertNotEmpty($matching);
         $first = array_values($matching)[0];
         self::assertSame('Team Away', $first['name']);
-        self::assertSame(50, $first['visitorTeamID']);
+        self::assertSame(50, $first['visitor_teamid']);
     }
 
     public function testFindAllStarGamesWithDefaultNamesExcludesRenamedTeams(): void
@@ -361,8 +361,8 @@ class BoxscoreRepositoryTest extends DatabaseTestCase
             'Date' => '2025-02-21',
             'name' => 'Team LeBron',
             'gameOfThatDay' => 1,
-            'visitorTeamID' => 50,
-            'homeTeamID' => 51,
+            'visitor_teamid' => 50,
+            'home_teamid' => 51,
             'attendance' => 20000, 'capacity' => 20000,
             'visitorWins' => 0, 'visitorLosses' => 0, 'homeWins' => 0, 'homeLosses' => 0,
             'visitorQ1points' => 25, 'visitorQ2points' => 25, 'visitorQ3points' => 25, 'visitorQ4points' => 25, 'visitorOTpoints' => 0,
@@ -386,16 +386,16 @@ class BoxscoreRepositoryTest extends DatabaseTestCase
 
     public function testGetPlayersForAllStarTeamReturnsPlayerNames(): void
     {
-        $this->insertTestPlayer(200010032, 'BS AllStar PG', ['tid' => 50]);
+        $this->insertTestPlayer(200010032, 'BS AllStar PG', ['teamid' => 50]);
 
         $this->insertRow('ibl_box_scores', [
             'Date' => '2025-02-22',
             'name' => 'BS AllStar PG',
             'pos' => 'PG',
             'pid' => 200010032,
-            'visitorTID' => 50,
-            'homeTID' => 51,
-            'teamID' => 50,
+            'visitor_teamid' => 50,
+            'home_teamid' => 51,
+            'teamid' => 50,
             'gameMIN' => 25, 'game2GM' => 4, 'game2GA' => 8, 'gameFTM' => 2, 'gameFTA' => 3,
             'game3GM' => 1, 'game3GA' => 3, 'gameORB' => 1, 'gameDRB' => 3,
             'gameAST' => 5, 'gameSTL' => 1, 'gameTOV' => 1, 'gameBLK' => 0, 'gamePF' => 2,

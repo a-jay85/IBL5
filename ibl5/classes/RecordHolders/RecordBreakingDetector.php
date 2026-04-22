@@ -140,7 +140,7 @@ class RecordBreakingDetector implements RecordBreakingDetectorInterface
     /**
      * Detect broken/tied player single-game records from the top entries.
      *
-     * @param list<array{pid: int, name: string, tid: int, team_name: string, date: string, BoxID: int, gameOfThatDay: int, oppTid: int, opp_team_name: string, value: int}> $topRecords
+     * @param list<array{pid: int, name: string, teamid: int, team_name: string, date: string, BoxID: int, gameOfThatDay: int, oppTid: int, opp_team_name: string, value: int}> $topRecords
      * @param array<string, int> $targetDates
      * @return list<string>
      */
@@ -186,7 +186,7 @@ class RecordBreakingDetector implements RecordBreakingDetectorInterface
     /**
      * Detect broken/tied team single-game records from the top entries.
      *
-     * @param list<array{tid: int, team_name: string, date: string, BoxID: int, gameOfThatDay: int, oppTid: int, opp_team_name: string, value: int}> $topRecords
+     * @param list<array{teamid: int, team_name: string, date: string, BoxID: int, gameOfThatDay: int, oppTid: int, opp_team_name: string, value: int}> $topRecords
      * @param array<string, int> $targetDates
      * @return list<string>
      */
@@ -276,7 +276,7 @@ class RecordBreakingDetector implements RecordBreakingDetectorInterface
     /**
      * Find the previous player record holder (best entry NOT from any target date).
      *
-     * @param list<array{pid: int, name: string, tid: int, team_name: string, date: string, BoxID: int, gameOfThatDay: int, oppTid: int, opp_team_name: string, value: int}> $records
+     * @param list<array{pid: int, name: string, teamid: int, team_name: string, date: string, BoxID: int, gameOfThatDay: int, oppTid: int, opp_team_name: string, value: int}> $records
      * @param array<string, int> $targetDates
      * @return array{name: string, value: int}|null
      */
@@ -293,7 +293,7 @@ class RecordBreakingDetector implements RecordBreakingDetectorInterface
     /**
      * Find the previous team record holder (best entry NOT from any target date).
      *
-     * @param list<array{tid: int, team_name: string, date: string, BoxID: int, gameOfThatDay: int, oppTid: int, opp_team_name: string, value: int}> $records
+     * @param list<array{teamid: int, team_name: string, date: string, BoxID: int, gameOfThatDay: int, oppTid: int, opp_team_name: string, value: int}> $records
      * @param array<string, int> $targetDates
      * @return array{team_name: string, value: int}|null
      */

@@ -106,7 +106,7 @@ class ContractListViewTest extends TestCase
 
     /**
      * @param array<string, mixed> $overrides
-     * @return array{contracts: list<array{pid: int, name: string, pos: string, teamname: string, tid: int, team_city: string, color1: string, color2: string, bird: string, con1: int, con2: int, con3: int, con4: int, con5: int, con6: int}>, capTotals: array{cap1: float, cap2: float, cap3: float, cap4: float, cap5: float, cap6: float}, avgCaps: array{acap1: float, acap2: float, acap3: float, acap4: float, acap5: float, acap6: float}}
+     * @return array{contracts: list<array{pid: int, name: string, pos: string, teamname: string, teamid: int, team_city: string, color1: string, color2: string, bird: string, con1: int, con2: int, con3: int, con4: int, con5: int, con6: int}>, capTotals: array{cap1: float, cap2: float, cap3: float, cap4: float, cap5: float, cap6: float}, avgCaps: array{acap1: float, acap2: float, acap3: float, acap4: float, acap5: float, acap6: float}}
      */
     private static function createRenderData(array $overrides = []): array
     {
@@ -116,22 +116,22 @@ class ContractListViewTest extends TestCase
             'avgCaps' => ['acap1' => 0.0, 'acap2' => 0.0, 'acap3' => 0.0, 'acap4' => 0.0, 'acap5' => 0.0, 'acap6' => 0.0],
         ];
 
-        /** @var array{contracts: list<array{pid: int, name: string, pos: string, teamname: string, tid: int, team_city: string, color1: string, color2: string, bird: string, con1: int, con2: int, con3: int, con4: int, con5: int, con6: int}>, capTotals: array{cap1: float, cap2: float, cap3: float, cap4: float, cap5: float, cap6: float}, avgCaps: array{acap1: float, acap2: float, acap3: float, acap4: float, acap5: float, acap6: float}} */
+        /** @var array{contracts: list<array{pid: int, name: string, pos: string, teamname: string, teamid: int, team_city: string, color1: string, color2: string, bird: string, con1: int, con2: int, con3: int, con4: int, con5: int, con6: int}>, capTotals: array{cap1: float, cap2: float, cap3: float, cap4: float, cap5: float, cap6: float}, avgCaps: array{acap1: float, acap2: float, acap3: float, acap4: float, acap5: float, acap6: float}} */
         return array_merge($defaults, $overrides);
     }
 
     /**
-     * @return array{pid: int, name: string, pos: string, teamname: string, tid: int, team_city: string, color1: string, color2: string, bird: string, con1: int, con2: int, con3: int, con4: int, con5: int, con6: int}
+     * @return array{pid: int, name: string, pos: string, teamname: string, teamid: int, team_city: string, color1: string, color2: string, bird: string, con1: int, con2: int, con3: int, con4: int, con5: int, con6: int}
      */
     private static function createContract(array $overrides = []): array
     {
-        /** @var array{pid: int, name: string, pos: string, teamname: string, tid: int, team_city: string, color1: string, color2: string, bird: string, con1: int, con2: int, con3: int, con4: int, con5: int, con6: int} */
+        /** @var array{pid: int, name: string, pos: string, teamname: string, teamid: int, team_city: string, color1: string, color2: string, bird: string, con1: int, con2: int, con3: int, con4: int, con5: int, con6: int} */
         return array_merge([
             'pid' => 1,
             'name' => 'Test Player',
             'pos' => 'G',
             'teamname' => 'Hawks',
-            'tid' => 1,
+            'teamid' => 1,
             'team_city' => 'Atlanta',
             'color1' => 'FF0000',
             'color2' => '000000',

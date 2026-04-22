@@ -24,14 +24,14 @@ class PlayerRepositoryTest extends DatabaseTestCase
         $this->insertTestPlayer(200010002, 'PLR LoadTest', [
             'age' => 25,
             'pos' => 'SF',
-            'tid' => 1,
+            'teamid' => 1,
         ]);
 
         $player = $this->repo->loadByID(200010002);
 
         self::assertSame(200010002, $player->playerID);
         self::assertSame('PLR LoadTest', $player->name);
-        self::assertSame(1, $player->teamID);
+        self::assertSame(1, $player->teamid);
         self::assertSame('Metros', $player->teamName);
         self::assertSame('SF', $player->position);
         self::assertSame(25, $player->age);
@@ -48,7 +48,7 @@ class PlayerRepositoryTest extends DatabaseTestCase
     public function testGetPlayerStatsReturnsRowWithNativeTypes(): void
     {
         $this->insertTestPlayer(200010003, 'PLR StatsTest', [
-            'tid' => 2,
+            'teamid' => 2,
             'pos' => 'SG',
         ]);
 
@@ -56,7 +56,7 @@ class PlayerRepositoryTest extends DatabaseTestCase
 
         self::assertNotNull($row);
         self::assertSame(200010003, $row['pid']);
-        self::assertSame(2, $row['tid']);
+        self::assertSame(2, $row['teamid']);
         self::assertSame('SG', $row['pos']);
     }
 
@@ -208,8 +208,8 @@ class PlayerRepositoryTest extends DatabaseTestCase
 
     public function testGetOneOnOneWinsReturnsWinsWithLoserPid(): void
     {
-        $this->insertTestPlayer(200010011, 'PLR WinTest', ['tid' => 1]);
-        $this->insertTestPlayer(200010012, 'PLR LoseTest', ['tid' => 2]);
+        $this->insertTestPlayer(200010011, 'PLR WinTest', ['teamid' => 1]);
+        $this->insertTestPlayer(200010012, 'PLR LoseTest', ['teamid' => 2]);
 
         $this->insertRow('ibl_one_on_one', [
             'gameid' => 900001,
@@ -232,8 +232,8 @@ class PlayerRepositoryTest extends DatabaseTestCase
 
     public function testGetOneOnOneLossesReturnsLossesWithWinnerPid(): void
     {
-        $this->insertTestPlayer(200010013, 'PLR Winner2', ['tid' => 1]);
-        $this->insertTestPlayer(200010014, 'PLR Loser2', ['tid' => 2]);
+        $this->insertTestPlayer(200010013, 'PLR Winner2', ['teamid' => 1]);
+        $this->insertTestPlayer(200010014, 'PLR Loser2', ['teamid' => 2]);
 
         $this->insertRow('ibl_one_on_one', [
             'gameid' => 900002,

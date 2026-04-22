@@ -68,7 +68,7 @@ class FreeAgencyCapCalculator
         // Add cash considerations (trades, buyouts) for the team
         // Must apply the same cy-based offset as player contracts
         $isOffseason = $this->season->isOffseasonPhase();
-        $cashRows = $this->cashConsiderationRepo->getTeamCashForSalary($this->team->teamID);
+        $cashRows = $this->cashConsiderationRepo->getTeamCashForSalary($this->team->teamid);
         foreach ($cashRows as $cashRow) {
             $cy = $cashRow['cy'] ?? 1;
             if ($isOffseason) {
@@ -179,8 +179,8 @@ class FreeAgencyCapCalculator
      */
     public function calculateTeamCapMetrics(?int $excludeOfferPid = null): array
     {
-        $rosterData = $this->teamQueryRepo->getRosterUnderContractOrderedByOrdinal($this->team->teamID);
-        $offersData = $this->teamQueryRepo->getFreeAgencyOffers($this->team->teamID);
+        $rosterData = $this->teamQueryRepo->getRosterUnderContractOrderedByOrdinal($this->team->teamid);
+        $offersData = $this->teamQueryRepo->getFreeAgencyOffers($this->team->teamid);
         
         $totalSalaries = $this->calculateTotalSalaries($rosterData, $offersData, $excludeOfferPid);
         $rosterSpots = $this->calculateRosterSpots($rosterData, $offersData, $excludeOfferPid);

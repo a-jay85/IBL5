@@ -24,7 +24,7 @@ class PlayerNameDecorator implements PlayerNameDecoratorInterface
      */
     public function getNameStatusClass(PlayerData $playerData): string
     {
-        if ($playerData->teamID === 0) {
+        if ($playerData->teamid === 0) {
             return '';
         }
 

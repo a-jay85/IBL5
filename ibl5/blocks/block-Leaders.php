@@ -17,70 +17,70 @@ $queryTopFiveInSeasonStatAverages = "SELECT *
     FROM (
         SELECT
             p.pid,
-            p.tid,
+            p.teamid,
             p.name,
             t.team_name AS teamname,
             ROUND((2 * p.stats_fgm + p.stats_ftm + p.stats_3gm) / p.stats_gm, 1) AS stat_value,
             'Points' AS stat_type,
             ROW_NUMBER() OVER (ORDER BY (2 * p.stats_fgm + p.stats_ftm + p.stats_3gm) / p.stats_gm DESC) AS rn
         FROM ibl_plr p
-        INNER JOIN ibl_team_info t ON p.tid = t.teamid
+        INNER JOIN ibl_team_info t ON p.teamid = t.teamid
         WHERE p.retired = 0 AND p.stats_gm > 0 AND p.name NOT LIKE '%Buyouts%'
 
         UNION ALL
 
         SELECT
             p.pid,
-            p.tid,
+            p.teamid,
             p.name,
             t.team_name AS teamname,
             ROUND((p.stats_orb + p.stats_drb) / p.stats_gm, 1) AS stat_value,
             'Rebounds' AS stat_type,
             ROW_NUMBER() OVER (ORDER BY (p.stats_orb + p.stats_drb) / p.stats_gm DESC) AS rn
         FROM ibl_plr p
-        INNER JOIN ibl_team_info t ON p.tid = t.teamid
+        INNER JOIN ibl_team_info t ON p.teamid = t.teamid
         WHERE p.retired = 0 AND p.stats_gm > 0 AND p.name NOT LIKE '%Buyouts%'
 
         UNION ALL
 
         SELECT
             p.pid,
-            p.tid,
+            p.teamid,
             p.name,
             t.team_name AS teamname,
             ROUND(p.stats_ast / p.stats_gm, 1) AS stat_value,
             'Assists' AS stat_type,
             ROW_NUMBER() OVER (ORDER BY p.stats_ast / p.stats_gm DESC) AS rn
         FROM ibl_plr p
-        INNER JOIN ibl_team_info t ON p.tid = t.teamid
+        INNER JOIN ibl_team_info t ON p.teamid = t.teamid
         WHERE p.retired = 0 AND p.stats_gm > 0 AND p.name NOT LIKE '%Buyouts%'
 
         UNION ALL
 
         SELECT
             p.pid,
-            p.tid,
+            p.teamid,
             p.name,
             t.team_name AS teamname,
             ROUND(p.stats_stl / p.stats_gm, 1) AS stat_value,
             'Steals' AS stat_type,
             ROW_NUMBER() OVER (ORDER BY p.stats_stl / p.stats_gm DESC) AS rn
         FROM ibl_plr p
-        INNER JOIN ibl_team_info t ON p.tid = t.teamid
+        INNER JOIN ibl_team_info t ON p.teamid = t.teamid
         WHERE p.retired = 0 AND p.stats_gm > 0 AND p.name NOT LIKE '%Buyouts%'
 
         UNION ALL
 
         SELECT
             p.pid,
-            p.tid,
+            p.teamid,
             p.name,
             t.team_name AS teamname,
             ROUND(p.stats_blk / p.stats_gm, 1) AS stat_value,
             'Blocks' AS stat_type,
             ROW_NUMBER() OVER (ORDER BY p.stats_blk / p.stats_gm DESC) AS rn
         FROM ibl_plr p
-        INNER JOIN ibl_team_info t ON p.tid = t.teamid
+        INNER JOIN ibl_team_info t ON p.teamid = t.teamid
         WHERE p.retired = 0 AND p.stats_gm > 0 AND p.name NOT LIKE '%Buyouts%'
     ) t
     WHERE rn <= 5
@@ -139,7 +139,7 @@ foreach ($categories as $index => $category) {
     // Leader (first player)
     $leader = $players[0];
     $leaderPid = $leader['pid'];
-    $leaderTid = $leader['tid'];
+    $leaderTid = $leader['teamid'];
     $leaderName = HtmlSanitizer::safeHtmlOutput($leader['name']);
     $leaderTeam = HtmlSanitizer::safeHtmlOutput($leader['teamname']);
     $leaderValue = HtmlSanitizer::safeHtmlOutput($leader['stat_value']);
@@ -157,7 +157,7 @@ foreach ($categories as $index => $category) {
     $content .= '</div>
             <div class="leaders-tabbed__leader-info">
                 <a href="modules.php?name=Player&pa=showpage&pid=' . $leaderPid . '" class="leaders-tabbed__leader-name">' . $leaderName . '</a>
-                <a href="modules.php?name=Team&op=team&teamID=' . $leaderTid . '" class="leaders-tabbed__leader-team">' . $leaderTeam . '</a>
+                <a href="modules.php?name=Team&op=team&teamid=' . $leaderTid . '" class="leaders-tabbed__leader-team">' . $leaderTeam . '</a>
             </div>
             <div class="leaders-tabbed__leader-value">' . $leaderValue . '</div>
         </div>
@@ -167,13 +167,13 @@ foreach ($categories as $index => $category) {
     for ($i = 1; $i < count($players); $i++) {
         $player = $players[$i];
         $pid = $player['pid'];
-        $tid = $player['tid'];
+        $teamid = $player['teamid'];
         $name = HtmlSanitizer::safeHtmlOutput($player['name']);
         $team = HtmlSanitizer::safeHtmlOutput($player['teamname']);
         $value = HtmlSanitizer::safeHtmlOutput($player['stat_value']);
         $rank = $i + 1;
 
-        $teamLogo = $tid ? '<img src="./' . HtmlSanitizer::safeHtmlOutput($imagesPath) . 'logo/new' . $tid . '.png" alt="' . $team . '" class="leaders-tabbed__runner-logo" loading="lazy">' : '';
+        $teamLogo = $teamid ? '<img src="./' . HtmlSanitizer::safeHtmlOutput($imagesPath) . 'logo/new' . $teamid . '.png" alt="' . $team . '" class="leaders-tabbed__runner-logo" loading="lazy">' : '';
 
         $content .= '<li class="leaders-tabbed__runner">
             <span class="leaders-tabbed__runner-rank">#' . $rank . '</span>

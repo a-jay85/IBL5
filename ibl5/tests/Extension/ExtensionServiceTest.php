@@ -271,9 +271,9 @@ class ExtensionServiceTest extends TestCase
         return array_merge([
             'pid' => 1, 'ordinal' => 1,
             'name' => 'Test Player', 'nickname' => 'Tester',
-            'age' => 25, 'tid' => 1, 'teamname' => 'Miami Cyclones', 'pos' => 'SF',
+            'age' => 25, 'teamid' => 1, 'teamname' => 'Miami Cyclones', 'pos' => 'SF',
             'r_fga' => 50, 'r_fgp' => 50, 'r_fta' => 50, 'r_ftp' => 50,
-            'r_tga' => 50, 'r_tgp' => 50, 'r_orb' => 50, 'r_drb' => 50,
+            'r_3ga' => 50, 'r_3gp' => 50, 'r_orb' => 50, 'r_drb' => 50,
             'r_ast' => 50, 'r_stl' => 50, 'r_tvr' => 50, 'r_blk' => 50,
             'r_foul' => 50,
             'oo' => 50, 'od' => 50, 'r_drive_off' => 50, 'dd' => 50,

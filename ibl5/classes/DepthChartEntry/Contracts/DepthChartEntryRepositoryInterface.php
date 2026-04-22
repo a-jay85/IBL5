@@ -24,7 +24,7 @@ interface DepthChartEntryRepositoryInterface
      * - Are on the active roster (ordinal <= WAIVERS_ORDINAL)
      * - Sorted by ordinal (draft order)
      *
-     * @param int $teamID Team ID for database query
+     * @param int $teamid Team ID for database query
      * @return list<PlayerRow>
      *
      * **Important Behaviors:**
@@ -33,7 +33,7 @@ interface DepthChartEntryRepositoryInterface
      * - Ordered by player ordinal for consistent display
      * - Team ID is cast to int for safety
      */
-    public function getPlayersOnTeam(int $teamID);
+    public function getPlayersOnTeam(int $teamid);
 
     /**
      * Update a player's depth chart configuration across all positions

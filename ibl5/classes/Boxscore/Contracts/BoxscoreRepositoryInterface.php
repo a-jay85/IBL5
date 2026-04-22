@@ -49,33 +49,33 @@ interface BoxscoreRepositoryInterface
      * Find a team boxscore by game identifiers
      *
      * @param string $date Game date in Y-m-d format
-     * @param int $visitorTeamID Visitor team ID
-     * @param int $homeTeamID Home team ID
+     * @param int $visitor_teamid Visitor team ID
+     * @param int $home_teamid Home team ID
      * @param int $gameOfThatDay Game number for that day (1 = first game, 2 = doubleheader)
      * @return array<string, mixed>|null Row with quarter point columns, or null if not found
      */
-    public function findTeamBoxscore(string $date, int $visitorTeamID, int $homeTeamID, int $gameOfThatDay): ?array;
+    public function findTeamBoxscore(string $date, int $visitor_teamid, int $home_teamid, int $gameOfThatDay): ?array;
 
     /**
      * Delete team boxscore records for a specific game
      *
      * @param string $date Game date in Y-m-d format
-     * @param int $visitorTeamID Visitor team ID
-     * @param int $homeTeamID Home team ID
+     * @param int $visitor_teamid Visitor team ID
+     * @param int $home_teamid Home team ID
      * @param int $gameOfThatDay Game number for that day
      * @return int Number of affected rows
      */
-    public function deleteTeamBoxscoresByGame(string $date, int $visitorTeamID, int $homeTeamID, int $gameOfThatDay): int;
+    public function deleteTeamBoxscoresByGame(string $date, int $visitor_teamid, int $home_teamid, int $gameOfThatDay): int;
 
     /**
      * Delete player boxscore records for a specific game
      *
      * @param string $date Game date in Y-m-d format
-     * @param int $visitorTID Visitor team ID
-     * @param int $homeTID Home team ID
+     * @param int $visitor_teamid Visitor team ID
+     * @param int $home_teamid Home team ID
      * @return int Number of affected rows
      */
-    public function deletePlayerBoxscoresByGame(string $date, int $visitorTID, int $homeTID): int;
+    public function deletePlayerBoxscoresByGame(string $date, int $visitor_teamid, int $home_teamid): int;
 
     /**
      * Insert a team boxscore row
@@ -83,8 +83,8 @@ interface BoxscoreRepositoryInterface
      * @param string $date Game date in Y-m-d format
      * @param string $name Team name from .sco file
      * @param int $gameOfThatDay Game number for that day
-     * @param int $visitorTeamID Visitor team ID
-     * @param int $homeTeamID Home team ID
+     * @param int $visitor_teamid Visitor team ID
+     * @param int $home_teamid Home team ID
      * @param int $attendance Attendance figure
      * @param int $capacity Arena capacity
      * @param int $visitorWins Visitor win count
@@ -120,8 +120,8 @@ interface BoxscoreRepositoryInterface
         string $date,
         string $name,
         int $gameOfThatDay,
-        int $visitorTeamID,
-        int $homeTeamID,
+        int $visitor_teamid,
+        int $home_teamid,
         int $attendance,
         int $capacity,
         int $visitorWins,
@@ -154,19 +154,19 @@ interface BoxscoreRepositoryInterface
     ): int;
 
     /**
-     * Check if any player boxscore records for a game have NULL teamID
+     * Check if any player boxscore records for a game have NULL teamid
      *
      * @param string $date Game date in Y-m-d format
-     * @param int $visitorTID Visitor team ID
-     * @param int $homeTID Home team ID
-     * @return bool True if at least one player record has NULL teamID
+     * @param int $visitor_teamid Visitor team ID
+     * @param int $home_teamid Home team ID
+     * @return bool True if at least one player record has NULL teamid
      */
-    public function hasNullTeamIdPlayerBoxscores(string $date, int $visitorTID, int $homeTID): bool;
+    public function hasNullTeamIdPlayerBoxscores(string $date, int $visitor_teamid, int $home_teamid): bool;
 
     /**
      * Find All-Star Game team names from existing boxscore records
      *
-     * Queries ibl_box_scores_teams for the All-Star Game (visitorTeamID=ALL_STAR_AWAY_TEAMID, homeTeamID=ALL_STAR_HOME_TEAMID)
+     * Queries ibl_box_scores_teams for the All-Star Game (visitor_teamid=ALL_STAR_AWAY_TEAMID, home_teamid=ALL_STAR_HOME_TEAMID)
      * on the given date. Returns the team names from the two team-total rows.
      *
      * @param string $date Game date in Y-m-d format
@@ -178,9 +178,9 @@ interface BoxscoreRepositoryInterface
      * Find All-Star Game team records that still have default placeholder names
      *
      * Returns rows from ibl_box_scores_teams where name is 'Team Away' or 'Team Home'
-     * and the game is an All-Star Game (visitorTeamID=ALL_STAR_AWAY_TEAMID, homeTeamID=ALL_STAR_HOME_TEAMID).
+     * and the game is an All-Star Game (visitor_teamid=ALL_STAR_AWAY_TEAMID, home_teamid=ALL_STAR_HOME_TEAMID).
      *
-     * @return list<array{id: int, Date: string, name: string, visitorTeamID: int, homeTeamID: int}>
+     * @return list<array{id: int, Date: string, name: string, visitor_teamid: int, home_teamid: int}>
      */
     public function findAllStarGamesWithDefaultNames(): array;
 
@@ -190,10 +190,10 @@ interface BoxscoreRepositoryInterface
      * Uses full names from ibl_plr (falls back to ibl_box_scores.name for team total rows).
      *
      * @param string $date Game date in Y-m-d format
-     * @param int $teamID Team ID (50 = visitor, 51 = home)
+     * @param int $teamid Team ID (50 = visitor, 51 = home)
      * @return list<string> Player names in insertion order
      */
-    public function getPlayersForAllStarTeam(string $date, int $teamID): array;
+    public function getPlayersForAllStarTeam(string $date, int $teamid): array;
 
     /**
      * Rename an All-Star team by updating the name on a team boxscore record
@@ -212,8 +212,8 @@ interface BoxscoreRepositoryInterface
      * @param string $name Player name
      * @param string $position Player position
      * @param int $playerID Player ID
-     * @param int $visitorTeamID Visitor team ID
-     * @param int $homeTeamID Home team ID
+     * @param int $visitor_teamid Visitor team ID
+     * @param int $home_teamid Home team ID
      * @param int $gameOfThatDay Game number for that date (1st, 2nd game)
      * @param int $attendance Attendance at the game
      * @param int $capacity Arena capacity
@@ -221,7 +221,7 @@ interface BoxscoreRepositoryInterface
      * @param int $visitorLosses Visitor team losses before this game
      * @param int $homeWins Home team wins before this game
      * @param int $homeLosses Home team losses before this game
-     * @param int $teamID Player's team ID (visitor or home)
+     * @param int $teamid Player's team ID (visitor or home)
      * @param int $minutesPlayed Minutes played
      * @param int $fieldGoalsMade FGM
      * @param int $fieldGoalsAttempted FGA
@@ -244,8 +244,8 @@ interface BoxscoreRepositoryInterface
         string $name,
         string $position,
         int $playerID,
-        int $visitorTeamID,
-        int $homeTeamID,
+        int $visitor_teamid,
+        int $home_teamid,
         int $gameOfThatDay,
         int $attendance,
         int $capacity,
@@ -253,7 +253,7 @@ interface BoxscoreRepositoryInterface
         int $visitorLosses,
         int $homeWins,
         int $homeLosses,
-        int $teamID,
+        int $teamid,
         int $minutesPlayed,
         int $fieldGoalsMade,
         int $fieldGoalsAttempted,

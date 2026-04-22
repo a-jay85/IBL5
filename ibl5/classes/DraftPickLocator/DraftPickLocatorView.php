@@ -156,7 +156,7 @@ class DraftPickLocatorView implements DraftPickLocatorViewInterface
 
             $escapedOwner = HtmlSanitizer::safeHtmlOutput($ownerOfPick);
             if ($ownerInfo !== null) {
-                $html .= '<a href="modules.php?name=Team&amp;op=team&amp;teamID=' . $ownerInfo['teamId'] . '" title="' . $escapedOwner . '">';
+                $html .= '<a href="modules.php?name=Team&amp;op=team&amp;teamid=' . $ownerInfo['teamId'] . '" title="' . $escapedOwner . '">';
                 $html .= '<img src="images/logo/new' . $ownerInfo['teamId'] . '.png" alt="' . $escapedOwner . '" class="draft-pick-logo" width="20" height="20" loading="lazy">';
                 $html .= '</a>';
             } else {

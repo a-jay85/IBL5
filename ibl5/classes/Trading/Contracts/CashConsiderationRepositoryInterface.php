@@ -12,10 +12,10 @@ namespace Trading\Contracts;
  *
  * @phpstan-type CashConsiderationRow = array{
  *     id: int,
- *     tid: int,
+ *     teamid: int,
  *     type: string,
  *     label: string,
- *     counterparty_tid: int|null,
+ *     counterparty_teamid: int|null,
  *     trade_offer_id: int|null,
  *     cy: int,
  *     cyt: int,
@@ -30,10 +30,10 @@ namespace Trading\Contracts;
  * }
  *
  * @phpstan-type CashConsiderationInsert = array{
- *     tid: int,
+ *     teamid: int,
  *     type: string,
  *     label: string,
- *     counterparty_tid?: int|null,
+ *     counterparty_teamid?: int|null,
  *     trade_offer_id?: int|null,
  *     cy: int,
  *     cyt: int,

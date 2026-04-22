@@ -16,7 +16,7 @@ use Team\Team;
  * @phpstan-import-type PlayerRow from \Services\CommonMysqliRepository
  *
  * @phpstan-type TeamPageData array{
- *     teamID: int,
+ *     teamid: int,
  *     team: Team,
  *     imagesPath: string,
  *     yr: ?string,
@@ -64,7 +64,7 @@ use Team\Team;
  * @phpstan-type PlayoffData array{rounds: list<PlayoffRoundData>, totalGameWins: int, totalGameLosses: int, totalSeriesWins: int, totalSeriesLosses: int}
  *
  * @phpstan-type WinLossRecord array{year: int, label: string, wins: int, losses: int, urlYear: int, isBest: bool}
- * @phpstan-type WinLossHistoryData array{records: list<WinLossRecord>, totalWins: int, totalLosses: int, teamID: int}
+ * @phpstan-type WinLossHistoryData array{records: list<WinLossRecord>, totalWins: int, totalLosses: int, teamid: int}
  *
  * @phpstan-type DraftPickItemData array{originalTeamID: int, originalTeamCity: string, originalTeamName: string, year: string, round: int|string, notes: ?string}
  */
@@ -77,12 +77,12 @@ interface TeamServiceInterface
      * via the repository, and calls private rendering helpers for sub-components
      * (tabs, table, sidebar).
      *
-     * @param int $teamID Team ID (>0 = specific team, 0 = free agents, -1 = entire league)
+     * @param int $teamid Team ID (>0 = specific team, 0 = free agents, -1 = entire league)
      * @param ?string $yr Historical year parameter (null if current season)
      * @param string $display Active display tab (e.g., 'ratings', 'contracts')
      * @param string $userTeamName Logged-in user's team name
      * @param ?string $split Split stats key (e.g. 'home', 'road', 'wins')
      * @return TeamPageData
      */
-    public function getTeamPageData(int $teamID, ?string $yr, string $display, string $userTeamName = '', ?string $split = null): array;
+    public function getTeamPageData(int $teamid, ?string $yr, string $display, string $userTeamName = '', ?string $split = null): array;
 }

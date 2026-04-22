@@ -70,7 +70,7 @@ class TradeRosterPreviewApiHandlerTest extends TestCase
 
     public function testHandleReturnsEmptyHtmlWhenTeamIDIsZero(): void
     {
-        $_GET = ['teamID' => '0'];
+        $_GET = ['teamid' => '0'];
 
         $handler = new TradeRosterPreviewApiHandler($this->mockDb);
 
@@ -85,7 +85,7 @@ class TradeRosterPreviewApiHandlerTest extends TestCase
 
     public function testHandleReturnsEmptyHtmlWhenAddPidsContainNonNumeric(): void
     {
-        $_GET = ['teamID' => '1', 'addPids' => '1,abc,3'];
+        $_GET = ['teamid' => '1', 'addPids' => '1,abc,3'];
 
         $handler = new TradeRosterPreviewApiHandler($this->mockDb);
 
@@ -100,7 +100,7 @@ class TradeRosterPreviewApiHandlerTest extends TestCase
 
     public function testHandleReturnsEmptyHtmlWhenRemovePidsContainNonNumeric(): void
     {
-        $_GET = ['teamID' => '1', 'removePids' => 'x,y'];
+        $_GET = ['teamid' => '1', 'removePids' => 'x,y'];
 
         $handler = new TradeRosterPreviewApiHandler($this->mockDb);
 
@@ -116,7 +116,7 @@ class TradeRosterPreviewApiHandlerTest extends TestCase
     public function testHandleReturnsEmptyHtmlWhenAddPidsExceedMaximum(): void
     {
         $pids = implode(',', range(1, 21));
-        $_GET = ['teamID' => '1', 'addPids' => $pids];
+        $_GET = ['teamid' => '1', 'addPids' => $pids];
 
         $handler = new TradeRosterPreviewApiHandler($this->mockDb);
 
@@ -132,7 +132,7 @@ class TradeRosterPreviewApiHandlerTest extends TestCase
     public function testHandleReturnsEmptyHtmlWhenRemovePidsExceedMaximum(): void
     {
         $pids = implode(',', range(1, 21));
-        $_GET = ['teamID' => '1', 'removePids' => $pids];
+        $_GET = ['teamid' => '1', 'removePids' => $pids];
 
         $handler = new TradeRosterPreviewApiHandler($this->mockDb);
 
@@ -147,7 +147,7 @@ class TradeRosterPreviewApiHandlerTest extends TestCase
 
     public function testHandleFallsBackToRatingsWhenDisplayMissing(): void
     {
-        $_GET = ['teamID' => '1'];
+        $_GET = ['teamid' => '1'];
 
         $handler = new TradeRosterPreviewApiHandler($this->mockDb);
 
@@ -162,7 +162,7 @@ class TradeRosterPreviewApiHandlerTest extends TestCase
 
     public function testHandleFallsBackToRatingsWhenSplitDisplayWithoutSplitParam(): void
     {
-        $_GET = ['teamID' => '1', 'display' => 'split'];
+        $_GET = ['teamid' => '1', 'display' => 'split'];
 
         $handler = new TradeRosterPreviewApiHandler($this->mockDb);
 
@@ -177,7 +177,7 @@ class TradeRosterPreviewApiHandlerTest extends TestCase
 
     public function testHandleFallsBackToRatingsForInvalidSplitKey(): void
     {
-        $_GET = ['teamID' => '1', 'display' => 'split', 'split' => 'invalid_key'];
+        $_GET = ['teamid' => '1', 'display' => 'split', 'split' => 'invalid_key'];
 
         $handler = new TradeRosterPreviewApiHandler($this->mockDb);
 
@@ -204,7 +204,7 @@ class TradeRosterPreviewApiHandlerTest extends TestCase
 
     public function testHandleAcceptsEmptyAddPids(): void
     {
-        $_GET = ['teamID' => '1', 'addPids' => '', 'removePids' => '1,2'];
+        $_GET = ['teamid' => '1', 'addPids' => '', 'removePids' => '1,2'];
 
         $handler = new TradeRosterPreviewApiHandler($this->mockDb);
 
@@ -219,7 +219,7 @@ class TradeRosterPreviewApiHandlerTest extends TestCase
 
     public function testHandleAcceptsEmptyRemovePids(): void
     {
-        $_GET = ['teamID' => '1', 'addPids' => '1,2', 'removePids' => ''];
+        $_GET = ['teamid' => '1', 'addPids' => '1,2', 'removePids' => ''];
 
         $handler = new TradeRosterPreviewApiHandler($this->mockDb);
 
@@ -235,7 +235,7 @@ class TradeRosterPreviewApiHandlerTest extends TestCase
     public function testBuildCashRowsIgnoredWhenDisplayIsNotContracts(): void
     {
         $_GET = [
-            'teamID' => '1',
+            'teamid' => '1',
             'display' => 'ratings',
             'userTeam' => 'Miami',
             'partnerTeam' => 'Boston',
@@ -259,7 +259,7 @@ class TradeRosterPreviewApiHandlerTest extends TestCase
     public function testBuildCashRowsSkippedWhenCashParamsMissing(): void
     {
         $_GET = [
-            'teamID' => '1',
+            'teamid' => '1',
             'display' => 'contracts',
         ];
 
@@ -277,7 +277,7 @@ class TradeRosterPreviewApiHandlerTest extends TestCase
     public function testBuildCashRowsSkippedWhenCashAmountsAreZero(): void
     {
         $_GET = [
-            'teamID' => '1',
+            'teamid' => '1',
             'display' => 'contracts',
             'userTeam' => 'Miami',
             'partnerTeam' => 'Boston',
@@ -302,7 +302,7 @@ class TradeRosterPreviewApiHandlerTest extends TestCase
     public function testCashAmountExceeding2000DefaultsToZero(): void
     {
         $_GET = [
-            'teamID' => '1',
+            'teamid' => '1',
             'display' => 'contracts',
             'userTeam' => 'Miami',
             'partnerTeam' => 'Boston',
@@ -327,7 +327,7 @@ class TradeRosterPreviewApiHandlerTest extends TestCase
     public function testNonNumericCashAmountDefaultsToZero(): void
     {
         $_GET = [
-            'teamID' => '1',
+            'teamid' => '1',
             'display' => 'contracts',
             'userTeam' => 'Miami',
             'partnerTeam' => 'Boston',

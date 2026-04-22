@@ -43,7 +43,7 @@ class RecordHoldersRepository extends \BaseMysqliRepository implements RecordHol
      */
     private const SEASON_YEAR_EXPRESSION = 'bs.season_year';
 
-    /** @var list<array{Date: string, visitorTeamID: int, homeTeamID: int, visitorScore: int, homeScore: int}>|null */
+    /** @var list<array{Date: string, visitor_teamid: int, home_teamid: int, visitorScore: int, homeScore: int}>|null */
     private ?array $regularSeasonGamesCache = null;
 
     /** @var array<int, string> Team ID → team name lookup cache */
@@ -71,19 +71,19 @@ class RecordHoldersRepository extends \BaseMysqliRepository implements RecordHol
     public function getQuadrupleDoubles(): array
     {
         $query = "WITH _game_of_day AS (
-                SELECT Date, visitorTeamID, homeTeamID, MIN(gameOfThatDay) AS gameOfThatDay
+                SELECT Date, visitor_teamid, home_teamid, MIN(gameOfThatDay) AS gameOfThatDay
                 FROM {$this->boxScoresTeamsTable}
-                GROUP BY Date, visitorTeamID, homeTeamID
+                GROUP BY Date, visitor_teamid, home_teamid
             )
             SELECT
                 bs.pid,
                 p.name,
-                h.teamid AS tid,
+                h.teamid AS teamid,
                 h.team AS team_name,
                 bs.Date AS `date`,
                 COALESCE(sch.BoxID, 0) AS BoxID,
                 COALESCE(bst.gameOfThatDay, 0) AS gameOfThatDay,
-                CASE WHEN h.teamid = bs.visitorTID THEN bs.homeTID ELSE bs.visitorTID END AS oppTid,
+                CASE WHEN h.teamid = bs.visitor_teamid THEN bs.home_teamid ELSE bs.visitor_teamid END AS oppTid,
                 opp.team_name AS opp_team_name,
                 bs.calc_points AS points,
                 bs.calc_rebounds AS rebounds,
@@ -94,12 +94,12 @@ class RecordHoldersRepository extends \BaseMysqliRepository implements RecordHol
             JOIN ibl_plr p ON p.pid = bs.pid
             JOIN ibl_hist h ON h.pid = bs.pid AND h.year = (" . self::SEASON_YEAR_EXPRESSION . ")
             LEFT JOIN {$this->scheduleTable} sch ON sch.Date = bs.Date
-                AND sch.Visitor = bs.visitorTID AND sch.Home = bs.homeTID
+                AND sch.Visitor = bs.visitor_teamid AND sch.Home = bs.home_teamid
             LEFT JOIN _game_of_day bst ON bst.Date = bs.Date
-                AND bst.visitorTeamID = bs.visitorTID AND bst.homeTeamID = bs.homeTID
+                AND bst.visitor_teamid = bs.visitor_teamid AND bst.home_teamid = bs.home_teamid
             LEFT JOIN {$this->teamInfoTable} opp ON opp.teamid = CASE
-                WHEN h.teamid = bs.visitorTID THEN bs.homeTID
-                ELSE bs.visitorTID END
+                WHEN h.teamid = bs.visitor_teamid THEN bs.home_teamid
+                ELSE bs.visitor_teamid END
             WHERE (
                 (CASE WHEN bs.calc_points >= 10 THEN 1 ELSE 0 END)
                 + (CASE WHEN bs.calc_rebounds >= 10 THEN 1 ELSE 0 END)
@@ -107,8 +107,8 @@ class RecordHoldersRepository extends \BaseMysqliRepository implements RecordHol
                 + (CASE WHEN bs.gameSTL >= 10 THEN 1 ELSE 0 END)
                 + (CASE WHEN bs.gameBLK >= 10 THEN 1 ELSE 0 END)
             ) >= 4
-                AND bs.visitorTID BETWEEN 1 AND " . League::MAX_REAL_TEAMID . "
-                AND bs.homeTID BETWEEN 1 AND " . League::MAX_REAL_TEAMID . "
+                AND bs.visitor_teamid BETWEEN 1 AND " . League::MAX_REAL_TEAMID . "
+                AND bs.home_teamid BETWEEN 1 AND " . League::MAX_REAL_TEAMID . "
             ORDER BY bs.Date ASC";
 
         $rows = $this->fetchAll($query);
@@ -116,11 +116,11 @@ class RecordHoldersRepository extends \BaseMysqliRepository implements RecordHol
         /** @var list<QuadrupleDoubleRecord> $records */
         $records = [];
         foreach ($rows as $row) {
-            /** @var array{pid: int, name: string, tid: int, team_name: string, date: string, BoxID: int, gameOfThatDay: int, oppTid: int, opp_team_name: string, points: int, rebounds: int, assists: int, steals: int, blocks: int} $row */
+            /** @var array{pid: int, name: string, teamid: int, team_name: string, date: string, BoxID: int, gameOfThatDay: int, oppTid: int, opp_team_name: string, points: int, rebounds: int, assists: int, steals: int, blocks: int} $row */
             $records[] = [
                 'pid' => $row['pid'],
                 'name' => $row['name'],
-                'tid' => $row['tid'],
+                'teamid' => $row['teamid'],
                 'team_name' => $row['team_name'],
                 'date' => $row['date'],
                 'BoxID' => $row['BoxID'],
@@ -180,34 +180,34 @@ class RecordHoldersRepository extends \BaseMysqliRepository implements RecordHol
 
         if ($half === 'first') {
             // First half: Q1 + Q2 — determine which team based on visitor/home columns
-            $expression = "(CASE WHEN t.teamid = bs.visitorTeamID
+            $expression = "(CASE WHEN t.teamid = bs.visitor_teamid
                 THEN bs.visitorQ1points + bs.visitorQ2points
                 ELSE bs.homeQ1points + bs.homeQ2points END)";
         } else {
             // Second half: Q3 + Q4 + OT
-            $expression = "(CASE WHEN t.teamid = bs.visitorTeamID
+            $expression = "(CASE WHEN t.teamid = bs.visitor_teamid
                 THEN bs.visitorQ3points + bs.visitorQ4points + COALESCE(bs.visitorOTpoints, 0)
                 ELSE bs.homeQ3points + bs.homeQ4points + COALESCE(bs.homeOTpoints, 0) END)";
         }
 
         $query = "SELECT
-                t.teamid AS tid,
+                t.teamid AS teamid,
                 t.team_name,
                 bs.Date AS `date`,
                 COALESCE(sch.BoxID, 0) AS BoxID,
                 COALESCE(bs.gameOfThatDay, 0) AS gameOfThatDay,
-                CASE WHEN t.teamid = bs.visitorTeamID THEN bs.homeTeamID ELSE bs.visitorTeamID END AS oppTid,
+                CASE WHEN t.teamid = bs.visitor_teamid THEN bs.home_teamid ELSE bs.visitor_teamid END AS oppTid,
                 opp.team_name AS opp_team_name,
                 {$expression} AS value
             FROM {$this->boxScoresTeamsTable} bs
             JOIN {$this->teamInfoTable} t ON t.team_name = bs.name
             LEFT JOIN {$this->scheduleTable} sch ON sch.Date = bs.Date
-                AND sch.Visitor = bs.visitorTeamID AND sch.Home = bs.homeTeamID
+                AND sch.Visitor = bs.visitor_teamid AND sch.Home = bs.home_teamid
             LEFT JOIN {$this->teamInfoTable} opp ON opp.teamid = CASE
-                WHEN t.teamid = bs.visitorTeamID THEN bs.homeTeamID
-                ELSE bs.visitorTeamID END
-            WHERE bs.visitorTeamID BETWEEN 1 AND " . League::MAX_REAL_TEAMID . "
-                AND bs.homeTeamID BETWEEN 1 AND " . League::MAX_REAL_TEAMID . "
+                WHEN t.teamid = bs.visitor_teamid THEN bs.home_teamid
+                ELSE bs.visitor_teamid END
+            WHERE bs.visitor_teamid BETWEEN 1 AND " . League::MAX_REAL_TEAMID . "
+                AND bs.home_teamid BETWEEN 1 AND " . League::MAX_REAL_TEAMID . "
             ORDER BY value {$safeOrder}, bs.Date ASC
             LIMIT 5";
 
@@ -216,9 +216,9 @@ class RecordHoldersRepository extends \BaseMysqliRepository implements RecordHol
         /** @var list<TeamHalfRecord> $records */
         $records = [];
         foreach ($rows as $row) {
-            /** @var array{tid: int, team_name: string, date: string, BoxID: int, gameOfThatDay: int, oppTid: int, opp_team_name: string, value: int} $row */
+            /** @var array{teamid: int, team_name: string, date: string, BoxID: int, gameOfThatDay: int, oppTid: int, opp_team_name: string, value: int} $row */
             $records[] = [
-                'tid' => $row['tid'],
+                'teamid' => $row['teamid'],
                 'team_name' => $row['team_name'],
                 'date' => $row['date'],
                 'BoxID' => $row['BoxID'],
@@ -243,9 +243,9 @@ class RecordHoldersRepository extends \BaseMysqliRepository implements RecordHol
     public function getLargestMarginOfVictory(string $dateFilter): array
     {
         $query = "WITH _game_of_day AS (
-                SELECT Date, visitorTeamID, homeTeamID, MIN(gameOfThatDay) AS gameOfThatDay
+                SELECT Date, visitor_teamid, home_teamid, MIN(gameOfThatDay) AS gameOfThatDay
                 FROM {$this->boxScoresTeamsTable}
-                GROUP BY Date, visitorTeamID, homeTeamID
+                GROUP BY Date, visitor_teamid, home_teamid
             )
             SELECT
                 winner_t.teamid AS winner_tid,
@@ -259,25 +259,25 @@ class RecordHoldersRepository extends \BaseMysqliRepository implements RecordHol
             FROM (
                 SELECT
                     bs.Date,
-                    bs.visitorTeamID,
-                    bs.homeTeamID,
+                    bs.visitor_teamid,
+                    bs.home_teamid,
                     ABS(bs.visitorScore - bs.homeScore) AS margin,
                     CASE WHEN bs.visitorScore > bs.homeScore
-                        THEN bs.visitorTeamID ELSE bs.homeTeamID END AS winner_id,
+                        THEN bs.visitor_teamid ELSE bs.home_teamid END AS winner_id,
                     CASE WHEN bs.visitorScore > bs.homeScore
-                        THEN bs.homeTeamID ELSE bs.visitorTeamID END AS loser_id
+                        THEN bs.home_teamid ELSE bs.visitor_teamid END AS loser_id
                 FROM vw_team_total_score bs
                 WHERE {$dateFilter}
-                    AND bs.visitorTeamID BETWEEN 1 AND " . League::MAX_REAL_TEAMID . "
-                    AND bs.homeTeamID BETWEEN 1 AND " . League::MAX_REAL_TEAMID . "
-                GROUP BY bs.Date, bs.visitorTeamID, bs.homeTeamID
+                    AND bs.visitor_teamid BETWEEN 1 AND " . League::MAX_REAL_TEAMID . "
+                    AND bs.home_teamid BETWEEN 1 AND " . League::MAX_REAL_TEAMID . "
+                GROUP BY bs.Date, bs.visitor_teamid, bs.home_teamid
             ) sub
             JOIN {$this->teamInfoTable} winner_t ON winner_t.teamid = sub.winner_id
             JOIN {$this->teamInfoTable} loser_t ON loser_t.teamid = sub.loser_id
             LEFT JOIN {$this->scheduleTable} sch ON sch.Date = sub.Date
-                AND sch.Visitor = sub.visitorTeamID AND sch.Home = sub.homeTeamID
+                AND sch.Visitor = sub.visitor_teamid AND sch.Home = sub.home_teamid
             LEFT JOIN _game_of_day bst ON bst.Date = sub.Date
-                AND bst.visitorTeamID = sub.visitorTeamID AND bst.homeTeamID = sub.homeTeamID
+                AND bst.visitor_teamid = sub.visitor_teamid AND bst.home_teamid = sub.home_teamid
             ORDER BY sub.margin DESC, sub.Date ASC
             LIMIT 5";
 
@@ -346,7 +346,7 @@ class RecordHoldersRepository extends \BaseMysqliRepository implements RecordHol
      *
      * Both getLongestStreak() and getBestWorstSeasonStart() need the same data.
      *
-     * @return list<array{Date: string, visitorTeamID: int, homeTeamID: int, visitorScore: int, homeScore: int}>
+     * @return list<array{Date: string, visitor_teamid: int, home_teamid: int, visitorScore: int, homeScore: int}>
      */
     private function getRegularSeasonGames(): array
     {
@@ -356,19 +356,19 @@ class RecordHoldersRepository extends \BaseMysqliRepository implements RecordHol
 
         $regularSeasonFilter = 'game_type = 1';
 
-        /** @var list<array{Date: string, visitorTeamID: int, homeTeamID: int, visitorScore: int, homeScore: int}> $rows */
+        /** @var list<array{Date: string, visitor_teamid: int, home_teamid: int, visitorScore: int, homeScore: int}> $rows */
         $rows = $this->fetchAll(
             "SELECT
                 Date,
-                visitorTeamID,
-                homeTeamID,
+                visitor_teamid,
+                home_teamid,
                 visitorScore,
                 homeScore
             FROM vw_team_total_score
             WHERE {$regularSeasonFilter}
-                AND visitorTeamID BETWEEN 1 AND " . League::MAX_REAL_TEAMID . "
-                AND homeTeamID BETWEEN 1 AND " . League::MAX_REAL_TEAMID . "
-            GROUP BY Date, visitorTeamID, homeTeamID
+                AND visitor_teamid BETWEEN 1 AND " . League::MAX_REAL_TEAMID . "
+                AND home_teamid BETWEEN 1 AND " . League::MAX_REAL_TEAMID . "
+            GROUP BY Date, visitor_teamid, home_teamid
             ORDER BY Date ASC"
         );
 
@@ -410,38 +410,38 @@ class RecordHoldersRepository extends \BaseMysqliRepository implements RecordHol
         $bestStreaks = [];
 
         foreach ($rows as $row) {
-            /** @var array{Date: string, visitorTeamID: int, homeTeamID: int, visitorScore: int, homeScore: int} $row */
+            /** @var array{Date: string, visitor_teamid: int, home_teamid: int, visitorScore: int, homeScore: int} $row */
             $date = $row['Date'];
-            $visitorTid = $row['visitorTeamID'];
-            $homeTid = $row['homeTeamID'];
+            $visitorTid = $row['visitor_teamid'];
+            $homeTid = $row['home_teamid'];
             $visitorScore = $row['visitorScore'];
             $homeScore = $row['homeScore'];
 
             $visitorWon = $visitorScore > $homeScore;
 
-            foreach ([$visitorTid, $homeTid] as $tid) {
-                $teamWon = ($tid === $visitorTid) ? $visitorWon : !$visitorWon;
+            foreach ([$visitorTid, $homeTid] as $teamid) {
+                $teamWon = ($teamid === $visitorTid) ? $visitorWon : !$visitorWon;
                 $isStreakType = ($type === 'winning') ? $teamWon : !$teamWon;
 
-                if (!isset($streaks[$tid])) {
-                    $streaks[$tid] = ['current' => 0, 'start' => '', 'team' => $tid];
-                    $bestStreaks[$tid] = ['streak' => 0, 'start' => '', 'end' => ''];
+                if (!isset($streaks[$teamid])) {
+                    $streaks[$teamid] = ['current' => 0, 'start' => '', 'team' => $teamid];
+                    $bestStreaks[$teamid] = ['streak' => 0, 'start' => '', 'end' => ''];
                 }
 
                 if ($isStreakType) {
-                    if ($streaks[$tid]['current'] === 0) {
-                        $streaks[$tid]['start'] = $date;
+                    if ($streaks[$teamid]['current'] === 0) {
+                        $streaks[$teamid]['start'] = $date;
                     }
-                    $streaks[$tid]['current']++;
-                    if ($streaks[$tid]['current'] > $bestStreaks[$tid]['streak']) {
-                        $bestStreaks[$tid] = [
-                            'streak' => $streaks[$tid]['current'],
-                            'start' => $streaks[$tid]['start'],
+                    $streaks[$teamid]['current']++;
+                    if ($streaks[$teamid]['current'] > $bestStreaks[$teamid]['streak']) {
+                        $bestStreaks[$teamid] = [
+                            'streak' => $streaks[$teamid]['current'],
+                            'start' => $streaks[$teamid]['start'],
                             'end' => $date,
                         ];
                     }
                 } else {
-                    $streaks[$tid]['current'] = 0;
+                    $streaks[$teamid]['current'] = 0;
                 }
             }
         }
@@ -457,12 +457,12 @@ class RecordHoldersRepository extends \BaseMysqliRepository implements RecordHol
         // Collect all teams matching the max streak
         /** @var list<StreakRecord> $records */
         $records = [];
-        foreach ($bestStreaks as $tid => $data) {
+        foreach ($bestStreaks as $teamid => $data) {
             if ($data['streak'] === $maxStreak && $maxStreak > 0) {
                 $startYear = IblSeasonDateHelper::dateToSeasonEndingYear($data['start']);
                 $endYear = IblSeasonDateHelper::dateToSeasonEndingYear($data['end']);
                 $records[] = [
-                    'team_name' => $this->resolveTeamName($tid),
+                    'team_name' => $this->resolveTeamName($teamid),
                     'streak' => $data['streak'],
                     'start_date' => $data['start'],
                     'end_date' => $data['end'],
@@ -492,17 +492,17 @@ class RecordHoldersRepository extends \BaseMysqliRepository implements RecordHol
         $seasonStarts = [];
 
         foreach ($rows as $row) {
-            /** @var array{Date: string, visitorTeamID: int, homeTeamID: int, visitorScore: int, homeScore: int} $row */
+            /** @var array{Date: string, visitor_teamid: int, home_teamid: int, visitorScore: int, homeScore: int} $row */
             $date = $row['Date'];
-            $visitorTid = $row['visitorTeamID'];
-            $homeTid = $row['homeTeamID'];
+            $visitorTid = $row['visitor_teamid'];
+            $homeTid = $row['home_teamid'];
             $visitorScore = $row['visitorScore'];
             $homeScore = $row['homeScore'];
             $visitorWon = $visitorScore > $homeScore;
             $seasonYear = IblSeasonDateHelper::dateToSeasonEndingYear($date);
 
-            foreach ([$visitorTid, $homeTid] as $tid) {
-                $key = $tid . '-' . $seasonYear;
+            foreach ([$visitorTid, $homeTid] as $teamid) {
+                $key = $teamid . '-' . $seasonYear;
                 if (!isset($seasonStarts[$key])) {
                     $seasonStarts[$key] = ['wins' => 0, 'losses' => 0, 'streakBroken' => false];
                 }
@@ -511,7 +511,7 @@ class RecordHoldersRepository extends \BaseMysqliRepository implements RecordHol
                     continue;
                 }
 
-                $teamWon = ($tid === $visitorTid) ? $visitorWon : !$visitorWon;
+                $teamWon = ($teamid === $visitorTid) ? $visitorWon : !$visitorWon;
 
                 if ($type === 'best') {
                     if ($teamWon) {
@@ -544,18 +544,18 @@ class RecordHoldersRepository extends \BaseMysqliRepository implements RecordHol
             $value = $type === 'best' ? $data['wins'] : $data['losses'];
             if ($value === $maxValue && $maxValue > 0) {
                 [$tidStr, $yearStr] = explode('-', $key);
-                $tid = (int) $tidStr;
+                $teamid = (int) $tidStr;
                 $year = (int) $yearStr;
                 if ($type === 'best') {
                     $records[] = [
-                        'team_name' => $this->resolveTeamName($tid),
+                        'team_name' => $this->resolveTeamName($teamid),
                         'year' => $year,
                         'wins' => $data['wins'],
                         'losses' => 0,
                     ];
                 } else {
                     $records[] = [
-                        'team_name' => $this->resolveTeamName($tid),
+                        'team_name' => $this->resolveTeamName($teamid),
                         'year' => $year,
                         'wins' => 0,
                         'losses' => $data['losses'],
@@ -631,36 +631,36 @@ class RecordHoldersRepository extends \BaseMysqliRepository implements RecordHol
                     '{$safeLabel}' AS stat_type,
                     bs.pid,
                     p.name,
-                    h.teamid AS tid,
+                    h.teamid AS teamid,
                     h.team AS team_name,
                     bs.Date AS `date`,
                     COALESCE(sch.BoxID, 0) AS BoxID,
                     COALESCE(bst.gameOfThatDay, 0) AS gameOfThatDay,
-                    CASE WHEN h.teamid = bs.visitorTID THEN bs.homeTID ELSE bs.visitorTID END AS oppTid,
+                    CASE WHEN h.teamid = bs.visitor_teamid THEN bs.home_teamid ELSE bs.visitor_teamid END AS oppTid,
                     opp.team_name AS opp_team_name,
                     {$expression} AS value
                 FROM {$this->boxScoresTable} bs
                 JOIN ibl_plr p ON p.pid = bs.pid
                 JOIN ibl_hist h ON h.pid = bs.pid AND h.year = (" . self::SEASON_YEAR_EXPRESSION . ")
                 LEFT JOIN {$this->scheduleTable} sch ON sch.Date = bs.Date
-                    AND sch.Visitor = bs.visitorTID AND sch.Home = bs.homeTID
+                    AND sch.Visitor = bs.visitor_teamid AND sch.Home = bs.home_teamid
                 LEFT JOIN _game_of_day bst ON bst.Date = bs.Date
-                    AND bst.visitorTeamID = bs.visitorTID AND bst.homeTeamID = bs.homeTID
+                    AND bst.visitor_teamid = bs.visitor_teamid AND bst.home_teamid = bs.home_teamid
                 LEFT JOIN {$this->teamInfoTable} opp ON opp.teamid = CASE
-                    WHEN h.teamid = bs.visitorTID THEN bs.homeTID
-                    ELSE bs.visitorTID END
+                    WHEN h.teamid = bs.visitor_teamid THEN bs.home_teamid
+                    ELSE bs.visitor_teamid END
                 WHERE {$dateFilter}
-                    AND bs.visitorTID BETWEEN 1 AND " . League::MAX_REAL_TEAMID . "
-                    AND bs.homeTID BETWEEN 1 AND " . League::MAX_REAL_TEAMID . "
+                    AND bs.visitor_teamid BETWEEN 1 AND " . League::MAX_REAL_TEAMID . "
+                    AND bs.home_teamid BETWEEN 1 AND " . League::MAX_REAL_TEAMID . "
                 ORDER BY value DESC, bs.Date ASC
                 LIMIT 5)";
         }
 
         // CTE materializes gameOfThatDay lookup once instead of per UNION ALL branch
         $cte = "WITH _game_of_day AS (
-            SELECT Date, visitorTeamID, homeTeamID, MIN(gameOfThatDay) AS gameOfThatDay
+            SELECT Date, visitor_teamid, home_teamid, MIN(gameOfThatDay) AS gameOfThatDay
             FROM {$this->boxScoresTeamsTable}
-            GROUP BY Date, visitorTeamID, homeTeamID
+            GROUP BY Date, visitor_teamid, home_teamid
         )\n";
         $query = $cte . implode("\nUNION ALL\n", $unions);
         $rows = $this->fetchAll($query);
@@ -672,12 +672,12 @@ class RecordHoldersRepository extends \BaseMysqliRepository implements RecordHol
         }
 
         foreach ($rows as $row) {
-            /** @var array{stat_type: string, pid: int, name: string, tid: int, team_name: string, date: string, BoxID: int, gameOfThatDay: int, oppTid: int, opp_team_name: string, value: int} $row */
+            /** @var array{stat_type: string, pid: int, name: string, teamid: int, team_name: string, date: string, BoxID: int, gameOfThatDay: int, oppTid: int, opp_team_name: string, value: int} $row */
             $label = $row['stat_type'];
             $results[$label][] = [
                 'pid' => $row['pid'],
                 'name' => $row['name'],
-                'tid' => $row['tid'],
+                'teamid' => $row['teamid'],
                 'team_name' => $row['team_name'],
                 'date' => $row['date'],
                 'BoxID' => $row['BoxID'],
@@ -709,24 +709,24 @@ class RecordHoldersRepository extends \BaseMysqliRepository implements RecordHol
             $safeOrder = $config['order'] === 'ASC' ? 'ASC' : 'DESC';
             $unions[] = "(SELECT
                     '{$safeLabel}' AS stat_type,
-                    t.teamid AS tid,
+                    t.teamid AS teamid,
                     t.team_name,
                     bs.Date AS `date`,
                     COALESCE(sch.BoxID, 0) AS BoxID,
                     COALESCE(bs.gameOfThatDay, 0) AS gameOfThatDay,
-                    CASE WHEN t.teamid = bs.visitorTeamID THEN bs.homeTeamID ELSE bs.visitorTeamID END AS oppTid,
+                    CASE WHEN t.teamid = bs.visitor_teamid THEN bs.home_teamid ELSE bs.visitor_teamid END AS oppTid,
                     opp.team_name AS opp_team_name,
                     {$config['expression']} AS value
                 FROM {$this->boxScoresTeamsTable} bs
                 JOIN {$this->teamInfoTable} t ON t.team_name = bs.name
                 LEFT JOIN {$this->scheduleTable} sch ON sch.Date = bs.Date
-                    AND sch.Visitor = bs.visitorTeamID AND sch.Home = bs.homeTeamID
+                    AND sch.Visitor = bs.visitor_teamid AND sch.Home = bs.home_teamid
                 LEFT JOIN {$this->teamInfoTable} opp ON opp.teamid = CASE
-                    WHEN t.teamid = bs.visitorTeamID THEN bs.homeTeamID
-                    ELSE bs.visitorTeamID END
+                    WHEN t.teamid = bs.visitor_teamid THEN bs.home_teamid
+                    ELSE bs.visitor_teamid END
                 WHERE {$dateFilter}
-                    AND bs.visitorTeamID BETWEEN 1 AND " . League::MAX_REAL_TEAMID . "
-                    AND bs.homeTeamID BETWEEN 1 AND " . League::MAX_REAL_TEAMID . "
+                    AND bs.visitor_teamid BETWEEN 1 AND " . League::MAX_REAL_TEAMID . "
+                    AND bs.home_teamid BETWEEN 1 AND " . League::MAX_REAL_TEAMID . "
                 ORDER BY value {$safeOrder}, bs.Date ASC
                 LIMIT 5)";
         }
@@ -741,10 +741,10 @@ class RecordHoldersRepository extends \BaseMysqliRepository implements RecordHol
         }
 
         foreach ($rows as $row) {
-            /** @var array{stat_type: string, tid: int, team_name: string, date: string, BoxID: int, gameOfThatDay: int, oppTid: int, opp_team_name: string, value: int} $row */
+            /** @var array{stat_type: string, teamid: int, team_name: string, date: string, BoxID: int, gameOfThatDay: int, oppTid: int, opp_team_name: string, value: int} $row */
             $label = $row['stat_type'];
             $results[$label][] = [
-                'tid' => $row['tid'],
+                'teamid' => $row['teamid'],
                 'team_name' => $row['team_name'],
                 'date' => $row['date'],
                 'BoxID' => $row['BoxID'],
@@ -900,8 +900,8 @@ class RecordHoldersRepository extends \BaseMysqliRepository implements RecordHol
                                   + COALESCE(bst.homeOTpoints, 0))
                                > (bst.visitorQ1points + bst.visitorQ2points + bst.visitorQ3points + bst.visitorQ4points
                                   + COALESCE(bst.visitorOTpoints, 0))
-                            THEN bst.homeTeamID
-                            ELSE bst.visitorTeamID
+                            THEN bst.home_teamid
+                            ELSE bst.visitor_teamid
                         END AS winner_tid,
                         ROW_NUMBER() OVER (
                             PARTITION BY YEAR(bst.Date)

@@ -124,7 +124,10 @@ class CareerLeaderboardsRepository extends \BaseMysqliRepository implements Care
 
         // Enrich rows missing drb (Olympics stored tables lack the column)
         foreach ($rows as $idx => $currentRow) {
-            if (!array_key_exists('drb', $currentRow)) {
+            if (!array_key_exists('drb', $currentRow)
+                && array_key_exists('reb', $currentRow)
+                && array_key_exists('orb', $currentRow)
+            ) {
                 $reb = is_string($currentRow['reb']) ? (float) $currentRow['reb'] : $currentRow['reb'];
                 $orb = is_string($currentRow['orb']) ? (float) $currentRow['orb'] : $currentRow['orb'];
                 $rows[$idx]['drb'] = $reb - $orb;

@@ -73,6 +73,7 @@ final class SeasonLeaderboardsViewTest extends TestCase
             'tgapg' => '4.0',
             'tgp' => '0.375',
             'orbpg' => '3.0',
+            'drebpg' => '5.0',
             'rpg' => '8.0',
             'apg' => '4.0',
             'spg' => '1.0',

@@ -377,7 +377,7 @@ class JsbImportService implements JsbImportServiceInterface
             try {
                 $affected = $this->repository->upsertRcbAlltimeRecord([
                     'scope' => $record['scope'],
-                    'team_id' => $record['team_id'],
+                    'teamid' => $record['teamid'],
                     'record_type' => $record['record_type'],
                     'stat_category' => $record['stat_category'],
                     'ranking' => $record['ranking'],
@@ -403,7 +403,7 @@ class JsbImportService implements JsbImportServiceInterface
                 $affected = $this->repository->upsertRcbSeasonRecord([
                     'season_year' => $seasonYear,
                     'scope' => $record['scope'],
-                    'team_id' => $record['team_id'],
+                    'teamid' => $record['teamid'],
                     'context' => $record['context'],
                     'stat_category' => $record['stat_category'],
                     'ranking' => $record['ranking'],

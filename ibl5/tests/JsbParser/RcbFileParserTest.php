@@ -276,7 +276,7 @@ class RcbFileParserTest extends TestCase
             $record = array_values($ppgRecords)[0];
 
             $this->assertSame('league', $record['scope']);
-            $this->assertSame(0, $record['team_id']);
+            $this->assertSame(0, $record['teamid']);
             $this->assertSame('single_season', $record['record_type']);
             $this->assertSame('ppg', $record['stat_category']);
             $this->assertSame(1, $record['ranking']);
@@ -342,13 +342,13 @@ class RcbFileParserTest extends TestCase
             $result = RcbFileParser::parseFile($tmpFile);
             $alltime = $result['alltime'];
 
-            $teamRecords = array_filter($alltime, static fn (array $r): bool => $r['scope'] === 'team' && $r['team_id'] === 2);
+            $teamRecords = array_filter($alltime, static fn (array $r): bool => $r['scope'] === 'team' && $r['teamid'] === 2);
 
             $this->assertNotSame([], $teamRecords);
             $record = array_values($teamRecords)[0];
 
             $this->assertSame('team', $record['scope']);
-            $this->assertSame(2, $record['team_id']);
+            $this->assertSame(2, $record['teamid']);
             $this->assertSame('single_season', $record['record_type']);
             $this->assertSame('ppg', $record['stat_category']);
             $this->assertSame('Dwyane Wade', $record['player_name']);
@@ -402,7 +402,7 @@ class RcbFileParserTest extends TestCase
 
             $record = $season[0];
             $this->assertSame('league', $record['scope']);
-            $this->assertSame(0, $record['team_id']);
+            $this->assertSame(0, $record['teamid']);
             $this->assertSame('away', $record['context']);
             $this->assertSame('pts', $record['stat_category']);
             $this->assertSame(1, $record['ranking']);

@@ -88,17 +88,6 @@ final class BanInconsistentColumnNamesRuleTest extends RuleTestCase
                     . 'Rename to `teampick_teamid`; migration 114 unified `*_tid` to `*_teamid`.',
                     17,
                 ],
-                [
-                    'Banned backtick-quoted column reference `tga` in SQL string. '
-                    . 'Rename to `r_3ga` when referencing `ibl_draft_class` — migration 114 unified the rating name. '
-                    . '(The `tga` counting stat on `ibl_hist`/`ibl_olympics_*` stays; this ban only bites in SQL strings, where `ibl_draft_class` is the most common context.)',
-                    18,
-                ],
-                [
-                    'Banned backtick-quoted column reference `tgp` in SQL string. '
-                    . 'Rename to `r_3gp` when referencing `ibl_draft_class` — migration 114 unified the rating name.',
-                    19,
-                ],
             ],
         );
     }

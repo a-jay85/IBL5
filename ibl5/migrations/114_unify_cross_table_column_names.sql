@@ -219,11 +219,13 @@ ALTER TABLE `ibl_olympics_box_scores_teams`
   ADD CONSTRAINT `fk_olympics_boxscoreteam_visitor` FOREIGN KEY (`visitor_teamid`) REFERENCES `ibl_olympics_team_info` (`teamid`) ON UPDATE CASCADE;
 
 -- ibl_draft_picks.{owner_tid,teampick_tid} → {owner_teamid,teampick_teamid}
+-- Rename the FK constraint names alongside the columns so information_schema
+-- doesn't retain the old `_tid` vocabulary.
 ALTER TABLE `ibl_draft_picks` DROP FOREIGN KEY `fk_draftpick_owner_tid`;
 ALTER TABLE `ibl_draft_picks` DROP FOREIGN KEY `fk_draftpick_teampick_tid`;
 ALTER TABLE `ibl_draft_picks`
   CHANGE COLUMN `owner_tid` `owner_teamid` int(11) NOT NULL DEFAULT 0 COMMENT 'Team that currently owns the pick',
   CHANGE COLUMN `teampick_tid` `teampick_teamid` int(11) NOT NULL DEFAULT 0 COMMENT 'Team whose original pick this is';
 ALTER TABLE `ibl_draft_picks`
-  ADD CONSTRAINT `fk_draftpick_owner_tid` FOREIGN KEY (`owner_teamid`) REFERENCES `ibl_team_info` (`teamid`) ON DELETE CASCADE ON UPDATE CASCADE,
-  ADD CONSTRAINT `fk_draftpick_teampick_tid` FOREIGN KEY (`teampick_teamid`) REFERENCES `ibl_team_info` (`teamid`) ON DELETE CASCADE ON UPDATE CASCADE;
+  ADD CONSTRAINT `fk_draftpick_owner_teamid` FOREIGN KEY (`owner_teamid`) REFERENCES `ibl_team_info` (`teamid`) ON DELETE CASCADE ON UPDATE CASCADE,
+  ADD CONSTRAINT `fk_draftpick_teampick_teamid` FOREIGN KEY (`teampick_teamid`) REFERENCES `ibl_team_info` (`teamid`) ON DELETE CASCADE ON UPDATE CASCADE;

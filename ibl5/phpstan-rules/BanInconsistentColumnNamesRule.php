@@ -36,11 +36,14 @@ final class BanInconsistentColumnNamesRule implements Rule
         // Turnovers
         '`stats_to`' => 'Rename to `stats_tvr` (turnovers, live layer); migration 114 unified `stats_to`/`tvr`.',
 
-        // 3-pointer ratings
+        // 3-pointer ratings. Note: bare `tga`/`tgp` are NOT banned — they
+        // remain valid counting-stat column names on `ibl_hist` and the
+        // olympics career tables. The migration renamed only the *rating*
+        // columns on `ibl_draft_class` (tga→r_3ga, tgp→r_3gp); any surviving
+        // `` `tga` `` against `ibl_draft_class` would fail at runtime via
+        // `SchemaValidator` boot assertions + the CrossTableColumnNamingTest.
         '`r_tga`' => 'Rename to `r_3ga` (3P attempts rating); migration 114 unified the rating to match `ibl_hist`.',
         '`r_tgp`' => 'Rename to `r_3gp` (3P percentage rating); migration 114 unified the rating to match `ibl_hist`.',
-        '`tga`' => 'Rename to `r_3ga` when referencing `ibl_draft_class` — migration 114 unified the rating name. (The `tga` counting stat on `ibl_hist`/`ibl_olympics_*` stays; this ban only bites in SQL strings, where `ibl_draft_class` is the most common context.)',
-        '`tgp`' => 'Rename to `r_3gp` when referencing `ibl_draft_class` — migration 114 unified the rating name.',
 
         // Team-id (bare)
         '`tid`' => 'Rename to `teamid`; migration 114 unified team-id spelling across the schema.',

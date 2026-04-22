@@ -15,5 +15,3 @@ $compoundHomeTeam = "SELECT `homeTeamID` FROM ibl_box_scores_teams";
 $compoundVisitorTeam = "SELECT `visitorTeamID` FROM ibl_box_scores_teams";
 $ownerTid = "SELECT `owner_tid` FROM ibl_draft_picks";
 $teampickTid = "SELECT `teampick_tid` FROM ibl_draft_picks";
-$bareTga = "SELECT `tga` FROM ibl_draft_class";
-$bareTgp = "SELECT `tgp` FROM ibl_draft_class";

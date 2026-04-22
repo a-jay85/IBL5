@@ -30,7 +30,7 @@ class ProjectedDraftOrderRepositoryTest extends DatabaseTestCase
 
         self::assertCount(28, $result);
         $first = $result[0];
-        self::assertArrayHasKey('tid', $first);
+        self::assertArrayHasKey('teamid', $first);
         self::assertArrayHasKey('team_name', $first);
         self::assertArrayHasKey('wins', $first);
         self::assertArrayHasKey('losses', $first);
@@ -40,8 +40,8 @@ class ProjectedDraftOrderRepositoryTest extends DatabaseTestCase
 
         // Should only include real teams (1-28)
         foreach ($result as $row) {
-            self::assertGreaterThanOrEqual(1, $row['tid']);
-            self::assertLessThanOrEqual(League::MAX_REAL_TEAMID, $row['tid']);
+            self::assertGreaterThanOrEqual(1, $row['teamid']);
+            self::assertLessThanOrEqual(League::MAX_REAL_TEAMID, $row['teamid']);
         }
     }
 
@@ -94,27 +94,27 @@ class ProjectedDraftOrderRepositoryTest extends DatabaseTestCase
         // Insert picks for rounds 1, 2, and 3
         $this->insertRow('ibl_draft_picks', [
             'ownerofpick' => 'Metros',
-            'owner_tid' => 1,
+            'owner_teamid' => 1,
             'teampick' => 'Metros',
-            'teampick_tid' => 1,
+            'teampick_teamid' => 1,
             'year' => 2099,
             'round' => 1,
             'notes' => 'Test R1',
         ]);
         $this->insertRow('ibl_draft_picks', [
             'ownerofpick' => 'Metros',
-            'owner_tid' => 1,
+            'owner_teamid' => 1,
             'teampick' => 'Metros',
-            'teampick_tid' => 1,
+            'teampick_teamid' => 1,
             'year' => 2099,
             'round' => 2,
             'notes' => 'Test R2',
         ]);
         $this->insertRow('ibl_draft_picks', [
             'ownerofpick' => 'Metros',
-            'owner_tid' => 1,
+            'owner_teamid' => 1,
             'teampick' => 'Metros',
-            'teampick_tid' => 1,
+            'teampick_teamid' => 1,
             'year' => 2099,
             'round' => 3,
             'notes' => 'Test R3',
@@ -155,10 +155,10 @@ class ProjectedDraftOrderRepositoryTest extends DatabaseTestCase
         $result = $this->repo->getPointDifferentials(2099);
 
         self::assertNotEmpty($result);
-        // Find Metros (tid=1): Game 1 home: 110 scored, 90 allowed. Game 2 visitor: 95 scored, 100 allowed.
+        // Find Metros (teamid=1): Game 1 home: 110 scored, 90 allowed. Game 2 visitor: 95 scored, 100 allowed.
         $metros = null;
         foreach ($result as $row) {
-            if ($row['tid'] === 1) {
+            if ($row['teamid'] === 1) {
                 $metros = $row;
                 break;
             }
@@ -182,8 +182,8 @@ class ProjectedDraftOrderRepositoryTest extends DatabaseTestCase
     public function testSaveFinalDraftOrderInsertsPicks(): void
     {
         $picks = [
-            ['round' => 1, 'pick' => 1, 'team' => 'Metros', 'tid' => 1],
-            ['round' => 1, 'pick' => 2, 'team' => 'Sharks', 'tid' => 2],
+            ['round' => 1, 'pick' => 1, 'team' => 'Metros', 'teamid' => 1],
+            ['round' => 1, 'pick' => 2, 'team' => 'Sharks', 'teamid' => 2],
         ];
 
         $this->repo->saveFinalDraftOrder(2099, $picks);
@@ -204,7 +204,7 @@ class ProjectedDraftOrderRepositoryTest extends DatabaseTestCase
     public function testSaveFinalDraftOrderSetsFinalized(): void
     {
         $picks = [
-            ['round' => 1, 'pick' => 1, 'team' => 'Metros', 'tid' => 1],
+            ['round' => 1, 'pick' => 1, 'team' => 'Metros', 'teamid' => 1],
         ];
 
         $this->repo->saveFinalDraftOrder(2099, $picks);
@@ -220,13 +220,13 @@ class ProjectedDraftOrderRepositoryTest extends DatabaseTestCase
             'round' => 1,
             'pick' => 1,
             'team' => 'OldTeam',
-            'tid' => 1,
+            'teamid' => 1,
             'player' => '',
             'uuid' => 'draft-old-slot-0000-000000000001',
         ]);
 
         $picks = [
-            ['round' => 1, 'pick' => 1, 'team' => 'Metros', 'tid' => 1],
+            ['round' => 1, 'pick' => 1, 'team' => 'Metros', 'teamid' => 1],
         ];
 
         $this->repo->saveFinalDraftOrder(2099, $picks);
@@ -240,9 +240,9 @@ class ProjectedDraftOrderRepositoryTest extends DatabaseTestCase
     public function testGetFinalDraftOrderReturnsSavedPicks(): void
     {
         $picks = [
-            ['round' => 1, 'pick' => 1, 'team' => 'Metros', 'tid' => 1],
-            ['round' => 1, 'pick' => 2, 'team' => 'Sharks', 'tid' => 2],
-            ['round' => 2, 'pick' => 1, 'team' => 'Sharks', 'tid' => 2],
+            ['round' => 1, 'pick' => 1, 'team' => 'Metros', 'teamid' => 1],
+            ['round' => 1, 'pick' => 2, 'team' => 'Sharks', 'teamid' => 2],
+            ['round' => 2, 'pick' => 1, 'team' => 'Sharks', 'teamid' => 2],
         ];
 
         $this->repo->saveFinalDraftOrder(2099, $picks);
@@ -264,7 +264,7 @@ class ProjectedDraftOrderRepositoryTest extends DatabaseTestCase
             'round' => 1,
             'pick' => 1,
             'team' => 'Metros',
-            'tid' => 1,
+            'teamid' => 1,
             'player' => 'John Doe',
             'uuid' => 'draft-started-0000-000000000001',
         ]);

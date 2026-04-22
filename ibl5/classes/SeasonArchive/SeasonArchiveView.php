@@ -274,7 +274,7 @@ class SeasonArchiveView implements SeasonArchiveViewInterface
             if ($gmOfYear['team'] !== '') {
                 $teamId = $teamIds[$gmOfYear['team']] ?? null;
                 if ($teamId !== null) {
-                    $gmDisplay .= ' (<a href="modules.php?name=Team&amp;op=team&amp;teamID=' . $teamId . '&amp;yr=' . $year . '">' . self::esc($gmOfYear['team']) . '</a>)';
+                    $gmDisplay .= ' (<a href="modules.php?name=Team&amp;op=team&amp;teamid=' . $teamId . '&amp;yr=' . $year . '">' . self::esc($gmOfYear['team']) . '</a>)';
                 } else {
                     $gmDisplay .= ' (' . self::esc($gmOfYear['team']) . ')';
                 }
@@ -512,7 +512,7 @@ class SeasonArchiveView implements SeasonArchiveViewInterface
 
         $teamid = $colors['teamid'];
         return '<div class="season-archive-champion-logo">'
-            . '<a href="modules.php?name=Team&amp;op=team&amp;teamID=' . $teamid . '&amp;yr=' . $year . '">'
+            . '<a href="modules.php?name=Team&amp;op=team&amp;teamid=' . $teamid . '&amp;yr=' . $year . '">'
             . '<img src="images/logo/new' . $teamid . '.png" alt="' . self::esc($iblChampion) . '" width="64" height="64" loading="lazy">'
             . '</a></div>';
     }

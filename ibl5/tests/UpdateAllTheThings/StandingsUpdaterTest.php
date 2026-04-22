@@ -537,8 +537,8 @@ class StandingsUpdaterTest extends TestCase
     {
         $this->mockDb->setReturnTrue(true);
         $clinchData = [
-            ['tid' => 1, 'team_name' => 'Celtics', 'homeWins' => 40, 'homeLosses' => 1, 'awayWins' => 40, 'awayLosses' => 1, 'wins' => 80],
-            ['tid' => 2, 'team_name' => 'Heat', 'homeWins' => 1, 'homeLosses' => 40, 'awayWins' => 1, 'awayLosses' => 40, 'wins' => 2],
+            ['teamid' => 1, 'team_name' => 'Celtics', 'homeWins' => 40, 'homeLosses' => 1, 'awayWins' => 40, 'awayLosses' => 1, 'wins' => 80],
+            ['teamid' => 2, 'team_name' => 'Heat', 'homeWins' => 1, 'homeLosses' => 40, 'awayWins' => 1, 'awayLosses' => 40, 'wins' => 2],
         ];
         // Route clinch-check queries ([\s\S] matches across newlines unlike .)
         $this->mockDb->onQuery('ORDER BY wins DESC', $clinchData);
@@ -565,8 +565,8 @@ class StandingsUpdaterTest extends TestCase
     {
         $this->mockDb->setReturnTrue(true);
         $clinchData = [
-            ['tid' => 1, 'team_name' => 'Celtics', 'homeWins' => 40, 'homeLosses' => 1, 'awayWins' => 40, 'awayLosses' => 1, 'wins' => 80],
-            ['tid' => 2, 'team_name' => 'Heat', 'homeWins' => 1, 'homeLosses' => 40, 'awayWins' => 1, 'awayLosses' => 40, 'wins' => 2],
+            ['teamid' => 1, 'team_name' => 'Celtics', 'homeWins' => 40, 'homeLosses' => 1, 'awayWins' => 40, 'awayLosses' => 1, 'wins' => 80],
+            ['teamid' => 2, 'team_name' => 'Heat', 'homeWins' => 1, 'homeLosses' => 40, 'awayWins' => 1, 'awayLosses' => 40, 'wins' => 2],
         ];
         $this->mockDb->onQuery('ORDER BY wins DESC', $clinchData);
         $this->mockDb->onQuery('ORDER BY losses ASC', [['losses' => 80]]);
@@ -615,8 +615,8 @@ class StandingsUpdaterTest extends TestCase
         $updater->setTestGames([]);
         $this->mockDb->setReturnTrue(true);
         $clinchData = [
-            ['tid' => 1, 'team_name' => 'Celtics', 'homeWins' => 40, 'homeLosses' => 1, 'awayWins' => 40, 'awayLosses' => 1, 'wins' => 80],
-            ['tid' => 2, 'team_name' => 'Heat', 'homeWins' => 1, 'homeLosses' => 40, 'awayWins' => 1, 'awayLosses' => 40, 'wins' => 2],
+            ['teamid' => 1, 'team_name' => 'Celtics', 'homeWins' => 40, 'homeLosses' => 1, 'awayWins' => 40, 'awayLosses' => 1, 'wins' => 80],
+            ['teamid' => 2, 'team_name' => 'Heat', 'homeWins' => 1, 'homeLosses' => 40, 'awayWins' => 1, 'awayLosses' => 40, 'wins' => 2],
         ];
         $this->mockDb->onQuery('ORDER BY wins DESC', $clinchData);
         $this->mockDb->onQuery('ORDER BY losses ASC', [['losses' => 80]]);

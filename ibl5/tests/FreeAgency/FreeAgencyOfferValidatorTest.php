@@ -422,7 +422,7 @@ class FreeAgencyOfferValidatorTest extends TestCase
 
     public function testRejectsMLEWhenTeamAlreadyHasPendingMLEOfferToDifferentPlayer(): void
     {
-        $team = $this->createTeamStub(hasMLE: 1, teamID: 7);
+        $team = $this->createTeamStub(hasMLE: 1, teamid: 7);
         $repository = $this->createRepositoryStub(pendingMle: true);
         $validator = new FreeAgencyOfferValidator($team, $repository, playerId: 99);
 
@@ -439,7 +439,7 @@ class FreeAgencyOfferValidatorTest extends TestCase
     {
         // Repository excludes the current player when checking — so a team
         // overwriting its own pending MLE offer to the same player is legal.
-        $team = $this->createTeamStub(hasMLE: 1, teamID: 7);
+        $team = $this->createTeamStub(hasMLE: 1, teamid: 7);
         $repository = $this->createRepositoryStub(pendingMle: false);
         $validator = new FreeAgencyOfferValidator($team, $repository, playerId: 42);
 
@@ -454,7 +454,7 @@ class FreeAgencyOfferValidatorTest extends TestCase
 
     public function testRejectsLLEWhenTeamAlreadyHasPendingLLEOfferToDifferentPlayer(): void
     {
-        $team = $this->createTeamStub(hasLLE: 1, teamID: 3);
+        $team = $this->createTeamStub(hasLLE: 1, teamid: 3);
         $repository = $this->createRepositoryStub(pendingLle: true);
         $validator = new FreeAgencyOfferValidator($team, $repository, playerId: 501);
 
@@ -469,7 +469,7 @@ class FreeAgencyOfferValidatorTest extends TestCase
 
     public function testAcceptsLLEOverwriteToSamePlayer(): void
     {
-        $team = $this->createTeamStub(hasLLE: 1, teamID: 3);
+        $team = $this->createTeamStub(hasLLE: 1, teamid: 3);
         $repository = $this->createRepositoryStub(pendingLle: false);
         $validator = new FreeAgencyOfferValidator($team, $repository, playerId: 501);
 
@@ -485,7 +485,7 @@ class FreeAgencyOfferValidatorTest extends TestCase
     {
         // MLE and LLE are independent exceptions. A pending MLE must not
         // block a LLE offer (and vice versa in the inverse test below).
-        $team = $this->createTeamStub(hasMLE: 1, hasLLE: 1, teamID: 7);
+        $team = $this->createTeamStub(hasMLE: 1, hasLLE: 1, teamid: 7);
         $repository = $this->createRepositoryStub(pendingMle: true, pendingLle: false);
         $validator = new FreeAgencyOfferValidator($team, $repository, playerId: 88);
 
@@ -499,7 +499,7 @@ class FreeAgencyOfferValidatorTest extends TestCase
 
     public function testPendingLLEDoesNotBlockMLEOffer(): void
     {
-        $team = $this->createTeamStub(hasMLE: 1, hasLLE: 1, teamID: 7);
+        $team = $this->createTeamStub(hasMLE: 1, hasLLE: 1, teamid: 7);
         $repository = $this->createRepositoryStub(pendingMle: false, pendingLle: true);
         $validator = new FreeAgencyOfferValidator($team, $repository, playerId: 88);
 
@@ -516,7 +516,7 @@ class FreeAgencyOfferValidatorTest extends TestCase
         // Rule 2: once an MLE has been consumed (hasMLE=0), no new MLE offer
         // is allowed for the remainder of the FA phase — even if the pending
         // offers table is empty.
-        $team = $this->createTeamStub(hasMLE: 0, teamID: 7);
+        $team = $this->createTeamStub(hasMLE: 0, teamid: 7);
         $repository = $this->createRepositoryStub(pendingMle: false);
         $validator = new FreeAgencyOfferValidator($team, $repository, playerId: 1);
 
@@ -531,7 +531,7 @@ class FreeAgencyOfferValidatorTest extends TestCase
 
     public function testAcceptedLLEBlocksAnyFurtherLLEOfferRegardlessOfPendingCheck(): void
     {
-        $team = $this->createTeamStub(hasLLE: 0, teamID: 7);
+        $team = $this->createTeamStub(hasLLE: 0, teamid: 7);
         $repository = $this->createRepositoryStub(pendingLle: false);
         $validator = new FreeAgencyOfferValidator($team, $repository, playerId: 1);
 
@@ -569,12 +569,12 @@ class FreeAgencyOfferValidatorTest extends TestCase
         ], $overrides);
     }
 
-    private function createTeamStub(int $hasMLE = 0, int $hasLLE = 0, int $teamID = 1): Team
+    private function createTeamStub(int $hasMLE = 0, int $hasLLE = 0, int $teamid = 1): Team
     {
         $team = $this->createStub(Team::class);
         $team->hasMLE = $hasMLE;
         $team->hasLLE = $hasLLE;
-        $team->teamID = $teamID;
+        $team->teamid = $teamid;
         return $team;
     }
 

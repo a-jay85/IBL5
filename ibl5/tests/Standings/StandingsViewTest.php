@@ -41,7 +41,7 @@ class StandingsViewTest extends TestCase
     private function makeTeamData(array $overrides = []): array
     {
         return array_merge([
-            'tid' => 1,
+            'teamid' => 1,
             'team_name' => 'Celtics',
             'leagueRecord' => '5-3',
             'pct' => '0.625',
@@ -73,7 +73,7 @@ class StandingsViewTest extends TestCase
     private function makeBulkTeamData(array $overrides = []): array
     {
         return array_merge([
-            'tid' => 1,
+            'teamid' => 1,
             'team_name' => 'Celtics',
             'leagueRecord' => '5-3',
             'pct' => '0.625',
@@ -153,8 +153,8 @@ class StandingsViewTest extends TestCase
     public function testRenderGroupsAndDisplaysTeamsCorrectly(): void
     {
         $bulkData = [
-            $this->makeBulkTeamData(['tid' => 1, 'team_name' => 'Celtics', 'conference' => 'Eastern', 'division' => 'Atlantic', 'confGB' => '0.0', 'divGB' => '0.0', 'confMagicNumber' => 70, 'divMagicNumber' => 65, 'wins' => 10]),
-            $this->makeBulkTeamData(['tid' => 2, 'team_name' => 'Lakers', 'conference' => 'Western', 'division' => 'Pacific', 'confGB' => '0.0', 'divGB' => '0.0', 'confMagicNumber' => 72, 'divMagicNumber' => 68, 'wins' => 8]),
+            $this->makeBulkTeamData(['teamid' => 1, 'team_name' => 'Celtics', 'conference' => 'Eastern', 'division' => 'Atlantic', 'confGB' => '0.0', 'divGB' => '0.0', 'confMagicNumber' => 70, 'divMagicNumber' => 65, 'wins' => 10]),
+            $this->makeBulkTeamData(['teamid' => 2, 'team_name' => 'Lakers', 'conference' => 'Western', 'division' => 'Pacific', 'confGB' => '0.0', 'divGB' => '0.0', 'confMagicNumber' => 72, 'divMagicNumber' => 68, 'wins' => 8]),
         ];
 
         $this->mockRepository->method('getAllStandings')->willReturn($bulkData);
@@ -171,8 +171,8 @@ class StandingsViewTest extends TestCase
     public function testRenderSortsByGamesBackThenClinchThenWins(): void
     {
         $bulkData = [
-            $this->makeBulkTeamData(['tid' => 1, 'team_name' => 'TeamA', 'conference' => 'Eastern', 'division' => 'Atlantic', 'confGB' => '5.0', 'divGB' => '5.0', 'confMagicNumber' => 70, 'divMagicNumber' => 65, 'wins' => 30]),
-            $this->makeBulkTeamData(['tid' => 2, 'team_name' => 'TeamB', 'conference' => 'Eastern', 'division' => 'Atlantic', 'confGB' => '0.0', 'divGB' => '0.0', 'confMagicNumber' => 60, 'divMagicNumber' => 55, 'wins' => 35]),
+            $this->makeBulkTeamData(['teamid' => 1, 'team_name' => 'TeamA', 'conference' => 'Eastern', 'division' => 'Atlantic', 'confGB' => '5.0', 'divGB' => '5.0', 'confMagicNumber' => 70, 'divMagicNumber' => 65, 'wins' => 30]),
+            $this->makeBulkTeamData(['teamid' => 2, 'team_name' => 'TeamB', 'conference' => 'Eastern', 'division' => 'Atlantic', 'confGB' => '0.0', 'divGB' => '0.0', 'confMagicNumber' => 60, 'divMagicNumber' => 55, 'wins' => 35]),
         ];
 
         $this->mockRepository->method('getAllStandings')->willReturn($bulkData);
@@ -221,7 +221,7 @@ class StandingsViewTest extends TestCase
         $this->assertStringContainsString('Celtics', $result);
         $this->assertStringContainsString('5-3', $result);
         $this->assertStringContainsString('0.625', $result);
-        $this->assertStringContainsString('teamID=1', $result);
+        $this->assertStringContainsString('teamid=1', $result);
     }
 
     public function testRenderRegionIncludesPythagoreanColumn(): void
@@ -530,8 +530,8 @@ class StandingsViewTest extends TestCase
     public function testBottomLockedClassAppliedWhenTeamCantCatchUp(): void
     {
         $teamData = [
-            $this->makeTeamData(['tid' => 1, 'team_name' => 'First', 'wins' => 50, 'gamesUnplayed' => 10, 'gamesBack' => '0.0']),
-            $this->makeTeamData(['tid' => 2, 'team_name' => 'Last', 'wins' => 30, 'gamesUnplayed' => 5, 'gamesBack' => '20.0']),
+            $this->makeTeamData(['teamid' => 1, 'team_name' => 'First', 'wins' => 50, 'gamesUnplayed' => 10, 'gamesBack' => '0.0']),
+            $this->makeTeamData(['teamid' => 2, 'team_name' => 'Last', 'wins' => 30, 'gamesUnplayed' => 5, 'gamesBack' => '20.0']),
         ];
 
         $this->mockRepository->method('getStandingsByRegion')->willReturn($teamData);
@@ -547,8 +547,8 @@ class StandingsViewTest extends TestCase
     public function testNoBottomLockWhenTeamCanStillCatchUp(): void
     {
         $teamData = [
-            $this->makeTeamData(['tid' => 1, 'team_name' => 'First', 'wins' => 40, 'gamesUnplayed' => 20, 'gamesBack' => '0.0']),
-            $this->makeTeamData(['tid' => 2, 'team_name' => 'Second', 'wins' => 35, 'gamesUnplayed' => 20, 'gamesBack' => '5.0']),
+            $this->makeTeamData(['teamid' => 1, 'team_name' => 'First', 'wins' => 40, 'gamesUnplayed' => 20, 'gamesBack' => '0.0']),
+            $this->makeTeamData(['teamid' => 2, 'team_name' => 'Second', 'wins' => 35, 'gamesUnplayed' => 20, 'gamesBack' => '5.0']),
         ];
 
         $this->mockRepository->method('getStandingsByRegion')->willReturn($teamData);
@@ -564,10 +564,10 @@ class StandingsViewTest extends TestCase
     public function testBottomLockCascadesFromBottom(): void
     {
         $teamData = [
-            $this->makeTeamData(['tid' => 1, 'team_name' => 'First', 'wins' => 60, 'gamesUnplayed' => 5, 'gamesBack' => '0.0']),
-            $this->makeTeamData(['tid' => 2, 'team_name' => 'Second', 'wins' => 50, 'gamesUnplayed' => 5, 'gamesBack' => '10.0']),
-            $this->makeTeamData(['tid' => 3, 'team_name' => 'Third', 'wins' => 30, 'gamesUnplayed' => 5, 'gamesBack' => '30.0']),
-            $this->makeTeamData(['tid' => 4, 'team_name' => 'Fourth', 'wins' => 20, 'gamesUnplayed' => 5, 'gamesBack' => '40.0']),
+            $this->makeTeamData(['teamid' => 1, 'team_name' => 'First', 'wins' => 60, 'gamesUnplayed' => 5, 'gamesBack' => '0.0']),
+            $this->makeTeamData(['teamid' => 2, 'team_name' => 'Second', 'wins' => 50, 'gamesUnplayed' => 5, 'gamesBack' => '10.0']),
+            $this->makeTeamData(['teamid' => 3, 'team_name' => 'Third', 'wins' => 30, 'gamesUnplayed' => 5, 'gamesBack' => '30.0']),
+            $this->makeTeamData(['teamid' => 4, 'team_name' => 'Fourth', 'wins' => 20, 'gamesUnplayed' => 5, 'gamesBack' => '40.0']),
         ];
 
         $this->mockRepository->method('getStandingsByRegion')->willReturn($teamData);
@@ -586,9 +586,9 @@ class StandingsViewTest extends TestCase
     public function testBottomLockStopsWhenTeamCanCatch(): void
     {
         $teamData = [
-            $this->makeTeamData(['tid' => 1, 'team_name' => 'First', 'wins' => 50, 'gamesUnplayed' => 10, 'gamesBack' => '0.0']),
-            $this->makeTeamData(['tid' => 2, 'team_name' => 'Second', 'wins' => 45, 'gamesUnplayed' => 10, 'gamesBack' => '5.0']),
-            $this->makeTeamData(['tid' => 3, 'team_name' => 'Third', 'wins' => 20, 'gamesUnplayed' => 5, 'gamesBack' => '30.0']),
+            $this->makeTeamData(['teamid' => 1, 'team_name' => 'First', 'wins' => 50, 'gamesUnplayed' => 10, 'gamesBack' => '0.0']),
+            $this->makeTeamData(['teamid' => 2, 'team_name' => 'Second', 'wins' => 45, 'gamesUnplayed' => 10, 'gamesBack' => '5.0']),
+            $this->makeTeamData(['teamid' => 3, 'team_name' => 'Third', 'wins' => 20, 'gamesUnplayed' => 5, 'gamesBack' => '30.0']),
         ];
 
         $this->mockRepository->method('getStandingsByRegion')->willReturn($teamData);
@@ -608,10 +608,10 @@ class StandingsViewTest extends TestCase
     public function testSeasonOverUnclinkedTeamsAreBottomLocked(): void
     {
         $teamData = [
-            $this->makeTeamData(['tid' => 1, 'team_name' => 'First', 'wins' => 58, 'gamesUnplayed' => 0, 'gamesBack' => '0.0', 'clinchedPlayoffs' => 1]),
-            $this->makeTeamData(['tid' => 2, 'team_name' => 'Second', 'wins' => 50, 'gamesUnplayed' => 0, 'gamesBack' => '8.0', 'clinchedPlayoffs' => 1]),
-            $this->makeTeamData(['tid' => 3, 'team_name' => 'Third', 'wins' => 36, 'gamesUnplayed' => 0, 'gamesBack' => '22.0']),
-            $this->makeTeamData(['tid' => 4, 'team_name' => 'Fourth', 'wins' => 20, 'gamesUnplayed' => 0, 'gamesBack' => '38.0']),
+            $this->makeTeamData(['teamid' => 1, 'team_name' => 'First', 'wins' => 58, 'gamesUnplayed' => 0, 'gamesBack' => '0.0', 'clinchedPlayoffs' => 1]),
+            $this->makeTeamData(['teamid' => 2, 'team_name' => 'Second', 'wins' => 50, 'gamesUnplayed' => 0, 'gamesBack' => '8.0', 'clinchedPlayoffs' => 1]),
+            $this->makeTeamData(['teamid' => 3, 'team_name' => 'Third', 'wins' => 36, 'gamesUnplayed' => 0, 'gamesBack' => '22.0']),
+            $this->makeTeamData(['teamid' => 4, 'team_name' => 'Fourth', 'wins' => 20, 'gamesUnplayed' => 0, 'gamesBack' => '38.0']),
         ];
 
         $this->mockRepository->method('getStandingsByRegion')->willReturn($teamData);
@@ -629,9 +629,9 @@ class StandingsViewTest extends TestCase
     public function testSeasonOverClinkedTeamsNeverBottomLocked(): void
     {
         $teamData = [
-            $this->makeTeamData(['tid' => 1, 'team_name' => 'First', 'wins' => 58, 'gamesUnplayed' => 0, 'gamesBack' => '0.0', 'clinchedDivision' => 1]),
-            $this->makeTeamData(['tid' => 2, 'team_name' => 'Second', 'wins' => 55, 'gamesUnplayed' => 0, 'gamesBack' => '3.0', 'clinchedPlayoffs' => 1]),
-            $this->makeTeamData(['tid' => 3, 'team_name' => 'Third', 'wins' => 53, 'gamesUnplayed' => 0, 'gamesBack' => '5.0', 'clinchedPlayoffs' => 1]),
+            $this->makeTeamData(['teamid' => 1, 'team_name' => 'First', 'wins' => 58, 'gamesUnplayed' => 0, 'gamesBack' => '0.0', 'clinchedDivision' => 1]),
+            $this->makeTeamData(['teamid' => 2, 'team_name' => 'Second', 'wins' => 55, 'gamesUnplayed' => 0, 'gamesBack' => '3.0', 'clinchedPlayoffs' => 1]),
+            $this->makeTeamData(['teamid' => 3, 'team_name' => 'Third', 'wins' => 53, 'gamesUnplayed' => 0, 'gamesBack' => '5.0', 'clinchedPlayoffs' => 1]),
         ];
 
         $this->mockRepository->method('getStandingsByRegion')->willReturn($teamData);
@@ -647,10 +647,10 @@ class StandingsViewTest extends TestCase
     public function testSeasonOverTiedEliminatedTeamsAllBottomLocked(): void
     {
         $teamData = [
-            $this->makeTeamData(['tid' => 1, 'team_name' => 'First', 'wins' => 45, 'gamesUnplayed' => 0, 'gamesBack' => '0.0', 'clinchedPlayoffs' => 1]),
-            $this->makeTeamData(['tid' => 2, 'team_name' => 'Second', 'wins' => 35, 'gamesUnplayed' => 0, 'gamesBack' => '10.0']),
-            $this->makeTeamData(['tid' => 3, 'team_name' => 'Third', 'wins' => 35, 'gamesUnplayed' => 0, 'gamesBack' => '10.0']),
-            $this->makeTeamData(['tid' => 4, 'team_name' => 'Fourth', 'wins' => 35, 'gamesUnplayed' => 0, 'gamesBack' => '10.0']),
+            $this->makeTeamData(['teamid' => 1, 'team_name' => 'First', 'wins' => 45, 'gamesUnplayed' => 0, 'gamesBack' => '0.0', 'clinchedPlayoffs' => 1]),
+            $this->makeTeamData(['teamid' => 2, 'team_name' => 'Second', 'wins' => 35, 'gamesUnplayed' => 0, 'gamesBack' => '10.0']),
+            $this->makeTeamData(['teamid' => 3, 'team_name' => 'Third', 'wins' => 35, 'gamesUnplayed' => 0, 'gamesBack' => '10.0']),
+            $this->makeTeamData(['teamid' => 4, 'team_name' => 'Fourth', 'wins' => 35, 'gamesUnplayed' => 0, 'gamesBack' => '10.0']),
         ];
 
         $this->mockRepository->method('getStandingsByRegion')->willReturn($teamData);
@@ -666,10 +666,10 @@ class StandingsViewTest extends TestCase
     public function testMidSeasonCascadeStopsAtClinchedTeam(): void
     {
         $teamData = [
-            $this->makeTeamData(['tid' => 1, 'team_name' => 'First', 'wins' => 60, 'gamesUnplayed' => 5, 'gamesBack' => '0.0', 'clinchedPlayoffs' => 1]),
-            $this->makeTeamData(['tid' => 2, 'team_name' => 'Second', 'wins' => 50, 'gamesUnplayed' => 5, 'gamesBack' => '10.0', 'clinchedPlayoffs' => 1]),
-            $this->makeTeamData(['tid' => 3, 'team_name' => 'Third', 'wins' => 20, 'gamesUnplayed' => 5, 'gamesBack' => '40.0']),
-            $this->makeTeamData(['tid' => 4, 'team_name' => 'Fourth', 'wins' => 10, 'gamesUnplayed' => 5, 'gamesBack' => '50.0']),
+            $this->makeTeamData(['teamid' => 1, 'team_name' => 'First', 'wins' => 60, 'gamesUnplayed' => 5, 'gamesBack' => '0.0', 'clinchedPlayoffs' => 1]),
+            $this->makeTeamData(['teamid' => 2, 'team_name' => 'Second', 'wins' => 50, 'gamesUnplayed' => 5, 'gamesBack' => '10.0', 'clinchedPlayoffs' => 1]),
+            $this->makeTeamData(['teamid' => 3, 'team_name' => 'Third', 'wins' => 20, 'gamesUnplayed' => 5, 'gamesBack' => '40.0']),
+            $this->makeTeamData(['teamid' => 4, 'team_name' => 'Fourth', 'wins' => 10, 'gamesUnplayed' => 5, 'gamesBack' => '50.0']),
         ];
 
         $this->mockRepository->method('getStandingsByRegion')->willReturn($teamData);
@@ -706,11 +706,11 @@ class StandingsViewTest extends TestCase
 
     public function testTwoTeamH2HTiebreakerSortsWinnerFirst(): void
     {
-        // Grizzlies (tid=10) and Lakers (tid=11) tied on GB/clinch/wins
+        // Grizzlies (teamid=10) and Lakers (teamid=11) tied on GB/clinch/wins
         // Grizzlies are 3-2 vs Lakers in H2H
         $teamData = [
-            $this->makeTeamData(['tid' => 11, 'team_name' => 'Lakers', 'wins' => 40, 'gamesBack' => '5.0']),
-            $this->makeTeamData(['tid' => 10, 'team_name' => 'Grizzlies', 'wins' => 40, 'gamesBack' => '5.0']),
+            $this->makeTeamData(['teamid' => 11, 'team_name' => 'Lakers', 'wins' => 40, 'gamesBack' => '5.0']),
+            $this->makeTeamData(['teamid' => 10, 'team_name' => 'Grizzlies', 'wins' => 40, 'gamesBack' => '5.0']),
         ];
 
         $seriesRecords = [
@@ -734,9 +734,9 @@ class StandingsViewTest extends TestCase
     {
         // Three-way tie: Mavericks (6-3 aggregate), Warriors (4-3), Jazz (2-6)
         $teamData = [
-            $this->makeTeamData(['tid' => 20, 'team_name' => 'Jazz', 'wins' => 38, 'gamesBack' => '7.0']),
-            $this->makeTeamData(['tid' => 21, 'team_name' => 'Warriors', 'wins' => 38, 'gamesBack' => '7.0']),
-            $this->makeTeamData(['tid' => 22, 'team_name' => 'Mavericks', 'wins' => 38, 'gamesBack' => '7.0']),
+            $this->makeTeamData(['teamid' => 20, 'team_name' => 'Jazz', 'wins' => 38, 'gamesBack' => '7.0']),
+            $this->makeTeamData(['teamid' => 21, 'team_name' => 'Warriors', 'wins' => 38, 'gamesBack' => '7.0']),
+            $this->makeTeamData(['teamid' => 22, 'team_name' => 'Mavericks', 'wins' => 38, 'gamesBack' => '7.0']),
         ];
 
         $seriesRecords = [
@@ -770,8 +770,8 @@ class StandingsViewTest extends TestCase
     {
         // Team A has better GB than Team B, but worse H2H
         $teamData = [
-            $this->makeTeamData(['tid' => 30, 'team_name' => 'TeamA', 'wins' => 45, 'gamesBack' => '0.0']),
-            $this->makeTeamData(['tid' => 31, 'team_name' => 'TeamB', 'wins' => 40, 'gamesBack' => '5.0']),
+            $this->makeTeamData(['teamid' => 30, 'team_name' => 'TeamA', 'wins' => 45, 'gamesBack' => '0.0']),
+            $this->makeTeamData(['teamid' => 31, 'team_name' => 'TeamB', 'wins' => 40, 'gamesBack' => '5.0']),
         ];
 
         $seriesRecords = [
@@ -795,8 +795,8 @@ class StandingsViewTest extends TestCase
     {
         // Teams split series evenly — original sort (by wins) should hold
         $teamData = [
-            $this->makeTeamData(['tid' => 40, 'team_name' => 'HighWins', 'wins' => 42, 'gamesBack' => '3.0']),
-            $this->makeTeamData(['tid' => 41, 'team_name' => 'LowWins', 'wins' => 42, 'gamesBack' => '3.0']),
+            $this->makeTeamData(['teamid' => 40, 'team_name' => 'HighWins', 'wins' => 42, 'gamesBack' => '3.0']),
+            $this->makeTeamData(['teamid' => 41, 'team_name' => 'LowWins', 'wins' => 42, 'gamesBack' => '3.0']),
         ];
 
         $seriesRecords = [
@@ -820,8 +820,8 @@ class StandingsViewTest extends TestCase
     {
         // Tied teams with no H2H games at all
         $teamData = [
-            $this->makeTeamData(['tid' => 50, 'team_name' => 'FirstTeam', 'wins' => 35, 'gamesBack' => '10.0']),
-            $this->makeTeamData(['tid' => 51, 'team_name' => 'SecondTeam', 'wins' => 35, 'gamesBack' => '10.0']),
+            $this->makeTeamData(['teamid' => 50, 'team_name' => 'FirstTeam', 'wins' => 35, 'gamesBack' => '10.0']),
+            $this->makeTeamData(['teamid' => 51, 'team_name' => 'SecondTeam', 'wins' => 35, 'gamesBack' => '10.0']),
         ];
 
         // No series records between these teams
@@ -843,8 +843,8 @@ class StandingsViewTest extends TestCase
     {
         // Verify the renderRegion path (not just render) applies H2H
         $teamData = [
-            $this->makeTeamData(['tid' => 60, 'team_name' => 'Loser', 'wins' => 40, 'gamesBack' => '5.0']),
-            $this->makeTeamData(['tid' => 61, 'team_name' => 'Winner', 'wins' => 40, 'gamesBack' => '5.0']),
+            $this->makeTeamData(['teamid' => 60, 'team_name' => 'Loser', 'wins' => 40, 'gamesBack' => '5.0']),
+            $this->makeTeamData(['teamid' => 61, 'team_name' => 'Winner', 'wins' => 40, 'gamesBack' => '5.0']),
         ];
 
         $seriesRecords = [

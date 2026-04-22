@@ -21,7 +21,7 @@ class ApiInjuriesRepository extends \BaseMysqliRepository
             'SELECT p.uuid AS player_uuid, p.pid, p.name, p.pos, p.injured,
                     t.teamid, t.uuid AS team_uuid, t.team_city, t.team_name
              FROM ibl_plr p
-             LEFT JOIN ibl_team_info t ON p.tid = t.teamid
+             LEFT JOIN ibl_team_info t ON p.teamid = t.teamid
              WHERE p.injured > 0 AND p.dc_canPlayInGame = 1
              ORDER BY p.injured DESC'
         );

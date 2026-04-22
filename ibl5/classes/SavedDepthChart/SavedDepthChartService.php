@@ -32,7 +32,7 @@ class SavedDepthChartService implements SavedDepthChartServiceInterface
      * @param array<string, mixed> $postData
      */
     public function saveOnSubmit(
-        int $tid,
+        int $teamid,
         string $username,
         ?string $name,
         array $rosterPlayers,
@@ -45,13 +45,13 @@ class SavedDepthChartService implements SavedDepthChartServiceInterface
         $this->db->begin_transaction();
         try {
             if ($loadedDcId > 0) {
-                $existingDc = $this->repository->getSavedDepthChartById($loadedDcId, $tid);
+                $existingDc = $this->repository->getSavedDepthChartById($loadedDcId, $teamid);
                 if ($existingDc !== null) {
                     $this->repository->updateDepthChartPlayers($loadedDcId, $snapshots);
 
-                    $this->repository->deactivateOthersForTeam($tid, $loadedDcId, $season->lastSimEndDate, $season->lastSimNumber);
+                    $this->repository->deactivateOthersForTeam($teamid, $loadedDcId, $season->lastSimEndDate, $season->lastSimNumber);
                     if ($existingDc['is_active'] === 0) {
-                        $this->repository->reactivate($loadedDcId, $tid);
+                        $this->repository->reactivate($loadedDcId, $teamid);
                     }
 
                     $this->db->commit();
@@ -59,7 +59,7 @@ class SavedDepthChartService implements SavedDepthChartServiceInterface
                     \Logging\LoggerFactory::getChannel('audit')->info('depth_chart_saved', [
                         'action' => 'depth_chart_saved',
                         'dc_id' => $loadedDcId,
-                        'team_id' => $tid,
+                        'team_id' => $teamid,
                         'dc_name' => $name,
                         'phase' => $season->phase,
                     ]);
@@ -69,15 +69,15 @@ class SavedDepthChartService implements SavedDepthChartServiceInterface
             }
 
             // Check if most recent DC is unused (no sim has consumed it yet)
-            $mostRecent = $this->repository->getMostRecentDepthChart($tid);
+            $mostRecent = $this->repository->getMostRecentDepthChart($teamid);
             if ($mostRecent !== null && $mostRecent['sim_end_date'] === null) {
                 // Unused DC exists — update it instead of creating a new one
                 $this->repository->updateDepthChartPlayers($mostRecent['id'], $snapshots);
 
                 // Ensure it's the only active DC
-                $this->repository->deactivateOthersForTeam($tid, $mostRecent['id'], $season->lastSimEndDate, $season->lastSimNumber);
+                $this->repository->deactivateOthersForTeam($teamid, $mostRecent['id'], $season->lastSimEndDate, $season->lastSimNumber);
                 if ($mostRecent['is_active'] === 0) {
-                    $this->repository->reactivate($mostRecent['id'], $tid);
+                    $this->repository->reactivate($mostRecent['id'], $teamid);
                 }
 
                 $this->db->commit();
@@ -85,7 +85,7 @@ class SavedDepthChartService implements SavedDepthChartServiceInterface
                 \Logging\LoggerFactory::getChannel('audit')->info('depth_chart_saved', [
                     'action' => 'depth_chart_saved',
                     'dc_id' => $mostRecent['id'],
-                    'team_id' => $tid,
+                    'team_id' => $teamid,
                     'dc_name' => $name,
                     'phase' => $season->phase,
                 ]);
@@ -94,13 +94,13 @@ class SavedDepthChartService implements SavedDepthChartServiceInterface
             }
 
             // No unused DC — create new one
-            $this->repository->deactivateForTeam($tid, $season->lastSimEndDate, $season->lastSimNumber);
+            $this->repository->deactivateForTeam($teamid, $season->lastSimEndDate, $season->lastSimNumber);
 
             $simStartDate = $this->calculateNextSimStartDate($season->lastSimEndDate);
             $simNumberStart = $season->lastSimNumber + 1;
 
             $dcId = $this->repository->createSavedDepthChart(
-                $tid,
+                $teamid,
                 $username,
                 $name,
                 $season->phase,
@@ -116,7 +116,7 @@ class SavedDepthChartService implements SavedDepthChartServiceInterface
             \Logging\LoggerFactory::getChannel('audit')->info('depth_chart_saved', [
                 'action' => 'depth_chart_saved',
                 'dc_id' => $dcId,
-                'team_id' => $tid,
+                'team_id' => $teamid,
                 'dc_name' => $name,
                 'phase' => $season->phase,
             ]);
@@ -132,9 +132,9 @@ class SavedDepthChartService implements SavedDepthChartServiceInterface
      * @see SavedDepthChartServiceInterface::loadSavedDepthChart()
      * @param list<int> $currentRosterPids
      */
-    public function loadSavedDepthChart(int $id, int $tid, array $currentRosterPids): ?array
+    public function loadSavedDepthChart(int $id, int $teamid, array $currentRosterPids): ?array
     {
-        $dc = $this->repository->getSavedDepthChartById($id, $tid);
+        $dc = $this->repository->getSavedDepthChartById($id, $teamid);
         if ($dc === null) {
             return null;
         }
@@ -161,7 +161,7 @@ class SavedDepthChartService implements SavedDepthChartServiceInterface
      * @see SavedDepthChartServiceInterface::getWinLossRecord()
      * @return array{wins: int, losses: int}
      */
-    public function getWinLossRecord(int $tid, string $startDate, string $endDate): array
+    public function getWinLossRecord(int $teamid, string $startDate, string $endDate): array
     {
         $query = "SELECT
             SUM(CASE WHEN (Visitor = ? AND VScore > HScore) OR (Home = ? AND HScore > VScore) THEN 1 ELSE 0 END) as wins,
@@ -178,9 +178,9 @@ class SavedDepthChartService implements SavedDepthChartServiceInterface
 
         $stmt->bind_param(
             'iiiissii',
-            $tid, $tid, $tid, $tid,
+            $teamid, $teamid, $teamid, $teamid,
             $startDate, $endDate,
-            $tid, $tid
+            $teamid, $teamid
         );
         $stmt->execute();
         $result = $stmt->get_result();
@@ -208,14 +208,14 @@ class SavedDepthChartService implements SavedDepthChartServiceInterface
      *
      * Shows phase, phase-specific sim range, date range, and win-loss record.
      */
-    public function buildCurrentLiveLabel(int $tid, Season $season): string
+    public function buildCurrentLiveLabel(int $teamid, Season $season): string
     {
         $currentPhaseSim = $season->getPhaseSpecificSimNumber();
 
         $parts = [];
 
         // Find active DC (most recently updated) for sim range, date range, and win-loss record
-        $activeDc = $this->repository->getActiveDepthChartForTeam($tid);
+        $activeDc = $this->repository->getActiveDepthChartForTeam($teamid);
 
         // Use the active DC's name if it has one, otherwise default label
         if ($activeDc !== null && $activeDc['name'] !== null && $activeDc['name'] !== '') {
@@ -252,7 +252,7 @@ class SavedDepthChartService implements SavedDepthChartServiceInterface
 
         // Win-loss record for the active DC's span
         if ($activeDc !== null) {
-            $record = $this->getWinLossRecord($tid, $activeDc['sim_start_date'], $season->lastSimEndDate);
+            $record = $this->getWinLossRecord($teamid, $activeDc['sim_start_date'], $season->lastSimEndDate);
             $parts[] = '(' . $record['wins'] . '-' . $record['losses'] . ')';
         }
 
@@ -263,18 +263,18 @@ class SavedDepthChartService implements SavedDepthChartServiceInterface
      * @see SavedDepthChartServiceInterface::getDropdownOptions()
      * @return list<array{id: int, label: string, isActive: bool}>
      */
-    public function getDropdownOptions(int $tid, Season $season): array
+    public function getDropdownOptions(int $teamid, Season $season): array
     {
-        $savedDcs = $this->repository->getSavedDepthChartsForTeam($tid);
+        $savedDcs = $this->repository->getSavedDepthChartsForTeam($teamid);
 
         // Find active DC (most recently updated if multiple)
-        $activeDc = $this->repository->getActiveDepthChartForTeam($tid);
+        $activeDc = $this->repository->getActiveDepthChartForTeam($teamid);
 
         // Hide active DC if it matches live ibl_plr settings exactly
         $hideActiveDc = false;
         if ($activeDc !== null) {
             $dcPlayers = $this->repository->getPlayersForDepthChart($activeDc['id']);
-            $liveRosterPlayers = $this->repository->getLiveRosterSettings($tid);
+            $liveRosterPlayers = $this->repository->getLiveRosterSettings($teamid);
             $hideActiveDc = $this->isDepthChartMatchingLive($dcPlayers, $liveRosterPlayers);
         }
 
@@ -285,7 +285,7 @@ class SavedDepthChartService implements SavedDepthChartServiceInterface
                 continue;
             }
 
-            $label = $this->buildDropdownLabel($dc, $season, $tid);
+            $label = $this->buildDropdownLabel($dc, $season, $teamid);
             $options[] = [
                 'id' => $dc['id'],
                 'label' => $label,
@@ -460,7 +460,7 @@ class SavedDepthChartService implements SavedDepthChartServiceInterface
      *
      * @param SavedDepthChartRow $dc
      */
-    private function buildDropdownLabel(array $dc, Season $season, int $tid): string
+    private function buildDropdownLabel(array $dc, Season $season, int $teamid): string
     {
         $parts = [];
 
@@ -495,7 +495,7 @@ class SavedDepthChartService implements SavedDepthChartServiceInterface
 
         // Win-loss record using sim_end_date or lastSimEndDate for active DCs
         $recordEndDate = $dc['sim_end_date'] ?? $season->lastSimEndDate;
-        $record = $this->getWinLossRecord($tid, $dc['sim_start_date'], $recordEndDate);
+        $record = $this->getWinLossRecord($teamid, $dc['sim_start_date'], $recordEndDate);
         $parts[] = '(' . $record['wins'] . '-' . $record['losses'] . ')';
 
         return implode(' | ', $parts);
@@ -519,18 +519,18 @@ class SavedDepthChartService implements SavedDepthChartServiceInterface
      * @see SavedDepthChartServiceInterface::nameOrCreateActive()
      * @return array{success: bool, id: int, name: string}|array{success: bool, error: string}
      */
-    public function nameOrCreateActive(int $tid, string $username, string $name, Season $season): array
+    public function nameOrCreateActive(int $teamid, string $username, string $name, Season $season): array
     {
-        $activeDc = $this->repository->getActiveDepthChartForTeam($tid);
+        $activeDc = $this->repository->getActiveDepthChartForTeam($teamid);
 
         if ($activeDc !== null) {
-            $this->repository->updateName($activeDc['id'], $tid, $name);
-            $this->repository->deactivateOthersForTeam($tid, $activeDc['id'], $season->lastSimEndDate, $season->lastSimNumber);
+            $this->repository->updateName($activeDc['id'], $teamid, $name);
+            $this->repository->deactivateOthersForTeam($teamid, $activeDc['id'], $season->lastSimEndDate, $season->lastSimNumber);
             return ['success' => true, 'id' => $activeDc['id'], 'name' => $name];
         }
 
         // No active DC — create one from live ibl_plr values
-        $livePlayers = $this->repository->getLiveRosterSettings($tid);
+        $livePlayers = $this->repository->getLiveRosterSettings($teamid);
         if ($livePlayers === []) {
             return ['success' => false, 'error' => 'No players found on roster'];
         }
@@ -560,7 +560,7 @@ class SavedDepthChartService implements SavedDepthChartServiceInterface
         $simNumberStart = $season->lastSimNumber + 1;
 
         $dcId = $this->repository->createSavedDepthChart(
-            $tid,
+            $teamid,
             $username,
             $name,
             $season->phase,

@@ -102,7 +102,7 @@ class MobileNavViewTest extends TestCase
         return [
             'icon' => '<img src="/ibl5/images/logo/new1.png" alt="Team Logo">',
             'links' => [
-                ['label' => 'Team Page', 'url' => 'modules.php?name=Team&op=team&teamID=1'],
+                ['label' => 'Team Page', 'url' => 'modules.php?name=Team&op=team&teamid=1'],
             ],
         ];
     }

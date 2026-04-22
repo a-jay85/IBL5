@@ -42,7 +42,7 @@ class SharedRepository extends \BaseMysqliRepository implements SharedRepository
     {
         /** @var array{ownerofpick: string}|null $result */
         $result = $this->fetchOne(
-            "SELECT ownerofpick FROM ibl_draft_picks WHERE year = ? AND round = ? AND teampick_tid = ? LIMIT 1",
+            "SELECT ownerofpick FROM ibl_draft_picks WHERE year = ? AND round = ? AND teampick_teamid = ? LIMIT 1",
             "iii",
             $draftYear,
             $draftRound,

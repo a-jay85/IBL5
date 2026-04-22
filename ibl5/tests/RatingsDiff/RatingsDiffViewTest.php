@@ -34,7 +34,7 @@ class RatingsDiffViewTest extends TestCase
         int $maxAbs = 0,
         bool $isNew = false,
         string $pos = 'PG',
-        int $tid = 1,
+        int $teamid = 1,
         ?string $teamName = 'Test Team',
     ): RatingRow {
         /** @var array<string, RatingDelta> $deltas */
@@ -57,7 +57,7 @@ class RatingsDiffViewTest extends TestCase
             pid: $pid,
             name: $name,
             pos: $pos,
-            tid: $tid,
+            teamid: $teamid,
             teamName: $teamName,
             deltas: $deltas,
             maxAbsDelta: $isNew ? 0 : $maxAbs,
@@ -91,7 +91,7 @@ class RatingsDiffViewTest extends TestCase
             pid: $pid,
             name: $name,
             pos: 'PG',
-            tid: 1,
+            teamid: 1,
             teamName: 'Test Team',
             deltas: $deltas,
             maxAbsDelta: $maxAbs,

@@ -500,7 +500,7 @@ class YourAccountServiceTest extends TestCase
 
         $result = $this->service->getTeamRedirectUrl('testuser');
 
-        $this->assertSame('modules.php?name=Team&op=team&teamID=10', $result);
+        $this->assertSame('modules.php?name=Team&op=team&teamid=10', $result);
     }
 
     public function testGetTeamRedirectUrlFreeAgentReturnsNull(): void

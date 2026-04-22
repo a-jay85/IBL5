@@ -107,7 +107,7 @@ final class PageCacheTest extends TestCase
 
     public function testBuildCacheKeyProduces32CharMd5(): void
     {
-        $key = PageCache::buildCacheKey('/ibl5/modules.php?name=Team&teamID=5', false);
+        $key = PageCache::buildCacheKey('/ibl5/modules.php?name=Team&teamid=5', false);
 
         self::assertMatchesRegularExpression('/^[a-f0-9]{32}$/', $key);
     }

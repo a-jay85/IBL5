@@ -24,7 +24,7 @@ class FranchiseRecordBookRepositoryTest extends DatabaseTestCase
         self::assertNotEmpty($result);
         $first = $result[0];
         self::assertSame('team', $first['scope']);
-        self::assertSame(1, $first['team_id']);
+        self::assertSame(1, $first['teamid']);
         self::assertSame('single_season', $first['record_type']);
         self::assertArrayHasKey('stat_category', $first);
         self::assertArrayHasKey('player_name', $first);

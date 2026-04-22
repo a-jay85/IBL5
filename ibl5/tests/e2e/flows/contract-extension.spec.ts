@@ -48,7 +48,7 @@ test.describe('Contract Extension flow', () => {
 
   test('team contracts page renders without errors', async ({ appState, page }) => {
     await appState({ 'Current Season Phase': 'Regular Season', 'Current Season Ending Year': '2026' });
-    await page.goto('modules.php?name=Team&op=team&teamID=1&display=contracts');
+    await page.goto('modules.php?name=Team&op=team&teamid=1&display=contracts');
     await assertNoPhpErrors(page, 'on team contracts page');
 
     // Contracts display should show player rows
@@ -82,7 +82,7 @@ test.describe('Contract Extension flow', () => {
 
     // Navigate directly to the result page to verify banner rendering
     await page.goto(
-      'modules.php?name=Team&op=team&teamID=1&display=contracts&result=extension_accepted&msg=Player+agreed+to+extension',
+      'modules.php?name=Team&op=team&teamid=1&display=contracts&result=extension_accepted&msg=Player+agreed+to+extension',
     );
 
     const banner = page.locator('.ibl-alert--success');
@@ -95,7 +95,7 @@ test.describe('Contract Extension flow', () => {
 
     const urls = [
       'modules.php?name=Player&pa=negotiate&pid=30',
-      'modules.php?name=Team&op=team&teamID=1&display=contracts',
+      'modules.php?name=Team&op=team&teamid=1&display=contracts',
     ];
     for (const url of urls) {
       await page.goto(url);

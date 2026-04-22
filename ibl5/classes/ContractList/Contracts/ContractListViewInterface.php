@@ -20,7 +20,7 @@ interface ContractListViewInterface
      *         name: string,
      *         pos: string,
      *         teamname: string,
-     *         tid: int,
+     *         teamid: int,
      *         team_city: string,
      *         color1: string,
      *         color2: string,

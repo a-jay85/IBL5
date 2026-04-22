@@ -20,7 +20,7 @@ interface InjuriesServiceInterface
      *     position: string,
      *     daysRemaining: int,
      *     returnDate: string,
-     *     teamID: int,
+     *     teamid: int,
      *     teamCity: string,
      *     teamName: string,
      *     teamColor1: string,

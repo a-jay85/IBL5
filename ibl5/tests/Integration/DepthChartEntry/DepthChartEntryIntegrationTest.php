@@ -398,13 +398,13 @@ class DepthChartEntryIntegrationTest extends IntegrationTestCase
             TestDataFactory::createPlayer([
                 'pid' => 1,
                 'name' => 'Player One',
-                'tid' => $teamId,
+                'teamid' => $teamId,
                 'ordinal' => 10
             ]),
             TestDataFactory::createPlayer([
                 'pid' => 2,
                 'name' => 'Player Two',
-                'tid' => $teamId,
+                'teamid' => $teamId,
                 'ordinal' => 20
             ]),
         ];
@@ -418,7 +418,7 @@ class DepthChartEntryIntegrationTest extends IntegrationTestCase
         $this->assertEquals('Player One', $result[0]['name']);
         $this->assertEquals('Player Two', $result[1]['name']);
         $this->assertQueryExecuted('SELECT * FROM ibl_plr');
-        $this->assertQueryExecuted("tid = $teamId");
+        $this->assertQueryExecuted("teamid = $teamId");
     }
 
     /**

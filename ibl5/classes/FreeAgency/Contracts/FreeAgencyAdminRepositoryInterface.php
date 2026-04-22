@@ -14,7 +14,7 @@ namespace FreeAgency\Contracts;
  *     name: string,
  *     pid: int,
  *     team: string,
- *     tid: int,
+ *     teamid: int,
  *     offer1: int,
  *     offer2: int,
  *     offer3: int,
@@ -52,7 +52,7 @@ interface FreeAgencyAdminRepositoryInterface
      * Sets cy=0, assigns contract year salaries, contract years total, and team ID.
      *
      * @param int $pid Player ID
-     * @param int $tid Team ID to assign
+     * @param int $teamid Team ID to assign
      * @param int $offerYears Total contract years
      * @param int $offer1 Year 1 salary
      * @param int $offer2 Year 2 salary
@@ -64,7 +64,7 @@ interface FreeAgencyAdminRepositoryInterface
      */
     public function updatePlayerContract(
         int $pid,
-        int $tid,
+        int $teamid,
         int $offerYears,
         int $offer1,
         int $offer2,

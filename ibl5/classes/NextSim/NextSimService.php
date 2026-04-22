@@ -97,7 +97,7 @@ class NextSimService implements NextSimServiceInterface
     {
         $starters = [];
         foreach (\JSB::PLAYER_POSITIONS as $position) {
-            $playerId = $this->teamQueryRepo->getCurrentlySetStarterPlayerIDForPosition($team->teamID, $position);
+            $playerId = $this->teamQueryRepo->getCurrentlySetStarterPlayerIDForPosition($team->teamid, $position);
             if ($playerId === 0) {
                 continue;
             }
@@ -118,7 +118,7 @@ class NextSimService implements NextSimServiceInterface
         $starters = [];
 
         foreach (\JSB::PLAYER_POSITIONS as $position) {
-            $playerId = $this->teamQueryRepo->getLastSimStarterPlayerIDForPosition($opposingTeam->teamID, $position);
+            $playerId = $this->teamQueryRepo->getLastSimStarterPlayerIDForPosition($opposingTeam->teamid, $position);
             if ($playerId === 0) {
                 continue;
             }

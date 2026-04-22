@@ -75,9 +75,9 @@ class FreeAgencyController
 
         $username = (string) ($cookie[1] ?? '');
         $userTeamName = $this->commonRepository->getTeamnameFromUsername($username) ?? '';
-        $teamID = $this->commonRepository->getTidFromTeamname($userTeamName) ?? 0;
+        $teamid = $this->commonRepository->getTidFromTeamname($userTeamName) ?? 0;
 
-        $team = Team::initialize($this->db, $teamID);
+        $team = Team::initialize($this->db, $teamid);
         $season = new Season($this->db);
 
         $negotiationData = $this->service->getNegotiationData($pid, $team, $season);

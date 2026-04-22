@@ -85,7 +85,7 @@ publicTest.describe('Visual regression — public pages', () => {
   });
 
   publicTest('team page roster table', async ({ page }) => {
-    await page.goto('modules.php?name=Team&op=team&teamID=1');
+    await page.goto('modules.php?name=Team&op=team&teamid=1');
     await page.waitForLoadState('networkidle');
     const table = page.locator('.ibl-data-table').first();
     await publicExpect(table).toBeVisible();
@@ -103,7 +103,7 @@ publicTest.describe('Visual regression — public pages', () => {
       'modules.php?name=DraftHistory',
       'modules.php?name=Schedule',
       'modules.php?name=Player&pa=showpage&pid=1',
-      'modules.php?name=Team&op=team&teamID=1',
+      'modules.php?name=Team&op=team&teamid=1',
     ];
 
     for (const url of urls) {

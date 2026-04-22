@@ -334,7 +334,7 @@ class JsbImportRepository extends \BaseMysqliRepository implements JsbImportRepo
     {
         return $this->execute(
             "INSERT INTO {$this->rcbAlltimeTable}
-                (scope, team_id, record_type, stat_category, ranking,
+                (scope, teamid, record_type, stat_category, ranking,
                  player_name, car_block_id, pid, stat_value, stat_raw,
                  team_of_record, season_year, career_total, source_file)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
@@ -350,7 +350,7 @@ class JsbImportRepository extends \BaseMysqliRepository implements JsbImportRepo
                 source_file = VALUES(source_file)",
             'sissisiidiiiis',
             $record['scope'],
-            $record['team_id'],
+            $record['teamid'],
             $record['record_type'],
             $record['stat_category'],
             $record['ranking'],
@@ -373,7 +373,7 @@ class JsbImportRepository extends \BaseMysqliRepository implements JsbImportRepo
     {
         return $this->execute(
             "INSERT INTO {$this->rcbSeasonTable}
-                (season_year, scope, team_id, context, stat_category, ranking,
+                (season_year, scope, teamid, context, stat_category, ranking,
                  player_name, player_position, car_block_id, pid,
                  stat_value, record_season_year, source_file)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
@@ -388,7 +388,7 @@ class JsbImportRepository extends \BaseMysqliRepository implements JsbImportRepo
             'isississiiiis',
             $record['season_year'],
             $record['scope'],
-            $record['team_id'],
+            $record['teamid'],
             $record['context'],
             $record['stat_category'],
             $record['ranking'],
@@ -430,7 +430,7 @@ class JsbImportRepository extends \BaseMysqliRepository implements JsbImportRepo
     {
         return $this->execute(
             "INSERT INTO {$this->plbSnapshotsTable}
-                (season_year, sim_number, source_archive, tid, slot_index,
+                (season_year, sim_number, source_archive, teamid, slot_index,
                  pid, player_name, dc_minutes, dc_of, dc_df, dc_oi, dc_di, dc_bh)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ON DUPLICATE KEY UPDATE
@@ -448,7 +448,7 @@ class JsbImportRepository extends \BaseMysqliRepository implements JsbImportRepo
             $record['season_year'],
             $record['sim_number'],
             $record['source_archive'],
-            $record['tid'],
+            $record['teamid'],
             $record['slot_index'],
             $record['pid'],
             $record['player_name'],

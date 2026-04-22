@@ -64,3 +64,7 @@ services:
         class: PHPStanRules\BanReservedWordColumnsRule
         tags:
             - phpstan.rules.rule
+    -
+        class: PHPStanRules\BanInconsistentColumnNamesRule
+        tags:
+            - phpstan.rules.rule

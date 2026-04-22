@@ -18,8 +18,8 @@ class Boxscore
     public string $gameDay;
     public int $gameOfThatDay;
 
-    public int $visitorTeamID;
-    public int $homeTeamID;
+    public int $visitor_teamid;
+    public int $home_teamid;
 
     public string $attendance;
     public string $capacity;
@@ -47,8 +47,8 @@ class Boxscore
         name,
         pos,
         pid,
-        visitorTID,
-        homeTID,
+        visitor_teamid,
+        home_teamid,
         gameOfThatDay,
         attendance,
         capacity,
@@ -56,7 +56,7 @@ class Boxscore
         visitorLosses,
         homeWins,
         homeLosses,
-        teamID,
+        teamid,
         gameMIN,
         game2GM,
         game2GA,
@@ -78,8 +78,8 @@ class Boxscore
         Date,
         name,
         gameOfThatDay,
-        visitorTeamID,
-        homeTeamID,
+        visitor_teamid,
+        home_teamid,
         attendance,
         capacity,
         visitorWins,
@@ -120,8 +120,8 @@ class Boxscore
         name,
         pos,
         pid,
-        visitorTID,
-        homeTID,
+        visitor_teamid,
+        home_teamid,
         gameOfThatDay,
         attendance,
         capacity,
@@ -129,7 +129,7 @@ class Boxscore
         visitorLosses,
         homeWins,
         homeLosses,
-        teamID,
+        teamid,
         gameMIN,
         game2GM,
         game2GA,
@@ -154,8 +154,8 @@ class Boxscore
         Date,
         name,
         gameOfThatDay,
-        visitorTeamID,
-        homeTeamID,
+        visitor_teamid,
+        home_teamid,
         attendance,
         capacity,
         visitorWins,
@@ -195,8 +195,8 @@ class Boxscore
         $this->gameMonth = sprintf("%02u", intval(substr($gameInfoLine, 0, 2)) + 10); // sprintf() prepends 0 if the result isn't in double-digits
         $this->gameDay = sprintf("%02u", intval(substr($gameInfoLine, 2, 2)) + 1);
         $this->gameOfThatDay = intval(substr($gameInfoLine, 4, 2)) + 1;
-        $this->visitorTeamID = intval(substr($gameInfoLine, 6, 2)) + 1;
-        $this->homeTeamID = intval(substr($gameInfoLine, 8, 2)) + 1;
+        $this->visitor_teamid = intval(substr($gameInfoLine, 6, 2)) + 1;
+        $this->home_teamid = intval(substr($gameInfoLine, 8, 2)) + 1;
         $this->attendance = substr($gameInfoLine, 10, 5);
         $this->capacity = substr($gameInfoLine, 15, 5);
         $this->visitorWins = substr($gameInfoLine, 20, 2);
@@ -247,13 +247,13 @@ class Boxscore
      */
     public function overrideGameContext(
         string $gameDate,
-        int $visitorTeamID,
-        int $homeTeamID,
+        int $visitor_teamid,
+        int $home_teamid,
         int $gameOfThatDay,
     ): void {
         $this->gameDate = $gameDate;
-        $this->visitorTeamID = $visitorTeamID;
-        $this->homeTeamID = $homeTeamID;
+        $this->visitor_teamid = $visitor_teamid;
+        $this->home_teamid = $home_teamid;
         $this->gameOfThatDay = $gameOfThatDay;
     }
 

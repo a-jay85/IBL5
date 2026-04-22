@@ -209,7 +209,7 @@ class ApiGameRepositoryTest extends DatabaseTestCase
     public function testGetBoxscorePlayersReturnsPlayerLines(): void
     {
         $date = '2025-10-01';
-        $this->insertTestPlayer(200000095, 'DB BoxPlr Batch7', ['tid' => 1]);
+        $this->insertTestPlayer(200000095, 'DB BoxPlr Batch7', ['teamid' => 1]);
         $this->insertPlayerBoxscoreRow($date, 200000095, 'DB BoxPlr Batch7', 'PG', 1, 2, 1);
 
         $result = $this->repo->getBoxscorePlayers(1, 2, $date);

@@ -96,7 +96,7 @@ class ProcessAllStarGamesStepTest extends TestCase
             'messages' => [],
         ]);
         $this->stubRepo->method('findAllStarGamesWithDefaultNames')->willReturn([
-            ['id' => 1, 'Date' => '2026-02-03', 'name' => BoxscoreProcessor::DEFAULT_AWAY_NAME, 'visitorTeamID' => 50, 'homeTeamID' => 51],
+            ['id' => 1, 'Date' => '2026-02-03', 'name' => BoxscoreProcessor::DEFAULT_AWAY_NAME, 'visitor_teamid' => 50, 'home_teamid' => 51],
         ]);
         $this->stubRepo->method('getPlayersForAllStarTeam')->willReturn(['Player A', 'Player B']);
         $this->stubView->method('renderAllStarLog')->willReturn('<div>Log</div>');

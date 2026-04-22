@@ -24,7 +24,7 @@ interface WaiversViewInterface
      * after a redirect.
      *
      * @param string $teamName Team name for display and form submission
-     * @param int $teamID Team ID for logo display
+     * @param int $teamid Team ID for logo display
      * @param string $action Action type ('add' or 'waive')
      * @param array<int, string> $players Array of pre-built HTML option strings for dropdown
      *   Each element should be output from buildPlayerOption()
@@ -48,7 +48,7 @@ interface WaiversViewInterface
      */
     public function renderWaiverForm(
         string $teamName,
-        int $teamID,
+        int $teamid,
         string $action,
         array $players,
         int $openRosterSpots,

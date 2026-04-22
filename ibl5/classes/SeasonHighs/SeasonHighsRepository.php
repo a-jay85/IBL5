@@ -58,8 +58,8 @@ class SeasonHighsRepository extends \BaseMysqliRepository implements SeasonHighs
 
         // Build optional location filter (home/away) — column-to-column comparison, no extra bind params
         $locationCondition = match ($locationFilter) {
-            'home' => ' AND bs.teamID = bs.homeTID',
-            'away' => ' AND bs.teamID = bs.visitorTID',
+            'home' => ' AND bs.teamid = bs.home_teamid',
+            'away' => ' AND bs.teamid = bs.visitor_teamid',
             default => '',
         };
 
@@ -69,20 +69,20 @@ class SeasonHighsRepository extends \BaseMysqliRepository implements SeasonHighs
         // Also JOIN with ibl_schedule to get BoxID for linking to box scores
         // Also JOIN with ibl_team_info to get team colors for styled team cell
         if ($tableSuffix === '') {
-            $query = "SELECT p.`pid`, p.`name`, p.`tid`, t.`team_name` AS `teamname`,
+            $query = "SELECT p.`pid`, p.`name`, p.`teamid`, t.`team_name` AS `teamname`,
                 t.`team_city`, t.`color1`, t.`color2`,
                 bs.`Date` AS `date`, sch.`BoxID`,
                 COALESCE(bst.gameOfThatDay, 0) AS gameOfThatDay,
                 {$statExpression} AS `{$safeStatName}`
                 FROM {$this->boxScoresTable} bs
                 JOIN {$this->playerTable} p ON bs.pid = p.pid
-                LEFT JOIN {$this->teamInfoTable} t ON p.tid = t.teamid
-                LEFT JOIN {$this->scheduleTable} sch ON sch.Date = bs.Date AND sch.Visitor = bs.visitorTID AND sch.Home = bs.homeTID
+                LEFT JOIN {$this->teamInfoTable} t ON p.teamid = t.teamid
+                LEFT JOIN {$this->scheduleTable} sch ON sch.Date = bs.Date AND sch.Visitor = bs.visitor_teamid AND sch.Home = bs.home_teamid
                 LEFT JOIN (
-                    SELECT Date, visitorTeamID, homeTeamID, MIN(gameOfThatDay) AS gameOfThatDay
+                    SELECT Date, visitor_teamid, home_teamid, MIN(gameOfThatDay) AS gameOfThatDay
                     FROM {$this->boxScoresTeamsTable}
-                    GROUP BY Date, visitorTeamID, homeTeamID
-                ) bst ON bst.Date = bs.Date AND bst.visitorTeamID = bs.visitorTID AND bst.homeTeamID = bs.homeTID
+                    GROUP BY Date, visitor_teamid, home_teamid
+                ) bst ON bst.Date = bs.Date AND bst.visitor_teamid = bs.visitor_teamid AND bst.home_teamid = bs.home_teamid
                 WHERE bs.`Date` BETWEEN ? AND ?{$locationCondition}
                 ORDER BY `{$safeStatName}` DESC, bs.`Date` ASC
                 LIMIT {$limit}";
@@ -96,7 +96,7 @@ class SeasonHighsRepository extends \BaseMysqliRepository implements SeasonHighs
                 {$statExpression} AS `{$safeStatName}`
                 FROM {$this->boxScoresTeamsTable} bs
                 JOIN {$this->teamInfoTable} t ON bs.name = t.team_name
-                LEFT JOIN {$this->scheduleTable} sch ON sch.Date = bs.Date AND sch.Visitor = bs.visitorTeamID AND sch.Home = bs.homeTeamID
+                LEFT JOIN {$this->scheduleTable} sch ON sch.Date = bs.Date AND sch.Visitor = bs.visitor_teamid AND sch.Home = bs.home_teamid
                 WHERE bs.`Date` BETWEEN ? AND ?
                 ORDER BY `{$safeStatName}` DESC, bs.`Date` ASC
                 LIMIT {$limit}";
@@ -119,8 +119,8 @@ class SeasonHighsRepository extends \BaseMysqliRepository implements SeasonHighs
                 $entry['pid'] = (int) $row['pid'];
             }
             // Include team data for player stats (used for styled team cell)
-            if (isset($row['tid'])) {
-                $entry['tid'] = (int) $row['tid'];
+            if (isset($row['teamid'])) {
+                $entry['teamid'] = (int) $row['teamid'];
                 $entry['teamname'] = (string) ($row['teamname'] ?? '');
                 $entry['team_city'] = (string) ($row['team_city'] ?? '');
                 $entry['color1'] = (string) ($row['color1'] ?? 'FFFFFF');

@@ -17,9 +17,9 @@ interface DepthChartEntryViewInterface
     /**
      * Render team logo image centered on page
      *
-     * @param int $teamID Team ID used to locate logo file (images/logo/{teamID}.jpg)
+     * @param int $teamid Team ID used to locate logo file (images/logo/{teamid}.jpg)
      */
-    public function renderTeamLogo(int $teamID): void;
+    public function renderTeamLogo(int $teamid): void;
 
     /**
      * Render position depth dropdown options (0-5)
@@ -50,10 +50,10 @@ interface DepthChartEntryViewInterface
      * The PG-C columns are position depth assignments (0-5 priority).
      *
      * @param string $teamName Team name to embed in hidden form field
-     * @param int $teamID Team ID
+     * @param int $teamid Team ID
      * @param array<string> $slotNames Array of 5 position slot names (kept for interface compat)
      */
-    public function renderFormHeader(string $teamName, int $teamID, array $slotNames): void;
+    public function renderFormHeader(string $teamName, int $teamid, array $slotNames): void;
 
     /**
      * Render a single player row in the depth chart form

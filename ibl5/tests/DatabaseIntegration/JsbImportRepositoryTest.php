@@ -210,7 +210,7 @@ class JsbImportRepositoryTest extends DatabaseTestCase
     {
         $affected = $this->repo->upsertRcbAlltimeRecord([
             'scope' => 'league',
-            'team_id' => 0,
+            'teamid' => 0,
             'record_type' => 'single_season',
             'stat_category' => 'ppg',
             'ranking' => 99,
@@ -235,7 +235,7 @@ class JsbImportRepositoryTest extends DatabaseTestCase
         $affected = $this->repo->upsertRcbSeasonRecord([
             'season_year' => 2099,
             'scope' => 'league',
-            'team_id' => 0,
+            'teamid' => 0,
             'context' => 'home',
             'stat_category' => 'pts',
             'ranking' => 99,
@@ -267,9 +267,9 @@ class JsbImportRepositoryTest extends DatabaseTestCase
         // 'Hornets' → 'Sting' resolves (CI seed uses 'Spurs' for teamid=10)
         $stmt = $this->db->prepare('UPDATE ibl_team_info SET team_name = ? WHERE teamid = ?');
         self::assertNotFalse($stmt);
-        $stmt->bind_param('si', $name, $tid);
+        $stmt->bind_param('si', $name, $teamid);
         $name = 'Sting';
-        $tid = 10;
+        $teamid = 10;
         $stmt->execute();
         $stmt->close();
 

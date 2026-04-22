@@ -24,8 +24,8 @@ class DepthChartEntryRepositoryTest extends DatabaseTestCase
 
     public function testGetPlayersOnTeamReturnsActivePlayers(): void
     {
-        $this->insertTestPlayer(200080001, 'DC Active P1', ['tid' => 1, 'retired' => 0, 'ordinal' => 1]);
-        $this->insertTestPlayer(200080002, 'DC Active P2', ['tid' => 1, 'retired' => 0, 'ordinal' => 2]);
+        $this->insertTestPlayer(200080001, 'DC Active P1', ['teamid' => 1, 'retired' => 0, 'ordinal' => 1]);
+        $this->insertTestPlayer(200080002, 'DC Active P2', ['teamid' => 1, 'retired' => 0, 'ordinal' => 2]);
 
         $players = $this->repo->getPlayersOnTeam(1);
 
@@ -37,9 +37,9 @@ class DepthChartEntryRepositoryTest extends DatabaseTestCase
     public function testGetPlayersOnTeamExcludesRetiredAndWaiverOrdinal(): void
     {
         // Retired player (retired=1)
-        $this->insertTestPlayer(200080003, 'DC Retired', ['tid' => 1, 'retired' => 1, 'ordinal' => 1]);
+        $this->insertTestPlayer(200080003, 'DC Retired', ['teamid' => 1, 'retired' => 1, 'ordinal' => 1]);
         // Waiver-ordinal player (ordinal=999, above WAIVERS_ORDINAL=960)
-        $this->insertTestPlayer(200080004, 'DC Waiver Ord', ['tid' => 1, 'retired' => 0, 'ordinal' => 999]);
+        $this->insertTestPlayer(200080004, 'DC Waiver Ord', ['teamid' => 1, 'retired' => 0, 'ordinal' => 999]);
 
         $players = $this->repo->getPlayersOnTeam(1);
 
@@ -52,7 +52,7 @@ class DepthChartEntryRepositoryTest extends DatabaseTestCase
 
     public function testUpdatePlayerDepthChartSetsAllColumns(): void
     {
-        $this->insertTestPlayer(200080005, 'DC Update Plyr', ['tid' => 1]);
+        $this->insertTestPlayer(200080005, 'DC Update Plyr', ['teamid' => 1]);
 
         $depthChartValues = [
             'pg' => 3,
@@ -98,7 +98,7 @@ class DepthChartEntryRepositoryTest extends DatabaseTestCase
 
     public function testUpdatePlayerDepthChartReturnsTrueOnSuccess(): void
     {
-        $this->insertTestPlayer(200080006, 'DC Success Plyr', ['tid' => 1]);
+        $this->insertTestPlayer(200080006, 'DC Success Plyr', ['teamid' => 1]);
 
         $result = $this->repo->updatePlayerDepthChart('DC Success Plyr', [
             'pg' => 1, 'sg' => 0, 'sf' => 0, 'pf' => 0, 'c' => 0,

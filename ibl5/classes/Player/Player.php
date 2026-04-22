@@ -63,7 +63,7 @@ class Player implements PlayerInterface
     public ?int $historicalYear = null;
 
     /** @var int|null Team ID (0 for free agents) */
-    public ?int $teamID = null;
+    public ?int $teamid = null;
 
     /** @var string|null Team name */
     public ?string $teamName = null;
@@ -337,7 +337,7 @@ class Player implements PlayerInterface
         $this->age = $this->playerData->age;
         $this->historicalYear = $this->playerData->historicalYear;
 
-        $this->teamID = $this->playerData->teamID;
+        $this->teamid = $this->playerData->teamid;
         $this->teamName = $this->playerData->teamName;
         $this->position = $this->playerData->position;
 

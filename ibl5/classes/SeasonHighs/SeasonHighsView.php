@@ -106,7 +106,7 @@ class SeasonHighsView implements SeasonHighsViewInterface
             /** @var string $date */
             $date = HtmlSanitizer::safeHtmlOutput($row['date']);
             $value = $row['value'];
-            $tid = 0;
+            $teamid = 0;
             $teamCell = '';
             $isTeamStat = false;
 
@@ -117,9 +117,9 @@ class SeasonHighsView implements SeasonHighsViewInterface
 
                 // Build team cell for player stats
                 if ($isPlayerStats) {
-                    $tid = $row['tid'] ?? 0;
+                    $teamid = $row['teamid'] ?? 0;
                     $teamCell = TeamCellHelper::renderTeamCellOrFreeAgent(
-                        $tid,
+                        $teamid,
                         $row['teamname'] ?? '',
                         $row['color1'] ?? 'FFFFFF',
                         $row['color2'] ?? '000000',
@@ -157,7 +157,7 @@ class SeasonHighsView implements SeasonHighsViewInterface
                     . "<td class=\"value-cell\">{$value}</td>"
                     . '</tr>';
             } else {
-                $output .= "<tr data-team-id=\"{$tid}\">
+                $output .= "<tr data-team-id=\"{$teamid}\">
     <td class=\"rank-cell\">{$rank}</td>
     <td class=\"name-cell\">{$name}</td>
     {$teamCell}

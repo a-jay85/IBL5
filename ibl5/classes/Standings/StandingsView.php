@@ -201,7 +201,7 @@ class StandingsView implements StandingsViewInterface
 
         foreach ($teams as $team) {
             $result[] = [
-                'tid' => $team['tid'],
+                'teamid' => $team['teamid'],
                 'team_name' => $team['team_name'],
                 'leagueRecord' => $team['leagueRecord'],
                 'pct' => $team['pct'],
@@ -315,7 +315,7 @@ class StandingsView implements StandingsViewInterface
      */
     private function renderTeamRow(array $team, bool $isBottomLocked = false): string
     {
-        $teamId = $team['tid'];
+        $teamId = $team['teamid'];
         $teamName = $this->formatTeamName($team);
         $streakData = $this->allStreakData[$teamId] ?? null;
 
@@ -570,7 +570,7 @@ class StandingsView implements StandingsViewInterface
      */
     private function sortTiedGroup(array $group): array
     {
-        $tids = array_map(static fn (array $t): int => $t['tid'], $group);
+        $tids = array_map(static fn (array $t): int => $t['teamid'], $group);
 
         /** @var array<int, float> */
         $aggregateH2HPct = [];
@@ -578,18 +578,18 @@ class StandingsView implements StandingsViewInterface
             $totalWins = 0;
             $totalLosses = 0;
             foreach ($tids as $opponentTid) {
-                if ($opponentTid === $team['tid']) {
+                if ($opponentTid === $team['teamid']) {
                     continue;
                 }
-                $totalWins += $this->seriesMatrix[$team['tid']][$opponentTid]['wins'] ?? 0;
-                $totalLosses += $this->seriesMatrix[$team['tid']][$opponentTid]['losses'] ?? 0;
+                $totalWins += $this->seriesMatrix[$team['teamid']][$opponentTid]['wins'] ?? 0;
+                $totalLosses += $this->seriesMatrix[$team['teamid']][$opponentTid]['losses'] ?? 0;
             }
-            $aggregateH2HPct[$team['tid']] = $this->safeWinPct($totalWins, $totalLosses);
+            $aggregateH2HPct[$team['teamid']] = $this->safeWinPct($totalWins, $totalLosses);
         }
 
         // Sort descending by H2H pct (best first for standings)
         usort($group, static function (array $a, array $b) use ($aggregateH2HPct): int {
-            return $aggregateH2HPct[$b['tid']] <=> $aggregateH2HPct[$a['tid']];
+            return $aggregateH2HPct[$b['teamid']] <=> $aggregateH2HPct[$a['teamid']];
         });
 
         return $group;

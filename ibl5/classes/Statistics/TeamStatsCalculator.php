@@ -47,14 +47,14 @@ class TeamStatsCalculator
         $this->teamRecordsCache = [];
 
         if (method_exists($this->db, 'fetchAll')) {
-            /** @var list<array{TeamID: int, win: int, loss: int}> $rows */
+            /** @var list<array{teamid: int, win: int, loss: int}> $rows */
             $rows = $this->db->fetchAll(
-                "SELECT tid AS TeamID, wins AS win, losses AS loss FROM {$this->standingsTable}",
+                "SELECT teamid AS teamid, wins AS win, losses AS loss FROM {$this->standingsTable}",
                 ""
             );
 
             foreach ($rows as $row) {
-                $this->teamRecordsCache[$row['TeamID']] = [
+                $this->teamRecordsCache[$row['teamid']] = [
                     'win' => $row['win'],
                     'loss' => $row['loss'],
                 ];
@@ -66,10 +66,10 @@ class TeamStatsCalculator
      * Calculate team statistics from an array of games
      *
      * @param list<GameRow> $games Array of game data with Visitor, VScore, Home, HScore
-     * @param int $tid Team ID to calculate stats for
+     * @param int $teamid Team ID to calculate stats for
      * @return TeamStats
      */
-    public function calculate(array $games, int $tid): array
+    public function calculate(array $games, int $teamid): array
     {
         $stats = $this->initializeStats();
 
@@ -78,7 +78,7 @@ class TeamStatsCalculator
             $game = $this->normalizeGameData($gameData);
 
             if ($game['awayScore'] !== $game['homeScore']) {
-                $this->updateGameStats($stats, $game, $index, $totalGames, $tid);
+                $this->updateGameStats($stats, $game, $index, $totalGames, $teamid);
             }
         }
 
@@ -130,9 +130,9 @@ class TeamStatsCalculator
      * @param TeamStats $stats
      * @param NormalizedGame $game
      */
-    private function updateGameStats(array &$stats, array $game, int $currentGame, int $totalGames, int $tid): void
+    private function updateGameStats(array &$stats, array $game, int $currentGame, int $totalGames, int $teamid): void
     {
-        if ($tid === $game['awayTeam']) {
+        if ($teamid === $game['awayTeam']) {
             $opponentTeam = $game['homeTeam'];
             $isWin = $game['awayScore'] > $game['homeScore'];
             $isHome = false;
@@ -191,7 +191,7 @@ class TeamStatsCalculator
         if (method_exists($this->db, 'fetchOne')) {
             /** @var array{win: int, loss: int}|null $result */
             $result = $this->db->fetchOne(
-                "SELECT wins AS win, losses AS loss FROM {$this->standingsTable} WHERE tid = ?",
+                "SELECT wins AS win, losses AS loss FROM {$this->standingsTable} WHERE teamid = ?",
                 "i",
                 $teamId
             );

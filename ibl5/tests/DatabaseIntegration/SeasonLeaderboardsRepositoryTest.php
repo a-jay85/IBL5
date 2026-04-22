@@ -62,8 +62,8 @@ class SeasonLeaderboardsRepositoryTest extends DatabaseTestCase
     {
         $pid1 = 200000043;
         $pid2 = 200000044;
-        $this->insertTestPlayer($pid1, 'DB Team1', ['tid' => 1]);
-        $this->insertTestPlayer($pid2, 'DB Team2', ['tid' => 2]);
+        $this->insertTestPlayer($pid1, 'DB Team1', ['teamid' => 1]);
+        $this->insertTestPlayer($pid2, 'DB Team2', ['teamid' => 2]);
         $this->insertHistRow($pid1, 'DB Team1', 2097, ['teamid' => 1]);
         $this->insertHistRow($pid2, 'DB Team2', 2097, ['teamid' => 2, 'team' => 'Sharks']);
 
@@ -140,8 +140,8 @@ class SeasonLeaderboardsRepositoryTest extends DatabaseTestCase
 
         self::assertNotEmpty($result);
         foreach ($result as $row) {
-            self::assertGreaterThanOrEqual(1, $row['TeamID']);
-            self::assertLessThanOrEqual(League::MAX_REAL_TEAMID, $row['TeamID']);
+            self::assertGreaterThanOrEqual(1, $row['teamid']);
+            self::assertLessThanOrEqual(League::MAX_REAL_TEAMID, $row['teamid']);
         }
     }
 

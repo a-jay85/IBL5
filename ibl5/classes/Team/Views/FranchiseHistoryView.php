@@ -90,7 +90,7 @@ class FranchiseHistoryView
      */
     private function renderWinLossHistory(array $data): string
     {
-        $teamID = $data['teamID'];
+        $teamid = $data['teamid'];
         $output = '<ul class="team-history-list">';
 
         foreach ($data['records'] as $record) {
@@ -101,7 +101,7 @@ class FranchiseHistoryView
             $winpct = StatsFormatter::formatPercentage($wins, $wins + $losses);
             $boldOpen = $record['isBest'] ? '<strong>' : '';
             $boldClose = $record['isBest'] ? '</strong>' : '';
-            $output .= "<li>{$boldOpen}<a href=\"./modules.php?name=Team&amp;op=team&amp;teamID=$teamID&amp;yr=$urlYear\">$label</a> <span class=\"record\">$wins-$losses ($winpct)</span>{$boldClose}</li>";
+            $output .= "<li>{$boldOpen}<a href=\"./modules.php?name=Team&amp;op=team&amp;teamid=$teamid&amp;yr=$urlYear\">$label</a> <span class=\"record\">$wins-$losses ($winpct)</span>{$boldClose}</li>";
         }
 
         $output .= '</ul>';

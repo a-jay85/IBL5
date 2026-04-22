@@ -95,7 +95,7 @@ class ApiGameRepository extends \BaseMysqliRepository
     {
         /** @var list<BoxscoreTeamRow> */
         return $this->fetchAll(
-            "SELECT * FROM {$this->boxScoresTeamsTable} WHERE visitorTeamID = ? AND homeTeamID = ? AND Date = ? ORDER BY id ASC",
+            "SELECT * FROM {$this->boxScoresTeamsTable} WHERE visitor_teamid = ? AND home_teamid = ? AND Date = ? ORDER BY id ASC",
             'iis',
             $visitorTeamId,
             $homeTeamId,
@@ -112,10 +112,10 @@ class ApiGameRepository extends \BaseMysqliRepository
     {
         /** @var list<BoxscorePlayerRow> */
         return $this->fetchAll(
-            "SELECT b.*, COALESCE(p.name, b.name) AS name, p.uuid AS player_uuid, p.tid AS player_tid
+            "SELECT b.*, COALESCE(p.name, b.name) AS name, p.uuid AS player_uuid, p.teamid AS player_tid
              FROM {$this->boxScoresTable} b
              LEFT JOIN ibl_plr p ON b.pid = p.pid
-             WHERE b.Date = ? AND b.visitorTID = ? AND b.homeTID = ?
+             WHERE b.Date = ? AND b.visitor_teamid = ? AND b.home_teamid = ?
              ORDER BY b.id ASC",
             'sii',
             $date,

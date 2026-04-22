@@ -53,22 +53,22 @@ class RatingsDiffRepository extends BaseMysqliRepository implements RatingsDiffR
     {
         $sql = <<<'SQL'
 SELECT
-    p.pid, p.name, p.pos, p.tid,
+    p.pid, p.name, p.pos, p.teamid,
     t.team_name,
     p.oo, p.od, p.r_drive_off, p.dd, p.po, p.pd, p.r_trans_off, p.td,
-    p.r_fga, p.r_fgp, p.r_fta, p.r_ftp, p.r_tga, p.r_tgp,
+    p.r_fga, p.r_fgp, p.r_fta, p.r_ftp, p.r_3ga, p.r_3gp,
     p.r_orb, p.r_drb, p.r_ast, p.r_stl, p.r_tvr, p.r_blk, p.r_foul,
     s.oo      AS s_oo,      s.od      AS s_od,      s.r_drive_off AS s_r_drive_off,
     s.dd      AS s_dd,      s.po      AS s_po,      s.pd          AS s_pd,
     s.r_trans_off AS s_r_trans_off,                 s.td          AS s_td,
     s.r_fga   AS s_r_fga,   s.r_fgp   AS s_r_fgp,
     s.r_fta   AS s_r_fta,   s.r_ftp   AS s_r_ftp,
-    s.r_tga   AS s_r_tga,   s.r_tgp   AS s_r_tgp,
+    s.r_3ga   AS s_r_tga,   s.r_3gp   AS s_r_tgp,
     s.r_orb   AS s_r_orb,   s.r_drb   AS s_r_drb,
     s.r_ast   AS s_r_ast,   s.r_stl   AS s_r_stl,
     s.r_tvr   AS s_r_tvr,   s.r_blk   AS s_r_blk,  s.r_foul AS s_r_foul
 FROM ibl_plr p
-LEFT JOIN ibl_team_info t ON t.teamid = p.tid
+LEFT JOIN ibl_team_info t ON t.teamid = p.teamid
 LEFT JOIN ibl_plr_snapshots s
        ON s.pid = p.pid
       AND s.season_year = ?
@@ -77,7 +77,7 @@ WHERE p.retired = 0
 SQL;
 
         if ($filterTid !== null) {
-            $sql .= ' AND p.tid = ?';
+            $sql .= ' AND p.teamid = ?';
             $sql .= ' ORDER BY p.name';
             return array_values($this->fetchAll($sql, 'ii', $baselineYear, $filterTid));
         }

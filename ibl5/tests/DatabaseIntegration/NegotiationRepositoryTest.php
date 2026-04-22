@@ -46,7 +46,7 @@ class NegotiationRepositoryTest extends DatabaseTestCase
     {
         // Insert two test players at the same position on the same team
         $this->insertTestPlayer(200040001, 'NEG SalaryPG1', [
-            'tid' => 1,
+            'teamid' => 1,
             'pos' => 'PG',
             'cy' => 1,
             'cyt' => 3,
@@ -54,7 +54,7 @@ class NegotiationRepositoryTest extends DatabaseTestCase
             'cy2' => 1600,
         ]);
         $this->insertTestPlayer(200040002, 'NEG SalaryPG2', [
-            'tid' => 1,
+            'teamid' => 1,
             'pos' => 'PG',
             'cy' => 1,
             'cyt' => 2,

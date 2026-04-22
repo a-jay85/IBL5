@@ -145,7 +145,7 @@ window.IBL_initNextSimHighlight();
     public function renderTabbedPositionTable(array $games, string $activePosition, Team $userTeam, array $userStarters): string
     {
         $tabs = self::POSITION_LABELS;
-        $apiUrl = 'modules.php?name=DepthChartEntry&op=nextsim-api&teamID=' . $userTeam->teamID;
+        $apiUrl = 'modules.php?name=DepthChartEntry&op=nextsim-api&teamid=' . $userTeam->teamid;
         $switcher = new \UI\Components\TableViewSwitcher(
             $tabs,
             $activePosition,
@@ -170,7 +170,7 @@ window.IBL_initNextSimHighlight();
     private function renderScheduleCard(array $gameData): string
     {
         $opposingTeam = $gameData['opposingTeam'];
-        $opposingTeamId = $opposingTeam->teamID;
+        $opposingTeamId = $opposingTeam->teamid;
 
         $dayNumberSafe = HtmlSanitizer::safeHtmlOutput((string)$gameData['dayNumber']);
         $locationPrefixSafe = HtmlSanitizer::safeHtmlOutput($gameData['locationPrefix']);
@@ -181,7 +181,7 @@ window.IBL_initNextSimHighlight();
         $html .= '<div class="next-sim-game-date">' . $gameDate . '</div>';
         $html .= '<div class="next-sim-day-label">Day ' . $dayNumberSafe . ' ' . $locationPrefixSafe . '</div>';
         $safeOppTeamName = HtmlSanitizer::safeHtmlOutput($opposingTeam->name ?? '');
-        $html .= '<a href="modules.php?name=Team&amp;op=team&amp;teamID=' . $opposingTeamId . '" aria-label="' . $safeOppTeamName . '">';
+        $html .= '<a href="modules.php?name=Team&amp;op=team&amp;teamid=' . $opposingTeamId . '" aria-label="' . $safeOppTeamName . '">';
         $html .= '<img src="./images/logo/new' . $opposingTeamId . '.png" alt="" class="next-sim-game-logo" width="20" height="20">';
         $html .= '</a>';
         $html .= '<div class="next-sim-record">' . $seasonRecord;
@@ -364,9 +364,9 @@ window.IBL_initNextSimHighlight();
      */
     private function renderGameInfoCell(Team $team, ?array $gameData): string
     {
-        $teamId = $team->teamID;
+        $teamId = $team->teamid;
 
-        $teamLink = 'modules.php?name=Team&amp;op=team&amp;teamID=' . $teamId;
+        $teamLink = 'modules.php?name=Team&amp;op=team&amp;teamid=' . $teamId;
         $logoImg = '<img src="./images/logo/new' . $teamId . '.png" alt="" class="next-sim-game-logo" width="20" height="20">';
 
         $safeTeamName = HtmlSanitizer::safeHtmlOutput($team->name ?? '');

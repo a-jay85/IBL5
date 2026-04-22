@@ -166,7 +166,7 @@ class ExtensionService implements ExtensionProcessorInterface
 
         $moneyCommitted = $this->repository->getMoneyCommittedAtPosition($team->name);
         if ($moneyCommitted === 0 && $player->position !== null) {
-            $posResult = $this->teamQueryRepo->getPlayersUnderContractByPosition($team->teamID, $player->position);
+            $posResult = $this->teamQueryRepo->getPlayersUnderContractByPosition($team->teamid, $player->position);
             $moneyCommitted = $this->teamQueryRepo->getTotalNextSeasonSalaries($posResult);
         }
 

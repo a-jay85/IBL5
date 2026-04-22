@@ -20,16 +20,16 @@ class DepthChartEntryRepositoryTest extends TestCase
 
     public function testGetPlayersOnTeamReturnsArrayOfPlayers(): void
     {
-        $teamID = 1;
+        $teamid = 1;
 
         $mockPlayers = [
-            ['pid' => 1, 'name' => 'Player One', 'tid' => 1, 'retired' => '0', 'ordinal' => 5],
-            ['pid' => 2, 'name' => 'Player Two', 'tid' => 1, 'retired' => '0', 'ordinal' => 6],
+            ['pid' => 1, 'name' => 'Player One', 'teamid' => 1, 'retired' => '0', 'ordinal' => 5],
+            ['pid' => 2, 'name' => 'Player Two', 'teamid' => 1, 'retired' => '0', 'ordinal' => 6],
         ];
 
         $this->mockDb->setMockData($mockPlayers);
 
-        $result = $this->repository->getPlayersOnTeam($teamID);
+        $result = $this->repository->getPlayersOnTeam($teamid);
 
         $this->assertIsArray($result);
         $this->assertCount(2, $result);
@@ -39,11 +39,11 @@ class DepthChartEntryRepositoryTest extends TestCase
 
     public function testGetPlayersOnTeamReturnsEmptyArrayForNoPlayers(): void
     {
-        $teamID = 99;
+        $teamid = 99;
 
         $this->mockDb->setMockData([]);
 
-        $result = $this->repository->getPlayersOnTeam($teamID);
+        $result = $this->repository->getPlayersOnTeam($teamid);
 
         $this->assertIsArray($result);
         $this->assertEmpty($result);

@@ -58,7 +58,7 @@ SELECT
   snap.pid,
   snap.name,
   snap.season_year                                           AS `year`,
-  snap.tid                                                   AS teamid,
+  snap.teamid                                                AS teamid,
   COALESCE(fs.team_name, '')                                 AS team,
   CAST(snap.stats_gm - snap.phantom_games AS SIGNED)         AS games,
   CAST(snap.stats_min AS SIGNED)                             AS minutes,
@@ -73,15 +73,15 @@ SELECT
   CAST(snap.stats_ast AS SIGNED)                             AS ast,
   CAST(snap.stats_stl AS SIGNED)                             AS stl,
   CAST(snap.stats_blk AS SIGNED)                             AS blk,
-  CAST(snap.stats_to  AS SIGNED)                             AS tvr,
+  CAST(snap.stats_tvr AS SIGNED)                             AS tvr,
   CAST(snap.stats_pf  AS SIGNED)                             AS pf,
   CAST(snap.stats_pts AS SIGNED)                             AS pts,
   CAST(COALESCE(snap.r_fga, 0) AS SIGNED)                    AS r_2ga,
   CAST(COALESCE(snap.r_fgp, 0) AS SIGNED)                    AS r_2gp,
   CAST(COALESCE(snap.r_fta, 0) AS SIGNED)                    AS r_fta,
   CAST(COALESCE(snap.r_ftp, 0) AS SIGNED)                    AS r_ftp,
-  CAST(COALESCE(snap.r_tga, 0) AS SIGNED)                    AS r_3ga,
-  CAST(COALESCE(snap.r_tgp, 0) AS SIGNED)                    AS r_3gp,
+  CAST(COALESCE(snap.r_3ga, 0) AS SIGNED)                    AS r_3ga,
+  CAST(COALESCE(snap.r_3gp, 0) AS SIGNED)                    AS r_3gp,
   CAST(COALESCE(snap.r_orb, 0) AS SIGNED)                    AS r_orb,
   CAST(COALESCE(snap.r_drb, 0) AS SIGNED)                    AS r_drb,
   CAST(COALESCE(snap.r_ast, 0) AS SIGNED)                    AS r_ast,
@@ -145,7 +145,7 @@ FROM (
   WHERE s.stats_gm > 0
 ) snap
 LEFT JOIN ibl_franchise_seasons fs
-  ON snap.tid = fs.franchise_id
+  ON snap.teamid = fs.franchise_id
   AND snap.season_year = fs.season_ending_year
 WHERE snap.rn = 1
 SQL;

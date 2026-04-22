@@ -158,7 +158,7 @@ class FreeAgencyAdminProcessor implements FreeAgencyAdminProcessorInterface
                         'playerName' => $playerName,
                         'playerId' => $playerId,
                         'teamName' => $offeringTeamName,
-                        'teamId' => $offeringTeam->teamID,
+                        'teamId' => $offeringTeam->teamid,
                         'offers' => [
                             'offer1' => $offer1,
                             'offer2' => $offer2,

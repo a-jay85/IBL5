@@ -166,7 +166,7 @@ class RcbFileParser implements RcbFileParserInterface
      * Parse the all-time records section (lines 0-49).
      *
      * @param list<string> $lines All lines from the file
-     * @return list<array{scope: string, team_id: int, record_type: string, stat_category: string, ranking: int, player_name: string, car_block_id: int, stat_value: float, stat_raw: int, team_of_record: int|null, season_year: int|null, career_total: int|null}>
+     * @return list<array{scope: string, teamid: int, record_type: string, stat_category: string, ranking: int, player_name: string, car_block_id: int, stat_value: float, stat_raw: int, team_of_record: int|null, season_year: int|null, career_total: int|null}>
      */
     private static function parseAlltimeSection(array $lines): array
     {
@@ -205,7 +205,7 @@ class RcbFileParser implements RcbFileParserInterface
 
                         $records[] = [
                             'scope' => $scope,
-                            'team_id' => $teamId,
+                            'teamid' => $teamId,
                             'record_type' => 'single_season',
                             'stat_category' => $statCategory,
                             'ranking' => $ranking + 1,
@@ -236,7 +236,7 @@ class RcbFileParser implements RcbFileParserInterface
 
                         $records[] = [
                             'scope' => $scope,
-                            'team_id' => $teamId,
+                            'teamid' => $teamId,
                             'record_type' => 'career',
                             'stat_category' => $statCategory,
                             'ranking' => $ranking + 1,
@@ -260,7 +260,7 @@ class RcbFileParser implements RcbFileParserInterface
      * Parse the current season records section (lines 50-82).
      *
      * @param list<string> $lines All lines from the file
-     * @return list<array{scope: string, team_id: int, context: string, stat_category: string, ranking: int, player_name: string, player_position: string, car_block_id: int, stat_value: int, season_year: int}>
+     * @return list<array{scope: string, teamid: int, context: string, stat_category: string, ranking: int, player_name: string, player_position: string, car_block_id: int, stat_value: int, season_year: int}>
      */
     private static function parseCurrentSeasonSection(array $lines): array
     {
@@ -299,7 +299,7 @@ class RcbFileParser implements RcbFileParserInterface
 
                 $records[] = [
                     'scope' => $scope,
-                    'team_id' => $teamId,
+                    'teamid' => $teamId,
                     'context' => $context,
                     'stat_category' => $statCategory,
                     'ranking' => $rankingPosition,

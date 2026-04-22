@@ -95,7 +95,7 @@ test.describe('Draft History flow', () => {
   });
 
   test('team history page loads without errors', async ({ page }) => {
-    await page.goto('modules.php?name=DraftHistory&op=team&teamID=1');
+    await page.goto('modules.php?name=DraftHistory&op=team&teamid=1');
     await assertNoPhpErrors(page, 'on DraftHistory team view');
     await expect(page.locator('.team-logo-banner').first()).toBeVisible();
   });

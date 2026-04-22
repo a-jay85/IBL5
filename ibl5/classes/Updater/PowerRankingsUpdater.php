@@ -33,9 +33,9 @@ class PowerRankingsUpdater extends \BaseMysqliRepository {
         $log = '';
 
         $teams = $this->fetchAll(
-            "SELECT TeamID, streak_type, streak
+            "SELECT teamid, streak_type, streak
             FROM {$powerTable}
-            ORDER BY TeamID ASC",
+            ORDER BY teamid ASC",
             ""
         );
 
@@ -61,15 +61,15 @@ class PowerRankingsUpdater extends \BaseMysqliRepository {
         $gamesByTeam = $this->partitionGamesByTeam($allPlayedGames);
 
         for ($i = 0; $i < count($teams); $i++) {
-            /** @var array{TeamID: int, streak_type: string, streak: int} $teamRow */
+            /** @var array{teamid: int, streak_type: string, streak: int} $teamRow */
             $teamRow = $teams[$i];
-            $tid = $teamRow['TeamID'];
-            $teamName = $teamNames[$tid] ?? 'Unknown';
+            $teamid = $teamRow['teamid'];
+            $teamName = $teamNames[$teamid] ?? 'Unknown';
 
-            $games = $gamesByTeam[$tid] ?? [];
+            $games = $gamesByTeam[$teamid] ?? [];
 
-            $stats = $this->calculateTeamStats($games, $tid);
-            $log .= $this->updateTeamStats($tid, $teamName, $stats);
+            $stats = $this->calculateTeamStats($games, $teamid);
+            $log .= $this->updateTeamStats($teamid, $teamName, $stats);
         }
 
         \UI\DebugOutput::display($log, 'Power Rankings Update Log');
@@ -182,14 +182,14 @@ class PowerRankingsUpdater extends \BaseMysqliRepository {
      * @param list<array{Visitor: int, VScore: int, Home: int, HScore: int}> $games
      * @return TeamStats
      */
-    protected function calculateTeamStats(array $games, int $tid): array {
-        return $this->statsCalculator->calculate($games, $tid);
+    protected function calculateTeamStats(array $games, int $teamid): array {
+        return $this->statsCalculator->calculate($games, $teamid);
     }
 
     /**
      * @param TeamStats $stats
      */
-    private function updateTeamStats(int $tid, string $teamName, array $stats): string {
+    private function updateTeamStats(int $teamid, string $teamName, array $stats): string {
         $powerTable = $this->resolveTable('ibl_power');
         $log = '';
 
@@ -208,14 +208,14 @@ class PowerRankingsUpdater extends \BaseMysqliRepository {
             streak_type = ?,
             streak = ?,
             ranking = ?
-            WHERE TeamID = ?",
+            WHERE teamid = ?",
             "iisidi",
             $stats['winsInLast10Games'],
             $stats['lossesInLast10Games'],
             $stats['streakType'],
             $stats['streak'],
             $ranking,
-            $tid
+            $teamid
         );
 
         $log .= "Updating {$teamName}: ranking={$ranking}, "
@@ -238,9 +238,9 @@ class PowerRankingsUpdater extends \BaseMysqliRepository {
         echo '<p>Calculating Strength of Schedule...<p>';
 
         // Load team win percentages from standings
-        /** @var list<array{tid: int, wins: int, losses: int}> $standingsRows */
+        /** @var list<array{teamid: int, wins: int, losses: int}> $standingsRows */
         $standingsRows = $this->fetchAll(
-            "SELECT tid, wins, losses FROM {$standingsTable}",
+            "SELECT teamid, wins, losses FROM {$standingsTable}",
             ""
         );
 
@@ -248,7 +248,7 @@ class PowerRankingsUpdater extends \BaseMysqliRepository {
         $teamWinPcts = [];
         foreach ($standingsRows as $row) {
             $totalGames = $row['wins'] + $row['losses'];
-            $teamWinPcts[$row['tid']] = $totalGames > 0
+            $teamWinPcts[$row['teamid']] = $totalGames > 0
                 ? round($row['wins'] / $totalGames, 3)
                 : 0.0;
         }
@@ -273,18 +273,18 @@ class PowerRankingsUpdater extends \BaseMysqliRepository {
         /** @var array<int, float> $remainingSosValues */
         $remainingSosValues = [];
 
-        foreach ($teamIds as $tid) {
-            $teamPlayedGames = $playedByTeam[$tid] ?? [];
-            $teamUnplayedGames = $unplayedByTeam[$tid] ?? [];
+        foreach ($teamIds as $teamid) {
+            $teamPlayedGames = $playedByTeam[$teamid] ?? [];
+            $teamUnplayedGames = $unplayedByTeam[$teamid] ?? [];
 
-            $sosValues[$tid] = StrengthOfScheduleCalculator::calculateAverageOpponentWinPct(
+            $sosValues[$teamid] = StrengthOfScheduleCalculator::calculateAverageOpponentWinPct(
                 $teamPlayedGames,
-                $tid,
+                $teamid,
                 $teamWinPcts
             );
-            $remainingSosValues[$tid] = StrengthOfScheduleCalculator::calculateAverageOpponentWinPct(
+            $remainingSosValues[$teamid] = StrengthOfScheduleCalculator::calculateAverageOpponentWinPct(
                 $teamUnplayedGames,
-                $tid,
+                $teamid,
                 $teamWinPcts
             );
         }
@@ -295,11 +295,11 @@ class PowerRankingsUpdater extends \BaseMysqliRepository {
 
         // Store SOS values in power table
         $sosLog = '';
-        foreach ($teamIds as $tid) {
-            $sos = $sosValues[$tid] ?? 0.0;
-            $remainingSos = $remainingSosValues[$tid] ?? 0.0;
-            $sosRank = $sosRanks[$tid] ?? 0;
-            $remainingSosRank = $remainingSosRanks[$tid] ?? 0;
+        foreach ($teamIds as $teamid) {
+            $sos = $sosValues[$teamid] ?? 0.0;
+            $remainingSos = $remainingSosValues[$teamid] ?? 0.0;
+            $sosRank = $sosRanks[$teamid] ?? 0;
+            $remainingSosRank = $remainingSosRanks[$teamid] ?? 0;
 
             $this->execute(
                 "UPDATE {$powerTable} SET
@@ -307,16 +307,16 @@ class PowerRankingsUpdater extends \BaseMysqliRepository {
                 remaining_sos = ?,
                 sos_rank = ?,
                 remaining_sos_rank = ?
-                WHERE TeamID = ?",
+                WHERE teamid = ?",
                 "ddiii",
                 $sos,
                 $remainingSos,
                 $sosRank,
                 $remainingSosRank,
-                $tid
+                $teamid
             );
 
-            $sosLog .= "TeamID {$tid}: SOS={$sos} (rank {$sosRank}), "
+            $sosLog .= "teamid {$teamid}: SOS={$sos} (rank {$sosRank}), "
                 . "RSOS={$remainingSos} (rank {$remainingSosRank})<br>";
         }
 

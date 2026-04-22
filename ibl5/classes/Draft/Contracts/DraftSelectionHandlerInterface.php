@@ -52,7 +52,7 @@ interface DraftSelectionHandlerInterface
      *  - Safe for direct echo to user
      *
      * Database Dependencies:
-     *  - Team must exist in ibl_team_info (for tid lookup)
+     *  - Team must exist in ibl_team_info (for teamid lookup)
      *  - Player must exist in ibl_draft_class (for rating mapping)
      *  - Draft pick must exist in ibl_draft (for round/pick lookup)
      *

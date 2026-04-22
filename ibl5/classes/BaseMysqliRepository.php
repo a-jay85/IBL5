@@ -60,7 +60,7 @@ use League\League;
  *     public function getPlayersByTeam(int $teamId, int $maxAge): array
  *     {
  *         return $this->fetchAll(
- *             "SELECT * FROM ibl_plr WHERE tid = ? AND age <= ?",
+ *             "SELECT * FROM ibl_plr WHERE teamid = ? AND age <= ?",
  *             "ii",
  *             $teamId,
  *             $maxAge
@@ -70,7 +70,7 @@ use League\League;
  *     public function updatePlayerTeam(int $pid, int $newTeamId): int
  *     {
  *         return $this->execute(
- *             "UPDATE ibl_plr SET tid = ? WHERE pid = ?",
+ *             "UPDATE ibl_plr SET teamid = ? WHERE pid = ?",
  *             "ii",
  *             $newTeamId,
  *             $pid
@@ -290,7 +290,7 @@ abstract class BaseMysqliRepository
      * @throws \RuntimeException Error 1001/1002/1003 on failure (see executeQuery)
      *
      * @example
-     * $players = $this->fetchAll("SELECT * FROM ibl_plr WHERE tid = ?", "i", 1);
+     * $players = $this->fetchAll("SELECT * FROM ibl_plr WHERE teamid = ?", "i", 1);
      * // Returns [['pid' => 1, 'name' => 'John', ...], ['pid' => 2, 'name' => 'Jane', ...]]
      */
     protected function fetchAll(string $query, string $types = '', mixed ...$params): array
@@ -331,7 +331,7 @@ abstract class BaseMysqliRepository
      * @throws \RuntimeException Error 1001/1002/1003 on failure (see executeQuery)
      *
      * @example
-     * $affected = $this->execute("UPDATE ibl_plr SET tid = ? WHERE pid = ?", "ii", 1, 123);
+     * $affected = $this->execute("UPDATE ibl_plr SET teamid = ? WHERE pid = ?", "ii", 1, 123);
      * // Returns 1 if player was updated, 0 if pid not found
      */
     protected function execute(string $query, string $types = '', mixed ...$params): int

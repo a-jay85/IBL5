@@ -31,37 +31,37 @@ class TeamTableService implements TeamTableServiceInterface
     /**
      * @see TeamTableServiceInterface::getTableOutput()
      */
-    public function getTableOutput(int $teamID, ?string $yr, string $display, ?string $split = null): string
+    public function getTableOutput(int $teamid, ?string $yr, string $display, ?string $split = null): string
     {
         $season = new Season($this->db);
 
         $isFreeAgency = $season->isOffseasonPhase();
 
-        if ($teamID === 0) {
+        if ($teamid === 0) {
             $result = $this->repository->getFreeAgents($isFreeAgency);
-        } elseif ($teamID === -1) {
+        } elseif ($teamid === -1) {
             $result = $this->repository->getEntireLeagueRoster();
         } else {
             if ($yr !== null && $yr !== '') {
-                $result = $this->repository->getHistoricalRoster($teamID, $yr);
+                $result = $this->repository->getHistoricalRoster($teamid, $yr);
             } elseif ($isFreeAgency) {
-                $result = $this->repository->getFreeAgencyRoster($teamID);
+                $result = $this->repository->getFreeAgencyRoster($teamid);
             } else {
-                $result = $this->repository->getRosterUnderContract($teamID);
+                $result = $this->repository->getRosterUnderContract($teamid);
             }
         }
 
         $insertyear = ($yr !== null && $yr !== '') ? "&yr=$yr" : "";
-        $baseUrl = "modules.php?name=Team&op=team&teamID=$teamID" . $insertyear;
-        $teamData = $this->repository->getTeam($teamID);
+        $baseUrl = "modules.php?name=Team&op=team&teamid=$teamid" . $insertyear;
+        $teamData = $this->repository->getTeam($teamid);
         $teamColor1 = is_string($teamData['color1'] ?? null) ? $teamData['color1'] : '000000';
         $teamColor2 = is_string($teamData['color2'] ?? null) ? $teamData['color2'] : 'FFFFFF';
 
-        $team = Team::initialize($this->db, $teamID);
+        $team = Team::initialize($this->db, $teamid);
 
         /** @var list<int> $starterPids */
         $starterPids = [];
-        if ($teamID > 0 && ($yr === null || $yr === '')) {
+        if ($teamid > 0 && ($yr === null || $yr === '')) {
             $starters = $this->extractStartersData($result);
             foreach ($starters as $data) {
                 if ($data['pid'] !== null) {
@@ -73,10 +73,10 @@ class TeamTableService implements TeamTableServiceInterface
         $tableHtml = $this->renderTableForDisplay($display, $result, $team, $yr, $season, $starterPids, $split);
 
         // HTMX API URL for tab/dropdown switching
-        $apiUrl = 'modules.php?name=Team&op=api&teamID=' . $teamID . $insertyear;
+        $apiUrl = 'modules.php?name=Team&op=api&teamid=' . $teamid . $insertyear;
 
         // Use dropdown for actual teams in current season; tabs for everything else
-        $useDropdown = $teamID > 0 && ($yr === null || $yr === '');
+        $useDropdown = $teamid > 0 && ($yr === null || $yr === '');
 
         if ($useDropdown) {
             $dropdownGroups = $this->buildDropdownGroups($season);
@@ -142,20 +142,20 @@ class TeamTableService implements TeamTableServiceInterface
      * @see TeamTableServiceInterface::getRosterAndStarters()
      * @return array{roster: list<array<string, mixed>>, starterPids: list<int>}
      */
-    public function getRosterAndStarters(int $teamID): array
+    public function getRosterAndStarters(int $teamid): array
     {
         $season = new Season($this->db);
         $isFreeAgency = $season->isOffseasonPhase();
 
         if ($isFreeAgency) {
-            $result = $this->repository->getFreeAgencyRoster($teamID);
+            $result = $this->repository->getFreeAgencyRoster($teamid);
         } else {
-            $result = $this->repository->getRosterUnderContract($teamID);
+            $result = $this->repository->getRosterUnderContract($teamid);
         }
 
         /** @var list<int> $starterPids */
         $starterPids = [];
-        if ($teamID > 0) {
+        if ($teamid > 0) {
             $starters = $this->extractStartersData($result);
             foreach ($starters as $data) {
                 if ($data['pid'] !== null) {
@@ -189,7 +189,7 @@ class TeamTableService implements TeamTableServiceInterface
                 return \UI\Tables\PeriodAverages::render($this->db, $team, $season, $season->playoffsStartDate, $season->playoffsEndDate, $starterPids);
             case 'contracts':
                 $cashRepo = new \Trading\CashConsiderationRepository($this->db);
-                $cashRows = $cashRepo->getTeamCashConsiderations($team->teamID ?? 0);
+                $cashRows = $cashRepo->getTeamCashConsiderations($team->teamid ?? 0);
                 foreach ($cashRows as $cashRow) {
                     $result[] = self::cashConsiderationToRosterRow($cashRow);
                 }
@@ -278,9 +278,9 @@ class TeamTableService implements TeamTableServiceInterface
         $allTeams = $this->repository->getAllTeams();
         $vsTeam = [];
         foreach ($allTeams as $teamRow) {
-            $tid = $teamRow['teamid'];
+            $teamid = $teamRow['teamid'];
             $teamName = $teamRow['team_name'];
-            $vsTeam['split:vs_' . $tid] = 'vs. ' . $teamName;
+            $vsTeam['split:vs_' . $teamid] = 'vs. ' . $teamName;
         }
         $groups['vs. Team'] = $vsTeam;
 
@@ -295,8 +295,8 @@ class TeamTableService implements TeamTableServiceInterface
     private function renderSplitStats(Team $team, Season $season, string $splitKey, array $starterPids): string
     {
         $splitRepo = new SplitStatsRepository($this->db);
-        $teamID = $team->teamID;
-        $rows = $splitRepo->getSplitStats($teamID, $season->endingYear, $splitKey);
+        $teamid = $team->teamid;
+        $rows = $splitRepo->getSplitStats($teamid, $season->endingYear, $splitKey);
         $splitLabel = $splitRepo->getSplitLabel($splitKey);
 
         return \UI\Tables\SplitStats::render($rows, $team, $splitLabel, $starterPids);
@@ -316,7 +316,7 @@ class TeamTableService implements TeamTableServiceInterface
             'name' => '| ' . (is_string($cashRow['label'] ?? null) ? $cashRow['label'] : ''),
             'nickname' => '',
             'ordinal' => 100000,
-            'tid' => $cashRow['tid'] ?? 0,
+            'teamid' => $cashRow['teamid'] ?? 0,
             'pos' => '',
             'age' => null,
             'peak' => null,
@@ -344,7 +344,7 @@ class TeamTableService implements TeamTableServiceInterface
             'draftyear' => 0, 'draftround' => 0, 'draftpickno' => 0,
             'draftedby' => '', 'draftedbycurrentname' => '', 'college' => '',
             'r_fga' => 0, 'r_fgp' => 0, 'r_fta' => 0, 'r_ftp' => 0,
-            'r_tga' => 0, 'r_tgp' => 0, 'r_orb' => 0, 'r_drb' => 0,
+            'r_3ga' => 0, 'r_3gp' => 0, 'r_orb' => 0, 'r_drb' => 0,
             'r_ast' => 0, 'r_stl' => 0, 'r_tvr' => 0, 'r_blk' => 0, 'r_foul' => 0,
             'isCashRow' => true,
         ];

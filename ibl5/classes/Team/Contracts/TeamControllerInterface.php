@@ -19,11 +19,11 @@ interface TeamControllerInterface
      * for data assembly and TeamView for rendering, then calls Footer.
      *
      * **Context Modes:**
-     * - teamID > 0: Specific team roster (current, free agency, or historical year)
-     * - teamID = 0: Free agents available for signing
-     * - teamID = -1: Entire league roster
+     * - teamid > 0: Specific team roster (current, free agency, or historical year)
+     * - teamid = 0: Free agents available for signing
+     * - teamid = -1: Entire league roster
      *
      * @return void Outputs complete HTML page directly
      */
-    public function displayTeamPage(int $teamID): void;
+    public function displayTeamPage(int $teamid): void;
 }

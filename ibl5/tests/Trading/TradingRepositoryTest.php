@@ -229,8 +229,8 @@ class TradingRepositoryTest extends TestCase
     {
         $repository = new TradeFormRepository($this->mockMysqliDb);
         $this->mockDb->setMockData([
-            ['pickid' => 1, 'year' => 2026, 'round' => 1, 'pick' => 5, 'owner_tid' => 1, 'teampick_tid' => 3],
-            ['pickid' => 2, 'year' => 2026, 'round' => 2, 'pick' => 10, 'owner_tid' => 1, 'teampick_tid' => 1],
+            ['pickid' => 1, 'year' => 2026, 'round' => 1, 'pick' => 5, 'owner_teamid' => 1, 'teampick_teamid' => 3],
+            ['pickid' => 2, 'year' => 2026, 'round' => 2, 'pick' => 10, 'owner_teamid' => 1, 'teampick_teamid' => 1],
         ]);
 
         $result = $repository->getTeamDraftPicksForTrading(1);

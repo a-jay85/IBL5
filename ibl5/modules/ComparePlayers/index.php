@@ -31,7 +31,7 @@ function userinfo($username, $bypass = 0, $hid = 0, $url = 0): void
     }
 
     $teamlogo = $commonRepository->getTeamnameFromUsername($username) ?? '';
-    $tid = $commonRepository->getTidFromTeamname($teamlogo);
+    $teamid = $commonRepository->getTidFromTeamname($teamlogo);
 
     PageLayout\PageLayout::header();
 

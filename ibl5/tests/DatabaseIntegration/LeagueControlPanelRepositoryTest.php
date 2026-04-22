@@ -201,7 +201,7 @@ class LeagueControlPanelRepositoryTest extends DatabaseTestCase
     public function testSetWaiversToFreeAgentsMovesPlayers(): void
     {
         $this->insertTestPlayer(200100030, 'Waiver Player B10', [
-            'tid' => 1,
+            'teamid' => 1,
             'ordinal' => 970,
             'retired' => 0,
             'bird' => 3,
@@ -209,7 +209,7 @@ class LeagueControlPanelRepositoryTest extends DatabaseTestCase
 
         $this->repo->setWaiversToFreeAgents();
 
-        $stmt = $this->db->prepare("SELECT tid, bird FROM ibl_plr WHERE pid = ?");
+        $stmt = $this->db->prepare("SELECT teamid, bird FROM ibl_plr WHERE pid = ?");
         self::assertNotFalse($stmt);
         $pid = 200100030;
         $stmt->bind_param('i', $pid);
@@ -218,7 +218,7 @@ class LeagueControlPanelRepositoryTest extends DatabaseTestCase
         $stmt->close();
 
         self::assertNotNull($row);
-        self::assertSame(0, $row['tid']);
+        self::assertSame(0, $row['teamid']);
         self::assertSame(0, $row['bird']);
     }
 
@@ -280,7 +280,7 @@ class LeagueControlPanelRepositoryTest extends DatabaseTestCase
     }
 
     /**
-     * Insert a row into ibl_cash_considerations (tid=1, type='buyout') with given cy fields.
+     * Insert a row into ibl_cash_considerations (teamid=1, type='buyout') with given cy fields.
      * Returns the AUTO_INCREMENT id.
      *
      * @param array<string, int> $fields cy, cy1..cy6 overrides
@@ -296,7 +296,7 @@ class LeagueControlPanelRepositoryTest extends DatabaseTestCase
         $cy6 = $fields['cy6'] ?? 0;
 
         $stmt = $this->db->prepare(
-            "INSERT INTO ibl_cash_considerations (tid, type, label, cy, cyt, cy1, cy2, cy3, cy4, cy5, cy6)"
+            "INSERT INTO ibl_cash_considerations (teamid, type, label, cy, cyt, cy1, cy2, cy3, cy4, cy5, cy6)"
             . " VALUES (1, 'buyout', 'Test Buyout', ?, 6, ?, ?, ?, ?, ?, ?)"
         );
         self::assertNotFalse($stmt);
@@ -327,9 +327,9 @@ class LeagueControlPanelRepositoryTest extends DatabaseTestCase
 
     public function testSetFreeAgencyFactorsForPfwUpdatesTeamInfo(): void
     {
-        $this->db->query("DELETE FROM ibl_standings WHERE tid = 1");
+        $this->db->query("DELETE FROM ibl_standings WHERE teamid = 1");
         $this->insertRow('ibl_standings', [
-            'tid' => 1,
+            'teamid' => 1,
             'team_name' => 'Metros',
             'wins' => 42,
             'losses' => 8,

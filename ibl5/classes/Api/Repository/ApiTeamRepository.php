@@ -39,7 +39,7 @@ class ApiTeamRepository extends \BaseMysqliRepository
                     s.conference, s.division,
                     t.discordID
              FROM {$this->teamInfoTable} t
-             LEFT JOIN {$this->standingsTable} s ON t.teamid = s.tid
+             LEFT JOIN {$this->standingsTable} s ON t.teamid = s.teamid
              WHERE t.teamid BETWEEN 1 AND ?
              ORDER BY {$orderBy}
              LIMIT ? OFFSET ?",
@@ -89,7 +89,7 @@ class ApiTeamRepository extends \BaseMysqliRepository
                     s.awayLosses AS away_losses,
                     s.gamesUnplayed AS games_remaining
              FROM {$this->teamInfoTable} t
-             LEFT JOIN {$this->standingsTable} s ON t.teamid = s.tid
+             LEFT JOIN {$this->standingsTable} s ON t.teamid = s.teamid
              WHERE t.uuid = ?",
             's',
             $uuid

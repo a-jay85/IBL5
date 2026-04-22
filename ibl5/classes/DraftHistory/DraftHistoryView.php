@@ -59,7 +59,7 @@ class DraftHistoryView implements DraftHistoryViewInterface
     public function renderTeamHistory(Team $team, array $draftPicks): string
     {
         $teamName = HtmlSanitizer::safeHtmlOutput($team->name);
-        $teamId = $team->teamID;
+        $teamId = $team->teamid;
 
         $output = "<h2 class=\"ibl-title\">{$teamName} Draft History</h2>";
         $output .= "<img src=\"images/logo/{$teamId}.jpg\" alt=\"\" class=\"team-logo-banner\">";

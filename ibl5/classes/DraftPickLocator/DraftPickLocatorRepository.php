@@ -38,7 +38,7 @@ class DraftPickLocatorRepository extends \BaseMysqliRepository implements DraftP
         return $this->fetchAll(
             "SELECT ownerofpick, year, round
              FROM ibl_draft_picks
-             WHERE teampick_tid = ?
+             WHERE teampick_teamid = ?
              ORDER BY year, round ASC",
             "i",
             $teamId
@@ -52,17 +52,17 @@ class DraftPickLocatorRepository extends \BaseMysqliRepository implements DraftP
      */
     public function getAllDraftPicksGroupedByTeam(): array
     {
-        /** @var list<array{teampick_tid: int, ownerofpick: string, year: int, round: int}> $rows */
+        /** @var list<array{teampick_teamid: int, ownerofpick: string, year: int, round: int}> $rows */
         $rows = $this->fetchAll(
-            "SELECT teampick_tid, ownerofpick, year, round
+            "SELECT teampick_teamid, ownerofpick, year, round
              FROM ibl_draft_picks
-             ORDER BY teampick_tid, year, round ASC"
+             ORDER BY teampick_teamid, year, round ASC"
         );
 
         /** @var array<int, list<array{ownerofpick: string, year: int, round: int}>> $grouped */
         $grouped = [];
         foreach ($rows as $row) {
-            $teamId = $row['teampick_tid'];
+            $teamId = $row['teampick_teamid'];
             $grouped[$teamId][] = [
                 'ownerofpick' => $row['ownerofpick'],
                 'year' => $row['year'],

@@ -75,7 +75,7 @@ interface SeasonLeaderboardsViewInterface
      * - Alternating row colors (odd: #DDDDDD, even: #FFFFFF)
      * - All values HTML-escaped
      * - Player link: modules.php?name=Player&pa=showpage&pid=X
-     * - Team link: modules.php?name=Team&op=team&teamID=X
+     * - Team link: modules.php?name=Team&op=team&teamid=X
      */
     public function renderPlayerRow(array $stats, int $rank): string;
 

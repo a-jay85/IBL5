@@ -5,7 +5,7 @@ declare(strict_types=1);
 /**
  * Schedule Module - Display league or team game schedule
  *
- * Shows the full league schedule, or a specific team's schedule if teamID is provided.
+ * Shows the full league schedule, or a specific team's schedule if teamid is provided.
  * Team schedules include team colors, logo banner, and win/loss tracking.
  *
  * @see TeamSchedule\TeamScheduleService For team-specific business logic
@@ -37,18 +37,18 @@ $standingsRepo = new StandingsRepository($mysqli_db);
 $allStreakData = $standingsRepo->getAllStreakData();
 /** @var array<int, float> $teamPowerRankings */
 $teamPowerRankings = [];
-foreach ($allStreakData as $tid => $data) {
-    $teamPowerRankings[$tid] = (float)$data['ranking'];
+foreach ($allStreakData as $teamid => $data) {
+    $teamPowerRankings[$teamid] = (float)$data['ranking'];
 }
 
 // Check for team ID parameter
-$teamID = isset($_GET['teamID']) ? (int)$_GET['teamID'] : 0;
+$teamid = isset($_GET['teamid']) ? (int)$_GET['teamid'] : 0;
 
 // Validate team ID exists (if provided)
 $isValidTeam = false;
-if ($teamID > 0) {
-    $team = \Team\Team::initialize($mysqli_db, $teamID);
-    $isValidTeam = ($team->teamID > 0);
+if ($teamid > 0) {
+    $team = \Team\Team::initialize($mysqli_db, $teamid);
+    $isValidTeam = ($team->teamid > 0);
 }
 
 PageLayout\PageLayout::header();
@@ -60,7 +60,7 @@ if ($isValidTeam) {
     $view = new TeamScheduleView();
 
     // Set remaining SOS summary for the team
-    $teamStreakData = $allStreakData[$teamID] ?? null;
+    $teamStreakData = $allStreakData[$teamid] ?? null;
     if ($teamStreakData !== null) {
         $view->setSosSummary([
             'remaining_sos' => $teamStreakData['remaining_sos'],
@@ -68,7 +68,7 @@ if ($isValidTeam) {
         ]);
     }
 
-    $games = $service->getProcessedSchedule($teamID, $season);
+    $games = $service->getProcessedSchedule($teamid, $season);
     echo $view->render($team, $games, $league->getSimLengthInDays(), $season->phase);
 } else {
     // League-wide schedule

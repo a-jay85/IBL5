@@ -153,7 +153,7 @@ class DraftHistoryViewTest extends TestCase
     {
         $team = $this->createMock(Team::class);
         $team->name = $name;
-        $team->teamID = $teamId;
+        $team->teamid = $teamId;
 
         return $team;
     }

@@ -54,7 +54,7 @@ class TeamRepositoryTest extends DatabaseTestCase
         $power = $this->repo->getTeamPowerData($teamName);
 
         self::assertNotNull($power);
-        self::assertArrayHasKey('tid', $power);
+        self::assertArrayHasKey('teamid', $power);
         self::assertArrayHasKey('team_name', $power);
         self::assertArrayHasKey('wins', $power);
         self::assertArrayHasKey('losses', $power);
@@ -180,7 +180,7 @@ class TeamRepositoryTest extends DatabaseTestCase
 
         self::assertNotEmpty($roster);
         foreach ($roster as $player) {
-            self::assertSame(1, $player['tid']);
+            self::assertSame(1, $player['teamid']);
             self::assertSame(0, $player['retired']);
         }
     }
@@ -192,7 +192,7 @@ class TeamRepositoryTest extends DatabaseTestCase
             'pid' => 99990,
             'name' => 'Test Free Agent',
             'age' => 25,
-            'tid' => 0,
+            'teamid' => 0,
             'pos' => 'SG',
             'sta' => 70,
             'exp' => 2,
@@ -362,8 +362,8 @@ class TeamRepositoryTest extends DatabaseTestCase
         // Team 1 (visitor) wins 3 games, Team 2 (home) wins 1 game.
         // Total score = sum of all 4 quarters. Visitor wins when v_total > h_total.
         $games = [
-            ['vTotal' => 100, 'hTotal' => 90],  // visitor (tid=1) wins
-            ['vTotal' => 85,  'hTotal' => 95],   // home (tid=2) wins
+            ['vTotal' => 100, 'hTotal' => 90],  // visitor (teamid=1) wins
+            ['vTotal' => 85,  'hTotal' => 95],   // home (teamid=2) wins
             ['vTotal' => 98,  'hTotal' => 88],   // visitor wins
             ['vTotal' => 97,  'hTotal' => 92],   // visitor wins
         ];
@@ -374,8 +374,8 @@ class TeamRepositoryTest extends DatabaseTestCase
                 'Date' => $date,
                 'name' => $i % 2 === 0 ? 'Metros' : 'Sharks',
                 'gameOfThatDay' => 1,
-                'visitorTeamID' => 1,
-                'homeTeamID' => 2,
+                'visitor_teamid' => 1,
+                'home_teamid' => 2,
                 'attendance' => 15000, 'capacity' => 18000,
                 'visitorWins' => 0, 'visitorLosses' => 0,
                 'homeWins' => 0, 'homeLosses' => 0,
@@ -417,9 +417,9 @@ class TeamRepositoryTest extends DatabaseTestCase
     public function testGetFreeAgencyRosterExcludesExpiringContracts(): void
     {
         // Non-expiring: cy=1, cyt=3 (cy != cyt → included)
-        $this->insertTestPlayer(200100001, 'FA Roster Keep', ['tid' => 1, 'cy' => 1, 'cyt' => 3]);
+        $this->insertTestPlayer(200100001, 'FA Roster Keep', ['teamid' => 1, 'cy' => 1, 'cyt' => 3]);
         // Expiring: cy=3, cyt=3 (cy == cyt → excluded by SQL `cyt != cy`)
-        $this->insertTestPlayer(200100002, 'FA Roster Expire', ['tid' => 1, 'cy' => 3, 'cyt' => 3]);
+        $this->insertTestPlayer(200100002, 'FA Roster Expire', ['teamid' => 1, 'cy' => 3, 'cyt' => 3]);
 
         $result = $this->repo->getFreeAgencyRoster(1);
 
@@ -447,13 +447,13 @@ class TeamRepositoryTest extends DatabaseTestCase
         }
     }
 
-    private function ensureStandingsAndPowerExist(int $tid, string $division, string $conference): void
+    private function ensureStandingsAndPowerExist(int $teamid, string $division, string $conference): void
     {
         // Use REPLACE to ensure data exists within transaction regardless of DB state
-        $this->db->query("DELETE FROM ibl_power WHERE TeamID = $tid");
-        $this->db->query("DELETE FROM ibl_standings WHERE tid = $tid");
+        $this->db->query("DELETE FROM ibl_power WHERE teamid = $teamid");
+        $this->db->query("DELETE FROM ibl_standings WHERE teamid = $teamid");
         $this->insertRow('ibl_standings', [
-            'tid' => $tid,
+            'teamid' => $teamid,
             'team_name' => 'TestTeam',
             'wins' => 30,
             'losses' => 20,
@@ -470,7 +470,7 @@ class TeamRepositoryTest extends DatabaseTestCase
             'gamesUnplayed' => 32,
         ]);
         $this->insertRow('ibl_power', [
-            'TeamID' => $tid,
+            'teamid' => $teamid,
             'ranking' => 75.5,
             'last_win' => 7,
             'last_loss' => 3,

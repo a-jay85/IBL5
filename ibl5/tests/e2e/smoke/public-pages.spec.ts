@@ -27,7 +27,7 @@ test.describe('Public page smoke tests', () => {
   });
 
   test('team page loads', async ({ page }) => {
-    await page.goto('modules.php?name=Team&op=team&teamID=1');
+    await page.goto('modules.php?name=Team&op=team&teamid=1');
     await expect(page.locator('.ibl-data-table').first()).toBeVisible();
   });
 
@@ -61,7 +61,7 @@ test.describe('Public page smoke tests', () => {
       'modules.php?name=DraftHistory',
       'modules.php?name=CapSpace',
       'modules.php?name=Player&pa=showpage&pid=1',
-      'modules.php?name=Team&op=team&teamID=1',
+      'modules.php?name=Team&op=team&teamid=1',
       'modules.php?name=Topics',
     ];
 

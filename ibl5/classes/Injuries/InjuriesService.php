@@ -42,7 +42,7 @@ class InjuriesService implements InjuriesServiceInterface
         foreach ($injuredRows as $injuredPlayerRow) {
             $player = Player::withPlrRow($this->db, $injuredPlayerRow);
             $playerID = $player->playerID ?? 0;
-            $team = Team::initialize($this->db, $playerID > 0 ? ($player->teamID ?? 0) : 0);
+            $team = Team::initialize($this->db, $playerID > 0 ? ($player->teamid ?? 0) : 0);
 
             $injuredPlayers[] = [
                 'playerID' => $playerID,
@@ -50,7 +50,7 @@ class InjuriesService implements InjuriesServiceInterface
                 'position' => $player->position ?? '',
                 'daysRemaining' => $player->daysRemainingForInjury ?? 0,
                 'returnDate' => $player->getInjuryReturnDate($season->lastSimEndDate),
-                'teamID' => $player->teamID ?? 0,
+                'teamid' => $player->teamid ?? 0,
                 'teamCity' => $team->city,
                 'teamName' => $team->name,
                 'teamColor1' => $team->color1,

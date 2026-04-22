@@ -96,9 +96,11 @@ SELECT
     TRY_CAST(pid AS INTEGER) AS pid,
     name,
     pos,
-    TRY_CAST(teamID AS INTEGER) AS team_id,
-    TRY_CAST(visitorTID AS INTEGER) AS visitor_tid,
-    TRY_CAST(homeTID AS INTEGER) AS home_tid,
+    -- Migration 114: MariaDB columns renamed teamID→teamid, visitorTID→visitor_teamid, homeTID→home_teamid.
+    -- Output aliases preserved for downstream-query compatibility.
+    TRY_CAST(teamid AS INTEGER) AS team_id,
+    TRY_CAST(visitor_teamid AS INTEGER) AS visitor_tid,
+    TRY_CAST(home_teamid AS INTEGER) AS home_tid,
     TRY_CAST(gameMIN AS INTEGER) AS minutes,
     TRY_CAST(game2GM AS INTEGER) AS fg2_made,
     TRY_CAST(game2GA AS INTEGER) AS fg2_att,
@@ -152,8 +154,10 @@ CREATE OR REPLACE TABLE fact_team_game AS
 SELECT
     TRY_CAST(id AS INTEGER) AS id,
     TRY_CAST(Date AS DATE) AS game_date,
-    TRY_CAST(visitorTeamID AS INTEGER) AS visitor_tid,
-    TRY_CAST(homeTeamID AS INTEGER) AS home_tid,
+    -- Migration 114: MariaDB columns renamed visitorTeamID→visitor_teamid, homeTeamID→home_teamid.
+    -- Output aliases preserved for downstream-query compatibility.
+    TRY_CAST(visitor_teamid AS INTEGER) AS visitor_tid,
+    TRY_CAST(home_teamid AS INTEGER) AS home_tid,
     TRY_CAST(game_type AS INTEGER) AS game_type,
     TRY_CAST(season_year AS INTEGER) AS season_year,
     TRY_CAST(attendance AS INTEGER) AS attendance,
@@ -261,7 +265,8 @@ SELECT
     name,
     TRY_CAST(season_year AS INTEGER) AS season_year,
     snapshot_phase,
-    TRY_CAST(tid AS INTEGER)         AS tid,
+    -- Migration 114: MariaDB column renamed tid → teamid.
+    TRY_CAST(teamid AS INTEGER)      AS teamid,
     TRY_CAST(age AS INTEGER)         AS age,
     pos,
     TRY_CAST(peak AS INTEGER)        AS peak,
@@ -278,7 +283,8 @@ SELECT
     -- Stat ratings (0-99 scale)
     TRY_CAST(r_fga AS INTEGER) AS r_fga, TRY_CAST(r_fgp AS INTEGER) AS r_fgp,
     TRY_CAST(r_fta AS INTEGER) AS r_fta, TRY_CAST(r_ftp AS INTEGER) AS r_ftp,
-    TRY_CAST(r_tga AS INTEGER) AS r_tga, TRY_CAST(r_tgp AS INTEGER) AS r_tgp,
+    -- Migration 114: MariaDB columns renamed r_tga → r_3ga, r_tgp → r_3gp. Kept output aliases.
+    TRY_CAST(r_3ga AS INTEGER) AS r_tga, TRY_CAST(r_3gp AS INTEGER) AS r_tgp,
     TRY_CAST(r_orb AS INTEGER) AS r_orb, TRY_CAST(r_drb AS INTEGER) AS r_drb,
     TRY_CAST(r_ast AS INTEGER) AS r_ast, TRY_CAST(r_stl AS INTEGER) AS r_stl,
     -- Migration 113: ibl_plr_snapshots.r_to (turnover rating) renamed to r_tvr.
@@ -312,7 +318,8 @@ SELECT
     TRY_CAST(stats_3gm AS INTEGER) AS stats_3gm, TRY_CAST(stats_3ga AS INTEGER) AS stats_3ga,
     TRY_CAST(stats_orb AS INTEGER) AS stats_orb, TRY_CAST(stats_drb AS INTEGER) AS stats_drb,
     TRY_CAST(stats_ast AS INTEGER) AS stats_ast, TRY_CAST(stats_stl AS INTEGER) AS stats_stl,
-    TRY_CAST(stats_to AS INTEGER) AS stats_to, TRY_CAST(stats_blk AS INTEGER) AS stats_blk,
+    -- Migration 114: MariaDB column renamed stats_to → stats_tvr. Kept output alias stats_to.
+    TRY_CAST(stats_tvr AS INTEGER) AS stats_to, TRY_CAST(stats_blk AS INTEGER) AS stats_blk,
     TRY_CAST(stats_pf AS INTEGER) AS stats_pf,
     TRY_CAST(stats_reb AS INTEGER) AS stats_reb, TRY_CAST(stats_pts AS INTEGER) AS stats_pts,
     -- Playoff stats

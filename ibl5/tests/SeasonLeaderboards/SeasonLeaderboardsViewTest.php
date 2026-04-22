@@ -93,7 +93,7 @@ final class SeasonLeaderboardsViewTest extends TestCase
         $this->assertStringContainsString('Test Player', $html);
 
         // Check team link (& properly encoded as &amp; in HTML)
-        $this->assertStringContainsString('modules.php?name=Team&amp;op=team&amp;teamID=1', $html);
+        $this->assertStringContainsString('modules.php?name=Team&amp;op=team&amp;teamid=1', $html);
         $this->assertStringContainsString('Test Team', $html);
 
         // Check some stats are displayed

@@ -27,7 +27,7 @@ class VotingBallotView implements VotingBallotViewInterface
     public function renderBallotForm(
         string $formAction,
         string $voterTeamName,
-        int $tid,
+        int $teamid,
         string $phase,
         array $categories
     ): string {
@@ -41,7 +41,7 @@ class VotingBallotView implements VotingBallotViewInterface
         $html = "<form name=\"{$formName}\" method=\"post\" action=\"{$safeFormAction}\">";
         $html .= \Utilities\CsrfGuard::generateToken($csrfFormName);
         $html .= '<div class="voting-form-container">';
-        $html .= "<img src=\"images/logo/{$tid}.jpg\" alt=\"Team Logo\" class=\"team-logo-banner\">";
+        $html .= "<img src=\"images/logo/{$teamid}.jpg\" alt=\"Team Logo\" class=\"team-logo-banner\">";
         $html .= '<button type="submit" class="ibl-btn ibl-btn--primary ibl-btn--lg">Submit Votes!</button>';
 
         foreach ($categories as $category) {

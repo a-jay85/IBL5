@@ -31,8 +31,8 @@ class GameTest extends TestCase
         
         $this->assertEquals('2025-01-15', $game->date);
         $this->assertEquals(1001, $game->boxScoreID);
-        $this->assertEquals(1, $game->visitorTeamID);
-        $this->assertEquals(2, $game->homeTeamID);
+        $this->assertEquals(1, $game->visitor_teamid);
+        $this->assertEquals(2, $game->home_teamid);
         $this->assertEquals(98, $game->visitorScore);
         $this->assertEquals(105, $game->homeScore);
     }

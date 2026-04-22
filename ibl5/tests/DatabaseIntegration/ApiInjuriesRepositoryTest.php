@@ -26,14 +26,14 @@ class ApiInjuriesRepositoryTest extends DatabaseTestCase
         $this->insertTestPlayer(200000070, 'DB Test Injured Player', [
             'injured' => 5,
             'dc_canPlayInGame' => 1,
-            'tid' => 1,
+            'teamid' => 1,
         ]);
 
         // Insert a healthy player
         $this->insertTestPlayer(200000071, 'DB Test Healthy Player', [
             'injured' => 0,
             'dc_canPlayInGame' => 1,
-            'tid' => 1,
+            'teamid' => 1,
         ]);
 
         $result = $this->repo->getInjuredPlayers();
@@ -50,7 +50,7 @@ class ApiInjuriesRepositoryTest extends DatabaseTestCase
         $this->insertTestPlayer(200000072, 'DB Test Inactive Injured', [
             'injured' => 3,
             'dc_canPlayInGame' => 0,
-            'tid' => 1,
+            'teamid' => 1,
         ]);
 
         $result = $this->repo->getInjuredPlayers();
@@ -65,7 +65,7 @@ class ApiInjuriesRepositoryTest extends DatabaseTestCase
         $this->insertTestPlayer(200000073, 'DB Test Injured With Team', [
             'injured' => 2,
             'dc_canPlayInGame' => 1,
-            'tid' => 1,
+            'teamid' => 1,
         ]);
 
         $result = $this->repo->getInjuredPlayers();
@@ -91,13 +91,13 @@ class ApiInjuriesRepositoryTest extends DatabaseTestCase
         $this->insertTestPlayer(200000074, 'DB Test Mild Injury', [
             'injured' => 1,
             'dc_canPlayInGame' => 1,
-            'tid' => 1,
+            'teamid' => 1,
         ]);
 
         $this->insertTestPlayer(200000075, 'DB Test Severe Injury', [
             'injured' => 10,
             'dc_canPlayInGame' => 1,
-            'tid' => 1,
+            'teamid' => 1,
         ]);
 
         $result = $this->repo->getInjuredPlayers();

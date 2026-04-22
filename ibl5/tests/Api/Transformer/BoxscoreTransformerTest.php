@@ -144,13 +144,13 @@ class BoxscoreTransformerTest extends TestCase
     {
         $row = $this->makeTeamRow();
         $row['id'] = 1;
-        $row['visitorTeamID'] = 11;
-        $row['homeTeamID'] = 26;
+        $row['visitor_teamid'] = 11;
+        $row['home_teamid'] = 26;
         $result = $this->transformer->transformTeamStats($row);
 
         $this->assertArrayNotHasKey('id', $result);
-        $this->assertArrayNotHasKey('visitorTeamID', $result);
-        $this->assertArrayNotHasKey('homeTeamID', $result);
+        $this->assertArrayNotHasKey('visitor_teamid', $result);
+        $this->assertArrayNotHasKey('home_teamid', $result);
     }
 
     public function testTransformPlayerLineIncludesPlayerInfo(): void
@@ -193,14 +193,14 @@ class BoxscoreTransformerTest extends TestCase
         $row = $this->makePlayerRow();
         $row['id'] = 1;
         $row['pid'] = 4825;
-        $row['visitorTID'] = 8;
-        $row['homeTID'] = 16;
+        $row['visitor_teamid'] = 8;
+        $row['home_teamid'] = 16;
         $result = $this->transformer->transformPlayerLine($row);
 
         $this->assertArrayNotHasKey('id', $result);
         $this->assertArrayNotHasKey('pid', $result);
-        $this->assertArrayNotHasKey('visitorTID', $result);
-        $this->assertArrayNotHasKey('homeTID', $result);
+        $this->assertArrayNotHasKey('visitor_teamid', $result);
+        $this->assertArrayNotHasKey('home_teamid', $result);
     }
 
     public function testTransformPlayerLineHandlesNullUuid(): void

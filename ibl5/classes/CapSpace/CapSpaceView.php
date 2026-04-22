@@ -106,7 +106,7 @@ class CapSpaceView implements CapSpaceViewInterface
     private function renderTeamRow(array $teamData): string
     {
         $teamId = $teamData['teamId'];
-        $contractsUrl = 'modules.php?name=Team&amp;op=team&amp;teamID=' . $teamId . '&amp;display=contracts';
+        $contractsUrl = 'modules.php?name=Team&amp;op=team&amp;teamid=' . $teamId . '&amp;display=contracts';
 
         $html = '<tr data-team-id="' . $teamId . '">';
         $html .= TeamCellHelper::renderTeamCell($teamId, $teamData['teamName'], $teamData['color1'], $teamData['color2'], 'sticky-col', $contractsUrl);

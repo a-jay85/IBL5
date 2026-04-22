@@ -60,28 +60,28 @@ class CommonMysqliRepositoryTest extends DatabaseTestCase
 
     public function testGetTidFromTeamnameReturnsInt(): void
     {
-        $tid = $this->repo->getTidFromTeamname('Metros');
+        $teamid = $this->repo->getTidFromTeamname('Metros');
 
-        self::assertSame(1, $tid);
+        self::assertSame(1, $teamid);
     }
 
     public function testGetTidFromTeamnameReturnsNullForUnknown(): void
     {
-        $tid = $this->repo->getTidFromTeamname('Nonexistent');
+        $teamid = $this->repo->getTidFromTeamname('Nonexistent');
 
-        self::assertNull($tid);
+        self::assertNull($teamid);
     }
 
     public function testGetPlayerByIdReturnsRow(): void
     {
-        $this->insertTestPlayer(200010001, 'CMR TestPlyr', ['tid' => 1]);
+        $this->insertTestPlayer(200010001, 'CMR TestPlyr', ['teamid' => 1]);
 
         $player = $this->repo->getPlayerByID(200010001);
 
         self::assertNotNull($player);
         self::assertSame(200010001, $player['pid']);
         self::assertSame('CMR TestPlyr', $player['name']);
-        self::assertSame(1, $player['tid']);
+        self::assertSame(1, $player['teamid']);
         self::assertSame('Metros', $player['teamname']);
     }
 
@@ -163,7 +163,7 @@ class CommonMysqliRepositoryTest extends DatabaseTestCase
 
     public function testGetPlayerByNameReturnsRowWithTeamData(): void
     {
-        $this->insertTestPlayer(200010021, 'CMR ByName', ['tid' => 1]);
+        $this->insertTestPlayer(200010021, 'CMR ByName', ['teamid' => 1]);
 
         $player = $this->repo->getPlayerByName('CMR ByName');
 

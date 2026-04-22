@@ -73,7 +73,7 @@ class DraftPickLocatorViewTest extends TestCase
     {
         $teams = [
             [
-                'teamID' => 1,
+                'teamid' => 1,
                 'teamId' => 1,
                 'teamCity' => 'Test<script>',
                 'teamName' => 'Team&Name',
@@ -175,9 +175,9 @@ class DraftPickLocatorViewTest extends TestCase
         $result = $this->view->render($teams, 2025);
 
         // Own pick links to own team page
-        $this->assertStringContainsString('href="modules.php?name=Team&amp;op=team&amp;teamID=1"', $result);
+        $this->assertStringContainsString('href="modules.php?name=Team&amp;op=team&amp;teamid=1"', $result);
         // Traded pick links to owning team page
-        $this->assertStringContainsString('href="modules.php?name=Team&amp;op=team&amp;teamID=2"', $result);
+        $this->assertStringContainsString('href="modules.php?name=Team&amp;op=team&amp;teamid=2"', $result);
         // Pick cells show team logos
         $this->assertStringContainsString('class="draft-pick-logo"', $result);
     }

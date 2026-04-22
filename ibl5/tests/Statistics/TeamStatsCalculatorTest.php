@@ -407,7 +407,7 @@ class TeamStatsCalculatorTest extends TestCase
 
         $result = $this->calculator->calculate($games, 1);
 
-        // When team IDs default to 0 and tid=1, falls into else branch
+        // When team IDs default to 0 and teamid=1, falls into else branch
         // Treats game as if team 1 is home team
         // homeScore (95) > awayScore (100) is false, so it's a loss
         $this->assertEquals(0, $result['wins']);

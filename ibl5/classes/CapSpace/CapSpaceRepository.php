@@ -41,7 +41,7 @@ class CapSpaceRepository extends \BaseMysqliRepository implements CapSpaceReposi
         return $this->fetchAll(
             "SELECT cy, cyt FROM ibl_plr
              WHERE retired = 0
-               AND tid = ?
+               AND teamid = ?
                AND cy <> cyt",
             "i",
             $teamId

@@ -2,4 +2,4 @@
 
 declare(strict_types=1);
 
-$teamId = $_GET['teamID'] ?? null;
+$teamId = $_GET['teamid'] ?? null;

@@ -127,7 +127,7 @@ class MockDatabase extends \mysqli
                 // Translate base keys to aliased JOIN keys if needed
                 if (isset($data['fgm']) && !isset($data['off_fgm'])) {
                     $data = [
-                        'teamID' => 1,
+                        'teamid' => 1,
                         'off_fgm' => $data['fgm'], 'off_ftm' => $data['ftm'], 'off_tgm' => $data['tgm'],
                         'def_fgm' => $data['fgm'], 'def_ftm' => $data['ftm'], 'def_tgm' => $data['tgm'],
                     ];

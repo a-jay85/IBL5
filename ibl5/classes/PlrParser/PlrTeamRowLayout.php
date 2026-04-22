@@ -43,7 +43,7 @@ namespace PlrParser;
  * sometimes stale (the user has seen incorrect names in older snapshots), so the
  * authoritative team identity comes from the row's *position* (ordinal − 1440) and
  * is cross-validated against the stat-sum from `ibl_box_scores_teams` filtered by
- * `visitorTeamID OR homeTeamID`.
+ * `visitor_teamid OR home_teamid`.
  */
 class PlrTeamRowLayout
 {

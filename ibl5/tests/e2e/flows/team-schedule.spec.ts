@@ -1,7 +1,7 @@
 import { test, expect } from '../fixtures/auth';
 import { assertNoPhpErrors } from '../helpers/php-errors';
 
-const TEAM_SCHEDULE_URL = 'modules.php?name=Schedule&teamID=1'; // Metros
+const TEAM_SCHEDULE_URL = 'modules.php?name=Schedule&teamid=1'; // Metros
 
 // ============================================================
 // Team Schedule — smoke (Regular Season)
@@ -311,21 +311,21 @@ test.describe('Team Schedule — SOS tier dot in streak', () => {
 test.describe('Team Schedule — no SOS data', () => {
   test.beforeEach(async ({ appState, page }) => {
     await appState({ 'Current Season Phase': 'Regular Season' });
-    // Use teamID=5 which has no ibl_power row seeded
-    await page.goto('modules.php?name=Schedule&teamID=5');
+    // Use teamid=5 which has no ibl_power row seeded
+    await page.goto('modules.php?name=Schedule&teamid=5');
   });
 
   test('no PHP errors', async ({ page }) => {
-    await assertNoPhpErrors(page, 'on Team Schedule (no SOS data, teamID=5)');
+    await assertNoPhpErrors(page, 'on Team Schedule (no SOS data, teamid=5)');
   });
 
   test('SOS summary absent when no power rankings for team', async ({ page }) => {
-    // CI seed: teamID=5 has no ibl_power row → .sos-summary absent.
+    // CI seed: teamid=5 has no ibl_power row → .sos-summary absent.
     await expect(page.locator('.sos-summary')).toHaveCount(0);
   });
 
   test('page renders schedule without power data', async ({ page }) => {
-    // teamID=5 has no ibl_power row, but the page still renders.
+    // teamid=5 has no ibl_power row, but the page still renders.
     // Tier dots may appear for opponents (derived from global power rankings).
     // The key assertion is the SOS summary absence (tested above) + no PHP errors.
     const body = await page.locator('body').textContent();

@@ -39,13 +39,13 @@ const TEAM_VIEWS = [
   { name: 'Historical 2024', param: 'yr=2024', hasWideTables: false },
 ] as const;
 
-const TEAM_BASE_URL = 'modules.php?name=Team&op=team&teamID=1';
+const TEAM_BASE_URL = 'modules.php?name=Team&op=team&teamid=1';
 
 // --- Olympics pages ---
 
 const OLYMPICS_URLS = [
   { name: 'Standings', url: 'modules.php?name=Standings&league=olympics' },
-  { name: 'Team', url: 'modules.php?name=Team&op=team&teamID=1&league=olympics' },
+  { name: 'Team', url: 'modules.php?name=Team&op=team&teamid=1&league=olympics' },
   { name: 'Season Leaderboards', url: 'modules.php?name=SeasonLeaderboards&league=olympics' },
   { name: 'Player', url: 'modules.php?name=Player&pa=showpage&pid=1&league=olympics' },
 ] as const;
@@ -162,7 +162,7 @@ test.describe('Olympics mobile smoke tests', () => {
 
   test('olympics Team — no horizontal overflow on mobile', async ({ page }) => {
     test.setTimeout(60_000);
-    await gotoWithRetry(page, 'modules.php?name=Team&op=team&teamID=1&league=olympics');
+    await gotoWithRetry(page, 'modules.php?name=Team&op=team&teamid=1&league=olympics');
     const body = await page.locator('body').textContent();
     expect(body?.length, 'olympics Team body too short').toBeGreaterThan(100);
     await assertNoHorizontalOverflow(page, 'on olympics Team');

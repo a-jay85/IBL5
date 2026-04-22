@@ -270,7 +270,7 @@ final class CachedSeasonLeaderboardsRepositoryTest extends TestCase
         $mockInner = $this->createMock(SeasonLeaderboardsRepositoryInterface::class);
         $repository = new CachedSeasonLeaderboardsRepository($mockInner, $this->cache);
 
-        $teams = [['TeamID' => 1, 'Team' => 'Hawks'], ['TeamID' => 2, 'Team' => 'Celtics']];
+        $teams = [['teamid' => 1, 'Team' => 'Hawks'], ['teamid' => 2, 'Team' => 'Celtics']];
 
         $mockInner->expects($this->once())
             ->method('getTeams')
@@ -301,7 +301,7 @@ final class CachedSeasonLeaderboardsRepositoryTest extends TestCase
 
         $mockInner->expects($this->once())
             ->method('getTeams')
-            ->willReturn([['TeamID' => 1, 'Team' => 'Hawks']]);
+            ->willReturn([['teamid' => 1, 'Team' => 'Hawks']]);
 
         $repository->rebuildCache();
 
@@ -317,7 +317,7 @@ final class CachedSeasonLeaderboardsRepositoryTest extends TestCase
 
         $this->cache->set('season_leaderboards:leaders', [['pid' => 1]], 86400);
         $this->cache->set('season_leaderboards:years', [2025], 86400);
-        $this->cache->set('season_leaderboards:teams', [['TeamID' => 1]], 86400);
+        $this->cache->set('season_leaderboards:teams', [['teamid' => 1]], 86400);
 
         $repository->invalidateCache();
 

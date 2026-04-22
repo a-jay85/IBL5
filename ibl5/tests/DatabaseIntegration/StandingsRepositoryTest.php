@@ -28,7 +28,7 @@ class StandingsRepositoryTest extends DatabaseTestCase
 
         self::assertNotEmpty($result);
         $first = $result[0];
-        self::assertArrayHasKey('tid', $first);
+        self::assertArrayHasKey('teamid', $first);
         self::assertArrayHasKey('team_name', $first);
         self::assertArrayHasKey('gamesBack', $first);
         self::assertArrayHasKey('color1', $first);
@@ -58,7 +58,7 @@ class StandingsRepositoryTest extends DatabaseTestCase
         self::assertNotEmpty($result);
 
         $first = $result[0];
-        self::assertArrayHasKey('tid', $first);
+        self::assertArrayHasKey('teamid', $first);
         self::assertArrayHasKey('team_name', $first);
         self::assertArrayHasKey('conference', $first);
         self::assertArrayHasKey('division', $first);
@@ -69,7 +69,7 @@ class StandingsRepositoryTest extends DatabaseTestCase
 
     public function testGetTeamStreakDataReturnsKnownTeam(): void
     {
-        // tid=1 exists in the real DB (seed or production)
+        // teamid=1 exists in the real DB (seed or production)
         $result = $this->repo->getTeamStreakData(1);
 
         self::assertNotNull($result);
@@ -92,7 +92,7 @@ class StandingsRepositoryTest extends DatabaseTestCase
         $result = $this->repo->getAllStreakData();
 
         self::assertNotEmpty($result);
-        // Should be keyed by TeamID (int)
+        // Should be keyed by teamid (int)
         self::assertArrayHasKey(1, $result);
         self::assertArrayHasKey(2, $result);
         self::assertArrayHasKey('streak_type', $result[1]);

@@ -315,7 +315,7 @@ class PlayerStatsTest extends TestCase
             'stats_drb' => 400,
             'stats_ast' => 600,
             'stats_stl' => 100,
-            'stats_to' => 250,
+            'stats_tvr' => 250,
             'stats_blk' => 50,
             'stats_pf' => 150,
             'sh_pts' => 40,

@@ -179,7 +179,7 @@ final class PlayerDatabaseViewTest extends TestCase
 
         $html = $this->view->renderPlayerRow($player, 0);
 
-        $this->assertStringContainsString('href="modules.php?name=Team&amp;op=team&amp;teamID=5"', $html);
+        $this->assertStringContainsString('href="modules.php?name=Team&amp;op=team&amp;teamid=5"', $html);
         $this->assertStringContainsString('ibl-team-cell--colored', $html);
         $this->assertStringContainsString('ibl-team-cell__name', $html);
         $this->assertStringContainsString('ibl-team-cell__logo', $html);
@@ -242,7 +242,7 @@ final class PlayerDatabaseViewTest extends TestCase
 
         // Check various stats are displayed
         $this->assertStringContainsString('>25<', $html); // age
-        $this->assertStringContainsString('>5<', $html); // exp/tid
+        $this->assertStringContainsString('>5<', $html); // exp/teamid
     }
 
     // ========== Table Footer Rendering Tests ==========
@@ -265,7 +265,7 @@ final class PlayerDatabaseViewTest extends TestCase
         $player->playerID = 123;
         $player->name = 'Test Player';
         $player->position = 'PG';
-        $player->teamID = 5;
+        $player->teamid = 5;
         $player->teamName = 'Test Team';
         $player->isRetired = 0;
         $player->age = 25;

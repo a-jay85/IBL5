@@ -12,7 +12,7 @@ use Utilities\HtmlSanitizer;
 /**
  * View class for rendering master contract list table.
  *
- * @phpstan-type ViewContract array{pid: int, name: string, pos: string, teamname: string, tid: int, team_city: string, color1: string, color2: string, bird: string, con1: int, con2: int, con3: int, con4: int, con5: int, con6: int}
+ * @phpstan-type ViewContract array{pid: int, name: string, pos: string, teamname: string, teamid: int, team_city: string, color1: string, color2: string, bird: string, con1: int, con2: int, con3: int, con4: int, con5: int, con6: int}
  * @phpstan-type CapTotals array{cap1: float, cap2: float, cap3: float, cap4: float, cap5: float, cap6: float}
  * @phpstan-type AvgCaps array{acap1: float, acap2: float, acap3: float, acap4: float, acap5: float, acap6: float}
  *
@@ -83,7 +83,7 @@ class ContractListView implements ContractListViewInterface
 
         foreach ($contracts as $contract) {
             $pid = $contract['pid'];
-            $tid = $contract['tid'];
+            $teamid = $contract['teamid'];
             $pos = HtmlSanitizer::safeHtmlOutput($contract['pos']);
             $bird = HtmlSanitizer::safeHtmlOutput($contract['bird']);
             $con1 = $contract['con1'];
@@ -94,9 +94,9 @@ class ContractListView implements ContractListViewInterface
             $con6 = $contract['con6'];
 
             $playerCell = PlayerImageHelper::renderFlexiblePlayerCell($pid, $contract['name'], 'sticky-col');
-            $teamCell = TeamCellHelper::renderTeamCellOrFreeAgent($tid, $contract['teamname'], $contract['color1'], $contract['color2']);
+            $teamCell = TeamCellHelper::renderTeamCellOrFreeAgent($teamid, $contract['teamname'], $contract['color1'], $contract['color2']);
 
-            $output .= "<tr data-team-id=\"{$tid}\">"
+            $output .= "<tr data-team-id=\"{$teamid}\">"
                 . $playerCell
                 . "<td>{$pos}</td>"
                 . $teamCell

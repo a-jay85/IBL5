@@ -914,7 +914,7 @@ class ScheduleIntegrationTest extends IntegrationTestCase
             ->disableOriginalConstructor()
             ->getMock();
 
-        $team->teamID = $teamId;
+        $team->teamid = $teamId;
         $team->name = $name;
         $team->color1 = $color1;
         $team->color2 = $color2;
@@ -948,12 +948,12 @@ class ScheduleIntegrationTest extends IntegrationTestCase
         $game->homeScore = $homeScore;
         $game->boxScoreID = 12345;
         $game->gameOfThatDay = 0;
-        $game->visitorTeamID = 5;
-        $game->homeTeamID = 10;
+        $game->visitor_teamid = 5;
+        $game->home_teamid = 10;
 
         // Create mock opposing Team object
         $opposingTeam = new \stdClass();
-        $opposingTeam->teamID = 10;
+        $opposingTeam->teamid = 10;
         $opposingTeam->name = 'Boston';
         $opposingTeam->seasonRecord = '8-7';
 

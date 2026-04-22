@@ -14,7 +14,7 @@ namespace SeasonHighs\Contracts;
  *     date: string,
  *     value: int,
  *     pid?: int,
- *     tid?: int,
+ *     teamid?: int,
  *     teamname?: string,
  *     team_city?: string,
  *     color1?: string,

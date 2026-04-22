@@ -39,8 +39,8 @@ if (!is_user($user)) {
     $allStreakData = $standingsRepo->getAllStreakData();
     /** @var array<int, float> $teamPowerRankings */
     $teamPowerRankings = [];
-    foreach ($allStreakData as $tid => $data) {
-        $teamPowerRankings[$tid] = (float)$data['ranking'];
+    foreach ($allStreakData as $teamid => $data) {
+        $teamPowerRankings[$teamid] = (float)$data['ranking'];
     }
 
     // Render header first (populates $cookie via cookiedecode())
@@ -56,7 +56,7 @@ if (!is_user($user)) {
     $view = new NextSimView($season);
 
     // Get next sim games
-    $games = $service->getNextSimGames($userTeam->teamID, $season);
+    $games = $service->getNextSimGames($userTeam->teamid, $season);
 
     $userStarters = $service->getUserStartingLineup($userTeam);
 

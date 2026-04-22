@@ -27,7 +27,7 @@ class TradeExecutionRepositoryTest extends DatabaseTestCase
 
     public function testInsertAndGetQueuedTrades(): void
     {
-        $params = ['pid' => 100, 'tid' => 5];
+        $params = ['pid' => 100, 'teamid' => 5];
         $this->repo->insertTradeQueue('player_transfer', $params, 'Player X to Team Y');
 
         $queued = $this->repo->getQueuedTrades();
@@ -39,7 +39,7 @@ class TradeExecutionRepositoryTest extends DatabaseTestCase
 
         $decodedParams = json_decode($last['params'], true, 512, JSON_THROW_ON_ERROR);
         self::assertSame(100, $decodedParams['pid']);
-        self::assertSame(5, $decodedParams['tid']);
+        self::assertSame(5, $decodedParams['teamid']);
     }
 
     public function testGetQueuedTradesOrderedById(): void
@@ -76,14 +76,14 @@ class TradeExecutionRepositoryTest extends DatabaseTestCase
 
     public function testExecuteQueuedPlayerTransferChangesTeamId(): void
     {
-        $this->insertTestPlayer(200031001, 'Exec Transfer P', ['tid' => 1]);
+        $this->insertTestPlayer(200031001, 'Exec Transfer P', ['teamid' => 1]);
 
         $affected = $this->repo->executeQueuedPlayerTransfer(200031001, 7);
 
         self::assertSame(1, $affected);
 
         // Verify via raw SELECT
-        $stmt = $this->db->prepare("SELECT tid FROM ibl_plr WHERE pid = ?");
+        $stmt = $this->db->prepare("SELECT teamid FROM ibl_plr WHERE pid = ?");
         self::assertNotFalse($stmt);
         $pid = 200031001;
         $stmt->bind_param('i', $pid);
@@ -92,7 +92,7 @@ class TradeExecutionRepositoryTest extends DatabaseTestCase
         $stmt->close();
 
         self::assertNotNull($row);
-        self::assertSame(7, $row['tid']);
+        self::assertSame(7, $row['teamid']);
     }
 
     // ── Pick transfer execution ─────────────────────────────────
@@ -106,7 +106,7 @@ class TradeExecutionRepositoryTest extends DatabaseTestCase
         self::assertSame(1, $affected);
 
         // Verify via raw SELECT
-        $stmt = $this->db->prepare("SELECT ownerofpick, owner_tid FROM ibl_draft_picks WHERE pickid = ?");
+        $stmt = $this->db->prepare("SELECT ownerofpick, owner_teamid FROM ibl_draft_picks WHERE pickid = ?");
         self::assertNotFalse($stmt);
         $stmt->bind_param('i', $pickId);
         $stmt->execute();
@@ -115,7 +115,7 @@ class TradeExecutionRepositoryTest extends DatabaseTestCase
 
         self::assertNotNull($row);
         self::assertSame('Sharks', $row['ownerofpick']);
-        self::assertSame(2, $row['owner_tid']);
+        self::assertSame(2, $row['owner_teamid']);
     }
 
     // ── Clear trade info ────────────────────────────────────────

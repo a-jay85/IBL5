@@ -185,7 +185,7 @@ class StandingsIntegrationTest extends IntegrationTestCase
 
         // Assert
         $this->assertQueryExecuted('ibl_power');
-        $this->assertQueryExecuted('TeamID');
+        $this->assertQueryExecuted('teamid');
     }
 
     /**
@@ -689,7 +689,7 @@ class StandingsIntegrationTest extends IntegrationTestCase
         $html = $this->view->renderRegion('Eastern');
 
         // Assert - HTML entities are properly escaped in href attribute
-        $this->assertStringContainsString('modules.php?name=Team&amp;op=team&amp;teamID=5', $html);
+        $this->assertStringContainsString('modules.php?name=Team&amp;op=team&amp;teamid=5', $html);
     }
 
     /**
@@ -958,7 +958,7 @@ class StandingsIntegrationTest extends IntegrationTestCase
         int $gamesUnplayed = 12
     ): array {
         return [
-            'tid' => $teamId,
+            'teamid' => $teamId,
             'team_name' => $teamName,
             'conference' => $conference,
             'division' => $division,

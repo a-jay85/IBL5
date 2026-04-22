@@ -25,7 +25,7 @@ class DepthChartEntryView implements DepthChartEntryViewInterface
     /**
      * @see DepthChartEntryViewInterface::renderTeamLogo()
      */
-    public function renderTeamLogo(int $teamID): void
+    public function renderTeamLogo(int $teamid): void
     {
         /** @var \League\LeagueContext $leagueContext */
         global $leagueContext;
@@ -34,7 +34,7 @@ class DepthChartEntryView implements DepthChartEntryViewInterface
         /** @var string $imagesPath */
         $imagesPath = $leagueConfig['images_path'];
 
-        echo '<div class="depth-chart-logo"><img src="./' . $imagesPath . 'logo/' . $teamID . '.jpg" alt="Team Logo"></div>';
+        echo '<div class="depth-chart-logo"><img src="./' . $imagesPath . 'logo/' . $teamid . '.jpg" alt="Team Logo"></div>';
     }
 
     /**
@@ -118,7 +118,7 @@ the earlier slot in that order claims them.</p>
     /**
      * @see DepthChartEntryViewInterface::renderFormHeader()
      */
-    public function renderFormHeader(string $teamLogo, int $teamID, array $slotNames): void
+    public function renderFormHeader(string $teamLogo, int $teamid, array $slotNames): void
     {
         $teamLogoEscaped = HtmlSanitizer::safeHtmlOutput($teamLogo);
         echo '<form name="DepthChartEntry" method="post" action="modules.php?name=DepthChartEntry&amp;op=submit" class="depth-chart-form">

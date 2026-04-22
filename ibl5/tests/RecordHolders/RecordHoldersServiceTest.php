@@ -54,7 +54,7 @@ final class RecordHoldersServiceTest extends TestCase
         $playerRecord = [
             'pid' => 927,
             'name' => 'Bob Pettit',
-            'tid' => 14,
+            'teamid' => 14,
             'team_name' => 'Timberwolves',
             'date' => '1996-01-16',
             'BoxID' => 0,
@@ -93,7 +93,7 @@ final class RecordHoldersServiceTest extends TestCase
         $heatRecord = [
             'pid' => 656,
             'name' => 'Tony Dumas',
-            'tid' => 5,
+            'teamid' => 5,
             'team_name' => 'Magic',
             'date' => '1994-10-12',
             'BoxID' => 0,
@@ -181,7 +181,7 @@ final class RecordHoldersServiceTest extends TestCase
         $qdRecord = [
             'pid' => 1481,
             'name' => 'Lenny Wilkens',
-            'tid' => 2,
+            'teamid' => 2,
             'team_name' => 'Heat',
             'date' => '1992-12-12',
             'BoxID' => 0,
@@ -311,7 +311,7 @@ final class RecordHoldersServiceTest extends TestCase
     public function testTeamGameRecordFormatsCorrectly(): void
     {
         $teamRecord = [
-            'tid' => 7,
+            'teamid' => 7,
             'team_name' => 'Bulls',
             'date' => '1995-03-12',
             'BoxID' => 0,
@@ -442,14 +442,14 @@ final class RecordHoldersServiceTest extends TestCase
     /**
      * Helper to create a player record with customizable values.
      *
-     * @return array{pid: int, name: string, tid: int, team_name: string, date: string, BoxID: int, gameOfThatDay: int, oppTid: int, opp_team_name: string, value: int}
+     * @return array{pid: int, name: string, teamid: int, team_name: string, date: string, BoxID: int, gameOfThatDay: int, oppTid: int, opp_team_name: string, value: int}
      */
-    private function createPlayerRecord(int $pid, string $name, int $value, int $tid = 14): array
+    private function createPlayerRecord(int $pid, string $name, int $value, int $teamid = 14): array
     {
         return [
             'pid' => $pid,
             'name' => $name,
-            'tid' => $tid,
+            'teamid' => $teamid,
             'team_name' => 'Test Team',
             'date' => '1996-01-16',
             'BoxID' => 0,
@@ -463,8 +463,8 @@ final class RecordHoldersServiceTest extends TestCase
     /**
      * Build a batch player result where every stat category has the same records.
      *
-     * @param list<array{pid: int, name: string, tid: int, team_name: string, date: string, BoxID: int, gameOfThatDay: int, oppTid: int, opp_team_name: string, value: int}> $records
-     * @return array<string, list<array{pid: int, name: string, tid: int, team_name: string, date: string, BoxID: int, gameOfThatDay: int, oppTid: int, opp_team_name: string, value: int}>>
+     * @param list<array{pid: int, name: string, teamid: int, team_name: string, date: string, BoxID: int, gameOfThatDay: int, oppTid: int, opp_team_name: string, value: int}> $records
+     * @return array<string, list<array{pid: int, name: string, teamid: int, team_name: string, date: string, BoxID: int, gameOfThatDay: int, oppTid: int, opp_team_name: string, value: int}>>
      */
     private function buildBatchPlayerResult(array $records): array
     {
@@ -513,8 +513,8 @@ final class RecordHoldersServiceTest extends TestCase
     /**
      * Build a batch team result where every stat category has the same records.
      *
-     * @param list<array{tid: int, team_name: string, date: string, BoxID: int, gameOfThatDay: int, oppTid: int, opp_team_name: string, value: int}> $records
-     * @return array<string, list<array{tid: int, team_name: string, date: string, BoxID: int, gameOfThatDay: int, oppTid: int, opp_team_name: string, value: int}>>
+     * @param list<array{teamid: int, team_name: string, date: string, BoxID: int, gameOfThatDay: int, oppTid: int, opp_team_name: string, value: int}> $records
+     * @return array<string, list<array{teamid: int, team_name: string, date: string, BoxID: int, gameOfThatDay: int, oppTid: int, opp_team_name: string, value: int}>>
      */
     private function buildBatchTeamResult(array $records): array
     {

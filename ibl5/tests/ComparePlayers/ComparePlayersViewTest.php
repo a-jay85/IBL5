@@ -262,7 +262,7 @@ class ComparePlayersViewTest extends TestCase
     {
         return [
             'pid' => 1,
-            'tid' => 1,
+            'teamid' => 1,
             'name' => 'Test Player',
             'pos' => 'PG',
             'age' => 25,
@@ -270,8 +270,8 @@ class ComparePlayersViewTest extends TestCase
             'r_fgp' => 90,
             'r_fta' => 80,
             'r_ftp' => 88,
-            'r_tga' => 75,
-            'r_tgp' => 82,
+            'r_3ga' => 75,
+            'r_3gp' => 82,
             'r_orb' => 70,
             'r_drb' => 85,
             'r_ast' => 90,
@@ -300,7 +300,7 @@ class ComparePlayersViewTest extends TestCase
             'stats_drb' => 350,
             'stats_ast' => 450,
             'stats_stl' => 120,
-            'stats_to' => 180,
+            'stats_tvr' => 180,
             'stats_blk' => 40,
             'stats_pf' => 160,
             'car_gm' => 500,

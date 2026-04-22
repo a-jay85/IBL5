@@ -180,7 +180,7 @@ class RecordHoldersService implements RecordHoldersServiceInterface
     /**
      * Format player single-game records from DB rows.
      *
-     * @param list<array{pid: int, name: string, tid: int, team_name: string, date: string, BoxID: int, gameOfThatDay: int, oppTid: int, opp_team_name: string, value: int}> $dbRecords
+     * @param list<array{pid: int, name: string, teamid: int, team_name: string, date: string, BoxID: int, gameOfThatDay: int, oppTid: int, opp_team_name: string, value: int}> $dbRecords
      * @param string $gameType
      * @return list<FormattedPlayerRecord>
      */
@@ -189,13 +189,13 @@ class RecordHoldersService implements RecordHoldersServiceInterface
         /** @var list<FormattedPlayerRecord> $formatted */
         $formatted = [];
         foreach ($dbRecords as $record) {
-            $teamAbbr = $this->getTeamAbbreviation($record['tid']);
+            $teamAbbr = $this->getTeamAbbreviation($record['teamid']);
             $seasonYear = IblSeasonDateHelper::dateToSeasonEndingYear($record['date']);
             $formatted[] = [
                 'pid' => $record['pid'],
                 'name' => $record['name'],
                 'teamAbbr' => $teamAbbr,
-                'teamTid' => $record['tid'],
+                'teamTid' => $record['teamid'],
                 'teamYr' => (string) $seasonYear,
                 'boxScoreUrl' => $this->buildBoxScoreUrl($record['date'], $record['gameOfThatDay'], $record['BoxID']),
                 'dateDisplay' => $this->formatDateDisplay($record['date'], $gameType),
@@ -222,7 +222,7 @@ class RecordHoldersService implements RecordHoldersServiceInterface
         foreach ($dbRecords as $record) {
             $gameType = IblSeasonDateHelper::getGameTypeFromDate($record['date']);
             $seasonYear = IblSeasonDateHelper::dateToSeasonEndingYear($record['date']);
-            $teamAbbr = $this->getTeamAbbreviation($record['tid']);
+            $teamAbbr = $this->getTeamAbbreviation($record['teamid']);
 
             // Build multi-line amount string
             $amount = $record['points'] . "pts\n"
@@ -237,7 +237,7 @@ class RecordHoldersService implements RecordHoldersServiceInterface
                 'pid' => $record['pid'],
                 'name' => $record['name'],
                 'teamAbbr' => $teamAbbr,
-                'teamTid' => $record['tid'],
+                'teamTid' => $record['teamid'],
                 'teamYr' => (string) $seasonYear,
                 'boxScoreUrl' => $this->buildBoxScoreUrl($record['date'], $record['gameOfThatDay'], $record['BoxID']),
                 'dateDisplay' => $this->formatDateDisplay($record['date'], $gameType),
@@ -396,7 +396,7 @@ class RecordHoldersService implements RecordHoldersServiceInterface
     /**
      * Format team single-game records from DB rows.
      *
-     * @param list<array{tid: int, team_name: string, date: string, BoxID: int, gameOfThatDay: int, oppTid: int, opp_team_name: string, value: int}> $dbRecords
+     * @param list<array{teamid: int, team_name: string, date: string, BoxID: int, gameOfThatDay: int, oppTid: int, opp_team_name: string, value: int}> $dbRecords
      * @return list<FormattedTeamGameRecord>
      */
     private function formatTeamGameRecords(array $dbRecords): array
@@ -406,8 +406,8 @@ class RecordHoldersService implements RecordHoldersServiceInterface
         foreach ($dbRecords as $record) {
             $seasonYear = IblSeasonDateHelper::dateToSeasonEndingYear($record['date']);
             $formatted[] = [
-                'teamAbbr' => $this->getTeamAbbreviation($record['tid']),
-                'teamTid' => $record['tid'],
+                'teamAbbr' => $this->getTeamAbbreviation($record['teamid']),
+                'teamTid' => $record['teamid'],
                 'teamYr' => (string) $seasonYear,
                 'boxScoreUrl' => $this->buildBoxScoreUrl($record['date'], $record['gameOfThatDay'], $record['BoxID']),
                 'dateDisplay' => $this->formatDateDisplay($record['date'], 'regularSeason'),

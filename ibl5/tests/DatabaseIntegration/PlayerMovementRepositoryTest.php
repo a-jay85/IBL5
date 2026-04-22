@@ -19,7 +19,7 @@ class PlayerMovementRepositoryTest extends DatabaseTestCase
     public function testReturnsMovedPlayer(): void
     {
         $pid = 200110001;
-        $this->insertTestPlayer($pid, 'PMV Moved', ['tid' => 2]);
+        $this->insertTestPlayer($pid, 'PMV Moved', ['teamid' => 2]);
         $this->insertHistRow($pid, 'PMV Moved', 2020, ['teamid' => 1, 'team' => 'Metros']);
 
         $results = $this->repo->getPlayerMovements(2020);
@@ -33,7 +33,7 @@ class PlayerMovementRepositoryTest extends DatabaseTestCase
     public function testExcludesNonMovedPlayer(): void
     {
         $pid = 200110002;
-        $this->insertTestPlayer($pid, 'PMV Stayed', ['tid' => 1]);
+        $this->insertTestPlayer($pid, 'PMV Stayed', ['teamid' => 1]);
         $this->insertHistRow($pid, 'PMV Stayed', 2020, ['teamid' => 1]);
 
         $results = $this->repo->getPlayerMovements(2020);
@@ -45,7 +45,7 @@ class PlayerMovementRepositoryTest extends DatabaseTestCase
     public function testMovementRowHasExpectedKeys(): void
     {
         $pid = 200110003;
-        $this->insertTestPlayer($pid, 'PMV Keys', ['tid' => 2]);
+        $this->insertTestPlayer($pid, 'PMV Keys', ['teamid' => 2]);
         $this->insertHistRow($pid, 'PMV Keys', 2020, ['teamid' => 1]);
 
         $results = $this->repo->getPlayerMovements(2020);
@@ -64,8 +64,8 @@ class PlayerMovementRepositoryTest extends DatabaseTestCase
     public function testFreeAgentMovementIncluded(): void
     {
         $pid = 200110004;
-        // Current team is Free Agents (tid=0), previously on team 3
-        $this->insertTestPlayer($pid, 'PMV FreeAgent', ['tid' => 0]);
+        // Current team is Free Agents (teamid=0), previously on team 3
+        $this->insertTestPlayer($pid, 'PMV FreeAgent', ['teamid' => 0]);
         $this->insertHistRow($pid, 'PMV FreeAgent', 2020, ['teamid' => 3, 'team' => 'Stallions']);
 
         $results = $this->repo->getPlayerMovements(2020);
@@ -79,7 +79,7 @@ class PlayerMovementRepositoryTest extends DatabaseTestCase
     public function testFiltersToRequestedYearOnly(): void
     {
         $pid = 200110005;
-        $this->insertTestPlayer($pid, 'PMV YearFilt', ['tid' => 2]);
+        $this->insertTestPlayer($pid, 'PMV YearFilt', ['teamid' => 2]);
         $this->insertHistRow($pid, 'PMV YearFilt', 2019, ['teamid' => 1]);
 
         $results = $this->repo->getPlayerMovements(2020);
@@ -102,13 +102,13 @@ class PlayerMovementRepositoryTest extends DatabaseTestCase
 
     public function testOrderedByNewTeamName(): void
     {
-        // Player 1 moves to Sharks (tid=2), Player 2 moves to Metros (tid=1)
-        // Seed: tid=1=Metros, tid=2=Sharks — Metros < Sharks alphabetically
+        // Player 1 moves to Sharks (teamid=2), Player 2 moves to Metros (teamid=1)
+        // Seed: teamid=1=Metros, teamid=2=Sharks — Metros < Sharks alphabetically
         $pid1 = 200110006;
         $pid2 = 200110007;
-        $this->insertTestPlayer($pid1, 'PMV OrderA', ['tid' => 2]);
+        $this->insertTestPlayer($pid1, 'PMV OrderA', ['teamid' => 2]);
         $this->insertHistRow($pid1, 'PMV OrderA', 2087, ['teamid' => 1, 'team' => 'Metros']);
-        $this->insertTestPlayer($pid2, 'PMV OrderB', ['tid' => 1]);
+        $this->insertTestPlayer($pid2, 'PMV OrderB', ['teamid' => 1]);
         $this->insertHistRow($pid2, 'PMV OrderB', 2087, ['teamid' => 2, 'team' => 'Sharks']);
 
         $results = $this->repo->getPlayerMovements(2087);
@@ -130,11 +130,11 @@ class PlayerMovementRepositoryTest extends DatabaseTestCase
         $pid2 = 200110009;
         $pid3 = 200110010;
         // Two moved, one stayed
-        $this->insertTestPlayer($pid1, 'PMV CntMov1', ['tid' => 2]);
+        $this->insertTestPlayer($pid1, 'PMV CntMov1', ['teamid' => 2]);
         $this->insertHistRow($pid1, 'PMV CntMov1', 2088, ['teamid' => 1]);
-        $this->insertTestPlayer($pid2, 'PMV CntMov2', ['tid' => 3]);
+        $this->insertTestPlayer($pid2, 'PMV CntMov2', ['teamid' => 3]);
         $this->insertHistRow($pid2, 'PMV CntMov2', 2088, ['teamid' => 1]);
-        $this->insertTestPlayer($pid3, 'PMV CntStay', ['tid' => 1]);
+        $this->insertTestPlayer($pid3, 'PMV CntStay', ['teamid' => 1]);
         $this->insertHistRow($pid3, 'PMV CntStay', 2088, ['teamid' => 1]);
 
         $results = $this->repo->getPlayerMovements(2088);

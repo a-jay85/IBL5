@@ -101,8 +101,8 @@ class ProjectedDraftOrderService implements ProjectedDraftOrderServiceInterface
         $pickOwnership = $this->buildPickOwnershipMap($pickOwnershipRows);
 
         $nameToIdMap = [];
-        foreach ($teamMap as $tid => $team) {
-            $nameToIdMap[$team['team_name']] = $tid;
+        foreach ($teamMap as $teamid => $team) {
+            $nameToIdMap[$team['team_name']] = $teamid;
         }
 
         // Build projected pick map: teamId => projected pick number (lottery only)
@@ -132,20 +132,20 @@ class ProjectedDraftOrderService implements ProjectedDraftOrderServiceInterface
         $standings = $this->repository->getAllTeamsWithStandings();
         $teamMap = $this->buildTeamMap($standings);
 
-        /** @var list<array{round: int, pick: int, team: string, tid: int}> $picks */
+        /** @var list<array{round: int, pick: int, team: string, teamid: int}> $picks */
         $picks = [];
 
         // Round 1: Picks 1-12 from the reordered lottery
-        foreach ($lotteryTeamIds as $index => $tid) {
-            $team = $teamMap[$tid] ?? null;
+        foreach ($lotteryTeamIds as $index => $teamid) {
+            $team = $teamMap[$teamid] ?? null;
             if ($team === null) {
-                throw new \InvalidArgumentException('Invalid team ID: ' . $tid);
+                throw new \InvalidArgumentException('Invalid team ID: ' . $teamid);
             }
             $picks[] = [
                 'round' => 1,
                 'pick' => $index + 1,
                 'team' => $team['team_name'],
-                'tid' => $tid,
+                'teamid' => $teamid,
             ];
         }
 
@@ -156,7 +156,7 @@ class ProjectedDraftOrderService implements ProjectedDraftOrderServiceInterface
                     'round' => 1,
                     'pick' => $slot['pick'],
                     'team' => $slot['teamName'],
-                    'tid' => $slot['teamId'],
+                    'teamid' => $slot['teamId'],
                 ];
             }
         }
@@ -167,7 +167,7 @@ class ProjectedDraftOrderService implements ProjectedDraftOrderServiceInterface
                 'round' => 2,
                 'pick' => $slot['pick'],
                 'team' => $slot['teamName'],
-                'tid' => $slot['teamId'],
+                'teamid' => $slot['teamId'],
             ];
         }
 
@@ -185,7 +185,7 @@ class ProjectedDraftOrderService implements ProjectedDraftOrderServiceInterface
     /**
      * Build draft slots from saved picks, enriching with standings and ownership data.
      *
-     * @param list<array{pick: int, team: string, tid: int, player: string}> $savedPicks
+     * @param list<array{pick: int, team: string, teamid: int, player: string}> $savedPicks
      * @param array<int, StandingsRow> $teamMap
      * @param array<string, int> $nameToIdMap
      * @param array<string, array<int, array{ownerName: string, notes: string}>> $pickOwnership
@@ -196,7 +196,7 @@ class ProjectedDraftOrderService implements ProjectedDraftOrderServiceInterface
     {
         $slots = [];
         foreach ($savedPicks as $savedPick) {
-            $team = $teamMap[$savedPick['tid']] ?? null;
+            $team = $teamMap[$savedPick['teamid']] ?? null;
             if ($team === null) {
                 continue;
             }
@@ -206,15 +206,15 @@ class ProjectedDraftOrderService implements ProjectedDraftOrderServiceInterface
             $ownerName = $ownership !== null ? $ownership['ownerName'] : $teamName;
             $notes = $ownership !== null ? $ownership['notes'] : '';
             $isTraded = $ownerName !== $teamName;
-            $ownerId = $nameToIdMap[$ownerName] ?? $savedPick['tid'];
+            $ownerId = $nameToIdMap[$ownerName] ?? $savedPick['teamid'];
             $ownerTeam = $teamMap[$ownerId] ?? $team;
 
-            $projectedPick = $projectedPickByTeam[$savedPick['tid']] ?? $savedPick['pick'];
+            $projectedPick = $projectedPickByTeam[$savedPick['teamid']] ?? $savedPick['pick'];
             $movement = $projectedPick - $savedPick['pick'];
 
             $slots[] = [
                 'pick' => $savedPick['pick'],
-                'teamId' => $savedPick['tid'],
+                'teamId' => $savedPick['teamid'],
                 'teamName' => $teamName,
                 'wins' => $team['wins'],
                 'losses' => $team['losses'],
@@ -257,13 +257,13 @@ class ProjectedDraftOrderService implements ProjectedDraftOrderServiceInterface
 
     /**
      * @param list<PointDifferentialRow> $rows
-     * @return array<int, float> tid => net points (pointsFor - pointsAgainst)
+     * @return array<int, float> teamid => net points (pointsFor - pointsAgainst)
      */
     private function buildPointDifferentialMap(array $rows): array
     {
         $map = [];
         foreach ($rows as $row) {
-            $map[$row['tid']] = $row['pointsFor'] - $row['pointsAgainst'];
+            $map[$row['teamid']] = $row['pointsFor'] - $row['pointsAgainst'];
         }
         return $map;
     }
@@ -289,7 +289,7 @@ class ProjectedDraftOrderService implements ProjectedDraftOrderServiceInterface
     {
         $map = [];
         foreach ($standings as $team) {
-            $map[$team['tid']] = $team;
+            $map[$team['teamid']] = $team;
         }
         return $map;
     }
@@ -429,7 +429,7 @@ class ProjectedDraftOrderService implements ProjectedDraftOrderServiceInterface
      */
     private function sortTiedGroup(array $group, array $h2h, array $pointDiffs): array
     {
-        $tids = array_map(static fn (array $t): int => $t['tid'], $group);
+        $tids = array_map(static fn (array $t): int => $t['teamid'], $group);
 
         // Compute each team's aggregate H2H win pct against all other teams in the group
         /** @var array<int, float> */
@@ -438,19 +438,19 @@ class ProjectedDraftOrderService implements ProjectedDraftOrderServiceInterface
             $totalWins = 0;
             $totalLosses = 0;
             foreach ($tids as $opponentTid) {
-                if ($opponentTid === $team['tid']) {
+                if ($opponentTid === $team['teamid']) {
                     continue;
                 }
-                $totalWins += $h2h[$team['tid']][$opponentTid] ?? 0;
-                $totalLosses += $h2h[$opponentTid][$team['tid']] ?? 0;
+                $totalWins += $h2h[$team['teamid']][$opponentTid] ?? 0;
+                $totalLosses += $h2h[$opponentTid][$team['teamid']] ?? 0;
             }
-            $aggregateH2HPct[$team['tid']] = $this->safeWinPct($totalWins, $totalLosses);
+            $aggregateH2HPct[$team['teamid']] = $this->safeWinPct($totalWins, $totalLosses);
         }
 
         // Sort ascending by aggregate H2H pct (worse H2H → earlier draft pick)
         // For sub-ties, fall through to non-H2H tiebreakers
         usort($group, function (array $a, array $b) use ($aggregateH2HPct, $pointDiffs): int {
-            $h2hDiff = $aggregateH2HPct[$a['tid']] <=> $aggregateH2HPct[$b['tid']];
+            $h2hDiff = $aggregateH2HPct[$a['teamid']] <=> $aggregateH2HPct[$b['teamid']];
             if ($h2hDiff !== 0) {
                 return $h2hDiff;
             }
@@ -478,8 +478,8 @@ class ProjectedDraftOrderService implements ProjectedDraftOrderServiceInterface
     private function applyTiebreakers(array $a, array $b, array $h2h, array $pointDiffs, string $direction): int
     {
         // 1. Head-to-head record (pairwise)
-        $aWinsVsB = $h2h[$a['tid']][$b['tid']] ?? 0;
-        $bWinsVsA = $h2h[$b['tid']][$a['tid']] ?? 0;
+        $aWinsVsB = $h2h[$a['teamid']][$b['teamid']] ?? 0;
+        $bWinsVsA = $h2h[$b['teamid']][$a['teamid']] ?? 0;
         if ($aWinsVsB !== $bWinsVsA) {
             return $bWinsVsA <=> $aWinsVsB;
         }
@@ -526,8 +526,8 @@ class ProjectedDraftOrderService implements ProjectedDraftOrderServiceInterface
         }
 
         // 5. Point differential
-        $aNetPts = $pointDiffs[$a['tid']] ?? 0.0;
-        $bNetPts = $pointDiffs[$b['tid']] ?? 0.0;
+        $aNetPts = $pointDiffs[$a['teamid']] ?? 0.0;
+        $bNetPts = $pointDiffs[$b['teamid']] ?? 0.0;
         $ptsDiff = $bNetPts <=> $aNetPts;
         if ($ptsDiff !== 0) {
             return $ptsDiff;
@@ -579,8 +579,8 @@ class ProjectedDraftOrderService implements ProjectedDraftOrderServiceInterface
     {
         $slots = [];
         $nameToIdMap = [];
-        foreach ($teamMap as $tid => $team) {
-            $nameToIdMap[$team['team_name']] = $tid;
+        foreach ($teamMap as $teamid => $team) {
+            $nameToIdMap[$team['team_name']] = $teamid;
         }
 
         foreach ($baseOrder as $index => $team) {
@@ -592,12 +592,12 @@ class ProjectedDraftOrderService implements ProjectedDraftOrderServiceInterface
             $notes = $ownership !== null ? $ownership['notes'] : '';
             $isTraded = $ownerName !== $teamName;
 
-            $ownerId = $nameToIdMap[$ownerName] ?? $team['tid'];
+            $ownerId = $nameToIdMap[$ownerName] ?? $team['teamid'];
             $ownerTeam = $teamMap[$ownerId] ?? $team;
 
             $slots[] = [
                 'pick' => $pickNumber,
-                'teamId' => $team['tid'],
+                'teamId' => $team['teamid'],
                 'teamName' => $teamName,
                 'wins' => $team['wins'],
                 'losses' => $team['losses'],

@@ -150,7 +150,7 @@ test.describe('Player page flow — edge cases', () => {
   });
 
   test('player links from team page resolve correctly', async ({ page }) => {
-    await page.goto('modules.php?name=Team&op=team&teamID=1');
+    await page.goto('modules.php?name=Team&op=team&teamid=1');
     const playerLink = page.locator('a[href*="name=Player"][href*="pid="]').first();
     const href = await playerLink.getAttribute('href');
     expect(href).toBeTruthy();

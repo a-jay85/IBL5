@@ -112,7 +112,7 @@ class JsbImportService implements JsbImportServiceInterface
                 $resolvedTeamId = $this->repository->resolveTeamIdByName($histData['team']);
                 $teamId = $resolvedTeamId ?? 0;
 
-                // Resolve player ID (pass resolvedTeamId for tid-based ibl_plr lookup; null skips Strategy 2)
+                // Resolve player ID (pass resolvedTeamId for teamid-based ibl_plr lookup; null skips Strategy 2)
                 $pid = $this->resolver->resolve($histData['name'], $histData['team'], $histData['year'], $resolvedTeamId);
                 if ($pid === null) {
                     $result->addSkipped();
@@ -377,7 +377,7 @@ class JsbImportService implements JsbImportServiceInterface
             try {
                 $affected = $this->repository->upsertRcbAlltimeRecord([
                     'scope' => $record['scope'],
-                    'team_id' => $record['team_id'],
+                    'teamid' => $record['teamid'],
                     'record_type' => $record['record_type'],
                     'stat_category' => $record['stat_category'],
                     'ranking' => $record['ranking'],
@@ -403,7 +403,7 @@ class JsbImportService implements JsbImportServiceInterface
                 $affected = $this->repository->upsertRcbSeasonRecord([
                     'season_year' => $seasonYear,
                     'scope' => $record['scope'],
-                    'team_id' => $record['team_id'],
+                    'teamid' => $record['teamid'],
                     'context' => $record['context'],
                     'stat_category' => $record['stat_category'],
                     'ranking' => $record['ranking'],
@@ -617,11 +617,11 @@ class JsbImportService implements JsbImportServiceInterface
         }
 
         foreach ($parsed as $lineIndex => $slots) {
-            // .plb line index is 0-based; tid = lineIndex + 1 (1-based team ID)
-            $tid = $lineIndex + 1;
+            // .plb line index is 0-based; teamid = lineIndex + 1 (1-based team ID)
+            $teamid = $lineIndex + 1;
 
-            // Skip special teams (tid > 28 = rookies, all-stars, etc.)
-            if ($tid > 28) {
+            // Skip special teams (teamid > 28 = rookies, all-stars, etc.)
+            if ($teamid > 28) {
                 continue;
             }
 
@@ -633,7 +633,7 @@ class JsbImportService implements JsbImportServiceInterface
                 }
 
                 // Resolve player identity from ordinal map
-                $player = $map->getSlotPlayer($tid, $slot['slot_index']);
+                $player = $map->getSlotPlayer($teamid, $slot['slot_index']);
                 $pid = $player !== null ? $player['pid'] : null;
                 $playerName = $player !== null ? $player['name'] : null;
 
@@ -642,7 +642,7 @@ class JsbImportService implements JsbImportServiceInterface
                         'season_year' => $seasonYear,
                         'sim_number' => $simNumber,
                         'source_archive' => $sourceArchive,
-                        'tid' => $tid,
+                        'teamid' => $teamid,
                         'slot_index' => $slot['slot_index'],
                         'pid' => $pid,
                         'player_name' => $playerName,
@@ -655,7 +655,7 @@ class JsbImportService implements JsbImportServiceInterface
                     ]);
                     $this->recordUpsertResult($affected, $result);
                 } catch (\RuntimeException $e) {
-                    $result->addError('PLB upsert failed for tid=' . $tid . ' slot=' . $slot['slot_index'] . ': ' . $e->getMessage());
+                    $result->addError('PLB upsert failed for teamid=' . $teamid . ' slot=' . $slot['slot_index'] . ': ' . $e->getMessage());
                 }
             }
         }

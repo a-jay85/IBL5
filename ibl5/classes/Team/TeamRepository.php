@@ -41,13 +41,13 @@ class TeamRepository extends \BaseMysqliRepository implements TeamRepositoryInte
      * @see TeamRepositoryInterface::getTeam()
      * @return TeamInfoRow|null
      */
-    public function getTeam(int $teamID): ?array
+    public function getTeam(int $teamid): ?array
     {
         /** @var TeamInfoRow|null */
         return $this->fetchOne(
             "SELECT * FROM {$this->teamInfoTable} WHERE teamid = ?",
             "i",
-            $teamID
+            $teamid
         );
     }
 
@@ -59,14 +59,14 @@ class TeamRepository extends \BaseMysqliRepository implements TeamRepositoryInte
     {
         /** @var PowerRow|null */
         return $this->fetchOne(
-            "SELECT s.tid, s.team_name, s.leagueRecord, s.wins, s.losses, s.pct,
+            "SELECT s.teamid, s.team_name, s.leagueRecord, s.wins, s.losses, s.pct,
                 s.conference, s.division, s.confRecord, s.divRecord, s.divGB,
                 s.homeRecord, s.awayRecord, s.gamesUnplayed,
                 p.ranking, p.last_win, p.last_loss, p.streak_type, p.streak,
                 p.sos, p.remaining_sos
             FROM {$this->standingsTable} s
-            JOIN {$this->powerTable} p ON s.tid = p.TeamID
-            JOIN {$this->teamInfoTable} t ON s.tid = t.teamid
+            JOIN {$this->powerTable} p ON s.teamid = p.teamid
+            JOIN {$this->teamInfoTable} t ON s.teamid = t.teamid
             WHERE t.team_name = ?",
             "s",
             $teamName
@@ -81,13 +81,13 @@ class TeamRepository extends \BaseMysqliRepository implements TeamRepositoryInte
     {
         /** @var list<PowerRow> */
         return $this->fetchAll(
-            "SELECT s.tid, s.team_name, s.leagueRecord, s.wins, s.losses, s.pct,
+            "SELECT s.teamid, s.team_name, s.leagueRecord, s.wins, s.losses, s.pct,
                 s.conference, s.division, s.confRecord, s.divRecord, s.divGB,
                 s.homeRecord, s.awayRecord, s.gamesUnplayed,
                 p.ranking, p.last_win, p.last_loss, p.streak_type, p.streak,
                 p.sos, p.remaining_sos
             FROM {$this->standingsTable} s
-            JOIN {$this->powerTable} p ON s.tid = p.TeamID
+            JOIN {$this->powerTable} p ON s.teamid = p.teamid
             WHERE s.division = ?
             ORDER BY s.divGB ASC",
             "s",
@@ -103,13 +103,13 @@ class TeamRepository extends \BaseMysqliRepository implements TeamRepositoryInte
     {
         /** @var list<PowerRow> */
         return $this->fetchAll(
-            "SELECT s.tid, s.team_name, s.leagueRecord, s.wins, s.losses, s.pct,
+            "SELECT s.teamid, s.team_name, s.leagueRecord, s.wins, s.losses, s.pct,
                 s.conference, s.division, s.confRecord, s.divRecord, s.divGB,
                 s.homeRecord, s.awayRecord, s.gamesUnplayed,
                 p.ranking, p.last_win, p.last_loss, p.streak_type, p.streak,
                 p.sos, p.remaining_sos
             FROM {$this->standingsTable} s
-            JOIN {$this->powerTable} p ON s.tid = p.TeamID
+            JOIN {$this->powerTable} p ON s.teamid = p.teamid
             WHERE s.conference = ?
             ORDER BY s.confGB ASC",
             "s",
@@ -216,24 +216,24 @@ class TeamRepository extends \BaseMysqliRepository implements TeamRepositoryInte
     private static function buildWinLossQuery(int $gameType): string
     {
         return "WITH unique_games AS (
-            SELECT Date, visitorTeamID, homeTeamID, gameOfThatDay,
+            SELECT Date, visitor_teamid, home_teamid, gameOfThatDay,
                 (visitorQ1points + visitorQ2points + visitorQ3points + visitorQ4points
                  + COALESCE(visitorOTpoints, 0)) AS visitor_total,
                 (homeQ1points + homeQ2points + homeQ3points + homeQ4points
                  + COALESCE(homeOTpoints, 0)) AS home_total
             FROM ibl_box_scores_teams
             WHERE game_type = {$gameType}
-                AND (visitorTeamID = (SELECT teamid FROM ibl_team_info WHERE team_name = ?)
-                     OR homeTeamID = (SELECT teamid FROM ibl_team_info WHERE team_name = ?))
-            GROUP BY Date, visitorTeamID, homeTeamID, gameOfThatDay
+                AND (visitor_teamid = (SELECT teamid FROM ibl_team_info WHERE team_name = ?)
+                     OR home_teamid = (SELECT teamid FROM ibl_team_info WHERE team_name = ?))
+            GROUP BY Date, visitor_teamid, home_teamid, gameOfThatDay
         ),
         team_games AS (
-            SELECT visitorTeamID AS team_id, Date,
+            SELECT visitor_teamid AS team_id, Date,
                    IF(visitor_total > home_total, 1, 0) AS win,
                    IF(visitor_total < home_total, 1, 0) AS loss
             FROM unique_games
             UNION ALL
-            SELECT homeTeamID AS team_id, Date,
+            SELECT home_teamid AS team_id, Date,
                    IF(home_total > visitor_total, 1, 0) AS win,
                    IF(home_total < visitor_total, 1, 0) AS loss
             FROM unique_games
@@ -270,7 +270,7 @@ class TeamRepository extends \BaseMysqliRepository implements TeamRepositoryInte
     private static function buildHeatWinLossQuery(): string
     {
         return "WITH unique_games AS (
-            SELECT Date, visitorTeamID, homeTeamID, gameOfThatDay,
+            SELECT Date, visitor_teamid, home_teamid, gameOfThatDay,
                 (visitorQ1points + visitorQ2points + visitorQ3points + visitorQ4points
                  + COALESCE(visitorOTpoints, 0)) AS visitor_total,
                 (homeQ1points + homeQ2points + homeQ3points + homeQ4points
@@ -278,17 +278,17 @@ class TeamRepository extends \BaseMysqliRepository implements TeamRepositoryInte
             FROM ibl_box_scores_teams
             WHERE game_type = 3
                 AND YEAR(Date) < 9000
-                AND (visitorTeamID = (SELECT teamid FROM ibl_team_info WHERE team_name = ?)
-                     OR homeTeamID = (SELECT teamid FROM ibl_team_info WHERE team_name = ?))
-            GROUP BY Date, visitorTeamID, homeTeamID, gameOfThatDay
+                AND (visitor_teamid = (SELECT teamid FROM ibl_team_info WHERE team_name = ?)
+                     OR home_teamid = (SELECT teamid FROM ibl_team_info WHERE team_name = ?))
+            GROUP BY Date, visitor_teamid, home_teamid, gameOfThatDay
         ),
         team_games AS (
-            SELECT visitorTeamID AS team_id, Date,
+            SELECT visitor_teamid AS team_id, Date,
                    IF(visitor_total > home_total, 1, 0) AS win,
                    IF(visitor_total < home_total, 1, 0) AS loss
             FROM unique_games
             UNION ALL
-            SELECT homeTeamID AS team_id, Date,
+            SELECT home_teamid AS team_id, Date,
                    IF(home_total > visitor_total, 1, 0) AS win,
                    IF(home_total < visitor_total, 1, 0) AS loss
             FROM unique_games
@@ -352,8 +352,8 @@ class TeamRepository extends \BaseMysqliRepository implements TeamRepositoryInte
                               + COALESCE(bst.homeOTpoints, 0))
                            > (bst.visitorQ1points + bst.visitorQ2points + bst.visitorQ3points + bst.visitorQ4points
                               + COALESCE(bst.visitorOTpoints, 0))
-                        THEN bst.homeTeamID
-                        ELSE bst.visitorTeamID
+                        THEN bst.home_teamid
+                        ELSE bst.visitor_teamid
                     END AS winner_tid,
                     ROW_NUMBER() OVER (
                         PARTITION BY YEAR(bst.Date)
@@ -411,18 +411,18 @@ class TeamRepository extends \BaseMysqliRepository implements TeamRepositoryInte
      * @see TeamRepositoryInterface::getFreeAgencyRoster()
      * @return list<PlayerRow>
      */
-    public function getFreeAgencyRoster(int $teamID): array
+    public function getFreeAgencyRoster(int $teamid): array
     {
         /** @var list<PlayerRow> */
         return $this->fetchAll(
             "SELECT *
             FROM ibl_plr
-            WHERE tid = ?
+            WHERE teamid = ?
               AND retired = 0
               AND cyt != cy
             ORDER BY CASE WHEN ordinal > 960 THEN 1 ELSE 0 END, name ASC",
             "i",
-            $teamID
+            $teamid
         );
     }
 
@@ -430,17 +430,17 @@ class TeamRepository extends \BaseMysqliRepository implements TeamRepositoryInte
      * @see TeamRepositoryInterface::getRosterUnderContract()
      * @return list<PlayerRow>
      */
-    public function getRosterUnderContract(int $teamID): array
+    public function getRosterUnderContract(int $teamid): array
     {
         /** @var list<PlayerRow> */
         return $this->fetchAll(
             "SELECT *
             FROM ibl_plr
-            WHERE tid = ?
+            WHERE teamid = ?
               AND retired = 0
             ORDER BY CASE WHEN ordinal > 960 THEN 1 ELSE 0 END, name ASC",
             "i",
-            $teamID
+            $teamid
         );
     }
 
@@ -478,13 +478,13 @@ class TeamRepository extends \BaseMysqliRepository implements TeamRepositoryInte
      * @see TeamRepositoryInterface::getHistoricalRoster()
      * @return list<HistRow>
      */
-    public function getHistoricalRoster(int $teamID, string $year): array
+    public function getHistoricalRoster(int $teamid, string $year): array
     {
         /** @var list<HistRow> */
         return $this->fetchAll(
             "SELECT * FROM ibl_hist WHERE teamid = ? AND year = ? ORDER BY name ASC",
             "is",
-            $teamID,
+            $teamid,
             $year
         );
     }

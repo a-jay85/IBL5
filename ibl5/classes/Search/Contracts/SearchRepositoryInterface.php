@@ -11,7 +11,7 @@ namespace Search\Contracts;
  * and for retrieving filter options (topics, categories, authors).
  *
  * @phpstan-type StoryResult array{sid: int, aid: string, informant: string, title: string, time: string, comments: int, topicId: int, topicText: string}
- * @phpstan-type CommentResult array{tid: int, sid: int, subject: string, date: string, name: string, articleTitle: string, replyCount: int}
+ * @phpstan-type CommentResult array{teamid: int, sid: int, subject: string, date: string, name: string, articleTitle: string, replyCount: int}
  * @phpstan-type UserResult array{userId: int, username: string, name: string}
  * @phpstan-type StorySearchResult array{results: list<StoryResult>, hasMore: bool}
  * @phpstan-type CommentSearchResult array{results: list<CommentResult>, hasMore: bool}

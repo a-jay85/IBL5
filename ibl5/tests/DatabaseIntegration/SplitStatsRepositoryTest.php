@@ -26,7 +26,7 @@ class SplitStatsRepositoryTest extends DatabaseTestCase
     {
         $this->insertTestPlayer(self::TEST_PID, 'SplitStats Test');
 
-        // Player boxscore for a home game (homeTID=1, teamID=1)
+        // Player boxscore for a home game (home_teamid=1, teamid=1)
         // Date in January 2098 → season_year=2098, game_type=1
         $this->insertPlayerBoxscoreRow(
             '2098-01-15', self::TEST_PID, 'SplitStats Test', 'PG', 2, self::TEST_TID, self::TEST_TID,
@@ -69,7 +69,7 @@ class SplitStatsRepositoryTest extends DatabaseTestCase
     {
         $this->insertSplitStatsGameData();
 
-        // Player's teamID=1 = homeTID, so 'road' split should not include this game
+        // Player's teamid=1 = home_teamid, so 'road' split should not include this game
         $result = $this->repo->getSplitStats(self::TEST_TID, 2098, 'road');
 
         $found = false;
@@ -145,7 +145,7 @@ class SplitStatsRepositoryTest extends DatabaseTestCase
     {
         $this->insertSplitStatsGameData();
 
-        // vs Sharks (tid=2) — game was against team 2
+        // vs Sharks (teamid=2) — game was against team 2
         $result = $this->repo->getSplitStats(self::TEST_TID, 2098, 'vs_2');
         $found = false;
         foreach ($result as $row) {
@@ -154,7 +154,7 @@ class SplitStatsRepositoryTest extends DatabaseTestCase
                 break;
             }
         }
-        self::assertTrue($found, 'Test player should appear vs tid=2');
+        self::assertTrue($found, 'Test player should appear vs teamid=2');
     }
 
     public function testGetValidSplitKeysReturnsExpectedKeys(): void
@@ -184,7 +184,7 @@ class SplitStatsRepositoryTest extends DatabaseTestCase
 
     public function testGetSplitLabelVsTeamHitsDatabase(): void
     {
-        // vs_1 should look up team name for tid=1
+        // vs_1 should look up team name for teamid=1
         $label = $this->repo->getSplitLabel('vs_1');
 
         self::assertStringStartsWith('vs. ', $label);

@@ -27,9 +27,9 @@ class NavigationRepositoryTest extends DatabaseTestCase
         // Set gm_username within the transaction (production may differ from CI seed)
         $stmt = $this->db->prepare('UPDATE ibl_team_info SET gm_username = ? WHERE teamid = ?');
         self::assertNotFalse($stmt);
-        $stmt->bind_param('si', $user, $tid);
+        $stmt->bind_param('si', $user, $teamid);
         $user = 'nav_test_gm';
-        $tid = 1;
+        $teamid = 1;
         $stmt->execute();
         $stmt->close();
 

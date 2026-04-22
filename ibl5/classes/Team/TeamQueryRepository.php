@@ -56,7 +56,7 @@ class TeamQueryRepository extends \BaseMysqliRepository implements TeamQueryRepo
         return $this->fetchAll(
             "SELECT p.*, t.team_name AS teamname, t.color1, t.color2
             FROM ibl_plr p
-            LEFT JOIN ibl_team_info t ON p.tid = t.teamid
+            LEFT JOIN ibl_team_info t ON p.teamid = t.teamid
             WHERE p.draftedby LIKE ?
             ORDER BY p.draftyear DESC,
                      p.draftround,
@@ -77,7 +77,7 @@ class TeamQueryRepository extends \BaseMysqliRepository implements TeamQueryRepo
         return $this->fetchAll(
             "SELECT *
             FROM ibl_draft_picks
-            WHERE owner_tid = ?
+            WHERE owner_teamid = ?
             ORDER BY year, round, teampick ASC",
             "i",
             $teamId
@@ -95,7 +95,7 @@ class TeamQueryRepository extends \BaseMysqliRepository implements TeamQueryRepo
         return $this->fetchAll(
             "SELECT *
             FROM ibl_fa_offers
-            WHERE tid = ?
+            WHERE teamid = ?
             ORDER BY name ASC",
             "i",
             $teamId
@@ -113,8 +113,8 @@ class TeamQueryRepository extends \BaseMysqliRepository implements TeamQueryRepo
         return $this->fetchAll(
             "SELECT p.*, t.team_name AS teamname, t.color1, t.color2
             FROM ibl_plr p
-            LEFT JOIN ibl_team_info t ON p.tid = t.teamid
-            WHERE p.tid = ?
+            LEFT JOIN ibl_team_info t ON p.teamid = t.teamid
+            WHERE p.teamid = ?
               AND p.retired = 0
               AND p.cyt != p.cy
             ORDER BY p.name ASC",
@@ -148,8 +148,8 @@ class TeamQueryRepository extends \BaseMysqliRepository implements TeamQueryRepo
         return $this->fetchAll(
             "SELECT p.*, t.team_name AS teamname, t.color1, t.color2
             FROM ibl_plr p
-            LEFT JOIN ibl_team_info t ON p.tid = t.teamid
-            WHERE p.tid = ?
+            LEFT JOIN ibl_team_info t ON p.teamid = t.teamid
+            WHERE p.teamid = ?
               AND p.retired = 0
               AND p.ordinal <= '" . \JSB::WAIVERS_ORDINAL . "'" . $freeAgencyCondition . "
             ORDER BY p.name ASC",
@@ -183,8 +183,8 @@ class TeamQueryRepository extends \BaseMysqliRepository implements TeamQueryRepo
         return $this->fetchAll(
             "SELECT p.*, t.team_name AS teamname, t.color1, t.color2
             FROM ibl_plr p
-            LEFT JOIN ibl_team_info t ON p.tid = t.teamid
-            WHERE p.tid = ?
+            LEFT JOIN ibl_team_info t ON p.teamid = t.teamid
+            WHERE p.teamid = ?
               AND p.retired = 0
               AND p.ordinal <= '" . \JSB::WAIVERS_ORDINAL . "'" . $freeAgencyCondition . "
               AND p.injured = '0'
@@ -203,7 +203,7 @@ class TeamQueryRepository extends \BaseMysqliRepository implements TeamQueryRepo
         $result = $this->fetchOne(
             "SELECT pid
             FROM ibl_plr
-            WHERE tid = ?
+            WHERE teamid = ?
               AND retired = 0
               AND " . $position . "Depth = 1",
             "i",
@@ -221,7 +221,7 @@ class TeamQueryRepository extends \BaseMysqliRepository implements TeamQueryRepo
         $result = $this->fetchOne(
             "SELECT pid
             FROM ibl_plr
-            WHERE tid = ?
+            WHERE teamid = ?
               AND retired = 0
               AND dc_" . $position . "Depth = 1",
             "i",
@@ -241,8 +241,8 @@ class TeamQueryRepository extends \BaseMysqliRepository implements TeamQueryRepo
         return $this->fetchAll(
             "SELECT p.*, t.team_name AS teamname, t.color1, t.color2
             FROM ibl_plr p
-            LEFT JOIN ibl_team_info t ON p.tid = t.teamid
-            WHERE p.tid = ?
+            LEFT JOIN ibl_team_info t ON p.teamid = t.teamid
+            WHERE p.teamid = ?
               AND p.cy1 != 0
               AND p.retired = 0",
             "i",
@@ -261,8 +261,8 @@ class TeamQueryRepository extends \BaseMysqliRepository implements TeamQueryRepo
         return $this->fetchAll(
             "SELECT p.*, t.team_name AS teamname, t.color1, t.color2
             FROM ibl_plr p
-            LEFT JOIN ibl_team_info t ON p.tid = t.teamid
-            WHERE p.tid = ?
+            LEFT JOIN ibl_team_info t ON p.teamid = t.teamid
+            WHERE p.teamid = ?
               AND p.pos = ?
               AND p.cy1 != 0
               AND p.retired = 0",
@@ -283,8 +283,8 @@ class TeamQueryRepository extends \BaseMysqliRepository implements TeamQueryRepo
         return $this->fetchAll(
             "SELECT p.*, t.team_name AS teamname, t.color1, t.color2
             FROM ibl_plr p
-            LEFT JOIN ibl_team_info t ON p.tid = t.teamid
-            WHERE p.tid = ?
+            LEFT JOIN ibl_team_info t ON p.teamid = t.teamid
+            WHERE p.teamid = ?
               AND p.retired = 0
             ORDER BY p.name ASC",
             "i",
@@ -303,8 +303,8 @@ class TeamQueryRepository extends \BaseMysqliRepository implements TeamQueryRepo
         return $this->fetchAll(
             "SELECT p.*, t.team_name AS teamname, t.color1, t.color2
             FROM ibl_plr p
-            LEFT JOIN ibl_team_info t ON p.tid = t.teamid
-            WHERE p.tid = ?
+            LEFT JOIN ibl_team_info t ON p.teamid = t.teamid
+            WHERE p.teamid = ?
               AND p.retired = 0
             ORDER BY p.ordinal ASC",
             "i",

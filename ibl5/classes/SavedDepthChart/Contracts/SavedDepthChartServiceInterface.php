@@ -29,7 +29,7 @@ interface SavedDepthChartServiceInterface
      * @return int The saved depth chart ID
      */
     public function saveOnSubmit(
-        int $tid,
+        int $teamid,
         string $username,
         ?string $name,
         array $rosterPlayers,
@@ -50,28 +50,28 @@ interface SavedDepthChartServiceInterface
      *     newPlayerPids: list<int>
      * }|null
      */
-    public function loadSavedDepthChart(int $id, int $tid, array $currentRosterPids): ?array;
+    public function loadSavedDepthChart(int $id, int $teamid, array $currentRosterPids): ?array;
 
     /**
      * Get win-loss record for a team in a date range
      *
      * @return array{wins: int, losses: int}
      */
-    public function getWinLossRecord(int $tid, string $startDate, string $endDate): array;
+    public function getWinLossRecord(int $teamid, string $startDate, string $endDate): array;
 
     /**
      * Build label for the "Current (Live)" dropdown entry
      *
      * Shows phase, phase-specific sim number, date range, and win-loss record.
      */
-    public function buildCurrentLiveLabel(int $tid, Season $season): string;
+    public function buildCurrentLiveLabel(int $teamid, Season $season): string;
 
     /**
      * Get formatted dropdown options for a team's saved depth charts
      *
      * @return list<array{id: int, label: string, isActive: bool}>
      */
-    public function getDropdownOptions(int $tid, Season $season): array;
+    public function getDropdownOptions(int $teamid, Season $season): array;
 
     /**
      * Build a player snapshot from roster data and depth chart POST values
@@ -93,5 +93,5 @@ interface SavedDepthChartServiceInterface
      *
      * @return array{success: bool, id: int, name: string}|array{success: bool, error: string}
      */
-    public function nameOrCreateActive(int $tid, string $username, string $name, Season $season): array;
+    public function nameOrCreateActive(int $teamid, string $username, string $name, Season $season): array;
 }

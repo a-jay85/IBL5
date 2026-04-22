@@ -21,12 +21,12 @@ class CapturingRepository implements FreeAgencyRepositoryInterface
     public bool $pendingMleExists = false;
     public bool $pendingLleExists = false;
 
-    public function getExistingOffer(int $tid, int $pid): ?array
+    public function getExistingOffer(int $teamid, int $pid): ?array
     {
         return null;
     }
 
-    public function deleteOffer(int $tid, int $pid): int
+    public function deleteOffer(int $teamid, int $pid): int
     {
         return 0;
     }
@@ -47,12 +47,12 @@ class CapturingRepository implements FreeAgencyRepositoryInterface
         return false;
     }
 
-    public function hasPendingMleOffer(int $tid, int $excludePid): bool
+    public function hasPendingMleOffer(int $teamid, int $excludePid): bool
     {
         return $this->pendingMleExists;
     }
 
-    public function hasPendingLleOffer(int $tid, int $excludePid): bool
+    public function hasPendingLleOffer(int $teamid, int $excludePid): bool
     {
         return $this->pendingLleExists;
     }
@@ -454,7 +454,7 @@ class FreeAgencyProcessorTest extends TestCase
             'lastname' => 'Player',
             'nickname' => '',
             'teamname' => 'Free Agent',
-            'tid' => 0,
+            'teamid' => 0,
             'pos' => 'G',
             'position' => 'G',
             'age' => 25,
@@ -493,8 +493,8 @@ class FreeAgencyProcessorTest extends TestCase
             'r_fgp' => 50,
             'r_fta' => 50,
             'r_ftp' => 50,
-            'r_tga' => 50,
-            'r_tgp' => 50,
+            'r_3ga' => 50,
+            'r_3gp' => 50,
             'r_orb' => 50,
             'r_drb' => 50,
             'r_ast' => 50,

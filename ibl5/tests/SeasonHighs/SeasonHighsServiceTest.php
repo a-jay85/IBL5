@@ -119,7 +119,7 @@ class SeasonHighsServiceTest extends TestCase
                     'date' => '2025-06-15',
                     'value' => 45,
                     'pid' => 1,
-                    'tid' => 5,
+                    'teamid' => 5,
                     'teamname' => 'Test Team',
                     'team_city' => 'Test City',
                     'color1' => 'FFFFFF',
@@ -356,7 +356,7 @@ class SeasonHighsServiceTest extends TestCase
 
     /**
      * @param array<string, mixed> $overrides
-     * @return array{name: string, date: string, value: int, pid: int, tid: int, teamname: string, color1: string, color2: string, boxId: int}
+     * @return array{name: string, date: string, value: int, pid: int, teamid: int, teamname: string, color1: string, color2: string, boxId: int}
      */
     private static function createBoxEntry(array $overrides = []): array
     {
@@ -365,14 +365,14 @@ class SeasonHighsServiceTest extends TestCase
             'date' => '2024-12-15',
             'value' => 30,
             'pid' => 1,
-            'tid' => 1,
+            'teamid' => 1,
             'teamname' => 'Hawks',
             'color1' => 'FF0000',
             'color2' => '000000',
             'boxId' => 100,
         ];
 
-        /** @var array{name: string, date: string, value: int, pid: int, tid: int, teamname: string, color1: string, color2: string, boxId: int} */
+        /** @var array{name: string, date: string, value: int, pid: int, teamid: int, teamname: string, color1: string, color2: string, boxId: int} */
         return array_merge($defaults, $overrides);
     }
 }

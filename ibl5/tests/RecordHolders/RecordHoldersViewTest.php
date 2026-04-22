@@ -232,7 +232,7 @@ final class RecordHoldersViewTest extends TestCase
 
         $html = $this->view->render($records);
 
-        $this->assertStringContainsString('modules.php?name=Team&amp;op=team&amp;teamID=2&amp;yr=1994', $html);
+        $this->assertStringContainsString('modules.php?name=Team&amp;op=team&amp;teamid=2&amp;yr=1994', $html);
         $this->assertStringContainsString('>1993-94</a>', $html);
     }
 
@@ -299,7 +299,7 @@ final class RecordHoldersViewTest extends TestCase
 
         $html = $this->view->render($records);
 
-        $this->assertStringContainsString('modules.php?name=Team&amp;op=team&amp;teamID=7&amp;yr=1993', $html);
+        $this->assertStringContainsString('modules.php?name=Team&amp;op=team&amp;teamid=7&amp;yr=1993', $html);
         $this->assertStringContainsString('>1992-93</a>', $html);
     }
 
@@ -339,9 +339,9 @@ final class RecordHoldersViewTest extends TestCase
 
         $html = $this->view->render($records);
 
-        $this->assertStringContainsString('modules.php?name=Team&amp;op=team&amp;teamID=4&amp;yr=1989', $html);
-        $this->assertStringContainsString('modules.php?name=Team&amp;op=team&amp;teamID=4&amp;yr=1990', $html);
-        $this->assertStringContainsString('modules.php?name=Team&amp;op=team&amp;teamID=4&amp;yr=1991', $html);
+        $this->assertStringContainsString('modules.php?name=Team&amp;op=team&amp;teamid=4&amp;yr=1989', $html);
+        $this->assertStringContainsString('modules.php?name=Team&amp;op=team&amp;teamid=4&amp;yr=1990', $html);
+        $this->assertStringContainsString('modules.php?name=Team&amp;op=team&amp;teamid=4&amp;yr=1991', $html);
     }
 
     public function testRenderSanitizesOutput(): void

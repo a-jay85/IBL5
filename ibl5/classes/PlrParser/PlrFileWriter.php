@@ -91,7 +91,7 @@ class PlrFileWriter implements PlrFileWriterInterface
      * @var array<string, array{int, int}>
      */
     public const FIELD_MAP = [
-        'tid' => [self::OFFSET_TID, self::WIDTH_TID],
+        'teamid' => [self::OFFSET_TID, self::WIDTH_TID],
         'PGDepth' => [self::OFFSET_PG_DEPTH, self::WIDTH_DEPTH],
         'SGDepth' => [self::OFFSET_SG_DEPTH, self::WIDTH_DEPTH],
         'SFDepth' => [self::OFFSET_SF_DEPTH, self::WIDTH_DEPTH],
@@ -244,7 +244,7 @@ class PlrFileWriter implements PlrFileWriterInterface
         $originalLength = strlen($line);
         $modified = $line;
 
-        // Read old tid before applying changes (needed for derived fields)
+        // Read old teamid before applying changes (needed for derived fields)
         $oldTid = (int) trim(substr($line, self::OFFSET_TID, self::WIDTH_TID));
 
         foreach ($changes as $field => $value) {
@@ -257,9 +257,9 @@ class PlrFileWriter implements PlrFileWriterInterface
             $modified = substr_replace($modified, $formatted, $offset, $width);
         }
 
-        // Auto-update derived fields when tid changes
-        if (isset($changes['tid'])) {
-            $newTid = $changes['tid'];
+        // Auto-update derived fields when teamid changes
+        if (isset($changes['teamid'])) {
+            $newTid = $changes['teamid'];
             $modified = self::applyDerivedTidFields($modified, $newTid, $oldTid);
         }
 
@@ -335,15 +335,15 @@ class PlrFileWriter implements PlrFileWriterInterface
     }
 
     /**
-     * Apply derived field updates when tid changes.
+     * Apply derived field updates when teamid changes.
      *
-     * - contractOwnedBy = new tid
-     * - currentTeamIndex = tid - 1 (or -1 for free agents when tid=0)
-     * - previousTeamIndex = old tid - 1
+     * - contractOwnedBy = new teamid
+     * - currentTeamIndex = teamid - 1 (or -1 for free agents when teamid=0)
+     * - previousTeamIndex = old teamid - 1
      */
     private static function applyDerivedTidFields(string $line, int $newTid, int $oldTid): string
     {
-        // contractOwnedBy = same as tid
+        // contractOwnedBy = same as teamid
         $line = substr_replace(
             $line,
             PlrFieldSerializer::formatInt($newTid, self::WIDTH_CONTRACT_OWNED_BY),
@@ -351,7 +351,7 @@ class PlrFileWriter implements PlrFileWriterInterface
             self::WIDTH_CONTRACT_OWNED_BY,
         );
 
-        // currentTeamIndex = tid - 1, or -1 for free agents
+        // currentTeamIndex = teamid - 1, or -1 for free agents
         $currentIndex = $newTid === 0 ? -1 : $newTid - 1;
         $line = substr_replace(
             $line,
@@ -360,7 +360,7 @@ class PlrFileWriter implements PlrFileWriterInterface
             self::WIDTH_CURRENT_TEAM_INDEX,
         );
 
-        // previousTeamIndex = old tid - 1
+        // previousTeamIndex = old teamid - 1
         $previousIndex = $oldTid === 0 ? -1 : $oldTid - 1;
         $line = substr_replace(
             $line,

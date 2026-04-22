@@ -12,7 +12,7 @@ namespace SavedDepthChart\Contracts;
  *
  * @phpstan-type SavedDepthChartRow array{
  *     id: int,
- *     tid: int,
+ *     teamid: int,
  *     username: string,
  *     name: string|null,
  *     phase: string,
@@ -72,7 +72,7 @@ interface SavedDepthChartRepositoryInterface
      * @return int Insert ID
      */
     public function createSavedDepthChart(
-        int $tid,
+        int $teamid,
         string $username,
         ?string $name,
         string $phase,
@@ -91,26 +91,26 @@ interface SavedDepthChartRepositoryInterface
     /**
      * Deactivate all active depth charts for a team, setting end dates
      */
-    public function deactivateForTeam(int $tid, string $simEndDate, int $simNumberEnd): void;
+    public function deactivateForTeam(int $teamid, string $simEndDate, int $simNumberEnd): void;
 
     /**
      * Deactivate all active depth charts for a team EXCEPT the given ID
      */
-    public function deactivateOthersForTeam(int $tid, int $excludeId, string $simEndDate, int $simNumberEnd): void;
+    public function deactivateOthersForTeam(int $teamid, int $excludeId, string $simEndDate, int $simNumberEnd): void;
 
     /**
      * Get all saved depth charts for a team, ordered by created_at DESC
      *
      * @return list<SavedDepthChartRow>
      */
-    public function getSavedDepthChartsForTeam(int $tid): array;
+    public function getSavedDepthChartsForTeam(int $teamid): array;
 
     /**
      * Get a single saved depth chart by ID with team authorization check
      *
      * @return SavedDepthChartRow|null
      */
-    public function getSavedDepthChartById(int $id, int $tid): ?array;
+    public function getSavedDepthChartById(int $id, int $teamid): ?array;
 
     /**
      * Get all player rows for a saved depth chart
@@ -122,7 +122,7 @@ interface SavedDepthChartRepositoryInterface
     /**
      * Rename a saved depth chart
      */
-    public function updateName(int $id, int $tid, string $newName): bool;
+    public function updateName(int $id, int $teamid, string $newName): bool;
 
     /**
      * Replace all player settings for an existing saved depth chart
@@ -141,14 +141,14 @@ interface SavedDepthChartRepositoryInterface
     /**
      * Re-activate a depth chart by ID (set is_active = 1)
      */
-    public function reactivate(int $id, int $tid): bool;
+    public function reactivate(int $id, int $teamid): bool;
 
     /**
      * Get the most recent saved depth chart for a team
      *
      * @return SavedDepthChartRow|null
      */
-    public function getMostRecentDepthChart(int $tid): ?array;
+    public function getMostRecentDepthChart(int $teamid): ?array;
 
     /**
      * Get live roster depth chart settings from ibl_plr
@@ -174,12 +174,12 @@ interface SavedDepthChartRepositoryInterface
      *     dc_bh: int
      * }>
      */
-    public function getLiveRosterSettings(int $tid): array;
+    public function getLiveRosterSettings(int $teamid): array;
 
     /**
      * Get the active (is_active = 1) depth chart for a team
      *
      * @return SavedDepthChartRow|null
      */
-    public function getActiveDepthChartForTeam(int $tid): ?array;
+    public function getActiveDepthChartForTeam(int $teamid): ?array;
 }

@@ -37,7 +37,7 @@ class PlrLineParser implements PlrLineParserInterface
             'name' => $name,
             'age' => (int) substr($line, 36, 2),
             'pid' => $pid,
-            'tid' => (int) substr($line, 44, 2),
+            'teamid' => (int) substr($line, 44, 2),
             'peak' => (int) substr($line, 46, 4),
             'pos' => trim(substr($line, 50, 2)),
             'realLifeGP' => (int) substr($line, 52, 4),

@@ -58,7 +58,7 @@ class PlayerTradingCardBackView
         ?\mysqli $db = null
     ): string {
         // Get color scheme and prepare player data using shared helpers
-        $colorScheme = CardBaseStyles::getColorSchemeForTeam($db, $player->teamID ?? 0);
+        $colorScheme = CardBaseStyles::getColorSchemeForTeam($db, $player->teamid ?? 0);
         $playerData = CardBaseStyles::preparePlayerData($player, $playerID);
 
         $cssProps = CardBaseStyles::getCardCssProperties($colorScheme);

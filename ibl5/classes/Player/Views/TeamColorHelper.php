@@ -27,16 +27,16 @@ class TeamColorHelper
      * Fetch team colors from the database
      * 
      * @param \mysqli $db Database connection
-     * @param int $teamID The team's ID
+     * @param int $teamid The team's ID
      * @return array{color1: string, color2: string} Team colors (hex without #)
      */
-    public static function getTeamColors(\mysqli $db, int $teamID): array
+    public static function getTeamColors(\mysqli $db, int $teamid): array
     {
         $stmt = $db->prepare('SELECT color1, color2 FROM ibl_team_info WHERE teamid = ?');
         if ($stmt === false) {
             return ['color1' => 'D4AF37', 'color2' => '1e3a5f'];
         }
-        $stmt->bind_param('i', $teamID);
+        $stmt->bind_param('i', $teamid);
         $stmt->execute();
         $result = $stmt->get_result();
         if ($result === false) {

@@ -18,13 +18,13 @@ class PlrFileWriterTest extends TestCase
      *
      * @param int $ordinal Player ordinal (offset 0, width 4)
      * @param int $pid Player ID (offset 38, width 6)
-     * @param int $tid Team ID (offset 44, width 2)
+     * @param int $teamid Team ID (offset 44, width 2)
      * @param int $bird Bird rights (offset 288, width 2)
      */
     private function buildSyntheticRecord(
         int $ordinal = 1,
         int $pid = 12345,
-        int $tid = 5,
+        int $teamid = 5,
         int $bird = 3,
     ): string {
         $record = str_repeat(' ', PlrFileWriter::PLAYER_RECORD_LENGTH);
@@ -32,15 +32,15 @@ class PlrFileWriterTest extends TestCase
         // Set identification fields
         $record = substr_replace($record, PlrFieldSerializer::formatInt($ordinal, 4), 0, 4);
         $record = substr_replace($record, PlrFieldSerializer::formatInt($pid, 6), 38, 6);
-        $record = substr_replace($record, PlrFieldSerializer::formatInt($tid, 2), 44, 2);
+        $record = substr_replace($record, PlrFieldSerializer::formatInt($teamid, 2), 44, 2);
 
         // Set bird rights
         $record = substr_replace($record, PlrFieldSerializer::formatInt($bird, 2), 288, 2);
 
         // Set derived fields to consistent values
         $record = substr_replace($record, PlrFieldSerializer::formatInt(0, 1), 330, 1); // freeAgentSigningFlag
-        $record = substr_replace($record, PlrFieldSerializer::formatInt($tid, 2), 331, 2); // contractOwnedBy
-        $currentIndex = $tid === 0 ? -1 : $tid - 1;
+        $record = substr_replace($record, PlrFieldSerializer::formatInt($teamid, 2), 331, 2); // contractOwnedBy
+        $currentIndex = $teamid === 0 ? -1 : $teamid - 1;
         $record = substr_replace($record, PlrFieldSerializer::formatInt($currentIndex, 2), 333, 2);
         $record = substr_replace($record, PlrFieldSerializer::formatInt($currentIndex, 2), 335, 2);
 
@@ -109,7 +109,7 @@ class PlrFileWriterTest extends TestCase
         $record = $this->buildSyntheticRecord(1, 12345, 5);
         $originalLength = strlen($record);
 
-        $modified = PlrFileWriter::applyChangesToRecord($record, ['tid' => 10]);
+        $modified = PlrFileWriter::applyChangesToRecord($record, ['teamid' => 10]);
 
         $this->assertSame($originalLength, strlen($modified));
     }
@@ -118,9 +118,9 @@ class PlrFileWriterTest extends TestCase
     {
         $record = $this->buildSyntheticRecord(1, 12345, 5);
 
-        $modified = PlrFileWriter::applyChangesToRecord($record, ['tid' => 10]);
+        $modified = PlrFileWriter::applyChangesToRecord($record, ['teamid' => 10]);
 
-        $this->assertSame(10, PlrFileWriter::readField($modified, 'tid'));
+        $this->assertSame(10, PlrFileWriter::readField($modified, 'teamid'));
     }
 
     public function testApplyChangesUpdatesDepthChart(): void
@@ -167,13 +167,13 @@ class PlrFileWriterTest extends TestCase
     {
         $record = $this->buildSyntheticRecord(1, 12345, 5);
 
-        $modified = PlrFileWriter::applyChangesToRecord($record, ['tid' => 10]);
+        $modified = PlrFileWriter::applyChangesToRecord($record, ['teamid' => 10]);
 
-        // contractOwnedBy should match new tid
+        // contractOwnedBy should match new teamid
         $this->assertSame(10, PlrFileWriter::readField($modified, 'contractOwnedBy'));
-        // currentTeamIndex = tid - 1 = 9
+        // currentTeamIndex = teamid - 1 = 9
         $this->assertSame(9, PlrFileWriter::readField($modified, 'currentTeamIndex'));
-        // previousTeamIndex = old tid - 1 = 4
+        // previousTeamIndex = old teamid - 1 = 4
         $this->assertSame(4, PlrFileWriter::readField($modified, 'previousTeamIndex'));
     }
 
@@ -181,12 +181,12 @@ class PlrFileWriterTest extends TestCase
     {
         $record = $this->buildSyntheticRecord(1, 12345, 5);
 
-        $modified = PlrFileWriter::applyChangesToRecord($record, ['tid' => 0]);
+        $modified = PlrFileWriter::applyChangesToRecord($record, ['teamid' => 0]);
 
         $this->assertSame(0, PlrFileWriter::readField($modified, 'contractOwnedBy'));
         // Free agent: currentTeamIndex = -1
         $this->assertSame(-1, PlrFileWriter::readField($modified, 'currentTeamIndex'));
-        // previousTeamIndex = old tid - 1 = 4
+        // previousTeamIndex = old teamid - 1 = 4
         $this->assertSame(4, PlrFileWriter::readField($modified, 'previousTeamIndex'));
     }
 
@@ -226,7 +226,7 @@ class PlrFileWriterTest extends TestCase
     {
         $record = $this->buildSyntheticRecord(1, 12345, 5);
 
-        $this->assertSame(5, PlrFileWriter::readField($record, 'tid'));
+        $this->assertSame(5, PlrFileWriter::readField($record, 'teamid'));
     }
 
     public function testReadPlayerName(): void
@@ -290,7 +290,7 @@ class PlrFileWriterTest extends TestCase
         $record = $this->buildSyntheticRecord(1, 12345, 5, 3);
 
         $modified = PlrFileWriter::applyChangesToRecord($record, [
-            'tid' => 10,
+            'teamid' => 10,
             'PGDepth' => 1,
             'canPlayInGame' => 1,
             'cy' => 2,
@@ -298,7 +298,7 @@ class PlrFileWriterTest extends TestCase
             'bird' => 4,
         ]);
 
-        $this->assertSame(10, PlrFileWriter::readField($modified, 'tid'));
+        $this->assertSame(10, PlrFileWriter::readField($modified, 'teamid'));
         $this->assertSame(1, PlrFileWriter::readField($modified, 'PGDepth'));
         $this->assertSame(1, PlrFileWriter::readField($modified, 'canPlayInGame'));
         $this->assertSame(2, PlrFileWriter::readField($modified, 'cy'));

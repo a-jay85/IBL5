@@ -49,7 +49,7 @@ class FreeAgencyView
         ]);
         ?>
 <h2 class="ibl-title">Free Agency</h2>
-<img src="images/logo/<?= $team->teamID ?>.jpg" alt="Team Logo" class="team-logo-banner">
+<img src="images/logo/<?= $team->teamid ?>.jpg" alt="Team Logo" class="team-logo-banner">
 <div class="mt-6"></div>
 <?= $this->renderPlayersUnderContract($team, $season, $capMetrics) ?>
 <div class="mt-6"></div>
@@ -80,7 +80,7 @@ class FreeAgencyView
     <?= $this->renderTableHeader('Players Under Contract', false, $team, false, false, $season) ?>
     <tbody>
         <?php
-        $rosterRows = $this->teamQueryRepo->getRosterUnderContractOrderedByOrdinal($team->teamID);
+        $rosterRows = $this->teamQueryRepo->getRosterUnderContractOrderedByOrdinal($team->teamid);
         foreach ($rosterRows as $playerRow): ?>
             <?php
             $player = Player::withPlrRow($this->mysqli_db, $playerRow);
@@ -131,7 +131,7 @@ class FreeAgencyView
         <?php
         // Append cash considerations and buyouts from dedicated table
         $cashRepo = new \Trading\CashConsiderationRepository($this->mysqli_db);
-        $cashRows = $cashRepo->getTeamCashConsiderations($team->teamID);
+        $cashRows = $cashRepo->getTeamCashConsiderations($team->teamid);
         foreach ($cashRows as $cashRow):
             $cashPlayerRow = \Team\TeamTableService::cashConsiderationToRosterRow($cashRow);
             /** @phpstan-ignore argument.type (cashConsiderationToRosterRow produces a PlayerRow-shaped array) */
@@ -189,7 +189,7 @@ class FreeAgencyView
     <?= $this->renderTableHeader('Contract Offers', false, $team, false, true, $season) ?>
     <tbody>
         <?php
-        $offersResult = $this->teamQueryRepo->getFreeAgencyOffers($team->teamID);
+        $offersResult = $this->teamQueryRepo->getFreeAgencyOffers($team->teamid);
         foreach ($offersResult as $offerRow): ?>
             <?php
             $player = Player::withPlayerID($this->mysqli_db, $offerRow['pid'] ?? 0);
@@ -247,7 +247,7 @@ class FreeAgencyView
     <?= $this->renderTableHeader('Unsigned Free Agents', true, $team, false, true, $season) ?>
     <tbody>
         <?php
-        $rosterRows = $this->teamQueryRepo->getRosterUnderContractOrderedByOrdinal($team->teamID);
+        $rosterRows = $this->teamQueryRepo->getRosterUnderContractOrderedByOrdinal($team->teamid);
         foreach ($rosterRows as $playerRow): ?>
             <?php
             $player = Player::withPlrRow($this->mysqli_db, $playerRow);
@@ -451,7 +451,7 @@ class FreeAgencyView
      */
     private function renderTeamCell(Player $player): string
     {
-        $teamId = $player->teamID ?? 0;
+        $teamId = $player->teamid ?? 0;
 
         if ($teamId === 0) {
             return '<td>FA</td>';

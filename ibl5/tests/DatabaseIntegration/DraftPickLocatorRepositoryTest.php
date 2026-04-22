@@ -35,7 +35,7 @@ class DraftPickLocatorRepositoryTest extends DatabaseTestCase
 
     public function testGetDraftPicksForTeamReturnsInserted(): void
     {
-        // teampick_tid=1 means the pick originally belonged to team 1
+        // teampick_teamid=1 means the pick originally belonged to team 1
         $this->insertDraftPickRow(2, 1, 2099, 1, [
             'ownerofpick' => 'Enforcers',
             'teampick' => 'Metros',
@@ -62,7 +62,7 @@ class DraftPickLocatorRepositoryTest extends DatabaseTestCase
         // Insert a pick for a different team to ensure isolation
         $this->insertDraftPickRow(1, 1, 2099, 1);
 
-        // Team 28 should not have picks for year 2099 (teampick_tid=28)
+        // Team 28 should not have picks for year 2099 (teampick_teamid=28)
         // But production data might exist, so query a non-existent year range
         $picks = $this->repo->getDraftPicksForTeam(1);
 

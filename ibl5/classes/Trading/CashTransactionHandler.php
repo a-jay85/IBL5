@@ -92,10 +92,10 @@ class CashTransactionHandler implements CashTransactionHandlerInterface
 
         // Insert positive cash row (sending team's cap hit)
         $affectedRowsPositive = $this->cashConsiderationRepository->insertCashConsideration([
-            'tid' => $offeringTeamId,
+            'teamid' => $offeringTeamId,
             'type' => 'cash',
             'label' => "Cash to $listeningTeamName",
-            'counterparty_tid' => $listeningTeamId,
+            'counterparty_teamid' => $listeningTeamId,
             'trade_offer_id' => $tradeOfferId,
             'cy' => $contractCurrentYear,
             'cyt' => $contractTotalYears,
@@ -109,10 +109,10 @@ class CashTransactionHandler implements CashTransactionHandlerInterface
 
         // Insert negative cash row (receiving team's cap relief)
         $affectedRowsNegative = $this->cashConsiderationRepository->insertCashConsideration([
-            'tid' => $listeningTeamId,
+            'teamid' => $listeningTeamId,
             'type' => 'cash',
             'label' => "Cash from $offeringTeamName",
-            'counterparty_tid' => $offeringTeamId,
+            'counterparty_teamid' => $offeringTeamId,
             'trade_offer_id' => $tradeOfferId,
             'cy' => $contractCurrentYear,
             'cyt' => $contractTotalYears,

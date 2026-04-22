@@ -49,7 +49,7 @@ class TeamsDropdownViewTest extends TestCase
 
         $this->assertStringContainsString('Boston Celtics', $html);
         $this->assertStringContainsString('new1.png', $html);
-        $this->assertStringContainsString('teamID=1', $html);
+        $this->assertStringContainsString('teamid=1', $html);
         $this->assertStringContainsString('Los Angeles Lakers', $html);
         $this->assertStringContainsString('new4.png', $html);
     }

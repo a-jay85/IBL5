@@ -96,8 +96,8 @@ class BoxscoreTest extends TestCase
         $line = $this->makeGameInfoLine(visitorTeamCode: '04', homeTeamCode: '09');
         $box = Boxscore::withGameInfoLine($line, 2026, 'Regular Season/Playoffs');
 
-        $this->assertSame(5, $box->visitorTeamID);
-        $this->assertSame(10, $box->homeTeamID);
+        $this->assertSame(5, $box->visitor_teamid);
+        $this->assertSame(10, $box->home_teamid);
     }
 
     public function testDayParsedWithPlusOneOffset(): void
@@ -239,8 +239,8 @@ class BoxscoreTest extends TestCase
         $box->overrideGameContext('2026-02-15', 50, 51, 1);
 
         $this->assertSame('2026-02-15', $box->gameDate);
-        $this->assertSame(50, $box->visitorTeamID);
-        $this->assertSame(51, $box->homeTeamID);
+        $this->assertSame(50, $box->visitor_teamid);
+        $this->assertSame(51, $box->home_teamid);
         $this->assertSame(1, $box->gameOfThatDay);
     }
 
@@ -276,8 +276,8 @@ class BoxscoreTest extends TestCase
     {
         $sql = Boxscore::teamInsertSql('ibl_box_scores_teams');
 
-        $this->assertStringContainsString('visitorTeamID', $sql);
-        $this->assertStringContainsString('homeTeamID', $sql);
+        $this->assertStringContainsString('visitor_teamid', $sql);
+        $this->assertStringContainsString('home_teamid', $sql);
         $this->assertStringContainsString('visitorQ1points', $sql);
         $this->assertStringContainsString('homeOTpoints', $sql);
     }

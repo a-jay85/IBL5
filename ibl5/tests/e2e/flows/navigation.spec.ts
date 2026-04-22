@@ -48,7 +48,7 @@ test.describe('Navigation bar (authenticated, desktop)', () => {
     await page.goto('index.php');
     await desktopNav(page).getByRole('button', { name: 'Teams' }).click();
 
-    const teamLinks = page.locator('a[href*="teamID="]');
+    const teamLinks = page.locator('a[href*="teamid="]');
     await expect(teamLinks.first()).toBeVisible();
   });
 

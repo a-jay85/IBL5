@@ -116,8 +116,8 @@ class LeagueScheduleRepositoryTest extends TestCase
     public function testGetTeamRecordsReturnsMapOfRecords(): void
     {
         $this->mockDb->setMockData([
-            ['tid' => 1, 'leagueRecord' => '25-10'],
-            ['tid' => 2, 'leagueRecord' => '20-15'],
+            ['teamid' => 1, 'leagueRecord' => '25-10'],
+            ['teamid' => 2, 'leagueRecord' => '20-15'],
         ]);
         $repository = new LeagueScheduleRepository($this->mockMysqliDb);
 

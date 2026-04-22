@@ -133,8 +133,8 @@ class SeasonArchiveRepository extends BaseMysqliRepository implements SeasonArch
                               + COALESCE(bst.homeOTpoints, 0))
                            > (bst.visitorQ1points + bst.visitorQ2points + bst.visitorQ3points + bst.visitorQ4points
                               + COALESCE(bst.visitorOTpoints, 0))
-                        THEN bst.homeTeamID
-                        ELSE bst.visitorTeamID
+                        THEN bst.home_teamid
+                        ELSE bst.visitor_teamid
                     END AS winner_tid,
                     ROW_NUMBER() OVER (
                         PARTITION BY YEAR(bst.Date)

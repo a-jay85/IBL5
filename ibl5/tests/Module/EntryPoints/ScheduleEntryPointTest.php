@@ -9,7 +9,7 @@ use Tests\Integration\Mocks\TestDataFactory;
 /**
  * Integration tests for modules/Schedule/index.php entry point.
  *
- * Exercises the (int) $_GET['teamID'] type-casting boundary with edge cases:
+ * Exercises the (int) $_GET['teamid'] type-casting boundary with edge cases:
  * missing params, zero, negative, non-numeric strings, floats, out-of-range IDs.
  */
 class ScheduleEntryPointTest extends ModuleEntryPointTestCase
@@ -38,10 +38,10 @@ class ScheduleEntryPointTest extends ModuleEntryPointTestCase
     public function testTeamIdZeroShowsLeagueSchedule(): void
     {
         $this->mockDb->setMockData([]);
-        $output = $this->runModule('Schedule', ['teamID' => '0']);
+        $output = $this->runModule('Schedule', ['teamid' => '0']);
 
         $this->assertNotEmpty($output);
-        // teamID=0 fails the > 0 guard — no Team::initialize call
+        // teamid=0 fails the > 0 guard — no Team::initialize call
         $this->assertQueryExecuted('ibl_schedule');
     }
 
@@ -49,7 +49,7 @@ class ScheduleEntryPointTest extends ModuleEntryPointTestCase
     {
         $this->mockDb->setMockTeamData([self::fullTeamData(['teamid' => 5])]);
         $this->mockDb->setMockData([]);
-        $output = $this->runModule('Schedule', ['teamID' => '5']);
+        $output = $this->runModule('Schedule', ['teamid' => '5']);
 
         $this->assertNotEmpty($output);
         $this->assertQueryExecuted('ibl_team_info');
@@ -58,7 +58,7 @@ class ScheduleEntryPointTest extends ModuleEntryPointTestCase
     public function testNegativeTeamIdShowsLeagueSchedule(): void
     {
         $this->mockDb->setMockData([]);
-        $output = $this->runModule('Schedule', ['teamID' => '-1']);
+        $output = $this->runModule('Schedule', ['teamid' => '-1']);
 
         $this->assertNotEmpty($output);
         // (int)'-1' === -1, fails > 0 guard
@@ -68,7 +68,7 @@ class ScheduleEntryPointTest extends ModuleEntryPointTestCase
     public function testNonNumericStringTeamIdShowsLeagueSchedule(): void
     {
         $this->mockDb->setMockData([]);
-        $output = $this->runModule('Schedule', ['teamID' => 'abc']);
+        $output = $this->runModule('Schedule', ['teamid' => 'abc']);
 
         $this->assertNotEmpty($output);
         // (int)'abc' === 0, fails > 0 guard
@@ -79,7 +79,7 @@ class ScheduleEntryPointTest extends ModuleEntryPointTestCase
     {
         $this->mockDb->setMockTeamData([self::fullTeamData(['teamid' => 5])]);
         $this->mockDb->setMockData([]);
-        $output = $this->runModule('Schedule', ['teamID' => '5.9']);
+        $output = $this->runModule('Schedule', ['teamid' => '5.9']);
 
         $this->assertNotEmpty($output);
         // (int)'5.9' === 5 — queries team 5
@@ -95,6 +95,6 @@ class ScheduleEntryPointTest extends ModuleEntryPointTestCase
 
         $this->expectException(\RuntimeException::class);
         $this->expectExceptionMessage('Team not found: 99999');
-        $this->runModule('Schedule', ['teamID' => '99999']);
+        $this->runModule('Schedule', ['teamid' => '99999']);
     }
 }

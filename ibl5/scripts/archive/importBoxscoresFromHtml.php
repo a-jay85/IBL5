@@ -371,7 +371,7 @@ foreach ($games as $game) {
             attendance = ?, capacity = ?,
             visitorWins = ?, visitorLosses = ?,
             homeWins = ?, homeLosses = ?
-            WHERE Date = ? AND visitorTeamID = ? AND homeTeamID = ? AND gameOfThatDay = ?";
+            WHERE Date = ? AND visitor_teamid = ? AND home_teamid = ? AND gameOfThatDay = ?";
 
         $teamStmt = $mysqli_db->prepare($teamUpdateSql);
         if ($teamStmt === false) {
@@ -410,7 +410,7 @@ foreach ($games as $game) {
             attendance = ?, capacity = ?,
             visitorWins = ?, visitorLosses = ?,
             homeWins = ?, homeLosses = ?
-            WHERE Date = ? AND visitorTID = ? AND homeTID = ? AND gameOfThatDay = ?";
+            WHERE Date = ? AND visitor_teamid = ? AND home_teamid = ? AND gameOfThatDay = ?";
 
         $playerStmt = $mysqli_db->prepare($playerUpdateSql);
         if ($playerStmt === false) {
@@ -616,8 +616,8 @@ foreach ($games as $game) {
 echo "\n=== W-L CONSISTENCY CHECK ===\n";
 
 $wlWarnings = 0;
-foreach ($teamWLHistory as $tid => $history) {
-    $teamName = $idToTeamName[$tid] ?? "TID{$tid}";
+foreach ($teamWLHistory as $teamid => $history) {
+    $teamName = $idToTeamName[$teamid] ?? "TID{$teamid}";
 
     // Sort by date (already in order from schedule, but be safe)
     usort($history, static fn(array $a, array $b): int => strcmp($a['date'], $b['date']));

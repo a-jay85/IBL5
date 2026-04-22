@@ -23,7 +23,7 @@ test.describe('Olympics module coverage', () => {
 
   test('olympics team page loads with roster', async ({ appState, page }) => {
     await appState({ 'Trivia Mode': 'Off' });
-    await page.goto('modules.php?name=Team&op=team&teamID=1&league=olympics');
+    await page.goto('modules.php?name=Team&op=team&teamid=1&league=olympics');
     await assertNoPhpErrors(page, 'on Olympics Team page');
 
     // Team page should have a table (roster or stats)
@@ -49,7 +49,7 @@ test.describe('Olympics module coverage', () => {
     await appState({ 'Trivia Mode': 'Off' });
     const urls = [
       'modules.php?name=Standings&league=olympics',
-      'modules.php?name=Team&op=team&teamID=1&league=olympics',
+      'modules.php?name=Team&op=team&teamid=1&league=olympics',
       'modules.php?name=SeasonLeaderboards&league=olympics',
     ];
     for (const url of urls) {

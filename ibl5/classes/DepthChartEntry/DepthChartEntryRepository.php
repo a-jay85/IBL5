@@ -23,13 +23,13 @@ class DepthChartEntryRepository extends \BaseMysqliRepository implements DepthCh
      * @see DepthChartEntryRepositoryInterface::getPlayersOnTeam()
      * @return list<PlayerRow>
      */
-    public function getPlayersOnTeam(int $teamID): array
+    public function getPlayersOnTeam(int $teamid): array
     {
         /** @var list<PlayerRow> */
         return $this->fetchAll(
-            "SELECT * FROM ibl_plr WHERE tid = ? AND retired = 0 AND ordinal <= ? ORDER BY ordinal ASC",
+            "SELECT * FROM ibl_plr WHERE teamid = ? AND retired = 0 AND ordinal <= ? ORDER BY ordinal ASC",
             "ii",
-            $teamID,
+            $teamid,
             \JSB::WAIVERS_ORDINAL
         );
     }

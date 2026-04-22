@@ -87,10 +87,10 @@ if ($dryRun) {
 // Prepare the upsert statement (all columns except id and created_at)
 $sql = <<<'SQL'
 INSERT INTO ibl_plr_snapshots
-    (pid, name, season_year, snapshot_phase, source_archive, tid,
+    (pid, name, season_year, snapshot_phase, source_archive, teamid,
      age, pos, peak, htft, htin, wt,
      oo, od, r_drive_off, dd, po, pd, r_trans_off, td,
-     r_fga, r_fgp, r_fta, r_ftp, r_tga, r_tgp,
+     r_fga, r_fgp, r_fta, r_ftp, r_3ga, r_3gp,
      r_orb, r_drb, r_ast, r_stl, r_tvr, r_blk, r_foul,
      talent, skill, intangibles, clutch, consistency, exp, bird,
      cy, cyt, cy1, cy2, cy3, cy4, cy5, cy6,
@@ -105,7 +105,7 @@ VALUES (?, ?, ?, ?, ?, ?,
         ?, ?, ?, ?, ?)
 ON DUPLICATE KEY UPDATE
     source_archive = VALUES(source_archive),
-    tid = VALUES(tid),
+    teamid = VALUES(teamid),
     age = VALUES(age),
     pos = VALUES(pos),
     peak = VALUES(peak),
@@ -118,7 +118,7 @@ ON DUPLICATE KEY UPDATE
     r_trans_off = VALUES(r_trans_off), td = VALUES(td),
     r_fga = VALUES(r_fga), r_fgp = VALUES(r_fgp),
     r_fta = VALUES(r_fta), r_ftp = VALUES(r_ftp),
-    r_tga = VALUES(r_tga), r_tgp = VALUES(r_tgp),
+    r_3ga = VALUES(r_3ga), r_3gp = VALUES(r_3gp),
     r_orb = VALUES(r_orb), r_drb = VALUES(r_drb),
     r_ast = VALUES(r_ast), r_stl = VALUES(r_stl),
     r_tvr = VALUES(r_tvr), r_blk = VALUES(r_blk),
@@ -159,7 +159,7 @@ while (($line = fgets($handle)) !== false) {
     $seasonYear = (int) $fields[3];
     $snapshotPhase = $fields[4];
     $sourceArchive = $fields[5];
-    $tid = (int) $fields[6];
+    $teamid = (int) $fields[6];
     $age = (int) $fields[7];
     $pos = $fields[8];
     $peak = (int) $fields[9];
@@ -210,7 +210,7 @@ while (($line = fgets($handle)) !== false) {
 
     $stmt->bind_param(
         'isissiisiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiii',
-        $pid, $name, $seasonYear, $snapshotPhase, $sourceArchive, $tid,
+        $pid, $name, $seasonYear, $snapshotPhase, $sourceArchive, $teamid,
         $age, $pos, $peak, $htft, $htin, $wt,
         $oo, $od, $do_, $dd, $po, $pd, $to_, $td,
         $rFga, $rFgp, $rFta, $rFtp, $rTga, $rTgp,

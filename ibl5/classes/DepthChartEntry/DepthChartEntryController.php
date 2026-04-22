@@ -83,8 +83,8 @@ class DepthChartEntryController implements DepthChartEntryControllerInterface
         }
 
         $teamName = $this->getUserTeamName($username);
-        $teamID = $this->commonRepository->getTidFromTeamname($teamName) ?? 0;
-        $team = Team::initialize($this->db, $teamID);
+        $teamid = $this->commonRepository->getTidFromTeamname($teamName) ?? 0;
+        $team = Team::initialize($this->db, $teamid);
 
         \PageLayout\PageLayout::header();
 
@@ -94,17 +94,17 @@ class DepthChartEntryController implements DepthChartEntryControllerInterface
             echo '<div class="ibl-alert ibl-alert--error">' . $flashErrorsHtml . '</div>';
         }
 
-        $this->view->renderTeamLogo($teamID);
+        $this->view->renderTeamLogo($teamid);
 
         // Render saved depth chart dropdown
         $savedDcService = new SavedDepthChartService($this->db);
-        $dropdownOptions = $savedDcService->getDropdownOptions($teamID, $season);
-        $currentLiveLabel = $savedDcService->buildCurrentLiveLabel($teamID, $season);
+        $dropdownOptions = $savedDcService->getDropdownOptions($teamid, $season);
+        $currentLiveLabel = $savedDcService->buildCurrentLiveLabel($teamid, $season);
         $this->view->renderSavedDepthChartDropdown($dropdownOptions, $currentLiveLabel);
 
         $this->view->renderHelpSection();
 
-        $playersResult = $this->repository->getPlayersOnTeam($teamID);
+        $playersResult = $this->repository->getPlayersOnTeam($teamid);
 
         // Compute quality scores and apply any flash override so the form
         // re-renders with the user's last submitted values after a validation
@@ -130,7 +130,7 @@ class DepthChartEntryController implements DepthChartEntryControllerInterface
         $slotNames = \JSB::PLAYER_POSITIONS;
 
         $this->view->renderLineupPreview();
-        $this->view->renderFormHeader($teamName, $teamID, $slotNames);
+        $this->view->renderFormHeader($teamName, $teamid, $slotNames);
 
         $depthCount = 1;
         foreach ($playersWithQuality as $player) {
@@ -142,12 +142,12 @@ class DepthChartEntryController implements DepthChartEntryControllerInterface
         $this->view->renderMobileView($playersWithQuality, $slotNames);
 
         echo '<div class="table-scroll-wrapper"><div class="table-scroll-container" tabindex="0" role="region" aria-label="Player ratings">';
-        echo $this->getTableOutput($teamID, $display, $split);
+        echo $this->getTableOutput($teamid, $display, $split);
         echo '</div></div>';
 
         // Output JS configuration for saved depth charts
         $jsConfig = json_encode([
-            'teamId' => $teamID,
+            'teamId' => $teamid,
             'apiBaseUrl' => 'modules.php?name=DepthChartEntry&op=api',
             'currentRosterPids' => $currentRosterPids,
         ], JSON_THROW_ON_ERROR);
@@ -158,7 +158,7 @@ class DepthChartEntryController implements DepthChartEntryControllerInterface
         echo '<script src="jslib/depth-chart-mobile.js"></script>';
 
         // NextSim position tables section
-        $this->renderNextSimSection($teamID, $team, $season);
+        $this->renderNextSimSection($teamid, $team, $season);
 
         \PageLayout\PageLayout::footer();
     }
@@ -166,41 +166,41 @@ class DepthChartEntryController implements DepthChartEntryControllerInterface
     /**
      * @see DepthChartEntryControllerInterface::getTableOutput()
      */
-    public function getTableOutput(int $teamID, string $display, ?string $split = null): string
+    public function getTableOutput(int $teamid, string $display, ?string $split = null): string
     {
         $season = new Season($this->db);
-        $team = Team::initialize($this->db, $teamID);
+        $team = Team::initialize($this->db, $teamid);
 
         // Delegate roster + starters to TeamService (single source of truth)
-        $rosterData = $this->teamTableService->getRosterAndStarters($teamID);
+        $rosterData = $this->teamTableService->getRosterAndStarters($teamid);
 
         $groups = $this->teamTableService->buildDropdownGroups($season);
 
         $activeValue = ($display === 'split' && $split !== null) ? 'split:' . $split : $display;
         $baseUrl = 'modules.php?name=DepthChartEntry';
-        $apiUrl = 'modules.php?name=DepthChartEntry&op=tab-api&teamID=' . $teamID;
+        $apiUrl = 'modules.php?name=DepthChartEntry&op=tab-api&teamid=' . $teamid;
         $dropdown = new TableViewDropdown($groups, $activeValue, $baseUrl, $team->color1, $team->color2, $apiUrl);
         $tableHtml = $this->teamTableService->renderTableForDisplay($display, $rosterData['roster'], $team, null, $season, $rosterData['starterPids'], $split);
 
         return $dropdown->wrap($tableHtml);
     }
 
-    private function renderNextSimSection(int $teamID, Team $team, Season $season): void
+    private function renderNextSimSection(int $teamid, Team $team, Season $season): void
     {
         // Load power rankings for SOS tier indicators
         $standingsRepo = new StandingsRepository($this->db);
         $allStreakData = $standingsRepo->getAllStreakData();
         /** @var array<int, float> $teamPowerRankings */
         $teamPowerRankings = [];
-        foreach ($allStreakData as $tid => $data) {
-            $teamPowerRankings[$tid] = (float) $data['ranking'];
+        foreach ($allStreakData as $rankedTeamid => $data) {
+            $teamPowerRankings[$rankedTeamid] = (float) $data['ranking'];
         }
 
         $teamScheduleRepository = new TeamScheduleRepository($this->db);
         $nextSimService = new NextSimService($this->db, $teamScheduleRepository, $teamPowerRankings);
         $nextSimView = new NextSimView($season);
 
-        $games = $nextSimService->getNextSimGames($teamID, $season);
+        $games = $nextSimService->getNextSimGames($teamid, $season);
         $userStarters = $nextSimService->getUserStartingLineup($team);
 
         echo '<div class="next-sim-depth-chart-section">';
@@ -276,7 +276,7 @@ class DepthChartEntryController implements DepthChartEntryControllerInterface
         /** @var int $stl */
         $stl = $player['stats_stl'] ?? 0;
         /** @var int $tvr */
-        $tvr = $player['stats_to'] ?? 0;
+        $tvr = $player['stats_tvr'] ?? 0;
         /** @var int $blk */
         $blk = $player['stats_blk'] ?? 0;
 

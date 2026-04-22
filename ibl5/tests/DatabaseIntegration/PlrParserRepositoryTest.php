@@ -30,7 +30,7 @@ class PlrParserRepositoryTest extends DatabaseTestCase
 
         self::assertGreaterThanOrEqual(1, $affected);
 
-        $stmt = $this->db->prepare('SELECT name, age, pos, tid FROM ibl_plr WHERE pid = ?');
+        $stmt = $this->db->prepare('SELECT name, age, pos, teamid FROM ibl_plr WHERE pid = ?');
         self::assertNotFalse($stmt);
         $stmt->bind_param('i', $pid);
         $pid = 200130001;
@@ -42,7 +42,7 @@ class PlrParserRepositoryTest extends DatabaseTestCase
         self::assertSame('PLR Parse Plyr', $row['name']);
         self::assertSame(25, $row['age']);
         self::assertSame('PG', $row['pos']);
-        self::assertSame(1, $row['tid']);
+        self::assertSame(1, $row['teamid']);
     }
 
     public function testUpsertPlayerUpdatesOnDuplicateKey(): void
@@ -79,7 +79,7 @@ class PlrParserRepositoryTest extends DatabaseTestCase
     {
         $defaults = [
             'ordinal' => 1, 'name' => $name, 'age' => 25, 'pid' => $pid,
-            'tid' => 1, 'peak' => 27, 'pos' => 'PG',
+            'teamid' => 1, 'peak' => 27, 'pos' => 'PG',
             'ratingOO' => 50, 'ratingOD' => 50, 'ratingDO' => 50, 'ratingDD' => 50,
             'ratingPO' => 50, 'ratingPD' => 50, 'ratingTO' => 50, 'ratingTD' => 50,
             'clutch' => 50, 'consistency' => 50,

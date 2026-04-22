@@ -134,7 +134,7 @@ class FreeAgencyOfferValidator implements FreeAgencyOfferValidatorInterface
         // Rule 2: Team already has a pending MLE offer to another player
         if (
             $this->repository !== null
-            && $this->repository->hasPendingMleOffer($this->team->teamID, $this->playerId)
+            && $this->repository->hasPendingMleOffer($this->team->teamid, $this->playerId)
         ) {
             return [
                 'valid' => false,
@@ -173,7 +173,7 @@ class FreeAgencyOfferValidator implements FreeAgencyOfferValidatorInterface
         // Rule 2: Team already has a pending LLE offer to another player
         if (
             $this->repository !== null
-            && $this->repository->hasPendingLleOffer($this->team->teamID, $this->playerId)
+            && $this->repository->hasPendingLleOffer($this->team->teamid, $this->playerId)
         ) {
             return [
                 'valid' => false,

@@ -32,7 +32,7 @@ class ProjectedDraftOrderRepositoryTest extends TestCase
     {
         $this->db->setMockData([
             [
-                'tid' => 1, 'team_name' => 'Heat', 'wins' => 50, 'losses' => 32,
+                'teamid' => 1, 'team_name' => 'Heat', 'wins' => 50, 'losses' => 32,
                 'pct' => 0.610, 'conference' => 'Eastern', 'division' => 'Atlantic',
                 'confWins' => 30, 'confLosses' => 12, 'divWins' => 10, 'divLosses' => 4,
                 'clinchedDivision' => 1, 'color1' => '98002E', 'color2' => 'F9A01B',
@@ -84,14 +84,14 @@ class ProjectedDraftOrderRepositoryTest extends TestCase
     public function testGetPointDifferentialsReturnsArray(): void
     {
         $this->db->setMockData([
-            ['tid' => 1, 'pointsFor' => 8500.0, 'pointsAgainst' => 8200.0],
+            ['teamid' => 1, 'pointsFor' => 8500.0, 'pointsAgainst' => 8200.0],
         ]);
 
         $result = $this->repository->getPointDifferentials(2026);
 
         $this->assertIsArray($result);
         $this->assertCount(1, $result);
-        $this->assertSame(1, $result[0]['tid']);
+        $this->assertSame(1, $result[0]['teamid']);
     }
 
     public function testExtendsBaseMysqliRepository(): void

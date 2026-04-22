@@ -114,7 +114,7 @@ class FreeAgencyServiceTest extends TestCase
 
         $team = $this->createStub(Team::class);
         $team->name = 'Test Team';
-        $team->teamID = 1;
+        $team->teamid = 1;
 
         $season = $this->createStub(\Season\Season::class);
 
@@ -138,7 +138,7 @@ class FreeAgencyServiceTest extends TestCase
 
         $team = $this->createStub(Team::class);
         $team->name = 'Test Team';
-        $team->teamID = 1;
+        $team->teamid = 1;
 
         $season = $this->createStub(\Season\Season::class);
 
@@ -155,7 +155,7 @@ class FreeAgencyServiceTest extends TestCase
 
         $team = $this->createStub(Team::class);
         $team->name = 'Test Team';
-        $team->teamID = 1;
+        $team->teamid = 1;
 
         $season = $this->createStub(\Season\Season::class);
 
@@ -184,7 +184,7 @@ class FreeAgencyServiceTest extends TestCase
 
         $team = $this->createStub(Team::class);
         $team->name = 'Test Team';
-        $team->teamID = 1;
+        $team->teamid = 1;
 
         $season = $this->createStub(\Season\Season::class);
 
@@ -213,7 +213,7 @@ class FreeAgencyServiceTest extends TestCase
 
         $team = $this->createStub(Team::class);
         $team->name = 'Test Team';
-        $team->teamID = 1;
+        $team->teamid = 1;
 
         $season = $this->createStub(\Season\Season::class);
 
@@ -239,7 +239,7 @@ class FreeAgencyServiceTest extends TestCase
 
         $team = $this->createStub(Team::class);
         $team->name = 'Test Team';
-        $team->teamID = 1;
+        $team->teamid = 1;
 
         $season = $this->createStub(\Season\Season::class);
 
@@ -275,7 +275,7 @@ class FreeAgencyServiceTest extends TestCase
 
         $team = $this->createStub(Team::class);
         $team->name = 'Test Team';
-        $team->teamID = 1;
+        $team->teamid = 1;
 
         $season = $this->createStub(\Season\Season::class);
 
@@ -304,7 +304,7 @@ class FreeAgencyServiceTest extends TestCase
             'lastname' => 'Player',
             'nickname' => '',
             'teamname' => 'Test Team',
-            'tid' => 1,
+            'teamid' => 1,
             'pos' => 'G',
             'position' => 'G',
             'age' => 25,
@@ -343,8 +343,8 @@ class FreeAgencyServiceTest extends TestCase
             'r_fgp' => 50,
             'r_fta' => 50,
             'r_ftp' => 50,
-            'r_tga' => 50,
-            'r_tgp' => 50,
+            'r_3ga' => 50,
+            'r_3gp' => 50,
             'r_orb' => 50,
             'r_drb' => 50,
             'r_ast' => 50,

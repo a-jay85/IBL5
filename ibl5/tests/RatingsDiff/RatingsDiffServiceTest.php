@@ -39,7 +39,7 @@ class RatingsDiffServiceTest extends TestCase
         int $pid = 1,
         string $name = 'Test Player',
         string $pos = 'PG',
-        int $tid = 5,
+        int $teamid = 5,
         ?string $teamName = 'Metro Squad',
         bool $isNew = false,
         array $overrides = [],
@@ -48,7 +48,7 @@ class RatingsDiffServiceTest extends TestCase
             'pid'       => $pid,
             'name'      => $name,
             'pos'       => $pos,
-            'tid'       => $tid,
+            'teamid'       => $teamid,
             'team_name' => $teamName,
         ];
 

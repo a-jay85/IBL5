@@ -115,7 +115,7 @@ class PlayerOverviewView implements PlayerOverviewViewInterface
     </tr>
         <?php
         foreach ($boxScores as $row) {
-            /** @var array{Date: string, homeTID: int, visitorTID: int, gameOfThatDay: int, BoxID: int, gameMIN: int, game2GM: int, game2GA: int, game3GM: int, game3GA: int, gameFTM: int, gameFTA: int, gameORB: int, gameDRB: int, gameAST: int, gameSTL: int, gameTOV: int, gameBLK: int, gamePF: int} $row */
+            /** @var array{Date: string, home_teamid: int, visitor_teamid: int, gameOfThatDay: int, BoxID: int, gameMIN: int, game2GM: int, game2GA: int, game3GM: int, game3GA: int, gameFTM: int, gameFTA: int, gameORB: int, gameDRB: int, gameAST: int, gameSTL: int, gameTOV: int, gameBLK: int, gamePF: int} $row */
             $fgm = $row['game2GM'] + $row['game3GM'];
             $fga = $row['game2GA'] + $row['game3GA'];
             $pts = (2 * $row['game2GM']) + (3 * $row['game3GM']) + $row['gameFTM'];
@@ -125,8 +125,8 @@ class PlayerOverviewView implements PlayerOverviewViewInterface
             $ftPct = StatsFormatter::formatPercentage($row['gameFTM'], $row['gameFTA']);
             $tgPct = StatsFormatter::formatPercentage($row['game3GM'], $row['game3GA']);
 
-            $awayTeam = $this->commonRepository->getTeamnameFromTeamID($row['homeTID']);
-            $homeTeam = $this->commonRepository->getTeamnameFromTeamID($row['visitorTID']);
+            $awayTeam = $this->commonRepository->getTeamnameFromTeamID($row['home_teamid']);
+            $homeTeam = $this->commonRepository->getTeamnameFromTeamID($row['visitor_teamid']);
             $safeDate = HtmlSanitizer::safeHtmlOutput($row['Date']);
             $boxScoreUrl = \Utilities\BoxScoreUrlBuilder::buildUrl($row['Date'], (int) ($row['gameOfThatDay'] ?? 0), (int) ($row['BoxID'] ?? 0));
             $safeBoxScoreUrl = HtmlSanitizer::safeHtmlOutput($boxScoreUrl);

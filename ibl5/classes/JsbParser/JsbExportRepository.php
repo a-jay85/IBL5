@@ -20,7 +20,7 @@ class JsbExportRepository extends \BaseMysqliRepository implements JsbExportRepo
     public function getAllPlayerChangeableFields(): array
     {
         $rows = $this->fetchAll(
-            'SELECT pid, name, tid,
+            'SELECT pid, name, teamid,
                     COALESCE(bird, 0) AS bird,
                     COALESCE(cy, 0) AS cy,
                     COALESCE(cyt, 0) AS cyt,
@@ -42,7 +42,7 @@ class JsbExportRepository extends \BaseMysqliRepository implements JsbExportRepo
             $result[$pid] = [
                 'pid' => $pid,
                 'name' => is_string($row['name']) ? $row['name'] : '',
-                'tid' => is_int($row['tid']) ? $row['tid'] : 0,
+                'teamid' => is_int($row['teamid']) ? $row['teamid'] : 0,
                 'bird' => is_int($row['bird']) ? $row['bird'] : 0,
                 'cy' => is_int($row['cy']) ? $row['cy'] : 0,
                 'cyt' => is_int($row['cyt']) ? $row['cyt'] : 0,

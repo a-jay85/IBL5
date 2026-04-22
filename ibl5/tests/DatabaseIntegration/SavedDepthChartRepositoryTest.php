@@ -58,7 +58,7 @@ class SavedDepthChartRepositoryTest extends DatabaseTestCase
 
         self::assertNotNull($chart);
         self::assertSame('Test DC', $chart['name']);
-        self::assertSame(1, $chart['tid']);
+        self::assertSame(1, $chart['teamid']);
         self::assertSame('testgm', $chart['username']);
     }
 
@@ -262,7 +262,7 @@ class SavedDepthChartRepositoryTest extends DatabaseTestCase
 
     public function testGetLiveRosterSettingsReturnsPlayersForTeam(): void
     {
-        $this->insertTestPlayer(200100020, 'Live Roster P1', ['tid' => 1, 'retired' => 0, 'ordinal' => 100]);
+        $this->insertTestPlayer(200100020, 'Live Roster P1', ['teamid' => 1, 'retired' => 0, 'ordinal' => 100]);
 
         $result = $this->repo->getLiveRosterSettings(1);
 

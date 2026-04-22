@@ -105,18 +105,18 @@ class BoxscoreRepository extends \BaseMysqliRepository implements BoxscoreReposi
     /**
      * @see BoxscoreRepositoryInterface::findTeamBoxscore()
      */
-    public function findTeamBoxscore(string $date, int $visitorTeamID, int $homeTeamID, int $gameOfThatDay): ?array
+    public function findTeamBoxscore(string $date, int $visitor_teamid, int $home_teamid, int $gameOfThatDay): ?array
     {
         return $this->fetchOne(
             "SELECT visitorQ1points, visitorQ2points, visitorQ3points, visitorQ4points, visitorOTpoints,
                     homeQ1points, homeQ2points, homeQ3points, homeQ4points, homeOTpoints
              FROM {$this->teamTable}
-             WHERE Date = ? AND visitorTeamID = ? AND homeTeamID = ? AND gameOfThatDay = ?
+             WHERE Date = ? AND visitor_teamid = ? AND home_teamid = ? AND gameOfThatDay = ?
              LIMIT 1",
             "siii",
             $date,
-            $visitorTeamID,
-            $homeTeamID,
+            $visitor_teamid,
+            $home_teamid,
             $gameOfThatDay
         );
     }
@@ -124,15 +124,15 @@ class BoxscoreRepository extends \BaseMysqliRepository implements BoxscoreReposi
     /**
      * @see BoxscoreRepositoryInterface::deleteTeamBoxscoresByGame()
      */
-    public function deleteTeamBoxscoresByGame(string $date, int $visitorTeamID, int $homeTeamID, int $gameOfThatDay): int
+    public function deleteTeamBoxscoresByGame(string $date, int $visitor_teamid, int $home_teamid, int $gameOfThatDay): int
     {
         return $this->execute(
             "DELETE FROM {$this->teamTable}
-             WHERE Date = ? AND visitorTeamID = ? AND homeTeamID = ? AND gameOfThatDay = ?",
+             WHERE Date = ? AND visitor_teamid = ? AND home_teamid = ? AND gameOfThatDay = ?",
             "siii",
             $date,
-            $visitorTeamID,
-            $homeTeamID,
+            $visitor_teamid,
+            $home_teamid,
             $gameOfThatDay
         );
     }
@@ -140,32 +140,32 @@ class BoxscoreRepository extends \BaseMysqliRepository implements BoxscoreReposi
     /**
      * @see BoxscoreRepositoryInterface::deletePlayerBoxscoresByGame()
      */
-    public function deletePlayerBoxscoresByGame(string $date, int $visitorTID, int $homeTID): int
+    public function deletePlayerBoxscoresByGame(string $date, int $visitor_teamid, int $home_teamid): int
     {
         return $this->execute(
             "DELETE FROM {$this->playerTable}
-             WHERE Date = ? AND visitorTID = ? AND homeTID = ?",
+             WHERE Date = ? AND visitor_teamid = ? AND home_teamid = ?",
             "sii",
             $date,
-            $visitorTID,
-            $homeTID
+            $visitor_teamid,
+            $home_teamid
         );
     }
 
     /**
      * @see BoxscoreRepositoryInterface::hasNullTeamIdPlayerBoxscores()
      */
-    public function hasNullTeamIdPlayerBoxscores(string $date, int $visitorTID, int $homeTID): bool
+    public function hasNullTeamIdPlayerBoxscores(string $date, int $visitor_teamid, int $home_teamid): bool
     {
         /** @var array{cnt: int}|null $row */
         $row = $this->fetchOne(
             "SELECT COUNT(*) AS cnt FROM {$this->playerTable}
-             WHERE Date = ? AND visitorTID = ? AND homeTID = ? AND pid <> 0 AND teamID IS NULL
+             WHERE Date = ? AND visitor_teamid = ? AND home_teamid = ? AND pid <> 0 AND teamid IS NULL
              LIMIT 1",
             "sii",
             $date,
-            $visitorTID,
-            $homeTID
+            $visitor_teamid,
+            $home_teamid
         );
 
         return $row !== null && $row['cnt'] > 0;
@@ -179,7 +179,7 @@ class BoxscoreRepository extends \BaseMysqliRepository implements BoxscoreReposi
         /** @var list<array{name: string}> $rows */
         $rows = $this->fetchAll(
             "SELECT name FROM {$this->teamTable}
-             WHERE Date = ? AND visitorTeamID = " . League::ALL_STAR_AWAY_TEAMID . " AND homeTeamID = " . League::ALL_STAR_HOME_TEAMID . "
+             WHERE Date = ? AND visitor_teamid = " . League::ALL_STAR_AWAY_TEAMID . " AND home_teamid = " . League::ALL_STAR_HOME_TEAMID . "
              ORDER BY id ASC
              LIMIT 2",
             "s",
@@ -201,12 +201,12 @@ class BoxscoreRepository extends \BaseMysqliRepository implements BoxscoreReposi
      */
     public function findAllStarGamesWithDefaultNames(): array
     {
-        /** @var list<array{id: int, Date: string, name: string, visitorTeamID: int, homeTeamID: int}> $rows */
+        /** @var list<array{id: int, Date: string, name: string, visitor_teamid: int, home_teamid: int}> $rows */
         $rows = $this->fetchAll(
-            "SELECT id, Date, name, visitorTeamID, homeTeamID
+            "SELECT id, Date, name, visitor_teamid, home_teamid
              FROM {$this->teamTable}
              WHERE name IN ('Team Away', 'Team Home')
-               AND visitorTeamID = " . League::ALL_STAR_AWAY_TEAMID . " AND homeTeamID = " . League::ALL_STAR_HOME_TEAMID . "
+               AND visitor_teamid = " . League::ALL_STAR_AWAY_TEAMID . " AND home_teamid = " . League::ALL_STAR_HOME_TEAMID . "
              ORDER BY Date ASC, id ASC",
             ""
         );
@@ -217,18 +217,18 @@ class BoxscoreRepository extends \BaseMysqliRepository implements BoxscoreReposi
     /**
      * @see BoxscoreRepositoryInterface::getPlayersForAllStarTeam()
      */
-    public function getPlayersForAllStarTeam(string $date, int $teamID): array
+    public function getPlayersForAllStarTeam(string $date, int $teamid): array
     {
         /** @var list<array{name: string}> $rows */
         $rows = $this->fetchAll(
             "SELECT COALESCE(p.name, bs.name) AS name
              FROM {$this->playerTable} bs
              LEFT JOIN ibl_plr p ON bs.pid = p.pid
-             WHERE bs.Date = ? AND bs.visitorTID = " . League::ALL_STAR_AWAY_TEAMID . " AND bs.homeTID = " . League::ALL_STAR_HOME_TEAMID . " AND bs.teamID = ?
+             WHERE bs.Date = ? AND bs.visitor_teamid = " . League::ALL_STAR_AWAY_TEAMID . " AND bs.home_teamid = " . League::ALL_STAR_HOME_TEAMID . " AND bs.teamid = ?
              ORDER BY bs.id ASC",
             "si",
             $date,
-            $teamID
+            $teamid
         );
 
         $names = [];
@@ -259,8 +259,8 @@ class BoxscoreRepository extends \BaseMysqliRepository implements BoxscoreReposi
         string $date,
         string $name,
         int $gameOfThatDay,
-        int $visitorTeamID,
-        int $homeTeamID,
+        int $visitor_teamid,
+        int $home_teamid,
         int $attendance,
         int $capacity,
         int $visitorWins,
@@ -297,8 +297,8 @@ class BoxscoreRepository extends \BaseMysqliRepository implements BoxscoreReposi
             $date,
             $name,
             $gameOfThatDay,
-            $visitorTeamID,
-            $homeTeamID,
+            $visitor_teamid,
+            $home_teamid,
             $attendance,
             $capacity,
             $visitorWins,
@@ -340,8 +340,8 @@ class BoxscoreRepository extends \BaseMysqliRepository implements BoxscoreReposi
         string $name,
         string $position,
         int $playerID,
-        int $visitorTeamID,
-        int $homeTeamID,
+        int $visitor_teamid,
+        int $home_teamid,
         int $gameOfThatDay,
         int $attendance,
         int $capacity,
@@ -349,7 +349,7 @@ class BoxscoreRepository extends \BaseMysqliRepository implements BoxscoreReposi
         int $visitorLosses,
         int $homeWins,
         int $homeLosses,
-        int $teamID,
+        int $teamid,
         int $minutesPlayed,
         int $fieldGoalsMade,
         int $fieldGoalsAttempted,
@@ -373,8 +373,8 @@ class BoxscoreRepository extends \BaseMysqliRepository implements BoxscoreReposi
             $name,
             $position,
             $playerID,
-            $visitorTeamID,
-            $homeTeamID,
+            $visitor_teamid,
+            $home_teamid,
             $gameOfThatDay,
             $attendance,
             $capacity,
@@ -382,7 +382,7 @@ class BoxscoreRepository extends \BaseMysqliRepository implements BoxscoreReposi
             $visitorLosses,
             $homeWins,
             $homeLosses,
-            $teamID,
+            $teamid,
             $minutesPlayed,
             $fieldGoalsMade,
             $fieldGoalsAttempted,

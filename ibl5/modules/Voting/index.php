@@ -34,7 +34,7 @@ function userinfo(string $username): void
     $league = new \League\League($mysqli_db);
 
     $voterTeamName = $commonRepository->getTeamnameFromUsername($username) ?? '';
-    $tid = $commonRepository->getTidFromTeamname($voterTeamName) ?? 0;
+    $teamid = $commonRepository->getTidFromTeamname($voterTeamName) ?? 0;
 
     $formAction = ($season->phase === 'Regular Season')
         ? 'modules/Voting/ASGVote.php'
@@ -47,7 +47,7 @@ function userinfo(string $username): void
     $categories = $service->getBallotData($voterTeamName, $season, $league);
 
     PageLayout\PageLayout::header();
-    echo $view->renderBallotForm($formAction, $voterTeamName, $tid, $season->phase, $categories);
+    echo $view->renderBallotForm($formAction, $voterTeamName, $teamid, $season->phase, $categories);
     PageLayout\PageLayout::footer();
 }
 

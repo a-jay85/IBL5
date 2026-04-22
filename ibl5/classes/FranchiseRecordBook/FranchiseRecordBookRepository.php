@@ -26,7 +26,7 @@ class FranchiseRecordBookRepository extends \BaseMysqliRepository implements Fra
     {
         /** @var list<AlltimeRecord> $rows */
         $rows = $this->fetchAll(
-            "SELECT r.id, r.scope, r.team_id, r.record_type, r.stat_category, r.ranking,
+            "SELECT r.id, r.scope, r.teamid, r.record_type, r.stat_category, r.ranking,
                     r.player_name, r.car_block_id,
                     COALESCE(r.pid, plr.pid) AS pid,
                     r.stat_value, r.stat_raw,
@@ -36,7 +36,7 @@ class FranchiseRecordBookRepository extends \BaseMysqliRepository implements Fra
                SELECT REPLACE(name, '''', '') AS clean_name, MAX(pid) AS pid
                FROM ibl_plr GROUP BY clean_name
              ) plr ON plr.clean_name = r.player_name
-             WHERE r.scope = 'team' AND r.team_id = ? AND r.record_type = 'single_season'
+             WHERE r.scope = 'team' AND r.teamid = ? AND r.record_type = 'single_season'
                AND r.ranking <= ?
              ORDER BY r.stat_category, r.ranking",
             'ii',
@@ -56,7 +56,7 @@ class FranchiseRecordBookRepository extends \BaseMysqliRepository implements Fra
     {
         /** @var list<AlltimeRecord> $rows */
         $rows = $this->fetchAll(
-            "SELECT r.id, r.scope, r.team_id, r.record_type, r.stat_category, r.ranking,
+            "SELECT r.id, r.scope, r.teamid, r.record_type, r.stat_category, r.ranking,
                     r.player_name, r.car_block_id,
                     COALESCE(r.pid, plr.pid) AS pid,
                     r.stat_value, r.stat_raw,
@@ -85,7 +85,7 @@ class FranchiseRecordBookRepository extends \BaseMysqliRepository implements Fra
     {
         /** @var list<AlltimeRecord> $rows */
         $rows = $this->fetchAll(
-            "SELECT r.id, r.scope, r.team_id, r.record_type, r.stat_category, r.ranking,
+            "SELECT r.id, r.scope, r.teamid, r.record_type, r.stat_category, r.ranking,
                     r.player_name, r.car_block_id,
                     COALESCE(r.pid, plr.pid) AS pid,
                     r.stat_value, r.stat_raw,

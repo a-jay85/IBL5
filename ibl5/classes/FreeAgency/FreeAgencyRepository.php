@@ -38,15 +38,15 @@ class FreeAgencyRepository extends BaseMysqliRepository implements FreeAgencyRep
      *
      * @return OfferRow|null
      */
-    public function getExistingOffer(int $tid, int $pid): ?array
+    public function getExistingOffer(int $teamid, int $pid): ?array
     {
         /** @var OfferRow|null $result */
         $result = $this->fetchOne(
             "SELECT offer1, offer2, offer3, offer4, offer5, offer6
              FROM ibl_fa_offers
-             WHERE tid = ? AND pid = ?",
+             WHERE teamid = ? AND pid = ?",
             "ii",
-            $tid,
+            $teamid,
             $pid
         );
 
@@ -56,13 +56,13 @@ class FreeAgencyRepository extends BaseMysqliRepository implements FreeAgencyRep
     /**
      * @see FreeAgencyRepositoryInterface::deleteOffer()
      */
-    public function deleteOffer(int $tid, int $pid): int
+    public function deleteOffer(int $teamid, int $pid): int
     {
         return $this->execute(
-            "DELETE FROM ibl_fa_offers WHERE pid = ? AND tid = ? LIMIT 1",
+            "DELETE FROM ibl_fa_offers WHERE pid = ? AND teamid = ? LIMIT 1",
             "ii",
             $pid,
-            $tid
+            $teamid
         );
     }
 
@@ -74,18 +74,18 @@ class FreeAgencyRepository extends BaseMysqliRepository implements FreeAgencyRep
     public function saveOffer(array $offerData): bool
     {
         return $this->transactional(function () use ($offerData): bool {
-            $this->deleteOffer($offerData['tid'], $offerData['pid']);
+            $this->deleteOffer($offerData['teamid'], $offerData['pid']);
 
             $affected = $this->execute(
                 "INSERT INTO ibl_fa_offers
-                 (name, pid, team, tid, offer1, offer2, offer3, offer4, offer5, offer6,
+                 (name, pid, team, teamid, offer1, offer2, offer3, offer4, offer5, offer6,
                   modifier, random, perceivedvalue, mle, lle, offer_type)
                  VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
                 "sisiiiiiiidddiii",
                 $offerData['playerName'],
                 $offerData['pid'],
                 $offerData['teamName'],
-                $offerData['tid'],
+                $offerData['teamid'],
                 $offerData['offer1'],
                 $offerData['offer2'],
                 $offerData['offer3'],
@@ -115,8 +115,8 @@ class FreeAgencyRepository extends BaseMysqliRepository implements FreeAgencyRep
         return $this->fetchAll(
             "SELECT p.*, t.team_name AS teamname, t.color1, t.color2
             FROM ibl_plr p
-            LEFT JOIN ibl_team_info t ON p.tid = t.teamid
-            WHERE p.tid <> ? AND p.retired = 0
+            LEFT JOIN ibl_team_info t ON p.teamid = t.teamid
+            WHERE p.teamid <> ? AND p.retired = 0
             ORDER BY p.ordinal ASC",
             "i",
             $teamId
@@ -148,15 +148,15 @@ class FreeAgencyRepository extends BaseMysqliRepository implements FreeAgencyRep
     /**
      * @see FreeAgencyRepositoryInterface::hasPendingMleOffer()
      */
-    public function hasPendingMleOffer(int $tid, int $excludePid): bool
+    public function hasPendingMleOffer(int $teamid, int $excludePid): bool
     {
         /** @var array{pid: int}|null $row */
         $row = $this->fetchOne(
             "SELECT pid FROM ibl_fa_offers
-             WHERE tid = ? AND MLE = 1 AND pid <> ?
+             WHERE teamid = ? AND MLE = 1 AND pid <> ?
              LIMIT 1",
             "ii",
-            $tid,
+            $teamid,
             $excludePid
         );
 
@@ -166,15 +166,15 @@ class FreeAgencyRepository extends BaseMysqliRepository implements FreeAgencyRep
     /**
      * @see FreeAgencyRepositoryInterface::hasPendingLleOffer()
      */
-    public function hasPendingLleOffer(int $tid, int $excludePid): bool
+    public function hasPendingLleOffer(int $teamid, int $excludePid): bool
     {
         /** @var array{pid: int}|null $row */
         $row = $this->fetchOne(
             "SELECT pid FROM ibl_fa_offers
-             WHERE tid = ? AND LLE = 1 AND pid <> ?
+             WHERE teamid = ? AND LLE = 1 AND pid <> ?
              LIMIT 1",
             "ii",
-            $tid,
+            $teamid,
             $excludePid
         );
 

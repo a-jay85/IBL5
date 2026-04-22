@@ -53,7 +53,7 @@ class WaiversRepositoryTest extends DatabaseTestCase
         // First drop player 2 (free agent) to waivers
         $this->repo->dropPlayerToWaivers(2, 1700000000);
 
-        // Now sign player 2 to Sharks (tid=2)
+        // Now sign player 2 to Sharks (teamid=2)
         $result = $this->repo->signPlayerFromWaivers(
             2,
             ['team_name' => 'Sharks', 'teamid' => 2],
@@ -63,7 +63,7 @@ class WaiversRepositoryTest extends DatabaseTestCase
         self::assertTrue($result);
 
         // Verify DB state
-        $stmt = $this->db->prepare("SELECT tid, ordinal, droptime, cy1, cyt FROM ibl_plr WHERE pid = ?");
+        $stmt = $this->db->prepare("SELECT teamid, ordinal, droptime, cy1, cyt FROM ibl_plr WHERE pid = ?");
         self::assertNotFalse($stmt);
         $pid = 2;
         $stmt->bind_param('i', $pid);
@@ -72,7 +72,7 @@ class WaiversRepositoryTest extends DatabaseTestCase
         $stmt->close();
 
         self::assertNotNull($row);
-        self::assertSame(2, $row['tid']);
+        self::assertSame(2, $row['teamid']);
         self::assertSame(800, $row['ordinal']);
         self::assertSame(0, $row['droptime']);
         self::assertSame(500, $row['cy1']);
@@ -106,7 +106,7 @@ class WaiversRepositoryTest extends DatabaseTestCase
 
         // Verify DB state: contract fields preserved, roster fields updated
         $stmt = $this->db->prepare(
-            "SELECT tid, ordinal, droptime, bird, cy, cyt, cy1, cy2, cy3 FROM ibl_plr WHERE pid = ?"
+            "SELECT teamid, ordinal, droptime, bird, cy, cyt, cy1, cy2, cy3 FROM ibl_plr WHERE pid = ?"
         );
         self::assertNotFalse($stmt);
         $stmt->bind_param('i', $pid);
@@ -116,7 +116,7 @@ class WaiversRepositoryTest extends DatabaseTestCase
 
         self::assertNotNull($row);
         // Roster fields updated
-        self::assertSame(2, $row['tid']);
+        self::assertSame(2, $row['teamid']);
         self::assertSame(800, $row['ordinal']);
         self::assertSame(0, $row['droptime']);
         self::assertSame(0, $row['bird']);

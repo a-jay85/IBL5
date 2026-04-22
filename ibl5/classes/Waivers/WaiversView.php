@@ -18,7 +18,7 @@ class WaiversView implements WaiversViewInterface
      */
     public function renderWaiverForm(
         string $teamName,
-        int $teamID,
+        int $teamid,
         string $action,
         array $players,
         int $openRosterSpots,
@@ -40,7 +40,7 @@ class WaiversView implements WaiversViewInterface
             <?= \Utilities\CsrfGuard::generateToken('waivers') ?>
             <input type="hidden" name="Team_Name" value="<?= $teamNameEscaped ?>">
             <div class="text-center">
-                <img src="images/logo/<?= $teamID ?>.jpg" alt="Team Logo" class="team-logo-banner">
+                <img src="images/logo/<?= $teamid ?>.jpg" alt="Team Logo" class="team-logo-banner">
                 <div class="ibl-card">
                     <div class="ibl-card__header">
                         <h2 class="ibl-card__title"><?= $openRosterSpots ?> OPEN SPOTS / <?= $healthyOpenRosterSpots ?> HEALTHY SPOTS</h2>

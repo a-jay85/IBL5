@@ -63,11 +63,11 @@ class PlayerStatsRepository extends BaseMysqliRepository implements PlayerStatsR
                     COALESCE(sch.BoxID, 0) AS BoxID
              FROM ibl_box_scores bs
              LEFT JOIN (
-                 SELECT Date, visitorTeamID, homeTeamID, MIN(gameOfThatDay) AS gameOfThatDay
+                 SELECT Date, visitor_teamid, home_teamid, MIN(gameOfThatDay) AS gameOfThatDay
                  FROM ibl_box_scores_teams
-                 GROUP BY Date, visitorTeamID, homeTeamID
-             ) bst ON bst.Date = bs.Date AND bst.visitorTeamID = bs.visitorTID AND bst.homeTeamID = bs.homeTID
-             LEFT JOIN ibl_schedule sch ON sch.Date = bs.Date AND sch.Visitor = bs.visitorTID AND sch.Home = bs.homeTID
+                 GROUP BY Date, visitor_teamid, home_teamid
+             ) bst ON bst.Date = bs.Date AND bst.visitor_teamid = bs.visitor_teamid AND bst.home_teamid = bs.home_teamid
+             LEFT JOIN ibl_schedule sch ON sch.Date = bs.Date AND sch.Visitor = bs.visitor_teamid AND sch.Home = bs.home_teamid
              WHERE bs.pid = ? AND bs.Date BETWEEN ? AND ?
              ORDER BY bs.Date ASC",
             "iss",
@@ -356,7 +356,7 @@ class PlayerStatsRepository extends BaseMysqliRepository implements PlayerStatsR
             CAST(SUM(bs.calc_points) AS SIGNED) AS pts
         FROM ibl_box_scores bs
         JOIN ibl_plr p ON bs.pid = p.pid
-        JOIN ibl_franchise_seasons fs ON bs.teamID = fs.franchise_id
+        JOIN ibl_franchise_seasons fs ON bs.teamid = fs.franchise_id
             AND bs.season_year = fs.season_ending_year
         WHERE bs.game_type = {$gameType} AND p.name = ?
         GROUP BY bs.pid, p.name, bs.season_year, fs.team_name

@@ -24,7 +24,7 @@ interface RookieOptionControllerInterface
      * @param string $teamName Team name exercising the option
      * @param int $playerID Player ID of the rookie
      * @param int $extensionAmount Rookie option salary amount in thousands
-     * @return array{success: bool, type: string, message: string, playerID: int, teamID?: int, emailSuccess?: bool}
+     * @return array{success: bool, type: string, message: string, playerID: int, teamid?: int, emailSuccess?: bool}
      *
      * **Validation:**
      * - Player must pass canRookieOption() check
@@ -40,7 +40,7 @@ interface RookieOptionControllerInterface
      * 7. Return result array for PRG redirect
      *
      * **Return Values:**
-     * - success=true: Option exercised, includes teamID and emailSuccess
+     * - success=true: Option exercised, includes teamid and emailSuccess
      * - success=false: Validation or database error, includes error message
      */
     public function processRookieOption(string $teamName, int $playerID, int $extensionAmount): array;

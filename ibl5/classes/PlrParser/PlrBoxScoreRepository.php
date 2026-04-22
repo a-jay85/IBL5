@@ -244,7 +244,7 @@ class PlrBoxScoreRepository extends \BaseMysqliRepository implements PlrBoxScore
      * ibl_box_scores_teams stores two rows per game: visitor stats (lower id),
      * home stats (higher id). ROW_NUMBER deduplicates so each team's own stats
      * are counted exactly once. The `name` column is unreliable — team identity
-     * comes from visitorTeamID/homeTeamID cross-referenced with row order.
+     * comes from visitor_teamid/home_teamid cross-referenced with row order.
      *
      * @return array<int, array{gp: int, gpAlt: int, twoGM: int, twoGA: int, ftm: int, fta: int, threeGM: int, threeGA: int, orb: int, drb: int, ast: int, stl: int, tov: int, blk: int, pf: int}>
      */
@@ -254,7 +254,7 @@ class PlrBoxScoreRepository extends \BaseMysqliRepository implements PlrBoxScore
             WITH ranked AS (
                 SELECT *,
                     ROW_NUMBER() OVER (
-                        PARTITION BY Date, gameOfThatDay, visitorTeamID, homeTeamID
+                        PARTITION BY Date, gameOfThatDay, visitor_teamid, home_teamid
                         ORDER BY id
                     ) AS rn
                 FROM {$this->boxScoresTeamsTable}
@@ -280,12 +280,12 @@ class PlrBoxScoreRepository extends \BaseMysqliRepository implements PlrBoxScore
                 SUM(gameBLK) AS blk,
                 SUM(gamePF) AS pf
             FROM (
-                SELECT visitorTeamID AS team_id,
+                SELECT visitor_teamid AS team_id,
                        game2GM, game2GA, gameFTM, gameFTA, game3GM, game3GA,
                        gameORB, gameDRB, gameAST, gameSTL, gameTOV, gameBLK, gamePF
                 FROM ranked WHERE rn = 1
                 UNION ALL
-                SELECT homeTeamID AS team_id,
+                SELECT home_teamid AS team_id,
                        game2GM, game2GA, gameFTM, gameFTA, game3GM, game3GA,
                        gameORB, gameDRB, gameAST, gameSTL, gameTOV, gameBLK, gamePF
                 FROM ranked WHERE rn = 2

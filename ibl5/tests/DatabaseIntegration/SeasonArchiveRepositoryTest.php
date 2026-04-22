@@ -61,8 +61,8 @@ class SeasonArchiveRepositoryTest extends DatabaseTestCase
                 'Date' => $date,
                 'name' => 'Metros',
                 'gameOfThatDay' => 1,
-                'visitorTeamID' => 2,
-                'homeTeamID' => 1,
+                'visitor_teamid' => 2,
+                'home_teamid' => 1,
                 'attendance' => 15000,
                 'capacity' => 15000,
                 'visitorWins' => 0,
@@ -97,8 +97,8 @@ class SeasonArchiveRepositoryTest extends DatabaseTestCase
                 'Date' => $date,
                 'name' => 'Sharks',
                 'gameOfThatDay' => 1,
-                'visitorTeamID' => 2,
-                'homeTeamID' => 1,
+                'visitor_teamid' => 2,
+                'home_teamid' => 1,
                 'attendance' => 15000,
                 'capacity' => 15000,
                 'visitorWins' => 0,
@@ -236,8 +236,8 @@ class SeasonArchiveRepositoryTest extends DatabaseTestCase
                 'Date' => $date,
                 'name' => 'Metros',
                 'gameOfThatDay' => 1,
-                'visitorTeamID' => 2,
-                'homeTeamID' => 1,
+                'visitor_teamid' => 2,
+                'home_teamid' => 1,
                 'attendance' => 10000,
                 'capacity' => 15000,
                 'visitorWins' => 0,
@@ -272,8 +272,8 @@ class SeasonArchiveRepositoryTest extends DatabaseTestCase
                 'Date' => $date,
                 'name' => 'Sharks',
                 'gameOfThatDay' => 1,
-                'visitorTeamID' => 2,
-                'homeTeamID' => 1,
+                'visitor_teamid' => 2,
+                'home_teamid' => 1,
                 'attendance' => 10000,
                 'capacity' => 15000,
                 'visitorWins' => 0,
@@ -330,7 +330,7 @@ class SeasonArchiveRepositoryTest extends DatabaseTestCase
 
     public function testGetPlayerIdsByNamesReturnsMappedPids(): void
     {
-        $this->insertTestPlayer(200090001, 'SA Test Player', ['tid' => 0, 'ordinal' => 1000]);
+        $this->insertTestPlayer(200090001, 'SA Test Player', ['teamid' => 0, 'ordinal' => 1000]);
 
         $result = $this->repo->getPlayerIdsByNames(['SA Test Player']);
 

@@ -26,7 +26,7 @@ get_lang($module_name);
 
 $pagetitle = "- Injured Players";
 
-$teamID = isset($teamID) ? (int) $teamID : 0;
+$teamid = isset($teamid) ? (int) $teamid : 0;
 
 global $mysqli_db;
 

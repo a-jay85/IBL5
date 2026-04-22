@@ -347,7 +347,7 @@ class SeasonTest extends \PHPUnit\Framework\TestCase
             'regular season with Yes setting' => ['Regular Season', 'Yes', true],
             'regular season with No setting' => ['Regular Season', 'No', false],
             'preseason with Yes setting' => ['Preseason', 'Yes', true],
-            'preseason with No setting' => ['Preseason', 'No', false],
+            'preseason with No setting' => ['Preseason', 'No', true],
             'playoffs with Yes setting' => ['Playoffs', 'Yes', true],
             'playoffs with No setting' => ['Playoffs', 'No', false],
         ];

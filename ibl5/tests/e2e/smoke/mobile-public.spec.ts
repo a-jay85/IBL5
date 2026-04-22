@@ -13,7 +13,7 @@ const PAGES = [
   { name: 'homepage', url: 'index.php', selector: 'body', hasWideTables: false },
   { name: 'standings', url: 'modules.php?name=Standings', selector: '.ibl-data-table', hasWideTables: true },
   { name: 'player page', url: 'modules.php?name=Player&pa=showpage&pid=1', selector: 'h2, h3', hasWideTables: false },
-  { name: 'team page', url: 'modules.php?name=Team&op=team&teamID=1', selector: '.ibl-data-table', hasWideTables: true },
+  { name: 'team page', url: 'modules.php?name=Team&op=team&teamid=1', selector: '.ibl-data-table', hasWideTables: true },
   { name: 'season leaderboards', url: 'modules.php?name=SeasonLeaderboards', selector: '.ibl-data-table', hasWideTables: true },
   { name: 'career leaderboards', url: 'modules.php?name=CareerLeaderboards', selector: '.ibl-title, .ibl-data-table', hasWideTables: false },
   { name: 'draft history', url: 'modules.php?name=DraftHistory', selector: '.ibl-data-table', hasWideTables: false },
@@ -70,7 +70,7 @@ test.describe('Mobile public page smoke tests', () => {
 
   test('team schedule — no horizontal overflow on mobile', async ({ page }) => {
     test.setTimeout(60_000);
-    await gotoWithRetry(page, 'modules.php?name=Schedule&teamID=1');
+    await gotoWithRetry(page, 'modules.php?name=Schedule&teamid=1');
     await expect(page.locator('.schedule-container, .schedule-game, table').first()).toBeVisible();
     await assertNoHorizontalOverflow(page, 'on team schedule');
   });
@@ -87,7 +87,7 @@ test.describe('Mobile public page smoke tests', () => {
 
   test('draft history team view — no horizontal overflow on mobile', async ({ page }) => {
     test.setTimeout(60_000);
-    await gotoWithRetry(page, 'modules.php?name=DraftHistory&teamID=1');
+    await gotoWithRetry(page, 'modules.php?name=DraftHistory&teamid=1');
     await expect(page.locator('.ibl-title').first()).toBeVisible();
     await assertNoHorizontalOverflow(page, 'on draft history team view');
   });
@@ -122,9 +122,9 @@ test.describe('Mobile public page smoke tests', () => {
     test.setTimeout(120_000);
     const urls = [
       ...PAGES.map(p => p.url),
-      'modules.php?name=Schedule&teamID=1',
+      'modules.php?name=Schedule&teamid=1',
       'modules.php?name=DraftHistory&year=2026',
-      'modules.php?name=DraftHistory&teamID=1',
+      'modules.php?name=DraftHistory&teamid=1',
       'modules.php?name=FranchiseRecordBook&teamid=1',
       'modules.php?name=SeasonArchive&year=2026',
       'modules.php?name=YourAccount&op=new_user',

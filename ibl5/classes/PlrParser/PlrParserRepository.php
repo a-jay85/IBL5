@@ -33,13 +33,13 @@ class PlrParserRepository extends \BaseMysqliRepository implements PlrParserRepo
     public function upsertPlayer(array $data): int
     {
         $query = "INSERT INTO {$this->plrTable}
-            (`ordinal`, `name`, `age`, `pid`, `tid`, `peak`, `pos`,
+            (`ordinal`, `name`, `age`, `pid`, `teamid`, `peak`, `pos`,
              `oo`, `od`, `r_drive_off`, `dd`, `po`, `pd`, `r_trans_off`, `td`,
              `Clutch`, `Consistency`,
              `PGDepth`, `SGDepth`, `SFDepth`, `PFDepth`, `CDepth`, `dc_canPlayInGame`,
              `stats_gs`, `stats_gm`, `stats_min`, `stats_fgm`, `stats_fga`,
              `stats_ftm`, `stats_fta`, `stats_3gm`, `stats_3ga`,
-             `stats_orb`, `stats_drb`, `stats_ast`, `stats_stl`, `stats_to`, `stats_blk`, `stats_pf`,
+             `stats_orb`, `stats_drb`, `stats_ast`, `stats_stl`, `stats_tvr`, `stats_blk`, `stats_pf`,
              `talent`, `skill`, `intangibles`, `coach`, `loyalty`, `playingTime`, `winner`, `tradition`, `security`,
              `exp`, `bird`, `cy`, `cyt`,
              `cy1`, `cy2`, `cy3`, `cy4`, `cy5`, `cy6`, `fa_signing_flag`,
@@ -50,7 +50,7 @@ class PlrParserRepository extends \BaseMysqliRepository implements PlrParserRepo
              `car_gm`, `car_min`, `car_fgm`, `car_fga`, `car_ftm`, `car_fta`,
              `car_tgm`, `car_tga`, `car_orb`, `car_drb`, `car_reb`,
              `car_ast`, `car_stl`, `car_to`, `car_blk`, `car_pf`, `car_pts`,
-             `r_fga`, `r_fgp`, `r_fta`, `r_ftp`, `r_tga`, `r_tgp`,
+             `r_fga`, `r_fgp`, `r_fta`, `r_ftp`, `r_3ga`, `r_3gp`,
              `r_orb`, `r_drb`, `r_ast`, `r_stl`, `r_tvr`, `r_blk`,
              `draftround`, `draftpickno`, `injured`,
              `htft`, `htin`, `wt`, `draftyear`, `retired`, `r_foul`)
@@ -80,7 +80,7 @@ class PlrParserRepository extends \BaseMysqliRepository implements PlrParserRepo
             `ordinal` = VALUES(`ordinal`),
             `name` = VALUES(`name`),
             `age` = VALUES(`age`),
-            `tid` = VALUES(`tid`),
+            `teamid` = VALUES(`teamid`),
             `peak` = VALUES(`peak`),
             `pos` = VALUES(`pos`),
             `oo` = VALUES(`oo`),
@@ -112,7 +112,7 @@ class PlrParserRepository extends \BaseMysqliRepository implements PlrParserRepo
             `stats_drb` = VALUES(`stats_drb`),
             `stats_ast` = VALUES(`stats_ast`),
             `stats_stl` = VALUES(`stats_stl`),
-            `stats_to` = VALUES(`stats_to`),
+            `stats_tvr` = VALUES(`stats_tvr`),
             `stats_blk` = VALUES(`stats_blk`),
             `stats_pf` = VALUES(`stats_pf`),
             `talent` = VALUES(`talent`),
@@ -180,8 +180,8 @@ class PlrParserRepository extends \BaseMysqliRepository implements PlrParserRepo
             `r_fgp` = VALUES(`r_fgp`),
             `r_fta` = VALUES(`r_fta`),
             `r_ftp` = VALUES(`r_ftp`),
-            `r_tga` = VALUES(`r_tga`),
-            `r_tgp` = VALUES(`r_tgp`),
+            `r_3ga` = VALUES(`r_3ga`),
+            `r_3gp` = VALUES(`r_3gp`),
             `r_orb` = VALUES(`r_orb`),
             `r_drb` = VALUES(`r_drb`),
             `r_ast` = VALUES(`r_ast`),
@@ -198,10 +198,10 @@ class PlrParserRepository extends \BaseMysqliRepository implements PlrParserRepo
             `retired` = VALUES(`retired`),
             `r_foul` = VALUES(`r_foul`)";
 
-        // Build types: ordinal(i) name(s) age(i) pid(i) tid(i) peak(i) pos(s)
+        // Build types: ordinal(i) name(s) age(i) pid(i) teamid(i) peak(i) pos(s)
         // + remaining int columns, then at the end retired(i) r_foul(i)
         // Total: 121 params — 2 strings (name, pos) and 119 ints
-        $types = 'isiiiis'   // ordinal, name, age, pid, tid, peak, pos
+        $types = 'isiiiis'   // ordinal, name, age, pid, teamid, peak, pos
             . 'iiiiiiii'     // oo, od, r_drive_off, dd, po, pd, r_trans_off, td
             . 'ii'           // Clutch, Consistency
             . 'iiiiii'       // PGDepth..CDepth, canPlayInGame → dc_canPlayInGame
@@ -218,7 +218,7 @@ class PlrParserRepository extends \BaseMysqliRepository implements PlrParserRepo
             . 'iiiiii'       // car_gm..car_fta
             . 'iiiii'        // car_tgm..car_reb
             . 'iiiiii'       // car_ast..car_pts
-            . 'iiiiii'       // r_fga..r_tgp
+            . 'iiiiii'       // r_fga..r_3gp
             . 'iiiiii'       // r_orb..r_blk
             . 'iii'          // draftround, draftpickno, injured
             . 'iiiiii';      // htft, htin, wt, draftyear, retired, r_foul
@@ -230,7 +230,7 @@ class PlrParserRepository extends \BaseMysqliRepository implements PlrParserRepo
             (string) $data['name'],
             (int) $data['age'],
             (int) $data['pid'],
-            (int) $data['tid'],
+            (int) $data['teamid'],
             (int) $data['peak'],
             (string) $data['pos'],
             (int) $data['ratingOO'],
@@ -403,11 +403,11 @@ class PlrParserRepository extends \BaseMysqliRepository implements PlrParserRepo
         'pid', 'name', 'season_year', 'snapshot_phase', 'source_archive',
         'ordinal',
         // Physical & position
-        'tid', 'age', 'pos', 'peak', 'htft', 'htin', 'wt',
+        'teamid', 'age', 'pos', 'peak', 'htft', 'htin', 'wt',
         // Positional ratings (1-9)
         'oo', 'od', 'r_drive_off', 'dd', 'po', 'pd', 'r_trans_off', 'td',
         // Stat ratings (0-99)
-        'r_fga', 'r_fgp', 'r_fta', 'r_ftp', 'r_tga', 'r_tgp',
+        'r_fga', 'r_fgp', 'r_fta', 'r_ftp', 'r_3ga', 'r_3gp',
         'r_orb', 'r_drb', 'r_ast', 'r_stl', 'r_tvr', 'r_blk', 'r_foul',
         // TSI attributes
         'talent', 'skill', 'intangibles', 'clutch', 'consistency',
@@ -419,7 +419,7 @@ class PlrParserRepository extends \BaseMysqliRepository implements PlrParserRepo
         // Season stats (regular season)
         'stats_gs', 'stats_gm', 'stats_min', 'stats_fgm', 'stats_fga',
         'stats_ftm', 'stats_fta', 'stats_3gm', 'stats_3ga',
-        'stats_orb', 'stats_drb', 'stats_ast', 'stats_stl', 'stats_to', 'stats_blk', 'stats_pf',
+        'stats_orb', 'stats_drb', 'stats_ast', 'stats_stl', 'stats_tvr', 'stats_blk', 'stats_pf',
         'stats_reb', 'stats_pts',
         // Playoff season stats (speculative — offset gap 208-267)
         'po_stats_gm', 'po_stats_min', 'po_stats_2gm', 'po_stats_2ga',

@@ -131,7 +131,7 @@ class DraftRepositoryTest extends DatabaseTestCase
 
         self::assertTrue($result);
 
-        $stmt = $this->db->prepare("SELECT pid, name, tid, pos FROM ibl_plr WHERE name = ? AND pid >= 90000");
+        $stmt = $this->db->prepare("SELECT pid, name, teamid, pos FROM ibl_plr WHERE name = ? AND pid >= 90000");
         self::assertNotFalse($stmt);
         $name = 'B10 Draft Prospect';
         $stmt->bind_param('s', $name);
@@ -141,7 +141,7 @@ class DraftRepositoryTest extends DatabaseTestCase
 
         self::assertNotNull($row, 'Drafted player should exist in ibl_plr');
         self::assertGreaterThanOrEqual(90000, $row['pid']);
-        self::assertSame(1, $row['tid']);
+        self::assertSame(1, $row['teamid']);
         self::assertSame('PG', $row['pos']);
     }
 
@@ -153,12 +153,12 @@ class DraftRepositoryTest extends DatabaseTestCase
 
         // Insert a taken slot and an empty slot
         $this->insertDraftRow(2099, 1, 1, 1, 'Already Picked');
-        $this->insertDraftRow(2099, 1, 2, 2, '', ['team' => 'Enforcers', 'tid' => 2]);
+        $this->insertDraftRow(2099, 1, 2, 2, '', ['team' => 'Enforcers', 'teamid' => 2]);
 
         $pick = $this->repo->getCurrentDraftPick();
 
         self::assertNotNull($pick);
-        self::assertSame(2, $pick['tid']);
+        self::assertSame(2, $pick['teamid']);
         self::assertSame(1, $pick['round']);
         self::assertSame(2, $pick['pick']);
     }

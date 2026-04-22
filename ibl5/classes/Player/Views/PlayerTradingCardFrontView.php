@@ -45,7 +45,7 @@ class PlayerTradingCardFrontView
     public static function render(Player $player, int $playerID, string $contractDisplay, ?\mysqli $db = null): string
     {
         // Get color scheme and prepare player data
-        $colorScheme = CardBaseStyles::getColorSchemeForTeam($db, $player->teamID ?? 0);
+        $colorScheme = CardBaseStyles::getColorSchemeForTeam($db, $player->teamid ?? 0);
         $playerData = CardBaseStyles::preparePlayerData($player, $playerID);
         
         // Additional front-card specific data

@@ -201,7 +201,7 @@ class WaiversIntegrationTest extends IntegrationTestCase
         $this->assertQueryExecuted("ordinal` = '800'");
         $this->assertQueryExecuted('bird` = 0');
         $this->assertQueryExecuted('droptime` = 0');
-        $this->assertQueryExecuted('tid` = 5');
+        $this->assertQueryExecuted('teamid` = 5');
         // Should NOT update contract fields when hasExistingContract = true
         $this->assertQueryNotExecuted('cy` = 0');
     }
@@ -233,7 +233,7 @@ class WaiversIntegrationTest extends IntegrationTestCase
         $this->assertQueryExecuted('cy` = 0');
         $this->assertQueryExecuted('cyt` = 1');
         $this->assertQueryExecuted("cy1` = 103");
-        $this->assertQueryExecuted('tid` = 8');
+        $this->assertQueryExecuted('teamid` = 8');
     }
 
     /**
@@ -763,7 +763,7 @@ class WaiversIntegrationTest extends IntegrationTestCase
         return TestDataFactory::createPlayer(array_merge([
             'pid' => 100,
             'name' => 'Test Waiver Player',
-            'tid' => 0,
+            'teamid' => 0,
             'teamname' => 'Free Agent',
             'ordinal' => 1000, // On waiver wire
             'droptime' => time() - 86400, // Dropped 24 hours ago (cleared)

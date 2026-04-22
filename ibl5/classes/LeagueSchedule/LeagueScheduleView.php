@@ -153,8 +153,8 @@ class LeagueScheduleView implements LeagueScheduleViewInterface
 
         $gameId = 'game-' . $game['boxid'];
         $boxScoreUrl = HtmlSanitizer::safeHtmlOutput($game['boxScoreUrl']);
-        $visitorTeamUrl = 'modules.php?name=Team&amp;op=team&amp;teamID=' . $game['visitor'];
-        $homeTeamUrl = 'modules.php?name=Team&amp;op=team&amp;teamID=' . $game['home'];
+        $visitorTeamUrl = 'modules.php?name=Team&amp;op=team&amp;teamid=' . $game['visitor'];
+        $homeTeamUrl = 'modules.php?name=Team&amp;op=team&amp;teamid=' . $game['home'];
 
         $html = '<div class="' . $gameClass . '" id="' . $gameId . '" data-home-team-id="' . $game['home'] . '" data-visitor-team-id="' . $game['visitor'] . '">';
 

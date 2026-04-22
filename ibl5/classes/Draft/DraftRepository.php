@@ -137,7 +137,7 @@ class DraftRepository extends \BaseMysqliRepository implements DraftRepositoryIn
         // Insert new player into ibl_plr
         $affected = $this->execute(
             "INSERT INTO ibl_plr (
-                pid, name, age, tid, pos,
+                pid, name, age, teamid, pos,
                 sta, oo, od, po, r_trans_off, r_drive_off, dd, pd, td,
                 talent, skill, intangibles,
                 dc_canPlayInGame, bird, exp, cy, cyt, retired
@@ -193,7 +193,7 @@ class DraftRepository extends \BaseMysqliRepository implements DraftRepositoryIn
      */
     public function getCurrentDraftPick(): ?array
     {
-        /** @var array{team: string, tid: int, round: int, pick: int, player: string}|null $row */
+        /** @var array{team: string, teamid: int, round: int, pick: int, player: string}|null $row */
         $row = $this->fetchOne(
             "SELECT * FROM ibl_draft WHERE player = '' ORDER BY round ASC, pick ASC LIMIT 1"
         );
@@ -201,7 +201,7 @@ class DraftRepository extends \BaseMysqliRepository implements DraftRepositoryIn
         if ($row !== null) {
             return [
                 'team' => $row['team'],
-                'tid' => $row['tid'],
+                'teamid' => $row['teamid'],
                 'round' => $row['round'],
                 'pick' => $row['pick'],
             ];

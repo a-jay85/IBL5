@@ -45,12 +45,12 @@ class ProcessAllStarGamesStep implements PipelineStepInterface
             foreach ($pendingDefaults as $row) {
                 /** @var string $date */
                 $date = $row['Date'];
-                $teamID = $row['name'] === BoxscoreProcessor::DEFAULT_AWAY_NAME
+                $teamid = $row['name'] === BoxscoreProcessor::DEFAULT_AWAY_NAME
                     ? 50
                     : 51;
-                $teamLabel = $teamID === 50 ? 'Away (Visitor)' : 'Home';
+                $teamLabel = $teamid === 50 ? 'Away (Visitor)' : 'Home';
                 $seasonYear = (int) substr($date, 0, 4);
-                $players = $this->boxscoreRepo->getPlayersForAllStarTeam($date, $teamID);
+                $players = $this->boxscoreRepo->getPlayersForAllStarTeam($date, $teamid);
 
                 $pendingRenames[] = [
                     'id' => $row['id'],

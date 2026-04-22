@@ -377,7 +377,7 @@ class OneOnOneGameEngine implements OneOnOneGameEngineInterface
             $offenseData['r_drive_off'],
             $offenseData['po'],
             $offenseData['r_fga'],
-            $offenseData['r_tga']
+            $offenseData['r_3ga']
         );
 
         return $this->processShotAttempt($shotType, $offenseData, $defenseData);
@@ -392,10 +392,10 @@ class OneOnOneGameEngine implements OneOnOneGameEngineInterface
     private function processShotAttempt(int $shotType, array $offenseData, array $defenseData): int
     {
         $fgp = $offenseData['r_fgp'];
-        $tgp = $offenseData['r_tgp'];
+        $tgp = $offenseData['r_3gp'];
         $fta = $offenseData['r_fta'];
         $fga = $offenseData['r_fga'];
-        $tga = $offenseData['r_tga'];
+        $tga = $offenseData['r_3ga'];
         $blk = $defenseData['r_blk'];
         $foul = $defenseData['r_foul'];
 

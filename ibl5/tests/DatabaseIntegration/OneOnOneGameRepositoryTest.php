@@ -39,7 +39,7 @@ class OneOnOneGameRepositoryTest extends DatabaseTestCase
     {
         $this->insertTestPlayer(200000050, 'DB Test Retired Player', [
             'retired' => 1,
-            'tid' => 1,
+            'teamid' => 1,
         ]);
 
         $players = $this->repo->getActivePlayers();
@@ -52,7 +52,7 @@ class OneOnOneGameRepositoryTest extends DatabaseTestCase
     {
         $this->insertTestPlayer(200000051, 'DB Test Active Player', [
             'retired' => 0,
-            'tid' => 1,
+            'teamid' => 1,
         ]);
 
         $players = $this->repo->getActivePlayers();
@@ -65,7 +65,7 @@ class OneOnOneGameRepositoryTest extends DatabaseTestCase
     {
         $this->insertTestPlayer(200000052, '(no starter)', [
             'retired' => 0,
-            'tid' => 1,
+            'teamid' => 1,
         ]);
 
         $players = $this->repo->getActivePlayers();
@@ -101,7 +101,7 @@ class OneOnOneGameRepositoryTest extends DatabaseTestCase
     {
         $this->insertTestPlayer(200000053, 'DB Test Game Player', [
             'oo' => 70, 'r_drive_off' => 60, 'po' => 65, 'od' => 55, 'dd' => 50, 'pd' => 45,
-            'r_fga' => 80, 'r_fgp' => 50, 'r_fta' => 70, 'r_tga' => 40, 'r_tgp' => 35,
+            'r_fga' => 80, 'r_fgp' => 50, 'r_fta' => 70, 'r_3ga' => 40, 'r_3gp' => 35,
             'r_orb' => 30, 'r_drb' => 60, 'r_stl' => 25, 'r_tvr' => 20, 'r_blk' => 15, 'r_foul' => 18,
         ]);
 

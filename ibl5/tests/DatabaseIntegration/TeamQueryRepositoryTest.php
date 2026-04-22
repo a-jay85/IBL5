@@ -26,7 +26,7 @@ class TeamQueryRepositoryTest extends DatabaseTestCase
     public function testGetBuyoutsReturnsBuyoutRowsFromCashConsiderations(): void
     {
         $stmt = $this->db->prepare(
-            "INSERT INTO ibl_cash_considerations (tid, type, label, cy, cyt, cy1) VALUES (?, 'buyout', ?, ?, ?, ?)"
+            "INSERT INTO ibl_cash_considerations (teamid, type, label, cy, cyt, cy1) VALUES (?, 'buyout', ?, ?, ?, ?)"
         );
         self::assertNotFalse($stmt);
         $label = 'Test Buyout';
@@ -88,9 +88,9 @@ class TeamQueryRepositoryTest extends DatabaseTestCase
     {
         $this->insertRow('ibl_draft_picks', [
             'ownerofpick' => 'TestPickOwner',
-            'owner_tid' => self::TEST_TID,
+            'owner_teamid' => self::TEST_TID,
             'teampick' => 'TestPickTeam',
-            'teampick_tid' => self::TEST_TID,
+            'teampick_teamid' => self::TEST_TID,
             'year' => 2098,
             'round' => 1,
             'notes' => 'Integration test pick',
@@ -102,7 +102,7 @@ class TeamQueryRepositoryTest extends DatabaseTestCase
         foreach ($result as $pick) {
             if ($pick['year'] === 2098 && $pick['notes'] === 'Integration test pick') {
                 $found = true;
-                self::assertSame(self::TEST_TID, $pick['owner_tid']);
+                self::assertSame(self::TEST_TID, $pick['owner_teamid']);
                 break;
             }
         }
@@ -113,13 +113,13 @@ class TeamQueryRepositoryTest extends DatabaseTestCase
 
     public function testGetFreeAgencyOffersReturnsOffers(): void
     {
-        $this->insertTestPlayer(200090103, 'FA Offer Target', ['tid' => 0]);
+        $this->insertTestPlayer(200090103, 'FA Offer Target', ['teamid' => 0]);
 
         $this->insertRow('ibl_fa_offers', [
             'name' => 'FA Offer Target',
             'pid' => 200090103,
             'team' => 'Test Team',
-            'tid' => self::TEST_TID,
+            'teamid' => self::TEST_TID,
             'offer1' => 1000,
             'offer2' => 1100,
             'offer3' => 0,
@@ -210,7 +210,7 @@ class TeamQueryRepositoryTest extends DatabaseTestCase
             'pos' => 'PG',
         ]);
         // Clear other starters for this position
-        $this->db->query("UPDATE ibl_plr SET PGDepth = 0 WHERE tid = " . self::TEST_TID . " AND pid != 200090107 AND PGDepth = 1");
+        $this->db->query("UPDATE ibl_plr SET PGDepth = 0 WHERE teamid = " . self::TEST_TID . " AND pid != 200090107 AND PGDepth = 1");
 
         $result = $this->repo->getLastSimStarterPlayerIDForPosition(self::TEST_TID, 'PG');
 
@@ -223,7 +223,7 @@ class TeamQueryRepositoryTest extends DatabaseTestCase
             'dc_PGDepth' => 1,
             'pos' => 'PG',
         ]);
-        $this->db->query("UPDATE ibl_plr SET dc_PGDepth = 0 WHERE tid = " . self::TEST_TID . " AND pid != 200090108 AND dc_PGDepth = 1");
+        $this->db->query("UPDATE ibl_plr SET dc_PGDepth = 0 WHERE teamid = " . self::TEST_TID . " AND pid != 200090108 AND dc_PGDepth = 1");
 
         $result = $this->repo->getCurrentlySetStarterPlayerIDForPosition(self::TEST_TID, 'PG');
 
@@ -335,10 +335,10 @@ class TeamQueryRepositoryTest extends DatabaseTestCase
     {
         // Use a real team with isolated test player. First clear any existing
         // cy1>0 players on team 28 to get a predictable sum.
-        $this->db->query('UPDATE ibl_plr SET cy1 = 0 WHERE tid = 28');
+        $this->db->query('UPDATE ibl_plr SET cy1 = 0 WHERE teamid = 28');
 
         $this->insertTestPlayer(200000150, 'TQ CurSal', [
-            'tid' => 28,
+            'teamid' => 28,
             'cy' => 1,
             'cyt' => 2,
             'cy1' => 3000,
@@ -356,10 +356,10 @@ class TeamQueryRepositoryTest extends DatabaseTestCase
 
     public function testGetTotalNextSeasonSalariesSumsContracts(): void
     {
-        $this->db->query('UPDATE ibl_plr SET cy1 = 0 WHERE tid = 28');
+        $this->db->query('UPDATE ibl_plr SET cy1 = 0 WHERE teamid = 28');
 
         $this->insertTestPlayer(200000151, 'TQ NxtSal', [
-            'tid' => 28,
+            'teamid' => 28,
             'cy' => 1,
             'cyt' => 2,
             'cy1' => 1500,

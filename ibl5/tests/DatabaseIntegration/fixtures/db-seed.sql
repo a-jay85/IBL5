@@ -40,11 +40,11 @@ VALUES
 ON DUPLICATE KEY UPDATE team_name = VALUES(team_name), team_city = VALUES(team_city), color1 = VALUES(color1), color2 = VALUES(color2);
 
 -- Players: PID 1 (rostered on Metros), PID 2 (free agent)
-INSERT INTO ibl_plr (pid, name, age, tid, pos, sta, exp, bird, cy, cyt, cy1, cy2, retired, ordinal, droptime, uuid)
+INSERT INTO ibl_plr (pid, name, age, teamid, pos, sta, exp, bird, cy, cyt, cy1, cy2, retired, ordinal, droptime, uuid)
 VALUES (1, 'Test Player One', 27, 1, 'PG', 80, 5, 3, 1, 3, 1500, 1600, 0, 1, 0, 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa')
 ON DUPLICATE KEY UPDATE name = VALUES(name);
 
-INSERT INTO ibl_plr (pid, name, age, tid, pos, sta, exp, bird, cy, cyt, cy1, cy2, retired, ordinal, droptime, uuid)
+INSERT INTO ibl_plr (pid, name, age, teamid, pos, sta, exp, bird, cy, cyt, cy1, cy2, retired, ordinal, droptime, uuid)
 VALUES (2, 'Test Player Two', 22, 0, 'SF', 75, 1, 0, 0, 0, 0, 0, 0, 1000, 0, 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb')
 ON DUPLICATE KEY UPDATE name = VALUES(name);
 
@@ -103,7 +103,7 @@ ON DUPLICATE KEY UPDATE value = VALUES(value);
 -- Standings: All 28 real teams with neutral records
 -- Division/conference assignments match League::DIVISION_NAMES
 -- ============================================================
-INSERT INTO ibl_standings (tid, team_name, pct, leagueRecord, wins, losses, conference, division)
+INSERT INTO ibl_standings (teamid, team_name, pct, leagueRecord, wins, losses, conference, division)
 VALUES
   ( 1, 'Metros',       0.500, '20-20', 20, 20, 'Eastern',  'Atlantic'),
   ( 2, 'Stars',        0.500, '20-20', 20, 20, 'Western',  'Pacific'),
@@ -138,7 +138,7 @@ ON DUPLICATE KEY UPDATE team_name = VALUES(team_name), wins = VALUES(wins), loss
 -- ============================================================
 -- Power ratings: All 28 real teams with neutral values
 -- ============================================================
-INSERT INTO ibl_power (TeamID, ranking, last_win, last_loss, streak_type, streak, sos, remaining_sos)
+INSERT INTO ibl_power (teamid, ranking, last_win, last_loss, streak_type, streak, sos, remaining_sos)
 VALUES
   ( 1, 50.0, 5, 5, 'W', 1, 0.500, 0.500),
   ( 2, 50.0, 5, 5, 'W', 1, 0.500, 0.500),
@@ -180,7 +180,7 @@ VALUES (1, 'testgm', 2020, NULL, 0, 0)
 ON DUPLICATE KEY UPDATE gm_display_name = VALUES(gm_display_name);
 
 -- Historical player stats via ibl_plr_snapshots (source of truth for RefreshIblHistStep)
-INSERT INTO ibl_plr_snapshots (pid, name, season_year, snapshot_phase, source_archive, tid, stats_gm, stats_min, stats_fgm, stats_fga, stats_ftm, stats_fta, stats_3gm, stats_3ga, stats_orb, stats_reb, stats_ast, stats_stl, stats_blk, stats_to, stats_pf, stats_pts)
+INSERT INTO ibl_plr_snapshots (pid, name, season_year, snapshot_phase, source_archive, teamid, stats_gm, stats_min, stats_fgm, stats_fga, stats_ftm, stats_fta, stats_3gm, stats_3ga, stats_orb, stats_reb, stats_ast, stats_stl, stats_blk, stats_tvr, stats_pf, stats_pts)
 VALUES (1, 'Test Player One', 2024, 'finals', 'db-seed', 1, 50, 1600, 300, 600, 100, 120, 50, 130, 40, 200, 150, 50, 20, 80, 100, 750)
 ON DUPLICATE KEY UPDATE stats_gm = VALUES(stats_gm);
 
@@ -281,25 +281,25 @@ VALUES (2025, 1, '2025-01-15', 2, 85, 1, 104, 'sched-0001-0001-0001-000000000001
 ON DUPLICATE KEY UPDATE VScore = VALUES(VScore);
 
 -- RCB alltime records: needed by FranchiseRecordBook (stat_category is ENUM)
-INSERT INTO ibl_rcb_alltime_records (scope, team_id, record_type, stat_category, ranking, player_name, stat_value, stat_raw, season_year)
+INSERT INTO ibl_rcb_alltime_records (scope, teamid, record_type, stat_category, ranking, player_name, stat_value, stat_raw, season_year)
 VALUES ('team', 1, 'single_season', 'ppg', 1, 'Test Player One', 25.5000, 255, 2024)
 ON DUPLICATE KEY UPDATE player_name = VALUES(player_name);
 
-INSERT INTO ibl_rcb_alltime_records (scope, team_id, record_type, stat_category, ranking, player_name, stat_value, stat_raw, season_year)
+INSERT INTO ibl_rcb_alltime_records (scope, teamid, record_type, stat_category, ranking, player_name, stat_value, stat_raw, season_year)
 VALUES ('league', 0, 'career', 'ppg', 1, 'Test Player One', 22.3000, 223, 0)
 ON DUPLICATE KEY UPDATE player_name = VALUES(player_name);
 
-INSERT INTO ibl_rcb_alltime_records (scope, team_id, record_type, stat_category, ranking, player_name, stat_value, stat_raw, season_year)
+INSERT INTO ibl_rcb_alltime_records (scope, teamid, record_type, stat_category, ranking, player_name, stat_value, stat_raw, season_year)
 VALUES ('league', 0, 'single_season', 'rpg', 1, 'Test Player One', 12.1000, 121, 2024)
 ON DUPLICATE KEY UPDATE player_name = VALUES(player_name);
 
 -- RCB season records: needed by SeasonHighs getRcbSeasonHighs() (stat_category is ENUM)
-INSERT INTO ibl_rcb_season_records (season_year, scope, team_id, context, stat_category, ranking, player_name, player_position, stat_value, record_season_year)
+INSERT INTO ibl_rcb_season_records (season_year, scope, teamid, context, stat_category, ranking, player_name, player_position, stat_value, record_season_year)
 VALUES (2025, 'league', 0, 'home', 'pts', 1, 'Test Player One', 'PG', 45, 2025)
 ON DUPLICATE KEY UPDATE player_name = VALUES(player_name);
 
 -- Draft picks: needed by TeamQuery getDraftPicks()
-INSERT INTO ibl_draft_picks (ownerofpick, owner_tid, teampick, teampick_tid, year, round, notes)
+INSERT INTO ibl_draft_picks (ownerofpick, owner_teamid, teampick, teampick_teamid, year, round, notes)
 VALUES ('Metros', 1, 'Metros', 1, 2025, 1, 'Own pick')
 ON DUPLICATE KEY UPDATE notes = VALUES(notes);
 

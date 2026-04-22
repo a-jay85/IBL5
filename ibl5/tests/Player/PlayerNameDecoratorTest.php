@@ -21,7 +21,7 @@ class PlayerNameDecoratorTest extends TestCase
     {
         $playerData = new PlayerData();
         $playerData->name = "John Doe";
-        $playerData->teamID = 5;
+        $playerData->teamid = 5;
         $playerData->ordinal = \JSB::WAIVERS_ORDINAL + 1;
         $playerData->contractCurrentYear = 1;
         $playerData->contractTotalYears = 3;
@@ -35,7 +35,7 @@ class PlayerNameDecoratorTest extends TestCase
     {
         $playerData = new PlayerData();
         $playerData->name = "John Doe";
-        $playerData->teamID = 5;
+        $playerData->teamid = 5;
         $playerData->ordinal = 1;
         $playerData->contractCurrentYear = 3;
         $playerData->contractTotalYears = 3;
@@ -49,7 +49,7 @@ class PlayerNameDecoratorTest extends TestCase
     {
         $playerData = new PlayerData();
         $playerData->name = "John Doe";
-        $playerData->teamID = 5;
+        $playerData->teamid = 5;
         $playerData->ordinal = \JSB::WAIVERS_ORDINAL + 1;
         $playerData->contractCurrentYear = 1;
         $playerData->contractTotalYears = 3;
@@ -63,7 +63,7 @@ class PlayerNameDecoratorTest extends TestCase
     {
         $playerData = new PlayerData();
         $playerData->name = "John Doe";
-        $playerData->teamID = 5;
+        $playerData->teamid = 5;
         $playerData->ordinal = 1;
         $playerData->contractCurrentYear = 3;
         $playerData->contractTotalYears = 3;
@@ -77,7 +77,7 @@ class PlayerNameDecoratorTest extends TestCase
     {
         $playerData = new PlayerData();
         $playerData->name = "John Doe";
-        $playerData->teamID = 5;
+        $playerData->teamid = 5;
         $playerData->ordinal = 1;
         $playerData->contractCurrentYear = 2;
         $playerData->contractTotalYears = 3;
@@ -91,7 +91,7 @@ class PlayerNameDecoratorTest extends TestCase
     {
         $playerData = new PlayerData();
         $playerData->name = "John Doe";
-        $playerData->teamID = 0;
+        $playerData->teamid = 0;
         $playerData->ordinal = 1;
         $playerData->contractCurrentYear = 1;
         $playerData->contractTotalYears = 3;
@@ -105,7 +105,7 @@ class PlayerNameDecoratorTest extends TestCase
     {
         $playerData = new PlayerData();
         $playerData->name = "John Doe";
-        $playerData->teamID = 5;
+        $playerData->teamid = 5;
         $playerData->ordinal = \JSB::WAIVERS_ORDINAL + 1;
         $playerData->contractCurrentYear = 3;
         $playerData->contractTotalYears = 3;

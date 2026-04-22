@@ -72,9 +72,9 @@ class Ratings
     </thead>
     <tbody>
 <?php foreach ($players as $player): ?>
-        <tr<?php if ($moduleName === "LeagueStarters"): ?> data-team-id="<?= $player->teamID ?? 0 ?>"<?php endif; ?>>
+        <tr<?php if ($moduleName === "LeagueStarters"): ?> data-team-id="<?= $player->teamid ?? 0 ?>"<?php endif; ?>>
 <?php if ($moduleName === "LeagueStarters"):
-    echo TeamCellHelper::renderTeamCellOrFreeAgent($player->teamID ?? 0, $player->teamName ?? '', $player->teamColor1 ?? 'FFFFFF', $player->teamColor2 ?? '000000');
+    echo TeamCellHelper::renderTeamCellOrFreeAgent($player->teamid ?? 0, $player->teamName ?? '', $player->teamColor1 ?? 'FFFFFF', $player->teamColor2 ?? '000000');
 endif; ?>
             <?= PlayerImageHelper::renderPlayerCell((int)$player->playerID, $player->decoratedName ?? '', $starterPids, $player->nameStatusClass) ?>
             <td><?= HtmlSanitizer::e($player->position ?? '') ?></td>

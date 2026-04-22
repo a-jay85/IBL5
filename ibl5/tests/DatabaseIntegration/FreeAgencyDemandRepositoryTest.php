@@ -60,13 +60,13 @@ class FreeAgencyDemandRepositoryTest extends DatabaseTestCase
 
     public function testGetPositionSalaryCommitmentReturnsSumExcludingPlayer(): void
     {
-        // Insert two PG players on Metros (tid=1) with known salaries
+        // Insert two PG players on Metros (teamid=1) with known salaries
         // vw_current_salary computes next_year_salary: when cy=1, next_year=cy2
         $this->insertTestPlayer(200070001, 'FA Demand PG1', [
-            'tid' => 1, 'pos' => 'PG', 'cy' => 1, 'cyt' => 3, 'cy1' => 1500, 'cy2' => 1600,
+            'teamid' => 1, 'pos' => 'PG', 'cy' => 1, 'cyt' => 3, 'cy1' => 1500, 'cy2' => 1600,
         ]);
         $this->insertTestPlayer(200070002, 'FA Demand PG2', [
-            'tid' => 1, 'pos' => 'PG', 'cy' => 1, 'cyt' => 3, 'cy1' => 2000, 'cy2' => 2100,
+            'teamid' => 1, 'pos' => 'PG', 'cy' => 1, 'cyt' => 3, 'cy1' => 2000, 'cy2' => 2100,
         ]);
 
         // Exclude player 200070001 — should return only 200070002's next_year_salary (2100)

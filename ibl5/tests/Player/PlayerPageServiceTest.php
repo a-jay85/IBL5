@@ -179,7 +179,7 @@ class PlayerPageServiceTest extends TestCase
     private function createMockPlayer(
         bool $wasRookieOptioned,
         bool $canRenegotiate,
-        int $teamID = 1,
+        int $teamid = 1,
         bool $canRookieOpt = false
     ): Player {
         // Use createStub since we're only configuring return values, not verifying expectations
@@ -188,16 +188,16 @@ class PlayerPageServiceTest extends TestCase
         $stub->method('wasRookieOptioned')->willReturn($wasRookieOptioned);
         $stub->method('canRenegotiateContract')->willReturn($canRenegotiate);
         $stub->method('canRookieOption')->willReturn($canRookieOpt);
-        $stub->teamID = $teamID;
+        $stub->teamid = $teamid;
 
         return $stub;
     }
 
-    private function createMockTeam(string $name, int $hasUsedExtension, int $teamID = 1): object
+    private function createMockTeam(string $name, int $hasUsedExtension, int $teamid = 1): object
     {
         $team = new \stdClass();
         $team->name = $name;
-        $team->teamID = $teamID;
+        $team->teamid = $teamid;
         $team->hasUsedExtensionThisSeason = $hasUsedExtension;
         return $team;
     }

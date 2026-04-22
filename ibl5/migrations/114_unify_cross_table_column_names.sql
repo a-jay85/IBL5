@@ -161,7 +161,7 @@ ALTER TABLE `ibl_fa_offers` ADD CONSTRAINT `fk_faoffer_tid`
 ALTER TABLE `ibl_cash_considerations` DROP FOREIGN KEY `fk_cash_considerations_team`;
 ALTER TABLE `ibl_cash_considerations`
   CHANGE COLUMN `tid` `teamid` int(11) NOT NULL COMMENT 'Team ID receiving cash',
-  CHANGE COLUMN `counterparty_tid` `counterparty_teamid` int(11) NOT NULL COMMENT 'Counterparty team ID';
+  CHANGE COLUMN `counterparty_tid` `counterparty_teamid` int(11) DEFAULT NULL COMMENT 'Other team involved (NULL for buyouts)';
 ALTER TABLE `ibl_cash_considerations` ADD CONSTRAINT `fk_cash_considerations_team`
   FOREIGN KEY (`teamid`) REFERENCES `ibl_team_info` (`teamid`) ON UPDATE CASCADE;
 

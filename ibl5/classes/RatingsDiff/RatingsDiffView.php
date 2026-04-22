@@ -46,8 +46,8 @@ class RatingsDiffView implements RatingsDiffViewInterface
         'td'          => 'td',
     ];
 
-    // Fixed columns before the per-rating columns: Player, Team, Pos, Max Δ = 4
-    private const FIXED_COL_COUNT = 4;
+    // Fixed columns before the per-rating columns: Player, Team, Age, Pos, Max Δ = 5
+    private const FIXED_COL_COUNT = 5;
 
     /**
      * @see RatingsDiffViewInterface::render()
@@ -95,6 +95,7 @@ class RatingsDiffView implements RatingsDiffViewInterface
         $html .= '<thead><tr>';
         $html .= '<th class="sticky-col">Player</th>';
         $html .= '<th class="ibl-team-cell--colored">Team</th>';
+        $html .= '<th>Age</th>';
         $html .= '<th>Pos</th>';
         $html .= '<th>Max &#916;</th>';
         foreach (RatingsDiffService::RATED_FIELDS as $field) {
@@ -131,6 +132,7 @@ class RatingsDiffView implements RatingsDiffViewInterface
         $html  = '<tr>';
         $html .= PlayerImageHelper::renderPlayerCell($row->pid, $safeName);
         $html .= TeamCellHelper::renderTeamCellOrFreeAgent($row->teamid, $row->teamName ?? '', $row->teamColor1, $row->teamColor2);
+        $html .= '<td>' . ($row->age !== null ? HtmlSanitizer::e($row->age) : '') . '</td>';
         $html .= '<td>' . HtmlSanitizer::e($row->pos) . '</td>';
         $html .= '<td sorttable_customkey="' . HtmlSanitizer::e($row->maxAbsDelta) . '">'
             . HtmlSanitizer::e($row->maxAbsDelta) . '</td>';
@@ -163,6 +165,7 @@ class RatingsDiffView implements RatingsDiffViewInterface
         $html  = '<tr>';
         $html .= PlayerImageHelper::renderPlayerCell($row->pid, $safeName);
         $html .= TeamCellHelper::renderTeamCellOrFreeAgent($row->teamid, $row->teamName ?? '', $row->teamColor1, $row->teamColor2);
+        $html .= '<td>' . ($row->age !== null ? HtmlSanitizer::e($row->age) : '') . '</td>';
         $html .= '<td>' . HtmlSanitizer::e($row->pos) . '</td>';
         // -9999999 keeps NEW rows at the bottom when any column is JS-sorted.
         $html .= '<td sorttable_customkey="-9999999"><span class="badge-new">NEW</span></td>';

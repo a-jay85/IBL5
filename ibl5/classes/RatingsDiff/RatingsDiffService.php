@@ -94,6 +94,7 @@ class RatingsDiffService implements Contracts\RatingsDiffServiceInterface
         $pid      = $this->readInt($row, 'pid');
         $name     = is_string($row['name'] ?? null) ? $row['name'] : '';
         $pos      = is_string($row['pos'] ?? null) ? $row['pos'] : '';
+        $age      = $this->readIntOrNull($row, 'age');
         $teamid      = $this->readInt($row, 'teamid');
         $teamName   = is_string($row['team_name'] ?? null) ? $row['team_name'] : null;
         $teamColor1 = is_string($row['color1'] ?? null) ? $row['color1'] : 'FFFFFF';
@@ -127,6 +128,7 @@ class RatingsDiffService implements Contracts\RatingsDiffServiceInterface
             pid: $pid,
             name: $name,
             pos: $pos,
+            age: $age,
             teamid: $teamid,
             teamName: $teamName,
             teamColor1: $teamColor1,

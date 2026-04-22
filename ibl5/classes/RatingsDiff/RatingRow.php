@@ -16,6 +16,7 @@ final class RatingRow
         public readonly int $pid,
         public readonly string $name,
         public readonly string $pos,
+        public readonly ?int $age,
         public readonly int $teamid,
         public readonly ?string $teamName,
         public readonly string $teamColor1,

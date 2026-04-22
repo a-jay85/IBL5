@@ -89,6 +89,7 @@
 @import './components/league-control-panel.css';
 @import './components/negotiate.css';
 @import './components/banners.css';
+@import './components/ratings-diff.css';
 @import './components/htmx.css';
 
 /* Site-wide layout wrapper (replaces legacy themeheader table) */

@@ -46,7 +46,7 @@ class RatingsDiffRepositoryTest extends DatabaseTestCase
             'season_year'  => $seasonYear,
             'snapshot_phase' => $phase,
             'source_archive' => 'test.plr',
-            'tid'          => 1,
+            'teamid'          => 1,
             'pos'          => 'PG',
             'oo'           => 50,
             'od'           => 50,
@@ -89,9 +89,9 @@ class RatingsDiffRepositoryTest extends DatabaseTestCase
     public function test_it_returns_max_season_year_for_end_of_season_snapshots(): void
     {
         // Use very high PIDs to avoid FK conflicts with real data
-        $this->insertTestPlayer(200_000_001, 'Player One', ['tid' => 1, 'retired' => 0]);
-        $this->insertTestPlayer(200_000_002, 'Player Two', ['tid' => 1, 'retired' => 0]);
-        $this->insertTestPlayer(200_000_003, 'Player Three', ['tid' => 1, 'retired' => 0]);
+        $this->insertTestPlayer(200_000_001, 'Player One', ['teamid' => 1, 'retired' => 0]);
+        $this->insertTestPlayer(200_000_002, 'Player Two', ['teamid' => 1, 'retired' => 0]);
+        $this->insertTestPlayer(200_000_003, 'Player Three', ['teamid' => 1, 'retired' => 0]);
 
         $this->insertSnapshot(200_000_001, 2023);
         $this->insertSnapshot(200_000_002, 2025);  // highest end-of-season year
@@ -104,7 +104,7 @@ class RatingsDiffRepositoryTest extends DatabaseTestCase
             'season_year'    => 2026,
             'snapshot_phase' => 'training-camp',
             'source_archive' => 'test.plr',
-            'tid'            => 1,
+            'teamid'            => 1,
             'pos'            => 'PG',
         ]);
 
@@ -120,14 +120,14 @@ class RatingsDiffRepositoryTest extends DatabaseTestCase
     public function test_it_returns_one_row_per_non_retired_player_with_baseline_joined(): void
     {
         // Player A: non-retired, has snapshot → returns with s_oo populated
-        $this->insertTestPlayer(200_000_010, 'Player Alpha', ['tid' => 1, 'retired' => 0, 'oo' => 70]);
+        $this->insertTestPlayer(200_000_010, 'Player Alpha', ['teamid' => 1, 'retired' => 0, 'oo' => 70]);
         $this->insertSnapshot(200_000_010, 2025);
 
         // Player B: non-retired, no snapshot → returns with s_oo = null
-        $this->insertTestPlayer(200_000_011, 'Player Beta', ['tid' => 1, 'retired' => 0, 'oo' => 60]);
+        $this->insertTestPlayer(200_000_011, 'Player Beta', ['teamid' => 1, 'retired' => 0, 'oo' => 60]);
 
         // Player C: retired → excluded from results
-        $this->insertTestPlayer(200_000_012, 'Player Charlie', ['tid' => 1, 'retired' => 1, 'oo' => 80]);
+        $this->insertTestPlayer(200_000_012, 'Player Charlie', ['teamid' => 1, 'retired' => 1, 'oo' => 80]);
         $this->insertSnapshot(200_000_012, 2025);
 
         $rows = $this->repo->getDiffRows(2025);
@@ -164,15 +164,15 @@ class RatingsDiffRepositoryTest extends DatabaseTestCase
     public function test_it_applies_filter_tid_when_set(): void
     {
         // Insert players on two different teams
-        $this->insertTestPlayer(200_000_020, 'Player On Team 1', ['tid' => 1, 'retired' => 0]);
-        $this->insertTestPlayer(200_000_021, 'Player On Team 2', ['tid' => 2, 'retired' => 0]);
+        $this->insertTestPlayer(200_000_020, 'Player On Team 1', ['teamid' => 1, 'retired' => 0]);
+        $this->insertTestPlayer(200_000_021, 'Player On Team 2', ['teamid' => 2, 'retired' => 0]);
         $this->insertSnapshot(200_000_020, 2025);
         $this->insertSnapshot(200_000_021, 2025);
 
         $rows = $this->repo->getDiffRows(2025, 1);
 
         $pids = array_column($rows, 'pid');
-        self::assertContains(200_000_020, $pids, 'tid=1 player should be included');
-        self::assertNotContains(200_000_021, $pids, 'tid=2 player should be excluded');
+        self::assertContains(200_000_020, $pids, 'teamid=1 player should be included');
+        self::assertNotContains(200_000_021, $pids, 'teamid=2 player should be excluded');
     }
 }

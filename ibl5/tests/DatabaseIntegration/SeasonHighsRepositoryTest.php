@@ -141,7 +141,7 @@ class SeasonHighsRepositoryTest extends DatabaseTestCase
         $this->insertRow('ibl_rcb_season_records', [
             'season_year' => 2098,
             'scope' => 'league',
-            'team_id' => 0,
+            'teamid' => 0,
             'context' => 'home',
             'stat_category' => 'pts',
             'ranking' => 1,

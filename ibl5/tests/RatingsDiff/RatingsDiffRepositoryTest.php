@@ -83,13 +83,13 @@ class RatingsDiffRepositoryTest extends TestCase
         $queries = $this->mockDb->getExecutedQueries();
         $combined = implode("\n", $queries);
         // MockPreparedStatement substitutes bound parameters; the final query
-        // should contain the literal tid filter.
-        self::assertStringContainsString('p.tid = 7', $combined);
+        // should contain the literal teamid filter.
+        self::assertStringContainsString('p.teamid = 7', $combined);
     }
 
     public function testGetDiffRowsReturnsRowsFromDatabase(): void
     {
-        $row = ['pid' => 1, 'name' => 'Test Player', 'pos' => 'PG', 'tid' => 5];
+        $row = ['pid' => 1, 'name' => 'Test Player', 'pos' => 'PG', 'teamid' => 5];
         $this->mockDb->setMockData([$row]);
         $repository = new RatingsDiffRepository($this->mockMysqliDb);
 

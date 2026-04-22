@@ -86,6 +86,7 @@ return [
     new SchemaAssertion('ibl_draft', 'teamid'),
     new SchemaAssertion('ibl_fa_offers', 'teamid'),
     new SchemaAssertion('ibl_cash_considerations', 'teamid'),
+    new SchemaAssertion('ibl_cash_considerations', 'counterparty_teamid'),
     new SchemaAssertion('ibl_standings', 'teamid'),
     new SchemaAssertion('ibl_olympics_standings', 'teamid'),
     new SchemaAssertion('ibl_saved_depth_charts', 'teamid'),

@@ -24,7 +24,7 @@ class RatingsDiffService implements Contracts\RatingsDiffServiceInterface
      */
     public const RATED_FIELDS = [
         'oo', 'od', 'r_drive_off', 'dd', 'po', 'pd', 'r_trans_off', 'td',
-        'r_fga', 'r_fgp', 'r_fta', 'r_ftp', 'r_tga', 'r_tgp',
+        'r_fga', 'r_fgp', 'r_fta', 'r_ftp', 'r_3ga', 'r_3gp',
         'r_orb', 'r_drb', 'r_ast', 'r_stl', 'r_tvr', 'r_blk', 'r_foul',
     ];
 
@@ -94,7 +94,7 @@ class RatingsDiffService implements Contracts\RatingsDiffServiceInterface
         $pid      = $this->readInt($row, 'pid');
         $name     = is_string($row['name'] ?? null) ? $row['name'] : '';
         $pos      = is_string($row['pos'] ?? null) ? $row['pos'] : '';
-        $tid      = $this->readInt($row, 'tid');
+        $teamid      = $this->readInt($row, 'teamid');
         $teamName = is_string($row['team_name'] ?? null) ? $row['team_name'] : null;
 
         // Use s_oo as the discriminator: if null, the player has no snapshot (LEFT JOIN miss)
@@ -125,7 +125,7 @@ class RatingsDiffService implements Contracts\RatingsDiffServiceInterface
             pid: $pid,
             name: $name,
             pos: $pos,
-            tid: $tid,
+            teamid: $teamid,
             teamName: $teamName,
             deltas: $deltas,
             maxAbsDelta: $maxAbsDelta,

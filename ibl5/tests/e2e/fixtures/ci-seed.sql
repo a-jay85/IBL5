@@ -826,7 +826,7 @@ ON DUPLICATE KEY UPDATE title = VALUES(title);
 -- 4 undrafted + 2 already drafted
 -- ============================================================
 
-INSERT INTO ibl_draft_class (name, pos, age, team, fga, fgp, fta, ftp, tga, tgp, orb, drb, ast, stl, tvr, blk, oo, r_drive_off, po, r_trans_off, od, dd, pd, td, talent, skill, intangibles, drafted, sta) VALUES
+INSERT INTO ibl_draft_class (name, pos, age, team, fga, fgp, fta, ftp, r_3ga, r_3gp, orb, drb, ast, stl, tvr, blk, oo, r_drive_off, po, r_trans_off, od, dd, pd, td, talent, skill, intangibles, drafted, sta) VALUES
   ('Prospect Guard',    'PG', 19, 'Duke',       60, 55, 50, 70, 40, 45, 30, 40, 65, 50, 45, 20, 60, 55, 40, 50, 55, 50, 40, 45, 70, 65, 60, 0, 75),
   ('Prospect Wing',     'SF', 20, 'Kentucky',   55, 50, 45, 65, 35, 40, 40, 50, 50, 45, 40, 30, 55, 50, 50, 45, 50, 55, 45, 50, 65, 60, 55, 0, 70),
   ('Prospect Big',      'C',  21, 'Gonzaga',    50, 55, 55, 60, 20, 30, 55, 60, 35, 30, 35, 55, 45, 40, 60, 35, 45, 40, 60, 40, 60, 55, 65, 0, 80),

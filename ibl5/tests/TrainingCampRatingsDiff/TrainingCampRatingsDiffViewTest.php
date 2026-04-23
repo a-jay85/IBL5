@@ -2,22 +2,22 @@
 
 declare(strict_types=1);
 
-namespace Tests\RatingsDiff;
+namespace Tests\TrainingCampRatingsDiff;
 
 use PHPUnit\Framework\TestCase;
-use RatingsDiff\Contracts\RatingsDiffViewInterface;
-use RatingsDiff\RatingDelta;
-use RatingsDiff\RatingRow;
-use RatingsDiff\RatingsDiffService;
-use RatingsDiff\RatingsDiffView;
+use TrainingCampRatingsDiff\Contracts\TrainingCampRatingsDiffViewInterface;
+use TrainingCampRatingsDiff\RatingDelta;
+use TrainingCampRatingsDiff\RatingRow;
+use TrainingCampRatingsDiff\TrainingCampRatingsDiffService;
+use TrainingCampRatingsDiff\TrainingCampRatingsDiffView;
 
-class RatingsDiffViewTest extends TestCase
+class TrainingCampRatingsDiffViewTest extends TestCase
 {
-    private RatingsDiffView $view;
+    private TrainingCampRatingsDiffView $view;
 
     protected function setUp(): void
     {
-        $this->view = new RatingsDiffView();
+        $this->view = new TrainingCampRatingsDiffView();
     }
 
     // ---------------------------------------------------------------------------
@@ -40,7 +40,7 @@ class RatingsDiffViewTest extends TestCase
         /** @var array<string, RatingDelta> $deltas */
         $deltas = [];
 
-        foreach (RatingsDiffService::RATED_FIELDS as $field) {
+        foreach (TrainingCampRatingsDiffService::RATED_FIELDS as $field) {
             if ($isNew) {
                 $deltas[$field] = new RatingDelta($field, null, 50, null);
             } else {
@@ -51,7 +51,7 @@ class RatingsDiffViewTest extends TestCase
             }
         }
 
-        $sumAbs = $isNew ? 0 : ($maxAbs * count(RatingsDiffService::RATED_FIELDS));
+        $sumAbs = $isNew ? 0 : ($maxAbs * count(TrainingCampRatingsDiffService::RATED_FIELDS));
 
         return new RatingRow(
             pid: $pid,
@@ -80,7 +80,7 @@ class RatingsDiffViewTest extends TestCase
         /** @var array<string, RatingDelta> $deltas */
         $deltas = [];
 
-        foreach (RatingsDiffService::RATED_FIELDS as $field) {
+        foreach (TrainingCampRatingsDiffService::RATED_FIELDS as $field) {
             if ($field === 'oo') {
                 $deltas[$field] = new RatingDelta($field, 50, 50 + $ooDelta, $ooDelta);
             } else {
@@ -112,7 +112,7 @@ class RatingsDiffViewTest extends TestCase
 
     public function test_view_implements_interface(): void
     {
-        self::assertInstanceOf(RatingsDiffViewInterface::class, $this->view);
+        self::assertInstanceOf(TrainingCampRatingsDiffViewInterface::class, $this->view);
     }
 
     // ---------------------------------------------------------------------------

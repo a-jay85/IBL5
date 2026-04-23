@@ -4,15 +4,15 @@ declare(strict_types=1);
 
 namespace Tests\DatabaseIntegration;
 
-use RatingsDiff\RatingsDiffRepository;
+use TrainingCampRatingsDiff\TrainingCampRatingsDiffRepository;
 
 /**
- * Integration tests for RatingsDiffRepository against a real MariaDB instance.
+ * Integration tests for TrainingCampRatingsDiffRepository against a real MariaDB instance.
  *
- * NOTE: This file lives in tests/DatabaseIntegration/ (NOT tests/RatingsDiff/)
+ * NOTE: This file lives in tests/DatabaseIntegration/ (NOT tests/TrainingCampRatingsDiff/)
  * to follow the project convention — real-DB tests are excluded from the default
  * PHPUnit suite and run explicitly via:
- *   vendor/bin/phpunit tests/DatabaseIntegration/RatingsDiffRepositoryTest.php
+ *   vendor/bin/phpunit tests/DatabaseIntegration/TrainingCampRatingsDiffRepositoryTest.php
  *
  * The #[Group('database')] attribute on DatabaseTestCase prevents accidental
  * inclusion in the normal test run (which lacks DB_HOST / DB_USER / DB_PASS / DB_NAME).
@@ -20,14 +20,14 @@ use RatingsDiff\RatingsDiffRepository;
  * Each test wraps its work in a transaction that DatabaseTestCase rolls back in
  * tearDown(), so no data persists between tests.
  */
-class RatingsDiffRepositoryTest extends DatabaseTestCase
+class TrainingCampRatingsDiffRepositoryTest extends DatabaseTestCase
 {
-    private RatingsDiffRepository $repo;
+    private TrainingCampRatingsDiffRepository $repo;
 
     protected function setUp(): void
     {
         parent::setUp();
-        $this->repo = new RatingsDiffRepository($this->db);
+        $this->repo = new TrainingCampRatingsDiffRepository($this->db);
     }
 
     // ---------------------------------------------------------------------------

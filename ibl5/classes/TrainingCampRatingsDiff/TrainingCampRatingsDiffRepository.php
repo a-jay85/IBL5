@@ -2,23 +2,23 @@
 
 declare(strict_types=1);
 
-namespace RatingsDiff;
+namespace TrainingCampRatingsDiff;
 
 use BaseMysqliRepository;
-use RatingsDiff\Contracts\RatingsDiffRepositoryInterface;
+use TrainingCampRatingsDiff\Contracts\TrainingCampRatingsDiffRepositoryInterface;
 
 /**
- * RatingsDiffRepository — fetches ibl_plr and ibl_plr_snapshots data for the diff page.
+ * TrainingCampRatingsDiffRepository — fetches ibl_plr and ibl_plr_snapshots data for the diff page.
  *
  * Column name notes (migration 113):
  *   - `to` was renamed to `r_trans_off` (transition offense rating)
  *   - `do` was renamed to `r_drive_off` (drive offense rating)
  *   - `r_to` was renamed to `r_tvr` (turnover rating)
  */
-class RatingsDiffRepository extends BaseMysqliRepository implements RatingsDiffRepositoryInterface
+class TrainingCampRatingsDiffRepository extends BaseMysqliRepository implements TrainingCampRatingsDiffRepositoryInterface
 {
     /**
-     * @see RatingsDiffRepositoryInterface::getLatestEndOfSeasonYear()
+     * @see TrainingCampRatingsDiffRepositoryInterface::getLatestEndOfSeasonYear()
      */
     public function getLatestEndOfSeasonYear(): ?int
     {
@@ -45,7 +45,7 @@ class RatingsDiffRepository extends BaseMysqliRepository implements RatingsDiffR
     }
 
     /**
-     * @see RatingsDiffRepositoryInterface::getDiffRows()
+     * @see TrainingCampRatingsDiffRepositoryInterface::getDiffRows()
      *
      * @return list<array<string, mixed>>
      */

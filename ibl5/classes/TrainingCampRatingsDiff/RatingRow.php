@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace RatingsDiff;
+namespace TrainingCampRatingsDiff;
 
 /**
  * Value object representing one player's full ratings diff row.
@@ -10,7 +10,7 @@ namespace RatingsDiff;
 final class RatingRow
 {
     /**
-     * @param array<string, RatingDelta> $deltas Keyed by field name (one of RatingsDiffService::RATED_FIELDS)
+     * @param array<string, RatingDelta> $deltas Keyed by field name (one of TrainingCampRatingsDiffService::RATED_FIELDS)
      */
     public function __construct(
         public readonly int $pid,

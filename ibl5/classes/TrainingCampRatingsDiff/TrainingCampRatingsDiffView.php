@@ -2,20 +2,20 @@
 
 declare(strict_types=1);
 
-namespace RatingsDiff;
+namespace TrainingCampRatingsDiff;
 
 use Player\PlayerImageHelper;
-use RatingsDiff\Contracts\RatingsDiffViewInterface;
+use TrainingCampRatingsDiff\Contracts\TrainingCampRatingsDiffViewInterface;
 use UI\TeamCellHelper;
 use Utilities\HtmlSanitizer;
 
 /**
- * RatingsDiffView — renders the admin ratings diff page.
+ * TrainingCampRatingsDiffView — renders the admin ratings diff page.
  *
  * Column name notes (migration 113):
  *   - `do`  → r_drive_off, `to`  → r_trans_off, `r_to` → r_tvr
  */
-class RatingsDiffView implements RatingsDiffViewInterface
+class TrainingCampRatingsDiffView implements TrainingCampRatingsDiffViewInterface
 {
     /**
      * Short display labels for each rated field, keyed by RATED_FIELDS name.
@@ -50,7 +50,7 @@ class RatingsDiffView implements RatingsDiffViewInterface
     private const FIXED_COL_COUNT = 5;
 
     /**
-     * @see RatingsDiffViewInterface::render()
+     * @see TrainingCampRatingsDiffViewInterface::render()
      *
      * @param list<RatingRow> $rows
      */
@@ -68,7 +68,7 @@ class RatingsDiffView implements RatingsDiffViewInterface
      */
     private function renderTable(int $baselineYear, array $rows, string $filterStatus): string
     {
-        $totalCols = self::FIXED_COL_COUNT + count(RatingsDiffService::RATED_FIELDS);
+        $totalCols = self::FIXED_COL_COUNT + count(TrainingCampRatingsDiffService::RATED_FIELDS);
 
         // Separate real rows from new-player rows (Service has already sorted them)
         /** @var list<RatingRow> $realRows */
@@ -99,7 +99,7 @@ class RatingsDiffView implements RatingsDiffViewInterface
         $html .= '<th>Age</th>';
         $html .= '<th>Pos</th>';
         $html .= '<th>Max &#916;</th>';
-        foreach (RatingsDiffService::RATED_FIELDS as $field) {
+        foreach (TrainingCampRatingsDiffService::RATED_FIELDS as $field) {
             $label = self::FIELD_LABELS[$field];
             $html .= '<th>' . HtmlSanitizer::e($label) . '</th>';
         }
@@ -166,7 +166,7 @@ class RatingsDiffView implements RatingsDiffViewInterface
         $html .= '<td sorttable_customkey="' . HtmlSanitizer::e($row->maxAbsDelta) . '">'
             . HtmlSanitizer::e($row->maxAbsDelta) . '</td>';
 
-        foreach (RatingsDiffService::RATED_FIELDS as $field) {
+        foreach (TrainingCampRatingsDiffService::RATED_FIELDS as $field) {
             $delta = $row->deltas[$field] ?? null;
             if ($delta !== null) {
                 $sortKey = ($delta->delta !== null) ? $delta->delta : 0;
@@ -199,7 +199,7 @@ class RatingsDiffView implements RatingsDiffViewInterface
         // -9999999 keeps NEW rows at the bottom when any column is JS-sorted.
         $html .= '<td sorttable_customkey="-9999999"><span class="badge-new">NEW</span></td>';
 
-        foreach (RatingsDiffService::RATED_FIELDS as $field) {
+        foreach (TrainingCampRatingsDiffService::RATED_FIELDS as $field) {
             $delta = $row->deltas[$field] ?? null;
             $html .= '<td sorttable_customkey="-9999999">'
                 . HtmlSanitizer::e($delta !== null ? $delta->after : '') . '</td>';

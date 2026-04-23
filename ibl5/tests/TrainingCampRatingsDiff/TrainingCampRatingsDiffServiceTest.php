@@ -2,29 +2,29 @@
 
 declare(strict_types=1);
 
-namespace Tests\RatingsDiff;
+namespace Tests\TrainingCampRatingsDiff;
 
 use PHPUnit\Framework\TestCase;
-use RatingsDiff\Contracts\RatingsDiffRepositoryInterface;
-use RatingsDiff\RatingRow;
-use RatingsDiff\RatingsDiffService;
+use TrainingCampRatingsDiff\Contracts\TrainingCampRatingsDiffRepositoryInterface;
+use TrainingCampRatingsDiff\RatingRow;
+use TrainingCampRatingsDiff\TrainingCampRatingsDiffService;
 
-class RatingsDiffServiceTest extends TestCase
+class TrainingCampRatingsDiffServiceTest extends TestCase
 {
-    /** @var RatingsDiffRepositoryInterface&\PHPUnit\Framework\MockObject\Stub */
-    private RatingsDiffRepositoryInterface $stubRepo;
+    /** @var TrainingCampRatingsDiffRepositoryInterface&\PHPUnit\Framework\MockObject\Stub */
+    private TrainingCampRatingsDiffRepositoryInterface $stubRepo;
 
-    private RatingsDiffService $service;
+    private TrainingCampRatingsDiffService $service;
 
     protected function setUp(): void
     {
-        $this->stubRepo = $this->createStub(RatingsDiffRepositoryInterface::class);
-        $this->service  = new RatingsDiffService($this->stubRepo);
+        $this->stubRepo = $this->createStub(TrainingCampRatingsDiffRepositoryInterface::class);
+        $this->service  = new TrainingCampRatingsDiffService($this->stubRepo);
     }
 
-    private function buildService(?RatingsDiffRepositoryInterface $repo = null): RatingsDiffService
+    private function buildService(?TrainingCampRatingsDiffRepositoryInterface $repo = null): TrainingCampRatingsDiffService
     {
-        return new RatingsDiffService($repo ?? $this->stubRepo);
+        return new TrainingCampRatingsDiffService($repo ?? $this->stubRepo);
     }
 
     // ---------------------------------------------------------------------------
@@ -52,7 +52,7 @@ class RatingsDiffServiceTest extends TestCase
             'team_name' => $teamName,
         ];
 
-        foreach (RatingsDiffService::RATED_FIELDS as $i => $field) {
+        foreach (TrainingCampRatingsDiffService::RATED_FIELDS as $i => $field) {
             $row[$field] = 50 + $i;
             if ($isNew) {
                 $row['s_' . $field] = null;
@@ -83,7 +83,7 @@ class RatingsDiffServiceTest extends TestCase
 
     public function test_it_resolves_baseline_year_from_repository_when_override_is_null(): void
     {
-        $mockRepo = $this->createMock(RatingsDiffRepositoryInterface::class);
+        $mockRepo = $this->createMock(TrainingCampRatingsDiffRepositoryInterface::class);
         $mockRepo->method('getLatestEndOfSeasonYear')->willReturn(2025);
         $mockRepo->expects($this->once())
             ->method('getDiffRows')
@@ -96,7 +96,7 @@ class RatingsDiffServiceTest extends TestCase
 
     public function test_it_uses_override_year_when_provided(): void
     {
-        $mockRepo = $this->createMock(RatingsDiffRepositoryInterface::class);
+        $mockRepo = $this->createMock(TrainingCampRatingsDiffRepositoryInterface::class);
         $mockRepo->expects($this->once())
             ->method('getDiffRows')
             ->with(2020, null)
@@ -108,7 +108,7 @@ class RatingsDiffServiceTest extends TestCase
 
     public function test_it_passes_filter_tid_through_to_repository(): void
     {
-        $mockRepo = $this->createMock(RatingsDiffRepositoryInterface::class);
+        $mockRepo = $this->createMock(TrainingCampRatingsDiffRepositoryInterface::class);
         $mockRepo->method('getLatestEndOfSeasonYear')->willReturn(2025);
         $mockRepo->expects($this->once())
             ->method('getDiffRows')
@@ -138,7 +138,7 @@ class RatingsDiffServiceTest extends TestCase
 
         self::assertCount(21, $ratingRow->deltas);
 
-        foreach (RatingsDiffService::RATED_FIELDS as $i => $field) {
+        foreach (TrainingCampRatingsDiffService::RATED_FIELDS as $i => $field) {
             $expectedAfter  = 50 + $i;
             $expectedBefore = 40 + $i;
             $expectedDelta  = 10;
@@ -179,7 +179,7 @@ class RatingsDiffServiceTest extends TestCase
         $rowA['oo']   = 60; $rowA['s_oo']   = 50; // delta=10
         $rowA['od']   = 55; $rowA['s_od']   = 45; // delta=10
         // All other fields: make after == before
-        foreach (RatingsDiffService::RATED_FIELDS as $field) {
+        foreach (TrainingCampRatingsDiffService::RATED_FIELDS as $field) {
             if ($field !== 'oo' && $field !== 'od') {
                 $rowA[$field]       = 50;
                 $rowA['s_' . $field] = 50;
@@ -190,7 +190,7 @@ class RatingsDiffServiceTest extends TestCase
         $rowB['oo']          = 60; $rowB['s_oo']          = 50; // delta=10
         $rowB['od']          = 55; $rowB['s_od']          = 45; // delta=10
         $rowB['r_drive_off'] = 52; $rowB['s_r_drive_off'] = 42; // delta=10
-        foreach (RatingsDiffService::RATED_FIELDS as $field) {
+        foreach (TrainingCampRatingsDiffService::RATED_FIELDS as $field) {
             if (!in_array($field, ['oo', 'od', 'r_drive_off'], true)) {
                 $rowB[$field]       = 50;
                 $rowB['s_' . $field] = 50;
@@ -199,7 +199,7 @@ class RatingsDiffServiceTest extends TestCase
 
         // C: oo: delta=5; rest 0 → max=5, sum=5
         $rowC['oo'] = 55; $rowC['s_oo'] = 50; // delta=5
-        foreach (RatingsDiffService::RATED_FIELDS as $field) {
+        foreach (TrainingCampRatingsDiffService::RATED_FIELDS as $field) {
             if ($field !== 'oo') {
                 $rowC[$field]       = 50;
                 $rowC['s_' . $field] = 50;
@@ -210,7 +210,7 @@ class RatingsDiffServiceTest extends TestCase
         $rowD['oo']          = 60; $rowD['s_oo']          = 50; // delta=10
         $rowD['od']          = 55; $rowD['s_od']          = 45; // delta=10
         $rowD['r_drive_off'] = 52; $rowD['s_r_drive_off'] = 42; // delta=10
-        foreach (RatingsDiffService::RATED_FIELDS as $field) {
+        foreach (TrainingCampRatingsDiffService::RATED_FIELDS as $field) {
             if (!in_array($field, ['oo', 'od', 'r_drive_off'], true)) {
                 $rowD[$field]       = 50;
                 $rowD['s_' . $field] = 50;
@@ -276,7 +276,7 @@ class RatingsDiffServiceTest extends TestCase
     {
         // All after values equal before values → all deltas = 0
         $row = $this->buildDbRow(1, 'Unchanged Player');
-        foreach (RatingsDiffService::RATED_FIELDS as $field) {
+        foreach (TrainingCampRatingsDiffService::RATED_FIELDS as $field) {
             $row[$field]       = 50;
             $row['s_' . $field] = 50;
         }

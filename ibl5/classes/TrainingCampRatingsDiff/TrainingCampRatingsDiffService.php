@@ -2,12 +2,12 @@
 
 declare(strict_types=1);
 
-namespace RatingsDiff;
+namespace TrainingCampRatingsDiff;
 
-use RatingsDiff\Contracts\RatingsDiffRepositoryInterface;
+use TrainingCampRatingsDiff\Contracts\TrainingCampRatingsDiffRepositoryInterface;
 
 /**
- * RatingsDiffService — computes per-player rating deltas against the latest end-of-season snapshot.
+ * TrainingCampRatingsDiffService — computes per-player rating deltas against the latest end-of-season snapshot.
  *
  * Column name notes (migration 113):
  *   - `do`  → r_drive_off (drive offense rating)
@@ -15,7 +15,7 @@ use RatingsDiff\Contracts\RatingsDiffRepositoryInterface;
  *   - `r_to` → r_tvr      (turnover rating)
  *   - `sta` is excluded — ibl_plr_snapshots does not have that column.
  */
-class RatingsDiffService implements Contracts\RatingsDiffServiceInterface
+class TrainingCampRatingsDiffService implements Contracts\TrainingCampRatingsDiffServiceInterface
 {
     /**
      * All 21 rating fields present in both ibl_plr and ibl_plr_snapshots.
@@ -29,12 +29,12 @@ class RatingsDiffService implements Contracts\RatingsDiffServiceInterface
     ];
 
     public function __construct(
-        private readonly RatingsDiffRepositoryInterface $repository,
+        private readonly TrainingCampRatingsDiffRepositoryInterface $repository,
     ) {
     }
 
     /**
-     * @see Contracts\RatingsDiffServiceInterface::getDiffs()
+     * @see Contracts\TrainingCampRatingsDiffServiceInterface::getDiffs()
      *
      * @return list<RatingRow>
      */
@@ -77,7 +77,7 @@ class RatingsDiffService implements Contracts\RatingsDiffServiceInterface
     }
 
     /**
-     * @see Contracts\RatingsDiffServiceInterface::getBaselineYear()
+     * @see Contracts\TrainingCampRatingsDiffServiceInterface::getBaselineYear()
      */
     public function getBaselineYear(?int $overrideYear = null): ?int
     {

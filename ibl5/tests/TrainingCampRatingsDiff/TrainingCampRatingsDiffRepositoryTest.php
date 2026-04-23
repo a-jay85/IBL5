@@ -2,13 +2,13 @@
 
 declare(strict_types=1);
 
-namespace Tests\RatingsDiff;
+namespace Tests\TrainingCampRatingsDiff;
 
 use PHPUnit\Framework\TestCase;
-use RatingsDiff\Contracts\RatingsDiffRepositoryInterface;
-use RatingsDiff\RatingsDiffRepository;
+use TrainingCampRatingsDiff\Contracts\TrainingCampRatingsDiffRepositoryInterface;
+use TrainingCampRatingsDiff\TrainingCampRatingsDiffRepository;
 
-class RatingsDiffRepositoryTest extends TestCase
+class TrainingCampRatingsDiffRepositoryTest extends TestCase
 {
     private \MockDatabase $mockDb;
     private \mysqli $mockMysqliDb;
@@ -21,15 +21,15 @@ class RatingsDiffRepositoryTest extends TestCase
 
     public function testImplementsInterface(): void
     {
-        $repository = new RatingsDiffRepository($this->mockMysqliDb);
+        $repository = new TrainingCampRatingsDiffRepository($this->mockMysqliDb);
 
-        self::assertInstanceOf(RatingsDiffRepositoryInterface::class, $repository);
+        self::assertInstanceOf(TrainingCampRatingsDiffRepositoryInterface::class, $repository);
     }
 
     public function testGetLatestEndOfSeasonYearReturnsNullWhenNoSnapshotsExist(): void
     {
         $this->mockDb->onQuery('MAX\(season_year\)', [['y' => null]]);
-        $repository = new RatingsDiffRepository($this->mockMysqliDb);
+        $repository = new TrainingCampRatingsDiffRepository($this->mockMysqliDb);
 
         $result = $repository->getLatestEndOfSeasonYear();
 
@@ -39,7 +39,7 @@ class RatingsDiffRepositoryTest extends TestCase
     public function testGetLatestEndOfSeasonYearReturnsMaxYearFromSnapshots(): void
     {
         $this->mockDb->onQuery('MAX\(season_year\)', [['y' => 2025]]);
-        $repository = new RatingsDiffRepository($this->mockMysqliDb);
+        $repository = new TrainingCampRatingsDiffRepository($this->mockMysqliDb);
 
         $result = $repository->getLatestEndOfSeasonYear();
 
@@ -50,7 +50,7 @@ class RatingsDiffRepositoryTest extends TestCase
     {
         // MariaDB typically returns ints natively, but older drivers may yield strings
         $this->mockDb->onQuery('MAX\(season_year\)', [['y' => '2024']]);
-        $repository = new RatingsDiffRepository($this->mockMysqliDb);
+        $repository = new TrainingCampRatingsDiffRepository($this->mockMysqliDb);
 
         $result = $repository->getLatestEndOfSeasonYear();
 
@@ -60,7 +60,7 @@ class RatingsDiffRepositoryTest extends TestCase
     public function testGetDiffRowsQueriesLiveAndSnapshotTables(): void
     {
         $this->mockDb->setMockData([]);
-        $repository = new RatingsDiffRepository($this->mockMysqliDb);
+        $repository = new TrainingCampRatingsDiffRepository($this->mockMysqliDb);
 
         $repository->getDiffRows(2024);
 
@@ -76,7 +76,7 @@ class RatingsDiffRepositoryTest extends TestCase
     public function testGetDiffRowsAppliesFilterTidWhenSet(): void
     {
         $this->mockDb->setMockData([]);
-        $repository = new RatingsDiffRepository($this->mockMysqliDb);
+        $repository = new TrainingCampRatingsDiffRepository($this->mockMysqliDb);
 
         $repository->getDiffRows(2024, 7);
 
@@ -91,7 +91,7 @@ class RatingsDiffRepositoryTest extends TestCase
     {
         $row = ['pid' => 1, 'name' => 'Test Player', 'pos' => 'PG', 'teamid' => 5];
         $this->mockDb->setMockData([$row]);
-        $repository = new RatingsDiffRepository($this->mockMysqliDb);
+        $repository = new TrainingCampRatingsDiffRepository($this->mockMysqliDb);
 
         $result = $repository->getDiffRows(2024);
 

@@ -2,12 +2,12 @@
 
 declare(strict_types=1);
 
-namespace RatingsDiff\Contracts;
+namespace TrainingCampRatingsDiff\Contracts;
 
 /**
- * RatingsDiffRepositoryInterface — data access for ratings diff page.
+ * TrainingCampRatingsDiffRepositoryInterface — data access for ratings diff page.
  */
-interface RatingsDiffRepositoryInterface
+interface TrainingCampRatingsDiffRepositoryInterface
 {
     /**
      * Returns the latest season_year that has end-of-season snapshots, or null if none exist.

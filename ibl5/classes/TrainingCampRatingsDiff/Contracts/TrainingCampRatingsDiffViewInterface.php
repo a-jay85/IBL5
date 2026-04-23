@@ -2,14 +2,14 @@
 
 declare(strict_types=1);
 
-namespace RatingsDiff\Contracts;
+namespace TrainingCampRatingsDiff\Contracts;
 
-use RatingsDiff\RatingRow;
+use TrainingCampRatingsDiff\RatingRow;
 
 /**
- * RatingsDiffViewInterface — HTML rendering for the ratings diff page.
+ * TrainingCampRatingsDiffViewInterface — HTML rendering for the ratings diff page.
  */
-interface RatingsDiffViewInterface
+interface TrainingCampRatingsDiffViewInterface
 {
     /**
      * Renders the full ratings diff page content.

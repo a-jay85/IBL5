@@ -2,14 +2,14 @@
 
 declare(strict_types=1);
 
-namespace RatingsDiff\Contracts;
+namespace TrainingCampRatingsDiff\Contracts;
 
-use RatingsDiff\RatingRow;
+use TrainingCampRatingsDiff\RatingRow;
 
 /**
- * RatingsDiffServiceInterface — business logic for the ratings diff page.
+ * TrainingCampRatingsDiffServiceInterface — business logic for the ratings diff page.
  */
-interface RatingsDiffServiceInterface
+interface TrainingCampRatingsDiffServiceInterface
 {
     /**
      * Returns player rating rows sorted by largest single rating change.

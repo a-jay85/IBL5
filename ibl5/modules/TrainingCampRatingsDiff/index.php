@@ -2,22 +2,25 @@
 
 declare(strict_types=1);
 
-require $_SERVER['DOCUMENT_ROOT'] . '/ibl5/mainfile.php';
+if (!defined('MODULE_FILE')) {
+    die("You can't access this file directly...");
+}
+
+use TrainingCampRatingsDiff\TrainingCampRatingsDiffRepository;
+use TrainingCampRatingsDiff\TrainingCampRatingsDiffService;
+use TrainingCampRatingsDiff\TrainingCampRatingsDiffView;
+
+global $mysqli_db, $user;
 
 if (!is_user($user)) {
-    $_SESSION['redirect_after_login_path'] = 'ratingsDiff.php';
-    \Utilities\HtmxHelper::redirect('modules.php?name=YourAccount');
+    loginbox();
 }
 
 if (!is_admin()) {
     http_response_code(403);
     echo 'Access denied. Administrator privileges required.';
-    exit;
+    return;
 }
-
-$repository = new RatingsDiff\RatingsDiffRepository($mysqli_db);
-$service    = new RatingsDiff\RatingsDiffService($repository);
-$view       = new RatingsDiff\RatingsDiffView();
 
 $overrideYear = null;
 if (isset($_GET['year']) && is_string($_GET['year']) && ctype_digit($_GET['year'])) {
@@ -32,9 +35,13 @@ if (isset($_GET['status']) && is_string($_GET['status']) && in_array($_GET['stat
     $filterStatus = $_GET['status'];
 }
 
+$repository = new TrainingCampRatingsDiffRepository($mysqli_db);
+$service    = new TrainingCampRatingsDiffService($repository);
+$view       = new TrainingCampRatingsDiffView();
+
 $baselineYear = $service->getBaselineYear($overrideYear);
 $rows = $service->getDiffs($overrideYear, $filterTid, $filterStatus);
 
-\PageLayout\PageLayout::header();
+PageLayout\PageLayout::header();
 echo $view->render($baselineYear, $rows, $filterStatus);
-\PageLayout\PageLayout::footer();
+PageLayout\PageLayout::footer();

@@ -1,6 +1,6 @@
 ---
 description: Frontmatter schema, 60-day staleness policy, on-touch verification rule, and dead-reference rules enforced by bin/check-docs
-last_verified: 2026-04-12
+last_verified: 2026-04-23
 paths: "**/*.md"
 ---
 
@@ -72,21 +72,9 @@ If a reference is intentional but unverifiable (e.g. an example path that should
 ## How to Run
 
 ```bash
-# Validate all in-scope docs (what CI runs)
-bin/check-docs
-
-# Include user memory files in the sweep (local only)
-bin/check-docs --include-memory
-
-# Bump last_verified on every in-scope doc to today (reviewed batch re-verification only)
-bin/check-docs --fix-dates
-
-# Verbose per-file output
-bin/check-docs --verbose
+bin/check-docs                  # Validate all in-scope docs (what CI runs)
+bin/check-docs --include-memory # Include user memory files (local only)
+bin/check-docs --fix-dates      # Batch re-verification only — bump all dates
 ```
 
-The CI workflow `doc-freshness.yml` runs `bin/check-docs` on every push and PR. Merge is blocked on failure.
-
-## Rationale
-
-Few-shot context: every code example and phrased rule in these docs is a demonstration the model pattern-matches against. Three-day debugging sessions have happened elsewhere because an agent followed a stale preference buried in a forgotten convention file. Structured frontmatter plus CI-enforced freshness makes staleness visible before it causes damage — it trades a small, automated friction for the large, manual cost of correcting an agent session that followed a ghost rule.
+CI workflow `doc-freshness.yml` runs `bin/check-docs` on every push and PR. Merge is blocked on failure.

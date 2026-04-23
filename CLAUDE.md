@@ -1,6 +1,6 @@
 ---
 description: Root Claude Code instructions for IBL5: commands, mandatory rules, and architecture pointers.
-last_verified: 2026-04-13
+last_verified: 2026-04-23
 ---
 
 # CLAUDE.md
@@ -16,35 +16,15 @@ IBL5 is an Internet Basketball League fantasy basketball site powered by Jump Sh
 ## Commands
 
 ```bash
-# Run all tests
-bin/test
-
-# Quick pass/fail check
-bin/test | tail -3
+bin/test                    # Run all PHPUnit tests
+bin/test | tail -3          # Quick pass/fail check
+cd ibl5 && composer run analyse  # PHPStan (level max + strict-rules + bleedingEdge)
+cd ibl5 && bun run test:e2e      # Playwright E2E (requires Docker + .env.test)
 ```
 
-`bin/test` wraps PHPUnit with standard flags (`--no-progress --no-output --testdox-summary`). Pass additional flags directly: `bin/test --filter testMethodName`, `bin/test --testsuite "Module"`. Only read output below `Summary of tests with errors, failures, or issues:`. See `phpunit-tests.md` for full rules.
+**Full test suite rule:** Always run `bin/test` (no `--filter`/`--testsuite`) after PHP changes and before considering any task complete. Only use targeted flags when actively debugging — then re-run the full suite.
 
-### Static Analysis (PHPStan)
-
-```bash
-# Run PHPStan (level max + strict-rules + bleedingEdge)
-cd ibl5 && composer run analyse
-```
-
-**Note:** PHPStan and the **full** PHPUnit test suite run automatically via PostToolUse hooks when a task is marked completed (TaskUpdate → `completed`). They only fire when PHP files have been modified (checked via `git diff`). If your changes introduce new errors above the baseline, fix them before proceeding. The only exception: errors clearly caused by another Claude instance's simultaneous changes to files you did not touch — those may be ignored.
-
-**Full test suite rule:** Always run the **full** PHPUnit test suite (no `--testsuite` or `--filter` flags) after making PHP changes and before considering any task complete. Changes in one module frequently break tests in other modules (e.g., updating a shared mock, interface, or base class). Only use `--testsuite` or `--filter` when actively debugging a specific failing test — then re-run the full suite once it passes.
-
-**Write PHPStan-clean code proactively.** The project runs level `max` with `phpstan-strict-rules` and `bleedingEdge`. See `php-classes.md` for the full list of PHPStan rules.
-
-### E2E Tests (Playwright)
-
-```bash
-cd ibl5 && bun run test:e2e
-```
-
-E2E tests do NOT auto-run via hooks — run manually. Requires Docker + `.env.test`. See `playwright-tests.md` for full rules and command variants.
+PHPStan and PHPUnit auto-run via PostToolUse hooks on task completion when PHP files changed. E2E tests do NOT auto-run. See `phpunit-tests.md` and `playwright-tests.md` for full rules.
 
 ## Architecture
 
@@ -66,12 +46,10 @@ The modules in `ibl5/classes/` follow Repository/Service/View pattern with inter
 Classes autoload from `ibl5/classes/`. `require_once`/`require`/`include` in `classes/**` is enforced-banned by PHPStan rule `BanRequireOnceRule` (`ibl.requireOnce`).
 
 ### Database
-- Schema: `ibl5/migrations/000_baseline_schema.sql` - **always verify table/column names here** (check subsequent migrations for alterations)
-- **Migrations are the single source of truth.** `000_baseline_schema.sql` is the production snapshot; all subsequent migrations alter it. There is no separate `schema.sql`.
+- Schema: `ibl5/migrations/000_baseline_schema.sql` — **always verify table/column names here** (check subsequent migrations for alterations). Migrations are the single source of truth.
 - **Native types enabled:** `MYSQLI_OPT_INT_AND_FLOAT_NATIVE` is set on `$mysqli_db`. See `core-coding.md` for type comparison rules.
-- **Docker:** `docker compose up -d` starts MariaDB + PHP-Apache (`http://main.localhost/ibl5/`). See `database-access.md` for connection details and `ibl5/docs/DOCKER_SETUP.md` for full setup.
-- **CLI MariaDB access:** `mariadb -h 127.0.0.1 --skip-ssl -u root -proot iblhoops_ibl5`. For quick queries, prefer the `./bin/db-query "SQL"` wrapper.
-- **DuckDB analytics:** Columnar OLAP layer over production data for cross-season analysis. See `duckdb-analytics.md` for tables, queries, and when to use it.
+- **Docker:** `docker compose up -d` → `http://main.localhost/ibl5/`. See `database-access.md` for connection details.
+- **CLI queries:** `./bin/db-query "SQL"`. See `duckdb-analytics.md` for cross-season OLAP analysis.
 
 ## Nightly Queue
 

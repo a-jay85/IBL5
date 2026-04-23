@@ -2,12 +2,12 @@
 
 declare(strict_types=1);
 
-namespace RatingsDiff;
+namespace TrainingCampRatingsDiff;
 
-use RatingsDiff\Contracts\RatingsDiffRepositoryInterface;
+use TrainingCampRatingsDiff\Contracts\TrainingCampRatingsDiffRepositoryInterface;
 
 /**
- * RatingsDiffService — computes per-player rating deltas against the latest end-of-season snapshot.
+ * TrainingCampRatingsDiffService — computes per-player rating deltas against the latest end-of-season snapshot.
  *
  * Column name notes (migration 113):
  *   - `do`  → r_drive_off (drive offense rating)
@@ -15,7 +15,7 @@ use RatingsDiff\Contracts\RatingsDiffRepositoryInterface;
  *   - `r_to` → r_tvr      (turnover rating)
  *   - `sta` is excluded — ibl_plr_snapshots does not have that column.
  */
-class RatingsDiffService implements Contracts\RatingsDiffServiceInterface
+class TrainingCampRatingsDiffService implements Contracts\TrainingCampRatingsDiffServiceInterface
 {
     /**
      * All 21 rating fields present in both ibl_plr and ibl_plr_snapshots.
@@ -23,29 +23,29 @@ class RatingsDiffService implements Contracts\RatingsDiffServiceInterface
      * @var list<string>
      */
     public const RATED_FIELDS = [
-        'oo', 'od', 'r_drive_off', 'dd', 'po', 'pd', 'r_trans_off', 'td',
         'r_fga', 'r_fgp', 'r_fta', 'r_ftp', 'r_3ga', 'r_3gp',
         'r_orb', 'r_drb', 'r_ast', 'r_stl', 'r_tvr', 'r_blk', 'r_foul',
+        'oo', 'r_drive_off', 'po', 'r_trans_off', 'od', 'dd', 'pd', 'td',
     ];
 
     public function __construct(
-        private readonly RatingsDiffRepositoryInterface $repository,
+        private readonly TrainingCampRatingsDiffRepositoryInterface $repository,
     ) {
     }
 
     /**
-     * @see Contracts\RatingsDiffServiceInterface::getDiffs()
+     * @see Contracts\TrainingCampRatingsDiffServiceInterface::getDiffs()
      *
      * @return list<RatingRow>
      */
-    public function getDiffs(?int $overrideYear = null, ?int $filterTid = null): array
+    public function getDiffs(?int $overrideYear = null, ?int $filterTid = null, string $filterStatus = ''): array
     {
         $baselineYear = $overrideYear ?? $this->repository->getLatestEndOfSeasonYear();
         if ($baselineYear === null) {
             return [];
         }
 
-        $dbRows = $this->repository->getDiffRows($baselineYear, $filterTid);
+        $dbRows = $this->repository->getDiffRows($baselineYear, $filterTid, $filterStatus);
 
         /** @var list<RatingRow> $realRows */
         $realRows = [];
@@ -77,7 +77,7 @@ class RatingsDiffService implements Contracts\RatingsDiffServiceInterface
     }
 
     /**
-     * @see Contracts\RatingsDiffServiceInterface::getBaselineYear()
+     * @see Contracts\TrainingCampRatingsDiffServiceInterface::getBaselineYear()
      */
     public function getBaselineYear(?int $overrideYear = null): ?int
     {
@@ -94,8 +94,11 @@ class RatingsDiffService implements Contracts\RatingsDiffServiceInterface
         $pid      = $this->readInt($row, 'pid');
         $name     = is_string($row['name'] ?? null) ? $row['name'] : '';
         $pos      = is_string($row['pos'] ?? null) ? $row['pos'] : '';
+        $age      = $this->readIntOrNull($row, 'age');
         $teamid      = $this->readInt($row, 'teamid');
-        $teamName = is_string($row['team_name'] ?? null) ? $row['team_name'] : null;
+        $teamName   = is_string($row['team_name'] ?? null) ? $row['team_name'] : null;
+        $teamColor1 = is_string($row['color1'] ?? null) ? $row['color1'] : 'FFFFFF';
+        $teamColor2 = is_string($row['color2'] ?? null) ? $row['color2'] : '000000';
 
         // Use s_oo as the discriminator: if null, the player has no snapshot (LEFT JOIN miss)
         $isNewPlayer = ($this->readIntOrNull($row, 's_oo') === null);
@@ -125,8 +128,11 @@ class RatingsDiffService implements Contracts\RatingsDiffServiceInterface
             pid: $pid,
             name: $name,
             pos: $pos,
+            age: $age,
             teamid: $teamid,
             teamName: $teamName,
+            teamColor1: $teamColor1,
+            teamColor2: $teamColor2,
             deltas: $deltas,
             maxAbsDelta: $maxAbsDelta,
             sumAbsDelta: $sumAbsDelta,

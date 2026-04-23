@@ -2,22 +2,22 @@
 
 declare(strict_types=1);
 
-namespace Tests\RatingsDiff;
+namespace Tests\TrainingCampRatingsDiff;
 
 use PHPUnit\Framework\TestCase;
-use RatingsDiff\Contracts\RatingsDiffViewInterface;
-use RatingsDiff\RatingDelta;
-use RatingsDiff\RatingRow;
-use RatingsDiff\RatingsDiffService;
-use RatingsDiff\RatingsDiffView;
+use TrainingCampRatingsDiff\Contracts\TrainingCampRatingsDiffViewInterface;
+use TrainingCampRatingsDiff\RatingDelta;
+use TrainingCampRatingsDiff\RatingRow;
+use TrainingCampRatingsDiff\TrainingCampRatingsDiffService;
+use TrainingCampRatingsDiff\TrainingCampRatingsDiffView;
 
-class RatingsDiffViewTest extends TestCase
+class TrainingCampRatingsDiffViewTest extends TestCase
 {
-    private RatingsDiffView $view;
+    private TrainingCampRatingsDiffView $view;
 
     protected function setUp(): void
     {
-        $this->view = new RatingsDiffView();
+        $this->view = new TrainingCampRatingsDiffView();
     }
 
     // ---------------------------------------------------------------------------
@@ -40,7 +40,7 @@ class RatingsDiffViewTest extends TestCase
         /** @var array<string, RatingDelta> $deltas */
         $deltas = [];
 
-        foreach (RatingsDiffService::RATED_FIELDS as $field) {
+        foreach (TrainingCampRatingsDiffService::RATED_FIELDS as $field) {
             if ($isNew) {
                 $deltas[$field] = new RatingDelta($field, null, 50, null);
             } else {
@@ -51,14 +51,17 @@ class RatingsDiffViewTest extends TestCase
             }
         }
 
-        $sumAbs = $isNew ? 0 : ($maxAbs * count(RatingsDiffService::RATED_FIELDS));
+        $sumAbs = $isNew ? 0 : ($maxAbs * count(TrainingCampRatingsDiffService::RATED_FIELDS));
 
         return new RatingRow(
             pid: $pid,
             name: $name,
             pos: $pos,
+            age: 25,
             teamid: $teamid,
             teamName: $teamName,
+            teamColor1: 'FF0000',
+            teamColor2: 'FFFFFF',
             deltas: $deltas,
             maxAbsDelta: $isNew ? 0 : $maxAbs,
             sumAbsDelta: $sumAbs,
@@ -77,7 +80,7 @@ class RatingsDiffViewTest extends TestCase
         /** @var array<string, RatingDelta> $deltas */
         $deltas = [];
 
-        foreach (RatingsDiffService::RATED_FIELDS as $field) {
+        foreach (TrainingCampRatingsDiffService::RATED_FIELDS as $field) {
             if ($field === 'oo') {
                 $deltas[$field] = new RatingDelta($field, 50, 50 + $ooDelta, $ooDelta);
             } else {
@@ -91,8 +94,11 @@ class RatingsDiffViewTest extends TestCase
             pid: $pid,
             name: $name,
             pos: 'PG',
+            age: 25,
             teamid: 1,
             teamName: 'Test Team',
+            teamColor1: 'FF0000',
+            teamColor2: 'FFFFFF',
             deltas: $deltas,
             maxAbsDelta: $maxAbs,
             sumAbsDelta: $maxAbs,
@@ -106,7 +112,7 @@ class RatingsDiffViewTest extends TestCase
 
     public function test_view_implements_interface(): void
     {
-        self::assertInstanceOf(RatingsDiffViewInterface::class, $this->view);
+        self::assertInstanceOf(TrainingCampRatingsDiffViewInterface::class, $this->view);
     }
 
     // ---------------------------------------------------------------------------
@@ -164,8 +170,8 @@ class RatingsDiffViewTest extends TestCase
         $row  = $this->buildRatingRow(1, '<script>alert(1)</script>', 5);
         $html = $this->view->render(2025, [$row]);
 
-        self::assertStringContainsString('&lt;script&gt;', $html);
-        self::assertStringNotContainsString('<script>', $html);
+        self::assertStringContainsString('&lt;script&gt;alert(1)&lt;/script&gt;', $html);
+        self::assertStringNotContainsString('<script>alert(1)</script>', $html);
     }
 
     // ---------------------------------------------------------------------------
@@ -178,7 +184,7 @@ class RatingsDiffViewTest extends TestCase
         $html = $this->view->render(2025, [$row]);
 
         self::assertStringContainsString('delta-up', $html);
-        self::assertStringContainsString('+5', $html);
+        self::assertStringContainsString('(+5)', $html);
     }
 
     public function test_it_renders_a_delta_down_span_for_negative_deltas(): void
@@ -187,16 +193,17 @@ class RatingsDiffViewTest extends TestCase
         $html = $this->view->render(2025, [$row]);
 
         self::assertStringContainsString('delta-down', $html);
-        self::assertStringContainsString('-8', $html);
+        self::assertStringContainsString('(-8)', $html);
     }
 
-    public function test_it_renders_a_delta_zero_span_for_zero_deltas(): void
+    public function test_it_renders_no_delta_span_for_zero_deltas(): void
     {
-        // All deltas are 0 (after == before == 50 for every field)
         $row  = $this->buildRatingRow(1, 'Player A', 0);
         $html = $this->view->render(2025, [$row]);
 
-        self::assertStringContainsString('delta-zero', $html);
+        self::assertStringNotContainsString('delta-zero', $html);
+        self::assertStringNotContainsString('delta-up', $html);
+        self::assertStringNotContainsString('delta-down', $html);
     }
 
     // ---------------------------------------------------------------------------
@@ -259,13 +266,13 @@ class RatingsDiffViewTest extends TestCase
     // No forbidden inline styles
     // ---------------------------------------------------------------------------
 
-    public function test_it_does_not_contain_inline_style_attributes_except_css_custom_properties(): void
+    public function test_it_does_not_contain_inline_style_attributes_except_allowed_patterns(): void
     {
         $row  = $this->buildRatingRow(1, 'Player A', 5);
         $html = $this->view->render(2025, [$row]);
 
-        // Regex: style=" followed by anything that is NOT "--" (CSS custom property)
-        $forbidden = (bool) preg_match('/style="(?!--)/', $html);
+        // Allow: CSS custom properties (--), team cell colors (background-color/color from TeamCellHelper)
+        $forbidden = (bool) preg_match('/style="(?!--|background-color: #|color: #)/', $html);
         self::assertFalse($forbidden, 'Output contains a forbidden inline style="..." attribute');
     }
 }

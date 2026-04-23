@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace RatingsDiff;
+namespace TrainingCampRatingsDiff;
 
 /**
  * Value object representing a single rating field's before/after/delta.

@@ -2,23 +2,23 @@
 
 declare(strict_types=1);
 
-namespace RatingsDiff;
+namespace TrainingCampRatingsDiff;
 
 use BaseMysqliRepository;
-use RatingsDiff\Contracts\RatingsDiffRepositoryInterface;
+use TrainingCampRatingsDiff\Contracts\TrainingCampRatingsDiffRepositoryInterface;
 
 /**
- * RatingsDiffRepository — fetches ibl_plr and ibl_plr_snapshots data for the diff page.
+ * TrainingCampRatingsDiffRepository — fetches ibl_plr and ibl_plr_snapshots data for the diff page.
  *
  * Column name notes (migration 113):
  *   - `to` was renamed to `r_trans_off` (transition offense rating)
  *   - `do` was renamed to `r_drive_off` (drive offense rating)
  *   - `r_to` was renamed to `r_tvr` (turnover rating)
  */
-class RatingsDiffRepository extends BaseMysqliRepository implements RatingsDiffRepositoryInterface
+class TrainingCampRatingsDiffRepository extends BaseMysqliRepository implements TrainingCampRatingsDiffRepositoryInterface
 {
     /**
-     * @see RatingsDiffRepositoryInterface::getLatestEndOfSeasonYear()
+     * @see TrainingCampRatingsDiffRepositoryInterface::getLatestEndOfSeasonYear()
      */
     public function getLatestEndOfSeasonYear(): ?int
     {
@@ -45,16 +45,16 @@ class RatingsDiffRepository extends BaseMysqliRepository implements RatingsDiffR
     }
 
     /**
-     * @see RatingsDiffRepositoryInterface::getDiffRows()
+     * @see TrainingCampRatingsDiffRepositoryInterface::getDiffRows()
      *
      * @return list<array<string, mixed>>
      */
-    public function getDiffRows(int $baselineYear, ?int $filterTid = null): array
+    public function getDiffRows(int $baselineYear, ?int $filterTid = null, string $filterStatus = ''): array
     {
         $sql = <<<'SQL'
 SELECT
-    p.pid, p.name, p.pos, p.teamid,
-    t.team_name,
+    p.pid, p.name, p.pos, p.age, p.teamid,
+    t.team_name, t.color1, t.color2,
     p.oo, p.od, p.r_drive_off, p.dd, p.po, p.pd, p.r_trans_off, p.td,
     p.r_fga, p.r_fgp, p.r_fta, p.r_ftp, p.r_3ga, p.r_3gp,
     p.r_orb, p.r_drb, p.r_ast, p.r_stl, p.r_tvr, p.r_blk, p.r_foul,
@@ -63,7 +63,7 @@ SELECT
     s.r_trans_off AS s_r_trans_off,                 s.td          AS s_td,
     s.r_fga   AS s_r_fga,   s.r_fgp   AS s_r_fgp,
     s.r_fta   AS s_r_fta,   s.r_ftp   AS s_r_ftp,
-    s.r_3ga   AS s_r_tga,   s.r_3gp   AS s_r_tgp,
+    s.r_3ga   AS s_r_3ga,   s.r_3gp   AS s_r_3gp,
     s.r_orb   AS s_r_orb,   s.r_drb   AS s_r_drb,
     s.r_ast   AS s_r_ast,   s.r_stl   AS s_r_stl,
     s.r_tvr   AS s_r_tvr,   s.r_blk   AS s_r_blk,  s.r_foul AS s_r_foul
@@ -75,6 +75,12 @@ LEFT JOIN ibl_plr_snapshots s
       AND s.snapshot_phase = 'end-of-season'
 WHERE p.retired = 0
 SQL;
+
+        if ($filterStatus === 'signed') {
+            $sql .= ' AND p.teamid > 0';
+        } elseif ($filterStatus === 'fa') {
+            $sql .= ' AND p.teamid = 0';
+        }
 
         if ($filterTid !== null) {
             $sql .= ' AND p.teamid = ?';

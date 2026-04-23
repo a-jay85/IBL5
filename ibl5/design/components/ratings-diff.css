@@ -1,4 +1,12 @@
 @layer components {
+  .ratings-diff-filter {
+    margin-bottom: 0.75rem;
+  }
+  .ratings-diff-filter select {
+    padding: 0.25rem 0.5rem;
+    border-radius: 0.25rem;
+    border: 1px solid #ccc;
+  }
   .ratings-diff-table .rating-cell {
     white-space: nowrap;
   }
@@ -15,6 +23,12 @@
   }
   .ratings-diff-table .delta-zero {
     color: #888;
+  }
+  .ratings-diff-table .rating-cell--up {
+    background-color: rgba(40, 167, 69, var(--di, 0.15));
+  }
+  .ratings-diff-table .rating-cell--down {
+    background-color: rgba(220, 53, 69, var(--di, 0.15));
   }
   .ratings-diff-table .badge-new {
     display: inline-block;

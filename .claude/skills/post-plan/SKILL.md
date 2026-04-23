@@ -143,11 +143,20 @@ Capture the `cat` output — that is `$DIFF` for every sub-agent prompt below. N
 
 Read root `CLAUDE.md`. If `! $NON_CODE_ONLY`, also read directory-specific `CLAUDE.md` files for modified directories.
 
-### 5B: Code Review — up to 6 parallel Sonnet agents
+### 5B: Code Review — up to 6 parallel agents (mixed tiers)
 
 **Read** `.claude/commands/_review-agents.md` — the canonical agent definitions (6 agents: architectural fitness, bug detection, git history, previous PRs, code comments, database performance).
 
 Pass each agent: PR metadata, file list, filtered `$DIFF`, CLAUDE.md content(s) from 5A. **No agent calls `gh pr diff`.**
+
+**Model tiers** — agents that must judge whether a finding is semantically relevant need Sonnet; agents that look up facts or match against named patterns use Haiku:
+
+- Agent 1 (Architectural fitness): **Sonnet** — judges R/S/V fit, dependency direction
+- Agent 2 (Bug detection): **Sonnet** — connects schema types to PHP comparison operators
+- Agent 3 (Git history): **Sonnet** — must judge whether a past commit's collision zone overlaps the current change
+- Agent 4 (Previous PRs): **Haiku** — mechanical `gh search prs` + `gh pr view` lookup. Add to prompt: "List EVERY prior review comment that touches these files. Do NOT judge relevance — report all matches."
+- Agent 5 (Code comments): **Sonnet** — must judge whether code semantically complies with docstring guidance
+- Agent 6 (Database performance): **Sonnet** — interprets query behavior in context
 
 **Launch gates** (consult Phase 2 variables — skip the launch entirely, don't let the agent exit early):
 
@@ -158,13 +167,15 @@ Pass each agent: PR metadata, file list, filtered `$DIFF`, CLAUDE.md content(s) 
 - Agent 5 (Code comments): skip if `$NON_CODE_ONLY` or `! $HAS_COMMENTS_IN_DIFF`
 - Agent 6 (Database performance): skip if `! $HAS_PHP`
 
-### 5C: Security Audit — conditional Sonnet agents
+### 5C: Security Audit — conditional Haiku agents
 
 **Skip entire 5C if** `! $HAS_PHP`. CSS, markdown, migrations, and lockfile bumps cannot introduce SQLi/CSRF/auth vulnerabilities.
 
 **Read** `.claude/commands/_security-agents.md` — the canonical security agent definitions and pattern-detection bash block.
 
 Run the pattern-detection block from that file to get SQL and Forms category counts, then launch only the relevant agents (SQL Injection if SQL > 0; CSRF Protection if Forms > 0; Auth/Authz unconditionally). Pass each agent the PHP-only subset of `$DIFF`.
+
+**All three security agents use Haiku.** Their prompts include explicit vulnerable/secure pattern tables — the agent checks each pattern against the diff and reports matches. Add to each prompt: "Check EACH pattern in the vulnerable and secure lists against the diff. For each pattern, state whether it was found and cite the file:line, or state it was not found."
 
 **XSS and Input Validation are NOT audited here** — they're deterministically enforced by `RequireEscapedOutputRule` and `BanRawSuperglobalsRule` (run in PostToolUse and CI).
 
@@ -200,9 +211,9 @@ Both comments end with: `Generated with [Claude Code](https://claude.ai/code)` a
 
 ## Phase 6: Final Verification
 
-Run parallel agents (**Sonnet** for PHPUnit+PHPStan, **Haiku** for E2E):
+Run parallel agents (**Haiku** for both):
 
-**Agent 1 — PHPUnit + PHPStan:** **Skip if** `! $HAS_PHP`. The PostToolUse hook already ran both during edits, and a PHP-less diff cannot regress either suite.
+**Agent 1 — PHPUnit + PHPStan (Haiku):** **Skip if** `! $HAS_PHP`. The PostToolUse hook already ran both during edits, and a PHP-less diff cannot regress either suite.
 ```bash
 cd <worktree>/ibl5 && vendor/bin/phpunit --no-progress --no-output --testdox-summary | tail -n 3
 cd <worktree>/ibl5 && composer run analyse

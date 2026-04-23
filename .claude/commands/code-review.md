@@ -4,7 +4,7 @@ allowed-tools: Bash(gh pr diff:*), Bash(gh pr view:*), Bash(gh pr comment:*),
   Bash(git log:*), Bash(git rev-parse:*), Bash(git show:*)
 description: Token-efficient code review for pull requests
 model: sonnet
-last_verified: 2026-04-12
+last_verified: 2026-04-23
 ---
 
 Provide a code review for the given pull request. This command optimizes token usage by fetching the diff once and distributing only what each agent needs.
@@ -54,7 +54,7 @@ Check if any CLAUDE.md files exist in directories whose files the PR modified. R
 
 Store all of these results — they will be passed as context to agents below.
 
-## Step 3: Launch parallel Sonnet agents
+## Step 3: Launch parallel agents (mixed tiers)
 
 **Read** `.claude/commands/_review-agents.md` for the canonical agent definitions. It defines up to 6 agents (architectural fitness, bug detection, git history, previous PRs, code comments, database performance).
 
@@ -62,6 +62,14 @@ Launch applicable agents in parallel (consult `_review-agents.md` for each agent
 - The filtered diff from Step 2c
 - The file list from Step 2b
 - The CLAUDE.md content(s) from Steps 2d/2e
+
+**Model tiers** (see `agent-tiering.md` for rationale):
+- Agent 1 (Architectural fitness): **Sonnet**
+- Agent 2 (Bug detection): **Sonnet**
+- Agent 3 (Git history): **Sonnet**
+- Agent 4 (Previous PRs): **Haiku** — add to prompt: "List EVERY prior review comment that touches these files. Do NOT judge relevance — report all matches."
+- Agent 5 (Code comments): **Sonnet**
+- Agent 6 (Database performance): **Sonnet**
 
 **CRITICAL: No agent should call `gh pr diff`.** The diff was already fetched in Step 2.
 

@@ -66,20 +66,19 @@ publicTest.describe('Visual regression — public pages', () => {
   publicTest('schedule page', async ({ page }) => {
     await page.goto('modules.php?name=Schedule');
     await page.waitForLoadState('networkidle');
-    const content = page.locator('.ibl-data-table, .ibl-title').first();
+    const content = page.locator('.schedule-header');
     await publicExpect(content).toBeVisible();
     await publicExpect(content).toHaveScreenshot('schedule-content.png', {
       animations: 'disabled',
     });
   });
 
-  publicTest('player page ratings grid', async ({ page }) => {
+  publicTest('player page bio grid', async ({ page }) => {
     await page.goto('modules.php?name=Player&pa=showpage&pid=1');
     await page.waitForLoadState('networkidle');
-    // Target the ratings grid instead of the full card to avoid headshot image instability
     const grid = page.locator('.stats-grid').first();
     await publicExpect(grid).toBeVisible();
-    await publicExpect(grid).toHaveScreenshot('player-page-ratings.png', {
+    await publicExpect(grid).toHaveScreenshot('player-page-bio.png', {
       animations: 'disabled',
     });
   });
@@ -133,9 +132,9 @@ authTest.describe('Visual regression — authenticated pages', () => {
     await page.goto('modules.php?name=DepthChartEntry');
     await page.waitForLoadState('networkidle');
     await authExpect(page.getByText('Sign In')).not.toBeVisible();
-    const title = page.locator('.ibl-title').first();
-    await authExpect(title).toBeVisible();
-    await authExpect(title).toHaveScreenshot('depth-chart-entry.png', {
+    const table = page.locator('.depth-chart-table');
+    await authExpect(table).toBeVisible();
+    await authExpect(table).toHaveScreenshot('depth-chart-entry.png', {
       animations: 'disabled',
     });
   });
@@ -144,7 +143,7 @@ authTest.describe('Visual regression — authenticated pages', () => {
     await appState({ 'Current Season Phase': 'Free Agency' });
     await page.goto('modules.php?name=FreeAgency');
     await page.waitForLoadState('networkidle');
-    const content = page.locator('.ibl-data-table, .ibl-card').first();
+    const content = page.locator('.ibl-data-table').first();
     await authExpect(content).toBeVisible();
     await authExpect(content).toHaveScreenshot('free-agency-content.png', {
       animations: 'disabled',
@@ -154,7 +153,7 @@ authTest.describe('Visual regression — authenticated pages', () => {
   authTest('desktop navigation bar', async ({ page }) => {
     await page.goto('index.php');
     await page.waitForLoadState('networkidle');
-    const nav = page.locator('nav, .ibl-nav, header').first();
+    const nav = page.locator('nav').first();
     await authExpect(nav).toBeVisible();
     await authExpect(nav).toHaveScreenshot('nav-desktop.png', {
       animations: 'disabled',

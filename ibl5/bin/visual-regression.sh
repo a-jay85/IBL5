@@ -77,7 +77,7 @@ echo ""
 docker run --rm \
   --network ibl5-proxy \
   -v "$IBL5_DIR:/ibl5" \
-  "${EXTRA_MOUNTS[@]}" \
+  ${EXTRA_MOUNTS[@]+"${EXTRA_MOUNTS[@]}"} \
   -w /ibl5 \
   "${ENV_FLAGS[@]}" \
   "$PLAYWRIGHT_IMAGE" \

@@ -45,7 +45,7 @@ class PlayerRatingsAndSalaryView implements PlayerRatingsAndSalaryViewInterface
         ?>
 <table class="sortable player-table">
     <tr>
-        <td colspan=29 class="player-table-header">Ratings by Year</td>
+        <td colspan=24 class="player-table-header">Ratings by Year</td>
     </tr>
     <tr>
         <th>year</th>
@@ -71,16 +71,11 @@ class PlayerRatingsAndSalaryView implements PlayerRatingsAndSalaryViewInterface
         <th>td</th>
         <th>Off</th>
         <th>Def</th>
-        <th>Tal</th>
-        <th>Skl</th>
-        <th>Int</th>
-        <th>Clu</th>
-        <th>Con</th>
         <th>Salary</th>
     </tr>
         <?php
         foreach ($historicalStats as $row) {
-            /** @var array{pid: int, name: string, year: int, team: string, teamid: int, games: int, minutes: int, fgm: int, fga: int, ftm: int, fta: int, tgm: int, tga: int, orb: int, reb: int, ast: int, stl: int, blk: int, tvr: int, pf: int, pts: int, r_2ga: int, r_2gp: int, r_fta: int, r_ftp: int, r_3ga: int, r_3gp: int, r_orb: int, r_drb: int, r_ast: int, r_stl: int, r_blk: int, r_tvr: int, r_oo: int, r_drive_off: int, r_po: int, r_trans_off: int, r_od: int, r_dd: int, r_pd: int, r_td: int, salary: int, talent: int, skill: int, intangibles: int, clutch: int, consistency: int} $row */
+            /** @var array{pid: int, name: string, year: int, team: string, teamid: int, games: int, minutes: int, fgm: int, fga: int, ftm: int, fta: int, tgm: int, tga: int, orb: int, reb: int, ast: int, stl: int, blk: int, tvr: int, pf: int, pts: int, r_2ga: int, r_2gp: int, r_fta: int, r_ftp: int, r_3ga: int, r_3gp: int, r_orb: int, r_drb: int, r_ast: int, r_stl: int, r_blk: int, r_tvr: int, r_oo: int, r_drive_off: int, r_po: int, r_trans_off: int, r_od: int, r_dd: int, r_pd: int, r_td: int, salary: int} $row */
             $r_oo = $row['r_oo'];
             $r_drive_off = $row['r_drive_off'];
             $r_po = $row['r_po'];
@@ -93,12 +88,6 @@ class PlayerRatingsAndSalaryView implements PlayerRatingsAndSalaryViewInterface
 
             $r_Off = $r_oo + $r_drive_off + $r_po + $r_trans_off;
             $r_Def = $r_od + $r_dd + $r_pd + $r_td;
-            $talent = $row['talent'];
-            $skill = $row['skill'];
-            $intangibles = $row['intangibles'];
-            $clutch = $row['clutch'];
-            $consistency = $row['consistency'];
-
             $totalSalary += $salary;
             ?>
     <tr>
@@ -125,11 +114,6 @@ class PlayerRatingsAndSalaryView implements PlayerRatingsAndSalaryViewInterface
         <td><?= $r_td ?></td>
         <td><?= $r_Off ?></td>
         <td><?= $r_Def ?></td>
-        <td><?= $talent > 0 ? $talent : '-' ?></td>
-        <td><?= $skill > 0 ? $skill : '-' ?></td>
-        <td><?= $intangibles > 0 ? $intangibles : '-' ?></td>
-        <td><?= $clutch !== 0 ? $clutch : '-' ?></td>
-        <td><?= $consistency !== 0 ? $consistency : '-' ?></td>
         <td><?= $salary ?></td>
     </tr>
             <?php
@@ -138,7 +122,7 @@ class PlayerRatingsAndSalaryView implements PlayerRatingsAndSalaryViewInterface
         $totalSalaryMillion = $totalSalary / 100;
         ?>
     <tr>
-        <td colspan=29 class="text-center font-bold">Total Career Salary Earned: <?= $totalSalaryMillion ?> million dollars</td>
+        <td colspan=24 class="text-center font-bold">Total Career Salary Earned: <?= $totalSalaryMillion ?> million dollars</td>
     </tr>
 </table>
         <?php

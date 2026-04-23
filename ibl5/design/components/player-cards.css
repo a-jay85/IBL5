@@ -433,6 +433,7 @@
     color: var(--card-text);
     overflow-x: auto;
     position: relative;
+    max-width: 1105px;
 }
 
 .player-stats-card * {

@@ -14,7 +14,7 @@ interface PlayerRatingsAndSalaryViewInterface extends PlayerViewInterface
     /**
      * Render ratings by year table with salary history
      * 
-     * Shows season-by-season ratings (all 22 rating categories) and salary,
+     * Shows season-by-season ratings and salary,
      * plus total career earnings at the bottom.
      * 
      * @param int $playerID Player ID to fetch ratings for

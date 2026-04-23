@@ -7,7 +7,7 @@ paths:
   - "**/db/**"
   - "**/seed*.php"
   - "**/seed*.sql"
-last_verified: 2026-04-11
+last_verified: 2026-04-23
 ---
 
 # Database Access Reference
@@ -62,6 +62,22 @@ Runs pending SQL migrations against a Docker MariaDB container. Tracks applied m
 ## MariaDB Strict Mode & Triggers
 
 - **NOT NULL columns without DEFAULT reject INSERTs before BEFORE INSERT triggers fire.** If a column is `NOT NULL` with no `DEFAULT`, MariaDB strict mode (enabled by default since 10.2) throws `Field 'x' doesn't have a default value` *before* any BEFORE INSERT trigger can auto-populate it. All uuid columns now have `DEFAULT (UUID())` (migration 065), so uuid is no longer an example of this problem. The rule still applies to other NOT NULL columns without defaults.
+
+## BaseMysqliRepository API
+
+All repositories extend `BaseMysqliRepository`. Core methods:
+
+| Method | Returns | Use |
+|--------|---------|-----|
+| `executeQuery($query, $types, ...$params)` | `mysqli_stmt` | Raw prepared statement (caller closes) |
+| `fetchOne($query, $types, ...$params)` | `?array` | Single row or null |
+| `fetchAll($query, $types, ...$params)` | `array` | All rows |
+| `execute($query, $types, ...$params)` | `int` | INSERT/UPDATE/DELETE — affected rows |
+| `getLastInsertId()` | `int` | Auto-increment ID after INSERT |
+
+**Type-spec characters:** `i` (INT), `s` (VARCHAR/TEXT), `d` (FLOAT/DOUBLE), `b` (BLOB).
+
+**Error codes:** 1001 = type/param count mismatch, 1002 = prepare failed (bad SQL), 1003 = execute failed (constraint violation).
 
 ## Multiple Claude Instances Protocol
 

@@ -14,6 +14,7 @@ services:
     volumes:
       - ${WORKTREE_PATH}/ibl5:/var/www/html/ibl5
       - ${REPO_ROOT}/ibl5/vendor:/var/www/html/ibl5/vendor:ro
+      - ${REPO_ROOT}/ibl5/backups:/var/www/html/ibl5/backups:ro
     depends_on:
       db:
         condition: service_healthy
@@ -43,7 +44,6 @@ services:
       retries: 10
     networks:
       - default
-      - ibl5-proxy
 
   browsersync:
     build:

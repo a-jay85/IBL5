@@ -113,7 +113,7 @@ class OneOnOneGameView implements OneOnOneGameViewInterface
     {
         $html = '<div class="ibl-card"><div class="ibl-card__body">';
         $html .= $result->playByPlay;
-        $html .= '<strong style="font-weight: bold;">GAME ID: ' . $gameId . '</strong>';
+        $html .= '<strong>GAME ID: ' . $gameId . '</strong>';
         $html .= '</div></div>';
 
         return $html;
@@ -138,8 +138,8 @@ class OneOnOneGameView implements OneOnOneGameViewInterface
         return '<div class="ibl-card">'
             . '<div class="ibl-card__header"><h2 class="ibl-card__title">Replay of Game Number ' . $gameId . '</h2></div>'
             . '<div class="ibl-card__body">'
-            . '<div style="text-align: center; margin-bottom: 1rem;">'
-            . '<strong style="font-weight: bold;">' . $winner . ' ' . $winScore . ', ' . $loser . ' ' . $lossScore . '</strong><br>'
+            . '<div class="text-center mb-4">'
+            . '<strong>' . $winner . ' ' . $winScore . ', ' . $loser . ' ' . $lossScore . '</strong><br>'
             . '<small>(Game played by ' . $owner . ')</small>'
             . '</div>'
             . $playByPlay

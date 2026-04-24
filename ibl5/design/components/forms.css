@@ -365,4 +365,13 @@
     padding: 0.75rem 1rem;
 }
 
+.ibl-select--auto {
+    width: auto;
+}
+
+.ibl-form-container {
+    max-width: 600px;
+    margin: 0 auto;
+}
+
 } /* end @layer components */

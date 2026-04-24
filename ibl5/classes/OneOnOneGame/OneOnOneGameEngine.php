@@ -588,7 +588,7 @@ class OneOnOneGameEngine implements OneOnOneGameEngineInterface
 
         return '<div class="table-scroll-wrapper"><div class="table-scroll-container">'
             . '<table class="ibl-data-table">'
-            . '<thead><tr><th colspan="13"><span style="color: var(--accent-500);">FINAL SCORE: ' . $p1Name . ' ' . $result->player1Score . ', ' . $p2Name . ' ' . $result->player2Score . '</span></th></tr>'
+            . '<thead><tr><th colspan="13"><span class="text-accent-500">FINAL SCORE: ' . $p1Name . ' ' . $result->player1Score . ', ' . $p2Name . ' ' . $result->player2Score . '</span></th></tr>'
             . '<tr><th>Name</th><th>FGM</th><th>FGA</th><th>FTM</th><th>FTA</th><th>3GM</th><th>3GA</th><th>ORB</th><th>REB</th><th>STL</th><th>BLK</th><th>TVR</th><th>FOUL</th></tr></thead>'
             . '<tbody>'
             . '<tr><td>' . $p1Name . '</td><td>' . $p1Stats->fieldGoalsMade . '</td><td>' . $p1Stats->fieldGoalsAttempted . '</td><td>' . $p1Stats->freeThrowsMade . '</td><td>' . $p1Stats->freeThrowsAttempted . '</td><td>' . $p1Stats->threePointersMade . '</td><td>' . $p1Stats->threePointersAttempted . '</td><td>' . $p1Stats->offensiveRebounds . '</td><td>' . $p1Stats->totalRebounds . '</td><td>' . $p1Stats->steals . '</td><td>' . $p1Stats->blocks . '</td><td>' . $p1Stats->turnovers . '</td><td>' . $p1Stats->fouls . '</td></tr>'

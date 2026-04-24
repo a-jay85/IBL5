@@ -150,7 +150,7 @@
                 changed = true;
             }
         });
-        saveBtn.style.display = changed ? '' : 'none';
+        saveBtn.hidden = !changed;
     }
 
     if (saveBtn) {

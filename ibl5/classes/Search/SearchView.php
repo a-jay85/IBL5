@@ -317,7 +317,7 @@ class SearchView implements SearchViewInterface
             $topicText = HtmlSanitizer::safeHtmlOutput($result['topicText']);
             $delay = min($index * 40, 400);
 
-            $output .= '<div class="search-result" style="animation-delay: ' . $delay . 'ms">';
+            $output .= '<div class="search-result" style="--anim-delay: ' . $delay . 'ms">';
             $output .= '<div class="search-result__header">';
             $output .= '<a href="modules.php?name=News&amp;file=article&amp;sid=' . $sid . '" class="search-result__title">' . $title . '</a>';
             $output .= '</div>';
@@ -377,7 +377,7 @@ class SearchView implements SearchViewInterface
             $replyCount = $result['replyCount'];
             $delay = min($index * 40, 400);
 
-            $output .= '<div class="search-result" style="animation-delay: ' . $delay . 'ms">';
+            $output .= '<div class="search-result" style="--anim-delay: ' . $delay . 'ms">';
             $output .= '<div class="search-result__header">';
             $output .= '<a href="modules.php?name=News&amp;file=article&amp;thold=-1&amp;mode=flat&amp;order=1&amp;sid=' . $sid . '#' . $teamid . '" class="search-result__title">' . $subject . '</a>';
             $output .= '</div>';
@@ -425,7 +425,7 @@ class SearchView implements SearchViewInterface
             $safeNoName = HtmlSanitizer::safeHtmlOutput(_NONAME);
             $displayName = ($name !== '') ? $name : $safeNoName;
 
-            $output .= '<div class="search-result search-result--compact" style="animation-delay: ' . $delay . 'ms">';
+            $output .= '<div class="search-result search-result--compact" style="--anim-delay: ' . $delay . 'ms">';
             $output .= '<div class="search-result__header">';
             $output .= '<span class="search-result__title">' . $username . '</span>';
             $output .= '<span class="search-result__subtitle">' . $displayName . '</span>';

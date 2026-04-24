@@ -53,7 +53,7 @@ test.describe('Activity Tracker flow', () => {
   test('team cells have colored backgrounds', async ({ page }) => {
     const firstTeamCell = page.locator('tr[data-team-id]').first().locator('td').first();
     const style = await firstTeamCell.getAttribute('style');
-    expect(style).toContain('background-color');
+    expect(style).toContain('--team-cell-bg');
   });
 
   test('table is sortable', async ({ page }) => {

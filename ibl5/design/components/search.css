@@ -132,6 +132,7 @@
     padding: var(--space-4);
     transition: box-shadow var(--transition-base), transform var(--transition-base);
     animation: searchResultIn 0.35s cubic-bezier(0.16, 1, 0.3, 1) both;
+    animation-delay: var(--anim-delay, 0ms);
 }
 
 @keyframes searchResultIn {

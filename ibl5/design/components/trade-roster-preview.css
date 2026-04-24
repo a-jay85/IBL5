@@ -279,4 +279,13 @@
     }
 }
 
+/* Trading roster column widths */
+.trading-col--checkbox {
+    width: 50px;
+}
+
+.trading-col--stat {
+    width: 40px;
+}
+
 } /* end @layer components */

@@ -110,7 +110,7 @@ class SeriesRecordsViewTest extends TestCase
 
         $this->assertStringContainsString('<td', $result);
         $this->assertStringContainsString('10 - 5', $result);
-        $this->assertStringContainsString('background-color: #8f8', $result);
+        $this->assertStringContainsString('--series-cell-bg: #8f8', $result);
     }
 
     public function testRenderRecordCellBoldsWhenRequired(): void

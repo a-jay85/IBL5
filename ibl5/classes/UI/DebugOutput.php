@@ -60,24 +60,19 @@ class DebugOutput
 
         ob_start();
         ?>
-<div style="margin: 10px 0; border: 1px solid #ccc; border-radius: 4px;">
-    <div style="padding: 8px; background-color: #f5f5f5; border-bottom: 1px solid #ccc; cursor: pointer;"
+<div class="debug-panel">
+    <div class="debug-panel__header"
          onclick="toggleDebug<?= $id ?>()">
         <span id="debugIcon<?= $id ?>">&#9654;</span> <?= HtmlSanitizer::e($title) ?>
     </div>
-    <pre id="debugContent<?= $id ?>" style="display: none; margin: 0; padding: 8px; background-color: #fff; overflow: auto;"><?= $safeContent ?></pre>
+    <pre id="debugContent<?= $id ?>" class="debug-panel__content" hidden><?= $safeContent ?></pre>
 </div>
 <script>
     function toggleDebug<?= $id ?>() {
         var content = document.getElementById('debugContent<?= $id ?>');
         var icon = document.getElementById('debugIcon<?= $id ?>');
-        if (content.style.display === 'none') {
-            content.style.display = 'block';
-            icon.textContent = '\u25BC';
-        } else {
-            content.style.display = 'none';
-            icon.textContent = '\u25B6';
-        }
+        content.hidden = !content.hidden;
+        icon.textContent = content.hidden ? '▶' : '▼';
     }
 </script>
         <?php

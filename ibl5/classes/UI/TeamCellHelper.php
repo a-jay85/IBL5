@@ -36,8 +36,8 @@ class TeamCellHelper implements TeamCellHelperInterface
 
         $safeName = $nameHtml !== '' ? $nameHtml : HtmlSanitizer::safeHtmlOutput($teamName);
 
-        return '<td class="' . $classes . '" style="background-color: #' . $safeColor1 . ';">'
-            . '<a href="' . $href . '" class="ibl-team-cell__name" aria-label="' . HtmlSanitizer::safeHtmlOutput($teamName) . '" style="color: #' . $safeColor2 . ';">'
+        return '<td class="' . $classes . '" style="--team-cell-bg: #' . $safeColor1 . '; --team-cell-color: #' . $safeColor2 . ';">'
+            . '<a href="' . $href . '" class="ibl-team-cell__name" aria-label="' . HtmlSanitizer::safeHtmlOutput($teamName) . '">'
             . '<img src="images/logo/new' . $teamId . '.png" alt="" class="ibl-team-cell__logo" width="24" height="24" loading="lazy">'
             . '<span class="ibl-team-cell__text">' . $safeName . '</span>'
             . '</a></td>';

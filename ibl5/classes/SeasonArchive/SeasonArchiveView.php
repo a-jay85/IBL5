@@ -483,7 +483,7 @@ class SeasonArchiveView implements SeasonArchiveViewInterface
 
         // H.E.A.T. Champions as a separate roster below
         if ($championRosters['heat'] !== []) {
-            $html .= '<div style="margin-top: var(--space-4, 1rem); max-width: 300px;">';
+            $html .= '<div class="season-archive-heat">';
             $html .= '<h4>H.E.A.T. Champions</h4>';
             $html .= $this->renderRosterTable($championRosters['heat'], $playerIds);
             $html .= '</div>';

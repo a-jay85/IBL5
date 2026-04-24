@@ -109,7 +109,7 @@ class SeriesRecordsView implements SeriesRecordsViewInterface
     public function renderHeaderCell(int $teamId): string
     {
         $safeTeamId = HtmlSanitizer::safeHtmlOutput((string)$teamId);
-        return '<th class="text-center"><img src="images/logo/new' . $safeTeamId . '.png" width="50" height="50" style="object-fit: contain;" alt="Team ' . $safeTeamId . ' logo"></th>';
+        return '<th class="text-center"><img src="images/logo/new' . $safeTeamId . '.png" width="50" height="50" class="series-logo-img" alt="Team ' . $safeTeamId . ' logo"></th>';
     }
 
     /**
@@ -138,7 +138,7 @@ class SeriesRecordsView implements SeriesRecordsViewInterface
         $boldOpen = $isBold ? '<strong>' : '';
         $boldClose = $isBold ? '</strong>' : '';
 
-        return '<td class="text-center" style="background-color: ' . $safeBgColor . ';">'
+        return '<td class="text-center series-record-cell" style="--series-cell-bg: ' . $safeBgColor . ';">'
             . $boldOpen . $safeWins . ' - ' . $safeLosses . $boldClose
             . '</td>';
     }

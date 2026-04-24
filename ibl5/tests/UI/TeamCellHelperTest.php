@@ -14,8 +14,8 @@ class TeamCellHelperTest extends TestCase
         $result = TeamCellHelper::renderTeamCell(1, 'Miami', 'FF0000', 'FFFFFF');
 
         $this->assertStringContainsString('class="ibl-team-cell--colored"', $result);
-        $this->assertStringContainsString('background-color: #FF0000;', $result);
-        $this->assertStringContainsString('color: #FFFFFF;', $result);
+        $this->assertStringContainsString('--team-cell-bg: #FF0000', $result);
+        $this->assertStringContainsString('--team-cell-color: #FFFFFF', $result);
         $this->assertStringContainsString('images/logo/new1.png', $result);
         $this->assertStringContainsString('ibl-team-cell__text', $result);
         $this->assertStringContainsString('Miami', $result);
@@ -58,7 +58,7 @@ class TeamCellHelperTest extends TestCase
     {
         $result = TeamCellHelper::renderTeamCell(1, 'Miami', '<script>', 'FFFFFF');
 
-        $this->assertStringContainsString('background-color: #000000;', $result);
+        $this->assertStringContainsString('--team-cell-bg: #000000', $result);
         $this->assertStringNotContainsString('<script>', $result);
     }
 
@@ -124,7 +124,7 @@ class TeamCellHelperTest extends TestCase
     {
         $result = TeamCellHelper::renderTeamCell(1, 'Miami', '#FF0000', '#FFFFFF');
 
-        $this->assertStringContainsString('background-color: #FF0000;', $result);
-        $this->assertStringContainsString('color: #FFFFFF;', $result);
+        $this->assertStringContainsString('--team-cell-bg: #FF0000', $result);
+        $this->assertStringContainsString('--team-cell-color: #FFFFFF', $result);
     }
 }

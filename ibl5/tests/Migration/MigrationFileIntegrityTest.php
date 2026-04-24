@@ -116,6 +116,11 @@ final class MigrationFileIntegrityTest extends TestCase
      *
      * This prevents silent no-ops from going undetected (the bug that caused
      * the dc_canPlayInGame production outage).
+     *
+     * Chain-aware: if a later migration renames the destination to another
+     * name (e.g., `dc_canPlayInGame` → `dc_can_play_in_game` in migration
+     * 116), the assertion must be for the final name in the chain, not the
+     * intermediate one.
      */
     public function testChangeColumnRenamesHaveSchemaAssertions(): void
     {
@@ -131,11 +136,59 @@ final class MigrationFileIntegrityTest extends TestCase
         }
 
         $files = glob($this->migrationsDir . '/*.sql') ?: [];
+        sort($files);
+
+        // First pass: build a rename chain map keyed by "table.old_column" →
+        // "new_column". Scans BOTH `CHANGE COLUMN IF EXISTS` (soft renames
+        // subject to this check) and plain `CHANGE COLUMN` (strict renames
+        // used once baseline assertions are in place — migration 114/116
+        // patterns). Consumer queries walk this map forward.
+        //
+        // Strategy: split each migration file into `ALTER TABLE ... ;` blocks,
+        // then extract the table name and every CHANGE COLUMN pair inside.
+        // This handles multi-CHANGE-COLUMN ALTERs (one ALTER, many renames).
+        $renameChain = [];
+        foreach ($files as $file) {
+            $basename = basename($file);
+            if ($basename === '000_baseline_schema.sql') {
+                continue;
+            }
+            $content = file_get_contents($file);
+            if ($content === false) {
+                continue;
+            }
+            if (preg_match_all(
+                '/ALTER\s+TABLE\s+[`]?(\w+)[`]?(.*?);/si',
+                $content,
+                $alterBlocks,
+                PREG_SET_ORDER
+            ) > 0) {
+                foreach ($alterBlocks as $block) {
+                    $table = $block[1];
+                    $body = $block[2];
+                    if (preg_match_all(
+                        '/CHANGE\s+COLUMN\s+(?:IF\s+EXISTS\s+)?[`]?(\w+)[`]?\s+[`]?(\w+)[`]?/si',
+                        $body,
+                        $pairs,
+                        PREG_SET_ORDER
+                    ) > 0) {
+                        foreach ($pairs as $pair) {
+                            $oldColumn = $pair[1];
+                            $newColumn = $pair[2];
+                            if ($oldColumn === $newColumn) {
+                                continue;
+                            }
+                            $renameChain[$table . '.' . $oldColumn] = $newColumn;
+                        }
+                    }
+                }
+            }
+        }
+
         $uncovered = [];
 
         foreach ($files as $file) {
             $basename = basename($file);
-            // Skip baseline — it defines schema, not renames
             if ($basename === '000_baseline_schema.sql') {
                 continue;
             }
@@ -156,7 +209,21 @@ final class MigrationFileIntegrityTest extends TestCase
                 foreach ($matches as $match) {
                     $table = $match[1];
                     $destColumn = $match[2];
-                    $key = $table . '.' . $destColumn;
+
+                    // Follow the rename chain forward: if a later migration
+                    // renamed this destination to another name, assert the
+                    // final name. Bounded to avoid infinite loops on a
+                    // hypothetical cycle.
+                    $finalColumn = $destColumn;
+                    for ($hop = 0; $hop < 10; $hop++) {
+                        $nextKey = $table . '.' . $finalColumn;
+                        if (!isset($renameChain[$nextKey])) {
+                            break;
+                        }
+                        $finalColumn = $renameChain[$nextKey];
+                    }
+
+                    $key = $table . '.' . $finalColumn;
 
                     if (!in_array($key, $assertedColumns, true)) {
                         $uncovered[] = "{$key} (from {$basename})";

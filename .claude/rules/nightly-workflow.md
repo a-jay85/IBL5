@@ -14,17 +14,17 @@ A headless `claude -p` process runs at 00:03 daily via macOS `launchd`, implemen
 |--------|---------|
 | Queue a plan | `bin/nightly-queue <slug>` |
 | Show queue | `bin/nightly-queue` (no args) |
-| Check morning results | `ls ~/.claude/projects/-Users-ajaynicolas-Documents-GitHub-IBL5/nightly/reports/` |
-| Cancel tonight's run | `rm ~/.claude/projects/-Users-ajaynicolas-Documents-GitHub-IBL5/nightly/queue/*.md` |
+| Check morning results | `ls ~/.claude/projects/-Users-ajaynicolas-GitHub-IBL5/nightly/reports/` |
+| Cancel tonight's run | `rm ~/.claude/projects/-Users-ajaynicolas-GitHub-IBL5/nightly/queue/*.md` |
 | Disable nightly job | `launchctl unload ~/Library/LaunchAgents/com.ibl5.nightly-claude.plist` |
 | Re-enable nightly job | `launchctl load ~/Library/LaunchAgents/com.ibl5.nightly-claude.plist` |
 | Force-trigger now | `launchctl start com.ibl5.nightly-claude` |
-| Check logs | `cat ~/.claude/projects/-Users-ajaynicolas-Documents-GitHub-IBL5/nightly/logs/$(date +%Y-%m-%d).log` |
+| Check logs | `cat ~/.claude/projects/-Users-ajaynicolas-GitHub-IBL5/nightly/logs/$(date +%Y-%m-%d).log` |
 
 ## Directory Layout
 
 ```
-~/.claude/projects/-Users-ajaynicolas-Documents-GitHub-IBL5/nightly/
+~/.claude/projects/-Users-ajaynicolas-GitHub-IBL5/nightly/
   queue/    symlinks to ~/.claude/plans/*.md (oldest runs first)
   done/     symlinks moved here after successful execution
   skipped/  symlinks moved here when skipped (ambiguity/errors)

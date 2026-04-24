@@ -41,11 +41,11 @@ test.describe('Series Records flow', () => {
 
   test('record cells have background-color styles', async ({ page }) => {
     const firstRow = page.locator('.sticky-table tbody tr').first();
-    // Non-diagonal cell (index 2) should have background-color
+    // Non-diagonal cell (index 2) should have --series-cell-bg custom property
     const recordCell = firstRow.locator('td').nth(2);
     const style = await recordCell.getAttribute('style');
     expect(style).toBeTruthy();
-    expect(style!).toContain('background-color');
+    expect(style!).toContain('--series-cell-bg');
   });
 
   test('table uses page-sticky wrapper', async ({ page }) => {

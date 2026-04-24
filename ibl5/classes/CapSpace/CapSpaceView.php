@@ -139,8 +139,8 @@ class CapSpaceView implements CapSpaceViewInterface
         $html .= '</td>';
 
         // MLE/LLE icons
-        $mleIcon = $teamData['hasMLE'] ? "\u{2705}" : "\u{274C}";
-        $lleIcon = $teamData['hasLLE'] ? "\u{2705}" : "\u{274C}";
+        $mleIcon = $teamData['has_mle'] ? "\u{2705}" : "\u{274C}";
+        $lleIcon = $teamData['has_lle'] ? "\u{2705}" : "\u{274C}";
 
         $html .= '<td>' . $mleIcon . '</td>';
         $html .= '<td>' . $lleIcon . '</td>';

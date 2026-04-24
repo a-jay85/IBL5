@@ -74,11 +74,11 @@ class ScheduleIntegrationTest extends IntegrationTestCase
                 'capacity' => 20000,
                 'owner_name' => 'Test Owner',
                 'owner_email' => 'test@example.com',
-                'discordID' => '123456789',
-                'Used_Extension_This_Chunk' => 0,
-                'Used_Extension_This_Season' => 0,
-                'HasMLE' => 1,
-                'HasLLE' => 1,
+                'discord_id' => '123456789',
+                'used_extension_this_chunk' => 0,
+                'used_extension_this_season' => 0,
+                'has_mle' => 1,
+                'has_lle' => 1,
                 'leagueRecord' => '10-5',
             ];
         }

@@ -374,7 +374,7 @@ INSERT INTO ibl_plr_snapshots (
    45, 185, 160, 48, 22, 65, 88, 565);
 
 -- Team MLE/LLE flags: Metros have both exceptions available
-UPDATE ibl_team_info SET HasMLE = 1, HasLLE = 1 WHERE teamid = 1;
+UPDATE ibl_team_info SET has_mle = 1, has_lle = 1 WHERE teamid = 1;
 
 -- ============================================================
 -- Additional players for depth chart starters

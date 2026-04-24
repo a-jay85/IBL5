@@ -66,7 +66,7 @@ class GMContactListView implements GMContactListViewInterface
      *     color1: string,
      *     color2: string,
      *     owner_name: string,
-     *     discordID: int|null
+     *     discord_id: int|null
      * }> $contacts Array of contact data
      * @return string HTML table rows
      */
@@ -91,7 +91,7 @@ class GMContactListView implements GMContactListViewInterface
      *     color1: string,
      *     color2: string,
      *     owner_name: string,
-     *     discordID: int|null
+     *     discord_id: int|null
      * } $contact Contact data array
      * @return string HTML for one contact row
      */
@@ -99,7 +99,7 @@ class GMContactListView implements GMContactListViewInterface
     {
         $teamId = $contact['teamid'];
         $ownerName = HtmlSanitizer::safeHtmlOutput($contact['owner_name']);
-        $discordID = $contact['discordID'];
+        $discordID = $contact['discord_id'];
 
         if ($discordID !== null) {
             $gmCell = "<a href=\"https://discord.com/users/{$discordID}\">{$ownerName}</a>";

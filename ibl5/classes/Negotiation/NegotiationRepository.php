@@ -23,9 +23,9 @@ class NegotiationRepository extends BaseMysqliRepository implements NegotiationR
      */
     public function getTeamPerformance(string $teamName): array
     {
-        /** @var array{Contract_Wins?: int, Contract_Losses?: int, Contract_AvgW?: int, Contract_AvgL?: int}|null $result */
+        /** @var array{contract_wins?: int, contract_losses?: int, contract_avg_w?: int, contract_avg_l?: int}|null $result */
         $result = $this->fetchOne(
-            "SELECT Contract_Wins, Contract_Losses, Contract_AvgW, Contract_AvgL
+            "SELECT contract_wins, contract_losses, contract_avg_w, contract_avg_l
              FROM ibl_team_info
              WHERE team_name = ?",
             "s",
@@ -34,18 +34,18 @@ class NegotiationRepository extends BaseMysqliRepository implements NegotiationR
 
         if ($result === null) {
             return [
-                'Contract_Wins' => 41,
-                'Contract_Losses' => 41,
-                'Contract_AvgW' => 41,
-                'Contract_AvgL' => 41,
+                'contract_wins' => 41,
+                'contract_losses' => 41,
+                'contract_avg_w' => 41,
+                'contract_avg_l' => 41,
             ];
         }
 
         return [
-            'Contract_Wins' => $result['Contract_Wins'] ?? 41,
-            'Contract_Losses' => $result['Contract_Losses'] ?? 41,
-            'Contract_AvgW' => $result['Contract_AvgW'] ?? 41,
-            'Contract_AvgL' => $result['Contract_AvgL'] ?? 41,
+            'contract_wins' => $result['contract_wins'] ?? 41,
+            'contract_losses' => $result['contract_losses'] ?? 41,
+            'contract_avg_w' => $result['contract_avg_w'] ?? 41,
+            'contract_avg_l' => $result['contract_avg_l'] ?? 41,
         ];
     }
 

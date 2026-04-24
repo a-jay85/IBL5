@@ -127,8 +127,8 @@ class FreeAgencyAdminRepositoryTest extends DatabaseTestCase
 
     public function testMarkMleUsedSetsHasMleToZero(): void
     {
-        // Seed has Metros in ibl_team_info — set HasMLE=1 first
-        $stmt = $this->db->prepare('UPDATE ibl_team_info SET HasMLE = 1 WHERE team_name = ?');
+        // Seed has Metros in ibl_team_info — set has_mle=1 first
+        $stmt = $this->db->prepare('UPDATE ibl_team_info SET has_mle = 1 WHERE team_name = ?');
         self::assertNotFalse($stmt);
         $stmt->bind_param('s', $team);
         $team = 'Metros';
@@ -137,7 +137,7 @@ class FreeAgencyAdminRepositoryTest extends DatabaseTestCase
 
         $this->repo->markMleUsed('Metros');
 
-        $stmt = $this->db->prepare('SELECT HasMLE FROM ibl_team_info WHERE team_name = ?');
+        $stmt = $this->db->prepare('SELECT has_mle FROM ibl_team_info WHERE team_name = ?');
         self::assertNotFalse($stmt);
         $stmt->bind_param('s', $team);
         $team = 'Metros';
@@ -146,13 +146,13 @@ class FreeAgencyAdminRepositoryTest extends DatabaseTestCase
         $stmt->close();
 
         self::assertNotNull($row);
-        self::assertSame(0, $row['HasMLE']);
+        self::assertSame(0, $row['has_mle']);
     }
 
     public function testMarkLleUsedSetsHasLleToZero(): void
     {
-        // Set HasLLE=1 first
-        $stmt = $this->db->prepare('UPDATE ibl_team_info SET HasLLE = 1 WHERE team_name = ?');
+        // Set has_lle=1 first
+        $stmt = $this->db->prepare('UPDATE ibl_team_info SET has_lle = 1 WHERE team_name = ?');
         self::assertNotFalse($stmt);
         $stmt->bind_param('s', $team);
         $team = 'Metros';
@@ -161,7 +161,7 @@ class FreeAgencyAdminRepositoryTest extends DatabaseTestCase
 
         $this->repo->markLleUsed('Metros');
 
-        $stmt = $this->db->prepare('SELECT HasLLE FROM ibl_team_info WHERE team_name = ?');
+        $stmt = $this->db->prepare('SELECT has_lle FROM ibl_team_info WHERE team_name = ?');
         self::assertNotFalse($stmt);
         $stmt->bind_param('s', $team);
         $team = 'Metros';
@@ -170,7 +170,7 @@ class FreeAgencyAdminRepositoryTest extends DatabaseTestCase
         $stmt->close();
 
         self::assertNotNull($row);
-        self::assertSame(0, $row['HasLLE']);
+        self::assertSame(0, $row['has_lle']);
     }
 
     // ── insertNewsStory (nuke_stories is InnoDB — rolls back) ──

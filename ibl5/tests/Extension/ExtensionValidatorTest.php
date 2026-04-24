@@ -192,8 +192,8 @@ class ExtensionValidatorTest extends TestCase
             'team_city' => 'Test',
             'team_nick' => 'Team',
             'seasonRecord' => '0-0',
-            'HasMLE' => 0,
-            'HasLLE' => 0,
+            'has_mle' => 0,
+            'has_lle' => 0,
             'leagueRecord' => '0-0',
             'capRoom' => 0,
             'capacity' => 20000,
@@ -202,9 +202,9 @@ class ExtensionValidatorTest extends TestCase
             'color1' => '#000000',
             'color2' => '#FFFFFF',
             'arena' => 'Test Arena',
-            'discordID' => '',
-            'Used_Extension_This_Season' => 0,
-            'Used_Extension_This_Chunk' => 0
+            'discord_id' => '',
+            'used_extension_this_season' => 0,
+            'used_extension_this_chunk' => 0
         ];
     }
 

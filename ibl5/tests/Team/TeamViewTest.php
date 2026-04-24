@@ -29,7 +29,7 @@ class TeamViewTest extends TestCase
         $team->name = 'Celtics';
         $team->color1 = 'FF0000';
         $team->color2 = '0000FF';
-        $team->discordID = null;
+        $team->discord_id = null;
 
         if (isset($overrides['team'])) {
             $team = $overrides['team'];
@@ -107,7 +107,7 @@ class TeamViewTest extends TestCase
         $team->name = 'Free Agents';
         $team->color1 = '000000';
         $team->color2 = 'FFFFFF';
-        $team->discordID = null;
+        $team->discord_id = null;
 
         $output = $this->view->render($this->createPageData([
             'teamid' => 0,
@@ -134,7 +134,7 @@ class TeamViewTest extends TestCase
         $team->name = 'Free Agents';
         $team->color1 = '000000';
         $team->color2 = 'FFFFFF';
-        $team->discordID = null;
+        $team->discord_id = null;
 
         $output = $this->view->render($this->createPageData([
             'teamid' => 0,
@@ -223,7 +223,7 @@ class TeamViewTest extends TestCase
         $team->name = 'Celtics';
         $team->color1 = 'FF0000';
         $team->color2 = '0000FF';
-        $team->discordID = '123456789012345678';
+        $team->discord_id = '123456789012345678';
 
         $output = $this->view->render($this->createPageData([
             'team' => $team,

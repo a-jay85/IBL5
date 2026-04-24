@@ -53,7 +53,7 @@ class CapSpaceServiceTest extends TestCase
     /**
      * Test that MLE/LLE integer values are correctly converted to booleans
      *
-     * Regression test for bug where $team->hasMLE === '1' always returned false
+     * Regression test for bug where $team->has_mle === '1' always returned false
      * because database stores integers, not strings.
      */
     public function testMleAndLleFlagsAreCorrectlyConvertedFromIntegersToBoolean(): void
@@ -68,10 +68,10 @@ class CapSpaceServiceTest extends TestCase
         $result = $this->service->publicProcessTeamCapData($mockTeam, $mockSeason);
 
         // Verify boolean conversion works correctly with integer 1
-        $this->assertIsBool($result['hasMLE'], 'hasMLE should be a boolean');
-        $this->assertIsBool($result['hasLLE'], 'hasLLE should be a boolean');
-        $this->assertTrue($result['hasMLE'], 'hasMLE should be true when team has MLE=1');
-        $this->assertTrue($result['hasLLE'], 'hasLLE should be true when team has LLE=1');
+        $this->assertIsBool($result['has_mle'], 'has_mle should be a boolean');
+        $this->assertIsBool($result['has_lle'], 'has_lle should be a boolean');
+        $this->assertTrue($result['has_mle'], 'has_mle should be true when team has MLE=1');
+        $this->assertTrue($result['has_lle'], 'has_lle should be true when team has LLE=1');
     }
 
     public function testMleAndLleFlagsHandleIntegerZeroCorrectly(): void
@@ -84,8 +84,8 @@ class CapSpaceServiceTest extends TestCase
 
         $result = $this->service->publicProcessTeamCapData($mockTeam, $mockSeason);
 
-        $this->assertFalse($result['hasMLE'], 'hasMLE should be false when team has MLE=0');
-        $this->assertFalse($result['hasLLE'], 'hasLLE should be false when team has LLE=0');
+        $this->assertFalse($result['has_mle'], 'has_mle should be false when team has MLE=0');
+        $this->assertFalse($result['has_lle'], 'has_lle should be false when team has LLE=0');
     }
 
     public function testMleAndLleFlagsHandleMixedStates(): void
@@ -98,8 +98,8 @@ class CapSpaceServiceTest extends TestCase
 
         $result = $this->service->publicProcessTeamCapData($mockTeam, $mockSeason);
 
-        $this->assertTrue($result['hasMLE'], 'hasMLE should be true when team has MLE=1');
-        $this->assertFalse($result['hasLLE'], 'hasLLE should be false when team has LLE=0');
+        $this->assertTrue($result['has_mle'], 'has_mle should be true when team has MLE=1');
+        $this->assertFalse($result['has_lle'], 'has_lle should be false when team has LLE=0');
     }
 
     public function testGetDisplayYearsForRegularSeason(): void
@@ -225,8 +225,8 @@ class CapSpaceServiceTest extends TestCase
         $mockTeam->city = 'Test City';
         $mockTeam->color1 = '000000';
         $mockTeam->color2 = 'FFFFFF';
-        $mockTeam->hasMLE = $hasMLE;
-        $mockTeam->hasLLE = $hasLLE;
+        $mockTeam->has_mle = $hasMLE;
+        $mockTeam->has_lle = $hasLLE;
 
         return $mockTeam;
     }

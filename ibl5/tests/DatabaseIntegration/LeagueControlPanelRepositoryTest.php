@@ -127,38 +127,38 @@ class LeagueControlPanelRepositoryTest extends DatabaseTestCase
     public function testResetAllContractExtensionsZeroesFlags(): void
     {
         // Set a non-zero value first
-        $this->db->query("UPDATE ibl_team_info SET Used_Extension_This_Season = 1 WHERE teamid = 1");
+        $this->db->query("UPDATE ibl_team_info SET used_extension_this_season = 1 WHERE teamid = 1");
 
         $result = $this->repo->resetAllContractExtensions();
         self::assertTrue($result);
 
-        $stmt = $this->db->prepare("SELECT Used_Extension_This_Season FROM ibl_team_info WHERE teamid = 1");
+        $stmt = $this->db->prepare("SELECT used_extension_this_season FROM ibl_team_info WHERE teamid = 1");
         self::assertNotFalse($stmt);
         $stmt->execute();
         $row = $stmt->get_result()->fetch_assoc();
         $stmt->close();
 
         self::assertNotNull($row);
-        self::assertSame(0, $row['Used_Extension_This_Season']);
+        self::assertSame(0, $row['used_extension_this_season']);
     }
 
     public function testResetAllMlesAndLlesResetsFlags(): void
     {
         // Set to 0 first
-        $this->db->query("UPDATE ibl_team_info SET HasMLE = 0, HasLLE = 0 WHERE teamid = 1");
+        $this->db->query("UPDATE ibl_team_info SET has_mle = 0, has_lle = 0 WHERE teamid = 1");
 
         $result = $this->repo->resetAllMlesAndLles();
         self::assertTrue($result);
 
-        $stmt = $this->db->prepare("SELECT HasMLE, HasLLE FROM ibl_team_info WHERE teamid = 1");
+        $stmt = $this->db->prepare("SELECT has_mle, has_lle FROM ibl_team_info WHERE teamid = 1");
         self::assertNotFalse($stmt);
         $stmt->execute();
         $row = $stmt->get_result()->fetch_assoc();
         $stmt->close();
 
         self::assertNotNull($row);
-        self::assertSame(1, $row['HasMLE']);
-        self::assertSame(1, $row['HasLLE']);
+        self::assertSame(1, $row['has_mle']);
+        self::assertSame(1, $row['has_lle']);
     }
 
     public function testSetFreeAgencyNotificationsUpdatesValue(): void
@@ -348,14 +348,14 @@ class LeagueControlPanelRepositoryTest extends DatabaseTestCase
 
         $this->repo->setFreeAgencyFactorsForPfw();
 
-        $stmt = $this->db->prepare("SELECT Contract_Wins, Contract_Losses FROM ibl_team_info WHERE teamid = 1");
+        $stmt = $this->db->prepare("SELECT contract_wins, contract_losses FROM ibl_team_info WHERE teamid = 1");
         self::assertNotFalse($stmt);
         $stmt->execute();
         $row = $stmt->get_result()->fetch_assoc();
         $stmt->close();
 
         self::assertNotNull($row);
-        self::assertSame(42, $row['Contract_Wins']);
-        self::assertSame(8, $row['Contract_Losses']);
+        self::assertSame(42, $row['contract_wins']);
+        self::assertSame(8, $row['contract_losses']);
     }
 }

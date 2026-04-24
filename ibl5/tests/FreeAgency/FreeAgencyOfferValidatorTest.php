@@ -413,7 +413,7 @@ class FreeAgencyOfferValidatorTest extends TestCase
     // PENDING MLE/LLE OFFERS (ONE-AT-A-TIME RULE)
     //
     // Bug fix: a GM could submit multiple pending MLE/LLE offers because
-    // the `HasMLE` / `HasLLE` flags on ibl_team_info only clear when admin
+    // the `has_mle` / `has_lle` flags on ibl_team_info only clear when admin
     // processes signings. The validator must also consult the pending
     // offers in ibl_fa_offers to enforce the "one pending offer at a time"
     // rule. Pending offers to the current player are excluded so a team
@@ -572,8 +572,8 @@ class FreeAgencyOfferValidatorTest extends TestCase
     private function createTeamStub(int $hasMLE = 0, int $hasLLE = 0, int $teamid = 1): Team
     {
         $team = $this->createStub(Team::class);
-        $team->hasMLE = $hasMLE;
-        $team->hasLLE = $hasLLE;
+        $team->has_mle = $hasMLE;
+        $team->has_lle = $hasLLE;
         $team->teamid = $teamid;
         return $team;
     }

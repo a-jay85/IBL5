@@ -39,6 +39,6 @@ class GMContactListRepositoryTest extends DatabaseTestCase
         self::assertArrayHasKey('color1', $first);
         self::assertArrayHasKey('color2', $first);
         self::assertArrayHasKey('owner_name', $first);
-        self::assertArrayHasKey('discordID', $first);
+        self::assertArrayHasKey('discord_id', $first);
     }
 }

@@ -64,7 +64,7 @@ class ExtensionRepositoryTest extends TestCase
         $result = $this->repository->markExtensionUsedThisSim('Test Team');
 
         $this->assertTrue($result);
-        $this->assertQueryExecuted('Used_Extension_This_Chunk');
+        $this->assertQueryExecuted('used_extension_this_chunk');
     }
 
     public function testMarksExtensionUsedThisSeason(): void
@@ -72,7 +72,7 @@ class ExtensionRepositoryTest extends TestCase
         $result = $this->repository->markExtensionUsedThisSeason('Test Team');
 
         $this->assertTrue($result);
-        $this->assertQueryExecuted('Used_Extension_This_Season');
+        $this->assertQueryExecuted('used_extension_this_season');
     }
 
     // ============================================
@@ -127,7 +127,7 @@ class ExtensionRepositoryTest extends TestCase
     public function testGetTeamTraditionDataReturnsTeamData(): void
     {
         $this->mockDb->setMockData([
-            ['Contract_Wins' => 50, 'Contract_Losses' => 32, 'Contract_AvgW' => 2500, 'Contract_AvgL' => 2000],
+            ['contract_wins' => 50, 'contract_losses' => 32, 'contract_avg_w' => 2500, 'contract_avg_l' => 2000],
         ]);
 
         $result = $this->repository->getTeamTraditionData('Test Team');
@@ -207,7 +207,7 @@ class ExtensionRepositoryTest extends TestCase
 
         // Verify all three operations were executed
         $this->assertQueryExecuted('UPDATE ibl_plr');
-        $this->assertQueryExecuted('Used_Extension_This_Season');
+        $this->assertQueryExecuted('used_extension_this_season');
         $this->assertQueryExecuted('nuke_stories');
     }
 

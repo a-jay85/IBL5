@@ -564,8 +564,8 @@ class FreeAgencyView
      */
     private function renderCapSpaceFooter(Team $team, array $capMetrics): string
     {
-        $MLEicon = ($team->hasMLE === 1) ? "\u{2705}" : "\u{274C}";
-        $LLEicon = ($team->hasLLE === 1) ? "\u{2705}" : "\u{274C}";
+        $MLEicon = ($team->has_mle === 1) ? "\u{2705}" : "\u{274C}";
+        $LLEicon = ($team->has_lle === 1) ? "\u{2705}" : "\u{274C}";
 
         ob_start();
         ?>

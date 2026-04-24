@@ -23,12 +23,12 @@ class NegotiationRepositoryTest extends DatabaseTestCase
     {
         $perf = $this->repo->getTeamPerformance('Metros');
 
-        self::assertArrayHasKey('Contract_Wins', $perf);
-        self::assertArrayHasKey('Contract_Losses', $perf);
-        self::assertArrayHasKey('Contract_AvgW', $perf);
-        self::assertArrayHasKey('Contract_AvgL', $perf);
-        self::assertIsInt($perf['Contract_Wins']);
-        self::assertIsInt($perf['Contract_Losses']);
+        self::assertArrayHasKey('contract_wins', $perf);
+        self::assertArrayHasKey('contract_losses', $perf);
+        self::assertArrayHasKey('contract_avg_w', $perf);
+        self::assertArrayHasKey('contract_avg_l', $perf);
+        self::assertIsInt($perf['contract_wins']);
+        self::assertIsInt($perf['contract_losses']);
     }
 
     public function testGetTeamPerformanceReturnsDefaultsForUnknownTeam(): void
@@ -36,10 +36,10 @@ class NegotiationRepositoryTest extends DatabaseTestCase
         $perf = $this->repo->getTeamPerformance('Nonexistent Team');
 
         // Method returns defaults of 41 for unknown teams
-        self::assertSame(41, $perf['Contract_Wins']);
-        self::assertSame(41, $perf['Contract_Losses']);
-        self::assertSame(41, $perf['Contract_AvgW']);
-        self::assertSame(41, $perf['Contract_AvgL']);
+        self::assertSame(41, $perf['contract_wins']);
+        self::assertSame(41, $perf['contract_losses']);
+        self::assertSame(41, $perf['contract_avg_w']);
+        self::assertSame(41, $perf['contract_avg_l']);
     }
 
     public function testGetPositionSalaryCommitmentReturnsInt(): void

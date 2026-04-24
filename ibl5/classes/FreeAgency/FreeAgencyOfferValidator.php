@@ -107,7 +107,7 @@ class FreeAgencyOfferValidator implements FreeAgencyOfferValidatorInterface
      *
      * Two rules enforced, in order:
      * 1. The team's MLE for this FA period has not already been consumed by
-     *    an accepted signing (`ibl_team_info.HasMLE = 0`).
+     *    an accepted signing (`ibl_team_info.has_mle = 0`).
      * 2. The team does not already have a pending MLE offer outstanding to
      *    a different player in `ibl_fa_offers`. A GM may only hold one
      *    pending MLE offer at any given time — they must rescind the prior
@@ -123,7 +123,7 @@ class FreeAgencyOfferValidator implements FreeAgencyOfferValidatorInterface
         }
 
         // Rule 1: MLE already consumed by an accepted signing this FA period
-        $hasMLE = $this->team->hasMLE;
+        $hasMLE = $this->team->has_mle;
         if ($hasMLE !== 1) {
             return [
                 'valid' => false,
@@ -162,7 +162,7 @@ class FreeAgencyOfferValidator implements FreeAgencyOfferValidatorInterface
         }
 
         // Rule 1: LLE already consumed by an accepted signing this FA period
-        $hasLLE = $this->team->hasLLE;
+        $hasLLE = $this->team->has_lle;
         if ($hasLLE !== 1) {
             return [
                 'valid' => false,

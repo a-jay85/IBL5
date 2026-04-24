@@ -118,7 +118,7 @@ class TeamView implements TeamViewInterface
     /**
      * Render the team banner row with logo centered and action links flanking it
      *
-     * @param Team $team Team object with color1, color2, name, discordID properties
+     * @param Team $team Team object with color1, color2, name, discord_id properties
      */
     private function renderTeamBanner(int $teamid, object $team, string $imagesPath, string $userTeamName, bool $isOwnTeam): string
     {
@@ -144,8 +144,8 @@ class TeamView implements TeamViewInterface
             } else {
                 $partnerParam = \Utilities\HtmlSanitizer::safeHtmlOutput($team->name);
                 $tradeButton = '<a href="modules.php?name=Trading&amp;op=offertrade&amp;partner=' . urlencode($team->name) . '" class="team-action-link">' . $tradeInner . '</a>';
-                if ($team->discordID !== null) {
-                    $discordIDSafe = \Utilities\HtmlSanitizer::safeHtmlOutput((string) $team->discordID);
+                if ($team->discord_id !== null) {
+                    $discordIDSafe = \Utilities\HtmlSanitizer::safeHtmlOutput((string) $team->discord_id);
                     $discordButton = '<a href="https://discord.com/users/' . $discordIDSafe . '" class="team-action-link team-action-link--discord" target="_blank" rel="noopener noreferrer">' . $discordInner . '</a>';
                 }
             }

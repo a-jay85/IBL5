@@ -144,9 +144,9 @@ class FreeAgencyAdminProcessor implements FreeAgencyAdminProcessorInterface
                 $playerTeam = Team::initialize($this->db, $player->teamName ?? '');
 
                 // Buffer Discord header
-                $pendingHeader = "**" . strtoupper("{$playerName}, {$playerTeam->city} {$player->teamName}") . "** <@!{$playerTeam->discordID}>\n";
+                $pendingHeader = "**" . strtoupper("{$playerName}, {$playerTeam->city} {$player->teamName}") . "** <@!{$playerTeam->discord_id}>\n";
 
-                $offeringTeamDiscordId = (string) ($offeringTeam->discordID ?? '');
+                $offeringTeamDiscordId = (string) ($offeringTeam->discord_id ?? '');
                 $pendingOfferLines[] = [
                     'teamName' => $offeringTeamName,
                     'line' => $this->buildOfferLine($offeringTeamName, $offer1, $offer2, $offer3, $offer4, $offer5, $offer6, $offeringTeamDiscordId),
@@ -187,7 +187,7 @@ class FreeAgencyAdminProcessor implements FreeAgencyAdminProcessorInterface
             } else {
                 // Additional offer for already-processed player - buffer for sorting
                 $offeringTeam = Team::initialize($this->db, $offeringTeamName);
-                $offeringTeamDiscordId = (string) ($offeringTeam->discordID ?? '');
+                $offeringTeamDiscordId = (string) ($offeringTeam->discord_id ?? '');
                 $pendingOfferLines[] = [
                     'teamName' => $offeringTeamName,
                     'line' => $this->buildOfferLine($offeringTeamName, $offer1, $offer2, $offer3, $offer4, $offer5, $offer6, $offeringTeamDiscordId),

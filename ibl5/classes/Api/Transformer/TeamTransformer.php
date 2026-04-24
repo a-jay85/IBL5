@@ -25,7 +25,7 @@ class TeamTransformer
             'full_name' => $row['team_city'] . ' ' . $row['team_name'],
             'team_id' => $row['teamid'],
             'owner' => $row['owner_name'],
-            'owner_discord_id' => $row['discordID'],
+            'owner_discord_id' => $row['discord_id'],
             'arena' => $row['arena'],
             'conference' => $row['conference'],
             'division' => $row['division'],

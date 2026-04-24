@@ -26,7 +26,7 @@ class FreeAgencyDemandRepositoryTest extends DatabaseTestCase
     {
         // Metros is in the seed — set known Contract values within the transaction
         $stmt = $this->db->prepare(
-            'UPDATE ibl_team_info SET Contract_Wins = ?, Contract_Losses = ?, Contract_AvgW = ?, Contract_AvgL = ? WHERE team_name = ?'
+            'UPDATE ibl_team_info SET contract_wins = ?, contract_losses = ?, contract_avg_w = ?, contract_avg_l = ? WHERE team_name = ?'
         );
         self::assertNotFalse($stmt);
         $stmt->bind_param('iiiis', $w, $l, $aw, $al, $tn);

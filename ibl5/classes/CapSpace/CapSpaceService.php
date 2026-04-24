@@ -18,7 +18,7 @@ use Season\Season;
  * @phpstan-import-type PlayerRow from \Services\CommonMysqliRepository
  * @phpstan-type AvailableSalary array{year1: int, year2: int, year3: int, year4: int, year5: int, year6: int}
  * @phpstan-type PositionSalaries array<string, int>
- * @phpstan-type CapSpaceTeamData array{team: Team, teamId: int, teamName: string, teamCity: string, color1: string, color2: string, availableSalary: AvailableSalary, positionSalaries: PositionSalaries, freeAgencySlots: int, hasMLE: bool, hasLLE: bool}
+ * @phpstan-type CapSpaceTeamData array{team: Team, teamId: int, teamName: string, teamCity: string, color1: string, color2: string, availableSalary: AvailableSalary, positionSalaries: PositionSalaries, freeAgencySlots: int, has_mle: bool, has_lle: bool}
  * @phpstan-type DisplayYears array{beginningYear: int, endingYear: int}
  *
  * @see CapSpaceRepositoryInterface For data access
@@ -115,8 +115,8 @@ class CapSpaceService
             'availableSalary' => $availableSalary,
             'positionSalaries' => $positionSalaries,
             'freeAgencySlots' => $freeAgencySlots,
-            'hasMLE' => $team->hasMLE === 1,
-            'hasLLE' => $team->hasLLE === 1,
+            'has_mle' => $team->has_mle === 1,
+            'has_lle' => $team->has_lle === 1,
         ];
     }
 

@@ -206,7 +206,7 @@ class LeagueControlPanelRepository extends \BaseMysqliRepository implements Leag
     public function setFreeAgencyFactorsForPfw(): bool
     {
         $this->execute(
-            "UPDATE ibl_team_info info JOIN ibl_standings s ON s.teamid = info.teamid SET Contract_Wins = s.wins, Contract_Losses = s.losses"
+            "UPDATE ibl_team_info info JOIN ibl_standings s ON s.teamid = info.teamid SET contract_wins = s.wins, contract_losses = s.losses"
         );
 
         return true;
@@ -257,7 +257,7 @@ class LeagueControlPanelRepository extends \BaseMysqliRepository implements Leag
      */
     public function resetAllContractExtensions(): bool
     {
-        $this->execute("UPDATE ibl_team_info SET Used_Extension_This_Season = 0");
+        $this->execute("UPDATE ibl_team_info SET used_extension_this_season = 0");
 
         return true;
     }
@@ -267,7 +267,7 @@ class LeagueControlPanelRepository extends \BaseMysqliRepository implements Leag
      */
     public function resetAllMlesAndLles(): bool
     {
-        $this->execute("UPDATE ibl_team_info SET HasMLE = 1, HasLLE = 1");
+        $this->execute("UPDATE ibl_team_info SET has_mle = 1, has_lle = 1");
 
         return true;
     }

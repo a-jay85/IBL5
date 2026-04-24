@@ -136,7 +136,7 @@ class CommonMysqliRepositoryTest extends DatabaseTestCase
     {
         $result = $this->repo->getTeamDiscordID('Metros');
 
-        // CI seed may or may not have discordID — either int or null is valid
+        // CI seed may or may not have discord_id — either int or null is valid
         self::assertTrue($result === null || is_int($result));
     }
 

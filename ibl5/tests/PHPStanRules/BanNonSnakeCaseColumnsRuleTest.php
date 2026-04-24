@@ -99,6 +99,51 @@ final class BanNonSnakeCaseColumnsRuleTest extends RuleTestCase
                     . '(Note: bare `sta` without backticks may legitimately appear in unrelated contexts.)',
                     19,
                 ],
+                [
+                    'Banned backtick-quoted column reference `discordID` in SQL string. '
+                    . 'Rename to `discord_id`; migration 117 snake-cased team-info columns.',
+                    20,
+                ],
+                [
+                    'Banned backtick-quoted column reference `Contract_Wins` in SQL string. '
+                    . 'Rename to `contract_wins`; migration 117 snake-cased team-info columns.',
+                    21,
+                ],
+                [
+                    'Banned backtick-quoted column reference `Contract_Losses` in SQL string. '
+                    . 'Rename to `contract_losses`; migration 117 snake-cased team-info columns.',
+                    22,
+                ],
+                [
+                    'Banned backtick-quoted column reference `Contract_AvgW` in SQL string. '
+                    . 'Rename to `contract_avg_w`; migration 117 snake-cased team-info columns.',
+                    23,
+                ],
+                [
+                    'Banned backtick-quoted column reference `Contract_AvgL` in SQL string. '
+                    . 'Rename to `contract_avg_l`; migration 117 snake-cased team-info columns.',
+                    24,
+                ],
+                [
+                    'Banned backtick-quoted column reference `Used_Extension_This_Chunk` in SQL string. '
+                    . 'Rename to `used_extension_this_chunk`; migration 117 snake-cased team-info columns.',
+                    25,
+                ],
+                [
+                    'Banned backtick-quoted column reference `Used_Extension_This_Season` in SQL string. '
+                    . 'Rename to `used_extension_this_season`; migration 117 snake-cased team-info columns.',
+                    26,
+                ],
+                [
+                    'Banned backtick-quoted column reference `HasMLE` in SQL string. '
+                    . 'Rename to `has_mle`; migration 117 snake-cased team-info columns.',
+                    27,
+                ],
+                [
+                    'Banned backtick-quoted column reference `HasLLE` in SQL string. '
+                    . 'Rename to `has_lle`; migration 117 snake-cased team-info columns.',
+                    28,
+                ],
             ],
         );
     }

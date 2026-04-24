@@ -81,7 +81,7 @@ class TradeAcceptControllerTest extends IntegrationTestCase
                 'created_at' => '2024-01-01 00:00:00',
                 'updated_at' => '2024-01-01 00:00:00',
                 // Discord lookup returns this GM's ID
-                'discordID' => '999999999',
+                'discord_id' => '999999999',
             ],
         ]);
 

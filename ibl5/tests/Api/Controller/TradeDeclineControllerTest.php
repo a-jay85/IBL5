@@ -67,7 +67,7 @@ class TradeDeclineControllerTest extends IntegrationTestCase
                 'approval' => 'Celtics',
                 'created_at' => '2024-01-01 00:00:00',
                 'updated_at' => '2024-01-01 00:00:00',
-                'discordID' => '999999999',
+                'discord_id' => '999999999',
             ],
         ]);
 

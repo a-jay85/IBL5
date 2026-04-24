@@ -19,8 +19,8 @@ class DraftHistoryEntryPointTest extends ModuleEntryPointTestCase
     private static function fullTeamData(array $overrides = []): array
     {
         return array_merge(TestDataFactory::createTeam(), [
-            'Used_Extension_This_Chunk' => 0,
-            'Used_Extension_This_Season' => 0,
+            'used_extension_this_chunk' => 0,
+            'used_extension_this_season' => 0,
             'leagueRecord' => '10-5',
         ], $overrides);
     }

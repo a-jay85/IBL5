@@ -28,7 +28,7 @@ class PlayerContractValidator implements PlayerContractValidatorInterface
         // During the Draft and Free Agency phases, evaluate eligibility from the
         // incoming season's perspective — contractCurrentYear will advance by one
         // when the new season officially starts. Any contract extension used in the
-        // past season is disregarded, since the Used_Extension_This_Season flag also
+        // past season is disregarded, since the used_extension_this_season flag also
         // resets at season rollover.
         if ($season !== null && $season->isOffseasonPhase()) {
             $currentYear++;

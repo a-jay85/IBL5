@@ -73,8 +73,8 @@ class CapSpaceViewTest extends TestCase
                 'color2' => 'FFFFFF',
                 'mle' => false,
                 'lle' => false,
-                'hasMLE' => false,
-                'hasLLE' => false,
+                'has_mle' => false,
+                'has_lle' => false,
                 'freeAgencySlots' => 0,
                 'availableSalary' => [
                     'year1' => 0,

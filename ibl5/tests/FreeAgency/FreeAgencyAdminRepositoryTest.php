@@ -157,7 +157,7 @@ class FreeAgencyAdminRepositoryTest extends TestCase
 
         // Verify the UPDATE query was executed
         $queries = $this->mockDb->getExecutedQueries();
-        $mleQueries = array_filter($queries, static fn (string $q): bool => stripos($q, 'HasMLE') !== false);
+        $mleQueries = array_filter($queries, static fn (string $q): bool => stripos($q, 'has_mle') !== false);
         $this->assertNotEmpty($mleQueries);
     }
 
@@ -172,7 +172,7 @@ class FreeAgencyAdminRepositoryTest extends TestCase
         $repository->markLleUsed('Chicago');
 
         $queries = $this->mockDb->getExecutedQueries();
-        $lleQueries = array_filter($queries, static fn (string $q): bool => stripos($q, 'HasLLE') !== false);
+        $lleQueries = array_filter($queries, static fn (string $q): bool => stripos($q, 'has_lle') !== false);
         $this->assertNotEmpty($lleQueries);
     }
 

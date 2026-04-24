@@ -100,7 +100,7 @@ class DraftSelectionHandler implements DraftSelectionHandlerInterface
 
         // Look up next team on the clock for the #draft-picks message.
         // Wrapped in try-catch so a lookup failure can't prevent webhooks from firing.
-        $discordIDOfTeamOnTheClock = null;
+        $discordIdOfTeamOnTheClock = null;
         try {
             $nextPick = $this->repository->getCurrentDraftPick();
             if ($nextPick !== null) {
@@ -110,7 +110,7 @@ class DraftSelectionHandler implements DraftSelectionHandlerInterface
                     $nextPick['teamid']
                 );
                 if ($teamOnTheClock !== null) {
-                    $discordIDOfTeamOnTheClock = $this->commonRepository->getTeamDiscordID($teamOnTheClock);
+                    $discordIdOfTeamOnTheClock = $this->commonRepository->getTeamDiscordID($teamOnTheClock);
                 }
             }
         } catch (\Throwable $e) {
@@ -125,7 +125,7 @@ class DraftSelectionHandler implements DraftSelectionHandlerInterface
 
         $messageWithNextTeam = $this->processor->createNextTeamMessage(
             $message,
-            $discordIDOfTeamOnTheClock,
+            $discordIdOfTeamOnTheClock,
             $this->season->endingYear
         );
 

@@ -16,7 +16,7 @@ interface NegotiationRepositoryInterface
      * Get team contract performance data
      * 
      * @param string $teamName Team name
-     * @return array{Contract_Wins: int, Contract_Losses: int, Contract_AvgW: int, Contract_AvgL: int}
+     * @return array{contract_wins: int, contract_losses: int, contract_avg_w: int, contract_avg_l: int}
      */
     public function getTeamPerformance(string $teamName): array;
 

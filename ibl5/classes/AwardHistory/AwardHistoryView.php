@@ -61,12 +61,12 @@ class AwardHistoryView implements AwardHistoryViewInterface
 
         $output .= '<div class="ibl-filter-form__group">';
         $output .= '<label class="ibl-filter-form__label" for="aw_year">Year</label>';
-        $output .= '<input type="text" name="aw_year" id="aw_year" value="' . $year . '" placeholder="Year" style="width: 5rem;">';
+        $output .= '<input type="text" name="aw_year" id="aw_year" value="' . $year . '" placeholder="Year" class="w-20">';
         $output .= '</div>';
         $output .= '</div>';
 
         // Sort row
-        $output .= '<div class="ibl-filter-form__row" style="margin-top: var(--space-3);">';
+        $output .= '<div class="ibl-filter-form__row mt-3">';
         $output .= '<div class="ibl-filter-form__group">';
         $output .= '<span class="ibl-filter-form__label">Sort by</span>';
         foreach ($sortOptions as $value => $label) {

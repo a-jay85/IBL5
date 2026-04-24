@@ -79,6 +79,25 @@ final class TestCookieOverrides
     }
 
     /**
+     * Read the `_test_team` cookie to override which team the logged-in
+     * user is associated with. Returns null when not set or E2E testing
+     * is disabled.
+     */
+    public static function getTeamOverride(): ?string
+    {
+        if (!self::isE2eTesting()) {
+            return null;
+        }
+
+        $raw = $_COOKIE['_test_team'] ?? null;
+        if (!is_string($raw) || $raw === '') {
+            return null;
+        }
+
+        return $raw;
+    }
+
+    /**
      * Reset cached overrides (for testing).
      */
     public static function resetCache(): void

@@ -554,6 +554,9 @@ UPDATE ibl_plr SET dc_sf_depth = 2 WHERE pid = 26;
 UPDATE ibl_plr SET dc_pf_depth = 2, dc_pg_depth = 3, dc_c_depth = 3 WHERE pid = 27;
 UPDATE ibl_plr SET dc_sf_depth = 3 WHERE pid = 28;
 UPDATE ibl_plr SET dc_pf_depth = 3 WHERE pid = 29;
+-- Extension Vet (pid=30) is the 13th Metros player; deactivate so baseline
+-- is exactly 12 active — matching the Regular-Season validator requirement.
+UPDATE ibl_plr SET dc_can_play_in_game = 0 WHERE pid = 30;
 
 -- Stars (tid=2): pid=4 covers PG/SG/PF, pid=5 covers SF/C
 UPDATE ibl_plr SET dc_pg_depth = 1, pg_depth = 1, dc_sg_depth = 1, sg_depth = 1, dc_pf_depth = 1, pf_depth = 1 WHERE pid = 4;
@@ -1130,6 +1133,180 @@ INSERT INTO ibl_plr_snapshots (
   (42, 'Rookie Big', 2026, 'finals', 'ci-seed', 15,
    41, 1300, 200, 440, 90, 110, 15, 40,
    55, 205, 80, 35, 30, 55, 90, 540);
+
+-- ============================================================
+-- Depth Chart E2E isolation team: Monarchs (tid=8)
+--
+-- These 12 players exist solely for depth-chart-entry-submission.spec.ts.
+-- A cookie-based team override (_test_dc_team) makes the DC page render
+-- this team instead of the logged-in user's Metros. Because no other spec
+-- touches tid=8, the roster is immune to parallel-worker mutations from
+-- trading/extension/waiver specs.
+--
+-- Layout: 5 starters (PG/SG/SF/PF/C), 7 backups covering ≥3 per position.
+-- ============================================================
+
+INSERT INTO ibl_plr (
+  pid, name, age, peak, teamid, pos, ordinal,
+  stamina, oo, od, r_drive_off, dd, po, pd, r_trans_off, r_tvr,
+  cy, cyt, cy1, cy2,
+  retired, exp,
+  htft, htin, wt, college,
+  draftround, draftpickno, draftyear, draftedby, draftedbycurrentname,
+  stats_gm, stats_min, stats_fgm, stats_fga, stats_ftm, stats_fta,
+  stats_3gm, stats_3ga, stats_orb, stats_drb, stats_ast, stats_stl,
+  stats_tvr, stats_blk, stats_pf,
+  uuid
+) VALUES
+  -- Starters
+  (100, 'DC Test PG',  27, 28, 8, 'PG', 1,
+   80, 75, 70, 65, 60, 72, 68, 70, 65,
+   1, 3, 800, 880,
+   0, 5,
+   6, 2, 190, 'DC University',
+   1, 5, 2021, 'Monarchs', 'Monarchs',
+   41, 1260, 200, 450, 100, 120,
+   60, 150, 30, 100, 200, 55,
+   75, 10, 80,
+   'dc000000-0000-0000-0000-000000000100'),
+  (101, 'DC Test SG',  26, 27, 8, 'SG', 2,
+   78, 72, 68, 63, 58, 70, 66, 68, 63,
+   1, 2, 600, 660,
+   0, 3,
+   6, 4, 195, 'DC State',
+   1, 12, 2023, 'Monarchs', 'Monarchs',
+   41, 1260, 180, 400, 90, 110,
+   50, 130, 35, 110, 170, 48,
+   65, 15, 85,
+   'dc000000-0000-0000-0000-000000000101'),
+  (102, 'DC Test SF',  28, 28, 8, 'SF', 3,
+   79, 74, 69, 64, 59, 71, 67, 69, 64,
+   1, 2, 700, 770,
+   0, 4,
+   6, 6, 210, 'DC College',
+   1, 8, 2022, 'Monarchs', 'Monarchs',
+   41, 1260, 190, 420, 95, 115,
+   45, 130, 45, 140, 160, 48,
+   60, 22, 88,
+   'dc000000-0000-0000-0000-000000000102'),
+  (103, 'DC Test PF',  29, 29, 8, 'PF', 4,
+   82, 78, 72, 68, 64, 76, 72, 74, 69,
+   1, 3, 900, 990,
+   0, 6,
+   6, 8, 225, 'DC Academy',
+   1, 3, 2020, 'Monarchs', 'Monarchs',
+   41, 1300, 210, 460, 110, 130,
+   30, 80, 50, 150, 100, 40,
+   55, 35, 90,
+   'dc000000-0000-0000-0000-000000000103'),
+  (104, 'DC Test C',   27, 28, 8, 'C',  5,
+   81, 76, 71, 66, 62, 73, 69, 71, 66,
+   1, 2, 500, 550,
+   0, 5,
+   7, 0, 245, 'DC Tech',
+   1, 6, 2021, 'Monarchs', 'Monarchs',
+   41, 1300, 220, 480, 115, 135,
+   20, 55, 60, 160, 90, 38,
+   50, 30, 95,
+   'dc000000-0000-0000-0000-000000000104'),
+  -- Backups (7 players covering ≥3 non-injured per position)
+  (105, 'DC Backup PG', 24, 27, 8, 'PG', 6,
+   75, 70, 65, 60, 55, 67, 63, 65, 60,
+   1, 2, 100, 110,
+   0, 2,
+   6, 1, 185, 'Backup U',
+   2, 20, 2024, 'Monarchs', 'Monarchs',
+   30, 600, 100, 230, 50, 60,
+   30, 80, 20, 60, 90, 25,
+   40, 10, 60,
+   'dc000000-0000-0000-0000-000000000105'),
+  (106, 'DC Backup SG', 25, 27, 8, 'SG', 7,
+   74, 69, 64, 59, 54, 66, 62, 64, 59,
+   1, 2, 100, 110,
+   0, 2,
+   6, 3, 190, 'Backup U',
+   2, 25, 2024, 'Monarchs', 'Monarchs',
+   30, 600, 95, 220, 45, 55,
+   25, 70, 25, 70, 80, 22,
+   38, 12, 65,
+   'dc000000-0000-0000-0000-000000000106'),
+  (107, 'DC Backup SF', 26, 28, 8, 'SF', 8,
+   76, 71, 66, 61, 56, 68, 64, 66, 61,
+   1, 2, 120, 130,
+   0, 3,
+   6, 5, 205, 'Backup U',
+   2, 30, 2023, 'Monarchs', 'Monarchs',
+   35, 800, 120, 280, 60, 72,
+   20, 55, 40, 110, 70, 28,
+   45, 18, 75,
+   'dc000000-0000-0000-0000-000000000107'),
+  (108, 'DC Backup PF', 23, 26, 8, 'PF', 9,
+   73, 68, 63, 58, 53, 65, 61, 63, 58,
+   1, 1, 80, 88,
+   0, 1,
+   6, 7, 220, 'Backup U',
+   2, 35, 2025, 'Monarchs', 'Monarchs',
+   20, 360, 60, 145, 30, 36,
+   15, 40, 30, 80, 50, 18,
+   30, 15, 50,
+   'dc000000-0000-0000-0000-000000000108'),
+  (109, 'DC Backup C',  25, 27, 8, 'C',  10,
+   77, 72, 67, 62, 57, 69, 65, 67, 62,
+   1, 3, 140, 155,
+   0, 4,
+   7, 0, 240, 'Backup U',
+   2, 18, 2022, 'Monarchs', 'Monarchs',
+   40, 1100, 150, 330, 70, 84,
+   10, 30, 55, 140, 75, 30,
+   48, 28, 85,
+   'dc000000-0000-0000-0000-000000000109'),
+  (110, 'DC Utility A', 26, 27, 8, 'PG', 11,
+   76, 70, 66, 61, 57, 68, 64, 66, 61,
+   1, 2, 150, 165,
+   0, 3,
+   6, 2, 195, 'Utility U',
+   2, 22, 2023, 'Monarchs', 'Monarchs',
+   35, 800, 110, 260, 55, 66,
+   28, 75, 25, 75, 85, 24,
+   42, 14, 70,
+   'dc000000-0000-0000-0000-000000000110'),
+  (111, 'DC Utility B', 27, 28, 8, 'SF', 12,
+   78, 73, 68, 63, 58, 70, 66, 68, 63,
+   1, 2, 130, 143,
+   0, 3,
+   6, 6, 210, 'Utility U',
+   2, 28, 2023, 'Monarchs', 'Monarchs',
+   35, 800, 115, 270, 58, 70,
+   22, 60, 38, 100, 75, 26,
+   44, 20, 72,
+   'dc000000-0000-0000-0000-000000000111');
+
+-- Monarchs DC test team: depth chart starters + position assignments
+-- Starters: 100=PG, 101=SG, 102=SF, 103=PF, 104=C
+UPDATE ibl_plr SET dc_pg_depth = 1, pg_depth = 1 WHERE pid = 100;
+UPDATE ibl_plr SET dc_sg_depth = 1, sg_depth = 1 WHERE pid = 101;
+UPDATE ibl_plr SET dc_sf_depth = 1, sf_depth = 1 WHERE pid = 102;
+UPDATE ibl_plr SET dc_pf_depth = 1, pf_depth = 1 WHERE pid = 103;
+UPDATE ibl_plr SET dc_c_depth  = 1, c_depth  = 1 WHERE pid = 104;
+-- Backups: each position gets ≥3 total assignments
+UPDATE ibl_plr SET dc_pg_depth = 2, dc_sg_depth = 2 WHERE pid = 105;
+UPDATE ibl_plr SET dc_sg_depth = 3, dc_sf_depth = 2 WHERE pid = 106;
+UPDATE ibl_plr SET dc_sf_depth = 3               WHERE pid = 107;
+UPDATE ibl_plr SET dc_pf_depth = 2, dc_c_depth = 2 WHERE pid = 108;
+UPDATE ibl_plr SET dc_c_depth  = 3, dc_pf_depth = 3 WHERE pid = 109;
+UPDATE ibl_plr SET dc_pg_depth = 3               WHERE pid = 110;
+UPDATE ibl_plr SET dc_pf_depth = 4               WHERE pid = 111;
+
+-- Saved depth chart configs for DC test team (Monarchs tid=8)
+INSERT INTO ibl_saved_depth_charts (id, teamid, username, name, phase, season_year, sim_start_date, sim_number_start, is_active) VALUES
+  (10, 8, 'A-Jay', 'DC Test Offense', 'Free Agency', 2026, '2026-03-01', 689, 0),
+  (11, 8, 'A-Jay', 'DC Test Defense', 'Free Agency', 2026, '2026-03-01', 689, 0);
+
+INSERT INTO ibl_saved_depth_chart_players (depth_chart_id, pid, player_name, ordinal, dc_pg_depth, dc_sg_depth, dc_sf_depth, dc_pf_depth, dc_c_depth, dc_can_play_in_game, dc_minutes, dc_of, dc_df, dc_oi, dc_di, dc_bh) VALUES
+  (10, 100, 'DC Test PG', 1, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0),
+  (10, 101, 'DC Test SG', 2, 0, 1, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0),
+  (11, 100, 'DC Test PG', 1, 0, 0, 0, 1, 0, 1, 0, 0, 0, 0, 0, 0),
+  (11, 101, 'DC Test SG', 2, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0);
 
 -- ============================================================
 -- API Key for E2E tests

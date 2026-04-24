@@ -22,7 +22,7 @@ class LoginFormViewTest extends TestCase
 
         $this->assertStringContainsString('id="nav-username"', $html);
         $this->assertStringContainsString('id="nav-password"', $html);
-        $this->assertStringContainsString('rounded-lg', $html);
+        $this->assertStringContainsString('nav-login-input', $html);
         $this->assertStringContainsString('w-4 h-4', $html);
     }
 
@@ -32,7 +32,7 @@ class LoginFormViewTest extends TestCase
 
         $this->assertStringContainsString('id="mobile-nav-username"', $html);
         $this->assertStringContainsString('id="mobile-nav-password"', $html);
-        $this->assertStringContainsString('rounded-xl', $html);
+        $this->assertStringContainsString('nav-login-input', $html);
         $this->assertStringContainsString('w-5 h-5', $html);
     }
 

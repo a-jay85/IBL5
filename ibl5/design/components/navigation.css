@@ -332,6 +332,22 @@
     transition: all 0.15s ease-out, opacity 0.2s ease-out, transform 0.2s ease-out;
 }
 
+.nav-dropdown-item--team {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.375rem 0.5rem;
+    font-size: 0.875rem;
+    color: var(--gray-300);
+    border-radius: 0.25rem;
+    border-left: none;
+}
+
+.nav-dropdown-item--team:hover {
+    color: white;
+    background: rgba(255, 255, 255, 0.05);
+}
+
 .group:hover .nav-dropdown-item {
     opacity: 1;
     transform: translateY(0);
@@ -361,7 +377,9 @@
    ========================================================================== */
 
 .group.nav-pinned > div,
-.group.nav-hover > div {
+.group.nav-hover > div,
+.group.nav-pinned > .nav-dropdown,
+.group.nav-hover > .nav-dropdown {
     opacity: 1 !important;
     visibility: visible !important;
 }
@@ -477,8 +495,18 @@ span.nav-dropdown-item a:hover {
 }
 
 /* Mobile section buttons (not links) */
-#nav-mobile-menu .mobile-dropdown-btn {
+.mobile-dropdown-btn {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0.875rem 1.25rem;
     color: white;
+    transition: background-color 150ms ease;
+}
+
+.mobile-dropdown-btn:hover {
+    background: rgba(255, 255, 255, 0.05);
 }
 
 /* Mobile home link */
@@ -701,6 +729,308 @@ span.nav-dropdown-item a:hover {
     opacity: 1;
     /* Opening: X fades IN only after the logo has fully faded out. */
     transition-delay: 160ms;
+}
+
+/* ==========================================================================
+   Navigation Semantic Classes
+   Replaces verbose Tailwind utility strings in Navigation View PHP files
+   with reusable component classes. Mobile-first: mobile values as defaults,
+   desktop overrides via min-width: 1024px media query.
+   ========================================================================== */
+
+.nav-icon-btn {
+    position: relative;
+    width: 2.5rem;
+    height: 2.5rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    border-radius: 0.5rem;
+    transition: background-color 150ms ease;
+}
+
+.nav-icon-btn:hover {
+    background-color: rgba(255, 255, 255, 0.1);
+}
+
+.nav-trigger {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.625rem 0.75rem;
+    font-size: 1.125rem;
+    font-weight: 600;
+    font-family: var(--font-display);
+    color: var(--gray-300);
+    transition: color 200ms ease;
+}
+
+.nav-trigger:hover {
+    color: white;
+}
+
+.nav-dropdown {
+    position: absolute;
+    top: 100%;
+    transform: translateY(-0.25rem);
+    opacity: 0;
+    visibility: hidden;
+    transition: all 200ms ease;
+    z-index: 50;
+}
+
+.group:hover > .nav-dropdown,
+.group.nav-pinned > .nav-dropdown,
+.group.nav-hover > .nav-dropdown {
+    opacity: 1;
+    visibility: visible;
+}
+
+.nav-dropdown--left {
+    left: 0;
+}
+
+.nav-dropdown--right {
+    right: 0;
+}
+
+.nav-dropdown__card {
+    background: rgba(30, 41, 59, 0.95);
+    backdrop-filter: blur(24px);
+    -webkit-backdrop-filter: blur(24px);
+    border-bottom-left-radius: 0.5rem;
+    border-bottom-right-radius: 0.5rem;
+    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.3);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    overflow: hidden;
+}
+
+.nav-dropdown__card--wide {
+    min-width: 280px;
+}
+
+.nav-dropdown__card--narrow {
+    min-width: 220px;
+}
+
+.nav-dropdown__card--auto {
+    width: max-content;
+}
+
+.nav-select {
+    width: 100%;
+    appearance: none;
+    background: rgba(255, 255, 255, 0.1);
+    color: white;
+    font-size: 0.875rem;
+    font-weight: 500;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 0.75rem;
+    padding: 0.625rem 2rem 0.625rem 0.75rem;
+    cursor: pointer;
+    transition: all 150ms ease;
+}
+
+.nav-select:hover {
+    background: rgba(255, 255, 255, 0.15);
+    border-color: rgba(255, 255, 255, 0.3);
+}
+
+.nav-select:focus {
+    outline: none;
+    box-shadow: 0 0 0 2px rgba(249, 115, 22, 0.5);
+    border-color: var(--accent-500);
+}
+
+@media (min-width: 1024px) {
+    .nav-select {
+        border-radius: 0.5rem;
+        padding-top: 0.5rem;
+        padding-bottom: 0.5rem;
+    }
+}
+
+.nav-logout-btn {
+    display: block;
+    width: 100%;
+    text-align: center;
+    background: rgba(255, 255, 255, 0.1);
+    color: white;
+    font-size: 0.875rem;
+    font-weight: 500;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 0.75rem;
+    padding: 0.625rem 0.75rem;
+    cursor: pointer;
+    transition: all 150ms ease;
+}
+
+.nav-logout-btn:hover {
+    background: rgba(255, 255, 255, 0.15);
+    border-color: rgba(255, 255, 255, 0.3);
+}
+
+@media (min-width: 1024px) {
+    .nav-logout-btn {
+        border-radius: 0.5rem;
+        padding-top: 0.5rem;
+        padding-bottom: 0.5rem;
+    }
+}
+
+.nav-badge {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.125rem 0.375rem;
+    border-radius: 0.25rem;
+    font-size: 1rem;
+    font-weight: 700;
+    background: var(--accent-500);
+    color: white;
+    margin-left: 0.5rem;
+    letter-spacing: 0.025em;
+}
+
+.nav-login-input {
+    width: 100%;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 0.75rem;
+    padding: 0.75rem 1rem 0.75rem 2.75rem;
+    font-size: 1rem;
+    color: white;
+    transition: all 150ms ease;
+}
+
+.nav-login-input::placeholder {
+    color: var(--gray-500);
+}
+
+.nav-login-input:focus {
+    outline: none;
+    border-color: var(--accent-500);
+    box-shadow: 0 0 0 2px rgba(249, 115, 22, 0.3);
+}
+
+@media (min-width: 1024px) {
+    .nav-login-input {
+        border-radius: 0.5rem;
+        padding: 0.625rem 0.75rem 0.625rem 2.5rem;
+        font-size: 0.875rem;
+    }
+
+    .nav-login-input:focus {
+        box-shadow: 0 0 0 1px rgba(249, 115, 22, 0.5);
+    }
+}
+
+.nav-login-btn {
+    width: 100%;
+    background: linear-gradient(to right, var(--accent-500), var(--color-orange-600, #ea580c));
+    color: white;
+    font-weight: 700;
+    padding: 0.875rem 1rem;
+    border-radius: 0.75rem;
+    box-shadow: 0 10px 15px -3px rgba(249, 115, 22, 0.25);
+    transition: all 200ms ease;
+    font-size: 1rem;
+    letter-spacing: 0.025em;
+}
+
+.nav-login-btn:hover {
+    background: linear-gradient(to right, var(--accent-400, #fb923c), var(--color-orange-500, #f97316));
+    box-shadow: 0 10px 15px -3px rgba(249, 115, 22, 0.4);
+}
+
+.nav-login-btn:active {
+    transform: scale(0.98);
+}
+
+@media (min-width: 1024px) {
+    .nav-login-btn {
+        font-weight: 600;
+        padding: 0.625rem 1rem;
+        border-radius: 0.5rem;
+        font-size: 0.875rem;
+    }
+
+    .nav-login-btn:active {
+        transform: none;
+    }
+}
+
+.nav-login-checkbox {
+    appearance: none;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 0.375rem;
+    cursor: pointer;
+    transition: all 150ms ease;
+}
+
+.nav-login-checkbox:checked {
+    background: var(--accent-500);
+    border-color: var(--accent-500);
+}
+
+.nav-login-checkbox:focus-visible {
+    box-shadow: 0 0 0 2px rgba(249, 115, 22, 0.5);
+}
+
+@media (min-width: 1024px) {
+    .nav-login-checkbox {
+        border-radius: 0.25rem;
+    }
+}
+
+.nav-logo-icon {
+    width: 2.5rem;
+    height: 2.5rem;
+    border-radius: 9999px;
+    background: linear-gradient(to bottom right, var(--accent-500), var(--color-orange-600, #ea580c));
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 10px 15px -3px rgba(249, 115, 22, 0.25);
+    transition: box-shadow 150ms ease;
+}
+
+.group:hover .nav-logo-icon {
+    box-shadow: 0 10px 15px -3px rgba(249, 115, 22, 0.4);
+}
+
+.nav-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.6);
+    backdrop-filter: blur(4px);
+    -webkit-backdrop-filter: blur(4px);
+    z-index: 40;
+    transition: opacity 300ms ease;
+}
+
+.nav-desktop {
+    display: none;
+    align-items: center;
+    margin-left: auto;
+    align-self: stretch;
+}
+
+@media (min-width: 1024px) {
+    .nav-desktop {
+        display: flex;
+    }
+}
+
+.nav-avatar {
+    width: 2.5rem;
+    height: 2.5rem;
+    border-radius: 9999px;
+    background: rgba(249, 115, 22, 0.2);
+    display: flex;
+    align-items: center;
+    justify-content: center;
 }
 
 /* ==========================================================================

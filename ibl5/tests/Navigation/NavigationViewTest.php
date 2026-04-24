@@ -98,7 +98,7 @@ class NavigationViewTest extends TestCase
         $html = $this->renderNav('Regular Season', 'Off');
 
         // Desktop nav wrapper
-        $this->assertStringContainsString('hidden lg:flex', $html);
+        $this->assertStringContainsString('nav-desktop', $html);
         // Mobile nav panel
         $this->assertStringContainsString('id="nav-mobile-menu"', $html);
         // Mobile overlay

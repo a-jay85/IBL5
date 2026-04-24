@@ -82,7 +82,7 @@ class DepthChartEntryController implements DepthChartEntryControllerInterface
             }
         }
 
-        $teamName = $this->getUserTeamName($username);
+        $teamName = $this->commonRepository->getTeamnameFromUsername($username) ?? '';
         $teamid = $this->commonRepository->getTidFromTeamname($teamName) ?? 0;
         $team = Team::initialize($this->db, $teamid);
 
@@ -217,12 +217,6 @@ class DepthChartEntryController implements DepthChartEntryControllerInterface
         }
 
         echo '</div>';
-    }
-
-    private function getUserTeamName(string $username): string
-    {
-        $teamName = $this->commonRepository->getTeamnameFromUsername($username);
-        return $teamName ?? '';
     }
 
     /**

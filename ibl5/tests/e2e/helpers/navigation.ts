@@ -1,7 +1,7 @@
 import type { Page, Locator } from '@playwright/test';
 
 export function desktopNav(page: Page): Locator {
-  return page.locator('.hidden.lg\\:flex').first();
+  return page.locator('.nav-desktop').first();
 }
 
 export async function openMobileMenu(page: Page): Promise<Locator> {

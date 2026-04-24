@@ -73,7 +73,7 @@ class DesktopNavViewTest extends TestCase
         );
 
         $this->assertStringContainsString('LIVE', $html);
-        $this->assertStringContainsString('bg-accent-500', $html);
+        $this->assertStringContainsString('nav-badge', $html);
     }
 
     public function testExternalLinkIcon(): void

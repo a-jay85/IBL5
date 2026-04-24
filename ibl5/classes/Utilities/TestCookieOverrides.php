@@ -79,6 +79,25 @@ final class TestCookieOverrides
     }
 
     /**
+     * Read the `_test_dc_team` cookie to override which team the
+     * DepthChartEntry module renders. Returns null when not set or
+     * E2E testing is disabled.
+     */
+    public static function getTeamOverride(): ?string
+    {
+        if (!self::isE2eTesting()) {
+            return null;
+        }
+
+        $raw = $_COOKIE['_test_dc_team'] ?? null;
+        if (!is_string($raw) || $raw === '') {
+            return null;
+        }
+
+        return $raw;
+    }
+
+    /**
      * Reset cached overrides (for testing).
      */
     public static function resetCache(): void

@@ -1,4 +1,4 @@
-import { test, expect } from '../fixtures/auth';
+import { test, expect } from '../fixtures/auth-dc';
 import { assertNoPhpErrors } from '../helpers/php-errors';
 
 // Depth Chart submission flow — these tests mutate shared DB state via form
@@ -6,18 +6,10 @@ import { assertNoPhpErrors } from '../helpers/php-errors';
 // Get (PRG) implementation behind the fix for the "Invalid or expired form
 // submission" regression that users hit after submit → back → resubmit.
 //
-// Seed dependency: the Metros roster (tid=1) must start with 12 active
-// players covering every position (PG/SG/SF/PF/C) at depth ≥3. CI provisions
-// this via ci-seed.sql on every run. Locally, run `bin/wt-up <name> --seed`
-// before executing the full suite.
-//
-// Parallel-spec caveat: Playwright runs at `workers: 4, fullyParallel: true`
-// and `extension.spec.ts` / `trading.spec.ts` mutate the Metros roster
-// (moving players onto or off tid=1) while these tests are mid-flight.
-// `retries: 2` in CI absorbs those transient races; persistent failures
-// here usually point to a real regression, not pollution.
-// TODO: isolate these tests onto a dedicated test user + team that no
-// other spec touches, so the suite stops depending on retry luck.
+// Isolation: the auth-dc fixture sets a `_test_dc_team` cookie that overrides
+// the logged-in user's team to Monarchs (tid=8). The Monarchs roster has
+// exactly 12 active players with proper depth coverage (seeded in ci-seed.sql)
+// and is not referenced by any other spec, so parallel workers cannot pollute it.
 test.describe.configure({ mode: 'serial' });
 
 test.describe('Depth Chart submission', () => {

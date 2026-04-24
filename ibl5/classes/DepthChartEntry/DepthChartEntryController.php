@@ -221,6 +221,11 @@ class DepthChartEntryController implements DepthChartEntryControllerInterface
 
     private function getUserTeamName(string $username): string
     {
+        $override = \Utilities\TestCookieOverrides::getTeamOverride();
+        if ($override !== null) {
+            return $override;
+        }
+
         $teamName = $this->commonRepository->getTeamnameFromUsername($username);
         return $teamName ?? '';
     }

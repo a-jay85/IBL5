@@ -483,7 +483,7 @@ parameters:
 		-
 			rawMessage: 'Direct $_COOKIE access is banned outside Controllers, ApiHandlers, and Utilities\CsrfGuard. Accept typed inputs as parameters from a Controller/ApiHandler instead.'
 			identifier: ibl.rawSuperglobal
-			count: 1
+			count: 2
 			path: classes/Utilities/TestCookieOverrides.php
 
 		-

@@ -13,12 +13,6 @@ parameters:
 			path: classes/ApiKeys/ApiKeysView.php
 
 		-
-			rawMessage: 'Inline `style="..."` attributes are banned in PHP. Move CSS to ibl5/design/components/. Exception: `style="--foo: ..."` CSS custom properties are allowed.'
-			identifier: ibl.inlineCss
-			count: 2
-			path: classes/AwardHistory/AwardHistoryView.php
-
-		-
 			rawMessage: Direct `include_once` is banned in classes/. All classes under ibl5/classes/ autoload via Composer PSR-4. Remove the statement and rely on autoload instead.
 			identifier: ibl.requireOnce
 			count: 1
@@ -117,20 +111,8 @@ parameters:
 		-
 			rawMessage: 'Inline `style="..."` attributes are banned in PHP. Move CSS to ibl5/design/components/. Exception: `style="--foo: ..."` CSS custom properties are allowed.'
 			identifier: ibl.inlineCss
-			count: 3
-			path: classes/Draft/DraftView.php
-
-		-
-			rawMessage: 'Inline `style="..."` attributes are banned in PHP. Move CSS to ibl5/design/components/. Exception: `style="--foo: ..."` CSS custom properties are allowed.'
-			identifier: ibl.inlineCss
 			count: 1
 			path: classes/DraftPickLocator/DraftPickLocatorView.php
-
-		-
-			rawMessage: 'Inline `style="..."` attributes are banned in PHP. Move CSS to ibl5/design/components/. Exception: `style="--foo: ..."` CSS custom properties are allowed.'
-			identifier: ibl.inlineCss
-			count: 4
-			path: classes/FranchiseHistory/FranchiseHistoryView.php
 
 		-
 			rawMessage: 'Unescaped output in View. Wrap the expression in HtmlSanitizer::e() (or another whitelisted safe helper), or cast it to (int)/(float)/(bool) if it is numeric.'
@@ -201,7 +183,7 @@ parameters:
 		-
 			rawMessage: 'Unescaped output in View. Wrap the expression in HtmlSanitizer::e() (or another whitelisted safe helper), or cast it to (int)/(float)/(bool) if it is numeric.'
 			identifier: ibl.unescapedOutput
-			count: 20
+			count: 19
 			path: classes/Navigation/Views/LoginFormView.php
 
 		-

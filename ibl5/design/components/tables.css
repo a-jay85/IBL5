@@ -2697,4 +2697,9 @@ td.ibl-team-cell--colored {
     opacity: 0.7;
 }
 
+/* Ratings table headers */
+table.sortable thead th {
+    font-size: 1rem;
+}
+
 } /* end @layer components */

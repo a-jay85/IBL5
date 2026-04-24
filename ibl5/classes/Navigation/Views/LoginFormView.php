@@ -29,17 +29,12 @@ class LoginFormView
             ? 'block text-base font-semibold tracking-widest uppercase text-gray-400 mb-1.5'
             : 'block text-base font-semibold tracking-widest uppercase text-gray-400 mb-2';
         $iconSize = $isDesktop ? 'w-4 h-4' : 'w-5 h-5';
-        $inputClass = $isDesktop
-            ? 'w-full bg-white/5 border border-white/10 rounded-lg py-2.5 pl-10 pr-3 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-accent-500 focus:ring-1 focus:ring-accent-500/50 transition-all'
-            : 'w-full bg-white/5 border border-white/10 rounded-xl py-3 pl-11 pr-4 text-base text-white placeholder-gray-500 focus:outline-none focus:border-accent-500 focus:ring-2 focus:ring-accent-500/30 transition-all';
+        $inputClass = 'nav-login-input';
         $checkboxSize = $isDesktop ? 'w-4 h-4' : 'w-5 h-5';
-        $checkboxRounding = $isDesktop ? 'rounded' : 'rounded-md';
         $checkmarkSize = $isDesktop ? 'w-2.5 h-2.5' : 'w-3 h-3';
         $rememberTextSize = $isDesktop ? 'text-sm' : 'text-base';
         $rememberGap = $isDesktop ? 'gap-2.5' : 'gap-3';
-        $buttonClass = $isDesktop
-            ? 'w-full bg-gradient-to-r from-accent-500 to-orange-600 hover:from-accent-400 hover:to-orange-500 text-white font-semibold py-2.5 px-4 rounded-lg shadow-lg shadow-accent-500/25 hover:shadow-accent-500/40 transition-all duration-200 text-sm tracking-wide'
-            : 'w-full bg-gradient-to-r from-accent-500 to-orange-600 hover:from-accent-400 hover:to-orange-500 text-white font-bold py-3.5 px-4 rounded-xl shadow-lg shadow-accent-500/25 hover:shadow-accent-500/40 transition-all duration-200 text-base tracking-wide active:scale-[0.98]';
+        $buttonClass = 'nav-login-btn';
         $idPrefix = $isDesktop ? 'nav' : 'mobile-nav';
 
         $currentQuery = parse_url($requestUri ?? '', PHP_URL_QUERY);
@@ -95,7 +90,7 @@ class LoginFormView
                             type="checkbox"
                             name="remember_me"
                             value="1"
-                            class="peer appearance-none <?= $checkboxSize ?> <?= $checkboxRounding ?> border border-white/20 bg-white/5 checked:bg-accent-500 checked:border-accent-500 focus-visible:ring-2 focus-visible:ring-accent-500/50 group-hover/remember:border-white/30 transition-all duration-150 cursor-pointer"
+                            class="peer nav-login-checkbox <?= $checkboxSize ?>"
                         >
                         <svg class="absolute <?= $checkmarkSize ?> text-white pointer-events-none opacity-0 peer-checked:opacity-100 transition-opacity duration-150" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="3"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>
                     </span>

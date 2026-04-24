@@ -66,7 +66,7 @@ class NavigationView
                     <!-- Logo -->
                     <a href="index.php" class="flex items-center gap-3 py-2 group">
                         <div class="relative">
-                            <div class="w-10 h-10 rounded-full bg-gradient-to-br from-accent-500 to-orange-600 flex items-center justify-center shadow-lg shadow-accent-500/25 group-hover:shadow-accent-500/40 transition-shadow">
+                            <div class="nav-logo-icon">
                                 <svg class="w-5 h-5 text-white" viewBox="0 0 24 24" fill="currentColor">
                                     <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="1.5" fill="none"/>
                                     <path d="M12 2C12 12 12 12 12 22" stroke="currentColor" stroke-width="1.5"/>
@@ -86,10 +86,10 @@ class NavigationView
 
                     <!-- Mobile controls -->
                     <div class="lg:hidden flex items-center gap-1">
-                        <button id="desktop-view-toggle" class="relative w-10 h-10 flex items-center justify-center text-white hover:bg-white/10 rounded-lg transition-colors" aria-label="Switch to desktop view" title="Switch to desktop view">
+                        <button id="desktop-view-toggle" class="nav-icon-btn" aria-label="Switch to desktop view" title="Switch to desktop view">
                             <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 17.25v1.007a3 3 0 01-.879 2.122L7.5 21h9l-.621-.621A3 3 0 0115 18.257V17.25m6-12V15a2.25 2.25 0 01-2.25 2.25H5.25A2.25 2.25 0 013 15V5.25A2.25 2.25 0 015.25 3h13.5A2.25 2.25 0 0121 5.25z"/></svg>
                         </button>
-                        <button id="nav-hamburger" class="relative w-10 h-10 flex items-center justify-center text-white hover:bg-white/10 rounded-lg transition-colors" aria-label="Toggle menu" aria-expanded="false">
+                        <button id="nav-hamburger" class="nav-icon-btn" aria-label="Toggle menu" aria-expanded="false">
                             <?php if ($showTeamLogoHamburger): ?>
                                 <img id="nav-hamburger-logo" src="/ibl5/images/logo/new<?= (int) $this->config->teamId ?>.png" alt="" class="nav-team-logo-hamburger">
                                 <svg id="nav-hamburger-close" class="nav-hamburger-close-icon" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true">

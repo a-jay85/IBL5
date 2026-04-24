@@ -109,15 +109,15 @@ class DraftView implements DraftViewInterface
             if ($teamLogo === $pickOwner && ($isPlayerDrafted === 0 || $isPlayerDrafted === null)) {
                 $html .= '<tr' . $rowClass . '>
                     <td class="sticky-col"><input type="radio" name="player" value="' . HtmlSanitizer::e($player['name']) . '" aria-label="' . $playerName . '"></td>
-                    <td class="sticky-col-2" style="white-space: nowrap;">' . $playerName . '</td>';
+                    <td class="sticky-col-2">' . $playerName . '</td>';
             } elseif ($isPlayerDrafted === 1) {
                 $html .= '<tr' . $rowClass . '>
                     <td class="sticky-col"></td>
-                    <td class="sticky-col-2" style="white-space: nowrap;">' . $playerName . '</td>';
+                    <td class="sticky-col-2">' . $playerName . '</td>';
             } else {
                 $html .= '<tr' . $rowClass . '>
                     <td class="sticky-col"></td>
-                    <td class="sticky-col-2" style="white-space: nowrap;">' . $playerName . '</td>';
+                    <td class="sticky-col-2">' . $playerName . '</td>';
             }
 
             $safePos = HtmlSanitizer::safeHtmlOutput($player['pos']);

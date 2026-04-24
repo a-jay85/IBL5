@@ -25,14 +25,14 @@ class TeamsDropdownView
         ob_start();
         ?>
         <div class="group">
-            <button class="flex items-center gap-2 px-3 py-2.5 text-lg font-semibold font-display text-gray-300 hover:text-white transition-colors duration-200">
+            <button class="nav-trigger">
                 <span class="text-accent-500 group-hover:text-accent-400 transition-colors"><?= $icon ?></span>
                 <span>Teams</span>
                 <svg class="w-3 h-3 opacity-50 group-hover:opacity-100 transition-all duration-200 group-hover:translate-y-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
             </button>
 
-            <div class="absolute -right-2 top-full -translate-y-1 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50">
-                <div class="w-max bg-navy-800/95 backdrop-blur-xl rounded-b-lg shadow-2xl shadow-black/30 border border-white/10 overflow-hidden">
+            <div class="nav-dropdown -right-2">
+                <div class="nav-dropdown__card nav-dropdown__card--auto">
                     <div class="grid grid-cols-2 gap-x-4 p-4">
                         <?php
                         $conferenceOrder = ['Western', 'Eastern'];
@@ -49,7 +49,7 @@ class TeamsDropdownView
                                     <?php if ($divIndex > 0): ?><div class="mt-3"></div><?php endif; ?>
                                     <div class="uppercase font-display text-xs tracking-wider text-gray-400 mb-1.5"><?= HtmlSanitizer::e($division) ?></div>
                                     <?php foreach ($teams as $team): ?>
-                                        <a href="modules.php?name=Team&amp;op=team&amp;teamid=<?= $team['teamid'] ?>" hx-boost="true" hx-target="#site-content" hx-swap="innerHTML show:window:top" hx-indicator="#site-content" class="nav-dropdown-item flex items-center gap-2 px-2 py-1.5 text-sm font-display text-gray-300 hover:text-white hover:bg-white/5 rounded transition-all duration-150">
+                                        <a href="modules.php?name=Team&amp;op=team&amp;teamid=<?= $team['teamid'] ?>" hx-boost="true" hx-target="#site-content" hx-swap="innerHTML show:window:top" hx-indicator="#site-content" class="nav-dropdown-item nav-dropdown-item--team">
                                             <span class="inline-flex items-center justify-center nav-team-logo-container"><img src="images/logo/new<?= $team['teamid'] ?>.png" alt="" class="nav-team-logo-img" loading="lazy"></span>
                                             <span><?= HtmlSanitizer::e($team['team_city'] . ' ' . $team['team_name']) ?></span>
                                         </a>
@@ -104,7 +104,7 @@ class TeamsDropdownView
         ob_start();
         ?>
         <div class="mobile-section">
-            <button class="mobile-dropdown-btn w-full flex items-center justify-between px-5 py-3.5 text-white hover:bg-white/5 transition-colors">
+            <button class="mobile-dropdown-btn">
                 <span class="flex items-center gap-3">
                     <span class="text-accent-500"><?= $icon ?></span>
                     <span class="font-display text-lg font-semibold">Teams</span>

@@ -49,7 +49,7 @@ class MobileNavView
         ob_start();
         ?>
         <!-- Mobile menu overlay -->
-        <div id="nav-overlay" class="hidden fixed inset-0 bg-black/60 backdrop-blur-sm z-40 lg:hidden transition-opacity duration-300"></div>
+        <div id="nav-overlay" class="nav-overlay lg:hidden"></div>
 
         <!-- Mobile menu -->
         <nav id="nav-mobile-menu" class="fixed top-[71px] right-0 bottom-0 w-[300px] max-w-[85vw] z-50 transform translate-x-full transition-transform duration-300 ease-out lg:hidden">
@@ -63,7 +63,7 @@ class MobileNavView
                 <?php if ($this->config->isLoggedIn && $this->config->username !== null): ?>
                     <div class="mobile-section px-5 py-4 border-b border-white/5">
                         <div class="flex items-center gap-3">
-                            <div class="w-10 h-10 rounded-full bg-accent-500/20 flex items-center justify-center">
+                            <div class="nav-avatar">
                                 <svg class="w-5 h-5 text-accent-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/></svg>
                             </div>
                             <div>
@@ -133,7 +133,7 @@ class MobileNavView
         ob_start();
         ?>
         <div class="mobile-section">
-            <button class="mobile-dropdown-btn w-full flex items-center justify-between px-5 py-3.5 text-white hover:bg-white/5 transition-colors">
+            <button class="mobile-dropdown-btn">
                 <span class="flex items-center gap-3">
                     <?php if ($icon !== ''): ?>
                         <span class="text-accent-500"><?= $icon ?></span>
@@ -163,7 +163,7 @@ class MobileNavView
                         $htmxAttrs = ($external || $noBoost) ? '' : ' hx-boost="true" hx-target="#site-content" hx-swap="innerHTML show:window:top" hx-indicator="#site-content"';
                         $externalIcon = $external ? ' <svg class="w-3 h-3 opacity-40" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/></svg>' : '';
                         $badgeHtml = $badge !== null
-                            ? '<span class="inline-flex items-center px-1.5 py-0.5 rounded text-base font-bold bg-accent-500 text-white ml-2">' . HtmlSanitizer::e($badge) . '</span>'
+                            ? '<span class="nav-badge">' . HtmlSanitizer::e($badge) . '</span>'
                             : '';
                         ?>
                         <a href="<?= $url ?>"<?= $target ?><?= $htmxAttrs ?> class="mobile-dropdown-link flex items-center justify-between">
@@ -199,7 +199,7 @@ class MobileNavView
         <div class="px-5 py-3 border-t border-white/10 mt-1">
             <label for="mobile-league-select" class="block text-base font-semibold tracking-widest uppercase text-gray-500 mb-2">League</label>
             <div class="relative">
-                <select id="mobile-league-select" name="league" onchange="window.location.href=this.value" class="w-full appearance-none bg-white/10 text-white text-sm font-medium border border-white/20 rounded-xl px-3 py-2.5 pr-8 cursor-pointer hover:bg-white/15 hover:border-white/30 focus:outline-none focus:ring-2 focus:ring-accent-500/50 focus:border-accent-500 transition-all">
+                <select id="mobile-league-select" name="league" onchange="window.location.href=this.value" class="nav-select">
                     <option value="index.php?league=ibl"<?= $iblSelected ?> class="bg-navy-800 text-white">IBL</option>
                     <option value="index.php?league=olympics"<?= $olympicsSelected ?> class="bg-navy-800 text-white">Olympics</option>
                 </select>
@@ -223,7 +223,7 @@ class MobileNavView
         ?>
         <div class="px-5 py-3 border-t border-white/10 mt-1">
             <div class="block text-base font-semibold tracking-widest uppercase text-gray-500 mb-2"><?= HtmlSanitizer::e($username) ?></div>
-            <a href="modules.php?name=YourAccount&amp;op=logout" hx-boost="false" class="block w-full text-center bg-white/10 text-white text-sm font-medium border border-white/20 rounded-xl px-3 py-2.5 cursor-pointer hover:bg-white/15 hover:border-white/30 transition-all">Logout</a>
+            <a href="modules.php?name=YourAccount&amp;op=logout" hx-boost="false" class="nav-logout-btn">Logout</a>
         </div>
         <?php
         return (string) ob_get_clean();

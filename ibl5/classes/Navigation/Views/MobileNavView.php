@@ -49,7 +49,7 @@ class MobileNavView
         ob_start();
         ?>
         <!-- Mobile menu overlay -->
-        <div id="nav-overlay" class="nav-overlay lg:hidden"></div>
+        <div id="nav-overlay" class="nav-overlay hidden lg:hidden"></div>
 
         <!-- Mobile menu -->
         <nav id="nav-mobile-menu" class="fixed top-[71px] right-0 bottom-0 w-[300px] max-w-[85vw] z-50 transform translate-x-full transition-transform duration-300 ease-out lg:hidden">

@@ -1001,7 +1001,6 @@ span.nav-dropdown-item a:hover {
 }
 
 .nav-overlay {
-    display: none;
     position: fixed;
     inset: 0;
     background: rgba(0, 0, 0, 0.6);

@@ -185,9 +185,13 @@ set -o pipefail
 
 echo ""
 echo "Backfilling schema_migrations from prod dump..."
-docker exec "$DB_CONTAINER" mariadb -uroot -proot iblhoops_ibl5 \
-    -e "INSERT IGNORE INTO schema_migrations (version) SELECT migration FROM migrations;" \
-    2> >(grep -v '\[Warning\].*password' >&2) || true
+docker exec "$DB_CONTAINER" mariadb -uroot -proot iblhoops_ibl5 -e "
+    CREATE TABLE IF NOT EXISTS schema_migrations (
+        version VARCHAR(255) PRIMARY KEY,
+        applied_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+    INSERT IGNORE INTO schema_migrations (version) SELECT migration FROM migrations;
+" 2> >(grep -v '\[Warning\].*password' >&2) || true
 
 if [ -n "$WORKTREE_PATH" ] && [ -d "$WORKTREE_PATH/ibl5/migrations" ]; then
     echo ""

@@ -58,6 +58,13 @@ ln -sf "$MAIN_IBL5/.env.test" "$WT_IBL5/.env.test"
 ln -sf "$MAIN_IBL5/vendor" "$WT_IBL5/vendor"
 ln -sf "$MAIN_IBL5/node_modules" "$WT_IBL5/node_modules"
 
+# Hide the main docker-compose.yml from the worktree so `docker compose up`
+# can't accidentally be run here (replacing main containers with broken mounts).
+# Worktree Docker uses bin/wt-up which reads docker/worktree-compose.yml instead.
+# --skip-worktree tells git to ignore the deletion so it won't appear in diffs.
+git -C "$WT_ROOT" update-index --skip-worktree docker-compose.yml
+rm -f "$WT_ROOT/docker-compose.yml"
+
 # Build CSS
 echo "Building CSS..."
 mkdir -p "$WT_IBL5/themes/IBL/style"

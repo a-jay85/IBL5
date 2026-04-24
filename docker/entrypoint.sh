@@ -20,6 +20,29 @@ db_exec() {
 # $_SERVER['SERVER_NAME']. Set it here so CLI context has it.
 export SERVER_NAME=localhost
 
+# ── Phase 0: Worktree mount guard ──────────────────────────────────────────
+# Worktrees symlink vendor/ to the main repo — that symlink is unresolvable
+# inside a container. If vendor is a dangling symlink, this container was
+# launched via `docker compose up` from a worktree directory instead of
+# using `bin/wt-up`. Abort with a clear message.
+if [ -L "$APP_DIR/vendor" ] && [ ! -e "$APP_DIR/vendor" ]; then
+    echo ""
+    echo "============================================================"
+    echo "  FATAL: Dangling vendor symlink detected."
+    echo ""
+    echo "  This container was started from a worktree directory using"
+    echo "  the main docker-compose.yml. Worktree Docker environments"
+    echo "  must be started with bin/wt-up <name>, not docker compose."
+    echo ""
+    echo "  To fix:"
+    echo "    1. Stop this container"
+    echo "    2. Run: docker compose up -d   (from the main repo root)"
+    echo "       OR:  bin/wt-up <worktree-name>"
+    echo "============================================================"
+    echo ""
+    exit 1
+fi
+
 # ── Phase 1: Filesystem setup ───────────────────────────────────────────────
 mkdir -p "$LOGS_DIR"
 chown www-data:www-data "$LOGS_DIR"

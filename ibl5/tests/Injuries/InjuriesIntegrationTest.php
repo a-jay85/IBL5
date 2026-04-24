@@ -322,8 +322,8 @@ class InjuriesIntegrationTest extends IntegrationTestCase
 
         $result = $this->view->render($injuredPlayers);
 
-        $this->assertStringContainsString('background-color: #006BB6', $result);
-        $this->assertStringContainsString('color: #FDB927', $result);
+        $this->assertStringContainsString('--team-cell-bg: #006BB6', $result);
+        $this->assertStringContainsString('--team-cell-color: #FDB927', $result);
     }
 
     /**

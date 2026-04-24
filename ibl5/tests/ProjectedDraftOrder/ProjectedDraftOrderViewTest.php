@@ -221,7 +221,7 @@ class ProjectedDraftOrderViewTest extends TestCase
 
         $result = $this->view->render($order, 2026);
 
-        $this->assertMatchesRegularExpression('/background-color: #98002E;.*20-62.*<\/td><td\b/s', $result);
+        $this->assertMatchesRegularExpression('/--team-cell-bg: #98002E.*20-62.*<\/td><td\b/s', $result);
     }
 
     public function testNoTooltipsInOutput(): void

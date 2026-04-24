@@ -90,7 +90,7 @@ class SplitStats
     </thead>
     <tbody>
 <?php if ($playerRows === []): ?>
-        <tr><td colspan="21" style="padding: 2rem; color: var(--gray-500);">No games found for <strong><?= $safeSplitLabel ?></strong> split.</td></tr>
+        <tr><td colspan="21" class="table-empty-message">No games found for <strong><?= $safeSplitLabel ?></strong> split.</td></tr>
 <?php endif; ?>
 <?php foreach ($playerRows as $row): ?>
         <tr>

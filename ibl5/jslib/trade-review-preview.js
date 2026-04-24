@@ -67,13 +67,13 @@
             return;
         }
 
-        var isVisible = state.panel.style.display !== 'none';
+        var isVisible = !state.panel.hidden;
 
         if (isVisible) {
-            state.panel.style.display = 'none';
+            state.panel.hidden = true;
             this.textContent = 'Preview';
         } else {
-            state.panel.style.display = '';
+            state.panel.hidden = false;
             this.textContent = 'Hide Preview';
 
             if (!state.initialized) {

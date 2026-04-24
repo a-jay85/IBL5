@@ -243,8 +243,8 @@
         var anyCash = hasAnyCash();
         var anyContent = anyPlayers || anyCash;
 
-        var wasHidden = panel.style.display === 'none';
-        panel.style.display = anyContent ? '' : 'none';
+        var wasHidden = panel.hidden;
+        panel.hidden = !anyContent;
 
         // Preview panel appears in-place — no auto-scroll
 

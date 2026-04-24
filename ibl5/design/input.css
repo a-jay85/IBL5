@@ -90,6 +90,7 @@
 @import './components/banners.css';
 @import './components/ratings-diff.css';
 @import './components/htmx.css';
+@import './components/debug.css';
 
 /* Site-wide layout wrapper (replaces legacy themeheader table) */
 @layer components {

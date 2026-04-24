@@ -35,7 +35,7 @@ class ProjectedDraftOrderView implements ProjectedDraftOrderViewInterface
         }
         $isDraggable = $isAdmin && !$isDraftStarted;
         if ($isDraggable) {
-            $html .= '<button type="button" id="draft-order-save-btn" class="ibl-btn ibl-btn--danger" style="display: none; margin-bottom: 1rem;">Save Draft Order</button>';
+            $html .= '<button type="button" id="draft-order-save-btn" class="ibl-btn ibl-btn--danger mb-4" hidden>Save Draft Order</button>';
         }
         $html .= $this->renderRoundTable($draftOrder['round1'], 'Round 1', showPlayoffDivider: true, isAdmin: $isDraggable, showPlayer: $isDraftStarted, isFinalized: $isFinalized);
         $html .= $this->renderRoundTable($draftOrder['round2'], 'Round 2', showPlayoffDivider: false, isAdmin: false, showPlayer: $isDraftStarted, isFinalized: $isFinalized);

@@ -1,0 +1,23 @@
+@layer components {
+
+.debug-panel {
+    margin: 10px 0;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+}
+
+.debug-panel__header {
+    padding: 8px;
+    background-color: #f5f5f5;
+    border-bottom: 1px solid #ccc;
+    cursor: pointer;
+}
+
+.debug-panel__content {
+    margin: 0;
+    padding: 8px;
+    background-color: #fff;
+    overflow: auto;
+}
+
+} /* end @layer components */

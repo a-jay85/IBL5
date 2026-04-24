@@ -668,7 +668,7 @@ class DepthChartEntryIntegrationTest extends IntegrationTestCase
         $html = $this->validator->getErrorMessagesHtml();
 
         // Assert - HTML formatting present
-        $this->assertStringContainsString('color: red', $html);
+        $this->assertStringContainsString('text-red-500', $html);
         $this->assertStringContainsString('<strong', $html);
         $this->assertStringContainsString('</strong>', $html);
         // The copy now tells the user to fix the error in the re-rendered

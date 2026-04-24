@@ -215,8 +215,8 @@ class RookieOptionFormViewTest extends TestCase
 
         $output = $this->view->renderForm($mockPlayer, 'Test Team', 500);
 
-        $this->assertStringContainsString('text-align: center', $output);
-        $this->assertStringContainsString('border-radius: 0.375rem', $output);
+        $this->assertStringContainsString('text-center', $output);
+        $this->assertStringContainsString('rookie-option-img', $output);
     }
 
     /**

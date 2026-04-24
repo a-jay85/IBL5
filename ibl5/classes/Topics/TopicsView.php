@@ -313,7 +313,7 @@ class TopicsView implements TopicsViewInterface
         $totNews = HtmlSanitizer::safeHtmlOutput(_TOTNEWS);
         $totReads = HtmlSanitizer::safeHtmlOutput(_TOTREADS);
 
-        $output = '<div class="topic-card" style="animation-delay: ' . $delay . 'ms">';
+        $output = '<div class="topic-card" style="--anim-delay: ' . $delay . 'ms">';
         $output .= '<div class="topic-card__header">';
         $output .= '<a href="modules.php?name=News&amp;topic=' . $topicId . '" class="topic-card__image-link" aria-label="' . $topicText . '">';
         $output .= '<img src="' . $imagePath . '" alt="" class="topic-card__image" loading="lazy">';

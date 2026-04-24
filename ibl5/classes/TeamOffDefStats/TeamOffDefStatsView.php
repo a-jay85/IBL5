@@ -325,7 +325,7 @@ class TeamOffDefStatsView implements TeamOffDefStatsViewInterface
      */
     private function renderLeagueTotalsRow(array $totals): string
     {
-        return '<tr style="font-weight:bold">
+        return '<tr class="career-row">
             <td></td>
             <td>' . ($totals['games'] ?? '0') . '</td>
             <td>' . ($totals['fgm'] ?? '0') . '</td>
@@ -353,7 +353,7 @@ class TeamOffDefStatsView implements TeamOffDefStatsViewInterface
      */
     private function renderLeagueAveragesRow(array $averages): string
     {
-        return '<tr style="font-weight:bold">
+        return '<tr class="career-row">
             <td></td>
             <td>' . ($averages['fgm'] ?? '0.0') . '</td>
             <td>' . ($averages['fga'] ?? '0.0') . '</td>

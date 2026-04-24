@@ -136,9 +136,9 @@ class YourAccountView implements Contracts\YourAccountViewInterface
                 </div>
 
                 <div class="ibl-form-group">
-                    <label style="display: flex; align-items: center; gap: var(--space-2); cursor: pointer;">
+                    <label class="auth-checkbox-label">
                         <input type="checkbox" name="remember_me" value="1">
-                        <span style="font-size: 1rem; color: var(--gray-600);">Remember me</span>
+                        <span>Remember me</span>
                     </label>
                 </div>
 
@@ -217,7 +217,7 @@ class YourAccountView implements Contracts\YourAccountViewInterface
                 <button type="submit" class="ibl-btn ibl-btn--primary ibl-btn--block">Create Account</button>
             </form>
 
-            <div style="margin-top: var(--space-4); font-size: 1rem; color: var(--gray-500); line-height: 1.5; text-align: center;">
+            <div class="auth-info-text mt-4">
                 You will receive an email with an activation link to complete your registration.
             </div>
         </div>
@@ -306,7 +306,7 @@ class YourAccountView implements Contracts\YourAccountViewInterface
             <p class="ibl-card__subtitle">We'll email you a reset link</p>
         </div>
         <div class="ibl-card__body">
-            <div style="margin-bottom: var(--space-4); font-size: 1rem; color: var(--gray-600); line-height: 1.5;">
+            <div class="auth-info-text mb-4">
                 Enter your email address and we'll send you a link to reset your password.
             </div>
 

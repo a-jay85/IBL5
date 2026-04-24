@@ -148,7 +148,7 @@ class DraftPickLocatorView implements DraftPickLocatorViewInterface
             } else {
                 if ($ownerInfo !== null) {
                     $bgColor = HtmlSanitizer::safeHtmlOutput($ownerInfo['color1']);
-                    $html .= '<td class="draft-pick-traded' . $yearSepClass . '" style="background-color: #' . $bgColor . ';">';
+                    $html .= '<td class="draft-pick-traded' . $yearSepClass . '" style="--pick-bg: #' . $bgColor . ';">';
                 } else {
                     $html .= '<td class="draft-pick-traded' . $yearSepClass . '">';
                 }

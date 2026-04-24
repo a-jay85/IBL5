@@ -157,7 +157,7 @@ class FreeAgencyView
     <tfoot>
         <tr>
             <td colspan="17" class="cap-footer-spacer"></td>
-            <td colspan="10" style="text-align: right;"><strong><?= HtmlSanitizer::e($team->name) ?> Total Salary</strong></td>
+            <td colspan="10" class="text-right"><strong><?= HtmlSanitizer::e($team->name) ?> Total Salary</strong></td>
             <?php foreach ($capMetrics['totalSalaries'] as $salary): ?>
                 <td class="col-salary"><strong><?= $salary ?></strong></td>
             <?php endforeach; ?>
@@ -213,7 +213,7 @@ class FreeAgencyView
     <tfoot>
         <tr>
             <td colspan="18" class="cap-footer-spacer"></td>
-            <td colspan="10" style="text-align: right;"><strong><?= HtmlSanitizer::e($team->name) ?> Total Salary Plus Contract Offers</strong></td>
+            <td colspan="10" class="text-right"><strong><?= HtmlSanitizer::e($team->name) ?> Total Salary Plus Contract Offers</strong></td>
             <?php foreach ($capMetrics['totalSalaries'] as $salary): ?>
                 <td class="col-salary"><strong><?= $salary ?></strong></td>
             <?php endforeach; ?>

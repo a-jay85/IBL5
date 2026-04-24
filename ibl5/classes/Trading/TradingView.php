@@ -93,10 +93,10 @@ class TradingView implements TradingViewInterface
                     <div class="trading-roster-details__panel trading-roster-details__panel--active" data-panel-id="players">
                         <table class="ibl-data-table trading-roster team-table" data-team-id="<?= $userTeamId ?>" style="<?= TableStyles::inlineVars($pageData['userTeamColor1'], $pageData['userTeamColor2']) ?>">
                             <colgroup>
-                                <col style="width: 50px;">
+                                <col class="trading-col--checkbox">
                                 <col>
-                                <col style="width: 40px;">
-                                <col style="width: 40px;">
+                                <col class="trading-col--stat">
+                                <col class="trading-col--stat">
                             </colgroup>
                             <tbody>
                                 <?= $userPlayerRows['html'] ?>
@@ -106,7 +106,7 @@ class TradingView implements TradingViewInterface
                     <div class="trading-roster-details__panel" data-panel-id="picks">
                         <table class="ibl-data-table trading-roster" data-no-responsive>
                             <colgroup>
-                                <col style="width: 50px;">
+                                <col class="trading-col--checkbox">
                                 <col>
                             </colgroup>
                             <tbody>
@@ -139,10 +139,10 @@ class TradingView implements TradingViewInterface
                     <div class="trading-roster-details__panel trading-roster-details__panel--active" data-panel-id="players">
                         <table class="ibl-data-table trading-roster team-table" data-team-id="<?= $partnerTeamId ?>" style="<?= TableStyles::inlineVars($pageData['partnerTeamColor1'], $pageData['partnerTeamColor2']) ?>">
                             <colgroup>
-                                <col style="width: 50px;">
+                                <col class="trading-col--checkbox">
                                 <col>
-                                <col style="width: 40px;">
-                                <col style="width: 40px;">
+                                <col class="trading-col--stat">
+                                <col class="trading-col--stat">
                             </colgroup>
                             <tbody>
                                 <?= $partnerPlayerRows['html'] ?>
@@ -152,7 +152,7 @@ class TradingView implements TradingViewInterface
                     <div class="trading-roster-details__panel" data-panel-id="picks">
                         <table class="ibl-data-table trading-roster" data-no-responsive>
                             <colgroup>
-                                <col style="width: 50px;">
+                                <col class="trading-col--checkbox">
                                 <col>
                             </colgroup>
                             <tbody>
@@ -488,7 +488,7 @@ $tradeConfig = [
         $safePartnerColor = \UI\TableStyles::sanitizeColor($partnerColor1);
         ob_start();
         ?>
-<div id="trade-roster-preview" class="trade-roster-preview" style="display: none; --preview-user-color: #<?= $safeUserColor ?>; --preview-partner-color: #<?= $safePartnerColor ?>;">
+<div id="trade-roster-preview" class="trade-roster-preview" style="--preview-user-color: #<?= $safeUserColor ?>; --preview-partner-color: #<?= $safePartnerColor ?>;" hidden>
     <div class="trade-roster-preview__header">
         <img src="images/logo/new<?= $userTeamId ?>.png" alt="<?= $userTeam ?>" class="trade-roster-preview__logo trade-roster-preview__logo--active" data-team-id="<?= $userTeamId ?>">
         <div class="trade-roster-preview__title">Roster Preview</div>
@@ -610,7 +610,7 @@ $tradeConfig = [
 
         ob_start();
         ?>
-<div id="trade-review-preview-<?= $offerId ?>" class="trade-roster-preview" style="display: none; --preview-user-color: #<?= $safeFromColor ?>; --preview-partner-color: #<?= $safeToColor ?>;">
+<div id="trade-review-preview-<?= $offerId ?>" class="trade-roster-preview" style="--preview-user-color: #<?= $safeFromColor ?>; --preview-partner-color: #<?= $safeToColor ?>;" hidden>
     <div class="trade-roster-preview__header">
         <img src="images/logo/new<?= $fromTeamId ?>.png" alt="From Team" class="trade-roster-preview__logo<?= $initialTeamId === $fromTeamId ? ' trade-roster-preview__logo--active' : '' ?>" data-team-id="<?= $fromTeamId ?>">
         <div class="trade-roster-preview__title">Roster Preview</div>

@@ -36,7 +36,7 @@ class WaiversView implements WaiversViewInterface
             'player_added'   => ['class' => 'ibl-alert--success', 'message' => 'Player successfully signed from waivers.'],
             'player_dropped' => ['class' => 'ibl-alert--success', 'message' => 'Player successfully dropped to waivers.'],
         ], $error) ?>
-        <form name="Waiver_Move" method="post" action="" style="max-width: 600px; margin: 0 auto;">
+        <form name="Waiver_Move" method="post" action="" class="ibl-form-container">
             <?= \Utilities\CsrfGuard::generateToken('waivers') ?>
             <input type="hidden" name="Team_Name" value="<?= $teamNameEscaped ?>">
             <div class="text-center">

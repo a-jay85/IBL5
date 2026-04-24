@@ -53,7 +53,7 @@ class LeagueControlPanelView implements LeagueControlPanelViewInterface
         <?= $this->renderTriviaControls() ?>
     </form>
 
-    <a href="/ibl5/index.php" class="updater__return" style="text-decoration: underline;">Return to IBL</a>
+    <a href="/ibl5/index.php" class="updater__return underline">Return to IBL</a>
 </div>
 </body>
 </html>
@@ -76,7 +76,7 @@ class LeagueControlPanelView implements LeagueControlPanelViewInterface
     <label>Current League:</label>
     <span class="league-badge <?= HtmlSanitizer::e($badgeClass) ?>"><?= HtmlSanitizer::e(strtoupper($leagueConfig['short_name'])) ?></span>
     <label>Switch to:</label>
-    <select onchange="window.location.href=this.value" class="ibl-select" style="width: auto;">
+    <select onchange="window.location.href=this.value" class="ibl-select ibl-select--auto">
         <option value="leagueControlPanel.php?league=ibl"<?= $iblSelected ?>>IBL</option>
         <option value="leagueControlPanel.php?league=olympics"<?= $olympicsSelected ?>>Olympics</option>
     </select>
@@ -118,7 +118,7 @@ class LeagueControlPanelView implements LeagueControlPanelViewInterface
 <section class="updater-section">
     <div class="updater-section__label">Season Phase</div>
     <div class="lcp-control-row">
-        <select name="SeasonPhase" class="ibl-select" style="width: auto;">
+        <select name="SeasonPhase" class="ibl-select ibl-select--auto">
         <?php foreach ($phases as $phase): ?>
             <option value="<?= HtmlSanitizer::e($phase) ?>"<?= $panelData['phase'] === $phase ? ' selected' : '' ?>><?= HtmlSanitizer::e($phase) ?></option>
         <?php endforeach; ?>
@@ -206,7 +206,7 @@ class LeagueControlPanelView implements LeagueControlPanelViewInterface
     </div>
     <div class="lcp-note">Upload sim backup to <strong>backups/</strong> before running</div>
     <div class="lcp-control-row">
-        <input type="number" name="SimLengthInDays" min="1" max="180" size="3" value="<?= HtmlSanitizer::e((string) $panelData['simLengthInDays']) ?>" class="ibl-input ibl-input--sm" style="width: 5rem;">
+        <input type="number" name="SimLengthInDays" min="1" max="180" size="3" value="<?= HtmlSanitizer::e((string) $panelData['simLengthInDays']) ?>" class="ibl-input ibl-input--sm w-20">
         <button type="submit" name="action" value="set_sim_length" class="ibl-btn ibl-btn--secondary ibl-btn--sm">Set Sim Length in Days</button>
     </div>
     <div class="lcp-note">You must click the button — pressing Enter will not work</div>
@@ -316,7 +316,7 @@ class LeagueControlPanelView implements LeagueControlPanelViewInterface
         ob_start();
         ?>
 <div class="lcp-control-row">
-    <select name="Waivers" class="ibl-select" style="width: auto;">
+    <select name="Waivers" class="ibl-select ibl-select--auto">
         <option value="Yes"<?= $panelData['allowWaivers'] === 'Yes' ? ' selected' : '' ?>>Yes</option>
         <option value="No"<?= $panelData['allowWaivers'] === 'No' ? ' selected' : '' ?>>No</option>
     </select>
@@ -334,7 +334,7 @@ class LeagueControlPanelView implements LeagueControlPanelViewInterface
         ob_start();
         ?>
 <div class="lcp-control-row">
-    <select name="Trades" class="ibl-select" style="width: auto;">
+    <select name="Trades" class="ibl-select ibl-select--auto">
         <option value="Yes"<?= $panelData['allowTrades'] === 'Yes' ? ' selected' : '' ?>>Yes</option>
         <option value="No"<?= $panelData['allowTrades'] === 'No' ? ' selected' : '' ?>>No</option>
     </select>
@@ -352,7 +352,7 @@ class LeagueControlPanelView implements LeagueControlPanelViewInterface
         ob_start();
         ?>
 <div class="lcp-control-row">
-    <select name="ShowDraftLink" class="ibl-select" style="width: auto;">
+    <select name="ShowDraftLink" class="ibl-select ibl-select--auto">
         <option value="On"<?= $panelData['showDraftLink'] === 'On' ? ' selected' : '' ?>>On</option>
         <option value="Off"<?= $panelData['showDraftLink'] === 'Off' ? ' selected' : '' ?>>Off</option>
     </select>
@@ -370,7 +370,7 @@ class LeagueControlPanelView implements LeagueControlPanelViewInterface
         ob_start();
         ?>
 <div class="lcp-control-row">
-    <select name="FANotifs" class="ibl-select" style="width: auto;">
+    <select name="FANotifs" class="ibl-select ibl-select--auto">
         <option value="On"<?= $panelData['freeAgencyNotifications'] === 'On' ? ' selected' : '' ?>>On</option>
         <option value="Off"<?= $panelData['freeAgencyNotifications'] === 'Off' ? ' selected' : '' ?>>Off</option>
     </select>

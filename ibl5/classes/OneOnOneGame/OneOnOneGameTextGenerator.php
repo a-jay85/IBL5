@@ -213,7 +213,7 @@ class OneOnOneGameTextGenerator
     public function getScoreText(string $player1Name, int $player1Score, string $player2Name, int $player2Score): string
     {
         // Names are already sanitized by the Engine before being passed here
-        return '<strong style="font-weight: bold;">SCORE: ' . $player1Name . ' ' . $player1Score . ', ' . $player2Name . ' ' . $player2Score . '</strong><p>';
+        return '<strong>SCORE: ' . $player1Name . ' ' . $player1Score . ', ' . $player2Name . ' ' . $player2Score . '</strong><p>';
     }
 
     /**

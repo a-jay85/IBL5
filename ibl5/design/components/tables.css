@@ -1186,6 +1186,7 @@ tbody tr.user-team-row:nth-child(even):hover {
    (0,1,1) and wins by source order. */
 td.ibl-team-cell--colored {
     text-align: left;
+    background-color: var(--team-cell-bg);
 }
 
 .ibl-team-cell--colored .ibl-team-cell__logo {
@@ -1201,6 +1202,7 @@ td.ibl-team-cell--colored {
     align-items: center;
     gap: var(--space-2);
     font-weight: 600;
+    color: var(--team-cell-color);
     text-decoration: none;
     white-space: nowrap;
     overflow: hidden;
@@ -2700,6 +2702,30 @@ td.ibl-team-cell--colored {
 /* Ratings table headers */
 table.sortable thead th {
     font-size: 1rem;
+}
+
+.table-empty-message {
+    padding: 2rem;
+    color: var(--gray-500);
+}
+
+.series-logo-img {
+    object-fit: contain;
+}
+
+/* Draft pick traded cell — dynamic background via custom property */
+.draft-pick-traded {
+    background-color: var(--pick-bg);
+}
+
+/* Series record cell — dynamic background via custom property */
+.series-record-cell {
+    background-color: var(--series-cell-bg);
+}
+
+/* Career/total row bold styling */
+.career-row {
+    font-weight: bold;
 }
 
 } /* end @layer components */

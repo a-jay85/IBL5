@@ -87,12 +87,6 @@ parameters:
 		-
 			rawMessage: 'Inline `style="..."` attributes are banned in PHP. Move CSS to ibl5/design/components/. Exception: `style="--foo: ..."` CSS custom properties are allowed.'
 			identifier: ibl.inlineCss
-			count: 1
-			path: classes/DepthChartEntry/DepthChartEntryValidator.php
-
-		-
-			rawMessage: 'Inline `style="..."` attributes are banned in PHP. Move CSS to ibl5/design/components/. Exception: `style="--foo: ..."` CSS custom properties are allowed.'
-			identifier: ibl.inlineCss
 			count: 2
 			path: classes/DepthChartEntry/DepthChartEntryView.php
 
@@ -107,12 +101,6 @@ parameters:
 			identifier: ibl.requireOnce
 			count: 2
 			path: classes/Discord/Discord.php
-
-		-
-			rawMessage: 'Inline `style="..."` attributes are banned in PHP. Move CSS to ibl5/design/components/. Exception: `style="--foo: ..."` CSS custom properties are allowed.'
-			identifier: ibl.inlineCss
-			count: 1
-			path: classes/DraftPickLocator/DraftPickLocatorView.php
 
 		-
 			rawMessage: 'Unescaped output in View. Wrap the expression in HtmlSanitizer::e() (or another whitelisted safe helper), or cast it to (int)/(float)/(bool) if it is numeric.'
@@ -203,24 +191,6 @@ parameters:
 			identifier: ibl.unescapedOutput
 			count: 8
 			path: classes/NextSim/NextSimView.php
-
-		-
-			rawMessage: 'Inline `style="..."` attributes are banned in PHP. Move CSS to ibl5/design/components/. Exception: `style="--foo: ..."` CSS custom properties are allowed.'
-			identifier: ibl.inlineCss
-			count: 1
-			path: classes/OneOnOneGame/OneOnOneGameEngine.php
-
-		-
-			rawMessage: 'Inline `style="..."` attributes are banned in PHP. Move CSS to ibl5/design/components/. Exception: `style="--foo: ..."` CSS custom properties are allowed.'
-			identifier: ibl.inlineCss
-			count: 1
-			path: classes/OneOnOneGame/OneOnOneGameTextGenerator.php
-
-		-
-			rawMessage: 'Inline `style="..."` attributes are banned in PHP. Move CSS to ibl5/design/components/. Exception: `style="--foo: ..."` CSS custom properties are allowed.'
-			identifier: ibl.inlineCss
-			count: 3
-			path: classes/OneOnOneGame/OneOnOneGameView.php
 
 		-
 			rawMessage: Inline `<style>` blocks are banned in PHP. Move CSS to ibl5/design/components/ and reference the stylesheet instead.
@@ -379,28 +349,10 @@ parameters:
 			path: classes/PlayerDatabase/PlayerDatabaseView.php
 
 		-
-			rawMessage: 'Inline `style="..."` attributes are banned in PHP. Move CSS to ibl5/design/components/. Exception: `style="--foo: ..."` CSS custom properties are allowed.'
-			identifier: ibl.inlineCss
-			count: 1
-			path: classes/ProjectedDraftOrder/ProjectedDraftOrderView.php
-
-		-
 			rawMessage: 'Unescaped output in View. Wrap the expression in HtmlSanitizer::e() (or another whitelisted safe helper), or cast it to (int)/(float)/(bool) if it is numeric.'
 			identifier: ibl.unescapedOutput
 			count: 9
 			path: classes/RookieOption/RookieOptionFormView.php
-
-		-
-			rawMessage: 'Inline `style="..."` attributes are banned in PHP. Move CSS to ibl5/design/components/. Exception: `style="--foo: ..."` CSS custom properties are allowed.'
-			identifier: ibl.inlineCss
-			count: 3
-			path: classes/Search/SearchView.php
-
-		-
-			rawMessage: 'Inline `style="..."` attributes are banned in PHP. Move CSS to ibl5/design/components/. Exception: `style="--foo: ..."` CSS custom properties are allowed.'
-			identifier: ibl.inlineCss
-			count: 1
-			path: classes/SeasonArchive/SeasonArchiveView.php
 
 		-
 			rawMessage: 'Unescaped output in View. Wrap the expression in HtmlSanitizer::e() (or another whitelisted safe helper), or cast it to (int)/(float)/(bool) if it is numeric.'
@@ -413,12 +365,6 @@ parameters:
 			identifier: ibl.cookieBeforeHeader
 			count: 1
 			path: classes/SeriesRecords/SeriesRecordsController.php
-
-		-
-			rawMessage: 'Inline `style="..."` attributes are banned in PHP. Move CSS to ibl5/design/components/. Exception: `style="--foo: ..."` CSS custom properties are allowed.'
-			identifier: ibl.inlineCss
-			count: 2
-			path: classes/SeriesRecords/SeriesRecordsView.php
 
 		-
 			rawMessage: 'Unescaped output in View. Wrap the expression in HtmlSanitizer::e() (or another whitelisted safe helper), or cast it to (int)/(float)/(bool) if it is numeric.'
@@ -437,18 +383,6 @@ parameters:
 			identifier: ibl.unescapedOutput
 			count: 20
 			path: classes/Team/TeamView.php
-
-		-
-			rawMessage: 'Inline `style="..."` attributes are banned in PHP. Move CSS to ibl5/design/components/. Exception: `style="--foo: ..."` CSS custom properties are allowed.'
-			identifier: ibl.inlineCss
-			count: 2
-			path: classes/TeamOffDefStats/TeamOffDefStatsView.php
-
-		-
-			rawMessage: 'Inline `style="..."` attributes are banned in PHP. Move CSS to ibl5/design/components/. Exception: `style="--foo: ..."` CSS custom properties are allowed.'
-			identifier: ibl.inlineCss
-			count: 1
-			path: classes/Topics/TopicsView.php
 
 		-
 			rawMessage: Deprecated HTML tag `<i>` found in string literal. Use <em> instead.
@@ -473,12 +407,6 @@ parameters:
 			identifier: ibl.unescapedOutput
 			count: 10
 			path: classes/TransactionHistory/TransactionHistoryView.php
-
-		-
-			rawMessage: 'Inline `style="..."` attributes are banned in PHP. Move CSS to ibl5/design/components/. Exception: `style="--foo: ..."` CSS custom properties are allowed.'
-			identifier: ibl.inlineCss
-			count: 2
-			path: classes/UI/TeamCellHelper.php
 
 		-
 			rawMessage: 'Direct $_COOKIE access is banned outside Controllers, ApiHandlers, and Utilities\CsrfGuard. Accept typed inputs as parameters from a Controller/ApiHandler instead.'

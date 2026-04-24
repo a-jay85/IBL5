@@ -1,4 +1,4 @@
-import { test, expect } from '../fixtures/auth-dc';
+import { test, expect } from '../fixtures/auth-isolated';
 import { assertNoPhpErrors } from '../helpers/php-errors';
 
 // Depth Chart submission flow — these tests mutate shared DB state via form

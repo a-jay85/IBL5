@@ -88,8 +88,7 @@ function api($user)
     $username = $cookie[1];
 
     $commonRepo = new Services\CommonMysqliRepository($mysqli_db);
-    $teamName = Utilities\TestCookieOverrides::getTeamOverride()
-        ?? $commonRepo->getTeamnameFromUsername($username);
+    $teamName = $commonRepo->getTeamnameFromUsername($username);
     if ($teamName === null || $teamName === '' || $teamName === 'Free Agents') {
         header('Content-Type: application/json; charset=utf-8');
         http_response_code(403);

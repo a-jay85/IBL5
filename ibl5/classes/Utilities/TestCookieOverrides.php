@@ -79,9 +79,9 @@ final class TestCookieOverrides
     }
 
     /**
-     * Read the `_test_dc_team` cookie to override which team the
-     * DepthChartEntry module renders. Returns null when not set or
-     * E2E testing is disabled.
+     * Read the `_test_team` cookie to override which team the logged-in
+     * user is associated with. Returns null when not set or E2E testing
+     * is disabled.
      */
     public static function getTeamOverride(): ?string
     {
@@ -89,7 +89,7 @@ final class TestCookieOverrides
             return null;
         }
 
-        $raw = $_COOKIE['_test_dc_team'] ?? null;
+        $raw = $_COOKIE['_test_team'] ?? null;
         if (!is_string($raw) || $raw === '') {
             return null;
         }

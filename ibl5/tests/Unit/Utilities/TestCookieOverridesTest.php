@@ -13,8 +13,8 @@ class TestCookieOverridesTest extends TestCase
     private bool $hadE2eTesting;
     private mixed $originalCookie;
     private bool $hadCookie;
-    private mixed $originalDcTeamCookie;
-    private bool $hadDcTeamCookie;
+    private mixed $originalTeamCookie;
+    private bool $hadTeamCookie;
 
     protected function setUp(): void
     {
@@ -28,8 +28,8 @@ class TestCookieOverridesTest extends TestCase
         // Save original cookies
         $this->hadCookie = array_key_exists('_test_overrides', $_COOKIE);
         $this->originalCookie = $_COOKIE['_test_overrides'] ?? null;
-        $this->hadDcTeamCookie = array_key_exists('_test_dc_team', $_COOKIE);
-        $this->originalDcTeamCookie = $_COOKIE['_test_dc_team'] ?? null;
+        $this->hadTeamCookie = array_key_exists('_test_team', $_COOKIE);
+        $this->originalTeamCookie = $_COOKIE['_test_team'] ?? null;
     }
 
     protected function tearDown(): void
@@ -49,10 +49,10 @@ class TestCookieOverridesTest extends TestCase
         } else {
             unset($_COOKIE['_test_overrides']);
         }
-        if ($this->hadDcTeamCookie) {
-            $_COOKIE['_test_dc_team'] = $this->originalDcTeamCookie;
+        if ($this->hadTeamCookie) {
+            $_COOKIE['_test_team'] = $this->originalTeamCookie;
         } else {
-            unset($_COOKIE['_test_dc_team']);
+            unset($_COOKIE['_test_team']);
         }
     }
 
@@ -168,7 +168,7 @@ class TestCookieOverridesTest extends TestCase
     public function testGetTeamOverrideReturnsNullWhenNotSet(): void
     {
         putenv('E2E_TESTING=1');
-        unset($_COOKIE['_test_dc_team']);
+        unset($_COOKIE['_test_team']);
 
         $this->assertNull(TestCookieOverrides::getTeamOverride());
     }
@@ -176,7 +176,7 @@ class TestCookieOverridesTest extends TestCase
     public function testGetTeamOverrideReturnsNullWhenEmpty(): void
     {
         putenv('E2E_TESTING=1');
-        $_COOKIE['_test_dc_team'] = '';
+        $_COOKIE['_test_team'] = '';
 
         $this->assertNull(TestCookieOverrides::getTeamOverride());
     }
@@ -184,7 +184,7 @@ class TestCookieOverridesTest extends TestCase
     public function testGetTeamOverrideReturnsNullWhenE2eDisabled(): void
     {
         putenv('E2E_TESTING');
-        $_COOKIE['_test_dc_team'] = 'Monarchs';
+        $_COOKIE['_test_team'] = 'Monarchs';
 
         $result = TestCookieOverrides::getTeamOverride();
 
@@ -196,7 +196,7 @@ class TestCookieOverridesTest extends TestCase
     public function testGetTeamOverrideReturnsTeamName(): void
     {
         putenv('E2E_TESTING=1');
-        $_COOKIE['_test_dc_team'] = 'Monarchs';
+        $_COOKIE['_test_team'] = 'Monarchs';
 
         $this->assertSame('Monarchs', TestCookieOverrides::getTeamOverride());
     }

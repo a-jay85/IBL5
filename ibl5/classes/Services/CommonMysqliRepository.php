@@ -55,6 +55,11 @@ class CommonMysqliRepository extends \BaseMysqliRepository
             return League::FREE_AGENTS_TEAM_NAME;
         }
 
+        $override = \Utilities\TestCookieOverrides::getTeamOverride();
+        if ($override !== null) {
+            return $override;
+        }
+
         // Primary: check ibl_team_info (authoritative for real GMs)
         /** @var array{team_name: string}|null $result */
         $result = $this->fetchOne(

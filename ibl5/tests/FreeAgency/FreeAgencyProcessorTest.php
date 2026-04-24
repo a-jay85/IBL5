@@ -337,8 +337,8 @@ class FreeAgencyProcessorTest extends TestCase
     public function testRejectsMLEOfferWhenRepositoryReportsPendingMLEOffer(): void
     {
         $this->mockDb->setMockData([$this->getCompletePlayerData([
-            'HasMLE' => 1,
-            'HasLLE' => 1,
+            'has_mle' => 1,
+            'has_lle' => 1,
         ])]);
 
         $capturingRepo = new CapturingRepository();
@@ -363,8 +363,8 @@ class FreeAgencyProcessorTest extends TestCase
     public function testRejectsLLEOfferWhenRepositoryReportsPendingLLEOffer(): void
     {
         $this->mockDb->setMockData([$this->getCompletePlayerData([
-            'HasMLE' => 1,
-            'HasLLE' => 1,
+            'has_mle' => 1,
+            'has_lle' => 1,
         ])]);
 
         $capturingRepo = new CapturingRepository();
@@ -540,18 +540,18 @@ class FreeAgencyProcessorTest extends TestCase
             'capacity' => 20000,
             'owner_name' => 'Test Owner',
             'owner_email' => 'test@test.com',
-            'discordID' => null,
-            'Used_Extension_This_Chunk' => 0,
-            'Used_Extension_This_Season' => 0,
+            'discord_id' => null,
+            'used_extension_this_chunk' => 0,
+            'used_extension_this_season' => 0,
             'Salary_Total' => 5000,
             'Salary_Cap' => 8250,
             'Tax_Line' => 10000,
-            'HasMLE' => 0,
-            'HasLLE' => 0,
-            'Contract_Wins' => 41,
-            'Contract_Losses' => 41,
-            'Contract_AvgW' => 500,
-            'Contract_AvgL' => 500,
+            'has_mle' => 0,
+            'has_lle' => 0,
+            'contract_wins' => 41,
+            'contract_losses' => 41,
+            'contract_avg_w' => 500,
+            'contract_avg_l' => 500,
             'next_year_salary' => 0,
             'money_committed_at_position' => 0,
             // Season settings

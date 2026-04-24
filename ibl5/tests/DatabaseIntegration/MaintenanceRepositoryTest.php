@@ -54,7 +54,7 @@ class MaintenanceRepositoryTest extends DatabaseTestCase
 
         self::assertTrue($result);
 
-        $stmt = $this->db->prepare('SELECT Contract_AvgW, Contract_AvgL FROM ibl_team_info WHERE team_name = ?');
+        $stmt = $this->db->prepare('SELECT contract_avg_w, contract_avg_l FROM ibl_team_info WHERE team_name = ?');
         self::assertNotFalse($stmt);
         $stmt->bind_param('s', $tn);
         $tn = 'Metros';
@@ -63,8 +63,8 @@ class MaintenanceRepositoryTest extends DatabaseTestCase
         $stmt->close();
 
         self::assertNotNull($row);
-        self::assertSame(45, $row['Contract_AvgW']);
-        self::assertSame(37, $row['Contract_AvgL']);
+        self::assertSame(45, $row['contract_avg_w']);
+        self::assertSame(37, $row['contract_avg_l']);
     }
 
     // ── getSetting ──────────────────────────────────────────────

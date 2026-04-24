@@ -90,8 +90,8 @@ class TestDataFactory
             'talent' => 50,
             'skill' => 50,
             'stamina' => 50,
-            'Used_Extension_This_Season' => 0,
-            'Used_Extension_This_Chunk' => 0,
+            'used_extension_this_season' => 0,
+            'used_extension_this_chunk' => 0,
         ];
 
         return array_merge($defaults, $overrides);
@@ -113,14 +113,14 @@ class TestDataFactory
             'Tax_Line' => 10000,
             'Apron' => 11500,
             'Hard_Cap' => 12000,
-            'HasMLE' => 1,
-            'HasLLE' => 1,
+            'has_mle' => 1,
+            'has_lle' => 1,
             'color1' => 'FF0000',
             'color2' => '000000',
             'owner_email' => 'test@example.com',
             'owner_name' => 'Test Owner',
             'team_city' => 'Test City',
-            'discordID' => '123456789',
+            'discord_id' => '123456789',
             'arena' => 'Test Arena',
             'capacity' => 20000,
         ];

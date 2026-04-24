@@ -269,8 +269,8 @@ class LeagueStartersServiceTest extends TestCase
             'team_city' => $city,
             'color1' => '#000000',
             'color2' => '#FFFFFF',
-            'Used_Extension_This_Chunk' => 0,
-            'Used_Extension_This_Season' => 0,
+            'used_extension_this_chunk' => 0,
+            'used_extension_this_season' => 0,
             'leagueRecord' => '0-0',
         ]);
     }

@@ -55,7 +55,7 @@ class DiscordIntegrationTest extends IntegrationTestCase
     public function testGetDiscordIDFromTeamnameReturnsStringFromDatabase(): void
     {
         $this->mockDb->setMockData([
-            ['discordID' => '123456789012345678']
+            ['discord_id' => '123456789012345678']
         ]);
 
         $discord = new Discord($this->mockDb);
@@ -78,12 +78,12 @@ class DiscordIntegrationTest extends IntegrationTestCase
     }
 
     /**
-     * Test getDiscordIDFromTeamname returns empty string when discordID is null
+     * Test getDiscordIDFromTeamname returns empty string when discord_id is null
      */
     public function testGetDiscordIDFromTeamnameReturnsEmptyForNullDiscordID(): void
     {
         $this->mockDb->setMockData([
-            ['discordID' => null]
+            ['discord_id' => null]
         ]);
 
         $discord = new Discord($this->mockDb);
@@ -107,7 +107,7 @@ class DiscordIntegrationTest extends IntegrationTestCase
         // MockPreparedStatement calls sql_query in both execute() and get_result()
         $this->assertGreaterThanOrEqual(1, count($queries));
         $this->assertStringContainsString('ibl_team_info', $queries[0]);
-        $this->assertStringContainsString('discordID', $queries[0]);
+        $this->assertStringContainsString('discord_id', $queries[0]);
         $this->assertStringContainsString('team_name', $queries[0]);
     }
 
@@ -117,7 +117,7 @@ class DiscordIntegrationTest extends IntegrationTestCase
     public function testGetDiscordIDFromTeamnameHandlesSpecialCharacters(): void
     {
         $this->mockDb->setMockData([
-            ['discordID' => '999888777666555444']
+            ['discord_id' => '999888777666555444']
         ]);
 
         $discord = new Discord($this->mockDb);
@@ -147,7 +147,7 @@ class DiscordIntegrationTest extends IntegrationTestCase
     {
         // Even if database returns integer-ish value
         $this->mockDb->setMockData([
-            ['discordID' => 123456789]
+            ['discord_id' => 123456789]
         ]);
 
         $discord = new Discord($this->mockDb);

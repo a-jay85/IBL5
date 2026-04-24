@@ -121,7 +121,7 @@ class FreeAgencyAdminRepository extends BaseMysqliRepository implements FreeAgen
     public function markMleUsed(string $teamName): void
     {
         $this->execute(
-            "UPDATE ibl_team_info SET HasMLE = 0 WHERE team_name = ? LIMIT 1",
+            "UPDATE ibl_team_info SET has_mle = 0 WHERE team_name = ? LIMIT 1",
             "s",
             $teamName
         );
@@ -133,7 +133,7 @@ class FreeAgencyAdminRepository extends BaseMysqliRepository implements FreeAgen
     public function markLleUsed(string $teamName): void
     {
         $this->execute(
-            "UPDATE ibl_team_info SET HasLLE = 0 WHERE team_name = ? LIMIT 1",
+            "UPDATE ibl_team_info SET has_lle = 0 WHERE team_name = ? LIMIT 1",
             "s",
             $teamName
         );

@@ -738,7 +738,7 @@ class RookieOptionIntegrationTest extends IntegrationTestCase
     }
 
     /**
-     * Player with Used_Extension_This_Season=1 should be blocked by validator
+     * Player with used_extension_this_season=1 should be blocked by validator
      *
      * @group integration
      * @group rookieoption

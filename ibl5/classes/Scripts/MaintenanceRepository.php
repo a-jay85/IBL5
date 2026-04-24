@@ -56,7 +56,7 @@ class MaintenanceRepository extends \BaseMysqliRepository implements Maintenance
     public function updateTeamTradition(string $teamName, int $avgWins, int $avgLosses): bool
     {
         $this->execute(
-            "UPDATE ibl_team_info SET Contract_AvgW = ?, Contract_AvgL = ? WHERE team_name = ?",
+            "UPDATE ibl_team_info SET contract_avg_w = ?, contract_avg_l = ? WHERE team_name = ?",
             "iis",
             $avgWins,
             $avgLosses,

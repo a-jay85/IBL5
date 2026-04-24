@@ -184,7 +184,7 @@ try {
     $updaterService->addStep(new Updater\Steps\UpdateStandingsStep($standingsUpdater));
     $updaterService->addStep(new Updater\Steps\UpdatePowerRankingsStep($powerRankingsUpdater));
 
-    // IBL-only: contract extensions don't exist in Olympics (ibl_olympics_team_info lacks Used_Extension_This_Chunk)
+    // IBL-only: contract extensions don't exist in Olympics (ibl_olympics_team_info lacks used_extension_this_chunk)
     if (!$isOlympics) {
         $updaterService->addStep(new Updater\Steps\ResetExtensionAttemptsStep($sharedRepository));
     }

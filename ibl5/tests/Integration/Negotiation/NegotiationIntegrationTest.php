@@ -66,7 +66,7 @@ class NegotiationIntegrationTest extends IntegrationTestCase
         $this->assertStringContainsString('Test Player', $result);
         
         // Verify team performance query was executed
-        $this->assertQueryExecuted('Contract_Wins');
+        $this->assertQueryExecuted('contract_wins');
     }
 
     /**
@@ -142,10 +142,10 @@ class NegotiationIntegrationTest extends IntegrationTestCase
                 'cy5' => 0,
                 'cy6' => 0,
                 // Team performance
-                'Contract_Wins' => 50,
-                'Contract_Losses' => 32,
-                'Contract_AvgW' => 2500,
-                'Contract_AvgL' => 2000,
+                'contract_wins' => 50,
+                'contract_losses' => 32,
+                'contract_avg_w' => 2500,
+                'contract_avg_l' => 2000,
                 // Cap space
                 'Salary_Total' => 5000,
                 'Salary_Cap' => 8250,

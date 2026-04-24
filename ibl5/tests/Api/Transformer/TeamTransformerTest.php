@@ -27,7 +27,7 @@ class TeamTransformerTest extends TestCase
             'team_city' => 'Chicago',
             'team_name' => 'Bulls',
             'owner_name' => 'TestOwner',
-            'discordID' => 123456789,
+            'discord_id' => 123456789,
             'arena' => 'United Center',
             'conference' => 'East',
             'division' => 'Central',

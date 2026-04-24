@@ -21,7 +21,7 @@ interface GMContactListRepositoryInterface
      *     color1: string,
      *     color2: string,
      *     owner_name: string,
-     *     discordID: int|null
+     *     discord_id: int|null
      * }> Array of team contact data
      */
     public function getAllTeamContacts(): array;

@@ -12,9 +12,9 @@ use PHPStan\Rules\RuleErrorBuilder;
 
 /**
  * Bans backtick-quoted references to former PascalCase / camelCase column
- * names that were snake_cased by migration 116 (Tier 3a cosmetic case-
- * consistency renames). Prevents the columns from being re-introduced by
- * future PRs.
+ * names that were snake_cased by migrations 116–117 (Tier 3a–3b cosmetic
+ * case-consistency renames). Prevents the columns from being re-introduced
+ * by future PRs.
  *
  * ADR-0010 covers the full Tier 3 roadmap; this rule is extended by PR 2-4.
  *
@@ -53,6 +53,17 @@ final class BanNonSnakeCaseColumnsRule implements Rule
 
         // Self-documenting renames.
         '`sta`' => 'Rename to `stamina`; migration 116 expanded abbreviated rating columns. (Note: bare `sta` without backticks may legitimately appear in unrelated contexts.)',
+
+        // Team-info columns (ibl_team_info, ibl_olympics_team_info).
+        '`discordID`' => 'Rename to `discord_id`; migration 117 snake-cased team-info columns.',
+        '`Contract_Wins`' => 'Rename to `contract_wins`; migration 117 snake-cased team-info columns.',
+        '`Contract_Losses`' => 'Rename to `contract_losses`; migration 117 snake-cased team-info columns.',
+        '`Contract_AvgW`' => 'Rename to `contract_avg_w`; migration 117 snake-cased team-info columns.',
+        '`Contract_AvgL`' => 'Rename to `contract_avg_l`; migration 117 snake-cased team-info columns.',
+        '`Used_Extension_This_Chunk`' => 'Rename to `used_extension_this_chunk`; migration 117 snake-cased team-info columns.',
+        '`Used_Extension_This_Season`' => 'Rename to `used_extension_this_season`; migration 117 snake-cased team-info columns.',
+        '`HasMLE`' => 'Rename to `has_mle`; migration 117 snake-cased team-info columns.',
+        '`HasLLE`' => 'Rename to `has_lle`; migration 117 snake-cased team-info columns.',
     ];
 
     public function getNodeType(): string

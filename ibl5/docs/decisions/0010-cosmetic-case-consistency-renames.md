@@ -17,7 +17,7 @@ After Tiers 1–2 there are **185 non-snake_case columns across 11 tables**. The
 | PR | Scope | Tables affected | Rough blast |
 |----|-------|-----------------|-------------|
 | 1 (this PR) | Player ratings + depth-chart dc_* + cache reserved word | `ibl_plr`, `ibl_plr_snapshots`, `ibl_olympics_plr`, `ibl_saved_depth_chart_players`, `ibl_olympics_saved_depth_chart_players`, `ibl_draft_class`, `cache`, `cache_locks` | ~180 prod + ~250 test |
-| 2 | Team-info columns (`WinLast10`, `confMagicNumber`, etc.) | `ibl_team_info`, `ibl_olympics_team_info` | ~148 prod + ~224 test |
+| 2 (PR #638) | Team-info columns (`discordID`, `Contract_*`, `HasMLE`, etc.) | `ibl_team_info`, `ibl_olympics_team_info` | ~148 prod + ~224 test |
 | 3 | Standings columns (`homeWins`, `leagueRecord`, etc.) | `ibl_standings`, `ibl_olympics_standings` | ~169 prod + ~278 test |
 | 4 | Box-score `game*` PascalCase family + schedule + quarter-points | `ibl_box_scores`, `ibl_box_scores_teams`, `ibl_schedule`, olympics equivalents | ~540 prod + ~388 test |
 
@@ -60,11 +60,18 @@ Tier 3 proceeds as a four-PR sequence, each following the Tier 1/2 playbook: foc
 - Negative: `PlayerDatabase::COLUMN_MAP` keeps `Clutch` / `Consistency` as form-field input-filter keys mapped to the new `clutch` / `consistency` column names — same pattern used in PR #632 for `to` / `do` / `r_to`. Documented in the class.
 - Negative: DuckDB analytics schema (`analytics/schema/*.sql`) reads the renamed MariaDB columns. `AS r_to` / `AS "do"` / `AS "to"` shims left by Tiers 1–2 are removed in this PR along with downstream consumer query updates (same incremental-cleanup approach ADR-0008 used).
 
+**PR 2 — migration 117:**
+
+- **Team-info columns (snake_case).** 9 columns on `ibl_team_info` and 5 on `ibl_olympics_team_info`: `discordID` → `discord_id`, `Contract_Wins` → `contract_wins`, `Contract_Losses` → `contract_losses`, `Contract_AvgW` → `contract_avg_w`, `Contract_AvgL` → `contract_avg_l`, `Used_Extension_This_Chunk` → `used_extension_this_chunk`, `Used_Extension_This_Season` → `used_extension_this_season`, `HasMLE` → `has_mle`, `HasLLE` → `has_lle`.
+- `BanNonSnakeCaseColumnsRule` extended with 9 additional banned tokens.
+- `Team` class properties `$discordID` → `$discord_id`, `$hasMLE` → `$has_mle`, `$hasLLE` → `$has_lle` renamed for consistency (direct column mirrors with ≤14 access sites).
+
 ## References
 
-- `ibl5/migrations/116_snake_case_player_columns.sql` — the DDL.
-- `ibl5/phpstan-rules/BanNonSnakeCaseColumnsRule.php` — the new enforcement rule.
-- `ibl5/phpstan-rules/BanReservedWordColumnsRule.php` — extended with `` `key` ``.
+- `ibl5/migrations/116_snake_case_player_columns.sql` — PR 1 DDL.
+- `ibl5/migrations/117_snake_case_team_info_columns.sql` — PR 2 DDL.
+- `ibl5/phpstan-rules/BanNonSnakeCaseColumnsRule.php` — the enforcement rule (extended per PR).
+- `ibl5/phpstan-rules/BanReservedWordColumnsRule.php` — extended with `` `key` `` (PR 1).
 - `ibl5/config/schema-assertions.php` — post-migration schema assertions.
 - `ibl5/docs/decisions/0008-ban-reserved-word-rating-columns.md` — Tier 1 precedent.
 - `ibl5/docs/decisions/0009-unify-cross-table-column-names.md` — Tier 2 precedent.

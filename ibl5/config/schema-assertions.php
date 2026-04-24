@@ -168,4 +168,22 @@ return [
     // cache reserved-word fix.
     new SchemaAssertion('cache', 'cache_key'),
     new SchemaAssertion('cache_locks', 'cache_key'),
+
+    // Migration 117: Tier 3b team-info column renames (ADR-0010).
+    // ibl_team_info (9 columns).
+    new SchemaAssertion('ibl_team_info', 'discord_id'),
+    new SchemaAssertion('ibl_team_info', 'contract_wins'),
+    new SchemaAssertion('ibl_team_info', 'contract_losses'),
+    new SchemaAssertion('ibl_team_info', 'contract_avg_w'),
+    new SchemaAssertion('ibl_team_info', 'contract_avg_l'),
+    new SchemaAssertion('ibl_team_info', 'used_extension_this_chunk'),
+    new SchemaAssertion('ibl_team_info', 'used_extension_this_season'),
+    new SchemaAssertion('ibl_team_info', 'has_mle'),
+    new SchemaAssertion('ibl_team_info', 'has_lle'),
+    // ibl_olympics_team_info (5 columns).
+    new SchemaAssertion('ibl_olympics_team_info', 'discord_id'),
+    new SchemaAssertion('ibl_olympics_team_info', 'contract_wins'),
+    new SchemaAssertion('ibl_olympics_team_info', 'contract_losses'),
+    new SchemaAssertion('ibl_olympics_team_info', 'contract_avg_w'),
+    new SchemaAssertion('ibl_olympics_team_info', 'contract_avg_l'),
 ];

@@ -111,8 +111,8 @@ class ExtensionServiceTest extends TestCase
     {
         $this->mockDb->setMockData([$this->getFullMockData([
             'loyalty' => 5,
-            'Contract_Wins' => 60,
-            'Contract_Losses' => 22,
+            'contract_wins' => 60,
+            'contract_losses' => 22,
         ])]);
 
         $service = new ExtensionService($this->mockDb);
@@ -144,10 +144,10 @@ class ExtensionServiceTest extends TestCase
             'loyalty' => 1,
             'winner' => 5,
             'tradition' => 5,
-            'Contract_Wins' => 20,
-            'Contract_Losses' => 62,
-            'Contract_AvgW' => 1200,
-            'Contract_AvgL' => 3800,
+            'contract_wins' => 20,
+            'contract_losses' => 62,
+            'contract_avg_w' => 1200,
+            'contract_avg_l' => 3800,
         ])]);
 
         $service = new ExtensionService($this->mockDb);
@@ -178,8 +178,8 @@ class ExtensionServiceTest extends TestCase
     {
         $this->mockDb->setMockData([$this->getFullMockData([
             'loyalty' => 5,
-            'Contract_Wins' => 60,
-            'Contract_Losses' => 22,
+            'contract_wins' => 60,
+            'contract_losses' => 22,
         ])]);
 
         $service = new ExtensionService($this->mockDb);
@@ -203,8 +203,8 @@ class ExtensionServiceTest extends TestCase
     {
         $this->mockDb->setMockData([$this->getFullMockData([
             'loyalty' => 5,
-            'Contract_Wins' => 60,
-            'Contract_Losses' => 22,
+            'contract_wins' => 60,
+            'contract_losses' => 22,
         ])]);
 
         $service = new ExtensionService($this->mockDb);
@@ -230,10 +230,10 @@ class ExtensionServiceTest extends TestCase
         $this->mockDb->setMockData([$this->getFullMockData([
             'loyalty' => 1,
             'winner' => 5,
-            'Contract_Wins' => 15,
-            'Contract_Losses' => 67,
-            'Contract_AvgW' => 1000,
-            'Contract_AvgL' => 4000,
+            'contract_wins' => 15,
+            'contract_losses' => 67,
+            'contract_avg_w' => 1000,
+            'contract_avg_l' => 4000,
         ])]);
 
         $service = new ExtensionService($this->mockDb);
@@ -293,11 +293,11 @@ class ExtensionServiceTest extends TestCase
             'color1' => 'Blue', 'color2' => 'White',
             'arena' => 'Test Arena', 'capacity' => 20000,
             'owner_name' => 'Test Owner', 'owner_email' => 'owner@test.com',
-            'discordID' => '123456',
-            'HasMLE' => 0, 'HasLLE' => 0, 'leagueRecord' => '0-0',
-            'Used_Extension_This_Season' => 0, 'Used_Extension_This_Chunk' => 0,
-            'Contract_Wins' => 50, 'Contract_Losses' => 32,
-            'Contract_AvgW' => 2500, 'Contract_AvgL' => 2000,
+            'discord_id' => '123456',
+            'has_mle' => 0, 'has_lle' => 0, 'leagueRecord' => '0-0',
+            'used_extension_this_season' => 0, 'used_extension_this_chunk' => 0,
+            'contract_wins' => 50, 'contract_losses' => 32,
+            'contract_avg_w' => 2500, 'contract_avg_l' => 2000,
             'money_committed_at_position' => 0,
             'catid' => 1, 'counter' => 10, 'topicid' => 5,
         ], $overrides);

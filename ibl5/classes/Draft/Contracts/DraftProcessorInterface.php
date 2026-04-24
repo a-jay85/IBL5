@@ -53,13 +53,13 @@ interface DraftProcessorInterface
      * If draft is complete, appends a completion message instead.
      *
      * @param string $baseMessage The base draft announcement (from createDraftAnnouncement)
-     * @param int|null $discordID The Discord ID of the next team's owner, or null if draft is complete
+     * @param int|null $discord_id The Discord ID of the next team's owner, or null if draft is complete
      * @param int|null $seasonYear The year of the draft (used only for completion message)
      * @return string The complete message with next team info or draft completion notice
      *
      * IMPORTANT BEHAVIORS:
-     *  - If discordID is not null: appends "**<@!DISCORD_ID>** is on the clock!" and module URL
-     *  - If discordID is null: appends completion message "The 2026 IBL Draft has officially concluded!"
+     *  - If discord_id is not null: appends "**<@!DISCORD_ID>** is on the clock!" and module URL
+     *  - If discord_id is null: appends completion message "The 2026 IBL Draft has officially concluded!"
      *  - Adds Markdown formatting (@mention for next owner, bold/emoji for completion)
      *  - Suitable for posting to #draft-picks Discord channel
      *  - Does NOT sanitize inputs – caller responsible for validation
@@ -68,7 +68,7 @@ interface DraftProcessorInterface
      * Return Value:
      *  - String with complete announcement and next team info (or completion message)
      *  - Multiple paragraphs separated by newlines
-     *  - Contains Markdown @mention if discordID provided
+     *  - Contains Markdown @mention if discord_id provided
      *  - Safe for Discord::postToChannel()
      *
      * Examples:
@@ -79,7 +79,7 @@ interface DraftProcessorInterface
      *  $msg = $processor->createNextTeamMessage($base, null, '2026');
      *  // Returns: "With pick #5...John Smith!\n**🏁 __The 2026 IBL Draft has officially concluded!__ 🏁**"
      */
-    public function createNextTeamMessage(string $baseMessage, ?int $discordID, ?int $seasonYear): string;
+    public function createNextTeamMessage(string $baseMessage, ?int $discord_id, ?int $seasonYear): string;
 
     /**
      * Get the success message HTML for display

@@ -15,7 +15,7 @@ use League\League;
  * @see BaseMysqliRepository For base class documentation and error codes
  *
  *
- * @phpstan-type TeamWithStandingsRow array{teamid: int, team_city: string, team_name: string, color1: string, color2: string, arena: string, capacity: int, owner_name: string, owner_email: string, discordID: ?int, Used_Extension_This_Chunk: int, Used_Extension_This_Season: ?int, HasMLE: int, HasLLE: int, leagueRecord: ?string, ...}
+ * @phpstan-type TeamWithStandingsRow array{teamid: int, team_city: string, team_name: string, color1: string, color2: string, arena: string, capacity: int, owner_name: string, owner_email: string, discord_id: ?int, used_extension_this_chunk: int, used_extension_this_season: ?int, has_mle: int, has_lle: int, leagueRecord: ?string, ...}
  */
 class Team extends \BaseMysqliRepository
 {
@@ -30,12 +30,12 @@ class Team extends \BaseMysqliRepository
 
     public string $ownerName;
     public string $ownerEmail;
-    public int|string|null $discordID;
+    public int|string|null $discord_id;
 
     public int $hasUsedExtensionThisSim = 0;
     public int $hasUsedExtensionThisSeason = 0;
-    public int $hasMLE = 0;
-    public int $hasLLE = 0;
+    public int $has_mle = 0;
+    public int $has_lle = 0;
 
     public int $numberOfPlayers;
     public int $numberOfHealthyPlayers;
@@ -141,13 +141,13 @@ class Team extends \BaseMysqliRepository
 
         $this->ownerName = $teamRow['owner_name'];
         $this->ownerEmail = $teamRow['owner_email'];
-        $discordID = $teamRow['discordID'] ?? null;
-        $this->discordID = $discordID;
+        $discordId = $teamRow['discord_id'] ?? null;
+        $this->discord_id = $discordId;
 
-        $this->hasUsedExtensionThisSim = $teamRow['Used_Extension_This_Chunk'];
-        $this->hasUsedExtensionThisSeason = $teamRow['Used_Extension_This_Season'] ?? 0;
-        $this->hasMLE = $teamRow['HasMLE'];
-        $this->hasLLE = $teamRow['HasLLE'];
+        $this->hasUsedExtensionThisSim = $teamRow['used_extension_this_chunk'];
+        $this->hasUsedExtensionThisSeason = $teamRow['used_extension_this_season'] ?? 0;
+        $this->has_mle = $teamRow['has_mle'];
+        $this->has_lle = $teamRow['has_lle'];
 
         /** @var string|null $leagueRecord */
         $leagueRecord = $teamRow['leagueRecord'] ?? null;

@@ -42,8 +42,8 @@ class SharedRepositoryTest extends DatabaseTestCase
 
     public function testResetSimContractExtensionAttemptsSetsToZero(): void
     {
-        // Set Used_Extension_This_Chunk=1 for Metros within the transaction
-        $stmt = $this->db->prepare('UPDATE ibl_team_info SET Used_Extension_This_Chunk = 1 WHERE team_name = ?');
+        // Set used_extension_this_chunk=1 for Metros within the transaction
+        $stmt = $this->db->prepare('UPDATE ibl_team_info SET used_extension_this_chunk = 1 WHERE team_name = ?');
         self::assertNotFalse($stmt);
         $stmt->bind_param('s', $tn);
         $tn = 'Metros';
@@ -52,7 +52,7 @@ class SharedRepositoryTest extends DatabaseTestCase
 
         $this->repo->resetSimContractExtensionAttempts();
 
-        $stmt = $this->db->prepare('SELECT Used_Extension_This_Chunk FROM ibl_team_info WHERE team_name = ?');
+        $stmt = $this->db->prepare('SELECT used_extension_this_chunk FROM ibl_team_info WHERE team_name = ?');
         self::assertNotFalse($stmt);
         $stmt->bind_param('s', $tn);
         $tn = 'Metros';
@@ -61,6 +61,6 @@ class SharedRepositoryTest extends DatabaseTestCase
         $stmt->close();
 
         self::assertNotNull($row);
-        self::assertSame(0, $row['Used_Extension_This_Chunk']);
+        self::assertSame(0, $row['used_extension_this_chunk']);
     }
 }

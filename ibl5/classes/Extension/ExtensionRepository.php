@@ -15,7 +15,7 @@ use Extension\Contracts\ExtensionRepositoryInterface;
  * @phpstan-import-type ExtensionOffer from Contracts\ExtensionRepositoryInterface
  * @phpstan-import-type TraditionData from Contracts\ExtensionRepositoryInterface
  *
- * @phpstan-type TeamTraditionDbRow array{Contract_Wins: int, Contract_Losses: int, Contract_AvgW: int, Contract_AvgL: int}
+ * @phpstan-type TeamTraditionDbRow array{contract_wins: int, contract_losses: int, contract_avg_w: int, contract_avg_l: int}
  * @phpstan-type MoneyCommittedDbRow array{money_committed_at_position: int}
  *
  * @see ExtensionRepositoryInterface
@@ -68,7 +68,7 @@ class ExtensionRepository extends \BaseMysqliRepository implements ExtensionRepo
     {
         try {
             $this->execute(
-                "UPDATE ibl_team_info SET Used_Extension_This_Chunk = 1 WHERE team_name = ?",
+                "UPDATE ibl_team_info SET used_extension_this_chunk = 1 WHERE team_name = ?",
                 's',
                 $teamName
             );
@@ -85,7 +85,7 @@ class ExtensionRepository extends \BaseMysqliRepository implements ExtensionRepo
     {
         try {
             $this->execute(
-                "UPDATE ibl_team_info SET Used_Extension_This_Season = 1 WHERE team_name = ?",
+                "UPDATE ibl_team_info SET used_extension_this_season = 1 WHERE team_name = ?",
                 's',
                 $teamName
             );
@@ -160,17 +160,17 @@ class ExtensionRepository extends \BaseMysqliRepository implements ExtensionRepo
         try {
             /** @var TeamTraditionDbRow|null $row */
             $row = $this->fetchOne(
-                "SELECT Contract_Wins, Contract_Losses, Contract_AvgW, Contract_AvgL FROM ibl_team_info WHERE team_name = ? LIMIT 1",
+                "SELECT contract_wins, contract_losses, contract_avg_w, contract_avg_l FROM ibl_team_info WHERE team_name = ? LIMIT 1",
                 's',
                 $teamName
             );
 
             if ($row !== null) {
                 return [
-                    'currentSeasonWins' => $row['Contract_Wins'],
-                    'currentSeasonLosses' => $row['Contract_Losses'],
-                    'tradition_wins' => $row['Contract_AvgW'],
-                    'tradition_losses' => $row['Contract_AvgL'],
+                    'currentSeasonWins' => $row['contract_wins'],
+                    'currentSeasonLosses' => $row['contract_losses'],
+                    'tradition_wins' => $row['contract_avg_w'],
+                    'tradition_losses' => $row['contract_avg_l'],
                 ];
             }
         } catch (\RuntimeException $e) {

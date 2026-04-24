@@ -73,10 +73,10 @@ class ExtensionIntegrationTest extends IntegrationTestCase
         $allQueries = implode(' ', $queries);
         
         // Verify sim flag was set
-        $this->assertStringContainsString('Used_Extension_This_Chunk = 1', $allQueries);
-        
+        $this->assertStringContainsString('used_extension_this_chunk = 1', $allQueries);
+
         // Verify season flag was set (for accepted extension)
-        $this->assertStringContainsString('Used_Extension_This_Season = 1', $allQueries);
+        $this->assertStringContainsString('used_extension_this_season = 1', $allQueries);
         
         // Verify player contract was updated
         $this->assertQueryExecuted('UPDATE ibl_plr');
@@ -114,8 +114,8 @@ class ExtensionIntegrationTest extends IntegrationTestCase
         // Verify sim flag was set but NOT season flag
         $queries = $this->getExecutedQueries();
         $allQueries = implode(' ', $queries);
-        $this->assertStringContainsString('Used_Extension_This_Chunk = 1', $allQueries);
-        $this->assertStringNotContainsString('Used_Extension_This_Season = 1', $allQueries);
+        $this->assertStringContainsString('used_extension_this_chunk = 1', $allQueries);
+        $this->assertStringNotContainsString('used_extension_this_season = 1', $allQueries);
     }
 
     /**
@@ -148,7 +148,7 @@ class ExtensionIntegrationTest extends IntegrationTestCase
         $this->assertStringContainsString('zero', $result['error']);
         
         // Verify NO database changes were made
-        $this->assertQueryNotExecuted('Used_Extension_This_Chunk');
+        $this->assertQueryNotExecuted('used_extension_this_chunk');
     }
 
     /**
@@ -606,12 +606,12 @@ class ExtensionIntegrationTest extends IntegrationTestCase
         $this->mockDb->setMockData([
             array_merge($this->getBasePlayerData(), [
                 // Team info fields
-                'Used_Extension_This_Season' => 0,
-                'Used_Extension_This_Chunk' => 0,
-                'Contract_Wins' => 50,
-                'Contract_Losses' => 32,
-                'Contract_AvgW' => 2500,
-                'Contract_AvgL' => 2000,
+                'used_extension_this_season' => 0,
+                'used_extension_this_chunk' => 0,
+                'contract_wins' => 50,
+                'contract_losses' => 32,
+                'contract_avg_w' => 2500,
+                'contract_avg_l' => 2000,
                 'money_committed_at_position' => 0,
                 // Player info fields (scenario-specific overrides)
                 'name' => 'Test Player',
@@ -647,12 +647,12 @@ class ExtensionIntegrationTest extends IntegrationTestCase
         $this->mockDb->setMockData([
             array_merge($this->getBasePlayerData(), [
                 // Team info fields - losing team
-                'Used_Extension_This_Season' => 0,
-                'Used_Extension_This_Chunk' => 0,
-                'Contract_Wins' => 25,
-                'Contract_Losses' => 57,
-                'Contract_AvgW' => 1500,
-                'Contract_AvgL' => 3500,
+                'used_extension_this_season' => 0,
+                'used_extension_this_chunk' => 0,
+                'contract_wins' => 25,
+                'contract_losses' => 57,
+                'contract_avg_w' => 1500,
+                'contract_avg_l' => 3500,
                 'money_committed_at_position' => 0,
                 // Player info fields - high demands (scenario-specific overrides)
                 'pid' => 2,
@@ -720,8 +720,8 @@ class ExtensionIntegrationTest extends IntegrationTestCase
     {
         $this->mockDb->setMockData([
             array_merge($this->getBasePlayerData(), [
-                'Used_Extension_This_Season' => 0,
-                'Used_Extension_This_Chunk' => 0,
+                'used_extension_this_season' => 0,
+                'used_extension_this_chunk' => 0,
                 'name' => 'Test Player',
                 'pid' => 3,
                 'ordinal' => 3,
@@ -745,8 +745,8 @@ class ExtensionIntegrationTest extends IntegrationTestCase
     {
         $this->mockDb->setMockData([
             array_merge($this->getBasePlayerData(), [
-                'Used_Extension_This_Season' => 1,
-                'Used_Extension_This_Chunk' => 0,
+                'used_extension_this_season' => 1,
+                'used_extension_this_chunk' => 0,
                 'name' => 'Test Player',
                 'pid' => 4,
                 'ordinal' => 4,
@@ -761,12 +761,12 @@ class ExtensionIntegrationTest extends IntegrationTestCase
         $this->mockDb->setMockData([
             array_merge($this->getBasePlayerData(), [
                 // Team info fields
-                'Used_Extension_This_Season' => 0,
-                'Used_Extension_This_Chunk' => 0,
-                'Contract_Wins' => 50,
-                'Contract_Losses' => 32,
-                'Contract_AvgW' => 2500,
-                'Contract_AvgL' => 2000,
+                'used_extension_this_season' => 0,
+                'used_extension_this_chunk' => 0,
+                'contract_wins' => 50,
+                'contract_losses' => 32,
+                'contract_avg_w' => 2500,
+                'contract_avg_l' => 2000,
                 'money_committed_at_position' => 0,
                 // Player info fields (combined in same row for mock)
                 'pid' => 5,
@@ -802,12 +802,12 @@ class ExtensionIntegrationTest extends IntegrationTestCase
         $this->mockDb->setMockData([
             array_merge($this->getBasePlayerData(), [
                 // Team info fields
-                'Used_Extension_This_Season' => 0,
-                'Used_Extension_This_Chunk' => 0,
-                'Contract_Wins' => 45,
-                'Contract_Losses' => 37,
-                'Contract_AvgW' => 2300,
-                'Contract_AvgL' => 2100,
+                'used_extension_this_season' => 0,
+                'used_extension_this_chunk' => 0,
+                'contract_wins' => 45,
+                'contract_losses' => 37,
+                'contract_avg_w' => 2300,
+                'contract_avg_l' => 2100,
                 'money_committed_at_position' => 0,
                 // Player info fields (combined in same row for mock)
                 'pid' => 6,
@@ -843,13 +843,13 @@ class ExtensionIntegrationTest extends IntegrationTestCase
         $this->mockDb->setMockData([
             array_merge($this->getBasePlayerData(), [
                 // Team info fields
-                'Used_Extension_This_Season' => 0,
-                'Used_Extension_This_Chunk' => 0,
+                'used_extension_this_season' => 0,
+                'used_extension_this_chunk' => 0,
                 'money_committed_at_position' => 8000,
-                'Contract_Wins' => 55,
-                'Contract_Losses' => 27,
-                'Contract_AvgW' => 2700,
-                'Contract_AvgL' => 1900,
+                'contract_wins' => 55,
+                'contract_losses' => 27,
+                'contract_avg_w' => 2700,
+                'contract_avg_l' => 1900,
                 // Player info fields (combined in same row for mock)
                 'pid' => 7,
                 'ordinal' => 7,
@@ -885,12 +885,12 @@ class ExtensionIntegrationTest extends IntegrationTestCase
         $this->mockDb->setMockData([
             array_merge($this->getBasePlayerData(), [
                 // Team info fields
-                'Used_Extension_This_Season' => 0,
-                'Used_Extension_This_Chunk' => 0,
-                'Contract_Wins' => 50,
-                'Contract_Losses' => 32,
-                'Contract_AvgW' => 2500,
-                'Contract_AvgL' => 2000,
+                'used_extension_this_season' => 0,
+                'used_extension_this_chunk' => 0,
+                'contract_wins' => 50,
+                'contract_losses' => 32,
+                'contract_avg_w' => 2500,
+                'contract_avg_l' => 2000,
                 'money_committed_at_position' => 0,
                 // Player info fields
                 'pid' => 8,
@@ -926,12 +926,12 @@ class ExtensionIntegrationTest extends IntegrationTestCase
         $this->mockDb->setMockData([
             array_merge($this->getBasePlayerData(), [
                 // Team info fields - losing team
-                'Used_Extension_This_Season' => 0,
-                'Used_Extension_This_Chunk' => 0,
-                'Contract_Wins' => 20,
-                'Contract_Losses' => 62,
-                'Contract_AvgW' => 1200,
-                'Contract_AvgL' => 3800,
+                'used_extension_this_season' => 0,
+                'used_extension_this_chunk' => 0,
+                'contract_wins' => 20,
+                'contract_losses' => 62,
+                'contract_avg_w' => 1200,
+                'contract_avg_l' => 3800,
                 'money_committed_at_position' => 0,
                 // Player info fields
                 'pid' => 9,
@@ -967,8 +967,8 @@ class ExtensionIntegrationTest extends IntegrationTestCase
     {
         $this->mockDb->setMockData([
             array_merge($this->getBasePlayerData(), [
-                'Used_Extension_This_Season' => 0,
-                'Used_Extension_This_Chunk' => 1, // Already used this chunk
+                'used_extension_this_season' => 0,
+                'used_extension_this_chunk' => 1, // Already used this chunk
                 'name' => 'Test Player',
                 'pid' => 10,
                 'ordinal' => 10,
@@ -1045,9 +1045,9 @@ class ExtensionIntegrationTest extends IntegrationTestCase
             'capacity' => 20000,
             'owner_name' => 'Test Owner',
             'owner_email' => 'owner@test.com',
-            'discordID' => '123456',
-            'HasMLE' => 0,
-            'HasLLE' => 0,
+            'discord_id' => '123456',
+            'has_mle' => 0,
+            'has_lle' => 0,
             'leagueRecord' => '0-0',
             'SERVER_NAME' => 'test.ibl.com',
             // Free agency preferences (required by Player.php line 162-163)

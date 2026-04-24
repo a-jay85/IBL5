@@ -39,9 +39,9 @@ class FreeAgencyDemandRepository extends BaseMysqliRepository implements FreeAge
      */
     public function getTeamPerformance(string $teamName): array
     {
-        /** @var array{Contract_Wins: int, Contract_Losses: int, Contract_AvgW: int, Contract_AvgL: int}|null $result */
+        /** @var array{contract_wins: int, contract_losses: int, contract_avg_w: int, contract_avg_l: int}|null $result */
         $result = $this->fetchOne(
-            "SELECT Contract_Wins, Contract_Losses, Contract_AvgW, Contract_AvgL
+            "SELECT contract_wins, contract_losses, contract_avg_w, contract_avg_l
              FROM ibl_team_info
              WHERE team_name = ?",
             "s",
@@ -53,10 +53,10 @@ class FreeAgencyDemandRepository extends BaseMysqliRepository implements FreeAge
         }
 
         return [
-            'wins' => $result['Contract_Wins'],
-            'losses' => $result['Contract_Losses'],
-            'tradWins' => $result['Contract_AvgW'],
-            'tradLosses' => $result['Contract_AvgL'],
+            'wins' => $result['contract_wins'],
+            'losses' => $result['contract_losses'],
+            'tradWins' => $result['contract_avg_w'],
+            'tradLosses' => $result['contract_avg_l'],
         ];
     }
 

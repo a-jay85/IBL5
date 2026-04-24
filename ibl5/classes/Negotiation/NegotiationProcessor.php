@@ -95,10 +95,10 @@ class NegotiationProcessor implements NegotiationProcessorInterface
         $moneyCommitted = $this->repository->getPositionSalaryCommitment($teamName, $playerPosition, $playerName);
         
         return [
-            'wins' => $teamData['Contract_Wins'],
-            'losses' => $teamData['Contract_Losses'],
-            'tradition_wins' => $teamData['Contract_AvgW'],
-            'tradition_losses' => $teamData['Contract_AvgL'],
+            'wins' => $teamData['contract_wins'],
+            'losses' => $teamData['contract_losses'],
+            'tradition_wins' => $teamData['contract_avg_w'],
+            'tradition_losses' => $teamData['contract_avg_l'],
             'money_committed_at_position' => $moneyCommitted
         ];
     }

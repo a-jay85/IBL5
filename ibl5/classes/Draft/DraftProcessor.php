@@ -27,11 +27,11 @@ class DraftProcessor implements DraftProcessorInterface
     /**
      * @see DraftProcessorInterface::createNextTeamMessage()
      */
-    public function createNextTeamMessage(string $baseMessage, ?int $discordID, ?int $seasonYear): string
+    public function createNextTeamMessage(string $baseMessage, ?int $discord_id, ?int $seasonYear): string
     {
-        if ($discordID !== null) {
+        if ($discord_id !== null) {
             return $baseMessage . '
-    **<@!' . $discordID . '>** is on the clock!
+    **<@!' . $discord_id . '>** is on the clock!
 ' . self::DRAFT_MODULE_URL;
         } else {
             return $baseMessage . "

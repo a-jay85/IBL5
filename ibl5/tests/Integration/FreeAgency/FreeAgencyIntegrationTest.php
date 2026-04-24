@@ -377,7 +377,7 @@ class FreeAgencyIntegrationTest extends IntegrationTestCase
      */
     public function testMLEOfferWhenAlreadyUsedRejected(): void
     {
-        // Arrange - team has already used their MLE (HasMLE=0)
+        // Arrange - team has already used their MLE (has_mle=0)
         $this->setupMLEAlreadyUsedScenario();
 
         $postData = [
@@ -401,7 +401,7 @@ class FreeAgencyIntegrationTest extends IntegrationTestCase
      * @group validation-failures
      *
      * Regression test: GMs could previously submit multiple pending MLE
-     * offers because validation only consulted `ibl_team_info.HasMLE`
+     * offers because validation only consulted `ibl_team_info.has_mle`
      * (cleared on signing), ignoring already-pending offers in
      * `ibl_fa_offers`. The validator now queries both.
      */
@@ -555,8 +555,8 @@ class FreeAgencyIntegrationTest extends IntegrationTestCase
                 'Salary_Total' => 5000,
                 'Salary_Cap' => 8250,
                 'Tax_Line' => 10000,
-                'HasMLE' => 0,
-                'HasLLE' => 0,
+                'has_mle' => 0,
+                'has_lle' => 0,
                 // Player is not signed
                 'teamid' => 0,
                 'teamname' => 'Free Agent',
@@ -574,8 +574,8 @@ class FreeAgencyIntegrationTest extends IntegrationTestCase
                 'Salary_Total' => 9000,
                 'Salary_Cap' => 8250,
                 'Tax_Line' => 10000,
-                'HasMLE' => 1,
-                'HasLLE' => 0,
+                'has_mle' => 1,
+                'has_lle' => 0,
                 // Over cap but can use MLE
                 'teamid' => 0,
                 'teamname' => 'Free Agent',
@@ -592,8 +592,8 @@ class FreeAgencyIntegrationTest extends IntegrationTestCase
                 'Salary_Total' => 9000,
                 'Salary_Cap' => 8250,
                 'Tax_Line' => 10000,
-                'HasMLE' => 0,
-                'HasLLE' => 1,
+                'has_mle' => 0,
+                'has_lle' => 1,
                 'teamid' => 0,
                 'teamname' => 'Free Agent',
                 'freeAgencyNotificationsState' => 'Off',
@@ -609,8 +609,8 @@ class FreeAgencyIntegrationTest extends IntegrationTestCase
                 'Salary_Total' => 12000,
                 'Salary_Cap' => 8250,
                 'Tax_Line' => 10000,
-                'HasMLE' => 0,
-                'HasLLE' => 0,
+                'has_mle' => 0,
+                'has_lle' => 0,
                 'teamid' => 0,
                 'teamname' => 'Free Agent',
                 'freeAgencyNotificationsState' => 'Off',
@@ -643,8 +643,8 @@ class FreeAgencyIntegrationTest extends IntegrationTestCase
                 'Salary_Total' => 8000,
                 'Salary_Cap' => 8250,
                 'Tax_Line' => 10000,
-                'HasMLE' => 0,
-                'HasLLE' => 0,
+                'has_mle' => 0,
+                'has_lle' => 0,
                 'teamid' => 0,
                 'teamname' => 'Free Agent',
                 'freeAgencyNotificationsState' => 'Off',
@@ -665,8 +665,8 @@ class FreeAgencyIntegrationTest extends IntegrationTestCase
                 'Salary_Total' => 5000,
                 'Salary_Cap' => 8250,
                 'Tax_Line' => 10000,
-                'HasMLE' => 0,
-                'HasLLE' => 0,
+                'has_mle' => 0,
+                'has_lle' => 0,
                 // Player is not signed (cy=0 means not in current contract)
                 'cy' => 0,
                 'cy1' => 0,
@@ -683,8 +683,8 @@ class FreeAgencyIntegrationTest extends IntegrationTestCase
                 'Salary_Total' => 9000,
                 'Salary_Cap' => 8250,
                 'Tax_Line' => 10000,
-                'HasMLE' => 0, // MLE already used
-                'HasLLE' => 0,
+                'has_mle' => 0, // MLE already used
+                'has_lle' => 0,
                 'teamid' => 0,
                 'teamname' => 'Free Agent',
                 'freeAgencyNotificationsState' => 'Off',
@@ -739,10 +739,10 @@ class FreeAgencyIntegrationTest extends IntegrationTestCase
             'loyalty' => 3,
             'playing_time' => 3,
             'security' => 3,
-            'Contract_Wins' => 50,
-            'Contract_Losses' => 32,
-            'Contract_AvgW' => 2500,
-            'Contract_AvgL' => 2000,
+            'contract_wins' => 50,
+            'contract_losses' => 32,
+            'contract_avg_w' => 2500,
+            'contract_avg_l' => 2000,
             'money_committed_at_position' => 2000,
         ]);
     }

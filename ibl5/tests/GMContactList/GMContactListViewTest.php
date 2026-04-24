@@ -52,7 +52,7 @@ class GMContactListViewTest extends TestCase
 
     public function testRenderLinksToDiscordDm(): void
     {
-        $contacts = [self::createContact(['discordID' => 123456789])];
+        $contacts = [self::createContact(['discord_id' => 123456789])];
 
         $html = $this->view->render($contacts);
 
@@ -61,7 +61,7 @@ class GMContactListViewTest extends TestCase
 
     public function testRenderWithNullDiscordIdShowsPlainName(): void
     {
-        $contacts = [self::createContact(['discordID' => null])];
+        $contacts = [self::createContact(['discord_id' => null])];
 
         $html = $this->view->render($contacts);
 
@@ -107,11 +107,11 @@ class GMContactListViewTest extends TestCase
     }
 
     /**
-     * @return array{teamid: int, team_city: string, team_name: string, color1: string, color2: string, owner_name: string, discordID: int|null}
+     * @return array{teamid: int, team_city: string, team_name: string, color1: string, color2: string, owner_name: string, discord_id: int|null}
      */
     private static function createContact(array $overrides = []): array
     {
-        /** @var array{teamid: int, team_city: string, team_name: string, color1: string, color2: string, owner_name: string, discordID: int|null} */
+        /** @var array{teamid: int, team_city: string, team_name: string, color1: string, color2: string, owner_name: string, discord_id: int|null} */
         return array_merge([
             'teamid' => 1,
             'team_city' => 'Atlanta',
@@ -119,7 +119,7 @@ class GMContactListViewTest extends TestCase
             'color1' => 'FF0000',
             'color2' => 'FFFFFF',
             'owner_name' => 'Test Owner',
-            'discordID' => 666988022751035397,
+            'discord_id' => 666988022751035397,
         ], $overrides);
     }
 }

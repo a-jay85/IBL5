@@ -443,7 +443,7 @@ class DraftIntegrationTest extends IntegrationTestCase
             'Beginning_Year' => 2024,
             'Ending_Year' => 2025,
             // Discord
-            'discordID' => '123456789',
+            'discord_id' => '123456789',
             // Max PID query result
             'max_pid' => 90050,
         ]);

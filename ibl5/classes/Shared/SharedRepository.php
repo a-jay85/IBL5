@@ -55,7 +55,7 @@ class SharedRepository extends \BaseMysqliRepository implements SharedRepository
     /**
      * Resets the contract extension counter for all teams
      *
-     * Sets Used_Extension_This_Chunk to 0 for all teams. This is typically called
+     * Sets used_extension_this_chunk to 0 for all teams. This is typically called
      * at the start of a simulation chunk to reset extension attempt counters.
      *
      * @return void
@@ -65,7 +65,7 @@ class SharedRepository extends \BaseMysqliRepository implements SharedRepository
     {
         try {
             $this->execute(
-                "UPDATE {$this->teamInfoTable} SET Used_Extension_This_Chunk = 0",
+                "UPDATE {$this->teamInfoTable} SET used_extension_this_chunk = 0",
                 ""
             );
         } catch (\Exception $e) {

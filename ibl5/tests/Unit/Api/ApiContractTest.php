@@ -312,7 +312,7 @@ class ApiContractTest extends TestCase
             'team_name' => 'Testers',
             'teamid' => 1,
             'owner_name' => 'Test Owner',
-            'discordID' => 123456789,
+            'discord_id' => 123456789,
             'arena' => 'Test Arena',
             'conference' => 'Eastern',
             'division' => 'Atlantic',

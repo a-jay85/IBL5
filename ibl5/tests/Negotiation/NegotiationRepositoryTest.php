@@ -114,10 +114,10 @@ class NegotiationRepositoryTest extends TestCase
         $result = $repository->getTeamPerformance('Test Team');
 
         $this->assertIsArray($result);
-        $this->assertArrayHasKey('Contract_Wins', $result);
-        $this->assertArrayHasKey('Contract_Losses', $result);
-        $this->assertEquals(41, $result['Contract_Wins']);
-        $this->assertEquals(41, $result['Contract_Losses']);
+        $this->assertArrayHasKey('contract_wins', $result);
+        $this->assertArrayHasKey('contract_losses', $result);
+        $this->assertEquals(41, $result['contract_wins']);
+        $this->assertEquals(41, $result['contract_losses']);
     }
 
     public function testGetTeamPerformanceReturnsTeamData(): void
@@ -125,18 +125,18 @@ class NegotiationRepositoryTest extends TestCase
         $repository = new NegotiationRepository($this->mockMysqliDb);
         $this->mockDb->setMockData([
             [
-                'Contract_Wins' => 50,
-                'Contract_Losses' => 32,
-                'Contract_AvgW' => 45,
-                'Contract_AvgL' => 37
+                'contract_wins' => 50,
+                'contract_losses' => 32,
+                'contract_avg_w' => 45,
+                'contract_avg_l' => 37
             ]
         ]);
 
         $result = $repository->getTeamPerformance('Test Team');
 
         $this->assertIsArray($result);
-        $this->assertEquals(50, $result['Contract_Wins']);
-        $this->assertEquals(32, $result['Contract_Losses']);
+        $this->assertEquals(50, $result['contract_wins']);
+        $this->assertEquals(32, $result['contract_losses']);
     }
 
     // ============================================

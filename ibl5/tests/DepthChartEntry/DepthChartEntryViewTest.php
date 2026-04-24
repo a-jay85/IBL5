@@ -32,13 +32,13 @@ class DepthChartEntryViewTest extends TestCase
             'name' => $name,
             'pos' => $pos,
             'injured' => 0,
-            'sta' => -5,
-            'dc_PGDepth' => 1,
-            'dc_SGDepth' => 0,
-            'dc_SFDepth' => 0,
-            'dc_PFDepth' => 0,
-            'dc_CDepth' => 0,
-            'dc_canPlayInGame' => 1,
+            'stamina' => -5,
+            'dc_pg_depth' => 1,
+            'dc_sg_depth' => 0,
+            'dc_sf_depth' => 0,
+            'dc_pf_depth' => 0,
+            'dc_c_depth' => 0,
+            'dc_can_play_in_game' => 1,
             'dc_minutes' => 0,
             'dc_of' => 0,
             'dc_df' => 0,
@@ -147,7 +147,7 @@ class DepthChartEntryViewTest extends TestCase
     public function testRenderPlayerRowActiveIsCheckbox(): void
     {
         $player = $this->buildTestPlayer();
-        $player['dc_canPlayInGame'] = 1;
+        $player['dc_can_play_in_game'] = 1;
 
         ob_start();
         $this->view->renderPlayerRow($player, 1);
@@ -170,7 +170,7 @@ class DepthChartEntryViewTest extends TestCase
     public function testRenderPlayerRowActiveCheckboxNotCheckedWhenInactive(): void
     {
         $player = $this->buildTestPlayer();
-        $player['dc_canPlayInGame'] = 0;
+        $player['dc_can_play_in_game'] = 0;
 
         ob_start();
         $this->view->renderPlayerRow($player, 1);
@@ -368,7 +368,7 @@ class DepthChartEntryViewTest extends TestCase
     public function testRenderMobileViewActiveCheckboxChecked(): void
     {
         $player = $this->buildTestPlayer();
-        $player['dc_canPlayInGame'] = 1;
+        $player['dc_can_play_in_game'] = 1;
 
         ob_start();
         $this->view->renderMobileView([$player], ['PG', 'SG', 'SF', 'PF', 'C']);
@@ -380,7 +380,7 @@ class DepthChartEntryViewTest extends TestCase
     public function testRenderMobileViewActiveCheckboxUnchecked(): void
     {
         $player = $this->buildTestPlayer();
-        $player['dc_canPlayInGame'] = 0;
+        $player['dc_can_play_in_game'] = 0;
 
         ob_start();
         $this->view->renderMobileView([$player], ['PG', 'SG', 'SF', 'PF', 'C']);
@@ -447,8 +447,8 @@ class DepthChartEntryViewTest extends TestCase
     public function testRenderMobileViewStepperInitialLabelMatchesDcValue(): void
     {
         $player = $this->buildTestPlayer();
-        $player['dc_PGDepth'] = 1; // PG depth → starter label "1st"
-        $player['dc_SFDepth'] = 2; // SF depth → backup label "2nd"
+        $player['dc_pg_depth'] = 1; // PG depth → starter label "1st"
+        $player['dc_sf_depth'] = 2; // SF depth → backup label "2nd"
 
         ob_start();
         $this->view->renderMobileView([$player], ['PG', 'SG', 'SF', 'PF', 'C']);
@@ -512,7 +512,7 @@ class DepthChartEntryViewTest extends TestCase
     public function testPositionDepthSelectsShowCorrectOptionLabels(): void
     {
         $player = $this->buildTestPlayer();
-        $player['dc_SFDepth'] = 3;
+        $player['dc_sf_depth'] = 3;
 
         ob_start();
         $this->view->renderPlayerRow($player, 1);
@@ -552,8 +552,8 @@ class DepthChartEntryViewTest extends TestCase
     public function testPositionDepthSelectPreselectsCorrectValue(): void
     {
         $player = $this->buildTestPlayer();
-        $player['dc_SFDepth'] = 1;
-        $player['dc_PGDepth'] = 0;
+        $player['dc_sf_depth'] = 1;
+        $player['dc_pg_depth'] = 0;
 
         ob_start();
         $this->view->renderPlayerRow($player, 1);

@@ -29,7 +29,7 @@ interface DepthChartEntryRepositoryInterface
      *
      * **Important Behaviors:**
      * - Filters out retired players automatically
-     * - Results include all depth chart fields (dc_PGDepth, dc_SGDepth, etc.)
+     * - Results include all depth chart fields (dc_pg_depth, dc_sg_depth, etc.)
      * - Ordered by player ordinal for consistent display
      * - Team ID is cast to int for safety
      */

@@ -64,11 +64,11 @@ class LeagueStartersService implements LeagueStartersServiceInterface
         $starterRows = $this->repository->getAllStartersWithTeamData();
 
         $depthColumns = [
-            'PG' => 'PGDepth',
-            'SG' => 'SGDepth',
-            'SF' => 'SFDepth',
-            'PF' => 'PFDepth',
-            'C' => 'CDepth',
+            'PG' => 'pg_depth',
+            'SG' => 'sg_depth',
+            'SF' => 'sf_depth',
+            'PF' => 'pf_depth',
+            'C' => 'c_depth',
         ];
 
         /** @var array<int, array<string, Player>> $starterMap teamid => [position => Player] */

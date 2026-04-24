@@ -194,7 +194,7 @@ class TeamRepositoryTest extends DatabaseTestCase
             'age' => 25,
             'teamid' => 0,
             'pos' => 'SG',
-            'sta' => 70,
+            'stamina' => 70,
             'exp' => 2,
             'bird' => 0,
             'cy' => 0,

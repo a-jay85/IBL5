@@ -189,7 +189,7 @@ INSERT INTO ibl_franchise_seasons (franchise_id, season_year, season_ending_year
 
 INSERT INTO ibl_plr (
   pid, name, age, peak, teamid, pos, ordinal,
-  sta, oo, od, r_drive_off, dd, po, pd, r_trans_off, r_tvr,
+  stamina, oo, od, r_drive_off, dd, po, pd, r_trans_off, r_tvr,
   cy, cyt, cy1, cy2,
   retired, exp,
   htft, htin, wt, college,
@@ -278,7 +278,7 @@ INSERT INTO ibl_plr (
 
 INSERT INTO ibl_plr (
   pid, name, age, peak, teamid, pos, ordinal,
-  sta, oo, od, r_drive_off, dd, po, pd, r_trans_off, td,
+  stamina, oo, od, r_drive_off, dd, po, pd, r_trans_off, td,
   cy, cyt, cy1, cy2,
   retired, exp, bird,
   htft, htin, wt, college,
@@ -323,7 +323,7 @@ INSERT INTO ibl_plr (
 -- "Konstantinos Papadopoulos" is long enough to trigger abbreviation → "K. Papadopoulos"
 INSERT INTO ibl_plr (
   pid, name, age, peak, teamid, pos, ordinal,
-  sta, oo, od, r_drive_off, dd, po, pd, r_trans_off, td,
+  stamina, oo, od, r_drive_off, dd, po, pd, r_trans_off, td,
   cy, cyt, cy1, cy2,
   retired, exp, bird,
   htft, htin, wt, college,
@@ -384,7 +384,7 @@ UPDATE ibl_team_info SET HasMLE = 1, HasLLE = 1 WHERE teamid = 1;
 
 INSERT INTO ibl_plr (
   pid, name, age, peak, teamid, pos, ordinal,
-  sta, oo, od, r_drive_off, dd, po, pd, r_trans_off, r_tvr,
+  stamina, oo, od, r_drive_off, dd, po, pd, r_trans_off, r_tvr,
   cy, cyt, cy1, cy2,
   retired, exp,
   htft, htin, wt, college,
@@ -510,7 +510,7 @@ INSERT INTO ibl_plr (
 -- ============================================================
 INSERT INTO ibl_plr (
   pid, name, age, peak, teamid, pos, ordinal,
-  sta, oo, od, r_drive_off, dd, po, pd, r_trans_off, r_tvr,
+  stamina, oo, od, r_drive_off, dd, po, pd, r_trans_off, r_tvr,
   cy, cyt, cy1, cy2,
   retired, exp,
   htft, htin, wt, college,
@@ -539,33 +539,33 @@ INSERT INTO ibl_plr (
 -- active assignments. The submit-path E2E tests need a default team that
 -- passes Regular-Season validation (12 active, 3 per position) without
 -- per-test form manipulation.
-UPDATE ibl_plr SET dc_PGDepth = 1, PGDepth = 1 WHERE pid = 20;
-UPDATE ibl_plr SET dc_SGDepth = 1, SGDepth = 1 WHERE pid = 1;
-UPDATE ibl_plr SET dc_SFDepth = 1, SFDepth = 1 WHERE pid = 21;
-UPDATE ibl_plr SET dc_PFDepth = 1, PFDepth = 1 WHERE pid = 2;
-UPDATE ibl_plr SET dc_CDepth  = 1, CDepth  = 1 WHERE pid = 22;
+UPDATE ibl_plr SET dc_pg_depth = 1, pg_depth = 1 WHERE pid = 20;
+UPDATE ibl_plr SET dc_sg_depth = 1, sg_depth = 1 WHERE pid = 1;
+UPDATE ibl_plr SET dc_sf_depth = 1, sf_depth = 1 WHERE pid = 21;
+UPDATE ibl_plr SET dc_pf_depth = 1, pf_depth = 1 WHERE pid = 2;
+UPDATE ibl_plr SET dc_c_depth  = 1, c_depth  = 1 WHERE pid = 22;
 -- FA Guard (pid=10) covers SG depth 2
-UPDATE ibl_plr SET dc_SGDepth = 2 WHERE pid = 10;
+UPDATE ibl_plr SET dc_sg_depth = 2 WHERE pid = 10;
 -- Konstantinos Papadopoulos (pid=200000030) covers C depth 2
-UPDATE ibl_plr SET dc_CDepth = 2 WHERE pid = 200000030;
+UPDATE ibl_plr SET dc_c_depth = 2 WHERE pid = 200000030;
 -- Backups cover the remaining ≥3 slots: PG, SG, SF, PF, C all hit 3
-UPDATE ibl_plr SET dc_PGDepth = 2, dc_SGDepth = 3 WHERE pid = 25;
-UPDATE ibl_plr SET dc_SFDepth = 2 WHERE pid = 26;
-UPDATE ibl_plr SET dc_PFDepth = 2, dc_PGDepth = 3, dc_CDepth = 3 WHERE pid = 27;
-UPDATE ibl_plr SET dc_SFDepth = 3 WHERE pid = 28;
-UPDATE ibl_plr SET dc_PFDepth = 3 WHERE pid = 29;
+UPDATE ibl_plr SET dc_pg_depth = 2, dc_sg_depth = 3 WHERE pid = 25;
+UPDATE ibl_plr SET dc_sf_depth = 2 WHERE pid = 26;
+UPDATE ibl_plr SET dc_pf_depth = 2, dc_pg_depth = 3, dc_c_depth = 3 WHERE pid = 27;
+UPDATE ibl_plr SET dc_sf_depth = 3 WHERE pid = 28;
+UPDATE ibl_plr SET dc_pf_depth = 3 WHERE pid = 29;
 
 -- Stars (tid=2): pid=4 covers PG/SG/PF, pid=5 covers SF/C
-UPDATE ibl_plr SET dc_PGDepth = 1, PGDepth = 1, dc_SGDepth = 1, SGDepth = 1, dc_PFDepth = 1, PFDepth = 1 WHERE pid = 4;
-UPDATE ibl_plr SET dc_SFDepth = 1, SFDepth = 1, dc_CDepth = 1, CDepth = 1 WHERE pid = 5;
+UPDATE ibl_plr SET dc_pg_depth = 1, pg_depth = 1, dc_sg_depth = 1, sg_depth = 1, dc_pf_depth = 1, pf_depth = 1 WHERE pid = 4;
+UPDATE ibl_plr SET dc_sf_depth = 1, sf_depth = 1, dc_c_depth = 1, c_depth = 1 WHERE pid = 5;
 
 -- Cougars (tid=3): pid=23 covers PG/SG/PF, pid=24 covers SF/C
-UPDATE ibl_plr SET dc_PGDepth = 1, PGDepth = 1, dc_SGDepth = 1, SGDepth = 1, dc_PFDepth = 1, PFDepth = 1 WHERE pid = 23;
-UPDATE ibl_plr SET dc_SFDepth = 1, SFDepth = 1, dc_CDepth = 1, CDepth = 1 WHERE pid = 24;
+UPDATE ibl_plr SET dc_pg_depth = 1, pg_depth = 1, dc_sg_depth = 1, sg_depth = 1, dc_pf_depth = 1, pf_depth = 1 WHERE pid = 23;
+UPDATE ibl_plr SET dc_sf_depth = 1, sf_depth = 1, dc_c_depth = 1, c_depth = 1 WHERE pid = 24;
 
 -- Phoenixes (tid=14): pid=6 covers PG/SG/SF, pid=7 covers PF/C
-UPDATE ibl_plr SET dc_PGDepth = 1, PGDepth = 1, dc_SGDepth = 1, SGDepth = 1, dc_SFDepth = 1, SFDepth = 1 WHERE pid = 6;
-UPDATE ibl_plr SET dc_PFDepth = 1, PFDepth = 1, dc_CDepth = 1, CDepth = 1 WHERE pid = 7;
+UPDATE ibl_plr SET dc_pg_depth = 1, pg_depth = 1, dc_sg_depth = 1, sg_depth = 1, dc_sf_depth = 1, sf_depth = 1 WHERE pid = 6;
+UPDATE ibl_plr SET dc_pf_depth = 1, pf_depth = 1, dc_c_depth = 1, c_depth = 1 WHERE pid = 7;
 
 -- ============================================================
 -- Saved depth chart configs (for depth-chart-changes test)
@@ -576,7 +576,7 @@ INSERT INTO ibl_saved_depth_charts (id, teamid, username, name, phase, season_ye
   (1, 1, 'A-Jay', 'Offensive Config', 'Free Agency', 2026, '2026-03-01', 689, 0),
   (2, 1, 'A-Jay', 'Defensive Config', 'Free Agency', 2026, '2026-03-01', 689, 0);
 
-INSERT INTO ibl_saved_depth_chart_players (depth_chart_id, pid, player_name, ordinal, dc_PGDepth, dc_SGDepth, dc_SFDepth, dc_PFDepth, dc_CDepth, dc_canPlayInGame, dc_minutes, dc_of, dc_df, dc_oi, dc_di, dc_bh) VALUES
+INSERT INTO ibl_saved_depth_chart_players (depth_chart_id, pid, player_name, ordinal, dc_pg_depth, dc_sg_depth, dc_sf_depth, dc_pf_depth, dc_c_depth, dc_can_play_in_game, dc_minutes, dc_of, dc_df, dc_oi, dc_di, dc_bh) VALUES
   (1, 1, 'Test Player', 1, 0, 1, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0),
   (1, 2, 'Test Player Two', 2, 0, 0, 0, 1, 0, 1, 0, 0, 0, 0, 0, 0),
   (2, 1, 'Test Player', 1, 0, 1, 0, 0, 0, 1, 0, 1, 0, 0, 0, 0),
@@ -784,7 +784,7 @@ INSERT INTO ibl_saved_depth_charts (id, teamid, username, name, phase, season_ye
   (2, 1, 'A-Jay', 'Defensive Config', 'Free Agency', 2026, '2026-03-01', 689, 0)
 ON DUPLICATE KEY UPDATE name = VALUES(name);
 
-INSERT INTO ibl_saved_depth_chart_players (depth_chart_id, pid, player_name, ordinal, dc_PGDepth, dc_SGDepth, dc_SFDepth, dc_PFDepth, dc_CDepth, dc_canPlayInGame, dc_minutes, dc_of, dc_df, dc_oi, dc_di, dc_bh) VALUES
+INSERT INTO ibl_saved_depth_chart_players (depth_chart_id, pid, player_name, ordinal, dc_pg_depth, dc_sg_depth, dc_sf_depth, dc_pf_depth, dc_c_depth, dc_can_play_in_game, dc_minutes, dc_of, dc_df, dc_oi, dc_di, dc_bh) VALUES
   (1, 1, 'Test Player One', 1, 1, 0, 0, 0, 0, 1, 30, 5, 5, 3, 3, 5),
   (1, 2, 'Test Player Two', 2, 0, 1, 0, 0, 0, 1, 28, 4, 6, 2, 4, 3),
   (2, 1, 'Test Player One', 1, 0, 0, 0, 1, 0, 1, 32, 3, 7, 2, 5, 4),
@@ -826,7 +826,7 @@ ON DUPLICATE KEY UPDATE title = VALUES(title);
 -- 4 undrafted + 2 already drafted
 -- ============================================================
 
-INSERT INTO ibl_draft_class (name, pos, age, team, fga, fgp, fta, ftp, r_3ga, r_3gp, orb, drb, ast, stl, tvr, blk, oo, r_drive_off, po, r_trans_off, od, dd, pd, td, talent, skill, intangibles, drafted, sta) VALUES
+INSERT INTO ibl_draft_class (name, pos, age, team, fga, fgp, fta, ftp, r_3ga, r_3gp, orb, drb, ast, stl, tvr, blk, oo, r_drive_off, po, r_trans_off, od, dd, pd, td, talent, skill, intangibles, drafted, stamina) VALUES
   ('Prospect Guard',    'PG', 19, 'Duke',       60, 55, 50, 70, 40, 45, 30, 40, 65, 50, 45, 20, 60, 55, 40, 50, 55, 50, 40, 45, 70, 65, 60, 0, 75),
   ('Prospect Wing',     'SF', 20, 'Kentucky',   55, 50, 45, 65, 35, 40, 40, 50, 50, 45, 40, 30, 55, 50, 50, 45, 50, 55, 45, 50, 65, 60, 55, 0, 70),
   ('Prospect Big',      'C',  21, 'Gonzaga',    50, 55, 55, 60, 20, 30, 55, 60, 35, 30, 35, 55, 45, 40, 60, 35, 45, 40, 60, 40, 60, 55, 65, 0, 80),
@@ -893,7 +893,7 @@ UPDATE ibl_team_info SET owner_name = 'GM Thunder'  WHERE teamid = 28;
 
 INSERT INTO ibl_plr (
   pid, name, age, peak, teamid, pos, ordinal,
-  sta, oo, od, r_drive_off, dd, po, pd, r_trans_off, r_tvr,
+  stamina, oo, od, r_drive_off, dd, po, pd, r_trans_off, r_tvr,
   cy, cyt, cy1, cy2,
   retired, exp,
   htft, htin, wt, college,
@@ -949,10 +949,10 @@ INSERT INTO ibl_plr (
    'a0000000-0000-0000-0000-000000000033');
 
 -- Starters for new players (needed to appear in voting)
-UPDATE ibl_plr SET dc_PGDepth = 1, PGDepth = 1 WHERE pid = 30;
-UPDATE ibl_plr SET dc_SFDepth = 1, SFDepth = 1 WHERE pid = 31;
-UPDATE ibl_plr SET dc_SGDepth = 1, SGDepth = 1 WHERE pid = 32;
-UPDATE ibl_plr SET dc_PFDepth = 1, PFDepth = 1 WHERE pid = 33;
+UPDATE ibl_plr SET dc_pg_depth = 1, pg_depth = 1 WHERE pid = 30;
+UPDATE ibl_plr SET dc_sf_depth = 1, sf_depth = 1 WHERE pid = 31;
+UPDATE ibl_plr SET dc_sg_depth = 1, sg_depth = 1 WHERE pid = 32;
+UPDATE ibl_plr SET dc_pf_depth = 1, pf_depth = 1 WHERE pid = 33;
 
 -- Player history for voting candidates (must have current year stats)
 INSERT INTO ibl_plr_snapshots (
@@ -1074,7 +1074,7 @@ INSERT INTO nuke_stories (catid, aid, title, time, hometext, bodytext, topic, ih
 
 INSERT INTO ibl_plr (
   pid, name, age, peak, teamid, pos, ordinal,
-  sta, oo, od, r_drive_off, dd, po, pd, r_trans_off, r_tvr,
+  stamina, oo, od, r_drive_off, dd, po, pd, r_trans_off, r_tvr,
   cy, cyt, cy1, cy2,
   retired, exp,
   htft, htin, wt, college,
@@ -1244,7 +1244,7 @@ INSERT INTO nuke_stories (catid, aid, title, time, hometext, bodytext, topic, ih
 
 INSERT INTO ibl_plr (
   pid, name, age, peak, teamid, pos, ordinal,
-  sta, oo, od, r_drive_off, dd, po, pd, r_trans_off, td,
+  stamina, oo, od, r_drive_off, dd, po, pd, r_trans_off, td,
   cy, cyt, cy1,
   retired, exp,
   htft, htin, wt, college,
@@ -1273,7 +1273,7 @@ ON DUPLICATE KEY UPDATE name = VALUES(name), draftyear = VALUES(draftyear);
 
 INSERT INTO ibl_plr (
   pid, name, age, peak, teamid, pos, ordinal,
-  sta, oo, od, r_drive_off, dd, po, pd, r_trans_off, r_tvr,
+  stamina, oo, od, r_drive_off, dd, po, pd, r_trans_off, r_tvr,
   cy, cyt, cy1, cy2,
   retired, exp,
   htft, htin, wt, college,

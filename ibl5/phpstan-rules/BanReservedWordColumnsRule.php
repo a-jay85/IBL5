@@ -34,6 +34,7 @@ final class BanReservedWordColumnsRule implements Rule
         '`r_to`' => 'Rename to `r_tvr` (live/snapshot turnover rating) or `r_trans_off` (hist transition offense rating) — `r_to` used to flip meaning across layers.',
         '`Start Date`' => 'Rename to `start_date` — space-containing identifier banned.',
         '`End Date`' => 'Rename to `end_date` — space-containing identifier banned.',
+        '`key`' => 'Rename to `cache_key` on the `cache` / `cache_locks` tables; the bare `key` column is a SQL reserved word (migration 116).',
     ];
 
     public function getNodeType(): string

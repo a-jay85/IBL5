@@ -141,7 +141,7 @@ class FreeAgencyPreviewView implements FreeAgencyPreviewViewInterface
                 . "<td>{$player['td']}</td>"
                 . "<td>{$player['loyalty']}</td>"
                 . "<td>{$player['winner']}</td>"
-                . "<td>{$player['playingTime']}</td>"
+                . "<td>{$player['playing_time']}</td>"
                 . "<td>{$player['security']}</td>"
                 . "<td>{$player['tradition']}</td>"
                 . '</tr>';

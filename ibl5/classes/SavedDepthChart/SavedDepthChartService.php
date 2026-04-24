@@ -308,12 +308,12 @@ class SavedDepthChartService implements SavedDepthChartServiceInterface
             'pid' => $this->toInt($rosterPlayer['pid'] ?? 0),
             'player_name' => $this->toString($rosterPlayer['name'] ?? ''),
             'ordinal' => $ordinal,
-            'dc_PGDepth' => $dcSettings['pg'] ?? 0,
-            'dc_SGDepth' => $dcSettings['sg'] ?? 0,
-            'dc_SFDepth' => $dcSettings['sf'] ?? 0,
-            'dc_PFDepth' => $dcSettings['pf'] ?? 0,
-            'dc_CDepth' => $dcSettings['c'] ?? 0,
-            'dc_canPlayInGame' => $dcSettings['canPlayInGame'] ?? 0,
+            'dc_pg_depth' => $dcSettings['pg'] ?? 0,
+            'dc_sg_depth' => $dcSettings['sg'] ?? 0,
+            'dc_sf_depth' => $dcSettings['sf'] ?? 0,
+            'dc_pf_depth' => $dcSettings['pf'] ?? 0,
+            'dc_c_depth' => $dcSettings['c'] ?? 0,
+            'dc_can_play_in_game' => $dcSettings['canPlayInGame'] ?? 0,
             'dc_minutes' => $dcSettings['min'] ?? 0,
             'dc_of' => $dcSettings['of'] ?? 0,
             'dc_df' => $dcSettings['df'] ?? 0,
@@ -541,12 +541,12 @@ class SavedDepthChartService implements SavedDepthChartServiceInterface
                 'pid' => $player['pid'],
                 'player_name' => $player['name'],
                 'ordinal' => $player['ordinal'],
-                'dc_PGDepth' => $player['dc_PGDepth'],
-                'dc_SGDepth' => $player['dc_SGDepth'],
-                'dc_SFDepth' => $player['dc_SFDepth'],
-                'dc_PFDepth' => $player['dc_PFDepth'],
-                'dc_CDepth' => $player['dc_CDepth'],
-                'dc_canPlayInGame' => $player['dc_canPlayInGame'],
+                'dc_pg_depth' => $player['dc_pg_depth'],
+                'dc_sg_depth' => $player['dc_sg_depth'],
+                'dc_sf_depth' => $player['dc_sf_depth'],
+                'dc_pf_depth' => $player['dc_pf_depth'],
+                'dc_c_depth' => $player['dc_c_depth'],
+                'dc_can_play_in_game' => $player['dc_can_play_in_game'],
                 'dc_minutes' => $player['dc_minutes'],
                 'dc_of' => $player['dc_of'],
                 'dc_df' => $player['dc_df'],
@@ -581,12 +581,12 @@ class SavedDepthChartService implements SavedDepthChartServiceInterface
      * match for every player. Detects roster changes from trades.
      *
      * @param list<SavedDepthChartPlayerRow> $dcPlayers Saved DC player settings
-     * @param list<array{pid: int, dc_PGDepth: int, dc_SGDepth: int, dc_SFDepth: int, dc_PFDepth: int, dc_CDepth: int, dc_canPlayInGame: int, dc_minutes: int, dc_of: int, dc_df: int, dc_oi: int, dc_di: int, dc_bh: int}> $liveRosterPlayers Live ibl_plr settings
+     * @param list<array{pid: int, dc_pg_depth: int, dc_sg_depth: int, dc_sf_depth: int, dc_pf_depth: int, dc_c_depth: int, dc_can_play_in_game: int, dc_minutes: int, dc_of: int, dc_df: int, dc_oi: int, dc_di: int, dc_bh: int}> $liveRosterPlayers Live ibl_plr settings
      */
     private function isDepthChartMatchingLive(array $dcPlayers, array $liveRosterPlayers): bool
     {
         // Build map of live settings by PID
-        /** @var array<int, array{pid: int, dc_PGDepth: int, dc_SGDepth: int, dc_SFDepth: int, dc_PFDepth: int, dc_CDepth: int, dc_canPlayInGame: int, dc_minutes: int, dc_of: int, dc_df: int, dc_oi: int, dc_di: int, dc_bh: int}> $liveByPid */
+        /** @var array<int, array{pid: int, dc_pg_depth: int, dc_sg_depth: int, dc_sf_depth: int, dc_pf_depth: int, dc_c_depth: int, dc_can_play_in_game: int, dc_minutes: int, dc_of: int, dc_df: int, dc_oi: int, dc_di: int, dc_bh: int}> $liveByPid */
         $liveByPid = [];
         foreach ($liveRosterPlayers as $player) {
             $liveByPid[$player['pid']] = $player;
@@ -610,8 +610,8 @@ class SavedDepthChartService implements SavedDepthChartServiceInterface
 
         // Compare all 12 dc_* columns for each player
         $dcColumns = [
-            'dc_PGDepth', 'dc_SGDepth', 'dc_SFDepth', 'dc_PFDepth', 'dc_CDepth',
-            'dc_canPlayInGame', 'dc_minutes', 'dc_of', 'dc_df', 'dc_oi', 'dc_di', 'dc_bh',
+            'dc_pg_depth', 'dc_sg_depth', 'dc_sf_depth', 'dc_pf_depth', 'dc_c_depth',
+            'dc_can_play_in_game', 'dc_minutes', 'dc_of', 'dc_df', 'dc_oi', 'dc_di', 'dc_bh',
         ];
 
         foreach ($savedByPid as $pid => $savedPlayer) {

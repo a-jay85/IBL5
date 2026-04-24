@@ -22,7 +22,7 @@ class JsbExportService implements JsbExportServiceInterface
     /**
      * Map of database field names to PlrFileWriter field names.
      *
-     * Depth chart fields (PGDepth–CDepth, canPlayInGame) are intentionally excluded —
+     * Depth chart fields (pg_depth–c_depth, dc_can_play_in_game) are intentionally excluded —
      * those are managed by DepthChartEntry and not exported to the .plr file.
      *
      * @var array<string, string>

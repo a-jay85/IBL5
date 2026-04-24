@@ -34,7 +34,7 @@ class PlayerSalaryPlaceholderTest extends TestCase
             $playerRow = TestDataFactory::createPlayer([
                 'name' => $name,
                 'loyalty' => 0,
-                'playingTime' => 0,
+                'playing_time' => 0,
                 'winner' => 0,
                 'tradition' => 0,
                 'security' => 0,

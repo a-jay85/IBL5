@@ -147,8 +147,8 @@ class PlayerRepository extends BaseMysqliRepository implements PlayerRepositoryI
         $playerData->ratingPostDefense = $plrRow['pd'];
         $playerData->ratingTransitionOffense = $plrRow['r_trans_off'];
         $playerData->ratingTransitionDefense = $plrRow['td'];
-        $playerData->ratingClutch = $plrRow['Clutch'];
-        $playerData->ratingConsistency = $plrRow['Consistency'];
+        $playerData->ratingClutch = $plrRow['clutch'];
+        $playerData->ratingConsistency = $plrRow['consistency'];
         $playerData->ratingTalent = $plrRow['talent'];
         $playerData->ratingSkill = $plrRow['skill'];
         $playerData->ratingIntangibles = $plrRow['intangibles'];
@@ -162,7 +162,7 @@ class PlayerRepository extends BaseMysqliRepository implements PlayerRepositoryI
     private function mapFreeAgencyFields(PlayerData $playerData, array $plrRow): void
     {
         $playerData->freeAgencyLoyalty = $plrRow['loyalty'];
-        $playerData->freeAgencyPlayingTime = $plrRow['playingTime'];
+        $playerData->freeAgencyPlayingTime = $plrRow['playing_time'];
         $playerData->freeAgencyPlayForWinner = $plrRow['winner'];
         $playerData->freeAgencyTradition = $plrRow['tradition'];
         $playerData->freeAgencySecurity = $plrRow['security'];

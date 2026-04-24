@@ -66,11 +66,11 @@ SELECT
     bs.ast, bs.stl, bs.tov, bs.blk, bs.pf,
     bs.points, bs.rebounds,
     -- PLR positional ratings (1-9)
-    r.oo, r.od, r."do", r.dd, r.po, r.pd, r."to", r.td,
+    r.oo, r.od, r.r_drive_off, r.dd, r.po, r.pd, r.r_trans_off, r.td,
     -- PLR stat ratings (0-99)
     r.r_fga, r.r_fgp, r.r_fta, r.r_ftp,
-    r.r_tga, r.r_tgp, r.r_orb, r.r_drb,
-    r.r_ast, r.r_stl, r.r_to, r.r_blk, r.r_foul,
+    r.r_3ga, r.r_3gp, r.r_orb, r.r_drb,
+    r.r_ast, r.r_stl, r.r_tvr, r.r_blk, r.r_foul,
     -- Quality attributes
     r.tsi_sum, r.clutch, r.consistency
 FROM plb_with_dates p
@@ -140,7 +140,7 @@ SELECT
     curr.r_oo  - prev.r_oo  AS delta_r_oo,
     curr.r_do  - prev.r_do  AS delta_r_do,
     curr.r_po  - prev.r_po  AS delta_r_po,
-    curr.r_to  - prev.r_to  AS delta_r_to,
+    curr.r_trans_off - prev.r_trans_off AS delta_r_trans_off,
     curr.r_od  - prev.r_od  AS delta_r_od,
     curr.r_dd  - prev.r_dd  AS delta_r_dd,
     curr.r_pd  - prev.r_pd  AS delta_r_pd,

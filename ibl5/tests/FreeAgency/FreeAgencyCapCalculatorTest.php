@@ -294,7 +294,7 @@ class FreeAgencyCapCalculatorTest extends TestCase
                 'cy5' => 0,
                 'cy6' => 0,
                 'loyalty' => 0,
-                'playingTime' => 0,
+                'playing_time' => 0,
                 'winner' => 0,
                 'tradition' => 0,
                 'security' => 0,

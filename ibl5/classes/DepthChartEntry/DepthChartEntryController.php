@@ -327,7 +327,7 @@ class DepthChartEntryController implements DepthChartEntryControllerInterface
      * internal lookups go through string literals anyway.
      *
      * @param array<array-key, mixed> $postData Raw $_POST payload.
-     * @return array<int, array{dc_PGDepth: int, dc_SGDepth: int, dc_SFDepth: int, dc_PFDepth: int, dc_CDepth: int, dc_canPlayInGame: int, dc_minutes: int}>
+     * @return array<int, array{dc_pg_depth: int, dc_sg_depth: int, dc_sf_depth: int, dc_pf_depth: int, dc_c_depth: int, dc_can_play_in_game: int, dc_minutes: int}>
      *         Keyed by player PID. Values use the same `dc_*` keys the view reads
      *         from the player row, so the caller can `array_merge` directly.
      */
@@ -346,12 +346,12 @@ class DepthChartEntryController implements DepthChartEntryControllerInterface
             }
 
             $override[$pid] = [
-                'dc_PGDepth' => self::clampDepth(self::intFromPost($postData['pg' . $i] ?? 0)),
-                'dc_SGDepth' => self::clampDepth(self::intFromPost($postData['sg' . $i] ?? 0)),
-                'dc_SFDepth' => self::clampDepth(self::intFromPost($postData['sf' . $i] ?? 0)),
-                'dc_PFDepth' => self::clampDepth(self::intFromPost($postData['pf' . $i] ?? 0)),
-                'dc_CDepth' => self::clampDepth(self::intFromPost($postData['c' . $i] ?? 0)),
-                'dc_canPlayInGame' => self::intFromPost($postData['canPlayInGame' . $i] ?? 0) === 1 ? 1 : 0,
+                'dc_pg_depth' => self::clampDepth(self::intFromPost($postData['pg' . $i] ?? 0)),
+                'dc_sg_depth' => self::clampDepth(self::intFromPost($postData['sg' . $i] ?? 0)),
+                'dc_sf_depth' => self::clampDepth(self::intFromPost($postData['sf' . $i] ?? 0)),
+                'dc_pf_depth' => self::clampDepth(self::intFromPost($postData['pf' . $i] ?? 0)),
+                'dc_c_depth' => self::clampDepth(self::intFromPost($postData['c' . $i] ?? 0)),
+                'dc_can_play_in_game' => self::intFromPost($postData['canPlayInGame' . $i] ?? 0) === 1 ? 1 : 0,
                 'dc_minutes' => self::clampMinutes(self::intFromPost($postData['min' . $i] ?? 0)),
             ];
         }

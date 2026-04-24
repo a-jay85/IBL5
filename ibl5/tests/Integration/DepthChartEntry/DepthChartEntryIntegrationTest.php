@@ -135,7 +135,7 @@ class DepthChartEntryIntegrationTest extends IntegrationTestCase
         // Assert - Database update succeeded and included correct data
         $this->assertTrue($updateResult);
         $this->assertQueryExecuted('UPDATE ibl_plr');
-        $this->assertQueryExecuted('dc_PGDepth');
+        $this->assertQueryExecuted('dc_pg_depth');
         $this->assertQueryExecuted('dc_of = 0');
         $this->assertQueryExecuted("name = 'John Smith'");
     }
@@ -445,12 +445,12 @@ class DepthChartEntryIntegrationTest extends IntegrationTestCase
         $lastQuery = end($queries);
 
         // Verify bound fields are in the query
-        $this->assertStringContainsString('dc_PGDepth', $lastQuery);
-        $this->assertStringContainsString('dc_SGDepth', $lastQuery);
-        $this->assertStringContainsString('dc_SFDepth', $lastQuery);
-        $this->assertStringContainsString('dc_PFDepth', $lastQuery);
-        $this->assertStringContainsString('dc_CDepth', $lastQuery);
-        $this->assertStringContainsString('dc_canPlayInGame', $lastQuery);
+        $this->assertStringContainsString('dc_pg_depth', $lastQuery);
+        $this->assertStringContainsString('dc_sg_depth', $lastQuery);
+        $this->assertStringContainsString('dc_sf_depth', $lastQuery);
+        $this->assertStringContainsString('dc_pf_depth', $lastQuery);
+        $this->assertStringContainsString('dc_c_depth', $lastQuery);
+        $this->assertStringContainsString('dc_can_play_in_game', $lastQuery);
         $this->assertStringContainsString('dc_minutes', $lastQuery);
         // Role columns are hardcoded to 0 in SQL
         $this->assertStringContainsString('dc_of = 0', $lastQuery);

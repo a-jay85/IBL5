@@ -925,7 +925,7 @@ class RecordHoldersRepository extends \BaseMysqliRepository implements RecordHol
     public function getLastAnnouncedDate(): ?string
     {
         $row = $this->fetchOne(
-            "SELECT `value` FROM `cache` WHERE `key` = ?",
+            "SELECT `value` FROM `cache` WHERE `cache_key` = ?",
             's',
             self::ANNOUNCEMENT_CACHE_KEY
         );
@@ -944,7 +944,7 @@ class RecordHoldersRepository extends \BaseMysqliRepository implements RecordHol
     public function markAnnouncementsProcessed(string $gameDate): void
     {
         $this->execute(
-            "REPLACE INTO `cache` (`key`, `value`, `expiration`) VALUES (?, ?, 0)",
+            "REPLACE INTO `cache` (`cache_key`, `value`, `expiration`) VALUES (?, ?, 0)",
             'ss',
             self::ANNOUNCEMENT_CACHE_KEY,
             $gameDate

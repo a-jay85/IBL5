@@ -30,7 +30,7 @@ class PlayerExportTransformerTest extends TestCase
             'age' => 39,
             'htft' => 6,
             'htin' => 9,
-            'dc_canPlayInGame' => 1,
+            'dc_can_play_in_game' => 1,
             'retired' => 0,
             'experience' => 20,
             'bird_rights' => 3,

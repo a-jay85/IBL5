@@ -76,12 +76,12 @@ class DepthChartEntryRepositoryTest extends TestCase
         // Verify the UPDATE statement contains all the expected fields
         $lastQuery = end($queries);
         $this->assertStringContainsString('UPDATE ibl_plr SET', $lastQuery);
-        $this->assertStringContainsString('dc_PGDepth', $lastQuery);
-        $this->assertStringContainsString('dc_SGDepth', $lastQuery);
-        $this->assertStringContainsString('dc_SFDepth', $lastQuery);
-        $this->assertStringContainsString('dc_PFDepth', $lastQuery);
-        $this->assertStringContainsString('dc_CDepth', $lastQuery);
-        $this->assertStringContainsString('dc_canPlayInGame', $lastQuery);
+        $this->assertStringContainsString('dc_pg_depth', $lastQuery);
+        $this->assertStringContainsString('dc_sg_depth', $lastQuery);
+        $this->assertStringContainsString('dc_sf_depth', $lastQuery);
+        $this->assertStringContainsString('dc_pf_depth', $lastQuery);
+        $this->assertStringContainsString('dc_c_depth', $lastQuery);
+        $this->assertStringContainsString('dc_can_play_in_game', $lastQuery);
         $this->assertStringContainsString('dc_minutes', $lastQuery);
         // Role columns are hardcoded to 0 in SQL, not bound as parameters
         $this->assertStringContainsString('dc_of = 0', $lastQuery);
@@ -252,12 +252,12 @@ class DepthChartEntryRepositoryTest extends TestCase
 
         // The database columns that receive bound parameter values
         $boundDatabaseColumns = [
-            'dc_PGDepth',        // from $processedPlayerData['pg']
-            'dc_SGDepth',        // from $processedPlayerData['sg']
-            'dc_SFDepth',        // from $processedPlayerData['sf']
-            'dc_PFDepth',        // from $processedPlayerData['pf']
-            'dc_CDepth',         // from $processedPlayerData['c']
-            'dc_canPlayInGame',  // from $processedPlayerData['canPlayInGame']
+            'dc_pg_depth',        // from $processedPlayerData['pg']
+            'dc_sg_depth',        // from $processedPlayerData['sg']
+            'dc_sf_depth',        // from $processedPlayerData['sf']
+            'dc_pf_depth',        // from $processedPlayerData['pf']
+            'dc_c_depth',         // from $processedPlayerData['c']
+            'dc_can_play_in_game',  // from $processedPlayerData['canPlayInGame']
             'dc_minutes',        // from $processedPlayerData['min']
         ];
 
@@ -271,12 +271,12 @@ class DepthChartEntryRepositoryTest extends TestCase
         // The bind_param order: 7 integers + 1 string (player name) = "iiiiiiis"
         $expectedBindParamTypes = 'iiiiiiis';
         $expectedBindParamValues = [
-            $boundFields['pg'],             // position 1: dc_PGDepth
-            $boundFields['sg'],             // position 2: dc_SGDepth
-            $boundFields['sf'],             // position 3: dc_SFDepth
-            $boundFields['pf'],             // position 4: dc_PFDepth
-            $boundFields['c'],              // position 5: dc_CDepth
-            $boundFields['canPlayInGame'],  // position 6: dc_canPlayInGame
+            $boundFields['pg'],             // position 1: dc_pg_depth
+            $boundFields['sg'],             // position 2: dc_sg_depth
+            $boundFields['sf'],             // position 3: dc_sf_depth
+            $boundFields['pf'],             // position 4: dc_pf_depth
+            $boundFields['c'],              // position 5: dc_c_depth
+            $boundFields['canPlayInGame'],  // position 6: dc_can_play_in_game
             $boundFields['min'],            // position 7: dc_minutes
             'Test Player'                   // position 8: name (WHERE clause)
         ];
@@ -344,12 +344,12 @@ class DepthChartEntryRepositoryTest extends TestCase
 
         // Step 3: Repository maps bound fields to database columns; role columns hardcoded to 0
         $boundDatabaseColumns = [
-            'dc_PGDepth',
-            'dc_SGDepth',
-            'dc_SFDepth',
-            'dc_PFDepth',
-            'dc_CDepth',
-            'dc_canPlayInGame',
+            'dc_pg_depth',
+            'dc_sg_depth',
+            'dc_sf_depth',
+            'dc_pf_depth',
+            'dc_c_depth',
+            'dc_can_play_in_game',
             'dc_minutes',
         ];
         $hardcodedColumns = ['dc_of', 'dc_df', 'dc_oi', 'dc_di', 'dc_bh'];
@@ -360,11 +360,11 @@ class DepthChartEntryRepositoryTest extends TestCase
 
         // Verify the mapping chain for position depth fields
         $completeChain = [
-            'pg' => ['POST' => 'pg1', 'processed' => 'pg', 'database' => 'dc_PGDepth'],
-            'sg' => ['POST' => 'sg1', 'processed' => 'sg', 'database' => 'dc_SGDepth'],
-            'sf' => ['POST' => 'sf1', 'processed' => 'sf', 'database' => 'dc_SFDepth'],
-            'pf' => ['POST' => 'pf1', 'processed' => 'pf', 'database' => 'dc_PFDepth'],
-            'c' => ['POST' => 'c1', 'processed' => 'c', 'database' => 'dc_CDepth'],
+            'pg' => ['POST' => 'pg1', 'processed' => 'pg', 'database' => 'dc_pg_depth'],
+            'sg' => ['POST' => 'sg1', 'processed' => 'sg', 'database' => 'dc_sg_depth'],
+            'sf' => ['POST' => 'sf1', 'processed' => 'sf', 'database' => 'dc_sf_depth'],
+            'pf' => ['POST' => 'pf1', 'processed' => 'pf', 'database' => 'dc_pf_depth'],
+            'c' => ['POST' => 'c1', 'processed' => 'c', 'database' => 'dc_c_depth'],
         ];
 
         $this->assertCount(5, $completeChain, 'Should have documented chain for 5 position depth fields');
@@ -379,12 +379,12 @@ class DepthChartEntryRepositoryTest extends TestCase
     {
         // The UPDATE statement has bound columns in this order:
         $boundColumnOrder = [
-            1 => 'dc_PGDepth',
-            2 => 'dc_SGDepth',
-            3 => 'dc_SFDepth',
-            4 => 'dc_PFDepth',
-            5 => 'dc_CDepth',
-            6 => 'dc_canPlayInGame',
+            1 => 'dc_pg_depth',
+            2 => 'dc_sg_depth',
+            3 => 'dc_sf_depth',
+            4 => 'dc_pf_depth',
+            5 => 'dc_c_depth',
+            6 => 'dc_can_play_in_game',
             7 => 'dc_minutes',
         ];
 

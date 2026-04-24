@@ -160,7 +160,7 @@ class LeagueStartersServiceTest extends TestCase
         ]);
 
         $this->mockDb->onQuery('SELECT[\s\S]*ibl_plr[\s\S]*pid', [
-            TestDataFactory::createPlayer(['pid' => 4040404, 'teamid' => 0, 'name' => 'Placeholder', 'loyalty' => 0, 'playingTime' => 0, 'winner' => 0, 'tradition' => 0, 'security' => 0]),
+            TestDataFactory::createPlayer(['pid' => 4040404, 'teamid' => 0, 'name' => 'Placeholder', 'loyalty' => 0, 'playing_time' => 0, 'winner' => 0, 'tradition' => 0, 'security' => 0]),
         ]);
 
         $service = new LeagueStartersService($this->mockMysqliDb, $this->mockLeague, $mockRepo);
@@ -183,7 +183,7 @@ class LeagueStartersServiceTest extends TestCase
         ]);
 
         $this->mockDb->onQuery('SELECT[\s\S]*ibl_plr[\s\S]*pid', [
-            TestDataFactory::createPlayer(['pid' => 4040404, 'teamid' => 0, 'name' => 'Placeholder', 'loyalty' => 0, 'playingTime' => 0, 'winner' => 0, 'tradition' => 0, 'security' => 0]),
+            TestDataFactory::createPlayer(['pid' => 4040404, 'teamid' => 0, 'name' => 'Placeholder', 'loyalty' => 0, 'playing_time' => 0, 'winner' => 0, 'tradition' => 0, 'security' => 0]),
         ]);
 
         $service = new LeagueStartersService($this->mockMysqliDb, $this->mockLeague, $mockRepo);
@@ -207,7 +207,7 @@ class LeagueStartersServiceTest extends TestCase
         ]);
 
         $this->mockDb->onQuery('SELECT[\s\S]*ibl_plr[\s\S]*pid', [
-            TestDataFactory::createPlayer(['pid' => 4040404, 'teamid' => 0, 'name' => 'Placeholder', 'loyalty' => 0, 'playingTime' => 0, 'winner' => 0, 'tradition' => 0, 'security' => 0]),
+            TestDataFactory::createPlayer(['pid' => 4040404, 'teamid' => 0, 'name' => 'Placeholder', 'loyalty' => 0, 'playing_time' => 0, 'winner' => 0, 'tradition' => 0, 'security' => 0]),
         ]);
 
         $service = new LeagueStartersService($this->mockMysqliDb, $this->mockLeague, $mockRepo);
@@ -249,12 +249,12 @@ class LeagueStartersServiceTest extends TestCase
             'color1' => '#000000',
             'color2' => '#FFFFFF',
             'loyalty' => 3,
-            'playingTime' => 3,
+            'playing_time' => 3,
             'winner' => 3,
             'tradition' => 3,
             'security' => 3,
         ]);
-        $row[$position . 'Depth'] = 1;
+        $row[strtolower($position) . '_depth'] = 1;
         return $row;
     }
 

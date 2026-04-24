@@ -180,7 +180,7 @@ class NegotiationRepository extends BaseMysqliRepository implements NegotiationR
     {
         /** @var array{value: string, expiration: int}|null $row */
         $row = $this->fetchOne(
-            "SELECT `value`, `expiration` FROM `cache` WHERE `key` = ?",
+            "SELECT `value`, `expiration` FROM `cache` WHERE `cache_key` = ?",
             "s",
             self::MARKET_MAX_CACHE_KEY
         );
@@ -214,7 +214,7 @@ class NegotiationRepository extends BaseMysqliRepository implements NegotiationR
         }
 
         $this->execute(
-            "REPLACE INTO `cache` (`key`, `value`, `expiration`) VALUES (?, ?, ?)",
+            "REPLACE INTO `cache` (`cache_key`, `value`, `expiration`) VALUES (?, ?, ?)",
             "ssi",
             self::MARKET_MAX_CACHE_KEY,
             $encoded,

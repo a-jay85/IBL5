@@ -218,7 +218,7 @@ abstract class DatabaseTestCase extends TestCase
             'age' => 27,
             'teamid' => 1,
             'pos' => 'PG',
-            'sta' => 80,
+            'stamina' => 80,
             'exp' => 5,
             'bird' => 3,
             'cy' => 1,
@@ -342,7 +342,7 @@ abstract class DatabaseTestCase extends TestCase
             'skill' => 50,
             'intangibles' => 50,
             'drafted' => 0,
-            'sta' => 80,
+            'stamina' => 80,
         ];
 
         return $this->insertRow('ibl_draft_class', array_merge($defaults, $overrides));

@@ -83,7 +83,7 @@ class FreeAgencyPreviewService implements FreeAgencyPreviewServiceInterface
                     'td' => $player['td'],
                     'loyalty' => $player['loyalty'],
                     'winner' => $player['winner'],
-                    'playingTime' => $player['playingTime'],
+                    'playing_time' => $player['playing_time'],
                     'security' => $player['security'],
                     'tradition' => $player['tradition'],
                 ];

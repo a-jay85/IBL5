@@ -69,8 +69,8 @@ class DepthChartEntryRepositoryTest extends DatabaseTestCase
         self::assertTrue($result);
 
         $stmt = $this->db->prepare(
-            'SELECT dc_PGDepth, dc_SGDepth, dc_SFDepth, dc_PFDepth, dc_CDepth,
-                    dc_canPlayInGame, dc_minutes, dc_of, dc_df, dc_oi, dc_di, dc_bh
+            'SELECT dc_pg_depth, dc_sg_depth, dc_sf_depth, dc_pf_depth, dc_c_depth,
+                    dc_can_play_in_game, dc_minutes, dc_of, dc_df, dc_oi, dc_di, dc_bh
              FROM ibl_plr WHERE pid = ?'
         );
         self::assertNotFalse($stmt);
@@ -81,12 +81,12 @@ class DepthChartEntryRepositoryTest extends DatabaseTestCase
         $stmt->close();
 
         self::assertNotNull($row);
-        self::assertSame(3, $row['dc_PGDepth']);
-        self::assertSame(2, $row['dc_SGDepth']);
-        self::assertSame(1, $row['dc_SFDepth']);
-        self::assertSame(0, $row['dc_PFDepth']);
-        self::assertSame(0, $row['dc_CDepth']);
-        self::assertSame(1, $row['dc_canPlayInGame']);
+        self::assertSame(3, $row['dc_pg_depth']);
+        self::assertSame(2, $row['dc_sg_depth']);
+        self::assertSame(1, $row['dc_sf_depth']);
+        self::assertSame(0, $row['dc_pf_depth']);
+        self::assertSame(0, $row['dc_c_depth']);
+        self::assertSame(1, $row['dc_can_play_in_game']);
         self::assertSame(32, $row['dc_minutes']);
         // Role columns are hardcoded to 0 in the SQL
         self::assertSame(0, $row['dc_of']);

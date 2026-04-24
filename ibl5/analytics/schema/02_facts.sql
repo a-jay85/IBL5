@@ -41,10 +41,10 @@ WITH hist_raw AS (
         TRY_CAST(r_tvr AS INTEGER) AS r_tvr,
         TRY_CAST(r_oo AS INTEGER)  AS r_oo,
         -- Migration 113: ibl_hist columns renamed r_do → r_drive_off, r_to → r_trans_off.
-        -- Output aliases preserved for downstream-query compatibility.
+        -- r_do alias preserved (downstream queries still reference it).
         TRY_CAST(r_drive_off AS INTEGER) AS r_do,
         TRY_CAST(r_po AS INTEGER)  AS r_po,
-        TRY_CAST(r_trans_off AS INTEGER) AS r_to,
+        TRY_CAST(r_trans_off AS INTEGER) AS r_trans_off,
         TRY_CAST(r_od AS INTEGER)  AS r_od,
         TRY_CAST(r_dd AS INTEGER)  AS r_dd,
         TRY_CAST(r_pd AS INTEGER)  AS r_pd,
@@ -276,20 +276,18 @@ SELECT
     -- Positional ratings (1-9 scale)
     TRY_CAST(oo AS INTEGER) AS oo, TRY_CAST(od AS INTEGER) AS od,
     -- Migration 113: positional rating columns renamed `do` → r_drive_off, `to` → r_trans_off.
-    -- Output aliases preserved for downstream-query compatibility.
-    TRY_CAST(r_drive_off AS INTEGER) AS "do", TRY_CAST(dd AS INTEGER) AS dd,
+    TRY_CAST(r_drive_off AS INTEGER) AS r_drive_off, TRY_CAST(dd AS INTEGER) AS dd,
     TRY_CAST(po AS INTEGER) AS po, TRY_CAST(pd AS INTEGER) AS pd,
-    TRY_CAST(r_trans_off AS INTEGER) AS "to", TRY_CAST(td AS INTEGER) AS td,
+    TRY_CAST(r_trans_off AS INTEGER) AS r_trans_off, TRY_CAST(td AS INTEGER) AS td,
     -- Stat ratings (0-99 scale)
     TRY_CAST(r_fga AS INTEGER) AS r_fga, TRY_CAST(r_fgp AS INTEGER) AS r_fgp,
     TRY_CAST(r_fta AS INTEGER) AS r_fta, TRY_CAST(r_ftp AS INTEGER) AS r_ftp,
-    -- Migration 114: MariaDB columns renamed r_tga → r_3ga, r_tgp → r_3gp. Kept output aliases.
-    TRY_CAST(r_3ga AS INTEGER) AS r_tga, TRY_CAST(r_3gp AS INTEGER) AS r_tgp,
+    -- Migration 114: MariaDB columns renamed r_tga → r_3ga, r_tgp → r_3gp.
+    TRY_CAST(r_3ga AS INTEGER) AS r_3ga, TRY_CAST(r_3gp AS INTEGER) AS r_3gp,
     TRY_CAST(r_orb AS INTEGER) AS r_orb, TRY_CAST(r_drb AS INTEGER) AS r_drb,
     TRY_CAST(r_ast AS INTEGER) AS r_ast, TRY_CAST(r_stl AS INTEGER) AS r_stl,
     -- Migration 113: ibl_plr_snapshots.r_to (turnover rating) renamed to r_tvr.
-    -- Output name r_to preserved for downstream-query compatibility.
-    TRY_CAST(r_tvr AS INTEGER) AS r_to,  TRY_CAST(r_blk AS INTEGER) AS r_blk,
+    TRY_CAST(r_tvr AS INTEGER) AS r_tvr,  TRY_CAST(r_blk AS INTEGER) AS r_blk,
     TRY_CAST(r_foul AS INTEGER) AS r_foul,
     -- Quality attributes
     TRY_CAST(talent AS INTEGER)      AS talent,
@@ -306,9 +304,9 @@ SELECT
     TRY_CAST(cy3 AS INTEGER) AS cy3, TRY_CAST(cy4 AS INTEGER) AS cy4,
     TRY_CAST(cy5 AS INTEGER) AS cy5, TRY_CAST(cy6 AS INTEGER) AS cy6,
     -- Depth chart positions
-    TRY_CAST(PGDepth AS INTEGER) AS PGDepth, TRY_CAST(SGDepth AS INTEGER) AS SGDepth,
-    TRY_CAST(SFDepth AS INTEGER) AS SFDepth, TRY_CAST(PFDepth AS INTEGER) AS PFDepth,
-    TRY_CAST(CDepth AS INTEGER) AS CDepth,
+    TRY_CAST(pg_depth AS INTEGER) AS pg_depth, TRY_CAST(sg_depth AS INTEGER) AS sg_depth,
+    TRY_CAST(sf_depth AS INTEGER) AS sf_depth, TRY_CAST(pf_depth AS INTEGER) AS pf_depth,
+    TRY_CAST(c_depth AS INTEGER) AS c_depth,
     -- Season stats
     TRY_CAST(ordinal AS INTEGER) AS ordinal,
     TRY_CAST(stats_gs AS INTEGER) AS stats_gs, TRY_CAST(stats_gm AS INTEGER) AS stats_gm,
@@ -370,14 +368,14 @@ SELECT
     TRY_CAST(rl_pf AS INTEGER) AS rl_pf,
     -- Preference weights
     TRY_CAST(coach AS INTEGER) AS coach, TRY_CAST(loyalty AS INTEGER) AS loyalty,
-    TRY_CAST(playingTime AS INTEGER) AS playingTime, TRY_CAST(winner AS INTEGER) AS winner,
+    TRY_CAST(playing_time AS INTEGER) AS playing_time, TRY_CAST(winner AS INTEGER) AS winner,
     TRY_CAST(tradition AS INTEGER) AS tradition, TRY_CAST(security AS INTEGER) AS security,
     -- Draft info
     TRY_CAST(draftround AS INTEGER) AS draftround,
     TRY_CAST(draftpickno AS INTEGER) AS draftpickno,
     TRY_CAST(fa_signing_flag AS INTEGER) AS fa_signing_flag,
     -- Other fields
-    TRY_CAST(dc_canPlayInGame AS INTEGER) AS dc_canPlayInGame,
+    TRY_CAST(dc_can_play_in_game AS INTEGER) AS dc_can_play_in_game,
     TRY_CAST(injured AS INTEGER) AS injured,
     -- Derived fields
     TRY_CAST(draftyear AS INTEGER) AS draftyear,

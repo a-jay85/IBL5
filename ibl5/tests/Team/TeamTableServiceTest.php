@@ -40,11 +40,11 @@ class TeamTableServiceTest extends TestCase
     public function testExtractStartersDataReturnsCorrectStructure(): void
     {
         $roster = [
-            ['pid' => 1, 'name' => 'John Doe', 'PGDepth' => 1, 'SGDepth' => 0, 'SFDepth' => 0, 'PFDepth' => 0, 'CDepth' => 0],
-            ['pid' => 2, 'name' => 'Jane Smith', 'PGDepth' => 0, 'SGDepth' => 1, 'SFDepth' => 0, 'PFDepth' => 0, 'CDepth' => 0],
-            ['pid' => 3, 'name' => 'Bob Johnson', 'PGDepth' => 0, 'SGDepth' => 0, 'SFDepth' => 1, 'PFDepth' => 0, 'CDepth' => 0],
-            ['pid' => 4, 'name' => 'Mike Williams', 'PGDepth' => 0, 'SGDepth' => 0, 'SFDepth' => 0, 'PFDepth' => 1, 'CDepth' => 0],
-            ['pid' => 5, 'name' => 'Tom Brown', 'PGDepth' => 0, 'SGDepth' => 0, 'SFDepth' => 0, 'PFDepth' => 0, 'CDepth' => 1],
+            ['pid' => 1, 'name' => 'John Doe', 'pg_depth' => 1, 'sg_depth' => 0, 'sf_depth' => 0, 'pf_depth' => 0, 'c_depth' => 0],
+            ['pid' => 2, 'name' => 'Jane Smith', 'pg_depth' => 0, 'sg_depth' => 1, 'sf_depth' => 0, 'pf_depth' => 0, 'c_depth' => 0],
+            ['pid' => 3, 'name' => 'Bob Johnson', 'pg_depth' => 0, 'sg_depth' => 0, 'sf_depth' => 1, 'pf_depth' => 0, 'c_depth' => 0],
+            ['pid' => 4, 'name' => 'Mike Williams', 'pg_depth' => 0, 'sg_depth' => 0, 'sf_depth' => 0, 'pf_depth' => 1, 'c_depth' => 0],
+            ['pid' => 5, 'name' => 'Tom Brown', 'pg_depth' => 0, 'sg_depth' => 0, 'sf_depth' => 0, 'pf_depth' => 0, 'c_depth' => 1],
         ];
 
         $starters = $this->service->extractStartersData($roster);
@@ -71,8 +71,8 @@ class TeamTableServiceTest extends TestCase
     public function testExtractStartersDataHandlesPartialData(): void
     {
         $roster = [
-            ['pid' => 1, 'name' => 'John Doe', 'PGDepth' => 1, 'SGDepth' => 0, 'SFDepth' => 0, 'PFDepth' => 0, 'CDepth' => 0],
-            ['pid' => 3, 'name' => 'Bob Johnson', 'PGDepth' => 0, 'SGDepth' => 0, 'SFDepth' => 1, 'PFDepth' => 0, 'CDepth' => 0],
+            ['pid' => 1, 'name' => 'John Doe', 'pg_depth' => 1, 'sg_depth' => 0, 'sf_depth' => 0, 'pf_depth' => 0, 'c_depth' => 0],
+            ['pid' => 3, 'name' => 'Bob Johnson', 'pg_depth' => 0, 'sg_depth' => 0, 'sf_depth' => 1, 'pf_depth' => 0, 'c_depth' => 0],
         ];
 
         $starters = $this->service->extractStartersData($roster);
@@ -93,8 +93,8 @@ class TeamTableServiceTest extends TestCase
     public function testExtractStartersDataIgnoresBackups(): void
     {
         $roster = [
-            ['pid' => 1, 'name' => 'Starter PG', 'PGDepth' => 1, 'SGDepth' => 0, 'SFDepth' => 0, 'PFDepth' => 0, 'CDepth' => 0],
-            ['pid' => 2, 'name' => 'Backup PG', 'PGDepth' => 2, 'SGDepth' => 0, 'SFDepth' => 0, 'PFDepth' => 0, 'CDepth' => 0],
+            ['pid' => 1, 'name' => 'Starter PG', 'pg_depth' => 1, 'sg_depth' => 0, 'sf_depth' => 0, 'pf_depth' => 0, 'c_depth' => 0],
+            ['pid' => 2, 'name' => 'Backup PG', 'pg_depth' => 2, 'sg_depth' => 0, 'sf_depth' => 0, 'pf_depth' => 0, 'c_depth' => 0],
         ];
 
         $starters = $this->service->extractStartersData($roster);
@@ -117,7 +117,7 @@ class TeamTableServiceTest extends TestCase
     {
         // Depth values come from the database as strings; verify '1' (int cast) works
         $roster = [
-            ['pid' => 10, 'name' => 'String Depth', 'PGDepth' => '1', 'SGDepth' => '0', 'SFDepth' => '0', 'PFDepth' => '0', 'CDepth' => '0'],
+            ['pid' => 10, 'name' => 'String Depth', 'pg_depth' => '1', 'sg_depth' => '0', 'sf_depth' => '0', 'pf_depth' => '0', 'c_depth' => '0'],
         ];
 
         $starters = $this->service->extractStartersData($roster);

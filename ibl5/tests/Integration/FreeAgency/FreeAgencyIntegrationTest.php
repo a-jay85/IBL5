@@ -737,7 +737,7 @@ class FreeAgencyIntegrationTest extends IntegrationTestCase
             'winner' => 3,
             'tradition' => 3,
             'loyalty' => 3,
-            'playingTime' => 3,
+            'playing_time' => 3,
             'security' => 3,
             'Contract_Wins' => 50,
             'Contract_Losses' => 32,

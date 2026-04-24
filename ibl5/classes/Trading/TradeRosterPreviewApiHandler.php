@@ -431,10 +431,10 @@ class TradeRosterPreviewApiHandler
             'r_ast' => 0, 'r_stl' => 0, 'r_tvr' => 0, 'r_blk' => 0, 'r_foul' => 0,
             'oo' => 0, 'od' => 0, 'r_drive_off' => 0, 'dd' => 0,
             'po' => 0, 'pd' => 0, 'r_trans_off' => 0, 'td' => 0,
-            'Clutch' => null, 'Consistency' => null,
+            'clutch' => null, 'consistency' => null,
             'talent' => 0, 'skill' => 0, 'intangibles' => 0,
             // Free agency (null, matching DB cash rows)
-            'loyalty' => null, 'playingTime' => null, 'winner' => null,
+            'loyalty' => null, 'playing_time' => null, 'winner' => null,
             'tradition' => null, 'security' => null,
             // Contract fields
             'exp' => 1,

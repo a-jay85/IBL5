@@ -159,12 +159,12 @@ class DepthChartEntryControllerTest extends TestCase
         $this->assertArrayHasKey(42, $override);
         $this->assertSame(
             [
-                'dc_PGDepth' => 1,
-                'dc_SGDepth' => 2,
-                'dc_SFDepth' => 3,
-                'dc_PFDepth' => 4,
-                'dc_CDepth' => 5,
-                'dc_canPlayInGame' => 1,
+                'dc_pg_depth' => 1,
+                'dc_sg_depth' => 2,
+                'dc_sf_depth' => 3,
+                'dc_pf_depth' => 4,
+                'dc_c_depth' => 5,
+                'dc_can_play_in_game' => 1,
                 'dc_minutes' => 32,
             ],
             $override[42],
@@ -186,8 +186,8 @@ class DepthChartEntryControllerTest extends TestCase
 
         $override = DepthChartEntryController::buildFormOverride($postData);
 
-        $this->assertSame(0, $override[7]['dc_PGDepth'], 'depth < 0 clamps to 0');
-        $this->assertSame(5, $override[7]['dc_SGDepth'], 'depth > 5 clamps to 5');
+        $this->assertSame(0, $override[7]['dc_pg_depth'], 'depth < 0 clamps to 0');
+        $this->assertSame(5, $override[7]['dc_sg_depth'], 'depth > 5 clamps to 5');
     }
 
     public function testBuildFormOverrideClampsMinutesTo0_40(): void
@@ -230,8 +230,8 @@ class DepthChartEntryControllerTest extends TestCase
         $active = DepthChartEntryController::buildFormOverride($postDataActive);
         $inactive = DepthChartEntryController::buildFormOverride($postDataInactive);
 
-        $this->assertSame(1, $active[7]['dc_canPlayInGame']);
-        $this->assertSame(0, $inactive[7]['dc_canPlayInGame']);
+        $this->assertSame(1, $active[7]['dc_can_play_in_game']);
+        $this->assertSame(0, $inactive[7]['dc_can_play_in_game']);
     }
 
     public function testBuildFormOverrideSkipsRowsWithoutPid(): void
@@ -275,9 +275,9 @@ class DepthChartEntryControllerTest extends TestCase
         $override = DepthChartEntryController::buildFormOverride($postData);
 
         $this->assertSame([100, 200, 300], array_keys($override));
-        $this->assertSame(1, $override[100]['dc_PGDepth']);
-        $this->assertSame(2, $override[200]['dc_SGDepth']);
-        $this->assertSame(3, $override[300]['dc_SFDepth']);
-        $this->assertSame(0, $override[300]['dc_canPlayInGame']);
+        $this->assertSame(1, $override[100]['dc_pg_depth']);
+        $this->assertSame(2, $override[200]['dc_sg_depth']);
+        $this->assertSame(3, $override[300]['dc_sf_depth']);
+        $this->assertSame(0, $override[300]['dc_can_play_in_game']);
     }
 }

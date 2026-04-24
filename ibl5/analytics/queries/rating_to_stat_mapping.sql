@@ -19,14 +19,14 @@ SELECT
     ROUND(CORR(r_fgp, CASE WHEN fg2_att > 0 THEN fg2_made * 100.0 / fg2_att END), 3)
         AS "r_fgp->2FG%",
     ROUND(CORR(r_fga, fg2_att + fg3_att), 3)  AS "r_fga->FGA",
-    ROUND(CORR(r_tgp, CASE WHEN fg3_att > 0 THEN fg3_made * 100.0 / fg3_att END), 3)
-        AS "r_tgp->3FG%",
+    ROUND(CORR(r_3gp, CASE WHEN fg3_att > 0 THEN fg3_made * 100.0 / fg3_att END), 3)
+        AS "r_3gp->3FG%",
     ROUND(CORR(r_ast, ast), 3)                 AS "r_ast->AST",
     ROUND(CORR(r_orb, orb), 3)                 AS "r_orb->ORB",
     ROUND(CORR(r_drb, drb), 3)                 AS "r_drb->DRB",
     ROUND(CORR(r_stl, stl), 3)                 AS "r_stl->STL",
     ROUND(CORR(r_blk, blk), 3)                 AS "r_blk->BLK",
-    ROUND(CORR(r_to, tov), 3)                  AS "r_to->TOV"
+    ROUND(CORR(r_tvr, tov), 3)                 AS "r_tvr->TOV"
 FROM fact_player_sim
 WHERE game_type = 1 AND minutes >= 10
 GROUP BY era
@@ -44,7 +44,7 @@ SELECT
     ROUND(AVG(CASE WHEN ft_att > 0 THEN ft_made * 100.0 / ft_att END), 1)    AS avg_ft_pct,
     ROUND(AVG(r_fgp), 1)       AS avg_r_fgp,
     ROUND(AVG(r_fga), 1)       AS avg_r_fga,
-    ROUND(AVG(r_tgp), 1)       AS avg_r_tgp
+    ROUND(AVG(r_3gp), 1)       AS avg_r_3gp
 FROM fact_player_sim
 WHERE game_type = 1 AND minutes >= 10
 GROUP BY season_year

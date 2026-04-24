@@ -27,7 +27,7 @@ class DatabaseCache implements DatabaseCacheInterface
      */
     public function get(string $key): ?array
     {
-        $stmt = $this->db->prepare("SELECT `value`, `expiration` FROM `cache` WHERE `key` = ?");
+        $stmt = $this->db->prepare("SELECT `value`, `expiration` FROM `cache` WHERE `cache_key` = ?");
         if ($stmt === false) {
             return null;
         }
@@ -75,7 +75,7 @@ class DatabaseCache implements DatabaseCacheInterface
             return;
         }
 
-        $stmt = $this->db->prepare("REPLACE INTO `cache` (`key`, `value`, `expiration`) VALUES (?, ?, ?)");
+        $stmt = $this->db->prepare("REPLACE INTO `cache` (`cache_key`, `value`, `expiration`) VALUES (?, ?, ?)");
         if ($stmt === false) {
             return;
         }
@@ -91,7 +91,7 @@ class DatabaseCache implements DatabaseCacheInterface
      */
     public function delete(string $key): void
     {
-        $stmt = $this->db->prepare("DELETE FROM `cache` WHERE `key` = ?");
+        $stmt = $this->db->prepare("DELETE FROM `cache` WHERE `cache_key` = ?");
         if ($stmt === false) {
             return;
         }

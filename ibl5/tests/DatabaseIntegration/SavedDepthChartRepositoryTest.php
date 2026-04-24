@@ -80,12 +80,12 @@ class SavedDepthChartRepositoryTest extends DatabaseTestCase
                 'pid' => 1,
                 'player_name' => 'Test Player One',
                 'ordinal' => 1,
-                'dc_PGDepth' => 1,
-                'dc_SGDepth' => 0,
-                'dc_SFDepth' => 0,
-                'dc_PFDepth' => 0,
-                'dc_CDepth' => 0,
-                'dc_canPlayInGame' => 1,
+                'dc_pg_depth' => 1,
+                'dc_sg_depth' => 0,
+                'dc_sf_depth' => 0,
+                'dc_pf_depth' => 0,
+                'dc_c_depth' => 0,
+                'dc_can_play_in_game' => 1,
                 'dc_minutes' => 32,
                 'dc_of' => 5,
                 'dc_df' => 5,
@@ -112,8 +112,8 @@ class SavedDepthChartRepositoryTest extends DatabaseTestCase
         $original = [
             [
                 'pid' => 1, 'player_name' => 'Test Player One', 'ordinal' => 1,
-                'dc_PGDepth' => 1, 'dc_SGDepth' => 0, 'dc_SFDepth' => 0, 'dc_PFDepth' => 0, 'dc_CDepth' => 0,
-                'dc_canPlayInGame' => 1, 'dc_minutes' => 32, 'dc_of' => 5, 'dc_df' => 5, 'dc_oi' => 3, 'dc_di' => 3, 'dc_bh' => 4,
+                'dc_pg_depth' => 1, 'dc_sg_depth' => 0, 'dc_sf_depth' => 0, 'dc_pf_depth' => 0, 'dc_c_depth' => 0,
+                'dc_can_play_in_game' => 1, 'dc_minutes' => 32, 'dc_of' => 5, 'dc_df' => 5, 'dc_oi' => 3, 'dc_di' => 3, 'dc_bh' => 4,
             ],
         ];
         $this->repo->saveDepthChartPlayers($dcId, $original);
@@ -121,8 +121,8 @@ class SavedDepthChartRepositoryTest extends DatabaseTestCase
         $updated = [
             [
                 'pid' => 1, 'player_name' => 'Test Player One', 'ordinal' => 1,
-                'dc_PGDepth' => 1, 'dc_SGDepth' => 2, 'dc_SFDepth' => 0, 'dc_PFDepth' => 0, 'dc_CDepth' => 0,
-                'dc_canPlayInGame' => 1, 'dc_minutes' => 36, 'dc_of' => 6, 'dc_df' => 4, 'dc_oi' => 3, 'dc_di' => 3, 'dc_bh' => 4,
+                'dc_pg_depth' => 1, 'dc_sg_depth' => 2, 'dc_sf_depth' => 0, 'dc_pf_depth' => 0, 'dc_c_depth' => 0,
+                'dc_can_play_in_game' => 1, 'dc_minutes' => 36, 'dc_of' => 6, 'dc_df' => 4, 'dc_oi' => 3, 'dc_di' => 3, 'dc_bh' => 4,
             ],
         ];
         $this->repo->updateDepthChartPlayers($dcId, $updated);
@@ -131,7 +131,7 @@ class SavedDepthChartRepositoryTest extends DatabaseTestCase
 
         self::assertCount(1, $players);
         self::assertSame(36, $players[0]['dc_minutes']);
-        self::assertSame(2, $players[0]['dc_SGDepth']);
+        self::assertSame(2, $players[0]['dc_sg_depth']);
     }
 
     public function testDeactivateForTeamSetsInactive(): void
@@ -271,7 +271,7 @@ class SavedDepthChartRepositoryTest extends DatabaseTestCase
         self::assertContains('Live Roster P1', $names);
 
         $first = $result[0];
-        self::assertArrayHasKey('dc_PGDepth', $first);
+        self::assertArrayHasKey('dc_pg_depth', $first);
         self::assertArrayHasKey('dc_minutes', $first);
         self::assertArrayHasKey('dc_of', $first);
         self::assertArrayHasKey('dc_bh', $first);

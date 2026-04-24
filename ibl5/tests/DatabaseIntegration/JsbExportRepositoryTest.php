@@ -88,7 +88,7 @@ class JsbExportRepositoryTest extends DatabaseTestCase
             'age' => 25,
             'teamid' => 1,
             'pos' => 'SF',
-            'sta' => 80,
+            'stamina' => 80,
             'exp' => 3,
             'retired' => 0,
             'ordinal' => 200,

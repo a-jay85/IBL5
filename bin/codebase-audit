@@ -24,7 +24,7 @@ CLASSES_DIR="$IBL5_DIR/classes"
 TESTS_DIR="$IBL5_DIR/tests"
 MIGRATIONS_DIR="$IBL5_DIR/migrations"
 DESIGN_DIR="$IBL5_DIR/design"
-MEMORY_DIR="$HOME/.claude/projects/-Users-ajaynicolas-Documents-GitHub-IBL5/memory"
+MEMORY_DIR="$HOME/.claude/projects/-Users-ajaynicolas-GitHub-IBL5/memory"
 RULES_DIR="$REPO_ROOT/.claude/rules"
 
 RESULTS_DIR="$HOME/.claude/audit-results"

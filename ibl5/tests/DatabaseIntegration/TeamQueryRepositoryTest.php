@@ -206,11 +206,11 @@ class TeamQueryRepositoryTest extends DatabaseTestCase
     public function testGetLastSimStarterPlayerIDForPosition(): void
     {
         $this->insertTestPlayer(200090107, 'PG Starter Test', [
-            'PGDepth' => 1,
+            'pg_depth' => 1,
             'pos' => 'PG',
         ]);
         // Clear other starters for this position
-        $this->db->query("UPDATE ibl_plr SET PGDepth = 0 WHERE teamid = " . self::TEST_TID . " AND pid != 200090107 AND PGDepth = 1");
+        $this->db->query("UPDATE ibl_plr SET pg_depth = 0 WHERE teamid = " . self::TEST_TID . " AND pid != 200090107 AND pg_depth = 1");
 
         $result = $this->repo->getLastSimStarterPlayerIDForPosition(self::TEST_TID, 'PG');
 
@@ -220,10 +220,10 @@ class TeamQueryRepositoryTest extends DatabaseTestCase
     public function testGetCurrentlySetStarterPlayerIDForPosition(): void
     {
         $this->insertTestPlayer(200090108, 'DC PG Starter', [
-            'dc_PGDepth' => 1,
+            'dc_pg_depth' => 1,
             'pos' => 'PG',
         ]);
-        $this->db->query("UPDATE ibl_plr SET dc_PGDepth = 0 WHERE teamid = " . self::TEST_TID . " AND pid != 200090108 AND dc_PGDepth = 1");
+        $this->db->query("UPDATE ibl_plr SET dc_pg_depth = 0 WHERE teamid = " . self::TEST_TID . " AND pid != 200090108 AND dc_pg_depth = 1");
 
         $result = $this->repo->getCurrentlySetStarterPlayerIDForPosition(self::TEST_TID, 'PG');
 

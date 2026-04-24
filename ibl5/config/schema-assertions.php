@@ -19,10 +19,11 @@ use Migration\SchemaAssertion;
  * @return list<SchemaAssertion>
  */
 return [
-    // Migration 062: dc_active → dc_canPlayInGame (caused production outage)
-    new SchemaAssertion('ibl_plr', 'dc_canPlayInGame'),
-    new SchemaAssertion('ibl_saved_depth_chart_players', 'dc_canPlayInGame'),
-    new SchemaAssertion('ibl_olympics_saved_depth_chart_players', 'dc_canPlayInGame'),
+    // Migration 062: dc_active → dc_canPlayInGame (caused production outage).
+    // Migration 116 renamed to dc_can_play_in_game; assertions updated in-place.
+    new SchemaAssertion('ibl_plr', 'dc_can_play_in_game'),
+    new SchemaAssertion('ibl_saved_depth_chart_players', 'dc_can_play_in_game'),
+    new SchemaAssertion('ibl_olympics_saved_depth_chart_players', 'dc_can_play_in_game'),
 
     // Migration 059: reserved-word renames (from → trade_from, to → trade_to)
     new SchemaAssertion('ibl_trade_info', 'trade_from'),
@@ -108,4 +109,63 @@ return [
     new SchemaAssertion('ibl_olympics_box_scores_teams', 'visitor_teamid'),
     new SchemaAssertion('ibl_draft_picks', 'owner_teamid'),
     new SchemaAssertion('ibl_draft_picks', 'teampick_teamid'),
+
+    // Migration 116: Tier 3a cosmetic case-consistency renames (ADR-0010).
+    // Player rating columns (ibl_plr + ibl_olympics_plr; already lowercase on
+    // ibl_plr_snapshots / ibl_hist).
+    new SchemaAssertion('ibl_plr', 'clutch'),
+    new SchemaAssertion('ibl_plr', 'consistency'),
+    new SchemaAssertion('ibl_olympics_plr', 'clutch'),
+    new SchemaAssertion('ibl_olympics_plr', 'consistency'),
+    // Position-depth columns (ibl_plr, ibl_plr_snapshots, ibl_olympics_plr).
+    new SchemaAssertion('ibl_plr', 'pg_depth'),
+    new SchemaAssertion('ibl_plr', 'sg_depth'),
+    new SchemaAssertion('ibl_plr', 'sf_depth'),
+    new SchemaAssertion('ibl_plr', 'pf_depth'),
+    new SchemaAssertion('ibl_plr', 'c_depth'),
+    new SchemaAssertion('ibl_plr_snapshots', 'pg_depth'),
+    new SchemaAssertion('ibl_plr_snapshots', 'sg_depth'),
+    new SchemaAssertion('ibl_plr_snapshots', 'sf_depth'),
+    new SchemaAssertion('ibl_plr_snapshots', 'pf_depth'),
+    new SchemaAssertion('ibl_plr_snapshots', 'c_depth'),
+    new SchemaAssertion('ibl_olympics_plr', 'pg_depth'),
+    new SchemaAssertion('ibl_olympics_plr', 'sg_depth'),
+    new SchemaAssertion('ibl_olympics_plr', 'sf_depth'),
+    new SchemaAssertion('ibl_olympics_plr', 'pf_depth'),
+    new SchemaAssertion('ibl_olympics_plr', 'c_depth'),
+    // Depth-chart dc_* columns (ibl_plr, ibl_olympics_plr, and both
+    // ibl_*_saved_depth_chart_players tables).
+    new SchemaAssertion('ibl_plr', 'dc_pg_depth'),
+    new SchemaAssertion('ibl_plr', 'dc_sg_depth'),
+    new SchemaAssertion('ibl_plr', 'dc_sf_depth'),
+    new SchemaAssertion('ibl_plr', 'dc_pf_depth'),
+    new SchemaAssertion('ibl_plr', 'dc_c_depth'),
+    new SchemaAssertion('ibl_olympics_plr', 'dc_pg_depth'),
+    new SchemaAssertion('ibl_olympics_plr', 'dc_sg_depth'),
+    new SchemaAssertion('ibl_olympics_plr', 'dc_sf_depth'),
+    new SchemaAssertion('ibl_olympics_plr', 'dc_pf_depth'),
+    new SchemaAssertion('ibl_olympics_plr', 'dc_c_depth'),
+    new SchemaAssertion('ibl_olympics_plr', 'dc_can_play_in_game'),
+    new SchemaAssertion('ibl_plr_snapshots', 'dc_can_play_in_game'),
+    new SchemaAssertion('ibl_saved_depth_chart_players', 'dc_pg_depth'),
+    new SchemaAssertion('ibl_saved_depth_chart_players', 'dc_sg_depth'),
+    new SchemaAssertion('ibl_saved_depth_chart_players', 'dc_sf_depth'),
+    new SchemaAssertion('ibl_saved_depth_chart_players', 'dc_pf_depth'),
+    new SchemaAssertion('ibl_saved_depth_chart_players', 'dc_c_depth'),
+    new SchemaAssertion('ibl_olympics_saved_depth_chart_players', 'dc_pg_depth'),
+    new SchemaAssertion('ibl_olympics_saved_depth_chart_players', 'dc_sg_depth'),
+    new SchemaAssertion('ibl_olympics_saved_depth_chart_players', 'dc_sf_depth'),
+    new SchemaAssertion('ibl_olympics_saved_depth_chart_players', 'dc_pf_depth'),
+    new SchemaAssertion('ibl_olympics_saved_depth_chart_players', 'dc_c_depth'),
+    // FA pref playing_time.
+    new SchemaAssertion('ibl_plr', 'playing_time'),
+    new SchemaAssertion('ibl_plr_snapshots', 'playing_time'),
+    new SchemaAssertion('ibl_olympics_plr', 'playing_time'),
+    // sta → stamina on player + draft-class tables.
+    new SchemaAssertion('ibl_plr', 'stamina'),
+    new SchemaAssertion('ibl_olympics_plr', 'stamina'),
+    new SchemaAssertion('ibl_draft_class', 'stamina'),
+    // cache reserved-word fix.
+    new SchemaAssertion('cache', 'cache_key'),
+    new SchemaAssertion('cache_locks', 'cache_key'),
 ];

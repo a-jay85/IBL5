@@ -53,7 +53,7 @@ class FreeAgencyPreviewRepositoryTest extends DatabaseTestCase
         // FA preference fields
         self::assertArrayHasKey('loyalty', $first);
         self::assertArrayHasKey('winner', $first);
-        self::assertArrayHasKey('playingTime', $first);
+        self::assertArrayHasKey('playing_time', $first);
         self::assertArrayHasKey('security', $first);
         self::assertArrayHasKey('tradition', $first);
 

@@ -177,7 +177,7 @@ class NegotiationProcessorTest extends TestCase
             'droptime' => 0,
             // Free agency preferences
             'loyalty' => 50,
-            'playingTime' => 50,
+            'playing_time' => 50,
             'winner' => 50,
             'tradition' => 50,
             'security' => 50,
@@ -205,8 +205,8 @@ class NegotiationProcessorTest extends TestCase
             'r_trans_off' => 50,
             'td' => 50,
             // Other ratings
-            'Clutch' => 50,
-            'Consistency' => 50,
+            'clutch' => 50,
+            'consistency' => 50,
             'talent' => 50,
             'skill' => 50,
             'intangibles' => 50,

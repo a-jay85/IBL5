@@ -27,7 +27,7 @@ class LeagueStartersRepository extends \BaseMysqliRepository implements LeagueSt
             JOIN ibl_team_info t ON p.teamid = t.teamid
             WHERE p.retired = 0
               AND p.teamid BETWEEN 1 AND ?
-              AND (p.PGDepth = 1 OR p.SGDepth = 1 OR p.SFDepth = 1 OR p.PFDepth = 1 OR p.CDepth = 1)",
+              AND (p.pg_depth = 1 OR p.sg_depth = 1 OR p.sf_depth = 1 OR p.pf_depth = 1 OR p.c_depth = 1)",
             'i',
             League::MAX_REAL_TEAMID
         );

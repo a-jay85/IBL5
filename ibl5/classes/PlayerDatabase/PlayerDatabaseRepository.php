@@ -44,8 +44,8 @@ class PlayerDatabaseRepository extends BaseMysqliRepository implements PlayerDat
         // values are the post-rename DB column names.
         'r_to' => 'r_tvr',
         'r_foul' => 'r_foul',
-        'Clutch' => 'Clutch',
-        'Consistency' => 'Consistency',
+        'Clutch' => 'clutch',
+        'Consistency' => 'consistency',
         'talent' => 'talent',
         'skill' => 'skill',
         'intangibles' => 'intangibles',

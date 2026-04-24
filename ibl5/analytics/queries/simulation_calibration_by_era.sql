@@ -54,11 +54,11 @@ SELECT
     season_year,
     COUNT(*) AS players,
     ROUND(AVG(r_fgp), 1) AS avg_r_fgp,
-    ROUND(AVG(r_tgp), 1) AS avg_r_tgp,
+    ROUND(AVG(r_3gp), 1) AS avg_r_3gp,
     ROUND(AVG(r_fga), 1) AS avg_r_fga,
-    ROUND(AVG(r_tga), 1) AS avg_r_tga,
+    ROUND(AVG(r_3ga), 1) AS avg_r_3ga,
     ROUND(AVG(r_blk), 1) AS avg_r_blk,
-    ROUND(AVG(r_to), 1)  AS avg_r_to,
+    ROUND(AVG(r_tvr), 1) AS avg_r_tvr,
     ROUND(AVG(r_foul), 1) AS avg_r_foul,
     ROUND(AVG(tsi_sum), 1) AS avg_tsi
 FROM (

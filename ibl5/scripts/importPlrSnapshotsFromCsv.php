@@ -94,7 +94,7 @@ INSERT INTO ibl_plr_snapshots
      r_orb, r_drb, r_ast, r_stl, r_tvr, r_blk, r_foul,
      talent, skill, intangibles, clutch, consistency, exp, bird,
      cy, cyt, cy1, cy2, cy3, cy4, cy5, cy6,
-     PGDepth, SGDepth, SFDepth, PFDepth, CDepth)
+     pg_depth, sg_depth, sf_depth, pf_depth, c_depth)
 VALUES (?, ?, ?, ?, ?, ?,
         ?, ?, ?, ?, ?, ?,
         ?, ?, ?, ?, ?, ?, ?, ?,
@@ -131,9 +131,9 @@ ON DUPLICATE KEY UPDATE
     cy1 = VALUES(cy1), cy2 = VALUES(cy2),
     cy3 = VALUES(cy3), cy4 = VALUES(cy4),
     cy5 = VALUES(cy5), cy6 = VALUES(cy6),
-    PGDepth = VALUES(PGDepth), SGDepth = VALUES(SGDepth),
-    SFDepth = VALUES(SFDepth), PFDepth = VALUES(PFDepth),
-    CDepth = VALUES(CDepth)
+    pg_depth = VALUES(pg_depth), sg_depth = VALUES(sg_depth),
+    sf_depth = VALUES(sf_depth), pf_depth = VALUES(pf_depth),
+    c_depth = VALUES(c_depth)
 SQL;
 
 $stmt = $mysqli_db->prepare($sql);

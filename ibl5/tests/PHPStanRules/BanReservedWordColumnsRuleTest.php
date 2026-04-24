@@ -49,6 +49,12 @@ final class BanReservedWordColumnsRuleTest extends RuleTestCase
                     . 'Rename to `end_date` — space-containing identifier banned.',
                     9,
                 ],
+                [
+                    'Banned backtick-quoted column reference `key` in SQL string. '
+                    . 'Rename to `cache_key` on the `cache` / `cache_locks` tables; '
+                    . 'the bare `key` column is a SQL reserved word (migration 116).',
+                    10,
+                ],
             ],
         );
     }

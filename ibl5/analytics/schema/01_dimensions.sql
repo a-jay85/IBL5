@@ -93,13 +93,12 @@ SELECT
     END AS tsi_band,
     TRY_CAST(r_fga AS INTEGER) AS r_fga, TRY_CAST(r_fgp AS INTEGER) AS r_fgp,
     TRY_CAST(r_fta AS INTEGER) AS r_fta, TRY_CAST(r_ftp AS INTEGER) AS r_ftp,
-    -- Migration 114: MariaDB columns renamed r_tga → r_3ga, r_tgp → r_3gp. Kept output aliases r_tga/r_tgp.
-    TRY_CAST(r_3ga AS INTEGER) AS r_tga, TRY_CAST(r_3gp AS INTEGER) AS r_tgp,
+    -- Migration 114: MariaDB columns renamed r_tga → r_3ga, r_tgp → r_3gp.
+    TRY_CAST(r_3ga AS INTEGER) AS r_3ga, TRY_CAST(r_3gp AS INTEGER) AS r_3gp,
     TRY_CAST(r_orb AS INTEGER) AS r_orb, TRY_CAST(r_drb AS INTEGER) AS r_drb,
     TRY_CAST(r_ast AS INTEGER) AS r_ast, TRY_CAST(r_stl AS INTEGER) AS r_stl,
-    -- Migration 113: MariaDB column renamed r_to → r_tvr. Kept output name r_to
-    -- for downstream-query compatibility.
-    TRY_CAST(r_tvr AS INTEGER) AS r_to,  TRY_CAST(r_blk AS INTEGER) AS r_blk,
+    -- Migration 113: MariaDB column renamed r_to → r_tvr.
+    TRY_CAST(r_tvr AS INTEGER) AS r_tvr,  TRY_CAST(r_blk AS INTEGER) AS r_blk,
     TRY_CAST(r_foul AS INTEGER) AS r_foul
 FROM read_csv('data/ibl_plr_snapshots.csv', delim='\t', header=true, all_varchar=true,
     null_padding=true, ignore_errors=true, strict_mode=false, quote='')

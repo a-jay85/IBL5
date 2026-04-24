@@ -30,7 +30,7 @@ class FreeAgencyPreviewRepository extends \BaseMysqliRepository implements FreeA
                          p.r_fga, p.r_fgp, p.r_fta, p.r_ftp, p.r_3ga, p.r_3gp,
                          p.r_orb, p.r_drb, p.r_ast, p.r_stl, p.r_blk, p.r_tvr, p.r_foul,
                          p.oo, p.r_drive_off, p.po, p.r_trans_off, p.od, p.dd, p.pd, p.td,
-                         p.loyalty, p.winner, p.playingTime, p.security, p.tradition,
+                         p.loyalty, p.winner, p.playing_time, p.security, p.tradition,
                          t.team_city, t.color1, t.color2
             FROM ibl_plr p
             LEFT JOIN ibl_team_info t ON p.teamid = t.teamid

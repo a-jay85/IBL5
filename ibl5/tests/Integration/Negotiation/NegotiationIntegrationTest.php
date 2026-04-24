@@ -208,7 +208,7 @@ class NegotiationIntegrationTest extends IntegrationTestCase
             'winner' => 3,
             'tradition' => 3,
             'loyalty' => 3,
-            'playingTime' => 3,
+            'playing_time' => 3,
             'security' => 3,
             // Draft info for rookie option check
             'draftround' => 1,

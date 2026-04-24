@@ -205,7 +205,7 @@ class TeamQueryRepository extends \BaseMysqliRepository implements TeamQueryRepo
             FROM ibl_plr
             WHERE teamid = ?
               AND retired = 0
-              AND " . $position . "Depth = 1",
+              AND " . strtolower($position) . "_depth = 1",
             "i",
             $teamId
         );
@@ -223,7 +223,7 @@ class TeamQueryRepository extends \BaseMysqliRepository implements TeamQueryRepo
             FROM ibl_plr
             WHERE teamid = ?
               AND retired = 0
-              AND dc_" . $position . "Depth = 1",
+              AND dc_" . strtolower($position) . "_depth = 1",
             "i",
             $teamId
         );

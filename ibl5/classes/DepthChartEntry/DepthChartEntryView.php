@@ -15,11 +15,11 @@ use Utilities\HtmlSanitizer;
 class DepthChartEntryView implements DepthChartEntryViewInterface
 {
     private const POSITION_SLOTS = [
-        ['label' => 'PG', 'field' => 'pg', 'dbKey' => 'dc_PGDepth'],
-        ['label' => 'SG', 'field' => 'sg', 'dbKey' => 'dc_SGDepth'],
-        ['label' => 'SF', 'field' => 'sf', 'dbKey' => 'dc_SFDepth'],
-        ['label' => 'PF', 'field' => 'pf', 'dbKey' => 'dc_PFDepth'],
-        ['label' => 'C',  'field' => 'c',  'dbKey' => 'dc_CDepth'],
+        ['label' => 'PG', 'field' => 'pg', 'dbKey' => 'dc_pg_depth'],
+        ['label' => 'SG', 'field' => 'sg', 'dbKey' => 'dc_sg_depth'],
+        ['label' => 'SF', 'field' => 'sf', 'dbKey' => 'dc_sf_depth'],
+        ['label' => 'PF', 'field' => 'pf', 'dbKey' => 'dc_pf_depth'],
+        ['label' => 'C',  'field' => 'c',  'dbKey' => 'dc_c_depth'],
     ];
 
     /**
@@ -215,7 +215,7 @@ the earlier slot in that order claims them.</p>
         // the checkbox submits "1" when checked. Two fields share the same
         // name so the form posts the right value regardless of checkbox state.
         /** @var int $dcActive */
-        $dcActive = $player['dc_canPlayInGame'] ?? 0;
+        $dcActive = $player['dc_can_play_in_game'] ?? 0;
         $activeCheckedAttr = ($dcActive === 1) ? ' checked' : '';
         echo "<td class=\"dc-active-cell\">";
         echo "<input type=\"hidden\" name=\"canPlayInGame{$depthCount}\" value=\"0\">";
@@ -387,7 +387,7 @@ JAVASCRIPT;
         $imageUrl = \Player\PlayerImageHelper::getImageUrl($pid);
 
         /** @var int $dcActive */
-        $dcActive = $player['dc_canPlayInGame'] ?? 0;
+        $dcActive = $player['dc_can_play_in_game'] ?? 0;
         $checkedAttr = ($dcActive === 1) ? ' checked' : '';
 
         echo "<div class=\"dc-card\" data-pid=\"{$pid}\" data-pos=\"{$pos}\" data-jsb-production=\"{$jsbProduction}\">";

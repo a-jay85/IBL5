@@ -122,7 +122,7 @@ class TeamTableService implements TeamTableServiceInterface
 
         foreach ($roster as $player) {
             foreach ($positions as $position) {
-                $depthField = $position . 'Depth';
+                $depthField = strtolower($position) . '_depth';
                 $depthValue = $player[$depthField] ?? null;
                 $depthInt = is_int($depthValue) ? $depthValue : (is_string($depthValue) ? (int) $depthValue : 0);
                 if ($depthInt === 1) {
@@ -324,9 +324,9 @@ class TeamTableService implements TeamTableServiceInterface
             'color2' => null,
             'oo' => 0, 'od' => 0, 'r_drive_off' => 0, 'dd' => 0,
             'po' => 0, 'pd' => 0, 'r_trans_off' => 0, 'td' => 0,
-            'Clutch' => null, 'Consistency' => null,
+            'clutch' => null, 'consistency' => null,
             'talent' => 0, 'skill' => 0, 'intangibles' => 0,
-            'loyalty' => null, 'playingTime' => null, 'winner' => null,
+            'loyalty' => null, 'playing_time' => null, 'winner' => null,
             'tradition' => null, 'security' => null,
             'exp' => 1, 'bird' => null,
             'cy' => $cashRow['cy'] ?? 1,

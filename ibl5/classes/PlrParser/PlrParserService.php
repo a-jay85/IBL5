@@ -345,11 +345,11 @@ class PlrParserService implements PlrParserServiceInterface
             'cy5' => (int) $derived['contractYear5'],
             'cy6' => (int) $derived['contractYear6'],
             // Depth chart
-            'PGDepth' => (int) $derived['PGDepth'],
-            'SGDepth' => (int) $derived['SGDepth'],
-            'SFDepth' => (int) $derived['SFDepth'],
-            'PFDepth' => (int) $derived['PFDepth'],
-            'CDepth' => (int) $derived['CDepth'],
+            'pg_depth' => (int) $derived['PGDepth'],
+            'sg_depth' => (int) $derived['SGDepth'],
+            'sf_depth' => (int) $derived['SFDepth'],
+            'pf_depth' => (int) $derived['PFDepth'],
+            'c_depth' => (int) $derived['CDepth'],
             // Season stats (regular season)
             'stats_gs' => (int) $derived['seasonGamesStarted'],
             'stats_gm' => (int) $derived['seasonGamesPlayed'],
@@ -450,7 +450,7 @@ class PlrParserService implements PlrParserServiceInterface
             // Preference weights
             'coach' => (int) $derived['coach'],
             'loyalty' => (int) $derived['loyalty'],
-            'playingTime' => (int) $derived['playingTime'],
+            'playing_time' => (int) $derived['playingTime'],
             'winner' => (int) $derived['playForWinner'],
             'tradition' => (int) $derived['tradition'],
             'security' => (int) $derived['security'],
@@ -459,7 +459,7 @@ class PlrParserService implements PlrParserServiceInterface
             'draftpickno' => (int) $derived['draftPickNumber'],
             'fa_signing_flag' => (int) $derived['freeAgentSigningFlag'],
             // Other
-            'dc_canPlayInGame' => (int) $derived['canPlayInGame'],
+            'dc_can_play_in_game' => (int) $derived['canPlayInGame'],
             'injured' => (int) $derived['injuryDaysLeft'],
             // Derived
             'draftyear' => (int) $derived['draftYear'],

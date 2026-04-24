@@ -68,3 +68,7 @@ services:
         class: PHPStanRules\BanInconsistentColumnNamesRule
         tags:
             - phpstan.rules.rule
+    -
+        class: PHPStanRules\BanNonSnakeCaseColumnsRule
+        tags:
+            - phpstan.rules.rule

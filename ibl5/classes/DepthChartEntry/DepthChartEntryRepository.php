@@ -51,12 +51,12 @@ class DepthChartEntryRepository extends \BaseMysqliRepository implements DepthCh
         try {
             $this->execute(
                 "UPDATE ibl_plr SET
-                    dc_PGDepth = ?,
-                    dc_SGDepth = ?,
-                    dc_SFDepth = ?,
-                    dc_PFDepth = ?,
-                    dc_CDepth = ?,
-                    dc_canPlayInGame = ?,
+                    dc_pg_depth = ?,
+                    dc_sg_depth = ?,
+                    dc_sf_depth = ?,
+                    dc_pf_depth = ?,
+                    dc_c_depth = ?,
+                    dc_can_play_in_game = ?,
                     dc_minutes = ?,
                     dc_of = 0,
                     dc_df = 0,

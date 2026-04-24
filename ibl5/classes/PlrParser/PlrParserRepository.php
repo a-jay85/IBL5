@@ -35,12 +35,12 @@ class PlrParserRepository extends \BaseMysqliRepository implements PlrParserRepo
         $query = "INSERT INTO {$this->plrTable}
             (`ordinal`, `name`, `age`, `pid`, `teamid`, `peak`, `pos`,
              `oo`, `od`, `r_drive_off`, `dd`, `po`, `pd`, `r_trans_off`, `td`,
-             `Clutch`, `Consistency`,
-             `PGDepth`, `SGDepth`, `SFDepth`, `PFDepth`, `CDepth`, `dc_canPlayInGame`,
+             `clutch`, `consistency`,
+             `pg_depth`, `sg_depth`, `sf_depth`, `pf_depth`, `c_depth`, `dc_can_play_in_game`,
              `stats_gs`, `stats_gm`, `stats_min`, `stats_fgm`, `stats_fga`,
              `stats_ftm`, `stats_fta`, `stats_3gm`, `stats_3ga`,
              `stats_orb`, `stats_drb`, `stats_ast`, `stats_stl`, `stats_tvr`, `stats_blk`, `stats_pf`,
-             `talent`, `skill`, `intangibles`, `coach`, `loyalty`, `playingTime`, `winner`, `tradition`, `security`,
+             `talent`, `skill`, `intangibles`, `coach`, `loyalty`, `playing_time`, `winner`, `tradition`, `security`,
              `exp`, `bird`, `cy`, `cyt`,
              `cy1`, `cy2`, `cy3`, `cy4`, `cy5`, `cy6`, `fa_signing_flag`,
              `sh_pts`, `sh_reb`, `sh_ast`, `sh_stl`, `sh_blk`, `s_dd`, `s_td`,
@@ -91,14 +91,14 @@ class PlrParserRepository extends \BaseMysqliRepository implements PlrParserRepo
             `pd` = VALUES(`pd`),
             `r_trans_off` = VALUES(`r_trans_off`),
             `td` = VALUES(`td`),
-            `Clutch` = VALUES(`Clutch`),
-            `Consistency` = VALUES(`Consistency`),
-            `PGDepth` = VALUES(`PGDepth`),
-            `SGDepth` = VALUES(`SGDepth`),
-            `SFDepth` = VALUES(`SFDepth`),
-            `PFDepth` = VALUES(`PFDepth`),
-            `CDepth` = VALUES(`CDepth`),
-            `dc_canPlayInGame` = VALUES(`dc_canPlayInGame`),
+            `clutch` = VALUES(`clutch`),
+            `consistency` = VALUES(`consistency`),
+            `pg_depth` = VALUES(`pg_depth`),
+            `sg_depth` = VALUES(`sg_depth`),
+            `sf_depth` = VALUES(`sf_depth`),
+            `pf_depth` = VALUES(`pf_depth`),
+            `c_depth` = VALUES(`c_depth`),
+            `dc_can_play_in_game` = VALUES(`dc_can_play_in_game`),
             `stats_gs` = VALUES(`stats_gs`),
             `stats_gm` = VALUES(`stats_gm`),
             `stats_min` = VALUES(`stats_min`),
@@ -120,7 +120,7 @@ class PlrParserRepository extends \BaseMysqliRepository implements PlrParserRepo
             `intangibles` = VALUES(`intangibles`),
             `coach` = VALUES(`coach`),
             `loyalty` = VALUES(`loyalty`),
-            `playingTime` = VALUES(`playingTime`),
+            `playing_time` = VALUES(`playing_time`),
             `winner` = VALUES(`winner`),
             `tradition` = VALUES(`tradition`),
             `security` = VALUES(`security`),
@@ -203,8 +203,8 @@ class PlrParserRepository extends \BaseMysqliRepository implements PlrParserRepo
         // Total: 121 params — 2 strings (name, pos) and 119 ints
         $types = 'isiiiis'   // ordinal, name, age, pid, teamid, peak, pos
             . 'iiiiiiii'     // oo, od, r_drive_off, dd, po, pd, r_trans_off, td
-            . 'ii'           // Clutch, Consistency
-            . 'iiiiii'       // PGDepth..CDepth, canPlayInGame → dc_canPlayInGame
+            . 'ii'           // clutch, consistency
+            . 'iiiiii'       // pg_depth..c_depth, dc_can_play_in_game
             . 'iiiii'        // stats_gs..stats_fga
             . 'iiii'         // stats_ftm..stats_3ga
             . 'iiiiiii'      // stats_orb..stats_pf
@@ -415,7 +415,7 @@ class PlrParserRepository extends \BaseMysqliRepository implements PlrParserRepo
         'exp', 'bird', 'cy', 'cyt',
         'cy1', 'cy2', 'cy3', 'cy4', 'cy5', 'cy6',
         // Depth chart
-        'PGDepth', 'SGDepth', 'SFDepth', 'PFDepth', 'CDepth',
+        'pg_depth', 'sg_depth', 'sf_depth', 'pf_depth', 'c_depth',
         // Season stats (regular season)
         'stats_gs', 'stats_gm', 'stats_min', 'stats_fgm', 'stats_fga',
         'stats_ftm', 'stats_fta', 'stats_3gm', 'stats_3ga',
@@ -443,11 +443,11 @@ class PlrParserRepository extends \BaseMysqliRepository implements PlrParserRepo
         'rl_3gm', 'rl_3ga', 'rl_orb', 'rl_drb', 'rl_ast', 'rl_stl',
         'rl_tvr', 'rl_blk', 'rl_pf',
         // Preferences
-        'coach', 'loyalty', 'playingTime', 'winner', 'tradition', 'security',
+        'coach', 'loyalty', 'playing_time', 'winner', 'tradition', 'security',
         // Draft info
         'draftround', 'draftpickno', 'fa_signing_flag',
         // Other
-        'dc_canPlayInGame', 'injured',
+        'dc_can_play_in_game', 'injured',
         // Derived
         'draftyear', 'salary',
         // Unknown gaps

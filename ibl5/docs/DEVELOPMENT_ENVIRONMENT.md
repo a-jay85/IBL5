@@ -1,81 +1,38 @@
 ---
-description: Docker setup, dependency caching, and database connection details.
-last_verified: 2026-04-11
+description: Docker setup, dependency management, testing commands, and database connection details.
+last_verified: 2026-04-23
 ---
 
 # IBL5 Development Environment Setup
 
-**Purpose:** Environment setup, dependency caching, and database connection for Copilot Agent.
+**Purpose:** Environment setup, dependency management, and database connection.
 **When to reference:** Initial setup, troubleshooting dependencies, database connection issues.
 
 ---
 
-## Check for Cached Dependencies FIRST
-
-**Before running `composer install` or any PHPUnit commands:**
+## Quick Start
 
 ```bash
-# Check if vendor directory exists
-ls -la ibl5/vendor/bin/phpunit 2>/dev/null && echo "PHPUnit cached - use directly"
+docker compose up -d          # Start Docker stack (PHP + MariaDB)
+cd ibl5 && composer install   # Install PHP dependencies
+bin/test                      # Run all tests
 ```
-
-**If vendor exists**, use PHPUnit directly WITHOUT running composer install:
-```bash
-cd ibl5 && vendor/bin/phpunit
-```
-
-**If vendor does NOT exist**, run the bootstrap script:
-```bash
-bash bootstrap-phpunit.sh
-cd ibl5 && vendor/bin/phpunit
-```
-
-**DO NOT** run `composer install` directly - always use the bootstrap script or check for existing dependencies first.
 
 ---
 
-## Dependency Caching Architecture
+## Dependencies
 
-### GitHub Actions Dependency Caching
-
-The `.github/workflows/cache-dependencies.yml` and `.github/workflows/tests.yml` workflows implement intelligent dependency caching:
-
-**Cache Dependencies Workflow:**
-- Runs daily to keep cache fresh
-- Runs when `composer.json` or `composer.lock` changes
-- Can be triggered manually
-- Pre-caches all PHP dependencies (PHPUnit, etc.)
-- **Cache-first strategy**: Checks GitHub cache BEFORE attempting network downloads
-
-**How it works:**
-1. GitHub Actions cache checked first using `composer.lock` hash as key
-2. If vendor cache exists, restored immediately (no network calls)
-3. If cache miss, Composer checks its own cache before downloading
-4. Only if both caches miss does Composer download from repositories
-5. Downloaded packages are cached for future runs
+Install with `composer install` from the `ibl5/` directory. In CI, `.github/workflows/cache-dependencies.yml` and `.github/workflows/tests.yml` handle caching via `actions/cache` keyed on `composer.lock`.
 
 ---
 
 ## Testing from Command Line
 
 ```bash
-# Step 1: Check if dependencies are already cached
-if [ -f "ibl5/vendor/bin/phpunit" ]; then
-    echo "Dependencies cached, running tests directly"
-    cd ibl5 && vendor/bin/phpunit
-else
-    echo "No cached dependencies, running bootstrap script"
-    bash bootstrap-phpunit.sh
-    cd ibl5 && vendor/bin/phpunit
-fi
-```
-
-**Quick commands when dependencies are cached:**
-```bash
-cd ibl5
-vendor/bin/phpunit                                    # Run all tests
-vendor/bin/phpunit tests/Player/                      # Run specific test suite
-vendor/bin/phpunit --filter testRenderPlayerHeader    # Run specific test
+bin/test                                              # Run all tests
+bin/test --filter testRenderPlayerHeader              # Run specific test
+bin/test --testsuite "Player"                         # Run specific suite
+cd ibl5 && composer run analyse                       # PHPStan
 ```
 
 ---
@@ -94,11 +51,9 @@ vendor/bin/phpcs --version                 # Should show PHP_CodeSniffer version
 
 | Issue | Solution |
 |-------|----------|
-| `Command 'phpunit' not found` | Dependencies not cached - run "Cache PHP Dependencies" workflow manually |
-| `Composer install fails` | Check `.github/workflows/cache-dependencies.yml` workflow logs |
-| `Tests fail to run` | Verify cache-dependencies workflow completed successfully |
-| `Cache outdated` | Manually trigger "Cache PHP Dependencies" workflow |
-| `Can't connect to database` | Check Docker MariaDB is running: `docker compose ps`. Start with `docker compose up -d` |
+| `vendor/bin/phpunit` not found | Run `cd ibl5 && composer install` |
+| `Composer install fails` | Check network; check `.github/workflows/cache-dependencies.yml` logs in CI |
+| `Can't connect to database` | Check Docker is running: `docker compose ps`. Start with `docker compose up -d` |
 
 ---
 
@@ -122,12 +77,8 @@ vendor/bin/phpcs --version                 # Should show PHP_CodeSniffer version
 ### Starting the Database
 
 ```bash
-# From repo root
 docker compose up -d
-
-# Verify it's running
 docker compose ps
-mariadb -h 127.0.0.1 --skip-ssl -u root -proot -e "SELECT VERSION();"
 ```
 
 ### Command Line Verification

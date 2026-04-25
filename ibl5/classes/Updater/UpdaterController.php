@@ -60,6 +60,7 @@ class UpdaterController implements UpdaterControllerInterface
             'Backup extracted' => 'Extracting files from backup archive...',
             'League config' => 'Importing league config (.lge)...',
             'Player file' => 'Parsing player file (.plr)...',
+            'Preseason data cleaned' => 'Cleaning preseason data...',
             'Schedule updated' => 'Updating schedule...',
             'Standings updated' => 'Updating standings...',
             'Power rankings updated' => 'Updating power rankings...',

@@ -62,12 +62,6 @@ class ScheduleUpdater extends \BaseMysqliRepository {
             return null;
         }
 
-        // Handle Preseason year adjustments
-        if ($this->season->phase === "Preseason") {
-            $this->season->beginningYear = Season::IBL_PRESEASON_YEAR;
-            $this->season->endingYear = Season::IBL_PRESEASON_YEAR + 1;
-        }
-
         return DateParser::extractDate(
             $rawDate,
             $this->season->phase,

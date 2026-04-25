@@ -247,8 +247,8 @@ class SeasonQueryRepository extends \BaseMysqliRepository implements SeasonQuery
 
         switch ($phase) {
             case 'Preseason':
-                $phaseStartDate = sprintf('%d-%02d-01', Season::IBL_PRESEASON_YEAR, Season::IBL_REGULAR_SEASON_STARTING_MONTH);
-                $phaseEndDate = sprintf('%d-%02d-30', Season::IBL_PRESEASON_YEAR + 1, Season::IBL_REGULAR_SEASON_ENDING_MONTH);
+                $phaseStartDate = sprintf('%d-%02d-01', $beginningYear, Season::IBL_REGULAR_SEASON_STARTING_MONTH);
+                $phaseEndDate = sprintf('%d-%02d-30', $seasonYear, Season::IBL_REGULAR_SEASON_ENDING_MONTH);
                 break;
             case 'HEAT':
                 $phaseStartDate = sprintf('%d-%02d-01', $beginningYear, Season::IBL_HEAT_MONTH);

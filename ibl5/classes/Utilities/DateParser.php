@@ -50,10 +50,7 @@ class DateParser
         $year = (int) date('Y', $timestamp);
 
         // Apply phase adjustments
-        if ($phase === "Preseason") {
-            $beginningYear = Season::IBL_PRESEASON_YEAR;
-            $endingYear = Season::IBL_PRESEASON_YEAR + 1;
-        } elseif ($phase === "HEAT") {
+        if ($phase === "HEAT") {
             if ($month === 11) {
                 $month = Season::IBL_HEAT_MONTH;
             }

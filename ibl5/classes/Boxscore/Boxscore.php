@@ -287,10 +287,10 @@ class Boxscore
      * @param \mysqli $db Active mysqli connection
      * @return bool True if both deletions succeeded
      */
-    public static function deletePreseasonBoxScores(\mysqli $db): bool
+    public static function deletePreseasonBoxScores(\mysqli $db, int $seasonBeginningYear): bool
     {
         $repository = new BoxscoreRepository($db);
-        return $repository->deletePreseasonBoxScores();
+        return $repository->deletePreseasonBoxScores($seasonBeginningYear);
     }
 
     /**

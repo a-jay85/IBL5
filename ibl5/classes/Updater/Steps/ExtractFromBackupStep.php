@@ -28,7 +28,7 @@ final class ExtractFromBackupStep implements PipelineStepInterface
 {
     /** @var list<string> JSB file extensions to extract */
     private const EXTENSIONS = [
-        'lge', 'plr', 'sco', 'car', 'trn', 'his',
+        'lge', 'plr', 'sco', 'sch', 'car', 'trn', 'his',
         'asw', 'rcb', 'awa', 'dra', 'ret', 'hof', 'plb',
     ];
 

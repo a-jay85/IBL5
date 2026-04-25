@@ -140,7 +140,7 @@ class DateParserTest extends TestCase
 
     // Preseason Phase
 
-    public function testExtractDatePreseasonUsesSpecialYear(): void
+    public function testExtractDatePreseasonUsesRealBeginningYear(): void
     {
         $result = DateParser::extractDate(
             'October 10, 2023',
@@ -151,8 +151,7 @@ class DateParserTest extends TestCase
         );
 
         $this->assertIsArray($result);
-        // Preseason uses IBL_PRESEASON_YEAR constant
-        $this->assertEquals(Season::IBL_PRESEASON_YEAR, $result['year']);
+        $this->assertEquals(2023, $result['year']);
     }
 
     // Date Format Output

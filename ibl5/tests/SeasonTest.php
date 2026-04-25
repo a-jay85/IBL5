@@ -132,11 +132,6 @@ class SeasonTest extends \PHPUnit\Framework\TestCase
     // CONSTANT TESTS
     // ============================================
 
-    public function testIblPreseasonYearConstant(): void
-    {
-        $this->assertSame(9998, Season::IBL_PRESEASON_YEAR);
-    }
-
     public function testIblOlympicsMonthConstant(): void
     {
         $this->assertSame(8, Season::IBL_OLYMPICS_MONTH);

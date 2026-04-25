@@ -38,11 +38,10 @@ class BoxscoreRepository extends \BaseMysqliRepository implements BoxscoreReposi
     /**
      * @see BoxscoreRepositoryInterface::deletePreseasonBoxScores()
      */
-    public function deletePreseasonBoxScores(): bool
+    public function deletePreseasonBoxScores(int $seasonBeginningYear): bool
     {
-        $preseasonYear = Season::IBL_PRESEASON_YEAR;
-        $startDate = "{$preseasonYear}-11-01";
-        $endDate = "{$preseasonYear}-11-30";
+        $startDate = "{$seasonBeginningYear}-11-01";
+        $endDate = "{$seasonBeginningYear}-12-31";
 
         return $this->deleteBoxScoresForDateRange($startDate, $endDate);
     }

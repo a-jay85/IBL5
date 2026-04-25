@@ -33,13 +33,13 @@ class RecordBreakingDetector implements RecordBreakingDetectorInterface
     private const PLAYER_STATS = [
         'points' => ['expression' => 'bs.calc_points', 'unit' => 'points'],
         'rebounds' => ['expression' => 'bs.calc_rebounds', 'unit' => 'rebounds'],
-        'assists' => ['expression' => 'bs.gameAST', 'unit' => 'assists'],
-        'steals' => ['expression' => 'bs.gameSTL', 'unit' => 'steals'],
-        'blocks' => ['expression' => 'bs.gameBLK', 'unit' => 'blocks'],
-        'turnovers' => ['expression' => 'bs.gameTOV', 'unit' => 'turnovers'],
+        'assists' => ['expression' => 'bs.game_ast', 'unit' => 'assists'],
+        'steals' => ['expression' => 'bs.game_stl', 'unit' => 'steals'],
+        'blocks' => ['expression' => 'bs.game_blk', 'unit' => 'blocks'],
+        'turnovers' => ['expression' => 'bs.game_tov', 'unit' => 'turnovers'],
         'fg_made' => ['expression' => 'bs.calc_fg_made', 'unit' => 'field goals'],
-        'ft_made' => ['expression' => 'bs.gameFTM', 'unit' => 'free throws'],
-        '3pt_made' => ['expression' => 'bs.game3GM', 'unit' => 'three pointers'],
+        'ft_made' => ['expression' => 'bs.game_ftm', 'unit' => 'free throws'],
+        '3pt_made' => ['expression' => 'bs.game_3gm', 'unit' => 'three pointers'],
     ];
 
     /**
@@ -50,12 +50,12 @@ class RecordBreakingDetector implements RecordBreakingDetectorInterface
     private const TEAM_STATS = [
         'team_points' => ['expression' => 'bs.calc_points', 'unit' => 'points', 'order' => 'DESC'],
         'team_rebounds' => ['expression' => 'bs.calc_rebounds', 'unit' => 'rebounds', 'order' => 'DESC'],
-        'team_assists' => ['expression' => 'bs.gameAST', 'unit' => 'assists', 'order' => 'DESC'],
-        'team_steals' => ['expression' => 'bs.gameSTL', 'unit' => 'steals', 'order' => 'DESC'],
-        'team_blocks' => ['expression' => 'bs.gameBLK', 'unit' => 'blocks', 'order' => 'DESC'],
+        'team_assists' => ['expression' => 'bs.game_ast', 'unit' => 'assists', 'order' => 'DESC'],
+        'team_steals' => ['expression' => 'bs.game_stl', 'unit' => 'steals', 'order' => 'DESC'],
+        'team_blocks' => ['expression' => 'bs.game_blk', 'unit' => 'blocks', 'order' => 'DESC'],
         'team_fg_made' => ['expression' => 'bs.calc_fg_made', 'unit' => 'field goals', 'order' => 'DESC'],
-        'team_ft_made' => ['expression' => 'bs.gameFTM', 'unit' => 'free throws', 'order' => 'DESC'],
-        'team_3pt_made' => ['expression' => 'bs.game3GM', 'unit' => 'three pointers', 'order' => 'DESC'],
+        'team_ft_made' => ['expression' => 'bs.game_ftm', 'unit' => 'free throws', 'order' => 'DESC'],
+        'team_3pt_made' => ['expression' => 'bs.game_3gm', 'unit' => 'three pointers', 'order' => 'DESC'],
         'team_fewest_points' => ['expression' => 'bs.calc_points', 'unit' => 'points', 'order' => 'ASC'],
     ];
 
@@ -140,7 +140,7 @@ class RecordBreakingDetector implements RecordBreakingDetectorInterface
     /**
      * Detect broken/tied player single-game records from the top entries.
      *
-     * @param list<array{pid: int, name: string, teamid: int, team_name: string, date: string, BoxID: int, gameOfThatDay: int, oppTid: int, opp_team_name: string, value: int}> $topRecords
+     * @param list<array{pid: int, name: string, teamid: int, team_name: string, date: string, box_id: int, game_of_that_day: int, oppTid: int, opp_team_name: string, value: int}> $topRecords
      * @param array<string, int> $targetDates
      * @return list<string>
      */
@@ -174,8 +174,8 @@ class RecordBreakingDetector implements RecordBreakingDetectorInterface
                     $gameTypeLabel,
                     $isTied,
                     $record['date'],
-                    $record['gameOfThatDay'],
-                    $record['BoxID']
+                    $record['game_of_that_day'],
+                    $record['box_id']
                 );
             }
         }
@@ -186,7 +186,7 @@ class RecordBreakingDetector implements RecordBreakingDetectorInterface
     /**
      * Detect broken/tied team single-game records from the top entries.
      *
-     * @param list<array{teamid: int, team_name: string, date: string, BoxID: int, gameOfThatDay: int, oppTid: int, opp_team_name: string, value: int}> $topRecords
+     * @param list<array{teamid: int, team_name: string, date: string, box_id: int, game_of_that_day: int, oppTid: int, opp_team_name: string, value: int}> $topRecords
      * @param array<string, int> $targetDates
      * @return list<string>
      */
@@ -227,8 +227,8 @@ class RecordBreakingDetector implements RecordBreakingDetectorInterface
                     $isTied,
                     $isAscending,
                     $record['date'],
-                    $record['gameOfThatDay'],
-                    $record['BoxID']
+                    $record['game_of_that_day'],
+                    $record['box_id']
                 );
             }
         }
@@ -264,8 +264,8 @@ class RecordBreakingDetector implements RecordBreakingDetectorInterface
                     $qd['blocks'],
                     $gameTypeLabel,
                     $qd['date'],
-                    $qd['gameOfThatDay'],
-                    $qd['BoxID']
+                    $qd['game_of_that_day'],
+                    $qd['box_id']
                 );
             }
         }
@@ -276,7 +276,7 @@ class RecordBreakingDetector implements RecordBreakingDetectorInterface
     /**
      * Find the previous player record holder (best entry NOT from any target date).
      *
-     * @param list<array{pid: int, name: string, teamid: int, team_name: string, date: string, BoxID: int, gameOfThatDay: int, oppTid: int, opp_team_name: string, value: int}> $records
+     * @param list<array{pid: int, name: string, teamid: int, team_name: string, date: string, box_id: int, game_of_that_day: int, oppTid: int, opp_team_name: string, value: int}> $records
      * @param array<string, int> $targetDates
      * @return array{name: string, value: int}|null
      */
@@ -293,7 +293,7 @@ class RecordBreakingDetector implements RecordBreakingDetectorInterface
     /**
      * Find the previous team record holder (best entry NOT from any target date).
      *
-     * @param list<array{teamid: int, team_name: string, date: string, BoxID: int, gameOfThatDay: int, oppTid: int, opp_team_name: string, value: int}> $records
+     * @param list<array{teamid: int, team_name: string, date: string, box_id: int, game_of_that_day: int, oppTid: int, opp_team_name: string, value: int}> $records
      * @param array<string, int> $targetDates
      * @return array{team_name: string, value: int}|null
      */

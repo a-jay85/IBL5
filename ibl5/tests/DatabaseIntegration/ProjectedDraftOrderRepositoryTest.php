@@ -47,16 +47,16 @@ class ProjectedDraftOrderRepositoryTest extends DatabaseTestCase
 
     public function testGetPlayedGamesFiltersUnplayed(): void
     {
-        // Seed schedule has Year=2025, VScore=85, HScore=104 (played)
+        // Seed schedule has season_year=2025, visitor_score=85, home_score=104 (played)
         // Insert an unplayed game (scores=0)
         $this->insertRow('ibl_schedule', [
-            'Year' => 2025,
-            'BoxID' => 0,
-            'Date' => '2025-02-01',
-            'Visitor' => 1,
-            'VScore' => 0,
-            'Home' => 2,
-            'HScore' => 0,
+            'season_year' => 2025,
+            'box_id' => 0,
+            'game_date' => '2025-02-01',
+            'visitor_teamid' => 1,
+            'visitor_score' => 0,
+            'home_teamid' => 2,
+            'home_score' => 0,
             'uuid' => 'sched-test-unplayed-000000000001',
         ]);
 
@@ -64,8 +64,8 @@ class ProjectedDraftOrderRepositoryTest extends DatabaseTestCase
 
         // All returned games should have scores > 0
         foreach ($result as $row) {
-            self::assertGreaterThan(0, $row['VScore']);
-            self::assertGreaterThan(0, $row['HScore']);
+            self::assertGreaterThan(0, $row['visitor_score']);
+            self::assertGreaterThan(0, $row['home_score']);
         }
     }
 
@@ -73,20 +73,20 @@ class ProjectedDraftOrderRepositoryTest extends DatabaseTestCase
     {
         // Insert played game for year 2099
         $this->insertRow('ibl_schedule', [
-            'Year' => 2099,
-            'BoxID' => 0,
-            'Date' => '2099-01-15',
-            'Visitor' => 2,
-            'VScore' => 90,
-            'Home' => 1,
-            'HScore' => 100,
+            'season_year' => 2099,
+            'box_id' => 0,
+            'game_date' => '2099-01-15',
+            'visitor_teamid' => 2,
+            'visitor_score' => 90,
+            'home_teamid' => 1,
+            'home_score' => 100,
             'uuid' => 'sched-test-yr2099-000000000001',
         ]);
 
         $result = $this->repo->getPlayedGames(2099);
 
         self::assertCount(1, $result);
-        self::assertSame(90, $result[0]['VScore']);
+        self::assertSame(90, $result[0]['visitor_score']);
     }
 
     public function testGetPickOwnershipFiltersRoundsOneAndTwo(): void
@@ -132,23 +132,23 @@ class ProjectedDraftOrderRepositoryTest extends DatabaseTestCase
     {
         // Insert two played games for year 2099
         $this->insertRow('ibl_schedule', [
-            'Year' => 2099,
-            'BoxID' => 0,
-            'Date' => '2099-02-10',
-            'Visitor' => 2,
-            'VScore' => 90,
-            'Home' => 1,
-            'HScore' => 110,
+            'season_year' => 2099,
+            'box_id' => 0,
+            'game_date' => '2099-02-10',
+            'visitor_teamid' => 2,
+            'visitor_score' => 90,
+            'home_teamid' => 1,
+            'home_score' => 110,
             'uuid' => 'sched-ptdiff-001-000000000001',
         ]);
         $this->insertRow('ibl_schedule', [
-            'Year' => 2099,
-            'BoxID' => 0,
-            'Date' => '2099-02-12',
-            'Visitor' => 1,
-            'VScore' => 95,
-            'Home' => 2,
-            'HScore' => 100,
+            'season_year' => 2099,
+            'box_id' => 0,
+            'game_date' => '2099-02-12',
+            'visitor_teamid' => 1,
+            'visitor_score' => 95,
+            'home_teamid' => 2,
+            'home_score' => 100,
             'uuid' => 'sched-ptdiff-002-000000000001',
         ]);
 

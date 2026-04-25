@@ -6,7 +6,7 @@ namespace ProjectedDraftOrder\Contracts;
 
 /**
  * @phpstan-type StandingsRow array{teamid: int, team_name: string, wins: int, losses: int, pct: float, conference: string, division: string, conf_wins: int|null, conf_losses: int|null, div_wins: int|null, div_losses: int|null, clinched_division: int|null, color1: string, color2: string}
- * @phpstan-type GameRow array{Visitor: int, VScore: int, Home: int, HScore: int}
+ * @phpstan-type GameRow array{visitor_teamid: int, visitor_score: int, home_teamid: int, home_score: int}
  * @phpstan-type PickOwnershipRow array{ownerofpick: string, teampick: string, round: int, notes: string|null}
  * @phpstan-type PointDifferentialRow array{teamid: int, pointsFor: float, pointsAgainst: float}
  * @see \ProjectedDraftOrder\ProjectedDraftOrderRepository

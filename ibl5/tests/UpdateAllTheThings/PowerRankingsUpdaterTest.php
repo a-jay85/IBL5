@@ -107,7 +107,7 @@ class PowerRankingsUpdaterTest extends TestCase
     public function testCalculateTeamStatsWithWinningGame(): void
     {
         $mockGames = [
-            ['Visitor' => 1, 'VScore' => 100, 'Home' => 2, 'HScore' => 95]
+            ['visitor_teamid' => 1, 'visitor_score' => 100, 'home_teamid' => 2, 'home_score' => 95]
         ];
         
         $this->mockDb->setMockData([['win' => 5, 'loss' => 3]]);
@@ -125,7 +125,7 @@ class PowerRankingsUpdaterTest extends TestCase
     public function testCalculateTeamStatsWithLosingGame(): void
     {
         $mockGames = [
-            ['Visitor' => 1, 'VScore' => 85, 'Home' => 2, 'HScore' => 95]
+            ['visitor_teamid' => 1, 'visitor_score' => 85, 'home_teamid' => 2, 'home_score' => 95]
         ];
         
         $this->mockDb->setMockData([['win' => 5, 'loss' => 3]]);
@@ -143,7 +143,7 @@ class PowerRankingsUpdaterTest extends TestCase
     public function testCalculateTeamStatsWithHomeGame(): void
     {
         $mockGames = [
-            ['Visitor' => 2, 'VScore' => 90, 'Home' => 1, 'HScore' => 100]
+            ['visitor_teamid' => 2, 'visitor_score' => 90, 'home_teamid' => 1, 'home_score' => 100]
         ];
         
         $this->mockDb->setMockData([['win' => 5, 'loss' => 3]]);
@@ -158,9 +158,9 @@ class PowerRankingsUpdaterTest extends TestCase
     public function testCalculateTeamStatsTracksWinningStreak(): void
     {
         $mockGames = [
-            ['Visitor' => 1, 'VScore' => 100, 'Home' => 2, 'HScore' => 95],
-            ['Visitor' => 3, 'VScore' => 85, 'Home' => 1, 'HScore' => 90],
-            ['Visitor' => 1, 'VScore' => 105, 'Home' => 4, 'HScore' => 100],
+            ['visitor_teamid' => 1, 'visitor_score' => 100, 'home_teamid' => 2, 'home_score' => 95],
+            ['visitor_teamid' => 3, 'visitor_score' => 85, 'home_teamid' => 1, 'home_score' => 90],
+            ['visitor_teamid' => 1, 'visitor_score' => 105, 'home_teamid' => 4, 'home_score' => 100],
         ];
         
         $this->mockDb->setMockData([['win' => 5, 'loss' => 3]]);
@@ -175,8 +175,8 @@ class PowerRankingsUpdaterTest extends TestCase
     public function testCalculateTeamStatsTracksLosingStreak(): void
     {
         $mockGames = [
-            ['Visitor' => 1, 'VScore' => 80, 'Home' => 2, 'HScore' => 95],
-            ['Visitor' => 3, 'VScore' => 100, 'Home' => 1, 'HScore' => 90],
+            ['visitor_teamid' => 1, 'visitor_score' => 80, 'home_teamid' => 2, 'home_score' => 95],
+            ['visitor_teamid' => 3, 'visitor_score' => 100, 'home_teamid' => 1, 'home_score' => 90],
         ];
         
         $this->mockDb->setMockData([['win' => 5, 'loss' => 3]]);
@@ -192,8 +192,8 @@ class PowerRankingsUpdaterTest extends TestCase
     public function testCalculateTeamStatsHandlesStreakChange(): void
     {
         $mockGames = [
-            ['Visitor' => 1, 'VScore' => 100, 'Home' => 2, 'HScore' => 95],
-            ['Visitor' => 3, 'VScore' => 100, 'Home' => 1, 'HScore' => 90],
+            ['visitor_teamid' => 1, 'visitor_score' => 100, 'home_teamid' => 2, 'home_score' => 95],
+            ['visitor_teamid' => 3, 'visitor_score' => 100, 'home_teamid' => 1, 'home_score' => 90],
         ];
         
         $this->mockDb->setMockData([['win' => 5, 'loss' => 3]]);
@@ -209,7 +209,7 @@ class PowerRankingsUpdaterTest extends TestCase
     public function testCalculateTeamStatsIgnoresTies(): void
     {
         $mockGames = [
-            ['Visitor' => 1, 'VScore' => 95, 'Home' => 2, 'HScore' => 95]
+            ['visitor_teamid' => 1, 'visitor_score' => 95, 'home_teamid' => 2, 'home_score' => 95]
         ];
         
         $result = $this->powerRankingsUpdater->publicCalculateTeamStats($mockGames, 1);
@@ -241,9 +241,9 @@ class PowerRankingsUpdaterTest extends TestCase
         $mockGames = [];
         for ($i = 0; $i < 15; $i++) {
             if ($i < 8) {
-                $mockGames[] = ['Visitor' => 1, 'VScore' => 80, 'Home' => 2, 'HScore' => 90];
+                $mockGames[] = ['visitor_teamid' => 1, 'visitor_score' => 80, 'home_teamid' => 2, 'home_score' => 90];
             } else {
-                $mockGames[] = ['Visitor' => 1, 'VScore' => 100, 'Home' => 2, 'HScore' => 90];
+                $mockGames[] = ['visitor_teamid' => 1, 'visitor_score' => 100, 'home_teamid' => 2, 'home_score' => 90];
             }
         }
         

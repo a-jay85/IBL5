@@ -95,7 +95,7 @@ class PowerRankingsUpdater extends \BaseMysqliRepository {
     /**
      * Fetch all played games for the season in a single query
      *
-     * @return list<array{Visitor: int, VScore: int, Home: int, HScore: int}>
+     * @return list<array{visitor_teamid: int, visitor_score: int, home_teamid: int, home_score: int}>
      */
     private function fetchAllPlayedGames(int $month): array
     {
@@ -103,13 +103,13 @@ class PowerRankingsUpdater extends \BaseMysqliRepository {
         $startDate = $this->season->beginningYear . "-$month-01";
         $endDate = $this->season->endingYear . "-05-30";
 
-        /** @var list<array{Visitor: int, VScore: int, Home: int, HScore: int}> */
+        /** @var list<array{visitor_teamid: int, visitor_score: int, home_teamid: int, home_score: int}> */
         return $this->fetchAll(
-            "SELECT Visitor, VScore, Home, HScore
+            "SELECT visitor_teamid, visitor_score, home_teamid, home_score
             FROM {$scheduleTable}
-            WHERE VScore > 0 AND HScore > 0
-            AND Date BETWEEN ? AND ?
-            ORDER BY Date ASC",
+            WHERE visitor_score > 0 AND home_score > 0
+            AND game_date BETWEEN ? AND ?
+            ORDER BY game_date ASC",
             "ss",
             $startDate,
             $endDate
@@ -119,7 +119,7 @@ class PowerRankingsUpdater extends \BaseMysqliRepository {
     /**
      * Fetch all unplayed games for the season
      *
-     * @return list<array{Visitor: int, Home: int}>
+     * @return list<array{visitor_teamid: int, home_teamid: int}>
      */
     private function fetchAllUnplayedGames(int $month): array
     {
@@ -127,13 +127,13 @@ class PowerRankingsUpdater extends \BaseMysqliRepository {
         $startDate = $this->season->beginningYear . "-$month-01";
         $endDate = $this->season->endingYear . "-05-30";
 
-        /** @var list<array{Visitor: int, Home: int}> */
+        /** @var list<array{visitor_teamid: int, home_teamid: int}> */
         return $this->fetchAll(
-            "SELECT Visitor, Home
+            "SELECT visitor_teamid, home_teamid
             FROM {$scheduleTable}
-            WHERE VScore = 0 AND HScore = 0
-            AND Date BETWEEN ? AND ?
-            ORDER BY Date ASC",
+            WHERE visitor_score = 0 AND home_score = 0
+            AND game_date BETWEEN ? AND ?
+            ORDER BY game_date ASC",
             "ss",
             $startDate,
             $endDate
@@ -143,17 +143,17 @@ class PowerRankingsUpdater extends \BaseMysqliRepository {
     /**
      * Partition games by team ID (each game appears under both participating teams)
      *
-     * @param list<array{Visitor: int, VScore: int, Home: int, HScore: int}> $allGames
-     * @return array<int, list<array{Visitor: int, VScore: int, Home: int, HScore: int}>>
+     * @param list<array{visitor_teamid: int, visitor_score: int, home_teamid: int, home_score: int}> $allGames
+     * @return array<int, list<array{visitor_teamid: int, visitor_score: int, home_teamid: int, home_score: int}>>
      */
     private function partitionGamesByTeam(array $allGames): array
     {
-        /** @var array<int, list<array{Visitor: int, VScore: int, Home: int, HScore: int}>> $byTeam */
+        /** @var array<int, list<array{visitor_teamid: int, visitor_score: int, home_teamid: int, home_score: int}>> $byTeam */
         $byTeam = [];
 
         foreach ($allGames as $game) {
-            $byTeam[$game['Visitor']][] = $game;
-            $byTeam[$game['Home']][] = $game;
+            $byTeam[$game['visitor_teamid']][] = $game;
+            $byTeam[$game['home_teamid']][] = $game;
         }
 
         return $byTeam;
@@ -162,24 +162,24 @@ class PowerRankingsUpdater extends \BaseMysqliRepository {
     /**
      * Partition unplayed games by team ID
      *
-     * @param list<array{Visitor: int, Home: int}> $allGames
-     * @return array<int, list<array{Visitor: int, Home: int}>>
+     * @param list<array{visitor_teamid: int, home_teamid: int}> $allGames
+     * @return array<int, list<array{visitor_teamid: int, home_teamid: int}>>
      */
     private function partitionUnplayedGamesByTeam(array $allGames): array
     {
-        /** @var array<int, list<array{Visitor: int, Home: int}>> $byTeam */
+        /** @var array<int, list<array{visitor_teamid: int, home_teamid: int}>> $byTeam */
         $byTeam = [];
 
         foreach ($allGames as $game) {
-            $byTeam[$game['Visitor']][] = $game;
-            $byTeam[$game['Home']][] = $game;
+            $byTeam[$game['visitor_teamid']][] = $game;
+            $byTeam[$game['home_teamid']][] = $game;
         }
 
         return $byTeam;
     }
 
     /**
-     * @param list<array{Visitor: int, VScore: int, Home: int, HScore: int}> $games
+     * @param list<array{visitor_teamid: int, visitor_score: int, home_teamid: int, home_score: int}> $games
      * @return TeamStats
      */
     protected function calculateTeamStats(array $games, int $teamid): array {
@@ -228,7 +228,7 @@ class PowerRankingsUpdater extends \BaseMysqliRepository {
     /**
      * Calculate and store SOS and remaining SOS for all teams
      *
-     * @param list<array{Visitor: int, VScore: int, Home: int, HScore: int}> $allPlayedGames
+     * @param list<array{visitor_teamid: int, visitor_score: int, home_teamid: int, home_score: int}> $allPlayedGames
      */
     private function calculateAndStoreSos(array $allPlayedGames, int $month): void
     {
@@ -254,12 +254,12 @@ class PowerRankingsUpdater extends \BaseMysqliRepository {
         }
 
         // Partition played games by team (reuse format for SOS calc)
-        /** @var array<int, list<array{Visitor: int, Home: int}>> $playedByTeam */
+        /** @var array<int, list<array{visitor_teamid: int, home_teamid: int}>> $playedByTeam */
         $playedByTeam = [];
         foreach ($allPlayedGames as $game) {
-            $simplified = ['Visitor' => $game['Visitor'], 'Home' => $game['Home']];
-            $playedByTeam[$game['Visitor']][] = $simplified;
-            $playedByTeam[$game['Home']][] = $simplified;
+            $simplified = ['visitor_teamid' => $game['visitor_teamid'], 'home_teamid' => $game['home_teamid']];
+            $playedByTeam[$game['visitor_teamid']][] = $simplified;
+            $playedByTeam[$game['home_teamid']][] = $simplified;
         }
 
         // Fetch and partition unplayed games

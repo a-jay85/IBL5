@@ -112,8 +112,8 @@ class ScheduleIntegrationTest extends IntegrationTestCase
 
         // Assert
         $this->assertQueryExecuted('ibl_schedule');
-        $this->assertQueryExecuted('Visitor = 5');
-        $this->assertQueryExecuted('Home = 5');
+        $this->assertQueryExecuted('visitor_teamid = 5');
+        $this->assertQueryExecuted('home_teamid = 5');
     }
 
     /**
@@ -154,7 +154,7 @@ class ScheduleIntegrationTest extends IntegrationTestCase
         $this->repository->getSchedule($teamId);
 
         // Assert
-        $this->assertQueryExecuted('ORDER BY s.Date ASC');
+        $this->assertQueryExecuted('ORDER BY s.game_date ASC');
     }
 
     /**
@@ -878,15 +878,15 @@ class ScheduleIntegrationTest extends IntegrationTestCase
         int $boxId = 12345
     ): array {
         return [
-            'SchedID' => rand(1, 10000),
-            'Year' => (int) date('Y', strtotime($date)),
-            'Date' => $date,
-            'Visitor' => $visitorId,
-            'VScore' => $visitorScore,
-            'Home' => $homeId,
-            'HScore' => $homeScore,
-            'BoxID' => $boxId,
-            'gameOfThatDay' => 0,
+            'id' => rand(1, 10000),
+            'season_year' => (int) date('Y', strtotime($date)),
+            'game_date' => $date,
+            'visitor_teamid' => $visitorId,
+            'visitor_score' => $visitorScore,
+            'home_teamid' => $homeId,
+            'home_score' => $homeScore,
+            'box_id' => $boxId,
+            'game_of_that_day' => 0,
         ];
     }
 

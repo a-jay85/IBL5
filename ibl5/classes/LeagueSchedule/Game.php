@@ -24,20 +24,20 @@ class Game
     public string $userTeamLocationPrefix;
 
     /**
-     * @param array{Date: string, BoxID: int, Visitor: int, Home: int, VScore: int, HScore: int, gameOfThatDay?: int|null} $scheduleRow
+     * @param array{game_date: string, box_id: int, visitor_teamid: int, home_teamid: int, visitor_score: int, home_score: int, game_of_that_day?: int|null} $scheduleRow
      */
     public function __construct(array $scheduleRow)
     {
-        $this->date = $scheduleRow['Date'];
+        $this->date = $scheduleRow['game_date'];
         $this->dateObject = date_create($this->date);
-        $this->boxScoreID = $scheduleRow['BoxID'];
-        $this->gameOfThatDay = (int) ($scheduleRow['gameOfThatDay'] ?? 0);
+        $this->boxScoreID = $scheduleRow['box_id'];
+        $this->gameOfThatDay = (int) ($scheduleRow['game_of_that_day'] ?? 0);
 
-        $this->visitor_teamid = $scheduleRow['Visitor'];
-        $this->home_teamid = $scheduleRow['Home'];
+        $this->visitor_teamid = $scheduleRow['visitor_teamid'];
+        $this->home_teamid = $scheduleRow['home_teamid'];
 
-        $this->visitorScore = $scheduleRow['VScore'];
-        $this->homeScore = $scheduleRow['HScore'];
+        $this->visitorScore = $scheduleRow['visitor_score'];
+        $this->homeScore = $scheduleRow['home_score'];
 
         $this->isUnplayed = ($this->visitorScore === $this->homeScore);
         $this->winningTeamID = $this->visitorScore > $this->homeScore ? $this->visitor_teamid : $this->home_teamid;

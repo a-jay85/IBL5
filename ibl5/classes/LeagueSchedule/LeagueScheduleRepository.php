@@ -35,22 +35,22 @@ class LeagueScheduleRepository extends \BaseMysqliRepository implements LeagueSc
      */
     public function getAllGamesWithBoxScoreInfo(): array
     {
-        $query = "SELECT s.SchedID, s.Date, s.Visitor, s.VScore, s.Home, s.HScore, s.BoxID,
-                  bst.gameOfThatDay
+        $query = "SELECT s.id, s.game_date, s.visitor_teamid, s.visitor_score, s.home_teamid, s.home_score, s.box_id,
+                  bst.game_of_that_day
                   FROM {$this->scheduleTable} s
                   LEFT JOIN (
-                      SELECT Date, visitor_teamid, home_teamid, MIN(gameOfThatDay) AS gameOfThatDay
+                      SELECT game_date, visitor_teamid, home_teamid, MIN(game_of_that_day) AS game_of_that_day
                       FROM {$this->boxScoresTeamsTable}
-                      GROUP BY Date, visitor_teamid, home_teamid
-                  ) bst ON bst.Date = s.Date AND bst.visitor_teamid = s.Visitor AND bst.home_teamid = s.Home
-                  ORDER BY s.Date ASC, s.SchedID ASC";
+                      GROUP BY game_date, visitor_teamid, home_teamid
+                  ) bst ON bst.game_date = s.game_date AND bst.visitor_teamid = s.visitor_teamid AND bst.home_teamid = s.home_teamid
+                  ORDER BY s.game_date ASC, s.id ASC";
 
         /** @var list<ScheduleRow> $rows */
         $rows = $this->fetchAll($query);
 
-        // Normalize gameOfThatDay — the LEFT JOIN can return null
+        // Normalize game_of_that_day — the LEFT JOIN can return null
         foreach ($rows as $index => $row) {
-            $rows[$index]['gameOfThatDay'] = (int)($row['gameOfThatDay'] ?? 0);
+            $rows[$index]['game_of_that_day'] = (int)($row['game_of_that_day'] ?? 0);
         }
 
         return $rows;

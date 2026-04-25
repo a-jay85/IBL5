@@ -62,14 +62,14 @@ class LeagueScheduleRepositoryTest extends TestCase
     {
         $this->mockDb->setMockData([
             [
-                'SchedID' => 1,
-                'Date' => '2025-11-01',
-                'Visitor' => 1,
-                'VScore' => 100,
-                'Home' => 2,
-                'HScore' => 95,
-                'BoxID' => 101,
-                'gameOfThatDay' => 1,
+                'id' => 1,
+                'game_date' => '2025-11-01',
+                'visitor_teamid' => 1,
+                'visitor_score' => 100,
+                'home_teamid' => 2,
+                'home_score' => 95,
+                'box_id' => 101,
+                'game_of_that_day' => 1,
             ],
         ]);
         $repository = new LeagueScheduleRepository($this->mockMysqliDb);
@@ -77,30 +77,30 @@ class LeagueScheduleRepositoryTest extends TestCase
         $result = $repository->getAllGamesWithBoxScoreInfo();
 
         $this->assertCount(1, $result);
-        $this->assertSame('2025-11-01', $result[0]['Date']);
-        $this->assertSame(1, $result[0]['Visitor']);
-        $this->assertSame(2, $result[0]['Home']);
+        $this->assertSame('2025-11-01', $result[0]['game_date']);
+        $this->assertSame(1, $result[0]['visitor_teamid']);
+        $this->assertSame(2, $result[0]['home_teamid']);
     }
 
     public function testGetAllGamesNormalizesNullGameOfThatDay(): void
     {
         $this->mockDb->setMockData([
             [
-                'SchedID' => 1,
-                'Date' => '2025-11-01',
-                'Visitor' => 1,
-                'VScore' => 0,
-                'Home' => 2,
-                'HScore' => 0,
-                'BoxID' => 101,
-                'gameOfThatDay' => null,
+                'id' => 1,
+                'game_date' => '2025-11-01',
+                'visitor_teamid' => 1,
+                'visitor_score' => 0,
+                'home_teamid' => 2,
+                'home_score' => 0,
+                'box_id' => 101,
+                'game_of_that_day' => null,
             ],
         ]);
         $repository = new LeagueScheduleRepository($this->mockMysqliDb);
 
         $result = $repository->getAllGamesWithBoxScoreInfo();
 
-        $this->assertSame(0, $result[0]['gameOfThatDay']);
+        $this->assertSame(0, $result[0]['game_of_that_day']);
     }
 
     public function testGetTeamRecordsReturnsEmptyArrayWhenNoTeams(): void

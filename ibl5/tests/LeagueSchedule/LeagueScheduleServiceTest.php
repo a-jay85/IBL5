@@ -56,24 +56,24 @@ class LeagueScheduleServiceTest extends TestCase
         $mockRepo = $this->createStub(LeagueScheduleRepositoryInterface::class);
         $mockRepo->method('getAllGamesWithBoxScoreInfo')->willReturn([
             [
-                'SchedID' => 1,
-                'Date' => '2025-11-01',
-                'Visitor' => 1,
-                'VScore' => 100,
-                'Home' => 2,
-                'HScore' => 95,
-                'BoxID' => 101,
-                'gameOfThatDay' => 1,
+                'id' => 1,
+                'game_date' => '2025-11-01',
+                'visitor_teamid' => 1,
+                'visitor_score' => 100,
+                'home_teamid' => 2,
+                'home_score' => 95,
+                'box_id' => 101,
+                'game_of_that_day' => 1,
             ],
             [
-                'SchedID' => 2,
-                'Date' => '2025-12-01',
-                'Visitor' => 3,
-                'VScore' => 110,
-                'Home' => 4,
-                'HScore' => 105,
-                'BoxID' => 102,
-                'gameOfThatDay' => 1,
+                'id' => 2,
+                'game_date' => '2025-12-01',
+                'visitor_teamid' => 3,
+                'visitor_score' => 110,
+                'home_teamid' => 4,
+                'home_score' => 105,
+                'box_id' => 102,
+                'game_of_that_day' => 1,
             ],
         ]);
         $mockRepo->method('getTeamRecords')->willReturn([
@@ -112,14 +112,14 @@ class LeagueScheduleServiceTest extends TestCase
         $mockRepo = $this->createStub(LeagueScheduleRepositoryInterface::class);
         $mockRepo->method('getAllGamesWithBoxScoreInfo')->willReturn([
             [
-                'SchedID' => 1,
-                'Date' => '2025-11-10',
-                'Visitor' => 1,
-                'VScore' => 0,
-                'Home' => 2,
-                'HScore' => 0,
-                'BoxID' => 101,
-                'gameOfThatDay' => 0,
+                'id' => 1,
+                'game_date' => '2025-11-10',
+                'visitor_teamid' => 1,
+                'visitor_score' => 0,
+                'home_teamid' => 2,
+                'home_score' => 0,
+                'box_id' => 101,
+                'game_of_that_day' => 0,
             ],
         ]);
         $mockRepo->method('getTeamRecords')->willReturn([]);
@@ -148,24 +148,24 @@ class LeagueScheduleServiceTest extends TestCase
         $mockRepo = $this->createStub(LeagueScheduleRepositoryInterface::class);
         $mockRepo->method('getAllGamesWithBoxScoreInfo')->willReturn([
             [
-                'SchedID' => 1,
-                'Date' => '2025-11-01',
-                'Visitor' => 1,
-                'VScore' => 100,
-                'Home' => 2,
-                'HScore' => 95,
-                'BoxID' => 101,
-                'gameOfThatDay' => 1,
+                'id' => 1,
+                'game_date' => '2025-11-01',
+                'visitor_teamid' => 1,
+                'visitor_score' => 100,
+                'home_teamid' => 2,
+                'home_score' => 95,
+                'box_id' => 101,
+                'game_of_that_day' => 1,
             ],
             [
-                'SchedID' => 2,
-                'Date' => '2026-06-01',
-                'Visitor' => 3,
-                'VScore' => 110,
-                'Home' => 4,
-                'HScore' => 105,
-                'BoxID' => 102,
-                'gameOfThatDay' => 1,
+                'id' => 2,
+                'game_date' => '2026-06-01',
+                'visitor_teamid' => 3,
+                'visitor_score' => 110,
+                'home_teamid' => 4,
+                'home_score' => 105,
+                'box_id' => 102,
+                'game_of_that_day' => 1,
             ],
         ]);
         $mockRepo->method('getTeamRecords')->willReturn([]);
@@ -197,14 +197,14 @@ class LeagueScheduleServiceTest extends TestCase
         $mockRepo = $this->createStub(LeagueScheduleRepositoryInterface::class);
         $mockRepo->method('getAllGamesWithBoxScoreInfo')->willReturn([
             [
-                'SchedID' => 1,
-                'Date' => '2025-11-01',
-                'Visitor' => 1,
-                'VScore' => 100,
-                'Home' => 2,
-                'HScore' => 95,
-                'BoxID' => 101,
-                'gameOfThatDay' => 1,
+                'id' => 1,
+                'game_date' => '2025-11-01',
+                'visitor_teamid' => 1,
+                'visitor_score' => 100,
+                'home_teamid' => 2,
+                'home_score' => 95,
+                'box_id' => 101,
+                'game_of_that_day' => 1,
             ],
         ]);
         $mockRepo->method('getTeamRecords')->willReturn([]);

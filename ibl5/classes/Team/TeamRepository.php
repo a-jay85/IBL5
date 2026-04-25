@@ -216,31 +216,31 @@ class TeamRepository extends \BaseMysqliRepository implements TeamRepositoryInte
     private static function buildWinLossQuery(int $gameType): string
     {
         return "WITH unique_games AS (
-            SELECT Date, visitor_teamid, home_teamid, gameOfThatDay,
-                (visitorQ1points + visitorQ2points + visitorQ3points + visitorQ4points
-                 + COALESCE(visitorOTpoints, 0)) AS visitor_total,
-                (homeQ1points + homeQ2points + homeQ3points + homeQ4points
-                 + COALESCE(homeOTpoints, 0)) AS home_total
+            SELECT game_date, visitor_teamid, home_teamid, game_of_that_day,
+                (visitor_q1_points + visitor_q2_points + visitor_q3_points + visitor_q4_points
+                 + COALESCE(visitor_ot_points, 0)) AS visitor_total,
+                (home_q1_points + home_q2_points + home_q3_points + home_q4_points
+                 + COALESCE(home_ot_points, 0)) AS home_total
             FROM ibl_box_scores_teams
             WHERE game_type = {$gameType}
                 AND (visitor_teamid = (SELECT teamid FROM ibl_team_info WHERE team_name = ?)
                      OR home_teamid = (SELECT teamid FROM ibl_team_info WHERE team_name = ?))
-            GROUP BY Date, visitor_teamid, home_teamid, gameOfThatDay
+            GROUP BY game_date, visitor_teamid, home_teamid, game_of_that_day
         ),
         team_games AS (
-            SELECT visitor_teamid AS team_id, Date,
+            SELECT visitor_teamid AS team_id, game_date,
                    IF(visitor_total > home_total, 1, 0) AS win,
                    IF(visitor_total < home_total, 1, 0) AS loss
             FROM unique_games
             UNION ALL
-            SELECT home_teamid AS team_id, Date,
+            SELECT home_teamid AS team_id, game_date,
                    IF(home_total > visitor_total, 1, 0) AS win,
                    IF(home_total < visitor_total, 1, 0) AS loss
             FROM unique_games
         )
         SELECT
-            CASE WHEN MONTH(tg.Date) >= 10 THEN YEAR(tg.Date) + 1
-                 ELSE YEAR(tg.Date) END AS year,
+            CASE WHEN MONTH(tg.game_date) >= 10 THEN YEAR(tg.game_date) + 1
+                 ELSE YEAR(tg.game_date) END AS year,
             ti.team_name AS currentname,
             COALESCE(fs.team_name, ti.team_name) AS namethatyear,
             CAST(SUM(tg.win)  AS UNSIGNED) AS wins,
@@ -250,13 +250,13 @@ class TeamRepository extends \BaseMysqliRepository implements TeamRepositoryInte
         LEFT JOIN ibl_franchise_seasons fs
             ON fs.franchise_id = tg.team_id
             AND fs.season_ending_year = (
-                CASE WHEN MONTH(tg.Date) >= 10 THEN YEAR(tg.Date) + 1
-                     ELSE YEAR(tg.Date) END
+                CASE WHEN MONTH(tg.game_date) >= 10 THEN YEAR(tg.game_date) + 1
+                     ELSE YEAR(tg.game_date) END
             )
         WHERE tg.team_id = (SELECT teamid FROM ibl_team_info WHERE team_name = ?)
         GROUP BY
             tg.team_id,
-            CASE WHEN MONTH(tg.Date) >= 10 THEN YEAR(tg.Date) + 1 ELSE YEAR(tg.Date) END,
+            CASE WHEN MONTH(tg.game_date) >= 10 THEN YEAR(tg.game_date) + 1 ELSE YEAR(tg.game_date) END,
             ti.team_name,
             COALESCE(fs.team_name, ti.team_name)
         ORDER BY year DESC";
@@ -270,31 +270,31 @@ class TeamRepository extends \BaseMysqliRepository implements TeamRepositoryInte
     private static function buildHeatWinLossQuery(): string
     {
         return "WITH unique_games AS (
-            SELECT Date, visitor_teamid, home_teamid, gameOfThatDay,
-                (visitorQ1points + visitorQ2points + visitorQ3points + visitorQ4points
-                 + COALESCE(visitorOTpoints, 0)) AS visitor_total,
-                (homeQ1points + homeQ2points + homeQ3points + homeQ4points
-                 + COALESCE(homeOTpoints, 0)) AS home_total
+            SELECT game_date, visitor_teamid, home_teamid, game_of_that_day,
+                (visitor_q1_points + visitor_q2_points + visitor_q3_points + visitor_q4_points
+                 + COALESCE(visitor_ot_points, 0)) AS visitor_total,
+                (home_q1_points + home_q2_points + home_q3_points + home_q4_points
+                 + COALESCE(home_ot_points, 0)) AS home_total
             FROM ibl_box_scores_teams
             WHERE game_type = 3
-                AND YEAR(Date) < 9000
+                AND YEAR(game_date) < 9000
                 AND (visitor_teamid = (SELECT teamid FROM ibl_team_info WHERE team_name = ?)
                      OR home_teamid = (SELECT teamid FROM ibl_team_info WHERE team_name = ?))
-            GROUP BY Date, visitor_teamid, home_teamid, gameOfThatDay
+            GROUP BY game_date, visitor_teamid, home_teamid, game_of_that_day
         ),
         team_games AS (
-            SELECT visitor_teamid AS team_id, Date,
+            SELECT visitor_teamid AS team_id, game_date,
                    IF(visitor_total > home_total, 1, 0) AS win,
                    IF(visitor_total < home_total, 1, 0) AS loss
             FROM unique_games
             UNION ALL
-            SELECT home_teamid AS team_id, Date,
+            SELECT home_teamid AS team_id, game_date,
                    IF(home_total > visitor_total, 1, 0) AS win,
                    IF(home_total < visitor_total, 1, 0) AS loss
             FROM unique_games
         )
         SELECT
-            YEAR(tg.Date) AS year,
+            YEAR(tg.game_date) AS year,
             ti.team_name AS currentname,
             COALESCE(fs.team_name, ti.team_name) AS namethatyear,
             CAST(SUM(tg.win)  AS UNSIGNED) AS wins,
@@ -303,11 +303,11 @@ class TeamRepository extends \BaseMysqliRepository implements TeamRepositoryInte
         JOIN ibl_team_info ti ON ti.teamid = tg.team_id
         LEFT JOIN ibl_franchise_seasons fs
             ON fs.franchise_id = tg.team_id
-            AND fs.season_ending_year = (YEAR(tg.Date) + 1)
+            AND fs.season_ending_year = (YEAR(tg.game_date) + 1)
         WHERE tg.team_id = (SELECT teamid FROM ibl_team_info WHERE team_name = ?)
         GROUP BY
             tg.team_id,
-            YEAR(tg.Date),
+            YEAR(tg.game_date),
             ti.team_name,
             COALESCE(fs.team_name, ti.team_name)
         ORDER BY year DESC";
@@ -346,18 +346,18 @@ class TeamRepository extends \BaseMysqliRepository implements TeamRepositoryInte
             SELECT hc.year, ti.team_name AS name, 'IBL HEAT Champions' AS award, 0 AS id
             FROM (
                 SELECT
-                    YEAR(bst.Date) AS year,
+                    YEAR(bst.game_date) AS year,
                     CASE
-                        WHEN (bst.homeQ1points + bst.homeQ2points + bst.homeQ3points + bst.homeQ4points
-                              + COALESCE(bst.homeOTpoints, 0))
-                           > (bst.visitorQ1points + bst.visitorQ2points + bst.visitorQ3points + bst.visitorQ4points
-                              + COALESCE(bst.visitorOTpoints, 0))
+                        WHEN (bst.home_q1_points + bst.home_q2_points + bst.home_q3_points + bst.home_q4_points
+                              + COALESCE(bst.home_ot_points, 0))
+                           > (bst.visitor_q1_points + bst.visitor_q2_points + bst.visitor_q3_points + bst.visitor_q4_points
+                              + COALESCE(bst.visitor_ot_points, 0))
                         THEN bst.home_teamid
                         ELSE bst.visitor_teamid
                     END AS winner_tid,
                     ROW_NUMBER() OVER (
-                        PARTITION BY YEAR(bst.Date)
-                        ORDER BY bst.Date DESC, bst.gameOfThatDay ASC
+                        PARTITION BY YEAR(bst.game_date)
+                        ORDER BY bst.game_date DESC, bst.game_of_that_day ASC
                     ) AS rn
                 FROM ibl_box_scores_teams bst
                 WHERE bst.game_type = 3

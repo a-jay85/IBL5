@@ -16,7 +16,7 @@ class Boxscore
     public int $gameYear;
     public string $gameMonth;
     public string $gameDay;
-    public int $gameOfThatDay;
+    public int $game_of_that_day;
 
     public int $visitor_teamid;
     public int $home_teamid;
@@ -24,126 +24,126 @@ class Boxscore
     public string $attendance;
     public string $capacity;
 
-    public string $visitorWins;
-    public string $visitorLosses;
-    public string $homeWins;
-    public string $homeLosses;
+    public string $visitor_wins;
+    public string $visitor_losses;
+    public string $home_wins;
+    public string $home_losses;
 
-    public string $visitorQ1points;
-    public string $visitorQ2points;
-    public string $visitorQ3points;
-    public string $visitorQ4points;
-    public string $visitorOTpoints;
+    public string $visitor_q1_points;
+    public string $visitor_q2_points;
+    public string $visitor_q3_points;
+    public string $visitor_q4_points;
+    public string $visitor_ot_points;
 
-    public string $homeQ1points;
-    public string $homeQ2points;
-    public string $homeQ3points;
-    public string $homeQ4points;
-    public string $homeOTpoints;
+    public string $home_q1_points;
+    public string $home_q2_points;
+    public string $home_q3_points;
+    public string $home_q4_points;
+    public string $home_ot_points;
 
     const PLAYERSTATEMENT_PREPARE = "INSERT INTO ibl_box_scores (
-        Date,
+        game_date,
         uuid,
         name,
         pos,
         pid,
         visitor_teamid,
         home_teamid,
-        gameOfThatDay,
+        game_of_that_day,
         attendance,
         capacity,
-        visitorWins,
-        visitorLosses,
-        homeWins,
-        homeLosses,
+        visitor_wins,
+        visitor_losses,
+        home_wins,
+        home_losses,
         teamid,
-        gameMIN,
-        game2GM,
-        game2GA,
-        gameFTM,
-        gameFTA,
-        game3GM,
-        game3GA,
-        gameORB,
-        gameDRB,
-        gameAST,
-        gameSTL,
-        gameTOV,
-        gameBLK,
-        gamePF
+        game_min,
+        game_2gm,
+        game_2ga,
+        game_ftm,
+        game_fta,
+        game_3gm,
+        game_3ga,
+        game_orb,
+        game_drb,
+        game_ast,
+        game_stl,
+        game_tov,
+        game_blk,
+        game_pf
     )
     VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)";
 
     const TEAMSTATEMENT_PREPARE = "INSERT INTO ibl_box_scores_teams (
-        Date,
+        game_date,
         name,
-        gameOfThatDay,
+        game_of_that_day,
         visitor_teamid,
         home_teamid,
         attendance,
         capacity,
-        visitorWins,
-        visitorLosses,
-        homeWins,
-        homeLosses,
-        visitorQ1points,
-        visitorQ2points,
-        visitorQ3points,
-        visitorQ4points,
-        visitorOTpoints,
-        homeQ1points,
-        homeQ2points,
-        homeQ3points,
-        homeQ4points,
-        homeOTpoints,
-        game2GM,
-        game2GA,
-        gameFTM,
-        gameFTA,
-        game3GM,
-        game3GA,
-        gameORB,
-        gameDRB,
-        gameAST,
-        gameSTL,
-        gameTOV,
-        gameBLK,
-        gamePF
+        visitor_wins,
+        visitor_losses,
+        home_wins,
+        home_losses,
+        visitor_q1_points,
+        visitor_q2_points,
+        visitor_q3_points,
+        visitor_q4_points,
+        visitor_ot_points,
+        home_q1_points,
+        home_q2_points,
+        home_q3_points,
+        home_q4_points,
+        home_ot_points,
+        game_2gm,
+        game_2ga,
+        game_ftm,
+        game_fta,
+        game_3gm,
+        game_3ga,
+        game_orb,
+        game_drb,
+        game_ast,
+        game_stl,
+        game_tov,
+        game_blk,
+        game_pf
     )
     VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)";
 
     public static function playerInsertSql(string $table): string
     {
         return "INSERT INTO {$table} (
-        Date,
+        game_date,
         uuid,
         name,
         pos,
         pid,
         visitor_teamid,
         home_teamid,
-        gameOfThatDay,
+        game_of_that_day,
         attendance,
         capacity,
-        visitorWins,
-        visitorLosses,
-        homeWins,
-        homeLosses,
+        visitor_wins,
+        visitor_losses,
+        home_wins,
+        home_losses,
         teamid,
-        gameMIN,
-        game2GM,
-        game2GA,
-        gameFTM,
-        gameFTA,
-        game3GM,
-        game3GA,
-        gameORB,
-        gameDRB,
-        gameAST,
-        gameSTL,
-        gameTOV,
-        gameBLK,
-        gamePF
+        game_min,
+        game_2gm,
+        game_2ga,
+        game_ftm,
+        game_fta,
+        game_3gm,
+        game_3ga,
+        game_orb,
+        game_drb,
+        game_ast,
+        game_stl,
+        game_tov,
+        game_blk,
+        game_pf
     )
     VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)";
     }
@@ -151,40 +151,40 @@ class Boxscore
     public static function teamInsertSql(string $table): string
     {
         return "INSERT INTO {$table} (
-        Date,
+        game_date,
         name,
-        gameOfThatDay,
+        game_of_that_day,
         visitor_teamid,
         home_teamid,
         attendance,
         capacity,
-        visitorWins,
-        visitorLosses,
-        homeWins,
-        homeLosses,
-        visitorQ1points,
-        visitorQ2points,
-        visitorQ3points,
-        visitorQ4points,
-        visitorOTpoints,
-        homeQ1points,
-        homeQ2points,
-        homeQ3points,
-        homeQ4points,
-        homeOTpoints,
-        game2GM,
-        game2GA,
-        gameFTM,
-        gameFTA,
-        game3GM,
-        game3GA,
-        gameORB,
-        gameDRB,
-        gameAST,
-        gameSTL,
-        gameTOV,
-        gameBLK,
-        gamePF
+        visitor_wins,
+        visitor_losses,
+        home_wins,
+        home_losses,
+        visitor_q1_points,
+        visitor_q2_points,
+        visitor_q3_points,
+        visitor_q4_points,
+        visitor_ot_points,
+        home_q1_points,
+        home_q2_points,
+        home_q3_points,
+        home_q4_points,
+        home_ot_points,
+        game_2gm,
+        game_2ga,
+        game_ftm,
+        game_fta,
+        game_3gm,
+        game_3ga,
+        game_orb,
+        game_drb,
+        game_ast,
+        game_stl,
+        game_tov,
+        game_blk,
+        game_pf
     )
     VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)";
     }
@@ -194,25 +194,25 @@ class Boxscore
         $this->gameYear = $seasonEndingYear;
         $this->gameMonth = sprintf("%02u", intval(substr($gameInfoLine, 0, 2)) + 10); // sprintf() prepends 0 if the result isn't in double-digits
         $this->gameDay = sprintf("%02u", intval(substr($gameInfoLine, 2, 2)) + 1);
-        $this->gameOfThatDay = intval(substr($gameInfoLine, 4, 2)) + 1;
+        $this->game_of_that_day = intval(substr($gameInfoLine, 4, 2)) + 1;
         $this->visitor_teamid = intval(substr($gameInfoLine, 6, 2)) + 1;
         $this->home_teamid = intval(substr($gameInfoLine, 8, 2)) + 1;
         $this->attendance = substr($gameInfoLine, 10, 5);
         $this->capacity = substr($gameInfoLine, 15, 5);
-        $this->visitorWins = substr($gameInfoLine, 20, 2);
-        $this->visitorLosses = substr($gameInfoLine, 22, 2);
-        $this->homeWins = substr($gameInfoLine, 24, 2);
-        $this->homeLosses = substr($gameInfoLine, 26, 2);
-        $this->visitorQ1points = substr($gameInfoLine, 28, 3);
-        $this->visitorQ2points = substr($gameInfoLine, 31, 3);
-        $this->visitorQ3points = substr($gameInfoLine, 34, 3);
-        $this->visitorQ4points = substr($gameInfoLine, 37, 3);
-        $this->visitorOTpoints = substr($gameInfoLine, 40, 3);
-        $this->homeQ1points = substr($gameInfoLine, 43, 3);
-        $this->homeQ2points = substr($gameInfoLine, 46, 3);
-        $this->homeQ3points = substr($gameInfoLine, 49, 3);
-        $this->homeQ4points = substr($gameInfoLine, 52, 3);
-        $this->homeOTpoints = substr($gameInfoLine, 55, 3);
+        $this->visitor_wins = substr($gameInfoLine, 20, 2);
+        $this->visitor_losses = substr($gameInfoLine, 22, 2);
+        $this->home_wins = substr($gameInfoLine, 24, 2);
+        $this->home_losses = substr($gameInfoLine, 26, 2);
+        $this->visitor_q1_points = substr($gameInfoLine, 28, 3);
+        $this->visitor_q2_points = substr($gameInfoLine, 31, 3);
+        $this->visitor_q3_points = substr($gameInfoLine, 34, 3);
+        $this->visitor_q4_points = substr($gameInfoLine, 37, 3);
+        $this->visitor_ot_points = substr($gameInfoLine, 40, 3);
+        $this->home_q1_points = substr($gameInfoLine, 43, 3);
+        $this->home_q2_points = substr($gameInfoLine, 46, 3);
+        $this->home_q3_points = substr($gameInfoLine, 49, 3);
+        $this->home_q4_points = substr($gameInfoLine, 52, 3);
+        $this->home_ot_points = substr($gameInfoLine, 55, 3);
 
         // Olympics: all games occur in August of the ending year
         if (strtolower($league) === 'olympics') {
@@ -249,12 +249,12 @@ class Boxscore
         string $gameDate,
         int $visitor_teamid,
         int $home_teamid,
-        int $gameOfThatDay,
+        int $game_of_that_day,
     ): void {
         $this->gameDate = $gameDate;
         $this->visitor_teamid = $visitor_teamid;
         $this->home_teamid = $home_teamid;
-        $this->gameOfThatDay = $gameOfThatDay;
+        $this->game_of_that_day = $game_of_that_day;
     }
 
     /**
@@ -263,20 +263,20 @@ class Boxscore
      * Compares the sum of visitor and home quarter scores from $this (strings from .sco file)
      * against the same sums from $dbRow (ints from DB with native types enabled).
      *
-     * @param array{visitorQ1points: int, visitorQ2points: int, visitorQ3points: int, visitorQ4points: int, visitorOTpoints: int, homeQ1points: int, homeQ2points: int, homeQ3points: int, homeQ4points: int, homeOTpoints: int} $dbRow
+     * @param array{visitor_q1_points: int, visitor_q2_points: int, visitor_q3_points: int, visitor_q4_points: int, visitor_ot_points: int, home_q1_points: int, home_q2_points: int, home_q3_points: int, home_q4_points: int, home_ot_points: int} $dbRow
      * @return bool True if both visitor and home totals match
      */
     public function scoresMatchDatabase(array $dbRow): bool
     {
-        $parsedVisitorTotal = (int) $this->visitorQ1points + (int) $this->visitorQ2points
-            + (int) $this->visitorQ3points + (int) $this->visitorQ4points + (int) $this->visitorOTpoints;
-        $parsedHomeTotal = (int) $this->homeQ1points + (int) $this->homeQ2points
-            + (int) $this->homeQ3points + (int) $this->homeQ4points + (int) $this->homeOTpoints;
+        $parsedVisitorTotal = (int) $this->visitor_q1_points + (int) $this->visitor_q2_points
+            + (int) $this->visitor_q3_points + (int) $this->visitor_q4_points + (int) $this->visitor_ot_points;
+        $parsedHomeTotal = (int) $this->home_q1_points + (int) $this->home_q2_points
+            + (int) $this->home_q3_points + (int) $this->home_q4_points + (int) $this->home_ot_points;
 
-        $dbVisitorTotal = $dbRow['visitorQ1points'] + $dbRow['visitorQ2points']
-            + $dbRow['visitorQ3points'] + $dbRow['visitorQ4points'] + $dbRow['visitorOTpoints'];
-        $dbHomeTotal = $dbRow['homeQ1points'] + $dbRow['homeQ2points']
-            + $dbRow['homeQ3points'] + $dbRow['homeQ4points'] + $dbRow['homeOTpoints'];
+        $dbVisitorTotal = $dbRow['visitor_q1_points'] + $dbRow['visitor_q2_points']
+            + $dbRow['visitor_q3_points'] + $dbRow['visitor_q4_points'] + $dbRow['visitor_ot_points'];
+        $dbHomeTotal = $dbRow['home_q1_points'] + $dbRow['home_q2_points']
+            + $dbRow['home_q3_points'] + $dbRow['home_q4_points'] + $dbRow['home_ot_points'];
 
         return $parsedVisitorTotal === $dbVisitorTotal && $parsedHomeTotal === $dbHomeTotal;
     }

@@ -124,7 +124,7 @@ class SeasonHighsServiceTest extends TestCase
                     'team_city' => 'Test City',
                     'color1' => 'FFFFFF',
                     'color2' => '000000',
-                    'gameOfThatDay' => 0,
+                    'game_of_that_day' => 0,
                 ],
             ]);
         $season = $this->createStubSeason(2024, 2025);

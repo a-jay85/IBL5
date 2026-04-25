@@ -24,8 +24,8 @@ class LeagueScheduleRepositoryTest extends DatabaseTestCase
 
         $found = $this->findBySchedId($results, $schedId);
         self::assertNotNull($found);
-        self::assertSame(1, $found['Visitor']);
-        self::assertSame(2, $found['Home']);
+        self::assertSame(1, $found['visitor_teamid']);
+        self::assertSame(2, $found['home_teamid']);
     }
 
     public function testGameWithBoxScoreHasNonZeroGameOfThatDay(): void
@@ -37,7 +37,7 @@ class LeagueScheduleRepositoryTest extends DatabaseTestCase
 
         $found = $this->findBySchedId($results, $schedId);
         self::assertNotNull($found);
-        self::assertSame(3, $found['gameOfThatDay']);
+        self::assertSame(3, $found['game_of_that_day']);
     }
 
     public function testGameWithoutBoxScoreHasZeroGameOfThatDay(): void
@@ -48,7 +48,7 @@ class LeagueScheduleRepositoryTest extends DatabaseTestCase
 
         $found = $this->findBySchedId($results, $schedId);
         self::assertNotNull($found);
-        self::assertSame(0, $found['gameOfThatDay']);
+        self::assertSame(0, $found['game_of_that_day']);
     }
 
     public function testMultipleBstRowsReturnsMinGameOfThatDay(): void
@@ -61,7 +61,7 @@ class LeagueScheduleRepositoryTest extends DatabaseTestCase
 
         $found = $this->findBySchedId($results, $schedId);
         self::assertNotNull($found);
-        self::assertSame(2, $found['gameOfThatDay']);
+        self::assertSame(2, $found['game_of_that_day']);
     }
 
     public function testResultRowHasAllRequiredKeys(): void
@@ -72,7 +72,7 @@ class LeagueScheduleRepositoryTest extends DatabaseTestCase
 
         $found = $this->findBySchedId($results, $schedId);
         self::assertNotNull($found);
-        $expectedKeys = ['SchedID', 'Date', 'Visitor', 'VScore', 'Home', 'HScore', 'BoxID', 'gameOfThatDay'];
+        $expectedKeys = ['id', 'game_date', 'visitor_teamid', 'visitor_score', 'home_teamid', 'home_score', 'box_id', 'game_of_that_day'];
         foreach ($expectedKeys as $key) {
             self::assertArrayHasKey($key, $found, "Missing key: $key");
         }
@@ -88,10 +88,10 @@ class LeagueScheduleRepositoryTest extends DatabaseTestCase
         $pos1 = null;
         $pos2 = null;
         foreach ($results as $i => $row) {
-            if ($row['SchedID'] === $schedId1) {
+            if ($row['id'] === $schedId1) {
                 $pos1 = $i;
             }
-            if ($row['SchedID'] === $schedId2) {
+            if ($row['id'] === $schedId2) {
                 $pos2 = $i;
             }
         }
@@ -137,7 +137,7 @@ class LeagueScheduleRepositoryTest extends DatabaseTestCase
     private function findBySchedId(array $results, int $schedId): ?array
     {
         foreach ($results as $row) {
-            if ($row['SchedID'] === $schedId) {
+            if ($row['id'] === $schedId) {
                 return $row;
             }
         }

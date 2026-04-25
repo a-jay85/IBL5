@@ -70,15 +70,15 @@ class PlayerStatsRepositoryTest extends DatabaseTestCase
         $this->insertTeamBoxscoreRow('2098-01-15', 'Metros', 1, 2, 1);
         $this->insertTeamBoxscoreRow('2098-01-15', 'Sharks', 1, 2, 1);
 
-        // Insert matching schedule row (needed for BoxID JOIN)
+        // Insert matching schedule row (needed for box_id JOIN)
         $this->insertRow('ibl_schedule', [
-            'Year' => 2098,
-            'BoxID' => 500,
-            'Date' => '2098-01-15',
-            'Visitor' => 2,
-            'VScore' => 85,
-            'Home' => 1,
-            'HScore' => 100,
+            'season_year' => 2098,
+            'box_id' => 500,
+            'game_date' => '2098-01-15',
+            'visitor_teamid' => 2,
+            'visitor_score' => 85,
+            'home_teamid' => 1,
+            'home_score' => 100,
             'uuid' => 'sched-boxdt-0000-000000000001',
         ]);
 
@@ -87,8 +87,8 @@ class PlayerStatsRepositoryTest extends DatabaseTestCase
         self::assertNotEmpty($result);
         $first = $result[0];
         self::assertSame($pid, $first['pid']);
-        self::assertArrayHasKey('gameOfThatDay', $first);
-        self::assertArrayHasKey('BoxID', $first);
+        self::assertArrayHasKey('game_of_that_day', $first);
+        self::assertArrayHasKey('box_id', $first);
     }
 
     public function testGetBoxScoresBetweenDatesExcludesOutOfRange(): void
@@ -152,7 +152,7 @@ class PlayerStatsRepositoryTest extends DatabaseTestCase
 
         self::assertNotNull($result);
         self::assertSame(2, $result['games']);
-        // FGM = calc_fg_made = game2GM + game3GM
+        // FGM = calc_fg_made = game_2gm + game_3gm
         self::assertSame(6 + 2 + 8 + 3, $result['fgm']); // 19
     }
 

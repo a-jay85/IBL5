@@ -244,9 +244,9 @@ class ProjectedDraftOrderService implements ProjectedDraftOrderServiceInterface
     {
         $h2h = [];
         foreach ($games as $game) {
-            $visitor = $game['Visitor'];
-            $home = $game['Home'];
-            if ($game['VScore'] > $game['HScore']) {
+            $visitor = $game['visitor_teamid'];
+            $home = $game['home_teamid'];
+            if ($game['visitor_score'] > $game['home_score']) {
                 $h2h[$visitor][$home] = ($h2h[$visitor][$home] ?? 0) + 1;
             } else {
                 $h2h[$home][$visitor] = ($h2h[$home][$visitor] ?? 0) + 1;

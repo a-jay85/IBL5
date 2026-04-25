@@ -214,19 +214,19 @@ class TeamOffDefStatsRepository extends \BaseMysqliRepository implements TeamOff
     {
         return "SELECT fs.franchise_id AS teamid, fs.team_name AS name, bst.season_year,
             CAST(COUNT(*) AS SIGNED) AS games,
-            CAST(SUM(bst.game2GM + bst.game3GM) AS SIGNED) AS fgm,
-            CAST(SUM(bst.game2GA + bst.game3GA) AS SIGNED) AS fga,
-            CAST(SUM(bst.gameFTM) AS SIGNED) AS ftm,
-            CAST(SUM(bst.gameFTA) AS SIGNED) AS fta,
-            CAST(SUM(bst.game3GM) AS SIGNED) AS tgm,
-            CAST(SUM(bst.game3GA) AS SIGNED) AS tga,
-            CAST(SUM(bst.gameORB) AS SIGNED) AS orb,
-            CAST(SUM(bst.gameORB + bst.gameDRB) AS SIGNED) AS reb,
-            CAST(SUM(bst.gameAST) AS SIGNED) AS ast,
-            CAST(SUM(bst.gameSTL) AS SIGNED) AS stl,
-            CAST(SUM(bst.gameTOV) AS SIGNED) AS tvr,
-            CAST(SUM(bst.gameBLK) AS SIGNED) AS blk,
-            CAST(SUM(bst.gamePF) AS SIGNED) AS pf
+            CAST(SUM(bst.game_2gm + bst.game_3gm) AS SIGNED) AS fgm,
+            CAST(SUM(bst.game_2ga + bst.game_3ga) AS SIGNED) AS fga,
+            CAST(SUM(bst.game_ftm) AS SIGNED) AS ftm,
+            CAST(SUM(bst.game_fta) AS SIGNED) AS fta,
+            CAST(SUM(bst.game_3gm) AS SIGNED) AS tgm,
+            CAST(SUM(bst.game_3ga) AS SIGNED) AS tga,
+            CAST(SUM(bst.game_orb) AS SIGNED) AS orb,
+            CAST(SUM(bst.game_orb + bst.game_drb) AS SIGNED) AS reb,
+            CAST(SUM(bst.game_ast) AS SIGNED) AS ast,
+            CAST(SUM(bst.game_stl) AS SIGNED) AS stl,
+            CAST(SUM(bst.game_tov) AS SIGNED) AS tvr,
+            CAST(SUM(bst.game_blk) AS SIGNED) AS blk,
+            CAST(SUM(bst.game_pf) AS SIGNED) AS pf
         FROM ibl_box_scores_teams bst
         JOIN ibl_franchise_seasons fs
             ON fs.team_name = bst.name AND fs.season_ending_year = bst.season_year
@@ -244,25 +244,25 @@ class TeamOffDefStatsRepository extends \BaseMysqliRepository implements TeamOff
     {
         return "SELECT fs.franchise_id AS teamid, fs.team_name AS name, my.season_year,
             CAST(COUNT(*) AS SIGNED) AS games,
-            CAST(SUM(opp.game2GM + opp.game3GM) AS SIGNED) AS fgm,
-            CAST(SUM(opp.game2GA + opp.game3GA) AS SIGNED) AS fga,
-            CAST(SUM(opp.gameFTM) AS SIGNED) AS ftm,
-            CAST(SUM(opp.gameFTA) AS SIGNED) AS fta,
-            CAST(SUM(opp.game3GM) AS SIGNED) AS tgm,
-            CAST(SUM(opp.game3GA) AS SIGNED) AS tga,
-            CAST(SUM(opp.gameORB) AS SIGNED) AS orb,
-            CAST(SUM(opp.gameORB + opp.gameDRB) AS SIGNED) AS reb,
-            CAST(SUM(opp.gameAST) AS SIGNED) AS ast,
-            CAST(SUM(opp.gameSTL) AS SIGNED) AS stl,
-            CAST(SUM(opp.gameTOV) AS SIGNED) AS tvr,
-            CAST(SUM(opp.gameBLK) AS SIGNED) AS blk,
-            CAST(SUM(opp.gamePF) AS SIGNED) AS pf
+            CAST(SUM(opp.game_2gm + opp.game_3gm) AS SIGNED) AS fgm,
+            CAST(SUM(opp.game_2ga + opp.game_3ga) AS SIGNED) AS fga,
+            CAST(SUM(opp.game_ftm) AS SIGNED) AS ftm,
+            CAST(SUM(opp.game_fta) AS SIGNED) AS fta,
+            CAST(SUM(opp.game_3gm) AS SIGNED) AS tgm,
+            CAST(SUM(opp.game_3ga) AS SIGNED) AS tga,
+            CAST(SUM(opp.game_orb) AS SIGNED) AS orb,
+            CAST(SUM(opp.game_orb + opp.game_drb) AS SIGNED) AS reb,
+            CAST(SUM(opp.game_ast) AS SIGNED) AS ast,
+            CAST(SUM(opp.game_stl) AS SIGNED) AS stl,
+            CAST(SUM(opp.game_tov) AS SIGNED) AS tvr,
+            CAST(SUM(opp.game_blk) AS SIGNED) AS blk,
+            CAST(SUM(opp.game_pf) AS SIGNED) AS pf
         FROM ibl_box_scores_teams my
         JOIN ibl_box_scores_teams opp
-            ON my.Date = opp.Date
+            ON my.game_date = opp.game_date
             AND my.visitor_teamid = opp.visitor_teamid
             AND my.home_teamid = opp.home_teamid
-            AND my.gameOfThatDay = opp.gameOfThatDay
+            AND my.game_of_that_day = opp.game_of_that_day
             AND my.name <> opp.name
         JOIN ibl_franchise_seasons fs
             ON fs.team_name = my.name AND fs.season_ending_year = my.season_year

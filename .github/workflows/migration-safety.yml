@@ -246,7 +246,7 @@ jobs:
         CHECKS=(
           "ibl_plr:pid,name,teamid,pos,uuid"
           "ibl_team_info:teamid,team_city,team_name,uuid"
-          "ibl_schedule:Date,Year,Visitor,Home,uuid"
+          "ibl_schedule:game_date,season_year,visitor_teamid,home_teamid,uuid"
           "ibl_settings:name,value"
           "ibl_draft_picks:pickid,ownerofpick,owner_teamid,year,round"
           "ibl_trade_info:id,tradeofferid,itemid,trade_from,trade_to"

@@ -44,7 +44,7 @@ class ProcessAllStarGamesStep implements PipelineStepInterface
             $pendingRenames = [];
             foreach ($pendingDefaults as $row) {
                 /** @var string $date */
-                $date = $row['Date'];
+                $date = $row['game_date'];
                 $teamid = $row['name'] === BoxscoreProcessor::DEFAULT_AWAY_NAME
                     ? 50
                     : 51;

@@ -16,7 +16,7 @@ interface SeasonHighsRepositoryInterface
     /**
      * Get season highs for a specific stat.
      *
-     * @param string $statExpression SQL expression for the stat (e.g., '(`game2GM`*2) + `gameFTM` + (`game3GM`*3)')
+     * @param string $statExpression SQL expression for the stat (e.g., '(`game_2gm`*2) + `game_ftm` + (`game_3gm`*3)')
      * @param string $statName Name of the stat column alias
      * @param string $tableSuffix Table suffix ('_teams' for teams, empty for players)
      * @param string $startDate Start date for the query (YYYY-MM-DD)

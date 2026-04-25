@@ -153,7 +153,7 @@ class ApiGameRepositoryTest extends DatabaseTestCase
         $schedId = $this->insertScheduleRow(2025, '2025-08-01', 1, 90, 2, 85);
 
         // Look up the uuid from the inserted row
-        $stmt = $this->db->prepare('SELECT uuid FROM ibl_schedule WHERE SchedID = ?');
+        $stmt = $this->db->prepare('SELECT uuid FROM ibl_schedule WHERE id = ?');
         self::assertNotFalse($stmt);
         $stmt->bind_param('i', $schedId);
         $stmt->execute();
@@ -191,8 +191,8 @@ class ApiGameRepositoryTest extends DatabaseTestCase
         self::assertNotEmpty($result);
         $row = $result[0];
 
-        self::assertArrayHasKey('visitorQ1points', $row);
-        self::assertArrayHasKey('homeQ1points', $row);
+        self::assertArrayHasKey('visitor_q1_points', $row);
+        self::assertArrayHasKey('home_q1_points', $row);
         self::assertArrayHasKey('attendance', $row);
         self::assertArrayHasKey('capacity', $row);
     }
@@ -219,8 +219,8 @@ class ApiGameRepositoryTest extends DatabaseTestCase
 
         self::assertArrayHasKey('name', $row);
         self::assertArrayHasKey('pos', $row);
-        self::assertArrayHasKey('gameMIN', $row);
-        self::assertArrayHasKey('game2GM', $row);
+        self::assertArrayHasKey('game_min', $row);
+        self::assertArrayHasKey('game_2gm', $row);
         self::assertArrayHasKey('player_uuid', $row);
     }
 

@@ -44,7 +44,7 @@ class TeamStatsCalculatorTest extends TestCase
     public function testCalculateWithAwayWin(): void
     {
         $games = [
-            ['Visitor' => 1, 'VScore' => 100, 'Home' => 2, 'HScore' => 95]
+            ['visitor_teamid' => 1, 'visitor_score' => 100, 'home_teamid' => 2, 'home_score' => 95]
         ];
 
         $result = $this->calculator->calculate($games, 1);
@@ -60,7 +60,7 @@ class TeamStatsCalculatorTest extends TestCase
     public function testCalculateWithHomeLoss(): void
     {
         $games = [
-            ['Visitor' => 2, 'VScore' => 100, 'Home' => 1, 'HScore' => 95]
+            ['visitor_teamid' => 2, 'visitor_score' => 100, 'home_teamid' => 1, 'home_score' => 95]
         ];
 
         $result = $this->calculator->calculate($games, 1);
@@ -76,7 +76,7 @@ class TeamStatsCalculatorTest extends TestCase
     public function testCalculateWithHomeWin(): void
     {
         $games = [
-            ['Visitor' => 2, 'VScore' => 95, 'Home' => 1, 'HScore' => 100]
+            ['visitor_teamid' => 2, 'visitor_score' => 95, 'home_teamid' => 1, 'home_score' => 100]
         ];
 
         $result = $this->calculator->calculate($games, 1);
@@ -90,7 +90,7 @@ class TeamStatsCalculatorTest extends TestCase
     public function testCalculateWithAwayLoss(): void
     {
         $games = [
-            ['Visitor' => 1, 'VScore' => 95, 'Home' => 2, 'HScore' => 100]
+            ['visitor_teamid' => 1, 'visitor_score' => 95, 'home_teamid' => 2, 'home_score' => 100]
         ];
 
         $result = $this->calculator->calculate($games, 1);
@@ -104,9 +104,9 @@ class TeamStatsCalculatorTest extends TestCase
     public function testCalculateStreakIncrementsForConsecutiveWins(): void
     {
         $games = [
-            ['Visitor' => 1, 'VScore' => 100, 'Home' => 2, 'HScore' => 95],
-            ['Visitor' => 1, 'VScore' => 105, 'Home' => 3, 'HScore' => 100],
-            ['Visitor' => 1, 'VScore' => 110, 'Home' => 4, 'HScore' => 105],
+            ['visitor_teamid' => 1, 'visitor_score' => 100, 'home_teamid' => 2, 'home_score' => 95],
+            ['visitor_teamid' => 1, 'visitor_score' => 105, 'home_teamid' => 3, 'home_score' => 100],
+            ['visitor_teamid' => 1, 'visitor_score' => 110, 'home_teamid' => 4, 'home_score' => 105],
         ];
 
         $result = $this->calculator->calculate($games, 1);
@@ -119,8 +119,8 @@ class TeamStatsCalculatorTest extends TestCase
     public function testCalculateStreakResetsOnLoss(): void
     {
         $games = [
-            ['Visitor' => 1, 'VScore' => 100, 'Home' => 2, 'HScore' => 95],
-            ['Visitor' => 1, 'VScore' => 95, 'Home' => 3, 'HScore' => 100],
+            ['visitor_teamid' => 1, 'visitor_score' => 100, 'home_teamid' => 2, 'home_score' => 95],
+            ['visitor_teamid' => 1, 'visitor_score' => 95, 'home_teamid' => 3, 'home_score' => 100],
         ];
 
         $result = $this->calculator->calculate($games, 1);
@@ -136,7 +136,7 @@ class TeamStatsCalculatorTest extends TestCase
         // Create 15 games, team wins all
         $games = [];
         for ($i = 0; $i < 15; $i++) {
-            $games[] = ['Visitor' => 1, 'VScore' => 100, 'Home' => $i + 2, 'HScore' => 95];
+            $games[] = ['visitor_teamid' => 1, 'visitor_score' => 100, 'home_teamid' => $i + 2, 'home_score' => 95];
         }
 
         $result = $this->calculator->calculate($games, 1);
@@ -149,8 +149,8 @@ class TeamStatsCalculatorTest extends TestCase
     public function testCalculateSkipsTiedGames(): void
     {
         $games = [
-            ['Visitor' => 1, 'VScore' => 100, 'Home' => 2, 'HScore' => 100], // Tied - should skip
-            ['Visitor' => 1, 'VScore' => 105, 'Home' => 3, 'HScore' => 100], // Win
+            ['visitor_teamid' => 1, 'visitor_score' => 100, 'home_teamid' => 2, 'home_score' => 100], // Tied - should skip
+            ['visitor_teamid' => 1, 'visitor_score' => 105, 'home_teamid' => 3, 'home_score' => 100], // Win
         ];
 
         $result = $this->calculator->calculate($games, 1);
@@ -322,7 +322,7 @@ class TeamStatsCalculatorTest extends TestCase
         // 15 consecutive wins
         $games = [];
         for ($i = 0; $i < 15; $i++) {
-            $games[] = ['Visitor' => 1, 'VScore' => 100, 'Home' => $i + 2, 'HScore' => 95];
+            $games[] = ['visitor_teamid' => 1, 'visitor_score' => 100, 'home_teamid' => $i + 2, 'home_score' => 95];
         }
 
         $result = $this->calculator->calculate($games, 1);
@@ -336,7 +336,7 @@ class TeamStatsCalculatorTest extends TestCase
         // 15 consecutive losses
         $games = [];
         for ($i = 0; $i < 15; $i++) {
-            $games[] = ['Visitor' => 1, 'VScore' => 95, 'Home' => $i + 2, 'HScore' => 100];
+            $games[] = ['visitor_teamid' => 1, 'visitor_score' => 95, 'home_teamid' => $i + 2, 'home_score' => 100];
         }
 
         $result = $this->calculator->calculate($games, 1);
@@ -349,10 +349,10 @@ class TeamStatsCalculatorTest extends TestCase
     {
         // Win, loss, win, loss pattern
         $games = [
-            ['Visitor' => 1, 'VScore' => 100, 'Home' => 2, 'HScore' => 95], // Win
-            ['Visitor' => 1, 'VScore' => 95, 'Home' => 3, 'HScore' => 100], // Loss
-            ['Visitor' => 1, 'VScore' => 100, 'Home' => 4, 'HScore' => 95], // Win
-            ['Visitor' => 1, 'VScore' => 95, 'Home' => 5, 'HScore' => 100], // Loss
+            ['visitor_teamid' => 1, 'visitor_score' => 100, 'home_teamid' => 2, 'home_score' => 95], // Win
+            ['visitor_teamid' => 1, 'visitor_score' => 95, 'home_teamid' => 3, 'home_score' => 100], // Loss
+            ['visitor_teamid' => 1, 'visitor_score' => 100, 'home_teamid' => 4, 'home_score' => 95], // Win
+            ['visitor_teamid' => 1, 'visitor_score' => 95, 'home_teamid' => 5, 'home_score' => 100], // Loss
         ];
 
         $result = $this->calculator->calculate($games, 1);
@@ -367,11 +367,11 @@ class TeamStatsCalculatorTest extends TestCase
     {
         $games = [
             // 3 wins
-            ['Visitor' => 1, 'VScore' => 100, 'Home' => 2, 'HScore' => 95],
-            ['Visitor' => 1, 'VScore' => 100, 'Home' => 3, 'HScore' => 95],
-            ['Visitor' => 1, 'VScore' => 100, 'Home' => 4, 'HScore' => 95],
+            ['visitor_teamid' => 1, 'visitor_score' => 100, 'home_teamid' => 2, 'home_score' => 95],
+            ['visitor_teamid' => 1, 'visitor_score' => 100, 'home_teamid' => 3, 'home_score' => 95],
+            ['visitor_teamid' => 1, 'visitor_score' => 100, 'home_teamid' => 4, 'home_score' => 95],
             // 1 loss (resets streak to 1)
-            ['Visitor' => 1, 'VScore' => 95, 'Home' => 5, 'HScore' => 100],
+            ['visitor_teamid' => 1, 'visitor_score' => 95, 'home_teamid' => 5, 'home_score' => 100],
         ];
 
         $result = $this->calculator->calculate($games, 1);
@@ -389,7 +389,7 @@ class TeamStatsCalculatorTest extends TestCase
     public function testHandlesMissingScoreFields(): void
     {
         $games = [
-            ['Visitor' => 1, 'Home' => 2], // Missing scores
+            ['visitor_teamid' => 1, 'home_teamid' => 2], // Missing scores
         ];
 
         $result = $this->calculator->calculate($games, 1);
@@ -402,7 +402,7 @@ class TeamStatsCalculatorTest extends TestCase
     public function testHandlesMissingTeamFields(): void
     {
         $games = [
-            ['VScore' => 100, 'HScore' => 95], // Missing team IDs (defaults to 0)
+            ['visitor_score' => 100, 'home_score' => 95], // Missing team IDs (defaults to 0)
         ];
 
         $result = $this->calculator->calculate($games, 1);
@@ -417,7 +417,7 @@ class TeamStatsCalculatorTest extends TestCase
     public function testHandlesNullValues(): void
     {
         $games = [
-            ['Visitor' => null, 'VScore' => null, 'Home' => null, 'HScore' => null],
+            ['visitor_teamid' => null, 'visitor_score' => null, 'home_teamid' => null, 'home_score' => null],
         ];
 
         $result = $this->calculator->calculate($games, 1);
@@ -434,7 +434,7 @@ class TeamStatsCalculatorTest extends TestCase
     {
         $games = [];
         for ($i = 0; $i < 10; $i++) {
-            $games[] = ['Visitor' => 1, 'VScore' => 100, 'Home' => $i + 2, 'HScore' => 95];
+            $games[] = ['visitor_teamid' => 1, 'visitor_score' => 100, 'home_teamid' => $i + 2, 'home_score' => 95];
         }
 
         $result = $this->calculator->calculate($games, 1);
@@ -447,7 +447,7 @@ class TeamStatsCalculatorTest extends TestCase
     {
         $games = [];
         for ($i = 0; $i < 5; $i++) {
-            $games[] = ['Visitor' => 1, 'VScore' => 100, 'Home' => $i + 2, 'HScore' => 95];
+            $games[] = ['visitor_teamid' => 1, 'visitor_score' => 100, 'home_teamid' => $i + 2, 'home_score' => 95];
         }
 
         $result = $this->calculator->calculate($games, 1);
@@ -460,10 +460,10 @@ class TeamStatsCalculatorTest extends TestCase
     {
         $games = [];
         // First game is a loss (outside last 10)
-        $games[] = ['Visitor' => 1, 'VScore' => 95, 'Home' => 99, 'HScore' => 100];
+        $games[] = ['visitor_teamid' => 1, 'visitor_score' => 95, 'home_teamid' => 99, 'home_score' => 100];
         // Next 10 are wins
         for ($i = 0; $i < 10; $i++) {
-            $games[] = ['Visitor' => 1, 'VScore' => 100, 'Home' => $i + 2, 'HScore' => 95];
+            $games[] = ['visitor_teamid' => 1, 'visitor_score' => 100, 'home_teamid' => $i + 2, 'home_score' => 95];
         }
 
         $result = $this->calculator->calculate($games, 1);
@@ -482,7 +482,7 @@ class TeamStatsCalculatorTest extends TestCase
     {
         $games = [];
         for ($i = 0; $i < 5; $i++) {
-            $games[] = ['Visitor' => $i + 2, 'VScore' => 95, 'Home' => 1, 'HScore' => 100];
+            $games[] = ['visitor_teamid' => $i + 2, 'visitor_score' => 95, 'home_teamid' => 1, 'home_score' => 100];
         }
 
         $result = $this->calculator->calculate($games, 1);
@@ -496,7 +496,7 @@ class TeamStatsCalculatorTest extends TestCase
     {
         $games = [];
         for ($i = 0; $i < 5; $i++) {
-            $games[] = ['Visitor' => 1, 'VScore' => 100, 'Home' => $i + 2, 'HScore' => 95];
+            $games[] = ['visitor_teamid' => 1, 'visitor_score' => 100, 'home_teamid' => $i + 2, 'home_score' => 95];
         }
 
         $result = $this->calculator->calculate($games, 1);
@@ -514,7 +514,7 @@ class TeamStatsCalculatorTest extends TestCase
     {
         // MockDatabase doesn't have fetchOne, so opponent records default to 0
         $games = [
-            ['Visitor' => 1, 'VScore' => 100, 'Home' => 2, 'HScore' => 95],
+            ['visitor_teamid' => 1, 'visitor_score' => 100, 'home_teamid' => 2, 'home_score' => 95],
         ];
 
         $result = $this->calculator->calculate($games, 1);
@@ -528,7 +528,7 @@ class TeamStatsCalculatorTest extends TestCase
     {
         // MockDatabase doesn't have fetchOne, so opponent records default to 0
         $games = [
-            ['Visitor' => 1, 'VScore' => 95, 'Home' => 2, 'HScore' => 100],
+            ['visitor_teamid' => 1, 'visitor_score' => 95, 'home_teamid' => 2, 'home_score' => 100],
         ];
 
         $result = $this->calculator->calculate($games, 1);

@@ -39,9 +39,9 @@ class SeriesRecordsRepositoryTest extends DatabaseTestCase
 
     public function testGetSeriesRecordsReturnsRecordsFromScheduleData(): void
     {
-        // Team 1 beats Team 2 at home (HScore > VScore)
+        // Team 1 beats Team 2 at home (home_score > visitor_score)
         $this->insertScheduleRow(2099, '2099-01-15', 2, 90, 1, 100);
-        // Team 2 beats Team 1 at home (HScore > VScore)
+        // Team 2 beats Team 1 at home (home_score > visitor_score)
         $this->insertScheduleRow(2099, '2099-01-20', 1, 85, 2, 95);
 
         $records = $this->repo->getSeriesRecords();

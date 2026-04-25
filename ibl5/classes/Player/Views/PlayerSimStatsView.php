@@ -134,22 +134,22 @@ class PlayerSimStatsView implements PlayerSimStatsViewInterface
         ];
 
         foreach ($boxScores as $row) {
-            /** @var array{gameMIN: int, game2GM: int, game2GA: int, game3GM: int, game3GA: int, gameFTM: int, gameFTA: int, gameORB: int, gameDRB: int, gameAST: int, gameSTL: int, gameTOV: int, gameBLK: int, gamePF: int} $row */
-            $totals['minutes'] += $row['gameMIN'];
-            $totals['fgm'] += $row['game2GM'] + $row['game3GM'];
-            $totals['fga'] += $row['game2GA'] + $row['game3GA'];
-            $totals['ftm'] += $row['gameFTM'];
-            $totals['fta'] += $row['gameFTA'];
-            $totals['tgm'] += $row['game3GM'];
-            $totals['tga'] += $row['game3GA'];
-            $totals['orb'] += $row['gameORB'];
-            $totals['drb'] += $row['gameDRB'];
-            $totals['ast'] += $row['gameAST'];
-            $totals['stl'] += $row['gameSTL'];
-            $totals['to'] += $row['gameTOV'];
-            $totals['blk'] += $row['gameBLK'];
-            $totals['pf'] += $row['gamePF'];
-            $totals['pts'] += (2 * $row['game2GM']) + (3 * $row['game3GM']) + $row['gameFTM'];
+            /** @var array{game_min: int, game_2gm: int, game_2ga: int, game_3gm: int, game_3ga: int, game_ftm: int, game_fta: int, game_orb: int, game_drb: int, game_ast: int, game_stl: int, game_tov: int, game_blk: int, game_pf: int} $row */
+            $totals['minutes'] += $row['game_min'];
+            $totals['fgm'] += $row['game_2gm'] + $row['game_3gm'];
+            $totals['fga'] += $row['game_2ga'] + $row['game_3ga'];
+            $totals['ftm'] += $row['game_ftm'];
+            $totals['fta'] += $row['game_fta'];
+            $totals['tgm'] += $row['game_3gm'];
+            $totals['tga'] += $row['game_3ga'];
+            $totals['orb'] += $row['game_orb'];
+            $totals['drb'] += $row['game_drb'];
+            $totals['ast'] += $row['game_ast'];
+            $totals['stl'] += $row['game_stl'];
+            $totals['to'] += $row['game_tov'];
+            $totals['blk'] += $row['game_blk'];
+            $totals['pf'] += $row['game_pf'];
+            $totals['pts'] += (2 * $row['game_2gm']) + (3 * $row['game_3gm']) + $row['game_ftm'];
         }
 
         return $totals;

@@ -106,16 +106,16 @@ test.describe('League Schedule — played games', () => {
     ).toBeVisible();
   });
 
-  test('played game with gameOfThatDay has IBL6 link', async ({ page }) => {
-    // Feb 20 game has ibl_box_scores_teams row with gameOfThatDay=1
+  test('played game with game_of_that_day has IBL6 link', async ({ page }) => {
+    // Feb 20 game has ibl_box_scores_teams row with game_of_that_day=1
     const ibl6Link = page.locator(
       '.schedule-game a.schedule-game__score-link[href*="boxscore"]',
     );
     await expect(ibl6Link.first()).toBeVisible();
   });
 
-  test('played game with BoxID has legacy link', async ({ page }) => {
-    // Feb 24 game has BoxID=42 but no ibl_box_scores_teams row
+  test('played game with box_id has legacy link', async ({ page }) => {
+    // Feb 24 game has box_id=42 but no ibl_box_scores_teams row
     const legacyLink = page.locator(
       '.schedule-game a.schedule-game__score-link[href*=".htm"]',
     );

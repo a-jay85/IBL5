@@ -73,13 +73,13 @@ class RecordHoldersService implements RecordHoldersServiceInterface
     private const PLAYER_STAT_EXPRESSIONS = [
         'Most Points in a Single Game' => 'bs.calc_points',
         'Most Rebounds in a Single Game' => 'bs.calc_rebounds',
-        'Most Assists in a Single Game' => 'bs.gameAST',
-        'Most Steals in a Single Game' => 'bs.gameSTL',
-        'Most Blocks in a Single Game' => 'bs.gameBLK',
-        'Most Turnovers in a Single Game' => 'bs.gameTOV',
+        'Most Assists in a Single Game' => 'bs.game_ast',
+        'Most Steals in a Single Game' => 'bs.game_stl',
+        'Most Blocks in a Single Game' => 'bs.game_blk',
+        'Most Turnovers in a Single Game' => 'bs.game_tov',
         'Most Field Goals in a Single Game' => 'bs.calc_fg_made',
-        'Most Free Throws in a Single Game' => 'bs.gameFTM',
-        'Most Three Pointers in a Single Game' => 'bs.game3GM',
+        'Most Free Throws in a Single Game' => 'bs.game_ftm',
+        'Most Three Pointers in a Single Game' => 'bs.game_3gm',
     ];
 
     /**
@@ -90,12 +90,12 @@ class RecordHoldersService implements RecordHoldersServiceInterface
     private const TEAM_STAT_EXPRESSIONS = [
         'Most Points in a Single Game' => 'bs.calc_points',
         'Most Rebounds in a Single Game' => 'bs.calc_rebounds',
-        'Most Assists in a Single Game' => 'bs.gameAST',
-        'Most Steals in a Single Game' => 'bs.gameSTL',
-        'Most Blocks in a Single Game' => 'bs.gameBLK',
+        'Most Assists in a Single Game' => 'bs.game_ast',
+        'Most Steals in a Single Game' => 'bs.game_stl',
+        'Most Blocks in a Single Game' => 'bs.game_blk',
         'Most Field Goals in a Single Game' => 'bs.calc_fg_made',
-        'Most Free Throws in a Single Game' => 'bs.gameFTM',
-        'Most Three Pointers in a Single Game' => 'bs.game3GM',
+        'Most Free Throws in a Single Game' => 'bs.game_ftm',
+        'Most Three Pointers in a Single Game' => 'bs.game_3gm',
     ];
 
     /**
@@ -180,7 +180,7 @@ class RecordHoldersService implements RecordHoldersServiceInterface
     /**
      * Format player single-game records from DB rows.
      *
-     * @param list<array{pid: int, name: string, teamid: int, team_name: string, date: string, BoxID: int, gameOfThatDay: int, oppTid: int, opp_team_name: string, value: int}> $dbRecords
+     * @param list<array{pid: int, name: string, teamid: int, team_name: string, date: string, box_id: int, game_of_that_day: int, oppTid: int, opp_team_name: string, value: int}> $dbRecords
      * @param string $gameType
      * @return list<FormattedPlayerRecord>
      */
@@ -197,7 +197,7 @@ class RecordHoldersService implements RecordHoldersServiceInterface
                 'teamAbbr' => $teamAbbr,
                 'teamTid' => $record['teamid'],
                 'teamYr' => (string) $seasonYear,
-                'boxScoreUrl' => $this->buildBoxScoreUrl($record['date'], $record['gameOfThatDay'], $record['BoxID']),
+                'boxScoreUrl' => $this->buildBoxScoreUrl($record['date'], $record['game_of_that_day'], $record['box_id']),
                 'dateDisplay' => $this->formatDateDisplay($record['date'], $gameType),
                 'oppAbbr' => $this->getTeamAbbreviation($record['oppTid']),
                 'oppTid' => $record['oppTid'],
@@ -239,7 +239,7 @@ class RecordHoldersService implements RecordHoldersServiceInterface
                 'teamAbbr' => $teamAbbr,
                 'teamTid' => $record['teamid'],
                 'teamYr' => (string) $seasonYear,
-                'boxScoreUrl' => $this->buildBoxScoreUrl($record['date'], $record['gameOfThatDay'], $record['BoxID']),
+                'boxScoreUrl' => $this->buildBoxScoreUrl($record['date'], $record['game_of_that_day'], $record['box_id']),
                 'dateDisplay' => $this->formatDateDisplay($record['date'], $gameType),
                 'oppAbbr' => $this->getTeamAbbreviation($record['oppTid']),
                 'oppTid' => $record['oppTid'],
@@ -396,7 +396,7 @@ class RecordHoldersService implements RecordHoldersServiceInterface
     /**
      * Format team single-game records from DB rows.
      *
-     * @param list<array{teamid: int, team_name: string, date: string, BoxID: int, gameOfThatDay: int, oppTid: int, opp_team_name: string, value: int}> $dbRecords
+     * @param list<array{teamid: int, team_name: string, date: string, box_id: int, game_of_that_day: int, oppTid: int, opp_team_name: string, value: int}> $dbRecords
      * @return list<FormattedTeamGameRecord>
      */
     private function formatTeamGameRecords(array $dbRecords): array
@@ -409,7 +409,7 @@ class RecordHoldersService implements RecordHoldersServiceInterface
                 'teamAbbr' => $this->getTeamAbbreviation($record['teamid']),
                 'teamTid' => $record['teamid'],
                 'teamYr' => (string) $seasonYear,
-                'boxScoreUrl' => $this->buildBoxScoreUrl($record['date'], $record['gameOfThatDay'], $record['BoxID']),
+                'boxScoreUrl' => $this->buildBoxScoreUrl($record['date'], $record['game_of_that_day'], $record['box_id']),
                 'dateDisplay' => $this->formatDateDisplay($record['date'], 'regularSeason'),
                 'oppAbbr' => $this->getTeamAbbreviation($record['oppTid']),
                 'oppTid' => $record['oppTid'],
@@ -423,7 +423,7 @@ class RecordHoldersService implements RecordHoldersServiceInterface
     /**
      * Format margin of victory records.
      *
-     * @param list<array{winner_tid: int, winner_name: string, loser_tid: int, loser_name: string, date: string, BoxID: int, gameOfThatDay: int, margin: int}> $dbRecords
+     * @param list<array{winner_tid: int, winner_name: string, loser_tid: int, loser_name: string, date: string, box_id: int, game_of_that_day: int, margin: int}> $dbRecords
      * @return list<FormattedTeamGameRecord>
      */
     private function formatMarginRecords(array $dbRecords): array
@@ -436,7 +436,7 @@ class RecordHoldersService implements RecordHoldersServiceInterface
                 'teamAbbr' => $this->getTeamAbbreviation($record['winner_tid']),
                 'teamTid' => $record['winner_tid'],
                 'teamYr' => (string) $seasonYear,
-                'boxScoreUrl' => $this->buildBoxScoreUrl($record['date'], $record['gameOfThatDay'], $record['BoxID']),
+                'boxScoreUrl' => $this->buildBoxScoreUrl($record['date'], $record['game_of_that_day'], $record['box_id']),
                 'dateDisplay' => $this->formatDateDisplay($record['date'], 'regularSeason'),
                 'oppAbbr' => $this->getTeamAbbreviation($record['loser_tid']),
                 'oppTid' => $record['loser_tid'],

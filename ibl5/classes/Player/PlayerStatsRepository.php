@@ -59,17 +59,17 @@ class PlayerStatsRepository extends BaseMysqliRepository implements PlayerStatsR
     {
         return $this->fetchAll(
             "SELECT bs.*,
-                    COALESCE(bst.gameOfThatDay, 0) AS gameOfThatDay,
-                    COALESCE(sch.BoxID, 0) AS BoxID
+                    COALESCE(bst.game_of_that_day, 0) AS game_of_that_day,
+                    COALESCE(sch.box_id, 0) AS box_id
              FROM ibl_box_scores bs
              LEFT JOIN (
-                 SELECT Date, visitor_teamid, home_teamid, MIN(gameOfThatDay) AS gameOfThatDay
+                 SELECT game_date, visitor_teamid, home_teamid, MIN(game_of_that_day) AS game_of_that_day
                  FROM ibl_box_scores_teams
-                 GROUP BY Date, visitor_teamid, home_teamid
-             ) bst ON bst.Date = bs.Date AND bst.visitor_teamid = bs.visitor_teamid AND bst.home_teamid = bs.home_teamid
-             LEFT JOIN ibl_schedule sch ON sch.Date = bs.Date AND sch.Visitor = bs.visitor_teamid AND sch.Home = bs.home_teamid
-             WHERE bs.pid = ? AND bs.Date BETWEEN ? AND ?
-             ORDER BY bs.Date ASC",
+                 GROUP BY game_date, visitor_teamid, home_teamid
+             ) bst ON bst.game_date = bs.game_date AND bst.visitor_teamid = bs.visitor_teamid AND bst.home_teamid = bs.home_teamid
+             LEFT JOIN ibl_schedule sch ON sch.game_date = bs.game_date AND sch.visitor_teamid = bs.visitor_teamid AND sch.home_teamid = bs.home_teamid
+             WHERE bs.pid = ? AND bs.game_date BETWEEN ? AND ?
+             ORDER BY bs.game_date ASC",
             "iss",
             $playerID,
             $startDate,
@@ -298,29 +298,29 @@ class PlayerStatsRepository extends BaseMysqliRepository implements PlayerStatsR
     {
         return "SELECT bs.pid, p.name,
             CAST(COUNT(*) AS SIGNED) AS games,
-            ROUND(AVG(bs.gameMIN), 2) AS minutes,
+            ROUND(AVG(bs.game_min), 2) AS minutes,
             ROUND(AVG(bs.calc_fg_made), 2) AS fgm,
-            ROUND(AVG(bs.game2GA + bs.game3GA), 2) AS fga,
-            CASE WHEN SUM(bs.game2GA + bs.game3GA) > 0
-                THEN ROUND(SUM(bs.calc_fg_made) / SUM(bs.game2GA + bs.game3GA), 3)
+            ROUND(AVG(bs.game_2ga + bs.game_3ga), 2) AS fga,
+            CASE WHEN SUM(bs.game_2ga + bs.game_3ga) > 0
+                THEN ROUND(SUM(bs.calc_fg_made) / SUM(bs.game_2ga + bs.game_3ga), 3)
                 ELSE 0.000 END AS fgpct,
-            ROUND(AVG(bs.gameFTM), 2) AS ftm,
-            ROUND(AVG(bs.gameFTA), 2) AS fta,
-            CASE WHEN SUM(bs.gameFTA) > 0
-                THEN ROUND(SUM(bs.gameFTM) / SUM(bs.gameFTA), 3)
+            ROUND(AVG(bs.game_ftm), 2) AS ftm,
+            ROUND(AVG(bs.game_fta), 2) AS fta,
+            CASE WHEN SUM(bs.game_fta) > 0
+                THEN ROUND(SUM(bs.game_ftm) / SUM(bs.game_fta), 3)
                 ELSE 0.000 END AS ftpct,
-            ROUND(AVG(bs.game3GM), 2) AS tgm,
-            ROUND(AVG(bs.game3GA), 2) AS tga,
-            CASE WHEN SUM(bs.game3GA) > 0
-                THEN ROUND(SUM(bs.game3GM) / SUM(bs.game3GA), 3)
+            ROUND(AVG(bs.game_3gm), 2) AS tgm,
+            ROUND(AVG(bs.game_3ga), 2) AS tga,
+            CASE WHEN SUM(bs.game_3ga) > 0
+                THEN ROUND(SUM(bs.game_3gm) / SUM(bs.game_3ga), 3)
                 ELSE 0.000 END AS tpct,
-            ROUND(AVG(bs.gameORB), 2) AS orb,
+            ROUND(AVG(bs.game_orb), 2) AS orb,
             ROUND(AVG(bs.calc_rebounds), 2) AS reb,
-            ROUND(AVG(bs.gameAST), 2) AS ast,
-            ROUND(AVG(bs.gameSTL), 2) AS stl,
-            ROUND(AVG(bs.gameTOV), 2) AS tvr,
-            ROUND(AVG(bs.gameBLK), 2) AS blk,
-            ROUND(AVG(bs.gamePF), 2) AS pf,
+            ROUND(AVG(bs.game_ast), 2) AS ast,
+            ROUND(AVG(bs.game_stl), 2) AS stl,
+            ROUND(AVG(bs.game_tov), 2) AS tvr,
+            ROUND(AVG(bs.game_blk), 2) AS blk,
+            ROUND(AVG(bs.game_pf), 2) AS pf,
             ROUND(AVG(bs.calc_points), 2) AS pts,
             p.retired
         FROM ibl_box_scores bs
@@ -339,20 +339,20 @@ class PlayerStatsRepository extends BaseMysqliRepository implements PlayerStatsR
         return "SELECT bs.season_year AS year, MIN(bs.pos) AS pos, bs.pid, p.name,
             fs.team_name AS team,
             CAST(COUNT(*) AS SIGNED) AS games,
-            CAST(SUM(bs.gameMIN) AS SIGNED) AS minutes,
+            CAST(SUM(bs.game_min) AS SIGNED) AS minutes,
             CAST(SUM(bs.calc_fg_made) AS SIGNED) AS fgm,
-            CAST(SUM(bs.game2GA + bs.game3GA) AS SIGNED) AS fga,
-            CAST(SUM(bs.gameFTM) AS SIGNED) AS ftm,
-            CAST(SUM(bs.gameFTA) AS SIGNED) AS fta,
-            CAST(SUM(bs.game3GM) AS SIGNED) AS tgm,
-            CAST(SUM(bs.game3GA) AS SIGNED) AS tga,
-            CAST(SUM(bs.gameORB) AS SIGNED) AS orb,
+            CAST(SUM(bs.game_2ga + bs.game_3ga) AS SIGNED) AS fga,
+            CAST(SUM(bs.game_ftm) AS SIGNED) AS ftm,
+            CAST(SUM(bs.game_fta) AS SIGNED) AS fta,
+            CAST(SUM(bs.game_3gm) AS SIGNED) AS tgm,
+            CAST(SUM(bs.game_3ga) AS SIGNED) AS tga,
+            CAST(SUM(bs.game_orb) AS SIGNED) AS orb,
             CAST(SUM(bs.calc_rebounds) AS SIGNED) AS reb,
-            CAST(SUM(bs.gameAST) AS SIGNED) AS ast,
-            CAST(SUM(bs.gameSTL) AS SIGNED) AS stl,
-            CAST(SUM(bs.gameTOV) AS SIGNED) AS tvr,
-            CAST(SUM(bs.gameBLK) AS SIGNED) AS blk,
-            CAST(SUM(bs.gamePF) AS SIGNED) AS pf,
+            CAST(SUM(bs.game_ast) AS SIGNED) AS ast,
+            CAST(SUM(bs.game_stl) AS SIGNED) AS stl,
+            CAST(SUM(bs.game_tov) AS SIGNED) AS tvr,
+            CAST(SUM(bs.game_blk) AS SIGNED) AS blk,
+            CAST(SUM(bs.game_pf) AS SIGNED) AS pf,
             CAST(SUM(bs.calc_points) AS SIGNED) AS pts
         FROM ibl_box_scores bs
         JOIN ibl_plr p ON bs.pid = p.pid

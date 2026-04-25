@@ -12,9 +12,9 @@ class StrengthOfScheduleCalculatorTest extends TestCase
     public function testCalculateAverageOpponentWinPctWithKnownOpponents(): void
     {
         $games = [
-            ['Visitor' => 1, 'Home' => 2],
-            ['Visitor' => 3, 'Home' => 1],
-            ['Visitor' => 1, 'Home' => 4],
+            ['visitor_teamid' => 1, 'home_teamid' => 2],
+            ['visitor_teamid' => 3, 'home_teamid' => 1],
+            ['visitor_teamid' => 1, 'home_teamid' => 4],
         ];
 
         $teamWinPcts = [
@@ -39,7 +39,7 @@ class StrengthOfScheduleCalculatorTest extends TestCase
     public function testCalculateAverageOpponentWinPctHandlesMissingTeam(): void
     {
         $games = [
-            ['Visitor' => 1, 'Home' => 99],
+            ['visitor_teamid' => 1, 'home_teamid' => 99],
         ];
 
         $teamWinPcts = [
@@ -121,7 +121,7 @@ class StrengthOfScheduleCalculatorTest extends TestCase
     public function testCalculateAverageOpponentWinPctSingleGame(): void
     {
         $games = [
-            ['Visitor' => 1, 'Home' => 2],
+            ['visitor_teamid' => 1, 'home_teamid' => 2],
         ];
 
         $teamWinPcts = [

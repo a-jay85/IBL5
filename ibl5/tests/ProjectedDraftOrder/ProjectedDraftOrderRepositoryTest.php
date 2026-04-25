@@ -58,14 +58,14 @@ class ProjectedDraftOrderRepositoryTest extends TestCase
     public function testGetPlayedGamesReturnsArray(): void
     {
         $this->db->setMockData([
-            ['Visitor' => 1, 'VScore' => 105, 'Home' => 2, 'HScore' => 98],
+            ['visitor_teamid' => 1, 'visitor_score' => 105, 'home_teamid' => 2, 'home_score' => 98],
         ]);
 
         $result = $this->repository->getPlayedGames(2026);
 
         $this->assertIsArray($result);
         $this->assertCount(1, $result);
-        $this->assertSame(1, $result[0]['Visitor']);
+        $this->assertSame(1, $result[0]['visitor_teamid']);
     }
 
     public function testGetPickOwnershipReturnsArray(): void

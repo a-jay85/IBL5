@@ -167,7 +167,7 @@ class ScheduleUpdater extends \BaseMysqliRepository {
 
             $this->execute(
                 "INSERT INTO {$scheduleTable} (
-                    Year, BoxID, Date, Visitor, Vscore, Home, Hscore, uuid
+                    season_year, box_id, game_date, visitor_teamid, visitor_score, home_teamid, home_score, uuid
                 ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
                 "iisiiiis",
                 $fullDate['year'],
@@ -257,13 +257,13 @@ class ScheduleUpdater extends \BaseMysqliRepository {
             try {
                 $this->execute(
                     "INSERT INTO {$scheduleTable} (
-                        Year,
-                        BoxID,
-                        Date,
-                        Visitor,
-                        Vscore,
-                        Home,
-                        Hscore,
+                        season_year,
+                        box_id,
+                        game_date,
+                        visitor_teamid,
+                        visitor_score,
+                        home_teamid,
+                        home_score,
                         uuid
                     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
                     "iisiiiis",

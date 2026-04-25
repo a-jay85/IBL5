@@ -175,40 +175,40 @@ class RecordHoldersRepositoryTest extends DatabaseTestCase
 
         foreach (['Metros', 'Sharks'] as $name) {
             $this->insertRow('ibl_box_scores_teams', [
-                'Date' => $date,
+                'game_date' => $date,
                 'name' => $name,
-                'gameOfThatDay' => 1,
+                'game_of_that_day' => 1,
                 'visitor_teamid' => 2,
                 'home_teamid' => 1,
                 'attendance' => 10000,
                 'capacity' => 15000,
-                'visitorWins' => 0,
-                'visitorLosses' => 0,
-                'homeWins' => 0,
-                'homeLosses' => 0,
-                'visitorQ1points' => $visitorQ,
-                'visitorQ2points' => $visitorQ,
-                'visitorQ3points' => $visitorQ,
-                'visitorQ4points' => $visitorScore - 3 * $visitorQ,
-                'visitorOTpoints' => 0,
-                'homeQ1points' => $homeQ,
-                'homeQ2points' => $homeQ,
-                'homeQ3points' => $homeQ,
-                'homeQ4points' => $homeScore - 3 * $homeQ,
-                'homeOTpoints' => 0,
-                'game2GM' => 30,
-                'game2GA' => 60,
-                'gameFTM' => 15,
-                'gameFTA' => 20,
-                'game3GM' => 8,
-                'game3GA' => 22,
-                'gameORB' => 10,
-                'gameDRB' => 30,
-                'gameAST' => 20,
-                'gameSTL' => 8,
-                'gameTOV' => 12,
-                'gameBLK' => 5,
-                'gamePF' => 18,
+                'visitor_wins' => 0,
+                'visitor_losses' => 0,
+                'home_wins' => 0,
+                'home_losses' => 0,
+                'visitor_q1_points' => $visitorQ,
+                'visitor_q2_points' => $visitorQ,
+                'visitor_q3_points' => $visitorQ,
+                'visitor_q4_points' => $visitorScore - 3 * $visitorQ,
+                'visitor_ot_points' => 0,
+                'home_q1_points' => $homeQ,
+                'home_q2_points' => $homeQ,
+                'home_q3_points' => $homeQ,
+                'home_q4_points' => $homeScore - 3 * $homeQ,
+                'home_ot_points' => 0,
+                'game_2gm' => 30,
+                'game_2ga' => 60,
+                'game_ftm' => 15,
+                'game_fta' => 20,
+                'game_3gm' => 8,
+                'game_3ga' => 22,
+                'game_orb' => 10,
+                'game_drb' => 30,
+                'game_ast' => 20,
+                'game_stl' => 8,
+                'game_tov' => 12,
+                'game_blk' => 5,
+                'game_pf' => 18,
             ]);
         }
     }
@@ -290,7 +290,7 @@ class RecordHoldersRepositoryTest extends DatabaseTestCase
         );
 
         $result = $this->repo->getTopPlayerSingleGameBatch(
-            ['Points' => 'bs.calc_points', 'Assists' => 'bs.gameAST'],
+            ['Points' => 'bs.calc_points', 'Assists' => 'bs.game_ast'],
             '1=1'
         );
 
@@ -313,8 +313,8 @@ class RecordHoldersRepositoryTest extends DatabaseTestCase
 
         $result = $this->repo->getTopTeamSingleGameBatch(
             [
-                'Points' => ['expression' => 'bs.game2GM * 2 + bs.gameFTM + bs.game3GM * 3', 'order' => 'DESC'],
-                'Assists' => ['expression' => 'bs.gameAST', 'order' => 'DESC'],
+                'Points' => ['expression' => 'bs.game_2gm * 2 + bs.game_ftm + bs.game_3gm * 3', 'order' => 'DESC'],
+                'Assists' => ['expression' => 'bs.game_ast', 'order' => 'DESC'],
             ],
             '1=1'
         );

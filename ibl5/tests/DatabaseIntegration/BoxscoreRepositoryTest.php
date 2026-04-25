@@ -23,8 +23,8 @@ class BoxscoreRepositoryTest extends DatabaseTestCase
         $row = $this->repo->findTeamBoxscore('2025-01-15', 2, 1, 1);
 
         self::assertNotNull($row);
-        self::assertArrayHasKey('visitorQ1points', $row);
-        self::assertArrayHasKey('homeQ1points', $row);
+        self::assertArrayHasKey('visitor_q1_points', $row);
+        self::assertArrayHasKey('home_q1_points', $row);
     }
 
     public function testFindTeamBoxscoreReturnsNullForMissing(): void
@@ -46,8 +46,8 @@ class BoxscoreRepositoryTest extends DatabaseTestCase
 
         $row = $this->repo->findTeamBoxscore('2025-02-01', 2, 1, 1);
         self::assertNotNull($row);
-        self::assertSame(28, $row['visitorQ1points']);
-        self::assertSame(20, $row['homeQ1points']);
+        self::assertSame(28, $row['visitor_q1_points']);
+        self::assertSame(20, $row['home_q1_points']);
     }
 
     public function testInsertPlayerBoxscoreCreatesRow(): void
@@ -60,7 +60,7 @@ class BoxscoreRepositoryTest extends DatabaseTestCase
         );
 
         $stmt = $this->db->prepare(
-            "SELECT name, pid, gameMIN FROM ibl_box_scores WHERE Date = '2025-02-01' AND pid = 1"
+            "SELECT name, pid, game_min FROM ibl_box_scores WHERE game_date = '2025-02-01' AND pid = 1"
         );
         self::assertNotFalse($stmt);
         $stmt->execute();
@@ -70,7 +70,7 @@ class BoxscoreRepositoryTest extends DatabaseTestCase
         self::assertNotNull($row);
         self::assertSame('Test Player One', $row['name']);
         self::assertSame(1, $row['pid']);
-        self::assertSame(32, $row['gameMIN']);
+        self::assertSame(32, $row['game_min']);
     }
 
     public function testDeleteTeamBoxscoresByGameRemovesRows(): void
@@ -119,76 +119,76 @@ class BoxscoreRepositoryTest extends DatabaseTestCase
     {
         // Insert two team boxscore rows for All-Star teams (visitor=50, home=51)
         $this->insertRow('ibl_box_scores_teams', [
-            'Date' => '2025-02-15',
+            'game_date' => '2025-02-15',
             'name' => 'Team West',
-            'gameOfThatDay' => 1,
+            'game_of_that_day' => 1,
             'visitor_teamid' => 50,
             'home_teamid' => 51,
             'attendance' => 20000,
             'capacity' => 20000,
-            'visitorWins' => 0,
-            'visitorLosses' => 0,
-            'homeWins' => 0,
-            'homeLosses' => 0,
-            'visitorQ1points' => 30,
-            'visitorQ2points' => 28,
-            'visitorQ3points' => 32,
-            'visitorQ4points' => 35,
-            'visitorOTpoints' => 0,
-            'homeQ1points' => 25,
-            'homeQ2points' => 30,
-            'homeQ3points' => 28,
-            'homeQ4points' => 32,
-            'homeOTpoints' => 0,
-            'game2GM' => 40,
-            'game2GA' => 80,
-            'gameFTM' => 20,
-            'gameFTA' => 25,
-            'game3GM' => 12,
-            'game3GA' => 30,
-            'gameORB' => 15,
-            'gameDRB' => 35,
-            'gameAST' => 25,
-            'gameSTL' => 10,
-            'gameTOV' => 15,
-            'gameBLK' => 6,
-            'gamePF' => 20,
+            'visitor_wins' => 0,
+            'visitor_losses' => 0,
+            'home_wins' => 0,
+            'home_losses' => 0,
+            'visitor_q1_points' => 30,
+            'visitor_q2_points' => 28,
+            'visitor_q3_points' => 32,
+            'visitor_q4_points' => 35,
+            'visitor_ot_points' => 0,
+            'home_q1_points' => 25,
+            'home_q2_points' => 30,
+            'home_q3_points' => 28,
+            'home_q4_points' => 32,
+            'home_ot_points' => 0,
+            'game_2gm' => 40,
+            'game_2ga' => 80,
+            'game_ftm' => 20,
+            'game_fta' => 25,
+            'game_3gm' => 12,
+            'game_3ga' => 30,
+            'game_orb' => 15,
+            'game_drb' => 35,
+            'game_ast' => 25,
+            'game_stl' => 10,
+            'game_tov' => 15,
+            'game_blk' => 6,
+            'game_pf' => 20,
         ]);
         $this->insertRow('ibl_box_scores_teams', [
-            'Date' => '2025-02-15',
+            'game_date' => '2025-02-15',
             'name' => 'Team East',
-            'gameOfThatDay' => 1,
+            'game_of_that_day' => 1,
             'visitor_teamid' => 50,
             'home_teamid' => 51,
             'attendance' => 20000,
             'capacity' => 20000,
-            'visitorWins' => 0,
-            'visitorLosses' => 0,
-            'homeWins' => 0,
-            'homeLosses' => 0,
-            'visitorQ1points' => 25,
-            'visitorQ2points' => 30,
-            'visitorQ3points' => 28,
-            'visitorQ4points' => 32,
-            'visitorOTpoints' => 0,
-            'homeQ1points' => 30,
-            'homeQ2points' => 28,
-            'homeQ3points' => 32,
-            'homeQ4points' => 35,
-            'homeOTpoints' => 0,
-            'game2GM' => 38,
-            'game2GA' => 78,
-            'gameFTM' => 18,
-            'gameFTA' => 23,
-            'game3GM' => 10,
-            'game3GA' => 28,
-            'gameORB' => 12,
-            'gameDRB' => 33,
-            'gameAST' => 22,
-            'gameSTL' => 8,
-            'gameTOV' => 13,
-            'gameBLK' => 5,
-            'gamePF' => 18,
+            'visitor_wins' => 0,
+            'visitor_losses' => 0,
+            'home_wins' => 0,
+            'home_losses' => 0,
+            'visitor_q1_points' => 25,
+            'visitor_q2_points' => 30,
+            'visitor_q3_points' => 28,
+            'visitor_q4_points' => 32,
+            'visitor_ot_points' => 0,
+            'home_q1_points' => 30,
+            'home_q2_points' => 28,
+            'home_q3_points' => 32,
+            'home_q4_points' => 35,
+            'home_ot_points' => 0,
+            'game_2gm' => 38,
+            'game_2ga' => 78,
+            'game_ftm' => 18,
+            'game_fta' => 23,
+            'game_3gm' => 10,
+            'game_3ga' => 28,
+            'game_orb' => 12,
+            'game_drb' => 33,
+            'game_ast' => 22,
+            'game_stl' => 8,
+            'game_tov' => 13,
+            'game_blk' => 5,
+            'game_pf' => 18,
         ]);
 
         $names = $this->repo->findAllStarTeamNames('2025-02-15');
@@ -208,40 +208,40 @@ class BoxscoreRepositoryTest extends DatabaseTestCase
     public function testRenameAllStarTeamUpdatesName(): void
     {
         $id = $this->insertRow('ibl_box_scores_teams', [
-            'Date' => '2025-02-16',
+            'game_date' => '2025-02-16',
             'name' => 'Team Away',
-            'gameOfThatDay' => 1,
+            'game_of_that_day' => 1,
             'visitor_teamid' => 50,
             'home_teamid' => 51,
             'attendance' => 20000,
             'capacity' => 20000,
-            'visitorWins' => 0,
-            'visitorLosses' => 0,
-            'homeWins' => 0,
-            'homeLosses' => 0,
-            'visitorQ1points' => 30,
-            'visitorQ2points' => 28,
-            'visitorQ3points' => 32,
-            'visitorQ4points' => 35,
-            'visitorOTpoints' => 0,
-            'homeQ1points' => 25,
-            'homeQ2points' => 30,
-            'homeQ3points' => 28,
-            'homeQ4points' => 32,
-            'homeOTpoints' => 0,
-            'game2GM' => 40,
-            'game2GA' => 80,
-            'gameFTM' => 20,
-            'gameFTA' => 25,
-            'game3GM' => 12,
-            'game3GA' => 30,
-            'gameORB' => 15,
-            'gameDRB' => 35,
-            'gameAST' => 25,
-            'gameSTL' => 10,
-            'gameTOV' => 15,
-            'gameBLK' => 6,
-            'gamePF' => 20,
+            'visitor_wins' => 0,
+            'visitor_losses' => 0,
+            'home_wins' => 0,
+            'home_losses' => 0,
+            'visitor_q1_points' => 30,
+            'visitor_q2_points' => 28,
+            'visitor_q3_points' => 32,
+            'visitor_q4_points' => 35,
+            'visitor_ot_points' => 0,
+            'home_q1_points' => 25,
+            'home_q2_points' => 30,
+            'home_q3_points' => 28,
+            'home_q4_points' => 32,
+            'home_ot_points' => 0,
+            'game_2gm' => 40,
+            'game_2ga' => 80,
+            'game_ftm' => 20,
+            'game_fta' => 25,
+            'game_3gm' => 12,
+            'game_3ga' => 30,
+            'game_orb' => 15,
+            'game_drb' => 35,
+            'game_ast' => 25,
+            'game_stl' => 10,
+            'game_tov' => 15,
+            'game_blk' => 6,
+            'game_pf' => 20,
         ]);
 
         $affected = $this->repo->renameAllStarTeam($id, 'Team LeBron');
@@ -280,34 +280,34 @@ class BoxscoreRepositoryTest extends DatabaseTestCase
 
         // Insert a player boxscore with NULL teamid manually
         $this->insertRow('ibl_box_scores', [
-            'Date' => '2025-04-02',
+            'game_date' => '2025-04-02',
             'name' => 'BS NullTidPlr',
             'pos' => 'PG',
             'pid' => 200010031,
             'visitor_teamid' => 2,
             'home_teamid' => 1,
             // teamid intentionally omitted — will be NULL
-            'gameMIN' => 30,
-            'game2GM' => 5,
-            'game2GA' => 10,
-            'gameFTM' => 4,
-            'gameFTA' => 5,
-            'game3GM' => 2,
-            'game3GA' => 6,
-            'gameORB' => 2,
-            'gameDRB' => 6,
-            'gameAST' => 5,
-            'gameSTL' => 2,
-            'gameTOV' => 2,
-            'gameBLK' => 1,
-            'gamePF' => 3,
-            'gameOfThatDay' => 1,
+            'game_min' => 30,
+            'game_2gm' => 5,
+            'game_2ga' => 10,
+            'game_ftm' => 4,
+            'game_fta' => 5,
+            'game_3gm' => 2,
+            'game_3ga' => 6,
+            'game_orb' => 2,
+            'game_drb' => 6,
+            'game_ast' => 5,
+            'game_stl' => 2,
+            'game_tov' => 2,
+            'game_blk' => 1,
+            'game_pf' => 3,
+            'game_of_that_day' => 1,
             'attendance' => 10000,
             'capacity' => 15000,
-            'visitorWins' => 20,
-            'visitorLosses' => 10,
-            'homeWins' => 25,
-            'homeLosses' => 5,
+            'visitor_wins' => 20,
+            'visitor_losses' => 10,
+            'home_wins' => 25,
+            'home_losses' => 5,
             'uuid' => 'bs-nulltid-' . bin2hex(random_bytes(6)),
         ]);
 
@@ -328,25 +328,25 @@ class BoxscoreRepositoryTest extends DatabaseTestCase
     public function testFindAllStarGamesWithDefaultNamesReturnsMatchingRows(): void
     {
         $this->insertRow('ibl_box_scores_teams', [
-            'Date' => '2025-02-20',
+            'game_date' => '2025-02-20',
             'name' => 'Team Away',
-            'gameOfThatDay' => 1,
+            'game_of_that_day' => 1,
             'visitor_teamid' => 50,
             'home_teamid' => 51,
             'attendance' => 20000, 'capacity' => 20000,
-            'visitorWins' => 0, 'visitorLosses' => 0, 'homeWins' => 0, 'homeLosses' => 0,
-            'visitorQ1points' => 25, 'visitorQ2points' => 25, 'visitorQ3points' => 25, 'visitorQ4points' => 25, 'visitorOTpoints' => 0,
-            'homeQ1points' => 25, 'homeQ2points' => 25, 'homeQ3points' => 25, 'homeQ4points' => 25, 'homeOTpoints' => 0,
-            'game2GM' => 30, 'game2GA' => 60, 'gameFTM' => 15, 'gameFTA' => 20,
-            'game3GM' => 8, 'game3GA' => 22, 'gameORB' => 10, 'gameDRB' => 30,
-            'gameAST' => 20, 'gameSTL' => 8, 'gameTOV' => 12, 'gameBLK' => 5, 'gamePF' => 18,
+            'visitor_wins' => 0, 'visitor_losses' => 0, 'home_wins' => 0, 'home_losses' => 0,
+            'visitor_q1_points' => 25, 'visitor_q2_points' => 25, 'visitor_q3_points' => 25, 'visitor_q4_points' => 25, 'visitor_ot_points' => 0,
+            'home_q1_points' => 25, 'home_q2_points' => 25, 'home_q3_points' => 25, 'home_q4_points' => 25, 'home_ot_points' => 0,
+            'game_2gm' => 30, 'game_2ga' => 60, 'game_ftm' => 15, 'game_fta' => 20,
+            'game_3gm' => 8, 'game_3ga' => 22, 'game_orb' => 10, 'game_drb' => 30,
+            'game_ast' => 20, 'game_stl' => 8, 'game_tov' => 12, 'game_blk' => 5, 'game_pf' => 18,
         ]);
 
         $rows = $this->repo->findAllStarGamesWithDefaultNames();
 
         $matching = array_filter(
             $rows,
-            static fn (array $r): bool => $r['Date'] === '2025-02-20',
+            static fn (array $r): bool => $r['game_date'] === '2025-02-20',
         );
 
         self::assertNotEmpty($matching);
@@ -358,25 +358,25 @@ class BoxscoreRepositoryTest extends DatabaseTestCase
     public function testFindAllStarGamesWithDefaultNamesExcludesRenamedTeams(): void
     {
         $this->insertRow('ibl_box_scores_teams', [
-            'Date' => '2025-02-21',
+            'game_date' => '2025-02-21',
             'name' => 'Team LeBron',
-            'gameOfThatDay' => 1,
+            'game_of_that_day' => 1,
             'visitor_teamid' => 50,
             'home_teamid' => 51,
             'attendance' => 20000, 'capacity' => 20000,
-            'visitorWins' => 0, 'visitorLosses' => 0, 'homeWins' => 0, 'homeLosses' => 0,
-            'visitorQ1points' => 25, 'visitorQ2points' => 25, 'visitorQ3points' => 25, 'visitorQ4points' => 25, 'visitorOTpoints' => 0,
-            'homeQ1points' => 25, 'homeQ2points' => 25, 'homeQ3points' => 25, 'homeQ4points' => 25, 'homeOTpoints' => 0,
-            'game2GM' => 30, 'game2GA' => 60, 'gameFTM' => 15, 'gameFTA' => 20,
-            'game3GM' => 8, 'game3GA' => 22, 'gameORB' => 10, 'gameDRB' => 30,
-            'gameAST' => 20, 'gameSTL' => 8, 'gameTOV' => 12, 'gameBLK' => 5, 'gamePF' => 18,
+            'visitor_wins' => 0, 'visitor_losses' => 0, 'home_wins' => 0, 'home_losses' => 0,
+            'visitor_q1_points' => 25, 'visitor_q2_points' => 25, 'visitor_q3_points' => 25, 'visitor_q4_points' => 25, 'visitor_ot_points' => 0,
+            'home_q1_points' => 25, 'home_q2_points' => 25, 'home_q3_points' => 25, 'home_q4_points' => 25, 'home_ot_points' => 0,
+            'game_2gm' => 30, 'game_2ga' => 60, 'game_ftm' => 15, 'game_fta' => 20,
+            'game_3gm' => 8, 'game_3ga' => 22, 'game_orb' => 10, 'game_drb' => 30,
+            'game_ast' => 20, 'game_stl' => 8, 'game_tov' => 12, 'game_blk' => 5, 'game_pf' => 18,
         ]);
 
         $rows = $this->repo->findAllStarGamesWithDefaultNames();
 
         $matching = array_filter(
             $rows,
-            static fn (array $r): bool => $r['Date'] === '2025-02-21',
+            static fn (array $r): bool => $r['game_date'] === '2025-02-21',
         );
 
         self::assertEmpty($matching);
@@ -389,18 +389,18 @@ class BoxscoreRepositoryTest extends DatabaseTestCase
         $this->insertTestPlayer(200010032, 'BS AllStar PG', ['teamid' => 50]);
 
         $this->insertRow('ibl_box_scores', [
-            'Date' => '2025-02-22',
+            'game_date' => '2025-02-22',
             'name' => 'BS AllStar PG',
             'pos' => 'PG',
             'pid' => 200010032,
             'visitor_teamid' => 50,
             'home_teamid' => 51,
             'teamid' => 50,
-            'gameMIN' => 25, 'game2GM' => 4, 'game2GA' => 8, 'gameFTM' => 2, 'gameFTA' => 3,
-            'game3GM' => 1, 'game3GA' => 3, 'gameORB' => 1, 'gameDRB' => 3,
-            'gameAST' => 5, 'gameSTL' => 1, 'gameTOV' => 1, 'gameBLK' => 0, 'gamePF' => 2,
-            'gameOfThatDay' => 1, 'attendance' => 20000, 'capacity' => 20000,
-            'visitorWins' => 0, 'visitorLosses' => 0, 'homeWins' => 0, 'homeLosses' => 0,
+            'game_min' => 25, 'game_2gm' => 4, 'game_2ga' => 8, 'game_ftm' => 2, 'game_fta' => 3,
+            'game_3gm' => 1, 'game_3ga' => 3, 'game_orb' => 1, 'game_drb' => 3,
+            'game_ast' => 5, 'game_stl' => 1, 'game_tov' => 1, 'game_blk' => 0, 'game_pf' => 2,
+            'game_of_that_day' => 1, 'attendance' => 20000, 'capacity' => 20000,
+            'visitor_wins' => 0, 'visitor_losses' => 0, 'home_wins' => 0, 'home_losses' => 0,
             'uuid' => 'bs-allstar-' . bin2hex(random_bytes(6)),
         ]);
 

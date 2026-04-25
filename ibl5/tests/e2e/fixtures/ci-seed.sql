@@ -593,9 +593,9 @@ INSERT INTO ibl_saved_depth_chart_players (depth_chart_id, pid, player_name, ord
 -- Generated columns (game_type, season_year, calc_*) are computed automatically.
 -- game_type=1 (regular season) when month is not 6 (playoffs), 10, or 0.
 INSERT INTO ibl_box_scores (
-  `Date`, pid, name, pos, visitor_teamid, home_teamid, teamid,
-  gameMIN, game2GM, game2GA, gameFTM, gameFTA, game3GM, game3GA,
-  gameORB, gameDRB, gameAST, gameSTL, gameTOV, gameBLK, gamePF,
+  `game_date`, pid, name, pos, visitor_teamid, home_teamid, teamid,
+  game_min, game_2gm, game_2ga, game_ftm, game_fta, game_3gm, game_3ga,
+  game_orb, game_drb, game_ast, game_stl, game_tov, game_blk, game_pf,
   `uuid`
 ) VALUES
   ('2026-03-07', 1, 'Test Player', 'SG', 2, 1, 1,
@@ -718,7 +718,7 @@ INSERT INTO ibl_olympics_standings (teamid, team_name, pct, league_record, wins,
   (3, 'Bulls',  0.500, '2-2', 2, 2, 'Group B', ''),
   (4, 'Coqs',   0.250, '1-3', 1, 3, 'Group B', '');
 
-INSERT INTO ibl_olympics_schedule (SchedID, Date, Year, Visitor, VScore, Home, HScore, BoxID, uuid) VALUES
+INSERT INTO ibl_olympics_schedule (id, game_date, season_year, visitor_teamid, visitor_score, home_teamid, home_score, box_id, uuid) VALUES
   (1, '2026-07-01', 2026, 1, 95, 2, 88, 1, 'e0000000-0000-0000-0000-000000000001'),
   (2, '2026-07-01', 2026, 3, 82, 4, 79, 2, 'e0000000-0000-0000-0000-000000000002');
 
@@ -798,7 +798,7 @@ ON DUPLICATE KEY UPDATE player_name = VALUES(player_name);
 -- Schedule games for NextSim (Metros games in sim 689 window)
 -- ============================================================
 
-INSERT INTO ibl_schedule (Year, Date, Visitor, Home, VScore, HScore, BoxID, uuid) VALUES
+INSERT INTO ibl_schedule (season_year, game_date, visitor_teamid, home_teamid, visitor_score, home_score, box_id, uuid) VALUES
   (2026, '2026-03-08', 1, 2,  0, 0, 0, 'c0000000-0000-0000-0000-000000000001'),
   (2026, '2026-03-10', 3, 1,  0, 0, 0, 'c0000000-0000-0000-0000-000000000002'),
   (2026, '2026-03-12', 1, 14, 0, 0, 0, 'c0000000-0000-0000-0000-000000000003');
@@ -995,28 +995,28 @@ INSERT INTO ibl_plr_snapshots (
 -- Played schedule games (covers win/loss, streak, record, score display)
 -- ============================================================
 
--- Metros win as visitor (no box score link — BoxID=0, no ibl_box_scores_teams row)
-INSERT INTO ibl_schedule (Year, Date, Visitor, Home, VScore, HScore, BoxID, uuid) VALUES
+-- Metros win as visitor (no box score link — box_id=0, no ibl_box_scores_teams row)
+INSERT INTO ibl_schedule (season_year, game_date, visitor_teamid, home_teamid, visitor_score, home_score, box_id, uuid) VALUES
   (2026, '2026-02-20', 1, 2, 105, 98, 0, 'sched-played-01')
-ON DUPLICATE KEY UPDATE VScore=VALUES(VScore);
+ON DUPLICATE KEY UPDATE visitor_score=VALUES(visitor_score);
 
 -- Metros loss at home (no box score link)
-INSERT INTO ibl_schedule (Year, Date, Visitor, Home, VScore, HScore, BoxID, uuid) VALUES
+INSERT INTO ibl_schedule (season_year, game_date, visitor_teamid, home_teamid, visitor_score, home_score, box_id, uuid) VALUES
   (2026, '2026-02-22', 3, 1, 110, 99, 0, 'sched-played-02')
-ON DUPLICATE KEY UPDATE VScore=VALUES(VScore);
+ON DUPLICATE KEY UPDATE visitor_score=VALUES(visitor_score);
 
--- Metros win as visitor, legacy BoxID=42
-INSERT INTO ibl_schedule (Year, Date, Visitor, Home, VScore, HScore, BoxID, uuid) VALUES
+-- Metros win as visitor, legacy box_id=42
+INSERT INTO ibl_schedule (season_year, game_date, visitor_teamid, home_teamid, visitor_score, home_score, box_id, uuid) VALUES
   (2026, '2026-02-24', 1, 4, 102, 95, 42, 'sched-played-03')
-ON DUPLICATE KEY UPDATE VScore=VALUES(VScore);
+ON DUPLICATE KEY UPDATE visitor_score=VALUES(visitor_score);
 
 -- ============================================================
--- Box score row for IBL6 URL path (gameOfThatDay > 0)
+-- Box score row for IBL6 URL path (game_of_that_day > 0)
 -- ============================================================
 
-INSERT INTO ibl_box_scores_teams (Date, visitor_teamid, home_teamid, gameOfThatDay, name) VALUES
+INSERT INTO ibl_box_scores_teams (game_date, visitor_teamid, home_teamid, game_of_that_day, name) VALUES
   ('2026-02-20', 1, 2, 1, 'Metros')
-ON DUPLICATE KEY UPDATE gameOfThatDay=VALUES(gameOfThatDay);
+ON DUPLICATE KEY UPDATE game_of_that_day=VALUES(game_of_that_day);
 
 -- ============================================================
 -- Power rankings (covers SOS tier dots, SOS summary)
@@ -1035,9 +1035,9 @@ ON DUPLICATE KEY UPDATE ranking=VALUES(ranking), last_win=VALUES(last_win), last
 -- June game (covers playoff month relabeling + reorder)
 -- ============================================================
 
-INSERT INTO ibl_schedule (Year, Date, Visitor, Home, VScore, HScore, BoxID, uuid) VALUES
+INSERT INTO ibl_schedule (season_year, game_date, visitor_teamid, home_teamid, visitor_score, home_score, box_id, uuid) VALUES
   (2026, '2026-06-05', 1, 2, 0, 0, 0, 'sched-playoff-june-01')
-ON DUPLICATE KEY UPDATE VScore=VALUES(VScore);
+ON DUPLICATE KEY UPDATE visitor_score=VALUES(visitor_score);
 
 -- ============================================================
 -- Injury data (Injuries module E2E tests)

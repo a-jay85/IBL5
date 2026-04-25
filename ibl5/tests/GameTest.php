@@ -44,8 +44,8 @@ class GameTest extends TestCase
     public function testHomeTeamWinsWhenHigherScore(): void
     {
         $row = $this->createValidScheduleRow([
-            'VScore' => 95,
-            'HScore' => 100
+            'visitor_score' => 95,
+            'home_score' => 100
         ]);
         $game = new Game($row);
         
@@ -56,8 +56,8 @@ class GameTest extends TestCase
     public function testVisitorTeamWinsWhenHigherScore(): void
     {
         $row = $this->createValidScheduleRow([
-            'VScore' => 110,
-            'HScore' => 105
+            'visitor_score' => 110,
+            'home_score' => 105
         ]);
         $game = new Game($row);
         
@@ -68,8 +68,8 @@ class GameTest extends TestCase
     public function testGameIsUnplayedWhenScoresTied(): void
     {
         $row = $this->createValidScheduleRow([
-            'VScore' => 0,
-            'HScore' => 0
+            'visitor_score' => 0,
+            'home_score' => 0
         ]);
         $game = new Game($row);
         
@@ -138,7 +138,7 @@ class GameTest extends TestCase
 
     public function testDateObjectMatchesDateString(): void
     {
-        $row = $this->createValidScheduleRow(['Date' => '2025-06-15']);
+        $row = $this->createValidScheduleRow(['game_date' => '2025-06-15']);
         $game = new Game($row);
         
         $this->assertEquals('2025-06-15', $game->dateObject->format('Y-m-d'));
@@ -151,12 +151,12 @@ class GameTest extends TestCase
     private function createValidScheduleRow(array $overrides = []): array
     {
         return array_merge([
-            'Date' => '2025-01-15',
-            'BoxID' => 1001,
-            'Visitor' => 1,
-            'Home' => 2,
-            'VScore' => 98,
-            'HScore' => 105,
+            'game_date' => '2025-01-15',
+            'box_id' => 1001,
+            'visitor_teamid' => 1,
+            'home_teamid' => 2,
+            'visitor_score' => 98,
+            'home_score' => 105,
         ], $overrides);
     }
 }

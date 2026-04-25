@@ -60,31 +60,31 @@ class PeriodAverages
         $query = "SELECT p.name,
             bs.pos,
             bs.pid,
-            COUNT(DISTINCT bs.`Date`) as games,
-            ROUND(SUM(bs.gameMIN)/COUNT(DISTINCT bs.`Date`), 1) as gameMINavg,
-            ROUND(SUM(bs.game2GM + bs.game3GM)/COUNT(DISTINCT bs.`Date`), 2) as gameFGMavg,
-            ROUND(SUM(bs.game2GA + bs.game3GA)/COUNT(DISTINCT bs.`Date`), 2) as gameFGAavg,
-            ROUND((SUM(bs.game2GM) + SUM(bs.game3GM)) / (SUM(bs.game2GA) + SUM(bs.game3GA)), 3) as gameFGPavg,
-            ROUND(SUM(bs.gameFTM)/COUNT(DISTINCT bs.`Date`), 2) as gameFTMavg,
-            ROUND(SUM(bs.gameFTA)/COUNT(DISTINCT bs.`Date`), 2) as gameFTAavg,
-            ROUND((SUM(bs.gameFTM)) / (SUM(bs.gameFTA)), 3) as gameFTPavg,
-            ROUND(SUM(bs.game3GM)/COUNT(DISTINCT bs.`Date`), 2) as game3GMavg,
-            ROUND(SUM(bs.game3GA)/COUNT(DISTINCT bs.`Date`), 2) as game3GAavg,
-            ROUND((SUM(bs.game3GM)) / (SUM(bs.game3GA)), 3) as game3GPavg,
-            ROUND(SUM(bs.gameORB)/COUNT(DISTINCT bs.`Date`), 1) as gameORBavg,
-            ROUND((SUM(bs.gameORB) + SUM(bs.gameDRB))/COUNT(DISTINCT bs.`Date`), 1) as gameREBavg,
-            ROUND(SUM(bs.gameAST)/COUNT(DISTINCT bs.`Date`), 1) as gameASTavg,
-            ROUND(SUM(bs.gameSTL)/COUNT(DISTINCT bs.`Date`), 1) as gameSTLavg,
-            ROUND(SUM(bs.gameTOV)/COUNT(DISTINCT bs.`Date`), 1) as gameTOVavg,
-            ROUND(SUM(bs.gameBLK)/COUNT(DISTINCT bs.`Date`), 1) as gameBLKavg,
-            ROUND(SUM(bs.gamePF)/COUNT(DISTINCT bs.`Date`) , 1) as gamePFavg,
-            ROUND(((2 * SUM(bs.game2GM)) + SUM(bs.gameFTM) + (3 * SUM(bs.game3GM)))/COUNT(DISTINCT bs.`Date`) , 1) as gamePTSavg
+            COUNT(DISTINCT bs.game_date) as games,
+            ROUND(SUM(bs.game_min)/COUNT(DISTINCT bs.game_date), 1) as gameMINavg,
+            ROUND(SUM(bs.game_2gm + bs.game_3gm)/COUNT(DISTINCT bs.game_date), 2) as gameFGMavg,
+            ROUND(SUM(bs.game_2ga + bs.game_3ga)/COUNT(DISTINCT bs.game_date), 2) as gameFGAavg,
+            ROUND((SUM(bs.game_2gm) + SUM(bs.game_3gm)) / (SUM(bs.game_2ga) + SUM(bs.game_3ga)), 3) as gameFGPavg,
+            ROUND(SUM(bs.game_ftm)/COUNT(DISTINCT bs.game_date), 2) as gameFTMavg,
+            ROUND(SUM(bs.game_fta)/COUNT(DISTINCT bs.game_date), 2) as gameFTAavg,
+            ROUND((SUM(bs.game_ftm)) / (SUM(bs.game_fta)), 3) as gameFTPavg,
+            ROUND(SUM(bs.game_3gm)/COUNT(DISTINCT bs.game_date), 2) as game3GMavg,
+            ROUND(SUM(bs.game_3ga)/COUNT(DISTINCT bs.game_date), 2) as game3GAavg,
+            ROUND((SUM(bs.game_3gm)) / (SUM(bs.game_3ga)), 3) as game3GPavg,
+            ROUND(SUM(bs.game_orb)/COUNT(DISTINCT bs.game_date), 1) as gameORBavg,
+            ROUND((SUM(bs.game_orb) + SUM(bs.game_drb))/COUNT(DISTINCT bs.game_date), 1) as gameREBavg,
+            ROUND(SUM(bs.game_ast)/COUNT(DISTINCT bs.game_date), 1) as gameASTavg,
+            ROUND(SUM(bs.game_stl)/COUNT(DISTINCT bs.game_date), 1) as gameSTLavg,
+            ROUND(SUM(bs.game_tov)/COUNT(DISTINCT bs.game_date), 1) as gameTOVavg,
+            ROUND(SUM(bs.game_blk)/COUNT(DISTINCT bs.game_date), 1) as gameBLKavg,
+            ROUND(SUM(bs.game_pf)/COUNT(DISTINCT bs.game_date) , 1) as gamePFavg,
+            ROUND(((2 * SUM(bs.game_2gm)) + SUM(bs.game_ftm) + (3 * SUM(bs.game_3gm)))/COUNT(DISTINCT bs.game_date) , 1) as gamePTSavg
         FROM   ibl_box_scores bs
         JOIN   ibl_plr p ON bs.pid = p.pid
-        WHERE  bs.date BETWEEN ? AND ?
+        WHERE  bs.game_date BETWEEN ? AND ?
             AND ( bs.home_teamid = ?
                 OR bs.visitor_teamid = ? )
-            AND bs.gameMIN > 0
+            AND bs.game_min > 0
             AND p.teamid = ?
             AND p.retired = 0
             {$pidFilterClause}

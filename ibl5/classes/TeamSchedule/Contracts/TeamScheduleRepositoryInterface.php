@@ -9,8 +9,8 @@ namespace TeamSchedule\Contracts;
  *
  * Provides methods for retrieving team schedule information from the database.
  *
- * @phpstan-type ScheduleRow array{Year: int, BoxID: int, Date: string, Visitor: int, VScore: int, Home: int, HScore: int, SchedID: int, created_at: string, updated_at: string, uuid: string, gameOfThatDay: ?int}
- * @phpstan-type ProjectedGameRow array{Year: int, BoxID: int, Date: string, Visitor: int, VScore: int, Home: int, HScore: int, SchedID: int, created_at: string, updated_at: string, uuid: string}
+ * @phpstan-type ScheduleRow array{season_year: int, box_id: int, game_date: string, visitor_teamid: int, visitor_score: int, home_teamid: int, home_score: int, id: int, created_at: string, updated_at: string, uuid: string, game_of_that_day: ?int}
+ * @phpstan-type ProjectedGameRow array{season_year: int, box_id: int, game_date: string, visitor_teamid: int, visitor_score: int, home_teamid: int, home_score: int, id: int, created_at: string, updated_at: string, uuid: string}
  *
  * @see \TeamSchedule\TeamScheduleRepository For the concrete implementation
  */

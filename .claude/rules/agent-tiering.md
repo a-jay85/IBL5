@@ -68,22 +68,7 @@ Choose the tier per prompt — do not default all Explore agents to one tier:
 
 ## Post-Plan Agents
 
-See `/post-plan` SKILL.md for authoritative model assignments. Summary:
-
-**Haiku** — pattern-match or command-report tasks:
-- Phase 5B Agent 4 (Previous PRs) — mechanical `gh search/view` lookup
-- Phase 5C Security agents (SQLi, CSRF, Auth) — explicit vulnerable/secure pattern tables
-- Phase 5D Scoring agent — numeric rubric application
-- Phase 6 Agent 1 (PHPUnit+PHPStan) — runs commands, reports output
-- Phase 6 Agent 2 (E2E Playwright) — runs commands, reports output
-
-**Sonnet** — synthesis-dependent tasks:
-- Phase 5B Agent 1 (Architectural fitness) — judges R/S/V fit, dependency direction
-- Phase 5B Agent 2 (Bug detection) — connects schema types to PHP comparisons
-- Phase 5B Agent 3 (Git history) — must judge whether a past commit's context overlaps the current change
-- Phase 5B Agent 5 (Code comments) — semantic compliance with docstring intent
-- Phase 5B Agent 6 (Database performance) — interprets query behavior in context
-- Phase 7 (Manual testing review) — category judgment
+See `/post-plan` SKILL.md for authoritative model assignments per phase.
 
 ## In Plans
 

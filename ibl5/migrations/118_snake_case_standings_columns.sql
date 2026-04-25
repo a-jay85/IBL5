@@ -1,7 +1,18 @@
 -- Migration 118: Tier 3c — snake_case standings columns.
 -- Renames 22 camelCase columns on ibl_standings and ibl_olympics_standings.
--- CHECK constraints auto-updated by CHANGE COLUMN (verified in MariaDB 10.11).
+-- CHECK constraints dropped before rename and recreated after (MariaDB 10.11
+-- multi-column ALTER validates CHECKs before applying renames).
 -- vw_team_standings recreated at end with updated source column names.
+
+-- Drop CHECK constraints on ibl_standings that reference columns being renamed.
+ALTER TABLE `ibl_standings`
+  DROP CONSTRAINT IF EXISTS `chk_standings_games_unplayed`,
+  DROP CONSTRAINT IF EXISTS `chk_standings_conf_wins`,
+  DROP CONSTRAINT IF EXISTS `chk_standings_conf_losses`,
+  DROP CONSTRAINT IF EXISTS `chk_standings_home_wins`,
+  DROP CONSTRAINT IF EXISTS `chk_standings_home_losses`,
+  DROP CONSTRAINT IF EXISTS `chk_standings_away_wins`,
+  DROP CONSTRAINT IF EXISTS `chk_standings_away_losses`;
 
 ALTER TABLE `ibl_standings`
   CHANGE COLUMN `leagueRecord`       `league_record`       varchar(5) DEFAULT '',
@@ -27,6 +38,26 @@ ALTER TABLE `ibl_standings`
   CHANGE COLUMN `clinchedPlayoffs`   `clinched_playoffs`   tinyint(1) DEFAULT NULL,
   CHANGE COLUMN `clinchedLeague`     `clinched_league`     tinyint(1) DEFAULT NULL;
 
+-- Recreate CHECK constraints with new column names.
+ALTER TABLE `ibl_standings`
+  ADD CONSTRAINT `chk_standings_games_unplayed` CHECK (`games_unplayed` IS NULL OR `games_unplayed` >= 0 AND `games_unplayed` <= 82),
+  ADD CONSTRAINT `chk_standings_conf_wins` CHECK (`conf_wins` IS NULL OR `conf_wins` <= 82),
+  ADD CONSTRAINT `chk_standings_conf_losses` CHECK (`conf_losses` IS NULL OR `conf_losses` <= 82),
+  ADD CONSTRAINT `chk_standings_home_wins` CHECK (`home_wins` IS NULL OR `home_wins` <= 41),
+  ADD CONSTRAINT `chk_standings_home_losses` CHECK (`home_losses` IS NULL OR `home_losses` <= 41),
+  ADD CONSTRAINT `chk_standings_away_wins` CHECK (`away_wins` IS NULL OR `away_wins` <= 41),
+  ADD CONSTRAINT `chk_standings_away_losses` CHECK (`away_losses` IS NULL OR `away_losses` <= 41);
+
+-- Drop CHECK constraints on ibl_olympics_standings.
+ALTER TABLE `ibl_olympics_standings`
+  DROP CONSTRAINT IF EXISTS `chk_olympics_standings_games_unplayed`,
+  DROP CONSTRAINT IF EXISTS `chk_olympics_standings_conf_wins`,
+  DROP CONSTRAINT IF EXISTS `chk_olympics_standings_conf_losses`,
+  DROP CONSTRAINT IF EXISTS `chk_olympics_standings_home_wins`,
+  DROP CONSTRAINT IF EXISTS `chk_olympics_standings_home_losses`,
+  DROP CONSTRAINT IF EXISTS `chk_olympics_standings_away_wins`,
+  DROP CONSTRAINT IF EXISTS `chk_olympics_standings_away_losses`;
+
 ALTER TABLE `ibl_olympics_standings`
   CHANGE COLUMN `leagueRecord`       `league_record`       varchar(5) DEFAULT '',
   CHANGE COLUMN `confRecord`         `conf_record`         varchar(5) NOT NULL DEFAULT '',
@@ -50,6 +81,16 @@ ALTER TABLE `ibl_olympics_standings`
   CHANGE COLUMN `clinchedDivision`   `clinched_division`   tinyint(1) DEFAULT NULL,
   CHANGE COLUMN `clinchedPlayoffs`   `clinched_playoffs`   tinyint(1) DEFAULT NULL,
   CHANGE COLUMN `clinchedLeague`     `clinched_league`     tinyint(1) DEFAULT NULL;
+
+-- Recreate CHECK constraints with new column names.
+ALTER TABLE `ibl_olympics_standings`
+  ADD CONSTRAINT `chk_olympics_standings_games_unplayed` CHECK (`games_unplayed` IS NULL OR `games_unplayed` >= 0),
+  ADD CONSTRAINT `chk_olympics_standings_conf_wins` CHECK (`conf_wins` IS NULL OR `conf_wins` >= 0),
+  ADD CONSTRAINT `chk_olympics_standings_conf_losses` CHECK (`conf_losses` IS NULL OR `conf_losses` >= 0),
+  ADD CONSTRAINT `chk_olympics_standings_home_wins` CHECK (`home_wins` IS NULL OR `home_wins` >= 0),
+  ADD CONSTRAINT `chk_olympics_standings_home_losses` CHECK (`home_losses` IS NULL OR `home_losses` >= 0),
+  ADD CONSTRAINT `chk_olympics_standings_away_wins` CHECK (`away_wins` IS NULL OR `away_wins` >= 0),
+  ADD CONSTRAINT `chk_olympics_standings_away_losses` CHECK (`away_losses` IS NULL OR `away_losses` >= 0);
 
 -- Recreate vw_team_standings with updated source column names.
 -- Output aliases unchanged — view consumers see the same shape.

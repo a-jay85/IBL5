@@ -246,7 +246,7 @@ function parseHtmlBoxscore(string $html): ?array
 echo $dryRun ? "=== DRY RUN MODE ===\n\n" : "=== IMPORTING BOX SCORES FROM HTML ===\n\n";
 
 // Step 1: Load schedule data for Dec 7-13
-$scheduleQuery = "SELECT id, box_id, game_date, Visitor, Home, visitor_score, home_score
+$scheduleQuery = "SELECT id, box_id, game_date, visitor_teamid, home_teamid, visitor_score, home_score
                    FROM ibl_schedule
                    WHERE game_date BETWEEN '2006-12-07' AND '2006-12-13'
                    ORDER BY game_date, id";

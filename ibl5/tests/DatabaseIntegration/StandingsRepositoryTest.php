@@ -160,7 +160,7 @@ class StandingsRepositoryTest extends DatabaseTestCase
 
     public function testGetSeriesRecordsReflectsScheduleData(): void
     {
-        // Seed data has schedule row: Year=2025, Visitor=2, visitor_score=85, Home=1, home_score=104
+        // Seed data has schedule row: season_year=2025, visitor_teamid=2, visitor_score=85, home_teamid=1, home_score=104
         // vw_series_records derives from ibl_schedule
         $result = $this->repo->getSeriesRecords();
 

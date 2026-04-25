@@ -1,140 +1,262 @@
 -- Migration 121: Tier 6 — snake_case rename of box-score and schedule columns (ADR-0010).
 -- Final cosmetic case-consistency PR. Renames PascalCase / camelCase columns on
--- the four box-score tables and the two schedule tables. Box-score tables have
--- 5 STORED generated columns each that reference the renamed source columns;
--- using ALTER TABLE ... RENAME COLUMN keeps the generated-column expressions,
--- CHECK constraints, and index column references in sync automatically (verified
--- on MariaDB 10.11). CHANGE COLUMN does NOT — it validates generated-column
--- expressions before applying the rename and fails. Schedule FKs on Home/Visitor
--- are dropped + re-added because the FK targets are also being renamed.
--- All affected views are recreated at the end.
+-- the four box-score tables and the two schedule tables.
+--
+-- Strategy: each box-score table has 5 STORED generated columns and a CHECK
+-- constraint that reference the columns being renamed. RENAME COLUMN's
+-- "auto-update generated columns" behaviour is not reliable across MariaDB
+-- patch levels, so we drop the generated columns + CHECK constraint first
+-- (which also auto-drops the 11 indexes that reference them), then rename the
+-- source columns with CHANGE COLUMN, then recreate the generated columns,
+-- CHECK constraint, and indexes with the new column names.
+-- Schedule FKs on Home/Visitor are dropped + re-added because the FK columns
+-- are also being renamed.
 
 -- ============================================================
--- Group A — ibl_box_scores (player rows)
+-- ibl_box_scores
 -- ============================================================
+
+ALTER TABLE `ibl_box_scores` DROP CONSTRAINT `chk_box_minutes`;
+
+-- Dropping the generated columns auto-drops every index that references them,
+-- including idx_gt_points/rebounds/fg_made (built on calc_*) AND
+-- idx_gt_ast/stl/blk/tov/ftm/3gm/pid/pid_season (built on game_type).
+ALTER TABLE `ibl_box_scores`
+  DROP COLUMN `game_type`,
+  DROP COLUMN `season_year`,
+  DROP COLUMN `calc_points`,
+  DROP COLUMN `calc_rebounds`,
+  DROP COLUMN `calc_fg_made`;
 
 ALTER TABLE `ibl_box_scores`
-  RENAME COLUMN `Date`           TO `game_date`,
-  RENAME COLUMN `gameMIN`        TO `game_min`,
-  RENAME COLUMN `game2GM`        TO `game_2gm`,
-  RENAME COLUMN `game2GA`        TO `game_2ga`,
-  RENAME COLUMN `gameFTM`        TO `game_ftm`,
-  RENAME COLUMN `gameFTA`        TO `game_fta`,
-  RENAME COLUMN `game3GM`        TO `game_3gm`,
-  RENAME COLUMN `game3GA`        TO `game_3ga`,
-  RENAME COLUMN `gameORB`        TO `game_orb`,
-  RENAME COLUMN `gameDRB`        TO `game_drb`,
-  RENAME COLUMN `gameAST`        TO `game_ast`,
-  RENAME COLUMN `gameSTL`        TO `game_stl`,
-  RENAME COLUMN `gameTOV`        TO `game_tov`,
-  RENAME COLUMN `gameBLK`        TO `game_blk`,
-  RENAME COLUMN `gamePF`         TO `game_pf`,
-  RENAME COLUMN `gameOfThatDay`  TO `game_of_that_day`,
-  RENAME COLUMN `visitorWins`    TO `visitor_wins`,
-  RENAME COLUMN `visitorLosses`  TO `visitor_losses`,
-  RENAME COLUMN `homeWins`       TO `home_wins`,
-  RENAME COLUMN `homeLosses`     TO `home_losses`;
+  CHANGE COLUMN `Date`           `game_date`         date                 NOT NULL                COMMENT 'Game date',
+  CHANGE COLUMN `gameMIN`        `game_min`          tinyint(3) unsigned  DEFAULT NULL            COMMENT 'Minutes played',
+  CHANGE COLUMN `game2GM`        `game_2gm`          tinyint(3) unsigned  DEFAULT NULL            COMMENT 'Two-point field goals made',
+  CHANGE COLUMN `game2GA`        `game_2ga`          tinyint(3) unsigned  DEFAULT NULL            COMMENT 'Two-point field goals attempted',
+  CHANGE COLUMN `gameFTM`        `game_ftm`          tinyint(3) unsigned  DEFAULT NULL            COMMENT 'Free throws made',
+  CHANGE COLUMN `gameFTA`        `game_fta`          tinyint(3) unsigned  DEFAULT NULL            COMMENT 'Free throws attempted',
+  CHANGE COLUMN `game3GM`        `game_3gm`          tinyint(3) unsigned  DEFAULT NULL            COMMENT 'Three pointers made',
+  CHANGE COLUMN `game3GA`        `game_3ga`          tinyint(3) unsigned  DEFAULT NULL            COMMENT 'Three pointers attempted',
+  CHANGE COLUMN `gameORB`        `game_orb`          tinyint(3) unsigned  DEFAULT NULL            COMMENT 'Offensive rebounds',
+  CHANGE COLUMN `gameDRB`        `game_drb`          tinyint(3) unsigned  DEFAULT NULL            COMMENT 'Defensive rebounds',
+  CHANGE COLUMN `gameAST`        `game_ast`          tinyint(3) unsigned  DEFAULT NULL            COMMENT 'Assists',
+  CHANGE COLUMN `gameSTL`        `game_stl`          tinyint(3) unsigned  DEFAULT NULL            COMMENT 'Steals',
+  CHANGE COLUMN `gameTOV`        `game_tov`          tinyint(3) unsigned  DEFAULT NULL            COMMENT 'Turnovers',
+  CHANGE COLUMN `gameBLK`        `game_blk`          tinyint(3) unsigned  DEFAULT NULL            COMMENT 'Blocks',
+  CHANGE COLUMN `gamePF`         `game_pf`           tinyint(3) unsigned  DEFAULT NULL            COMMENT 'Personal fouls',
+  CHANGE COLUMN `gameOfThatDay`  `game_of_that_day`  tinyint(3) unsigned  DEFAULT NULL            COMMENT 'Game number for that date (1st, 2nd game)',
+  CHANGE COLUMN `visitorWins`    `visitor_wins`      smallint(5) unsigned DEFAULT NULL            COMMENT 'Visitor team wins before this game',
+  CHANGE COLUMN `visitorLosses`  `visitor_losses`    smallint(5) unsigned DEFAULT NULL            COMMENT 'Visitor team losses before this game',
+  CHANGE COLUMN `homeWins`       `home_wins`         smallint(5) unsigned DEFAULT NULL            COMMENT 'Home team wins before this game',
+  CHANGE COLUMN `homeLosses`     `home_losses`       smallint(5) unsigned DEFAULT NULL            COMMENT 'Home team losses before this game';
+
+ALTER TABLE `ibl_box_scores`
+  ADD COLUMN `game_type`     tinyint(3) unsigned  GENERATED ALWAYS AS (CASE WHEN MONTH(`game_date`) = 6 THEN 2 WHEN MONTH(`game_date`) = 10 THEN 3 WHEN MONTH(`game_date`) = 0 THEN 0 ELSE 1 END) STORED,
+  ADD COLUMN `season_year`   smallint(5) unsigned GENERATED ALWAYS AS (CASE WHEN YEAR(`game_date`) = 0 THEN 0 WHEN MONTH(`game_date`) >= 10 THEN YEAR(`game_date`) + 1 ELSE YEAR(`game_date`) END) STORED,
+  ADD COLUMN `calc_points`   smallint(5) unsigned GENERATED ALWAYS AS (`game_2gm` * 2 + `game_ftm` + `game_3gm` * 3) STORED,
+  ADD COLUMN `calc_rebounds` tinyint(3) unsigned  GENERATED ALWAYS AS (`game_orb` + `game_drb`) STORED,
+  ADD COLUMN `calc_fg_made`  tinyint(3) unsigned  GENERATED ALWAYS AS (`game_2gm` + `game_3gm`) STORED;
+
+ALTER TABLE `ibl_box_scores`
+  ADD KEY `idx_gt_points`     (`game_type`, `calc_points`),
+  ADD KEY `idx_gt_rebounds`   (`game_type`, `calc_rebounds`),
+  ADD KEY `idx_gt_fg_made`    (`game_type`, `calc_fg_made`),
+  ADD KEY `idx_gt_ast`        (`game_type`, `game_ast`),
+  ADD KEY `idx_gt_stl`        (`game_type`, `game_stl`),
+  ADD KEY `idx_gt_blk`        (`game_type`, `game_blk`),
+  ADD KEY `idx_gt_tov`        (`game_type`, `game_tov`),
+  ADD KEY `idx_gt_ftm`        (`game_type`, `game_ftm`),
+  ADD KEY `idx_gt_3gm`        (`game_type`, `game_3gm`),
+  ADD KEY `idx_gt_pid`        (`game_type`, `pid`),
+  ADD KEY `idx_gt_pid_season` (`game_type`, `pid`, `season_year`);
+
+ALTER TABLE `ibl_box_scores`
+  ADD CONSTRAINT `chk_box_minutes` CHECK (`game_min` IS NULL OR `game_min` >= 0 AND `game_min` <= 70);
 
 -- ============================================================
--- Group B — ibl_olympics_box_scores (player rows)
+-- ibl_olympics_box_scores
 -- ============================================================
+
+ALTER TABLE `ibl_olympics_box_scores` DROP CONSTRAINT `chk_olympics_box_minutes`;
 
 ALTER TABLE `ibl_olympics_box_scores`
-  RENAME COLUMN `Date`           TO `game_date`,
-  RENAME COLUMN `gameMIN`        TO `game_min`,
-  RENAME COLUMN `game2GM`        TO `game_2gm`,
-  RENAME COLUMN `game2GA`        TO `game_2ga`,
-  RENAME COLUMN `gameFTM`        TO `game_ftm`,
-  RENAME COLUMN `gameFTA`        TO `game_fta`,
-  RENAME COLUMN `game3GM`        TO `game_3gm`,
-  RENAME COLUMN `game3GA`        TO `game_3ga`,
-  RENAME COLUMN `gameORB`        TO `game_orb`,
-  RENAME COLUMN `gameDRB`        TO `game_drb`,
-  RENAME COLUMN `gameAST`        TO `game_ast`,
-  RENAME COLUMN `gameSTL`        TO `game_stl`,
-  RENAME COLUMN `gameTOV`        TO `game_tov`,
-  RENAME COLUMN `gameBLK`        TO `game_blk`,
-  RENAME COLUMN `gamePF`         TO `game_pf`,
-  RENAME COLUMN `gameOfThatDay`  TO `game_of_that_day`,
-  RENAME COLUMN `visitorWins`    TO `visitor_wins`,
-  RENAME COLUMN `visitorLosses`  TO `visitor_losses`,
-  RENAME COLUMN `homeWins`       TO `home_wins`,
-  RENAME COLUMN `homeLosses`     TO `home_losses`;
+  DROP COLUMN `game_type`,
+  DROP COLUMN `season_year`,
+  DROP COLUMN `calc_points`,
+  DROP COLUMN `calc_rebounds`,
+  DROP COLUMN `calc_fg_made`;
+
+ALTER TABLE `ibl_olympics_box_scores`
+  CHANGE COLUMN `Date`           `game_date`         date                NOT NULL                COMMENT 'Game date',
+  CHANGE COLUMN `gameMIN`        `game_min`          tinyint(3) unsigned DEFAULT NULL            COMMENT 'Minutes played',
+  CHANGE COLUMN `game2GM`        `game_2gm`          tinyint(3) unsigned DEFAULT NULL            COMMENT 'Field goals made',
+  CHANGE COLUMN `game2GA`        `game_2ga`          tinyint(3) unsigned DEFAULT NULL            COMMENT 'Field goals attempted',
+  CHANGE COLUMN `gameFTM`        `game_ftm`          tinyint(3) unsigned DEFAULT NULL            COMMENT 'Free throws made',
+  CHANGE COLUMN `gameFTA`        `game_fta`          tinyint(3) unsigned DEFAULT NULL            COMMENT 'Free throws attempted',
+  CHANGE COLUMN `game3GM`        `game_3gm`          tinyint(3) unsigned DEFAULT NULL            COMMENT 'Three pointers made',
+  CHANGE COLUMN `game3GA`        `game_3ga`          tinyint(3) unsigned DEFAULT NULL            COMMENT 'Three pointers attempted',
+  CHANGE COLUMN `gameORB`        `game_orb`          tinyint(3) unsigned DEFAULT NULL            COMMENT 'Offensive rebounds',
+  CHANGE COLUMN `gameDRB`        `game_drb`          tinyint(3) unsigned DEFAULT NULL            COMMENT 'Defensive rebounds',
+  CHANGE COLUMN `gameAST`        `game_ast`          tinyint(3) unsigned DEFAULT NULL            COMMENT 'Assists',
+  CHANGE COLUMN `gameSTL`        `game_stl`          tinyint(3) unsigned DEFAULT NULL            COMMENT 'Steals',
+  CHANGE COLUMN `gameTOV`        `game_tov`          tinyint(3) unsigned DEFAULT NULL            COMMENT 'Turnovers',
+  CHANGE COLUMN `gameBLK`        `game_blk`          tinyint(3) unsigned DEFAULT NULL            COMMENT 'Blocks',
+  CHANGE COLUMN `gamePF`         `game_pf`           tinyint(3) unsigned DEFAULT NULL            COMMENT 'Personal fouls',
+  CHANGE COLUMN `gameOfThatDay`  `game_of_that_day`  int(11)             DEFAULT NULL            COMMENT 'Game number for that date',
+  CHANGE COLUMN `visitorWins`    `visitor_wins`      int(11)             DEFAULT NULL            COMMENT 'Visitor team wins before game',
+  CHANGE COLUMN `visitorLosses`  `visitor_losses`    int(11)             DEFAULT NULL            COMMENT 'Visitor team losses before game',
+  CHANGE COLUMN `homeWins`       `home_wins`         int(11)             DEFAULT NULL            COMMENT 'Home team wins before game',
+  CHANGE COLUMN `homeLosses`     `home_losses`       int(11)             DEFAULT NULL            COMMENT 'Home team losses before game';
+
+ALTER TABLE `ibl_olympics_box_scores`
+  ADD COLUMN `game_type`     tinyint(3) unsigned  GENERATED ALWAYS AS (CASE WHEN MONTH(`game_date`) = 6 THEN 2 WHEN MONTH(`game_date`) = 10 THEN 3 WHEN MONTH(`game_date`) = 0 THEN 0 ELSE 1 END) STORED,
+  ADD COLUMN `season_year`   smallint(5) unsigned GENERATED ALWAYS AS (CASE WHEN YEAR(`game_date`) = 0 THEN 0 WHEN MONTH(`game_date`) >= 10 THEN YEAR(`game_date`) + 1 ELSE YEAR(`game_date`) END) STORED,
+  ADD COLUMN `calc_points`   smallint(5) unsigned GENERATED ALWAYS AS (`game_2gm` * 2 + `game_ftm` + `game_3gm` * 3) STORED,
+  ADD COLUMN `calc_rebounds` tinyint(3) unsigned  GENERATED ALWAYS AS (`game_orb` + `game_drb`) STORED,
+  ADD COLUMN `calc_fg_made`  tinyint(3) unsigned  GENERATED ALWAYS AS (`game_2gm` + `game_3gm`) STORED;
+
+ALTER TABLE `ibl_olympics_box_scores`
+  ADD KEY `idx_gt_points`   (`game_type`, `calc_points`),
+  ADD KEY `idx_gt_rebounds` (`game_type`, `calc_rebounds`),
+  ADD KEY `idx_gt_fg_made`  (`game_type`, `calc_fg_made`),
+  ADD KEY `idx_gt_ast`      (`game_type`, `game_ast`),
+  ADD KEY `idx_gt_stl`      (`game_type`, `game_stl`),
+  ADD KEY `idx_gt_blk`      (`game_type`, `game_blk`),
+  ADD KEY `idx_gt_tov`      (`game_type`, `game_tov`),
+  ADD KEY `idx_gt_ftm`      (`game_type`, `game_ftm`),
+  ADD KEY `idx_gt_3gm`      (`game_type`, `game_3gm`),
+  ADD KEY `idx_gt_pid`      (`game_type`, `pid`);
+
+ALTER TABLE `ibl_olympics_box_scores`
+  ADD CONSTRAINT `chk_olympics_box_minutes` CHECK (`game_min` IS NULL OR `game_min` >= 0 AND `game_min` <= 70);
 
 -- ============================================================
--- Group C — ibl_box_scores_teams (team rows; quarter-points + totals)
+-- ibl_box_scores_teams
 -- ============================================================
 
 ALTER TABLE `ibl_box_scores_teams`
-  RENAME COLUMN `Date`            TO `game_date`,
-  RENAME COLUMN `gameOfThatDay`   TO `game_of_that_day`,
-  RENAME COLUMN `visitorWins`     TO `visitor_wins`,
-  RENAME COLUMN `visitorLosses`   TO `visitor_losses`,
-  RENAME COLUMN `homeWins`        TO `home_wins`,
-  RENAME COLUMN `homeLosses`      TO `home_losses`,
-  RENAME COLUMN `visitorQ1points` TO `visitor_q1_points`,
-  RENAME COLUMN `visitorQ2points` TO `visitor_q2_points`,
-  RENAME COLUMN `visitorQ3points` TO `visitor_q3_points`,
-  RENAME COLUMN `visitorQ4points` TO `visitor_q4_points`,
-  RENAME COLUMN `visitorOTpoints` TO `visitor_ot_points`,
-  RENAME COLUMN `homeQ1points`    TO `home_q1_points`,
-  RENAME COLUMN `homeQ2points`    TO `home_q2_points`,
-  RENAME COLUMN `homeQ3points`    TO `home_q3_points`,
-  RENAME COLUMN `homeQ4points`    TO `home_q4_points`,
-  RENAME COLUMN `homeOTpoints`    TO `home_ot_points`,
-  RENAME COLUMN `gameMIN`         TO `game_min`,
-  RENAME COLUMN `game2GM`         TO `game_2gm`,
-  RENAME COLUMN `game2GA`         TO `game_2ga`,
-  RENAME COLUMN `gameFTM`         TO `game_ftm`,
-  RENAME COLUMN `gameFTA`         TO `game_fta`,
-  RENAME COLUMN `game3GM`         TO `game_3gm`,
-  RENAME COLUMN `game3GA`         TO `game_3ga`,
-  RENAME COLUMN `gameORB`         TO `game_orb`,
-  RENAME COLUMN `gameDRB`         TO `game_drb`,
-  RENAME COLUMN `gameAST`         TO `game_ast`,
-  RENAME COLUMN `gameSTL`         TO `game_stl`,
-  RENAME COLUMN `gameTOV`         TO `game_tov`,
-  RENAME COLUMN `gameBLK`         TO `game_blk`,
-  RENAME COLUMN `gamePF`          TO `game_pf`;
+  DROP COLUMN `game_type`,
+  DROP COLUMN `season_year`,
+  DROP COLUMN `calc_points`,
+  DROP COLUMN `calc_rebounds`,
+  DROP COLUMN `calc_fg_made`;
+
+ALTER TABLE `ibl_box_scores_teams`
+  CHANGE COLUMN `Date`            `game_date`          date    NOT NULL     COMMENT 'Game date',
+  CHANGE COLUMN `gameOfThatDay`   `game_of_that_day`   int(11) DEFAULT NULL COMMENT 'Game number for that date (1st, 2nd, etc.)',
+  CHANGE COLUMN `visitorWins`     `visitor_wins`       int(11) DEFAULT NULL COMMENT 'Visitor record wins before game',
+  CHANGE COLUMN `visitorLosses`   `visitor_losses`     int(11) DEFAULT NULL COMMENT 'Visitor record losses before game',
+  CHANGE COLUMN `homeWins`        `home_wins`          int(11) DEFAULT NULL COMMENT 'Home record wins before game',
+  CHANGE COLUMN `homeLosses`      `home_losses`        int(11) DEFAULT NULL COMMENT 'Home record losses before game',
+  CHANGE COLUMN `visitorQ1points` `visitor_q1_points`  int(11) DEFAULT NULL COMMENT 'Visitor Q1 points',
+  CHANGE COLUMN `visitorQ2points` `visitor_q2_points`  int(11) DEFAULT NULL COMMENT 'Visitor Q2 points',
+  CHANGE COLUMN `visitorQ3points` `visitor_q3_points`  int(11) DEFAULT NULL COMMENT 'Visitor Q3 points',
+  CHANGE COLUMN `visitorQ4points` `visitor_q4_points`  int(11) DEFAULT NULL COMMENT 'Visitor Q4 points',
+  CHANGE COLUMN `visitorOTpoints` `visitor_ot_points`  int(11) DEFAULT NULL COMMENT 'Visitor overtime points',
+  CHANGE COLUMN `homeQ1points`    `home_q1_points`     int(11) DEFAULT NULL COMMENT 'Home Q1 points',
+  CHANGE COLUMN `homeQ2points`    `home_q2_points`     int(11) DEFAULT NULL COMMENT 'Home Q2 points',
+  CHANGE COLUMN `homeQ3points`    `home_q3_points`     int(11) DEFAULT NULL COMMENT 'Home Q3 points',
+  CHANGE COLUMN `homeQ4points`    `home_q4_points`     int(11) DEFAULT NULL COMMENT 'Home Q4 points',
+  CHANGE COLUMN `homeOTpoints`    `home_ot_points`     int(11) DEFAULT NULL COMMENT 'Home overtime points',
+  CHANGE COLUMN `gameMIN`         `game_min`           int(11) DEFAULT NULL COMMENT 'Total game minutes',
+  CHANGE COLUMN `game2GM`         `game_2gm`           int(11) DEFAULT NULL COMMENT 'Two-point field goals made',
+  CHANGE COLUMN `game2GA`         `game_2ga`           int(11) DEFAULT NULL COMMENT 'Two-point field goals attempted',
+  CHANGE COLUMN `gameFTM`         `game_ftm`           int(11) DEFAULT NULL COMMENT 'Free throws made',
+  CHANGE COLUMN `gameFTA`         `game_fta`           int(11) DEFAULT NULL COMMENT 'Free throws attempted',
+  CHANGE COLUMN `game3GM`         `game_3gm`           int(11) DEFAULT NULL COMMENT 'Three pointers made',
+  CHANGE COLUMN `game3GA`         `game_3ga`           int(11) DEFAULT NULL COMMENT 'Three pointers attempted',
+  CHANGE COLUMN `gameORB`         `game_orb`           int(11) DEFAULT NULL COMMENT 'Offensive rebounds',
+  CHANGE COLUMN `gameDRB`         `game_drb`           int(11) DEFAULT NULL COMMENT 'Defensive rebounds',
+  CHANGE COLUMN `gameAST`         `game_ast`           int(11) DEFAULT NULL COMMENT 'Assists',
+  CHANGE COLUMN `gameSTL`         `game_stl`           int(11) DEFAULT NULL COMMENT 'Steals',
+  CHANGE COLUMN `gameTOV`         `game_tov`           int(11) DEFAULT NULL COMMENT 'Turnovers',
+  CHANGE COLUMN `gameBLK`         `game_blk`           int(11) DEFAULT NULL COMMENT 'Blocks',
+  CHANGE COLUMN `gamePF`          `game_pf`            int(11) DEFAULT NULL COMMENT 'Personal fouls';
+
+ALTER TABLE `ibl_box_scores_teams`
+  ADD COLUMN `game_type`     tinyint(3) unsigned  GENERATED ALWAYS AS (CASE WHEN MONTH(`game_date`) = 6 THEN 2 WHEN MONTH(`game_date`) = 10 THEN 3 WHEN MONTH(`game_date`) = 0 THEN 0 ELSE 1 END) STORED,
+  ADD COLUMN `season_year`   smallint(5) unsigned GENERATED ALWAYS AS (CASE WHEN YEAR(`game_date`) = 0 THEN 0 WHEN MONTH(`game_date`) >= 10 THEN YEAR(`game_date`) + 1 ELSE YEAR(`game_date`) END) STORED,
+  ADD COLUMN `calc_points`   smallint(5) unsigned GENERATED ALWAYS AS (`game_2gm` * 2 + `game_ftm` + `game_3gm` * 3) STORED,
+  ADD COLUMN `calc_rebounds` smallint(5) unsigned GENERATED ALWAYS AS (`game_orb` + `game_drb`) STORED,
+  ADD COLUMN `calc_fg_made`  smallint(5) unsigned GENERATED ALWAYS AS (`game_2gm` + `game_3gm`) STORED;
+
+ALTER TABLE `ibl_box_scores_teams`
+  ADD KEY `idx_gt_points`             (`game_type`, `calc_points`),
+  ADD KEY `idx_gt_rebounds`           (`game_type`, `calc_rebounds`),
+  ADD KEY `idx_gt_fg_made`            (`game_type`, `calc_fg_made`),
+  ADD KEY `idx_gt_ast`                (`game_type`, `game_ast`),
+  ADD KEY `idx_gt_stl`                (`game_type`, `game_stl`),
+  ADD KEY `idx_gt_blk`                (`game_type`, `game_blk`),
+  ADD KEY `idx_gt_tov`                (`game_type`, `game_tov`),
+  ADD KEY `idx_gt_ftm`                (`game_type`, `game_ftm`),
+  ADD KEY `idx_gt_3gm`                (`game_type`, `game_3gm`),
+  ADD KEY `idx_gt_date_teams`         (`game_type`, `game_date`, `visitor_teamid`, `home_teamid`),
+  ADD KEY `idx_gt_name_season`        (`game_type`, `name`, `season_year`),
+  ADD KEY `idx_date_visitor_home_gotd` (`game_date`, `visitor_teamid`, `home_teamid`, `game_of_that_day`);
 
 -- ============================================================
--- Group D — ibl_olympics_box_scores_teams (team rows; quarter-points + totals)
+-- ibl_olympics_box_scores_teams
 -- ============================================================
 
 ALTER TABLE `ibl_olympics_box_scores_teams`
-  RENAME COLUMN `Date`            TO `game_date`,
-  RENAME COLUMN `gameOfThatDay`   TO `game_of_that_day`,
-  RENAME COLUMN `visitorWins`     TO `visitor_wins`,
-  RENAME COLUMN `visitorLosses`   TO `visitor_losses`,
-  RENAME COLUMN `homeWins`        TO `home_wins`,
-  RENAME COLUMN `homeLosses`      TO `home_losses`,
-  RENAME COLUMN `visitorQ1points` TO `visitor_q1_points`,
-  RENAME COLUMN `visitorQ2points` TO `visitor_q2_points`,
-  RENAME COLUMN `visitorQ3points` TO `visitor_q3_points`,
-  RENAME COLUMN `visitorQ4points` TO `visitor_q4_points`,
-  RENAME COLUMN `visitorOTpoints` TO `visitor_ot_points`,
-  RENAME COLUMN `homeQ1points`    TO `home_q1_points`,
-  RENAME COLUMN `homeQ2points`    TO `home_q2_points`,
-  RENAME COLUMN `homeQ3points`    TO `home_q3_points`,
-  RENAME COLUMN `homeQ4points`    TO `home_q4_points`,
-  RENAME COLUMN `homeOTpoints`    TO `home_ot_points`,
-  RENAME COLUMN `gameMIN`         TO `game_min`,
-  RENAME COLUMN `game2GM`         TO `game_2gm`,
-  RENAME COLUMN `game2GA`         TO `game_2ga`,
-  RENAME COLUMN `gameFTM`         TO `game_ftm`,
-  RENAME COLUMN `gameFTA`         TO `game_fta`,
-  RENAME COLUMN `game3GM`         TO `game_3gm`,
-  RENAME COLUMN `game3GA`         TO `game_3ga`,
-  RENAME COLUMN `gameORB`         TO `game_orb`,
-  RENAME COLUMN `gameDRB`         TO `game_drb`,
-  RENAME COLUMN `gameAST`         TO `game_ast`,
-  RENAME COLUMN `gameSTL`         TO `game_stl`,
-  RENAME COLUMN `gameTOV`         TO `game_tov`,
-  RENAME COLUMN `gameBLK`         TO `game_blk`,
-  RENAME COLUMN `gamePF`          TO `game_pf`;
+  DROP COLUMN `game_type`,
+  DROP COLUMN `season_year`,
+  DROP COLUMN `calc_points`,
+  DROP COLUMN `calc_rebounds`,
+  DROP COLUMN `calc_fg_made`;
+
+ALTER TABLE `ibl_olympics_box_scores_teams`
+  CHANGE COLUMN `Date`            `game_date`          date    NOT NULL     COMMENT 'Game date',
+  CHANGE COLUMN `gameOfThatDay`   `game_of_that_day`   int(11) DEFAULT NULL COMMENT 'Game number for that date',
+  CHANGE COLUMN `visitorWins`     `visitor_wins`       int(11) DEFAULT NULL COMMENT 'Visitor team wins before game',
+  CHANGE COLUMN `visitorLosses`   `visitor_losses`     int(11) DEFAULT NULL COMMENT 'Visitor team losses before game',
+  CHANGE COLUMN `homeWins`        `home_wins`          int(11) DEFAULT NULL COMMENT 'Home team wins before game',
+  CHANGE COLUMN `homeLosses`      `home_losses`        int(11) DEFAULT NULL COMMENT 'Home team losses before game',
+  CHANGE COLUMN `visitorQ1points` `visitor_q1_points`  int(11) DEFAULT NULL COMMENT 'Visitor Q1 points',
+  CHANGE COLUMN `visitorQ2points` `visitor_q2_points`  int(11) DEFAULT NULL COMMENT 'Visitor Q2 points',
+  CHANGE COLUMN `visitorQ3points` `visitor_q3_points`  int(11) DEFAULT NULL COMMENT 'Visitor Q3 points',
+  CHANGE COLUMN `visitorQ4points` `visitor_q4_points`  int(11) DEFAULT NULL COMMENT 'Visitor Q4 points',
+  CHANGE COLUMN `visitorOTpoints` `visitor_ot_points`  int(11) DEFAULT NULL COMMENT 'Visitor overtime points',
+  CHANGE COLUMN `homeQ1points`    `home_q1_points`     int(11) DEFAULT NULL COMMENT 'Home Q1 points',
+  CHANGE COLUMN `homeQ2points`    `home_q2_points`     int(11) DEFAULT NULL COMMENT 'Home Q2 points',
+  CHANGE COLUMN `homeQ3points`    `home_q3_points`     int(11) DEFAULT NULL COMMENT 'Home Q3 points',
+  CHANGE COLUMN `homeQ4points`    `home_q4_points`     int(11) DEFAULT NULL COMMENT 'Home Q4 points',
+  CHANGE COLUMN `homeOTpoints`    `home_ot_points`     int(11) DEFAULT NULL COMMENT 'Home overtime points',
+  CHANGE COLUMN `gameMIN`         `game_min`           int(11) DEFAULT NULL COMMENT 'Total game minutes',
+  CHANGE COLUMN `game2GM`         `game_2gm`           int(11) DEFAULT NULL COMMENT 'Field goals made',
+  CHANGE COLUMN `game2GA`         `game_2ga`           int(11) DEFAULT NULL COMMENT 'Field goals attempted',
+  CHANGE COLUMN `gameFTM`         `game_ftm`           int(11) DEFAULT NULL COMMENT 'Free throws made',
+  CHANGE COLUMN `gameFTA`         `game_fta`           int(11) DEFAULT NULL COMMENT 'Free throws attempted',
+  CHANGE COLUMN `game3GM`         `game_3gm`           int(11) DEFAULT NULL COMMENT 'Three pointers made',
+  CHANGE COLUMN `game3GA`         `game_3ga`           int(11) DEFAULT NULL COMMENT 'Three pointers attempted',
+  CHANGE COLUMN `gameORB`         `game_orb`           int(11) DEFAULT NULL COMMENT 'Offensive rebounds',
+  CHANGE COLUMN `gameDRB`         `game_drb`           int(11) DEFAULT NULL COMMENT 'Defensive rebounds',
+  CHANGE COLUMN `gameAST`         `game_ast`           int(11) DEFAULT NULL COMMENT 'Assists',
+  CHANGE COLUMN `gameSTL`         `game_stl`           int(11) DEFAULT NULL COMMENT 'Steals',
+  CHANGE COLUMN `gameTOV`         `game_tov`           int(11) DEFAULT NULL COMMENT 'Turnovers',
+  CHANGE COLUMN `gameBLK`         `game_blk`           int(11) DEFAULT NULL COMMENT 'Blocks',
+  CHANGE COLUMN `gamePF`          `game_pf`            int(11) DEFAULT NULL COMMENT 'Personal fouls';
+
+ALTER TABLE `ibl_olympics_box_scores_teams`
+  ADD COLUMN `game_type`     tinyint(3) unsigned  GENERATED ALWAYS AS (CASE WHEN MONTH(`game_date`) = 6 THEN 2 WHEN MONTH(`game_date`) = 10 THEN 3 WHEN MONTH(`game_date`) = 0 THEN 0 ELSE 1 END) STORED,
+  ADD COLUMN `season_year`   smallint(5) unsigned GENERATED ALWAYS AS (CASE WHEN YEAR(`game_date`) = 0 THEN 0 WHEN MONTH(`game_date`) >= 10 THEN YEAR(`game_date`) + 1 ELSE YEAR(`game_date`) END) STORED,
+  ADD COLUMN `calc_points`   smallint(5) unsigned GENERATED ALWAYS AS (`game_2gm` * 2 + `game_ftm` + `game_3gm` * 3) STORED,
+  ADD COLUMN `calc_rebounds` smallint(5) unsigned GENERATED ALWAYS AS (`game_orb` + `game_drb`) STORED,
+  ADD COLUMN `calc_fg_made`  smallint(5) unsigned GENERATED ALWAYS AS (`game_2gm` + `game_3gm`) STORED;
+
+ALTER TABLE `ibl_olympics_box_scores_teams`
+  ADD KEY `idx_gt_points`   (`game_type`, `calc_points`),
+  ADD KEY `idx_gt_rebounds` (`game_type`, `calc_rebounds`),
+  ADD KEY `idx_gt_fg_made`  (`game_type`, `calc_fg_made`),
+  ADD KEY `idx_gt_ast`      (`game_type`, `game_ast`),
+  ADD KEY `idx_gt_stl`      (`game_type`, `game_stl`),
+  ADD KEY `idx_gt_blk`      (`game_type`, `game_blk`),
+  ADD KEY `idx_gt_tov`      (`game_type`, `game_tov`),
+  ADD KEY `idx_gt_ftm`      (`game_type`, `game_ftm`),
+  ADD KEY `idx_gt_3gm`      (`game_type`, `game_3gm`);
 
 -- ============================================================
--- Group E — ibl_schedule (FK churn on Home/Visitor)
+-- ibl_schedule (FK churn on Home/Visitor)
 -- ============================================================
 
 ALTER TABLE `ibl_schedule`
@@ -142,14 +264,14 @@ ALTER TABLE `ibl_schedule`
   DROP FOREIGN KEY `fk_schedule_visitor`;
 
 ALTER TABLE `ibl_schedule`
-  RENAME COLUMN `SchedID` TO `id`,
-  RENAME COLUMN `Year`    TO `season_year`,
-  RENAME COLUMN `BoxID`   TO `box_id`,
-  RENAME COLUMN `Date`    TO `game_date`,
-  RENAME COLUMN `Visitor` TO `visitor_teamid`,
-  RENAME COLUMN `VScore`  TO `visitor_score`,
-  RENAME COLUMN `Home`    TO `home_teamid`,
-  RENAME COLUMN `HScore`  TO `home_score`;
+  CHANGE COLUMN `SchedID` `id`             int(11)              NOT NULL AUTO_INCREMENT COMMENT 'Primary key',
+  CHANGE COLUMN `Year`    `season_year`    smallint(5) unsigned NOT NULL                COMMENT 'Season year',
+  CHANGE COLUMN `BoxID`   `box_id`         int(11)              NOT NULL DEFAULT 0      COMMENT 'Link to box score data',
+  CHANGE COLUMN `Date`    `game_date`      date                 NOT NULL                COMMENT 'Game date',
+  CHANGE COLUMN `Visitor` `visitor_teamid` int(11)              NOT NULL DEFAULT 0      COMMENT 'Visiting team ID (FK to ibl_team_info)',
+  CHANGE COLUMN `VScore`  `visitor_score`  tinyint(3) unsigned  NOT NULL DEFAULT 0      COMMENT 'Visitor score',
+  CHANGE COLUMN `Home`    `home_teamid`    int(11)              NOT NULL DEFAULT 0      COMMENT 'Home team ID (FK to ibl_team_info)',
+  CHANGE COLUMN `HScore`  `home_score`     tinyint(3) unsigned  NOT NULL DEFAULT 0      COMMENT 'Home score';
 
 ALTER TABLE `ibl_schedule`
   ADD CONSTRAINT `fk_schedule_home`
@@ -158,7 +280,7 @@ ALTER TABLE `ibl_schedule`
     FOREIGN KEY (`visitor_teamid`) REFERENCES `ibl_team_info` (`teamid`) ON UPDATE CASCADE;
 
 -- ============================================================
--- Group F — ibl_olympics_schedule (FK churn on Home/Visitor)
+-- ibl_olympics_schedule (FK churn on Home/Visitor)
 -- ============================================================
 
 ALTER TABLE `ibl_olympics_schedule`
@@ -166,14 +288,14 @@ ALTER TABLE `ibl_olympics_schedule`
   DROP FOREIGN KEY `fk_olympics_schedule_visitor`;
 
 ALTER TABLE `ibl_olympics_schedule`
-  RENAME COLUMN `SchedID` TO `id`,
-  RENAME COLUMN `Year`    TO `season_year`,
-  RENAME COLUMN `BoxID`   TO `box_id`,
-  RENAME COLUMN `Date`    TO `game_date`,
-  RENAME COLUMN `Visitor` TO `visitor_teamid`,
-  RENAME COLUMN `VScore`  TO `visitor_score`,
-  RENAME COLUMN `Home`    TO `home_teamid`,
-  RENAME COLUMN `HScore`  TO `home_score`;
+  CHANGE COLUMN `SchedID` `id`             int(11)              NOT NULL AUTO_INCREMENT COMMENT 'Primary key',
+  CHANGE COLUMN `Year`    `season_year`    smallint(5) unsigned NOT NULL                COMMENT 'Tournament year',
+  CHANGE COLUMN `BoxID`   `box_id`         int(11)              NOT NULL DEFAULT 0      COMMENT 'Box score identifier',
+  CHANGE COLUMN `Date`    `game_date`      date                 NOT NULL                COMMENT 'Game date',
+  CHANGE COLUMN `Visitor` `visitor_teamid` int(11)              NOT NULL                COMMENT 'Visiting team ID (FK to ibl_olympics_team_info)',
+  CHANGE COLUMN `VScore`  `visitor_score`  tinyint(3) unsigned  NOT NULL DEFAULT 0      COMMENT 'Visitor score',
+  CHANGE COLUMN `Home`    `home_teamid`    int(11)              NOT NULL                COMMENT 'Home team ID (FK to ibl_olympics_team_info)',
+  CHANGE COLUMN `HScore`  `home_score`     tinyint(3) unsigned  NOT NULL DEFAULT 0      COMMENT 'Home score';
 
 ALTER TABLE `ibl_olympics_schedule`
   ADD CONSTRAINT `fk_olympics_schedule_home`
@@ -182,11 +304,10 @@ ALTER TABLE `ibl_olympics_schedule`
     FOREIGN KEY (`visitor_teamid`) REFERENCES `ibl_olympics_team_info` (`teamid`) ON UPDATE CASCADE;
 
 -- ============================================================
--- View regeneration — box-score column renames invalidate view DEFINITIONs;
--- recreate every view that referenced a renamed column. 21 views total
--- (the 20 listed in the Tier 6 plan plus vw_team_awards which was missed —
--- its third UNION branch directly references `bst.Date`, `bst.homeQ1points`,
--- and friends from `ibl_box_scores_teams`).
+-- View regeneration — recreate every view that referenced a renamed column.
+-- 21 views total (the 20 listed in the Tier 6 plan plus vw_team_awards which
+-- was missed — its third UNION branch directly references `bst.Date`,
+-- `bst.homeQ1points`, etc. from `ibl_box_scores_teams`).
 -- Output aliases stay unchanged where downstream PHP relies on them.
 -- ============================================================
 

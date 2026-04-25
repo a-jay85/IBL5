@@ -88,7 +88,7 @@ interface PlayerRepositoryInterface
     /**
      * Get All-Star Game appearances count for a player
      * 
-     * Counts awards where Award contains 'Conference All-Star'.
+     * Counts awards where awardcontains 'Conference All-Star'.
      * 
      * @param string $playerName Player name (exact match)
      * @return int Number of All-Star Game appearances
@@ -98,7 +98,7 @@ interface PlayerRepositoryInterface
     /**
      * Get Three-Point Contest appearances count for a player
      * 
-     * Counts awards where Award starts with 'Three-Point Contest'.
+     * Counts awards where awardstarts with 'Three-Point Contest'.
      * 
      * @param string $playerName Player name (exact match)
      * @return int Number of Three-Point Contest appearances
@@ -108,7 +108,7 @@ interface PlayerRepositoryInterface
     /**
      * Get Slam Dunk Competition appearances count for a player
      * 
-     * Counts awards where Award starts with 'Slam Dunk Competition'.
+     * Counts awards where awardstarts with 'Slam Dunk Competition'.
      * 
      * @param string $playerName Player name (exact match)
      * @return int Number of Slam Dunk Competition appearances
@@ -118,7 +118,7 @@ interface PlayerRepositoryInterface
     /**
      * Get Rookie-Sophomore Challenge appearances count for a player
      * 
-     * Counts awards where Award is exactly 'Rookie-Sophomore Challenge'.
+     * Counts awards where awardis exactly 'Rookie-Sophomore Challenge'.
      * 
      * @param string $playerName Player name (exact match)
      * @return int Number of Rookie-Sophomore Challenge appearances

@@ -57,31 +57,31 @@ class SplitStatsRepository extends \BaseMysqliRepository implements SplitStatsRe
         $query = "SELECT p.name,
             bs.pos,
             bs.pid,
-            COUNT(DISTINCT bs.`Date`) as games,
-            ROUND(SUM(bs.gameMIN)/COUNT(DISTINCT bs.`Date`), 1) as gameMINavg,
-            ROUND(SUM(bs.game2GM + bs.game3GM)/COUNT(DISTINCT bs.`Date`), 2) as gameFGMavg,
-            ROUND(SUM(bs.game2GA + bs.game3GA)/COUNT(DISTINCT bs.`Date`), 2) as gameFGAavg,
-            ROUND((SUM(bs.game2GM) + SUM(bs.game3GM)) / NULLIF(SUM(bs.game2GA) + SUM(bs.game3GA), 0), 3) as gameFGPavg,
-            ROUND(SUM(bs.gameFTM)/COUNT(DISTINCT bs.`Date`), 2) as gameFTMavg,
-            ROUND(SUM(bs.gameFTA)/COUNT(DISTINCT bs.`Date`), 2) as gameFTAavg,
-            ROUND(SUM(bs.gameFTM) / NULLIF(SUM(bs.gameFTA), 0), 3) as gameFTPavg,
-            ROUND(SUM(bs.game3GM)/COUNT(DISTINCT bs.`Date`), 2) as game3GMavg,
-            ROUND(SUM(bs.game3GA)/COUNT(DISTINCT bs.`Date`), 2) as game3GAavg,
-            ROUND(SUM(bs.game3GM) / NULLIF(SUM(bs.game3GA), 0), 3) as game3GPavg,
-            ROUND(SUM(bs.gameORB)/COUNT(DISTINCT bs.`Date`), 1) as gameORBavg,
-            ROUND((SUM(bs.gameORB) + SUM(bs.gameDRB))/COUNT(DISTINCT bs.`Date`), 1) as gameREBavg,
-            ROUND(SUM(bs.gameAST)/COUNT(DISTINCT bs.`Date`), 1) as gameASTavg,
-            ROUND(SUM(bs.gameSTL)/COUNT(DISTINCT bs.`Date`), 1) as gameSTLavg,
-            ROUND(SUM(bs.gameTOV)/COUNT(DISTINCT bs.`Date`), 1) as gameTOVavg,
-            ROUND(SUM(bs.gameBLK)/COUNT(DISTINCT bs.`Date`), 1) as gameBLKavg,
-            ROUND(SUM(bs.gamePF)/COUNT(DISTINCT bs.`Date`), 1) as gamePFavg,
-            ROUND(((2 * SUM(bs.game2GM)) + SUM(bs.gameFTM) + (3 * SUM(bs.game3GM)))/COUNT(DISTINCT bs.`Date`), 1) as gamePTSavg
+            COUNT(DISTINCT bs.`game_date`) as games,
+            ROUND(SUM(bs.game_min)/COUNT(DISTINCT bs.`game_date`), 1) as gameMINavg,
+            ROUND(SUM(bs.game_2gm + bs.game_3gm)/COUNT(DISTINCT bs.`game_date`), 2) as gameFGMavg,
+            ROUND(SUM(bs.game_2ga + bs.game_3ga)/COUNT(DISTINCT bs.`game_date`), 2) as gameFGAavg,
+            ROUND((SUM(bs.game_2gm) + SUM(bs.game_3gm)) / NULLIF(SUM(bs.game_2ga) + SUM(bs.game_3ga), 0), 3) as gameFGPavg,
+            ROUND(SUM(bs.game_ftm)/COUNT(DISTINCT bs.`game_date`), 2) as gameFTMavg,
+            ROUND(SUM(bs.game_fta)/COUNT(DISTINCT bs.`game_date`), 2) as gameFTAavg,
+            ROUND(SUM(bs.game_ftm) / NULLIF(SUM(bs.game_fta), 0), 3) as gameFTPavg,
+            ROUND(SUM(bs.game_3gm)/COUNT(DISTINCT bs.`game_date`), 2) as game3GMavg,
+            ROUND(SUM(bs.game_3ga)/COUNT(DISTINCT bs.`game_date`), 2) as game3GAavg,
+            ROUND(SUM(bs.game_3gm) / NULLIF(SUM(bs.game_3ga), 0), 3) as game3GPavg,
+            ROUND(SUM(bs.game_orb)/COUNT(DISTINCT bs.`game_date`), 1) as gameORBavg,
+            ROUND((SUM(bs.game_orb) + SUM(bs.game_drb))/COUNT(DISTINCT bs.`game_date`), 1) as gameREBavg,
+            ROUND(SUM(bs.game_ast)/COUNT(DISTINCT bs.`game_date`), 1) as gameASTavg,
+            ROUND(SUM(bs.game_stl)/COUNT(DISTINCT bs.`game_date`), 1) as gameSTLavg,
+            ROUND(SUM(bs.game_tov)/COUNT(DISTINCT bs.`game_date`), 1) as gameTOVavg,
+            ROUND(SUM(bs.game_blk)/COUNT(DISTINCT bs.`game_date`), 1) as gameBLKavg,
+            ROUND(SUM(bs.game_pf)/COUNT(DISTINCT bs.`game_date`), 1) as gamePFavg,
+            ROUND(((2 * SUM(bs.game_2gm)) + SUM(bs.game_ftm) + (3 * SUM(bs.game_3gm)))/COUNT(DISTINCT bs.`game_date`), 1) as gamePTSavg
         FROM ibl_box_scores bs
         JOIN ibl_plr p ON bs.pid = p.pid
         " . $splitCondition['joins'] . "
         WHERE bs.season_year = ?
             AND (bs.home_teamid = ? OR bs.visitor_teamid = ?)
-            AND bs.gameMIN > 0
+            AND bs.game_min > 0
             AND p.teamid = ?
             AND p.retired = 0
             AND bs.game_type = 1
@@ -206,16 +206,16 @@ class SplitStatsRepository extends \BaseMysqliRepository implements SplitStatsRe
 
         // Result splits
         if ($splitKey === 'wins') {
-            $result['joins'] = 'JOIN ibl_schedule sch ON bs.`Date` = sch.`Date` AND ((sch.Home = bs.home_teamid AND sch.Visitor = bs.visitor_teamid) OR (sch.Home = bs.visitor_teamid AND sch.Visitor = bs.home_teamid))';
-            $result['where'] = 'AND ((sch.Home = ? AND sch.HScore > sch.VScore) OR (sch.Visitor = ? AND sch.VScore > sch.HScore))';
+            $result['joins'] = 'JOIN ibl_schedule sch ON bs.`game_date` = sch.`game_date` AND ((sch.home_teamid = bs.home_teamid AND sch.visitor_teamid = bs.visitor_teamid) OR (sch.home_teamid = bs.visitor_teamid AND sch.visitor_teamid = bs.home_teamid))';
+            $result['where'] = 'AND ((sch.home_teamid = ? AND sch.home_score > sch.visitor_score) OR (sch.visitor_teamid = ? AND sch.visitor_score > sch.home_score))';
             $result['types'] = 'ii';
             $result['params'] = [$teamid, $teamid];
             return $result;
         }
 
         if ($splitKey === 'losses') {
-            $result['joins'] = 'JOIN ibl_schedule sch ON bs.`Date` = sch.`Date` AND ((sch.Home = bs.home_teamid AND sch.Visitor = bs.visitor_teamid) OR (sch.Home = bs.visitor_teamid AND sch.Visitor = bs.home_teamid))';
-            $result['where'] = 'AND ((sch.Home = ? AND sch.HScore < sch.VScore) OR (sch.Visitor = ? AND sch.VScore < sch.HScore))';
+            $result['joins'] = 'JOIN ibl_schedule sch ON bs.`game_date` = sch.`game_date` AND ((sch.home_teamid = bs.home_teamid AND sch.visitor_teamid = bs.visitor_teamid) OR (sch.home_teamid = bs.visitor_teamid AND sch.visitor_teamid = bs.home_teamid))';
+            $result['where'] = 'AND ((sch.home_teamid = ? AND sch.home_score < sch.visitor_score) OR (sch.visitor_teamid = ? AND sch.visitor_score < sch.home_score))';
             $result['types'] = 'ii';
             $result['params'] = [$teamid, $teamid];
             return $result;
@@ -224,7 +224,7 @@ class SplitStatsRepository extends \BaseMysqliRepository implements SplitStatsRe
         // Season half splits
         if ($splitKey === 'pre_allstar') {
             $cutoffDate = sprintf('%d-%02d-%02d', $seasonEndingYear, Season::IBL_ALL_STAR_MONTH, Season::IBL_ALL_STAR_BREAK_START_DAY);
-            $result['where'] = 'AND bs.`Date` < ?';
+            $result['where'] = 'AND bs.`game_date` < ?';
             $result['types'] = 's';
             $result['params'] = [$cutoffDate];
             return $result;
@@ -232,7 +232,7 @@ class SplitStatsRepository extends \BaseMysqliRepository implements SplitStatsRe
 
         if ($splitKey === 'post_allstar') {
             $cutoffDate = sprintf('%d-%02d-%02d', $seasonEndingYear, Season::IBL_ALL_STAR_MONTH, Season::IBL_POST_ALL_STAR_FIRST_DAY);
-            $result['where'] = 'AND bs.`Date` >= ?';
+            $result['where'] = 'AND bs.`game_date` >= ?';
             $result['types'] = 's';
             $result['params'] = [$cutoffDate];
             return $result;
@@ -241,7 +241,7 @@ class SplitStatsRepository extends \BaseMysqliRepository implements SplitStatsRe
         // Month splits
         if (str_starts_with($splitKey, 'month_')) {
             $month = (int) substr($splitKey, 6);
-            $result['where'] = 'AND MONTH(bs.`Date`) = ?';
+            $result['where'] = 'AND MONTH(bs.`game_date`) = ?';
             $result['types'] = 'i';
             $result['params'] = [$month];
             return $result;

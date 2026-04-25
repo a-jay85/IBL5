@@ -53,7 +53,7 @@ $insertDates = ['2006-12-11', '2006-12-12', '2006-12-13'];
  *   homeTotal: array{name: string, fgm: int, fga: int, ftm: int, fta: int, tpm: int, tpa: int, oreb: int, dreb: int, ast: int, stl: int, tov: int, blk: int, pf: int},
  *   visitorQ1: int, visitorQ2: int, visitorQ3: int, visitorQ4: int, visitorOT: int,
  *   homeQ1: int, homeQ2: int, homeQ3: int, homeQ4: int, homeOT: int,
- *   visitorWins: int, visitorLosses: int, homeWins: int, homeLosses: int,
+ *   visitor_wins: int, visitor_losses: int, home_wins: int, home_losses: int,
  *   attendance: int, capacity: int
  * }|null
  */
@@ -140,7 +140,7 @@ function parseHtmlBoxscore(string $html): ?array
             // Truncate to 16 chars to match DB column
             $playerName = mb_substr($playerName, 0, 16);
 
-            // HTML shows total FGM/FGA; DB stores 2-point only (game2GM = fgm - 3pm)
+            // HTML shows total FGM/FGA; DB stores 2-point only (game_2gm = fgm - 3pm)
             $totalFgm = (int) trim(strip_tags($cells[3]));
             $totalFga = (int) trim(strip_tags($cells[4]));
             $tpm = (int) trim(strip_tags($cells[7]));
@@ -178,7 +178,7 @@ function parseHtmlBoxscore(string $html): ?array
             // Team total row
             $teamName = trim(strip_tags($cells[1]));
 
-            // HTML shows total FGM/FGA; DB stores 2-point only (game2GM = fgm - 3pm)
+            // HTML shows total FGM/FGA; DB stores 2-point only (game_2gm = fgm - 3pm)
             $totalFgm = (int) trim(strip_tags($cells[3]));
             $totalFga = (int) trim(strip_tags($cells[4]));
             $tpm = (int) trim(strip_tags($cells[7]));
@@ -232,10 +232,10 @@ function parseHtmlBoxscore(string $html): ?array
         'homeQ3' => $quarterRows[1]['q3'],
         'homeQ4' => $quarterRows[1]['q4'],
         'homeOT' => $quarterRows[1]['ot'],
-        'visitorWins' => $quarterRows[0]['wins'],
-        'visitorLosses' => $quarterRows[0]['losses'],
-        'homeWins' => $quarterRows[1]['wins'],
-        'homeLosses' => $quarterRows[1]['losses'],
+        'visitor_wins' => $quarterRows[0]['wins'],
+        'visitor_losses' => $quarterRows[0]['losses'],
+        'home_wins' => $quarterRows[1]['wins'],
+        'home_losses' => $quarterRows[1]['losses'],
         'attendance' => $attendance,
         'capacity' => $capacity,
     ];
@@ -246,10 +246,10 @@ function parseHtmlBoxscore(string $html): ?array
 echo $dryRun ? "=== DRY RUN MODE ===\n\n" : "=== IMPORTING BOX SCORES FROM HTML ===\n\n";
 
 // Step 1: Load schedule data for Dec 7-13
-$scheduleQuery = "SELECT SchedID, BoxID, Date, Visitor, Home, VScore, HScore
+$scheduleQuery = "SELECT id, box_id, game_date, Visitor, Home, visitor_score, home_score
                    FROM ibl_schedule
-                   WHERE Date BETWEEN '2006-12-07' AND '2006-12-13'
-                   ORDER BY Date, SchedID";
+                   WHERE game_date BETWEEN '2006-12-07' AND '2006-12-13'
+                   ORDER BY game_date, id";
 
 $stmt = $mysqli_db->prepare($scheduleQuery);
 if ($stmt === false) {
@@ -259,28 +259,28 @@ if ($stmt === false) {
 $stmt->execute();
 $result = $stmt->get_result();
 
-/** @var list<array{SchedID: int, BoxID: int, Date: string, Visitor: int, Home: int, VScore: int, HScore: int}> $scheduleRows */
+/** @var list<array{id: int, box_id: int, game_date: string, visitor_teamid: int, home_teamid: int, visitor_score: int, home_score: int}> $scheduleRows */
 $scheduleRows = [];
 while ($row = $result->fetch_assoc()) {
-    /** @var array{SchedID: int, BoxID: int, Date: string, Visitor: int, Home: int, VScore: int, HScore: int} $row */
+    /** @var array{id: int, box_id: int, game_date: string, visitor_teamid: int, home_teamid: int, visitor_score: int, home_score: int} $row */
     $scheduleRows[] = $row;
 }
 $stmt->close();
 
-// Build gameOfThatDay index: count games within each date
+// Build game_of_that_day index: count games within each date
 /** @var array<string, int> $dateGameCounter */
 $dateGameCounter = [];
 
-/** @var list<array{SchedID: int, BoxID: int, Date: string, Visitor: int, Home: int, VScore: int, HScore: int, gameOfThatDay: int}> $games */
+/** @var list<array{id: int, box_id: int, game_date: string, visitor_teamid: int, home_teamid: int, visitor_score: int, home_score: int, game_of_that_day: int}> $games */
 $games = [];
 foreach ($scheduleRows as $row) {
-    $date = $row['Date'];
+    $date = $row['game_date'];
     if (!isset($dateGameCounter[$date])) {
         $dateGameCounter[$date] = 0;
     }
     $dateGameCounter[$date]++;
 
-    $games[] = array_merge($row, ['gameOfThatDay' => $dateGameCounter[$date]]);
+    $games[] = array_merge($row, ['game_of_that_day' => $dateGameCounter[$date]]);
 }
 
 echo "Found " . count($games) . " games in schedule (Dec 7-13)\n\n";
@@ -297,11 +297,11 @@ $errors = [];
 $teamWLHistory = [];
 
 foreach ($games as $game) {
-    $boxId = $game['BoxID'];
-    $date = $game['Date'];
-    $visitorTid = $game['Visitor'];
-    $homeTid = $game['Home'];
-    $gameOfDay = $game['gameOfThatDay'];
+    $boxId = $game['box_id'];
+    $date = $game['game_date'];
+    $visitorTid = $game['visitor_teamid'];
+    $homeTid = $game['home_teamid'];
+    $gameOfDay = $game['game_of_that_day'];
     $visitorName = $idToTeamName[$visitorTid] ?? "TID{$visitorTid}";
     $homeName = $idToTeamName[$homeTid] ?? "TID{$homeTid}";
 
@@ -336,17 +336,17 @@ foreach ($games as $game) {
     echo "OK\n";
 
     // Track W-L history for validation
-    $visitorWon = $game['VScore'] > $game['HScore'];
+    $visitorWon = $game['visitor_score'] > $game['home_score'];
     $teamWLHistory[$visitorTid][] = [
         'date' => $date,
-        'wins' => $parsed['visitorWins'],
-        'losses' => $parsed['visitorLosses'],
+        'wins' => $parsed['visitor_wins'],
+        'losses' => $parsed['visitor_losses'],
         'gameResult' => $visitorWon ? 'W' : 'L',
     ];
     $teamWLHistory[$homeTid][] = [
         'date' => $date,
-        'wins' => $parsed['homeWins'],
-        'losses' => $parsed['homeLosses'],
+        'wins' => $parsed['home_wins'],
+        'losses' => $parsed['home_losses'],
         'gameResult' => $visitorWon ? 'L' : 'W',
     ];
 
@@ -355,8 +355,8 @@ foreach ($games as $game) {
         if ($dryRun) {
             echo "  WOULD UPDATE team rows: Q scores, attendance={$parsed['attendance']}, "
                 . "capacity={$parsed['capacity']}, "
-                . "visWL={$parsed['visitorWins']}-{$parsed['visitorLosses']}, "
-                . "homeWL={$parsed['homeWins']}-{$parsed['homeLosses']}\n";
+                . "visWL={$parsed['visitor_wins']}-{$parsed['visitor_losses']}, "
+                . "homeWL={$parsed['home_wins']}-{$parsed['home_losses']}\n";
             echo "  WOULD UPDATE player rows with W-L, attendance, capacity\n";
             $gamesUpdated++;
             continue;
@@ -364,14 +364,14 @@ foreach ($games as $game) {
 
         // Update ibl_box_scores_teams rows
         $teamUpdateSql = "UPDATE ibl_box_scores_teams SET
-            visitorQ1points = ?, visitorQ2points = ?, visitorQ3points = ?, visitorQ4points = ?,
-            visitorOTpoints = ?,
-            homeQ1points = ?, homeQ2points = ?, homeQ3points = ?, homeQ4points = ?,
-            homeOTpoints = ?,
+            visitor_q1_points = ?, visitor_q2_points = ?, visitor_q3_points = ?, visitor_q4_points = ?,
+            visitor_ot_points = ?,
+            home_q1_points = ?, home_q2_points = ?, home_q3_points = ?, home_q4_points = ?,
+            home_ot_points = ?,
             attendance = ?, capacity = ?,
-            visitorWins = ?, visitorLosses = ?,
-            homeWins = ?, homeLosses = ?
-            WHERE Date = ? AND visitor_teamid = ? AND home_teamid = ? AND gameOfThatDay = ?";
+            visitor_wins = ?, visitor_losses = ?,
+            home_wins = ?, home_losses = ?
+            WHERE game_date = ? AND visitor_teamid = ? AND home_teamid = ? AND game_of_that_day = ?";
 
         $teamStmt = $mysqli_db->prepare($teamUpdateSql);
         if ($teamStmt === false) {
@@ -392,10 +392,10 @@ foreach ($games as $game) {
             $parsed['homeOT'],
             $parsed['attendance'],
             $parsed['capacity'],
-            $parsed['visitorWins'],
-            $parsed['visitorLosses'],
-            $parsed['homeWins'],
-            $parsed['homeLosses'],
+            $parsed['visitor_wins'],
+            $parsed['visitor_losses'],
+            $parsed['home_wins'],
+            $parsed['home_losses'],
             $date,
             $visitorTid,
             $homeTid,
@@ -408,9 +408,9 @@ foreach ($games as $game) {
         // Update ibl_box_scores player rows
         $playerUpdateSql = "UPDATE ibl_box_scores SET
             attendance = ?, capacity = ?,
-            visitorWins = ?, visitorLosses = ?,
-            homeWins = ?, homeLosses = ?
-            WHERE Date = ? AND visitor_teamid = ? AND home_teamid = ? AND gameOfThatDay = ?";
+            visitor_wins = ?, visitor_losses = ?,
+            home_wins = ?, home_losses = ?
+            WHERE game_date = ? AND visitor_teamid = ? AND home_teamid = ? AND game_of_that_day = ?";
 
         $playerStmt = $mysqli_db->prepare($playerUpdateSql);
         if ($playerStmt === false) {
@@ -421,10 +421,10 @@ foreach ($games as $game) {
             'iiiiiisiii',
             $parsed['attendance'],
             $parsed['capacity'],
-            $parsed['visitorWins'],
-            $parsed['visitorLosses'],
-            $parsed['homeWins'],
-            $parsed['homeLosses'],
+            $parsed['visitor_wins'],
+            $parsed['visitor_losses'],
+            $parsed['home_wins'],
+            $parsed['home_losses'],
             $date,
             $visitorTid,
             $homeTid,
@@ -462,10 +462,10 @@ foreach ($games as $game) {
             $homeTid,
             $parsed['attendance'],
             $parsed['capacity'],
-            $parsed['visitorWins'],
-            $parsed['visitorLosses'],
-            $parsed['homeWins'],
-            $parsed['homeLosses'],
+            $parsed['visitor_wins'],
+            $parsed['visitor_losses'],
+            $parsed['home_wins'],
+            $parsed['home_losses'],
             $parsed['visitorQ1'],
             $parsed['visitorQ2'],
             $parsed['visitorQ3'],
@@ -500,10 +500,10 @@ foreach ($games as $game) {
             $homeTid,
             $parsed['attendance'],
             $parsed['capacity'],
-            $parsed['visitorWins'],
-            $parsed['visitorLosses'],
-            $parsed['homeWins'],
-            $parsed['homeLosses'],
+            $parsed['visitor_wins'],
+            $parsed['visitor_losses'],
+            $parsed['home_wins'],
+            $parsed['home_losses'],
             $parsed['visitorQ1'],
             $parsed['visitorQ2'],
             $parsed['visitorQ3'],
@@ -545,10 +545,10 @@ foreach ($games as $game) {
                 $gameOfDay,
                 $parsed['attendance'],
                 $parsed['capacity'],
-                $parsed['visitorWins'],
-                $parsed['visitorLosses'],
-                $parsed['homeWins'],
-                $parsed['homeLosses'],
+                $parsed['visitor_wins'],
+                $parsed['visitor_losses'],
+                $parsed['home_wins'],
+                $parsed['home_losses'],
                 $visitorTid,
                 $player['minutes'],
                 $player['fgm'],
@@ -582,10 +582,10 @@ foreach ($games as $game) {
                 $gameOfDay,
                 $parsed['attendance'],
                 $parsed['capacity'],
-                $parsed['visitorWins'],
-                $parsed['visitorLosses'],
-                $parsed['homeWins'],
-                $parsed['homeLosses'],
+                $parsed['visitor_wins'],
+                $parsed['visitor_losses'],
+                $parsed['home_wins'],
+                $parsed['home_losses'],
                 $homeTid,
                 $player['minutes'],
                 $player['fgm'],

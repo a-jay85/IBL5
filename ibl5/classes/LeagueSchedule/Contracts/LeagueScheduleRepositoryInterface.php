@@ -8,14 +8,14 @@ namespace LeagueSchedule\Contracts;
  * LeagueScheduleRepositoryInterface - Contract for league schedule database operations
  *
  * @phpstan-type ScheduleRow array{
- *     SchedID: int,
- *     Date: string,
- *     Visitor: int,
- *     VScore: int,
- *     Home: int,
- *     HScore: int,
- *     BoxID: int,
- *     gameOfThatDay: int
+ *     id: int,
+ *     game_date: string,
+ *     visitor_teamid: int,
+ *     visitor_score: int,
+ *     home_teamid: int,
+ *     home_score: int,
+ *     box_id: int,
+ *     game_of_that_day: int
  * }
  *
  * @see \LeagueSchedule\LeagueScheduleRepository For the concrete implementation
@@ -25,7 +25,7 @@ interface LeagueScheduleRepositoryInterface
     /**
      * Get all scheduled games with box score info
      *
-     * @return list<ScheduleRow> Games ordered by date ascending, then SchedID ascending
+     * @return list<ScheduleRow> Games ordered by date ascending, then id ascending
      */
     public function getAllGamesWithBoxScoreInfo(): array;
 

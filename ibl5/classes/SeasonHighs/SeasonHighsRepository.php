@@ -66,39 +66,39 @@ class SeasonHighsRepository extends \BaseMysqliRepository implements SeasonHighs
         // For player stats (no suffix), JOIN with ibl_plr to get full names
         // The ibl_box_scores.name field truncates longer names (see Boxscore::MAX_PLAYER_NAME_LENGTH)
         // The ibl_plr.name field is varchar(32) which stores full names
-        // Also JOIN with ibl_schedule to get BoxID for linking to box scores
+        // Also JOIN with ibl_schedule to get box_id for linking to box scores
         // Also JOIN with ibl_team_info to get team colors for styled team cell
         if ($tableSuffix === '') {
             $query = "SELECT p.`pid`, p.`name`, p.`teamid`, t.`team_name` AS `teamname`,
                 t.`team_city`, t.`color1`, t.`color2`,
-                bs.`Date` AS `date`, sch.`BoxID`,
-                COALESCE(bst.gameOfThatDay, 0) AS gameOfThatDay,
+                bs.`game_date` AS `date`, sch.`box_id`,
+                COALESCE(bst.game_of_that_day, 0) AS game_of_that_day,
                 {$statExpression} AS `{$safeStatName}`
                 FROM {$this->boxScoresTable} bs
                 JOIN {$this->playerTable} p ON bs.pid = p.pid
                 LEFT JOIN {$this->teamInfoTable} t ON p.teamid = t.teamid
-                LEFT JOIN {$this->scheduleTable} sch ON sch.Date = bs.Date AND sch.Visitor = bs.visitor_teamid AND sch.Home = bs.home_teamid
+                LEFT JOIN {$this->scheduleTable} sch ON sch.game_date = bs.game_date AND sch.visitor_teamid = bs.visitor_teamid AND sch.home_teamid = bs.home_teamid
                 LEFT JOIN (
-                    SELECT Date, visitor_teamid, home_teamid, MIN(gameOfThatDay) AS gameOfThatDay
+                    SELECT game_date, visitor_teamid, home_teamid, MIN(game_of_that_day) AS game_of_that_day
                     FROM {$this->boxScoresTeamsTable}
-                    GROUP BY Date, visitor_teamid, home_teamid
-                ) bst ON bst.Date = bs.Date AND bst.visitor_teamid = bs.visitor_teamid AND bst.home_teamid = bs.home_teamid
-                WHERE bs.`Date` BETWEEN ? AND ?{$locationCondition}
-                ORDER BY `{$safeStatName}` DESC, bs.`Date` ASC
+                    GROUP BY game_date, visitor_teamid, home_teamid
+                ) bst ON bst.game_date = bs.game_date AND bst.visitor_teamid = bs.visitor_teamid AND bst.home_teamid = bs.home_teamid
+                WHERE bs.`game_date` BETWEEN ? AND ?{$locationCondition}
+                ORDER BY `{$safeStatName}` DESC, bs.`game_date` ASC
                 LIMIT {$limit}";
         } else {
             // For team stats, JOIN with ibl_team_info to get team ID and colors for linking
-            // Also JOIN with ibl_schedule to get BoxID for linking to box scores
-            // bs IS ibl_box_scores_teams, so gameOfThatDay is directly available
+            // Also JOIN with ibl_schedule to get box_id for linking to box scores
+            // bs IS ibl_box_scores_teams, so game_of_that_day is directly available
             $query = "SELECT t.`teamid`, t.`team_city`, t.`color1`, t.`color2`,
-                bs.`name`, bs.`Date` AS `date`, sch.`BoxID`,
-                COALESCE(bs.`gameOfThatDay`, 0) AS gameOfThatDay,
+                bs.`name`, bs.`game_date` AS `date`, sch.`box_id`,
+                COALESCE(bs.`game_of_that_day`, 0) AS game_of_that_day,
                 {$statExpression} AS `{$safeStatName}`
                 FROM {$this->boxScoresTeamsTable} bs
                 JOIN {$this->teamInfoTable} t ON bs.name = t.team_name
-                LEFT JOIN {$this->scheduleTable} sch ON sch.Date = bs.Date AND sch.Visitor = bs.visitor_teamid AND sch.Home = bs.home_teamid
-                WHERE bs.`Date` BETWEEN ? AND ?
-                ORDER BY `{$safeStatName}` DESC, bs.`Date` ASC
+                LEFT JOIN {$this->scheduleTable} sch ON sch.game_date = bs.game_date AND sch.visitor_teamid = bs.visitor_teamid AND sch.home_teamid = bs.home_teamid
+                WHERE bs.`game_date` BETWEEN ? AND ?
+                ORDER BY `{$safeStatName}` DESC, bs.`game_date` ASC
                 LIMIT {$limit}";
         }
 
@@ -133,12 +133,12 @@ class SeasonHighsRepository extends \BaseMysqliRepository implements SeasonHighs
                 $entry['color1'] = (string) ($row['color1'] ?? 'FFFFFF');
                 $entry['color2'] = (string) ($row['color2'] ?? '000000');
             }
-            // Include BoxID and gameOfThatDay for linking dates to box scores
-            if (isset($row['BoxID'])) {
-                $entry['boxId'] = (int) $row['BoxID'];
+            // Include box_id and game_of_that_day for linking dates to box scores
+            if (isset($row['box_id'])) {
+                $entry['boxId'] = (int) $row['box_id'];
             }
-            if (isset($row['gameOfThatDay'])) {
-                $entry['gameOfThatDay'] = (int) $row['gameOfThatDay'];
+            if (isset($row['game_of_that_day'])) {
+                $entry['gameOfThatDay'] = (int) $row['game_of_that_day'];
             }
             $normalized[] = $entry;
         }

@@ -73,7 +73,7 @@ class SeasonQueryRepositoryTest extends TestCase
     public function testGetFirstBoxScoreDateReturnsDate(): void
     {
         $this->mockDb->setMockData([
-            ['Date' => '2024-11-01'],
+            ['game_date' => '2024-11-01'],
         ]);
 
         $result = $this->repository->getFirstBoxScoreDate();
@@ -93,7 +93,7 @@ class SeasonQueryRepositoryTest extends TestCase
     public function testGetLastBoxScoreDateReturnsDate(): void
     {
         $this->mockDb->setMockData([
-            ['Date' => '2025-05-15'],
+            ['game_date' => '2025-05-15'],
         ]);
 
         $result = $this->repository->getLastBoxScoreDate();

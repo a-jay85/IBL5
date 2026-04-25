@@ -36,13 +36,13 @@ class SplitStatsRepositoryTest extends DatabaseTestCase
 
         // Schedule row with scores (needed for wins/losses split)
         $this->insertRow('ibl_schedule', [
-            'Year' => 2098,
-            'BoxID' => 90001,
-            'Date' => '2098-01-15',
-            'Visitor' => 2,
-            'VScore' => 85,
-            'Home' => self::TEST_TID,
-            'HScore' => 104,
+            'season_year' => 2098,
+            'box_id' => 90001,
+            'game_date' => '2098-01-15',
+            'visitor_teamid' => 2,
+            'visitor_score' => 85,
+            'home_teamid' => self::TEST_TID,
+            'home_score' => 104,
             'uuid' => 'split-sch-0000-0000-000000090001',
         ]);
     }
@@ -95,7 +95,7 @@ class SplitStatsRepositoryTest extends DatabaseTestCase
                 break;
             }
         }
-        self::assertTrue($found, 'Test player should appear in wins split (HScore=104 > VScore=85)');
+        self::assertTrue($found, 'Test player should appear in wins split (home_score=104 > visitor_score=85)');
     }
 
     public function testGetSplitStatsLossesReturnsEmptyWhenTeamWon(): void

@@ -276,9 +276,9 @@ VALUES (2024, 'GM of the Year', 'testgm', 10001)
 ON DUPLICATE KEY UPDATE name = VALUES(name);
 
 -- Schedule: needed by RecordHolders JOIN to schedule, SplitStats wins/losses
-INSERT INTO ibl_schedule (`Year`, BoxID, `Date`, Visitor, VScore, Home, HScore, uuid)
+INSERT INTO ibl_schedule (season_year, box_id, game_date, visitor_teamid, visitor_score, home_teamid, home_score, uuid)
 VALUES (2025, 1, '2025-01-15', 2, 85, 1, 104, 'sched-0001-0001-0001-000000000001')
-ON DUPLICATE KEY UPDATE VScore = VALUES(VScore);
+ON DUPLICATE KEY UPDATE visitor_score = VALUES(visitor_score);
 
 -- RCB alltime records: needed by FranchiseRecordBook (stat_category is ENUM)
 INSERT INTO ibl_rcb_alltime_records (scope, teamid, record_type, stat_category, ranking, player_name, stat_value, stat_raw, season_year)

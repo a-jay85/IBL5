@@ -55,7 +55,7 @@ class TeamScheduleRepositoryTest extends DatabaseTestCase
 
         $found = $this->findBySchedId($results, $schedId);
         self::assertNotNull($found);
-        self::assertSame(2, $found['gameOfThatDay']);
+        self::assertSame(2, $found['game_of_that_day']);
     }
 
     public function testGetScheduleNullGameOfThatDayWhenNoBst(): void
@@ -67,7 +67,7 @@ class TeamScheduleRepositoryTest extends DatabaseTestCase
         $found = $this->findBySchedId($results, $schedId);
         self::assertNotNull($found);
         // TeamSchedule does NOT normalize null to 0 (unlike LeagueSchedule)
-        self::assertNull($found['gameOfThatDay']);
+        self::assertNull($found['game_of_that_day']);
     }
 
     public function testGetScheduleOrderedByDateAsc(): void
@@ -80,10 +80,10 @@ class TeamScheduleRepositoryTest extends DatabaseTestCase
         $pos1 = null;
         $pos2 = null;
         foreach ($results as $i => $row) {
-            if ($row['SchedID'] === $schedId1) {
+            if ($row['id'] === $schedId1) {
                 $pos1 = $i;
             }
-            if ($row['SchedID'] === $schedId2) {
+            if ($row['id'] === $schedId2) {
                 $pos2 = $i;
             }
         }
@@ -179,10 +179,10 @@ class TeamScheduleRepositoryTest extends DatabaseTestCase
         $pos1 = null;
         $pos2 = null;
         foreach ($results as $i => $row) {
-            if ($row['SchedID'] === $schedId1) {
+            if ($row['id'] === $schedId1) {
                 $pos1 = $i;
             }
-            if ($row['SchedID'] === $schedId2) {
+            if ($row['id'] === $schedId2) {
                 $pos2 = $i;
             }
         }
@@ -199,7 +199,7 @@ class TeamScheduleRepositoryTest extends DatabaseTestCase
     private function findBySchedId(array $results, int $schedId): ?array
     {
         foreach ($results as $row) {
-            if ($row['SchedID'] === $schedId) {
+            if ($row['id'] === $schedId) {
                 return $row;
             }
         }

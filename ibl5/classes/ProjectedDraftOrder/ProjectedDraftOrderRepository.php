@@ -29,14 +29,14 @@ class ProjectedDraftOrderRepository extends \BaseMysqliRepository implements Pro
         );
     }
 
-    /** @return list<array{Visitor: int, VScore: int, Home: int, HScore: int}> */
+    /** @return list<array{visitor_teamid: int, visitor_score: int, home_teamid: int, home_score: int}> */
     public function getPlayedGames(int $seasonYear): array
     {
-        /** @var list<array{Visitor: int, VScore: int, Home: int, HScore: int}> */
+        /** @var list<array{visitor_teamid: int, visitor_score: int, home_teamid: int, home_score: int}> */
         return $this->fetchAll(
-            "SELECT Visitor, VScore, Home, HScore
+            "SELECT visitor_teamid, visitor_score, home_teamid, home_score
              FROM ibl_schedule
-             WHERE Year = ? AND VScore > 0 AND HScore > 0",
+             WHERE season_year = ? AND visitor_score > 0 AND home_score > 0",
             "i",
             $seasonYear
         );
@@ -61,11 +61,11 @@ class ProjectedDraftOrderRepository extends \BaseMysqliRepository implements Pro
         /** @var list<array{teamid: int, pointsFor: float, pointsAgainst: float}> */
         return $this->fetchAll(
             "SELECT teamid, SUM(pf) AS pointsFor, SUM(pa) AS pointsAgainst FROM (
-                SELECT Visitor AS teamid, VScore AS pf, HScore AS pa
-                FROM ibl_schedule WHERE Year = ? AND VScore > 0 AND HScore > 0
+                SELECT visitor_teamid AS teamid, visitor_score AS pf, home_score AS pa
+                FROM ibl_schedule WHERE season_year = ? AND visitor_score > 0 AND home_score > 0
                 UNION ALL
-                SELECT Home AS teamid, HScore AS pf, VScore AS pa
-                FROM ibl_schedule WHERE Year = ? AND VScore > 0 AND HScore > 0
+                SELECT home_teamid AS teamid, home_score AS pf, visitor_score AS pa
+                FROM ibl_schedule WHERE season_year = ? AND visitor_score > 0 AND home_score > 0
              ) AS g GROUP BY teamid",
             "ii",
             $seasonYear,

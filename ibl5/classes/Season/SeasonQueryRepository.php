@@ -94,12 +94,12 @@ class SeasonQueryRepository extends \BaseMysqliRepository implements SeasonQuery
      */
     public function getFirstBoxScoreDate(): string
     {
-        /** @var array{Date: string}|null $result */
+        /** @var array{game_date: string}|null $result */
         $result = $this->fetchOne(
-            "SELECT Date FROM {$this->boxScoresTable} ORDER BY Date ASC LIMIT 1"
+            "SELECT game_date FROM {$this->boxScoresTable} ORDER BY game_date ASC LIMIT 1"
         );
 
-        return $result['Date'] ?? '';
+        return $result['game_date'] ?? '';
     }
 
     /**
@@ -109,12 +109,12 @@ class SeasonQueryRepository extends \BaseMysqliRepository implements SeasonQuery
      */
     public function getLastBoxScoreDate(): string
     {
-        /** @var array{Date: string}|null $result */
+        /** @var array{game_date: string}|null $result */
         $result = $this->fetchOne(
-            "SELECT Date FROM {$this->boxScoresTable} ORDER BY Date DESC LIMIT 1"
+            "SELECT game_date FROM {$this->boxScoresTable} ORDER BY game_date DESC LIMIT 1"
         );
 
-        return $result['Date'] ?? '';
+        return $result['game_date'] ?? '';
     }
 
     /**
@@ -170,7 +170,7 @@ class SeasonQueryRepository extends \BaseMysqliRepository implements SeasonQuery
 
         /** @var array{max_date: string|null}|null $result */
         $result = $this->fetchOne(
-            "SELECT MAX(Date) AS max_date FROM {$this->scheduleTable} WHERE Date < ?",
+            "SELECT MAX(game_date) AS max_date FROM {$this->scheduleTable} WHERE game_date < ?",
             "s",
             $playoffsStart
         );

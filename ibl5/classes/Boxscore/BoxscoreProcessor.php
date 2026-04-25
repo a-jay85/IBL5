@@ -237,25 +237,25 @@ class BoxscoreProcessor implements BoxscoreProcessorInterface
                     $this->repository->insertTeamBoxscore(
                         $boxscoreGameInfo->gameDate,
                         $name,
-                        $boxscoreGameInfo->gameOfThatDay,
+                        $boxscoreGameInfo->game_of_that_day,
                         $boxscoreGameInfo->visitor_teamid,
                         $boxscoreGameInfo->home_teamid,
                         (int) $boxscoreGameInfo->attendance,
                         (int) $boxscoreGameInfo->capacity,
-                        (int) $boxscoreGameInfo->visitorWins,
-                        (int) $boxscoreGameInfo->visitorLosses,
-                        (int) $boxscoreGameInfo->homeWins,
-                        (int) $boxscoreGameInfo->homeLosses,
-                        (int) $boxscoreGameInfo->visitorQ1points,
-                        (int) $boxscoreGameInfo->visitorQ2points,
-                        (int) $boxscoreGameInfo->visitorQ3points,
-                        (int) $boxscoreGameInfo->visitorQ4points,
-                        (int) $boxscoreGameInfo->visitorOTpoints,
-                        (int) $boxscoreGameInfo->homeQ1points,
-                        (int) $boxscoreGameInfo->homeQ2points,
-                        (int) $boxscoreGameInfo->homeQ3points,
-                        (int) $boxscoreGameInfo->homeQ4points,
-                        (int) $boxscoreGameInfo->homeOTpoints,
+                        (int) $boxscoreGameInfo->visitor_wins,
+                        (int) $boxscoreGameInfo->visitor_losses,
+                        (int) $boxscoreGameInfo->home_wins,
+                        (int) $boxscoreGameInfo->home_losses,
+                        (int) $boxscoreGameInfo->visitor_q1_points,
+                        (int) $boxscoreGameInfo->visitor_q2_points,
+                        (int) $boxscoreGameInfo->visitor_q3_points,
+                        (int) $boxscoreGameInfo->visitor_q4_points,
+                        (int) $boxscoreGameInfo->visitor_ot_points,
+                        (int) $boxscoreGameInfo->home_q1_points,
+                        (int) $boxscoreGameInfo->home_q2_points,
+                        (int) $boxscoreGameInfo->home_q3_points,
+                        (int) $boxscoreGameInfo->home_q4_points,
+                        (int) $boxscoreGameInfo->home_ot_points,
                         (int) $playerStats->gameFieldGoalsMade,
                         (int) $playerStats->gameFieldGoalsAttempted,
                         (int) $playerStats->gameFreeThrowsMade,
@@ -284,13 +284,13 @@ class BoxscoreProcessor implements BoxscoreProcessorInterface
                         (int) $playerStats->playerID,
                         $boxscoreGameInfo->visitor_teamid,
                         $boxscoreGameInfo->home_teamid,
-                        $boxscoreGameInfo->gameOfThatDay,
+                        $boxscoreGameInfo->game_of_that_day,
                         (int) $boxscoreGameInfo->attendance,
                         (int) $boxscoreGameInfo->capacity,
-                        (int) $boxscoreGameInfo->visitorWins,
-                        (int) $boxscoreGameInfo->visitorLosses,
-                        (int) $boxscoreGameInfo->homeWins,
-                        (int) $boxscoreGameInfo->homeLosses,
+                        (int) $boxscoreGameInfo->visitor_wins,
+                        (int) $boxscoreGameInfo->visitor_losses,
+                        (int) $boxscoreGameInfo->home_wins,
+                        (int) $boxscoreGameInfo->home_losses,
                         $playerTeamID,
                         (int) $playerStats->gameMinutesPlayed,
                         (int) $playerStats->gameFieldGoalsMade,
@@ -388,7 +388,7 @@ class BoxscoreProcessor implements BoxscoreProcessorInterface
             );
 
             if ($existingGame !== null) {
-                /** @var array{visitorQ1points: int, visitorQ2points: int, visitorQ3points: int, visitorQ4points: int, visitorOTpoints: int, homeQ1points: int, homeQ2points: int, homeQ3points: int, homeQ4points: int, homeOTpoints: int} $existingGame */
+                /** @var array{visitor_q1_points: int, visitor_q2_points: int, visitor_q3_points: int, visitor_q4_points: int, visitor_ot_points: int, home_q1_points: int, home_q2_points: int, home_q3_points: int, home_q4_points: int, home_ot_points: int} $existingGame */
                 if ($boxscoreGameInfo->scoresMatchDatabase($existingGame)) {
                     // Outcome A: scores match — skip
                     $messages[] = 'All-Star Game: already exists with matching scores, skipped.';
@@ -441,14 +441,14 @@ class BoxscoreProcessor implements BoxscoreProcessorInterface
             $boxscoreGameInfo->gameDate,
             $boxscoreGameInfo->visitor_teamid,
             $boxscoreGameInfo->home_teamid,
-            $boxscoreGameInfo->gameOfThatDay
+            $boxscoreGameInfo->game_of_that_day
         );
 
         if ($existingGame === null) {
             return 'insert';
         }
 
-        /** @var array{visitorQ1points: int, visitorQ2points: int, visitorQ3points: int, visitorQ4points: int, visitorOTpoints: int, homeQ1points: int, homeQ2points: int, homeQ3points: int, homeQ4points: int, homeOTpoints: int} $existingGame */
+        /** @var array{visitor_q1_points: int, visitor_q2_points: int, visitor_q3_points: int, visitor_q4_points: int, visitor_ot_points: int, home_q1_points: int, home_q2_points: int, home_q3_points: int, home_q4_points: int, home_ot_points: int} $existingGame */
         $scoresMatch = $boxscoreGameInfo->scoresMatchDatabase($existingGame);
 
         if ($scoresMatch) {
@@ -469,7 +469,7 @@ class BoxscoreProcessor implements BoxscoreProcessorInterface
             $boxscoreGameInfo->gameDate,
             $boxscoreGameInfo->visitor_teamid,
             $boxscoreGameInfo->home_teamid,
-            $boxscoreGameInfo->gameOfThatDay
+            $boxscoreGameInfo->game_of_that_day
         );
         $this->repository->deletePlayerBoxscoresByGame(
             $boxscoreGameInfo->gameDate,

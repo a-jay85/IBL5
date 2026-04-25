@@ -30,15 +30,15 @@ class SeasonHighsService implements SeasonHighsServiceInterface
      * @var array<string, string>
      */
     private const STATS = [
-        'POINTS' => '(`game2GM`*2) + `gameFTM` + (`game3GM`*3)',
-        'REBOUNDS' => '(`gameORB` + `gameDRB`)',
-        'ASSISTS' => '`gameAST`',
-        'STEALS' => '`gameSTL`',
-        'BLOCKS' => '`gameBLK`',
-        'TURNOVERS' => '`gameTOV`',
-        'Field Goals Made' => '(`game2GM` + `game3GM`)',
-        'Free Throws Made' => '`gameFTM`',
-        'Three Pointers Made' => '`game3GM`',
+        'POINTS' => '(`game_2gm`*2) + `game_ftm` + (`game_3gm`*3)',
+        'REBOUNDS' => '(`game_orb` + `game_drb`)',
+        'ASSISTS' => '`game_ast`',
+        'STEALS' => '`game_stl`',
+        'BLOCKS' => '`game_blk`',
+        'TURNOVERS' => '`game_tov`',
+        'Field Goals Made' => '(`game_2gm` + `game_3gm`)',
+        'Free Throws Made' => '`game_ftm`',
+        'Three Pointers Made' => '`game_3gm`',
     ];
 
     /**
@@ -47,14 +47,14 @@ class SeasonHighsService implements SeasonHighsServiceInterface
      * @var array<string, string>
      */
     private const HOME_AWAY_STATS = [
-        'POINTS' => '(`game2GM`*2) + `gameFTM` + (`game3GM`*3)',
-        'REBOUNDS' => '(`gameORB` + `gameDRB`)',
-        'ASSISTS' => '`gameAST`',
-        'STEALS' => '`gameSTL`',
-        'BLOCKS' => '`gameBLK`',
-        'Field Goals Made' => '(`game2GM` + `game3GM`)',
-        'Three Pointers Made' => '`game3GM`',
-        'Free Throws Made' => '`gameFTM`',
+        'POINTS' => '(`game_2gm`*2) + `game_ftm` + (`game_3gm`*3)',
+        'REBOUNDS' => '(`game_orb` + `game_drb`)',
+        'ASSISTS' => '`game_ast`',
+        'STEALS' => '`game_stl`',
+        'BLOCKS' => '`game_blk`',
+        'Field Goals Made' => '(`game_2gm` + `game_3gm`)',
+        'Three Pointers Made' => '`game_3gm`',
+        'Free Throws Made' => '`game_ftm`',
     ];
 
     /**

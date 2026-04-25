@@ -12,7 +12,7 @@ use League\LeagueContext;
  * Computes wins, losses, home/away splits, streaks, and ranking scores
  * from game result data for power rankings updates.
  *
- * @phpstan-type GameRow array{Visitor: int, VScore: int, Home: int, HScore: int}
+ * @phpstan-type GameRow array{visitor_teamid: int, visitor_score: int, home_teamid: int, home_score: int}
  * @phpstan-type NormalizedGame array{awayTeam: int, awayScore: int, homeTeam: int, homeScore: int}
  * @phpstan-type TeamStats array{wins: int, losses: int, homeWins: int, homeLosses: int, awayWins: int, awayLosses: int, winPoints: int, lossPoints: int, winsInLast10Games: int, lossesInLast10Games: int, streak: int, streakType: string}
  */
@@ -65,7 +65,7 @@ class TeamStatsCalculator
     /**
      * Calculate team statistics from an array of games
      *
-     * @param list<GameRow> $games Array of game data with Visitor, VScore, Home, HScore
+     * @param list<GameRow> $games Array of game data with visitor_teamid, visitor_score, home_teamid, home_score
      * @param int $teamid Team ID to calculate stats for
      * @return TeamStats
      */
@@ -117,10 +117,10 @@ class TeamStatsCalculator
     private function normalizeGameData(array $gameData): array
     {
         return [
-            'awayTeam' => $gameData['Visitor'] ?? 0,
-            'awayScore' => $gameData['VScore'] ?? 0,
-            'homeTeam' => $gameData['Home'] ?? 0,
-            'homeScore' => $gameData['HScore'] ?? 0,
+            'awayTeam' => $gameData['visitor_teamid'] ?? 0,
+            'awayScore' => $gameData['visitor_score'] ?? 0,
+            'homeTeam' => $gameData['home_teamid'] ?? 0,
+            'homeScore' => $gameData['home_score'] ?? 0,
         ];
     }
 

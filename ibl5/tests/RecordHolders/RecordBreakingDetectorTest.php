@@ -246,8 +246,8 @@ final class RecordBreakingDetectorTest extends TestCase
             'teamid' => 5,
             'team_name' => 'Magic',
             'date' => '2007-02-21',
-            'BoxID' => 0,
-            'gameOfThatDay' => 0,
+            'box_id' => 0,
+            'game_of_that_day' => 0,
             'oppTid' => 3,
             'opp_team_name' => 'Knicks',
             'points' => 18,
@@ -278,8 +278,8 @@ final class RecordBreakingDetectorTest extends TestCase
             'teamid' => 1,
             'team_name' => 'Celtics',
             'date' => '2007-01-15',
-            'BoxID' => 0,
-            'gameOfThatDay' => 0,
+            'box_id' => 0,
+            'game_of_that_day' => 0,
             'oppTid' => 2,
             'opp_team_name' => 'Heat',
             'points' => 20,
@@ -307,8 +307,8 @@ final class RecordBreakingDetectorTest extends TestCase
             'teamid' => 1,
             'team_name' => 'Celtics',
             'date' => '2000-01-01',
-            'BoxID' => 0,
-            'gameOfThatDay' => 0,
+            'box_id' => 0,
+            'game_of_that_day' => 0,
             'oppTid' => 2,
             'opp_team_name' => 'Heat',
             'points' => 20,
@@ -334,19 +334,19 @@ final class RecordBreakingDetectorTest extends TestCase
      * Create a player record with sensible defaults.
      *
      * @param array<string, int|string> $overrides
-     * @return array{pid: int, name: string, teamid: int, team_name: string, date: string, BoxID: int, gameOfThatDay: int, oppTid: int, opp_team_name: string, value: int}
+     * @return array{pid: int, name: string, teamid: int, team_name: string, date: string, box_id: int, game_of_that_day: int, oppTid: int, opp_team_name: string, value: int}
      */
     private function makePlayerRecord(array $overrides = []): array
     {
-        /** @var array{pid: int, name: string, teamid: int, team_name: string, date: string, BoxID: int, gameOfThatDay: int, oppTid: int, opp_team_name: string, value: int} */
+        /** @var array{pid: int, name: string, teamid: int, team_name: string, date: string, box_id: int, game_of_that_day: int, oppTid: int, opp_team_name: string, value: int} */
         return array_merge([
             'pid' => 100,
             'name' => 'Test Player',
             'teamid' => 2,
             'team_name' => 'Heat',
             'date' => '2007-01-15',
-            'BoxID' => 0,
-            'gameOfThatDay' => 0,
+            'box_id' => 0,
+            'game_of_that_day' => 0,
             'oppTid' => 3,
             'opp_team_name' => 'Knicks',
             'value' => 50,
@@ -357,17 +357,17 @@ final class RecordBreakingDetectorTest extends TestCase
      * Create a team record with sensible defaults.
      *
      * @param array<string, int|string> $overrides
-     * @return array{teamid: int, team_name: string, date: string, BoxID: int, gameOfThatDay: int, oppTid: int, opp_team_name: string, value: int}
+     * @return array{teamid: int, team_name: string, date: string, box_id: int, game_of_that_day: int, oppTid: int, opp_team_name: string, value: int}
      */
     private function makeTeamRecord(array $overrides = []): array
     {
-        /** @var array{teamid: int, team_name: string, date: string, BoxID: int, gameOfThatDay: int, oppTid: int, opp_team_name: string, value: int} */
+        /** @var array{teamid: int, team_name: string, date: string, box_id: int, game_of_that_day: int, oppTid: int, opp_team_name: string, value: int} */
         return array_merge([
             'teamid' => 2,
             'team_name' => 'Heat',
             'date' => '2007-01-15',
-            'BoxID' => 0,
-            'gameOfThatDay' => 0,
+            'box_id' => 0,
+            'game_of_that_day' => 0,
             'oppTid' => 3,
             'opp_team_name' => 'Knicks',
             'value' => 100,
@@ -377,8 +377,8 @@ final class RecordBreakingDetectorTest extends TestCase
     /**
      * Build a player batch result keyed by all PLAYER_STAT_KEYS.
      *
-     * @param list<array{pid: int, name: string, teamid: int, team_name: string, date: string, BoxID: int, gameOfThatDay: int, oppTid: int, opp_team_name: string, value: int}> $records
-     * @return array<string, list<array{pid: int, name: string, teamid: int, team_name: string, date: string, BoxID: int, gameOfThatDay: int, oppTid: int, opp_team_name: string, value: int}>>
+     * @param list<array{pid: int, name: string, teamid: int, team_name: string, date: string, box_id: int, game_of_that_day: int, oppTid: int, opp_team_name: string, value: int}> $records
+     * @return array<string, list<array{pid: int, name: string, teamid: int, team_name: string, date: string, box_id: int, game_of_that_day: int, oppTid: int, opp_team_name: string, value: int}>>
      */
     private function buildPlayerBatchResult(array $records): array
     {
@@ -392,8 +392,8 @@ final class RecordBreakingDetectorTest extends TestCase
     /**
      * Build a team batch result keyed by all TEAM_STAT_KEYS.
      *
-     * @param list<array{teamid: int, team_name: string, date: string, BoxID: int, gameOfThatDay: int, oppTid: int, opp_team_name: string, value: int}> $records
-     * @return array<string, list<array{teamid: int, team_name: string, date: string, BoxID: int, gameOfThatDay: int, oppTid: int, opp_team_name: string, value: int}>>
+     * @param list<array{teamid: int, team_name: string, date: string, box_id: int, game_of_that_day: int, oppTid: int, opp_team_name: string, value: int}> $records
+     * @return array<string, list<array{teamid: int, team_name: string, date: string, box_id: int, game_of_that_day: int, oppTid: int, opp_team_name: string, value: int}>>
      */
     private function buildTeamBatchResult(array $records): array
     {

@@ -127,21 +127,21 @@ class SeasonArchiveRepository extends BaseMysqliRepository implements SeasonArch
             SELECT hc.year, ti.team_name AS name, 'IBL HEAT Champions' AS award, 0 AS id
             FROM (
                 SELECT
-                    YEAR(bst.Date) AS year,
+                    YEAR(bst.game_date) AS year,
                     CASE
-                        WHEN (bst.homeQ1points + bst.homeQ2points + bst.homeQ3points + bst.homeQ4points
-                              + COALESCE(bst.homeOTpoints, 0))
-                           > (bst.visitorQ1points + bst.visitorQ2points + bst.visitorQ3points + bst.visitorQ4points
-                              + COALESCE(bst.visitorOTpoints, 0))
+                        WHEN (bst.home_q1_points + bst.home_q2_points + bst.home_q3_points + bst.home_q4_points
+                              + COALESCE(bst.home_ot_points, 0))
+                           > (bst.visitor_q1_points + bst.visitor_q2_points + bst.visitor_q3_points + bst.visitor_q4_points
+                              + COALESCE(bst.visitor_ot_points, 0))
                         THEN bst.home_teamid
                         ELSE bst.visitor_teamid
                     END AS winner_tid,
                     ROW_NUMBER() OVER (
-                        PARTITION BY YEAR(bst.Date)
-                        ORDER BY bst.Date DESC, bst.gameOfThatDay ASC
+                        PARTITION BY YEAR(bst.game_date)
+                        ORDER BY bst.game_date DESC, bst.game_of_that_day ASC
                     ) AS rn
                 FROM ibl_box_scores_teams bst
-                WHERE bst.game_type = 3 AND YEAR(bst.Date) = ?
+                WHERE bst.game_type = 3 AND YEAR(bst.game_date) = ?
             ) hc
             JOIN ibl_team_info ti ON ti.teamid = hc.winner_tid
             WHERE hc.rn = 1

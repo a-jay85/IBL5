@@ -9,8 +9,8 @@ use League\LeagueContext;
 
 /**
  * @phpstan-type GameViewRow array{game_uuid: string, season_year: int, game_date: string, game_status: string, box_score_id: int, game_of_that_day: int, visitor_uuid: string, visitor_city: string, visitor_name: string, visitor_full_name: string, visitor_score: int, visitor_team_id: int, home_uuid: string, home_city: string, home_name: string, home_full_name: string, home_score: int, home_team_id: int, ...}
- * @phpstan-type BoxscoreTeamRow array{name: string, visitorQ1points: int, visitorQ2points: int, visitorQ3points: int, visitorQ4points: int, visitorOTpoints: int, homeQ1points: int, homeQ2points: int, homeQ3points: int, homeQ4points: int, homeOTpoints: int, gameMIN: int|null, game2GM: int, game2GA: int, gameFTM: int, gameFTA: int, game3GM: int, game3GA: int, gameORB: int, gameDRB: int, gameAST: int, gameSTL: int, gameTOV: int, gameBLK: int, gamePF: int, attendance: int, capacity: int, visitorWins: int, visitorLosses: int, homeWins: int, homeLosses: int, calc_points: int, calc_rebounds: int, calc_fg_made: int, ...}
- * @phpstan-type BoxscorePlayerRow array{player_uuid: string|null, name: string, pos: string, gameMIN: int, game2GM: int, game2GA: int, gameFTM: int, gameFTA: int, game3GM: int, game3GA: int, gameORB: int, gameDRB: int, gameAST: int, gameSTL: int, gameTOV: int, gameBLK: int, gamePF: int, calc_points: int, calc_rebounds: int, calc_fg_made: int, player_tid: int|null, ...}
+ * @phpstan-type BoxscoreTeamRow array{name: string, visitor_q1_points: int, visitor_q2_points: int, visitor_q3_points: int, visitor_q4_points: int, visitor_ot_points: int, home_q1_points: int, home_q2_points: int, home_q3_points: int, home_q4_points: int, home_ot_points: int, game_min: int|null, game_2gm: int, game_2ga: int, game_ftm: int, game_fta: int, game_3gm: int, game_3ga: int, game_orb: int, game_drb: int, game_ast: int, game_stl: int, game_tov: int, game_blk: int, game_pf: int, attendance: int, capacity: int, visitor_wins: int, visitor_losses: int, home_wins: int, home_losses: int, calc_points: int, calc_rebounds: int, calc_fg_made: int, ...}
+ * @phpstan-type BoxscorePlayerRow array{player_uuid: string|null, name: string, pos: string, game_min: int, game_2gm: int, game_2ga: int, game_ftm: int, game_fta: int, game_3gm: int, game_3ga: int, game_orb: int, game_drb: int, game_ast: int, game_stl: int, game_tov: int, game_blk: int, game_pf: int, calc_points: int, calc_rebounds: int, calc_fg_made: int, player_tid: int|null, ...}
  */
 class ApiGameRepository extends \BaseMysqliRepository
 {
@@ -95,7 +95,7 @@ class ApiGameRepository extends \BaseMysqliRepository
     {
         /** @var list<BoxscoreTeamRow> */
         return $this->fetchAll(
-            "SELECT * FROM {$this->boxScoresTeamsTable} WHERE visitor_teamid = ? AND home_teamid = ? AND Date = ? ORDER BY id ASC",
+            "SELECT * FROM {$this->boxScoresTeamsTable} WHERE visitor_teamid = ? AND home_teamid = ? AND game_date = ? ORDER BY id ASC",
             'iis',
             $visitorTeamId,
             $homeTeamId,
@@ -115,7 +115,7 @@ class ApiGameRepository extends \BaseMysqliRepository
             "SELECT b.*, COALESCE(p.name, b.name) AS name, p.uuid AS player_uuid, p.teamid AS player_tid
              FROM {$this->boxScoresTable} b
              LEFT JOIN ibl_plr p ON b.pid = p.pid
-             WHERE b.Date = ? AND b.visitor_teamid = ? AND b.home_teamid = ?
+             WHERE b.game_date = ? AND b.visitor_teamid = ? AND b.home_teamid = ?
              ORDER BY b.id ASC",
             'sii',
             $date,

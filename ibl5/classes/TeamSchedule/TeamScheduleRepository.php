@@ -36,15 +36,15 @@ class TeamScheduleRepository extends \BaseMysqliRepository implements TeamSchedu
     {
         /** @var list<ScheduleRow> */
         return $this->fetchAll(
-            "SELECT s.*, bst.gameOfThatDay
+            "SELECT s.*, bst.game_of_that_day
             FROM {$this->scheduleTable} s
             LEFT JOIN (
-                SELECT Date, visitor_teamid, home_teamid, MIN(gameOfThatDay) AS gameOfThatDay
+                SELECT game_date, visitor_teamid, home_teamid, MIN(game_of_that_day) AS game_of_that_day
                 FROM {$this->boxScoresTeamsTable}
-                GROUP BY Date, visitor_teamid, home_teamid
-            ) bst ON bst.Date = s.Date AND bst.visitor_teamid = s.Visitor AND bst.home_teamid = s.Home
-            WHERE s.Visitor = ? OR s.Home = ?
-            ORDER BY s.Date ASC",
+                GROUP BY game_date, visitor_teamid, home_teamid
+            ) bst ON bst.game_date = s.game_date AND bst.visitor_teamid = s.visitor_teamid AND bst.home_teamid = s.home_teamid
+            WHERE s.visitor_teamid = ? OR s.home_teamid = ?
+            ORDER BY s.game_date ASC",
             'ii',
             $teamid,
             $teamid
@@ -61,9 +61,9 @@ class TeamScheduleRepository extends \BaseMysqliRepository implements TeamSchedu
         /** @var list<ProjectedGameRow> */
         return $this->fetchAll(
             "SELECT * FROM `{$this->scheduleTable}`
-             WHERE (Visitor = ? OR Home = ?)
-               AND Date BETWEEN ADDDATE(?, 1) AND ?
-             ORDER BY Date ASC",
+             WHERE (visitor_teamid = ? OR home_teamid = ?)
+               AND game_date BETWEEN ADDDATE(?, 1) AND ?
+             ORDER BY game_date ASC",
             'iiss',
             $teamid,
             $teamid,

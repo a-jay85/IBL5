@@ -155,6 +155,49 @@ final class BanNonSnakeCaseColumnsRule implements Rule
         '`Default_Theme`' => 'Rename to `default_theme`; migration 120 snake-cased nuke_config columns.',
         '`Version_Num`' => 'Rename to `version_num`; migration 120 snake-cased nuke_config columns.',
         '`pollID`' => 'Rename to `poll_id`; migration 120 snake-cased nuke_stories.pollID.',
+
+        // Migration 121: Tier 6 — box-score + schedule snake_case (ADR-0010).
+        // Box-score per-game stats (ibl_box_scores, ibl_box_scores_teams,
+        // ibl_olympics_box_scores, ibl_olympics_box_scores_teams).
+        '`gameMIN`' => 'Rename to `game_min`; migration 121 snake-cased box-score stat columns.',
+        '`game2GM`' => 'Rename to `game_2gm`; migration 121 snake-cased box-score stat columns.',
+        '`game2GA`' => 'Rename to `game_2ga`; migration 121 snake-cased box-score stat columns.',
+        '`gameFTM`' => 'Rename to `game_ftm`; migration 121 snake-cased box-score stat columns.',
+        '`gameFTA`' => 'Rename to `game_fta`; migration 121 snake-cased box-score stat columns.',
+        '`game3GM`' => 'Rename to `game_3gm`; migration 121 snake-cased box-score stat columns.',
+        '`game3GA`' => 'Rename to `game_3ga`; migration 121 snake-cased box-score stat columns.',
+        '`gameORB`' => 'Rename to `game_orb`; migration 121 snake-cased box-score stat columns.',
+        '`gameDRB`' => 'Rename to `game_drb`; migration 121 snake-cased box-score stat columns.',
+        '`gameAST`' => 'Rename to `game_ast`; migration 121 snake-cased box-score stat columns.',
+        '`gameSTL`' => 'Rename to `game_stl`; migration 121 snake-cased box-score stat columns.',
+        '`gameTOV`' => 'Rename to `game_tov`; migration 121 snake-cased box-score stat columns.',
+        '`gameBLK`' => 'Rename to `game_blk`; migration 121 snake-cased box-score stat columns.',
+        '`gamePF`' => 'Rename to `game_pf`; migration 121 snake-cased box-score stat columns.',
+        '`gameOfThatDay`' => 'Rename to `game_of_that_day`; migration 121 snake-cased box-score stat columns.',
+        '`visitorWins`' => 'Rename to `visitor_wins`; migration 121 snake-cased box-score record columns.',
+        '`visitorLosses`' => 'Rename to `visitor_losses`; migration 121 snake-cased box-score record columns.',
+        // homeWins / homeLosses already banned via ibl_standings rename (migration 118).
+        // ibl_box_scores_teams quarter-points + OT.
+        '`visitorQ1points`' => 'Rename to `visitor_q1_points`; migration 121 snake-cased ibl_box_scores_teams quarter columns.',
+        '`visitorQ2points`' => 'Rename to `visitor_q2_points`; migration 121 snake-cased ibl_box_scores_teams quarter columns.',
+        '`visitorQ3points`' => 'Rename to `visitor_q3_points`; migration 121 snake-cased ibl_box_scores_teams quarter columns.',
+        '`visitorQ4points`' => 'Rename to `visitor_q4_points`; migration 121 snake-cased ibl_box_scores_teams quarter columns.',
+        '`visitorOTpoints`' => 'Rename to `visitor_ot_points`; migration 121 snake-cased ibl_box_scores_teams quarter columns.',
+        '`homeQ1points`' => 'Rename to `home_q1_points`; migration 121 snake-cased ibl_box_scores_teams quarter columns.',
+        '`homeQ2points`' => 'Rename to `home_q2_points`; migration 121 snake-cased ibl_box_scores_teams quarter columns.',
+        '`homeQ3points`' => 'Rename to `home_q3_points`; migration 121 snake-cased ibl_box_scores_teams quarter columns.',
+        '`homeQ4points`' => 'Rename to `home_q4_points`; migration 121 snake-cased ibl_box_scores_teams quarter columns.',
+        '`homeOTpoints`' => 'Rename to `home_ot_points`; migration 121 snake-cased ibl_box_scores_teams quarter columns.',
+        // ibl_schedule + ibl_olympics_schedule (PK + FK churn).
+        '`SchedID`' => 'Rename to `id`; migration 121 snake-cased ibl_schedule PK.',
+        '`BoxID`' => 'Rename to `box_id`; migration 121 snake-cased ibl_schedule.BoxID.',
+        '`VScore`' => 'Rename to `visitor_score`; migration 121 snake-cased ibl_schedule scores.',
+        '`HScore`' => 'Rename to `home_score`; migration 121 snake-cased ibl_schedule scores.',
+        // Common-English-word columns matched only when backtick-quoted in SQL strings.
+        '`Date`' => 'Rename to `game_date`; migration 121 snake-cased box-score + schedule date column.',
+        '`Year`' => 'Rename to `season_year`; migration 121 snake-cased ibl_schedule.Year.',
+        '`Visitor`' => 'Rename to `visitor_teamid`; migration 121 snake-cased ibl_schedule.Visitor (FK to ibl_team_info).',
+        '`Home`' => 'Rename to `home_teamid`; migration 121 snake-cased ibl_schedule.Home (FK to ibl_team_info).',
     ];
 
     public function getNodeType(): string

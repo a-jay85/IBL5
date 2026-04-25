@@ -16,7 +16,7 @@ class TestableStandingsUpdater extends StandingsUpdater
     /** @var array<int, array{conference: string, division: string, teamName: string}> */
     private array $testTeamMap = [];
 
-    /** @var list<array{Visitor: int, VScore: int, Home: int, HScore: int}> */
+    /** @var list<array{visitor_teamid: int, visitor_score: int, home_teamid: int, home_score: int}> */
     private array $testGames = [];
 
     /**
@@ -28,7 +28,7 @@ class TestableStandingsUpdater extends StandingsUpdater
     }
 
     /**
-     * @param list<array{Visitor: int, VScore: int, Home: int, HScore: int}> $games
+     * @param list<array{visitor_teamid: int, visitor_score: int, home_teamid: int, home_score: int}> $games
      */
     public function setTestGames(array $games): void
     {
@@ -120,9 +120,9 @@ class StandingsUpdaterTest extends TestCase
         $this->mockDb->setReturnTrue(true);
         $this->updater->setTestTeamMap($this->defaultTeamMap);
         $this->updater->setTestGames([
-            ['Visitor' => 1, 'VScore' => 100, 'Home' => 2, 'HScore' => 90],
-            ['Visitor' => 2, 'VScore' => 95, 'Home' => 1, 'HScore' => 105],
-            ['Visitor' => 1, 'VScore' => 80, 'Home' => 4, 'HScore' => 90],
+            ['visitor_teamid' => 1, 'visitor_score' => 100, 'home_teamid' => 2, 'home_score' => 90],
+            ['visitor_teamid' => 2, 'visitor_score' => 95, 'home_teamid' => 1, 'home_score' => 105],
+            ['visitor_teamid' => 1, 'visitor_score' => 80, 'home_teamid' => 4, 'home_score' => 90],
         ]);
 
         ob_start();
@@ -153,8 +153,8 @@ class StandingsUpdaterTest extends TestCase
         $this->mockDb->setReturnTrue(true);
         $this->updater->setTestTeamMap($this->defaultTeamMap);
         $this->updater->setTestGames([
-            ['Visitor' => 1, 'VScore' => 100, 'Home' => 2, 'HScore' => 90],  // Team 1 away win
-            ['Visitor' => 4, 'VScore' => 80, 'Home' => 1, 'HScore' => 95],   // Team 1 home win
+            ['visitor_teamid' => 1, 'visitor_score' => 100, 'home_teamid' => 2, 'home_score' => 90],  // Team 1 away win
+            ['visitor_teamid' => 4, 'visitor_score' => 80, 'home_teamid' => 1, 'home_score' => 95],   // Team 1 home win
         ]);
 
         ob_start();
@@ -179,9 +179,9 @@ class StandingsUpdaterTest extends TestCase
         $this->updater->setTestTeamMap($this->defaultTeamMap);
         $this->updater->setTestGames([
             // Eastern vs Eastern (should count for conf record)
-            ['Visitor' => 1, 'VScore' => 100, 'Home' => 2, 'HScore' => 90],
+            ['visitor_teamid' => 1, 'visitor_score' => 100, 'home_teamid' => 2, 'home_score' => 90],
             // Eastern vs Western (should NOT count for conf record)
-            ['Visitor' => 1, 'VScore' => 100, 'Home' => 4, 'HScore' => 90],
+            ['visitor_teamid' => 1, 'visitor_score' => 100, 'home_teamid' => 4, 'home_score' => 90],
         ]);
 
         ob_start();
@@ -206,9 +206,9 @@ class StandingsUpdaterTest extends TestCase
         $this->updater->setTestTeamMap($this->defaultTeamMap);
         $this->updater->setTestGames([
             // Atlantic vs Atlantic (same division)
-            ['Visitor' => 1, 'VScore' => 100, 'Home' => 2, 'HScore' => 90],
+            ['visitor_teamid' => 1, 'visitor_score' => 100, 'home_teamid' => 2, 'home_score' => 90],
             // Atlantic vs Central (same conference, different division)
-            ['Visitor' => 1, 'VScore' => 100, 'Home' => 3, 'HScore' => 90],
+            ['visitor_teamid' => 1, 'visitor_score' => 100, 'home_teamid' => 3, 'home_score' => 90],
         ]);
 
         ob_start();
@@ -234,9 +234,9 @@ class StandingsUpdaterTest extends TestCase
             2 => ['conference' => 'Eastern', 'division' => 'Atlantic', 'teamName' => 'Heat'],
         ]);
         $this->updater->setTestGames([
-            ['Visitor' => 1, 'VScore' => 100, 'Home' => 2, 'HScore' => 90],
-            ['Visitor' => 2, 'VScore' => 100, 'Home' => 1, 'HScore' => 90],
-            ['Visitor' => 1, 'VScore' => 100, 'Home' => 2, 'HScore' => 90],
+            ['visitor_teamid' => 1, 'visitor_score' => 100, 'home_teamid' => 2, 'home_score' => 90],
+            ['visitor_teamid' => 2, 'visitor_score' => 100, 'home_teamid' => 1, 'home_score' => 90],
+            ['visitor_teamid' => 1, 'visitor_score' => 100, 'home_teamid' => 2, 'home_score' => 90],
         ]);
 
         ob_start();
@@ -268,10 +268,10 @@ class StandingsUpdaterTest extends TestCase
         // 5 games total for team 1 (3 away + 2 home)
         $games = [];
         for ($i = 0; $i < 3; $i++) {
-            $games[] = ['Visitor' => 1, 'VScore' => 100, 'Home' => 2, 'HScore' => 90];
+            $games[] = ['visitor_teamid' => 1, 'visitor_score' => 100, 'home_teamid' => 2, 'home_score' => 90];
         }
         for ($i = 0; $i < 2; $i++) {
-            $games[] = ['Visitor' => 2, 'VScore' => 90, 'Home' => 1, 'HScore' => 100];
+            $games[] = ['visitor_teamid' => 2, 'visitor_score' => 90, 'home_teamid' => 1, 'home_score' => 100];
         }
         $this->updater->setTestGames($games);
 
@@ -325,11 +325,11 @@ class StandingsUpdaterTest extends TestCase
         ]);
         $this->updater->setTestGames([
             // Team 1 wins all 4 games (2-0 record)
-            ['Visitor' => 1, 'VScore' => 100, 'Home' => 2, 'HScore' => 90],
-            ['Visitor' => 1, 'VScore' => 100, 'Home' => 2, 'HScore' => 90],
+            ['visitor_teamid' => 1, 'visitor_score' => 100, 'home_teamid' => 2, 'home_score' => 90],
+            ['visitor_teamid' => 1, 'visitor_score' => 100, 'home_teamid' => 2, 'home_score' => 90],
             // Team 2 is 0-2 after above, add 2 more wins for both teams
-            ['Visitor' => 2, 'VScore' => 100, 'Home' => 1, 'HScore' => 90],
-            ['Visitor' => 2, 'VScore' => 100, 'Home' => 1, 'HScore' => 90],
+            ['visitor_teamid' => 2, 'visitor_score' => 100, 'home_teamid' => 1, 'home_score' => 90],
+            ['visitor_teamid' => 2, 'visitor_score' => 100, 'home_teamid' => 1, 'home_score' => 90],
         ]);
 
         ob_start();
@@ -443,7 +443,7 @@ class StandingsUpdaterTest extends TestCase
         ]);
         // Game references team 99 which is not in teamMap
         $this->updater->setTestGames([
-            ['Visitor' => 1, 'VScore' => 100, 'Home' => 99, 'HScore' => 90],
+            ['visitor_teamid' => 1, 'visitor_score' => 100, 'home_teamid' => 99, 'home_score' => 90],
         ]);
 
         ob_start();
@@ -485,8 +485,8 @@ class StandingsUpdaterTest extends TestCase
         ]);
         $this->updater->setTestGames([
             // Team 1 beats team 2 twice → Celtics 2-0, Heat 0-2
-            ['Visitor' => 1, 'VScore' => 100, 'Home' => 2, 'HScore' => 90],
-            ['Visitor' => 1, 'VScore' => 100, 'Home' => 2, 'HScore' => 90],
+            ['visitor_teamid' => 1, 'visitor_score' => 100, 'home_teamid' => 2, 'home_score' => 90],
+            ['visitor_teamid' => 1, 'visitor_score' => 100, 'home_teamid' => 2, 'home_score' => 90],
         ]);
 
         ob_start();

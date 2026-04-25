@@ -115,20 +115,20 @@ class PlayerOverviewView implements PlayerOverviewViewInterface
     </tr>
         <?php
         foreach ($boxScores as $row) {
-            /** @var array{Date: string, home_teamid: int, visitor_teamid: int, gameOfThatDay: int, BoxID: int, gameMIN: int, game2GM: int, game2GA: int, game3GM: int, game3GA: int, gameFTM: int, gameFTA: int, gameORB: int, gameDRB: int, gameAST: int, gameSTL: int, gameTOV: int, gameBLK: int, gamePF: int} $row */
-            $fgm = $row['game2GM'] + $row['game3GM'];
-            $fga = $row['game2GA'] + $row['game3GA'];
-            $pts = (2 * $row['game2GM']) + (3 * $row['game3GM']) + $row['gameFTM'];
-            $reb = $row['gameORB'] + $row['gameDRB'];
+            /** @var array{game_date: string, home_teamid: int, visitor_teamid: int, game_of_that_day: int, box_id: int, game_min: int, game_2gm: int, game_2ga: int, game_3gm: int, game_3ga: int, game_ftm: int, game_fta: int, game_orb: int, game_drb: int, game_ast: int, game_stl: int, game_tov: int, game_blk: int, game_pf: int} $row */
+            $fgm = $row['game_2gm'] + $row['game_3gm'];
+            $fga = $row['game_2ga'] + $row['game_3ga'];
+            $pts = (2 * $row['game_2gm']) + (3 * $row['game_3gm']) + $row['game_ftm'];
+            $reb = $row['game_orb'] + $row['game_drb'];
 
             $fgPct = StatsFormatter::formatPercentage($fgm, $fga);
-            $ftPct = StatsFormatter::formatPercentage($row['gameFTM'], $row['gameFTA']);
-            $tgPct = StatsFormatter::formatPercentage($row['game3GM'], $row['game3GA']);
+            $ftPct = StatsFormatter::formatPercentage($row['game_ftm'], $row['game_fta']);
+            $tgPct = StatsFormatter::formatPercentage($row['game_3gm'], $row['game_3ga']);
 
             $awayTeam = $this->commonRepository->getTeamnameFromTeamID($row['home_teamid']);
             $homeTeam = $this->commonRepository->getTeamnameFromTeamID($row['visitor_teamid']);
-            $safeDate = HtmlSanitizer::safeHtmlOutput($row['Date']);
-            $boxScoreUrl = \Utilities\BoxScoreUrlBuilder::buildUrl($row['Date'], (int) ($row['gameOfThatDay'] ?? 0), (int) ($row['BoxID'] ?? 0));
+            $safeDate = HtmlSanitizer::safeHtmlOutput($row['game_date']);
+            $boxScoreUrl = \Utilities\BoxScoreUrlBuilder::buildUrl($row['game_date'], (int) ($row['game_of_that_day'] ?? 0), (int) ($row['box_id'] ?? 0));
             $safeBoxScoreUrl = HtmlSanitizer::safeHtmlOutput($boxScoreUrl);
             $safeAwayTeam = HtmlSanitizer::safeHtmlOutput($awayTeam);
             $safeHomeTeam = HtmlSanitizer::safeHtmlOutput($homeTeam);
@@ -137,25 +137,25 @@ class PlayerOverviewView implements PlayerOverviewViewInterface
         <td class="gamelog"><?php if ($boxScoreUrl !== ''): ?><a href="<?= $safeBoxScoreUrl ?>"><?= $safeDate ?></a><?php else: ?><?= $safeDate ?><?php endif; ?></td>
         <td class="gamelog"><?= $safeAwayTeam ?></td>
         <td class="gamelog"><?= $safeHomeTeam ?></td>
-        <td class="gamelog"><?= $row['gameMIN'] ?></td>
+        <td class="gamelog"><?= $row['game_min'] ?></td>
         <td class="gamelog"><?= $pts ?></td>
         <td class="gamelog"><?= $fgm ?></td>
         <td class="gamelog"><?= $fga ?></td>
         <td class="gamelog"><?= $fgPct ?></td>
-        <td class="gamelog"><?= $row['gameFTM'] ?></td>
-        <td class="gamelog"><?= $row['gameFTA'] ?></td>
+        <td class="gamelog"><?= $row['game_ftm'] ?></td>
+        <td class="gamelog"><?= $row['game_fta'] ?></td>
         <td class="gamelog"><?= $ftPct ?></td>
-        <td class="gamelog"><?= $row['game3GM'] ?></td>
-        <td class="gamelog"><?= $row['game3GA'] ?></td>
+        <td class="gamelog"><?= $row['game_3gm'] ?></td>
+        <td class="gamelog"><?= $row['game_3ga'] ?></td>
         <td class="gamelog"><?= $tgPct ?></td>
-        <td class="gamelog"><?= $row['gameORB'] ?></td>
-        <td class="gamelog"><?= $row['gameDRB'] ?></td>
+        <td class="gamelog"><?= $row['game_orb'] ?></td>
+        <td class="gamelog"><?= $row['game_drb'] ?></td>
         <td class="gamelog"><?= $reb ?></td>
-        <td class="gamelog"><?= $row['gameAST'] ?></td>
-        <td class="gamelog"><?= $row['gameSTL'] ?></td>
-        <td class="gamelog"><?= $row['gameTOV'] ?></td>
-        <td class="gamelog"><?= $row['gameBLK'] ?></td>
-        <td class="gamelog"><?= $row['gamePF'] ?></td>
+        <td class="gamelog"><?= $row['game_ast'] ?></td>
+        <td class="gamelog"><?= $row['game_stl'] ?></td>
+        <td class="gamelog"><?= $row['game_tov'] ?></td>
+        <td class="gamelog"><?= $row['game_blk'] ?></td>
+        <td class="gamelog"><?= $row['game_pf'] ?></td>
     </tr>
             <?php
         }

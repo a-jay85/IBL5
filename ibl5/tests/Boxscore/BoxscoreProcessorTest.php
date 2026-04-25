@@ -298,10 +298,10 @@ class BoxscoreProcessorTest extends TestCase
         // findTeamBoxscore returns matching quarter scores
         // buildGameInfoLine defaults: visitor Q scores = 025,030,028,027,000 = 110; home = 022,031,025,030,000 = 108
         $mockDb->onQuery('(?s)SELECT.*ibl_box_scores_teams.*WHERE', [[
-            'visitorQ1points' => 25, 'visitorQ2points' => 30, 'visitorQ3points' => 28,
-            'visitorQ4points' => 27, 'visitorOTpoints' => 0,
-            'homeQ1points' => 22, 'homeQ2points' => 31, 'homeQ3points' => 25,
-            'homeQ4points' => 30, 'homeOTpoints' => 0,
+            'visitor_q1_points' => 25, 'visitor_q2_points' => 30, 'visitor_q3_points' => 28,
+            'visitor_q4_points' => 27, 'visitor_ot_points' => 0,
+            'home_q1_points' => 22, 'home_q2_points' => 31, 'home_q3_points' => 25,
+            'home_q4_points' => 30, 'home_ot_points' => 0,
         ]]);
         // hasNullTeamIdPlayerBoxscores returns false (cnt=0)
         $mockDb->onQuery('(?s)COUNT.*teamid IS NULL', [['cnt' => 0]]);
@@ -321,10 +321,10 @@ class BoxscoreProcessorTest extends TestCase
         $mockDb->setReturnTrue(true);
         // findTeamBoxscore returns different scores (all zeros — clearly different)
         $mockDb->onQuery('(?s)SELECT.*ibl_box_scores_teams.*WHERE', [[
-            'visitorQ1points' => 0, 'visitorQ2points' => 0, 'visitorQ3points' => 0,
-            'visitorQ4points' => 0, 'visitorOTpoints' => 0,
-            'homeQ1points' => 0, 'homeQ2points' => 0, 'homeQ3points' => 0,
-            'homeQ4points' => 0, 'homeOTpoints' => 0,
+            'visitor_q1_points' => 0, 'visitor_q2_points' => 0, 'visitor_q3_points' => 0,
+            'visitor_q4_points' => 0, 'visitor_ot_points' => 0,
+            'home_q1_points' => 0, 'home_q2_points' => 0, 'home_q3_points' => 0,
+            'home_q4_points' => 0, 'home_ot_points' => 0,
         ]]);
 
         $repository = new BoxscoreRepository($mockDb);
@@ -342,10 +342,10 @@ class BoxscoreProcessorTest extends TestCase
         $mockDb->setReturnTrue(true);
         // findTeamBoxscore returns matching scores
         $mockDb->onQuery('(?s)SELECT.*ibl_box_scores_teams.*WHERE', [[
-            'visitorQ1points' => 25, 'visitorQ2points' => 30, 'visitorQ3points' => 28,
-            'visitorQ4points' => 27, 'visitorOTpoints' => 0,
-            'homeQ1points' => 22, 'homeQ2points' => 31, 'homeQ3points' => 25,
-            'homeQ4points' => 30, 'homeOTpoints' => 0,
+            'visitor_q1_points' => 25, 'visitor_q2_points' => 30, 'visitor_q3_points' => 28,
+            'visitor_q4_points' => 27, 'visitor_ot_points' => 0,
+            'home_q1_points' => 22, 'home_q2_points' => 31, 'home_q3_points' => 25,
+            'home_q4_points' => 30, 'home_ot_points' => 0,
         ]]);
         // hasNullTeamIdPlayerBoxscores returns true (cnt=1)
         $mockDb->onQuery('(?s)COUNT.*teamid IS NULL', [['cnt' => 1]]);
@@ -495,10 +495,10 @@ class BoxscoreProcessorTest extends TestCase
         $mockDb->setReturnTrue(true);
         // findTeamBoxscore returns matching scores
         $mockDb->onQuery('(?s)SELECT.*ibl_box_scores_teams.*WHERE', [[
-            'visitorQ1points' => 25, 'visitorQ2points' => 30, 'visitorQ3points' => 28,
-            'visitorQ4points' => 27, 'visitorOTpoints' => 0,
-            'homeQ1points' => 22, 'homeQ2points' => 31, 'homeQ3points' => 25,
-            'homeQ4points' => 30, 'homeOTpoints' => 0,
+            'visitor_q1_points' => 25, 'visitor_q2_points' => 30, 'visitor_q3_points' => 28,
+            'visitor_q4_points' => 27, 'visitor_ot_points' => 0,
+            'home_q1_points' => 22, 'home_q2_points' => 31, 'home_q3_points' => 25,
+            'home_q4_points' => 30, 'home_ot_points' => 0,
         ]]);
         $mockDb->onQuery('(?s)COUNT.*teamid IS NULL', [['cnt' => 0]]);
 
@@ -522,10 +522,10 @@ class BoxscoreProcessorTest extends TestCase
         $mockDb->setReturnTrue(true);
         // findTeamBoxscore returns different scores
         $mockDb->onQuery('(?s)SELECT.*ibl_box_scores_teams.*WHERE', [[
-            'visitorQ1points' => 0, 'visitorQ2points' => 0, 'visitorQ3points' => 0,
-            'visitorQ4points' => 0, 'visitorOTpoints' => 0,
-            'homeQ1points' => 0, 'homeQ2points' => 0, 'homeQ3points' => 0,
-            'homeQ4points' => 0, 'homeOTpoints' => 0,
+            'visitor_q1_points' => 0, 'visitor_q2_points' => 0, 'visitor_q3_points' => 0,
+            'visitor_q4_points' => 0, 'visitor_ot_points' => 0,
+            'home_q1_points' => 0, 'home_q2_points' => 0, 'home_q3_points' => 0,
+            'home_q4_points' => 0, 'home_ot_points' => 0,
         ]]);
 
         $repository = new BoxscoreRepository($mockDb);

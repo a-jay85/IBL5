@@ -248,7 +248,7 @@ class TeamScheduleServiceTest extends TestCase
     }
 
     /**
-     * @return array{Date: string, BoxID: int, Visitor: int, Home: int, VScore: int, HScore: int}
+     * @return array{game_date: string, box_id: int, visitor_teamid: int, home_teamid: int, visitor_score: int, home_score: int, game_of_that_day: int}
      */
     private function makeGameRow(
         string $date,
@@ -258,12 +258,13 @@ class TeamScheduleServiceTest extends TestCase
         int $hScore,
     ): array {
         return [
-            'Date' => $date,
-            'BoxID' => 1,
-            'Visitor' => $visitor,
-            'Home' => $home,
-            'VScore' => $vScore,
-            'HScore' => $hScore,
+            'game_date' => $date,
+            'box_id' => 1,
+            'visitor_teamid' => $visitor,
+            'home_teamid' => $home,
+            'visitor_score' => $vScore,
+            'home_score' => $hScore,
+            'game_of_that_day' => 0,
         ];
     }
 }

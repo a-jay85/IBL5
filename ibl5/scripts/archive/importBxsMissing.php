@@ -57,7 +57,7 @@ for ($i = 0; $i < 28; $i++) {
     $gameRecordOffsets[] = 66693000 + $i * $BXS_RECORD_SIZE;
 }
 
-// Schedule-derived gameOfThatDay: games appear in schedule order (1-7 per date)
+// Schedule-derived game_of_that_day: games appear in schedule order (1-7 per date)
 // The .bxs record order matches schedule order within each date
 $scheduleOrder = [
     // Dec 7: 7 games
@@ -212,7 +212,7 @@ foreach ($gameRecordOffsets as $offset) {
         continue;
     }
 
-    // Look up gameOfThatDay from schedule
+    // Look up game_of_that_day from schedule
     $matchupKey = $header['visId'] . '-' . $header['homeId'];
     $gameOfDay = $scheduleOrder[$header['date']][$matchupKey] ?? null;
     if ($gameOfDay === null) {
@@ -280,20 +280,20 @@ foreach ($gameRecordOffsets as $offset) {
                 $header['homeId'],
                 0, // attendance
                 0, // capacity
-                0, // visitorWins
-                0, // visitorLosses
-                0, // homeWins
-                0, // homeLosses
-                0, // visitorQ1points
-                0, // visitorQ2points
-                0, // visitorQ3points
-                0, // visitorQ4points
-                0, // visitorOTpoints
-                0, // homeQ1points
-                0, // homeQ2points
-                0, // homeQ3points
-                0, // homeQ4points
-                0, // homeOTpoints
+                0, // visitor_wins
+                0, // visitor_losses
+                0, // home_wins
+                0, // home_losses
+                0, // visitor_q1_points
+                0, // visitor_q2_points
+                0, // visitor_q3_points
+                0, // visitor_q4_points
+                0, // visitor_ot_points
+                0, // home_q1_points
+                0, // home_q2_points
+                0, // home_q3_points
+                0, // home_q4_points
+                0, // home_ot_points
                 $player['fgm'],
                 $player['fga'],
                 $player['ftm'],
@@ -326,10 +326,10 @@ foreach ($gameRecordOffsets as $offset) {
                 $gameOfDay,
                 0, // attendance
                 0, // capacity
-                0, // visitorWins
-                0, // visitorLosses
-                0, // homeWins
-                0, // homeLosses
+                0, // visitor_wins
+                0, // visitor_losses
+                0, // home_wins
+                0, // home_losses
                 $playerTeamID,
                 $player['minutes'],
                 $player['fgm'],

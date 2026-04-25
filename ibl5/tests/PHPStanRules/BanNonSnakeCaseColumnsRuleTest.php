@@ -494,6 +494,181 @@ final class BanNonSnakeCaseColumnsRuleTest extends RuleTestCase
                     . 'Rename to `poll_id`; migration 120 snake-cased nuke_stories.pollID.',
                     98,
                 ],
+                [
+                    'Banned backtick-quoted column reference `gameMIN` in SQL string. '
+                    . 'Rename to `game_min`; migration 121 snake-cased box-score stat columns.',
+                    99,
+                ],
+                [
+                    'Banned backtick-quoted column reference `game2GM` in SQL string. '
+                    . 'Rename to `game_2gm`; migration 121 snake-cased box-score stat columns.',
+                    100,
+                ],
+                [
+                    'Banned backtick-quoted column reference `game2GA` in SQL string. '
+                    . 'Rename to `game_2ga`; migration 121 snake-cased box-score stat columns.',
+                    101,
+                ],
+                [
+                    'Banned backtick-quoted column reference `gameFTM` in SQL string. '
+                    . 'Rename to `game_ftm`; migration 121 snake-cased box-score stat columns.',
+                    102,
+                ],
+                [
+                    'Banned backtick-quoted column reference `gameFTA` in SQL string. '
+                    . 'Rename to `game_fta`; migration 121 snake-cased box-score stat columns.',
+                    103,
+                ],
+                [
+                    'Banned backtick-quoted column reference `game3GM` in SQL string. '
+                    . 'Rename to `game_3gm`; migration 121 snake-cased box-score stat columns.',
+                    104,
+                ],
+                [
+                    'Banned backtick-quoted column reference `game3GA` in SQL string. '
+                    . 'Rename to `game_3ga`; migration 121 snake-cased box-score stat columns.',
+                    105,
+                ],
+                [
+                    'Banned backtick-quoted column reference `gameORB` in SQL string. '
+                    . 'Rename to `game_orb`; migration 121 snake-cased box-score stat columns.',
+                    106,
+                ],
+                [
+                    'Banned backtick-quoted column reference `gameDRB` in SQL string. '
+                    . 'Rename to `game_drb`; migration 121 snake-cased box-score stat columns.',
+                    107,
+                ],
+                [
+                    'Banned backtick-quoted column reference `gameAST` in SQL string. '
+                    . 'Rename to `game_ast`; migration 121 snake-cased box-score stat columns.',
+                    108,
+                ],
+                [
+                    'Banned backtick-quoted column reference `gameSTL` in SQL string. '
+                    . 'Rename to `game_stl`; migration 121 snake-cased box-score stat columns.',
+                    109,
+                ],
+                [
+                    'Banned backtick-quoted column reference `gameTOV` in SQL string. '
+                    . 'Rename to `game_tov`; migration 121 snake-cased box-score stat columns.',
+                    110,
+                ],
+                [
+                    'Banned backtick-quoted column reference `gameBLK` in SQL string. '
+                    . 'Rename to `game_blk`; migration 121 snake-cased box-score stat columns.',
+                    111,
+                ],
+                [
+                    'Banned backtick-quoted column reference `gamePF` in SQL string. '
+                    . 'Rename to `game_pf`; migration 121 snake-cased box-score stat columns.',
+                    112,
+                ],
+                [
+                    'Banned backtick-quoted column reference `gameOfThatDay` in SQL string. '
+                    . 'Rename to `game_of_that_day`; migration 121 snake-cased box-score stat columns.',
+                    113,
+                ],
+                [
+                    'Banned backtick-quoted column reference `visitorWins` in SQL string. '
+                    . 'Rename to `visitor_wins`; migration 121 snake-cased box-score record columns.',
+                    114,
+                ],
+                [
+                    'Banned backtick-quoted column reference `visitorLosses` in SQL string. '
+                    . 'Rename to `visitor_losses`; migration 121 snake-cased box-score record columns.',
+                    115,
+                ],
+                [
+                    'Banned backtick-quoted column reference `visitorQ1points` in SQL string. '
+                    . 'Rename to `visitor_q1_points`; migration 121 snake-cased ibl_box_scores_teams quarter columns.',
+                    116,
+                ],
+                [
+                    'Banned backtick-quoted column reference `visitorQ2points` in SQL string. '
+                    . 'Rename to `visitor_q2_points`; migration 121 snake-cased ibl_box_scores_teams quarter columns.',
+                    117,
+                ],
+                [
+                    'Banned backtick-quoted column reference `visitorQ3points` in SQL string. '
+                    . 'Rename to `visitor_q3_points`; migration 121 snake-cased ibl_box_scores_teams quarter columns.',
+                    118,
+                ],
+                [
+                    'Banned backtick-quoted column reference `visitorQ4points` in SQL string. '
+                    . 'Rename to `visitor_q4_points`; migration 121 snake-cased ibl_box_scores_teams quarter columns.',
+                    119,
+                ],
+                [
+                    'Banned backtick-quoted column reference `visitorOTpoints` in SQL string. '
+                    . 'Rename to `visitor_ot_points`; migration 121 snake-cased ibl_box_scores_teams quarter columns.',
+                    120,
+                ],
+                [
+                    'Banned backtick-quoted column reference `homeQ1points` in SQL string. '
+                    . 'Rename to `home_q1_points`; migration 121 snake-cased ibl_box_scores_teams quarter columns.',
+                    121,
+                ],
+                [
+                    'Banned backtick-quoted column reference `homeQ2points` in SQL string. '
+                    . 'Rename to `home_q2_points`; migration 121 snake-cased ibl_box_scores_teams quarter columns.',
+                    122,
+                ],
+                [
+                    'Banned backtick-quoted column reference `homeQ3points` in SQL string. '
+                    . 'Rename to `home_q3_points`; migration 121 snake-cased ibl_box_scores_teams quarter columns.',
+                    123,
+                ],
+                [
+                    'Banned backtick-quoted column reference `homeQ4points` in SQL string. '
+                    . 'Rename to `home_q4_points`; migration 121 snake-cased ibl_box_scores_teams quarter columns.',
+                    124,
+                ],
+                [
+                    'Banned backtick-quoted column reference `homeOTpoints` in SQL string. '
+                    . 'Rename to `home_ot_points`; migration 121 snake-cased ibl_box_scores_teams quarter columns.',
+                    125,
+                ],
+                [
+                    'Banned backtick-quoted column reference `SchedID` in SQL string. '
+                    . 'Rename to `id`; migration 121 snake-cased ibl_schedule PK.',
+                    126,
+                ],
+                [
+                    'Banned backtick-quoted column reference `BoxID` in SQL string. '
+                    . 'Rename to `box_id`; migration 121 snake-cased ibl_schedule.BoxID.',
+                    127,
+                ],
+                [
+                    'Banned backtick-quoted column reference `VScore` in SQL string. '
+                    . 'Rename to `visitor_score`; migration 121 snake-cased ibl_schedule scores.',
+                    128,
+                ],
+                [
+                    'Banned backtick-quoted column reference `HScore` in SQL string. '
+                    . 'Rename to `home_score`; migration 121 snake-cased ibl_schedule scores.',
+                    129,
+                ],
+                [
+                    'Banned backtick-quoted column reference `Date` in SQL string. '
+                    . 'Rename to `game_date`; migration 121 snake-cased box-score + schedule date column.',
+                    130,
+                ],
+                [
+                    'Banned backtick-quoted column reference `Year` in SQL string. '
+                    . 'Rename to `season_year`; migration 121 snake-cased ibl_schedule.Year.',
+                    131,
+                ],
+                [
+                    'Banned backtick-quoted column reference `Visitor` in SQL string. '
+                    . 'Rename to `visitor_teamid`; migration 121 snake-cased ibl_schedule.Visitor (FK to ibl_team_info).',
+                    132,
+                ],
+                [
+                    'Banned backtick-quoted column reference `Home` in SQL string. '
+                    . 'Rename to `home_teamid`; migration 121 snake-cased ibl_schedule.Home (FK to ibl_team_info).',
+                    133,
+                ],
             ],
         );
     }

@@ -122,7 +122,7 @@ class PlayerStatsRepositoryTest extends TestCase
     public function testGetBoxScoresBetweenDatesReturnsArrayOfBoxScores(): void
     {
         $testData = [
-            ['Date' => '2024-10-01', 'gameMIN' => 30, 'game2GM' => 5, 'game2GA' => 10],
+            ['game_date' => '2024-10-01', 'game_min' => 30, 'game_2gm' => 5, 'game_2ga' => 10],
         ];
         
         $this->mockResult->method('fetch_assoc')

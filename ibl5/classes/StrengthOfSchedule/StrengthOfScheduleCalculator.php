@@ -23,7 +23,7 @@ class StrengthOfScheduleCalculator
     /**
      * Calculate average opponent win percentage from a list of games
      *
-     * @param list<array{Visitor: int, Home: int}> $games Games played or remaining
+     * @param list<array{visitor_teamid: int, home_teamid: int}> $games Games played or remaining
      * @param int $teamId The team to calculate SOS for
      * @param array<int, float> $teamWinPcts Map of team ID → win percentage (0.0-1.0)
      * @return float Average opponent win percentage (0.0-1.0)
@@ -38,7 +38,7 @@ class StrengthOfScheduleCalculator
         $gameCount = count($games);
 
         foreach ($games as $game) {
-            $opponentId = ($game['Visitor'] === $teamId) ? $game['Home'] : $game['Visitor'];
+            $opponentId = ($game['visitor_teamid'] === $teamId) ? $game['home_teamid'] : $game['visitor_teamid'];
             $totalOpponentWinPct += $teamWinPcts[$opponentId] ?? 0.0;
         }
 

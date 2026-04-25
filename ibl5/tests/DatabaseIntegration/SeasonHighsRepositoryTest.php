@@ -49,7 +49,7 @@ class SeasonHighsRepositoryTest extends DatabaseTestCase
         $this->insertTeamBoxscoreRow('2098-01-15', 'Metros', 1, 2, 1);
 
         $result = $this->repo->getSeasonHighs(
-            'bs.gameAST',
+            'bs.game_ast',
             'Assists',
             '_teams',
             '2098-01-01',

@@ -121,12 +121,12 @@ class StandingsRepositoryTest extends DatabaseTestCase
         self::assertNotNull($result);
         self::assertArrayHasKey('pointsScored', $result);
         self::assertArrayHasKey('pointsAllowed', $result);
-        // Offense: from Metros row — game2GM=30, gameFTM=15, game3GM=8
+        // Offense: from Metros row — game_2gm=30, game_ftm=15, game_3gm=8
         // Points = fgm*2 + ftm + tgm*3 = (30+8)*2 + 15 + 8*3 ... wait
-        // Actually: offense VIEW sums game2GM+game3GM as fgm, gameFTM as ftm, game3GM as tgm
+        // Actually: offense VIEW sums game_2gm+game_3gm as fgm, game_ftm as ftm, game_3gm as tgm
         // calculatePoints = fgm*2 + ftm + tgm = (30+8)*2 + 15 + 8*3 is wrong
         // StatsFormatter::calculatePoints(fgm, ftm, tgm) = fgm*2 + ftm + tgm*3
-        // From VIEW: fgm = SUM(game2GM + game3GM) = 30+8 = 38, ftm = 15, tgm = 8
+        // From VIEW: fgm = SUM(game_2gm + game_3gm) = 30+8 = 38, ftm = 15, tgm = 8
         // Points = 38*2 + 15 + 8*3 = 76 + 15 + 24 = 115
         self::assertGreaterThan(0, $result['pointsScored']);
         self::assertGreaterThan(0, $result['pointsAllowed']);
@@ -160,7 +160,7 @@ class StandingsRepositoryTest extends DatabaseTestCase
 
     public function testGetSeriesRecordsReflectsScheduleData(): void
     {
-        // Seed data has schedule row: Year=2025, Visitor=2, VScore=85, Home=1, HScore=104
+        // Seed data has schedule row: Year=2025, Visitor=2, visitor_score=85, Home=1, home_score=104
         // vw_series_records derives from ibl_schedule
         $result = $this->repo->getSeriesRecords();
 

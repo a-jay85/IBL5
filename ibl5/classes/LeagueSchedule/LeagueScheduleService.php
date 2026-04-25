@@ -61,13 +61,13 @@ class LeagueScheduleService implements LeagueScheduleServiceInterface
         $firstUnplayedId = null;
 
         foreach ($rawGames as $row) {
-            $date = $row['Date'];
-            $visitor = $row['Visitor'];
-            $visitorScore = $row['VScore'];
-            $home = $row['Home'];
-            $homeScore = $row['HScore'];
-            $boxid = $row['BoxID'];
-            $gameOfThatDay = $row['gameOfThatDay'];
+            $date = $row['game_date'];
+            $visitor = $row['visitor_teamid'];
+            $visitorScore = $row['visitor_score'];
+            $home = $row['home_teamid'];
+            $homeScore = $row['home_score'];
+            $boxid = $row['box_id'];
+            $gameOfThatDay = $row['game_of_that_day'];
 
             $dateTimestamp = strtotime($date);
             $monthKey = $dateTimestamp !== false ? date('Y-m', $dateTimestamp) : '1970-01';

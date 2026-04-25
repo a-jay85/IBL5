@@ -111,11 +111,11 @@ class BoxscoreTest extends TestCase
 
     public function testGameOfThatDayParsedWithPlusOneOffset(): void
     {
-        // gameOfThatDay code "02" → 2+1 = 3
+        // game_of_that_day code "02" → 2+1 = 3
         $line = $this->makeGameInfoLine(gameOfDayCode: '02');
         $box = Boxscore::withGameInfoLine($line, 2026, 'Regular Season/Playoffs');
 
-        $this->assertSame(3, $box->gameOfThatDay);
+        $this->assertSame(3, $box->game_of_that_day);
     }
 
     public function testAttendanceAndCapacityExtracted(): void
@@ -132,10 +132,10 @@ class BoxscoreTest extends TestCase
         $line = $this->makeGameInfoLine(vWins: '30', vLosses: '10', hWins: '25', hLosses: '15');
         $box = Boxscore::withGameInfoLine($line, 2026, 'Regular Season/Playoffs');
 
-        $this->assertSame('30', $box->visitorWins);
-        $this->assertSame('10', $box->visitorLosses);
-        $this->assertSame('25', $box->homeWins);
-        $this->assertSame('15', $box->homeLosses);
+        $this->assertSame('30', $box->visitor_wins);
+        $this->assertSame('10', $box->visitor_losses);
+        $this->assertSame('25', $box->home_wins);
+        $this->assertSame('15', $box->home_losses);
     }
 
     public function testQuarterScoresExtracted(): void
@@ -146,10 +146,10 @@ class BoxscoreTest extends TestCase
         );
         $box = Boxscore::withGameInfoLine($line, 2026, 'Regular Season/Playoffs');
 
-        $this->assertSame(' 25', $box->visitorQ1points);
-        $this->assertSame(' 30', $box->visitorQ2points);
-        $this->assertSame(' 27', $box->homeQ1points);
-        $this->assertSame('  0', $box->visitorOTpoints);
+        $this->assertSame(' 25', $box->visitor_q1_points);
+        $this->assertSame(' 30', $box->visitor_q2_points);
+        $this->assertSame(' 27', $box->home_q1_points);
+        $this->assertSame('  0', $box->visitor_ot_points);
     }
 
     public function testGameDateAssembledCorrectly(): void
@@ -175,10 +175,10 @@ class BoxscoreTest extends TestCase
         );
 
         $dbRow = [
-            'visitorQ1points' => 25, 'visitorQ2points' => 30,
-            'visitorQ3points' => 22, 'visitorQ4points' => 28, 'visitorOTpoints' => 0,
-            'homeQ1points' => 27, 'homeQ2points' => 24,
-            'homeQ3points' => 31, 'homeQ4points' => 26, 'homeOTpoints' => 0,
+            'visitor_q1_points' => 25, 'visitor_q2_points' => 30,
+            'visitor_q3_points' => 22, 'visitor_q4_points' => 28, 'visitor_ot_points' => 0,
+            'home_q1_points' => 27, 'home_q2_points' => 24,
+            'home_q3_points' => 31, 'home_q4_points' => 26, 'home_ot_points' => 0,
         ];
 
         $this->assertTrue($box->scoresMatchDatabase($dbRow));
@@ -196,10 +196,10 @@ class BoxscoreTest extends TestCase
         );
 
         $dbRow = [
-            'visitorQ1points' => 99, 'visitorQ2points' => 30,
-            'visitorQ3points' => 22, 'visitorQ4points' => 28, 'visitorOTpoints' => 0,
-            'homeQ1points' => 27, 'homeQ2points' => 24,
-            'homeQ3points' => 31, 'homeQ4points' => 26, 'homeOTpoints' => 0,
+            'visitor_q1_points' => 99, 'visitor_q2_points' => 30,
+            'visitor_q3_points' => 22, 'visitor_q4_points' => 28, 'visitor_ot_points' => 0,
+            'home_q1_points' => 27, 'home_q2_points' => 24,
+            'home_q3_points' => 31, 'home_q4_points' => 26, 'home_ot_points' => 0,
         ];
 
         $this->assertFalse($box->scoresMatchDatabase($dbRow));
@@ -217,10 +217,10 @@ class BoxscoreTest extends TestCase
         );
 
         $dbRow = [
-            'visitorQ1points' => 25, 'visitorQ2points' => 30,
-            'visitorQ3points' => 22, 'visitorQ4points' => 28, 'visitorOTpoints' => 0,
-            'homeQ1points' => 27, 'homeQ2points' => 24,
-            'homeQ3points' => 31, 'homeQ4points' => 99, 'homeOTpoints' => 0,
+            'visitor_q1_points' => 25, 'visitor_q2_points' => 30,
+            'visitor_q3_points' => 22, 'visitor_q4_points' => 28, 'visitor_ot_points' => 0,
+            'home_q1_points' => 27, 'home_q2_points' => 24,
+            'home_q3_points' => 31, 'home_q4_points' => 99, 'home_ot_points' => 0,
         ];
 
         $this->assertFalse($box->scoresMatchDatabase($dbRow));
@@ -241,7 +241,7 @@ class BoxscoreTest extends TestCase
         $this->assertSame('2026-02-15', $box->gameDate);
         $this->assertSame(50, $box->visitor_teamid);
         $this->assertSame(51, $box->home_teamid);
-        $this->assertSame(1, $box->gameOfThatDay);
+        $this->assertSame(1, $box->game_of_that_day);
     }
 
     // --- SQL builders ---
@@ -258,10 +258,10 @@ class BoxscoreTest extends TestCase
     {
         $sql = Boxscore::playerInsertSql('ibl_box_scores');
 
-        $this->assertStringContainsString('Date', $sql);
+        $this->assertStringContainsString('game_date', $sql);
         $this->assertStringContainsString('pid', $sql);
-        $this->assertStringContainsString('gameMIN', $sql);
-        $this->assertStringContainsString('gamePF', $sql);
+        $this->assertStringContainsString('game_min', $sql);
+        $this->assertStringContainsString('game_pf', $sql);
     }
 
     public function testTeamInsertSqlContainsTableName(): void
@@ -278,8 +278,8 @@ class BoxscoreTest extends TestCase
 
         $this->assertStringContainsString('visitor_teamid', $sql);
         $this->assertStringContainsString('home_teamid', $sql);
-        $this->assertStringContainsString('visitorQ1points', $sql);
-        $this->assertStringContainsString('homeOTpoints', $sql);
+        $this->assertStringContainsString('visitor_q1_points', $sql);
+        $this->assertStringContainsString('home_ot_points', $sql);
     }
 
     // --- Helper to build fixed-width game info lines ---

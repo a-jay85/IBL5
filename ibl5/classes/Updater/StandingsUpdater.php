@@ -158,7 +158,7 @@ class StandingsUpdater extends \BaseMysqliRepository {
     /**
      * Fetch all played games from schedule table for the current season
      *
-     * @return list<array{Visitor: int, VScore: int, Home: int, HScore: int}>
+     * @return list<array{visitor_teamid: int, visitor_score: int, home_teamid: int, home_score: int}>
      */
     protected function fetchPlayedGames(): array
     {
@@ -167,13 +167,13 @@ class StandingsUpdater extends \BaseMysqliRepository {
         $startDate = $this->season->beginningYear . "-{$month}-01";
         $endDate = $this->season->endingYear . "-05-30";
 
-        /** @var list<array{Visitor: int, VScore: int, Home: int, HScore: int}> */
+        /** @var list<array{visitor_teamid: int, visitor_score: int, home_teamid: int, home_score: int}> */
         return $this->fetchAll(
-            "SELECT Visitor, VScore, Home, HScore
+            "SELECT visitor_teamid, visitor_score, home_teamid, home_score
             FROM {$scheduleTable}
-            WHERE VScore > 0 AND HScore > 0
-            AND Date BETWEEN ? AND ?
-            ORDER BY Date ASC",
+            WHERE visitor_score > 0 AND home_score > 0
+            AND game_date BETWEEN ? AND ?
+            ORDER BY game_date ASC",
             "ss",
             $startDate,
             $endDate
@@ -216,7 +216,7 @@ class StandingsUpdater extends \BaseMysqliRepository {
     /**
      * Tally all game results into per-team standings
      *
-     * @param list<array{Visitor: int, VScore: int, Home: int, HScore: int}> $games
+     * @param list<array{visitor_teamid: int, visitor_score: int, home_teamid: int, home_score: int}> $games
      * @param array<int, TeamStanding> $standings
      * @param array<int, TeamMapping> $teamMap
      * @return array<int, TeamStanding>
@@ -224,8 +224,8 @@ class StandingsUpdater extends \BaseMysqliRepository {
     private function tallyGameResults(array $games, array $standings, array $teamMap): array
     {
         foreach ($games as $game) {
-            $visitorTid = $game['Visitor'];
-            $homeTid = $game['Home'];
+            $visitorTid = $game['visitor_teamid'];
+            $homeTid = $game['home_teamid'];
 
             if (!isset($standings[$visitorTid]) || !isset($standings[$homeTid])) {
                 continue;
@@ -236,7 +236,7 @@ class StandingsUpdater extends \BaseMysqliRepository {
             /** @var TeamStanding $home */
             $home = $standings[$homeTid];
 
-            $visitorWon = $game['VScore'] > $game['HScore'];
+            $visitorWon = $game['visitor_score'] > $game['home_score'];
 
             if ($visitorWon) {
                 $visitor['wins']++;
@@ -677,13 +677,13 @@ class StandingsUpdater extends \BaseMysqliRepository {
             "SELECT
                 COUNT(*) AS total_games,
                 SUM(CASE
-                    WHEN (Visitor = ? AND VScore > HScore) OR (Home = ? AND HScore > VScore) THEN 1
+                    WHEN (visitor_teamid = ? AND visitor_score > home_score) OR (home_teamid = ? AND home_score > visitor_score) THEN 1
                     ELSE 0
                 END) AS team1_wins
             FROM {$scheduleTable}
-            WHERE VScore > 0 AND HScore > 0
-            AND Date BETWEEN ? AND ?
-            AND ((Visitor = ? AND Home = ?) OR (Visitor = ? AND Home = ?))",
+            WHERE visitor_score > 0 AND home_score > 0
+            AND game_date BETWEEN ? AND ?
+            AND ((visitor_teamid = ? AND home_teamid = ?) OR (visitor_teamid = ? AND home_teamid = ?))",
             "iissiiii",
             $tid1, $tid1,
             $startDate, $endDate,

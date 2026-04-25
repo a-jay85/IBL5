@@ -50,8 +50,8 @@ final class RecordHoldersRepositoryTest extends IntegrationTestCase
 
         $this->repository->getTopTeamHalfScore('first', 'DESC');
 
-        $this->assertQueryExecuted('Q1points');
-        $this->assertQueryExecuted('Q2points');
+        $this->assertQueryExecuted('q1_points');
+        $this->assertQueryExecuted('q2_points');
     }
 
     public function testGetBestWorstSeasonRecordQueriesWinLoss(): void
@@ -120,13 +120,13 @@ final class RecordHoldersRepositoryTest extends IntegrationTestCase
         $this->mockDb->setMockData([]);
 
         $expressions = [
-            'points' => '(bs.game2GM * 2 + bs.gameFTM + bs.game3GM * 3)',
-            'rebounds' => '(bs.gameORB + bs.gameDRB)',
+            'points' => '(bs.game_2gm * 2 + bs.game_ftm + bs.game_3gm * 3)',
+            'rebounds' => '(bs.game_orb + bs.game_drb)',
         ];
 
         $result = $this->repository->getTopPlayerSingleGameBatch(
             $expressions,
-            'MONTH(bs.Date) IN (11, 12, 1, 2, 3, 4, 5)'
+            'MONTH(bs.game_date) IN (11, 12, 1, 2, 3, 4, 5)'
         );
 
         $this->assertQueryExecuted('UNION ALL');
@@ -151,8 +151,8 @@ final class RecordHoldersRepositoryTest extends IntegrationTestCase
                 'teamid' => 14,
                 'team_name' => 'Timberwolves',
                 'date' => '1996-01-16',
-                'BoxID' => 0,
-                'gameOfThatDay' => 0,
+                'box_id' => 0,
+                'game_of_that_day' => 0,
                 'oppTid' => 20,
                 'opp_team_name' => 'Grizzlies',
                 'value' => 80,
@@ -164,8 +164,8 @@ final class RecordHoldersRepositoryTest extends IntegrationTestCase
                 'teamid' => 1,
                 'team_name' => 'Celtics',
                 'date' => '1995-02-10',
-                'BoxID' => 5,
-                'gameOfThatDay' => 0,
+                'box_id' => 5,
+                'game_of_that_day' => 0,
                 'oppTid' => 2,
                 'opp_team_name' => 'Heat',
                 'value' => 30,
@@ -188,8 +188,8 @@ final class RecordHoldersRepositoryTest extends IntegrationTestCase
         $this->mockDb->setMockData([]);
 
         $expressions = [
-            'points' => ['expression' => '(bs.game2GM * 2 + bs.gameFTM + bs.game3GM * 3)', 'order' => 'DESC'],
-            'fewest' => ['expression' => '(bs.game2GM * 2 + bs.gameFTM + bs.game3GM * 3)', 'order' => 'ASC'],
+            'points' => ['expression' => '(bs.game_2gm * 2 + bs.game_ftm + bs.game_3gm * 3)', 'order' => 'DESC'],
+            'fewest' => ['expression' => '(bs.game_2gm * 2 + bs.game_ftm + bs.game_3gm * 3)', 'order' => 'ASC'],
         ];
 
         $result = $this->repository->getTopTeamSingleGameBatch($expressions, '1=1');

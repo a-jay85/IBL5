@@ -287,9 +287,9 @@ class StandingsRepository extends \BaseMysqliRepository implements StandingsRepo
     private static function buildOffenseSubquery(string $filterClause): string
     {
         return "SELECT fs.franchise_id AS teamid, fs.team_name AS name, bst.season_year,
-            CAST(SUM(bst.game2GM + bst.game3GM) AS SIGNED) AS fgm,
-            CAST(SUM(bst.gameFTM) AS SIGNED) AS ftm,
-            CAST(SUM(bst.game3GM) AS SIGNED) AS tgm
+            CAST(SUM(bst.game_2gm + bst.game_3gm) AS SIGNED) AS fgm,
+            CAST(SUM(bst.game_ftm) AS SIGNED) AS ftm,
+            CAST(SUM(bst.game_3gm) AS SIGNED) AS tgm
         FROM ibl_box_scores_teams bst
         JOIN ibl_franchise_seasons fs
             ON fs.team_name = bst.name AND fs.season_ending_year = bst.season_year
@@ -303,15 +303,15 @@ class StandingsRepository extends \BaseMysqliRepository implements StandingsRepo
     private static function buildDefenseSubquery(string $filterClause): string
     {
         return "SELECT fs.franchise_id AS teamid, fs.team_name AS name, my.season_year,
-            CAST(SUM(opp.game2GM + opp.game3GM) AS SIGNED) AS fgm,
-            CAST(SUM(opp.gameFTM) AS SIGNED) AS ftm,
-            CAST(SUM(opp.game3GM) AS SIGNED) AS tgm
+            CAST(SUM(opp.game_2gm + opp.game_3gm) AS SIGNED) AS fgm,
+            CAST(SUM(opp.game_ftm) AS SIGNED) AS ftm,
+            CAST(SUM(opp.game_3gm) AS SIGNED) AS tgm
         FROM ibl_box_scores_teams my
         JOIN ibl_box_scores_teams opp
-            ON my.Date = opp.Date
+            ON my.game_date = opp.game_date
             AND my.visitor_teamid = opp.visitor_teamid
             AND my.home_teamid = opp.home_teamid
-            AND my.gameOfThatDay = opp.gameOfThatDay
+            AND my.game_of_that_day = opp.game_of_that_day
             AND my.name <> opp.name
         JOIN ibl_franchise_seasons fs
             ON fs.team_name = my.name AND fs.season_ending_year = my.season_year

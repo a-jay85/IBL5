@@ -31,31 +31,31 @@ class PlrBoxScoreRepository extends \BaseMysqliRepository implements PlrBoxScore
      */
     public function sumStatsByGameTypeThroughDate(int $seasonYear, int $gameType, string $endDate): array
     {
-        // `gp` counts only games where the player actually played (gameMIN > 0).
-        // Box scores include DNP rows (gameMIN = 0) for roster players who didn't suit up;
+        // `gp` counts only games where the player actually played (game_min > 0).
+        // Box scores include DNP rows (game_min = 0) for roster players who didn't suit up;
         // those don't count toward seasonGamesPlayed in the .plr file.
         $sql = "
             SELECT
                 pid,
-                SUM(CASE WHEN gameMIN > 0 THEN 1 ELSE 0 END) AS gp,
-                SUM(gameMIN) AS min,
-                SUM(game2GM) AS two_gm,
-                SUM(game2GA) AS two_ga,
-                SUM(gameFTM) AS ftm,
-                SUM(gameFTA) AS fta,
-                SUM(game3GM) AS three_gm,
-                SUM(game3GA) AS three_ga,
-                SUM(gameORB) AS orb,
-                SUM(gameDRB) AS drb,
-                SUM(gameAST) AS ast,
-                SUM(gameSTL) AS stl,
-                SUM(gameTOV) AS tov,
-                SUM(gameBLK) AS blk,
-                SUM(gamePF) AS pf
+                SUM(CASE WHEN game_min > 0 THEN 1 ELSE 0 END) AS gp,
+                SUM(game_min) AS min,
+                SUM(game_2gm) AS two_gm,
+                SUM(game_2ga) AS two_ga,
+                SUM(game_ftm) AS ftm,
+                SUM(game_fta) AS fta,
+                SUM(game_3gm) AS three_gm,
+                SUM(game_3ga) AS three_ga,
+                SUM(game_orb) AS orb,
+                SUM(game_drb) AS drb,
+                SUM(game_ast) AS ast,
+                SUM(game_stl) AS stl,
+                SUM(game_tov) AS tov,
+                SUM(game_blk) AS blk,
+                SUM(game_pf) AS pf
             FROM {$this->boxScoresTable}
             WHERE season_year = ?
               AND game_type = ?
-              AND Date <= ?
+              AND game_date <= ?
               AND pid IS NOT NULL
             GROUP BY pid
         ";
@@ -93,35 +93,35 @@ class PlrBoxScoreRepository extends \BaseMysqliRepository implements PlrBoxScore
     public function getSingleGameMaximumsThroughDate(int $seasonYear, int $gameType, string $endDate): array
     {
         // Double-double = exactly 2 of {pts>=10, reb>=10, ast>=10, stl>=10, blk>=10}.
-        // Triple+ = 3 or more. DNP rows excluded via gameMIN > 0.
+        // Triple+ = 3 or more. DNP rows excluded via game_min > 0.
         $sql = "
             SELECT
                 pid,
                 MAX(calc_points) AS high_pts,
                 MAX(calc_rebounds) AS high_reb,
-                MAX(gameAST) AS high_ast,
-                MAX(gameSTL) AS high_stl,
-                MAX(gameBLK) AS high_blk,
+                MAX(game_ast) AS high_ast,
+                MAX(game_stl) AS high_stl,
+                MAX(game_blk) AS high_blk,
                 SUM(CASE WHEN (
                     (calc_points >= 10)
                     + (calc_rebounds >= 10)
-                    + (gameAST >= 10)
-                    + (gameSTL >= 10)
-                    + (gameBLK >= 10)
+                    + (game_ast >= 10)
+                    + (game_stl >= 10)
+                    + (game_blk >= 10)
                 ) = 2 THEN 1 ELSE 0 END) AS doubles,
                 SUM(CASE WHEN (
                     (calc_points >= 10)
                     + (calc_rebounds >= 10)
-                    + (gameAST >= 10)
-                    + (gameSTL >= 10)
-                    + (gameBLK >= 10)
+                    + (game_ast >= 10)
+                    + (game_stl >= 10)
+                    + (game_blk >= 10)
                 ) >= 3 THEN 1 ELSE 0 END) AS triples
             FROM {$this->boxScoresTable}
             WHERE season_year = ?
               AND game_type = ?
-              AND Date <= ?
+              AND game_date <= ?
               AND pid IS NOT NULL
-              AND gameMIN > 0
+              AND game_min > 0
             GROUP BY pid
         ";
 
@@ -151,7 +151,7 @@ class PlrBoxScoreRepository extends \BaseMysqliRepository implements PlrBoxScore
     {
         /** @var array{last_date: string|null}|null $row */
         $row = $this->fetchOne(
-            "SELECT MAX(Date) AS last_date FROM {$this->boxScoresTable} WHERE season_year = ? AND game_type = ?",
+            "SELECT MAX(game_date) AS last_date FROM {$this->boxScoresTable} WHERE season_year = ? AND game_type = ?",
             'ii',
             $seasonYear,
             $gameType,
@@ -169,26 +169,26 @@ class PlrBoxScoreRepository extends \BaseMysqliRepository implements PlrBoxScore
     {
         $sql = "
             SELECT
-                Date AS date,
-                SUM(CASE WHEN gameMIN > 0 THEN 1 ELSE 0 END) AS gp,
-                SUM(gameMIN) AS min,
-                SUM(game2GM) AS two_gm,
-                SUM(game2GA) AS two_ga,
-                SUM(gameFTM) AS ftm,
-                SUM(gameFTA) AS fta,
-                SUM(game3GM) AS three_gm,
-                SUM(game3GA) AS three_ga,
-                SUM(gameORB) AS orb,
-                SUM(gameDRB) AS drb,
-                SUM(gameAST) AS ast,
-                SUM(gameSTL) AS stl,
-                SUM(gameTOV) AS tov,
-                SUM(gameBLK) AS blk,
-                SUM(gamePF) AS pf
+                game_date AS date,
+                SUM(CASE WHEN game_min > 0 THEN 1 ELSE 0 END) AS gp,
+                SUM(game_min) AS min,
+                SUM(game_2gm) AS two_gm,
+                SUM(game_2ga) AS two_ga,
+                SUM(game_ftm) AS ftm,
+                SUM(game_fta) AS fta,
+                SUM(game_3gm) AS three_gm,
+                SUM(game_3ga) AS three_ga,
+                SUM(game_orb) AS orb,
+                SUM(game_drb) AS drb,
+                SUM(game_ast) AS ast,
+                SUM(game_stl) AS stl,
+                SUM(game_tov) AS tov,
+                SUM(game_blk) AS blk,
+                SUM(game_pf) AS pf
             FROM {$this->boxScoresTable}
             WHERE pid = ? AND season_year = ? AND game_type = 1
-            GROUP BY Date
-            ORDER BY Date
+            GROUP BY game_date
+            ORDER BY game_date
         ";
 
         /** @var list<array{date: string, gp: int|null, min: int|null, two_gm: int|null, two_ga: int|null, ftm: int|null, fta: int|null, three_gm: int|null, three_ga: int|null, orb: int|null, drb: int|null, ast: int|null, stl: int|null, tov: int|null, blk: int|null, pf: int|null}> $rows */
@@ -254,40 +254,40 @@ class PlrBoxScoreRepository extends \BaseMysqliRepository implements PlrBoxScore
             WITH ranked AS (
                 SELECT *,
                     ROW_NUMBER() OVER (
-                        PARTITION BY Date, gameOfThatDay, visitor_teamid, home_teamid
+                        PARTITION BY game_date, game_of_that_day, visitor_teamid, home_teamid
                         ORDER BY id
                     ) AS rn
                 FROM {$this->boxScoresTeamsTable}
                 WHERE season_year = ?
                   AND game_type = ?
-                  AND Date <= ?
+                  AND game_date <= ?
             )
             SELECT
                 team_id,
                 COUNT(*) AS gp,
                 COUNT(*) AS gpAlt,
-                SUM(game2GM) AS twoGM,
-                SUM(game2GA) AS twoGA,
-                SUM(gameFTM) AS ftm,
-                SUM(gameFTA) AS fta,
-                SUM(game3GM) AS threeGM,
-                SUM(game3GA) AS threeGA,
-                SUM(gameORB) AS orb,
-                SUM(gameDRB) AS drb,
-                SUM(gameAST) AS ast,
-                SUM(gameSTL) AS stl,
-                SUM(gameTOV) AS tov,
-                SUM(gameBLK) AS blk,
-                SUM(gamePF) AS pf
+                SUM(game_2gm) AS twoGM,
+                SUM(game_2ga) AS twoGA,
+                SUM(game_ftm) AS ftm,
+                SUM(game_fta) AS fta,
+                SUM(game_3gm) AS threeGM,
+                SUM(game_3ga) AS threeGA,
+                SUM(game_orb) AS orb,
+                SUM(game_drb) AS drb,
+                SUM(game_ast) AS ast,
+                SUM(game_stl) AS stl,
+                SUM(game_tov) AS tov,
+                SUM(game_blk) AS blk,
+                SUM(game_pf) AS pf
             FROM (
                 SELECT visitor_teamid AS team_id,
-                       game2GM, game2GA, gameFTM, gameFTA, game3GM, game3GA,
-                       gameORB, gameDRB, gameAST, gameSTL, gameTOV, gameBLK, gamePF
+                       game_2gm, game_2ga, game_ftm, game_fta, game_3gm, game_3ga,
+                       game_orb, game_drb, game_ast, game_stl, game_tov, game_blk, game_pf
                 FROM ranked WHERE rn = 1
                 UNION ALL
                 SELECT home_teamid AS team_id,
-                       game2GM, game2GA, gameFTM, gameFTA, game3GM, game3GA,
-                       gameORB, gameDRB, gameAST, gameSTL, gameTOV, gameBLK, gamePF
+                       game_2gm, game_2ga, game_ftm, game_fta, game_3gm, game_3ga,
+                       game_orb, game_drb, game_ast, game_stl, game_tov, game_blk, game_pf
                 FROM ranked WHERE rn = 2
             ) AS team_stats
             GROUP BY team_id

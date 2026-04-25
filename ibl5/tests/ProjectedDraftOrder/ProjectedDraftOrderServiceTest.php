@@ -138,9 +138,9 @@ class ProjectedDraftOrderServiceTest extends TestCase
         $standings = $this->buildTiedStandings();
         $games = [
             // TeamA beats TeamB twice, TeamB beats TeamA once
-            ['Visitor' => 101, 'VScore' => 100, 'Home' => 102, 'HScore' => 90],
-            ['Visitor' => 101, 'VScore' => 95, 'Home' => 102, 'HScore' => 88],
-            ['Visitor' => 102, 'VScore' => 105, 'Home' => 101, 'HScore' => 100],
+            ['visitor_teamid' => 101, 'visitor_score' => 100, 'home_teamid' => 102, 'home_score' => 90],
+            ['visitor_teamid' => 101, 'visitor_score' => 95, 'home_teamid' => 102, 'home_score' => 88],
+            ['visitor_teamid' => 102, 'visitor_score' => 105, 'home_teamid' => 101, 'home_score' => 100],
         ];
 
         $this->stubRepository->method('getAllTeamsWithStandings')->willReturn($standings);
@@ -346,7 +346,7 @@ class ProjectedDraftOrderServiceTest extends TestCase
         $standings = $this->buildTiedPlayoffTeams();
         $games = [
             // PlayoffA beats PlayoffB
-            ['Visitor' => 201, 'VScore' => 100, 'Home' => 202, 'HScore' => 90],
+            ['visitor_teamid' => 201, 'visitor_score' => 100, 'home_teamid' => 202, 'home_score' => 90],
         ];
 
         $this->stubRepository->method('getAllTeamsWithStandings')->willReturn($standings);
@@ -387,20 +387,20 @@ class ProjectedDraftOrderServiceTest extends TestCase
         $standings = $this->buildThreeWayTiedStandings();
         $games = [
             // Team A (301) vs Team B (302): A wins 1, B wins 4
-            ['Visitor' => 301, 'VScore' => 100, 'Home' => 302, 'HScore' => 90],
-            ['Visitor' => 302, 'VScore' => 100, 'Home' => 301, 'HScore' => 90],
-            ['Visitor' => 302, 'VScore' => 100, 'Home' => 301, 'HScore' => 90],
-            ['Visitor' => 302, 'VScore' => 100, 'Home' => 301, 'HScore' => 90],
-            ['Visitor' => 302, 'VScore' => 100, 'Home' => 301, 'HScore' => 90],
+            ['visitor_teamid' => 301, 'visitor_score' => 100, 'home_teamid' => 302, 'home_score' => 90],
+            ['visitor_teamid' => 302, 'visitor_score' => 100, 'home_teamid' => 301, 'home_score' => 90],
+            ['visitor_teamid' => 302, 'visitor_score' => 100, 'home_teamid' => 301, 'home_score' => 90],
+            ['visitor_teamid' => 302, 'visitor_score' => 100, 'home_teamid' => 301, 'home_score' => 90],
+            ['visitor_teamid' => 302, 'visitor_score' => 100, 'home_teamid' => 301, 'home_score' => 90],
             // Team A (301) vs Team C (303): A wins 1, C wins 2
-            ['Visitor' => 301, 'VScore' => 100, 'Home' => 303, 'HScore' => 90],
-            ['Visitor' => 303, 'VScore' => 100, 'Home' => 301, 'HScore' => 90],
-            ['Visitor' => 303, 'VScore' => 100, 'Home' => 301, 'HScore' => 90],
+            ['visitor_teamid' => 301, 'visitor_score' => 100, 'home_teamid' => 303, 'home_score' => 90],
+            ['visitor_teamid' => 303, 'visitor_score' => 100, 'home_teamid' => 301, 'home_score' => 90],
+            ['visitor_teamid' => 303, 'visitor_score' => 100, 'home_teamid' => 301, 'home_score' => 90],
             // Team B (302) vs Team C (303): B wins 2, C wins 2
-            ['Visitor' => 302, 'VScore' => 100, 'Home' => 303, 'HScore' => 90],
-            ['Visitor' => 302, 'VScore' => 100, 'Home' => 303, 'HScore' => 90],
-            ['Visitor' => 303, 'VScore' => 100, 'Home' => 302, 'HScore' => 90],
-            ['Visitor' => 303, 'VScore' => 100, 'Home' => 302, 'HScore' => 90],
+            ['visitor_teamid' => 302, 'visitor_score' => 100, 'home_teamid' => 303, 'home_score' => 90],
+            ['visitor_teamid' => 302, 'visitor_score' => 100, 'home_teamid' => 303, 'home_score' => 90],
+            ['visitor_teamid' => 303, 'visitor_score' => 100, 'home_teamid' => 302, 'home_score' => 90],
+            ['visitor_teamid' => 303, 'visitor_score' => 100, 'home_teamid' => 302, 'home_score' => 90],
         ];
 
         // Aggregate H2H:

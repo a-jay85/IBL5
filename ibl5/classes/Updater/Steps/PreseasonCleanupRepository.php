@@ -35,7 +35,7 @@ final class PreseasonCleanupRepository extends \BaseMysqliRepository
 
         /** @var array{cnt: int}|null $row */
         $row = $this->fetchOne(
-            "SELECT COUNT(*) AS cnt FROM {$boxScoresTable} WHERE Date BETWEEN ? AND ?",
+            "SELECT COUNT(*) AS cnt FROM {$boxScoresTable} WHERE game_date BETWEEN ? AND ?",
             "ss",
             $startDate,
             $endDate,

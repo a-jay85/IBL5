@@ -180,6 +180,13 @@ try {
 
     $updaterService->addStep(new Updater\Steps\ParsePlayerFileStep($plrService, $defaultPlrPath));
 
+    // IBL-only: clean preseason data on first Regular Season sim
+    if (!$isOlympics) {
+        $updaterService->addStep(new Updater\Steps\CleanupPreseasonDataStep(
+            $boxscoreRepo, $season, $mysqli_db, $leagueContext,
+        ));
+    }
+
     $updaterService->addStep(new Updater\Steps\UpdateScheduleStep($scheduleUpdater));
     $updaterService->addStep(new Updater\Steps\UpdateStandingsStep($standingsUpdater));
     $updaterService->addStep(new Updater\Steps\UpdatePowerRankingsStep($powerRankingsUpdater));

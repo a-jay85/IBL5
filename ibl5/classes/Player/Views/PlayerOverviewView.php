@@ -56,8 +56,8 @@ class PlayerOverviewView implements PlayerOverviewViewInterface
     ): string {
         // Calculate date range based on season phase
         if ($season->phase === "Preseason") {
-            $startDate = Season::IBL_PRESEASON_YEAR . "-" . Season::IBL_REGULAR_SEASON_STARTING_MONTH . "-01";
-            $endDate = (Season::IBL_PRESEASON_YEAR + 1) . "-07-01";
+            $startDate = $season->beginningYear . "-" . Season::IBL_REGULAR_SEASON_STARTING_MONTH . "-01";
+            $endDate = $season->endingYear . "-07-01";
         } elseif ($season->phase === "HEAT") {
             $startDate = $season->beginningYear . "-" . Season::IBL_HEAT_MONTH . "-01";
             $endDate = $season->endingYear . "-07-01";

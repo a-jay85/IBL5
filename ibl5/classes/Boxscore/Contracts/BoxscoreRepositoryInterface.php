@@ -16,12 +16,13 @@ interface BoxscoreRepositoryInterface
     /**
      * Delete preseason boxscores for both players and teams
      *
-     * Removes all boxscore records from November (preseason month)
-     * of the preseason year (9998).
+     * Removes all boxscore records from November through December
+     * of the given season beginning year.
      *
+     * @param int $seasonBeginningYear The year the season starts (e.g., 2024 for 2024-25 season)
      * @return bool True if both deletions succeeded, false otherwise
      */
-    public function deletePreseasonBoxScores(): bool;
+    public function deletePreseasonBoxScores(int $seasonBeginningYear): bool;
 
     /**
      * Delete H.E.A.T. tournament boxscores for both players and teams

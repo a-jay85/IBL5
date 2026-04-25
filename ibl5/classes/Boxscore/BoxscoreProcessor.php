@@ -104,6 +104,11 @@ class BoxscoreProcessor implements BoxscoreProcessorInterface
                 }
                 $linesProcessed += $gameLinesProcessed;
             }
+
+            $totalGames = $gamesInserted + $gamesUpdated + $gamesSkipped;
+            if ($totalGames % 50 === 0) {
+                flush();
+            }
         }
 
         fclose($scoFile);

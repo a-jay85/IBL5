@@ -43,7 +43,7 @@ class BoxscoreRepositoryTest extends TestCase
     {
         $this->mockDb->setReturnTrue(true);
 
-        $result = $this->repository->deletePreseasonBoxScores();
+        $result = $this->repository->deletePreseasonBoxScores(2025);
 
         $this->assertTrue($result);
         $queries = $this->mockDb->getExecutedQueries();
@@ -56,12 +56,11 @@ class BoxscoreRepositoryTest extends TestCase
     {
         $this->mockDb->setReturnTrue(true);
 
-        $this->repository->deletePreseasonBoxScores();
+        $this->repository->deletePreseasonBoxScores(2025);
 
         $queries = $this->mockDb->getExecutedQueries();
-        // Preseason year is 9998, November dates
-        $this->assertStringContainsString('9998-11-01', $queries[0]);
-        $this->assertStringContainsString('9998-11-30', $queries[0]);
+        $this->assertStringContainsString('2025-11-01', $queries[0]);
+        $this->assertStringContainsString('2025-12-31', $queries[0]);
     }
 
     public function testDeleteHeatBoxScoresUsesCorrectDateRange(): void
@@ -95,7 +94,7 @@ class BoxscoreRepositoryTest extends TestCase
         ini_set('error_log', '/dev/null');
 
         $this->expectException(\RuntimeException::class);
-        $this->repository->deletePreseasonBoxScores();
+        $this->repository->deletePreseasonBoxScores(2025);
     }
 
     public function testInsertTeamBoxscoreExecutesInsertQuery(): void
@@ -209,7 +208,7 @@ class BoxscoreRepositoryTest extends TestCase
         $repo = new BoxscoreRepository($this->mockDb, $leagueContext);
         $this->mockDb->setReturnTrue(true);
 
-        $repo->deletePreseasonBoxScores();
+        $repo->deletePreseasonBoxScores(2025);
 
         $queries = $this->mockDb->getExecutedQueries();
         $this->assertCount(2, $queries);

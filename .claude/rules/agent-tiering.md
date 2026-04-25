@@ -1,6 +1,6 @@
 ---
-description: Agent model tiering rules — match sub-agent model to task difficulty
-last_verified: 2026-04-23
+description: Sub-agent decision rules — when to spawn, when to skip, and which model to pick
+last_verified: 2026-04-25
 ---
 
 # Agent Tiering
@@ -12,6 +12,23 @@ When spawning sub-agents or writing plans that will spawn them, always tier by t
 The dividing line between Haiku and Sonnet is **synthesis**. Haiku reliably runs commands, matches patterns against checklists, and formats structured output. Sonnet is needed when the agent must judge whether two things are semantically related — connecting a past commit to the current change's collision zone, deciding whether a docstring's intent matches renamed code, or tracing how data flows across multiple files.
 
 Haiku's specific failure mode: it produces confident, well-structured "all clean" results while missing issues that require connecting dots across files. A scoring filter catches Haiku's false positives but cannot recover its misses.
+
+## Skip the Agent — Direct Tool Calls
+
+Every sub-agent pays a fixed context overhead: system prompt, CLAUDE.md, rules, and memory (~3-5K tokens depending on path-conditional loading) are loaded before the agent reads its prompt. This overhead is justified when the agent absorbs verbose output, runs in parallel, or needs multi-step reasoning. It is not justified for a single short-output command.
+
+**Run it directly (no agent) when ALL of these are true:**
+- The task is a single command or tool call (one bash invocation, one file read)
+- The expected output is short (under ~50 lines)
+- No other agents need to run in parallel at the same time
+- The output won't persist in context across many subsequent turns
+
+**Still spawn an agent when ANY of these are true:**
+- Output is verbose (test suites, PHPStan, large grep results) — the agent absorbs it and returns a summary, keeping Opus's context clean
+- Multiple independent tasks can run concurrently — parallelism saves wall-clock time
+- The task involves multiple sequential tool calls (run command, read file, run another command)
+
+The context-window cost compounds: every token of verbose output in Opus's context is re-sent on every subsequent turn. A Haiku agent that absorbs 500 lines and returns a 10-line summary saves Opus-rate tokens for the rest of the conversation.
 
 ## Tiers
 
@@ -51,22 +68,7 @@ Choose the tier per prompt — do not default all Explore agents to one tier:
 
 ## Post-Plan Agents
 
-See `/post-plan` SKILL.md for authoritative model assignments. Summary:
-
-**Haiku** — pattern-match or command-report tasks:
-- Phase 5B Agent 4 (Previous PRs) — mechanical `gh search/view` lookup
-- Phase 5C Security agents (SQLi, CSRF, Auth) — explicit vulnerable/secure pattern tables
-- Phase 5D Scoring agent — numeric rubric application
-- Phase 6 Agent 1 (PHPUnit+PHPStan) — runs commands, reports output
-- Phase 6 Agent 2 (E2E Playwright) — runs commands, reports output
-
-**Sonnet** — synthesis-dependent tasks:
-- Phase 5B Agent 1 (Architectural fitness) — judges R/S/V fit, dependency direction
-- Phase 5B Agent 2 (Bug detection) — connects schema types to PHP comparisons
-- Phase 5B Agent 3 (Git history) — must judge whether a past commit's context overlaps the current change
-- Phase 5B Agent 5 (Code comments) — semantic compliance with docstring intent
-- Phase 5B Agent 6 (Database performance) — interprets query behavior in context
-- Phase 7 (Manual testing review) — category judgment
+See `/post-plan` SKILL.md for authoritative model assignments per phase.
 
 ## In Plans
 

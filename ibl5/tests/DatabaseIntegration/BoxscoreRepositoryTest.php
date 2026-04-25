@@ -101,14 +101,13 @@ class BoxscoreRepositoryTest extends DatabaseTestCase
 
     public function testDeletePreseasonBoxScoresRemovesOnlyPreseason(): void
     {
-        // Preseason uses year 9998, month 11
-        $this->insertTeamBoxscoreRow('9998-11-15', 'Metros', 1, 2, 1);
-        // Regular season boxscore should not be deleted
+        $this->insertTeamBoxscoreRow('2024-11-15', 'Metros', 1, 2, 1);
+        // Regular season boxscore (Jan) should not be deleted
         $this->insertTeamBoxscoreRow('2025-01-15', 'Metros', 1, 2, 1);
 
-        $this->repo->deletePreseasonBoxScores();
+        $this->repo->deletePreseasonBoxScores(2024);
 
-        $preseason = $this->repo->findTeamBoxscore('9998-11-15', 2, 1, 1);
+        $preseason = $this->repo->findTeamBoxscore('2024-11-15', 2, 1, 1);
         self::assertNull($preseason);
 
         $regular = $this->repo->findTeamBoxscore('2025-01-15', 2, 1, 1);

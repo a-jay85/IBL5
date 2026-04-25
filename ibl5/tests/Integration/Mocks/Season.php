@@ -28,7 +28,6 @@ class Season
     public ?string $lastRegularSeasonGameDate = null;
     public int $simLengthInDays = 7;
 
-    const IBL_PRESEASON_YEAR = 9998;
     const IBL_OLYMPICS_MONTH = 8;
     const IBL_HEAT_MONTH = 10;
     const IBL_REGULAR_SEASON_STARTING_MONTH = 11;

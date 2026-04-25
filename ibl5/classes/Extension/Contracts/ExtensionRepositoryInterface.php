@@ -23,7 +23,7 @@ interface ExtensionRepositoryInterface
      *
      * @param string $playerName Player name for lookup
      * @param ExtensionOffer $offer Offer array with yearly salary amounts in thousands
-     * @param int $currentSalary Player's current year salary (becomes cy1)
+     * @param int $currentSalary Player's current year salary (becomes salary_yr1)
      * @return bool True if update succeeded, false on database error
      */
     public function updatePlayerContract(string $playerName, array $offer, int $currentSalary): bool;

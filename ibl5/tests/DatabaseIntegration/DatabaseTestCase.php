@@ -223,8 +223,8 @@ abstract class DatabaseTestCase extends TestCase
             'bird' => 3,
             'cy' => 1,
             'cyt' => 3,
-            'cy1' => 1500,
-            'cy2' => 1600,
+            'salary_yr1' => 1500,
+            'salary_yr2' => 1600,
             'retired' => 0,
             'ordinal' => 1,
             'droptime' => 0,
@@ -440,7 +440,7 @@ abstract class DatabaseTestCase extends TestCase
     /**
      * Insert a row into ibl_trade_cash (offer-based pattern).
      *
-     * @param array{cy1?: int, cy2?: int, cy3?: int, cy4?: int, cy5?: int, cy6?: int} $years
+     * @param array{salary_yr1?: int, salary_yr2?: int, salary_yr3?: int, salary_yr4?: int, salary_yr5?: int, salary_yr6?: int} $years
      */
     protected function insertTradeCashRow(int $offerId, string $sending, string $receiving, array $years = []): void
     {
@@ -448,12 +448,12 @@ abstract class DatabaseTestCase extends TestCase
             'tradeOfferID' => $offerId,
             'sendingTeam' => $sending,
             'receivingTeam' => $receiving,
-            'cy1' => $years['cy1'] ?? 0,
-            'cy2' => $years['cy2'] ?? 0,
-            'cy3' => $years['cy3'] ?? 0,
-            'cy4' => $years['cy4'] ?? 0,
-            'cy5' => $years['cy5'] ?? 0,
-            'cy6' => $years['cy6'] ?? 0,
+            'salary_yr1' => $years['salary_yr1'] ?? 0,
+            'salary_yr2' => $years['salary_yr2'] ?? 0,
+            'salary_yr3' => $years['salary_yr3'] ?? 0,
+            'salary_yr4' => $years['salary_yr4'] ?? 0,
+            'salary_yr5' => $years['salary_yr5'] ?? 0,
+            'salary_yr6' => $years['salary_yr6'] ?? 0,
         ]);
     }
 

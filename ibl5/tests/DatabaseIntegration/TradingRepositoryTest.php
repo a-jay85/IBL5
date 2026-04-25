@@ -197,27 +197,27 @@ class TradingRepositoryTest extends DatabaseTestCase
 
     public function testGetTeamPlayerCountOffseasonExcludesExpired(): void
     {
-        // Player with cy=1, cyt=1 — next year is cy+1=2, cy2=0 → expired
+        // Player with cy=1, cyt=1 — next year is cy+1=2, salary_yr2=0 → expired
         $this->insertTestPlayer(200030107, 'Trade Expired', [
             'teamid' => 4,
             'ordinal' => 100,
             'cy' => 1,
             'cyt' => 1,
-            'cy1' => 1500,
-            'cy2' => 0,
+            'salary_yr1' => 1500,
+            'salary_yr2' => 0,
         ]);
 
         $baseline = $this->formRepo->getTeamPlayerCount(4, true);
 
-        // The expired player should not be counted (cy2=0 means no salary next year)
+        // The expired player should not be counted (salary_yr2=0 means no salary next year)
         // Insert a non-expired player for comparison
         $this->insertTestPlayer(200030108, 'Trade Active', [
             'teamid' => 4,
             'ordinal' => 200,
             'cy' => 1,
             'cyt' => 3,
-            'cy1' => 1500,
-            'cy2' => 1600,
+            'salary_yr1' => 1500,
+            'salary_yr2' => 1600,
         ]);
 
         $count = $this->formRepo->getTeamPlayerCount(4, true);
@@ -350,7 +350,7 @@ class TradingRepositoryTest extends DatabaseTestCase
     {
         $offerId = $this->insertTradeOfferRow();
         $this->insertTradeInfoRow($offerId, 1, '1', 'Metros', 'Sharks');
-        $this->insertTradeCashRow($offerId, 'Metros', 'Sharks', ['cy1' => 500]);
+        $this->insertTradeCashRow($offerId, 'Metros', 'Sharks', ['salary_yr1' => 500]);
 
         // This implicitly commits the outer DatabaseTestCase transaction
         $this->offerRepo->deleteTradeOffer($offerId);

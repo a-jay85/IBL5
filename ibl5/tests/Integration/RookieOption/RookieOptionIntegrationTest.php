@@ -15,8 +15,8 @@ use RookieOption\RookieOptionValidator;
  * Integration tests for complete rookie option workflows
  *
  * Tests end-to-end scenarios combining validation and database persistence:
- * - Successful rookie option exercise for first round picks (cy4)
- * - Successful rookie option exercise for second round picks (cy3)
+ * - Successful rookie option exercise for first round picks (salary_yr4)
+ * - Successful rookie option exercise for second round picks (salary_yr3)
  * - Validation failures (ownership, eligibility, draft round)
  * - Database update operations
  * - Experience-based eligibility rules
@@ -80,14 +80,14 @@ class RookieOptionIntegrationTest extends IntegrationTestCase
         // Assert
         $this->assertTrue($ownershipResult->isValid(), 'Ownership validation should pass');
         $this->assertTrue($eligibilityResult['valid'], 'Eligibility validation should pass');
-        $this->assertEquals(175, $eligibilityResult['finalYearSalary'], 'Should return cy3 for first round');
+        $this->assertEquals(175, $eligibilityResult['finalYearSalary'], 'Should return salary_yr3 for first round');
         $this->assertTrue($updateResult, 'Database update should succeed');
 
-        // Assert - Correct contract year updated (cy4 for first round)
+        // Assert - Correct contract year updated (salary_yr4 for first round)
         $this->assertQueryExecuted('UPDATE ibl_plr');
-        $this->assertQueryExecuted('cy4');
+        $this->assertQueryExecuted('salary_yr4');
         $this->assertQueryExecuted((string) $extensionAmount);
-        $this->assertQueryNotExecuted('cy3');
+        $this->assertQueryNotExecuted('salary_yr3');
     }
 
     /**
@@ -121,7 +121,7 @@ class RookieOptionIntegrationTest extends IntegrationTestCase
         $this->assertTrue($ownershipResult->isValid());
         $this->assertTrue($eligibilityResult['valid']);
         $this->assertTrue($updateResult);
-        $this->assertQueryExecuted('cy4');
+        $this->assertQueryExecuted('salary_yr4');
     }
 
     // ========== SECOND ROUND PICK SUCCESS SCENARIOS ==========
@@ -156,14 +156,14 @@ class RookieOptionIntegrationTest extends IntegrationTestCase
         // Assert
         $this->assertTrue($ownershipResult->isValid());
         $this->assertTrue($eligibilityResult['valid']);
-        $this->assertEquals(110, $eligibilityResult['finalYearSalary'], 'Should return cy2 for second round');
+        $this->assertEquals(110, $eligibilityResult['finalYearSalary'], 'Should return salary_yr2 for second round');
         $this->assertTrue($updateResult);
 
-        // Assert - Correct contract year updated (cy3 for second round)
+        // Assert - Correct contract year updated (salary_yr3 for second round)
         $this->assertQueryExecuted('UPDATE ibl_plr');
-        $this->assertQueryExecuted('cy3');
+        $this->assertQueryExecuted('salary_yr3');
         $this->assertQueryExecuted((string) $extensionAmount);
-        $this->assertQueryNotExecuted('cy4');
+        $this->assertQueryNotExecuted('salary_yr4');
     }
 
     /**
@@ -197,7 +197,7 @@ class RookieOptionIntegrationTest extends IntegrationTestCase
         $this->assertTrue($ownershipResult->isValid());
         $this->assertTrue($eligibilityResult['valid']);
         $this->assertTrue($updateResult);
-        $this->assertQueryExecuted('cy3');
+        $this->assertQueryExecuted('salary_yr3');
     }
 
     // ========== OWNERSHIP VALIDATION FAILURES ==========
@@ -315,7 +315,7 @@ class RookieOptionIntegrationTest extends IntegrationTestCase
      */
     public function testRookieOptionFailsForSecondRoundWithZeroCy2(): void
     {
-        // Arrange - Second round pick with no cy2 salary
+        // Arrange - Second round pick with no salary_yr2 salary
         $mockPlayer = $this->createMockPlayerObject(
             teamName: 'Miami Cyclones',
             canRookieOption: true,
@@ -414,10 +414,10 @@ class RookieOptionIntegrationTest extends IntegrationTestCase
         $queries = $this->getExecutedQueries();
         $this->assertCount(3, $queries);
 
-        // First and third are round 1 (cy4), second is round 2 (cy3)
-        $this->assertStringContainsString('cy4', $queries[0]);
-        $this->assertStringContainsString('cy3', $queries[1]);
-        $this->assertStringContainsString('cy4', $queries[2]);
+        // First and third are round 1 (salary_yr4), second is round 2 (salary_yr3)
+        $this->assertStringContainsString('salary_yr4', $queries[0]);
+        $this->assertStringContainsString('salary_yr3', $queries[1]);
+        $this->assertStringContainsString('salary_yr4', $queries[2]);
     }
 
     // ========== COMPLETE WORKFLOW TESTS ==========
@@ -462,7 +462,7 @@ class RookieOptionIntegrationTest extends IntegrationTestCase
 
         // Verify database was updated correctly
         $this->assertQueryExecuted('UPDATE ibl_plr');
-        $this->assertQueryExecuted('cy4');
+        $this->assertQueryExecuted('salary_yr4');
         $this->assertQueryExecuted('300');
     }
 
@@ -503,7 +503,7 @@ class RookieOptionIntegrationTest extends IntegrationTestCase
         $this->assertTrue($step2['valid']);
         $this->assertEquals(108, $step2['finalYearSalary']);
         $this->assertTrue($step3);
-        $this->assertQueryExecuted('cy3');
+        $this->assertQueryExecuted('salary_yr3');
     }
 
     /**
@@ -608,7 +608,7 @@ class RookieOptionIntegrationTest extends IntegrationTestCase
         // Assert
         $this->assertTrue($result);
         $this->assertQueryExecuted('1500');
-        $this->assertQueryExecuted('cy4');
+        $this->assertQueryExecuted('salary_yr4');
     }
 
     /**
@@ -672,14 +672,14 @@ class RookieOptionIntegrationTest extends IntegrationTestCase
     // ========== CONTRACT YEAR TARGETING ==========
 
     /**
-     * First round pick option year goes to cy4
+     * First round pick option year goes to salary_yr4
      *
      * @group integration
      * @group rookieoption
      */
     public function testFirstRoundOptionSetsCorrectContractYear(): void
     {
-        // Arrange - First round pick with cy3 salary
+        // Arrange - First round pick with salary_yr3 salary
         $playerID = 800;
         $draftRound = 1;
         $extensionAmount = 220;
@@ -697,22 +697,22 @@ class RookieOptionIntegrationTest extends IntegrationTestCase
         // Act
         $result = $this->repository->updatePlayerRookieOption($playerID, $draftRound, $extensionAmount);
 
-        // Assert - cy4 should be set for first round, NOT cy3
+        // Assert - salary_yr4 should be set for first round, NOT salary_yr3
         $this->assertTrue($result);
-        $this->assertQueryExecuted('cy4');
-        $this->assertQueryNotExecuted('cy3');
+        $this->assertQueryExecuted('salary_yr4');
+        $this->assertQueryNotExecuted('salary_yr3');
         $this->assertQueryExecuted('220');
     }
 
     /**
-     * Second round pick option year goes to cy3
+     * Second round pick option year goes to salary_yr3
      *
      * @group integration
      * @group rookieoption
      */
     public function testSecondRoundOptionSetsCorrectContractYear(): void
     {
-        // Arrange - Second round pick with cy2 salary
+        // Arrange - Second round pick with salary_yr2 salary
         $playerID = 801;
         $draftRound = 2;
         $extensionAmount = 165;
@@ -730,10 +730,10 @@ class RookieOptionIntegrationTest extends IntegrationTestCase
         // Act
         $result = $this->repository->updatePlayerRookieOption($playerID, $draftRound, $extensionAmount);
 
-        // Assert - cy3 should be set for second round, NOT cy4
+        // Assert - salary_yr3 should be set for second round, NOT salary_yr4
         $this->assertTrue($result);
-        $this->assertQueryExecuted('cy3');
-        $this->assertQueryNotExecuted('cy4');
+        $this->assertQueryExecuted('salary_yr3');
+        $this->assertQueryNotExecuted('salary_yr4');
         $this->assertQueryExecuted('165');
     }
 

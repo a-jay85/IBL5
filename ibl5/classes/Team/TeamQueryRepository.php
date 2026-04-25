@@ -134,13 +134,13 @@ class TeamQueryRepository extends \BaseMysqliRepository implements TeamQueryRepo
         if ($season !== null && $season->isOffseasonPhase()) {
             // During Free Agency, only count players who have a salary for next year
             $freeAgencyCondition = " AND (
-                (p.cy = 0 AND p.cy1 > 0) OR
-                (p.cy = 0 AND p.cy2 > 0) OR
-                (p.cy = 1 AND p.cy2 > 0) OR
-                (p.cy = 2 AND p.cy3 > 0) OR
-                (p.cy = 3 AND p.cy4 > 0) OR
-                (p.cy = 4 AND p.cy5 > 0) OR
-                (p.cy = 5 AND p.cy6 > 0)
+                (p.cy = 0 AND p.salary_yr1 > 0) OR
+                (p.cy = 0 AND p.salary_yr2 > 0) OR
+                (p.cy = 1 AND p.salary_yr2 > 0) OR
+                (p.cy = 2 AND p.salary_yr3 > 0) OR
+                (p.cy = 3 AND p.salary_yr4 > 0) OR
+                (p.cy = 4 AND p.salary_yr5 > 0) OR
+                (p.cy = 5 AND p.salary_yr6 > 0)
             )";
         }
 
@@ -169,13 +169,13 @@ class TeamQueryRepository extends \BaseMysqliRepository implements TeamQueryRepo
         if ($season !== null && $season->isOffseasonPhase()) {
             // During Free Agency, only count players who have a salary for next year
             $freeAgencyCondition = " AND (
-                (p.cy = 0 AND p.cy1 > 0) OR
-                (p.cy = 0 AND p.cy2 > 0) OR
-                (p.cy = 1 AND p.cy2 > 0) OR
-                (p.cy = 2 AND p.cy3 > 0) OR
-                (p.cy = 3 AND p.cy4 > 0) OR
-                (p.cy = 4 AND p.cy5 > 0) OR
-                (p.cy = 5 AND p.cy6 > 0)
+                (p.cy = 0 AND p.salary_yr1 > 0) OR
+                (p.cy = 0 AND p.salary_yr2 > 0) OR
+                (p.cy = 1 AND p.salary_yr2 > 0) OR
+                (p.cy = 2 AND p.salary_yr3 > 0) OR
+                (p.cy = 3 AND p.salary_yr4 > 0) OR
+                (p.cy = 4 AND p.salary_yr5 > 0) OR
+                (p.cy = 5 AND p.salary_yr6 > 0)
             )";
         }
 
@@ -243,7 +243,7 @@ class TeamQueryRepository extends \BaseMysqliRepository implements TeamQueryRepo
             FROM ibl_plr p
             LEFT JOIN ibl_team_info t ON p.teamid = t.teamid
             WHERE p.teamid = ?
-              AND p.cy1 != 0
+              AND p.salary_yr1 != 0
               AND p.retired = 0",
             "i",
             $teamId
@@ -264,7 +264,7 @@ class TeamQueryRepository extends \BaseMysqliRepository implements TeamQueryRepo
             LEFT JOIN ibl_team_info t ON p.teamid = t.teamid
             WHERE p.teamid = ?
               AND p.pos = ?
-              AND p.cy1 != 0
+              AND p.salary_yr1 != 0
               AND p.retired = 0",
             "is",
             $teamId,
@@ -332,7 +332,7 @@ class TeamQueryRepository extends \BaseMysqliRepository implements TeamQueryRepo
             $cyt = $contract['cyt'] ?? 0;
             $i = 1;
             while ($yearUnderContract <= $cyt) {
-                $fieldString = "cy" . $yearUnderContract;
+                $fieldString = "salary_yr" . $yearUnderContract;
                 $key = "year" . $i;
                 if (!isset($salaryCapSpent[$key])) {
                     $salaryCapSpent[$key] = 0;
@@ -359,12 +359,12 @@ class TeamQueryRepository extends \BaseMysqliRepository implements TeamQueryRepo
                     $salaryCapSpent[$key] = 0;
                 }
                 $salaryCapSpent[$key] += match ($yearUnderContract) {
-                    1 => $cashRow['cy1'],
-                    2 => $cashRow['cy2'],
-                    3 => $cashRow['cy3'],
-                    4 => $cashRow['cy4'],
-                    5 => $cashRow['cy5'],
-                    6 => $cashRow['cy6'],
+                    1 => $cashRow['salary_yr1'],
+                    2 => $cashRow['salary_yr2'],
+                    3 => $cashRow['salary_yr3'],
+                    4 => $cashRow['salary_yr4'],
+                    5 => $cashRow['salary_yr5'],
+                    6 => $cashRow['salary_yr6'],
                     default => 0,
                 };
                 $yearUnderContract++;
@@ -436,12 +436,12 @@ class TeamQueryRepository extends \BaseMysqliRepository implements TeamQueryRepo
                 $cy = 1;
             }
             $totalCurrentSeasonBuyouts += match ($cy) {
-                1 => $buyout['cy1'],
-                2 => $buyout['cy2'],
-                3 => $buyout['cy3'],
-                4 => $buyout['cy4'],
-                5 => $buyout['cy5'],
-                6 => $buyout['cy6'],
+                1 => $buyout['salary_yr1'],
+                2 => $buyout['salary_yr2'],
+                3 => $buyout['salary_yr3'],
+                4 => $buyout['salary_yr4'],
+                5 => $buyout['salary_yr5'],
+                6 => $buyout['salary_yr6'],
                 default => 0,
             };
         }

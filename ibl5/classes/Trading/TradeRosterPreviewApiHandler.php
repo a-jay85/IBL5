@@ -386,7 +386,7 @@ class TradeRosterPreviewApiHandler
      */
     private function makeCashRow(string $label, int $teamId, array $amounts, int $startYear, int $endYear, bool $negate): array
     {
-        $cy1 = $cy2 = $cy3 = $cy4 = $cy5 = $cy6 = 0;
+        $salaryYr1 = $salaryYr2 = $salaryYr3 = $salaryYr4 = $salaryYr5 = $salaryYr6 = 0;
         $totalYears = 0;
 
         for ($yr = $startYear; $yr <= $endYear; $yr++) {
@@ -397,12 +397,12 @@ class TradeRosterPreviewApiHandler
             $cyIndex = $yr - $startYear + 1;
             if ($cyIndex >= 1 && $cyIndex <= 6) {
                 match ($cyIndex) {
-                    1 => $cy1 = $amount,
-                    2 => $cy2 = $amount,
-                    3 => $cy3 = $amount,
-                    4 => $cy4 = $amount,
-                    5 => $cy5 = $amount,
-                    6 => $cy6 = $amount,
+                    1 => $salaryYr1 = $amount,
+                    2 => $salaryYr2 = $amount,
+                    3 => $salaryYr3 = $amount,
+                    4 => $salaryYr4 = $amount,
+                    5 => $salaryYr5 = $amount,
+                    6 => $salaryYr6 = $amount,
                 };
                 if ($amount !== 0 && $cyIndex > $totalYears) {
                     $totalYears = $cyIndex;
@@ -441,8 +441,8 @@ class TradeRosterPreviewApiHandler
             'bird' => null,
             'cy' => 1,
             'cyt' => $totalYears,
-            'cy1' => $cy1, 'cy2' => $cy2, 'cy3' => $cy3,
-            'cy4' => $cy4, 'cy5' => $cy5, 'cy6' => $cy6,
+            'salary_yr1' => $salaryYr1, 'salary_yr2' => $salaryYr2, 'salary_yr3' => $salaryYr3,
+            'salary_yr4' => $salaryYr4, 'salary_yr5' => $salaryYr5, 'salary_yr6' => $salaryYr6,
             // Draft (zero/empty, matching DB cash rows)
             'draftyear' => 0, 'draftround' => 0, 'draftpickno' => 0,
             'draftedby' => '', 'draftedbycurrentname' => '', 'college' => '',

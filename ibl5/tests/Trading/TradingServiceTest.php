@@ -62,8 +62,8 @@ class TradingServiceTest extends TestCase
         $season = $this->createSeasonStub('Regular Season');
 
         $players = [
-            $this->createPlayerRow(cy: 1, cy1: 500, cy2: 600, cy3: 0, cy4: 0, cy5: 0, cy6: 0),
-            $this->createPlayerRow(cy: 1, cy1: 300, cy2: 400, cy3: 500, cy4: 0, cy5: 0, cy6: 0),
+            $this->createPlayerRow(cy: 1, salaryYr1: 500, salaryYr2: 600, salaryYr3: 0, salaryYr4: 0, salaryYr5: 0, salaryYr6: 0),
+            $this->createPlayerRow(cy: 1, salaryYr1: 300, salaryYr2: 400, salaryYr3: 500, salaryYr4: 0, salaryYr5: 0, salaryYr6: 0),
         ];
 
         $result = $service->calculateFutureSalaries($players, $season);
@@ -79,15 +79,15 @@ class TradingServiceTest extends TestCase
         $season = $this->createSeasonStub('Regular Season');
 
         $players = [
-            $this->createPlayerRow(cy: 1, cy1: 500, cy2: 600, cy3: 0, cy4: 0, cy5: 0, cy6: 0),
-            $this->createPlayerRow(cy: 1, cy1: 300, cy2: 0, cy3: 0, cy4: 0, cy5: 0, cy6: 0),
+            $this->createPlayerRow(cy: 1, salaryYr1: 500, salaryYr2: 600, salaryYr3: 0, salaryYr4: 0, salaryYr5: 0, salaryYr6: 0),
+            $this->createPlayerRow(cy: 1, salaryYr1: 300, salaryYr2: 0, salaryYr3: 0, salaryYr4: 0, salaryYr5: 0, salaryYr6: 0),
         ];
 
         $result = $service->calculateFutureSalaries($players, $season);
 
-        $this->assertSame(2, $result['hold'][0]); // Both have cy1 > 0
-        $this->assertSame(1, $result['hold'][1]); // Only first has cy2 > 0
-        $this->assertSame(0, $result['hold'][2]); // Neither has cy3 > 0
+        $this->assertSame(2, $result['hold'][0]); // Both have salary_yr1 > 0
+        $this->assertSame(1, $result['hold'][1]); // Only first has salary_yr2 > 0
+        $this->assertSame(0, $result['hold'][2]); // Neither has salary_yr3 > 0
     }
 
     public function testCalculateFutureSalariesAdvancesContractYearInPlayoffs(): void
@@ -96,14 +96,14 @@ class TradingServiceTest extends TestCase
         $season = $this->createSeasonStub('Playoffs');
 
         $players = [
-            $this->createPlayerRow(cy: 1, cy1: 500, cy2: 600, cy3: 700, cy4: 0, cy5: 0, cy6: 0),
+            $this->createPlayerRow(cy: 1, salaryYr1: 500, salaryYr2: 600, salaryYr3: 700, salaryYr4: 0, salaryYr5: 0, salaryYr6: 0),
         ];
 
         $result = $service->calculateFutureSalaries($players, $season);
 
-        // In Playoffs, cy is incremented: cy=1 -> cy=2, so starts reading from cy2
-        $this->assertSame(600, $result['player'][0]); // cy2
-        $this->assertSame(700, $result['player'][1]); // cy3
+        // In Playoffs, cy is incremented: cy=1 -> cy=2, so starts reading from salary_yr2
+        $this->assertSame(600, $result['player'][0]); // salary_yr2
+        $this->assertSame(700, $result['player'][1]); // salary_yr3
     }
 
     public function testCalculateFutureSalariesAdvancesContractYearInDraft(): void
@@ -112,14 +112,14 @@ class TradingServiceTest extends TestCase
         $season = $this->createSeasonStub('Draft');
 
         $players = [
-            $this->createPlayerRow(cy: 2, cy1: 100, cy2: 200, cy3: 300, cy4: 400, cy5: 0, cy6: 0),
+            $this->createPlayerRow(cy: 2, salaryYr1: 100, salaryYr2: 200, salaryYr3: 300, salaryYr4: 400, salaryYr5: 0, salaryYr6: 0),
         ];
 
         $result = $service->calculateFutureSalaries($players, $season);
 
-        // In Draft, cy is incremented: cy=2 -> cy=3, so starts reading from cy3
-        $this->assertSame(300, $result['player'][0]); // cy3
-        $this->assertSame(400, $result['player'][1]); // cy4
+        // In Draft, cy is incremented: cy=2 -> cy=3, so starts reading from salary_yr3
+        $this->assertSame(300, $result['player'][0]); // salary_yr3
+        $this->assertSame(400, $result['player'][1]); // salary_yr4
     }
 
     public function testCalculateFutureSalariesAdvancesContractYearInFreeAgency(): void
@@ -128,13 +128,13 @@ class TradingServiceTest extends TestCase
         $season = $this->createSeasonStub('Free Agency');
 
         $players = [
-            $this->createPlayerRow(cy: 1, cy1: 500, cy2: 600, cy3: 0, cy4: 0, cy5: 0, cy6: 0),
+            $this->createPlayerRow(cy: 1, salaryYr1: 500, salaryYr2: 600, salaryYr3: 0, salaryYr4: 0, salaryYr5: 0, salaryYr6: 0),
         ];
 
         $result = $service->calculateFutureSalaries($players, $season);
 
-        // In Free Agency, cy is incremented: cy=1 -> cy=2, so starts reading from cy2
-        $this->assertSame(600, $result['player'][0]); // cy2
+        // In Free Agency, cy is incremented: cy=1 -> cy=2, so starts reading from salary_yr2
+        $this->assertSame(600, $result['player'][0]); // salary_yr2
     }
 
     public function testCalculateFutureSalariesHandlesZeroContractYear(): void
@@ -143,14 +143,14 @@ class TradingServiceTest extends TestCase
         $season = $this->createSeasonStub('Regular Season');
 
         $players = [
-            $this->createPlayerRow(cy: 0, cy1: 500, cy2: 600, cy3: 0, cy4: 0, cy5: 0, cy6: 0),
+            $this->createPlayerRow(cy: 0, salaryYr1: 500, salaryYr2: 600, salaryYr3: 0, salaryYr4: 0, salaryYr5: 0, salaryYr6: 0),
         ];
 
         $result = $service->calculateFutureSalaries($players, $season);
 
         // cy=0 gets clamped to cy=1
-        $this->assertSame(500, $result['player'][0]); // cy1
-        $this->assertSame(600, $result['player'][1]); // cy2
+        $this->assertSame(500, $result['player'][0]); // salary_yr1
+        $this->assertSame(600, $result['player'][1]); // salary_yr2
     }
 
     public function testCalculateFutureSalariesHandlesExpiredContract(): void
@@ -159,14 +159,14 @@ class TradingServiceTest extends TestCase
         $season = $this->createSeasonStub('Regular Season');
 
         $players = [
-            $this->createPlayerRow(cy: 6, cy1: 100, cy2: 200, cy3: 300, cy4: 400, cy5: 500, cy6: 600),
+            $this->createPlayerRow(cy: 6, salaryYr1: 100, salaryYr2: 200, salaryYr3: 300, salaryYr4: 400, salaryYr5: 500, salaryYr6: 600),
         ];
 
         $result = $service->calculateFutureSalaries($players, $season);
 
-        // cy=6, last year — only cy6 contributes
-        $this->assertSame(600, $result['player'][0]); // cy6
-        $this->assertSame(0, $result['player'][1]); // nothing beyond cy6
+        // cy=6, last year — only salary_yr6 contributes
+        $this->assertSame(600, $result['player'][0]); // salary_yr6
+        $this->assertSame(0, $result['player'][1]); // nothing beyond salary_yr6
     }
 
     // ============================================
@@ -302,7 +302,7 @@ class TradingServiceTest extends TestCase
         ]);
         $mockCashRepo->method('getCashTransactionsByOfferIds')->willReturn([
             '1:Lakers' => ['tradeOfferID' => 1, 'sendingTeam' => 'Lakers', 'receivingTeam' => 'Celtics',
-                'cy1' => 100, 'cy2' => 200, 'cy3' => 150, 'cy4' => null, 'cy5' => null, 'cy6' => null],
+                'salary_yr1' => 100, 'salary_yr2' => 200, 'salary_yr3' => 150, 'salary_yr4' => null, 'salary_yr5' => null, 'salary_yr6' => null],
         ]);
         $mockFormRepo->method('getAllTeamsWithCity')->willReturn([]);
 
@@ -331,7 +331,7 @@ class TradingServiceTest extends TestCase
         ]);
         $mockCashRepo->method('getCashTransactionsByOfferIds')->willReturn([
             '1:Lakers' => ['tradeOfferID' => 1, 'sendingTeam' => 'Lakers', 'receivingTeam' => 'Celtics',
-                'cy1' => 0, 'cy2' => 200, 'cy3' => 0, 'cy4' => 0, 'cy5' => 300, 'cy6' => 0],
+                'salary_yr1' => 0, 'salary_yr2' => 200, 'salary_yr3' => 0, 'salary_yr4' => 0, 'salary_yr5' => 300, 'salary_yr6' => 0],
         ]);
         $mockFormRepo->method('getAllTeamsWithCity')->willReturn([]);
 
@@ -359,7 +359,7 @@ class TradingServiceTest extends TestCase
         ]);
         $mockCashRepo->method('getCashTransactionsByOfferIds')->willReturn([
             '1:Lakers' => ['tradeOfferID' => 1, 'sendingTeam' => 'Lakers', 'receivingTeam' => 'Celtics',
-                'cy1' => 100, 'cy2' => 200, 'cy3' => 0, 'cy4' => 150, 'cy5' => null, 'cy6' => null],
+                'salary_yr1' => 100, 'salary_yr2' => 200, 'salary_yr3' => 0, 'salary_yr4' => 150, 'salary_yr5' => null, 'salary_yr6' => null],
         ]);
         $mockFormRepo->method('getAllTeamsWithCity')->willReturn([]);
 
@@ -381,7 +381,7 @@ class TradingServiceTest extends TestCase
         $this->assertSame((int) $m2[1] + 1, (int) $m2[2]);
         $this->assertSame((int) $m3[1] + 1, (int) $m3[2]);
 
-        // cy2 label is 1 year after cy1, cy4 label is 3 years after cy1
+        // salary_yr2 label is 1 year after salary_yr1, salary_yr4 label is 3 years after salary_yr1
         $this->assertSame((int) $m1[1] + 1, (int) $m2[1]);
         $this->assertSame((int) $m1[1] + 3, (int) $m3[1]);
     }
@@ -401,7 +401,7 @@ class TradingServiceTest extends TestCase
         ]);
         $mockCashRepo->method('getCashTransactionsByOfferIds')->willReturn([
             '1:Lakers' => ['tradeOfferID' => 1, 'sendingTeam' => 'Lakers', 'receivingTeam' => 'Celtics',
-                'cy1' => 0, 'cy2' => 0, 'cy3' => 0, 'cy4' => 0, 'cy5' => 0, 'cy6' => 0],
+                'salary_yr1' => 0, 'salary_yr2' => 0, 'salary_yr3' => 0, 'salary_yr4' => 0, 'salary_yr5' => 0, 'salary_yr6' => 0],
         ]);
         $mockFormRepo->method('getAllTeamsWithCity')->willReturn([]);
 
@@ -450,7 +450,7 @@ class TradingServiceTest extends TestCase
         ]);
         $mockCashRepo->method('getCashTransactionsByOfferIds')->willReturn([
             '1:Lakers' => ['tradeOfferID' => 1, 'sendingTeam' => 'Lakers', 'receivingTeam' => 'Celtics',
-                'cy1' => 500, 'cy2' => null, 'cy3' => null, 'cy4' => null, 'cy5' => null, 'cy6' => null],
+                'salary_yr1' => 500, 'salary_yr2' => null, 'salary_yr3' => null, 'salary_yr4' => null, 'salary_yr5' => null, 'salary_yr6' => null],
         ]);
         $mockFormRepo->method('getAllTeamsWithCity')->willReturn([]);
 
@@ -548,7 +548,7 @@ class TradingServiceTest extends TestCase
         ]);
         $mockCashRepo->method('getCashTransactionsByOfferIds')->willReturn([
             '1:Lakers' => ['tradeOfferID' => 1, 'sendingTeam' => 'Lakers', 'receivingTeam' => 'Celtics',
-                'cy1' => 300, 'cy2' => null, 'cy3' => null, 'cy4' => null, 'cy5' => null, 'cy6' => null],
+                'salary_yr1' => 300, 'salary_yr2' => null, 'salary_yr3' => null, 'salary_yr4' => null, 'salary_yr5' => null, 'salary_yr6' => null],
         ]);
 
         $service = new TradingService($mockOfferRepo, $mockAssetRepo, $mockFormRepo, $mockCommon, $this->mockDb, $mockCashRepo);
@@ -615,12 +615,12 @@ class TradingServiceTest extends TestCase
 
     private function createPlayerRow(
         int $cy = 1,
-        int $cy1 = 0,
-        int $cy2 = 0,
-        int $cy3 = 0,
-        int $cy4 = 0,
-        int $cy5 = 0,
-        int $cy6 = 0
+        int $salaryYr1 = 0,
+        int $salaryYr2 = 0,
+        int $salaryYr3 = 0,
+        int $salaryYr4 = 0,
+        int $salaryYr5 = 0,
+        int $salaryYr6 = 0
     ): array {
         return [
             'pos' => 'PG',
@@ -628,12 +628,12 @@ class TradingServiceTest extends TestCase
             'pid' => 1,
             'ordinal' => 5,
             'cy' => $cy,
-            'cy1' => $cy1,
-            'cy2' => $cy2,
-            'cy3' => $cy3,
-            'cy4' => $cy4,
-            'cy5' => $cy5,
-            'cy6' => $cy6,
+            'salary_yr1' => $salaryYr1,
+            'salary_yr2' => $salaryYr2,
+            'salary_yr3' => $salaryYr3,
+            'salary_yr4' => $salaryYr4,
+            'salary_yr5' => $salaryYr5,
+            'salary_yr6' => $salaryYr6,
         ];
     }
 
@@ -955,7 +955,7 @@ class QueryAwareMockDatabase extends \MockDatabase
         if (stripos($query, 'ibl_trade_cash') !== false) {
             // Return cash data
             return new \MockDatabaseResult([
-                ['cy1' => 100, 'cy2' => 200, 'cy3' => 0, 'cy4' => 0, 'cy5' => 0, 'cy6' => 0]
+                ['salary_yr1' => 100, 'salary_yr2' => 200, 'salary_yr3' => 0, 'salary_yr4' => 0, 'salary_yr5' => 0, 'salary_yr6' => 0]
             ]);
         }
 

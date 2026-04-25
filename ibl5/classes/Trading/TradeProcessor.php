@@ -179,12 +179,12 @@ class TradeProcessor implements TradeProcessorInterface
         }
 
         $cashYear = [
-            1 => $cashDetails['cy1'] ?? 0,
-            2 => $cashDetails['cy2'] ?? 0,
-            3 => $cashDetails['cy3'] ?? 0,
-            4 => $cashDetails['cy4'] ?? 0,
-            5 => $cashDetails['cy5'] ?? 0,
-            6 => $cashDetails['cy6'] ?? 0,
+            1 => $cashDetails['salary_yr1'] ?? 0,
+            2 => $cashDetails['salary_yr2'] ?? 0,
+            3 => $cashDetails['salary_yr3'] ?? 0,
+            4 => $cashDetails['salary_yr4'] ?? 0,
+            5 => $cashDetails['salary_yr5'] ?? 0,
+            6 => $cashDetails['salary_yr6'] ?? 0,
         ];
 
         return $this->cashHandler->createCashTransaction($offeringTeamName, $listeningTeamName, $cashYear, $this->season->endingYear, $offerId);

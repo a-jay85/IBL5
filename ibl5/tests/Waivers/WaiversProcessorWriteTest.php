@@ -129,7 +129,7 @@ class WaiversProcessorWriteTest extends TestCase
     public function testProcessAddReturnsErrorWhenValidationFails(): void
     {
         $this->commonRepoStub->method('getPlayerByID')->willReturn([
-            'name' => 'Test Player', 'pid' => 1, 'cy1' => 0, 'exp' => 5,
+            'name' => 'Test Player', 'pid' => 1, 'salary_yr1' => 0, 'exp' => 5,
         ]);
         $this->validatorStub->method('validateAdd')->willReturn(false);
         $this->validatorStub->method('getErrors')->willReturn(['Full roster']);
@@ -143,7 +143,7 @@ class WaiversProcessorWriteTest extends TestCase
     public function testProcessAddReturnsErrorWhenTeamNotFound(): void
     {
         $this->commonRepoStub->method('getPlayerByID')->willReturn([
-            'name' => 'Test Player', 'pid' => 1, 'cy1' => 0, 'exp' => 5,
+            'name' => 'Test Player', 'pid' => 1, 'salary_yr1' => 0, 'exp' => 5,
         ]);
         $this->validatorStub->method('validateAdd')->willReturn(true);
         $this->commonRepoStub->method('getTeamByName')->willReturn(null);
@@ -157,7 +157,7 @@ class WaiversProcessorWriteTest extends TestCase
     public function testProcessAddReturnsErrorWhenRepoSignFails(): void
     {
         $this->commonRepoStub->method('getPlayerByID')->willReturn([
-            'name' => 'Test Player', 'pid' => 1, 'cy1' => 0, 'exp' => 5,
+            'name' => 'Test Player', 'pid' => 1, 'salary_yr1' => 0, 'exp' => 5,
         ]);
         $this->validatorStub->method('validateAdd')->willReturn(true);
         $this->commonRepoStub->method('getTeamByName')->willReturn(['team_name' => 'Test Team', 'teamid' => 1]);
@@ -172,7 +172,7 @@ class WaiversProcessorWriteTest extends TestCase
     public function testProcessAddReturnsSuccessWhenAllValid(): void
     {
         $this->commonRepoStub->method('getPlayerByID')->willReturn([
-            'name' => 'Test Player', 'pid' => 1, 'cy1' => 0, 'exp' => 5,
+            'name' => 'Test Player', 'pid' => 1, 'salary_yr1' => 0, 'exp' => 5,
         ]);
         $this->validatorStub->method('validateAdd')->willReturn(true);
         $this->commonRepoStub->method('getTeamByName')->willReturn(['team_name' => 'Test Team', 'teamid' => 1]);

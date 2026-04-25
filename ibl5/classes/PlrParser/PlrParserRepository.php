@@ -42,7 +42,7 @@ class PlrParserRepository extends \BaseMysqliRepository implements PlrParserRepo
              `stats_orb`, `stats_drb`, `stats_ast`, `stats_stl`, `stats_tvr`, `stats_blk`, `stats_pf`,
              `talent`, `skill`, `intangibles`, `coach`, `loyalty`, `playing_time`, `winner`, `tradition`, `security`,
              `exp`, `bird`, `cy`, `cyt`,
-             `cy1`, `cy2`, `cy3`, `cy4`, `cy5`, `cy6`, `fa_signing_flag`,
+             `salary_yr1`, `salary_yr2`, `salary_yr3`, `salary_yr4`, `salary_yr5`, `salary_yr6`, `fa_signing_flag`,
              `sh_pts`, `sh_reb`, `sh_ast`, `sh_stl`, `sh_blk`, `s_dd`, `s_td`,
              `sp_pts`, `sp_reb`, `sp_ast`, `sp_stl`, `sp_blk`,
              `ch_pts`, `ch_reb`, `ch_ast`, `ch_stl`, `ch_blk`, `c_dd`, `c_td`,
@@ -128,12 +128,12 @@ class PlrParserRepository extends \BaseMysqliRepository implements PlrParserRepo
             `bird` = VALUES(`bird`),
             `cy` = VALUES(`cy`),
             `cyt` = VALUES(`cyt`),
-            `cy1` = VALUES(`cy1`),
-            `cy2` = VALUES(`cy2`),
-            `cy3` = VALUES(`cy3`),
-            `cy4` = VALUES(`cy4`),
-            `cy5` = VALUES(`cy5`),
-            `cy6` = VALUES(`cy6`),
+            `salary_yr1` = VALUES(`salary_yr1`),
+            `salary_yr2` = VALUES(`salary_yr2`),
+            `salary_yr3` = VALUES(`salary_yr3`),
+            `salary_yr4` = VALUES(`salary_yr4`),
+            `salary_yr5` = VALUES(`salary_yr5`),
+            `salary_yr6` = VALUES(`salary_yr6`),
             `fa_signing_flag` = VALUES(`fa_signing_flag`),
             `sh_pts` = VALUES(`sh_pts`),
             `sh_reb` = VALUES(`sh_reb`),
@@ -210,7 +210,7 @@ class PlrParserRepository extends \BaseMysqliRepository implements PlrParserRepo
             . 'iiiiiii'      // stats_orb..stats_pf
             . 'iiiiiiiii'    // talent..security
             . 'iiii'         // exp, bird, cy, cyt
-            . 'iiiiiii'      // cy1..cy6, fa_signing_flag
+            . 'iiiiiii'      // salary_yr1..salary_yr6, fa_signing_flag
             . 'iiiiiii'      // sh_pts..s_td
             . 'iiiii'        // sp_pts..sp_blk
             . 'iiiiiii'      // ch_pts..c_td
@@ -413,7 +413,7 @@ class PlrParserRepository extends \BaseMysqliRepository implements PlrParserRepo
         'talent', 'skill', 'intangibles', 'clutch', 'consistency',
         // Contract
         'exp', 'bird', 'cy', 'cyt',
-        'cy1', 'cy2', 'cy3', 'cy4', 'cy5', 'cy6',
+        'salary_yr1', 'salary_yr2', 'salary_yr3', 'salary_yr4', 'salary_yr5', 'salary_yr6',
         // Depth chart
         'pg_depth', 'sg_depth', 'sf_depth', 'pf_depth', 'c_depth',
         // Season stats (regular season)

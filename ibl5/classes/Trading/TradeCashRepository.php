@@ -48,22 +48,22 @@ class TradeCashRepository extends BaseMysqliRepository implements TradeCashRepos
     /**
      * @see TradeCashRepositoryInterface::insertCashTradeOffer()
      */
-    public function insertCashTradeOffer(int $tradeOfferId, string $sendingTeam, string $receivingTeam, int $cy1, int $cy2, int $cy3, int $cy4, int $cy5, int $cy6): int
+    public function insertCashTradeOffer(int $tradeOfferId, string $sendingTeam, string $receivingTeam, int $salaryYr1, int $salaryYr2, int $salaryYr3, int $salaryYr4, int $salaryYr5, int $salaryYr6): int
     {
         return $this->execute(
             "INSERT INTO ibl_trade_cash
-                (`tradeOfferID`, `sendingTeam`, `receivingTeam`, `cy1`, `cy2`, `cy3`, `cy4`, `cy5`, `cy6`)
+                (`tradeOfferID`, `sendingTeam`, `receivingTeam`, `salary_yr1`, `salary_yr2`, `salary_yr3`, `salary_yr4`, `salary_yr5`, `salary_yr6`)
              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
             "issiiiiii",
             $tradeOfferId,
             $sendingTeam,
             $receivingTeam,
-            $cy1,
-            $cy2,
-            $cy3,
-            $cy4,
-            $cy5,
-            $cy6
+            $salaryYr1,
+            $salaryYr2,
+            $salaryYr3,
+            $salaryYr4,
+            $salaryYr5,
+            $salaryYr6
         );
     }
 

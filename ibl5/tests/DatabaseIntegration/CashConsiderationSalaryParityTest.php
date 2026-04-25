@@ -55,17 +55,17 @@ class CashConsiderationSalaryParityTest extends DatabaseTestCase
             'label' => 'Test Cash Entry',
             'cy' => 1,
             'cyt' => 1,
-            'cy1' => 500,
-            'cy2' => 0,
-            'cy3' => 0,
-            'cy4' => 0,
-            'cy5' => 0,
-            'cy6' => 0,
+            'salary_yr1' => 500,
+            'salary_yr2' => 0,
+            'salary_yr3' => 0,
+            'salary_yr4' => 0,
+            'salary_yr5' => 0,
+            'salary_yr6' => 0,
         ]);
 
         $salaryAfter = $this->commonRepo->getTeamTotalSalary($teamName);
 
-        // The cash entry's current_salary (cy=1 → cy1=500) must be included
+        // The cash entry's current_salary (cy=1 → salary_yr1=500) must be included
         self::assertSame($salaryBefore + 500, $salaryAfter);
     }
 
@@ -76,7 +76,7 @@ class CashConsiderationSalaryParityTest extends DatabaseTestCase
 
         $nextYearBefore = $this->commonRepo->getTeamNextYearSalary($teamName);
 
-        // cy=1, cyt=2: current year is cy1, next year is cy2
+        // cy=1, cyt=2: current year is salary_yr1, next year is salary_yr2
         $this->cashRepo->insertCashConsideration([
             'teamid' => $team['teamid'],
 
@@ -84,17 +84,17 @@ class CashConsiderationSalaryParityTest extends DatabaseTestCase
             'label' => 'Test Multi-Year Cash',
             'cy' => 1,
             'cyt' => 2,
-            'cy1' => 300,
-            'cy2' => 400,
-            'cy3' => 0,
-            'cy4' => 0,
-            'cy5' => 0,
-            'cy6' => 0,
+            'salary_yr1' => 300,
+            'salary_yr2' => 400,
+            'salary_yr3' => 0,
+            'salary_yr4' => 0,
+            'salary_yr5' => 0,
+            'salary_yr6' => 0,
         ]);
 
         $nextYearAfter = $this->commonRepo->getTeamNextYearSalary($teamName);
 
-        // next_year_salary: cy=1 → cy2=400
+        // next_year_salary: cy=1 → salary_yr2=400
         self::assertSame($nextYearBefore + 400, $nextYearAfter);
     }
 
@@ -113,12 +113,12 @@ class CashConsiderationSalaryParityTest extends DatabaseTestCase
             'label' => 'Test Incoming Cash',
             'cy' => 1,
             'cyt' => 1,
-            'cy1' => -200,
-            'cy2' => 0,
-            'cy3' => 0,
-            'cy4' => 0,
-            'cy5' => 0,
-            'cy6' => 0,
+            'salary_yr1' => -200,
+            'salary_yr2' => 0,
+            'salary_yr3' => 0,
+            'salary_yr4' => 0,
+            'salary_yr5' => 0,
+            'salary_yr6' => 0,
         ]);
 
         $salaryAfter = $this->commonRepo->getTeamTotalSalary($teamName);
@@ -140,12 +140,12 @@ class CashConsiderationSalaryParityTest extends DatabaseTestCase
             'label' => 'Test Buyout',
             'cy' => 1,
             'cyt' => 1,
-            'cy1' => 350,
-            'cy2' => 0,
-            'cy3' => 0,
-            'cy4' => 0,
-            'cy5' => 0,
-            'cy6' => 0,
+            'salary_yr1' => 350,
+            'salary_yr2' => 0,
+            'salary_yr3' => 0,
+            'salary_yr4' => 0,
+            'salary_yr5' => 0,
+            'salary_yr6' => 0,
         ]);
 
         $salaryAfter = $this->commonRepo->getTeamTotalSalary($teamName);
@@ -164,15 +164,15 @@ class CashConsiderationSalaryParityTest extends DatabaseTestCase
         $rows = $this->fetchAll("
             WITH plr_totals AS (
                 SELECT teamid,
-                       SUM(CASE cy WHEN 1 THEN cy1 WHEN 2 THEN cy2 WHEN 3 THEN cy3
-                                    WHEN 4 THEN cy4 WHEN 5 THEN cy5 WHEN 6 THEN cy6 ELSE 0 END) AS plr_salary
+                       SUM(CASE cy WHEN 1 THEN salary_yr1 WHEN 2 THEN salary_yr2 WHEN 3 THEN salary_yr3
+                                    WHEN 4 THEN salary_yr4 WHEN 5 THEN salary_yr5 WHEN 6 THEN salary_yr6 ELSE 0 END) AS plr_salary
                 FROM ibl_plr WHERE retired = 0 AND teamid BETWEEN 1 AND 28
                 GROUP BY teamid
             ),
             cash_totals AS (
                 SELECT teamid,
-                       SUM(CASE cy WHEN 1 THEN cy1 WHEN 2 THEN cy2 WHEN 3 THEN cy3
-                                    WHEN 4 THEN cy4 WHEN 5 THEN cy5 WHEN 6 THEN cy6 ELSE 0 END) AS cash_salary
+                       SUM(CASE cy WHEN 1 THEN salary_yr1 WHEN 2 THEN salary_yr2 WHEN 3 THEN salary_yr3
+                                    WHEN 4 THEN salary_yr4 WHEN 5 THEN salary_yr5 WHEN 6 THEN salary_yr6 ELSE 0 END) AS cash_salary
                 FROM ibl_cash_considerations WHERE teamid BETWEEN 1 AND 28
                 GROUP BY teamid
             ),
@@ -266,8 +266,8 @@ class CashConsiderationSalaryParityTest extends DatabaseTestCase
         self::assertSame('cash', $pos['type']);
         self::assertSame("Cash to {$team2['team_name']}", $pos['label']);
         self::assertSame($team2['teamid'], (int) $pos['counterparty_teamid']);
-        self::assertSame(500, (int) $pos['cy1']);
-        self::assertSame(300, (int) $pos['cy2']);
+        self::assertSame(500, (int) $pos['salary_yr1']);
+        self::assertSame(300, (int) $pos['salary_yr2']);
         self::assertSame(2, (int) $pos['cyt']);
 
         // Verify the negative entry (receiving team)
@@ -280,8 +280,8 @@ class CashConsiderationSalaryParityTest extends DatabaseTestCase
         self::assertSame('cash', $neg['type']);
         self::assertSame("Cash from {$team1['team_name']}", $neg['label']);
         self::assertSame($team1['teamid'], (int) $neg['counterparty_teamid']);
-        self::assertSame(-500, (int) $neg['cy1']);
-        self::assertSame(-300, (int) $neg['cy2']);
+        self::assertSame(-500, (int) $neg['salary_yr1']);
+        self::assertSame(-300, (int) $neg['salary_yr2']);
         self::assertSame(2, (int) $neg['cyt']);
     }
 

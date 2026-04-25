@@ -40,11 +40,11 @@ VALUES
 ON DUPLICATE KEY UPDATE team_name = VALUES(team_name), team_city = VALUES(team_city), color1 = VALUES(color1), color2 = VALUES(color2);
 
 -- Players: PID 1 (rostered on Metros), PID 2 (free agent)
-INSERT INTO ibl_plr (pid, name, age, teamid, pos, stamina, exp, bird, cy, cyt, cy1, cy2, retired, ordinal, droptime, uuid)
+INSERT INTO ibl_plr (pid, name, age, teamid, pos, stamina, exp, bird, cy, cyt, salary_yr1, salary_yr2, retired, ordinal, droptime, uuid)
 VALUES (1, 'Test Player One', 27, 1, 'PG', 80, 5, 3, 1, 3, 1500, 1600, 0, 1, 0, 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa')
 ON DUPLICATE KEY UPDATE name = VALUES(name);
 
-INSERT INTO ibl_plr (pid, name, age, teamid, pos, stamina, exp, bird, cy, cyt, cy1, cy2, retired, ordinal, droptime, uuid)
+INSERT INTO ibl_plr (pid, name, age, teamid, pos, stamina, exp, bird, cy, cyt, salary_yr1, salary_yr2, retired, ordinal, droptime, uuid)
 VALUES (2, 'Test Player Two', 22, 0, 'SF', 75, 1, 0, 0, 0, 0, 0, 0, 1000, 0, 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb')
 ON DUPLICATE KEY UPDATE name = VALUES(name);
 

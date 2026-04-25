@@ -64,7 +64,7 @@ class ContractListServiceTest extends TestCase
     public function testCalculatesContractYearsForCyZero(): void
     {
         $this->mockRepository->method('getActivePlayerContracts')->willReturn([
-            self::createPlayerContract(['cy' => 0, 'cy1' => 500, 'cy2' => 600, 'cy3' => 700]),
+            self::createPlayerContract(['cy' => 0, 'salary_yr1' => 500, 'salary_yr2' => 600, 'salary_yr3' => 700]),
         ]);
 
         $result = $this->service->getContractsWithCalculations();
@@ -77,12 +77,12 @@ class ContractListServiceTest extends TestCase
     public function testCalculatesContractYearsWithCyOffset(): void
     {
         $this->mockRepository->method('getActivePlayerContracts')->willReturn([
-            self::createPlayerContract(['cy' => 2, 'cy1' => 100, 'cy2' => 200, 'cy3' => 300, 'cy4' => 400]),
+            self::createPlayerContract(['cy' => 2, 'salary_yr1' => 100, 'salary_yr2' => 200, 'salary_yr3' => 300, 'salary_yr4' => 400]),
         ]);
 
         $result = $this->service->getContractsWithCalculations();
 
-        // cy=2 means: con1 maps to cy2, con2 maps to cy3, etc.
+        // cy=2 means: con1 maps to salary_yr2, con2 maps to salary_yr3, etc.
         $this->assertSame(200, $result['contracts'][0]['con1']);
         $this->assertSame(300, $result['contracts'][0]['con2']);
         $this->assertSame(400, $result['contracts'][0]['con3']);
@@ -91,7 +91,7 @@ class ContractListServiceTest extends TestCase
     public function testContractYearsBeyondSixAreZero(): void
     {
         $this->mockRepository->method('getActivePlayerContracts')->willReturn([
-            self::createPlayerContract(['cy' => 5, 'cy5' => 500, 'cy6' => 600]),
+            self::createPlayerContract(['cy' => 5, 'salary_yr5' => 500, 'salary_yr6' => 600]),
         ]);
 
         $result = $this->service->getContractsWithCalculations();
@@ -105,8 +105,8 @@ class ContractListServiceTest extends TestCase
     public function testCapTotalsAccumulateAcrossPlayers(): void
     {
         $this->mockRepository->method('getActivePlayerContracts')->willReturn([
-            self::createPlayerContract(['cy' => 0, 'cy1' => 500]),
-            self::createPlayerContract(['cy' => 0, 'cy1' => 300]),
+            self::createPlayerContract(['cy' => 0, 'salary_yr1' => 500]),
+            self::createPlayerContract(['cy' => 0, 'salary_yr1' => 300]),
         ]);
 
         $result = $this->service->getContractsWithCalculations();
@@ -118,7 +118,7 @@ class ContractListServiceTest extends TestCase
     public function testAvgCapsCalculatedPerTeam(): void
     {
         $this->mockRepository->method('getActivePlayerContracts')->willReturn([
-            self::createPlayerContract(['cy' => 0, 'cy1' => 2800]),
+            self::createPlayerContract(['cy' => 0, 'salary_yr1' => 2800]),
         ]);
 
         $result = $this->service->getContractsWithCalculations();
@@ -141,11 +141,11 @@ class ContractListServiceTest extends TestCase
     }
 
     /**
-     * @return array{pid: int, name: string, pos: string, teamname: string, teamid: int, cy: int, cyt: int, cy1: int, cy2: int, cy3: int, cy4: int, cy5: int, cy6: int, bird: string, team_city: string|null, color1: string|null, color2: string|null}
+     * @return array{pid: int, name: string, pos: string, teamname: string, teamid: int, cy: int, cyt: int, salary_yr1: int, salary_yr2: int, salary_yr3: int, salary_yr4: int, salary_yr5: int, salary_yr6: int, bird: string, team_city: string|null, color1: string|null, color2: string|null}
      */
     private static function createPlayerContract(array $overrides = []): array
     {
-        /** @var array{pid: int, name: string, pos: string, teamname: string, teamid: int, cy: int, cyt: int, cy1: int, cy2: int, cy3: int, cy4: int, cy5: int, cy6: int, bird: string, team_city: string|null, color1: string|null, color2: string|null} */
+        /** @var array{pid: int, name: string, pos: string, teamname: string, teamid: int, cy: int, cyt: int, salary_yr1: int, salary_yr2: int, salary_yr3: int, salary_yr4: int, salary_yr5: int, salary_yr6: int, bird: string, team_city: string|null, color1: string|null, color2: string|null} */
         return array_merge([
             'pid' => 1,
             'name' => 'Test Player',
@@ -154,12 +154,12 @@ class ContractListServiceTest extends TestCase
             'teamid' => 1,
             'cy' => 1,
             'cyt' => 3,
-            'cy1' => 500,
-            'cy2' => 550,
-            'cy3' => 600,
-            'cy4' => 0,
-            'cy5' => 0,
-            'cy6' => 0,
+            'salary_yr1' => 500,
+            'salary_yr2' => 550,
+            'salary_yr3' => 600,
+            'salary_yr4' => 0,
+            'salary_yr5' => 0,
+            'salary_yr6' => 0,
             'bird' => 'Yes',
             'team_city' => 'Atlanta',
             'color1' => 'FF0000',

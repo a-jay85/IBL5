@@ -88,7 +88,7 @@ class FreeAgencyAdminRepositoryTest extends DatabaseTestCase
 
     public function testUpdatePlayerContractSetsFieldsCorrectly(): void
     {
-        $this->insertTestPlayer(200060005, 'FA Contract Plyr', ['teamid' => 0, 'cy' => 0, 'cyt' => 0, 'cy1' => 0]);
+        $this->insertTestPlayer(200060005, 'FA Contract Plyr', ['teamid' => 0, 'cy' => 0, 'cyt' => 0, 'salary_yr1' => 0]);
 
         $affected = $this->repo->updatePlayerContract(
             200060005,
@@ -104,7 +104,7 @@ class FreeAgencyAdminRepositoryTest extends DatabaseTestCase
 
         self::assertSame(1, $affected);
 
-        $stmt = $this->db->prepare('SELECT cy, cyt, cy1, cy2, cy3, cy4, teamid, fa_signing_flag FROM ibl_plr WHERE pid = ?');
+        $stmt = $this->db->prepare('SELECT cy, cyt, salary_yr1, salary_yr2, salary_yr3, salary_yr4, teamid, fa_signing_flag FROM ibl_plr WHERE pid = ?');
         self::assertNotFalse($stmt);
         $stmt->bind_param('i', $pid);
         $pid = 200060005;
@@ -115,10 +115,10 @@ class FreeAgencyAdminRepositoryTest extends DatabaseTestCase
         self::assertNotNull($row);
         self::assertSame(0, $row['cy']);
         self::assertSame(3, $row['cyt']);
-        self::assertSame(1500, $row['cy1']);
-        self::assertSame(1600, $row['cy2']);
-        self::assertSame(1700, $row['cy3']);
-        self::assertSame(0, $row['cy4']);
+        self::assertSame(1500, $row['salary_yr1']);
+        self::assertSame(1600, $row['salary_yr2']);
+        self::assertSame(1700, $row['salary_yr3']);
+        self::assertSame(0, $row['salary_yr4']);
         self::assertSame(1, $row['teamid']);
         self::assertSame(1, $row['fa_signing_flag']);
     }

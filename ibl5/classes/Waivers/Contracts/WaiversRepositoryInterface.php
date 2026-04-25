@@ -58,7 +58,7 @@ interface WaiversRepositoryInterface
      * - Sets `bird` = 0 (resets Bird rights on waiver claim)
      * - Sets `teamid` to new team
      * - Sets `droptime` = 0 (clears waiver status)
-     * - If no existing contract: sets cy=0, cyt=1, cy1=salary, cy2-6=0
+     * - If no existing contract: sets cy=0, cyt=1, salary_yr1=salary, salary_yr2-6=0
      * 
      * **Behaviors:**
      * - Escapes team name for SQL safety

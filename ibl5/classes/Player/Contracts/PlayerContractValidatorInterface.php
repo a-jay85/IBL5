@@ -46,12 +46,12 @@ interface PlayerContractValidatorInterface
      * Eligibility depends on draft round and season phase:
      * 
      * Round 1:
-     * - Free Agency phase: Requires 2 years experience, cy4 must be empty
-     * - Preseason/HEAT: Requires 3 years experience, cy4 must be empty
-     * 
+     * - Free Agency phase: Requires 2 years experience, salary_yr4 must be empty
+     * - Preseason/HEAT: Requires 3 years experience, salary_yr4 must be empty
+     *
      * Round 2:
-     * - Free Agency phase: Requires 1 year experience, cy3 must be empty
-     * - Preseason/HEAT: Requires 2 years experience, cy3 must be empty
+     * - Free Agency phase: Requires 1 year experience, salary_yr3 must be empty
+     * - Preseason/HEAT: Requires 2 years experience, salary_yr3 must be empty
      * 
      * @param PlayerData $playerData The player to check
      * @param string $seasonPhase Current season phase ("Free Agency", "Preseason", "HEAT", etc.)
@@ -62,8 +62,8 @@ interface PlayerContractValidatorInterface
     /**
      * Get the final year rookie contract salary
      * 
-     * First round picks have 3-year rookie contracts (final year is cy3).
-     * Second round picks have 2-year rookie contracts (final year is cy2).
+     * First round picks have 3-year rookie contracts (final year is salary_yr3).
+     * Second round picks have 2-year rookie contracts (final year is salary_yr2).
      * Non-draft picks have no final year rookie contract and return 0.
      * 
      * This is used to determine if a team can exercise the rookie option.
@@ -88,13 +88,13 @@ interface PlayerContractValidatorInterface
      * Check if a player's rookie option was previously exercised
      * 
      * The rookie option doubles the salary from the previous year.
-     * For first round picks: Check in year 4 if cy4 = cy3 * 2
-     * For second round picks: Check in year 3 if cy3 = cy2 * 2
+     * For first round picks: Check in year 4 if salary_yr4 = salary_yr3 * 2
+     * For second round picks: Check in year 3 if salary_yr3 = salary_yr2 * 2
      * 
      * Only returns true when the player is in the year AFTER the rookie option year.
      * So this check only works when:
-     * - First round player is in year 4 with cy4 = cy3 * 2
-     * - Second round player is in year 3 with cy3 = cy2 * 2
+     * - First round player is in year 4 with salary_yr4 = salary_yr3 * 2
+     * - Second round player is in year 3 with salary_yr3 = salary_yr2 * 2
      * 
      * @param PlayerData $playerData The player to check
      * @return bool True if rookie option was exercised

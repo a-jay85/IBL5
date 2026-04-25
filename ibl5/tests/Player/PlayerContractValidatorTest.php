@@ -217,7 +217,7 @@ class PlayerContractValidatorTest extends TestCase
         
         $result = $this->validator->getFinalYearRookieContractSalary($playerData);
         
-        $this->assertEquals(150, $result, 'First round picks have 3-year contracts (cy3 is final year)');
+        $this->assertEquals(150, $result, 'First round picks have 3-year contracts (salary_yr3 is final year)');
     }
 
     public function testGetFinalYearRookieContractSalarySecondRound()
@@ -229,7 +229,7 @@ class PlayerContractValidatorTest extends TestCase
         
         $result = $this->validator->getFinalYearRookieContractSalary($playerData);
         
-        $this->assertEquals(100, $result, 'Second round picks have 2-year contracts (cy2 is final year)');
+        $this->assertEquals(100, $result, 'Second round picks have 2-year contracts (salary_yr2 is final year)');
     }
 
     public function testGetFinalYearRookieContractSalaryNotDraftPick()

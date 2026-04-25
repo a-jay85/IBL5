@@ -44,7 +44,7 @@ class ExtensionRepository extends \BaseMysqliRepository implements ExtensionRepo
 
         try {
             $this->execute(
-                "UPDATE ibl_plr SET cy = 1, cyt = ?, cy1 = ?, cy2 = ?, cy3 = ?, cy4 = ?, cy5 = ?, cy6 = ? WHERE name = ?",
+                "UPDATE ibl_plr SET cy = 1, cyt = ?, salary_yr1 = ?, salary_yr2 = ?, salary_yr3 = ?, salary_yr4 = ?, salary_yr5 = ?, salary_yr6 = ? WHERE name = ?",
                 'iiiiiiis',
                 $totalYears,
                 $currentSalary,

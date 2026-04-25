@@ -63,7 +63,7 @@ class WaiversRepositoryTest extends DatabaseTestCase
         self::assertTrue($result);
 
         // Verify DB state
-        $stmt = $this->db->prepare("SELECT teamid, ordinal, droptime, cy1, cyt FROM ibl_plr WHERE pid = ?");
+        $stmt = $this->db->prepare("SELECT teamid, ordinal, droptime, salary_yr1, cyt FROM ibl_plr WHERE pid = ?");
         self::assertNotFalse($stmt);
         $pid = 2;
         $stmt->bind_param('i', $pid);
@@ -75,7 +75,7 @@ class WaiversRepositoryTest extends DatabaseTestCase
         self::assertSame(2, $row['teamid']);
         self::assertSame(800, $row['ordinal']);
         self::assertSame(0, $row['droptime']);
-        self::assertSame(500, $row['cy1']);
+        self::assertSame(500, $row['salary_yr1']);
         self::assertSame(1, $row['cyt']);
     }
 
@@ -85,7 +85,7 @@ class WaiversRepositoryTest extends DatabaseTestCase
 
         // Set known contract fields on the player
         $stmt = $this->db->prepare(
-            "UPDATE ibl_plr SET cy = 1, cyt = 3, cy1 = 500, cy2 = 550, cy3 = 600, cy4 = 0, cy5 = 0, cy6 = 0 WHERE pid = ?"
+            "UPDATE ibl_plr SET cy = 1, cyt = 3, salary_yr1 = 500, salary_yr2 = 550, salary_yr3 = 600, salary_yr4 = 0, salary_yr5 = 0, salary_yr6 = 0 WHERE pid = ?"
         );
         self::assertNotFalse($stmt);
         $stmt->bind_param('i', $pid);
@@ -106,7 +106,7 @@ class WaiversRepositoryTest extends DatabaseTestCase
 
         // Verify DB state: contract fields preserved, roster fields updated
         $stmt = $this->db->prepare(
-            "SELECT teamid, ordinal, droptime, bird, cy, cyt, cy1, cy2, cy3 FROM ibl_plr WHERE pid = ?"
+            "SELECT teamid, ordinal, droptime, bird, cy, cyt, salary_yr1, salary_yr2, salary_yr3 FROM ibl_plr WHERE pid = ?"
         );
         self::assertNotFalse($stmt);
         $stmt->bind_param('i', $pid);
@@ -123,8 +123,8 @@ class WaiversRepositoryTest extends DatabaseTestCase
         // Contract fields preserved
         self::assertSame(1, $row['cy']);
         self::assertSame(3, $row['cyt']);
-        self::assertSame(500, $row['cy1']);
-        self::assertSame(550, $row['cy2']);
-        self::assertSame(600, $row['cy3']);
+        self::assertSame(500, $row['salary_yr1']);
+        self::assertSame(550, $row['salary_yr2']);
+        self::assertSame(600, $row['salary_yr3']);
     }
 }

@@ -179,12 +179,12 @@ class PlayerRepository extends BaseMysqliRepository implements PlayerRepositoryI
         $playerData->birdYears = $plrRow['bird'];
         $playerData->contractCurrentYear = $plrRow['cy'];
         $playerData->contractTotalYears = $plrRow['cyt'];
-        $playerData->contractYear1Salary = $plrRow['cy1'];
-        $playerData->contractYear2Salary = $plrRow['cy2'];
-        $playerData->contractYear3Salary = $plrRow['cy3'];
-        $playerData->contractYear4Salary = $plrRow['cy4'];
-        $playerData->contractYear5Salary = $plrRow['cy5'];
-        $playerData->contractYear6Salary = $plrRow['cy6'];
+        $playerData->contractYear1Salary = $plrRow['salary_yr1'];
+        $playerData->contractYear2Salary = $plrRow['salary_yr2'];
+        $playerData->contractYear3Salary = $plrRow['salary_yr3'];
+        $playerData->contractYear4Salary = $plrRow['salary_yr4'];
+        $playerData->contractYear5Salary = $plrRow['salary_yr5'];
+        $playerData->contractYear6Salary = $plrRow['salary_yr6'];
     }
 
     /**

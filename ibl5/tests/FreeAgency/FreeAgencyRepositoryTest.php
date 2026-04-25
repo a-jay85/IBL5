@@ -228,7 +228,7 @@ class FreeAgencyRepositoryTest extends TestCase
     public function testIsPlayerAlreadySignedReturnsTrueWhenCyZeroAndCy1NonZero(): void
     {
         $repository = new FreeAgencyRepository($this->mockMysqliDb);
-        $this->mockDb->onQuery('SELECT cy, cy1 FROM ibl_plr', [['cy' => 0, 'cy1' => 500]]);
+        $this->mockDb->onQuery('SELECT cy, salary_yr1 FROM ibl_plr', [['cy' => 0, 'salary_yr1' => 500]]);
 
         $result = $repository->isPlayerAlreadySigned(100);
 
@@ -238,7 +238,7 @@ class FreeAgencyRepositoryTest extends TestCase
     public function testIsPlayerAlreadySignedReturnsFalseWhenCy1IsZero(): void
     {
         $repository = new FreeAgencyRepository($this->mockMysqliDb);
-        $this->mockDb->onQuery('SELECT cy, cy1 FROM ibl_plr', [['cy' => 0, 'cy1' => 0]]);
+        $this->mockDb->onQuery('SELECT cy, salary_yr1 FROM ibl_plr', [['cy' => 0, 'salary_yr1' => 0]]);
 
         $result = $repository->isPlayerAlreadySigned(100);
 
@@ -248,7 +248,7 @@ class FreeAgencyRepositoryTest extends TestCase
     public function testIsPlayerAlreadySignedReturnsFalseWhenPlayerNotFound(): void
     {
         $repository = new FreeAgencyRepository($this->mockMysqliDb);
-        $this->mockDb->onQuery('SELECT cy, cy1 FROM ibl_plr', []);
+        $this->mockDb->onQuery('SELECT cy, salary_yr1 FROM ibl_plr', []);
 
         $result = $repository->isPlayerAlreadySigned(999);
 

@@ -61,7 +61,7 @@ interface FreeAgencyRepositoryInterface
     /**
      * Check if a player has already been signed during this free agency period
      *
-     * Returns true if player has cy=0 and a non-zero cy1 contract in the database,
+     * Returns true if player has cy=0 and a non-zero salary_yr1 contract in the database,
      * indicating they've been signed in the current free agency period.
      * Used to prevent duplicate signings of same player.
      *

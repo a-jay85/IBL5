@@ -102,13 +102,13 @@ class PlrFileWriterExpandedFieldsTest extends TestCase
         $record = str_repeat(' ', PlrFileWriter::PLAYER_RECORD_LENGTH);
         $record = substr_replace($record, PlrFieldSerializer::formatInt(1, 4), 0, 4);
         $record = substr_replace($record, PlrFieldSerializer::formatInt(12345, 6), 38, 6);
-        $record = substr_replace($record, PlrFieldSerializer::formatInt(8500, 4), 298, 4); // cy1
+        $record = substr_replace($record, PlrFieldSerializer::formatInt(8500, 4), 298, 4); // salary_yr1
 
         $updated = PlrFileWriter::applyChangesToRecord($record, [
             'seasonGamesPlayed' => 82,
             'seasonMIN' => 2900,
         ]);
 
-        $this->assertSame(8500, PlrFileWriter::readField($updated, 'cy1'));
+        $this->assertSame(8500, PlrFileWriter::readField($updated, 'salary_yr1'));
     }
 }

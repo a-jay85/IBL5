@@ -155,12 +155,12 @@ class League extends BaseMysqliRepository
             FROM ibl_plr
             WHERE retired = 0
               AND CASE COALESCE(cy, 0) + 1
-                  WHEN 1 THEN cy1
-                  WHEN 2 THEN cy2
-                  WHEN 3 THEN cy3
-                  WHEN 4 THEN cy4
-                  WHEN 5 THEN cy5
-                  WHEN 6 THEN cy6
+                  WHEN 1 THEN salary_yr1
+                  WHEN 2 THEN salary_yr2
+                  WHEN 3 THEN salary_yr3
+                  WHEN 4 THEN salary_yr4
+                  WHEN 5 THEN salary_yr5
+                  WHEN 6 THEN salary_yr6
                   ELSE 0
               END = 0
             ORDER BY name ASC"

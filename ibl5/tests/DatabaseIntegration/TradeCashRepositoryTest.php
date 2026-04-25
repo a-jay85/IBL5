@@ -32,9 +32,9 @@ class TradeCashRepositoryTest extends DatabaseTestCase
         self::assertSame($offerId, $row['tradeOfferID']);
         self::assertSame('Metros', $row['sendingTeam']);
         self::assertSame('Sharks', $row['receivingTeam']);
-        self::assertSame(500, $row['cy1']);
-        self::assertSame(600, $row['cy2']);
-        self::assertSame(0, $row['cy3']);
+        self::assertSame(500, $row['salary_yr1']);
+        self::assertSame(600, $row['salary_yr2']);
+        self::assertSame(0, $row['salary_yr3']);
     }
 
     public function testGetCashTransactionByOfferReturnsNullWhenNone(): void
@@ -52,9 +52,9 @@ class TradeCashRepositoryTest extends DatabaseTestCase
         $offer2 = $this->insertTradeOfferRow();
         $offer3 = $this->insertTradeOfferRow();
 
-        $this->insertTradeCashRow($offer1, 'Metros', 'Sharks', ['cy1' => 100]);
-        $this->insertTradeCashRow($offer2, 'Sharks', 'Metros', ['cy1' => 200]);
-        $this->insertTradeCashRow($offer3, 'Metros', 'Hawks', ['cy1' => 300]);
+        $this->insertTradeCashRow($offer1, 'Metros', 'Sharks', ['salary_yr1' => 100]);
+        $this->insertTradeCashRow($offer2, 'Sharks', 'Metros', ['salary_yr1' => 200]);
+        $this->insertTradeCashRow($offer3, 'Metros', 'Hawks', ['salary_yr1' => 300]);
 
         $result = $this->repo->getCashTransactionsByOfferIds([$offer1, $offer2, $offer3]);
 
@@ -62,8 +62,8 @@ class TradeCashRepositoryTest extends DatabaseTestCase
         self::assertArrayHasKey("$offer1:Metros", $result);
         self::assertArrayHasKey("$offer2:Sharks", $result);
         self::assertArrayHasKey("$offer3:Metros", $result);
-        self::assertSame(100, $result["$offer1:Metros"]['cy1']);
-        self::assertSame(200, $result["$offer2:Sharks"]['cy1']);
+        self::assertSame(100, $result["$offer1:Metros"]['salary_yr1']);
+        self::assertSame(200, $result["$offer2:Sharks"]['salary_yr1']);
     }
 
     public function testGetCashTransactionsByOfferIdsEmptyReturnsEmpty(): void
@@ -80,8 +80,8 @@ class TradeCashRepositoryTest extends DatabaseTestCase
         $offer1 = $this->insertTradeOfferRow();
         $offer2 = $this->insertTradeOfferRow();
 
-        $this->insertTradeCashRow($offer1, 'Metros', 'Sharks', ['cy1' => 100]);
-        $this->insertTradeCashRow($offer2, 'Hawks', 'Metros', ['cy1' => 200]);
+        $this->insertTradeCashRow($offer1, 'Metros', 'Sharks', ['salary_yr1' => 100]);
+        $this->insertTradeCashRow($offer2, 'Hawks', 'Metros', ['salary_yr1' => 200]);
 
         $this->repo->deleteTradeCashByOfferId($offer1);
 
@@ -90,7 +90,7 @@ class TradeCashRepositoryTest extends DatabaseTestCase
 
         $remaining = $this->repo->getCashTransactionByOffer($offer2, 'Hawks');
         self::assertNotNull($remaining);
-        self::assertSame(200, $remaining['cy1']);
+        self::assertSame(200, $remaining['salary_yr1']);
     }
 
     // ── Clear all trade cash ────────────────────────────────────
@@ -98,7 +98,7 @@ class TradeCashRepositoryTest extends DatabaseTestCase
     public function testClearTradeCashRemovesAllRows(): void
     {
         $offer = $this->insertTradeOfferRow();
-        $this->insertTradeCashRow($offer, 'Metros', 'Sharks', ['cy1' => 100]);
+        $this->insertTradeCashRow($offer, 'Metros', 'Sharks', ['salary_yr1' => 100]);
 
         $this->repo->clearTradeCash();
 

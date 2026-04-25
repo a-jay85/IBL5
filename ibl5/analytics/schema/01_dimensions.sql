@@ -22,8 +22,8 @@ SELECT
     TRY_CAST(exp AS INTEGER) AS exp,
     -- Current contract salary (cy indicates current year of contract)
     CASE TRY_CAST(cy AS INTEGER)
-        WHEN 1 THEN TRY_CAST(cy1 AS INTEGER) WHEN 2 THEN TRY_CAST(cy2 AS INTEGER) WHEN 3 THEN TRY_CAST(cy3 AS INTEGER)
-        WHEN 4 THEN TRY_CAST(cy4 AS INTEGER) WHEN 5 THEN TRY_CAST(cy5 AS INTEGER) WHEN 6 THEN TRY_CAST(cy6 AS INTEGER)
+        WHEN 1 THEN TRY_CAST(salary_yr1 AS INTEGER) WHEN 2 THEN TRY_CAST(salary_yr2 AS INTEGER) WHEN 3 THEN TRY_CAST(salary_yr3 AS INTEGER)
+        WHEN 4 THEN TRY_CAST(salary_yr4 AS INTEGER) WHEN 5 THEN TRY_CAST(salary_yr5 AS INTEGER) WHEN 6 THEN TRY_CAST(salary_yr6 AS INTEGER)
         ELSE 0
     END AS current_salary,
     -- Migration 114: MariaDB column renamed tid → teamid.

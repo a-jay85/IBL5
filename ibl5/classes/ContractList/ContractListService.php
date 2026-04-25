@@ -106,7 +106,7 @@ class ContractListService implements ContractListServiceInterface
     /**
      * Calculate contract year values for a player.
      *
-     * @param array{cy: int, cyt: int, cy1: int, cy2: int, cy3: int, cy4: int, cy5: int, cy6: int} $player Player data
+     * @param array{cy: int, cyt: int, salary_yr1: int, salary_yr2: int, salary_yr3: int, salary_yr4: int, salary_yr5: int, salary_yr6: int} $player Player data
      * @return array{con1: int, con2: int, con3: int, con4: int, con5: int, con6: int} Contract values per year
      */
     private function calculateContractYears(array $player): array
@@ -121,36 +121,36 @@ class ContractListService implements ContractListServiceInterface
         $year5 = $cy + 4;
         $year6 = $cy + 5;
 
-        /** @var array{cy1: int, cy2: int, cy3: int, cy4: int, cy5: int, cy6: int} $cyValues */
+        /** @var array{salary_yr1: int, salary_yr2: int, salary_yr3: int, salary_yr4: int, salary_yr5: int, salary_yr6: int} $cyValues */
         $cyValues = [
-            'cy1' => $player['cy1'],
-            'cy2' => $player['cy2'],
-            'cy3' => $player['cy3'],
-            'cy4' => $player['cy4'],
-            'cy5' => $player['cy5'],
-            'cy6' => $player['cy6'],
+            'salary_yr1' => $player['salary_yr1'],
+            'salary_yr2' => $player['salary_yr2'],
+            'salary_yr3' => $player['salary_yr3'],
+            'salary_yr4' => $player['salary_yr4'],
+            'salary_yr5' => $player['salary_yr5'],
+            'salary_yr6' => $player['salary_yr6'],
         ];
 
         if ($cy === 0) {
             // Direct mapping when cy is 0
             return [
-                'con1' => ($year1 < 7) ? $cyValues['cy1'] : 0,
-                'con2' => ($year2 < 7) ? $cyValues['cy2'] : 0,
-                'con3' => ($year3 < 7) ? $cyValues['cy3'] : 0,
-                'con4' => ($year4 < 7) ? $cyValues['cy4'] : 0,
-                'con5' => ($year5 < 7) ? $cyValues['cy5'] : 0,
-                'con6' => ($year6 < 7) ? $cyValues['cy6'] : 0,
+                'con1' => ($year1 < 7) ? $cyValues['salary_yr1'] : 0,
+                'con2' => ($year2 < 7) ? $cyValues['salary_yr2'] : 0,
+                'con3' => ($year3 < 7) ? $cyValues['salary_yr3'] : 0,
+                'con4' => ($year4 < 7) ? $cyValues['salary_yr4'] : 0,
+                'con5' => ($year5 < 7) ? $cyValues['salary_yr5'] : 0,
+                'con6' => ($year6 < 7) ? $cyValues['salary_yr6'] : 0,
             ];
         }
 
         // Dynamic mapping based on current year
         return [
-            'con1' => ($year1 < 7) ? ($cyValues['cy' . $year1] ?? 0) : 0,
-            'con2' => ($year2 < 7) ? ($cyValues['cy' . $year2] ?? 0) : 0,
-            'con3' => ($year3 < 7) ? ($cyValues['cy' . $year3] ?? 0) : 0,
-            'con4' => ($year4 < 7) ? ($cyValues['cy' . $year4] ?? 0) : 0,
-            'con5' => ($year5 < 7) ? ($cyValues['cy' . $year5] ?? 0) : 0,
-            'con6' => ($year6 < 7) ? ($cyValues['cy' . $year6] ?? 0) : 0,
+            'con1' => ($year1 < 7) ? ($cyValues['salary_yr' . $year1] ?? 0) : 0,
+            'con2' => ($year2 < 7) ? ($cyValues['salary_yr' . $year2] ?? 0) : 0,
+            'con3' => ($year3 < 7) ? ($cyValues['salary_yr' . $year3] ?? 0) : 0,
+            'con4' => ($year4 < 7) ? ($cyValues['salary_yr' . $year4] ?? 0) : 0,
+            'con5' => ($year5 < 7) ? ($cyValues['salary_yr' . $year5] ?? 0) : 0,
+            'con6' => ($year6 < 7) ? ($cyValues['salary_yr' . $year6] ?? 0) : 0,
         ];
     }
 }

@@ -91,12 +91,12 @@ class FreeAgencyAdminRepository extends BaseMysqliRepository implements FreeAgen
         return $this->execute(
             "UPDATE ibl_plr
              SET cy = 0,
-                 cy1 = ?,
-                 cy2 = ?,
-                 cy3 = ?,
-                 cy4 = ?,
-                 cy5 = ?,
-                 cy6 = ?,
+                 salary_yr1 = ?,
+                 salary_yr2 = ?,
+                 salary_yr3 = ?,
+                 salary_yr4 = ?,
+                 salary_yr5 = ?,
+                 salary_yr6 = ?,
                  cyt = ?,
                  teamid = ?,
                  fa_signing_flag = 1

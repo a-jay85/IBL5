@@ -36,7 +36,7 @@ class RookieOptionRepositoryTest extends TestCase
         $queries = $this->mockDb->getExecutedQueries();
         $this->assertCount(1, $queries);
         $this->assertStringContainsString('UPDATE ibl_plr', $queries[0]);
-        $this->assertStringContainsString('cy4', $queries[0]);
+        $this->assertStringContainsString('salary_yr4', $queries[0]);
         $this->assertStringContainsString('200', $queries[0]);
         $this->assertStringContainsString('WHERE pid = 123', $queries[0]);
     }
@@ -56,7 +56,7 @@ class RookieOptionRepositoryTest extends TestCase
         $queries = $this->mockDb->getExecutedQueries();
         $this->assertCount(1, $queries);
         $this->assertStringContainsString('UPDATE ibl_plr', $queries[0]);
-        $this->assertStringContainsString('cy3', $queries[0]);
+        $this->assertStringContainsString('salary_yr3', $queries[0]);
         $this->assertStringContainsString('150', $queries[0]);
         $this->assertStringContainsString('WHERE pid = 456', $queries[0]);
     }

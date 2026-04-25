@@ -93,7 +93,7 @@ INSERT INTO ibl_plr_snapshots
      r_fga, r_fgp, r_fta, r_ftp, r_3ga, r_3gp,
      r_orb, r_drb, r_ast, r_stl, r_tvr, r_blk, r_foul,
      talent, skill, intangibles, clutch, consistency, exp, bird,
-     cy, cyt, cy1, cy2, cy3, cy4, cy5, cy6,
+     cy, cyt, salary_yr1, salary_yr2, salary_yr3, salary_yr4, salary_yr5, salary_yr6,
      pg_depth, sg_depth, sf_depth, pf_depth, c_depth)
 VALUES (?, ?, ?, ?, ?, ?,
         ?, ?, ?, ?, ?, ?,
@@ -128,9 +128,9 @@ ON DUPLICATE KEY UPDATE
     clutch = VALUES(clutch), consistency = VALUES(consistency),
     exp = VALUES(exp), bird = VALUES(bird),
     cy = VALUES(cy), cyt = VALUES(cyt),
-    cy1 = VALUES(cy1), cy2 = VALUES(cy2),
-    cy3 = VALUES(cy3), cy4 = VALUES(cy4),
-    cy5 = VALUES(cy5), cy6 = VALUES(cy6),
+    salary_yr1 = VALUES(salary_yr1), salary_yr2 = VALUES(salary_yr2),
+    salary_yr3 = VALUES(salary_yr3), salary_yr4 = VALUES(salary_yr4),
+    salary_yr5 = VALUES(salary_yr5), salary_yr6 = VALUES(salary_yr6),
     pg_depth = VALUES(pg_depth), sg_depth = VALUES(sg_depth),
     sf_depth = VALUES(sf_depth), pf_depth = VALUES(pf_depth),
     c_depth = VALUES(c_depth)
@@ -196,12 +196,12 @@ while (($line = fgets($handle)) !== false) {
     $bird = (int) $fields[40];
     $cy = (int) $fields[41];
     $cyt = (int) $fields[42];
-    $cy1 = (int) $fields[43];
-    $cy2 = (int) $fields[44];
-    $cy3 = (int) $fields[45];
-    $cy4 = (int) $fields[46];
-    $cy5 = (int) $fields[47];
-    $cy6 = (int) $fields[48];
+    $salaryYr1 = (int) $fields[43];
+    $salaryYr2 = (int) $fields[44];
+    $salaryYr3 = (int) $fields[45];
+    $salaryYr4 = (int) $fields[46];
+    $salaryYr5 = (int) $fields[47];
+    $salaryYr6 = (int) $fields[48];
     $pgDepth = (int) $fields[49];
     $sgDepth = (int) $fields[50];
     $sfDepth = (int) $fields[51];
@@ -216,7 +216,7 @@ while (($line = fgets($handle)) !== false) {
         $rFga, $rFgp, $rFta, $rFtp, $rTga, $rTgp,
         $rOrb, $rDrb, $rAst, $rStl, $rTo, $rBlk, $rFoul,
         $talent, $skill, $intangibles, $clutch, $consistency, $exp, $bird,
-        $cy, $cyt, $cy1, $cy2, $cy3, $cy4, $cy5, $cy6,
+        $cy, $cyt, $salaryYr1, $salaryYr2, $salaryYr3, $salaryYr4, $salaryYr5, $salaryYr6,
         $pgDepth, $sgDepth, $sfDepth, $pfDepth, $cDepth
     );
 

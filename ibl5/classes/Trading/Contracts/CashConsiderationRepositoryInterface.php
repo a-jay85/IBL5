@@ -19,12 +19,12 @@ namespace Trading\Contracts;
  *     trade_offer_id: int|null,
  *     cy: int,
  *     cyt: int,
- *     cy1: int,
- *     cy2: int,
- *     cy3: int,
- *     cy4: int,
- *     cy5: int,
- *     cy6: int,
+ *     salary_yr1: int,
+ *     salary_yr2: int,
+ *     salary_yr3: int,
+ *     salary_yr4: int,
+ *     salary_yr5: int,
+ *     salary_yr6: int,
  *     created_at: string,
  *     updated_at: string
  * }
@@ -37,12 +37,12 @@ namespace Trading\Contracts;
  *     trade_offer_id?: int|null,
  *     cy: int,
  *     cyt: int,
- *     cy1: int,
- *     cy2: int,
- *     cy3: int,
- *     cy4: int,
- *     cy5: int,
- *     cy6: int
+ *     salary_yr1: int,
+ *     salary_yr2: int,
+ *     salary_yr3: int,
+ *     salary_yr4: int,
+ *     salary_yr5: int,
+ *     salary_yr6: int
  * }
  */
 interface CashConsiderationRepositoryInterface
@@ -73,7 +73,7 @@ interface CashConsiderationRepositoryInterface
      * Get cash/buyout records for salary cap calculations.
      * Returns the fields needed for the cy-based salary offset logic.
      *
-     * @return list<array{cy: int, cy1: int, cy2: int, cy3: int, cy4: int, cy5: int, cy6: int}>
+     * @return list<array{cy: int, salary_yr1: int, salary_yr2: int, salary_yr3: int, salary_yr4: int, salary_yr5: int, salary_yr6: int}>
      */
     public function getTeamCashForSalary(int $teamId): array;
 

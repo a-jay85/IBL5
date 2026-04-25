@@ -58,12 +58,12 @@ class PlrFileWriter implements PlrFileWriterInterface
     public const WIDTH_CYT = 2;
 
     // Contract year salaries (4 chars each, offsets 298-321)
-    public const OFFSET_CY1 = 298;
-    public const OFFSET_CY2 = 302;
-    public const OFFSET_CY3 = 306;
-    public const OFFSET_CY4 = 310;
-    public const OFFSET_CY5 = 314;
-    public const OFFSET_CY6 = 318;
+    public const OFFSET_SALARY_YR1 = 298;
+    public const OFFSET_SALARY_YR2 = 302;
+    public const OFFSET_SALARY_YR3 = 306;
+    public const OFFSET_SALARY_YR4 = 310;
+    public const OFFSET_SALARY_YR5 = 314;
+    public const OFFSET_SALARY_YR6 = 318;
     public const WIDTH_CY_SALARY = 4;
 
     // Derived fields (auto-updated when related fields change)
@@ -101,12 +101,12 @@ class PlrFileWriter implements PlrFileWriterInterface
         'bird' => [self::OFFSET_BIRD, self::WIDTH_BIRD],
         'cy' => [self::OFFSET_CY, self::WIDTH_CY],
         'cyt' => [self::OFFSET_CYT, self::WIDTH_CYT],
-        'cy1' => [self::OFFSET_CY1, self::WIDTH_CY_SALARY],
-        'cy2' => [self::OFFSET_CY2, self::WIDTH_CY_SALARY],
-        'cy3' => [self::OFFSET_CY3, self::WIDTH_CY_SALARY],
-        'cy4' => [self::OFFSET_CY4, self::WIDTH_CY_SALARY],
-        'cy5' => [self::OFFSET_CY5, self::WIDTH_CY_SALARY],
-        'cy6' => [self::OFFSET_CY6, self::WIDTH_CY_SALARY],
+        'salary_yr1' => [self::OFFSET_SALARY_YR1, self::WIDTH_CY_SALARY],
+        'salary_yr2' => [self::OFFSET_SALARY_YR2, self::WIDTH_CY_SALARY],
+        'salary_yr3' => [self::OFFSET_SALARY_YR3, self::WIDTH_CY_SALARY],
+        'salary_yr4' => [self::OFFSET_SALARY_YR4, self::WIDTH_CY_SALARY],
+        'salary_yr5' => [self::OFFSET_SALARY_YR5, self::WIDTH_CY_SALARY],
+        'salary_yr6' => [self::OFFSET_SALARY_YR6, self::WIDTH_CY_SALARY],
         'freeAgentSigningFlag' => [self::OFFSET_FA_SIGNING_FLAG, self::WIDTH_FA_SIGNING_FLAG],
         'contractOwnedBy' => [self::OFFSET_CONTRACT_OWNED_BY, self::WIDTH_CONTRACT_OWNED_BY],
         'currentTeamIndex' => [self::OFFSET_CURRENT_TEAM_INDEX, self::WIDTH_CURRENT_TEAM_INDEX],

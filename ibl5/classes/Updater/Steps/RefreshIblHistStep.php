@@ -97,9 +97,9 @@ SELECT
   CAST(COALESCE(snap.pd,    0) AS SIGNED)                    AS r_pd,
   CAST(COALESCE(snap.td,    0) AS SIGNED)                    AS r_td,
   CAST(COALESCE(CASE snap.cy
-    WHEN 1 THEN snap.cy1  WHEN 2 THEN snap.cy2
-    WHEN 3 THEN snap.cy3  WHEN 4 THEN snap.cy4
-    WHEN 5 THEN snap.cy5  WHEN 6 THEN snap.cy6
+    WHEN 1 THEN snap.salary_yr1  WHEN 2 THEN snap.salary_yr2
+    WHEN 3 THEN snap.salary_yr3  WHEN 4 THEN snap.salary_yr4
+    WHEN 5 THEN snap.salary_yr5  WHEN 6 THEN snap.salary_yr6
     ELSE 0 END, 0) AS SIGNED)                                AS salary,
   CAST(COALESCE(snap.talent, 0)                  AS SIGNED)  AS talent,
   CAST(COALESCE(snap.skill, 0)                   AS SIGNED)  AS skill,
@@ -109,12 +109,12 @@ SELECT
   CAST(COALESCE(snap.consistency, 0)             AS SIGNED)  AS consistency,
   CAST(COALESCE(snap.age, 0)                     AS SIGNED)  AS age,
   CAST(COALESCE(snap.peak, 0)                    AS SIGNED)  AS peak,
-  CAST(COALESCE(snap.cy1, 0)                     AS SIGNED)  AS cy1,
-  CAST(COALESCE(snap.cy2, 0)                     AS SIGNED)  AS cy2,
-  CAST(COALESCE(snap.cy3, 0)                     AS SIGNED)  AS cy3,
-  CAST(COALESCE(snap.cy4, 0)                     AS SIGNED)  AS cy4,
-  CAST(COALESCE(snap.cy5, 0)                     AS SIGNED)  AS cy5,
-  CAST(COALESCE(snap.cy6, 0)                     AS SIGNED)  AS cy6,
+  CAST(COALESCE(snap.salary_yr1, 0)               AS SIGNED)  AS salary_yr1,
+  CAST(COALESCE(snap.salary_yr2, 0)               AS SIGNED)  AS salary_yr2,
+  CAST(COALESCE(snap.salary_yr3, 0)               AS SIGNED)  AS salary_yr3,
+  CAST(COALESCE(snap.salary_yr4, 0)               AS SIGNED)  AS salary_yr4,
+  CAST(COALESCE(snap.salary_yr5, 0)               AS SIGNED)  AS salary_yr5,
+  CAST(COALESCE(snap.salary_yr6, 0)               AS SIGNED)  AS salary_yr6,
   CAST(snap.phantom_games AS SIGNED)                         AS phantom_games
 FROM (
   SELECT

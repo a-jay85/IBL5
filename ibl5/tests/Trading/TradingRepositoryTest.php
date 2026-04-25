@@ -202,8 +202,8 @@ class TradingRepositoryTest extends TestCase
     {
         $repository = new TradeFormRepository($this->mockMysqliDb);
         $this->mockDb->setMockData([
-            ['pos' => 'PG', 'name' => 'Guard One', 'pid' => 1, 'ordinal' => 10, 'cy' => 2, 'cy1' => 500, 'cy2' => 525, 'cy3' => 0, 'cy4' => 0, 'cy5' => 0, 'cy6' => 0],
-            ['pos' => 'C', 'name' => 'Center Two', 'pid' => 2, 'ordinal' => 20, 'cy' => 1, 'cy1' => 800, 'cy2' => 0, 'cy3' => 0, 'cy4' => 0, 'cy5' => 0, 'cy6' => 0],
+            ['pos' => 'PG', 'name' => 'Guard One', 'pid' => 1, 'ordinal' => 10, 'cy' => 2, 'salary_yr1' => 500, 'salary_yr2' => 525, 'salary_yr3' => 0, 'salary_yr4' => 0, 'salary_yr5' => 0, 'salary_yr6' => 0],
+            ['pos' => 'C', 'name' => 'Center Two', 'pid' => 2, 'ordinal' => 20, 'cy' => 1, 'salary_yr1' => 800, 'salary_yr2' => 0, 'salary_yr3' => 0, 'salary_yr4' => 0, 'salary_yr5' => 0, 'salary_yr6' => 0],
         ]);
 
         $result = $repository->getTeamPlayersForTrading(1);

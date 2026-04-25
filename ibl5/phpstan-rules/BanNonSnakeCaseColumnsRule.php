@@ -88,6 +88,15 @@ final class BanNonSnakeCaseColumnsRule implements Rule
         '`clinchedDivision`' => 'Rename to `clinched_division`; migration 118 snake-cased standings columns.',
         '`clinchedPlayoffs`' => 'Rename to `clinched_playoffs`; migration 118 snake-cased standings columns.',
         '`clinchedLeague`' => 'Rename to `clinched_league`; migration 118 snake-cased standings columns.',
+
+        // Contract salary columns (ibl_plr, ibl_plr_snapshots, ibl_olympics_plr,
+        // ibl_cash_considerations, ibl_trade_cash, ibl_hist).
+        '`cy1`' => 'Rename to `salary_yr1`; migration 119 renamed contract salary columns.',
+        '`cy2`' => 'Rename to `salary_yr2`; migration 119 renamed contract salary columns.',
+        '`cy3`' => 'Rename to `salary_yr3`; migration 119 renamed contract salary columns.',
+        '`cy4`' => 'Rename to `salary_yr4`; migration 119 renamed contract salary columns.',
+        '`cy5`' => 'Rename to `salary_yr5`; migration 119 renamed contract salary columns.',
+        '`cy6`' => 'Rename to `salary_yr6`; migration 119 renamed contract salary columns.',
     ];
 
     public function getNodeType(): string

@@ -67,7 +67,7 @@ class WaiversRepositoryTest extends TestCase
         $this->assertStringContainsString('UPDATE ibl_plr', $queries[0]);
         $this->assertStringContainsString('ordinal', $queries[0]);
         $this->assertStringContainsString('800', $queries[0]);
-        $this->assertStringContainsString('cy1', $queries[0]);
+        $this->assertStringContainsString('salary_yr1', $queries[0]);
         $this->assertStringContainsString('103', $queries[0]);
         $this->assertStringContainsString('`cy` = 0', $queries[0]);
         $this->assertStringContainsString('`cyt` = 1', $queries[0]);
@@ -102,7 +102,7 @@ class WaiversRepositoryTest extends TestCase
         $this->assertStringContainsString('UPDATE ibl_plr', $queries[0]);
         $this->assertStringContainsString('ordinal', $queries[0]);
         $this->assertStringContainsString('800', $queries[0]);
-        $this->assertStringNotContainsString('cy1', $queries[0]);
+        $this->assertStringNotContainsString('salary_yr1', $queries[0]);
     }
     
     public function testSignPlayerFromWaiversWithNewContractDuringFreeAgency()
@@ -132,7 +132,7 @@ class WaiversRepositoryTest extends TestCase
         $this->assertStringContainsString('UPDATE ibl_plr', $queries[0]);
         $this->assertStringContainsString('ordinal', $queries[0]);
         $this->assertStringContainsString('800', $queries[0]);
-        $this->assertStringContainsString('`cy1` = 76', $queries[0]);
+        $this->assertStringContainsString('`salary_yr1` = 76', $queries[0]);
         $this->assertStringContainsString('`cy` = 0', $queries[0]);
         $this->assertStringContainsString('`cyt` = 1', $queries[0]);
         $this->assertStringContainsString('droptime', $queries[0]);

@@ -170,7 +170,7 @@ class TradingService implements TradingServiceInterface
             $i = 0;
             $cy = $contractYear;
             while ($cy < 7) {
-                $cyRawValue = $playerRow["cy{$cy}"] ?? 0;
+                $cyRawValue = $playerRow["salary_yr{$cy}"] ?? 0;
                 $cyValue = is_int($cyRawValue) ? $cyRawValue : 0;
                 $futureSalary['player'][$i] += $cyValue;
                 if ($cyValue > 0) {
@@ -319,7 +319,7 @@ class TradingService implements TradingServiceInterface
 
         if ($cashDetails !== null) {
             for ($y = 1; $y <= 6; $y++) {
-                $cyKey = "cy{$y}";
+                $cyKey = "salary_yr{$y}";
                 $amount = $cashDetails[$cyKey];
                 if ($amount === null || $amount <= 0) {
                     continue;
@@ -414,8 +414,8 @@ class TradingService implements TradingServiceInterface
             $fromCash = [];
             $toCash = [];
             for ($y = 1; $y <= 6; $y++) {
-                $fromCash[$y] = ($fromCashRow !== null && $fromCashRow["cy{$y}"] !== null) ? $fromCashRow["cy{$y}"] : 0;
-                $toCash[$y] = ($toCashRow !== null && $toCashRow["cy{$y}"] !== null) ? $toCashRow["cy{$y}"] : 0;
+                $fromCash[$y] = ($fromCashRow !== null && $fromCashRow["salary_yr{$y}"] !== null) ? $fromCashRow["salary_yr{$y}"] : 0;
+                $toCash[$y] = ($toCashRow !== null && $toCashRow["salary_yr{$y}"] !== null) ? $toCashRow["salary_yr{$y}"] : 0;
             }
 
             $offer['previewData'] = [

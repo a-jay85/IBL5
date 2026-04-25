@@ -254,6 +254,36 @@ final class BanNonSnakeCaseColumnsRuleTest extends RuleTestCase
                     . 'Rename to `clinched_league`; migration 118 snake-cased standings columns.',
                     50,
                 ],
+                [
+                    'Banned backtick-quoted column reference `cy1` in SQL string. '
+                    . 'Rename to `salary_yr1`; migration 119 renamed contract salary columns.',
+                    51,
+                ],
+                [
+                    'Banned backtick-quoted column reference `cy2` in SQL string. '
+                    . 'Rename to `salary_yr2`; migration 119 renamed contract salary columns.',
+                    52,
+                ],
+                [
+                    'Banned backtick-quoted column reference `cy3` in SQL string. '
+                    . 'Rename to `salary_yr3`; migration 119 renamed contract salary columns.',
+                    53,
+                ],
+                [
+                    'Banned backtick-quoted column reference `cy4` in SQL string. '
+                    . 'Rename to `salary_yr4`; migration 119 renamed contract salary columns.',
+                    54,
+                ],
+                [
+                    'Banned backtick-quoted column reference `cy5` in SQL string. '
+                    . 'Rename to `salary_yr5`; migration 119 renamed contract salary columns.',
+                    55,
+                ],
+                [
+                    'Banned backtick-quoted column reference `cy6` in SQL string. '
+                    . 'Rename to `salary_yr6`; migration 119 renamed contract salary columns.',
+                    56,
+                ],
             ],
         );
     }

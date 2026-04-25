@@ -20,12 +20,12 @@ interface ContractListRepositoryInterface
      *     teamname: string,
      *     cy: int,
      *     cyt: int,
-     *     cy1: int,
-     *     cy2: int,
-     *     cy3: int,
-     *     cy4: int,
-     *     cy5: int,
-     *     cy6: int,
+     *     salary_yr1: int,
+     *     salary_yr2: int,
+     *     salary_yr3: int,
+     *     salary_yr4: int,
+     *     salary_yr5: int,
+     *     salary_yr6: int,
      *     bird: string
      * }> Array of player contract data
      */

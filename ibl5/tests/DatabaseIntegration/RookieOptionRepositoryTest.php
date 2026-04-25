@@ -22,13 +22,13 @@ class RookieOptionRepositoryTest extends DatabaseTestCase
 
     public function testUpdatePlayerRookieOptionSetsCy4ForFirstRoundPick(): void
     {
-        $this->insertTestPlayer(200150001, 'Rookie Round1', ['cy4' => 0]);
+        $this->insertTestPlayer(200150001, 'Rookie Round1', ['salary_yr4' => 0]);
 
         $result = $this->repo->updatePlayerRookieOption(200150001, 1, 2500);
 
         self::assertTrue($result);
 
-        $stmt = $this->db->prepare('SELECT cy4 FROM ibl_plr WHERE pid = ?');
+        $stmt = $this->db->prepare('SELECT salary_yr4 FROM ibl_plr WHERE pid = ?');
         self::assertNotFalse($stmt);
         $stmt->bind_param('i', $pid);
         $pid = 200150001;
@@ -37,18 +37,18 @@ class RookieOptionRepositoryTest extends DatabaseTestCase
         $stmt->close();
 
         self::assertNotNull($row);
-        self::assertSame(2500, $row['cy4']);
+        self::assertSame(2500, $row['salary_yr4']);
     }
 
     public function testUpdatePlayerRookieOptionSetsCy3ForSecondRoundPick(): void
     {
-        $this->insertTestPlayer(200150002, 'Rookie Round2', ['cy3' => 0]);
+        $this->insertTestPlayer(200150002, 'Rookie Round2', ['salary_yr3' => 0]);
 
         $result = $this->repo->updatePlayerRookieOption(200150002, 2, 1800);
 
         self::assertTrue($result);
 
-        $stmt = $this->db->prepare('SELECT cy3 FROM ibl_plr WHERE pid = ?');
+        $stmt = $this->db->prepare('SELECT salary_yr3 FROM ibl_plr WHERE pid = ?');
         self::assertNotFalse($stmt);
         $stmt->bind_param('i', $pid);
         $pid = 200150002;
@@ -57,7 +57,7 @@ class RookieOptionRepositoryTest extends DatabaseTestCase
         $stmt->close();
 
         self::assertNotNull($row);
-        self::assertSame(1800, $row['cy3']);
+        self::assertSame(1800, $row['salary_yr3']);
     }
 
     public function testUpdatePlayerRookieOptionReturnsFalseForUnknownPlayer(): void

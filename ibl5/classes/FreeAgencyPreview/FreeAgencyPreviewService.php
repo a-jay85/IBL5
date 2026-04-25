@@ -40,12 +40,12 @@ class FreeAgencyPreviewService implements FreeAgencyPreviewServiceInterface
         foreach ($players as $player) {
             $nextYear = ($player['cy'] ?? 0) + 1;
             $nextYearSalary = match ($nextYear) {
-                1 => $player['cy1'],
-                2 => $player['cy2'],
-                3 => $player['cy3'],
-                4 => $player['cy4'],
-                5 => $player['cy5'],
-                6 => $player['cy6'],
+                1 => $player['salary_yr1'],
+                2 => $player['salary_yr2'],
+                3 => $player['salary_yr3'],
+                4 => $player['salary_yr4'],
+                5 => $player['salary_yr5'],
+                6 => $player['salary_yr6'],
                 default => 0,
             };
 

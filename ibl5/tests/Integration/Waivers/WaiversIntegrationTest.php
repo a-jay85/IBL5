@@ -188,7 +188,7 @@ class WaiversIntegrationTest extends IntegrationTestCase
         $contractData = ['hasExistingContract' => true, 'salary' => 500];
 
         $this->mockDb->setMockData([
-            $this->getBasePlayerData(['pid' => $playerID, 'cy1' => 500, 'cy' => 1])
+            $this->getBasePlayerData(['pid' => $playerID, 'salary_yr1' => 500, 'cy' => 1])
         ]);
         $this->mockDb->setAffectedRows(1);
 
@@ -219,7 +219,7 @@ class WaiversIntegrationTest extends IntegrationTestCase
         $contractData = ['hasExistingContract' => false, 'salary' => 103];
 
         $this->mockDb->setMockData([
-            $this->getBasePlayerData(['pid' => $playerID, 'cy1' => 0, 'cy' => 0])
+            $this->getBasePlayerData(['pid' => $playerID, 'salary_yr1' => 0, 'cy' => 0])
         ]);
         $this->mockDb->setAffectedRows(1);
 
@@ -232,7 +232,7 @@ class WaiversIntegrationTest extends IntegrationTestCase
         $this->assertQueryExecuted("ordinal` = '800'");
         $this->assertQueryExecuted('cy` = 0');
         $this->assertQueryExecuted('cyt` = 1');
-        $this->assertQueryExecuted("cy1` = 103");
+        $this->assertQueryExecuted("salary_yr1` = 103");
         $this->assertQueryExecuted('teamid` = 8');
     }
 
@@ -409,9 +409,9 @@ class WaiversIntegrationTest extends IntegrationTestCase
         $playerData = TestDataFactory::createPlayer([
             'cy' => 1,
             'cyt' => 3,
-            'cy1' => 500,
-            'cy2' => 550,
-            'cy3' => 600,
+            'salary_yr1' => 500,
+            'salary_yr2' => 550,
+            'salary_yr3' => 600,
             'exp' => 5,
         ]);
         $season = $this->createMockSeason('Regular Season');
@@ -435,9 +435,9 @@ class WaiversIntegrationTest extends IntegrationTestCase
         $playerData = TestDataFactory::createPlayer([
             'cy' => 0,
             'cyt' => 0,
-            'cy1' => 0,
-            'cy2' => 0,
-            'cy3' => 0,
+            'salary_yr1' => 0,
+            'salary_yr2' => 0,
+            'salary_yr3' => 0,
             'exp' => 3,
         ]);
         $season = $this->createMockSeason('Regular Season');
@@ -463,9 +463,9 @@ class WaiversIntegrationTest extends IntegrationTestCase
         $playerData = TestDataFactory::createPlayer([
             'cy' => 1,
             'cyt' => 2,
-            'cy1' => 400, // Current season salary
-            'cy2' => 450, // Next season salary
-            'cy3' => 0,
+            'salary_yr1' => 400, // Current season salary
+            'salary_yr2' => 450, // Next season salary
+            'salary_yr3' => 0,
             'exp' => 4,
         ]);
         $season = $this->createMockSeason('Free Agency');
@@ -473,7 +473,7 @@ class WaiversIntegrationTest extends IntegrationTestCase
         // Act
         $result = $this->processor->determineContractData($playerData, $season);
 
-        // Assert - Should use cy2 (next season) during Free Agency
+        // Assert - Should use salary_yr2 (next season) during Free Agency
         $this->assertTrue($result['hasExistingContract']);
         $this->assertEquals(450, $result['salary']);
     }
@@ -665,7 +665,7 @@ class WaiversIntegrationTest extends IntegrationTestCase
         $playerData = $this->getBasePlayerData([
             'cy' => 0,
             'cyt' => 0,
-            'cy1' => 0,
+            'salary_yr1' => 0,
             'exp' => 5,
         ]);
         $season = $this->createMockSeason('Regular Season');
@@ -689,9 +689,9 @@ class WaiversIntegrationTest extends IntegrationTestCase
         $playerData = $this->getBasePlayerData([
             'cy' => 2,
             'cyt' => 3,
-            'cy1' => 500,
-            'cy2' => 550,
-            'cy3' => 600,
+            'salary_yr1' => 500,
+            'salary_yr2' => 550,
+            'salary_yr3' => 600,
             'exp' => 5,
         ]);
         $season = $this->createMockSeason('Regular Season');
@@ -771,12 +771,12 @@ class WaiversIntegrationTest extends IntegrationTestCase
             'bird_years' => 0,
             'bird' => 0,
             'cy' => 0,
-            'cy1' => 0,
-            'cy2' => 0,
-            'cy3' => 0,
-            'cy4' => 0,
-            'cy5' => 0,
-            'cy6' => 0,
+            'salary_yr1' => 0,
+            'salary_yr2' => 0,
+            'salary_yr3' => 0,
+            'salary_yr4' => 0,
+            'salary_yr5' => 0,
+            'salary_yr6' => 0,
             'cyt' => 0,
         ], $overrides));
     }

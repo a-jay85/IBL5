@@ -103,7 +103,7 @@ ON DUPLICATE KEY UPDATE value = VALUES(value);
 -- Standings: All 28 real teams with neutral records
 -- Division/conference assignments match League::DIVISION_NAMES
 -- ============================================================
-INSERT INTO ibl_standings (teamid, team_name, pct, leagueRecord, wins, losses, conference, division)
+INSERT INTO ibl_standings (teamid, team_name, pct, league_record, wins, losses, conference, division)
 VALUES
   ( 1, 'Metros',       0.500, '20-20', 20, 20, 'Eastern',  'Atlantic'),
   ( 2, 'Stars',        0.500, '20-20', 20, 20, 'Western',  'Pacific'),

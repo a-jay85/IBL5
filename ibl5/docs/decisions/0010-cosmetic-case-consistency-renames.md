@@ -1,5 +1,5 @@
 ---
-description: Rationale for snake-casing PascalCase/camelCase player, depth-chart, team-info, and box-score columns across the schema (Tier 3 of the sql-column-naming audit), enforced by a new PHPStan rule. Covers the four-PR roadmap; PR 1 is the immediate scope.
+description: Rationale for snake-casing PascalCase/camelCase player, depth-chart, team-info, standings, and box-score columns across the schema (Tier 3 of the sql-column-naming audit), enforced by a new PHPStan rule. Covers the four-PR roadmap.
 last_verified: 2026-04-24
 ---
 
@@ -60,16 +60,24 @@ Tier 3 proceeds as a four-PR sequence, each following the Tier 1/2 playbook: foc
 - Negative: `PlayerDatabase::COLUMN_MAP` keeps `Clutch` / `Consistency` as form-field input-filter keys mapped to the new `clutch` / `consistency` column names — same pattern used in PR #632 for `to` / `do` / `r_to`. Documented in the class.
 - Negative: DuckDB analytics schema (`analytics/schema/*.sql`) reads the renamed MariaDB columns. `AS r_to` / `AS "do"` / `AS "to"` shims left by Tiers 1–2 are removed in this PR along with downstream consumer query updates (same incremental-cleanup approach ADR-0008 used).
 
-**PR 2 — migration 117:**
+**PR 2 (PR #638) — migration 117:**
 
 - **Team-info columns (snake_case).** 9 columns on `ibl_team_info` and 5 on `ibl_olympics_team_info`: `discordID` → `discord_id`, `Contract_Wins` → `contract_wins`, `Contract_Losses` → `contract_losses`, `Contract_AvgW` → `contract_avg_w`, `Contract_AvgL` → `contract_avg_l`, `Used_Extension_This_Chunk` → `used_extension_this_chunk`, `Used_Extension_This_Season` → `used_extension_this_season`, `HasMLE` → `has_mle`, `HasLLE` → `has_lle`.
 - `BanNonSnakeCaseColumnsRule` extended with 9 additional banned tokens.
 - `Team` class properties `$discordID` → `$discord_id`, `$hasMLE` → `$has_mle`, `$hasLLE` → `$has_lle` renamed for consistency (direct column mirrors with ≤14 access sites).
 
+**PR 3 — migration 118:**
+
+- **Standings columns (snake_case).** 22 camelCase columns on `ibl_standings` and `ibl_olympics_standings`: `leagueRecord` → `league_record`, `confRecord` → `conf_record`, `confGB` → `conf_gb`, `divRecord` → `div_record`, `divGB` → `div_gb`, `homeRecord` → `home_record`, `awayRecord` → `away_record`, `gamesUnplayed` → `games_unplayed`, `confWins` → `conf_wins`, `confLosses` → `conf_losses`, `divWins` → `div_wins`, `divLosses` → `div_losses`, `homeWins` → `home_wins`, `homeLosses` → `home_losses`, `awayWins` → `away_wins`, `awayLosses` → `away_losses`, `confMagicNumber` → `conf_magic_number`, `divMagicNumber` → `div_magic_number`, `clinchedConference` → `clinched_conference`, `clinchedDivision` → `clinched_division`, `clinchedPlayoffs` → `clinched_playoffs`, `clinchedLeague` → `clinched_league`.
+- `vw_team_standings` recreated with updated source column names (output aliases unchanged).
+- `BanNonSnakeCaseColumnsRule` extended with 22 additional banned tokens.
+- Dynamic column construction in `StandingsUpdater` fixed: `"clinched" . ucfirst($grouping)` → `"clinched_" . $grouping`.
+
 ## References
 
 - `ibl5/migrations/116_snake_case_player_columns.sql` — PR 1 DDL.
 - `ibl5/migrations/117_snake_case_team_info_columns.sql` — PR 2 DDL.
+- `ibl5/migrations/118_snake_case_standings_columns.sql` — PR 3 DDL.
 - `ibl5/phpstan-rules/BanNonSnakeCaseColumnsRule.php` — the enforcement rule (extended per PR).
 - `ibl5/phpstan-rules/BanReservedWordColumnsRule.php` — extended with `` `key` `` (PR 1).
 - `ibl5/config/schema-assertions.php` — post-migration schema assertions.

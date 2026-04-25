@@ -12,7 +12,7 @@ use PHPStan\Rules\RuleErrorBuilder;
 
 /**
  * Bans backtick-quoted references to former PascalCase / camelCase column
- * names that were snake_cased by migrations 116–117 (Tier 3a–3b cosmetic
+ * names that were snake_cased by migrations 116–118 (Tier 3a–3c cosmetic
  * case-consistency renames). Prevents the columns from being re-introduced
  * by future PRs.
  *
@@ -64,6 +64,30 @@ final class BanNonSnakeCaseColumnsRule implements Rule
         '`Used_Extension_This_Season`' => 'Rename to `used_extension_this_season`; migration 117 snake-cased team-info columns.',
         '`HasMLE`' => 'Rename to `has_mle`; migration 117 snake-cased team-info columns.',
         '`HasLLE`' => 'Rename to `has_lle`; migration 117 snake-cased team-info columns.',
+
+        // Standings columns (ibl_standings, ibl_olympics_standings).
+        '`leagueRecord`' => 'Rename to `league_record`; migration 118 snake-cased standings columns.',
+        '`confRecord`' => 'Rename to `conf_record`; migration 118 snake-cased standings columns.',
+        '`confGB`' => 'Rename to `conf_gb`; migration 118 snake-cased standings columns.',
+        '`divRecord`' => 'Rename to `div_record`; migration 118 snake-cased standings columns.',
+        '`divGB`' => 'Rename to `div_gb`; migration 118 snake-cased standings columns.',
+        '`homeRecord`' => 'Rename to `home_record`; migration 118 snake-cased standings columns.',
+        '`awayRecord`' => 'Rename to `away_record`; migration 118 snake-cased standings columns.',
+        '`gamesUnplayed`' => 'Rename to `games_unplayed`; migration 118 snake-cased standings columns.',
+        '`confWins`' => 'Rename to `conf_wins`; migration 118 snake-cased standings columns.',
+        '`confLosses`' => 'Rename to `conf_losses`; migration 118 snake-cased standings columns.',
+        '`divWins`' => 'Rename to `div_wins`; migration 118 snake-cased standings columns.',
+        '`divLosses`' => 'Rename to `div_losses`; migration 118 snake-cased standings columns.',
+        '`homeWins`' => 'Rename to `home_wins`; migration 118 snake-cased standings columns.',
+        '`homeLosses`' => 'Rename to `home_losses`; migration 118 snake-cased standings columns.',
+        '`awayWins`' => 'Rename to `away_wins`; migration 118 snake-cased standings columns.',
+        '`awayLosses`' => 'Rename to `away_losses`; migration 118 snake-cased standings columns.',
+        '`confMagicNumber`' => 'Rename to `conf_magic_number`; migration 118 snake-cased standings columns.',
+        '`divMagicNumber`' => 'Rename to `div_magic_number`; migration 118 snake-cased standings columns.',
+        '`clinchedConference`' => 'Rename to `clinched_conference`; migration 118 snake-cased standings columns.',
+        '`clinchedDivision`' => 'Rename to `clinched_division`; migration 118 snake-cased standings columns.',
+        '`clinchedPlayoffs`' => 'Rename to `clinched_playoffs`; migration 118 snake-cased standings columns.',
+        '`clinchedLeague`' => 'Rename to `clinched_league`; migration 118 snake-cased standings columns.',
     ];
 
     public function getNodeType(): string

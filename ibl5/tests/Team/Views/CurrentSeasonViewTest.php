@@ -17,7 +17,7 @@ class CurrentSeasonViewTest extends TestCase
     }
 
     /**
-     * @return array{teamName: string, fka: ?string, wins: int, losses: int, arena: string, capacity: int, conference: string, conferencePosition: int, division: string, divisionPosition: int, divisionGB: float, homeRecord: string, awayRecord: string, lastWin: int, lastLoss: int}
+     * @return array{teamName: string, fka: ?string, wins: int, losses: int, arena: string, capacity: int, conference: string, conferencePosition: int, division: string, divisionPosition: int, divisionGB: float, home_record: string, away_record: string, lastWin: int, lastLoss: int}
      */
     private function buildData(
         string $teamName = 'Miami Heat',
@@ -31,8 +31,8 @@ class CurrentSeasonViewTest extends TestCase
         string $division = 'Atlantic',
         int $divisionPosition = 1,
         float $divisionGB = 0.0,
-        string $homeRecord = '25-5',
-        string $awayRecord = '15-15',
+        string $home_record = '25-5',
+        string $away_record = '15-15',
         int $lastWin = 7,
         int $lastLoss = 3,
     ): array {
@@ -48,8 +48,8 @@ class CurrentSeasonViewTest extends TestCase
             'division' => $division,
             'divisionPosition' => $divisionPosition,
             'divisionGB' => $divisionGB,
-            'homeRecord' => $homeRecord,
-            'awayRecord' => $awayRecord,
+            'home_record' => $home_record,
+            'away_record' => $away_record,
             'lastWin' => $lastWin,
             'lastLoss' => $lastLoss,
         ];

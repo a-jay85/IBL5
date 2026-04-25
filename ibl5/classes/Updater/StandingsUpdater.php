@@ -22,14 +22,14 @@ use Season\Season;
  *     division: string,
  *     wins: int,
  *     losses: int,
- *     homeWins: int,
- *     homeLosses: int,
- *     awayWins: int,
- *     awayLosses: int,
- *     confWins: int,
- *     confLosses: int,
- *     divWins: int,
- *     divLosses: int
+ *     home_wins: int,
+ *     home_losses: int,
+ *     away_wins: int,
+ *     away_losses: int,
+ *     conf_wins: int,
+ *     conf_losses: int,
+ *     div_wins: int,
+ *     div_losses: int
  * }
  * @phpstan-type TeamMapping array{conference: string, division: string, teamName: string}
  */
@@ -199,14 +199,14 @@ class StandingsUpdater extends \BaseMysqliRepository {
                 'division' => $info['division'],
                 'wins' => 0,
                 'losses' => 0,
-                'homeWins' => 0,
-                'homeLosses' => 0,
-                'awayWins' => 0,
-                'awayLosses' => 0,
-                'confWins' => 0,
-                'confLosses' => 0,
-                'divWins' => 0,
-                'divLosses' => 0,
+                'home_wins' => 0,
+                'home_losses' => 0,
+                'away_wins' => 0,
+                'away_losses' => 0,
+                'conf_wins' => 0,
+                'conf_losses' => 0,
+                'div_wins' => 0,
+                'div_losses' => 0,
             ];
         }
 
@@ -240,14 +240,14 @@ class StandingsUpdater extends \BaseMysqliRepository {
 
             if ($visitorWon) {
                 $visitor['wins']++;
-                $visitor['awayWins']++;
+                $visitor['away_wins']++;
                 $home['losses']++;
-                $home['homeLosses']++;
+                $home['home_losses']++;
             } else {
                 $home['wins']++;
-                $home['homeWins']++;
+                $home['home_wins']++;
                 $visitor['losses']++;
-                $visitor['awayLosses']++;
+                $visitor['away_losses']++;
             }
 
             $sameConference = isset($teamMap[$visitorTid], $teamMap[$homeTid])
@@ -255,11 +255,11 @@ class StandingsUpdater extends \BaseMysqliRepository {
 
             if ($sameConference) {
                 if ($visitorWon) {
-                    $visitor['confWins']++;
-                    $home['confLosses']++;
+                    $visitor['conf_wins']++;
+                    $home['conf_losses']++;
                 } else {
-                    $home['confWins']++;
-                    $visitor['confLosses']++;
+                    $home['conf_wins']++;
+                    $visitor['conf_losses']++;
                 }
             }
 
@@ -268,11 +268,11 @@ class StandingsUpdater extends \BaseMysqliRepository {
 
             if ($sameDivision) {
                 if ($visitorWon) {
-                    $visitor['divWins']++;
-                    $home['divLosses']++;
+                    $visitor['div_wins']++;
+                    $home['div_losses']++;
                 } else {
-                    $home['divWins']++;
-                    $visitor['divLosses']++;
+                    $home['div_wins']++;
+                    $visitor['div_losses']++;
                 }
             }
 
@@ -341,80 +341,80 @@ class StandingsUpdater extends \BaseMysqliRepository {
         foreach ($standings as $team) {
             $totalGames = $team['wins'] + $team['losses'];
             $pct = $totalGames > 0 ? round($team['wins'] / $totalGames, 3) : 0.000;
-            $gamesUnplayed = 82 - $team['homeWins'] - $team['homeLosses'] - $team['awayWins'] - $team['awayLosses'];
+            $games_unplayed = 82 - $team['home_wins'] - $team['home_losses'] - $team['away_wins'] - $team['away_losses'];
 
-            $leagueRecord = $team['wins'] . '-' . $team['losses'];
-            $confRecord = $team['confWins'] . '-' . $team['confLosses'];
-            $divRecord = $team['divWins'] . '-' . $team['divLosses'];
-            $homeRecord = $team['homeWins'] . '-' . $team['homeLosses'];
-            $awayRecord = $team['awayWins'] . '-' . $team['awayLosses'];
+            $league_record = $team['wins'] . '-' . $team['losses'];
+            $conf_record = $team['conf_wins'] . '-' . $team['conf_losses'];
+            $div_record = $team['div_wins'] . '-' . $team['div_losses'];
+            $home_record = $team['home_wins'] . '-' . $team['home_losses'];
+            $away_record = $team['away_wins'] . '-' . $team['away_losses'];
 
             $teamGB = ($team['wins'] - $team['losses']) / 2.0;
-            $confGB = $confLeaderGB[$team['conference']] - $teamGB;
-            $divGB = $divLeaderGB[$team['division']] - $teamGB;
+            $conf_gb = $confLeaderGB[$team['conference']] - $teamGB;
+            $div_gb = $divLeaderGB[$team['division']] - $teamGB;
 
             $this->execute(
                 "INSERT INTO {$standingsTable} (
-                    teamid, team_name, leagueRecord, wins, losses, pct, gamesUnplayed,
-                    conference, confGB, confRecord,
-                    division, divGB, divRecord,
-                    homeRecord, awayRecord,
-                    confWins, confLosses, divWins, divLosses,
-                    homeWins, homeLosses, awayWins, awayLosses
+                    teamid, team_name, league_record, wins, losses, pct, games_unplayed,
+                    conference, conf_gb, conf_record,
+                    division, div_gb, div_record,
+                    home_record, away_record,
+                    conf_wins, conf_losses, div_wins, div_losses,
+                    home_wins, home_losses, away_wins, away_losses
                 ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 ON DUPLICATE KEY UPDATE
                     team_name = VALUES(team_name),
-                    leagueRecord = VALUES(leagueRecord),
+                    league_record = VALUES(league_record),
                     wins = VALUES(wins),
                     losses = VALUES(losses),
                     pct = VALUES(pct),
-                    gamesUnplayed = VALUES(gamesUnplayed),
+                    games_unplayed = VALUES(games_unplayed),
                     conference = VALUES(conference),
-                    confGB = VALUES(confGB),
-                    confRecord = VALUES(confRecord),
+                    conf_gb = VALUES(conf_gb),
+                    conf_record = VALUES(conf_record),
                     division = VALUES(division),
-                    divGB = VALUES(divGB),
-                    divRecord = VALUES(divRecord),
-                    homeRecord = VALUES(homeRecord),
-                    awayRecord = VALUES(awayRecord),
-                    confWins = VALUES(confWins),
-                    confLosses = VALUES(confLosses),
-                    divWins = VALUES(divWins),
-                    divLosses = VALUES(divLosses),
-                    homeWins = VALUES(homeWins),
-                    homeLosses = VALUES(homeLosses),
-                    awayWins = VALUES(awayWins),
-                    awayLosses = VALUES(awayLosses),
-                    confMagicNumber = NULL,
-                    divMagicNumber = NULL,
-                    clinchedConference = NULL,
-                    clinchedDivision = NULL,
-                    clinchedPlayoffs = NULL,
-                    clinchedLeague = NULL",
+                    div_gb = VALUES(div_gb),
+                    div_record = VALUES(div_record),
+                    home_record = VALUES(home_record),
+                    away_record = VALUES(away_record),
+                    conf_wins = VALUES(conf_wins),
+                    conf_losses = VALUES(conf_losses),
+                    div_wins = VALUES(div_wins),
+                    div_losses = VALUES(div_losses),
+                    home_wins = VALUES(home_wins),
+                    home_losses = VALUES(home_losses),
+                    away_wins = VALUES(away_wins),
+                    away_losses = VALUES(away_losses),
+                    conf_magic_number = NULL,
+                    div_magic_number = NULL,
+                    clinched_conference = NULL,
+                    clinched_division = NULL,
+                    clinched_playoffs = NULL,
+                    clinched_league = NULL",
                 "issiidisdssdsssiiiiiiii",
                 $team['teamid'],
                 $team['teamName'],
-                $leagueRecord,
+                $league_record,
                 $team['wins'],
                 $team['losses'],
                 $pct,
-                $gamesUnplayed,
+                $games_unplayed,
                 $team['conference'],
-                $confGB,
-                $confRecord,
+                $conf_gb,
+                $conf_record,
                 $team['division'],
-                $divGB,
-                $divRecord,
-                $homeRecord,
-                $awayRecord,
-                $team['confWins'],
-                $team['confLosses'],
-                $team['divWins'],
-                $team['divLosses'],
-                $team['homeWins'],
-                $team['homeLosses'],
-                $team['awayWins'],
-                $team['awayLosses']
+                $div_gb,
+                $div_record,
+                $home_record,
+                $away_record,
+                $team['conf_wins'],
+                $team['conf_losses'],
+                $team['div_wins'],
+                $team['div_losses'],
+                $team['home_wins'],
+                $team['home_losses'],
+                $team['away_wins'],
+                $team['away_losses']
             );
 
             $log .= "Inserted standings for team: {$team['teamName']}<br>";
@@ -430,7 +430,7 @@ class StandingsUpdater extends \BaseMysqliRepository {
         list($grouping, $groupingGB, $groupingMagicNumber) = $this->assignGroupingsFor($region);
 
         $teams = $this->fetchAll(
-            "SELECT teamid, team_name, homeWins, homeLosses, awayWins, awayLosses
+            "SELECT teamid, team_name, home_wins, home_losses, away_wins, away_losses
             FROM {$standingsTable}
             WHERE {$grouping} = ?
             ORDER BY pct DESC",
@@ -442,16 +442,16 @@ class StandingsUpdater extends \BaseMysqliRepository {
         $numTeams = count($teams);
 
         for ($i = 0; $i < $numTeams; $i++) {
-            /** @var array{teamid: int, team_name: string, homeWins: int, homeLosses: int, awayWins: int, awayLosses: int} $teamRow */
+            /** @var array{teamid: int, team_name: string, home_wins: int, home_losses: int, away_wins: int, away_losses: int} $teamRow */
             $teamRow = $teams[$i];
             $teamid = $teamRow['teamid'];
             $teamName = $teamRow['team_name'];
-            $teamTotalWins = $teamRow['homeWins'] + $teamRow['awayWins'];
+            $teamTotalWins = $teamRow['home_wins'] + $teamRow['away_wins'];
 
             if ($i + 1 !== $numTeams) {
-                /** @var array{teamid: int, team_name: string, homeWins: int, homeLosses: int, awayWins: int, awayLosses: int} $belowTeamRow */
+                /** @var array{teamid: int, team_name: string, home_wins: int, home_losses: int, away_wins: int, away_losses: int} $belowTeamRow */
                 $belowTeamRow = $teams[$i + 1];
-                $belowTeamTotalLosses = $belowTeamRow['homeLosses'] + $belowTeamRow['awayLosses'];
+                $belowTeamTotalLosses = $belowTeamRow['home_losses'] + $belowTeamRow['away_losses'];
             } else {
                 $belowTeamTotalLosses = 0;
             }
@@ -492,7 +492,7 @@ class StandingsUpdater extends \BaseMysqliRepository {
 
         /** @var list<array{teamid: int, team_name: string, wins: int}> $topTeams */
         $topTeams = $this->fetchAll(
-            "SELECT teamid, team_name, homeWins + awayWins AS wins
+            "SELECT teamid, team_name, home_wins + away_wins AS wins
             FROM {$standingsTable}
             WHERE {$grouping} = ?
             ORDER BY wins DESC
@@ -522,7 +522,7 @@ class StandingsUpdater extends \BaseMysqliRepository {
         $winningestTeamWins = $first['wins'];
 
         $leastLosingestTeam = $this->fetchOne(
-            "SELECT homeLosses + awayLosses AS losses
+            "SELECT home_losses + away_losses AS losses
             FROM {$standingsTable}
             WHERE {$grouping} = ?
                 AND team_name <> ?
@@ -551,7 +551,7 @@ class StandingsUpdater extends \BaseMysqliRepository {
 
         if ($magicNumber <= 0) {
             $this->execute(
-                "UPDATE {$standingsTable} SET clinched" . ucfirst($grouping) . " = 1 WHERE team_name = ?",
+                "UPDATE {$standingsTable} SET clinched_{$grouping} = 1 WHERE team_name = ?",
                 "s",
                 $winningestTeamName
             );
@@ -570,7 +570,7 @@ class StandingsUpdater extends \BaseMysqliRepository {
 
         /** @var list<array{teamid: int, team_name: string, wins: int}> $topTeams */
         $topTeams = $this->fetchAll(
-            "SELECT teamid, team_name, homeWins + awayWins AS wins
+            "SELECT teamid, team_name, home_wins + away_wins AS wins
             FROM {$standingsTable}
             ORDER BY wins DESC
             LIMIT 2",
@@ -598,7 +598,7 @@ class StandingsUpdater extends \BaseMysqliRepository {
         $winningestTeamWins = $first['wins'];
 
         $leastLosingestTeam = $this->fetchOne(
-            "SELECT homeLosses + awayLosses AS losses
+            "SELECT home_losses + away_losses AS losses
             FROM {$standingsTable}
             WHERE team_name <> ?
             ORDER BY losses ASC
@@ -625,7 +625,7 @@ class StandingsUpdater extends \BaseMysqliRepository {
 
         if ($magicNumber <= 0) {
             $this->execute(
-                "UPDATE {$standingsTable} SET clinchedLeague = 1 WHERE team_name = ?",
+                "UPDATE {$standingsTable} SET clinched_league = 1 WHERE team_name = ?",
                 "s",
                 $winningestTeamName
             );
@@ -643,13 +643,13 @@ class StandingsUpdater extends \BaseMysqliRepository {
         $standingsTable = $this->resolveTable('ibl_standings');
         if ($grouping !== '' && $region !== '') {
             $result = $this->fetchOne(
-                "SELECT MAX(gamesUnplayed) AS maxLeft FROM {$standingsTable} WHERE {$grouping} = ?",
+                "SELECT MAX(games_unplayed) AS maxLeft FROM {$standingsTable} WHERE {$grouping} = ?",
                 "s",
                 $region
             );
         } else {
             $result = $this->fetchOne(
-                "SELECT MAX(gamesUnplayed) AS maxLeft FROM {$standingsTable}",
+                "SELECT MAX(games_unplayed) AS maxLeft FROM {$standingsTable}",
                 ""
             );
         }
@@ -709,7 +709,7 @@ class StandingsUpdater extends \BaseMysqliRepository {
         echo "<p>Checking if any teams have clinched playoff spots in the {$conference} Conference...<br>";
 
         $eightWinningestTeams = $this->fetchAll(
-            "SELECT team_name, homeWins + awayWins AS wins
+            "SELECT team_name, home_wins + away_wins AS wins
             FROM {$standingsTable}
             WHERE conference = ?
             ORDER BY wins DESC
@@ -719,7 +719,7 @@ class StandingsUpdater extends \BaseMysqliRepository {
         );
 
         $sixLosingestTeams = $this->fetchAll(
-            "SELECT homeLosses + awayLosses AS losses
+            "SELECT home_losses + away_losses AS losses
             FROM {$standingsTable}
             WHERE conference = ?
             ORDER BY losses DESC
@@ -755,7 +755,7 @@ class StandingsUpdater extends \BaseMysqliRepository {
 
             if ($teamsEliminated === 6) {
                 $this->execute(
-                    "UPDATE {$standingsTable} SET clinchedPlayoffs = 1 WHERE team_name = ?",
+                    "UPDATE {$standingsTable} SET clinched_playoffs = 1 WHERE team_name = ?",
                     "s",
                     $contendingTeamName
                 );

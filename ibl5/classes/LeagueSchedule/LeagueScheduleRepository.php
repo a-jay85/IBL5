@@ -62,7 +62,7 @@ class LeagueScheduleRepository extends \BaseMysqliRepository implements LeagueSc
     public function getTeamRecords(): array
     {
         $rows = $this->fetchAll(
-            "SELECT teamid, leagueRecord FROM {$this->standingsTable} ORDER BY teamid ASC"
+            "SELECT teamid, league_record FROM {$this->standingsTable} ORDER BY teamid ASC"
         );
 
         /** @var array<int, string> $records */
@@ -70,9 +70,9 @@ class LeagueScheduleRepository extends \BaseMysqliRepository implements LeagueSc
         foreach ($rows as $row) {
             /** @var int $teamid */
             $teamid = $row['teamid'];
-            /** @var string $leagueRecord */
-            $leagueRecord = $row['leagueRecord'];
-            $records[$teamid] = $leagueRecord;
+            /** @var string $league_record */
+            $league_record = $row['league_record'];
+            $records[$teamid] = $league_record;
         }
 
         return $records;

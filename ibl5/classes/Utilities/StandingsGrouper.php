@@ -25,24 +25,24 @@ class StandingsGrouper
         if (in_array($region, self::CONFERENCES, true)) {
             return [
                 'grouping' => 'conference',
-                'groupingGB' => 'confGB',
-                'groupingMagicNumber' => 'confMagicNumber',
+                'groupingGB' => 'conf_gb',
+                'groupingMagicNumber' => 'conf_magic_number',
             ];
         }
 
         if (in_array($region, self::DIVISIONS, true)) {
             return [
                 'grouping' => 'division',
-                'groupingGB' => 'divGB',
-                'groupingMagicNumber' => 'divMagicNumber',
+                'groupingGB' => 'div_gb',
+                'groupingMagicNumber' => 'div_magic_number',
             ];
         }
 
         // Default to conference grouping
         return [
             'grouping' => 'conference',
-            'groupingGB' => 'confGB',
-            'groupingMagicNumber' => 'confMagicNumber',
+            'groupingGB' => 'conf_gb',
+            'groupingMagicNumber' => 'conf_magic_number',
         ];
     }
 

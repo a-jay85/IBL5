@@ -190,7 +190,7 @@ class LeagueScheduleView implements LeagueScheduleViewInterface
 
         // Home logo + team
         $safeHomeTeam = HtmlSanitizer::safeHtmlOutput($game['homeTeam']);
-        $safeHomeRecord = HtmlSanitizer::safeHtmlOutput($game['homeRecord']);
+        $safeHomeRecord = HtmlSanitizer::safeHtmlOutput($game['home_record']);
 
         $html .= '<a href="' . $homeTeamUrl . '" class="schedule-game__logo-link" aria-label="' . $safeHomeTeam . '"><img class="schedule-game__logo" src="images/logo/new' . $game['home'] . '.png" alt="" width="25" height="25" loading="lazy"></a>';
         $html .= '<a href="' . $homeTeamUrl . '" class="schedule-game__team-link">';

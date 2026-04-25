@@ -100,7 +100,7 @@ INSERT INTO ibl_team_info (teamid, team_city, team_name, color1, color2, uuid) V
 
 -- Divisions must match League::DIVISION_NAMES = ['Atlantic', 'Central', 'Midwest', 'Pacific']
 -- 7 teams per division: Atlantic & Central (Eastern), Midwest & Pacific (Western)
-INSERT INTO ibl_standings (teamid, team_name, pct, leagueRecord, wins, losses, conference, division) VALUES
+INSERT INTO ibl_standings (teamid, team_name, pct, league_record, wins, losses, conference, division) VALUES
   ( 1, 'Metros',       0.500, '20-20', 20, 20, 'Eastern',  'Atlantic'),
   ( 2, 'Stars',        0.500, '20-20', 20, 20, 'Western',  'Pacific'),
   ( 3, 'Cougars',      0.500, '20-20', 20, 20, 'Eastern',  'Central'),
@@ -132,9 +132,9 @@ INSERT INTO ibl_standings (teamid, team_name, pct, leagueRecord, wins, losses, c
 
 -- Clinch indicators for standings E2E tests
 -- Y = clinched playoff berth, X = clinched division, W = clinched conference
-UPDATE ibl_standings SET clinchedPlayoffs = 1 WHERE teamid = 1;
-UPDATE ibl_standings SET clinchedDivision = 1 WHERE teamid = 2;
-UPDATE ibl_standings SET clinchedConference = 1 WHERE teamid = 3;
+UPDATE ibl_standings SET clinched_playoffs = 1 WHERE teamid = 1;
+UPDATE ibl_standings SET clinched_division = 1 WHERE teamid = 2;
+UPDATE ibl_standings SET clinched_conference = 1 WHERE teamid = 3;
 
 -- ============================================================
 -- Franchise seasons (required by trigger FK; 1 row per franchise)
@@ -712,7 +712,7 @@ INSERT INTO ibl_olympics_team_info (teamid, team_city, team_name, color1, color2
   (3, 'Spain',  'Bulls',   'AA151B', 'F1BF00', 'd0000000-0000-0000-0000-000000000003'),
   (4, 'France', 'Coqs',    '002395', 'ED2939', 'd0000000-0000-0000-0000-000000000004');
 
-INSERT INTO ibl_olympics_standings (teamid, team_name, pct, leagueRecord, wins, losses, conference, division) VALUES
+INSERT INTO ibl_olympics_standings (teamid, team_name, pct, league_record, wins, losses, conference, division) VALUES
   (1, 'Eagles', 0.750, '3-1', 3, 1, 'Group A', ''),
   (2, 'Maple',  0.500, '2-2', 2, 2, 'Group A', ''),
   (3, 'Bulls',  0.500, '2-2', 2, 2, 'Group B', ''),

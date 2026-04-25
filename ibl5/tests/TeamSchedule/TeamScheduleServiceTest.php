@@ -242,7 +242,7 @@ class TeamScheduleServiceTest extends TestCase
                 'used_extension_this_season' => 0,
                 'has_mle' => 0,
                 'has_lle' => 0,
-                'leagueRecord' => '30-10',
+                'league_record' => '30-10',
             ],
         ]);
     }

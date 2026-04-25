@@ -1048,7 +1048,7 @@ class ExtensionIntegrationTest extends IntegrationTestCase
             'discord_id' => '123456',
             'has_mle' => 0,
             'has_lle' => 0,
-            'leagueRecord' => '0-0',
+            'league_record' => '0-0',
             'SERVER_NAME' => 'test.ibl.com',
             // Free agency preferences (required by Player.php line 162-163)
             'loyalty' => 3,

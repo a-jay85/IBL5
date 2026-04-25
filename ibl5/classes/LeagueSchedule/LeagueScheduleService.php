@@ -112,7 +112,7 @@ class LeagueScheduleService implements LeagueScheduleServiceInterface
                 'home' => $home,
                 'homeScore' => $homeScore,
                 'homeTeam' => $homeTeam ?? '',
-                'homeRecord' => $teamRecords[$home] ?? '',
+                'home_record' => $teamRecords[$home] ?? '',
                 'boxid' => $boxid,
                 'gameOfThatDay' => $gameOfThatDay,
                 'boxScoreUrl' => \Utilities\BoxScoreUrlBuilder::buildUrl($date, $gameOfThatDay, $boxid),

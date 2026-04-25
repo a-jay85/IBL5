@@ -167,9 +167,9 @@ class StandingsUpdaterTest extends TestCase
         $team1Insert = $this->findInsertForTeam($insertQueries, "'Celtics'");
         $this->assertNotNull($team1Insert, 'Expected INSERT for Celtics');
 
-        // Verify the INSERT has homeWins=1, homeLosses=0, awayWins=1, awayLosses=0
+        // Verify the INSERT has home_wins=1, home_losses=0, away_wins=1, away_losses=0
         // These are the last 4 integer values in the INSERT
-        // homeRecord should be '1-0', awayRecord should be '1-0'
+        // home_record should be '1-0', away_record should be '1-0'
         $this->assertStringContainsString("'1-0'", $team1Insert);
     }
 
@@ -194,9 +194,9 @@ class StandingsUpdaterTest extends TestCase
         $team1Insert = $this->findInsertForTeam($insertQueries, "'Celtics'");
         $this->assertNotNull($team1Insert, 'Expected INSERT for Celtics');
 
-        // Team 1 total: 2-0, confRecord should be 1-0 (only the Eastern vs Eastern game)
-        // The confRecord '1-0' appears in the query
-        // leagueRecord is '2-0', confRecord is '1-0'
+        // Team 1 total: 2-0, conf_record should be 1-0 (only the Eastern vs Eastern game)
+        // The conf_record '1-0' appears in the query
+        // league_record is '2-0', conf_record is '1-0'
         $this->assertStringContainsString("'2-0'", $team1Insert);
     }
 
@@ -222,7 +222,7 @@ class StandingsUpdaterTest extends TestCase
         $this->assertNotNull($team1Insert, 'Expected INSERT for Celtics');
 
         // Team 1: total 2-0, conf 2-0, div 1-0 (only vs Heat in Atlantic)
-        // The INSERT should contain the confWins=2, divWins=1 somewhere
+        // The INSERT should contain the conf_wins=2, div_wins=1 somewhere
         $this->assertStringContainsString("'2-0'", $team1Insert);
     }
 
@@ -284,7 +284,7 @@ class StandingsUpdaterTest extends TestCase
 
         $team1Insert = $this->findInsertForTeam($insertQueries, "'Celtics'");
         $this->assertNotNull($team1Insert, 'Expected INSERT for Celtics');
-        // gamesUnplayed = 82 - 5 = 77
+        // games_unplayed = 82 - 5 = 77
         $this->assertStringContainsString('77', $team1Insert);
     }
 
@@ -310,9 +310,9 @@ class StandingsUpdaterTest extends TestCase
         // Verify pct is 0 (no division by zero)
         $team1Insert = $this->findInsertForTeam($insertQueries, "'Celtics'");
         $this->assertNotNull($team1Insert, 'Expected INSERT for Celtics');
-        // leagueRecord should be '0-0'
+        // league_record should be '0-0'
         $this->assertStringContainsString("'0-0'", $team1Insert);
-        // gamesUnplayed should be 82
+        // games_unplayed should be 82
         $this->assertStringContainsString('82', $team1Insert);
     }
 
@@ -344,7 +344,7 @@ class StandingsUpdaterTest extends TestCase
         $team2Insert = $this->findInsertForTeam($insertQueries, "'Heat'");
         $this->assertNotNull($team1Insert);
         $this->assertNotNull($team2Insert);
-        // Both are 2-2 so confGB should be 0
+        // Both are 2-2 so conf_gb should be 0
         $this->assertStringContainsString("'2-2'", $team1Insert);
         $this->assertStringContainsString("'2-2'", $team2Insert);
     }
@@ -373,8 +373,8 @@ class StandingsUpdaterTest extends TestCase
 
             $this->assertIsArray($result);
             $this->assertSame('conference', $result[0]);
-            $this->assertSame('confGB', $result[1]);
-            $this->assertSame('confMagicNumber', $result[2]);
+            $this->assertSame('conf_gb', $result[1]);
+            $this->assertSame('conf_magic_number', $result[2]);
         }
     }
 
@@ -387,8 +387,8 @@ class StandingsUpdaterTest extends TestCase
 
             $this->assertIsArray($result);
             $this->assertSame('division', $result[0]);
-            $this->assertSame('divGB', $result[1]);
-            $this->assertSame('divMagicNumber', $result[2]);
+            $this->assertSame('div_gb', $result[1]);
+            $this->assertSame('div_magic_number', $result[2]);
         }
     }
 
@@ -496,7 +496,7 @@ class StandingsUpdaterTest extends TestCase
         $queries = $this->mockDb->getExecutedQueries();
         $insertQueries = $this->filterInsertQueries($queries);
 
-        // Celtics: confGB = 0.0 (leader)
+        // Celtics: conf_gb = 0.0 (leader)
         $celticsInsert = $this->findInsertForTeam($insertQueries, "'Celtics'");
         $this->assertNotNull($celticsInsert);
         // Leader GB formula: leader has (2-0)/2 = 1.0 differential, so GB = 0
@@ -537,15 +537,15 @@ class StandingsUpdaterTest extends TestCase
     {
         $this->mockDb->setReturnTrue(true);
         $clinchData = [
-            ['teamid' => 1, 'team_name' => 'Celtics', 'homeWins' => 40, 'homeLosses' => 1, 'awayWins' => 40, 'awayLosses' => 1, 'wins' => 80],
-            ['teamid' => 2, 'team_name' => 'Heat', 'homeWins' => 1, 'homeLosses' => 40, 'awayWins' => 1, 'awayLosses' => 40, 'wins' => 2],
+            ['teamid' => 1, 'team_name' => 'Celtics', 'home_wins' => 40, 'home_losses' => 1, 'away_wins' => 40, 'away_losses' => 1, 'wins' => 80],
+            ['teamid' => 2, 'team_name' => 'Heat', 'home_wins' => 1, 'home_losses' => 40, 'away_wins' => 1, 'away_losses' => 40, 'wins' => 2],
         ];
         // Route clinch-check queries ([\s\S] matches across newlines unlike .)
         $this->mockDb->onQuery('ORDER BY wins DESC', $clinchData);
         $this->mockDb->onQuery('ORDER BY losses ASC', [['losses' => 80]]);
         $this->mockDb->onQuery('ORDER BY losses DESC', [['losses' => 80]]);
         $this->mockDb->onQuery('ORDER BY pct DESC', $clinchData);
-        $this->mockDb->onQuery('gamesUnplayed', [['maxLeft' => 0]]);
+        $this->mockDb->onQuery('games_unplayed', [['maxLeft' => 0]]);
         $this->updater->setTestTeamMap($this->defaultTeamMap);
         $this->updater->setTestGames([]);
 
@@ -565,14 +565,14 @@ class StandingsUpdaterTest extends TestCase
     {
         $this->mockDb->setReturnTrue(true);
         $clinchData = [
-            ['teamid' => 1, 'team_name' => 'Celtics', 'homeWins' => 40, 'homeLosses' => 1, 'awayWins' => 40, 'awayLosses' => 1, 'wins' => 80],
-            ['teamid' => 2, 'team_name' => 'Heat', 'homeWins' => 1, 'homeLosses' => 40, 'awayWins' => 1, 'awayLosses' => 40, 'wins' => 2],
+            ['teamid' => 1, 'team_name' => 'Celtics', 'home_wins' => 40, 'home_losses' => 1, 'away_wins' => 40, 'away_losses' => 1, 'wins' => 80],
+            ['teamid' => 2, 'team_name' => 'Heat', 'home_wins' => 1, 'home_losses' => 40, 'away_wins' => 1, 'away_losses' => 40, 'wins' => 2],
         ];
         $this->mockDb->onQuery('ORDER BY wins DESC', $clinchData);
         $this->mockDb->onQuery('ORDER BY losses ASC', [['losses' => 80]]);
         $this->mockDb->onQuery('ORDER BY losses DESC', [['losses' => 80]]);
         $this->mockDb->onQuery('ORDER BY pct DESC', $clinchData);
-        $this->mockDb->onQuery('gamesUnplayed', [['maxLeft' => 0]]);
+        $this->mockDb->onQuery('games_unplayed', [['maxLeft' => 0]]);
         $this->updater->setTestTeamMap($this->defaultTeamMap);
         $this->updater->setTestGames([]);
 
@@ -615,14 +615,14 @@ class StandingsUpdaterTest extends TestCase
         $updater->setTestGames([]);
         $this->mockDb->setReturnTrue(true);
         $clinchData = [
-            ['teamid' => 1, 'team_name' => 'Celtics', 'homeWins' => 40, 'homeLosses' => 1, 'awayWins' => 40, 'awayLosses' => 1, 'wins' => 80],
-            ['teamid' => 2, 'team_name' => 'Heat', 'homeWins' => 1, 'homeLosses' => 40, 'awayWins' => 1, 'awayLosses' => 40, 'wins' => 2],
+            ['teamid' => 1, 'team_name' => 'Celtics', 'home_wins' => 40, 'home_losses' => 1, 'away_wins' => 40, 'away_losses' => 1, 'wins' => 80],
+            ['teamid' => 2, 'team_name' => 'Heat', 'home_wins' => 1, 'home_losses' => 40, 'away_wins' => 1, 'away_losses' => 40, 'wins' => 2],
         ];
         $this->mockDb->onQuery('ORDER BY wins DESC', $clinchData);
         $this->mockDb->onQuery('ORDER BY losses ASC', [['losses' => 80]]);
         $this->mockDb->onQuery('ORDER BY losses DESC', [['losses' => 80]]);
         $this->mockDb->onQuery('ORDER BY pct DESC', $clinchData);
-        $this->mockDb->onQuery('gamesUnplayed', [['maxLeft' => 0]]);
+        $this->mockDb->onQuery('games_unplayed', [['maxLeft' => 0]]);
 
         ob_start();
         $updater->update();

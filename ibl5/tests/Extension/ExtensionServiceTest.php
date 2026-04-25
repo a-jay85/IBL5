@@ -294,7 +294,7 @@ class ExtensionServiceTest extends TestCase
             'arena' => 'Test Arena', 'capacity' => 20000,
             'owner_name' => 'Test Owner', 'owner_email' => 'owner@test.com',
             'discord_id' => '123456',
-            'has_mle' => 0, 'has_lle' => 0, 'leagueRecord' => '0-0',
+            'has_mle' => 0, 'has_lle' => 0, 'league_record' => '0-0',
             'used_extension_this_season' => 0, 'used_extension_this_chunk' => 0,
             'contract_wins' => 50, 'contract_losses' => 32,
             'contract_avg_w' => 2500, 'contract_avg_l' => 2000,

@@ -77,7 +77,7 @@ class StandingsView implements StandingsViewInterface
 
         foreach ($regions as $region) {
             $isConference = in_array($region, League::CONFERENCE_NAMES, true);
-            $gbColumn = $isConference ? 'confGB' : 'divGB';
+            $gbColumn = $isConference ? 'conf_gb' : 'div_gb';
 
             $regionTeams = $grouped[$region] ?? [];
             $this->sortStandings($regionTeams, $gbColumn);
@@ -163,14 +163,14 @@ class StandingsView implements StandingsViewInterface
      * Sort standings in-place replicating SQL ORDER BY
      *
      * @param list<BulkStandingsRow> $teams
-     * @param string $gbColumn Column name for games back sorting ('confGB' or 'divGB')
+     * @param string $gbColumn Column name for games back sorting ('conf_gb' or 'div_gb')
      */
     private function sortStandings(array &$teams, string $gbColumn): void
     {
         usort($teams, function (array $a, array $b) use ($gbColumn): int {
             // 1. Games back ASC
-            $gbA = $gbColumn === 'confGB' ? $a['confGB'] : $a['divGB'];
-            $gbB = $gbColumn === 'confGB' ? $b['confGB'] : $b['divGB'];
+            $gbA = $gbColumn === 'conf_gb' ? $a['conf_gb'] : $a['div_gb'];
+            $gbB = $gbColumn === 'conf_gb' ? $b['conf_gb'] : $b['div_gb'];
             $gbCmp = (float) $gbA <=> (float) $gbB;
             if ($gbCmp !== 0) {
                 return $gbCmp;
@@ -203,19 +203,19 @@ class StandingsView implements StandingsViewInterface
             $result[] = [
                 'teamid' => $team['teamid'],
                 'team_name' => $team['team_name'],
-                'leagueRecord' => $team['leagueRecord'],
+                'league_record' => $team['league_record'],
                 'pct' => $team['pct'],
-                'gamesBack' => $isConference ? $team['confGB'] : $team['divGB'],
-                'confRecord' => $team['confRecord'],
-                'divRecord' => $team['divRecord'],
-                'homeRecord' => $team['homeRecord'],
-                'awayRecord' => $team['awayRecord'],
-                'gamesUnplayed' => $team['gamesUnplayed'],
-                'magicNumber' => $isConference ? $team['confMagicNumber'] : $team['divMagicNumber'],
-                'clinchedConference' => $team['clinchedConference'],
-                'clinchedDivision' => $team['clinchedDivision'],
-                'clinchedPlayoffs' => $team['clinchedPlayoffs'],
-                'clinchedLeague' => $team['clinchedLeague'],
+                'gamesBack' => $isConference ? $team['conf_gb'] : $team['div_gb'],
+                'conf_record' => $team['conf_record'],
+                'div_record' => $team['div_record'],
+                'home_record' => $team['home_record'],
+                'away_record' => $team['away_record'],
+                'games_unplayed' => $team['games_unplayed'],
+                'magicNumber' => $isConference ? $team['conf_magic_number'] : $team['div_magic_number'],
+                'clinched_conference' => $team['clinched_conference'],
+                'clinched_division' => $team['clinched_division'],
+                'clinched_playoffs' => $team['clinched_playoffs'],
+                'clinched_league' => $team['clinched_league'],
                 'wins' => $team['wins'],
                 'homeGames' => $team['homeGames'],
                 'awayGames' => $team['awayGames'],
@@ -338,15 +338,15 @@ class StandingsView implements StandingsViewInterface
             );
         }
 
-        $leagueRecord = $team['leagueRecord'];
+        $leagueRecord = $team['league_record'];
         $pct = $team['pct'];
         $gamesBack = $team['gamesBack'];
         $magicNumber = $team['magicNumber'];
-        $gamesUnplayed = $team['gamesUnplayed'];
-        $confRecord = $team['confRecord'];
-        $divRecord = $team['divRecord'];
-        $homeRecord = $team['homeRecord'];
-        $awayRecord = $team['awayRecord'];
+        $gamesUnplayed = $team['games_unplayed'];
+        $confRecord = $team['conf_record'];
+        $divRecord = $team['div_record'];
+        $homeRecord = $team['home_record'];
+        $awayRecord = $team['away_record'];
         $homeGames = $team['homeGames'];
         $awayGames = $team['awayGames'];
 
@@ -397,19 +397,19 @@ class StandingsView implements StandingsViewInterface
     {
         $teamName = \Utilities\HtmlSanitizer::safeHtmlOutput($team['team_name']);
 
-        if ($team['clinchedLeague'] === 1) {
+        if ($team['clinched_league'] === 1) {
             return '<span class="ibl-clinched-indicator">W</span>-' . $teamName;
         }
 
-        if ($team['clinchedConference'] === 1) {
+        if ($team['clinched_conference'] === 1) {
             return '<span class="ibl-clinched-indicator">Z</span>-' . $teamName;
         }
 
-        if ($team['clinchedDivision'] === 1) {
+        if ($team['clinched_division'] === 1) {
             return '<span class="ibl-clinched-indicator">Y</span>-' . $teamName;
         }
 
-        if ($team['clinchedPlayoffs'] === 1) {
+        if ($team['clinched_playoffs'] === 1) {
             return '<span class="ibl-clinched-indicator">X</span>-' . $teamName;
         }
 
@@ -424,19 +424,19 @@ class StandingsView implements StandingsViewInterface
      */
     private function getClinchTierClass(array $team): string
     {
-        if ($team['clinchedLeague'] === 1) {
+        if ($team['clinched_league'] === 1) {
             return 'clinch-league';
         }
 
-        if ($team['clinchedConference'] === 1) {
+        if ($team['clinched_conference'] === 1) {
             return 'clinch-conference';
         }
 
-        if ($team['clinchedDivision'] === 1) {
+        if ($team['clinched_division'] === 1) {
             return 'clinch-division';
         }
 
-        if ($team['clinchedPlayoffs'] === 1) {
+        if ($team['clinched_playoffs'] === 1) {
             return 'clinch-playoffs';
         }
 
@@ -476,7 +476,7 @@ class StandingsView implements StandingsViewInterface
                 break;
             }
 
-            $maxPossibleWins = $standings[$i]['wins'] + $standings[$i]['gamesUnplayed'];
+            $maxPossibleWins = $standings[$i]['wins'] + $standings[$i]['games_unplayed'];
             if ($maxPossibleWins < $standings[$i - 1]['wins']) {
                 $locked[$i] = true;
             } else {
@@ -495,7 +495,7 @@ class StandingsView implements StandingsViewInterface
     private function isSeasonOver(array $standings): bool
     {
         foreach ($standings as $team) {
-            if ($team['gamesUnplayed'] > 0) {
+            if ($team['games_unplayed'] > 0) {
                 return false;
             }
         }
@@ -506,14 +506,14 @@ class StandingsView implements StandingsViewInterface
     /**
      * Compute clinch tier score for a team (higher = better clinch status)
      *
-     * @param array{clinchedLeague: int, clinchedConference: int, clinchedDivision: int, clinchedPlayoffs: int, ...} $team
+     * @param array{clinched_league: int, clinched_conference: int, clinched_division: int, clinched_playoffs: int, ...} $team
      */
     private function getClinchTierScore(array $team): int
     {
-        return $team['clinchedLeague'] * 4
-            + $team['clinchedConference'] * 3
-            + $team['clinchedDivision'] * 2
-            + $team['clinchedPlayoffs'];
+        return $team['clinched_league'] * 4
+            + $team['clinched_conference'] * 3
+            + $team['clinched_division'] * 2
+            + $team['clinched_playoffs'];
     }
 
     /**
@@ -615,9 +615,9 @@ class StandingsView implements StandingsViewInterface
      */
     private function hasClinchStatus(array $team): bool
     {
-        return $team['clinchedLeague'] === 1
-            || $team['clinchedConference'] === 1
-            || $team['clinchedDivision'] === 1
-            || $team['clinchedPlayoffs'] === 1;
+        return $team['clinched_league'] === 1
+            || $team['clinched_conference'] === 1
+            || $team['clinched_division'] === 1
+            || $team['clinched_playoffs'] === 1;
     }
 }

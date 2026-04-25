@@ -67,8 +67,8 @@ class StandingsIntegrationTest extends IntegrationTestCase
         // Assert
         $this->assertQueryExecuted('ibl_standings');
         $this->assertQueryExecuted('conference');
-        $this->assertQueryExecuted('confGB');
-        $this->assertQueryExecuted('confMagicNumber');
+        $this->assertQueryExecuted('conf_gb');
+        $this->assertQueryExecuted('conf_magic_number');
     }
 
     /**
@@ -107,7 +107,7 @@ class StandingsIntegrationTest extends IntegrationTestCase
         $this->repository->getStandingsByRegion('Western');
 
         // Assert - Query now uses table alias 's.' for standings table
-        $this->assertQueryExecuted('ORDER BY s.confGB ASC');
+        $this->assertQueryExecuted('ORDER BY s.conf_gb ASC');
     }
 
     // ========== REPOSITORY - DIVISION STANDINGS TESTS ==========
@@ -128,8 +128,8 @@ class StandingsIntegrationTest extends IntegrationTestCase
         // Assert
         $this->assertQueryExecuted('ibl_standings');
         $this->assertQueryExecuted('division');
-        $this->assertQueryExecuted('divGB');
-        $this->assertQueryExecuted('divMagicNumber');
+        $this->assertQueryExecuted('div_gb');
+        $this->assertQueryExecuted('div_magic_number');
     }
 
     /**
@@ -947,43 +947,43 @@ class StandingsIntegrationTest extends IntegrationTestCase
         string $teamName,
         string $conference,
         string $division,
-        string $leagueRecord,
+        string $league_record,
         float $pct,
         float $gamesBack,
-        int $clinchedConference = 0,
-        int $clinchedDivision = 0,
-        int $clinchedPlayoffs = 0,
-        int $clinchedLeague = 0,
+        int $clinched_conference = 0,
+        int $clinched_division = 0,
+        int $clinched_playoffs = 0,
+        int $clinched_league = 0,
         int $wins = 50,
-        int $gamesUnplayed = 12
+        int $games_unplayed = 12
     ): array {
         return [
             'teamid' => $teamId,
             'team_name' => $teamName,
             'conference' => $conference,
             'division' => $division,
-            'leagueRecord' => $leagueRecord,
+            'league_record' => $league_record,
             'pct' => $pct,
             'gamesBack' => $gamesBack,
-            'confGB' => $gamesBack,
-            'divGB' => $gamesBack,
-            'confRecord' => '30-10',
-            'divRecord' => '15-5',
-            'homeRecord' => '30-5',
-            'awayRecord' => '20-15',
-            'gamesUnplayed' => $gamesUnplayed,
+            'conf_gb' => $gamesBack,
+            'div_gb' => $gamesBack,
+            'conf_record' => '30-10',
+            'div_record' => '15-5',
+            'home_record' => '30-5',
+            'away_record' => '20-15',
+            'games_unplayed' => $games_unplayed,
             'magicNumber' => $gamesBack > 0 ? 20 : 0,
-            'confMagicNumber' => $gamesBack > 0 ? 20 : 0,
-            'divMagicNumber' => $gamesBack > 0 ? 15 : 0,
-            'clinchedConference' => $clinchedConference,
-            'clinchedDivision' => $clinchedDivision,
-            'clinchedPlayoffs' => $clinchedPlayoffs,
-            'clinchedLeague' => $clinchedLeague,
+            'conf_magic_number' => $gamesBack > 0 ? 20 : 0,
+            'div_magic_number' => $gamesBack > 0 ? 15 : 0,
+            'clinched_conference' => $clinched_conference,
+            'clinched_division' => $clinched_division,
+            'clinched_playoffs' => $clinched_playoffs,
+            'clinched_league' => $clinched_league,
             'wins' => $wins,
-            'homeWins' => 30,
-            'homeLosses' => 5,
-            'awayWins' => 20,
-            'awayLosses' => 15,
+            'home_wins' => 30,
+            'home_losses' => 5,
+            'away_wins' => 20,
+            'away_losses' => 15,
             'homeGames' => 35,
             'awayGames' => 35,
             'color1' => '000000',

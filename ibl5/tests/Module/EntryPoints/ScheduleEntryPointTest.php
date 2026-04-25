@@ -22,7 +22,7 @@ class ScheduleEntryPointTest extends ModuleEntryPointTestCase
         return array_merge(TestDataFactory::createTeam(), [
             'used_extension_this_chunk' => 0,
             'used_extension_this_season' => 0,
-            'leagueRecord' => '10-5',
+            'league_record' => '10-5',
         ], $overrides);
     }
 

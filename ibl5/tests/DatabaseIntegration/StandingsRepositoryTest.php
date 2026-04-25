@@ -40,7 +40,7 @@ class StandingsRepositoryTest extends DatabaseTestCase
 
         self::assertNotEmpty($result);
         $first = $result[0];
-        // For division queries, gamesBack comes from divGB
+        // For division queries, gamesBack comes from div_gb
         self::assertArrayHasKey('gamesBack', $first);
     }
 

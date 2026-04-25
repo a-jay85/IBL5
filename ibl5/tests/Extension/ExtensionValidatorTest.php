@@ -194,7 +194,7 @@ class ExtensionValidatorTest extends TestCase
             'seasonRecord' => '0-0',
             'has_mle' => 0,
             'has_lle' => 0,
-            'leagueRecord' => '0-0',
+            'league_record' => '0-0',
             'capRoom' => 0,
             'capacity' => 20000,
             'owner_name' => 'Test Owner',

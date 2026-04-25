@@ -127,13 +127,13 @@ class ScheduleUpdaterTest extends TestCase
      * @group schedule-updater
      * @group database
      */
-    public function testUpdateTruncatesScheduleTable(): void
+    public function testUpdateDeletesScheduleTable(): void
     {
         $this->mockDb->setReturnTrue(true);
 
         ob_start();
 
-        // update() will fail because the .sch file doesn't exist at DOCUMENT_ROOT, but TRUNCATE is executed first
+        // update() will fail because .sch file doesn't exist, but DELETE is executed first
         try {
             $this->scheduleUpdater->update();
         } catch (\RuntimeException $e) {
@@ -144,7 +144,7 @@ class ScheduleUpdaterTest extends TestCase
 
         $queries = $this->mockDb->getExecutedQueries();
         $this->assertNotEmpty($queries);
-        $this->assertSame('TRUNCATE TABLE ibl_schedule', $queries[0]);
+        $this->assertSame('DELETE FROM ibl_schedule', $queries[0]);
     }
 
     /**
@@ -258,6 +258,6 @@ class ScheduleUpdaterTest extends TestCase
 
         $queries = $this->mockDb->getExecutedQueries();
         $this->assertNotEmpty($queries);
-        $this->assertSame('TRUNCATE TABLE ibl_olympics_schedule', $queries[0]);
+        $this->assertSame('DELETE FROM ibl_olympics_schedule', $queries[0]);
     }
 }

@@ -40,9 +40,12 @@ class ScheduleUpdater extends \BaseMysqliRepository {
         12 => 'December',
     ];
 
-    public function __construct(\mysqli $db, Season $season, ?LeagueContext $leagueContext = null) {
+    private ?string $schFilePath;
+
+    public function __construct(\mysqli $db, Season $season, ?LeagueContext $leagueContext = null, ?string $schFilePath = null) {
         parent::__construct($db, $leagueContext);
         $this->season = $season;
+        $this->schFilePath = $schFilePath;
     }
 
     /**
@@ -186,14 +189,18 @@ class ScheduleUpdater extends \BaseMysqliRepository {
 
         $log = '';
 
-        $this->execute("TRUNCATE TABLE {$scheduleTable}", '');
-        $log .= "TRUNCATE TABLE {$scheduleTable}<p>";
+        $this->execute("DELETE FROM {$scheduleTable}", '');
+        $log .= "DELETE FROM {$scheduleTable}<p>";
 
         $this->preloadTeamNameMap();
 
-        $ibl5Root = \Bootstrap\AppPaths::root();
-        $filePrefix = $this->leagueContext !== null ? $this->leagueContext->getFilePrefix() : 'IBL5';
-        $schFilePath = $ibl5Root . '/' . $filePrefix . '.sch';
+        if ($this->schFilePath !== null) {
+            $schFilePath = $this->schFilePath;
+        } else {
+            $ibl5Root = \Bootstrap\AppPaths::root();
+            $filePrefix = $this->leagueContext !== null ? $this->leagueContext->getFilePrefix() : 'IBL5';
+            $schFilePath = $ibl5Root . '/' . $filePrefix . '.sch';
+        }
 
         $games = SchFileParser::parseFile($schFilePath);
 

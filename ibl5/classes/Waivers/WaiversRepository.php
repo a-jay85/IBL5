@@ -58,8 +58,8 @@ class WaiversRepository extends BaseMysqliRepository implements WaiversRepositor
                 $salary = $contractData['salary'];
                 $query = "UPDATE ibl_plr
                           SET `ordinal` = '800', `bird` = 0, `cy` = 0, `cyt` = 1,
-                              `cy1` = ?, `cy2` = 0, `cy3` = 0, `cy4` = 0, `cy5` = 0,
-                              `cy6` = 0, `teamid` = ?, `droptime` = 0
+                              `salary_yr1` = ?, `salary_yr2` = 0, `salary_yr3` = 0, `salary_yr4` = 0, `salary_yr5` = 0,
+                              `salary_yr6` = 0, `teamid` = ?, `droptime` = 0
                           WHERE `pid` = ? LIMIT 1";
                 $affectedRows = $this->execute($query, 'iii', $salary, $teamid, $playerID);
             } else {

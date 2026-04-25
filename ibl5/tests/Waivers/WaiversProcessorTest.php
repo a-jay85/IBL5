@@ -51,12 +51,12 @@ class WaiversProcessorTest extends TestCase
      * Maps array keys to Player properties:
      * - 'cy' => contractCurrentYear
      * - 'cyt' => contractTotalYears  
-     * - 'cy1' => contractYear1Salary
-     * - 'cy2' => contractYear2Salary
-     * - 'cy3' => contractYear3Salary
-     * - 'cy4' => contractYear4Salary
-     * - 'cy5' => contractYear5Salary
-     * - 'cy6' => contractYear6Salary
+     * - 'salary_yr1' => contractYear1Salary
+     * - 'salary_yr2' => contractYear2Salary
+     * - 'salary_yr3' => contractYear3Salary
+     * - 'salary_yr4' => contractYear4Salary
+     * - 'salary_yr5' => contractYear5Salary
+     * - 'salary_yr6' => contractYear6Salary
      * - 'exp' => yearsOfExperience
      */
     private function createMockPlayer(array $properties): Player
@@ -69,12 +69,12 @@ class WaiversProcessorTest extends TestCase
         $propertyMap = [
             'cy' => 'contractCurrentYear',
             'cyt' => 'contractTotalYears',
-            'cy1' => 'contractYear1Salary',
-            'cy2' => 'contractYear2Salary',
-            'cy3' => 'contractYear3Salary',
-            'cy4' => 'contractYear4Salary',
-            'cy5' => 'contractYear5Salary',
-            'cy6' => 'contractYear6Salary',
+            'salary_yr1' => 'contractYear1Salary',
+            'salary_yr2' => 'contractYear2Salary',
+            'salary_yr3' => 'contractYear3Salary',
+            'salary_yr4' => 'contractYear4Salary',
+            'salary_yr5' => 'contractYear5Salary',
+            'salary_yr6' => 'contractYear6Salary',
             'exp' => 'yearsOfExperience',
         ];
         
@@ -152,7 +152,7 @@ class WaiversProcessorTest extends TestCase
     public function testGetPlayerContractDisplayWithNoSalary()
     {
         $player = $this->createMockPlayer([
-            'cy1' => 0,
+            'salary_yr1' => 0,
             'exp' => 5
         ]);
         
@@ -163,11 +163,11 @@ class WaiversProcessorTest extends TestCase
     public function testGetPlayerContractDisplayWithExistingContract()
     {
         $player = $this->createMockPlayer([
-            'cy1' => 500,
+            'salary_yr1' => 500,
             'cy' => 1,
             'cyt' => 3,
-            'cy2' => 550,
-            'cy3' => 600
+            'salary_yr2' => 550,
+            'salary_yr3' => 600
         ]);
         
         $contract = $this->processor->getPlayerContractDisplay($player, $this->mockSeasonRegular);
@@ -177,11 +177,11 @@ class WaiversProcessorTest extends TestCase
     public function testGetPlayerContractDisplayWithPartialContract()
     {
         $player = $this->createMockPlayer([
-            'cy1' => 500,
+            'salary_yr1' => 500,
             'cy' => 2,
             'cyt' => 3,
-            'cy2' => 550,
-            'cy3' => 600
+            'salary_yr2' => 550,
+            'salary_yr3' => 600
         ]);
         
         $contract = $this->processor->getPlayerContractDisplay($player, $this->mockSeasonRegular);
@@ -191,10 +191,10 @@ class WaiversProcessorTest extends TestCase
     public function testGetPlayerContractDisplayWithOneYearRemaining()
     {
         $player = $this->createMockPlayer([
-            'cy1' => 500,
+            'salary_yr1' => 500,
             'cy' => 3,
             'cyt' => 3,
-            'cy3' => 600
+            'salary_yr3' => 600
         ]);
         
         $contract = $this->processor->getPlayerContractDisplay($player, $this->mockSeasonRegular);
@@ -233,7 +233,7 @@ class WaiversProcessorTest extends TestCase
     public function testDetermineContractDataForNewContract()
     {
         $playerData = [
-            'cy1' => 0,
+            'salary_yr1' => 0,
             'exp' => 8
         ];
         
@@ -246,11 +246,11 @@ class WaiversProcessorTest extends TestCase
     public function testDetermineContractDataForExistingContract()
     {
         $playerData = [
-            'cy1' => 500,
+            'salary_yr1' => 500,
             'cy' => 1,
             'cyt' => 3,
-            'cy2' => 550,
-            'cy3' => 600
+            'salary_yr2' => 550,
+            'salary_yr3' => 600
         ];
         
         $contractData = $this->processor->determineContractData($playerData, $this->mockSeasonRegular);
@@ -262,11 +262,11 @@ class WaiversProcessorTest extends TestCase
     public function testDetermineContractDataForMidContract()
     {
         $playerData = [
-            'cy1' => 500,
+            'salary_yr1' => 500,
             'cy' => 2,
             'cyt' => 3,
-            'cy2' => 550,
-            'cy3' => 600
+            'salary_yr2' => 550,
+            'salary_yr3' => 600
         ];
         
         $contractData = $this->processor->determineContractData($playerData, $this->mockSeasonRegular);
@@ -278,7 +278,7 @@ class WaiversProcessorTest extends TestCase
     public function testGetPlayerContractDisplayWithMissingExperience()
     {
         $player = $this->createMockPlayer([
-            'cy1' => 0,
+            'salary_yr1' => 0,
             'exp' => 0
         ]);
         
@@ -290,7 +290,7 @@ class WaiversProcessorTest extends TestCase
     public function testGetPlayerContractDisplayWithEmptyContract()
     {
         $player = $this->createMockPlayer([
-            'cy1' => 0,
+            'salary_yr1' => 0,
             'cy' => 1,
             'cyt' => 1,
             'exp' => 0
@@ -303,8 +303,8 @@ class WaiversProcessorTest extends TestCase
     public function testDetermineContractDataForNewContractDuringFreeAgency()
     {
         $playerData = [
-            'cy1' => 0,
-            'cy2' => 0,
+            'salary_yr1' => 0,
+            'salary_yr2' => 0,
             'exp' => 6
         ];
         
@@ -317,8 +317,8 @@ class WaiversProcessorTest extends TestCase
     public function testGetPlayerContractDisplayDuringFreeAgency()
     {
         $player = $this->createMockPlayer([
-            'cy1' => 0,
-            'cy2' => 0,
+            'salary_yr1' => 0,
+            'salary_yr2' => 0,
             'exp' => 4
         ]);
         
@@ -329,12 +329,12 @@ class WaiversProcessorTest extends TestCase
     public function testGetPlayerContractDisplayWithExistingContractDuringFreeAgency()
     {
         $player = $this->createMockPlayer([
-            'cy1' => 0,
-            'cy2' => 500,
+            'salary_yr1' => 0,
+            'salary_yr2' => 500,
             'cy' => 2,
             'cyt' => 4,
-            'cy3' => 550,
-            'cy4' => 600
+            'salary_yr3' => 550,
+            'salary_yr4' => 600
         ]);
 
         $contract = $this->processor->getPlayerContractDisplay($player, $this->mockSeasonFreeAgency);
@@ -346,7 +346,7 @@ class WaiversProcessorTest extends TestCase
     public function testGetPlayerContractDisplayWithNullExperience(): void
     {
         $player = $this->createMockPlayer([
-            'cy1' => 0,
+            'salary_yr1' => 0,
             // 'exp' not set → yearsOfExperience is null → defaults to 0
         ]);
 
@@ -358,7 +358,7 @@ class WaiversProcessorTest extends TestCase
     public function testGetPlayerContractDisplayDuringFreeAgencyWithNullExperience(): void
     {
         $player = $this->createMockPlayer([
-            'cy1' => 0,
+            'salary_yr1' => 0,
             // 'exp' not set → offseason path: (null ?? 0) + 1 = 1 year experience
         ]);
 

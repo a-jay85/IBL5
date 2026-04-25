@@ -10,7 +10,7 @@ namespace Trading\Contracts;
  * Defines methods for accessing and modifying cash-related trade data.
  * Extracted from the original TradingRepositoryInterface to follow single-responsibility principle.
  *
- * @phpstan-type TradeCashRow array{tradeOfferID: int, sendingTeam: string, receivingTeam: string, cy1: ?int, cy2: ?int, cy3: ?int, cy4: ?int, cy5: ?int, cy6: ?int}
+ * @phpstan-type TradeCashRow array{tradeOfferID: int, sendingTeam: string, receivingTeam: string, salary_yr1: ?int, salary_yr2: ?int, salary_yr3: ?int, salary_yr4: ?int, salary_yr5: ?int, salary_yr6: ?int}
  */
 interface TradeCashRepositoryInterface
 {
@@ -19,7 +19,7 @@ interface TradeCashRepositoryInterface
      *
      * @param int $offerId Trade offer ID
      * @param string $sendingTeam Sending team name
-     * @return TradeCashRow|null Cash details with cy1-cy6 fields, or null if not found
+     * @return TradeCashRow|null Cash details with salary_yr1-salary_yr6 fields, or null if not found
      */
     public function getCashTransactionByOffer(int $offerId, string $sendingTeam): ?array;
 
@@ -29,15 +29,15 @@ interface TradeCashRepositoryInterface
      * @param int $tradeOfferId Trade offer ID
      * @param string $sendingTeam Sending team name
      * @param string $receivingTeam Receiving team name
-     * @param int $cy1 Cash year 1
-     * @param int $cy2 Cash year 2
-     * @param int $cy3 Cash year 3
-     * @param int $cy4 Cash year 4
-     * @param int $cy5 Cash year 5
-     * @param int $cy6 Cash year 6
+     * @param int $salaryYr1 Salary year 1
+     * @param int $salaryYr2 Salary year 2
+     * @param int $salaryYr3 Salary year 3
+     * @param int $salaryYr4 Salary year 4
+     * @param int $salaryYr5 Salary year 5
+     * @param int $salaryYr6 Salary year 6
      * @return int Number of affected rows
      */
-    public function insertCashTradeOffer(int $tradeOfferId, string $sendingTeam, string $receivingTeam, int $cy1, int $cy2, int $cy3, int $cy4, int $cy5, int $cy6): int;
+    public function insertCashTradeOffer(int $tradeOfferId, string $sendingTeam, string $receivingTeam, int $salaryYr1, int $salaryYr2, int $salaryYr3, int $salaryYr4, int $salaryYr5, int $salaryYr6): int;
 
     /**
      * Clear all trade cash data

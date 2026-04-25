@@ -26,14 +26,14 @@ class TeamQueryRepositoryTest extends DatabaseTestCase
     public function testGetBuyoutsReturnsBuyoutRowsFromCashConsiderations(): void
     {
         $stmt = $this->db->prepare(
-            "INSERT INTO ibl_cash_considerations (teamid, type, label, cy, cyt, cy1) VALUES (?, 'buyout', ?, ?, ?, ?)"
+            "INSERT INTO ibl_cash_considerations (teamid, type, label, cy, cyt, salary_yr1) VALUES (?, 'buyout', ?, ?, ?, ?)"
         );
         self::assertNotFalse($stmt);
         $label = 'Test Buyout';
         $cy = 1;
         $cyt = 1;
-        $cy1 = 500;
-        $stmt->bind_param('isiii', ...[ self::TEST_TID, $label, $cy, $cyt, $cy1 ]);
+        $salaryYr1 = 500;
+        $stmt->bind_param('isiii', ...[ self::TEST_TID, $label, $cy, $cyt, $salaryYr1 ]);
         $stmt->execute();
         $stmt->close();
 
@@ -43,7 +43,7 @@ class TeamQueryRepositoryTest extends DatabaseTestCase
         foreach ($result as $row) {
             if ($row['label'] === 'Test Buyout') {
                 $found = true;
-                self::assertSame(500, $row['cy1']);
+                self::assertSame(500, $row['salary_yr1']);
                 break;
             }
         }
@@ -242,13 +242,13 @@ class TeamQueryRepositoryTest extends DatabaseTestCase
 
     public function testGetAllPlayersUnderContractFiltersByCy1(): void
     {
-        $this->insertTestPlayer(200090109, 'Under Contract Guy', ['cy1' => 2000]);
+        $this->insertTestPlayer(200090109, 'Under Contract Guy', ['salary_yr1' => 2000]);
 
         $result = $this->repo->getAllPlayersUnderContract(self::TEST_TID);
 
         self::assertNotEmpty($result);
         foreach ($result as $player) {
-            self::assertNotSame(0, $player['cy1']);
+            self::assertNotSame(0, $player['salary_yr1']);
         }
     }
 
@@ -256,11 +256,11 @@ class TeamQueryRepositoryTest extends DatabaseTestCase
     {
         $this->insertTestPlayer(200090110, 'PG Contract', [
             'pos' => 'PG',
-            'cy1' => 1500,
+            'salary_yr1' => 1500,
         ]);
         $this->insertTestPlayer(200090111, 'SF Contract', [
             'pos' => 'SF',
-            'cy1' => 1500,
+            'salary_yr1' => 1500,
             'uuid' => 'tq-test-sf11-0000-000000000001',
         ]);
 
@@ -334,15 +334,15 @@ class TeamQueryRepositoryTest extends DatabaseTestCase
     public function testGetTotalCurrentSeasonSalariesSumsContracts(): void
     {
         // Use a real team with isolated test player. First clear any existing
-        // cy1>0 players on team 28 to get a predictable sum.
-        $this->db->query('UPDATE ibl_plr SET cy1 = 0 WHERE teamid = 28');
+        // salary_yr1>0 players on team 28 to get a predictable sum.
+        $this->db->query('UPDATE ibl_plr SET salary_yr1 = 0 WHERE teamid = 28');
 
         $this->insertTestPlayer(200000150, 'TQ CurSal', [
             'teamid' => 28,
             'cy' => 1,
             'cyt' => 2,
-            'cy1' => 3000,
-            'cy2' => 3200,
+            'salary_yr1' => 3000,
+            'salary_yr2' => 3200,
         ]);
 
         $rows = $this->repo->getAllPlayersUnderContract(28);
@@ -356,14 +356,14 @@ class TeamQueryRepositoryTest extends DatabaseTestCase
 
     public function testGetTotalNextSeasonSalariesSumsContracts(): void
     {
-        $this->db->query('UPDATE ibl_plr SET cy1 = 0 WHERE teamid = 28');
+        $this->db->query('UPDATE ibl_plr SET salary_yr1 = 0 WHERE teamid = 28');
 
         $this->insertTestPlayer(200000151, 'TQ NxtSal', [
             'teamid' => 28,
             'cy' => 1,
             'cyt' => 2,
-            'cy1' => 1500,
-            'cy2' => 2200,
+            'salary_yr1' => 1500,
+            'salary_yr2' => 2200,
         ]);
 
         $rows = $this->repo->getAllPlayersUnderContract(28);

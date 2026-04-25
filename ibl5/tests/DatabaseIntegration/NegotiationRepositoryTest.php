@@ -50,16 +50,16 @@ class NegotiationRepositoryTest extends DatabaseTestCase
             'pos' => 'PG',
             'cy' => 1,
             'cyt' => 3,
-            'cy1' => 1500,
-            'cy2' => 1600,
+            'salary_yr1' => 1500,
+            'salary_yr2' => 1600,
         ]);
         $this->insertTestPlayer(200040002, 'NEG SalaryPG2', [
             'teamid' => 1,
             'pos' => 'PG',
             'cy' => 1,
             'cyt' => 2,
-            'cy1' => 2000,
-            'cy2' => 2100,
+            'salary_yr1' => 2000,
+            'salary_yr2' => 2100,
         ]);
 
         // Exclude NEG SalaryPG1 — should only include NEG SalaryPG2's next year salary

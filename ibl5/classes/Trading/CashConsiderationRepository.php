@@ -30,7 +30,7 @@ class CashConsiderationRepository extends BaseMysqliRepository implements CashCo
         $tradeOfferSql = $tradeOfferId !== null ? '?' : 'NULL';
 
         $sql = "INSERT INTO ibl_cash_considerations
-                    (teamid, type, label, counterparty_teamid, trade_offer_id, cy, cyt, cy1, cy2, cy3, cy4, cy5, cy6)
+                    (teamid, type, label, counterparty_teamid, trade_offer_id, cy, cyt, salary_yr1, salary_yr2, salary_yr3, salary_yr4, salary_yr5, salary_yr6)
                  VALUES (?, ?, ?, {$counterpartySql}, {$tradeOfferSql}, ?, ?, ?, ?, ?, ?, ?, ?)";
 
         $types = 'iss';
@@ -48,8 +48,8 @@ class CashConsiderationRepository extends BaseMysqliRepository implements CashCo
         $types .= 'iiiiiiii';
         $params = array_merge($params, [
             $data['cy'], $data['cyt'],
-            $data['cy1'], $data['cy2'], $data['cy3'],
-            $data['cy4'], $data['cy5'], $data['cy6'],
+            $data['salary_yr1'], $data['salary_yr2'], $data['salary_yr3'],
+            $data['salary_yr4'], $data['salary_yr5'], $data['salary_yr6'],
         ]);
 
         return $this->execute($sql, $types, ...$params);
@@ -86,9 +86,9 @@ class CashConsiderationRepository extends BaseMysqliRepository implements CashCo
      */
     public function getTeamCashForSalary(int $teamId): array
     {
-        /** @var list<array{cy: int, cy1: int, cy2: int, cy3: int, cy4: int, cy5: int, cy6: int}> */
+        /** @var list<array{cy: int, salary_yr1: int, salary_yr2: int, salary_yr3: int, salary_yr4: int, salary_yr5: int, salary_yr6: int}> */
         return $this->fetchAll(
-            "SELECT cy, cy1, cy2, cy3, cy4, cy5, cy6
+            "SELECT cy, salary_yr1, salary_yr2, salary_yr3, salary_yr4, salary_yr5, salary_yr6
              FROM ibl_cash_considerations
              WHERE teamid = ?",
             "i",
@@ -104,15 +104,15 @@ class CashConsiderationRepository extends BaseMysqliRepository implements CashCo
         // Delete entries where no future-year obligations remain.
         // cy is the current contract year (1-indexed). An entry is expired when
         // all years AFTER the current year are zero — the current year's balance
-        // (cy1 when cy=1) is irrelevant since it is already being processed.
-        // cy >= N means year N is current or in the past; cyN = 0 means no obligation.
+        // (salary_yr1 when cy=1) is irrelevant since it is already being processed.
+        // cy >= N means year N is current or in the past; salary_yrN = 0 means no obligation.
         return $this->execute(
             "DELETE FROM ibl_cash_considerations
-             WHERE (cy >= 2 OR cy2 = 0)
-               AND (cy >= 3 OR cy3 = 0)
-               AND (cy >= 4 OR cy4 = 0)
-               AND (cy >= 5 OR cy5 = 0)
-               AND (cy >= 6 OR cy6 = 0)"
+             WHERE (cy >= 2 OR salary_yr2 = 0)
+               AND (cy >= 3 OR salary_yr3 = 0)
+               AND (cy >= 4 OR salary_yr4 = 0)
+               AND (cy >= 5 OR salary_yr5 = 0)
+               AND (cy >= 6 OR salary_yr6 = 0)"
         );
     }
 }

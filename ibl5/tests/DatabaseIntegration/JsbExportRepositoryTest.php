@@ -29,12 +29,12 @@ class JsbExportRepositoryTest extends DatabaseTestCase
             'bird' => 3,
             'cy' => 2,
             'cyt' => 4,
-            'cy1' => 1500,
-            'cy2' => 1700,
-            'cy3' => 1900,
-            'cy4' => 0,
-            'cy5' => 0,
-            'cy6' => 0,
+            'salary_yr1' => 1500,
+            'salary_yr2' => 1700,
+            'salary_yr3' => 1900,
+            'salary_yr4' => 0,
+            'salary_yr5' => 0,
+            'salary_yr6' => 0,
             'ordinal' => 100,
             'fa_signing_flag' => 0,
         ]);
@@ -53,9 +53,9 @@ class JsbExportRepositoryTest extends DatabaseTestCase
         self::assertSame(3, $player['bird']);          // tinyint(1) → int through COALESCE
         self::assertSame(0, $player['cy']);             // tinyint(3) unsigned → string → 0
         self::assertSame(0, $player['cyt']);            // tinyint → string → 0
-        self::assertSame(1500, $player['cy1']);         // int → int through COALESCE
-        self::assertSame(1700, $player['cy2']);         // int → int through COALESCE
-        self::assertSame(1900, $player['cy3']);         // int → int through COALESCE
+        self::assertSame(1500, $player['salary_yr1']);         // int → int through COALESCE
+        self::assertSame(1700, $player['salary_yr2']);         // int → int through COALESCE
+        self::assertSame(1900, $player['salary_yr3']);         // int → int through COALESCE
         self::assertSame(0, $player['fa_signing_flag']); // tinyint(1) → int through COALESCE
     }
 

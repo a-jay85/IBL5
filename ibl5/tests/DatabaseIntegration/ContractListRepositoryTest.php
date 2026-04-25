@@ -45,12 +45,12 @@ class ContractListRepositoryTest extends DatabaseTestCase
         self::assertArrayHasKey('teamname', $first);
         self::assertArrayHasKey('cy', $first);
         self::assertArrayHasKey('cyt', $first);
-        self::assertArrayHasKey('cy1', $first);
-        self::assertArrayHasKey('cy2', $first);
-        self::assertArrayHasKey('cy3', $first);
-        self::assertArrayHasKey('cy4', $first);
-        self::assertArrayHasKey('cy5', $first);
-        self::assertArrayHasKey('cy6', $first);
+        self::assertArrayHasKey('salary_yr1', $first);
+        self::assertArrayHasKey('salary_yr2', $first);
+        self::assertArrayHasKey('salary_yr3', $first);
+        self::assertArrayHasKey('salary_yr4', $first);
+        self::assertArrayHasKey('salary_yr5', $first);
+        self::assertArrayHasKey('salary_yr6', $first);
         self::assertArrayHasKey('bird', $first);
         self::assertArrayHasKey('team_city', $first);
         self::assertArrayHasKey('color1', $first);

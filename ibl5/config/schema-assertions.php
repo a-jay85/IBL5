@@ -234,4 +234,48 @@ return [
     new SchemaAssertion('ibl_olympics_standings', 'clinched_division'),
     new SchemaAssertion('ibl_olympics_standings', 'clinched_playoffs'),
     new SchemaAssertion('ibl_olympics_standings', 'clinched_league'),
+
+    // Migration 119: Tier 4 opacity fix — cy1-cy6 → salary_yr1-salary_yr6 (ADR-0010).
+    // ibl_plr (6 columns).
+    new SchemaAssertion('ibl_plr', 'salary_yr1'),
+    new SchemaAssertion('ibl_plr', 'salary_yr2'),
+    new SchemaAssertion('ibl_plr', 'salary_yr3'),
+    new SchemaAssertion('ibl_plr', 'salary_yr4'),
+    new SchemaAssertion('ibl_plr', 'salary_yr5'),
+    new SchemaAssertion('ibl_plr', 'salary_yr6'),
+    // ibl_plr_snapshots (6 columns).
+    new SchemaAssertion('ibl_plr_snapshots', 'salary_yr1'),
+    new SchemaAssertion('ibl_plr_snapshots', 'salary_yr2'),
+    new SchemaAssertion('ibl_plr_snapshots', 'salary_yr3'),
+    new SchemaAssertion('ibl_plr_snapshots', 'salary_yr4'),
+    new SchemaAssertion('ibl_plr_snapshots', 'salary_yr5'),
+    new SchemaAssertion('ibl_plr_snapshots', 'salary_yr6'),
+    // ibl_olympics_plr (6 columns).
+    new SchemaAssertion('ibl_olympics_plr', 'salary_yr1'),
+    new SchemaAssertion('ibl_olympics_plr', 'salary_yr2'),
+    new SchemaAssertion('ibl_olympics_plr', 'salary_yr3'),
+    new SchemaAssertion('ibl_olympics_plr', 'salary_yr4'),
+    new SchemaAssertion('ibl_olympics_plr', 'salary_yr5'),
+    new SchemaAssertion('ibl_olympics_plr', 'salary_yr6'),
+    // ibl_cash_considerations (6 columns).
+    new SchemaAssertion('ibl_cash_considerations', 'salary_yr1'),
+    new SchemaAssertion('ibl_cash_considerations', 'salary_yr2'),
+    new SchemaAssertion('ibl_cash_considerations', 'salary_yr3'),
+    new SchemaAssertion('ibl_cash_considerations', 'salary_yr4'),
+    new SchemaAssertion('ibl_cash_considerations', 'salary_yr5'),
+    new SchemaAssertion('ibl_cash_considerations', 'salary_yr6'),
+    // ibl_trade_cash (6 columns).
+    new SchemaAssertion('ibl_trade_cash', 'salary_yr1'),
+    new SchemaAssertion('ibl_trade_cash', 'salary_yr2'),
+    new SchemaAssertion('ibl_trade_cash', 'salary_yr3'),
+    new SchemaAssertion('ibl_trade_cash', 'salary_yr4'),
+    new SchemaAssertion('ibl_trade_cash', 'salary_yr5'),
+    new SchemaAssertion('ibl_trade_cash', 'salary_yr6'),
+    // ibl_hist (6 columns).
+    new SchemaAssertion('ibl_hist', 'salary_yr1'),
+    new SchemaAssertion('ibl_hist', 'salary_yr2'),
+    new SchemaAssertion('ibl_hist', 'salary_yr3'),
+    new SchemaAssertion('ibl_hist', 'salary_yr4'),
+    new SchemaAssertion('ibl_hist', 'salary_yr5'),
+    new SchemaAssertion('ibl_hist', 'salary_yr6'),
 ];

@@ -77,8 +77,8 @@ class FreeAgencyCapCalculator
             if ($cy === 0) {
                 $cy = 1;
             }
-            $salaryFields = [1 => $cashRow['cy1'], 2 => $cashRow['cy2'], 3 => $cashRow['cy3'],
-                             4 => $cashRow['cy4'], 5 => $cashRow['cy5'], 6 => $cashRow['cy6']];
+            $salaryFields = [1 => $cashRow['salary_yr1'], 2 => $cashRow['salary_yr2'], 3 => $cashRow['salary_yr3'],
+                             4 => $cashRow['salary_yr4'], 5 => $cashRow['salary_yr5'], 6 => $cashRow['salary_yr6']];
             $slot = 0;
             while ($cy <= 6 && $slot < 6) {
                 $totalSalaries[$slot] += $salaryFields[$cy] ?? 0;

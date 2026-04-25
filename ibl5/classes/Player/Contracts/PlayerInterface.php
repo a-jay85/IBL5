@@ -150,10 +150,10 @@ interface PlayerInterface
      *
      * Only first and second round picks with ≤3 years experience are eligible.
      * Eligibility varies by season phase and years of experience:
-     * - Round 1 FA: 2 years experience, cy4 empty
-     * - Round 1 Preseason/HEAT: 3 years experience, cy4 empty
-     * - Round 2 FA: 1 year experience, cy3 empty
-     * - Round 2 Preseason/HEAT: 2 years experience, cy3 empty
+     * - Round 1 FA: 2 years experience, salary_yr4 empty
+     * - Round 1 Preseason/HEAT: 3 years experience, salary_yr4 empty
+     * - Round 2 FA: 1 year experience, salary_yr3 empty
+     * - Round 2 Preseason/HEAT: 2 years experience, salary_yr3 empty
      *
      * @param string $seasonPhase Current season phase ("Free Agency", "Preseason", "HEAT", etc.)
      * @return bool True if player is eligible for rookie option
@@ -163,8 +163,8 @@ interface PlayerInterface
     /**
      * Get the final year rookie contract salary
      *
-     * For first round picks, returns cy3 (final year of 3-year rookie contract).
-     * For second round picks, returns cy2 (final year of 2-year rookie contract).
+     * For first round picks, returns salary_yr3 (final year of 3-year rookie contract).
+     * For second round picks, returns salary_yr2 (final year of 2-year rookie contract).
      * For non-draft picks, returns 0.
      *
      * @return int Final year rookie contract salary, or 0 if not a draft pick
@@ -184,8 +184,8 @@ interface PlayerInterface
     /**
      * Check if a player's rookie option was previously exercised
      *
-     * First round: Check if year 4 salary is double year 3 salary.
-     * Second round: Check if year 3 salary is double year 2 salary.
+     * First round: Check if salary_yr4 is double salary_yr3.
+     * Second round: Check if salary_yr3 is double salary_yr2.
      * Only returns true when in the year AFTER the rookie option year.
      *
      * @return bool True if rookie option was exercised

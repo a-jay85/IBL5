@@ -120,15 +120,15 @@ class FreeAgencyRepositoryTest extends DatabaseTestCase
     public function testIsPlayerAlreadySignedReturnsFalseWhenContracted(): void
     {
         // cy=1 means in year 1 of contract — not a "signed" free agent
-        $this->insertTestPlayer(200020005, 'FA ContractTst', ['cy' => 1, 'cy1' => 1500]);
+        $this->insertTestPlayer(200020005, 'FA ContractTst', ['cy' => 1, 'salary_yr1' => 1500]);
 
         self::assertFalse($this->repo->isPlayerAlreadySigned(200020005));
     }
 
     public function testIsPlayerAlreadySignedReturnsTrueWhenCyZeroAndCy1Set(): void
     {
-        // cy=0, cy1 != 0 means player was just signed (contract year 0 with salary set)
-        $this->insertTestPlayer(200020006, 'FA SignedTest', ['cy' => 0, 'cy1' => 1500]);
+        // cy=0, salary_yr1 != 0 means player was just signed (contract year 0 with salary set)
+        $this->insertTestPlayer(200020006, 'FA SignedTest', ['cy' => 0, 'salary_yr1' => 1500]);
 
         self::assertTrue($this->repo->isPlayerAlreadySigned(200020006));
     }

@@ -19,7 +19,7 @@ class PlayerDataConverterTest extends TestCase
 
     public function testArrayToPlayerDataReturnsPlayerDataObject(): void
     {
-        $playerData = ['cy' => 1, 'cyt' => 3, 'cy1' => 5000000];
+        $playerData = ['cy' => 1, 'cyt' => 3, 'salary_yr1' => 5000000];
 
         $result = PlayerDataConverter::arrayToPlayerData($playerData);
 
@@ -46,7 +46,7 @@ class PlayerDataConverterTest extends TestCase
 
     public function testArrayToPlayerDataSetsContractYear1Salary(): void
     {
-        $playerData = ['cy1' => 5000000];
+        $playerData = ['salary_yr1' => 5000000];
 
         $result = PlayerDataConverter::arrayToPlayerData($playerData);
 
@@ -55,7 +55,7 @@ class PlayerDataConverterTest extends TestCase
 
     public function testArrayToPlayerDataSetsContractYear2Salary(): void
     {
-        $playerData = ['cy2' => 5500000];
+        $playerData = ['salary_yr2' => 5500000];
 
         $result = PlayerDataConverter::arrayToPlayerData($playerData);
 
@@ -64,7 +64,7 @@ class PlayerDataConverterTest extends TestCase
 
     public function testArrayToPlayerDataSetsContractYear3Salary(): void
     {
-        $playerData = ['cy3' => 6000000];
+        $playerData = ['salary_yr3' => 6000000];
 
         $result = PlayerDataConverter::arrayToPlayerData($playerData);
 
@@ -73,7 +73,7 @@ class PlayerDataConverterTest extends TestCase
 
     public function testArrayToPlayerDataSetsContractYear4Salary(): void
     {
-        $playerData = ['cy4' => 6500000];
+        $playerData = ['salary_yr4' => 6500000];
 
         $result = PlayerDataConverter::arrayToPlayerData($playerData);
 
@@ -82,7 +82,7 @@ class PlayerDataConverterTest extends TestCase
 
     public function testArrayToPlayerDataSetsContractYear5Salary(): void
     {
-        $playerData = ['cy5' => 7000000];
+        $playerData = ['salary_yr5' => 7000000];
 
         $result = PlayerDataConverter::arrayToPlayerData($playerData);
 
@@ -91,7 +91,7 @@ class PlayerDataConverterTest extends TestCase
 
     public function testArrayToPlayerDataSetsContractYear6Salary(): void
     {
-        $playerData = ['cy6' => 7500000];
+        $playerData = ['salary_yr6' => 7500000];
 
         $result = PlayerDataConverter::arrayToPlayerData($playerData);
 
@@ -123,7 +123,7 @@ class PlayerDataConverterTest extends TestCase
         $playerData = [
             'cy' => '2',
             'cyt' => '4',
-            'cy1' => '5000000',
+            'salary_yr1' => '5000000',
         ];
 
         $result = PlayerDataConverter::arrayToPlayerData($playerData);
@@ -138,12 +138,12 @@ class PlayerDataConverterTest extends TestCase
         $playerData = [
             'cy' => 1,
             'cyt' => 6,
-            'cy1' => 10000000,
-            'cy2' => 11000000,
-            'cy3' => 12000000,
-            'cy4' => 13000000,
-            'cy5' => 14000000,
-            'cy6' => 15000000,
+            'salary_yr1' => 10000000,
+            'salary_yr2' => 11000000,
+            'salary_yr3' => 12000000,
+            'salary_yr4' => 13000000,
+            'salary_yr5' => 14000000,
+            'salary_yr6' => 15000000,
             'exp' => 10,
         ];
 

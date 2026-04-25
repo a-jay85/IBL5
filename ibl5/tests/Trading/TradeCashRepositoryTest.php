@@ -96,7 +96,7 @@ class TradeCashRepositoryTest extends TestCase
     {
         $repository = new TradeCashRepository($this->mockMysqliDb);
         $this->mockDb->setMockData([
-            ['tradeOfferID' => 5, 'sendingTeam' => 'Boston', 'receivingTeam' => 'Denver', 'cy1' => 50, 'cy2' => 75, 'cy3' => 0, 'cy4' => 0, 'cy5' => 0, 'cy6' => 0],
+            ['tradeOfferID' => 5, 'sendingTeam' => 'Boston', 'receivingTeam' => 'Denver', 'salary_yr1' => 50, 'salary_yr2' => 75, 'salary_yr3' => 0, 'salary_yr4' => 0, 'salary_yr5' => 0, 'salary_yr6' => 0],
         ]);
 
         $result = $repository->getCashTransactionByOffer(5, 'Boston');

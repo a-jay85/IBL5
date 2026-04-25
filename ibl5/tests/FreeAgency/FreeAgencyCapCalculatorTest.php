@@ -230,7 +230,7 @@ class FreeAgencyCapCalculatorTest extends TestCase
     {
         // Cash entries live in ibl_cash_considerations, not ibl_plr
         $this->mockDb->onQuery('ibl_cash_considerations', [
-            ['cy' => 1, 'cy1' => 300, 'cy2' => 0, 'cy3' => 0, 'cy4' => 0, 'cy5' => 0, 'cy6' => 0],
+            ['cy' => 1, 'salary_yr1' => 300, 'salary_yr2' => 0, 'salary_yr3' => 0, 'salary_yr4' => 0, 'salary_yr5' => 0, 'salary_yr6' => 0],
         ]);
 
         $team = $this->createMockTeamEntity();
@@ -252,8 +252,8 @@ class FreeAgencyCapCalculatorTest extends TestCase
     {
         // Cash entries are in ibl_cash_considerations, not in the roster
         $this->mockDb->onQuery('ibl_cash_considerations', [
-            ['cy' => 1, 'cy1' => 300, 'cy2' => 0, 'cy3' => 0, 'cy4' => 0, 'cy5' => 0, 'cy6' => 0],
-            ['cy' => 1, 'cy1' => 200, 'cy2' => 0, 'cy3' => 0, 'cy4' => 0, 'cy5' => 0, 'cy6' => 0],
+            ['cy' => 1, 'salary_yr1' => 300, 'salary_yr2' => 0, 'salary_yr3' => 0, 'salary_yr4' => 0, 'salary_yr5' => 0, 'salary_yr6' => 0],
+            ['cy' => 1, 'salary_yr1' => 200, 'salary_yr2' => 0, 'salary_yr3' => 0, 'salary_yr4' => 0, 'salary_yr5' => 0, 'salary_yr6' => 0],
         ]);
 
         $team = $this->createMockTeamEntity();
@@ -280,19 +280,19 @@ class FreeAgencyCapCalculatorTest extends TestCase
     {
         // Cash entry contributes to salary via ibl_cash_considerations
         $this->mockDb->onQuery('ibl_cash_considerations', [
-            ['cy' => 1, 'cy1' => 300, 'cy2' => 0, 'cy3' => 0, 'cy4' => 0, 'cy5' => 0, 'cy6' => 0],
+            ['cy' => 1, 'salary_yr1' => 300, 'salary_yr2' => 0, 'salary_yr3' => 0, 'salary_yr4' => 0, 'salary_yr5' => 0, 'salary_yr6' => 0],
         ]);
 
         $players = [
             TestDataFactory::createPlayer([
                 'name' => 'Real Player',
                 'cy' => 0,
-                'cy1' => 500,
-                'cy2' => 550,
-                'cy3' => 0,
-                'cy4' => 0,
-                'cy5' => 0,
-                'cy6' => 0,
+                'salary_yr1' => 500,
+                'salary_yr2' => 550,
+                'salary_yr3' => 0,
+                'salary_yr4' => 0,
+                'salary_yr5' => 0,
+                'salary_yr6' => 0,
                 'loyalty' => 0,
                 'playing_time' => 0,
                 'winner' => 0,

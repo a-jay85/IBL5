@@ -135,12 +135,12 @@ class NegotiationIntegrationTest extends IntegrationTestCase
                 // Player is eligible for renegotiation (in last year of contract)
                 'cy' => 2,
                 'cyt' => 2,
-                'cy1' => 800,
-                'cy2' => 850,
-                'cy3' => 0,  // No salary in year 3 means eligible for renegotiation
-                'cy4' => 0,
-                'cy5' => 0,
-                'cy6' => 0,
+                'salary_yr1' => 800,
+                'salary_yr2' => 850,
+                'salary_yr3' => 0,  // No salary in year 3 means eligible for renegotiation
+                'salary_yr4' => 0,
+                'salary_yr5' => 0,
+                'salary_yr6' => 0,
                 // Team performance
                 'contract_wins' => 50,
                 'contract_losses' => 32,
@@ -198,12 +198,12 @@ class NegotiationIntegrationTest extends IntegrationTestCase
             // Contract fields
             'cy' => 1,
             'cyt' => 3,
-            'cy1' => 800,
-            'cy2' => 850,
-            'cy3' => 900,
-            'cy4' => 0,
-            'cy5' => 0,
-            'cy6' => 0,
+            'salary_yr1' => 800,
+            'salary_yr2' => 850,
+            'salary_yr3' => 900,
+            'salary_yr4' => 0,
+            'salary_yr5' => 0,
+            'salary_yr6' => 0,
             // Player preferences
             'winner' => 3,
             'tradition' => 3,

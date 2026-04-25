@@ -24,12 +24,12 @@ class JsbExportRepository extends \BaseMysqliRepository implements JsbExportRepo
                     COALESCE(bird, 0) AS bird,
                     COALESCE(cy, 0) AS cy,
                     COALESCE(cyt, 0) AS cyt,
-                    COALESCE(cy1, 0) AS cy1,
-                    COALESCE(cy2, 0) AS cy2,
-                    COALESCE(cy3, 0) AS cy3,
-                    COALESCE(cy4, 0) AS cy4,
-                    COALESCE(cy5, 0) AS cy5,
-                    COALESCE(cy6, 0) AS cy6,
+                    COALESCE(salary_yr1, 0) AS salary_yr1,
+                    COALESCE(salary_yr2, 0) AS salary_yr2,
+                    COALESCE(salary_yr3, 0) AS salary_yr3,
+                    COALESCE(salary_yr4, 0) AS salary_yr4,
+                    COALESCE(salary_yr5, 0) AS salary_yr5,
+                    COALESCE(salary_yr6, 0) AS salary_yr6,
                     COALESCE(fa_signing_flag, 0) AS fa_signing_flag
              FROM ibl_plr
              WHERE ordinal <= 1440 AND pid <> 0
@@ -46,12 +46,12 @@ class JsbExportRepository extends \BaseMysqliRepository implements JsbExportRepo
                 'bird' => is_int($row['bird']) ? $row['bird'] : 0,
                 'cy' => is_int($row['cy']) ? $row['cy'] : 0,
                 'cyt' => is_int($row['cyt']) ? $row['cyt'] : 0,
-                'cy1' => is_int($row['cy1']) ? $row['cy1'] : 0,
-                'cy2' => is_int($row['cy2']) ? $row['cy2'] : 0,
-                'cy3' => is_int($row['cy3']) ? $row['cy3'] : 0,
-                'cy4' => is_int($row['cy4']) ? $row['cy4'] : 0,
-                'cy5' => is_int($row['cy5']) ? $row['cy5'] : 0,
-                'cy6' => is_int($row['cy6']) ? $row['cy6'] : 0,
+                'salary_yr1' => is_int($row['salary_yr1']) ? $row['salary_yr1'] : 0,
+                'salary_yr2' => is_int($row['salary_yr2']) ? $row['salary_yr2'] : 0,
+                'salary_yr3' => is_int($row['salary_yr3']) ? $row['salary_yr3'] : 0,
+                'salary_yr4' => is_int($row['salary_yr4']) ? $row['salary_yr4'] : 0,
+                'salary_yr5' => is_int($row['salary_yr5']) ? $row['salary_yr5'] : 0,
+                'salary_yr6' => is_int($row['salary_yr6']) ? $row['salary_yr6'] : 0,
                 'fa_signing_flag' => is_int($row['fa_signing_flag']) ? $row['fa_signing_flag'] : 0,
             ];
         }

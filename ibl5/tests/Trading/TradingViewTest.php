@@ -58,7 +58,7 @@ class TradingViewTest extends TestCase
     {
         $pageData = $this->createTradeOfferPageData();
         $pageData['userPlayers'] = [
-            ['pos' => 'PG', 'name' => 'LeBron James', 'pid' => 1, 'ordinal' => 5, 'cy' => 1, 'cy1' => 500, 'cy2' => 600, 'cy3' => 0, 'cy4' => 0, 'cy5' => 0, 'cy6' => 0],
+            ['pos' => 'PG', 'name' => 'LeBron James', 'pid' => 1, 'ordinal' => 5, 'cy' => 1, 'salary_yr1' => 500, 'salary_yr2' => 600, 'salary_yr3' => 0, 'salary_yr4' => 0, 'salary_yr5' => 0, 'salary_yr6' => 0],
         ];
 
         $html = $this->view->renderTradeOfferForm($pageData);
@@ -131,7 +131,7 @@ class TradingViewTest extends TestCase
     {
         $pageData = $this->createTradeOfferPageData();
         $pageData['userPlayers'] = [
-            ['pos' => 'PG', 'name' => 'Waived Player', 'pid' => 1, 'ordinal' => 999, 'cy' => 1, 'cy1' => 500, 'cy2' => 0, 'cy3' => 0, 'cy4' => 0, 'cy5' => 0, 'cy6' => 0],
+            ['pos' => 'PG', 'name' => 'Waived Player', 'pid' => 1, 'ordinal' => 999, 'cy' => 1, 'salary_yr1' => 500, 'salary_yr2' => 0, 'salary_yr3' => 0, 'salary_yr4' => 0, 'salary_yr5' => 0, 'salary_yr6' => 0],
         ];
 
         $html = $this->view->renderTradeOfferForm($pageData);

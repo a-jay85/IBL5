@@ -128,9 +128,9 @@ class FreeAgencyRepository extends BaseMysqliRepository implements FreeAgencyRep
      */
     public function isPlayerAlreadySigned(int $playerId): bool
     {
-        /** @var array{cy: int|null, cy1: int|null}|null $row */
+        /** @var array{cy: int|null, salary_yr1: int|null}|null $row */
         $row = $this->fetchOne(
-            "SELECT cy, cy1 FROM ibl_plr WHERE pid = ?",
+            "SELECT cy, salary_yr1 FROM ibl_plr WHERE pid = ?",
             "i",
             $playerId
         );
@@ -140,7 +140,7 @@ class FreeAgencyRepository extends BaseMysqliRepository implements FreeAgencyRep
         }
 
         $currentContractYear = $row['cy'] ?? 0;
-        $year1Contract = $row['cy1'] ?? 0;
+        $year1Contract = $row['salary_yr1'] ?? 0;
 
         return ($currentContractYear === 0 && $year1Contract !== 0);
     }

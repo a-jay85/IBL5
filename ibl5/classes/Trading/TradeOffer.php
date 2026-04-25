@@ -259,12 +259,12 @@ class TradeOffer implements TradeOfferInterface
                 $cy = 1;
             }
             $total += match ($cy) {
-                1 => $record['cy1'],
-                2 => $record['cy2'],
-                3 => $record['cy3'],
-                4 => $record['cy4'],
-                5 => $record['cy5'],
-                6 => $record['cy6'],
+                1 => $record['salary_yr1'],
+                2 => $record['salary_yr2'],
+                3 => $record['salary_yr3'],
+                4 => $record['salary_yr4'],
+                5 => $record['salary_yr5'],
+                6 => $record['salary_yr6'],
                 default => 0,
             };
         }

@@ -34,7 +34,7 @@ class FreeAgencyPreviewServiceTest extends TestCase
     public function testExcludesPlayersWithNonZeroNextYearSalary(): void
     {
         $this->mockRepository->method('getActivePlayers')->willReturn([
-            self::createActivePlayer(['cy' => 1, 'cy2' => 600]),
+            self::createActivePlayer(['cy' => 1, 'salary_yr2' => 600]),
         ]);
 
         $result = $this->service->getUpcomingFreeAgents(2025);
@@ -45,7 +45,7 @@ class FreeAgencyPreviewServiceTest extends TestCase
     public function testIncludesPlayersWithZeroNextYearSalary(): void
     {
         $this->mockRepository->method('getActivePlayers')->willReturn([
-            self::createActivePlayer(['cy' => 2, 'cy3' => 0, 'name' => 'Free Agent']),
+            self::createActivePlayer(['cy' => 2, 'salary_yr3' => 0, 'name' => 'Free Agent']),
         ]);
 
         $result = $this->service->getUpcomingFreeAgents(2025);
@@ -57,8 +57,8 @@ class FreeAgencyPreviewServiceTest extends TestCase
     public function testFiltersOutPlayersUnderContract(): void
     {
         $this->mockRepository->method('getActivePlayers')->willReturn([
-            self::createActivePlayer(['cy' => 1, 'cy2' => 0, 'name' => 'Expiring']),
-            self::createActivePlayer(['cy' => 1, 'cy2' => 500, 'name' => 'UnderContract']),
+            self::createActivePlayer(['cy' => 1, 'salary_yr2' => 0, 'name' => 'Expiring']),
+            self::createActivePlayer(['cy' => 1, 'salary_yr2' => 500, 'name' => 'UnderContract']),
         ]);
 
         $result = $this->service->getUpcomingFreeAgents(2025);
@@ -72,9 +72,9 @@ class FreeAgencyPreviewServiceTest extends TestCase
         $this->mockRepository->method('getActivePlayers')->willReturn([
             self::createActivePlayer([
                 'cy' => 0,
-                'cy1' => 0,
-                'cy2' => 0,
-                'cy3' => 0,
+                'salary_yr1' => 0,
+                'salary_yr2' => 0,
+                'salary_yr3' => 0,
                 'name' => 'No Contract',
             ]),
         ]);
@@ -90,7 +90,7 @@ class FreeAgencyPreviewServiceTest extends TestCase
         $this->mockRepository->method('getActivePlayers')->willReturn([
             self::createActivePlayer([
                 'cy' => 2,
-                'cy3' => 0,
+                'salary_yr3' => 0,
                 'r_fga' => 65,
                 'oo' => 70,
             ]),
@@ -107,7 +107,7 @@ class FreeAgencyPreviewServiceTest extends TestCase
         $this->mockRepository->method('getActivePlayers')->willReturn([
             self::createActivePlayer([
                 'cy' => 2,
-                'cy3' => 0,
+                'salary_yr3' => 0,
                 'team_city' => null,
                 'color1' => null,
                 'color2' => null,
@@ -131,11 +131,11 @@ class FreeAgencyPreviewServiceTest extends TestCase
     }
 
     /**
-     * @return array{pid: int, teamid: int, name: string, teamname: string, pos: string, age: int, draftyear: int, exp: int, cy: int, cyt: int, cy1: int, cy2: int, cy3: int, cy4: int, cy5: int, cy6: int, r_fga: int, r_fgp: int, r_fta: int, r_ftp: int, r_3ga: int, r_3gp: int, r_orb: int, r_drb: int, r_ast: int, r_stl: int, r_blk: int, r_tvr: int, r_foul: int, oo: int, r_drive_off: int, po: int, r_trans_off: int, od: int, dd: int, pd: int, td: int, loyalty: int, winner: int, playing_time: int, security: int, tradition: int, team_city: string|null, color1: string|null, color2: string|null}
+     * @return array{pid: int, teamid: int, name: string, teamname: string, pos: string, age: int, draftyear: int, exp: int, cy: int, cyt: int, salary_yr1: int, salary_yr2: int, salary_yr3: int, salary_yr4: int, salary_yr5: int, salary_yr6: int, r_fga: int, r_fgp: int, r_fta: int, r_ftp: int, r_3ga: int, r_3gp: int, r_orb: int, r_drb: int, r_ast: int, r_stl: int, r_blk: int, r_tvr: int, r_foul: int, oo: int, r_drive_off: int, po: int, r_trans_off: int, od: int, dd: int, pd: int, td: int, loyalty: int, winner: int, playing_time: int, security: int, tradition: int, team_city: string|null, color1: string|null, color2: string|null}
      */
     private static function createActivePlayer(array $overrides = []): array
     {
-        /** @var array{pid: int, teamid: int, name: string, teamname: string, pos: string, age: int, draftyear: int, exp: int, cy: int, cyt: int, cy1: int, cy2: int, cy3: int, cy4: int, cy5: int, cy6: int, r_fga: int, r_fgp: int, r_fta: int, r_ftp: int, r_3ga: int, r_3gp: int, r_orb: int, r_drb: int, r_ast: int, r_stl: int, r_blk: int, r_tvr: int, r_foul: int, oo: int, r_drive_off: int, po: int, r_trans_off: int, od: int, dd: int, pd: int, td: int, loyalty: int, winner: int, playing_time: int, security: int, tradition: int, team_city: string|null, color1: string|null, color2: string|null} */
+        /** @var array{pid: int, teamid: int, name: string, teamname: string, pos: string, age: int, draftyear: int, exp: int, cy: int, cyt: int, salary_yr1: int, salary_yr2: int, salary_yr3: int, salary_yr4: int, salary_yr5: int, salary_yr6: int, r_fga: int, r_fgp: int, r_fta: int, r_ftp: int, r_3ga: int, r_3gp: int, r_orb: int, r_drb: int, r_ast: int, r_stl: int, r_blk: int, r_tvr: int, r_foul: int, oo: int, r_drive_off: int, po: int, r_trans_off: int, od: int, dd: int, pd: int, td: int, loyalty: int, winner: int, playing_time: int, security: int, tradition: int, team_city: string|null, color1: string|null, color2: string|null} */
         return array_merge([
             'pid' => 1,
             'teamid' => 1,
@@ -147,12 +147,12 @@ class FreeAgencyPreviewServiceTest extends TestCase
             'exp' => 3,
             'cy' => 1,
             'cyt' => 3,
-            'cy1' => 500,
-            'cy2' => 600,
-            'cy3' => 700,
-            'cy4' => 0,
-            'cy5' => 0,
-            'cy6' => 0,
+            'salary_yr1' => 500,
+            'salary_yr2' => 600,
+            'salary_yr3' => 700,
+            'salary_yr4' => 0,
+            'salary_yr5' => 0,
+            'salary_yr6' => 0,
             'r_fga' => 50,
             'r_fgp' => 50,
             'r_fta' => 50,

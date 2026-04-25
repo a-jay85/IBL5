@@ -394,7 +394,7 @@ class FreeAgencyProcessorTest extends TestCase
     {
         $this->mockDb->setMockData([array_merge($this->getCompletePlayerData(), [
             'cy' => 0,
-            'cy1' => 500, // signed this FA period
+            'salary_yr1' => 500, // signed this FA period
         ])]);
 
         $capturingRepo = new CapturingRepository();
@@ -466,12 +466,12 @@ class FreeAgencyProcessorTest extends TestCase
             'wt' => 200,
             'cy' => 0,
             'cyt' => 0,
-            'cy1' => 0,
-            'cy2' => 0,
-            'cy3' => 0,
-            'cy4' => 0,
-            'cy5' => 0,
-            'cy6' => 0,
+            'salary_yr1' => 0,
+            'salary_yr2' => 0,
+            'salary_yr3' => 0,
+            'salary_yr4' => 0,
+            'salary_yr5' => 0,
+            'salary_yr6' => 0,
             'exp' => 3,
             'bird' => 0,
             'bird_years' => 0,

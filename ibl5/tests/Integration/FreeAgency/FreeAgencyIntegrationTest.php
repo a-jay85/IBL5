@@ -630,7 +630,7 @@ class FreeAgencyIntegrationTest extends IntegrationTestCase
                 'freeAgencyNotificationsState' => 'Off',
                 // Critical: These fields indicate player was signed this FA period
                 'cy' => 0,  // Current year = 0 (not yet started)
-                'cy1' => 500,  // But has year 1 contract != 0 (signed!)
+                'salary_yr1' => 500,  // But has year 1 contract != 0 (signed!)
             ])
         ]);
     }
@@ -669,7 +669,7 @@ class FreeAgencyIntegrationTest extends IntegrationTestCase
                 'has_lle' => 0,
                 // Player is not signed (cy=0 means not in current contract)
                 'cy' => 0,
-                'cy1' => 0,
+                'salary_yr1' => 0,
                 'freeAgencyNotificationsState' => 'Off',
             ])
         ]);
@@ -725,7 +725,7 @@ class FreeAgencyIntegrationTest extends IntegrationTestCase
             'pos' => 'SG',
             // Free agent contract status (not signed)
             'cy' => 0,  // Current year = 0 (not in contract)
-            'cy1' => 0,  // Year 1 salary = 0 (unsigned)
+            'salary_yr1' => 0,  // Year 1 salary = 0 (unsigned)
         ]), TestDataFactory::createTeam([
             'teamid' => 1,
             'team_name' => 'Miami Cyclones',

@@ -90,12 +90,12 @@ class PlayerContractValidator implements PlayerContractValidatorInterface
     {
         $round = $playerData->draftRound;
 
-        // First round picks have a 3-year contract (cy3 is final year)
+        // First round picks have a 3-year contract (salary_yr3 is final year)
         if ($round === 1) {
             return $playerData->contractYear3Salary ?? 0;
         }
 
-        // Second round picks have a 2-year contract (cy2 is final year)
+        // Second round picks have a 2-year contract (salary_yr2 is final year)
         if ($round === 2) {
             return $playerData->contractYear2Salary ?? 0;
         }

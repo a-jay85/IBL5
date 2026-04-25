@@ -198,12 +198,12 @@ class TradeIntegrationTest extends IntegrationTestCase
         ]);
         $this->mockDb->setMockData([
             [
-                'cy1' => 1000,
-                'cy2' => 1500,
-                'cy3' => 0,
-                'cy4' => 0,
-                'cy5' => 0,
-                'cy6' => 0,
+                'salary_yr1' => 1000,
+                'salary_yr2' => 1500,
+                'salary_yr3' => 0,
+                'salary_yr4' => 0,
+                'salary_yr5' => 0,
+                'salary_yr6' => 0,
                 0 => 1000,
                 1 => 1500,
                 2 => 0,
@@ -489,12 +489,12 @@ class TradeIntegrationTest extends IntegrationTestCase
         ]);
         $this->mockDb->setMockData([
             [
-                'cy1' => 500,
-                'cy2' => 0,
-                'cy3' => 0,
-                'cy4' => 0,
-                'cy5' => 0,
-                'cy6' => 0,
+                'salary_yr1' => 500,
+                'salary_yr2' => 0,
+                'salary_yr3' => 0,
+                'salary_yr4' => 0,
+                'salary_yr5' => 0,
+                'salary_yr6' => 0,
                 0 => 500,
                 1 => 0,
                 2 => 0,

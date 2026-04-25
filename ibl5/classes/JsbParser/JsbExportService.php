@@ -32,12 +32,12 @@ class JsbExportService implements JsbExportServiceInterface
         'bird' => 'bird',
         'cy' => 'cy',
         'cyt' => 'cyt',
-        'cy1' => 'cy1',
-        'cy2' => 'cy2',
-        'cy3' => 'cy3',
-        'cy4' => 'cy4',
-        'cy5' => 'cy5',
-        'cy6' => 'cy6',
+        'salary_yr1' => 'salary_yr1',
+        'salary_yr2' => 'salary_yr2',
+        'salary_yr3' => 'salary_yr3',
+        'salary_yr4' => 'salary_yr4',
+        'salary_yr5' => 'salary_yr5',
+        'salary_yr6' => 'salary_yr6',
         'fa_signing_flag' => 'freeAgentSigningFlag',
     ];
 
@@ -231,7 +231,7 @@ class JsbExportService implements JsbExportServiceInterface
      * Compare database values to file values and build change set.
      *
      * @param string $line The current player record from the .plr file
-     * @param array{pid: int, name: string, teamid: int, bird: int, cy: int, cyt: int, cy1: int, cy2: int, cy3: int, cy4: int, cy5: int, cy6: int, fa_signing_flag: int} $dbPlayer
+     * @param array{pid: int, name: string, teamid: int, bird: int, cy: int, cyt: int, salary_yr1: int, salary_yr2: int, salary_yr3: int, salary_yr4: int, salary_yr5: int, salary_yr6: int, fa_signing_flag: int} $dbPlayer
      * @return array<string, int> Map of PlrFileWriter field name → new value (only fields that differ)
      */
     private function buildChangeSet(string $line, array $dbPlayer): array

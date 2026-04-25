@@ -300,9 +300,9 @@ SELECT
     -- Contract
     TRY_CAST(bird AS INTEGER) AS bird,
     TRY_CAST(cy AS INTEGER) AS cy, TRY_CAST(cyt AS INTEGER) AS cyt,
-    TRY_CAST(cy1 AS INTEGER) AS cy1, TRY_CAST(cy2 AS INTEGER) AS cy2,
-    TRY_CAST(cy3 AS INTEGER) AS cy3, TRY_CAST(cy4 AS INTEGER) AS cy4,
-    TRY_CAST(cy5 AS INTEGER) AS cy5, TRY_CAST(cy6 AS INTEGER) AS cy6,
+    TRY_CAST(salary_yr1 AS INTEGER) AS salary_yr1, TRY_CAST(salary_yr2 AS INTEGER) AS salary_yr2,
+    TRY_CAST(salary_yr3 AS INTEGER) AS salary_yr3, TRY_CAST(salary_yr4 AS INTEGER) AS salary_yr4,
+    TRY_CAST(salary_yr5 AS INTEGER) AS salary_yr5, TRY_CAST(salary_yr6 AS INTEGER) AS salary_yr6,
     -- Depth chart positions
     TRY_CAST(pg_depth AS INTEGER) AS pg_depth, TRY_CAST(sg_depth AS INTEGER) AS sg_depth,
     TRY_CAST(sf_depth AS INTEGER) AS sf_depth, TRY_CAST(pf_depth AS INTEGER) AS pf_depth,

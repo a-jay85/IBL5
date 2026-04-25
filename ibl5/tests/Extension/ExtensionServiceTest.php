@@ -287,7 +287,7 @@ class ExtensionServiceTest extends TestCase
             'injured' => 0, 'retired' => 0, 'droptime' => 0,
             'exp' => 5, 'bird' => 2,
             'cy' => 1, 'cyt' => 1,
-            'cy1' => 800, 'cy2' => 0, 'cy3' => 0, 'cy4' => 0, 'cy5' => 0, 'cy6' => 0,
+            'salary_yr1' => 800, 'salary_yr2' => 0, 'salary_yr3' => 0, 'salary_yr4' => 0, 'salary_yr5' => 0, 'salary_yr6' => 0,
             'winner' => 3, 'tradition' => 3, 'loyalty' => 3, 'playing_time' => 3, 'security' => 3,
             'teamid' => 1, 'team_city' => 'Miami', 'team_name' => 'Cyclones',
             'color1' => 'Blue', 'color2' => 'White',

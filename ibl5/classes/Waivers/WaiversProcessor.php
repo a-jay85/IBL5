@@ -62,12 +62,12 @@ class WaiversProcessor implements WaiversProcessorInterface
         $playerArray = [
             'cy' => $player->contractCurrentYear,
             'cyt' => $player->contractTotalYears,
-            'cy1' => $player->contractYear1Salary,
-            'cy2' => $player->contractYear2Salary,
-            'cy3' => $player->contractYear3Salary,
-            'cy4' => $player->contractYear4Salary,
-            'cy5' => $player->contractYear5Salary,
-            'cy6' => $player->contractYear6Salary,
+            'salary_yr1' => $player->contractYear1Salary,
+            'salary_yr2' => $player->contractYear2Salary,
+            'salary_yr3' => $player->contractYear3Salary,
+            'salary_yr4' => $player->contractYear4Salary,
+            'salary_yr5' => $player->contractYear5Salary,
+            'salary_yr6' => $player->contractYear6Salary,
             'exp' => $player->yearsOfExperience,
         ];
         $playerData = PlayerDataConverter::arrayToPlayerData($playerArray);

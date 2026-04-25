@@ -149,18 +149,18 @@ class PlrFileWriterTest extends TestCase
         $modified = PlrFileWriter::applyChangesToRecord($record, [
             'cy' => 1,
             'cyt' => 4,
-            'cy1' => 1500,
-            'cy2' => 1600,
-            'cy3' => 1700,
-            'cy4' => 1800,
-            'cy5' => 0,
-            'cy6' => 0,
+            'salary_yr1' => 1500,
+            'salary_yr2' => 1600,
+            'salary_yr3' => 1700,
+            'salary_yr4' => 1800,
+            'salary_yr5' => 0,
+            'salary_yr6' => 0,
         ]);
 
         $this->assertSame(1, PlrFileWriter::readField($modified, 'cy'));
         $this->assertSame(4, PlrFileWriter::readField($modified, 'cyt'));
-        $this->assertSame(1500, PlrFileWriter::readField($modified, 'cy1'));
-        $this->assertSame(1800, PlrFileWriter::readField($modified, 'cy4'));
+        $this->assertSame(1500, PlrFileWriter::readField($modified, 'salary_yr1'));
+        $this->assertSame(1800, PlrFileWriter::readField($modified, 'salary_yr4'));
     }
 
     public function testDerivedFieldsWhenTidChanges(): void

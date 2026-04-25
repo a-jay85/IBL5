@@ -399,7 +399,7 @@ $tradeConfig = [
             }
 
             /** @var int $contractAmount */
-            $contractAmount = ($contractYear < 7) ? ($row["cy{$contractYear}"] ?? 0) : 0;
+            $contractAmount = ($contractYear < 7) ? ($row["salary_yr{$contractYear}"] ?? 0) : 0;
             ?>
 <tr>
 <?php if ($contractAmount !== 0 && $ordinal <= \JSB::WAIVERS_ORDINAL):

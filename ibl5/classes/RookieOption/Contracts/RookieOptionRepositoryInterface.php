@@ -26,8 +26,8 @@ interface RookieOptionRepositoryInterface
      * @return bool True if update succeeded, false on database error
      * 
      * **Database Changes:**
-     * - Draft round 1: Sets cy4 = extensionAmount
-     * - Draft round 2: Sets cy3 = extensionAmount
+     * - Draft round 1: Sets salary_yr4 = extensionAmount
+     * - Draft round 2: Sets salary_yr3 = extensionAmount
      * 
      * **Behaviors:**
      * - Casts playerID and extensionAmount to integers

@@ -1,5 +1,5 @@
 ---
-description: Rationale for snake-casing PascalCase/camelCase player, depth-chart, team-info, standings, and box-score columns across the schema (Tier 3 of the sql-column-naming audit), enforced by a new PHPStan rule. Covers the four-PR roadmap.
+description: Rationale for snake-casing PascalCase/camelCase player, depth-chart, team-info, standings, and contract-salary columns across the schema (Tiers 3-4 of the sql-column-naming audit), enforced by a PHPStan rule. Covers the five-PR roadmap.
 last_verified: 2026-04-24
 ---
 
@@ -73,11 +73,24 @@ Tier 3 proceeds as a four-PR sequence, each following the Tier 1/2 playbook: foc
 - `BanNonSnakeCaseColumnsRule` extended with 22 additional banned tokens.
 - Dynamic column construction in `StandingsUpdater` fixed: `"clinched" . ucfirst($grouping)` → `"clinched_" . $grouping`.
 
+**Tier 4 — migration 119:**
+
+- **Contract salary columns (opacity fix).** `cy1`–`cy6` → `salary_yr1`–`salary_yr6` on 6 tables: `ibl_plr`, `ibl_plr_snapshots`, `ibl_olympics_plr`, `ibl_cash_considerations`, `ibl_trade_cash`, `ibl_hist`. The standalone `cy` column (contract year index) is NOT renamed.
+- CHECK constraints on `ibl_plr` and `ibl_olympics_plr` dropped and recreated with new column names (MariaDB 10.11 does not auto-update CHECK constraints during `CHANGE COLUMN`).
+- Views `vw_current_salary` and `vw_player_current` recreated with updated source column names (output aliases unchanged to avoid downstream breakage).
+- `BanNonSnakeCaseColumnsRule` extended with 6 additional banned tokens (`` `cy1` ``–`` `cy6` ``).
+- Dynamic string construction in `ContractListService::calculateContractYears()` (`'cy' . $year`) and `TeamQueryRepository::getSalaryCapArray()` (`"cy" . $yearUnderContract`) updated to `'salary_yr' . $year` and `"salary_yr" . $yearUnderContract`.
+- `PlrFileWriter` constants `OFFSET_CY1`–`OFFSET_CY6` renamed to `OFFSET_SALARY_YR1`–`OFFSET_SALARY_YR6`.
+- DuckDB analytics schemas updated (`01_dimensions.sql`, `02_facts.sql`).
+- 36 schema assertions added (6 columns × 6 tables).
+- Blast radius: 288 prod hits across 47 files + 507 test hits across 44 files.
+
 ## References
 
 - `ibl5/migrations/116_snake_case_player_columns.sql` — PR 1 DDL.
 - `ibl5/migrations/117_snake_case_team_info_columns.sql` — PR 2 DDL.
 - `ibl5/migrations/118_snake_case_standings_columns.sql` — PR 3 DDL.
+- `ibl5/migrations/119_rename_cy1_cy6_to_salary_yr1_yr6.sql` — Tier 4 DDL.
 - `ibl5/phpstan-rules/BanNonSnakeCaseColumnsRule.php` — the enforcement rule (extended per PR).
 - `ibl5/phpstan-rules/BanReservedWordColumnsRule.php` — extended with `` `key` `` (PR 1).
 - `ibl5/config/schema-assertions.php` — post-migration schema assertions.

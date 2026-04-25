@@ -33,7 +33,7 @@ interface RookieOptionControllerInterface
      * **Processing Steps:**
      * 1. Load player from database
      * 2. Validate rookie option eligibility
-     * 3. Update player's contract (cy3 or cy4 depending on draft round)
+     * 3. Update player's contract (salary_yr3 or salary_yr4 depending on draft round)
      * 4. Send Discord notification to #rookie-options
      * 5. Send email notification to commissioner
      * 6. Create news story if email succeeded

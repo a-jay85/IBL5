@@ -478,7 +478,7 @@ class FreeAgencyAdminProcessorTest extends TestCase
             'talent' => 50, 'skill' => 50, 'intangibles' => 50, 'coach' => 0,
             'loyalty' => 3, 'playing_time' => 3, 'winner' => 3, 'tradition' => 3, 'security' => 3,
             'exp' => 5, 'bird' => 1,
-            'cy' => 0, 'cyt' => 0, 'cy1' => 0, 'cy2' => 0, 'cy3' => 0, 'cy4' => 0, 'cy5' => 0, 'cy6' => 0,
+            'cy' => 0, 'cyt' => 0, 'salary_yr1' => 0, 'salary_yr2' => 0, 'salary_yr3' => 0, 'salary_yr4' => 0, 'salary_yr5' => 0, 'salary_yr6' => 0,
             'fa_signing_flag' => 0,
             'stats_gs' => 0, 'stats_gm' => 0, 'stats_min' => 0,
             'stats_fgm' => 0, 'stats_fga' => 0, 'stats_ftm' => 0, 'stats_fta' => 0,

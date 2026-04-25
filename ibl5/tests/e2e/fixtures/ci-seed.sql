@@ -190,7 +190,7 @@ INSERT INTO ibl_franchise_seasons (franchise_id, season_year, season_ending_year
 INSERT INTO ibl_plr (
   pid, name, age, peak, teamid, pos, ordinal,
   stamina, oo, od, r_drive_off, dd, po, pd, r_trans_off, r_tvr,
-  cy, cyt, cy1, cy2,
+  cy, cyt, salary_yr1, salary_yr2,
   retired, exp,
   htft, htin, wt, college,
   draftround, draftpickno, draftyear, draftedby, draftedbycurrentname,
@@ -279,7 +279,7 @@ INSERT INTO ibl_plr (
 INSERT INTO ibl_plr (
   pid, name, age, peak, teamid, pos, ordinal,
   stamina, oo, od, r_drive_off, dd, po, pd, r_trans_off, td,
-  cy, cyt, cy1, cy2,
+  cy, cyt, salary_yr1, salary_yr2,
   retired, exp, bird,
   htft, htin, wt, college,
   draftround, draftpickno, draftyear, draftedby, draftedbycurrentname,
@@ -324,7 +324,7 @@ INSERT INTO ibl_plr (
 INSERT INTO ibl_plr (
   pid, name, age, peak, teamid, pos, ordinal,
   stamina, oo, od, r_drive_off, dd, po, pd, r_trans_off, td,
-  cy, cyt, cy1, cy2,
+  cy, cyt, salary_yr1, salary_yr2,
   retired, exp, bird,
   htft, htin, wt, college,
   draftround, draftpickno, draftyear, draftedby, draftedbycurrentname,
@@ -348,7 +348,7 @@ INSERT INTO ibl_plr (
 -- Cash entries live in ibl_cash_considerations (not ibl_plr) since migration 095.
 -- Tests verify that cash rows appear in "Under Contract" and do NOT appear
 -- in "Unsigned Free Agents" or "All Other Free Agents".
-INSERT INTO ibl_cash_considerations (teamid, type, label, cy, cyt, cy1, cy2)
+INSERT INTO ibl_cash_considerations (teamid, type, label, cy, cyt, salary_yr1, salary_yr2)
 VALUES (1, 'cash', 'Cash from Trade', 1, 1, 300, 0);
 
 -- Free agent demands
@@ -385,7 +385,7 @@ UPDATE ibl_team_info SET has_mle = 1, has_lle = 1 WHERE teamid = 1;
 INSERT INTO ibl_plr (
   pid, name, age, peak, teamid, pos, ordinal,
   stamina, oo, od, r_drive_off, dd, po, pd, r_trans_off, r_tvr,
-  cy, cyt, cy1, cy2,
+  cy, cyt, salary_yr1, salary_yr2,
   retired, exp,
   htft, htin, wt, college,
   draftround, draftpickno, draftyear, draftedby, draftedbycurrentname,
@@ -511,7 +511,7 @@ INSERT INTO ibl_plr (
 INSERT INTO ibl_plr (
   pid, name, age, peak, teamid, pos, ordinal,
   stamina, oo, od, r_drive_off, dd, po, pd, r_trans_off, r_tvr,
-  cy, cyt, cy1, cy2,
+  cy, cyt, salary_yr1, salary_yr2,
   retired, exp,
   htft, htin, wt, college,
   draftround, draftpickno, draftyear, draftedby, draftedbycurrentname,
@@ -897,7 +897,7 @@ UPDATE ibl_team_info SET owner_name = 'GM Thunder'  WHERE teamid = 28;
 INSERT INTO ibl_plr (
   pid, name, age, peak, teamid, pos, ordinal,
   stamina, oo, od, r_drive_off, dd, po, pd, r_trans_off, r_tvr,
-  cy, cyt, cy1, cy2,
+  cy, cyt, salary_yr1, salary_yr2,
   retired, exp,
   htft, htin, wt, college,
   draftround, draftpickno, draftyear, draftedby, draftedbycurrentname,
@@ -1078,7 +1078,7 @@ INSERT INTO nuke_stories (catid, aid, title, time, hometext, bodytext, topic, ih
 INSERT INTO ibl_plr (
   pid, name, age, peak, teamid, pos, ordinal,
   stamina, oo, od, r_drive_off, dd, po, pd, r_trans_off, r_tvr,
-  cy, cyt, cy1, cy2,
+  cy, cyt, salary_yr1, salary_yr2,
   retired, exp,
   htft, htin, wt, college,
   draftround, draftpickno, draftyear, draftedby, draftedbycurrentname,
@@ -1149,7 +1149,7 @@ INSERT INTO ibl_plr_snapshots (
 INSERT INTO ibl_plr (
   pid, name, age, peak, teamid, pos, ordinal,
   stamina, oo, od, r_drive_off, dd, po, pd, r_trans_off, r_tvr,
-  cy, cyt, cy1, cy2,
+  cy, cyt, salary_yr1, salary_yr2,
   retired, exp,
   htft, htin, wt, college,
   draftround, draftpickno, draftyear, draftedby, draftedbycurrentname,
@@ -1422,7 +1422,7 @@ INSERT INTO nuke_stories (catid, aid, title, time, hometext, bodytext, topic, ih
 INSERT INTO ibl_plr (
   pid, name, age, peak, teamid, pos, ordinal,
   stamina, oo, od, r_drive_off, dd, po, pd, r_trans_off, td,
-  cy, cyt, cy1,
+  cy, cyt, salary_yr1,
   retired, exp,
   htft, htin, wt, college,
   draftround, draftpickno, draftyear, draftedby, draftedbycurrentname,
@@ -1451,7 +1451,7 @@ ON DUPLICATE KEY UPDATE name = VALUES(name), draftyear = VALUES(draftyear);
 INSERT INTO ibl_plr (
   pid, name, age, peak, teamid, pos, ordinal,
   stamina, oo, od, r_drive_off, dd, po, pd, r_trans_off, r_tvr,
-  cy, cyt, cy1, cy2,
+  cy, cyt, salary_yr1, salary_yr2,
   retired, exp,
   htft, htin, wt, college,
   draftround, draftpickno, draftyear, draftedby, draftedbycurrentname,
@@ -1507,8 +1507,8 @@ SELECT
   CAST(COALESCE(snap.od, 0) AS SIGNED) AS r_od, CAST(COALESCE(snap.dd, 0) AS SIGNED) AS r_dd,
   CAST(COALESCE(snap.pd, 0) AS SIGNED) AS r_pd, CAST(COALESCE(snap.td, 0) AS SIGNED) AS r_td,
   CAST(COALESCE(CASE snap.cy
-    WHEN 1 THEN snap.cy1 WHEN 2 THEN snap.cy2 WHEN 3 THEN snap.cy3
-    WHEN 4 THEN snap.cy4 WHEN 5 THEN snap.cy5 WHEN 6 THEN snap.cy6
+    WHEN 1 THEN snap.salary_yr1 WHEN 2 THEN snap.salary_yr2 WHEN 3 THEN snap.salary_yr3
+    WHEN 4 THEN snap.salary_yr4 WHEN 5 THEN snap.salary_yr5 WHEN 6 THEN snap.salary_yr6
     ELSE 0 END, 0) AS SIGNED) AS salary,
   CAST(COALESCE(snap.talent, 0) AS SIGNED) AS talent,
   CAST(COALESCE(snap.skill, 0) AS SIGNED) AS skill,
@@ -1518,9 +1518,9 @@ SELECT
   CAST(COALESCE(snap.consistency, 0) AS SIGNED) AS consistency,
   CAST(COALESCE(snap.age, 0) AS SIGNED) AS age,
   CAST(COALESCE(snap.peak, 0) AS SIGNED) AS peak,
-  CAST(COALESCE(snap.cy1, 0) AS SIGNED) AS cy1, CAST(COALESCE(snap.cy2, 0) AS SIGNED) AS cy2,
-  CAST(COALESCE(snap.cy3, 0) AS SIGNED) AS cy3, CAST(COALESCE(snap.cy4, 0) AS SIGNED) AS cy4,
-  CAST(COALESCE(snap.cy5, 0) AS SIGNED) AS cy5, CAST(COALESCE(snap.cy6, 0) AS SIGNED) AS cy6,
+  CAST(COALESCE(snap.salary_yr1, 0) AS SIGNED) AS salary_yr1, CAST(COALESCE(snap.salary_yr2, 0) AS SIGNED) AS salary_yr2,
+  CAST(COALESCE(snap.salary_yr3, 0) AS SIGNED) AS salary_yr3, CAST(COALESCE(snap.salary_yr4, 0) AS SIGNED) AS salary_yr4,
+  CAST(COALESCE(snap.salary_yr5, 0) AS SIGNED) AS salary_yr5, CAST(COALESCE(snap.salary_yr6, 0) AS SIGNED) AS salary_yr6,
   CAST(snap.phantom_games AS SIGNED) AS phantom_games
 FROM (
   SELECT s.*, ROW_NUMBER() OVER (

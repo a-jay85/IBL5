@@ -79,7 +79,7 @@ class CapSpaceRepositoryTest extends DatabaseTestCase
             'teamid' => 1,
             'cy' => 1,
             'cyt' => 3,
-            'cy1' => 1500,
+            'salary_yr1' => 1500,
         ]);
 
         $players = $this->repo->getPlayersUnderContractAfterSeason(1);

@@ -41,7 +41,7 @@ class TradeFormRepository extends BaseMysqliRepository implements TradeFormRepos
     {
         /** @var list<TradingPlayerRow> */
         return $this->fetchAll(
-            "SELECT pos, name, pid, ordinal, cy, cy1, cy2, cy3, cy4, cy5, cy6
+            "SELECT pos, name, pid, ordinal, cy, salary_yr1, salary_yr2, salary_yr3, salary_yr4, salary_yr5, salary_yr6
              FROM ibl_plr
              WHERE teamid = ? AND retired = 0
              ORDER BY ordinal ASC",
@@ -87,12 +87,12 @@ class TradeFormRepository extends BaseMysqliRepository implements TradeFormRepos
             // The effective contract year is cy + 1; if that year's salary is $0,
             // the player is effectively a free agent.
             $sql .= " AND CASE COALESCE(cy, 0) + 1"
-                . " WHEN 1 THEN cy1"
-                . " WHEN 2 THEN cy2"
-                . " WHEN 3 THEN cy3"
-                . " WHEN 4 THEN cy4"
-                . " WHEN 5 THEN cy5"
-                . " WHEN 6 THEN cy6"
+                . " WHEN 1 THEN salary_yr1"
+                . " WHEN 2 THEN salary_yr2"
+                . " WHEN 3 THEN salary_yr3"
+                . " WHEN 4 THEN salary_yr4"
+                . " WHEN 5 THEN salary_yr5"
+                . " WHEN 6 THEN salary_yr6"
                 . " ELSE 0"
                 . " END != 0";
         }

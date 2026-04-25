@@ -38,12 +38,12 @@ class JsbExportServiceTest extends TestCase
         string $name = 'Test Player',
         int $cy = 2,
         int $cyt = 2,
-        int $cy1 = 500,
-        int $cy2 = 600,
-        int $cy3 = 0,
-        int $cy4 = 0,
-        int $cy5 = 0,
-        int $cy6 = 0,
+        int $salaryYr1 = 500,
+        int $salaryYr2 = 600,
+        int $salaryYr3 = 0,
+        int $salaryYr4 = 0,
+        int $salaryYr5 = 0,
+        int $salaryYr6 = 0,
         int $faSigningFlag = 0,
     ): string {
         $record = str_repeat(' ', PlrFileWriter::PLAYER_RECORD_LENGTH);
@@ -55,12 +55,12 @@ class JsbExportServiceTest extends TestCase
         $record = substr_replace($record, PlrFieldSerializer::formatInt($bird, 2), 288, 2);
         $record = substr_replace($record, PlrFieldSerializer::formatInt($cy, 2), 290, 2);
         $record = substr_replace($record, PlrFieldSerializer::formatInt($cyt, 2), 292, 2);
-        $record = substr_replace($record, PlrFieldSerializer::formatInt($cy1, 4), 298, 4);
-        $record = substr_replace($record, PlrFieldSerializer::formatInt($cy2, 4), 302, 4);
-        $record = substr_replace($record, PlrFieldSerializer::formatInt($cy3, 4), 306, 4);
-        $record = substr_replace($record, PlrFieldSerializer::formatInt($cy4, 4), 310, 4);
-        $record = substr_replace($record, PlrFieldSerializer::formatInt($cy5, 4), 314, 4);
-        $record = substr_replace($record, PlrFieldSerializer::formatInt($cy6, 4), 318, 4);
+        $record = substr_replace($record, PlrFieldSerializer::formatInt($salaryYr1, 4), 298, 4);
+        $record = substr_replace($record, PlrFieldSerializer::formatInt($salaryYr2, 4), 302, 4);
+        $record = substr_replace($record, PlrFieldSerializer::formatInt($salaryYr3, 4), 306, 4);
+        $record = substr_replace($record, PlrFieldSerializer::formatInt($salaryYr4, 4), 310, 4);
+        $record = substr_replace($record, PlrFieldSerializer::formatInt($salaryYr5, 4), 314, 4);
+        $record = substr_replace($record, PlrFieldSerializer::formatInt($salaryYr6, 4), 318, 4);
         $record = substr_replace($record, PlrFieldSerializer::formatInt($faSigningFlag, 1), 330, 1);
         $record = substr_replace($record, PlrFieldSerializer::formatInt($teamid, 2), 331, 2);
         $currentIndex = $teamid === 0 ? -1 : $teamid - 1;
@@ -100,12 +100,12 @@ class JsbExportServiceTest extends TestCase
                 'bird' => 3,
                 'cy' => 2,
                 'cyt' => 2,
-                'cy1' => 500,
-                'cy2' => 600,
-                'cy3' => 0,
-                'cy4' => 0,
-                'cy5' => 0,
-                'cy6' => 0,
+                'salary_yr1' => 500,
+                'salary_yr2' => 600,
+                'salary_yr3' => 0,
+                'salary_yr4' => 0,
+                'salary_yr5' => 0,
+                'salary_yr6' => 0,
                 'fa_signing_flag' => 0,
             ],
         ]);
@@ -137,12 +137,12 @@ class JsbExportServiceTest extends TestCase
                 'bird' => 3,
                 'cy' => 2,
                 'cyt' => 2,
-                'cy1' => 500,
-                'cy2' => 600,
-                'cy3' => 0,
-                'cy4' => 0,
-                'cy5' => 0,
-                'cy6' => 0,
+                'salary_yr1' => 500,
+                'salary_yr2' => 600,
+                'salary_yr3' => 0,
+                'salary_yr4' => 0,
+                'salary_yr5' => 0,
+                'salary_yr6' => 0,
                 'fa_signing_flag' => 0,
             ],
         ]);
@@ -182,12 +182,12 @@ class JsbExportServiceTest extends TestCase
                 'bird' => 5,
                 'cy' => 3,
                 'cyt' => 3,
-                'cy1' => 700,
-                'cy2' => 800,
-                'cy3' => 900,
-                'cy4' => 0,
-                'cy5' => 0,
-                'cy6' => 0,
+                'salary_yr1' => 700,
+                'salary_yr2' => 800,
+                'salary_yr3' => 900,
+                'salary_yr4' => 0,
+                'salary_yr5' => 0,
+                'salary_yr6' => 0,
                 'fa_signing_flag' => 0,
             ],
         ]);
@@ -219,12 +219,12 @@ class JsbExportServiceTest extends TestCase
                 'bird' => 3,
                 'cy' => 2,
                 'cyt' => 2,
-                'cy1' => 500,
-                'cy2' => 600,
-                'cy3' => 0,
-                'cy4' => 0,
-                'cy5' => 0,
-                'cy6' => 0,
+                'salary_yr1' => 500,
+                'salary_yr2' => 600,
+                'salary_yr3' => 0,
+                'salary_yr4' => 0,
+                'salary_yr5' => 0,
+                'salary_yr6' => 0,
                 'fa_signing_flag' => 0,
             ],
         ]);

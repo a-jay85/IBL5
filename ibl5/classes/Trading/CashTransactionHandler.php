@@ -80,12 +80,12 @@ class CashTransactionHandler implements CashTransactionHandlerInterface
         $offeringTeamId = $this->commonRepository->getTidFromTeamname($offeringTeamName) ?? 0;
         $listeningTeamId = $this->commonRepository->getTidFromTeamname($listeningTeamName) ?? 0;
 
-        $cy1 = (int) ($cashYear[1] ?? 0);
-        $cy2 = (int) ($cashYear[2] ?? 0);
-        $cy3 = (int) ($cashYear[3] ?? 0);
-        $cy4 = (int) ($cashYear[4] ?? 0);
-        $cy5 = (int) ($cashYear[5] ?? 0);
-        $cy6 = (int) ($cashYear[6] ?? 0);
+        $salaryYr1 = (int) ($cashYear[1] ?? 0);
+        $salaryYr2 = (int) ($cashYear[2] ?? 0);
+        $salaryYr3 = (int) ($cashYear[3] ?? 0);
+        $salaryYr4 = (int) ($cashYear[4] ?? 0);
+        $salaryYr5 = (int) ($cashYear[5] ?? 0);
+        $salaryYr6 = (int) ($cashYear[6] ?? 0);
 
         $contractCurrentYear = 1;
         $contractTotalYears = $this->calculateContractTotalYears($cashYear);
@@ -99,12 +99,12 @@ class CashTransactionHandler implements CashTransactionHandlerInterface
             'trade_offer_id' => $tradeOfferId,
             'cy' => $contractCurrentYear,
             'cyt' => $contractTotalYears,
-            'cy1' => $cy1,
-            'cy2' => $cy2,
-            'cy3' => $cy3,
-            'cy4' => $cy4,
-            'cy5' => $cy5,
-            'cy6' => $cy6,
+            'salary_yr1' => $salaryYr1,
+            'salary_yr2' => $salaryYr2,
+            'salary_yr3' => $salaryYr3,
+            'salary_yr4' => $salaryYr4,
+            'salary_yr5' => $salaryYr5,
+            'salary_yr6' => $salaryYr6,
         ]);
 
         // Insert negative cash row (receiving team's cap relief)
@@ -116,12 +116,12 @@ class CashTransactionHandler implements CashTransactionHandlerInterface
             'trade_offer_id' => $tradeOfferId,
             'cy' => $contractCurrentYear,
             'cyt' => $contractTotalYears,
-            'cy1' => -$cy1,
-            'cy2' => -$cy2,
-            'cy3' => -$cy3,
-            'cy4' => -$cy4,
-            'cy5' => -$cy5,
-            'cy6' => -$cy6,
+            'salary_yr1' => -$salaryYr1,
+            'salary_yr2' => -$salaryYr2,
+            'salary_yr3' => -$salaryYr3,
+            'salary_yr4' => -$salaryYr4,
+            'salary_yr5' => -$salaryYr5,
+            'salary_yr6' => -$salaryYr6,
         ]);
 
         $success = ($affectedRowsPositive > 0) && ($affectedRowsNegative > 0);
@@ -138,23 +138,23 @@ class CashTransactionHandler implements CashTransactionHandlerInterface
      */
     public function insertCashTradeData(int $tradeOfferId, string $offeringTeamName, string $listeningTeamName, array $cashAmounts): bool
     {
-        $cy1 = (int) ($cashAmounts[1] ?? 0);
-        $cy2 = (int) ($cashAmounts[2] ?? 0);
-        $cy3 = (int) ($cashAmounts[3] ?? 0);
-        $cy4 = (int) ($cashAmounts[4] ?? 0);
-        $cy5 = (int) ($cashAmounts[5] ?? 0);
-        $cy6 = (int) ($cashAmounts[6] ?? 0);
+        $salaryYr1 = (int) ($cashAmounts[1] ?? 0);
+        $salaryYr2 = (int) ($cashAmounts[2] ?? 0);
+        $salaryYr3 = (int) ($cashAmounts[3] ?? 0);
+        $salaryYr4 = (int) ($cashAmounts[4] ?? 0);
+        $salaryYr5 = (int) ($cashAmounts[5] ?? 0);
+        $salaryYr6 = (int) ($cashAmounts[6] ?? 0);
 
         $affectedRows = $this->cashRepository->insertCashTradeOffer(
             $tradeOfferId,
             $offeringTeamName,
             $listeningTeamName,
-            $cy1,
-            $cy2,
-            $cy3,
-            $cy4,
-            $cy5,
-            $cy6
+            $salaryYr1,
+            $salaryYr2,
+            $salaryYr3,
+            $salaryYr4,
+            $salaryYr5,
+            $salaryYr6
         );
 
         return $affectedRows > 0;

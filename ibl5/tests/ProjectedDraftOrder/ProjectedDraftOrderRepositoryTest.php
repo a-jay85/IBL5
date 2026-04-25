@@ -34,8 +34,8 @@ class ProjectedDraftOrderRepositoryTest extends TestCase
             [
                 'teamid' => 1, 'team_name' => 'Heat', 'wins' => 50, 'losses' => 32,
                 'pct' => 0.610, 'conference' => 'Eastern', 'division' => 'Atlantic',
-                'confWins' => 30, 'confLosses' => 12, 'divWins' => 10, 'divLosses' => 4,
-                'clinchedDivision' => 1, 'color1' => '98002E', 'color2' => 'F9A01B',
+                'conf_wins' => 30, 'conf_losses' => 12, 'div_wins' => 10, 'div_losses' => 4,
+                'clinched_division' => 1, 'color1' => '98002E', 'color2' => 'F9A01B',
             ],
         ]);
 

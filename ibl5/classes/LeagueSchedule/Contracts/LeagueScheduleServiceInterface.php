@@ -19,7 +19,7 @@ use Season\Season;
  *     home: int,
  *     homeScore: int,
  *     homeTeam: string,
- *     homeRecord: string,
+ *     home_record: string,
  *     boxid: int,
  *     gameOfThatDay: int,
  *     boxScoreUrl: string,

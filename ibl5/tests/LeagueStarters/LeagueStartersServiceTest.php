@@ -271,7 +271,7 @@ class LeagueStartersServiceTest extends TestCase
             'color2' => '#FFFFFF',
             'used_extension_this_chunk' => 0,
             'used_extension_this_season' => 0,
-            'leagueRecord' => '0-0',
+            'league_record' => '0-0',
         ]);
     }
 }

@@ -79,7 +79,7 @@ class ScheduleIntegrationTest extends IntegrationTestCase
                 'used_extension_this_season' => 0,
                 'has_mle' => 1,
                 'has_lle' => 1,
-                'leagueRecord' => '10-5',
+                'league_record' => '10-5',
             ];
         }
 

@@ -203,9 +203,9 @@ class TeamService implements TeamServiceInterface
             'conferencePosition' => $confPos,
             'division' => $powerData['division'],
             'divisionPosition' => $divPos,
-            'divisionGB' => (float) ($powerData['divGB'] ?? 0.0),
-            'homeRecord' => $powerData['homeRecord'],
-            'awayRecord' => $powerData['awayRecord'],
+            'divisionGB' => (float) ($powerData['div_gb'] ?? 0.0),
+            'home_record' => $powerData['home_record'],
+            'away_record' => $powerData['away_record'],
             'lastWin' => $powerData['last_win'],
             'lastLoss' => $powerData['last_loss'],
         ];

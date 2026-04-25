@@ -24,8 +24,8 @@ class CurrentSeasonView
         $arena = HtmlSanitizer::e($data['arena']);
         $conference = HtmlSanitizer::e($data['conference']);
         $division = HtmlSanitizer::e($data['division']);
-        $homeRecord = HtmlSanitizer::e($data['homeRecord']);
-        $awayRecord = HtmlSanitizer::e($data['awayRecord']);
+        $homeRecord = HtmlSanitizer::e($data['home_record']);
+        $awayRecord = HtmlSanitizer::e($data['away_record']);
         $wins = $data['wins'];
         $losses = $data['losses'];
         $confPos = $data['conferencePosition'];

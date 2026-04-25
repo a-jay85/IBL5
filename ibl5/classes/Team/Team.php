@@ -15,7 +15,7 @@ use League\League;
  * @see BaseMysqliRepository For base class documentation and error codes
  *
  *
- * @phpstan-type TeamWithStandingsRow array{teamid: int, team_city: string, team_name: string, color1: string, color2: string, arena: string, capacity: int, owner_name: string, owner_email: string, discord_id: ?int, used_extension_this_chunk: int, used_extension_this_season: ?int, has_mle: int, has_lle: int, leagueRecord: ?string, ...}
+ * @phpstan-type TeamWithStandingsRow array{teamid: int, team_city: string, team_name: string, color1: string, color2: string, arena: string, capacity: int, owner_name: string, owner_email: string, discord_id: ?int, used_extension_this_chunk: int, used_extension_this_season: ?int, has_mle: int, has_lle: int, league_record: ?string, ...}
  */
 class Team extends \BaseMysqliRepository
 {
@@ -94,7 +94,7 @@ class Team extends \BaseMysqliRepository
 
         if (is_int($identifier)) {
             $query = "SELECT ibl_team_info.*,
-                     ibl_standings.leagueRecord
+                     ibl_standings.league_record
                 FROM ibl_team_info
                     LEFT JOIN ibl_standings
                     ON ibl_team_info.teamid = ibl_standings.teamid
@@ -104,7 +104,7 @@ class Team extends \BaseMysqliRepository
             $teamRow = $this->fetchOne($query, "i", $identifier);
         } else {
             $query = "SELECT ibl_team_info.*,
-                     ibl_standings.leagueRecord
+                     ibl_standings.league_record
                 FROM ibl_team_info
                     LEFT JOIN ibl_standings
                     ON ibl_team_info.teamid = ibl_standings.teamid
@@ -150,7 +150,7 @@ class Team extends \BaseMysqliRepository
         $this->has_lle = $teamRow['has_lle'];
 
         /** @var string|null $leagueRecord */
-        $leagueRecord = $teamRow['leagueRecord'] ?? null;
+        $leagueRecord = $teamRow['league_record'] ?? null;
         $this->seasonRecord = $leagueRecord;
     }
 }

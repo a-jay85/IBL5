@@ -77,17 +77,17 @@ class ApiTeamRepository extends \BaseMysqliRepository
             "SELECT t.teamid, t.uuid, t.team_city, t.team_name, t.owner_name, t.arena,
                     s.conference, s.division,
                     t.discord_id,
-                    s.leagueRecord AS league_record,
+                    s.league_record AS league_record,
                     s.pct AS win_percentage,
-                    s.confRecord AS conference_record,
-                    s.confGB AS conference_games_back,
-                    s.divRecord AS division_record,
-                    s.divGB AS division_games_back,
-                    s.homeWins AS home_wins,
-                    s.homeLosses AS home_losses,
-                    s.awayWins AS away_wins,
-                    s.awayLosses AS away_losses,
-                    s.gamesUnplayed AS games_remaining
+                    s.conf_record AS conference_record,
+                    s.conf_gb AS conference_games_back,
+                    s.div_record AS division_record,
+                    s.div_gb AS division_games_back,
+                    s.home_wins AS home_wins,
+                    s.home_losses AS home_losses,
+                    s.away_wins AS away_wins,
+                    s.away_losses AS away_losses,
+                    s.games_unplayed AS games_remaining
              FROM {$this->teamInfoTable} t
              LEFT JOIN {$this->standingsTable} s ON t.teamid = s.teamid
              WHERE t.uuid = ?",

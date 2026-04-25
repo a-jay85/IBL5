@@ -13,13 +13,13 @@ use ProjectedDraftOrder\Contracts\ProjectedDraftOrderRepositoryInterface;
  */
 class ProjectedDraftOrderRepository extends \BaseMysqliRepository implements ProjectedDraftOrderRepositoryInterface
 {
-    /** @return list<array{teamid: int, team_name: string, wins: int, losses: int, pct: float, conference: string, division: string, confWins: int|null, confLosses: int|null, divWins: int|null, divLosses: int|null, clinchedDivision: int|null, color1: string, color2: string}> */
+    /** @return list<array{teamid: int, team_name: string, wins: int, losses: int, pct: float, conference: string, division: string, conf_wins: int|null, conf_losses: int|null, div_wins: int|null, div_losses: int|null, clinched_division: int|null, color1: string, color2: string}> */
     public function getAllTeamsWithStandings(): array
     {
-        /** @var list<array{teamid: int, team_name: string, wins: int, losses: int, pct: float, conference: string, division: string, confWins: int|null, confLosses: int|null, divWins: int|null, divLosses: int|null, clinchedDivision: int|null, color1: string, color2: string}> */
+        /** @var list<array{teamid: int, team_name: string, wins: int, losses: int, pct: float, conference: string, division: string, conf_wins: int|null, conf_losses: int|null, div_wins: int|null, div_losses: int|null, clinched_division: int|null, color1: string, color2: string}> */
         return $this->fetchAll(
             "SELECT s.teamid, s.team_name, s.wins, s.losses, s.pct, s.conference, s.division,
-                    s.confWins, s.confLosses, s.divWins, s.divLosses, s.clinchedDivision,
+                    s.conf_wins, s.conf_losses, s.div_wins, s.div_losses, s.clinched_division,
                     t.color1, t.color2
              FROM ibl_standings s
              JOIN ibl_team_info t ON s.teamid = t.teamid

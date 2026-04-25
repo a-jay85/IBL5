@@ -49,8 +49,8 @@ use Team\Team;
  *     division: string,
  *     divisionPosition: int,
  *     divisionGB: float,
- *     homeRecord: string,
- *     awayRecord: string,
+ *     home_record: string,
+ *     away_record: string,
  *     lastWin: int,
  *     lastLoss: int
  * }

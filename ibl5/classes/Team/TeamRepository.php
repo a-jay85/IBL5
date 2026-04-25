@@ -59,9 +59,9 @@ class TeamRepository extends \BaseMysqliRepository implements TeamRepositoryInte
     {
         /** @var PowerRow|null */
         return $this->fetchOne(
-            "SELECT s.teamid, s.team_name, s.leagueRecord, s.wins, s.losses, s.pct,
-                s.conference, s.division, s.confRecord, s.divRecord, s.divGB,
-                s.homeRecord, s.awayRecord, s.gamesUnplayed,
+            "SELECT s.teamid, s.team_name, s.league_record, s.wins, s.losses, s.pct,
+                s.conference, s.division, s.conf_record, s.div_record, s.div_gb,
+                s.home_record, s.away_record, s.games_unplayed,
                 p.ranking, p.last_win, p.last_loss, p.streak_type, p.streak,
                 p.sos, p.remaining_sos
             FROM {$this->standingsTable} s
@@ -81,15 +81,15 @@ class TeamRepository extends \BaseMysqliRepository implements TeamRepositoryInte
     {
         /** @var list<PowerRow> */
         return $this->fetchAll(
-            "SELECT s.teamid, s.team_name, s.leagueRecord, s.wins, s.losses, s.pct,
-                s.conference, s.division, s.confRecord, s.divRecord, s.divGB,
-                s.homeRecord, s.awayRecord, s.gamesUnplayed,
+            "SELECT s.teamid, s.team_name, s.league_record, s.wins, s.losses, s.pct,
+                s.conference, s.division, s.conf_record, s.div_record, s.div_gb,
+                s.home_record, s.away_record, s.games_unplayed,
                 p.ranking, p.last_win, p.last_loss, p.streak_type, p.streak,
                 p.sos, p.remaining_sos
             FROM {$this->standingsTable} s
             JOIN {$this->powerTable} p ON s.teamid = p.teamid
             WHERE s.division = ?
-            ORDER BY s.divGB ASC",
+            ORDER BY s.div_gb ASC",
             "s",
             $division
         );
@@ -103,15 +103,15 @@ class TeamRepository extends \BaseMysqliRepository implements TeamRepositoryInte
     {
         /** @var list<PowerRow> */
         return $this->fetchAll(
-            "SELECT s.teamid, s.team_name, s.leagueRecord, s.wins, s.losses, s.pct,
-                s.conference, s.division, s.confRecord, s.divRecord, s.divGB,
-                s.homeRecord, s.awayRecord, s.gamesUnplayed,
+            "SELECT s.teamid, s.team_name, s.league_record, s.wins, s.losses, s.pct,
+                s.conference, s.division, s.conf_record, s.div_record, s.div_gb,
+                s.home_record, s.away_record, s.games_unplayed,
                 p.ranking, p.last_win, p.last_loss, p.streak_type, p.streak,
                 p.sos, p.remaining_sos
             FROM {$this->standingsTable} s
             JOIN {$this->powerTable} p ON s.teamid = p.teamid
             WHERE s.conference = ?
-            ORDER BY s.confGB ASC",
+            ORDER BY s.conf_gb ASC",
             "s",
             $conference
         );

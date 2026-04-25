@@ -501,16 +501,16 @@ class ProjectedDraftOrderService implements ProjectedDraftOrderServiceInterface
     private function applyNonH2HTiebreakers(array $a, array $b, array $pointDiffs): int
     {
         // 2. Division winner status
-        $aDivWinner = ($a['clinchedDivision'] ?? 0) === 1;
-        $bDivWinner = ($b['clinchedDivision'] ?? 0) === 1;
+        $aDivWinner = ($a['clinched_division'] ?? 0) === 1;
+        $bDivWinner = ($b['clinched_division'] ?? 0) === 1;
         if ($aDivWinner !== $bDivWinner) {
             return $aDivWinner ? -1 : 1;
         }
 
         // 3. Division record (same-division teams only)
         if ($a['division'] === $b['division']) {
-            $aDivPct = $this->safeWinPct($a['divWins'], $a['divLosses']);
-            $bDivPct = $this->safeWinPct($b['divWins'], $b['divLosses']);
+            $aDivPct = $this->safeWinPct($a['div_wins'], $a['div_losses']);
+            $bDivPct = $this->safeWinPct($b['div_wins'], $b['div_losses']);
             $divDiff = $bDivPct <=> $aDivPct;
             if ($divDiff !== 0) {
                 return $divDiff;
@@ -518,8 +518,8 @@ class ProjectedDraftOrderService implements ProjectedDraftOrderServiceInterface
         }
 
         // 4. Conference record
-        $aConfPct = $this->safeWinPct($a['confWins'], $a['confLosses']);
-        $bConfPct = $this->safeWinPct($b['confWins'], $b['confLosses']);
+        $aConfPct = $this->safeWinPct($a['conf_wins'], $a['conf_losses']);
+        $bConfPct = $this->safeWinPct($b['conf_wins'], $b['conf_losses']);
         $confDiff = $bConfPct <=> $aConfPct;
         if ($confDiff !== 0) {
             return $confDiff;

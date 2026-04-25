@@ -48,16 +48,16 @@ class StandingsRepository extends \BaseMysqliRepository implements StandingsRepo
         if (in_array($region, League::CONFERENCE_NAMES, true)) {
             return [
                 'grouping' => 'conference',
-                'gbColumn' => 'confGB',
-                'magicNumberColumn' => 'confMagicNumber',
+                'gbColumn' => 'conf_gb',
+                'magicNumberColumn' => 'conf_magic_number',
             ];
         }
 
         if (in_array($region, League::DIVISION_NAMES, true)) {
             return [
                 'grouping' => 'division',
-                'gbColumn' => 'divGB',
-                'magicNumberColumn' => 'divMagicNumber',
+                'gbColumn' => 'div_gb',
+                'magicNumberColumn' => 'div_magic_number',
             ];
         }
 
@@ -76,32 +76,32 @@ class StandingsRepository extends \BaseMysqliRepository implements StandingsRepo
         $query = "SELECT
             s.teamid,
             s.team_name,
-            s.leagueRecord,
+            s.league_record,
             s.pct,
             s.{$columns['gbColumn']} AS gamesBack,
-            s.confRecord,
-            s.divRecord,
-            s.homeRecord,
-            s.awayRecord,
-            s.gamesUnplayed,
+            s.conf_record,
+            s.div_record,
+            s.home_record,
+            s.away_record,
+            s.games_unplayed,
             s.{$columns['magicNumberColumn']} AS magicNumber,
-            s.clinchedConference,
-            s.clinchedDivision,
-            s.clinchedPlayoffs,
-            s.clinchedLeague,
+            s.clinched_conference,
+            s.clinched_division,
+            s.clinched_playoffs,
+            s.clinched_league,
             s.wins,
-            (s.homeWins + s.homeLosses) AS homeGames,
-            (s.awayWins + s.awayLosses) AS awayGames,
+            (s.home_wins + s.home_losses) AS homeGames,
+            (s.away_wins + s.away_losses) AS awayGames,
             t.color1,
             t.color2
             FROM {$this->standingsTable} s
             JOIN {$this->teamInfoTable} t ON s.teamid = t.teamid
             WHERE s.{$columns['grouping']} = ?
             ORDER BY s.{$columns['gbColumn']} ASC,
-                (COALESCE(s.clinchedLeague, 0) * 4
-                 + COALESCE(s.clinchedConference, 0) * 3
-                 + COALESCE(s.clinchedDivision, 0) * 2
-                 + COALESCE(s.clinchedPlayoffs, 0)) DESC,
+                (COALESCE(s.clinched_league, 0) * 4
+                 + COALESCE(s.clinched_conference, 0) * 3
+                 + COALESCE(s.clinched_division, 0) * 2
+                 + COALESCE(s.clinched_playoffs, 0)) DESC,
                 s.wins DESC";
 
         /** @var list<StandingsRow> */
@@ -118,15 +118,15 @@ class StandingsRepository extends \BaseMysqliRepository implements StandingsRepo
         /** @var list<BulkStandingsRow> */
         return $this->fetchAll(
             "SELECT
-                s.teamid, s.team_name, s.leagueRecord, s.pct,
-                s.confGB, s.divGB,
-                s.confRecord, s.divRecord, s.homeRecord, s.awayRecord,
-                s.gamesUnplayed,
-                s.confMagicNumber, s.divMagicNumber,
-                s.clinchedConference, s.clinchedDivision, s.clinchedPlayoffs, s.clinchedLeague,
+                s.teamid, s.team_name, s.league_record, s.pct,
+                s.conf_gb, s.div_gb,
+                s.conf_record, s.div_record, s.home_record, s.away_record,
+                s.games_unplayed,
+                s.conf_magic_number, s.div_magic_number,
+                s.clinched_conference, s.clinched_division, s.clinched_playoffs, s.clinched_league,
                 s.wins,
-                (s.homeWins + s.homeLosses) AS homeGames,
-                (s.awayWins + s.awayLosses) AS awayGames,
+                (s.home_wins + s.home_losses) AS homeGames,
+                (s.away_wins + s.away_losses) AS awayGames,
                 s.conference, s.division,
                 t.color1, t.color2
             FROM {$this->standingsTable} s

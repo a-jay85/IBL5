@@ -452,7 +452,7 @@ class FreeAgencyAdminProcessorTest extends TestCase
             'contract_losses' => 42,
             'contract_avg_w' => 40,
             'contract_avg_l' => 42,
-            'leagueRecord' => '40-42',
+            'league_record' => '40-42',
         ];
         $this->mockDb->setMockTeamData([$teamRow]);
 

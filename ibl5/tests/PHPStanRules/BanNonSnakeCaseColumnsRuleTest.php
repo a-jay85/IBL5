@@ -144,6 +144,116 @@ final class BanNonSnakeCaseColumnsRuleTest extends RuleTestCase
                     . 'Rename to `has_lle`; migration 117 snake-cased team-info columns.',
                     28,
                 ],
+                [
+                    'Banned backtick-quoted column reference `leagueRecord` in SQL string. '
+                    . 'Rename to `league_record`; migration 118 snake-cased standings columns.',
+                    29,
+                ],
+                [
+                    'Banned backtick-quoted column reference `confRecord` in SQL string. '
+                    . 'Rename to `conf_record`; migration 118 snake-cased standings columns.',
+                    30,
+                ],
+                [
+                    'Banned backtick-quoted column reference `confGB` in SQL string. '
+                    . 'Rename to `conf_gb`; migration 118 snake-cased standings columns.',
+                    31,
+                ],
+                [
+                    'Banned backtick-quoted column reference `divRecord` in SQL string. '
+                    . 'Rename to `div_record`; migration 118 snake-cased standings columns.',
+                    32,
+                ],
+                [
+                    'Banned backtick-quoted column reference `divGB` in SQL string. '
+                    . 'Rename to `div_gb`; migration 118 snake-cased standings columns.',
+                    33,
+                ],
+                [
+                    'Banned backtick-quoted column reference `homeRecord` in SQL string. '
+                    . 'Rename to `home_record`; migration 118 snake-cased standings columns.',
+                    34,
+                ],
+                [
+                    'Banned backtick-quoted column reference `awayRecord` in SQL string. '
+                    . 'Rename to `away_record`; migration 118 snake-cased standings columns.',
+                    35,
+                ],
+                [
+                    'Banned backtick-quoted column reference `gamesUnplayed` in SQL string. '
+                    . 'Rename to `games_unplayed`; migration 118 snake-cased standings columns.',
+                    36,
+                ],
+                [
+                    'Banned backtick-quoted column reference `confWins` in SQL string. '
+                    . 'Rename to `conf_wins`; migration 118 snake-cased standings columns.',
+                    37,
+                ],
+                [
+                    'Banned backtick-quoted column reference `confLosses` in SQL string. '
+                    . 'Rename to `conf_losses`; migration 118 snake-cased standings columns.',
+                    38,
+                ],
+                [
+                    'Banned backtick-quoted column reference `divWins` in SQL string. '
+                    . 'Rename to `div_wins`; migration 118 snake-cased standings columns.',
+                    39,
+                ],
+                [
+                    'Banned backtick-quoted column reference `divLosses` in SQL string. '
+                    . 'Rename to `div_losses`; migration 118 snake-cased standings columns.',
+                    40,
+                ],
+                [
+                    'Banned backtick-quoted column reference `homeWins` in SQL string. '
+                    . 'Rename to `home_wins`; migration 118 snake-cased standings columns.',
+                    41,
+                ],
+                [
+                    'Banned backtick-quoted column reference `homeLosses` in SQL string. '
+                    . 'Rename to `home_losses`; migration 118 snake-cased standings columns.',
+                    42,
+                ],
+                [
+                    'Banned backtick-quoted column reference `awayWins` in SQL string. '
+                    . 'Rename to `away_wins`; migration 118 snake-cased standings columns.',
+                    43,
+                ],
+                [
+                    'Banned backtick-quoted column reference `awayLosses` in SQL string. '
+                    . 'Rename to `away_losses`; migration 118 snake-cased standings columns.',
+                    44,
+                ],
+                [
+                    'Banned backtick-quoted column reference `confMagicNumber` in SQL string. '
+                    . 'Rename to `conf_magic_number`; migration 118 snake-cased standings columns.',
+                    45,
+                ],
+                [
+                    'Banned backtick-quoted column reference `divMagicNumber` in SQL string. '
+                    . 'Rename to `div_magic_number`; migration 118 snake-cased standings columns.',
+                    46,
+                ],
+                [
+                    'Banned backtick-quoted column reference `clinchedConference` in SQL string. '
+                    . 'Rename to `clinched_conference`; migration 118 snake-cased standings columns.',
+                    47,
+                ],
+                [
+                    'Banned backtick-quoted column reference `clinchedDivision` in SQL string. '
+                    . 'Rename to `clinched_division`; migration 118 snake-cased standings columns.',
+                    48,
+                ],
+                [
+                    'Banned backtick-quoted column reference `clinchedPlayoffs` in SQL string. '
+                    . 'Rename to `clinched_playoffs`; migration 118 snake-cased standings columns.',
+                    49,
+                ],
+                [
+                    'Banned backtick-quoted column reference `clinchedLeague` in SQL string. '
+                    . 'Rename to `clinched_league`; migration 118 snake-cased standings columns.',
+                    50,
+                ],
             ],
         );
     }

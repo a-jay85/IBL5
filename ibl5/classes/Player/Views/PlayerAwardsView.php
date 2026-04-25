@@ -80,7 +80,7 @@ class PlayerAwardsView implements PlayerAwardsViewInterface
         <?php
         foreach ($awards as $award) {
             $year = HtmlSanitizer::safeHtmlOutput($award['year']);
-            $awardName = HtmlSanitizer::safeHtmlOutput($award['Award']);
+            $awardName = HtmlSanitizer::safeHtmlOutput($award['award']);
             ?>
     <tr>
         <td class="year-cell"><?= $year ?></td>

@@ -22,8 +22,8 @@ namespace FreeAgency\Contracts;
  *     offer5: int,
  *     offer6: int,
  *     bird: int,
- *     MLE: int,
- *     LLE: int,
+ *     mle: int,
+ *     lle: int,
  *     random: int,
  *     perceivedvalue: float
  * }

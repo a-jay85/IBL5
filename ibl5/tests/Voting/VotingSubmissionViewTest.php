@@ -91,7 +91,7 @@ final class VotingSubmissionViewTest extends TestCase
     public function testEoyConfirmationEscapesPlayerNames(): void
     {
         $ballot = self::validEoyBallot();
-        $ballot['MVP_1'] = '<script>xss</script>, Knicks';
+        $ballot['mvp_1'] = '<script>xss</script>, Knicks';
         $html = $this->view->renderEoyConfirmation('Test Team', $ballot);
 
         $this->assertStringNotContainsString('<script>xss</script>', $html);
@@ -148,40 +148,40 @@ final class VotingSubmissionViewTest extends TestCase
     // ==================== Fixtures ====================
 
     /**
-     * @return array{MVP_1: string, MVP_2: string, MVP_3: string, Six_1: string, Six_2: string, Six_3: string, ROY_1: string, ROY_2: string, ROY_3: string, GM_1: string, GM_2: string, GM_3: string}
+     * @return array{mvp_1: string, mvp_2: string, mvp_3: string, six_1: string, six_2: string, six_3: string, roy_1: string, roy_2: string, roy_3: string, gm_1: string, gm_2: string, gm_3: string}
      */
     private static function validEoyBallot(): array
     {
         return [
-            'MVP_1' => 'Player A, Knicks',
-            'MVP_2' => 'Player B, Lakers',
-            'MVP_3' => 'Player C, Celtics',
-            'Six_1' => 'Player D, Hawks',
-            'Six_2' => 'Player E, Nets',
-            'Six_3' => 'Player F, Heat',
-            'ROY_1' => 'Player G, Spurs',
-            'ROY_2' => 'Player H, Bulls',
-            'ROY_3' => 'Player I, Jazz',
-            'GM_1' => 'GM Alpha, Suns',
-            'GM_2' => 'GM Beta, Sixers',
-            'GM_3' => 'GM Gamma, Bucks',
+            'mvp_1' => 'Player A, Knicks',
+            'mvp_2' => 'Player B, Lakers',
+            'mvp_3' => 'Player C, Celtics',
+            'six_1' => 'Player D, Hawks',
+            'six_2' => 'Player E, Nets',
+            'six_3' => 'Player F, Heat',
+            'roy_1' => 'Player G, Spurs',
+            'roy_2' => 'Player H, Bulls',
+            'roy_3' => 'Player I, Jazz',
+            'gm_1' => 'GM Alpha, Suns',
+            'gm_2' => 'GM Beta, Sixers',
+            'gm_3' => 'GM Gamma, Bucks',
         ];
     }
 
     /**
-     * @return array{East_F1: string, East_F2: string, East_F3: string, East_F4: string, East_B1: string, East_B2: string, East_B3: string, East_B4: string, West_F1: string, West_F2: string, West_F3: string, West_F4: string, West_B1: string, West_B2: string, West_B3: string, West_B4: string}
+     * @return array{east_f1: string, east_f2: string, east_f3: string, east_f4: string, east_b1: string, east_b2: string, east_b3: string, east_b4: string, west_f1: string, west_f2: string, west_f3: string, west_f4: string, west_b1: string, west_b2: string, west_b3: string, west_b4: string}
      */
     private static function validAsgBallot(): array
     {
         return [
-            'East_F1' => 'EF1, Knicks', 'East_F2' => 'EF2, Hawks',
-            'East_F3' => 'EF3, Celtics', 'East_F4' => 'EF4, Nets',
-            'East_B1' => 'EB1, Heat', 'East_B2' => 'EB2, Bulls',
-            'East_B3' => 'EB3, Pacers', 'East_B4' => 'EB4, Cavs',
-            'West_F1' => 'WF1, Lakers', 'West_F2' => 'WF2, Suns',
-            'West_F3' => 'WF3, Nuggets', 'West_F4' => 'WF4, Clippers',
-            'West_B1' => 'WB1, Warriors', 'West_B2' => 'WB2, Grizzlies',
-            'West_B3' => 'WB3, Mavs', 'West_B4' => 'WB4, Thunder',
+            'east_f1' => 'EF1, Knicks', 'east_f2' => 'EF2, Hawks',
+            'east_f3' => 'EF3, Celtics', 'east_f4' => 'EF4, Nets',
+            'east_b1' => 'EB1, Heat', 'east_b2' => 'EB2, Bulls',
+            'east_b3' => 'EB3, Pacers', 'east_b4' => 'EB4, Cavs',
+            'west_f1' => 'WF1, Lakers', 'west_f2' => 'WF2, Suns',
+            'west_f3' => 'WF3, Nuggets', 'west_f4' => 'WF4, Clippers',
+            'west_b1' => 'WB1, Warriors', 'west_b2' => 'WB2, Grizzlies',
+            'west_b3' => 'WB3, Mavs', 'west_b4' => 'WB4, Thunder',
         ];
     }
 }

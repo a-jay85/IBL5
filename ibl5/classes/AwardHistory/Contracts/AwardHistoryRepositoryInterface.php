@@ -25,7 +25,7 @@ interface AwardHistoryRepositoryInterface
      *     sortby: int
      * } $params Validated parameters from AwardHistoryValidatorInterface
      * @return array{
-     *     results: array<int, array{year: int, Award: string, name: string, table_ID: int}>,
+     *     results: array<int, array{year: int, award: string, name: string, table_id: int}>,
      *     count: int
      * } Search results:
      *     - results: array of award records from ibl_awards table
@@ -34,20 +34,20 @@ interface AwardHistoryRepositoryInterface
      * IMPORTANT BEHAVIORS:
      *  - Filters with null values are SKIPPED (not applied to WHERE clause)
      *  - If no filters produce conditions, ALL awards are returned
-     *  - Name and Award searches use LIKE with % wildcards (case-insensitive)
+     *  - Name and award searches use LIKE with % wildcards (case-insensitive)
      *  - Year uses exact match (=)
      *  - Results are ordered by sortby parameter (ASC):
      *      - 1: name
-     *      - 2: Award
+     *      - 2: award
      *      - 3: year
      *  - Returns array{results: [], count: 0} if no matches
      *  - Never throws exceptions – returns empty results on error
      * 
      * SCHEMA REFERENCE (ibl_awards):
      *  - year: int(11) - Year of the award
-     *  - Award: varchar(128) - Award name/type
+     *  - award: varchar(128) - Award name/type
      *  - name: varchar(32) - Player name
-     *  - table_ID: int(11) AUTO_INCREMENT PRIMARY KEY
+     *  - table_id: int(11) AUTO_INCREMENT PRIMARY KEY
      * 
      * Examples:
      *  $result = $repo->searchAwards(['name' => 'Smith', 'award' => null, 'year' => null, 'sortby' => 1]);

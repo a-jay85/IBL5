@@ -367,7 +367,7 @@ class TradingRepositoryTest extends DatabaseTestCase
         $stmt->close();
         self::assertNull($row);
 
-        $stmt2 = $this->db->prepare("SELECT id FROM ibl_trade_cash WHERE tradeOfferID = ?");
+        $stmt2 = $this->db->prepare("SELECT id FROM ibl_trade_cash WHERE trade_offer_id = ?");
         self::assertNotFalse($stmt2);
         $stmt2->bind_param('i', $offerId);
         $stmt2->execute();

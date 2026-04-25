@@ -27,8 +27,8 @@ final class AwardHistoryRepositoryTest extends TestCase
     public function testSearchAwardsReturnsResultsArray(): void
     {
         $this->mockDb->setMockData([
-            ['year' => 2025, 'Award' => 'MVP', 'name' => 'Johnson', 'table_ID' => 1],
-            ['year' => 2024, 'Award' => 'MVP', 'name' => 'Smith', 'table_ID' => 2],
+            ['year' => 2025, 'award' => 'MVP', 'name' => 'Johnson', 'table_id' => 1],
+            ['year' => 2024, 'award' => 'MVP', 'name' => 'Smith', 'table_id' => 2],
         ]);
 
         $repository = new AwardHistoryRepository($this->mockDb);
@@ -49,7 +49,7 @@ final class AwardHistoryRepositoryTest extends TestCase
     public function testSearchAwardsWithNameFilter(): void
     {
         $this->mockDb->setMockData([
-            ['year' => 2025, 'Award' => 'MVP', 'name' => 'Johnson', 'table_ID' => 1],
+            ['year' => 2025, 'award' => 'MVP', 'name' => 'Johnson', 'table_id' => 1],
         ]);
 
         $repository = new AwardHistoryRepository($this->mockDb);
@@ -68,8 +68,8 @@ final class AwardHistoryRepositoryTest extends TestCase
     public function testSearchAwardsWithAwardFilter(): void
     {
         $this->mockDb->setMockData([
-            ['year' => 2025, 'Award' => 'MVP', 'name' => 'Johnson', 'table_ID' => 1],
-            ['year' => 2024, 'Award' => 'MVP', 'name' => 'Smith', 'table_ID' => 2],
+            ['year' => 2025, 'award' => 'MVP', 'name' => 'Johnson', 'table_id' => 1],
+            ['year' => 2024, 'award' => 'MVP', 'name' => 'Smith', 'table_id' => 2],
         ]);
 
         $repository = new AwardHistoryRepository($this->mockDb);
@@ -88,7 +88,7 @@ final class AwardHistoryRepositoryTest extends TestCase
     public function testSearchAwardsWithYearFilter(): void
     {
         $this->mockDb->setMockData([
-            ['year' => 2025, 'Award' => 'MVP', 'name' => 'Johnson', 'table_ID' => 1],
+            ['year' => 2025, 'award' => 'MVP', 'name' => 'Johnson', 'table_id' => 1],
         ]);
 
         $repository = new AwardHistoryRepository($this->mockDb);
@@ -107,7 +107,7 @@ final class AwardHistoryRepositoryTest extends TestCase
     public function testSearchAwardsWithMultipleFilters(): void
     {
         $this->mockDb->setMockData([
-            ['year' => 2025, 'Award' => 'MVP', 'name' => 'Johnson', 'table_ID' => 1],
+            ['year' => 2025, 'award' => 'MVP', 'name' => 'Johnson', 'table_id' => 1],
         ]);
 
         $repository = new AwardHistoryRepository($this->mockDb);
@@ -145,7 +145,7 @@ final class AwardHistoryRepositoryTest extends TestCase
     public function testSearchAwardsSortColumnWhitelist(int $sortBy): void
     {
         $this->mockDb->setMockData([
-            ['year' => 2025, 'Award' => 'MVP', 'name' => 'Johnson', 'table_ID' => 1],
+            ['year' => 2025, 'award' => 'MVP', 'name' => 'Johnson', 'table_id' => 1],
         ]);
 
         $repository = new AwardHistoryRepository($this->mockDb);

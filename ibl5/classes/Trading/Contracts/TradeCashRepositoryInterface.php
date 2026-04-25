@@ -10,7 +10,7 @@ namespace Trading\Contracts;
  * Defines methods for accessing and modifying cash-related trade data.
  * Extracted from the original TradingRepositoryInterface to follow single-responsibility principle.
  *
- * @phpstan-type TradeCashRow array{tradeOfferID: int, sendingTeam: string, receivingTeam: string, salary_yr1: ?int, salary_yr2: ?int, salary_yr3: ?int, salary_yr4: ?int, salary_yr5: ?int, salary_yr6: ?int}
+ * @phpstan-type TradeCashRow array{trade_offer_id: int, sending_team: string, receiving_team: string, salary_yr1: ?int, salary_yr2: ?int, salary_yr3: ?int, salary_yr4: ?int, salary_yr5: ?int, salary_yr6: ?int}
  */
 interface TradeCashRepositoryInterface
 {
@@ -50,7 +50,7 @@ interface TradeCashRepositoryInterface
      * Get cash transactions for multiple offer IDs in a single query
      *
      * @param list<int> $offerIds Trade offer IDs to look up
-     * @return array<string, TradeCashRow> Cash rows keyed by "{offerId}:{sendingTeam}"
+     * @return array<string, TradeCashRow> Cash rows keyed by "{offerId}:{sending_team}"
      */
     public function getCashTransactionsByOfferIds(array $offerIds): array;
 

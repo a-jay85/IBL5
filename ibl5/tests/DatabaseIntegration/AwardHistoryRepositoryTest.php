@@ -46,7 +46,7 @@ class AwardHistoryRepositoryTest extends DatabaseTestCase
 
         $found = $this->findByName($result['results'], 'AWH AwardLike');
         self::assertNotNull($found);
-        self::assertSame('Most Valuable Player', $found['Award']);
+        self::assertSame('Most Valuable Player', $found['award']);
     }
 
     public function testFilterByNameLikePattern(): void
@@ -100,7 +100,7 @@ class AwardHistoryRepositoryTest extends DatabaseTestCase
         $result = $this->repo->searchAwards($this->buildParams(['year' => 2099, 'sortby' => 2]));
 
         self::assertGreaterThanOrEqual(2, $result['count']);
-        self::assertSame('DPOY', $result['results'][0]['Award']);
+        self::assertSame('DPOY', $result['results'][0]['award']);
     }
 
     public function testSortByYear(): void
@@ -175,9 +175,9 @@ class AwardHistoryRepositoryTest extends DatabaseTestCase
         self::assertSame(1, $result['count']);
         $row = $result['results'][0];
         self::assertArrayHasKey('year', $row);
-        self::assertArrayHasKey('Award', $row);
+        self::assertArrayHasKey('award', $row);
         self::assertArrayHasKey('name', $row);
-        self::assertArrayHasKey('table_ID', $row);
+        self::assertArrayHasKey('table_id', $row);
         self::assertArrayHasKey('pid', $row);
     }
 

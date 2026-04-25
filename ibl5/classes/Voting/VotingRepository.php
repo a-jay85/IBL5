@@ -22,14 +22,14 @@ class VotingRepository extends \BaseMysqliRepository implements VotingRepository
 
     /** @var list<string> Allowlisted column names for dynamic SQL in vote queries */
     private const ALLOWED_COLUMNS = [
-        'East_F1', 'East_F2', 'East_F3', 'East_F4',
-        'East_B1', 'East_B2', 'East_B3', 'East_B4',
-        'West_F1', 'West_F2', 'West_F3', 'West_F4',
-        'West_B1', 'West_B2', 'West_B3', 'West_B4',
-        'MVP_1', 'MVP_2', 'MVP_3',
-        'Six_1', 'Six_2', 'Six_3',
-        'ROY_1', 'ROY_2', 'ROY_3',
-        'GM_1', 'GM_2', 'GM_3',
+        'east_f1', 'east_f2', 'east_f3', 'east_f4',
+        'east_b1', 'east_b2', 'east_b3', 'east_b4',
+        'west_f1', 'west_f2', 'west_f3', 'west_f4',
+        'west_b1', 'west_b2', 'west_b3', 'west_b4',
+        'mvp_1', 'mvp_2', 'mvp_3',
+        'six_1', 'six_2', 'six_3',
+        'roy_1', 'roy_2', 'roy_3',
+        'gm_1', 'gm_2', 'gm_3',
     ];
 
     /**
@@ -41,16 +41,16 @@ class VotingRepository extends \BaseMysqliRepository implements VotingRepository
     {
         $this->execute(
             "UPDATE ibl_votes_EOY
-             SET MVP_1 = ?, MVP_2 = ?, MVP_3 = ?,
-                 Six_1 = ?, Six_2 = ?, Six_3 = ?,
-                 ROY_1 = ?, ROY_2 = ?, ROY_3 = ?,
-                 GM_1 = ?, GM_2 = ?, GM_3 = ?
+             SET mvp_1 = ?, mvp_2 = ?, mvp_3 = ?,
+                 six_1 = ?, six_2 = ?, six_3 = ?,
+                 roy_1 = ?, roy_2 = ?, roy_3 = ?,
+                 gm_1 = ?, gm_2 = ?, gm_3 = ?
              WHERE team_name = ?",
             'sssssssssssss',
-            $ballot['MVP_1'], $ballot['MVP_2'], $ballot['MVP_3'],
-            $ballot['Six_1'], $ballot['Six_2'], $ballot['Six_3'],
-            $ballot['ROY_1'], $ballot['ROY_2'], $ballot['ROY_3'],
-            $ballot['GM_1'], $ballot['GM_2'], $ballot['GM_3'],
+            $ballot['mvp_1'], $ballot['mvp_2'], $ballot['mvp_3'],
+            $ballot['six_1'], $ballot['six_2'], $ballot['six_3'],
+            $ballot['roy_1'], $ballot['roy_2'], $ballot['roy_3'],
+            $ballot['gm_1'], $ballot['gm_2'], $ballot['gm_3'],
             $teamName
         );
     }
@@ -64,16 +64,16 @@ class VotingRepository extends \BaseMysqliRepository implements VotingRepository
     {
         $this->execute(
             "UPDATE ibl_votes_ASG
-             SET East_F1 = ?, East_F2 = ?, East_F3 = ?, East_F4 = ?,
-                 East_B1 = ?, East_B2 = ?, East_B3 = ?, East_B4 = ?,
-                 West_F1 = ?, West_F2 = ?, West_F3 = ?, West_F4 = ?,
-                 West_B1 = ?, West_B2 = ?, West_B3 = ?, West_B4 = ?
+             SET east_f1 = ?, east_f2 = ?, east_f3 = ?, east_f4 = ?,
+                 east_b1 = ?, east_b2 = ?, east_b3 = ?, east_b4 = ?,
+                 west_f1 = ?, west_f2 = ?, west_f3 = ?, west_f4 = ?,
+                 west_b1 = ?, west_b2 = ?, west_b3 = ?, west_b4 = ?
              WHERE team_name = ?",
             'sssssssssssssssss',
-            $ballot['East_F1'], $ballot['East_F2'], $ballot['East_F3'], $ballot['East_F4'],
-            $ballot['East_B1'], $ballot['East_B2'], $ballot['East_B3'], $ballot['East_B4'],
-            $ballot['West_F1'], $ballot['West_F2'], $ballot['West_F3'], $ballot['West_F4'],
-            $ballot['West_B1'], $ballot['West_B2'], $ballot['West_B3'], $ballot['West_B4'],
+            $ballot['east_f1'], $ballot['east_f2'], $ballot['east_f3'], $ballot['east_f4'],
+            $ballot['east_b1'], $ballot['east_b2'], $ballot['east_b3'], $ballot['east_b4'],
+            $ballot['west_f1'], $ballot['west_f2'], $ballot['west_f3'], $ballot['west_f4'],
+            $ballot['west_b1'], $ballot['west_b2'], $ballot['west_b3'], $ballot['west_b4'],
             $teamName
         );
     }

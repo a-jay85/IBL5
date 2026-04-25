@@ -37,20 +37,20 @@ $username = (string) ($cookie[1] ?? '');
 $commonRepository = new \Services\CommonMysqliRepository($mysqli_db);
 $teamName = $commonRepository->getTeamnameFromUsername($username) ?? '';
 
-/** @var array{MVP_1: string, MVP_2: string, MVP_3: string, Six_1: string, Six_2: string, Six_3: string, ROY_1: string, ROY_2: string, ROY_3: string, GM_1: string, GM_2: string, GM_3: string} $ballot */
+/** @var array{mvp_1: string, mvp_2: string, mvp_3: string, six_1: string, six_2: string, six_3: string, roy_1: string, roy_2: string, roy_3: string, gm_1: string, gm_2: string, gm_3: string} $ballot */
 $ballot = [
-    'MVP_1' => is_string($_POST['MVP'][1] ?? null) ? $_POST['MVP'][1] : '',
-    'MVP_2' => is_string($_POST['MVP'][2] ?? null) ? $_POST['MVP'][2] : '',
-    'MVP_3' => is_string($_POST['MVP'][3] ?? null) ? $_POST['MVP'][3] : '',
-    'Six_1' => is_string($_POST['Six'][1] ?? null) ? $_POST['Six'][1] : '',
-    'Six_2' => is_string($_POST['Six'][2] ?? null) ? $_POST['Six'][2] : '',
-    'Six_3' => is_string($_POST['Six'][3] ?? null) ? $_POST['Six'][3] : '',
-    'ROY_1' => is_string($_POST['ROY'][1] ?? null) ? $_POST['ROY'][1] : '',
-    'ROY_2' => is_string($_POST['ROY'][2] ?? null) ? $_POST['ROY'][2] : '',
-    'ROY_3' => is_string($_POST['ROY'][3] ?? null) ? $_POST['ROY'][3] : '',
-    'GM_1'  => is_string($_POST['GM'][1] ?? null)  ? $_POST['GM'][1]  : '',
-    'GM_2'  => is_string($_POST['GM'][2] ?? null)  ? $_POST['GM'][2]  : '',
-    'GM_3'  => is_string($_POST['GM'][3] ?? null)  ? $_POST['GM'][3]  : '',
+    'mvp_1' => is_string($_POST['MVP'][1] ?? null) ? $_POST['MVP'][1] : '',
+    'mvp_2' => is_string($_POST['MVP'][2] ?? null) ? $_POST['MVP'][2] : '',
+    'mvp_3' => is_string($_POST['MVP'][3] ?? null) ? $_POST['MVP'][3] : '',
+    'six_1' => is_string($_POST['Six'][1] ?? null) ? $_POST['Six'][1] : '',
+    'six_2' => is_string($_POST['Six'][2] ?? null) ? $_POST['Six'][2] : '',
+    'six_3' => is_string($_POST['Six'][3] ?? null) ? $_POST['Six'][3] : '',
+    'roy_1' => is_string($_POST['ROY'][1] ?? null) ? $_POST['ROY'][1] : '',
+    'roy_2' => is_string($_POST['ROY'][2] ?? null) ? $_POST['ROY'][2] : '',
+    'roy_3' => is_string($_POST['ROY'][3] ?? null) ? $_POST['ROY'][3] : '',
+    'gm_1'  => is_string($_POST['GM'][1] ?? null)  ? $_POST['GM'][1]  : '',
+    'gm_2'  => is_string($_POST['GM'][2] ?? null)  ? $_POST['GM'][2]  : '',
+    'gm_3'  => is_string($_POST['GM'][3] ?? null)  ? $_POST['GM'][3]  : '',
 ];
 
 $repository = new VotingRepository($mysqli_db);

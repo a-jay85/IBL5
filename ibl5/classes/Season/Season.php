@@ -110,7 +110,7 @@ class Season
         $this->lastRegularSeasonGameDate = $this->queryRepo->getLastRegularSeasonGameDate($this->endingYear);
 
         $arrayLastSimDates = $this->queryRepo->getLastSimDatesArray();
-        $this->lastSimNumber = $arrayLastSimDates["Sim"];
+        $this->lastSimNumber = $arrayLastSimDates["sim"];
         $this->lastSimStartDate = $arrayLastSimDates["start_date"];
         $this->lastSimEndDate = $arrayLastSimDates["end_date"];
 

@@ -44,21 +44,21 @@ class VotingSubmissionView implements VotingSubmissionViewInterface
         ob_start();
         ?>
 <div class="voting-submission-confirmation">
-    <p>MVP Choice 1: <?= HtmlSanitizer::e($ballot['MVP_1']) ?></p>
-    <p>MVP Choice 2: <?= HtmlSanitizer::e($ballot['MVP_2']) ?></p>
-    <p>MVP Choice 3: <?= HtmlSanitizer::e($ballot['MVP_3']) ?></p>
+    <p>MVP Choice 1: <?= HtmlSanitizer::e($ballot['mvp_1']) ?></p>
+    <p>MVP Choice 2: <?= HtmlSanitizer::e($ballot['mvp_2']) ?></p>
+    <p>MVP Choice 3: <?= HtmlSanitizer::e($ballot['mvp_3']) ?></p>
 
-    <p>6th Man Choice 1: <?= HtmlSanitizer::e($ballot['Six_1']) ?></p>
-    <p>6th Man Choice 2: <?= HtmlSanitizer::e($ballot['Six_2']) ?></p>
-    <p>6th Man Choice 3: <?= HtmlSanitizer::e($ballot['Six_3']) ?></p>
+    <p>6th Man Choice 1: <?= HtmlSanitizer::e($ballot['six_1']) ?></p>
+    <p>6th Man Choice 2: <?= HtmlSanitizer::e($ballot['six_2']) ?></p>
+    <p>6th Man Choice 3: <?= HtmlSanitizer::e($ballot['six_3']) ?></p>
 
-    <p>ROY Choice 1: <?= HtmlSanitizer::e($ballot['ROY_1']) ?></p>
-    <p>ROY Choice 2: <?= HtmlSanitizer::e($ballot['ROY_2']) ?></p>
-    <p>ROY Choice 3: <?= HtmlSanitizer::e($ballot['ROY_3']) ?></p>
+    <p>ROY Choice 1: <?= HtmlSanitizer::e($ballot['roy_1']) ?></p>
+    <p>ROY Choice 2: <?= HtmlSanitizer::e($ballot['roy_2']) ?></p>
+    <p>ROY Choice 3: <?= HtmlSanitizer::e($ballot['roy_3']) ?></p>
 
-    <p>GM Choice 1: <?= HtmlSanitizer::e($ballot['GM_1']) ?></p>
-    <p>GM Choice 2: <?= HtmlSanitizer::e($ballot['GM_2']) ?></p>
-    <p>GM Choice 3: <?= HtmlSanitizer::e($ballot['GM_3']) ?></p>
+    <p>GM Choice 1: <?= HtmlSanitizer::e($ballot['gm_1']) ?></p>
+    <p>GM Choice 2: <?= HtmlSanitizer::e($ballot['gm_2']) ?></p>
+    <p>GM Choice 3: <?= HtmlSanitizer::e($ballot['gm_3']) ?></p>
 
     <p class="voting-submission-success"><strong>Thank you for voting - the <?= HtmlSanitizer::e($teamName) ?> vote has been recorded!</strong></p>
 </div>
@@ -75,10 +75,10 @@ class VotingSubmissionView implements VotingSubmissionViewInterface
     {
         /** @var array<string, array{label: string, fields: list<string>}> */
         $categories = [
-            'ecf' => ['label' => 'Eastern Frontcourt', 'fields' => ['East_F1', 'East_F2', 'East_F3', 'East_F4']],
-            'ecb' => ['label' => 'Eastern Backcourt', 'fields' => ['East_B1', 'East_B2', 'East_B3', 'East_B4']],
-            'wcf' => ['label' => 'Western Frontcourt', 'fields' => ['West_F1', 'West_F2', 'West_F3', 'West_F4']],
-            'wcb' => ['label' => 'Western Backcourt', 'fields' => ['West_B1', 'West_B2', 'West_B3', 'West_B4']],
+            'ecf' => ['label' => 'Eastern Frontcourt', 'fields' => ['east_f1', 'east_f2', 'east_f3', 'east_f4']],
+            'ecb' => ['label' => 'Eastern Backcourt', 'fields' => ['east_b1', 'east_b2', 'east_b3', 'east_b4']],
+            'wcf' => ['label' => 'Western Frontcourt', 'fields' => ['west_f1', 'west_f2', 'west_f3', 'west_f4']],
+            'wcb' => ['label' => 'Western Backcourt', 'fields' => ['west_b1', 'west_b2', 'west_b3', 'west_b4']],
         ];
 
         ob_start();

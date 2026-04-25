@@ -128,7 +128,7 @@ final class AwardHistoryViewTest extends TestCase
 
     public function testRenderAwardRowReturnsHtmlString(): void
     {
-        $award = ['year' => 2025, 'Award' => 'MVP', 'name' => 'Johnson'];
+        $award = ['year' => 2025, 'award' => 'MVP', 'name' => 'Johnson'];
         
         $result = $this->view->renderAwardRow($award, 0);
 
@@ -139,7 +139,7 @@ final class AwardHistoryViewTest extends TestCase
 
     public function testRenderAwardRowDisplaysAwardData(): void
     {
-        $award = ['year' => 2025, 'Award' => 'Most Valuable Player', 'name' => 'Magic Johnson'];
+        $award = ['year' => 2025, 'award' => 'Most Valuable Player', 'name' => 'Magic Johnson'];
         
         $result = $this->view->renderAwardRow($award, 0);
 
@@ -150,7 +150,7 @@ final class AwardHistoryViewTest extends TestCase
 
     public function testRenderAwardRowCreatesPlainRows(): void
     {
-        $award = ['year' => 2025, 'Award' => 'MVP', 'name' => 'Johnson'];
+        $award = ['year' => 2025, 'award' => 'MVP', 'name' => 'Johnson'];
 
         $evenRow = $this->view->renderAwardRow($award, 0);
         $oddRow = $this->view->renderAwardRow($award, 1);
@@ -164,7 +164,7 @@ final class AwardHistoryViewTest extends TestCase
 
     public function testRenderAwardRowEscapesHtmlCharacters(): void
     {
-        $award = ['year' => 2025, 'Award' => '<script>XSS</script>', 'name' => '<b>Hacker</b>'];
+        $award = ['year' => 2025, 'award' => '<script>XSS</script>', 'name' => '<b>Hacker</b>'];
         
         $result = $this->view->renderAwardRow($award, 0);
 
@@ -174,7 +174,7 @@ final class AwardHistoryViewTest extends TestCase
 
     public function testRenderAwardRowHandlesMissingData(): void
     {
-        $award = ['year' => null, 'Award' => null, 'name' => null];
+        $award = ['year' => null, 'award' => null, 'name' => null];
         
         $result = $this->view->renderAwardRow($award, 0);
 

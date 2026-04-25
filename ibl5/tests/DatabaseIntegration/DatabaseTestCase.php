@@ -404,7 +404,7 @@ abstract class DatabaseTestCase extends TestCase
     {
         return $this->insertRow('ibl_awards', [
             'name' => $playerName,
-            'Award' => $award,
+            'award' => $award,
             'year' => $year,
         ]);
     }
@@ -445,9 +445,9 @@ abstract class DatabaseTestCase extends TestCase
     protected function insertTradeCashRow(int $offerId, string $sending, string $receiving, array $years = []): void
     {
         $this->insertRow('ibl_trade_cash', [
-            'tradeOfferID' => $offerId,
-            'sendingTeam' => $sending,
-            'receivingTeam' => $receiving,
+            'trade_offer_id' => $offerId,
+            'sending_team' => $sending,
+            'receiving_team' => $receiving,
             'salary_yr1' => $years['salary_yr1'] ?? 0,
             'salary_yr2' => $years['salary_yr2'] ?? 0,
             'salary_yr3' => $years['salary_yr3'] ?? 0,
@@ -493,8 +493,8 @@ abstract class DatabaseTestCase extends TestCase
             'modifier' => 1.0,
             'random' => 0.5,
             'perceivedvalue' => 3000.0,
-            'MLE' => 0,
-            'LLE' => 0,
+            'mle' => 0,
+            'lle' => 0,
             'offer_type' => 0,
         ];
 
@@ -531,7 +531,7 @@ abstract class DatabaseTestCase extends TestCase
         return $this->insertRow('ibl_team_awards', [
             'year' => $year,
             'name' => $teamName,
-            'Award' => $award,
+            'award' => $award,
         ]);
     }
 

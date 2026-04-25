@@ -22,7 +22,7 @@ interface AwardHistoryServiceInterface
      * 
      * @param array<string, mixed> $rawParams Raw POST parameters from form
      * @return array{
-     *     awards: array<int, array{year: int, Award: string, name: string}>,
+     *     awards: array<int, array{year: int, award: string, name: string}>,
      *     count: int,
      *     params: array{name: string|null, award: string|null, year: int|null, sortby: int}
      * } Search results:
@@ -39,7 +39,7 @@ interface AwardHistoryServiceInterface
      * Examples:
      *  $result = $service->search(['aw_name' => 'Johnson', 'aw_Award' => 'MVP']);
      *  $result['count'] = 3;
-     *  $result['awards'][0] = ['year' => 2025, 'Award' => 'Regular Season MVP', 'name' => 'Magic Johnson'];
+     *  $result['awards'][0] = ['year' => 2025, 'award' => 'Regular Season MVP', 'name' => 'Magic Johnson'];
      */
     public function search(array $rawParams): array;
 

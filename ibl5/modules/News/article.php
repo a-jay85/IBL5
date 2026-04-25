@@ -54,7 +54,7 @@ if (stristr($REQUEST_URI, "mainfile")) {
 
 // Fetch article using prepared statement
 $stmt = $mysqli_db->prepare(
-    "SELECT catid, aid, time, title, hometext, bodytext, topic, informant, notes, acomm, haspoll, pollID
+    "SELECT catid, aid, time, title, hometext, bodytext, topic, informant, notes, acomm, haspoll, poll_id
      FROM " . $prefix . "_stories
      WHERE sid = ?"
 );
@@ -89,7 +89,7 @@ $informant = $row['informant'] ?? '';
 $notes = \Utilities\HtmlSanitizer::safeHtmlOutput($row['notes'] ?? '');
 $acomm = (int) ($row['acomm'] ?? 0);
 $haspoll = (int) ($row['haspoll'] ?? 0);
-$pollID = (int) ($row['pollID'] ?? 0);
+$pollID = (int) ($row['poll_id'] ?? 0);
 
 if (empty($aaid)) {
     Header("Location: modules.php?name=$module_name");

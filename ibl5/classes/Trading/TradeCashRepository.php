@@ -38,7 +38,7 @@ class TradeCashRepository extends BaseMysqliRepository implements TradeCashRepos
     {
         /** @var TradeCashRow|null */
         return $this->fetchOne(
-            "SELECT * FROM ibl_trade_cash WHERE tradeOfferID = ? AND sendingTeam = ?",
+            "SELECT * FROM ibl_trade_cash WHERE trade_offer_id = ? AND sending_team = ?",
             "is",
             $offerId,
             $sendingTeam
@@ -52,7 +52,7 @@ class TradeCashRepository extends BaseMysqliRepository implements TradeCashRepos
     {
         return $this->execute(
             "INSERT INTO ibl_trade_cash
-                (`tradeOfferID`, `sendingTeam`, `receivingTeam`, `salary_yr1`, `salary_yr2`, `salary_yr3`, `salary_yr4`, `salary_yr5`, `salary_yr6`)
+                (`trade_offer_id`, `sending_team`, `receiving_team`, `salary_yr1`, `salary_yr2`, `salary_yr3`, `salary_yr4`, `salary_yr5`, `salary_yr6`)
              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
             "issiiiiii",
             $tradeOfferId,
@@ -91,14 +91,14 @@ class TradeCashRepository extends BaseMysqliRepository implements TradeCashRepos
 
         /** @var list<TradeCashRow> $rows */
         $rows = $this->fetchAll(
-            "SELECT * FROM ibl_trade_cash WHERE tradeOfferID IN ({$placeholders})",
+            "SELECT * FROM ibl_trade_cash WHERE trade_offer_id IN ({$placeholders})",
             $types,
             ...$offerIds
         );
 
         $result = [];
         foreach ($rows as $row) {
-            $key = $row['tradeOfferID'] . ':' . $row['sendingTeam'];
+            $key = $row['trade_offer_id'] . ':' . $row['sending_team'];
             $result[$key] = $row;
         }
 
@@ -111,7 +111,7 @@ class TradeCashRepository extends BaseMysqliRepository implements TradeCashRepos
     public function deleteTradeCashByOfferId(int $offerId): int
     {
         return $this->execute(
-            "DELETE FROM ibl_trade_cash WHERE tradeOfferID = ?",
+            "DELETE FROM ibl_trade_cash WHERE trade_offer_id = ?",
             "i",
             $offerId
         );

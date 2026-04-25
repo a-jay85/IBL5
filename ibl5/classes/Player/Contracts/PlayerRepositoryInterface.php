@@ -15,7 +15,7 @@ use Player\PlayerData;
  * @phpstan-import-type PlayerRow from \Services\CommonMysqliRepository
  *
  * @phpstan-type HistoricalPlayerRow array{pid: ?int, year: ?int, name: ?string, team: ?string, teamid: ?int, salary: ?int, r_2ga: ?int, r_2gp: ?int, r_fta: ?int, r_ftp: ?int, r_3ga: ?int, r_3gp: ?int, r_orb: ?int, r_drb: ?int, r_ast: ?int, r_stl: ?int, r_blk: ?int, r_tvr: ?int, r_oo: ?int, r_od: ?int, r_drive_off: ?int, r_dd: ?int, r_po: ?int, r_pd: ?int, r_trans_off: ?int, r_td: ?int, ...}
- * @phpstan-type AwardRow array{year: int, name: string, Award: string}
+ * @phpstan-type AwardRow array{year: int, name: string, award: string}
  * @phpstan-type PlayerNewsRow array{sid: int, title: string, time: string}
  * @phpstan-type OneOnOneWinRow array{gameid: int, winner: string, loser: string, winscore: int, lossscore: int, loser_pid: ?int}
  * @phpstan-type OneOnOneLossRow array{gameid: int, winner: string, loser: string, winscore: int, lossscore: int, winner_pid: ?int}
@@ -88,7 +88,7 @@ interface PlayerRepositoryInterface
     /**
      * Get All-Star Game appearances count for a player
      * 
-     * Counts awards where Award contains 'Conference All-Star'.
+     * Counts awards where awardcontains 'Conference All-Star'.
      * 
      * @param string $playerName Player name (exact match)
      * @return int Number of All-Star Game appearances
@@ -98,7 +98,7 @@ interface PlayerRepositoryInterface
     /**
      * Get Three-Point Contest appearances count for a player
      * 
-     * Counts awards where Award starts with 'Three-Point Contest'.
+     * Counts awards where awardstarts with 'Three-Point Contest'.
      * 
      * @param string $playerName Player name (exact match)
      * @return int Number of Three-Point Contest appearances
@@ -108,7 +108,7 @@ interface PlayerRepositoryInterface
     /**
      * Get Slam Dunk Competition appearances count for a player
      * 
-     * Counts awards where Award starts with 'Slam Dunk Competition'.
+     * Counts awards where awardstarts with 'Slam Dunk Competition'.
      * 
      * @param string $playerName Player name (exact match)
      * @return int Number of Slam Dunk Competition appearances
@@ -118,7 +118,7 @@ interface PlayerRepositoryInterface
     /**
      * Get Rookie-Sophomore Challenge appearances count for a player
      * 
-     * Counts awards where Award is exactly 'Rookie-Sophomore Challenge'.
+     * Counts awards where awardis exactly 'Rookie-Sophomore Challenge'.
      * 
      * @param string $playerName Player name (exact match)
      * @return int Number of Rookie-Sophomore Challenge appearances

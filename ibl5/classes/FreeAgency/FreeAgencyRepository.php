@@ -153,7 +153,7 @@ class FreeAgencyRepository extends BaseMysqliRepository implements FreeAgencyRep
         /** @var array{pid: int}|null $row */
         $row = $this->fetchOne(
             "SELECT pid FROM ibl_fa_offers
-             WHERE teamid = ? AND MLE = 1 AND pid <> ?
+             WHERE teamid = ? AND mle = 1 AND pid <> ?
              LIMIT 1",
             "ii",
             $teamid,
@@ -171,7 +171,7 @@ class FreeAgencyRepository extends BaseMysqliRepository implements FreeAgencyRep
         /** @var array{pid: int}|null $row */
         $row = $this->fetchOne(
             "SELECT pid FROM ibl_fa_offers
-             WHERE teamid = ? AND LLE = 1 AND pid <> ?
+             WHERE teamid = ? AND lle = 1 AND pid <> ?
              LIMIT 1",
             "ii",
             $teamid,

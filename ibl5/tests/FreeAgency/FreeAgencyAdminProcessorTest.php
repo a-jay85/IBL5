@@ -581,8 +581,8 @@ class FreeAgencyAdminProcessorTest extends TestCase
             'offer5' => $offer5,
             'offer6' => $offer6,
             'bird' => $bird,
-            'MLE' => $mle,
-            'LLE' => $lle,
+            'mle' => $mle,
+            'lle' => $lle,
             'random' => $random,
             'perceivedvalue' => $perceivedvalue,
         ];

@@ -301,7 +301,7 @@ class TradingServiceTest extends TestCase
             ['tradeofferid' => 1, 'itemid' => 0, 'itemtype' => 'cash', 'trade_from' => 'Lakers', 'trade_to' => 'Celtics', 'approval' => 'Celtics', 'created_at' => '', 'updated_at' => ''],
         ]);
         $mockCashRepo->method('getCashTransactionsByOfferIds')->willReturn([
-            '1:Lakers' => ['tradeOfferID' => 1, 'sendingTeam' => 'Lakers', 'receivingTeam' => 'Celtics',
+            '1:Lakers' => ['trade_offer_id' => 1, 'sending_team' => 'Lakers', 'receiving_team' => 'Celtics',
                 'salary_yr1' => 100, 'salary_yr2' => 200, 'salary_yr3' => 150, 'salary_yr4' => null, 'salary_yr5' => null, 'salary_yr6' => null],
         ]);
         $mockFormRepo->method('getAllTeamsWithCity')->willReturn([]);
@@ -330,7 +330,7 @@ class TradingServiceTest extends TestCase
             ['tradeofferid' => 1, 'itemid' => 0, 'itemtype' => 'cash', 'trade_from' => 'Lakers', 'trade_to' => 'Celtics', 'approval' => 'Celtics', 'created_at' => '', 'updated_at' => ''],
         ]);
         $mockCashRepo->method('getCashTransactionsByOfferIds')->willReturn([
-            '1:Lakers' => ['tradeOfferID' => 1, 'sendingTeam' => 'Lakers', 'receivingTeam' => 'Celtics',
+            '1:Lakers' => ['trade_offer_id' => 1, 'sending_team' => 'Lakers', 'receiving_team' => 'Celtics',
                 'salary_yr1' => 0, 'salary_yr2' => 200, 'salary_yr3' => 0, 'salary_yr4' => 0, 'salary_yr5' => 300, 'salary_yr6' => 0],
         ]);
         $mockFormRepo->method('getAllTeamsWithCity')->willReturn([]);
@@ -358,7 +358,7 @@ class TradingServiceTest extends TestCase
             ['tradeofferid' => 1, 'itemid' => 0, 'itemtype' => 'cash', 'trade_from' => 'Lakers', 'trade_to' => 'Celtics', 'approval' => 'Celtics', 'created_at' => '', 'updated_at' => ''],
         ]);
         $mockCashRepo->method('getCashTransactionsByOfferIds')->willReturn([
-            '1:Lakers' => ['tradeOfferID' => 1, 'sendingTeam' => 'Lakers', 'receivingTeam' => 'Celtics',
+            '1:Lakers' => ['trade_offer_id' => 1, 'sending_team' => 'Lakers', 'receiving_team' => 'Celtics',
                 'salary_yr1' => 100, 'salary_yr2' => 200, 'salary_yr3' => 0, 'salary_yr4' => 150, 'salary_yr5' => null, 'salary_yr6' => null],
         ]);
         $mockFormRepo->method('getAllTeamsWithCity')->willReturn([]);
@@ -400,7 +400,7 @@ class TradingServiceTest extends TestCase
             ['tradeofferid' => 1, 'itemid' => 0, 'itemtype' => 'cash', 'trade_from' => 'Lakers', 'trade_to' => 'Celtics', 'approval' => 'Celtics', 'created_at' => '', 'updated_at' => ''],
         ]);
         $mockCashRepo->method('getCashTransactionsByOfferIds')->willReturn([
-            '1:Lakers' => ['tradeOfferID' => 1, 'sendingTeam' => 'Lakers', 'receivingTeam' => 'Celtics',
+            '1:Lakers' => ['trade_offer_id' => 1, 'sending_team' => 'Lakers', 'receiving_team' => 'Celtics',
                 'salary_yr1' => 0, 'salary_yr2' => 0, 'salary_yr3' => 0, 'salary_yr4' => 0, 'salary_yr5' => 0, 'salary_yr6' => 0],
         ]);
         $mockFormRepo->method('getAllTeamsWithCity')->willReturn([]);
@@ -449,7 +449,7 @@ class TradingServiceTest extends TestCase
             ['tradeofferid' => 1, 'itemid' => 0, 'itemtype' => 'cash', 'trade_from' => 'Lakers', 'trade_to' => 'Celtics', 'approval' => 'Celtics', 'created_at' => '', 'updated_at' => ''],
         ]);
         $mockCashRepo->method('getCashTransactionsByOfferIds')->willReturn([
-            '1:Lakers' => ['tradeOfferID' => 1, 'sendingTeam' => 'Lakers', 'receivingTeam' => 'Celtics',
+            '1:Lakers' => ['trade_offer_id' => 1, 'sending_team' => 'Lakers', 'receiving_team' => 'Celtics',
                 'salary_yr1' => 500, 'salary_yr2' => null, 'salary_yr3' => null, 'salary_yr4' => null, 'salary_yr5' => null, 'salary_yr6' => null],
         ]);
         $mockFormRepo->method('getAllTeamsWithCity')->willReturn([]);
@@ -547,7 +547,7 @@ class TradingServiceTest extends TestCase
             ['teamid' => 2, 'team_name' => 'Celtics', 'team_city' => 'Boston', 'color1' => '007A33', 'color2' => 'FFFFFF'],
         ]);
         $mockCashRepo->method('getCashTransactionsByOfferIds')->willReturn([
-            '1:Lakers' => ['tradeOfferID' => 1, 'sendingTeam' => 'Lakers', 'receivingTeam' => 'Celtics',
+            '1:Lakers' => ['trade_offer_id' => 1, 'sending_team' => 'Lakers', 'receiving_team' => 'Celtics',
                 'salary_yr1' => 300, 'salary_yr2' => null, 'salary_yr3' => null, 'salary_yr4' => null, 'salary_yr5' => null, 'salary_yr6' => null],
         ]);
 

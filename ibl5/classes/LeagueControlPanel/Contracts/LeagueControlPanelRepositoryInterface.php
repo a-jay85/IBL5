@@ -152,7 +152,7 @@ interface LeagueControlPanelRepositoryInterface
     /**
      * Upsert an award row into ibl_awards.
      *
-     * Uses INSERT ... ON DUPLICATE KEY UPDATE on (year, Award, name).
+     * Uses INSERT ... ON DUPLICATE KEY UPDATE on (year, award, name).
      *
      * @param int $year Season ending year
      * @param string $award Award name (e.g., "Most Valuable Player (1st)")

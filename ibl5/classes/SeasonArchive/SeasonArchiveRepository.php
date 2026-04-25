@@ -62,7 +62,7 @@ class SeasonArchiveRepository extends BaseMysqliRepository implements SeasonArch
     {
         /** @var list<AwardRow> */
         return $this->fetchAll(
-            "SELECT year, Award, name, table_ID FROM ibl_awards WHERE year = ? ORDER BY Award ASC, table_ID ASC",
+            "SELECT year, award, name, table_id FROM ibl_awards WHERE year = ? ORDER BY award ASC, table_id ASC",
             "i",
             $year
         );
@@ -103,13 +103,13 @@ class SeasonArchiveRepository extends BaseMysqliRepository implements SeasonArch
      */
     private static function buildTeamAwardsByYearQuery(): string
     {
-        return "SELECT year, name, Award, ID
+        return "SELECT year, name, award, id
             FROM ibl_team_awards
             WHERE year = ?
 
             UNION ALL
 
-            SELECT ranked.year, ranked.name, 'IBL Champions' AS Award, 0 AS ID
+            SELECT ranked.year, ranked.name, 'IBL Champions' AS award, 0 AS id
             FROM (
                 SELECT
                     psr.year,
@@ -124,7 +124,7 @@ class SeasonArchiveRepository extends BaseMysqliRepository implements SeasonArch
 
             UNION ALL
 
-            SELECT hc.year, ti.team_name AS name, 'IBL HEAT Champions' AS Award, 0 AS ID
+            SELECT hc.year, ti.team_name AS name, 'IBL HEAT Champions' AS award, 0 AS id
             FROM (
                 SELECT
                     YEAR(bst.Date) AS year,
@@ -146,7 +146,7 @@ class SeasonArchiveRepository extends BaseMysqliRepository implements SeasonArch
             JOIN ibl_team_info ti ON ti.teamid = hc.winner_tid
             WHERE hc.rn = 1
 
-            ORDER BY " . self::AWARD_HIERARCHY_CASE . ", Award ASC, name ASC";
+            ORDER BY " . self::AWARD_HIERARCHY_CASE . ", award ASC, name ASC";
     }
 
     /**
@@ -157,7 +157,7 @@ class SeasonArchiveRepository extends BaseMysqliRepository implements SeasonArch
      * IBL Champions → IBL HEAT Champions → Conference Champions (alpha) →
      * Division Champions (alpha) → IBL Draft Lottery Winners → everything else.
      */
-    private const AWARD_HIERARCHY_CASE = "CASE Award
+    private const AWARD_HIERARCHY_CASE = "CASE award
                 WHEN 'IBL Champions' THEN 1
                 WHEN 'IBL HEAT Champions' THEN 2
                 WHEN 'Eastern Conference Champions' THEN 3
@@ -177,7 +177,7 @@ class SeasonArchiveRepository extends BaseMysqliRepository implements SeasonArch
     {
         /** @var list<GmAwardWithTeamRow> */
         return $this->fetchAll(
-            "SELECT ga.year, ga.Award, ga.name AS gm_display_name, ti.team_name, ga.table_ID
+            "SELECT ga.year, ga.award, ga.name AS gm_display_name, ti.team_name, ga.table_id
             FROM ibl_gm_awards ga
             JOIN ibl_gm_tenures gt ON ga.name = gt.gm_display_name
                 AND ga.year >= gt.start_season_year

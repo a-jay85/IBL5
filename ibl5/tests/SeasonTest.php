@@ -81,7 +81,7 @@ class SeasonTest extends \PHPUnit\Framework\TestCase
                                 }
                                 if (str_contains($this->query, 'ibl_sim_dates')) {
                                     return [
-                                        'Sim' => 10,
+                                        'sim' => 10,
                                         'start_date' => '2025-01-01',
                                         'end_date' => '2025-01-07'
                                     ];

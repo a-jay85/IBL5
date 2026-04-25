@@ -200,7 +200,7 @@ class PlayerStatsRepositoryTest extends DatabaseTestCase
 
         self::assertIsArray($dates);
         if ($dates !== []) {
-            self::assertArrayHasKey('Sim', $dates[0]);
+            self::assertArrayHasKey('sim', $dates[0]);
         }
     }
 

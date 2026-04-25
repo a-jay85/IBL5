@@ -22,7 +22,7 @@ class AwardsViewTest extends TestCase
             ['id' => 1, 'franchise_id' => 1, 'gm_display_name' => 'JohnGM', 'start_season_year' => 2020, 'end_season_year' => null, 'is_mid_season_start' => 0, 'is_mid_season_end' => 0],
         ];
         $awards = [
-            ['year' => 2022, 'Award' => 'GM of the Year', 'name' => 'JohnGM', 'table_ID' => 1],
+            ['year' => 2022, 'award' => 'GM of the Year', 'name' => 'JohnGM', 'table_id' => 1],
         ];
 
         $html = $this->view->renderGmHistory($tenures, $awards);
@@ -54,8 +54,8 @@ class AwardsViewTest extends TestCase
     public function testTeamAccomplishmentsRendersList(): void
     {
         $awards = [
-            ['year' => 2020, 'Award' => 'Best Record'],
-            ['year' => 2019, 'Award' => 'Division Champions'],
+            ['year' => 2020, 'award' => 'Best Record'],
+            ['year' => 2019, 'award' => 'Division Champions'],
         ];
 
         $html = $this->view->renderTeamAccomplishments($awards);
@@ -75,7 +75,7 @@ class AwardsViewTest extends TestCase
     public function testEscapesHtmlInAwardNames(): void
     {
         $awards = [
-            ['year' => 2020, 'Award' => '<b>Hacked</b>'],
+            ['year' => 2020, 'award' => '<b>Hacked</b>'],
         ];
 
         $html = $this->view->renderTeamAccomplishments($awards);

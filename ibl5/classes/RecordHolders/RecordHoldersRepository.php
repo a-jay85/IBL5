@@ -148,7 +148,7 @@ class RecordHoldersRepository extends \BaseMysqliRepository implements RecordHol
         $query = "SELECT a.name, h.pid, COUNT(*) AS appearances
             FROM ibl_awards a
             LEFT JOIN (SELECT DISTINCT pid, name FROM ibl_hist) h ON h.name = a.name
-            WHERE a.Award LIKE '%Conference All-Star'
+            WHERE a.award LIKE '%Conference All-Star'
             GROUP BY a.name, h.pid
             ORDER BY appearances DESC, a.name ASC
             LIMIT 5";
@@ -872,12 +872,12 @@ class RecordHoldersRepository extends \BaseMysqliRepository implements RecordHol
                 COUNT(*) AS count,
                 GROUP_CONCAT(year ORDER BY year ASC SEPARATOR ', ') AS years
             FROM (
-                SELECT year, name, Award
+                SELECT year, name, award
                 FROM ibl_team_awards
 
                 UNION ALL
 
-                SELECT ranked.year, ranked.name, 'IBL Champions' AS Award
+                SELECT ranked.year, ranked.name, 'IBL Champions' AS award
                 FROM (
                     SELECT
                         psr.year,
@@ -891,7 +891,7 @@ class RecordHoldersRepository extends \BaseMysqliRepository implements RecordHol
 
                 UNION ALL
 
-                SELECT hc.year, ti.team_name AS name, 'IBL HEAT Champions' AS Award
+                SELECT hc.year, ti.team_name AS name, 'IBL HEAT Champions' AS award
                 FROM (
                     SELECT
                         YEAR(bst.Date) AS year,
@@ -913,7 +913,7 @@ class RecordHoldersRepository extends \BaseMysqliRepository implements RecordHol
                 JOIN ibl_team_info ti ON ti.teamid = hc.winner_tid
                 WHERE hc.rn = 1
             ) all_awards
-            WHERE Award LIKE ?
+            WHERE award LIKE ?
             GROUP BY name
             ORDER BY count DESC, name ASC
             LIMIT 5";
@@ -961,7 +961,7 @@ class RecordHoldersRepository extends \BaseMysqliRepository implements RecordHol
         // Get the latest sim's date range from ibl_sim_dates
         /** @var array{start_date: string, end_date: string}|null $latestSim */
         $latestSim = $this->fetchOne(
-            "SELECT start_date, end_date FROM ibl_sim_dates ORDER BY Sim DESC LIMIT 1"
+            "SELECT start_date, end_date FROM ibl_sim_dates ORDER BY sim DESC LIMIT 1"
         );
 
         if ($latestSim === null) {

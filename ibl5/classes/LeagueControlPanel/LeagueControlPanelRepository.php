@@ -144,10 +144,10 @@ class LeagueControlPanelRepository extends \BaseMysqliRepository implements Leag
     {
         $this->transactional(function (): void {
             $this->execute(
-                "UPDATE ibl_votes_ASG SET East_F1 = NULL, East_F2 = NULL, East_F3 = NULL, East_F4 = NULL,
-                    West_F1 = NULL, West_F2 = NULL, West_F3 = NULL, West_F4 = NULL,
-                    East_B1 = NULL, East_B2 = NULL, East_B3 = NULL, East_B4 = NULL,
-                    West_B1 = NULL, West_B2 = NULL, West_B3 = NULL, West_B4 = NULL"
+                "UPDATE ibl_votes_ASG SET east_f1 = NULL, east_f2 = NULL, east_f3 = NULL, east_f4 = NULL,
+                    west_f1 = NULL, west_f2 = NULL, west_f3 = NULL, west_f4 = NULL,
+                    east_b1 = NULL, east_b2 = NULL, east_b3 = NULL, east_b4 = NULL,
+                    west_b1 = NULL, west_b2 = NULL, west_b3 = NULL, west_b4 = NULL"
             );
 
             $this->execute(
@@ -169,10 +169,10 @@ class LeagueControlPanelRepository extends \BaseMysqliRepository implements Leag
     {
         $this->transactional(function (): void {
             $this->execute(
-                "UPDATE ibl_votes_EOY SET MVP_1 = NULL, MVP_2 = NULL, MVP_3 = NULL,
-                    Six_1 = NULL, Six_2 = NULL, Six_3 = NULL,
-                    ROY_1 = NULL, ROY_2 = NULL, ROY_3 = NULL,
-                    GM_1 = NULL, GM_2 = NULL, GM_3 = NULL"
+                "UPDATE ibl_votes_EOY SET mvp_1 = NULL, mvp_2 = NULL, mvp_3 = NULL,
+                    six_1 = NULL, six_2 = NULL, six_3 = NULL,
+                    roy_1 = NULL, roy_2 = NULL, roy_3 = NULL,
+                    gm_1 = NULL, gm_2 = NULL, gm_3 = NULL"
             );
 
             $this->execute(
@@ -288,7 +288,7 @@ class LeagueControlPanelRepository extends \BaseMysqliRepository implements Leag
     public function upsertAward(int $year, string $award, string $name): int
     {
         return $this->execute(
-            "INSERT INTO ibl_awards (year, Award, name)
+            "INSERT INTO ibl_awards (year, award, name)
             VALUES (?, ?, ?)
             ON DUPLICATE KEY UPDATE name = VALUES(name)",
             'iss',
@@ -304,7 +304,7 @@ class LeagueControlPanelRepository extends \BaseMysqliRepository implements Leag
     public function upsertGmAward(int $year, string $name): int
     {
         return $this->execute(
-            "INSERT INTO ibl_gm_awards (year, Award, name)
+            "INSERT INTO ibl_gm_awards (year, award, name)
             VALUES (?, 'GM of the Year', ?)
             ON DUPLICATE KEY UPDATE name = VALUES(name)",
             'is',
@@ -328,7 +328,7 @@ class LeagueControlPanelRepository extends \BaseMysqliRepository implements Leag
     public function hasFinalsMvp(int $year): bool
     {
         $row = $this->fetchOne(
-            "SELECT table_ID FROM ibl_awards WHERE year = ? AND Award = 'IBL Finals MVP' LIMIT 1",
+            "SELECT table_id FROM ibl_awards WHERE year = ? AND award = 'IBL Finals MVP' LIMIT 1",
             'i',
             $year
         );

@@ -321,13 +321,13 @@ class TeamRepository extends \BaseMysqliRepository implements TeamRepositoryInte
      */
     private static function buildTeamAccomplishmentsQuery(): string
     {
-        return "SELECT year, name, Award, ID
+        return "SELECT year, name, award, id
             FROM ibl_team_awards
             WHERE name = ?
 
             UNION ALL
 
-            SELECT ranked.year, ranked.name, 'IBL Champions' AS Award, 0 AS ID
+            SELECT ranked.year, ranked.name, 'IBL Champions' AS award, 0 AS id
             FROM (
                 SELECT
                     psr.year,
@@ -343,7 +343,7 @@ class TeamRepository extends \BaseMysqliRepository implements TeamRepositoryInte
 
             UNION ALL
 
-            SELECT hc.year, ti.team_name AS name, 'IBL HEAT Champions' AS Award, 0 AS ID
+            SELECT hc.year, ti.team_name AS name, 'IBL HEAT Champions' AS award, 0 AS id
             FROM (
                 SELECT
                     YEAR(bst.Date) AS year,
@@ -365,7 +365,7 @@ class TeamRepository extends \BaseMysqliRepository implements TeamRepositoryInte
             JOIN ibl_team_info ti ON ti.teamid = hc.winner_tid
             WHERE hc.rn = 1 AND ti.team_name = ?
 
-            ORDER BY year DESC, " . self::AWARD_HIERARCHY_CASE . ", Award ASC";
+            ORDER BY year DESC, " . self::AWARD_HIERARCHY_CASE . ", award ASC";
     }
 
     /**
@@ -376,7 +376,7 @@ class TeamRepository extends \BaseMysqliRepository implements TeamRepositoryInte
      * IBL Champions → IBL HEAT Champions → Conference Champions (alpha) →
      * Division Champions (alpha) → IBL Draft Lottery Winners → everything else.
      */
-    private const AWARD_HIERARCHY_CASE = "CASE Award
+    private const AWARD_HIERARCHY_CASE = "CASE award
                 WHEN 'IBL Champions' THEN 1
                 WHEN 'IBL HEAT Champions' THEN 2
                 WHEN 'Eastern Conference Champions' THEN 3

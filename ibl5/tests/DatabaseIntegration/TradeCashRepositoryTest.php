@@ -29,9 +29,9 @@ class TradeCashRepositoryTest extends DatabaseTestCase
 
         $row = $this->repo->getCashTransactionByOffer($offerId, 'Metros');
         self::assertNotNull($row);
-        self::assertSame($offerId, $row['tradeOfferID']);
-        self::assertSame('Metros', $row['sendingTeam']);
-        self::assertSame('Sharks', $row['receivingTeam']);
+        self::assertSame($offerId, $row['trade_offer_id']);
+        self::assertSame('Metros', $row['sending_team']);
+        self::assertSame('Sharks', $row['receiving_team']);
         self::assertSame(500, $row['salary_yr1']);
         self::assertSame(600, $row['salary_yr2']);
         self::assertSame(0, $row['salary_yr3']);

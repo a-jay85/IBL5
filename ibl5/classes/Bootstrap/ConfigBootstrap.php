@@ -119,7 +119,7 @@ class ConfigBootstrap implements BootstrapStepInterface
         $GLOBALS['startdate'] = filter($row['startdate'], "nohtml");
         $GLOBALS['adminmail'] = filter($row['adminmail'], "nohtml");
         $GLOBALS['anonpost'] = intval($row['anonpost']);
-        $GLOBALS['Default_Theme'] = filter($row['Default_Theme'], "nohtml");
+        $GLOBALS['Default_Theme'] = filter($row['default_theme'], "nohtml");
         $GLOBALS['foot1'] = filter($row['foot1']);
         $GLOBALS['foot2'] = filter($row['foot2']);
         $GLOBALS['foot3'] = filter($row['foot3']);
@@ -149,10 +149,10 @@ class ConfigBootstrap implements BootstrapStepInterface
         $GLOBALS['notify_from'] = filter($row['notify_from'], "nohtml");
         $GLOBALS['moderate'] = intval($row['moderate']);
         $GLOBALS['admingraphic'] = intval($row['admingraphic']);
-        $GLOBALS['CensorMode'] = intval($row['CensorMode']);
-        $GLOBALS['CensorReplace'] = filter($row['CensorReplace'], "nohtml");
+        $GLOBALS['CensorMode'] = intval($row['censor_mode']);
+        $GLOBALS['CensorReplace'] = filter($row['censor_replace'], "nohtml");
         $GLOBALS['copyright'] = filter($row['copyright']);
-        $GLOBALS['Version_Num'] = floatval($row['Version_Num']);
+        $GLOBALS['Version_Num'] = floatval($row['version_num']);
         $nukeurl = $GLOBALS['nukeurl'];
         $GLOBALS['domain'] = is_string($nukeurl) ? str_replace("http://", "", $nukeurl) : '';
         $GLOBALS['display_errors'] = filter($row['display_errors']);

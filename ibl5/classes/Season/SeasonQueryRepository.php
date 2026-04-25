@@ -122,16 +122,16 @@ class SeasonQueryRepository extends \BaseMysqliRepository implements SeasonQuery
      *
      * Returns the most recent simulation date range from ibl_sim_dates.
      *
-     * @return array{Sim: int, start_date: string, end_date: string}
+     * @return array{sim: int, start_date: string, end_date: string}
      */
     public function getLastSimDatesArray(): array
     {
-        /** @var array{Sim: int, start_date: string, end_date: string}|null $result */
+        /** @var array{sim: int, start_date: string, end_date: string}|null $result */
         $result = $this->fetchOne(
-            "SELECT Sim, start_date, end_date FROM ibl_sim_dates ORDER BY Sim DESC LIMIT 1"
+            "SELECT sim, start_date, end_date FROM ibl_sim_dates ORDER BY sim DESC LIMIT 1"
         );
 
-        return $result ?? ['Sim' => 0, 'start_date' => '', 'end_date' => ''];
+        return $result ?? ['sim' => 0, 'start_date' => '', 'end_date' => ''];
     }
 
     /**
@@ -147,7 +147,7 @@ class SeasonQueryRepository extends \BaseMysqliRepository implements SeasonQuery
     public function setLastSimDatesArray(string $newSimNumber, string $newSimStartDate, string $newSimEndDate): int
     {
         return $this->execute(
-            "INSERT INTO ibl_sim_dates (Sim, start_date, end_date) VALUES (?, ?, ?)",
+            "INSERT INTO ibl_sim_dates (sim, start_date, end_date) VALUES (?, ?, ?)",
             "sss",
             $newSimNumber,
             $newSimStartDate,
@@ -266,7 +266,7 @@ class SeasonQueryRepository extends \BaseMysqliRepository implements SeasonQuery
 
         /** @var array{cnt: int}|null $result */
         $result = $this->fetchOne(
-            "SELECT COUNT(*) AS cnt FROM ibl_sim_dates WHERE end_date BETWEEN ? AND ? AND Sim <= ?",
+            "SELECT COUNT(*) AS cnt FROM ibl_sim_dates WHERE end_date BETWEEN ? AND ? AND sim <= ?",
             "ssi",
             $phaseStartDate,
             $phaseEndDate,

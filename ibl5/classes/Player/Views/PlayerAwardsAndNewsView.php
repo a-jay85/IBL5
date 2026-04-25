@@ -48,10 +48,10 @@ class PlayerAwardsAndNewsView implements PlayerAwardsAndNewsViewInterface
         <td class="player-table-header">AWARDS</td>
     </tr>
         <?php
-        /** @var list<array{year: int, name: string, Award: string, prim: int}> $awards */
+        /** @var list<array{year: int, name: string, award: string, prim: int}> $awards */
         foreach ($awards as $award) {
             $year = HtmlSanitizer::safeHtmlOutput((string) $award['year']);
-            $type = HtmlSanitizer::safeHtmlOutput($award['Award']);
+            $type = HtmlSanitizer::safeHtmlOutput($award['award']);
             ?>
     <tr>
         <td><?= $year ?> <?= $type ?></td>

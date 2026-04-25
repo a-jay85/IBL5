@@ -94,14 +94,14 @@ class PlayerRepositoryTest extends DatabaseTestCase
     {
         $this->insertRow('ibl_awards', [
             'year' => 2025,
-            'Award' => 'MVP',
+            'award' => 'MVP',
             'name' => 'PLR AwardTest',
         ]);
 
         $awards = $this->repo->getAwards('PLR AwardTest');
 
         self::assertCount(1, $awards);
-        self::assertSame('MVP', $awards[0]['Award']);
+        self::assertSame('MVP', $awards[0]['award']);
         self::assertSame('PLR AwardTest', $awards[0]['name']);
     }
 
@@ -200,7 +200,7 @@ class PlayerRepositoryTest extends DatabaseTestCase
 
         self::assertIsArray($dates);
         if ($dates !== []) {
-            self::assertArrayHasKey('Sim', $dates[0]);
+            self::assertArrayHasKey('sim', $dates[0]);
         }
     }
 

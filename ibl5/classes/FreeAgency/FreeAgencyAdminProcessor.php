@@ -74,8 +74,8 @@ class FreeAgencyAdminProcessor implements FreeAgencyAdminProcessorInterface
             $offer6 = $row['offer6'];
 
             $birdYears = $row['bird'];
-            $mle = $row['MLE'];
-            $lle = $row['LLE'];
+            $mle = $row['mle'];
+            $lle = $row['lle'];
             $random = $row['random'];
 
             // Calculate offer years and total

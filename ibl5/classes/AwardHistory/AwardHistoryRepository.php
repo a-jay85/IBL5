@@ -25,7 +25,7 @@ class AwardHistoryRepository extends BaseMysqliRepository implements AwardHistor
      */
     private const SORT_COLUMN_MAP = [
         1 => 'a.name',
-        2 => 'a.Award',
+        2 => 'a.award',
         3 => 'a.year',
     ];
 
@@ -48,7 +48,7 @@ class AwardHistoryRepository extends BaseMysqliRepository implements AwardHistor
         $where = new \Services\QueryConditions();
         $where->addIfNotNull('a.year = ?', 'i', $params['year']);
         if ($params['award'] !== null) {
-            $where->add('a.Award LIKE ?', 's', '%' . $params['award'] . '%');
+            $where->add('a.award LIKE ?', 's', '%' . $params['award'] . '%');
         }
         if ($params['name'] !== null) {
             $where->add('a.name LIKE ?', 's', '%' . $params['name'] . '%');
@@ -56,9 +56,9 @@ class AwardHistoryRepository extends BaseMysqliRepository implements AwardHistor
 
         $sortColumn = self::SORT_COLUMN_MAP[$params['sortby']] ?? 'year';
         $whereClause = $where->toWhereClause();
-        $query = "SELECT a.year, a.Award, a.name, a.table_ID, p.pid FROM ibl_awards a LEFT JOIN ibl_plr p ON a.name = p.name WHERE $whereClause ORDER BY $sortColumn ASC";
+        $query = "SELECT a.year, a.award, a.name, a.table_id, p.pid FROM ibl_awards a LEFT JOIN ibl_plr p ON a.name = p.name WHERE $whereClause ORDER BY $sortColumn ASC";
 
-        /** @var array<int, array{year: int, Award: string, name: string, table_ID: int}> $results */
+        /** @var array<int, array{year: int, award: string, name: string, table_id: int}> $results */
         $results = $this->fetchAll($query, $where->getTypes(), ...$where->getParams());
 
         return [

@@ -23,10 +23,10 @@ interface VotingResultsServiceInterface
      * @return list<VoteTable> Array of category results
      *
      * **Categories Returned:**
-     * 1. Eastern Conference Frontcourt (columns: East_F1-F4)
-     * 2. Eastern Conference Backcourt (columns: East_B1-B4)
-     * 3. Western Conference Frontcourt (columns: West_F1-F4)
-     * 4. Western Conference Backcourt (columns: West_B1-B4)
+     * 1. Eastern Conference Frontcourt (columns: east_f1-f4)
+     * 2. Eastern Conference Backcourt (columns: east_b1-b4)
+     * 3. Western Conference Frontcourt (columns: west_f1-f4)
+     * 4. Western Conference Backcourt (columns: west_b1-b4)
      *
      * **Behaviors:**
      * - Each ballot column counts as 1 vote
@@ -45,10 +45,10 @@ interface VotingResultsServiceInterface
      * @return list<VoteTable> Array of category results
      *
      * **Categories Returned:**
-     * 1. Most Valuable Player (columns: MVP_1, MVP_2, MVP_3)
-     * 2. Sixth Man of the Year (columns: Six_1, Six_2, Six_3)
-     * 3. Rookie of the Year (columns: ROY_1, ROY_2, ROY_3)
-     * 4. GM of the Year (columns: GM_1, GM_2, GM_3)
+     * 1. Most Valuable Player (columns: mvp_1, mvp_2, mvp_3)
+     * 2. Sixth Man of the Year (columns: six_1, six_2, six_3)
+     * 3. Rookie of the Year (columns: roy_1, roy_2, roy_3)
+     * 4. GM of the Year (columns: gm_1, gm_2, gm_3)
      *
      * **Scoring:**
      * - First place (_1): 3 points

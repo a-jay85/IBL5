@@ -96,13 +96,13 @@ class TradeCashRepositoryTest extends TestCase
     {
         $repository = new TradeCashRepository($this->mockMysqliDb);
         $this->mockDb->setMockData([
-            ['tradeOfferID' => 5, 'sendingTeam' => 'Boston', 'receivingTeam' => 'Denver', 'salary_yr1' => 50, 'salary_yr2' => 75, 'salary_yr3' => 0, 'salary_yr4' => 0, 'salary_yr5' => 0, 'salary_yr6' => 0],
+            ['trade_offer_id' => 5, 'sending_team' => 'Boston', 'receiving_team' => 'Denver', 'salary_yr1' => 50, 'salary_yr2' => 75, 'salary_yr3' => 0, 'salary_yr4' => 0, 'salary_yr5' => 0, 'salary_yr6' => 0],
         ]);
 
         $result = $repository->getCashTransactionByOffer(5, 'Boston');
 
         $this->assertIsArray($result);
-        $this->assertSame(5, $result['tradeOfferID']);
+        $this->assertSame(5, $result['trade_offer_id']);
     }
 
     public function testGetCashTransactionByOfferReturnsNullWhenNotFound(): void

@@ -24,8 +24,8 @@ class LeagueScheduleRepositoryTest extends DatabaseTestCase
 
         $found = $this->findBySchedId($results, $schedId);
         self::assertNotNull($found);
-        self::assertSame(1, $found['Visitor']);
-        self::assertSame(2, $found['Home']);
+        self::assertSame(1, $found['visitor_teamid']);
+        self::assertSame(2, $found['home_teamid']);
     }
 
     public function testGameWithBoxScoreHasNonZeroGameOfThatDay(): void

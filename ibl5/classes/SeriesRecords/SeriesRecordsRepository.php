@@ -51,7 +51,7 @@ class SeriesRecordsRepository extends \BaseMysqliRepository implements SeriesRec
     public function getMaxTeamId(): int
     {
         /** @var array{max_visitor: int|null}|null $result */
-        $result = $this->fetchOne("SELECT MAX(Visitor) as max_visitor FROM ibl_schedule");
+        $result = $this->fetchOne("SELECT MAX(visitor_teamid) as max_visitor FROM ibl_schedule");
         if ($result === null || $result['max_visitor'] === null) {
             return 0;
         }

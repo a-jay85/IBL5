@@ -273,8 +273,8 @@ class TestDataFactory
             'modifier' => 1.0,
             'random' => 0.0,
             'perceivedvalue' => 550.0,
-            'MLE' => 0,
-            'LLE' => 0,
+            'mle' => 0,
+            'lle' => 0,
             'offer_type' => 0,
         ];
 

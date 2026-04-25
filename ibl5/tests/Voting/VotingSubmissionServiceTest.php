@@ -37,9 +37,9 @@ final class VotingSubmissionServiceTest extends TestCase
     public static function eoyPlayerSelfVoteFieldProvider(): array
     {
         return [
-            'MVP_1' => ['MVP_1'], 'MVP_2' => ['MVP_2'], 'MVP_3' => ['MVP_3'],
-            'Six_1' => ['Six_1'], 'Six_2' => ['Six_2'], 'Six_3' => ['Six_3'],
-            'ROY_1' => ['ROY_1'], 'ROY_2' => ['ROY_2'], 'ROY_3' => ['ROY_3'],
+            'mvp_1' => ['mvp_1'], 'mvp_2' => ['mvp_2'], 'mvp_3' => ['mvp_3'],
+            'six_1' => ['six_1'], 'six_2' => ['six_2'], 'six_3' => ['six_3'],
+            'roy_1' => ['roy_1'], 'roy_2' => ['roy_2'], 'roy_3' => ['roy_3'],
         ];
     }
 
@@ -62,7 +62,7 @@ final class VotingSubmissionServiceTest extends TestCase
     public static function eoyGmSelfVoteFieldProvider(): array
     {
         return [
-            'GM_1' => ['GM_1'], 'GM_2' => ['GM_2'], 'GM_3' => ['GM_3'],
+            'gm_1' => ['gm_1'], 'gm_2' => ['gm_2'], 'gm_3' => ['gm_3'],
         ];
     }
 
@@ -71,7 +71,7 @@ final class VotingSubmissionServiceTest extends TestCase
     public function testEoyRejectsEmptyMvp(): void
     {
         $ballot = self::validEoyBallot();
-        $ballot['MVP_1'] = '';
+        $ballot['mvp_1'] = '';
 
         $service = new VotingSubmissionService($this->createStub(VotingRepositoryInterface::class));
         $result = $service->submitEoyVote('Other Team', $ballot);
@@ -83,7 +83,7 @@ final class VotingSubmissionServiceTest extends TestCase
     public function testEoyRejectsEmptySixthMan(): void
     {
         $ballot = self::validEoyBallot();
-        $ballot['Six_2'] = '';
+        $ballot['six_2'] = '';
 
         $service = new VotingSubmissionService($this->createStub(VotingRepositoryInterface::class));
         $result = $service->submitEoyVote('Other Team', $ballot);
@@ -95,7 +95,7 @@ final class VotingSubmissionServiceTest extends TestCase
     public function testEoyRejectsEmptyRoy(): void
     {
         $ballot = self::validEoyBallot();
-        $ballot['ROY_3'] = '';
+        $ballot['roy_3'] = '';
 
         $service = new VotingSubmissionService($this->createStub(VotingRepositoryInterface::class));
         $result = $service->submitEoyVote('Other Team', $ballot);
@@ -107,7 +107,7 @@ final class VotingSubmissionServiceTest extends TestCase
     public function testEoyRejectsEmptyGm(): void
     {
         $ballot = self::validEoyBallot();
-        $ballot['GM_1'] = '';
+        $ballot['gm_1'] = '';
 
         $service = new VotingSubmissionService($this->createStub(VotingRepositoryInterface::class));
         $result = $service->submitEoyVote('Other Team', $ballot);
@@ -121,8 +121,8 @@ final class VotingSubmissionServiceTest extends TestCase
     public function testEoyRejectsDuplicateMvp(): void
     {
         $ballot = self::validEoyBallot();
-        $ballot['MVP_1'] = 'Same Player, Knicks';
-        $ballot['MVP_2'] = 'Same Player, Knicks';
+        $ballot['mvp_1'] = 'Same Player, Knicks';
+        $ballot['mvp_2'] = 'Same Player, Knicks';
 
         $service = new VotingSubmissionService($this->createStub(VotingRepositoryInterface::class));
         $result = $service->submitEoyVote('Other Team', $ballot);
@@ -134,8 +134,8 @@ final class VotingSubmissionServiceTest extends TestCase
     public function testEoyRejectsDuplicateSixthMan(): void
     {
         $ballot = self::validEoyBallot();
-        $ballot['Six_1'] = 'Same Bench, Hawks';
-        $ballot['Six_3'] = 'Same Bench, Hawks';
+        $ballot['six_1'] = 'Same Bench, Hawks';
+        $ballot['six_3'] = 'Same Bench, Hawks';
 
         $service = new VotingSubmissionService($this->createStub(VotingRepositoryInterface::class));
         $result = $service->submitEoyVote('Other Team', $ballot);
@@ -147,8 +147,8 @@ final class VotingSubmissionServiceTest extends TestCase
     public function testEoyRejectsDuplicateRoy(): void
     {
         $ballot = self::validEoyBallot();
-        $ballot['ROY_2'] = 'Same Rookie, Nets';
-        $ballot['ROY_3'] = 'Same Rookie, Nets';
+        $ballot['roy_2'] = 'Same Rookie, Nets';
+        $ballot['roy_3'] = 'Same Rookie, Nets';
 
         $service = new VotingSubmissionService($this->createStub(VotingRepositoryInterface::class));
         $result = $service->submitEoyVote('Other Team', $ballot);
@@ -160,8 +160,8 @@ final class VotingSubmissionServiceTest extends TestCase
     public function testEoyRejectsDuplicateGm(): void
     {
         $ballot = self::validEoyBallot();
-        $ballot['GM_1'] = 'Same GM, Celtics';
-        $ballot['GM_2'] = 'Same GM, Celtics';
+        $ballot['gm_1'] = 'Same GM, Celtics';
+        $ballot['gm_2'] = 'Same GM, Celtics';
 
         $service = new VotingSubmissionService($this->createStub(VotingRepositoryInterface::class));
         $result = $service->submitEoyVote('Other Team', $ballot);
@@ -175,10 +175,10 @@ final class VotingSubmissionServiceTest extends TestCase
     public function testEoyCollectsMultipleErrors(): void
     {
         $ballot = self::validEoyBallot();
-        $ballot['MVP_1'] = '';  // empty
-        $ballot['Six_1'] = ''; // empty
-        $ballot['ROY_1'] = 'Same Rookie, Nets';
-        $ballot['ROY_2'] = 'Same Rookie, Nets'; // duplicate
+        $ballot['mvp_1'] = '';  // empty
+        $ballot['six_1'] = ''; // empty
+        $ballot['roy_1'] = 'Same Rookie, Nets';
+        $ballot['roy_2'] = 'Same Rookie, Nets'; // duplicate
 
         $service = new VotingSubmissionService($this->createStub(VotingRepositoryInterface::class));
         $result = $service->submitEoyVote('Other Team', $ballot);
@@ -236,7 +236,7 @@ final class VotingSubmissionServiceTest extends TestCase
     public function testEoyErrorsPreventsRepositorySave(): void
     {
         $ballot = self::validEoyBallot();
-        $ballot['MVP_1'] = ''; // invalid
+        $ballot['mvp_1'] = ''; // invalid
 
         $repo = $this->createMock(VotingRepositoryInterface::class);
         $repo->expects($this->never())->method('saveEoyVote');
@@ -251,7 +251,7 @@ final class VotingSubmissionServiceTest extends TestCase
     public function testAsgRejectsSelfVote(): void
     {
         $ballot = self::validAsgBallot();
-        $ballot['East_F1'] = 'Star Player, My Team';
+        $ballot['east_f1'] = 'Star Player, My Team';
 
         $service = new VotingSubmissionService($this->createStub(VotingRepositoryInterface::class));
         $result = $service->submitAsgVote('My Team', $ballot, self::validAsgRawPost());
@@ -265,7 +265,7 @@ final class VotingSubmissionServiceTest extends TestCase
     public function testAsgRejectsMissingVoteInCategory(): void
     {
         $ballot = self::validAsgBallot();
-        $ballot['West_F3'] = '';
+        $ballot['west_f3'] = '';
 
         $service = new VotingSubmissionService($this->createStub(VotingRepositoryInterface::class));
         $result = $service->submitAsgVote('Other Team', $ballot, self::validAsgRawPost());
@@ -296,8 +296,8 @@ final class VotingSubmissionServiceTest extends TestCase
     public function testAsgCollectsMultipleErrors(): void
     {
         $ballot = self::validAsgBallot();
-        $ballot['East_F1'] = 'Star, My Team'; // self-vote
-        $ballot['West_B2'] = '';              // missing
+        $ballot['east_f1'] = 'Star, My Team'; // self-vote
+        $ballot['west_b2'] = '';              // missing
 
         $service = new VotingSubmissionService($this->createStub(VotingRepositoryInterface::class));
         $result = $service->submitAsgVote('My Team', $ballot, self::validAsgRawPost());
@@ -325,7 +325,7 @@ final class VotingSubmissionServiceTest extends TestCase
     public function testAsgErrorsPreventsRepositorySave(): void
     {
         $ballot = self::validAsgBallot();
-        $ballot['East_F1'] = ''; // invalid
+        $ballot['east_f1'] = ''; // invalid
 
         $repo = $this->createMock(VotingRepositoryInterface::class);
         $repo->expects($this->never())->method('saveAsgVote');
@@ -358,40 +358,40 @@ final class VotingSubmissionServiceTest extends TestCase
     // ==================== Fixtures ====================
 
     /**
-     * @return array{MVP_1: string, MVP_2: string, MVP_3: string, Six_1: string, Six_2: string, Six_3: string, ROY_1: string, ROY_2: string, ROY_3: string, GM_1: string, GM_2: string, GM_3: string}
+     * @return array{mvp_1: string, mvp_2: string, mvp_3: string, six_1: string, six_2: string, six_3: string, roy_1: string, roy_2: string, roy_3: string, gm_1: string, gm_2: string, gm_3: string}
      */
     private static function validEoyBallot(): array
     {
         return [
-            'MVP_1' => 'Player A, Knicks',
-            'MVP_2' => 'Player B, Lakers',
-            'MVP_3' => 'Player C, Celtics',
-            'Six_1' => 'Player D, Hawks',
-            'Six_2' => 'Player E, Nets',
-            'Six_3' => 'Player F, Heat',
-            'ROY_1' => 'Player G, Spurs',
-            'ROY_2' => 'Player H, Bulls',
-            'ROY_3' => 'Player I, Jazz',
-            'GM_1' => 'GM Alpha, Suns',
-            'GM_2' => 'GM Beta, Sixers',
-            'GM_3' => 'GM Gamma, Bucks',
+            'mvp_1' => 'Player A, Knicks',
+            'mvp_2' => 'Player B, Lakers',
+            'mvp_3' => 'Player C, Celtics',
+            'six_1' => 'Player D, Hawks',
+            'six_2' => 'Player E, Nets',
+            'six_3' => 'Player F, Heat',
+            'roy_1' => 'Player G, Spurs',
+            'roy_2' => 'Player H, Bulls',
+            'roy_3' => 'Player I, Jazz',
+            'gm_1' => 'GM Alpha, Suns',
+            'gm_2' => 'GM Beta, Sixers',
+            'gm_3' => 'GM Gamma, Bucks',
         ];
     }
 
     /**
-     * @return array{East_F1: string, East_F2: string, East_F3: string, East_F4: string, East_B1: string, East_B2: string, East_B3: string, East_B4: string, West_F1: string, West_F2: string, West_F3: string, West_F4: string, West_B1: string, West_B2: string, West_B3: string, West_B4: string}
+     * @return array{east_f1: string, east_f2: string, east_f3: string, east_f4: string, east_b1: string, east_b2: string, east_b3: string, east_b4: string, west_f1: string, west_f2: string, west_f3: string, west_f4: string, west_b1: string, west_b2: string, west_b3: string, west_b4: string}
      */
     private static function validAsgBallot(): array
     {
         return [
-            'East_F1' => 'EF1, Knicks', 'East_F2' => 'EF2, Hawks',
-            'East_F3' => 'EF3, Celtics', 'East_F4' => 'EF4, Nets',
-            'East_B1' => 'EB1, Heat', 'East_B2' => 'EB2, Bulls',
-            'East_B3' => 'EB3, Pacers', 'East_B4' => 'EB4, Cavs',
-            'West_F1' => 'WF1, Lakers', 'West_F2' => 'WF2, Suns',
-            'West_F3' => 'WF3, Nuggets', 'West_F4' => 'WF4, Clippers',
-            'West_B1' => 'WB1, Warriors', 'West_B2' => 'WB2, Grizzlies',
-            'West_B3' => 'WB3, Mavs', 'West_B4' => 'WB4, Thunder',
+            'east_f1' => 'EF1, Knicks', 'east_f2' => 'EF2, Hawks',
+            'east_f3' => 'EF3, Celtics', 'east_f4' => 'EF4, Nets',
+            'east_b1' => 'EB1, Heat', 'east_b2' => 'EB2, Bulls',
+            'east_b3' => 'EB3, Pacers', 'east_b4' => 'EB4, Cavs',
+            'west_f1' => 'WF1, Lakers', 'west_f2' => 'WF2, Suns',
+            'west_f3' => 'WF3, Nuggets', 'west_f4' => 'WF4, Clippers',
+            'west_b1' => 'WB1, Warriors', 'west_b2' => 'WB2, Grizzlies',
+            'west_b3' => 'WB3, Mavs', 'west_b4' => 'WB4, Thunder',
         ];
     }
 

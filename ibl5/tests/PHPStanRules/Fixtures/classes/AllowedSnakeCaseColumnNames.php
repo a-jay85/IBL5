@@ -15,3 +15,13 @@ $allowed7 = "SELECT `conf_wins`, `conf_losses`, `div_wins`, `div_losses` FROM ib
 $allowed8 = "SELECT `home_wins`, `home_losses`, `away_wins`, `away_losses` FROM ibl_standings";
 $allowed9 = "SELECT `conf_magic_number`, `div_magic_number` FROM ibl_standings";
 $allowed10 = "SELECT `clinched_conference`, `clinched_division`, `clinched_playoffs`, `clinched_league` FROM ibl_standings";
+
+// Post-migration-120 snake_case Tier 5 names: should not trigger the rule.
+$allowed11 = "SELECT `trade_offer_id`, `sending_team`, `receiving_team` FROM ibl_trade_cash";
+$allowed12 = "SELECT `award`, `table_id`, `id` FROM ibl_team_awards";
+$allowed13 = "SELECT `mle`, `lle` FROM ibl_fa_offers";
+$allowed14 = "SELECT `east_f1`, `east_b2`, `west_f3`, `west_b4` FROM ibl_votes_ASG";
+$allowed15 = "SELECT `mvp_1`, `roy_2`, `gm_3`, `six_1` FROM ibl_votes_EOY";
+$allowed16 = "SELECT `sim` FROM ibl_sim_dates";
+$allowed17 = "SELECT `censor_mode`, `censor_replace`, `default_theme`, `version_num` FROM nuke_config";
+$allowed18 = "SELECT `poll_id` FROM nuke_stories";

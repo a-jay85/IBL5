@@ -284,6 +284,216 @@ final class BanNonSnakeCaseColumnsRuleTest extends RuleTestCase
                     . 'Rename to `salary_yr6`; migration 119 renamed contract salary columns.',
                     56,
                 ],
+                [
+                    'Banned backtick-quoted column reference `tradeOfferID` in SQL string. '
+                    . 'Rename to `trade_offer_id`; migration 120 snake-cased trade cash columns.',
+                    57,
+                ],
+                [
+                    'Banned backtick-quoted column reference `sendingTeam` in SQL string. '
+                    . 'Rename to `sending_team`; migration 120 snake-cased trade cash columns.',
+                    58,
+                ],
+                [
+                    'Banned backtick-quoted column reference `receivingTeam` in SQL string. '
+                    . 'Rename to `receiving_team`; migration 120 snake-cased trade cash columns.',
+                    59,
+                ],
+                [
+                    'Banned backtick-quoted column reference `Award` in SQL string. '
+                    . 'Rename to `award`; migration 120 snake-cased awards columns.',
+                    60,
+                ],
+                [
+                    'Banned backtick-quoted column reference `table_ID` in SQL string. '
+                    . 'Rename to `table_id`; migration 120 snake-cased awards columns.',
+                    61,
+                ],
+                [
+                    'Banned backtick-quoted column reference `ID` in SQL string. '
+                    . 'Rename to `id`; migration 120 snake-cased ibl_team_awards.ID.',
+                    62,
+                ],
+                [
+                    'Banned backtick-quoted column reference `MLE` in SQL string. '
+                    . 'Rename to `mle`; migration 120 snake-cased FA offer flags.',
+                    63,
+                ],
+                [
+                    'Banned backtick-quoted column reference `LLE` in SQL string. '
+                    . 'Rename to `lle`; migration 120 snake-cased FA offer flags.',
+                    64,
+                ],
+                [
+                    'Banned backtick-quoted column reference `East_F1` in SQL string. '
+                    . 'Rename to `east_f1`; migration 120 snake-cased ASG ballot columns.',
+                    65,
+                ],
+                [
+                    'Banned backtick-quoted column reference `East_F2` in SQL string. '
+                    . 'Rename to `east_f2`; migration 120 snake-cased ASG ballot columns.',
+                    66,
+                ],
+                [
+                    'Banned backtick-quoted column reference `East_F3` in SQL string. '
+                    . 'Rename to `east_f3`; migration 120 snake-cased ASG ballot columns.',
+                    67,
+                ],
+                [
+                    'Banned backtick-quoted column reference `East_F4` in SQL string. '
+                    . 'Rename to `east_f4`; migration 120 snake-cased ASG ballot columns.',
+                    68,
+                ],
+                [
+                    'Banned backtick-quoted column reference `East_B1` in SQL string. '
+                    . 'Rename to `east_b1`; migration 120 snake-cased ASG ballot columns.',
+                    69,
+                ],
+                [
+                    'Banned backtick-quoted column reference `East_B2` in SQL string. '
+                    . 'Rename to `east_b2`; migration 120 snake-cased ASG ballot columns.',
+                    70,
+                ],
+                [
+                    'Banned backtick-quoted column reference `East_B3` in SQL string. '
+                    . 'Rename to `east_b3`; migration 120 snake-cased ASG ballot columns.',
+                    71,
+                ],
+                [
+                    'Banned backtick-quoted column reference `East_B4` in SQL string. '
+                    . 'Rename to `east_b4`; migration 120 snake-cased ASG ballot columns.',
+                    72,
+                ],
+                [
+                    'Banned backtick-quoted column reference `West_F1` in SQL string. '
+                    . 'Rename to `west_f1`; migration 120 snake-cased ASG ballot columns.',
+                    73,
+                ],
+                [
+                    'Banned backtick-quoted column reference `West_F2` in SQL string. '
+                    . 'Rename to `west_f2`; migration 120 snake-cased ASG ballot columns.',
+                    74,
+                ],
+                [
+                    'Banned backtick-quoted column reference `West_F3` in SQL string. '
+                    . 'Rename to `west_f3`; migration 120 snake-cased ASG ballot columns.',
+                    75,
+                ],
+                [
+                    'Banned backtick-quoted column reference `West_F4` in SQL string. '
+                    . 'Rename to `west_f4`; migration 120 snake-cased ASG ballot columns.',
+                    76,
+                ],
+                [
+                    'Banned backtick-quoted column reference `West_B1` in SQL string. '
+                    . 'Rename to `west_b1`; migration 120 snake-cased ASG ballot columns.',
+                    77,
+                ],
+                [
+                    'Banned backtick-quoted column reference `West_B2` in SQL string. '
+                    . 'Rename to `west_b2`; migration 120 snake-cased ASG ballot columns.',
+                    78,
+                ],
+                [
+                    'Banned backtick-quoted column reference `West_B3` in SQL string. '
+                    . 'Rename to `west_b3`; migration 120 snake-cased ASG ballot columns.',
+                    79,
+                ],
+                [
+                    'Banned backtick-quoted column reference `West_B4` in SQL string. '
+                    . 'Rename to `west_b4`; migration 120 snake-cased ASG ballot columns.',
+                    80,
+                ],
+                [
+                    'Banned backtick-quoted column reference `MVP_1` in SQL string. '
+                    . 'Rename to `mvp_1`; migration 120 snake-cased EOY ballot columns.',
+                    81,
+                ],
+                [
+                    'Banned backtick-quoted column reference `MVP_2` in SQL string. '
+                    . 'Rename to `mvp_2`; migration 120 snake-cased EOY ballot columns.',
+                    82,
+                ],
+                [
+                    'Banned backtick-quoted column reference `MVP_3` in SQL string. '
+                    . 'Rename to `mvp_3`; migration 120 snake-cased EOY ballot columns.',
+                    83,
+                ],
+                [
+                    'Banned backtick-quoted column reference `ROY_1` in SQL string. '
+                    . 'Rename to `roy_1`; migration 120 snake-cased EOY ballot columns.',
+                    84,
+                ],
+                [
+                    'Banned backtick-quoted column reference `ROY_2` in SQL string. '
+                    . 'Rename to `roy_2`; migration 120 snake-cased EOY ballot columns.',
+                    85,
+                ],
+                [
+                    'Banned backtick-quoted column reference `ROY_3` in SQL string. '
+                    . 'Rename to `roy_3`; migration 120 snake-cased EOY ballot columns.',
+                    86,
+                ],
+                [
+                    'Banned backtick-quoted column reference `GM_1` in SQL string. '
+                    . 'Rename to `gm_1`; migration 120 snake-cased EOY ballot columns.',
+                    87,
+                ],
+                [
+                    'Banned backtick-quoted column reference `GM_2` in SQL string. '
+                    . 'Rename to `gm_2`; migration 120 snake-cased EOY ballot columns.',
+                    88,
+                ],
+                [
+                    'Banned backtick-quoted column reference `GM_3` in SQL string. '
+                    . 'Rename to `gm_3`; migration 120 snake-cased EOY ballot columns.',
+                    89,
+                ],
+                [
+                    'Banned backtick-quoted column reference `Six_1` in SQL string. '
+                    . 'Rename to `six_1`; migration 120 snake-cased EOY ballot columns.',
+                    90,
+                ],
+                [
+                    'Banned backtick-quoted column reference `Six_2` in SQL string. '
+                    . 'Rename to `six_2`; migration 120 snake-cased EOY ballot columns.',
+                    91,
+                ],
+                [
+                    'Banned backtick-quoted column reference `Six_3` in SQL string. '
+                    . 'Rename to `six_3`; migration 120 snake-cased EOY ballot columns.',
+                    92,
+                ],
+                [
+                    'Banned backtick-quoted column reference `Sim` in SQL string. '
+                    . 'Rename to `sim`; migration 120 snake-cased ibl_sim_dates.Sim.',
+                    93,
+                ],
+                [
+                    'Banned backtick-quoted column reference `CensorMode` in SQL string. '
+                    . 'Rename to `censor_mode`; migration 120 snake-cased nuke_config columns.',
+                    94,
+                ],
+                [
+                    'Banned backtick-quoted column reference `CensorReplace` in SQL string. '
+                    . 'Rename to `censor_replace`; migration 120 snake-cased nuke_config columns.',
+                    95,
+                ],
+                [
+                    'Banned backtick-quoted column reference `Default_Theme` in SQL string. '
+                    . 'Rename to `default_theme`; migration 120 snake-cased nuke_config columns.',
+                    96,
+                ],
+                [
+                    'Banned backtick-quoted column reference `Version_Num` in SQL string. '
+                    . 'Rename to `version_num`; migration 120 snake-cased nuke_config columns.',
+                    97,
+                ],
+                [
+                    'Banned backtick-quoted column reference `pollID` in SQL string. '
+                    . 'Rename to `poll_id`; migration 120 snake-cased nuke_stories.pollID.',
+                    98,
+                ],
             ],
         );
     }

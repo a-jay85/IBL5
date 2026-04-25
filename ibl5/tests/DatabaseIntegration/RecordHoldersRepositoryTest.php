@@ -79,9 +79,9 @@ class RecordHoldersRepositoryTest extends DatabaseTestCase
     public function testGetMostAllStarAppearancesReturnsRows(): void
     {
         // Insert unique all-star awards
-        $this->insertRow('ibl_awards', ['year' => 2096, 'Award' => 'Eastern Conference All-Star', 'name' => 'AllStar Test']);
-        $this->insertRow('ibl_awards', ['year' => 2097, 'Award' => 'Eastern Conference All-Star', 'name' => 'AllStar Test']);
-        $this->insertRow('ibl_awards', ['year' => 2098, 'Award' => 'Eastern Conference All-Star', 'name' => 'AllStar Test']);
+        $this->insertRow('ibl_awards', ['year' => 2096, 'award' => 'Eastern Conference All-Star', 'name' => 'AllStar Test']);
+        $this->insertRow('ibl_awards', ['year' => 2097, 'award' => 'Eastern Conference All-Star', 'name' => 'AllStar Test']);
+        $this->insertRow('ibl_awards', ['year' => 2098, 'award' => 'Eastern Conference All-Star', 'name' => 'AllStar Test']);
 
         $result = $this->repo->getMostAllStarAppearances();
 
@@ -349,12 +349,12 @@ class RecordHoldersRepositoryTest extends DatabaseTestCase
         $this->insertRow('ibl_team_awards', [
             'year' => 2096,
             'name' => 'Metros',
-            'Award' => 'Test Title 2096',
+            'award' => 'Test Title 2096',
         ]);
         $this->insertRow('ibl_team_awards', [
             'year' => 2097,
             'name' => 'Metros',
-            'Award' => 'Test Title 2097',
+            'award' => 'Test Title 2097',
         ]);
 
         $result = $this->repo->getMostTitlesByType('Test Title');
@@ -398,7 +398,7 @@ class RecordHoldersRepositoryTest extends DatabaseTestCase
 
         // Insert sim date range
         $this->insertRow('ibl_sim_dates', [
-            'Sim' => 90001,
+            'sim' => 90001,
             'start_date' => '2098-01-10',
             'end_date' => '2098-01-20',
         ]);
@@ -418,7 +418,7 @@ class RecordHoldersRepositoryTest extends DatabaseTestCase
     public function testGetUnannouncedGameDatesRespectsLastAnnouncedDate(): void
     {
         $this->insertRow('ibl_sim_dates', [
-            'Sim' => 90002,
+            'sim' => 90002,
             'start_date' => '2098-02-10',
             'end_date' => '2098-02-20',
         ]);

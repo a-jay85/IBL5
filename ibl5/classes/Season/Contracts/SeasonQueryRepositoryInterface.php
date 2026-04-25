@@ -51,7 +51,7 @@ interface SeasonQueryRepositoryInterface
     /**
      * Get last sim dates array
      *
-     * @return array{Sim: int, start_date: string, end_date: string}
+     * @return array{sim: int, start_date: string, end_date: string}
      */
     public function getLastSimDatesArray(): array;
 

@@ -24,7 +24,7 @@ class AllStarAppearancesRepository extends \BaseMysqliRepository implements AllS
         $query = "SELECT a.name, h.pid, COUNT(*) as appearances
             FROM ibl_awards a
             LEFT JOIN (SELECT DISTINCT pid, name FROM ibl_hist) h ON h.name = a.name
-            WHERE a.Award LIKE '%Conference All-Star'
+            WHERE a.award LIKE '%Conference All-Star'
             GROUP BY a.name, h.pid
             ORDER BY appearances DESC, a.name ASC";
 

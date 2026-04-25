@@ -74,7 +74,7 @@ class SeasonQueryRepositoryTest extends DatabaseTestCase
     {
         $dates = $this->repo->getLastSimDatesArray();
 
-        self::assertArrayHasKey('Sim', $dates);
+        self::assertArrayHasKey('sim', $dates);
         self::assertArrayHasKey('start_date', $dates);
         self::assertArrayHasKey('end_date', $dates);
     }

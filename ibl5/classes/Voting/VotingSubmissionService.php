@@ -40,10 +40,10 @@ class VotingSubmissionService implements VotingSubmissionServiceInterface
 
     /** @var array<string, array{prefix: string, label: string}> ASG position code => field prefix + display label */
     private const ASG_POSITIONS = [
-        'ECF' => ['prefix' => 'East_F', 'label' => 'Eastern Frontcourt'],
-        'ECB' => ['prefix' => 'East_B', 'label' => 'Eastern Backcourt'],
-        'WCF' => ['prefix' => 'West_F', 'label' => 'Western Frontcourt'],
-        'WCB' => ['prefix' => 'West_B', 'label' => 'Western Backcourt'],
+        'ECF' => ['prefix' => 'east_f', 'label' => 'Eastern Frontcourt'],
+        'ECB' => ['prefix' => 'east_b', 'label' => 'Eastern Backcourt'],
+        'WCF' => ['prefix' => 'west_f', 'label' => 'Western Frontcourt'],
+        'WCB' => ['prefix' => 'west_b', 'label' => 'Western Backcourt'],
     ];
 
     public function __construct(
@@ -108,9 +108,9 @@ class VotingSubmissionService implements VotingSubmissionServiceInterface
     {
         // Player categories: MVP, Six, ROY
         $playerFields = [
-            'MVP_1', 'MVP_2', 'MVP_3',
-            'Six_1', 'Six_2', 'Six_3',
-            'ROY_1', 'ROY_2', 'ROY_3',
+            'mvp_1', 'mvp_2', 'mvp_3',
+            'six_1', 'six_2', 'six_3',
+            'roy_1', 'roy_2', 'roy_3',
         ];
         if ($teamName !== '') {
             foreach ($playerFields as $field) {
@@ -120,7 +120,7 @@ class VotingSubmissionService implements VotingSubmissionServiceInterface
             }
 
             // GM category
-            $gmFields = ['GM_1', 'GM_2', 'GM_3'];
+            $gmFields = ['gm_1', 'gm_2', 'gm_3'];
             foreach ($gmFields as $field) {
                 if (str_contains($ballot[$field], $teamName)) {
                     $errors[] = 'Sorry, you cannot vote for yourself. Try again.';
@@ -136,8 +136,9 @@ class VotingSubmissionService implements VotingSubmissionServiceInterface
     private function validateEoyEmptyFields(array $ballot, array &$errors): void
     {
         foreach (self::EOY_CATEGORIES as $code => $label) {
+            $prefix = strtolower($code);
             for ($i = 1; $i <= 3; $i++) {
-                $field = "{$code}_{$i}";
+                $field = "{$prefix}_{$i}";
                 if ($ballot[$field] === '') {
                     $errors[] = "Sorry, you must select {$label}. Try again.";
                 }
@@ -152,9 +153,10 @@ class VotingSubmissionService implements VotingSubmissionServiceInterface
     private function validateEoyDuplicates(array $ballot, array &$errors): void
     {
         foreach (self::EOY_DUPLICATE_LABELS as $code => $label) {
-            $v1 = $ballot["{$code}_1"];
-            $v2 = $ballot["{$code}_2"];
-            $v3 = $ballot["{$code}_3"];
+            $prefix = strtolower($code);
+            $v1 = $ballot["{$prefix}_1"];
+            $v2 = $ballot["{$prefix}_2"];
+            $v3 = $ballot["{$prefix}_3"];
 
             $hasDuplicate = ($v1 !== '' && $v2 !== '' && $v1 === $v2)
                 || ($v1 !== '' && $v3 !== '' && $v1 === $v3)
@@ -180,7 +182,7 @@ class VotingSubmissionService implements VotingSubmissionServiceInterface
 
         foreach (self::ASG_POSITIONS as $pos) {
             $prefix = $pos['prefix'];
-            $court = str_contains($prefix, 'F') ? 'Frontcourt' : 'Backcourt';
+            $court = str_contains($prefix, 'f') ? 'Frontcourt' : 'Backcourt';
             for ($i = 1; $i <= 4; $i++) {
                 $field = "{$prefix}{$i}";
                 if (str_contains($ballot[$field], $teamName)) {

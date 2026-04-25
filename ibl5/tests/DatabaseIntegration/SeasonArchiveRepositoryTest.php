@@ -32,7 +32,7 @@ class SeasonArchiveRepositoryTest extends DatabaseTestCase
         // Insert a test award to ensure we have data for a specific year
         $this->insertRow('ibl_awards', [
             'year' => 2098,
-            'Award' => 'Test Integration Award',
+            'award' => 'Test Integration Award',
             'name' => 'Test Winner',
         ]);
 
@@ -40,9 +40,9 @@ class SeasonArchiveRepositoryTest extends DatabaseTestCase
 
         self::assertNotEmpty($result);
         $first = $result[0];
-        self::assertArrayHasKey('Award', $first);
+        self::assertArrayHasKey('award', $first);
         self::assertArrayHasKey('name', $first);
-        self::assertSame('Test Integration Award', $first['Award']);
+        self::assertSame('Test Integration Award', $first['award']);
     }
 
     public function testGetAwardsByYearReturnsEmptyForUnknownYear(): void
@@ -146,7 +146,7 @@ class SeasonArchiveRepositoryTest extends DatabaseTestCase
         $this->insertRow('ibl_team_awards', [
             'year' => 2098,
             'name' => 'Test Team',
-            'Award' => 'Test Award 2098',
+            'award' => 'Test Award 2098',
         ]);
 
         $result = $this->repo->getTeamAwardsByYear(2098);
@@ -154,7 +154,7 @@ class SeasonArchiveRepositoryTest extends DatabaseTestCase
         self::assertNotEmpty($result);
         $first = $result[0];
         self::assertArrayHasKey('name', $first);
-        self::assertArrayHasKey('Award', $first);
+        self::assertArrayHasKey('award', $first);
     }
 
     public function testGetTeamAwardsByYearSortsHierarchically(): void
@@ -163,34 +163,34 @@ class SeasonArchiveRepositoryTest extends DatabaseTestCase
         $this->insertRow('ibl_team_awards', [
             'year' => 2097,
             'name' => 'Team A',
-            'Award' => 'IBL Draft Lottery Winners',
+            'award' => 'IBL Draft Lottery Winners',
         ]);
         $this->insertRow('ibl_team_awards', [
             'year' => 2097,
             'name' => 'Team B',
-            'Award' => 'Pacific Division Champions',
+            'award' => 'Pacific Division Champions',
         ]);
         $this->insertRow('ibl_team_awards', [
             'year' => 2097,
             'name' => 'Team C',
-            'Award' => 'Atlantic Division Champions',
+            'award' => 'Atlantic Division Champions',
         ]);
         $this->insertRow('ibl_team_awards', [
             'year' => 2097,
             'name' => 'Team D',
-            'Award' => 'Western Conference Champions',
+            'award' => 'Western Conference Champions',
         ]);
         $this->insertRow('ibl_team_awards', [
             'year' => 2097,
             'name' => 'Team E',
-            'Award' => 'Eastern Conference Champions',
+            'award' => 'Eastern Conference Champions',
         ]);
 
         $result = $this->repo->getTeamAwardsByYear(2097);
 
         $awards = [];
         foreach ($result as $row) {
-            $awards[] = $row['Award'];
+            $awards[] = $row['award'];
         }
 
         self::assertSame([
@@ -212,7 +212,7 @@ class SeasonArchiveRepositoryTest extends DatabaseTestCase
         self::assertArrayHasKey('gm_display_name', $first);
         self::assertArrayHasKey('team_name', $first);
         self::assertArrayHasKey('year', $first);
-        self::assertArrayHasKey('Award', $first);
+        self::assertArrayHasKey('award', $first);
     }
 
     public function testGetAllGmTenuresWithTeamsReturnsRows(): void

@@ -65,8 +65,8 @@ class PlayerSimStatsView implements PlayerSimStatsViewInterface
     </tr>
         <?php
         foreach ($simDates as $simDate) {
-            /** @var array{Sim: int, start_date: string, end_date: string} $simDate */
-            $simNumber = $simDate['Sim'];
+            /** @var array{sim: int, start_date: string, end_date: string} $simDate */
+            $simNumber = $simDate['sim'];
             $simStartDate = $simDate['start_date'];
             $simEndDate = $simDate['end_date'];
 

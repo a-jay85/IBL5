@@ -58,7 +58,7 @@ class StandingsUpdater extends \BaseMysqliRepository {
         }
 
         $this->execute(
-            "INSERT INTO ibl_team_awards (year, name, Award)
+            "INSERT INTO ibl_team_awards (year, name, award)
              VALUES (?, ?, ?)
              ON DUPLICATE KEY UPDATE name = VALUES(name)",
             "iss",

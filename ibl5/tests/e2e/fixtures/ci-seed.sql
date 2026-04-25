@@ -15,15 +15,15 @@
 
 INSERT INTO nuke_config (
   sitename, nukeurl, site_logo, slogan, startdate, adminmail,
-  anonpost, Default_Theme, overwrite_theme,
+  anonpost, default_theme, overwrite_theme,
   foot1, foot2, foot3,
   commentlimit, anonymous, minpass, pollcomm, articlecomm,
   broadcast_msg, my_headlines, top, storyhome, user_news, oldnum,
   ultramode, banners, backend_title, backend_language, language, locale,
   multilingual, useflags, notify, notify_email, notify_subject,
   notify_message, notify_from, moderate, admingraphic,
-  CensorMode, CensorReplace,
-  copyright, Version_Num, gfx_chk, nuke_editor, display_errors
+  censor_mode, censor_replace,
+  copyright, version_num, gfx_chk, nuke_editor, display_errors
 ) VALUES (
   'IBL5', 'http://localhost:8080/', '', 'Internet Basketball League', '2026-01-01',
   'admin@example.com',
@@ -55,7 +55,7 @@ INSERT INTO ibl_settings (name, value) VALUES
   ('Sim Length in Days',            '7')
 ON DUPLICATE KEY UPDATE value = VALUES(value);
 
-INSERT INTO ibl_sim_dates (Sim, start_date, end_date) VALUES
+INSERT INTO ibl_sim_dates (sim, start_date, end_date) VALUES
   (689, '2026-03-01', '2026-03-07');
 
 -- ============================================================
@@ -676,12 +676,12 @@ INSERT INTO ibl_rcb_alltime_records (scope, teamid, record_type, stat_category, 
   ('team', 1, 'single_season', 'apg', 2, 'Test Player Two', 2, 3.9474,  39,  1, 2026);
 
 -- ============================================================
--- Award History (ibl_awards — searched by AwardHistory module)
--- Award names must contain 'MVP' for test search, and player
+-- award History (ibl_awards — searched by AwardHistory module)
+-- award names must contain 'MVP' for test search, and player
 -- names must match ibl_plr.name for pid JOIN.
 -- ============================================================
 
-INSERT INTO ibl_awards (year, Award, name) VALUES
+INSERT INTO ibl_awards (year, award, name) VALUES
   (2026, 'Regular Season MVP',           'Test Player'),
   (2026, 'Defensive Player of the Year', 'Test Player Two'),
   (2025, 'Regular Season MVP',           'Test Player'),
@@ -1049,10 +1049,10 @@ UPDATE ibl_plr SET injured = 3 WHERE pid = 7;
 
 -- ============================================================
 -- All-Star appearance data (AllStarAppearances module)
--- Award must match '%Conference All-Star' pattern
+-- award must match '%Conference All-Star' pattern
 -- ============================================================
 
-INSERT INTO ibl_awards (year, Award, name) VALUES
+INSERT INTO ibl_awards (year, award, name) VALUES
   (2026, 'Eastern Conference All-Star', 'Test Player'),
   (2025, 'Eastern Conference All-Star', 'Test Player'),
   (2024, 'Eastern Conference All-Star', 'Test Player'),
@@ -1361,13 +1361,13 @@ INSERT IGNORE INTO nuke_stats_hour (year, month, date, hour, hits) VALUES
 -- ============================================================
 -- ASG table has no PK/UNIQUE — delete first for idempotency on re-runs
 DELETE FROM ibl_votes_ASG WHERE teamid IN (1, 2);
-INSERT INTO ibl_votes_ASG (teamid, team_city, team_name, East_F1, East_F2, East_B1, East_B2, West_F1, West_F2, West_B1, West_B2) VALUES
+INSERT INTO ibl_votes_ASG (teamid, team_city, team_name, east_f1, east_f2, east_b1, east_b2, west_f1, west_f2, west_b1, west_b2) VALUES
   (1, 'Test', 'Metros', 'Test Player, Metros', 'Test Player Two, Metros', 'Stars Guard, Stars', 'FA Guard, Metros',
    'FA Forward, Stars', 'FA Center, Stars', 'Test Player, Metros', 'Stars Guard, Stars'),
   (2, 'Test', 'Stars', 'Test Player, Metros', 'Stars Guard, Stars', 'Test Player Two, Metros', 'FA Guard, Metros',
    'FA Forward, Stars', 'Test Player, Metros', 'FA Center, Stars', 'Stars Guard, Stars');
 
-INSERT INTO ibl_votes_EOY (teamid, team_city, team_name, MVP_1, MVP_2, MVP_3, Six_1, Six_2, Six_3, ROY_1, ROY_2, ROY_3, GM_1, GM_2, GM_3) VALUES
+INSERT INTO ibl_votes_EOY (teamid, team_city, team_name, mvp_1, mvp_2, mvp_3, six_1, six_2, six_3, roy_1, roy_2, roy_3, gm_1, gm_2, gm_3) VALUES
   (1, 'Test', 'Metros', 'Test Player, Metros', 'Stars Guard, Stars', 'Test Player Two, Metros',
    'FA Guard, Metros', 'FA Forward, Stars', 'Test Player Two, Metros',
    'Rookie Guard, Diesels', 'Rookie Wing, Pioneers', 'Rookie Big, Blues',
@@ -1379,18 +1379,18 @@ INSERT INTO ibl_votes_EOY (teamid, team_city, team_name, MVP_1, MVP_2, MVP_3, Si
 ON DUPLICATE KEY UPDATE
   team_city = VALUES(team_city),
   team_name = VALUES(team_name),
-  MVP_1 = VALUES(MVP_1),
-  MVP_2 = VALUES(MVP_2),
-  MVP_3 = VALUES(MVP_3),
-  Six_1 = VALUES(Six_1),
-  Six_2 = VALUES(Six_2),
-  Six_3 = VALUES(Six_3),
-  ROY_1 = VALUES(ROY_1),
-  ROY_2 = VALUES(ROY_2),
-  ROY_3 = VALUES(ROY_3),
-  GM_1 = VALUES(GM_1),
-  GM_2 = VALUES(GM_2),
-  GM_3 = VALUES(GM_3);
+  mvp_1 = VALUES(mvp_1),
+  mvp_2 = VALUES(mvp_2),
+  mvp_3 = VALUES(mvp_3),
+  six_1 = VALUES(six_1),
+  six_2 = VALUES(six_2),
+  six_3 = VALUES(six_3),
+  roy_1 = VALUES(roy_1),
+  roy_2 = VALUES(roy_2),
+  roy_3 = VALUES(roy_3),
+  gm_1 = VALUES(gm_1),
+  gm_2 = VALUES(gm_2),
+  gm_3 = VALUES(gm_3);
 
 -- ============================================================
 -- Round 2 draft picks (ProjectedDraftOrder round separator tests)

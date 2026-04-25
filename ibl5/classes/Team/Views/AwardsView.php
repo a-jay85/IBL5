@@ -40,7 +40,7 @@ class AwardsView
     /**
      * Render team accomplishments.
      *
-     * @param list<array{year: int, Award: string}> $awards
+     * @param list<array{year: int, award: string}> $awards
      */
     public function renderTeamAccomplishments(array $awards): string
     {
@@ -84,7 +84,7 @@ class AwardsView
 
         foreach ($awards as $award) {
             $year = $award['year'];
-            $awardName = HtmlSanitizer::e($award['Award']);
+            $awardName = HtmlSanitizer::e($award['award']);
             $output .= "<li><span class=\"award-year\">$year</span> $awardName</li>";
         }
 
@@ -94,7 +94,7 @@ class AwardsView
     }
 
     /**
-     * @param list<array{year: int, Award: string}> $awards
+     * @param list<array{year: int, award: string}> $awards
      */
     private function renderAwardsList(array $awards): string
     {
@@ -106,7 +106,7 @@ class AwardsView
 
         foreach ($awards as $record) {
             $year = $record['year'];
-            $sanitizedAward = HtmlSanitizer::e($record['Award']);
+            $sanitizedAward = HtmlSanitizer::e($record['award']);
             $output .= "<li><span class=\"award-year\">$year</span> $sanitizedAward</li>";
         }
 

@@ -23,18 +23,18 @@ class VotingResultsService implements VotingResultsServiceInterface
 {
     /** @var array<string, list<string>> */
     private const ALL_STAR_CATEGORIES = [
-        'Eastern Conference Frontcourt' => ['East_F1', 'East_F2', 'East_F3', 'East_F4'],
-        'Eastern Conference Backcourt' => ['East_B1', 'East_B2', 'East_B3', 'East_B4'],
-        'Western Conference Frontcourt' => ['West_F1', 'West_F2', 'West_F3', 'West_F4'],
-        'Western Conference Backcourt' => ['West_B1', 'West_B2', 'West_B3', 'West_B4'],
+        'Eastern Conference Frontcourt' => ['east_f1', 'east_f2', 'east_f3', 'east_f4'],
+        'Eastern Conference Backcourt' => ['east_b1', 'east_b2', 'east_b3', 'east_b4'],
+        'Western Conference Frontcourt' => ['west_f1', 'west_f2', 'west_f3', 'west_f4'],
+        'Western Conference Backcourt' => ['west_b1', 'west_b2', 'west_b3', 'west_b4'],
     ];
 
     /** @var array<string, array<string, int>> */
     private const END_OF_YEAR_CATEGORIES = [
-        'Most Valuable Player' => ['MVP_1' => 3, 'MVP_2' => 2, 'MVP_3' => 1],
-        'Sixth Man of the Year' => ['Six_1' => 3, 'Six_2' => 2, 'Six_3' => 1],
-        'Rookie of the Year' => ['ROY_1' => 3, 'ROY_2' => 2, 'ROY_3' => 1],
-        'GM of the Year' => ['GM_1' => 3, 'GM_2' => 2, 'GM_3' => 1],
+        'Most Valuable Player' => ['mvp_1' => 3, 'mvp_2' => 2, 'mvp_3' => 1],
+        'Sixth Man of the Year' => ['six_1' => 3, 'six_2' => 2, 'six_3' => 1],
+        'Rookie of the Year' => ['roy_1' => 3, 'roy_2' => 2, 'roy_3' => 1],
+        'GM of the Year' => ['gm_1' => 3, 'gm_2' => 2, 'gm_3' => 1],
     ];
 
     private VotingRepositoryInterface $repository;

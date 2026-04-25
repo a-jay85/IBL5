@@ -256,7 +256,7 @@ class TeamRepositoryTest extends DatabaseTestCase
     {
         $this->insertRow('ibl_gm_awards', [
             'name' => 'b9_test_gm',
-            'Award' => 'GM of the Year',
+            'award' => 'GM of the Year',
             'year' => 2099,
         ]);
 
@@ -264,7 +264,7 @@ class TeamRepositoryTest extends DatabaseTestCase
 
         self::assertCount(1, $result);
         self::assertSame('b9_test_gm', $result[0]['name']);
-        self::assertSame('GM of the Year', $result[0]['Award']);
+        self::assertSame('GM of the Year', $result[0]['award']);
         self::assertSame(2099, $result[0]['year']);
     }
 
@@ -282,7 +282,7 @@ class TeamRepositoryTest extends DatabaseTestCase
         $result = $this->repo->getTeamAccomplishments('B9TestTeam');
 
         self::assertNotEmpty($result);
-        self::assertSame('Atlantic Division Title', $result[0]['Award']);
+        self::assertSame('Atlantic Division Title', $result[0]['award']);
     }
 
     public function testGetTeamAccomplishmentsReturnsEmptyForUnknownTeam(): void
@@ -304,7 +304,7 @@ class TeamRepositoryTest extends DatabaseTestCase
         $awards = [];
         foreach ($result as $row) {
             if ((int) $row['year'] === 2097) {
-                $awards[] = $row['Award'];
+                $awards[] = $row['award'];
             }
         }
 

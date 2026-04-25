@@ -309,7 +309,7 @@ class TradingService implements TradingServiceInterface
     /**
      * Resolve cash items from a pre-loaded cash map
      *
-     * @param array<string, TradeCashRow> $cashMap Keyed by "{offerId}:{sendingTeam}"
+     * @param array<string, TradeCashRow> $cashMap Keyed by "{offerId}:{sending_team}"
      * @return list<array{type: string, description: string, notes: string|null, from: string, to: string}>
      */
     private function resolveCashItemsFromMap(string $from, string $to, int $offerId, int $seasonEndingYear, array $cashMap): array

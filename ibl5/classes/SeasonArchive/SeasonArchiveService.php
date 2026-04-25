@@ -243,7 +243,7 @@ class SeasonArchiveService implements SeasonArchiveServiceInterface
     private function extractAward(array $awards, string $awardName): string
     {
         foreach ($awards as $award) {
-            if (trim($award['Award']) === $awardName) {
+            if (trim($award['award']) === $awardName) {
                 return trim($award['name']);
             }
         }
@@ -264,7 +264,7 @@ class SeasonArchiveService implements SeasonArchiveServiceInterface
     {
         $names = [];
         foreach ($awards as $award) {
-            if (trim($award['Award']) === $awardName) {
+            if (trim($award['award']) === $awardName) {
                 $names[] = trim($award['name']);
             }
         }
@@ -282,7 +282,7 @@ class SeasonArchiveService implements SeasonArchiveServiceInterface
     private function getGmOfTheYear(array $gmAwards, int $year): array
     {
         foreach ($gmAwards as $award) {
-            if ($award['Award'] === 'GM of the Year' && $award['year'] === $year) {
+            if ($award['award'] === 'GM of the Year' && $award['year'] === $year) {
                 return ['name' => $award['gm_display_name'], 'team' => $award['team_name']];
             }
         }
@@ -313,7 +313,7 @@ class SeasonArchiveService implements SeasonArchiveServiceInterface
                 continue;
             }
 
-            if ($award['Award'] !== 'ASG Head Coach' && $award['Award'] !== 'ASG Co-Head Coach') {
+            if ($award['award'] !== 'ASG Head Coach' && $award['award'] !== 'ASG Co-Head Coach') {
                 continue;
             }
 
@@ -368,7 +368,7 @@ class SeasonArchiveService implements SeasonArchiveServiceInterface
      * Parse team awards from raw HTML data
      *
      * The ibl_team_awards table has HTML-contaminated data:
-     * - Award field: "<B>Atlantic Division Champions</b>"
+     * - award field: "<B>Atlantic Division Champions</b>"
      * - Multiple awards may be concatenated with <BR>
      *
      * @param list<TeamAwardRow> $teamAwardRows Raw team award rows
@@ -379,7 +379,7 @@ class SeasonArchiveService implements SeasonArchiveServiceInterface
         $awards = [];
 
         foreach ($teamAwardRows as $row) {
-            $rawAward = $row['Award'];
+            $rawAward = $row['award'];
             $teamName = $row['name'];
 
             // Strip HTML tags and split by common delimiters
@@ -513,7 +513,7 @@ class SeasonArchiveService implements SeasonArchiveServiceInterface
     private function getHeatChampionFromTeamAwards(array $teamAwards): string
     {
         foreach ($teamAwards as $row) {
-            $cleanAward = strip_tags($row['Award']);
+            $cleanAward = strip_tags($row['award']);
             if (stripos($cleanAward, 'HEAT Champion') !== false) {
                 return $row['name'];
             }

@@ -43,24 +43,24 @@ $ecb = is_array($_POST['ECB'] ?? null) ? $_POST['ECB'] : [];
 $wcf = is_array($_POST['WCF'] ?? null) ? $_POST['WCF'] : [];
 $wcb = is_array($_POST['WCB'] ?? null) ? $_POST['WCB'] : [];
 
-/** @var array{East_F1: string, East_F2: string, East_F3: string, East_F4: string, East_B1: string, East_B2: string, East_B3: string, East_B4: string, West_F1: string, West_F2: string, West_F3: string, West_F4: string, West_B1: string, West_B2: string, West_B3: string, West_B4: string} $ballot */
+/** @var array{east_f1: string, east_f2: string, east_f3: string, east_f4: string, east_b1: string, east_b2: string, east_b3: string, east_b4: string, west_f1: string, west_f2: string, west_f3: string, west_f4: string, west_b1: string, west_b2: string, west_b3: string, west_b4: string} $ballot */
 $ballot = [
-    'East_F1' => is_string($ecf[0] ?? null) ? $ecf[0] : '',
-    'East_F2' => is_string($ecf[1] ?? null) ? $ecf[1] : '',
-    'East_F3' => is_string($ecf[2] ?? null) ? $ecf[2] : '',
-    'East_F4' => is_string($ecf[3] ?? null) ? $ecf[3] : '',
-    'East_B1' => is_string($ecb[0] ?? null) ? $ecb[0] : '',
-    'East_B2' => is_string($ecb[1] ?? null) ? $ecb[1] : '',
-    'East_B3' => is_string($ecb[2] ?? null) ? $ecb[2] : '',
-    'East_B4' => is_string($ecb[3] ?? null) ? $ecb[3] : '',
-    'West_F1' => is_string($wcf[0] ?? null) ? $wcf[0] : '',
-    'West_F2' => is_string($wcf[1] ?? null) ? $wcf[1] : '',
-    'West_F3' => is_string($wcf[2] ?? null) ? $wcf[2] : '',
-    'West_F4' => is_string($wcf[3] ?? null) ? $wcf[3] : '',
-    'West_B1' => is_string($wcb[0] ?? null) ? $wcb[0] : '',
-    'West_B2' => is_string($wcb[1] ?? null) ? $wcb[1] : '',
-    'West_B3' => is_string($wcb[2] ?? null) ? $wcb[2] : '',
-    'West_B4' => is_string($wcb[3] ?? null) ? $wcb[3] : '',
+    'east_f1' => is_string($ecf[0] ?? null) ? $ecf[0] : '',
+    'east_f2' => is_string($ecf[1] ?? null) ? $ecf[1] : '',
+    'east_f3' => is_string($ecf[2] ?? null) ? $ecf[2] : '',
+    'east_f4' => is_string($ecf[3] ?? null) ? $ecf[3] : '',
+    'east_b1' => is_string($ecb[0] ?? null) ? $ecb[0] : '',
+    'east_b2' => is_string($ecb[1] ?? null) ? $ecb[1] : '',
+    'east_b3' => is_string($ecb[2] ?? null) ? $ecb[2] : '',
+    'east_b4' => is_string($ecb[3] ?? null) ? $ecb[3] : '',
+    'west_f1' => is_string($wcf[0] ?? null) ? $wcf[0] : '',
+    'west_f2' => is_string($wcf[1] ?? null) ? $wcf[1] : '',
+    'west_f3' => is_string($wcf[2] ?? null) ? $wcf[2] : '',
+    'west_f4' => is_string($wcf[3] ?? null) ? $wcf[3] : '',
+    'west_b1' => is_string($wcb[0] ?? null) ? $wcb[0] : '',
+    'west_b2' => is_string($wcb[1] ?? null) ? $wcb[1] : '',
+    'west_b3' => is_string($wcb[2] ?? null) ? $wcb[2] : '',
+    'west_b4' => is_string($wcb[3] ?? null) ? $wcb[3] : '',
 ];
 
 // Raw post arrays for too-many-votes validation (count check)

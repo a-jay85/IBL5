@@ -10,10 +10,10 @@ namespace SeasonArchive\Contracts;
  * Defines methods for retrieving season archive data from the database,
  * including awards, playoff results, team awards, HEAT standings, and GM history.
  *
- * @phpstan-type AwardRow array{year: int, Award: string, name: string, table_ID: int}
+ * @phpstan-type AwardRow array{year: int, award: string, name: string, table_id: int}
  * @phpstan-type PlayoffRow array{year: int, round: int, winner: string, loser: string, winner_games: int, loser_games: int}
- * @phpstan-type TeamAwardRow array{year: int, name: string, Award: string, ID: int}
- * @phpstan-type GmAwardWithTeamRow array{year: int, Award: string, gm_display_name: string, team_name: string, table_ID: int}
+ * @phpstan-type TeamAwardRow array{year: int, name: string, award: string, id: int}
+ * @phpstan-type GmAwardWithTeamRow array{year: int, award: string, gm_display_name: string, team_name: string, table_id: int}
  * @phpstan-type GmTenureWithTeamRow array{gm_display_name: string, start_season_year: int, end_season_year: int|null, team_name: string}
  * @phpstan-type HeatWinLossRow array{year: int, currentname: string, namethatyear: string, wins: int, losses: int}
  * @phpstan-type TeamColorRow array{teamid: int, team_name: string, color1: string, color2: string}

@@ -109,12 +109,12 @@ class AwardHistoryView implements AwardHistoryViewInterface
     /**
      * @see AwardHistoryViewInterface::renderAwardRow()
      *
-     * @param array{year: int, Award: string, name: string, pid?: int} $award
+     * @param array{year: int, award: string, name: string, pid?: int} $award
      */
     public function renderAwardRow(array $award, int $rowIndex): string
     {
         $year = HtmlSanitizer::safeHtmlOutput((string)($award['year'] ?? ''));
-        $awardName = HtmlSanitizer::safeHtmlOutput($award['Award'] ?? '');
+        $awardName = HtmlSanitizer::safeHtmlOutput($award['award'] ?? '');
         $pid = (int)($award['pid'] ?? 0);
 
         if ($pid > 0) {

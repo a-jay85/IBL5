@@ -97,6 +97,64 @@ final class BanNonSnakeCaseColumnsRule implements Rule
         '`cy4`' => 'Rename to `salary_yr4`; migration 119 renamed contract salary columns.',
         '`cy5`' => 'Rename to `salary_yr5`; migration 119 renamed contract salary columns.',
         '`cy6`' => 'Rename to `salary_yr6`; migration 119 renamed contract salary columns.',
+
+        // Migration 120: Tier 5 misc snake_case cleanup (ADR-0010).
+        // Trade cash columns (ibl_trade_cash).
+        '`tradeOfferID`' => 'Rename to `trade_offer_id`; migration 120 snake-cased trade cash columns.',
+        '`sendingTeam`' => 'Rename to `sending_team`; migration 120 snake-cased trade cash columns.',
+        '`receivingTeam`' => 'Rename to `receiving_team`; migration 120 snake-cased trade cash columns.',
+
+        // Awards tables (ibl_awards, ibl_gm_awards, ibl_gm_history,
+        // ibl_team_awards, ibl_olympics_win_loss).
+        '`Award`' => 'Rename to `award`; migration 120 snake-cased awards columns.',
+        '`table_ID`' => 'Rename to `table_id`; migration 120 snake-cased awards columns.',
+        '`ID`' => 'Rename to `id`; migration 120 snake-cased ibl_team_awards.ID.',
+
+        // Free-agency offer flags (ibl_fa_offers).
+        '`MLE`' => 'Rename to `mle`; migration 120 snake-cased FA offer flags.',
+        '`LLE`' => 'Rename to `lle`; migration 120 snake-cased FA offer flags.',
+
+        // ASG ballot columns (ibl_votes_ASG).
+        '`East_F1`' => 'Rename to `east_f1`; migration 120 snake-cased ASG ballot columns.',
+        '`East_F2`' => 'Rename to `east_f2`; migration 120 snake-cased ASG ballot columns.',
+        '`East_F3`' => 'Rename to `east_f3`; migration 120 snake-cased ASG ballot columns.',
+        '`East_F4`' => 'Rename to `east_f4`; migration 120 snake-cased ASG ballot columns.',
+        '`East_B1`' => 'Rename to `east_b1`; migration 120 snake-cased ASG ballot columns.',
+        '`East_B2`' => 'Rename to `east_b2`; migration 120 snake-cased ASG ballot columns.',
+        '`East_B3`' => 'Rename to `east_b3`; migration 120 snake-cased ASG ballot columns.',
+        '`East_B4`' => 'Rename to `east_b4`; migration 120 snake-cased ASG ballot columns.',
+        '`West_F1`' => 'Rename to `west_f1`; migration 120 snake-cased ASG ballot columns.',
+        '`West_F2`' => 'Rename to `west_f2`; migration 120 snake-cased ASG ballot columns.',
+        '`West_F3`' => 'Rename to `west_f3`; migration 120 snake-cased ASG ballot columns.',
+        '`West_F4`' => 'Rename to `west_f4`; migration 120 snake-cased ASG ballot columns.',
+        '`West_B1`' => 'Rename to `west_b1`; migration 120 snake-cased ASG ballot columns.',
+        '`West_B2`' => 'Rename to `west_b2`; migration 120 snake-cased ASG ballot columns.',
+        '`West_B3`' => 'Rename to `west_b3`; migration 120 snake-cased ASG ballot columns.',
+        '`West_B4`' => 'Rename to `west_b4`; migration 120 snake-cased ASG ballot columns.',
+
+        // EOY ballot columns (ibl_votes_EOY).
+        '`MVP_1`' => 'Rename to `mvp_1`; migration 120 snake-cased EOY ballot columns.',
+        '`MVP_2`' => 'Rename to `mvp_2`; migration 120 snake-cased EOY ballot columns.',
+        '`MVP_3`' => 'Rename to `mvp_3`; migration 120 snake-cased EOY ballot columns.',
+        '`ROY_1`' => 'Rename to `roy_1`; migration 120 snake-cased EOY ballot columns.',
+        '`ROY_2`' => 'Rename to `roy_2`; migration 120 snake-cased EOY ballot columns.',
+        '`ROY_3`' => 'Rename to `roy_3`; migration 120 snake-cased EOY ballot columns.',
+        '`GM_1`' => 'Rename to `gm_1`; migration 120 snake-cased EOY ballot columns.',
+        '`GM_2`' => 'Rename to `gm_2`; migration 120 snake-cased EOY ballot columns.',
+        '`GM_3`' => 'Rename to `gm_3`; migration 120 snake-cased EOY ballot columns.',
+        '`Six_1`' => 'Rename to `six_1`; migration 120 snake-cased EOY ballot columns.',
+        '`Six_2`' => 'Rename to `six_2`; migration 120 snake-cased EOY ballot columns.',
+        '`Six_3`' => 'Rename to `six_3`; migration 120 snake-cased EOY ballot columns.',
+
+        // Sim sequence (ibl_sim_dates).
+        '`Sim`' => 'Rename to `sim`; migration 120 snake-cased ibl_sim_dates.Sim.',
+
+        // PHP-Nuke config + stories (nuke_config, nuke_stories).
+        '`CensorMode`' => 'Rename to `censor_mode`; migration 120 snake-cased nuke_config columns.',
+        '`CensorReplace`' => 'Rename to `censor_replace`; migration 120 snake-cased nuke_config columns.',
+        '`Default_Theme`' => 'Rename to `default_theme`; migration 120 snake-cased nuke_config columns.',
+        '`Version_Num`' => 'Rename to `version_num`; migration 120 snake-cased nuke_config columns.',
+        '`pollID`' => 'Rename to `poll_id`; migration 120 snake-cased nuke_stories.pollID.',
     ];
 
     public function getNodeType(): string

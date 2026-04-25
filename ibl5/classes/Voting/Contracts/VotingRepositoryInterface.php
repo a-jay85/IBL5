@@ -12,17 +12,17 @@ namespace Voting\Contracts;
  * @phpstan-import-type VoteRow from VotingResultsServiceInterface
  *
  * @phpstan-type EoyBallot array{
- *     MVP_1: string, MVP_2: string, MVP_3: string,
- *     Six_1: string, Six_2: string, Six_3: string,
- *     ROY_1: string, ROY_2: string, ROY_3: string,
- *     GM_1: string, GM_2: string, GM_3: string
+ *     mvp_1: string, mvp_2: string, mvp_3: string,
+ *     six_1: string, six_2: string, six_3: string,
+ *     roy_1: string, roy_2: string, roy_3: string,
+ *     gm_1: string, gm_2: string, gm_3: string
  * }
  *
  * @phpstan-type AsgBallot array{
- *     East_F1: string, East_F2: string, East_F3: string, East_F4: string,
- *     East_B1: string, East_B2: string, East_B3: string, East_B4: string,
- *     West_F1: string, West_F2: string, West_F3: string, West_F4: string,
- *     West_B1: string, West_B2: string, West_B3: string, West_B4: string
+ *     east_f1: string, east_f2: string, east_f3: string, east_f4: string,
+ *     east_b1: string, east_b2: string, east_b3: string, east_b4: string,
+ *     west_f1: string, west_f2: string, west_f3: string, west_f4: string,
+ *     west_b1: string, west_b2: string, west_b3: string, west_b4: string
  * }
  */
 interface VotingRepositoryInterface
@@ -71,7 +71,7 @@ interface VotingRepositoryInterface
      * Builds a UNION ALL across the given columns, groups by player name,
      * counts votes (unweighted), and resolves player IDs.
      *
-     * @param list<string> $columns Ballot column names (e.g., ['East_F1', 'East_F2', ...])
+     * @param list<string> $columns Ballot column names (e.g., ['east_f1', 'east_f2', ...])
      * @return list<VoteRow> Sorted by votes DESC, name ASC; blank entries labeled
      */
     public function fetchAllStarTotals(array $columns): array;
@@ -82,7 +82,7 @@ interface VotingRepositoryInterface
      * Builds a UNION ALL with per-column weights, groups by player name,
      * sums weighted scores, and resolves player IDs.
      *
-     * @param array<string, int> $columnsWithWeights Column name => point value (e.g., ['MVP_1' => 3, 'MVP_2' => 2, 'MVP_3' => 1])
+     * @param array<string, int> $columnsWithWeights Column name => point value (e.g., ['mvp_1' => 3, 'mvp_2' => 2, 'mvp_3' => 1])
      * @return list<VoteRow> Sorted by votes DESC, name ASC; blank entries labeled
      */
     public function fetchEndOfYearTotals(array $columnsWithWeights): array;

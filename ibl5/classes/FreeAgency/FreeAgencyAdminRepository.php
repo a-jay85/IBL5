@@ -148,7 +148,7 @@ class FreeAgencyAdminRepository extends BaseMysqliRepository implements FreeAgen
 
         return $this->execute(
             "INSERT INTO nuke_stories
-             (catid, aid, title, time, hometext, bodytext, comments, counter, topic, informant, notes, ihome, alanguage, acomm, haspoll, pollID, associated)
+             (catid, aid, title, time, hometext, bodytext, comments, counter, topic, informant, notes, ihome, alanguage, acomm, haspoll, poll_id, associated)
              VALUES (8, 'chibul', ?, ?, ?, ?, 0, 0, 29, 'chibul', '', 0, 'english', 0, 0, 0, '29-')",
             "ssss",
             $title,

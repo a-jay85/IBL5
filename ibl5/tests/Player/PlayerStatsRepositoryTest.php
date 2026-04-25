@@ -107,8 +107,8 @@ class PlayerStatsRepositoryTest extends TestCase
     public function testGetSimDatesReturnsArrayOfDates(): void
     {
         $testData = [
-            ['Sim' => 1, 'start_date' => '2024-10-01', 'end_date' => '2024-10-07'],
-            ['Sim' => 2, 'start_date' => '2024-10-08', 'end_date' => '2024-10-14'],
+            ['sim' => 1, 'start_date' => '2024-10-01', 'end_date' => '2024-10-07'],
+            ['sim' => 2, 'start_date' => '2024-10-08', 'end_date' => '2024-10-14'],
         ];
         
         $this->mockResult->method('fetch_assoc')

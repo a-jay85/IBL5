@@ -129,8 +129,8 @@ class TeamQueryRepositoryTest extends DatabaseTestCase
             'modifier' => 1.0,
             'random' => 0.5,
             'perceivedvalue' => 1000.0,
-            'MLE' => 0,
-            'LLE' => 0,
+            'mle' => 0,
+            'lle' => 0,
             'offer_type' => 0,
         ]);
 

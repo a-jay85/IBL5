@@ -230,48 +230,48 @@ VALUES
 ON DUPLICATE KEY UPDATE team_name = VALUES(team_name);
 
 -- ASG voting rows for Metros and Stars
-INSERT INTO ibl_votes_ASG (teamid, team_city, team_name, East_F1)
+INSERT INTO ibl_votes_ASG (teamid, team_city, team_name, east_f1)
 VALUES (1, 'New York', 'Metros', 'Some Player')
-ON DUPLICATE KEY UPDATE East_F1 = VALUES(East_F1);
+ON DUPLICATE KEY UPDATE east_f1 = VALUES(east_f1);
 
-INSERT INTO ibl_votes_ASG (teamid, team_city, team_name, West_F1)
+INSERT INTO ibl_votes_ASG (teamid, team_city, team_name, west_f1)
 VALUES (2, 'Los Angeles', 'Stars', 'Another Player')
-ON DUPLICATE KEY UPDATE West_F1 = VALUES(West_F1);
+ON DUPLICATE KEY UPDATE west_f1 = VALUES(west_f1);
 
 -- EOY voting rows for Metros and Stars
-INSERT INTO ibl_votes_EOY (teamid, team_city, team_name, MVP_1)
+INSERT INTO ibl_votes_EOY (teamid, team_city, team_name, mvp_1)
 VALUES (1, 'New York', 'Metros', 'Some Player')
-ON DUPLICATE KEY UPDATE MVP_1 = VALUES(MVP_1);
+ON DUPLICATE KEY UPDATE mvp_1 = VALUES(mvp_1);
 
-INSERT INTO ibl_votes_EOY (teamid, team_city, team_name, MVP_1)
+INSERT INTO ibl_votes_EOY (teamid, team_city, team_name, mvp_1)
 VALUES (2, 'Los Angeles', 'Stars', 'Another Player')
-ON DUPLICATE KEY UPDATE MVP_1 = VALUES(MVP_1);
+ON DUPLICATE KEY UPDATE mvp_1 = VALUES(mvp_1);
 
 -- Transaction history entries (nuke_stories with transaction categories)
-INSERT INTO nuke_stories (sid, catid, aid, title, time, hometext, comments, counter, topic, informant, ihome, acomm, haspoll, pollID, score, ratings)
+INSERT INTO nuke_stories (sid, catid, aid, title, time, hometext, comments, counter, topic, informant, ihome, acomm, haspoll, poll_id, score, ratings)
 VALUES (1, 1, 'admin', 'Metros sign Test Player One', '2024-03-15 12:00:00', 'Details...', 0, 0, 1, '', 0, 0, 0, 0, 0, 0)
 ON DUPLICATE KEY UPDATE title = VALUES(title);
 
-INSERT INTO nuke_stories (sid, catid, aid, title, time, hometext, comments, counter, topic, informant, ihome, acomm, haspoll, pollID, score, ratings)
+INSERT INTO nuke_stories (sid, catid, aid, title, time, hometext, comments, counter, topic, informant, ihome, acomm, haspoll, poll_id, score, ratings)
 VALUES (2, 2, 'admin', 'Stars trade for draft pick', '2023-07-10 14:30:00', 'Details...', 0, 0, 1, '', 0, 0, 0, 0, 0, 0)
 ON DUPLICATE KEY UPDATE title = VALUES(title);
 
 -- Awards: needed by SeasonArchive and RecordHolders
 -- Use a distinct name to avoid conflicting with PlayerRepositoryTest (which expects no awards for 'Test Player One')
-INSERT INTO ibl_awards (year, Award, name, table_ID)
+INSERT INTO ibl_awards (year, award, name, table_id)
 VALUES (2024, 'Eastern Conference All-Star', 'Seed Awards Player', 10001)
 ON DUPLICATE KEY UPDATE name = VALUES(name);
 
-INSERT INTO ibl_awards (year, Award, name, table_ID)
+INSERT INTO ibl_awards (year, award, name, table_id)
 VALUES (2024, 'MVP', 'Seed Awards Player', 10002)
 ON DUPLICATE KEY UPDATE name = VALUES(name);
 
-INSERT INTO ibl_awards (year, Award, name, table_ID)
+INSERT INTO ibl_awards (year, award, name, table_id)
 VALUES (2023, 'Eastern Conference All-Star', 'Seed Awards Player', 10003)
 ON DUPLICATE KEY UPDATE name = VALUES(name);
 
 -- GM Awards: needed by SeasonArchive getAllGmAwardsWithTeams()
-INSERT INTO ibl_gm_awards (year, Award, name, table_ID)
+INSERT INTO ibl_gm_awards (year, award, name, table_id)
 VALUES (2024, 'GM of the Year', 'testgm', 10001)
 ON DUPLICATE KEY UPDATE name = VALUES(name);
 
@@ -309,12 +309,12 @@ VALUES ('test_seed_key', 'test_value', 0)
 ON DUPLICATE KEY UPDATE `value` = VALUES(`value`);
 
 -- Sim dates: needed by RecordHolders getUnannouncedGameDates()
-INSERT INTO ibl_sim_dates (Sim, start_date, end_date)
+INSERT INTO ibl_sim_dates (sim, start_date, end_date)
 VALUES (1, '2025-01-10', '2025-01-20')
 ON DUPLICATE KEY UPDATE start_date = VALUES(start_date);
 
 -- Team awards: needed by vw_team_awards and SeasonArchive
-INSERT INTO ibl_team_awards (year, name, Award)
+INSERT INTO ibl_team_awards (year, name, award)
 VALUES (2024, 'Metros', 'Best Record')
 ON DUPLICATE KEY UPDATE name = VALUES(name);
 

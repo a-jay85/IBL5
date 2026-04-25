@@ -70,7 +70,7 @@ final class AwardHistoryServiceTest extends TestCase
     {
         $validatedParams = ['name' => 'Johnson', 'award' => 'MVP', 'year' => 2025, 'sortby' => 1];
         $expectedResults = [
-            ['year' => 2025, 'Award' => 'MVP', 'name' => 'Johnson'],
+            ['year' => 2025, 'award' => 'MVP', 'name' => 'Johnson'],
         ];
 
         $this->mockValidator->method('validateSearchParams')

@@ -55,7 +55,7 @@ interface AwardHistoryViewInterface
     /**
      * Render a single award row in the results table
      * 
-     * @param array{year: int, Award: string, name: string} $award Award data
+     * @param array{year: int, award: string, name: string} $award Award data
      * @param int $rowIndex Row index for alternating row colors (0-based)
      * @return string HTML table row
      * 

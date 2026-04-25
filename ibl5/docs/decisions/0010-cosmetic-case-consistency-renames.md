@@ -1,6 +1,6 @@
 ---
-description: Rationale for snake-casing PascalCase/camelCase player, depth-chart, team-info, standings, and contract-salary columns across the schema (Tiers 3-4 of the sql-column-naming audit), enforced by a PHPStan rule. Covers the five-PR roadmap.
-last_verified: 2026-04-24
+description: Rationale for snake-casing PascalCase/camelCase columns across the schema (Tiers 3-5 of the sql-column-naming audit), enforced by a PHPStan rule. Covers the multi-PR roadmap from player ratings through awards/voting/legacy-nuke cleanup.
+last_verified: 2026-04-25
 ---
 
 # ADR-0010: Cosmetic Case-Consistency Renames (Tier 3)
@@ -85,12 +85,24 @@ Tier 3 proceeds as a four-PR sequence, each following the Tier 1/2 playbook: foc
 - 36 schema assertions added (6 columns × 6 tables).
 - Blast radius: 288 prod hits across 47 files + 507 test hits across 44 files.
 
+**Tier 5 — migration 120:**
+
+- **Miscellaneous snake_case cleanup across small, low-traffic tables.** ~47 columns across 12 tables — trade cash (`tradeOfferID`/`sendingTeam`/`receivingTeam` on `ibl_trade_cash`), awards (`Award`/`table_ID`/`ID` across `ibl_awards`, `ibl_gm_awards`, `ibl_gm_history`, `ibl_team_awards`, `ibl_olympics_win_loss`), FA offer flags (`MLE`/`LLE` on `ibl_fa_offers`), ASG/EOY ballot columns (16 + 12 on `ibl_votes_ASG` and `ibl_votes_EOY`), `ibl_sim_dates.Sim`, and the legacy `nuke_config`/`nuke_stories` columns (`CensorMode`, `CensorReplace`, `Default_Theme`, `Version_Num`, `pollID`).
+- FK `fk_trade_cash_offer` on `ibl_trade_cash` dropped and recreated to span the renamed `trade_offer_id` column.
+- Views `vw_team_awards`, `vw_franchise_summary`, and `vw_free_agency_offers` recreated with updated source column names (output aliases lowercased to match the new convention).
+- `BanNonSnakeCaseColumnsRule` extended with ~42 additional banned tokens.
+- `VotingSubmissionService::ASG_POSITIONS` prefix strings (`'East_F'`, `'East_B'`, …) lowercased to match the new column names. EOY duplicate-detection lowercases internal category codes via `strtolower()` at use-site, preserving the public POST/category-code identifiers (`MVP`, `Six`, `ROY`, `GM` and `ECF`/`ECB`/`WCF`/`WCB`) which remain external HTML form contracts.
+- Box-scores and schedule tables intentionally deferred to a future Tier 6 PR (generated columns + 13+ view recreations + a 589K-row table warrant their own change scope).
+- `Bootstrap/ConfigBootstrap.php` and `mainfile.php` array reads from `nuke_config` rows updated; the PHP global variable names (`$Default_Theme`, `$CensorMode`, etc.) are preserved as a legacy contract used by `LegacyFunctions.php` censor logic.
+- 47 schema assertions added.
+
 ## References
 
 - `ibl5/migrations/116_snake_case_player_columns.sql` — PR 1 DDL.
 - `ibl5/migrations/117_snake_case_team_info_columns.sql` — PR 2 DDL.
 - `ibl5/migrations/118_snake_case_standings_columns.sql` — PR 3 DDL.
 - `ibl5/migrations/119_rename_cy1_cy6_to_salary_yr1_yr6.sql` — Tier 4 DDL.
+- `ibl5/migrations/120_misc_snake_case_cleanup.sql` — Tier 5 DDL.
 - `ibl5/phpstan-rules/BanNonSnakeCaseColumnsRule.php` — the enforcement rule (extended per PR).
 - `ibl5/phpstan-rules/BanReservedWordColumnsRule.php` — extended with `` `key` `` (PR 1).
 - `ibl5/config/schema-assertions.php` — post-migration schema assertions.

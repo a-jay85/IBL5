@@ -391,10 +391,10 @@ class PlayerRepository extends BaseMysqliRepository implements PlayerRepositoryI
         /** @var array{allStar: int, threePoint: int, dunkContest: int, rookieSoph: int}|null $result */
         $result = $this->fetchOne(
             "SELECT
-                SUM(CASE WHEN Award LIKE '%Conference All-Star' THEN 1 ELSE 0 END) AS allStar,
-                SUM(CASE WHEN Award LIKE 'Three-Point Contest%' THEN 1 ELSE 0 END) AS threePoint,
-                SUM(CASE WHEN Award LIKE 'Slam Dunk Competition%' THEN 1 ELSE 0 END) AS dunkContest,
-                SUM(CASE WHEN Award LIKE 'Rookie-Sophomore Challenge' THEN 1 ELSE 0 END) AS rookieSoph
+                SUM(CASE WHEN award LIKE '%Conference All-Star' THEN 1 ELSE 0 END) AS allStar,
+                SUM(CASE WHEN award LIKE 'Three-Point Contest%' THEN 1 ELSE 0 END) AS threePoint,
+                SUM(CASE WHEN award LIKE 'Slam Dunk Competition%' THEN 1 ELSE 0 END) AS dunkContest,
+                SUM(CASE WHEN award LIKE 'Rookie-Sophomore Challenge' THEN 1 ELSE 0 END) AS rookieSoph
             FROM ibl_awards
             WHERE name = ?",
             "s",
@@ -415,12 +415,12 @@ class PlayerRepository extends BaseMysqliRepository implements PlayerRepositoryI
     /**
      * Get all sim dates ordered by sim number
      *
-     * @return array<int, array<string, mixed>> Array of sim date records (keys: Sim, start_date, end_date)
+     * @return array<int, array<string, mixed>> Array of sim date records (keys: sim, start_date, end_date)
      */
     public function getAllSimDates(): array
     {
         return $this->fetchAll(
-            "SELECT Sim, start_date, end_date FROM ibl_sim_dates ORDER BY Sim ASC",
+            "SELECT sim, start_date, end_date FROM ibl_sim_dates ORDER BY sim ASC",
             ""
         );
     }

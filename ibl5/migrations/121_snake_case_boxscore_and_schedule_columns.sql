@@ -18,9 +18,23 @@
 
 ALTER TABLE `ibl_box_scores` DROP CONSTRAINT `chk_box_minutes`;
 
--- Dropping the generated columns auto-drops every index that references them,
--- including idx_gt_points/rebounds/fg_made (built on calc_*) AND
--- idx_gt_ast/stl/blk/tov/ftm/3gm/pid/pid_season (built on game_type).
+-- Drop the indexes that reference renamed source columns (the index keeps
+-- working after CHANGE COLUMN — MariaDB updates the column-list pointer in
+-- place — but the index ENTRY would block re-adding the same name later in
+-- this migration). Drop everything we plan to recreate.
+ALTER TABLE `ibl_box_scores`
+  DROP INDEX `idx_gt_points`,
+  DROP INDEX `idx_gt_rebounds`,
+  DROP INDEX `idx_gt_fg_made`,
+  DROP INDEX `idx_gt_ast`,
+  DROP INDEX `idx_gt_stl`,
+  DROP INDEX `idx_gt_blk`,
+  DROP INDEX `idx_gt_tov`,
+  DROP INDEX `idx_gt_ftm`,
+  DROP INDEX `idx_gt_3gm`,
+  DROP INDEX `idx_gt_pid`,
+  DROP INDEX `idx_gt_pid_season`;
+
 ALTER TABLE `ibl_box_scores`
   DROP COLUMN `game_type`,
   DROP COLUMN `season_year`,
@@ -80,6 +94,18 @@ ALTER TABLE `ibl_box_scores`
 ALTER TABLE `ibl_olympics_box_scores` DROP CONSTRAINT `chk_olympics_box_minutes`;
 
 ALTER TABLE `ibl_olympics_box_scores`
+  DROP INDEX `idx_gt_points`,
+  DROP INDEX `idx_gt_rebounds`,
+  DROP INDEX `idx_gt_fg_made`,
+  DROP INDEX `idx_gt_ast`,
+  DROP INDEX `idx_gt_stl`,
+  DROP INDEX `idx_gt_blk`,
+  DROP INDEX `idx_gt_tov`,
+  DROP INDEX `idx_gt_ftm`,
+  DROP INDEX `idx_gt_3gm`,
+  DROP INDEX `idx_gt_pid`;
+
+ALTER TABLE `ibl_olympics_box_scores`
   DROP COLUMN `game_type`,
   DROP COLUMN `season_year`,
   DROP COLUMN `calc_points`,
@@ -133,6 +159,20 @@ ALTER TABLE `ibl_olympics_box_scores`
 -- ============================================================
 -- ibl_box_scores_teams
 -- ============================================================
+
+ALTER TABLE `ibl_box_scores_teams`
+  DROP INDEX `idx_gt_points`,
+  DROP INDEX `idx_gt_rebounds`,
+  DROP INDEX `idx_gt_fg_made`,
+  DROP INDEX `idx_gt_ast`,
+  DROP INDEX `idx_gt_stl`,
+  DROP INDEX `idx_gt_blk`,
+  DROP INDEX `idx_gt_tov`,
+  DROP INDEX `idx_gt_ftm`,
+  DROP INDEX `idx_gt_3gm`,
+  DROP INDEX `idx_gt_date_teams`,
+  DROP INDEX `idx_gt_name_season`,
+  DROP INDEX `idx_date_visitor_home_gotd`;
 
 ALTER TABLE `ibl_box_scores_teams`
   DROP COLUMN `game_type`,
@@ -197,6 +237,17 @@ ALTER TABLE `ibl_box_scores_teams`
 -- ============================================================
 -- ibl_olympics_box_scores_teams
 -- ============================================================
+
+ALTER TABLE `ibl_olympics_box_scores_teams`
+  DROP INDEX `idx_gt_points`,
+  DROP INDEX `idx_gt_rebounds`,
+  DROP INDEX `idx_gt_fg_made`,
+  DROP INDEX `idx_gt_ast`,
+  DROP INDEX `idx_gt_stl`,
+  DROP INDEX `idx_gt_blk`,
+  DROP INDEX `idx_gt_tov`,
+  DROP INDEX `idx_gt_ftm`,
+  DROP INDEX `idx_gt_3gm`;
 
 ALTER TABLE `ibl_olympics_box_scores_teams`
   DROP COLUMN `game_type`,

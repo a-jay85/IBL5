@@ -45,8 +45,8 @@ class PreseasonTransitionPipelineTest extends PipelineIntegrationTestCase
         $season = $this->buildSeason('HEAT', 2099);
 
         $schPath = $this->buildSchFile([
-            ['date_slot' => 103, 'game_index' => 0, 'visitor' => 1, 'home' => 2, 'visitor_score' => 105, 'home_score' => 98],
-            ['date_slot' => 103, 'game_index' => 1, 'visitor' => 3, 'home' => 4, 'visitor_score' => 110, 'home_score' => 102],
+            ['date_slot' => 5, 'game_index' => 0, 'visitor' => 1, 'home' => 2, 'visitor_score' => 105, 'home_score' => 98],
+            ['date_slot' => 5, 'game_index' => 1, 'visitor' => 3, 'home' => 4, 'visitor_score' => 110, 'home_score' => 102],
         ]);
         $plrPath = $this->buildPlrFile([
             ['pid' => 200001, 'name' => 'Pipeline Player A', 'teamid' => 1, 'ordinal' => 1],

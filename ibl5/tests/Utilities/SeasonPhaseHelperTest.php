@@ -28,7 +28,7 @@ class SeasonPhaseHelperTest extends TestCase
     public function testGetMonthForPreseasonPhase(): void
     {
         $result = SeasonPhaseHelper::getMonthForPhase('Preseason');
-        $this->assertEquals(Season::IBL_REGULAR_SEASON_STARTING_MONTH, $result);
+        $this->assertEquals(Season::IBL_PRESEASON_MONTH, $result);
     }
 
     public function testGetMonthForFreeAgencyPhase(): void

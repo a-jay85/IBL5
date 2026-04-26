@@ -1,6 +1,6 @@
 ---
 name: post-plan
-description: Single orchestrator for the post-plan workflow. Runs diff classification, simplify, commit/push/PR, code review, security audit, verification, CI monitoring, retrospective, and worktree teardown as one uninterrupted sequence.
+description: Single orchestrator for the post-plan workflow. Runs diff classification, simplify, commit/push/PR, code review, security audit, verification, CI monitoring, retrospective, worktree teardown, and background process cleanup as one uninterrupted sequence.
 last_verified: 2026-04-25
 ---
 
@@ -409,3 +409,20 @@ Phase 9 merged the PR, deleted the branch, and checked out master. The worktree 
    ```
 2. Print preview URL: `http://<slug>.localhost/ibl5/`
 3. Do NOT run `wt-remove` or `git branch -D`
+
+---
+
+## Phase 12: Background Process Cleanup
+
+Background shells from earlier phases (`bin/e2e-wt.sh` in Phase 6, `gh pr checks --watch` in Phase 8) may still be running. If they complete after the conversation goes idle, the deferred tool result forces a full context reload at Opus rates — often for output that is no longer needed.
+
+Kill known lingering patterns so their tool results deliver immediately (cache warm) rather than hours later (cache miss):
+
+```bash
+pkill -f 'bin/e2e-wt\.sh' 2>/dev/null
+pkill -f 'bunx.*playwright' 2>/dev/null
+pkill -f 'gh pr checks.*--watch' 2>/dev/null
+echo "Background process cleanup complete"
+```
+
+This is a single Bash call — no agent needed. Ignore any "no matching processes" output; the `2>/dev/null` suppression handles it. The killed processes deliver their tool results immediately as errors, which is expected and harmless.

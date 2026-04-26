@@ -48,6 +48,7 @@ services:
     restart: unless-stopped
     environment:
       DB_HOST: mariadb
+      SKIP_PROD_SEED: ${SKIP_PROD_SEED:-}
       MAIL_TRANSPORT: smtp
       MAIL_SMTP_HOST: mailpit
       MAIL_SMTP_PORT: 1025

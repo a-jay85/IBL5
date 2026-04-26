@@ -1,7 +1,7 @@
 ---
 name: post-plan
 description: Single orchestrator for the post-plan workflow. Runs diff classification, simplify, commit/push/PR, code review, security audit, verification, CI monitoring, retrospective, and worktree teardown as one uninterrupted sequence.
-last_verified: 2026-04-21
+last_verified: 2026-04-25
 ---
 
 # Post-Plan Orchestrator
@@ -222,7 +222,7 @@ cd <worktree>/ibl5 && composer run analyse
 **Agent 2 — E2E (Playwright):**
 
 Steps:
-1. Run `bin/wt-down <worktree-name> --volumes` then `bin/wt-up <worktree-name> --seed`
+1. Run `bin/wt-down <worktree-name>` then `bin/wt-up <worktree-name> --seed`
 2. Run `bin/e2e-for-pr <worktree-name>` and capture both stdout and exit code
 3. Branch on the result:
    - **Exit 0, empty stdout** → print "No E2E tests map to changed files — skipping E2E" and stop
@@ -321,13 +321,90 @@ Save to memory only if something was learned that would **prevent a bug** in a f
 
 ---
 
-## Phase 11: Worktree Preview Environment
+## Phase 11: Preview Environment
 
-**Skip if** worktree was pre-existing, earlier phases left uncommitted fixes, or `$CLAUDE_HEADLESS` is set (nightly autonomous mode — no human present to verify).
+**Skip entirely if** `$CLAUDE_HEADLESS` is set (nightly autonomous mode — no human present to verify).
+
+Check the PR state using the PR number captured in Phase 5A:
+
+```bash
+PR_STATE=$(gh pr view <PR_NUMBER> --json state --jq '.state')
+```
+
+### Path A: Main-stack rebuild (when `$PR_STATE` = `MERGED`)
+
+Phase 9 merged the PR, deleted the branch, and checked out master. The worktree branch no longer exists — rebuild the main Docker stack with fresh prod data.
+
+1. **Update vendor** (may be stale after merge):
+   ```bash
+   (cd <repo-root>/ibl5 && composer install)
+   ```
+
+2. **Check for prod credentials** before tearing down the running stack:
+   ```bash
+   grep -q '^REMOTE_HOST=' <repo-root>/.env \
+     && grep -q '^REMOTE_USER=' <repo-root>/.env \
+     && grep -q '^REMOTE_PASSWORD=' <repo-root>/.env
+   ```
+   If any `REMOTE_*` credential is missing: warn "Fresh prod data unavailable — REMOTE_* credentials not found in .env. Skipping main-stack rebuild." and **stop Phase 11** (leave the existing main stack untouched).
+
+3. **Tear down and restart** with stale seed skipped:
+   ```bash
+   cd <repo-root> && docker compose down -v
+   SKIP_PROD_SEED=1 docker compose up -d
+   ```
+   `docker compose down -v` removes only the main project's volume (`ibl5-mariadb-data`) — worktree volumes are in separate compose projects and are not affected.
+
+4. **Wait for MariaDB to be healthy:**
+   ```bash
+   RETRIES=0
+   until docker exec ibl5-mariadb healthcheck.sh --connect --innodb_initialized &>/dev/null; do
+       RETRIES=$((RETRIES + 1))
+       if [ "$RETRIES" -ge 30 ]; then
+           echo "Error: MariaDB did not become healthy after 30 attempts"
+           break
+       fi
+       sleep 2
+   done
+   ```
+
+5. **Stream fresh prod data:**
+   ```bash
+   bin/db-sync-prod
+   ```
+   With no arguments, targets the main `ibl5-mariadb` container. Streams from prod, handles generated columns, strips DEFINER clauses, backfills `schema_migrations`, and runs `bin/db-migrate` for pending migrations.
+
+6. **Smoke test** — verify main.localhost loads with prod content:
+   ```bash
+   HTTP_CODE=$(curl -s -o /dev/null -w '%{http_code}' http://main.localhost/ibl5/)
+   if [ "$HTTP_CODE" != "200" ]; then
+       echo "FAIL: main.localhost returned HTTP $HTTP_CODE"
+       docker logs ibl5-php --tail 30
+   fi
+
+   BODY=$(curl -s http://main.localhost/ibl5/)
+   if echo "$BODY" | grep -qi 'fatal error\|500 Internal'; then
+       echo "FAIL: PHP fatal error detected in response"
+       docker logs ibl5-php --tail 30
+   fi
+
+   if echo "$BODY" | grep -qi 'standings\|scores\|roster'; then
+       echo "PASS: Prod content detected"
+   else
+       echo "WARN: Could not confirm prod content in response"
+   fi
+   ```
+   If the smoke test fails: print the error details. Do NOT retry the full rebuild — the logs are more useful for diagnosis.
+
+7. **Print preview URL:** `http://main.localhost/ibl5/`
+
+### Path B: Worktree preview (when `$PR_STATE` != `MERGED`)
+
+**Skip if** worktree was pre-existing or earlier phases left uncommitted fixes.
 
 1. Tear down and restart with production data:
    ```bash
-   bin/wt-down <worktree-name> --volumes
+   bin/wt-down <worktree-name>
    bin/wt-up <worktree-name> --prod
    ```
 2. Print preview URL: `http://<slug>.localhost/ibl5/`

@@ -4,7 +4,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
         curl \
         unzip \
         default-mysql-client \
-    && docker-php-ext-install mysqli pdo_mysql \
+        libzip-dev \
+    && docker-php-ext-install mysqli pdo_mysql zip \
     && rm -rf /var/lib/apt/lists/*
 
 COPY docker/opcache.ini $PHP_INI_DIR/conf.d/opcache.ini

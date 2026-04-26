@@ -465,4 +465,19 @@ class TrnFileParserTest extends TestCase
             unlink($tmpFile);
         }
     }
+
+    public function testParseAcceptsInMemoryData(): void
+    {
+        $data = str_repeat("\0", TrnFileParser::FILE_SIZE);
+        $result = TrnFileParser::parse($data);
+        $this->assertIsArray($result);
+        $this->assertArrayHasKey('transactions', $result);
+    }
+
+    public function testParseThrowsForInvalidSize(): void
+    {
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessage('Invalid .trn file size');
+        TrnFileParser::parse('too short');
+    }
 }

@@ -43,22 +43,13 @@ class AswFileParser implements AswFileParserInterface
     public const THREE_PT_SCORES_END = 111;
 
     /**
-     * @see AswFileParserInterface::parseFile()
+     * @see AswFileParserInterface::parse()
      */
-    public static function parseFile(string $filePath): array
+    public static function parse(string $data): array
     {
-        if (!file_exists($filePath)) {
-            throw new \RuntimeException("ASW file not found: {$filePath}");
-        }
-
-        $content = file_get_contents($filePath);
-        if ($content === false) {
-            throw new \RuntimeException("Failed to read ASW file: {$filePath}");
-        }
-
         // Normalize line endings
-        $content = str_replace("\r\n", "\n", $content);
-        $lines = explode("\n", $content);
+        $data = str_replace("\r\n", "\n", $data);
+        $lines = explode("\n", $data);
 
         // Parse roster sections (player IDs)
         $allstar1 = self::parseRosterSection($lines, self::ALLSTAR_1_START, self::ALLSTAR_1_END);
@@ -95,6 +86,23 @@ class AswFileParser implements AswFileParserInterface
                 'three_pt_finals' => $threePtFinals,
             ],
         ];
+    }
+
+    /**
+     * @see AswFileParserInterface::parseFile()
+     */
+    public static function parseFile(string $filePath): array
+    {
+        if (!file_exists($filePath)) {
+            throw new \RuntimeException("ASW file not found: {$filePath}");
+        }
+
+        $content = file_get_contents($filePath);
+        if ($content === false) {
+            throw new \RuntimeException("Failed to read ASW file: {$filePath}");
+        }
+
+        return self::parse($content);
     }
 
     /**

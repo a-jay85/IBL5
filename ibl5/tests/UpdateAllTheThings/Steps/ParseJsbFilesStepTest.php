@@ -7,51 +7,65 @@ namespace Tests\UpdateAllTheThings\Steps;
 use JsbParser\JsbImportResult;
 use JsbParser\JsbImportService;
 use PHPUnit\Framework\TestCase;
+use Updater\Contracts\JsbSourceResolverInterface;
 use Updater\Contracts\PipelineStepInterface;
 use Updater\Steps\ParseJsbFilesStep;
-use Season\Season;
 
 class ParseJsbFilesStepTest extends TestCase
 {
     private JsbImportService $stubService;
-    private Season $stubSeason;
+    private JsbSourceResolverInterface $stubResolver;
 
     protected function setUp(): void
     {
         $this->stubService = $this->createStub(JsbImportService::class);
-        $this->stubSeason = $this->createStub(Season::class);
+        $this->stubResolver = $this->createStub(JsbSourceResolverInterface::class);
+    }
+
+    private function createStep(): ParseJsbFilesStep
+    {
+        return new ParseJsbFilesStep($this->stubService, $this->stubResolver, 2026);
     }
 
     public function testImplementsPipelineStepInterface(): void
     {
-        $step = new ParseJsbFilesStep($this->stubService, '/tmp', $this->stubSeason);
-
-        $this->assertInstanceOf(PipelineStepInterface::class, $step);
+        $this->assertInstanceOf(PipelineStepInterface::class, $this->createStep());
     }
 
     public function testGetLabelReturnsExpectedLabel(): void
     {
-        $step = new ParseJsbFilesStep($this->stubService, '/tmp', $this->stubSeason);
-
-        $this->assertSame('JSB files parsed', $step->getLabel());
+        $this->assertSame('JSB files parsed', $this->createStep()->getLabel());
     }
 
-    public function testExecuteReturnsSuccessWithSummary(): void
+    public function testExecuteReturnsSuccessWhenAllFilesNull(): void
     {
-        $jsbResult = new JsbImportResult();
-        $jsbResult->addMessage('CAR: 150 records');
-        $jsbResult->addMessage('TRN: 10 trades');
+        $this->stubResolver->method('getContents')->willReturn(null);
 
-        $this->stubService->method('processCurrentSeason')->willReturn($jsbResult);
-
-        $step = new ParseJsbFilesStep($this->stubService, '/tmp', $this->stubSeason);
-        $result = $step->execute();
+        $result = $this->createStep()->execute();
 
         $this->assertTrue($result->success);
         $this->assertSame('JSB files parsed', $result->label);
-        $this->assertNotSame('', $result->detail);
-        $this->assertSame(['CAR: 150 records', 'TRN: 10 trades'], $result->messages);
-        $this->assertSame(0, $result->messageErrorCount);
+    }
+
+    public function testExecuteProcessesFilesReturnedByResolver(): void
+    {
+        $jsbResult = new JsbImportResult();
+        $jsbResult->addMessage('TRN: 10 records');
+
+        $this->stubResolver->method('getContents')->willReturnMap([
+            ['trn', 'trn-data'],
+            ['car', null],
+            ['his', null],
+            ['asw', null],
+            ['rcb', null],
+        ]);
+
+        $this->stubService->method('processTrnData')->willReturn($jsbResult);
+
+        $result = $this->createStep()->execute();
+
+        $this->assertTrue($result->success);
+        $this->assertContains('TRN: 10 records', $result->messages);
     }
 
     public function testExecutePassesErrorCountFromResult(): void
@@ -60,30 +74,28 @@ class ParseJsbFilesStepTest extends TestCase
         $jsbResult->addError('Failed to parse player');
         $jsbResult->addError('Unknown team');
 
-        $this->stubService->method('processCurrentSeason')->willReturn($jsbResult);
+        $this->stubResolver->method('getContents')->willReturnMap([
+            ['trn', 'trn-data'],
+            ['car', null],
+            ['his', null],
+            ['asw', null],
+            ['rcb', null],
+        ]);
+        $this->stubService->method('processTrnData')->willReturn($jsbResult);
 
-        $step = new ParseJsbFilesStep($this->stubService, '/tmp', $this->stubSeason);
-        $result = $step->execute();
+        $result = $this->createStep()->execute();
 
         $this->assertTrue($result->success);
         $this->assertSame(2, $result->messageErrorCount);
     }
 
-    public function testExecuteCapturesOutputBufferLog(): void
+    public function testExecuteSkipsFileWhenResolverReturnsNull(): void
     {
-        $jsbResult = new JsbImportResult();
+        $this->stubResolver->method('getContents')->willReturn(null);
 
-        $this->stubService->method('processCurrentSeason')->willReturnCallback(
-            static function () use ($jsbResult): JsbImportResult {
-                echo '<p>Processing JSB...</p>';
-                return $jsbResult;
-            }
-        );
-
-        $step = new ParseJsbFilesStep($this->stubService, '/tmp', $this->stubSeason);
-        $result = $step->execute();
+        $result = $this->createStep()->execute();
 
         $this->assertTrue($result->success);
-        $this->assertSame('<p>Processing JSB...</p>', $result->capturedLog);
+        $this->assertSame([], $result->messages);
     }
 }

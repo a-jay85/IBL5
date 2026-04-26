@@ -13,6 +13,14 @@ namespace JsbParser\Contracts;
 interface PlbFileParserInterface
 {
     /**
+     * Parse raw .plb text data.
+     *
+     * @return array<int, list<array{slot_index: int, dc_minutes: int, dc_of: int, dc_df: int, dc_oi: int, dc_di: int, dc_bh: int}>>
+     * @throws \RuntimeException If data cannot be parsed
+     */
+    public static function parse(string $data): array;
+
+    /**
      * Parse a complete .plb file.
      *
      * @param string $filePath Path to the .plb file

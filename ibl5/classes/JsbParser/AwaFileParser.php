@@ -70,19 +70,10 @@ class AwaFileParser implements AwaFileParserInterface
     ];
 
     /**
-     * @see AwaFileParserInterface::parseFile()
+     * @see AwaFileParserInterface::parse()
      */
-    public static function parseFile(string $filePath): array
+    public static function parse(string $data): array
     {
-        if (!file_exists($filePath)) {
-            throw new \RuntimeException("AWA file not found: {$filePath}");
-        }
-
-        $data = file_get_contents($filePath);
-        if ($data === false) {
-            throw new \RuntimeException("Failed to read AWA file: {$filePath}");
-        }
-
         $fileSize = strlen($data);
         $minSize = self::BLOCK_SIZE * 2;
         if ($fileSize < $minSize) {
@@ -108,6 +99,23 @@ class AwaFileParser implements AwaFileParserInterface
             'starting_year' => $startingYear,
             'seasons' => $seasons,
         ];
+    }
+
+    /**
+     * @see AwaFileParserInterface::parseFile()
+     */
+    public static function parseFile(string $filePath): array
+    {
+        if (!file_exists($filePath)) {
+            throw new \RuntimeException("AWA file not found: {$filePath}");
+        }
+
+        $data = file_get_contents($filePath);
+        if ($data === false) {
+            throw new \RuntimeException("Failed to read AWA file: {$filePath}");
+        }
+
+        return self::parse($data);
     }
 
     /**

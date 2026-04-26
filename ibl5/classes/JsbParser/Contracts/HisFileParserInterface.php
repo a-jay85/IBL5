@@ -12,10 +12,18 @@ namespace JsbParser\Contracts;
 interface HisFileParserInterface
 {
     /**
+     * Parse raw .his text data.
+     *
+     * @return list<array{year: int, teams: list<array{name: string, wins: int, losses: int, year: int, playoff_result: string, made_playoffs: int, playoff_round_reached: string, won_championship: int}>}>
+     * @throws \RuntimeException If data cannot be parsed
+     */
+    public static function parse(string $data): array;
+
+    /**
      * Parse a complete .his file.
      *
      * @param string $filePath Path to the .his file
-     * @return list<array{year: int, teams: list<array{name: string, wins: int, losses: int, playoff_result: string, made_playoffs: int, playoff_round_reached: string, won_championship: int}>}>
+     * @return list<array{year: int, teams: list<array{name: string, wins: int, losses: int, year: int, playoff_result: string, made_playoffs: int, playoff_round_reached: string, won_championship: int}>}>
      * @throws \RuntimeException If file cannot be read
      */
     public static function parseFile(string $filePath): array;

@@ -93,7 +93,7 @@ class ConfigBootstrap implements BootstrapStepInterface
 
     private function loadNukeConfig(ContainerInterface $container): void
     {
-        /** @var \Database\MySQL $db */ // @phpstan-ignore varTag.deprecatedClass
+        /** @var \Database\MySQL $db */
         $db = $GLOBALS['db'];
         $rawPrefix = $GLOBALS['prefix'] ?? 'nuke';
         $prefix = is_string($rawPrefix) ? $rawPrefix : 'nuke';
@@ -101,8 +101,8 @@ class ConfigBootstrap implements BootstrapStepInterface
         if (!defined('NUKE_FILE')) {
             define('NUKE_FILE', true);
         }
-        $result = $db->sql_query("SELECT * FROM " . $prefix . "_config"); // @phpstan-ignore method.deprecatedClass
-        $fetchedRow = $db->sql_fetchrow($result); // @phpstan-ignore method.deprecatedClass
+        $result = $db->sql_query("SELECT * FROM " . $prefix . "_config");
+        $fetchedRow = $db->sql_fetchrow($result);
 
         if (!is_array($fetchedRow)) {
             return;

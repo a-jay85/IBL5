@@ -127,4 +127,14 @@ class RetFileParserTest extends TestCase
 
         RetFileParser::parseFile('/nonexistent/file.ret');
     }
+
+    public function testParseAcceptsInMemoryData(): void
+    {
+        $data = "John Doe 12345\nJane Smith 67890\n";
+        $result = RetFileParser::parse($data);
+        $this->assertIsArray($result);
+        $this->assertCount(2, $result);
+        $this->assertSame(12345, $result[0]['jsb_pid']);
+        $this->assertSame('John Doe', $result[0]['player_name']);
+    }
 }

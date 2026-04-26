@@ -186,4 +186,15 @@ class PlbFileParserTest extends TestCase
         $this->assertSame(0, $slot['dc_minutes']);
         $this->assertArrayHasKey('dc_minutes', $slot);
     }
+
+    public function testParseAcceptsInMemoryData(): void
+    {
+        // One team line with 30 slots × 12 chars = 360 chars minimum
+        $line = str_repeat('121212121212', 30); // 360 chars
+        $data = $line . "\n";
+        $result = PlbFileParser::parse($data);
+        $this->assertIsArray($result);
+        $this->assertCount(1, $result);
+        $this->assertCount(30, $result[0]);
+    }
 }

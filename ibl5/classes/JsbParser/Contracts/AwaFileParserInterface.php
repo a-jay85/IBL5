@@ -13,6 +13,14 @@ namespace JsbParser\Contracts;
 interface AwaFileParserInterface
 {
     /**
+     * Parse raw .awa binary data.
+     *
+     * @return array{starting_year: int, seasons: list<array{year: int, stat_leaders: array<string, list<array{rank: int, pid: int}>>}>}
+     * @throws \RuntimeException If data has invalid structure
+     */
+    public static function parse(string $data): array;
+
+    /**
      * Parse a complete .awa file.
      *
      * @param string $filePath Path to the .awa file

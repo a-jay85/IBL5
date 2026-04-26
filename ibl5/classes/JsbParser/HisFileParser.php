@@ -26,22 +26,13 @@ class HisFileParser implements HisFileParserInterface
     private const TEAM_LINE_PATTERN = '/^(.+?)\s+\((\d+)-(\d+)\)\s*(.*?)\s*\((\d{4})\)\s*$/';
 
     /**
-     * @see HisFileParserInterface::parseFile()
+     * @see HisFileParserInterface::parse()
      */
-    public static function parseFile(string $filePath): array
+    public static function parse(string $data): array
     {
-        if (!file_exists($filePath)) {
-            throw new \RuntimeException("HIS file not found: {$filePath}");
-        }
-
-        $content = file_get_contents($filePath);
-        if ($content === false) {
-            throw new \RuntimeException("Failed to read HIS file: {$filePath}");
-        }
-
         // Normalize line endings (CRLF → LF)
-        $content = str_replace("\r\n", "\n", $content);
-        $lines = explode("\n", $content);
+        $data = str_replace("\r\n", "\n", $data);
+        $lines = explode("\n", $data);
 
         /** @var array<int, list<array{name: string, wins: int, losses: int, year: int, playoff_result: string, made_playoffs: int, playoff_round_reached: string, won_championship: int}>> $seasonMap */
         $seasonMap = [];
@@ -76,6 +67,23 @@ class HisFileParser implements HisFileParserInterface
         }
 
         return $seasons;
+    }
+
+    /**
+     * @see HisFileParserInterface::parseFile()
+     */
+    public static function parseFile(string $filePath): array
+    {
+        if (!file_exists($filePath)) {
+            throw new \RuntimeException("HIS file not found: {$filePath}");
+        }
+
+        $content = file_get_contents($filePath);
+        if ($content === false) {
+            throw new \RuntimeException("Failed to read HIS file: {$filePath}");
+        }
+
+        return self::parse($content);
     }
 
     /**

@@ -558,4 +558,11 @@ class RcbFileParserTest extends TestCase
             'blk' => ['blk'],
         ];
     }
+
+    public function testParseThrowsForTooFewLines(): void
+    {
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessage('expected at least');
+        RcbFileParser::parse('too few lines');
+    }
 }

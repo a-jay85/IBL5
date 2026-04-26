@@ -20,24 +20,15 @@ class HofFileParser implements HofFileParserInterface
     private const BLOCK_SIZE = 500;
 
     /**
-     * @see HofFileParserInterface::parseFile()
+     * @see HofFileParserInterface::parse()
      */
-    public static function parseFile(string $filePath): array
+    public static function parse(string $data): array
     {
-        if (!file_exists($filePath)) {
-            throw new \RuntimeException("HOF file not found: {$filePath}");
-        }
-
-        $fileSize = filesize($filePath);
-        if ($fileSize !== self::FILE_SIZE) {
+        $dataSize = strlen($data);
+        if ($dataSize !== self::FILE_SIZE) {
             throw new \RuntimeException(
-                "HOF file size mismatch: expected " . self::FILE_SIZE . " bytes, got {$fileSize}"
+                "HOF data size mismatch: expected " . self::FILE_SIZE . " bytes, got {$dataSize}"
             );
-        }
-
-        $raw = file_get_contents($filePath);
-        if ($raw === false) {
-            throw new \RuntimeException("Failed to read HOF file: {$filePath}");
         }
 
         /** @var list<array{jsb_pid: int, player_name: string, pos: string, induction_year: int}> $entries */
@@ -45,7 +36,7 @@ class HofFileParser implements HofFileParserInterface
 
         // Process each 500-byte block
         for ($block = 0; $block < 14; $block++) {
-            $blockData = substr($raw, $block * self::BLOCK_SIZE, self::BLOCK_SIZE);
+            $blockData = substr($data, $block * self::BLOCK_SIZE, self::BLOCK_SIZE);
 
             // Split block by CRLF to get individual entries
             $lines = explode("\r\n", $blockData);
@@ -77,5 +68,22 @@ class HofFileParser implements HofFileParserInterface
         }
 
         return $entries;
+    }
+
+    /**
+     * @see HofFileParserInterface::parseFile()
+     */
+    public static function parseFile(string $filePath): array
+    {
+        if (!file_exists($filePath)) {
+            throw new \RuntimeException("HOF file not found: {$filePath}");
+        }
+
+        $raw = file_get_contents($filePath);
+        if ($raw === false) {
+            throw new \RuntimeException("Failed to read HOF file: {$filePath}");
+        }
+
+        return self::parse($raw);
     }
 }

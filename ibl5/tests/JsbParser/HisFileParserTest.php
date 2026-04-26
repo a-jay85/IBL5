@@ -280,4 +280,13 @@ class HisFileParserTest extends TestCase
             unlink($tmpFile);
         }
     }
+
+    public function testParseAcceptsInMemoryData(): void
+    {
+        $data = "Detroit (45-37) Championship (2006)\n";
+        $result = HisFileParser::parse($data);
+        $this->assertIsArray($result);
+        $this->assertCount(1, $result);
+        $this->assertSame(2007, $result[0]['year']);
+    }
 }

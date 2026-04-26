@@ -342,4 +342,21 @@ class AwaFileParserTest extends TestCase
         }
         return null;
     }
+
+    public function testParseThrowsForTooSmallData(): void
+    {
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessage('need at least');
+        AwaFileParser::parse(str_repeat(' ', 100));
+    }
+
+    public function testParseAcceptsMinimalData(): void
+    {
+        // Two blocks (header + one block): 2000 bytes
+        $data = str_repeat(' ', AwaFileParser::BLOCK_SIZE * 2);
+        $result = AwaFileParser::parse($data);
+        $this->assertIsArray($result);
+        $this->assertArrayHasKey('seasons', $result);
+        $this->assertSame([], $result['seasons']);
+    }
 }

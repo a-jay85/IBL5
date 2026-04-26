@@ -13,6 +13,14 @@ namespace JsbParser\Contracts;
 interface AswFileParserInterface
 {
     /**
+     * Parse raw .asw text data.
+     *
+     * @return array{rosters: array{allstar_1: list<int>, allstar_2: list<int>, rookie_1: list<int>, rookie_2: list<int>, three_point: list<int>, dunk_contest: list<int>}, scores: array{dunk_round1: list<int>, dunk_finals: list<int>, three_pt_round1: list<int>, three_pt_semis: list<int>, three_pt_finals: list<int>}}
+     * @throws \RuntimeException If data cannot be parsed
+     */
+    public static function parse(string $data): array;
+
+    /**
      * Parse a complete .asw file.
      *
      * @param string $filePath Path to the .asw file

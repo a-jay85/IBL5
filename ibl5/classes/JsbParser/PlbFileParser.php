@@ -21,22 +21,13 @@ class PlbFileParser implements PlbFileParserInterface
     private const MIN_LINE_LENGTH = 360; // 30 × 12
 
     /**
-     * @see PlbFileParserInterface::parseFile()
+     * @see PlbFileParserInterface::parse()
      */
-    public static function parseFile(string $filePath): array
+    public static function parse(string $data): array
     {
-        if (!file_exists($filePath)) {
-            throw new \RuntimeException("PLB file not found: {$filePath}");
-        }
-
-        $contents = file_get_contents($filePath);
-        if ($contents === false) {
-            throw new \RuntimeException("Failed to read PLB file: {$filePath}");
-        }
-
         // Normalize line endings (CRLF → LF)
-        $contents = str_replace("\r\n", "\n", $contents);
-        $lines = explode("\n", $contents);
+        $data = str_replace("\r\n", "\n", $data);
+        $lines = explode("\n", $data);
 
         /** @var array<int, list<array{slot_index: int, dc_minutes: int, dc_of: int, dc_df: int, dc_oi: int, dc_di: int, dc_bh: int}>> $result */
         $result = [];
@@ -68,5 +59,22 @@ class PlbFileParser implements PlbFileParserInterface
         }
 
         return $result;
+    }
+
+    /**
+     * @see PlbFileParserInterface::parseFile()
+     */
+    public static function parseFile(string $filePath): array
+    {
+        if (!file_exists($filePath)) {
+            throw new \RuntimeException("PLB file not found: {$filePath}");
+        }
+
+        $contents = file_get_contents($filePath);
+        if ($contents === false) {
+            throw new \RuntimeException("Failed to read PLB file: {$filePath}");
+        }
+
+        return self::parse($contents);
     }
 }

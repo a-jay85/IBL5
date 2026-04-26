@@ -13,6 +13,14 @@ namespace JsbParser\Contracts;
 interface RetFileParserInterface
 {
     /**
+     * Parse raw .ret text data.
+     *
+     * @return list<array{jsb_pid: int, player_name: string}>
+     * @throws \RuntimeException If data cannot be parsed
+     */
+    public static function parse(string $data): array;
+
+    /**
      * Parse a complete .ret file.
      *
      * @param string $filePath Path to the .ret file

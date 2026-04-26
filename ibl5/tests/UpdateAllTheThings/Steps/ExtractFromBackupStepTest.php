@@ -95,7 +95,7 @@ class ExtractFromBackupStepTest extends TestCase
         $result = $step->execute();
 
         $this->assertTrue($result->success);
-        $this->assertStringContainsString('Extracted 10 files', $result->detail);
+        $this->assertStringContainsString('Extracted 2 files', $result->detail);
     }
 
     public function testSkipsRenameForProperlyNamedBackup(): void

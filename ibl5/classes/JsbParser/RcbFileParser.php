@@ -125,23 +125,14 @@ class RcbFileParser implements RcbFileParserInterface
     ];
 
     /**
-     * @see RcbFileParserInterface::parseFile()
+     * @see RcbFileParserInterface::parse()
      */
-    public static function parseFile(string $filePath): array
+    public static function parse(string $data): array
     {
-        if (!file_exists($filePath)) {
-            throw new \RuntimeException("RCB file not found: {$filePath}");
-        }
-
-        $contents = file_get_contents($filePath);
-        if ($contents === false) {
-            throw new \RuntimeException("Failed to read RCB file: {$filePath}");
-        }
-
         // Split on CRLF (or LF for flexibility)
-        $lines = preg_split('/\r?\n/', $contents);
+        $lines = preg_split('/\r?\n/', $data);
         if ($lines === false) {
-            throw new \RuntimeException("Failed to split RCB file into lines: {$filePath}");
+            throw new \RuntimeException('Failed to split RCB data into lines');
         }
 
         $lineCount = count($lines);
@@ -160,6 +151,23 @@ class RcbFileParser implements RcbFileParserInterface
             'alltime' => $alltime,
             'currentSeason' => $currentSeason,
         ];
+    }
+
+    /**
+     * @see RcbFileParserInterface::parseFile()
+     */
+    public static function parseFile(string $filePath): array
+    {
+        if (!file_exists($filePath)) {
+            throw new \RuntimeException("RCB file not found: {$filePath}");
+        }
+
+        $contents = file_get_contents($filePath);
+        if ($contents === false) {
+            throw new \RuntimeException("Failed to read RCB file: {$filePath}");
+        }
+
+        return self::parse($contents);
     }
 
     /**

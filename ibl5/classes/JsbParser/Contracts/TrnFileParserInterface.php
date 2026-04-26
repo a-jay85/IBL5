@@ -12,6 +12,14 @@ namespace JsbParser\Contracts;
 interface TrnFileParserInterface
 {
     /**
+     * Parse raw .trn binary bytes.
+     *
+     * @return array{record_count: int, transactions: list<array{index: int, month: int, day: int, year: int, type: int, pid: int|null, team_id: int|null, games_missed: int|null, injury_description: string|null, trade_items: list<array{marker: int, from_team: int, to_team: int, player_id: int|null, draft_year: int|null}>|null}>}
+     * @throws \RuntimeException If data has invalid structure
+     */
+    public static function parse(string $data): array;
+
+    /**
      * Parse a complete .trn file.
      *
      * @param string $filePath Path to the .trn file

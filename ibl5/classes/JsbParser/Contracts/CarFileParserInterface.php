@@ -13,6 +13,14 @@ namespace JsbParser\Contracts;
 interface CarFileParserInterface
 {
     /**
+     * Parse raw .car binary bytes.
+     *
+     * @return array{player_count: int, players: list<array{block_index: int, jsb_id: int, name: string, season_count: int, seasons: list<array{year: int, team: string, name: string, position: string, gp: int, min: int, two_gm: int, two_ga: int, ftm: int, fta: int, three_gm: int, three_ga: int, orb: int, drb: int, ast: int, stl: int, to: int, blk: int, pf: int}>}>}
+     * @throws \RuntimeException If data has invalid structure
+     */
+    public static function parse(string $data): array;
+
+    /**
      * Parse a complete .car file.
      *
      * @param string $filePath Path to the .car file

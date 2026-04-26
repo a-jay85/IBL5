@@ -14,6 +14,14 @@ namespace JsbParser\Contracts;
 interface DraFileParserInterface
 {
     /**
+     * Parse raw .dra text data.
+     *
+     * @return list<array{draft_year: int, picks: list<array{round: int, pick: int, team_name: string, pos: string, player_name: string}>}>
+     * @throws \RuntimeException If data cannot be parsed
+     */
+    public static function parse(string $data): array;
+
+    /**
      * Parse a complete .dra file.
      *
      * @param string $filePath Path to the .dra file

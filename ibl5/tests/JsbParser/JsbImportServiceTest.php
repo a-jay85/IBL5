@@ -369,4 +369,85 @@ class JsbImportServiceTest extends TestCase
             unlink($tmpFile);
         }
     }
+
+    // ── process*Data() — in-memory variants ─────────────────────
+
+    public function testProcessCarDataReturnsErrorOnInvalidData(): void
+    {
+        $result = $this->makeService()->processCarData('invalid data', 2006);
+        $this->assertSame(1, $result->errors);
+        $this->assertStringContainsString('CAR parse failed', $result->messages[0]);
+    }
+
+    public function testProcessCarDataProcessesMatchingYear(): void
+    {
+        $seasonRecord = $this->buildSeasonRecord(2006);
+        $playerBlock = $this->buildPlayerBlock(1, 100, 'Test Player', $seasonRecord);
+        $carData = $this->buildCarFile(1, $playerBlock);
+
+        $this->stubRepo->method('resolveTeamIdByName')->willReturn(21);
+        $mockResolver = $this->createMock(PlayerIdResolver::class);
+        $mockResolver->expects($this->once())->method('resolve')->willReturn(12345);
+
+        $result = $this->makeService($mockResolver)->processCarData($carData, 2006);
+        $this->assertSame(1, $result->inserted);
+    }
+
+    public function testProcessTrnDataReturnsErrorOnInvalidData(): void
+    {
+        $result = $this->makeService()->processTrnData('invalid data', null);
+        $this->assertSame(1, $result->errors);
+        $this->assertStringContainsString('TRN parse failed', $result->messages[0]);
+    }
+
+    public function testProcessTrnDataProcessesValidData(): void
+    {
+        $trnData = $this->buildTrnFile(0);
+        $this->stubRepo->method('fetchMaxTradeGroupId')->willReturn(1);
+
+        $result = $this->makeService()->processTrnData($trnData, 'test');
+        $this->assertSame(0, $result->errors);
+    }
+
+    public function testProcessHisDataUpsertsPerTeam(): void
+    {
+        $hisContent = "Celtics (50-32) Won First Round (2005)\n"
+            . "Lakers (55-27) Won Championship (2005)\n";
+
+        $this->stubRepo->method('resolveTeamIdByName')->willReturn(1);
+        $this->stubRepo->method('upsertHistoryRecord')->willReturn(1);
+
+        $result = $this->makeService()->processHisData($hisContent, 'test-source');
+        $this->assertSame(2, $result->inserted);
+    }
+
+    public function testProcessRcbDataReturnsErrorOnInvalidData(): void
+    {
+        $result = $this->makeService()->processRcbData('invalid', 2006);
+        $this->assertSame(1, $result->errors);
+        $this->assertStringContainsString('RCB parse failed', $result->messages[0]);
+    }
+
+    public function testProcessDraDataReturnsNoErrorForEmptyData(): void
+    {
+        $result = $this->makeService()->processDraData('');
+        $this->assertSame(0, $result->errors);
+    }
+
+    public function testProcessRetDataParsesEntries(): void
+    {
+        $retData = "John Doe 12345\nJane Smith 67890\n";
+        $this->stubRepo->method('getPlayerName')->willReturn('John Doe');
+        $this->stubRepo->method('upsertRetiredPlayer')->willReturn(1);
+
+        $result = $this->makeService()->processRetData($retData, 2026);
+        $this->assertSame(0, $result->errors);
+        $this->assertSame(2, $result->inserted);
+    }
+
+    public function testProcessHofDataReturnsNoErrorForEmptyData(): void
+    {
+        $result = $this->makeService()->processHofData(str_repeat(' ', 7000));
+        $this->assertSame(0, $result->errors);
+    }
 }

@@ -47,19 +47,10 @@ class TrnFileParser implements TrnFileParserInterface
     public const TRADE_MARKER_DRAFT_PICK = 1;
 
     /**
-     * @see TrnFileParserInterface::parseFile()
+     * @see TrnFileParserInterface::parse()
      */
-    public static function parseFile(string $filePath): array
+    public static function parse(string $data): array
     {
-        if (!file_exists($filePath)) {
-            throw new \RuntimeException("TRN file not found: {$filePath}");
-        }
-
-        $data = file_get_contents($filePath);
-        if ($data === false) {
-            throw new \RuntimeException("Failed to read TRN file: {$filePath}");
-        }
-
         $fileSize = strlen($data);
         if ($fileSize !== self::FILE_SIZE) {
             throw new \RuntimeException(
@@ -84,6 +75,23 @@ class TrnFileParser implements TrnFileParserInterface
             'record_count' => $recordCount,
             'transactions' => $transactions,
         ];
+    }
+
+    /**
+     * @see TrnFileParserInterface::parseFile()
+     */
+    public static function parseFile(string $filePath): array
+    {
+        if (!file_exists($filePath)) {
+            throw new \RuntimeException("TRN file not found: {$filePath}");
+        }
+
+        $data = file_get_contents($filePath);
+        if ($data === false) {
+            throw new \RuntimeException("Failed to read TRN file: {$filePath}");
+        }
+
+        return self::parse($data);
     }
 
     /**

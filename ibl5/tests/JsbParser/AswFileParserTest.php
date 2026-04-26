@@ -331,4 +331,15 @@ class AswFileParserTest extends TestCase
             unlink($tmpFile);
         }
     }
+
+    public function testParseAcceptsInMemoryData(): void
+    {
+        // 10,000-byte ASW file with all zeros (no valid player IDs)
+        $data = str_repeat("0\r\n", 112) . str_repeat(" ", 10000 - 112 * 3);
+        $data = str_pad($data, 10000);
+        $result = AswFileParser::parse($data);
+        $this->assertIsArray($result);
+        $this->assertArrayHasKey('rosters', $result);
+        $this->assertArrayHasKey('scores', $result);
+    }
 }

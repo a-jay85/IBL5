@@ -24,19 +24,10 @@ class CarFileParser implements CarFileParserInterface
     public const PLAYER_COUNT_WIDTH = 4;
 
     /**
-     * @see CarFileParserInterface::parseFile()
+     * @see CarFileParserInterface::parse()
      */
-    public static function parseFile(string $filePath): array
+    public static function parse(string $data): array
     {
-        if (!file_exists($filePath)) {
-            throw new \RuntimeException("CAR file not found: {$filePath}");
-        }
-
-        $data = file_get_contents($filePath);
-        if ($data === false) {
-            throw new \RuntimeException("Failed to read CAR file: {$filePath}");
-        }
-
         $fileSize = strlen($data);
         if ($fileSize < self::BLOCK_SIZE) {
             throw new \RuntimeException(
@@ -61,6 +52,23 @@ class CarFileParser implements CarFileParserInterface
             'player_count' => $playerCount,
             'players' => $players,
         ];
+    }
+
+    /**
+     * @see CarFileParserInterface::parseFile()
+     */
+    public static function parseFile(string $filePath): array
+    {
+        if (!file_exists($filePath)) {
+            throw new \RuntimeException("CAR file not found: {$filePath}");
+        }
+
+        $data = file_get_contents($filePath);
+        if ($data === false) {
+            throw new \RuntimeException("Failed to read CAR file: {$filePath}");
+        }
+
+        return self::parse($data);
     }
 
     /**

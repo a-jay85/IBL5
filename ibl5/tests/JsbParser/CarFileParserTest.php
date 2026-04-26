@@ -260,6 +260,24 @@ class CarFileParserTest extends TestCase
         $this->assertNull($result);
     }
 
+    public function testParseAcceptsInMemoryData(): void
+    {
+        $seasonRecord = $this->buildSeasonRecord();
+        $playerBlock = $this->buildPlayerBlock(1, 12345, 'Test Player', $seasonRecord);
+        $carData = $this->buildCarFile(1, $playerBlock);
+
+        $result = CarFileParser::parse($carData);
+        $this->assertSame(1, $result['player_count']);
+        $this->assertCount(1, $result['players']);
+    }
+
+    public function testParseThrowsForTooSmallData(): void
+    {
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessage('too small');
+        CarFileParser::parse(str_repeat(' ', 100));
+    }
+
     public function testParseFileThrowsForMissingFile(): void
     {
         $this->expectException(\RuntimeException::class);

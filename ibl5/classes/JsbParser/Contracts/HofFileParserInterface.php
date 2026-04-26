@@ -13,6 +13,14 @@ namespace JsbParser\Contracts;
 interface HofFileParserInterface
 {
     /**
+     * Parse raw .hof binary data.
+     *
+     * @return list<array{jsb_pid: int, player_name: string, pos: string, induction_year: int}>
+     * @throws \RuntimeException If data has invalid structure
+     */
+    public static function parse(string $data): array;
+
+    /**
      * Parse a complete .hof file.
      *
      * @param string $filePath Path to the .hof file

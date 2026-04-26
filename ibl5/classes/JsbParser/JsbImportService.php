@@ -7,7 +7,6 @@ namespace JsbParser;
 use JsbParser\Contracts\JsbImportRepositoryInterface;
 use JsbParser\Contracts\JsbImportServiceInterface;
 use PlrParser\PlrOrdinalMap;
-use Season\Season;
 
 /**
  * Orchestrator service for JSB file parsing and database import.
@@ -36,65 +35,14 @@ class JsbImportService implements JsbImportServiceInterface
     }
 
     /**
-     * @see JsbImportServiceInterface::processCurrentSeason()
+     * @see JsbImportServiceInterface::processCarData()
      */
-    public function processCurrentSeason(string $basePath, Season $season, string $filePrefix = 'IBL5'): JsbImportResult
-    {
-        $result = new JsbImportResult();
-        $seasonYear = $season->endingYear;
-
-        // Process .trn first (trade data helps with player ID resolution)
-        $trnPath = $basePath . '/' . $filePrefix . '.trn';
-        if (file_exists($trnPath)) {
-            $trnResult = $this->processTrnFile($trnPath, 'current-season');
-            $result->merge($trnResult);
-            $result->addMessage('TRN: ' . $trnResult->summary());
-        }
-
-        // Process .car (uses trade data for mid-season splits)
-        $carPath = $basePath . '/' . $filePrefix . '.car';
-        if (file_exists($carPath)) {
-            $carResult = $this->processCarFile($carPath, $seasonYear);
-            $result->merge($carResult);
-            $result->addMessage('CAR: ' . $carResult->summary());
-        }
-
-        // Process .his
-        $hisPath = $basePath . '/' . $filePrefix . '.his';
-        if (file_exists($hisPath)) {
-            $hisResult = $this->processHisFile($hisPath, 'current-season');
-            $result->merge($hisResult);
-            $result->addMessage('HIS: ' . $hisResult->summary());
-        }
-
-        // Process .asw
-        $aswPath = $basePath . '/' . $filePrefix . '.asw';
-        if (file_exists($aswPath)) {
-            $aswResult = $this->processAswFile($aswPath, $seasonYear);
-            $result->merge($aswResult);
-            $result->addMessage('ASW: ' . $aswResult->summary());
-        }
-
-        // Process .rcb (Record Book)
-        $rcbPath = $basePath . '/' . $filePrefix . '.rcb';
-        if (file_exists($rcbPath)) {
-            $rcbResult = $this->processRcbFile($rcbPath, $seasonYear, 'current-season');
-            $result->merge($rcbResult);
-            $result->addMessage('RCB: ' . $rcbResult->summary());
-        }
-
-        return $result;
-    }
-
-    /**
-     * @see JsbImportServiceInterface::processCarFile()
-     */
-    public function processCarFile(string $filePath, ?int $filterYear = null): JsbImportResult
+    public function processCarData(string $data, ?int $filterYear = null): JsbImportResult
     {
         $result = new JsbImportResult();
 
         try {
-            $parsed = CarFileParser::parseFile($filePath);
+            $parsed = CarFileParser::parse($data);
         } catch (\RuntimeException $e) {
             $result->addError('CAR parse failed: ' . $e->getMessage());
             return $result;
@@ -129,14 +77,35 @@ class JsbImportService implements JsbImportServiceInterface
     }
 
     /**
-     * @see JsbImportServiceInterface::processTrnFile()
+     * @see JsbImportServiceInterface::processCarFile()
      */
-    public function processTrnFile(string $filePath, ?string $sourceLabel = null): JsbImportResult
+    public function processCarFile(string $filePath, ?int $filterYear = null): JsbImportResult
+    {
+        if (!file_exists($filePath)) {
+            $result = new JsbImportResult();
+            $result->addError('CAR file not found: ' . $filePath);
+            return $result;
+        }
+
+        $data = file_get_contents($filePath);
+        if ($data === false) {
+            $result = new JsbImportResult();
+            $result->addError('Failed to read CAR file: ' . $filePath);
+            return $result;
+        }
+
+        return $this->processCarData($data, $filterYear);
+    }
+
+    /**
+     * @see JsbImportServiceInterface::processTrnData()
+     */
+    public function processTrnData(string $data, ?string $sourceLabel = null): JsbImportResult
     {
         $result = new JsbImportResult();
 
         try {
-            $parsed = TrnFileParser::parseFile($filePath);
+            $parsed = TrnFileParser::parse($data);
         } catch (\RuntimeException $e) {
             $result->addError('TRN parse failed: ' . $e->getMessage());
             return $result;
@@ -168,14 +137,35 @@ class JsbImportService implements JsbImportServiceInterface
     }
 
     /**
-     * @see JsbImportServiceInterface::processHisFile()
+     * @see JsbImportServiceInterface::processTrnFile()
      */
-    public function processHisFile(string $filePath, ?string $sourceLabel = null): JsbImportResult
+    public function processTrnFile(string $filePath, ?string $sourceLabel = null): JsbImportResult
+    {
+        if (!file_exists($filePath)) {
+            $result = new JsbImportResult();
+            $result->addError('TRN file not found: ' . $filePath);
+            return $result;
+        }
+
+        $data = file_get_contents($filePath);
+        if ($data === false) {
+            $result = new JsbImportResult();
+            $result->addError('Failed to read TRN file: ' . $filePath);
+            return $result;
+        }
+
+        return $this->processTrnData($data, $sourceLabel);
+    }
+
+    /**
+     * @see JsbImportServiceInterface::processHisData()
+     */
+    public function processHisData(string $data, ?string $sourceLabel = null): JsbImportResult
     {
         $result = new JsbImportResult();
 
         try {
-            $parsed = HisFileParser::parseFile($filePath);
+            $parsed = HisFileParser::parse($data);
         } catch (\RuntimeException $e) {
             $result->addError('HIS parse failed: ' . $e->getMessage());
             return $result;
@@ -209,14 +199,35 @@ class JsbImportService implements JsbImportServiceInterface
     }
 
     /**
-     * @see JsbImportServiceInterface::processAswFile()
+     * @see JsbImportServiceInterface::processHisFile()
      */
-    public function processAswFile(string $filePath, int $seasonYear): JsbImportResult
+    public function processHisFile(string $filePath, ?string $sourceLabel = null): JsbImportResult
+    {
+        if (!file_exists($filePath)) {
+            $result = new JsbImportResult();
+            $result->addError('HIS file not found: ' . $filePath);
+            return $result;
+        }
+
+        $data = file_get_contents($filePath);
+        if ($data === false) {
+            $result = new JsbImportResult();
+            $result->addError('Failed to read HIS file: ' . $filePath);
+            return $result;
+        }
+
+        return $this->processHisData($data, $sourceLabel);
+    }
+
+    /**
+     * @see JsbImportServiceInterface::processAswData()
+     */
+    public function processAswData(string $data, int $seasonYear): JsbImportResult
     {
         $result = new JsbImportResult();
 
         try {
-            $parsed = AswFileParser::parseFile($filePath);
+            $parsed = AswFileParser::parse($data);
         } catch (\RuntimeException $e) {
             $result->addError('ASW parse failed: ' . $e->getMessage());
             return $result;
@@ -291,26 +302,47 @@ class JsbImportService implements JsbImportServiceInterface
         return $result;
     }
 
+    /**
+     * @see JsbImportServiceInterface::processAswFile()
+     */
+    public function processAswFile(string $filePath, int $seasonYear): JsbImportResult
+    {
+        if (!file_exists($filePath)) {
+            $result = new JsbImportResult();
+            $result->addError('ASW file not found: ' . $filePath);
+            return $result;
+        }
+
+        $data = file_get_contents($filePath);
+        if ($data === false) {
+            $result = new JsbImportResult();
+            $result->addError('Failed to read ASW file: ' . $filePath);
+            return $result;
+        }
+
+        return $this->processAswData($data, $seasonYear);
+    }
+
     /** @var list<string> Rank suffixes for award names */
     private const RANK_SUFFIXES = ['(1st)', '(2nd)', '(3rd)', '(4th)', '(5th)'];
 
     /**
-     * @see JsbImportServiceInterface::processAwaFile()
+     * @see JsbImportServiceInterface::processAwaData()
      */
-    public function processAwaFile(string $awaPath, string $carPath, ?int $filterYear = null): JsbImportResult
+    public function processAwaData(string $awaData, string $carData, ?int $filterYear = null): JsbImportResult
     {
         $result = new JsbImportResult();
 
         try {
-            $awaParsed = AwaFileParser::parseFile($awaPath);
+            $awaParsed = AwaFileParser::parse($awaData);
         } catch (\RuntimeException $e) {
             $result->addError('AWA parse failed: ' . $e->getMessage());
             return $result;
         }
 
-        // Build PID → name map from .car file
+        // Build PID → name map from .car data
         try {
-            $carParsed = CarFileParser::parseFile($carPath);
+            $carParsed = CarFileParser::parse($carData);
         } catch (\RuntimeException $e) {
             $result->addError('CAR parse failed (for AWA name resolution): ' . $e->getMessage());
             return $result;
@@ -359,14 +391,36 @@ class JsbImportService implements JsbImportServiceInterface
     }
 
     /**
-     * @see JsbImportServiceInterface::processRcbFile()
+     * @see JsbImportServiceInterface::processAwaFile()
      */
-    public function processRcbFile(string $filePath, int $seasonYear, ?string $sourceLabel = null): JsbImportResult
+    public function processAwaFile(string $awaPath, string $carPath, ?int $filterYear = null): JsbImportResult
+    {
+        if (!file_exists($awaPath) || !file_exists($carPath)) {
+            $result = new JsbImportResult();
+            $result->addError('AWA or CAR file not found');
+            return $result;
+        }
+
+        $awaData = file_get_contents($awaPath);
+        $carData = file_get_contents($carPath);
+        if ($awaData === false || $carData === false) {
+            $result = new JsbImportResult();
+            $result->addError('Failed to read AWA or CAR file');
+            return $result;
+        }
+
+        return $this->processAwaData($awaData, $carData, $filterYear);
+    }
+
+    /**
+     * @see JsbImportServiceInterface::processRcbData()
+     */
+    public function processRcbData(string $data, int $seasonYear, ?string $sourceLabel = null): JsbImportResult
     {
         $result = new JsbImportResult();
 
         try {
-            $parsed = RcbFileParser::parseFile($filePath);
+            $parsed = RcbFileParser::parse($data);
         } catch (\RuntimeException $e) {
             $result->addError('RCB parse failed: ' . $e->getMessage());
             return $result;
@@ -422,6 +476,27 @@ class JsbImportService implements JsbImportServiceInterface
         }
 
         return $result;
+    }
+
+    /**
+     * @see JsbImportServiceInterface::processRcbFile()
+     */
+    public function processRcbFile(string $filePath, int $seasonYear, ?string $sourceLabel = null): JsbImportResult
+    {
+        if (!file_exists($filePath)) {
+            $result = new JsbImportResult();
+            $result->addError('RCB file not found: ' . $filePath);
+            return $result;
+        }
+
+        $data = file_get_contents($filePath);
+        if ($data === false) {
+            $result = new JsbImportResult();
+            $result->addError('Failed to read RCB file: ' . $filePath);
+            return $result;
+        }
+
+        return $this->processRcbData($data, $seasonYear, $sourceLabel);
     }
 
     /**
@@ -598,10 +673,10 @@ class JsbImportService implements JsbImportServiceInterface
     }
 
     /**
-     * @see JsbImportServiceInterface::processPlbFile()
+     * @see JsbImportServiceInterface::processPlbData()
      */
-    public function processPlbFile(
-        string $filePath,
+    public function processPlbData(
+        string $data,
         PlrOrdinalMap $map,
         int $seasonYear,
         int $simNumber,
@@ -610,7 +685,7 @@ class JsbImportService implements JsbImportServiceInterface
         $result = new JsbImportResult();
 
         try {
-            $parsed = PlbFileParser::parseFile($filePath);
+            $parsed = PlbFileParser::parse($data);
         } catch (\RuntimeException $e) {
             $result->addError('PLB parse failed: ' . $e->getMessage());
             return $result;
@@ -664,6 +739,32 @@ class JsbImportService implements JsbImportServiceInterface
     }
 
     /**
+     * @see JsbImportServiceInterface::processPlbFile()
+     */
+    public function processPlbFile(
+        string $filePath,
+        PlrOrdinalMap $map,
+        int $seasonYear,
+        int $simNumber,
+        string $sourceArchive,
+    ): JsbImportResult {
+        if (!file_exists($filePath)) {
+            $result = new JsbImportResult();
+            $result->addError('PLB file not found: ' . $filePath);
+            return $result;
+        }
+
+        $data = file_get_contents($filePath);
+        if ($data === false) {
+            $result = new JsbImportResult();
+            $result->addError('Failed to read PLB file: ' . $filePath);
+            return $result;
+        }
+
+        return $this->processPlbData($data, $map, $seasonYear, $simNumber, $sourceArchive);
+    }
+
+    /**
      * Initialize trade group ID counter from existing data.
      */
     private function initTradeGroupId(): void
@@ -677,14 +778,14 @@ class JsbImportService implements JsbImportServiceInterface
     }
 
     /**
-     * @see JsbImportServiceInterface::processDraFile()
+     * @see JsbImportServiceInterface::processDraData()
      */
-    public function processDraFile(string $filePath): JsbImportResult
+    public function processDraData(string $data): JsbImportResult
     {
         $result = new JsbImportResult();
 
         try {
-            $parsed = DraFileParser::parseFile($filePath);
+            $parsed = DraFileParser::parse($data);
         } catch (\RuntimeException $e) {
             $result->addError('DRA parse failed: ' . $e->getMessage());
             return $result;
@@ -713,14 +814,35 @@ class JsbImportService implements JsbImportServiceInterface
     }
 
     /**
-     * @see JsbImportServiceInterface::processRetFile()
+     * @see JsbImportServiceInterface::processDraFile()
      */
-    public function processRetFile(string $filePath, int $retirementYear): JsbImportResult
+    public function processDraFile(string $filePath): JsbImportResult
+    {
+        if (!file_exists($filePath)) {
+            $result = new JsbImportResult();
+            $result->addError('DRA file not found: ' . $filePath);
+            return $result;
+        }
+
+        $data = file_get_contents($filePath);
+        if ($data === false) {
+            $result = new JsbImportResult();
+            $result->addError('Failed to read DRA file: ' . $filePath);
+            return $result;
+        }
+
+        return $this->processDraData($data);
+    }
+
+    /**
+     * @see JsbImportServiceInterface::processRetData()
+     */
+    public function processRetData(string $data, int $retirementYear): JsbImportResult
     {
         $result = new JsbImportResult();
 
         try {
-            $parsed = RetFileParser::parseFile($filePath);
+            $parsed = RetFileParser::parse($data);
         } catch (\RuntimeException $e) {
             $result->addError('RET parse failed: ' . $e->getMessage());
             return $result;
@@ -748,14 +870,35 @@ class JsbImportService implements JsbImportServiceInterface
     }
 
     /**
-     * @see JsbImportServiceInterface::processHofFile()
+     * @see JsbImportServiceInterface::processRetFile()
      */
-    public function processHofFile(string $filePath): JsbImportResult
+    public function processRetFile(string $filePath, int $retirementYear): JsbImportResult
+    {
+        if (!file_exists($filePath)) {
+            $result = new JsbImportResult();
+            $result->addError('RET file not found: ' . $filePath);
+            return $result;
+        }
+
+        $data = file_get_contents($filePath);
+        if ($data === false) {
+            $result = new JsbImportResult();
+            $result->addError('Failed to read RET file: ' . $filePath);
+            return $result;
+        }
+
+        return $this->processRetData($data, $retirementYear);
+    }
+
+    /**
+     * @see JsbImportServiceInterface::processHofData()
+     */
+    public function processHofData(string $data): JsbImportResult
     {
         $result = new JsbImportResult();
 
         try {
-            $parsed = HofFileParser::parseFile($filePath);
+            $parsed = HofFileParser::parse($data);
         } catch (\RuntimeException $e) {
             $result->addError('HOF parse failed: ' . $e->getMessage());
             return $result;
@@ -781,5 +924,26 @@ class JsbImportService implements JsbImportServiceInterface
         }
 
         return $result;
+    }
+
+    /**
+     * @see JsbImportServiceInterface::processHofFile()
+     */
+    public function processHofFile(string $filePath): JsbImportResult
+    {
+        if (!file_exists($filePath)) {
+            $result = new JsbImportResult();
+            $result->addError('HOF file not found: ' . $filePath);
+            return $result;
+        }
+
+        $data = file_get_contents($filePath);
+        if ($data === false) {
+            $result = new JsbImportResult();
+            $result->addError('Failed to read HOF file: ' . $filePath);
+            return $result;
+        }
+
+        return $this->processHofData($data);
     }
 }

@@ -14,6 +14,14 @@ namespace JsbParser\Contracts;
 interface RcbFileParserInterface
 {
     /**
+     * Parse raw .rcb text data.
+     *
+     * @return array{alltime: list<array{scope: string, teamid: int, record_type: string, stat_category: string, ranking: int, player_name: string, car_block_id: int, stat_value: float, stat_raw: int, team_of_record: int|null, season_year: int|null, career_total: int|null}>, currentSeason: list<array{scope: string, teamid: int, context: string, stat_category: string, ranking: int, player_name: string, player_position: string, car_block_id: int, stat_value: int, season_year: int}>}
+     * @throws \RuntimeException If data has invalid structure
+     */
+    public static function parse(string $data): array;
+
+    /**
      * Parse a complete .rcb file.
      *
      * @param string $filePath Path to the .rcb file

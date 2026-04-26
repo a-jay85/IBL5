@@ -201,4 +201,13 @@ class DraFileParserTest extends TestCase
 
         DraFileParser::parseFile('/nonexistent/file.dra');
     }
+
+    public function testParseAcceptsInMemoryData(): void
+    {
+        $data = "***** 2025 rookie draft *****\nRound 1 Pick 1\nLakers: SF John Doe\n";
+        $result = DraFileParser::parse($data);
+        $this->assertIsArray($result);
+        $this->assertCount(1, $result);
+        $this->assertSame(2025, $result[0]['draft_year']);
+    }
 }

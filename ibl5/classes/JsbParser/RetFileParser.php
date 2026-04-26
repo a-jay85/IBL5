@@ -15,23 +15,14 @@ use JsbParser\Contracts\RetFileParserInterface;
 class RetFileParser implements RetFileParserInterface
 {
     /**
-     * @see RetFileParserInterface::parseFile()
+     * @see RetFileParserInterface::parse()
      */
-    public static function parseFile(string $filePath): array
+    public static function parse(string $data): array
     {
-        if (!file_exists($filePath)) {
-            throw new \RuntimeException("RET file not found: {$filePath}");
-        }
-
-        $raw = file_get_contents($filePath);
-        if ($raw === false) {
-            throw new \RuntimeException("Failed to read RET file: {$filePath}");
-        }
-
         // Normalize line endings
-        $raw = str_replace("\r\n", "\n", $raw);
-        $raw = str_replace("\r", "\n", $raw);
-        $lines = explode("\n", $raw);
+        $data = str_replace("\r\n", "\n", $data);
+        $data = str_replace("\r", "\n", $data);
+        $lines = explode("\n", $data);
 
         /** @var list<array{jsb_pid: int, player_name: string}> $entries */
         $entries = [];
@@ -69,5 +60,22 @@ class RetFileParser implements RetFileParserInterface
         }
 
         return $entries;
+    }
+
+    /**
+     * @see RetFileParserInterface::parseFile()
+     */
+    public static function parseFile(string $filePath): array
+    {
+        if (!file_exists($filePath)) {
+            throw new \RuntimeException("RET file not found: {$filePath}");
+        }
+
+        $raw = file_get_contents($filePath);
+        if ($raw === false) {
+            throw new \RuntimeException("Failed to read RET file: {$filePath}");
+        }
+
+        return self::parse($raw);
     }
 }

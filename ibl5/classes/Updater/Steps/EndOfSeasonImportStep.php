@@ -7,6 +7,7 @@ namespace Updater\Steps;
 use JsbParser\Contracts\JsbImportRepositoryInterface;
 use JsbParser\JsbImportResult;
 use JsbParser\JsbImportService;
+use Updater\Contracts\JsbSourceResolverInterface;
 use Updater\Contracts\PipelineStepInterface;
 use Updater\StepResult;
 
@@ -27,8 +28,7 @@ final class EndOfSeasonImportStep implements PipelineStepInterface
         private readonly JsbImportRepositoryInterface $jsbRepo,
         private readonly JsbImportService $jsbService,
         private readonly int $seasonEndingYear,
-        private readonly string $basePath,
-        private readonly string $filePrefix,
+        private readonly JsbSourceResolverInterface $sourceResolver,
     ) {
     }
 
@@ -65,12 +65,12 @@ final class EndOfSeasonImportStep implements PipelineStepInterface
      */
     private function importDra(JsbImportResult $result, array &$messages): void
     {
-        $path = $this->filePath('dra');
-        if (!file_exists($path)) {
+        $data = $this->sourceResolver->getContents('dra');
+        if ($data === null) {
             return;
         }
 
-        $draResult = $this->jsbService->processDraFile($path);
+        $draResult = $this->jsbService->processDraData($data);
         $result->merge($draResult);
         $messages[] = 'DRA: ' . $draResult->summary();
     }
@@ -80,12 +80,12 @@ final class EndOfSeasonImportStep implements PipelineStepInterface
      */
     private function importRet(JsbImportResult $result, array &$messages): void
     {
-        $path = $this->filePath('ret');
-        if (!file_exists($path)) {
+        $data = $this->sourceResolver->getContents('ret');
+        if ($data === null) {
             return;
         }
 
-        $retResult = $this->jsbService->processRetFile($path, $this->seasonEndingYear);
+        $retResult = $this->jsbService->processRetData($data, $this->seasonEndingYear);
         $result->merge($retResult);
         $messages[] = 'RET: ' . $retResult->summary();
     }
@@ -95,12 +95,12 @@ final class EndOfSeasonImportStep implements PipelineStepInterface
      */
     private function importHof(JsbImportResult $result, array &$messages): void
     {
-        $path = $this->filePath('hof');
-        if (!file_exists($path)) {
+        $data = $this->sourceResolver->getContents('hof');
+        if ($data === null) {
             return;
         }
 
-        $hofResult = $this->jsbService->processHofFile($path);
+        $hofResult = $this->jsbService->processHofData($data);
         $result->merge($hofResult);
         $messages[] = 'HOF: ' . $hofResult->summary();
     }
@@ -110,19 +110,14 @@ final class EndOfSeasonImportStep implements PipelineStepInterface
      */
     private function importAwa(JsbImportResult $result, array &$messages): void
     {
-        $awaPath = $this->filePath('awa');
-        $carPath = $this->filePath('car');
-        if (!file_exists($awaPath) || !file_exists($carPath)) {
+        $awaData = $this->sourceResolver->getContents('awa');
+        $carData = $this->sourceResolver->getContents('car');
+        if ($awaData === null || $carData === null) {
             return;
         }
 
-        $awaResult = $this->jsbService->processAwaFile($awaPath, $carPath, $this->seasonEndingYear);
+        $awaResult = $this->jsbService->processAwaData($awaData, $carData, $this->seasonEndingYear);
         $result->merge($awaResult);
         $messages[] = 'AWA: ' . $awaResult->summary();
-    }
-
-    private function filePath(string $extension): string
-    {
-        return $this->basePath . '/' . $this->filePrefix . '.' . $extension;
     }
 }

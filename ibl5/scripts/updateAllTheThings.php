@@ -216,12 +216,12 @@ try {
         ));
     }
 
-    $updaterService->addStep(new Updater\Steps\ParseJsbFilesStep($jsbService, $basePath, $season, $filePrefix));
+    $updaterService->addStep(new Updater\Steps\ParseJsbFilesStep($jsbService, $sourceResolver, $season->endingYear));
 
     // IBL-only: End-of-season imports when champion exists
     if (!$isOlympics) {
         $updaterService->addStep(new Updater\Steps\EndOfSeasonImportStep(
-            $jsbRepo, $jsbService, $season->endingYear, $basePath, $filePrefix,
+            $jsbRepo, $jsbService, $season->endingYear, $sourceResolver,
         ));
     }
 

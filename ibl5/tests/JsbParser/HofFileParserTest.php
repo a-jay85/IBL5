@@ -141,7 +141,7 @@ class HofFileParserTest extends TestCase
 
         try {
             $this->expectException(\RuntimeException::class);
-            $this->expectExceptionMessage('HOF file size mismatch');
+            $this->expectExceptionMessage('HOF data size mismatch');
 
             HofFileParser::parseFile($tmpFile);
         } finally {
@@ -182,5 +182,19 @@ class HofFileParserTest extends TestCase
         $this->expectExceptionMessage('HOF file not found');
 
         HofFileParser::parseFile('/nonexistent/file.hof');
+    }
+
+    public function testParseThrowsForWrongSize(): void
+    {
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessage('HOF data size mismatch');
+        HofFileParser::parse(str_repeat(' ', 100));
+    }
+
+    public function testParseAcceptsValidSizedData(): void
+    {
+        $data = str_repeat(' ', 7000);
+        $result = HofFileParser::parse($data);
+        $this->assertIsArray($result);
     }
 }

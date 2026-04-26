@@ -8,6 +8,7 @@ use JsbParser\Contracts\JsbImportRepositoryInterface;
 use JsbParser\JsbImportResult;
 use JsbParser\JsbImportService;
 use PHPUnit\Framework\TestCase;
+use Updater\Contracts\JsbSourceResolverInterface;
 use Updater\Contracts\PipelineStepInterface;
 use Updater\Steps\EndOfSeasonImportStep;
 
@@ -15,21 +16,22 @@ class EndOfSeasonImportStepTest extends TestCase
 {
     private JsbImportRepositoryInterface $stubRepo;
     private JsbImportService $stubService;
+    private JsbSourceResolverInterface $stubResolver;
 
     protected function setUp(): void
     {
         $this->stubRepo = $this->createStub(JsbImportRepositoryInterface::class);
         $this->stubService = $this->createStub(JsbImportService::class);
+        $this->stubResolver = $this->createStub(JsbSourceResolverInterface::class);
     }
 
-    private function createStep(string $basePath = '/tmp'): EndOfSeasonImportStep
+    private function createStep(): EndOfSeasonImportStep
     {
         return new EndOfSeasonImportStep(
             $this->stubRepo,
             $this->stubService,
             2026,
-            $basePath,
-            'IBL5',
+            $this->stubResolver,
         );
     }
 
@@ -60,48 +62,36 @@ class EndOfSeasonImportStepTest extends TestCase
         $jsbResult = new JsbImportResult();
         $jsbResult->addInserted();
 
-        $this->stubService->method('processDraFile')->willReturn($jsbResult);
-        $this->stubService->method('processRetFile')->willReturn($jsbResult);
-        $this->stubService->method('processHofFile')->willReturn($jsbResult);
-        $this->stubService->method('processAwaFile')->willReturn($jsbResult);
+        $this->stubResolver->method('getContents')->willReturnMap([
+            ['dra', 'dra-data'],
+            ['ret', 'ret-data'],
+            ['hof', 'hof-data'],
+            ['awa', 'awa-data'],
+            ['car', 'car-data'],
+        ]);
 
-        // Use a temp dir with actual files
-        $tmpDir = sys_get_temp_dir() . '/eos-test-' . uniqid();
-        mkdir($tmpDir, 0777, true);
-        foreach (['dra', 'ret', 'hof', 'awa', 'car'] as $ext) {
-            touch($tmpDir . '/IBL5.' . $ext);
-        }
+        $this->stubService->method('processDraData')->willReturn($jsbResult);
+        $this->stubService->method('processRetData')->willReturn($jsbResult);
+        $this->stubService->method('processHofData')->willReturn($jsbResult);
+        $this->stubService->method('processAwaData')->willReturn($jsbResult);
 
-        try {
-            $step = new EndOfSeasonImportStep(
-                $this->stubRepo,
-                $this->stubService,
-                2026,
-                $tmpDir,
-                'IBL5',
-            );
-            $result = $step->execute();
+        $result = $this->createStep()->execute();
 
-            $this->assertTrue($result->success);
-            $this->assertNotEmpty($result->messages);
-        } finally {
-            // Cleanup
-            foreach (glob($tmpDir . '/*') as $file) {
-                unlink($file);
-            }
-            rmdir($tmpDir);
-        }
+        $this->assertTrue($result->success);
+        $this->assertNotEmpty($result->messages);
     }
 
-    public function testSkipsIndividualImportWhenFileNotFound(): void
+    public function testSkipsIndividualImportWhenResolverReturnsNull(): void
     {
         $this->stubRepo->method('hasChampionForSeason')->willReturn(true);
 
-        // Base path has no files — all imports should be silently skipped
-        $result = $this->createStep('/nonexistent/path')->execute();
+        $this->stubResolver->method('getContents')->willReturn(null);
+
+        $result = $this->createStep()->execute();
 
         $this->assertTrue($result->success);
         $this->assertSame(0, $result->messageErrorCount);
+        $this->assertSame([], $result->messages);
     }
 
     public function testErrorsFromIndividualImportAreCollected(): void
@@ -112,27 +102,38 @@ class EndOfSeasonImportStepTest extends TestCase
         $errorResult->addError('Parse failed');
         $errorResult->addError('Another error');
 
-        $this->stubService->method('processDraFile')->willReturn($errorResult);
+        $this->stubResolver->method('getContents')->willReturnMap([
+            ['dra', 'dra-data'],
+            ['ret', null],
+            ['hof', null],
+            ['awa', null],
+            ['car', null],
+        ]);
+        $this->stubService->method('processDraData')->willReturn($errorResult);
 
-        $tmpDir = sys_get_temp_dir() . '/eos-err-' . uniqid();
-        mkdir($tmpDir, 0777, true);
-        touch($tmpDir . '/IBL5.dra');
+        $result = $this->createStep()->execute();
 
-        try {
-            $step = new EndOfSeasonImportStep(
-                $this->stubRepo,
-                $this->stubService,
-                2026,
-                $tmpDir,
-                'IBL5',
-            );
-            $result = $step->execute();
+        $this->assertTrue($result->success);
+        $this->assertSame(2, $result->messageErrorCount);
+    }
 
-            $this->assertTrue($result->success);
-            $this->assertSame(2, $result->messageErrorCount);
-        } finally {
-            unlink($tmpDir . '/IBL5.dra');
-            rmdir($tmpDir);
-        }
+    public function testAwaSkippedWhenCarDataNull(): void
+    {
+        $this->stubRepo->method('hasChampionForSeason')->willReturn(true);
+
+        $jsbResult = new JsbImportResult();
+
+        $this->stubResolver->method('getContents')->willReturnMap([
+            ['dra', null],
+            ['ret', null],
+            ['hof', null],
+            ['awa', 'awa-data'],
+            ['car', null],
+        ]);
+
+        $result = $this->createStep()->execute();
+
+        $this->assertTrue($result->success);
+        $this->assertSame([], $result->messages);
     }
 }

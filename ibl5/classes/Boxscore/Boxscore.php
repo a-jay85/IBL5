@@ -228,6 +228,8 @@ class Boxscore
                 $this->gameYear = $seasonStartingYear;
                 if ($seasonPhase === "HEAT") {
                     $this->gameMonth = (string) Season::IBL_HEAT_MONTH;
+                } elseif ($seasonPhase === "Preseason") {
+                    $this->gameMonth = sprintf("%02u", (int)$this->gameMonth - 2);
                 }
             }
         }

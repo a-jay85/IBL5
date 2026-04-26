@@ -6,18 +6,18 @@ namespace Tests\DatabaseIntegration\UpdateAllTheThings;
 
 class PreseasonTransitionPipelineTest extends PipelineIntegrationTestCase
 {
-    public function testFirstRegularSeasonSimCleansPreseasonData(): void
+    public function testFirstHeatSimCleansPreseasonData(): void
     {
-        $this->updateSetting('Current Season Phase', 'Regular Season');
+        $this->updateSetting('Current Season Phase', 'HEAT');
         $this->updateSetting('Current Season Ending Year', '2099');
-        $this->seedSimDates(1, '2098-10-15', '2098-10-20');
+        $this->seedSimDates(1, '2098-09-15', '2098-09-20');
         $this->seedLeagueConfig(2099);
 
-        $this->insertTeamBoxscoreRow('2098-12-28', 'PreGame1', 1, 5, 6);
-        $this->insertTeamBoxscoreRow('2098-12-29', 'PreGame2', 1, 7, 8);
+        $this->insertTeamBoxscoreRow('2098-09-28', 'PreGame1', 1, 5, 6);
+        $this->insertTeamBoxscoreRow('2098-10-02', 'PreGame2', 1, 7, 8);
 
-        $this->insertPlayerBoxscoreRow('2098-12-28', 1, 'Test Player One', 'PG', 5, 6, 5);
-        $this->insertPlayerBoxscoreRow('2098-12-29', 2, 'Test Player Two', 'SF', 7, 8, 7);
+        $this->insertPlayerBoxscoreRow('2098-09-28', 1, 'Test Player One', 'PG', 5, 6, 5);
+        $this->insertPlayerBoxscoreRow('2098-10-02', 2, 'Test Player Two', 'SF', 7, 8, 7);
 
         $this->insertRow('ibl_team_awards', [
             'year' => 2099,
@@ -42,7 +42,7 @@ class PreseasonTransitionPipelineTest extends PipelineIntegrationTestCase
             'to_teamid' => 2,
         ]);
 
-        $season = $this->buildSeason('Regular Season', 2099);
+        $season = $this->buildSeason('HEAT', 2099);
 
         $schPath = $this->buildSchFile([
             ['date_slot' => 103, 'game_index' => 0, 'visitor' => 1, 'home' => 2, 'visitor_score' => 105, 'home_score' => 98],
@@ -63,12 +63,12 @@ class PreseasonTransitionPipelineTest extends PipelineIntegrationTestCase
         self::assertNotNull($cleanupResult, 'CleanupPreseasonDataStep should have run');
         self::assertStringContainsString('Cleaned:', $cleanupResult->detail);
 
-        self::assertSame(0, $this->countRows('ibl_box_scores_teams', "game_date BETWEEN '2098-11-01' AND '2098-12-31'"));
-        self::assertSame(0, $this->countRows('ibl_box_scores', "game_date BETWEEN '2098-11-01' AND '2098-12-31'"));
+        self::assertSame(0, $this->countRows('ibl_box_scores_teams', "game_date BETWEEN '2098-09-01' AND '2098-10-31'"));
+        self::assertSame(0, $this->countRows('ibl_box_scores', "game_date BETWEEN '2098-09-01' AND '2098-10-31'"));
         self::assertSame(0, $this->countRows('ibl_team_awards', "year = 2099"));
         self::assertSame(0, $this->countRows('ibl_jsb_history', "season_year = 2099"));
         self::assertSame(0, $this->countRows('ibl_jsb_transactions', "season_year = 2099"));
 
-        self::assertSame(2, $this->countRows('ibl_schedule', "game_date LIKE '2099-01-%'"));
+        self::assertSame(2, $this->countRows('ibl_schedule', "game_date LIKE '2098-10-%'"));
     }
 }

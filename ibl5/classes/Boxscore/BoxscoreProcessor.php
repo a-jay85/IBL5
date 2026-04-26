@@ -495,11 +495,6 @@ class BoxscoreProcessor implements BoxscoreProcessorInterface
         /** @var list<string> $messages */
         $messages = [];
 
-        if ($operatingSeasonPhase === 'Preseason') {
-            $messages[] = 'Preseason box scores added. Sim Start/End Dates not updated during Preseason.';
-            return $messages;
-        }
-
         $newSimEndDate = $this->season->getLastBoxScoreDate();
 
         if ($this->season->lastSimEndDate !== '') {

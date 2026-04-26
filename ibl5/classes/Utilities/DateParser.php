@@ -54,6 +54,12 @@ class DateParser
             if ($month === 11) {
                 $month = Season::IBL_HEAT_MONTH;
             }
+        } elseif ($phase === "Preseason") {
+            if ($month === 11) {
+                $month = Season::IBL_PRESEASON_MONTH;
+            } elseif ($month === 12) {
+                $month = Season::IBL_HEAT_MONTH;
+            }
         }
 
         // Olympics override
@@ -62,7 +68,7 @@ class DateParser
         }
 
         // Determine year based on month
-        if ($month < Season::IBL_HEAT_MONTH) {
+        if ($month < Season::IBL_PRESEASON_MONTH) {
             $year = $endingYear;
         } else {
             $year = $beginningYear;

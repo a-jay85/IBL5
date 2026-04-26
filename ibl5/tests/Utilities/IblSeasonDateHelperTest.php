@@ -9,6 +9,11 @@ use Utilities\IblSeasonDateHelper;
 
 final class IblSeasonDateHelperTest extends TestCase
 {
+    public function testSeptemberDateReturnsNextYear(): void
+    {
+        $this->assertSame(2026, IblSeasonDateHelper::dateToSeasonEndingYear('2025-09-10'));
+    }
+
     public function testOctoberDateReturnsNextYear(): void
     {
         $this->assertSame(2026, IblSeasonDateHelper::dateToSeasonEndingYear('2025-10-15'));
@@ -42,6 +47,11 @@ final class IblSeasonDateHelperTest extends TestCase
     public function testEmptyDateReturnsZero(): void
     {
         $this->assertSame(0, IblSeasonDateHelper::dateToSeasonEndingYear(''));
+    }
+
+    public function testSeptemberDateReturnsPreseason(): void
+    {
+        $this->assertSame('preseason', IblSeasonDateHelper::getGameTypeFromDate('2025-09-10'));
     }
 
     public function testOctoberDateReturnsHeat(): void

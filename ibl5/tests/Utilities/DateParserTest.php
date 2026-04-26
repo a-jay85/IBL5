@@ -154,6 +154,51 @@ class DateParserTest extends TestCase
         $this->assertEquals(2023, $result['year']);
     }
 
+    public function testExtractDatePreseasonRemapsNovemberToSeptember(): void
+    {
+        $result = DateParser::extractDate(
+            'November 15, 2023',
+            'Preseason',
+            2023,
+            2024,
+            'IBL'
+        );
+
+        $this->assertIsArray($result);
+        $this->assertEquals(9, $result['month']);
+        $this->assertEquals(2023, $result['year']);
+    }
+
+    public function testExtractDatePreseasonRemapsDecemberToOctober(): void
+    {
+        $result = DateParser::extractDate(
+            'December 20, 2023',
+            'Preseason',
+            2023,
+            2024,
+            'IBL'
+        );
+
+        $this->assertIsArray($result);
+        $this->assertEquals(10, $result['month']);
+        $this->assertEquals(2023, $result['year']);
+    }
+
+    public function testExtractDateSeptemberRoutesToBeginningYear(): void
+    {
+        $result = DateParser::extractDate(
+            'September 5, 2023',
+            'Preseason',
+            2023,
+            2024,
+            'IBL'
+        );
+
+        $this->assertIsArray($result);
+        $this->assertEquals(9, $result['month']);
+        $this->assertEquals(2023, $result['year']);
+    }
+
     // Date Format Output
 
     public function testExtractDateReturnsFormattedDateString(): void

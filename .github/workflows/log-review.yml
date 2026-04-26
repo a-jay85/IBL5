@@ -1,0 +1,94 @@
+name: Weekly Log Review
+
+on:
+  # Sunday ~9am ET (13:00 UTC; ~8am EST in winter). Offset from :00.
+  schedule:
+    - cron: '57 12 * * 0'
+
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+jobs:
+  review:
+    name: Fetch & Notify
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Setup SSH
+        run: |
+          mkdir -p ~/.ssh
+          echo "$DEPLOY_KEY" > ~/.ssh/id_deploy
+          chmod 600 ~/.ssh/id_deploy
+          ssh-keyscan -p ${{ secrets.PORT }} ${{ secrets.HOST }} >> ~/.ssh/known_hosts 2>/dev/null
+        env:
+          DEPLOY_KEY: ${{ secrets.PRIVATE_KEY }}
+
+      - name: Fetch log digest
+        id: digest
+        run: |
+          chmod +x bin/log-fetch-prod
+          DIGEST=$(bin/log-fetch-prod \
+            --ssh-host "${{ secrets.USERNAME }}@${{ secrets.HOST }}" \
+            --ssh-port "${{ secrets.PORT }}" \
+            --ssh-key ~/.ssh/id_deploy)
+          echo "$DIGEST"
+          # Store in file for next step (multi-line output)
+          echo "$DIGEST" > /tmp/log-digest.txt
+
+      - name: Build Discord summary
+        id: summary
+        run: |
+          DIGEST=$(cat /tmp/log-digest.txt)
+
+          # Extract key metrics
+          TOTAL=$(echo "$DIGEST" | grep "^Total entries:" | sed 's/Total entries: //')
+          PERIOD=$(echo "$DIGEST" | grep "^Period:" | sed 's/Period: //')
+          WARNINGS=$(echo "$DIGEST" | awk '/^--- Severity Counts ---$/,/^$/' | grep WARNING | awk '{print $1}')
+          ERRORS=$(echo "$DIGEST" | awk '/^--- Severity Counts ---$/,/^$/' | grep -E 'ERROR|CRITICAL|ALERT|EMERGENCY' | awk '{sum+=$1} END {print sum+0}')
+          SLOW=$(echo "$DIGEST" | grep "^--- Slow Queries" | sed -n 's/.*(\([0-9]*\) total.*/\1/p')
+
+          # Top 3 deduplicated messages (preserve full message text)
+          TOP_ISSUES=$(echo "$DIGEST" \
+            | awk '/^--- Deduplicated Messages/,/^$/' \
+            | grep -v "^---" | grep -v "^$" \
+            | head -3 \
+            | sed 's/^ */  /')
+
+          # Top 3 slow query repos
+          TOP_SLOW=$(echo "$DIGEST" \
+            | awk '/^--- Slow Queries/,/^$/' \
+            | grep "hits" \
+            | head -3 \
+            | sed 's/^ */  /')
+
+          # Build message (Discord DM limit: 2000 chars)
+          {
+            echo "Weekly Log Review ($PERIOD)"
+            echo "Total: ${TOTAL:-0} entries | Warnings: ${WARNINGS:-0} | Errors: ${ERRORS:-0}"
+            echo ""
+            echo "Top issues:"
+            echo "${TOP_ISSUES:-  (none)}"
+            echo ""
+            echo "Slow queries ($SLOW total):"
+            echo "${TOP_SLOW:-  (none)}"
+            echo ""
+            echo "Full digest: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          } | tee /tmp/discord-msg.txt
+
+      - name: Send Discord DM
+        env:
+          OWNER_DISCORD_ID: ${{ secrets.OWNER_DISCORD_ID }}
+        run: |
+          MSG=$(cat /tmp/discord-msg.txt)
+
+          PAYLOAD=$(jq -n --arg id "$OWNER_DISCORD_ID" --arg msg "$MSG" \
+            '{content: {receivingUserDiscordID: $id, message: $msg}}')
+
+          echo "$PAYLOAD" | ssh -p ${{ secrets.PORT }} -i ~/.ssh/id_deploy ${{ secrets.USERNAME }}@${{ secrets.HOST }} \
+            'curl -s --max-time 10 -X POST http://localhost:50000/discordDM -H "Content-Type: application/json" -d @-' \
+            || echo "::warning::IBLbot notification failed (bot may be down)"

@@ -46,22 +46,7 @@ jobs:
       - name: Stop IBL6 to free resources for deploy
         run: |
           ssh -p ${{ secrets.PORT }} -i ~/.ssh/id_deploy ${{ secrets.USERNAME }}@${{ secrets.HOST }} '
-            if pkill -f "node build/index[.]js"; then
-              echo "SIGTERM sent, waiting for process to exit..."
-              for i in $(seq 1 10); do
-                if ! pgrep -f "node build/index[.]js" > /dev/null 2>&1; then
-                  echo "IBL6 stopped gracefully"
-                  exit 0
-                fi
-                sleep 1
-              done
-              echo "Process still alive after 10s, sending SIGKILL..."
-              pkill -9 -f "node build/index[.]js" || true
-              sleep 1
-              echo "IBL6 force-killed"
-            else
-              echo "IBL6 was not running"
-            fi
+            pm2 stop ibl6 2>/dev/null && echo "IBL6 stopped" || echo "IBL6 was not running"
           '
 
       - name: Pull latest code on server
@@ -138,19 +123,11 @@ jobs:
             echo "Registering slash commands..."
             npm run deploy-commands
 
-            echo "Stopping old bot process..."
-            if [ -f bot.pid ] && kill -0 "$(cat bot.pid)" 2>/dev/null; then
-              kill "$(cat bot.pid)"
-              sleep 2
-            fi
+            echo "Restarting IBLbot via PM2..."
+            pm2 restart iblbot --update-env
+            pm2 save
 
-            echo "Starting new bot process..."
-            mkdir -p logs
-            setsid node dist/index.js > logs/bot.log 2>&1 < /dev/null &
-            echo $! > bot.pid
-            sleep 1
-
-            echo "IBLbot deployed successfully (PID: $(cat bot.pid))"
+            echo "IBLbot deployed successfully (PID: $(pm2 pid iblbot))"
           '
 
       - name: Check for IBL6 changes
@@ -190,11 +167,28 @@ jobs:
           ssh -p ${{ secrets.PORT }} -i ~/.ssh/id_deploy ${{ secrets.USERNAME }}@${{ secrets.HOST }} '
             cd www/IBL6
             mkdir -p logs
-            setsid env PORT=3001 UV_THREADPOOL_SIZE=2 node --max-old-space-size=128 build/index.js > logs/ibl6.log 2>&1 < /dev/null &
-            echo $! > ibl6.pid
-            sleep 1
-            echo "IBL6 started (PID: $(cat ibl6.pid))"
+            pm2 restart ibl6 --update-env 2>/dev/null \
+              || pm2 start ecosystem.config.cjs --only ibl6
+            pm2 save
+            echo "IBL6 started (PID: $(pm2 pid ibl6))"
           '
+
+      - name: Smoke test IBL6
+        if: ${{ !cancelled() }}
+        run: |
+          for i in 1 2 3; do
+            if curl -fsS --max-time 10 https://ibl6.iblhoops.net/ >/dev/null 2>&1; then
+              echo "IBL6 smoke test passed (attempt $i)"
+              exit 0
+            fi
+            echo "Attempt $i failed, waiting 5s..."
+            sleep 5
+          done
+          echo "Smoke test failed after 3 attempts, restarting IBL6..."
+          ssh -p ${{ secrets.PORT }} -i ~/.ssh/id_deploy ${{ secrets.USERNAME }}@${{ secrets.HOST }} 'pm2 restart ibl6'
+          sleep 5
+          curl -fsS --max-time 10 https://ibl6.iblhoops.net/ >/dev/null 2>&1
+          echo "IBL6 recovered after restart"
 
   notify-deploy-failure:
     name: Notify Deploy Failure

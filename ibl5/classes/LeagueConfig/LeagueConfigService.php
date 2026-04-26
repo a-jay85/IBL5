@@ -26,8 +26,6 @@ class LeagueConfigService
      */
     public function processLgeFile(string $filePath): array
     {
-        $messages = [];
-
         try {
             $parsed = LgeFileParser::parseFile($filePath);
         } catch (\RuntimeException $e) {
@@ -39,6 +37,43 @@ class LeagueConfigService
                 'error' => $e->getMessage(),
             ];
         }
+
+        return $this->processParsed($parsed);
+    }
+
+    /**
+     * Parse raw .lge bytes and store the league configuration in the database.
+     *
+     * @return array{success: bool, season_ending_year: int, teams_stored: int, messages: list<string>, error?: string}
+     */
+    public function processLgeData(string $data): array
+    {
+        try {
+            $parsed = LgeFileParser::parse($data);
+        } catch (\RuntimeException $e) {
+            return [
+                'success' => false,
+                'season_ending_year' => 0,
+                'teams_stored' => 0,
+                'messages' => [],
+                'error' => $e->getMessage(),
+            ];
+        }
+
+        return $this->processParsed($parsed);
+    }
+
+    /**
+     * @param array{
+     *     header: array{qualifier_count: int, playoff_formats: list<string>, conferences: list<string>, divisions: list<string>},
+     *     teams: list<array{slot: int, name: string, control: string, conference: string, division: string}>,
+     *     season: array{season_beginning_year: int, season_ending_year: int, phase: string, team_count: int}
+     * } $parsed
+     * @return array{success: bool, season_ending_year: int, teams_stored: int, messages: list<string>}
+     */
+    private function processParsed(array $parsed): array
+    {
+        $messages = [];
 
         $header = $parsed['header'];
         $teams = $parsed['teams'];

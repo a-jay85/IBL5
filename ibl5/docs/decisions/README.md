@@ -1,6 +1,6 @@
 ---
 description: Index of IBL5 Architecture Decision Records (ADRs). Source of truth for every load-bearing decision and its rationale.
-last_verified: 2026-04-11
+last_verified: 2026-04-25
 ---
 
 # IBL5 Architecture Decision Records
@@ -22,6 +22,7 @@ Every load-bearing decision in IBL5 is captured here as a numbered ADR so that f
 | [0003](0003-statsformatter-mandate.md) | `StatsFormatter` mandate, `number_format()` banned | Accepted | Single centralized stat formatter enforced by `BanNumberFormatRule`. |
 | [0004](0004-docker-only-dev-environment.md) | Docker-only development environment | Accepted | MAMP sunset; reproducible dev + CI parity + worktree port isolation. |
 | [0005](0005-strict-types-enforcement.md) | Strict types + typed properties enforcement | Accepted | PHPStan level `max` + `strict-rules` as the floor; type coercion bugs banned mechanically. |
+| [0012](0012-archive-first-jsb-reading.md) | Archive-first JSB file reading | Accepted | `.lge`/`.sch` read directly from backup archive via `JsbSourceResolver`; disk-fallback for manual uploads. |
 
 ## When an ADR is Required
 

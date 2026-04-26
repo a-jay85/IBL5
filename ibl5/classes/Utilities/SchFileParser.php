@@ -30,7 +30,7 @@ class SchFileParser
     private const EMPTY_RECORD = '0   0     ';
 
     /**
-     * Parse a .sch file and return all games as structured arrays.
+     * Parse raw .sch binary/ASCII bytes and return all games as structured arrays.
      *
      * @return list<array{
      *     date_slot: int,
@@ -42,22 +42,13 @@ class SchFileParser
      *     played: bool
      * }>
      */
-    public static function parseFile(string $filePath): array
+    public static function parse(string $data): array
     {
-        if (!file_exists($filePath)) {
-            throw new \RuntimeException("Schedule file not found: {$filePath}");
-        }
-
-        $fileSize = filesize($filePath);
-        if ($fileSize !== self::FILE_SIZE) {
+        $dataSize = strlen($data);
+        if ($dataSize !== self::FILE_SIZE) {
             throw new \RuntimeException(
-                "Invalid .sch file size: expected " . self::FILE_SIZE . " bytes, got {$fileSize}"
+                "Invalid .sch data size: expected " . self::FILE_SIZE . " bytes, got {$dataSize}"
             );
-        }
-
-        $data = file_get_contents($filePath);
-        if ($data === false) {
-            throw new \RuntimeException("Failed to read schedule file: {$filePath}");
         }
 
         $games = [];
@@ -102,6 +93,33 @@ class SchFileParser
         }
 
         return $games;
+    }
+
+    /**
+     * Parse a .sch file and return all games as structured arrays.
+     *
+     * @return list<array{
+     *     date_slot: int,
+     *     game_index: int,
+     *     visitor: int,
+     *     home: int,
+     *     visitor_score: int,
+     *     home_score: int,
+     *     played: bool
+     * }>
+     */
+    public static function parseFile(string $filePath): array
+    {
+        if (!file_exists($filePath)) {
+            throw new \RuntimeException("Schedule file not found: {$filePath}");
+        }
+
+        $data = file_get_contents($filePath);
+        if ($data === false) {
+            throw new \RuntimeException("Failed to read schedule file: {$filePath}");
+        }
+
+        return self::parse($data);
     }
 
     /**

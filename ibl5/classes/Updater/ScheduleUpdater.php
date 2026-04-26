@@ -6,6 +6,7 @@ namespace Updater;
 
 use League\League;
 use League\LeagueContext;
+use Updater\Contracts\JsbSourceResolverInterface;
 use Utilities\UuidGenerator;
 use Utilities\SchFileParser;
 use Utilities\ScheduleHtmParser;
@@ -40,12 +41,12 @@ class ScheduleUpdater extends \BaseMysqliRepository {
         12 => 'December',
     ];
 
-    private ?string $schFilePath;
+    private ?JsbSourceResolverInterface $sourceResolver;
 
-    public function __construct(\mysqli $db, Season $season, ?LeagueContext $leagueContext = null, ?string $schFilePath = null) {
+    public function __construct(\mysqli $db, Season $season, ?LeagueContext $leagueContext = null, ?JsbSourceResolverInterface $sourceResolver = null) {
         parent::__construct($db, $leagueContext);
         $this->season = $season;
-        $this->schFilePath = $schFilePath;
+        $this->sourceResolver = $sourceResolver;
     }
 
     /**
@@ -194,15 +195,18 @@ class ScheduleUpdater extends \BaseMysqliRepository {
 
         $this->preloadTeamNameMap();
 
-        if ($this->schFilePath !== null) {
-            $schFilePath = $this->schFilePath;
+        if ($this->sourceResolver !== null) {
+            $schData = $this->sourceResolver->getContents('sch');
+            if ($schData === null) {
+                throw new \RuntimeException('Schedule file not found via resolver');
+            }
+            $games = SchFileParser::parse($schData);
         } else {
             $ibl5Root = \Bootstrap\AppPaths::root();
             $filePrefix = $this->leagueContext !== null ? $this->leagueContext->getFilePrefix() : 'IBL5';
             $schFilePath = $ibl5Root . '/' . $filePrefix . '.sch';
+            $games = SchFileParser::parseFile($schFilePath);
         }
-
-        $games = SchFileParser::parseFile($schFilePath);
 
         $currentDateSlot = -1;
         $date = null;

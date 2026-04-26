@@ -117,12 +117,47 @@ class LgeFileParserTest extends TestCase
 
         try {
             $this->expectException(\RuntimeException::class);
-            $this->expectExceptionMessage('Invalid .lge file size');
+            $this->expectExceptionMessage('Invalid .lge data size');
 
             LgeFileParser::parseFile($tmpFile);
         } finally {
             unlink($tmpFile);
         }
+    }
+
+    // parse() tests
+
+    public function testParseAcceptsRawBytesAndReturnsSameAsParseFile(): void
+    {
+        $teamNames = [
+            'Celtics', 'Heat', 'Knicks', 'Nets', 'Magic', 'Bucks',
+            'Bulls', 'Pelicans', 'Hawks', 'Hornets', 'Pacers', 'Raptors',
+            'Jazz', 'Timberwolves', 'Nuggets', 'Thunder', 'Spurs', 'Trailblazers',
+            'Clippers', 'Grizzlies', 'Lakers', 'Suns', 'Warriors', 'Kings',
+        ];
+
+        $data = self::buildSyntheticLge($teamNames, 1988);
+
+        $tmpFile = tempnam(sys_get_temp_dir(), 'lge_test_');
+        $this->assertIsString($tmpFile);
+        file_put_contents($tmpFile, $data);
+
+        try {
+            $fromFile = LgeFileParser::parseFile($tmpFile);
+            $fromBytes = LgeFileParser::parse($data);
+
+            $this->assertSame($fromFile, $fromBytes);
+        } finally {
+            unlink($tmpFile);
+        }
+    }
+
+    public function testParseThrowsOnWrongSize(): void
+    {
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessage('Invalid .lge data size');
+
+        LgeFileParser::parse(str_repeat(' ', 100));
     }
 
     // Full file parsing with real data

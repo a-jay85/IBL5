@@ -241,12 +241,38 @@ class SchFileParserTest extends TestCase
 
         try {
             $this->expectException(\RuntimeException::class);
-            $this->expectExceptionMessage('Invalid .sch file size');
+            $this->expectExceptionMessage('Invalid .sch data size');
 
             SchFileParser::parseFile($tmpFile);
         } finally {
             unlink($tmpFile);
         }
+    }
+
+    // parse() tests
+
+    public function testParseAcceptsRawBytesAndReturnsSameAsParseFile(): void
+    {
+        $schFile = dirname(__DIR__, 2) . '/IBL5.sch';
+        if (!file_exists($schFile)) {
+            $this->fail("Test .sch file not found at: {$schFile}");
+        }
+
+        $data = file_get_contents($schFile);
+        $this->assertIsString($data);
+
+        $fromFile = SchFileParser::parseFile($schFile);
+        $fromBytes = SchFileParser::parse($data);
+
+        $this->assertSame($fromFile, $fromBytes);
+    }
+
+    public function testParseThrowsOnWrongSize(): void
+    {
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessage('Invalid .sch data size');
+
+        SchFileParser::parse(str_repeat("\0", 100));
     }
 
     public function testParseFileWithRealData(): void

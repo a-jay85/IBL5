@@ -231,7 +231,33 @@ final class ArchiveExtractor implements ArchiveExtractorInterface
         return $files;
     }
 
+    public function extractToString(string $archivePath, string $filename): string|false
+    {
+        $format = $this->detectFormat($archivePath);
+
+        if ($format === 'rar') {
+            return $this->readFromRar($archivePath, $filename);
+        }
+
+        return $this->readFromZip($archivePath, $filename);
+    }
+
     private function extractFromZip(string $archivePath, string $filename, string $targetDir): string|false
+    {
+        $contents = $this->readFromZip($archivePath, $filename);
+        if ($contents === false) {
+            return false;
+        }
+
+        $targetPath = $targetDir . '/' . basename($filename);
+        if (file_put_contents($targetPath, $contents) === false) {
+            return false;
+        }
+
+        return $targetPath;
+    }
+
+    private function readFromZip(string $archivePath, string $filename): string|false
     {
         $zip = new ZipArchive();
         $result = $zip->open($archivePath, ZipArchive::RDONLY);
@@ -245,7 +271,6 @@ final class ArchiveExtractor implements ArchiveExtractorInterface
             return false;
         }
 
-        $targetPath = $targetDir . '/' . basename($filename);
         $stream = $zip->getStream($filename);
         if ($stream === false) {
             $zip->close();
@@ -260,11 +285,7 @@ final class ArchiveExtractor implements ArchiveExtractorInterface
             return false;
         }
 
-        if (file_put_contents($targetPath, $contents) === false) {
-            return false;
-        }
-
-        return $targetPath;
+        return $contents;
     }
 
     private function extractFromRar(string $archivePath, string $filename, string $targetDir): string|false
@@ -317,6 +338,72 @@ final class ArchiveExtractor implements ArchiveExtractorInterface
             if ($exitCode === 0 && file_exists($targetPath) && filesize($targetPath) > 0) {
                 return $targetPath;
             }
+        }
+
+        return false;
+    }
+
+    private function readFromRar(string $archivePath, string $filename): string|false
+    {
+        $tmpDir = sys_get_temp_dir();
+        $tmpPath = $tmpDir . '/' . basename($filename) . '.' . uniqid();
+
+        // Try unrar first, then 7z as fallback
+        $unrarBin = $this->findBinary('unrar');
+        if ($unrarBin !== null) {
+            $cmd = sprintf(
+                '%s p -inul %s %s > %s 2>/dev/null',
+                escapeshellarg($unrarBin),
+                escapeshellarg($archivePath),
+                escapeshellarg($filename),
+                escapeshellarg($tmpPath)
+            );
+            exec($cmd, $output, $exitCode);
+            if ($exitCode === 0 && file_exists($tmpPath) && filesize($tmpPath) > 0) {
+                $contents = file_get_contents($tmpPath);
+                unlink($tmpPath);
+                return $contents;
+            }
+        }
+
+        $sevenZipBin = $this->findBinary('7z');
+        if ($sevenZipBin !== null) {
+            $cmd = sprintf(
+                '%s e -so %s %s > %s 2>/dev/null',
+                escapeshellarg($sevenZipBin),
+                escapeshellarg($archivePath),
+                escapeshellarg($filename),
+                escapeshellarg($tmpPath)
+            );
+            exec($cmd, $output, $exitCode);
+            if ($exitCode === 0 && file_exists($tmpPath) && filesize($tmpPath) > 0) {
+                $contents = file_get_contents($tmpPath);
+                unlink($tmpPath);
+                return $contents;
+            }
+        }
+
+        // libarchive's bsdtar handles RAR v5 natively and ships with macOS.
+        // Useful as a fallback on dev workstations where unrar/7z aren't installed.
+        $bsdtarBin = $this->findBinary('bsdtar');
+        if ($bsdtarBin !== null) {
+            $cmd = sprintf(
+                '%s -xOf %s %s > %s 2>/dev/null',
+                escapeshellarg($bsdtarBin),
+                escapeshellarg($archivePath),
+                escapeshellarg($filename),
+                escapeshellarg($tmpPath)
+            );
+            exec($cmd, $output, $exitCode);
+            if ($exitCode === 0 && file_exists($tmpPath) && filesize($tmpPath) > 0) {
+                $contents = file_get_contents($tmpPath);
+                unlink($tmpPath);
+                return $contents;
+            }
+        }
+
+        if (file_exists($tmpPath)) {
+            unlink($tmpPath);
         }
 
         return false;

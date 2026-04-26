@@ -72,4 +72,11 @@ interface ArchiveExtractorInterface
      * @param string $extension File extension without dot (e.g. 'plr', 'sco')
      */
     public function jsbFilename(string $extension): string;
+
+    /**
+     * Read a file's contents from an archive without writing to disk.
+     *
+     * @return string|false Raw file contents, or false if file not found in archive
+     */
+    public function extractToString(string $archivePath, string $filename): string|false;
 }

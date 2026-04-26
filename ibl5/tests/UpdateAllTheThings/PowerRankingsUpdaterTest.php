@@ -63,7 +63,7 @@ class PowerRankingsUpdaterTest extends TestCase
         
         $result = $this->powerRankingsUpdater->publicDetermineMonth();
         
-        $this->assertEquals(Season::IBL_REGULAR_SEASON_STARTING_MONTH, $result);
+        $this->assertEquals(Season::IBL_PRESEASON_MONTH, $result);
     }
 
     public function testDetermineMonthForHEAT(): void

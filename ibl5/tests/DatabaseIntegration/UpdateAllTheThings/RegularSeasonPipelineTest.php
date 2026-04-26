@@ -51,7 +51,7 @@ class RegularSeasonPipelineTest extends PipelineIntegrationTestCase
 
         $cleanupResult = $this->findResultByLabel($results, 'Preseason data cleaned');
         self::assertNotNull($cleanupResult);
-        self::assertStringContainsString('Not first Regular Season sim', $cleanupResult->detail);
+        self::assertStringContainsString('Not HEAT phase', $cleanupResult->detail);
 
         $eosResult = $this->findResultByLabel($results, 'End-of-season imports');
         self::assertNotNull($eosResult);

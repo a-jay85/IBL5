@@ -29,6 +29,7 @@ class Season
     public int $simLengthInDays = 7;
 
     const IBL_OLYMPICS_MONTH = 8;
+    const IBL_PRESEASON_MONTH = 9;
     const IBL_HEAT_MONTH = 10;
     const IBL_REGULAR_SEASON_STARTING_MONTH = 11;
     const IBL_ALL_STAR_MONTH = 2;
@@ -209,5 +210,9 @@ class Season
         $this->lastSimStartDate = $newSimStartDate;
         $this->lastSimEndDate = $newSimEndDate;
         return 1;
+    }
+
+    public function reloadSimDates(): void
+    {
     }
 }

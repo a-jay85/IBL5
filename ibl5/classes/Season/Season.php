@@ -55,6 +55,7 @@ class Season
     private ?string $lastRegularSeasonGameDate = null;
 
     const IBL_OLYMPICS_MONTH = 8;
+    const IBL_PRESEASON_MONTH = 9;
     const IBL_HEAT_MONTH = 10;
     const IBL_REGULAR_SEASON_STARTING_MONTH = 11;
     const IBL_ALL_STAR_MONTH = 02;
@@ -250,6 +251,14 @@ class Season
     public function setLastSimDatesArray(string $newSimNumber, string $newSimStartDate, string $newSimEndDate): int
     {
         return $this->queryRepo->setLastSimDatesArray($newSimNumber, $newSimStartDate, $newSimEndDate);
+    }
+
+    public function reloadSimDates(): void
+    {
+        $arrayLastSimDates = $this->queryRepo->getLastSimDatesArray();
+        $this->lastSimNumber = $arrayLastSimDates["sim"];
+        $this->lastSimStartDate = $arrayLastSimDates["start_date"];
+        $this->lastSimEndDate = $arrayLastSimDates["end_date"];
     }
 
     /**

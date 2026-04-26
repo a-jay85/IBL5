@@ -263,8 +263,8 @@ class SeasonHighsService implements SeasonHighsServiceInterface
 
             case 'Preseason':
                 return [
-                    'start' => sprintf('%d-%02d-01', $beginningYear, Season::IBL_REGULAR_SEASON_STARTING_MONTH),
-                    'end' => sprintf('%d-%02d-30', $endingYear, Season::IBL_REGULAR_SEASON_ENDING_MONTH),
+                    'start' => sprintf('%d-%02d-01', $beginningYear, Season::IBL_PRESEASON_MONTH),
+                    'end' => sprintf('%d-%02d-31', $beginningYear, Season::IBL_HEAT_MONTH),
                 ];
 
             case 'HEAT':

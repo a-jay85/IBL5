@@ -142,7 +142,7 @@ class BoxscoreProcessorTest extends TestCase
         $this->assertStringContainsString('1990-1991 HEAT', $result['messages'][0]);
     }
 
-    public function testProcessScoFilePreseasonSkipsSimDates(): void
+    public function testProcessScoFilePreseasonUpdatesSimDates(): void
     {
         $tmpFile = tempnam(sys_get_temp_dir(), 'sco_test_');
         $this->assertNotFalse($tmpFile);
@@ -161,8 +161,7 @@ class BoxscoreProcessorTest extends TestCase
 
         $this->assertTrue($result['success']);
         $lastMessage = end($result['messages']);
-        $this->assertStringContainsString('Preseason', $lastMessage);
-        $this->assertStringContainsString('not updated', $lastMessage);
+        $this->assertStringNotContainsString('not updated', $lastMessage);
     }
 
     public function testConstructorAcceptsOptionalLeagueContext(): void

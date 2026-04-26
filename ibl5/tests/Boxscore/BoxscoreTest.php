@@ -90,6 +90,24 @@ class BoxscoreTest extends TestCase
         $this->assertSame(2025, $box->gameYear);
     }
 
+    public function testPreseasonPhaseRemapsNovemberToSeptember(): void
+    {
+        $line = $this->makeGameInfoLine(monthCode: '01', dayCode: '05');
+        $box = Boxscore::withGameInfoLine($line, 2026, 'Preseason');
+
+        $this->assertSame('09', $box->gameMonth);
+        $this->assertSame(2025, $box->gameYear);
+    }
+
+    public function testPreseasonPhaseRemapsDecemberToOctober(): void
+    {
+        $line = $this->makeGameInfoLine(monthCode: '02', dayCode: '10');
+        $box = Boxscore::withGameInfoLine($line, 2026, 'Preseason');
+
+        $this->assertSame('10', $box->gameMonth);
+        $this->assertSame(2025, $box->gameYear);
+    }
+
     public function testTeamIdsParsedWithPlusOneOffset(): void
     {
         // Visitor team code "04" → 4+1 = 5, Home team code "09" → 9+1 = 10

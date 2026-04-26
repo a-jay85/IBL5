@@ -39,7 +39,7 @@ class PreseasonPipelineTest extends PipelineIntegrationTestCase
 
         $cleanupResult = $this->findResultByLabel($results, 'Preseason data cleaned');
         self::assertNotNull($cleanupResult);
-        self::assertStringContainsString('Not Regular Season phase', $cleanupResult->detail);
+        self::assertStringContainsString('Not HEAT phase', $cleanupResult->detail);
     }
 
     public function testPlayoffsPipelineCompletes(): void
@@ -65,6 +65,6 @@ class PreseasonPipelineTest extends PipelineIntegrationTestCase
 
         $cleanupResult = $this->findResultByLabel($results, 'Preseason data cleaned');
         self::assertNotNull($cleanupResult);
-        self::assertStringContainsString('Not Regular Season phase', $cleanupResult->detail);
+        self::assertStringContainsString('Not HEAT phase', $cleanupResult->detail);
     }
 }

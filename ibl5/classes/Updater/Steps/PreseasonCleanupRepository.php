@@ -11,27 +11,11 @@ use Season\Season;
  */
 final class PreseasonCleanupRepository extends \BaseMysqliRepository
 {
-    public function hasRegularSeasonSimDates(Season $season): bool
-    {
-        $startDate = sprintf('%d-%02d-01', $season->beginningYear, Season::IBL_REGULAR_SEASON_STARTING_MONTH);
-        $endDate = sprintf('%d-%02d-30', $season->endingYear, Season::IBL_PLAYOFF_MONTH);
-
-        /** @var array{cnt: int}|null $row */
-        $row = $this->fetchOne(
-            "SELECT COUNT(*) AS cnt FROM ibl_sim_dates WHERE end_date BETWEEN ? AND ?",
-            "ss",
-            $startDate,
-            $endDate,
-        );
-
-        return $row !== null && $row['cnt'] > 0;
-    }
-
     public function hasPreseasonBoxScores(int $beginningYear): bool
     {
         $boxScoresTable = $this->resolveTable('ibl_box_scores_teams');
-        $startDate = sprintf('%d-11-01', $beginningYear);
-        $endDate = sprintf('%d-12-31', $beginningYear);
+        $startDate = sprintf('%d-09-01', $beginningYear);
+        $endDate = sprintf('%d-10-31', $beginningYear);
 
         /** @var array{cnt: int}|null $row */
         $row = $this->fetchOne(
@@ -42,6 +26,19 @@ final class PreseasonCleanupRepository extends \BaseMysqliRepository
         );
 
         return $row !== null && $row['cnt'] > 0;
+    }
+
+    public function deletePreseasonSimDates(int $beginningYear): void
+    {
+        $startDate = sprintf('%d-09-01', $beginningYear);
+        $endDate = sprintf('%d-10-31', $beginningYear);
+
+        $this->execute(
+            "DELETE FROM ibl_sim_dates WHERE end_date BETWEEN ? AND ?",
+            "ss",
+            $startDate,
+            $endDate,
+        );
     }
 
     public function deletePreseasonJsbData(int $endingYear): void

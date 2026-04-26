@@ -30,7 +30,18 @@ class CleanupPreseasonDataStepTest extends TestCase
         $result = $step->execute();
 
         $this->assertTrue($result->success);
-        $this->assertStringContainsString('Not Regular Season', $result->detail);
+        $this->assertStringContainsString('Not HEAT', $result->detail);
+    }
+
+    public function testSkipsWhenPhaseIsRegularSeason(): void
+    {
+        $season = $this->buildSeason('Regular Season');
+        $step = $this->buildStep($season);
+
+        $result = $step->execute();
+
+        $this->assertTrue($result->success);
+        $this->assertStringContainsString('Not HEAT', $result->detail);
     }
 
     public function testSkipsWhenPhaseIsPlayoffs(): void
@@ -41,27 +52,13 @@ class CleanupPreseasonDataStepTest extends TestCase
         $result = $step->execute();
 
         $this->assertTrue($result->success);
-        $this->assertStringContainsString('Not Regular Season', $result->detail);
-    }
-
-    public function testSkipsWhenSimDatesExist(): void
-    {
-        $season = $this->buildSeason('Regular Season');
-
-        $this->mockDb->onQuery('SELECT COUNT.*ibl_sim_dates', [['cnt' => 3]]);
-
-        $step = $this->buildStep($season);
-        $result = $step->execute();
-
-        $this->assertTrue($result->success);
-        $this->assertStringContainsString('Not first Regular Season sim', $result->detail);
+        $this->assertStringContainsString('Not HEAT', $result->detail);
     }
 
     public function testSkipsWhenNoPreseasonBoxScores(): void
     {
-        $season = $this->buildSeason('Regular Season');
+        $season = $this->buildSeason('HEAT');
 
-        $this->mockDb->onQuery('SELECT COUNT.*ibl_sim_dates', [['cnt' => 0]]);
         $this->mockDb->onQuery('SELECT COUNT.*ibl_box_scores_teams', [['cnt' => 0]]);
 
         $step = $this->buildStep($season);
@@ -71,11 +68,10 @@ class CleanupPreseasonDataStepTest extends TestCase
         $this->assertStringContainsString('No preseason data to clean', $result->detail);
     }
 
-    public function testCleansPreseasonDataOnFirstRegularSeasonSim(): void
+    public function testCleansPreseasonDataOnFirstHeatSim(): void
     {
-        $season = $this->buildSeason('Regular Season');
+        $season = $this->buildSeason('HEAT');
 
-        $this->mockDb->onQuery('SELECT COUNT.*ibl_sim_dates', [['cnt' => 0]]);
         $this->mockDb->onQuery('SELECT COUNT.*ibl_box_scores_teams', [['cnt' => 42]]);
         $this->mockDb->setReturnTrue(true);
 
@@ -85,12 +81,13 @@ class CleanupPreseasonDataStepTest extends TestCase
         $this->assertTrue($result->success);
         $this->assertStringContainsString('Cleaned:', $result->detail);
         $this->assertStringContainsString('box scores', $result->detail);
+        $this->assertStringContainsString('sim dates', $result->detail);
         $this->assertStringContainsString('team awards', $result->detail);
     }
 
     public function testGetLabelReturnsExpectedString(): void
     {
-        $season = $this->buildSeason('Regular Season');
+        $season = $this->buildSeason('HEAT');
         $step = $this->buildStep($season);
 
         $this->assertSame('Preseason data cleaned', $step->getLabel());

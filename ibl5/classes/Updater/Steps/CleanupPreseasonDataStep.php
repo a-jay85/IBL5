@@ -11,11 +11,11 @@ use Updater\Contracts\PipelineStepInterface;
 use Updater\StepResult;
 
 /**
- * Clean up preseason data on the first Regular Season sim.
+ * Clean up preseason data on the first HEAT sim.
  *
- * Preseason uses real season dates (same Nov-Dec range as Regular Season).
- * When the phase transitions to Regular Season, stale preseason data must
- * be cleared so the RS pipeline can re-import fresh data from JSB files.
+ * Preseason games are stored with Sep-Oct dates. When the phase transitions
+ * to HEAT, stale preseason data must be cleared so the HEAT pipeline can
+ * re-import fresh data from JSB files.
  *
  * IBL-only — Olympics does not have a preseason phase.
  */
@@ -39,12 +39,8 @@ final class CleanupPreseasonDataStep implements PipelineStepInterface
 
     public function execute(): StepResult
     {
-        if ($this->season->phase !== 'Regular Season') {
-            return StepResult::skipped($this->getLabel(), 'Not Regular Season phase');
-        }
-
-        if ($this->cleanupRepo->hasRegularSeasonSimDates($this->season)) {
-            return StepResult::skipped($this->getLabel(), 'Not first Regular Season sim');
+        if ($this->season->phase !== 'HEAT') {
+            return StepResult::skipped($this->getLabel(), 'Not HEAT phase');
         }
 
         if (!$this->cleanupRepo->hasPreseasonBoxScores($this->season->beginningYear)) {
@@ -59,10 +55,15 @@ final class CleanupPreseasonDataStep implements PipelineStepInterface
         $cleaned = [];
 
         $this->boxscoreRepo->deletePreseasonBoxScores($this->season->beginningYear);
-        $cleaned[] = 'box scores (Nov-Dec)';
+        $cleaned[] = 'box scores (Sep-Oct)';
+
+        $this->cleanupRepo->deletePreseasonSimDates($this->season->beginningYear);
+        $cleaned[] = 'sim dates';
 
         $this->cleanupRepo->deletePreseasonJsbData($this->season->endingYear);
         $cleaned[] = 'team awards, JSB history, transactions, season records, PLR snapshots';
+
+        $this->season->reloadSimDates();
 
         return StepResult::success(
             $this->getLabel(),

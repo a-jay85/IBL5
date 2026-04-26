@@ -237,6 +237,10 @@ class ScheduleUpdater extends \BaseMysqliRepository {
             if ($this->season->phase === "HEAT" && $month !== Season::IBL_HEAT_MONTH) {
                 continue;
             }
+            if ($this->season->phase === "Preseason" && $month !== null
+                && $month !== Season::IBL_PRESEASON_MONTH && $month !== Season::IBL_HEAT_MONTH) {
+                continue;
+            }
 
             // Compute BoxID: real for played games, placeholder for unplayed
             if ($game['played']) {

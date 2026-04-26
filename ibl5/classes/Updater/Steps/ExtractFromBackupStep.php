@@ -63,7 +63,8 @@ final class ExtractFromBackupStep implements PipelineStepInterface
             );
         }
 
-        $extractedCount = $this->extractFiles($archivePath);
+        $missingExtensions = [];
+        $extractedCount = $this->extractFiles($archivePath, $missingExtensions);
         $renameMessage = $this->autoRenameIfNeeded($archivePath, $backupDir);
 
         $archiveName = basename($archivePath);
@@ -78,11 +79,16 @@ final class ExtractFromBackupStep implements PipelineStepInterface
         if ($renameMessage !== null) {
             $messages[] = $renameMessage;
         }
-        $messages[] = sprintf(
+
+        $foundMessage = sprintf(
             '%d of %d file types found in archive',
             $extractedCount,
             count(self::EXTENSIONS),
         );
+        if ($missingExtensions !== []) {
+            $foundMessage .= ' (missing: .' . implode(', .', $missingExtensions) . ')';
+        }
+        $messages[] = $foundMessage;
 
         return StepResult::success($this->getLabel(), $detail, messages: $messages);
     }
@@ -90,9 +96,10 @@ final class ExtractFromBackupStep implements PipelineStepInterface
     /**
      * Extract all JSB files from the archive to the base path.
      *
+     * @param list<string> $missingExtensions Populated with extensions not found in archive
      * @return int Number of files successfully extracted
      */
-    private function extractFiles(string $archivePath): int
+    private function extractFiles(string $archivePath, array &$missingExtensions): int
     {
         $extracted = 0;
 
@@ -106,6 +113,8 @@ final class ExtractFromBackupStep implements PipelineStepInterface
 
             if ($result !== false) {
                 $extracted++;
+            } else {
+                $missingExtensions[] = $ext;
             }
         }
 

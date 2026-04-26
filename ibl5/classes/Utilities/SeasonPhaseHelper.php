@@ -21,6 +21,9 @@ class SeasonPhaseHelper
         if ($phase === "HEAT") {
             return Season::IBL_HEAT_MONTH;
         }
+        if ($phase === "Preseason") {
+            return Season::IBL_PRESEASON_MONTH;
+        }
         return Season::IBL_REGULAR_SEASON_STARTING_MONTH;
     }
 

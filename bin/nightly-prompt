@@ -1,12 +1,14 @@
 You are executing the IBL5 nightly autonomous workflow. No human is present — you must never ask questions or wait for input. You have full tool access.
 
+The outer bash loop in bin/nightly-run fires a fresh claude -p per plan. You handle exactly ONE plan per invocation. The loop handles queue iteration and time guards.
+
 ## Step 1: Check the Queue
 
 NIGHTLY_DIR is: $HOME/.claude/projects/-Users-ajaynicolas-GitHub-IBL5/nightly
 
 List files in $NIGHTLY_DIR/queue/. If the directory is empty (no .md files), write a one-line report to $NIGHTLY_DIR/reports/YYYY-MM-DD-no-queue.md (using today's date) saying "No plan queued for tonight." and STOP immediately.
 
-If multiple files exist, pick the OLDEST by modification time (ls -1tr | head -1). Process exactly ONE plan per night.
+If multiple files exist, pick the OLDEST by modification time (ls -1tr | head -1).
 
 Read the plan file. If it is a symlink, follow it to read the original content.
 
@@ -28,9 +30,21 @@ Skip ONLY when the plan is genuinely ambiguous: unclear requirements, missing ex
 
 Extract a kebab-case slug from the plan title for the worktree name. Example: "Optimize vw_team_awards Slow Queries" becomes "optimize-vw-team-awards". Max 50 characters, lowercase, alphanumeric and hyphens only.
 
-## Step 4: Set Up the Worktree
+## Step 4: Set Up the Worktree (or Resume)
 
-Run these commands in sequence. Stop on any failure:
+First, check if a worktree already exists for this slug:
+
+```bash
+SLUG=<slug>
+WORKTREE_DIR="/Users/ajaynicolas/GitHub/IBL5/worktrees/$SLUG"
+if [ -d "$WORKTREE_DIR" ]; then
+    echo "RESUME: worktree exists"
+else
+    echo "FRESH: no worktree"
+fi
+```
+
+### Fresh start (no existing worktree)
 
 ```bash
 cd /Users/ajaynicolas/GitHub/IBL5
@@ -39,7 +53,20 @@ git pull origin master
 bin/wt-new <slug>
 ```
 
-If bin/wt-new fails (e.g., branch/worktree already exists), write an error report to $NIGHTLY_DIR/reports/YYYY-MM-DD-error-<slug>.md, move the plan symlink to $NIGHTLY_DIR/skipped/, and STOP.
+If bin/wt-new fails, write an error report to $NIGHTLY_DIR/reports/YYYY-MM-DD-error-<slug>.md, move the plan symlink to $NIGHTLY_DIR/skipped/, and STOP.
+
+### Resume (worktree exists)
+
+The worktree may exist from a previous interrupted run. Check its state:
+
+```bash
+cd /Users/ajaynicolas/GitHub/IBL5/worktrees/<slug>
+git log --oneline origin/master..HEAD
+```
+
+- If the branch is already merged on origin/master (git log shows nothing or branch doesn't exist on remote), this is a stale worktree. Remove it with `bin/wt-rm <slug>` and start fresh (run the "Fresh start" path above).
+- If there are commits ahead of master, this is a partial implementation. Read the commit messages and the plan to determine what steps are already complete. Continue from where the previous session left off — do NOT redo completed work.
+- If the worktree exists but has no commits ahead of master (just created, never committed), treat it as a fresh worktree and start implementation from Step 5.
 
 ## Step 5: Implement the Plan
 
@@ -53,6 +80,26 @@ Key rules (from CLAUDE.md):
 - Run the full test suite (bin/test) after PHP changes
 - Run PHPStan (cd worktrees/<slug>/ibl5 && composer run analyse) after PHP changes
 - Verify table/column names against migrations before writing queries
+
+### Incremental Commits
+
+Commit and push after each major milestone to checkpoint progress. This ensures work survives if the session ends unexpectedly. Use conventional commit messages — squash-merge erases the history anyway.
+
+Checkpoint after each of these (when applicable):
+1. Migration written and applied successfully
+2. PHPStan rule or config changes complete
+3. PHP class sweep complete and tests passing
+4. Test file updates complete
+5. Seed/fixture updates complete
+
+```bash
+cd /Users/ajaynicolas/GitHub/IBL5/worktrees/<slug>
+git add -A
+git commit -m "<type>: <what this checkpoint covers>"
+git push origin <slug>
+```
+
+Do NOT wait for /post-plan to make the first commit. /post-plan will add a final commit with any remaining changes (from simplify, code review fixes, etc.) on top of your checkpoints.
 
 If implementation requires information you do not have — external resources, unclear requirements, missing context — do NOT guess. Move the plan to skipped/ with a report explaining what information is needed, and STOP.
 
@@ -79,14 +126,15 @@ After /post-plan completes successfully:
 ## Error Handling
 
 If ANY step fails after worktree creation (Step 4):
-1. Write a detailed error report to $NIGHTLY_DIR/reports/YYYY-MM-DD-error-<slug>.md
-2. Move the plan symlink to $NIGHTLY_DIR/skipped/ (not done/)
-3. Do NOT delete the worktree — preserve it for morning debugging
-4. STOP — do not attempt recovery or the next plan
+1. Commit and push whatever work exists on the branch (incremental checkpoint — do not lose progress)
+2. Write a detailed error report to $NIGHTLY_DIR/reports/YYYY-MM-DD-error-<slug>.md
+3. Move the plan symlink to $NIGHTLY_DIR/skipped/ (not done/)
+4. Do NOT delete the worktree — preserve it for morning debugging or resume
+5. STOP
 
 ## Hard Rules
 
-- Process exactly 1 plan per night
+- Process exactly 1 plan per invocation (the outer loop handles queue iteration)
 - NEVER use the AskUserQuestion tool — it will block waiting for a human who is not there
 - NEVER use the ExitPlanMode tool — you are not in plan mode
 - If you encounter ANY ambiguity about requirements, skip and report — do not guess

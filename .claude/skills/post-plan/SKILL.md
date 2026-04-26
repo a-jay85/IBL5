@@ -1,7 +1,7 @@
 ---
 name: post-plan
 description: Single orchestrator for the post-plan workflow. Runs diff classification, simplify, commit/push/PR, code review, security audit, verification, CI monitoring, retrospective, worktree teardown, and background process cleanup as one uninterrupted sequence.
-last_verified: 2026-04-25
+last_verified: 2026-04-26
 ---
 
 # Post-Plan Orchestrator
@@ -9,6 +9,21 @@ last_verified: 2026-04-25
 Execute all phases below **sequentially in a single response**. Do NOT stop, ask for input, or return control between phases.
 
 Phase numbers below are local to this skill. The variables computed in Phase 2 (`HAS_PHP`, `NON_CODE_ONLY`, `DOCS_ONLY`, `CSS_ONLY`, `MIGRATION_ONLY`, `HAS_MODIFIED`, `HAS_COMMENTS_IN_DIFF`, `DIFF`, etc.) are consulted by every downstream phase to gate sub-agent launches — never recompute them locally.
+
+## Incremental Checkpoints
+
+After any phase that modifies files, commit and push before moving to the next phase. Never carry uncommitted work across phase boundaries — if the session dies mid-skill (usage limit, crash), the latest checkpoint is preserved on the branch and a fresh session can resume.
+
+```bash
+cd <worktree>
+git add -A
+if ! git diff --cached --quiet; then
+    git commit -m "<scope>: <what this phase changed>"
+    git push origin HEAD
+fi
+```
+
+Phase 4 makes the initial commit and opens the PR. Phases that may modify files afterwards (Phase 3 simplify, Phase 5D follow-up fixes if review identifies real bugs, Phase 6 fix-and-rerun loops, Phase 7 test writing, Phase 8 CI fixes) MUST checkpoint before continuing. Squash-merge in Phase 9 collapses the chain.
 
 ---
 
@@ -289,6 +304,7 @@ Using the Sonnet agent's classifications:
 2. **PHPUnit/API-test/E2E-replaceable:** Write the appropriate test type. Fix until green; reclassify as truly manual after 2 failed attempts.
 3. **Truly manual:** Keep in PR description.
 4. **Update PR:** Remove verified/automated steps. If none remain, replace section with `No manual testing needed — all changes are covered by automated tests.` Apply: `gh pr edit --body "<updated>"`
+5. **Checkpoint:** If any new tests were written or files modified, commit and push before continuing to Phase 8.
 
 ---
 

@@ -1,7 +1,11 @@
 #!/bin/bash
 # Wrapper script for the IBL5 nightly autonomous workflow.
-# Called by launchd at 00:03 daily. Runs claude -p in headless mode
-# with the nightly prompt, capturing output to a timestamped log.
+# Called by launchd at 00:03 daily. Loops through queued plans,
+# firing a fresh claude -p per plan until the queue is empty
+# or the time guard is exceeded.
+#
+# If plans remain in the queue when the loop exits (time guard or
+# usage limit), schedules a one-shot 11am PT resume via launchd.
 #
 # To test manually: bin/nightly-run
 # To force-trigger via launchd: launchctl start com.ibl5.nightly-claude
@@ -16,18 +20,134 @@ export PATH="/usr/local/bin:/opt/homebrew/bin:$HOME/.bun/bin:$HOME/.local/bin:/A
 export CLAUDE_HEADLESS=1
 
 REPO="/Users/ajaynicolas/GitHub/IBL5"
-LOG_DIR="$HOME/.claude/projects/-Users-ajaynicolas-GitHub-IBL5/nightly/logs"
-mkdir -p "$LOG_DIR"
+NIGHTLY_DIR="$HOME/.claude/projects/-Users-ajaynicolas-GitHub-IBL5/nightly"
+LOG_DIR="$NIGHTLY_DIR/logs"
+QUEUE_DIR="$NIGHTLY_DIR/queue"
+RESUME_PLIST="$HOME/Library/LaunchAgents/com.ibl5.nightly-resume.plist"
+MAX_ELAPSED=14400  # 4 hours — leaves headroom in the 5h usage window
+MAX_ATTEMPTS=2     # per-plan retry cap within one night
+
+mkdir -p "$LOG_DIR" "$QUEUE_DIR"
 LOG="$LOG_DIR/$(date +%Y-%m-%d).log"
 
 cd "$REPO"
 
-echo "=== Nightly run starting at $(date) ===" >> "$LOG"
+# Clean up one-shot resume plist if this IS a resume run
+if [ -f "$RESUME_PLIST" ]; then
+    launchctl unload "$RESUME_PLIST" 2>/dev/null || true
+    rm -f "$RESUME_PLIST"
+fi
 
-claude -p "$(cat bin/nightly-prompt)" \
-  --dangerously-skip-permissions \
-  --model opus \
-  --name "nightly-$(date +%Y-%m-%d)" \
-  >> "$LOG" 2>&1
+START=$(date +%s)
+PLANS_RUN=0
 
-echo "=== Nightly run finished at $(date) ===" >> "$LOG"
+echo "=== Nightly session starting at $(date) ===" >> "$LOG"
+
+while true; do
+    # Check if queue has plans
+    if ! ls "$QUEUE_DIR"/*.md &>/dev/null; then
+        if [ "$PLANS_RUN" -eq 0 ]; then
+            echo "Queue empty — nothing to run." >> "$LOG"
+        else
+            echo "Queue drained after $PLANS_RUN plan(s)." >> "$LOG"
+        fi
+        break
+    fi
+
+    # Time guard: don't start a new plan if >4h elapsed
+    ELAPSED=$(( $(date +%s) - START ))
+    if [ "$ELAPSED" -gt "$MAX_ELAPSED" ]; then
+        echo "Time guard: ${ELAPSED}s elapsed (max ${MAX_ELAPSED}s), stopping." >> "$LOG"
+        break
+    fi
+
+    # Pick the oldest queued plan
+    NEXT_PLAN=$(ls -1tr "$QUEUE_DIR"/*.md 2>/dev/null | head -1)
+    PLAN_NAME=$(basename "$NEXT_PLAN")
+
+    # Per-plan retry counter — skip poison pills
+    ATTEMPT_FILE="$QUEUE_DIR/${PLAN_NAME}.attempts"
+    ATTEMPTS=0
+    if [ -f "$ATTEMPT_FILE" ]; then
+        ATTEMPTS=$(cat "$ATTEMPT_FILE")
+    fi
+    if [ "$ATTEMPTS" -ge "$MAX_ATTEMPTS" ]; then
+        echo "Plan $PLAN_NAME failed $ATTEMPTS times — moving to skipped/." >> "$LOG"
+        mkdir -p "$NIGHTLY_DIR/skipped"
+        mv "$NEXT_PLAN" "$NIGHTLY_DIR/skipped/"
+        rm -f "$ATTEMPT_FILE"
+        REPORTS_DIR="$NIGHTLY_DIR/reports"
+        mkdir -p "$REPORTS_DIR"
+        SLUG=$(basename "$PLAN_NAME" .md)
+        printf 'Plan "%s" skipped after %d failed attempts in one night. Needs human review.\n' \
+            "$SLUG" "$ATTEMPTS" \
+            > "$REPORTS_DIR/$(date +%Y-%m-%d)-skipped-$SLUG.md"
+        continue
+    fi
+
+    # Increment attempt counter
+    echo $(( ATTEMPTS + 1 )) > "$ATTEMPT_FILE"
+
+    PLANS_RUN=$(( PLANS_RUN + 1 ))
+    echo "--- Plan #$PLANS_RUN: $PLAN_NAME (attempt $(( ATTEMPTS + 1 ))) at $(date) ---" >> "$LOG"
+
+    claude -p "$(cat bin/nightly-prompt)" \
+        --dangerously-skip-permissions \
+        --model opus \
+        --max-turns 200 \
+        --name "nightly-$(date +%Y-%m-%d-%H%M)" \
+        >> "$LOG" 2>&1 || true
+
+    echo "--- Plan #$PLANS_RUN finished at $(date) ---" >> "$LOG"
+
+    # If the plan moved out of queue/ (to done/ or skipped/), clean up its attempt file
+    if [ ! -e "$NEXT_PLAN" ]; then
+        rm -f "$ATTEMPT_FILE"
+    fi
+done
+
+# Clean up any leftover attempt files for plans that completed
+for af in "$QUEUE_DIR"/*.attempts; do
+    [ -e "$af" ] || continue
+    PLAN_FOR_ATTEMPT="${af%.attempts}"
+    if [ ! -e "$PLAN_FOR_ATTEMPT" ]; then
+        rm -f "$af"
+    fi
+done
+
+# Schedule 11am PT resume if plans remain in the queue
+if ls "$QUEUE_DIR"/*.md &>/dev/null; then
+    REMAINING=$(ls -1 "$QUEUE_DIR"/*.md 2>/dev/null | wc -l | tr -d ' ')
+    echo "Scheduling 11am PT resume for $REMAINING remaining plan(s)." >> "$LOG"
+
+    cat > "$RESUME_PLIST" <<EOF
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.ibl5.nightly-resume</string>
+    <key>Program</key>
+    <string>$REPO/bin/nightly-run</string>
+    <key>StartCalendarInterval</key>
+    <dict>
+        <key>Hour</key>
+        <integer>11</integer>
+        <key>Minute</key>
+        <integer>0</integer>
+    </dict>
+    <key>WorkingDirectory</key>
+    <string>$REPO</string>
+    <key>StandardOutPath</key>
+    <string>$LOG_DIR/launchd-stdout.log</string>
+    <key>StandardErrorPath</key>
+    <string>$LOG_DIR/launchd-stderr.log</string>
+</dict>
+</plist>
+EOF
+
+    launchctl load "$RESUME_PLIST"
+    echo "Resume plist loaded: $RESUME_PLIST" >> "$LOG"
+fi
+
+echo "=== Nightly session complete at $(date) — $PLANS_RUN plan(s) run ===" >> "$LOG"

@@ -1,0 +1,244 @@
+#!/usr/bin/env bash
+# Fetch and aggregate production logs into a compact digest.
+#
+# Runs all aggregation server-side via SSH to minimize data transfer.
+# Output is plain text, ~500-2000 tokens for a typical week.
+#
+# Usage:
+#   bin/log-fetch-prod                     # WARNING+ from past 7 days (local SSH via .env)
+#   bin/log-fetch-prod --all-levels        # All levels
+#   bin/log-fetch-prod --days 14           # Past 14 days
+#   bin/log-fetch-prod --ssh-host USER@HOST --ssh-port 22 --ssh-key ~/.ssh/id  # CI mode
+
+set -euo pipefail
+
+REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+DAYS=7
+ALL_LEVELS=false
+SSH_HOST=""
+SSH_PORT=""
+SSH_KEY=""
+MAX_MESSAGES=50
+
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --all-levels) ALL_LEVELS=true; shift ;;
+    --days) DAYS="$2"; shift 2 ;;
+    --ssh-host) SSH_HOST="$2"; shift 2 ;;
+    --ssh-port) SSH_PORT="$2"; shift 2 ;;
+    --ssh-key) SSH_KEY="$2"; shift 2 ;;
+    *) echo "Unknown option: $1" >&2; exit 1 ;;
+  esac
+done
+
+# Fall back to .env for local use
+if [ -z "$SSH_HOST" ]; then
+  # Try repo root first, then git toplevel (worktrees resolve to main repo)
+  ENV_FILE="${REPO_ROOT}/.env"
+  if [ ! -f "$ENV_FILE" ]; then
+    GIT_ROOT="$(git -C "$REPO_ROOT" rev-parse --path-format=absolute --git-common-dir 2>/dev/null | sed 's|/\.git$||')" || true
+    if [ -n "$GIT_ROOT" ] && [ -f "$GIT_ROOT/.env" ]; then
+      ENV_FILE="$GIT_ROOT/.env"
+    else
+      echo "FAILED: No --ssh-host and no .env found." >&2
+      exit 1
+    fi
+  fi
+  # shellcheck source=/dev/null
+  source "$ENV_FILE"
+  SSH_HOST="${PROD_SSH_HOST}"
+fi
+
+# Build SSH command args
+SSH_ARGS=""
+if [ -n "$SSH_PORT" ]; then
+  SSH_ARGS="$SSH_ARGS -p $SSH_PORT"
+fi
+if [ -n "$SSH_KEY" ]; then
+  SSH_ARGS="$SSH_ARGS -i $SSH_KEY"
+fi
+
+# Build date list for the past N days (Linux date -d, macOS date -v fallback)
+DATE_LIST=""
+for i in $(seq 0 $((DAYS - 1))); do
+  if d=$(date -d "$i days ago" +%Y-%m-%d 2>/dev/null); then
+    DATE_LIST="$DATE_LIST $d"
+  elif d=$(date -v-"${i}"d +%Y-%m-%d 2>/dev/null); then
+    DATE_LIST="$DATE_LIST $d"
+  else
+    echo "FAILED: Cannot compute dates on this platform." >&2
+    exit 1
+  fi
+done
+DATE_LIST=$(echo "$DATE_LIST" | xargs)
+
+# Build the file list for the remote side
+FILE_LIST=""
+for d in $DATE_LIST; do
+  FILE_LIST="$FILE_LIST ibl5-$d.log"
+done
+
+# Determine minimum level filter
+if [ "$ALL_LEVELS" = true ]; then
+  LEVEL_FILTER=0
+else
+  LEVEL_FILTER=300
+fi
+
+# Compute display date range (oldest .. newest)
+DATE_FROM=$(echo "$DATE_LIST" | awk '{print $NF}')
+DATE_TO=$(echo "$DATE_LIST" | awk '{print $1}')
+
+# Run aggregation server-side via SSH
+# shellcheck disable=SC2086
+ssh $SSH_ARGS "$SSH_HOST" bash << REMOTE
+  set -e
+  cd www/ibl5/logs 2>/dev/null || cd ~/www/ibl5/logs 2>/dev/null || {
+    echo "FAILED: Cannot find log directory on production." >&2
+    exit 1
+  }
+
+  # Collect matching log files that exist
+  FILES=""
+  for f in $FILE_LIST; do
+    [ -f "\$f" ] && FILES="\$FILES \$f"
+  done
+
+  if [ -z "\$FILES" ]; then
+    echo "No log files found for the requested date range."
+    exit 0
+  fi
+
+  TOTAL_LINES=\$(cat \$FILES | wc -l | tr -d ' ')
+
+  if command -v jq >/dev/null 2>&1; then
+    # === jq path (full aggregation) ===
+
+    echo "=== IBL5 Production Log Digest ==="
+    echo "Period: $DATE_FROM to $DATE_TO"
+    echo "Total entries: \$TOTAL_LINES"
+    echo ""
+
+    # Section 1: Severity counts
+    echo "--- Severity Counts ---"
+    cat \$FILES | jq -r '.level_name // "UNKNOWN"' 2>/dev/null | sort | uniq -c | sort -rn
+    echo ""
+
+    # Section 2: Channel counts
+    echo "--- Channel Counts ---"
+    cat \$FILES | jq -r '.channel // "unknown"' 2>/dev/null | sort | uniq -c | sort -rn
+    echo ""
+
+    # Section 3: Deduplicated messages at the configured level threshold
+    echo "--- Deduplicated Messages (level >= $LEVEL_FILTER) ---"
+    cat \$FILES \
+      | jq -r "select(.level >= $LEVEL_FILTER) | [.channel // \"?\", .level_name // \"?\", .message // \"?\", .datetime // \"?\", (.context | tostring)] | @tsv" 2>/dev/null \
+      | awk -F'\t' '
+        {
+          key = \$1 "|" \$2 "|" \$3
+          count[key]++
+          if (!(key in first_ts)) first_ts[key] = \$4
+          last_ts[key] = \$4
+          if (!(key in sample_ctx)) sample_ctx[key] = \$5
+        }
+        END {
+          for (key in count) {
+            printf "%6d\t%s\t[%s .. %s]\tctx=%s\n", count[key], key, first_ts[key], last_ts[key], sample_ctx[key]
+          }
+        }
+      ' \
+      | sort -rn \
+      | head -n $MAX_MESSAGES
+
+    TOTAL_UNIQUE=\$(cat \$FILES \
+      | jq -r "select(.level >= $LEVEL_FILTER) | (.channel // \"?\") + \"|\" + (.level_name // \"?\") + \"|\" + (.message // \"?\")" 2>/dev/null \
+      | sort -u | wc -l | tr -d ' ')
+    if [ "\$TOTAL_UNIQUE" -gt $MAX_MESSAGES ]; then
+      echo "  ... and \$((\$TOTAL_UNIQUE - $MAX_MESSAGES)) more unique patterns"
+    fi
+    echo ""
+
+    # Section 4: Slow queries aggregated by repository
+    SLOW_COUNT=\$(cat \$FILES | jq -c 'select(.channel == "perf" and .message == "slow_query")' 2>/dev/null | wc -l | tr -d ' ')
+    echo "--- Slow Queries (\$SLOW_COUNT total, by repository) ---"
+    if [ "\$SLOW_COUNT" -gt 0 ]; then
+      cat \$FILES \
+        | jq -r 'select(.channel == "perf" and .message == "slow_query") | "\(.context.elapsed_ms // 0) \(.context.repository // "?")"' 2>/dev/null \
+        | awk '{
+            repo = \$2; ms = \$1 + 0
+            count[repo]++
+            total[repo] += ms
+            if (ms > max[repo]) max[repo] = ms
+          }
+          END {
+            for (r in count) {
+              printf "%4d hits  max=%dms  avg=%dms  %s\n", count[r], max[r], total[r]/count[r], r
+            }
+          }' \
+        | sort -rn \
+        | head -20
+    else
+      echo "  (none)"
+    fi
+
+  else
+    # === grep+awk fallback (no jq — dedup via awk on extracted fields) ===
+
+    echo "=== IBL5 Production Log Digest (no jq) ==="
+    echo "Period: $DATE_FROM to $DATE_TO"
+    echo "Total entries: \$TOTAL_LINES"
+    echo ""
+
+    echo "--- Severity Counts ---"
+    grep -ohE '"level_name":"[A-Z]+"' \$FILES 2>/dev/null \
+      | sed 's/"level_name":"//;s/"//' | sort | uniq -c | sort -rn || true
+    echo ""
+
+    echo "--- Channel Counts ---"
+    grep -ohE '"channel":"[a-z_]+"' \$FILES 2>/dev/null \
+      | sed 's/"channel":"//;s/"//' | sort | uniq -c | sort -rn || true
+    echo ""
+
+    # Deduplicated messages: extract channel|level|message, then sort|uniq
+    if [ "$ALL_LEVELS" = "true" ]; then
+      GREP_PATTERN='"level_name":"[A-Z]+"'
+      echo "--- Deduplicated Messages (all levels) ---"
+    else
+      GREP_PATTERN='"level_name":"(WARNING|ERROR|CRITICAL|ALERT|EMERGENCY)"'
+      echo "--- Deduplicated Messages (WARNING+) ---"
+    fi
+    grep -hE "\$GREP_PATTERN" \$FILES 2>/dev/null \
+      | while IFS= read -r line; do
+          ch=\$(echo "\$line" | sed -n 's/.*"channel":"\([^"]*\)".*/\1/p')
+          lv=\$(echo "\$line" | sed -n 's/.*"level_name":"\([^"]*\)".*/\1/p')
+          msg=\$(echo "\$line" | sed -n 's/.*"message":"\([^"]*\)".*/\1/p')
+          echo "\${ch}|\${lv}|\${msg}"
+        done \
+      | sort | uniq -c | sort -rn \
+      | head -$MAX_MESSAGES || true
+    echo ""
+
+    # Slow queries: aggregate by repository (count, max ms)
+    SLOW_COUNT=\$(grep -h '"slow_query"' \$FILES 2>/dev/null | wc -l | tr -d ' ')
+    echo "--- Slow Queries (\$SLOW_COUNT total, by repository) ---"
+    if [ "\$SLOW_COUNT" -gt 0 ]; then
+      grep -h '"slow_query"' \$FILES 2>/dev/null \
+        | sed -n 's/.*"elapsed_ms":\([0-9]*\)[^,]*.*"repository":"\([^"]*\)".*/\1 \2/p' \
+        | awk '{
+            repo = \$2; ms = \$1 + 0
+            count[repo]++
+            total[repo] += ms
+            if (ms > max[repo]) max[repo] = ms
+          }
+          END {
+            for (r in count) {
+              printf "%4d hits  max=%dms  avg=%dms  %s\n", count[r], max[r], total[r]/count[r], r
+            }
+          }' \
+        | sort -rn \
+        | head -20
+    else
+      echo "  (none)"
+    fi
+  fi
+REMOTE

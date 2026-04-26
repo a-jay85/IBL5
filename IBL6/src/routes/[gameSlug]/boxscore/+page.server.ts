@@ -17,12 +17,12 @@ export const load: PageServerLoad = async ({ params }) => {
 		// Get game info
 		const gameInfo = await query(
 			`SELECT DISTINCT
-				game.Date,
-				game.visitorTeamID as awayTeamId,
-				game.homeTeamID as homeTeamId,
-				game.gameOfThatDay,
-				(game.visitorQ1points + game.visitorQ2points + game.visitorQ3points + game.visitorQ4points + COALESCE(game.visitorOTpoints, 0)) as awayScore,
-				(game.homeQ1points + game.homeQ2points + game.homeQ3points + game.homeQ4points + COALESCE(game.homeOTpoints, 0)) as homeScore,
+				game.game_date,
+				game.visitor_teamid as awayTeamId,
+				game.home_teamid as homeTeamId,
+				game.game_of_that_day,
+				(game.visitor_q1_points + game.visitor_q2_points + game.visitor_q3_points + game.visitor_q4_points + COALESCE(game.visitor_ot_points, 0)) as awayScore,
+				(game.home_q1_points + game.home_q2_points + game.home_q3_points + game.home_q4_points + COALESCE(game.home_ot_points, 0)) as homeScore,
 				away.teamid as away_teamid,
 				away.team_city as away_city,
 				away.team_name as away_name,
@@ -34,10 +34,10 @@ export const load: PageServerLoad = async ({ params }) => {
 				home.color1 as home_color1,
 				home.color2 as home_color2
 			FROM ibl_box_scores_teams game
-			LEFT JOIN ibl_team_info home ON game.homeTeamID = home.teamid
-			LEFT JOIN ibl_team_info away ON game.visitorTeamID = away.teamid
-			WHERE DATE(game.Date) = ?
-			AND game.gameOfThatDay = ?
+			LEFT JOIN ibl_team_info home ON game.home_teamid = home.teamid
+			LEFT JOIN ibl_team_info away ON game.visitor_teamid = away.teamid
+			WHERE DATE(game.game_date) = ?
+			AND game.game_of_that_day = ?
 			LIMIT 1`,
 			[gameDate, gameNumber]
 		);
@@ -51,37 +51,37 @@ export const load: PageServerLoad = async ({ params }) => {
 		// Get players using the recorded teamID (not the player's current team)
 		const players = await query(
 			`SELECT
-				bp.Date,
+				bp.game_date,
 				COALESCE(plr.name, bp.name) as name,
 				bp.pos,
 				bp.pid,
-				bp.teamID as playerTeamId,
+				bp.teamid as playerTeamId,
 				CASE
-					WHEN bp.teamID = ? THEN 1
+					WHEN bp.teamid = ? THEN 1
 					ELSE 0
 				END as isAwayPlayer,
-				bp.gameMIN as min,
+				bp.game_min as min,
 				bp.calc_fg_made as fgm,
-				(bp.game2GA + bp.game3GA) as fga,
-				bp.gameFTM as ftm,
-				bp.gameFTA as fta,
-				bp.game3GM as tpm,
-				bp.game3GA as tpa,
-				bp.gameORB as orb,
-				bp.gameDRB as drb,
-				bp.gameAST as ast,
-				bp.gameSTL as stl,
-				bp.gameTOV as tov,
-				bp.gameBLK as blk,
-				bp.gamePF as pf,
+				(bp.game_2ga + bp.game_3ga) as fga,
+				bp.game_ftm as ftm,
+				bp.game_fta as fta,
+				bp.game_3gm as tpm,
+				bp.game_3ga as tpa,
+				bp.game_orb as orb,
+				bp.game_drb as drb,
+				bp.game_ast as ast,
+				bp.game_stl as stl,
+				bp.game_tov as tov,
+				bp.game_blk as blk,
+				bp.game_pf as pf,
 				bp.calc_rebounds as reb,
 				bp.calc_points as pts
 			FROM ibl_box_scores bp
 			LEFT JOIN ibl_plr plr ON bp.pid = plr.pid
-			WHERE DATE(bp.Date) = ?
-			AND bp.gameOfThatDay = ?
-			AND bp.teamID IN (?, ?)
-			ORDER BY bp.teamID = ? DESC, bp.gameMIN DESC`,
+			WHERE DATE(bp.game_date) = ?
+			AND bp.game_of_that_day = ?
+			AND bp.teamid IN (?, ?)
+			ORDER BY bp.teamid = ? DESC, bp.game_min DESC`,
 			[
 				gameData.awayTeamId,
 				gameDate,
@@ -98,8 +98,8 @@ export const load: PageServerLoad = async ({ params }) => {
 
 		// Transform game data
 		const formattedGame = {
-			date: gameData.Date,
-			gameOfThatDay: gameData.gameOfThatDay,
+			date: gameData.game_date,
+			gameOfThatDay: gameData.game_of_that_day,
 			awayScore: Number(gameData.awayScore) || 0,
 			homeScore: Number(gameData.homeScore) || 0,
 			awayTeamId: gameData.awayTeamId,

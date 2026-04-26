@@ -314,10 +314,23 @@ abstract class PipelineIntegrationTestCase extends DatabaseTestCase
             $boxscoreProcessor, $boxscoreRepo, $boxscoreView, $scoPath,
         ));
 
-        $service->addStep(new Steps\ParseJsbFilesStep($jsbService, $this->tempDir, $season, 'IBL5'));
+        $tempDir = $this->tempDir;
+        $jsbFileResolver = $this->createStub(JsbSourceResolverInterface::class);
+        $jsbFileResolver->method('getContents')->willReturnCallback(
+            static function (string $ext) use ($tempDir): ?string {
+                $path = $tempDir . '/IBL5.' . $ext;
+                if (is_file($path)) {
+                    $data = file_get_contents($path);
+                    return $data !== false ? $data : null;
+                }
+                return null;
+            },
+        );
+
+        $service->addStep(new Steps\ParseJsbFilesStep($jsbService, $jsbFileResolver, $season->endingYear));
 
         $service->addStep(new Steps\EndOfSeasonImportStep(
-            $jsbRepo, $jsbService, $season->endingYear, $this->tempDir, 'IBL5',
+            $jsbRepo, $jsbService, $season->endingYear, $jsbFileResolver,
         ));
 
         $service->addStep(new Steps\SnapshotPlrStep(

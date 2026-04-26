@@ -31,6 +31,64 @@ parameters:
 			path: classes/Bootstrap/AutoloaderBootstrap.php
 
 		-
+			rawMessage: '''
+				Call to method sql_fetchrow() of deprecated class Database\MySQL:
+				This class is for PHP-Nuke module backward compatibility only.
+
+				All IBL5 classes in /ibl5/classes/ and scripts in /ibl5/scripts/ have been
+				migrated to modern mysqli with prepared statements via BaseMysqliRepository.
+
+				This class is ONLY used by legacy PHP-Nuke code in:
+				- /ibl5/modules/
+				- /ibl5/admin/modules/
+				- /ibl5/blocks/
+
+				DO NOT use this class for new code. Instead:
+				- Extend BaseMysqliRepository for repository classes
+				- Use $mysqli_db global with prepared statements
+
+				Example:
+				  $stmt = $mysqli_db->prepare("SELECT * FROM table WHERE id = ?");
+				  $stmt->bind_param("i", $id);
+				  $stmt->execute();
+				  $result = $stmt->get_result();
+
+				Scheduled for removal once PHP-Nuke modules are deprecated.
+			'''
+			identifier: method.deprecatedClass
+			count: 1
+			path: classes/Bootstrap/ConfigBootstrap.php
+
+		-
+			rawMessage: '''
+				Call to method sql_query() of deprecated class Database\MySQL:
+				This class is for PHP-Nuke module backward compatibility only.
+
+				All IBL5 classes in /ibl5/classes/ and scripts in /ibl5/scripts/ have been
+				migrated to modern mysqli with prepared statements via BaseMysqliRepository.
+
+				This class is ONLY used by legacy PHP-Nuke code in:
+				- /ibl5/modules/
+				- /ibl5/admin/modules/
+				- /ibl5/blocks/
+
+				DO NOT use this class for new code. Instead:
+				- Extend BaseMysqliRepository for repository classes
+				- Use $mysqli_db global with prepared statements
+
+				Example:
+				  $stmt = $mysqli_db->prepare("SELECT * FROM table WHERE id = ?");
+				  $stmt->bind_param("i", $id);
+				  $stmt->execute();
+				  $result = $stmt->get_result();
+
+				Scheduled for removal once PHP-Nuke modules are deprecated.
+			'''
+			identifier: method.deprecatedClass
+			count: 1
+			path: classes/Bootstrap/ConfigBootstrap.php
+
+		-
 			rawMessage: Deprecated HTML tag `<b>` found in string literal. Use <strong> instead.
 			identifier: ibl.deprecatedHtmlTag
 			count: 1
@@ -52,6 +110,35 @@ parameters:
 			rawMessage: Direct `require_once` is banned in classes/. All classes under ibl5/classes/ autoload via Composer PSR-4. Remove the statement and rely on autoload instead.
 			identifier: ibl.requireOnce
 			count: 2
+			path: classes/Bootstrap/ConfigBootstrap.php
+
+		-
+			rawMessage: '''
+				PHPDoc tag @var references deprecated class Database\MySQL:
+				This class is for PHP-Nuke module backward compatibility only.
+
+				All IBL5 classes in /ibl5/classes/ and scripts in /ibl5/scripts/ have been
+				migrated to modern mysqli with prepared statements via BaseMysqliRepository.
+
+				This class is ONLY used by legacy PHP-Nuke code in:
+				- /ibl5/modules/
+				- /ibl5/admin/modules/
+				- /ibl5/blocks/
+
+				DO NOT use this class for new code. Instead:
+				- Extend BaseMysqliRepository for repository classes
+				- Use $mysqli_db global with prepared statements
+
+				Example:
+				  $stmt = $mysqli_db->prepare("SELECT * FROM table WHERE id = ?");
+				  $stmt->bind_param("i", $id);
+				  $stmt->execute();
+				  $result = $stmt->get_result();
+
+				Scheduled for removal once PHP-Nuke modules are deprecated.
+			'''
+			identifier: varTag.deprecatedClass
+			count: 1
 			path: classes/Bootstrap/ConfigBootstrap.php
 
 		-

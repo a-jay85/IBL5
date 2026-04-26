@@ -3,7 +3,7 @@ description: Environment setup: CSS build, IBLbot, and environment-specific gotc
 paths:
   - "**/design/**/*.css"
   - "**/IBLbot/**/*"
-last_verified: 2026-04-11
+last_verified: 2026-04-25
 ---
 
 # Environment Commands
@@ -25,6 +25,6 @@ bunx @tailwindcss/cli -i design/input.css -o themes/IBL/style/style.css
 
 ```bash
 # Build the TypeScript bot — must run from IBLbot directory, NOT from ibl5/
-cd /Users/ajaynicolas/Documents/GitHub/IBL5/ibl5/IBLbot && npm run build
+cd /Users/ajaynicolas/GitHub/IBL5/ibl5/IBLbot && npm run build
 ```
 - CWD is usually `ibl5/` so bare `npm run build` will fail ("Missing script: build"). Always `cd` to the IBLbot directory first.

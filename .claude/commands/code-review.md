@@ -47,7 +47,7 @@ gh api "repos/a-jay85/IBL5/pulls/{N}/files" --paginate --jq '.[] | select(.filen
 If still too large, further exclude test files from the diff content given to agents 1-2 (but note their existence).
 
 ### 2d. Read the root CLAUDE.md
-Read the file `/Users/ajaynicolas/Documents/GitHub/IBL5/CLAUDE.md`.
+Read the file `/Users/ajaynicolas/GitHub/IBL5/CLAUDE.md`.
 
 ### 2e. Find directory-specific CLAUDE.md files
 Check if any CLAUDE.md files exist in directories whose files the PR modified. Read those too.

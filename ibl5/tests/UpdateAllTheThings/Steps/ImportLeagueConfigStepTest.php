@@ -8,6 +8,7 @@ use LeagueConfig\LeagueConfigRepository;
 use LeagueConfig\LeagueConfigService;
 use LeagueConfig\LeagueConfigView;
 use PHPUnit\Framework\TestCase;
+use Updater\Contracts\JsbSourceResolverInterface;
 use Updater\Contracts\PipelineStepInterface;
 use Updater\Steps\ImportLeagueConfigStep;
 
@@ -16,24 +17,26 @@ class ImportLeagueConfigStepTest extends TestCase
     private LeagueConfigRepository $stubRepo;
     private LeagueConfigService $stubService;
     private LeagueConfigView $stubView;
+    private JsbSourceResolverInterface $stubResolver;
 
     protected function setUp(): void
     {
         $this->stubRepo = $this->createStub(LeagueConfigRepository::class);
         $this->stubService = $this->createStub(LeagueConfigService::class);
         $this->stubView = $this->createStub(LeagueConfigView::class);
+        $this->stubResolver = $this->createStub(JsbSourceResolverInterface::class);
     }
 
     public function testImplementsPipelineStepInterface(): void
     {
-        $step = $this->createStep('/tmp/IBL5.lge');
+        $step = $this->createStep();
 
         $this->assertInstanceOf(PipelineStepInterface::class, $step);
     }
 
     public function testGetLabelReturnsExpectedLabel(): void
     {
-        $step = $this->createStep('/tmp/IBL5.lge');
+        $step = $this->createStep();
 
         $this->assertSame('League config', $step->getLabel());
     }
@@ -42,18 +45,19 @@ class ImportLeagueConfigStepTest extends TestCase
     {
         $this->stubRepo->method('hasConfigForSeason')->willReturn(true);
 
-        $step = $this->createStep('/tmp/IBL5.lge');
+        $step = $this->createStep();
         $result = $step->execute();
 
         $this->assertTrue($result->success);
         $this->assertStringContainsString('Already imported', $result->detail);
     }
 
-    public function testSkipsWhenFileNotFound(): void
+    public function testSkipsWhenResolverReturnsNull(): void
     {
         $this->stubRepo->method('hasConfigForSeason')->willReturn(false);
+        $this->stubResolver->method('getContents')->willReturn(null);
 
-        $step = $this->createStep('/nonexistent/IBL5.lge');
+        $step = $this->createStep();
         $result = $step->execute();
 
         $this->assertTrue($result->success);
@@ -63,8 +67,9 @@ class ImportLeagueConfigStepTest extends TestCase
     public function testSuccessfulImport(): void
     {
         $this->stubRepo->method('hasConfigForSeason')->willReturn(false);
+        $this->stubResolver->method('getContents')->willReturn('lge-data');
 
-        $this->stubService->method('processLgeFile')->willReturn([
+        $this->stubService->method('processLgeData')->willReturn([
             'success' => true,
             'season_ending_year' => 2026,
             'teams_stored' => 28,
@@ -74,7 +79,7 @@ class ImportLeagueConfigStepTest extends TestCase
 
         $this->stubView->method('renderParseResult')->willReturn('<div>Parsed</div>');
 
-        $step = $this->createStep($this->createTempFile());
+        $step = $this->createStep();
         $result = $step->execute();
 
         $this->assertTrue($result->success);
@@ -85,8 +90,9 @@ class ImportLeagueConfigStepTest extends TestCase
     public function testSuccessfulImportWithDiscrepancies(): void
     {
         $this->stubRepo->method('hasConfigForSeason')->willReturn(false);
+        $this->stubResolver->method('getContents')->willReturn('lge-data');
 
-        $this->stubService->method('processLgeFile')->willReturn([
+        $this->stubService->method('processLgeData')->willReturn([
             'success' => true,
             'season_ending_year' => 2026,
             'teams_stored' => 28,
@@ -97,7 +103,7 @@ class ImportLeagueConfigStepTest extends TestCase
         $this->stubView->method('renderParseResult')->willReturn('<div>Parsed</div>');
         $this->stubView->method('renderCrossCheckResults')->willReturn('<div>Discrepancy</div>');
 
-        $step = $this->createStep($this->createTempFile());
+        $step = $this->createStep();
         $result = $step->execute();
 
         $this->assertTrue($result->success);
@@ -107,8 +113,9 @@ class ImportLeagueConfigStepTest extends TestCase
     public function testFailedImportReturnsFailure(): void
     {
         $this->stubRepo->method('hasConfigForSeason')->willReturn(false);
+        $this->stubResolver->method('getContents')->willReturn('lge-data');
 
-        $this->stubService->method('processLgeFile')->willReturn([
+        $this->stubService->method('processLgeData')->willReturn([
             'success' => false,
             'season_ending_year' => 0,
             'teams_stored' => 0,
@@ -118,32 +125,21 @@ class ImportLeagueConfigStepTest extends TestCase
 
         $this->stubView->method('renderParseResult')->willReturn('');
 
-        $step = $this->createStep($this->createTempFile());
+        $step = $this->createStep();
         $result = $step->execute();
 
         $this->assertFalse($result->success);
         $this->assertSame('Invalid file format', $result->errorMessage);
     }
 
-    private function createStep(string $lgePath): ImportLeagueConfigStep
+    private function createStep(?JsbSourceResolverInterface $resolver = null): ImportLeagueConfigStep
     {
         return new ImportLeagueConfigStep(
             $this->stubRepo,
             $this->stubService,
             $this->stubView,
             2026,
-            $lgePath,
+            $resolver ?? $this->stubResolver,
         );
-    }
-
-    private function createTempFile(): string
-    {
-        $path = tempnam(sys_get_temp_dir(), 'lge_test_');
-        if ($path === false) {
-            $this->fail('Failed to create temp file');
-        }
-        $this->addToAssertionCount(1);
-
-        return $path;
     }
 }

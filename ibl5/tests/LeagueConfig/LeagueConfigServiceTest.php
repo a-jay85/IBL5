@@ -136,6 +136,65 @@ class LeagueConfigServiceTest extends TestCase
         $this->assertStringContainsString('Miami Dolphins', $result[0]);
     }
 
+    public function testProcessLgeDataReturnsSuccessForValidBytes(): void
+    {
+        $lgeFile = dirname(__DIR__, 2) . '/IBL5.lge';
+        if (!file_exists($lgeFile)) {
+            $this->fail("Test .lge file not found at: {$lgeFile}");
+        }
+
+        $data = file_get_contents($lgeFile);
+        self::assertIsString($data);
+
+        $mockRepository = $this->createMock(LeagueConfigRepositoryInterface::class);
+        $mockRepository->expects($this->once())
+            ->method('upsertSeasonConfig')
+            ->with($this->isInt(), $this->isArray())
+            ->willReturn(28);
+
+        $service = new LeagueConfigService($mockRepository);
+        $result = $service->processLgeData($data);
+
+        $this->assertTrue($result['success']);
+        $this->assertSame(28, $result['teams_stored']);
+        $this->assertGreaterThan(0, $result['season_ending_year']);
+    }
+
+    public function testProcessLgeDataReturnsErrorForInvalidSize(): void
+    {
+        $stubRepository = $this->createStub(LeagueConfigRepositoryInterface::class);
+        $service = new LeagueConfigService($stubRepository);
+
+        $result = $service->processLgeData('too short');
+
+        $this->assertFalse($result['success']);
+        $this->assertSame(0, $result['season_ending_year']);
+        $this->assertSame(0, $result['teams_stored']);
+        $this->assertArrayHasKey('error', $result);
+        $this->assertStringContainsString('Invalid .lge data size', $result['error']);
+    }
+
+    public function testProcessLgeDataMatchesProcessLgeFile(): void
+    {
+        $lgeFile = dirname(__DIR__, 2) . '/IBL5.lge';
+        if (!file_exists($lgeFile)) {
+            $this->fail("Test .lge file not found at: {$lgeFile}");
+        }
+
+        $data = file_get_contents($lgeFile);
+        self::assertIsString($data);
+
+        $stubRepository = $this->createStub(LeagueConfigRepositoryInterface::class);
+        $stubRepository->method('upsertSeasonConfig')->willReturn(28);
+
+        $service = new LeagueConfigService($stubRepository);
+
+        $fileResult = $service->processLgeFile($lgeFile);
+        $dataResult = $service->processLgeData($data);
+
+        $this->assertSame($fileResult, $dataResult);
+    }
+
     public function testCrossCheckDetectsFranchiseNotInLgeFile(): void
     {
         $stubRepo = $this->createStub(LeagueConfigRepositoryInterface::class);

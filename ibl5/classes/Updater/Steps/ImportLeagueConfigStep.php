@@ -7,13 +7,15 @@ namespace Updater\Steps;
 use LeagueConfig\LeagueConfigRepository;
 use LeagueConfig\LeagueConfigService;
 use LeagueConfig\LeagueConfigView;
+use Updater\Contracts\JsbSourceResolverInterface;
 use Updater\Contracts\PipelineStepInterface;
 use Updater\StepResult;
 
 /**
- * Step 1: Import league config from .lge file.
+ * Step 1: Import league config from .lge data.
  *
- * Skips if already imported for the current season or if the file is missing.
+ * Reads .lge contents via JsbSourceResolver (archive-first, disk-fallback).
+ * Skips if already imported for the current season or if the data is unavailable.
  */
 class ImportLeagueConfigStep implements PipelineStepInterface
 {
@@ -22,7 +24,7 @@ class ImportLeagueConfigStep implements PipelineStepInterface
         private readonly LeagueConfigService $service,
         private readonly LeagueConfigView $view,
         private readonly int $seasonEndingYear,
-        private readonly string $lgePath,
+        private readonly JsbSourceResolverInterface $sourceResolver,
     ) {
     }
 
@@ -37,11 +39,12 @@ class ImportLeagueConfigStep implements PipelineStepInterface
             return StepResult::skipped($this->getLabel(), 'Already imported for ' . $this->seasonEndingYear);
         }
 
-        if (!is_file($this->lgePath)) {
+        $lgeData = $this->sourceResolver->getContents('lge');
+        if ($lgeData === null) {
             return StepResult::skipped($this->getLabel(), 'No IBL5.lge file found (skipped)');
         }
 
-        $lgeResult = $this->service->processLgeFile($this->lgePath);
+        $lgeResult = $this->service->processLgeData($lgeData);
         $inlineHtml = $this->view->renderParseResult($lgeResult);
 
         if (!$lgeResult['success']) {

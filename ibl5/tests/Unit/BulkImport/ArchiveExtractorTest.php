@@ -379,4 +379,46 @@ final class ArchiveExtractorTest extends TestCase
         self::assertSame('IBL5.sco', $this->extractor->jsbFilename('sco'));
         self::assertSame('IBL5.car', $this->extractor->jsbFilename('car'));
     }
+
+    // ── extractToString ──────────────────────────────────────────────────────
+
+    public function testExtractToStringReturnsContentsFromZip(): void
+    {
+        $tmpDir = sys_get_temp_dir() . '/ibl5_ets_test_' . uniqid();
+        mkdir($tmpDir, 0755, true);
+
+        $zipPath = $tmpDir . '/test.zip';
+        $zip = new ZipArchive();
+        $zip->open($zipPath, ZipArchive::CREATE);
+        $zip->addFromString('IBL5.plr', 'test player data content');
+        $zip->close();
+
+        try {
+            $result = $this->extractor->extractToString($zipPath, 'IBL5.plr');
+            self::assertSame('test player data content', $result);
+        } finally {
+            array_map('unlink', glob($tmpDir . '/*') ?: []);
+            rmdir($tmpDir);
+        }
+    }
+
+    public function testExtractToStringReturnsFalseForMissingFile(): void
+    {
+        $tmpDir = sys_get_temp_dir() . '/ibl5_ets_missing_' . uniqid();
+        mkdir($tmpDir, 0755, true);
+
+        $zipPath = $tmpDir . '/test.zip';
+        $zip = new ZipArchive();
+        $zip->open($zipPath, ZipArchive::CREATE);
+        $zip->addFromString('IBL5.sco', 'some other file');
+        $zip->close();
+
+        try {
+            $result = $this->extractor->extractToString($zipPath, 'IBL5.plr');
+            self::assertFalse($result);
+        } finally {
+            array_map('unlink', glob($tmpDir . '/*') ?: []);
+            rmdir($tmpDir);
+        }
+    }
 }

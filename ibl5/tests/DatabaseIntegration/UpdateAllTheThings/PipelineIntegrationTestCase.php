@@ -17,6 +17,7 @@ use Season\Season;
 use Services\CommonMysqliRepository;
 use Shared\SharedRepository;
 use Tests\DatabaseIntegration\DatabaseTestCase;
+use Updater\Contracts\JsbSourceResolverInterface;
 use Updater\Steps;
 use Updater\UpdaterService;
 use Updater\StepResult;
@@ -272,7 +273,17 @@ abstract class PipelineIntegrationTestCase extends DatabaseTestCase
         $jsbResolver = new PlayerIdResolver($this->db);
         $jsbService = new JsbImportService($jsbRepo, $jsbResolver);
 
-        $scheduleUpdater = new \Updater\ScheduleUpdater($this->db, $season, null, $schPath);
+        $schResolver = $this->createStub(JsbSourceResolverInterface::class);
+        $schResolver->method('getContents')->willReturnCallback(
+            static function (string $ext) use ($schPath): ?string {
+                if ($ext === 'sch' && is_file($schPath)) {
+                    $data = file_get_contents($schPath);
+                    return $data !== false ? $data : null;
+                }
+                return null;
+            },
+        );
+        $scheduleUpdater = new \Updater\ScheduleUpdater($this->db, $season, null, $schResolver);
         $standingsUpdater = new \Updater\StandingsUpdater($this->db, $season);
         $powerRankingsUpdater = new \Updater\PowerRankingsUpdater($this->db, $season);
 

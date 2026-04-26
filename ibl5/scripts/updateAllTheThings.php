@@ -128,25 +128,9 @@ try {
     $filePrefix = $leagueContext !== null ? $leagueContext->getFilePrefix() : 'IBL5';
 
 
-    $scheduleUpdater = new Updater\ScheduleUpdater($mysqli_db, $season, $leagueContext);
-    echo $view->renderInitStatus('ScheduleUpdater initialized');
-    flush();
-
-    $standingsUpdater = new Updater\StandingsUpdater($mysqli_db, $season, $leagueContext);
-    echo $view->renderInitStatus('StandingsUpdater initialized');
-    flush();
-
-    $powerRankingsUpdater = new Updater\PowerRankingsUpdater($mysqli_db, $season, null, $leagueContext);
-    echo $view->renderInitStatus('PowerRankingsUpdater initialized');
-    flush();
-
-    echo $view->renderSectionClose();
-    flush();
-
     // --- Pipeline: register all steps and delegate to controller ---
     $updaterService = new Updater\UpdaterService();
 
-    $defaultLgePath = $basePath . '/' . $filePrefix . '.lge';
     $defaultPlrPath = $basePath . '/' . $filePrefix . '.plr';
     $defaultScoPath = $basePath . '/' . $filePrefix . '.sco';
 
@@ -174,9 +158,31 @@ try {
         $backupLocator, $archiveExtractor, $season, $basePath, $filePrefix,
     ));
 
+    // JsbSourceResolver reads .lge/.sch directly from archive (disk-fallback)
+    $seasonLabel = BulkImport\BackupArchiveLocator::seasonLabel($season->beginningYear, $season->endingYear);
+    $seasonBackupDir = $basePath . '/backups/' . $seasonLabel;
+    $sourceResolver = new Updater\JsbSourceResolver(
+        $backupLocator, $archiveExtractor, $seasonBackupDir, $basePath, $filePrefix,
+    );
+
     $updaterService->addStep(new Updater\Steps\ImportLeagueConfigStep(
-        $lgeRepo, $lgeService, $lgeView, $season->endingYear, $defaultLgePath,
+        $lgeRepo, $lgeService, $lgeView, $season->endingYear, $sourceResolver,
     ));
+
+    $scheduleUpdater = new Updater\ScheduleUpdater($mysqli_db, $season, $leagueContext, $sourceResolver);
+    echo $view->renderInitStatus('ScheduleUpdater initialized');
+    flush();
+
+    $standingsUpdater = new Updater\StandingsUpdater($mysqli_db, $season, $leagueContext);
+    echo $view->renderInitStatus('StandingsUpdater initialized');
+    flush();
+
+    $powerRankingsUpdater = new Updater\PowerRankingsUpdater($mysqli_db, $season, null, $leagueContext);
+    echo $view->renderInitStatus('PowerRankingsUpdater initialized');
+    flush();
+
+    echo $view->renderSectionClose();
+    flush();
 
     $updaterService->addStep(new Updater\Steps\ParsePlayerFileStep($plrService, $defaultPlrPath));
 

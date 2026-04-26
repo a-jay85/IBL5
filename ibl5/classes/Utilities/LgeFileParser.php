@@ -42,6 +42,31 @@ class LgeFileParser
     public const SEASON_INFO_OFFSET = 0x0F98;
 
     /**
+     * Parse raw .lge binary/ASCII bytes and return the complete league configuration.
+     *
+     * @return array{
+     *     header: array{qualifier_count: int, playoff_formats: list<string>, conferences: list<string>, divisions: list<string>},
+     *     teams: list<array{slot: int, name: string, control: string, conference: string, division: string}>,
+     *     season: array{season_beginning_year: int, season_ending_year: int, phase: string, team_count: int}
+     * }
+     */
+    public static function parse(string $data): array
+    {
+        $dataSize = strlen($data);
+        if ($dataSize !== self::FILE_SIZE) {
+            throw new \RuntimeException(
+                'Invalid .lge data size: expected ' . self::FILE_SIZE . " bytes, got {$dataSize}"
+            );
+        }
+
+        return [
+            'header' => self::parseHeader($data),
+            'teams' => self::parseTeamEntries($data),
+            'season' => self::parseSeasonMetadata($data),
+        ];
+    }
+
+    /**
      * Parse a .lge file and return the complete league configuration.
      *
      * @return array{
@@ -56,23 +81,12 @@ class LgeFileParser
             throw new \RuntimeException("League file not found: {$filePath}");
         }
 
-        $fileSize = filesize($filePath);
-        if ($fileSize !== self::FILE_SIZE) {
-            throw new \RuntimeException(
-                'Invalid .lge file size: expected ' . self::FILE_SIZE . " bytes, got {$fileSize}"
-            );
-        }
-
         $data = file_get_contents($filePath);
         if ($data === false) {
             throw new \RuntimeException("Failed to read league file: {$filePath}");
         }
 
-        return [
-            'header' => self::parseHeader($data),
-            'teams' => self::parseTeamEntries($data),
-            'season' => self::parseSeasonMetadata($data),
-        ];
+        return self::parse($data);
     }
 
     /**

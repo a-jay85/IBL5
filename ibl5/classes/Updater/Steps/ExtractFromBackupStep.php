@@ -26,9 +26,9 @@ use Updater\StepResult;
  */
 final class ExtractFromBackupStep implements PipelineStepInterface
 {
-    /** @var list<string> JSB file extensions to extract */
+    /** @var list<string> JSB file extensions to extract (.lge and .sch read directly from archive by JsbSourceResolver) */
     private const EXTENSIONS = [
-        'lge', 'plr', 'sco', 'sch', 'car', 'trn', 'his',
+        'plr', 'sco', 'car', 'trn', 'his',
         'asw', 'rcb', 'awa', 'dra', 'ret', 'hof', 'plb',
     ];
 

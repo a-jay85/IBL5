@@ -136,7 +136,7 @@ Review changed files (`git diff --name-only HEAD~1` or vs base branch) for reuse
 
 1. Stage relevant changes, review with `git diff --staged`, commit (CLAUDE.md conventions), push, create PR
 2. **Stacked PRs:** If branched from a feature branch (not `master`), use `--base <parent-branch>`
-3. **Manual testing in PR description:** Include a "Manual Testing" section. If automated tests fully cover behavior, write: `No manual testing needed — all changes are covered by unit and E2E tests.` Otherwise, list only steps requiring subjective human judgment on new or redesigned UI/UX ("does this look/feel good?", "does this flow work well?"). Production comparison and "does output still match?" are visual-regression-replaceable, not manual. Do NOT list CLI commands or script invocations — Phase 7 executes those.
+3. **Manual testing in PR description:** Check the plan file for a Verification Matrix. If one exists, copy only the rows classified as `Truly-manual` into the PR's `## Manual Testing` section. If the matrix has zero truly-manual rows (or the plan says "All verification is automated"), write: `No manual testing needed — all changes are covered by unit and E2E tests.` If no plan file or no matrix exists, fall back to the original rule: list only steps requiring subjective human judgment on new or redesigned UI/UX ("does this look/feel good?", "does this flow work well?"). Production comparison and "does output still match?" are visual-regression-replaceable, not manual. Do NOT list CLI commands or script invocations — Phase 7 executes those.
 4. Use Haiku agents for commit message generation if delegating
 
 ---

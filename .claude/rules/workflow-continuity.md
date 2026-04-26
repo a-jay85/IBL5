@@ -1,11 +1,15 @@
 ---
 description: Worktree setup and /post-plan workflow rules for multi-step implementation work.
-last_verified: 2026-04-25
+last_verified: 2026-04-26
 ---
 
 # Workflow Continuity Rule
 
 > **Why this exists:** [ADR-0004](../../ibl5/docs/decisions/0004-docker-only-dev-environment.md) explains why every worktree runs its own isolated Docker stack; MAMP and native PHP setups are unsupported.
+
+## Planning
+
+Use `/plan <task description>` for implementation planning. This skill injects the verification matrix rule (`.claude/rules/plan-verification.md`) into the Plan agent so every verification step is classified at plan-write time. Do NOT use the built-in `EnterPlanMode` — it does not inject the rule, so subagents produce unclassified manual testing items.
 
 ## Phase 1: Worktree Setup
 

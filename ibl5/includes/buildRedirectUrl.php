@@ -21,6 +21,8 @@ function buildRedirectUrl(): ?string
         $allowedPaths = [
             'leagueControlPanel.php',
             'scripts/updateAllTheThings.php',
+            'ibl/IBL/Schedule.htm',
+            'ibl/IBL/Standings.htm',
         ];
 
         $pathOnly = strtok($storedPath, '?');

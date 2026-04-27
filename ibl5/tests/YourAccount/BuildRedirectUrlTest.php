@@ -185,6 +185,24 @@ class BuildRedirectUrlTest extends TestCase
         $this->assertArrayNotHasKey('redirect_after_login_path', $_SESSION);
     }
 
+    public function testReturnsIblSchedulePath(): void
+    {
+        $_SESSION['redirect_after_login_path'] = 'ibl/IBL/Schedule.htm';
+
+        $result = buildRedirectUrl();
+
+        $this->assertSame('ibl/IBL/Schedule.htm', $result);
+    }
+
+    public function testReturnsIblStandingsPath(): void
+    {
+        $_SESSION['redirect_after_login_path'] = 'ibl/IBL/Standings.htm';
+
+        $result = buildRedirectUrl();
+
+        $this->assertSame('ibl/IBL/Standings.htm', $result);
+    }
+
     public function testStandalonePathTakesPriorityOverModuleRedirect(): void
     {
         $_SESSION['redirect_after_login_path'] = 'leagueControlPanel.php';

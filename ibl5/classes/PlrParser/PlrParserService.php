@@ -36,25 +36,27 @@ class PlrParserService implements PlrParserServiceInterface
      */
     public function processPlrFile(string $filePath): PlrParseResult
     {
-        $result = new PlrParseResult();
-
-        // Pass 1: Calculate foul baseline
-        $maxFoulRatio = $this->calculateFoulBaseline($filePath);
-        $result->addMessage('Foul baseline calculated (max ratio: ' . \BasketballStats\StatsFormatter::formatWithDecimals($maxFoulRatio, 6) . ')');
-
-        // Pass 2: Parse players and upsert
-        $handle = fopen($filePath, 'rb');
-        if ($handle === false) {
+        $data = file_get_contents($filePath);
+        if ($data === false) {
+            $result = new PlrParseResult();
             $result->addMessage('ERROR: Could not open PLR file');
             return $result;
         }
 
-        while (!feof($handle)) {
-            $line = fgets($handle);
-            if ($line === false) {
-                break;
-            }
+        return $this->processPlrData($data);
+    }
 
+    /**
+     * @see PlrParserServiceInterface::processPlrData()
+     */
+    public function processPlrData(string $data): PlrParseResult
+    {
+        $result = new PlrParseResult();
+
+        $maxFoulRatio = $this->calculateFoulBaselineFromData($data);
+        $result->addMessage('Foul baseline calculated (max ratio: ' . \BasketballStats\StatsFormatter::formatWithDecimals($maxFoulRatio, 6) . ')');
+
+        foreach (explode("\r\n", $data) as $line) {
             $parsed = PlrLineParser::parse($line);
             if ($parsed === null) {
                 continue;
@@ -65,8 +67,6 @@ class PlrParserService implements PlrParserServiceInterface
             $this->repository->upsertPlayer($derived);
             $result->playersUpserted++;
         }
-
-        fclose($handle);
 
         return $result;
     }
@@ -82,20 +82,24 @@ class PlrParserService implements PlrParserServiceInterface
         if (!is_file($filePath)) {
             return 0.0;
         }
-
-        $handle = fopen($filePath, 'rb');
-        if ($handle === false) {
+        $data = file_get_contents($filePath);
+        if ($data === false) {
             return 0.0;
         }
+        return $this->calculateFoulBaselineFromData($data);
+    }
 
+    /**
+     * Pass 1 (string variant): max foul-per-minute ratio across all players.
+     *
+     * @param string $data Raw .plr file contents (CRLF-separated 607-byte records)
+     * @return float Maximum foul ratio (0.0 if no valid data)
+     */
+    public function calculateFoulBaselineFromData(string $data): float
+    {
         $maxRatio = 0.0;
 
-        while (!feof($handle)) {
-            $line = fgets($handle);
-            if ($line === false) {
-                break;
-            }
-
+        foreach (explode("\r\n", $data) as $line) {
             $realLifeMIN = (int) substr($line, 56, 4);
             $realLifePF = (int) substr($line, 108, 4);
 
@@ -107,7 +111,6 @@ class PlrParserService implements PlrParserServiceInterface
             }
         }
 
-        fclose($handle);
         return $maxRatio;
     }
 
@@ -213,23 +216,32 @@ class PlrParserService implements PlrParserServiceInterface
         ?string $snapshotPhase = null,
         ?string $sourceArchive = null,
     ): PlrParseResult {
-        $result = new PlrParseResult();
-
-        $maxFoulRatio = $this->calculateFoulBaseline($filePath);
-        $result->addMessage('Foul baseline calculated (max ratio: ' . \BasketballStats\StatsFormatter::formatWithDecimals($maxFoulRatio, 6) . ')');
-
-        $handle = fopen($filePath, 'rb');
-        if ($handle === false) {
+        $data = file_get_contents($filePath);
+        if ($data === false) {
+            $result = new PlrParseResult();
             $result->addMessage('ERROR: Could not open PLR file');
             return $result;
         }
 
-        while (!feof($handle)) {
-            $line = fgets($handle);
-            if ($line === false) {
-                break;
-            }
+        return $this->processPlrDataForYear($data, $endingYear, $mode, $snapshotPhase, $sourceArchive);
+    }
 
+    /**
+     * @see PlrParserServiceInterface::processPlrDataForYear()
+     */
+    public function processPlrDataForYear(
+        string $data,
+        int $endingYear,
+        PlrImportMode $mode,
+        ?string $snapshotPhase = null,
+        ?string $sourceArchive = null,
+    ): PlrParseResult {
+        $result = new PlrParseResult();
+
+        $maxFoulRatio = $this->calculateFoulBaselineFromData($data);
+        $result->addMessage('Foul baseline calculated (max ratio: ' . \BasketballStats\StatsFormatter::formatWithDecimals($maxFoulRatio, 6) . ')');
+
+        foreach (explode("\r\n", $data) as $line) {
             $parsed = PlrLineParser::parse($line);
             if ($parsed === null) {
                 continue;
@@ -242,8 +254,6 @@ class PlrParserService implements PlrParserServiceInterface
                 PlrImportMode::Snapshot => $this->processSnapshotPlayer($derived, $result, $endingYear, $snapshotPhase ?? '', $sourceArchive ?? ''),
             };
         }
-
-        fclose($handle);
 
         return $result;
     }

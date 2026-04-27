@@ -21,6 +21,14 @@ interface PlrParserServiceInterface
     public function processPlrFile(string $filePath): PlrParseResult;
 
     /**
+     * Process raw .plr file contents — parse all players, upsert into DB, assign team names.
+     *
+     * @param string $data Raw .plr file contents (CRLF-separated 607-byte records)
+     * @return PlrParseResult Result summary
+     */
+    public function processPlrData(string $data): PlrParseResult;
+
+    /**
      * Process a .plr file with an explicit ending year, bypassing the Season dependency.
      *
      * In Live mode: upserts players + historical stats (same as processPlrFile).
@@ -35,6 +43,27 @@ interface PlrParserServiceInterface
      */
     public function processPlrFileForYear(
         string $filePath,
+        int $endingYear,
+        PlrImportMode $mode,
+        ?string $snapshotPhase = null,
+        ?string $sourceArchive = null,
+    ): PlrParseResult;
+
+    /**
+     * Process raw .plr file contents with an explicit ending year, bypassing the Season dependency.
+     *
+     * In Live mode: upserts players + historical stats (same as processPlrData).
+     * In Snapshot mode: upserts rating snapshots into ibl_plr_snapshots.
+     *
+     * @param string $data Raw .plr file contents (CRLF-separated 607-byte records)
+     * @param int $endingYear Season ending year for draft year calculation
+     * @param PlrImportMode $mode Import mode (Live or Snapshot)
+     * @param string|null $snapshotPhase Phase label for snapshots (e.g. 'end-of-season')
+     * @param string|null $sourceArchive Source archive filename for snapshots
+     * @return PlrParseResult Result summary
+     */
+    public function processPlrDataForYear(
+        string $data,
         int $endingYear,
         PlrImportMode $mode,
         ?string $snapshotPhase = null,

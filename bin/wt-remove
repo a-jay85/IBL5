@@ -65,5 +65,7 @@ if [ -f "$WT_PATH/.wt-slug" ]; then
 fi
 
 echo "Removing worktree '$NAME'..."
+# Docker on macOS sets deny-delete ACLs on bind-mount dirs (e.g. ibl5/backups)
+chmod -R -N "$WT_PATH" 2>/dev/null || true
 git worktree remove --force "$WT_PATH"
 echo "Done. Worktree '$NAME' removed."

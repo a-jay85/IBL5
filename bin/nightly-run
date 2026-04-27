@@ -34,7 +34,7 @@ cd "$REPO"
 
 # Clean up one-shot resume plist if this IS a resume run
 if [ -f "$RESUME_PLIST" ]; then
-    launchctl unload "$RESUME_PLIST" 2>/dev/null || true
+    launchctl bootout "gui/$(id -u)/com.ibl5.nightly-resume" 2>/dev/null || true
     rm -f "$RESUME_PLIST"
 fi
 
@@ -146,7 +146,7 @@ if ls "$QUEUE_DIR"/*.md &>/dev/null; then
 </plist>
 EOF
 
-    launchctl load "$RESUME_PLIST"
+    launchctl bootstrap "gui/$(id -u)" "$RESUME_PLIST"
     echo "Resume plist loaded: $RESUME_PLIST" >> "$LOG"
 fi
 

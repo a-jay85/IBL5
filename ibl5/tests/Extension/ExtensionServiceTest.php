@@ -269,7 +269,7 @@ class ExtensionServiceTest extends TestCase
         ]);
         $this->mockDb->setMockData([$mockData]);
 
-        $mockTeamQueryRepo = $this->createMock(TeamQueryRepositoryInterface::class);
+        $stubTeamQueryRepo = $this->createStub(TeamQueryRepositoryInterface::class);
 
         $playerRow = $mockData;
         $playerRow['pid'] = $extendedPlayerPid;
@@ -280,11 +280,11 @@ class ExtensionServiceTest extends TestCase
         $teammateRow['name'] = 'Teammate';
         $teammateRow['salary_yr2'] = 500;
 
-        $mockTeamQueryRepo->method('getPlayersUnderContractByPosition')
+        $stubTeamQueryRepo->method('getPlayersUnderContractByPosition')
             ->willReturn([$playerRow, $teammateRow]);
 
         $capturedRows = null;
-        $mockTeamQueryRepo->method('getTotalNextSeasonSalaries')
+        $stubTeamQueryRepo->method('getTotalNextSeasonSalaries')
             ->willReturnCallback(function (array $rows) use (&$capturedRows): int {
                 $capturedRows = $rows;
                 return 500;
@@ -295,7 +295,7 @@ class ExtensionServiceTest extends TestCase
             null,
             null,
             null,
-            $mockTeamQueryRepo
+            $stubTeamQueryRepo
         );
 
         $result = $service->processExtension([

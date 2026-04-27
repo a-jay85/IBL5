@@ -7,7 +7,6 @@ namespace Mail;
 use Mail\Contracts\MailServiceInterface;
 use PHPMailer\PHPMailer\PHPMailer;
 use PHPMailer\PHPMailer\Exception as PHPMailerException;
-use Utilities\EmailSanitizer;
 
 /**
  * Mail delivery service with configurable transport.

@@ -330,7 +330,7 @@ class ExtensionIntegrationTest extends IntegrationTestCase
 
         // Assert
         $this->assertTrue($result['success']);
-        $this->assertFalse($result['accepted']); // Rejects due to playing time concerns
+        $this->assertFalse($result['accepted']);
     }
 
     /**
@@ -612,7 +612,7 @@ class ExtensionIntegrationTest extends IntegrationTestCase
                 'contract_losses' => 32,
                 'contract_avg_w' => 2500,
                 'contract_avg_l' => 2000,
-                'money_committed_at_position' => 0,
+
                 // Player info fields (scenario-specific overrides)
                 'name' => 'Test Player',
                 'nickname' => 'Tester',
@@ -653,7 +653,7 @@ class ExtensionIntegrationTest extends IntegrationTestCase
                 'contract_losses' => 57,
                 'contract_avg_w' => 1500,
                 'contract_avg_l' => 3500,
-                'money_committed_at_position' => 0,
+
                 // Player info fields - high demands (scenario-specific overrides)
                 'pid' => 2,
                 'ordinal' => 2,
@@ -767,7 +767,7 @@ class ExtensionIntegrationTest extends IntegrationTestCase
                 'contract_losses' => 32,
                 'contract_avg_w' => 2500,
                 'contract_avg_l' => 2000,
-                'money_committed_at_position' => 0,
+
                 // Player info fields (combined in same row for mock)
                 'pid' => 5,
                 'ordinal' => 5,
@@ -808,7 +808,7 @@ class ExtensionIntegrationTest extends IntegrationTestCase
                 'contract_losses' => 37,
                 'contract_avg_w' => 2300,
                 'contract_avg_l' => 2100,
-                'money_committed_at_position' => 0,
+
                 // Player info fields (combined in same row for mock)
                 'pid' => 6,
                 'ordinal' => 6,
@@ -845,18 +845,17 @@ class ExtensionIntegrationTest extends IntegrationTestCase
                 // Team info fields
                 'used_extension_this_season' => 0,
                 'used_extension_this_chunk' => 0,
-                'money_committed_at_position' => 8000,
-                'contract_wins' => 55,
-                'contract_losses' => 27,
-                'contract_avg_w' => 2700,
-                'contract_avg_l' => 1900,
+                'contract_wins' => 30,
+                'contract_losses' => 52,
+                'contract_avg_w' => 1800,
+                'contract_avg_l' => 2800,
                 // Player info fields (combined in same row for mock)
                 'pid' => 7,
                 'ordinal' => 7,
                 'name' => 'Rotation Player',
                 'nickname' => 'Roto',
                 'age' => 24,
-                'pos' => 'G',  // Position field required
+                'pos' => 'G',
                 'exp' => 4,
                 'bird' => 2,
                 'winner' => 3,
@@ -878,6 +877,15 @@ class ExtensionIntegrationTest extends IntegrationTestCase
                 'topicid' => 5
             ])
         ]);
+
+        $base = $this->getBasePlayerData();
+        $this->mockDb->onQuery('p\.teamid[\s\S]*p\.pos[\s\S]*salary_yr1', [
+            array_merge($base, ['pid' => 100, 'ordinal' => 100, 'name' => 'Big Contract G1', 'nickname' => 'BCG1', 'pos' => 'G', 'cy' => 1, 'cyt' => 3, 'salary_yr1' => 1000, 'salary_yr2' => 1100, 'salary_yr3' => 1200]),
+            array_merge($base, ['pid' => 101, 'ordinal' => 101, 'name' => 'Big Contract G2', 'nickname' => 'BCG2', 'pos' => 'G', 'cy' => 1, 'cyt' => 4, 'salary_yr1' => 900, 'salary_yr2' => 1000, 'salary_yr3' => 1100, 'salary_yr4' => 1200]),
+            array_merge($base, ['pid' => 102, 'ordinal' => 102, 'name' => 'Big Contract G3', 'nickname' => 'BCG3', 'pos' => 'G', 'cy' => 1, 'cyt' => 5, 'salary_yr1' => 1200, 'salary_yr2' => 1300, 'salary_yr3' => 1400, 'salary_yr4' => 1500, 'salary_yr5' => 1600]),
+            array_merge($base, ['pid' => 103, 'ordinal' => 103, 'name' => 'Big Contract G4', 'nickname' => 'BCG4', 'pos' => 'G', 'cy' => 1, 'cyt' => 3, 'salary_yr1' => 800, 'salary_yr2' => 900, 'salary_yr3' => 1000]),
+            array_merge($base, ['pid' => 104, 'ordinal' => 104, 'name' => 'Big Contract G5', 'nickname' => 'BCG5', 'pos' => 'G', 'cy' => 1, 'cyt' => 3, 'salary_yr1' => 700, 'salary_yr2' => 800, 'salary_yr3' => 900]),
+        ]);
     }
 
     private function setupBirdRightsThresholdScenario(): void
@@ -891,7 +899,7 @@ class ExtensionIntegrationTest extends IntegrationTestCase
                 'contract_losses' => 32,
                 'contract_avg_w' => 2500,
                 'contract_avg_l' => 2000,
-                'money_committed_at_position' => 0,
+
                 // Player info fields
                 'pid' => 8,
                 'ordinal' => 8,
@@ -932,7 +940,7 @@ class ExtensionIntegrationTest extends IntegrationTestCase
                 'contract_losses' => 62,
                 'contract_avg_w' => 1200,
                 'contract_avg_l' => 3800,
-                'money_committed_at_position' => 0,
+
                 // Player info fields
                 'pid' => 9,
                 'ordinal' => 9,

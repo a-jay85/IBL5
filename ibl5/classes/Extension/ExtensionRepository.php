@@ -16,7 +16,6 @@ use Extension\Contracts\ExtensionRepositoryInterface;
  * @phpstan-import-type TraditionData from Contracts\ExtensionRepositoryInterface
  *
  * @phpstan-type TeamTraditionDbRow array{contract_wins: int, contract_losses: int, contract_avg_w: int, contract_avg_l: int}
- * @phpstan-type MoneyCommittedDbRow array{money_committed_at_position: int}
  *
  * @see ExtensionRepositoryInterface
  */
@@ -178,29 +177,6 @@ class ExtensionRepository extends \BaseMysqliRepository implements ExtensionRepo
         }
 
         return $defaults;
-    }
-
-    /**
-     * @see ExtensionRepositoryInterface::getMoneyCommittedAtPosition()
-     */
-    public function getMoneyCommittedAtPosition(string $teamName): int
-    {
-        try {
-            /** @var MoneyCommittedDbRow|null $row */
-            $row = $this->fetchOne(
-                "SELECT money_committed_at_position FROM ibl_team_info WHERE team_name = ? LIMIT 1",
-                's',
-                $teamName
-            );
-
-            if ($row !== null && $row['money_committed_at_position'] > 0) {
-                return $row['money_committed_at_position'];
-            }
-        } catch (\RuntimeException $e) {
-            \Logging\LoggerFactory::getChannel('app')->warning('ExtensionRepository::getMoneyCommittedAtPosition failed', ['error' => $e->getMessage()]);
-        }
-
-        return 0;
     }
 
     /**

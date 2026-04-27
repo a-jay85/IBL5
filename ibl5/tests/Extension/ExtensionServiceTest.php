@@ -11,6 +11,7 @@ use Extension\Contracts\ExtensionRepositoryInterface;
 use Extension\Contracts\ExtensionValidatorInterface;
 use Extension\Contracts\ExtensionOfferEvaluatorInterface;
 use Player\Player;
+use Team\Contracts\TeamQueryRepositoryInterface;
 use Team\Team;
 
 /**
@@ -252,6 +253,66 @@ class ExtensionServiceTest extends TestCase
     }
 
     // ============================================
+    // BUG FIX: POSITION SALARY EXCLUDES EXTENDED PLAYER
+    // ============================================
+
+    public function testBuildEvaluationContextExcludesExtendedPlayerFromPositionSalary(): void
+    {
+        $extendedPlayerPid = 1;
+        $teammatePid = 2;
+
+        $mockData = $this->getFullMockData([
+            'pid' => $extendedPlayerPid,
+            'loyalty' => 5,
+            'contract_wins' => 60,
+            'contract_losses' => 22,
+        ]);
+        $this->mockDb->setMockData([$mockData]);
+
+        $mockTeamQueryRepo = $this->createMock(TeamQueryRepositoryInterface::class);
+
+        $playerRow = $mockData;
+        $playerRow['pid'] = $extendedPlayerPid;
+        $playerRow['salary_yr2'] = 900;
+
+        $teammateRow = $mockData;
+        $teammateRow['pid'] = $teammatePid;
+        $teammateRow['name'] = 'Teammate';
+        $teammateRow['salary_yr2'] = 500;
+
+        $mockTeamQueryRepo->method('getPlayersUnderContractByPosition')
+            ->willReturn([$playerRow, $teammateRow]);
+
+        $capturedRows = null;
+        $mockTeamQueryRepo->method('getTotalNextSeasonSalaries')
+            ->willReturnCallback(function (array $rows) use (&$capturedRows): int {
+                $capturedRows = $rows;
+                return 500;
+            });
+
+        $service = new ExtensionService(
+            $this->mockDb,
+            null,
+            null,
+            null,
+            $mockTeamQueryRepo
+        );
+
+        $result = $service->processExtension([
+            'teamName' => 'Miami Cyclones',
+            'playerID' => $extendedPlayerPid,
+            'offer' => ['year1' => 1000, 'year2' => 1100, 'year3' => 1200, 'year4' => 0, 'year5' => 0],
+            'demands' => null,
+        ]);
+
+        $this->assertTrue($result['success']);
+        $this->assertNotNull($capturedRows);
+        $capturedPids = array_map(static fn(array $row): int => (int) $row['pid'], $capturedRows);
+        $this->assertNotContains($extendedPlayerPid, $capturedPids, 'Extended player should be excluded from position salary calculation');
+        $this->assertContains($teammatePid, $capturedPids, 'Teammate should remain in position salary calculation');
+    }
+
+    // ============================================
     // BACKWARD COMPATIBILITY
     // ============================================
 
@@ -298,7 +359,7 @@ class ExtensionServiceTest extends TestCase
             'used_extension_this_season' => 0, 'used_extension_this_chunk' => 0,
             'contract_wins' => 50, 'contract_losses' => 32,
             'contract_avg_w' => 2500, 'contract_avg_l' => 2000,
-            'money_committed_at_position' => 0,
+
             'catid' => 1, 'counter' => 10, 'topicid' => 5,
         ], $overrides);
     }

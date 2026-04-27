@@ -100,6 +100,14 @@ class ContractRules
      */
     public const LLE_OFFER = 145;
 
+    public const PLAY_FOR_WINNER_FACTOR = 0.000153;
+    public const TRADITION_FACTOR = 0.000153;
+    public const LOYALTY_BONUS_PERCENTAGE = 0.025;
+    public const PLAYING_TIME_BASE_FACTOR = 0.025;
+    public const PLAYING_TIME_MONEY_FACTOR = 0.0025;
+    public const PLAYING_TIME_DIVISOR = 100;
+    public const MAX_POSITION_SALARY_CAP = 2000;
+
     /**
      * Calculate the maximum annual raise amount for a contract
      *
@@ -181,5 +189,29 @@ class ContractRules
     public static function getMLEOffers(int $years): array
     {
         return array_slice(self::MLE_OFFERS, 0, $years);
+    }
+
+    public static function calculateWinnerModifier(int $wins, int $losses, int $preference): float
+    {
+        return self::PLAY_FOR_WINNER_FACTOR * ($wins - $losses) * ($preference - 1);
+    }
+
+    public static function calculateTraditionModifier(int $tradWins, int $tradLosses, int $preference): float
+    {
+        return self::TRADITION_FACTOR * ($tradWins - $tradLosses) * ($preference - 1);
+    }
+
+    public static function calculateLoyaltyModifier(int $preference, bool $isOwnTeam = true): float
+    {
+        $sign = $isOwnTeam ? 1 : -1;
+        return $sign * self::LOYALTY_BONUS_PERCENTAGE * ($preference - 1);
+    }
+
+    public static function calculatePlayingTimeModifier(int $moneyCommitted, int $preference): float
+    {
+        $capped = min($moneyCommitted, self::MAX_POSITION_SALARY_CAP);
+        return (self::PLAYING_TIME_BASE_FACTOR
+                - self::PLAYING_TIME_MONEY_FACTOR * $capped / self::PLAYING_TIME_DIVISOR)
+               * ($preference - 1);
     }
 }

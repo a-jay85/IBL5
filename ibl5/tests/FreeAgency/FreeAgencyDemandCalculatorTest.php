@@ -614,6 +614,82 @@ class FreeAgencyDemandCalculatorTest extends TestCase
     }
 
     // ================================================================
+    // CHARACTERIZATION TESTS — pin current formula before unification
+    // ================================================================
+
+    /**
+     * Playing time modifier at mc=500, pref=5, all others neutral.
+     * formula: -(0.0025*500/100 - 0.025) * (5-1) = -(0.0125 - 0.025)*4 = 0.05
+     * modifier = 1 + 0.05 = 1.05
+     */
+    public function testPlayingTimeModifierAtMc500Pref5(): void
+    {
+        $this->mockRepository->teamPerformance = [
+            'wins' => 41, 'losses' => 41,
+            'tradWins' => 500, 'tradLosses' => 500,
+        ];
+        $this->mockRepository->positionSalaryCommitment = 500;
+        $this->calculator->setRandomFactor(0);
+
+        $result = $this->calculator->calculatePerceivedValue(
+            offerAverage: 1000,
+            teamName: 'Test Team',
+            player: $this->createPlayer(playingTime: 5),
+            yearsInOffer: 1
+        );
+
+        $this->assertEqualsWithDelta(1.05, $result['modifier'], 0.000001);
+    }
+
+    /**
+     * Playing time modifier at mc=1500, pref=5, all others neutral.
+     * formula: -(0.0025*1500/100 - 0.025) * (5-1) = -(0.0375 - 0.025)*4 = -0.05
+     * modifier = 1 - 0.05 = 0.95
+     */
+    public function testPlayingTimeModifierAtMc1500Pref5(): void
+    {
+        $this->mockRepository->teamPerformance = [
+            'wins' => 41, 'losses' => 41,
+            'tradWins' => 500, 'tradLosses' => 500,
+        ];
+        $this->mockRepository->positionSalaryCommitment = 1500;
+        $this->calculator->setRandomFactor(0);
+
+        $result = $this->calculator->calculatePerceivedValue(
+            offerAverage: 1000,
+            teamName: 'Test Team',
+            player: $this->createPlayer(playingTime: 5),
+            yearsInOffer: 1
+        );
+
+        $this->assertEqualsWithDelta(0.95, $result['modifier'], 0.000001);
+    }
+
+    /**
+     * Winner modifier with raw differential: 60W/22L, pref=5, all others neutral.
+     * formula: 0.000153 * (60-22) * (5-1) = 0.000153 * 38 * 4 = 0.023256
+     * modifier = 1 + 0.023256 = 1.023256
+     */
+    public function testWinnerModifierExactValueWithRawDifferential(): void
+    {
+        $this->mockRepository->teamPerformance = [
+            'wins' => 60, 'losses' => 22,
+            'tradWins' => 500, 'tradLosses' => 500,
+        ];
+        $this->mockRepository->positionSalaryCommitment = 1000;
+        $this->calculator->setRandomFactor(0);
+
+        $result = $this->calculator->calculatePerceivedValue(
+            offerAverage: 1000,
+            teamName: 'Test Team',
+            player: $this->createPlayer(playForWinner: 5),
+            yearsInOffer: 1
+        );
+
+        $this->assertEqualsWithDelta(1.023256, $result['modifier'], 0.000001);
+    }
+
+    // ================================================================
     // HELPERS
     // ================================================================
 

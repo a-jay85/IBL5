@@ -15,15 +15,8 @@ use Player\Player;
  */
 class FreeAgencyDemandCalculator implements FreeAgencyDemandCalculatorInterface
 {
-    private const PLAY_FOR_WINNER_FACTOR = 0.000153;
-    private const TRADITION_FACTOR = 0.000153;
-    private const LOYALTY_BONUS_PERCENTAGE = 0.025;
     private const SECURITY_BASE_FACTOR = -0.025;
     private const SECURITY_YEAR_FACTOR = 0.01;
-    private const PLAYING_TIME_BASE_FACTOR = 0.025;
-    private const PLAYING_TIME_MONEY_FACTOR = 0.0025;
-    private const PLAYING_TIME_DIVISOR = 100;
-    private const MAX_POSITION_SALARY_CAP = 2000;
     private const RANDOM_VARIANCE_MIN = -5;
     private const RANDOM_VARIANCE_MAX = 5;
     private const RANDOM_VARIANCE_BASE = 100;
@@ -103,20 +96,17 @@ class FreeAgencyDemandCalculator implements FreeAgencyDemandCalculatorInterface
      * 
      * @param string $teamName Team name
      * @param Player $player Player to exclude and get position from
-     * @return int Total salary committed (capped at MAX_POSITION_SALARY_CAP)
+     * @return int Total salary committed at position
      */
     private function calculatePositionSalary(
         string $teamName,
         Player $player
     ): int {
-        $totalSalary = $this->repository->getPositionSalaryCommitment(
+        return $this->repository->getPositionSalaryCommitment(
             $teamName,
             $player->position ?? '',
             $player->playerID ?? 0
         );
-        
-        // Cap at maximum
-        return min($totalSalary, self::MAX_POSITION_SALARY_CAP);
     }
 
     /**
@@ -152,30 +142,13 @@ class FreeAgencyDemandCalculator implements FreeAgencyDemandCalculatorInterface
         int $yearsInOffer,
         int $positionSalary
     ): float {
-        // Play for winner factor
-        $seasonDifferential = $teamWins - $teamLosses;
-        $factorPlayForWinner = self::PLAY_FOR_WINNER_FACTOR * $seasonDifferential * ($playerWinner - 1);
-        
-        // Tradition factor
-        $traditionDifferential = $tradWins - $tradLosses;
-        $factorTradition = self::TRADITION_FACTOR * $traditionDifferential * ($playerTradition - 1);
-        
-        // Loyalty factor (bonus for staying, penalty for leaving)
-        if ($teamName === $playerTeamName) {
-            $factorLoyalty = self::LOYALTY_BONUS_PERCENTAGE * ($playerLoyalty - 1);
-        } else {
-            $factorLoyalty = -self::LOYALTY_BONUS_PERCENTAGE * ($playerLoyalty - 1);
-        }
-        
-        // Security factor (longer contracts more attractive)
-        $factorSecurity = (self::SECURITY_YEAR_FACTOR * ($yearsInOffer - 1) + self::SECURITY_BASE_FACTOR) 
+        $factorPlayForWinner = \ContractRules::calculateWinnerModifier($teamWins, $teamLosses, $playerWinner);
+        $factorTradition = \ContractRules::calculateTraditionModifier($tradWins, $tradLosses, $playerTradition);
+        $factorLoyalty = \ContractRules::calculateLoyaltyModifier($playerLoyalty, $teamName === $playerTeamName);
+        $factorSecurity = (self::SECURITY_YEAR_FACTOR * ($yearsInOffer - 1) + self::SECURITY_BASE_FACTOR)
                           * ($playerSecurity - 1);
-        
-        // Playing time factor (less money at position means more opportunity)
-        $factorPlayingTime = -(self::PLAYING_TIME_MONEY_FACTOR * $positionSalary / self::PLAYING_TIME_DIVISOR 
-                              - self::PLAYING_TIME_BASE_FACTOR) 
-                             * ($playerPlayingTime - 1);
-        
+        $factorPlayingTime = \ContractRules::calculatePlayingTimeModifier($positionSalary, $playerPlayingTime);
+
         return 1 + $factorPlayForWinner + $factorTradition + $factorLoyalty + $factorSecurity + $factorPlayingTime;
     }
 

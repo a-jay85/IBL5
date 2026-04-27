@@ -79,14 +79,6 @@ interface ExtensionRepositoryInterface
     public function getTeamTraditionData(string $teamName): array;
 
     /**
-     * Retrieves money committed at a player's position from cached column
-     *
-     * @param string $teamName Team name for lookup
-     * @return int Money committed (0 if not found or no data)
-     */
-    public function getMoneyCommittedAtPosition(string $teamName): int;
-
-    /**
      * Saves an accepted extension in a single transaction
      *
      * Wraps updatePlayerContract + markExtensionUsedThisSeason +

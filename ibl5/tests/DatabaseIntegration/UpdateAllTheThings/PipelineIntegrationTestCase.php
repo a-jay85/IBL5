@@ -253,7 +253,6 @@ abstract class PipelineIntegrationTestCase extends DatabaseTestCase
     protected function buildPipeline(
         Season $season,
         string $schPath,
-        string $plrPath,
         string $scoPath,
     ): UpdaterService {
         $service = new UpdaterService();
@@ -290,7 +289,20 @@ abstract class PipelineIntegrationTestCase extends DatabaseTestCase
         // Step 0: ExtractFromBackupStep — SKIPPED (files pre-placed in temp dir)
         // Step 1: ImportLeagueConfigStep — SKIPPED (pre-seeded via seedLeagueConfig)
 
-        $service->addStep(new Steps\ParsePlayerFileStep($plrService, $plrPath));
+        $tempDir = $this->tempDir;
+        $jsbFileResolver = $this->createStub(JsbSourceResolverInterface::class);
+        $jsbFileResolver->method('getContents')->willReturnCallback(
+            static function (string $ext) use ($tempDir): ?string {
+                $path = $tempDir . '/IBL5.' . $ext;
+                if (is_file($path)) {
+                    $data = file_get_contents($path);
+                    return $data !== false ? $data : null;
+                }
+                return null;
+            },
+        );
+
+        $service->addStep(new Steps\ParsePlayerFileStep($plrService, $jsbFileResolver));
 
         $service->addStep(new Steps\CleanupPreseasonDataStep(
             $boxscoreRepo, $season, $this->db,
@@ -314,19 +326,6 @@ abstract class PipelineIntegrationTestCase extends DatabaseTestCase
             $boxscoreProcessor, $boxscoreRepo, $boxscoreView, $scoPath,
         ));
 
-        $tempDir = $this->tempDir;
-        $jsbFileResolver = $this->createStub(JsbSourceResolverInterface::class);
-        $jsbFileResolver->method('getContents')->willReturnCallback(
-            static function (string $ext) use ($tempDir): ?string {
-                $path = $tempDir . '/IBL5.' . $ext;
-                if (is_file($path)) {
-                    $data = file_get_contents($path);
-                    return $data !== false ? $data : null;
-                }
-                return null;
-            },
-        );
-
         $service->addStep(new Steps\ParseJsbFilesStep($jsbService, $jsbFileResolver, $season->endingYear));
 
         $service->addStep(new Steps\EndOfSeasonImportStep(
@@ -334,7 +333,7 @@ abstract class PipelineIntegrationTestCase extends DatabaseTestCase
         ));
 
         $service->addStep(new Steps\SnapshotPlrStep(
-            $plrService, $jsbRepo, $season->endingYear, $plrPath,
+            $plrService, $jsbRepo, $season->endingYear, $jsbFileResolver,
         ));
 
         $service->addStep(new Steps\RefreshIblHistStep($this->db));

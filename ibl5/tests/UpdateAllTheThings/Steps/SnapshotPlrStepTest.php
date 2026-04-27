@@ -9,6 +9,7 @@ use PHPUnit\Framework\TestCase;
 use PlrParser\Contracts\PlrParserServiceInterface;
 use PlrParser\PlrImportMode;
 use PlrParser\PlrParseResult;
+use Updater\Contracts\JsbSourceResolverInterface;
 use Updater\Contracts\PipelineStepInterface;
 use Updater\Steps\SnapshotPlrStep;
 
@@ -16,20 +17,22 @@ class SnapshotPlrStepTest extends TestCase
 {
     private JsbImportRepositoryInterface $stubJsbRepo;
     private PlrParserServiceInterface $stubPlrService;
+    private JsbSourceResolverInterface $stubResolver;
 
     protected function setUp(): void
     {
         $this->stubJsbRepo = $this->createStub(JsbImportRepositoryInterface::class);
         $this->stubPlrService = $this->createStub(PlrParserServiceInterface::class);
+        $this->stubResolver = $this->createStub(JsbSourceResolverInterface::class);
     }
 
-    private function createStep(string $plrFilePath = '/tmp/nonexistent.plr'): SnapshotPlrStep
+    private function createStep(): SnapshotPlrStep
     {
         return new SnapshotPlrStep(
             $this->stubPlrService,
             $this->stubJsbRepo,
             2026,
-            $plrFilePath,
+            $this->stubResolver,
         );
     }
 
@@ -43,9 +46,11 @@ class SnapshotPlrStepTest extends TestCase
         $this->assertSame('Player snapshot', $this->createStep()->getLabel());
     }
 
-    public function testSkipsWhenPlrFileDoesNotExist(): void
+    public function testSkipsWhenResolverReturnsNull(): void
     {
-        $result = $this->createStep('/nonexistent/path/IBL5.plr')->execute();
+        $this->stubResolver->method('getContents')->willReturn(null);
+
+        $result = $this->createStep()->execute();
 
         $this->assertTrue($result->success);
         $this->assertStringContainsString('not found', $result->detail);
@@ -53,6 +58,7 @@ class SnapshotPlrStepTest extends TestCase
 
     public function testUsesEndOfSeasonPhaseWhenChampionExists(): void
     {
+        $this->stubResolver->method('getContents')->willReturn('plr-bytes');
         $this->stubJsbRepo->method('hasChampionForSeason')->willReturn(true);
 
         $plrResult = new PlrParseResult();
@@ -60,9 +66,9 @@ class SnapshotPlrStepTest extends TestCase
 
         $mockPlrService = $this->createMock(PlrParserServiceInterface::class);
         $mockPlrService->expects($this->once())
-            ->method('processPlrFileForYear')
+            ->method('processPlrDataForYear')
             ->with(
-                $this->anything(),
+                'plr-bytes',
                 2026,
                 PlrImportMode::Snapshot,
                 'end-of-season',
@@ -70,22 +76,16 @@ class SnapshotPlrStepTest extends TestCase
             )
             ->willReturn($plrResult);
 
-        $tmpFile = tempnam(sys_get_temp_dir(), 'plr-test-');
-        self::assertIsString($tmpFile);
+        $step = new SnapshotPlrStep($mockPlrService, $this->stubJsbRepo, 2026, $this->stubResolver);
+        $result = $step->execute();
 
-        try {
-            $step = new SnapshotPlrStep($mockPlrService, $this->stubJsbRepo, 2026, $tmpFile);
-            $result = $step->execute();
-
-            $this->assertTrue($result->success);
-            $this->assertStringContainsString('end-of-season', $result->detail);
-        } finally {
-            unlink($tmpFile);
-        }
+        $this->assertTrue($result->success);
+        $this->assertStringContainsString('end-of-season', $result->detail);
     }
 
     public function testUsesMidSeasonPhaseWhenNoChampion(): void
     {
+        $this->stubResolver->method('getContents')->willReturn('plr-bytes');
         $this->stubJsbRepo->method('hasChampionForSeason')->willReturn(false);
 
         $plrResult = new PlrParseResult();
@@ -93,9 +93,9 @@ class SnapshotPlrStepTest extends TestCase
 
         $mockPlrService = $this->createMock(PlrParserServiceInterface::class);
         $mockPlrService->expects($this->once())
-            ->method('processPlrFileForYear')
+            ->method('processPlrDataForYear')
             ->with(
-                $this->anything(),
+                'plr-bytes',
                 2026,
                 PlrImportMode::Snapshot,
                 'mid-season',
@@ -103,38 +103,25 @@ class SnapshotPlrStepTest extends TestCase
             )
             ->willReturn($plrResult);
 
-        $tmpFile = tempnam(sys_get_temp_dir(), 'plr-test-');
-        self::assertIsString($tmpFile);
+        $step = new SnapshotPlrStep($mockPlrService, $this->stubJsbRepo, 2026, $this->stubResolver);
+        $result = $step->execute();
 
-        try {
-            $step = new SnapshotPlrStep($mockPlrService, $this->stubJsbRepo, 2026, $tmpFile);
-            $result = $step->execute();
-
-            $this->assertTrue($result->success);
-            $this->assertStringContainsString('mid-season', $result->detail);
-        } finally {
-            unlink($tmpFile);
-        }
+        $this->assertTrue($result->success);
+        $this->assertStringContainsString('mid-season', $result->detail);
     }
 
     public function testReturnsSuccessWithResultSummary(): void
     {
+        $this->stubResolver->method('getContents')->willReturn('plr-bytes');
         $this->stubJsbRepo->method('hasChampionForSeason')->willReturn(false);
 
         $plrResult = new PlrParseResult();
         $plrResult->playersUpserted = 42;
-        $this->stubPlrService->method('processPlrFileForYear')->willReturn($plrResult);
+        $this->stubPlrService->method('processPlrDataForYear')->willReturn($plrResult);
 
-        $tmpFile = tempnam(sys_get_temp_dir(), 'plr-test-');
-        self::assertIsString($tmpFile);
+        $result = $this->createStep()->execute();
 
-        try {
-            $result = $this->createStep($tmpFile)->execute();
-
-            $this->assertTrue($result->success);
-            $this->assertStringContainsString('42 players upserted', $result->detail);
-        } finally {
-            unlink($tmpFile);
-        }
+        $this->assertTrue($result->success);
+        $this->assertStringContainsString('42 players upserted', $result->detail);
     }
 }

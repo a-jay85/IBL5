@@ -20,13 +20,13 @@ class PreseasonPipelineTest extends PipelineIntegrationTestCase
             ['date_slot' => 33, 'game_index' => 0, 'visitor' => 1, 'home' => 2, 'visitor_score' => 95, 'home_score' => 100],
             ['date_slot' => 33, 'game_index' => 1, 'visitor' => 3, 'home' => 4, 'visitor_score' => 88, 'home_score' => 92],
         ]);
-        $plrPath = $this->buildPlrFile([
+        $this->buildPlrFile([
             ['pid' => 200001, 'name' => 'Preseason Player A', 'teamid' => 1, 'ordinal' => 1],
             ['pid' => 200002, 'name' => 'Preseason Player B', 'teamid' => 2, 'ordinal' => 2],
         ]);
         $scoPath = $this->buildScoFile();
 
-        $pipeline = $this->buildPipeline($season, $schPath, $plrPath, $scoPath);
+        $pipeline = $this->buildPipeline($season, $schPath, $scoPath);
         $results = $this->runPipeline($pipeline);
 
         $this->assertZeroPipelineErrors($pipeline, $results);
@@ -52,13 +52,13 @@ class PreseasonPipelineTest extends PipelineIntegrationTestCase
         $season = $this->buildSeason('Playoffs', 2026);
 
         $schPath = $this->buildSchFile([]);
-        $plrPath = $this->buildPlrFile([
+        $this->buildPlrFile([
             ['pid' => 200001, 'name' => 'Playoff Player A', 'teamid' => 1, 'ordinal' => 1],
             ['pid' => 200002, 'name' => 'Playoff Player B', 'teamid' => 2, 'ordinal' => 2],
         ]);
         $scoPath = $this->buildScoFile();
 
-        $pipeline = $this->buildPipeline($season, $schPath, $plrPath, $scoPath);
+        $pipeline = $this->buildPipeline($season, $schPath, $scoPath);
         $results = $this->runPipeline($pipeline);
 
         $this->assertZeroPipelineErrors($pipeline, $results);

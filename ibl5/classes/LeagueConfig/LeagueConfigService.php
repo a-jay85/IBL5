@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace LeagueConfig;
 
 use LeagueConfig\Contracts\LeagueConfigRepositoryInterface;
-use Utilities\LgeFileParser;
 
 /**
  * Orchestrates .lge file parsing and storage.

@@ -118,3 +118,19 @@ runs:
         $db->close();
         echo "Test user created: $user\n";
         PHPSCRIPT
+
+    - name: Wait for Playwright image
+      if: inputs.with-playwright == 'true'
+      shell: bash
+      run: |
+        deadline=$((SECONDS + 300))
+        while ! docker image inspect mcr.microsoft.com/playwright:v1.58.2-jammy >/dev/null 2>&1; do
+          if [ $SECONDS -ge $deadline ]; then
+            echo "::warning::Background pull timed out after 5 min — retrying foreground"
+            pkill -f "docker pull mcr.microsoft.com/playwright" || true
+            docker pull mcr.microsoft.com/playwright:v1.58.2-jammy
+            break
+          fi
+          sleep 2
+        done
+        echo "Playwright image ready"

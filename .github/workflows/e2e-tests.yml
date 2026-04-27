@@ -94,14 +94,6 @@ jobs:
       # --- Run Tests ---
       # Visual regression runs in its own job — before functional E2E tests which modify
       # the database (trades, waivers, etc.) and would invalidate the baselines.
-      - name: Wait for Playwright image
-        run: |
-          while ! docker image inspect mcr.microsoft.com/playwright:v1.58.2-jammy >/dev/null 2>&1; do
-            echo "Waiting for Playwright image pull..."
-            sleep 2
-          done
-          echo "Playwright image ready"
-
       - name: Run visual regression tests
         id: visual-regression
         continue-on-error: ${{ contains(github.event.pull_request.labels.*.name, 'update-baselines') }}
@@ -284,14 +276,6 @@ jobs:
           test-pass: ${{ secrets.IBL_TEST_PASS }}
 
       # --- Run Sharded Tests ---
-      - name: Wait for Playwright image
-        run: |
-          while ! docker image inspect mcr.microsoft.com/playwright:v1.58.2-jammy >/dev/null 2>&1; do
-            echo "Waiting for Playwright image pull..."
-            sleep 2
-          done
-          echo "Playwright image ready"
-
       - name: Run E2E tests (shard ${{ matrix.shard-index }}/${{ matrix.total-shards }})
         env:
           IBL_TEST_USER: ${{ secrets.IBL_TEST_USER }}

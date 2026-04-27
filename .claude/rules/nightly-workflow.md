@@ -6,7 +6,7 @@ paths: "bin/nightly-*"
 
 # Nightly Autonomous Workflow
 
-A headless `claude -p` process runs at 00:03 daily via macOS `launchd`. It loops through all queued plans — one fresh `claude -p` invocation per plan — until the queue is empty or the 4-hour time guard is exceeded.
+A headless `claude -p` process runs at 00:03 daily via macOS `launchd`. It loops through all queued plans — one fresh `claude -p` invocation per plan — until the queue is empty or the ~4h45m time guard is exceeded.
 
 ## Quick Reference
 
@@ -51,7 +51,7 @@ Cancelling: `rm queue/<file>.md` removes only the symlink, not the original plan
 
 `bin/nightly-run` loops through the queue, firing a fresh `claude -p` per plan. Each invocation processes exactly one plan, then exits. The bash loop provides:
 
-- **Time guard:** Won't start a new plan if >4h have elapsed (configurable via `MAX_ELAPSED` in `bin/nightly-run`)
+- **Time guard:** Won't start a new plan if >4h45m have elapsed (configurable via `MAX_ELAPSED` in `bin/nightly-run`)
 - **Poison-pill protection:** Tracks attempts per plan via `.attempts` sidecar files. After 2 failures in one night, the plan is moved to `skipped/` with a report. Prevents one bad plan from consuming the entire window.
 - **Turn cap:** `--max-turns 200` per invocation prevents runaway tool-call loops
 

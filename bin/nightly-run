@@ -24,7 +24,7 @@ NIGHTLY_DIR="$HOME/.claude/projects/-Users-ajaynicolas-GitHub-IBL5/nightly"
 LOG_DIR="$NIGHTLY_DIR/logs"
 QUEUE_DIR="$NIGHTLY_DIR/queue"
 RESUME_PLIST="$HOME/Library/LaunchAgents/com.ibl5.nightly-resume.plist"
-MAX_ELAPSED=14400  # 4 hours — leaves headroom in the 5h usage window
+MAX_ELAPSED=17100  # ~4h45m — stops around 4:45am, leaves headroom in the 5h usage window
 MAX_ATTEMPTS=2     # per-plan retry cap within one night
 
 mkdir -p "$LOG_DIR" "$QUEUE_DIR"

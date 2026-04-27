@@ -85,9 +85,28 @@ if [ "$TABLE_COUNT" = "0" ] && [ "${SKIP_PROD_SEED:-}" != "1" ]; then
     if [ -f "$PROD_SEED" ]; then
         echo "[entrypoint] Empty database detected. Importing prod-seed.sql..."
         echo "[entrypoint] This may take 1-2 minutes for the 87MB dump."
-        # Strip DEFINER clauses — prod exports contain DEFINER=user@host that
-        # don't exist in Docker MariaDB, causing ERROR 1449 on import.
-        sed 's/ DEFINER=[^ ]* / /g' "$PROD_SEED" | db_exec
+        # The prod-seed is a two-part dump (schema then data). The schema
+        # section's footer restores FOREIGN_KEY_CHECKS=1 before data inserts
+        # begin, causing FK violations on tables with cross-references.
+        # Fix: wrap the entire import in FOREIGN_KEY_CHECKS=0.
+        # --force: continue past non-fatal errors (e.g. ERROR 1906 for
+        # generated-column values that MariaDB safely ignores).
+        # Also strip DEFINER clauses — prod exports contain DEFINER=user@host
+        # that don't exist in Docker MariaDB, causing ERROR 1449 on import.
+        { echo "SET FOREIGN_KEY_CHECKS=0;"; sed 's/ DEFINER=[^ ]* / /g' "$PROD_SEED"; echo "SET FOREIGN_KEY_CHECKS=1;"; } \
+            | mariadb --force -h "$DB_HOST" --skip-ssl -u root -proot "$DB_NAME" 2>&1 \
+            | grep -v '\[Warning\].*password' \
+            | grep -i 'ERROR' > /tmp/import-errors.log || true
+        if [ -s /tmp/import-errors.log ]; then
+            if grep -v 'ERROR 1906' /tmp/import-errors.log | grep -qi 'ERROR'; then
+                echo "[entrypoint] ERROR: Prod-seed import had fatal errors:"
+                grep -v 'ERROR 1906' /tmp/import-errors.log
+                exit 1
+            fi
+            WARN_COUNT=$(wc -l < /tmp/import-errors.log | tr -d '[:space:]')
+            echo "[entrypoint] Import completed with $WARN_COUNT generated-column warnings (harmless)."
+        fi
+        rm -f /tmp/import-errors.log
         echo "[entrypoint] Prod-seed import complete."
     else
         echo "[entrypoint] WARNING: Empty database and no prod-seed.sql found."

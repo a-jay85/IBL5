@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Utilities;
+namespace RecordHolders;
 
 /**
  * Shared helper for IBL season date logic.

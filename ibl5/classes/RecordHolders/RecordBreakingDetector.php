@@ -7,7 +7,6 @@ namespace RecordHolders;
 use RecordHolders\Contracts\RecordBreakingDetectorInterface;
 use RecordHolders\Contracts\RecordHoldersRepositoryInterface;
 use Utilities\BoxScoreUrlBuilder;
-use Utilities\IblSeasonDateHelper;
 use Discord\Discord;
 
 /**

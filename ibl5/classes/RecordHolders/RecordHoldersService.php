@@ -6,7 +6,6 @@ namespace RecordHolders;
 
 use RecordHolders\Contracts\RecordHoldersRepositoryInterface;
 use RecordHolders\Contracts\RecordHoldersServiceInterface;
-use Utilities\IblSeasonDateHelper;
 
 /**
  * RecordHoldersService - Business logic for all-time IBL record holders.

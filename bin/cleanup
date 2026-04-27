@@ -64,8 +64,9 @@ cleanup_worktree() {
     fi
 
     echo "Cleaning: $wt_name (branch: $branch)..."
-    "$REPO_ROOT/bin/wt-remove" --force --volumes "$wt_name" 2>/dev/null || true
-    git -C "$REPO_ROOT" branch -d "$branch" 2>/dev/null || \
+    "$REPO_ROOT/bin/wt-remove" --force --volumes "$wt_name" 2>/dev/null \
+        || git -C "$REPO_ROOT" worktree prune 2>/dev/null || true
+    git -C "$REPO_ROOT" branch -D "$branch" 2>/dev/null || \
         echo "  Note: local branch '$branch' already deleted or not found"
     CLEANED=$((CLEANED + 1))
     echo "  Done."
@@ -173,13 +174,17 @@ if [ "$DRY_RUN" = true ]; then
 fi
 
 if [ "$ALL" = true ]; then
-    # Process all git-registered worktrees (excluding main repo)
+    # Process all git-registered worktrees (excluding main repo).
+    # nocasematch: macOS APFS is case-insensitive, so a worktree registered
+    # under /Users/x/github/… must match REPO_ROOT /Users/x/GitHub/….
+    shopt -s nocasematch
     while IFS= read -r wt_path; do
         [[ "$wt_path" == "$REPO_ROOT" ]] && continue
         # Only process worktrees under our worktrees/ directory
         [[ "$wt_path" == "$REPO_ROOT/worktrees/"* ]] || continue
         check_worktree "$wt_path"
     done < <(git -C "$REPO_ROOT" worktree list --porcelain | awk '/^worktree / { print substr($0, 10) }')
+    shopt -u nocasematch
 
     # Clean up orphaned directories (exist on disk but not registered with git)
     if [ -d "$REPO_ROOT/worktrees" ]; then

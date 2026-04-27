@@ -83,105 +83,17 @@ jobs:
         working-directory: ibl5
         run: composer install --no-interaction --no-progress --prefer-dist --ignore-platform-reqs
 
-      # --- App Setup (must exist before Docker build) ---
-      - name: Create config.php
-        working-directory: ibl5
-        run: |
-          cat > config.php <<'PHPCFG'
-          <?php
-          if (realpath(__FILE__) === realpath($_SERVER['SCRIPT_FILENAME'])) {
-              header("Location: index.php");
-              exit();
-          }
-          $display_errors = true;
-          $dbhost = getenv('DB_HOST') ?: '127.0.0.1';
-          $dbuname = 'root';
-          $dbpass = 'root';
-          $dbname = 'ibl5';
-          $prefix = 'nuke';
-          $user_prefix = 'nuke';
-          $dbtype = 'MySQL';
-          $sitekey = 'ci-test-key-not-secret';
-          $subscription_url = '';
-          $admin_file = 'admin';
-          PHPCFG
-
-      - name: Build CSS
-        working-directory: ibl5
-        run: bunx @tailwindcss/cli -i design/input.css -o themes/IBL/style/style.css
-
-      # --- Docker Compose ---
-      - name: Pull or build PHP image
-        run: |
-          docker pull ghcr.io/a-jay85/ibl5/php-apache:latest || \
-          docker build -t ghcr.io/a-jay85/ibl5/php-apache:latest .
-
-      - name: Start Docker containers
-        run: docker compose -f docker-compose.ci.yml up -d --wait
-
-      - name: Enable PHP error log file
-        run: |
-          docker compose -f docker-compose.ci.yml exec -T php sh -c \
-            "echo 'error_log = /tmp/php_errors.log' > /usr/local/etc/php/conf.d/zz-error-log.ini && \
-             echo 'log_errors = On' >> /usr/local/etc/php/conf.d/zz-error-log.ini && \
-             touch /tmp/php_errors.log && chmod 666 /tmp/php_errors.log && \
-             apache2ctl graceful"
-
-      - name: Pull Playwright image (background)
-        run: nohup docker pull mcr.microsoft.com/playwright:v1.58.2-jammy > /tmp/playwright-pull.log 2>&1 &
-
-      # --- Database Setup ---
-      - name: Create database and apply migrations
-        run: |
-          chmod +x ibl5/bin/run-migrations-ci.sh
-          ibl5/bin/run-migrations-ci.sh -h 127.0.0.1 -u root -proot ibl5
-
-      - name: Import seed data
-        run: |
-          docker compose -f docker-compose.ci.yml exec -T mariadb \
-            mariadb -u root -proot ibl5 < ibl5/tests/e2e/fixtures/ci-seed.sql
-
-      - name: Create test user
-        env:
-          IBL_TEST_USER: ${{ secrets.IBL_TEST_USER }}
-          IBL_TEST_PASS: ${{ secrets.IBL_TEST_PASS }}
-        run: |
-          docker compose -f docker-compose.ci.yml exec \
-            -e IBL_TEST_USER="$IBL_TEST_USER" \
-            -e IBL_TEST_PASS="$IBL_TEST_PASS" \
-            -T php php <<'PHPSCRIPT'
-          <?php
-          $hash = password_hash(getenv('IBL_TEST_PASS'), PASSWORD_BCRYPT);
-          $user = getenv('IBL_TEST_USER');
-          $email = 'ci-test@example.com';
-          $db = new mysqli('mariadb', 'root', 'root', 'ibl5');
-
-          // roles_mask = 1 grants ADMIN role (Delight\Auth\Role::ADMIN)
-          // Required for admin page E2E tests (updateAllTheThings.php, block.php)
-          $stmt = $db->prepare("INSERT INTO auth_users (email, password, username, status, verified, resettable, roles_mask, registered, force_logout) VALUES (?, ?, ?, 0, 1, 1, 1, ?, 0)");
-          $time = time();
-          $stmt->bind_param('sssi', $email, $hash, $user, $time);
-          $stmt->execute();
-
-          $stmt = $db->prepare("UPDATE ibl_team_info SET gm_username = ? WHERE team_name = 'Metros'");
-          $stmt->bind_param('s', $user);
-          $stmt->execute();
-
-          $db->close();
-          echo "Test user created: $user\n";
-          PHPSCRIPT
+      # --- Docker E2E Setup ---
+      - uses: ./.github/actions/setup-docker-e2e
+        with:
+          build-css: 'true'
+          with-playwright: 'true'
+          test-user: ${{ secrets.IBL_TEST_USER }}
+          test-pass: ${{ secrets.IBL_TEST_PASS }}
 
       # --- Run Tests ---
       # Visual regression runs in its own job — before functional E2E tests which modify
       # the database (trades, waivers, etc.) and would invalidate the baselines.
-      - name: Wait for Playwright image
-        run: |
-          while ! docker image inspect mcr.microsoft.com/playwright:v1.58.2-jammy >/dev/null 2>&1; do
-            echo "Waiting for Playwright image pull..."
-            sleep 2
-          done
-          echo "Playwright image ready"
-
       - name: Run visual regression tests
         id: visual-regression
         continue-on-error: ${{ contains(github.event.pull_request.labels.*.name, 'update-baselines') }}
@@ -298,45 +210,8 @@ jobs:
         working-directory: ibl5
         run: composer install --no-interaction --no-progress --prefer-dist --ignore-platform-reqs
 
-      - name: Create config.php
-        working-directory: ibl5
-        run: |
-          cat > config.php <<'PHPCFG'
-          <?php
-          if (realpath(__FILE__) === realpath($_SERVER['SCRIPT_FILENAME'])) {
-              header("Location: index.php");
-              exit();
-          }
-          $display_errors = true;
-          $dbhost = getenv('DB_HOST') ?: '127.0.0.1';
-          $dbuname = 'root';
-          $dbpass = 'root';
-          $dbname = 'ibl5';
-          $prefix = 'nuke';
-          $user_prefix = 'nuke';
-          $dbtype = 'MySQL';
-          $sitekey = 'ci-test-key-not-secret';
-          $subscription_url = '';
-          $admin_file = 'admin';
-          PHPCFG
-
-      - name: Pull or build PHP image
-        run: |
-          docker pull ghcr.io/a-jay85/ibl5/php-apache:latest || \
-          docker build -t ghcr.io/a-jay85/ibl5/php-apache:latest .
-
-      - name: Start Docker containers
-        run: docker compose -f docker-compose.ci.yml up -d --wait
-
-      - name: Create database and apply migrations
-        run: |
-          chmod +x ibl5/bin/run-migrations-ci.sh
-          ibl5/bin/run-migrations-ci.sh -h 127.0.0.1 -u root -proot ibl5
-
-      - name: Import seed data
-        run: |
-          docker compose -f docker-compose.ci.yml exec -T mariadb \
-            mariadb -u root -proot ibl5 < ibl5/tests/e2e/fixtures/ci-seed.sql
+      # --- Docker E2E Setup ---
+      - uses: ./.github/actions/setup-docker-e2e
 
       - name: Run API E2E tests
         working-directory: ibl5
@@ -392,103 +267,15 @@ jobs:
         working-directory: ibl5
         run: composer install --no-interaction --no-progress --prefer-dist --ignore-platform-reqs
 
-      # --- App Setup ---
-      - name: Create config.php
-        working-directory: ibl5
-        run: |
-          cat > config.php <<'PHPCFG'
-          <?php
-          if (realpath(__FILE__) === realpath($_SERVER['SCRIPT_FILENAME'])) {
-              header("Location: index.php");
-              exit();
-          }
-          $display_errors = true;
-          $dbhost = getenv('DB_HOST') ?: '127.0.0.1';
-          $dbuname = 'root';
-          $dbpass = 'root';
-          $dbname = 'ibl5';
-          $prefix = 'nuke';
-          $user_prefix = 'nuke';
-          $dbtype = 'MySQL';
-          $sitekey = 'ci-test-key-not-secret';
-          $subscription_url = '';
-          $admin_file = 'admin';
-          PHPCFG
-
-      - name: Build CSS
-        working-directory: ibl5
-        run: bunx @tailwindcss/cli -i design/input.css -o themes/IBL/style/style.css
-
-      # --- Docker Compose ---
-      - name: Pull or build PHP image
-        run: |
-          docker pull ghcr.io/a-jay85/ibl5/php-apache:latest || \
-          docker build -t ghcr.io/a-jay85/ibl5/php-apache:latest .
-
-      - name: Start Docker containers
-        run: docker compose -f docker-compose.ci.yml up -d --wait
-
-      - name: Enable PHP error log file
-        run: |
-          docker compose -f docker-compose.ci.yml exec -T php sh -c \
-            "echo 'error_log = /tmp/php_errors.log' > /usr/local/etc/php/conf.d/zz-error-log.ini && \
-             echo 'log_errors = On' >> /usr/local/etc/php/conf.d/zz-error-log.ini && \
-             touch /tmp/php_errors.log && chmod 666 /tmp/php_errors.log && \
-             apache2ctl graceful"
-
-      - name: Pull Playwright image (background)
-        run: nohup docker pull mcr.microsoft.com/playwright:v1.58.2-jammy > /tmp/playwright-pull.log 2>&1 &
-
-      # --- Database Setup ---
-      - name: Create database and apply migrations
-        run: |
-          chmod +x ibl5/bin/run-migrations-ci.sh
-          ibl5/bin/run-migrations-ci.sh -h 127.0.0.1 -u root -proot ibl5
-
-      - name: Import seed data
-        run: |
-          docker compose -f docker-compose.ci.yml exec -T mariadb \
-            mariadb -u root -proot ibl5 < ibl5/tests/e2e/fixtures/ci-seed.sql
-
-      - name: Create test user
-        env:
-          IBL_TEST_USER: ${{ secrets.IBL_TEST_USER }}
-          IBL_TEST_PASS: ${{ secrets.IBL_TEST_PASS }}
-        run: |
-          docker compose -f docker-compose.ci.yml exec \
-            -e IBL_TEST_USER="$IBL_TEST_USER" \
-            -e IBL_TEST_PASS="$IBL_TEST_PASS" \
-            -T php php <<'PHPSCRIPT'
-          <?php
-          $hash = password_hash(getenv('IBL_TEST_PASS'), PASSWORD_BCRYPT);
-          $user = getenv('IBL_TEST_USER');
-          $email = 'ci-test@example.com';
-          $db = new mysqli('mariadb', 'root', 'root', 'ibl5');
-
-          // roles_mask = 1 grants ADMIN role (Delight\Auth\Role::ADMIN)
-          // Required for admin page E2E tests (updateAllTheThings.php, block.php)
-          $stmt = $db->prepare("INSERT INTO auth_users (email, password, username, status, verified, resettable, roles_mask, registered, force_logout) VALUES (?, ?, ?, 0, 1, 1, 1, ?, 0)");
-          $time = time();
-          $stmt->bind_param('sssi', $email, $hash, $user, $time);
-          $stmt->execute();
-
-          $stmt = $db->prepare("UPDATE ibl_team_info SET gm_username = ? WHERE team_name = 'Metros'");
-          $stmt->bind_param('s', $user);
-          $stmt->execute();
-
-          $db->close();
-          echo "Test user created: $user\n";
-          PHPSCRIPT
+      # --- Docker E2E Setup ---
+      - uses: ./.github/actions/setup-docker-e2e
+        with:
+          build-css: 'true'
+          with-playwright: 'true'
+          test-user: ${{ secrets.IBL_TEST_USER }}
+          test-pass: ${{ secrets.IBL_TEST_PASS }}
 
       # --- Run Sharded Tests ---
-      - name: Wait for Playwright image
-        run: |
-          while ! docker image inspect mcr.microsoft.com/playwright:v1.58.2-jammy >/dev/null 2>&1; do
-            echo "Waiting for Playwright image pull..."
-            sleep 2
-          done
-          echo "Playwright image ready"
-
       - name: Run E2E tests (shard ${{ matrix.shard-index }}/${{ matrix.total-shards }})
         env:
           IBL_TEST_USER: ${{ secrets.IBL_TEST_USER }}

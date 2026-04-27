@@ -1,0 +1,136 @@
+name: 'Setup Docker E2E Environment'
+description: 'Creates config.php, starts Docker Compose CI stack, runs migrations, seeds DB, and optionally creates E2E test user'
+inputs:
+  build-css:
+    description: 'Build Tailwind CSS before starting containers'
+    required: false
+    default: 'false'
+  with-playwright:
+    description: 'Enable Playwright-related setup: PHP error log, background image pull, test user creation'
+    required: false
+    default: 'false'
+  test-user:
+    description: 'E2E test username (required when with-playwright is true)'
+    required: false
+    default: ''
+  test-pass:
+    description: 'E2E test password (required when with-playwright is true)'
+    required: false
+    default: ''
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Create config.php
+      shell: bash
+      working-directory: ibl5
+      run: |
+        cat > config.php <<'PHPCFG'
+        <?php
+        if (realpath(__FILE__) === realpath($_SERVER['SCRIPT_FILENAME'])) {
+            header("Location: index.php");
+            exit();
+        }
+        $display_errors = true;
+        $dbhost = getenv('DB_HOST') ?: '127.0.0.1';
+        $dbuname = 'root';
+        $dbpass = 'root';
+        $dbname = 'ibl5';
+        $prefix = 'nuke';
+        $user_prefix = 'nuke';
+        $dbtype = 'MySQL';
+        $sitekey = 'ci-test-key-not-secret';
+        $subscription_url = '';
+        $admin_file = 'admin';
+        PHPCFG
+
+    - name: Build CSS
+      if: inputs.build-css == 'true'
+      shell: bash
+      working-directory: ibl5
+      run: bunx @tailwindcss/cli -i design/input.css -o themes/IBL/style/style.css
+
+    - name: Pull or build PHP image
+      shell: bash
+      run: |
+        docker pull ghcr.io/a-jay85/ibl5/php-apache:latest || \
+        docker build -t ghcr.io/a-jay85/ibl5/php-apache:latest .
+
+    - name: Start Docker containers
+      shell: bash
+      run: docker compose -f docker-compose.ci.yml up -d --wait
+
+    - name: Enable PHP error log file
+      if: inputs.with-playwright == 'true'
+      shell: bash
+      run: |
+        docker compose -f docker-compose.ci.yml exec -T php sh -c \
+          "echo 'error_log = /tmp/php_errors.log' > /usr/local/etc/php/conf.d/zz-error-log.ini && \
+           echo 'log_errors = On' >> /usr/local/etc/php/conf.d/zz-error-log.ini && \
+           touch /tmp/php_errors.log && chmod 666 /tmp/php_errors.log && \
+           apache2ctl graceful"
+
+    - name: Pull Playwright image (background)
+      if: inputs.with-playwright == 'true'
+      shell: bash
+      run: nohup docker pull mcr.microsoft.com/playwright:v1.58.2-jammy > /tmp/playwright-pull.log 2>&1 &
+
+    - name: Create database and apply migrations
+      shell: bash
+      run: |
+        chmod +x ibl5/bin/run-migrations-ci.sh
+        ibl5/bin/run-migrations-ci.sh -h 127.0.0.1 -u root -proot ibl5
+
+    - name: Import seed data
+      shell: bash
+      run: |
+        docker compose -f docker-compose.ci.yml exec -T mariadb \
+          mariadb -u root -proot ibl5 < ibl5/tests/e2e/fixtures/ci-seed.sql
+
+    - name: Create test user
+      if: inputs.with-playwright == 'true'
+      shell: bash
+      env:
+        IBL_TEST_USER: ${{ inputs.test-user }}
+        IBL_TEST_PASS: ${{ inputs.test-pass }}
+      run: |
+        docker compose -f docker-compose.ci.yml exec \
+          -e IBL_TEST_USER="$IBL_TEST_USER" \
+          -e IBL_TEST_PASS="$IBL_TEST_PASS" \
+          -T php php <<'PHPSCRIPT'
+        <?php
+        $hash = password_hash(getenv('IBL_TEST_PASS'), PASSWORD_BCRYPT);
+        $user = getenv('IBL_TEST_USER');
+        $email = 'ci-test@example.com';
+        $db = new mysqli('mariadb', 'root', 'root', 'ibl5');
+
+        // roles_mask = 1 grants ADMIN role (Delight\Auth\Role::ADMIN)
+        // Required for admin page E2E tests (updateAllTheThings.php, block.php)
+        $stmt = $db->prepare("INSERT INTO auth_users (email, password, username, status, verified, resettable, roles_mask, registered, force_logout) VALUES (?, ?, ?, 0, 1, 1, 1, ?, 0)");
+        $time = time();
+        $stmt->bind_param('sssi', $email, $hash, $user, $time);
+        $stmt->execute();
+
+        $stmt = $db->prepare("UPDATE ibl_team_info SET gm_username = ? WHERE team_name = 'Metros'");
+        $stmt->bind_param('s', $user);
+        $stmt->execute();
+
+        $db->close();
+        echo "Test user created: $user\n";
+        PHPSCRIPT
+
+    - name: Wait for Playwright image
+      if: inputs.with-playwright == 'true'
+      shell: bash
+      run: |
+        deadline=$((SECONDS + 300))
+        while ! docker image inspect mcr.microsoft.com/playwright:v1.58.2-jammy >/dev/null 2>&1; do
+          if [ $SECONDS -ge $deadline ]; then
+            echo "::warning::Background pull timed out after 5 min — retrying foreground"
+            pkill -f "docker pull mcr.microsoft.com/playwright" || true
+            docker pull mcr.microsoft.com/playwright:v1.58.2-jammy
+            break
+          fi
+          sleep 2
+        done
+        echo "Playwright image ready"

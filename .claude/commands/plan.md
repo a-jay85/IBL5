@@ -9,13 +9,9 @@ You are planning an implementation task. The user's request follows this skill's
 
 **Do NOT write or edit any code files.** This skill produces a plan only. The single output is the plan file.
 
-## Step 1: Read the verification rule
+## Step 1: Verification rule
 
-```bash
-cat /Users/ajaynicolas/GitHub/IBL5/.claude/rules/plan-verification.md
-```
-
-Store the entire content as `$VERIFICATION_RULE`. This rule MUST be injected verbatim into every Plan agent prompt in Step 3. Do not summarize or paraphrase it.
+`plan-verification.md` is already in your context (always-loaded rule — no `paths:` field). Use its full content as `$VERIFICATION_RULE` for injection into the Plan agent prompt in Step 3. Do not re-read the file. Do not summarize or paraphrase the rule.
 
 ## Step 2: Explore the codebase
 
@@ -30,12 +26,13 @@ Collect: file paths, existing patterns, dependencies, blast radius, existing tes
 
 ## Step 3: Design the plan
 
+The Plan agent auto-loads CLAUDE.md, all always-loaded rules (agent-tiering, core-coding, plan-verification, etc.), and user memory. Do NOT re-inject any of these into the prompt — only supply what the agent cannot get on its own.
+
 Launch a **single Plan agent** (`model: "opus"`) with a prompt containing ALL of these:
 
 1. **Task description** from `$ARGUMENTS`
 2. **Exploration results** from Step 2 — file paths, code traces, existing patterns, test coverage findings
 3. **The full `$VERIFICATION_RULE`** from Step 1, prefixed with: `MANDATORY — you must follow this rule exactly:`
-4. **Project constraints** relevant to the task (from CLAUDE.md — XSS, strict types, StatsFormatter, CSS rules, etc.)
 
 The Plan agent MUST produce:
 - Implementation steps with tests woven inline (pre-impl before their step, post-impl after)

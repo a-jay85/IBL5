@@ -15,7 +15,6 @@ use Extension\ExtensionRepository;
  * - Team extension usage flags
  * - News story creation
  * - Team tradition data retrieval
- * - Money committed at position retrieval
  *
  * @covers \Extension\ExtensionRepository
  */
@@ -149,37 +148,6 @@ class ExtensionRepositoryTest extends TestCase
         $this->assertSame(41, $result['currentSeasonLosses']);
         $this->assertSame(41, $result['tradition_wins']);
         $this->assertSame(41, $result['tradition_losses']);
-    }
-
-    public function testGetMoneyCommittedAtPositionReturnsValue(): void
-    {
-        $this->mockDb->setMockData([
-            ['money_committed_at_position' => 5000],
-        ]);
-
-        $result = $this->repository->getMoneyCommittedAtPosition('Test Team');
-
-        $this->assertSame(5000, $result);
-    }
-
-    public function testGetMoneyCommittedAtPositionReturnsZeroWhenNotFound(): void
-    {
-        $this->mockDb->setMockData([]);
-
-        $result = $this->repository->getMoneyCommittedAtPosition('Nonexistent Team');
-
-        $this->assertSame(0, $result);
-    }
-
-    public function testGetMoneyCommittedAtPositionReturnsZeroWhenValueIsZero(): void
-    {
-        $this->mockDb->setMockData([
-            ['money_committed_at_position' => 0],
-        ]);
-
-        $result = $this->repository->getMoneyCommittedAtPosition('Test Team');
-
-        $this->assertSame(0, $result);
     }
 
     public function testSaveAcceptedExtensionCallsAllOperations(): void

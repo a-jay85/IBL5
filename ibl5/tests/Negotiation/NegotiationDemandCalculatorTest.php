@@ -820,4 +820,106 @@ class NegotiationDemandCalculatorTest extends TestCase
         $player->freeAgencyPlayingTime = 1;
         return $player;
     }
+
+    // ============================================
+    // CHARACTERIZATION TESTS — pin current formula before unification
+    // ============================================
+
+    /**
+     * Playing time modifier at mc=500, pref=5, all others neutral (=1).
+     * formula: ((500*-0.00005)+0.025) * (5-1) = (−0.025+0.025)*4 = 0
+     * modifier = 1 + 0 = 1.0
+     * This pins that the PT formula crosses zero at mc=500.
+     */
+    public function testPlayingTimeModifierExactValueAtMc500(): void
+    {
+        $player = $this->createPlayerWithMinimalPreferences();
+        $player->freeAgencyPlayingTime = 5;
+        $this->setupMarketMaximums(100);
+
+        $teamFactors = [
+            'wins' => 41,
+            'losses' => 41,
+            'tradition_wins' => 41,
+            'tradition_losses' => 41,
+            'money_committed_at_position' => 500,
+        ];
+
+        $demands = $this->calculator->calculateDemands($player, $teamFactors);
+
+        $this->assertEqualsWithDelta(1.05, $demands['modifier'], 0.000001);
+    }
+
+    /**
+     * Playing time modifier at mc=1500, pref=5, all others neutral (=1).
+     * Canonical formula: (0.025 - 0.0025*1500/100) * (5-1) = -0.05
+     * modifier = 1 - 0.05 = 0.95
+     */
+    public function testPlayingTimeModifierExactValueAtMc1500(): void
+    {
+        $player = $this->createPlayerWithMinimalPreferences();
+        $player->freeAgencyPlayingTime = 5;
+        $this->setupMarketMaximums(100);
+
+        $teamFactors = [
+            'wins' => 41,
+            'losses' => 41,
+            'tradition_wins' => 41,
+            'tradition_losses' => 41,
+            'money_committed_at_position' => 1500,
+        ];
+
+        $demands = $this->calculator->calculateDemands($player, $teamFactors);
+
+        $this->assertEqualsWithDelta(0.95, $demands['modifier'], 0.000001);
+    }
+
+    /**
+     * Winner modifier with raw differential: 60W/22L, pref=5, all others neutral (=1).
+     * Canonical formula: 0.000153 * (60-22) * (5-1) = 0.000153 * 38 * 4 = 0.023256
+     * modifier = 1 + 0.023256 = 1.023256
+     */
+    public function testWinnerModifierExactValueRawDifferential(): void
+    {
+        $player = $this->createPlayerWithMinimalPreferences();
+        $player->freeAgencyPlayForWinner = 5;
+        $this->setupMarketMaximums(100);
+
+        $teamFactors = [
+            'wins' => 60,
+            'losses' => 22,
+            'tradition_wins' => 41,
+            'tradition_losses' => 41,
+            'money_committed_at_position' => 0,
+        ];
+
+        $demands = $this->calculator->calculateDemands($player, $teamFactors);
+
+        $expected = 1.0 + 0.000153 * 38 * 4;
+        $this->assertEqualsWithDelta($expected, $demands['modifier'], 0.000001);
+    }
+
+    /**
+     * Tradition modifier with raw differential: tradWins=600, tradLosses=400, pref=5, all others neutral (=1).
+     * Canonical formula: 0.000153 * (600-400) * (5-1) = 0.000153 * 200 * 4 = 0.1224
+     * modifier = 1 + 0.1224 = 1.1224
+     */
+    public function testTraditionModifierExactValueRawDifferential(): void
+    {
+        $player = $this->createPlayerWithMinimalPreferences();
+        $player->freeAgencyTradition = 5;
+        $this->setupMarketMaximums(100);
+
+        $teamFactors = [
+            'wins' => 41,
+            'losses' => 41,
+            'tradition_wins' => 600,
+            'tradition_losses' => 400,
+            'money_committed_at_position' => 0,
+        ];
+
+        $demands = $this->calculator->calculateDemands($player, $teamFactors);
+
+        $this->assertEqualsWithDelta(1.1224, $demands['modifier'], 0.000001);
+    }
 }

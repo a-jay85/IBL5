@@ -446,4 +446,157 @@ class ContractRulesTest extends TestCase
         $this->assertEquals([1451], $oneYearOffer);
         $this->assertEquals(1451, $oneYearOffer[0]);
     }
+
+    // ============================================
+    // MODIFIER CONSTANTS
+    // ============================================
+
+    public function testPlayForWinnerFactorIs0Point000153(): void
+    {
+        $this->assertSame(0.000153, \ContractRules::PLAY_FOR_WINNER_FACTOR);
+    }
+
+    public function testTraditionFactorIs0Point000153(): void
+    {
+        $this->assertSame(0.000153, \ContractRules::TRADITION_FACTOR);
+    }
+
+    public function testLoyaltyBonusPercentageIs0Point025(): void
+    {
+        $this->assertSame(0.025, \ContractRules::LOYALTY_BONUS_PERCENTAGE);
+    }
+
+    public function testPlayingTimeBaseFactorIs0Point025(): void
+    {
+        $this->assertSame(0.025, \ContractRules::PLAYING_TIME_BASE_FACTOR);
+    }
+
+    public function testPlayingTimeMoneyFactorIs0Point0025(): void
+    {
+        $this->assertSame(0.0025, \ContractRules::PLAYING_TIME_MONEY_FACTOR);
+    }
+
+    public function testPlayingTimeDivisorIs100(): void
+    {
+        $this->assertSame(100, \ContractRules::PLAYING_TIME_DIVISOR);
+    }
+
+    public function testMaxPositionSalaryCapIs2000(): void
+    {
+        $this->assertSame(2000, \ContractRules::MAX_POSITION_SALARY_CAP);
+    }
+
+    // ============================================
+    // calculateWinnerModifier
+    // ============================================
+
+    public function testCalculateWinnerModifierWithWinningTeamAndHighPreference(): void
+    {
+        $result = \ContractRules::calculateWinnerModifier(60, 22, 5);
+        $this->assertEqualsWithDelta(0.023256, $result, 0.000001);
+    }
+
+    public function testCalculateWinnerModifierWithLosingTeamReturnsNegative(): void
+    {
+        $result = \ContractRules::calculateWinnerModifier(20, 62, 5);
+        $this->assertLessThan(0.0, $result);
+    }
+
+    public function testCalculateWinnerModifierWithDefaultPreferenceReturnsZero(): void
+    {
+        $result = \ContractRules::calculateWinnerModifier(60, 22, 1);
+        $this->assertSame(0.0, $result);
+    }
+
+    public function testCalculateWinnerModifierWith500TeamReturnsZero(): void
+    {
+        $result = \ContractRules::calculateWinnerModifier(41, 41, 5);
+        $this->assertSame(0.0, $result);
+    }
+
+    // ============================================
+    // calculateTraditionModifier
+    // ============================================
+
+    public function testCalculateTraditionModifierWithStrongTradition(): void
+    {
+        $result = \ContractRules::calculateTraditionModifier(2700, 1900, 5);
+        $this->assertEqualsWithDelta(0.000153 * 800 * 4, $result, 0.000001);
+    }
+
+    public function testCalculateTraditionModifierWithWeakTradition(): void
+    {
+        $result = \ContractRules::calculateTraditionModifier(1000, 4000, 5);
+        $this->assertLessThan(0.0, $result);
+    }
+
+    public function testCalculateTraditionModifierWithDefaultPreferenceReturnsZero(): void
+    {
+        $result = \ContractRules::calculateTraditionModifier(2700, 1900, 1);
+        $this->assertSame(0.0, $result);
+    }
+
+    // ============================================
+    // calculateLoyaltyModifier
+    // ============================================
+
+    public function testCalculateLoyaltyModifierOwnTeamHighLoyalty(): void
+    {
+        $result = \ContractRules::calculateLoyaltyModifier(5, true);
+        $this->assertEqualsWithDelta(0.1, $result, 0.000001);
+    }
+
+    public function testCalculateLoyaltyModifierOwnTeamDefaultPreference(): void
+    {
+        $result = \ContractRules::calculateLoyaltyModifier(1, true);
+        $this->assertSame(0.0, $result);
+    }
+
+    public function testCalculateLoyaltyModifierOtherTeamReturnsNegative(): void
+    {
+        $result = \ContractRules::calculateLoyaltyModifier(5, false);
+        $this->assertEqualsWithDelta(-0.1, $result, 0.000001);
+    }
+
+    // ============================================
+    // calculatePlayingTimeModifier
+    // ============================================
+
+    public function testCalculatePlayingTimeModifierAtMc0(): void
+    {
+        $result = \ContractRules::calculatePlayingTimeModifier(0, 5);
+        $this->assertEqualsWithDelta(0.10, $result, 0.000001);
+    }
+
+    public function testCalculatePlayingTimeModifierAtMc500(): void
+    {
+        $result = \ContractRules::calculatePlayingTimeModifier(500, 5);
+        $this->assertEqualsWithDelta(0.05, $result, 0.000001);
+    }
+
+    public function testCalculatePlayingTimeModifierAtMc1000(): void
+    {
+        $result = \ContractRules::calculatePlayingTimeModifier(1000, 5);
+        $this->assertEqualsWithDelta(0.0, $result, 0.000001);
+    }
+
+    public function testCalculatePlayingTimeModifierAtMc1500(): void
+    {
+        $result = \ContractRules::calculatePlayingTimeModifier(1500, 5);
+        $this->assertEqualsWithDelta(-0.05, $result, 0.000001);
+    }
+
+    public function testCalculatePlayingTimeModifierCapsAtMc2000(): void
+    {
+        $result2000 = \ContractRules::calculatePlayingTimeModifier(2000, 5);
+        $result3000 = \ContractRules::calculatePlayingTimeModifier(3000, 5);
+        $this->assertEqualsWithDelta(-0.10, $result2000, 0.000001);
+        $this->assertEqualsWithDelta($result2000, $result3000, 0.000001);
+    }
+
+    public function testCalculatePlayingTimeModifierDefaultPreference(): void
+    {
+        $result = \ContractRules::calculatePlayingTimeModifier(1500, 1);
+        $this->assertSame(0.0, $result);
+    }
 }

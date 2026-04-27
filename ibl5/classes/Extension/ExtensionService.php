@@ -164,11 +164,12 @@ class ExtensionService implements ExtensionProcessorInterface
     {
         $this->repository->markExtensionUsedThisSim($team->name);
 
-        $moneyCommitted = $this->repository->getMoneyCommittedAtPosition($team->name);
-        if ($moneyCommitted === 0 && $player->position !== null) {
-            $posResult = $this->teamQueryRepo->getPlayersUnderContractByPosition($team->teamid, $player->position);
-            $moneyCommitted = $this->teamQueryRepo->getTotalNextSeasonSalaries($posResult);
-        }
+        $posResult = $this->teamQueryRepo->getPlayersUnderContractByPosition($team->teamid, $player->position ?? '');
+        $filteredResult = array_filter(
+            $posResult,
+            static fn(array $row): bool => $row['pid'] !== $player->playerID
+        );
+        $moneyCommitted = $this->teamQueryRepo->getTotalNextSeasonSalaries(array_values($filteredResult));
 
         $traditionData = $this->repository->getTeamTraditionData($team->name);
 

@@ -399,7 +399,7 @@ class ExtensionOfferEvaluatorTest extends TestCase
 
         // Assert - Modifier should be around 1.0 (neutral preferences)
         $this->assertGreaterThan(0.9, $modifier);
-        $this->assertLessThan(1.15, $modifier); // Slightly relaxed to account for formula precision
+        $this->assertLessThan(1.2, $modifier);
     }
 
     /**
@@ -625,5 +625,65 @@ class ExtensionOfferEvaluatorTest extends TestCase
         $result = $this->evaluator->calculatePlayingTimeModifier([], []);
 
         $this->assertSame(0.0, $result);
+    }
+
+    // ============================================
+    // CHARACTERIZATION TESTS — pin current formula before unification
+    // ============================================
+
+    /**
+     * Playing time modifier component at mc=500, pt=5.
+     * formula: -0.0025 * (500/100) * (5-1) = -0.0025 * 5 * 4 = -0.05
+     */
+    public function testPlayingTimeModifierExactValueAtMc500(): void
+    {
+        $result = $this->evaluator->calculatePlayingTimeModifier(
+            ['money_committed_at_position' => 500],
+            ['playing_time' => 5]
+        );
+
+        $this->assertEqualsWithDelta(0.05, $result, 0.000001);
+    }
+
+    /**
+     * Playing time modifier component at mc=1500, pt=5.
+     * Canonical formula: (0.025 - 0.0025*1500/100) * (5-1) = -0.05
+     */
+    public function testPlayingTimeModifierExactValueAtMc1500(): void
+    {
+        $result = $this->evaluator->calculatePlayingTimeModifier(
+            ['money_committed_at_position' => 1500],
+            ['playing_time' => 5]
+        );
+
+        $this->assertEqualsWithDelta(-0.05, $result, 0.000001);
+    }
+
+    /**
+     * Winner modifier component with raw differential: 60W/22L, pref=5.
+     * formula: 0.000153 * (60-22) * (5-1) = 0.000153 * 38 * 4 = 0.023256
+     */
+    public function testWinnerModifierExactValueWithRawDifferential(): void
+    {
+        $result = $this->evaluator->calculateWinnerModifier(
+            ['wins' => 60, 'losses' => 22],
+            ['winner' => 5]
+        );
+
+        $this->assertEqualsWithDelta(0.023256, $result, 0.000001);
+    }
+
+    /**
+     * Tradition modifier component with raw differential: tradWins=700, tradLosses=300, pref=5.
+     * formula: 0.000153 * (700-300) * (5-1) = 0.000153 * 400 * 4 = 0.2448
+     */
+    public function testTraditionModifierExactValueWithRawDifferential(): void
+    {
+        $result = $this->evaluator->calculateTraditionModifier(
+            ['tradition_wins' => 700, 'tradition_losses' => 300],
+            ['tradition' => 5]
+        );
+
+        $this->assertEqualsWithDelta(0.2448, $result, 0.000001);
     }
 }

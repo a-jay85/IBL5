@@ -171,38 +171,25 @@ class NegotiationDemandCalculator implements NegotiationDemandCalculatorInterfac
      */
     private function calculateModifier(Player $player, array $teamFactors): float
     {
-        $playerPrefs = [
-            'winner' => $player->freeAgencyPlayForWinner ?? 1,
-            'tradition' => $player->freeAgencyTradition ?? 1,
-            'loyalty' => $player->freeAgencyLoyalty ?? 1,
-            'playingTime' => $player->freeAgencyPlayingTime ?? 1
-        ];
-        
-        // Play for winner factor
-        $wins = $teamFactors['wins'] ?? 41;
-        $losses = $teamFactors['losses'] ?? 41;
-        $totalGames = $wins + $losses;
-        $PFWFactor = 0;
-        if ($totalGames > 0) {
-            $PFWFactor = (0.025 * ($wins - $losses) / $totalGames * ($playerPrefs['winner'] - 1));
-        }
-        
-        // Tradition factor
-        $tradWins = $teamFactors['tradition_wins'] ?? 41;
-        $tradLosses = $teamFactors['tradition_losses'] ?? 41;
-        $totalTradGames = $tradWins + $tradLosses;
-        $traditionFactor = 0;
-        if ($totalTradGames > 0) {
-            $traditionFactor = (0.025 * ($tradWins - $tradLosses) / $totalTradGames * ($playerPrefs['tradition'] - 1));
-        }
-        
-        // Loyalty factor
-        $loyaltyFactor = (0.025 * ($playerPrefs['loyalty'] - 1));
-        
-        // Playing time factor (based on money committed at position)
-        $moneyCommitted = $teamFactors['money_committed_at_position'] ?? 0;
-        $PTFactor = (($moneyCommitted * -0.00005) + 0.025) * ($playerPrefs['playingTime'] - 1);
-        
+        $PFWFactor = \ContractRules::calculateWinnerModifier(
+            $teamFactors['wins'] ?? 41,
+            $teamFactors['losses'] ?? 41,
+            $player->freeAgencyPlayForWinner ?? 1
+        );
+
+        $traditionFactor = \ContractRules::calculateTraditionModifier(
+            $teamFactors['tradition_wins'] ?? 41,
+            $teamFactors['tradition_losses'] ?? 41,
+            $player->freeAgencyTradition ?? 1
+        );
+
+        $loyaltyFactor = \ContractRules::calculateLoyaltyModifier($player->freeAgencyLoyalty ?? 1);
+
+        $PTFactor = \ContractRules::calculatePlayingTimeModifier(
+            $teamFactors['money_committed_at_position'] ?? 0,
+            $player->freeAgencyPlayingTime ?? 1
+        );
+
         return 1 + $PFWFactor + $traditionFactor + $loyaltyFactor + $PTFactor;
     }
     

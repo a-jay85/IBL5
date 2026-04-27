@@ -2,10 +2,10 @@
 
 declare(strict_types=1);
 
-namespace Tests\Utilities;
+namespace Tests\Updater;
 
 use PHPUnit\Framework\TestCase;
-use Utilities\RecordParser;
+use Updater\RecordParser;
 
 /**
  * RecordParserTest - Tests for win-loss record parsing utility

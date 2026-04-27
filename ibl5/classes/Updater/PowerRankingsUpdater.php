@@ -7,7 +7,6 @@ namespace Updater;
 use League\LeagueContext;
 use Statistics\TeamStatsCalculator;
 use StrengthOfSchedule\StrengthOfScheduleCalculator;
-use Utilities\SeasonPhaseHelper;
 use Season\Season;
 
 /**

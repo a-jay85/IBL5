@@ -2,10 +2,10 @@
 
 declare(strict_types=1);
 
-namespace Tests\Utilities;
+namespace Tests\Updater;
 
 use PHPUnit\Framework\TestCase;
-use Utilities\DateParser;
+use Updater\DateParser;
 use Season\Season;
 
 /**

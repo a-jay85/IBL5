@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Utilities;
+namespace Mail;
 
 /**
  * Email Sanitization Utility

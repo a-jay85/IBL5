@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Utilities;
+namespace Updater;
 
 /**
  * RecordParser - Parse win-loss record strings

@@ -9,8 +9,6 @@ use League\LeagueContext;
 use Updater\Contracts\JsbSourceResolverInterface;
 use Utilities\UuidGenerator;
 use Utilities\SchFileParser;
-use Utilities\ScheduleHtmParser;
-use Utilities\DateParser;
 use Utilities\HtmlSanitizer;
 use Season\Season;
 

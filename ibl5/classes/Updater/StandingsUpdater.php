@@ -5,9 +5,6 @@ declare(strict_types=1);
 namespace Updater;
 
 use League\LeagueContext;
-use Utilities\RecordParser;
-use Utilities\SeasonPhaseHelper;
-use Utilities\StandingsGrouper;
 use Season\Season;
 
 /**

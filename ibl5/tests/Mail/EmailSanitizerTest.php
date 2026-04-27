@@ -2,13 +2,13 @@
 
 declare(strict_types=1);
 
-namespace Tests\Utilities;
+namespace Tests\Mail;
 
 use PHPUnit\Framework\TestCase;
-use Utilities\EmailSanitizer;
+use Mail\EmailSanitizer;
 
 /**
- * @covers \Utilities\EmailSanitizer
+ * @covers \Mail\EmailSanitizer
  */
 class EmailSanitizerTest extends TestCase
 {

@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Utilities;
+namespace Updater;
 
 /**
  * StandingsGrouper - Determine groupings for conference/division standings

@@ -1,6 +1,6 @@
 ---
 description: JSB file reading uses archive-first strategy via JsbSourceResolver — reads .lge and .sch directly from backup ZIP without extracting to disk.
-last_verified: 2026-04-25
+last_verified: 2026-04-27
 ---
 
 # ADR-0012: Archive-first JSB file reading
@@ -35,6 +35,6 @@ Introduce `JsbSourceResolver` (archive-first, disk-fallback) and `ArchiveExtract
 - `ibl5/classes/Updater/JsbSourceResolver.php` — archive-first resolver
 - `ibl5/classes/Updater/Contracts/JsbSourceResolverInterface.php` — resolver contract
 - `ibl5/classes/BulkImport/Contracts/ArchiveExtractorInterface.php` — `extractToString()` addition
-- `ibl5/classes/Utilities/LgeFileParser.php` — `parse(string $data)` method
+- `ibl5/classes/LeagueConfig/LgeFileParser.php` — `parse(string $data)` method
 - `ibl5/classes/Utilities/SchFileParser.php` — `parse(string $data)` method
 - `ibl5/classes/LeagueConfig/LeagueConfigService.php` — `processLgeData(string $data)` method

@@ -2,13 +2,13 @@
 
 declare(strict_types=1);
 
-namespace Tests\Utilities;
+namespace Tests\Updater;
 
 use PHPUnit\Framework\TestCase;
-use Utilities\ScheduleHtmParser;
+use Updater\ScheduleHtmParser;
 
 /**
- * @covers \Utilities\ScheduleHtmParser
+ * @covers \Updater\ScheduleHtmParser
  */
 class ScheduleHtmParserTest extends TestCase
 {

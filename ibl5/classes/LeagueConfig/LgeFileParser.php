@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Utilities;
+namespace LeagueConfig;
 
 /**
  * LgeFileParser - Parse JSB .lge league configuration files

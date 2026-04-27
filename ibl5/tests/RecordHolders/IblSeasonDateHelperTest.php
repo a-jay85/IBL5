@@ -2,10 +2,10 @@
 
 declare(strict_types=1);
 
-namespace Tests\Utilities;
+namespace Tests\RecordHolders;
 
 use PHPUnit\Framework\TestCase;
-use Utilities\IblSeasonDateHelper;
+use RecordHolders\IblSeasonDateHelper;
 
 final class IblSeasonDateHelperTest extends TestCase
 {

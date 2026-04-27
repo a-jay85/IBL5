@@ -2,10 +2,10 @@
 
 declare(strict_types=1);
 
-namespace Tests\Utilities;
+namespace Tests\LeagueConfig;
 
 use PHPUnit\Framework\TestCase;
-use Utilities\LgeFileParser;
+use LeagueConfig\LgeFileParser;
 
 /**
  * LgeFileParserTest - Tests for the JSB .lge league file parser

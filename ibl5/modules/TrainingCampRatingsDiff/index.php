@@ -16,12 +16,6 @@ if (!is_user($user)) {
     loginbox();
 }
 
-if (!is_admin()) {
-    http_response_code(403);
-    echo 'Access denied. Administrator privileges required.';
-    return;
-}
-
 $overrideYear = null;
 if (isset($_GET['year']) && is_string($_GET['year']) && ctype_digit($_GET['year'])) {
     $overrideYear = (int) $_GET['year'];

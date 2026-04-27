@@ -23,7 +23,7 @@ class RegularSeasonPipelineTest extends PipelineIntegrationTestCase
             ['date_slot' => 104, 'game_index' => 0, 'visitor' => 5, 'home' => 6, 'visitor_score' => 99, 'home_score' => 101],
             ['date_slot' => 104, 'game_index' => 1, 'visitor' => 7, 'home' => 8, 'visitor_score' => 85, 'home_score' => 90],
         ]);
-        $plrPath = $this->buildPlrFile([
+        $this->buildPlrFile([
             ['pid' => 200001, 'name' => 'RS Player A', 'teamid' => 1, 'ordinal' => 1],
             ['pid' => 200002, 'name' => 'RS Player B', 'teamid' => 2, 'ordinal' => 2],
             ['pid' => 200003, 'name' => 'RS Player C', 'teamid' => 3, 'ordinal' => 3],
@@ -31,7 +31,7 @@ class RegularSeasonPipelineTest extends PipelineIntegrationTestCase
         ]);
         $scoPath = $this->buildScoFile();
 
-        $pipeline = $this->buildPipeline($season, $schPath, $plrPath, $scoPath);
+        $pipeline = $this->buildPipeline($season, $schPath, $scoPath);
         $results = $this->runPipeline($pipeline);
 
         $this->assertZeroPipelineErrors($pipeline, $results);

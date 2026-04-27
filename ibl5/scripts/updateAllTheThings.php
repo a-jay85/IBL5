@@ -131,7 +131,6 @@ try {
     // --- Pipeline: register all steps and delegate to controller ---
     $updaterService = new Updater\UpdaterService();
 
-    $defaultPlrPath = $basePath . '/' . $filePrefix . '.plr';
     $defaultScoPath = $basePath . '/' . $filePrefix . '.sco';
 
     $lgeRepo = new LeagueConfig\LeagueConfigRepository($mysqli_db, $leagueContext);
@@ -184,7 +183,7 @@ try {
     echo $view->renderSectionClose();
     flush();
 
-    $updaterService->addStep(new Updater\Steps\ParsePlayerFileStep($plrService, $defaultPlrPath));
+    $updaterService->addStep(new Updater\Steps\ParsePlayerFileStep($plrService, $sourceResolver));
 
     // IBL-only: clean preseason data on first Regular Season sim
     if (!$isOlympics) {
@@ -228,7 +227,7 @@ try {
     // IBL-only: snapshot player stats + refresh materialized ibl_hist table
     if (!$isOlympics) {
         $updaterService->addStep(new Updater\Steps\SnapshotPlrStep(
-            $plrService, $jsbRepo, $season->endingYear, $defaultPlrPath,
+            $plrService, $jsbRepo, $season->endingYear, $sourceResolver,
         ));
         $updaterService->addStep(new Updater\Steps\RefreshIblHistStep($mysqli_db));
     }

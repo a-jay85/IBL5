@@ -48,13 +48,13 @@ class PreseasonTransitionPipelineTest extends PipelineIntegrationTestCase
             ['date_slot' => 5, 'game_index' => 0, 'visitor' => 1, 'home' => 2, 'visitor_score' => 105, 'home_score' => 98],
             ['date_slot' => 5, 'game_index' => 1, 'visitor' => 3, 'home' => 4, 'visitor_score' => 110, 'home_score' => 102],
         ]);
-        $plrPath = $this->buildPlrFile([
+        $this->buildPlrFile([
             ['pid' => 200001, 'name' => 'Pipeline Player A', 'teamid' => 1, 'ordinal' => 1],
             ['pid' => 200002, 'name' => 'Pipeline Player B', 'teamid' => 2, 'ordinal' => 2],
         ]);
         $scoPath = $this->buildScoFile();
 
-        $pipeline = $this->buildPipeline($season, $schPath, $plrPath, $scoPath);
+        $pipeline = $this->buildPipeline($season, $schPath, $scoPath);
         $results = $this->runPipeline($pipeline);
 
         $this->assertZeroPipelineErrors($pipeline, $results);

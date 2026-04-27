@@ -7,6 +7,7 @@ namespace Updater\Steps;
 use JsbParser\Contracts\JsbImportRepositoryInterface;
 use PlrParser\Contracts\PlrParserServiceInterface;
 use PlrParser\PlrImportMode;
+use Updater\Contracts\JsbSourceResolverInterface;
 use Updater\Contracts\PipelineStepInterface;
 use Updater\StepResult;
 
@@ -25,7 +26,7 @@ final class SnapshotPlrStep implements PipelineStepInterface
         private readonly PlrParserServiceInterface $plrService,
         private readonly JsbImportRepositoryInterface $jsbRepo,
         private readonly int $seasonEndingYear,
-        private readonly string $plrFilePath,
+        private readonly JsbSourceResolverInterface $sourceResolver,
     ) {
     }
 
@@ -36,7 +37,8 @@ final class SnapshotPlrStep implements PipelineStepInterface
 
     public function execute(): StepResult
     {
-        if (!file_exists($this->plrFilePath)) {
+        $data = $this->sourceResolver->getContents('plr');
+        if ($data === null) {
             return StepResult::skipped($this->getLabel(), 'PLR file not found');
         }
 
@@ -44,8 +46,8 @@ final class SnapshotPlrStep implements PipelineStepInterface
             ? 'end-of-season'
             : 'mid-season';
 
-        $result = $this->plrService->processPlrFileForYear(
-            $this->plrFilePath,
+        $result = $this->plrService->processPlrDataForYear(
+            $data,
             $this->seasonEndingYear,
             PlrImportMode::Snapshot,
             $phase,

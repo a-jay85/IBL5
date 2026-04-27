@@ -5,37 +5,42 @@ declare(strict_types=1);
 namespace Tests\UpdateAllTheThings\Steps;
 
 use PHPUnit\Framework\TestCase;
+use PlrParser\Contracts\PlrParserServiceInterface;
 use PlrParser\PlrParseResult;
-use PlrParser\PlrParserService;
+use Updater\Contracts\JsbSourceResolverInterface;
 use Updater\Contracts\PipelineStepInterface;
 use Updater\Steps\ParsePlayerFileStep;
 
 class ParsePlayerFileStepTest extends TestCase
 {
-    private PlrParserService $stubService;
+    private PlrParserServiceInterface $stubService;
+    private JsbSourceResolverInterface $stubResolver;
 
     protected function setUp(): void
     {
-        $this->stubService = $this->createStub(PlrParserService::class);
+        $this->stubService = $this->createStub(PlrParserServiceInterface::class);
+        $this->stubResolver = $this->createStub(JsbSourceResolverInterface::class);
     }
 
     public function testImplementsPipelineStepInterface(): void
     {
-        $step = new ParsePlayerFileStep($this->stubService, '/tmp/IBL5.plr');
+        $step = new ParsePlayerFileStep($this->stubService, $this->stubResolver);
 
         $this->assertInstanceOf(PipelineStepInterface::class, $step);
     }
 
     public function testGetLabelReturnsExpectedLabel(): void
     {
-        $step = new ParsePlayerFileStep($this->stubService, '/tmp/IBL5.plr');
+        $step = new ParsePlayerFileStep($this->stubService, $this->stubResolver);
 
         $this->assertSame('Player file', $step->getLabel());
     }
 
-    public function testSkipsWhenFileNotFound(): void
+    public function testSkipsWhenResolverReturnsNull(): void
     {
-        $step = new ParsePlayerFileStep($this->stubService, '/nonexistent/IBL5.plr');
+        $this->stubResolver->method('getContents')->willReturn(null);
+
+        $step = new ParsePlayerFileStep($this->stubService, $this->stubResolver);
         $result = $step->execute();
 
         $this->assertTrue($result->success);
@@ -47,14 +52,15 @@ class ParsePlayerFileStepTest extends TestCase
         $plrResult = new PlrParseResult();
         $plrResult->playersUpserted = 150;
 
-        $this->stubService->method('processPlrFile')->willReturn($plrResult);
+        $this->stubResolver->method('getContents')->willReturn('plr-bytes');
 
-        $path = tempnam(sys_get_temp_dir(), 'plr_test_');
-        if ($path === false) {
-            $this->fail('Failed to create temp file');
-        }
+        $mockService = $this->createMock(PlrParserServiceInterface::class);
+        $mockService->expects($this->once())
+            ->method('processPlrData')
+            ->with('plr-bytes')
+            ->willReturn($plrResult);
 
-        $step = new ParsePlayerFileStep($this->stubService, $path);
+        $step = new ParsePlayerFileStep($mockService, $this->stubResolver);
         $result = $step->execute();
 
         $this->assertTrue($result->success);

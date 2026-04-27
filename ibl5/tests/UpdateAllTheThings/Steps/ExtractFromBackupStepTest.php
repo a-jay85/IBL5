@@ -75,15 +75,8 @@ class ExtractFromBackupStepTest extends TestCase
             ->willReturn('/tmp/backups/25-26/25-26_15_reg-sim15.zip');
         $this->stubLocator->method('isProperlyNamed')->willReturn(true);
 
-        // Simulate 10 of 13 extensions found in archive
-        $callCount = 0;
-        $this->stubExtractor->method('extractSingleFile')
-            ->willReturnCallback(static function () use (&$callCount): string|false {
-                $callCount++;
-                return $callCount <= 10 ? '/tmp/IBL5.ext' : false;
-            });
-        // Note: extractFiles() builds filenames directly as filePrefix + ext,
-        // not via extractor->jsbFilename(). No jsbFilename stub needed.
+        // EXTENSIONS = ['sco'] — single extension, extraction succeeds
+        $this->stubExtractor->method('extractSingleFile')->willReturn('/tmp/IBL5.sco');
 
         $step = new ExtractFromBackupStep(
             $this->stubLocator,
@@ -95,7 +88,7 @@ class ExtractFromBackupStepTest extends TestCase
         $result = $step->execute();
 
         $this->assertTrue($result->success);
-        $this->assertStringContainsString('Extracted 2 files', $result->detail);
+        $this->assertStringContainsString('Extracted 1 files', $result->detail);
     }
 
     public function testSkipsRenameForProperlyNamedBackup(): void

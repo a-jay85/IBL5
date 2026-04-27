@@ -1,5 +1,5 @@
 ---
-description: JSB file reading uses archive-first strategy via JsbSourceResolver — reads .lge and .sch directly from backup ZIP without extracting to disk.
+description: JSB file reading uses archive-first strategy via JsbSourceResolver — reads .lge, .sch, and .plr directly from backup ZIP without extracting to disk.
 last_verified: 2026-04-27
 ---
 
@@ -14,14 +14,14 @@ The `updateAllTheThings.php` pipeline extracted all 14 JSB file types from the b
 
 ## Decision
 
-Introduce `JsbSourceResolver` (archive-first, disk-fallback) and `ArchiveExtractor::extractToString()` so that `.lge` and `.sch` data is read directly from the backup archive without writing to disk. Both `LgeFileParser` and `SchFileParser` gain a `parse(string $data)` method accepting raw bytes, and `LeagueConfigService` gains a `processLgeData(string $data)` sibling to the existing `processLgeFile()`. The disk path remains as a fallback for manual uploads or when no backup archive exists.
+Introduce `JsbSourceResolver` (archive-first, disk-fallback) and `ArchiveExtractor::extractToString()` so that `.lge`, `.sch`, and `.plr` data is read directly from the backup archive without writing to disk. `LgeFileParser` and `SchFileParser` gain a `parse(string $data)` method accepting raw bytes; `LeagueConfigService` gains a `processLgeData(string $data)` sibling to the existing `processLgeFile()`; and `PlrParserService` gains `processPlrData(string $data)` and `processPlrDataForYear(string $data, ...)` siblings to the file-based methods. The disk path remains as a fallback for manual uploads or when no backup archive exists.
 
-`ExtractFromBackupStep` no longer extracts `.lge` or `.sch` (12 extensions instead of 14). Other file types (`.plr`, `.sco`, etc.) continue to be extracted to disk because their consumers are not yet refactored.
+`ExtractFromBackupStep` no longer extracts `.lge`, `.sch`, or `.plr` — only `.sco` remains on the disk-extraction path. Other file types continue to be extracted to disk because their consumers are not yet refactored.
 
 ## Alternatives Considered
 
 - **Extract all to disk, then read** — the status quo. Rejected because: files linger in `ibl5/`, no reason for the I/O round-trip on files already available in the archive.
-- **Read all 14 file types from archive** — full migration. Rejected because: higher blast radius; `.plr` and `.sco` consumers have more complex calling patterns. The resolver pattern makes it easy to extend later.
+- **Read all 14 file types from archive in one PR** — full migration. Rejected because: higher blast radius; `.sco` and the JSB-parser file types have more complex calling patterns. The resolver pattern makes it easy to extend later — `.plr` was the second file type migrated.
 
 ## Consequences
 
@@ -38,3 +38,4 @@ Introduce `JsbSourceResolver` (archive-first, disk-fallback) and `ArchiveExtract
 - `ibl5/classes/LeagueConfig/LgeFileParser.php` — `parse(string $data)` method
 - `ibl5/classes/Utilities/SchFileParser.php` — `parse(string $data)` method
 - `ibl5/classes/LeagueConfig/LeagueConfigService.php` — `processLgeData(string $data)` method
+- `ibl5/classes/PlrParser/PlrParserService.php` — `processPlrData()`, `processPlrDataForYear()`, `calculateFoulBaselineFromData()` methods

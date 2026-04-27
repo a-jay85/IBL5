@@ -69,6 +69,32 @@ class PlrParserServiceTest extends TestCase
         $this->assertSame(0.0, $result);
     }
 
+    public function testCalculateFoulBaselineFromDataWithValidData(): void
+    {
+        $line = $this->buildFoulRatioLine(realLifeMIN: 1000, realLifePF: 100);
+
+        $result = $this->service->calculateFoulBaselineFromData($line . "\r\n");
+
+        $this->assertSame(0.1, $result);
+    }
+
+    public function testCalculateFoulBaselineFromDataWithEmptyString(): void
+    {
+        $result = $this->service->calculateFoulBaselineFromData('');
+
+        $this->assertSame(0.0, $result);
+    }
+
+    public function testCalculateFoulBaselineFromDataPicksMaxAcrossLines(): void
+    {
+        $low = $this->buildFoulRatioLine(realLifeMIN: 1000, realLifePF: 50);   // 0.05
+        $high = $this->buildFoulRatioLine(realLifeMIN: 1000, realLifePF: 200); // 0.2
+
+        $result = $this->service->calculateFoulBaselineFromData($low . "\r\n" . $high);
+
+        $this->assertSame(0.2, $result);
+    }
+
     public function testParsePlrLineReturnsNullForPidZero(): void
     {
         // pid field (offset 38, length 6) = 000000
@@ -356,6 +382,50 @@ class PlrParserServiceTest extends TestCase
 
         $this->assertSame(0, $result->playersUpserted);
         unlink($tmpFile);
+    }
+
+    public function testProcessPlrDataWithValidData(): void
+    {
+        $data = $this->buildFullPlrData();
+
+        /** @var PlrParserRepositoryInterface&\PHPUnit\Framework\MockObject\MockObject $mockRepo */
+        $mockRepo = $this->createMock(PlrParserRepositoryInterface::class);
+        $mockRepo->expects($this->once())->method('upsertPlayer');
+
+        $service = new PlrParserService($mockRepo, $this->stubCommonRepo, $this->stubSeason);
+        $result = $service->processPlrData($data);
+
+        $this->assertSame(1, $result->playersUpserted);
+    }
+
+    public function testProcessPlrDataSkipsPidZero(): void
+    {
+        $line = str_repeat(' ', 700);
+        $line = substr_replace($line, '   1', 0, 4);    // ordinal = 1
+        $line = substr_replace($line, '000000', 38, 6); // pid = 0
+
+        /** @var PlrParserRepositoryInterface&\PHPUnit\Framework\MockObject\MockObject $mockRepo */
+        $mockRepo = $this->createMock(PlrParserRepositoryInterface::class);
+        $mockRepo->expects($this->never())->method('upsertPlayer');
+
+        $service = new PlrParserService($mockRepo, $this->stubCommonRepo, $this->stubSeason);
+        $result = $service->processPlrData($line . "\r\n");
+
+        $this->assertSame(0, $result->playersUpserted);
+    }
+
+    public function testProcessPlrDataWithMultiplePlayers(): void
+    {
+        $data = $this->buildFullPlrData() . "\r\n" . $this->buildFullPlrData(pid: 2);
+
+        /** @var PlrParserRepositoryInterface&\PHPUnit\Framework\MockObject\MockObject $mockRepo */
+        $mockRepo = $this->createMock(PlrParserRepositoryInterface::class);
+        $mockRepo->expects($this->exactly(2))->method('upsertPlayer');
+
+        $service = new PlrParserService($mockRepo, $this->stubCommonRepo, $this->stubSeason);
+        $result = $service->processPlrData($data);
+
+        $this->assertSame(2, $result->playersUpserted);
     }
 
     /**
@@ -688,6 +758,42 @@ class PlrParserServiceTest extends TestCase
         unlink($tmpFile);
     }
 
+    public function testProcessPlrDataForYearSnapshotMode(): void
+    {
+        $data = $this->buildFullPlrData();
+
+        /** @var PlrParserRepositoryInterface&\PHPUnit\Framework\MockObject\MockObject $mockRepo */
+        $mockRepo = $this->createMock(PlrParserRepositoryInterface::class);
+        $mockRepo->expects($this->once())->method('upsertSnapshot');
+        $mockRepo->expects($this->never())->method('upsertPlayer');
+
+        $service = new PlrParserService($mockRepo, $this->stubCommonRepo, $this->stubSeason);
+        $result = $service->processPlrDataForYear(
+            $data,
+            2001,
+            PlrImportMode::Snapshot,
+            'end-of-season',
+            '00-01_36_finals',
+        );
+
+        $this->assertSame(1, $result->playersUpserted);
+    }
+
+    public function testProcessPlrDataForYearLiveMode(): void
+    {
+        $data = $this->buildFullPlrData();
+
+        /** @var PlrParserRepositoryInterface&\PHPUnit\Framework\MockObject\MockObject $mockRepo */
+        $mockRepo = $this->createMock(PlrParserRepositoryInterface::class);
+        $mockRepo->expects($this->once())->method('upsertPlayer');
+        $mockRepo->expects($this->never())->method('upsertSnapshot');
+
+        $service = new PlrParserService($mockRepo, $this->stubCommonRepo, $this->stubSeason);
+        $result = $service->processPlrDataForYear($data, 2001, PlrImportMode::Live);
+
+        $this->assertSame(1, $result->playersUpserted);
+    }
+
     /**
      * Create a temp PLR file with one valid player line (all fields populated).
      *
@@ -695,32 +801,49 @@ class PlrParserServiceTest extends TestCase
      */
     private function createFullPlrFile(): string
     {
-        // Build a complete PLR line with valid data
-        $line = str_repeat('0', 700);
-
-        // Key fields to ensure the line passes validation
-        $line = substr_replace($line, '   1', 0, 4);      // ordinal = 1
-        $line = substr_replace($line, str_pad('Test Player', 32), 4, 32);
-        $line = substr_replace($line, '25', 36, 2);         // age
-        $line = substr_replace($line, '000001', 38, 6);     // pid = 1
-        $line = substr_replace($line, ' 1', 44, 2);         // teamid = 1
-        $line = substr_replace($line, '  28', 46, 4);       // peak
-        $line = substr_replace($line, 'PG', 50, 2);         // pos
-        $line = substr_replace($line, '1000', 56, 4);       // realLifeMIN
-        $line = substr_replace($line, ' 100', 108, 4);      // realLifePF
-        $line = substr_replace($line, ' 2', 290, 2);        // currentContractYear
-        $line = substr_replace($line, ' 4', 292, 2);        // totalContractYears
-        $line = substr_replace($line, ' 500', 298, 4);      // contractYear1
-        $line = substr_replace($line, ' 550', 302, 4);      // contractYear2
-        $line = substr_replace($line, ' 5', 286, 2);        // exp
-        $line = substr_replace($line, '75', 550, 2);         // heightInches
-        $line = substr_replace($line, '195', 552, 3);        // weight
-
         $tmpFile = tempnam(sys_get_temp_dir(), 'plr_full_');
         if ($tmpFile === false) {
             throw new \RuntimeException('Failed to create temp file');
         }
-        file_put_contents($tmpFile, $line . "\n");
+        file_put_contents($tmpFile, $this->buildFullPlrData() . "\n");
         return $tmpFile;
+    }
+
+    /**
+     * Build raw PLR file content with one valid player line (all fields populated).
+     */
+    private function buildFullPlrData(int $pid = 1): string
+    {
+        $line = str_repeat('0', 700);
+
+        $line = substr_replace($line, '   1', 0, 4);                               // ordinal = 1
+        $line = substr_replace($line, str_pad('Test Player', 32), 4, 32);
+        $line = substr_replace($line, '25', 36, 2);                                // age
+        $line = substr_replace($line, str_pad((string) $pid, 6, '0', STR_PAD_LEFT), 38, 6);
+        $line = substr_replace($line, ' 1', 44, 2);                                // teamid = 1
+        $line = substr_replace($line, '  28', 46, 4);                              // peak
+        $line = substr_replace($line, 'PG', 50, 2);                                // pos
+        $line = substr_replace($line, '1000', 56, 4);                              // realLifeMIN
+        $line = substr_replace($line, ' 100', 108, 4);                             // realLifePF
+        $line = substr_replace($line, ' 2', 290, 2);                               // currentContractYear
+        $line = substr_replace($line, ' 4', 292, 2);                               // totalContractYears
+        $line = substr_replace($line, ' 500', 298, 4);                             // contractYear1
+        $line = substr_replace($line, ' 550', 302, 4);                             // contractYear2
+        $line = substr_replace($line, ' 5', 286, 2);                               // exp
+        $line = substr_replace($line, '75', 550, 2);                               // heightInches
+        $line = substr_replace($line, '195', 552, 3);                              // weight
+
+        return $line;
+    }
+
+    /**
+     * Build a PLR line populated only with the fields needed for foul-ratio calculation.
+     */
+    private function buildFoulRatioLine(int $realLifeMIN, int $realLifePF): string
+    {
+        $line = str_repeat(' ', 700);
+        $line = substr_replace($line, str_pad((string) $realLifeMIN, 4, ' ', STR_PAD_LEFT), 56, 4);
+        $line = substr_replace($line, str_pad((string) $realLifePF, 4, ' ', STR_PAD_LEFT), 108, 4);
+        return $line;
     }
 }

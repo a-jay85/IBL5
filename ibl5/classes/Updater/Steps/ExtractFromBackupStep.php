@@ -26,9 +26,9 @@ use Updater\StepResult;
  */
 final class ExtractFromBackupStep implements PipelineStepInterface
 {
-    /** @var list<string> JSB file extensions to extract (.lge and .sch read directly from archive by JsbSourceResolver) */
+    /** @var list<string> JSB file extensions to extract (.lge, .sch, .plr read directly from archive by JsbSourceResolver) */
     private const EXTENSIONS = [
-        'plr', 'sco',
+        'sco',
     ];
 
     public function __construct(

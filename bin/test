@@ -7,7 +7,7 @@
 #   bin/test --filter testMethodName  # Single test
 #   bin/test --testsuite "Module"     # Single suite
 
-SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd -P)"
 IBL5_DIR="$SCRIPT_DIR/../ibl5"
 cd "$IBL5_DIR" || exit 1
 

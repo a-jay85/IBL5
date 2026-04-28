@@ -163,19 +163,19 @@ class TeamRepositoryTest extends DatabaseTestCase
         /** @var string $teamName */
         $teamName = $row['team_name'];
 
-        $this->insertTeamSeasonRecordRow(1, 2098, 1, $teamName, $teamName, 50, 32);
+        $this->insertTeamSeasonRecordRow(1, 9098, 1, $teamName, $teamName, 50, 32);
 
         $history = $this->repo->getRegularSeasonHistory($teamName);
 
         self::assertNotEmpty($history);
         $found = null;
         foreach ($history as $r) {
-            if ($r['year'] === 2098) {
+            if ($r['year'] === 9098) {
                 $found = $r;
                 break;
             }
         }
-        self::assertNotNull($found, 'Expected 2098 row in history');
+        self::assertNotNull($found, 'Expected 9098 row in history');
         self::assertSame(50, $found['wins']);
         self::assertSame(32, $found['losses']);
     }
@@ -348,16 +348,21 @@ class TeamRepositoryTest extends DatabaseTestCase
     public function testGetHEATHistoryReturnsArrayWithExpectedShape(): void
     {
         // ibl_team_season_records (game_type=3) is the materialized HEAT table.
-        $this->insertTeamSeasonRecordRow(1, 2098, 3, 'Metros', 'Metros', 4, 2);
+        $this->insertTeamSeasonRecordRow(1, 9098, 3, 'Metros', 'Metros', 4, 2);
 
         $result = $this->repo->getHEATHistory('Metros');
 
         self::assertNotEmpty($result);
-        self::assertArrayHasKey('year', $result[0]);
-        self::assertArrayHasKey('currentname', $result[0]);
-        self::assertArrayHasKey('namethatyear', $result[0]);
-        self::assertArrayHasKey('wins', $result[0]);
-        self::assertArrayHasKey('losses', $result[0]);
+        $found = null;
+        foreach ($result as $r) {
+            if ($r['year'] === 9098) {
+                $found = $r;
+                break;
+            }
+        }
+        self::assertNotNull($found, 'Expected 9098 HEAT row');
+        self::assertSame(4, $found['wins']);
+        self::assertSame(2, $found['losses']);
     }
 
     // ── getPlayoffResults ───────────────────────────────────────
@@ -367,39 +372,38 @@ class TeamRepositoryTest extends DatabaseTestCase
         // Insert directly into the materialized table (vw_playoff_series_results
         // is now a thin pass-through; RefreshPlayoffSeriesResultsStep populates
         // the table on every pipeline run).
-        $this->insertPlayoffSeriesResultRow(2099, 1, 1, 2, 'Metros', 'Sharks', 3, 1);
-        $this->insertFranchiseSeasonRow(1, 2099, 'Metros');
-        $this->insertFranchiseSeasonRow(2, 2099, 'Sharks');
+        $this->insertPlayoffSeriesResultRow(9099, 1, 1, 2, 'Metros', 'Sharks', 3, 1);
+        $this->insertFranchiseSeasonRow(1, 9099, 'Metros');
+        $this->insertFranchiseSeasonRow(2, 9099, 'Sharks');
 
         $result = $this->repo->getPlayoffResults('Metros');
 
-        $series2099 = array_filter(
+        $series = array_values(array_filter(
             $result,
-            static fn (array $r): bool => $r['year'] === 2099,
-        );
+            static fn (array $r): bool => $r['year'] === 9099,
+        ));
 
-        self::assertNotEmpty($series2099);
-        $series = array_values($series2099)[0];
-        self::assertSame(3, $series['winner_games']);
-        self::assertSame(1, $series['loser_games']);
-        self::assertSame('Metros', $series['winner']);
+        self::assertNotEmpty($series);
+        self::assertSame(3, $series[0]['winner_games']);
+        self::assertSame(1, $series[0]['loser_games']);
+        self::assertSame('Metros', $series[0]['winner']);
     }
 
     public function testGetPlayoffResultsFiltersByTeamName(): void
     {
-        // Insert two series — one involving Metros, one not.
-        $this->insertPlayoffSeriesResultRow(2099, 1, 1, 2, 'Metros', 'Sharks', 3, 1);
-        $this->insertPlayoffSeriesResultRow(2099, 1, 3, 4, 'Lakers', 'Celtics', 3, 0);
+        // Insert two series in a far-future year — one involving Metros, one not.
+        $this->insertPlayoffSeriesResultRow(9099, 1, 1, 2, 'Metros', 'Sharks', 3, 1);
+        $this->insertPlayoffSeriesResultRow(9099, 1, 3, 4, 'Lakers', 'Celtics', 3, 0);
 
         $result = $this->repo->getPlayoffResults('Metros');
 
-        $series2099 = array_values(array_filter(
+        $series = array_values(array_filter(
             $result,
-            static fn (array $r): bool => $r['year'] === 2099,
+            static fn (array $r): bool => $r['year'] === 9099,
         ));
 
-        self::assertCount(1, $series2099);
-        self::assertSame('Metros', $series2099[0]['winner']);
+        self::assertCount(1, $series);
+        self::assertSame('Metros', $series[0]['winner']);
     }
 
     // ── getFreeAgencyRoster ────────────────────────────────────

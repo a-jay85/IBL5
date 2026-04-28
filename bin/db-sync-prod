@@ -114,11 +114,12 @@ GENERATED_TABLES=$(remote_query "
     ORDER BY table_name;
 ")
 
-# Fetch table + view list in one round trip
-TABLE_META=$(remote_query "
-    SELECT CONCAT(IF(engine IS NOT NULL, 'T', 'V'), '|', table_name)
+# Fetch real tables (not views) in one round trip
+ALL_TABLES=$(remote_query "
+    SELECT table_name
     FROM information_schema.tables
     WHERE table_schema='$REMOTE_DATABASE'
+      AND engine IS NOT NULL
     ORDER BY table_name;
 ")
 
@@ -128,18 +129,11 @@ for t in $GENERATED_TABLES; do
 done
 
 REGULAR_TABLES=""
-VIEWS=""
-for row in $TABLE_META; do
-    kind="${row%%|*}"
-    name="${row#*|}"
-    if [ "$kind" = "T" ]; then
-        if [ -n "$GEN_RE" ] && echo "$name" | grep -qE "^($GEN_RE)$"; then
-            continue
-        fi
-        REGULAR_TABLES="$REGULAR_TABLES $name"
-    else
-        VIEWS="$VIEWS $name"
+for name in $ALL_TABLES; do
+    if [ -n "$GEN_RE" ] && echo "$name" | grep -qE "^($GEN_RE)$"; then
+        continue
     fi
+    REGULAR_TABLES="$REGULAR_TABLES $name"
 done
 
 echo "Dumping prod → $DB_CONTAINER..."
@@ -153,29 +147,30 @@ echo ""
 # that doesn't exist on Docker MariaDB's root user → ERROR 1449).
 # FOREIGN_KEY_CHECKS=0 wraps the whole import since inserts run in alpha
 # table order, which doesn't respect FK dependency order.
+TOTAL_STEPS=2
+[ -n "$GENERATED_TABLES" ] && TOTAL_STEPS=3
+STEP=0
+
 set -o pipefail
 {
     echo "SET FOREIGN_KEY_CHECKS=0;"
 
-    echo "-- [db-sync-prod] schema for all tables"
+    STEP=$((STEP + 1))
+    echo "  [$STEP/$TOTAL_STEPS] Schema (tables, views, routines, triggers)..." >&2
     remote_dump --routines --triggers --no-data "$REMOTE_DATABASE"
 
-    echo "-- [db-sync-prod] data for regular tables"
+    STEP=$((STEP + 1))
+    echo "  [$STEP/$TOTAL_STEPS] Table data..." >&2
     # shellcheck disable=SC2086
     remote_dump --no-create-info --skip-triggers --skip-add-locks \
         "$REMOTE_DATABASE" $REGULAR_TABLES
 
     if [ -n "$GENERATED_TABLES" ]; then
-        echo "-- [db-sync-prod] data for generated-column tables"
+        STEP=$((STEP + 1))
+        echo "  [$STEP/$TOTAL_STEPS] Generated-column table data..." >&2
         # shellcheck disable=SC2086
         remote_dump --no-create-info --skip-triggers --skip-add-locks \
             "$REMOTE_DATABASE" $GENERATED_TABLES
-    fi
-
-    if [ -n "$VIEWS" ]; then
-        echo "-- [db-sync-prod] views"
-        # shellcheck disable=SC2086
-        remote_dump "$REMOTE_DATABASE" $VIEWS
     fi
 
     echo "SET FOREIGN_KEY_CHECKS=1;"

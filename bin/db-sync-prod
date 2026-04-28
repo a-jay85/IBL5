@@ -181,7 +181,22 @@ set -o pipefail
     echo "SET FOREIGN_KEY_CHECKS=1;"
 } \
     | perl -pe 's/ DEFINER=\S+ / /g' \
-    | docker exec -i "$DB_CONTAINER" mariadb -uroot -proot iblhoops_ibl5
+    | docker exec -i "$DB_CONTAINER" mariadb --force -uroot -proot iblhoops_ibl5 2>&1 \
+    | grep -v '\[Warning\].*password' \
+    | grep -i 'ERROR' > /tmp/db-sync-errors.log || true
+
+if [ -s /tmp/db-sync-errors.log ]; then
+    if grep -v 'ERROR 1906' /tmp/db-sync-errors.log | grep -qi 'ERROR'; then
+        echo ""
+        echo "ERROR: Import had fatal errors:"
+        grep -v 'ERROR 1906' /tmp/db-sync-errors.log | head -20
+        rm -f /tmp/db-sync-errors.log
+        exit 1
+    fi
+    WARN_COUNT=$(wc -l < /tmp/db-sync-errors.log | tr -d '[:space:]')
+    echo "  ($WARN_COUNT generated-column warnings during import, harmless)"
+fi
+rm -f /tmp/db-sync-errors.log
 
 echo ""
 echo "Backfilling schema_migrations from prod dump..."

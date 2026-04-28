@@ -127,20 +127,15 @@ class FranchiseHistoryRepositoryTest extends DatabaseTestCase
 
     public function testPlayoffTotalsReflectPlayoffBoxscores(): void
     {
-        // June dates = game_type=2 (playoff)
-        // season_year = YEAR(2098-06-15) = 2098
-        $this->insertFranchiseSeasonRow(1, 2098, 'Metros');
-        $this->insertFranchiseSeasonRow(2, 2098, 'Sharks');
+        // vw_playoff_series_results is now a thin pass-through over the
+        // materialized ibl_playoff_series_results table (refreshed by
+        // RefreshPlayoffSeriesResultsStep). Insert directly to assert the
+        // aggregation chain through vw_franchise_summary.
+        $this->insertFranchiseSeasonRow(1, 9098, 'Metros');
+        $this->insertFranchiseSeasonRow(2, 9098, 'Sharks');
+        $this->insertPlayoffSeriesResultRow(9098, 1, 1, 2, 'Metros', 'Sharks', 4, 2);
 
-        // Game 1: Metros (home) vs Sharks (visitor)
-        $this->insertTeamBoxscoreRow('2098-06-10', 'Metros', 1, 2, 1);
-        $this->insertTeamBoxscoreRow('2098-06-10', 'Sharks', 1, 2, 1);
-
-        // Game 2: Same matchup
-        $this->insertTeamBoxscoreRow('2098-06-12', 'Metros', 1, 2, 1);
-        $this->insertTeamBoxscoreRow('2098-06-12', 'Sharks', 1, 2, 1);
-
-        $result = $this->repo->getAllFranchiseHistory(2098);
+        $result = $this->repo->getAllFranchiseHistory(9098);
         $metros = null;
         foreach ($result as $row) {
             if ($row['team_name'] === 'Metros') {
@@ -149,8 +144,6 @@ class FranchiseHistoryRepositoryTest extends DatabaseTestCase
             }
         }
         self::assertNotNull($metros);
-        // Playoff data derives from vw_playoff_series_results which aggregates from box_scores_teams
-        // The exact win count depends on VIEW logic (score comparison), but should be > 0
         $totalPlayoffGames = $metros['playoff_total_wins'] + $metros['playoff_total_losses'];
         self::assertGreaterThan(0, $totalPlayoffGames, 'Playoff games should be counted');
     }

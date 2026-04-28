@@ -28,10 +28,11 @@ test.describe('Waivers flow: open', () => {
   });
 
   test('waiver form has expected structure', async ({ page }) => {
-    await expect(page.locator('form[name="Waiver_Move"]')).toBeVisible();
+    const form = page.locator('form[name="Waiver_Move"]');
+    await expect(form).toBeVisible();
     await expect(page.locator('select[name="Player_ID"]')).toBeVisible();
     await expect(
-      page.locator('button[type="submit"], input[type="submit"]').first(),
+      form.locator('button[type="submit"], input[type="submit"]').first(),
     ).toBeVisible();
   });
 

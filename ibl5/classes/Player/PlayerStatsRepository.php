@@ -59,14 +59,9 @@ class PlayerStatsRepository extends BaseMysqliRepository implements PlayerStatsR
     {
         return $this->fetchAll(
             "SELECT bs.*,
-                    COALESCE(bst.game_of_that_day, 0) AS game_of_that_day,
+                    COALESCE(bs.game_of_that_day, 0) AS game_of_that_day,
                     COALESCE(sch.box_id, 0) AS box_id
              FROM ibl_box_scores bs
-             LEFT JOIN (
-                 SELECT game_date, visitor_teamid, home_teamid, MIN(game_of_that_day) AS game_of_that_day
-                 FROM ibl_box_scores_teams
-                 GROUP BY game_date, visitor_teamid, home_teamid
-             ) bst ON bst.game_date = bs.game_date AND bst.visitor_teamid = bs.visitor_teamid AND bst.home_teamid = bs.home_teamid
              LEFT JOIN ibl_schedule sch ON sch.game_date = bs.game_date AND sch.visitor_teamid = bs.visitor_teamid AND sch.home_teamid = bs.home_teamid
              WHERE bs.pid = ? AND bs.game_date BETWEEN ? AND ?
              ORDER BY bs.game_date ASC",
@@ -221,10 +216,6 @@ class PlayerStatsRepository extends BaseMysqliRepository implements PlayerStatsR
     {
         /** @var CareerAveragesRow|null */
         return $this->fetchOne(
-            self::buildCareerAveragesQuery(1, 'p.name = ?'),
-            "s",
-            $playerName
-        ) ?? $this->fetchOne(
             self::buildHistCareerAveragesQuery('p.name = ?'),
             "s",
             $playerName
@@ -239,10 +230,6 @@ class PlayerStatsRepository extends BaseMysqliRepository implements PlayerStatsR
     {
         /** @var CareerAveragesRow|null */
         return $this->fetchOne(
-            self::buildCareerAveragesQuery(1, 'bs.pid = ?'),
-            "i",
-            $playerID
-        ) ?? $this->fetchOne(
             self::buildHistCareerAveragesQuery('h.pid = ?'),
             "i",
             $playerID
@@ -250,9 +237,9 @@ class PlayerStatsRepository extends BaseMysqliRepository implements PlayerStatsR
     }
 
     /**
-     * Build regular-season career averages from ibl_hist (pre-aggregated per-season totals).
-     *
-     * Much faster than aggregating 589K ibl_box_scores rows — ibl_hist has ~12K rows.
+     * Primary source for regular-season career averages. ibl_hist is refreshed every
+     * sim from ibl_plr_snapshots and contains per-season aggregates (~12K rows) — much
+     * faster than aggregating 589K+ ibl_box_scores rows.
      */
     private static function buildHistCareerAveragesQuery(string $filterClause): string
     {
@@ -290,9 +277,9 @@ class PlayerStatsRepository extends BaseMysqliRepository implements PlayerStatsR
     }
 
     /**
-     * Build career averages from ibl_box_scores for playoff/HEAT game types.
-     *
-     * Regular season career averages use buildHistCareerAveragesQuery() instead.
+     * Build career averages from ibl_box_scores for playoff/HEAT game types
+     * (game_type 2 and 3). Regular-season averages (game_type=1) use
+     * buildHistCareerAveragesQuery() to avoid scanning 489K+ box-score rows.
      */
     private static function buildCareerAveragesQuery(int $gameType, string $filterClause): string
     {

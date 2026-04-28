@@ -27,7 +27,7 @@ class SeasonHighsServiceTest extends TestCase
     public function testGetSeasonHighsDataReturnsExpectedStructure(): void
     {
         $repo = $this->createStub(SeasonHighsRepositoryInterface::class);
-        $repo->method('getSeasonHighs')->willReturn([]);
+        $repo->method('getSeasonHighsBatch')->willReturnCallback(self::emptyBatchFor(...));
         $season = $this->createStubSeason(2024, 2025);
         $service = new SeasonHighsService($repo, $season);
 
@@ -40,7 +40,7 @@ class SeasonHighsServiceTest extends TestCase
     public function testGetSeasonHighsDataReturnsNineStatCategories(): void
     {
         $repo = $this->createStub(SeasonHighsRepositoryInterface::class);
-        $repo->method('getSeasonHighs')->willReturn([]);
+        $repo->method('getSeasonHighsBatch')->willReturnCallback(self::emptyBatchFor(...));
         $season = $this->createStubSeason(2024, 2025);
         $service = new SeasonHighsService($repo, $season);
 
@@ -53,7 +53,7 @@ class SeasonHighsServiceTest extends TestCase
     public function testGetSeasonHighsDataIncludesPointsStat(): void
     {
         $repo = $this->createStub(SeasonHighsRepositoryInterface::class);
-        $repo->method('getSeasonHighs')->willReturn([]);
+        $repo->method('getSeasonHighsBatch')->willReturnCallback(self::emptyBatchFor(...));
         $season = $this->createStubSeason(2024, 2025);
         $service = new SeasonHighsService($repo, $season);
 
@@ -66,11 +66,11 @@ class SeasonHighsServiceTest extends TestCase
 
     public function testCallsRepositoryForPlayerAndTeamHighs(): void
     {
-        // Each of 9 stats calls getSeasonHighs twice (player + team) = 18 calls
+        // Two batched calls — one for player highs, one for team highs.
         $repo = $this->createMock(SeasonHighsRepositoryInterface::class);
-        $repo->expects($this->exactly(18))
-            ->method('getSeasonHighs')
-            ->willReturn([]);
+        $repo->expects($this->exactly(2))
+            ->method('getSeasonHighsBatch')
+            ->willReturnCallback(self::emptyBatchFor(...));
         $season = $this->createStubSeason(2024, 2025);
         $service = new SeasonHighsService($repo, $season);
 
@@ -80,12 +80,12 @@ class SeasonHighsServiceTest extends TestCase
     public function testRegularSeasonUsesCorrectDateRange(): void
     {
         $repo = $this->createStub(SeasonHighsRepositoryInterface::class);
-        $repo->method('getSeasonHighs')
-            ->willReturnCallback(function (string $expr, string $name, string $suffix, string $start, string $end): array {
+        $repo->method('getSeasonHighsBatch')
+            ->willReturnCallback(function (array $stats, string $suffix, string $start, string $end): array {
                 // Regular season: Nov 2024 to May 2025
                 $this->assertStringStartsWith('2024-11', $start);
                 $this->assertStringStartsWith('2025-05', $end);
-                return [];
+                return self::emptyBatchFor($stats, $suffix, $start, $end);
             });
         $season = $this->createStubSeason(2024, 2025);
         $service = new SeasonHighsService($repo, $season);
@@ -96,12 +96,12 @@ class SeasonHighsServiceTest extends TestCase
     public function testPlayoffsUsesCorrectDateRange(): void
     {
         $repo = $this->createStub(SeasonHighsRepositoryInterface::class);
-        $repo->method('getSeasonHighs')
-            ->willReturnCallback(function (string $expr, string $name, string $suffix, string $start, string $end): array {
+        $repo->method('getSeasonHighsBatch')
+            ->willReturnCallback(function (array $stats, string $suffix, string $start, string $end): array {
                 // Playoffs: June 2025
                 $this->assertStringStartsWith('2025-06', $start);
                 $this->assertStringStartsWith('2025-06', $end);
-                return [];
+                return self::emptyBatchFor($stats, $suffix, $start, $end);
             });
         $season = $this->createStubSeason(2024, 2025);
         $service = new SeasonHighsService($repo, $season);
@@ -112,21 +112,27 @@ class SeasonHighsServiceTest extends TestCase
     public function testSeasonHighsHandlesEntriesWithoutBoxId(): void
     {
         $repo = $this->createStub(SeasonHighsRepositoryInterface::class);
-        $repo->method('getSeasonHighs')
-            ->willReturn([
-                [
-                    'name' => 'Test Player',
-                    'date' => '2025-06-15',
-                    'value' => 45,
-                    'pid' => 1,
-                    'teamid' => 5,
-                    'teamname' => 'Test Team',
-                    'team_city' => 'Test City',
-                    'color1' => 'FFFFFF',
-                    'color2' => '000000',
-                    'game_of_that_day' => 0,
-                ],
-            ]);
+        $repo->method('getSeasonHighsBatch')
+            ->willReturnCallback(function (array $stats): array {
+                $result = [];
+                foreach ($stats as $name => $_) {
+                    $result[$name] = $name === 'POINTS' ? [
+                        [
+                            'name' => 'Test Player',
+                            'date' => '2025-06-15',
+                            'value' => 45,
+                            'pid' => 1,
+                            'teamid' => 5,
+                            'teamname' => 'Test Team',
+                            'team_city' => 'Test City',
+                            'color1' => 'FFFFFF',
+                            'color2' => '000000',
+                            'game_of_that_day' => 0,
+                        ],
+                    ] : [];
+                }
+                return $result;
+            });
         $season = $this->createStubSeason(2024, 2025);
         $service = new SeasonHighsService($repo, $season);
 
@@ -144,7 +150,7 @@ class SeasonHighsServiceTest extends TestCase
     public function testGetHomeAwayHighsReturnsHomeAndAwayKeys(): void
     {
         $repo = $this->createStub(SeasonHighsRepositoryInterface::class);
-        $repo->method('getSeasonHighs')->willReturn([]);
+        $repo->method('getSeasonHighsBatch')->willReturnCallback(self::emptyBatchFor(...));
         $season = $this->createStubSeason(2024, 2025);
         $service = new SeasonHighsService($repo, $season);
 
@@ -157,7 +163,7 @@ class SeasonHighsServiceTest extends TestCase
     public function testGetHomeAwayHighsHasEightStatCategories(): void
     {
         $repo = $this->createStub(SeasonHighsRepositoryInterface::class);
-        $repo->method('getSeasonHighs')->willReturn([]);
+        $repo->method('getSeasonHighsBatch')->willReturnCallback(self::emptyBatchFor(...));
         $season = $this->createStubSeason(2024, 2025);
         $service = new SeasonHighsService($repo, $season);
 
@@ -175,11 +181,10 @@ class SeasonHighsServiceTest extends TestCase
         $locationFilters = [];
 
         $repo = $this->createMock(SeasonHighsRepositoryInterface::class);
-        $repo->expects($this->exactly(16))
-            ->method('getSeasonHighs')
+        $repo->expects($this->exactly(2))
+            ->method('getSeasonHighsBatch')
             ->willReturnCallback(function (
-                string $expr,
-                string $name,
+                array $stats,
                 string $suffix,
                 string $start,
                 string $end,
@@ -187,38 +192,24 @@ class SeasonHighsServiceTest extends TestCase
                 ?string $locationFilter = null
             ) use (&$locationFilters): array {
                 $locationFilters[] = $locationFilter;
-                return [];
+                return self::emptyBatchFor($stats, $suffix, $start, $end);
             });
 
         $season = $this->createStubSeason(2024, 2025);
         $service = new SeasonHighsService($repo, $season);
         $service->getHomeAwayHighs('Regular Season');
 
-        // 8 stats, each called twice (home then away) = 16 calls
-        $this->assertCount(16, $locationFilters);
-        $homeCount = 0;
-        $awayCount = 0;
-        foreach ($locationFilters as $i => $filter) {
-            if ($i % 2 === 0) {
-                $this->assertSame('home', $filter, "Call {$i} should be 'home'");
-                $homeCount++;
-            } else {
-                $this->assertSame('away', $filter, "Call {$i} should be 'away'");
-                $awayCount++;
-            }
-        }
-        $this->assertSame(8, $homeCount);
-        $this->assertSame(8, $awayCount);
+        // Two batched calls — first home, then away.
+        $this->assertSame(['home', 'away'], $locationFilters);
     }
 
     public function testGetHomeAwayHighsUsesLimitOfTen(): void
     {
         $repo = $this->createMock(SeasonHighsRepositoryInterface::class);
-        $repo->expects($this->exactly(16))
-            ->method('getSeasonHighs')
+        $repo->expects($this->exactly(2))
+            ->method('getSeasonHighsBatch')
             ->willReturnCallback(function (
-                string $expr,
-                string $name,
+                array $stats,
                 string $suffix,
                 string $start,
                 string $end,
@@ -226,7 +217,7 @@ class SeasonHighsServiceTest extends TestCase
                 ?string $locationFilter = null
             ): array {
                 $this->assertSame(10, $limit);
-                return [];
+                return self::emptyBatchFor($stats, $suffix, $start, $end);
             });
 
         $season = $this->createStubSeason(2024, 2025);
@@ -340,6 +331,28 @@ class SeasonHighsServiceTest extends TestCase
         $result = $service->validateAgainstRcb($homeAwayData, 2024);
 
         $this->assertSame([], $result);
+    }
+
+    /**
+     * Build an empty-result batch keyed by stat name — mirrors the repository
+     * contract that always returns one entry per requested stat.
+     *
+     * @param array<string, string> $stats
+     * @return array<string, list<array{name: string, date: string, value: int}>>
+     */
+    private static function emptyBatchFor(
+        array $stats,
+        string $suffix = '',
+        string $start = '',
+        string $end = '',
+        int $limit = 15,
+        ?string $locationFilter = null
+    ): array {
+        $result = [];
+        foreach ($stats as $name => $_) {
+            $result[$name] = [];
+        }
+        return $result;
     }
 
     /**

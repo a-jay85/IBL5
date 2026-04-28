@@ -162,7 +162,8 @@ interface PlayerStatsRepositoryInterface
     /**
      * Get regular season career averages for a player
      *
-     * Queries ibl_season_career_avgs table for aggregated career averages.
+     * Queries ibl_hist (materialized per-season totals, refreshed every sim from
+     * ibl_plr_snapshots) for aggregated career averages.
      *
      * @param string $playerName Player name (exact match)
      * @return CareerAveragesRow|null Career averages row or null if not found
@@ -172,7 +173,8 @@ interface PlayerStatsRepositoryInterface
     /**
      * Get regular season career averages for a player by ID
      *
-     * Queries ibl_season_career_avgs table for aggregated career averages.
+     * Queries ibl_hist (materialized per-season totals, refreshed every sim from
+     * ibl_plr_snapshots) for aggregated career averages.
      *
      * @param int $playerID Player ID (pid)
      * @return CareerAveragesRow|null Career averages row or null if not found

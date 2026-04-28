@@ -35,6 +35,30 @@ interface SeasonHighsRepositoryInterface
     ): array;
 
     /**
+     * Get season highs for multiple stats in a single batched UNION ALL query.
+     *
+     * Replaces N round-trips (one per stat) with a single query whose branches
+     * each produce up to $limit rows. UNION ALL does not preserve outer order,
+     * so the result groups are re-sorted in PHP by value DESC, date ASC.
+     *
+     * @param array<string, string> $stats Map of stat name => SQL expression
+     * @param string $tableSuffix Table suffix ('_teams' for teams, empty for players)
+     * @param string $startDate Start date (YYYY-MM-DD)
+     * @param string $endDate End date (YYYY-MM-DD)
+     * @param int $limit Number of results per stat
+     * @param string|null $locationFilter 'home', 'away', or null
+     * @return array<string, list<SeasonHighEntry>> Results keyed by stat name (one entry per requested stat, possibly empty)
+     */
+    public function getSeasonHighsBatch(
+        array $stats,
+        string $tableSuffix,
+        string $startDate,
+        string $endDate,
+        int $limit = 15,
+        ?string $locationFilter = null
+    ): array;
+
+    /**
      * Get RCB-sourced single-game records for a given context (home/away).
      *
      * @param int $seasonYear Season year

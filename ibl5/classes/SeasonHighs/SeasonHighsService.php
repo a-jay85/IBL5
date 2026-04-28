@@ -90,26 +90,19 @@ class SeasonHighsService implements SeasonHighsServiceInterface
     {
         $dateRange = $this->getDateRangeForPhase($seasonPhase);
 
-        $playerHighs = [];
-        $teamHighs = [];
+        $playerHighs = $this->repository->getSeasonHighsBatch(
+            self::STATS,
+            '',
+            $dateRange['start'],
+            $dateRange['end']
+        );
 
-        foreach (self::STATS as $statName => $statExpression) {
-            $playerHighs[$statName] = $this->repository->getSeasonHighs(
-                $statExpression,
-                $statName,
-                '',
-                $dateRange['start'],
-                $dateRange['end']
-            );
-
-            $teamHighs[$statName] = $this->repository->getSeasonHighs(
-                $statExpression,
-                $statName,
-                '_teams',
-                $dateRange['start'],
-                $dateRange['end']
-            );
-        }
+        $teamHighs = $this->repository->getSeasonHighsBatch(
+            self::STATS,
+            '_teams',
+            $dateRange['start'],
+            $dateRange['end']
+        );
 
         return [
             'playerHighs' => $playerHighs,
@@ -126,32 +119,23 @@ class SeasonHighsService implements SeasonHighsServiceInterface
     {
         $dateRange = $this->getDateRangeForPhase($seasonPhase);
 
-        /** @var array<string, list<SeasonHighEntry>> $homeHighs */
-        $homeHighs = [];
-        /** @var array<string, list<SeasonHighEntry>> $awayHighs */
-        $awayHighs = [];
+        $homeHighs = $this->repository->getSeasonHighsBatch(
+            self::HOME_AWAY_STATS,
+            '',
+            $dateRange['start'],
+            $dateRange['end'],
+            self::HOME_AWAY_LIMIT,
+            'home'
+        );
 
-        foreach (self::HOME_AWAY_STATS as $statName => $statExpression) {
-            $homeHighs[$statName] = $this->repository->getSeasonHighs(
-                $statExpression,
-                $statName,
-                '',
-                $dateRange['start'],
-                $dateRange['end'],
-                self::HOME_AWAY_LIMIT,
-                'home'
-            );
-
-            $awayHighs[$statName] = $this->repository->getSeasonHighs(
-                $statExpression,
-                $statName,
-                '',
-                $dateRange['start'],
-                $dateRange['end'],
-                self::HOME_AWAY_LIMIT,
-                'away'
-            );
-        }
+        $awayHighs = $this->repository->getSeasonHighsBatch(
+            self::HOME_AWAY_STATS,
+            '',
+            $dateRange['start'],
+            $dateRange['end'],
+            self::HOME_AWAY_LIMIT,
+            'away'
+        );
 
         return [
             'home' => $homeHighs,

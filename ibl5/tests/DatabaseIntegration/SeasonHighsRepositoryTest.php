@@ -141,6 +141,71 @@ class SeasonHighsRepositoryTest extends DatabaseTestCase
         self::assertSame([], $result);
     }
 
+    public function testGetSeasonHighsBatchReturnsMultipleStats(): void
+    {
+        $this->insertTestPlayer(200090401, 'Batch Test One');
+        $this->insertTestPlayer(200090402, 'Batch Test Two');
+
+        // Player one: high points (40), low assists
+        $this->insertPlayerBoxscoreRow(
+            '2098-01-15', 200090401, 'Batch Test One', 'PG', 2, 1, 1,
+            minutes: 35, points2m: 12, points2a: 20, ftm: 8, fta: 10, points3m: 4, points3a: 9,
+            ast: 2,
+        );
+
+        // Player two: lower points, high assists (15)
+        $this->insertPlayerBoxscoreRow(
+            '2098-01-16', 200090402, 'Batch Test Two', 'PG', 2, 1, 1,
+            minutes: 30, points2m: 4, points2a: 10, ftm: 2, fta: 3, points3m: 1, points3a: 4,
+            ast: 15,
+        );
+
+        $result = $this->repo->getSeasonHighsBatch(
+            [
+                'POINTS' => '(`game_2gm`*2) + `game_ftm` + (`game_3gm`*3)',
+                'ASSISTS' => '`game_ast`',
+            ],
+            '',
+            '2098-01-01',
+            '2098-01-31',
+        );
+
+        self::assertArrayHasKey('POINTS', $result);
+        self::assertArrayHasKey('ASSISTS', $result);
+
+        // POINTS leader is player one (12*2 + 8 + 4*3 = 44)
+        self::assertNotEmpty($result['POINTS']);
+        self::assertSame('Batch Test One', $result['POINTS'][0]['name']);
+        self::assertSame(44, $result['POINTS'][0]['value']);
+        self::assertArrayHasKey('pid', $result['POINTS'][0]);
+        self::assertArrayHasKey('teamid', $result['POINTS'][0]);
+        self::assertArrayHasKey('gameOfThatDay', $result['POINTS'][0]);
+
+        // ASSISTS leader is player two
+        self::assertNotEmpty($result['ASSISTS']);
+        self::assertSame('Batch Test Two', $result['ASSISTS'][0]['name']);
+        self::assertSame(15, $result['ASSISTS'][0]['value']);
+    }
+
+    public function testGetSeasonHighsBatchReturnsEmptyEntriesForUnmatchedStats(): void
+    {
+        $result = $this->repo->getSeasonHighsBatch(
+            [
+                'POINTS' => '(`game_2gm`*2) + `game_ftm` + (`game_3gm`*3)',
+                'BLOCKS' => '`game_blk`',
+            ],
+            '',
+            '2099-01-01',
+            '2099-01-31',
+        );
+
+        // Both keys present even when no rows match — service callers iterate over expected keys.
+        self::assertArrayHasKey('POINTS', $result);
+        self::assertArrayHasKey('BLOCKS', $result);
+        self::assertSame([], $result['POINTS']);
+        self::assertSame([], $result['BLOCKS']);
+    }
+
     public function testGetRcbSeasonHighsReturnsRows(): void
     {
         // Insert test data within transaction to avoid seed dependency issues

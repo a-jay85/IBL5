@@ -49,7 +49,7 @@ Classes autoload from `ibl5/classes/`. `require_once`/`require`/`include` in `cl
 - Schema: `ibl5/migrations/000_baseline_schema.sql` — **always verify table/column names here** (check subsequent migrations for alterations). Migrations are the single source of truth.
 - **Native types enabled:** `MYSQLI_OPT_INT_AND_FLOAT_NATIVE` is set on `$mysqli_db`. See `core-coding.md` for type comparison rules.
 - **Docker:** `docker compose up -d` → `http://main.localhost/ibl5/`. See `database-access.md` for connection details.
-- **CLI queries:** `./bin/db-query "SQL"`. See `duckdb-analytics.md` for cross-season OLAP analysis.
+- **CLI queries:** `./bin/db-query "SQL"`.
 
 ## Nightly Queue
 

@@ -42,7 +42,6 @@ const REFERENCE_PREFIXES = [
 const REFERENCE_ALLOWLIST = [
     '.claude/settings.json',
     '.claude/settings.local.json',
-    'ibl5/analytics/data/ibl_analytics.duckdb',
 ];
 
 function usage(): string

@@ -58,7 +58,6 @@ Tier 3 proceeds as a four-PR sequence, each following the Tier 1/2 playbook: foc
 - Positive: `ibl.bannedNonSnakeCaseColumn` prevents regression; PRs 2–4 extend the same rule instead of each adding a new one.
 - Negative: one-time PHP sweep touches ~180 prod files and ~250 test files. Mitigated by (a) `SchemaValidator` hard-failing at boot if any rename regressed, (b) PHPStan rule catching missed sites in review, (c) split into 5 parallel Sonnet agents per cluster (player parser, depth chart, FA/negotiation/team, cache + PlayerDatabase, test fixtures).
 - Negative: `PlayerDatabase::COLUMN_MAP` keeps `Clutch` / `Consistency` as form-field input-filter keys mapped to the new `clutch` / `consistency` column names — same pattern used in PR #632 for `to` / `do` / `r_to`. Documented in the class.
-- Negative: DuckDB analytics schema (`analytics/schema/*.sql`) reads the renamed MariaDB columns. `AS r_to` / `AS "do"` / `AS "to"` shims left by Tiers 1–2 are removed in this PR along with downstream consumer query updates (same incremental-cleanup approach ADR-0008 used).
 
 **PR 2 (PR #638) — migration 117:**
 
@@ -81,7 +80,6 @@ Tier 3 proceeds as a four-PR sequence, each following the Tier 1/2 playbook: foc
 - `BanNonSnakeCaseColumnsRule` extended with 6 additional banned tokens (`` `cy1` ``–`` `cy6` ``).
 - Dynamic string construction in `ContractListService::calculateContractYears()` (`'cy' . $year`) and `TeamQueryRepository::getSalaryCapArray()` (`"cy" . $yearUnderContract`) updated to `'salary_yr' . $year` and `"salary_yr" . $yearUnderContract`.
 - `PlrFileWriter` constants `OFFSET_CY1`–`OFFSET_CY6` renamed to `OFFSET_SALARY_YR1`–`OFFSET_SALARY_YR6`.
-- DuckDB analytics schemas updated (`01_dimensions.sql`, `02_facts.sql`).
 - 36 schema assertions added (6 columns × 6 tables).
 - Blast radius: 288 prod hits across 47 files + 507 test hits across 44 files.
 

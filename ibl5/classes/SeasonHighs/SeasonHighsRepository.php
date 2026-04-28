@@ -72,17 +72,12 @@ class SeasonHighsRepository extends \BaseMysqliRepository implements SeasonHighs
             $query = "SELECT p.`pid`, p.`name`, p.`teamid`, t.`team_name` AS `teamname`,
                 t.`team_city`, t.`color1`, t.`color2`,
                 bs.`game_date` AS `date`, sch.`box_id`,
-                COALESCE(bst.game_of_that_day, 0) AS game_of_that_day,
+                COALESCE(bs.`game_of_that_day`, 0) AS game_of_that_day,
                 {$statExpression} AS `{$safeStatName}`
                 FROM {$this->boxScoresTable} bs
                 JOIN {$this->playerTable} p ON bs.pid = p.pid
                 LEFT JOIN {$this->teamInfoTable} t ON p.teamid = t.teamid
                 LEFT JOIN {$this->scheduleTable} sch ON sch.game_date = bs.game_date AND sch.visitor_teamid = bs.visitor_teamid AND sch.home_teamid = bs.home_teamid
-                LEFT JOIN (
-                    SELECT game_date, visitor_teamid, home_teamid, MIN(game_of_that_day) AS game_of_that_day
-                    FROM {$this->boxScoresTeamsTable}
-                    GROUP BY game_date, visitor_teamid, home_teamid
-                ) bst ON bst.game_date = bs.game_date AND bst.visitor_teamid = bs.visitor_teamid AND bst.home_teamid = bs.home_teamid
                 WHERE bs.`game_date` BETWEEN ? AND ?{$locationCondition}
                 ORDER BY `{$safeStatName}` DESC, bs.`game_date` ASC
                 LIMIT {$limit}";
@@ -104,46 +99,143 @@ class SeasonHighsRepository extends \BaseMysqliRepository implements SeasonHighs
 
         $results = $this->fetchAll($query, "ss", $startDate, $endDate);
 
-        // Normalize the results
         /** @var list<SeasonHighEntry> $normalized */
         $normalized = [];
         foreach ($results as $row) {
             /** @var array<string, int|float|string|null> $row */
-            $entry = [
-                'name' => (string) ($row['name'] ?? ''),
-                'date' => (string) ($row['date'] ?? ''),
-                'value' => (int) ($row[$safeStatName] ?? 0),
-            ];
-            // Include pid for player stats (used for profile links)
-            if (isset($row['pid'])) {
-                $entry['pid'] = (int) $row['pid'];
-            }
-            // Include team data for player stats (used for styled team cell)
-            if (isset($row['teamid'])) {
-                $entry['teamid'] = (int) $row['teamid'];
-                $entry['teamname'] = (string) ($row['teamname'] ?? '');
-                $entry['team_city'] = (string) ($row['team_city'] ?? '');
-                $entry['color1'] = (string) ($row['color1'] ?? 'FFFFFF');
-                $entry['color2'] = (string) ($row['color2'] ?? '000000');
-            }
-            // Include teamid and colors for team stats (used for styled team cell)
-            if (isset($row['teamid'])) {
-                $entry['teamid'] = (int) $row['teamid'];
-                $entry['team_city'] = (string) ($row['team_city'] ?? '');
-                $entry['color1'] = (string) ($row['color1'] ?? 'FFFFFF');
-                $entry['color2'] = (string) ($row['color2'] ?? '000000');
-            }
-            // Include box_id and game_of_that_day for linking dates to box scores
-            if (isset($row['box_id'])) {
-                $entry['boxId'] = (int) $row['box_id'];
-            }
-            if (isset($row['game_of_that_day'])) {
-                $entry['gameOfThatDay'] = (int) $row['game_of_that_day'];
-            }
-            $normalized[] = $entry;
+            $normalized[] = $this->normalizeRow($row, $safeStatName);
         }
 
         return $normalized;
+    }
+
+    /**
+     * @see SeasonHighsRepositoryInterface::getSeasonHighsBatch()
+     *
+     * @param array<string, string> $stats
+     * @return array<string, list<SeasonHighEntry>>
+     */
+    public function getSeasonHighsBatch(
+        array $stats,
+        string $tableSuffix,
+        string $startDate,
+        string $endDate,
+        int $limit = 15,
+        ?string $locationFilter = null
+    ): array {
+        if ($stats === []) {
+            return [];
+        }
+
+        // Initialize result with empty arrays for every requested stat so callers
+        // iterating over expected keys never hit an undefined index.
+        $byStatName = [];
+        foreach ($stats as $statName => $_) {
+            $byStatName[$statName] = [];
+        }
+
+        $locationCondition = match ($locationFilter) {
+            'home' => ' AND bs.teamid = bs.home_teamid',
+            'away' => ' AND bs.teamid = bs.visitor_teamid',
+            default => '',
+        };
+
+        // Each branch contributes top-$limit rows for one stat. Enforce a
+        // safe integer for inline LIMIT (no placeholder allowed inside parens).
+        $safeLimit = max(1, $limit);
+
+        $branches = [];
+        $params = [];
+        $types = '';
+        foreach ($stats as $statName => $statExpression) {
+            if ($tableSuffix === '') {
+                $branches[] = "(SELECT ? AS stat_category, p.`pid`, p.`name`, p.`teamid`, t.`team_name` AS `teamname`,
+                    t.`team_city`, t.`color1`, t.`color2`,
+                    bs.`game_date` AS `date`, sch.`box_id`,
+                    COALESCE(bs.`game_of_that_day`, 0) AS game_of_that_day,
+                    ({$statExpression}) AS stat_value
+                    FROM {$this->boxScoresTable} bs
+                    JOIN {$this->playerTable} p ON bs.pid = p.pid
+                    LEFT JOIN {$this->teamInfoTable} t ON p.teamid = t.teamid
+                    LEFT JOIN {$this->scheduleTable} sch ON sch.game_date = bs.game_date AND sch.visitor_teamid = bs.visitor_teamid AND sch.home_teamid = bs.home_teamid
+                    WHERE bs.`game_date` BETWEEN ? AND ?{$locationCondition}
+                    ORDER BY stat_value DESC, bs.`game_date` ASC
+                    LIMIT {$safeLimit})";
+            } else {
+                $branches[] = "(SELECT ? AS stat_category, t.`teamid`, t.`team_city`, t.`color1`, t.`color2`,
+                    bs.`name`, bs.`game_date` AS `date`, sch.`box_id`,
+                    COALESCE(bs.`game_of_that_day`, 0) AS game_of_that_day,
+                    ({$statExpression}) AS stat_value
+                    FROM {$this->boxScoresTeamsTable} bs
+                    JOIN {$this->teamInfoTable} t ON bs.name = t.team_name
+                    LEFT JOIN {$this->scheduleTable} sch ON sch.game_date = bs.game_date AND sch.visitor_teamid = bs.visitor_teamid AND sch.home_teamid = bs.home_teamid
+                    WHERE bs.`game_date` BETWEEN ? AND ?
+                    ORDER BY stat_value DESC, bs.`game_date` ASC
+                    LIMIT {$safeLimit})";
+            }
+            $params[] = $statName;
+            $params[] = $startDate;
+            $params[] = $endDate;
+            $types .= 'sss';
+        }
+
+        $query = implode("\nUNION ALL\n", $branches);
+        $results = $this->fetchAll($query, $types, ...$params);
+
+        foreach ($results as $row) {
+            /** @var array<string, int|float|string|null> $row */
+            $statCategory = (string) $row['stat_category'];
+            if (!array_key_exists($statCategory, $byStatName)) {
+                continue;
+            }
+            $byStatName[$statCategory][] = $this->normalizeRow($row, 'stat_value');
+        }
+
+        foreach ($byStatName as &$entries) {
+            usort($entries, static function (array $a, array $b): int {
+                if ($a['value'] !== $b['value']) {
+                    return $b['value'] <=> $a['value'];
+                }
+                return strcmp($a['date'], $b['date']);
+            });
+        }
+        unset($entries);
+
+        return $byStatName;
+    }
+
+    /**
+     * Normalize a raw result row into a SeasonHighEntry.
+     *
+     * @param array<string, int|float|string|null> $row
+     * @return SeasonHighEntry
+     */
+    private function normalizeRow(array $row, string $valueKey): array
+    {
+        $entry = [
+            'name' => (string) ($row['name'] ?? ''),
+            'date' => (string) ($row['date'] ?? ''),
+            'value' => (int) ($row[$valueKey] ?? 0),
+        ];
+        if (isset($row['pid'])) {
+            $entry['pid'] = (int) $row['pid'];
+        }
+        if (isset($row['teamid'])) {
+            $entry['teamid'] = (int) $row['teamid'];
+            $entry['team_city'] = (string) ($row['team_city'] ?? '');
+            $entry['color1'] = (string) ($row['color1'] ?? 'FFFFFF');
+            $entry['color2'] = (string) ($row['color2'] ?? '000000');
+            if (isset($row['teamname'])) {
+                $entry['teamname'] = (string) $row['teamname'];
+            }
+        }
+        if (isset($row['box_id'])) {
+            $entry['boxId'] = (int) $row['box_id'];
+        }
+        if (isset($row['game_of_that_day'])) {
+            $entry['gameOfThatDay'] = (int) $row['game_of_that_day'];
+        }
+        return $entry;
     }
 
     /**

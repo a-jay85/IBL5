@@ -115,6 +115,18 @@ class DebugSessionTest extends TestCase
         $this->assertFalse($session->isViewAllExtensionsEnabled());
     }
 
+    public function testIsDebugAdminReturnsTrueForAJayWithE2ETesting(): void
+    {
+        $session = new DebugSession('A-Jay', 'php', null, true);
+        $this->assertTrue($session->isDebugAdmin());
+    }
+
+    public function testIsDebugAdminReturnsFalseForNonAJayWithE2ETesting(): void
+    {
+        $session = new DebugSession('SomeUser', 'php', null, true);
+        $this->assertFalse($session->isDebugAdmin());
+    }
+
     public function testViewAllExtensionsReturnsFalseOnProductionEvenWithSession(): void
     {
         $_SESSION['debug_view_all_extensions'] = true;

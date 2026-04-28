@@ -14,9 +14,9 @@ class DebugSession implements DebugSessionInterface
 
     private bool $isAdmin;
 
-    public function __construct(?string $username, ?string $serverName, ?string $cookieValue = null)
+    public function __construct(?string $username, ?string $serverName, ?string $cookieValue = null, bool $isE2ETesting = false)
     {
-        $this->isAdmin = $username === 'A-Jay' && self::isLocalhost($serverName);
+        $this->isAdmin = $username === 'A-Jay' && (self::isLocalhost($serverName) || $isE2ETesting);
 
         if ($this->isAdmin) {
             $this->hydrateSessionFromCookie($cookieValue);

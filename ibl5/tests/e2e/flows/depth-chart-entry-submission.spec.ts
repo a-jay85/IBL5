@@ -260,9 +260,9 @@ test.describe('Depth Chart submission', () => {
   test('CSRF failure shows inline error without redirecting', async ({ page }) => {
     await expect(page.locator('.depth-chart-form')).toBeVisible({ timeout: 15000 });
 
-    // Blank the CSRF token field so server-side validation fails.
+    // Blank the depth chart form's CSRF token so server-side validation fails.
     await page.evaluate(() => {
-      const el = document.querySelector('input[name="_csrf_token"]');
+      const el = document.querySelector('.depth-chart-form input[name="_csrf_token"]');
       if (el instanceof HTMLInputElement) {
         el.value = '';
       }

@@ -123,15 +123,15 @@ class SeasonHighsRepository extends \BaseMysqliRepository implements SeasonHighs
         int $limit = 15,
         ?string $locationFilter = null
     ): array {
+        if ($stats === []) {
+            return [];
+        }
+
         // Initialize result with empty arrays for every requested stat so callers
         // iterating over expected keys never hit an undefined index.
         $byStatName = [];
         foreach ($stats as $statName => $_) {
             $byStatName[$statName] = [];
-        }
-
-        if ($stats === []) {
-            return $byStatName;
         }
 
         $locationCondition = match ($locationFilter) {
@@ -184,14 +184,13 @@ class SeasonHighsRepository extends \BaseMysqliRepository implements SeasonHighs
 
         foreach ($results as $row) {
             /** @var array<string, int|float|string|null> $row */
-            $statCategory = (string) ($row['stat_category'] ?? '');
+            $statCategory = (string) $row['stat_category'];
             if (!array_key_exists($statCategory, $byStatName)) {
                 continue;
             }
             $byStatName[$statCategory][] = $this->normalizeRow($row, 'stat_value');
         }
 
-        // UNION ALL does not preserve outer order — re-sort each group.
         foreach ($byStatName as &$entries) {
             usort($entries, static function (array $a, array $b): int {
                 if ($a['value'] !== $b['value']) {

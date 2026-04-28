@@ -163,8 +163,6 @@ class PlayerStatsRepositoryTest extends DatabaseTestCase
         $pid = 200000075;
         $this->insertTestPlayer($pid, 'DB Szn Avg');
 
-        // ibl_hist is the materialized per-season totals table — refreshed every sim
-        // from ibl_plr_snapshots and the primary source for regular-season career averages.
         $this->insertHistRow($pid, 'DB Szn Avg', 2098);
 
         $result = $this->repo->getSeasonCareerAverages('DB Szn Avg');

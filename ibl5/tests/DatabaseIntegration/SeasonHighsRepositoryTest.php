@@ -25,8 +25,6 @@ class SeasonHighsRepositoryTest extends DatabaseTestCase
             minutes: 35, points2m: 10, points2a: 18, ftm: 6, fta: 7, points3m: 4, points3a: 8,
         );
 
-        // Companion team boxscore row matches the (date, visitor, home) composite key
-        // so game_of_that_day round-trips before AND after the bst subquery removal.
         $this->insertTeamBoxscoreRow('2098-01-15', 'Metros', 1, 2, 1);
 
         $result = $this->repo->getSeasonHighs(

@@ -31,15 +31,15 @@
     "tmp": "0.2.5"
   },
   "devDependencies": {
-    "@axe-core/playwright": "^4.11.1",
+    "@axe-core/playwright": "^4.11.2",
     "@lhci/cli": "^0.15.1",
-    "@playwright/test": "^1.56.0",
+    "@playwright/test": "^1.59.1",
     "@tailwindcss/cli": "^4.0.0",
     "browser-sync": "^3.0.4",
     "eslint": "^10.2.1",
-    "eslint-plugin-playwright": "^2.10.1",
+    "eslint-plugin-playwright": "^2.10.2",
     "tailwindcss": "^4.0.0",
-    "typescript-eslint": "^8.58.1",
+    "typescript-eslint": "^8.59.1",
     "vitest": "^4.1.0"
   }
 }

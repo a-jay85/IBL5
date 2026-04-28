@@ -7,8 +7,8 @@
 #   bin/test --filter testMethodName  # Single test
 #   bin/test --testsuite "Module"     # Single suite
 
-SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd -P)"
-IBL5_DIR="$SCRIPT_DIR/../ibl5"
+SCRIPT_DIR="$(cd "$(dirname "$0")" && /bin/pwd -P)"
+IBL5_DIR="$(cd "$SCRIPT_DIR/../ibl5" && /bin/pwd -P)"
 cd "$IBL5_DIR" || exit 1
 
 exec vendor/bin/phpunit --no-progress --no-output --testdox-summary "$@"

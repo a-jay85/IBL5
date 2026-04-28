@@ -14,6 +14,9 @@ use Player\Player;
  *
  * @phpstan-type TeamFactors array{wins: int, losses: int, tradition_wins: int, tradition_losses: int, money_committed_at_position: int}
  * @phpstan-type DemandResult array{year1: float|int, year2: float|int, year3: float|int, year4: float|int, year5: float|int, year6: int, years: int, total: float|int, modifier: float}
+ * @phpstan-type RatingBreakdown array{name: string, playerValue: int, marketMax: int, rawScore: int}
+ * @phpstan-type ModifierBreakdown array{name: string, formula: string, inputs: string, result: float}
+ * @phpstan-type DemandsBreakdown array{ratings: list<RatingBreakdown>, totalRawScore: int, baseline: int, adjustedScore: int, avgDemands: float|int, totalDemands: float|int, baseDemands: float|int, maxRaise: float|int, faPreferences: array{playForWinner: int, tradition: int, loyalty: int, playingTime: int}, teamFactors: TeamFactors, modifiers: list<ModifierBreakdown>, totalModifier: float, demands: DemandResult}
  */
 interface NegotiationDemandCalculatorInterface
 {
@@ -45,4 +48,13 @@ interface NegotiationDemandCalculatorInterface
      * - Modifier divides base demands (higher modifier = lower demands)
      */
     public function calculateDemands(Player $player, array $teamFactors): array;
+
+    /**
+     * Calculate demands with full intermediate breakdown for debugging.
+     *
+     * @param Player $player The player object with ratings and stats
+     * @param TeamFactors $teamFactors Team factors affecting demands
+     * @return DemandsBreakdown Full breakdown of the calculation
+     */
+    public function calculateDemandsWithBreakdown(Player $player, array $teamFactors): array;
 }

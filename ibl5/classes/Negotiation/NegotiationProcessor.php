@@ -32,9 +32,8 @@ class NegotiationProcessor implements NegotiationProcessorInterface
     /**
      * @see NegotiationProcessorInterface::processNegotiation()
      */
-    public function processNegotiation(int $playerID, string $userTeamName, string $prefix): string
+    public function processNegotiation(int $playerID, string $userTeamName, string $prefix, bool $bypassOwnership = false): string
     {
-        // Load player using existing Player class
         try {
             $player = Player::withPlayerID($this->db, $playerID);
         } catch (\Exception $e) {
@@ -42,42 +41,43 @@ class NegotiationProcessor implements NegotiationProcessorInterface
         } catch (\TypeError $e) {
             return NegotiationViewHelper::renderError('Player not found.');
         }
-        
-        // Render page header
+
         $output = NegotiationViewHelper::renderHeader($player);
-        
-        // Validate free agency is not active
+
         $freeAgencyValidation = $this->validator->validateFreeAgencyNotActive();
         if (!$freeAgencyValidation->isValid()) {
             return $output . NegotiationViewHelper::renderError($freeAgencyValidation->getError() ?? '');
         }
 
-        // Validate negotiation eligibility
-        $eligibilityValidation = $this->validator->validateNegotiationEligibility($player, $userTeamName);
+        if ($bypassOwnership) {
+            $eligibilityValidation = $this->validator->validateRenegotiationEligibility($player);
+        } else {
+            $eligibilityValidation = $this->validator->validateNegotiationEligibility($player, $userTeamName);
+        }
         if (!$eligibilityValidation->isValid()) {
             return $output . NegotiationViewHelper::renderError($eligibilityValidation->getError() ?? '');
         }
 
-        // Get team factors for demand calculation
-        $teamFactors = $this->getTeamFactors($userTeamName, $player->position ?? '', $player->name ?? '');
-        
-        // Calculate contract demands
+        $factorsTeamName = $bypassOwnership ? ($player->teamName ?? '') : $userTeamName;
+        $teamFactors = $this->getTeamFactors($factorsTeamName, $player->position ?? '', $player->name ?? '');
+
+        if ($bypassOwnership) {
+            $breakdown = $this->demandCalculator->calculateDemandsWithBreakdown($player, $teamFactors);
+            $output .= NegotiationDemandsBreakdownView::render($breakdown);
+            return $output;
+        }
+
         $demands = $this->demandCalculator->calculateDemands($player, $teamFactors);
-        
-        // Calculate available cap space
         $capSpace = $this->repository->getTeamCapSpaceNextSeason($userTeamName);
-        
-        // Determine max first year salary based on experience
         $maxYearOneSalary = \ContractRules::getMaxContractSalary($player->yearsOfExperience ?? 0);
-        
-        // Render negotiation form
+
         $output .= NegotiationViewHelper::renderNegotiationForm(
             $player,
             $demands,
             $capSpace,
             $maxYearOneSalary
         );
-        
+
         return $output;
     }
     

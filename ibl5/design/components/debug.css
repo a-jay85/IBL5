@@ -20,4 +20,139 @@
     overflow: auto;
 }
 
+/* Debug breakdown (contract demands formula) */
+
+.debug-breakdown {
+    margin-top: 1rem;
+    border: 1px solid #444;
+    border-radius: 6px;
+    background: #1a1a2e;
+    color: #e0e0e0;
+}
+
+.debug-breakdown__summary {
+    padding: 0.75rem 1rem;
+    font-weight: 600;
+    cursor: pointer;
+    background: #16213e;
+    border-radius: 6px;
+    color: #a5d8ff;
+}
+
+.debug-breakdown[open] > .debug-breakdown__summary {
+    border-bottom: 1px solid #444;
+    border-radius: 6px 6px 0 0;
+}
+
+.debug-breakdown__section {
+    padding: 0.75rem 1rem;
+    border-bottom: 1px solid #333;
+}
+
+.debug-breakdown__section:last-child {
+    border-bottom: none;
+}
+
+.debug-breakdown__heading {
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: #a5d8ff;
+    margin: 0 0 0.5rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.debug-breakdown .ibl-data-table {
+    font-size: 0.8rem;
+    background: transparent;
+    color: #e0e0e0;
+}
+
+.debug-breakdown .ibl-data-table th {
+    background: #16213e;
+    color: #a5d8ff;
+    border-color: #444;
+}
+
+.debug-breakdown .ibl-data-table td {
+    border-color: #333;
+}
+
+.debug-breakdown__kv {
+    margin: 0;
+    font-size: 0.85rem;
+}
+
+.debug-breakdown__kv > div {
+    display: flex;
+    justify-content: space-between;
+    padding: 0.25rem 0;
+    border-bottom: 1px dotted #333;
+}
+
+.debug-breakdown__kv dt {
+    color: #ccc;
+}
+
+.debug-breakdown__kv dd {
+    margin: 0;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+}
+
+.debug-breakdown__mono {
+    font-family: monospace;
+    font-size: 0.75rem;
+}
+
+.debug-breakdown__formula {
+    font-family: monospace;
+    font-size: 0.9rem;
+    margin: 0;
+    color: #ccc;
+}
+
+.debug-breakdown__total-row td {
+    border-top: 2px solid #a5d8ff;
+}
+
+/* Debug toggle in navigation */
+
+.debug-toggle-form {
+    margin: 0;
+}
+
+.debug-toggle-btn {
+    all: unset;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    width: 100%;
+    font: inherit;
+    color: inherit;
+}
+
+.debug-toggle-btn:hover {
+    opacity: 0.8;
+}
+
+.debug-toggle-on,
+.debug-toggle-off {
+    display: inline-block;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    flex-shrink: 0;
+}
+
+.debug-toggle-on {
+    background: #22c55e;
+    box-shadow: 0 0 4px #22c55e;
+}
+
+.debug-toggle-off {
+    background: #ef4444;
+}
+
 } /* end @layer components */

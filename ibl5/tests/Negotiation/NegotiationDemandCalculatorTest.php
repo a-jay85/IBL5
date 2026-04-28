@@ -922,4 +922,114 @@ class NegotiationDemandCalculatorTest extends TestCase
 
         $this->assertEqualsWithDelta(1.1224, $demands['modifier'], 0.000001);
     }
+
+    // ── calculateDemandsWithBreakdown ──────────────────────────
+
+    public function testBreakdownReturnsAllIntermediateValues(): void
+    {
+        $player = $this->createPlayerWithRatings(50);
+        $this->setupMarketMaximums(100);
+        $teamFactors = $this->getDefaultTeamFactors();
+
+        $breakdown = $this->calculator->calculateDemandsWithBreakdown($player, $teamFactors);
+
+        $this->assertArrayHasKey('ratings', $breakdown);
+        $this->assertArrayHasKey('totalRawScore', $breakdown);
+        $this->assertArrayHasKey('baseline', $breakdown);
+        $this->assertArrayHasKey('adjustedScore', $breakdown);
+        $this->assertArrayHasKey('avgDemands', $breakdown);
+        $this->assertArrayHasKey('totalDemands', $breakdown);
+        $this->assertArrayHasKey('baseDemands', $breakdown);
+        $this->assertArrayHasKey('maxRaise', $breakdown);
+        $this->assertArrayHasKey('faPreferences', $breakdown);
+        $this->assertArrayHasKey('teamFactors', $breakdown);
+        $this->assertArrayHasKey('modifiers', $breakdown);
+        $this->assertArrayHasKey('totalModifier', $breakdown);
+        $this->assertArrayHasKey('demands', $breakdown);
+    }
+
+    public function testBreakdownRatingsMatchPlayerValues(): void
+    {
+        $player = $this->createPlayerWithRatings(75);
+        $this->setupMarketMaximums(100);
+        $teamFactors = $this->getDefaultTeamFactors();
+
+        $breakdown = $this->calculator->calculateDemandsWithBreakdown($player, $teamFactors);
+
+        $this->assertCount(21, $breakdown['ratings']);
+        foreach ($breakdown['ratings'] as $rating) {
+            $this->assertSame(75, $rating['playerValue']);
+            $this->assertSame(100, $rating['marketMax']);
+            $this->assertSame(75, $rating['rawScore']);
+        }
+    }
+
+    public function testBreakdownScorePipelineIsConsistent(): void
+    {
+        $player = $this->createPlayerWithRatings(50);
+        $this->setupMarketMaximums(100);
+        $teamFactors = $this->getDefaultTeamFactors();
+
+        $breakdown = $this->calculator->calculateDemandsWithBreakdown($player, $teamFactors);
+
+        $this->assertSame(700, $breakdown['baseline']);
+        $this->assertSame(
+            $breakdown['totalRawScore'] - $breakdown['baseline'],
+            $breakdown['adjustedScore']
+        );
+        $this->assertEquals(
+            $breakdown['adjustedScore'] * 3,
+            $breakdown['avgDemands']
+        );
+    }
+
+    public function testBreakdownDemandsMatchCalculateDemands(): void
+    {
+        $player = $this->createPlayerWithRatings(80);
+        $this->setupMarketMaximums(100);
+        $teamFactors = $this->getDefaultTeamFactors();
+
+        $demands = $this->calculator->calculateDemands($player, $teamFactors);
+        // Need to re-setup mock data since it's consumed
+        $this->setupMarketMaximums(100);
+        $breakdown = $this->calculator->calculateDemandsWithBreakdown($player, $teamFactors);
+
+        $this->assertEquals($demands['year1'], $breakdown['demands']['year1']);
+        $this->assertEquals($demands['total'], $breakdown['demands']['total']);
+        $this->assertEquals($demands['modifier'], $breakdown['demands']['modifier']);
+    }
+
+    public function testBreakdownModifiersListAllFourComponents(): void
+    {
+        $player = $this->createPlayerWithRatings(50);
+        $this->setupMarketMaximums(100);
+        $teamFactors = $this->getDefaultTeamFactors();
+
+        $breakdown = $this->calculator->calculateDemandsWithBreakdown($player, $teamFactors);
+
+        $this->assertCount(4, $breakdown['modifiers']);
+        $modNames = array_column($breakdown['modifiers'], 'name');
+        $this->assertContains('Play for Winner', $modNames);
+        $this->assertContains('Tradition', $modNames);
+        $this->assertContains('Loyalty', $modNames);
+        $this->assertContains('Playing Time', $modNames);
+    }
+
+    public function testBreakdownFaPreferencesMatchPlayer(): void
+    {
+        $player = $this->createPlayerWithRatings(50);
+        $player->freeAgencyPlayForWinner = 7;
+        $player->freeAgencyTradition = 8;
+        $player->freeAgencyLoyalty = 3;
+        $player->freeAgencyPlayingTime = 5;
+        $this->setupMarketMaximums(100);
+        $teamFactors = $this->getDefaultTeamFactors();
+
+        $breakdown = $this->calculator->calculateDemandsWithBreakdown($player, $teamFactors);
+
+        $this->assertSame(7, $breakdown['faPreferences']['playForWinner']);
+        $this->assertSame(8, $breakdown['faPreferences']['tradition']);
+        $this->assertSame(3, $breakdown['faPreferences']['loyalty']);
+        $this->assertSame(5, $breakdown['faPreferences']['playingTime']);
+    }
 }

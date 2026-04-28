@@ -13,6 +13,9 @@ use Player\Player;
  *
  * @phpstan-import-type TeamFactors from NegotiationDemandCalculatorInterface
  * @phpstan-import-type DemandResult from NegotiationDemandCalculatorInterface
+ * @phpstan-import-type DemandsBreakdown from NegotiationDemandCalculatorInterface
+ * @phpstan-import-type RatingBreakdown from NegotiationDemandCalculatorInterface
+ * @phpstan-import-type ModifierBreakdown from NegotiationDemandCalculatorInterface
  * @phpstan-type RatingMap array{fga: int, fgp: int, fta: int, ftp: int, tga: int, tgp: int, orb: int, drb: int, ast: int, stl: int, tov: int, blk: int, foul: int, oo: int, od: int, do: int, dd: int, po: int, pd: int, to: int, td: int}
  * @phpstan-type MarketMaximums array{fga: int, fgp: int, fta: int, ftp: int, tga: int, tgp: int, orb: int, drb: int, ast: int, stl: int, tov: int, blk: int, foul: int, oo: int, od: int, do: int, dd: int, po: int, pd: int, to: int, td: int}
  * @phpstan-type BaseDemands array{dem1: float, dem2: float, dem3: float, dem4: float, dem5: float, dem6: int}
@@ -65,6 +68,138 @@ class NegotiationDemandCalculator implements NegotiationDemandCalculatorInterfac
         ];
     }
     
+    private const RATING_NAMES = [
+        'fga' => '2G Attempts',
+        'fgp' => '2G Percentage',
+        'fta' => 'FT Attempts',
+        'ftp' => 'FT Percentage',
+        'tga' => '3G Attempts',
+        'tgp' => '3G Percentage',
+        'orb' => 'Off Rebounds',
+        'drb' => 'Def Rebounds',
+        'ast' => 'Assists',
+        'stl' => 'Steals',
+        'tov' => 'Turnovers',
+        'blk' => 'Blocks',
+        'foul' => 'Fouls',
+        'oo' => 'Outside Off',
+        'od' => 'Outside Def',
+        'do' => 'Drive Off',
+        'dd' => 'Drive Def',
+        'po' => 'Post Off',
+        'pd' => 'Post Def',
+        'to' => 'Transition Off',
+        'td' => 'Transition Def',
+    ];
+
+    /**
+     * @see NegotiationDemandCalculatorInterface::calculateDemandsWithBreakdown()
+     *
+     * @param Player $player The player object with ratings and stats
+     * @param TeamFactors $teamFactors Team factors affecting demands
+     * @return DemandsBreakdown Full breakdown of the calculation
+     */
+    public function calculateDemandsWithBreakdown(Player $player, array $teamFactors): array
+    {
+        $playerRatings = $this->getPlayerRatings($player);
+        $marketMaximums = $this->repository->getMarketMaximums();
+
+        /** @var list<RatingBreakdown> $ratingsBreakdown */
+        $ratingsBreakdown = [];
+        $totalRawScore = 0;
+        foreach ($playerRatings as $key => $value) {
+            $max = $marketMaximums[$key] ?? 0;
+            $rawScore = ($max > 0) ? intval(round($value / $max * 100)) : 0;
+            $totalRawScore += $rawScore;
+            $ratingsBreakdown[] = [
+                'name' => self::RATING_NAMES[$key] ?? $key,
+                'playerValue' => $value,
+                'marketMax' => $max,
+                'rawScore' => $rawScore,
+            ];
+        }
+
+        $adjustedScore = $totalRawScore - self::RAW_SCORE_BASELINE;
+        $avgDemands = $adjustedScore * self::DEMANDS_FACTOR;
+        $totalDemands = $avgDemands * 5;
+        $baseDemands = $totalDemands / 6;
+        $maxRaise = floor($baseDemands * \ContractRules::STANDARD_RAISE_PERCENTAGE);
+
+        $pfwPref = $player->freeAgencyPlayForWinner ?? 1;
+        $tradPref = $player->freeAgencyTradition ?? 1;
+        $loyPref = $player->freeAgencyLoyalty ?? 1;
+        $ptPref = $player->freeAgencyPlayingTime ?? 1;
+
+        $pfwFactor = \ContractRules::calculateWinnerModifier(
+            $teamFactors['wins'] ?? 41,
+            $teamFactors['losses'] ?? 41,
+            $pfwPref
+        );
+        $traditionFactor = \ContractRules::calculateTraditionModifier(
+            $teamFactors['tradition_wins'] ?? 41,
+            $teamFactors['tradition_losses'] ?? 41,
+            $tradPref
+        );
+        $loyaltyFactor = \ContractRules::calculateLoyaltyModifier($loyPref);
+        $ptFactor = \ContractRules::calculatePlayingTimeModifier(
+            $teamFactors['money_committed_at_position'] ?? 0,
+            $ptPref
+        );
+
+        /** @var list<ModifierBreakdown> $modifiers */
+        $modifiers = [
+            [
+                'name' => 'Play for Winner',
+                'formula' => 'PFW_FACTOR × (W - L) × (pref - 1)',
+                'inputs' => 'W=' . ($teamFactors['wins'] ?? 41) . ', L=' . ($teamFactors['losses'] ?? 41) . ', pref=' . $pfwPref,
+                'result' => $pfwFactor,
+            ],
+            [
+                'name' => 'Tradition',
+                'formula' => 'TRAD_FACTOR × (tradW - tradL) × (pref - 1)',
+                'inputs' => 'tradW=' . ($teamFactors['tradition_wins'] ?? 41) . ', tradL=' . ($teamFactors['tradition_losses'] ?? 41) . ', pref=' . $tradPref,
+                'result' => $traditionFactor,
+            ],
+            [
+                'name' => 'Loyalty',
+                'formula' => 'sign × LOYALTY_PCT × (pref - 1)',
+                'inputs' => 'pref=' . $loyPref . ', isOwnTeam=true',
+                'result' => $loyaltyFactor,
+            ],
+            [
+                'name' => 'Playing Time',
+                'formula' => '(BASE - MONEY_FACTOR × cap($) / DIV) × (pref - 1)',
+                'inputs' => '$=' . ($teamFactors['money_committed_at_position'] ?? 0) . ', pref=' . $ptPref,
+                'result' => $ptFactor,
+            ],
+        ];
+
+        $totalModifier = 1 + $pfwFactor + $traditionFactor + $loyaltyFactor + $ptFactor;
+
+        $demands = $this->calculateDemands($player, $teamFactors);
+
+        return [
+            'ratings' => $ratingsBreakdown,
+            'totalRawScore' => $totalRawScore,
+            'baseline' => self::RAW_SCORE_BASELINE,
+            'adjustedScore' => $adjustedScore,
+            'avgDemands' => $avgDemands,
+            'totalDemands' => $totalDemands,
+            'baseDemands' => $baseDemands,
+            'maxRaise' => $maxRaise,
+            'faPreferences' => [
+                'playForWinner' => $pfwPref,
+                'tradition' => $tradPref,
+                'loyalty' => $loyPref,
+                'playingTime' => $ptPref,
+            ],
+            'teamFactors' => $teamFactors,
+            'modifiers' => $modifiers,
+            'totalModifier' => $totalModifier,
+            'demands' => $demands,
+        ];
+    }
+
     /**
      * Calculate base contract demands from player ratings
      *

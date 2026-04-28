@@ -97,6 +97,7 @@ while true; do
     if [ "$REMAINING_SECS" -lt 300 ]; then
         REMAINING_SECS=300
     fi
+    LOG_LINE_BEFORE=$(wc -l < "$LOG" 2>/dev/null || echo 0)
     timeout "$REMAINING_SECS" \
         claude -p "$(cat bin/nightly-prompt)" \
             --dangerously-skip-permissions \
@@ -106,6 +107,20 @@ while true; do
             >> "$LOG" 2>&1 || true
 
     echo "--- Plan #$PLANS_RUN finished at $(date) ---" >> "$LOG"
+
+    # Usage-limit exits are transient — don't count them as failures.
+    # Undo the attempt increment and stop the loop so the 11am resume
+    # picks up the remaining queue after the limit resets.
+    if tail -n +"$((LOG_LINE_BEFORE + 1))" "$LOG" | grep -q "hit your limit"; then
+        echo "Usage limit reached — not counting as a failed attempt, stopping loop." >> "$LOG"
+        CURRENT=$(cat "$ATTEMPT_FILE")
+        if [ "$CURRENT" -le 1 ]; then
+            rm -f "$ATTEMPT_FILE"
+        else
+            echo $(( CURRENT - 1 )) > "$ATTEMPT_FILE"
+        fi
+        break
+    fi
 
     # If the plan moved out of queue/ (to done/ or skipped/), clean up its attempt file
     if [ ! -e "$NEXT_PLAN" ]; then

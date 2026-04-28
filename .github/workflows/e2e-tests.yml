@@ -88,8 +88,8 @@ jobs:
         with:
           build-css: 'true'
           with-playwright: 'true'
-          test-user: ${{ secrets.IBL_TEST_USER }}
-          test-pass: ${{ secrets.IBL_TEST_PASS }}
+          test-user: ${{ secrets.IBL_TEST_USER || 'ci-e2e-user' }}
+          test-pass: ${{ secrets.IBL_TEST_PASS || 'ci-e2e-pass-not-secret' }}
 
       # --- Run Tests ---
       # Visual regression runs in its own job — before functional E2E tests which modify
@@ -98,8 +98,8 @@ jobs:
         id: visual-regression
         continue-on-error: ${{ contains(github.event.pull_request.labels.*.name, 'update-baselines') }}
         env:
-          IBL_TEST_USER: ${{ secrets.IBL_TEST_USER }}
-          IBL_TEST_PASS: ${{ secrets.IBL_TEST_PASS }}
+          IBL_TEST_USER: ${{ secrets.IBL_TEST_USER || 'ci-e2e-user' }}
+          IBL_TEST_PASS: ${{ secrets.IBL_TEST_PASS || 'ci-e2e-pass-not-secret' }}
         run: |
           docker run --rm \
             --network ibl5-e2e \
@@ -117,8 +117,8 @@ jobs:
       - name: Regenerate visual regression baselines
         if: steps.visual-regression.outcome == 'failure' && contains(github.event.pull_request.labels.*.name, 'update-baselines')
         env:
-          IBL_TEST_USER: ${{ secrets.IBL_TEST_USER }}
-          IBL_TEST_PASS: ${{ secrets.IBL_TEST_PASS }}
+          IBL_TEST_USER: ${{ secrets.IBL_TEST_USER || 'ci-e2e-user' }}
+          IBL_TEST_PASS: ${{ secrets.IBL_TEST_PASS || 'ci-e2e-pass-not-secret' }}
         run: |
           docker run --rm \
             --network ibl5-e2e \
@@ -272,14 +272,14 @@ jobs:
         with:
           build-css: 'true'
           with-playwright: 'true'
-          test-user: ${{ secrets.IBL_TEST_USER }}
-          test-pass: ${{ secrets.IBL_TEST_PASS }}
+          test-user: ${{ secrets.IBL_TEST_USER || 'ci-e2e-user' }}
+          test-pass: ${{ secrets.IBL_TEST_PASS || 'ci-e2e-pass-not-secret' }}
 
       # --- Run Sharded Tests ---
       - name: Run E2E tests (shard ${{ matrix.shard-index }}/${{ matrix.total-shards }})
         env:
-          IBL_TEST_USER: ${{ secrets.IBL_TEST_USER }}
-          IBL_TEST_PASS: ${{ secrets.IBL_TEST_PASS }}
+          IBL_TEST_USER: ${{ secrets.IBL_TEST_USER || 'ci-e2e-user' }}
+          IBL_TEST_PASS: ${{ secrets.IBL_TEST_PASS || 'ci-e2e-pass-not-secret' }}
         run: |
           docker run --rm \
             --network ibl5-e2e \

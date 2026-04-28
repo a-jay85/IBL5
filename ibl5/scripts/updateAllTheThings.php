@@ -214,6 +214,7 @@ try {
             $boxscoreProcessor, $boxscoreRepo, $boxscoreView, $defaultScoPath,
         ));
         $updaterService->addStep(new Updater\Steps\RefreshPlayoffSeriesResultsStep($mysqli_db));
+        $updaterService->addStep(new Updater\Steps\RefreshTeamSeasonRecordsStep($mysqli_db));
     }
 
     $updaterService->addStep(new Updater\Steps\ParseJsbFilesStep($jsbService, $sourceResolver, $season->endingYear));

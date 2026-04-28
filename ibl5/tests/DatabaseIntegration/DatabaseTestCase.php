@@ -270,6 +270,57 @@ abstract class DatabaseTestCase extends TestCase
     }
 
     /**
+     * Insert a row into ibl_playoff_series_results (materialized table that
+     * backs the vw_playoff_series_results view).
+     */
+    protected function insertPlayoffSeriesResultRow(
+        int $year,
+        int $round,
+        int $winnerTid,
+        int $loserTid,
+        string $winner,
+        string $loser,
+        int $winnerGames,
+        int $loserGames,
+    ): void {
+        $this->insertRow('ibl_playoff_series_results', [
+            'year' => $year,
+            'round' => $round,
+            'winner_tid' => $winnerTid,
+            'loser_tid' => $loserTid,
+            'winner' => $winner,
+            'loser' => $loser,
+            'winner_games' => $winnerGames,
+            'loser_games' => $loserGames,
+            'total_games' => $winnerGames + $loserGames,
+        ]);
+    }
+
+    /**
+     * Insert a row into ibl_team_season_records (materialized per-team
+     * win/loss totals refreshed by RefreshTeamSeasonRecordsStep).
+     */
+    protected function insertTeamSeasonRecordRow(
+        int $teamId,
+        int $year,
+        int $gameType,
+        string $currentname,
+        string $namethatyear,
+        int $wins,
+        int $losses,
+    ): void {
+        $this->insertRow('ibl_team_season_records', [
+            'team_id' => $teamId,
+            'year' => $year,
+            'game_type' => $gameType,
+            'currentname' => $currentname,
+            'namethatyear' => $namethatyear,
+            'wins' => $wins,
+            'losses' => $losses,
+        ]);
+    }
+
+    /**
      * Insert a row into ibl_franchise_seasons.
      * Needed by tests that activate VIEW JOINs through franchise_seasons.
      */

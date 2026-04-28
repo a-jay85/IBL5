@@ -1,6 +1,6 @@
 ---
 description: Rationale for unifying turnover, 3-pointer rating, and team-id column names across the schema (Tier 2 of the sql-column-naming audit), enforced by a new PHPStan rule.
-last_verified: 2026-04-21
+last_verified: 2026-04-28
 ---
 
 # ADR-0009: Unify Cross-Table Column Names
@@ -36,7 +36,7 @@ Migration 114 unifies all three concepts:
 ## Alternatives Considered
 
 - **Box-score PascalCase rename (`gameTOV` → `stats_tvr`, `gameMIN` → `stats_min`, etc.) in the same PR** — deferred to Tier 3. The `game*` family is internally consistent within box-score tables; renaming one breaks the family without a clean replacement.
-- **Pick `r_tga` / `r_tgp` as canonical (rename `ibl_hist`'s `r_3ga`/`r_3gp` to match)** — rejected. Hist is the read-mostly archive layer and is referenced by every analytics query and DuckDB pipeline; the live layer is rewritten more often. Renaming the smaller side has lower risk.
+- **Pick `r_tga` / `r_tgp` as canonical (rename `ibl_hist`'s `r_3ga`/`r_3gp` to match)** — rejected. Hist is the read-mostly archive layer; the live layer is rewritten more often. Renaming the smaller side has lower risk.
 - **Outliers-only team-id rename (only `TeamID` and `team_id`, leave `tid` alone)** — rejected. Maintains the dual-convention pain (`tid` on player-side, `teamid` on team-side) that forces every join to translate.
 - **Include `ibl_hist.year` → `season_year`** — deferred. Already aliased in views; not a backtick problem; not a meaning-flip; out of ADR scope.
 
@@ -47,7 +47,6 @@ Migration 114 unifies all three concepts:
 - Positive: `ibl_power.TeamID` is no longer the schema's only PascalCase PK.
 - Negative: large one-time PHP sweep across ~80–150 production files + ~30–50 test files. Mitigated by `SchemaValidator` hard-failing at boot if any rename regressed and by the PHPStan rule catching missed sites in review.
 - Negative: legacy filter-form API on `PlayerDatabase` keeps `tid` / `stats_to` / `r_tga` as input-side filter keys mapped via `COLUMN_MAP` (same pattern PR 1 used for `to` / `do` / `r_to`). One extra translation layer, documented in the class.
-- Negative: DuckDB analytics schema reads renamed MariaDB columns but keeps old DuckDB OUTPUT aliases unchanged to avoid rippling through pre-built queries (same approach ADR-0008 took).
 
 ## References
 

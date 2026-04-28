@@ -1,6 +1,6 @@
 ---
 description: Rationale for renaming reserved-word rating columns and fixing the r_to meaning-flip across ibl_plr and ibl_hist, enforced by a new PHPStan rule.
-last_verified: 2026-04-21
+last_verified: 2026-04-28
 ---
 
 # ADR-0008: Ban Reserved-Word Rating Columns
@@ -33,10 +33,9 @@ Migration 113 renames the offending columns: `to` → `r_trans_off`, `do` → `r
 
 - Positive: every query against player ratings is now backtick-free; new code cannot re-introduce the backticks without failing `ibl.bannedReservedWordColumn`.
 - Positive: `r_tvr` and `r_trans_off` have single, unambiguous meanings across live, snapshot, archive, and hist layers; the `RefreshIblHistStep` alias-flip is gone.
-- Positive: `bin/db-query`, DuckDB analytics, and ad-hoc reporting can use modern snake_case identifiers on `ibl_sim_dates`.
+- Positive: `bin/db-query` and ad-hoc reporting can use modern snake_case identifiers on `ibl_sim_dates`.
 - Negative: one-time PHP sweep across 28 repositories/services/views plus test fixtures. Mitigated by `SchemaValidator` hard-failing at boot if any rename regressed, and the new `BanReservedWordColumnsRule` catching missed sites in review.
 - Negative: legacy filter-form API on `PlayerDatabase` keeps `do` / `to` / `r_to` as form-field names, mapped via `COLUMN_MAP` — one extra translation layer, documented in the class.
-- Negative: the DuckDB analytics schema (`ibl5/analytics/schema/`) now reads renamed MariaDB columns but keeps old DuckDB output aliases (`AS r_to`, `AS "do"`, etc.) to avoid rippling through pre-built queries; a future PR should rename the DuckDB outputs to match.
 
 ## References
 

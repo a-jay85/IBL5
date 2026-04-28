@@ -87,6 +87,7 @@ function themeheader()
         $username,
         $_SERVER['SERVER_NAME'] ?? null,
         $_COOKIE[\Debug\DebugSession::COOKIE_NAME] ?? null,
+        getenv('E2E_TESTING') === '1',
     );
 
     $navConfig = new \Navigation\NavigationConfig(

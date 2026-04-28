@@ -14,7 +14,7 @@ The DuckDB OLAP layer was built for cross-season statistical analysis when the J
 
 ## Decision
 
-Remove the entire DuckDB analytics surface: the analytics directory, five bin helper scripts (analytics-setup, analytics-build, analytics-export, db-import-boxscores, import-plr-snapshots), two PHP scripts (analyticsWriteback.php, importPlrSnapshotsFromCsv.php), the duckdb-analytics agent rule, and the two write-back MariaDB tables (ibl_analytics_tsi_bands, ibl_analytics_player_peaks) via `ibl5/migrations/125_drop_analytics_tables.sql`.
+Remove the entire DuckDB analytics surface: the analytics directory, five bin helper scripts (analytics-setup, analytics-build, analytics-export, db-import-boxscores, import-plr-snapshots), two PHP scripts (analyticsWriteback.php, importPlrSnapshotsFromCsv.php), the duckdb-analytics agent rule, and the two write-back MariaDB tables (ibl_analytics_tsi_bands, ibl_analytics_player_peaks) via `ibl5/migrations/126_drop_analytics_tables.sql`.
 
 ## Alternatives Considered
 
@@ -28,4 +28,4 @@ Remove the entire DuckDB analytics surface: the analytics directory, five bin he
 
 ## References
 
-- `ibl5/migrations/125_drop_analytics_tables.sql`
+- `ibl5/migrations/126_drop_analytics_tables.sql`

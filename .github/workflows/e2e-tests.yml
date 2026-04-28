@@ -110,7 +110,7 @@ jobs:
             -e "IBL_TEST_USER=$IBL_TEST_USER" \
             -e "IBL_TEST_PASS=$IBL_TEST_PASS" \
             -e "HOME=/tmp" \
-            mcr.microsoft.com/playwright:v1.58.2-jammy \
+            mcr.microsoft.com/playwright:v1.59.1-jammy \
             npx playwright test --config=playwright.visual.config.ts
 
       # --- Auto-update baselines when label is present ---
@@ -129,7 +129,7 @@ jobs:
             -e "IBL_TEST_USER=$IBL_TEST_USER" \
             -e "IBL_TEST_PASS=$IBL_TEST_PASS" \
             -e "HOME=/tmp" \
-            mcr.microsoft.com/playwright:v1.58.2-jammy \
+            mcr.microsoft.com/playwright:v1.59.1-jammy \
             npx playwright test --config=playwright.visual.config.ts --update-snapshots
 
       - name: Commit and push updated baselines
@@ -290,7 +290,7 @@ jobs:
             -e "IBL_TEST_USER=$IBL_TEST_USER" \
             -e "IBL_TEST_PASS=$IBL_TEST_PASS" \
             -e "HOME=/tmp" \
-            mcr.microsoft.com/playwright:v1.58.2-jammy \
+            mcr.microsoft.com/playwright:v1.59.1-jammy \
             npx playwright test \
               --shard=${{ matrix.shard-index }}/${{ matrix.total-shards }} \
               --reporter=blob

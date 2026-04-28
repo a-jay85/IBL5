@@ -73,7 +73,7 @@ runs:
     - name: Pull Playwright image (background)
       if: inputs.with-playwright == 'true'
       shell: bash
-      run: nohup docker pull mcr.microsoft.com/playwright:v1.58.2-jammy > /tmp/playwright-pull.log 2>&1 &
+      run: nohup docker pull mcr.microsoft.com/playwright:v1.59.1-jammy > /tmp/playwright-pull.log 2>&1 &
 
     - name: Create database and apply migrations
       shell: bash
@@ -124,11 +124,11 @@ runs:
       shell: bash
       run: |
         deadline=$((SECONDS + 300))
-        while ! docker image inspect mcr.microsoft.com/playwright:v1.58.2-jammy >/dev/null 2>&1; do
+        while ! docker image inspect mcr.microsoft.com/playwright:v1.59.1-jammy >/dev/null 2>&1; do
           if [ $SECONDS -ge $deadline ]; then
             echo "::warning::Background pull timed out after 5 min — retrying foreground"
             pkill -f "docker pull mcr.microsoft.com/playwright" || true
-            docker pull mcr.microsoft.com/playwright:v1.58.2-jammy
+            docker pull mcr.microsoft.com/playwright:v1.59.1-jammy
             break
           fi
           sleep 2

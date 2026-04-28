@@ -200,7 +200,8 @@ docker exec "$DB_CONTAINER" mariadb -uroot -proot iblhoops_ibl5 -e "
         version VARCHAR(255) PRIMARY KEY,
         applied_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     );
-    INSERT IGNORE INTO schema_migrations (version) SELECT migration FROM migrations;
+    INSERT IGNORE INTO schema_migrations (version)
+        SELECT migration FROM migrations WHERE migration LIKE '%.sql';
 " 2> >(grep -v '\[Warning\].*password' >&2) || true
 
 if [ -n "$WORKTREE_PATH" ] && [ -d "$WORKTREE_PATH/ibl5/migrations" ]; then

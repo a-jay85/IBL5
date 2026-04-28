@@ -28,18 +28,26 @@ fi
 
 DB_CMD="mariadb -u root -proot iblhoops_ibl5"
 
-# Wrapper to suppress MariaDB "password on command line" warning
+# Wrapper to suppress MariaDB "password on command line" warning.
+# Returns the real exit code from docker exec.
 db_exec() {
-    docker exec "$@" 2>&1 | grep -v '\[Warning\].*password' || true
+    local output rc=0
+    output=$(docker exec "$@" 2>&1) || rc=$?
+    [ -n "$output" ] && printf '%s\n' "$output" | grep -v '\[Warning\].*password' || true
+    return $rc
 }
 db_exec_stdin() {
-    docker exec -i "$@" 2>&1 | grep -v '\[Warning\].*password' || true
+    local output rc=0
+    output=$(docker exec -i "$@" 2>&1) || rc=$?
+    [ -n "$output" ] && printf '%s\n' "$output" | grep -v '\[Warning\].*password' || true
+    return $rc
 }
 
 echo "Running migrations..."
 db_exec "$DB_CONTAINER" $DB_CMD \
     -e "CREATE TABLE IF NOT EXISTS schema_migrations (version VARCHAR(255) PRIMARY KEY, applied_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP);"
 
+FAILED=0
 for migration in "$MIGRATIONS_DIR"/*.sql; do
     [ -f "$migration" ] || continue
     BASENAME=$(basename "$migration")
@@ -47,8 +55,17 @@ for migration in "$MIGRATIONS_DIR"/*.sql; do
         -e "SELECT COUNT(*) FROM schema_migrations WHERE version='$BASENAME';")
     if [ "$ALREADY" = "0" ]; then
         echo "  Applying $BASENAME..."
-        db_exec_stdin "$DB_CONTAINER" $DB_CMD < "$migration"
-        db_exec "$DB_CONTAINER" $DB_CMD \
-            -e "INSERT INTO schema_migrations (version) VALUES ('$BASENAME');"
+        if db_exec_stdin "$DB_CONTAINER" $DB_CMD < "$migration"; then
+            db_exec "$DB_CONTAINER" $DB_CMD \
+                -e "INSERT INTO schema_migrations (version) VALUES ('$BASENAME');"
+        else
+            echo "  FAILED: $BASENAME" >&2
+            FAILED=$((FAILED + 1))
+        fi
     fi
 done
+
+if [ "$FAILED" -gt 0 ]; then
+    echo "ERROR: $FAILED migration(s) failed." >&2
+    exit 1
+fi

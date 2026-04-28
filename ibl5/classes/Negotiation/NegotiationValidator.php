@@ -45,6 +45,20 @@ class NegotiationValidator implements NegotiationValidatorInterface
     }
 
     /**
+     * @see NegotiationValidatorInterface::validateRenegotiationEligibility()
+     */
+    public function validateRenegotiationEligibility(Player $player): ValidationResult
+    {
+        $playerData = $this->createPlayerData($player);
+
+        if (!$this->contractValidator->canRenegotiateContract($playerData)) {
+            return ValidationResult::failure('Sorry, this player is not eligible for a contract extension at this time.');
+        }
+
+        return ValidationResult::success();
+    }
+
+    /**
      * @see NegotiationValidatorInterface::validateFreeAgencyNotActive()
      */
     public function validateFreeAgencyNotActive(): ValidationResult

@@ -83,6 +83,12 @@ function themeheader()
         $isDraftOrderFinalized = $draftOrderRepo->isDraftOrderFinalized();
     }
 
+    $debugSession = new \Debug\DebugSession(
+        $username,
+        $_SERVER['SERVER_NAME'] ?? null,
+        $_COOKIE[\Debug\DebugSession::COOKIE_NAME] ?? null,
+    );
+
     $navConfig = new \Navigation\NavigationConfig(
         isLoggedIn: $isLoggedIn,
         username: $username,
@@ -95,6 +101,8 @@ function themeheader()
         serverName: $_SERVER['SERVER_NAME'] ?? null,
         requestUri: $_SERVER['REQUEST_URI'] ?? null,
         isDraftOrderFinalized: $isDraftOrderFinalized,
+        isDebugAdmin: $debugSession->isDebugAdmin(),
+        debugViewAllExtensions: $debugSession->isViewAllExtensionsEnabled(),
     );
 
     $navView = new \Navigation\NavigationView($navConfig);

@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace Navigation;
 
 use Navigation\Contracts\NavigationMenuBuilderInterface;
+use Utilities\CsrfGuard;
+use Utilities\HtmlSanitizer;
 
 /**
  * Builds navigation menu data structures from NavigationConfig.
@@ -29,7 +31,13 @@ class NavigationMenuBuilder implements NavigationMenuBuilderInterface
      */
     public function getMenuStructure(): array
     {
-        return [
+        $menus = [];
+
+        if ($this->config->isDebugAdmin) {
+            $menus['Debug'] = $this->getDebugMenu();
+        }
+
+        $menus += [
             'Season' => [
                 'icon' => '<svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>',
                 'links' => [
@@ -88,6 +96,8 @@ class NavigationMenuBuilder implements NavigationMenuBuilderInterface
                 ], static fn (mixed $item): bool => $item !== null)),
             ],
         ];
+
+        return $menus;
     }
 
     /**
@@ -192,6 +202,33 @@ class NavigationMenuBuilder implements NavigationMenuBuilderInterface
         return [
             'icon' => '<img src="/ibl5/images/logo/new' . $teamId . '.png" alt="Team Logo" class="w-6 h-6 object-contain">',
             'links' => $links,
+        ];
+    }
+
+    /**
+     * @return NavMenuData
+     */
+    private function getDebugMenu(): array
+    {
+        $isOn = $this->config->debugViewAllExtensions;
+        $statusLabel = $isOn ? 'ON' : 'OFF';
+        $dotClass = $isOn ? 'debug-toggle-on' : 'debug-toggle-off';
+        $redirect = HtmlSanitizer::e($this->config->requestUri ?? '/');
+        $csrfToken = CsrfGuard::generateToken('debug_toggle');
+
+        $formHtml = '<form method="post" action="modules.php?name=DebugMenu&amp;op=toggle_extensions" class="debug-toggle-form">'
+            . $csrfToken
+            . '<input type="hidden" name="redirect" value="' . $redirect . '">'
+            . '<button type="submit" class="debug-toggle-btn">'
+            . '<span class="' . $dotClass . '"></span> View All Extensions: ' . $statusLabel
+            . '</button>'
+            . '</form>';
+
+        return [
+            'icon' => '<svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M8 2l1.88 1.88M14.12 3.88L16 2M9 7.13v-1a3.003 3.003 0 116 0v1M12 20c-3.3 0-6-2.7-6-6v-3a6 6 0 0112 0v3c0 3.3-2.7 6-6 6zM4.26 10.54l-2.12-.71M19.74 10.54l2.12-.71M4.26 16.46l-2.12.71M19.74 16.46l2.12.71M12 20v2"/></svg>',
+            'links' => [
+                ['rawHtml' => $formHtml],
+            ],
         ];
     }
 }

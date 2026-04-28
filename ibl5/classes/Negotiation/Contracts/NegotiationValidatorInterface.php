@@ -30,4 +30,11 @@ interface NegotiationValidatorInterface
      * Contract extensions are not allowed during the free agency period.
      */
     public function validateFreeAgencyNotActive(): \Services\ValidationResult;
+
+    /**
+     * Validate renegotiation eligibility without ownership check.
+     *
+     * Used by admin debug bypass to inspect any player's demands.
+     */
+    public function validateRenegotiationEligibility(Player $player): \Services\ValidationResult;
 }

@@ -204,6 +204,37 @@ class NegotiationValidatorTest extends TestCase
         $this->assertTrue($result->isValid());
     }
 
+    // ── validateRenegotiationEligibility (no ownership check) ────────────────
+
+    /**
+     * @group validation
+     */
+    public function testRenegotiationEligibilitySkipsOwnershipCheck(): void
+    {
+        $player = $this->createMockPlayer('Test Player', 'Seattle Supersonics');
+        $player->contractCurrentYear = 5;
+        $player->contractYear6Salary = 0;
+
+        $result = $this->validator->validateRenegotiationEligibility($player);
+
+        $this->assertTrue($result->isValid());
+    }
+
+    /**
+     * @group validation
+     */
+    public function testRenegotiationEligibilityRejectsIneligibleContract(): void
+    {
+        $player = $this->createMockPlayer('Test Player', 'Seattle Supersonics');
+        $player->contractCurrentYear = 2;
+        $player->contractYear3Salary = 1000;
+
+        $result = $this->validator->validateRenegotiationEligibility($player);
+
+        $this->assertFalse($result->isValid());
+        $this->assertStringContainsString('not eligible', $result->getError() ?? '');
+    }
+
     // ── Null-field edge cases (mutation hardening) ────────────────
 
     public function testValidatesPlayerWithNullContractSalaryFields(): void

@@ -48,5 +48,5 @@ interface NegotiationProcessorInterface
      * - Starts from HARD_CAP_MAX
      * - Subtracts next year's salary for all non-retired players
      */
-    public function processNegotiation(int $playerID, string $userTeamName, string $prefix): string;
+    public function processNegotiation(int $playerID, string $userTeamName, string $prefix, bool $bypassOwnership = false): string;
 }

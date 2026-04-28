@@ -62,9 +62,15 @@ function negotiate($playerID)
     $commonRepository = new CommonMysqliRepository($mysqli_db);
     $userTeamName = $commonRepository->getTeamnameFromUsername(strval($cookie[1] ?? ''));
 
-    // Use NegotiationProcessor to handle all business logic
+    $debugSession = new \Debug\DebugSession(
+        strval($cookie[1] ?? ''),
+        $_SERVER['SERVER_NAME'] ?? null,
+        $_COOKIE[\Debug\DebugSession::COOKIE_NAME] ?? null,
+    );
+    $bypassOwnership = $debugSession->isViewAllExtensionsEnabled();
+
     $processor = new NegotiationProcessor($mysqli_db);
-    echo $processor->processNegotiation($playerID, $userTeamName, $prefix);
+    echo $processor->processNegotiation($playerID, $userTeamName, $prefix, $bypassOwnership);
 
     PageLayout\PageLayout::footer();
 }

@@ -287,8 +287,8 @@ class TeamService implements TeamServiceInterface
      */
     private function preparePlayoffData(Team $team): array
     {
-        $playoffResults = $this->repository->getPlayoffResults();
         $teamName = $team->name;
+        $playoffResults = $this->repository->getPlayoffResults($teamName);
 
         $totalGameWins = 0;
         $totalGameLosses = 0;
@@ -312,10 +312,6 @@ class TeamService implements TeamServiceInterface
 
             $isWin = ($winner === $teamName);
             $isLoss = ($loser === $teamName);
-
-            if (!$isWin && !$isLoss) {
-                continue;
-            }
 
             $year = \Utilities\HtmlSanitizer::safeHtmlOutput((string) $playoff['year']);
             $winnerSafe = \Utilities\HtmlSanitizer::safeHtmlOutput($playoff['winner_name_that_year']);

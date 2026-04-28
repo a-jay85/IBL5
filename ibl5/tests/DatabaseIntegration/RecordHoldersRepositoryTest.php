@@ -446,11 +446,9 @@ class RecordHoldersRepositoryTest extends DatabaseTestCase
 
     public function testGetMostPlayoffAppearancesReturnsRows(): void
     {
-        // Insert playoff boxscores (month=6 → game_type=2)
-        for ($day = 1; $day <= 4; $day++) {
-            $date = sprintf('2098-06-%02d', $day);
-            $this->insertGamePair($date, 113, 73);
-        }
+        // vw_playoff_series_results is a thin pass-through over the
+        // materialized ibl_playoff_series_results table — insert directly.
+        $this->insertPlayoffSeriesResultRow(9098, 1, 1, 2, 'Metros', 'Sharks', 4, 1);
 
         $result = $this->repo->getMostPlayoffAppearances();
 

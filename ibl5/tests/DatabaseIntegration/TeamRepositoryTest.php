@@ -149,13 +149,10 @@ class TeamRepositoryTest extends DatabaseTestCase
         self::assertTrue($found, 'Inserted GM tenure not found');
     }
 
-    public function testGetRegularSeasonHistoryDependsOnBoxscoreView(): void
+    public function testGetRegularSeasonHistoryReadsFromMaterializedTable(): void
     {
-        // ibl_team_win_loss is a VIEW derived from ibl_box_scores_teams.
-        // Insert a regular season boxscore (month 01 = game_type 1)
-        $this->insertTeamBoxscoreRow('2098-01-15', 'TestHistTeam', 1, 2, 1);
-
-        // The view joins with ibl_team_info, so get team_name for teamid=1
+        // ibl_team_season_records is the materialized table refreshed by
+        // RefreshTeamSeasonRecordsStep. Insert directly to verify the lookup.
         $stmt = $this->db->prepare("SELECT team_name FROM ibl_team_info WHERE teamid = 1");
         self::assertNotFalse($stmt);
         $stmt->execute();
@@ -165,12 +162,22 @@ class TeamRepositoryTest extends DatabaseTestCase
 
         /** @var string $teamName */
         $teamName = $row['team_name'];
+
+        $this->insertTeamSeasonRecordRow(1, 9098, 1, $teamName, $teamName, 50, 32);
+
         $history = $this->repo->getRegularSeasonHistory($teamName);
 
         self::assertNotEmpty($history);
-        self::assertArrayHasKey('year', $history[0]);
-        self::assertArrayHasKey('wins', $history[0]);
-        self::assertArrayHasKey('losses', $history[0]);
+        $found = null;
+        foreach ($history as $r) {
+            if ($r['year'] === 9098) {
+                $found = $r;
+                break;
+            }
+        }
+        self::assertNotNull($found, 'Expected 9098 row in history');
+        self::assertSame(50, $found['wins']);
+        self::assertSame(32, $found['losses']);
     }
 
     public function testGetRosterUnderContractReturnsContractedPlayers(): void
@@ -340,76 +347,63 @@ class TeamRepositoryTest extends DatabaseTestCase
 
     public function testGetHEATHistoryReturnsArrayWithExpectedShape(): void
     {
-        // ibl_heat_win_loss is a VIEW derived from game_type=3 boxscores.
-        // CI seed may have no HEAT game data — test shape contract only.
+        // ibl_team_season_records (game_type=3) is the materialized HEAT table.
+        $this->insertTeamSeasonRecordRow(1, 9098, 3, 'Metros', 'Metros', 4, 2);
+
         $result = $this->repo->getHEATHistory('Metros');
 
-        self::assertIsArray($result);
-        if ($result !== []) {
-            self::assertArrayHasKey('year', $result[0]);
-            self::assertArrayHasKey('currentname', $result[0]);
-            self::assertArrayHasKey('namethatyear', $result[0]);
-            self::assertArrayHasKey('wins', $result[0]);
-            self::assertArrayHasKey('losses', $result[0]);
+        self::assertNotEmpty($result);
+        $found = null;
+        foreach ($result as $r) {
+            if ($r['year'] === 9098) {
+                $found = $r;
+                break;
+            }
         }
+        self::assertNotNull($found, 'Expected 9098 HEAT row');
+        self::assertSame(4, $found['wins']);
+        self::assertSame(2, $found['losses']);
     }
 
     // ── getPlayoffResults ───────────────────────────────────────
 
     public function testGetPlayoffResultsReturnsPlayoffSeriesData(): void
     {
-        // Insert 4 playoff boxscores (June = game_type=2 auto-generated).
-        // Team 1 (visitor) wins 3 games, Team 2 (home) wins 1 game.
-        // Total score = sum of all 4 quarters. Visitor wins when v_total > h_total.
-        $games = [
-            ['vTotal' => 100, 'hTotal' => 90],  // visitor (teamid=1) wins
-            ['vTotal' => 85,  'hTotal' => 95],   // home (teamid=2) wins
-            ['vTotal' => 98,  'hTotal' => 88],   // visitor wins
-            ['vTotal' => 97,  'hTotal' => 92],   // visitor wins
-        ];
+        // Insert directly into the materialized table (vw_playoff_series_results
+        // is now a thin pass-through; RefreshPlayoffSeriesResultsStep populates
+        // the table on every pipeline run).
+        $this->insertPlayoffSeriesResultRow(9099, 1, 1, 2, 'Metros', 'Sharks', 3, 1);
+        $this->insertFranchiseSeasonRow(1, 9099, 'Metros');
+        $this->insertFranchiseSeasonRow(2, 9099, 'Sharks');
 
-        foreach ($games as $i => $g) {
-            $date = sprintf('2099-06-%02d', $i + 1);
-            $this->insertRow('ibl_box_scores_teams', [
-                'game_date' => $date,
-                'name' => $i % 2 === 0 ? 'Metros' : 'Sharks',
-                'game_of_that_day' => 1,
-                'visitor_teamid' => 1,
-                'home_teamid' => 2,
-                'attendance' => 15000, 'capacity' => 18000,
-                'visitor_wins' => 0, 'visitor_losses' => 0,
-                'home_wins' => 0, 'home_losses' => 0,
-                'visitor_q1_points' => (int) ($g['vTotal'] / 4),
-                'visitor_q2_points' => (int) ($g['vTotal'] / 4),
-                'visitor_q3_points' => (int) ($g['vTotal'] / 4),
-                'visitor_q4_points' => $g['vTotal'] - 3 * (int) ($g['vTotal'] / 4),
-                'visitor_ot_points' => 0,
-                'home_q1_points' => (int) ($g['hTotal'] / 4),
-                'home_q2_points' => (int) ($g['hTotal'] / 4),
-                'home_q3_points' => (int) ($g['hTotal'] / 4),
-                'home_q4_points' => $g['hTotal'] - 3 * (int) ($g['hTotal'] / 4),
-                'home_ot_points' => 0,
-                'game_2gm' => 30, 'game_2ga' => 60, 'game_ftm' => 15, 'game_fta' => 20,
-                'game_3gm' => 8, 'game_3ga' => 22, 'game_orb' => 10, 'game_drb' => 30,
-                'game_ast' => 20, 'game_stl' => 8, 'game_tov' => 12, 'game_blk' => 5, 'game_pf' => 18,
-            ]);
-        }
+        $result = $this->repo->getPlayoffResults('Metros');
 
-        $this->insertFranchiseSeasonRow(1, 2099, 'Metros');
-        $this->insertFranchiseSeasonRow(2, 2099, 'Sharks');
-
-        $result = $this->repo->getPlayoffResults();
-
-        // Find our 2099 series
-        $series2099 = array_filter(
+        $series = array_values(array_filter(
             $result,
-            static fn (array $r): bool => $r['year'] === 2099,
-        );
+            static fn (array $r): bool => $r['year'] === 9099,
+        ));
 
-        self::assertNotEmpty($series2099);
-        $series = array_values($series2099)[0];
-        self::assertSame(3, $series['winner_games']);
-        self::assertSame(1, $series['loser_games']);
+        self::assertNotEmpty($series);
+        self::assertSame(3, $series[0]['winner_games']);
+        self::assertSame(1, $series[0]['loser_games']);
+        self::assertSame('Metros', $series[0]['winner']);
+    }
+
+    public function testGetPlayoffResultsFiltersByTeamName(): void
+    {
+        // Insert two series in a far-future year — one involving Metros, one not.
+        $this->insertPlayoffSeriesResultRow(9099, 1, 1, 2, 'Metros', 'Sharks', 3, 1);
+        $this->insertPlayoffSeriesResultRow(9099, 1, 3, 4, 'Lakers', 'Celtics', 3, 0);
+
+        $result = $this->repo->getPlayoffResults('Metros');
+
+        $series = array_values(array_filter(
+            $result,
+            static fn (array $r): bool => $r['year'] === 9099,
+        ));
+
+        self::assertCount(1, $series);
+        self::assertSame('Metros', $series[0]['winner']);
     }
 
     // ── getFreeAgencyRoster ────────────────────────────────────

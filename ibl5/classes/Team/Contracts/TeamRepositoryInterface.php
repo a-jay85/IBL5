@@ -110,11 +110,12 @@ interface TeamRepositoryInterface
     public function getHEATHistory(string $teamName): array;
 
     /**
-     * Get playoff results for all teams
+     * Get playoff series results in which the named team participated.
      *
+     * @param string $teamName Team name (matched against winner or loser)
      * @return list<PlayoffResultRow> Rows ordered by year DESC
      */
-    public function getPlayoffResults(): array;
+    public function getPlayoffResults(string $teamName): array;
 
     /**
      * Get free agency roster for a team (expiring contracts only)

@@ -54,84 +54,11 @@ class SeasonArchiveRepositoryTest extends DatabaseTestCase
 
     public function testGetPlayoffResultsByYearReturnsRows(): void
     {
-        // Insert playoff games (month=6 → game_type=2) to populate vw_playoff_series_results
-        for ($day = 1; $day <= 4; $day++) {
-            $date = sprintf('2098-06-%02d', $day);
-            $this->insertRow('ibl_box_scores_teams', [
-                'game_date' => $date,
-                'name' => 'Metros',
-                'game_of_that_day' => 1,
-                'visitor_teamid' => 2,
-                'home_teamid' => 1,
-                'attendance' => 15000,
-                'capacity' => 15000,
-                'visitor_wins' => 0,
-                'visitor_losses' => $day - 1,
-                'home_wins' => $day - 1,
-                'home_losses' => 0,
-                'visitor_q1_points' => 20,
-                'visitor_q2_points' => 18,
-                'visitor_q3_points' => 15,
-                'visitor_q4_points' => 20,
-                'visitor_ot_points' => 0,
-                'home_q1_points' => 30,
-                'home_q2_points' => 28,
-                'home_q3_points' => 25,
-                'home_q4_points' => 30,
-                'home_ot_points' => 0,
-                'game_2gm' => 30,
-                'game_2ga' => 60,
-                'game_ftm' => 15,
-                'game_fta' => 20,
-                'game_3gm' => 8,
-                'game_3ga' => 22,
-                'game_orb' => 10,
-                'game_drb' => 30,
-                'game_ast' => 20,
-                'game_stl' => 8,
-                'game_tov' => 12,
-                'game_blk' => 5,
-                'game_pf' => 18,
-            ]);
-            $this->insertRow('ibl_box_scores_teams', [
-                'game_date' => $date,
-                'name' => 'Sharks',
-                'game_of_that_day' => 1,
-                'visitor_teamid' => 2,
-                'home_teamid' => 1,
-                'attendance' => 15000,
-                'capacity' => 15000,
-                'visitor_wins' => 0,
-                'visitor_losses' => $day - 1,
-                'home_wins' => $day - 1,
-                'home_losses' => 0,
-                'visitor_q1_points' => 20,
-                'visitor_q2_points' => 18,
-                'visitor_q3_points' => 15,
-                'visitor_q4_points' => 20,
-                'visitor_ot_points' => 0,
-                'home_q1_points' => 30,
-                'home_q2_points' => 28,
-                'home_q3_points' => 25,
-                'home_q4_points' => 30,
-                'home_ot_points' => 0,
-                'game_2gm' => 30,
-                'game_2ga' => 60,
-                'game_ftm' => 15,
-                'game_fta' => 20,
-                'game_3gm' => 8,
-                'game_3ga' => 22,
-                'game_orb' => 10,
-                'game_drb' => 30,
-                'game_ast' => 20,
-                'game_stl' => 8,
-                'game_tov' => 12,
-                'game_blk' => 5,
-                'game_pf' => 18,
-            ]);
-        }
+        // vw_playoff_series_results is a thin pass-through over the
+        // materialized ibl_playoff_series_results table — insert directly.
+        $this->insertPlayoffSeriesResultRow(9098, 1, 1, 2, 'Metros', 'Sharks', 4, 0);
 
-        $result = $this->repo->getPlayoffResultsByYear(2098);
+        $result = $this->repo->getPlayoffResultsByYear(9098);
 
         self::assertNotEmpty($result);
         $first = $result[0];

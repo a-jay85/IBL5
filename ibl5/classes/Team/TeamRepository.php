@@ -183,10 +183,11 @@ class TeamRepository extends \BaseMysqliRepository implements TeamRepositoryInte
     {
         /** @var list<WinLossRow> */
         return $this->fetchAll(
-            self::buildWinLossQuery(1),
-            "sss",
-            $teamName,
-            $teamName,
+            "SELECT `year`, currentname, namethatyear, wins, losses
+             FROM ibl_team_season_records
+             WHERE currentname = ? AND game_type = 1
+             ORDER BY `year` DESC",
+            "s",
             $teamName
         );
     }
@@ -199,118 +200,13 @@ class TeamRepository extends \BaseMysqliRepository implements TeamRepositoryInte
     {
         /** @var list<HEATWinLossRow> */
         return $this->fetchAll(
-            self::buildHeatWinLossQuery(),
-            "sss",
-            $teamName,
-            $teamName,
+            "SELECT `year`, currentname, namethatyear, wins, losses
+             FROM ibl_team_season_records
+             WHERE currentname = ? AND game_type = 3
+             ORDER BY `year` DESC",
+            "s",
             $teamName
         );
-    }
-
-    /**
-     * Build inlined regular-season win/loss query with team filter pushed into CTE.
-     *
-     * Replaces SELECT from ibl_team_win_loss view which materializes ALL games
-     * before filtering by team.
-     */
-    private static function buildWinLossQuery(int $gameType): string
-    {
-        return "WITH unique_games AS (
-            SELECT game_date, visitor_teamid, home_teamid, game_of_that_day,
-                (visitor_q1_points + visitor_q2_points + visitor_q3_points + visitor_q4_points
-                 + COALESCE(visitor_ot_points, 0)) AS visitor_total,
-                (home_q1_points + home_q2_points + home_q3_points + home_q4_points
-                 + COALESCE(home_ot_points, 0)) AS home_total
-            FROM ibl_box_scores_teams
-            WHERE game_type = {$gameType}
-                AND (visitor_teamid = (SELECT teamid FROM ibl_team_info WHERE team_name = ?)
-                     OR home_teamid = (SELECT teamid FROM ibl_team_info WHERE team_name = ?))
-            GROUP BY game_date, visitor_teamid, home_teamid, game_of_that_day
-        ),
-        team_games AS (
-            SELECT visitor_teamid AS team_id, game_date,
-                   IF(visitor_total > home_total, 1, 0) AS win,
-                   IF(visitor_total < home_total, 1, 0) AS loss
-            FROM unique_games
-            UNION ALL
-            SELECT home_teamid AS team_id, game_date,
-                   IF(home_total > visitor_total, 1, 0) AS win,
-                   IF(home_total < visitor_total, 1, 0) AS loss
-            FROM unique_games
-        )
-        SELECT
-            CASE WHEN MONTH(tg.game_date) >= 10 THEN YEAR(tg.game_date) + 1
-                 ELSE YEAR(tg.game_date) END AS year,
-            ti.team_name AS currentname,
-            COALESCE(fs.team_name, ti.team_name) AS namethatyear,
-            CAST(SUM(tg.win)  AS UNSIGNED) AS wins,
-            CAST(SUM(tg.loss) AS UNSIGNED) AS losses
-        FROM team_games tg
-        JOIN ibl_team_info ti ON ti.teamid = tg.team_id
-        LEFT JOIN ibl_franchise_seasons fs
-            ON fs.franchise_id = tg.team_id
-            AND fs.season_ending_year = (
-                CASE WHEN MONTH(tg.game_date) >= 10 THEN YEAR(tg.game_date) + 1
-                     ELSE YEAR(tg.game_date) END
-            )
-        WHERE tg.team_id = (SELECT teamid FROM ibl_team_info WHERE team_name = ?)
-        GROUP BY
-            tg.team_id,
-            CASE WHEN MONTH(tg.game_date) >= 10 THEN YEAR(tg.game_date) + 1 ELSE YEAR(tg.game_date) END,
-            ti.team_name,
-            COALESCE(fs.team_name, ti.team_name)
-        ORDER BY year DESC";
-    }
-
-    /**
-     * Build inlined HEAT win/loss query with team filter pushed into CTE.
-     *
-     * Replaces SELECT from ibl_heat_win_loss view.
-     */
-    private static function buildHeatWinLossQuery(): string
-    {
-        return "WITH unique_games AS (
-            SELECT game_date, visitor_teamid, home_teamid, game_of_that_day,
-                (visitor_q1_points + visitor_q2_points + visitor_q3_points + visitor_q4_points
-                 + COALESCE(visitor_ot_points, 0)) AS visitor_total,
-                (home_q1_points + home_q2_points + home_q3_points + home_q4_points
-                 + COALESCE(home_ot_points, 0)) AS home_total
-            FROM ibl_box_scores_teams
-            WHERE game_type = 3
-                AND YEAR(game_date) < 9000
-                AND (visitor_teamid = (SELECT teamid FROM ibl_team_info WHERE team_name = ?)
-                     OR home_teamid = (SELECT teamid FROM ibl_team_info WHERE team_name = ?))
-            GROUP BY game_date, visitor_teamid, home_teamid, game_of_that_day
-        ),
-        team_games AS (
-            SELECT visitor_teamid AS team_id, game_date,
-                   IF(visitor_total > home_total, 1, 0) AS win,
-                   IF(visitor_total < home_total, 1, 0) AS loss
-            FROM unique_games
-            UNION ALL
-            SELECT home_teamid AS team_id, game_date,
-                   IF(home_total > visitor_total, 1, 0) AS win,
-                   IF(home_total < visitor_total, 1, 0) AS loss
-            FROM unique_games
-        )
-        SELECT
-            YEAR(tg.game_date) AS year,
-            ti.team_name AS currentname,
-            COALESCE(fs.team_name, ti.team_name) AS namethatyear,
-            CAST(SUM(tg.win)  AS UNSIGNED) AS wins,
-            CAST(SUM(tg.loss) AS UNSIGNED) AS losses
-        FROM team_games tg
-        JOIN ibl_team_info ti ON ti.teamid = tg.team_id
-        LEFT JOIN ibl_franchise_seasons fs
-            ON fs.franchise_id = tg.team_id
-            AND fs.season_ending_year = (YEAR(tg.game_date) + 1)
-        WHERE tg.team_id = (SELECT teamid FROM ibl_team_info WHERE team_name = ?)
-        GROUP BY
-            tg.team_id,
-            YEAR(tg.game_date),
-            ti.team_name,
-            COALESCE(fs.team_name, ti.team_name)
-        ORDER BY year DESC";
     }
 
     /**
@@ -393,17 +289,21 @@ class TeamRepository extends \BaseMysqliRepository implements TeamRepositoryInte
      * @see TeamRepositoryInterface::getPlayoffResults()
      * @return list<PlayoffResultRow>
      */
-    public function getPlayoffResults(): array
+    public function getPlayoffResults(string $teamName): array
     {
         /** @var list<PlayoffResultRow> */
         return $this->fetchAll(
-            "SELECT pr.year, pr.round, pr.winner, pr.loser, pr.winner_games, pr.loser_games,
+            "SELECT pr.`year`, pr.`round`, pr.winner, pr.loser, pr.winner_games, pr.loser_games,
                     COALESCE(wfs.team_name, pr.winner) AS winner_name_that_year,
                     COALESCE(lfs.team_name, pr.loser) AS loser_name_that_year
-             FROM vw_playoff_series_results pr
-             LEFT JOIN ibl_franchise_seasons wfs ON wfs.franchise_id = pr.winner_tid AND wfs.season_ending_year = pr.year
-             LEFT JOIN ibl_franchise_seasons lfs ON lfs.franchise_id = pr.loser_tid AND lfs.season_ending_year = pr.year
-             ORDER BY pr.year DESC"
+             FROM ibl_playoff_series_results pr
+             LEFT JOIN ibl_franchise_seasons wfs ON wfs.franchise_id = pr.winner_tid AND wfs.season_ending_year = pr.`year`
+             LEFT JOIN ibl_franchise_seasons lfs ON lfs.franchise_id = pr.loser_tid AND lfs.season_ending_year = pr.`year`
+             WHERE pr.winner = ? OR pr.loser = ?
+             ORDER BY pr.`year` DESC",
+            "ss",
+            $teamName,
+            $teamName
         );
     }
 

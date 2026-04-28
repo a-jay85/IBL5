@@ -25,6 +25,10 @@ class SeasonHighsRepositoryTest extends DatabaseTestCase
             minutes: 35, points2m: 10, points2a: 18, ftm: 6, fta: 7, points3m: 4, points3a: 8,
         );
 
+        // Companion team boxscore row matches the (date, visitor, home) composite key
+        // so game_of_that_day round-trips before AND after the bst subquery removal.
+        $this->insertTeamBoxscoreRow('2098-01-15', 'Metros', 1, 2, 1);
+
         $result = $this->repo->getSeasonHighs(
             'bs.calc_points',
             'Points',
@@ -39,9 +43,11 @@ class SeasonHighsRepositoryTest extends DatabaseTestCase
         self::assertArrayHasKey('date', $first);
         self::assertArrayHasKey('value', $first);
         self::assertArrayHasKey('pid', $first);
+        self::assertArrayHasKey('gameOfThatDay', $first);
         self::assertSame('SeasonHighs Test', $first['name']);
         // calc_points = 10*2 + 6 + 4*3 = 38
         self::assertSame(38, $first['value']);
+        self::assertSame(1, $first['gameOfThatDay']);
     }
 
     public function testGetSeasonHighsTeamReturnsRows(): void

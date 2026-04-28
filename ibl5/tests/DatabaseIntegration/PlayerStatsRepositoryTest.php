@@ -88,6 +88,8 @@ class PlayerStatsRepositoryTest extends DatabaseTestCase
         $first = $result[0];
         self::assertSame($pid, $first['pid']);
         self::assertArrayHasKey('game_of_that_day', $first);
+        // COALESCE in MariaDB may return string; consumer casts via (int).
+        self::assertEquals(1, $first['game_of_that_day']);
         self::assertArrayHasKey('box_id', $first);
     }
 
@@ -161,17 +163,15 @@ class PlayerStatsRepositoryTest extends DatabaseTestCase
         $pid = 200000075;
         $this->insertTestPlayer($pid, 'DB Szn Avg');
 
-        // Regular season boxscore (Jan = game_type 1)
-        $this->insertPlayerBoxscoreRow(
-            '2098-01-20', $pid, 'DB Szn Avg', 'PG', 2, 1, 1,
-            minutes: 35, points2m: 7, ftm: 5, points3m: 3
-        );
+        // ibl_hist is the materialized per-season totals table — refreshed every sim
+        // from ibl_plr_snapshots and the primary source for regular-season career averages.
+        $this->insertHistRow($pid, 'DB Szn Avg', 2098);
 
         $result = $this->repo->getSeasonCareerAverages('DB Szn Avg');
 
         self::assertNotNull($result);
         self::assertSame($pid, $result['pid']);
-        self::assertSame(1, $result['games']);
+        self::assertSame(50, $result['games']); // insertHistRow default
     }
 
     public function testGetSeasonCareerAveragesByIdMatchesByName(): void
@@ -179,9 +179,7 @@ class PlayerStatsRepositoryTest extends DatabaseTestCase
         $pid = 200000076;
         $this->insertTestPlayer($pid, 'DB Match');
 
-        $this->insertPlayerBoxscoreRow(
-            '2098-02-10', $pid, 'DB Match', 'SG', 2, 1, 1
-        );
+        $this->insertHistRow($pid, 'DB Match', 2098);
 
         $byName = $this->repo->getSeasonCareerAverages('DB Match');
         $byId = $this->repo->getSeasonCareerAveragesById($pid);
@@ -190,6 +188,21 @@ class PlayerStatsRepositoryTest extends DatabaseTestCase
         self::assertNotNull($byId);
         self::assertSame($byName['pid'], $byId['pid']);
         self::assertSame($byName['games'], $byId['games']);
+    }
+
+    public function testGetSeasonCareerAveragesUsesHistDirectly(): void
+    {
+        // Player with ONLY ibl_hist rows (no box_scores) — career averages still returned
+        $pid = 200000079;
+        $this->insertTestPlayer($pid, 'DB Hist Direct');
+        $this->insertHistRow($pid, 'DB Hist Direct', 2097, ['games' => 40, 'pts' => 600]);
+        $this->insertHistRow($pid, 'DB Hist Direct', 2098, ['games' => 50, 'pts' => 750]);
+
+        $result = $this->repo->getSeasonCareerAverages('DB Hist Direct');
+
+        self::assertNotNull($result);
+        self::assertSame($pid, $result['pid']);
+        self::assertSame(90, $result['games']); // 40 + 50
     }
 
     // ── getSimDates ─────────────────────────────────────────────

@@ -72,17 +72,12 @@ class SeasonHighsRepository extends \BaseMysqliRepository implements SeasonHighs
             $query = "SELECT p.`pid`, p.`name`, p.`teamid`, t.`team_name` AS `teamname`,
                 t.`team_city`, t.`color1`, t.`color2`,
                 bs.`game_date` AS `date`, sch.`box_id`,
-                COALESCE(bst.game_of_that_day, 0) AS game_of_that_day,
+                COALESCE(bs.`game_of_that_day`, 0) AS game_of_that_day,
                 {$statExpression} AS `{$safeStatName}`
                 FROM {$this->boxScoresTable} bs
                 JOIN {$this->playerTable} p ON bs.pid = p.pid
                 LEFT JOIN {$this->teamInfoTable} t ON p.teamid = t.teamid
                 LEFT JOIN {$this->scheduleTable} sch ON sch.game_date = bs.game_date AND sch.visitor_teamid = bs.visitor_teamid AND sch.home_teamid = bs.home_teamid
-                LEFT JOIN (
-                    SELECT game_date, visitor_teamid, home_teamid, MIN(game_of_that_day) AS game_of_that_day
-                    FROM {$this->boxScoresTeamsTable}
-                    GROUP BY game_date, visitor_teamid, home_teamid
-                ) bst ON bst.game_date = bs.game_date AND bst.visitor_teamid = bs.visitor_teamid AND bst.home_teamid = bs.home_teamid
                 WHERE bs.`game_date` BETWEEN ? AND ?{$locationCondition}
                 ORDER BY `{$safeStatName}` DESC, bs.`game_date` ASC
                 LIMIT {$limit}";

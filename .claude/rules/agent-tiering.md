@@ -1,6 +1,6 @@
 ---
 description: Sub-agent decision rules — when to spawn, when to skip, and which model to pick
-last_verified: 2026-04-25
+last_verified: 2026-04-28
 ---
 
 # Agent Tiering
@@ -24,9 +24,11 @@ Every sub-agent pays a fixed context overhead: system prompt, CLAUDE.md, rules, 
 - The output won't persist in context across many subsequent turns
 
 **Still spawn an agent when ANY of these are true:**
-- Output is verbose (test suites, PHPStan, large grep results) — the agent absorbs it and returns a summary, keeping Opus's context clean
-- Multiple independent tasks can run concurrently — parallelism saves wall-clock time
+- Output is unpredictably verbose (large grep results, failing test suites with stack traces) — the agent absorbs it and returns a summary, keeping Opus's context clean
+- Multiple independent tasks can run concurrently AND each produces verbose output — parallelism saves wall-clock time
 - The task involves multiple sequential tool calls (run command, read file, run another command)
+
+**PHPUnit and PHPStan are always direct Bash calls** — passing output is ~5 lines; even failures are typically under 50 lines. The 20-27K token agent overhead (system prompt + rules + context) dwarfs the output. Use `run_in_background` for parallelism without agent overhead.
 
 The context-window cost compounds: every token of verbose output in Opus's context is re-sent on every subsequent turn. A Haiku agent that absorbs 500 lines and returns a 10-line summary saves Opus-rate tokens for the rest of the conversation.
 
@@ -78,7 +80,7 @@ Explicitly label which implementation phases go to Sonnet / Haiku / self. The ti
 
 When a plan phase writes out every action as literal commands (`git mv`, explicit find/replace mappings, `git rm`, config line swaps), the executing agent is Haiku. The prompt already contains the recipe — the agent executes it. Sonnet is only needed when the prompt asks the agent to decide *what* to do, not just *how* to do it.
 
-**Haiku:** `git mv` file renames with explicit source→target, namespace find/replace from a provided mapping, `git rm` + config updates, running test/lint commands
+**Haiku:** `git mv` file renames with explicit source→target, namespace find/replace from a provided mapping, `git rm` + config updates, multi-step recipe execution
 **Sonnet:** call-site sweeps where the agent must judge whether a match is a column vs. table name, test-writing, code authoring, debugging failures
 
 ### Bulk-sweep pattern
@@ -86,5 +88,5 @@ When a plan phase writes out every action as literal commands (`git mv`, explici
 - Migration authoring, PHPStan rules, ADRs → Opus (self).
 - Per-module PHP call-site sweeps that require judgment (e.g., distinguishing column refs from table refs in backtick-quoted SQL) → Sonnet.
 - Per-module sweeps with an explicit old→new mapping and no ambiguity → Haiku.
-- Running tests, migrations, schema verification → Haiku.
+- Running tests, migrations, schema verification → direct Bash (short output); Haiku only if multi-step or output is unpredictably large.
 - Interpreting failing tests, deciding when to update baselines → Opus (self).

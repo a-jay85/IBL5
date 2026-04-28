@@ -91,12 +91,19 @@ while true; do
     PLANS_RUN=$(( PLANS_RUN + 1 ))
     echo "--- Plan #$PLANS_RUN: $PLAN_NAME (attempt $(( ATTEMPTS + 1 ))) at $(date) ---" >> "$LOG"
 
-    claude -p "$(cat bin/nightly-prompt)" \
-        --dangerously-skip-permissions \
-        --model opus \
-        --max-turns 200 \
-        --name "nightly-$(date +%Y-%m-%d-%H%M)" \
-        >> "$LOG" 2>&1 || true
+    # timeout kills the process tree if claude -p hangs (stuck tool call,
+    # MCP server won't exit, etc.) so the loop can recover and continue.
+    REMAINING_SECS=$(( MAX_ELAPSED - $(( $(date +%s) - START )) ))
+    if [ "$REMAINING_SECS" -lt 300 ]; then
+        REMAINING_SECS=300
+    fi
+    timeout "$REMAINING_SECS" \
+        claude -p "$(cat bin/nightly-prompt)" \
+            --dangerously-skip-permissions \
+            --model opus \
+            --max-turns 200 \
+            --name "nightly-$(date +%Y-%m-%d-%H%M)" \
+            >> "$LOG" 2>&1 || true
 
     echo "--- Plan #$PLANS_RUN finished at $(date) ---" >> "$LOG"
 

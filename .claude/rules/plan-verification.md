@@ -1,6 +1,6 @@
 ---
 description: Requires plans to classify every verification step into the test-type taxonomy at plan-write time, preventing manual-testing items from deferring to post-plan cleanup.
-last_verified: 2026-04-26
+last_verified: 2026-04-28
 ---
 
 # Plan Verification Matrix
@@ -47,6 +47,23 @@ Each implementation phase that changes behavior must have a corresponding row (o
 ### Weave tests inline
 
 Pre-implementation tests go **before** their corresponding implementation step. Post-implementation tests go **immediately after**. Never collect all tests into a separate appendix at the bottom.
+
+## Forced E2E triggers
+
+These patterns **require** at least one E2E row in the verification matrix, even when PHPUnit covers the underlying logic. Unit tests verify isolated behavior; only E2E confirms the behavior composes into a rendered page.
+
+| Trigger pattern | Why PHPUnit is insufficient |
+|-----------------|----------------------------|
+| New POST/form endpoint | Form submission, CSRF, redirect, and resulting page state are browser-only |
+| New conditional UI gated by session, cookie, or user identity | Session/cookie hydration and DOM presence depend on the full request lifecycle |
+| New navigation entry or menu item | Rendering is composed through `NavigationMenuBuilder` → theme → DOM; unit-testing the builder alone misses integration |
+| New HTML route (module `index.php`) | The route may render, redirect, or error — only a browser visit confirms which |
+| New `<details>`, modal, toggle, or expandable section | Expand/collapse, visibility toggling, and content rendering are DOM interactions |
+| New indicator or status element that changes with state | Visual state feedback (dots, badges, labels) must be verified in-browser across both states |
+
+When a plan introduces any of these patterns, the planner must add a corresponding E2E row — one row per distinct user-visible state. For example, a toggle that shows/hides UI needs two E2E rows: one verifying the ON state, one verifying OFF.
+
+If E2E coverage is blocked by a missing test fixture (e.g., no CI seed user for an admin-gated feature), the plan must include a phase that creates the fixture. "No fixture exists" is not a reason to downgrade to PHPUnit.
 
 ## What the plan must NOT do
 

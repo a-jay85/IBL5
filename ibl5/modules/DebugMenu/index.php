@@ -12,13 +12,13 @@ use Utilities\HtmxHelper;
 
 function toggleExtensions(): void
 {
-    global $cookie;
+    global $authService;
 
     if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
-        HtmxHelper::redirect('/');
+        HtmxHelper::redirect('/ibl5/');
     }
 
-    $username = strval($cookie[1] ?? '');
+    $username = $authService->getUsername() ?? '';
     $debugSession = new DebugSession(
         $username,
         $_SERVER['SERVER_NAME'] ?? null,
@@ -26,18 +26,18 @@ function toggleExtensions(): void
     );
 
     if (!$debugSession->isDebugAdmin()) {
-        HtmxHelper::redirect('/');
+        HtmxHelper::redirect('/ibl5/');
     }
 
     if (!CsrfGuard::validateSubmittedToken('debug_toggle')) {
-        HtmxHelper::redirect('/');
+        HtmxHelper::redirect('/ibl5/');
     }
 
     $debugSession->toggleViewAllExtensions();
 
-    $redirect = $_POST['redirect'] ?? '/';
+    $redirect = $_POST['redirect'] ?? '/ibl5/';
     if (!is_string($redirect)) {
-        $redirect = '/';
+        $redirect = '/ibl5/';
     }
 
     $redirect = sanitizeRedirect($redirect);
@@ -48,16 +48,16 @@ function toggleExtensions(): void
 function sanitizeRedirect(string $url): string
 {
     if ($url === '' || $url[0] !== '/') {
-        return '/';
+        return '/ibl5/';
     }
 
     if (str_starts_with($url, '//')) {
-        return '/';
+        return '/ibl5/';
     }
 
     $parsed = parse_url($url);
     if ($parsed === false || isset($parsed['scheme']) || isset($parsed['host'])) {
-        return '/';
+        return '/ibl5/';
     }
 
     return $url;
@@ -70,5 +70,5 @@ switch ($op) {
         toggleExtensions();
         break;
     default:
-        HtmxHelper::redirect('/');
+        HtmxHelper::redirect('/ibl5/');
 }

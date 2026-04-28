@@ -15,7 +15,7 @@ use Player\Contracts\PlayerStatsRepositoryInterface;
  * and per-game averages. Uses PlayerStatsRepository for all database operations.
  *
  * @see PlayerStatsInterface
- * @phpstan-import-type PlayerRow from \Services\CommonMysqliRepository
+ * @phpstan-import-type PlayerStatsRow from \Player\Contracts\PlayerStatsInterface
  */
 class PlayerStats implements PlayerStatsInterface
 {
@@ -173,7 +173,7 @@ class PlayerStats implements PlayerStatsInterface
     {
         $repository = new PlayerStatsRepository($db);
         $instance = new self($repository);
-        /** @var PlayerRow $plrRow */
+        /** @var PlayerStatsRow $plrRow */
         $instance->fill($plrRow);
         return $instance;
     }
@@ -205,7 +205,7 @@ class PlayerStats implements PlayerStatsInterface
      */
     protected function loadByID(int $playerID): void
     {
-        /** @var PlayerRow|null $plrRow */
+        /** @var PlayerStatsRow|null $plrRow */
         $plrRow = $this->repository->getPlayerStats($playerID);
         if ($plrRow !== null) {
             $this->fill($plrRow);
@@ -215,7 +215,7 @@ class PlayerStats implements PlayerStatsInterface
     /**
      * Fill stats from a current player database row
      *
-     * @param PlayerRow $plrRow
+     * @param PlayerStatsRow $plrRow
      */
     protected function fill(array $plrRow): void
     {

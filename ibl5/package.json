@@ -37,7 +37,7 @@
     "@tailwindcss/cli": "^4.0.0",
     "browser-sync": "^3.0.4",
     "eslint": "^10.2.0",
-    "eslint-plugin-playwright": "^2.10.1",
+    "eslint-plugin-playwright": "^2.10.2",
     "tailwindcss": "^4.0.0",
     "typescript-eslint": "^8.58.1",
     "vitest": "^4.1.0"

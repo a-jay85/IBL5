@@ -517,7 +517,7 @@ tr:has(.contract-hint-cell):focus-within .contract-hint-cell {
     }
 
     .ibl-data-table.responsive-table td.sticky-col {
-        box-shadow: 2px 0 4px rgba(0, 0, 0, 0.05);
+        box-shadow: var(--shadow-sticky-col);
     }
 
     /* Two sticky columns (rank + name pattern) */
@@ -563,12 +563,12 @@ tr:has(.contract-hint-cell):focus-within .contract-hint-cell {
 
     /* Col-2 gets shadow only for 2-column sticky layouts */
     .ibl-data-table.responsive-table:not(:has(.sticky-col-3)) td.sticky-col-2 {
-        box-shadow: 2px 0 4px rgba(0, 0, 0, 0.05);
+        box-shadow: var(--shadow-sticky-col);
     }
 
     /* Col-3 gets shadow for 3-column sticky layouts */
     .ibl-data-table.responsive-table td.sticky-col-3 {
-        box-shadow: 2px 0 4px rgba(0, 0, 0, 0.05);
+        box-shadow: var(--shadow-sticky-col);
     }
 
     /* Drafted row sticky backgrounds - consolidated */
@@ -901,7 +901,7 @@ tr:has(.contract-hint-cell):focus-within .contract-hint-cell {
     position: sticky;
     top: 0;
     z-index: 10;
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    box-shadow: var(--shadow-sticky-header);
 }
 
 .sticky-table thead th {
@@ -930,12 +930,12 @@ tr:has(.contract-hint-cell):focus-within .contract-hint-cell {
 
 /* Shadows — column edge, header bottom, corner combined */
 .sticky-table tbody td.sticky-col {
-    box-shadow: 2px 0 4px rgba(0, 0, 0, 0.08);
+    box-shadow: var(--shadow-sticky-col);
     border-right: 1px solid var(--gray-100);
 }
 
 .sticky-table tbody td.sticky-col-2 {
-    box-shadow: 2px 0 4px rgba(0, 0, 0, 0.08);
+    box-shadow: var(--shadow-sticky-col);
     border-right: 1px solid var(--gray-100);
 }
 
@@ -943,7 +943,7 @@ tr:has(.contract-hint-cell):focus-within .contract-hint-cell {
    to avoid overlapping shadows creating darker lines between columns. */
 
 .sticky-table thead .sticky-corner {
-    box-shadow: 2px 2px 4px rgba(0, 0, 0, 0.1);
+    box-shadow: var(--shadow-sticky-col), var(--shadow-sticky-header);
 }
 
 /* Sticky-col body cell backgrounds — required so content behind

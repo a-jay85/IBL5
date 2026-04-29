@@ -219,13 +219,10 @@
         var desktopToggle = document.getElementById('desktop-view-toggle');
         var mobileToggle = document.getElementById('mobile-view-toggle');
 
-        // Show mobile-view toggle only when (1) desktop view is forced AND
-        // (2) the device actually has a touch/coarse pointer — i.e., a real
-        // phone/tablet. This prevents the "switch to mobile" icon from
-        // appearing on real desktops where it makes no sense.
-        var isTouchDevice = window.matchMedia
-            && window.matchMedia('(pointer: coarse) and (hover: none)').matches;
-        if (mobileToggle && isTouchDevice && document.documentElement.classList.contains('desktop-view-active')) {
+        // Show mobile-view toggle when desktop view is forced.
+        // desktop-view-active can only be set by clicking a button visible
+        // at < 1024px, so the user already self-selected as needing mobile.
+        if (mobileToggle && document.documentElement.classList.contains('desktop-view-active')) {
             mobileToggle.classList.remove('hidden');
         }
 

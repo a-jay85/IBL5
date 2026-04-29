@@ -52,6 +52,20 @@
     --warning-yellow: var(--color-warning-yellow);
     --success-lime: var(--color-success-lime);
 
+    /* Transaction badge palette */
+    --txn-bg-trade: var(--color-txn-trade-bg);
+    --txn-fg-trade: var(--color-txn-trade-fg);
+    --txn-bg-fa: var(--color-txn-fa-bg);
+    --txn-fg-fa: var(--color-txn-fa-fg);
+    --txn-bg-waiver: var(--color-txn-waiver-bg);
+    --txn-fg-waiver: var(--color-txn-waiver-fg);
+    --txn-bg-extension: var(--color-txn-extension-bg);
+    --txn-fg-extension: var(--color-txn-extension-fg);
+    --txn-bg-draft: var(--color-txn-draft-bg);
+    --txn-fg-draft: var(--color-txn-draft-fg);
+    --txn-bg-release: var(--color-txn-release-bg);
+    --txn-fg-release: var(--color-txn-release-fg);
+
     /* Neutrals (source of truth: @theme --color-gray-*) */
     --gray-50: var(--color-gray-50);
     --gray-100: var(--color-gray-100);

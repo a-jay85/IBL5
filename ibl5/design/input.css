@@ -59,6 +59,20 @@
   --color-info-100: #dbeafe;
   --color-info-50: #eff6ff;
 
+  /* Transaction badge palette */
+  --color-txn-trade-bg: #e3f2fd;
+  --color-txn-trade-fg: #1565c0;
+  --color-txn-fa-bg: #fff3e0;
+  --color-txn-fa-fg: #e65100;
+  --color-txn-waiver-bg: #e8f5e9;
+  --color-txn-waiver-fg: #2e7d32;
+  --color-txn-extension-bg: #fce4ec;
+  --color-txn-extension-fg: #c2185b;
+  --color-txn-draft-bg: #f3e5f5;
+  --color-txn-draft-fg: #7b1fa2;
+  --color-txn-release-bg: #e0f7fa;
+  --color-txn-release-fg: #00838f;
+
   /* Neutrals (promoted so utilities + tokens share source) */
   --color-gray-50:  #f9fafb;
   --color-gray-100: #f3f4f6;

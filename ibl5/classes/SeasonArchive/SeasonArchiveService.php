@@ -55,7 +55,7 @@ class SeasonArchiveService implements SeasonArchiveServiceInterface
             $awards = $this->repository->getAwardsByYear($year);
             $playoffResults = $this->repository->getPlayoffResultsByYear($year);
             $heatYear = $year - 1;
-            $teamAwards = $this->repository->getTeamAwardsByYear($year);
+            $teamAwards = $this->repository->getTeamAwardsByYear($year, $heatYear);
 
             $iblChampion = $this->getIblChampionFromPlayoffs($playoffResults);
             $heatChampion = $this->getHeatChampionFromTeamAwards($teamAwards);
@@ -96,10 +96,10 @@ class SeasonArchiveService implements SeasonArchiveServiceInterface
         }
 
         $playoffResults = $this->repository->getPlayoffResultsByYear($year);
-        $teamAwards = $this->repository->getTeamAwardsByYear($year);
+        $heatYear = $year - 1;
+        $teamAwards = $this->repository->getTeamAwardsByYear($year, $heatYear);
         $gmAwards = $this->repository->getAllGmAwardsWithTeams();
         $gmTenures = $this->repository->getAllGmTenuresWithTeams();
-        $heatYear = $year - 1;
         $heatStandingsRaw = $this->repository->getHeatWinLossByYear($heatYear);
         $teamColors = $this->repository->getTeamColors();
         $teamConferences = $this->repository->getTeamConferences();
@@ -110,7 +110,7 @@ class SeasonArchiveService implements SeasonArchiveServiceInterface
         // Get IBL Finals (round 4)
         $iblFinals = $this->getIblFinals($playoffResults);
 
-        // Parse team awards
+        // Parse team awards (includes HEAT champion from box scores)
         $parsedTeamAwards = $this->parseTeamAwards($teamAwards);
 
         // Build HEAT standings

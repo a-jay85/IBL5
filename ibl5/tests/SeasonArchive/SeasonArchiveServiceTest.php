@@ -152,6 +152,29 @@ class SeasonArchiveServiceTest extends TestCase
         $this->service->getSeasonDetail(1989);
     }
 
+    public function testGetTeamAwardsByYearReceivesHeatYear(): void
+    {
+        $mockRepo = $this->createMock(SeasonArchiveRepositoryInterface::class);
+        $mockRepo->method('getTeamConferences')->willReturn([]);
+        $mockRepo->method('getAwardsByYear')->willReturn([
+            ['year' => 1989, 'award' => 'Most Valuable Player (1st)', 'name' => 'Test MVP', 'table_id' => 1],
+        ]);
+        $mockRepo->method('getPlayoffResultsByYear')->willReturn([]);
+        $mockRepo->method('getAllGmAwardsWithTeams')->willReturn([]);
+        $mockRepo->method('getAllGmTenuresWithTeams')->willReturn([]);
+        $mockRepo->method('getHeatWinLossByYear')->willReturn([]);
+        $mockRepo->method('getTeamColors')->willReturn([]);
+        $mockRepo->method('getPlayerIdsByNames')->willReturn([]);
+
+        $mockRepo->expects($this->once())
+            ->method('getTeamAwardsByYear')
+            ->with(1989, 1988)
+            ->willReturn([]);
+
+        $service = new SeasonArchiveService($mockRepo);
+        $service->getSeasonDetail(1989);
+    }
+
     public function testExtractAwardHandlesTrailingWhitespace(): void
     {
         $this->mockRepository->method('getAwardsByYear')->willReturn([

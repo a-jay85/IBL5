@@ -76,7 +76,7 @@ class SeasonArchiveRepositoryTest extends DatabaseTestCase
             'award' => 'Test Award 2098',
         ]);
 
-        $result = $this->repo->getTeamAwardsByYear(2098);
+        $result = $this->repo->getTeamAwardsByYear(2098, 2097);
 
         self::assertNotEmpty($result);
         $first = $result[0];
@@ -113,7 +113,7 @@ class SeasonArchiveRepositoryTest extends DatabaseTestCase
             'award' => 'Eastern Conference Champions',
         ]);
 
-        $result = $this->repo->getTeamAwardsByYear(2097);
+        $result = $this->repo->getTeamAwardsByYear(2097, 2096);
 
         $awards = [];
         foreach ($result as $row) {

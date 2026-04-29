@@ -84,7 +84,7 @@ class SeasonArchiveRepository extends BaseMysqliRepository implements SeasonArch
     /**
      * @see SeasonArchiveRepositoryInterface::getTeamAwardsByYear()
      */
-    public function getTeamAwardsByYear(int $year): array
+    public function getTeamAwardsByYear(int $year, int $heatYear): array
     {
         /** @var list<TeamAwardRow> */
         return $this->fetchAll(
@@ -92,7 +92,7 @@ class SeasonArchiveRepository extends BaseMysqliRepository implements SeasonArch
             "iii",
             $year,
             $year,
-            $year
+            $heatYear
         );
     }
 

@@ -52,9 +52,10 @@ interface SeasonArchiveRepositoryInterface
      * so this uses LIKE matching.
      *
      * @param int $year Season ending year
+     * @param int $heatYear HEAT year (ending year minus 1) for the HEAT champion subquery
      * @return list<TeamAwardRow> Array of team award records
      */
-    public function getTeamAwardsByYear(int $year): array;
+    public function getTeamAwardsByYear(int $year, int $heatYear): array;
 
     /**
      * Get all GM awards with associated team names (via tenure JOIN)

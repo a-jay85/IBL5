@@ -18,7 +18,7 @@ CURRENT=$(git branch --show-current)
 
 # Stash uncommitted changes upfront so they survive the reset
 STASHED=0
-if ! git diff --quiet HEAD 2>/dev/null || ! git diff --cached --quiet HEAD 2>/dev/null; then
+if has_uncommitted_changes; then
     echo "Stashing uncommitted changes..."
     git stash push -q -m "syncBranches: auto-stash before sync"
     STASHED=1
@@ -44,14 +44,6 @@ WORKTREE_BRANCHES=$(git worktree list --porcelain | grep '^branch ' | sed 's|^br
 
 is_in_worktree() {
     echo "$WORKTREE_BRANCHES" | grep -qx "$1"
-}
-
-# Get worktree path for a branch name
-get_worktree_path() {
-    git worktree list --porcelain | awk -v branch="refs/heads/$1" '
-        /^worktree / { path = substr($0, 10) }
-        $0 == "branch " branch { print path; exit }
-    '
 }
 
 # Iterate local branches that have an origin tracking branch
@@ -81,9 +73,7 @@ while IFS= read -r branch; do
                 ((SKIPPED++))
                 continue
             fi
-            # Skip if worktree has uncommitted changes
-            if ! git -C "$wt_path" diff --quiet HEAD 2>/dev/null || \
-               ! git -C "$wt_path" diff --cached --quiet HEAD 2>/dev/null; then
+            if has_uncommitted_changes "$wt_path"; then
                 echo "  SKIP    $branch (worktree has uncommitted changes)"
                 ((SKIPPED++))
                 continue

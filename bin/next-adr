@@ -9,6 +9,8 @@
 
 set -euo pipefail
 
+source "$(dirname "$0")/lib/git-helpers.sh"
+
 if [ $# -ne 1 ] || [ -z "$1" ]; then
     echo "Usage: $0 \"kebab-title\"" >&2
     exit 2
@@ -25,22 +27,9 @@ fi
 
 WORKTREE_DIR="$(cd "$(dirname "$0")/.." && pwd)/ibl5/docs/decisions"
 
-# Resolve the main repo's decisions dir so concurrent worktrees don't collide on
-# numbering. In a worktree, .git is a file containing `gitdir: <main>/.git/worktrees/<name>`;
-# dirname -3 backs out to the main repo path. In the main repo itself, .git is a dir
-# and CANONICAL_DIR == WORKTREE_DIR.
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-if [ -f "$REPO_ROOT/.git" ]; then
-    GITDIR=$(awk '/^gitdir:/ {print $2}' "$REPO_ROOT/.git")
-    if [ -n "$GITDIR" ]; then
-        CANONICAL_ROOT=$(cd "$GITDIR/../../.." && pwd)
-        CANONICAL_DIR="$CANONICAL_ROOT/ibl5/docs/decisions"
-    else
-        CANONICAL_DIR="$WORKTREE_DIR"
-    fi
-else
-    CANONICAL_DIR="$WORKTREE_DIR"
-fi
+CANONICAL_ROOT=$(resolve_canonical_root "$REPO_ROOT")
+CANONICAL_DIR="$CANONICAL_ROOT/ibl5/docs/decisions"
 
 get_max() {
     local dir="$1"

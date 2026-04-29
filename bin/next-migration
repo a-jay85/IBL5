@@ -3,12 +3,14 @@
 # Checks the main repo (not the current worktree) to avoid collisions
 # with migrations added by other branches after the worktree was created.
 
-MAIN_DIR="$(cd "$(dirname "$0")/.." && pwd)/ibl5/migrations"
+REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+source "$(dirname "$0")/lib/git-helpers.sh"
 
-# Also check the main repo at the canonical path (for worktrees that diverged)
-CANONICAL_DIR="/Users/ajaynicolas/Documents/GitHub/IBL5/ibl5/migrations"
+MAIN_DIR="$REPO_ROOT/ibl5/migrations"
 
-# Find the highest migration number across both locations
+CANONICAL_ROOT=$(resolve_canonical_root "$REPO_ROOT")
+CANONICAL_DIR="$CANONICAL_ROOT/ibl5/migrations"
+
 get_max() {
     local dir="$1"
     if [ -d "$dir" ]; then

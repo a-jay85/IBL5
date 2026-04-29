@@ -321,9 +321,10 @@ jobs:
           # must work in bash 3.2 (macOS default shell).
           #
           # Excludes for pre-existing warnings, tracked as burn-down debt:
-          #   SC2034 — unused variables (3 occurrences in bin/codebase-audit,
-          #            bin/lib/wt-guards.sh, bin/sim-files-update)
-          #   SC1090 — non-const source (bin/sim-files-update:23, dynamic env file)
+          #   SC2034 — unused variables (2 occurrences in bin/codebase-audit,
+          #            bin/lib/wt-guards.sh)
+          #   SC1090 — non-const source (db-sync-prod, db-export-prod, log-fetch-prod
+          #            source dynamic .env file)
           #   SC2207 — array splitting suggestion (ibl5/bin/run-migrations-ci.sh:20,
           #            CI-only script, suggestion uses bash 4 mapfile)
           # Bash portability checks (SC3xxx) remain fully enforced.

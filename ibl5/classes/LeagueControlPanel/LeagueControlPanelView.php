@@ -244,7 +244,6 @@ class LeagueControlPanelView implements LeagueControlPanelViewInterface
     <div class="lcp-control-row">
         <a href="/ibl5/import-demands.php">Free Agency Demands CSV Uploader</a>
     </div>
-    <?= $this->renderTradesSelect($panelData) ?>
     <?= $this->renderDraftLinkSelect($panelData) ?>
     <?= $this->renderAwardsControls($panelData) ?>
 </section>

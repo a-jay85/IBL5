@@ -14,7 +14,7 @@
 
 .offer-player-img {
     max-width: 120px;
-    border-radius: 0.375rem;
+    border-radius: var(--radius-md);
 }
 
 /* Ratings table — compact font for the 21-column layout */

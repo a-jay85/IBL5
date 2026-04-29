@@ -29,7 +29,7 @@
     padding: 0.25rem 0.5rem;
     font-size: var(--text-sm);
     border: 1px solid var(--gray-300);
-    border-radius: 4px;
+    border-radius: var(--radius-sm);
     max-width: 480px;
     cursor: pointer;
 }
@@ -54,7 +54,7 @@
 .saved-dc-rename-btn {
     background: none;
     border: 1px solid var(--gray-300);
-    border-radius: 4px;
+    border-radius: var(--radius-sm);
     padding: 0.2rem 0.4rem;
     cursor: pointer;
     font-size: var(--text-sm);
@@ -92,7 +92,7 @@ tr.depth-chart-traded-player select {
     background-color: var(--error-500);
     color: #fff;
     padding: 0.05rem 0.3rem;
-    border-radius: 3px;
+    border-radius: var(--radius-sm);
     margin-left: 0.35rem;
     vertical-align: middle;
     letter-spacing: 0.03em;

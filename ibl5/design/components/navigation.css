@@ -932,7 +932,7 @@ span.nav-dropdown-item a:hover {
 
 .nav-login-btn {
     width: 100%;
-    background: linear-gradient(to right, var(--accent-500), var(--color-orange-600, #ea580c));
+    background: linear-gradient(to right, var(--accent-500), var(--accent-600));
     color: white;
     font-weight: 700;
     padding: 0.875rem 1rem;
@@ -944,7 +944,7 @@ span.nav-dropdown-item a:hover {
 }
 
 .nav-login-btn:hover {
-    background: linear-gradient(to right, var(--accent-400, #fb923c), var(--color-orange-500, #f97316));
+    background: linear-gradient(to right, var(--accent-400, #fb923c), var(--accent-500));
     box-shadow: 0 10px 15px -3px rgba(249, 115, 22, 0.4);
 }
 
@@ -993,7 +993,7 @@ span.nav-dropdown-item a:hover {
     width: 2.5rem;
     height: 2.5rem;
     border-radius: var(--radius-full);
-    background: linear-gradient(to bottom right, var(--accent-500), var(--color-orange-600, #ea580c));
+    background: linear-gradient(to bottom right, var(--accent-500), var(--accent-600));
     display: flex;
     align-items: center;
     justify-content: center;

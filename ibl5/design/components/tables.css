@@ -1585,7 +1585,7 @@ td.ibl-team-cell--colored {
    ========================================================================== */
 
 .voting-submission-error {
-    color: var(--red-600);
+    color: var(--error-600);
     font-weight: 600;
     margin: var(--space-2) 0;
 }
@@ -2543,16 +2543,16 @@ td.ibl-team-cell--colored {
 .season-highs-discrepancy-panel {
     margin-top: var(--space-6, 1.5rem);
     padding: var(--space-4, 1rem);
-    border: 1px solid var(--amber-300, #fcd34d);
-    border-radius: var(--radius-lg, 0.5rem);
-    background: var(--amber-50, #fffbeb);
+    border: 1px solid var(--warning-200);
+    border-radius: var(--radius-lg);
+    background: var(--warning-50);
 }
 
 .discrepancy-panel-title {
     font-family: var(--font-display);
     font-size: 1rem;
     font-weight: 600;
-    color: var(--amber-800, #92400e);
+    color: var(--warning-600);
     margin-bottom: var(--space-3, 0.75rem);
 }
 
@@ -2580,7 +2580,7 @@ td.ibl-team-cell--colored {
 }
 
 .season-highs-discrepancy-panel .ibl-data-table thead {
-    background: var(--amber-600, #d97706);
+    background: var(--warning-600);
 }
 
 .season-highs-discrepancy-panel .ibl-data-table td {

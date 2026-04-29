@@ -16,7 +16,7 @@
     font-size: var(--text-sm);
     font-weight: 600;
     text-transform: uppercase;
-    letter-spacing: 0.05em;
+    letter-spacing: var(--tracking-display);
     color: var(--gray-600);
   }
 
@@ -29,7 +29,7 @@
     font-weight: 700;
     font-size: var(--text-sm);
     text-transform: uppercase;
-    letter-spacing: 0.08em;
+    letter-spacing: var(--tracking-eyebrow);
   }
 
   .league-badge-ibl {

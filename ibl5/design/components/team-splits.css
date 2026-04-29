@@ -34,7 +34,7 @@
     font-size: var(--text-xl);
     font-weight: 600;
     text-transform: uppercase;
-    letter-spacing: 0.03em;
+    letter-spacing: var(--tracking-display);
     color: color-mix(in srgb, var(--team-tab-bg-color) 85%, black);
     background-color: color-mix(in srgb, var(--team-tab-bg-color) 8%, white);
     border: 2px solid color-mix(in srgb, var(--team-tab-bg-color) 30%, white);

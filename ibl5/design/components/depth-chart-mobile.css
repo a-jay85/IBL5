@@ -144,7 +144,7 @@
     font-size: var(--text-2xs);
     font-weight: 600;
     text-transform: uppercase;
-    letter-spacing: 0.04em;
+    letter-spacing: var(--tracking-display);
     color: var(--gray-500);
     margin-bottom: 2px;
     white-space: nowrap;

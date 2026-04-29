@@ -95,7 +95,7 @@ tr.depth-chart-traded-player select {
     border-radius: var(--radius-sm);
     margin-left: 0.35rem;
     vertical-align: middle;
-    letter-spacing: 0.03em;
+    letter-spacing: var(--tracking-display);
 }
 
 } /* end @layer components */

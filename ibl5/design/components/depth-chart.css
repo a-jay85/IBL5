@@ -176,7 +176,7 @@
     font-weight: 600;
     color: var(--gray-400);
     text-transform: uppercase;
-    letter-spacing: 0.04em;
+    letter-spacing: var(--tracking-display);
     text-align: left;
     width: 4.5em;
     overflow: visible;

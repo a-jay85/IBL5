@@ -59,7 +59,7 @@
     color: #a5d8ff;
     margin: 0 0 0.5rem;
     text-transform: uppercase;
-    letter-spacing: 0.05em;
+    letter-spacing: var(--tracking-display);
 }
 
 .debug-breakdown .ibl-data-table {

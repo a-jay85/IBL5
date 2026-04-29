@@ -31,11 +31,11 @@ body:has(> .updater) {
    ========================================================================== */
 
 .updater__title {
-    font-family: var(--font-display, 'Barlow Condensed', sans-serif);
+    font-family: var(--font-display);
     font-size: var(--text-xl);
     font-weight: 700;
     text-transform: uppercase;
-    letter-spacing: 0.08em;
+    letter-spacing: var(--tracking-eyebrow);
     color: var(--gray-800, #1f2937);
     margin: 0 0 var(--space-6, 1.5rem);
     padding-bottom: var(--space-3, 0.75rem);
@@ -51,11 +51,11 @@ body:has(> .updater) {
 }
 
 .updater-section__label {
-    font-family: var(--font-display, 'Barlow Condensed', sans-serif);
+    font-family: var(--font-display);
     font-size: var(--text-2xs);
     font-weight: 600;
     text-transform: uppercase;
-    letter-spacing: 0.12em;
+    letter-spacing: var(--tracking-eyebrow);
     color: var(--gray-400, #9ca3af);
     margin-bottom: var(--space-2, 0.5rem);
 }
@@ -267,11 +267,11 @@ body:has(> .updater) {
 }
 
 .updater-summary__status {
-    font-family: var(--font-display, 'Barlow Condensed', sans-serif);
+    font-family: var(--font-display);
     font-size: var(--text-sm);
     font-weight: 600;
     text-transform: uppercase;
-    letter-spacing: 0.06em;
+    letter-spacing: var(--tracking-eyebrow);
 }
 
 .updater-summary__status--success {

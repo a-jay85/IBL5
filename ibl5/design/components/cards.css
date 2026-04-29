@@ -44,7 +44,7 @@
     font-weight: 600;
     color: white;
     text-transform: uppercase;
-    letter-spacing: 0.05em;
+    letter-spacing: var(--tracking-display);
     margin: 0;
 }
 
@@ -131,7 +131,7 @@
     font-size: var(--text-xl);
     font-weight: 600;
     text-transform: uppercase;
-    letter-spacing: 0.05em;
+    letter-spacing: var(--tracking-display);
 }
 
 .ibl-badge--success {
@@ -196,7 +196,7 @@
     font-weight: 700;
     color: var(--team-color-secondary);
     text-transform: uppercase;
-    letter-spacing: 0.05em;
+    letter-spacing: var(--tracking-display);
     margin: 0;
 }
 
@@ -227,7 +227,7 @@
     font-weight: 700;
     font-size: var(--text-sm);
     text-transform: uppercase;
-    letter-spacing: 0.05em;
+    letter-spacing: var(--tracking-display);
     color: var(--gray-500);
 }
 
@@ -440,7 +440,7 @@
     font-weight: 700;
     font-size: var(--text-sm);
     text-transform: uppercase;
-    letter-spacing: 0.05em;
+    letter-spacing: var(--tracking-display);
     color: var(--gray-500);
     padding: var(--space-2) var(--space-3);
     margin: 0;

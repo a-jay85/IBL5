@@ -97,11 +97,11 @@
 
 .ibl-data-table th {
     color: white;
-    font-family: var(--font-display, 'Barlow Condensed', -apple-system, BlinkMacSystemFont, sans-serif);
+    font-family: var(--font-display);
     font-weight: 600;
     font-size: var(--text-xl);
     text-transform: uppercase;
-    letter-spacing: 0.03em;
+    letter-spacing: var(--tracking-display);
     line-height: 1.2rem;
     padding: 0.75rem 0.1rem;
     text-align: center;
@@ -1110,7 +1110,7 @@ tr:has(.contract-hint-cell):focus-within .contract-hint-cell {
    ========================================================================== */
 
 .ibl-table-title {
-    font-family: var(--font-display, 'Barlow Condensed', -apple-system, BlinkMacSystemFont, sans-serif);
+    font-family: var(--font-display);
     font-size: var(--text-2xl);
     font-weight: 600;
     color: var(--navy-900, #0a0f1a);
@@ -1125,7 +1125,7 @@ tr:has(.contract-hint-cell):focus-within .contract-hint-cell {
     font-size: var(--text-sm);
     font-weight: 600;
     text-transform: uppercase;
-    letter-spacing: 0.05em;
+    letter-spacing: var(--tracking-display);
     padding: var(--space-1) var(--space-2);
 }
 
@@ -1855,7 +1855,7 @@ td.ibl-team-cell--colored {
     font-family: var(--font-display);
     font-weight: 700;
     font-size: 1rem;
-    letter-spacing: 0.025em;
+    letter-spacing: var(--tracking-display);
     cursor: pointer;
     list-style: none;
     border-radius: var(--radius-md) var(--radius-md) 0 0;
@@ -2159,7 +2159,7 @@ td.ibl-team-cell--colored {
     font-family: var(--font-display);
     font-weight: 600;
     text-transform: uppercase;
-    letter-spacing: 0.03em;
+    letter-spacing: var(--tracking-display);
     padding: 0.25rem 0.2rem;
 }
 
@@ -2248,7 +2248,7 @@ td.ibl-team-cell--colored {
     font-weight: 600;
     color: var(--navy-800);
     text-transform: uppercase;
-    letter-spacing: 0.03em;
+    letter-spacing: var(--tracking-display);
     margin: var(--space-3) var(--space-3) var(--space-1);
     padding-bottom: var(--space-0);
     border-bottom: 2px solid var(--accent-500);
@@ -2314,7 +2314,7 @@ td.ibl-team-cell--colored {
     font-weight: 600;
     color: var(--gray-500);
     text-transform: uppercase;
-    letter-spacing: 0.05em;
+    letter-spacing: var(--tracking-display);
     margin: var(--space-4) var(--space-3) var(--space-2);
     padding-bottom: var(--space-1);
     border-bottom: 1px solid var(--gray-200);
@@ -2479,7 +2479,7 @@ td.ibl-team-cell--colored {
     font-weight: 600;
     font-size: var(--text-sm);
     text-transform: uppercase;
-    letter-spacing: 0.05em;
+    letter-spacing: var(--tracking-display);
     color: var(--gray-600, #4b5563);
 }
 
@@ -2501,7 +2501,7 @@ td.ibl-team-cell--colored {
     font-weight: 600;
     color: var(--gray-700, #374151);
     text-transform: uppercase;
-    letter-spacing: 0.03em;
+    letter-spacing: var(--tracking-display);
     margin: var(--space-3) 0 var(--space-2);
     padding-left: var(--space-2);
     border-left: 3px solid var(--accent-500, #f97316);
@@ -2549,7 +2549,7 @@ td.ibl-team-cell--colored {
 }
 
 .discrepancy-panel-title {
-    font-family: var(--font-display, 'Barlow Condensed', -apple-system, BlinkMacSystemFont, sans-serif);
+    font-family: var(--font-display);
     font-size: 1rem;
     font-weight: 600;
     color: var(--amber-800, #92400e);

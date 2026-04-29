@@ -68,7 +68,7 @@
     font-weight: 600;
     color: var(--gray-600);
     text-transform: uppercase;
-    letter-spacing: 0.04em;
+    letter-spacing: var(--tracking-display);
 }
 
 .search-form__type {
@@ -111,7 +111,7 @@
     font-size: var(--text-xl);
     font-weight: 700;
     text-transform: uppercase;
-    letter-spacing: 0.04em;
+    letter-spacing: var(--tracking-display);
     color: var(--navy-800);
     padding-bottom: var(--space-3);
     border-bottom: 2px solid var(--navy-800);
@@ -230,7 +230,7 @@
     font-size: var(--text-xs);
     font-weight: 600;
     text-transform: uppercase;
-    letter-spacing: 0.04em;
+    letter-spacing: var(--tracking-display);
     color: var(--gray-400);
     text-decoration: none;
     transition: color var(--transition-fast);
@@ -255,7 +255,7 @@
     font-size: 1rem;
     font-weight: 600;
     text-transform: uppercase;
-    letter-spacing: 0.04em;
+    letter-spacing: var(--tracking-display);
     color: var(--accent-500);
     text-decoration: none;
     padding: var(--space-2) var(--space-3);

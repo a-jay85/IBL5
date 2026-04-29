@@ -61,7 +61,7 @@
     font-weight: 700;
     color: white;
     text-transform: uppercase;
-    letter-spacing: 0.05em;
+    letter-spacing: var(--tracking-display);
 }
 
 /* Tab Panels */

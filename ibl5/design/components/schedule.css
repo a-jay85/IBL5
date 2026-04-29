@@ -98,7 +98,7 @@
 .schedule-month {
     margin-bottom: var(--space-4);
     scroll-margin-top: 80px; /* Offset for sticky header */
-    border: 1px solid var(--gray-200, #e5e7eb);
+    border: 1px solid var(--gray-200);
     border-radius: var(--radius-md);
     overflow: hidden;
 }
@@ -201,11 +201,11 @@
 }
 
 .schedule-game.user-team-game {
-    background: var(--warning-100, #fef3c7);
+    background: var(--warning-100);
 }
 
 .schedule-game.user-team-game:hover {
-    background: var(--warning-200, #fde68a);
+    background: var(--warning-200);
 }
 
 /* Team name */

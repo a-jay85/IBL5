@@ -23,7 +23,7 @@
 
 /* Transaction table overrides moved to tables.css */
 
-.txn-reset { margin-left: var(--space-2, 0.5rem); }
+.txn-reset { margin-left: var(--space-2); }
 
 
 /* ==========================================================================

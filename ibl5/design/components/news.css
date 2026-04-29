@@ -8,12 +8,12 @@
     background: white;
     border-radius: var(--radius-xl);
     overflow: hidden;
-    box-shadow: var(--shadow-md, 0 4px 6px -1px rgb(0 0 0 / 0.1));
-    border: 1px solid var(--gray-100, #f3f4f6);
+    box-shadow: var(--shadow-md);
+    border: 1px solid var(--gray-100);
     max-width: 1400px;
-    margin-bottom: var(--space-4, 1rem);
+    margin-bottom: var(--space-4);
     margin-inline: auto;
-    transition: box-shadow var(--transition-base, 0.2s ease);
+    transition: box-shadow var(--transition-base);
 }
 
 .news-article:hover {

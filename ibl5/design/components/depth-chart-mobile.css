@@ -118,7 +118,7 @@
     height: 1.25rem;
     margin: 0 0 0 auto;
     cursor: pointer;
-    accent-color: var(--color-accent-500, #f97316);
+    accent-color: var(--color-accent-500);
 }
 
 

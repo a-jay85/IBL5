@@ -671,7 +671,7 @@ span.nav-dropdown-item a:hover {
 
 /* Nav bar solid opaque navy background (replaces inline style) */
 .nav-bar-bg {
-    background: var(--navy-800, #111827);
+    background: var(--navy-800);
 }
 
 /* Team logo container in Teams dropdown (replaces style="width:27px;height:27px;flex-shrink:0") */
@@ -944,7 +944,7 @@ span.nav-dropdown-item a:hover {
 }
 
 .nav-login-btn:hover {
-    background: linear-gradient(to right, var(--accent-400, #fb923c), var(--accent-500));
+    background: linear-gradient(to right, var(--accent-400), var(--accent-500));
     box-shadow: 0 10px 15px -3px rgba(249, 115, 22, 0.4);
 }
 

@@ -235,8 +235,8 @@
 /* Red tint on roster details summary when team exceeds hard cap */
 .trading-roster-details__summary.cap-warning-banner {
     background: linear-gradient(135deg,
-        color-mix(in srgb, #dc2626 60%, var(--team-color-primary, #111827)),
-        color-mix(in srgb, #dc2626 40%, var(--team-color-primary, #111827)));
+        color-mix(in srgb, var(--error-600) 60%, var(--team-color-primary, #111827)),
+        color-mix(in srgb, var(--error-600) 40%, var(--team-color-primary, #111827)));
 }
 
 .trading-roster-details__summary.cap-warning-banner .trading-roster-details__logo {

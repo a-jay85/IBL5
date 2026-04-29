@@ -99,8 +99,8 @@
 
 .draft-year-select:focus {
     outline: none;
-    border-color: var(--navy-500, #1e3a5f);
-    box-shadow: 0 0 0 3px rgba(30, 58, 95, 0.1);
+    border-color: var(--navy-700);
+    box-shadow: var(--ring-accent);
 }
 
 .draft-retired-badge {

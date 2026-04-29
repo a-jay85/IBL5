@@ -9,8 +9,8 @@
 :root {
     --sos-tier-elite: var(--error-500);     /* #ef4444 - hardest */
     --sos-tier-strong: var(--accent-500);    /* #f97316 */
-    --sos-tier-average: #eab308;             /* yellow - no token match */
-    --sos-tier-weak: #84cc16;               /* lime - no token match */
+    --sos-tier-average: var(--warning-yellow);
+    --sos-tier-weak: var(--success-lime);
     --sos-tier-bottom: var(--success-500);   /* #22c55e - easiest */
 }
 

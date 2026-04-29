@@ -48,6 +48,10 @@
     --info-100: var(--color-info-100);
     --info-50: var(--color-info-50);
 
+    /* Supplementary hues */
+    --warning-yellow: var(--color-warning-yellow);
+    --success-lime: var(--color-success-lime);
+
     /* Neutrals (source of truth: @theme --color-gray-*) */
     --gray-50: var(--color-gray-50);
     --gray-100: var(--color-gray-100);

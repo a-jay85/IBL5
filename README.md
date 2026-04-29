@@ -1,6 +1,6 @@
 ---
 description: "IBL5 project overview: tech stack, quick start, and docs index."
-last_verified: 2026-04-13
+last_verified: 2026-04-29
 ---
 
 # IBL5 - Internet Basketball League
@@ -28,7 +28,7 @@ cd ibl5 && composer install && cd ..
 docker compose up -d
 
 # 3. Run tests
-bin/test
+cd ibl5 && composer run test
 ```
 
 See [DOCKER_SETUP.md](ibl5/docs/DOCKER_SETUP.md) for detailed Docker setup and [DEVELOPMENT_ENVIRONMENT.md](ibl5/docs/DEVELOPMENT_ENVIRONMENT.md) for dependency caching.
@@ -50,7 +50,7 @@ IBL5/
 │   ├── modules/              # Legacy PHP-Nuke entry points
 │   ├── db/                   # Database connection setup
 │   └── design/               # CSS source files (Tailwind)
-├── bin/                      # Dev scripts (test, db-migrate, wt-new, etc.)
+├── bin/                      # Dev scripts (db-migrate, wt-new, etc.)
 ├── .claude/                  # Claude Code rules and skills
 ├── .github/                  # CI/CD workflows
 └── CLAUDE.md                 # AI agent instructions
@@ -76,14 +76,14 @@ See `ibl5/classes/Waivers/` for the canonical example (Repository, Service, Proc
 ## Testing
 
 ```bash
-# Run all tests
-bin/test
+# Run all tests (from ibl5/)
+composer run test
 
 # Run a specific module's tests
-bin/test --filter Player
+composer run test -- --filter Player
 
 # Run static analysis
-cd ibl5 && composer run analyse
+composer run analyse
 
 # Run E2E tests (requires Docker)
 cd ibl5 && bun run test:e2e

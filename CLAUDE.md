@@ -1,6 +1,6 @@
 ---
 description: Root Claude Code instructions for IBL5: commands, mandatory rules, and architecture pointers.
-last_verified: 2026-04-23
+last_verified: 2026-04-29
 ---
 
 # CLAUDE.md
@@ -16,13 +16,13 @@ IBL5 is an Internet Basketball League fantasy basketball site powered by Jump Sh
 ## Commands
 
 ```bash
-bin/test                    # Run all PHPUnit tests
-bin/test | tail -3          # Quick pass/fail check
-cd ibl5 && composer run analyse  # PHPStan (level max + strict-rules + bleedingEdge)
-cd ibl5 && bun run test:e2e      # Playwright E2E (requires Docker + .env.test)
+cd ibl5 && composer run test          # Run all PHPUnit tests
+cd ibl5 && composer run test | tail -3  # Quick pass/fail check
+cd ibl5 && composer run analyse       # PHPStan (level max + strict-rules + bleedingEdge)
+cd ibl5 && bun run test:e2e           # Playwright E2E (requires Docker + .env.test)
 ```
 
-**Full test suite rule:** Always run `bin/test` (no `--filter`/`--testsuite`) after PHP changes and before considering any task complete. Only use targeted flags when actively debugging — then re-run the full suite.
+**Full test suite rule:** Always run `composer run test` (no `--filter`/`--testsuite`) after PHP changes and before considering any task complete. Only use targeted flags when actively debugging — then re-run the full suite.
 
 PHPStan and PHPUnit auto-run via PostToolUse hooks on task completion when PHP files changed. E2E tests do NOT auto-run. See `phpunit-tests.md` and `playwright-tests.md` for full rules.
 

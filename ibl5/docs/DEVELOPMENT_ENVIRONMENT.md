@@ -1,6 +1,6 @@
 ---
 description: Docker setup, dependency management, testing commands, and database connection details.
-last_verified: 2026-04-23
+last_verified: 2026-04-29
 ---
 
 # IBL5 Development Environment Setup
@@ -15,7 +15,7 @@ last_verified: 2026-04-23
 ```bash
 docker compose up -d          # Start Docker stack (PHP + MariaDB)
 cd ibl5 && composer install   # Install PHP dependencies
-bin/test                      # Run all tests
+composer run test             # Run all tests (from ibl5/)
 ```
 
 ---
@@ -29,10 +29,10 @@ Install with `composer install` from the `ibl5/` directory. In CI, `.github/work
 ## Testing from Command Line
 
 ```bash
-bin/test                                              # Run all tests
-bin/test --filter testRenderPlayerHeader              # Run specific test
-bin/test --testsuite "Player"                         # Run specific suite
-cd ibl5 && composer run analyse                       # PHPStan
+composer run test                                     # Run all tests (from ibl5/)
+composer run test -- --filter testRenderPlayerHeader  # Run specific test
+composer run test -- --testsuite "Player"             # Run specific suite
+composer run analyse                                  # PHPStan
 ```
 
 ---

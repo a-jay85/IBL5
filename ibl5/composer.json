@@ -19,6 +19,7 @@
         "pre-autoload-dump": "if [ -L vendor ]; then echo 'ERROR: vendor/ is a symlink (worktree). Do not run composer install/dump-autoload here — it corrupts shared autoload paths. Run from the main repo instead.' && exit 1; fi",
         "lint:php": "vendor/bin/phpcs --standard=PSR12 src",
         "lint:php:fix": "vendor/bin/phpcbf --standard=PSR12 src",
+        "test": "vendor/bin/phpunit --no-progress --no-output --testdox-summary",
         "analyse": "vendor/bin/phpstan analyse --configuration=phpstan.neon --autoload-file=phpstan-stubs/phpstan-rules-bootstrap.php --memory-limit=1G",
         "analyse:baseline": "vendor/bin/phpstan analyse --configuration=phpstan.neon --autoload-file=phpstan-stubs/phpstan-rules-bootstrap.php --generate-baseline --memory-limit=1G",
         "mutation": "vendor/bin/infection --configuration=infection.json5 --coverage=coverage"

@@ -345,8 +345,8 @@ class SeasonTest extends \PHPUnit\Framework\TestCase
             'preseason with No setting' => ['Preseason', 'No', true],
             'heat phase overrides No setting' => ['HEAT', 'No', true],
             'heat phase with Yes setting' => ['HEAT', 'Yes', true],
-            'playoffs with Yes setting' => ['Playoffs', 'Yes', true],
-            'playoffs with No setting' => ['Playoffs', 'No', false],
+            'playoffs always blocked with Yes setting' => ['Playoffs', 'Yes', false],
+            'playoffs always blocked with No setting' => ['Playoffs', 'No', false],
         ];
     }
 }

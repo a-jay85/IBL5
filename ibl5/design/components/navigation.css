@@ -669,9 +669,9 @@ span.nav-dropdown-item a:hover {
    Replaces repeated inline styles with reusable classes.
    ========================================================================== */
 
-/* Nav bar solid opaque navy background (replaces style="background: #1e293b;") */
+/* Nav bar solid opaque navy background (replaces inline style) */
 .nav-bar-bg {
-    background: #1e293b;
+    background: var(--navy-800, #111827);
 }
 
 /* Team logo container in Teams dropdown (replaces style="width:27px;height:27px;flex-shrink:0") */

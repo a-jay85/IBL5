@@ -161,7 +161,7 @@
 /* Rank cell styling */
 .ibl-data-table .rank-cell {
     font-weight: 600;
-    color: var(--navy-700, #334155);
+    color: var(--navy-700, #1a2234);
 }
 
 /* Date cell styling - prevent wrapping */
@@ -266,7 +266,7 @@
 
 /* Divider column */
 .ibl-data-table .divider {
-    background-color: var(--navy-900, #0f172a);
+    background-color: var(--navy-900, #0a0f1a);
     width: 3px;
     padding: 0;
 }
@@ -925,7 +925,7 @@ tr:has(.contract-hint-cell):focus-within .contract-hint-cell {
 /* Corner cell — intersection of sticky header and sticky column */
 .sticky-table .sticky-corner {
     z-index: 15;
-    background: var(--navy-800, #1e293b);
+    background: var(--navy-800, #111827);
 }
 
 /* Shadows — column edge, header bottom, corner combined */
@@ -984,7 +984,7 @@ tr:has(.contract-hint-cell):focus-within .contract-hint-cell {
 
     /* Flat background on column headers row — gradient only on title row */
     .page-sticky .sticky-table thead tr:last-child th {
-        background: var(--team-color-primary, var(--navy-800, #1e293b));
+        background: var(--team-color-primary, var(--navy-800, #111827));
     }
 
     /* Rounded corners on title row only — column header row gets corners via JS clone */
@@ -1052,7 +1052,7 @@ tr:has(.contract-hint-cell):focus-within .contract-hint-cell {
 .page-sticky-header-clone .team-table.sticky-table thead th,
 .page-sticky-header-clone .sticky-table thead th,
 .page-sticky-header-clone th {
-    background: var(--team-color-primary, var(--navy-800, #1e293b));
+    background: var(--team-color-primary, var(--navy-800, #111827));
     box-shadow: none;
 }
 
@@ -1113,7 +1113,7 @@ tr:has(.contract-hint-cell):focus-within .contract-hint-cell {
     font-family: var(--font-display, 'Barlow Condensed', -apple-system, BlinkMacSystemFont, sans-serif);
     font-size: 1.5rem;
     font-weight: 600;
-    color: var(--navy-900, #0f172a);
+    color: var(--navy-900, #0a0f1a);
     text-align: center;
     margin: 0 0 1rem 0;
 }
@@ -1417,7 +1417,7 @@ td.ibl-team-cell--colored {
     right: 100%;
     transform: translateY(-50%);
     padding: 0.375rem 0.625rem;
-    background-color: var(--navy-900, #0f172a);
+    background-color: var(--navy-900, #0a0f1a);
     color: white;
     font-size: 0.8rem;
     font-weight: 500;
@@ -1440,7 +1440,7 @@ td.ibl-team-cell--colored {
     right: 100%;
     transform: translateY(-50%);
     border: 5px solid transparent;
-    border-left-color: var(--navy-900, #0f172a);
+    border-left-color: var(--navy-900, #0a0f1a);
     opacity: 0;
     visibility: hidden;
     transition: opacity 150ms ease, visibility 150ms ease;
@@ -1738,7 +1738,7 @@ td.ibl-team-cell--colored {
 }
 
 .ibl-btn--primary:hover {
-    background: linear-gradient(135deg, var(--navy-700, #334155), var(--navy-800, #1e293b));
+    background: linear-gradient(135deg, var(--navy-700, #1a2234), var(--navy-800, #111827));
 }
 
 /* Submit button uses site accent orange */
@@ -1770,7 +1770,7 @@ td.ibl-team-cell--colored {
 
 /* Link styling for Trading */
 .ibl-link {
-    color: var(--navy-700, #334155);
+    color: var(--navy-700, #1a2234);
     text-decoration: none;
     font-weight: 500;
     transition: color 150ms ease;
@@ -1849,8 +1849,8 @@ td.ibl-team-cell--colored {
     position: relative;
     padding: 0.5rem 0.75rem;
     background: linear-gradient(90deg,
-        var(--team-color-primary, #1e293b),
-        color-mix(in srgb, var(--team-color-primary, #1e293b) 70%, black));
+        var(--team-color-primary, #111827),
+        color-mix(in srgb, var(--team-color-primary, #111827) 70%, black));
     color: var(--team-color-secondary, white);
     font-family: var(--font-display);
     font-weight: 700;
@@ -2397,7 +2397,7 @@ td.ibl-team-cell--colored {
     margin-right: 0;
     margin-left: -2px;
     border-left-color: transparent;
-    border-right-color: var(--navy-900, #0f172a);
+    border-right-color: var(--navy-900, #0a0f1a);
 }
 
 /* Draft Order Movement Highlights */

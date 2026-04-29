@@ -103,7 +103,7 @@
 }
 
 .ibl-btn--primary:hover:not(:disabled) {
-    background: linear-gradient(135deg, var(--navy-700, #334155), var(--navy-800, #1e293b));
+    background: linear-gradient(135deg, var(--navy-700, #1a2234), var(--navy-800, #111827));
 }
 
 /* Secondary button */
@@ -348,7 +348,7 @@
    ========================================================================== */
 
 .ibl-link {
-    color: var(--navy-700, #334155);
+    color: var(--navy-700, #1a2234);
     text-decoration: none;
     font-weight: 500;
     transition: color 150ms ease;

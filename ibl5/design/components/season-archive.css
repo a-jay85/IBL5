@@ -31,7 +31,7 @@
     font-family: var(--font-display, 'Barlow Condensed', sans-serif);
     font-size: 1.25rem;
     font-weight: 600;
-    color: var(--navy-900, #0f172a);
+    color: var(--navy-900, #0a0f1a);
     margin-bottom: var(--space-3, 0.75rem);
 }
 
@@ -52,7 +52,7 @@
     font-family: var(--font-display, 'Barlow Condensed', sans-serif);
     font-size: 1.1rem;
     font-weight: 600;
-    color: var(--navy-800, #1e293b);
+    color: var(--navy-800, #111827);
     margin-bottom: var(--space-2, 0.5rem);
 }
 

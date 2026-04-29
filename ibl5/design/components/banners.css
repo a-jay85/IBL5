@@ -9,8 +9,8 @@
     }
 
     .banners-header {
-        background-color: var(--banner-primary);
-        color: var(--banner-secondary);
+        background-color: var(--banner-primary, #000);
+        color: var(--banner-secondary, #fff);
         padding: 0.5rem 1rem;
     }
 
@@ -34,8 +34,8 @@
         align-items: flex-start;
         justify-content: center;
         text-align: center;
-        background-color: var(--banner-primary);
-        color: var(--banner-secondary);
+        background-color: var(--banner-primary, #000);
+        color: var(--banner-secondary, #fff);
         background-image: var(--banner-bg-image, none);
         background-size: cover;
         background-position: center;

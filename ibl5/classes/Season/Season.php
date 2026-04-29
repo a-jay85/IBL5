@@ -173,13 +173,13 @@ class Season
     /**
      * Check if trades are currently allowed.
      *
-     * Returns true unconditionally during Draft and Free Agency phases,
-     * regardless of the "Allow Trades" setting value. Only checks the
-     * setting during other phases (Preseason, HEAT, Regular Season, Playoffs).
+     * Returns true unconditionally during Draft, Free Agency, Preseason,
+     * and HEAT phases, regardless of the "Allow Trades" setting value.
+     * Only checks the setting during Regular Season and Playoffs.
      */
     public function areTradesAllowed(): bool
     {
-        if ($this->phase === 'Draft' || $this->phase === 'Free Agency' || $this->phase === 'Preseason') {
+        if ($this->phase === 'Draft' || $this->phase === 'Free Agency' || $this->phase === 'Preseason' || $this->phase === 'HEAT') {
             return true;
         }
 

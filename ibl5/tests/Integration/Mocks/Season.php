@@ -92,7 +92,7 @@ class Season
      */
     public function areTradesAllowed(): bool
     {
-        if ($this->phase === 'Draft' || $this->phase === 'Free Agency' || $this->phase === 'Preseason') {
+        if ($this->phase === 'Draft' || $this->phase === 'Free Agency' || $this->phase === 'Preseason' || $this->phase === 'HEAT') {
             return true;
         }
 

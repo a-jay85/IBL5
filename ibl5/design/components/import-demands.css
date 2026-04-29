@@ -1,37 +1,39 @@
+@layer components {
+
 .import-demands {
     max-width: 700px;
-    margin: 2rem auto;
+    margin: var(--space-8, 2rem) auto;
     font-family: Arial, Helvetica, sans-serif;
-    padding: 0 1rem;
+    padding: 0 var(--space-4, 1rem);
 }
 
 .import-demands h1 {
-    font-size: 1.5rem;
-    margin-bottom: 0.5rem;
+    font-size: var(--text-2xl, 1.5rem);
+    margin-bottom: var(--space-2, 0.5rem);
 }
 
 .import-demands p {
-    margin: 0.25rem 0;
-    color: #444;
-    font-size: 0.9rem;
+    margin: var(--space-1, 0.25rem) 0;
+    color: var(--gray-700, #374151);
+    font-size: var(--text-sm, 0.875rem);
 }
 
 .import-demands code {
-    background: #f0f0f0;
+    background: var(--gray-100, #f3f4f6);
     padding: 0.1rem 0.3rem;
-    border-radius: 3px;
-    font-size: 0.85rem;
+    border-radius: var(--radius-sm, 0.25rem);
+    font-size: var(--text-sm, 0.875rem);
 }
 
 .import-demands form {
-    margin: 1.5rem 0;
-    padding: 1rem;
-    background: #f8f8f8;
-    border: 1px solid #ddd;
-    border-radius: 4px;
+    margin: var(--space-6, 1.5rem) 0;
+    padding: var(--space-4, 1rem);
+    background: var(--gray-50, #f9fafb);
+    border: 1px solid var(--gray-200, #e5e7eb);
+    border-radius: var(--radius-sm, 0.25rem);
     display: flex;
     align-items: center;
-    gap: 1rem;
+    gap: var(--space-4, 1rem);
 }
 
 .import-demands form label {
@@ -40,62 +42,64 @@
 }
 
 .import-demands form button {
-    padding: 0.5rem 1.25rem;
-    background: #2563eb;
-    color: #fff;
+    padding: var(--space-2, 0.5rem) var(--space-5, 1.25rem);
+    background: var(--accent-500, #f97316);
+    color: white;
     border: none;
-    border-radius: 4px;
+    border-radius: var(--radius-sm, 0.25rem);
     cursor: pointer;
-    font-size: 0.9rem;
+    font-size: var(--text-sm, 0.875rem);
     white-space: nowrap;
 }
 
 .import-demands form button:hover {
-    background: #1d4ed8;
+    background: var(--accent-600, #ea580c);
 }
 
 .import-demands .results {
-    margin-top: 1rem;
+    margin-top: var(--space-4, 1rem);
 }
 
 .import-demands .alert {
-    padding: 0.75rem 1rem;
-    border-radius: 4px;
-    margin-bottom: 0.75rem;
+    padding: var(--space-3, 0.75rem) var(--space-4, 1rem);
+    border-radius: var(--radius-sm, 0.25rem);
+    margin-bottom: var(--space-3, 0.75rem);
 }
 
 .import-demands .alert-error {
-    background: #fef2f2;
-    border: 1px solid #fca5a5;
-    color: #991b1b;
+    background: var(--error-50, #fef2f2);
+    border: 1px solid var(--error-200, #fecaca);
+    color: var(--error-600, #dc2626);
 }
 
 .import-demands .alert-success {
-    background: #f0fdf4;
-    border: 1px solid #86efac;
-    color: #166534;
+    background: var(--success-50, #f0fdf4);
+    border: 1px solid var(--success-200, #bbf7d0);
+    color: var(--success-600, #16a34a);
 }
 
 .import-demands .alert-warning {
-    background: #fffbeb;
-    border: 1px solid #fcd34d;
-    color: #92400e;
+    background: var(--warning-50, #fffbeb);
+    border: 1px solid var(--warning-200, #fde68a);
+    color: var(--warning-600, #d97706);
 }
 
 .import-demands .skipped-table {
-    margin-top: 0.5rem;
+    margin-top: var(--space-2, 0.5rem);
     border-collapse: collapse;
     width: 100%;
-    font-size: 0.85rem;
+    font-size: var(--text-sm, 0.875rem);
 }
 
 .import-demands .skipped-table th,
 .import-demands .skipped-table td {
     text-align: left;
-    padding: 0.35rem 0.5rem;
-    border-bottom: 1px solid #e5e5e5;
+    padding: var(--space-1, 0.25rem) var(--space-2, 0.5rem);
+    border-bottom: 1px solid var(--gray-200, #e5e7eb);
 }
 
 .import-demands .skipped-table th {
     font-weight: bold;
 }
+
+} /* end @layer components */

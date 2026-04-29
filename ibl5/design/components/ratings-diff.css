@@ -1,28 +1,28 @@
 @layer components {
   .ratings-diff-filter {
-    margin-bottom: 0.75rem;
+    margin-bottom: var(--space-3);
   }
   .ratings-diff-filter select {
-    padding: 0.25rem 0.5rem;
-    border-radius: 0.25rem;
-    border: 1px solid #ccc;
+    padding: var(--space-1) var(--space-2);
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--gray-300);
   }
   .ratings-diff-table .rating-cell {
     white-space: nowrap;
   }
   .ratings-diff-table .delta {
     margin-left: 0.35em;
-    font-size: 0.85em;
+    font-size: var(--text-sm);
     font-weight: 600;
   }
   .ratings-diff-table .delta-up {
-    color: #1b7f2e; /* green */
+    color: var(--success-600);
   }
   .ratings-diff-table .delta-down {
-    color: #b2331f; /* red */
+    color: var(--error-600);
   }
   .ratings-diff-table .delta-zero {
-    color: #888;
+    color: var(--gray-500);
   }
   .ratings-diff-table .rating-cell--up {
     background-color: rgba(40, 167, 69, var(--di, 0.15));
@@ -33,12 +33,12 @@
   .ratings-diff-table .badge-new {
     display: inline-block;
     padding: 0.1em 0.5em;
-    background: #ddd;
-    color: #333;
-    border-radius: 0.25em;
-    font-size: 0.8em;
+    background: var(--gray-200);
+    color: var(--gray-700);
+    border-radius: var(--radius-sm);
+    font-size: var(--text-sm);
     font-weight: 700;
-    letter-spacing: 0.05em;
+    letter-spacing: var(--tracking-display);
   }
   .ratings-diff-table .ratings-separator td {
     padding: 0;

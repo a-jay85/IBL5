@@ -9,8 +9,8 @@
 :root {
     --sos-tier-elite: var(--error-500);     /* #ef4444 - hardest */
     --sos-tier-strong: var(--accent-500);    /* #f97316 */
-    --sos-tier-average: #eab308;             /* yellow - no token match */
-    --sos-tier-weak: #84cc16;               /* lime - no token match */
+    --sos-tier-average: var(--warning-yellow);
+    --sos-tier-weak: var(--success-lime);
     --sos-tier-bottom: var(--success-500);   /* #22c55e - easiest */
 }
 
@@ -19,7 +19,7 @@
   display: inline-block;
   width: 10px;
   height: 10px;
-  border-radius: 50%;
+  border-radius: var(--radius-full);
   margin: 0 4px;
   vertical-align: middle;
   flex-shrink: 0;
@@ -30,7 +30,7 @@
   display: inline-block;
   width: 7px;
   height: 7px;
-  border-radius: 50%;
+  border-radius: var(--radius-full);
   margin: 0 2px;
   vertical-align: middle;
   flex-shrink: 0;
@@ -61,12 +61,12 @@
 .next-sim-opponent-tier {
   display: inline-block;
   padding: 2px 8px;
-  border-radius: 4px;
-  font-size: 0.7rem;
+  border-radius: var(--radius-sm);
+  font-size: var(--text-2xs);
   font-weight: 600;
   color: #fff;
   text-transform: uppercase;
-  letter-spacing: 0.05em;
+  letter-spacing: var(--tracking-display);
   vertical-align: middle;
 }
 
@@ -74,8 +74,8 @@
 .sos-summary {
   text-align: center;
   padding: 4px 12px;
-  font-size: 0.85rem;
-  color: var(--color-text-secondary, #6b7280);
+  font-size: var(--text-sm);
+  color: var(--color-text-secondary);
 }
 
 .sos-summary__label {
@@ -84,12 +84,12 @@
 
 .sos-summary__value {
   font-weight: 700;
-  color: var(--color-text-primary, #111827);
+  color: var(--color-text-primary);
 }
 
 .sos-summary__rank {
-  font-size: 0.8rem;
-  color: var(--color-text-secondary, #6b7280);
+  font-size: var(--text-sm);
+  color: var(--color-text-secondary);
 }
 
 /* Tier Legend */
@@ -98,8 +98,8 @@
   justify-content: center;
   gap: 12px;
   padding: 4px 0 8px;
-  font-size: 0.75rem;
-  color: var(--color-text-secondary, #6b7280);
+  font-size: var(--text-xs);
+  color: var(--color-text-secondary);
   flex-wrap: wrap;
 }
 

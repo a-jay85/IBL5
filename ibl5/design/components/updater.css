@@ -16,14 +16,14 @@ body:has(> .updater) {
     width: auto;
     max-width: none;
     padding-top: 0;
-    background: var(--gray-50, #f9fafb);
+    background: var(--gray-50);
 }
 
 .updater {
     max-width: 620px;
-    margin: var(--space-8, 2rem) auto;
-    padding: 0 var(--space-4, 1rem);
-    font-family: var(--font-sans, 'Barlow', sans-serif);
+    margin: var(--space-8) auto;
+    padding: 0 var(--space-4);
+    font-family: var(--font-sans);
 }
 
 /* ==========================================================================
@@ -31,15 +31,15 @@ body:has(> .updater) {
    ========================================================================== */
 
 .updater__title {
-    font-family: var(--font-display, 'Barlow Condensed', sans-serif);
-    font-size: 1.25rem;
+    font-family: var(--font-display);
+    font-size: var(--text-xl);
     font-weight: 700;
     text-transform: uppercase;
-    letter-spacing: 0.08em;
-    color: var(--gray-800, #1f2937);
-    margin: 0 0 var(--space-6, 1.5rem);
-    padding-bottom: var(--space-3, 0.75rem);
-    border-bottom: 2px solid var(--gray-800, #1f2937);
+    letter-spacing: var(--tracking-eyebrow);
+    color: var(--gray-800);
+    margin: 0 0 var(--space-6);
+    padding-bottom: var(--space-3);
+    border-bottom: 2px solid var(--gray-800);
 }
 
 /* ==========================================================================
@@ -47,17 +47,17 @@ body:has(> .updater) {
    ========================================================================== */
 
 .updater-section {
-    margin-bottom: var(--space-6, 1.5rem);
+    margin-bottom: var(--space-6);
 }
 
 .updater-section__label {
-    font-family: var(--font-display, 'Barlow Condensed', sans-serif);
-    font-size: 0.6875rem;
+    font-family: var(--font-display);
+    font-size: var(--text-2xs);
     font-weight: 600;
     text-transform: uppercase;
-    letter-spacing: 0.12em;
-    color: var(--gray-400, #9ca3af);
-    margin-bottom: var(--space-2, 0.5rem);
+    letter-spacing: var(--tracking-eyebrow);
+    color: var(--gray-400);
+    margin-bottom: var(--space-2);
 }
 
 /* ==========================================================================
@@ -65,15 +65,15 @@ body:has(> .updater) {
    ========================================================================== */
 
 .updater-init {
-    font-size: 0.8125rem;
-    color: var(--gray-400, #9ca3af);
+    font-size: var(--text-sm);
+    color: var(--gray-400);
     line-height: 1.8;
 }
 
 .updater-init__check {
-    color: var(--success-500, #22c55e);
+    color: var(--success-500);
     font-weight: 700;
-    font-size: 0.75rem;
+    font-size: var(--text-xs);
 }
 
 /* ==========================================================================
@@ -84,17 +84,17 @@ body:has(> .updater) {
     display: flex;
     flex-wrap: wrap;
     align-items: center;
-    gap: var(--space-2, 0.5rem);
-    padding: var(--space-1, 0.25rem) 0;
-    font-size: 0.9375rem;
+    gap: var(--space-2);
+    padding: var(--space-1) 0;
+    font-size: 1rem;
     font-weight: 500;
-    color: var(--gray-700, #374151);
+    color: var(--gray-700);
 }
 
 /* --- Running State --- */
 
 .updater-step--running {
-    color: var(--gray-400, #9ca3af);
+    color: var(--gray-400);
     font-weight: 400;
 }
 
@@ -110,16 +110,16 @@ body:has(> .updater) {
     width: 0.875rem;
     text-align: center;
     font-weight: 700;
-    font-size: 0.875rem;
+    font-size: var(--text-sm);
     line-height: 1;
 }
 
 .updater-step--success .updater-step__icon {
-    color: var(--success-600, #16a34a);
+    color: var(--success-600);
 }
 
 .updater-step--error .updater-step__icon {
-    color: var(--error-600, #dc2626);
+    color: var(--error-600);
 }
 
 /* --- Spinner --- */
@@ -127,9 +127,9 @@ body:has(> .updater) {
 .updater-step__spinner {
     width: 0.875rem;
     height: 0.875rem;
-    border: 2px solid var(--gray-200, #e5e7eb);
-    border-top-color: var(--gray-400, #9ca3af);
-    border-radius: 50%;
+    border: 2px solid var(--gray-200);
+    border-top-color: var(--gray-400);
+    border-radius: var(--radius-full);
     animation: updater-spin 0.7s linear infinite;
     flex-shrink: 0;
 }
@@ -141,31 +141,31 @@ body:has(> .updater) {
 /* --- Label --- */
 
 .updater-step__label {
-    font-family: var(--font-sans, 'Barlow', sans-serif);
+    font-family: var(--font-sans);
 }
 
 /* --- Detail (optional secondary text) --- */
 
 .updater-step__detail {
-    font-size: 0.8125rem;
+    font-size: var(--text-sm);
     font-weight: 400;
-    color: var(--gray-400, #9ca3af);
+    color: var(--gray-400);
 }
 
 .updater-step__detail::before {
     content: '\b7';
-    margin-right: var(--space-1, 0.25rem);
-    color: var(--gray-300, #d1d5db);
+    margin-right: var(--space-1);
+    color: var(--gray-300);
 }
 
 /* --- Inline error message --- */
 
 .updater-step__error {
     flex-basis: 100%;
-    font-size: 0.8125rem;
+    font-size: var(--text-sm);
     font-weight: 400;
-    color: var(--error-600, #dc2626);
-    padding: var(--space-1, 0.25rem) 0 var(--space-1, 0.25rem) calc(0.875rem + var(--space-2, 0.5rem));
+    color: var(--error-600);
+    padding: var(--space-1) 0 var(--space-1) calc(0.875rem + var(--space-2));
 }
 
 /* ==========================================================================
@@ -173,10 +173,10 @@ body:has(> .updater) {
    ========================================================================== */
 
 .updater-log {
-    font-size: 0.75rem;
-    color: var(--gray-400, #9ca3af);
+    font-size: var(--text-xs);
+    color: var(--gray-400);
     line-height: 1.6;
-    padding: 0 0 var(--space-1, 0.25rem) calc(0.875rem + var(--space-2, 0.5rem));
+    padding: 0 0 var(--space-1) calc(0.875rem + var(--space-2));
     word-break: break-word;
 }
 
@@ -186,13 +186,13 @@ body:has(> .updater) {
 
 .updater-log b,
 .updater-log strong {
-    color: var(--gray-600, #4b5563);
+    color: var(--gray-600);
     font-weight: 600;
 }
 
 .updater-log font[color="red"],
 .updater-log .text-error {
-    color: var(--error-500, #ef4444);
+    color: var(--error-500);
 }
 
 .updater-log pre {
@@ -209,7 +209,7 @@ body:has(> .updater) {
 .updater-details__summary {
     cursor: pointer;
     font-weight: 500;
-    color: var(--gray-500, #6b7280);
+    color: var(--gray-500);
     user-select: none;
     list-style: none;
 }
@@ -221,8 +221,8 @@ body:has(> .updater) {
 .updater-details__summary::before {
     content: '\25b6';
     display: inline-block;
-    font-size: 0.5625rem;
-    margin-right: var(--space-1, 0.25rem);
+    font-size: var(--text-2xs);
+    margin-right: var(--space-1);
     transition: transform 0.15s ease;
 }
 
@@ -231,7 +231,7 @@ body:has(> .updater) {
 }
 
 .updater-details__content {
-    padding: var(--space-1, 0.25rem) 0 0 calc(0.5625rem + var(--space-1, 0.25rem));
+    padding: var(--space-1) 0 0 calc(0.5625rem + var(--space-1));
 }
 
 .updater-details__content p {
@@ -241,16 +241,16 @@ body:has(> .updater) {
 /* --- Error variant --- */
 
 .updater-details__summary--errors {
-    color: var(--error-500, #ef4444);
+    color: var(--error-500);
     font-weight: 600;
 }
 
 .updater-details--errors {
-    margin-top: var(--space-1, 0.25rem);
+    margin-top: var(--space-1);
 }
 
 .updater-details__content .text-error {
-    color: var(--error-500, #ef4444);
+    color: var(--error-500);
 }
 
 /* ==========================================================================
@@ -261,25 +261,25 @@ body:has(> .updater) {
     display: flex;
     flex-wrap: wrap;
     align-items: center;
-    gap: var(--space-3, 0.75rem);
-    padding: var(--space-3, 0.75rem) 0;
-    border-top: 2px solid var(--gray-800, #1f2937);
+    gap: var(--space-3);
+    padding: var(--space-3) 0;
+    border-top: 2px solid var(--gray-800);
 }
 
 .updater-summary__status {
-    font-family: var(--font-display, 'Barlow Condensed', sans-serif);
-    font-size: 0.8125rem;
+    font-family: var(--font-display);
+    font-size: var(--text-sm);
     font-weight: 600;
     text-transform: uppercase;
-    letter-spacing: 0.06em;
+    letter-spacing: var(--tracking-eyebrow);
 }
 
 .updater-summary__status--success {
-    color: var(--success-600, #16a34a);
+    color: var(--success-600);
 }
 
 .updater-summary__status--error {
-    color: var(--error-600, #dc2626);
+    color: var(--error-600);
 }
 
 /* ==========================================================================
@@ -289,7 +289,7 @@ body:has(> .updater) {
 .updater__return {
     display: block;
     text-align: center;
-    margin-top: var(--space-4, 1rem);
+    margin-top: var(--space-4);
 }
 
 } /* end @layer components */

@@ -13,10 +13,10 @@
 
   .league-switcher-admin label {
     font-family: var(--font-display);
-    font-size: 0.875rem;
+    font-size: var(--text-sm);
     font-weight: 600;
     text-transform: uppercase;
-    letter-spacing: 0.05em;
+    letter-spacing: var(--tracking-display);
     color: var(--gray-600);
   }
 
@@ -27,9 +27,9 @@
     border-radius: var(--radius-md);
     font-family: var(--font-display);
     font-weight: 700;
-    font-size: 0.875rem;
+    font-size: var(--text-sm);
     text-transform: uppercase;
-    letter-spacing: 0.08em;
+    letter-spacing: var(--tracking-eyebrow);
   }
 
   .league-badge-ibl {
@@ -55,7 +55,7 @@
   }
 
   .lcp-note {
-    font-size: 0.8125rem;
+    font-size: var(--text-sm);
     color: var(--gray-400);
     font-style: italic;
     margin-top: var(--space-1);

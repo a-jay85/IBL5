@@ -3,7 +3,7 @@
 .debug-panel {
     margin: 10px 0;
     border: 1px solid #ccc;
-    border-radius: 4px;
+    border-radius: var(--radius-sm);
 }
 
 .debug-panel__header {
@@ -25,7 +25,7 @@
 .debug-breakdown {
     margin-top: 1rem;
     border: 1px solid #444;
-    border-radius: 6px;
+    border-radius: var(--radius-md);
     background: #1a1a2e;
     color: #e0e0e0;
 }
@@ -35,13 +35,13 @@
     font-weight: 600;
     cursor: pointer;
     background: #16213e;
-    border-radius: 6px;
+    border-radius: var(--radius-md);
     color: #a5d8ff;
 }
 
 .debug-breakdown[open] > .debug-breakdown__summary {
     border-bottom: 1px solid #444;
-    border-radius: 6px 6px 0 0;
+    border-radius: var(--radius-md) var(--radius-md) 0 0;
 }
 
 .debug-breakdown__section {
@@ -54,16 +54,16 @@
 }
 
 .debug-breakdown__heading {
-    font-size: 0.85rem;
+    font-size: var(--text-sm);
     font-weight: 600;
     color: #a5d8ff;
     margin: 0 0 0.5rem;
     text-transform: uppercase;
-    letter-spacing: 0.05em;
+    letter-spacing: var(--tracking-display);
 }
 
 .debug-breakdown .ibl-data-table {
-    font-size: 0.8rem;
+    font-size: var(--text-sm);
     background: transparent;
     color: #e0e0e0;
 }
@@ -80,7 +80,7 @@
 
 .debug-breakdown__kv {
     margin: 0;
-    font-size: 0.85rem;
+    font-size: var(--text-sm);
 }
 
 .debug-breakdown__kv > div {
@@ -102,12 +102,12 @@
 
 .debug-breakdown__mono {
     font-family: monospace;
-    font-size: 0.75rem;
+    font-size: var(--text-xs);
 }
 
 .debug-breakdown__formula {
     font-family: monospace;
-    font-size: 0.9rem;
+    font-size: 1rem;
     margin: 0;
     color: #ccc;
 }
@@ -144,7 +144,7 @@
     display: inline-block;
     width: 8px;
     height: 8px;
-    border-radius: 50%;
+    border-radius: var(--radius-full);
     flex-shrink: 0;
 }
 

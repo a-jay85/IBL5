@@ -168,17 +168,17 @@
 
 .auth-status__title {
     font-family: var(--font-display);
-    font-size: 1.5rem;
+    font-size: var(--text-2xl);
     font-weight: 700;
     text-transform: uppercase;
-    letter-spacing: 0.05em;
+    letter-spacing: var(--tracking-display);
     color: var(--gray-800);
     margin-bottom: var(--space-2);
 }
 
 .auth-status__message {
     font-family: var(--font-sans);
-    font-size: 1.125rem;
+    font-size: var(--text-lg);
     color: var(--gray-600);
     line-height: 1.6;
     margin-bottom: var(--space-4);

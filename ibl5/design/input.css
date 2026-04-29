@@ -22,6 +22,11 @@
   --color-accent-200: #fed7aa;
   --color-accent-100: #ffedd5;
 
+  /* Fill in missing palette steps */
+  --color-accent-700: #c2410c;
+  --color-success-400: #4ade80;
+  --color-error-400: #f87171;
+
   /* Status: Success */
   --color-success-600: #16a34a;
   --color-success-500: #22c55e;
@@ -37,11 +42,15 @@
   --color-error-50: #fef2f2;
 
   /* Status: Warning */
+  --color-warning-yellow: #eab308;
   --color-warning-600: #d97706;
   --color-warning-500: #f59e0b;
   --color-warning-200: #fde68a;
   --color-warning-100: #fef3c7;
   --color-warning-50: #fffbeb;
+
+  /* Supplementary status hues (SoS tier scale) */
+  --color-success-lime: #84cc16;
 
   /* Status: Info */
   --color-info-600: #2563eb;
@@ -50,9 +59,54 @@
   --color-info-100: #dbeafe;
   --color-info-50: #eff6ff;
 
+  /* Transaction badge palette */
+  --color-txn-trade-bg: #e3f2fd;
+  --color-txn-trade-fg: #1565c0;
+  --color-txn-fa-bg: #fff3e0;
+  --color-txn-fa-fg: #e65100;
+  --color-txn-waiver-bg: #e8f5e9;
+  --color-txn-waiver-fg: #2e7d32;
+  --color-txn-extension-bg: #fce4ec;
+  --color-txn-extension-fg: #c2185b;
+  --color-txn-draft-bg: #f3e5f5;
+  --color-txn-draft-fg: #7b1fa2;
+  --color-txn-release-bg: #e0f7fa;
+  --color-txn-release-fg: #00838f;
+
+  /* Neutrals (promoted so utilities + tokens share source) */
+  --color-gray-50:  #f9fafb;
+  --color-gray-100: #f3f4f6;
+  --color-gray-200: #e5e7eb;
+  --color-gray-300: #d1d5db;
+  --color-gray-400: #9ca3af;
+  --color-gray-500: #6b7280;
+  --color-gray-600: #4b5563;
+  --color-gray-700: #374151;
+  --color-gray-800: #1f2937;
+  --color-gray-900: #111827;
+
+  /* Type scale */
+  --text-2xs:   0.6875rem;
+  --text-xs:    0.75rem;
+  --text-sm:    0.875rem;
+  --text-base:  1rem;
+  --text-lg:    1.125rem;
+  --text-xl:    1.25rem;
+  --text-2xl:   1.5rem;
+
+  /* Tracking */
+  --tracking-display: 0.04em;
+  --tracking-eyebrow: 0.08em;
+
+  /* Focus ring + accent glow */
+  --ring-accent:        0 0 0 3px rgb(249 115 22 / 0.1);
+  --ring-accent-strong: 0 0 0 2px rgb(249 115 22 / 0.5);
+  --shadow-sticky-col:    2px 0 4px rgb(0 0 0 / 0.08);
+  --shadow-sticky-header: 0 2px 4px rgb(0 0 0 / 0.1);
+
   /* Font families */
-  --font-display: 'Barlow Condensed', sans-serif;
-  --font-sans: 'Barlow', system-ui, sans-serif;
+  --font-display: 'Barlow Condensed', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --font-sans: 'Barlow', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
 }
 
 @import './tokens/tokens.css';

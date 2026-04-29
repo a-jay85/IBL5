@@ -27,7 +27,7 @@
 }
 
 .schedule-highlight-note {
-    font-size: 0.875rem;
+    font-size: var(--text-sm);
     font-style: italic;
     color: var(--gray-500);
     margin: 0;
@@ -43,7 +43,7 @@
     font-size: 1rem;
     font-weight: 600;
     text-transform: uppercase;
-    letter-spacing: 0.03em;
+    letter-spacing: var(--tracking-display);
     text-decoration: none;
     border-radius: var(--radius-full);
     transition: all var(--transition-fast);
@@ -98,7 +98,7 @@
 .schedule-month {
     margin-bottom: var(--space-4);
     scroll-margin-top: 80px; /* Offset for sticky header */
-    border: 1px solid var(--gray-200, #e5e7eb);
+    border: 1px solid var(--gray-200);
     border-radius: var(--radius-md);
     overflow: hidden;
 }
@@ -108,10 +108,10 @@
     background: var(--navy-800);
     color: white;
     font-family: var(--font-display);
-    font-size: 1.125rem;
+    font-size: var(--text-lg);
     font-weight: 700;
     text-transform: uppercase;
-    letter-spacing: 0.05em;
+    letter-spacing: var(--tracking-display);
     border-radius: var(--radius-md) var(--radius-md) 0 0;
 }
 
@@ -145,7 +145,7 @@
 
 .schedule-day__num {
     font-family: var(--font-display);
-    font-size: 1.125rem;
+    font-size: var(--text-lg);
     font-weight: 700;
     color: var(--navy-800);
     line-height: 1;
@@ -201,11 +201,11 @@
 }
 
 .schedule-game.user-team-game {
-    background: var(--warning-100, #fef3c7);
+    background: var(--warning-100);
 }
 
 .schedule-game.user-team-game:hover {
-    background: var(--warning-200, #fde68a);
+    background: var(--warning-200);
 }
 
 /* Team name */
@@ -400,7 +400,7 @@
 /* Streak column styling */
 .schedule-game__streak {
     font-family: var(--font-display);
-    font-size: 0.875rem;
+    font-size: var(--text-sm);
     font-weight: 700;
     text-align: center;
     color: var(--gray-500);
@@ -450,7 +450,7 @@
     }
 
     .schedule-game__streak {
-        font-size: 0.75rem;
+        font-size: var(--text-xs);
     }
 }
 

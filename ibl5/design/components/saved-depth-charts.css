@@ -15,7 +15,7 @@
 
 .saved-dc-label {
     font-weight: 600;
-    font-size: 0.875rem;
+    font-size: var(--text-sm);
     white-space: nowrap;
 }
 
@@ -27,9 +27,9 @@
 
 .saved-dc-select {
     padding: 0.25rem 0.5rem;
-    font-size: 0.8125rem;
+    font-size: var(--text-sm);
     border: 1px solid var(--gray-300);
-    border-radius: 4px;
+    border-radius: var(--radius-sm);
     max-width: 480px;
     cursor: pointer;
 }
@@ -54,10 +54,10 @@
 .saved-dc-rename-btn {
     background: none;
     border: 1px solid var(--gray-300);
-    border-radius: 4px;
+    border-radius: var(--radius-sm);
     padding: 0.2rem 0.4rem;
     cursor: pointer;
-    font-size: 0.875rem;
+    font-size: var(--text-sm);
     line-height: 1;
     color: var(--gray-600);
     transition: color 0.15s, border-color 0.15s;
@@ -69,7 +69,7 @@
 }
 
 .saved-dc-loading {
-    font-size: 0.8125rem;
+    font-size: var(--text-sm);
     color: var(--gray-500);
     font-style: italic;
 }
@@ -86,16 +86,16 @@ tr.depth-chart-traded-player select {
 
 .traded-badge {
     display: inline-block;
-    font-size: 0.625rem;
+    font-size: var(--text-2xs);
     font-weight: 700;
     text-transform: uppercase;
     background-color: var(--error-500);
     color: #fff;
     padding: 0.05rem 0.3rem;
-    border-radius: 3px;
+    border-radius: var(--radius-sm);
     margin-left: 0.35rem;
     vertical-align: middle;
-    letter-spacing: 0.03em;
+    letter-spacing: var(--tracking-display);
 }
 
 } /* end @layer components */

@@ -78,13 +78,13 @@
    ========================================================================== */
 
 .ibl-data-table {
-    font-family: var(--font-sans, 'Barlow', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif);
+    font-family: var(--font-sans);
     border-collapse: separate;
     border-spacing: 0;
-    border: 1px solid var(--gray-200, #e5e7eb);
-    border-radius: var(--radius-lg, 0.5rem);
+    border: 1px solid var(--gray-200);
+    border-radius: var(--radius-lg);
     overflow: hidden;
-    box-shadow: var(--shadow-md, 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1));
+    box-shadow: var(--shadow-md);
     width: auto;
     max-width: 1440px;
     margin: 0 auto var(--space-4);
@@ -97,11 +97,11 @@
 
 .ibl-data-table th {
     color: white;
-    font-family: var(--font-display, 'Barlow Condensed', -apple-system, BlinkMacSystemFont, sans-serif);
+    font-family: var(--font-display);
     font-weight: 600;
-    font-size: 1.2rem;
+    font-size: var(--text-xl);
     text-transform: uppercase;
-    letter-spacing: 0.03em;
+    letter-spacing: var(--tracking-display);
     line-height: 1.2rem;
     padding: 0.75rem 0.1rem;
     text-align: center;
@@ -111,7 +111,7 @@
 
 /* Data cells */
 .ibl-data-table td {
-    color: var(--gray-800, #1f2937);
+    color: var(--gray-800);
     font-size: 1rem;
     padding: 0.25rem 0.1rem;
     text-align: center;
@@ -128,23 +128,23 @@
 }
 
 .ibl-data-table tbody tr:nth-child(even) {
-    background-color: var(--gray-50, #f9fafb);
+    background-color: var(--gray-50);
 }
 
 .ibl-data-table tbody tr:hover {
-    background-color: var(--gray-100, #f3f4f6);
+    background-color: var(--gray-100);
 }
 
 /* Links */
 .ibl-data-table a {
-    color: var(--gray-800, #1f2937);
+    color: var(--gray-800);
     text-decoration: none;
     font-weight: 500;
     transition: color 150ms ease;
 }
 
 .ibl-data-table a:hover {
-    color: var(--accent-500, #f97316);
+    color: var(--accent-500);
 }
 
 /* First/last cell padding */
@@ -161,7 +161,7 @@
 /* Rank cell styling */
 .ibl-data-table .rank-cell {
     font-weight: 600;
-    color: var(--navy-700, #334155);
+    color: var(--navy-700);
 }
 
 /* Date cell styling - prevent wrapping */
@@ -172,72 +172,72 @@
 /* Highlight row - use :nth-child for higher specificity without !important */
 .ibl-data-table tbody tr.highlight:nth-child(odd),
 .ibl-data-table tbody tr.highlight:nth-child(even) {
-    background-color: var(--accent-100, #ffedd5);
+    background-color: var(--accent-100);
 }
 
 .ibl-data-table tbody tr.highlight:nth-child(odd):hover,
 .ibl-data-table tbody tr.highlight:nth-child(even):hover {
-    background-color: var(--accent-200, #fed7aa);
+    background-color: var(--accent-200);
 }
 
 /* Standings clinch tier rows — strongest to weakest orange */
 .ibl-data-table tbody tr.clinch-league:nth-child(odd),
 .ibl-data-table tbody tr.clinch-league:nth-child(even) {
-    background-color: var(--accent-200, #fed7aa);
+    background-color: var(--accent-200);
 }
 
 .ibl-data-table tbody tr.clinch-league:nth-child(odd):hover,
 .ibl-data-table tbody tr.clinch-league:nth-child(even):hover {
-    background-color: var(--accent-300, #fdba74);
+    background-color: var(--accent-300);
 }
 
 .ibl-data-table tbody tr.clinch-conference:nth-child(odd),
 .ibl-data-table tbody tr.clinch-conference:nth-child(even) {
-    background-color: color-mix(in srgb, var(--accent-200, #fed7aa) 60%, var(--accent-100, #ffedd5));
+    background-color: color-mix(in srgb, var(--accent-200) 60%, var(--accent-100));
 }
 
 .ibl-data-table tbody tr.clinch-conference:nth-child(odd):hover,
 .ibl-data-table tbody tr.clinch-conference:nth-child(even):hover {
-    background-color: var(--accent-200, #fed7aa);
+    background-color: var(--accent-200);
 }
 
 .ibl-data-table tbody tr.clinch-division:nth-child(odd),
 .ibl-data-table tbody tr.clinch-division:nth-child(even) {
-    background-color: var(--accent-100, #ffedd5);
+    background-color: var(--accent-100);
 }
 
 .ibl-data-table tbody tr.clinch-division:nth-child(odd):hover,
 .ibl-data-table tbody tr.clinch-division:nth-child(even):hover {
-    background-color: var(--accent-200, #fed7aa);
+    background-color: var(--accent-200);
 }
 
 .ibl-data-table tbody tr.clinch-playoffs:nth-child(odd),
 .ibl-data-table tbody tr.clinch-playoffs:nth-child(even) {
-    background-color: color-mix(in srgb, var(--accent-100, #ffedd5) 50%, white);
+    background-color: color-mix(in srgb, var(--accent-100) 50%, white);
 }
 
 .ibl-data-table tbody tr.clinch-playoffs:nth-child(odd):hover,
 .ibl-data-table tbody tr.clinch-playoffs:nth-child(even):hover {
-    background-color: var(--accent-100, #ffedd5);
+    background-color: var(--accent-100);
 }
 
 /* Bottom-locked row — team can't catch the team above */
 .ibl-data-table tbody tr.bottom-locked:nth-child(odd),
 .ibl-data-table tbody tr.bottom-locked:nth-child(even) {
-    background-color: var(--gray-100, #f3f4f6);
-    color: var(--gray-400, #9ca3af);
+    background-color: var(--gray-100);
+    color: var(--gray-400);
 }
 
 .ibl-data-table tbody tr.bottom-locked:nth-child(odd):hover,
 .ibl-data-table tbody tr.bottom-locked:nth-child(even):hover {
-    background-color: var(--gray-200, #e5e7eb);
+    background-color: var(--gray-200);
 }
 
 .ibl-data-table tbody tr.bottom-locked td,
 .ibl-data-table tbody tr.bottom-locked td a,
 .ibl-data-table tbody tr.bottom-locked td .ibl-stat-highlight,
 .ibl-data-table tbody tr.bottom-locked td .ibl-clinched-indicator {
-    color: var(--gray-400, #9ca3af);
+    color: var(--gray-400);
 }
 
 .ibl-data-table tbody tr.bottom-locked td.ibl-team-cell--colored {
@@ -266,7 +266,7 @@
 
 /* Divider column */
 .ibl-data-table .divider {
-    background-color: var(--navy-900, #0f172a);
+    background-color: var(--navy-900);
     width: 3px;
     padding: 0;
 }
@@ -274,49 +274,49 @@
 /* Totals/summary row - use :nth-child for higher specificity without !important */
 .ibl-data-table tbody tr.totals-row:nth-child(odd),
 .ibl-data-table tbody tr.totals-row:nth-child(even) {
-    background-color: var(--accent-100, #ffedd5);
+    background-color: var(--accent-100);
     font-weight: 600;
 }
 
 .ibl-data-table tbody tr.totals-row:nth-child(odd):hover,
 .ibl-data-table tbody tr.totals-row:nth-child(even):hover {
-    background-color: var(--accent-200, #fed7aa);
+    background-color: var(--accent-200);
 }
 
 /* Table footer summary rows (team totals, cap totals, etc.) */
 .ibl-data-table tfoot tr {
-    background-color: var(--accent-100, #ffedd5);
+    background-color: var(--accent-100);
     font-weight: 600;
 }
 
 .ibl-data-table tfoot tr:hover {
-    background-color: var(--accent-200, #fed7aa);
+    background-color: var(--accent-200);
 }
 
 /* Top border separating tfoot from tbody */
 .ibl-data-table tfoot tr:first-child td {
-    border-top: 1px solid var(--gray-200, #e5e7eb);
+    border-top: 1px solid var(--gray-200);
 }
 
 /* Legend/key row — subtle, de-emphasized */
 .ibl-data-table tfoot tr.tfoot-legend {
-    background-color: var(--gray-50, #f9fafb);
+    background-color: var(--gray-50);
     font-weight: 400;
-    font-size: 0.875rem;
-    color: var(--gray-500, #6b7280);
+    font-size: var(--text-sm);
+    color: var(--gray-500);
 }
 
 .ibl-data-table tfoot tr.tfoot-legend:hover {
-    background-color: var(--gray-100, #f3f4f6);
+    background-color: var(--gray-100);
 }
 
 .ibl-data-table tfoot tr.tfoot-legend td {
-    border-top: 1px solid var(--gray-200, #e5e7eb);
+    border-top: 1px solid var(--gray-200);
 }
 
 /* Cap exceeded — red highlight when salary totals exceed hard cap */
 .ibl-data-table tfoot td.cap-exceeded {
-    color: var(--color-error-600, #dc2626);
+    color: var(--color-error-600);
     font-weight: 700;
 }
 
@@ -371,8 +371,8 @@
 /* Weak separators (gray, same as before) */
 .team-table th.sep-weak,
 .team-table td.sep-weak {
-    border-left: 0.5px solid var(--gray-200, #e5e7eb);
-    border-right: 0.5px solid var(--gray-200, #e5e7eb);
+    border-left: 0.5px solid var(--gray-200);
+    border-right: 0.5px solid var(--gray-200);
     padding: 0;
 }
 
@@ -390,7 +390,7 @@
     cursor: pointer;
     text-decoration: underline;
     text-decoration-style: dotted;
-    text-decoration-color: var(--gray-400, #9ca3af);
+    text-decoration-color: var(--gray-400);
     text-underline-offset: 2px;
     -webkit-tap-highlight-color: transparent;
 }
@@ -404,7 +404,7 @@
     left: 0;
     z-index: 0;
     background-color: inherit;
-    color: var(--accent-700, #c2410c);
+    color: var(--accent-700);
     text-decoration-line: none;
     font-weight: 600;
     white-space: nowrap;
@@ -458,7 +458,7 @@ tr:has(.contract-hint-cell):focus-within .contract-hint-cell {
 }
 
 .team-table tfoot tr:first-child td {
-    border-top-color: color-mix(in srgb, var(--team-color-primary) 30%, var(--gray-200, #e5e7eb));
+    border-top-color: color-mix(in srgb, var(--team-color-primary) 30%, var(--gray-200));
 }
 
 /* Ratings highlight rows (team-colored) */
@@ -509,15 +509,15 @@ tr:has(.contract-hint-cell):focus-within .contract-hint-cell {
     }
 
     .responsive-table tbody tr:nth-child(even) td[class*="sticky-col"] {
-        background-color: var(--gray-50, #f9fafb);
+        background-color: var(--gray-50);
     }
 
     .responsive-table tbody tr:hover td[class*="sticky-col"] {
-        background-color: var(--team-row-hover-bg, var(--gray-100, #f3f4f6));
+        background-color: var(--team-row-hover-bg, var(--gray-100));
     }
 
     .ibl-data-table.responsive-table td.sticky-col {
-        box-shadow: 2px 0 4px rgba(0, 0, 0, 0.05);
+        box-shadow: var(--shadow-sticky-col);
     }
 
     /* Two sticky columns (rank + name pattern) */
@@ -563,88 +563,88 @@ tr:has(.contract-hint-cell):focus-within .contract-hint-cell {
 
     /* Col-2 gets shadow only for 2-column sticky layouts */
     .ibl-data-table.responsive-table:not(:has(.sticky-col-3)) td.sticky-col-2 {
-        box-shadow: 2px 0 4px rgba(0, 0, 0, 0.05);
+        box-shadow: var(--shadow-sticky-col);
     }
 
     /* Col-3 gets shadow for 3-column sticky layouts */
     .ibl-data-table.responsive-table td.sticky-col-3 {
-        box-shadow: 2px 0 4px rgba(0, 0, 0, 0.05);
+        box-shadow: var(--shadow-sticky-col);
     }
 
     /* Drafted row sticky backgrounds - consolidated */
     .responsive-table tbody tr.drafted td[class*="sticky-col"] {
-        background-color: var(--gray-100, #f3f4f6);
+        background-color: var(--gray-100);
     }
 
     /* Ratings highlight row sticky backgrounds (team-colored in Next Sim, League Starters) */
     .responsive-table tbody tr.ratings-highlight td[class*="sticky-col"] {
-        background-color: var(--team-row-highlight-bg, #FFFFAA);
+        background-color: var(--team-row-highlight-bg);
     }
 
     .responsive-table tbody tr.ratings-highlight:hover td[class*="sticky-col"] {
-        background-color: var(--team-row-highlight-hover-bg, var(--gray-100, #f3f4f6));
+        background-color: var(--team-row-highlight-hover-bg, var(--gray-100));
     }
 
     /* User team highlight sticky backgrounds */
     .responsive-table tbody tr.user-team-row td[class*="sticky-col"],
     .sticky-table tbody tr.user-team-row td[class*="sticky-col"] {
-        background-color: var(--warning-100, #fef3c7);
+        background-color: var(--warning-100);
     }
 
     .responsive-table tbody tr.user-team-row:hover td[class*="sticky-col"],
     .sticky-table tbody tr.user-team-row:hover td[class*="sticky-col"] {
-        background-color: var(--warning-200, #fde68a);
+        background-color: var(--warning-200);
     }
 
     /* Clinch tier sticky backgrounds */
     .responsive-table tbody tr.clinch-league td[class*="sticky-col"] {
-        background-color: var(--accent-200, #fed7aa);
+        background-color: var(--accent-200);
     }
 
     .responsive-table tbody tr.clinch-league:hover td[class*="sticky-col"] {
-        background-color: var(--accent-300, #fdba74);
+        background-color: var(--accent-300);
     }
 
     .responsive-table tbody tr.clinch-conference td[class*="sticky-col"] {
-        background-color: color-mix(in srgb, var(--accent-200, #fed7aa) 60%, var(--accent-100, #ffedd5));
+        background-color: color-mix(in srgb, var(--accent-200) 60%, var(--accent-100));
     }
 
     .responsive-table tbody tr.clinch-conference:hover td[class*="sticky-col"] {
-        background-color: var(--accent-200, #fed7aa);
+        background-color: var(--accent-200);
     }
 
     .responsive-table tbody tr.clinch-division td[class*="sticky-col"] {
-        background-color: var(--accent-100, #ffedd5);
+        background-color: var(--accent-100);
     }
 
     .responsive-table tbody tr.clinch-division:hover td[class*="sticky-col"] {
-        background-color: var(--accent-200, #fed7aa);
+        background-color: var(--accent-200);
     }
 
     .responsive-table tbody tr.clinch-playoffs td[class*="sticky-col"] {
-        background-color: color-mix(in srgb, var(--accent-100, #ffedd5) 50%, white);
+        background-color: color-mix(in srgb, var(--accent-100) 50%, white);
     }
 
     .responsive-table tbody tr.clinch-playoffs:hover td[class*="sticky-col"] {
-        background-color: var(--accent-100, #ffedd5);
+        background-color: var(--accent-100);
     }
 
     /* Bottom-locked row sticky backgrounds */
     .responsive-table tbody tr.bottom-locked td[class*="sticky-col"] {
-        background-color: var(--gray-100, #f3f4f6);
+        background-color: var(--gray-100);
     }
 
     .responsive-table tbody tr.bottom-locked:hover td[class*="sticky-col"] {
-        background-color: var(--gray-200, #e5e7eb);
+        background-color: var(--gray-200);
     }
 
     /* Tfoot sticky-col backgrounds (team-colored or accent fallback) */
     .responsive-table tfoot td[class*="sticky-col"] {
-        background-color: var(--team-row-highlight-bg, var(--accent-100, #ffedd5));
+        background-color: var(--team-row-highlight-bg, var(--accent-100));
     }
 
     .responsive-table tfoot tr:hover td[class*="sticky-col"] {
-        background-color: var(--team-row-highlight-hover-bg, var(--accent-200, #fed7aa));
+        background-color: var(--team-row-highlight-hover-bg, var(--accent-200));
     }
 
     /* Remove first-column left padding on responsive tables -
@@ -742,11 +742,11 @@ tr:has(.contract-hint-cell):focus-within .contract-hint-cell {
 /* When a table has a <caption> (team tabs), move the top border-radius
    from the table to the caption so the tabs get the rounded corners. */
 .ibl-data-table:has(> caption) {
-    border-radius: 0 0 var(--radius-lg, 0.5rem) var(--radius-lg, 0.5rem);
+    border-radius: 0 0 var(--radius-lg) var(--radius-lg);
 }
 
 .team-table-caption {
-    border-radius: var(--radius-lg, 0.5rem) var(--radius-lg, 0.5rem) 0 0;
+    border-radius: var(--radius-lg) var(--radius-lg) 0 0;
     overflow: hidden;
 }
 
@@ -756,7 +756,7 @@ tr:has(.contract-hint-cell):focus-within .contract-hint-cell {
     -webkit-overflow-scrolling: touch;
     max-width: 100%;
     width: 100%;
-    border-radius: var(--radius-lg, 0.5rem);
+    border-radius: var(--radius-lg);
 }
 
 /* Center section titles on mobile */
@@ -812,7 +812,7 @@ tr:has(.contract-hint-cell):focus-within .contract-hint-cell {
     pointer-events: none;
     opacity: 1;
     transition: opacity 0.3s ease;
-    border-radius: 0 var(--radius-lg, 0.5rem) var(--radius-lg, 0.5rem) 0;
+    border-radius: 0 var(--radius-lg) var(--radius-lg) 0;
     z-index: 2;
 }
 
@@ -851,9 +851,9 @@ tr:has(.contract-hint-cell):focus-within .contract-hint-cell {
     max-height: 80vh;
     overflow: auto;
     margin: 0 auto;
-    border: 1px solid var(--gray-200, #e5e7eb);
-    border-radius: var(--radius-lg, 0.5rem);
-    box-shadow: var(--shadow-md, 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1));
+    border: 1px solid var(--gray-200);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-md);
 }
 
 /* Desktop: remove height constraint; fit-content so border-radius
@@ -901,7 +901,7 @@ tr:has(.contract-hint-cell):focus-within .contract-hint-cell {
     position: sticky;
     top: 0;
     z-index: 10;
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    box-shadow: var(--shadow-sticky-header);
 }
 
 .sticky-table thead th {
@@ -925,17 +925,17 @@ tr:has(.contract-hint-cell):focus-within .contract-hint-cell {
 /* Corner cell — intersection of sticky header and sticky column */
 .sticky-table .sticky-corner {
     z-index: 15;
-    background: var(--navy-800, #1e293b);
+    background: var(--navy-800);
 }
 
 /* Shadows — column edge, header bottom, corner combined */
 .sticky-table tbody td.sticky-col {
-    box-shadow: 2px 0 4px rgba(0, 0, 0, 0.08);
+    box-shadow: var(--shadow-sticky-col);
     border-right: 1px solid var(--gray-100);
 }
 
 .sticky-table tbody td.sticky-col-2 {
-    box-shadow: 2px 0 4px rgba(0, 0, 0, 0.08);
+    box-shadow: var(--shadow-sticky-col);
     border-right: 1px solid var(--gray-100);
 }
 
@@ -943,7 +943,7 @@ tr:has(.contract-hint-cell):focus-within .contract-hint-cell {
    to avoid overlapping shadows creating darker lines between columns. */
 
 .sticky-table thead .sticky-corner {
-    box-shadow: 2px 2px 4px rgba(0, 0, 0, 0.1);
+    box-shadow: var(--shadow-sticky-col), var(--shadow-sticky-header);
 }
 
 /* Sticky-col body cell backgrounds — required so content behind
@@ -953,16 +953,16 @@ tr:has(.contract-hint-cell):focus-within .contract-hint-cell {
 }
 
 .sticky-table tbody tr:nth-child(even) td[class*="sticky-col"] {
-    background-color: var(--gray-50, #f9fafb);
+    background-color: var(--gray-50);
 }
 
 .sticky-table tbody tr:hover td[class*="sticky-col"] {
-    background-color: var(--gray-100, #f3f4f6);
+    background-color: var(--gray-100);
 }
 
 /* Drafted row sticky backgrounds */
 .sticky-table tbody tr.drafted td[class*="sticky-col"] {
-    background-color: var(--gray-100, #f3f4f6);
+    background-color: var(--gray-100);
 }
 
 /* Prevent cell text wrapping on mobile (e.g. "12 - 5" in series records) */
@@ -984,25 +984,25 @@ tr:has(.contract-hint-cell):focus-within .contract-hint-cell {
 
     /* Flat background on column headers row — gradient only on title row */
     .page-sticky .sticky-table thead tr:last-child th {
-        background: var(--team-color-primary, var(--navy-800, #1e293b));
+        background: var(--team-color-primary, var(--navy-800));
     }
 
     /* Rounded corners on title row only — column header row gets corners via JS clone */
     .page-sticky .sticky-table thead tr:first-child th:first-child {
-        border-top-left-radius: var(--radius-lg, 0.5rem);
+        border-top-left-radius: var(--radius-lg);
     }
 
     .page-sticky .sticky-table thead tr:first-child th:last-child {
-        border-top-right-radius: var(--radius-lg, 0.5rem);
+        border-top-right-radius: var(--radius-lg);
     }
 
     /* Rounded corners on body bottom cells since the wrapper no longer clips */
     .page-sticky .sticky-table tbody tr:last-child td:first-child {
-        border-bottom-left-radius: var(--radius-lg, 0.5rem);
+        border-bottom-left-radius: var(--radius-lg);
     }
 
     .page-sticky .sticky-table tbody tr:last-child td:last-child {
-        border-bottom-right-radius: var(--radius-lg, 0.5rem);
+        border-bottom-right-radius: var(--radius-lg);
     }
 }
 
@@ -1012,7 +1012,7 @@ tr:has(.contract-hint-cell):focus-within .contract-hint-cell {
     z-index: 40;
     pointer-events: none;
     filter: drop-shadow(0 2px 3px rgba(0, 0, 0, 0.15));
-    border-radius: var(--radius-lg, 0.5rem) var(--radius-lg, 0.5rem) 0 0;
+    border-radius: var(--radius-lg) var(--radius-lg) 0 0;
 }
 
 /* Inner wrapper clips the table horizontally */
@@ -1027,20 +1027,20 @@ tr:has(.contract-hint-cell):focus-within .contract-hint-cell {
     content: '';
     position: absolute;
     top: 0;
-    width: var(--radius-lg, 0.5rem);
-    height: var(--radius-lg, 0.5rem);
+    width: var(--radius-lg);
+    height: var(--radius-lg);
     z-index: 1;
     pointer-events: none;
 }
 
 .page-sticky-header-clone::before {
     left: 0;
-    background: radial-gradient(circle at 100% 100%, transparent 0, transparent var(--radius-lg, 0.5rem), var(--page-bg, #eeeeee) var(--radius-lg, 0.5rem));
+    background: radial-gradient(circle at 100% 100%, transparent 0, transparent var(--radius-lg), var(--page-bg) var(--radius-lg));
 }
 
 .page-sticky-header-clone::after {
     right: 0;
-    background: radial-gradient(circle at 0% 100%, transparent 0, transparent var(--radius-lg, 0.5rem), var(--page-bg, #eeeeee) var(--radius-lg, 0.5rem));
+    background: radial-gradient(circle at 0% 100%, transparent 0, transparent var(--radius-lg), var(--page-bg) var(--radius-lg));
 }
 
 /* Remove table border (causes line artifact at top edge) */
@@ -1052,7 +1052,7 @@ tr:has(.contract-hint-cell):focus-within .contract-hint-cell {
 .page-sticky-header-clone .team-table.sticky-table thead th,
 .page-sticky-header-clone .sticky-table thead th,
 .page-sticky-header-clone th {
-    background: var(--team-color-primary, var(--navy-800, #1e293b));
+    background: var(--team-color-primary, var(--navy-800));
     box-shadow: none;
 }
 
@@ -1068,7 +1068,7 @@ tr:has(.contract-hint-cell):focus-within .contract-hint-cell {
 
 .ibl-data-table.sticky-header {
     overflow: visible;
-    border-radius: var(--radius-lg, 0.5rem);
+    border-radius: var(--radius-lg);
 }
 
 .sticky-header thead th {
@@ -1082,22 +1082,22 @@ tr:has(.contract-hint-cell):focus-within .contract-hint-cell {
    box-shadow in the page bg color masks content scrolling behind the corners.
    --page-bg is set on <body> via inline style from PHP (see theme.php). */
 .sticky-header thead th:first-child {
-    border-top-left-radius: var(--radius-lg, 0.5rem);
-    box-shadow: -4px -4px 0 4px var(--page-bg, #eeeeee);
+    border-top-left-radius: var(--radius-lg);
+    box-shadow: -4px -4px 0 4px var(--page-bg);
 }
 
 .sticky-header thead th:last-child {
-    border-top-right-radius: var(--radius-lg, 0.5rem);
-    box-shadow: 4px -4px 0 4px var(--page-bg, #eeeeee);
+    border-top-right-radius: var(--radius-lg);
+    box-shadow: 4px -4px 0 4px var(--page-bg);
 }
 
 /* Rounded bottom corners on last row's first/last cells */
 .sticky-header tbody tr:last-child td:first-child {
-    border-bottom-left-radius: var(--radius-lg, 0.5rem);
+    border-bottom-left-radius: var(--radius-lg);
 }
 
 .sticky-header tbody tr:last-child td:last-child {
-    border-bottom-right-radius: var(--radius-lg, 0.5rem);
+    border-bottom-right-radius: var(--radius-lg);
 }
 
 /* Shadow on the last header cell's bottom border to hint at content beneath */
@@ -1110,10 +1110,10 @@ tr:has(.contract-hint-cell):focus-within .contract-hint-cell {
    ========================================================================== */
 
 .ibl-table-title {
-    font-family: var(--font-display, 'Barlow Condensed', -apple-system, BlinkMacSystemFont, sans-serif);
-    font-size: 1.5rem;
+    font-family: var(--font-display);
+    font-size: var(--text-2xl);
     font-weight: 600;
-    color: var(--navy-900, #0f172a);
+    color: var(--navy-900);
     text-align: center;
     margin: 0 0 1rem 0;
 }
@@ -1122,10 +1122,10 @@ tr:has(.contract-hint-cell):focus-within .contract-hint-cell {
 .ibl-table-subheading th,
 .ibl-table-subheading td {
     color: var(--gray-600);
-    font-size: 0.875rem;
+    font-size: var(--text-sm);
     font-weight: 600;
     text-transform: uppercase;
-    letter-spacing: 0.05em;
+    letter-spacing: var(--tracking-display);
     padding: var(--space-1) var(--space-2);
 }
 
@@ -1136,12 +1136,12 @@ tr:has(.contract-hint-cell):focus-within .contract-hint-cell {
 /* User team highlighting (applied by user-team-highlighter.js) */
 tbody tr.user-team-row:nth-child(odd),
 tbody tr.user-team-row:nth-child(even) {
-    background-color: var(--warning-100, #fef3c7);
+    background-color: var(--warning-100);
 }
 
 tbody tr.user-team-row:nth-child(odd):hover,
 tbody tr.user-team-row:nth-child(even):hover {
-    background-color: var(--warning-200, #fde68a);
+    background-color: var(--warning-200);
 }
 
 /* ==========================================================================
@@ -1326,7 +1326,7 @@ td.ibl-team-cell--colored {
     width: 24px;
     height: 24px;
     object-fit: cover;
-    border-radius: 50%;
+    border-radius: var(--radius-full);
     flex-shrink: 0;
 }
 
@@ -1401,7 +1401,7 @@ td.ibl-team-cell--colored {
     cursor: help;
     text-decoration: underline;
     text-decoration-style: dotted;
-    text-decoration-color: var(--gray-400, #9ca3af);
+    text-decoration-color: var(--gray-400);
     text-underline-offset: 2px;
 }
 
@@ -1417,19 +1417,19 @@ td.ibl-team-cell--colored {
     right: 100%;
     transform: translateY(-50%);
     padding: 0.375rem 0.625rem;
-    background-color: var(--navy-900, #0f172a);
+    background-color: var(--navy-900);
     color: white;
-    font-size: 0.8rem;
+    font-size: var(--text-sm);
     font-weight: 500;
     white-space: nowrap;
-    border-radius: var(--radius-sm, 0.25rem);
+    border-radius: var(--radius-sm);
     opacity: 0;
     visibility: hidden;
     transition: opacity 150ms ease, visibility 150ms ease;
     z-index: 100;
     pointer-events: none;
     margin-right: 8px;
-    box-shadow: var(--shadow-md, 0 4px 6px -1px rgb(0 0 0 / 0.1));
+    box-shadow: var(--shadow-md);
 }
 
 /* Arrow pointing right */
@@ -1440,7 +1440,7 @@ td.ibl-team-cell--colored {
     right: 100%;
     transform: translateY(-50%);
     border: 5px solid transparent;
-    border-left-color: var(--navy-900, #0f172a);
+    border-left-color: var(--navy-900);
     opacity: 0;
     visibility: hidden;
     transition: opacity 150ms ease, visibility 150ms ease;
@@ -1465,8 +1465,8 @@ td.ibl-team-cell--colored {
 /* Remove default focus ring, add subtle highlight */
 .ibl-tooltip:focus {
     outline: none;
-    background-color: var(--accent-100, #ffedd5);
-    border-radius: var(--radius-sm, 0.25rem);
+    background-color: var(--accent-100);
+    border-radius: var(--radius-sm);
 }
 
 /* ==========================================================================
@@ -1560,7 +1560,7 @@ td.ibl-team-cell--colored {
     }
 
     .voting-category-title {
-        font-size: 1.25rem;
+        font-size: var(--text-xl);
     }
 
     /* Override mobile table reductions - keep full size for voting tables */
@@ -1585,7 +1585,7 @@ td.ibl-team-cell--colored {
    ========================================================================== */
 
 .voting-submission-error {
-    color: var(--red-600);
+    color: var(--error-600);
     font-weight: 600;
     margin: var(--space-2) 0;
 }
@@ -1712,8 +1712,8 @@ td.ibl-team-cell--colored {
 .trading-cash-exchange input[type="number"] {
     width: 80px;
     padding: 0.25rem 0.5rem;
-    border: 1px solid var(--gray-300, #d1d5db);
-    border-radius: var(--radius-sm, 0.25rem);
+    border: 1px solid var(--gray-300);
+    border-radius: var(--radius-sm);
     text-align: right;
 }
 
@@ -1721,10 +1721,10 @@ td.ibl-team-cell--colored {
 .trade-offer-card {
     margin-bottom: 1rem;
     padding: 1rem;
-    border: 1px solid var(--gray-200, #e5e7eb);
-    border-radius: var(--radius-md, 0.375rem);
+    border: 1px solid var(--gray-200);
+    border-radius: var(--radius-md);
     background: white;
-    box-shadow: var(--shadow-sm, 0 1px 2px 0 rgb(0 0 0 / 0.05));
+    box-shadow: var(--shadow-sm);
 }
 
 .trade-offer-card p {
@@ -1738,7 +1738,7 @@ td.ibl-team-cell--colored {
 }
 
 .ibl-btn--primary:hover {
-    background: linear-gradient(135deg, var(--navy-700, #334155), var(--navy-800, #1e293b));
+    background: linear-gradient(135deg, var(--navy-700), var(--navy-800));
 }
 
 /* Submit button uses site accent orange */
@@ -1751,33 +1751,33 @@ td.ibl-team-cell--colored {
 }
 
 .ibl-btn--success {
-    background: linear-gradient(135deg, var(--success-500, #22c55e), var(--success-600, #16a34a));
+    background: linear-gradient(135deg, var(--success-500), var(--success-600));
     color: white;
 }
 
 .ibl-btn--success:hover {
-    background: linear-gradient(135deg, var(--success-400, #4ade80), var(--success-500, #22c55e));
+    background: linear-gradient(135deg, var(--success-400), var(--success-500));
 }
 
 .ibl-btn--danger {
-    background: linear-gradient(135deg, var(--error-500, #ef4444), var(--error-600, #dc2626));
+    background: linear-gradient(135deg, var(--error-500), var(--error-600));
     color: white;
 }
 
 .ibl-btn--danger:hover {
-    background: linear-gradient(135deg, var(--error-400, #f87171), var(--error-500, #ef4444));
+    background: linear-gradient(135deg, var(--error-400), var(--error-500));
 }
 
 /* Link styling for Trading */
 .ibl-link {
-    color: var(--navy-700, #334155);
+    color: var(--navy-700);
     text-decoration: none;
     font-weight: 500;
     transition: color 150ms ease;
 }
 
 .ibl-link:hover {
-    color: var(--accent-500, #f97316);
+    color: var(--accent-500);
 }
 
 /* ---------- Trading layout: inline-style replacements ---------- */
@@ -1787,8 +1787,8 @@ td.ibl-team-cell--colored {
     padding: 1rem;
     position: sticky;
     bottom: 0;
-    background: var(--page-bg, #eeeeee);
-    border-top: 1px solid var(--gray-200, #e5e7eb);
+    background: var(--page-bg);
+    border-top: 1px solid var(--gray-200);
     z-index: 10;
 }
 
@@ -1821,14 +1821,14 @@ td.ibl-team-cell--colored {
 }
 
 .trade-offer-card__awaiting {
-    color: var(--gray-500, #6b7280);
+    color: var(--gray-500);
     font-style: italic;
 }
 
 .trade-offer-card__notes {
     margin-left: 1rem;
     font-style: italic;
-    color: var(--gray-600, #4b5563);
+    color: var(--gray-600);
 }
 
 .trade-offer-card__preview-wrap {
@@ -1849,13 +1849,13 @@ td.ibl-team-cell--colored {
     position: relative;
     padding: 0.5rem 0.75rem;
     background: linear-gradient(90deg,
-        var(--team-color-primary, #1e293b),
-        color-mix(in srgb, var(--team-color-primary, #1e293b) 70%, black));
+        var(--team-color-primary),
+        color-mix(in srgb, var(--team-color-primary) 70%, black));
     color: var(--team-color-secondary, white);
     font-family: var(--font-display);
     font-weight: 700;
-    font-size: 0.95rem;
-    letter-spacing: 0.025em;
+    font-size: 1rem;
+    letter-spacing: var(--tracking-display);
     cursor: pointer;
     list-style: none;
     border-radius: var(--radius-md) var(--radius-md) 0 0;
@@ -1923,7 +1923,7 @@ td.ibl-team-cell--colored {
     width: 20px;
     height: 20px;
     cursor: pointer;
-    accent-color: var(--accent-500, #f97316);
+    accent-color: var(--accent-500);
 }
 
 /* ---------- Trading mobile responsive ---------- */
@@ -2096,7 +2096,7 @@ td.ibl-team-cell--colored {
     padding: 0.25rem;
     border: 1px solid var(--gray-300);
     border-radius: var(--radius-sm);
-    font-size: 0.875rem;
+    font-size: var(--text-sm);
 }
 
 /* Minutes number input — matches the role-slot select's size/appearance.
@@ -2105,7 +2105,7 @@ td.ibl-team-cell--colored {
     padding: 0.25rem;
     border: 1px solid var(--gray-300);
     border-radius: var(--radius-sm);
-    font-size: 0.875rem;
+    font-size: var(--text-sm);
     width: 4rem;
     text-align: center;
 }
@@ -2122,7 +2122,7 @@ td.ibl-team-cell--colored {
     height: 1.125rem;
     margin: 0 auto;
     cursor: pointer;
-    accent-color: var(--color-accent-500, #f97316);
+    accent-color: var(--color-accent-500);
 }
 
 /* ==========================================================================
@@ -2149,7 +2149,7 @@ td.ibl-team-cell--colored {
 .draft-pick-table td {
     border-bottom: 1px solid var(--gray-100);
     text-align: center;
-    font-size: 0.875rem;
+    font-size: var(--text-sm);
 }
 
 /* Match ibl-data-table header styling */
@@ -2159,7 +2159,7 @@ td.ibl-team-cell--colored {
     font-family: var(--font-display);
     font-weight: 600;
     text-transform: uppercase;
-    letter-spacing: 0.03em;
+    letter-spacing: var(--tracking-display);
     padding: 0.25rem 0.2rem;
 }
 
@@ -2200,16 +2200,16 @@ td.ibl-team-cell--colored {
 
 /* Alternating row colors (match ibl-data-table) */
 .draft-pick-table tbody tr:nth-child(even) {
-    background-color: var(--gray-50, #f9fafb);
+    background-color: var(--gray-50);
 }
 
 .draft-pick-table tbody tr:hover {
-    background-color: var(--gray-100, #f3f4f6);
+    background-color: var(--gray-100);
 }
 
 /* Draft Pick Locator: highlight cells containing user's team name in their row */
 .draft-pick-table tbody tr.user-team-row .draft-pick-own {
-    background-color: var(--warning-100, #fef3c7);
+    background-color: var(--warning-100);
 }
 
 /* ==========================================================================
@@ -2244,11 +2244,11 @@ td.ibl-team-cell--colored {
 
 .record-category__title {
     font-family: var(--font-display);
-    font-size: 1.125rem;
+    font-size: var(--text-lg);
     font-weight: 600;
     color: var(--navy-800);
     text-transform: uppercase;
-    letter-spacing: 0.03em;
+    letter-spacing: var(--tracking-display);
     margin: var(--space-3) var(--space-3) var(--space-1);
     padding-bottom: var(--space-0);
     border-bottom: 2px solid var(--accent-500);
@@ -2276,7 +2276,7 @@ td.ibl-team-cell--colored {
 .record-table td img { margin: 0 auto; }
 .record-table .player-cell { font-weight: 600; }
 .record-table .player-cell img { display: block; margin: 0 auto var(--space-1); }
-.record-table td.ibl-stat-highlight { font-size: 1.125rem; text-align: center; }
+.record-table td.ibl-stat-highlight { font-size: var(--text-lg); text-align: center; }
 
 /* Colgroup widths — 5-column player single-game layout */
 .record-table--5col col.col-player { width: 25%; }
@@ -2314,7 +2314,7 @@ td.ibl-team-cell--colored {
     font-weight: 600;
     color: var(--gray-500);
     text-transform: uppercase;
-    letter-spacing: 0.05em;
+    letter-spacing: var(--tracking-display);
     margin: var(--space-4) var(--space-3) var(--space-2);
     padding-bottom: var(--space-1);
     border-bottom: 1px solid var(--gray-200);
@@ -2326,18 +2326,18 @@ td.ibl-team-cell--colored {
 
 .projected-draft-order-description {
     color: var(--gray-600);
-    font-size: 0.875rem;
+    font-size: var(--text-sm);
     line-height: 1.5;
     margin-bottom: var(--space-4);
 }
 
 .projected-draft-order-separator td {
-    background-color: var(--gray-200, #e5e7eb);
+    background-color: var(--gray-200);
 }
 
 .projected-draft-order-lottery-results td {
-    background-color: var(--accent-500, #f97316);
-    color: var(--navy-900, #0a0f1a);
+    background-color: var(--accent-500);
+    color: var(--navy-900);
 }
 
 /* Vertical separator between Team and Record columns */
@@ -2397,16 +2397,16 @@ td.ibl-team-cell--colored {
     margin-right: 0;
     margin-left: -2px;
     border-left-color: transparent;
-    border-right-color: var(--navy-900, #0f172a);
+    border-right-color: var(--navy-900);
 }
 
 /* Draft Order Movement Highlights */
 .draft-moved-up td {
-    background-color: var(--success-100, #dcfce7);
+    background-color: var(--success-100);
 }
 
 .draft-moved-down td {
-    background-color: var(--error-100, #fee2e2);
+    background-color: var(--error-100);
 }
 
 /* Draft Order Drag-and-Drop (admin) */
@@ -2419,14 +2419,14 @@ td.ibl-team-cell--colored {
     left: 0.25rem;
     top: 50%;
     transform: translateY(-50%);
-    color: var(--gray-400, #9ca3af);
+    color: var(--gray-400);
     font-size: 1rem;
     line-height: 1;
     pointer-events: none;
 }
 
 .draft-draggable:hover .draft-drag-handle {
-    color: var(--gray-600, #4b5563);
+    color: var(--gray-600);
 }
 
 .draft-draggable {
@@ -2440,11 +2440,11 @@ td.ibl-team-cell--colored {
 }
 
 .draft-draggable:hover td {
-    background-color: var(--gray-50, #f9fafb);
+    background-color: var(--gray-50);
 }
 
 .draft-drag-placeholder td {
-    background-color: var(--gray-200, #e5e7eb);
+    background-color: var(--gray-200);
     box-shadow: inset 0 1px 4px rgba(0, 0, 0, 0.12);
     height: 2.5rem;
 }
@@ -2470,50 +2470,50 @@ td.ibl-team-cell--colored {
     gap: var(--space-3);
     margin-bottom: var(--space-4);
     padding: var(--space-3);
-    background: var(--gray-50, #f9fafb);
-    border-radius: var(--radius-lg, 0.5rem);
+    background: var(--gray-50);
+    border-radius: var(--radius-lg);
 }
 
 .record-book-team-selector label {
     font-family: var(--font-display);
     font-weight: 600;
-    font-size: 0.875rem;
+    font-size: var(--text-sm);
     text-transform: uppercase;
-    letter-spacing: 0.05em;
-    color: var(--gray-600, #4b5563);
+    letter-spacing: var(--tracking-display);
+    color: var(--gray-600);
 }
 
 .record-book-team-selector select {
     padding: var(--space-2) var(--space-3);
-    border: 1px solid var(--gray-300, #d1d5db);
-    border-radius: var(--radius-md, 0.375rem);
-    font-size: 0.875rem;
+    border: 1px solid var(--gray-300);
+    border-radius: var(--radius-md);
+    font-size: var(--text-sm);
     background: white;
 }
 
 .record-book-category {
-    margin-bottom: var(--space-6, 1.5rem);
+    margin-bottom: var(--space-6);
 }
 
 .record-book-category-title {
     font-family: var(--font-display);
     font-size: 1rem;
     font-weight: 600;
-    color: var(--gray-700, #374151);
+    color: var(--gray-700);
     text-transform: uppercase;
-    letter-spacing: 0.03em;
+    letter-spacing: var(--tracking-display);
     margin: var(--space-3) 0 var(--space-2);
     padding-left: var(--space-2);
-    border-left: 3px solid var(--accent-500, #f97316);
+    border-left: 3px solid var(--accent-500);
 }
 
 .record-book-table {
-    font-size: 0.875rem;
+    font-size: var(--text-sm);
 }
 
 .record-book-table td:first-child {
     font-weight: 600;
-    color: var(--gray-500, #6b7280);
+    color: var(--gray-500);
     width: 2rem;
     text-align: center;
 }
@@ -2524,7 +2524,7 @@ td.ibl-team-cell--colored {
 }
 
 .record-book-section-title {
-    font-size: 1.25rem;
+    font-size: var(--text-xl);
     margin-top: 1.5rem;
 }
 
@@ -2541,23 +2541,23 @@ td.ibl-team-cell--colored {
    ========================================================================== */
 
 .season-highs-discrepancy-panel {
-    margin-top: var(--space-6, 1.5rem);
-    padding: var(--space-4, 1rem);
-    border: 1px solid var(--amber-300, #fcd34d);
-    border-radius: var(--radius-lg, 0.5rem);
-    background: var(--amber-50, #fffbeb);
+    margin-top: var(--space-6);
+    padding: var(--space-4);
+    border: 1px solid var(--warning-200);
+    border-radius: var(--radius-lg);
+    background: var(--warning-50);
 }
 
 .discrepancy-panel-title {
-    font-family: var(--font-display, 'Barlow Condensed', -apple-system, BlinkMacSystemFont, sans-serif);
+    font-family: var(--font-display);
     font-size: 1rem;
     font-weight: 600;
-    color: var(--amber-800, #92400e);
-    margin-bottom: var(--space-3, 0.75rem);
+    color: var(--warning-600);
+    margin-bottom: var(--space-3);
 }
 
 .season-highs-discrepancy-panel .ibl-data-table {
-    font-size: 0.875rem;
+    font-size: var(--text-sm);
 }
 
 /* ==========================================================================
@@ -2568,23 +2568,23 @@ td.ibl-team-cell--colored {
    ========================================================================== */
 
 .ibl-data-table th.sorted-col {
-    background: var(--navy-600, #2d4a7a);
+    background: var(--navy-600);
 }
 
 .ibl-data-table td.sorted-col {
-    background-color: var(--accent-100, #ffedd5);
+    background-color: var(--accent-100);
 }
 
 .ibl-data-table tbody tr:hover td.sorted-col {
-    background-color: var(--accent-200, #fed7aa);
+    background-color: var(--accent-200);
 }
 
 .season-highs-discrepancy-panel .ibl-data-table thead {
-    background: var(--amber-600, #d97706);
+    background: var(--warning-600);
 }
 
 .season-highs-discrepancy-panel .ibl-data-table td {
-    padding: var(--space-2, 0.5rem) var(--space-3, 0.75rem);
+    padding: var(--space-2) var(--space-3);
 }
 
 /* ==========================================================================
@@ -2628,7 +2628,7 @@ td.ibl-team-cell--colored {
 /* Right-border separators — applied to the last cell before a column group boundary.
    Coexists with the empty-cell .sep-team/.sep-weak pattern used by other modules. */
 .team-table td.sep-r-team {
-    border-right: 2px solid color-mix(in srgb, var(--team-color-primary) 30%, var(--gray-300, #d1d5db));
+    border-right: 2px solid color-mix(in srgb, var(--team-color-primary) 30%, var(--gray-300));
 }
 
 /* In thead, the sep border must contrast against the dark header background */
@@ -2638,7 +2638,7 @@ td.ibl-team-cell--colored {
 
 .team-table th.sep-r-weak,
 .team-table td.sep-r-weak {
-    border-right: 2px solid var(--gray-200, #e5e7eb);
+    border-right: 2px solid var(--gray-200);
 }
 
 /* FA tables: logo-only team cell — visually hidden but copyable to clipboard */
@@ -2674,7 +2674,7 @@ td.ibl-team-cell--colored {
     font-weight: 400;
 }
 .cap-footer-spacer {
-    background-color: var(--team-row-highlight-bg, #e5e7eb);
+    background-color: var(--team-row-highlight-bg);
 }
 
 /* Team-table + sticky-table combo: use team header colors */

@@ -2,6 +2,40 @@
 
 
 /* ==========================================================================
+   File-local tokens — INTENTIONALLY separate from the global system.
+   The trading-card surface uses its own px scale, gold accents, and a
+   distinct shadow vocabulary. Don't replace these with global tokens.
+   ========================================================================== */
+.trading-card,
+.trading-card-back,
+.player-stats-card {
+    --pc-pad-xs: 2px;
+    --pc-pad-sm: 4px;
+    --pc-pad-md: 8px;
+    --pc-pad-lg: 12px;
+    --pc-pad-xl: 16px;
+
+    --pc-text-2xs: 9px;
+    --pc-text-xs: 10px;
+    --pc-text-sm: 11px;
+    --pc-text-md: 12px;
+    --pc-text-lg: 14px;
+    --pc-text-xl: 20px;
+
+    --pc-radius-sm: 4px;
+    --pc-radius-md: 6px;
+    --pc-radius-lg: 8px;
+    --pc-radius-xl: 12px;
+    --pc-radius-2xl: 16px;
+
+    --pc-shadow-sm: 0 2px 8px rgba(0,0,0,0.3);
+    --pc-shadow-md: 0 4px 12px rgba(0,0,0,0.35);
+
+    --pc-gold: #D4AF37;
+    --pc-ink: #0f1419;
+}
+
+/* ==========================================================================
    Trading Card Base Styles
    Shared between front (.trading-card) and back (.trading-card-back)
    ========================================================================== */
@@ -9,15 +43,15 @@
 .trading-card,
 .trading-card-back {
     background: linear-gradient(145deg, var(--card-grad-start) 0%, var(--card-grad-mid) 20%, var(--card-grad-mid) 80%, var(--card-grad-end) 100%);
-    border: 4px solid var(--card-border);
-    border-radius: 16px;
+    border: var(--pc-pad-sm) solid var(--card-border);
+    border-radius: var(--pc-radius-2xl);
     box-shadow:
         0 0 0 2px var(--card-grad-mid),
         0 0 0 4px var(--card-border),
         0 10px 40px rgba(0,0,0,0.4);
     max-width: 420px;
     margin: 0 auto;
-    padding: 16px 16px 50px 16px;
+    padding: var(--pc-pad-xl) var(--pc-pad-xl) 50px var(--pc-pad-xl);
     color: var(--card-text);
 }
 
@@ -32,12 +66,12 @@
     display: flex;
     align-items: center;
     justify-content: space-between;
-    margin-bottom: 12px;
+    margin-bottom: var(--pc-pad-lg);
 }
 
 .trading-card .card-header h2,
 .trading-card-back .card-header h2 {
-    font-size: 20px;
+    font-size: var(--pc-text-xl);
     font-weight: bold;
     color: var(--card-text);
     line-height: 1.2;
@@ -47,7 +81,7 @@
 .trading-card .card-header .nickname,
 .trading-card-back .card-header .nickname {
     color: var(--card-accent);
-    font-size: 14px;
+    font-size: var(--pc-text-lg);
     font-style: italic;
     margin: 2px 0 0 0;
 }
@@ -57,25 +91,25 @@
     background: linear-gradient(135deg, var(--card-border) 0%, var(--card-accent) 100%);
     color: var(--card-grad-mid);
     font-weight: 700;
-    padding: 2px 8px;
-    border-radius: 4px;
-    font-size: 11px;
+    padding: var(--pc-pad-xs) var(--pc-pad-md);
+    border-radius: var(--pc-radius-sm);
+    font-size: var(--pc-text-sm);
 }
 
 /* Photo and Stats Row */
 .trading-card .photo-stats-row,
 .trading-card-back .photo-stats-row {
     display: flex;
-    gap: 16px;
-    margin-bottom: 16px;
+    gap: var(--pc-pad-xl);
+    margin-bottom: var(--pc-pad-xl);
 }
 
 .trading-card .player-photo-frame,
 .trading-card-back .player-photo-frame {
     border: 3px solid var(--card-border);
-    border-radius: 8px;
+    border-radius: var(--pc-radius-lg);
     background: linear-gradient(135deg, var(--card-grad-mid) 0%, var(--card-grad-start) 100%);
-    padding: 4px;
+    padding: var(--pc-pad-sm);
     flex-shrink: 0;
 }
 
@@ -84,16 +118,16 @@
     width: 96px;
     height: 112px;
     object-fit: cover;
-    border-radius: 4px;
+    border-radius: var(--pc-radius-sm);
     display: block;
 }
 
 .trading-card .quick-stats,
 .trading-card-back .quick-stats {
     flex: 1;
-    font-size: 14px;
+    font-size: var(--pc-text-lg);
     display: flex;
-    gap: 8px;
+    gap: var(--pc-pad-md);
     align-items: center;
     min-width: 0;
 }
@@ -104,7 +138,7 @@
     min-width: 0;
     display: grid;
     grid-template-columns: auto 1fr;
-    gap: 4px 8px;
+    gap: var(--pc-pad-sm) var(--pc-pad-md);
     color: var(--card-text-muted);
 }
 
@@ -157,9 +191,9 @@
 .trading-card .draft-info,
 .trading-card-back .draft-info {
     text-align: center;
-    font-size: 12px;
+    font-size: var(--pc-text-md);
     color: var(--card-text-muted);
-    margin-bottom: 12px;
+    margin-bottom: var(--pc-pad-lg);
     font-style: italic;
 }
 
@@ -178,11 +212,11 @@
 .trading-card .section-title,
 .trading-card-back .section-title {
     color: var(--card-accent);
-    font-size: 12px;
+    font-size: var(--pc-text-md);
     font-weight: bold;
     text-transform: uppercase;
     letter-spacing: 0.05em;
-    margin-bottom: 8px;
+    margin-bottom: var(--pc-pad-md);
     text-align: center;
 }
 
@@ -192,10 +226,10 @@
 .trading-card-back .allstar-row {
     display: flex;
     justify-content: center;
-    gap: 8px;
+    gap: var(--pc-pad-md);
     flex-wrap: wrap;
-    margin-bottom: 12px;
-    font-size: 12px;
+    margin-bottom: var(--pc-pad-lg);
+    font-size: var(--pc-text-md);
 }
 
 .trading-card .stat-pill,
@@ -203,8 +237,8 @@
 .trading-card-back .allstar-pill {
     background: color-mix(in srgb, var(--card-border) 15%, transparent);
     border: 1px solid color-mix(in srgb, var(--card-border) 30%, transparent);
-    border-radius: 6px;
-    padding: 4px 8px;
+    border-radius: var(--pc-radius-md);
+    padding: var(--pc-pad-sm) var(--pc-pad-md);
     font-family: 'Monaco', 'Menlo', monospace;
     display: inline-block;
     text-align: center;
@@ -232,14 +266,14 @@
     .trading-card,
     .trading-card-back {
         max-width: 100%;
-        margin: 8px;
-        border-radius: 12px;
-        padding: 12px;
+        margin: var(--pc-pad-md);
+        border-radius: var(--pc-radius-xl);
+        padding: var(--pc-pad-lg);
     }
 
     .trading-card .photo-stats-row,
     .trading-card-back .photo-stats-row {
-        gap: 12px;
+        gap: var(--pc-pad-lg);
     }
 
     .trading-card .player-photo-frame img,
@@ -256,7 +290,7 @@
 
     .trading-card-back .allstar-pill {
         padding: 3px 6px;
-        font-size: 10px;
+        font-size: var(--pc-text-xs);
     }
 }
 
@@ -266,11 +300,11 @@
 
 .trading-card .rating-row {
     display: grid;
-    gap: 4px;
+    gap: var(--pc-pad-sm);
     background: rgba(0,0,0,0.3);
-    border-radius: 8px;
-    padding: 8px;
-    margin-bottom: 6px;
+    border-radius: var(--pc-radius-lg);
+    padding: var(--pc-pad-md);
+    margin-bottom: var(--pc-pad-md);
 }
 
 .trading-card .rating-row.shooting { grid-template-columns: repeat(6, 1fr); }
@@ -279,11 +313,11 @@
 
 .trading-card .rating-cell {
     text-align: center;
-    padding: 4px 2px;
+    padding: var(--pc-pad-sm) var(--pc-pad-xs);
 }
 
 .trading-card .rating-label {
-    font-size: 9px;
+    font-size: var(--pc-text-2xs);
     font-weight: 600;
     text-transform: uppercase;
     color: var(--card-accent);
@@ -291,7 +325,7 @@
 }
 
 .trading-card .rating-value {
-    font-size: 14px;
+    font-size: var(--pc-text-lg);
     font-weight: 700;
     color: var(--card-text);
     font-family: 'Monaco', 'Menlo', monospace;
@@ -300,16 +334,16 @@
 .trading-card .contract-bar {
     background: linear-gradient(90deg, color-mix(in srgb, var(--card-border) 20%, transparent) 0%, color-mix(in srgb, var(--card-border) 5%, transparent) 100%);
     border-left: 3px solid var(--card-border);
-    padding: 8px 12px;
-    border-radius: 0 8px 8px 0;
-    margin-top: 8px;
+    padding: var(--pc-pad-md) var(--pc-pad-lg);
+    border-radius: 0 var(--pc-radius-lg) var(--pc-radius-lg) 0;
+    margin-top: var(--pc-pad-md);
 }
 
 .trading-card .contract-bar .contract-flex {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    font-size: 12px;
+    font-size: var(--pc-text-md);
 }
 
 .trading-card .contract-bar .contract-label {
@@ -319,18 +353,18 @@
 .trading-card .contract-bar .contract-value {
     color: var(--card-text);
     font-weight: bold;
-    margin-left: 4px;
+    margin-left: var(--pc-pad-sm);
 }
 
 .trading-card .contract-bar .contract-amount {
     color: var(--card-accent);
     font-weight: bold;
-    margin-left: 4px;
+    margin-left: var(--pc-pad-sm);
 }
 
 @media (max-width: 480px) {
     .trading-card .rating-label { font-size: 8px; }
-    .trading-card .rating-value { font-size: 12px; }
+    .trading-card .rating-value { font-size: var(--pc-text-md); }
 }
 
 /* ==========================================================================
@@ -340,18 +374,18 @@
 .trading-card-back .highs-table {
     width: 100%;
     background: rgba(0,0,0,0.3);
-    border-radius: 8px;
-    padding: 8px;
-    margin-bottom: 12px;
+    border-radius: var(--pc-radius-lg);
+    padding: var(--pc-pad-md);
+    margin-bottom: var(--pc-pad-lg);
     border-collapse: collapse;
     table-layout: fixed;
 }
 
 .trading-card-back .highs-table th,
 .trading-card-back .highs-table td {
-    padding: 4px 6px;
+    padding: var(--pc-pad-sm) var(--pc-pad-md);
     text-align: center;
-    font-size: 12px;
+    font-size: var(--pc-text-md);
     width: 18%;
 }
 
@@ -362,7 +396,7 @@
 .trading-card-back .highs-table .highs-header {
     color: var(--card-accent);
     font-weight: 600;
-    font-size: 10px;
+    font-size: var(--pc-text-xs);
     text-transform: uppercase;
     letter-spacing: 0.5px;
     border-bottom: 1px solid color-mix(in srgb, var(--card-border) 30%, transparent);
@@ -370,7 +404,7 @@
 
 .trading-card-back .highs-table .category-header {
     color: var(--card-text-muted);
-    font-size: 9px;
+    font-size: var(--pc-text-2xs);
     font-weight: 600;
     text-transform: uppercase;
 }
@@ -379,7 +413,7 @@
     color: var(--card-accent);
     font-weight: 600;
     text-align: left;
-    font-size: 11px;
+    font-size: var(--pc-text-sm);
 }
 
 .trading-card-back .highs-table .stat-value {
@@ -398,7 +432,7 @@
 
 .trading-card-back .allstar-pill .pill-label {
     display: block;
-    font-size: 9px;
+    font-size: var(--pc-text-2xs);
     text-transform: uppercase;
 }
 
@@ -406,7 +440,7 @@
     .trading-card-back .highs-table th,
     .trading-card-back .highs-table td {
         padding: 3px 4px;
-        font-size: 10px;
+        font-size: var(--pc-text-xs);
     }
 }
 
@@ -423,13 +457,13 @@
 .player-stats-card {
     background: linear-gradient(145deg, var(--card-grad-start) 0%, var(--card-grad-mid) 20%, var(--card-grad-mid) 80%, var(--card-grad-end) 100%);
     border: 3px solid var(--card-border);
-    border-radius: 12px;
+    border-radius: var(--pc-radius-xl);
     box-shadow:
         0 0 0 1px var(--card-grad-mid),
         0 0 0 3px var(--card-border),
         0 8px 32px rgba(0,0,0,0.3);
-    margin: 16px auto;
-    padding: 16px;
+    margin: var(--pc-pad-xl) auto;
+    padding: var(--pc-pad-xl);
     color: var(--card-text);
     overflow-x: auto;
     position: relative;
@@ -462,13 +496,13 @@
     background: linear-gradient(135deg, var(--card-border) 0%, var(--card-accent) 100%);
     color: var(--card-grad-mid);
     font-weight: 700;
-    font-size: 14px;
+    font-size: var(--pc-text-lg);
     text-transform: uppercase;
     letter-spacing: 0.5px;
-    padding: 10px 16px;
+    padding: 10px var(--pc-pad-xl);
     text-align: center;
     border: none;
-    border-radius: 8px 8px 0 0;
+    border-radius: var(--pc-radius-lg) var(--pc-radius-lg) 0 0;
 }
 
 /* Column headers */
@@ -476,10 +510,10 @@
 .player-stats-card .stats-table th {
     color: var(--card-accent);
     font-weight: 600;
-    font-size: 11px;
+    font-size: var(--pc-text-sm);
     text-transform: uppercase;
     letter-spacing: 0.3px;
-    padding: 8px 6px;
+    padding: var(--pc-pad-md) var(--pc-pad-md);
     text-align: center;
     border: none;
     white-space: nowrap;
@@ -490,13 +524,13 @@
 /* Table cells */
 .player-stats-card table td,
 .player-stats-card .stats-table td {
-    padding: 6px 6px;
+    padding: var(--pc-pad-md) var(--pc-pad-md);
     text-align: center;
     border: none;
     border-bottom: 1px solid rgba(255, 255, 255, 0.08);
     color: var(--card-text-muted);
     font-family: 'Monaco', 'Menlo', 'Consolas', monospace;
-    font-size: 12px;
+    font-size: var(--pc-text-md);
     white-space: nowrap;
     background: transparent;
 }
@@ -536,7 +570,7 @@
     color: var(--card-accent);
     font-weight: 600;
     font-style: italic;
-    padding: 12px;
+    padding: var(--pc-pad-lg);
     text-align: center;
     border-top: 2px solid color-mix(in srgb, var(--card-border) 30%, transparent);
 }
@@ -567,9 +601,9 @@
 /* Responsive: Horizontal scroll on small screens */
 @media (max-width: 768px) {
     .player-stats-card {
-        margin: 12px 8px;
-        padding: 12px;
-        border-radius: 8px;
+        margin: var(--pc-pad-lg) var(--pc-pad-md);
+        padding: var(--pc-pad-lg);
+        border-radius: var(--pc-radius-lg);
     }
 
     .player-stats-card table th,
@@ -577,13 +611,13 @@
     .player-stats-card .stats-table th,
     .player-stats-card .stats-table td {
         padding: 4px 4px;
-        font-size: 10px;
+        font-size: var(--pc-text-xs);
     }
 
     .player-stats-card .stats-table-header,
     .player-stats-card .player-table-header {
-        font-size: 12px;
-        padding: 8px 12px;
+        font-size: var(--pc-text-md);
+        padding: var(--pc-pad-md) var(--pc-pad-lg);
     }
 }
 
@@ -599,15 +633,15 @@
 .player-stats-card .card-title-badge {
     display: inline-flex;
     align-items: center;
-    gap: 8px;
+    gap: var(--pc-pad-md);
 }
 
 .player-stats-card .card-title-badge .badge {
     background: rgba(0, 0, 0, 0.3);
-    color: #fff;
-    font-size: 10px;
+    color: white;
+    font-size: var(--pc-text-xs);
     padding: 2px 6px;
-    border-radius: 4px;
+    border-radius: var(--pc-radius-sm);
     font-weight: 400;
     text-transform: none;
     letter-spacing: normal;
@@ -620,10 +654,10 @@
     right: 8px;
     background: color-mix(in srgb, var(--card-border) 90%, transparent);
     color: var(--card-grad-mid);
-    font-size: 9px;
+    font-size: var(--pc-text-2xs);
     font-weight: 700;
-    padding: 3px 8px;
-    border-radius: 4px;
+    padding: 3px var(--pc-pad-md);
+    border-radius: var(--pc-radius-sm);
     text-transform: uppercase;
     letter-spacing: 0.5px;
     z-index: 5;
@@ -681,7 +715,7 @@
     cursor: pointer;
     z-index: 10;
     transition: all 0.3s ease;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+    box-shadow: var(--pc-shadow-sm);
 }
 
 .flip-icon:hover {
@@ -693,7 +727,7 @@
 .flip-icon svg {
     width: 20px;
     height: 20px;
-    fill: #0f1419;
+    fill: var(--pc-ink);
 }
 
 .flip-icon::before {
@@ -701,13 +735,13 @@
     position: absolute;
     bottom: 100%;
     right: 0;
-    margin-bottom: 8px;
-    padding: 4px 8px;
+    margin-bottom: var(--pc-pad-md);
+    padding: var(--pc-pad-sm) var(--pc-pad-md);
     background: rgba(0, 0, 0, 0.8);
-    color: #D4AF37;
-    font-size: 11px;
+    color: var(--pc-gold);
+    font-size: var(--pc-text-sm);
     white-space: nowrap;
-    border-radius: 4px;
+    border-radius: var(--pc-radius-sm);
     opacity: 0;
     pointer-events: none;
     transition: opacity 0.3s, transform 0.3s;
@@ -720,7 +754,7 @@
 
 @keyframes pulse-glow {
     0%, 100% {
-        box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+        box-shadow: var(--pc-shadow-sm);
     }
     50% {
         box-shadow: 0 2px 16px rgba(212, 175, 55, 0.7);
@@ -751,7 +785,7 @@
 
 .stats-flip-container {
     perspective: 2000px;
-    margin: 16px auto;
+    margin: var(--pc-pad-xl) auto;
     position: relative;
     min-height: 200px;
 }
@@ -789,21 +823,21 @@
 .stats-flip-toggle {
     display: flex;
     align-items: center;
-    gap: 6px;
+    gap: var(--pc-pad-md);
     width: fit-content;
     margin-left: auto;
-    margin-bottom: 8px;
+    margin-bottom: var(--pc-pad-md);
     position: relative;
     z-index: 5;
     background: color-mix(in srgb, var(--card-border) 95%, transparent);
     color: var(--card-grad-mid);
-    font-size: 11px;
+    font-size: var(--pc-text-sm);
     font-weight: 700;
-    padding: 6px 12px;
-    border-radius: 6px;
+    padding: var(--pc-pad-md) var(--pc-pad-lg);
+    border-radius: var(--pc-radius-md);
     cursor: pointer;
     transition: all 0.3s ease;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+    box-shadow: var(--pc-shadow-sm);
     border: none;
     text-transform: uppercase;
     letter-spacing: 0.5px;
@@ -828,7 +862,7 @@
 
 @keyframes stats-pulse-glow {
     0%, 100% {
-        box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+        box-shadow: var(--pc-shadow-sm);
     }
     50% {
         box-shadow: 0 2px 16px color-mix(in srgb, var(--card-border) 70%, transparent);
@@ -841,8 +875,8 @@
 
 @media (max-width: 768px) {
     .stats-flip-toggle {
-        font-size: 10px;
-        padding: 4px 8px;
+        font-size: var(--pc-text-xs);
+        padding: var(--pc-pad-sm) var(--pc-pad-md);
     }
 
     .stats-flip-toggle svg {

@@ -6,6 +6,7 @@
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+source "$(dirname "$0")/lib/wt-guards.sh"
 WORKTREE_NAME=""
 ALL=false
 FORCE=false
@@ -20,8 +21,6 @@ for arg in "$@"; do
     esac
 done
 
-# Check for uncommitted changes in a worktree directory.
-# Returns 0 if clean or --force, 1 if dirty and should abort.
 check_uncommitted() {
     local wt_path="$1"
     local wt_name
@@ -31,7 +30,7 @@ check_uncommitted() {
         return 0
     fi
 
-    if ! git -C "$wt_path" diff --quiet 2>/dev/null || ! git -C "$wt_path" diff --cached --quiet 2>/dev/null; then
+    if has_uncommitted_changes "$wt_path"; then
         echo "ERROR: Worktree '$wt_name' has uncommitted changes:" >&2
         git -C "$wt_path" status --short >&2
         echo "" >&2
@@ -141,12 +140,7 @@ if [ -z "$WORKTREE_NAME" ]; then
     exit 1
 fi
 
-# Resolve the actual worktree path from git (handles worktrees created from
-# subdirectories, e.g., ibl5/worktrees/ instead of worktrees/).
-WORKTREE_PATH=$(git worktree list --porcelain | awk -v branch="refs/heads/$WORKTREE_NAME" '
-    /^worktree / { path = substr($0, 10) }
-    $0 == "branch " branch { print path; exit }
-')
+WORKTREE_PATH=$(get_worktree_path "$WORKTREE_NAME")
 
 # Fall back to the conventional location if git doesn't know the branch.
 if [ -z "$WORKTREE_PATH" ]; then

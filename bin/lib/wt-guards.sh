@@ -68,3 +68,21 @@ has_open_pr() {
     fi
     return 1
 }
+
+# Resolve the worktree path for a branch name.
+# Prints the path to stdout; empty output means no worktree found.
+get_worktree_path() {
+    local branch="$1"
+    git worktree list --porcelain | awk -v branch="refs/heads/$branch" '
+        /^worktree / { path = substr($0, 10) }
+        $0 == "branch " branch { print path; exit }
+    '
+}
+
+# Check if a directory has uncommitted or staged changes.
+# Returns 0 (has changes) or 1 (clean).
+has_uncommitted_changes() {
+    local dir="${1:-.}"
+    ! git -C "$dir" diff --quiet 2>/dev/null ||
+        ! git -C "$dir" diff --cached --quiet 2>/dev/null
+}

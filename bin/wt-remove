@@ -29,12 +29,7 @@ if [ -z "$NAME" ]; then
     exit 1
 fi
 
-# Resolve the actual worktree path from git (handles worktrees created from
-# subdirectories, e.g., ibl5/worktrees/ instead of worktrees/).
-WT_PATH=$(git worktree list --porcelain | awk -v branch="refs/heads/$NAME" '
-    /^worktree / { path = substr($0, 10) }
-    $0 == "branch " branch { print path; exit }
-')
+WT_PATH=$(get_worktree_path "$NAME")
 
 # Fall back to the conventional location if git doesn't know the branch
 # (e.g., branch already deleted but directory remains).

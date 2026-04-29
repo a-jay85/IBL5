@@ -5,19 +5,13 @@
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+source "$REPO_ROOT/bin/lib/db-helpers.sh"
+
 WORKTREE_NAME=""
 USE_PR=false
 SEED_DB=false
 PROD_DB=false
 NO_DATA=false
-
-# Wrapper to suppress MariaDB "password on command line" warning
-db_exec() {
-    docker exec "$@" 2>&1 | grep -v '\[Warning\].*password' || true
-}
-db_exec_stdin() {
-    docker exec -i "$@" 2>&1 | grep -v '\[Warning\].*password' || true
-}
 
 # Parse arguments
 for arg in "$@"; do
@@ -241,23 +235,9 @@ fi
 
 if [ "$PROD_DB" = true ]; then
     echo "Importing prod-seed.sql..."
-    # Wrap in FOREIGN_KEY_CHECKS=0 — the schema section's footer restores
-    # FK_CHECKS=1 before data inserts begin (alphabetical order), causing FK
-    # violations. --force continues past non-fatal ERROR 1906 (generated-column
-    # values that MariaDB safely ignores). Also strip DEFINER clauses.
-    { echo "SET FOREIGN_KEY_CHECKS=0;"; sed 's/ DEFINER=[^ ]* / /g' "$PROD_SEED"; echo "SET FOREIGN_KEY_CHECKS=1;"; } \
-        | docker exec -i "$DB_CONTAINER" mariadb --force -u root -proot iblhoops_ibl5 2>&1 \
-        | grep -v '\[Warning\].*password' \
-        | grep -i 'ERROR' > /tmp/wt-import-errors.log || true
-    if [ -s /tmp/wt-import-errors.log ]; then
-        if grep -v 'ERROR 1906' /tmp/wt-import-errors.log | grep -qi 'ERROR'; then
-            echo "ERROR: prod-seed import had fatal errors:"
-            grep -v 'ERROR 1906' /tmp/wt-import-errors.log | head -20
-            rm -f /tmp/wt-import-errors.log
-            exit 1
-        fi
+    if ! db_import_sql "$DB_CONTAINER" < "$PROD_SEED"; then
+        exit 1
     fi
-    rm -f /tmp/wt-import-errors.log
 
     # Backfill schema_migrations so future db-migrate runs skip already-applied ones.
     # The prod dump tracks applied migrations in 'migrations' (id, migration, batch),
@@ -281,7 +261,7 @@ if [ "$SEED_DB" = true ]; then
     CI_SEED="$WORKTREE_PATH/ibl5/tests/e2e/fixtures/ci-seed.sql"
     if [ -f "$CI_SEED" ]; then
         echo "Importing ci-seed.sql..."
-        db_exec_stdin "$DB_CONTAINER" $DB_CMD < "$CI_SEED"
+        db_exec_stdin_stream "$DB_CONTAINER" $DB_CMD < "$CI_SEED"
     else
         echo "Warning: ci-seed.sql not found at $CI_SEED"
     fi

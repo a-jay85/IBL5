@@ -14,6 +14,8 @@
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+source "$REPO_ROOT/bin/lib/db-helpers.sh"
+
 WORKTREE_ARG="${1:-}"
 
 # Load .env for REMOTE_* creds
@@ -142,19 +144,13 @@ if [ -n "$GENERATED_TABLES" ]; then
 fi
 echo ""
 
-# Stream everything into the container in one pipeline.
-# DEFINER clauses are stripped on-the-fly (prod contains DEFINER=user@host
-# that doesn't exist on Docker MariaDB's root user → ERROR 1449).
-# FOREIGN_KEY_CHECKS=0 wraps the whole import since inserts run in alpha
-# table order, which doesn't respect FK dependency order.
+# Stream everything into the container via db_import_sql (handles FK checks,
+# DEFINER stripping, and error filtering).
 TOTAL_STEPS=2
 [ -n "$GENERATED_TABLES" ] && TOTAL_STEPS=3
 STEP=0
 
-set -o pipefail
 {
-    echo "SET FOREIGN_KEY_CHECKS=0;"
-
     STEP=$((STEP + 1))
     echo "  [$STEP/$TOTAL_STEPS] Schema (tables, views, routines, triggers)..." >&2
     remote_dump --routines --triggers --no-data "$REMOTE_DATABASE"
@@ -172,26 +168,7 @@ set -o pipefail
         remote_dump --no-create-info --skip-triggers --skip-add-locks \
             "$REMOTE_DATABASE" $GENERATED_TABLES
     fi
-
-    echo "SET FOREIGN_KEY_CHECKS=1;"
-} \
-    | perl -pe 's/ DEFINER=\S+ / /g' \
-    | docker exec -i "$DB_CONTAINER" mariadb --force -uroot -proot iblhoops_ibl5 2>&1 \
-    | grep -v '\[Warning\].*password' \
-    | grep -i 'ERROR' > /tmp/db-sync-errors.log || true
-
-if [ -s /tmp/db-sync-errors.log ]; then
-    if grep -v 'ERROR 1906' /tmp/db-sync-errors.log | grep -qi 'ERROR'; then
-        echo ""
-        echo "ERROR: Import had fatal errors:"
-        grep -v 'ERROR 1906' /tmp/db-sync-errors.log | head -20
-        rm -f /tmp/db-sync-errors.log
-        exit 1
-    fi
-    WARN_COUNT=$(wc -l < /tmp/db-sync-errors.log | tr -d '[:space:]')
-    echo "  ($WARN_COUNT generated-column warnings during import, harmless)"
-fi
-rm -f /tmp/db-sync-errors.log
+} | db_import_sql "$DB_CONTAINER" || exit 1
 
 echo ""
 echo "Backfilling schema_migrations from prod dump..."
@@ -202,7 +179,7 @@ docker exec "$DB_CONTAINER" mariadb -uroot -proot iblhoops_ibl5 -e "
     );
     INSERT IGNORE INTO schema_migrations (version)
         SELECT migration FROM migrations WHERE migration LIKE '%.sql';
-" 2> >(grep -v '\[Warning\].*password' >&2) || true
+" 2> >(db_strip_warnings >&2) || true
 
 if [ -n "$WORKTREE_PATH" ] && [ -d "$WORKTREE_PATH/ibl5/migrations" ]; then
     echo ""
@@ -218,4 +195,4 @@ SELECT CONCAT('  ibl_team_info:        ', COUNT(*), ' rows') FROM ibl_team_info;
 SELECT CONCAT('  ibl_plr:              ', COUNT(*), ' rows') FROM ibl_plr;
 SELECT CONCAT('  ibl_box_scores:       ', COUNT(*), ' rows') FROM ibl_box_scores;
 SELECT CONCAT('  ibl_box_scores_teams: ', COUNT(*), ' rows') FROM ibl_box_scores_teams;
-" 2> >(grep -v '\[Warning\].*password' >&2) || true
+" 2> >(db_strip_warnings >&2) || true

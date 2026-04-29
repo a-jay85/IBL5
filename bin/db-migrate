@@ -7,6 +7,8 @@
 
 set -euo pipefail
 
+source "$(dirname "$0")/lib/db-helpers.sh"
+
 DB_CONTAINER="${1:-}"
 MIGRATIONS_DIR="${2:-}"
 
@@ -27,21 +29,6 @@ if ! ls "$MIGRATIONS_DIR"/*.sql &>/dev/null; then
 fi
 
 DB_CMD="mariadb -u root -proot iblhoops_ibl5"
-
-# Wrapper to suppress MariaDB "password on command line" warning.
-# Returns the real exit code from docker exec.
-db_exec() {
-    local output rc=0
-    output=$(docker exec "$@" 2>&1) || rc=$?
-    [ -n "$output" ] && printf '%s\n' "$output" | grep -v '\[Warning\].*password' || true
-    return $rc
-}
-db_exec_stdin() {
-    local output rc=0
-    output=$(docker exec -i "$@" 2>&1) || rc=$?
-    [ -n "$output" ] && printf '%s\n' "$output" | grep -v '\[Warning\].*password' || true
-    return $rc
-}
 
 echo "Running migrations..."
 db_exec "$DB_CONTAINER" $DB_CMD \

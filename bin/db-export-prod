@@ -1,15 +1,7 @@
 #!/bin/bash
 # Export production database for use in worktree Docker environments.
-# Box score tables are limited to a single season to keep the dump small.
-#
-# Usage: bin/db-export-prod [--all-seasons] [season-ending-year]
-#   --all-seasons       Export ALL box score data (not just one season)
-#   season-ending-year  The calendar year the season's playoffs end
-#                       (default: auto-detected from ibl_settings)
-#
-# IBL seasons run October → June:
-#   HEAT starts in October of year Y-1, playoffs end in June of year Y.
-#   So "2007" exports games from 2006-10-01 through 2007-06-30.
+# Box score tables (ibl_box_scores, ibl_box_scores_teams) are excluded due to
+# STORED GENERATED columns that cause ERROR 1906 on import.
 #
 # Connection: reads REMOTE_* from .env for production, falls back to local Docker.
 # Output: ibl5/fixtures/prod-seed.sql (gitignored)
@@ -52,42 +44,10 @@ else
     echo "Mode: local Docker ($DB_HOST)"
 fi
 
-# Parse flags
-ALL_SEASONS=false
-if [ "${1:-}" = "--all-seasons" ]; then
-    ALL_SEASONS=true
-    shift
-fi
-
-# Detect most recent season from the database (not wall-clock time).
-# ibl_settings stores "Current Season Ending Year" which is the calendar year
-# the current or most-recently-completed season's playoffs end in.
-if [ -n "${1:-}" ]; then
-    SEASON_END_YEAR="$1"
-else
-    SEASON_END_YEAR=$(MYSQL_PWD="$DB_PASS_VAL" mariadb -h "$DB_HOST" \
-        -P "$DB_PORT" --skip-ssl -u "$DB_USER_VAL" "$DB_NAME" -N -e \
-        "SELECT value FROM ibl_settings WHERE name='Current Season Ending Year';")
-    if [ -z "$SEASON_END_YEAR" ]; then
-        echo "Error: could not detect season from ibl_settings." >&2
-        exit 1
-    fi
-fi
-SEASON_START="$((SEASON_END_YEAR - 1))-10-01"
-SEASON_END="${SEASON_END_YEAR}-06-30"
-
 DUMP_OPTS="--skip-ssl --single-transaction --skip-lock-tables $EXTRA_OPTS"
 
-echo "Exporting production DB (excluding box scores — use db-import-boxscores)..."
+echo "Exporting production DB (excluding box scores)..."
 
-# Box score tables are excluded from the main dump because they contain STORED
-# GENERATED columns (game_type, season_year, calc_*) that mariadb-dump includes
-# in INSERT values. Docker MariaDB 10.6 rejects these with ERROR 1906, causing
-# the entire INSERT batch to fail silently under --force. Use the dedicated
-# bin/db-import-boxscores script which handles generated columns correctly.
-BOX_TABLES=""
-
-# Tables/views to skip entirely (box scores handled by db-import-boxscores)
 SKIP_REGEX="^(ibl_box_scores|ibl_box_scores_teams)$"
 
 # Helper: run a mariadb query
@@ -166,20 +126,6 @@ db_dump --no-create-info --skip-triggers "$DB_NAME" $REGULAR_TABLES \
     > "$TMPDIR/regular.sql" &
 PIDS="$PIDS $!"
 
-for tbl in $BOX_TABLES; do
-    if [ "$ALL_SEASONS" = true ]; then
-        echo "-- Dumping $tbl (all seasons)..."
-        db_dump --no-create-info --skip-triggers \
-            "$DB_NAME" "$tbl" > "$TMPDIR/box_${tbl}.sql" &
-    else
-        echo "-- Dumping $tbl (season ${SEASON_END_YEAR} only)..."
-        db_dump --no-create-info --skip-triggers \
-            --where="Date BETWEEN '${SEASON_START}' AND '${SEASON_END}'" \
-            "$DB_NAME" "$tbl" > "$TMPDIR/box_${tbl}.sql" &
-    fi
-    PIDS="$PIDS $!"
-done
-
 if [ -n "$VIEWS" ]; then
     echo "-- Dumping views..."
     # shellcheck disable=SC2086
@@ -225,9 +171,6 @@ strip_dump_wrapper() {
 [ -s "$OUTPUT" ] && [ "$(tail -c 1 "$OUTPUT" | wc -l)" -eq 0 ] && echo >> "$OUTPUT"
 
 strip_dump_wrapper "$TMPDIR/regular.sql" >> "$OUTPUT"
-for tbl in $BOX_TABLES; do
-    strip_dump_wrapper "$TMPDIR/box_${tbl}.sql" >> "$OUTPUT"
-done
 [ -f "$TMPDIR/views.sql" ] && strip_dump_wrapper "$TMPDIR/views.sql" >> "$OUTPUT"
 
 # 5. Strip DEFINER clauses — prod exports contain DEFINER=user@host that may
@@ -237,7 +180,3 @@ perl -pi -e 's/ DEFINER=[^ ]* / /g' "$OUTPUT"
 SIZE=$(du -h "$OUTPUT" | cut -f1)
 echo ""
 echo "Done: $OUTPUT ($SIZE)"
-echo ""
-echo "Box scores (ibl_box_scores, ibl_box_scores_teams) are NOT included."
-echo "Import them separately after loading the seed:"
-echo "  bin/db-import-boxscores --remote"

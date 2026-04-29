@@ -54,7 +54,7 @@
 }
 
 .debug-breakdown__heading {
-    font-size: 0.85rem;
+    font-size: var(--text-sm);
     font-weight: 600;
     color: #a5d8ff;
     margin: 0 0 0.5rem;
@@ -63,7 +63,7 @@
 }
 
 .debug-breakdown .ibl-data-table {
-    font-size: 0.8rem;
+    font-size: var(--text-sm);
     background: transparent;
     color: #e0e0e0;
 }
@@ -80,7 +80,7 @@
 
 .debug-breakdown__kv {
     margin: 0;
-    font-size: 0.85rem;
+    font-size: var(--text-sm);
 }
 
 .debug-breakdown__kv > div {
@@ -102,12 +102,12 @@
 
 .debug-breakdown__mono {
     font-family: monospace;
-    font-size: 0.75rem;
+    font-size: var(--text-xs);
 }
 
 .debug-breakdown__formula {
     font-family: monospace;
-    font-size: 0.9rem;
+    font-size: 1rem;
     margin: 0;
     color: #ccc;
 }

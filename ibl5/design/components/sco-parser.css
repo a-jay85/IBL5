@@ -50,7 +50,7 @@
 
 .sco-log__message {
     font-family: var(--font-mono, monospace);
-    font-size: 0.8125rem;
+    font-size: var(--text-sm);
     color: #94a3b8;
     line-height: 1.7;
     margin: 0;
@@ -88,7 +88,7 @@
 
 .all-star-rename__heading {
     font-family: var(--font-display, 'Barlow Condensed', sans-serif);
-    font-size: 1.125rem;
+    font-size: var(--text-lg);
     font-weight: 700;
     text-transform: uppercase;
     letter-spacing: 0.02em;
@@ -104,7 +104,7 @@
 }
 
 .all-star-rename__chip {
-    font-size: 0.8125rem;
+    font-size: var(--text-sm);
     font-weight: 500;
     padding: 0.125rem 0.5rem;
     border-radius: 9999px;
@@ -135,7 +135,7 @@
 
 .all-star-rename__status {
     margin-top: var(--space-2, 0.5rem);
-    font-size: 0.875rem;
+    font-size: var(--text-sm);
 }
 
 .all-star-rename__success {

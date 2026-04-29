@@ -59,7 +59,7 @@
 .leaders-tabbed__title {
     margin: 0;
     font-family: var(--font-display);
-    font-size: 1.5rem;
+    font-size: var(--text-2xl);
     font-weight: 700;
     color: white;
     text-transform: uppercase;
@@ -131,7 +131,7 @@
 
 .leaders-tabbed__leader-name {
     font-weight: 600;
-    font-size: 1.125rem;
+    font-size: var(--text-lg);
     color: var(--navy-900);
     text-decoration: none;
     white-space: nowrap;

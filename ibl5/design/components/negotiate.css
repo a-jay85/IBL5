@@ -19,7 +19,7 @@
 
 /* Ratings table — compact font for the 21-column layout */
 .offer-ratings {
-    font-size: 0.875rem;
+    font-size: var(--text-sm);
 }
 
 /* Salary row — flex layout for year columns (demands and offer inputs) */

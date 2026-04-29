@@ -74,7 +74,7 @@
     color: var(--gray-700, #374151);
     font-family: var(--font-display);
     font-weight: 700;
-    font-size: 1.1rem;
+    font-size: var(--text-lg);
     text-align: center;
     letter-spacing: 0.025em;
     text-transform: uppercase;
@@ -275,7 +275,7 @@
 @media (max-width: 768px) {
     .trade-roster-preview__tabs .ibl-tab {
         padding: var(--space-1) 0.25rem;
-        font-size: 0.75rem;
+        font-size: var(--text-xs);
     }
 }
 

@@ -11,7 +11,7 @@
 }
 
 .topics-page__subtitle {
-    font-size: 1.125rem;
+    font-size: var(--text-lg);
     color: var(--gray-500);
     margin: -0.5rem 0 var(--space-6);
     text-align: center;
@@ -110,7 +110,7 @@
 
 .topic-card__title {
     font-family: var(--font-display);
-    font-size: 1.25rem;
+    font-size: var(--text-xl);
     font-weight: 700;
     text-transform: uppercase;
     letter-spacing: 0.03em;
@@ -140,7 +140,7 @@
 }
 
 .topic-card__stat {
-    font-size: 0.8rem;
+    font-size: var(--text-sm);
     color: rgba(255, 255, 255, 0.6);
     letter-spacing: 0.02em;
 }
@@ -177,7 +177,7 @@
 .topic-card__article {
     padding: var(--space-2) 0;
     border-bottom: 1px solid var(--gray-100);
-    font-size: 0.95rem;
+    font-size: 1rem;
     line-height: 1.4;
     display: flex;
     flex-wrap: wrap;
@@ -191,7 +191,7 @@
 
 .topic-card__cat {
     font-family: var(--font-display);
-    font-size: 0.8rem;
+    font-size: var(--text-sm);
     font-weight: 700;
     text-transform: uppercase;
     letter-spacing: 0.04em;
@@ -229,7 +229,7 @@
 
 .topic-card__more a {
     font-family: var(--font-display);
-    font-size: 0.9rem;
+    font-size: 1rem;
     font-weight: 600;
     text-transform: uppercase;
     letter-spacing: 0.04em;
@@ -246,7 +246,7 @@
 .topic-card__empty {
     color: var(--gray-400);
     font-style: italic;
-    font-size: 0.95rem;
+    font-size: 1rem;
     margin: 0;
     padding: var(--space-2) 0;
 }

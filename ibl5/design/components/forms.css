@@ -9,7 +9,7 @@
 .ibl-select,
 .ibl-textarea {
     font-family: var(--font-sans);
-    font-size: 1.125rem;
+    font-size: var(--text-lg);
     color: var(--navy-800);
     background-color: white;
     border: 1px solid var(--gray-300);
@@ -61,7 +61,7 @@
 }
 
 .ibl-label--sm {
-    font-size: 0.75rem;
+    font-size: var(--text-xs);
 }
 
 .ibl-label--required::after {
@@ -79,7 +79,7 @@
     justify-content: center;
     gap: var(--space-2);
     font-family: var(--font-display);
-    font-size: 1.125rem;
+    font-size: var(--text-lg);
     font-weight: 600;
     text-transform: uppercase;
     letter-spacing: 0.05em;
@@ -170,7 +170,7 @@
 }
 
 .ibl-btn--lg {
-    font-size: 1.25rem;
+    font-size: var(--text-xl);
     padding: var(--space-3) var(--space-6);
 }
 
@@ -237,7 +237,7 @@
     flex: 1;
     border: none;
     outline: none;
-    font-size: 1.125rem;
+    font-size: var(--text-lg);
     background: transparent;
 }
 
@@ -303,7 +303,7 @@
 .ibl-filter-form input[type="text"],
 .ibl-filter-form input[type="number"] {
     font-family: var(--font-sans, 'Barlow', sans-serif);
-    font-size: 1.125rem;
+    font-size: var(--text-lg);
     padding: 0.375rem 0.625rem;
     border: 1px solid var(--gray-300, #d1d5db);
     border-radius: var(--radius-md, 0.375rem);

@@ -99,7 +99,7 @@
     color: white;
     font-family: var(--font-display, 'Barlow Condensed', -apple-system, BlinkMacSystemFont, sans-serif);
     font-weight: 600;
-    font-size: 1.2rem;
+    font-size: var(--text-xl);
     text-transform: uppercase;
     letter-spacing: 0.03em;
     line-height: 1.2rem;
@@ -302,7 +302,7 @@
 .ibl-data-table tfoot tr.tfoot-legend {
     background-color: var(--gray-50, #f9fafb);
     font-weight: 400;
-    font-size: 0.875rem;
+    font-size: var(--text-sm);
     color: var(--gray-500, #6b7280);
 }
 
@@ -1111,7 +1111,7 @@ tr:has(.contract-hint-cell):focus-within .contract-hint-cell {
 
 .ibl-table-title {
     font-family: var(--font-display, 'Barlow Condensed', -apple-system, BlinkMacSystemFont, sans-serif);
-    font-size: 1.5rem;
+    font-size: var(--text-2xl);
     font-weight: 600;
     color: var(--navy-900, #0a0f1a);
     text-align: center;
@@ -1122,7 +1122,7 @@ tr:has(.contract-hint-cell):focus-within .contract-hint-cell {
 .ibl-table-subheading th,
 .ibl-table-subheading td {
     color: var(--gray-600);
-    font-size: 0.875rem;
+    font-size: var(--text-sm);
     font-weight: 600;
     text-transform: uppercase;
     letter-spacing: 0.05em;
@@ -1419,7 +1419,7 @@ td.ibl-team-cell--colored {
     padding: 0.375rem 0.625rem;
     background-color: var(--navy-900, #0a0f1a);
     color: white;
-    font-size: 0.8rem;
+    font-size: var(--text-sm);
     font-weight: 500;
     white-space: nowrap;
     border-radius: var(--radius-sm, 0.25rem);
@@ -1560,7 +1560,7 @@ td.ibl-team-cell--colored {
     }
 
     .voting-category-title {
-        font-size: 1.25rem;
+        font-size: var(--text-xl);
     }
 
     /* Override mobile table reductions - keep full size for voting tables */
@@ -1854,7 +1854,7 @@ td.ibl-team-cell--colored {
     color: var(--team-color-secondary, white);
     font-family: var(--font-display);
     font-weight: 700;
-    font-size: 0.95rem;
+    font-size: 1rem;
     letter-spacing: 0.025em;
     cursor: pointer;
     list-style: none;
@@ -2096,7 +2096,7 @@ td.ibl-team-cell--colored {
     padding: 0.25rem;
     border: 1px solid var(--gray-300);
     border-radius: var(--radius-sm);
-    font-size: 0.875rem;
+    font-size: var(--text-sm);
 }
 
 /* Minutes number input — matches the role-slot select's size/appearance.
@@ -2105,7 +2105,7 @@ td.ibl-team-cell--colored {
     padding: 0.25rem;
     border: 1px solid var(--gray-300);
     border-radius: var(--radius-sm);
-    font-size: 0.875rem;
+    font-size: var(--text-sm);
     width: 4rem;
     text-align: center;
 }
@@ -2149,7 +2149,7 @@ td.ibl-team-cell--colored {
 .draft-pick-table td {
     border-bottom: 1px solid var(--gray-100);
     text-align: center;
-    font-size: 0.875rem;
+    font-size: var(--text-sm);
 }
 
 /* Match ibl-data-table header styling */
@@ -2244,7 +2244,7 @@ td.ibl-team-cell--colored {
 
 .record-category__title {
     font-family: var(--font-display);
-    font-size: 1.125rem;
+    font-size: var(--text-lg);
     font-weight: 600;
     color: var(--navy-800);
     text-transform: uppercase;
@@ -2276,7 +2276,7 @@ td.ibl-team-cell--colored {
 .record-table td img { margin: 0 auto; }
 .record-table .player-cell { font-weight: 600; }
 .record-table .player-cell img { display: block; margin: 0 auto var(--space-1); }
-.record-table td.ibl-stat-highlight { font-size: 1.125rem; text-align: center; }
+.record-table td.ibl-stat-highlight { font-size: var(--text-lg); text-align: center; }
 
 /* Colgroup widths — 5-column player single-game layout */
 .record-table--5col col.col-player { width: 25%; }
@@ -2326,7 +2326,7 @@ td.ibl-team-cell--colored {
 
 .projected-draft-order-description {
     color: var(--gray-600);
-    font-size: 0.875rem;
+    font-size: var(--text-sm);
     line-height: 1.5;
     margin-bottom: var(--space-4);
 }
@@ -2477,7 +2477,7 @@ td.ibl-team-cell--colored {
 .record-book-team-selector label {
     font-family: var(--font-display);
     font-weight: 600;
-    font-size: 0.875rem;
+    font-size: var(--text-sm);
     text-transform: uppercase;
     letter-spacing: 0.05em;
     color: var(--gray-600, #4b5563);
@@ -2487,7 +2487,7 @@ td.ibl-team-cell--colored {
     padding: var(--space-2) var(--space-3);
     border: 1px solid var(--gray-300, #d1d5db);
     border-radius: var(--radius-md, 0.375rem);
-    font-size: 0.875rem;
+    font-size: var(--text-sm);
     background: white;
 }
 
@@ -2508,7 +2508,7 @@ td.ibl-team-cell--colored {
 }
 
 .record-book-table {
-    font-size: 0.875rem;
+    font-size: var(--text-sm);
 }
 
 .record-book-table td:first-child {
@@ -2524,7 +2524,7 @@ td.ibl-team-cell--colored {
 }
 
 .record-book-section-title {
-    font-size: 1.25rem;
+    font-size: var(--text-xl);
     margin-top: 1.5rem;
 }
 
@@ -2557,7 +2557,7 @@ td.ibl-team-cell--colored {
 }
 
 .season-highs-discrepancy-panel .ibl-data-table {
-    font-size: 0.875rem;
+    font-size: var(--text-sm);
 }
 
 /* ==========================================================================

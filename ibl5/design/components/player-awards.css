@@ -9,7 +9,7 @@
     align-items: center;
     gap: 0.25rem;
     font-family: var(--font-sans);
-    font-size: 0.95rem;
+    font-size: 1rem;
     color: var(--gray-600);
     cursor: pointer;
     margin-right: var(--space-2);

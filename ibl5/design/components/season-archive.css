@@ -29,7 +29,7 @@
 
 .season-archive-section h3 {
     font-family: var(--font-display, 'Barlow Condensed', sans-serif);
-    font-size: 1.25rem;
+    font-size: var(--text-xl);
     font-weight: 600;
     color: var(--navy-900, #0a0f1a);
     margin-bottom: var(--space-3, 0.75rem);
@@ -50,7 +50,7 @@
 .season-archive-roster-col h4,
 .season-archive-section h4 {
     font-family: var(--font-display, 'Barlow Condensed', sans-serif);
-    font-size: 1.1rem;
+    font-size: var(--text-lg);
     font-weight: 600;
     color: var(--navy-800, #111827);
     margin-bottom: var(--space-2, 0.5rem);
@@ -58,7 +58,7 @@
 
 /* Coach caption */
 .season-archive-coach-caption {
-    font-size: 0.85rem;
+    font-size: var(--text-sm);
     color: var(--gray-600, #4b5563);
     margin-bottom: var(--space-1, 0.25rem);
     font-style: italic;
@@ -87,7 +87,7 @@
 
 /* Bracket hint text */
 .season-archive-bracket-hint {
-    font-size: 0.85rem;
+    font-size: var(--text-sm);
     color: var(--gray-500, #6b7280);
     margin-bottom: var(--space-2, 0.5rem);
 }

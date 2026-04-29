@@ -37,7 +37,7 @@
 
 .search-form__select {
     font-family: var(--font-sans);
-    font-size: 0.95rem;
+    font-size: 1rem;
     color: var(--navy-800);
     background: white;
     border: 1px solid var(--gray-300);
@@ -64,7 +64,7 @@
 
 .search-form__types-label {
     font-family: var(--font-display);
-    font-size: 0.9rem;
+    font-size: 1rem;
     font-weight: 600;
     color: var(--gray-600);
     text-transform: uppercase;
@@ -76,7 +76,7 @@
     align-items: center;
     gap: var(--space-1);
     cursor: pointer;
-    font-size: 0.95rem;
+    font-size: 1rem;
     color: var(--gray-700);
     transition: color var(--transition-fast);
 }
@@ -108,7 +108,7 @@
 
 .search-results__heading {
     font-family: var(--font-display);
-    font-size: 1.25rem;
+    font-size: var(--text-xl);
     font-weight: 700;
     text-transform: uppercase;
     letter-spacing: 0.04em;
@@ -165,7 +165,7 @@
 
 .search-result__title {
     font-family: var(--font-display);
-    font-size: 1.15rem;
+    font-size: var(--text-lg);
     font-weight: 700;
     color: var(--navy-800);
     text-decoration: none;
@@ -177,7 +177,7 @@
 }
 
 .search-result__subtitle {
-    font-size: 0.95rem;
+    font-size: 1rem;
     color: var(--gray-500);
 }
 
@@ -193,7 +193,7 @@
     flex-wrap: wrap;
     align-items: center;
     gap: var(--space-1) var(--space-3);
-    font-size: 0.85rem;
+    font-size: var(--text-sm);
     color: var(--gray-500);
 }
 
@@ -227,7 +227,7 @@
 
 .search-result__admin a {
     font-family: var(--font-display);
-    font-size: 0.75rem;
+    font-size: var(--text-xs);
     font-weight: 600;
     text-transform: uppercase;
     letter-spacing: 0.04em;
@@ -252,7 +252,7 @@
 
 .search-pagination__link {
     font-family: var(--font-display);
-    font-size: 0.95rem;
+    font-size: 1rem;
     font-weight: 600;
     text-transform: uppercase;
     letter-spacing: 0.04em;

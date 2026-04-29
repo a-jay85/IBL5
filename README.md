@@ -27,8 +27,8 @@ cd ibl5 && composer install && cd ..
 # 2. Start Docker (Apache/PHP + MariaDB)
 docker compose up -d
 
-# 3. Run tests
-cd ibl5 && composer run test
+# 3. Run tests (from ibl5/)
+vendor/bin/phpunit
 ```
 
 See [DOCKER_SETUP.md](ibl5/docs/DOCKER_SETUP.md) for detailed Docker setup and [DEVELOPMENT_ENVIRONMENT.md](ibl5/docs/DEVELOPMENT_ENVIRONMENT.md) for dependency caching.
@@ -76,17 +76,19 @@ See `ibl5/classes/Waivers/` for the canonical example (Repository, Service, Proc
 ## Testing
 
 ```bash
-# Run all tests (from ibl5/)
-composer run test
+# All commands below run from ibl5/
+
+# Run all tests
+vendor/bin/phpunit
 
 # Run a specific module's tests
-composer run test -- --filter Player
+vendor/bin/phpunit --filter Player
 
 # Run static analysis
 composer run analyse
 
 # Run E2E tests (requires Docker)
-cd ibl5 && bun run test:e2e
+bun run test:e2e
 ```
 
 **Current:** 4851 tests, 27370 assertions | PHPStan level max

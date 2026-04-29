@@ -15,7 +15,7 @@ last_verified: 2026-04-29
 ```bash
 docker compose up -d          # Start Docker stack (PHP + MariaDB)
 cd ibl5 && composer install   # Install PHP dependencies
-composer run test             # Run all tests (from ibl5/)
+vendor/bin/phpunit            # Run all tests (from ibl5/)
 ```
 
 ---
@@ -29,9 +29,9 @@ Install with `composer install` from the `ibl5/` directory. In CI, `.github/work
 ## Testing from Command Line
 
 ```bash
-composer run test                                     # Run all tests (from ibl5/)
-composer run test -- --filter testRenderPlayerHeader  # Run specific test
-composer run test -- --testsuite "Player"             # Run specific suite
+vendor/bin/phpunit                                    # Run all tests (from ibl5/)
+vendor/bin/phpunit --filter testRenderPlayerHeader    # Run specific test
+vendor/bin/phpunit --testsuite "Player"               # Run specific suite
 composer run analyse                                  # PHPStan
 ```
 

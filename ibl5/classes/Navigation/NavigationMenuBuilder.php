@@ -46,11 +46,14 @@ class NavigationMenuBuilder implements NavigationMenuBuilderInterface
                     ['label' => 'Injuries', 'url' => 'modules.php?name=Injuries'],
                     ['label' => 'Player Database', 'url' => 'modules.php?name=PlayerDatabase'],
                     ['label' => 'Player Export', 'url' => 'modules.php?name=PlayerExportGuide'],
+                    ['label' => 'Cap Space', 'url' => 'modules.php?name=CapSpace'],
                     $this->config->isDraftOrderFinalized
-                        ? ['label' => 'Draft Order', 'url' => 'modules.php?name=ProjectedDraftOrder', 'badge' => 'FINAL']
+                        ? ($this->config->seasonPhase === 'Draft'
+                            ? ['label' => 'Draft Order', 'url' => 'modules.php?name=ProjectedDraftOrder', 'badge' => 'FINAL']
+                            : ['label' => 'Draft Order', 'url' => 'modules.php?name=ProjectedDraftOrder'])
                         : ['label' => 'Projected Draft Order', 'url' => 'modules.php?name=ProjectedDraftOrder'],
                     ['label' => 'Draft Pick Locator', 'url' => 'modules.php?name=DraftPickLocator'],
-                    ['label' => 'Cap Space', 'url' => 'modules.php?name=CapSpace'],
+                    ['label' => 'Training Camp Ratings Diff', 'url' => 'modules.php?name=TrainingCampRatingsDiff'],
                     ['label' => 'Free Agency Preview', 'url' => 'modules.php?name=FreeAgencyPreview'],
                     ['label' => 'Contract List', 'url' => 'modules.php?name=ContractList'],
                     ['label' => 'Player Movement', 'url' => 'modules.php?name=PlayerMovement'],
@@ -60,7 +63,7 @@ class NavigationMenuBuilder implements NavigationMenuBuilderInterface
             'Stats' => [
                 'icon' => '<svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"/></svg>',
                 'links' => [
-                    ['label' => 'League Starters', 'url' => 'modules.php?name=LeagueStarters', 'badge' => 'NEW'],
+                    ['label' => 'League Starters', 'url' => 'modules.php?name=LeagueStarters'],
                     ['label' => 'Compare Players', 'url' => 'modules.php?name=ComparePlayers'],
                     ['label' => 'Season Highs', 'url' => 'modules.php?name=SeasonHighs'],
                     ['label' => 'Series Records', 'url' => 'modules.php?name=SeriesRecords'],
@@ -178,7 +181,7 @@ class NavigationMenuBuilder implements NavigationMenuBuilderInterface
         $links = [
             ['label' => 'Team Page', 'url' => 'modules.php?name=Team&op=team&teamid=' . $teamId],
             ['label' => 'Schedule', 'url' => 'modules.php?name=Schedule&teamid=' . $teamId],
-            ['label' => 'Next Sim', 'url' => 'modules.php?name=NextSim', 'badge' => 'NEW'],
+            ['label' => 'Next Sim', 'url' => 'modules.php?name=NextSim'],
             ['label' => 'Depth Chart Entry', 'url' => 'modules.php?name=DepthChartEntry'],
             ['label' => 'Trading', 'url' => 'modules.php?name=Trading&op=reviewtrade'],
             ['label' => 'Voting', 'url' => 'modules.php?name=Voting'],

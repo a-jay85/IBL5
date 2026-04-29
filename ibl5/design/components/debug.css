@@ -129,8 +129,10 @@
     align-items: center;
     gap: 0.5rem;
     width: 100%;
-    font: inherit;
-    color: inherit;
+    font-family: var(--font-display);
+    font-size: 1rem;
+    font-weight: 600;
+    color: white;
 }
 
 .debug-toggle-btn:hover {

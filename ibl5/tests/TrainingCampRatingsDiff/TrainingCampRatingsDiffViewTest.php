@@ -150,15 +150,17 @@ class TrainingCampRatingsDiffViewTest extends TestCase
         self::assertStringContainsString('2025', $html);
     }
 
-    public function test_it_renders_the_sortable_ibl_data_table_responsive_table_ratings_diff_table_classes(): void
+    public function test_it_renders_the_sortable_ibl_data_table_sticky_table_ratings_diff_table_classes(): void
     {
         $row  = $this->buildRatingRow(1, 'Player A', 5);
         $html = $this->view->render(2025, [$row]);
 
         self::assertStringContainsString('sortable', $html);
         self::assertStringContainsString('ibl-data-table', $html);
-        self::assertStringContainsString('responsive-table', $html);
+        self::assertStringContainsString('sticky-table', $html);
         self::assertStringContainsString('ratings-diff-table', $html);
+        self::assertStringContainsString('sticky-scroll-wrapper page-sticky', $html);
+        self::assertStringContainsString('sticky-corner', $html);
     }
 
     // ---------------------------------------------------------------------------

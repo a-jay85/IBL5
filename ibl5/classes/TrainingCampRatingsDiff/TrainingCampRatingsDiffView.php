@@ -89,12 +89,12 @@ class TrainingCampRatingsDiffView implements TrainingCampRatingsDiffViewInterfac
             . '. Sorted by largest single rating change.</p>';
         $html .= $this->renderStatusFilter($filterStatus);
 
-        $html .= '<div class="table-scroll-wrapper"><div class="table-scroll-container">';
-        $html .= '<table class="sortable ibl-data-table responsive-table ratings-diff-table">';
+        $html .= '<div class="sticky-scroll-wrapper page-sticky"><div class="sticky-scroll-container">';
+        $html .= '<table class="sortable ibl-data-table sticky-table ratings-diff-table">';
 
         // thead
         $html .= '<thead><tr>';
-        $html .= '<th class="sticky-col">Player</th>';
+        $html .= '<th class="sticky-col sticky-corner">Player</th>';
         $html .= '<th class="ibl-team-cell--colored">Team</th>';
         $html .= '<th>Age</th>';
         $html .= '<th>Pos</th>';

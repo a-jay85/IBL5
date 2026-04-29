@@ -451,6 +451,11 @@ nav .group > a:hover {
     border-left-color: var(--color-accent-500);
 }
 
+/* Unlinked text in rawHtml nav items (e.g. "Waivers:", "View All Extensions: OFF") */
+span.nav-dropdown-item {
+    color: white;
+}
+
 /* Inline links within rawHtml nav items (e.g. "Waivers: Add | Drop") */
 span.nav-dropdown-item a:link {
     color: var(--gray-200);

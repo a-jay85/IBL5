@@ -52,14 +52,22 @@ class SeasonArchiveServiceTest extends TestCase
         $this->assertSame('Season X (1997-98)', $label);
     }
 
+    public function testBuildSeasonLabelForSeasonNineteen(): void
+    {
+        $label = $this->service->buildSeasonLabel(2007);
+        $this->assertSame('Season XIX (2006-07)', $label);
+    }
+
     public function testGetSeasonDetailReturnsNullForInvalidYear(): void
     {
         $result = $this->service->getSeasonDetail(1980);
         $this->assertNull($result);
     }
 
-    public function testGetSeasonDetailReturnsNullForYearBeyondRange(): void
+    public function testGetSeasonDetailReturnsNullForYearWithNoAwardsData(): void
     {
+        $this->mockRepository->method('getAwardsByYear')->willReturn([]);
+
         $result = $this->service->getSeasonDetail(2010);
         $this->assertNull($result);
     }

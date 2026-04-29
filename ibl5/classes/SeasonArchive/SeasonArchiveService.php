@@ -26,13 +26,6 @@ use SeasonArchive\Contracts\SeasonArchiveServiceInterface;
  */
 class SeasonArchiveService implements SeasonArchiveServiceInterface
 {
-    private const ROMAN_NUMERALS = [
-        1 => 'I', 2 => 'II', 3 => 'III', 4 => 'IV', 5 => 'V',
-        6 => 'VI', 7 => 'VII', 8 => 'VIII', 9 => 'IX', 10 => 'X',
-        11 => 'XI', 12 => 'XII', 13 => 'XIII', 14 => 'XIV', 15 => 'XV',
-        16 => 'XVI', 17 => 'XVII', 18 => 'XVIII',
-    ];
-
     /** @var int Season I ending year (league founded 1988, first season ends 1989) */
     private const FIRST_ENDING_YEAR = 1989;
 
@@ -93,7 +86,7 @@ class SeasonArchiveService implements SeasonArchiveServiceInterface
     public function getSeasonDetail(int $year): ?array
     {
         $seasonNumber = $year - (self::FIRST_ENDING_YEAR - 1);
-        if ($seasonNumber < 1 || $seasonNumber > 18) {
+        if ($seasonNumber < 1) {
             return null;
         }
 
@@ -224,11 +217,29 @@ class SeasonArchiveService implements SeasonArchiveServiceInterface
     public function buildSeasonLabel(int $year): string
     {
         $seasonNumber = $year - (self::FIRST_ENDING_YEAR - 1);
-        $roman = self::ROMAN_NUMERALS[$seasonNumber] ?? (string) $seasonNumber;
+        $roman = self::toRoman($seasonNumber);
         $startYear = $year - 1;
         $endYearShort = substr((string) $year, 2);
 
         return 'Season ' . $roman . ' (' . $startYear . '-' . $endYearShort . ')';
+    }
+
+    private static function toRoman(int $number): string
+    {
+        $map = [
+            1000 => 'M', 900 => 'CM', 500 => 'D', 400 => 'CD',
+            100 => 'C', 90 => 'XC', 50 => 'L', 40 => 'XL',
+            10 => 'X', 9 => 'IX', 5 => 'V', 4 => 'IV', 1 => 'I',
+        ];
+        $result = '';
+        foreach ($map as $value => $numeral) {
+            while ($number >= $value) {
+                $result .= $numeral;
+                $number -= $value;
+            }
+        }
+
+        return $result;
     }
 
     /**

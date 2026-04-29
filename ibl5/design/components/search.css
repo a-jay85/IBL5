@@ -51,7 +51,7 @@
 .search-form__select:focus {
     outline: none;
     border-color: var(--accent-500);
-    box-shadow: 0 0 0 3px rgba(249, 115, 22, 0.1);
+    box-shadow: var(--ring-accent);
 }
 
 /* Search type radio buttons */

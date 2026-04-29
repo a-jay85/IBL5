@@ -844,7 +844,7 @@ span.nav-dropdown-item a:hover {
 
 .nav-select:focus {
     outline: none;
-    box-shadow: 0 0 0 2px rgba(249, 115, 22, 0.5);
+    box-shadow: var(--ring-accent-strong);
     border-color: var(--accent-500);
 }
 
@@ -980,7 +980,7 @@ span.nav-dropdown-item a:hover {
 }
 
 .nav-login-checkbox:focus-visible {
-    box-shadow: 0 0 0 2px rgba(249, 115, 22, 0.5);
+    box-shadow: var(--ring-accent-strong);
 }
 
 @media (min-width: 1024px) {

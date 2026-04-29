@@ -24,7 +24,7 @@
 .ibl-textarea:focus {
     outline: none;
     border-color: var(--accent-500);
-    box-shadow: 0 0 0 3px rgba(249, 115, 22, 0.1);
+    box-shadow: var(--ring-accent);
 }
 
 .ibl-input::placeholder {
@@ -225,7 +225,7 @@
 
 .ibl-search:focus-within {
     border-color: var(--accent-500);
-    box-shadow: 0 0 0 3px rgba(249, 115, 22, 0.1);
+    box-shadow: var(--ring-accent);
 }
 
 .ibl-search__icon {
@@ -316,7 +316,7 @@
 .ibl-filter-form input:focus {
     outline: none;
     border-color: var(--accent-500, #f97316);
-    box-shadow: 0 0 0 3px rgba(249, 115, 22, 0.1);
+    box-shadow: var(--ring-accent);
 }
 
 .ibl-filter-form input[type="number"] {

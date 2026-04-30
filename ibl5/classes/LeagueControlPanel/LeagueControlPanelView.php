@@ -137,7 +137,7 @@ class LeagueControlPanelView implements LeagueControlPanelViewInterface
     {
         return match ($panelData['phase']) {
             'Preseason' => $this->renderPreseasonControls($panelData),
-            'HEAT' => $this->renderHeatControls(),
+            'HEAT' => $this->renderHeatControls($panelData),
             'Regular Season' => $this->renderRegularSeasonControls($currentLeague, $panelData),
             'Playoffs' => $this->renderPlayoffsControls($panelData),
             'Draft' => $this->renderDraftControls($panelData),
@@ -177,7 +177,10 @@ class LeagueControlPanelView implements LeagueControlPanelViewInterface
         return (string) ob_get_clean();
     }
 
-    private function renderHeatControls(): string
+    /**
+     * @param array{phase: string, allowTrades: string, allowWaivers: string, showDraftLink: string, freeAgencyNotifications: string, triviaMode: string, simLengthInDays: int, seasonEndingYear: int, hasFinalsMvp: bool} $panelData
+     */
+    private function renderHeatControls(array $panelData): string
     {
         ob_start();
         ?>
@@ -187,6 +190,11 @@ class LeagueControlPanelView implements LeagueControlPanelViewInterface
         <a href="/ibl5/scripts/updateAllTheThings.php">Update All The Things</a>
     </div>
     <div class="lcp-note">Upload sim backup to <strong>backups/</strong> before running</div>
+    <div class="lcp-control-row">
+        <input type="number" name="SimLengthInDays" min="1" max="180" size="3" value="<?= HtmlSanitizer::e((string) $panelData['simLengthInDays']) ?>" class="ibl-input ibl-input--sm w-20">
+        <button type="submit" name="action" value="set_sim_length" class="ibl-btn ibl-btn--secondary ibl-btn--sm">Set Sim Length in Days</button>
+    </div>
+    <div class="lcp-note">You must click the button — pressing Enter will not work</div>
 </section>
         <?php
         return (string) ob_get_clean();
@@ -238,6 +246,11 @@ class LeagueControlPanelView implements LeagueControlPanelViewInterface
         <a href="/ibl5/scripts/updateAllTheThings.php">Update All The Things</a>
     </div>
     <div class="lcp-note">Upload sim backup to <strong>backups/</strong> before running</div>
+    <div class="lcp-control-row">
+        <input type="number" name="SimLengthInDays" min="1" max="180" size="3" value="<?= HtmlSanitizer::e((string) $panelData['simLengthInDays']) ?>" class="ibl-input ibl-input--sm w-20">
+        <button type="submit" name="action" value="set_sim_length" class="ibl-btn ibl-btn--secondary ibl-btn--sm">Set Sim Length in Days</button>
+    </div>
+    <div class="lcp-note">You must click the button — pressing Enter will not work</div>
     <div class="lcp-control-row">
         <button type="submit" name="action" value="reset_eoy_voting" class="ibl-btn ibl-btn--secondary ibl-btn--sm">Reset End of the Year Voting</button>
     </div>

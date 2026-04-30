@@ -110,6 +110,8 @@ class LeagueControlPanelViewTest extends TestCase
         ]);
 
         $this->assertStringContainsString('Update All The Things', $html);
+        $this->assertStringContainsString('name="SimLengthInDays"', $html);
+        $this->assertStringContainsString('value="set_sim_length"', $html);
         $this->assertStringNotContainsString('value="set_allow_waivers"', $html);
     }
 
@@ -148,6 +150,8 @@ class LeagueControlPanelViewTest extends TestCase
         ]);
 
         $this->assertStringContainsString('Update All The Things', $html);
+        $this->assertStringContainsString('name="SimLengthInDays"', $html);
+        $this->assertStringContainsString('value="set_sim_length"', $html);
         $this->assertStringContainsString('value="reset_eoy_voting"', $html);
         $this->assertStringNotContainsString('value="set_allow_trades"', $html);
         $this->assertStringContainsString('value="set_show_draft_link"', $html);

@@ -1,7 +1,7 @@
 ---
 description: Playwright E2E testing rules, Docker requirements, and actionability pitfalls.
 paths: ibl5/tests/e2e/**/*.ts
-last_verified: 2026-04-13
+last_verified: 2026-04-30
 ---
 
 # Playwright E2E Testing Rules
@@ -32,11 +32,11 @@ cd ibl5 && bun run test:e2e:serial
 
 This runs with `--workers=1 --retries=2` (CI-matching retries, single worker). Use this to determine whether a failure is a genuine bug or a parallelism artifact before investigating further.
 
-## Prerequisites
+## Prerequisites (run before any E2E work)
 
-- **Docker must be running** — E2E tests hit the local server (`http://main.localhost/ibl5/`), unlike PHPUnit tests which use mocks
-- **`.env.test` must exist** with valid credentials — copy from `.env.test.example`
-- **CSS must be rebuilt after branch switches** — `css:watch` may not detect source changes from `git checkout`. Run `bunx @tailwindcss/cli -i design/input.css -o themes/IBL/style/style.css` if tests depend on CSS from another branch
+1. **Verify Docker is running:** `docker compose ps` — if no containers are up, run `docker compose up -d`
+2. **Verify `.env.test` exists** with valid credentials — copy from `.env.test.example` if missing
+3. **Rebuild CSS after branch switches:** `css:watch` may not detect source changes from `git checkout`. Run `bunx @tailwindcss/cli -i design/input.css -o themes/IBL/style/style.css`
 
 ## Test Categories
 
@@ -282,26 +282,22 @@ test.describe('Public module flow', () => {
 ## DON'T:
 1. **Don't** call login inside tests — use the auth fixture
 2. **Don't** skip tests due to season phase — use `appState` (from fixtures) to set the state you need. Never use `setState()` directly — it races with parallel workers
-3. **Don't** use `.only` — it will fail in CI (`forbidOnly: true`)
-4. **Don't** use fragile structural selectors
-5. **Don't** mutate production data (create trades, submit forms) without cleanup
-6. **Don't** assume Docker is running — tests will fail with connection errors if it's not
-7. **Don't** import from `@playwright/test` for authenticated tests — import from `../fixtures/auth`
-8. **Don't** use `toBeVisible()` or `toHaveText()` on locators that match multiple elements — Playwright strict mode throws. Use `.first()`, `.nth(n)`, or check `.count()` instead
-9. **Don't** use `boundingBox()` to verify CSS properties like `width: fit-content` — parent layout context affects the bounding box. Use `page.evaluate(() => getComputedStyle(el).property)` to check computed CSS values directly
-10. **Don't** import `Page` type from `../fixtures/auth` — it only exports `test` and `expect`. Import `Page` separately: `import type { Page } from '@playwright/test'`
-11. **Don't** use `link.click()` for page-to-page navigation — it triggers a Playwright-managed navigation wait that can time out under concurrent load from parallel workers. Instead, extract the href with `getAttribute('href')` and use `page.goto(href)`, which handles navigation more reliably
-12. **Don't** use `test.skip()` — set prerequisites via `appState` + CI seed instead
-13. **Don't** use `.catch(() => false)` to swallow visibility errors — use `await expect().toBeVisible()` with a timeout (exception: `phase-gating-public.spec.ts` where testing element absence is the purpose)
-14. **Don't** use bare `return` without a preceding assertion — every code path must assert something
-15. **Don't** write dual-path `if/else` inside tests — split into separate focused tests with explicit `appState` prerequisites
-16. **Don't** write `if (count > 0) { assert }` with no else — the test silently passes when the element is absent. Use a hard assertion instead
+3. **Don't** use fragile structural selectors — use accessible roles, text content, or stable CSS classes instead (see Locator Best Practices above)
+4. **Don't** mutate production data (create trades, submit forms) without cleanup — use `appState` for reversible settings, or `test.afterEach()` / `test.afterAll()` hooks for data created during the test
+5. **Don't** import from `@playwright/test` for authenticated tests — import from `../fixtures/auth`
+6. **Don't** use `toBeVisible()` or `toHaveText()` on locators that match multiple elements — Playwright strict mode throws. Use `.first()`, `.nth(n)`, or check `.count()` instead
+7. **Don't** use `boundingBox()` to verify CSS properties like `width: fit-content` — parent layout context affects the bounding box. Use `page.evaluate(() => getComputedStyle(el).property)` to check computed CSS values directly
+8. **Don't** import `Page` type from `../fixtures/auth` — it only exports `test` and `expect`. Import `Page` separately: `import type { Page } from '@playwright/test'`
+9. **Don't** use `link.click()` for page-to-page navigation — it triggers a Playwright-managed navigation wait that can time out under concurrent load from parallel workers. Instead, extract the href with `getAttribute('href')` and use `page.goto(href)`, which handles navigation more reliably
+10. **Don't** use `test.skip()` — set prerequisites via `appState` + CI seed instead
+11. **Don't** use `.catch(() => false)` to swallow visibility errors — use `await expect().toBeVisible()` with a timeout (exception: `phase-gating-public.spec.ts` where testing element absence is the purpose)
+12. **Don't** use bare `return` without a preceding assertion — add `await expect(locator).toBeVisible()` or `expect(value).toBe(expected)` before any early return
+13. **Don't** write dual-path `if/else` inside tests — split into separate focused tests with explicit `appState` prerequisites
+14. **Don't** write `if (count > 0) { assert }` with no else — the test silently passes when the element is absent. Use a hard assertion instead
 
 ## Mandatory: No Skips, No Silent Passes
 
-Every E2E test must either **pass with a real assertion** or **fail loudly**. No `test.skip()`. No bare `return`. No `.catch(() => false)` + early exit. No `if (count > 0) { assert }` without an else.
-
-**Set prerequisites, don't detect state.** Use `appState` (from `../fixtures/auth` or `../fixtures/public`) to set `Current Season Phase` and `Current Season Ending Year`. CI seed data (`ci-seed.sql`) provides all test data for year 2026. Tests that need specific data should set `'Current Season Ending Year': '2026'` so the app resolves CI-seed players, schedule, and settings.
+The rules below (DON'Ts 10-14) are the most common E2E anti-patterns. Banned examples:
 
 ```typescript
 // CORRECT — each test has one purpose, one setup, one assertion path

@@ -1,7 +1,7 @@
 ---
 description: PHPUnit testing rules: output parsing, behavior-focused patterns.
 paths: ibl5/tests/**/*.php
-last_verified: 2026-04-29
+last_verified: 2026-04-30
 ---
 
 # PHPUnit Testing Rules
@@ -134,7 +134,7 @@ public function testSaveDelegates(): void
 
 ## DON'T:
 - **NEVER** use `createMock()` when no `expects()` calls are configured — use `createStub()` instead
-- **NEVER** use `ReflectionClass` for private methods
+- **NEVER** use `ReflectionClass` for private methods — test behavior through public APIs; if a private method needs direct testing, it should be extracted to a separate class with a public interface
 - **NEVER** use `markTestSkipped()` - delete instead
 - **NEVER** check full SQL query structure (column names, WHERE clauses, bind strings) — except security tests. For void write methods with no return value to assert on, you may use `assertQueryExecuted('table_name')` to verify the target table was hit, but don't match beyond the table name.
 

@@ -1,7 +1,7 @@
 ---
 description: Interface-driven PHP class standards, XSS rules, and PHPStan gotchas for ibl5/classes.
 paths: ibl5/classes/**/*.php
-last_verified: 2026-04-11
+last_verified: 2026-04-30
 ---
 
 # PHP Class Development Rules
@@ -44,27 +44,9 @@ class MyRepository extends BaseMysqliRepository
 - **CSV:** `Api\Response\CsvResponder` — streaming CSV with UTF-8 BOM for Excel compatibility (Controller → Transformer → CsvResponder). See `PlayerExportController` for the canonical example.
 
 ## View Rendering Pattern
-Use output buffering with `HtmlSanitizer::e()` for XSS-safe output:
-```php
-public function renderTable(array $data): string
-{
-    ob_start();
-    ?>
-<table>
-    <?php foreach ($data as $row): ?>
-    <tr><td><?= \Utilities\HtmlSanitizer::e($row['name']) ?></td></tr>
-    <?php endforeach; ?>
-</table>
-    <?php
-    return ob_get_clean();
-}
-```
+See `view-rendering.md` for the canonical ob_start() / HtmlSanitizer::e() example and View class structure.
 
-## Statistics Formatting
-
-> **Why this exists:** [ADR-0003](../../ibl5/docs/decisions/0003-statsformatter-mandate.md) explains why `StatsFormatter` is the single source of truth and `number_format()` is banned by `BanNumberFormatRule`.
-
-Use `BasketballStats\StatsFormatter` — `number_format()` is banned by PHPStan:
+## Statistics Formatting (`number_format()` banned — ADR-0003)
 - `formatPercentage($made, $attempted)` - FG%, 3P% (3 decimals)
 - `formatPerGameAverage($total, $games)` - PPG, APG (1 decimal)
 - `formatPer36Stat($total, $minutes)` - Per-36 stats

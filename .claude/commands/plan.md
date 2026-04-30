@@ -1,6 +1,6 @@
 ---
 description: "Plan an implementation task with mandatory test classification. Wraps the built-in plan mode with the verification matrix rule injected so subagents can't skip it."
-last_verified: 2026-04-26
+last_verified: 2026-04-29
 ---
 
 # /plan — Implementation Planning with Verification Matrix
@@ -13,14 +13,21 @@ You are planning an implementation task. The user's request follows this skill's
 
 `plan-verification.md` is already in your context (always-loaded rule — no `paths:` field). Use its full content as `$VERIFICATION_RULE` for injection into the Plan agent prompt in Step 3. Do not re-read the file. Do not summarize or paraphrase the rule.
 
-## Step 2: Explore the codebase
+## Step 2: Orient on the codebase
 
-Launch up to 3 **Explore agents** (Sonnet for cross-module traces, Haiku for file/grep lookups) to understand the task. Follow the agent-tiering rules in `.claude/rules/agent-tiering.md`.
+**Prefer direct tool calls over Explore agents.** Most orientation can be done without spawning an agent:
 
-Provide each agent with:
-- The user's task description (`$ARGUMENTS`)
-- Specific areas to investigate (files, modules, patterns)
-- A response cap (under 200 lines)
+1. Read `.claude/rules/codebase-map.md` to identify affected modules and their file locations
+2. Run targeted `grep`/`find` via Bash for specific symbols, callers, or file paths
+3. Read key files directly (migrations, interfaces, existing tests)
+
+**Only spawn an Explore agent when** direct lookups leave unanswered questions. Tier per `.claude/rules/agent-tiering.md`:
+
+- Single-module change → 0 agents (direct tools suffice) or 1 Haiku for enumeration
+- Spans 2+ modules → up to 2 agents (Sonnet for cross-module traces, Haiku for file/grep lookups)
+- Never spawn 3 agents
+
+Provide each agent a single concrete question, pre-resolved paths, and a response cap (under 150 lines).
 
 Collect: file paths, existing patterns, dependencies, blast radius, existing test coverage for affected code.
 

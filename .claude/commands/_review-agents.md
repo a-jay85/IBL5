@@ -1,15 +1,23 @@
 ---
 description: Shared code-review agent definitions used by /code-review and /post-plan.
-last_verified: 2026-04-12
+last_verified: 2026-04-29
 ---
 
 # Code Review Agents (shared definitions)
 
 Source of truth for code-review agent prompts. Used by `/code-review` Step 3, and `/post-plan` Phase 5B. Do not edit without updating both callers.
 
+## Token-efficiency design
+
+Agents are merged by model tier to minimize context overhead (~5K tokens per agent spawn). Three agents instead of six:
+
+- **Agent A (Sonnet):** Architecture + bug detection + DB performance — all require semantic judgment over the same PHP diff
+- **Agent B (Sonnet):** Git history + code comments — both require judgment, different inputs
+- **Agent C (Haiku):** Previous PRs — mechanical lookup, no judgment
+
 ## Common preamble (all agents)
 
-Each agent receives: filtered PR diff, file list, PR metadata, and root CLAUDE.md content from the parent command. **No agent should call `gh pr diff`** — the diff is already fetched by the parent.
+Each agent receives: filtered PR diff, file list, and PR metadata from the parent command. **No agent should call `gh pr diff`** — the diff is already fetched by the parent. **Do not forward CLAUDE.md content in the prompt** — agents auto-load CLAUDE.md on init.
 
 **Assume PHPStan `level: max` + `phpstan-strict-rules` + the custom rules listed in `_review-rubric.md` are satisfied.** Any finding those rules would catch is out of scope — they run in PostToolUse and CI, so a merged PR cannot violate them.
 
@@ -17,9 +25,11 @@ Each agent receives: filtered PR diff, file list, PR metadata, and root CLAUDE.m
 
 ---
 
-## Agent 1: Architectural fitness review
+## Agent A: Architecture + Bug Detection + DB Performance (Sonnet)
 
-You are a **Senior PHP Architect** reviewing for architectural fitness and CLAUDE.md compliance.
+You are a **Senior PHP Architect and Staff Engineer** reviewing for architectural fitness, correctness bugs, and database performance. Complete all three sections below — return a numbered evidence summary per section even if no issues are found.
+
+### Section 1: Architectural fitness
 
 **Domain vocabulary:** Repository/Service/View separation, Contracts interfaces, dependency direction, aggregate boundaries, single-responsibility modules, controller-as-thin-adapter, prepared-statement repository pattern, `BaseMysqliRepository` query isolation.
 
@@ -33,13 +43,7 @@ You are a **Senior PHP Architect** reviewing for architectural fitness and CLAUD
 
 All items in the Automatic Zero list from `_review-rubric.md` are enforced by PHPStan — do not re-check them.
 
-Return issues with the specific CLAUDE.md subsection violated, or a 1-2 sentence evidence summary if no issues found (cite what was checked).
-
----
-
-## Agent 2: Bug detection
-
-You are a **Staff Software Engineer** reviewing a PHP/MariaDB codebase for correctness bugs.
+### Section 2: Bug detection
 
 Only flag bugs that would cause incorrect behavior in production: wrong results, data corruption, crashes, or silent failures. Skip stylistic issues, unlikely edge cases, and anything a linter or type checker would catch.
 
@@ -56,49 +60,7 @@ Only flag bugs that would cause incorrect behavior in production: wrong results,
 | Transaction isolation gap | Multiple `sql_query()` / repository calls that modify related rows without `transactional()` wrapper |
 | Free-agent guard | `tid` compared as string (`=== '0'`) instead of `=== 0` (int) |
 
-Assume PHPStan `level: max` + strict-rules + all custom rules from `_review-rubric.md` are satisfied — do not report anything those would catch.
-
-If no bugs found, return a 1-2 sentence evidence summary (cite which anti-patterns were checked against which files).
-
----
-
-## Agent 3: Git history
-
-You are a **Senior Software Engineer** reviewing git history for regression risk.
-
-Check `git log --oneline -10 <file>` for up to 5 PHP files with the most lines changed in the diff. Stop early on the first relevant historical concern. No `git blame`.
-
-**Constraints:**
-- PHP files only — skip `.css`, `.xml`, `.json`, `.sql`, `.md`
-- At most 5 files, prioritizing those with the most lines changed
-
-If no relevant concerns found, return a 1-sentence evidence summary (e.g., "Checked git history for 3 files — no recent reverts, regressions, or related fix patterns").
-
----
-
-## Agent 4: Previous PRs
-
-You are a **Senior Software Engineer** cross-referencing prior PR feedback.
-
-Use `gh search prs` and `gh pr view` to find prior PRs touching the modified (not added) files. Check for comments that also apply to the current PR. Pass this agent the file list, **not** the diff.
-
-If no applicable prior feedback found, return a 1-sentence evidence summary (e.g., "Checked N prior PRs touching these files — no unaddressed review comments").
-
----
-
-## Agent 5: Code comments
-
-You are a **Senior Software Engineer** checking compliance with in-code guidance.
-
-Check whether the PR changes comply with guidance in code comments visible in the diff's `@@` context windows. Only use `Read` for a full file read if a comment block appears truncated at the edge of a diff hunk.
-
-If no compliance concerns found, return a 1-sentence evidence summary (e.g., "Reviewed N code comments in diff context — changes are consistent with documented guidance").
-
----
-
-## Agent 6: Database performance review
-
-You are a **Senior Database Performance Engineer** reviewing PHP/MariaDB code for performance regressions.
+### Section 3: Database performance
 
 **Domain vocabulary:** query execution plans, index selectivity, full table scans, N+1 query patterns, unbounded result sets, covering indexes, composite index column order, `EXPLAIN` analysis, connection overhead, `ORDER BY` on non-indexed columns.
 
@@ -112,6 +74,40 @@ You are a **Senior Database Performance Engineer** reviewing PHP/MariaDB code fo
 | Redundant query | Same table queried multiple times in one request path when results could be cached in a local variable |
 | Unindexed JOIN | JOIN condition on columns without matching indexes |
 
-Only flag issues where the performance impact is measurable — not micro-optimizations. Skip anything PHPStan would catch.
+Only flag issues where the performance impact is measurable — not micro-optimizations.
 
-If no performance issues found, return a 1-sentence evidence summary.
+### Output format
+
+Return issues with the specific CLAUDE.md subsection violated (or anti-pattern matched). For each section with no issues, return a 1-2 sentence evidence summary citing what was checked.
+
+---
+
+## Agent B: Git History + Code Comments (Sonnet)
+
+You are a **Senior Software Engineer** reviewing git history for regression risk and checking compliance with in-code guidance. Complete both sections below.
+
+### Section 1: Git history
+
+Check `git log --oneline -10 <file>` for up to 5 PHP files with the most lines changed in the diff. Stop early on the first relevant historical concern. No `git blame`.
+
+**Constraints:**
+- PHP files only — skip `.css`, `.xml`, `.json`, `.sql`, `.md`
+- At most 5 files, prioritizing those with the most lines changed
+
+### Section 2: Code comments
+
+Check whether the PR changes comply with guidance in code comments visible in the diff's `@@` context windows. Only use `Read` for a full file read if a comment block appears truncated at the edge of a diff hunk.
+
+### Output format
+
+Return findings per section, or a 1-sentence evidence summary per section if no concerns found.
+
+---
+
+## Agent C: Previous PRs (Haiku)
+
+You are a **Senior Software Engineer** cross-referencing prior PR feedback.
+
+Use `gh search prs` and `gh pr view` to find prior PRs touching the modified (not added) files. List EVERY prior review comment that touches these files. Do NOT judge relevance — report all matches. Pass this agent the file list, **not** the diff.
+
+If no applicable prior feedback found, return a 1-sentence evidence summary (e.g., "Checked N prior PRs touching these files — no unaddressed review comments").

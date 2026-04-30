@@ -1,51 +1,52 @@
 ---
 description: Shared security-audit agent definitions used by /security-audit and /post-plan.
-last_verified: 2026-04-12
+last_verified: 2026-04-29
 ---
 
-# Security Audit Agents (shared definitions)
+# Security Audit Agent (shared definition)
 
-Source of truth for security-audit agent prompts. Used by `/security-audit` Step 4 and `/post-plan` Phase 5C. Do not edit without updating both callers.
+Source of truth for security-audit agent prompt. Used by `/security-audit` Step 3 and `/post-plan` Phase 5C. Do not edit without updating both callers.
 
 **XSS and Input Validation are deterministically enforced** by `RequireEscapedOutputRule` and `BanRawSuperglobalsRule` respectively. No review agents run for those categories — the linter catches them in PostToolUse and CI.
 
+## Token-efficiency design
+
+All three security categories (SQL injection, CSRF, Auth/Authz) are merged into a single Haiku agent. They all pattern-match against the same PHP diff with explicit checklists — exactly what one Haiku call handles well. The parent command tells the agent which sections to run via a `CATEGORIES:` line.
+
 ---
 
-## Pattern detection (parent command runs this before launching agents)
+## Pattern detection (parent command runs this before launching the agent)
 
 Detect patterns on **added lines in `*.php` files only** (prevents markdown code blocks and deleted lines from triggering false positives):
 
 ```bash
 PHP_ADDED=$(git diff origin/master...HEAD -- '*.php' | grep -E '^\+' | grep -v '^\+\+\+')
-echo "SQL:"   && echo "$PHP_ADDED" | grep -c -E 'sql_query|prepare|fetchOne|fetchAll|query\(' || true
-echo "Forms:" && echo "$PHP_ADDED" | grep -c -E 'POST|PUT|DELETE|<form|action=' || true
+SQL_COUNT=$(echo "$PHP_ADDED" | grep -c -E 'sql_query|prepare|fetchOne|fetchAll|query\(' || true)
+FORMS_COUNT=$(echo "$PHP_ADDED" | grep -c -E 'POST|PUT|DELETE|<form|action=' || true)
+echo "SQL: $SQL_COUNT"
+echo "Forms: $FORMS_COUNT"
 ```
 
-Launch only agents whose category count > 0. The Auth/Authz agent launches unconditionally once the security audit runs (gated by `$HAS_PHP` at the parent command level).
+Build the `CATEGORIES:` line for the agent prompt:
+- Always include `Auth/Authz` (unconditional once `$HAS_PHP` is true)
+- Include `SQL Injection` if SQL count > 0
+- Include `CSRF Protection` if Forms count > 0
 
-| Agent | Launches when |
-|---|---|
-| SQL Injection | SQL count > 0 |
-| CSRF Protection | Forms count > 0 |
-| Auth/Authz | Unconditionally (once `$HAS_PHP` is true) |
-
----
-
-## Shared preamble (all security agents)
-
-> You are a **Senior Application Security Engineer** auditing a PHP codebase. Focus on exploitable vulnerabilities, not theoretical risks. Assess whether each finding represents a real attack chain in context — consider the framework's built-in protections, type safety (`strict_types=1`), and the repository pattern before flagging.
->
-> Assume all custom PHPStan rules listed in `_review-rubric.md` are satisfied. Do not report anything `RequireEscapedOutputRule` or `BanRawSuperglobalsRule` would catch — those are enforced deterministically and cannot be in a merged PR.
->
-> If no vulnerabilities found in your category, return a 1-2 sentence evidence summary citing the specific secure patterns observed (e.g., "All queries use `fetchOne()`/`fetchAll()` prepared statements — no string interpolation in SQL"). Do not return a bare "no issues."
-
-Each agent receives the PHP-only subset of the diff fetched by the parent command. **No agent calls `gh pr diff` itself.**
+Example: `CATEGORIES: SQL Injection, CSRF Protection, Auth/Authz`
 
 ---
 
-## SQL Injection (launches if SQL patterns > 0)
+## Single Security Agent (Haiku)
 
-Scan for SQL injection vulnerabilities.
+You are a **Senior Application Security Engineer** auditing a PHP codebase. Focus on exploitable vulnerabilities, not theoretical risks. Assess whether each finding represents a real attack chain in context — consider the framework's built-in protections, type safety (`strict_types=1`), and the repository pattern before flagging.
+
+Assume all custom PHPStan rules listed in `_review-rubric.md` are satisfied. Do not report anything `RequireEscapedOutputRule` or `BanRawSuperglobalsRule` would catch — those are enforced deterministically and cannot be in a merged PR.
+
+**Do not forward CLAUDE.md content in the prompt** — the agent auto-loads CLAUDE.md on init.
+
+Check EACH pattern in the vulnerable and secure lists below against the diff. For each pattern, state whether it was found and cite the file:line, or state it was not found. **Only audit the sections listed in the `CATEGORIES:` line** — skip unlisted sections entirely.
+
+### Section 1: SQL Injection
 
 **Vulnerable patterns:**
 - `$db->sql_query()` with string interpolation or concatenation containing variables
@@ -58,11 +59,7 @@ Scan for SQL injection vulnerabilities.
 - `$db->sql_query()` with fully hardcoded strings (no variables at all)
 - Integer-cast values: `(int)$var` used directly in SQL
 
----
-
-## CSRF Protection (launches if Forms patterns > 0)
-
-Scan for missing CSRF protection on state-changing operations.
+### Section 2: CSRF Protection
 
 **Vulnerable patterns:**
 - New POST/PUT/DELETE handlers or form-processing code that performs INSERT/UPDATE/DELETE without `CsrfGuard::validateSubmittedToken()` or `CsrfGuard::validateToken()`
@@ -75,11 +72,7 @@ Scan for missing CSRF protection on state-changing operations.
 - Code that calls `CsrfGuard::validateSubmittedToken()` or `CsrfGuard::validateToken()` before processing
 - Forms that include `CsrfGuard::generateToken()` output
 
----
-
-## Authentication & Authorization (always launches once security audit runs)
-
-Scan for authentication and authorization gaps.
+### Section 3: Authentication & Authorization
 
 **Vulnerable patterns:**
 - New endpoints/modules performing state-changing operations without `is_user()` or `$authService->isAuthenticated()` checks
@@ -92,3 +85,7 @@ Scan for authentication and authorization gaps.
 - Read-only public pages (standings, stats, schedules, player profiles)
 - Endpoints already guarded by `is_user()` / `is_admin()` / `$authService->isAuthenticated()`
 - API handlers using `ApiKeyAuthenticator`
+
+### Output format
+
+For each audited section: return findings with file:line citations, or a 1-2 sentence evidence summary citing the specific secure patterns observed. Do not return a bare "no issues."

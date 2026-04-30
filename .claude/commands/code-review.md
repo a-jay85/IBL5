@@ -4,7 +4,7 @@ allowed-tools: Bash(gh pr diff:*), Bash(gh pr view:*), Bash(gh pr comment:*),
   Bash(git log:*), Bash(git rev-parse:*), Bash(git show:*)
 description: Token-efficient code review for pull requests
 model: sonnet
-last_verified: 2026-04-23
+last_verified: 2026-04-29
 ---
 
 Provide a code review for the given pull request. This command optimizes token usage by fetching the diff once and distributing only what each agent needs.
@@ -46,30 +46,26 @@ gh api "repos/a-jay85/IBL5/pulls/{N}/files" --paginate --jq '.[] | select(.filen
 ```
 If still too large, further exclude test files from the diff content given to agents 1-2 (but note their existence).
 
-### 2d. Read the root CLAUDE.md
-Read the file `/Users/ajaynicolas/GitHub/IBL5/CLAUDE.md`.
+### 2d. Find directory-specific CLAUDE.md files
+Check if any CLAUDE.md files exist in directories whose files the PR modified. Read those — they are not auto-loaded and must be forwarded to agents.
 
-### 2e. Find directory-specific CLAUDE.md files
-Check if any CLAUDE.md files exist in directories whose files the PR modified. Read those too.
+**Do not forward root CLAUDE.md content in agent prompts** — agents auto-load it on init. Forwarding it doubles the token cost (~5K × N agents).
 
 Store all of these results — they will be passed as context to agents below.
 
-## Step 3: Launch parallel agents (mixed tiers)
+## Step 3: Launch parallel agents (merged by tier)
 
-**Read** `.claude/commands/_review-agents.md` for the canonical agent definitions. It defines up to 6 agents (architectural fitness, bug detection, git history, previous PRs, code comments, database performance).
+**Read** `.claude/commands/_review-agents.md` for the canonical agent definitions. It defines 3 merged agents (A=architecture+bugs+DB, B=git history+code comments, C=previous PRs).
 
-Launch applicable agents in parallel (consult `_review-agents.md` for each agent's focus; skip Agent 6 if no PHP files changed). Each agent receives:
+Launch applicable agents in parallel. Each agent receives:
 - The filtered diff from Step 2c
 - The file list from Step 2b
-- The CLAUDE.md content(s) from Steps 2d/2e
+- Directory-specific CLAUDE.md content(s) from Step 2d (if any)
 
 **Model tiers** (see `agent-tiering.md` for rationale):
-- Agent 1 (Architectural fitness): **Sonnet**
-- Agent 2 (Bug detection): **Sonnet**
-- Agent 3 (Git history): **Sonnet**
-- Agent 4 (Previous PRs): **Haiku** — add to prompt: "List EVERY prior review comment that touches these files. Do NOT judge relevance — report all matches."
-- Agent 5 (Code comments): **Sonnet**
-- Agent 6 (Database performance): **Sonnet**
+- Agent A (Architecture + Bug detection + DB performance): **Sonnet** — skip if no code files; omit DB section if no PHP
+- Agent B (Git history + Code comments): **Sonnet** — skip if no PHP and no code comments in diff
+- Agent C (Previous PRs): **Haiku** — skip if no modified (non-added) files
 
 **CRITICAL: No agent should call `gh pr diff`.** The diff was already fetched in Step 2.
 

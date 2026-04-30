@@ -3,10 +3,10 @@ allowed-tools: Bash(gh pr diff:*), Bash(gh pr view:*), Bash(gh pr comment:*),
   Bash(gh api:*), Bash(git rev-parse:*)
 description: Token-efficient security audit for pull requests
 model: sonnet
-last_verified: 2026-04-23
+last_verified: 2026-04-29
 ---
 
-Perform a security audit on the given pull request. This command optimizes token usage by fetching the diff once and distributing it to specialized security agents.
+Perform a security audit on the given pull request. This command optimizes token usage by fetching the diff once and passing it to a single merged security agent.
 
 ## Step 1: Eligibility check
 
@@ -48,15 +48,13 @@ Store all of these results — they will be passed as context to agents below.
 
 ## Step 3: Pattern detection and agent launch
 
-**Read** `.claude/commands/_security-agents.md` for the canonical pattern-detection bash block and agent definitions.
+**Read** `.claude/commands/_security-agents.md` for the canonical pattern-detection bash block and agent definition.
 
-Run the pattern-detection block from that file to get SQL and Forms category counts. Then launch only the relevant agents (SQL Injection if SQL > 0; CSRF Protection if Forms > 0; Auth/Authz unconditionally) in parallel. Pass each agent the PHP-only diff from Step 2c.
-
-**All three security agents use Haiku.** Their prompts include explicit vulnerable/secure pattern tables. Add to each prompt: "Check EACH pattern in the vulnerable and secure lists against the diff. For each pattern, state whether it was found and cite the file:line, or state it was not found."
+Run the pattern-detection block from that file to get SQL and Forms category counts. Build the `CATEGORIES:` line (always include Auth/Authz; add SQL Injection if SQL > 0; add CSRF Protection if Forms > 0). Launch a **single Haiku agent** with the categories line and the PHP-only diff from Step 2c. Do not forward CLAUDE.md content (auto-loaded).
 
 **XSS and Input Validation are NOT audited here** — they're deterministically enforced by `RequireEscapedOutputRule` and `BanRawSuperglobalsRule`. Any finding those rules would catch is out of scope.
 
-**CRITICAL: No agent should call `gh pr diff`.** The diff was already fetched in Step 2.
+**CRITICAL: The agent should not call `gh pr diff`.** The diff was already fetched in Step 2.
 
 ## Step 4: Confidence scoring
 

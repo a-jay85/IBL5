@@ -1,7 +1,7 @@
 ---
 name: post-plan
 description: Single orchestrator for the post-plan workflow. Runs diff classification, simplify, commit/push/PR, code review, security audit, verification, CI monitoring, retrospective, worktree teardown, and background process cleanup as one uninterrupted sequence.
-last_verified: 2026-04-26
+last_verified: 2026-04-29
 ---
 
 # Post-Plan Orchestrator
@@ -156,41 +156,33 @@ cat /tmp/post-plan-diff-$PPID   # filtered diff written by Phase 2 (already < 10
 
 Capture the `cat` output — that is `$DIFF` for every sub-agent prompt below. No sub-agent calls `gh pr diff`.
 
-Read root `CLAUDE.md`. If `! $NON_CODE_ONLY`, also read directory-specific `CLAUDE.md` files for modified directories.
+**Do not forward CLAUDE.md content in agent prompts** — sub-agents auto-load CLAUDE.md on init, so forwarding it doubles the token cost (~5K × N agents). If directory-specific `CLAUDE.md` files exist for modified directories, read them and forward only those (they are not auto-loaded).
 
-### 5B: Code Review — up to 6 parallel agents (mixed tiers)
+### 5B: Code Review — up to 3 parallel agents (merged by tier)
 
-**Read** `.claude/commands/_review-agents.md` — the canonical agent definitions (6 agents: architectural fitness, bug detection, git history, previous PRs, code comments, database performance).
+**Read** `.claude/commands/_review-agents.md` — the canonical agent definitions (3 merged agents: A=architecture+bugs+DB, B=git history+code comments, C=previous PRs).
 
-Pass each agent: PR metadata, file list, filtered `$DIFF`, CLAUDE.md content(s) from 5A. **No agent calls `gh pr diff`.**
+Pass each agent: PR metadata, file list, and filtered `$DIFF`. **No agent calls `gh pr diff`.** Do not forward CLAUDE.md content (auto-loaded).
 
-**Model tiers** — agents that must judge whether a finding is semantically relevant need Sonnet; agents that look up facts or match against named patterns use Haiku:
+**Model tiers:**
 
-- Agent 1 (Architectural fitness): **Sonnet** — judges R/S/V fit, dependency direction
-- Agent 2 (Bug detection): **Sonnet** — connects schema types to PHP comparison operators
-- Agent 3 (Git history): **Sonnet** — must judge whether a past commit's collision zone overlaps the current change
-- Agent 4 (Previous PRs): **Haiku** — mechanical `gh search prs` + `gh pr view` lookup. Add to prompt: "List EVERY prior review comment that touches these files. Do NOT judge relevance — report all matches."
-- Agent 5 (Code comments): **Sonnet** — must judge whether code semantically complies with docstring guidance
-- Agent 6 (Database performance): **Sonnet** — interprets query behavior in context
+- Agent A (Architecture + Bug detection + DB performance): **Sonnet**
+- Agent B (Git history + Code comments): **Sonnet**
+- Agent C (Previous PRs): **Haiku**
 
 **Launch gates** (consult Phase 2 variables — skip the launch entirely, don't let the agent exit early):
 
-- Agent 1 (Architectural fitness): skip if `$NON_CODE_ONLY`
-- Agent 2 (Bug detection): skip if `$NON_CODE_ONLY` or `$MIGRATION_ONLY`
-- Agent 3 (Git history): skip if `! $HAS_PHP` or `$LINES_PHP_CHANGED <= 50`
-- Agent 4 (Previous PRs): skip if `$NON_CODE_ONLY` or `! $HAS_MODIFIED` or `$LINES_PHP_CHANGED <= 50`
-- Agent 5 (Code comments): skip if `$NON_CODE_ONLY` or `! $HAS_COMMENTS_IN_DIFF`
-- Agent 6 (Database performance): skip if `! $HAS_PHP`
+- Agent A: skip if `$NON_CODE_ONLY`. If `$MIGRATION_ONLY`, instruct agent to skip Section 2 (bug detection). If `! $HAS_PHP`, instruct agent to skip Section 3 (DB performance).
+- Agent B: skip if BOTH sub-gates fail: (`! $HAS_PHP` or `$LINES_PHP_CHANGED <= 50`) AND (`$NON_CODE_ONLY` or `! $HAS_COMMENTS_IN_DIFF`). If only one sub-gate passes, instruct agent to run only that section.
+- Agent C: skip if `$NON_CODE_ONLY` or `! $HAS_MODIFIED` or `$LINES_PHP_CHANGED <= 50`
 
-### 5C: Security Audit — conditional Haiku agents
+### 5C: Security Audit — single conditional Haiku agent
 
 **Skip entire 5C if** `! $HAS_PHP`. CSS, markdown, migrations, and lockfile bumps cannot introduce SQLi/CSRF/auth vulnerabilities.
 
-**Read** `.claude/commands/_security-agents.md` — the canonical security agent definitions and pattern-detection bash block.
+**Read** `.claude/commands/_security-agents.md` — the canonical security agent definition and pattern-detection bash block.
 
-Run the pattern-detection block from that file to get SQL and Forms category counts, then launch only the relevant agents (SQL Injection if SQL > 0; CSRF Protection if Forms > 0; Auth/Authz unconditionally). Pass each agent the PHP-only subset of `$DIFF`.
-
-**All three security agents use Haiku.** Their prompts include explicit vulnerable/secure pattern tables — the agent checks each pattern against the diff and reports matches. Add to each prompt: "Check EACH pattern in the vulnerable and secure lists against the diff. For each pattern, state whether it was found and cite the file:line, or state it was not found."
+Run the pattern-detection block from that file to get SQL and Forms category counts. Build the `CATEGORIES:` line (always include Auth/Authz; add SQL Injection if SQL > 0; add CSRF Protection if Forms > 0). Launch a **single Haiku agent** with the categories line and the PHP-only subset of `$DIFF`. Do not forward CLAUDE.md content (auto-loaded).
 
 **XSS and Input Validation are NOT audited here** — they're deterministically enforced by `RequireEscapedOutputRule` and `BanRawSuperglobalsRule` (run in PostToolUse and CI).
 
@@ -226,15 +218,16 @@ Both comments end with: `Generated with [Claude Code](https://claude.ai/code)` a
 
 ## Phase 6: Final Verification
 
-Run parallel agents (**Haiku** for both):
+**PHPUnit + PHPStan — direct Bash (no agent):** **Skip if** `! $HAS_PHP`. The PostToolUse hook already ran both during edits, and a PHP-less diff cannot regress either suite. Run both as direct Bash calls with `run_in_background: true` so they execute in parallel with the E2E agent below. Output is ~5 lines each — agent overhead (~25K tokens) is never justified.
 
-**Agent 1 — PHPUnit + PHPStan (Haiku):** **Skip if** `! $HAS_PHP`. The PostToolUse hook already ran both during edits, and a PHP-less diff cannot regress either suite.
 ```bash
 cd <worktree>/ibl5 && vendor/bin/phpunit --no-progress --no-output --testdox-summary | tail -n 3
+```
+```bash
 cd <worktree>/ibl5 && composer run analyse
 ```
 
-**Agent 2 — E2E (Playwright):**
+**E2E agent (Haiku):**
 
 Steps:
 1. Run `bin/wt-down <worktree-name>` then `bin/wt-up <worktree-name> --seed`
@@ -384,9 +377,9 @@ Phase 9 merged the PR, deleted the branch, and checked out master. The worktree 
    done
    ```
 
-5. **Stream fresh prod data:**
+5. **Stream fresh prod data** (redirect to log to keep context clean):
    ```bash
-   bin/db-sync-prod
+   bin/db-sync-prod > /tmp/db-sync-prod.log 2>&1 && echo "PASS: db-sync-prod completed" && tail -20 /tmp/db-sync-prod.log || { echo "FAIL: db-sync-prod"; tail -40 /tmp/db-sync-prod.log; }
    ```
    With no arguments, targets the main `ibl5-mariadb` container. Streams from prod, handles generated columns, strips DEFINER clauses, backfills `schema_migrations`, and runs `bin/db-migrate` for pending migrations.
 

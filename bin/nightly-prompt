@@ -70,16 +70,7 @@ git log --oneline origin/master..HEAD
 
 ## Step 5: Implement the Plan
 
-Work in worktrees/<slug>/ibl5/. Read CLAUDE.md for all project rules. Follow the plan step by step.
-
-Key rules (from CLAUDE.md):
-- Every PHP file needs declare(strict_types=1)
-- Use === and !== (never == or !=)
-- Wrap dynamic output in HtmlSanitizer::e()
-- All CSS goes in ibl5/design/components/
-- Run the full test suite (bin/test) after PHP changes
-- Run PHPStan (cd worktrees/<slug>/ibl5 && composer run analyse) after PHP changes
-- Verify table/column names against migrations before writing queries
+Work in worktrees/<slug>/ibl5/. CLAUDE.md is auto-loaded — follow all project rules. Follow the plan step by step.
 
 ### Incremental Commits
 

@@ -57,4 +57,16 @@ interface TeamOffDefStatsRepositoryInterface
      * @return array{offense: TeamOffenseStatsRow, defense: TeamDefenseStatsRow}|null Both stats or null
      */
     public function getTeamBothStats(string $teamName, int $seasonYear): ?array;
+
+    /**
+     * Get both offense and defense statistics for a team within a date range
+     *
+     * No game_type filter — includes regular season and playoffs.
+     *
+     * @param string $teamName Team name
+     * @param string $startDate Start date (Y-m-d)
+     * @param string $endDate End date (Y-m-d)
+     * @return array{offense: TeamOffenseStatsRow, defense: TeamDefenseStatsRow}|null Both stats or null
+     */
+    public function getTeamBothStatsForDateRange(string $teamName, string $startDate, string $endDate): ?array;
 }

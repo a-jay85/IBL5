@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace UI\Tables;
 
+use BasketballStats\StatsFormatter;
 use Player\PlayerImageHelper;
+use TeamOffDefStats\TeamOffDefStatsRepository;
 use Utilities\HtmlSanitizer;
 use Team\Team;
 use Season\Season;
@@ -42,6 +44,9 @@ class PeriodAverages
         if ($endDate instanceof \DateTime) {
             $endDate = $endDate->format('Y-m-d');
         }
+
+        $offDefRepo = new TeamOffDefStatsRepository($db);
+        $bothStats = $offDefRepo->getTeamBothStatsForDateRange($team->name, (string) $startDate, (string) $endDate);
 
         $teamid = (int)$team->teamid;
 
@@ -200,6 +205,61 @@ class PeriodAverages
         </tr>
 <?php endforeach; ?>
     </tbody>
+    <tfoot>
+<?php if ($bothStats !== null):
+    $off = $bothStats['offense'];
+    $def = $bothStats['defense'];
+    $offGames = $off['games'];
+    $defGames = $def['games'];
+    $offPts = StatsFormatter::calculatePoints($off['fgm'], $off['ftm'], $off['tgm']);
+    $defPts = StatsFormatter::calculatePoints($def['fgm'], $def['ftm'], $def['tgm']);
+?>
+        <tr>
+            <td colspan="2"><?= HtmlSanitizer::e($team->name) ?> Offense</td>
+            <td><?= $offGames ?></td>
+            <td class="sep-r-team"></td>
+            <td><?= StatsFormatter::formatPerGameAverage($off['fgm'], $offGames) ?></td>
+            <td><?= StatsFormatter::formatPerGameAverage($off['fga'], $offGames) ?></td>
+            <td class="sep-r-weak"><?= StatsFormatter::formatPercentage($off['fgm'], $off['fga']) ?></td>
+            <td><?= StatsFormatter::formatPerGameAverage($off['ftm'], $offGames) ?></td>
+            <td><?= StatsFormatter::formatPerGameAverage($off['fta'], $offGames) ?></td>
+            <td class="sep-r-weak"><?= StatsFormatter::formatPercentage($off['ftm'], $off['fta']) ?></td>
+            <td><?= StatsFormatter::formatPerGameAverage($off['tgm'], $offGames) ?></td>
+            <td><?= StatsFormatter::formatPerGameAverage($off['tga'], $offGames) ?></td>
+            <td class="sep-r-team"><?= StatsFormatter::formatPercentage($off['tgm'], $off['tga']) ?></td>
+            <td><?= StatsFormatter::formatPerGameAverage($off['orb'], $offGames) ?></td>
+            <td><?= StatsFormatter::formatPerGameAverage($off['reb'], $offGames) ?></td>
+            <td><?= StatsFormatter::formatPerGameAverage($off['ast'], $offGames) ?></td>
+            <td><?= StatsFormatter::formatPerGameAverage($off['stl'], $offGames) ?></td>
+            <td><?= StatsFormatter::formatPerGameAverage($off['tvr'], $offGames) ?></td>
+            <td><?= StatsFormatter::formatPerGameAverage($off['blk'], $offGames) ?></td>
+            <td><?= StatsFormatter::formatPerGameAverage($off['pf'], $offGames) ?></td>
+            <td><?= StatsFormatter::formatPerGameAverage($offPts, $offGames) ?></td>
+        </tr>
+        <tr>
+            <td colspan="2"><?= HtmlSanitizer::e($team->name) ?> Defense</td>
+            <td><?= $defGames ?></td>
+            <td class="sep-r-team"></td>
+            <td><?= StatsFormatter::formatPerGameAverage($def['fgm'], $defGames) ?></td>
+            <td><?= StatsFormatter::formatPerGameAverage($def['fga'], $defGames) ?></td>
+            <td class="sep-r-weak"><?= StatsFormatter::formatPercentage($def['fgm'], $def['fga']) ?></td>
+            <td><?= StatsFormatter::formatPerGameAverage($def['ftm'], $defGames) ?></td>
+            <td><?= StatsFormatter::formatPerGameAverage($def['fta'], $defGames) ?></td>
+            <td class="sep-r-weak"><?= StatsFormatter::formatPercentage($def['ftm'], $def['fta']) ?></td>
+            <td><?= StatsFormatter::formatPerGameAverage($def['tgm'], $defGames) ?></td>
+            <td><?= StatsFormatter::formatPerGameAverage($def['tga'], $defGames) ?></td>
+            <td class="sep-r-team"><?= StatsFormatter::formatPercentage($def['tgm'], $def['tga']) ?></td>
+            <td><?= StatsFormatter::formatPerGameAverage($def['orb'], $defGames) ?></td>
+            <td><?= StatsFormatter::formatPerGameAverage($def['reb'], $defGames) ?></td>
+            <td><?= StatsFormatter::formatPerGameAverage($def['ast'], $defGames) ?></td>
+            <td><?= StatsFormatter::formatPerGameAverage($def['stl'], $defGames) ?></td>
+            <td><?= StatsFormatter::formatPerGameAverage($def['tvr'], $defGames) ?></td>
+            <td><?= StatsFormatter::formatPerGameAverage($def['blk'], $defGames) ?></td>
+            <td><?= StatsFormatter::formatPerGameAverage($def['pf'], $defGames) ?></td>
+            <td><?= StatsFormatter::formatPerGameAverage($defPts, $defGames) ?></td>
+        </tr>
+<?php endif; ?>
+    </tfoot>
 </table>
         <?php
         return (string) ob_get_clean();

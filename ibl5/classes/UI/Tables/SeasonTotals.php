@@ -38,8 +38,9 @@ class SeasonTotals
         $playerRows = PlayerRowTransformer::resolveWithStats($db, $result, $yr);
 
         $season = new Season($db);
+        $seasonYear = ($yr !== '') ? (int) $yr : $season->endingYear;
         $offDefRepo = new TeamOffDefStatsRepository($db);
-        $bothStats = $offDefRepo->getTeamBothStats($team->name, $season->endingYear);
+        $bothStats = $offDefRepo->getTeamBothStats($team->name, $seasonYear);
 
         ob_start();
         ?>
@@ -104,7 +105,7 @@ endif; ?>
 <?php endforeach; ?>
     </tbody>
     <tfoot>
-<?php if ($yr === "" && $bothStats !== null):
+<?php if ($bothStats !== null):
     $labelColspan = ($moduleName === "LeagueStarters") ? 3 : 2;
     $off = $bothStats['offense'];
     $def = $bothStats['defense'];

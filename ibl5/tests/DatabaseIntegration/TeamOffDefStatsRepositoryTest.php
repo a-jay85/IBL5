@@ -138,4 +138,61 @@ class TeamOffDefStatsRepositoryTest extends DatabaseTestCase
             self::assertNull($result);
         }
     }
+
+    public function testGetTeamBothStatsExcludesNonRegularSeason(): void
+    {
+        $this->insertFranchiseSeasonRow(1, 2098, 'Metros');
+        $this->insertFranchiseSeasonRow(2, 2098, 'Stars');
+
+        // June date → game_type=2 (playoffs), NOT regular season
+        $this->insertTeamBoxscoreRow('2098-06-15', 'Metros', 1, 1, 2);
+        $this->insertTeamBoxscoreRow('2098-06-15', 'Stars', 1, 1, 2);
+
+        $result = $this->repo->getTeamBothStats('Metros', 2098);
+
+        self::assertNull($result);
+    }
+
+    public function testGetTeamBothStatsForDateRangeReturnsNullWhenNoData(): void
+    {
+        $result = $this->repo->getTeamBothStatsForDateRange('Metros', '2099-01-01', '2099-01-31');
+
+        self::assertNull($result);
+    }
+
+    public function testGetTeamBothStatsForDateRangeReturnsDataForMatchingDates(): void
+    {
+        $this->insertFranchiseSeasonRow(1, 2099, 'Metros');
+        $this->insertFranchiseSeasonRow(2, 2099, 'Stars');
+
+        $this->insertTeamBoxscoreRow('2099-01-15', 'Metros', 1, 1, 2);
+        $this->insertTeamBoxscoreRow('2099-01-15', 'Stars', 1, 1, 2);
+
+        $result = $this->repo->getTeamBothStatsForDateRange('Metros', '2099-01-10', '2099-01-20');
+
+        self::assertNotNull($result);
+        self::assertArrayHasKey('offense', $result);
+        self::assertArrayHasKey('defense', $result);
+        self::assertSame(1, $result['offense']['games']);
+        self::assertSame(1, $result['defense']['games']);
+    }
+
+    public function testGetTeamBothStatsForDateRangeIncludesAllGameTypes(): void
+    {
+        $this->insertFranchiseSeasonRow(1, 2097, 'Metros');
+        $this->insertFranchiseSeasonRow(2, 2097, 'Stars');
+
+        // June date → game_type=2 (playoffs)
+        $this->insertTeamBoxscoreRow('2097-06-10', 'Metros', 1, 1, 2);
+        $this->insertTeamBoxscoreRow('2097-06-10', 'Stars', 1, 1, 2);
+
+        // getTeamBothStats (regular season only) excludes this
+        $seasonResult = $this->repo->getTeamBothStats('Metros', 2097);
+        self::assertNull($seasonResult);
+
+        // getTeamBothStatsForDateRange includes all game types
+        $rangeResult = $this->repo->getTeamBothStatsForDateRange('Metros', '2097-06-01', '2097-06-30');
+        self::assertNotNull($rangeResult);
+        self::assertSame(1, $rangeResult['offense']['games']);
+    }
 }

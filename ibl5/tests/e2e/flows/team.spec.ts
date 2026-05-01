@@ -220,3 +220,47 @@ test.describe('Team page: historical year view', () => {
     await assertNoPhpErrors(page, 'on historical year view');
   });
 });
+
+// ===========================================================================
+// Team page: offense/defense footer rows
+// ===========================================================================
+
+publicTest.describe('Team page: offense/defense footer stats', () => {
+  publicTest('avg_s shows offense/defense footer rows', async ({ appState, page }) => {
+    await appState({ 'Current Season Ending Year': '2026' });
+    await page.goto('modules.php?name=Team&op=team&teamid=1');
+    const dropdown = page.locator('.ibl-view-select').first();
+    await dropdown.selectOption('avg_s');
+    const tfoot = page.locator('.ibl-data-table tfoot');
+    await publicExpect(tfoot).toContainText('Metros Offense');
+    await publicExpect(tfoot).toContainText('Metros Defense');
+  });
+
+  publicTest('historical year avg_s shows offense/defense footer', async ({ appState, page }) => {
+    await appState({ 'Current Season Ending Year': '2026' });
+    await page.goto('modules.php?name=Team&op=team&teamid=1&yr=2026&display=avg_s');
+    const tfoot = page.locator('.ibl-data-table tfoot');
+    await publicExpect(tfoot).toContainText('Metros Offense');
+    await publicExpect(tfoot).toContainText('Metros Defense');
+  });
+
+  publicTest('chunk shows offense/defense footer rows', async ({ appState, page }) => {
+    await appState({ 'Current Season Ending Year': '2026' });
+    await page.goto('modules.php?name=Team&op=team&teamid=1');
+    const dropdown = page.locator('.ibl-view-select').first();
+    await dropdown.selectOption('chunk');
+    const tfoot = page.locator('.ibl-data-table tfoot');
+    await publicExpect(tfoot).toContainText('Metros Offense');
+    await publicExpect(tfoot).toContainText('Metros Defense');
+  });
+
+  publicTest('playoffs shows offense/defense footer rows', async ({ appState, page }) => {
+    await appState({ 'Current Season Phase': 'Playoffs', 'Current Season Ending Year': '2026' });
+    await page.goto('modules.php?name=Team&op=team&teamid=1');
+    const dropdown = page.locator('.ibl-view-select').first();
+    await dropdown.selectOption('playoffs');
+    const tfoot = page.locator('.ibl-data-table tfoot');
+    await publicExpect(tfoot).toContainText('Metros Offense');
+    await publicExpect(tfoot).toContainText('Metros Defense');
+  });
+});

@@ -116,7 +116,6 @@ class BuildRedirectUrlTest extends TestCase
 
     public function testReturnsNullWhenSessionIsNotString(): void
     {
-        /** @phpstan-ignore assign.propertyType */
         $_SESSION['redirect_after_login'] = 12345;
 
         $this->assertNull(buildRedirectUrl());

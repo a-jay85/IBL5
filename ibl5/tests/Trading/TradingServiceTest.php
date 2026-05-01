@@ -11,6 +11,8 @@ use Trading\Contracts\TradeAssetRepositoryInterface;
 use Trading\Contracts\TradeFormRepositoryInterface;
 use Trading\Contracts\TradeCashRepositoryInterface;
 use Season\Season;
+use Tests\Integration\Mocks\MockDatabase;
+use Tests\Integration\Mocks\MockDatabaseResult;
 
 class TradingServiceTest extends TestCase
 {
@@ -646,7 +648,7 @@ class TradingServiceTest extends TestCase
      */
     public function testApprovalAlwaysSetToListeningTeam(): void
     {
-        $db = new \MockDatabase();
+        $db = new MockDatabase();
         $db->setMockData([
             ['id' => 1001, 'cnt' => 10],
             ['name' => 'Test Player', 'pos' => 'PG', 'cnt' => 10]
@@ -711,7 +713,7 @@ class TradingServiceTest extends TestCase
      */
     public function testCashFromListeningTeamHasCorrectApproval(): void
     {
-        $db = new \MockDatabase();
+        $db = new MockDatabase();
         $db->setMockData([
             ['id' => 1001, 'cnt' => 10],
             ['name' => 'Test Player', 'pos' => 'PG', 'cnt' => 10]
@@ -910,7 +912,7 @@ class TradingServiceTest extends TestCase
  * Enhanced MockDatabase that can return different data based on query type
  * (Merged from TradeApprovalTest)
  */
-class QueryAwareMockDatabase extends \MockDatabase
+class QueryAwareMockDatabase extends MockDatabase
 {
     public function sql_query(string $query): object|bool
     {
@@ -931,35 +933,35 @@ class QueryAwareMockDatabase extends \MockDatabase
 
         // Return appropriate mock data based on query type
         if (stripos($query, 'LAST_INSERT_ID') !== false) {
-            return new \MockDatabaseResult([['id' => 1001]]);
+            return new MockDatabaseResult([['id' => 1001]]);
         }
 
         if (stripos($query, 'ibl_plr') !== false) {
             // Return roster count for COUNT queries
             if (stripos($query, 'COUNT(*)') !== false) {
-                return new \MockDatabaseResult([['cnt' => 10]]);
+                return new MockDatabaseResult([['cnt' => 10]]);
             }
             // Return player data
-            return new \MockDatabaseResult([
+            return new MockDatabaseResult([
                 ['name' => 'Test Player', 'pos' => 'PG']
             ]);
         }
 
         if (stripos($query, 'ibl_draft_picks') !== false) {
             // Return draft pick data
-            return new \MockDatabaseResult([
+            return new MockDatabaseResult([
                 ['teampick' => 'Test Team', 'year' => 2025, 'round' => 1, 'notes' => '']
             ]);
         }
 
         if (stripos($query, 'ibl_trade_cash') !== false) {
             // Return cash data
-            return new \MockDatabaseResult([
+            return new MockDatabaseResult([
                 ['salary_yr1' => 100, 'salary_yr2' => 200, 'salary_yr3' => 0, 'salary_yr4' => 0, 'salary_yr5' => 0, 'salary_yr6' => 0]
             ]);
         }
 
         // Default: return empty result
-        return new \MockDatabaseResult([]);
+        return new MockDatabaseResult([]);
     }
 }

@@ -54,9 +54,10 @@ interface TeamOffDefStatsRepositoryInterface
      *
      * @param string $teamName Team name
      * @param int $seasonYear Season ending year
+     * @param bool $regularSeasonOnly When true, only game_type=1 (regular season) rows
      * @return array{offense: TeamOffenseStatsRow, defense: TeamDefenseStatsRow}|null Both stats or null
      */
-    public function getTeamBothStats(string $teamName, int $seasonYear): ?array;
+    public function getTeamBothStats(string $teamName, int $seasonYear, bool $regularSeasonOnly = true): ?array;
 
     /**
      * Get both offense and defense statistics for a team within a date range

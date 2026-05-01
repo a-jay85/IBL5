@@ -40,7 +40,8 @@ class SeasonAverages
         $season = new Season($db);
         $seasonYear = ($yr !== '') ? (int) $yr : $season->endingYear;
         $offDefRepo = new TeamOffDefStatsRepository($db);
-        $bothStats = $offDefRepo->getTeamBothStats($team->name, $seasonYear);
+        $bothStats = $offDefRepo->getTeamBothStats($team->name, $seasonYear)
+            ?? $offDefRepo->getTeamBothStats($team->name, $seasonYear, false);
 
         ob_start();
         ?>

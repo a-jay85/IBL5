@@ -131,7 +131,7 @@ class TeamOffDefStatsRepository extends \BaseMysqliRepository implements TeamOff
      * @param int $seasonYear Season ending year
      * @return array{offense: TeamOffenseStatsRow, defense: TeamDefenseStatsRow}|null Both stats or null
      */
-    public function getTeamBothStats(string $teamName, int $seasonYear): ?array
+    public function getTeamBothStats(string $teamName, int $seasonYear, bool $regularSeasonOnly = true): ?array
     {
         /** @var array<string, int|string|null>|null $row */
         $row = $this->fetchOne(
@@ -146,8 +146,8 @@ class TeamOffDefStatsRepository extends \BaseMysqliRepository implements TeamOff
                 tds.ftm AS tds_ftm, tds.fta AS tds_fta, tds.tgm AS tds_tgm, tds.tga AS tds_tga,
                 tds.orb AS tds_orb, tds.reb AS tds_reb, tds.ast AS tds_ast, tds.stl AS tds_stl,
                 tds.tvr AS tds_tvr, tds.blk AS tds_blk, tds.pf AS tds_pf
-            FROM (" . self::buildOffenseSubquery('bst.season_year = ? AND fs.team_name = ?') . ") tos
-            JOIN (" . self::buildDefenseSubquery('my.season_year = ? AND fs.team_name = ?') . ") tds
+            FROM (" . self::buildOffenseSubquery('bst.season_year = ? AND fs.team_name = ?', $regularSeasonOnly) . ") tos
+            JOIN (" . self::buildDefenseSubquery('my.season_year = ? AND fs.team_name = ?', $regularSeasonOnly) . ") tds
                 ON tos.teamid = tds.teamid AND tos.season_year = tds.season_year
             LIMIT 1",
             "isis",

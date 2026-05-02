@@ -15,6 +15,22 @@ set -euo pipefail
 # launchd runs with minimal env — ensure our tools are findable
 export PATH="/usr/local/bin:/opt/homebrew/bin:$HOME/.bun/bin:$HOME/.local/bin:/Applications/cmux.app/Contents/Resources/bin:$PATH"
 
+# macOS doesn't ship GNU timeout — provide a POSIX-compatible shim
+if ! command -v timeout &>/dev/null; then
+    timeout() {
+        local secs=$1; shift
+        "$@" &
+        local cmd_pid=$!
+        ( sleep "$secs" && kill -TERM "$cmd_pid" 2>/dev/null ) &
+        local timer_pid=$!
+        local status=0
+        wait "$cmd_pid" || status=$?
+        kill "$timer_pid" 2>/dev/null || true
+        wait "$timer_pid" 2>/dev/null || true
+        return "$status"
+    }
+fi
+
 # Signal to /post-plan that we're running headless (skips Phase 11:
 # Worktree Preview Environment — no human present to verify)
 export CLAUDE_HEADLESS=1

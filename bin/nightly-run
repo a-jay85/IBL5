@@ -1,8 +1,8 @@
 #!/bin/bash
 # Wrapper script for the IBL5 nightly autonomous workflow.
 # Called by launchd at 00:03 daily. Loops through queued plans,
-# firing a fresh claude -p per plan until the queue is empty
-# or the time guard is exceeded.
+# firing two claude -p invocations per plan (implementation + post-plan)
+# until the queue is empty or the time guard is exceeded.
 #
 # If plans remain in the queue when the loop exits (time guard or
 # usage limit), schedules a one-shot 11am PT resume via launchd.
@@ -25,9 +25,10 @@ LOG_DIR="$NIGHTLY_DIR/logs"
 QUEUE_DIR="$NIGHTLY_DIR/queue"
 RESUME_PLIST="$HOME/Library/LaunchAgents/com.ibl5.nightly-resume.plist"
 MAX_ELAPSED=17100  # ~4h45m — stops around 4:45am, leaves headroom in the 5h usage window
-MAX_ATTEMPTS=2     # per-plan retry cap within one night
+MAX_ATTEMPTS=3     # per-plan retry cap within one night (covers impl + postplan phases)
 
-mkdir -p "$LOG_DIR" "$QUEUE_DIR"
+HANDOFF_DIR="$NIGHTLY_DIR/handoff"
+mkdir -p "$LOG_DIR" "$QUEUE_DIR" "$HANDOFF_DIR"
 LOG="$LOG_DIR/$(date +%Y-%m-%d).log"
 
 cd "$REPO"
@@ -48,6 +49,9 @@ while true; do
     if ! ls "$QUEUE_DIR"/*.md &>/dev/null; then
         if [ "$PLANS_RUN" -eq 0 ]; then
             echo "Queue empty — nothing to run." >> "$LOG"
+            mkdir -p "$NIGHTLY_DIR/reports"
+            echo "No plan queued for tonight." \
+                > "$NIGHTLY_DIR/reports/$(date +%Y-%m-%d)-no-queue.md"
         else
             echo "Queue drained after $PLANS_RUN plan(s)." >> "$LOG"
         fi
@@ -91,35 +95,78 @@ while true; do
     PLANS_RUN=$(( PLANS_RUN + 1 ))
     echo "--- Plan #$PLANS_RUN: $PLAN_NAME (attempt $(( ATTEMPTS + 1 ))) at $(date) ---" >> "$LOG"
 
-    # timeout kills the process tree if claude -p hangs (stuck tool call,
-    # MCP server won't exit, etc.) so the loop can recover and continue.
-    REMAINING_SECS=$(( MAX_ELAPSED - $(( $(date +%s) - START )) ))
-    if [ "$REMAINING_SECS" -lt 300 ]; then
-        REMAINING_SECS=300
-    fi
-    LOG_LINE_BEFORE=$(wc -l < "$LOG" 2>/dev/null || echo 0)
-    timeout "$REMAINING_SECS" \
-        claude -p "$(cat bin/nightly-prompt)" \
-            --dangerously-skip-permissions \
-            --model opus \
-            --max-turns 200 \
-            --name "nightly-$(date +%Y-%m-%d-%H%M)" \
-            >> "$LOG" 2>&1 || true
+    # --- Phase 1: Implementation ---
+    # Skip if handoff file exists (resume: impl done, postplan pending)
+    HANDOFF_FILE="$HANDOFF_DIR/${PLAN_NAME}.json"
 
-    echo "--- Plan #$PLANS_RUN finished at $(date) ---" >> "$LOG"
-
-    # Usage-limit exits are transient — don't count them as failures.
-    # Undo the attempt increment and stop the loop so the 11am resume
-    # picks up the remaining queue after the limit resets.
-    if tail -n +"$((LOG_LINE_BEFORE + 1))" "$LOG" | grep -q "hit your limit"; then
-        echo "Usage limit reached — not counting as a failed attempt, stopping loop." >> "$LOG"
-        CURRENT=$(cat "$ATTEMPT_FILE")
-        if [ "$CURRENT" -le 1 ]; then
-            rm -f "$ATTEMPT_FILE"
-        else
-            echo $(( CURRENT - 1 )) > "$ATTEMPT_FILE"
+    if [ -f "$HANDOFF_FILE" ]; then
+        echo "Handoff exists — skipping impl, proceeding to post-plan." >> "$LOG"
+    else
+        REMAINING_SECS=$(( MAX_ELAPSED - $(( $(date +%s) - START )) ))
+        if [ "$REMAINING_SECS" -lt 300 ]; then
+            REMAINING_SECS=300
         fi
-        break
+        IMPL_LOG_BEFORE=$(wc -l < "$LOG" 2>/dev/null || echo 0)
+        timeout "$REMAINING_SECS" \
+            claude -p "$(cat bin/nightly-prompt-impl)" \
+                --dangerously-skip-permissions \
+                --model claude-opus-4-6 \
+                --max-turns 200 \
+                --name "nightly-impl-$(date +%Y-%m-%d-%H%M)" \
+                >> "$LOG" 2>&1 || true
+
+        echo "--- Plan #$PLANS_RUN impl finished at $(date) ---" >> "$LOG"
+
+        # Usage-limit check after implementation
+        if tail -n +"$((IMPL_LOG_BEFORE + 1))" "$LOG" | grep -q "hit your limit"; then
+            echo "Usage limit during impl — stopping loop." >> "$LOG"
+            CURRENT=$(cat "$ATTEMPT_FILE")
+            if [ "$CURRENT" -le 1 ]; then
+                rm -f "$ATTEMPT_FILE"
+            else
+                echo $(( CURRENT - 1 )) > "$ATTEMPT_FILE"
+            fi
+            break
+        fi
+    fi
+
+    # --- Phase 2: Post-Plan (only if handoff file exists) ---
+    if [ -f "$HANDOFF_FILE" ]; then
+        # Re-check time guard before starting post-plan
+        ELAPSED=$(( $(date +%s) - START ))
+        if [ "$ELAPSED" -gt "$MAX_ELAPSED" ]; then
+            echo "Time guard between phases — will resume postplan next run." >> "$LOG"
+            break
+        fi
+
+        REMAINING_SECS=$(( MAX_ELAPSED - $(( $(date +%s) - START )) ))
+        if [ "$REMAINING_SECS" -lt 300 ]; then
+            REMAINING_SECS=300
+        fi
+        PP_LOG_BEFORE=$(wc -l < "$LOG" 2>/dev/null || echo 0)
+        timeout "$REMAINING_SECS" \
+            claude -p "$(cat bin/nightly-prompt-postplan)
+
+PLAN_FILE=$PLAN_NAME" \
+                --dangerously-skip-permissions \
+                --model claude-opus-4-6 \
+                --max-turns 120 \
+                --name "nightly-postplan-$(date +%Y-%m-%d-%H%M)" \
+                >> "$LOG" 2>&1 || true
+
+        echo "--- Plan #$PLANS_RUN postplan finished at $(date) ---" >> "$LOG"
+
+        # Usage-limit check after post-plan
+        if tail -n +"$((PP_LOG_BEFORE + 1))" "$LOG" | grep -q "hit your limit"; then
+            echo "Usage limit during postplan — stopping loop." >> "$LOG"
+            CURRENT=$(cat "$ATTEMPT_FILE")
+            if [ "$CURRENT" -le 1 ]; then
+                rm -f "$ATTEMPT_FILE"
+            else
+                echo $(( CURRENT - 1 )) > "$ATTEMPT_FILE"
+            fi
+            break
+        fi
     fi
 
     # If the plan moved out of queue/ (to done/ or skipped/), clean up its attempt file
@@ -134,6 +181,15 @@ for af in "$QUEUE_DIR"/*.attempts; do
     PLAN_FOR_ATTEMPT="${af%.attempts}"
     if [ ! -e "$PLAN_FOR_ATTEMPT" ]; then
         rm -f "$af"
+    fi
+done
+
+# Clean up orphaned handoff files (plan no longer in queue)
+for hf in "$HANDOFF_DIR"/*.json; do
+    [ -e "$hf" ] || continue
+    PLAN_FOR_HANDOFF="$QUEUE_DIR/$(basename "${hf%.json}")"
+    if [ ! -e "$PLAN_FOR_HANDOFF" ]; then
+        rm -f "$hf"
     fi
 done
 

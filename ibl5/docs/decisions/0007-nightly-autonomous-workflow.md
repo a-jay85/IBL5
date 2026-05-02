@@ -1,6 +1,6 @@
 ---
 description: ADR for the nightly autonomous workflow — headless Claude executes queued plans via launchd at midnight.
-last_verified: 2026-04-13
+last_verified: 2026-05-01
 ---
 
 # ADR-0007: Nightly Autonomous Workflow
@@ -14,9 +14,9 @@ Daytime plan-mode sessions generate implementation plans that are approved but n
 
 ## Decision
 
-Use macOS `launchd` to fire a headless `claude -p` process at 00:03 daily. The process reads one queued plan (symlinked from `~/.claude/plans/`), creates a worktree, implements the plan, and runs `/post-plan` for code review, security audit, testing, and PR creation. The `CLAUDE_HEADLESS=1` environment variable gates `/post-plan` Phase 11 (Worktree Preview Environment) since no human is present to verify visually.
+Use macOS `launchd` to fire a headless `claude -p` process at 00:03 daily. For each queued plan, two context-isolated agents run sequentially: an implementation agent (`bin/nightly-prompt-impl`) creates a worktree and implements the plan, then a post-plan agent (`bin/nightly-prompt-postplan`) runs `/post-plan` for code review, security audit, testing, and PR creation. A JSON handoff file bridges state between agents. The `CLAUDE_HEADLESS=1` environment variable gates `/post-plan` Phase 11 (Worktree Preview Environment) since no human is present to verify visually.
 
-Enforcement: `launchd` plist at `~/Library/LaunchAgents/com.ibl5.nightly-claude.plist`. Queue managed by `bin/nightly-queue`. Prompt authored in `bin/nightly-prompt`.
+Enforcement: `launchd` plist at `~/Library/LaunchAgents/com.ibl5.nightly-claude.plist`. Queue managed by `bin/nightly-queue`. Prompts authored in `bin/nightly-prompt-impl` and `bin/nightly-prompt-postplan`.
 
 ## Alternatives Considered
 
@@ -35,7 +35,8 @@ Enforcement: `launchd` plist at `~/Library/LaunchAgents/com.ibl5.nightly-claude.
 ## References
 
 - `bin/nightly-queue` — symlink queue helper
-- `bin/nightly-prompt` — self-contained prompt for headless execution
+- `bin/nightly-prompt-impl` — implementation agent prompt (queue check through handoff file)
+- `bin/nightly-prompt-postplan` — post-plan agent prompt (reads handoff, runs /post-plan, reports)
 - `bin/nightly-run` — launchd wrapper script
 - `.claude/rules/nightly-workflow.md` — workflow documentation
 - `.claude/skills/post-plan/SKILL.md` — Phase 11 `$CLAUDE_HEADLESS` gate

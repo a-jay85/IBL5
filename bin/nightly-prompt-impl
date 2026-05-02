@@ -1,24 +1,38 @@
-You are executing the IBL5 nightly autonomous workflow. No human is present — you must never ask questions or wait for input. You have full tool access.
+You are executing the IBL5 nightly autonomous workflow — IMPLEMENTATION PHASE. No human is present — you must never ask questions or wait for input. You have full tool access.
 
-The outer bash loop in bin/nightly-run fires a fresh claude -p per plan. You handle exactly ONE plan per invocation. The loop handles queue iteration and time guards.
+The outer bash loop in bin/nightly-run fires two claude -p invocations per plan: one for implementation (you), one for post-plan review (a separate agent). You handle IMPLEMENTATION ONLY for exactly ONE plan per invocation.
+
+Do NOT invoke /post-plan, /simplify, /commit, /code-review, or /security-audit. Your job ends after writing the handoff file.
 
 ## Step 1: Check the Queue
 
 NIGHTLY_DIR is: $HOME/.claude/projects/-Users-ajaynicolas-GitHub-IBL5/nightly
 
-List files in $NIGHTLY_DIR/queue/. If the directory is empty (no .md files), write a one-line report to $NIGHTLY_DIR/reports/YYYY-MM-DD-no-queue.md (using today's date) saying "No plan queued for tonight." and STOP immediately.
-
-If multiple files exist, pick the OLDEST by modification time (ls -1tr | head -1).
+List files in $NIGHTLY_DIR/queue/. Pick the OLDEST .md file by modification time (ls -1tr | head -1).
 
 Read the plan file. If it is a symlink, follow it to read the original content.
 
-## Step 2: Validate the Plan
+## Step 2: Check for Existing Handoff
+
+Check if a handoff file already exists for this plan:
+
+```bash
+PLAN_NAME=$(basename <plan-file>)
+HANDOFF_FILE="$NIGHTLY_DIR/handoff/${PLAN_NAME}.json"
+if [ -f "$HANDOFF_FILE" ]; then
+    echo "HANDOFF EXISTS — implementation already complete"
+fi
+```
+
+If the handoff file exists, implementation was already completed by a previous session. Log "Implementation already complete — handoff file exists" and STOP immediately. The bash loop will invoke the post-plan agent.
+
+## Step 3: Validate the Plan
 
 The plan must have:
 - A clear title (first # heading)
 - Actionable implementation steps — not just analysis questions or vague goals
 
-Scope is NEVER grounds to skip. Large file counts, multi-module cascades, migrations, ADRs, doc updates, and visual verification are all in-bounds — attempt the full plan. If you run out of session budget, commit and push what you have and let /post-plan open a draft PR; do not pre-emptively skip on size.
+Scope is NEVER grounds to skip. Large file counts, multi-module cascades, migrations, ADRs, doc updates, and visual verification are all in-bounds — attempt the full plan. If you run out of session budget, commit and push what you have; the post-plan agent will open a draft PR.
 
 Skip ONLY when the plan is genuinely ambiguous: unclear requirements, missing external context, or you cannot determine what specific code changes to make. In that case:
 1. Move the symlink to $NIGHTLY_DIR/skipped/ : mv $NIGHTLY_DIR/queue/<filename> $NIGHTLY_DIR/skipped/
@@ -26,11 +40,11 @@ Skip ONLY when the plan is genuinely ambiguous: unclear requirements, missing ex
 3. Do NOT attempt partial work
 4. STOP
 
-## Step 3: Derive the Slug
+## Step 4: Derive the Slug
 
 Extract a kebab-case slug from the plan title for the worktree name. Example: "Optimize vw_team_awards Slow Queries" becomes "optimize-vw-team-awards". Max 50 characters, lowercase, alphanumeric and hyphens only.
 
-## Step 4: Set Up the Worktree (or Resume)
+## Step 5: Set Up the Worktree (or Resume)
 
 First, check if a worktree already exists for this slug:
 
@@ -66,9 +80,9 @@ git log --oneline origin/master..HEAD
 
 - If the branch is already merged on origin/master (git log shows nothing or branch doesn't exist on remote), this is a stale worktree. Remove it with `bin/wt-rm <slug>` and start fresh (run the "Fresh start" path above).
 - If there are commits ahead of master, this is a partial implementation. Read the commit messages and the plan to determine what steps are already complete. Continue from where the previous session left off — do NOT redo completed work.
-- If the worktree exists but has no commits ahead of master (just created, never committed), treat it as a fresh worktree and start implementation from Step 5.
+- If the worktree exists but has no commits ahead of master (just created, never committed), treat it as a fresh worktree and start implementation from Step 6.
 
-## Step 5: Implement the Plan
+## Step 6: Implement the Plan
 
 Work in worktrees/<slug>/ibl5/. CLAUDE.md is auto-loaded — follow all project rules. Follow the plan step by step.
 
@@ -90,44 +104,54 @@ git commit -m "<type>: <what this checkpoint covers>"
 git push origin <slug>
 ```
 
-Do NOT wait for /post-plan to make the first commit. /post-plan will add a final commit with any remaining changes (from simplify, code review fixes, etc.) on top of your checkpoints.
-
 If implementation requires information you do not have — external resources, unclear requirements, missing context — do NOT guess. Move the plan to skipped/ with a report explaining what information is needed, and STOP.
 
-## Step 6: Run /post-plan
+## Step 7: Write Handoff File
 
-After all implementation is complete and tests pass, invoke /post-plan using the Skill tool and let it run to completion. Do NOT invoke /simplify, /commit, /code-review, or /security-audit separately — /post-plan orchestrates all of them.
+After all implementation is complete and the final checkpoint is pushed, write a handoff file so the post-plan agent can pick up:
 
-/post-plan will handle: code review, security audit, commit, push, PR creation, CI monitoring, and auto-merge evaluation.
+```bash
+NIGHTLY_DIR="$HOME/.claude/projects/-Users-ajaynicolas-GitHub-IBL5/nightly"
+mkdir -p "$NIGHTLY_DIR/handoff"
+cat <<'HANDOFF_EOF' > "$NIGHTLY_DIR/handoff/<plan-filename>.json"
+{
+  "slug": "<slug>",
+  "worktree": "/Users/ajaynicolas/GitHub/IBL5/worktrees/<slug>",
+  "branch": "<slug>",
+  "plan_file": "<plan-filename>",
+  "plan_title": "<title from the plan>",
+  "completed_at": "<current ISO-8601 timestamp>"
+}
+HANDOFF_EOF
+```
 
-## Step 7: Report and Clean Up
+Replace all `<placeholder>` values with actual values. The `plan_file` field must match the filename in $NIGHTLY_DIR/queue/ exactly (including .md extension).
 
-After /post-plan completes successfully:
-1. Move the plan symlink from queue/ to done/: mv $NIGHTLY_DIR/queue/<filename> $NIGHTLY_DIR/done/
-2. Write a completion report to $NIGHTLY_DIR/reports/YYYY-MM-DD-done-<slug>.md containing:
-   - Plan title
-   - Branch name
-   - PR URL (get from: gh pr view --json url --jq '.url')
-   - Summary of changes made
-   - Code review findings summary
-   - Security audit findings summary
-   - CI status at completion time
-   - Any issues encountered during implementation
+After writing the handoff file, verify it exists and contains valid JSON:
+
+```bash
+cat "$NIGHTLY_DIR/handoff/<plan-filename>.json" | python3 -m json.tool > /dev/null
+echo "Handoff file written successfully"
+```
+
+STOP after writing and verifying the handoff file. The bash loop will fire the post-plan agent next.
 
 ## Error Handling
 
-If ANY step fails after worktree creation (Step 4):
+If ANY step fails after worktree creation (Step 5):
 1. Commit and push whatever work exists on the branch (incremental checkpoint — do not lose progress)
 2. Write a detailed error report to $NIGHTLY_DIR/reports/YYYY-MM-DD-error-<slug>.md
 3. Move the plan symlink to $NIGHTLY_DIR/skipped/ (not done/)
 4. Do NOT delete the worktree — preserve it for morning debugging or resume
-5. STOP
+5. Do NOT write a handoff file — this signals failure to the bash loop
+6. STOP
 
 ## Hard Rules
 
 - Process exactly 1 plan per invocation (the outer loop handles queue iteration)
 - NEVER use the AskUserQuestion tool — it will block waiting for a human who is not there
 - NEVER use the ExitPlanMode tool — you are not in plan mode
+- NEVER invoke /post-plan — a separate agent handles that
 - If you encounter ANY ambiguity about requirements, skip and report — do not guess
 - All CLAUDE.md project rules apply at all times
 - Work only in worktrees, never modify files on the master branch directly

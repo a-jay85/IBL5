@@ -26,8 +26,8 @@ jobs:
     permissions:
       pull-requests: read
     outputs:
-      src: ${{ github.event_name == 'push' || steps.filter.outputs.src == 'true' }}
-      shell: ${{ github.event_name == 'push' || steps.filter.outputs.shell == 'true' }}
+      src: ${{ github.event_name == 'push' || github.event.pull_request.user.login == 'dependabot[bot]' || steps.filter.outputs.src == 'true' }}
+      shell: ${{ github.event_name == 'push' || github.event.pull_request.user.login == 'dependabot[bot]' || steps.filter.outputs.shell == 'true' }}
     steps:
       - uses: dorny/paths-filter@v4
         id: filter

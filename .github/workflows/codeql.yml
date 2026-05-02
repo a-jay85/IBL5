@@ -10,12 +10,6 @@ on:
       - '.github/workflows/*.yml'
   pull_request:
     types: [opened, synchronize, reopened, ready_for_review]
-    paths:
-      - '**/*.ts'
-      - '**/*.tsx'
-      - '**/*.js'
-      - '**/*.jsx'
-      - '.github/workflows/*.yml'
 
 permissions:
   contents: read
@@ -25,8 +19,30 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  changes:
+    name: Detect changes
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    permissions:
+      pull-requests: read
+    outputs:
+      src: ${{ github.event.pull_request.user.login == 'dependabot[bot]' || steps.filter.outputs.src == 'true' }}
+    steps:
+      - uses: dorny/paths-filter@v4
+        id: filter
+        with:
+          filters: |
+            src:
+              - '**/*.ts'
+              - '**/*.tsx'
+              - '**/*.js'
+              - '**/*.jsx'
+              - '.github/workflows/*.yml'
+
   analyze:
     name: Analyze
+    needs: [changes]
+    if: always() && (github.event_name == 'push' || needs.changes.outputs.src == 'true')
     runs-on: ubuntu-latest
     permissions:
       security-events: write

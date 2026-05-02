@@ -3,13 +3,7 @@ name: ESLint
 on:
   pull_request:
     branches: [master]
-    paths:
-      - 'ibl5/tests/e2e/**'
-      - 'ibl5/playwright.config.ts'
-      - 'ibl5/eslint.config.js'
-      - 'ibl5/package.json'
-      - 'ibl5/bun.lock'
-      - '.github/workflows/eslint.yml'
+    types: [opened, synchronize, reopened, ready_for_review]
 
 permissions:
   contents: read
@@ -19,8 +13,30 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  changes:
+    name: Detect changes
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: read
+    outputs:
+      src: ${{ github.event.pull_request.user.login == 'dependabot[bot]' || steps.filter.outputs.src == 'true' }}
+    steps:
+      - uses: dorny/paths-filter@v4
+        id: filter
+        with:
+          filters: |
+            src:
+              - 'ibl5/tests/e2e/**'
+              - 'ibl5/playwright.config.ts'
+              - 'ibl5/eslint.config.js'
+              - 'ibl5/package.json'
+              - 'ibl5/bun.lock'
+              - '.github/workflows/eslint.yml'
+
   eslint:
     name: ESLint (e2e specs)
+    needs: [changes]
+    if: needs.changes.outputs.src == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:

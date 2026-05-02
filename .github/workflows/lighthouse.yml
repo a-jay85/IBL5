@@ -4,16 +4,6 @@ on:
   pull_request:
     branches: [master]
     types: [opened, synchronize, reopened, ready_for_review]
-    paths:
-      - '**.php'
-      - '**.css'
-      - '**.ts'
-      - '**.js'
-      - 'ibl5/design/**'
-      - 'ibl5/migrations/**.sql'
-      - 'Dockerfile'
-      - 'docker-compose*.yml'
-      - '.github/workflows/lighthouse.yml'
 
 permissions:
   contents: read
@@ -23,8 +13,33 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  changes:
+    name: Detect changes
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: read
+    outputs:
+      src: ${{ github.event.pull_request.user.login == 'dependabot[bot]' || steps.filter.outputs.src == 'true' }}
+    steps:
+      - uses: dorny/paths-filter@v4
+        id: filter
+        with:
+          filters: |
+            src:
+              - '**.php'
+              - '**.css'
+              - '**.ts'
+              - '**.js'
+              - 'ibl5/design/**'
+              - 'ibl5/migrations/**.sql'
+              - 'Dockerfile'
+              - 'docker-compose*.yml'
+              - '.github/workflows/lighthouse.yml'
+
   lighthouse:
     name: Performance Audit
+    needs: [changes]
+    if: needs.changes.outputs.src == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 15
 

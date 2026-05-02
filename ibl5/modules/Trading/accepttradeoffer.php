@@ -12,7 +12,7 @@ try {
 global $mysqli_db;
 
 if (!isset($mysqli_db) || !($mysqli_db instanceof mysqli)) {
-    error_log("Database connection not available");
+    \Logging\LoggerFactory::getChannel('trade')->critical('Database connection not available');
     die("Error: Database connection failed");
 }
 
@@ -43,7 +43,7 @@ if ($offerId !== null) {
             \Utilities\HtmxHelper::redirect('/ibl5/modules.php?name=Trading&op=reviewtrade&result=accept_error&error=' . rawurlencode($result['error'] ?? 'Unknown error'));
         }
     } catch (Exception $e) {
-        error_log("Failed to process trade: " . $e->getMessage());
+        \Logging\LoggerFactory::getChannel('trade')->error('Failed to process trade', ['error' => $e->getMessage()]);
         \Utilities\HtmxHelper::redirect('/ibl5/modules.php?name=Trading&op=reviewtrade&result=accept_error&error=' . rawurlencode($e->getMessage()));
     }
 } else {

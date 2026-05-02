@@ -16,12 +16,12 @@ if (!\Utilities\CsrfGuard::validateSubmittedToken('trade_reject')) {
 }
 
 if (!isset($_POST['offer']) || empty($_POST['offer'])) {
-    error_log("Missing offer ID in POST data");
+    \Logging\LoggerFactory::getChannel('trade')->warning('Missing offer ID in POST data');
     die("Error: Missing trade offer ID");
 }
 
 if (!isset($mysqli_db) || !($mysqli_db instanceof mysqli)) {
-    error_log("Database connection not available");
+    \Logging\LoggerFactory::getChannel('trade')->critical('Database connection not available');
     die("Error: Database connection failed");
 }
 
@@ -39,6 +39,10 @@ if ($tradeRows === []) {
 
 // Delete trade offer
 $repository->deleteTradeOffer($offerId);
+
+\Logging\LoggerFactory::getChannel('audit')->info('trade_offer_rejected', [
+    'offer_id' => $offerId,
+]);
 
 // Attempt Discord notification (gracefully fail if not available)
 try {

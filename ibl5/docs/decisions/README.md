@@ -1,6 +1,6 @@
 ---
 description: Index of IBL5 Architecture Decision Records (ADRs). Source of truth for every load-bearing decision and its rationale.
-last_verified: 2026-04-28
+last_verified: 2026-05-01
 ---
 
 # IBL5 Architecture Decision Records
@@ -24,6 +24,7 @@ Every load-bearing decision in IBL5 is captured here as a numbered ADR so that f
 | [0005](0005-strict-types-enforcement.md) | Strict types + typed properties enforcement | Accepted | PHPStan level `max` + `strict-rules` as the floor; type coercion bugs banned mechanically. |
 | [0012](0012-archive-first-jsb-reading.md) | Archive-first JSB file reading | Accepted | `.lge`/`.sch` read directly from backup archive via `JsbSourceResolver`; disk-fallback for manual uploads. |
 | [0016](0016-remove-duckdb-analytics.md) | Remove DuckDB analytics layer | Accepted | JSB source decompiled; DuckDB OLAP layer and write-back tables removed. |
+| [0017](0017-dependabot-full-ci-and-auto-merge.md) | Dependabot full CI and auto-merge | Accepted | Force all CI checks on Dependabot PRs; auto-squash-merge on pass. |
 
 ## When an ADR is Required
 

@@ -48,7 +48,7 @@ inject_config_guard() {
     for config in "$CONFIG_DIR/config.php" "$CONFIG_DIR/configOlympics.php"; do
         [[ -f "$config" ]] || continue
         if ! grep -q '.e2e-active' "$config" 2>/dev/null; then
-            sed -i '' '6 a\
+            sed -i '' '1 a\
 '"$E2E_GUARD"'
 ' "$config"
             echo "==> Injected E2E config guard into $(basename "$config")"

@@ -1,0 +1,81 @@
+You are executing the IBL5 nightly autonomous workflow — POST-PLAN PHASE. No human is present — you must never ask questions or wait for input. You have full tool access.
+
+A separate implementation agent has already completed all code changes for this plan. Your job is ONLY to run /post-plan, write the completion report, and clean up. Do NOT re-implement anything or modify the implementation.
+
+## Step 1: Read Handoff File
+
+NIGHTLY_DIR is: $HOME/.claude/projects/-Users-ajaynicolas-GitHub-IBL5/nightly
+
+The plan filename is provided at the end of this prompt as PLAN_FILE=<filename>. Read the handoff file:
+
+```bash
+cat "$NIGHTLY_DIR/handoff/<PLAN_FILE>.json"
+```
+
+Parse the JSON to extract: slug, worktree path, branch name, plan title, plan filename.
+
+If the handoff file does not exist or is invalid JSON, write an error report to $NIGHTLY_DIR/reports/YYYY-MM-DD-error-unknown.md and STOP.
+
+## Step 2: Enter Worktree
+
+Change into the worktree directory from the handoff file:
+
+```bash
+cd <worktree-path>
+git log --oneline origin/master..HEAD
+```
+
+Verify the worktree exists and the branch has commits ahead of master. If not, write an error report and STOP — the implementation agent may have failed silently.
+
+## Step 3: Run /post-plan
+
+Invoke /post-plan using the Skill tool and let it run to completion. Do NOT invoke /simplify, /commit, /code-review, or /security-audit separately — /post-plan orchestrates all of them.
+
+/post-plan will handle: code review, security audit, commit, push, PR creation, CI monitoring, and auto-merge evaluation.
+
+## Step 4: Report and Clean Up
+
+After /post-plan completes successfully:
+
+1. Move the plan symlink from queue/ to done/:
+   ```bash
+   mv "$NIGHTLY_DIR/queue/<plan-filename>" "$NIGHTLY_DIR/done/"
+   ```
+
+2. Write a completion report to $NIGHTLY_DIR/reports/YYYY-MM-DD-done-<slug>.md containing:
+   - Plan title
+   - Branch name
+   - PR URL (get from: gh pr view --json url --jq '.url')
+   - Summary of changes made
+   - Code review findings summary
+   - Security audit findings summary
+   - CI status at completion time
+   - Any issues encountered
+
+3. Delete the handoff file:
+   ```bash
+   rm "$NIGHTLY_DIR/handoff/<plan-filename>.json"
+   ```
+
+## Error Handling
+
+If ANY step fails:
+1. Write a detailed error report to $NIGHTLY_DIR/reports/YYYY-MM-DD-error-<slug>.md
+2. Move the plan symlink to $NIGHTLY_DIR/skipped/ (not done/):
+   ```bash
+   mv "$NIGHTLY_DIR/queue/<plan-filename>" "$NIGHTLY_DIR/skipped/"
+   ```
+3. Delete the handoff file (the branch has committed work for manual recovery):
+   ```bash
+   rm -f "$NIGHTLY_DIR/handoff/<plan-filename>.json"
+   ```
+4. Do NOT delete the worktree — preserve it for morning debugging
+5. STOP
+
+## Hard Rules
+
+- NEVER use the AskUserQuestion tool — it will block waiting for a human who is not there
+- NEVER use the ExitPlanMode tool — you are not in plan mode
+- NEVER re-implement or modify the implementation code — only run /post-plan
+- If /post-plan fails, report the error and stop — do not retry within this invocation
+- All CLAUDE.md project rules apply at all times

@@ -12,7 +12,7 @@ try {
 global $mysqli_db;
 
 if (!isset($mysqli_db) || !($mysqli_db instanceof mysqli)) {
-    error_log("Database connection not available");
+    \Logging\LoggerFactory::getChannel('trade')->critical('Database connection not available');
     die("Error: Database connection failed");
 }
 
@@ -55,11 +55,15 @@ try {
     $tradeOffer = new Trading\TradeOffer($mysqli_db);
     $result = $tradeOffer->createTradeOffer($tradeData);
 } catch (Exception $e) {
-    error_log("Failed to create trade offer: " . $e->getMessage());
+    \Logging\LoggerFactory::getChannel('trade')->error('Failed to create trade offer', ['error' => $e->getMessage()]);
     $result = ['success' => false, 'error' => $e->getMessage()];
 }
 
 if ($result['success']) {
+    \Logging\LoggerFactory::getChannel('audit')->info('trade_offer_created', [
+        'offering_team' => $tradeData['offeringTeam'],
+        'listening_team' => $tradeData['listeningTeam'],
+    ]);
     \Utilities\HtmxHelper::redirect('/ibl5/modules.php?name=Trading&op=reviewtrade&result=offer_sent');
 } else {
     // Store checked items and cash amounts in session so the form can restore them

@@ -20,8 +20,8 @@ class PiiRedactionProcessor implements ProcessorInterface
     public function __invoke(LogRecord $record): LogRecord
     {
         return $record->with(
-            context: $this->redactArray($record->context, $record->channel),
-            extra: $this->redactArray($record->extra, $record->channel),
+            context: $this->redactArray($record->context),
+            extra: $this->redactArray($record->extra),
         );
     }
 
@@ -29,7 +29,7 @@ class PiiRedactionProcessor implements ProcessorInterface
      * @param array<array-key, mixed> $data
      * @return array<array-key, mixed>
      */
-    private function redactArray(array $data, string $channel): array
+    private function redactArray(array $data): array
     {
         $result = [];
         foreach ($data as $key => $value) {
@@ -47,7 +47,7 @@ class PiiRedactionProcessor implements ProcessorInterface
 
             if (is_array($value)) {
                 /** @var array<array-key, mixed> $value */
-                $result[$key] = $this->redactArray($value, $channel);
+                $result[$key] = $this->redactArray($value);
             } elseif (is_string($value)) {
                 $result[$key] = $this->redactString($value);
             } else {

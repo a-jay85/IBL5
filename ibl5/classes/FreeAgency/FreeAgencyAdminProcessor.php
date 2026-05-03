@@ -238,6 +238,13 @@ class FreeAgencyAdminProcessor implements FreeAgencyAdminProcessorInterface
         $successCount = $counts['successCount'];
         $errorCount = $counts['errorCount'];
 
+        \Logging\LoggerFactory::getChannel('audit')->info('fa_signings_executed', [
+            'action' => 'fa_signings_executed',
+            'day' => $day,
+            'success_count' => $successCount,
+            'error_count' => $errorCount,
+        ]);
+
         if ($errorCount === 0 && $successCount > 0) {
             return [
                 'success' => true,
@@ -261,6 +268,10 @@ class FreeAgencyAdminProcessor implements FreeAgencyAdminProcessorInterface
     public function clearOffers(): array
     {
         $this->repository->clearAllOffers();
+
+        \Logging\LoggerFactory::getChannel('audit')->info('fa_offers_cleared', [
+            'action' => 'fa_offers_cleared',
+        ]);
 
         return [
             'success' => true,

@@ -318,6 +318,12 @@ _**{$player->teamName}** GM <@!$playerTeamDiscordID> could not be reached for co
 
         $this->repository->deleteOffer($teamid, $playerID);
 
+        \Logging\LoggerFactory::getChannel('audit')->info('fa_offer_deleted', [
+            'action' => 'fa_offer_deleted',
+            'team_name' => $teamName,
+            'player_id' => $playerID,
+        ]);
+
         return ['success' => true];
     }
 }

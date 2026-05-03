@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace Updater\Steps;
 
 use BulkImport\BackupArchiveLocator;
-use BulkImport\Contracts\ArchiveExtractorInterface;
 use BulkImport\Contracts\BackupArchiveLocatorInterface;
 use Season\Season;
 use Updater\Contracts\PipelineStepInterface;
@@ -26,17 +25,13 @@ use Updater\StepResult;
  */
 final class ExtractFromBackupStep implements PipelineStepInterface
 {
-    /** @var list<string> JSB file extensions to extract (.lge, .sch, .plr read directly from archive by JsbSourceResolver) */
-    private const EXTENSIONS = [
-        'sco',
-    ];
+    /** @var list<string> JSB file extensions to extract (all types now read directly from archive by JsbSourceResolver) */
+    private const EXTENSIONS = [];
 
     public function __construct(
         private readonly BackupArchiveLocatorInterface $locator,
-        private readonly ArchiveExtractorInterface $extractor,
         private readonly Season $season,
         private readonly string $basePath,
-        private readonly string $filePrefix,
     ) {
     }
 
@@ -93,31 +88,17 @@ final class ExtractFromBackupStep implements PipelineStepInterface
     }
 
     /**
-     * Extract all JSB files from the archive to the base path.
+     * Extract JSB files from the archive to the base path.
+     *
+     * All file types are now read directly from archive by JsbSourceResolver,
+     * so EXTENSIONS is empty and this always returns 0.
      *
      * @param list<string> $missingExtensions Populated with extensions not found in archive
      * @return int Number of files successfully extracted
      */
     private function extractFiles(string $archivePath, array &$missingExtensions): int
     {
-        $extracted = 0;
-
-        foreach (self::EXTENSIONS as $ext) {
-            $filename = $this->filePrefix . '.' . $ext;
-            $result = $this->extractor->extractSingleFile(
-                $archivePath,
-                $filename,
-                $this->basePath,
-            );
-
-            if ($result !== false) {
-                $extracted++;
-            } else {
-                $missingExtensions[] = $ext;
-            }
-        }
-
-        return $extracted;
+        return 0;
     }
 
     /**

@@ -47,6 +47,27 @@ class BoxscoreProcessor implements BoxscoreProcessorInterface
      */
     public function processScoFile(string $filePath, int $seasonEndingYear, string $seasonPhase, bool $skipSimDates = false): array
     {
+        $data = @file_get_contents($filePath);
+        if ($data === false) {
+            return [
+                'success' => false,
+                'gamesInserted' => 0,
+                'gamesUpdated' => 0,
+                'gamesSkipped' => 0,
+                'linesProcessed' => 0,
+                'messages' => [],
+                'error' => 'Failed to open .sco file',
+            ];
+        }
+
+        return $this->processScoData($data, $seasonEndingYear, $seasonPhase, $skipSimDates);
+    }
+
+    /**
+     * @see BoxscoreProcessorInterface::processScoData()
+     */
+    public function processScoData(string $data, int $seasonEndingYear, string $seasonPhase, bool $skipSimDates = false): array
+    {
         /** @var list<string> $messages */
         $messages = [];
 
@@ -56,8 +77,7 @@ class BoxscoreProcessor implements BoxscoreProcessorInterface
 
         $messages[] = "Parsing .sco file for the {$operatingSeasonStartingYear}-{$operatingSeasonEndingYear} {$operatingSeasonPhase}...";
 
-        $scoFile = @fopen($filePath, 'rb');
-        if ($scoFile === false) {
+        if (strlen($data) < ScoFileParser::HEADER_OFFSET_BYTES) {
             return [
                 'success' => false,
                 'gamesInserted' => 0,
@@ -65,23 +85,20 @@ class BoxscoreProcessor implements BoxscoreProcessorInterface
                 'gamesSkipped' => 0,
                 'linesProcessed' => 0,
                 'messages' => $messages,
-                'error' => 'Failed to open .sco file',
+                'error' => 'Data too short for .sco format',
             ];
         }
 
-        fseek($scoFile, ScoFileParser::HEADER_OFFSET_BYTES);
-
+        $offset = ScoFileParser::HEADER_OFFSET_BYTES;
         $gamesInserted = 0;
         $gamesUpdated = 0;
         $gamesSkipped = 0;
         $linesProcessed = 0;
         $league = $this->leagueContext !== null ? $this->leagueContext->getCurrentLeague() : 'ibl';
 
-        while (!feof($scoFile)) {
-            $line = fgets($scoFile, ScoFileParser::RECORD_SIZE + 1);
-            if ($line === false) {
-                break;
-            }
+        while ($offset + ScoFileParser::RECORD_SIZE <= strlen($data)) {
+            $line = substr($data, $offset, ScoFileParser::RECORD_SIZE);
+            $offset += ScoFileParser::RECORD_SIZE;
 
             $gameInfoLine = ScoFileParser::extractGameInfo($line);
             $boxscoreGameInfo = Boxscore::withGameInfoLine($gameInfoLine, $operatingSeasonEndingYear, $operatingSeasonPhase, $league);
@@ -95,7 +112,6 @@ class BoxscoreProcessor implements BoxscoreProcessorInterface
 
             $gameLinesProcessed = $this->processGameLine($line, $boxscoreGameInfo);
 
-            // Only count the game if data was actually written to the DB
             if ($gameLinesProcessed > 0) {
                 if ($upsertAction === 'update') {
                     $gamesUpdated++;
@@ -110,8 +126,6 @@ class BoxscoreProcessor implements BoxscoreProcessorInterface
                 flush();
             }
         }
-
-        fclose($scoFile);
 
         $messages[] = "Number of .sco lines processed: {$linesProcessed}";
         $messages[] = "Games inserted: {$gamesInserted} | Games updated: {$gamesUpdated} | Games skipped: {$gamesSkipped}";
@@ -138,10 +152,27 @@ class BoxscoreProcessor implements BoxscoreProcessorInterface
         string $filePath,
         int $seasonEndingYear,
     ): array {
+        $data = @file_get_contents($filePath);
+        if ($data === false) {
+            return [
+                'success' => false,
+                'messages' => ['Failed to open .sco file for All-Star games'],
+            ];
+        }
+
+        return $this->processAllStarGamesData($data, $seasonEndingYear);
+    }
+
+    /**
+     * @see BoxscoreProcessorInterface::processAllStarGamesData()
+     */
+    public function processAllStarGamesData(
+        string $data,
+        int $seasonEndingYear,
+    ): array {
         /** @var list<string> $messages */
         $messages = [];
 
-        // Olympics doesn't have All-Star games
         if ($this->leagueContext !== null && $this->leagueContext->isOlympics()) {
             return [
                 'success' => true,
@@ -152,7 +183,6 @@ class BoxscoreProcessor implements BoxscoreProcessorInterface
 
         $operatingSeasonEndingYear = $seasonEndingYear > 0 ? $seasonEndingYear : $this->season->endingYear;
 
-        // Check if regular season has progressed past All-Star Weekend
         $lastBoxScoreDate = $this->season->getLastBoxScoreDate();
         $allStarCutoff = sprintf('%d-%02d-%02d', $operatingSeasonEndingYear, Season::IBL_ALL_STAR_MONTH, Season::IBL_ALL_STAR_BREAK_END_DAY);
 
@@ -164,30 +194,18 @@ class BoxscoreProcessor implements BoxscoreProcessorInterface
             ];
         }
 
-        $scoFile = @fopen($filePath, 'rb');
-        if ($scoFile === false) {
-            return [
-                'success' => false,
-                'messages' => ['Failed to open .sco file for All-Star games'],
-            ];
-        }
+        $risingStarsLine = strlen($data) >= ScoFileParser::RECORD_SIZE
+            ? substr($data, 0, ScoFileParser::RECORD_SIZE)
+            : null;
+        $allStarLine = strlen($data) >= ScoFileParser::RECORD_SIZE * 2
+            ? substr($data, ScoFileParser::RECORD_SIZE, ScoFileParser::RECORD_SIZE)
+            : null;
 
-        fseek($scoFile, 0);
-
-        // Block 0: Rising Stars Game (bytes 0–1999)
-        $risingStarsLine = fgets($scoFile, ScoFileParser::RECORD_SIZE + 1);
-        // Block 1: All-Star Game (bytes 2000–3999)
-        $allStarLine = fgets($scoFile, ScoFileParser::RECORD_SIZE + 1);
-
-        fclose($scoFile);
-
-        // Process Rising Stars Game
-        if ($risingStarsLine !== false && trim(ScoFileParser::extractGameInfo($risingStarsLine)) !== '') {
+        if ($risingStarsLine !== null && trim(ScoFileParser::extractGameInfo($risingStarsLine)) !== '') {
             $this->processRisingStarsGame($risingStarsLine, $operatingSeasonEndingYear, $messages);
         }
 
-        // Process All-Star Game (inserted with default placeholder names)
-        if ($allStarLine !== false && trim(ScoFileParser::extractGameInfo($allStarLine)) !== '') {
+        if ($allStarLine !== null && trim(ScoFileParser::extractGameInfo($allStarLine)) !== '') {
             $this->processAllStarGame($allStarLine, $operatingSeasonEndingYear, $messages);
         }
 

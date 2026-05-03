@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace Tests\UpdateAllTheThings\Steps;
 
-use BulkImport\Contracts\ArchiveExtractorInterface;
 use BulkImport\Contracts\BackupArchiveLocatorInterface;
 use PHPUnit\Framework\TestCase;
 use Season\Season;
@@ -14,13 +13,11 @@ use Updater\Steps\ExtractFromBackupStep;
 class ExtractFromBackupStepTest extends TestCase
 {
     private BackupArchiveLocatorInterface $stubLocator;
-    private ArchiveExtractorInterface $stubExtractor;
     private Season $stubSeason;
 
     protected function setUp(): void
     {
         $this->stubLocator = $this->createStub(BackupArchiveLocatorInterface::class);
-        $this->stubExtractor = $this->createStub(ArchiveExtractorInterface::class);
         $this->stubSeason = $this->createStub(Season::class);
         $this->stubSeason->beginningYear = 2025;
         $this->stubSeason->endingYear = 2026;
@@ -30,10 +27,8 @@ class ExtractFromBackupStepTest extends TestCase
     {
         $step = new ExtractFromBackupStep(
             $this->stubLocator,
-            $this->stubExtractor,
             $this->stubSeason,
             '/tmp',
-            'IBL5',
         );
 
         $this->assertInstanceOf(PipelineStepInterface::class, $step);
@@ -43,10 +38,8 @@ class ExtractFromBackupStepTest extends TestCase
     {
         $step = new ExtractFromBackupStep(
             $this->stubLocator,
-            $this->stubExtractor,
             $this->stubSeason,
             '/tmp',
-            'IBL5',
         );
 
         $this->assertSame('Backup extracted', $step->getLabel());
@@ -58,10 +51,8 @@ class ExtractFromBackupStepTest extends TestCase
 
         $step = new ExtractFromBackupStep(
             $this->stubLocator,
-            $this->stubExtractor,
             $this->stubSeason,
             '/tmp',
-            'IBL5',
         );
         $result = $step->execute();
 
@@ -69,26 +60,21 @@ class ExtractFromBackupStepTest extends TestCase
         $this->assertStringContainsString('No backup found', $result->detail);
     }
 
-    public function testExtractsFilesFromBackup(): void
+    public function testExtractsZeroFilesFromBackup(): void
     {
         $this->stubLocator->method('findLatestArchive')
             ->willReturn('/tmp/backups/25-26/25-26_15_reg-sim15.zip');
         $this->stubLocator->method('isProperlyNamed')->willReturn(true);
 
-        // EXTENSIONS = ['sco'] — single extension, extraction succeeds
-        $this->stubExtractor->method('extractSingleFile')->willReturn('/tmp/IBL5.sco');
-
         $step = new ExtractFromBackupStep(
             $this->stubLocator,
-            $this->stubExtractor,
             $this->stubSeason,
             '/tmp',
-            'IBL5',
         );
         $result = $step->execute();
 
         $this->assertTrue($result->success);
-        $this->assertStringContainsString('Extracted 1 files', $result->detail);
+        $this->assertStringContainsString('Extracted 0 files', $result->detail);
     }
 
     public function testSkipsRenameForProperlyNamedBackup(): void
@@ -96,47 +82,17 @@ class ExtractFromBackupStepTest extends TestCase
         $this->stubLocator->method('findLatestArchive')
             ->willReturn('/tmp/backups/25-26/25-26_15_reg-sim15.zip');
         $this->stubLocator->method('isProperlyNamed')->willReturn(true);
-        $this->stubExtractor->method('extractSingleFile')->willReturn(false);
-        // Note: extractFiles() builds filenames directly as filePrefix + ext,
-        // not via extractor->jsbFilename(). No jsbFilename stub needed.
 
         $step = new ExtractFromBackupStep(
             $this->stubLocator,
-            $this->stubExtractor,
             $this->stubSeason,
             '/tmp',
-            'IBL5',
         );
         $result = $step->execute();
 
         $this->assertTrue($result->success);
-        // No rename message in messages for properly named files
         foreach ($result->messages as $msg) {
             $this->assertStringNotContainsString('renamed from', $msg);
         }
-    }
-
-    public function testHandlesMissingFilesInArchiveGracefully(): void
-    {
-        $this->stubLocator->method('findLatestArchive')
-            ->willReturn('/tmp/backups/25-26/25-26_15_reg-sim15.zip');
-        $this->stubLocator->method('isProperlyNamed')->willReturn(true);
-
-        // All extractions fail (no files in archive)
-        $this->stubExtractor->method('extractSingleFile')->willReturn(false);
-        // Note: extractFiles() builds filenames directly as filePrefix + ext,
-        // not via extractor->jsbFilename(). No jsbFilename stub needed.
-
-        $step = new ExtractFromBackupStep(
-            $this->stubLocator,
-            $this->stubExtractor,
-            $this->stubSeason,
-            '/tmp',
-            'IBL5',
-        );
-        $result = $step->execute();
-
-        $this->assertTrue($result->success);
-        $this->assertStringContainsString('Extracted 0 files', $result->detail);
     }
 }

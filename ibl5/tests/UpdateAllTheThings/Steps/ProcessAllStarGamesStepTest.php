@@ -8,6 +8,7 @@ use Boxscore\BoxscoreProcessor;
 use Boxscore\BoxscoreRepository;
 use Boxscore\BoxscoreView;
 use PHPUnit\Framework\TestCase;
+use Updater\Contracts\JsbSourceResolverInterface;
 use Updater\Contracts\PipelineStepInterface;
 use Updater\Steps\ProcessAllStarGamesStep;
 
@@ -16,12 +17,14 @@ class ProcessAllStarGamesStepTest extends TestCase
     private BoxscoreProcessor $stubProcessor;
     private BoxscoreRepository $stubRepo;
     private BoxscoreView $stubView;
+    private JsbSourceResolverInterface $stubResolver;
 
     protected function setUp(): void
     {
         $this->stubProcessor = $this->createStub(BoxscoreProcessor::class);
         $this->stubRepo = $this->createStub(BoxscoreRepository::class);
         $this->stubView = $this->createStub(BoxscoreView::class);
+        $this->stubResolver = $this->createStub(JsbSourceResolverInterface::class);
     }
 
     public function testImplementsPipelineStepInterface(): void
@@ -30,7 +33,7 @@ class ProcessAllStarGamesStepTest extends TestCase
             $this->stubProcessor,
             $this->stubRepo,
             $this->stubView,
-            '/tmp/IBL5.sco',
+            $this->stubResolver,
         );
 
         $this->assertInstanceOf(PipelineStepInterface::class, $step);
@@ -42,19 +45,21 @@ class ProcessAllStarGamesStepTest extends TestCase
             $this->stubProcessor,
             $this->stubRepo,
             $this->stubView,
-            '/tmp/IBL5.sco',
+            $this->stubResolver,
         );
 
         $this->assertSame('All-Star games processed', $step->getLabel());
     }
 
-    public function testSkipsWhenFileNotFound(): void
+    public function testSkipsWhenResolverReturnsNull(): void
     {
+        $this->stubResolver->method('getContents')->willReturn(null);
+
         $step = new ProcessAllStarGamesStep(
             $this->stubProcessor,
             $this->stubRepo,
             $this->stubView,
-            '/nonexistent/IBL5.sco',
+            $this->stubResolver,
         );
         $result = $step->execute();
 
@@ -64,23 +69,19 @@ class ProcessAllStarGamesStepTest extends TestCase
 
     public function testSuccessfulProcessingWithoutPendingRenames(): void
     {
-        $this->stubProcessor->method('processAllStarGames')->willReturn([
+        $this->stubResolver->method('getContents')->willReturn('sco data');
+        $this->stubProcessor->method('processAllStarGamesData')->willReturn([
             'success' => true,
             'messages' => [],
         ]);
         $this->stubRepo->method('findAllStarGamesWithDefaultNames')->willReturn([]);
         $this->stubView->method('renderAllStarLog')->willReturn('<div>All-Star OK</div>');
 
-        $path = tempnam(sys_get_temp_dir(), 'sco_test_');
-        if ($path === false) {
-            $this->fail('Failed to create temp file');
-        }
-
         $step = new ProcessAllStarGamesStep(
             $this->stubProcessor,
             $this->stubRepo,
             $this->stubView,
-            $path,
+            $this->stubResolver,
         );
         $result = $step->execute();
 
@@ -91,7 +92,8 @@ class ProcessAllStarGamesStepTest extends TestCase
 
     public function testSuccessfulProcessingWithPendingRenames(): void
     {
-        $this->stubProcessor->method('processAllStarGames')->willReturn([
+        $this->stubResolver->method('getContents')->willReturn('sco data');
+        $this->stubProcessor->method('processAllStarGamesData')->willReturn([
             'success' => true,
             'messages' => [],
         ]);
@@ -102,16 +104,11 @@ class ProcessAllStarGamesStepTest extends TestCase
         $this->stubView->method('renderAllStarLog')->willReturn('<div>Log</div>');
         $this->stubView->method('renderAllStarRenameUI')->willReturn('<div>Rename UI</div>');
 
-        $path = tempnam(sys_get_temp_dir(), 'sco_test_');
-        if ($path === false) {
-            $this->fail('Failed to create temp file');
-        }
-
         $step = new ProcessAllStarGamesStep(
             $this->stubProcessor,
             $this->stubRepo,
             $this->stubView,
-            $path,
+            $this->stubResolver,
         );
         $result = $step->execute();
 

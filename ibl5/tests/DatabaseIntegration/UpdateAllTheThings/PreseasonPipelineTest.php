@@ -24,9 +24,9 @@ class PreseasonPipelineTest extends PipelineIntegrationTestCase
             ['pid' => 200001, 'name' => 'Preseason Player A', 'teamid' => 1, 'ordinal' => 1],
             ['pid' => 200002, 'name' => 'Preseason Player B', 'teamid' => 2, 'ordinal' => 2],
         ]);
-        $scoPath = $this->buildScoFile();
+        $this->buildScoFile();
 
-        $pipeline = $this->buildPipeline($season, $schPath, $scoPath);
+        $pipeline = $this->buildPipeline($season, $schPath);
         $results = $this->runPipeline($pipeline);
 
         $this->assertZeroPipelineErrors($pipeline, $results);
@@ -56,9 +56,9 @@ class PreseasonPipelineTest extends PipelineIntegrationTestCase
             ['pid' => 200001, 'name' => 'Playoff Player A', 'teamid' => 1, 'ordinal' => 1],
             ['pid' => 200002, 'name' => 'Playoff Player B', 'teamid' => 2, 'ordinal' => 2],
         ]);
-        $scoPath = $this->buildScoFile();
+        $this->buildScoFile();
 
-        $pipeline = $this->buildPipeline($season, $schPath, $scoPath);
+        $pipeline = $this->buildPipeline($season, $schPath);
         $results = $this->runPipeline($pipeline);
 
         $this->assertZeroPipelineErrors($pipeline, $results);

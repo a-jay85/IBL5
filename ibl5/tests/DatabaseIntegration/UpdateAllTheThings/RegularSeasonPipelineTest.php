@@ -29,9 +29,9 @@ class RegularSeasonPipelineTest extends PipelineIntegrationTestCase
             ['pid' => 200003, 'name' => 'RS Player C', 'teamid' => 3, 'ordinal' => 3],
             ['pid' => 200004, 'name' => 'RS Player D', 'teamid' => 4, 'ordinal' => 4],
         ]);
-        $scoPath = $this->buildScoFile();
+        $this->buildScoFile();
 
-        $pipeline = $this->buildPipeline($season, $schPath, $scoPath);
+        $pipeline = $this->buildPipeline($season, $schPath);
         $results = $this->runPipeline($pipeline);
 
         $this->assertZeroPipelineErrors($pipeline, $results);

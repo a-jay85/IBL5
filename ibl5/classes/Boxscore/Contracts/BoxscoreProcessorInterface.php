@@ -37,6 +37,19 @@ interface BoxscoreProcessorInterface
     public function processScoFile(string $filePath, int $seasonEndingYear, string $seasonPhase, bool $skipSimDates = false): array;
 
     /**
+     * Process .sco data from a string and insert/update boxscore records
+     *
+     * Same as processScoFile() but accepts raw binary data instead of a file path.
+     *
+     * @param string $data Raw .sco file contents (must be at least HEADER_OFFSET_BYTES long)
+     * @param int $seasonEndingYear Season ending year (0 to use current season)
+     * @param string $seasonPhase Season phase (empty to use current phase)
+     * @param bool $skipSimDates When true, skip updating ibl_sim_dates
+     * @return array{success: bool, gamesInserted: int, gamesUpdated: int, gamesSkipped: int, linesProcessed: int, messages: list<string>, error?: string}
+     */
+    public function processScoData(string $data, int $seasonEndingYear, string $seasonPhase, bool $skipSimDates = false): array;
+
+    /**
      * Process All-Star Weekend games from the first 4000 bytes of a .sco file
      *
      * Block 0 (bytes 0–1999): Rising Stars Game (Rookies vs Sophomores)
@@ -48,6 +61,20 @@ interface BoxscoreProcessorInterface
      */
     public function processAllStarGames(
         string $filePath,
+        int $seasonEndingYear,
+    ): array;
+
+    /**
+     * Process All-Star Weekend games from raw .sco data
+     *
+     * Same as processAllStarGames() but accepts raw binary data instead of a file path.
+     *
+     * @param string $data Raw .sco file contents (first 4000 bytes used)
+     * @param int $seasonEndingYear Season ending year
+     * @return array{success: bool, messages: list<string>, skipped?: string}
+     */
+    public function processAllStarGamesData(
+        string $data,
         int $seasonEndingYear,
     ): array;
 }

@@ -49,6 +49,10 @@ LOG="$LOG_DIR/$(date +%Y-%m-%d).log"
 
 cd "$REPO"
 
+# Prevent macOS from sleeping while we run (released automatically on exit)
+caffeinate -s -w $$ &
+CAFFEINATE_PID=$!
+
 # Clean up one-shot resume plist if this IS a resume run
 if [ -f "$RESUME_PLIST" ]; then
     launchctl bootout "gui/$(id -u)/com.ibl5.nightly-resume" 2>/dev/null || true

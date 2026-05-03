@@ -45,7 +45,7 @@ class LeagueControlPanelProcessor implements LeagueControlPanelProcessorInterfac
      */
     public function dispatch(string $action, array $postData): array
     {
-        return match ($action) {
+        $result = match ($action) {
             'set_season_phase' => $this->setSeasonPhase($postData),
             'set_sim_length' => $this->setSimLength($postData),
             'set_allow_trades' => $this->setAllowTrades($postData),
@@ -66,6 +66,15 @@ class LeagueControlPanelProcessor implements LeagueControlPanelProcessorInterfac
             'set_finals_mvp' => $this->setFinalsMvp($postData),
             default => ['success' => false, 'message' => 'Unknown action: ' . $action],
         };
+
+        if ($result['success']) {
+            \Logging\LoggerFactory::getChannel('admin')->info('admin_action', [
+                'action' => $action,
+                'message' => $result['message'],
+            ]);
+        }
+
+        return $result;
     }
 
     /**

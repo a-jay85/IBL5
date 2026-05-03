@@ -16,21 +16,7 @@ use Monolog\Processor\UidProcessor;
 use Monolog\Processor\WebProcessor;
 use Psr\Log\LoggerInterface;
 
-/**
- * Creates named PSR-3 logger instances backed by Monolog.
- *
- * All channels share a single RotatingFileHandler writing JSON to logs/ibl5-YYYY-MM-DD.log.
- * CLI scripts automatically get an additional stdout handler at INFO level.
- *
- * Usage:
- *   LoggerFactory::channel('db')->error('Query failed', ['query' => $sql]);
- *   LoggerFactory::channel('discord')->warning('DM skipped', ['team' => $name]);
- *
- * Note: The static accessor (getChannel) exists until Bootstrap\Container is wired into
- * mainfile.php. Once that happens, inject LoggerFactoryInterface via the container instead.
- *
- * @phpstan-type LoggingConfig array{log_dir: string|null, level: string, retention: int}
- */
+/** @phpstan-type LoggingConfig array{log_dir: string|null, level: string, retention: int, channel_retention?: array<string, int>, discord_webhook_url?: string|null, discord_alert_level?: string} */
 class LoggerFactory implements LoggerFactoryInterface
 {
     private static ?self $instance = null;
@@ -46,6 +32,9 @@ class LoggerFactory implements LoggerFactoryInterface
     /** @var list<ProcessorInterface> */
     private array $processors;
 
+    /** @var array<string, \Monolog\Handler\HandlerInterface> */
+    private array $channelHandlers = [];
+
     /** @var LoggingConfig */
     private const DEFAULT_CONFIG = [
         'log_dir' => null,
@@ -56,20 +45,16 @@ class LoggerFactory implements LoggerFactoryInterface
     /**
      * @param list<\Monolog\Handler\HandlerInterface> $handlers
      * @param list<ProcessorInterface> $processors
+     * @param array<string, \Monolog\Handler\HandlerInterface> $channelHandlers
      */
-    private function __construct(array $handlers, array $processors = [])
+    private function __construct(array $handlers, array $processors = [], array $channelHandlers = [])
     {
         $this->handlers = $handlers;
         $this->processors = $processors;
+        $this->channelHandlers = $channelHandlers;
         self::$instance = $this;
     }
 
-    /**
-     * Create a factory from the config file.
-     *
-     * Loads config/logging.config.php if it exists, falls back to
-     * config/logging.config.example.php, then to hardcoded defaults.
-     */
     public static function fromConfig(): self
     {
         $configPath = self::resolveConfigDir() . '/logging.config.php';
@@ -94,26 +79,56 @@ class LoggerFactory implements LoggerFactoryInterface
 
         $retention = is_int($config['retention'] ?? null) ? $config['retention'] : 30;
 
+        $formatter = new JsonFormatter();
+        $formatter->includeStacktraces(true);
+
         $handler = new RotatingFileHandler(
             $logDir . '/ibl5.log',
             $retention,
             $level,
         );
-
-        $formatter = new JsonFormatter();
-        $formatter->includeStacktraces(true);
         $handler->setFormatter($formatter);
 
         /** @var list<\Monolog\Handler\HandlerInterface> $handlers */
         $handlers = [$handler];
 
-        // CLI scripts get an additional stdout handler at INFO level
         if (PHP_SAPI === 'cli') {
             $cliHandler = new StreamHandler('php://stdout', Level::Info);
             $handlers[] = $cliHandler;
         }
 
+        $webhookUrl = $config['discord_webhook_url'] ?? null;
+        if (is_string($webhookUrl) && $webhookUrl !== '') {
+            $alertLevelName = is_string($config['discord_alert_level'] ?? null)
+                ? strtolower($config['discord_alert_level'])
+                : 'error';
+            $alertLevel = self::parseLevel($alertLevelName);
+            $handlers[] = new DiscordWebhookHandler($webhookUrl, $alertLevel);
+        }
+
+        /** @var array<string, int> $channelRetention */
+        $channelRetention = is_array($config['channel_retention'] ?? null)
+            ? $config['channel_retention']
+            : [];
+
+        /** @var array<string, \Monolog\Handler\HandlerInterface> $channelHandlers */
+        $channelHandlers = [];
+        foreach ($channelRetention as $channel => $days) {
+            if (!is_string($channel) || !is_int($days)) {
+                continue;
+            }
+            $channelHandler = new RotatingFileHandler(
+                $logDir . '/ibl5-' . $channel . '.log',
+                $days,
+                $level,
+            );
+            $channelHandler->setFormatter($formatter);
+            $channelHandlers[$channel] = $channelHandler;
+        }
+
+        // PiiRedactionProcessor must be pushed first so it runs last (after WebProcessor/UserContextProcessor populate extra)
         $processors = [
+            new PiiRedactionProcessor(),
             new UidProcessor(7),
             new WebProcessor(),
             new UserContextProcessor(),
@@ -123,27 +138,29 @@ class LoggerFactory implements LoggerFactoryInterface
             ? $config['slow_query_threshold_ms']
             : 200;
 
-        return new self($handlers, $processors);
+        return new self($handlers, $processors, $channelHandlers);
     }
 
-    /**
-     * Create a factory with a NullHandler for tests (no file I/O, no output).
-     */
     public static function forTests(): self
     {
-        self::$slowQueryThresholdMs = 0;
-        return new self([new NullHandler()]);
+        return self::forTesting(new NullHandler());
     }
 
-    /**
-     * Get a logger for the given channel.
-     *
-     * @see LoggerFactoryInterface::channel()
-     */
+    public static function forTesting(\Monolog\Handler\HandlerInterface $handler): self
+    {
+        self::$slowQueryThresholdMs = 0;
+        return new self([$handler]);
+    }
+
+    /** @see LoggerFactoryInterface::channel() */
     public function channel(string $channel): LoggerInterface
     {
         if (!isset($this->channels[$channel])) {
             $logger = new Logger($channel);
+
+            if (isset($this->channelHandlers[$channel])) {
+                $logger->pushHandler($this->channelHandlers[$channel]);
+            }
             foreach ($this->handlers as $handler) {
                 $logger->pushHandler($handler);
             }
@@ -156,16 +173,9 @@ class LoggerFactory implements LoggerFactoryInterface
         return $this->channels[$channel];
     }
 
-    /**
-     * Static accessor for the singleton instance's channel method.
-     *
-     * Falls back to a NullHandler logger if no instance has been initialized
-     * (e.g. during early bootstrap or in edge-case code paths).
-     */
     public static function getChannel(string $channel): LoggerInterface
     {
         if (self::$instance === null) {
-            // Lazy fallback — avoids crashes if called before fromConfig()
             self::forTests();
         }
 
@@ -175,19 +185,12 @@ class LoggerFactory implements LoggerFactoryInterface
         return $instance->channel($channel);
     }
 
-    /**
-     * Clear the singleton (for test teardown).
-     */
     public static function reset(): void
     {
         self::$instance = null;
         self::$slowQueryThresholdMs = 200;
     }
 
-    /**
-     * Get the configured slow query threshold in milliseconds.
-     * Returns 0 if slow query logging is disabled.
-     */
     public static function getSlowQueryThresholdMs(): int
     {
         return self::$slowQueryThresholdMs;
@@ -209,30 +212,24 @@ class LoggerFactory implements LoggerFactoryInterface
 
     private static function resolveConfigDir(): string
     {
-        // When running from ibl5/ directory (normal app context)
         if (is_dir('config')) {
             return 'config';
         }
 
-        // When running from project root or tests
         if (is_dir('ibl5/config')) {
             return 'ibl5/config';
         }
 
-        // Absolute fallback based on this file's location
         return dirname(__DIR__, 2) . '/config';
     }
 
     private static function resolveLogDir(): string
     {
-        // When running from ibl5/ directory
         if (is_dir('logs') || is_dir('config')) {
             $dir = 'logs';
         } elseif (is_dir('ibl5/logs') || is_dir('ibl5/config')) {
-            // When running from project root
             $dir = 'ibl5/logs';
         } else {
-            // Absolute fallback
             $dir = dirname(__DIR__, 2) . '/logs';
         }
 

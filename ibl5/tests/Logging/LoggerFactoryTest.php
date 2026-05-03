@@ -5,8 +5,12 @@ declare(strict_types=1);
 namespace Tests\Logging;
 
 use Logging\Contracts\LoggerFactoryInterface;
+use Logging\DiscordWebhookHandler;
 use Logging\LoggerFactory;
+use Logging\PiiRedactionProcessor;
 use Monolog\Handler\NullHandler;
+use Monolog\Handler\RotatingFileHandler;
+use Monolog\Handler\TestHandler;
 use Monolog\Logger;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\LoggerInterface;
@@ -52,7 +56,6 @@ class LoggerFactoryTest extends TestCase
         $logger = $factory->channel('test');
         $this->assertInstanceOf(Logger::class, $logger);
 
-        // Verify NullHandler is present (no file I/O)
         /** @var Logger $monologLogger */
         $monologLogger = $logger;
         $handlers = $monologLogger->getHandlers();
@@ -62,7 +65,6 @@ class LoggerFactoryTest extends TestCase
 
     public function testFromConfigLoadsDefaults(): void
     {
-        // fromConfig() should succeed even without a config file
         $factory = LoggerFactory::fromConfig();
 
         $logger = $factory->channel('app');
@@ -79,7 +81,6 @@ class LoggerFactoryTest extends TestCase
         $factory2 = LoggerFactory::forTests();
         $logger2 = LoggerFactory::getChannel('test');
 
-        // After reset, the singleton is a new instance, so channels are new
         $this->assertNotSame($logger1, $logger2);
     }
 
@@ -87,7 +88,6 @@ class LoggerFactoryTest extends TestCase
     {
         LoggerFactory::reset();
 
-        // getChannel() should not throw even if no factory has been initialized
         $logger = LoggerFactory::getChannel('fallback');
         $this->assertInstanceOf(LoggerInterface::class, $logger);
     }
@@ -116,7 +116,7 @@ class LoggerFactoryTest extends TestCase
         /** @var Logger $logger */
         $logger = $factory->channel('app');
 
-        $this->assertCount(3, $logger->getProcessors());
+        $this->assertCount(4, $logger->getProcessors());
     }
 
     public function testForTestsHasNoProcessors(): void
@@ -141,5 +141,109 @@ class LoggerFactoryTest extends TestCase
         LoggerFactory::forTests();
 
         $this->assertSame(0, LoggerFactory::getSlowQueryThresholdMs());
+    }
+
+    public function testForTestingUsesProvidedHandler(): void
+    {
+        $handler = new TestHandler();
+        $factory = LoggerFactory::forTesting($handler);
+
+        /** @var Logger $logger */
+        $logger = $factory->channel('test');
+
+        $handlers = $logger->getHandlers();
+        $this->assertCount(1, $handlers);
+        $this->assertSame($handler, $handlers[0]);
+    }
+
+    // --- Per-channel retention ---
+
+    public function testAuditChannelGetsDedicatedHandler(): void
+    {
+        $factory = LoggerFactory::fromConfig();
+
+        /** @var Logger $logger */
+        $logger = $factory->channel('audit');
+
+        $handlers = $logger->getHandlers();
+        $rotatingHandlers = array_filter(
+            $handlers,
+            static fn ($h): bool => $h instanceof RotatingFileHandler,
+        );
+
+        // audit should have its own RotatingFileHandler + the shared one
+        $this->assertGreaterThanOrEqual(2, count($rotatingHandlers));
+    }
+
+    public function testAdminChannelGetsDedicatedHandler(): void
+    {
+        $factory = LoggerFactory::fromConfig();
+
+        /** @var Logger $logger */
+        $logger = $factory->channel('admin');
+
+        $handlers = $logger->getHandlers();
+        $rotatingHandlers = array_filter(
+            $handlers,
+            static fn ($h): bool => $h instanceof RotatingFileHandler,
+        );
+
+        $this->assertGreaterThanOrEqual(2, count($rotatingHandlers));
+    }
+
+    public function testRegularChannelUsesSharedHandler(): void
+    {
+        $factory = LoggerFactory::fromConfig();
+
+        /** @var Logger $auditLogger */
+        $auditLogger = $factory->channel('audit');
+
+        /** @var Logger $appLogger */
+        $appLogger = $factory->channel('app');
+
+        $auditRotating = array_filter(
+            $auditLogger->getHandlers(),
+            static fn ($h): bool => $h instanceof RotatingFileHandler,
+        );
+
+        $appRotating = array_filter(
+            $appLogger->getHandlers(),
+            static fn ($h): bool => $h instanceof RotatingFileHandler,
+        );
+
+        // audit has 2 RotatingFileHandlers (dedicated + shared), app has 1 (shared only)
+        $this->assertGreaterThan(count($appRotating), count($auditRotating));
+    }
+
+    // --- Discord handler ---
+
+    public function testDiscordHandlerNotAddedWhenUrlNull(): void
+    {
+        $factory = LoggerFactory::fromConfig();
+
+        /** @var Logger $logger */
+        $logger = $factory->channel('app');
+
+        $discordHandlers = array_filter(
+            $logger->getHandlers(),
+            static fn ($h): bool => $h instanceof DiscordWebhookHandler,
+        );
+
+        $this->assertCount(0, $discordHandlers);
+    }
+
+    public function testFromConfigIncludesPiiRedactionProcessor(): void
+    {
+        $factory = LoggerFactory::fromConfig();
+
+        /** @var Logger $logger */
+        $logger = $factory->channel('app');
+
+        $piiProcessors = array_filter(
+            $logger->getProcessors(),
+            static fn ($p): bool => $p instanceof PiiRedactionProcessor,
+        );
+
+        $this->assertCount(1, $piiProcessors);
     }
 }

@@ -7,13 +7,15 @@ namespace Updater\Steps;
 use Boxscore\BoxscoreProcessor;
 use Boxscore\BoxscoreRepository;
 use Boxscore\BoxscoreView;
+use Updater\Contracts\JsbSourceResolverInterface;
 use Updater\Contracts\PipelineStepInterface;
 use Updater\StepResult;
 
 /**
  * Step 9: Process All-Star games from .sco file.
  *
- * Skips if the .sco file is missing. Also checks for All-Star team renaming needs.
+ * Reads .sco data via the archive-first resolver. Skips if no .sco source is available.
+ * Also checks for All-Star team renaming needs.
  */
 class ProcessAllStarGamesStep implements PipelineStepInterface
 {
@@ -21,7 +23,7 @@ class ProcessAllStarGamesStep implements PipelineStepInterface
         private readonly BoxscoreProcessor $processor,
         private readonly BoxscoreRepository $boxscoreRepo,
         private readonly BoxscoreView $view,
-        private readonly string $scoPath,
+        private readonly JsbSourceResolverInterface $sourceResolver,
     ) {
     }
 
@@ -32,11 +34,12 @@ class ProcessAllStarGamesStep implements PipelineStepInterface
 
     public function execute(): StepResult
     {
-        if (!is_file($this->scoPath)) {
+        $data = $this->sourceResolver->getContents('sco');
+        if ($data === null) {
             return StepResult::skipped('All-Star games', 'No IBL5.sco file found (skipped)');
         }
 
-        $allStarResult = $this->processor->processAllStarGames($this->scoPath, 0);
+        $allStarResult = $this->processor->processAllStarGamesData($data, 0);
         $inlineHtml = $this->view->renderAllStarLog($allStarResult);
 
         $pendingDefaults = $this->boxscoreRepo->findAllStarGamesWithDefaultNames();

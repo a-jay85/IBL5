@@ -52,9 +52,9 @@ class PreseasonTransitionPipelineTest extends PipelineIntegrationTestCase
             ['pid' => 200001, 'name' => 'Pipeline Player A', 'teamid' => 1, 'ordinal' => 1],
             ['pid' => 200002, 'name' => 'Pipeline Player B', 'teamid' => 2, 'ordinal' => 2],
         ]);
-        $scoPath = $this->buildScoFile();
+        $this->buildScoFile();
 
-        $pipeline = $this->buildPipeline($season, $schPath, $scoPath);
+        $pipeline = $this->buildPipeline($season, $schPath);
         $results = $this->runPipeline($pipeline);
 
         $this->assertZeroPipelineErrors($pipeline, $results);

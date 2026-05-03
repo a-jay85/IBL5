@@ -191,7 +191,7 @@ class BoxscoreProcessorTest extends TestCase
         $olympicsContext->method('getTableName')->willReturnArgument(0);
 
         $processor = new BoxscoreProcessor($this->mockDb, null, null, $olympicsContext);
-        $result = $processor->processAllStarGames('/nonexistent/file.sco', 2025);
+        $result = $processor->processAllStarGamesData('dummy data', 2025);
 
         $this->assertTrue($result['success']);
         $this->assertSame('Olympics context', $result['skipped']);
@@ -543,24 +543,23 @@ class BoxscoreProcessorTest extends TestCase
 
     // --- processAllStarGames tests ---
 
-    public function testProcessAllStarGamesSkipsBeforeCutoff(): void
+    public function testProcessAllStarGamesDataSkipsBeforeCutoff(): void
     {
         $mockDb = new \MockDatabase();
         $mockDb->setReturnTrue(true);
 
         $repository = new BoxscoreRepository($mockDb);
         $seasonStub = $this->createStub(Season::class);
-        // Last box score date is before the All-Star cutoff (Feb 4)
         $seasonStub->method('getLastBoxScoreDate')->willReturn('2026-01-15');
 
         $processor = new BoxscoreProcessor($mockDb, $repository, $seasonStub);
-        $result = $processor->processAllStarGames('/nonexistent/file.sco', 2026);
+        $result = $processor->processAllStarGamesData('dummy data', 2026);
 
         $this->assertTrue($result['success']);
         $this->assertSame('All-Star Weekend not yet reached', $result['skipped']);
     }
 
-    public function testProcessAllStarGamesSkipsWhenNoBoxScoreDateExists(): void
+    public function testProcessAllStarGamesDataSkipsWhenNoBoxScoreDateExists(): void
     {
         $mockDb = new \MockDatabase();
         $mockDb->setReturnTrue(true);
@@ -570,10 +569,53 @@ class BoxscoreProcessorTest extends TestCase
         $seasonStub->method('getLastBoxScoreDate')->willReturn('');
 
         $processor = new BoxscoreProcessor($mockDb, $repository, $seasonStub);
-        $result = $processor->processAllStarGames('/nonexistent/file.sco', 2026);
+        $result = $processor->processAllStarGamesData('dummy data', 2026);
 
         $this->assertTrue($result['success']);
         $this->assertSame('All-Star Weekend not yet reached', $result['skipped']);
+    }
+
+    public function testProcessScoDataReturnsErrorForTooShortData(): void
+    {
+        $mockDb = new \MockDatabase();
+        $mockDb->setReturnTrue(true);
+
+        $repository = new BoxscoreRepository($mockDb);
+        $seasonStub = $this->createStub(Season::class);
+        $seasonStub->lastSimEndDate = '';
+
+        $processor = new BoxscoreProcessor($mockDb, $repository, $seasonStub);
+        $result = $processor->processScoData('too short', 2026, 'Regular Season');
+
+        $this->assertFalse($result['success']);
+        $this->assertArrayHasKey('error', $result);
+        $this->assertStringContainsString('too short', $result['error']);
+    }
+
+    public function testProcessScoDataInsertsNewGame(): void
+    {
+        $mockDb = new \MockDatabase();
+        $mockDb->setReturnTrue(true);
+        $mockDb->onQuery('(?s)SELECT.*ibl_box_scores_teams.*WHERE', []);
+
+        $repository = new BoxscoreRepository($mockDb);
+        $seasonStub = $this->createStub(Season::class);
+        $seasonStub->lastSimEndDate = '';
+        $seasonStub->method('getLastBoxScoreDate')->willReturn('2026-01-11');
+        $seasonStub->method('getFirstBoxScoreDate')->willReturn('2026-01-11');
+        $seasonStub->method('setLastSimDatesArray')->willReturn(1);
+
+        $scoFile = $this->buildScoFileWithOneGame($this->buildGameInfoLine(3, 10));
+        $data = file_get_contents($scoFile);
+        $this->assertNotFalse($data);
+
+        $processor = new BoxscoreProcessor($mockDb, $repository, $seasonStub);
+        $result = $processor->processScoData($data, 2026, 'Regular Season/Playoffs', skipSimDates: true);
+
+        $this->assertTrue($result['success']);
+        $this->assertSame(1, $result['gamesInserted']);
+        $this->assertSame(0, $result['gamesSkipped']);
+        $this->assertGreaterThan(0, $result['linesProcessed']);
     }
 
     // --- Helper methods ---

@@ -253,7 +253,6 @@ abstract class PipelineIntegrationTestCase extends DatabaseTestCase
     protected function buildPipeline(
         Season $season,
         string $schPath,
-        string $scoPath,
     ): UpdaterService {
         $service = new UpdaterService();
 
@@ -319,11 +318,11 @@ abstract class PipelineIntegrationTestCase extends DatabaseTestCase
         ));
 
         $service->addStep(new Steps\ProcessBoxscoresStep(
-            $boxscoreProcessor, $boxscoreView, $scoPath,
+            $boxscoreProcessor, $boxscoreView, $jsbFileResolver,
         ));
 
         $service->addStep(new Steps\ProcessAllStarGamesStep(
-            $boxscoreProcessor, $boxscoreRepo, $boxscoreView, $scoPath,
+            $boxscoreProcessor, $boxscoreRepo, $boxscoreView, $jsbFileResolver,
         ));
 
         $service->addStep(new Steps\ParseJsbFilesStep($jsbService, $jsbFileResolver, $season->endingYear));

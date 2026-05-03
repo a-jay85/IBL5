@@ -7,6 +7,7 @@ namespace Tests\UpdateAllTheThings\Steps;
 use Boxscore\BoxscoreProcessor;
 use Boxscore\BoxscoreView;
 use PHPUnit\Framework\TestCase;
+use Updater\Contracts\JsbSourceResolverInterface;
 use Updater\Contracts\PipelineStepInterface;
 use Updater\Steps\ProcessBoxscoresStep;
 
@@ -14,30 +15,34 @@ class ProcessBoxscoresStepTest extends TestCase
 {
     private BoxscoreProcessor $stubProcessor;
     private BoxscoreView $stubView;
+    private JsbSourceResolverInterface $stubResolver;
 
     protected function setUp(): void
     {
         $this->stubProcessor = $this->createStub(BoxscoreProcessor::class);
         $this->stubView = $this->createStub(BoxscoreView::class);
+        $this->stubResolver = $this->createStub(JsbSourceResolverInterface::class);
     }
 
     public function testImplementsPipelineStepInterface(): void
     {
-        $step = new ProcessBoxscoresStep($this->stubProcessor, $this->stubView, '/tmp/IBL5.sco');
+        $step = new ProcessBoxscoresStep($this->stubProcessor, $this->stubView, $this->stubResolver);
 
         $this->assertInstanceOf(PipelineStepInterface::class, $step);
     }
 
     public function testGetLabelReturnsExpectedLabel(): void
     {
-        $step = new ProcessBoxscoresStep($this->stubProcessor, $this->stubView, '/tmp/IBL5.sco');
+        $step = new ProcessBoxscoresStep($this->stubProcessor, $this->stubView, $this->stubResolver);
 
         $this->assertSame('Boxscores processed', $step->getLabel());
     }
 
-    public function testSkipsWhenFileNotFound(): void
+    public function testSkipsWhenResolverReturnsNull(): void
     {
-        $step = new ProcessBoxscoresStep($this->stubProcessor, $this->stubView, '/nonexistent/IBL5.sco');
+        $this->stubResolver->method('getContents')->willReturn(null);
+
+        $step = new ProcessBoxscoresStep($this->stubProcessor, $this->stubView, $this->stubResolver);
         $result = $step->execute();
 
         $this->assertTrue($result->success);
@@ -55,15 +60,11 @@ class ProcessBoxscoresStepTest extends TestCase
             'messages' => [],
         ];
 
-        $this->stubProcessor->method('processScoFile')->willReturn($scoResult);
+        $this->stubResolver->method('getContents')->willReturn('sco data');
+        $this->stubProcessor->method('processScoData')->willReturn($scoResult);
         $this->stubView->method('renderParseLog')->willReturn('<div>10 games inserted</div>');
 
-        $path = tempnam(sys_get_temp_dir(), 'sco_test_');
-        if ($path === false) {
-            $this->fail('Failed to create temp file');
-        }
-
-        $step = new ProcessBoxscoresStep($this->stubProcessor, $this->stubView, $path);
+        $step = new ProcessBoxscoresStep($this->stubProcessor, $this->stubView, $this->stubResolver);
         $result = $step->execute();
 
         $this->assertTrue($result->success);

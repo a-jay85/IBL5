@@ -131,8 +131,6 @@ try {
     // --- Pipeline: register all steps and delegate to controller ---
     $updaterService = new Updater\UpdaterService();
 
-    $defaultScoPath = $basePath . '/' . $filePrefix . '.sco';
-
     $lgeRepo = new LeagueConfig\LeagueConfigRepository($mysqli_db, $leagueContext);
     $lgeService = new LeagueConfig\LeagueConfigService($lgeRepo);
     $lgeView = new LeagueConfig\LeagueConfigView();
@@ -154,7 +152,7 @@ try {
     $archiveExtractor = new BulkImport\ArchiveExtractor();
     $backupLocator = new BulkImport\BackupArchiveLocator($archiveExtractor);
     $updaterService->addStep(new Updater\Steps\ExtractFromBackupStep(
-        $backupLocator, $archiveExtractor, $season, $basePath, $filePrefix,
+        $backupLocator, $season, $basePath,
     ));
 
     // JsbSourceResolver reads .lge/.sch directly from archive (disk-fallback)
@@ -205,13 +203,13 @@ try {
     ));
 
     $updaterService->addStep(new Updater\Steps\ProcessBoxscoresStep(
-        $boxscoreProcessor, $boxscoreView, $defaultScoPath,
+        $boxscoreProcessor, $boxscoreView, $sourceResolver,
     ));
 
     // IBL-only: All-Star games don't exist in Olympics
     if (!$isOlympics) {
         $updaterService->addStep(new Updater\Steps\ProcessAllStarGamesStep(
-            $boxscoreProcessor, $boxscoreRepo, $boxscoreView, $defaultScoPath,
+            $boxscoreProcessor, $boxscoreRepo, $boxscoreView, $sourceResolver,
         ));
         $updaterService->addStep(new Updater\Steps\RefreshPlayoffSeriesResultsStep($mysqli_db));
         $updaterService->addStep(new Updater\Steps\RefreshTeamSeasonRecordsStep($mysqli_db));

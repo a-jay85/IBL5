@@ -8,10 +8,12 @@ use Auth\Contracts\AuthServiceInterface;
 use Mail\Contracts\MailServiceInterface;
 use PHPUnit\Framework\TestCase;
 use Services\CommonMysqliRepository;
+use Tests\Support\AuthLogAssertions;
 use YourAccount\YourAccountService;
 
 class YourAccountServiceTest extends TestCase
 {
+    use AuthLogAssertions;
     /** @var AuthServiceInterface&\PHPUnit\Framework\MockObject\Stub */
     private AuthServiceInterface $stubAuthService;
 
@@ -25,11 +27,18 @@ class YourAccountServiceTest extends TestCase
 
     protected function setUp(): void
     {
+        $this->setUpAuthLogCapture();
+
         $this->stubAuthService = $this->createStub(AuthServiceInterface::class);
         $this->stubCommonRepository = $this->createStub(CommonMysqliRepository::class);
         $this->stubMailService = $this->createStub(MailServiceInterface::class);
 
         $this->service = $this->buildService();
+    }
+
+    protected function tearDown(): void
+    {
+        $this->tearDownAuthLogCapture();
     }
 
     private function buildService(
@@ -557,5 +566,121 @@ class YourAccountServiceTest extends TestCase
         $result = $this->service->getTeamRedirectUrl('testuser');
 
         $this->assertNull($result);
+    }
+
+    // ─── Auth Logging ────────────────────────────────────────────────
+
+    public function testLoginSuccessEmitsAuthLog(): void
+    {
+        $this->stubAuthService->method('attempt')->willReturn(true);
+
+        $this->service->attemptLogin('testuser', 'pass123', false, '192.168.1.1');
+
+        $this->assertAuthLogEmitted('login_success');
+        $this->assertAuthLogContext('login_success', [
+            'username' => 'testuser',
+            'client_ip' => '192.168.1.1',
+        ]);
+    }
+
+    public function testLoginFailedEmitsWarningAuthLog(): void
+    {
+        $this->stubAuthService->method('attempt')->willReturn(false);
+        $this->stubAuthService->method('getLastError')->willReturn('Invalid credentials');
+
+        $this->service->attemptLogin('baduser', 'wrongpass', false, '10.0.0.5');
+
+        $this->assertAuthWarningLogEmitted('login_failed');
+        $this->assertAuthWarningLogContext('login_failed', [
+            'username' => 'baduser',
+            'client_ip' => '10.0.0.5',
+            'error' => 'Invalid credentials',
+        ]);
+    }
+
+    public function testRegisterUserSuccessEmitsAuthLog(): void
+    {
+        $mockAuth = $this->createMock(AuthServiceInterface::class);
+        $mockAuth->expects($this->once())
+            ->method('register')
+            ->willReturnCallback(static function (string $email, string $password, string $username, ?callable $callback): int {
+                return 1;
+            });
+
+        $this->service = $this->buildService(authService: $mockAuth);
+        $this->service->registerUser('newgm', 'gm@test.com', 'password1', 'password1');
+
+        $this->assertAuthLogEmitted('user_registered');
+        $this->assertAuthLogContext('user_registered', [
+            'username' => 'newgm',
+        ]);
+    }
+
+    public function testPasswordResetRequestedEmitsAuthLog(): void
+    {
+        $mockAuth = $this->createMock(AuthServiceInterface::class);
+        $mockAuth->expects($this->once())
+            ->method('forgotPassword')
+            ->willReturnCallback(static function (string $email, callable $callback): void {
+                $callback('sel', 'tok');
+            });
+        $mockAuth->method('getLastError')->willReturn(null);
+
+        $this->service = $this->buildService(authService: $mockAuth);
+        $this->service->requestPasswordReset('user@test.com');
+
+        $this->assertAuthLogEmitted('password_reset_requested');
+    }
+
+    public function testPasswordResetRequestedDoesNotLogEmail(): void
+    {
+        $mockAuth = $this->createMock(AuthServiceInterface::class);
+        $mockAuth->expects($this->once())
+            ->method('forgotPassword')
+            ->willReturnCallback(static function (string $email, callable $callback): void {
+                $callback('sel', 'tok');
+            });
+        $mockAuth->method('getLastError')->willReturn(null);
+
+        $this->service = $this->buildService(authService: $mockAuth);
+        $this->service->requestPasswordReset('secret@private.com');
+
+        $this->assertAuthLogContextMissing('password_reset_requested', 'email');
+    }
+
+    public function testPasswordResetCompletedEmitsAuthLog(): void
+    {
+        $mockAuth = $this->createMock(AuthServiceInterface::class);
+        $mockAuth->expects($this->once())->method('resetPassword');
+
+        $this->service = $this->buildService(authService: $mockAuth);
+        $this->service->resetPassword('sel', 'tok', 'newpass', 'newpass');
+
+        $this->assertAuthLogEmitted('password_reset_completed');
+    }
+
+    public function testResetPasswordDoesNotLogPasswordMaterial(): void
+    {
+        $mockAuth = $this->createMock(AuthServiceInterface::class);
+        $mockAuth->expects($this->once())->method('resetPassword');
+
+        $this->service = $this->buildService(authService: $mockAuth);
+        $this->service->resetPassword('sel', 'tok', 'secretpass', 'secretpass');
+
+        $this->assertAuthLogContextMissing('password_reset_completed', 'password');
+        $this->assertAuthLogContextMissing('password_reset_completed', 'newPassword');
+        $this->assertAuthLogContextMissing('password_reset_completed', 'token');
+        $this->assertAuthLogContextMissing('password_reset_completed', 'selector');
+    }
+
+    public function testLogoutEmitsAuthLog(): void
+    {
+        $mockAuth = $this->createMock(AuthServiceInterface::class);
+        $mockAuth->expects($this->once())->method('logout');
+
+        $this->service = $this->buildService(authService: $mockAuth);
+        $this->service->logout();
+
+        $this->assertAuthLogEmitted('logout');
     }
 }

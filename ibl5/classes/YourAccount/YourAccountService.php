@@ -6,6 +6,7 @@ namespace YourAccount;
 
 use Auth\Contracts\AuthServiceInterface;
 use League\League;
+use Logging\LoggerFactory;
 use Mail\Contracts\MailServiceInterface;
 use Services\CommonMysqliRepository;
 use YourAccount\Contracts\YourAccountServiceInterface;
@@ -50,10 +51,20 @@ class YourAccountService implements YourAccountServiceInterface
     public function attemptLogin(string $username, string $password, bool $rememberMe, string $clientIp): array
     {
         if ($this->authService->attempt($username, $password, $rememberMe)) {
+            LoggerFactory::getChannel('auth')->info('login_success', [
+                'username' => $username,
+                'client_ip' => $clientIp,
+            ]);
             return ['success' => true, 'error' => null];
         }
 
-        return ['success' => false, 'error' => $this->authService->getLastError()];
+        $error = $this->authService->getLastError();
+        LoggerFactory::getChannel('auth')->warning('login_failed', [
+            'username' => $username,
+            'client_ip' => $clientIp,
+            'error' => $error,
+        ]);
+        return ['success' => false, 'error' => $error];
     }
 
     /**
@@ -82,6 +93,9 @@ class YourAccountService implements YourAccountServiceInterface
                 },
             );
 
+            LoggerFactory::getChannel('auth')->info('user_registered', [
+                'username' => $username,
+            ]);
             return ['success' => true, 'error' => null];
         } catch (\RuntimeException) {
             $error = $this->authService->getLastError() ?? 'An error occurred during registration.';
@@ -131,6 +145,7 @@ class YourAccountService implements YourAccountServiceInterface
             return ['success' => false, 'error' => $error];
         }
 
+        LoggerFactory::getChannel('auth')->info('password_reset_requested');
         return ['success' => true, 'error' => null];
     }
 
@@ -145,6 +160,7 @@ class YourAccountService implements YourAccountServiceInterface
 
         try {
             $this->authService->resetPassword($selector, $token, $newPassword);
+            LoggerFactory::getChannel('auth')->info('password_reset_completed');
             return ['success' => true, 'error' => null];
         } catch (\RuntimeException) {
             $error = $this->authService->getLastError() ?? 'An error occurred while resetting your password.';
@@ -157,6 +173,7 @@ class YourAccountService implements YourAccountServiceInterface
      */
     public function logout(): void
     {
+        LoggerFactory::getChannel('auth')->info('logout');
         $this->authService->logout();
     }
 

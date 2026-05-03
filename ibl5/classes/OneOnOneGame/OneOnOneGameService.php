@@ -63,6 +63,14 @@ class OneOnOneGameService implements OneOnOneGameServiceInterface
         // Post to Discord
         $this->postToDiscord($result, $gameId);
 
+        \Logging\LoggerFactory::getChannel('audit')->info('one_on_one_game_played', [
+            'action' => 'one_on_one_game_played',
+            'game_id' => $gameId,
+            'player1_id' => $player1Id,
+            'player2_id' => $player2Id,
+            'owner' => $owner,
+        ]);
+
         return $result;
     }
 

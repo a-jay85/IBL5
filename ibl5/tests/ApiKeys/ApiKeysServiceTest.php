@@ -7,9 +7,21 @@ namespace Tests\ApiKeys;
 use ApiKeys\ApiKeysService;
 use ApiKeys\Contracts\ApiKeysRepositoryInterface;
 use PHPUnit\Framework\TestCase;
+use Tests\Support\AuditLogAssertions;
 
 class ApiKeysServiceTest extends TestCase
 {
+    use AuditLogAssertions;
+
+    protected function setUp(): void
+    {
+        $this->setUpAuditLogCapture();
+    }
+
+    protected function tearDown(): void
+    {
+        $this->tearDownAuditLogCapture();
+    }
     public function testGenerateKeyForUserReturnsRawKeyAndPrefix(): void
     {
         $mockRepo = $this->createMock(ApiKeysRepositoryInterface::class);
@@ -147,5 +159,39 @@ class ApiKeysServiceTest extends TestCase
         $service = new ApiKeysService($mockRepo);
         $result = $service->generateKeyForUser(1, 'testuser');
         $this->assertStringStartsWith('ibl_', $result['raw_key']);
+    }
+
+    // ==================== Audit Logging ====================
+
+    public function testGenerateKeyEmitsAuditLogWithKeyPrefixNotRawKey(): void
+    {
+        $stubRepo = $this->createStub(ApiKeysRepositoryInterface::class);
+        $stubRepo->method('findByUserId')->willReturn(null);
+
+        $service = new ApiKeysService($stubRepo);
+        $result = $service->generateKeyForUser(42, 'someGM');
+
+        $this->assertAuditLogEmitted('api_key_generated');
+        $this->assertAuditLogContext('api_key_generated', [
+            'action' => 'api_key_generated',
+            'user_id' => 42,
+            'username' => 'someGM',
+            'key_prefix' => $result['prefix'],
+        ]);
+        $this->assertAuditLogContextMissing('api_key_generated', 'raw_key');
+    }
+
+    public function testRevokeKeyEmitsAuditLog(): void
+    {
+        $stubRepo = $this->createStub(ApiKeysRepositoryInterface::class);
+
+        $service = new ApiKeysService($stubRepo);
+        $service->revokeKeyForUser(5);
+
+        $this->assertAuditLogEmitted('api_key_revoked');
+        $this->assertAuditLogContext('api_key_revoked', [
+            'action' => 'api_key_revoked',
+            'user_id' => 5,
+        ]);
     }
 }

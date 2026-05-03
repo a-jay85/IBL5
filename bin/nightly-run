@@ -169,7 +169,7 @@ while true; do
 
 PLAN_FILE=$PLAN_NAME" \
                 --dangerously-skip-permissions \
-                --model claude-opus-4-6 \
+                --model claude-sonnet-4-6 \
                 --max-turns 120 \
                 --name "nightly-postplan-$(date +%Y-%m-%d-%H%M)" \
                 >> "$LOG" 2>&1 || true

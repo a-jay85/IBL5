@@ -126,11 +126,12 @@ class LoggerFactory implements LoggerFactoryInterface
             $channelHandlers[$channel] = $channelHandler;
         }
 
+        // PiiRedactionProcessor must be pushed first so it runs last (after WebProcessor/UserContextProcessor populate extra)
         $processors = [
+            new PiiRedactionProcessor(),
             new UidProcessor(7),
             new WebProcessor(),
             new UserContextProcessor(),
-            new PiiRedactionProcessor(),
         ];
 
         self::$slowQueryThresholdMs = is_int($config['slow_query_threshold_ms'] ?? null)

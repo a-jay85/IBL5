@@ -40,6 +40,13 @@ class ApiKeysService implements ApiKeysServiceInterface
 
         $this->repository->createKey($userId, $keyHash, $keyPrefix, $username);
 
+        \Logging\LoggerFactory::getChannel('audit')->info('api_key_generated', [
+            'action' => 'api_key_generated',
+            'user_id' => $userId,
+            'username' => $username,
+            'key_prefix' => $keyPrefix,
+        ]);
+
         return [
             'raw_key' => $rawKey,
             'prefix' => $keyPrefix,
@@ -52,6 +59,11 @@ class ApiKeysService implements ApiKeysServiceInterface
     public function revokeKeyForUser(int $userId): void
     {
         $this->repository->revokeByUserId($userId);
+
+        \Logging\LoggerFactory::getChannel('audit')->info('api_key_revoked', [
+            'action' => 'api_key_revoked',
+            'user_id' => $userId,
+        ]);
     }
 
     /**

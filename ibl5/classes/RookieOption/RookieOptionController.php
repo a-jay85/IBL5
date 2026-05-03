@@ -80,6 +80,15 @@ class RookieOptionController implements RookieOptionControllerInterface
             $this->createRookieOptionNewsStory($teamName, $playerName, $extensionAmount);
         }
 
+        \Logging\LoggerFactory::getChannel('audit')->info('rookie_option_exercised', [
+            'action' => 'rookie_option_exercised',
+            'player_id' => $playerID,
+            'player_name' => $playerName,
+            'team_name' => $teamName,
+            'extension_amount' => $extensionAmount,
+            'draft_round' => $player->draftRound,
+        ]);
+
         return [
             'success' => true,
             'type' => 'rookie_option_success',

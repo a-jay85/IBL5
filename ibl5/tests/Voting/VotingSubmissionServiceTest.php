@@ -6,6 +6,7 @@ namespace Tests\Voting;
 
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
+use Tests\Support\AuditLogAssertions;
 use Voting\Contracts\VotingRepositoryInterface;
 use Voting\SubmissionResult;
 use Voting\VotingSubmissionService;
@@ -16,6 +17,18 @@ use Voting\VotingSubmissionService;
  */
 final class VotingSubmissionServiceTest extends TestCase
 {
+    use AuditLogAssertions;
+
+    protected function setUp(): void
+    {
+        $this->setUpAuditLogCapture();
+    }
+
+    protected function tearDown(): void
+    {
+        $this->tearDownAuditLogCapture();
+    }
+
     // ==================== EOY: Self-Vote ====================
 
     #[DataProvider('eoyPlayerSelfVoteFieldProvider')]
@@ -353,6 +366,56 @@ final class VotingSubmissionServiceTest extends TestCase
         $this->assertFalse($result->success);
         $this->assertCount(2, $result->errors);
         $this->assertTrue($result->hasErrors());
+    }
+
+    // ==================== Audit Logging ====================
+
+    public function testEoySuccessEmitsAuditLog(): void
+    {
+        $ballot = self::validEoyBallot();
+        $service = new VotingSubmissionService($this->createStub(VotingRepositoryInterface::class));
+        $service->submitEoyVote('Test Team', $ballot);
+
+        $this->assertAuditLogEmitted('eoy_vote_submitted');
+        $this->assertAuditLogContext('eoy_vote_submitted', [
+            'action' => 'eoy_vote_submitted',
+            'team_name' => 'Test Team',
+        ]);
+    }
+
+    public function testEoyValidationErrorDoesNotEmitAuditLog(): void
+    {
+        $ballot = self::validEoyBallot();
+        $ballot['mvp_1'] = '';
+
+        $service = new VotingSubmissionService($this->createStub(VotingRepositoryInterface::class));
+        $service->submitEoyVote('Other Team', $ballot);
+
+        $this->assertAuditLogNotEmitted('eoy_vote_submitted');
+    }
+
+    public function testAsgSuccessEmitsAuditLog(): void
+    {
+        $ballot = self::validAsgBallot();
+        $service = new VotingSubmissionService($this->createStub(VotingRepositoryInterface::class));
+        $service->submitAsgVote('Test Team', $ballot, self::validAsgRawPost());
+
+        $this->assertAuditLogEmitted('asg_vote_submitted');
+        $this->assertAuditLogContext('asg_vote_submitted', [
+            'action' => 'asg_vote_submitted',
+            'team_name' => 'Test Team',
+        ]);
+    }
+
+    public function testAsgValidationErrorDoesNotEmitAuditLog(): void
+    {
+        $ballot = self::validAsgBallot();
+        $ballot['east_f1'] = '';
+
+        $service = new VotingSubmissionService($this->createStub(VotingRepositoryInterface::class));
+        $service->submitAsgVote('Other Team', $ballot, self::validAsgRawPost());
+
+        $this->assertAuditLogNotEmitted('asg_vote_submitted');
     }
 
     // ==================== Fixtures ====================

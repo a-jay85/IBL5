@@ -8,19 +8,28 @@ use ProjectedDraftOrder\Contracts\ProjectedDraftOrderRepositoryInterface;
 use ProjectedDraftOrder\Contracts\ProjectedDraftOrderServiceInterface;
 use ProjectedDraftOrder\ProjectedDraftOrderService;
 use PHPUnit\Framework\TestCase;
+use Tests\Support\AuditLogAssertions;
 
 /**
  * @covers \ProjectedDraftOrder\ProjectedDraftOrderService
  */
 class ProjectedDraftOrderServiceTest extends TestCase
 {
+    use AuditLogAssertions;
+
     private object $stubRepository;
     private ProjectedDraftOrderService $service;
 
     protected function setUp(): void
     {
+        $this->setUpAuditLogCapture();
         $this->stubRepository = $this->createStub(ProjectedDraftOrderRepositoryInterface::class);
         $this->service = new ProjectedDraftOrderService($this->stubRepository);
+    }
+
+    protected function tearDown(): void
+    {
+        $this->tearDownAuditLogCapture();
     }
 
     public function testImplementsServiceInterface(): void
@@ -603,6 +612,35 @@ class ProjectedDraftOrderServiceTest extends TestCase
         $this->expectException(\InvalidArgumentException::class);
 
         $this->service->saveLotteryOrder(2026, [999, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]);
+    }
+
+    // =========================================================================
+    // Audit Logging
+    // =========================================================================
+
+    public function testSaveLotteryOrderEmitsAuditLog(): void
+    {
+        $standings = $this->buildFullLeagueStandings();
+        $stubRepo = $this->createStub(ProjectedDraftOrderRepositoryInterface::class);
+        $stubRepo->method('getAllTeamsWithStandings')->willReturn($standings);
+        $stubRepo->method('getPlayedGames')->willReturn([]);
+        $stubRepo->method('getPickOwnership')->willReturn([]);
+        $stubRepo->method('getPointDifferentials')->willReturn([]);
+
+        $service = new ProjectedDraftOrderService($stubRepo);
+        $projected = $service->calculateDraftOrder(2026);
+        $lotteryTids = [];
+        for ($i = 0; $i < 12; $i++) {
+            $lotteryTids[] = $projected['round1'][$i]['teamId'];
+        }
+
+        $service->saveLotteryOrder(2026, $lotteryTids);
+
+        $this->assertAuditLogEmitted('lottery_order_saved');
+        $this->assertAuditLogContext('lottery_order_saved', [
+            'action' => 'lottery_order_saved',
+            'season_year' => 2026,
+        ]);
     }
 
     // =========================================================================

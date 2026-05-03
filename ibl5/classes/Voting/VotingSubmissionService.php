@@ -71,6 +71,11 @@ class VotingSubmissionService implements VotingSubmissionServiceInterface
         $this->repository->saveEoyVote($teamName, $ballot);
         $this->repository->markEoyVoteCast($teamName);
 
+        \Logging\LoggerFactory::getChannel('audit')->info('eoy_vote_submitted', [
+            'action' => 'eoy_vote_submitted',
+            'team_name' => $teamName,
+        ]);
+
         return SubmissionResult::success();
     }
 
@@ -94,6 +99,11 @@ class VotingSubmissionService implements VotingSubmissionServiceInterface
 
         $this->repository->saveAsgVote($teamName, $ballot);
         $this->repository->markAsgVoteCast($teamName);
+
+        \Logging\LoggerFactory::getChannel('audit')->info('asg_vote_submitted', [
+            'action' => 'asg_vote_submitted',
+            'team_name' => $teamName,
+        ]);
 
         return SubmissionResult::success();
     }

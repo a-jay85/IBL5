@@ -69,6 +69,11 @@ class DepthChartEntrySubmissionHandler implements DepthChartEntrySubmissionHandl
             $_SESSION['flash_success'] = 'Depth chart saved, but the file/email could not be sent. Please contact the commissioner.';
         }
 
+        \Logging\LoggerFactory::getChannel('audit')->info('depth_chart_submitted', [
+            'action' => 'depth_chart_submitted',
+            'team_name' => $teamName,
+        ]);
+
         return true;
     }
 

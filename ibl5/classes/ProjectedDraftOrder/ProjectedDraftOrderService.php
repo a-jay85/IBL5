@@ -180,6 +180,12 @@ class ProjectedDraftOrderService implements ProjectedDraftOrderServiceInterface
         $ownership = $pickOwnership[$firstTeamName][1] ?? null;
         $ownerName = $ownership !== null ? $ownership['ownerName'] : $firstTeamName;
         $this->repository->upsertLotteryWinnerAward($seasonYear, $ownerName);
+
+        \Logging\LoggerFactory::getChannel('audit')->info('lottery_order_saved', [
+            'action' => 'lottery_order_saved',
+            'season_year' => $seasonYear,
+            'first_pick_team' => $firstTeamName,
+        ]);
     }
 
     /**

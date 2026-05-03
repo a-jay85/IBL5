@@ -10,6 +10,7 @@ use OneOnOneGame\OneOnOneGameService;
 use OneOnOneGame\OneOnOneGameRepository;
 use OneOnOneGame\OneOnOneGameEngine;
 use OneOnOneGame\OneOnOneGameResult;
+use Tests\Support\AuditLogAssertions;
 
 /**
  * Tests for OneOnOneGameService
@@ -17,6 +18,8 @@ use OneOnOneGame\OneOnOneGameResult;
 #[AllowMockObjectsWithoutExpectations]
 final class OneOnOneGameServiceTest extends TestCase
 {
+    use AuditLogAssertions;
+
     private OneOnOneGameService $service;
     /** @var OneOnOneGameRepository&\PHPUnit\Framework\MockObject\MockObject */
     private $mockRepository;
@@ -25,9 +28,15 @@ final class OneOnOneGameServiceTest extends TestCase
 
     protected function setUp(): void
     {
+        $this->setUpAuditLogCapture();
         $this->mockRepository = $this->createMock(OneOnOneGameRepository::class);
         $this->mockGameEngine = $this->createMock(OneOnOneGameEngine::class);
         $this->service = new OneOnOneGameService($this->mockRepository, $this->mockGameEngine);
+    }
+
+    protected function tearDown(): void
+    {
+        $this->tearDownAuditLogCapture();
     }
 
     // ========== validatePlayerSelection Tests ==========
@@ -179,6 +188,41 @@ final class OneOnOneGameServiceTest extends TestCase
         $result = $this->service->playGame(1, 2, 'Owner');
 
         $this->assertEquals(42, $result->gameId);
+    }
+
+    // ========== Audit Logging ==========
+
+    public function testPlayGameEmitsAuditLog(): void
+    {
+        $player1Data = $this->createMockPlayerData(1, 'Player One');
+        $player2Data = $this->createMockPlayerData(2, 'Player Two');
+        $gameResult = new OneOnOneGameResult();
+        $gameResult->player1Name = 'Player One';
+        $gameResult->player2Name = 'Player Two';
+        $gameResult->player1Score = 21;
+        $gameResult->player2Score = 18;
+
+        $this->mockRepository->method('getPlayerForGame')
+            ->willReturnCallback(function ($id) use ($player1Data, $player2Data) {
+                return $id === 1 ? $player1Data : $player2Data;
+            });
+
+        $this->mockGameEngine->method('simulateGame')
+            ->willReturn($gameResult);
+
+        $this->mockRepository->method('saveGame')
+            ->willReturn(99);
+
+        $this->service->playGame(1, 2, 'TestOwner');
+
+        $this->assertAuditLogEmitted('one_on_one_game_played');
+        $this->assertAuditLogContext('one_on_one_game_played', [
+            'action' => 'one_on_one_game_played',
+            'game_id' => 99,
+            'player1_id' => 1,
+            'player2_id' => 2,
+            'owner' => 'TestOwner',
+        ]);
     }
 
     // ========== Helper Methods ==========

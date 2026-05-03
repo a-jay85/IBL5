@@ -21,4 +21,17 @@ return [
 
     // Log queries slower than this threshold (milliseconds). 0 = disabled.
     'slow_query_threshold_ms' => 200,
+
+    // Per-channel retention overrides. Channels listed here get dedicated log files
+    // (e.g. logs/ibl5-audit-YYYY-MM-DD.log) with their own retention period.
+    'channel_retention' => [
+        'audit' => 365,
+        'admin' => 365,
+    ],
+
+    // Discord webhook URL for error alerting. null = disabled.
+    'discord_webhook_url' => null,
+
+    // Minimum level to trigger Discord alerts: error|critical|alert|emergency
+    'discord_alert_level' => 'error',
 ];

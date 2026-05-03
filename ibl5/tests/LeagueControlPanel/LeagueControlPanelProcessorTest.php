@@ -8,6 +8,8 @@ use LeagueControlPanel\Contracts\AwardGenerationServiceInterface;
 use LeagueControlPanel\Contracts\LeagueControlPanelProcessorInterface;
 use LeagueControlPanel\Contracts\LeagueControlPanelRepositoryInterface;
 use LeagueControlPanel\LeagueControlPanelProcessor;
+use Logging\LoggerFactory;
+use Monolog\Handler\TestHandler;
 use PHPUnit\Framework\TestCase;
 
 /**
@@ -33,6 +35,7 @@ class LeagueControlPanelProcessorTest extends TestCase
         if (file_exists($htm)) {
             unlink($htm);
         }
+        LoggerFactory::reset();
     }
 
     public function testImplementsInterface(): void
@@ -530,6 +533,33 @@ class LeagueControlPanelProcessorTest extends TestCase
         $this->assertTrue($result['success']);
         $this->assertStringContainsString('James Harden', $result['message']);
         $this->assertStringContainsString('2026', $result['message']);
+    }
+
+    // --- Admin Action Logging ---
+
+    public function testDispatchLogsOnSuccessfulAction(): void
+    {
+        $handler = new TestHandler();
+        LoggerFactory::forTesting($handler);
+
+        $mock = $this->createMock(LeagueControlPanelRepositoryInterface::class);
+        $mock->expects($this->once())->method('setSeasonPhase')->with('Preseason');
+
+        $processor = new LeagueControlPanelProcessor($mock, $this->createStub(AwardGenerationServiceInterface::class));
+        $processor->dispatch('set_season_phase', ['SeasonPhase' => 'Preseason']);
+
+        $this->assertTrue($handler->hasInfoThatContains('admin_action'));
+    }
+
+    public function testDispatchDoesNotLogOnFailedAction(): void
+    {
+        $handler = new TestHandler();
+        LoggerFactory::forTesting($handler);
+
+        $processor = $this->createProcessorWithStub();
+        $processor->dispatch('set_season_phase', ['SeasonPhase' => 'InvalidPhase']);
+
+        $this->assertFalse($handler->hasInfoRecords());
     }
 
     private function createProcessorWithStub(): LeagueControlPanelProcessor

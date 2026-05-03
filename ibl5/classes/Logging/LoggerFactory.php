@@ -20,7 +20,8 @@ use Psr\Log\LoggerInterface;
  * Creates named PSR-3 logger instances backed by Monolog.
  *
  * All channels share a single RotatingFileHandler writing JSON to logs/ibl5-YYYY-MM-DD.log.
- * CLI scripts automatically get an additional stdout handler at INFO level.
+ * Channels listed in `channel_retention` config get dedicated handlers with their own
+ * retention and log file. CLI scripts automatically get an additional stdout handler.
  *
  * Usage:
  *   LoggerFactory::channel('db')->error('Query failed', ['query' => $sql]);
@@ -29,7 +30,7 @@ use Psr\Log\LoggerInterface;
  * Note: The static accessor (getChannel) exists until Bootstrap\Container is wired into
  * mainfile.php. Once that happens, inject LoggerFactoryInterface via the container instead.
  *
- * @phpstan-type LoggingConfig array{log_dir: string|null, level: string, retention: int}
+ * @phpstan-type LoggingConfig array{log_dir: string|null, level: string, retention: int, channel_retention?: array<string, int>, discord_webhook_url?: string|null, discord_alert_level?: string}
  */
 class LoggerFactory implements LoggerFactoryInterface
 {
@@ -46,6 +47,9 @@ class LoggerFactory implements LoggerFactoryInterface
     /** @var list<ProcessorInterface> */
     private array $processors;
 
+    /** @var array<string, \Monolog\Handler\HandlerInterface> */
+    private array $channelHandlers = [];
+
     /** @var LoggingConfig */
     private const DEFAULT_CONFIG = [
         'log_dir' => null,
@@ -56,11 +60,13 @@ class LoggerFactory implements LoggerFactoryInterface
     /**
      * @param list<\Monolog\Handler\HandlerInterface> $handlers
      * @param list<ProcessorInterface> $processors
+     * @param array<string, \Monolog\Handler\HandlerInterface> $channelHandlers
      */
-    private function __construct(array $handlers, array $processors = [])
+    private function __construct(array $handlers, array $processors = [], array $channelHandlers = [])
     {
         $this->handlers = $handlers;
         $this->processors = $processors;
+        $this->channelHandlers = $channelHandlers;
         self::$instance = $this;
     }
 
@@ -94,14 +100,14 @@ class LoggerFactory implements LoggerFactoryInterface
 
         $retention = is_int($config['retention'] ?? null) ? $config['retention'] : 30;
 
+        $formatter = new JsonFormatter();
+        $formatter->includeStacktraces(true);
+
         $handler = new RotatingFileHandler(
             $logDir . '/ibl5.log',
             $retention,
             $level,
         );
-
-        $formatter = new JsonFormatter();
-        $formatter->includeStacktraces(true);
         $handler->setFormatter($formatter);
 
         /** @var list<\Monolog\Handler\HandlerInterface> $handlers */
@@ -113,17 +119,49 @@ class LoggerFactory implements LoggerFactoryInterface
             $handlers[] = $cliHandler;
         }
 
+        // Discord webhook handler for error alerting
+        $webhookUrl = $config['discord_webhook_url'] ?? null;
+        if (is_string($webhookUrl) && $webhookUrl !== '') {
+            $alertLevelName = is_string($config['discord_alert_level'] ?? null)
+                ? strtolower($config['discord_alert_level'])
+                : 'error';
+            $alertLevel = self::parseLevel($alertLevelName);
+            $handlers[] = new DiscordWebhookHandler($webhookUrl, $alertLevel);
+        }
+
+        // Per-channel retention overrides
+        /** @var array<string, int> $channelRetention */
+        $channelRetention = is_array($config['channel_retention'] ?? null)
+            ? $config['channel_retention']
+            : [];
+
+        /** @var array<string, \Monolog\Handler\HandlerInterface> $channelHandlers */
+        $channelHandlers = [];
+        foreach ($channelRetention as $channel => $days) {
+            if (!is_string($channel) || !is_int($days)) {
+                continue;
+            }
+            $channelHandler = new RotatingFileHandler(
+                $logDir . '/ibl5-' . $channel . '.log',
+                $days,
+                $level,
+            );
+            $channelHandler->setFormatter($formatter);
+            $channelHandlers[$channel] = $channelHandler;
+        }
+
         $processors = [
             new UidProcessor(7),
             new WebProcessor(),
             new UserContextProcessor(),
+            new PiiRedactionProcessor(),
         ];
 
         self::$slowQueryThresholdMs = is_int($config['slow_query_threshold_ms'] ?? null)
             ? $config['slow_query_threshold_ms']
             : 200;
 
-        return new self($handlers, $processors);
+        return new self($handlers, $processors, $channelHandlers);
     }
 
     /**
@@ -136,6 +174,17 @@ class LoggerFactory implements LoggerFactoryInterface
     }
 
     /**
+     * Create a factory with a specific handler for tests that need to inspect log records.
+     *
+     * @param \Monolog\Handler\HandlerInterface $handler
+     */
+    public static function forTesting(\Monolog\Handler\HandlerInterface $handler): self
+    {
+        self::$slowQueryThresholdMs = 0;
+        return new self([$handler]);
+    }
+
+    /**
      * Get a logger for the given channel.
      *
      * @see LoggerFactoryInterface::channel()
@@ -144,6 +193,10 @@ class LoggerFactory implements LoggerFactoryInterface
     {
         if (!isset($this->channels[$channel])) {
             $logger = new Logger($channel);
+
+            if (isset($this->channelHandlers[$channel])) {
+                $logger->pushHandler($this->channelHandlers[$channel]);
+            }
             foreach ($this->handlers as $handler) {
                 $logger->pushHandler($handler);
             }

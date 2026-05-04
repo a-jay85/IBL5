@@ -1,0 +1,72 @@
+#!/usr/bin/env php
+<?php
+
+declare(strict_types=1);
+
+require_once __DIR__ . '/../vendor/autoload.php';
+
+// In git worktrees, vendor/ is symlinked so composer's $baseDir resolves to main repo.
+// Prepend worktree classes/ so new/modified classes are found.
+if (is_link(__DIR__ . '/../vendor')) {
+    $wtClasses = realpath(__DIR__ . '/../classes');
+    if ($wtClasses !== false) {
+        spl_autoload_register(static function (string $class) use ($wtClasses): void {
+            $file = $wtClasses . '/' . str_replace('\\', '/', $class) . '.php';
+            if (file_exists($file)) {
+                require $file;
+            }
+        }, true, true);
+    }
+}
+
+if ($argc < 3) {
+    fwrite(STDERR, "Usage: php bin/check-coverage-regression <clover-file> <baseline-json>\n");
+    exit(1);
+}
+
+$cloverFile = $argv[1];
+$baselineFile = $argv[2];
+
+$checker = new \Utilities\CoverageChecker();
+$cloverResult = $checker->check($cloverFile, 0.0);
+
+if (!$cloverResult->passed() && $cloverResult->getPercentage() === 0.0) {
+    fwrite(STDERR, "Error reading clover file: " . $cloverResult->getMessage() . "\n");
+    exit(1);
+}
+
+$currentCoverage = $cloverResult->getPercentage();
+
+$previousCoverage = null;
+$tolerance = 0.5;
+
+if (file_exists($baselineFile)) {
+    $json = file_get_contents($baselineFile);
+    if ($json === false) {
+        fwrite(STDERR, "Error reading baseline file: {$baselineFile}\n");
+        exit(1);
+    }
+
+    /** @var array{percentage?: float, tolerance?: float}|null $baseline */
+    $baseline = json_decode($json, true);
+    if (!is_array($baseline)) {
+        fwrite(STDERR, "Invalid JSON in baseline file: {$baselineFile}\n");
+        exit(1);
+    }
+
+    $previousCoverage = isset($baseline['percentage']) ? (float) $baseline['percentage'] : null;
+    $tolerance = isset($baseline['tolerance']) ? (float) $baseline['tolerance'] : 0.5;
+}
+
+$comparator = new \Utilities\CoverageComparator();
+$result = $comparator->compare($currentCoverage, $previousCoverage, $tolerance);
+
+echo $result->getMessage() . "\n";
+echo sprintf(
+    "  Current: %.2f%% | Previous: %s | Minimum: %.2f%%\n",
+    $result->getCurrent(),
+    $result->getPrevious() !== null ? sprintf('%.2f%%', $result->getPrevious()) : 'N/A',
+    $result->getMinimumAllowed(),
+);
+
+exit($result->passed() ? 0 : 1);

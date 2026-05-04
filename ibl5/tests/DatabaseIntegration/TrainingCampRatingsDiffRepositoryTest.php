@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\DatabaseIntegration;
 
+use PHPUnit\Framework\Attributes\Group;
 use TrainingCampRatingsDiff\TrainingCampRatingsDiffRepository;
 
 /**
@@ -20,6 +21,7 @@ use TrainingCampRatingsDiff\TrainingCampRatingsDiffRepository;
  * Each test wraps its work in a transaction that DatabaseTestCase rolls back in
  * tearDown(), so no data persists between tests.
  */
+#[Group('database')]
 class TrainingCampRatingsDiffRepositoryTest extends DatabaseTestCase
 {
     private TrainingCampRatingsDiffRepository $repo;

@@ -4,8 +4,11 @@ declare(strict_types=1);
 
 namespace Tests\DatabaseIntegration;
 
+use PHPUnit\Framework\Attributes\Group;
+
 use PlayerMovement\PlayerMovementRepository;
 
+#[Group('database')]
 class PlayerMovementRepositoryTest extends DatabaseTestCase
 {
     private PlayerMovementRepository $repo;

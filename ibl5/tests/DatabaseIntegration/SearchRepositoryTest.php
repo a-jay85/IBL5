@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Tests\DatabaseIntegration;
 
+use PHPUnit\Framework\Attributes\Group;
+
 use Search\SearchRepository;
 
 /**
@@ -12,6 +14,7 @@ use Search\SearchRepository;
  * plus topic, category, and author lookups.
  * All methods here are read-only. Tests rely on CI seed data.
  */
+#[Group('database')]
 class SearchRepositoryTest extends DatabaseTestCase
 {
     private SearchRepository $repo;

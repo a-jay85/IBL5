@@ -4,11 +4,14 @@ declare(strict_types=1);
 
 namespace Tests\DatabaseIntegration;
 
+use PHPUnit\Framework\Attributes\Group;
+
 use Negotiation\NegotiationRepository;
 
 /**
  * Tests NegotiationRepository against real MariaDB — team performance, salary queries, FA status.
  */
+#[Group('database')]
 class NegotiationRepositoryTest extends DatabaseTestCase
 {
     private NegotiationRepository $repo;

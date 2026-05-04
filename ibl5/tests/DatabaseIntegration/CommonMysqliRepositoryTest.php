@@ -4,12 +4,15 @@ declare(strict_types=1);
 
 namespace Tests\DatabaseIntegration;
 
+use PHPUnit\Framework\Attributes\Group;
+
 use League\League;
 use Services\CommonMysqliRepository;
 
 /**
  * Tests CommonMysqliRepository read-only lookups against real MariaDB.
  */
+#[Group('database')]
 class CommonMysqliRepositoryTest extends DatabaseTestCase
 {
     private CommonMysqliRepository $repo;

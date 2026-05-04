@@ -4,8 +4,11 @@ declare(strict_types=1);
 
 namespace Tests\DatabaseIntegration;
 
+use PHPUnit\Framework\Attributes\Group;
+
 use LeagueControlPanel\LeagueControlPanelRepository;
 
+#[Group('database')]
 class LeagueControlPanelRepositoryTest extends DatabaseTestCase
 {
     private LeagueControlPanelRepository $repo;

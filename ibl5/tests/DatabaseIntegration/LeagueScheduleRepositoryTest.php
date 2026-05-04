@@ -4,8 +4,11 @@ declare(strict_types=1);
 
 namespace Tests\DatabaseIntegration;
 
+use PHPUnit\Framework\Attributes\Group;
+
 use LeagueSchedule\LeagueScheduleRepository;
 
+#[Group('database')]
 class LeagueScheduleRepositoryTest extends DatabaseTestCase
 {
     private LeagueScheduleRepository $repo;

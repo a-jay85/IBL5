@@ -4,12 +4,15 @@ declare(strict_types=1);
 
 namespace Tests\DatabaseIntegration;
 
+use PHPUnit\Framework\Attributes\Group;
+
 use DepthChartEntry\DepthChartEntryRepository;
 
 /**
  * Tests DepthChartEntryRepository against real MariaDB — player roster queries,
  * depth chart column updates, and team history timestamp updates.
  */
+#[Group('database')]
 class DepthChartEntryRepositoryTest extends DatabaseTestCase
 {
     private DepthChartEntryRepository $repo;

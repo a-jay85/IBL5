@@ -4,9 +4,12 @@ declare(strict_types=1);
 
 namespace Tests\DatabaseIntegration;
 
+use PHPUnit\Framework\Attributes\Group;
+
 use FranchiseRecordBook\FranchiseRecordBookRepository;
 use League\League;
 
+#[Group('database')]
 class FranchiseRecordBookRepositoryTest extends DatabaseTestCase
 {
     private FranchiseRecordBookRepository $repo;

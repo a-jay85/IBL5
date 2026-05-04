@@ -4,12 +4,15 @@ declare(strict_types=1);
 
 namespace Tests\DatabaseIntegration;
 
+use PHPUnit\Framework\Attributes\Group;
+
 use Topics\TopicsRepository;
 
 /**
  * Tests TopicsRepository against real MariaDB — topic listings with
  * story counts and recent articles from nuke_* tables (read-only).
  */
+#[Group('database')]
 class TopicsRepositoryTest extends DatabaseTestCase
 {
     private TopicsRepository $repo;

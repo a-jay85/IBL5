@@ -4,12 +4,15 @@ declare(strict_types=1);
 
 namespace Tests\DatabaseIntegration;
 
+use PHPUnit\Framework\Attributes\Group;
+
 use Shared\SharedRepository;
 
 /**
  * Tests SharedRepository against real MariaDB — draft pick ownership lookups
  * and contract extension resets.
  */
+#[Group('database')]
 class SharedRepositoryTest extends DatabaseTestCase
 {
     private SharedRepository $repo;

@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Tests\DatabaseIntegration;
 
+use PHPUnit\Framework\Attributes\Group;
+
 use CareerLeaderboards\CareerLeaderboardsRepository;
 
 /**
@@ -12,6 +14,7 @@ use CareerLeaderboards\CareerLeaderboardsRepository;
  * Tests dual code paths: ibl_hist GROUP BY aggregation vs direct SELECT
  * from VIEW-backed tables. Dynamic SQL with whitelisted table/column names.
  */
+#[Group('database')]
 class CareerLeaderboardsRepositoryTest extends DatabaseTestCase
 {
     private CareerLeaderboardsRepository $repo;

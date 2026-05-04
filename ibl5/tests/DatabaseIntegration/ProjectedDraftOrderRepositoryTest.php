@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Tests\DatabaseIntegration;
 
+use PHPUnit\Framework\Attributes\Group;
+
 use League\League;
 use ProjectedDraftOrder\ProjectedDraftOrderRepository;
 
@@ -14,6 +16,7 @@ use ProjectedDraftOrder\ProjectedDraftOrderRepository;
  * Write operations use transactional() with savepoint support, so
  * DatabaseTestCase's transaction rollback handles all cleanup.
  */
+#[Group('database')]
 class ProjectedDraftOrderRepositoryTest extends DatabaseTestCase
 {
     private ProjectedDraftOrderRepository $repo;

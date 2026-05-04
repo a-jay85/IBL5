@@ -34,8 +34,10 @@ final class PreseasonCleanupRepository extends \BaseMysqliRepository
         $endDate = sprintf('%d-09-30', $beginningYear);
 
         $this->execute(
-            "DELETE FROM ibl_sim_dates WHERE end_date BETWEEN ? AND ?",
-            "ss",
+            "DELETE FROM ibl_sim_dates WHERE start_date BETWEEN ? AND ? AND end_date BETWEEN ? AND ?",
+            "ssss",
+            $startDate,
+            $endDate,
             $startDate,
             $endDate,
         );

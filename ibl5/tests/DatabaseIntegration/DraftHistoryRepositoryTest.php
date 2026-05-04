@@ -4,11 +4,14 @@ declare(strict_types=1);
 
 namespace Tests\DatabaseIntegration;
 
+use PHPUnit\Framework\Attributes\Group;
+
 use DraftHistory\DraftHistoryRepository;
 
 /**
  * Tests DraftHistoryRepository against real MariaDB — draft picks by year/team.
  */
+#[Group('database')]
 class DraftHistoryRepositoryTest extends DatabaseTestCase
 {
     private DraftHistoryRepository $repo;

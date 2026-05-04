@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Tests\DatabaseIntegration;
 
+use PHPUnit\Framework\Attributes\Group;
+
 use Trading\TradeExecutionRepository;
 
 /**
@@ -13,6 +15,7 @@ use Trading\TradeExecutionRepository;
  * TRUNCATE TABLE causes an implicit commit, making tearDown rollback a no-op.
  * The table starts empty from seed, so no residual data concerns.
  */
+#[Group('database')]
 class TradeExecutionRepositoryTest extends DatabaseTestCase
 {
     private TradeExecutionRepository $repo;

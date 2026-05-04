@@ -4,12 +4,15 @@ declare(strict_types=1);
 
 namespace Tests\DatabaseIntegration;
 
+use PHPUnit\Framework\Attributes\Group;
+
 use CapSpace\CapSpaceRepository;
 
 /**
  * Tests CapSpaceRepository against real MariaDB — team listings and
  * players under contract filtering (cy != cyt, excludes pipe names).
  */
+#[Group('database')]
 class CapSpaceRepositoryTest extends DatabaseTestCase
 {
     private CapSpaceRepository $repo;

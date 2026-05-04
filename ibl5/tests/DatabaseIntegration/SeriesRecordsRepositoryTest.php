@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Tests\DatabaseIntegration;
 
+use PHPUnit\Framework\Attributes\Group;
+
 use SeriesRecords\SeriesRecordsRepository;
 
 /**
@@ -11,6 +13,7 @@ use SeriesRecords\SeriesRecordsRepository;
  * series records via vw_series_records (derived from ibl_schedule),
  * and max team ID lookups.
  */
+#[Group('database')]
 class SeriesRecordsRepositoryTest extends DatabaseTestCase
 {
     private SeriesRecordsRepository $repo;

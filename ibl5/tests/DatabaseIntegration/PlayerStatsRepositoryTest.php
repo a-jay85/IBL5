@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Tests\DatabaseIntegration;
 
+use PHPUnit\Framework\Attributes\Group;
+
 use Player\PlayerStatsRepository;
 
 /**
@@ -15,6 +17,7 @@ use Player\PlayerStatsRepository;
  * - June dates → game_type=2 (playoffs)
  * - October dates → game_type=3 (HEAT)
  */
+#[Group('database')]
 class PlayerStatsRepositoryTest extends DatabaseTestCase
 {
     private PlayerStatsRepository $repo;

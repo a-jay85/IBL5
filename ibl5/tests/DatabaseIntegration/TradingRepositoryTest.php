@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Tests\DatabaseIntegration;
 
+use PHPUnit\Framework\Attributes\Group;
+
 use Trading\TradeCashRepository;
 use Trading\TradeAssetRepository;
 use Trading\TradeFormRepository;
@@ -17,6 +19,7 @@ use Trading\TradeOfferRepository;
  * deleteTradeOffer() calls begin_transaction() internally, which implicitly commits
  * the outer DatabaseTestCase transaction. tearDown rollback becomes a no-op.
  */
+#[Group('database')]
 class TradingRepositoryTest extends DatabaseTestCase
 {
     private TradeOfferRepository $offerRepo;

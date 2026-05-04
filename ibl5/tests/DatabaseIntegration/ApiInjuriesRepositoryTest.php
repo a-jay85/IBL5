@@ -4,12 +4,15 @@ declare(strict_types=1);
 
 namespace Tests\DatabaseIntegration;
 
+use PHPUnit\Framework\Attributes\Group;
+
 use Api\Repository\ApiInjuriesRepository;
 
 /**
  * Tests ApiInjuriesRepository against real MariaDB —
  * injured player listing with team data from ibl_plr + ibl_team_info.
  */
+#[Group('database')]
 class ApiInjuriesRepositoryTest extends DatabaseTestCase
 {
     private ApiInjuriesRepository $repo;

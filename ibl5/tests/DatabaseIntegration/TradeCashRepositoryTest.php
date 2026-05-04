@@ -4,11 +4,14 @@ declare(strict_types=1);
 
 namespace Tests\DatabaseIntegration;
 
+use PHPUnit\Framework\Attributes\Group;
+
 use Trading\TradeCashRepository;
 
 /**
  * Tests TradeCashRepository against real MariaDB — cash trade offers, player records, salary queries.
  */
+#[Group('database')]
 class TradeCashRepositoryTest extends DatabaseTestCase
 {
     private TradeCashRepository $repo;

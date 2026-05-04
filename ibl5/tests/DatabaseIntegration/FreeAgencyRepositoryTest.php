@@ -4,11 +4,14 @@ declare(strict_types=1);
 
 namespace Tests\DatabaseIntegration;
 
+use PHPUnit\Framework\Attributes\Group;
+
 use FreeAgency\FreeAgencyRepository;
 
 /**
  * Tests FreeAgencyRepository against real MariaDB — offer CRUD, player signing status.
  */
+#[Group('database')]
 class FreeAgencyRepositoryTest extends DatabaseTestCase
 {
     private FreeAgencyRepository $repo;

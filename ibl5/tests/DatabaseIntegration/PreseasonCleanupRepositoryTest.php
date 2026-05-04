@@ -4,8 +4,11 @@ declare(strict_types=1);
 
 namespace Tests\DatabaseIntegration;
 
+use PHPUnit\Framework\Attributes\Group;
+
 use Updater\Steps\PreseasonCleanupRepository;
 
+#[Group('database')]
 class PreseasonCleanupRepositoryTest extends DatabaseTestCase
 {
     private PreseasonCleanupRepository $repo;
@@ -30,13 +33,26 @@ class PreseasonCleanupRepositoryTest extends DatabaseTestCase
         self::assertTrue($this->repo->hasPreseasonBoxScores(2098));
     }
 
-    public function testDeletePreseasonSimDatesPreservesOctoberRows(): void
+    public function testDeletePreseasonSimDatesDeletesSeptemberOnlyRows(): void
     {
         $this->insertRow('ibl_sim_dates', [
             'sim' => 900,
             'start_date' => '2098-09-20',
             'end_date' => '2098-09-25',
         ]);
+
+        $this->repo->deletePreseasonSimDates(2098);
+
+        $result = $this->db->query("SELECT sim FROM ibl_sim_dates WHERE sim = 900");
+        self::assertNotFalse($result);
+        $rows = $result->fetch_all(MYSQLI_ASSOC);
+        $result->free();
+
+        self::assertEmpty($rows, 'September-only sim date should be deleted');
+    }
+
+    public function testDeletePreseasonSimDatesPreservesOctoberRows(): void
+    {
         $this->insertRow('ibl_sim_dates', [
             'sim' => 901,
             'start_date' => '2098-10-05',
@@ -45,13 +61,29 @@ class PreseasonCleanupRepositoryTest extends DatabaseTestCase
 
         $this->repo->deletePreseasonSimDates(2098);
 
-        $result = $this->db->query("SELECT sim FROM ibl_sim_dates WHERE sim IN (900, 901)");
+        $result = $this->db->query("SELECT sim FROM ibl_sim_dates WHERE sim = 901");
         self::assertNotFalse($result);
         $rows = $result->fetch_all(MYSQLI_ASSOC);
         $result->free();
 
-        $sims = array_column($rows, 'sim');
-        self::assertNotContains(900, $sims, 'September sim date should be deleted');
-        self::assertContains(901, $sims, 'October sim date should be preserved');
+        self::assertNotEmpty($rows, 'October sim date should be preserved');
+    }
+
+    public function testDeletePreseasonSimDatesPreservesSeptemberStartOctoberEndRows(): void
+    {
+        $this->insertRow('ibl_sim_dates', [
+            'sim' => 902,
+            'start_date' => '2098-09-28',
+            'end_date' => '2098-10-03',
+        ]);
+
+        $this->repo->deletePreseasonSimDates(2098);
+
+        $result = $this->db->query("SELECT sim FROM ibl_sim_dates WHERE sim = 902");
+        self::assertNotFalse($result);
+        $rows = $result->fetch_all(MYSQLI_ASSOC);
+        $result->free();
+
+        self::assertNotEmpty($rows, 'Sim date spanning Sep-Oct should be preserved');
     }
 }

@@ -4,12 +4,15 @@ declare(strict_types=1);
 
 namespace Tests\DatabaseIntegration;
 
+use PHPUnit\Framework\Attributes\Group;
+
 use RookieOption\RookieOptionRepository;
 
 /**
  * Tests RookieOptionRepository against real MariaDB — rookie option
  * contract year updates on ibl_plr (InnoDB, normal transaction rollback).
  */
+#[Group('database')]
 class RookieOptionRepositoryTest extends DatabaseTestCase
 {
     private RookieOptionRepository $repo;

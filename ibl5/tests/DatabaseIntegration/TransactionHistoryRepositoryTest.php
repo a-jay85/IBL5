@@ -4,12 +4,15 @@ declare(strict_types=1);
 
 namespace Tests\DatabaseIntegration;
 
+use PHPUnit\Framework\Attributes\Group;
+
 use TransactionHistory\TransactionHistoryRepository;
 
 /**
  * Tests TransactionHistoryRepository against real MariaDB.
  * Tests only read seed data.
  */
+#[Group('database')]
 class TransactionHistoryRepositoryTest extends DatabaseTestCase
 {
     private TransactionHistoryRepository $repo;

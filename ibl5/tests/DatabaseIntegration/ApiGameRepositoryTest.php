@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Tests\DatabaseIntegration;
 
+use PHPUnit\Framework\Attributes\Group;
+
 use Api\Pagination\Paginator;
 use Api\Repository\ApiGameRepository;
 
@@ -13,6 +15,7 @@ use Api\Repository\ApiGameRepository;
  * from ibl_box_scores / ibl_box_scores_teams.
  * CI seed has schedule data and 28 teams.
  */
+#[Group('database')]
 class ApiGameRepositoryTest extends DatabaseTestCase
 {
     private ApiGameRepository $repo;

@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Tests\DatabaseIntegration;
 
+use PHPUnit\Framework\Attributes\Group;
+
 use Standings\StandingsRepository;
 
 /**
@@ -12,6 +14,7 @@ use Standings\StandingsRepository;
  * Tests standings queries, streak data, Pythagorean stats (via VIEWs
  * ibl_team_offense_stats / ibl_team_defense_stats), and series records.
  */
+#[Group('database')]
 class StandingsRepositoryTest extends DatabaseTestCase
 {
     private StandingsRepository $repo;

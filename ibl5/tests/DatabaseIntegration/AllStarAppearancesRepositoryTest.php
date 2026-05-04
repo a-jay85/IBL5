@@ -4,8 +4,11 @@ declare(strict_types=1);
 
 namespace Tests\DatabaseIntegration;
 
+use PHPUnit\Framework\Attributes\Group;
+
 use AllStarAppearances\AllStarAppearancesRepository;
 
+#[Group('database')]
 class AllStarAppearancesRepositoryTest extends DatabaseTestCase
 {
     private AllStarAppearancesRepository $repo;

@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Tests\DatabaseIntegration;
 
+use PHPUnit\Framework\Attributes\Group;
+
 use Services\CommonMysqliRepository;
 use Trading\CashConsiderationRepository;
 
@@ -16,6 +18,7 @@ use Trading\CashConsiderationRepository;
  * produces correct salary sums — catching regressions if the view definition,
  * table structure, or salary calculation logic diverges.
  */
+#[Group('database')]
 class CashConsiderationSalaryParityTest extends DatabaseTestCase
 {
     private CommonMysqliRepository $commonRepo;

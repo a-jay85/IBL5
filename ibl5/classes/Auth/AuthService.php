@@ -27,7 +27,8 @@ use Delight\Auth\UserAlreadyExistsException;
  */
 class AuthService implements AuthServiceInterface
 {
-    private const BCRYPT_COST = 12;
+    public const BCRYPT_COST_PROD = 12;
+    private const BCRYPT_COST_TEST = 4;
     private const REMEMBER_DURATION_SECONDS = 7776000; // 90 days
 
     private const SESSION_USER_ID = 'auth_user_id';
@@ -281,7 +282,14 @@ class AuthService implements AuthServiceInterface
 
     public function hashPassword(string $password): string
     {
-        return password_hash($password, PASSWORD_BCRYPT, ['cost' => self::BCRYPT_COST]);
+        return password_hash($password, PASSWORD_BCRYPT, ['cost' => self::getBcryptCost()]);
+    }
+
+    private static function getBcryptCost(): int
+    {
+        return defined('PHPUNIT_RUNNING') && PHPUNIT_RUNNING === true
+            ? self::BCRYPT_COST_TEST
+            : self::BCRYPT_COST_PROD;
     }
 
     /**

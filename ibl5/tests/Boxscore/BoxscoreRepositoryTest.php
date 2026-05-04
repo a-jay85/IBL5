@@ -8,7 +8,7 @@ use Boxscore\BoxscoreRepository;
 use Boxscore\Contracts\BoxscoreRepositoryInterface;
 use League\LeagueContext;
 use PHPUnit\Framework\TestCase;
-use Tests\Integration\Mocks\MockDatabase;
+use Tests\WideUnit\Mocks\MockDatabase;
 
 /**
  * @covers \Boxscore\BoxscoreRepository

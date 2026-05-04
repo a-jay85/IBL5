@@ -6,13 +6,13 @@ namespace Tests\SavedDepthChart;
 
 use SavedDepthChart\Contracts\SavedDepthChartServiceInterface;
 use SavedDepthChart\SavedDepthChartService;
-use Tests\Integration\IntegrationTestCase;
+use Tests\WideUnit\WideUnitTestCase;
 use Season\Season;
 
 /**
  * @covers \SavedDepthChart\SavedDepthChartService
  */
-class SavedDepthChartServiceTest extends IntegrationTestCase
+class SavedDepthChartServiceTest extends WideUnitTestCase
 {
     private SavedDepthChartService $service;
 

@@ -6,9 +6,9 @@ namespace Tests\Api\Controller;
 
 use Api\Controller\LeadersController;
 use Api\Response\JsonResponder;
-use Tests\Integration\IntegrationTestCase;
+use Tests\WideUnit\WideUnitTestCase;
 
-class LeadersControllerTest extends IntegrationTestCase
+class LeadersControllerTest extends WideUnitTestCase
 {
     public function testHandleCallsResponderWithLeaderData(): void
     {

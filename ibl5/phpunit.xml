@@ -153,8 +153,8 @@
         <testsuite name="Scripts Module Tests">
             <directory>tests/Scripts</directory>
         </testsuite>
-        <testsuite name="Integration Tests">
-            <directory>tests/Integration</directory>
+        <testsuite name="WideUnit Tests">
+            <directory>tests/WideUnit</directory>
         </testsuite>
         <testsuite name="GMContactList Module Tests">
             <directory>tests/GMContactList</directory>

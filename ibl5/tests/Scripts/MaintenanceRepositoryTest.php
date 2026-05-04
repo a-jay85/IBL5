@@ -7,7 +7,7 @@ namespace Tests\Scripts;
 use Scripts\MaintenanceRepository;
 use Scripts\Contracts\MaintenanceRepositoryInterface;
 use PHPUnit\Framework\TestCase;
-use Tests\Integration\Mocks\MockDatabase;
+use Tests\WideUnit\Mocks\MockDatabase;
 
 /**
  * @covers \Scripts\MaintenanceRepository

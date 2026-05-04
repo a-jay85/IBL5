@@ -4,14 +4,14 @@ declare(strict_types=1);
 
 namespace Tests\Topics;
 
-use Tests\Integration\IntegrationTestCase;
+use Tests\WideUnit\WideUnitTestCase;
 use Topics\Contracts\TopicsRepositoryInterface;
 use Topics\TopicsRepository;
 
 /**
  * @covers \Topics\TopicsRepository
  */
-class TopicsRepositoryTest extends IntegrationTestCase
+class TopicsRepositoryTest extends WideUnitTestCase
 {
     private TopicsRepository $repository;
 

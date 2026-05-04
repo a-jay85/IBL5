@@ -6,9 +6,9 @@ namespace Tests\Api\Controller;
 
 use Api\Controller\GameListController;
 use Api\Response\JsonResponder;
-use Tests\Integration\IntegrationTestCase;
+use Tests\WideUnit\WideUnitTestCase;
 
-class GameListControllerTest extends IntegrationTestCase
+class GameListControllerTest extends WideUnitTestCase
 {
     public function testHandleCallsResponderWithGameData(): void
     {

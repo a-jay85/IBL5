@@ -6,9 +6,9 @@ namespace Tests\Api\Controller;
 
 use Api\Controller\TradeAcceptController;
 use Api\Response\JsonResponder;
-use Tests\Integration\IntegrationTestCase;
+use Tests\WideUnit\WideUnitTestCase;
 
-class TradeAcceptControllerTest extends IntegrationTestCase
+class TradeAcceptControllerTest extends WideUnitTestCase
 {
     public function testReturns400WhenOfferIdMissing(): void
     {

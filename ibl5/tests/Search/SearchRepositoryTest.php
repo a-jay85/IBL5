@@ -6,12 +6,12 @@ namespace Tests\Search;
 
 use Search\Contracts\SearchRepositoryInterface;
 use Search\SearchRepository;
-use Tests\Integration\IntegrationTestCase;
+use Tests\WideUnit\WideUnitTestCase;
 
 /**
  * @covers \Search\SearchRepository
  */
-class SearchRepositoryTest extends IntegrationTestCase
+class SearchRepositoryTest extends WideUnitTestCase
 {
     private SearchRepository $repository;
 

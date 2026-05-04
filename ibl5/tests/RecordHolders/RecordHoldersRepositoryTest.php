@@ -4,10 +4,10 @@ declare(strict_types=1);
 
 namespace Tests\RecordHolders;
 
-use Tests\Integration\IntegrationTestCase;
+use Tests\WideUnit\WideUnitTestCase;
 use RecordHolders\RecordHoldersRepository;
 
-final class RecordHoldersRepositoryTest extends IntegrationTestCase
+final class RecordHoldersRepositoryTest extends WideUnitTestCase
 {
     private RecordHoldersRepository $repository;
 

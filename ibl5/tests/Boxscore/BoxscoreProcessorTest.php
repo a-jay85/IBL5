@@ -10,7 +10,7 @@ use Boxscore\BoxscoreRepository;
 use Boxscore\Contracts\BoxscoreProcessorInterface;
 use PHPUnit\Framework\TestCase;
 use Season\Season;
-use Tests\Integration\Mocks\MockDatabase;
+use Tests\WideUnit\Mocks\MockDatabase;
 
 /**
  * Test subclass exposing protected methods for unit testing.

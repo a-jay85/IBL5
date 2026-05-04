@@ -7,7 +7,7 @@ namespace Tests\Updater;
 use Boxscore\BoxscoreRepository;
 use PHPUnit\Framework\TestCase;
 use Season\Season;
-use Tests\Integration\Mocks\MockDatabase;
+use Tests\WideUnit\Mocks\MockDatabase;
 use Updater\Steps\CleanupPreseasonDataStep;
 
 /**
@@ -94,11 +94,11 @@ class CleanupPreseasonDataStepTest extends TestCase
     }
 
     /**
-     * @return \Tests\Integration\Mocks\Season
+     * @return \Tests\WideUnit\Mocks\Season
      */
-    private function buildSeason(string $phase): \Tests\Integration\Mocks\Season
+    private function buildSeason(string $phase): \Tests\WideUnit\Mocks\Season
     {
-        $season = new \Tests\Integration\Mocks\Season($this->mockDb);
+        $season = new \Tests\WideUnit\Mocks\Season($this->mockDb);
         $season->phase = $phase;
         $season->beginningYear = 2024;
         $season->endingYear = 2025;
@@ -109,7 +109,7 @@ class CleanupPreseasonDataStepTest extends TestCase
         return $season;
     }
 
-    private function buildStep(\Tests\Integration\Mocks\Season $season): CleanupPreseasonDataStep
+    private function buildStep(\Tests\WideUnit\Mocks\Season $season): CleanupPreseasonDataStep
     {
         /** @var Season $season */
         $repo = new BoxscoreRepository($this->mockDb);

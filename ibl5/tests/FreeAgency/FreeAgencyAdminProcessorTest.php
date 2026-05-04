@@ -7,7 +7,7 @@ namespace Tests\FreeAgency;
 use FreeAgency\Contracts\FreeAgencyAdminRepositoryInterface;
 use FreeAgency\FreeAgencyAdminProcessor;
 use PHPUnit\Framework\TestCase;
-use Tests\Integration\Mocks\MockDatabase;
+use Tests\WideUnit\Mocks\MockDatabase;
 
 class FreeAgencyAdminProcessorTest extends TestCase
 {

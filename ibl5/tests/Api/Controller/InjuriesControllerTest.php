@@ -6,9 +6,9 @@ namespace Tests\Api\Controller;
 
 use Api\Controller\InjuriesController;
 use Api\Response\JsonResponder;
-use Tests\Integration\IntegrationTestCase;
+use Tests\WideUnit\WideUnitTestCase;
 
-class InjuriesControllerTest extends IntegrationTestCase
+class InjuriesControllerTest extends WideUnitTestCase
 {
     public function testHandleCallsResponderWithInjuredPlayers(): void
     {

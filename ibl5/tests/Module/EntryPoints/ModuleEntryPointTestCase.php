@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Module\EntryPoints;
 
-use Tests\Integration\IntegrationTestCase;
+use Tests\WideUnit\WideUnitTestCase;
 
 /**
  * Base class for module entry point integration tests.
@@ -16,7 +16,7 @@ use Tests\Integration\IntegrationTestCase;
  * - Double output buffering to handle PageLayout::footer()'s ob_end_flush()
  * - Theme function stubs (themeheader, themefooter, etc.)
  */
-abstract class ModuleEntryPointTestCase extends IntegrationTestCase
+abstract class ModuleEntryPointTestCase extends WideUnitTestCase
 {
     /** @var array<string, mixed> */
     private array $savedGet;

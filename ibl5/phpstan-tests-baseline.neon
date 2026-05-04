@@ -201,8 +201,14 @@ parameters:
 		-
 			rawMessage: 'Dynamic call to static method PHPUnit\Framework\TestCase::createStub().'
 			identifier: staticMethod.dynamicCall
-			count: 4
+			count: 6
 			path: tests/ApiKeys/ApiKeysServiceTest.php
+
+		-
+			rawMessage: 'Call to static method PHPUnit\Framework\Assert::assertSame() with 12 and 12 will always evaluate to true.'
+			identifier: staticMethod.alreadyNarrowedType
+			count: 1
+			path: tests/Auth/AuthServiceBcryptCostTest.php
 
 		-
 			rawMessage: 'Call to static method PHPUnit\Framework\Assert::assertInstanceOf() with ''Auth\\Contracts\\AuthServiceInterface'' and Auth\AuthService will always evaluate to true.'
@@ -315,7 +321,7 @@ parameters:
 		-
 			rawMessage: 'Call to method onQuery() on an unknown class MockDatabase.'
 			identifier: class.notFound
-			count: 10
+			count: 11
 			path: tests/Boxscore/BoxscoreProcessorTest.php
 
 		-
@@ -327,19 +333,19 @@ parameters:
 		-
 			rawMessage: 'Call to method setReturnTrue() on an unknown class MockDatabase.'
 			identifier: class.notFound
-			count: 19
+			count: 21
 			path: tests/Boxscore/BoxscoreProcessorTest.php
 
 		-
 			rawMessage: 'Dynamic call to static method PHPUnit\Framework\TestCase::createStub().'
 			identifier: staticMethod.dynamicCall
-			count: 10
+			count: 12
 			path: tests/Boxscore/BoxscoreProcessorTest.php
 
 		-
 			rawMessage: Instantiated class MockDatabase not found.
 			identifier: class.notFound
-			count: 13
+			count: 15
 			path: tests/Boxscore/BoxscoreProcessorTest.php
 
 		-
@@ -351,13 +357,13 @@ parameters:
 		-
 			rawMessage: 'Parameter #1 $db of class Boxscore\BoxscoreProcessor constructor expects mysqli, MockDatabase given.'
 			identifier: argument.type
-			count: 12
+			count: 14
 			path: tests/Boxscore/BoxscoreProcessorTest.php
 
 		-
 			rawMessage: 'Parameter #1 $db of class Boxscore\BoxscoreRepository constructor expects mysqli, MockDatabase given.'
 			identifier: argument.type
-			count: 12
+			count: 14
 			path: tests/Boxscore/BoxscoreProcessorTest.php
 
 		-
@@ -3094,696 +3100,6 @@ parameters:
 			path: tests/Injuries/InjuriesViewTest.php
 
 		-
-			rawMessage: 'Loose comparison via "==" between int<1, 2>|int<4, 8> and int is not allowed.'
-			identifier: equal.notAllowed
-			count: 1
-			path: tests/Integration/DepthChartEntry/DepthChartEntryIntegrationTest.php
-
-		-
-			rawMessage: 'Loose comparison via "==" between int<1, 2>|int<5, 8> and int is not allowed.'
-			identifier: equal.notAllowed
-			count: 1
-			path: tests/Integration/DepthChartEntry/DepthChartEntryIntegrationTest.php
-
-		-
-			rawMessage: 'Loose comparison via "==" between int<1, 8> and int is not allowed.'
-			identifier: equal.notAllowed
-			count: 4
-			path: tests/Integration/DepthChartEntry/DepthChartEntryIntegrationTest.php
-
-		-
-			rawMessage: 'Method Tests\Integration\DepthChartEntry\DepthChartEntryIntegrationTest::createPlayoffsPostDataWithMinimalDepth() return type has no value type specified in iterable type array.'
-			identifier: missingType.iterableValue
-			count: 1
-			path: tests/Integration/DepthChartEntry/DepthChartEntryIntegrationTest.php
-
-		-
-			rawMessage: 'Method Tests\Integration\DepthChartEntry\DepthChartEntryIntegrationTest::createPostDataWithActiveCount() return type has no value type specified in iterable type array.'
-			identifier: missingType.iterableValue
-			count: 1
-			path: tests/Integration/DepthChartEntry/DepthChartEntryIntegrationTest.php
-
-		-
-			rawMessage: 'Method Tests\Integration\DepthChartEntry\DepthChartEntryIntegrationTest::createPostDataWithInsufficientPositionDepth() return type has no value type specified in iterable type array.'
-			identifier: missingType.iterableValue
-			count: 1
-			path: tests/Integration/DepthChartEntry/DepthChartEntryIntegrationTest.php
-
-		-
-			rawMessage: 'Method Tests\Integration\DepthChartEntry\DepthChartEntryIntegrationTest::createPostDataWithMultipleIssues() return type has no value type specified in iterable type array.'
-			identifier: missingType.iterableValue
-			count: 1
-			path: tests/Integration/DepthChartEntry/DepthChartEntryIntegrationTest.php
-
-		-
-			rawMessage: 'Method Tests\Integration\DepthChartEntry\DepthChartEntryIntegrationTest::createPostDataWithMultipleStarter() return type has no value type specified in iterable type array.'
-			identifier: missingType.iterableValue
-			count: 1
-			path: tests/Integration/DepthChartEntry/DepthChartEntryIntegrationTest.php
-
-		-
-			rawMessage: 'Method Tests\Integration\DepthChartEntry\DepthChartEntryIntegrationTest::createSinglePlayerPostData() return type has no value type specified in iterable type array.'
-			identifier: missingType.iterableValue
-			count: 1
-			path: tests/Integration/DepthChartEntry/DepthChartEntryIntegrationTest.php
-
-		-
-			rawMessage: 'Method Tests\Integration\DepthChartEntry\DepthChartEntryIntegrationTest::createValidPlayoffsPostData() return type has no value type specified in iterable type array.'
-			identifier: missingType.iterableValue
-			count: 1
-			path: tests/Integration/DepthChartEntry/DepthChartEntryIntegrationTest.php
-
-		-
-			rawMessage: 'Method Tests\Integration\DepthChartEntry\DepthChartEntryIntegrationTest::createValidRegularSeasonPostData() return type has no value type specified in iterable type array.'
-			identifier: missingType.iterableValue
-			count: 1
-			path: tests/Integration/DepthChartEntry/DepthChartEntryIntegrationTest.php
-
-		-
-			rawMessage: 'Offset int<0, 11> on array{array{pg: 1, sg: 0, sf: 0, pf: 0, c: 0}, array{pg: 2, sg: 0, sf: 0, pf: 0, c: 0}, array{pg: 0, sg: 1, sf: 0, pf: 0, c: 0}, array{pg: 0, sg: 2, sf: 0, pf: 0, c: 0}, array{pg: 0, sg: 0, sf: 1, pf: 0, c: 0}, array{pg: 0, sg: 0, sf: 2, pf: 0, c: 0}, array{pg: 0, sg: 0, sf: 0, pf: 1, c: 0}, array{pg: 0, sg: 0, sf: 0, pf: 2, c: 0}, ...} on left side of ?? always exists and is not nullable.'
-			identifier: nullCoalesce.offset
-			count: 1
-			path: tests/Integration/DepthChartEntry/DepthChartEntryIntegrationTest.php
-
-		-
-			rawMessage: 'Parameter #2 $depthChartValues of method DepthChartEntry\DepthChartEntryRepository::updatePlayerDepthChart() expects array{pg: int, sg: int, sf: int, pf: int, c: int, canPlayInGame: int, min: int, of: int, ...}, array{name: ''Player 1'', pg: 1, sg: 0, sf: 0, pf: 0, c: 0, canPlayInGame: 1, min: 30}|array{name: ''Player 2'', pg: 0, sg: 1, sf: 0, pf: 0, c: 0, canPlayInGame: 1, min: 28}|array{name: ''Player 3'', pg: 0, sg: 0, sf: 1, pf: 0, c: 0, canPlayInGame: 1, min: 32} given.'
-			identifier: argument.type
-			count: 1
-			path: tests/Integration/DepthChartEntry/DepthChartEntryIntegrationTest.php
-
-		-
-			rawMessage: 'Parameter #2 $depthChartValues of method DepthChartEntry\DepthChartEntryRepository::updatePlayerDepthChart() expects array{pg: int, sg: int, sf: int, pf: int, c: int, canPlayInGame: int, min: int, of: int, ...}, array{pg: 0, sg: 0, sf: 0, pf: 0, c: 0, canPlayInGame: 1, min: 0} given.'
-			identifier: argument.type
-			count: 1
-			path: tests/Integration/DepthChartEntry/DepthChartEntryIntegrationTest.php
-
-		-
-			rawMessage: 'Parameter #2 $depthChartValues of method DepthChartEntry\DepthChartEntryRepository::updatePlayerDepthChart() expects array{pg: int, sg: int, sf: int, pf: int, c: int, canPlayInGame: int, min: int, of: int, ...}, array{pg: 1, sg: 2, sf: 3, pf: 4, c: 5, canPlayInGame: 1, min: 35} given.'
-			identifier: argument.type
-			count: 1
-			path: tests/Integration/DepthChartEntry/DepthChartEntryIntegrationTest.php
-
-		-
-			rawMessage: 'You should use assertSame() instead of assertEquals(), because both values are scalars of the same type'
-			identifier: phpunit.assertEquals
-			count: 37
-			path: tests/Integration/DepthChartEntry/DepthChartEntryIntegrationTest.php
-
-		-
-			rawMessage: 'Dynamic call to static method PHPUnit\Framework\TestCase::createStub().'
-			identifier: staticMethod.dynamicCall
-			count: 2
-			path: tests/Integration/Draft/DraftIntegrationTest.php
-
-		-
-			rawMessage: 'Method Tests\Integration\Draft\DraftIntegrationTest::getBaseDraftData() return type has no value type specified in iterable type array.'
-			identifier: missingType.iterableValue
-			count: 1
-			path: tests/Integration/Draft/DraftIntegrationTest.php
-
-		-
-			rawMessage: 'Array has 2 duplicate keys with value ''teamid'' (''teamid'', ''teamid'').'
-			identifier: array.duplicateKey
-			count: 1
-			path: tests/Integration/Extension/ExtensionIntegrationTest.php
-
-		-
-			rawMessage: '''
-				Instantiation of deprecated class Extension\ExtensionProcessor:
-				Use ExtensionService instead
-			'''
-			identifier: new.deprecatedClass
-			count: 1
-			path: tests/Integration/Extension/ExtensionIntegrationTest.php
-
-		-
-			rawMessage: 'Method Tests\Integration\Extension\ExtensionIntegrationTest::getBasePlayerData() return type has no value type specified in iterable type array.'
-			identifier: missingType.iterableValue
-			count: 1
-			path: tests/Integration/Extension/ExtensionIntegrationTest.php
-
-		-
-			rawMessage: '''
-				Property $extensionProcessor references deprecated class Extension\ExtensionProcessor in its type:
-				Use ExtensionService instead
-			'''
-			identifier: property.deprecatedClass
-			count: 1
-			path: tests/Integration/Extension/ExtensionIntegrationTest.php
-
-		-
-			rawMessage: 'You should use assertSame() instead of assertEquals(), because both values are scalars of the same type'
-			identifier: phpunit.assertEquals
-			count: 2
-			path: tests/Integration/Extension/ExtensionIntegrationTest.php
-
-		-
-			rawMessage: 'Method Tests\Integration\FreeAgency\FreeAgencyIntegrationTest::getBaseFreeAgentData() return type has no value type specified in iterable type array.'
-			identifier: missingType.iterableValue
-			count: 1
-			path: tests/Integration/FreeAgency/FreeAgencyIntegrationTest.php
-
-		-
-			rawMessage: 'AnonymousClass2afc458204aa20c6aefbd0a07b6df7b0::__construct() does not call parent constructor from mysqli.'
-			identifier: constructor.missingParentCall
-			count: 1
-			path: tests/Integration/IntegrationTestCase.php
-
-		-
-			rawMessage: 'Call to method PHPUnit\Framework\Assert::assertTrue() with true will always evaluate to true.'
-			identifier: method.alreadyNarrowedType
-			count: 1
-			path: tests/Integration/IntegrationTestCase.php
-
-		-
-			rawMessage: 'Call to method sql_query() on an unknown class MockDatabase.'
-			identifier: class.notFound
-			count: 1
-			path: tests/Integration/IntegrationTestCase.php
-
-		-
-			rawMessage: Class MockDatabaseResult not found.
-			identifier: class.notFound
-			count: 1
-			path: tests/Integration/IntegrationTestCase.php
-
-		-
-			rawMessage: 'Dynamic call to static method PHPUnit\Framework\Assert::fail().'
-			identifier: staticMethod.dynamicCall
-			count: 1
-			path: tests/Integration/IntegrationTestCase.php
-
-		-
-			rawMessage: Instantiated class MockDatabase not found.
-			identifier: class.notFound
-			count: 1
-			path: tests/Integration/IntegrationTestCase.php
-
-		-
-			rawMessage: Instantiated class MockPreparedStatement not found.
-			identifier: class.notFound
-			count: 1
-			path: tests/Integration/IntegrationTestCase.php
-
-		-
-			rawMessage: 'Method Tests\Integration\IntegrationTestCase::getExecutedQueries() return type has no value type specified in iterable type array.'
-			identifier: missingType.iterableValue
-			count: 1
-			path: tests/Integration/IntegrationTestCase.php
-
-		-
-			rawMessage: 'Method mysqli@anonymous/Integration/IntegrationTestCase.php:67::prepare() has invalid return type MockPreparedStatement.'
-			identifier: class.notFound
-			count: 1
-			path: tests/Integration/IntegrationTestCase.php
-
-		-
-			rawMessage: 'Method mysqli@anonymous/Integration/IntegrationTestCase.php:67::prepare() never returns false so it can be removed from the return type.'
-			identifier: return.unusedType
-			count: 1
-			path: tests/Integration/IntegrationTestCase.php
-
-		-
-			rawMessage: 'Method mysqli@anonymous/Integration/IntegrationTestCase.php:67::query() never returns mysqli_result so it can be removed from the return type.'
-			identifier: return.unusedType
-			count: 1
-			path: tests/Integration/IntegrationTestCase.php
-
-		-
-			rawMessage: 'Parameter #1 $mockDb of class mysqli@anonymous/Integration/IntegrationTestCase.php:67 constructor expects MockDatabase, Tests\Integration\Mocks\MockDatabase|null given.'
-			identifier: argument.type
-			count: 1
-			path: tests/Integration/IntegrationTestCase.php
-
-		-
-			rawMessage: 'Parameter $mockDb of method mysqli@anonymous/Integration/IntegrationTestCase.php:67::__construct() has invalid type MockDatabase.'
-			identifier: class.notFound
-			count: 1
-			path: tests/Integration/IntegrationTestCase.php
-
-		-
-			rawMessage: 'Property Tests\Integration\IntegrationTestCase::$mockDb (Tests\Integration\Mocks\MockDatabase|null) does not accept MockDatabase.'
-			identifier: assign.propertyType
-			count: 1
-			path: tests/Integration/IntegrationTestCase.php
-
-		-
-			rawMessage: Property mysqli@anonymous/Integration/IntegrationTestCase.php:67::$mockDb has unknown class MockDatabase as its type.
-			identifier: class.notFound
-			count: 1
-			path: tests/Integration/IntegrationTestCase.php
-
-		-
-			rawMessage: 'Return type (MockPreparedStatement|false) of method mysqli@anonymous/Integration/IntegrationTestCase.php:67::prepare() should be covariant with return type (mysqli_stmt|false) of method mysqli::prepare()'
-			identifier: method.childReturnType
-			count: 1
-			path: tests/Integration/IntegrationTestCase.php
-
-		-
-			rawMessage: Short ternary operator is not allowed. Use null coalesce operator if applicable or consider using long ternary.
-			identifier: ternary.shortNotAllowed
-			count: 1
-			path: tests/Integration/IntegrationTestCase.php
-
-		-
-			rawMessage: 'Method Tests\Integration\Mocks\Discord::postToChannel() has no return type specified.'
-			identifier: missingType.return
-			count: 1
-			path: tests/Integration/Mocks/Discord.php
-
-		-
-			rawMessage: 'Method Tests\Integration\Mocks\Discord::postToChannel() has parameter $channel with no type specified.'
-			identifier: missingType.parameter
-			count: 1
-			path: tests/Integration/Mocks/Discord.php
-
-		-
-			rawMessage: 'Method Tests\Integration\Mocks\Discord::postToChannel() has parameter $message with no type specified.'
-			identifier: missingType.parameter
-			count: 1
-			path: tests/Integration/Mocks/Discord.php
-
-		-
-			rawMessage: 'Construct empty() is not allowed. Use more strict comparison.'
-			identifier: empty.notAllowed
-			count: 6
-			path: tests/Integration/Mocks/MockDatabase.php
-
-		-
-			rawMessage: 'Method Tests\Integration\Mocks\MockDatabase::getExecutedQueries() return type has no value type specified in iterable type array.'
-			identifier: missingType.iterableValue
-			count: 1
-			path: tests/Integration/Mocks/MockDatabase.php
-
-		-
-			rawMessage: 'Method Tests\Integration\Mocks\MockDatabase::setMockData() has parameter $data with no value type specified in iterable type array.'
-			identifier: missingType.iterableValue
-			count: 1
-			path: tests/Integration/Mocks/MockDatabase.php
-
-		-
-			rawMessage: 'Method Tests\Integration\Mocks\MockDatabase::setMockPythagoreanData() has parameter $data with no value type specified in iterable type array.'
-			identifier: missingType.iterableValue
-			count: 1
-			path: tests/Integration/Mocks/MockDatabase.php
-
-		-
-			rawMessage: 'Method Tests\Integration\Mocks\MockDatabase::setMockTeamData() has parameter $data with no value type specified in iterable type array.'
-			identifier: missingType.iterableValue
-			count: 1
-			path: tests/Integration/Mocks/MockDatabase.php
-
-		-
-			rawMessage: 'Method Tests\Integration\Mocks\MockDatabase::setMockTradeInfo() has parameter $data with no value type specified in iterable type array.'
-			identifier: missingType.iterableValue
-			count: 1
-			path: tests/Integration/Mocks/MockDatabase.php
-
-		-
-			rawMessage: 'Method Tests\Integration\Mocks\MockDatabase::setVotingResultsQueue() has parameter $resultsQueue with no value type specified in iterable type array.'
-			identifier: missingType.iterableValue
-			count: 1
-			path: tests/Integration/Mocks/MockDatabase.php
-
-		-
-			rawMessage: 'Method Tests\Integration\Mocks\MockDatabase::sql_fetch_assoc() return type has no value type specified in iterable type array.'
-			identifier: missingType.iterableValue
-			count: 1
-			path: tests/Integration/Mocks/MockDatabase.php
-
-		-
-			rawMessage: 'Method Tests\Integration\Mocks\MockDatabase::sql_fetchrow() return type has no value type specified in iterable type array.'
-			identifier: missingType.iterableValue
-			count: 1
-			path: tests/Integration/Mocks/MockDatabase.php
-
-		-
-			rawMessage: Property Tests\Integration\Mocks\MockDatabase::$executedQueries type has no value type specified in iterable type array.
-			identifier: missingType.iterableValue
-			count: 1
-			path: tests/Integration/Mocks/MockDatabase.php
-
-		-
-			rawMessage: Property Tests\Integration\Mocks\MockDatabase::$mockData type has no value type specified in iterable type array.
-			identifier: missingType.iterableValue
-			count: 1
-			path: tests/Integration/Mocks/MockDatabase.php
-
-		-
-			rawMessage: Property Tests\Integration\Mocks\MockDatabase::$mockPythagoreanData type has no value type specified in iterable type array.
-			identifier: missingType.iterableValue
-			count: 1
-			path: tests/Integration/Mocks/MockDatabase.php
-
-		-
-			rawMessage: Property Tests\Integration\Mocks\MockDatabase::$mockTeamData type has no value type specified in iterable type array.
-			identifier: missingType.iterableValue
-			count: 1
-			path: tests/Integration/Mocks/MockDatabase.php
-
-		-
-			rawMessage: Property Tests\Integration\Mocks\MockDatabase::$mockTradeInfo type has no value type specified in iterable type array.
-			identifier: missingType.iterableValue
-			count: 1
-			path: tests/Integration/Mocks/MockDatabase.php
-
-		-
-			rawMessage: Property Tests\Integration\Mocks\MockDatabase::$votingResultsQueue type has no value type specified in iterable type array.
-			identifier: missingType.iterableValue
-			count: 1
-			path: tests/Integration/Mocks/MockDatabase.php
-
-		-
-			rawMessage: 'Return type (Tests\Integration\Mocks\MockPreparedStatement) of method Tests\Integration\Mocks\MockDatabase::prepare() should be compatible with return type (mysqli_stmt|false) of method mysqli::prepare()'
-			identifier: method.childReturnType
-			count: 1
-			path: tests/Integration/Mocks/MockDatabase.php
-
-		-
-			rawMessage: 'Tests\Integration\Mocks\MockDatabase::__construct() does not call parent constructor from mysqli.'
-			identifier: constructor.missingParentCall
-			count: 1
-			path: tests/Integration/Mocks/MockDatabase.php
-
-		-
-			rawMessage: 'Method Tests\Integration\Mocks\MockDatabaseResult::__construct() has parameter $data with no value type specified in iterable type array.'
-			identifier: missingType.iterableValue
-			count: 1
-			path: tests/Integration/Mocks/MockDatabaseResult.php
-
-		-
-			rawMessage: 'Method Tests\Integration\Mocks\MockDatabaseResult::fetchAssoc() return type has no value type specified in iterable type array.'
-			identifier: missingType.iterableValue
-			count: 1
-			path: tests/Integration/Mocks/MockDatabaseResult.php
-
-		-
-			rawMessage: 'Method Tests\Integration\Mocks\MockDatabaseResult::fetchRow() return type has no value type specified in iterable type array.'
-			identifier: missingType.iterableValue
-			count: 1
-			path: tests/Integration/Mocks/MockDatabaseResult.php
-
-		-
-			rawMessage: 'Method Tests\Integration\Mocks\MockDatabaseResult::fetch_assoc() return type has no value type specified in iterable type array.'
-			identifier: missingType.iterableValue
-			count: 1
-			path: tests/Integration/Mocks/MockDatabaseResult.php
-
-		-
-			rawMessage: Property Tests\Integration\Mocks\MockDatabaseResult::$data type has no value type specified in iterable type array.
-			identifier: missingType.iterableValue
-			count: 1
-			path: tests/Integration/Mocks/MockDatabaseResult.php
-
-		-
-			rawMessage: 'Class Tests\Integration\Mocks\MockMysqliResult implements generic interface Iterator but does not specify its types: TKey, TValue'
-			identifier: missingType.generics
-			count: 1
-			path: tests/Integration/Mocks/MockMysqliResult.php
-
-		-
-			rawMessage: 'Method Tests\Integration\Mocks\MockMysqliResult::fetch_array() return type has no value type specified in iterable type array.'
-			identifier: missingType.iterableValue
-			count: 1
-			path: tests/Integration/Mocks/MockMysqliResult.php
-
-		-
-			rawMessage: 'Method Tests\Integration\Mocks\MockMysqliResult::fetch_assoc() return type has no value type specified in iterable type array.'
-			identifier: missingType.iterableValue
-			count: 1
-			path: tests/Integration/Mocks/MockMysqliResult.php
-
-		-
-			rawMessage: Property Tests\Integration\Mocks\MockMysqliResult::$data type has no value type specified in iterable type array.
-			identifier: missingType.iterableValue
-			count: 1
-			path: tests/Integration/Mocks/MockMysqliResult.php
-
-		-
-			rawMessage: Property Tests\Integration\Mocks\MockMysqliResult::$lengths type has no value type specified in iterable type array.
-			identifier: missingType.iterableValue
-			count: 1
-			path: tests/Integration/Mocks/MockMysqliResult.php
-
-		-
-			rawMessage: Property Tests\Integration\Mocks\MockMysqliResult::$mockResult has no type specified.
-			identifier: missingType.property
-			count: 1
-			path: tests/Integration/Mocks/MockMysqliResult.php
-
-		-
-			rawMessage: 'Method Tests\Integration\Mocks\MockPreparedStatement::execute() has parameter $params with no value type specified in iterable type array.'
-			identifier: missingType.iterableValue
-			count: 1
-			path: tests/Integration/Mocks/MockPreparedStatement.php
-
-		-
-			rawMessage: Property Tests\Integration\Mocks\MockPreparedStatement::$boundParams type has no value type specified in iterable type array.
-			identifier: missingType.iterableValue
-			count: 1
-			path: tests/Integration/Mocks/MockPreparedStatement.php
-
-		-
-			rawMessage: 'Property Tests\Integration\Mocks\MockPreparedStatement::$mockDb (Tests\Integration\Mocks\MockDatabase|null) is never assigned null so it can be removed from the property type.'
-			identifier: property.unusedType
-			count: 1
-			path: tests/Integration/Mocks/MockPreparedStatement.php
-
-		-
-			rawMessage: 'Property Tests\Integration\Mocks\MockPreparedStatement::$paramTypes is never read, only written.'
-			identifier: property.onlyWritten
-			count: 1
-			path: tests/Integration/Mocks/MockPreparedStatement.php
-
-		-
-			rawMessage: Property Tests\Integration\Mocks\MockPreparedStatement::$paramTypes type has no value type specified in iterable type array.
-			identifier: missingType.iterableValue
-			count: 1
-			path: tests/Integration/Mocks/MockPreparedStatement.php
-
-		-
-			rawMessage: 'Method Tests\Integration\Mocks\Season::getLastSimDatesArray() is unused.'
-			identifier: method.unused
-			count: 1
-			path: tests/Integration/Mocks/Season.php
-
-		-
-			rawMessage: 'Method Tests\Integration\Mocks\Season::getLastSimDatesArray() return type has no value type specified in iterable type array.'
-			identifier: missingType.iterableValue
-			count: 1
-			path: tests/Integration/Mocks/Season.php
-
-		-
-			rawMessage: 'Array has 2 duplicate keys with value ''intangibles'' (''intangibles'', ''intangibles'').'
-			identifier: array.duplicateKey
-			count: 1
-			path: tests/Integration/Mocks/TestDataFactory.php
-
-		-
-			rawMessage: 'Array has 2 duplicate keys with value ''skill'' (''skill'', ''skill'').'
-			identifier: array.duplicateKey
-			count: 1
-			path: tests/Integration/Mocks/TestDataFactory.php
-
-		-
-			rawMessage: 'Array has 2 duplicate keys with value ''talent'' (''talent'', ''talent'').'
-			identifier: array.duplicateKey
-			count: 1
-			path: tests/Integration/Mocks/TestDataFactory.php
-
-		-
-			rawMessage: 'Array has 2 duplicate keys with value ''teamid'' (''teamid'', ''teamid'').'
-			identifier: array.duplicateKey
-			count: 1
-			path: tests/Integration/ModifierConsistencyTest.php
-
-		-
-			rawMessage: 'Call to method onQuery() on an unknown class MockDatabase.'
-			identifier: class.notFound
-			count: 1
-			path: tests/Integration/ModifierConsistencyTest.php
-
-		-
-			rawMessage: 'Call to method setMockData() on an unknown class MockDatabase.'
-			identifier: class.notFound
-			count: 1
-			path: tests/Integration/ModifierConsistencyTest.php
-
-		-
-			rawMessage: Instantiated class MockDatabase not found.
-			identifier: class.notFound
-			count: 2
-			path: tests/Integration/ModifierConsistencyTest.php
-
-		-
-			rawMessage: 'Parameter #1 $db of class Negotiation\NegotiationDemandCalculator constructor expects mysqli, MockDatabase given.'
-			identifier: argument.type
-			count: 1
-			path: tests/Integration/ModifierConsistencyTest.php
-
-		-
-			rawMessage: 'Parameter #1 $db of static method Player\Player::withPlayerID() expects mysqli, MockDatabase given.'
-			identifier: argument.type
-			count: 1
-			path: tests/Integration/ModifierConsistencyTest.php
-
-		-
-			rawMessage: 'Dynamic call to static method PHPUnit\Framework\TestCase::createStub().'
-			identifier: staticMethod.dynamicCall
-			count: 1
-			path: tests/Integration/Negotiation/NegotiationIntegrationTest.php
-
-		-
-			rawMessage: 'Method Tests\Integration\Negotiation\NegotiationIntegrationTest::getBaseNegotiationData() return type has no value type specified in iterable type array.'
-			identifier: missingType.iterableValue
-			count: 1
-			path: tests/Integration/Negotiation/NegotiationIntegrationTest.php
-
-		-
-			rawMessage: Expression on left side of ?? is not nullable.
-			identifier: nullCoalesce.expr
-			count: 2
-			path: tests/Integration/RookieOption/RookieOptionIntegrationTest.php
-
-		-
-			rawMessage: 'You should use assertSame() instead of assertEquals(), because both values are scalars of the same type'
-			identifier: phpunit.assertEquals
-			count: 5
-			path: tests/Integration/RookieOption/RookieOptionIntegrationTest.php
-
-		-
-			rawMessage: 'Dynamic call to static method PHPUnit\Framework\TestCase::createStub().'
-			identifier: staticMethod.dynamicCall
-			count: 1
-			path: tests/Integration/Schedule/ScheduleIntegrationTest.php
-
-		-
-			rawMessage: 'Method Tests\Integration\Schedule\ScheduleIntegrationTest::createProcessedGameRow() return type has no value type specified in iterable type array.'
-			identifier: missingType.iterableValue
-			count: 1
-			path: tests/Integration/Schedule/ScheduleIntegrationTest.php
-
-		-
-			rawMessage: 'Method Tests\Integration\Schedule\ScheduleIntegrationTest::createScheduleRow() return type has no value type specified in iterable type array.'
-			identifier: missingType.iterableValue
-			count: 1
-			path: tests/Integration/Schedule/ScheduleIntegrationTest.php
-
-		-
-			rawMessage: 'Method Tests\Integration\Schedule\ScheduleIntegrationTest::getDefaultTeamData() return type has no value type specified in iterable type array.'
-			identifier: missingType.iterableValue
-			count: 1
-			path: tests/Integration/Schedule/ScheduleIntegrationTest.php
-
-		-
-			rawMessage: 'You should use assertSame() instead of assertEquals(), because both values are scalars of the same type'
-			identifier: phpunit.assertEquals
-			count: 53
-			path: tests/Integration/Schedule/ScheduleIntegrationTest.php
-
-		-
-			rawMessage: 'Method Tests\Integration\Standings\StandingsIntegrationTest::createStandingsRow() return type has no value type specified in iterable type array.'
-			identifier: missingType.iterableValue
-			count: 1
-			path: tests/Integration/Standings/StandingsIntegrationTest.php
-
-		-
-			rawMessage: 'You should use assertSame() instead of assertEquals(), because both values are scalars of the same type'
-			identifier: phpunit.assertEquals
-			count: 1
-			path: tests/Integration/Trading/TradeIntegrationTest.php
-
-		-
-			rawMessage: 'Call to method PHPUnit\Framework\Assert::assertTrue() with true will always evaluate to true.'
-			identifier: method.alreadyNarrowedType
-			count: 7
-			path: tests/Integration/Voting/VotingIntegrationTest.php
-
-		-
-			rawMessage: Instantiated class MockDatabase not found.
-			identifier: class.notFound
-			count: 1
-			path: tests/Integration/Voting/VotingIntegrationTest.php
-
-		-
-			rawMessage: 'Parameter #1 $tables of method Voting\VotingResultsTableRenderer::renderTables() expects list<array{title: string, rows: list<array{name: string, votes: int, pid: int}>}>, array{array{title: ''Category'', rows: array{array{name: ''Player'', votes: 1}}}} given.'
-			identifier: argument.type
-			count: 1
-			path: tests/Integration/Voting/VotingIntegrationTest.php
-
-		-
-			rawMessage: 'Parameter #1 $tables of method Voting\VotingResultsTableRenderer::renderTables() expects list<array{title: string, rows: list<array{name: string, votes: int, pid: int}>}>, array{array{title: ''MVP Voting'', rows: array{array{name: ''Star Player'', votes: 25}, array{name: ''Runner Up'', votes: 18}}}} given.'
-			identifier: argument.type
-			count: 1
-			path: tests/Integration/Voting/VotingIntegrationTest.php
-
-		-
-			rawMessage: 'Parameter #1 $tables of method Voting\VotingResultsTableRenderer::renderTables() expects list<array{title: string, rows: list<array{name: string, votes: int, pid: int}>}>, array{array{title: ''Styled Table'', rows: array{array{name: ''Row 1'', votes: 1}, array{name: ''Row 2'', votes: 2}, array{name: ''Row 3'', votes: 3}}}} given.'
-			identifier: argument.type
-			count: 1
-			path: tests/Integration/Voting/VotingIntegrationTest.php
-
-		-
-			rawMessage: 'Parameter #1 $tables of method Voting\VotingResultsTableRenderer::renderTables() expects list<array{title: string, rows: list<array{name: string, votes: int, pid: int}>}>, array{array{title: ''Test Category'', rows: array{array{name: ''Player One'', votes: 10}}}} given.'
-			identifier: argument.type
-			count: 1
-			path: tests/Integration/Voting/VotingIntegrationTest.php
-
-		-
-			rawMessage: 'Parameter #1 $tables of method Voting\VotingResultsTableRenderer::renderTables() expects list<array{title: string, rows: list<array{name: string, votes: int, pid: int}>}>, array{array{title: ''Test'', rows: array{array{name: ''<script>alert("xss"…'', votes: 1}}}} given.'
-			identifier: argument.type
-			count: 1
-			path: tests/Integration/Voting/VotingIntegrationTest.php
-
-		-
-			rawMessage: 'Parameter #1 $tables of method Voting\VotingResultsTableRenderer::renderTables() expects list<array{title: string, rows: list<array{name: string, votes: int, pid: int}>}>, array{array{title: ''Test'', rows: array{array{name: ''Player "The Great"…'', votes: 5}}}} given.'
-			identifier: argument.type
-			count: 1
-			path: tests/Integration/Voting/VotingIntegrationTest.php
-
-		-
-			rawMessage: 'Parameter #1 $tables of method Voting\VotingResultsTableRenderer::renderTables() expects list<array{title: string, rows: list<array{name: string, votes: int, pid: int}>}>, array{array{title: ''Test'', rows: array{array{name: ''Player'', votes: 1}}}} given.'
-			identifier: argument.type
-			count: 1
-			path: tests/Integration/Voting/VotingIntegrationTest.php
-
-		-
-			rawMessage: 'Parameter #3 $season of class Voting\VotingResultsController constructor expects Season\Season, Tests\Integration\Mocks\Season given.'
-			identifier: argument.type
-			count: 9
-			path: tests/Integration/Voting/VotingIntegrationTest.php
-
-		-
-			rawMessage: 'Trivial assertion `assertTrue(true)` always passes and does not test anything. Delete the call or replace it with an assertion against actual behavior.'
-			identifier: ibl.meaninglessAssertion
-			count: 7
-			path: tests/Integration/Voting/VotingIntegrationTest.php
-
-		-
-			rawMessage: 'Dynamic call to static method PHPUnit\Framework\TestCase::createStub().'
-			identifier: staticMethod.dynamicCall
-			count: 6
-			path: tests/Integration/Waivers/WaiversIntegrationTest.php
-
-		-
-			rawMessage: 'Method Tests\Integration\Waivers\WaiversIntegrationTest::getBasePlayerData() has parameter $overrides with no value type specified in iterable type array.'
-			identifier: missingType.iterableValue
-			count: 1
-			path: tests/Integration/Waivers/WaiversIntegrationTest.php
-
-		-
-			rawMessage: 'Method Tests\Integration\Waivers\WaiversIntegrationTest::getBasePlayerData() return type has no value type specified in iterable type array.'
-			identifier: missingType.iterableValue
-			count: 1
-			path: tests/Integration/Waivers/WaiversIntegrationTest.php
-
-		-
-			rawMessage: 'You should use assertSame() instead of assertEquals(), because both values are scalars of the same type'
-			identifier: phpunit.assertEquals
-			count: 7
-			path: tests/Integration/Waivers/WaiversIntegrationTest.php
-
-		-
 			rawMessage: 'Parameter &$lines by-ref type of method Tests\JsbParser\AswFileParserTest::fillLines() expects list<string>, non-empty-array<int, string> given.'
 			identifier: parameterByRef.type
 			count: 1
@@ -4044,7 +3360,7 @@ parameters:
 		-
 			rawMessage: 'Dynamic call to static method PHPUnit\Framework\TestCase::createStub().'
 			identifier: staticMethod.dynamicCall
-			count: 33
+			count: 34
 			path: tests/LeagueControlPanel/LeagueControlPanelProcessorTest.php
 
 		-
@@ -5903,7 +5219,7 @@ parameters:
 		-
 			rawMessage: 'Dynamic call to static method PHPUnit\Framework\TestCase::createStub().'
 			identifier: staticMethod.dynamicCall
-			count: 1
+			count: 2
 			path: tests/ProjectedDraftOrder/ProjectedDraftOrderServiceTest.php
 
 		-
@@ -6963,86 +6279,86 @@ parameters:
 			path: tests/SiteStatistics/StatisticsProcessorTest.php
 
 		-
-			rawMessage: 'Method Tests\Integration\Mocks\MockDatabase@anonymous/SiteStatistics/StatisticsRepositoryTest.php:30::setQueryResults() has parameter $results with no value type specified in iterable type array.'
-			identifier: missingType.iterableValue
-			count: 1
-			path: tests/SiteStatistics/StatisticsRepositoryTest.php
-
-		-
-			rawMessage: 'Method Tests\Integration\Mocks\MockDatabaseResult@anonymous/SiteStatistics/StatisticsRepositoryTest.php:64::__construct() has parameter $results with no value type specified in iterable type array.'
-			identifier: missingType.iterableValue
-			count: 1
-			path: tests/SiteStatistics/StatisticsRepositoryTest.php
-
-		-
-			rawMessage: 'Method Tests\Integration\Mocks\MockDatabaseResult@anonymous/SiteStatistics/StatisticsRepositoryTest.php:64::fetch_assoc() return type has no value type specified in iterable type array.'
-			identifier: missingType.iterableValue
-			count: 1
-			path: tests/SiteStatistics/StatisticsRepositoryTest.php
-
-		-
-			rawMessage: 'Method Tests\Integration\Mocks\MockPreparedStatement@anonymous/SiteStatistics/StatisticsRepositoryTest.php:48::__construct() has parameter $db with no type specified.'
-			identifier: missingType.parameter
-			count: 1
-			path: tests/SiteStatistics/StatisticsRepositoryTest.php
-
-		-
-			rawMessage: 'Method Tests\Integration\Mocks\MockPreparedStatement@anonymous/SiteStatistics/StatisticsRepositoryTest.php:48::__construct() has parameter $results with no value type specified in iterable type array.'
-			identifier: missingType.iterableValue
-			count: 1
-			path: tests/SiteStatistics/StatisticsRepositoryTest.php
-
-		-
-			rawMessage: 'Method Tests\Integration\Mocks\MockPreparedStatement@anonymous/SiteStatistics/StatisticsRepositoryTest.php:48::__construct() has parameter $state with no value type specified in iterable type array.'
-			identifier: missingType.iterableValue
-			count: 1
-			path: tests/SiteStatistics/StatisticsRepositoryTest.php
-
-		-
-			rawMessage: 'Method Tests\Integration\Mocks\MockPreparedStatement@anonymous/SiteStatistics/StatisticsRepositoryTest.php:48::get_result() never returns false so it can be removed from the return type.'
-			identifier: return.unusedType
-			count: 1
-			path: tests/SiteStatistics/StatisticsRepositoryTest.php
-
-		-
 			rawMessage: 'Method Tests\SiteStatistics\StatisticsRepositoryTest::createMockDatabase() has no return type specified.'
 			identifier: missingType.return
 			count: 1
 			path: tests/SiteStatistics/StatisticsRepositoryTest.php
 
 		-
-			rawMessage: Property Tests\Integration\Mocks\MockDatabase@anonymous/SiteStatistics/StatisticsRepositoryTest.php:30::$queryResults type has no value type specified in iterable type array.
+			rawMessage: 'Method Tests\WideUnit\Mocks\MockDatabase@anonymous/SiteStatistics/StatisticsRepositoryTest.php:30::setQueryResults() has parameter $results with no value type specified in iterable type array.'
 			identifier: missingType.iterableValue
 			count: 1
 			path: tests/SiteStatistics/StatisticsRepositoryTest.php
 
 		-
-			rawMessage: Property Tests\Integration\Mocks\MockDatabase@anonymous/SiteStatistics/StatisticsRepositoryTest.php:30::$sharedState type has no value type specified in iterable type array.
+			rawMessage: 'Method Tests\WideUnit\Mocks\MockDatabaseResult@anonymous/SiteStatistics/StatisticsRepositoryTest.php:64::__construct() has parameter $results with no value type specified in iterable type array.'
 			identifier: missingType.iterableValue
 			count: 1
 			path: tests/SiteStatistics/StatisticsRepositoryTest.php
 
 		-
-			rawMessage: Property Tests\Integration\Mocks\MockDatabaseResult@anonymous/SiteStatistics/StatisticsRepositoryTest.php:64::$allResults type has no value type specified in iterable type array.
+			rawMessage: 'Method Tests\WideUnit\Mocks\MockDatabaseResult@anonymous/SiteStatistics/StatisticsRepositoryTest.php:64::fetch_assoc() return type has no value type specified in iterable type array.'
 			identifier: missingType.iterableValue
 			count: 1
 			path: tests/SiteStatistics/StatisticsRepositoryTest.php
 
 		-
-			rawMessage: Property Tests\Integration\Mocks\MockPreparedStatement@anonymous/SiteStatistics/StatisticsRepositoryTest.php:48::$results type has no value type specified in iterable type array.
+			rawMessage: 'Method Tests\WideUnit\Mocks\MockPreparedStatement@anonymous/SiteStatistics/StatisticsRepositoryTest.php:48::__construct() has parameter $db with no type specified.'
+			identifier: missingType.parameter
+			count: 1
+			path: tests/SiteStatistics/StatisticsRepositoryTest.php
+
+		-
+			rawMessage: 'Method Tests\WideUnit\Mocks\MockPreparedStatement@anonymous/SiteStatistics/StatisticsRepositoryTest.php:48::__construct() has parameter $results with no value type specified in iterable type array.'
 			identifier: missingType.iterableValue
 			count: 1
 			path: tests/SiteStatistics/StatisticsRepositoryTest.php
 
 		-
-			rawMessage: Property Tests\Integration\Mocks\MockPreparedStatement@anonymous/SiteStatistics/StatisticsRepositoryTest.php:48::$sharedState type has no value type specified in iterable type array.
+			rawMessage: 'Method Tests\WideUnit\Mocks\MockPreparedStatement@anonymous/SiteStatistics/StatisticsRepositoryTest.php:48::__construct() has parameter $state with no value type specified in iterable type array.'
 			identifier: missingType.iterableValue
+			count: 1
+			path: tests/SiteStatistics/StatisticsRepositoryTest.php
+
+		-
+			rawMessage: 'Method Tests\WideUnit\Mocks\MockPreparedStatement@anonymous/SiteStatistics/StatisticsRepositoryTest.php:48::get_result() never returns false so it can be removed from the return type.'
+			identifier: return.unusedType
 			count: 1
 			path: tests/SiteStatistics/StatisticsRepositoryTest.php
 
 		-
 			rawMessage: Property Tests\SiteStatistics\StatisticsRepositoryTest::$mockDb has no type specified.
 			identifier: missingType.property
+			count: 1
+			path: tests/SiteStatistics/StatisticsRepositoryTest.php
+
+		-
+			rawMessage: Property Tests\WideUnit\Mocks\MockDatabase@anonymous/SiteStatistics/StatisticsRepositoryTest.php:30::$queryResults type has no value type specified in iterable type array.
+			identifier: missingType.iterableValue
+			count: 1
+			path: tests/SiteStatistics/StatisticsRepositoryTest.php
+
+		-
+			rawMessage: Property Tests\WideUnit\Mocks\MockDatabase@anonymous/SiteStatistics/StatisticsRepositoryTest.php:30::$sharedState type has no value type specified in iterable type array.
+			identifier: missingType.iterableValue
+			count: 1
+			path: tests/SiteStatistics/StatisticsRepositoryTest.php
+
+		-
+			rawMessage: Property Tests\WideUnit\Mocks\MockDatabaseResult@anonymous/SiteStatistics/StatisticsRepositoryTest.php:64::$allResults type has no value type specified in iterable type array.
+			identifier: missingType.iterableValue
+			count: 1
+			path: tests/SiteStatistics/StatisticsRepositoryTest.php
+
+		-
+			rawMessage: Property Tests\WideUnit\Mocks\MockPreparedStatement@anonymous/SiteStatistics/StatisticsRepositoryTest.php:48::$results type has no value type specified in iterable type array.
+			identifier: missingType.iterableValue
+			count: 1
+			path: tests/SiteStatistics/StatisticsRepositoryTest.php
+
+		-
+			rawMessage: Property Tests\WideUnit\Mocks\MockPreparedStatement@anonymous/SiteStatistics/StatisticsRepositoryTest.php:48::$sharedState type has no value type specified in iterable type array.
+			identifier: missingType.iterableValue
 			count: 1
 			path: tests/SiteStatistics/StatisticsRepositoryTest.php
 
@@ -8781,15 +8097,9 @@ parameters:
 			path: tests/UpdateAllTheThings/Steps/ExtendDepthChartsStepTest.php
 
 		-
-			rawMessage: 'Call to an undefined method BulkImport\Contracts\ArchiveExtractorInterface::method().'
-			identifier: method.notFound
-			count: 3
-			path: tests/UpdateAllTheThings/Steps/ExtractFromBackupStepTest.php
-
-		-
 			rawMessage: 'Call to an undefined method BulkImport\Contracts\BackupArchiveLocatorInterface::method().'
 			identifier: method.notFound
-			count: 7
+			count: 5
 			path: tests/UpdateAllTheThings/Steps/ExtractFromBackupStepTest.php
 
 		-
@@ -8801,7 +8111,7 @@ parameters:
 		-
 			rawMessage: 'Dynamic call to static method PHPUnit\Framework\TestCase::createStub().'
 			identifier: staticMethod.dynamicCall
-			count: 3
+			count: 2
 			path: tests/UpdateAllTheThings/Steps/ExtractFromBackupStepTest.php
 
 		-
@@ -8901,21 +8211,21 @@ parameters:
 			path: tests/UpdateAllTheThings/Steps/ProcessAllStarGamesStepTest.php
 
 		-
+			rawMessage: 'Call to an undefined method Updater\Contracts\JsbSourceResolverInterface::method().'
+			identifier: method.notFound
+			count: 3
+			path: tests/UpdateAllTheThings/Steps/ProcessAllStarGamesStepTest.php
+
+		-
 			rawMessage: 'Call to method PHPUnit\Framework\Assert::assertInstanceOf() with ''Updater\\Contracts\\PipelineStepInterface'' and Updater\Steps\ProcessAllStarGamesStep will always evaluate to true.'
 			identifier: method.alreadyNarrowedType
 			count: 1
 			path: tests/UpdateAllTheThings/Steps/ProcessAllStarGamesStepTest.php
 
 		-
-			rawMessage: 'Dynamic call to static method PHPUnit\Framework\Assert::fail().'
-			identifier: staticMethod.dynamicCall
-			count: 2
-			path: tests/UpdateAllTheThings/Steps/ProcessAllStarGamesStepTest.php
-
-		-
 			rawMessage: 'Dynamic call to static method PHPUnit\Framework\TestCase::createStub().'
 			identifier: staticMethod.dynamicCall
-			count: 3
+			count: 4
 			path: tests/UpdateAllTheThings/Steps/ProcessAllStarGamesStepTest.php
 
 		-
@@ -8931,21 +8241,21 @@ parameters:
 			path: tests/UpdateAllTheThings/Steps/ProcessBoxscoresStepTest.php
 
 		-
+			rawMessage: 'Call to an undefined method Updater\Contracts\JsbSourceResolverInterface::method().'
+			identifier: method.notFound
+			count: 2
+			path: tests/UpdateAllTheThings/Steps/ProcessBoxscoresStepTest.php
+
+		-
 			rawMessage: 'Call to method PHPUnit\Framework\Assert::assertInstanceOf() with ''Updater\\Contracts\\PipelineStepInterface'' and Updater\Steps\ProcessBoxscoresStep will always evaluate to true.'
 			identifier: method.alreadyNarrowedType
 			count: 1
 			path: tests/UpdateAllTheThings/Steps/ProcessBoxscoresStepTest.php
 
 		-
-			rawMessage: 'Dynamic call to static method PHPUnit\Framework\Assert::fail().'
-			identifier: staticMethod.dynamicCall
-			count: 1
-			path: tests/UpdateAllTheThings/Steps/ProcessBoxscoresStepTest.php
-
-		-
 			rawMessage: 'Dynamic call to static method PHPUnit\Framework\TestCase::createStub().'
 			identifier: staticMethod.dynamicCall
-			count: 2
+			count: 3
 			path: tests/UpdateAllTheThings/Steps/ProcessBoxscoresStepTest.php
 
 		-
@@ -9099,7 +8409,7 @@ parameters:
 			path: tests/Updater/CleanupPreseasonDataStepTest.php
 
 		-
-			rawMessage: PHPDoc tag @var with type Season\Season is not subtype of native type Tests\Integration\Mocks\Season.
+			rawMessage: PHPDoc tag @var with type Season\Season is not subtype of native type Tests\WideUnit\Mocks\Season.
 			identifier: varTag.nativeType
 			count: 1
 			path: tests/Updater/CleanupPreseasonDataStepTest.php
@@ -9197,7 +8507,7 @@ parameters:
 		-
 			rawMessage: 'Dynamic call to static method PHPUnit\Framework\TestCase::createStub().'
 			identifier: staticMethod.dynamicCall
-			count: 15
+			count: 19
 			path: tests/Voting/VotingSubmissionServiceTest.php
 
 		-
@@ -9637,6 +8947,696 @@ parameters:
 			identifier: method.alreadyNarrowedType
 			count: 1
 			path: tests/Waivers/WaiversViewTest.php
+
+		-
+			rawMessage: 'Loose comparison via "==" between int<1, 2>|int<4, 8> and int is not allowed.'
+			identifier: equal.notAllowed
+			count: 1
+			path: tests/WideUnit/DepthChartEntry/DepthChartEntryWideUnitTest.php
+
+		-
+			rawMessage: 'Loose comparison via "==" between int<1, 2>|int<5, 8> and int is not allowed.'
+			identifier: equal.notAllowed
+			count: 1
+			path: tests/WideUnit/DepthChartEntry/DepthChartEntryWideUnitTest.php
+
+		-
+			rawMessage: 'Loose comparison via "==" between int<1, 8> and int is not allowed.'
+			identifier: equal.notAllowed
+			count: 4
+			path: tests/WideUnit/DepthChartEntry/DepthChartEntryWideUnitTest.php
+
+		-
+			rawMessage: 'Method Tests\WideUnit\DepthChartEntry\DepthChartEntryWideUnitTest::createPlayoffsPostDataWithMinimalDepth() return type has no value type specified in iterable type array.'
+			identifier: missingType.iterableValue
+			count: 1
+			path: tests/WideUnit/DepthChartEntry/DepthChartEntryWideUnitTest.php
+
+		-
+			rawMessage: 'Method Tests\WideUnit\DepthChartEntry\DepthChartEntryWideUnitTest::createPostDataWithActiveCount() return type has no value type specified in iterable type array.'
+			identifier: missingType.iterableValue
+			count: 1
+			path: tests/WideUnit/DepthChartEntry/DepthChartEntryWideUnitTest.php
+
+		-
+			rawMessage: 'Method Tests\WideUnit\DepthChartEntry\DepthChartEntryWideUnitTest::createPostDataWithInsufficientPositionDepth() return type has no value type specified in iterable type array.'
+			identifier: missingType.iterableValue
+			count: 1
+			path: tests/WideUnit/DepthChartEntry/DepthChartEntryWideUnitTest.php
+
+		-
+			rawMessage: 'Method Tests\WideUnit\DepthChartEntry\DepthChartEntryWideUnitTest::createPostDataWithMultipleIssues() return type has no value type specified in iterable type array.'
+			identifier: missingType.iterableValue
+			count: 1
+			path: tests/WideUnit/DepthChartEntry/DepthChartEntryWideUnitTest.php
+
+		-
+			rawMessage: 'Method Tests\WideUnit\DepthChartEntry\DepthChartEntryWideUnitTest::createPostDataWithMultipleStarter() return type has no value type specified in iterable type array.'
+			identifier: missingType.iterableValue
+			count: 1
+			path: tests/WideUnit/DepthChartEntry/DepthChartEntryWideUnitTest.php
+
+		-
+			rawMessage: 'Method Tests\WideUnit\DepthChartEntry\DepthChartEntryWideUnitTest::createSinglePlayerPostData() return type has no value type specified in iterable type array.'
+			identifier: missingType.iterableValue
+			count: 1
+			path: tests/WideUnit/DepthChartEntry/DepthChartEntryWideUnitTest.php
+
+		-
+			rawMessage: 'Method Tests\WideUnit\DepthChartEntry\DepthChartEntryWideUnitTest::createValidPlayoffsPostData() return type has no value type specified in iterable type array.'
+			identifier: missingType.iterableValue
+			count: 1
+			path: tests/WideUnit/DepthChartEntry/DepthChartEntryWideUnitTest.php
+
+		-
+			rawMessage: 'Method Tests\WideUnit\DepthChartEntry\DepthChartEntryWideUnitTest::createValidRegularSeasonPostData() return type has no value type specified in iterable type array.'
+			identifier: missingType.iterableValue
+			count: 1
+			path: tests/WideUnit/DepthChartEntry/DepthChartEntryWideUnitTest.php
+
+		-
+			rawMessage: 'Offset int<0, 11> on array{array{pg: 1, sg: 0, sf: 0, pf: 0, c: 0}, array{pg: 2, sg: 0, sf: 0, pf: 0, c: 0}, array{pg: 0, sg: 1, sf: 0, pf: 0, c: 0}, array{pg: 0, sg: 2, sf: 0, pf: 0, c: 0}, array{pg: 0, sg: 0, sf: 1, pf: 0, c: 0}, array{pg: 0, sg: 0, sf: 2, pf: 0, c: 0}, array{pg: 0, sg: 0, sf: 0, pf: 1, c: 0}, array{pg: 0, sg: 0, sf: 0, pf: 2, c: 0}, ...} on left side of ?? always exists and is not nullable.'
+			identifier: nullCoalesce.offset
+			count: 1
+			path: tests/WideUnit/DepthChartEntry/DepthChartEntryWideUnitTest.php
+
+		-
+			rawMessage: 'Parameter #2 $depthChartValues of method DepthChartEntry\DepthChartEntryRepository::updatePlayerDepthChart() expects array{pg: int, sg: int, sf: int, pf: int, c: int, canPlayInGame: int, min: int, of: int, ...}, array{name: ''Player 1'', pg: 1, sg: 0, sf: 0, pf: 0, c: 0, canPlayInGame: 1, min: 30}|array{name: ''Player 2'', pg: 0, sg: 1, sf: 0, pf: 0, c: 0, canPlayInGame: 1, min: 28}|array{name: ''Player 3'', pg: 0, sg: 0, sf: 1, pf: 0, c: 0, canPlayInGame: 1, min: 32} given.'
+			identifier: argument.type
+			count: 1
+			path: tests/WideUnit/DepthChartEntry/DepthChartEntryWideUnitTest.php
+
+		-
+			rawMessage: 'Parameter #2 $depthChartValues of method DepthChartEntry\DepthChartEntryRepository::updatePlayerDepthChart() expects array{pg: int, sg: int, sf: int, pf: int, c: int, canPlayInGame: int, min: int, of: int, ...}, array{pg: 0, sg: 0, sf: 0, pf: 0, c: 0, canPlayInGame: 1, min: 0} given.'
+			identifier: argument.type
+			count: 1
+			path: tests/WideUnit/DepthChartEntry/DepthChartEntryWideUnitTest.php
+
+		-
+			rawMessage: 'Parameter #2 $depthChartValues of method DepthChartEntry\DepthChartEntryRepository::updatePlayerDepthChart() expects array{pg: int, sg: int, sf: int, pf: int, c: int, canPlayInGame: int, min: int, of: int, ...}, array{pg: 1, sg: 2, sf: 3, pf: 4, c: 5, canPlayInGame: 1, min: 35} given.'
+			identifier: argument.type
+			count: 1
+			path: tests/WideUnit/DepthChartEntry/DepthChartEntryWideUnitTest.php
+
+		-
+			rawMessage: 'You should use assertSame() instead of assertEquals(), because both values are scalars of the same type'
+			identifier: phpunit.assertEquals
+			count: 37
+			path: tests/WideUnit/DepthChartEntry/DepthChartEntryWideUnitTest.php
+
+		-
+			rawMessage: 'Dynamic call to static method PHPUnit\Framework\TestCase::createStub().'
+			identifier: staticMethod.dynamicCall
+			count: 2
+			path: tests/WideUnit/Draft/DraftWideUnitTest.php
+
+		-
+			rawMessage: 'Method Tests\WideUnit\Draft\DraftWideUnitTest::getBaseDraftData() return type has no value type specified in iterable type array.'
+			identifier: missingType.iterableValue
+			count: 1
+			path: tests/WideUnit/Draft/DraftWideUnitTest.php
+
+		-
+			rawMessage: 'Array has 2 duplicate keys with value ''teamid'' (''teamid'', ''teamid'').'
+			identifier: array.duplicateKey
+			count: 1
+			path: tests/WideUnit/Extension/ExtensionWideUnitTest.php
+
+		-
+			rawMessage: '''
+				Instantiation of deprecated class Extension\ExtensionProcessor:
+				Use ExtensionService instead
+			'''
+			identifier: new.deprecatedClass
+			count: 1
+			path: tests/WideUnit/Extension/ExtensionWideUnitTest.php
+
+		-
+			rawMessage: 'Method Tests\WideUnit\Extension\ExtensionWideUnitTest::getBasePlayerData() return type has no value type specified in iterable type array.'
+			identifier: missingType.iterableValue
+			count: 1
+			path: tests/WideUnit/Extension/ExtensionWideUnitTest.php
+
+		-
+			rawMessage: '''
+				Property $extensionProcessor references deprecated class Extension\ExtensionProcessor in its type:
+				Use ExtensionService instead
+			'''
+			identifier: property.deprecatedClass
+			count: 1
+			path: tests/WideUnit/Extension/ExtensionWideUnitTest.php
+
+		-
+			rawMessage: 'You should use assertSame() instead of assertEquals(), because both values are scalars of the same type'
+			identifier: phpunit.assertEquals
+			count: 2
+			path: tests/WideUnit/Extension/ExtensionWideUnitTest.php
+
+		-
+			rawMessage: 'Method Tests\WideUnit\FreeAgency\FreeAgencyWideUnitTest::getBaseFreeAgentData() return type has no value type specified in iterable type array.'
+			identifier: missingType.iterableValue
+			count: 1
+			path: tests/WideUnit/FreeAgency/FreeAgencyWideUnitTest.php
+
+		-
+			rawMessage: 'Method Tests\WideUnit\Mocks\Discord::postToChannel() has no return type specified.'
+			identifier: missingType.return
+			count: 1
+			path: tests/WideUnit/Mocks/Discord.php
+
+		-
+			rawMessage: 'Method Tests\WideUnit\Mocks\Discord::postToChannel() has parameter $channel with no type specified.'
+			identifier: missingType.parameter
+			count: 1
+			path: tests/WideUnit/Mocks/Discord.php
+
+		-
+			rawMessage: 'Method Tests\WideUnit\Mocks\Discord::postToChannel() has parameter $message with no type specified.'
+			identifier: missingType.parameter
+			count: 1
+			path: tests/WideUnit/Mocks/Discord.php
+
+		-
+			rawMessage: 'Construct empty() is not allowed. Use more strict comparison.'
+			identifier: empty.notAllowed
+			count: 6
+			path: tests/WideUnit/Mocks/MockDatabase.php
+
+		-
+			rawMessage: 'Method Tests\WideUnit\Mocks\MockDatabase::getExecutedQueries() return type has no value type specified in iterable type array.'
+			identifier: missingType.iterableValue
+			count: 1
+			path: tests/WideUnit/Mocks/MockDatabase.php
+
+		-
+			rawMessage: 'Method Tests\WideUnit\Mocks\MockDatabase::setMockData() has parameter $data with no value type specified in iterable type array.'
+			identifier: missingType.iterableValue
+			count: 1
+			path: tests/WideUnit/Mocks/MockDatabase.php
+
+		-
+			rawMessage: 'Method Tests\WideUnit\Mocks\MockDatabase::setMockPythagoreanData() has parameter $data with no value type specified in iterable type array.'
+			identifier: missingType.iterableValue
+			count: 1
+			path: tests/WideUnit/Mocks/MockDatabase.php
+
+		-
+			rawMessage: 'Method Tests\WideUnit\Mocks\MockDatabase::setMockTeamData() has parameter $data with no value type specified in iterable type array.'
+			identifier: missingType.iterableValue
+			count: 1
+			path: tests/WideUnit/Mocks/MockDatabase.php
+
+		-
+			rawMessage: 'Method Tests\WideUnit\Mocks\MockDatabase::setMockTradeInfo() has parameter $data with no value type specified in iterable type array.'
+			identifier: missingType.iterableValue
+			count: 1
+			path: tests/WideUnit/Mocks/MockDatabase.php
+
+		-
+			rawMessage: 'Method Tests\WideUnit\Mocks\MockDatabase::setVotingResultsQueue() has parameter $resultsQueue with no value type specified in iterable type array.'
+			identifier: missingType.iterableValue
+			count: 1
+			path: tests/WideUnit/Mocks/MockDatabase.php
+
+		-
+			rawMessage: 'Method Tests\WideUnit\Mocks\MockDatabase::sql_fetch_assoc() return type has no value type specified in iterable type array.'
+			identifier: missingType.iterableValue
+			count: 1
+			path: tests/WideUnit/Mocks/MockDatabase.php
+
+		-
+			rawMessage: 'Method Tests\WideUnit\Mocks\MockDatabase::sql_fetchrow() return type has no value type specified in iterable type array.'
+			identifier: missingType.iterableValue
+			count: 1
+			path: tests/WideUnit/Mocks/MockDatabase.php
+
+		-
+			rawMessage: Property Tests\WideUnit\Mocks\MockDatabase::$executedQueries type has no value type specified in iterable type array.
+			identifier: missingType.iterableValue
+			count: 1
+			path: tests/WideUnit/Mocks/MockDatabase.php
+
+		-
+			rawMessage: Property Tests\WideUnit\Mocks\MockDatabase::$mockData type has no value type specified in iterable type array.
+			identifier: missingType.iterableValue
+			count: 1
+			path: tests/WideUnit/Mocks/MockDatabase.php
+
+		-
+			rawMessage: Property Tests\WideUnit\Mocks\MockDatabase::$mockPythagoreanData type has no value type specified in iterable type array.
+			identifier: missingType.iterableValue
+			count: 1
+			path: tests/WideUnit/Mocks/MockDatabase.php
+
+		-
+			rawMessage: Property Tests\WideUnit\Mocks\MockDatabase::$mockTeamData type has no value type specified in iterable type array.
+			identifier: missingType.iterableValue
+			count: 1
+			path: tests/WideUnit/Mocks/MockDatabase.php
+
+		-
+			rawMessage: Property Tests\WideUnit\Mocks\MockDatabase::$mockTradeInfo type has no value type specified in iterable type array.
+			identifier: missingType.iterableValue
+			count: 1
+			path: tests/WideUnit/Mocks/MockDatabase.php
+
+		-
+			rawMessage: Property Tests\WideUnit\Mocks\MockDatabase::$votingResultsQueue type has no value type specified in iterable type array.
+			identifier: missingType.iterableValue
+			count: 1
+			path: tests/WideUnit/Mocks/MockDatabase.php
+
+		-
+			rawMessage: 'Return type (Tests\WideUnit\Mocks\MockPreparedStatement) of method Tests\WideUnit\Mocks\MockDatabase::prepare() should be compatible with return type (mysqli_stmt|false) of method mysqli::prepare()'
+			identifier: method.childReturnType
+			count: 1
+			path: tests/WideUnit/Mocks/MockDatabase.php
+
+		-
+			rawMessage: 'Tests\WideUnit\Mocks\MockDatabase::__construct() does not call parent constructor from mysqli.'
+			identifier: constructor.missingParentCall
+			count: 1
+			path: tests/WideUnit/Mocks/MockDatabase.php
+
+		-
+			rawMessage: 'Method Tests\WideUnit\Mocks\MockDatabaseResult::__construct() has parameter $data with no value type specified in iterable type array.'
+			identifier: missingType.iterableValue
+			count: 1
+			path: tests/WideUnit/Mocks/MockDatabaseResult.php
+
+		-
+			rawMessage: 'Method Tests\WideUnit\Mocks\MockDatabaseResult::fetchAssoc() return type has no value type specified in iterable type array.'
+			identifier: missingType.iterableValue
+			count: 1
+			path: tests/WideUnit/Mocks/MockDatabaseResult.php
+
+		-
+			rawMessage: 'Method Tests\WideUnit\Mocks\MockDatabaseResult::fetchRow() return type has no value type specified in iterable type array.'
+			identifier: missingType.iterableValue
+			count: 1
+			path: tests/WideUnit/Mocks/MockDatabaseResult.php
+
+		-
+			rawMessage: 'Method Tests\WideUnit\Mocks\MockDatabaseResult::fetch_assoc() return type has no value type specified in iterable type array.'
+			identifier: missingType.iterableValue
+			count: 1
+			path: tests/WideUnit/Mocks/MockDatabaseResult.php
+
+		-
+			rawMessage: Property Tests\WideUnit\Mocks\MockDatabaseResult::$data type has no value type specified in iterable type array.
+			identifier: missingType.iterableValue
+			count: 1
+			path: tests/WideUnit/Mocks/MockDatabaseResult.php
+
+		-
+			rawMessage: 'Class Tests\WideUnit\Mocks\MockMysqliResult implements generic interface Iterator but does not specify its types: TKey, TValue'
+			identifier: missingType.generics
+			count: 1
+			path: tests/WideUnit/Mocks/MockMysqliResult.php
+
+		-
+			rawMessage: 'Method Tests\WideUnit\Mocks\MockMysqliResult::fetch_array() return type has no value type specified in iterable type array.'
+			identifier: missingType.iterableValue
+			count: 1
+			path: tests/WideUnit/Mocks/MockMysqliResult.php
+
+		-
+			rawMessage: 'Method Tests\WideUnit\Mocks\MockMysqliResult::fetch_assoc() return type has no value type specified in iterable type array.'
+			identifier: missingType.iterableValue
+			count: 1
+			path: tests/WideUnit/Mocks/MockMysqliResult.php
+
+		-
+			rawMessage: Property Tests\WideUnit\Mocks\MockMysqliResult::$data type has no value type specified in iterable type array.
+			identifier: missingType.iterableValue
+			count: 1
+			path: tests/WideUnit/Mocks/MockMysqliResult.php
+
+		-
+			rawMessage: Property Tests\WideUnit\Mocks\MockMysqliResult::$lengths type has no value type specified in iterable type array.
+			identifier: missingType.iterableValue
+			count: 1
+			path: tests/WideUnit/Mocks/MockMysqliResult.php
+
+		-
+			rawMessage: Property Tests\WideUnit\Mocks\MockMysqliResult::$mockResult has no type specified.
+			identifier: missingType.property
+			count: 1
+			path: tests/WideUnit/Mocks/MockMysqliResult.php
+
+		-
+			rawMessage: 'Method Tests\WideUnit\Mocks\MockPreparedStatement::execute() has parameter $params with no value type specified in iterable type array.'
+			identifier: missingType.iterableValue
+			count: 1
+			path: tests/WideUnit/Mocks/MockPreparedStatement.php
+
+		-
+			rawMessage: Property Tests\WideUnit\Mocks\MockPreparedStatement::$boundParams type has no value type specified in iterable type array.
+			identifier: missingType.iterableValue
+			count: 1
+			path: tests/WideUnit/Mocks/MockPreparedStatement.php
+
+		-
+			rawMessage: 'Property Tests\WideUnit\Mocks\MockPreparedStatement::$mockDb (Tests\WideUnit\Mocks\MockDatabase|null) is never assigned null so it can be removed from the property type.'
+			identifier: property.unusedType
+			count: 1
+			path: tests/WideUnit/Mocks/MockPreparedStatement.php
+
+		-
+			rawMessage: 'Property Tests\WideUnit\Mocks\MockPreparedStatement::$paramTypes is never read, only written.'
+			identifier: property.onlyWritten
+			count: 1
+			path: tests/WideUnit/Mocks/MockPreparedStatement.php
+
+		-
+			rawMessage: Property Tests\WideUnit\Mocks\MockPreparedStatement::$paramTypes type has no value type specified in iterable type array.
+			identifier: missingType.iterableValue
+			count: 1
+			path: tests/WideUnit/Mocks/MockPreparedStatement.php
+
+		-
+			rawMessage: 'Method Tests\WideUnit\Mocks\Season::getLastSimDatesArray() is unused.'
+			identifier: method.unused
+			count: 1
+			path: tests/WideUnit/Mocks/Season.php
+
+		-
+			rawMessage: 'Method Tests\WideUnit\Mocks\Season::getLastSimDatesArray() return type has no value type specified in iterable type array.'
+			identifier: missingType.iterableValue
+			count: 1
+			path: tests/WideUnit/Mocks/Season.php
+
+		-
+			rawMessage: 'Array has 2 duplicate keys with value ''intangibles'' (''intangibles'', ''intangibles'').'
+			identifier: array.duplicateKey
+			count: 1
+			path: tests/WideUnit/Mocks/TestDataFactory.php
+
+		-
+			rawMessage: 'Array has 2 duplicate keys with value ''skill'' (''skill'', ''skill'').'
+			identifier: array.duplicateKey
+			count: 1
+			path: tests/WideUnit/Mocks/TestDataFactory.php
+
+		-
+			rawMessage: 'Array has 2 duplicate keys with value ''talent'' (''talent'', ''talent'').'
+			identifier: array.duplicateKey
+			count: 1
+			path: tests/WideUnit/Mocks/TestDataFactory.php
+
+		-
+			rawMessage: 'Array has 2 duplicate keys with value ''teamid'' (''teamid'', ''teamid'').'
+			identifier: array.duplicateKey
+			count: 1
+			path: tests/WideUnit/ModifierConsistencyTest.php
+
+		-
+			rawMessage: 'Call to method onQuery() on an unknown class MockDatabase.'
+			identifier: class.notFound
+			count: 1
+			path: tests/WideUnit/ModifierConsistencyTest.php
+
+		-
+			rawMessage: 'Call to method setMockData() on an unknown class MockDatabase.'
+			identifier: class.notFound
+			count: 1
+			path: tests/WideUnit/ModifierConsistencyTest.php
+
+		-
+			rawMessage: Instantiated class MockDatabase not found.
+			identifier: class.notFound
+			count: 2
+			path: tests/WideUnit/ModifierConsistencyTest.php
+
+		-
+			rawMessage: 'Parameter #1 $db of class Negotiation\NegotiationDemandCalculator constructor expects mysqli, MockDatabase given.'
+			identifier: argument.type
+			count: 1
+			path: tests/WideUnit/ModifierConsistencyTest.php
+
+		-
+			rawMessage: 'Parameter #1 $db of static method Player\Player::withPlayerID() expects mysqli, MockDatabase given.'
+			identifier: argument.type
+			count: 1
+			path: tests/WideUnit/ModifierConsistencyTest.php
+
+		-
+			rawMessage: 'Dynamic call to static method PHPUnit\Framework\TestCase::createStub().'
+			identifier: staticMethod.dynamicCall
+			count: 1
+			path: tests/WideUnit/Negotiation/NegotiationWideUnitTest.php
+
+		-
+			rawMessage: 'Method Tests\WideUnit\Negotiation\NegotiationWideUnitTest::getBaseNegotiationData() return type has no value type specified in iterable type array.'
+			identifier: missingType.iterableValue
+			count: 1
+			path: tests/WideUnit/Negotiation/NegotiationWideUnitTest.php
+
+		-
+			rawMessage: Expression on left side of ?? is not nullable.
+			identifier: nullCoalesce.expr
+			count: 2
+			path: tests/WideUnit/RookieOption/RookieOptionWideUnitTest.php
+
+		-
+			rawMessage: 'You should use assertSame() instead of assertEquals(), because both values are scalars of the same type'
+			identifier: phpunit.assertEquals
+			count: 5
+			path: tests/WideUnit/RookieOption/RookieOptionWideUnitTest.php
+
+		-
+			rawMessage: 'Dynamic call to static method PHPUnit\Framework\TestCase::createStub().'
+			identifier: staticMethod.dynamicCall
+			count: 1
+			path: tests/WideUnit/Schedule/ScheduleWideUnitTest.php
+
+		-
+			rawMessage: 'Method Tests\WideUnit\Schedule\ScheduleWideUnitTest::createProcessedGameRow() return type has no value type specified in iterable type array.'
+			identifier: missingType.iterableValue
+			count: 1
+			path: tests/WideUnit/Schedule/ScheduleWideUnitTest.php
+
+		-
+			rawMessage: 'Method Tests\WideUnit\Schedule\ScheduleWideUnitTest::createScheduleRow() return type has no value type specified in iterable type array.'
+			identifier: missingType.iterableValue
+			count: 1
+			path: tests/WideUnit/Schedule/ScheduleWideUnitTest.php
+
+		-
+			rawMessage: 'Method Tests\WideUnit\Schedule\ScheduleWideUnitTest::getDefaultTeamData() return type has no value type specified in iterable type array.'
+			identifier: missingType.iterableValue
+			count: 1
+			path: tests/WideUnit/Schedule/ScheduleWideUnitTest.php
+
+		-
+			rawMessage: 'You should use assertSame() instead of assertEquals(), because both values are scalars of the same type'
+			identifier: phpunit.assertEquals
+			count: 53
+			path: tests/WideUnit/Schedule/ScheduleWideUnitTest.php
+
+		-
+			rawMessage: 'Method Tests\WideUnit\Standings\StandingsWideUnitTest::createStandingsRow() return type has no value type specified in iterable type array.'
+			identifier: missingType.iterableValue
+			count: 1
+			path: tests/WideUnit/Standings/StandingsWideUnitTest.php
+
+		-
+			rawMessage: 'You should use assertSame() instead of assertEquals(), because both values are scalars of the same type'
+			identifier: phpunit.assertEquals
+			count: 1
+			path: tests/WideUnit/Trading/TradeWideUnitTest.php
+
+		-
+			rawMessage: 'Call to method PHPUnit\Framework\Assert::assertTrue() with true will always evaluate to true.'
+			identifier: method.alreadyNarrowedType
+			count: 7
+			path: tests/WideUnit/Voting/VotingWideUnitTest.php
+
+		-
+			rawMessage: Instantiated class MockDatabase not found.
+			identifier: class.notFound
+			count: 1
+			path: tests/WideUnit/Voting/VotingWideUnitTest.php
+
+		-
+			rawMessage: 'Parameter #1 $tables of method Voting\VotingResultsTableRenderer::renderTables() expects list<array{title: string, rows: list<array{name: string, votes: int, pid: int}>}>, array{array{title: ''Category'', rows: array{array{name: ''Player'', votes: 1}}}} given.'
+			identifier: argument.type
+			count: 1
+			path: tests/WideUnit/Voting/VotingWideUnitTest.php
+
+		-
+			rawMessage: 'Parameter #1 $tables of method Voting\VotingResultsTableRenderer::renderTables() expects list<array{title: string, rows: list<array{name: string, votes: int, pid: int}>}>, array{array{title: ''MVP Voting'', rows: array{array{name: ''Star Player'', votes: 25}, array{name: ''Runner Up'', votes: 18}}}} given.'
+			identifier: argument.type
+			count: 1
+			path: tests/WideUnit/Voting/VotingWideUnitTest.php
+
+		-
+			rawMessage: 'Parameter #1 $tables of method Voting\VotingResultsTableRenderer::renderTables() expects list<array{title: string, rows: list<array{name: string, votes: int, pid: int}>}>, array{array{title: ''Styled Table'', rows: array{array{name: ''Row 1'', votes: 1}, array{name: ''Row 2'', votes: 2}, array{name: ''Row 3'', votes: 3}}}} given.'
+			identifier: argument.type
+			count: 1
+			path: tests/WideUnit/Voting/VotingWideUnitTest.php
+
+		-
+			rawMessage: 'Parameter #1 $tables of method Voting\VotingResultsTableRenderer::renderTables() expects list<array{title: string, rows: list<array{name: string, votes: int, pid: int}>}>, array{array{title: ''Test Category'', rows: array{array{name: ''Player One'', votes: 10}}}} given.'
+			identifier: argument.type
+			count: 1
+			path: tests/WideUnit/Voting/VotingWideUnitTest.php
+
+		-
+			rawMessage: 'Parameter #1 $tables of method Voting\VotingResultsTableRenderer::renderTables() expects list<array{title: string, rows: list<array{name: string, votes: int, pid: int}>}>, array{array{title: ''Test'', rows: array{array{name: ''<script>alert("xss"…'', votes: 1}}}} given.'
+			identifier: argument.type
+			count: 1
+			path: tests/WideUnit/Voting/VotingWideUnitTest.php
+
+		-
+			rawMessage: 'Parameter #1 $tables of method Voting\VotingResultsTableRenderer::renderTables() expects list<array{title: string, rows: list<array{name: string, votes: int, pid: int}>}>, array{array{title: ''Test'', rows: array{array{name: ''Player "The Great"…'', votes: 5}}}} given.'
+			identifier: argument.type
+			count: 1
+			path: tests/WideUnit/Voting/VotingWideUnitTest.php
+
+		-
+			rawMessage: 'Parameter #1 $tables of method Voting\VotingResultsTableRenderer::renderTables() expects list<array{title: string, rows: list<array{name: string, votes: int, pid: int}>}>, array{array{title: ''Test'', rows: array{array{name: ''Player'', votes: 1}}}} given.'
+			identifier: argument.type
+			count: 1
+			path: tests/WideUnit/Voting/VotingWideUnitTest.php
+
+		-
+			rawMessage: 'Parameter #3 $season of class Voting\VotingResultsController constructor expects Season\Season, Tests\WideUnit\Mocks\Season given.'
+			identifier: argument.type
+			count: 9
+			path: tests/WideUnit/Voting/VotingWideUnitTest.php
+
+		-
+			rawMessage: 'Trivial assertion `assertTrue(true)` always passes and does not test anything. Delete the call or replace it with an assertion against actual behavior.'
+			identifier: ibl.meaninglessAssertion
+			count: 7
+			path: tests/WideUnit/Voting/VotingWideUnitTest.php
+
+		-
+			rawMessage: 'Dynamic call to static method PHPUnit\Framework\TestCase::createStub().'
+			identifier: staticMethod.dynamicCall
+			count: 6
+			path: tests/WideUnit/Waivers/WaiversWideUnitTest.php
+
+		-
+			rawMessage: 'Method Tests\WideUnit\Waivers\WaiversWideUnitTest::getBasePlayerData() has parameter $overrides with no value type specified in iterable type array.'
+			identifier: missingType.iterableValue
+			count: 1
+			path: tests/WideUnit/Waivers/WaiversWideUnitTest.php
+
+		-
+			rawMessage: 'Method Tests\WideUnit\Waivers\WaiversWideUnitTest::getBasePlayerData() return type has no value type specified in iterable type array.'
+			identifier: missingType.iterableValue
+			count: 1
+			path: tests/WideUnit/Waivers/WaiversWideUnitTest.php
+
+		-
+			rawMessage: 'You should use assertSame() instead of assertEquals(), because both values are scalars of the same type'
+			identifier: phpunit.assertEquals
+			count: 7
+			path: tests/WideUnit/Waivers/WaiversWideUnitTest.php
+
+		-
+			rawMessage: 'AnonymousClass14b7cfd45257a3f672cd08769ad0d0fa::__construct() does not call parent constructor from mysqli.'
+			identifier: constructor.missingParentCall
+			count: 1
+			path: tests/WideUnit/WideUnitTestCase.php
+
+		-
+			rawMessage: 'Call to method PHPUnit\Framework\Assert::assertTrue() with true will always evaluate to true.'
+			identifier: method.alreadyNarrowedType
+			count: 1
+			path: tests/WideUnit/WideUnitTestCase.php
+
+		-
+			rawMessage: 'Call to method sql_query() on an unknown class MockDatabase.'
+			identifier: class.notFound
+			count: 1
+			path: tests/WideUnit/WideUnitTestCase.php
+
+		-
+			rawMessage: Class MockDatabaseResult not found.
+			identifier: class.notFound
+			count: 1
+			path: tests/WideUnit/WideUnitTestCase.php
+
+		-
+			rawMessage: 'Dynamic call to static method PHPUnit\Framework\Assert::fail().'
+			identifier: staticMethod.dynamicCall
+			count: 1
+			path: tests/WideUnit/WideUnitTestCase.php
+
+		-
+			rawMessage: Instantiated class MockDatabase not found.
+			identifier: class.notFound
+			count: 1
+			path: tests/WideUnit/WideUnitTestCase.php
+
+		-
+			rawMessage: Instantiated class MockPreparedStatement not found.
+			identifier: class.notFound
+			count: 1
+			path: tests/WideUnit/WideUnitTestCase.php
+
+		-
+			rawMessage: 'Method Tests\WideUnit\WideUnitTestCase::getExecutedQueries() return type has no value type specified in iterable type array.'
+			identifier: missingType.iterableValue
+			count: 1
+			path: tests/WideUnit/WideUnitTestCase.php
+
+		-
+			rawMessage: 'Method mysqli@anonymous/WideUnit/WideUnitTestCase.php:68::prepare() has invalid return type MockPreparedStatement.'
+			identifier: class.notFound
+			count: 1
+			path: tests/WideUnit/WideUnitTestCase.php
+
+		-
+			rawMessage: 'Method mysqli@anonymous/WideUnit/WideUnitTestCase.php:68::prepare() never returns false so it can be removed from the return type.'
+			identifier: return.unusedType
+			count: 1
+			path: tests/WideUnit/WideUnitTestCase.php
+
+		-
+			rawMessage: 'Method mysqli@anonymous/WideUnit/WideUnitTestCase.php:68::query() never returns mysqli_result so it can be removed from the return type.'
+			identifier: return.unusedType
+			count: 1
+			path: tests/WideUnit/WideUnitTestCase.php
+
+		-
+			rawMessage: 'Parameter #1 $mockDb of class mysqli@anonymous/WideUnit/WideUnitTestCase.php:68 constructor expects MockDatabase, Tests\WideUnit\Mocks\MockDatabase|null given.'
+			identifier: argument.type
+			count: 1
+			path: tests/WideUnit/WideUnitTestCase.php
+
+		-
+			rawMessage: 'Parameter $mockDb of method mysqli@anonymous/WideUnit/WideUnitTestCase.php:68::__construct() has invalid type MockDatabase.'
+			identifier: class.notFound
+			count: 1
+			path: tests/WideUnit/WideUnitTestCase.php
+
+		-
+			rawMessage: 'Property Tests\WideUnit\WideUnitTestCase::$mockDb (Tests\WideUnit\Mocks\MockDatabase|null) does not accept MockDatabase.'
+			identifier: assign.propertyType
+			count: 1
+			path: tests/WideUnit/WideUnitTestCase.php
+
+		-
+			rawMessage: Property mysqli@anonymous/WideUnit/WideUnitTestCase.php:68::$mockDb has unknown class MockDatabase as its type.
+			identifier: class.notFound
+			count: 1
+			path: tests/WideUnit/WideUnitTestCase.php
+
+		-
+			rawMessage: 'Return type (MockPreparedStatement|false) of method mysqli@anonymous/WideUnit/WideUnitTestCase.php:68::prepare() should be covariant with return type (mysqli_stmt|false) of method mysqli::prepare()'
+			identifier: method.childReturnType
+			count: 1
+			path: tests/WideUnit/WideUnitTestCase.php
+
+		-
+			rawMessage: Short ternary operator is not allowed. Use null coalesce operator if applicable or consider using long ternary.
+			identifier: ternary.shortNotAllowed
+			count: 1
+			path: tests/WideUnit/WideUnitTestCase.php
 
 		-
 			rawMessage: Casting to string something that's already string.

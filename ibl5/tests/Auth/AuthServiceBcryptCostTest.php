@@ -11,9 +11,6 @@ class AuthServiceBcryptCostTest extends TestCase
 {
     public function testProductionBcryptCostIs12(): void
     {
-        $reflection = new \ReflectionClass(AuthService::class);
-        $constant = $reflection->getConstant('BCRYPT_COST_PROD');
-
-        self::assertSame(12, $constant);
+        self::assertSame(12, AuthService::BCRYPT_COST_PROD);
     }
 }

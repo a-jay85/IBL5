@@ -66,8 +66,10 @@ class PreseasonTransitionPipelineTest extends PipelineIntegrationTestCase
         self::assertNotNull($cleanupResult, 'CleanupPreseasonDataStep should have run');
         self::assertStringContainsString('Cleaned:', $cleanupResult->detail);
 
-        self::assertSame(0, $this->countRows('ibl_box_scores_teams', "game_date BETWEEN '2098-09-01' AND '2098-10-31'"));
-        self::assertSame(0, $this->countRows('ibl_box_scores', "game_date BETWEEN '2098-09-01' AND '2098-10-31'"));
+        self::assertSame(0, $this->countRows('ibl_box_scores_teams', "game_date BETWEEN '2098-09-01' AND '2098-09-30'"));
+        self::assertSame(0, $this->countRows('ibl_box_scores', "game_date BETWEEN '2098-09-01' AND '2098-09-30'"));
+        self::assertSame(1, $this->countRows('ibl_box_scores_teams', "game_date = '2098-10-02'"));
+        self::assertSame(1, $this->countRows('ibl_box_scores', "game_date = '2098-10-02'"));
         self::assertSame(0, $this->countRows('ibl_team_awards', "year = 2099"));
         self::assertSame(0, $this->countRows('ibl_jsb_history', "season_year = 2099"));
         self::assertSame(0, $this->countRows('ibl_jsb_transactions', "season_year = 2099"));

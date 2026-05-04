@@ -15,7 +15,7 @@ final class PreseasonCleanupRepository extends \BaseMysqliRepository
     {
         $boxScoresTable = $this->resolveTable('ibl_box_scores_teams');
         $startDate = sprintf('%d-09-01', $beginningYear);
-        $endDate = sprintf('%d-10-31', $beginningYear);
+        $endDate = sprintf('%d-09-30', $beginningYear);
 
         /** @var array{cnt: int}|null $row */
         $row = $this->fetchOne(
@@ -31,11 +31,13 @@ final class PreseasonCleanupRepository extends \BaseMysqliRepository
     public function deletePreseasonSimDates(int $beginningYear): void
     {
         $startDate = sprintf('%d-09-01', $beginningYear);
-        $endDate = sprintf('%d-10-31', $beginningYear);
+        $endDate = sprintf('%d-09-30', $beginningYear);
 
         $this->execute(
-            "DELETE FROM ibl_sim_dates WHERE end_date BETWEEN ? AND ?",
-            "ss",
+            "DELETE FROM ibl_sim_dates WHERE start_date BETWEEN ? AND ? AND end_date BETWEEN ? AND ?",
+            "ssss",
+            $startDate,
+            $endDate,
             $startDate,
             $endDate,
         );

@@ -60,7 +60,7 @@ class BoxscoreRepositoryTest extends TestCase
 
         $queries = $this->mockDb->getExecutedQueries();
         $this->assertStringContainsString('2025-09-01', $queries[0]);
-        $this->assertStringContainsString('2025-10-31', $queries[0]);
+        $this->assertStringContainsString('2025-09-30', $queries[0]);
     }
 
     public function testDeleteHeatBoxScoresUsesCorrectDateRange(): void

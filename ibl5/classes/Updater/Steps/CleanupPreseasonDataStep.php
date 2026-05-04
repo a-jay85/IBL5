@@ -13,7 +13,7 @@ use Updater\StepResult;
 /**
  * Clean up preseason data on the first HEAT sim.
  *
- * Preseason games are stored with Sep-Oct dates. When the phase transitions
+ * Preseason games are stored with September dates. When the phase transitions
  * to HEAT, stale preseason data must be cleared so the HEAT pipeline can
  * re-import fresh data from JSB files.
  *
@@ -55,7 +55,7 @@ final class CleanupPreseasonDataStep implements PipelineStepInterface
         $cleaned = [];
 
         $this->boxscoreRepo->deletePreseasonBoxScores($this->season->beginningYear);
-        $cleaned[] = 'box scores (Sep-Oct)';
+        $cleaned[] = 'box scores (Sep)';
 
         $this->cleanupRepo->deletePreseasonSimDates($this->season->beginningYear);
         $cleaned[] = 'sim dates';

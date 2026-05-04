@@ -212,10 +212,11 @@ Mutation testing (Infection PHP) runs weekly + on-demand via the `mutation-test`
 
 **IMPORTANT:** Before considering ANY task involving PHP code complete:
 
-1. **Run the FULL test suite**: `vendor/bin/phpunit` (from `ibl5/`) — never use `--testsuite` or `--filter` as the final verification. Changes in one module frequently break tests in other modules (shared mocks, interfaces, base classes).
-2. **Verify clean output**: The final line must show `OK (X tests, Y assertions)` with NO warnings, failures, or errors
-3. **Check for warnings**: If output shows `OK, but there were issues!`, run `--display-all-issues` and FIX the warnings
-4. **Don't silence warnings**: Resolve root causes instead of suppressing warnings (unless truly necessary)
+1. **Run the FULL test suite**: `composer test` (from `ibl5/`) — never use `--testsuite` or `--filter` as the final verification. Changes in one module frequently break tests in other modules (shared mocks, interfaces, base classes).
+2. **When DB-touching code changed**: Run `composer test:all` instead (requires Docker MariaDB with env vars `DB_HOST`, `DB_USER`, `DB_PASS`, `DB_NAME`).
+3. **Verify clean output**: The final line must show `OK (X tests, Y assertions)` with NO warnings, failures, or errors
+4. **Check for warnings**: If output shows `OK, but there were issues!`, run `--display-all-issues` and FIX the warnings
+5. **Don't silence warnings**: Resolve root causes instead of suppressing warnings (unless truly necessary)
 
 **When to use targeted suites:** Only use `--testsuite` or `--filter` when actively debugging a specific failing test to get faster feedback. Once the targeted test passes, immediately re-run the full suite.
 

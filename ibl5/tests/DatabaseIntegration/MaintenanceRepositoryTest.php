@@ -4,12 +4,15 @@ declare(strict_types=1);
 
 namespace Tests\DatabaseIntegration;
 
+use PHPUnit\Framework\Attributes\Group;
+
 use Scripts\MaintenanceRepository;
 
 /**
  * Tests MaintenanceRepository against real MariaDB — team listings,
  * tradition updates, and settings lookups used by maintenance scripts.
  */
+#[Group('database')]
 class MaintenanceRepositoryTest extends DatabaseTestCase
 {
     private MaintenanceRepository $repo;

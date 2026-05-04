@@ -4,12 +4,15 @@ declare(strict_types=1);
 
 namespace Tests\DatabaseIntegration;
 
+use PHPUnit\Framework\Attributes\Group;
+
 use Api\Repository\ApiKeyRepository;
 
 /**
  * Tests ApiKeyRepository against real MariaDB —
  * API key lookup and last-used timestamp update.
  */
+#[Group('database')]
 class ApiKeyRepositoryTest extends DatabaseTestCase
 {
     private ApiKeyRepository $repo;

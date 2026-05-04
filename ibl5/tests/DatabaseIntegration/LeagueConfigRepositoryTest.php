@@ -4,12 +4,15 @@ declare(strict_types=1);
 
 namespace Tests\DatabaseIntegration;
 
+use PHPUnit\Framework\Attributes\Group;
+
 use LeagueConfig\LeagueConfigRepository;
 
 /**
  * Tests LeagueConfigRepository against real MariaDB — season config upserts,
  * config lookups, and franchise team mapping.
  */
+#[Group('database')]
 class LeagueConfigRepositoryTest extends DatabaseTestCase
 {
     private LeagueConfigRepository $repo;

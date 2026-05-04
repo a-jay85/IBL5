@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Tests\DatabaseIntegration;
 
+use PHPUnit\Framework\Attributes\Group;
+
 /**
  * Verifies that the player-rating columns renamed by migration 113 stay
  * semantically consistent across the live, snapshot, and hist layers.
@@ -19,6 +21,7 @@ namespace Tests\DatabaseIntegration;
  * layer. This test runs in CI forever to prevent future renames from
  * re-introducing that kind of silent flip.
  */
+#[Group('database')]
 final class RatingColumnSemanticParityTest extends DatabaseTestCase
 {
     public function testSnapshotAndHistRatingsMatchForSameSeason(): void

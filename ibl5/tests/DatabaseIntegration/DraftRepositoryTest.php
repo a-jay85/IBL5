@@ -4,11 +4,14 @@ declare(strict_types=1);
 
 namespace Tests\DatabaseIntegration;
 
+use PHPUnit\Framework\Attributes\Group;
+
 use Draft\DraftRepository;
 
 /**
  * Tests DraftRepository against real MariaDB — draft picks, draft class, player creation.
  */
+#[Group('database')]
 class DraftRepositoryTest extends DatabaseTestCase
 {
     private DraftRepository $repo;

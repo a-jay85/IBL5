@@ -4,8 +4,11 @@ declare(strict_types=1);
 
 namespace Tests\DatabaseIntegration;
 
+use PHPUnit\Framework\Attributes\Group;
+
 use TeamSchedule\TeamScheduleRepository;
 
+#[Group('database')]
 class TeamScheduleRepositoryTest extends DatabaseTestCase
 {
     private TeamScheduleRepository $repo;

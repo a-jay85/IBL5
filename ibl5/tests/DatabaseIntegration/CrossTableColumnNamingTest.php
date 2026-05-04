@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Tests\DatabaseIntegration;
 
+use PHPUnit\Framework\Attributes\Group;
+
 /**
  * Verifies the column renames in migration 114 (Tier 2 cross-table
  * unification): `stats_to` → `stats_tvr` (live turnovers), `r_tga` / `r_tgp`
@@ -16,6 +18,7 @@ namespace Tests\DatabaseIntegration;
  * silently re-introducing a divergent column name. A column-missing
  * regression throws during the SELECT, failing the test loudly.
  */
+#[Group('database')]
 final class CrossTableColumnNamingTest extends DatabaseTestCase
 {
     public function testLiveTablesUseStatsTvr(): void

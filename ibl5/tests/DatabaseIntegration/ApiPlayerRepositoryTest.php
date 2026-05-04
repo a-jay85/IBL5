@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Tests\DatabaseIntegration;
 
+use PHPUnit\Framework\Attributes\Group;
+
 use Api\Pagination\Paginator;
 use Api\Repository\ApiPlayerRepository;
 
@@ -11,6 +13,7 @@ use Api\Repository\ApiPlayerRepository;
  * Tests ApiPlayerRepository against real MariaDB —
  * player listing, counting, and UUID lookup via vw_player_current view.
  */
+#[Group('database')]
 class ApiPlayerRepositoryTest extends DatabaseTestCase
 {
     private ApiPlayerRepository $repo;

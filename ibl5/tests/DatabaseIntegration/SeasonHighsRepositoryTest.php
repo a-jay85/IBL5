@@ -4,8 +4,11 @@ declare(strict_types=1);
 
 namespace Tests\DatabaseIntegration;
 
+use PHPUnit\Framework\Attributes\Group;
+
 use SeasonHighs\SeasonHighsRepository;
 
+#[Group('database')]
 class SeasonHighsRepositoryTest extends DatabaseTestCase
 {
     private SeasonHighsRepository $repo;

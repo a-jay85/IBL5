@@ -4,12 +4,15 @@ declare(strict_types=1);
 
 namespace Tests\DatabaseIntegration;
 
+use PHPUnit\Framework\Attributes\Group;
+
 use Navigation\NavigationRepository;
 
 /**
  * Tests NavigationRepository against real MariaDB — team ID resolution
  * from username and teams data grouped by conference/division.
  */
+#[Group('database')]
 class NavigationRepositoryTest extends DatabaseTestCase
 {
     private NavigationRepository $repo;

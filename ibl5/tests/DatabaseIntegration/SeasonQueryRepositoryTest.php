@@ -4,11 +4,14 @@ declare(strict_types=1);
 
 namespace Tests\DatabaseIntegration;
 
+use PHPUnit\Framework\Attributes\Group;
+
 use Season\SeasonQueryRepository;
 
 /**
  * Tests SeasonQueryRepository against real MariaDB — settings reads, sim dates, phase calculations.
  */
+#[Group('database')]
 class SeasonQueryRepositoryTest extends DatabaseTestCase
 {
     private SeasonQueryRepository $repo;

@@ -4,8 +4,11 @@ declare(strict_types=1);
 
 namespace Tests\DatabaseIntegration;
 
+use PHPUnit\Framework\Attributes\Group;
+
 use PlayerDatabase\PlayerDatabaseRepository;
 
+#[Group('database')]
 class PlayerDatabaseRepositoryTest extends DatabaseTestCase
 {
     private PlayerDatabaseRepository $repo;

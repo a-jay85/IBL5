@@ -4,12 +4,15 @@ declare(strict_types=1);
 
 namespace Tests\DatabaseIntegration;
 
+use PHPUnit\Framework\Attributes\Group;
+
 use Api\Repository\ApiPlayerStatsRepository;
 
 /**
  * Tests ApiPlayerStatsRepository against real MariaDB —
  * career stats via vw_player_career_stats view and season history from ibl_hist.
  */
+#[Group('database')]
 class ApiPlayerStatsRepositoryTest extends DatabaseTestCase
 {
     private ApiPlayerStatsRepository $repo;

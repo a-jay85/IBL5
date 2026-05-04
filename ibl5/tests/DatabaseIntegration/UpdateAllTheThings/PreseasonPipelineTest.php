@@ -4,6 +4,9 @@ declare(strict_types=1);
 
 namespace Tests\DatabaseIntegration\UpdateAllTheThings;
 
+use PHPUnit\Framework\Attributes\Group;
+
+#[Group('database')]
 class PreseasonPipelineTest extends PipelineIntegrationTestCase
 {
     public function testPreseasonScheduleUsesRealYears(): void

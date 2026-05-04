@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Tests\DatabaseIntegration;
 
+use PHPUnit\Framework\Attributes\Group;
+
 use JsbParser\JsbImportRepository;
 
 /**
@@ -13,6 +15,7 @@ use JsbParser\JsbImportRepository;
  *
  * Also covers resolveTeamId() (pure logic) and getPlayerName() (DB read).
  */
+#[Group('database')]
 class JsbImportRepositoryTest extends DatabaseTestCase
 {
     private JsbImportRepository $repo;

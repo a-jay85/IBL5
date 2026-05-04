@@ -4,12 +4,15 @@ declare(strict_types=1);
 
 namespace Tests\DatabaseIntegration;
 
+use PHPUnit\Framework\Attributes\Group;
+
 use FreeAgencyPreview\FreeAgencyPreviewRepository;
 
 /**
  * Tests FreeAgencyPreviewRepository against real MariaDB — active player
  * listings with ratings and FA preference fields.
  */
+#[Group('database')]
 class FreeAgencyPreviewRepositoryTest extends DatabaseTestCase
 {
     private FreeAgencyPreviewRepository $repo;

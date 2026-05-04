@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Tests\DatabaseIntegration;
 
+use PHPUnit\Framework\Attributes\Group;
+
 use League\League;
 use SeasonLeaderboards\SeasonLeaderboardsRepository;
 
@@ -13,6 +15,7 @@ use SeasonLeaderboards\SeasonLeaderboardsRepository;
  * Tests dynamic WHERE via QueryConditions, LEFT JOIN ibl_hist + team_info,
  * and whitelisted ORDER BY expressions.
  */
+#[Group('database')]
 class SeasonLeaderboardsRepositoryTest extends DatabaseTestCase
 {
     private SeasonLeaderboardsRepository $repo;

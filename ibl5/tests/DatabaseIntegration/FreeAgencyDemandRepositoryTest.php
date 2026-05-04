@@ -4,12 +4,15 @@ declare(strict_types=1);
 
 namespace Tests\DatabaseIntegration;
 
+use PHPUnit\Framework\Attributes\Group;
+
 use FreeAgency\FreeAgencyDemandRepository;
 
 /**
  * Tests FreeAgencyDemandRepository against real MariaDB — team performance
  * lookups, position salary commitment via vw_current_salary, and player demands.
  */
+#[Group('database')]
 class FreeAgencyDemandRepositoryTest extends DatabaseTestCase
 {
     private FreeAgencyDemandRepository $repo;

@@ -4,12 +4,15 @@ declare(strict_types=1);
 
 namespace Tests\DatabaseIntegration;
 
+use PHPUnit\Framework\Attributes\Group;
+
 use ContractList\ContractListRepository;
 
 /**
  * Tests ContractListRepository against real MariaDB — active player
  * contract listings with team info JOINs.
  */
+#[Group('database')]
 class ContractListRepositoryTest extends DatabaseTestCase
 {
     private ContractListRepository $repo;

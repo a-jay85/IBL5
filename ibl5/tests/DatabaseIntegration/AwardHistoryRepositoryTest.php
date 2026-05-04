@@ -4,8 +4,11 @@ declare(strict_types=1);
 
 namespace Tests\DatabaseIntegration;
 
+use PHPUnit\Framework\Attributes\Group;
+
 use AwardHistory\AwardHistoryRepository;
 
+#[Group('database')]
 class AwardHistoryRepositoryTest extends DatabaseTestCase
 {
     private AwardHistoryRepository $repo;

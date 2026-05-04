@@ -4,12 +4,15 @@ declare(strict_types=1);
 
 namespace Tests\DatabaseIntegration;
 
+use PHPUnit\Framework\Attributes\Group;
+
 use Waivers\WaiversRepository;
 
 /**
  * Tests WaiversRepository write methods against real MariaDB.
  * These are impossible to test with mocked mysqli because $stmt->affected_rows is readonly.
  */
+#[Group('database')]
 class WaiversRepositoryTest extends DatabaseTestCase
 {
     private WaiversRepository $repo;

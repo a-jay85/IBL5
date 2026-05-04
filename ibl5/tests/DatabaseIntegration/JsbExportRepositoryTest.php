@@ -4,12 +4,15 @@ declare(strict_types=1);
 
 namespace Tests\DatabaseIntegration;
 
+use PHPUnit\Framework\Attributes\Group;
+
 use JsbParser\JsbExportRepository;
 
 /**
  * Tests JsbExportRepository against real MariaDB —
  * player changeable fields and completed trade items for JSB file export.
  */
+#[Group('database')]
 class JsbExportRepositoryTest extends DatabaseTestCase
 {
     private JsbExportRepository $repo;

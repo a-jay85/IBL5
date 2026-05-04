@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Tests\DatabaseIntegration;
 
+use PHPUnit\Framework\Attributes\Group;
+
 use Api\Repository\RateLimitRepository;
 
 /**
@@ -11,6 +13,7 @@ use Api\Repository\RateLimitRepository;
  * atomic increment, request count retrieval, and old-entry pruning
  * on the ibl_api_rate_limits table.
  */
+#[Group('database')]
 class RateLimitRepositoryTest extends DatabaseTestCase
 {
     private RateLimitRepository $repo;

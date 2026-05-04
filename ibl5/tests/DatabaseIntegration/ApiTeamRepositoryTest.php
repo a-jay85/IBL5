@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Tests\DatabaseIntegration;
 
+use PHPUnit\Framework\Attributes\Group;
+
 use Api\Pagination\Paginator;
 use Api\Repository\ApiTeamRepository;
 
@@ -12,6 +14,7 @@ use Api\Repository\ApiTeamRepository;
  * team listing, counting, and UUID lookup via ibl_team_info + ibl_standings.
  * CI seed has 28 real teams.
  */
+#[Group('database')]
 class ApiTeamRepositoryTest extends DatabaseTestCase
 {
     private ApiTeamRepository $repo;

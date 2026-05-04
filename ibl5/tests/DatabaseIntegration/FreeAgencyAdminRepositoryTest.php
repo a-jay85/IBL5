@@ -4,12 +4,15 @@ declare(strict_types=1);
 
 namespace Tests\DatabaseIntegration;
 
+use PHPUnit\Framework\Attributes\Group;
+
 use FreeAgency\FreeAgencyAdminRepository;
 
 /**
  * Tests FreeAgencyAdminRepository against real MariaDB — offers, demands,
  * contract updates, MLE/LLE marking, news stories, and offer clearing.
  */
+#[Group('database')]
 class FreeAgencyAdminRepositoryTest extends DatabaseTestCase
 {
     private FreeAgencyAdminRepository $repo;

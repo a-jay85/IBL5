@@ -4,12 +4,15 @@ declare(strict_types=1);
 
 namespace Tests\DatabaseIntegration;
 
+use PHPUnit\Framework\Attributes\Group;
+
 use ActivityTracker\ActivityTrackerRepository;
 
 /**
  * Tests ActivityTrackerRepository against real MariaDB — team activity
  * listings with depth chart and voting timestamps.
  */
+#[Group('database')]
 class ActivityTrackerRepositoryTest extends DatabaseTestCase
 {
     private ActivityTrackerRepository $repo;

@@ -4,8 +4,11 @@ declare(strict_types=1);
 
 namespace Tests\DatabaseIntegration;
 
+use PHPUnit\Framework\Attributes\Group;
+
 use Boxscore\BoxscoreRepository;
 
+#[Group('database')]
 class BoxscoreRepositoryTest extends DatabaseTestCase
 {
     private BoxscoreRepository $repo;

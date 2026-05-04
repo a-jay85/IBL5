@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Tests\DatabaseIntegration;
 
+use PHPUnit\Framework\Attributes\Group;
+
 /**
  * Structural checks on ibl_hist to guard against drift in the materialization
  * logic (RefreshIblHistStep). Runs every CI.
@@ -16,6 +18,7 @@ namespace Tests\DatabaseIntegration;
  * Complements RatingColumnSemanticParityTest (which asserts semantic
  * consistency of individual ratings across layers).
  */
+#[Group('database')]
 final class IblHistStructuralTest extends DatabaseTestCase
 {
     public function testRowCountEqualsDistinctPidYearInSnapshots(): void

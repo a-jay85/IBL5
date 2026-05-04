@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Tests\DatabaseIntegration;
 
+use PHPUnit\Framework\Attributes\Group;
+
 use FranchiseHistory\FranchiseHistoryRepository;
 use League\League;
 
@@ -13,6 +15,7 @@ use League\League;
  * Tests the VIEW chain: vw_franchise_summary → ibl_team_win_loss → ibl_box_scores_teams,
  * plus vw_playoff_series_results and ibl_heat_win_loss.
  */
+#[Group('database')]
 class FranchiseHistoryRepositoryTest extends DatabaseTestCase
 {
     private FranchiseHistoryRepository $repo;

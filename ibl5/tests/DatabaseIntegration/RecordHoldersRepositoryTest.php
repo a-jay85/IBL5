@@ -4,8 +4,11 @@ declare(strict_types=1);
 
 namespace Tests\DatabaseIntegration;
 
+use PHPUnit\Framework\Attributes\Group;
+
 use RecordHolders\RecordHoldersRepository;
 
+#[Group('database')]
 class RecordHoldersRepositoryTest extends DatabaseTestCase
 {
     private RecordHoldersRepository $repo;

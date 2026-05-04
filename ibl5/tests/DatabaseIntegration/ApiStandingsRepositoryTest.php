@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Tests\DatabaseIntegration;
 
+use PHPUnit\Framework\Attributes\Group;
+
 use Api\Repository\ApiStandingsRepository;
 
 /**
@@ -11,6 +13,7 @@ use Api\Repository\ApiStandingsRepository;
  * standings view queries with optional conference filtering.
  * CI seed has 28 teams with standings data.
  */
+#[Group('database')]
 class ApiStandingsRepositoryTest extends DatabaseTestCase
 {
     private ApiStandingsRepository $repo;

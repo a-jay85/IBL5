@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Tests\DatabaseIntegration;
 
+use PHPUnit\Framework\Attributes\Group;
+
 use Api\Pagination\Paginator;
 use Api\Repository\ApiLeadersRepository;
 
@@ -12,6 +14,7 @@ use Api\Repository\ApiLeadersRepository;
  * statistical leaders from ibl_hist + ibl_plr + ibl_team_info
  * with category-based sorting and season filtering.
  */
+#[Group('database')]
 class ApiLeadersRepositoryTest extends DatabaseTestCase
 {
     private ApiLeadersRepository $repo;

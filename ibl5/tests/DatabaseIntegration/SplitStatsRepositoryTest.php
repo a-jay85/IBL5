@@ -4,8 +4,11 @@ declare(strict_types=1);
 
 namespace Tests\DatabaseIntegration;
 
+use PHPUnit\Framework\Attributes\Group;
+
 use Team\SplitStatsRepository;
 
+#[Group('database')]
 class SplitStatsRepositoryTest extends DatabaseTestCase
 {
     private SplitStatsRepository $repo;

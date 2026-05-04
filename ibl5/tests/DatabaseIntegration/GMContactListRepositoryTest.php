@@ -4,12 +4,15 @@ declare(strict_types=1);
 
 namespace Tests\DatabaseIntegration;
 
+use PHPUnit\Framework\Attributes\Group;
+
 use GMContactList\GMContactListRepository;
 
 /**
  * Tests GMContactListRepository against real MariaDB — GM contact
  * listings with team info for all 28 real teams.
  */
+#[Group('database')]
 class GMContactListRepositoryTest extends DatabaseTestCase
 {
     private GMContactListRepository $repo;

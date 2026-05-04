@@ -4,11 +4,14 @@ declare(strict_types=1);
 
 namespace Tests\DatabaseIntegration;
 
+use PHPUnit\Framework\Attributes\Group;
+
 use Player\PlayerRepository;
 
 /**
  * Tests PlayerRepository against real MariaDB — JOINs, PlayerData hydration, native types.
  */
+#[Group('database')]
 class PlayerRepositoryTest extends DatabaseTestCase
 {
     private PlayerRepository $repo;

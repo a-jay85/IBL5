@@ -4,12 +4,15 @@ declare(strict_types=1);
 
 namespace Tests\DatabaseIntegration;
 
+use PHPUnit\Framework\Attributes\Group;
+
 use DraftPickLocator\DraftPickLocatorRepository;
 use League\League;
 
 /**
  * Tests DraftPickLocatorRepository against real MariaDB — draft pick ownership queries.
  */
+#[Group('database')]
 class DraftPickLocatorRepositoryTest extends DatabaseTestCase
 {
     private DraftPickLocatorRepository $repo;

@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Tests\DatabaseIntegration;
 
+use PHPUnit\Framework\Attributes\Group;
+
 use OneOnOneGame\OneOnOneGameRepository;
 use OneOnOneGame\OneOnOneGameResult;
 
@@ -11,6 +13,7 @@ use OneOnOneGame\OneOnOneGameResult;
  * Tests OneOnOneGameRepository against real MariaDB —
  * CRUD operations on the ibl_one_on_one table plus player lookups from ibl_plr.
  */
+#[Group('database')]
 class OneOnOneGameRepositoryTest extends DatabaseTestCase
 {
     private OneOnOneGameRepository $repo;

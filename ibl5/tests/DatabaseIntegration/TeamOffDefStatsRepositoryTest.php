@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Tests\DatabaseIntegration;
 
+use PHPUnit\Framework\Attributes\Group;
+
 use League\League;
 use TeamOffDefStats\TeamOffDefStatsRepository;
 
@@ -13,6 +15,7 @@ use TeamOffDefStats\TeamOffDefStatsRepository;
  * The VIEWs ibl_team_offense_stats and ibl_team_defense_stats derive from
  * ibl_box_scores_teams + ibl_franchise_seasons. Tests must insert underlying data.
  */
+#[Group('database')]
 class TeamOffDefStatsRepositoryTest extends DatabaseTestCase
 {
     private TeamOffDefStatsRepository $repo;

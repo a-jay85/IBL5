@@ -4,9 +4,12 @@ declare(strict_types=1);
 
 namespace Tests\DatabaseIntegration;
 
+use PHPUnit\Framework\Attributes\Group;
+
 use League\League;
 use Team\TeamRepository;
 
+#[Group('database')]
 class TeamRepositoryTest extends DatabaseTestCase
 {
     private TeamRepository $repo;

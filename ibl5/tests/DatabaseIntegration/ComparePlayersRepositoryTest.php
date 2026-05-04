@@ -4,12 +4,15 @@ declare(strict_types=1);
 
 namespace Tests\DatabaseIntegration;
 
+use PHPUnit\Framework\Attributes\Group;
+
 use ComparePlayers\ComparePlayersRepository;
 
 /**
  * Tests ComparePlayersRepository against real MariaDB — player name listings
  * with pipe/no-starter filtering, and player lookups with team color JOINs.
  */
+#[Group('database')]
 class ComparePlayersRepositoryTest extends DatabaseTestCase
 {
     private ComparePlayersRepository $repo;

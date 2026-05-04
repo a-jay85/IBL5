@@ -4,8 +4,11 @@ declare(strict_types=1);
 
 namespace Tests\DatabaseIntegration;
 
+use PHPUnit\Framework\Attributes\Group;
+
 use SavedDepthChart\SavedDepthChartRepository;
 
+#[Group('database')]
 class SavedDepthChartRepositoryTest extends DatabaseTestCase
 {
     private SavedDepthChartRepository $repo;

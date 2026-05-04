@@ -4,12 +4,15 @@ declare(strict_types=1);
 
 namespace Tests\DatabaseIntegration;
 
+use PHPUnit\Framework\Attributes\Group;
+
 use PlrParser\PlrParserRepository;
 
 /**
  * Tests PlrParserRepository against real MariaDB — massive upserts
  * into ibl_plr (121 params) and ibl_plr_snapshots.
  */
+#[Group('database')]
 class PlrParserRepositoryTest extends DatabaseTestCase
 {
     private PlrParserRepository $repo;

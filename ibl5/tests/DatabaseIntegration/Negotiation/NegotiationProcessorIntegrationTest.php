@@ -8,16 +8,6 @@ use PHPUnit\Framework\Attributes\Group;
 use Tests\DatabaseIntegration\DatabaseTestCase;
 use Negotiation\NegotiationProcessor;
 
-/**
- * Integration tests for NegotiationProcessor against real MariaDB.
- *
- * NegotiationProcessor is read-only — it queries DB state and returns HTML.
- * No transaction management inside the processor, so DatabaseTestCase's
- * begin_transaction/rollback isolation works without modification.
- *
- * Season\Season is aliased to a mock by the PHPUnit bootstrap, so tests
- * that need a specific phase inject a Season object with the phase set.
- */
 #[Group('database')]
 class NegotiationProcessorIntegrationTest extends DatabaseTestCase
 {

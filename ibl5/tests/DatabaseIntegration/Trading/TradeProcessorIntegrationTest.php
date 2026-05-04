@@ -9,13 +9,7 @@ use Tests\DatabaseIntegration\DatabaseTestCase;
 use Trading\TradeItemType;
 use Trading\TradeProcessor;
 
-/**
- * Integration tests for TradeProcessor against real MariaDB.
- *
- * TradeProcessor::processTrade() calls begin_transaction() internally, which
- * implicitly commits DatabaseTestCase's outer transaction. To preserve test
- * isolation we commit the outer tx in setUp and do explicit cleanup in tearDown.
- */
+/** processTrade() commits internally — can't use DatabaseTestCase's outer-tx rollback; tearDown does manual cleanup. */
 #[Group('database')]
 class TradeProcessorIntegrationTest extends DatabaseTestCase
 {
@@ -218,9 +212,7 @@ class TradeProcessorIntegrationTest extends DatabaseTestCase
         return $id;
     }
 
-    /**
-     * @param list<array{id: int, type: string, from: string, to: string}> $items
-     */
+    /** @param list<array{id: int, type: string, from: string, to: string}> $items */
     private function seedPendingTrade(array $items): int
     {
         $offerId = $this->insertTradeOfferRow();

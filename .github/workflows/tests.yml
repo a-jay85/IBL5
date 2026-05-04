@@ -40,7 +40,6 @@ jobs:
               - 'ibl5/composer.json'
               - 'ibl5/composer.lock'
               - 'ibl5/phpunit.xml'
-              - 'ibl5/phpunit.db.xml'
               - 'ibl5/phpstan.neon'
               - 'ibl5/phpstan-rules/**'
               - 'ibl5/tests/DatabaseIntegration/fixtures/**'
@@ -245,7 +244,7 @@ jobs:
         DB_USER: root
         DB_PASS: root
         DB_NAME: ibl5
-      run: vendor/bin/phpunit --configuration phpunit.db.xml --no-progress --no-output --testdox-summary
+      run: vendor/bin/phpunit --group database --no-progress --no-output --testdox-summary
 
   phpstan:
     name: PHPStan Analysis

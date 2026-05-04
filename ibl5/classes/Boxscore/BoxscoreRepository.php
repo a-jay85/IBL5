@@ -41,7 +41,7 @@ class BoxscoreRepository extends \BaseMysqliRepository implements BoxscoreReposi
     public function deletePreseasonBoxScores(int $seasonBeginningYear): bool
     {
         $startDate = "{$seasonBeginningYear}-09-01";
-        $endDate = "{$seasonBeginningYear}-10-31";
+        $endDate = "{$seasonBeginningYear}-09-30";
 
         return $this->deleteBoxScoresForDateRange($startDate, $endDate);
     }

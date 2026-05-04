@@ -5,10 +5,11 @@ on:
     - cron: '0 3 * * 1'  # Monday 3am UTC
   workflow_dispatch:
   pull_request:
-    types: [labeled]
+    types: [opened, synchronize, reopened, labeled]
 
 permissions:
   contents: read
+  pull-requests: write
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -88,6 +89,114 @@ jobs:
       run: |
         if [ -f infection-summary.log ]; then
           echo "## Mutation Testing Results" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          cat infection-summary.log >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+        fi
+
+  mutation-pr:
+    name: Infection PHP (per-PR diff)
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request' && github.event.action != 'labeled'
+    timeout-minutes: 15
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v6
+      with:
+        fetch-depth: 0
+
+    - name: Setup PHP
+      uses: shivammathur/setup-php@v2
+      with:
+        php-version: '8.5'
+        extensions: mbstring, intl, pcov
+        coverage: pcov
+
+    - name: Cache vendor directory
+      uses: actions/cache@v5
+      with:
+        path: ibl5/vendor
+        key: ${{ runner.os }}-vendor-${{ hashFiles('ibl5/composer.lock') }}
+        restore-keys: |
+          ${{ runner.os }}-vendor-
+
+    - name: Create config.php
+      working-directory: ibl5
+      run: cp config.php.example config.php
+
+    - name: Install dependencies
+      working-directory: ibl5
+      run: composer install --no-progress --no-interaction
+
+    - name: Detect covered changes
+      id: changes
+      working-directory: ibl5
+      run: |
+        CHANGED=$(git diff --name-only --diff-filter=AM \
+          origin/${{ github.base_ref }}...HEAD \
+          -- 'classes/**/*.php' || true)
+        if [ -z "$CHANGED" ]; then
+          echo "skip=true" >> $GITHUB_OUTPUT
+        else
+          echo "skip=false" >> $GITHUB_OUTPUT
+        fi
+
+    - name: Generate coverage
+      if: steps.changes.outputs.skip == 'false'
+      working-directory: ibl5
+      run: |
+        mkdir -p coverage
+        vendor/bin/phpunit \
+          --coverage-clover coverage/clover.xml \
+          --coverage-xml coverage/coverage-xml \
+          --log-junit coverage/junit.xml \
+          --no-progress
+
+    - name: Run Infection on diff
+      if: steps.changes.outputs.skip == 'false'
+      working-directory: ibl5
+      run: |
+        vendor/bin/infection \
+          --configuration=infection.json5 \
+          --coverage=coverage \
+          --git-diff-filter=AM \
+          --git-diff-base=origin/${{ github.base_ref }} \
+          --git-diff-lines \
+          --map-source-class-to-test \
+          --only-covering-test-cases \
+          --skip-initial-tests \
+          --show-mutations \
+          --no-progress \
+          --min-msi=100
+
+    - name: Post PR comment with summary
+      if: always() && steps.changes.outputs.skip == 'false'
+      uses: actions/github-script@v8
+      with:
+        script: |
+          const fs = require('fs');
+          const path = 'ibl5/infection-summary.log';
+          let body;
+          if (fs.existsSync(path)) {
+            const summary = fs.readFileSync(path, 'utf8');
+            body = `## Mutation Testing (Diff)\n\`\`\`\n${summary}\n\`\`\``;
+          } else {
+            body = `## Mutation Testing (Diff)\n\nInfection did not produce a summary log. Check the workflow run for details.`;
+          }
+          github.rest.issues.createComment({
+            issue_number: context.issue.number,
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            body
+          });
+
+    - name: Post summary
+      if: always() && steps.changes.outputs.skip == 'false'
+      working-directory: ibl5
+      run: |
+        if [ -f infection-summary.log ]; then
+          echo "## Mutation Testing (Diff) Results" >> $GITHUB_STEP_SUMMARY
           echo '```' >> $GITHUB_STEP_SUMMARY
           cat infection-summary.log >> $GITHUB_STEP_SUMMARY
           echo '```' >> $GITHUB_STEP_SUMMARY

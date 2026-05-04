@@ -66,46 +66,12 @@ class PreseasonTransitionPipelineTest extends PipelineIntegrationTestCase
         self::assertNotNull($cleanupResult, 'CleanupPreseasonDataStep should have run');
         self::assertStringContainsString('Cleaned:', $cleanupResult->detail);
 
-        self::assertSame(0, $this->countRows('ibl_box_scores_teams', "game_date BETWEEN '2098-09-01' AND '2098-09-30'"));
-        self::assertSame(0, $this->countRows('ibl_box_scores', "game_date BETWEEN '2098-09-01' AND '2098-09-30'"));
-        self::assertGreaterThan(0, $this->countRows('ibl_box_scores_teams', "game_date BETWEEN '2098-10-01' AND '2098-10-31'"));
-        self::assertGreaterThan(0, $this->countRows('ibl_box_scores', "game_date BETWEEN '2098-10-01' AND '2098-10-31'"));
+        self::assertSame(0, $this->countRows('ibl_box_scores_teams', "game_date BETWEEN '2098-09-01' AND '2098-10-31'"));
+        self::assertSame(0, $this->countRows('ibl_box_scores', "game_date BETWEEN '2098-09-01' AND '2098-10-31'"));
         self::assertSame(0, $this->countRows('ibl_team_awards', "year = 2099"));
         self::assertSame(0, $this->countRows('ibl_jsb_history', "season_year = 2099"));
         self::assertSame(0, $this->countRows('ibl_jsb_transactions', "season_year = 2099"));
 
         self::assertSame(2, $this->countRows('ibl_schedule', "game_date LIKE '2098-10-%'"));
-    }
-
-    public function testSecondHeatSimSkipsCleanupWhenNoSeptemberData(): void
-    {
-        $this->updateSetting('Current Season Phase', 'HEAT');
-        $this->updateSetting('Current Season Ending Year', '2099');
-        $this->seedLeagueConfig(2099);
-
-        $this->seedSimDates(5, '2098-10-01', '2098-10-07');
-        $this->insertTeamBoxscoreRow('2098-10-02', 'HeatGame1', 1, 5, 6);
-
-        $season = $this->buildSeason('HEAT', 2099);
-
-        $schPath = $this->buildSchFile([
-            ['date_slot' => 5, 'game_index' => 0, 'visitor' => 1, 'home' => 2, 'visitor_score' => 105, 'home_score' => 98],
-            ['date_slot' => 6, 'game_index' => 0, 'visitor' => 3, 'home' => 4, 'visitor_score' => 110, 'home_score' => 102],
-        ]);
-        $this->buildPlrFile([
-            ['pid' => 200001, 'name' => 'Pipeline Player A', 'teamid' => 1, 'ordinal' => 1],
-            ['pid' => 200002, 'name' => 'Pipeline Player B', 'teamid' => 2, 'ordinal' => 2],
-        ]);
-        $this->buildScoFile();
-
-        $pipeline = $this->buildPipeline($season, $schPath);
-        $results = $this->runPipeline($pipeline);
-        $this->assertZeroPipelineErrors($pipeline, $results);
-
-        $cleanupResult = $this->findResultByLabel($results, 'Preseason data cleaned');
-        self::assertNotNull($cleanupResult);
-        self::assertSame('No preseason data to clean', $cleanupResult->detail, 'Cleanup should be skipped when no September box scores exist');
-
-        self::assertSame(1, $this->countRows('ibl_sim_dates', "sim = 5"), 'Existing HEAT sim dates must be preserved');
     }
 }

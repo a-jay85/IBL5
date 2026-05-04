@@ -55,7 +55,7 @@ final class CleanupPreseasonDataStep implements PipelineStepInterface
         $cleaned = [];
 
         $this->boxscoreRepo->deletePreseasonBoxScores($this->season->beginningYear);
-        $cleaned[] = 'box scores (Sep-Oct)';
+        $cleaned[] = 'box scores (Sep)';
 
         $this->cleanupRepo->deletePreseasonSimDates($this->season->beginningYear);
         $cleaned[] = 'sim dates';

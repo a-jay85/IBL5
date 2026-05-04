@@ -48,10 +48,18 @@ INSERT INTO ibl_plr (pid, name, age, teamid, pos, stamina, exp, bird, cy, cyt, s
 VALUES (2, 'Test Player Two', 22, 0, 'SF', 75, 1, 0, 0, 0, 0, 0, 0, 1000, 0, 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb')
 ON DUPLICATE KEY UPDATE name = VALUES(name);
 
--- Users: one GM mapped to Metros (via auth_users + ibl_team_info.gm_username)
+-- Users: GM (non-admin) and admin fixtures
+-- Passwords are real bcrypt cost-4 hashes — password_verify() works against them.
+-- GM fixture: testgm/gm-password (non-admin, cost 4)
 INSERT INTO auth_users (id, email, password, username, status, verified, resettable, roles_mask, registered, last_login, force_logout)
-VALUES (1, 'test@example.com', '$2y$12$placeholder_hash_for_tests_only..', 'testgm', 0, 1, 1, 0, UNIX_TIMESTAMP(), NULL, 0)
-ON DUPLICATE KEY UPDATE username = VALUES(username);
+VALUES (1, 'test@example.com', '$2y$04$iQGtQtp3qeQH98Q.kx99c..rREmkgak7Xq9/uLjpJQubS3Bgm3gHi', 'testgm', 0, 1, 1, 0, UNIX_TIMESTAMP(), NULL, 0)
+ON DUPLICATE KEY UPDATE username = VALUES(username), password = VALUES(password);
+
+-- Admin fixture: testadmin/test-password (bcrypt cost 4 for fast tests)
+-- roles_mask = 1 grants ADMIN role (Delight\Auth\Role::ADMIN)
+INSERT INTO auth_users (id, email, password, username, status, verified, resettable, roles_mask, registered, last_login, force_logout)
+VALUES (2, 'admin@example.com', '$2y$04$mFS8uV7f1CVkCMug3cn9Rup8sGVb0qUDlZsgKB.E/x/ADAHt1S.yu', 'testadmin', 0, 1, 1, 1, UNIX_TIMESTAMP(), NULL, 0)
+ON DUPLICATE KEY UPDATE roles_mask = VALUES(roles_mask), password = VALUES(password);
 
 -- Settings: commonly read by services
 INSERT INTO ibl_settings (name, value)

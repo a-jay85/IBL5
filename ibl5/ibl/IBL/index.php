@@ -6,7 +6,7 @@ require $_SERVER['DOCUMENT_ROOT'] . '/ibl5/mainfile.php';
 
 $allowedFiles = ['Schedule.htm', 'Standings.htm'];
 
-$file = $_GET['file'] ?? '';
+$file = $_GET['file'] ?? 'Standings.htm';
 if (!is_string($file) || !in_array($file, $allowedFiles, true)) {
     http_response_code(404);
     exit;

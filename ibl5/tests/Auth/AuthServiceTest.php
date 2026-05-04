@@ -64,12 +64,11 @@ class AuthServiceTest extends TestCase
         self::assertFalse(password_verify('wrong-password', $hash));
     }
 
-    public function testHashPasswordUsesCost12(): void
+    public function testHashPasswordUsesTestCostInTestEnvironment(): void
     {
         $hash = $this->authService->hashPassword('test');
 
-        // bcrypt hash format: $2y$12$...
-        self::assertStringStartsWith('$2y$12$', $hash);
+        self::assertStringStartsWith('$2y$04$', $hash);
     }
 
     public function testIsAuthenticatedReturnsFalseByDefault(): void
@@ -181,7 +180,7 @@ class AuthServiceTest extends TestCase
     {
         $hash = $this->authService->hashPassword('test-password');
 
-        self::assertStringStartsWith('$2y$12$', $hash);
+        self::assertStringStartsWith('$2y$04$', $hash);
         self::assertTrue(password_verify('test-password', $hash));
     }
 

@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Module\EntryPoints;
 
-use Tests\Integration\Mocks\TestDataFactory;
+use Tests\WideUnit\Mocks\TestDataFactory;
 
 /**
  * Integration tests for modules/Schedule/index.php entry point.

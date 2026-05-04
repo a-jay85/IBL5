@@ -5,12 +5,12 @@ declare(strict_types=1);
 namespace Tests\FranchiseRecordBook;
 
 use FranchiseRecordBook\FranchiseRecordBookApiHandler;
-use Tests\Integration\IntegrationTestCase;
+use Tests\WideUnit\WideUnitTestCase;
 
 /**
  * @covers \FranchiseRecordBook\FranchiseRecordBookApiHandler
  */
-class FranchiseRecordBookApiHandlerTest extends IntegrationTestCase
+class FranchiseRecordBookApiHandlerTest extends WideUnitTestCase
 {
     protected function setUp(): void
     {

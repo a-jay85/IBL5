@@ -6,9 +6,9 @@ namespace Tests\Api\Controller;
 
 use Api\Controller\PlayerStatsController;
 use Api\Response\JsonResponder;
-use Tests\Integration\IntegrationTestCase;
+use Tests\WideUnit\WideUnitTestCase;
 
-class PlayerStatsControllerTest extends IntegrationTestCase
+class PlayerStatsControllerTest extends WideUnitTestCase
 {
     public function testHandleReturns404ForUnknownUuid(): void
     {

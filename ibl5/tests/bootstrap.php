@@ -70,12 +70,12 @@ if (is_link(__DIR__ . '/../vendor')) {
 
 // Now that autoloader is registered, define class aliases for backward compatibility
 // This maps the old global mock classes to the new namespaced ones
-class_alias('Tests\\Integration\\Mocks\\MockDatabase', 'MockDatabase');
-class_alias('Tests\\Integration\\Mocks\\MockDatabaseResult', 'MockDatabaseResult');
-class_alias('Tests\\Integration\\Mocks\\MockPreparedStatement', 'MockPreparedStatement');
-class_alias('Tests\\Integration\\Mocks\\MockMysqliResult', 'MockMysqliResult');
-class_alias('Tests\\Integration\\Mocks\\UI', 'UI');
-class_alias('Tests\\Integration\\Mocks\\Season', 'Season\\Season');
+class_alias('Tests\\WideUnit\\Mocks\\MockDatabase', 'MockDatabase');
+class_alias('Tests\\WideUnit\\Mocks\\MockDatabaseResult', 'MockDatabaseResult');
+class_alias('Tests\\WideUnit\\Mocks\\MockPreparedStatement', 'MockPreparedStatement');
+class_alias('Tests\\WideUnit\\Mocks\\MockMysqliResult', 'MockMysqliResult');
+class_alias('Tests\\WideUnit\\Mocks\\UI', 'UI');
+class_alias('Tests\\WideUnit\\Mocks\\Season', 'Season\\Season');
 
 // Set up $_SERVER variables needed by config.php
 if (!isset($_SERVER['SERVER_NAME'])) {
@@ -89,8 +89,8 @@ if (!isset($_SERVER['SCRIPT_FILENAME'])) {
 require_once __DIR__ . '/../config.php';
 
 // Set up global $mysqli_db mock for tests that use Player or other refactored classes
-// Note: Integration tests should set up their own $mysqli_db that shares the same MockDatabase
-// instance used by the test. See ExtensionIntegrationTest for example.
+// Note: WideUnit tests should set up their own $mysqli_db that shares the same MockDatabase
+// instance used by the test. See ExtensionWideUnitTest for example.
 //
 // Unit tests that directly mock Player/PlayerRepository don't need this global.
 

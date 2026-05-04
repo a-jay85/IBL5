@@ -1,6 +1,6 @@
 ---
 description: Development standards, priorities, and workflow for IBL5.
-last_verified: 2026-04-11
+last_verified: 2026-05-04
 ---
 
 # Development Guide
@@ -24,7 +24,7 @@ last_verified: 2026-04-11
 
 1. **Test Coverage → 80%** - ✅ Goal achieved with 3033 tests (~80% coverage). Comprehensive edge case testing complete.
 
-   **Priority Integration Tests:** ✅ All Complete
+   **Priority WideUnit Tests:** ✅ All Complete
    - ~~Waivers, DepthChart, RookieOption, Schedule, Standings, Voting~~
 
    **Unit Test Gaps:** ✅ All Closed (Jan 26, 2026)
@@ -162,7 +162,7 @@ last_verified: 2026-04-11
 - **SalaryConverterTest** (14 tests) - Full coverage for previously untested utility class
 - **DiscordIntegrationTest** (29 tests) - Config loading, database queries, message formatting
 - **InjuriesIntegrationTest** (28 tests) - XSS protection, HTML structure, rendering edge cases
-- **StandingsIntegrationTest** (26 tests) - Region validation, clinching indicators, streak display
+- **StandingsWideUnitTest** (26 tests) - Region validation, clinching indicators, streak display
 - **LeagueContextIntegrationTest** (36 tests) - Constants, config structure, module lists
 
 **Coverage Added:**
@@ -176,12 +176,12 @@ last_verified: 2026-04-11
 
 ---
 
-### Schedule Integration Tests Added (Jan 25, 2026)
+### Schedule WideUnit Tests Added (Jan 25, 2026)
 
 **Impact:** Added 30 integration test methods for complete team schedule display workflow coverage
 
-**Integration Test Coverage:**
-- **Schedule Integration:** ScheduleIntegrationTest (30 test methods)
+**WideUnit Test Coverage:**
+- **Schedule WideUnit:** ScheduleWideUnitTest (30 test methods)
   - Repository tests: Query generation, result iteration, date ordering, empty result handling
   - Win/loss tracking: Cumulative wins/losses, mixed results across season
   - Streak calculation: Win streaks, loss streaks, streak reset on opposite result
@@ -203,16 +203,16 @@ last_verified: 2026-04-11
 - View rendering (7 tests)
 - Complete workflow (2 tests)
 
-**Status:** All 1591 tests passing ✅ Schedule module now has comprehensive integration test coverage
+**Status:** All 1591 tests passing ✅ Schedule module now has comprehensive wide-unit test coverage
 
 ---
 
-### Standings Integration Tests Added (Jan 25, 2026)
+### Standings WideUnit Tests Added (Jan 25, 2026)
 
 **Impact:** Added 35 integration test methods for complete standings display workflow coverage
 
-**Integration Test Coverage:**
-- **Standings Integration:** StandingsIntegrationTest (35 test methods)
+**WideUnit Test Coverage:**
+- **Standings WideUnit:** StandingsWideUnitTest (35 test methods)
   - Repository tests: Conference/division standings queries, region validation
   - Streak data: Power table queries, last 10 record, streak type/count
   - Pythagorean stats: Points scored/allowed calculation from offense/defense stats
@@ -236,16 +236,16 @@ last_verified: 2026-04-11
 - Full render tests (3 tests)
 - Complete workflow tests (2 tests)
 
-**Status:** All 1621 tests passing ✅ Standings module now has comprehensive integration test coverage
+**Status:** All 1621 tests passing ✅ Standings module now has comprehensive wide-unit test coverage
 
 ---
 
-### Voting Integration Tests Added (Jan 25, 2026)
+### Voting WideUnit Tests Added (Jan 25, 2026)
 
 **Impact:** Added 30 integration test methods for complete voting results display workflow coverage
 
-**Integration Test Coverage:**
-- **Voting Integration:** VotingIntegrationTest (30 test methods)
+**WideUnit Test Coverage:**
+- **Voting WideUnit:** VotingWideUnitTest (30 test methods)
   - Service tests: ASG/EOY table queries, vote aggregation, weighted scoring
   - All-Star voting: Eastern/Western Conference Frontcourt/Backcourt categories
   - End-of-Year voting: MVP, Sixth Man, Rookie of Year, GM of Year with weighted points
@@ -266,16 +266,16 @@ last_verified: 2026-04-11
 - Complete workflow tests (4 tests)
 - Table styling tests (2 tests)
 
-**Status:** All 1621 tests passing ✅ Voting module now has comprehensive integration test coverage
+**Status:** All 1621 tests passing ✅ Voting module now has comprehensive wide-unit test coverage
 
 ---
 
-### RookieOption Integration Tests Added (Jan 25, 2026)
+### RookieOption WideUnit Tests Added (Jan 25, 2026)
 
 **Impact:** Added 20 integration test methods for complete rookie option exercise workflow coverage
 
-**Integration Test Coverage:**
-- **RookieOption Integration:** RookieOptionIntegrationTest (20 test methods)
+**WideUnit Test Coverage:**
+- **RookieOption WideUnit:** RookieOptionWideUnitTest (20 test methods)
   - First round pick workflows: Regular Season and Free Agency phases
   - Second round pick workflows: Regular Season and Free Agency phases
   - Ownership validation: Player must be on requesting team
@@ -293,16 +293,16 @@ last_verified: 2026-04-11
 - Complete workflow tests (4 tests)
 - Edge cases (4 tests)
 
-**Status:** RookieOption module now has comprehensive integration test coverage
+**Status:** RookieOption module now has comprehensive wide-unit test coverage
 
 ---
 
-### DepthChart Integration Tests Added (Jan 25, 2026)
+### DepthChart WideUnit Tests Added (Jan 25, 2026)
 
 **Impact:** Added 22 integration test methods for complete depth chart submission workflow coverage
 
-**Integration Test Coverage:**
-- **DepthChart Integration:** DepthChartIntegrationTest (22 test methods)
+**WideUnit Test Coverage:**
+- **DepthChart WideUnit:** DepthChartWideUnitTest (22 test methods)
   - Complete submission workflow: Processing → Validation → Database updates → CSV export
   - Validation failures: Insufficient active players, position depth requirements, multiple starting positions
   - Season phase rules: Regular Season (12 active, 3 per position) vs Playoffs (10-12 active, 2 per position)
@@ -318,16 +318,16 @@ last_verified: 2026-04-11
 - Input sanitization (3 tests)
 - Error handling (3 tests)
 
-**Status:** DepthChart module now has comprehensive integration test coverage following IntegrationTestCase pattern
+**Status:** DepthChart module now has comprehensive wide-unit test coverage following WideUnitTestCase pattern
 
 ---
 
-### Waivers Integration Tests Added (Jan 25, 2026)
+### Waivers WideUnit Tests Added (Jan 25, 2026)
 
 **Impact:** Added 25 integration test methods for complete waiver wire workflow coverage
 
-**Integration Test Coverage:**
-- **Waivers Integration:** WaiversIntegrationTest (25 test methods)
+**WideUnit Test Coverage:**
+- **Waivers WideUnit:** WaiversWideUnitTest (25 test methods)
   - Drop to waivers: Success scenarios, validation failures, database error handling
   - Add from waivers: Existing contract preservation, veteran minimum assignment
   - Validation: Cap violations (hard cap limits), roster slot constraints, player ID validation
@@ -345,30 +345,30 @@ last_verified: 2026-04-11
 - Veteran minimum calculation (2 tests)
 - Validator error handling (2 tests)
 
-**Status:** All tests passing ✅ Waivers module now has comprehensive integration test coverage following TestDataFactory pattern
+**Status:** All tests passing ✅ Waivers module now has comprehensive wide-unit test coverage following TestDataFactory pattern
 
 ---
 
-### Integration Tests Added (Jan 12, 2026 - PR #159)
+### WideUnit Tests Added (Jan 12, 2026 - PR #159)
 
 **Impact:** Added 38 integration test methods across 5 critical workflow suites, with refactored test infrastructure using TestDataFactory pattern
 
-**Integration Test Coverage:**
-- **Draft Integration:** DraftIntegrationTest (6 test methods) - Player creation, pick ownership, validation failures
-- **Extension Integration:** ExtensionIntegrationTest (12 test methods) - Extension offers, CBA validation, player preferences, Bird rights
-- **FreeAgency Integration:** FreeAgencyIntegrationTest (7 test methods) - Custom/MLE/LLE/VetMin offers, cap space validation, offer deletion
-- **Negotiation Integration:** NegotiationIntegrationTest (4 test methods) - Demand calculation, cap space, eligibility checks
-- **Trading Integration:** TradeIntegrationTest (9 test methods) - Player/pick/cash trades, news stories, cleanup workflows
+**WideUnit Test Coverage:**
+- **Draft WideUnit:** DraftWideUnitTest (6 test methods) - Player creation, pick ownership, validation failures
+- **Extension WideUnit:** ExtensionWideUnitTest (12 test methods) - Extension offers, CBA validation, player preferences, Bird rights
+- **FreeAgency WideUnit:** FreeAgencyWideUnitTest (7 test methods) - Custom/MLE/LLE/VetMin offers, cap space validation, offer deletion
+- **Negotiation WideUnit:** NegotiationWideUnitTest (4 test methods) - Demand calculation, cap space, eligibility checks
+- **Trading WideUnit:** TradeWideUnitTest (9 test methods) - Player/pick/cash trades, news stories, cleanup workflows
 
 **Test Infrastructure Improvements:**
-- Created standalone TestDataFactory class in Tests\Integration\Mocks\ namespace for centralized fixture creation
-- IntegrationTestCase base class provides transaction rollback, mock database, and helper assertions
-- All integration tests use TestDataFactory::createPlayer/createTeam/createSeason static methods
-- Refactored mock classes from inline definitions to proper namespaced classes in tests/Integration/Mocks/
+- Created standalone TestDataFactory class in Tests\WideUnit\Mocks\ namespace for centralized fixture creation
+- WideUnitTestCase base class provides mock database and helper assertions
+- All wide-unit tests use TestDataFactory::createPlayer/createTeam/createSeason static methods
+- Refactored mock classes from inline definitions to proper namespaced classes in tests/WideUnit/Mocks/
 - Enhanced autoloader.php to support Tests\ namespace
 - All tests use @covers annotations for accurate coverage measurement
 
-**Status:** Integration infrastructure complete with TestDataFactory pattern enabling consistent fixture creation across all integration test suites
+**Status:** WideUnit infrastructure complete with TestDataFactory pattern enabling consistent fixture creation across all wide-unit test suites
 
 ---
 
@@ -395,7 +395,7 @@ last_verified: 2026-04-11
 
 **Infrastructure Improvements:**
 - Enhanced `phpunit.xml` with comprehensive test suite definitions
-- Created IntegrationTestCase base class (208 lines) for database testing with transaction rollback
+- Created WideUnitTestCase base class (208 lines) for database testing with transaction rollback
 - Refactored PowerRankingsUpdater, ScheduleUpdater, StandingsUpdater to use new utilities
 
 **Impact:** Net +7,627 insertions, -476 deletions across 65 files

@@ -5,8 +5,8 @@ declare(strict_types=1);
 namespace Tests\Injuries;
 
 use PHPUnit\Framework\Attributes\AllowMockObjectsWithoutExpectations;
-use Tests\Integration\IntegrationTestCase;
-use Tests\Integration\Mocks\TestDataFactory;
+use Tests\WideUnit\WideUnitTestCase;
+use Tests\WideUnit\Mocks\TestDataFactory;
 use Injuries\InjuriesService;
 use Injuries\InjuriesView;
 
@@ -19,7 +19,7 @@ use Injuries\InjuriesView;
  * @covers \Injuries\InjuriesView
  */
 #[AllowMockObjectsWithoutExpectations]
-class InjuriesIntegrationTest extends IntegrationTestCase
+class InjuriesIntegrationTest extends WideUnitTestCase
 {
     private InjuriesView $view;
 

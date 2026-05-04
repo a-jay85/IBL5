@@ -6,9 +6,9 @@ namespace Tests\Api\Controller;
 
 use Api\Controller\StandingsController;
 use Api\Response\JsonResponder;
-use Tests\Integration\IntegrationTestCase;
+use Tests\WideUnit\WideUnitTestCase;
 
-class StandingsControllerTest extends IntegrationTestCase
+class StandingsControllerTest extends WideUnitTestCase
 {
     public function testHandleCallsResponderWithStandingsData(): void
     {

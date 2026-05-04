@@ -6,7 +6,7 @@ namespace Tests\Updater;
 
 use League\LeagueContext;
 use PHPUnit\Framework\TestCase;
-use Tests\Integration\Mocks\MockDatabase;
+use Tests\WideUnit\Mocks\MockDatabase;
 use Season\Season;
 
 /**

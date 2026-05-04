@@ -5,9 +5,9 @@ declare(strict_types=1);
 namespace Tests\Services;
 
 use Services\CommonMysqliRepository;
-use Tests\Integration\IntegrationTestCase;
+use Tests\WideUnit\WideUnitTestCase;
 
-class CommonMysqliRepositoryTest extends IntegrationTestCase
+class CommonMysqliRepositoryTest extends WideUnitTestCase
 {
     private CommonMysqliRepository $repository;
 

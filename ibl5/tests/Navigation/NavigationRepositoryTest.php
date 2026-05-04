@@ -5,9 +5,9 @@ declare(strict_types=1);
 namespace Tests\Navigation;
 
 use Navigation\NavigationRepository;
-use Tests\Integration\IntegrationTestCase;
+use Tests\WideUnit\WideUnitTestCase;
 
-class NavigationRepositoryTest extends IntegrationTestCase
+class NavigationRepositoryTest extends WideUnitTestCase
 {
     private NavigationRepository $repository;
 

@@ -7,7 +7,7 @@ namespace Tests\ProjectedDraftOrder;
 use ProjectedDraftOrder\Contracts\ProjectedDraftOrderRepositoryInterface;
 use ProjectedDraftOrder\ProjectedDraftOrderRepository;
 use PHPUnit\Framework\TestCase;
-use Tests\Integration\Mocks\MockDatabase;
+use Tests\WideUnit\Mocks\MockDatabase;
 
 /**
  * @covers \ProjectedDraftOrder\ProjectedDraftOrderRepository

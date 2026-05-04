@@ -11,7 +11,7 @@ use League\League;
 use Team\Contracts\TeamQueryRepositoryInterface;
 use Team\Team;
 use Season\Season;
-use Tests\Integration\Mocks\TestDataFactory;
+use Tests\WideUnit\Mocks\TestDataFactory;
 
 /**
  * Comprehensive tests for FreeAgencyCapCalculator

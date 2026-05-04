@@ -7,9 +7,9 @@ namespace Tests\LeagueConfig;
 use League\LeagueContext;
 use LeagueConfig\Contracts\LeagueConfigRepositoryInterface;
 use LeagueConfig\LeagueConfigRepository;
-use Tests\Integration\IntegrationTestCase;
+use Tests\WideUnit\WideUnitTestCase;
 
-class LeagueConfigRepositoryTest extends IntegrationTestCase
+class LeagueConfigRepositoryTest extends WideUnitTestCase
 {
     public function testImplementsRepositoryInterface(): void
     {

@@ -5,8 +5,8 @@ declare(strict_types=1);
 namespace Tests\Discord;
 
 use PHPUnit\Framework\Attributes\AllowMockObjectsWithoutExpectations;
-use Tests\Integration\IntegrationTestCase;
-use Tests\Integration\Mocks\TestDataFactory;
+use Tests\WideUnit\WideUnitTestCase;
+use Tests\WideUnit\Mocks\TestDataFactory;
 use Discord\Discord;
 
 /**
@@ -17,7 +17,7 @@ use Discord\Discord;
  * @covers \Discord
  */
 #[AllowMockObjectsWithoutExpectations]
-class DiscordIntegrationTest extends IntegrationTestCase
+class DiscordIntegrationTest extends WideUnitTestCase
 {
     // ============================================
     // CONSTRUCTOR TESTS

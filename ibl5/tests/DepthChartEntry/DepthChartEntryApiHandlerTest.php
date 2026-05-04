@@ -5,14 +5,14 @@ declare(strict_types=1);
 namespace Tests\DepthChartEntry;
 
 use DepthChartEntry\DepthChartEntryApiHandler;
-use Tests\Integration\IntegrationTestCase;
+use Tests\WideUnit\WideUnitTestCase;
 
 /**
  * Tests for DepthChartEntryApiHandler
  *
  * Validates display mode whitelist and split parameter support.
  */
-class DepthChartEntryApiHandlerTest extends IntegrationTestCase
+class DepthChartEntryApiHandlerTest extends WideUnitTestCase
 {
     public function testCanBeInstantiated(): void
     {

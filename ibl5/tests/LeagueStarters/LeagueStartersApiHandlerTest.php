@@ -5,12 +5,12 @@ declare(strict_types=1);
 namespace Tests\LeagueStarters;
 
 use LeagueStarters\LeagueStartersApiHandler;
-use Tests\Integration\IntegrationTestCase;
+use Tests\WideUnit\WideUnitTestCase;
 
 /**
  * @covers \LeagueStarters\LeagueStartersApiHandler
  */
-class LeagueStartersApiHandlerTest extends IntegrationTestCase
+class LeagueStartersApiHandlerTest extends WideUnitTestCase
 {
     public function testCanBeInstantiated(): void
     {

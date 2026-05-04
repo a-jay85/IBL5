@@ -8,7 +8,7 @@ use LeagueStarters\Contracts\LeagueStartersRepositoryInterface;
 use LeagueStarters\LeagueStartersService;
 use PHPUnit\Framework\TestCase;
 use League\League;
-use Tests\Integration\Mocks\TestDataFactory;
+use Tests\WideUnit\Mocks\TestDataFactory;
 
 class LeagueStartersServiceTest extends TestCase
 {

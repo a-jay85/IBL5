@@ -5,12 +5,12 @@ declare(strict_types=1);
 namespace Tests\SavedDepthChart;
 
 use SavedDepthChart\SavedDepthChartApiHandler;
-use Tests\Integration\IntegrationTestCase;
+use Tests\WideUnit\WideUnitTestCase;
 
 /**
  * @covers \SavedDepthChart\SavedDepthChartApiHandler
  */
-class SavedDepthChartApiHandlerTest extends IntegrationTestCase
+class SavedDepthChartApiHandlerTest extends WideUnitTestCase
 {
     private SavedDepthChartApiHandler $handler;
 

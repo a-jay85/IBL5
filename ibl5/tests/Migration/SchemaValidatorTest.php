@@ -8,7 +8,7 @@ use Migration\SchemaAssertion;
 use Migration\SchemaValidationResult;
 use Migration\SchemaValidator;
 use PHPUnit\Framework\TestCase;
-use Tests\Integration\Mocks\MockDatabase;
+use Tests\WideUnit\Mocks\MockDatabase;
 
 final class SchemaValidatorTest extends TestCase
 {

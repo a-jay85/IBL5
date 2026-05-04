@@ -1,7 +1,7 @@
 ---
 description: PHPUnit testing rules: output parsing, behavior-focused patterns.
 paths: ibl5/tests/**/*.php
-last_verified: 2026-04-30
+last_verified: 2026-05-04
 ---
 
 # PHPUnit Testing Rules
@@ -146,11 +146,11 @@ Register in `ibl5/phpunit.xml`:
 </testsuite>
 ```
 
-## Integration Test Setup
+## WideUnit Test Setup
 
 ```php
-// Integration test setup
-class MyTest extends IntegrationTestCase {
+// WideUnit test setup (mock-based multi-class workflow tests)
+class MyTest extends WideUnitTestCase {
     protected function setUp(): void {
         parent::setUp();  // Sets up $this->mockDb
     }
@@ -198,7 +198,7 @@ class ScheduleEntryPointTest extends ModuleEntryPointTestCase
 }
 ```
 
-- Extend `Tests\Module\EntryPoints\ModuleEntryPointTestCase` (which extends `IntegrationTestCase`)
+- Extend `Tests\Module\EntryPoints\ModuleEntryPointTestCase` (which extends `WideUnitTestCase`)
 - Use `$this->runModule('ModuleName', get: [...], post: [...])` to include the module's `index.php` and capture output
 - Use `$this->authenticateAs('username')` to simulate an authenticated user
 - Lives in `tests/Module/EntryPoints/`, registered under the "Module Tests" testsuite

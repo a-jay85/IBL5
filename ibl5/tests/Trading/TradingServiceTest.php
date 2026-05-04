@@ -11,8 +11,8 @@ use Trading\Contracts\TradeAssetRepositoryInterface;
 use Trading\Contracts\TradeFormRepositoryInterface;
 use Trading\Contracts\TradeCashRepositoryInterface;
 use Season\Season;
-use Tests\Integration\Mocks\MockDatabase;
-use Tests\Integration\Mocks\MockDatabaseResult;
+use Tests\WideUnit\Mocks\MockDatabase;
+use Tests\WideUnit\Mocks\MockDatabaseResult;
 
 class TradingServiceTest extends TestCase
 {

@@ -6,7 +6,7 @@ namespace Tests\Player;
 
 use PHPUnit\Framework\TestCase;
 use Player\Player;
-use Tests\Integration\Mocks\TestDataFactory;
+use Tests\WideUnit\Mocks\TestDataFactory;
 
 class PlayerSalaryPlaceholderTest extends TestCase
 {

@@ -5,12 +5,12 @@ declare(strict_types=1);
 namespace Tests\DraftHistory;
 
 use DraftHistory\DraftHistoryApiHandler;
-use Tests\Integration\IntegrationTestCase;
+use Tests\WideUnit\WideUnitTestCase;
 
 /**
  * @covers \DraftHistory\DraftHistoryApiHandler
  */
-class DraftHistoryApiHandlerTest extends IntegrationTestCase
+class DraftHistoryApiHandlerTest extends WideUnitTestCase
 {
     protected function setUp(): void
     {

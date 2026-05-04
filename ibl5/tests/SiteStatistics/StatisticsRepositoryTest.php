@@ -6,9 +6,9 @@ namespace Tests\SiteStatistics;
 
 use PHPUnit\Framework\TestCase;
 use SiteStatistics\StatisticsRepository;
-use Tests\Integration\Mocks\MockDatabase;
-use Tests\Integration\Mocks\MockPreparedStatement;
-use Tests\Integration\Mocks\MockDatabaseResult;
+use Tests\WideUnit\Mocks\MockDatabase;
+use Tests\WideUnit\Mocks\MockPreparedStatement;
+use Tests\WideUnit\Mocks\MockDatabaseResult;
 
 class StatisticsRepositoryTest extends TestCase
 {

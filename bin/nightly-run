@@ -1,11 +1,8 @@
 #!/bin/bash
 # Wrapper script for the IBL5 nightly autonomous workflow.
-# Called by launchd at 00:03 daily. Loops through queued plans,
+# Called by launchd at 00:03 and 11:00 daily. Loops through queued plans,
 # firing two claude -p invocations per plan (implementation + post-plan)
 # until the queue is empty or the time guard is exceeded.
-#
-# If plans remain in the queue when the loop exits (time guard or
-# usage limit), schedules a one-shot 11am PT resume via launchd.
 #
 # To test manually: bin/nightly-run
 # To force-trigger via launchd: launchctl start com.ibl5.nightly-claude
@@ -39,7 +36,6 @@ REPO="/Users/ajaynicolas/GitHub/IBL5"
 NIGHTLY_DIR="$HOME/.claude/projects/-Users-ajaynicolas-GitHub-IBL5/nightly"
 LOG_DIR="$NIGHTLY_DIR/logs"
 QUEUE_DIR="$NIGHTLY_DIR/queue"
-RESUME_PLIST="$HOME/Library/LaunchAgents/com.ibl5.nightly-resume.plist"
 MAX_ELAPSED=17100  # ~4h45m — stops around 4:45am, leaves headroom in the 5h usage window
 MAX_ATTEMPTS=3     # per-plan retry cap within one night (covers impl + postplan phases)
 
@@ -52,12 +48,6 @@ cd "$REPO"
 # Prevent macOS from sleeping while we run (released automatically on exit)
 caffeinate -s -w $$ &
 CAFFEINATE_PID=$!
-
-# Clean up one-shot resume plist if this IS a resume run
-if [ -f "$RESUME_PLIST" ]; then
-    launchctl bootout "gui/$(id -u)/com.ibl5.nightly-resume" 2>/dev/null || true
-    rm -f "$RESUME_PLIST"
-fi
 
 START=$(date +%s)
 PLANS_RUN=0
@@ -212,40 +202,5 @@ for hf in "$HANDOFF_DIR"/*.json; do
         rm -f "$hf"
     fi
 done
-
-# Schedule 11am PT resume if plans remain in the queue
-if ls "$QUEUE_DIR"/*.md &>/dev/null; then
-    REMAINING=$(ls -1 "$QUEUE_DIR"/*.md 2>/dev/null | wc -l | tr -d ' ')
-    echo "Scheduling 11am PT resume for $REMAINING remaining plan(s)." >> "$LOG"
-
-    cat > "$RESUME_PLIST" <<EOF
-<?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-<plist version="1.0">
-<dict>
-    <key>Label</key>
-    <string>com.ibl5.nightly-resume</string>
-    <key>Program</key>
-    <string>$REPO/bin/nightly-run</string>
-    <key>StartCalendarInterval</key>
-    <dict>
-        <key>Hour</key>
-        <integer>11</integer>
-        <key>Minute</key>
-        <integer>0</integer>
-    </dict>
-    <key>WorkingDirectory</key>
-    <string>$REPO</string>
-    <key>StandardOutPath</key>
-    <string>$LOG_DIR/launchd-stdout.log</string>
-    <key>StandardErrorPath</key>
-    <string>$LOG_DIR/launchd-stderr.log</string>
-</dict>
-</plist>
-EOF
-
-    launchctl bootstrap "gui/$(id -u)" "$RESUME_PLIST"
-    echo "Resume plist loaded: $RESUME_PLIST" >> "$LOG"
-fi
 
 echo "=== Nightly session complete at $(date) — $PLANS_RUN plan(s) run ===" >> "$LOG"

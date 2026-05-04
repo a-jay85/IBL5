@@ -1,12 +1,12 @@
 ---
-description: Nightly autonomous workflow — launchd fires claude -p at midnight, running two context-isolated agents per plan (implementation + post-plan) with time guards and incremental checkpoints.
-last_verified: 2026-05-01
+description: Nightly autonomous workflow — launchd fires claude -p at 00:03 and 11:00 daily, running two context-isolated agents per plan (implementation + post-plan) with time guards and incremental checkpoints.
+last_verified: 2026-05-04
 paths: "bin/nightly-*"
 ---
 
 # Nightly Autonomous Workflow
 
-A headless `claude -p` process runs at 00:03 daily via macOS `launchd`. It loops through all queued plans — two fresh `claude -p` invocations per plan (implementation, then post-plan) — until the queue is empty or the ~4h45m time guard is exceeded.
+A headless `claude -p` process runs twice daily via macOS `launchd` — at 00:03 and 11:00. It loops through all queued plans — two fresh `claude -p` invocations per plan (implementation, then post-plan) — until the queue is empty or the ~4h45m time guard is exceeded.
 
 ## Quick Reference
 
@@ -36,7 +36,7 @@ A headless `claude -p` process runs at 00:03 daily via macOS `launchd`. It loops
 ## How It Works
 
 1. **Daytime:** Work with Claude in plan mode. After approval, queue the plan: `bin/nightly-queue <slug>`
-2. **00:03:** `launchd` fires `bin/nightly-run`
+2. **00:03 and 11:00:** `launchd` fires `bin/nightly-run`
 3. **Loop:** For each queued plan (oldest first), `nightly-run` fires two `claude -p` invocations sequentially:
    - **Implementation agent** (`bin/nightly-prompt-impl`): creates worktree, implements the plan, makes checkpoint commits, writes a handoff file
    - **Post-plan agent** (`bin/nightly-prompt-postplan`): reads the handoff file, runs `/post-plan` (code review, security audit, PR, CI monitoring, auto-merge), writes the completion report
@@ -97,11 +97,9 @@ Resume behavior depends on which phase was interrupted:
 - **Branch merged on master:** Stale worktree — removes it and starts fresh.
 - **No commits ahead:** Treats as fresh worktree, starts implementation.
 
-## 11am Resume
+## Dual Schedule
 
-When the loop exits with plans still in the queue (time guard exceeded or usage limit hit), `nightly-run` writes a one-shot launchd plist (`com.ibl5.nightly-resume`) that fires at 11:00 AM PT — after peak usage hours. On entry, the resume run removes its own plist so it doesn't repeat. The resume run is a normal `nightly-run` invocation: it picks up the queue, resumes partial worktrees, and applies the same time guard and poison-pill logic.
-
-The resume plist lives at `~/Library/LaunchAgents/com.ibl5.nightly-resume.plist` and is ephemeral — created only when needed, deleted on next run.
+The main launchd plist fires `nightly-run` at both 00:03 and 11:00 daily. Both runs are identical — they pick up the queue, resume partial worktrees, and apply the same time guard and poison-pill logic. If the queue is empty, the run logs "Queue empty" and exits immediately.
 
 ## Headless Mode
 
@@ -112,6 +110,5 @@ The resume plist lives at `~/Library/LaunchAgents/com.ibl5.nightly-resume.plist`
 - `bin/nightly-queue` — symlink queue helper
 - `bin/nightly-prompt-impl` — implementation agent prompt (Steps 1-7: queue check through handoff file)
 - `bin/nightly-prompt-postplan` — post-plan agent prompt (reads handoff, runs /post-plan, reports, cleans up)
-- `bin/nightly-run` — wrapper script called by launchd (loop + two-phase execution + time guard + 11am resume)
-- `~/Library/LaunchAgents/com.ibl5.nightly-claude.plist` — launchd schedule (00:03 daily)
-- `~/Library/LaunchAgents/com.ibl5.nightly-resume.plist` — one-shot resume (created dynamically, self-cleaning)
+- `bin/nightly-run` — wrapper script called by launchd (loop + two-phase execution + time guard)
+- `~/Library/LaunchAgents/com.ibl5.nightly-claude.plist` — launchd schedule (00:03 and 11:00 daily)

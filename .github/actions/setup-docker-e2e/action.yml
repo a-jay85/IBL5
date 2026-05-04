@@ -123,12 +123,26 @@ runs:
       if: inputs.with-playwright == 'true'
       shell: bash
       run: |
+        image="mcr.microsoft.com/playwright:v1.59.1-jammy"
         deadline=$((SECONDS + 300))
-        while ! docker image inspect mcr.microsoft.com/playwright:v1.59.1-jammy >/dev/null 2>&1; do
+        while ! docker image inspect "$image" >/dev/null 2>&1; do
           if [ $SECONDS -ge $deadline ]; then
-            echo "::warning::Background pull timed out after 5 min — retrying foreground"
+            echo "::warning::Background pull timed out after 5 min — retrying with backoff"
             pkill -f "docker pull mcr.microsoft.com/playwright" || true
-            docker pull mcr.microsoft.com/playwright:v1.59.1-jammy
+            pulled=false
+            for attempt in 1 2 3 4; do
+              if docker pull "$image"; then
+                pulled=true
+                break
+              fi
+              backoff=$((30 * attempt))
+              echo "::warning::Pull attempt $attempt failed — retrying in ${backoff}s"
+              sleep $backoff
+            done
+            if [ "$pulled" = false ]; then
+              echo "::error::All Playwright image pull attempts failed"
+              exit 1
+            fi
             break
           fi
           sleep 2

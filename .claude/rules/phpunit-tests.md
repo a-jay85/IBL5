@@ -206,7 +206,13 @@ class ScheduleEntryPointTest extends ModuleEntryPointTestCase
 
 ## Mutation Testing
 
-Mutation testing (Infection PHP) runs weekly + on-demand via the `mutation-test` PR label — NOT on every PR. Current thresholds: **100% MSI / 100% Covered MSI**. See `memory/ci-quality-gates.md` for full details.
+Mutation testing (Infection PHP) runs in three modes:
+
+1. **Per-PR diff** — on every PR that touches `classes/**/*.php`. Scopes mutations to changed lines only via `--git-diff-filter=AM --git-diff-lines`. Fast (~minutes). Posts a PR comment with the summary.
+2. **Weekly full suite** — Monday 03:00 UTC (`schedule`). Runs the full Infection suite.
+3. **On-demand full suite** — apply the `mutation-test` label to a PR. Runs the full Infection suite.
+
+Current thresholds: **100% MSI / 100% Covered MSI**. See `memory/ci-quality-gates.md` for full details.
 
 ## Completion Criteria
 

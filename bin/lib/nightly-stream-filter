@@ -1,0 +1,48 @@
+#!/bin/bash
+# Usage: claude ... --output-format stream-json | nightly-stream-filter <heartbeat_file>
+set -euo pipefail
+
+HEARTBEAT_FILE="${1:?Usage: nightly-stream-filter <heartbeat_file>}"
+TOOL_COUNT=0
+TURN_COUNT=1
+START_EPOCH=$(date +%s)
+
+elapsed_ts() {
+    local now
+    now=$(date +%s)
+    local diff=$(( now - START_EPOCH ))
+    printf '[%02d:%02d:%02d]' $(( diff / 3600 )) $(( (diff % 3600) / 60 )) $(( diff % 60 ))
+}
+
+while IFS= read -r line; do
+    date +%s > "$HEARTBEAT_FILE"
+
+    ev_type=$(printf '%s' "$line" | jq -r '.type // empty' 2>/dev/null) || continue
+    case "$ev_type" in
+        assistant)
+            tool_name=$(printf '%s' "$line" | jq -r '
+                .message.content[]
+                | select(.type=="tool_use")
+                | .name // empty
+            ' 2>/dev/null) || true
+            if [ -n "$tool_name" ]; then
+                TOOL_COUNT=$(( TOOL_COUNT + 1 ))
+                printf '%s tool: %s (#%d, turn %d)\n' "$(elapsed_ts)" "$tool_name" "$TOOL_COUNT" "$TURN_COUNT"
+            fi
+            ;;
+        user)
+            TURN_COUNT=$(( TURN_COUNT + 1 ))
+            ;;
+        result)
+            result_text=$(printf '%s' "$line" | jq -r '.result // empty' 2>/dev/null) || true
+            if [ -n "$result_text" ]; then
+                printf '%s\n' "$result_text"
+            fi
+            stop_reason=$(printf '%s' "$line" | jq -r '.stop_reason // "unknown"' 2>/dev/null) || true
+            num_turns=$(printf '%s' "$line" | jq -r '.num_turns // "?"' 2>/dev/null) || true
+            duration_ms=$(printf '%s' "$line" | jq -r '.duration_ms // "?"' 2>/dev/null) || true
+            printf '%s exit: stop_reason=%s turns=%s tools=%d duration=%sms\n' \
+                "$(elapsed_ts)" "$stop_reason" "$num_turns" "$TOOL_COUNT" "$duration_ms"
+            ;;
+    esac
+done

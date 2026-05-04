@@ -41,6 +41,38 @@ MAX_ATTEMPTS=3     # per-plan retry cap within one night (covers impl + postplan
 
 HANDOFF_DIR="$NIGHTLY_DIR/handoff"
 mkdir -p "$LOG_DIR" "$QUEUE_DIR" "$HANDOFF_DIR"
+
+WATCHER_PID=""
+cleanup_watcher() {
+    if [ -n "$WATCHER_PID" ]; then
+        kill "$WATCHER_PID" 2>/dev/null || true
+        wait "$WATCHER_PID" 2>/dev/null || true
+    fi
+    rm -f "$NIGHTLY_DIR/.heartbeat-$$-impl" "$NIGHTLY_DIR/.heartbeat-$$-postplan" 2>/dev/null || true
+}
+trap cleanup_watcher EXIT
+
+run_heartbeat_watcher() {
+    local hb_file=$1 log_file=$2 label=$3
+    while sleep 60; do
+        if [ ! -f "$hb_file" ]; then
+            continue
+        fi
+        local last_epoch now age
+        last_epoch=$(cat "$hb_file" 2>/dev/null) || continue
+        [ -n "$last_epoch" ] || continue
+        now=$(date +%s)
+        age=$(( now - last_epoch ))
+        local ts
+        ts=$(date +%H:%M:%S)
+        if [ "$age" -gt 300 ]; then
+            printf '[%s] WARNING: %s — no events for %ds (possibly stalled)\n' "$ts" "$label" "$age" >> "$log_file"
+        else
+            printf '[%s] heartbeat: %s alive (%ds since last event)\n' "$ts" "$label" "$age" >> "$log_file"
+        fi
+    done
+}
+
 LOG="$LOG_DIR/$(date +%Y-%m-%d).log"
 
 cd "$REPO"
@@ -117,13 +149,33 @@ while true; do
             REMAINING_SECS=300
         fi
         IMPL_LOG_BEFORE=$(wc -l < "$LOG" 2>/dev/null || echo 0)
+        HEARTBEAT_FILE="$NIGHTLY_DIR/.heartbeat-$$-impl"
+        rm -f "$HEARTBEAT_FILE"
+
+        run_heartbeat_watcher "$HEARTBEAT_FILE" "$LOG" "impl:$PLAN_NAME" &
+        WATCHER_PID=$!
+
+        IMPL_STATUS=0
         timeout "$REMAINING_SECS" \
             claude -p "$(cat bin/nightly-prompt-impl)" \
                 --dangerously-skip-permissions \
                 --model claude-opus-4-6 \
                 --max-turns 200 \
+                --output-format stream-json \
+                --verbose \
                 --name "nightly-impl-$(date +%Y-%m-%d-%H%M)" \
-                >> "$LOG" 2>&1 || true
+            2>> "$LOG" \
+            | bin/lib/nightly-stream-filter "$HEARTBEAT_FILE" \
+            >> "$LOG" || IMPL_STATUS=$?
+
+        kill "$WATCHER_PID" 2>/dev/null || true
+        wait "$WATCHER_PID" 2>/dev/null || true
+        WATCHER_PID=""
+        rm -f "$HEARTBEAT_FILE"
+
+        if [ "$IMPL_STATUS" -ne 0 ]; then
+            printf '[%s] claude exited code=%d (impl phase)\n' "$(date +%H:%M:%S)" "$IMPL_STATUS" >> "$LOG"
+        fi
 
         echo "--- Plan #$PLANS_RUN impl finished at $(date) ---" >> "$LOG"
 
@@ -154,6 +206,13 @@ while true; do
             REMAINING_SECS=300
         fi
         PP_LOG_BEFORE=$(wc -l < "$LOG" 2>/dev/null || echo 0)
+        HEARTBEAT_FILE="$NIGHTLY_DIR/.heartbeat-$$-postplan"
+        rm -f "$HEARTBEAT_FILE"
+
+        run_heartbeat_watcher "$HEARTBEAT_FILE" "$LOG" "postplan:$PLAN_NAME" &
+        WATCHER_PID=$!
+
+        PP_STATUS=0
         timeout "$REMAINING_SECS" \
             claude -p "$(cat bin/nightly-prompt-postplan)
 
@@ -161,8 +220,21 @@ PLAN_FILE=$PLAN_NAME" \
                 --dangerously-skip-permissions \
                 --model claude-sonnet-4-6 \
                 --max-turns 120 \
+                --output-format stream-json \
+                --verbose \
                 --name "nightly-postplan-$(date +%Y-%m-%d-%H%M)" \
-                >> "$LOG" 2>&1 || true
+            2>> "$LOG" \
+            | bin/lib/nightly-stream-filter "$HEARTBEAT_FILE" \
+            >> "$LOG" || PP_STATUS=$?
+
+        kill "$WATCHER_PID" 2>/dev/null || true
+        wait "$WATCHER_PID" 2>/dev/null || true
+        WATCHER_PID=""
+        rm -f "$HEARTBEAT_FILE"
+
+        if [ "$PP_STATUS" -ne 0 ]; then
+            printf '[%s] claude exited code=%d (postplan phase)\n' "$(date +%H:%M:%S)" "$PP_STATUS" >> "$LOG"
+        fi
 
         echo "--- Plan #$PLANS_RUN postplan finished at $(date) ---" >> "$LOG"
 

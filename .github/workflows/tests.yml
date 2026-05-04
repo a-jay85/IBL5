@@ -115,6 +115,10 @@ jobs:
       working-directory: ibl5
       run: php bin/check-coverage coverage/clover.xml 70
 
+    - name: Check coverage regression
+      working-directory: ibl5
+      run: php bin/check-coverage-regression coverage/clover.xml coverage-baseline.json
+
     - name: Check if threshold needs ratcheting
       working-directory: ibl5
       run: |
@@ -279,6 +283,10 @@ jobs:
       working-directory: ibl5
       run: composer run analyse
 
+    - name: Check baseline drift
+      working-directory: ibl5
+      run: php bin/check-baseline-drift
+
   shellcheck:
     name: ShellCheck (bash 3.2 compat)
     needs: [changes]
@@ -367,10 +375,83 @@ jobs:
 
           echo "OK: no host mariadb invocations found outside bin/db-query."
 
+  update-baselines:
+    name: Update coverage & PHPStan baselines
+    needs: [test, phpstan]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/master'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v6
+      with:
+        token: ${{ secrets.CI_PAT }}
+
+    - name: Setup PHP
+      uses: shivammathur/setup-php@v2
+      with:
+        php-version: '8.5'
+        extensions: mbstring, intl, pcov
+        coverage: pcov
+
+    - name: Cache vendor directory
+      uses: actions/cache@v5
+      with:
+        path: ibl5/vendor
+        key: ${{ runner.os }}-vendor-${{ hashFiles('ibl5/composer.lock') }}
+        restore-keys: |
+          ${{ runner.os }}-vendor-
+
+    - name: Install dependencies
+      working-directory: ibl5
+      run: composer install --no-progress --no-interaction
+
+    - name: Update coverage baseline
+      working-directory: ibl5
+      run: |
+        mkdir -p coverage
+        vendor/bin/phpunit --coverage-clover coverage/clover.xml --no-output --no-progress
+        COVERAGE=$(php -r '
+          $xml = simplexml_load_file("coverage/clover.xml");
+          $m = $xml->xpath("/coverage/project/metrics")[0];
+          echo round((int)$m["coveredstatements"] / (int)$m["statements"] * 100, 2);
+        ')
+        TOLERANCE=$(php -r '
+          $json = file_get_contents("coverage-baseline.json");
+          $data = json_decode($json, true);
+          echo $data["tolerance"] ?? "0.5";
+        ')
+        php -r '
+          echo json_encode([
+              "percentage" => (float) $argv[1],
+              "as_of" => date("Y-m-d"),
+              "tolerance" => (float) $argv[2],
+          ], JSON_PRETTY_PRINT) . "\n";
+        ' "$COVERAGE" "$TOLERANCE" > coverage-baseline.json
+
+    - name: Update PHPStan baseline counts
+      working-directory: ibl5
+      run: php bin/check-baseline-drift --update
+
+    - name: Commit updated baselines
+      working-directory: ibl5
+      run: |
+        git config user.name "github-actions[bot]"
+        git config user.email "github-actions[bot]@users.noreply.github.com"
+        git add coverage-baseline.json phpstan-baseline-counts.json
+        if git diff --cached --quiet; then
+          echo "No baseline changes detected"
+        else
+          git commit -m "ci: update coverage & PHPStan baseline snapshots [auto]"
+          git push
+        fi
+
   gate:
     name: Tests and Analysis
     if: always()
-    needs: [changes, test, audit-php, audit-js, db-integration, phpstan, shellcheck, host-mariadb-guard]
+    needs: [changes, test, audit-php, audit-js, db-integration, phpstan, shellcheck, host-mariadb-guard, update-baselines]
     runs-on: ubuntu-latest
     steps:
       - run: exit 1

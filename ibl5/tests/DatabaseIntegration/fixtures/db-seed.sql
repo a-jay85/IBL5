@@ -298,9 +298,42 @@ INSERT INTO ibl_rcb_season_records (season_year, scope, teamid, context, stat_ca
 VALUES (2025, 'league', 0, 'home', 'pts', 1, 'Test Player One', 'PG', 45, 2025)
 ON DUPLICATE KEY UPDATE player_name = VALUES(player_name);
 
--- Draft picks: needed by TeamQuery getDraftPicks()
+-- Additional players: needed by Trading/Negotiation integration tests
+INSERT INTO ibl_plr (pid, name, age, teamid, pos, stamina, exp, bird, cy, cyt, salary_yr1, salary_yr2, retired, ordinal, droptime, uuid)
+VALUES (3, 'Test Player Three', 25, 2, 'SF', 85, 4, 2, 1, 3, 1200, 1300, 0, 2, 0, 'cccccccc-cccc-cccc-cccc-cccccccccccc')
+ON DUPLICATE KEY UPDATE name = VALUES(name);
+
+INSERT INTO ibl_plr (pid, name, age, teamid, pos, stamina, exp, bird, cy, cyt, salary_yr1, salary_yr2, retired, ordinal, droptime, uuid)
+VALUES (4, 'Test Player Four', 30, 2, 'C', 75, 8, 3, 2, 4, 2000, 2200, 0, 3, 0, 'dddddddd-dddd-dddd-dddd-dddddddddddd')
+ON DUPLICATE KEY UPDATE name = VALUES(name);
+
+INSERT INTO ibl_plr (pid, name, age, teamid, pos, stamina, exp, bird, cy, cyt, salary_yr1, salary_yr2, retired, ordinal, droptime, uuid)
+VALUES (5, 'Test Player Five', 23, 3, 'SG', 90, 2, 1, 1, 2, 800, 900, 0, 1, 0, 'eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee')
+ON DUPLICATE KEY UPDATE name = VALUES(name);
+
+INSERT INTO ibl_plr (pid, name, age, teamid, pos, stamina, exp, bird, cy, cyt, salary_yr1, salary_yr2, retired, ordinal, droptime, uuid)
+VALUES (6, 'Test Player Six', 28, 3, 'PF', 80, 6, 3, 1, 3, 1800, 1900, 0, 2, 0, 'ffffffff-ffff-ffff-ffff-ffffffffffff')
+ON DUPLICATE KEY UPDATE name = VALUES(name);
+
+-- Draft picks: needed by TeamQuery getDraftPicks() and Trading integration tests
 INSERT INTO ibl_draft_picks (ownerofpick, owner_teamid, teampick, teampick_teamid, year, round, notes)
 VALUES ('Metros', 1, 'Metros', 1, 2025, 1, 'Own pick')
+ON DUPLICATE KEY UPDATE notes = VALUES(notes);
+
+INSERT INTO ibl_draft_picks (ownerofpick, owner_teamid, teampick, teampick_teamid, year, round, notes)
+VALUES ('Metros', 1, 'Metros', 1, 2027, 1, 'Future 1st')
+ON DUPLICATE KEY UPDATE notes = VALUES(notes);
+
+INSERT INTO ibl_draft_picks (ownerofpick, owner_teamid, teampick, teampick_teamid, year, round, notes)
+VALUES ('Stars', 2, 'Stars', 2, 2027, 1, 'Own pick')
+ON DUPLICATE KEY UPDATE notes = VALUES(notes);
+
+INSERT INTO ibl_draft_picks (ownerofpick, owner_teamid, teampick, teampick_teamid, year, round, notes)
+VALUES ('Cougars', 3, 'Cougars', 3, 2027, 1, 'Own pick')
+ON DUPLICATE KEY UPDATE notes = VALUES(notes);
+
+INSERT INTO ibl_draft_picks (ownerofpick, owner_teamid, teampick, teampick_teamid, year, round, notes)
+VALUES ('Diesels', 4, 'Diesels', 4, 2027, 2, 'Own pick')
 ON DUPLICATE KEY UPDATE notes = VALUES(notes);
 
 -- Cache: needed by RecordHolders getLastAnnouncedDate()

@@ -103,4 +103,13 @@ class SearchEntryPointTest extends ModuleEntryPointTestCase
         $this->assertNotEmpty($output);
         $this->assertQueryExecuted('nuke_stories');
     }
+
+    public function testQueryWithSpecialCharsEscaped(): void
+    {
+        $this->mockDb->setMockData([]);
+        $output = $this->runModule('Search', [], [], ['query' => '<script>alert(1)</script>']);
+
+        $this->assertNotEmpty($output);
+        $this->assertStringNotContainsString('<script>', $output);
+    }
 }

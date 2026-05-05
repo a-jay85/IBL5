@@ -37,7 +37,6 @@
             "Player/Views/PlayerRegularSeasonTotalsView.php",
             "Player/Views/PlayerSeasonStatsView.php",
             "Player/Views/PlayerSimStatsView.php",
-            "Player/Views/PlayerStatsFlipCardView.php",
             "Player/Views/PlayerTradingCardBackView.php",
             "Player/Views/PlayerTradingCardFlipView.php",
             "Player/Views/PlayerTradingCardFrontView.php"

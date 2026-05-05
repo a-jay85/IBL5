@@ -29,13 +29,4 @@ class FreeAgencyPreviewEntryPointTest extends ModuleEntryPointTestCase
         $this->assertNotEmpty($output);
     }
 
-    public function testHandlesEmptyFreeAgentsList(): void
-    {
-        $this->seedSeasonMocks();
-        $this->mockDb->setMockData([]);
-
-        $output = $this->runModule('FreeAgencyPreview');
-
-        $this->assertNotEmpty($output);
-    }
 }

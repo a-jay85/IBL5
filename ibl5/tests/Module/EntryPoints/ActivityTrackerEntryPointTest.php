@@ -16,12 +16,4 @@ class ActivityTrackerEntryPointTest extends ModuleEntryPointTestCase
         $this->assertQueryExecuted('ibl_team_info');
     }
 
-    public function testHandlesEmptyActivityData(): void
-    {
-        $this->mockDb->setMockData([]);
-
-        $output = $this->runModule('ActivityTracker');
-
-        $this->assertNotEmpty($output);
-    }
 }

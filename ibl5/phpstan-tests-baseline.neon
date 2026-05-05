@@ -307,6 +307,18 @@ parameters:
 			path: tests/Bootstrap/ContainerTest.php
 
 		-
+			rawMessage: 'Method Tests\Bootstrap\PhpunitConfigTest::isDirectoryCovered() has parameter $registeredDirs with no value type specified in iterable type array.'
+			identifier: missingType.iterableValue
+			count: 1
+			path: tests/Bootstrap/PhpunitConfigTest.php
+
+		-
+			rawMessage: 'Method Tests\Bootstrap\PhpunitConfigTest::isDirectoryCovered() has parameter $registeredFiles with no value type specified in iterable type array.'
+			identifier: missingType.iterableValue
+			count: 1
+			path: tests/Bootstrap/PhpunitConfigTest.php
+
+		-
 			rawMessage: 'Call to static method PHPUnit\Framework\Assert::assertTrue() with true will always evaluate to true.'
 			identifier: staticMethod.alreadyNarrowedType
 			count: 4
@@ -727,6 +739,24 @@ parameters:
 			path: tests/DatabaseIntegration/FranchiseHistoryRepositoryTest.php
 
 		-
+			rawMessage: 'Offset ''fa_signing_flag'' does not exist on array{pid: int, name: string, nickname: string|null, age: int|null, teamid: 1, teamname: string|null, pos: string, stamina: int|null, ...}.'
+			identifier: offsetAccess.notFound
+			count: 1
+			path: tests/DatabaseIntegration/FreeAgency/FreeAgencyRepositoryIntegrationTest.php
+
+		-
+			rawMessage: 'Parameter #1 $offerData of method FreeAgency\FreeAgencyRepository::saveOffer() expects array{pid: int, teamid: int, teamName: string, playerName: string, offer1: int, offer2: int, offer3: int, offer4: int, ...}, array{playerName: ''FA Replace'', pid: 200060402, teamName: ''Metros'', teamid: 1, offer1: 700, offer2: 750, offer3: 800, offer4: 0, ...} given.'
+			identifier: argument.type
+			count: 1
+			path: tests/DatabaseIntegration/FreeAgency/FreeAgencyRepositoryIntegrationTest.php
+
+		-
+			rawMessage: 'Parameter #1 $offerData of method FreeAgency\FreeAgencyRepository::saveOffer() expects array{pid: int, teamid: int, teamName: string, playerName: string, offer1: int, offer2: int, offer3: int, offer4: int, ...}, array{playerName: ''FA Target'', pid: 200060401, teamName: ''Metros'', teamid: 1, offer1: 500, offer2: 550, offer3: 600, offer4: 0, ...} given.'
+			identifier: argument.type
+			count: 1
+			path: tests/DatabaseIntegration/FreeAgency/FreeAgencyRepositoryIntegrationTest.php
+
+		-
 			rawMessage: 'Undefined variable: $pid'
 			identifier: variable.undefined
 			count: 1
@@ -923,6 +953,12 @@ parameters:
 			identifier: offsetAccess.notFound
 			count: 1
 			path: tests/DatabaseIntegration/TeamScheduleRepositoryTest.php
+
+		-
+			rawMessage: 'Missing call to parent::tearDown() method.'
+			identifier: phpunit.callParent
+			count: 1
+			path: tests/DatabaseIntegration/Trading/TradeProcessorIntegrationTest.php
 
 		-
 			rawMessage: 'Offset ''owner_teamid'' does not exist on array{pickid: int, ownerofpick: ''Sharks'', teampick: string, year: string, round: string, notes: string|null, created_at: string, updated_at: string}.'
@@ -3749,10 +3785,10 @@ parameters:
 			path: tests/Migration/MigrationRunnerTest.php
 
 		-
-			rawMessage: 'Method Tests\Module\EntryPoints\DraftHistoryEntryPointTest::fullTeamData() has parameter $overrides with no value type specified in iterable type array.'
-			identifier: missingType.iterableValue
+			rawMessage: 'Dynamic call to static method PHPUnit\Framework\TestCase::createStub().'
+			identifier: staticMethod.dynamicCall
 			count: 1
-			path: tests/Module/EntryPoints/DraftHistoryEntryPointTest.php
+			path: tests/Module/EntryPoints/ApiKeysEntryPointTest.php
 
 		-
 			rawMessage: 'Dynamic call to static method PHPUnit\Framework\TestCase::createStub().'
@@ -3761,10 +3797,16 @@ parameters:
 			path: tests/Module/EntryPoints/ModuleEntryPointTestCase.php
 
 		-
-			rawMessage: 'Method Tests\Module\EntryPoints\ScheduleEntryPointTest::fullTeamData() has parameter $overrides with no value type specified in iterable type array.'
+			rawMessage: 'Method Tests\Module\EntryPoints\PlayerEntryPointTest::seedShowpageMocks() has parameter $playerOverrides with no value type specified in iterable type array.'
 			identifier: missingType.iterableValue
 			count: 1
-			path: tests/Module/EntryPoints/ScheduleEntryPointTest.php
+			path: tests/Module/EntryPoints/PlayerEntryPointTest.php
+
+		-
+			rawMessage: 'Dynamic call to static method PHPUnit\Framework\TestCase::createStub().'
+			identifier: staticMethod.dynamicCall
+			count: 1
+			path: tests/Module/EntryPoints/TeamEntryPointTest.php
 
 		-
 			rawMessage: 'Call to method setMockData() on an unknown class MockDatabase.'
@@ -7825,6 +7867,12 @@ parameters:
 			identifier: staticMethod.dynamicCall
 			count: 1
 			path: tests/Unit/BulkImport/BackupArchiveLocatorTest.php
+
+		-
+			rawMessage: 'Dynamic call to static method PHPUnit\Framework\TestCase::createStub().'
+			identifier: staticMethod.dynamicCall
+			count: 7
+			path: tests/Unit/BulkImport/BulkImportRunnerTest.php
 
 		-
 			rawMessage: 'Dynamic call to static method PHPUnit\Framework\TestCase::createStub().'

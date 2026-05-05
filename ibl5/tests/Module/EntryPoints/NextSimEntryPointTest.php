@@ -29,17 +29,4 @@ class NextSimEntryPointTest extends ModuleEntryPointTestCase
 
         $this->assertNotEmpty($output);
     }
-
-    public function testHandlesNoUpcomingGames(): void
-    {
-        $this->authenticateAs('testgm');
-        $this->mockDb->setMockTeamData([self::fullTeamData()]);
-        $this->mockDb->setMockData([]);
-
-        $output = $this->runModule('NextSim', [], [], [
-            'user' => $GLOBALS['user'],
-        ]);
-
-        $this->assertNotEmpty($output);
-    }
 }

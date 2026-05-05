@@ -8,17 +8,16 @@ use Tests\WideUnit\Mocks\TestDataFactory;
 
 class LeagueStartersEntryPointTest extends ModuleEntryPointTestCase
 {
-    private function seedPlayerData(): void
+    protected function setUp(): void
     {
+        parent::setUp();
+        $this->mockDb->setMockTeamData([self::fullTeamData()]);
         $this->mockDb->onQuery('ibl_plr', [TestDataFactory::createPlayer(['pid' => 4040404, 'name' => 'Placeholder'])]);
+        $this->mockDb->setMockData([]);
     }
 
     public function testDefaultRendersLeagueStartersPage(): void
     {
-        $this->mockDb->setMockTeamData([self::fullTeamData()]);
-        $this->seedPlayerData();
-        $this->mockDb->setMockData([]);
-
         $output = $this->runModule('LeagueStarters');
 
         $this->assertNotEmpty($output);
@@ -26,10 +25,6 @@ class LeagueStartersEntryPointTest extends ModuleEntryPointTestCase
 
     public function testOpApiReturnsHtmlFragment(): void
     {
-        $this->mockDb->setMockTeamData([self::fullTeamData()]);
-        $this->seedPlayerData();
-        $this->mockDb->setMockData([]);
-
         $output = $this->runModule('LeagueStarters', ['op' => 'api', 'display' => 'ratings']);
 
         $this->assertNotEmpty($output);
@@ -37,10 +32,6 @@ class LeagueStartersEntryPointTest extends ModuleEntryPointTestCase
 
     public function testDisplayParamValidatesAgainstWhitelist(): void
     {
-        $this->mockDb->setMockTeamData([self::fullTeamData()]);
-        $this->seedPlayerData();
-        $this->mockDb->setMockData([]);
-
         $output = $this->runModule('LeagueStarters', ['display' => 'total_s']);
 
         $this->assertNotEmpty($output);
@@ -48,10 +39,6 @@ class LeagueStartersEntryPointTest extends ModuleEntryPointTestCase
 
     public function testInvalidDisplayParamDefaultsToRatings(): void
     {
-        $this->mockDb->setMockTeamData([self::fullTeamData()]);
-        $this->seedPlayerData();
-        $this->mockDb->setMockData([]);
-
         $output = $this->runModule('LeagueStarters', ['display' => 'bogus']);
 
         $this->assertNotEmpty($output);

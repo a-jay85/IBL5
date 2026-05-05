@@ -16,9 +16,6 @@ class PageLayoutTest extends TestCase
     /** @var array<string, mixed> */
     private array $savedGlobals;
 
-    /** @var list<string> Global keys injected during tests */
-    private array $injectedGlobalKeys = [];
-
     protected function setUp(): void
     {
         $this->savedServer = $_SERVER;
@@ -34,7 +31,7 @@ class PageLayoutTest extends TestCase
         $legacyPath = dirname(__DIR__, 3) . '/classes/Bootstrap/LegacyFunctions.php';
         require_once $legacyPath;
 
-        $authStub = $this->createStub(\Auth\Contracts\AuthServiceInterface::class);
+        $authStub = static::createStub(\Auth\Contracts\AuthServiceInterface::class);
         $authStub->method('getCookieArray')->willReturn(null);
         $GLOBALS['authService'] = $authStub;
 
@@ -43,7 +40,8 @@ class PageLayoutTest extends TestCase
         $GLOBALS['slogan'] = 'Test Slogan';
         $GLOBALS['name'] = '';
         $GLOBALS['user'] = '';
-        $this->injectedGlobalKeys = ['sitename', 'pagetitle', 'slogan', 'name', 'user', 'authService'];
+
+
 
         $_SESSION = [];
     }
@@ -150,7 +148,7 @@ class PageLayoutTest extends TestCase
         self::assertMatchesRegularExpression('/<!--.*Page Generation.*-->/', $output);
     }
 
-    public function testRenderPageGenerationTimeUsesCustomLabels(): void
+    public function testRenderPageGenerationTimeUsesDefinedLabels(): void
     {
         if (!defined('_PAGEGENERATION')) {
             define('_PAGEGENERATION', 'Generated in:');
@@ -163,8 +161,8 @@ class PageLayoutTest extends TestCase
         PageLayout::renderPageGenerationTime();
         $output = (string) ob_get_clean();
 
-        self::assertStringContainsString('Generated in:', $output);
-        self::assertStringContainsString('secs', $output);
+        self::assertStringContainsString(\_PAGEGENERATION, $output);
+        self::assertStringContainsString(\_SECONDS, $output);
     }
 
     public function testHeaderBoostedShowsAdminPhaseGateNotice(): void

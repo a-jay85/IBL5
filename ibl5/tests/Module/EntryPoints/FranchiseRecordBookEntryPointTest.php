@@ -109,4 +109,22 @@ class FranchiseRecordBookEntryPointTest extends ModuleEntryPointTestCase
         // isRealFranchise(29) === false → league path
         $this->assertQueryExecuted('ibl_rcb');
     }
+
+    public function testOpApiWithValidTeamidReturnsContent(): void
+    {
+        $this->mockDb->setMockData([]);
+        $output = $this->runModule('FranchiseRecordBook', ['op' => 'api', 'teamid' => '5']);
+
+        $this->assertNotEmpty($output);
+        $this->assertQueryExecuted('ibl_rcb');
+    }
+
+    public function testOpApiWithoutTeamidReturnsLeagueContent(): void
+    {
+        $this->mockDb->setMockData([]);
+        $output = $this->runModule('FranchiseRecordBook', ['op' => 'api']);
+
+        $this->assertNotEmpty($output);
+        $this->assertQueryExecuted('ibl_rcb');
+    }
 }

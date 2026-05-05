@@ -71,4 +71,31 @@ class TransactionHistoryEntryPointTest extends ModuleEntryPointTestCase
         $this->assertNotEmpty($output);
         $this->assertQueryExecuted('nuke_stories');
     }
+
+    public function testOutOfRangeCategoryIgnored(): void
+    {
+        $this->mockDb->setMockData([]);
+        $output = $this->runModule('TransactionHistory', ['cat' => '999']);
+
+        $this->assertNotEmpty($output);
+        $this->assertQueryExecuted('nuke_stories');
+    }
+
+    public function testMonthThirteenIgnored(): void
+    {
+        $this->mockDb->setMockData([]);
+        $output = $this->runModule('TransactionHistory', ['month' => '13']);
+
+        $this->assertNotEmpty($output);
+        $this->assertQueryExecuted('nuke_stories');
+    }
+
+    public function testZeroMonthIgnored(): void
+    {
+        $this->mockDb->setMockData([]);
+        $output = $this->runModule('TransactionHistory', ['month' => '0']);
+
+        $this->assertNotEmpty($output);
+        $this->assertQueryExecuted('nuke_stories');
+    }
 }

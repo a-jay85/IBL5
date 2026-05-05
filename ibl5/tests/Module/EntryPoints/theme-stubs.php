@@ -28,3 +28,24 @@ if (!function_exists('themecenterbox')) {
     {
     }
 }
+
+if (!function_exists('OpenTable')) {
+    function OpenTable(): void
+    {
+        echo '<div class="stub-table">';
+    }
+}
+
+if (!function_exists('OpenTable2')) {
+    function OpenTable2(): void
+    {
+        echo '<div class="stub-table">';
+    }
+}
+
+if (!function_exists('CloseTable')) {
+    function CloseTable(): void
+    {
+        echo '</div>';
+    }
+}

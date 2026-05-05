@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Module\EntryPoints;
 
+use Tests\WideUnit\Mocks\TestDataFactory;
 use Tests\WideUnit\WideUnitTestCase;
 
 /**
@@ -191,6 +192,19 @@ abstract class ModuleEntryPointTestCase extends WideUnitTestCase
             'sitename', 'pagetitle', 'slogan', 'name', 'user', 'cookie',
             'currentlang', 'language', 'op', 'pa', 'articlecomm',
         ]);
+    }
+
+    /**
+     * @param array<string, mixed> $overrides
+     * @return array<string, mixed>
+     */
+    protected static function fullTeamData(array $overrides = []): array
+    {
+        return array_merge(TestDataFactory::createTeam(), [
+            'used_extension_this_chunk' => 0,
+            'used_extension_this_season' => 0,
+            'league_record' => '10-5',
+        ], $overrides);
     }
 
     /**

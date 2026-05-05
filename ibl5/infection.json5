@@ -3,12 +3,16 @@
     "source": {
         "directories": ["classes"],
         "excludes": [
-            "*Repository*",
             "*Controller*", "*Handler*",
             "*/Contracts/*",
             "SiteStatistics", "Bootstrap", "Database", "Auth", "Cache",
             "Scripts", "Discord",
             "OneOnOneGame", "UI.php", "Game.php", "JSB.php",
+            // Repositories without direct test coverage (Pass 2 — deferred)
+            "ApiKeys/ApiKeysRepository.php",
+            "BaseMysqliRepository.php",
+            "PlrParser/PlrBoxScoreRepository.php",
+            "Voting/VotingRepository.php",
             // Views without companion tests (Pass 2 — deferred)
             "Boxscore/BoxscoreView.php",
             "FreeAgency/FreeAgencyNegotiationView.php",
@@ -53,7 +57,7 @@
         "CastString": false
     },
     "testFramework": "phpunit",
-    "testFrameworkOptions": "",
+    "testFrameworkOptions": "--configuration=phpunit-mutation.xml",
     "minMsi": 100,
     "minCoveredMsi": 100,
     "threads": 4,

@@ -13,13 +13,14 @@ declare(strict_types=1);
 if (!function_exists('themeheader')) {
     function themeheader(): void
     {
-        echo '<body>';
+        echo '<!-- THEMEHEADER_CALLED --><body>';
     }
 }
 
 if (!function_exists('themefooter')) {
     function themefooter(): void
     {
+        echo '<!-- THEMEFOOTER_CALLED -->';
     }
 }
 

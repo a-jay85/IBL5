@@ -1,7 +1,7 @@
 ---
 description: PHPUnit testing rules: output parsing, behavior-focused patterns.
 paths: ibl5/tests/**/*.php
-last_verified: 2026-05-04
+last_verified: 2026-05-05
 ---
 
 # PHPUnit Testing Rules
@@ -179,6 +179,12 @@ $this->mockDb->setMockData([['pid' => 1, 'name' => 'Player']]);
 
 **Legacy approach (still works):** `setMockData()` sets a single shared data pool for all unmatched SELECT queries. Old tests that include `'total' => N` in every row still function correctly — no migration needed.
 
+**`MockPreparedStatement` interpolates bound params back into SQL.** `BaseMysqliRepository::fetchOne/fetchAll` uses `prepare()` → `bind_param()` → `execute()`. `MockPreparedStatement::execute()` calls `replacePlaceholders()`, which substitutes `?` with the bound values before passing the final SQL to `MockDatabase::sql_query()`. This means `onQuery('Player One', ...)` CAN distinguish two calls to the same SQL with different bound names — e.g., `WHERE p.name = 'Player One' LIMIT 1` vs `WHERE p.name = 'Player Two' LIMIT 1`:
+```php
+$this->mockDb->onQuery('Player One', [$player1]);
+$this->mockDb->onQuery('Player Two', [$player2]);
+```
+
 ### MockDatabase `insert_id` Limitation
 
 `MockDatabase` extends `\mysqli` without a real connection. Accessing `$db->insert_id` (used by `BaseMysqliRepository::getLastInsertId()`) throws "object is already closed". Tests for code paths that INSERT and read `insert_id` (e.g., `createSavedDepthChart()`) cannot use MockDatabase — use DB integration tests instead.
@@ -203,6 +209,7 @@ class ScheduleEntryPointTest extends ModuleEntryPointTestCase
 - Use `$this->authenticateAs('username')` to simulate an authenticated user
 - Lives in `tests/Module/EntryPoints/`, registered under the "Module Tests" testsuite
 - The class handles double output buffering for `PageLayout::footer()`'s `ob_end_flush()` — do not wrap `runModule()` in your own `ob_start()`
+- **Use the HTML form field name, not the validator output key.** If `AwardHistoryValidator` reads `$params['aw_name']`, the POST array must use `['aw_name' => ...]` — not `['name' => ...]` (the validator's output key). Using the wrong key silently drops the filter (the `??null` fallback fires), the query runs unfiltered, and `assertQueryExecuted()` still passes — a false-positive that hides the bug.
 
 ## Mutation Testing
 

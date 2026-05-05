@@ -13,14 +13,9 @@ class CareerLeaderboardsEntryPointTest extends ModuleEntryPointTestCase
         $this->mockDb->onQuery('cache', []);
     }
 
-    private function globals(): array
-    {
-        return ['mysqli_db' => $GLOBALS['mysqli_db']];
-    }
-
     public function testNotSubmittedRendersFilterForm(): void
     {
-        $output = $this->runModule('CareerLeaderboards', [], [], $this->globals());
+        $output = $this->runModule('CareerLeaderboards', [], [], $this->dbGlobals());
 
         $this->assertNotEmpty($output);
         $this->assertStringContainsString('Career Leaderboards', $output);
@@ -35,7 +30,7 @@ class CareerLeaderboardsEntryPointTest extends ModuleEntryPointTestCase
             'sort_cat' => 'Points',
             'active' => '0',
             'display' => '50',
-        ], $this->globals());
+        ], $this->dbGlobals());
 
         $this->assertNotEmpty($output);
         $this->assertQueryExecuted('ibl_hist');
@@ -49,7 +44,7 @@ class CareerLeaderboardsEntryPointTest extends ModuleEntryPointTestCase
             'sort_cat' => 'Points',
             'active' => '1',
             'display' => '50',
-        ], $this->globals());
+        ], $this->dbGlobals());
 
         $this->assertNotEmpty($output);
         $this->assertQueryExecuted('ibl_hist');
@@ -63,7 +58,7 @@ class CareerLeaderboardsEntryPointTest extends ModuleEntryPointTestCase
             'sort_cat' => 'Points',
             'active' => '0',
             'display' => '50',
-        ], $this->globals());
+        ], $this->dbGlobals());
 
         $this->assertNotEmpty($output);
         $this->assertStringContainsString('Career Leaderboards', $output);

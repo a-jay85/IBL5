@@ -207,6 +207,12 @@ abstract class ModuleEntryPointTestCase extends WideUnitTestCase
         ], $overrides);
     }
 
+    /** @return array<string, mixed> */
+    protected function dbGlobals(): array
+    {
+        return ['mysqli_db' => $GLOBALS['mysqli_db']];
+    }
+
     /**
      * Set the auth stub to simulate an authenticated user.
      */

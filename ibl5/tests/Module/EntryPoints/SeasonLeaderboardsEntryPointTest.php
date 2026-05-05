@@ -13,14 +13,9 @@ class SeasonLeaderboardsEntryPointTest extends ModuleEntryPointTestCase
         $this->mockDb->onQuery('cache', []);
     }
 
-    private function globals(): array
-    {
-        return ['mysqli_db' => $GLOBALS['mysqli_db']];
-    }
-
     public function testEmptyPostRendersFilterFormAndDefaultLeaderboard(): void
     {
-        $output = $this->runModule('SeasonLeaderboards', [], [], $this->globals());
+        $output = $this->runModule('SeasonLeaderboards', [], [], $this->dbGlobals());
 
         $this->assertNotEmpty($output);
         $this->assertStringContainsString('Season Leaders', $output);
@@ -34,7 +29,7 @@ class SeasonLeaderboardsEntryPointTest extends ModuleEntryPointTestCase
             'team' => '1',
             'sortby' => 'PPG',
             'limit' => '50',
-        ], $this->globals());
+        ], $this->dbGlobals());
 
         $this->assertNotEmpty($output);
         $this->assertQueryExecuted('ibl_hist');
@@ -47,7 +42,7 @@ class SeasonLeaderboardsEntryPointTest extends ModuleEntryPointTestCase
             'team' => 'garbage',
             'sortby' => 'PPG',
             'limit' => '50',
-        ], $this->globals());
+        ], $this->dbGlobals());
 
         $this->assertNotEmpty($output);
         $this->assertQueryExecuted('ibl_hist');
@@ -59,7 +54,7 @@ class SeasonLeaderboardsEntryPointTest extends ModuleEntryPointTestCase
             'year' => '2024',
             'team' => '0',
             'limit' => '25',
-        ], $this->globals());
+        ], $this->dbGlobals());
 
         $this->assertNotEmpty($output);
         $this->assertStringContainsString('Season Leaders', $output);

@@ -21,7 +21,7 @@ class AwardHistoryEntryPointTest extends ModuleEntryPointTestCase
         $this->mockDb->setMockData([
             ['year' => 2024, 'award' => 'MVP', 'name' => 'Test Player', 'table_id' => 1, 'pid' => 1],
         ]);
-        $output = $this->runModule('AwardHistory', [], ['name' => 'Test']);
+        $output = $this->runModule('AwardHistory', [], ['aw_name' => 'Test']);
 
         $this->assertNotEmpty($output);
         $this->assertQueryExecuted('ibl_awards');
@@ -30,7 +30,7 @@ class AwardHistoryEntryPointTest extends ModuleEntryPointTestCase
     public function testPostWithEmptyFilterRunsSearchWithNoResults(): void
     {
         $this->mockDb->setMockData([]);
-        $output = $this->runModule('AwardHistory', [], ['name' => '']);
+        $output = $this->runModule('AwardHistory', [], ['aw_name' => '']);
 
         $this->assertNotEmpty($output);
         $this->assertQueryExecuted('ibl_awards');

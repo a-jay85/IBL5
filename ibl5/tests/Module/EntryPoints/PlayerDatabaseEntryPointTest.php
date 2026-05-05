@@ -20,7 +20,7 @@ class PlayerDatabaseEntryPointTest extends ModuleEntryPointTestCase
         $this->mockDb->setMockData([
             ['pid' => 1, 'name' => 'Test Player', 'pos' => 'G', 'teamid' => 1],
         ]);
-        $output = $this->runModule('PlayerDatabase', [], ['name' => 'Test']);
+        $output = $this->runModule('PlayerDatabase', [], ['search_name' => 'Test']);
 
         $this->assertNotEmpty($output);
         $this->assertQueryExecuted('ibl_plr');
@@ -29,7 +29,7 @@ class PlayerDatabaseEntryPointTest extends ModuleEntryPointTestCase
     public function testPostWithEmptyFiltersRunsSearchWithNoResults(): void
     {
         $this->mockDb->setMockData([]);
-        $output = $this->runModule('PlayerDatabase', [], ['name' => '']);
+        $output = $this->runModule('PlayerDatabase', [], ['search_name' => '']);
 
         $this->assertNotEmpty($output);
         $this->assertQueryExecuted('ibl_plr');

@@ -42,7 +42,7 @@ jobs:
               - 'ibl5/phpunit.xml'
               - 'ibl5/phpstan.neon'
               - 'ibl5/phpstan-rules/**'
-              - 'ibl5/tests/DatabaseIntegration/fixtures/**'
+              - 'ibl5/tests/DatabaseIntegration/Fixtures/**'
               - '.github/workflows/tests.yml'
             shell:
               - 'bin/**'
@@ -239,7 +239,7 @@ jobs:
 
     - name: Import seed data
       working-directory: ibl5
-      run: mysql -h 127.0.0.1 -u root -proot ibl5 < tests/DatabaseIntegration/fixtures/db-seed.sql
+      run: mysql -h 127.0.0.1 -u root -proot ibl5 < tests/DatabaseIntegration/Fixtures/db-seed.sql
 
     - name: Run database integration tests
       working-directory: ibl5

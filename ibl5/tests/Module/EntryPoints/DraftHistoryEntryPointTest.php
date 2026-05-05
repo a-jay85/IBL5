@@ -7,7 +7,8 @@ namespace Tests\Module\EntryPoints;
 /**
  * Integration tests for modules/DraftHistory/index.php entry point.
  *
- * Exercises (int) $_GET['teamid'] and (int) $_REQUEST['year'] type-casting boundaries.
+ * Exercises (int) $_GET['teamid'] and (int) $_REQUEST['year'] type-casting boundaries,
+ * plus the HTMX API handler (op=api) which returns HTML fragments.
  */
 class DraftHistoryEntryPointTest extends ModuleEntryPointTestCase
 {
@@ -88,6 +89,41 @@ class DraftHistoryEntryPointTest extends ModuleEntryPointTestCase
 
         $this->assertNotEmpty($output);
         // teamid=0 fails > 0 guard, falls to year view
+        $this->assertQueryExecuted('draftyear');
+    }
+
+    public function testOpApiReturnsHtmlFragment(): void
+    {
+        $this->mockDb->setMockData([]);
+        $output = $this->runModule('DraftHistory', ['op' => 'api']);
+
+        $this->assertNotEmpty($output);
+        $this->assertQueryExecuted('draftyear');
+    }
+
+    public function testOpApiWithValidYearReturnsHtml(): void
+    {
+        $this->mockDb->setMockData([]);
+        $output = $this->runModule('DraftHistory', ['op' => 'api', 'year' => '2020']);
+
+        $this->assertNotEmpty($output);
+    }
+
+    public function testOpApiWithNonNumericYearFallsBackToLatest(): void
+    {
+        $this->mockDb->setMockData([]);
+        $output = $this->runModule('DraftHistory', ['op' => 'api', 'year' => 'garbage']);
+
+        $this->assertNotEmpty($output);
+    }
+
+    public function testNonNumericTeamIdCastsToZero(): void
+    {
+        $this->mockDb->setMockData([]);
+        $output = $this->runModule('DraftHistory', ['teamid' => 'garbage']);
+
+        $this->assertNotEmpty($output);
+        // (int)'garbage' === 0, fails > 0 guard, falls to year view
         $this->assertQueryExecuted('draftyear');
     }
 }

@@ -219,4 +219,9 @@ class Season
     public function reloadSimDates(): void
     {
     }
+
+    public function getPhaseSpecificSimNumber(): int
+    {
+        return $this->lastSimNumber;
+    }
 }

@@ -38,7 +38,7 @@
         "method.templateTypeNotInParameter": 2,
         "method.unused": 2,
         "missingType.generics": 1,
-        "missingType.iterableValue": 166,
+        "missingType.iterableValue": 165,
         "missingType.parameter": 19,
         "missingType.property": 32,
         "missingType.return": 230,
@@ -61,7 +61,7 @@
         "return.unusedType": 61,
         "staticMethod.alreadyNarrowedType": 22,
         "staticMethod.deprecated": 1,
-        "staticMethod.dynamicCall": 132,
+        "staticMethod.dynamicCall": 135,
         "staticMethod.impossibleType": 2,
         "ternary.alwaysTrue": 1,
         "ternary.condNotBoolean": 1,
@@ -70,5 +70,5 @@
         "varTag.type": 1,
         "variable.undefined": 25
     },
-    "as_of": "2026-05-04"
+    "as_of": "2026-05-06"
 }

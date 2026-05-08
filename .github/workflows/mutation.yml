@@ -230,7 +230,7 @@ jobs:
 
     - name: Post PR comment with summary
       if: always() && steps.changes.outputs.skip == 'false'
-      uses: actions/github-script@v8
+      uses: actions/github-script@v9
       with:
         script: |
           const fs = require('fs');

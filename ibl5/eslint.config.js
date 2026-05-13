@@ -60,13 +60,14 @@ export default [
     },
   },
   {
-    // The base fixture, auth.setup.ts, and the Playwright config legitimately
-    // import from @playwright/test — base.ts owns the watcher override;
-    // auth.setup.ts runs before any fixture is established; the configs need
-    // defineConfig from the package root.
+    // The base fixture, auth.setup.ts, auth-regular.setup.ts, and the Playwright
+    // configs legitimately import from @playwright/test — base.ts owns the
+    // watcher override; the auth setup files run before any fixture is
+    // established; the configs need defineConfig from the package root.
     files: [
       'tests/e2e/fixtures/base.ts',
       'tests/e2e/auth.setup.ts',
+      'tests/e2e/auth-regular.setup.ts',
       'playwright.config.ts',
       'playwright.visual.config.ts',
     ],

@@ -17,6 +17,14 @@ inputs:
     description: 'E2E test password (required when with-playwright is true)'
     required: false
     default: ''
+  test-user-regular:
+    description: 'Non-admin E2E test username (optional; enables role-gating tests)'
+    required: false
+    default: ''
+  test-pass-regular:
+    description: 'Non-admin E2E test password (optional; enables role-gating tests)'
+    required: false
+    default: ''
 
 runs:
   using: 'composite'
@@ -117,6 +125,36 @@ runs:
 
         $db->close();
         echo "Test user created: $user\n";
+        PHPSCRIPT
+
+    - name: Create regular (non-admin) test user
+      if: inputs.with-playwright == 'true' && inputs.test-user-regular != ''
+      shell: bash
+      env:
+        IBL_TEST_USER_REGULAR: ${{ inputs.test-user-regular }}
+        IBL_TEST_PASS_REGULAR: ${{ inputs.test-pass-regular }}
+      run: |
+        docker compose -f docker-compose.ci.yml exec \
+          -e IBL_TEST_USER_REGULAR="$IBL_TEST_USER_REGULAR" \
+          -e IBL_TEST_PASS_REGULAR="$IBL_TEST_PASS_REGULAR" \
+          -T php php <<'PHPSCRIPT'
+        <?php
+        $hash = password_hash(getenv('IBL_TEST_PASS_REGULAR'), PASSWORD_BCRYPT);
+        $user = getenv('IBL_TEST_USER_REGULAR');
+        $email = 'ci-test-regular@example.com';
+        $db = new mysqli('mariadb', 'root', 'root', 'ibl5');
+
+        // roles_mask = 0 grants no roles — authenticated non-admin.
+        // No ibl_team_info.gm_username assignment: this user has no team,
+        // exercising the "authenticated, no franchise" code path that
+        // Phase 3 role-gating tests depend on.
+        $stmt = $db->prepare("INSERT INTO auth_users (email, password, username, status, verified, resettable, roles_mask, registered, force_logout) VALUES (?, ?, ?, 0, 1, 1, 0, ?, 0)");
+        $time = time();
+        $stmt->bind_param('sssi', $email, $hash, $user, $time);
+        $stmt->execute();
+
+        $db->close();
+        echo "Regular test user created: $user\n";
         PHPSCRIPT
 
     - name: Wait for Playwright image

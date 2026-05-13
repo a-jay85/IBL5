@@ -1582,9 +1582,14 @@ LEFT JOIN ibl_franchise_seasons fs
 WHERE snap.rn = 1;
 
 -- ============================================================
--- Non-admin user for phase-gating E2E tests (Batch C prep)
--- Username: E2E-Regular — no team, no admin privileges.
--- Password hash is set at CI runtime (same pattern as primary test user).
--- To activate: add IBL_TEST_USER_REGULAR / IBL_TEST_PASS_REGULAR
--- GitHub secrets and a user-creation step in e2e-tests.yml.
+-- Non-admin user for phase-gating E2E tests:
+-- Created at CI runtime by the "Create regular (non-admin) test user"
+-- step in .github/actions/setup-docker-e2e/action.yml.
+-- Credentials read from IBL_TEST_USER_REGULAR / IBL_TEST_PASS_REGULAR
+-- (defaults: 'ci-e2e-regular' / 'e2e-regular-pass'). The password
+-- default is kept ≤20 chars because the login form has maxlength=20
+-- (see YourAccountView.php) — longer defaults get silently truncated
+-- by Playwright's fill() and login fails.
+-- roles_mask=0, no ibl_team_info row — exercises the authenticated
+-- non-admin "no franchise" code path.
 -- ============================================================

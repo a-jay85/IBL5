@@ -46,7 +46,10 @@ export default defineConfig({
   projects: [
     {
       name: 'setup',
-      testMatch: /auth\.setup\.ts/,
+      // Matches both auth.setup.ts (admin) and auth-regular.setup.ts (non-admin).
+      // The regular setup is skipped at runtime when IBL_TEST_USER_REGULAR is
+      // unset (local devs can opt out) — see auth-regular.setup.ts.
+      testMatch: /auth(-regular)?\.setup\.ts$/,
     },
     {
       name: 'chromium',
@@ -55,7 +58,7 @@ export default defineConfig({
         storageState: 'playwright/.auth/user.json',
       },
       dependencies: ['setup'],
-      testIgnore: [/auth\.setup\.ts/, /visual-regression/],
+      testIgnore: [/auth\.setup\.ts/, /auth-regular\.setup\.ts/, /visual-regression/],
     },
   ],
 });

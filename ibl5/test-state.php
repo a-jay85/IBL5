@@ -84,6 +84,76 @@ if ($method === 'DELETE' && $action === 'clear-throttle') {
     exit;
 }
 
+// DELETE ?action=reset-extension&pid=N — reset rolling player's contract back
+// to seed values after a contract-extension submission test. Scaffolded for
+// PR-B's contract-extension flow; pid=30 (Extension Vet, Metros) is the only
+// supported player today since it's the seed fixture for that test. See
+// tests/e2e/fixtures/ci-seed.sql for the source-of-truth values.
+if ($method === 'DELETE' && $action === 'reset-extension') {
+    $pid = (int)($_GET['pid'] ?? 0);
+    if ($pid !== 30) {
+        http_response_code(400);
+        echo json_encode(['error' => 'reset-extension only supports pid=30 (Extension Vet seed)']);
+        $db->close();
+        exit;
+    }
+    $stmt = $db->prepare(
+        'UPDATE ibl_plr SET cy = 2, cyt = 2,
+            salary_yr1 = 1500, salary_yr2 = 1650,
+            salary_yr3 = 0, salary_yr4 = 0, salary_yr5 = 0, salary_yr6 = 0
+         WHERE pid = ?'
+    );
+    $stmt->bind_param('i', $pid);
+    $stmt->execute();
+    $reset = $stmt->affected_rows > 0 ? 1 : 0;
+    $stmt->close();
+    echo json_encode(['reset' => $reset]);
+    $db->close();
+    exit;
+}
+
+// DELETE ?action=reset-draft-order&year=N — clear ibl_draft_picks for one
+// season year, allowing repeat runs of the ProjectedDraftOrder save_order test.
+if ($method === 'DELETE' && $action === 'reset-draft-order') {
+    $year = (int)($_GET['year'] ?? 0);
+    if ($year < 1900 || $year > 2200) {
+        http_response_code(400);
+        echo json_encode(['error' => 'reset-draft-order requires a valid year']);
+        $db->close();
+        exit;
+    }
+    $stmt = $db->prepare('DELETE FROM ibl_draft_picks WHERE year = ?');
+    $stmt->bind_param('i', $year);
+    $stmt->execute();
+    $cleared = $stmt->affected_rows;
+    $stmt->close();
+    echo json_encode(['cleared' => $cleared]);
+    $db->close();
+    exit;
+}
+
+// DELETE ?action=delete-test-user&username=NAME — remove a registration-test
+// user from auth_users. Refuses to delete usernames that do not start with
+// the `e2e_` prefix so the endpoint cannot wipe real accounts even if
+// E2E_TESTING is mistakenly enabled in a non-test environment.
+if ($method === 'DELETE' && $action === 'delete-test-user') {
+    $username = (string)($_GET['username'] ?? '');
+    if (!str_starts_with($username, 'e2e_')) {
+        http_response_code(400);
+        echo json_encode(['error' => 'delete-test-user only accepts usernames starting with e2e_']);
+        $db->close();
+        exit;
+    }
+    $stmt = $db->prepare('DELETE FROM auth_users WHERE username = ?');
+    $stmt->bind_param('s', $username);
+    $stmt->execute();
+    $deleted = $stmt->affected_rows;
+    $stmt->close();
+    echo json_encode(['deleted' => $deleted]);
+    $db->close();
+    exit;
+}
+
 if ($method === 'GET') {
     $result = $db->query('SELECT name, value FROM ibl_settings');
     $settings = [];

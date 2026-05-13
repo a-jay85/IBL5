@@ -190,12 +190,12 @@ interface DraftViewInterface
      *  - Iterates through all players checking 'drafted' field
      *  - Returns true as soon as first undrafted player found (early exit)
      *  - Returns false if $players is empty or all players drafted
-     *  - Compares drafted field with == 0 (loose comparison with integer 0)
+     *  - Compares drafted field with === 0 (strict comparison with integer 0)
      *  - NEVER throws exceptions
      *
      * Examples:
      *  $hasPlayers = $view->hasUndraftedPlayers($players);
-     *  // Returns true if any player has drafted == 0
+     *  // Returns true if any player has drafted === 0
      *  // Returns false if all have drafted == 1 or array is empty
      */
     public function hasUndraftedPlayers(array $players): bool;

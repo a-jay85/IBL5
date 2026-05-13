@@ -213,12 +213,10 @@ jobs:
 
     - name: Run Infection on diff
       if: steps.changes.outputs.skip == 'false'
-      working-directory: ibl5
       run: |
-        vendor/bin/infection \
-          --configuration=infection.json5 \
-          --coverage=coverage \
-          --git-diff-filter=AM \
+        ibl5/vendor/bin/infection \
+          --configuration=ibl5/infection.json5 \
+          --coverage=ibl5/coverage \
           --git-diff-base=origin/${{ github.base_ref }} \
           --git-diff-lines \
           --map-source-class-to-test \

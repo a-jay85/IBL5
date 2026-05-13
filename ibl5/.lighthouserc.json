@@ -8,7 +8,7 @@
         "http://localhost:8080/ibl5/modules.php?name=Player&pa=showpage&pid=1",
         "http://localhost:8080/ibl5/modules.php?name=SeasonLeaderboards"
       ],
-      "numberOfRuns": 1,
+      "numberOfRuns": 3,
       "settings": {
         "onlyCategories": ["performance", "accessibility", "best-practices"]
       }

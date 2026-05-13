@@ -7,6 +7,7 @@ on:
 
 permissions:
   contents: read
+  pull-requests: write
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -41,7 +42,7 @@ jobs:
     needs: [changes]
     if: needs.changes.outputs.src == 'true'
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 25
 
     steps:
       - uses: actions/checkout@v6
@@ -84,6 +85,40 @@ jobs:
         env:
           LHCI_GITHUB_APP_TOKEN: ${{ secrets.LHCI_GITHUB_APP_TOKEN }}
           CHROME_PATH: /usr/bin/google-chrome-stable
+
+      - name: Download master baseline
+        id: baseline
+        if: always()
+        uses: dawidd6/action-download-artifact@v6
+        continue-on-error: true
+        with:
+          workflow: lighthouse-baseline.yml
+          branch: master
+          name: lighthouse-baseline-manifest
+          path: ibl5/baseline/
+          if_no_artifact_found: warn
+
+      - name: Generate PR comment
+        id: comment
+        if: always()
+        working-directory: ibl5
+        run: |
+          BASELINE_FLAG=""
+          if [[ -f baseline/manifest.json ]]; then
+            BASELINE_FLAG="--baseline=baseline/manifest.json"
+          fi
+          ../bin/lighthouse-comment \
+            --manifest=.lighthouseci/manifest.json \
+            --links=.lighthouseci/links.json \
+            $BASELINE_FLAG \
+            --out=.lighthouseci/comment.md || true
+
+      - name: Post sticky PR comment
+        if: always() && hashFiles('ibl5/.lighthouseci/comment.md') != ''
+        uses: marocchino/sticky-pull-request-comment@v2
+        with:
+          header: lighthouse-comment
+          path: ibl5/.lighthouseci/comment.md
 
       # --- Cleanup ---
       - name: Teardown

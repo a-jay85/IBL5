@@ -1,0 +1,16 @@
+[
+  {
+    "url": "http://localhost:8080/ibl5/index.php",
+    "isRepresentativeRun": true,
+    "htmlPath": "/tmp/lhr-aaa.html",
+    "jsonPath": "/tmp/lhr-aaa.json",
+    "summary": { "performance": 0.92, "accessibility": 0.75, "best-practices": 0.91 }
+  },
+  {
+    "url": "http://localhost:8080/ibl5/modules.php?name=Standings",
+    "isRepresentativeRun": true,
+    "htmlPath": "/tmp/lhr-bbb.html",
+    "jsonPath": "/tmp/lhr-bbb.json",
+    "summary": { "performance": 0.85, "accessibility": 0.93, "best-practices": 0.88 }
+  }
+]

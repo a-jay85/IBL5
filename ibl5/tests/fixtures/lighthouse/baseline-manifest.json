@@ -1,0 +1,37 @@
+[
+  {
+    "url": "http://localhost:8080/ibl5/index.php",
+    "isRepresentativeRun": true,
+    "htmlPath": "/tmp/lhr-aaa.html",
+    "jsonPath": "/tmp/lhr-aaa.json",
+    "summary": { "performance": 0.92, "accessibility": 0.96, "best-practices": 0.91 }
+  },
+  {
+    "url": "http://localhost:8080/ibl5/modules.php?name=Standings",
+    "isRepresentativeRun": true,
+    "htmlPath": "/tmp/lhr-bbb.html",
+    "jsonPath": "/tmp/lhr-bbb.json",
+    "summary": { "performance": 0.60, "accessibility": 0.93, "best-practices": 0.88 }
+  },
+  {
+    "url": "http://localhost:8080/ibl5/modules.php?name=Team&op=team&teamID=1",
+    "isRepresentativeRun": true,
+    "htmlPath": "/tmp/lhr-ccc.html",
+    "jsonPath": "/tmp/lhr-ccc.json",
+    "summary": { "performance": 0.78, "accessibility": 0.91, "best-practices": 0.83 }
+  },
+  {
+    "url": "http://localhost:8080/ibl5/modules.php?name=Player&pa=showpage&pid=1",
+    "isRepresentativeRun": true,
+    "htmlPath": "/tmp/lhr-ddd.html",
+    "jsonPath": "/tmp/lhr-ddd.json",
+    "summary": { "performance": 0.71, "accessibility": 0.89, "best-practices": 0.86 }
+  },
+  {
+    "url": "http://localhost:8080/ibl5/modules.php?name=SeasonLeaderboards",
+    "isRepresentativeRun": true,
+    "htmlPath": "/tmp/lhr-eee.html",
+    "jsonPath": "/tmp/lhr-eee.json",
+    "summary": { "performance": 0.80, "accessibility": 0.95, "best-practices": 0.84 }
+  }
+]

@@ -267,6 +267,9 @@
         <testsuite name="Debug Module Tests">
             <directory>tests/Debug</directory>
         </testsuite>
+        <testsuite name="Cli Module Tests">
+            <directory>tests/Cli</directory>
+        </testsuite>
         <testsuite name="Database Integration Tests">
             <directory>tests/DatabaseIntegration</directory>
         </testsuite>

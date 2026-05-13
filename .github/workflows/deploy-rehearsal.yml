@@ -1,0 +1,104 @@
+name: Deploy Rehearsal
+
+on:
+  pull_request:
+    branches: [master]
+    paths:
+      - 'ibl5/migrations/**.sql'
+      - 'ibl5/composer.json'
+      - 'ibl5/composer.lock'
+      - 'ibl5/bin/migrate'
+      - 'ibl5/bin/validate-schema'
+      - 'ibl5/config/schema-assertions.php'
+      - 'ibl5/classes/Migration/**'
+      - '.github/workflows/deploy-rehearsal.yml'
+  push:
+    branches: [master]
+    paths:
+      - 'ibl5/migrations/**.sql'
+      - 'ibl5/composer.json'
+      - 'ibl5/composer.lock'
+      - 'ibl5/bin/migrate'
+      - 'ibl5/bin/validate-schema'
+      - 'ibl5/config/schema-assertions.php'
+      - 'ibl5/classes/Migration/**'
+      - '.github/workflows/deploy-rehearsal.yml'
+  workflow_call: {}
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  rehearse:
+    name: Deploy Rehearsal (composer --no-dev + migrate + validate-schema)
+    runs-on: ubuntu-latest
+
+    services:
+      mariadb:
+        image: mariadb:10.11
+        env:
+          MARIADB_ROOT_PASSWORD: root
+          MARIADB_DATABASE: iblhoops_ibl5
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mariadb-admin ping -proot"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=5
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.5'
+          extensions: mbstring, intl, mysqli
+          coverage: none
+
+      # Mirror main.yml "Install PHP dependencies" exactly (--no-dev catches
+      # dev-dependency leaks that tests.yml's full install would miss)
+      - name: composer install --no-dev (mirrors main.yml)
+        working-directory: ibl5
+        run: composer install --no-dev --no-interaction --optimize-autoloader
+
+      - name: Configure ibl5 to point at CI MariaDB
+        working-directory: ibl5
+        run: |
+          cp config.php.example config.php
+          sed -i "s/\$dbhost = getenv('DB_HOST') ?: 'localhost';/\$dbhost = '127.0.0.1';/" config.php
+          sed -i "s/\$dbuname = \"iblhoops_\";/\$dbuname = \"root\";/" config.php
+          sed -i "s/\$dbpass = \"password\";/\$dbpass = \"root\";/" config.php
+          sed -i "s/\$dbname = \"iblhoops_\";/\$dbname = \"iblhoops_ibl5\";/" config.php
+
+      - name: Apply baseline schema
+        working-directory: ibl5
+        run: |
+          sed 's/DEFINER=`[^`]*`@`[^`]*`//g' migrations/000_baseline_schema.sql \
+            | mysql -h 127.0.0.1 -u root -proot iblhoops_ibl5
+
+      - name: Mark baseline as applied in migration tracker
+        run: |
+          mysql -h 127.0.0.1 -u root -proot iblhoops_ibl5 -e "
+            CREATE TABLE IF NOT EXISTS migrations (
+              id INT AUTO_INCREMENT PRIMARY KEY,
+              migration VARCHAR(255) NOT NULL,
+              batch INT NOT NULL
+            );
+            INSERT INTO migrations (migration, batch) VALUES ('000_baseline_schema.sql', 0);
+          "
+
+      # Mirror main.yml "Run database migrations" exactly
+      - name: php bin/migrate (mirrors main.yml)
+        run: php ibl5/bin/migrate
+
+      # Mirror main.yml "Validate database schema" exactly — this is the gate
+      - name: php bin/validate-schema (mirrors main.yml; pre-flight gate)
+        run: php ibl5/bin/validate-schema

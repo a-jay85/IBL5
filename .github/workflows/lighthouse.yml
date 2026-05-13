@@ -86,9 +86,9 @@ jobs:
           LHCI_GITHUB_APP_TOKEN: ${{ secrets.LHCI_GITHUB_APP_TOKEN }}
           CHROME_PATH: /usr/bin/google-chrome-stable
 
-      # --- PR Comment ---
       - name: Download master baseline
         id: baseline
+        if: always()
         uses: dawidd6/action-download-artifact@v6
         continue-on-error: true
         with:
@@ -100,6 +100,7 @@ jobs:
 
       - name: Generate PR comment
         id: comment
+        if: always()
         working-directory: ibl5
         run: |
           BASELINE_FLAG=""

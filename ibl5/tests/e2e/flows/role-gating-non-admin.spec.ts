@@ -134,8 +134,12 @@ test.describe('Phase-restricted modules: hidden for non-admin', () => {
     appState,
     page,
   }) => {
+    // Waivers is always-on during HEAT / Regular Season / Playoffs, so the
+    // "Allow Waiver Moves" setting only takes effect during Free Agency or
+    // Preseason. Use Preseason here — Free Agency would let the gate run
+    // but adds the FA module's own phase noise to the picture.
     await appState({
-      'Current Season Phase': 'Regular Season',
+      'Current Season Phase': 'Preseason',
       'Allow Waiver Moves': 'No',
     });
     await page.goto('modules.php?name=Waivers');

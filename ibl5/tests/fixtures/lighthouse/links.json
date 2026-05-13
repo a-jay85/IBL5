@@ -1,0 +1,7 @@
+{
+  "http://localhost:8080/ibl5/index.php": "https://storage.googleapis.com/lighthouse-infrastructure/reports/aaa.html",
+  "http://localhost:8080/ibl5/modules.php?name=Standings": "https://storage.googleapis.com/lighthouse-infrastructure/reports/bbb.html",
+  "http://localhost:8080/ibl5/modules.php?name=Team&op=team&teamID=1": "https://storage.googleapis.com/lighthouse-infrastructure/reports/ccc.html",
+  "http://localhost:8080/ibl5/modules.php?name=Player&pa=showpage&pid=1": "https://storage.googleapis.com/lighthouse-infrastructure/reports/ddd.html",
+  "http://localhost:8080/ibl5/modules.php?name=SeasonLeaderboards": "https://storage.googleapis.com/lighthouse-infrastructure/reports/eee.html"
+}

@@ -1,0 +1,96 @@
+#!/usr/bin/env php
+<?php
+
+declare(strict_types=1);
+
+require_once __DIR__ . '/../ibl5/vendor/autoload.php';
+
+// In worktrees, vendor/ is symlinked — the autoloader resolves classes/ from
+// the main repo. Register a fallback so worktree-local classes are found.
+$worktreeClasses = realpath(__DIR__ . '/../ibl5/classes');
+if ($worktreeClasses !== false && is_link(__DIR__ . '/../ibl5/vendor')) {
+    spl_autoload_register(static function (string $class) use ($worktreeClasses): void {
+        $file = $worktreeClasses . '/' . str_replace('\\', '/', $class) . '.php';
+        if (file_exists($file)) {
+            require $file;
+        }
+    }, true, true);
+}
+
+use Cli\LighthouseCommentFormatter;
+
+$manifestPath = null;
+$linksPath = null;
+$baselinePath = null;
+$outPath = null;
+
+foreach ($argv as $i => $arg) {
+    if ($i === 0) {
+        continue;
+    }
+    if (str_starts_with($arg, '--manifest=')) {
+        $manifestPath = substr($arg, strlen('--manifest='));
+    } elseif (str_starts_with($arg, '--links=')) {
+        $linksPath = substr($arg, strlen('--links='));
+    } elseif (str_starts_with($arg, '--baseline=')) {
+        $baselinePath = substr($arg, strlen('--baseline='));
+    } elseif (str_starts_with($arg, '--out=')) {
+        $outPath = substr($arg, strlen('--out='));
+    } elseif ($arg === '--help') {
+        fwrite(STDOUT, "Usage: bin/lighthouse-comment --manifest=PATH [--links=PATH] [--baseline=PATH] [--out=PATH]\n");
+        exit(0);
+    } else {
+        fwrite(STDERR, "Unknown argument: $arg\n");
+        fwrite(STDERR, "Usage: bin/lighthouse-comment --manifest=PATH [--links=PATH] [--baseline=PATH] [--out=PATH]\n");
+        exit(2);
+    }
+}
+
+if ($manifestPath === null) {
+    fwrite(STDERR, "--manifest is required\n");
+    fwrite(STDERR, "Usage: bin/lighthouse-comment --manifest=PATH [--links=PATH] [--baseline=PATH] [--out=PATH]\n");
+    exit(2);
+}
+
+if (!file_exists($manifestPath)) {
+    fwrite(STDERR, "Manifest file not found: $manifestPath\n");
+    exit(2);
+}
+
+$manifestJson = file_get_contents($manifestPath);
+if ($manifestJson === false) {
+    fwrite(STDERR, "Could not read manifest file: $manifestPath\n");
+    exit(2);
+}
+
+/** @var list<array{url: string, summary: array<string, float>}> $manifest */
+$manifest = json_decode($manifestJson, true, 512, JSON_THROW_ON_ERROR);
+
+$links = [];
+if ($linksPath !== null && file_exists($linksPath)) {
+    $linksJson = file_get_contents($linksPath);
+    if ($linksJson !== false) {
+        /** @var array<string, string> $links */
+        $links = json_decode($linksJson, true, 512, JSON_THROW_ON_ERROR);
+    }
+}
+
+$baseline = null;
+if ($baselinePath !== null && file_exists($baselinePath)) {
+    $baselineJson = file_get_contents($baselinePath);
+    if ($baselineJson !== false) {
+        /** @var list<array{url: string, summary: array<string, float>}> $baseline */
+        $baseline = json_decode($baselineJson, true, 512, JSON_THROW_ON_ERROR);
+    }
+}
+
+$formatter = new LighthouseCommentFormatter();
+$result = $formatter->format($manifest, $links, $baseline);
+
+if ($outPath !== null) {
+    file_put_contents($outPath, $result['markdown']);
+} else {
+    fwrite(STDOUT, $result['markdown']);
+}
+
+exit($result['hasErrorViolation'] ? 1 : 0);

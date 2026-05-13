@@ -187,6 +187,18 @@ while true; do
 
         echo "--- Plan #$PLANS_RUN impl finished at $(date) ---" >> "$LOG"
 
+        # Auth-error circuit breaker — transient, not a plan failure; stop immediately
+        if tail -n +"$((IMPL_LOG_BEFORE + 1))" "$LOG" | grep -q "authentication_error"; then
+            echo "Auth error during impl — stopping loop (not a plan failure)." >> "$LOG"
+            CURRENT=$(cat "$ATTEMPT_FILE")
+            if [ "$CURRENT" -le 1 ]; then
+                rm -f "$ATTEMPT_FILE"
+            else
+                echo $(( CURRENT - 1 )) > "$ATTEMPT_FILE"
+            fi
+            break
+        fi
+
         # Usage-limit check after implementation
         if tail -n +"$((IMPL_LOG_BEFORE + 1))" "$LOG" | grep -q "hit your limit"; then
             echo "Usage limit during impl — stopping loop." >> "$LOG"
@@ -245,6 +257,18 @@ PLAN_FILE=$PLAN_NAME" \
         fi
 
         echo "--- Plan #$PLANS_RUN postplan finished at $(date) ---" >> "$LOG"
+
+        # Auth-error circuit breaker — transient, not a plan failure; stop immediately
+        if tail -n +"$((PP_LOG_BEFORE + 1))" "$LOG" | grep -q "authentication_error"; then
+            echo "Auth error during postplan — stopping loop (not a plan failure)." >> "$LOG"
+            CURRENT=$(cat "$ATTEMPT_FILE")
+            if [ "$CURRENT" -le 1 ]; then
+                rm -f "$ATTEMPT_FILE"
+            else
+                echo $(( CURRENT - 1 )) > "$ATTEMPT_FILE"
+            fi
+            break
+        fi
 
         # Usage-limit check after post-plan
         if tail -n +"$((PP_LOG_BEFORE + 1))" "$LOG" | grep -q "hit your limit"; then

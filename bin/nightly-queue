@@ -8,11 +8,13 @@
 # Usage:
 #   bin/nightly-queue <plan-slug-or-filename>
 #   bin/nightly-queue                          # show current queue
+#   bin/nightly-queue requeue                  # move all skipped plans back to queue
 #
 # Examples:
 #   bin/nightly-queue velvet-brewing-starlight
 #   bin/nightly-queue velvet-brewing-starlight.md
 #   bin/nightly-queue ~/.claude/plans/velvet-brewing-starlight.md
+#   bin/nightly-queue requeue
 
 set -euo pipefail
 
@@ -42,6 +44,31 @@ show_queue() {
 }
 
 if [ $# -eq 0 ]; then
+    show_queue
+    exit 0
+fi
+
+if [ "$1" = "requeue" ]; then
+    SKIPPED_DIR="$NIGHTLY_DIR/skipped"
+    if ! ls "$SKIPPED_DIR"/*.md &>/dev/null; then
+        echo "No skipped plans to requeue."
+        exit 0
+    fi
+    count=0
+    for f in "$SKIPPED_DIR"/*.md; do
+        name=$(basename "$f")
+        if [ -e "$QUEUE_DIR/$name" ]; then
+            echo "  skip: $name (already queued)"
+            continue
+        fi
+        mv "$f" "$QUEUE_DIR/$name"
+        rm -f "$QUEUE_DIR/${name}.attempts"
+        count=$((count + 1))
+        echo "  requeued: $name"
+    done
+    echo ""
+    echo "$count plan(s) moved from skipped/ back to queue/."
+    echo ""
     show_queue
     exit 0
 fi

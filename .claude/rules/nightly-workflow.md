@@ -1,6 +1,6 @@
 ---
 description: Nightly autonomous workflow — launchd fires claude -p at 00:03 and 11:00 daily, running two context-isolated agents per plan (implementation + post-plan) with time guards and incremental checkpoints.
-last_verified: 2026-05-04
+last_verified: 2026-05-12
 paths: "bin/nightly-*"
 ---
 
@@ -19,6 +19,7 @@ A headless `claude -p` process runs twice daily via macOS `launchd` — at 00:03
 | Disable nightly job | `launchctl unload ~/Library/LaunchAgents/com.ibl5.nightly-claude.plist` |
 | Re-enable nightly job | `launchctl load ~/Library/LaunchAgents/com.ibl5.nightly-claude.plist` |
 | Force-trigger now | `launchctl start com.ibl5.nightly-claude` |
+| Requeue skipped plans | `bin/nightly-queue requeue` |
 | Check logs | `cat ~/.claude/projects/-Users-ajaynicolas-GitHub-IBL5/nightly/logs/$(date +%Y-%m-%d).log` |
 
 ## Directory Layout
@@ -62,7 +63,7 @@ Cancelling: `rm queue/<file>.md` removes only the symlink, not the original plan
 `bin/nightly-run` loops through the queue, firing two `claude -p` invocations per plan. The bash loop provides:
 
 - **Two-phase execution:** Implementation agent writes a JSON handoff file to `handoff/`; post-plan agent reads it. The bash loop checks for the handoff file between phases — if it exists, implementation is skipped (resume scenario).
-- **Per-phase usage-limit detection:** After each `claude -p` invocation, the loop checks for "hit your limit" in the log. If detected, the attempt counter is decremented (usage limits are transient, not failures) and the loop breaks.
+- **Per-phase circuit breakers:** After each `claude -p` invocation, the loop checks for `authentication_error` (401) and "hit your limit" in the log. Both are transient — the attempt counter is decremented and the loop breaks immediately, preventing queue drain.
 - **Time guard:** Won't start a new plan (or post-plan phase) if >4h45m have elapsed (configurable via `MAX_ELAPSED` in `bin/nightly-run`)
 - **Poison-pill protection:** Tracks attempts per plan via `.attempts` sidecar files. After 3 failures in one night, the plan is moved to `skipped/` with a report.
 - **Turn caps:** Implementation: `--max-turns 200`. Post-plan: `--max-turns 120`.

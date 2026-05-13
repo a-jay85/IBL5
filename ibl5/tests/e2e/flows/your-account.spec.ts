@@ -1,5 +1,6 @@
 import { test, expect } from '../fixtures/public';
 import { assertNoPhpErrors } from '../helpers/php-errors';
+import { deleteTestUser } from '../helpers/cleanup';
 
 // YourAccount flow tests — registration, forgot password, activation errors,
 // reset password. Login/logout is covered in login-logout.spec.ts.
@@ -141,18 +142,40 @@ test.describe('Registration: duplicate username', () => {
 });
 
 test.describe('Registration: successful submission', () => {
-  test('valid registration shows activation email sent page', async ({ page }) => {
+  // Track the username created by the happy-path test so afterEach can
+  // clean it up via test-state.php?action=delete-test-user. The cleanup
+  // doubles as a DB-level assertion: a registration that genuinely
+  // persisted to auth_users will report `deleted: 1`; a failed write would
+  // report `deleted: 0`, failing the test.
+  let createdUsername: string | null = null;
+
+  test.afterEach(async ({ request }) => {
+    if (createdUsername === null) return;
+    const username = createdUsername;
+    createdUsername = null;
+    const result = await deleteTestUser(request, username);
+    expect(
+      result.deleted,
+      `expected auth_users row for ${username} to be deleted (proves registration persisted)`,
+    ).toBe(1);
+  });
+
+  test('valid registration creates an auth_users row and shows activation page', async ({
+    page,
+  }) => {
     await page.goto('modules.php?name=YourAccount&op=new_user');
 
     // Use a unique username to avoid collisions across test runs
     const uniqueSuffix = Date.now().toString(36);
     const username = `e2e_reg_${uniqueSuffix}`;
+    const password = 'testpass12345';
     const email = `${username}@test.example`;
+    createdUsername = username;
 
     await page.locator('#register-username').fill(username);
     await page.locator('#register-email').fill(email);
-    await page.locator('#register-password').fill('testpass12345');
-    await page.locator('#register-password2').fill('testpass12345');
+    await page.locator('#register-password').fill(password);
+    await page.locator('#register-password2').fill(password);
 
     const submitBtn = page.locator('button[type="submit"]').filter({
       hasText: /create account/i,
@@ -167,6 +190,35 @@ test.describe('Registration: successful submission', () => {
     await expect(page.locator('.auth-status__icon--success')).toBeVisible();
     const body = await page.locator('body').textContent();
     expect(body).toMatch(/account created|activation email/i);
+
+    // The afterEach hook above asserts the auth_users row was actually
+    // written (deleted === 1). That's the DB-level proof — a passing
+    // success banner without a real row would slip through any UI-only
+    // check.
+  });
+});
+
+test.describe('Registration: bad CSRF', () => {
+  test('POST op=finish without _csrf_token redirects to op=new_user', async ({
+    request,
+  }) => {
+    const response = await request.post(
+      'modules.php?name=YourAccount&op=finish',
+      {
+        form: {
+          username: 'e2e_csrf_bad',
+          user_email: 'csrf@test.example',
+          user_password: 'pass12345',
+          user_password2: 'pass12345',
+        },
+        maxRedirects: 0,
+      },
+    );
+
+    expect([301, 302, 303]).toContain(response.status());
+    expect(response.headers()['location']).toBe(
+      'modules.php?name=YourAccount&op=new_user',
+    );
   });
 });
 

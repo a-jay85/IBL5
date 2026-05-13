@@ -218,7 +218,6 @@ jobs:
         vendor/bin/infection \
           --configuration=infection.json5 \
           --coverage=coverage \
-          --git-diff-filter=AM \
           --git-diff-base=origin/${{ github.base_ref }} \
           --git-diff-lines \
           --map-source-class-to-test \

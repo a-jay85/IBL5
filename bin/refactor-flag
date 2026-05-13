@@ -1,0 +1,368 @@
+#!/usr/bin/env php
+<?php
+
+declare(strict_types=1);
+
+/**
+ * bin/refactor-flag — refactor-without-tests CI gate for IBL5.
+ *
+ * Detects refactor signals (renames, signature changes, visibility narrowing,
+ * class removal, large deletions) in ibl5/classes/** and blocks when the PR
+ * does not also touch tests or carry a bypass marker.
+ *
+ * Exits 0 when no triggers fire, or triggers fire with coverage/bypass.
+ * Exits 1 when triggers fire without either resolution.
+ * Exits 2 on usage error.
+ */
+
+const TRIGGER_DESCRIPTIONS = [
+    'rename' => 'file rename under ibl5/classes/ (high refactor signal)',
+    'signature-change' => 'method signature change in ibl5/classes/ (parameters or return type differ)',
+    'visibility-change' => 'visibility narrowing in ibl5/classes/ (e.g. public → private)',
+    'class-removed' => 'class declaration removed from ibl5/classes/ file',
+    'large-deletion' => 'large deletion (>30 lines) in ibl5/classes/ file',
+];
+
+const BYPASS_REGEX = '/<!--\s*no-refactor-tests:\s*(.+?)\s*-->/s';
+const BYPASS_MIN_LENGTH = 20;
+const LARGE_DELETION_THRESHOLD = 30;
+
+function usage(): string
+{
+    return <<<USAGE
+Usage: bin/refactor-flag [options]
+
+Refactor-without-tests gate: refuses to pass when a diff contains refactor
+signals under ibl5/classes/** without accompanying test changes or a bypass
+marker in the PR body.
+
+Modes:
+  --staged           Scan staged changes via `git diff --cached`. Default.
+  --pr               Scan the current PR against origin/master. Fetches the
+                     PR body via `gh pr view` for bypass marker detection.
+
+Options:
+  --bypass-from-stdin   Read the PR body from stdin (for local testing).
+                        Overrides any automatic fetch.
+  --help, -h            Show this message.
+
+Exit 0 on pass, 1 on failure, 2 on usage error.
+
+USAGE;
+}
+
+function runCmd(string $cmd): array
+{
+    $output = [];
+    $exit = 0;
+    exec($cmd . ' 2>/dev/null', $output, $exit);
+    return [$output, $exit];
+}
+
+function gitDiffRange(string $mode): string
+{
+    return $mode === 'pr' ? 'origin/master...HEAD' : '--cached';
+}
+
+/** @return list<string> */
+function diffNames(string $mode, string $filter): array
+{
+    $range = gitDiffRange($mode);
+    [$lines] = runCmd(sprintf('git diff %s --name-only --diff-filter=%s', escapeshellarg($range), escapeshellarg($filter)));
+    return array_values(array_filter($lines, static fn (string $line): bool => $line !== ''));
+}
+
+/**
+ * @return list<array{from: string, to: string}>
+ */
+function diffRenames(string $mode): array
+{
+    $range = gitDiffRange($mode);
+    [$lines] = runCmd(sprintf('git diff %s --name-status --diff-filter=R -M', escapeshellarg($range)));
+    $renames = [];
+    foreach ($lines as $line) {
+        $parts = preg_split('/\t+/', $line);
+        if ($parts !== false && count($parts) >= 3) {
+            $renames[] = ['from' => $parts[1], 'to' => $parts[2]];
+        }
+    }
+    return $renames;
+}
+
+/** @return list<string> */
+function diffAddedAndDeletedLines(string $mode, string $file): array
+{
+    $range = gitDiffRange($mode);
+    [$lines] = runCmd(sprintf('git diff %s -- %s', escapeshellarg($range), escapeshellarg($file)));
+    return $lines;
+}
+
+function isClassesFile(string $path): bool
+{
+    return str_starts_with($path, 'ibl5/classes/') && !str_starts_with($path, 'ibl5/classes/Contracts/');
+}
+
+/**
+ * @return list<array{type: string, file: string, severity: string}>
+ */
+function detectTriggers(string $mode): array
+{
+    $triggers = [];
+
+    // 1. Rename trigger
+    $renames = diffRenames($mode);
+    foreach ($renames as $rename) {
+        if (isClassesFile($rename['from']) || isClassesFile($rename['to'])) {
+            $triggers[] = [
+                'type' => 'rename',
+                'file' => $rename['from'] . ' → ' . $rename['to'],
+                'severity' => 'high',
+            ];
+        }
+    }
+
+    // Get modified files under ibl5/classes/
+    $modified = diffNames($mode, 'M');
+    $classesModified = array_filter($modified, 'isClassesFile');
+
+    foreach ($classesModified as $file) {
+        $diffLines = diffAddedAndDeletedLines($mode, $file);
+
+        $deletedFunctions = [];
+        $addedFunctions = [];
+
+        foreach ($diffLines as $line) {
+            // 2. Method signature change detection
+            if (preg_match('/^-\s*(public|private|protected)\s+(?:static\s+)?function\s+(\w+)\s*\((.*)/', $line, $m)) {
+                $deletedFunctions[$m[2]] = ['visibility' => $m[1], 'rest' => $m[3]];
+            }
+            if (preg_match('/^\+\s*(public|private|protected)\s+(?:static\s+)?function\s+(\w+)\s*\((.*)/', $line, $m)) {
+                $addedFunctions[$m[2]] = ['visibility' => $m[1], 'rest' => $m[3]];
+            }
+
+            // 4. Class declaration removed
+            if (preg_match('/^-(?:(?:abstract|final|readonly)\s+)*class\s+\w+/', $line) === 1) {
+                $triggers[] = [
+                    'type' => 'class-removed',
+                    'file' => $file,
+                    'severity' => 'high',
+                ];
+            }
+        }
+
+        foreach ($deletedFunctions as $name => $del) {
+            if (!isset($addedFunctions[$name])) {
+                continue;
+            }
+            $add = $addedFunctions[$name];
+
+            // 3. Visibility change (narrowing)
+            $visibilityOrder = ['public' => 3, 'protected' => 2, 'private' => 1];
+            $oldVis = $visibilityOrder[$del['visibility']] ?? 0;
+            $newVis = $visibilityOrder[$add['visibility']] ?? 0;
+            if ($newVis < $oldVis) {
+                $triggers[] = [
+                    'type' => 'visibility-change',
+                    'file' => $file,
+                    'severity' => 'medium',
+                ];
+                continue;
+            }
+
+            // 2. Signature change (different parameters or return type)
+            if ($del['rest'] !== $add['rest']) {
+                $triggers[] = [
+                    'type' => 'signature-change',
+                    'file' => $file,
+                    'severity' => 'high',
+                ];
+            }
+        }
+
+        // 5. Large deletion
+        $deletedCount = 0;
+        foreach ($diffLines as $line) {
+            if (str_starts_with($line, '-') && !str_starts_with($line, '---')) {
+                $deletedCount++;
+            }
+        }
+        if ($deletedCount > LARGE_DELETION_THRESHOLD) {
+            $triggers[] = [
+                'type' => 'large-deletion',
+                'file' => $file,
+                'severity' => 'medium',
+            ];
+        }
+    }
+
+    return $triggers;
+}
+
+/**
+ * Extract class/module names affected by triggers.
+ * @param list<array{type: string, file: string, severity: string}> $triggers
+ * @return list<string>
+ */
+function affectedNames(array $triggers): array
+{
+    $names = [];
+    foreach ($triggers as $t) {
+        $file = $t['file'];
+        // Handle rename "from → to" format
+        if (str_contains($file, ' → ')) {
+            $parts = explode(' → ', $file);
+            foreach ($parts as $p) {
+                $names = array_merge($names, extractClassAndModuleNames(trim($p)));
+            }
+        } else {
+            $names = array_merge($names, extractClassAndModuleNames($file));
+        }
+    }
+    return array_values(array_unique($names));
+}
+
+/** @return list<string> */
+function extractClassAndModuleNames(string $path): array
+{
+    $names = [];
+    $basename = pathinfo($path, PATHINFO_FILENAME);
+    if ($basename !== '') {
+        $names[] = strtolower($basename);
+    }
+    // Extract module directory name (e.g. ibl5/classes/Waivers/WaiverService.php → waivers)
+    if (preg_match('#ibl5/classes/([^/]+)/#', $path, $m) === 1) {
+        $names[] = strtolower($m[1]);
+    }
+    return $names;
+}
+
+/**
+ * @param list<array{type: string, file: string, severity: string}> $triggers
+ */
+function checkTestCoverage(string $mode, array $triggers): bool
+{
+    $addedFiles = diffNames($mode, 'A');
+    $modifiedFiles = diffNames($mode, 'M');
+
+    // Test added in this PR — any new file under ibl5/tests/
+    foreach ($addedFiles as $file) {
+        if (str_starts_with($file, 'ibl5/tests/')) {
+            return true;
+        }
+    }
+
+    // Test modified in this PR — must match an affected class/module name
+    $affected = affectedNames($triggers);
+    foreach ($modifiedFiles as $file) {
+        if (!str_starts_with($file, 'ibl5/tests/')) {
+            continue;
+        }
+        $testBasename = strtolower(pathinfo($file, PATHINFO_FILENAME));
+        foreach ($affected as $name) {
+            if (str_contains($testBasename, $name) || str_contains($name, $testBasename)) {
+                return true;
+            }
+        }
+    }
+
+    return false;
+}
+
+function fetchPrBody(string $mode, bool $fromStdin): ?string
+{
+    if ($fromStdin) {
+        $body = stream_get_contents(STDIN);
+        return $body === false ? null : $body;
+    }
+    if ($mode !== 'pr') {
+        return null;
+    }
+    $prNumber = getenv('PR_NUMBER');
+    $cmd = 'gh pr view';
+    if (is_string($prNumber) && $prNumber !== '') {
+        $cmd .= ' ' . escapeshellarg($prNumber);
+    }
+    $cmd .= ' --json body --jq .body';
+    [$lines, $exit] = runCmd($cmd);
+    if ($exit !== 0 || $lines === []) {
+        return null;
+    }
+    return implode("\n", $lines);
+}
+
+function extractBypassReason(?string $body): ?string
+{
+    if ($body === null || $body === '' || $body === 'null') {
+        return null;
+    }
+    if (preg_match(BYPASS_REGEX, $body, $m) !== 1) {
+        return null;
+    }
+    $reason = trim($m[1]);
+    if (strlen($reason) < BYPASS_MIN_LENGTH) {
+        return null;
+    }
+    return $reason;
+}
+
+// --- main ---
+
+$opts = ['mode' => 'staged', 'bypass_from_stdin' => false];
+foreach (array_slice($argv, 1) as $arg) {
+    switch ($arg) {
+        case '--staged':
+            $opts['mode'] = 'staged';
+            break;
+        case '--pr':
+            $opts['mode'] = 'pr';
+            break;
+        case '--bypass-from-stdin':
+            $opts['bypass_from_stdin'] = true;
+            break;
+        case '--help':
+        case '-h':
+            echo usage();
+            exit(0);
+        default:
+            fwrite(STDERR, "unknown flag: {$arg}\n");
+            fwrite(STDERR, usage());
+            exit(2);
+    }
+}
+
+$triggers = detectTriggers($opts['mode']);
+if ($triggers === []) {
+    echo "No refactor signals detected.\n";
+    exit(0);
+}
+
+$bypassReason = extractBypassReason(fetchPrBody($opts['mode'], $opts['bypass_from_stdin']));
+$hasCoverage = checkTestCoverage($opts['mode'], $triggers);
+
+echo "Refactor signals detected:\n";
+foreach ($triggers as $t) {
+    $desc = TRIGGER_DESCRIPTIONS[$t['type']] ?? $t['type'];
+    echo sprintf("  - [%s] %s — %s\n", $t['type'], $t['file'], $desc);
+}
+echo "\n";
+
+if ($hasCoverage) {
+    echo "PASS: test changes cover the refactor.\n";
+    exit(0);
+}
+
+if ($bypassReason !== null) {
+    echo "PASS (bypass): {$bypassReason}\n";
+    exit(0);
+}
+
+echo "FAIL: refactor signals detected without accompanying test changes.\n";
+echo "\n";
+echo "Resolve by either:\n";
+echo "  1. Add or modify a test under ibl5/tests/ that covers the refactored code.\n";
+echo "     Pre-impl characterization tests (green-green) are strongly recommended.\n";
+echo "  2. Add a bypass marker to the PR body (HTML comment):\n";
+echo "     <!-- no-refactor-tests: reason at least 20 characters long -->\n";
+echo "\n";
+echo "See .claude/rules/refactor-flag.md for the full policy.\n";
+exit(1);

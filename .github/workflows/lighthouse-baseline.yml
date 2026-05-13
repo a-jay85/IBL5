@@ -1,0 +1,77 @@
+name: Lighthouse Baseline
+
+on:
+  push:
+    branches: [master]
+    paths:
+      - '**.php'
+      - '**.css'
+      - '**.ts'
+      - '**.js'
+      - 'ibl5/design/**'
+      - 'ibl5/migrations/**.sql'
+      - 'Dockerfile'
+      - 'docker-compose*.yml'
+      - 'ibl5/.lighthouserc.json'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}
+  cancel-in-progress: false
+
+jobs:
+  baseline:
+    name: Generate baseline
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: oven-sh/setup-bun@v2
+
+      - name: Cache vendor directory
+        uses: actions/cache@v5
+        with:
+          path: ibl5/vendor
+          key: ${{ runner.os }}-vendor-${{ hashFiles('ibl5/composer.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-vendor-
+
+      - name: Cache node_modules
+        uses: actions/cache@v5
+        with:
+          path: ibl5/node_modules
+          key: ${{ runner.os }}-bun-${{ hashFiles('ibl5/bun.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-bun-
+
+      - name: Install dependencies
+        working-directory: ibl5
+        run: |
+          composer install --no-interaction --no-progress --prefer-dist --ignore-platform-reqs
+          bun install
+
+      - uses: ./.github/actions/setup-docker-e2e
+        with:
+          build-css: 'true'
+
+      - name: Run Lighthouse
+        working-directory: ibl5
+        run: bunx @lhci/cli autorun
+        env:
+          CHROME_PATH: /usr/bin/google-chrome-stable
+
+      - name: Upload baseline manifest
+        uses: actions/upload-artifact@v5
+        with:
+          name: lighthouse-baseline-manifest
+          path: |
+            ibl5/.lighthouseci/manifest.json
+            ibl5/.lighthouseci/links.json
+          retention-days: 30
+
+      - name: Teardown
+        if: always()
+        run: docker compose -f docker-compose.ci.yml down --volumes

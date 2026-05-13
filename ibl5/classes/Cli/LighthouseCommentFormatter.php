@@ -70,8 +70,8 @@ final class LighthouseCommentFormatter
 
                 $cells[] = $this->formatCell($category, $score, $delta);
 
-                $threshold = self::THRESHOLDS[$category] ?? null;
-                if ($threshold !== null && $threshold['level'] === 'error' && $score < $threshold['minScore']) {
+                $threshold = self::THRESHOLDS[$category];
+                if ($threshold['level'] === 'error' && $score < $threshold['minScore']) {
                     $hasErrorViolation = true;
                 }
             }
@@ -98,17 +98,18 @@ final class LighthouseCommentFormatter
         ];
     }
 
+    /**
+     * @param key-of<self::THRESHOLDS> $category
+     */
     private function formatCell(string $category, float $score, ?float $delta): string
     {
-        $threshold = self::THRESHOLDS[$category] ?? null;
+        $threshold = self::THRESHOLDS[$category];
         $scoreStr = sprintf('%.2f', $score);
 
-        $isErrorViolation = $threshold !== null
-            && $threshold['level'] === 'error'
+        $isErrorViolation = $threshold['level'] === 'error'
             && $score < $threshold['minScore'];
 
-        $isWarnViolation = $threshold !== null
-            && $threshold['level'] === 'warn'
+        $isWarnViolation = $threshold['level'] === 'warn'
             && $score < $threshold['minScore'];
 
         $isRegression = $delta !== null && $delta < -self::REGRESSION_THRESHOLD;
@@ -151,7 +152,7 @@ final class LighthouseCommentFormatter
             $short = substr($short, 5);
         }
 
-        return $short ?: '/';
+        return $short !== '' ? $short : '/';
     }
 
     private function wrapComment(string $body): string

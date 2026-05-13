@@ -80,10 +80,23 @@ if ! echo "$TABLE_COUNT" | grep -qE '^[0-9]+$'; then
     TABLE_COUNT="-1"
 fi
 
-if [ "$TABLE_COUNT" = "0" ] && [ "${SKIP_PROD_SEED:-}" != "1" ]; then
+# Detect "schema exists but no data" — tables were created by migrations
+# but seed data was never loaded (e.g. volume was wiped and recreated).
+NEEDS_SEED="false"
+if [ "$TABLE_COUNT" = "0" ]; then
+    NEEDS_SEED="true"
+elif [ "$TABLE_COUNT" != "-1" ]; then
+    CONFIG_ROWS=$(db_exec -N -e "SELECT COUNT(*) FROM nuke_config;" 2>/dev/null | tr -d '[:space:]')
+    if [ "$CONFIG_ROWS" = "0" ]; then
+        echo "[entrypoint] WARNING: $TABLE_COUNT tables exist but nuke_config is empty — data was lost."
+        NEEDS_SEED="true"
+    fi
+fi
+
+if [ "$NEEDS_SEED" = "true" ] && [ "${SKIP_PROD_SEED:-}" != "1" ]; then
     PROD_SEED="$APP_DIR/fixtures/prod-seed.sql"
     if [ -f "$PROD_SEED" ]; then
-        echo "[entrypoint] Empty database detected. Importing prod-seed.sql..."
+        echo "[entrypoint] Empty or unseeded database detected. Importing prod-seed.sql..."
         echo "[entrypoint] This may take 1-2 minutes for the 87MB dump."
         # The prod-seed is a two-part dump (schema then data). The schema
         # section's footer restores FOREIGN_KEY_CHECKS=1 before data inserts
@@ -114,7 +127,7 @@ if [ "$TABLE_COUNT" = "0" ] && [ "${SKIP_PROD_SEED:-}" != "1" ]; then
         echo "[entrypoint] Provide ibl5/fixtures/prod-seed.sql or run migrations manually."
     fi
 else
-    echo "[entrypoint] Database has $TABLE_COUNT tables — skipping prod-seed import."
+    echo "[entrypoint] Database has $TABLE_COUNT tables with data — skipping prod-seed import."
 fi
 
 # ── Phase 3: Migrations (always, idempotent) ────────────────────────────────

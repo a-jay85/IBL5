@@ -17,6 +17,11 @@ export const CONSOLE_ALLOWLIST: RegExp[] = [
   // image isn't present. Filtering keeps the watcher focused on actual
   // app-emitted errors.
   /^Failed to load resource: the server responded with a status of/,
+  // CSP `connect-src 'self'` blocks Google Fonts on every page. The
+  // restriction is intentional (CSP header in themes/IBL/theme.php);
+  // the fonts load via stylesheet instead. The "blocked" console
+  // message is the browser reporting the policy working as designed.
+  /Content Security Policy directive: "connect-src 'self'"/,
 ];
 
 export interface ConsoleErrorWatcher {

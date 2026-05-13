@@ -404,6 +404,10 @@ jobs:
         restore-keys: |
           ${{ runner.os }}-vendor-
 
+    - name: Create config.php
+      working-directory: ibl5
+      run: cp config.php.example config.php
+
     - name: Install dependencies
       working-directory: ibl5
       run: composer install --no-progress --no-interaction

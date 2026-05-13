@@ -12,6 +12,7 @@ on:
       - 'ibl5/config/schema-assertions.php'
       - 'ibl5/classes/Migration/**'
       - '.github/workflows/deploy-rehearsal.yml'
+      - '.github/workflows/main.yml'
   push:
     branches: [master]
     paths:
@@ -23,6 +24,7 @@ on:
       - 'ibl5/config/schema-assertions.php'
       - 'ibl5/classes/Migration/**'
       - '.github/workflows/deploy-rehearsal.yml'
+      - '.github/workflows/main.yml'
   workflow_call: {}
   workflow_dispatch: {}
 

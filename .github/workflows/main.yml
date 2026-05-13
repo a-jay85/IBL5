@@ -202,7 +202,7 @@ jobs:
     runs-on: ubuntu-latest
     # pre-flight failure → build-and-deploy is 'skipped', not 'failure'
     needs: [pre-flight, build-and-deploy]
-    if: ${{ always() && (needs.build-and-deploy.result == 'failure' || needs.pre-flight.result == 'failure') }}
+    if: ${{ always() && (needs.build-and-deploy.result == 'failure' || needs.pre-flight.result == 'failure' || needs.pre-flight.result == 'cancelled') }}
     timeout-minutes: 5
 
     steps:
@@ -223,8 +223,8 @@ jobs:
           RUN_URL="https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
           SHORT_SHA="${{ github.sha }}"
           SHORT_SHA="${SHORT_SHA:0:7}"
-          if [ "$PREFLIGHT_RESULT" = "failure" ]; then
-            MSG=$(printf 'Production deploy BLOCKED — pre-flight rehearsal FAILED for commit %s. Deploy did not start.\n\nCheck the run for details: %s' "$SHORT_SHA" "$RUN_URL")
+          if [ "$PREFLIGHT_RESULT" = "failure" ] || [ "$PREFLIGHT_RESULT" = "cancelled" ]; then
+            MSG=$(printf 'Production deploy BLOCKED — pre-flight rehearsal %s for commit %s. Deploy did not start.\n\nCheck the run for details: %s' "${PREFLIGHT_RESULT^^}" "$SHORT_SHA" "$RUN_URL")
           else
             MSG=$(printf 'Production deploy FAILED for commit %s.\n\nCheck the run for details: %s' "$SHORT_SHA" "$RUN_URL")
           fi

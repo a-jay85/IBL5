@@ -9,7 +9,7 @@
 
 set -euo pipefail
 
-PLAYWRIGHT_IMAGE="mcr.microsoft.com/playwright:v1.58.2-jammy"
+PLAYWRIGHT_IMAGE="${PLAYWRIGHT_IMAGE:-mcr.microsoft.com/playwright:v1.60.0-jammy}"
 
 # Resolve ibl5/ directory (script lives in ibl5/bin/)
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"

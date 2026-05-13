@@ -1,4 +1,4 @@
-import { test as base } from '@playwright/test';
+import { test as base } from './base';
 import { createCookieStateFixture, type SetStateFn } from '../helpers/test-state';
 import { publicStorageState } from '../helpers/public-storage-state';
 
@@ -15,4 +15,4 @@ export const test = base.extend<{ appState: SetStateFn }>({
   appState: createCookieStateFixture(),
 });
 
-export { expect } from '@playwright/test';
+export { expect } from './base';

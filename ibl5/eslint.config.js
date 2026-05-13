@@ -45,6 +45,33 @@ export default [
       'playwright/no-networkidle': 'warn',
       // TODO: tighten playwright/no-wait-for-navigation to error after burn-down (12 violations)
       'playwright/no-wait-for-navigation': 'warn',
+
+      // Force every test/expect import inside tests/e2e/** to go through
+      // fixtures/base.ts, which overrides the `page` fixture to attach the
+      // console-error / pageerror watcher. Bypassing this would silently
+      // disable browser-side error detection for new specs.
+      'no-restricted-imports': ['error', {
+        paths: [{
+          name: '@playwright/test',
+          message: 'Import test/expect from tests/e2e/fixtures/base (or auth/public), not @playwright/test. The base fixture attaches the console-error watcher.',
+          allowTypeImports: true,
+        }],
+      }],
+    },
+  },
+  {
+    // The base fixture, auth.setup.ts, and the Playwright config legitimately
+    // import from @playwright/test — base.ts owns the watcher override;
+    // auth.setup.ts runs before any fixture is established; the configs need
+    // defineConfig from the package root.
+    files: [
+      'tests/e2e/fixtures/base.ts',
+      'tests/e2e/auth.setup.ts',
+      'playwright.config.ts',
+      'playwright.visual.config.ts',
+    ],
+    rules: {
+      'no-restricted-imports': 'off',
     },
   },
 ];

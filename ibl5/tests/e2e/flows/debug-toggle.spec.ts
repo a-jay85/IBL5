@@ -1,7 +1,7 @@
 import { test, expect } from '../fixtures/auth';
 import { assertNoPhpErrors } from '../helpers/php-errors';
 import { desktopNav } from '../helpers/navigation';
-import type { Page } from '@playwright/test';
+import type { Page } from '../fixtures/base';
 
 async function clickToggle(page: Page): Promise<void> {
   await page.waitForLoadState('networkidle');

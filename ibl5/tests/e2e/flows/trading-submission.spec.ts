@@ -1,5 +1,5 @@
 import { test, expect } from '../fixtures/auth';
-import type { Page, APIRequestContext } from '@playwright/test';
+import type { Page, APIRequestContext } from '../fixtures/base';
 import { assertNoPhpErrors } from '../helpers/php-errors';
 import { gotoWithRetry } from '../helpers/navigation';
 

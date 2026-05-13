@@ -40,12 +40,36 @@ jobs:
               - '.github/workflows/e2e-tests.yml'
               - '.github/scripts/**'
 
+  playwright-version-drift:
+    name: Playwright version drift guard
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - name: Verify all surfaces pin v1.60.0-jammy
+        run: |
+          EXPECTED="v1.60.0-jammy"
+          EXPECTED_NPM="1.60.0"
+          fail=0
+          grep -q "playwright:${EXPECTED}" ibl5/bin/visual-regression.sh \
+            || { echo "drift: ibl5/bin/visual-regression.sh"; fail=1; }
+          grep -q "playwright:${EXPECTED}" .github/actions/setup-docker-e2e/action.yml \
+            || { echo "drift: .github/actions/setup-docker-e2e/action.yml"; fail=1; }
+          grep -q "playwright:${EXPECTED}" .github/workflows/e2e-tests.yml \
+            || { echo "drift: .github/workflows/e2e-tests.yml"; fail=1; }
+          grep -q "\"@playwright/test\": \"${EXPECTED_NPM}\"" ibl5/package.json \
+            || { echo "drift: ibl5/package.json"; fail=1; }
+          grep -q "\"@playwright/test@${EXPECTED_NPM}\"" ibl5/bun.lock \
+            || { echo "drift: ibl5/bun.lock"; fail=1; }
+          exit $fail
+
   e2e:
     name: Visual Regression
     needs: [changes]
     if: needs.changes.outputs.src == 'true'
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    # 30 min (was 20) — full-page matrix over 49 modules is ~4-6x the
+    # wall-clock of the prior 13 element crops.
+    timeout-minutes: 30
 
     steps:
       - uses: actions/checkout@v6

@@ -26,4 +26,4 @@ export const test = authTest.extend({
   },
 });
 
-export { expect } from '@playwright/test';
+export { expect } from './base';

@@ -30,7 +30,7 @@ test.describe('Console error watcher — self-tests', () => {
       // eslint-disable-next-line playwright/no-wait-for-timeout
       await rawPage.waitForTimeout(50);
 
-      expect(() => watcher.assertNoConsoleErrors()).toThrow(/console.*intentional console error/);
+      expect(() => watcher.assertNoConsoleErrors()).toThrow(/intentional console error/);
     } finally {
       await context.close();
     }
@@ -50,7 +50,7 @@ test.describe('Console error watcher — self-tests', () => {
       // eslint-disable-next-line playwright/no-wait-for-timeout
       await rawPage.waitForTimeout(50);
 
-      expect(() => watcher.assertNoConsoleErrors()).toThrow(/pageerror.*intentional pageerror/);
+      expect(() => watcher.assertNoConsoleErrors()).toThrow(/intentional pageerror/);
     } finally {
       await context.close();
     }

@@ -10,7 +10,13 @@ import type { ConsoleMessage, Page, TestInfo } from '@playwright/test';
  * masks defects in any test that visits the affected page.
  */
 export const CONSOLE_ALLOWLIST: RegExp[] = [
-  // (No allowlist entries yet — populate from the first run of the suite.)
+  // Browser-level resource-load failures (missing images, icons, vendor
+  // assets) emitted by Chromium as `console.error` with status 4xx/5xx.
+  // These are environment / asset-pipeline issues, not application bugs;
+  // they fire on virtually every page in CI seed where some referenced
+  // image isn't present. Filtering keeps the watcher focused on actual
+  // app-emitted errors.
+  /^Failed to load resource: the server responded with a status of/,
 ];
 
 export interface ConsoleErrorWatcher {

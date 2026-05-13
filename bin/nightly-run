@@ -16,7 +16,24 @@ export PATH="/usr/local/bin:/opt/homebrew/bin:$HOME/.bun/bin:$HOME/.local/bin:/A
 # The shim must close inherited pipeline fds inside the timer subshell (bash 3.2
 # doesn't reliably apply external redirects on backgrounded subshells in pipes).
 if command -v gtimeout &>/dev/null; then
-    timeout() { gtimeout "$@"; }
+    timeout() {
+        local secs=$1; shift
+        "$@" &
+        local cmd_pid=$!
+        if [ -n "${NIGHTLY_CMDPID_FILE:-}" ]; then
+            echo "$cmd_pid" > "$NIGHTLY_CMDPID_FILE"
+        fi
+        ( exec 0</dev/null 1>/dev/null 2>&1
+          sleep "$secs" && kill -TERM "$cmd_pid" 2>/dev/null
+        ) &
+        local timer_pid=$!
+        local status=0
+        wait "$cmd_pid" || status=$?
+        pkill -P "$timer_pid" 2>/dev/null || true
+        kill "$timer_pid" 2>/dev/null || true
+        wait "$timer_pid" 2>/dev/null || true
+        return "$status"
+    }
 elif ! command -v timeout &>/dev/null; then
     # NIGHTLY_CMDPID_FILE: if set, the timeout shim writes the backgrounded
     # command's PID there so the heartbeat watcher can stall-kill it.

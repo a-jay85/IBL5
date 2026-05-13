@@ -3,10 +3,13 @@
     "source": {
         "directories": ["classes"],
         "excludes": [
-            "*Controller*", "*Handler*",
             "*/Contracts/*",
-            "SiteStatistics", "Bootstrap", "Database", "Auth", "Cache",
-            "Scripts", "Discord",
+            "Bootstrap", "Database", "Auth",
+            "Cache/PageCache.php", "Cache/DatabaseCache.php",
+            "SiteStatistics/StatisticsRepository.php",
+            "SiteStatistics/StatisticsProcessor.php",
+            "SiteStatistics/StatisticsView.php",
+            "Scripts", "Discord/Discord.php",
             "OneOnOneGame", "UI.php", "Game.php", "JSB.php",
             // Repositories without direct test coverage (Pass 2 — deferred)
             "ApiKeys/ApiKeysRepository.php",
@@ -43,7 +46,23 @@
             "Player/Views/PlayerSimStatsView.php",
             "Player/Views/PlayerTradingCardBackView.php",
             "Player/Views/PlayerTradingCardFlipView.php",
-            "Player/Views/PlayerTradingCardFrontView.php"
+            "Player/Views/PlayerTradingCardFrontView.php",
+            // Controllers without direct test coverage (Pass 2 — deferred)
+            "Player/PlayerPageController.php",
+            "Updater/UpdaterController.php",
+            "Api/Controller/PlayerExportController.php",
+            "Api/Controller/TeamDetailController.php",
+            "Api/Controller/GameDetailController.php",
+            "Api/Controller/PlayerDetailController.php",
+            "Api/Controller/TeamListController.php",
+            "Api/Controller/PlayerHistoryController.php",
+            "Api/Controller/SeasonController.php",
+            "Api/Controller/TeamRosterController.php",
+            "Api/Controller/PlayerListController.php",
+            "Api/Controller/GameBoxscoreController.php",
+            // Handlers without direct test coverage (Pass 2 — deferred)
+            "NextSim/NextSimTabApiHandler.php",
+            "Team/TeamApiHandler.php"
         ]
     },
     "phpUnit": {

@@ -9,6 +9,9 @@ module.exports = {
         PORT: 3001,
         UV_THREADPOOL_SIZE: 2
       },
+      max_memory_restart: '200M',
+      min_uptime: '10s',
+      max_restarts: 10,
       log_date_format: 'YYYY-MM-DD HH:mm:ss',
       out_file: 'logs/ibl6-out.log',
       error_file: 'logs/ibl6-error.log',

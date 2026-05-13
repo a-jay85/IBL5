@@ -15,9 +15,20 @@ export type { SetStateFn };
  * module is hidden, or that an admin-only endpoint returns 403).
  *
  * Logout tests must use fixtures/public.ts instead.
+ *
+ * When IBL_TEST_USER_REGULAR is unset (local dev hasn't opted in),
+ * auth-regular.setup.ts skips and the file at playwright/.auth/regular.json
+ * is either absent or stale. Fall back to an empty storage state so the
+ * fixture itself doesn't error during loading — consumer specs guard
+ * their bodies with `test.skip()` against the same env var so the
+ * assertions don't run against an unauthenticated session.
  */
+const REGULAR_STORAGE_STATE = process.env.IBL_TEST_USER_REGULAR
+  ? 'playwright/.auth/regular.json'
+  : { cookies: [], origins: [] };
+
 export const test = base.extend<{ appState: SetStateFn }>({
-  storageState: 'playwright/.auth/regular.json',
+  storageState: REGULAR_STORAGE_STATE,
   appState: createCookieStateFixture(),
 });
 

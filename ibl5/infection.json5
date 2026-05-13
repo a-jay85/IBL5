@@ -4,13 +4,9 @@
         "directories": ["classes"],
         "excludes": [
             "*/Contracts/*",
-            "Bootstrap", "Database", "Auth",
-            "Cache/PageCache.php", "Cache/DatabaseCache.php",
-            "SiteStatistics/StatisticsRepository.php",
-            "SiteStatistics/StatisticsProcessor.php",
+            "Bootstrap", "Database",
             "SiteStatistics/StatisticsView.php",
-            "Scripts", "Discord/Discord.php",
-            "OneOnOneGame", "UI.php", "Game.php", "JSB.php",
+            "OneOnOneGame", "JSB.php",
             // Repositories without direct test coverage (Pass 2 — deferred)
             "ApiKeys/ApiKeysRepository.php",
             "BaseMysqliRepository.php",

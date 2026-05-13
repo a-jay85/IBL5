@@ -12,13 +12,19 @@
  * The `public` fixture (`../fixtures/public`) sets this automatically.
  */
 
+interface StorageStateCookie {
+  name: string;
+  value: string;
+  domain: string;
+  path: string;
+  expires: number;
+  httpOnly: boolean;
+  secure: boolean;
+  sameSite: 'Strict' | 'Lax' | 'None';
+}
+
 interface StorageState {
-  cookies: Array<{
-    name: string;
-    value: string;
-    domain: string;
-    path: string;
-  }>;
+  cookies: StorageStateCookie[];
   origins: Array<Record<string, unknown>>;
 }
 
@@ -32,6 +38,14 @@ export function publicStorageState(): StorageState {
         value: '1',
         domain,
         path: '/',
+        // APIRequestContext.storageState validates these fields strictly
+        // (BrowserContext is lenient); supply explicit defaults so tests
+        // that take `{ request }` from fixtures/public don't crash with
+        // "storageState.cookies[0].expires: expected float, got undefined".
+        expires: -1,
+        httpOnly: false,
+        secure: false,
+        sameSite: 'Lax',
       },
     ],
     origins: [],

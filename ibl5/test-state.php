@@ -112,8 +112,12 @@ if ($method === 'DELETE' && $action === 'reset-extension') {
     exit;
 }
 
-// DELETE ?action=reset-draft-order&year=N — clear ibl_draft_picks for one
-// season year, allowing repeat runs of the ProjectedDraftOrder save_order test.
+// DELETE ?action=reset-draft-order&year=N — clear ibl_draft rows for one
+// season year and flip `Draft Order Finalized` back to 'No', allowing repeat
+// runs of the ProjectedDraftOrder save_order test. ProjectedDraftOrderService::
+// saveLotteryOrder writes draft slots to ibl_draft (not ibl_draft_picks, the
+// pick-ownership table) and sets the finalized flag as a side effect; both
+// must be reset for a clean slate.
 if ($method === 'DELETE' && $action === 'reset-draft-order') {
     $year = (int)($_GET['year'] ?? 0);
     if ($year < 1900 || $year > 2200) {
@@ -122,11 +126,12 @@ if ($method === 'DELETE' && $action === 'reset-draft-order') {
         $db->close();
         exit;
     }
-    $stmt = $db->prepare('DELETE FROM ibl_draft_picks WHERE year = ?');
+    $stmt = $db->prepare('DELETE FROM ibl_draft WHERE year = ?');
     $stmt->bind_param('i', $year);
     $stmt->execute();
     $cleared = $stmt->affected_rows;
     $stmt->close();
+    $db->query("UPDATE ibl_settings SET value = 'No' WHERE name = 'Draft Order Finalized'");
     echo json_encode(['cleared' => $cleared]);
     $db->close();
     exit;

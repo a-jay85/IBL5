@@ -18,10 +18,15 @@ export PATH="/usr/local/bin:/opt/homebrew/bin:$HOME/.bun/bin:$HOME/.local/bin:/A
 if command -v gtimeout &>/dev/null; then
     timeout() { gtimeout "$@"; }
 elif ! command -v timeout &>/dev/null; then
+    # NIGHTLY_CMDPID_FILE: if set, the timeout shim writes the backgrounded
+    # command's PID there so the heartbeat watcher can stall-kill it.
     timeout() {
         local secs=$1; shift
         "$@" &
         local cmd_pid=$!
+        if [ -n "${NIGHTLY_CMDPID_FILE:-}" ]; then
+            echo "$cmd_pid" > "$NIGHTLY_CMDPID_FILE"
+        fi
         # exec inside subshell guarantees fd closure (bash 3.2 pipeline compat)
         ( exec 0</dev/null 1>/dev/null 2>&1
           sleep "$secs" && kill -TERM "$cmd_pid" 2>/dev/null
@@ -46,6 +51,9 @@ LOG_DIR="$NIGHTLY_DIR/logs"
 QUEUE_DIR="$NIGHTLY_DIR/queue"
 MAX_ELAPSED=17100  # ~4h45m — stops around 4:45am, leaves headroom in the 5h usage window
 MAX_ATTEMPTS=3     # per-plan retry cap within one night (covers impl + postplan phases)
+MAX_IMPL_SECS=3600   # per-phase cap: impl gets at most 1h
+MAX_PP_SECS=1800     # per-phase cap: post-plan gets at most 30m
+STALL_KILL_SECS=600  # kill phase if no stream events for 10 minutes
 
 HANDOFF_DIR="$NIGHTLY_DIR/handoff"
 mkdir -p "$LOG_DIR" "$QUEUE_DIR" "$HANDOFF_DIR"
@@ -56,12 +64,13 @@ cleanup_watcher() {
         kill "$WATCHER_PID" 2>/dev/null || true
         wait "$WATCHER_PID" 2>/dev/null || true
     fi
-    rm -f "$NIGHTLY_DIR/.heartbeat-$$-impl" "$NIGHTLY_DIR/.heartbeat-$$-postplan" 2>/dev/null || true
+    rm -f "$NIGHTLY_DIR/.heartbeat-$$-impl" "$NIGHTLY_DIR/.heartbeat-$$-postplan" \
+         "$NIGHTLY_DIR/.cmdpid-$$-impl" "$NIGHTLY_DIR/.cmdpid-$$-postplan" 2>/dev/null || true
 }
 trap cleanup_watcher EXIT
 
 run_heartbeat_watcher() {
-    local hb_file=$1 log_file=$2 label=$3
+    local hb_file=$1 log_file=$2 label=$3 pid_file=$4
     while sleep 60; do
         if [ ! -f "$hb_file" ]; then
             continue
@@ -73,7 +82,20 @@ run_heartbeat_watcher() {
         age=$(( now - last_epoch ))
         local ts
         ts=$(date +%H:%M:%S)
-        if [ "$age" -gt 300 ]; then
+        if [ "$age" -gt "$STALL_KILL_SECS" ]; then
+            local target_pid
+            target_pid=$(cat "$pid_file" 2>/dev/null) || true
+            if [ -n "$target_pid" ] && kill -0 "$target_pid" 2>/dev/null; then
+                printf '[%s] STALL-KILL: %s — no events for %ds, killing pid %s and children\n' \
+                    "$ts" "$label" "$age" "$target_pid" >> "$log_file"
+                pkill -TERM -P "$target_pid" 2>/dev/null || true
+                kill -TERM "$target_pid" 2>/dev/null || true
+                return
+            else
+                printf '[%s] WARNING: %s — no events for %ds (stalled, pid gone)\n' \
+                    "$ts" "$label" "$age" >> "$log_file"
+            fi
+        elif [ "$age" -gt 300 ]; then
             printf '[%s] WARNING: %s — no events for %ds (possibly stalled)\n' "$ts" "$label" "$age" >> "$log_file"
         else
             printf '[%s] heartbeat: %s alive (%ds since last event)\n' "$ts" "$label" "$age" >> "$log_file"
@@ -156,14 +178,20 @@ while true; do
         if [ "$REMAINING_SECS" -lt 300 ]; then
             REMAINING_SECS=300
         fi
+        # Per-phase cap: don't let one impl consume the whole night
+        if [ "$REMAINING_SECS" -gt "$MAX_IMPL_SECS" ]; then
+            REMAINING_SECS="$MAX_IMPL_SECS"
+        fi
         IMPL_LOG_BEFORE=$(wc -l < "$LOG" 2>/dev/null || echo 0)
         HEARTBEAT_FILE="$NIGHTLY_DIR/.heartbeat-$$-impl"
-        rm -f "$HEARTBEAT_FILE"
+        CMDPID_FILE="$NIGHTLY_DIR/.cmdpid-$$-impl"
+        rm -f "$HEARTBEAT_FILE" "$CMDPID_FILE"
 
-        run_heartbeat_watcher "$HEARTBEAT_FILE" "$LOG" "impl:$PLAN_NAME" &
+        run_heartbeat_watcher "$HEARTBEAT_FILE" "$LOG" "impl:$PLAN_NAME" "$CMDPID_FILE" &
         WATCHER_PID=$!
 
         IMPL_STATUS=0
+        NIGHTLY_CMDPID_FILE="$CMDPID_FILE" \
         timeout "$REMAINING_SECS" \
             claude -p "$(cat bin/nightly-prompt-impl)" \
                 --dangerously-skip-permissions \
@@ -179,7 +207,7 @@ while true; do
         kill "$WATCHER_PID" 2>/dev/null || true
         wait "$WATCHER_PID" 2>/dev/null || true
         WATCHER_PID=""
-        rm -f "$HEARTBEAT_FILE"
+        rm -f "$HEARTBEAT_FILE" "$CMDPID_FILE"
 
         if [ "$IMPL_STATUS" -ne 0 ]; then
             printf '[%s] claude exited code=%d (impl phase)\n' "$(date +%H:%M:%S)" "$IMPL_STATUS" >> "$LOG"
@@ -225,14 +253,19 @@ while true; do
         if [ "$REMAINING_SECS" -lt 300 ]; then
             REMAINING_SECS=300
         fi
+        if [ "$REMAINING_SECS" -gt "$MAX_PP_SECS" ]; then
+            REMAINING_SECS="$MAX_PP_SECS"
+        fi
         PP_LOG_BEFORE=$(wc -l < "$LOG" 2>/dev/null || echo 0)
         HEARTBEAT_FILE="$NIGHTLY_DIR/.heartbeat-$$-postplan"
-        rm -f "$HEARTBEAT_FILE"
+        CMDPID_FILE="$NIGHTLY_DIR/.cmdpid-$$-postplan"
+        rm -f "$HEARTBEAT_FILE" "$CMDPID_FILE"
 
-        run_heartbeat_watcher "$HEARTBEAT_FILE" "$LOG" "postplan:$PLAN_NAME" &
+        run_heartbeat_watcher "$HEARTBEAT_FILE" "$LOG" "postplan:$PLAN_NAME" "$CMDPID_FILE" &
         WATCHER_PID=$!
 
         PP_STATUS=0
+        NIGHTLY_CMDPID_FILE="$CMDPID_FILE" \
         timeout "$REMAINING_SECS" \
             claude -p "$(cat bin/nightly-prompt-postplan)
 
@@ -250,7 +283,7 @@ PLAN_FILE=$PLAN_NAME" \
         kill "$WATCHER_PID" 2>/dev/null || true
         wait "$WATCHER_PID" 2>/dev/null || true
         WATCHER_PID=""
-        rm -f "$HEARTBEAT_FILE"
+        rm -f "$HEARTBEAT_FILE" "$CMDPID_FILE"
 
         if [ "$PP_STATUS" -ne 0 ]; then
             printf '[%s] claude exited code=%d (postplan phase)\n' "$(date +%H:%M:%S)" "$PP_STATUS" >> "$LOG"

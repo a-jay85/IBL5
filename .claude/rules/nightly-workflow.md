@@ -1,6 +1,6 @@
 ---
 description: Nightly autonomous workflow — launchd fires claude -p at 00:03 and 11:00 daily, running two context-isolated agents per plan (implementation + post-plan) with time guards and incremental checkpoints.
-last_verified: 2026-05-12
+last_verified: 2026-05-13
 paths: "bin/nightly-*"
 ---
 
@@ -65,6 +65,8 @@ Cancelling: `rm queue/<file>.md` removes only the symlink, not the original plan
 - **Two-phase execution:** Implementation agent writes a JSON handoff file to `handoff/`; post-plan agent reads it. The bash loop checks for the handoff file between phases — if it exists, implementation is skipped (resume scenario).
 - **Per-phase circuit breakers:** After each `claude -p` invocation, the loop checks for `authentication_error` (401) and "hit your limit" in the log. Both are transient — the attempt counter is decremented and the loop breaks immediately, preventing queue drain.
 - **Time guard:** Won't start a new plan (or post-plan phase) if >4h45m have elapsed (configurable via `MAX_ELAPSED` in `bin/nightly-run`)
+- **Per-phase caps:** `MAX_IMPL_SECS=3600` (1h) and `MAX_PP_SECS=1800` (30m) prevent a single phase from consuming the entire session budget.
+- **Stall-kill:** The heartbeat watcher kills a phase (and its children) if no stream events arrive for `STALL_KILL_SECS=600` (10m). Catches orphaned child processes that hold the pipeline open after `claude` finishes.
 - **Poison-pill protection:** Tracks attempts per plan via `.attempts` sidecar files. After 3 failures in one night, the plan is moved to `skipped/` with a report.
 - **Turn caps:** Implementation: `--max-turns 200`. Post-plan: `--max-turns 120`.
 

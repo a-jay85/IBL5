@@ -1,5 +1,5 @@
 import type { Page, Locator } from '@playwright/test';
-import { expect } from '@playwright/test';
+import { expect } from '../fixtures/base';
 
 /**
  * Assert the page body has no horizontal overflow at the current viewport width.

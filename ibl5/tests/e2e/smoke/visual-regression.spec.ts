@@ -1,188 +1,216 @@
-import { test as publicTest, expect as publicExpect } from '../fixtures/public';
-import { test as authTest, expect as authExpect } from '../fixtures/auth';
+/**
+ * Full-page visual regression matrix.
+ *
+ * One screenshot per module under `ibl5/modules/` (47 modules) plus the
+ * homepage (`index.php`) and one mobile-only repeat of DepthChartEntry at
+ * 375×812. All other shots use the desktop 1280×900 viewport from
+ * `playwright.visual.config.ts`. Total: 49 baselines.
+ *
+ * - Public-fixture modules render without authentication.
+ * - Auth-fixture modules use the CI test user (admin role, Metros GM).
+ * - Each row declares its `anchor` selector (asserted visible before the
+ *   screenshot) so a broken module renders an empty page instead of a
+ *   silently-passing blank baseline.
+ * - `GLOBAL_MASK_SELECTORS` covers known volatile regions (timestamps,
+ *   live-time text); per-row `extraMask` adds module-specific noise areas.
+ * - Per-row `extraMaxDiffPixelRatio` overrides the global 0.005 threshold
+ *   where structural rendering noise demands it.
+ *
+ * The 13 element-crop baselines from the previous spec are intentionally
+ * dropped: full-page coverage subsumes them. CSS regressions previously
+ * limited to one element are now caught wherever the element appears.
+ */
+import type { Locator, Page } from '@playwright/test';
+import { test as publicTest } from '../fixtures/public';
+import { test as authTest } from '../fixtures/auth';
+import { expect } from '../fixtures/base';
 import { assertNoPhpErrors } from '../helpers/php-errors';
 
+type ModuleSnapshot = {
+  /** Slug used in the test title and snapshot filename. */
+  name: string;
+  /** Path under `BASE_URL`, e.g. `modules.php?name=Standings`. */
+  url: string;
+  /** Selector that must be visible before the screenshot is captured. */
+  anchor: string;
+  /** Optional cookie-state overrides (forwarded to `appState`). */
+  state?: Record<string, string>;
+  /** Module-specific masks layered on top of `GLOBAL_MASK_SELECTORS`. */
+  extraMask?: string[];
+  /** Per-row override for `maxDiffPixelRatio`. */
+  extraMaxDiffPixelRatio?: number;
+  /** Mobile viewport (375×812) instead of desktop 1280×900. */
+  mobile?: boolean;
+  /**
+   * Optional comment for future readers: e.g. "renders empty under CI seed —
+   * any non-blank diff is real." Surfaces in `console.log` during runs.
+   */
+  notes?: string;
+};
+
+/**
+ * Selectors masked on every screenshot. Volatile regions that would otherwise
+ * cause flake from clock drift, request-count changes, or post-render JS
+ * rewrites.
+ *
+ * `time.local-time` — `jslib/local-time.js` rewrites text post-DOMContentLoaded.
+ * `.news-article__meta` — News article timestamps and read counters.
+ * `[data-volatile="timestamp"]` — convention for opt-in masking of future
+ *    volatile markup; harmless if no element carries the attribute.
+ */
+const GLOBAL_MASK_SELECTORS: string[] = [
+  'time.local-time',
+  '.news-article__meta',
+  '[data-volatile="timestamp"]',
+];
+
+function buildMasks(page: Page, extraMask: string[] = []): Locator[] {
+  return [...GLOBAL_MASK_SELECTORS, ...extraMask].map((sel) => page.locator(sel));
+}
+
+const PUBLIC_MODULES: ModuleSnapshot[] = [
+  { name: 'index', url: 'index.php', anchor: 'article' },
+  { name: 'activity-tracker', url: 'modules.php?name=ActivityTracker', anchor: '.ibl-data-table',
+    extraMask: ['.activity-row time'] },
+  { name: 'all-star-appearances', url: 'modules.php?name=AllStarAppearances', anchor: '.ibl-data-table' },
+  { name: 'award-history', url: 'modules.php?name=AwardHistory', anchor: '.ibl-data-table' },
+  { name: 'career-leaderboards', url: 'modules.php?name=CareerLeaderboards', anchor: 'form' },
+  { name: 'compare-players', url: 'modules.php?name=ComparePlayers', anchor: 'form' },
+  { name: 'contract-list', url: 'modules.php?name=ContractList', anchor: '.ibl-data-table' },
+  { name: 'draft-history', url: 'modules.php?name=DraftHistory', anchor: '.ibl-data-table' },
+  { name: 'draft-pick-locator', url: 'modules.php?name=DraftPickLocator', anchor: '.ibl-data-table' },
+  { name: 'franchise-history', url: 'modules.php?name=FranchiseHistory&teamid=1', anchor: '.ibl-data-table' },
+  { name: 'franchise-record-book', url: 'modules.php?name=FranchiseRecordBook&teamid=1', anchor: '.ibl-data-table' },
+  { name: 'free-agency-preview', url: 'modules.php?name=FreeAgencyPreview', anchor: '.ibl-data-table' },
+  { name: 'gm-contact-list', url: 'modules.php?name=GMContactList', anchor: '.ibl-data-table' },
+  { name: 'injuries', url: 'modules.php?name=Injuries', anchor: '.ibl-data-table' },
+  { name: 'league-starters', url: 'modules.php?name=LeagueStarters', anchor: '.ibl-data-table' },
+  { name: 'news', url: 'modules.php?name=News', anchor: 'article',
+    extraMask: ['article time'] },
+  { name: 'next-sim', url: 'modules.php?name=NextSim', anchor: '#site-content',
+    extraMask: ['time.local-time'] },
+  { name: 'player', url: 'modules.php?name=Player&pa=showpage&pid=1', anchor: '.stats-grid' },
+  { name: 'player-database', url: 'modules.php?name=PlayerDatabase', anchor: 'form' },
+  { name: 'player-movement', url: 'modules.php?name=PlayerMovement', anchor: '.ibl-data-table' },
+  { name: 'projected-draft-order', url: 'modules.php?name=ProjectedDraftOrder', anchor: '.ibl-data-table' },
+  { name: 'record-holders', url: 'modules.php?name=RecordHolders', anchor: '.ibl-data-table' },
+  { name: 'schedule', url: 'modules.php?name=Schedule', anchor: '.schedule-header',
+    extraMask: ['.schedule-today-highlight'] },
+  { name: 'search', url: 'modules.php?name=Search', anchor: 'form' },
+  { name: 'season-archive', url: 'modules.php?name=SeasonArchive', anchor: '.ibl-data-table' },
+  { name: 'season-highs', url: 'modules.php?name=SeasonHighs', anchor: '.ibl-data-table' },
+  { name: 'season-leaderboards', url: 'modules.php?name=SeasonLeaderboards', anchor: '.ibl-data-table',
+    extraMaxDiffPixelRatio: 0.1 },
+  { name: 'series-records', url: 'modules.php?name=SeriesRecords', anchor: '.ibl-data-table' },
+  { name: 'site-statistics', url: 'modules.php?name=SiteStatistics', anchor: '#site-content' },
+  { name: 'standings', url: 'modules.php?name=Standings', anchor: '.ibl-data-table' },
+  { name: 'team', url: 'modules.php?name=Team&op=team&teamid=1', anchor: '.ibl-data-table' },
+  { name: 'team-off-def-stats', url: 'modules.php?name=TeamOffDefStats', anchor: '.ibl-data-table' },
+  { name: 'topics', url: 'modules.php?name=Topics', anchor: '.ibl-data-table' },
+  { name: 'transaction-history', url: 'modules.php?name=TransactionHistory', anchor: '.ibl-data-table',
+    extraMask: ['.transaction-row time'] },
+  { name: 'voting-results', url: 'modules.php?name=VotingResults', anchor: '#site-content' },
+  { name: 'your-account', url: 'modules.php?name=YourAccount', anchor: '#site-content' },
+];
+
+const AUTH_MODULES: ModuleSnapshot[] = [
+  { name: 'api-keys', url: 'modules.php?name=ApiKeys', anchor: '#site-content' },
+  { name: 'cap-space', url: 'modules.php?name=CapSpace&teamid=1', anchor: '.ibl-data-table' },
+  { name: 'debug-menu', url: 'modules.php?name=DebugMenu', anchor: '#site-content',
+    notes: 'Admin-only diagnostic page; renders link list under CI seed.' },
+  { name: 'depth-chart-entry', url: 'modules.php?name=DepthChartEntry', anchor: '.depth-chart-table' },
+  { name: 'depth-chart-entry-mobile', url: 'modules.php?name=DepthChartEntry',
+    anchor: '.dc-card', mobile: true },
+  { name: 'draft', url: 'modules.php?name=Draft', anchor: '#site-content',
+    state: { 'Show Draft Link': 'Yes' },
+    notes: 'Outside Draft phase, requires Show Draft Link toggle to render.' },
+  { name: 'free-agency', url: 'modules.php?name=FreeAgency', anchor: '.ibl-data-table',
+    state: { 'Current Season Phase': 'Free Agency' } },
+  { name: 'one-on-one-game', url: 'modules.php?name=OneOnOneGame', anchor: '#site-content',
+    notes: 'Admin-only game-runner; baseline reflects empty state under CI seed.' },
+  { name: 'player-export-guide', url: 'modules.php?name=PlayerExportGuide', anchor: '#site-content',
+    notes: 'Admin-only documentation; static content.' },
+  { name: 'trading', url: 'modules.php?name=Trading', anchor: '.trading-team-select',
+    state: { 'Allow Trades': 'Yes' } },
+  { name: 'training-camp-ratings-diff', url: 'modules.php?name=TrainingCampRatingsDiff', anchor: '#site-content',
+    notes: 'Admin-only; renders empty state unless ratings snapshot exists.' },
+  { name: 'voting', url: 'modules.php?name=Voting', anchor: '#site-content' },
+  { name: 'waivers', url: 'modules.php?name=Waivers', anchor: '#site-content' },
+];
+
+async function captureSnapshot(page: Page, row: ModuleSnapshot): Promise<void> {
+  await page.goto(row.url);
+  await page.waitForLoadState('networkidle');
+  const anchor = page.locator(row.anchor).first();
+  await anchor.waitFor({ state: 'visible' });
+  await expect(page).toHaveScreenshot(`${row.name}.png`, {
+    fullPage: true,
+    animations: 'disabled',
+    mask: buildMasks(page, row.extraMask),
+    ...(row.extraMaxDiffPixelRatio !== undefined
+      ? { maxDiffPixelRatio: row.extraMaxDiffPixelRatio }
+      : {}),
+  });
+}
+
 // ============================================================
-// Public visual regression tests — no authentication required
+// Public visual regression — no authentication required
 // ============================================================
 
-publicTest.describe('Visual regression — public pages', () => {
+publicTest.describe('Visual regression — public pages (full-page)', () => {
   publicTest.beforeEach(async ({ appState }) => {
     await appState({ 'Trivia Mode': 'Off' });
   });
 
-  publicTest('homepage layout', async ({ page }) => {
-    await page.goto('index.php');
-    await publicExpect(page).toHaveTitle(/IBL/i);
-    await page.waitForLoadState('networkidle');
-    const article = page.locator('article').first();
-    await publicExpect(article).toBeVisible();
-    await publicExpect(article).toHaveScreenshot('homepage-content.png', {
-      animations: 'disabled',
+  for (const row of PUBLIC_MODULES) {
+    publicTest(`${row.name}`, async ({ appState, page }) => {
+      if (row.state) {
+        await appState(row.state);
+      }
+      if (row.notes) {
+        console.log(`[visual-regression] ${row.name}: ${row.notes}`);
+      }
+      await captureSnapshot(page, row);
     });
-  });
-
-  publicTest('standings table', async ({ page }) => {
-    await page.goto('modules.php?name=Standings');
-    await page.waitForLoadState('networkidle');
-    const table = page.locator('.ibl-data-table').first();
-    await publicExpect(table).toBeVisible();
-    await publicExpect(table).toHaveScreenshot('standings-table.png', {
-      animations: 'disabled',
-    });
-  });
-
-  publicTest('season leaderboards table', async ({ page }) => {
-    await page.goto('modules.php?name=SeasonLeaderboards');
-    await page.waitForLoadState('networkidle');
-    const table = page.locator('.ibl-data-table').first();
-    await publicExpect(table).toBeVisible();
-    await publicExpect(table).toHaveScreenshot('season-leaderboards-table.png', {
-      animations: 'disabled',
-      maxDiffPixelRatio: 0.1,
-    });
-  });
-
-  publicTest('career leaderboards form', async ({ page }) => {
-    await page.goto('modules.php?name=CareerLeaderboards');
-    await page.waitForLoadState('networkidle');
-    const form = page.getByRole('button', { name: /display/i }).locator('..');
-    await publicExpect(form).toBeVisible();
-    await publicExpect(form).toHaveScreenshot('career-leaderboards-form.png', {
-      animations: 'disabled',
-    });
-  });
-
-  publicTest('draft history table', async ({ page }) => {
-    await page.goto('modules.php?name=DraftHistory');
-    await page.waitForLoadState('networkidle');
-    const table = page.locator('.ibl-data-table').first();
-    await publicExpect(table).toBeVisible();
-    await publicExpect(table).toHaveScreenshot('draft-history-table.png', {
-      animations: 'disabled',
-    });
-  });
-
-  publicTest('schedule page', async ({ page }) => {
-    await page.goto('modules.php?name=Schedule');
-    await page.waitForLoadState('networkidle');
-    const content = page.locator('.schedule-header');
-    await publicExpect(content).toBeVisible();
-    await publicExpect(content).toHaveScreenshot('schedule-content.png', {
-      animations: 'disabled',
-    });
-  });
-
-  publicTest('player page bio grid', async ({ page }) => {
-    await page.goto('modules.php?name=Player&pa=showpage&pid=1');
-    await page.waitForLoadState('networkidle');
-    const grid = page.locator('.stats-grid').first();
-    await publicExpect(grid).toBeVisible();
-    await publicExpect(grid).toHaveScreenshot('player-page-bio.png', {
-      animations: 'disabled',
-    });
-  });
-
-  publicTest('team page roster table', async ({ page }) => {
-    await page.goto('modules.php?name=Team&op=team&teamid=1');
-    await page.waitForLoadState('networkidle');
-    const table = page.locator('.ibl-data-table').first();
-    await publicExpect(table).toBeVisible();
-    await publicExpect(table).toHaveScreenshot('team-roster-table.png', {
-      animations: 'disabled',
-    });
-  });
+  }
 
   publicTest('no PHP errors on visual regression pages', async ({ page }) => {
-    const urls = [
-      'index.php',
-      'modules.php?name=Standings',
-      'modules.php?name=SeasonLeaderboards',
-      'modules.php?name=CareerLeaderboards',
-      'modules.php?name=DraftHistory',
-      'modules.php?name=Schedule',
-      'modules.php?name=Player&pa=showpage&pid=1',
-      'modules.php?name=Team&op=team&teamid=1',
-    ];
-
-    for (const url of urls) {
-      await page.goto(url);
-      await assertNoPhpErrors(page, `on ${url}`);
+    for (const row of PUBLIC_MODULES) {
+      await page.goto(row.url);
+      await assertNoPhpErrors(page, `on ${row.url}`);
     }
   });
 });
 
 // ============================================================
-// Authenticated visual regression tests
+// Authenticated visual regression — requires test user
 // ============================================================
 
-authTest.describe('Visual regression — authenticated pages', () => {
-  authTest('trading page team select', async ({ appState, page }) => {
-    await appState({ 'Allow Trades': 'Yes' });
-    await page.goto('modules.php?name=Trading');
-    await page.waitForLoadState('networkidle');
-    const teamSelect = page.locator('.trading-team-select');
-    await authExpect(teamSelect).toBeVisible();
-    await authExpect(teamSelect).toHaveScreenshot('trading-team-select.png', {
-      animations: 'disabled',
+authTest.describe('Visual regression — authenticated pages (full-page)', () => {
+  for (const row of AUTH_MODULES) {
+    authTest(`${row.name}`, async ({ appState, page }) => {
+      if (row.state) {
+        await appState(row.state);
+      }
+      if (row.mobile) {
+        await page.setViewportSize({ width: 375, height: 812 });
+      }
+      if (row.notes) {
+        console.log(`[visual-regression] ${row.name}: ${row.notes}`);
+      }
+      await captureSnapshot(page, row);
     });
-  });
-
-  authTest('depth chart entry page', async ({ page }) => {
-    await page.goto('modules.php?name=DepthChartEntry');
-    await page.waitForLoadState('networkidle');
-    await authExpect(page.getByText('Sign In')).not.toBeVisible();
-    const table = page.locator('.depth-chart-table');
-    await authExpect(table).toBeVisible();
-    await authExpect(table).toHaveScreenshot('depth-chart-entry.png', {
-      animations: 'disabled',
-    });
-  });
-
-  authTest('free agency page', async ({ appState, page }) => {
-    await appState({ 'Current Season Phase': 'Free Agency' });
-    await page.goto('modules.php?name=FreeAgency');
-    await page.waitForLoadState('networkidle');
-    const content = page.locator('.ibl-data-table').first();
-    await authExpect(content).toBeVisible();
-    await authExpect(content).toHaveScreenshot('free-agency-content.png', {
-      animations: 'disabled',
-    });
-  });
-
-  authTest('desktop navigation bar', async ({ page }) => {
-    await page.goto('index.php');
-    await page.waitForLoadState('networkidle');
-    const nav = page.locator('nav').first();
-    await authExpect(nav).toBeVisible();
-    await authExpect(nav).toHaveScreenshot('nav-desktop.png', {
-      animations: 'disabled',
-    });
-  });
-
-  authTest('depth chart entry mobile card view', async ({ page }) => {
-    await page.setViewportSize({ width: 375, height: 812 });
-    await page.goto('modules.php?name=DepthChartEntry');
-    await page.waitForLoadState('networkidle');
-    const firstCard = page.locator('.dc-card').first();
-    await authExpect(firstCard).toBeVisible();
-    await authExpect(firstCard).toHaveScreenshot('depth-chart-entry-mobile-card.png', {
-      animations: 'disabled',
-    });
-  });
+  }
 
   authTest('no PHP errors on visual regression pages', async ({ appState, page }) => {
-    await appState({ 'Allow Trades': 'Yes', 'Current Season Phase': 'Free Agency' });
-    const urls = [
-      'index.php',
-      'modules.php?name=Trading',
-      'modules.php?name=DepthChartEntry',
-      'modules.php?name=FreeAgency',
-    ];
-
-    for (const url of urls) {
-      await page.goto(url);
-      await assertNoPhpErrors(page, `on ${url}`);
+    await appState({
+      'Allow Trades': 'Yes',
+      'Current Season Phase': 'Free Agency',
+      'Show Draft Link': 'Yes',
+    });
+    for (const row of AUTH_MODULES) {
+      await page.goto(row.url);
+      await assertNoPhpErrors(page, `on ${row.url}`);
     }
   });
 });

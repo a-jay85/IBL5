@@ -1,5 +1,5 @@
-import { test, expect } from '@playwright/test';
-import type { Page } from '@playwright/test';
+import { test, expect } from '../fixtures/base';
+import type { Page } from '../fixtures/base';
 import { assertNoPhpErrors } from '../helpers/php-errors';
 import { publicStorageState } from '../helpers/public-storage-state';
 

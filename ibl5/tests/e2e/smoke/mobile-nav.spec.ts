@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from '../fixtures/base';
 import { openMobileMenu, gotoWithRetry } from '../helpers/navigation';
 import { publicStorageState } from '../helpers/public-storage-state';
 

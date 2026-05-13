@@ -278,12 +278,10 @@
         </include>
         <exclude>
             <directory>classes/*/Contracts</directory>
-            <directory>classes/SiteStatistics</directory>
+            <file>classes/SiteStatistics/StatisticsView.php</file>
             <directory>classes/OneOnOneGame</directory>
             <directory>classes/Database</directory>
             <file>classes/MySQL.php</file>
-            <file>classes/UI.php</file>
-            <file>classes/Game.php</file>
             <file>classes/JSB.php</file>
         </exclude>
     </source>

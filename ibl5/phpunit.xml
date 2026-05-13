@@ -262,6 +262,9 @@
         <testsuite name="Database Integration Tests">
             <directory>tests/DatabaseIntegration</directory>
         </testsuite>
+        <testsuite name="Cli Tests">
+            <directory>tests/Cli</directory>
+        </testsuite>
     </testsuites>
     <groups>
         <exclude>

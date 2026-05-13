@@ -200,6 +200,25 @@ PHP;
         self::assertStringContainsString('PASS', $result['output']);
     }
 
+    /** Case 8b: final/abstract class declaration removed + no test → exit 1 */
+    public function testFinalClassRemovedWithNoTestExitsOne(): void
+    {
+        $withClass = "<?php\nfinal class Foo {}\n";
+
+        file_put_contents($this->tmpDir . '/ibl5/classes/Example/Foo.php', $withClass);
+        $this->runInDir('git add -A');
+        $this->runInDir('git commit -m "add final class"');
+
+        file_put_contents($this->tmpDir . '/ibl5/classes/Example/Foo.php', "<?php\n// removed\n");
+        $this->runInDir('git add -A');
+
+        $result = $this->runScript();
+
+        self::assertSame(1, $result['exit']);
+        self::assertStringContainsString('FAIL', $result['output']);
+        self::assertStringContainsString('class-removed', $result['output']);
+    }
+
     /** Case 9: Visibility change (public → private) + no test → exit 1 */
     public function testVisibilityChangeWithNoTestExitsOne(): void
     {

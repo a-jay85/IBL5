@@ -141,7 +141,7 @@ function detectTriggers(string $mode): array
             }
 
             // 4. Class declaration removed
-            if (preg_match('/^-class\s+\w+/', $line) === 1) {
+            if (preg_match('/^-(?:(?:abstract|final|readonly)\s+)*class\s+\w+/', $line) === 1) {
                 $triggers[] = [
                     'type' => 'class-removed',
                     'file' => $file,

@@ -54,6 +54,8 @@ jobs:
     needs: [changes]
     if: needs.changes.outputs.src == 'true'
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     strategy:
       matrix:
         php-version: ['8.5']

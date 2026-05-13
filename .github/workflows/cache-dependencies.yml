@@ -26,12 +26,16 @@ on:
       - develop
 
 permissions:
+  contents: read
   packages: write
 
 jobs:
   cache-dependencies:
     name: Pre-cache Dependencies
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
 
     steps:
       - name: Checkout code

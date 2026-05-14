@@ -1,0 +1,72 @@
+#!/bin/bash
+# Run database integration tests in a worktree, mirroring the CI pipeline exactly:
+# wipe DB → migrations → db-seed.sql → phpunit --group database.
+#
+# Usage: bin/wt-db-test <worktree-name>
+#
+# The worktree's Docker environment must already be running (bin/wt-up).
+# This resets the database to a clean state — any existing data is destroyed.
+
+set -euo pipefail
+
+REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+source "$REPO_ROOT/bin/lib/db-helpers.sh"
+
+WORKTREE_NAME="${1:-}"
+if [ -z "$WORKTREE_NAME" ]; then
+    echo "Usage: bin/wt-db-test <worktree-name>" >&2
+    exit 1
+fi
+
+WORKTREE_PATH="$REPO_ROOT/worktrees/$WORKTREE_NAME"
+if [ ! -d "$WORKTREE_PATH" ]; then
+    echo "Error: Worktree not found at $WORKTREE_PATH" >&2
+    exit 1
+fi
+
+# Read slug from the dotfile written by wt-up
+SLUG_FILE="$WORKTREE_PATH/.wt-slug"
+if [ ! -f "$SLUG_FILE" ]; then
+    echo "Error: No .wt-slug file — run bin/wt-up $WORKTREE_NAME first" >&2
+    exit 1
+fi
+SLUG=$(cat "$SLUG_FILE")
+
+DB_CONTAINER="ibl5-db-$SLUG"
+PHP_CONTAINER="ibl5-php-$SLUG"
+DB_NAME="iblhoops_ibl5"
+DB_CMD="mariadb -u root -proot"
+
+# Verify containers are running
+if ! docker inspect "$DB_CONTAINER" &>/dev/null; then
+    echo "Error: DB container $DB_CONTAINER not running — run bin/wt-up $WORKTREE_NAME first" >&2
+    exit 1
+fi
+if ! docker inspect "$PHP_CONTAINER" &>/dev/null; then
+    echo "Error: PHP container $PHP_CONTAINER not running" >&2
+    exit 1
+fi
+
+DB_SEED="$WORKTREE_PATH/ibl5/tests/DatabaseIntegration/Fixtures/db-seed.sql"
+if [ ! -f "$DB_SEED" ]; then
+    echo "Error: db-seed.sql not found at $DB_SEED" >&2
+    exit 1
+fi
+
+echo "=== Resetting database for integration tests ==="
+
+echo "Dropping and recreating $DB_NAME..."
+db_exec "$DB_CONTAINER" $DB_CMD -e "DROP DATABASE IF EXISTS $DB_NAME; CREATE DATABASE $DB_NAME;"
+
+echo "Running migrations..."
+"$REPO_ROOT/bin/db-migrate" "$DB_CONTAINER" "$WORKTREE_PATH/ibl5/migrations"
+
+echo "Importing db-seed.sql..."
+db_exec_stdin_stream "$DB_CONTAINER" $DB_CMD "$DB_NAME" < "$DB_SEED"
+
+echo ""
+echo "=== Running database integration tests ==="
+echo ""
+
+docker exec -w /var/www/html/ibl5 "$PHP_CONTAINER" \
+    vendor/bin/phpunit --group database

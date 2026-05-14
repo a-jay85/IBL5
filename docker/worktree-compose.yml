@@ -5,6 +5,9 @@ services:
     restart: unless-stopped
     environment:
       DB_HOST: db
+      DB_USER: root
+      DB_PASS: root
+      DB_NAME: iblhoops_ibl5
       E2E_TESTING: 1
       SKIP_PROD_SEED: ${SKIP_PROD_SEED:-}
       MAIL_TRANSPORT: smtp

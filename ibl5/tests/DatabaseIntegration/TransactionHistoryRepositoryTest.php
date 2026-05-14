@@ -77,6 +77,33 @@ class TransactionHistoryRepositoryTest extends DatabaseTestCase
         }
     }
 
+    public function testTiesOnTimeResolveBySidDesc(): void
+    {
+        $timestamp = '2099-06-15 12:00:00';
+        $sids = [];
+        for ($i = 0; $i < 3; $i++) {
+            $sids[] = $this->insertRow('nuke_stories', [
+                'catid' => 1,
+                'title' => "TieTest Row $i",
+                'time' => $timestamp,
+                'aid' => '',
+            ]);
+        }
+
+        $transactions = $this->repo->getTransactions(1, 2099, 6);
+
+        $resultSids = [];
+        foreach ($transactions as $row) {
+            $sid = (int) $row['sid'];
+            if (in_array($sid, $sids, true)) {
+                $resultSids[] = $sid;
+            }
+        }
+
+        // Should be descending by sid
+        self::assertSame(array_reverse($sids), $resultSids);
+    }
+
     public function testGetTransactionsReturnsEmptyForNoMatches(): void
     {
         $transactions = $this->repo->getTransactions(null, 1900, null);

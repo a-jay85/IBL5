@@ -189,6 +189,25 @@ final class CachedCareerLeaderboardsRepositoryTest extends TestCase
         }
     }
 
+    public function testTiesResolveByPidAscAsInt(): void
+    {
+        $stubInner = $this->createStub(CareerLeaderboardsRepositoryInterface::class);
+        $repository = new CachedCareerLeaderboardsRepository($stubInner, $this->cache);
+
+        $rows = [
+            ['pid' => 30, 'name' => 'Player C', 'pts' => 200, 'games' => 100, 'retired' => 0],
+            ['pid' => 10, 'name' => 'Player A', 'pts' => 200, 'games' => 100, 'retired' => 0],
+            ['pid' => 20, 'name' => 'Player B', 'pts' => 200, 'games' => 100, 'retired' => 0],
+        ];
+        $this->cache->set('career_leaderboards:v2:ibl_hist', $rows, 86400);
+
+        $result = $repository->getLeaderboards('ibl_hist', 'pts', 0, 0);
+
+        $this->assertSame(10, $result['results'][0]['pid']);
+        $this->assertSame(20, $result['results'][1]['pid']);
+        $this->assertSame(30, $result['results'][2]['pid']);
+    }
+
     public function testCombinesActiveFilterSortAndLimit(): void
     {
         $stubInner = $this->createStub(CareerLeaderboardsRepositoryInterface::class);

@@ -140,6 +140,31 @@ class AllStarAppearancesRepositoryTest extends DatabaseTestCase
         self::assertSame(1, $b['appearances']);
     }
 
+    public function testTiesResolveByPidAscWithNullHandling(): void
+    {
+        $pid = 200130010;
+        $this->insertTestPlayer($pid, 'ASA TieName');
+        $this->insertHistRow($pid, 'ASA TieName', 2020);
+
+        $this->insertAwardRow('ASA TieName', 'Eastern Conference All-Star', 2020);
+        $this->insertAwardRow('ASA TieName', 'Eastern Conference All-Star', 2021);
+
+        // Second player with same name length pattern but no hist row → NULL pid
+        $this->insertAwardRow('ASA TieNamf', 'Eastern Conference All-Star', 2020);
+        $this->insertAwardRow('ASA TieNamf', 'Eastern Conference All-Star', 2021);
+
+        $results = $this->repo->getAllStarAppearances();
+
+        $withPid = $this->findByName($results, 'ASA TieName');
+        $withoutPid = $this->findByName($results, 'ASA TieNamf');
+        self::assertNotNull($withPid);
+        self::assertNotNull($withoutPid);
+        self::assertSame(2, $withPid['appearances']);
+        self::assertSame(2, $withoutPid['appearances']);
+        self::assertNull($withoutPid['pid']);
+        self::assertSame($pid, $withPid['pid']);
+    }
+
     public function testReturnsArrayOfResults(): void
     {
         $results = $this->repo->getAllStarAppearances();

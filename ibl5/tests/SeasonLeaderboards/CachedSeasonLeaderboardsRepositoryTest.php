@@ -326,6 +326,25 @@ final class CachedSeasonLeaderboardsRepositoryTest extends TestCase
         $this->assertNull($this->cache->get('season_leaderboards:teams'));
     }
 
+    public function testTiesResolveByPidAsc(): void
+    {
+        $stubInner = $this->createStub(SeasonLeaderboardsRepositoryInterface::class);
+        $repository = new CachedSeasonLeaderboardsRepository($stubInner, $this->cache);
+
+        $rows = [
+            $this->createRow(30, 'Player C', 2024, 1, 80, 800, fgm: 200, ftm: 100, tgm: 50),
+            $this->createRow(10, 'Player A', 2024, 2, 80, 800, fgm: 200, ftm: 100, tgm: 50),
+            $this->createRow(20, 'Player B', 2024, 3, 80, 800, fgm: 200, ftm: 100, tgm: 50),
+        ];
+        $this->cache->set('season_leaderboards:leaders', $rows, 86400);
+
+        $result = $repository->getSeasonLeaders(['sortby' => 'PPG']);
+
+        $this->assertSame(10, $result['results'][0]['pid']);
+        $this->assertSame(20, $result['results'][1]['pid']);
+        $this->assertSame(30, $result['results'][2]['pid']);
+    }
+
     public function testZeroGamesPlayerDoesNotCauseDivisionByZero(): void
     {
         $stubInner = $this->createStub(SeasonLeaderboardsRepositoryInterface::class);

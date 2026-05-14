@@ -77,7 +77,11 @@ class CachedSeasonLeaderboardsRepository implements SeasonLeaderboardsRepository
         usort($rows, static function (array $a, array $b) use ($sortBy): int {
             $aVal = self::getSortValue($a, $sortBy);
             $bVal = self::getSortValue($b, $sortBy);
-            return $bVal <=> $aVal;
+            $cmp = $bVal <=> $aVal;
+            if ($cmp !== 0) {
+                return $cmp;
+            }
+            return $a['pid'] <=> $b['pid'];
         });
 
         // Apply limit

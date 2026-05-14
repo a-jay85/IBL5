@@ -192,6 +192,50 @@ class CareerLeaderboardsRepositoryTest extends DatabaseTestCase
         self::assertLessThan($lowIdx, $highIdx, 'Higher pts player should appear first');
     }
 
+    public function testIblHistTiesResolveByPidAsc(): void
+    {
+        $pids = [200000035, 200000037, 200000036];
+        foreach ($pids as $pid) {
+            $this->insertTestPlayer($pid, "DB Tie $pid");
+            $this->insertHistRow($pid, "DB Tie $pid", 2099, ['pts' => 777, 'games' => 50]);
+        }
+
+        $result = $this->repo->getLeaderboards('ibl_hist', 'pts', 0, 5000);
+        $resultPids = [];
+        foreach ($result['results'] as $row) {
+            $p = (int) $row['pid'];
+            if (in_array($p, $pids, true)) {
+                $resultPids[] = $p;
+            }
+        }
+
+        self::assertSame([200000035, 200000036, 200000037], $resultPids);
+    }
+
+    public function testPerSeasonTableTiesResolveByPidAsc(): void
+    {
+        $pids = [200000038, 200000040, 200000039];
+        foreach ($pids as $pid) {
+            $this->insertTestPlayer($pid, "DB PST $pid");
+            $this->insertPlayerBoxscoreRow(
+                '2099-01-15', $pid, "DB PST $pid", 'PG', 2, 1, 1,
+                minutes: 30, points2m: 5, points2a: 10, ftm: 3, fta: 4,
+                points3m: 2, points3a: 5
+            );
+        }
+
+        $result = $this->repo->getLeaderboards('ibl_season_career_avgs', 'pts', 0, 5000);
+        $resultPids = [];
+        foreach ($result['results'] as $row) {
+            $p = (int) $row['pid'];
+            if (in_array($p, $pids, true)) {
+                $resultPids[] = $p;
+            }
+        }
+
+        self::assertSame([200000038, 200000039, 200000040], $resultPids);
+    }
+
     public function testGetTableTypeReturnsCorrectType(): void
     {
         self::assertSame('totals', $this->repo->getTableType('ibl_hist'));

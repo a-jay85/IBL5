@@ -86,7 +86,7 @@ REMOTE_URL="$(git remote get-url origin 2>/dev/null)" || {
     exit 2
 }
 
-REPO="$(echo "$REMOTE_URL" | sed -E 's#^(https://github\.com/|git@github\.com:)##; s#\.git$##')"
+REPO="$(echo "$REMOTE_URL" | sed -E 's#^(https://github\.com/|ssh://git@github\.com/|git@github\.com:)##; s#\.git$##')"
 if [ -z "$REPO" ]; then
     echo "ERROR: cannot parse repo slug from origin URL: $REMOTE_URL" >&2
     exit 2

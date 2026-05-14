@@ -4,6 +4,18 @@ on:
   pull_request:
     branches: [master]
     types: [opened, synchronize, reopened, ready_for_review]
+  push:
+    branches: [master]
+    paths:
+      - '**.php'
+      - '**.css'
+      - '**.ts'
+      - '**.js'
+      - 'ibl5/design/**'
+      - 'ibl5/migrations/**.sql'
+      - 'Dockerfile'
+      - 'docker-compose*.yml'
+      - '.github/workflows/lighthouse.yml'
 
 permissions:
   contents: read
@@ -16,6 +28,7 @@ concurrency:
 jobs:
   changes:
     name: Detect changes
+    if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
     permissions:
       pull-requests: read
@@ -40,7 +53,9 @@ jobs:
   lighthouse:
     name: Performance Audit
     needs: [changes]
-    if: needs.changes.outputs.src == 'true'
+    if: |
+      always() &&
+      (github.event_name == 'push' || needs.changes.outputs.src == 'true')
     runs-on: ubuntu-latest
     timeout-minutes: 25
 
@@ -114,11 +129,15 @@ jobs:
             --out=.lighthouseci/comment.md || true
 
       - name: Post sticky PR comment
-        if: always() && hashFiles('ibl5/.lighthouseci/comment.md') != ''
+        if: always() && github.event_name == 'pull_request' && hashFiles('ibl5/.lighthouseci/comment.md') != ''
         uses: marocchino/sticky-pull-request-comment@v2
         with:
           header: lighthouse-comment
           path: ibl5/.lighthouseci/comment.md
+
+      - name: Publish to job summary (master push)
+        if: always() && github.event_name == 'push' && hashFiles('ibl5/.lighthouseci/comment.md') != ''
+        run: cat ibl5/.lighthouseci/comment.md >> "$GITHUB_STEP_SUMMARY"
 
       # --- Cleanup ---
       - name: Teardown

@@ -28,7 +28,11 @@ export function startExpressServer(client: Client): void {
 
     app.post('/discordTradeDM', handleTradeDM(client));
 
-    app.listen(config.express.port, () => {
+    app.get('/', (_req, res) => {
+        res.send('ok');
+    });
+
+    app.listen(config.express.port, '127.0.0.1', () => {
         console.log(`Express server listening on port ${config.express.port}`);
     });
 }

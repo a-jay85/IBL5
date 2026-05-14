@@ -153,7 +153,7 @@ jobs:
             npm run deploy-commands
 
             echo "Restarting IBLbot via PM2..."
-            pm2 restart iblbot --update-env
+            pm2 startOrRestart ecosystem.config.cjs --update-env
             pm2 save
 
             echo "IBLbot deployed successfully (PID: $(pm2 pid iblbot))"

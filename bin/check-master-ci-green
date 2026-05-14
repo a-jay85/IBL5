@@ -1,0 +1,121 @@
+#!/bin/bash
+
+# Verifies that all GitHub CI check-runs are green on a given SHA.
+# Used by bin/merge-master-to-prod to prevent shipping a red build.
+#
+# Exit codes: 0 = pass, 1 = CI failure, 2 = usage error.
+
+set -euo pipefail
+
+MIN_REQUIRED_CHECKS="${MIN_REQUIRED_CHECKS:-1}"
+GH_API_CMD="${GH_API_CMD:-gh api}"
+
+usage() {
+    cat <<'EOF'
+Usage: bin/check-master-ci-green [SHA] [--skip-ci-check] [--help|-h]
+
+Checks that all GitHub CI check-runs are green on the given SHA
+(defaults to origin/master).
+
+Options:
+  --skip-ci-check   Emergency bypass — prints a warning and exits 0.
+  --help, -h        Show this message.
+
+Environment:
+  GH_API_CMD            Override the API command (default: "gh api").
+                        For testing: GH_API_CMD='cat /tmp/fixture.json #'
+  MIN_REQUIRED_CHECKS   Minimum number of check-runs expected (default: 1).
+                        Guards against the post-push race where workflows
+                        have not started yet.
+
+Trade-off: uses an "all-must-pass" model rather than a hardcoded check-name
+list. A new optional check that lands red will block. Use --skip-ci-check
+as the escape hatch. A future SKIP_CHECKS env var (comma-separated names
+to ignore) may be added but is out of scope for v1.
+
+Limitation: fetches one page of check-runs (100 results). IBL5's combined
+workflow count is well under 50, so a single page suffices.
+
+Exit codes: 0 = pass, 1 = CI failure, 2 = usage error.
+EOF
+}
+
+SHA=""
+SKIP=0
+
+for arg in "$@"; do
+    case "$arg" in
+        --skip-ci-check)
+            SKIP=1
+            ;;
+        --help|-h)
+            usage
+            exit 0
+            ;;
+        --*)
+            echo "unknown flag: $arg" >&2
+            usage >&2
+            exit 2
+            ;;
+        *)
+            SHA="$arg"
+            ;;
+    esac
+done
+
+if [ "$SKIP" = "1" ]; then
+    echo "BYPASS: --skip-ci-check flag set — skipping CI verification."
+    exit 0
+fi
+
+if ! gh auth status >/dev/null 2>&1; then
+    echo "ERROR: GitHub CLI is not authenticated." >&2
+    echo "Run 'gh auth login' to authenticate, then retry." >&2
+    exit 2
+fi
+
+if [ -z "$SHA" ]; then
+    SHA="$(git rev-parse origin/master 2>/dev/null)" || {
+        echo "ERROR: cannot resolve origin/master" >&2
+        exit 2
+    }
+fi
+
+REMOTE_URL="$(git remote get-url origin 2>/dev/null)" || {
+    echo "ERROR: cannot read origin remote URL" >&2
+    exit 2
+}
+
+REPO="$(echo "$REMOTE_URL" | sed -E 's#^(https://github\.com/|git@github\.com:)##; s#\.git$##')"
+if [ -z "$REPO" ]; then
+    echo "ERROR: cannot parse repo slug from origin URL: $REMOTE_URL" >&2
+    exit 2
+fi
+
+JSON="$(bash -c "$GH_API_CMD \"repos/$REPO/commits/$SHA/check-runs?per_page=100\"" 2>/dev/null)" || {
+    echo "ERROR: GitHub API request failed" >&2
+    exit 2
+}
+
+TOTAL="$(echo "$JSON" | jq '.check_runs | length')"
+
+if [ "$TOTAL" -lt "$MIN_REQUIRED_CHECKS" ]; then
+    echo "FAIL: only $TOTAL check-run(s) found (minimum: $MIN_REQUIRED_CHECKS)." >&2
+    echo "Workflows may not have started yet. Wait and retry." >&2
+    exit 1
+fi
+
+STILL_RUNNING="$(echo "$JSON" | jq -r '[.check_runs[] | select(.status != "completed")] | map(.name) | join(", ")')"
+if [ -n "$STILL_RUNNING" ]; then
+    echo "FAIL: checks still running: $STILL_RUNNING" >&2
+    exit 1
+fi
+
+FAILED="$(echo "$JSON" | jq -r '[.check_runs[] | select(.status == "completed" and (.conclusion | IN("success","skipped","neutral") | not))] | map(.name + " (" + .conclusion + ")") | join(", ")')"
+if [ -n "$FAILED" ]; then
+    echo "FAIL: checks failed: $FAILED" >&2
+    exit 1
+fi
+
+echo "PASS: $TOTAL check-run(s) all green on $SHA"
+exit 0

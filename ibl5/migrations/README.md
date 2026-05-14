@@ -17,6 +17,36 @@ The production deploy workflow automatically reverts the last commit if post-dep
 
 If a reverted deploy still fails smoke tests (because the old code is incompatible with the new schema), the workflow sends a "manual intervention required" notification instead of reverting again.
 
+## Destructive Migration CI Scan
+
+The `migration-safety.yml` workflow includes a **destructive migration scan** (`bin/check-destructive-migrations`) that blocks PRs and pushes containing these patterns in new or modified `.sql` files under `ibl5/migrations/`:
+
+| Pattern | What it catches |
+|---------|----------------|
+| `drop-column` | `ALTER TABLE ... DROP COLUMN` |
+| `drop-table` | `DROP TABLE` (suppressed when `IF EXISTS` + matching `CREATE TABLE` in same file) |
+| `truncate` | `TRUNCATE [TABLE] ...` |
+| `rename-column` | `ALTER TABLE ... RENAME COLUMN` |
+| `add-not-null-no-default` | `ADD COLUMN ... NOT NULL` without `DEFAULT` |
+
+The file `000_baseline_schema.sql` is always excluded from scanning.
+
+### Bypass markers
+
+When a destructive operation is intentional and reviewed, add a bypass marker:
+
+**Per-file** (inline SQL comment — suppresses all triggers for that file):
+```sql
+-- destructive-migration: <reason at least 20 characters>
+```
+
+**Per-PR** (HTML comment in the PR body — suppresses all triggers globally):
+```html
+<!-- destructive-migration: <reason at least 20 characters> -->
+```
+
+The reason must be at least 20 characters. Short reasons are rejected.
+
 ## Automated Migration Runner
 
 Migrations are applied automatically during deployment via `ibl5/bin/migrate`. The runner:

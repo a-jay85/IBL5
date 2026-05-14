@@ -2,6 +2,8 @@
 
 # Merges master into production and pushes both branches to origin.
 # All git output is suppressed; only errors or the final summary are printed.
+#
+# Set SKIP_CI_CHECK=1 to bypass the CI-green gate (emergency use only).
 
 set -e
 
@@ -15,6 +17,13 @@ export SKIP_WT_CLEANUP=1
 
 git checkout master -q
 git pull origin master -q
+
+if [ "${SKIP_CI_CHECK:-0}" != "1" ]; then
+    MASTER_SHA="$(git rev-parse origin/master)"
+    SCRIPT_ROOT="$(git rev-parse --show-toplevel)"
+    "$SCRIPT_ROOT/bin/check-master-ci-green" "$MASTER_SHA" || fail "master HEAD is not green on CI (set SKIP_CI_CHECK=1 to bypass)"
+fi
+
 git push origin master -q 2>/dev/null || fail "push master"
 
 git checkout production -q

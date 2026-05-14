@@ -1,0 +1,240 @@
+#!/bin/bash
+
+# Scans migration SQL files for destructive patterns (DROP COLUMN, DROP TABLE,
+# TRUNCATE, RENAME COLUMN, ADD NOT NULL without DEFAULT).
+#
+# Exit codes: 0 = pass, 1 = destructive patterns found, 2 = usage error.
+
+set -euo pipefail
+
+BYPASS_MIN_LENGTH=20
+BASELINE_FILE="ibl5/migrations/000_baseline_schema.sql"
+
+usage() {
+    cat <<'EOF'
+Usage: bin/check-destructive-migrations [--staged|--since=<sha>] [--bypass-from-stdin] [--help|-h]
+
+Scans added/modified migration files under ibl5/migrations/ for destructive
+SQL patterns and blocks unless a bypass marker is present.
+
+Modes:
+  --staged           Scan staged changes (git diff --cached). Default.
+  --since=<sha>      Scan changes since the given SHA (git diff <sha>...HEAD).
+
+Options:
+  --bypass-from-stdin   Read PR body from stdin for the global bypass marker.
+  --help, -h            Show this message.
+
+Detected patterns (v1):
+  drop-column             ALTER TABLE ... DROP COLUMN
+  drop-table              DROP TABLE (suppressed when IF EXISTS + matching
+                          CREATE TABLE in same file = recreate pattern)
+  truncate                TRUNCATE [TABLE] ...
+  rename-column           ALTER TABLE ... RENAME COLUMN
+  add-not-null-no-default ADD COLUMN ... NOT NULL without DEFAULT
+
+Bypass markers:
+  Per-file (inline SQL comment):
+    -- destructive-migration: <reason at least 20 chars>
+  Per-PR (HTML comment in PR body, via --bypass-from-stdin):
+    <!-- destructive-migration: <reason at least 20 chars> -->
+
+Explicitly NOT scanned (v1 limitations):
+  - MODIFY ... NOT NULL (requires multi-statement analysis)
+  - Bare DELETE FROM (often legitimate cleanup)
+
+Hard-excluded files:
+  - 000_baseline_schema.sql (recreate template with intentional DROP TABLE)
+
+Exit codes: 0 = pass, 1 = destructive patterns found, 2 = usage error.
+EOF
+}
+
+MODE="staged"
+BYPASS_STDIN=0
+SINCE_SHA=""
+
+for arg in "$@"; do
+    case "$arg" in
+        --staged)
+            MODE="staged"
+            ;;
+        --since=*)
+            MODE="since"
+            SINCE_SHA="${arg#--since=}"
+            ;;
+        --bypass-from-stdin)
+            BYPASS_STDIN=1
+            ;;
+        --help|-h)
+            usage
+            exit 0
+            ;;
+        --*)
+            echo "unknown flag: $arg" >&2
+            usage >&2
+            exit 2
+            ;;
+        *)
+            echo "unknown argument: $arg" >&2
+            usage >&2
+            exit 2
+            ;;
+    esac
+done
+
+if [ "$MODE" = "since" ]; then
+    RANGE="${SINCE_SHA}...HEAD"
+else
+    RANGE="--cached"
+fi
+
+get_migration_files() {
+    # shellcheck disable=SC2086
+    git diff $RANGE --name-only --diff-filter=AM -- 'ibl5/migrations/*.sql' 2>/dev/null \
+        | grep -v '^$' \
+        | grep -v "^${BASELINE_FILE}$" \
+        || true
+}
+
+FILES="$(get_migration_files)"
+
+if [ -z "$FILES" ]; then
+    echo "No destructive migration patterns detected."
+    exit 0
+fi
+
+PR_BODY_BYPASS=""
+if [ "$BYPASS_STDIN" = "1" ]; then
+    PR_BODY="$(cat)"
+    REASON="$(echo "$PR_BODY" | sed -n 's/.*<!--[[:space:]]*destructive-migration:[[:space:]]*\(.\{1,\}\)[[:space:]]*-->.*/\1/p' | head -1)"
+    REASON="$(echo "$REASON" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')"
+    if [ -n "$REASON" ] && [ "${#REASON}" -ge "$BYPASS_MIN_LENGTH" ]; then
+        PR_BODY_BYPASS="$REASON"
+    fi
+fi
+
+TRIGGERS=""
+
+get_added_lines() {
+    local file="$1"
+    # shellcheck disable=SC2086
+    git diff $RANGE -- "$file" | grep '^+' | grep -v '^+++' | sed 's/^+//'
+}
+
+match_icase() {
+    echo "$1" | grep -iqE "$2"
+}
+
+check_file() {
+    local file="$1"
+
+    local added_lines
+    added_lines="$(get_added_lines "$file")" || true
+
+    if [ -z "$added_lines" ]; then
+        return
+    fi
+
+    local inline_bypass=""
+    local bypass_reason
+    bypass_reason="$(echo "$added_lines" | sed -n 's/^[[:space:]]*--[[:space:]]*destructive-migration:[[:space:]]*\(.\{1,\}\)/\1/p' | head -1)" || true
+    bypass_reason="$(echo "$bypass_reason" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')"
+    if [ -n "$bypass_reason" ] && [ "${#bypass_reason}" -ge "$BYPASS_MIN_LENGTH" ]; then
+        inline_bypass="$bypass_reason"
+    fi
+
+    local file_triggers=""
+    local line_num=0
+
+    while IFS= read -r line; do
+        line_num=$((line_num + 1))
+
+        local stripped
+        stripped="$(echo "$line" | sed 's/--.*$//')"
+        [ -z "$stripped" ] && continue
+
+        # drop-column
+        if match_icase "$stripped" 'ALTER[[:space:]]+TABLE[[:space:]].*DROP[[:space:]]+COLUMN'; then
+            file_triggers="${file_triggers}  [drop-column] ${file}:${line_num} ${stripped}
+"
+        fi
+
+        # drop-table
+        if match_icase "$stripped" 'DROP[[:space:]]+TABLE'; then
+            local suppressed=0
+            if match_icase "$stripped" 'DROP[[:space:]]+TABLE[[:space:]]+IF[[:space:]]+EXISTS'; then
+                local table_name
+                table_name="$(echo "$stripped" | sed -E 's/.*DROP[[:space:]]+TABLE[[:space:]]+IF[[:space:]]+EXISTS[[:space:]]+`?([a-zA-Z0-9_]+).*/\1/I' | head -1)" || true
+                if [ -n "$table_name" ]; then
+                    if echo "$added_lines" | grep -iqE "CREATE[[:space:]]+TABLE[[:space:]]+(IF[[:space:]]+NOT[[:space:]]+EXISTS[[:space:]]+)?\`?${table_name}\`?"; then
+                        suppressed=1
+                    fi
+                fi
+            fi
+            if [ "$suppressed" = "0" ]; then
+                file_triggers="${file_triggers}  [drop-table] ${file}:${line_num} ${stripped}
+"
+            fi
+        fi
+
+        # truncate
+        if match_icase "$stripped" 'TRUNCATE[[:space:]]+(TABLE[[:space:]]+)?[^[:space:]]'; then
+            file_triggers="${file_triggers}  [truncate] ${file}:${line_num} ${stripped}
+"
+        fi
+
+        # rename-column
+        if match_icase "$stripped" 'ALTER[[:space:]]+TABLE[[:space:]].*RENAME[[:space:]]+COLUMN'; then
+            file_triggers="${file_triggers}  [rename-column] ${file}:${line_num} ${stripped}
+"
+        fi
+
+        # add-not-null-no-default
+        if match_icase "$stripped" 'ADD[[:space:]]+COLUMN[[:space:]].*NOT[[:space:]]+NULL'; then
+            if ! match_icase "$stripped" 'DEFAULT'; then
+                file_triggers="${file_triggers}  [add-not-null-no-default] ${file}:${line_num} ${stripped}
+"
+            fi
+        fi
+
+    done <<< "$added_lines"
+
+    if [ -n "$file_triggers" ]; then
+        if [ -n "$inline_bypass" ]; then
+            echo "PASS (bypass): $inline_bypass"
+            return
+        fi
+        TRIGGERS="${TRIGGERS}${file_triggers}"
+    fi
+}
+
+while IFS= read -r file; do
+    [ -z "$file" ] && continue
+    check_file "$file"
+done <<< "$FILES"
+
+if [ -z "$TRIGGERS" ]; then
+    echo "No destructive migration patterns detected."
+    exit 0
+fi
+
+if [ -n "$PR_BODY_BYPASS" ]; then
+    echo "PASS (bypass): $PR_BODY_BYPASS"
+    exit 0
+fi
+
+echo "Destructive migration patterns detected:"
+echo ""
+printf '%s' "$TRIGGERS"
+echo ""
+echo "To proceed, add one of these bypass markers:"
+echo ""
+echo "  Per-file (SQL comment in the migration):"
+echo "    -- destructive-migration: <reason at least 20 chars>"
+echo ""
+echo "  Per-PR (HTML comment in PR body):"
+echo "    <!-- destructive-migration: <reason at least 20 chars> -->"
+echo ""
+echo "See ibl5/migrations/README.md for the full destructive migration policy."
+exit 1

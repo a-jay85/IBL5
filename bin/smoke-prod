@@ -19,6 +19,7 @@
 #   SMOKE_IBL6_URL          Override the IBL6 probe URL (default: https://ibl6.iblhoops.net/)
 #   SMOKE_INTERCHECK_DELAY  Seconds between checks (default: 1)
 #   SMOKE_RETRY_DELAY       Seconds to wait before retry on unexpected status (default: 10)
+#   SMOKE_REHEARSAL_MODE    If "1", broaden API accept-list to 200|401|404 and skip CSS check
 
 set -euo pipefail
 
@@ -45,6 +46,7 @@ for arg in "$@"; do
             echo "  SMOKE_IBL6_URL          Override IBL6 probe URL"
             echo "  SMOKE_INTERCHECK_DELAY  Seconds between checks (default: 1)"
             echo "  SMOKE_RETRY_DELAY       Seconds before retry (default: 10)"
+            echo "  SMOKE_REHEARSAL_MODE    Set to 1 to broaden API accept-list and skip CSS check"
             exit 0
             ;;
         --*)
@@ -80,6 +82,7 @@ USER_AGENT="IBL5-smoke/1.0 (+https://github.com/a-jay85/IBL5)"
 # Space requests apart so we stay under the LiteSpeed per-IP WAF threshold.
 INTERCHECK_DELAY="${SMOKE_INTERCHECK_DELAY:-1}"
 RETRY_DELAY="${SMOKE_RETRY_DELAY:-10}"
+REHEARSAL_MODE="${SMOKE_REHEARSAL_MODE:-0}"
 
 # Per-scope counters
 IBL5_PASS=0
@@ -151,9 +154,17 @@ if [ "$SCOPE" = "ibl5" ] || [ "$SCOPE" = "all" ]; then
     sleep "$INTERCHECK_DELAY"
     check IBL5 "Login page"   "$BASE/ibl5/modules.php?name=YourAccount"              "Sign In"
     sleep "$INTERCHECK_DELAY"
-    check IBL5 "API routing"  "$BASE/ibl5/api/v1/season"                             "" "200|401"
+    if [ "$REHEARSAL_MODE" = "1" ]; then
+        check IBL5 "API routing"  "$BASE/ibl5/api/v1/season"                         "" "200|401|404"
+    else
+        check IBL5 "API routing"  "$BASE/ibl5/api/v1/season"                         "" "200|401"
+    fi
     sleep "$INTERCHECK_DELAY"
-    check IBL5 "CSS asset"    "$BASE/ibl5/themes/IBL/style/style.css"                ""
+    if [ "$REHEARSAL_MODE" != "1" ]; then
+        check IBL5 "CSS asset"    "$BASE/ibl5/themes/IBL/style/style.css"            ""
+    else
+        echo "  SKIP: CSS asset (rehearsal mode)"
+    fi
     sleep "$INTERCHECK_DELAY"
     echo ""
 fi

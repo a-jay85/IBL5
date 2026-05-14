@@ -104,3 +104,34 @@ jobs:
       # Mirror main.yml "Validate database schema" exactly — this is the gate
       - name: php bin/validate-schema (mirrors main.yml; pre-flight gate)
         run: php ibl5/bin/validate-schema
+
+      - name: Seed rehearsal database with smoke fixtures
+        run: mysql -h 127.0.0.1 -u root -proot iblhoops_ibl5 < ibl5/tests/DatabaseIntegration/Fixtures/db-seed.sql
+
+      - name: Start PHP built-in server for rehearsal smoke probe
+        id: server
+        run: |
+          php -S 127.0.0.1:8080 -t . > /tmp/php-server.log 2>&1 &
+          echo "pid=$!" >> "$GITHUB_OUTPUT"
+          for i in $(seq 1 20); do
+            nc -z 127.0.0.1 8080 && exit 0
+            sleep 0.5
+          done
+          echo "::error::PHP built-in server did not start within 10s"
+          cat /tmp/php-server.log
+          exit 1
+
+      - name: Run IBL5 smoke checks against rehearsal server
+        env:
+          SMOKE_REHEARSAL_MODE: "1"
+          SMOKE_INTERCHECK_DELAY: "0"
+          SMOKE_RETRY_DELAY: "2"
+        run: |
+          chmod +x bin/smoke-prod
+          bin/smoke-prod --scope=ibl5 http://127.0.0.1:8080
+
+      - name: Tear down PHP built-in server
+        if: always()
+        run: |
+          kill ${{ steps.server.outputs.pid }} 2>/dev/null || true
+          [ -f /tmp/php-server.log ] && tail -50 /tmp/php-server.log || true

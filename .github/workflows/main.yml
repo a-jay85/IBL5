@@ -53,12 +53,14 @@ jobs:
       - name: Stop IBL6 to free resources for deploy
         run: |
           ssh -p ${{ secrets.PORT }} -i ~/.ssh/id_deploy ${{ secrets.USERNAME }}@${{ secrets.HOST }} '
+            echo "Stop IBL6 to free resources for deploy" > /tmp/ibl5-last-deploy-step
             pm2 stop ibl6 2>/dev/null && echo "IBL6 stopped" || echo "IBL6 was not running"
           '
 
       - name: Pull latest code on server
         run: |
           ssh -p ${{ secrets.PORT }} -i ~/.ssh/id_deploy ${{ secrets.USERNAME }}@${{ secrets.HOST }} '
+            echo "Pull latest code on server" > /tmp/ibl5-last-deploy-step
             set -e
             cd www
             git fetch origin
@@ -68,14 +70,30 @@ jobs:
       - name: Install PHP dependencies
         run: |
           ssh -p ${{ secrets.PORT }} -i ~/.ssh/id_deploy ${{ secrets.USERNAME }}@${{ secrets.HOST }} '
+            echo "Install PHP dependencies" > /tmp/ibl5-last-deploy-step
             set -e
             cd www/ibl5
             composer install --no-dev --no-interaction --optimize-autoloader
           '
 
+      - name: Verify recent DB backup exists
+        continue-on-error: ${{ vars.BACKUP_DIR == '' }}
+        run: |
+          scp -P ${{ secrets.PORT }} -i ~/.ssh/id_deploy bin/check-backup-freshness \
+            ${{ secrets.USERNAME }}@${{ secrets.HOST }}:/tmp/check-backup-freshness
+          ssh -p ${{ secrets.PORT }} -i ~/.ssh/id_deploy ${{ secrets.USERNAME }}@${{ secrets.HOST }} '
+            echo "Verify recent DB backup exists" > /tmp/ibl5-last-deploy-step
+            chmod +x /tmp/check-backup-freshness
+            BACKUP_DIR="${{ vars.BACKUP_DIR }}" \
+              BACKUP_MAX_AGE_HOURS="${{ vars.BACKUP_MAX_AGE_HOURS || 26 }}" \
+              SKIP_BACKUP_CHECK="${{ vars.SKIP_BACKUP_CHECK || 0 }}" \
+              /tmp/check-backup-freshness
+          '
+
       - name: Run database migrations
         run: |
           ssh -p ${{ secrets.PORT }} -i ~/.ssh/id_deploy ${{ secrets.USERNAME }}@${{ secrets.HOST }} '
+            echo "Run database migrations" > /tmp/ibl5-last-deploy-step
             set -e
             cd www
             php ibl5/bin/migrate
@@ -84,6 +102,7 @@ jobs:
       - name: Validate database schema
         run: |
           ssh -p ${{ secrets.PORT }} -i ~/.ssh/id_deploy ${{ secrets.USERNAME }}@${{ secrets.HOST }} '
+            echo "Validate database schema" > /tmp/ibl5-last-deploy-step
             set -e
             cd www
             php ibl5/bin/validate-schema
@@ -95,12 +114,14 @@ jobs:
       - name: Flush OPcache
         run: |
           ssh -p ${{ secrets.PORT }} -i ~/.ssh/id_deploy ${{ secrets.USERNAME }}@${{ secrets.HOST }} '
+            echo "Flush OPcache" > /tmp/ibl5-last-deploy-step
             killall lsphp && echo "OPcache flushed (lsphp workers killed)" || echo "No lsphp processes found"
           '
 
       - name: Purge page cache
         run: |
           ssh -p ${{ secrets.PORT }} -i ~/.ssh/id_deploy ${{ secrets.USERNAME }}@${{ secrets.HOST }} '
+            echo "Purge page cache" > /tmp/ibl5-last-deploy-step
             cd www/ibl5
             php -r "require \"vendor/autoload.php\"; echo \"Purged \" . Cache\PageCache::purge() . \" cached pages\" . PHP_EOL;"
           '
@@ -118,6 +139,7 @@ jobs:
         if: steps.iblbot-changes.outputs.changed == 'true'
         run: |
           ssh -p ${{ secrets.PORT }} -i ~/.ssh/id_deploy ${{ secrets.USERNAME }}@${{ secrets.HOST }} '
+            echo "Deploy and restart IBLbot" > /tmp/ibl5-last-deploy-step
             set -e
             cd www/ibl5/IBLbot
 
@@ -172,6 +194,7 @@ jobs:
         if: ${{ !cancelled() }}
         run: |
           ssh -p ${{ secrets.PORT }} -i ~/.ssh/id_deploy ${{ secrets.USERNAME }}@${{ secrets.HOST }} '
+            echo "Start IBL6" > /tmp/ibl5-last-deploy-step
             cd www/IBL6
             mkdir -p logs
             pm2 restart ibl6 --update-env 2>/dev/null \
@@ -215,18 +238,39 @@ jobs:
         env:
           DEPLOY_KEY: ${{ secrets.PRIVATE_KEY }}
 
+      - name: Capture deploy state from server
+        id: state
+        continue-on-error: true
+        run: |
+          OUTPUT=$(ssh -p ${{ secrets.PORT }} -i ~/.ssh/id_deploy ${{ secrets.USERNAME }}@${{ secrets.HOST }} '
+            STEP=$(cat /tmp/ibl5-last-deploy-step 2>/dev/null || echo "unknown — deploy did not reach the server")
+            cd www 2>/dev/null || { printf "STEP_NAME=%s\nLAST_MIGRATION=unknown\nDEPLOYED_SHA=unknown\n" "$STEP"; exit 0; }
+            SHA=$(git rev-parse --short HEAD 2>/dev/null || echo "unknown")
+            MIG=$(mysql -N -e "SELECT migration FROM iblhoops_ibl5.migrations ORDER BY id DESC LIMIT 1" 2>/dev/null || echo "unknown")
+            printf "STEP_NAME=%s\nLAST_MIGRATION=%s\nDEPLOYED_SHA=%s\n" "$STEP" "$MIG" "$SHA"
+          ') || OUTPUT=$'STEP_NAME=unknown\nLAST_MIGRATION=unknown\nDEPLOYED_SHA=unknown'
+          echo "$OUTPUT" >> "$GITHUB_OUTPUT"
+
       - name: Send Discord DM
         env:
           OWNER_DISCORD_ID: ${{ secrets.OWNER_DISCORD_ID }}
           PREFLIGHT_RESULT: ${{ needs.pre-flight.result }}
+          STEP_NAME: ${{ steps.state.outputs.STEP_NAME }}
+          LAST_MIGRATION: ${{ steps.state.outputs.LAST_MIGRATION }}
+          DEPLOYED_SHA: ${{ steps.state.outputs.DEPLOYED_SHA }}
         run: |
           RUN_URL="https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
           SHORT_SHA="${{ github.sha }}"
           SHORT_SHA="${SHORT_SHA:0:7}"
+          STEP_NAME="${STEP_NAME:-unknown}"
+          LAST_MIGRATION="${LAST_MIGRATION:-unknown}"
+          DEPLOYED_SHA="${DEPLOYED_SHA:-unknown}"
           if [ "$PREFLIGHT_RESULT" = "failure" ] || [ "$PREFLIGHT_RESULT" = "cancelled" ]; then
-            MSG=$(printf 'Production deploy BLOCKED — pre-flight rehearsal %s for commit %s. Deploy did not start.\n\nCheck the run for details: %s' "${PREFLIGHT_RESULT^^}" "$SHORT_SHA" "$RUN_URL")
+            MSG=$(printf 'Production deploy BLOCKED — pre-flight rehearsal %s for commit %s. Deploy did not start.\n\nCurrently live: SHA %s, last applied migration: %s\n\nRun: %s' \
+              "${PREFLIGHT_RESULT^^}" "$SHORT_SHA" "$DEPLOYED_SHA" "$LAST_MIGRATION" "$RUN_URL")
           else
-            MSG=$(printf 'Production deploy FAILED for commit %s.\n\nCheck the run for details: %s' "$SHORT_SHA" "$RUN_URL")
+            MSG=$(printf 'Production deploy FAILED at step: %s\n\nCommit: %s\nLast applied migration: %s\nDeployed SHA on box: %s\n\nRun: %s' \
+              "$STEP_NAME" "$SHORT_SHA" "$LAST_MIGRATION" "$DEPLOYED_SHA" "$RUN_URL")
           fi
 
           PAYLOAD=$(jq -n --arg id "$OWNER_DISCORD_ID" --arg msg "$MSG" \

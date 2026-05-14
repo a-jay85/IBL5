@@ -25,19 +25,18 @@ QUEUE_DIR="$NIGHTLY_DIR/queue"
 mkdir -p "$QUEUE_DIR"
 
 show_queue() {
-    echo "Nightly queue (oldest first = next to run):"
+    echo "Nightly queue (next to run first):"
     local found=0
-    for f in "$QUEUE_DIR"/*.md; do
-        [ -e "$f" ] || continue
+    local i=1
+    while IFS= read -r f; do
         found=1
         local name
         name=$(basename "$f")
-        local target
-        target=$(readlink "$f" 2>/dev/null || echo "(not a symlink)")
         local title
         title=$(head -1 "$f" 2>/dev/null | sed 's/^# //')
-        printf "  %-40s %s\n" "$name" "$title"
-    done
+        printf "  %2d. %-40s %s\n" "$i" "$name" "$title"
+        i=$((i + 1))
+    done < <(ls -1tr "$QUEUE_DIR"/*.md 2>/dev/null)
     if [ "$found" -eq 0 ]; then
         echo "  (empty)"
     fi

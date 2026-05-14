@@ -1,14 +1,14 @@
 ---
 name: post-plan
-description: Single orchestrator for the post-plan workflow. Runs diff classification, simplify, commit/push/PR, code review, security audit, verification, CI monitoring, retrospective, worktree teardown, and background process cleanup as one uninterrupted sequence.
-last_verified: 2026-04-29
+description: Single orchestrator for the post-plan workflow. Runs simplify, commit/push/PR, diff classification, code review, security audit, verification, CI monitoring, retrospective, worktree teardown, and background process cleanup as one uninterrupted sequence.
+last_verified: 2026-05-14
 ---
 
 # Post-Plan Orchestrator
 
 Execute all phases below **sequentially in a single response**. Do NOT stop, ask for input, or return control between phases.
 
-Phase numbers below are local to this skill. The variables computed in Phase 2 (`HAS_PHP`, `NON_CODE_ONLY`, `DOCS_ONLY`, `CSS_ONLY`, `MIGRATION_ONLY`, `HAS_MODIFIED`, `HAS_COMMENTS_IN_DIFF`, `DIFF`, etc.) are consulted by every downstream phase to gate sub-agent launches — never recompute them locally.
+Phase numbers below are local to this skill. The variables computed in Phase 4 (`HAS_PHP`, `NON_CODE_ONLY`, `DOCS_ONLY`, `CSS_ONLY`, `MIGRATION_ONLY`, `HAS_MODIFIED`, `HAS_COMMENTS_IN_DIFF`, `DIFF`, etc.) are consulted by every downstream phase to gate sub-agent launches — never recompute them locally.
 
 ## Incremental Checkpoints
 
@@ -23,7 +23,7 @@ if ! git diff --cached --quiet; then
 fi
 ```
 
-Phase 4 makes the initial commit and opens the PR. Phases that may modify files afterwards (Phase 3 simplify, Phase 5D follow-up fixes if review identifies real bugs, Phase 6 fix-and-rerun loops, Phase 7 test writing, Phase 8 CI fixes) MUST checkpoint before continuing. Squash-merge in Phase 9 collapses the chain.
+Phase 3 makes the initial commit and opens the PR. Phase 2 (simplify) runs against the working tree before that commit, so its changes fold into the initial commit naturally. Phases that may modify files after Phase 3 (Phase 5D follow-up fixes if review identifies real bugs, Phase 6 fix-and-rerun loops, Phase 7 test writing, Phase 8 CI fixes) MUST checkpoint before continuing. Squash-merge in Phase 9 collapses the chain.
 
 ---
 
@@ -37,7 +37,24 @@ rm -f /tmp/claude-plan-active-$PPID
 
 ---
 
-## Phase 2: Classify Diff
+## Phase 2: Simplify
+
+Review changed files (`git diff --name-only origin/master` — covers both committed and uncommitted work) for reuse opportunities and over-engineering. Mandatory CLAUDE.md rules are enforced by PHPStan custom rules (see `.claude/commands/_review-rubric.md` for the full list) — assume they hold and focus on judgment-level issues like duplication, awkward abstractions, and dead code.
+
+This phase runs before commit so simplify changes fold into the initial commit. If the working tree is clean and `git diff origin/master...HEAD` is also empty (nothing to ship), abort the entire skill — there is nothing to post-plan.
+
+---
+
+## Phase 3: Commit, Push & PR
+
+1. **If working tree has uncommitted changes:** stage relevant changes, review with `git diff --staged`, commit (CLAUDE.md conventions), push. Skip this sub-step if the working tree is already clean (user committed before invoking the skill).
+2. **If no PR exists for the current branch:** create one with `gh pr create`. **Stacked PRs:** If branched from a feature branch (not `master`), use `--base <parent-branch>`. Skip if a PR already exists.
+3. **Manual testing in PR description:** Check the plan file for a Verification Matrix. If one exists, copy only the rows classified as `Truly-manual` into the PR's `## Manual Testing` section. If the matrix has zero truly-manual rows (or the plan says "All verification is automated"), write: `No manual testing needed — all changes are covered by unit and E2E tests.` If no plan file or no matrix exists, fall back to the original rule: list only steps requiring subjective human judgment on new or redesigned UI/UX ("does this look/feel good?", "does this flow work well?"). Production comparison and "does output still match?" are visual-regression-replaceable, not manual. Do NOT list CLI commands or script invocations — Phase 7 executes those.
+4. Use Haiku agents for commit message generation if delegating
+
+---
+
+## Phase 4: Classify Diff
 
 Run this bash block once. It computes classification flags and writes the filtered diff to `/tmp/post-plan-diff-$PPID` (same `$PPID` pattern Phase 1 uses — stable across Bash tool calls in the session). Uses `gh pr diff` when a PR exists (correct base for stacked PRs), falls back to `git diff origin/master...HEAD` pre-PR. Every later phase consults these flags and reads the diff file — do not recompute.
 
@@ -124,23 +141,6 @@ Each Bash tool call runs in a fresh shell, so the classification flags are **not
 
 ---
 
-## Phase 3: Simplify
-
-**Skip if** `$NON_CODE_ONLY` or `$MIGRATION_ONLY` (nothing reviewable).
-
-Review changed files (`git diff --name-only HEAD~1` or vs base branch) for reuse opportunities and over-engineering. Mandatory CLAUDE.md rules are enforced by PHPStan custom rules (see `.claude/commands/_review-rubric.md` for the full list) — assume they hold and focus on judgment-level issues like duplication, awkward abstractions, and dead code.
-
----
-
-## Phase 4: Commit, Push & PR
-
-1. Stage relevant changes, review with `git diff --staged`, commit (CLAUDE.md conventions), push, create PR
-2. **Stacked PRs:** If branched from a feature branch (not `master`), use `--base <parent-branch>`
-3. **Manual testing in PR description:** Check the plan file for a Verification Matrix. If one exists, copy only the rows classified as `Truly-manual` into the PR's `## Manual Testing` section. If the matrix has zero truly-manual rows (or the plan says "All verification is automated"), write: `No manual testing needed — all changes are covered by unit and E2E tests.` If no plan file or no matrix exists, fall back to the original rule: list only steps requiring subjective human judgment on new or redesigned UI/UX ("does this look/feel good?", "does this flow work well?"). Production comparison and "does output still match?" are visual-regression-replaceable, not manual. Do NOT list CLI commands or script invocations — Phase 7 executes those.
-4. Use Haiku agents for commit message generation if delegating
-
----
-
 ## Phase 5: Code Review + Security Audit
 
 Agent definitions and scoring rubric live in shared include files under `.claude/commands/` so this skill, `/code-review`, and `/security-audit` all share one source of truth. Read them as instructed below — do NOT inline the definitions or duplicate them.
@@ -151,7 +151,7 @@ Run these commands yourself (not via agents):
 
 ```bash
 gh pr view --json number,headRefOid,headRefName,baseRefName,title,body,author
-cat /tmp/post-plan-diff-$PPID   # filtered diff written by Phase 2 (already < 100KB after the fallback)
+cat /tmp/post-plan-diff-$PPID   # filtered diff written by Phase 4 (already < 100KB after the fallback)
 ```
 
 Capture the `cat` output — that is `$DIFF` for every sub-agent prompt below. No sub-agent calls `gh pr diff`.
@@ -170,7 +170,7 @@ Pass each agent: PR metadata, file list, and filtered `$DIFF`. **No agent calls 
 - Agent B (Git history + Code comments): **Sonnet**
 - Agent C (Previous PRs): **Haiku**
 
-**Launch gates** (consult Phase 2 variables — skip the launch entirely, don't let the agent exit early):
+**Launch gates** (consult Phase 4 variables — skip the launch entirely, don't let the agent exit early):
 
 - Agent A: skip if `$NON_CODE_ONLY`. If `$MIGRATION_ONLY`, instruct agent to skip Section 2 (bug detection). If `! $HAS_PHP`, instruct agent to skip Section 3 (DB performance).
 - Agent B: skip if BOTH sub-gates fail: (`! $HAS_PHP` or `$LINES_PHP_CHANGED <= 50`) AND (`$NON_CODE_ONLY` or `! $HAS_COMMENTS_IN_DIFF`). If only one sub-gate passes, instruct agent to run only that section.

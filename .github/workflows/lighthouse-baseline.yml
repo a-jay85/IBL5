@@ -63,6 +63,19 @@ jobs:
         env:
           CHROME_PATH: /usr/bin/google-chrome-stable
 
+      # autorun's upload step uses temporary-public-storage (writes links.json
+      # only). The baseline artifact needs manifest.json — emit it via a
+      # second filesystem upload from the same collected lhr-*.json files.
+      - name: Write manifest.json for baseline artifact
+        working-directory: ibl5
+        run: |
+          bunx @lhci/cli upload --target=filesystem --outputDir=.lighthouseci
+          # lhci writes one entry per run (3 per URL); the formatter expects
+          # one entry per URL — filter to representative runs.
+          jq '[.[] | select(.isRepresentativeRun == true)]' \
+            .lighthouseci/manifest.json > .lighthouseci/manifest.tmp.json
+          mv .lighthouseci/manifest.tmp.json .lighthouseci/manifest.json
+
       - name: Upload baseline manifest
         uses: actions/upload-artifact@v5
         with:

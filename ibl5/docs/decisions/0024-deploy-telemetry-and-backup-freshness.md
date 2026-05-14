@@ -1,20 +1,19 @@
 ---
-description: Adds deploy-step sentinel telemetry, enriched failure notifications, deploy-rehearsal HTTP probe, and pre-migrate backup freshness gate to CI/CD workflows.
+description: Adds deploy-step sentinel telemetry, enriched failure notifications, and a deploy-rehearsal HTTP probe to CI/CD workflows.
 last_verified: 2026-05-14
 ---
 
-# ADR-0024: Deploy Telemetry, Rehearsal HTTP Probe, and Backup Freshness Gate
+# ADR-0024: Deploy Telemetry and Rehearsal HTTP Probe
 
 **Status:** Accepted
 **Date:** 2026-05-14
 
 ## Context
 
-Three gaps in the master-to-production deploy pipeline:
+Two gaps in the master-to-production deploy pipeline:
 
 1. **Failure notifications lack context.** When `notify-deploy-failure` fires a Discord DM, operators must open the run log to identify which step failed, what migration was last applied, and what SHA is live.
 2. **Deploy rehearsal only validates migrations.** `deploy-rehearsal.yml` catches migration and schema assertion failures but not HTTP-level breakages (syntax errors, missing routes, broken controllers).
-3. **No pre-migrate backup check.** Migrations alter the production database irreversibly. If the hosting provider's auto-snapshot is stale, a failed migration leaves no recovery path.
 
 Additionally, `smoke-prod.yml`'s `rollback-and-notify` job performed a re-smoke after revert that was unreachable correctly — it ran against the runner checkout rather than waiting for the revert deploy to land. The `workflow_run`-triggered smoke already covers post-revert verification.
 
@@ -30,30 +29,21 @@ The misleading re-smoke in `smoke-prod.yml` is removed. Post-revert health is ve
 
 After the existing migration + schema validation, `deploy-rehearsal.yml` now seeds the rehearsal database, boots a PHP built-in server, and runs the IBL5 smoke battery against it. A new `SMOKE_REHEARSAL_MODE` env var in `bin/smoke-prod` broadens the API accept-list (404 is valid without `.htaccess` rewrites) and skips the CSS asset check (no Tailwind build in rehearsal).
 
-### Pre-migrate backup freshness gate
-
-A new `bin/check-backup-freshness` script verifies the hosting provider's most recent DB snapshot is within a configurable age threshold. It runs on the prod box via `scp` + `ssh` before the migration step. The backup directory path, age threshold, and bypass flag are configured via GitHub Actions repository variables (`vars.BACKUP_DIR`, `vars.BACKUP_MAX_AGE_HOURS`, `vars.SKIP_BACKUP_CHECK`).
-
-The step uses `continue-on-error` when `BACKUP_DIR` is unset, so the gate is non-blocking until the operator discovers the correct path via SSH and sets the variable.
-
 ## Alternatives Considered
 
 - **Inline sentinel in step names (use YAML step name metadata)** — GitHub Actions doesn't expose the failing step name as an output or env var in `if: failure()` jobs. The sentinel file is the simplest reliable approach.
-- **Skip the backup check entirely** — acceptable for small/reversible migrations, but the project runs destructive migrations (column renames, table drops) that are unrecoverable without a backup.
 - **Use `php -r` to read the last migration via config.php** — considered but rejected in favor of `mysql -N -e` to avoid nested escaping issues (triple-quoted PHP inside single-quoted SSH inside YAML).
 
 ## Consequences
 
 - Positive: operators diagnose deploy failures from the Discord DM without opening the run log.
 - Positive: HTTP-level regressions (broken routes, syntax errors) are caught before production.
-- Positive: stale-backup deploys are blocked before migrations touch the database.
-- Negative: `bin/check-backup-freshness` requires operator SSH discovery (Phase C.0) to identify the correct backup directory path on the hosting provider.
 - Negative: deploy-rehearsal adds ~30s (PHP server boot + smoke checks) to every rehearsal run.
 
 ## References
 
-- `.github/workflows/main.yml` — sentinel writes, backup freshness step, enriched notifications
+- `.github/workflows/main.yml` — sentinel writes, enriched notifications
 - `.github/workflows/smoke-prod.yml` — removed re-smoke steps
 - `.github/workflows/deploy-rehearsal.yml` — seed, boot, smoke, teardown steps
 - `bin/smoke-prod` — `SMOKE_REHEARSAL_MODE` env var
-- `bin/check-backup-freshness` — backup freshness script
+- Pre-migrate backup freshness gate reverted 2026-05-14: SSH-based freshness check could not see JetBackup 5's snapshot directory; weekly/monthly JetBackup snapshots cover the recovery need for now.

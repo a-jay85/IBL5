@@ -326,6 +326,37 @@ class LeagueControlPanelRepositoryTest extends DatabaseTestCase
         return is_array($row) ? $row : null;
     }
 
+    // ── hasGeneratedAwardsForYear ──────────────────────────────────
+
+    public function testHasGeneratedAwardsForYearReturnsTrueWhenMvpExists(): void
+    {
+        $this->insertRow('ibl_awards', [
+            'year' => 2099,
+            'award' => 'Most Valuable Player (1st)',
+            'name' => 'Test Player',
+        ]);
+
+        self::assertTrue($this->repo->hasGeneratedAwardsForYear(2099));
+    }
+
+    public function testHasGeneratedAwardsForYearReturnsFalseWhenNoMvp(): void
+    {
+        self::assertFalse($this->repo->hasGeneratedAwardsForYear(2099));
+    }
+
+    // ── getEoyVotesCastCount ───────────────────────────────────────
+
+    public function testGetEoyVotesCastCountReturnsCorrectCount(): void
+    {
+        // CI seed has all 28 teams with eoy_vote = 'No Vote' by default
+        // Set some votes to a non-default value
+        $this->db->query("UPDATE ibl_team_info SET eoy_vote = '2026-01-15' WHERE teamid IN (1, 2, 3)");
+
+        $count = $this->repo->getEoyVotesCastCount();
+
+        self::assertSame(3, $count);
+    }
+
     // ── setFreeAgencyFactorsForPfw ──────────────────────────────
 
     public function testSetFreeAgencyFactorsForPfwUpdatesTeamInfo(): void

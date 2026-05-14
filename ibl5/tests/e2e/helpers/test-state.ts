@@ -41,6 +41,20 @@ export async function setState(
   return (await response.json()) as SetStateResult;
 }
 
+export async function setEoyVotes(
+  request: APIRequestContext,
+  count: number,
+): Promise<void> {
+  const response = await request.delete(
+    `test-state.php?action=set-eoy-votes&count=${count}`,
+  );
+  if (!response.ok()) {
+    throw new Error(
+      `test-state.php set-eoy-votes failed: ${response.status()} ${await response.text()}`,
+    );
+  }
+}
+
 export type SetStateFn = (settings: Settings) => Promise<SetStateResult>;
 
 /**

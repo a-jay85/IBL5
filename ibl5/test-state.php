@@ -159,6 +159,29 @@ if ($method === 'DELETE' && $action === 'delete-test-user') {
     exit;
 }
 
+// DELETE ?action=set-eoy-votes&count=N — set N teams as having voted for E2E
+// testing of the updater awards step. Teams 1..count get a non-default vote,
+// teams (count+1)..28 get reset to 'No Vote'.
+if ($method === 'DELETE' && $action === 'set-eoy-votes') {
+    $count = (int)($_GET['count'] ?? -1);
+    if ($count < 0 || $count > 28) {
+        http_response_code(400);
+        echo json_encode(['error' => 'set-eoy-votes count must be 0-28']);
+        $db->close();
+        exit;
+    }
+    if ($count > 0) {
+        $db->query("UPDATE ibl_team_info SET eoy_vote = NOW() WHERE teamid BETWEEN 1 AND $count");
+    }
+    if ($count < 28) {
+        $next = $count + 1;
+        $db->query("UPDATE ibl_team_info SET eoy_vote = 'No Vote' WHERE teamid BETWEEN $next AND 28");
+    }
+    echo json_encode(['set' => $count]);
+    $db->close();
+    exit;
+}
+
 if ($method === 'GET') {
     $result = $db->query('SELECT name, value FROM ibl_settings');
     $settings = [];

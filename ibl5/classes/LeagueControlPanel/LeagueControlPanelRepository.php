@@ -335,4 +335,30 @@ class LeagueControlPanelRepository extends \BaseMysqliRepository implements Leag
 
         return $row !== null;
     }
+
+    /**
+     * @see LeagueControlPanelRepositoryInterface::hasGeneratedAwardsForYear()
+     */
+    public function hasGeneratedAwardsForYear(int $year): bool
+    {
+        $row = $this->fetchOne(
+            "SELECT table_id FROM ibl_awards WHERE year = ? AND award = 'Most Valuable Player (1st)' LIMIT 1",
+            'i',
+            $year
+        );
+        return $row !== null;
+    }
+
+    /**
+     * @see LeagueControlPanelRepositoryInterface::getEoyVotesCastCount()
+     */
+    public function getEoyVotesCastCount(): int
+    {
+        /** @var array{cnt: int}|null $row */
+        $row = $this->fetchOne(
+            "SELECT COUNT(*) AS cnt FROM ibl_team_info WHERE eoy_vote != 'No Vote' AND teamid BETWEEN 1 AND " . League::MAX_REAL_TEAMID,
+            ""
+        );
+        return $row !== null ? $row['cnt'] : 0;
+    }
 }

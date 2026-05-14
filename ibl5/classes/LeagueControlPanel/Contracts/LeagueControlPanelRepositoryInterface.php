@@ -197,4 +197,21 @@ interface LeagueControlPanelRepositoryInterface
      * @return int Number of deleted rows
      */
     public function deleteOutdatedBuyoutsAndCash(): int;
+
+    /**
+     * Check if season awards have been generated for the given year.
+     *
+     * Uses "Most Valuable Player (1st)" as the sentinel award.
+     *
+     * @param int $year Season ending year
+     * @return bool True if awards exist
+     */
+    public function hasGeneratedAwardsForYear(int $year): bool;
+
+    /**
+     * Count how many teams have cast their EOY vote.
+     *
+     * @return int Number of votes cast (eoy_vote != 'No Vote')
+     */
+    public function getEoyVotesCastCount(): int;
 }

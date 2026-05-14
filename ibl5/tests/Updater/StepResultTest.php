@@ -32,6 +32,7 @@ class StepResultTest extends TestCase
 
         $this->assertSame('', $result->detail);
         $this->assertSame('', $result->capturedLog);
+        $this->assertFalse($result->collapsibleLog);
         $this->assertSame('', $result->inlineHtml);
         $this->assertSame('', $result->errorMessage);
         $this->assertSame([], $result->messages);
@@ -77,6 +78,7 @@ class StepResultTest extends TestCase
 
         $this->assertSame('', $result->detail);
         $this->assertSame('', $result->capturedLog);
+        $this->assertFalse($result->collapsibleLog);
         $this->assertSame('', $result->inlineHtml);
         $this->assertSame([], $result->messages);
         $this->assertSame(0, $result->messageErrorCount);
@@ -103,6 +105,7 @@ class StepResultTest extends TestCase
 
         $this->assertSame('', $result->errorMessage);
         $this->assertSame('', $result->capturedLog);
+        $this->assertFalse($result->collapsibleLog);
         $this->assertSame('', $result->inlineHtml);
         $this->assertSame([], $result->messages);
         $this->assertSame(0, $result->messageErrorCount);

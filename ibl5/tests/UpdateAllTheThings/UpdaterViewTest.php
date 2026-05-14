@@ -156,6 +156,41 @@ class UpdaterViewTest extends TestCase
         $this->assertStringNotContainsString('<details', $result);
     }
 
+    public function testRenderCollapsibleLogWrapsInDetailsElement(): void
+    {
+        $result = $this->view->renderCollapsibleLog('<p>Computing standings...</p>');
+
+        $this->assertStringContainsString('<details', $result);
+        $this->assertStringContainsString('<summary', $result);
+        $this->assertStringContainsString('Click for details', $result);
+        $this->assertStringContainsString('updater-details', $result);
+        $this->assertStringContainsString('updater-details__summary', $result);
+        $this->assertStringContainsString('updater-details__content', $result);
+        $this->assertStringContainsString('<p>Computing standings...</p>', $result);
+        $this->assertStringContainsString('updater-log', $result);
+    }
+
+    public function testRenderCollapsibleLogReturnsEmptyForBlank(): void
+    {
+        $this->assertSame('', $this->view->renderCollapsibleLog(''));
+        $this->assertSame('', $this->view->renderCollapsibleLog('   '));
+    }
+
+    public function testRenderCollapsibleLogEscapesSummaryLabel(): void
+    {
+        $result = $this->view->renderCollapsibleLog('<p>Content</p>', '<script>alert(1)</script>');
+
+        $this->assertStringNotContainsString('<script>', $result);
+        $this->assertStringContainsString('&lt;script&gt;', $result);
+    }
+
+    public function testRenderCollapsibleLogPreservesTrustedHtmlBody(): void
+    {
+        $result = $this->view->renderCollapsibleLog('<p>Updating the ibl_standings table...</p>');
+
+        $this->assertStringContainsString('<p>Updating the ibl_standings table...</p>', $result);
+    }
+
     public function testRenderLogReturnsEmptyStringForEmptyOutput(): void
     {
         $this->assertSame('', $this->view->renderLog(''));

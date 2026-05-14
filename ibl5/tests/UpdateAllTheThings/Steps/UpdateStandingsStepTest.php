@@ -51,5 +51,6 @@ class UpdateStandingsStepTest extends TestCase
 
         $this->assertTrue($result->success);
         $this->assertSame('<p>Computing standings...</p>', $result->capturedLog);
+        $this->assertTrue($result->collapsibleLog);
     }
 }

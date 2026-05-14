@@ -89,7 +89,9 @@ class UpdaterController implements UpdaterControllerInterface
             }
 
             if ($result->capturedLog !== '') {
-                echo $this->view->renderLog($result->capturedLog);
+                echo $result->collapsibleLog
+                    ? $this->view->renderCollapsibleLog($result->capturedLog)
+                    : $this->view->renderLog($result->capturedLog);
             }
 
             if ($result->messages !== [] || $result->messageErrorCount > 0) {

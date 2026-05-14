@@ -17,6 +17,7 @@ class StepResultTest extends TestCase
         $this->assertTrue($result->success);
         $this->assertSame('', $result->detail);
         $this->assertSame('', $result->capturedLog);
+        $this->assertFalse($result->collapsibleLog);
         $this->assertSame('', $result->inlineHtml);
         $this->assertSame('', $result->errorMessage);
         $this->assertSame([], $result->messages);
@@ -53,6 +54,7 @@ class StepResultTest extends TestCase
         $this->assertSame('Connection refused', $result->errorMessage);
         $this->assertSame('', $result->detail);
         $this->assertSame('', $result->capturedLog);
+        $this->assertFalse($result->collapsibleLog);
         $this->assertSame('', $result->inlineHtml);
         $this->assertSame([], $result->messages);
         $this->assertSame(0, $result->messageErrorCount);
@@ -67,6 +69,7 @@ class StepResultTest extends TestCase
         $this->assertSame('No IBL5.plr file found', $result->detail);
         $this->assertSame('', $result->errorMessage);
         $this->assertSame('', $result->capturedLog);
+        $this->assertFalse($result->collapsibleLog);
         $this->assertSame('', $result->inlineHtml);
         $this->assertSame([], $result->messages);
         $this->assertSame(0, $result->messageErrorCount);

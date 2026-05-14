@@ -158,6 +158,26 @@ class UpdaterView implements Contracts\UpdaterViewInterface
     }
 
     /**
+     * @see UpdaterViewInterface::renderCollapsibleLog()
+     */
+    public function renderCollapsibleLog(string $capturedOutput, string $summaryLabel = 'Click for details'): string
+    {
+        $trimmed = trim($capturedOutput);
+        if ($trimmed === '') {
+            return '';
+        }
+
+        $safeSummary = HtmlSanitizer::safeHtmlOutput($summaryLabel);
+
+        return '<div class="updater-log">'
+            . '<details class="updater-details">'
+            . '<summary class="updater-details__summary">' . $safeSummary . '</summary>'
+            . '<div class="updater-details__content">' . $trimmed . '</div>'
+            . '</details>'
+            . '</div>';
+    }
+
+    /**
      * Render trusted HTML inline within the pipeline's visual framework.
      *
      * Used for embedding output from other View classes (BoxscoreView, LeagueConfigView)

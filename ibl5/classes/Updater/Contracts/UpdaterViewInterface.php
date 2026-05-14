@@ -50,6 +50,11 @@ interface UpdaterViewInterface
     public function renderLog(string $capturedOutput): string;
 
     /**
+     * Render captured output inside a collapsible details/summary element.
+     */
+    public function renderCollapsibleLog(string $capturedOutput, string $summaryLabel = 'Click for details'): string;
+
+    /**
      * Render trusted HTML inline within the pipeline's visual framework.
      */
     public function renderInlineHtml(string $trustedHtml): string;

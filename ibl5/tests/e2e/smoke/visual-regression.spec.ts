@@ -39,6 +39,8 @@ type ModuleSnapshot = {
   extraMask?: string[];
   /** Per-row override for `maxDiffPixelRatio`. */
   extraMaxDiffPixelRatio?: number;
+  /** Screenshot the anchor element instead of the full page. */
+  elementScreenshot?: boolean;
   /** Mobile viewport (375×812) instead of desktop 1280×900. */
   mobile?: boolean;
   /**
@@ -100,7 +102,7 @@ const PUBLIC_MODULES: ModuleSnapshot[] = [
   { name: 'season-archive', url: 'modules.php?name=SeasonArchive', anchor: '.ibl-data-table' },
   { name: 'season-highs', url: 'modules.php?name=SeasonHighs', anchor: '.ibl-data-table' },
   { name: 'season-leaderboards', url: 'modules.php?name=SeasonLeaderboards', anchor: '.ibl-data-table',
-    extraMaxDiffPixelRatio: 0.1 },
+    elementScreenshot: true },
   { name: 'series-records', url: 'modules.php?name=SeriesRecords', anchor: '.ibl-data-table' },
   { name: 'site-statistics', url: 'modules.php?name=SiteStatistics', anchor: '#site-content' },
   { name: 'standings', url: 'modules.php?name=Standings', anchor: '.ibl-data-table' },
@@ -143,14 +145,21 @@ async function captureSnapshot(page: Page, row: ModuleSnapshot): Promise<void> {
   await page.waitForLoadState('networkidle');
   const anchor = page.locator(row.anchor).first();
   await anchor.waitFor({ state: 'visible' });
-  await expect(page).toHaveScreenshot(`${row.name}.png`, {
-    fullPage: true,
-    animations: 'disabled',
+  const screenshotOpts = {
+    animations: 'disabled' as const,
     mask: buildMasks(page, row.extraMask),
     ...(row.extraMaxDiffPixelRatio !== undefined
       ? { maxDiffPixelRatio: row.extraMaxDiffPixelRatio }
       : {}),
-  });
+  };
+  if (row.elementScreenshot) {
+    await expect(anchor).toHaveScreenshot(`${row.name}.png`, screenshotOpts);
+  } else {
+    await expect(page).toHaveScreenshot(`${row.name}.png`, {
+      fullPage: true,
+      ...screenshotOpts,
+    });
+  }
 }
 
 // ============================================================

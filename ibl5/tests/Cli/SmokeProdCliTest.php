@@ -197,17 +197,108 @@ final class SmokeProdCliTest extends TestCase
     }
 
     // =========================================================================
+    // Post-impl: SMOKE_REHEARSAL_MODE
+    // =========================================================================
+
+    public function testRehearsalModeBroadensApiAcceptList(): void
+    {
+        $this->startServer('ibl5', healthy: true, pathStatusOverrides: [
+            'api/v1/season' => 404,
+        ]);
+
+        $result = $this->runSmoke(scope: 'ibl5', rehearsalMode: true);
+
+        self::assertSame(0, $result['exit'], "Output: {$result['output']}");
+        self::assertStringContainsString('OK: API routing', $result['output']);
+    }
+
+    public function testRehearsalModeSkipsCssAsset(): void
+    {
+        $this->startServer('ibl5', healthy: true, pathStatusOverrides: [
+            'style.css' => 404,
+        ]);
+
+        $result = $this->runSmoke(scope: 'ibl5', rehearsalMode: true);
+
+        self::assertSame(0, $result['exit'], "Output: {$result['output']}");
+        self::assertStringContainsString('SKIP: CSS asset (rehearsal mode)', $result['output']);
+        self::assertStringNotContainsString('FAIL: CSS asset', $result['output']);
+    }
+
+    public function testRehearsalModeDoesNotAffectOtherChecks(): void
+    {
+        $this->startServer('ibl5', healthy: false);
+
+        $result = $this->runSmoke(scope: 'ibl5', rehearsalMode: true);
+
+        self::assertSame(1, $result['exit']);
+        self::assertStringContainsString('FAIL: Homepage', $result['output']);
+    }
+
+    public function testProductionModeApi404StillFails(): void
+    {
+        $this->startServer('ibl5', healthy: true, pathStatusOverrides: [
+            'api/v1/season' => 404,
+        ]);
+
+        $result = $this->runSmoke(scope: 'ibl5', rehearsalMode: false);
+
+        self::assertSame(1, $result['exit']);
+        self::assertStringContainsString('FAIL: API routing', $result['output']);
+    }
+
+    public function testProductionModeCss404StillFails(): void
+    {
+        $this->startServer('ibl5', healthy: true, pathStatusOverrides: [
+            'style.css' => 404,
+        ]);
+
+        $result = $this->runSmoke(scope: 'ibl5', rehearsalMode: false);
+
+        self::assertSame(1, $result['exit']);
+        self::assertStringContainsString('FAIL: CSS asset', $result['output']);
+    }
+
+    public function testHelpDocumentsRehearsalMode(): void
+    {
+        $result = $this->runRaw('--help');
+
+        self::assertSame(0, $result['exit']);
+        self::assertStringContainsString('SMOKE_REHEARSAL_MODE', $result['output']);
+    }
+
+    // =========================================================================
     // Helpers
     // =========================================================================
 
-    private function startServer(string $name, bool $healthy): void
-    {
+    /**
+     * @param array<string, int> $pathStatusOverrides path-substring => HTTP status
+     */
+    private function startServer(
+        string $name,
+        bool $healthy,
+        array $pathStatusOverrides = [],
+    ): void {
         $port = $this->findFreePort();
         $this->ports[$name] = $port;
 
-        $routerContent = $healthy
-            ? '<?php http_response_code(200); echo "IBL Standings team player Sign In";'
-            : '<?php http_response_code(500); echo "Server Error";';
+        if ($pathStatusOverrides !== []) {
+            $cases = '';
+            foreach ($pathStatusOverrides as $pathMatch => $status) {
+                $cases .= sprintf(
+                    'if (strpos($_SERVER["REQUEST_URI"], %s) !== false) { http_response_code(%d); echo ""; exit; } ',
+                    var_export($pathMatch, true),
+                    $status,
+                );
+            }
+            $defaultStatus = $healthy ? 200 : 500;
+            $defaultBody = $healthy ? 'IBL Standings team player Sign In' : 'Server Error';
+            $routerContent = "<?php {$cases} http_response_code({$defaultStatus}); echo \"{$defaultBody}\";";
+        } else {
+            $routerContent = $healthy
+                ? '<?php http_response_code(200); echo "IBL Standings team player Sign In";'
+                : '<?php http_response_code(500); echo "Server Error";';
+        }
 
         $routerFile = $this->fixtureDir . "/router-{$name}.php";
         file_put_contents($routerFile, $routerContent);
@@ -258,13 +349,20 @@ final class SmokeProdCliTest extends TestCase
      * Run bin/smoke-prod with --scope and env overrides.
      * @return array{output: string, exit: int}
      */
-    private function runSmoke(string $scope, ?string $ibl6Url = null): array
-    {
+    private function runSmoke(
+        string $scope,
+        ?string $ibl6Url = null,
+        bool $rehearsalMode = false,
+    ): array {
         $baseUrl = isset($this->ports['ibl5'])
             ? 'http://127.0.0.1:' . $this->ports['ibl5']
             : 'http://127.0.0.1:1';
 
         $env = 'SMOKE_INTERCHECK_DELAY=0 SMOKE_RETRY_DELAY=0';
+
+        if ($rehearsalMode) {
+            $env .= ' SMOKE_REHEARSAL_MODE=1';
+        }
 
         if ($ibl6Url !== null) {
             $env .= ' SMOKE_IBL6_URL=' . escapeshellarg($ibl6Url);

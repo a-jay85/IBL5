@@ -1,0 +1,62 @@
+#!/usr/bin/env bash
+# Verify hosting provider's most recent DB snapshot is within the freshness threshold.
+#
+# Environment:
+#   BACKUP_DIR              REQUIRED. Absolute path to provider's snapshot directory.
+#   BACKUP_MAX_AGE_HOURS    Threshold in hours (default: 26).
+#   SKIP_BACKUP_CHECK       If "1", bypass with a warning (exit 0).
+#
+# Exit codes: 0 = fresh (or skipped), 1 = stale/missing, 2 = usage error.
+
+set -euo pipefail
+
+if [ "${1:-}" = "--help" ]; then
+    echo "Usage: check-backup-freshness [--help]"
+    echo ""
+    echo "Environment:"
+    echo "  BACKUP_DIR              Absolute path to provider's snapshot directory"
+    echo "  BACKUP_MAX_AGE_HOURS    Threshold in hours (default: 26)"
+    echo "  SKIP_BACKUP_CHECK       Set to 1 to bypass with a warning"
+    exit 0
+fi
+
+if [ "${SKIP_BACKUP_CHECK:-0}" = "1" ]; then
+    echo "WARNING: backup freshness check bypassed (SKIP_BACKUP_CHECK=1)"
+    exit 0
+fi
+
+if [ -z "${BACKUP_DIR:-}" ]; then
+    echo "error: BACKUP_DIR is required" >&2
+    exit 2
+fi
+
+if [ ! -d "$BACKUP_DIR" ]; then
+    echo "error: backup directory not found: $BACKUP_DIR" >&2
+    exit 1
+fi
+
+THRESHOLD="${BACKUP_MAX_AGE_HOURS:-26}"
+NOW=$(date +%s)
+
+if stat -c %Y / >/dev/null 2>&1; then
+    STAT_FMT=(-c %Y)
+else
+    STAT_FMT=(-f %m)
+fi
+NEWEST_MTIME=$(find "$BACKUP_DIR" -mindepth 1 -maxdepth 1 \( -type f -o -type d \) -exec stat "${STAT_FMT[@]}" {} \; 2>/dev/null | sort -nr | head -1)
+
+if [ -z "$NEWEST_MTIME" ]; then
+    echo "error: no backup files found in $BACKUP_DIR" >&2
+    exit 1
+fi
+
+AGE_SECONDS=$((NOW - NEWEST_MTIME))
+AGE_HOURS=$((AGE_SECONDS / 3600))
+THRESHOLD_SECONDS=$((THRESHOLD * 3600))
+
+if [ "$AGE_SECONDS" -gt "$THRESHOLD_SECONDS" ]; then
+    echo "error: newest backup is ${AGE_HOURS}h old (threshold: ${THRESHOLD}h). Trigger a manual snapshot or set BACKUP_MAX_AGE_HOURS to override." >&2
+    exit 1
+fi
+
+echo "Newest backup: ${AGE_HOURS}h old (threshold: ${THRESHOLD}h) — OK"

@@ -142,6 +142,29 @@ class TeamOffDefStatsRepositoryTest extends DatabaseTestCase
         }
     }
 
+    public function testGetAllTeamStatsExcludesNonRegularSeasonGames(): void
+    {
+        $this->insertFranchiseSeasonRow(1, 2096, 'Metros');
+
+        // January = regular season (game_type=1)
+        $this->insertTeamBoxscoreRow('2096-01-15', 'Metros', 1, 2, 1);
+
+        // June = playoffs (game_type=2) — should be excluded by default
+        $this->insertTeamBoxscoreRow('2096-06-15', 'Metros', 1, 2, 1);
+
+        $stats = $this->repo->getAllTeamStats(2096);
+        $metros = null;
+        foreach ($stats as $row) {
+            if ($row['teamid'] === 1) {
+                $metros = $row;
+                break;
+            }
+        }
+
+        self::assertNotNull($metros);
+        self::assertSame(1, $metros['offense_games']);
+    }
+
     public function testGetTeamBothStatsExcludesNonRegularSeason(): void
     {
         $this->insertFranchiseSeasonRow(1, 2098, 'Metros');
@@ -154,6 +177,52 @@ class TeamOffDefStatsRepositoryTest extends DatabaseTestCase
         $result = $this->repo->getTeamBothStats('Metros', 2098);
 
         self::assertNull($result);
+    }
+
+    public function testGetAllTeamStatsWithMultipleGameTypes(): void
+    {
+        $this->insertFranchiseSeasonRow(1, 2095, 'Metros');
+
+        // January = regular season (game_type=1)
+        $this->insertTeamBoxscoreRow('2095-01-15', 'Metros', 1, 2, 1);
+
+        // June = playoffs (game_type=2)
+        $this->insertTeamBoxscoreRow('2095-06-15', 'Metros', 1, 2, 1);
+
+        $stats = $this->repo->getAllTeamStats(2095, [1, 2]);
+        $metros = null;
+        foreach ($stats as $row) {
+            if ($row['teamid'] === 1) {
+                $metros = $row;
+                break;
+            }
+        }
+
+        self::assertNotNull($metros);
+        self::assertSame(2, $metros['offense_games']);
+    }
+
+    public function testGetAllTeamStatsWithPreseasonGameType(): void
+    {
+        $this->insertFranchiseSeasonRow(1, 2095, 'Metros');
+
+        // October 2094 → game_type=3, season_year=2095
+        $this->insertTeamBoxscoreRow('2094-10-15', 'Metros', 1, 2, 1);
+
+        // January 2095 → game_type=1, season_year=2095
+        $this->insertTeamBoxscoreRow('2095-01-15', 'Metros', 1, 2, 1);
+
+        $stats = $this->repo->getAllTeamStats(2095, [3]);
+        $metros = null;
+        foreach ($stats as $row) {
+            if ($row['teamid'] === 1) {
+                $metros = $row;
+                break;
+            }
+        }
+
+        self::assertNotNull($metros);
+        self::assertSame(1, $metros['offense_games']);
     }
 
     public function testGetTeamBothStatsForDateRangeReturnsNullWhenNoData(): void

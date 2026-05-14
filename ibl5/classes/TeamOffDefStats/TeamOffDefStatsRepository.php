@@ -32,12 +32,24 @@ class TeamOffDefStatsRepository extends \BaseMysqliRepository implements TeamOff
     }
 
     /**
-     * Get all team statistics (offense and defense) in a single bulk query
-     *
-     * @see TeamOffDefStatsRepositoryInterface::getAllTeamStats()
-     * @return list<AllTeamStatsRow> Array of team statistics rows ordered by team name
+     * @return list<int>
      */
-    public function getAllTeamStats(int $seasonYear): array
+    public static function gameTypesForPhase(string $phase): array
+    {
+        return match ($phase) {
+            'Preseason', 'HEAT' => [3],
+            'Regular Season' => [1],
+            'Playoffs', 'Free Agency', 'Draft' => [1, 2],
+            default => [1],
+        };
+    }
+
+    /**
+     * @see TeamOffDefStatsRepositoryInterface::getAllTeamStats()
+     * @param list<int> $gameTypes
+     * @return list<AllTeamStatsRow>
+     */
+    public function getAllTeamStats(int $seasonYear, array $gameTypes = [1]): array
     {
         $query = "
             SELECT
@@ -75,8 +87,8 @@ class TeamOffDefStatsRepository extends \BaseMysqliRepository implements TeamOff
                 tds.blk AS defense_blk,
                 tds.pf AS defense_pf
             FROM ibl_team_info ti
-            LEFT JOIN (" . self::buildOffenseSubquery('bst.season_year = ?') . ") tos ON ti.teamid = tos.teamid
-            LEFT JOIN (" . self::buildDefenseSubquery('my.season_year = ?') . ") tds ON ti.teamid = tds.teamid
+            LEFT JOIN (" . self::buildOffenseSubquery('bst.season_year = ?', $gameTypes) . ") tos ON ti.teamid = tos.teamid
+            LEFT JOIN (" . self::buildDefenseSubquery('my.season_year = ?', $gameTypes) . ") tds ON ti.teamid = tds.teamid
             WHERE ti.teamid BETWEEN 1 AND " . League::MAX_REAL_TEAMID . "
             ORDER BY ti.team_city
         ";
@@ -86,8 +98,6 @@ class TeamOffDefStatsRepository extends \BaseMysqliRepository implements TeamOff
     }
 
     /**
-     * Get team offense statistics by team name
-     *
      * @see TeamOffDefStatsRepositoryInterface::getTeamOffenseStats()
      * @param string $teamName Team name
      * @param int $seasonYear Season ending year
@@ -97,7 +107,7 @@ class TeamOffDefStatsRepository extends \BaseMysqliRepository implements TeamOff
     {
         /** @var TeamOffenseStatsRow|null */
         return $this->fetchOne(
-            "SELECT * FROM (" . self::buildOffenseSubquery('bst.season_year = ? AND fs.team_name = ?') . ") t LIMIT 1",
+            "SELECT * FROM (" . self::buildOffenseSubquery('bst.season_year = ? AND fs.team_name = ?', [1]) . ") t LIMIT 1",
             "is",
             $seasonYear,
             $teamName
@@ -105,8 +115,6 @@ class TeamOffDefStatsRepository extends \BaseMysqliRepository implements TeamOff
     }
 
     /**
-     * Get team defense statistics by team name
-     *
      * @see TeamOffDefStatsRepositoryInterface::getTeamDefenseStats()
      * @param string $teamName Team name
      * @param int $seasonYear Season ending year
@@ -116,7 +124,7 @@ class TeamOffDefStatsRepository extends \BaseMysqliRepository implements TeamOff
     {
         /** @var TeamDefenseStatsRow|null */
         return $this->fetchOne(
-            "SELECT * FROM (" . self::buildDefenseSubquery('my.season_year = ? AND fs.team_name = ?') . ") t LIMIT 1",
+            "SELECT * FROM (" . self::buildDefenseSubquery('my.season_year = ? AND fs.team_name = ?', [1]) . ") t LIMIT 1",
             "is",
             $seasonYear,
             $teamName
@@ -124,8 +132,6 @@ class TeamOffDefStatsRepository extends \BaseMysqliRepository implements TeamOff
     }
 
     /**
-     * Get both offense and defense statistics for a team in a single JOIN query
-     *
      * @see TeamOffDefStatsRepositoryInterface::getTeamBothStats()
      * @param string $teamName Team name
      * @param int $seasonYear Season ending year
@@ -133,6 +139,8 @@ class TeamOffDefStatsRepository extends \BaseMysqliRepository implements TeamOff
      */
     public function getTeamBothStats(string $teamName, int $seasonYear, bool $regularSeasonOnly = true): ?array
     {
+        $gameTypes = $regularSeasonOnly ? [1] : [];
+
         /** @var array<string, int|string|null>|null $row */
         $row = $this->fetchOne(
             "SELECT
@@ -146,8 +154,8 @@ class TeamOffDefStatsRepository extends \BaseMysqliRepository implements TeamOff
                 tds.ftm AS tds_ftm, tds.fta AS tds_fta, tds.tgm AS tds_tgm, tds.tga AS tds_tga,
                 tds.orb AS tds_orb, tds.reb AS tds_reb, tds.ast AS tds_ast, tds.stl AS tds_stl,
                 tds.tvr AS tds_tvr, tds.blk AS tds_blk, tds.pf AS tds_pf
-            FROM (" . self::buildOffenseSubquery('bst.season_year = ? AND fs.team_name = ?', $regularSeasonOnly) . ") tos
-            JOIN (" . self::buildDefenseSubquery('my.season_year = ? AND fs.team_name = ?', $regularSeasonOnly) . ") tds
+            FROM (" . self::buildOffenseSubquery('bst.season_year = ? AND fs.team_name = ?', $gameTypes) . ") tos
+            JOIN (" . self::buildDefenseSubquery('my.season_year = ? AND fs.team_name = ?', $gameTypes) . ") tds
                 ON tos.teamid = tds.teamid AND tos.season_year = tds.season_year
             LIMIT 1",
             "isis",
@@ -183,8 +191,8 @@ class TeamOffDefStatsRepository extends \BaseMysqliRepository implements TeamOff
                 tds.ftm AS tds_ftm, tds.fta AS tds_fta, tds.tgm AS tds_tgm, tds.tga AS tds_tga,
                 tds.orb AS tds_orb, tds.reb AS tds_reb, tds.ast AS tds_ast, tds.stl AS tds_stl,
                 tds.tvr AS tds_tvr, tds.blk AS tds_blk, tds.pf AS tds_pf
-            FROM (" . self::buildOffenseSubquery('bst.game_date BETWEEN ? AND ? AND fs.team_name = ?', false) . ") tos
-            JOIN (" . self::buildDefenseSubquery('my.game_date BETWEEN ? AND ? AND fs.team_name = ?', false) . ") tds
+            FROM (" . self::buildOffenseSubquery('bst.game_date BETWEEN ? AND ? AND fs.team_name = ?', []) . ") tos
+            JOIN (" . self::buildDefenseSubquery('my.game_date BETWEEN ? AND ? AND fs.team_name = ?', []) . ") tds
                 ON tos.teamid = tds.teamid
             LIMIT 1",
             "ssssss",
@@ -255,14 +263,27 @@ class TeamOffDefStatsRepository extends \BaseMysqliRepository implements TeamOff
     }
 
     /**
-     * Build inlined offense stats subquery with filter pushed before GROUP BY.
-     *
-     * Replaces ibl_team_offense_stats view which materializes ALL seasons
-     * before filtering.
+     * @param list<int> $gameTypes Empty array = no filter
      */
-    private static function buildOffenseSubquery(string $filterClause, bool $regularSeasonOnly = true): string
+    private static function buildGameTypeFilter(string $alias, array $gameTypes): string
     {
-        $gameTypeFilter = $regularSeasonOnly ? 'bst.game_type = 1 AND ' : '';
+        if ($gameTypes === []) {
+            return '';
+        }
+
+        $safeTypes = array_map('intval', $gameTypes);
+
+        return count($safeTypes) === 1
+            ? "{$alias}.game_type = {$safeTypes[0]} AND "
+            : "{$alias}.game_type IN (" . implode(', ', $safeTypes) . ') AND ';
+    }
+
+    /**
+     * @param list<int> $gameTypes
+     */
+    private static function buildOffenseSubquery(string $filterClause, array $gameTypes = [1]): string
+    {
+        $gameTypeFilter = self::buildGameTypeFilter('bst', $gameTypes);
 
         return "SELECT fs.franchise_id AS teamid, fs.team_name AS name, bst.season_year,
             CAST(COUNT(*) AS SIGNED) AS games,
@@ -287,14 +308,11 @@ class TeamOffDefStatsRepository extends \BaseMysqliRepository implements TeamOff
     }
 
     /**
-     * Build inlined defense stats subquery with filter pushed before GROUP BY.
-     *
-     * Replaces ibl_team_defense_stats view which materializes ALL seasons
-     * before filtering.
+     * @param list<int> $gameTypes
      */
-    private static function buildDefenseSubquery(string $filterClause, bool $regularSeasonOnly = true): string
+    private static function buildDefenseSubquery(string $filterClause, array $gameTypes = [1]): string
     {
-        $gameTypeFilter = $regularSeasonOnly ? 'my.game_type = 1 AND ' : '';
+        $gameTypeFilter = self::buildGameTypeFilter('my', $gameTypes);
 
         return "SELECT fs.franchise_id AS teamid, fs.team_name AS name, my.season_year,
             CAST(COUNT(*) AS SIGNED) AS games,

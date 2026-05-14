@@ -1,23 +1,54 @@
-import { test, expect } from '../fixtures/base';
+import { test, expect } from '../fixtures/public';
 import { assertNoPhpErrors } from '../helpers/php-errors';
-import { publicStorageState } from '../helpers/public-storage-state';
-
-// Team Offense/Defense Stats — public page, no authentication required.
-test.use({ storageState: publicStorageState() });
 
 test.describe('Team Stats flow', () => {
-  test.beforeEach(async ({ page }) => {
+  test('page renders tables during Regular Season', async ({
+    appState,
+    page,
+  }) => {
+    await appState({
+      'Current Season Phase': 'Regular Season',
+      'Current Season Ending Year': '2026',
+    });
     await page.goto('modules.php?name=TeamOffDefStats');
-  });
 
-  test('page loads with title containing Statistics', async ({ page }) => {
     const title = page.locator('.ibl-title').first();
     await expect(title).toBeVisible();
-    const titleText = await title.textContent();
-    expect(titleText?.toLowerCase()).toContain('statistic');
+    await expect(page.locator('.ibl-data-table').first()).toBeVisible();
   });
 
-  test('all 5 section headings visible', async ({ page }) => {
+  test('page renders tables during Playoffs', async ({ appState, page }) => {
+    await appState({
+      'Current Season Phase': 'Playoffs',
+      'Current Season Ending Year': '2026',
+    });
+    await page.goto('modules.php?name=TeamOffDefStats');
+
+    const title = page.locator('.ibl-title').first();
+    await expect(title).toBeVisible();
+    await expect(page.locator('.ibl-data-table').first()).toBeVisible();
+  });
+
+  test('page renders tables during Preseason', async ({ appState, page }) => {
+    await appState({
+      'Current Season Phase': 'Preseason',
+      'Current Season Ending Year': '2026',
+    });
+    await page.goto('modules.php?name=TeamOffDefStats');
+
+    const title = page.locator('.ibl-title').first();
+    await expect(title).toBeVisible();
+    // Preseason may have no data — tables still render with empty rows
+    await expect(page.locator('.ibl-data-table').first()).toBeVisible();
+  });
+
+  test('all 5 section headings visible', async ({ appState, page }) => {
+    await appState({
+      'Current Season Phase': 'Regular Season',
+      'Current Season Ending Year': '2026',
+    });
+    await page.goto('modules.php?name=TeamOffDefStats');
+
     const body = await page.locator('body').textContent();
     const expectedSections = [
       'Team Offense Totals',
@@ -35,11 +66,19 @@ test.describe('Team Stats flow', () => {
     }
   });
 
-  test('each section has a data table with rows', async ({ page }) => {
+  test('each section has a data table with rows', async ({
+    appState,
+    page,
+  }) => {
+    await appState({
+      'Current Season Phase': 'Regular Season',
+      'Current Season Ending Year': '2026',
+    });
+    await page.goto('modules.php?name=TeamOffDefStats');
+
     const tables = page.locator('.ibl-data-table');
     expect(await tables.count()).toBeGreaterThanOrEqual(5);
 
-    // Check first 5 tables have data rows
     for (let i = 0; i < 5; i++) {
       const rows = tables.nth(i).locator('tbody tr');
       expect(
@@ -49,31 +88,50 @@ test.describe('Team Stats flow', () => {
     }
   });
 
-  test('sortable tables support client-side sorting', async ({ page }) => {
+  test('sortable tables support client-side sorting', async ({
+    appState,
+    page,
+  }) => {
+    await appState({
+      'Current Season Phase': 'Regular Season',
+      'Current Season Ending Year': '2026',
+    });
+    await page.goto('modules.php?name=TeamOffDefStats');
+
     const sortableTable = page.locator('.ibl-data-table.sortable').first();
     await expect(sortableTable).toBeVisible();
 
-    // Click a header to sort
     const header = sortableTable.locator('thead th').nth(2);
     await header.click();
 
-    // Table should still be visible (no page reload errors)
     await expect(sortableTable).toBeVisible();
 
-    // Click again for reverse sort
     await header.click();
     await expect(sortableTable).toBeVisible();
   });
 
-  test('tables have team rows matching expected count', async ({ page }) => {
-    // Each table should have rows for all 28 teams
+  test('tables have team rows matching expected count', async ({
+    appState,
+    page,
+  }) => {
+    await appState({
+      'Current Season Phase': 'Regular Season',
+      'Current Season Ending Year': '2026',
+    });
+    await page.goto('modules.php?name=TeamOffDefStats');
+
     const firstTable = page.locator('.ibl-data-table').first();
     await expect(firstTable).toBeVisible();
     const rows = firstTable.locator('tbody tr');
     expect(await rows.count()).toBeGreaterThanOrEqual(20);
   });
 
-  test('no PHP errors', async ({ page }) => {
+  test('no PHP errors', async ({ appState, page }) => {
+    await appState({
+      'Current Season Phase': 'Regular Season',
+      'Current Season Ending Year': '2026',
+    });
+    await page.goto('modules.php?name=TeamOffDefStats');
     await assertNoPhpErrors(page, 'on Team Stats page');
   });
 });

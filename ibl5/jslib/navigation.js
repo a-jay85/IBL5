@@ -9,17 +9,38 @@
 (function() {
     'use strict';
 
+    // Tracks document-level listeners so they can be torn down on re-init
+    // (bfcache restore). Element-level listeners are stripped by cloneNode.
+    var navAbortController = null;
+
     function initNavigation() {
         var hamburger = document.getElementById('nav-hamburger');
         var mobileMenu = document.getElementById('nav-mobile-menu');
         var menuOverlay = document.getElementById('nav-overlay');
-        var hamburgerTop = document.getElementById('hamburger-top');
-        var hamburgerMiddle = document.getElementById('hamburger-middle');
-        var hamburgerBottom = document.getElementById('hamburger-bottom');
 
         if (!hamburger || !mobileMenu) {
             return;
         }
+
+        // Abort previous document-level listeners before re-attaching.
+        // Element-level listeners are stripped by replacing the element
+        // with a shallow clone (preserves children and attributes, drops
+        // all addEventListener bindings).
+        if (navAbortController) {
+            navAbortController.abort();
+        }
+        navAbortController = new AbortController();
+        var signal = navAbortController.signal;
+
+        hamburger = replaceWithClone(hamburger);
+        if (menuOverlay) {
+            menuOverlay = replaceWithClone(menuOverlay);
+        }
+        mobileMenu = replaceWithClone(mobileMenu);
+
+        var hamburgerTop = document.getElementById('hamburger-top');
+        var hamburgerMiddle = document.getElementById('hamburger-middle');
+        var hamburgerBottom = document.getElementById('hamburger-bottom');
 
         // Toggle mobile menu
         hamburger.addEventListener('click', function(e) {
@@ -43,7 +64,7 @@
             if (e.key === 'Escape') {
                 closeMenu();
             }
-        });
+        }, { signal: signal });
 
         function openMenu() {
             // Slide in menu
@@ -160,7 +181,7 @@
                     group.classList.remove('nav-hover');
                 });
             }
-        });
+        }, { signal: signal });
 
         // Close pinned/hovered dropdowns on Escape
         document.addEventListener('keydown', function(e) {
@@ -170,7 +191,7 @@
                     group.classList.remove('nav-hover');
                 });
             }
-        });
+        }, { signal: signal });
 
         // Close mobile menu when a boosted link is tapped
         // so the user can see the new content loading behind the menu
@@ -211,6 +232,12 @@
                 }
             });
         });
+    }
+
+    function replaceWithClone(el) {
+        var clone = el.cloneNode(true);
+        el.parentNode.replaceChild(clone, el);
+        return clone;
     }
 
     // Desktop/Mobile view toggle — runs immediately (no DOM dependency
@@ -257,4 +284,12 @@
         initNavigation();
         initViewToggle();
     }
+
+    // Re-initialize after bfcache restore (Safari back button). Safari
+    // can drop element-level event listeners when restoring from bfcache;
+    // initNavigation() is safe to call again because it clones elements
+    // (stripping old listeners) and aborts previous document listeners.
+    window.addEventListener('pageshow', function (evt) {
+        if (evt.persisted) initNavigation();
+    });
 })();

@@ -5,6 +5,15 @@ import { publicStorageState } from '../helpers/public-storage-state';
 test.use({ storageState: publicStorageState() });
 test.use({ viewport: { width: 375, height: 812 } });
 
+// NOTE: Safari bfcache edge case (not testable here)
+// On iOS Safari, using the browser back button restores the page from bfcache,
+// which can silently drop element-level event listeners. This kills the
+// hamburger button. The fix (navigation.js pageshow handler + cloneNode
+// re-init) cannot be E2E-tested because Playwright runs Chromium, whose
+// bfcache preserves JS heap state including listeners. To verify the fix,
+// test manually on an iPhone: navigate away → Safari back button → tap
+// hamburger. See the pageshow handler in navigation.js.
+
 test.describe('Mobile nav interaction tests', () => {
   test.beforeEach(async ({ page }) => {
     await gotoWithRetry(page, 'index.php');

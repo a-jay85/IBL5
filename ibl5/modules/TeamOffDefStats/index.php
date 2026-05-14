@@ -33,7 +33,8 @@ $view = new TeamOffDefStats\TeamOffDefStatsView();
 $season = new \Season\Season($mysqli_db);
 
 // Fetch and process data
-$rawStats = $repository->getAllTeamStats($season->endingYear);
+$gameTypes = TeamOffDefStats\TeamOffDefStatsRepository::gameTypesForPhase($season->phase);
+$rawStats = $repository->getAllTeamStats($season->endingYear, $gameTypes);
 $processedStats = $service->processTeamStats($rawStats);
 $leagueTotals = $service->calculateLeagueTotals($processedStats);
 $differentials = $service->calculateDifferentials($processedStats);

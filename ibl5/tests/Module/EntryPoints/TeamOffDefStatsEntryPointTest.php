@@ -21,4 +21,24 @@ class TeamOffDefStatsEntryPointTest extends ModuleEntryPointTestCase
         $this->assertNotEmpty($output);
         $this->assertQueryExecuted('ibl_box_scores');
     }
+
+    public function testRendersTeamStatsInPlayoffs(): void
+    {
+        $this->mockDb->onQuery('ibl_settings', [['value' => 'Playoffs']]);
+        $this->mockDb->setMockData([]);
+        $output = $this->runModule('TeamOffDefStats');
+
+        $this->assertNotEmpty($output);
+        $this->assertQueryExecuted('ibl_box_scores');
+    }
+
+    public function testRendersTeamStatsInPreseason(): void
+    {
+        $this->mockDb->onQuery('ibl_settings', [['value' => 'Preseason']]);
+        $this->mockDb->setMockData([]);
+        $output = $this->runModule('TeamOffDefStats');
+
+        $this->assertNotEmpty($output);
+        $this->assertQueryExecuted('ibl_box_scores');
+    }
 }

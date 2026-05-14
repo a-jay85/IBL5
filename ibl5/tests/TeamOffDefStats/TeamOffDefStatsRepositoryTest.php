@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\TeamOffDefStats;
 
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use TeamOffDefStats\TeamOffDefStatsRepository;
 use TeamOffDefStats\Contracts\TeamOffDefStatsRepositoryInterface;
@@ -221,6 +222,31 @@ class TeamOffDefStatsRepositoryTest extends TestCase
                 };
             }
         };
+    }
+
+    /**
+     * @return array<string, array{string, list<int>}>
+     */
+    public static function phaseGameTypesProvider(): array
+    {
+        return [
+            'Preseason' => ['Preseason', [3]],
+            'HEAT' => ['HEAT', [3]],
+            'Regular Season' => ['Regular Season', [1]],
+            'Playoffs' => ['Playoffs', [1, 2]],
+            'Free Agency' => ['Free Agency', [1, 2]],
+            'Draft' => ['Draft', [1, 2]],
+            'unknown fallback' => ['SomeUnknownPhase', [1]],
+        ];
+    }
+
+    /**
+     * @param list<int> $expected
+     */
+    #[DataProvider('phaseGameTypesProvider')]
+    public function testGameTypesForPhase(string $phase, array $expected): void
+    {
+        $this->assertSame($expected, TeamOffDefStatsRepository::gameTypesForPhase($phase));
     }
 
     /**

@@ -27,9 +27,10 @@ interface TeamOffDefStatsRepositoryInterface
      * 30 individual queries.
      *
      * @param int $seasonYear Season ending year (e.g. 2025 for the 2024-25 season)
+     * @param list<int> $gameTypes Game type filter (1=regular, 2=playoff, 3=preseason/HEAT). Default [1].
      * @return list<AllTeamStatsRow> Array of team statistics rows ordered by team city
      */
-    public function getAllTeamStats(int $seasonYear): array;
+    public function getAllTeamStats(int $seasonYear, array $gameTypes = [1]): array;
 
     /**
      * Get team offense statistics by team name

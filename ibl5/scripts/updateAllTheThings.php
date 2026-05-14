@@ -217,10 +217,26 @@ try {
 
     $updaterService->addStep(new Updater\Steps\ParseJsbFilesStep($jsbService, $sourceResolver, $season->endingYear));
 
-    // IBL-only: End-of-season imports when champion exists
+    // IBL-only: Season awards + end-of-season imports when champion exists
     if (!$isOlympics) {
+        $lcpRepo = new LeagueControlPanel\LeagueControlPanelRepository($mysqli_db);
+        $seasonPhase = $lcpRepo->getSetting('Current Season Phase') ?? '';
+        $eoyVotesCast = $lcpRepo->getEoyVotesCastCount();
+        $awardsAlreadyGenerated = $lcpRepo->hasGeneratedAwardsForYear($season->endingYear);
+        $leadersHtmExists = file_exists($basePath . '/Leaders.htm');
+        $hasFinalsMvp = $lcpRepo->hasFinalsMvp($season->endingYear);
+
+        $updaterService->addStep(new Updater\Steps\GenerateSeasonAwardsStep(
+            $seasonPhase,
+            $season->endingYear,
+            $eoyVotesCast,
+            League\League::MAX_REAL_TEAMID,
+            $awardsAlreadyGenerated,
+            $leadersHtmExists,
+        ));
+
         $updaterService->addStep(new Updater\Steps\EndOfSeasonImportStep(
-            $jsbRepo, $jsbService, $season->endingYear, $sourceResolver,
+            $jsbRepo, $jsbService, $season->endingYear, $sourceResolver, $hasFinalsMvp,
         ));
     }
 

@@ -29,6 +29,7 @@ final class EndOfSeasonImportStep implements PipelineStepInterface
         private readonly JsbImportService $jsbService,
         private readonly int $seasonEndingYear,
         private readonly JsbSourceResolverInterface $sourceResolver,
+        private readonly bool $hasFinalsMvp = true,
     ) {
     }
 
@@ -52,9 +53,12 @@ final class EndOfSeasonImportStep implements PipelineStepInterface
         $this->importHof($result, $messages);
         $this->importAwa($result, $messages);
 
+        $inlineHtml = $this->renderFinalsMvpCard();
+
         return StepResult::success(
             $this->getLabel(),
             $result->summary(),
+            inlineHtml: $inlineHtml,
             messages: $messages,
             messageErrorCount: $result->errors,
         );
@@ -119,5 +123,39 @@ final class EndOfSeasonImportStep implements PipelineStepInterface
         $awaResult = $this->jsbService->processAwaData($awaData, $carData, $this->seasonEndingYear);
         $result->merge($awaResult);
         $messages[] = 'AWA: ' . $awaResult->summary();
+    }
+
+    private function renderFinalsMvpCard(): string
+    {
+        if ($this->hasFinalsMvp) {
+            ob_start();
+            ?>
+<div class="ibl-card sco-parse-result">
+    <div class="ibl-card__header">
+        <h2 class="ibl-card__title">IBL Finals MVP</h2>
+    </div>
+    <div class="ibl-card__body">
+        <span class="step-result__icon step-result__icon--ok">✔</span> Finals MVP already recorded
+    </div>
+</div>
+            <?php
+            return (string) ob_get_clean();
+        }
+
+        ob_start();
+        ?>
+<div class="ibl-card sco-parse-result">
+    <div class="ibl-card__header">
+        <h2 class="ibl-card__title">IBL Finals MVP</h2>
+    </div>
+    <div class="ibl-card__body">
+        <form method="POST" action="/ibl5/leagueControlPanel.php">
+            <input type="text" name="finals_mvp_name" maxlength="32" placeholder="Finals MVP name" class="ibl-input ibl-input--sm">
+            <button type="submit" name="action" value="set_finals_mvp" class="ibl-btn ibl-btn--primary">Set Finals MVP</button>
+        </form>
+    </div>
+</div>
+        <?php
+        return (string) ob_get_clean();
     }
 }

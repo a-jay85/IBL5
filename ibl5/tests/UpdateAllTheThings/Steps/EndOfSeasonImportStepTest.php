@@ -136,4 +136,62 @@ class EndOfSeasonImportStepTest extends TestCase
         $this->assertTrue($result->success);
         $this->assertSame([], $result->messages);
     }
+
+    public function testRendersFinalsMvpFormWhenChampionExistsAndNoMvp(): void
+    {
+        $this->stubRepo->method('hasChampionForSeason')->willReturn(true);
+        $this->stubResolver->method('getContents')->willReturn(null);
+
+        $step = new EndOfSeasonImportStep(
+            $this->stubRepo,
+            $this->stubService,
+            2026,
+            $this->stubResolver,
+            false,
+        );
+
+        $result = $step->execute();
+
+        $this->assertTrue($result->success);
+        $this->assertStringContainsString('set_finals_mvp', $result->inlineHtml);
+        $this->assertStringContainsString('Finals MVP name', $result->inlineHtml);
+        $this->assertStringContainsString('ibl-btn--primary', $result->inlineHtml);
+    }
+
+    public function testShowsFinalsMvpCheckmarkWhenAlreadyRecorded(): void
+    {
+        $this->stubRepo->method('hasChampionForSeason')->willReturn(true);
+        $this->stubResolver->method('getContents')->willReturn(null);
+
+        $step = new EndOfSeasonImportStep(
+            $this->stubRepo,
+            $this->stubService,
+            2026,
+            $this->stubResolver,
+            true,
+        );
+
+        $result = $step->execute();
+
+        $this->assertTrue($result->success);
+        $this->assertStringContainsString('Finals MVP already recorded', $result->inlineHtml);
+    }
+
+    public function testNoFinalsMvpPromptWhenNoChampion(): void
+    {
+        $this->stubRepo->method('hasChampionForSeason')->willReturn(false);
+
+        $step = new EndOfSeasonImportStep(
+            $this->stubRepo,
+            $this->stubService,
+            2026,
+            $this->stubResolver,
+            false,
+        );
+
+        $result = $step->execute();
+
+        $this->assertStringContainsString('No champion', $result->detail);
+        $this->assertSame('', $result->inlineHtml);
+    }
 }

@@ -43,7 +43,7 @@ class PlayerAwardsView implements PlayerAwardsViewInterface
                 <th colspan=2>All-Star Activity</th>
             </tr>
             <tr>
-                <td class="font-bold">All Star Games:</td>
+                <td class="font-bold">All-Star Games:</td>
                 <td><?= $allStarGames ?></td>
             </tr>
             <tr>

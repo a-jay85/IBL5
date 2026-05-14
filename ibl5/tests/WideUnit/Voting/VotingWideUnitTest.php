@@ -504,7 +504,7 @@ class VotingWideUnitTest extends TestCase
         // Arrange
         $this->season->phase = 'Regular Season';
         $this->queueVotingResults([
-            [['name' => 'All Star', 'votes' => 10]],
+            [['name' => 'All-Star', 'votes' => 10]],
             [], [], [],
         ]);
         $controller = new VotingResultsController($this->service, $this->renderer, $this->season);
@@ -569,7 +569,7 @@ class VotingWideUnitTest extends TestCase
         // Arrange - Set phase to Playoffs but call All-Star directly
         $this->season->phase = 'Playoffs';
         $this->queueVotingResults([
-            [['name' => 'All Star Player', 'votes' => 8]],
+            [['name' => 'All-Star Player', 'votes' => 8]],
             [], [], [],
         ]);
         $controller = new VotingResultsController($this->service, $this->renderer, $this->season);

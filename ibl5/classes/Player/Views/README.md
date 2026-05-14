@@ -65,7 +65,7 @@ echo $awardsView->renderAwardsList($player->name);
 $allstarquery = $db->sql_query("SELECT * FROM ibl_awards WHERE name='$player->name' AND Award LIKE '%Conference All-Star'");
 $asg = $db->sql_numrows($allstarquery);
 // ... more queries ...
-echo "<tr><td><b>All Star Games:</b></td><td>$asg</td></tr>";
+echo "<tr><td><b>All-Star Games:</b></td><td>$asg</td></tr>";
 ```
 
 **New Code (repository-based):**

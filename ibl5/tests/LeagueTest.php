@@ -186,7 +186,7 @@ class LeagueTest extends TestCase
     }
 
     // ============================================
-    // ALL STAR POSITION CONSTANTS TESTS
+    // ALL-STAR POSITION CONSTANTS TESTS
     // ============================================
 
     public function testAllStarBackcourtPositionsContainsPgAndSg(): void

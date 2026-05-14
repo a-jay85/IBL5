@@ -26,7 +26,7 @@ class AllStarAppearancesRepository extends \BaseMysqliRepository implements AllS
             LEFT JOIN (SELECT DISTINCT pid, name FROM ibl_hist) h ON h.name = a.name
             WHERE a.award LIKE '%Conference All-Star'
             GROUP BY a.name, h.pid
-            ORDER BY appearances DESC, a.name ASC";
+            ORDER BY appearances DESC, a.name ASC, COALESCE(h.pid, 0) ASC";
 
         /** @var array<int, array{name: string, pid: int|null, appearances: int}> */
         return $this->fetchAll($query);

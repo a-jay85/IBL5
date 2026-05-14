@@ -189,6 +189,30 @@ class StandingsViewTest extends TestCase
         $this->assertLessThan($posA, $posB);
     }
 
+    public function testRenderTiesOnGbClinchWinsResolveByTeamidAsc(): void
+    {
+        $bulkData = [
+            $this->makeBulkTeamData(['teamid' => 15, 'team_name' => 'TeamC', 'conference' => 'Eastern', 'division' => 'Atlantic', 'conf_gb' => '0.0', 'div_gb' => '0.0', 'wins' => 20]),
+            $this->makeBulkTeamData(['teamid' => 5, 'team_name' => 'TeamA', 'conference' => 'Eastern', 'division' => 'Atlantic', 'conf_gb' => '0.0', 'div_gb' => '0.0', 'wins' => 20]),
+            $this->makeBulkTeamData(['teamid' => 10, 'team_name' => 'TeamB', 'conference' => 'Eastern', 'division' => 'Atlantic', 'conf_gb' => '0.0', 'div_gb' => '0.0', 'wins' => 20]),
+        ];
+
+        $this->mockRepository->method('getAllStandings')->willReturn($bulkData);
+        $this->mockRepository->method('getAllStreakData')->willReturn([]);
+        $this->mockRepository->method('getAllPythagoreanStats')->willReturn([]);
+
+        $result = $this->view->render();
+
+        $posA = strpos($result, 'TeamA');
+        $posB = strpos($result, 'TeamB');
+        $posC = strpos($result, 'TeamC');
+        $this->assertIsInt($posA);
+        $this->assertIsInt($posB);
+        $this->assertIsInt($posC);
+        $this->assertLessThan($posB, $posA, 'TeamA (teamid=5) should appear before TeamB (teamid=10)');
+        $this->assertLessThan($posC, $posB, 'TeamB (teamid=10) should appear before TeamC (teamid=15)');
+    }
+
     public function testRenderRegionGeneratesTableHeaders(): void
     {
         $this->mockRepository->method('getStandingsByRegion')->willReturn([]);

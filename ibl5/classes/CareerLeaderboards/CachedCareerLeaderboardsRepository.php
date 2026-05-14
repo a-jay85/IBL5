@@ -82,7 +82,11 @@ class CachedCareerLeaderboardsRepository implements CareerLeaderboardsRepository
         usort($rows, static function (array $a, array $b) use ($sortColumn): int {
             $aVal = (float) ($a[$sortColumn] ?? 0);
             $bVal = (float) ($b[$sortColumn] ?? 0);
-            return $bVal <=> $aVal;
+            $cmp = $bVal <=> $aVal;
+            if ($cmp !== 0) {
+                return $cmp;
+            }
+            return $a['pid'] <=> $b['pid'];
         });
 
         // Apply limit

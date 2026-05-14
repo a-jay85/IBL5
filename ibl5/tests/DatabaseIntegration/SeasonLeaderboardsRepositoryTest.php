@@ -156,6 +156,25 @@ class SeasonLeaderboardsRepositoryTest extends DatabaseTestCase
         self::assertSame([], $result['results']);
     }
 
+    public function testTiesResolveByPidAsc(): void
+    {
+        $pids = [200000071, 200000073, 200000072];
+        foreach ($pids as $pid) {
+            $this->insertTestPlayer($pid, "DB Tie $pid");
+            $this->insertHistRow($pid, "DB Tie $pid", 2099, [
+                'fgm' => 300, 'ftm' => 100, 'tgm' => 50, 'games' => 50,
+            ]);
+        }
+
+        $result = $this->repo->getSeasonLeaders(['year' => '2099', 'sortby' => 'PPG'], 0);
+        $resultPids = array_map(
+            static fn (array $r): int => (int) $r['pid'],
+            $result['results']
+        );
+
+        self::assertSame([200000071, 200000072, 200000073], $resultPids);
+    }
+
     public function testGetYearsReturnsEmptyWhenNoHistData(): void
     {
         $this->db->query("DELETE FROM ibl_hist");

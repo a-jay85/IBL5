@@ -183,7 +183,12 @@ class StandingsView implements StandingsViewInterface
             }
 
             // 3. Wins DESC
-            return $b['wins'] <=> $a['wins'];
+            $winsCmp = $b['wins'] <=> $a['wins'];
+            if ($winsCmp !== 0) {
+                return $winsCmp;
+            }
+
+            return $a['teamid'] <=> $b['teamid'];
         });
     }
 

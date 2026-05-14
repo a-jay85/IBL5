@@ -27,6 +27,10 @@ Environment:
   MIN_REQUIRED_CHECKS   Minimum number of check-runs expected (default: 1).
                         Guards against the post-push race where workflows
                         have not started yet.
+  MAX_WALKBACK          How many ancestor commits to check when HEAD has no
+                        check-runs (default: 10). Handles path-filtered
+                        commits (e.g. Dependabot bumps outside workflow
+                        path globs).
 
 Trade-off: uses an "all-must-pass" model rather than a hardcoded check-name
 list. A new optional check that lands red will block. Use --skip-ci-check
@@ -100,9 +104,25 @@ JSON="$(bash -c "$GH_API_CMD \"repos/$REPO/commits/$SHA/check-runs?per_page=100\
 TOTAL="$(echo "$JSON" | jq '.check_runs | length')"
 
 if [ "$TOTAL" -lt "$MIN_REQUIRED_CHECKS" ]; then
-    echo "FAIL: only $TOTAL check-run(s) found (minimum: $MIN_REQUIRED_CHECKS)." >&2
-    echo "Workflows may not have started yet. Wait and retry." >&2
-    exit 1
+    MAX_WALKBACK="${MAX_WALKBACK:-10}"
+    FOUND=0
+    for ANCESTOR_SHA in $(git log --format=%H "$SHA" --skip=1 --max-count="$MAX_WALKBACK"); do
+        ANCESTOR_JSON="$(bash -c "$GH_API_CMD \"repos/$REPO/commits/$ANCESTOR_SHA/check-runs?per_page=100\"" 2>/dev/null)" || continue
+        ANCESTOR_TOTAL="$(echo "$ANCESTOR_JSON" | jq '.check_runs | length')"
+        if [ "$ANCESTOR_TOTAL" -ge "$MIN_REQUIRED_CHECKS" ]; then
+            echo "HEAD ${SHA:0:11} has no check-runs (path-filtered). Falling back to ancestor ${ANCESTOR_SHA:0:11} ($ANCESTOR_TOTAL run(s))."
+            JSON="$ANCESTOR_JSON"
+            TOTAL="$ANCESTOR_TOTAL"
+            SHA="$ANCESTOR_SHA"
+            FOUND=1
+            break
+        fi
+    done
+    if [ "$FOUND" = "0" ]; then
+        echo "FAIL: no check-runs found on HEAD or the last $MAX_WALKBACK ancestors." >&2
+        echo "Workflows may not have started yet, or path filters excluded all commits." >&2
+        exit 1
+    fi
 fi
 
 STILL_RUNNING="$(echo "$JSON" | jq -r '[.check_runs[] | select(.status != "completed")] | map(.name) | join(", ")')"

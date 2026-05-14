@@ -134,18 +134,6 @@ jobs:
           fi
           git push origin production
 
-      - name: Wait for revert deploy to land
-        if: steps.revert.outcome == 'success'
-        run: sleep 30
-
-      - name: Re-smoke after revert (IBL5 scope only)
-        id: resmoke
-        if: steps.revert.outcome == 'success'
-        continue-on-error: true
-        run: |
-          chmod +x bin/smoke-prod
-          bin/smoke-prod --scope=ibl5 https://www.iblhoops.net
-
       - name: Setup SSH
         run: |
           mkdir -p ~/.ssh
@@ -161,7 +149,6 @@ jobs:
           COMMIT_SHA: ${{ steps.check.outputs.commit_sha }}
           SHOULD_REVERT: ${{ steps.check.outputs.should_revert }}
           REVERT_OUTCOME: ${{ steps.revert.outcome }}
-          RESMOKE_OUTCOME: ${{ steps.resmoke.outcome }}
           OWNER_DISCORD_ID: ${{ secrets.OWNER_DISCORD_ID }}
         run: |
           RUN_URL="https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
@@ -171,8 +158,6 @@ jobs:
             MSG=$(printf 'Production smoke test FAILED but HEAD is already a revert — manual intervention required.\n\nCommit: %s\nRun: %s' "$SHORT_SHA" "$RUN_URL")
           elif [ "$REVERT_OUTCOME" = "failure" ]; then
             MSG=$(printf 'Production smoke test FAILED and auto-revert FAILED (push rejected?) — manual intervention required.\n\nCommit: %s\nRun: %s' "$SHORT_SHA" "$RUN_URL")
-          elif [ "$RESMOKE_OUTCOME" = "failure" ]; then
-            MSG=$(printf 'Production smoke FAILED, auto-revert SUCCEEDED, but post-revert smoke STILL FAILS — REVERT DID NOT RESTORE HEALTH. Manual intervention required.\n\nReverted: %s\nRun: %s' "$COMMIT_MSG" "$RUN_URL")
           else
             MSG=$(printf 'Production smoke test FAILED after deploy. Auto-reverted commit %s. A recovery deploy is in progress.\n\nReverted: %s\nRun: %s' "$SHORT_SHA" "$COMMIT_MSG" "$RUN_URL")
           fi

@@ -103,7 +103,7 @@ JSON="$(bash -c "$GH_API_CMD \"repos/$REPO/commits/$SHA/check-runs?per_page=100\
 
 TOTAL="$(echo "$JSON" | jq '.check_runs | length')"
 
-if [ "$TOTAL" -lt "$MIN_REQUIRED_CHECKS" ]; then
+if [ "$TOTAL" -eq 0 ]; then
     MAX_WALKBACK="${MAX_WALKBACK:-10}"
     FOUND=0
     for ANCESTOR_SHA in $(git log --format=%H "$SHA" --skip=1 --max-count="$MAX_WALKBACK"); do
@@ -119,10 +119,14 @@ if [ "$TOTAL" -lt "$MIN_REQUIRED_CHECKS" ]; then
         fi
     done
     if [ "$FOUND" = "0" ]; then
-        echo "FAIL: no check-runs found on HEAD or the last $MAX_WALKBACK ancestors." >&2
-        echo "Workflows may not have started yet, or path filters excluded all commits." >&2
+        echo "FAIL: only 0 check-run(s) found on HEAD and $MAX_WALKBACK ancestors (minimum: $MIN_REQUIRED_CHECKS)." >&2
+        echo "Workflows may not have started yet. Wait and retry." >&2
         exit 1
     fi
+elif [ "$TOTAL" -lt "$MIN_REQUIRED_CHECKS" ]; then
+    echo "FAIL: only $TOTAL check-run(s) found (minimum: $MIN_REQUIRED_CHECKS)." >&2
+    echo "Workflows may not have started yet. Wait and retry." >&2
+    exit 1
 fi
 
 STILL_RUNNING="$(echo "$JSON" | jq -r '[.check_runs[] | select(.status != "completed")] | map(.name) | join(", ")')"

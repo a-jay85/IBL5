@@ -55,6 +55,51 @@ export async function setEoyVotes(
   }
 }
 
+export async function setLeadersHtm(
+  request: APIRequestContext,
+  present: boolean,
+): Promise<void> {
+  const response = await request.delete(
+    `test-state.php?action=set-leaders-htm&present=${present ? 1 : 0}`,
+  );
+  if (!response.ok()) {
+    throw new Error(
+      `test-state.php set-leaders-htm failed: ${response.status()} ${await response.text()}`,
+    );
+  }
+}
+
+export async function setChampion(
+  request: APIRequestContext,
+  year: number,
+  present: boolean,
+): Promise<void> {
+  const response = await request.delete(
+    `test-state.php?action=set-champion&year=${year}&present=${present ? 1 : 0}`,
+  );
+  if (!response.ok()) {
+    throw new Error(
+      `test-state.php set-champion failed: ${response.status()} ${await response.text()}`,
+    );
+  }
+}
+
+export async function setAward(
+  request: APIRequestContext,
+  year: number,
+  award: string,
+  present: boolean,
+): Promise<void> {
+  const response = await request.delete(
+    `test-state.php?action=set-award&year=${year}&award=${encodeURIComponent(award)}&present=${present ? 1 : 0}`,
+  );
+  if (!response.ok()) {
+    throw new Error(
+      `test-state.php set-award failed: ${response.status()} ${await response.text()}`,
+    );
+  }
+}
+
 export type SetStateFn = (settings: Settings) => Promise<SetStateResult>;
 
 /**

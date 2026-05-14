@@ -159,6 +159,79 @@ if ($method === 'DELETE' && $action === 'delete-test-user') {
     exit;
 }
 
+// DELETE ?action=set-leaders-htm&present=1|0 — create or remove Leaders.htm
+// for E2E testing of the GenerateSeasonAwardsStep (Leaders.htm gate).
+if ($method === 'DELETE' && $action === 'set-leaders-htm') {
+    $present = (int)($_GET['present'] ?? -1);
+    if ($present !== 0 && $present !== 1) {
+        http_response_code(400);
+        echo json_encode(['error' => 'set-leaders-htm requires present=0 or present=1']);
+        $db->close();
+        exit;
+    }
+    $path = __DIR__ . '/Leaders.htm';
+    if ($present === 1) {
+        file_put_contents($path, '<!-- E2E test fixture -->');
+    } elseif (file_exists($path)) {
+        unlink($path);
+    }
+    echo json_encode(['leaders_htm' => $present === 1 ? 'created' : 'removed']);
+    $db->close();
+    exit;
+}
+
+// DELETE ?action=set-champion&year=N&present=1|0 — insert or remove a
+// won_championship=1 row in ibl_jsb_history for E2E testing of
+// EndOfSeasonImportStep (champion gate).
+if ($method === 'DELETE' && $action === 'set-champion') {
+    $year = (int)($_GET['year'] ?? 0);
+    $present = (int)($_GET['present'] ?? -1);
+    if ($year < 1900 || $year > 2200 || ($present !== 0 && $present !== 1)) {
+        http_response_code(400);
+        echo json_encode(['error' => 'set-champion requires valid year and present=0|1']);
+        $db->close();
+        exit;
+    }
+    if ($present === 1) {
+        $db->query("INSERT IGNORE INTO ibl_jsb_history (season_year, team_name, wins, losses, won_championship) VALUES ($year, '__e2e_champ', 50, 32, 1)");
+    } else {
+        $db->query("DELETE FROM ibl_jsb_history WHERE season_year = $year AND team_name = '__e2e_champ'");
+    }
+    echo json_encode(['champion' => $present === 1 ? 'inserted' : 'removed']);
+    $db->close();
+    exit;
+}
+
+// DELETE ?action=set-award&year=N&award=NAME&present=1|0 — insert or remove an
+// award row in ibl_awards for E2E testing. Used to control awardsAlreadyGenerated
+// (award='Most Valuable Player (1st)') and hasFinalsMvp (award='IBL Finals MVP').
+if ($method === 'DELETE' && $action === 'set-award') {
+    $year = (int)($_GET['year'] ?? 0);
+    $award = (string)($_GET['award'] ?? '');
+    $present = (int)($_GET['present'] ?? -1);
+    $allowedAwards = ['Most Valuable Player (1st)', 'IBL Finals MVP'];
+    if ($year < 1900 || $year > 2200 || !in_array($award, $allowedAwards, true) || ($present !== 0 && $present !== 1)) {
+        http_response_code(400);
+        echo json_encode(['error' => 'set-award requires valid year, allowed award name, and present=0|1']);
+        $db->close();
+        exit;
+    }
+    if ($present === 1) {
+        $stmt = $db->prepare("INSERT IGNORE INTO ibl_awards (year, Award, name) VALUES (?, ?, '__e2e_test')");
+        $stmt->bind_param('is', $year, $award);
+        $stmt->execute();
+        $stmt->close();
+    } else {
+        $stmt = $db->prepare("DELETE FROM ibl_awards WHERE year = ? AND Award = ? AND name = '__e2e_test'");
+        $stmt->bind_param('is', $year, $award);
+        $stmt->execute();
+        $stmt->close();
+    }
+    echo json_encode(['award' => $present === 1 ? 'inserted' : 'removed']);
+    $db->close();
+    exit;
+}
+
 // DELETE ?action=set-eoy-votes&count=N — set N teams as having voted for E2E
 // testing of the updater awards step. Teams 1..count get a non-default vote,
 // teams (count+1)..28 get reset to 'No Vote'.

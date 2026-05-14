@@ -160,6 +160,7 @@ jobs:
 
       # --- Auto-update baselines when label is present ---
       - name: Regenerate visual regression baselines
+        id: regen-baselines
         if: github.event_name == 'pull_request' && steps.visual-regression.outcome == 'failure' && contains(github.event.pull_request.labels.*.name, 'update-baselines')
         env:
           IBL_TEST_USER: ${{ secrets.IBL_TEST_USER || 'ci-e2e-user' }}
@@ -195,7 +196,7 @@ jobs:
           fi
 
       - name: Remove update-baselines label
-        if: always() && github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'update-baselines')
+        if: always() && steps.regen-baselines.outcome != 'skipped' && github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'update-baselines')
         env:
           GH_TOKEN: ${{ secrets.CI_PAT }}
         run: gh pr edit ${{ github.event.pull_request.number }} --remove-label update-baselines

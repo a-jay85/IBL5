@@ -173,6 +173,10 @@ if [ "$DRY_RUN" = true ]; then
 fi
 
 if [ "$ALL" = true ]; then
+    # Drop stale worktree records whose directories were manually deleted.
+    # Frees the branch so the bare-branch sweep below can decide its fate.
+    git -C "$REPO_ROOT" worktree prune --verbose 2>/dev/null | sed 's/^/  /' || true
+
     # Process all git-registered worktrees (excluding main repo).
     # nocasematch: macOS APFS is case-insensitive, so a worktree registered
     # under /Users/x/github/… must match REPO_ROOT /Users/x/GitHub/….

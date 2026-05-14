@@ -39,6 +39,6 @@ class ProcessBoxscoresStep implements PipelineStepInterface
         $scoResult = $this->processor->processScoData($data, 0, '');
         $inlineHtml = $this->view->renderParseLog($scoResult);
 
-        return StepResult::success($this->getLabel(), inlineHtml: $inlineHtml);
+        return StepResult::success($this->getLabel(), collapsibleLog: true, inlineHtml: $inlineHtml);
     }
 }

@@ -70,5 +70,6 @@ class ProcessBoxscoresStepTest extends TestCase
         $this->assertTrue($result->success);
         $this->assertSame('Boxscores processed', $result->label);
         $this->assertStringContainsString('10 games inserted', $result->inlineHtml);
+        $this->assertTrue($result->collapsibleLog);
     }
 }

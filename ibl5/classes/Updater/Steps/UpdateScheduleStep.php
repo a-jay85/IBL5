@@ -31,6 +31,6 @@ class UpdateScheduleStep implements PipelineStepInterface
         $this->updater->update();
         $log = (string) ob_get_clean();
 
-        return StepResult::success($this->getLabel(), capturedLog: $log);
+        return StepResult::success($this->getLabel(), capturedLog: $log, collapsibleLog: true);
     }
 }

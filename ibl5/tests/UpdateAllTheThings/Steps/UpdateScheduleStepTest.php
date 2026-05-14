@@ -51,5 +51,6 @@ class UpdateScheduleStepTest extends TestCase
 
         $this->assertTrue($result->success);
         $this->assertSame('<p>Updating schedule...</p>', $result->capturedLog);
+        $this->assertTrue($result->collapsibleLog);
     }
 }

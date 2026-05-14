@@ -51,5 +51,6 @@ class UpdatePowerRankingsStepTest extends TestCase
 
         $this->assertTrue($result->success);
         $this->assertSame('<p>Calculating power rankings...</p>', $result->capturedLog);
+        $this->assertTrue($result->collapsibleLog);
     }
 }

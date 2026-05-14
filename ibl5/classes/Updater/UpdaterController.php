@@ -85,7 +85,9 @@ class UpdaterController implements UpdaterControllerInterface
             echo $this->view->renderStepComplete($result->label, $result->detail);
 
             if ($result->inlineHtml !== '') {
-                echo $this->view->renderInlineHtml($result->inlineHtml);
+                echo $result->collapsibleLog
+                    ? $this->view->renderCollapsibleLog($result->inlineHtml)
+                    : $this->view->renderInlineHtml($result->inlineHtml);
             }
 
             if ($result->capturedLog !== '') {

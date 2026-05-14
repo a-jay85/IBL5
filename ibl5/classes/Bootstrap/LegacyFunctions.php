@@ -1,6 +1,8 @@
 <?php
 
 /**
+ * @internal
+ *
  * Legacy global functions extracted from mainfile.php.
  *
  * These functions are called by PHP-Nuke modules as bare functions
@@ -10,6 +12,13 @@
  * This file is required once after the bootstrap pipeline populates $GLOBALS.
  * It is intentionally NOT a class and does NOT have declare(strict_types=1)
  * because the legacy function signatures rely on PHP's loose type coercion.
+ *
+ * Retained for the module entry-point test harness
+ * (tests/Module/EntryPoints/ModuleEntryPointTestCase.php) and
+ * tests/Unit/PageLayout/PageLayoutTest.php. Not for new production code.
+ *
+ * Whitelisted in BanDirectNukeGlobalsRule so its internal access to
+ * $_GET, $_POST, and $nuke_user globals does not produce PHPStan errors.
  */
 
 // Guard: only define these functions once (prevents double-include issues)

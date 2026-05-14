@@ -76,20 +76,6 @@ jobs:
             composer install --no-dev --no-interaction --optimize-autoloader
           '
 
-      - name: Verify recent DB backup exists
-        continue-on-error: ${{ vars.BACKUP_DIR == '' }}
-        run: |
-          scp -P ${{ secrets.PORT }} -i ~/.ssh/id_deploy bin/check-backup-freshness \
-            ${{ secrets.USERNAME }}@${{ secrets.HOST }}:/tmp/check-backup-freshness
-          ssh -p ${{ secrets.PORT }} -i ~/.ssh/id_deploy ${{ secrets.USERNAME }}@${{ secrets.HOST }} '
-            echo "Verify recent DB backup exists" > /tmp/ibl5-last-deploy-step
-            chmod +x /tmp/check-backup-freshness
-            BACKUP_DIR="${{ vars.BACKUP_DIR }}" \
-              BACKUP_MAX_AGE_HOURS="${{ vars.BACKUP_MAX_AGE_HOURS || 26 }}" \
-              SKIP_BACKUP_CHECK="${{ vars.SKIP_BACKUP_CHECK || 0 }}" \
-              /tmp/check-backup-freshness
-          '
-
       - name: Run database migrations
         run: |
           ssh -p ${{ secrets.PORT }} -i ~/.ssh/id_deploy ${{ secrets.USERNAME }}@${{ secrets.HOST }} '

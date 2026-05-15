@@ -59,28 +59,23 @@ class PlayerTradingCardFlipView
         ?\mysqli $db = null
     ): string {
         $flipIcon = CardFlipStyles::getFlipIcon();
-        
-        ob_start();
-        ?>
-<div class="card-flip-container">
-    <div class="card-flip-inner">
-        <!-- Front of Card -->
-        <div class="card-front">
-            <?= PlayerTradingCardFrontView::render($player, $playerID, $contractDisplay, $db) ?>
-            <div class="flip-icon pulse" title="Click to see stats"><?= $flipIcon ?></div>
-        </div>
-        
-        <!-- Back of Card -->
-        <div class="card-back">
-            <?= PlayerTradingCardBackView::render(
-                $player, $playerStats, $playerID,
-                $allStarGames, $threePointContests, $dunkContests, $rookieSophChallenges, $db
-            ) ?>
-            <div class="flip-icon" title="Click to see ratings"><?= $flipIcon ?></div>
-        </div>
-    </div>
-</div>
-        <?php
-        return (string) ob_get_clean();
+        $frontHtml = PlayerTradingCardFrontView::render($player, $playerID, $contractDisplay, $db);
+        $backHtml = PlayerTradingCardBackView::render(
+            $player, $playerStats, $playerID,
+            $allStarGames, $threePointContests, $dunkContests, $rookieSophChallenges, $db
+        );
+
+        return '<div class="card-flip-container">'
+            . '<div class="card-flip-inner">'
+            . '<div class="card-front">'
+            . $frontHtml
+            . '<div class="flip-icon pulse" title="Click to see stats">' . $flipIcon . '</div>'
+            . '</div>'
+            . '<div class="card-back">'
+            . $backHtml
+            . '<div class="flip-icon" title="Click to see ratings">' . $flipIcon . '</div>'
+            . '</div>'
+            . '</div>'
+            . '</div>';
     }
 }

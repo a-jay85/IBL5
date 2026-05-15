@@ -45,18 +45,13 @@ class PlayerStatsCardView
         if ($colorScheme === null) {
             $colorScheme = TeamColorHelper::getDefaultColorScheme();
         }
-        $cssProps = CardBaseStyles::getCardCssProperties($colorScheme);
-
-        ob_start();
-        ?>
-<div class="player-stats-card" style="<?= $cssProps ?>">
-    <?php if ($statsType !== ''): ?>
-    <div class="stats-type-indicator"><?= HtmlSanitizer::e($statsType) ?></div>
-    <?php endif; ?>
-    <?= $tableContent ?>
-</div>
-        <?php
-        return (string) ob_get_clean();
+        $html = '<div class="player-stats-card" style="' . CardBaseStyles::getCardCssProperties($colorScheme) . '">';
+        if ($statsType !== '') {
+            $html .= '<div class="stats-type-indicator">' . HtmlSanitizer::e($statsType) . '</div>';
+        }
+        $html .= $tableContent;
+        $html .= '</div>';
+        return $html;
     }
 
     /**

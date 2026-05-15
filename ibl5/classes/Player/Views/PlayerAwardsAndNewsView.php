@@ -50,11 +50,9 @@ class PlayerAwardsAndNewsView implements PlayerAwardsAndNewsViewInterface
         <?php
         /** @var list<array{year: int, name: string, award: string, prim: int}> $awards */
         foreach ($awards as $award) {
-            $year = HtmlSanitizer::safeHtmlOutput((string) $award['year']);
-            $type = HtmlSanitizer::safeHtmlOutput($award['award']);
             ?>
     <tr>
-        <td><?= $year ?> <?= $type ?></td>
+        <td><?= (int) $award['year'] ?> <?= HtmlSanitizer::e($award['award']) ?></td>
     </tr>
             <?php
         }
@@ -68,12 +66,7 @@ class PlayerAwardsAndNewsView implements PlayerAwardsAndNewsViewInterface
             <?php
             /** @var list<array{sid: int, title: string, time: string}> $articles */
             foreach ($articles as $article): ?>
-                <?php
-                $sid = $article['sid'];
-                $title = HtmlSanitizer::safeHtmlOutput($article['title']);
-                $time = HtmlSanitizer::safeHtmlOutput($article['time']);
-                ?>
-                * <a href="modules.php?name=News&file=article&sid=<?= $sid ?>&mode=&order=0&thold=0"><?= $title ?></a> (<?= $time ?>)<br>
+                * <a href="modules.php?name=News&file=article&sid=<?= (int) $article['sid'] ?>&mode=&order=0&thold=0"><?= HtmlSanitizer::e($article['title']) ?></a> (<?= HtmlSanitizer::e($article['time']) ?>)<br>
             <?php endforeach; ?>
             </small>
         </td>

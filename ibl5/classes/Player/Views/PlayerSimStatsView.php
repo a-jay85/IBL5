@@ -7,6 +7,7 @@ namespace Player\Views;
 use Player\PlayerStatsRepository;
 use Player\Contracts\PlayerSimStatsViewInterface;
 use BasketballStats\StatsFormatter;
+use Utilities\HtmlSanitizer;
 
 /**
  * PlayerSimStatsView - Renders sim-by-sim statistics
@@ -80,35 +81,22 @@ class PlayerSimStatsView implements PlayerSimStatsViewInterface
             // Calculate totals
             $totals = $this->calculateSimTotals(array_values($boxScores));
 
-            // Calculate averages
-            $avgMinutes = sprintf('%01.1f', $totals['minutes'] / $numberOfGames);
-            $avgFGP = StatsFormatter::formatPercentageWithDecimals($totals['fgm'], $totals['fga']);
-            $avgFTP = StatsFormatter::formatPercentageWithDecimals($totals['ftm'], $totals['fta']);
-            $avg3GP = StatsFormatter::formatPercentageWithDecimals($totals['tgm'], $totals['tga']);
-            $avgORB = sprintf('%01.1f', $totals['orb'] / $numberOfGames);
-            $avgREB = sprintf('%01.1f', ($totals['orb'] + $totals['drb']) / $numberOfGames);
-            $avgAST = sprintf('%01.1f', $totals['ast'] / $numberOfGames);
-            $avgSTL = sprintf('%01.1f', $totals['stl'] / $numberOfGames);
-            $avgTO = sprintf('%01.1f', $totals['to'] / $numberOfGames);
-            $avgBLK = sprintf('%01.1f', $totals['blk'] / $numberOfGames);
-            $avgPF = sprintf('%01.1f', $totals['pf'] / $numberOfGames);
-            $avgPTS = sprintf('%01.1f', $totals['pts'] / $numberOfGames);
             ?>
     <tr>
-        <td><?= $simNumber ?></td>
-        <td><?= $numberOfGames ?></td>
-        <td><?= $avgMinutes ?></td>
-        <td><?= $avgFGP ?></td>
-        <td><?= $avgFTP ?></td>
-        <td><?= $avg3GP ?></td>
-        <td><?= $avgORB ?></td>
-        <td><?= $avgREB ?></td>
-        <td><?= $avgAST ?></td>
-        <td><?= $avgSTL ?></td>
-        <td><?= $avgTO ?></td>
-        <td><?= $avgBLK ?></td>
-        <td><?= $avgPF ?></td>
-        <td><?= $avgPTS ?></td>
+        <td><?= HtmlSanitizer::e($simNumber) ?></td>
+        <td><?= HtmlSanitizer::e($numberOfGames) ?></td>
+        <td><?= HtmlSanitizer::e(sprintf('%01.1f', $totals['minutes'] / $numberOfGames)) ?></td>
+        <td><?= HtmlSanitizer::e(StatsFormatter::formatPercentageWithDecimals($totals['fgm'], $totals['fga'])) ?></td>
+        <td><?= HtmlSanitizer::e(StatsFormatter::formatPercentageWithDecimals($totals['ftm'], $totals['fta'])) ?></td>
+        <td><?= HtmlSanitizer::e(StatsFormatter::formatPercentageWithDecimals($totals['tgm'], $totals['tga'])) ?></td>
+        <td><?= HtmlSanitizer::e(sprintf('%01.1f', $totals['orb'] / $numberOfGames)) ?></td>
+        <td><?= HtmlSanitizer::e(sprintf('%01.1f', ($totals['orb'] + $totals['drb']) / $numberOfGames)) ?></td>
+        <td><?= HtmlSanitizer::e(sprintf('%01.1f', $totals['ast'] / $numberOfGames)) ?></td>
+        <td><?= HtmlSanitizer::e(sprintf('%01.1f', $totals['stl'] / $numberOfGames)) ?></td>
+        <td><?= HtmlSanitizer::e(sprintf('%01.1f', $totals['to'] / $numberOfGames)) ?></td>
+        <td><?= HtmlSanitizer::e(sprintf('%01.1f', $totals['blk'] / $numberOfGames)) ?></td>
+        <td><?= HtmlSanitizer::e(sprintf('%01.1f', $totals['pf'] / $numberOfGames)) ?></td>
+        <td><?= HtmlSanitizer::e(sprintf('%01.1f', $totals['pts'] / $numberOfGames)) ?></td>
     </tr>
             <?php
         }

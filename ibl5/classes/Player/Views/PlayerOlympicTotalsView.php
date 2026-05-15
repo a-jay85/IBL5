@@ -73,8 +73,6 @@ class PlayerOlympicTotalsView implements PlayerOlympicTotalsViewInterface
         <?php
         foreach ($olympicsStats as $row) {
             /** @var array{team: string, year: int, games: int, minutes: int, fgm: int, fga: int, ftm: int, fta: int, tgm: int, tga: int, orb: int, reb: int, ast: int, stl: int, tvr: int, blk: int, pf: int, pts: int} $row */
-            $year = $row['year'];
-            $team = HtmlSanitizer::safeHtmlOutput($row['team']);
             $gm = $row['games'];
             $min = $row['minutes'];
             $fgm = $row['fgm'];
@@ -112,40 +110,40 @@ class PlayerOlympicTotalsView implements PlayerOlympicTotalsViewInterface
             $carTotals['pts'] += $pts;
             ?>
     <tr>
-        <td><?= $year ?></td>
-        <td><?= $team ?></td>
-        <td><?= $gm ?></td>
-        <td><?= $min ?></td>
-        <td><?= $fgm ?>-<?= $fga ?></td>
-        <td><?= $ftm ?>-<?= $fta ?></td>
-        <td><?= $tgm ?>-<?= $tga ?></td>
-        <td><?= $orb ?></td>
-        <td><?= $reb ?></td>
-        <td><?= $ast ?></td>
-        <td><?= $stl ?></td>
-        <td><?= $tvr ?></td>
-        <td><?= $blk ?></td>
-        <td><?= $pf ?></td>
-        <td><?= $pts ?></td>
+        <td><?= (int)$row['year'] ?></td>
+        <td><?= HtmlSanitizer::e($row['team']) ?></td>
+        <td><?= (int)$gm ?></td>
+        <td><?= (int)$min ?></td>
+        <td><?= (int)$fgm ?>-<?= (int)$fga ?></td>
+        <td><?= (int)$ftm ?>-<?= (int)$fta ?></td>
+        <td><?= (int)$tgm ?>-<?= (int)$tga ?></td>
+        <td><?= (int)$orb ?></td>
+        <td><?= (int)$reb ?></td>
+        <td><?= (int)$ast ?></td>
+        <td><?= (int)$stl ?></td>
+        <td><?= (int)$tvr ?></td>
+        <td><?= (int)$blk ?></td>
+        <td><?= (int)$pf ?></td>
+        <td><?= (int)$pts ?></td>
     </tr>
             <?php
         }
         ?>
     <tr class="player-table-row-bold">
         <td colspan=2>Olympics Totals</td>
-        <td><?= $carTotals['gm'] ?></td>
-        <td><?= $carTotals['min'] ?></td>
-        <td><?= $carTotals['fgm'] ?>-<?= $carTotals['fga'] ?></td>
-        <td><?= $carTotals['ftm'] ?>-<?= $carTotals['fta'] ?></td>
-        <td><?= $carTotals['tgm'] ?>-<?= $carTotals['tga'] ?></td>
-        <td><?= $carTotals['orb'] ?></td>
-        <td><?= $carTotals['reb'] ?></td>
-        <td><?= $carTotals['ast'] ?></td>
-        <td><?= $carTotals['stl'] ?></td>
-        <td><?= $carTotals['tvr'] ?></td>
-        <td><?= $carTotals['blk'] ?></td>
-        <td><?= $carTotals['pf'] ?></td>
-        <td><?= $carTotals['pts'] ?></td>
+        <td><?= (int)$carTotals['gm'] ?></td>
+        <td><?= (int)$carTotals['min'] ?></td>
+        <td><?= (int)$carTotals['fgm'] ?>-<?= (int)$carTotals['fga'] ?></td>
+        <td><?= (int)$carTotals['ftm'] ?>-<?= (int)$carTotals['fta'] ?></td>
+        <td><?= (int)$carTotals['tgm'] ?>-<?= (int)$carTotals['tga'] ?></td>
+        <td><?= (int)$carTotals['orb'] ?></td>
+        <td><?= (int)$carTotals['reb'] ?></td>
+        <td><?= (int)$carTotals['ast'] ?></td>
+        <td><?= (int)$carTotals['stl'] ?></td>
+        <td><?= (int)$carTotals['tvr'] ?></td>
+        <td><?= (int)$carTotals['blk'] ?></td>
+        <td><?= (int)$carTotals['pf'] ?></td>
+        <td><?= (int)$carTotals['pts'] ?></td>
     </tr>
 </table>
         <?php

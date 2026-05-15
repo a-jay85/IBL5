@@ -72,9 +72,6 @@ class PlayerRegularSeasonTotalsView implements PlayerRegularSeasonTotalsViewInte
     </tr>
         <?php
         foreach ($historicalStats as $row) {
-            $year = $row['year'];
-            $team = HtmlSanitizer::safeHtmlOutput($row['team']);
-            $teamId = $row['teamid'];
             $gm = $row['games'];
             $min = $row['minutes'];
             $fgm = $row['fgm'];
@@ -91,7 +88,7 @@ class PlayerRegularSeasonTotalsView implements PlayerRegularSeasonTotalsViewInte
             $blk = $row['blk'];
             $pf = $row['pf'];
             $pts = $row['pts'];
-            
+
             // Calculate points if pts is 0 (e.g., 2006 season)
             // Formula: 2*fgm + ftm + tgm (fgm includes all field goals, tgm adds the extra point for 3-pointers)
             if ($pts === 0) {
@@ -117,21 +114,21 @@ class PlayerRegularSeasonTotalsView implements PlayerRegularSeasonTotalsViewInte
             $carTotals['pts'] += $pts;
             ?>
     <tr>
-        <td><?= $year ?></td>
-        <td><a href="modules.php?name=Team&op=team&teamid=<?= $teamId ?>&yr=<?= $year ?>"><?= $team ?></a></td>
-        <td><?= $gm ?></td>
-        <td><?= $min ?></td>
-        <td><?= $fgm ?>-<?= $fga ?></td>
-        <td><?= $ftm ?>-<?= $fta ?></td>
-        <td><?= $tgm ?>-<?= $tga ?></td>
-        <td><?= $orb ?></td>
-        <td><?= $reb ?></td>
-        <td><?= $ast ?></td>
-        <td><?= $stl ?></td>
-        <td><?= $tvr ?></td>
-        <td><?= $blk ?></td>
-        <td><?= $pf ?></td>
-        <td><?= $pts ?></td>
+        <td><?= (int)$row['year'] ?></td>
+        <td><a href="modules.php?name=Team&op=team&teamid=<?= (int)$row['teamid'] ?>&yr=<?= (int)$row['year'] ?>"><?= HtmlSanitizer::e($row['team']) ?></a></td>
+        <td><?= (int)$gm ?></td>
+        <td><?= (int)$min ?></td>
+        <td><?= (int)$fgm ?>-<?= (int)$fga ?></td>
+        <td><?= (int)$ftm ?>-<?= (int)$fta ?></td>
+        <td><?= (int)$tgm ?>-<?= (int)$tga ?></td>
+        <td><?= (int)$orb ?></td>
+        <td><?= (int)$reb ?></td>
+        <td><?= (int)$ast ?></td>
+        <td><?= (int)$stl ?></td>
+        <td><?= (int)$tvr ?></td>
+        <td><?= (int)$blk ?></td>
+        <td><?= (int)$pf ?></td>
+        <td><?= (int)$pts ?></td>
     </tr>
             <?php
         }
@@ -141,19 +138,19 @@ class PlayerRegularSeasonTotalsView implements PlayerRegularSeasonTotalsViewInte
         ?>
     <tr class="player-table-row-bold">
         <td colspan=2>Career</td>
-        <td><?= $carTotals['gm'] ?></td>
-        <td><?= $carTotals['min'] ?></td>
-        <td><?= $carTotals['fgm'] ?>-<?= $carTotals['fga'] ?></td>
-        <td><?= $carTotals['ftm'] ?>-<?= $carTotals['fta'] ?></td>
-        <td><?= $carTotals['tgm'] ?>-<?= $carTotals['tga'] ?></td>
-        <td><?= $carTotals['orb'] ?></td>
-        <td><?= $carTotals['reb'] ?></td>
-        <td><?= $carTotals['ast'] ?></td>
-        <td><?= $carTotals['stl'] ?></td>
-        <td><?= $carTotals['tvr'] ?></td>
-        <td><?= $carTotals['blk'] ?></td>
-        <td><?= $carTotals['pf'] ?></td>
-        <td><?= $carTotals['pts'] ?></td>
+        <td><?= (int)$carTotals['gm'] ?></td>
+        <td><?= (int)$carTotals['min'] ?></td>
+        <td><?= (int)$carTotals['fgm'] ?>-<?= (int)$carTotals['fga'] ?></td>
+        <td><?= (int)$carTotals['ftm'] ?>-<?= (int)$carTotals['fta'] ?></td>
+        <td><?= (int)$carTotals['tgm'] ?>-<?= (int)$carTotals['tga'] ?></td>
+        <td><?= (int)$carTotals['orb'] ?></td>
+        <td><?= (int)$carTotals['reb'] ?></td>
+        <td><?= (int)$carTotals['ast'] ?></td>
+        <td><?= (int)$carTotals['stl'] ?></td>
+        <td><?= (int)$carTotals['tvr'] ?></td>
+        <td><?= (int)$carTotals['blk'] ?></td>
+        <td><?= (int)$carTotals['pf'] ?></td>
+        <td><?= (int)$carTotals['pts'] ?></td>
     </tr>
 </table>
         <?php

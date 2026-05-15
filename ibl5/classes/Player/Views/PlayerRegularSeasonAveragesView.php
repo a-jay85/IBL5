@@ -75,87 +75,57 @@ class PlayerRegularSeasonAveragesView implements PlayerRegularSeasonAveragesView
     </tr>
         <?php
         foreach ($historicalStats as $row) {
-            $year = $row['year'];
-            $team = HtmlSanitizer::safeHtmlOutput($row['team']);
-            $teamId = $row['teamid'];
             $gm = $row['games'];
-            
-            if ($gm > 0) {
-                // Calculate points if pts is 0 (e.g., 2006 season)
-                // Formula: 2*fgm + ftm + tgm
-                $ptsTotal = $row['pts'];
-                if ($ptsTotal === 0) {
-                    $ptsTotal = (2 * $row['fgm']) + $row['ftm'] + $row['tgm'];
-                }
-                
-                $min = StatsFormatter::formatPerGameAverage((float)$row['minutes'], $gm);
-                $fgm = StatsFormatter::formatPerGameAverage((float)$row['fgm'], $gm);
-                $fga = StatsFormatter::formatPerGameAverage((float)$row['fga'], $gm);
-                $fgp = StatsFormatter::formatPercentageWithDecimals($row['fgm'], $row['fga']);
-                $ftm = StatsFormatter::formatPerGameAverage((float)$row['ftm'], $gm);
-                $fta = StatsFormatter::formatPerGameAverage((float)$row['fta'], $gm);
-                $ftp = StatsFormatter::formatPercentageWithDecimals($row['ftm'], $row['fta']);
-                $tgm = StatsFormatter::formatPerGameAverage((float)$row['tgm'], $gm);
-                $tga = StatsFormatter::formatPerGameAverage((float)$row['tga'], $gm);
-                $tgp = StatsFormatter::formatPercentageWithDecimals($row['tgm'], $row['tga']);
-                $orb = StatsFormatter::formatPerGameAverage((float)$row['orb'], $gm);
-                $reb = StatsFormatter::formatPerGameAverage((float)$row['reb'], $gm);
-                $ast = StatsFormatter::formatPerGameAverage((float)$row['ast'], $gm);
-                $stl = StatsFormatter::formatPerGameAverage((float)$row['stl'], $gm);
-                $tvr = StatsFormatter::formatPerGameAverage((float)$row['tvr'], $gm);
-                $blk = StatsFormatter::formatPerGameAverage((float)$row['blk'], $gm);
-                $pf = StatsFormatter::formatPerGameAverage((float)$row['pf'], $gm);
-                $pts = StatsFormatter::formatPerGameAverage((float)$ptsTotal, $gm);
-            } else {
-                $min = $fgm = $fga = $fgp = $ftm = $fta = $ftp = $tgm = $tga = $tgp = '0.0';
-                $orb = $reb = $ast = $stl = $tvr = $blk = $pf = $pts = '0.0';
+
+            // Calculate points if pts is 0 (e.g., 2006 season)
+            // Formula: 2*fgm + ftm + tgm
+            $ptsTotal = $row['pts'];
+            if ($ptsTotal === 0) {
+                $ptsTotal = (2 * $row['fgm']) + $row['ftm'] + $row['tgm'];
             }
             ?>
     <tr>
-        <td><?= $year ?></td>
-        <td><a href="modules.php?name=Team&op=team&teamid=<?= $teamId ?>&yr=<?= $year ?>"><?= $team ?></a></td>
-        <td><?= $gm ?></td>
-        <td><?= $min ?></td>
-        <td><?= $fgm ?></td>
-        <td><?= $fga ?></td>
-        <td><?= $fgp ?></td>
-        <td><?= $ftm ?></td>
-        <td><?= $fta ?></td>
-        <td><?= $ftp ?></td>
-        <td><?= $tgm ?></td>
-        <td><?= $tga ?></td>
-        <td><?= $tgp ?></td>
-        <td><?= $orb ?></td>
-        <td><?= $reb ?></td>
-        <td><?= $ast ?></td>
-        <td><?= $stl ?></td>
-        <td><?= $tvr ?></td>
-        <td><?= $blk ?></td>
-        <td><?= $pf ?></td>
-        <td><?= $pts ?></td>
+        <td><?= (int)$row['year'] ?></td>
+        <td><a href="modules.php?name=Team&op=team&teamid=<?= (int)$row['teamid'] ?>&yr=<?= (int)$row['year'] ?>"><?= HtmlSanitizer::e($row['team']) ?></a></td>
+        <td><?= (int)$gm ?></td>
+        <td><?= $gm > 0 ? StatsFormatter::formatPerGameAverage((float)$row['minutes'], $gm) : '0.0' ?></td>
+        <td><?= $gm > 0 ? StatsFormatter::formatPerGameAverage((float)$row['fgm'], $gm) : '0.0' ?></td>
+        <td><?= $gm > 0 ? StatsFormatter::formatPerGameAverage((float)$row['fga'], $gm) : '0.0' ?></td>
+        <td><?= $gm > 0 ? StatsFormatter::formatPercentageWithDecimals($row['fgm'], $row['fga']) : '0.0' ?></td>
+        <td><?= $gm > 0 ? StatsFormatter::formatPerGameAverage((float)$row['ftm'], $gm) : '0.0' ?></td>
+        <td><?= $gm > 0 ? StatsFormatter::formatPerGameAverage((float)$row['fta'], $gm) : '0.0' ?></td>
+        <td><?= $gm > 0 ? StatsFormatter::formatPercentageWithDecimals($row['ftm'], $row['fta']) : '0.0' ?></td>
+        <td><?= $gm > 0 ? StatsFormatter::formatPerGameAverage((float)$row['tgm'], $gm) : '0.0' ?></td>
+        <td><?= $gm > 0 ? StatsFormatter::formatPerGameAverage((float)$row['tga'], $gm) : '0.0' ?></td>
+        <td><?= $gm > 0 ? StatsFormatter::formatPercentageWithDecimals($row['tgm'], $row['tga']) : '0.0' ?></td>
+        <td><?= $gm > 0 ? StatsFormatter::formatPerGameAverage((float)$row['orb'], $gm) : '0.0' ?></td>
+        <td><?= $gm > 0 ? StatsFormatter::formatPerGameAverage((float)$row['reb'], $gm) : '0.0' ?></td>
+        <td><?= $gm > 0 ? StatsFormatter::formatPerGameAverage((float)$row['ast'], $gm) : '0.0' ?></td>
+        <td><?= $gm > 0 ? StatsFormatter::formatPerGameAverage((float)$row['stl'], $gm) : '0.0' ?></td>
+        <td><?= $gm > 0 ? StatsFormatter::formatPerGameAverage((float)$row['tvr'], $gm) : '0.0' ?></td>
+        <td><?= $gm > 0 ? StatsFormatter::formatPerGameAverage((float)$row['blk'], $gm) : '0.0' ?></td>
+        <td><?= $gm > 0 ? StatsFormatter::formatPerGameAverage((float)$row['pf'], $gm) : '0.0' ?></td>
+        <td><?= $gm > 0 ? StatsFormatter::formatPerGameAverage((float)$ptsTotal, $gm) : '0.0' ?></td>
     </tr>
             <?php
         }
 
         // Career averages row
         if ($careerAverages !== null) {
-            $carFgp = StatsFormatter::formatPercentageWithDecimals((float)$careerAverages['fgm'], (float)$careerAverages['fga']);
-            $carFtp = StatsFormatter::formatPercentageWithDecimals((float)$careerAverages['ftm'], (float)$careerAverages['fta']);
-            $carTgp = StatsFormatter::formatPercentageWithDecimals((float)$careerAverages['tgm'], (float)$careerAverages['tga']);
             ?>
     <tr class="player-table-row-bold">
         <td colspan=2>Career</td>
-        <td><?= $careerAverages['games'] ?></td>
+        <td><?= (int)$careerAverages['games'] ?></td>
         <td><?= StatsFormatter::formatWithDecimals((float)$careerAverages['minutes'], 1) ?></td>
         <td><?= StatsFormatter::formatWithDecimals((float)$careerAverages['fgm'], 1) ?></td>
         <td><?= StatsFormatter::formatWithDecimals((float)$careerAverages['fga'], 1) ?></td>
-        <td><?= $carFgp ?></td>
+        <td><?= StatsFormatter::formatPercentageWithDecimals((float)$careerAverages['fgm'], (float)$careerAverages['fga']) ?></td>
         <td><?= StatsFormatter::formatWithDecimals((float)$careerAverages['ftm'], 1) ?></td>
         <td><?= StatsFormatter::formatWithDecimals((float)$careerAverages['fta'], 1) ?></td>
-        <td><?= $carFtp ?></td>
+        <td><?= StatsFormatter::formatPercentageWithDecimals((float)$careerAverages['ftm'], (float)$careerAverages['fta']) ?></td>
         <td><?= StatsFormatter::formatWithDecimals((float)$careerAverages['tgm'], 1) ?></td>
         <td><?= StatsFormatter::formatWithDecimals((float)$careerAverages['tga'], 1) ?></td>
-        <td><?= $carTgp ?></td>
+        <td><?= StatsFormatter::formatPercentageWithDecimals((float)$careerAverages['tgm'], (float)$careerAverages['tga']) ?></td>
         <td><?= StatsFormatter::formatWithDecimals((float)$careerAverages['orb'], 1) ?></td>
         <td><?= StatsFormatter::formatWithDecimals((float)$careerAverages['reb'], 1) ?></td>
         <td><?= StatsFormatter::formatWithDecimals((float)$careerAverages['ast'], 1) ?></td>

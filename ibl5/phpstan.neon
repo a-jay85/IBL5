@@ -8,7 +8,6 @@ parameters:
         - classes
         - phpstan-rules
     excludePaths:
-        - classes/SiteStatistics
         - classes/Bootstrap/LegacyFunctions.php
     bootstrapFiles:
         - phpstan-stubs/nuke-globals.stub.php

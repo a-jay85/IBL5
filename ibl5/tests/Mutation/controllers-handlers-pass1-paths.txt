@@ -18,7 +18,6 @@ classes/RookieOption/RookieOptionController.php
 classes/SavedDepthChart/SavedDepthChartApiHandler.php
 classes/SeriesRecords/SeriesRecordsController.php
 classes/Api/Controller/StandingsController.php
-classes/SiteStatistics/StatisticsController.php
 classes/Team/TeamController.php
 classes/Api/Controller/TradeAcceptController.php
 classes/Api/Controller/TradeDeclineController.php

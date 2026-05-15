@@ -5,7 +5,6 @@
         "excludes": [
             "*/Contracts/*",
             "Bootstrap", "Database",
-            "SiteStatistics/StatisticsView.php",
             "OneOnOneGame",
             // Repositories without direct test coverage (Pass 2 — deferred)
             "ApiKeys/ApiKeysRepository.php",

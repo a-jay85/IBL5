@@ -1,6 +1,6 @@
 ---
 description: Why PHPStan level max plus strict-rules plus RequireStrictTypesRule is the non-negotiable type floor.
-last_verified: 2026-04-11
+last_verified: 2026-05-14
 ---
 
 # ADR-0005: Strict types + typed properties enforcement
@@ -36,7 +36,7 @@ The rule fires in PostToolUse during editing and in CI via `tests.yml` PHPStan j
 - Positive: large-scale refactoring is safe. Renaming a field or changing a return type surfaces every caller through type errors instead of at runtime.
 - Positive: agents writing new code inherit the constraint automatically — the PostToolUse PHPStan run rejects loose patterns before they reach commit.
 - Positive: onboarding is faster because the type system communicates intent. New contributors don't need to guess what `$row['tid']` contains.
-- Negative: PHPStan level max is noisy on legacy code. Modules in `ibl5/classes/SiteStatistics/` are excluded via `phpstan.neon` `excludePaths` because they predate the contract. Deliberate carve-out, not drift.
+- Negative: PHPStan level max is noisy on legacy code. Legacy modules that predate the contract may be excluded via `phpstan.neon` `excludePaths`. Deliberate carve-out, not drift.
 - Negative: every new PHPStan major version raises new issues. Accepted as the price of strictness; each PHPStan upgrade is its own focused PR.
 - Negative: PHP's own strict type checking is not as strong as a statically compiled language. `array|string|false` unions still exist for database return types. PHPStan narrows them via `@phpstan-var` and dedicated type guards — see `.claude/rules/php-classes.md` for the patterns.
 

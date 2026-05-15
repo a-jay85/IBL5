@@ -208,7 +208,7 @@ require_once __DIR__ . "/db/db.php";
 \Logging\LoggerFactory::fromConfig();
 
 // Initialize session-based AuthService for user authentication
-$authService = new \Auth\AuthService($mysqli_db);
+$authService = new \Auth\AuthService(new \Auth\AuthRepository($mysqli_db));
 
 // Attempt to restore session from "remember me" cookie for returning users
 $authService->tryRememberMe();

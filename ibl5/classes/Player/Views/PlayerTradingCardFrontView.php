@@ -87,8 +87,8 @@ class PlayerTradingCardFrontView
         $pTrd = self::renderPill('TRD', $player->freeAgencyTradition, true);
 
         // Contract data
-        $expYears = (int) ($player->yearsOfExperience ?? 0);
-        $birdYears = (int) ($player->birdYears ?? 0);
+        $expYears = $player->yearsOfExperience ?? 0;
+        $birdYears = $player->birdYears ?? 0;
         $contractSafe = HtmlSanitizer::e($contractDisplay);
 
         return '<div class="trading-card" style="' . $cssProps . '">'

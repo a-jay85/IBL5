@@ -388,7 +388,7 @@ function resetPlayerDatabase() {
 <tr>
     <td><?= HtmlSanitizer::e($position) ?></td>
     <?= PlayerImageHelper::renderFlexiblePlayerCell($pid, $playerName) ?>
-    <td><?= $player->age !== null ? (int) $player->age : '' ?></td>
+    <td><?= $player->age !== null ? HtmlSanitizer::e($player->age) : '' ?></td>
     <?= TeamCellHelper::renderTeamCellOrFreeAgent($teamid, $player->teamName ?? '', $player->teamColor1 ?? 'FFFFFF', $player->teamColor2 ?? '000000') ?>
     <td><?= (int) $player->yearsOfExperience ?></td>
     <td><?= (int) $player->birdYears ?></td>

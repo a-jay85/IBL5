@@ -55,7 +55,11 @@ class ExtensionRepository extends \BaseMysqliRepository implements ExtensionRepo
                 $playerName
             );
             return true;
-        } catch (\RuntimeException) {
+        } catch (\RuntimeException $e) {
+            \Logging\LoggerFactory::getChannel('db')->error('updatePlayerContract failed', [
+                'exception' => $e,
+                'context' => ['playerName' => $playerName],
+            ]);
             return false;
         }
     }
@@ -72,7 +76,11 @@ class ExtensionRepository extends \BaseMysqliRepository implements ExtensionRepo
                 $teamName
             );
             return true;
-        } catch (\RuntimeException) {
+        } catch (\RuntimeException $e) {
+            \Logging\LoggerFactory::getChannel('db')->error('markExtensionUsedThisSim failed', [
+                'exception' => $e,
+                'context' => ['teamName' => $teamName],
+            ]);
             return false;
         }
     }
@@ -89,7 +97,11 @@ class ExtensionRepository extends \BaseMysqliRepository implements ExtensionRepo
                 $teamName
             );
             return true;
-        } catch (\RuntimeException) {
+        } catch (\RuntimeException $e) {
+            \Logging\LoggerFactory::getChannel('db')->error('markExtensionUsedThisSeason failed', [
+                'exception' => $e,
+                'context' => ['teamName' => $teamName],
+            ]);
             return false;
         }
     }

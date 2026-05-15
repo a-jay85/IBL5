@@ -77,28 +77,32 @@ class DepthChartEntryRepository extends \BaseMysqliRepository implements DepthCh
 
             return true;
         } catch (\RuntimeException $e) {
+            \Logging\LoggerFactory::getChannel('db')->error('updatePlayerDepthChart failed', [
+                'exception' => $e,
+                'context' => ['playerName' => $playerName],
+            ]);
             return false;
         }
     }
-    
+
     /**
      * @see DepthChartEntryRepositoryInterface::updateTeamHistory()
      */
     public function updateTeamHistory(string $teamName): bool
     {
-        // Update both depth and sim_depth timestamps in a single statement
-        // We don't check affected_rows because MySQL returns 0 when NOW() equals the existing timestamp
         try {
             $this->execute(
                 "UPDATE ibl_team_info SET depth = NOW(), sim_depth = NOW() WHERE team_name = ?",
                 "s",
                 $teamName
             );
-            
-            // Success: the query executed without throwing an exception
+
             return true;
         } catch (\RuntimeException $e) {
-            // If an exception was thrown, the query failed (e.g., team doesn't exist)
+            \Logging\LoggerFactory::getChannel('db')->error('updateTeamHistory failed', [
+                'exception' => $e,
+                'context' => ['teamName' => $teamName],
+            ]);
             return false;
         }
     }

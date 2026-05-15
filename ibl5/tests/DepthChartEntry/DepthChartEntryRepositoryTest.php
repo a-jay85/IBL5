@@ -6,6 +6,8 @@ namespace Tests\DepthChartEntry;
 
 use PHPUnit\Framework\TestCase;
 use DepthChartEntry\DepthChartEntryRepository;
+use Logging\LoggerFactory;
+use Monolog\Handler\TestHandler;
 
 class DepthChartEntryRepositoryTest extends TestCase
 {
@@ -16,6 +18,11 @@ class DepthChartEntryRepositoryTest extends TestCase
     {
         $this->mockDb = $this->createMockDatabase();
         $this->repository = new DepthChartEntryRepository($this->mockDb);
+    }
+
+    protected function tearDown(): void
+    {
+        LoggerFactory::reset();
     }
 
     public function testGetPlayersOnTeamReturnsArrayOfPlayers(): void
@@ -368,6 +375,51 @@ class DepthChartEntryRepositoryTest extends TestCase
         ];
 
         $this->assertCount(5, $completeChain, 'Should have documented chain for 5 position depth fields');
+    }
+
+    // ============================================
+    // FAILURE PATH LOGGING
+    // ============================================
+
+    public function testUpdatePlayerDepthChartLogsOnFailure(): void
+    {
+        $handler = new TestHandler();
+        LoggerFactory::forTesting($handler);
+
+        $repo = new class (new \MockDatabase()) extends DepthChartEntryRepository {
+            protected function execute(string $query, string $types = '', mixed ...$params): int
+            {
+                throw new \RuntimeException('forced failure', 1003);
+            }
+        };
+
+        $depthChartValues = [
+            'pg' => 1, 'sg' => 0, 'sf' => 0, 'pf' => 0, 'c' => 0,
+            'canPlayInGame' => 1, 'min' => 30,
+        ];
+
+        $result = $repo->updatePlayerDepthChart('Test Player', $depthChartValues);
+
+        $this->assertFalse($result);
+        $this->assertTrue($handler->hasErrorThatContains('updatePlayerDepthChart failed'));
+    }
+
+    public function testUpdateTeamHistoryLogsOnFailure(): void
+    {
+        $handler = new TestHandler();
+        LoggerFactory::forTesting($handler);
+
+        $repo = new class (new \MockDatabase()) extends DepthChartEntryRepository {
+            protected function execute(string $query, string $types = '', mixed ...$params): int
+            {
+                throw new \RuntimeException('forced failure', 1003);
+            }
+        };
+
+        $result = $repo->updateTeamHistory('Test Team');
+
+        $this->assertFalse($result);
+        $this->assertTrue($handler->hasErrorThatContains('updateTeamHistory failed'));
     }
 
     /**

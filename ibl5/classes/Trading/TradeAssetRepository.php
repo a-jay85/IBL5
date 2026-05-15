@@ -40,7 +40,7 @@ class TradeAssetRepository extends BaseMysqliRepository implements TradeAssetRep
     {
         /** @var PlayerRow|null */
         return $this->fetchOne(
-            "SELECT * FROM ibl_plr WHERE pid = ?",
+            "SELECT * FROM `ibl_plr` WHERE pid = ?",
             "i",
             $playerId
         );
@@ -62,7 +62,7 @@ class TradeAssetRepository extends BaseMysqliRepository implements TradeAssetRep
 
         /** @var list<PlayerRow> $rows */
         $rows = $this->fetchAll(
-            "SELECT * FROM ibl_plr WHERE pid IN ({$placeholders})",
+            "SELECT * FROM `ibl_plr` WHERE pid IN ({$placeholders})",
             $types,
             ...$playerIds
         );
@@ -82,7 +82,7 @@ class TradeAssetRepository extends BaseMysqliRepository implements TradeAssetRep
     {
         /** @var DraftPickRow|null */
         return $this->fetchOne(
-            "SELECT * FROM ibl_draft_picks WHERE pickid = ?",
+            "SELECT * FROM `ibl_draft_picks` WHERE pickid = ?",
             "i",
             $pickId
         );
@@ -104,7 +104,7 @@ class TradeAssetRepository extends BaseMysqliRepository implements TradeAssetRep
 
         /** @var list<DraftPickRow> $rows */
         $rows = $this->fetchAll(
-            "SELECT * FROM ibl_draft_picks WHERE pickid IN ({$placeholders})",
+            "SELECT * FROM `ibl_draft_picks` WHERE pickid IN ({$placeholders})",
             $types,
             ...$pickIds
         );
@@ -123,7 +123,7 @@ class TradeAssetRepository extends BaseMysqliRepository implements TradeAssetRep
     public function updatePlayerTeam(int $playerId, int $newTeamId): int
     {
         return $this->execute(
-            "UPDATE ibl_plr SET teamid = ? WHERE pid = ?",
+            "UPDATE `ibl_plr` SET teamid = ? WHERE pid = ?",
             "ii",
             $newTeamId,
             $playerId
@@ -136,7 +136,7 @@ class TradeAssetRepository extends BaseMysqliRepository implements TradeAssetRep
     public function updateDraftPickOwnerById(int $pickId, string $newOwner, int $newOwnerId): int
     {
         return $this->execute(
-            "UPDATE ibl_draft_picks SET ownerofpick = ?, owner_teamid = ? WHERE pickid = ?",
+            "UPDATE `ibl_draft_picks` SET ownerofpick = ?, owner_teamid = ? WHERE pickid = ?",
             "sii",
             $newOwner,
             $newOwnerId,
@@ -150,7 +150,7 @@ class TradeAssetRepository extends BaseMysqliRepository implements TradeAssetRep
     public function playerIdExists(int $playerId): bool
     {
         $result = $this->fetchOne(
-            "SELECT 1 FROM ibl_plr WHERE pid = ? LIMIT 1",
+            "SELECT 1 FROM `ibl_plr` WHERE pid = ? LIMIT 1",
             "i",
             $playerId
         );
@@ -164,7 +164,7 @@ class TradeAssetRepository extends BaseMysqliRepository implements TradeAssetRep
     {
         /** @var TradeValidationRow|null */
         return $this->fetchOne(
-            "SELECT ordinal, cy FROM ibl_plr WHERE pid = ?",
+            "SELECT ordinal, cy FROM `ibl_plr` WHERE pid = ?",
             "i",
             $playerId
         );

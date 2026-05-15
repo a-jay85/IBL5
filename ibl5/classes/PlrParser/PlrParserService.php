@@ -259,7 +259,7 @@ class PlrParserService implements PlrParserServiceInterface
     }
 
     /**
-     * Process a player in Live mode: upsert into ibl_plr.
+     * Process a player in Live mode: upsert into `ibl_plr`.
      *
      * @param array<string, int|string|float> $derived
      */
@@ -270,7 +270,7 @@ class PlrParserService implements PlrParserServiceInterface
     }
 
     /**
-     * Process a player in Snapshot mode: upsert into ibl_plr_snapshots.
+     * Process a player in Snapshot mode: upsert into `ibl_plr_snapshots`.
      *
      * @param array<string, int|string|float> $derived
      */

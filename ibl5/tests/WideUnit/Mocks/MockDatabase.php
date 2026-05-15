@@ -61,10 +61,13 @@ class MockDatabase extends \mysqli
         // Track all executed queries for verification
         $this->executedQueries[] = $query;
 
+        // Strip backticks for pattern matching (SQL table names may be backtick-quoted)
+        $normalized = str_replace('`', '', $query);
+
         // For queries that expect boolean return (INSERT, UPDATE, DELETE)
-        if (stripos($query, 'INSERT') === 0 ||
-            stripos($query, 'UPDATE') === 0 ||
-            stripos($query, 'DELETE') === 0) {
+        if (stripos($normalized, 'INSERT') === 0 ||
+            stripos($normalized, 'UPDATE') === 0 ||
+            stripos($normalized, 'DELETE') === 0) {
             // Set affected rows for UPDATE/DELETE operations (default to 1 for successful operations)
             if ($this->returnTrue) {
                 $this->affectedRows = 1;
@@ -74,7 +77,7 @@ class MockDatabase extends \mysqli
 
         // Check registered query patterns first (highest priority)
         foreach ($this->queryPatterns as $pattern => $rows) {
-            if (preg_match('/' . $pattern . '/i', $query) === 1) {
+            if (preg_match('/' . $pattern . '/i', $normalized) === 1) {
                 return new MockDatabaseResult($rows);
             }
         }
@@ -82,21 +85,21 @@ class MockDatabase extends \mysqli
         // Special handling for PID existence checks (generateUniquePid)
         // Return empty result to indicate PID is available unless explicitly configured
         // Only match the specific "SELECT 1 FROM ibl_plr WHERE pid = X" pattern for existence checks
-        if (stripos($query, 'SELECT 1 FROM ibl_plr WHERE pid = ') !== false) {
+        if (stripos($normalized, 'SELECT 1 FROM ibl_plr WHERE pid = ') !== false) {
             return new MockDatabaseResult([]);
         }
-        
+
         // Special handling for trade info queries (support both direct and prepared statement patterns)
-        if (stripos($query, 'ibl_trade_info') !== false &&
-            stripos($query, 'tradeofferid') !== false &&
+        if (stripos($normalized, 'ibl_trade_info') !== false &&
+            stripos($normalized, 'tradeofferid') !== false &&
             !empty($this->mockTradeInfo)) {
             return new MockDatabaseResult($this->mockTradeInfo);
         }
 
         // Special handling for team info queries - return mock team data if available
-        if (stripos($query, 'ibl_team_info') !== false && !empty($this->mockTeamData)) {
+        if (stripos($normalized, 'ibl_team_info') !== false && !empty($this->mockTeamData)) {
             // Try to match by teamid if specified in query
-            if (preg_match('/teamid\s*=\s*[\'"]?(\d+)[\'"]?/i', $query, $matches)) {
+            if (preg_match('/teamid\s*=\s*[\'"]?(\d+)[\'"]?/i', $normalized, $matches)) {
                 $searchId = (int)$matches[1];
                 foreach ($this->mockTeamData as $team) {
                     if (isset($team['teamid']) && (int)$team['teamid'] === $searchId) {
@@ -111,7 +114,7 @@ class MockDatabase extends \mysqli
         // Special handling for bulk ibl_power queries (getAllStreakData)
         // Only intercept queries WITHOUT a WHERE clause to avoid breaking
         // single-team queries (getTeamStreakData, getTeamPowerData) that set up their own mock data
-        if (stripos($query, 'ibl_power') !== false && stripos($query, 'WHERE') === false) {
+        if (stripos($normalized, 'ibl_power') !== false && stripos($normalized, 'WHERE') === false) {
             return new MockDatabaseResult([]);
         }
 
@@ -119,9 +122,9 @@ class MockDatabase extends \mysqli
         // Always intercept these queries to avoid returning standings data
         // The JOIN query uses aliases: off_fgm, off_ftm, off_tgm, def_fgm, def_ftm, def_tgm
         // Detects both old view names and inlined queries that aggregate from ibl_box_scores_teams
-        if (stripos($query, 'ibl_team_offense_stats') !== false ||
-            stripos($query, 'ibl_team_defense_stats') !== false ||
-            (stripos($query, 'off_fgm') !== false && stripos($query, 'def_fgm') !== false)) {
+        if (stripos($normalized, 'ibl_team_offense_stats') !== false ||
+            stripos($normalized, 'ibl_team_defense_stats') !== false ||
+            (stripos($normalized, 'off_fgm') !== false && stripos($normalized, 'def_fgm') !== false)) {
             if (!empty($this->mockPythagoreanData)) {
                 $data = $this->mockPythagoreanData;
                 // Translate base keys to aliased JOIN keys if needed
@@ -141,8 +144,8 @@ class MockDatabase extends \mysqli
         // Special handling for market maximums query (bulk MAX from ibl_plr)
         // Returns sensible defaults so tests don't produce undefined-key warnings
         // Exclude queries that use ibl_plr only in a LEFT JOIN subquery (e.g., FranchiseRecordBook)
-        if (stripos($query, 'MAX(') !== false && stripos($query, 'ibl_plr') !== false
-            && stripos($query, 'ibl_rcb') === false) {
+        if (stripos($normalized, 'MAX(') !== false && stripos($normalized, 'ibl_plr') !== false
+            && stripos($normalized, 'ibl_rcb') === false) {
             // If mock data has the correct aliased keys, use it directly
             if (!empty($this->mockData) && isset($this->mockData[0]['fga'])) {
                 return new MockDatabaseResult($this->mockData);
@@ -160,8 +163,8 @@ class MockDatabase extends \mysqli
 
         // Special handling for voting queries (ASG and EOY tables)
         // Returns results from queue for consecutive queries
-        if ((stripos($query, 'ibl_votes_ASG') !== false ||
-             stripos($query, 'ibl_votes_EOY') !== false) &&
+        if ((stripos($normalized, 'ibl_votes_ASG') !== false ||
+             stripos($normalized, 'ibl_votes_EOY') !== false) &&
             !empty($this->votingResultsQueue)) {
             $data = array_shift($this->votingResultsQueue);
             return new MockDatabaseResult($data ?? []);
@@ -169,7 +172,7 @@ class MockDatabase extends \mysqli
         
         // Smart filtering for player queries with pid/itemid/pickid
         // Match patterns like: WHERE pid = 1001, WHERE `pid` = 1001, WHERE pid=1001
-        if (preg_match('/WHERE\s+`?(?:pid|itemid|pickid)`?\s*=\s*[\'"]?(\d+)[\'"]?/i', $query, $matches)) {
+        if (preg_match('/WHERE\s+(?:pid|itemid|pickid)\s*=\s*[\'"]?(\d+)[\'"]?/i', $normalized, $matches)) {
             $searchId = (int)$matches[1];
             $filteredData = [];
             
@@ -293,7 +296,10 @@ class MockDatabase extends \mysqli
     
     public function getExecutedQueries(): array
     {
-        return $this->executedQueries;
+        return array_map(
+            static fn (string $q): string => str_replace('`', '', $q),
+            $this->executedQueries
+        );
     }
     
     public function clearQueries(): void

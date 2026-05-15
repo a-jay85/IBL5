@@ -104,8 +104,8 @@ class CareerLeaderboardsRepository extends \BaseMysqliRepository implements Care
                 sum(h.pf) as pf,
                 sum(h.pts) as pts,
                 p.retired
-                FROM ibl_hist h
-                LEFT JOIN ibl_plr p ON h.pid = p.pid
+                FROM `ibl_hist` h
+                LEFT JOIN `ibl_plr` p ON h.pid = p.pid
                 WHERE $whereClause
                 GROUP BY pid
                 ORDER BY $sortColumn DESC, pid ASC"
@@ -113,7 +113,7 @@ class CareerLeaderboardsRepository extends \BaseMysqliRepository implements Care
         } else {
             $query = "SELECT h.*, p.retired
                 FROM $tableKey h
-                LEFT JOIN ibl_plr p ON h.pid = p.pid
+                LEFT JOIN `ibl_plr` p ON h.pid = p.pid
                 WHERE $whereClause
                 ORDER BY $sortColumn DESC, h.pid ASC"
                 . " LIMIT " . ($limit > 0 ? $limit : self::DEFAULT_SAFETY_LIMIT) . ";";

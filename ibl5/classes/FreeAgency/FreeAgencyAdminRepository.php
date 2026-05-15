@@ -31,8 +31,8 @@ class FreeAgencyAdminRepository extends BaseMysqliRepository implements FreeAgen
         /** @var list<OfferRow> */
         return $this->fetchAll(
             "SELECT ibl_fa_offers.*, ibl_plr.bird
-             FROM ibl_fa_offers
-             JOIN ibl_plr ON ibl_fa_offers.pid = ibl_plr.pid
+             FROM `ibl_fa_offers`
+             JOIN `ibl_plr` ON ibl_fa_offers.pid = ibl_plr.pid
              ORDER BY ibl_fa_offers.name ASC, ibl_fa_offers.perceivedvalue DESC",
             ""
         );
@@ -54,7 +54,7 @@ class FreeAgencyAdminRepository extends BaseMysqliRepository implements FreeAgen
 
         /** @var list<array{pid: int, dem1: int, dem2: int, dem3: int, dem4: int, dem5: int, dem6: int}> $rows */
         $rows = $this->fetchAll(
-            "SELECT pid, dem1, dem2, dem3, dem4, dem5, dem6 FROM ibl_demands WHERE pid IN ({$placeholders})",
+            "SELECT pid, dem1, dem2, dem3, dem4, dem5, dem6 FROM `ibl_demands` WHERE pid IN ({$placeholders})",
             $types,
             ...$playerIds
         );
@@ -89,7 +89,7 @@ class FreeAgencyAdminRepository extends BaseMysqliRepository implements FreeAgen
         int $offer6
     ): int {
         return $this->execute(
-            "UPDATE ibl_plr
+            "UPDATE `ibl_plr`
              SET cy = 0,
                  salary_yr1 = ?,
                  salary_yr2 = ?,
@@ -121,7 +121,7 @@ class FreeAgencyAdminRepository extends BaseMysqliRepository implements FreeAgen
     public function markMleUsed(string $teamName): void
     {
         $this->execute(
-            "UPDATE ibl_team_info SET has_mle = 0 WHERE team_name = ? LIMIT 1",
+            "UPDATE `ibl_team_info` SET has_mle = 0 WHERE team_name = ? LIMIT 1",
             "s",
             $teamName
         );
@@ -133,7 +133,7 @@ class FreeAgencyAdminRepository extends BaseMysqliRepository implements FreeAgen
     public function markLleUsed(string $teamName): void
     {
         $this->execute(
-            "UPDATE ibl_team_info SET has_lle = 0 WHERE team_name = ? LIMIT 1",
+            "UPDATE `ibl_team_info` SET has_lle = 0 WHERE team_name = ? LIMIT 1",
             "s",
             $teamName
         );
@@ -163,7 +163,7 @@ class FreeAgencyAdminRepository extends BaseMysqliRepository implements FreeAgen
      */
     public function clearAllOffers(): void
     {
-        $this->execute("DELETE FROM ibl_fa_offers", "");
+        $this->execute("DELETE FROM `ibl_fa_offers`", "");
     }
 
     /**

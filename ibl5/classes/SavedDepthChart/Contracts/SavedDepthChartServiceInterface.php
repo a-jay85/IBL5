@@ -24,7 +24,7 @@ interface SavedDepthChartServiceInterface
      * If $loadedDcId > 0: update that DC's player settings
      * If $loadedDcId === 0: deactivate previous active DC, create new one
      *
-     * @param list<array<string, mixed>> $rosterPlayers Current roster from ibl_plr
+     * @param list<array<string, mixed>> $rosterPlayers Current roster from `ibl_plr`
      * @param array<string, mixed> $postData POST data from the form
      * @return int The saved depth chart ID
      */
@@ -79,7 +79,7 @@ interface SavedDepthChartServiceInterface
      * Only captures DC settings (dc_* columns). Player ratings can be
      * retrieved by joining with ibl_hist on pid + season_year.
      *
-     * @param array<string, mixed> $rosterPlayer Row from ibl_plr
+     * @param array<string, mixed> $rosterPlayer Row from `ibl_plr`
      * @param array<string, int> $dcSettings Depth chart settings from POST
      * @return PlayerSnapshotData
      */

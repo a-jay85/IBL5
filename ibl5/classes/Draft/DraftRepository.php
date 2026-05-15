@@ -33,7 +33,7 @@ class DraftRepository extends \BaseMysqliRepository implements DraftRepositoryIn
     {
         /** @var array{player: string}|null $row */
         $row = $this->fetchOne(
-            "SELECT `player` FROM ibl_draft WHERE `round` = ? AND `pick` = ?",
+            "SELECT `player` FROM `ibl_draft` WHERE `round` = ? AND `pick` = ?",
             "ii",
             $draftRound,
             $draftPick
@@ -48,7 +48,7 @@ class DraftRepository extends \BaseMysqliRepository implements DraftRepositoryIn
     public function updateDraftTable(string $playerName, string $date, int $draftRound, int $draftPick): bool
     {
         $affected = $this->execute(
-            "UPDATE ibl_draft SET `player` = ?, `date` = ? WHERE `round` = ? AND `pick` = ?",
+            "UPDATE `ibl_draft` SET `player` = ?, `date` = ? WHERE `round` = ? AND `pick` = ?",
             "ssii",
             $playerName,
             $date,
@@ -80,7 +80,7 @@ class DraftRepository extends \BaseMysqliRepository implements DraftRepositoryIn
 
         /** @var array{max_pid: int|null}|null $row */
         $row = $this->fetchOne(
-            "SELECT MAX(pid) as max_pid FROM ibl_plr WHERE pid >= ?",
+            "SELECT MAX(pid) as max_pid FROM `ibl_plr` WHERE pid >= ?",
             "i",
             $draftPidStart
         );
@@ -107,7 +107,7 @@ class DraftRepository extends \BaseMysqliRepository implements DraftRepositoryIn
 
         /** @var DraftClassPlayerRow|null $draftClassPlayer */
         $draftClassPlayer = $this->fetchOne(
-            "SELECT * FROM ibl_draft_class WHERE name = ? LIMIT 1",
+            "SELECT * FROM `ibl_draft_class` WHERE name = ? LIMIT 1",
             "s",
             $playerName
         );
@@ -134,9 +134,9 @@ class DraftRepository extends \BaseMysqliRepository implements DraftRepositoryIn
         $skill = $draftClassPlayer['skill'];
         $intangibles = $draftClassPlayer['intangibles'];
 
-        // Insert new player into ibl_plr
+        // Insert new player into `ibl_plr`
         $affected = $this->execute(
-            "INSERT INTO ibl_plr (
+            "INSERT INTO `ibl_plr` (
                 pid, name, age, teamid, pos,
                 stamina, oo, od, po, r_trans_off, r_drive_off, dd, pd, td,
                 talent, skill, intangibles,
@@ -162,7 +162,7 @@ class DraftRepository extends \BaseMysqliRepository implements DraftRepositoryIn
     public function isPlayerAlreadyDrafted(string $playerName): bool
     {
         $row = $this->fetchOne(
-            "SELECT drafted FROM ibl_draft_class WHERE name = ? LIMIT 1",
+            "SELECT drafted FROM `ibl_draft_class` WHERE name = ? LIMIT 1",
             "s",
             $playerName
         );
@@ -182,8 +182,8 @@ class DraftRepository extends \BaseMysqliRepository implements DraftRepositoryIn
         /** @var list<DraftClassPlayerRow> */
         return $this->fetchAll(
             "SELECT dc.*, t.teamid AS team_tid, t.color1, t.color2
-            FROM ibl_draft_class dc
-            LEFT JOIN ibl_team_info t ON dc.team = t.team_name
+            FROM `ibl_draft_class` dc
+            LEFT JOIN `ibl_team_info` t ON dc.team = t.team_name
             ORDER BY dc.drafted, dc.name"
         );
     }
@@ -195,7 +195,7 @@ class DraftRepository extends \BaseMysqliRepository implements DraftRepositoryIn
     {
         /** @var array{team: string, teamid: int, round: int, pick: int, player: string}|null $row */
         $row = $this->fetchOne(
-            "SELECT * FROM ibl_draft WHERE player = '' ORDER BY round ASC, pick ASC LIMIT 1"
+            "SELECT * FROM `ibl_draft` WHERE player = '' ORDER BY round ASC, pick ASC LIMIT 1"
         );
 
         if ($row !== null) {

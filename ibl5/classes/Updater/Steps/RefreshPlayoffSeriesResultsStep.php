@@ -35,11 +35,11 @@ final class RefreshPlayoffSeriesResultsStep implements PipelineStepInterface
         $this->db->begin_transaction();
 
         try {
-            if ($this->db->query('DELETE FROM ibl_playoff_series_results') === false) {
+            if ($this->db->query('DELETE FROM `ibl_playoff_series_results`') === false) {
                 throw new \RuntimeException('DELETE failed: ' . $this->db->error);
             }
             if ($this->db->query(
-                'INSERT INTO ibl_playoff_series_results '
+                'INSERT INTO `ibl_playoff_series_results` '
                 . '(`year`, `round`, `winner_tid`, `loser_tid`, `winner`, `loser`, '
                 . '`winner_games`, `loser_games`, `total_games`) '
                 . self::SELECT_SQL,
@@ -73,7 +73,7 @@ WITH playoff_games AS (
          + COALESCE(visitor_ot_points, 0)) AS v_total,
         (home_q1_points + home_q2_points + home_q3_points + home_q4_points
          + COALESCE(home_ot_points, 0)) AS h_total
-    FROM ibl_box_scores_teams
+    FROM `ibl_box_scores_teams`
     WHERE game_type = 2
     GROUP BY game_date, visitor_teamid, home_teamid, game_of_that_day
 ),
@@ -121,7 +121,7 @@ SELECT
 FROM series_meta sm
 JOIN team_wins tw
     ON tw.`year` = sm.`year` AND tw.team_a = sm.team_a AND tw.team_b = sm.team_b AND tw.rn = 1
-JOIN ibl_team_info w ON w.teamid = tw.winner_tid
-JOIN ibl_team_info l ON l.teamid = CASE WHEN tw.winner_tid = sm.team_a THEN sm.team_b ELSE sm.team_a END
+JOIN `ibl_team_info` w ON w.teamid = tw.winner_tid
+JOIN `ibl_team_info` l ON l.teamid = CASE WHEN tw.winner_tid = sm.team_a THEN sm.team_b ELSE sm.team_a END
 SQL;
 }

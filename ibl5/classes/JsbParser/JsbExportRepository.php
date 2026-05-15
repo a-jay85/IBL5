@@ -31,7 +31,7 @@ class JsbExportRepository extends \BaseMysqliRepository implements JsbExportRepo
                     COALESCE(salary_yr5, 0) AS salary_yr5,
                     COALESCE(salary_yr6, 0) AS salary_yr6,
                     COALESCE(fa_signing_flag, 0) AS fa_signing_flag
-             FROM ibl_plr
+             FROM `ibl_plr`
              WHERE ordinal <= 1440 AND pid <> 0
              ORDER BY pid',
         );
@@ -67,7 +67,7 @@ class JsbExportRepository extends \BaseMysqliRepository implements JsbExportRepo
         $rows = $this->fetchAll(
             'SELECT tradeofferid, itemid, itemtype,
                     trade_from, trade_to, created_at
-             FROM ibl_trade_info
+             FROM `ibl_trade_info`
              WHERE approval = ? AND created_at >= ?
              ORDER BY tradeofferid, id',
             'ss',

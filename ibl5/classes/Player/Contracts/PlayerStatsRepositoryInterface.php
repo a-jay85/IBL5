@@ -20,7 +20,7 @@ namespace Player\Contracts;
 interface PlayerStatsRepositoryInterface
 {
     /**
-     * Get player statistics by player ID from ibl_plr table
+     * Get player statistics by player ID from `ibl_plr` table
      *
      * Returns all columns from the current player table including
      * season stats, career totals, and season/career highs.
@@ -57,7 +57,7 @@ interface PlayerStatsRepositoryInterface
     /**
      * Get all simulation date ranges
      * 
-     * Returns all records from ibl_sim_dates table containing sim numbers
+     * Returns all records from `ibl_sim_dates` table containing sim numbers
      * and their corresponding date ranges.
      * 
      * @param int $limit Maximum number of sim records to return (default 20)

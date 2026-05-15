@@ -55,7 +55,7 @@ class PlayerStatsTransformer
     }
 
     /**
-     * Transform a season history row from ibl_hist.
+     * Transform a season history row from `ibl_hist`.
      *
      * @param SeasonHistoryRow $row
      * @return array<string, mixed>

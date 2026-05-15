@@ -34,7 +34,7 @@ final class PreseasonCleanupRepository extends \BaseMysqliRepository
         $endDate = sprintf('%d-09-30', $beginningYear);
 
         $this->execute(
-            "DELETE FROM ibl_sim_dates WHERE start_date BETWEEN ? AND ? AND end_date BETWEEN ? AND ?",
+            "DELETE FROM `ibl_sim_dates` WHERE start_date BETWEEN ? AND ? AND end_date BETWEEN ? AND ?",
             "ssss",
             $startDate,
             $endDate,
@@ -46,12 +46,12 @@ final class PreseasonCleanupRepository extends \BaseMysqliRepository
     public function deletePreseasonJsbData(int $endingYear): void
     {
         $this->transactional(function () use ($endingYear): void {
-            $this->execute("DELETE FROM ibl_team_awards WHERE year = ?", "i", $endingYear);
-            $this->execute("DELETE FROM ibl_jsb_history WHERE season_year = ?", "i", $endingYear);
-            $this->execute("DELETE FROM ibl_jsb_transactions WHERE season_year = ?", "i", $endingYear);
-            $this->execute("DELETE FROM ibl_rcb_season_records WHERE season_year = ?", "i", $endingYear);
+            $this->execute("DELETE FROM `ibl_team_awards` WHERE year = ?", "i", $endingYear);
+            $this->execute("DELETE FROM `ibl_jsb_history` WHERE season_year = ?", "i", $endingYear);
+            $this->execute("DELETE FROM `ibl_jsb_transactions` WHERE season_year = ?", "i", $endingYear);
+            $this->execute("DELETE FROM `ibl_rcb_season_records` WHERE season_year = ?", "i", $endingYear);
             $this->execute(
-                "DELETE FROM ibl_plr_snapshots WHERE season_year = ? AND snapshot_phase = 'mid-season'",
+                "DELETE FROM `ibl_plr_snapshots` WHERE season_year = ? AND snapshot_phase = 'mid-season'",
                 "i",
                 $endingYear,
             );

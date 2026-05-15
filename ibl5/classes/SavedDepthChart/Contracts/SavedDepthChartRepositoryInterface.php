@@ -151,7 +151,7 @@ interface SavedDepthChartRepositoryInterface
     public function getMostRecentDepthChart(int $teamid): ?array;
 
     /**
-     * Get live roster depth chart settings from ibl_plr
+     * Get live roster depth chart settings from `ibl_plr`
      *
      * Returns all dc_* columns plus name and ordinal for active players on the team.
      * This allows comparison with saved depth chart snapshots and building snapshots from live data.

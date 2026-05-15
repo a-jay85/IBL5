@@ -19,7 +19,7 @@ class RookieOptionRepository extends \BaseMysqliRepository implements RookieOpti
         $contractYear = ($draftRound === 1) ? 'salary_yr4' : 'salary_yr3';
         
         // Use prepared statement via BaseMysqliRepository
-        $query = "UPDATE ibl_plr SET `{$contractYear}` = ? WHERE pid = ?";
+        $query = "UPDATE `ibl_plr` SET `{$contractYear}` = ? WHERE pid = ?";
         $affectedRows = $this->execute($query, 'ii', $extensionAmount, $playerID);
         
         return $affectedRows > 0;

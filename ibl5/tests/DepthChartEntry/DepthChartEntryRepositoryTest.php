@@ -82,7 +82,7 @@ class DepthChartEntryRepositoryTest extends TestCase
 
         // Verify the UPDATE statement contains all the expected fields
         $lastQuery = end($queries);
-        $this->assertStringContainsString('UPDATE `ibl_plr` SET', $lastQuery);
+        $this->assertStringContainsString('UPDATE ibl_plr SET', $lastQuery);
         $this->assertStringContainsString('dc_pg_depth', $lastQuery);
         $this->assertStringContainsString('dc_sg_depth', $lastQuery);
         $this->assertStringContainsString('dc_sf_depth', $lastQuery);
@@ -192,7 +192,7 @@ class DepthChartEntryRepositoryTest extends TestCase
         
         // Verify the UPDATE statement contains both timestamp fields
         $lastQuery = end($queries);
-        $this->assertStringContainsString('UPDATE `ibl_team_info` SET', $lastQuery);
+        $this->assertStringContainsString('UPDATE ibl_team_info SET', $lastQuery);
         $this->assertStringContainsString('depth = NOW()', $lastQuery);
         $this->assertStringContainsString('sim_depth = NOW()', $lastQuery);
         $this->assertStringContainsString("WHERE team_name = '$teamName'", $lastQuery);

@@ -39,7 +39,7 @@ class SeasonQueryRepository extends \BaseMysqliRepository implements SeasonQuery
 
         /** @var list<array{name: string, value: string}> $rows */
         $rows = $this->fetchAll(
-            "SELECT name, value FROM ibl_settings WHERE name IN ({$placeholders})",
+            "SELECT name, value FROM `ibl_settings` WHERE name IN ({$placeholders})",
             $types,
             ...$names
         );
@@ -62,7 +62,7 @@ class SeasonQueryRepository extends \BaseMysqliRepository implements SeasonQuery
     {
         /** @var array{value: string}|null $result */
         $result = $this->fetchOne(
-            "SELECT value FROM ibl_settings WHERE name = ? LIMIT 1",
+            "SELECT value FROM `ibl_settings` WHERE name = ? LIMIT 1",
             "s",
             "Current Season Phase"
         );
@@ -79,7 +79,7 @@ class SeasonQueryRepository extends \BaseMysqliRepository implements SeasonQuery
     {
         /** @var array{value: string}|null $result */
         $result = $this->fetchOne(
-            "SELECT value FROM ibl_settings WHERE name = ? LIMIT 1",
+            "SELECT value FROM `ibl_settings` WHERE name = ? LIMIT 1",
             "s",
             "Current Season Ending Year"
         );
@@ -120,7 +120,7 @@ class SeasonQueryRepository extends \BaseMysqliRepository implements SeasonQuery
     /**
      * Get last sim dates array
      *
-     * Returns the most recent simulation date range from ibl_sim_dates.
+     * Returns the most recent simulation date range from `ibl_sim_dates`.
      *
      * @return array{sim: int, start_date: string, end_date: string}
      */
@@ -128,7 +128,7 @@ class SeasonQueryRepository extends \BaseMysqliRepository implements SeasonQuery
     {
         /** @var array{sim: int, start_date: string, end_date: string}|null $result */
         $result = $this->fetchOne(
-            "SELECT sim, start_date, end_date FROM ibl_sim_dates ORDER BY sim DESC LIMIT 1"
+            "SELECT sim, start_date, end_date FROM `ibl_sim_dates` ORDER BY sim DESC LIMIT 1"
         );
 
         return $result ?? ['sim' => 0, 'start_date' => '', 'end_date' => ''];
@@ -137,7 +137,7 @@ class SeasonQueryRepository extends \BaseMysqliRepository implements SeasonQuery
     /**
      * Set last sim dates array
      *
-     * Inserts a new simulation date range into ibl_sim_dates.
+     * Inserts a new simulation date range into `ibl_sim_dates`.
      *
      * @param string $newSimNumber New sim number
      * @param string $newSimStartDate New sim start date (YYYY-MM-DD format)
@@ -147,7 +147,7 @@ class SeasonQueryRepository extends \BaseMysqliRepository implements SeasonQuery
     public function setLastSimDatesArray(string $newSimNumber, string $newSimStartDate, string $newSimEndDate): int
     {
         return $this->execute(
-            "INSERT INTO ibl_sim_dates (sim, start_date, end_date) VALUES (?, ?, ?)",
+            "INSERT INTO `ibl_sim_dates` (sim, start_date, end_date) VALUES (?, ?, ?)",
             "sss",
             $newSimNumber,
             $newSimStartDate,
@@ -158,7 +158,7 @@ class SeasonQueryRepository extends \BaseMysqliRepository implements SeasonQuery
     /**
      * Get the last regular season game date from the schedule
      *
-     * Fetches MAX(Date) from ibl_schedule before the playoffs start date.
+     * Fetches MAX(Date) from `ibl_schedule` before the playoffs start date.
      * Used to detect the RS-to-Playoffs gap for sim date projections.
      *
      * @param int $endingYear Season ending year (used to calculate playoffs start)
@@ -187,7 +187,7 @@ class SeasonQueryRepository extends \BaseMysqliRepository implements SeasonQuery
     {
         /** @var array{value: string}|null $result */
         $result = $this->fetchOne(
-            "SELECT value FROM ibl_settings WHERE name = ? LIMIT 1",
+            "SELECT value FROM `ibl_settings` WHERE name = ? LIMIT 1",
             "s",
             "Allow Trades"
         );
@@ -204,7 +204,7 @@ class SeasonQueryRepository extends \BaseMysqliRepository implements SeasonQuery
     {
         /** @var array{value: string}|null $result */
         $result = $this->fetchOne(
-            "SELECT value FROM ibl_settings WHERE name = ? LIMIT 1",
+            "SELECT value FROM `ibl_settings` WHERE name = ? LIMIT 1",
             "s",
             "Allow Waiver Moves"
         );
@@ -221,7 +221,7 @@ class SeasonQueryRepository extends \BaseMysqliRepository implements SeasonQuery
     {
         /** @var array{value: string}|null $result */
         $result = $this->fetchOne(
-            "SELECT value FROM ibl_settings WHERE name = ? LIMIT 1",
+            "SELECT value FROM `ibl_settings` WHERE name = ? LIMIT 1",
             "s",
             "Free Agency Notifications"
         );
@@ -266,7 +266,7 @@ class SeasonQueryRepository extends \BaseMysqliRepository implements SeasonQuery
 
         /** @var array{cnt: int}|null $result */
         $result = $this->fetchOne(
-            "SELECT COUNT(*) AS cnt FROM ibl_sim_dates WHERE end_date BETWEEN ? AND ? AND sim <= ?",
+            "SELECT COUNT(*) AS cnt FROM `ibl_sim_dates` WHERE end_date BETWEEN ? AND ? AND sim <= ?",
             "ssi",
             $phaseStartDate,
             $phaseEndDate,

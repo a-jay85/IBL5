@@ -125,7 +125,7 @@ class TeamRepository extends \BaseMysqliRepository implements TeamRepositoryInte
     {
         /** @var list<BannerRow> */
         return $this->fetchAll(
-            "SELECT * FROM ibl_banners WHERE currentname = ? ORDER BY year ASC",
+            "SELECT * FROM `ibl_banners` WHERE currentname = ? ORDER BY year ASC",
             "s",
             $teamName
         );
@@ -139,7 +139,7 @@ class TeamRepository extends \BaseMysqliRepository implements TeamRepositoryInte
     {
         /** @var list<GMTenureRow> */
         return $this->fetchAll(
-            "SELECT * FROM ibl_gm_tenures WHERE franchise_id = ? ORDER BY start_season_year ASC",
+            "SELECT * FROM `ibl_gm_tenures` WHERE franchise_id = ? ORDER BY start_season_year ASC",
             "i",
             $franchiseId
         );
@@ -153,7 +153,7 @@ class TeamRepository extends \BaseMysqliRepository implements TeamRepositoryInte
     {
         /** @var list<GMAwardRow> */
         return $this->fetchAll(
-            "SELECT * FROM ibl_gm_awards WHERE name = ? ORDER BY year ASC",
+            "SELECT * FROM `ibl_gm_awards` WHERE name = ? ORDER BY year ASC",
             "s",
             $gmUsername
         );
@@ -184,7 +184,7 @@ class TeamRepository extends \BaseMysqliRepository implements TeamRepositoryInte
         /** @var list<WinLossRow> */
         return $this->fetchAll(
             "SELECT `year`, currentname, namethatyear, wins, losses
-             FROM ibl_team_season_records
+             FROM `ibl_team_season_records`
              WHERE currentname = ? AND game_type = 1
              ORDER BY `year` DESC",
             "s",
@@ -201,7 +201,7 @@ class TeamRepository extends \BaseMysqliRepository implements TeamRepositoryInte
         /** @var list<HEATWinLossRow> */
         return $this->fetchAll(
             "SELECT `year`, currentname, namethatyear, wins, losses
-             FROM ibl_team_season_records
+             FROM `ibl_team_season_records`
              WHERE currentname = ? AND game_type = 3
              ORDER BY `year` DESC",
             "s",
@@ -218,7 +218,7 @@ class TeamRepository extends \BaseMysqliRepository implements TeamRepositoryInte
     private static function buildTeamAccomplishmentsQuery(): string
     {
         return "SELECT year, name, award, id
-            FROM ibl_team_awards
+            FROM `ibl_team_awards`
             WHERE name = ?
 
             UNION ALL
@@ -255,10 +255,10 @@ class TeamRepository extends \BaseMysqliRepository implements TeamRepositoryInte
                         PARTITION BY YEAR(bst.game_date)
                         ORDER BY bst.game_date DESC, bst.game_of_that_day ASC
                     ) AS rn
-                FROM ibl_box_scores_teams bst
+                FROM `ibl_box_scores_teams` bst
                 WHERE bst.game_type = 3
             ) hc
-            JOIN ibl_team_info ti ON ti.teamid = hc.winner_tid
+            JOIN `ibl_team_info` ti ON ti.teamid = hc.winner_tid
             WHERE hc.rn = 1 AND ti.team_name = ?
 
             ORDER BY year DESC, " . self::AWARD_HIERARCHY_CASE . ", award ASC";
@@ -296,9 +296,9 @@ class TeamRepository extends \BaseMysqliRepository implements TeamRepositoryInte
             "SELECT pr.`year`, pr.`round`, pr.winner, pr.loser, pr.winner_games, pr.loser_games,
                     COALESCE(wfs.team_name, pr.winner) AS winner_name_that_year,
                     COALESCE(lfs.team_name, pr.loser) AS loser_name_that_year
-             FROM ibl_playoff_series_results pr
-             LEFT JOIN ibl_franchise_seasons wfs ON wfs.franchise_id = pr.winner_tid AND wfs.season_ending_year = pr.`year`
-             LEFT JOIN ibl_franchise_seasons lfs ON lfs.franchise_id = pr.loser_tid AND lfs.season_ending_year = pr.`year`
+             FROM `ibl_playoff_series_results` pr
+             LEFT JOIN `ibl_franchise_seasons` wfs ON wfs.franchise_id = pr.winner_tid AND wfs.season_ending_year = pr.`year`
+             LEFT JOIN `ibl_franchise_seasons` lfs ON lfs.franchise_id = pr.loser_tid AND lfs.season_ending_year = pr.`year`
              WHERE pr.winner = ? OR pr.loser = ?
              ORDER BY pr.`year` DESC",
             "ss",
@@ -316,7 +316,7 @@ class TeamRepository extends \BaseMysqliRepository implements TeamRepositoryInte
         /** @var list<PlayerRow> */
         return $this->fetchAll(
             "SELECT *
-            FROM ibl_plr
+            FROM `ibl_plr`
             WHERE teamid = ?
               AND retired = 0
               AND cyt != cy
@@ -335,7 +335,7 @@ class TeamRepository extends \BaseMysqliRepository implements TeamRepositoryInte
         /** @var list<PlayerRow> */
         return $this->fetchAll(
             "SELECT *
-            FROM ibl_plr
+            FROM `ibl_plr`
             WHERE teamid = ?
               AND retired = 0
             ORDER BY CASE WHEN ordinal > 960 THEN 1 ELSE 0 END, name ASC",
@@ -353,12 +353,12 @@ class TeamRepository extends \BaseMysqliRepository implements TeamRepositoryInte
         if ($includeFreeAgencyActive) {
             /** @var list<PlayerRow> */
             return $this->fetchAll(
-                "SELECT * FROM ibl_plr WHERE ordinal > '959' AND retired = 0 AND cyt != cy ORDER BY ordinal ASC"
+                "SELECT * FROM `ibl_plr` WHERE ordinal > '959' AND retired = 0 AND cyt != cy ORDER BY ordinal ASC"
             );
         }
         /** @var list<PlayerRow> */
         return $this->fetchAll(
-            "SELECT * FROM ibl_plr WHERE ordinal > '959' AND retired = 0 ORDER BY ordinal ASC"
+            "SELECT * FROM `ibl_plr` WHERE ordinal > '959' AND retired = 0 ORDER BY ordinal ASC"
         );
     }
 
@@ -370,7 +370,7 @@ class TeamRepository extends \BaseMysqliRepository implements TeamRepositoryInte
     {
         /** @var list<PlayerRow> */
         return $this->fetchAll(
-            "SELECT * FROM ibl_plr WHERE retired = 0 AND name NOT LIKE '%Buyouts' ORDER BY ordinal ASC"
+            "SELECT * FROM `ibl_plr` WHERE retired = 0 AND name NOT LIKE '%Buyouts' ORDER BY ordinal ASC"
         );
     }
 
@@ -382,7 +382,7 @@ class TeamRepository extends \BaseMysqliRepository implements TeamRepositoryInte
     {
         /** @var list<HistRow> */
         return $this->fetchAll(
-            "SELECT * FROM ibl_hist WHERE teamid = ? AND year = ? ORDER BY name ASC",
+            "SELECT * FROM `ibl_hist` WHERE teamid = ? AND year = ? ORDER BY name ASC",
             "is",
             $teamid,
             $year
@@ -397,7 +397,7 @@ class TeamRepository extends \BaseMysqliRepository implements TeamRepositoryInte
     {
         /** @var list<FranchiseSeasonRow> */
         return $this->fetchAll(
-            "SELECT * FROM ibl_franchise_seasons WHERE franchise_id = ? ORDER BY season_year ASC",
+            "SELECT * FROM `ibl_franchise_seasons` WHERE franchise_id = ? ORDER BY season_year ASC",
             "i",
             $franchiseId
         );

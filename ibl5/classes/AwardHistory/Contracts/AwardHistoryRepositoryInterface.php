@@ -28,7 +28,7 @@ interface AwardHistoryRepositoryInterface
      *     results: array<int, array{year: int, award: string, name: string, table_id: int}>,
      *     count: int
      * } Search results:
-     *     - results: array of award records from ibl_awards table
+     *     - results: array of award records from `ibl_awards` table
      *     - count: total number of matching records
      * 
      * IMPORTANT BEHAVIORS:

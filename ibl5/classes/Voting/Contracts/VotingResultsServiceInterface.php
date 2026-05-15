@@ -18,7 +18,7 @@ interface VotingResultsServiceInterface
     /**
      * Get All-Star voting results
      *
-     * Retrieves and aggregates All-Star ballot data from ibl_votes_ASG table.
+     * Retrieves and aggregates All-Star ballot data from `ibl_votes_ASG` table.
      *
      * @return list<VoteTable> Array of category results
      *
@@ -39,7 +39,7 @@ interface VotingResultsServiceInterface
     /**
      * Get end-of-year awards voting results
      *
-     * Retrieves and aggregates end-of-year ballot data from ibl_votes_EOY table
+     * Retrieves and aggregates end-of-year ballot data from `ibl_votes_EOY` table
      * with weighted scoring (1st place = 3pts, 2nd = 2pts, 3rd = 1pt).
      *
      * @return list<VoteTable> Array of category results

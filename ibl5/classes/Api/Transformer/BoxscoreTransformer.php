@@ -11,7 +11,7 @@ namespace Api\Transformer;
 class BoxscoreTransformer
 {
     /**
-     * Transform a team box score row from ibl_box_scores_teams.
+     * Transform a team box score row from `ibl_box_scores_teams`.
      *
      * @param BoxscoreTeamRow $row
      * @return array<string, mixed>
@@ -56,7 +56,7 @@ class BoxscoreTransformer
     }
 
     /**
-     * Transform a player box score line from ibl_box_scores.
+     * Transform a player box score line from `ibl_box_scores`.
      *
      * @param BoxscorePlayerRow $row
      * @return array<string, mixed>

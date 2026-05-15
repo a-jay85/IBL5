@@ -95,8 +95,8 @@ class Team extends \BaseMysqliRepository
         if (is_int($identifier)) {
             $query = "SELECT ibl_team_info.*,
                      ibl_standings.league_record
-                FROM ibl_team_info
-                    LEFT JOIN ibl_standings
+                FROM `ibl_team_info`
+                    LEFT JOIN `ibl_standings`
                     ON ibl_team_info.teamid = ibl_standings.teamid
                 WHERE ibl_team_info.teamid = ?
                 LIMIT 1";
@@ -105,8 +105,8 @@ class Team extends \BaseMysqliRepository
         } else {
             $query = "SELECT ibl_team_info.*,
                      ibl_standings.league_record
-                FROM ibl_team_info
-                    LEFT JOIN ibl_standings
+                FROM `ibl_team_info`
+                    LEFT JOIN `ibl_standings`
                     ON ibl_team_info.teamid = ibl_standings.teamid
                 WHERE ibl_team_info.team_name = ?
                 LIMIT 1";

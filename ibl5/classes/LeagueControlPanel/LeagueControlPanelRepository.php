@@ -19,7 +19,7 @@ class LeagueControlPanelRepository extends \BaseMysqliRepository implements Leag
     public function getSetting(string $name): ?string
     {
         $row = $this->fetchOne(
-            "SELECT value FROM ibl_settings WHERE name = ?",
+            "SELECT value FROM `ibl_settings` WHERE name = ?",
             "s",
             $name
         );
@@ -45,7 +45,7 @@ class LeagueControlPanelRepository extends \BaseMysqliRepository implements Leag
         $types = str_repeat('s', count($names));
 
         $rows = $this->fetchAll(
-            "SELECT name, value FROM ibl_settings WHERE name IN ($placeholders)",
+            "SELECT name, value FROM `ibl_settings` WHERE name IN ($placeholders)",
             $types,
             ...$names
         );
@@ -78,7 +78,7 @@ class LeagueControlPanelRepository extends \BaseMysqliRepository implements Leag
     public function updateSetting(string $name, string $value): bool
     {
         $this->execute(
-            "UPDATE ibl_settings SET value = ? WHERE name = ?",
+            "UPDATE `ibl_settings` SET value = ? WHERE name = ?",
             "ss",
             $value,
             $name
@@ -94,14 +94,14 @@ class LeagueControlPanelRepository extends \BaseMysqliRepository implements Leag
     {
         $this->transactional(function () use ($phase): void {
             $this->execute(
-                "UPDATE ibl_settings SET value = ? WHERE name = 'Current Season Phase'",
+                "UPDATE `ibl_settings` SET value = ? WHERE name = 'Current Season Phase'",
                 "s",
                 $phase
             );
 
             if ($phase === 'Preseason' || $phase === 'HEAT') {
                 $this->execute(
-                    "UPDATE ibl_settings SET value = 'Off' WHERE name = 'Show Draft Link'"
+                    "UPDATE `ibl_settings` SET value = 'Off' WHERE name = 'Show Draft Link'"
                 );
             }
         });
@@ -115,7 +115,7 @@ class LeagueControlPanelRepository extends \BaseMysqliRepository implements Leag
     public function setSimLengthInDays(int $days): bool
     {
         $this->execute(
-            "UPDATE ibl_settings SET value = ? WHERE name = 'Sim Length in Days'",
+            "UPDATE `ibl_settings` SET value = ? WHERE name = 'Sim Length in Days'",
             "i",
             $days
         );
@@ -129,7 +129,7 @@ class LeagueControlPanelRepository extends \BaseMysqliRepository implements Leag
     public function setShowDraftLink(string $value): bool
     {
         $this->execute(
-            "UPDATE ibl_settings SET value = ? WHERE name = 'Show Draft Link'",
+            "UPDATE `ibl_settings` SET value = ? WHERE name = 'Show Draft Link'",
             "s",
             $value
         );
@@ -144,18 +144,18 @@ class LeagueControlPanelRepository extends \BaseMysqliRepository implements Leag
     {
         $this->transactional(function (): void {
             $this->execute(
-                "UPDATE ibl_votes_ASG SET east_f1 = NULL, east_f2 = NULL, east_f3 = NULL, east_f4 = NULL,
+                "UPDATE `ibl_votes_ASG` SET east_f1 = NULL, east_f2 = NULL, east_f3 = NULL, east_f4 = NULL,
                     west_f1 = NULL, west_f2 = NULL, west_f3 = NULL, west_f4 = NULL,
                     east_b1 = NULL, east_b2 = NULL, east_b3 = NULL, east_b4 = NULL,
                     west_b1 = NULL, west_b2 = NULL, west_b3 = NULL, west_b4 = NULL"
             );
 
             $this->execute(
-                "UPDATE ibl_settings SET value = 'Yes' WHERE name = 'ASG Voting'"
+                "UPDATE `ibl_settings` SET value = 'Yes' WHERE name = 'ASG Voting'"
             );
 
             $this->execute(
-                "UPDATE ibl_team_info SET asg_vote = 'No Vote'"
+                "UPDATE `ibl_team_info` SET asg_vote = 'No Vote'"
             );
         });
 
@@ -169,18 +169,18 @@ class LeagueControlPanelRepository extends \BaseMysqliRepository implements Leag
     {
         $this->transactional(function (): void {
             $this->execute(
-                "UPDATE ibl_votes_EOY SET mvp_1 = NULL, mvp_2 = NULL, mvp_3 = NULL,
+                "UPDATE `ibl_votes_EOY` SET mvp_1 = NULL, mvp_2 = NULL, mvp_3 = NULL,
                     six_1 = NULL, six_2 = NULL, six_3 = NULL,
                     roy_1 = NULL, roy_2 = NULL, roy_3 = NULL,
                     gm_1 = NULL, gm_2 = NULL, gm_3 = NULL"
             );
 
             $this->execute(
-                "UPDATE ibl_settings SET value = 'Yes' WHERE name = 'EOY Voting'"
+                "UPDATE `ibl_settings` SET value = 'Yes' WHERE name = 'EOY Voting'"
             );
 
             $this->execute(
-                "UPDATE ibl_team_info SET eoy_vote = 'No Vote'"
+                "UPDATE `ibl_team_info` SET eoy_vote = 'No Vote'"
             );
         });
 
@@ -193,7 +193,7 @@ class LeagueControlPanelRepository extends \BaseMysqliRepository implements Leag
     public function setWaiversToFreeAgents(): bool
     {
         $this->execute(
-            "UPDATE ibl_plr SET teamid = " . League::FREE_AGENTS_TEAMID . ", bird = 0"
+            "UPDATE `ibl_plr` SET teamid = " . League::FREE_AGENTS_TEAMID . ", bird = 0"
             . " WHERE retired <> 1 AND ordinal > " . \JSB::WAIVERS_ORDINAL
         );
 
@@ -206,7 +206,7 @@ class LeagueControlPanelRepository extends \BaseMysqliRepository implements Leag
     public function setFreeAgencyFactorsForPfw(): bool
     {
         $this->execute(
-            "UPDATE ibl_team_info info JOIN ibl_standings s ON s.teamid = info.teamid SET contract_wins = s.wins, contract_losses = s.losses"
+            "UPDATE `ibl_team_info` info JOIN `ibl_standings` s ON s.teamid = info.teamid SET contract_wins = s.wins, contract_losses = s.losses"
         );
 
         return true;
@@ -258,7 +258,7 @@ class LeagueControlPanelRepository extends \BaseMysqliRepository implements Leag
     public function resetAllContractExtensions(): bool
     {
         $this->transactional(function (): void {
-            $this->execute("UPDATE ibl_team_info SET used_extension_this_season = 0");
+            $this->execute("UPDATE `ibl_team_info` SET used_extension_this_season = 0");
         });
 
         return true;
@@ -270,7 +270,7 @@ class LeagueControlPanelRepository extends \BaseMysqliRepository implements Leag
     public function resetAllMlesAndLles(): bool
     {
         $this->transactional(function (): void {
-            $this->execute("UPDATE ibl_team_info SET has_mle = 1, has_lle = 1");
+            $this->execute("UPDATE `ibl_team_info` SET has_mle = 1, has_lle = 1");
         });
 
         return true;
@@ -283,7 +283,7 @@ class LeagueControlPanelRepository extends \BaseMysqliRepository implements Leag
     {
         $draftPidStart = 90000;
 
-        return $this->execute("DELETE FROM ibl_plr WHERE pid >= ?", "i", $draftPidStart);
+        return $this->execute("DELETE FROM `ibl_plr` WHERE pid >= ?", "i", $draftPidStart);
     }
 
     /**
@@ -292,7 +292,7 @@ class LeagueControlPanelRepository extends \BaseMysqliRepository implements Leag
     public function upsertAward(int $year, string $award, string $name): int
     {
         return $this->execute(
-            "INSERT INTO ibl_awards (year, award, name)
+            "INSERT INTO `ibl_awards` (year, award, name)
             VALUES (?, ?, ?)
             ON DUPLICATE KEY UPDATE name = VALUES(name)",
             'iss',
@@ -308,7 +308,7 @@ class LeagueControlPanelRepository extends \BaseMysqliRepository implements Leag
     public function upsertGmAward(int $year, string $name): int
     {
         return $this->execute(
-            "INSERT INTO ibl_gm_awards (year, award, name)
+            "INSERT INTO `ibl_gm_awards` (year, award, name)
             VALUES (?, 'GM of the Year', ?)
             ON DUPLICATE KEY UPDATE name = VALUES(name)",
             'is',
@@ -332,7 +332,7 @@ class LeagueControlPanelRepository extends \BaseMysqliRepository implements Leag
     public function hasFinalsMvp(int $year): bool
     {
         $row = $this->fetchOne(
-            "SELECT table_id FROM ibl_awards WHERE year = ? AND award = 'IBL Finals MVP' LIMIT 1",
+            "SELECT table_id FROM `ibl_awards` WHERE year = ? AND award = 'IBL Finals MVP' LIMIT 1",
             'i',
             $year
         );
@@ -346,7 +346,7 @@ class LeagueControlPanelRepository extends \BaseMysqliRepository implements Leag
     public function hasGeneratedAwardsForYear(int $year): bool
     {
         $row = $this->fetchOne(
-            "SELECT table_id FROM ibl_awards WHERE year = ? AND award = 'Most Valuable Player (1st)' LIMIT 1",
+            "SELECT table_id FROM `ibl_awards` WHERE year = ? AND award = 'Most Valuable Player (1st)' LIMIT 1",
             'i',
             $year
         );
@@ -360,7 +360,7 @@ class LeagueControlPanelRepository extends \BaseMysqliRepository implements Leag
     {
         /** @var array{cnt: int}|null $row */
         $row = $this->fetchOne(
-            "SELECT COUNT(*) AS cnt FROM ibl_team_info WHERE eoy_vote != 'No Vote' AND teamid BETWEEN 1 AND " . League::MAX_REAL_TEAMID,
+            "SELECT COUNT(*) AS cnt FROM `ibl_team_info` WHERE eoy_vote != 'No Vote' AND teamid BETWEEN 1 AND " . League::MAX_REAL_TEAMID,
             ""
         );
         return $row !== null ? $row['cnt'] : 0;

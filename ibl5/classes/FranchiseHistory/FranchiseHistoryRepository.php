@@ -42,7 +42,7 @@ class FranchiseHistoryRepository extends \BaseMysqliRepository implements Franch
             League::FREE_AGENTS_TEAMID
         );
 
-        // Query 2: Rolling 5-season window from ibl_team_win_loss directly (avoids double materialization)
+        // Query 2: Rolling 5-season window from `ibl_team_win_loss` directly (avoids double materialization)
         /** @var list<array{currentname: string, five_season_wins: int, five_season_losses: int}> $windowRows */
         $windowRows = $this->fetchAll(
             "SELECT currentname,

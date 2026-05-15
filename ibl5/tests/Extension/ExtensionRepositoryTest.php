@@ -50,7 +50,7 @@ class ExtensionRepositoryTest extends TestCase
         $result = $this->repository->updatePlayerContract('Test Player', $offer, 800);
 
         $this->assertTrue($result);
-        $this->assertQueryExecuted('UPDATE `ibl_plr`');
+        $this->assertQueryExecuted('UPDATE ibl_plr');
     }
 
     public function testUpdatesPlayerContractWith3YearExtension(): void
@@ -181,7 +181,7 @@ class ExtensionRepositoryTest extends TestCase
         );
 
         // Verify all three operations were executed
-        $this->assertQueryExecuted('UPDATE `ibl_plr`');
+        $this->assertQueryExecuted('UPDATE ibl_plr');
         $this->assertQueryExecuted('used_extension_this_season');
         $this->assertQueryExecuted('nuke_stories');
     }

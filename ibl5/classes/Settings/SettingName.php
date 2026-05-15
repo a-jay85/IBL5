@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Settings;
 
 /**
- * Canonical setting names from ibl_settings table
+ * Canonical setting names from `ibl_settings` table
  *
  * Use these constants instead of raw strings to avoid typos and make
  * setting names discoverable via IDE autocomplete.

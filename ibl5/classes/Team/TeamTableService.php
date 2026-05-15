@@ -306,7 +306,7 @@ class TeamTableService implements TeamTableServiceInterface
      * Convert a cash consideration row to the PlayerRow-compatible format
      * expected by Contracts::render().
      *
-     * @param array<string, mixed> $cashRow Row from ibl_cash_considerations
+     * @param array<string, mixed> $cashRow Row from `ibl_cash_considerations`
      * @return array<string, mixed>
      */
     public static function cashConsiderationToRosterRow(array $cashRow): array

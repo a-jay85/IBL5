@@ -49,8 +49,8 @@ class PlayerRepository extends BaseMysqliRepository implements PlayerRepositoryI
         /** @var PlayerRow|null $plrRow */
         $plrRow = $this->fetchOne(
             "SELECT p.*, t.team_name AS teamname, t.color1, t.color2
-             FROM ibl_plr p
-             LEFT JOIN ibl_team_info t ON p.teamid = t.teamid
+             FROM `ibl_plr` p
+             LEFT JOIN `ibl_team_info` t ON p.teamid = t.teamid
              WHERE p.pid = ? LIMIT 1",
             "i",
             $playerID
@@ -66,7 +66,7 @@ class PlayerRepository extends BaseMysqliRepository implements PlayerRepositoryI
     /**
      * Fill a PlayerData object from a current player row
      *
-     * @param PlayerRow $plrRow Database row from ibl_plr
+     * @param PlayerRow $plrRow Database row from `ibl_plr`
      */
     public function fillFromCurrentRow(array $plrRow): PlayerData
     {
@@ -99,7 +99,7 @@ class PlayerRepository extends BaseMysqliRepository implements PlayerRepositoryI
     /**
      * Map basic player fields
      *
-     * @param PlayerRow $plrRow Database row from ibl_plr
+     * @param PlayerRow $plrRow Database row from `ibl_plr`
      */
     private function mapBasicFields(PlayerData $playerData, array $plrRow): void
     {
@@ -122,7 +122,7 @@ class PlayerRepository extends BaseMysqliRepository implements PlayerRepositoryI
     /**
      * Map rating fields from current player row
      *
-     * @param PlayerRow $plrRow Database row from ibl_plr
+     * @param PlayerRow $plrRow Database row from `ibl_plr`
      */
     private function mapRatingsFromCurrentRow(PlayerData $playerData, array $plrRow): void
     {
@@ -157,7 +157,7 @@ class PlayerRepository extends BaseMysqliRepository implements PlayerRepositoryI
     /**
      * Map free agency preference fields
      *
-     * @param PlayerRow $plrRow Database row from ibl_plr
+     * @param PlayerRow $plrRow Database row from `ibl_plr`
      */
     private function mapFreeAgencyFields(PlayerData $playerData, array $plrRow): void
     {
@@ -171,7 +171,7 @@ class PlayerRepository extends BaseMysqliRepository implements PlayerRepositoryI
     /**
      * Map contract fields
      *
-     * @param PlayerRow $plrRow Database row from ibl_plr
+     * @param PlayerRow $plrRow Database row from `ibl_plr`
      */
     private function mapContractFields(PlayerData $playerData, array $plrRow): void
     {
@@ -190,7 +190,7 @@ class PlayerRepository extends BaseMysqliRepository implements PlayerRepositoryI
     /**
      * Map draft fields
      *
-     * @param PlayerRow $plrRow Database row from ibl_plr
+     * @param PlayerRow $plrRow Database row from `ibl_plr`
      */
     private function mapDraftFields(PlayerData $playerData, array $plrRow): void
     {
@@ -205,7 +205,7 @@ class PlayerRepository extends BaseMysqliRepository implements PlayerRepositoryI
     /**
      * Map physical attribute fields
      *
-     * @param PlayerRow $plrRow Database row from ibl_plr
+     * @param PlayerRow $plrRow Database row from `ibl_plr`
      */
     private function mapPhysicalFields(PlayerData $playerData, array $plrRow): void
     {
@@ -220,7 +220,7 @@ class PlayerRepository extends BaseMysqliRepository implements PlayerRepositoryI
     /**
      * Map status fields
      *
-     * @param PlayerRow $plrRow Database row from ibl_plr
+     * @param PlayerRow $plrRow Database row from `ibl_plr`
      */
     private function mapStatusFields(PlayerData $playerData, array $plrRow): void
     {
@@ -317,7 +317,7 @@ class PlayerRepository extends BaseMysqliRepository implements PlayerRepositoryI
     public function getFreeAgencyDemands(int $playerID): array
     {
         $row = $this->fetchOne(
-            "SELECT * FROM ibl_demands WHERE pid = ?",
+            "SELECT * FROM `ibl_demands` WHERE pid = ?",
             "i",
             $playerID
         );
@@ -395,7 +395,7 @@ class PlayerRepository extends BaseMysqliRepository implements PlayerRepositoryI
                 SUM(CASE WHEN award LIKE 'Three-Point Contest%' THEN 1 ELSE 0 END) AS threePoint,
                 SUM(CASE WHEN award LIKE 'Slam Dunk Competition%' THEN 1 ELSE 0 END) AS dunkContest,
                 SUM(CASE WHEN award LIKE 'Rookie-Sophomore Challenge' THEN 1 ELSE 0 END) AS rookieSoph
-            FROM ibl_awards
+            FROM `ibl_awards`
             WHERE name = ?",
             "s",
             $playerName
@@ -420,7 +420,7 @@ class PlayerRepository extends BaseMysqliRepository implements PlayerRepositoryI
     public function getAllSimDates(): array
     {
         return $this->fetchAll(
-            "SELECT sim, start_date, end_date FROM ibl_sim_dates ORDER BY sim ASC",
+            "SELECT sim, start_date, end_date FROM `ibl_sim_dates` ORDER BY sim ASC",
             ""
         );
     }
@@ -432,7 +432,7 @@ class PlayerRepository extends BaseMysqliRepository implements PlayerRepositoryI
     public function getHistoricalStats(int $playerID): array
     {
         return $this->fetchAll(
-            "SELECT * FROM ibl_hist WHERE pid = ? ORDER BY year ASC",
+            "SELECT * FROM `ibl_hist` WHERE pid = ? ORDER BY year ASC",
             "i",
             $playerID
         );
@@ -469,7 +469,7 @@ class PlayerRepository extends BaseMysqliRepository implements PlayerRepositoryI
     /**
      * Build inlined per-season stats query with predicate pushed before GROUP BY.
      *
-     * Replaces SELECT from ibl_playoff_stats / ibl_heat_stats views.
+     * Replaces SELECT from `ibl_playoff_stats` / ibl_heat_stats views.
      */
     private static function buildPerSeasonStatsQuery(int $gameType): string
     {
@@ -491,9 +491,9 @@ class PlayerRepository extends BaseMysqliRepository implements PlayerRepositoryI
             CAST(SUM(bs.game_blk) AS SIGNED) AS blk,
             CAST(SUM(bs.game_pf) AS SIGNED) AS pf,
             CAST(SUM(bs.calc_points) AS SIGNED) AS pts
-        FROM ibl_box_scores bs
-        JOIN ibl_plr p ON bs.pid = p.pid
-        JOIN ibl_franchise_seasons fs ON bs.teamid = fs.franchise_id
+        FROM `ibl_box_scores` bs
+        JOIN `ibl_plr` p ON bs.pid = p.pid
+        JOIN `ibl_franchise_seasons` fs ON bs.teamid = fs.franchise_id
             AND bs.season_year = fs.season_ending_year
         WHERE bs.game_type = {$gameType} AND p.name = ?
         GROUP BY bs.pid, p.name, bs.season_year, fs.team_name
@@ -507,7 +507,7 @@ class PlayerRepository extends BaseMysqliRepository implements PlayerRepositoryI
     public function getOlympicsStats(int $playerID): array
     {
         return $this->fetchAll(
-            "SELECT * FROM ibl_olympics_stats WHERE pid = ? ORDER BY year ASC",
+            "SELECT * FROM `ibl_olympics_stats` WHERE pid = ? ORDER BY year ASC",
             "i",
             $playerID
         );
@@ -522,7 +522,7 @@ class PlayerRepository extends BaseMysqliRepository implements PlayerRepositoryI
     {
         /** @var list<AwardRow> */
         return $this->fetchAll(
-            "SELECT * FROM ibl_awards WHERE name = ? ORDER BY year ASC",
+            "SELECT * FROM `ibl_awards` WHERE name = ? ORDER BY year ASC",
             "s",
             $playerName
         );
@@ -536,7 +536,7 @@ class PlayerRepository extends BaseMysqliRepository implements PlayerRepositoryI
     {
         /** @var PlayerRow|null */
         return $this->fetchOne(
-            "SELECT * FROM ibl_plr WHERE pid = ? LIMIT 1",
+            "SELECT * FROM `ibl_plr` WHERE pid = ? LIMIT 1",
             "i",
             $playerID
         );
@@ -580,8 +580,8 @@ class PlayerRepository extends BaseMysqliRepository implements PlayerRepositoryI
         /** @var list<OneOnOneWinRow> */
         return $this->fetchAll(
             "SELECT o.gameid, o.winner, o.loser, o.winscore, o.lossscore, p.pid as loser_pid 
-             FROM ibl_one_on_one o 
-             LEFT JOIN ibl_plr p ON o.loser = p.name 
+             FROM `ibl_one_on_one` o 
+             LEFT JOIN `ibl_plr` p ON o.loser = p.name 
              WHERE o.winner = ? 
              ORDER BY o.gameid ASC",
             "s",
@@ -601,8 +601,8 @@ class PlayerRepository extends BaseMysqliRepository implements PlayerRepositoryI
         /** @var list<OneOnOneLossRow> */
         return $this->fetchAll(
             "SELECT o.gameid, o.winner, o.loser, o.winscore, o.lossscore, p.pid as winner_pid
-             FROM ibl_one_on_one o
-             LEFT JOIN ibl_plr p ON o.winner = p.name
+             FROM `ibl_one_on_one` o
+             LEFT JOIN `ibl_plr` p ON o.winner = p.name
              WHERE o.loser = ?
              ORDER BY o.gameid ASC",
             "s",
@@ -617,7 +617,7 @@ class PlayerRepository extends BaseMysqliRepository implements PlayerRepositoryI
     {
         /** @var array{pid: int}|null $row */
         $row = $this->fetchOne(
-            "SELECT pid FROM ibl_plr WHERE uuid = ?",
+            "SELECT pid FROM `ibl_plr` WHERE uuid = ?",
             "s",
             $uuid
         );

@@ -14,14 +14,14 @@ namespace SeasonLeaderboards\Contracts;
  * @phpstan-type LeaderboardResult array{results: list<HistRow>, count: int}
  * @phpstan-type TeamRow array{teamid: int, Team: string}
  *
- * Note: TeamRow is populated from ibl_team_info (teamid AS teamid, team_name AS Team)
+ * Note: TeamRow is populated from `ibl_team_info` (teamid AS teamid, team_name AS Team)
  */
 interface SeasonLeaderboardsRepositoryInterface
 {
     /**
      * Get season leaders based on filters
      *
-     * Retrieves player statistics from ibl_hist table with optional
+     * Retrieves player statistics from `ibl_hist` table with optional
      * filtering by year and team, sorted by specified stat category.
      *
      * @param LeaderboardFilters $filters Filter parameters
@@ -42,7 +42,7 @@ interface SeasonLeaderboardsRepositoryInterface
     /**
      * Get all teams for dropdown
      *
-     * Retrieves teams from ibl_power table for filter dropdown.
+     * Retrieves teams from `ibl_power` table for filter dropdown.
      *
      * @return list<TeamRow> Array of team rows
      *

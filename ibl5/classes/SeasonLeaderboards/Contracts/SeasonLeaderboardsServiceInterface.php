@@ -20,7 +20,7 @@ interface SeasonLeaderboardsServiceInterface
      * Transforms raw database row into formatted statistics array with
      * calculated values, percentages, and per-game averages.
      *
-     * @param HistRow $row Database row from ibl_hist table
+     * @param HistRow $row Database row from `ibl_hist` table
      * @return ProcessedStats Formatted player statistics
      *
      * **QA Formula:**

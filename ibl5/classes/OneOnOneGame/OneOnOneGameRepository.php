@@ -29,7 +29,7 @@ class OneOnOneGameRepository extends BaseMysqliRepository implements OneOnOneGam
     {
         /** @var array<int, array{pid: int, name: string}> */
         return $this->fetchAll(
-            "SELECT pid, name FROM ibl_plr WHERE retired = 0 AND name != '(no starter)' ORDER BY name ASC",
+            "SELECT pid, name FROM `ibl_plr` WHERE retired = 0 AND name != '(no starter)' ORDER BY name ASC",
             ""
         );
     }
@@ -47,7 +47,7 @@ class OneOnOneGameRepository extends BaseMysqliRepository implements OneOnOneGam
                     oo, r_drive_off, po, od, dd, pd,
                     r_fga, r_fgp, r_fta, r_3ga, r_3gp,
                     r_orb, r_drb, r_stl, r_tvr, r_blk, r_foul
-             FROM ibl_plr
+             FROM `ibl_plr`
              WHERE pid = ?",
             "i",
             $playerId
@@ -61,7 +61,7 @@ class OneOnOneGameRepository extends BaseMysqliRepository implements OneOnOneGam
     {
         /** @var array{gameid: int}|null $row */
         $row = $this->fetchOne(
-            "SELECT gameid FROM ibl_one_on_one ORDER BY gameid DESC LIMIT 1",
+            "SELECT gameid FROM `ibl_one_on_one` ORDER BY gameid DESC LIMIT 1",
             ""
         );
 
@@ -82,7 +82,7 @@ class OneOnOneGameRepository extends BaseMysqliRepository implements OneOnOneGam
         $lossScore = $result->getLoserScore();
 
         $this->execute(
-            "INSERT INTO ibl_one_on_one (gameid, playbyplay, winner, loser, winscore, lossscore, owner)
+            "INSERT INTO `ibl_one_on_one` (gameid, playbyplay, winner, loser, winscore, lossscore, owner)
              VALUES (?, ?, ?, ?, ?, ?, ?)",
             "isssiss",
             $gameId,
@@ -107,7 +107,7 @@ class OneOnOneGameRepository extends BaseMysqliRepository implements OneOnOneGam
         /** @var GameRecord|null */
         return $this->fetchOne(
             "SELECT gameid, playbyplay, winner, loser, winscore, lossscore, owner
-             FROM ibl_one_on_one
+             FROM `ibl_one_on_one`
              WHERE gameid = ?",
             "i",
             $gameId

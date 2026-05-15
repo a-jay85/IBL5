@@ -41,7 +41,7 @@ class TradeOfferRepository extends BaseMysqliRepository implements TradeOfferRep
      */
     public function generateNextTradeOfferId(): int
     {
-        $this->execute("INSERT INTO ibl_trade_offers () VALUES ()");
+        $this->execute("INSERT INTO `ibl_trade_offers` () VALUES ()");
         /** @var array{id: int}|null $row */
         $row = $this->fetchOne("SELECT LAST_INSERT_ID() AS id");
         if ($row === null || $row['id'] === 0) {
@@ -60,7 +60,7 @@ class TradeOfferRepository extends BaseMysqliRepository implements TradeOfferRep
         }
 
         return $this->execute(
-            "INSERT INTO ibl_trade_info (tradeofferid, itemid, itemtype, trade_from, trade_to, approval) VALUES (?, ?, ?, ?, ?, ?)",
+            "INSERT INTO `ibl_trade_info` (tradeofferid, itemid, itemtype, trade_from, trade_to, approval) VALUES (?, ?, ?, ?, ?, ?)",
             "iissss",
             $tradeOfferId,
             $itemId,
@@ -78,7 +78,7 @@ class TradeOfferRepository extends BaseMysqliRepository implements TradeOfferRep
     {
         /** @var list<TradeInfoRow> */
         return $this->fetchAll(
-            "SELECT * FROM ibl_trade_info WHERE tradeofferid = ?",
+            "SELECT * FROM `ibl_trade_info` WHERE tradeofferid = ?",
             "i",
             $offerId
         );
@@ -91,7 +91,7 @@ class TradeOfferRepository extends BaseMysqliRepository implements TradeOfferRep
     {
         /** @var list<TradeInfoRow> */
         return $this->fetchAll(
-            "SELECT * FROM ibl_trade_info WHERE tradeofferid = ? FOR UPDATE",
+            "SELECT * FROM `ibl_trade_info` WHERE tradeofferid = ? FOR UPDATE",
             "i",
             $offerId
         );
@@ -104,7 +104,7 @@ class TradeOfferRepository extends BaseMysqliRepository implements TradeOfferRep
     {
         /** @var list<TradeInfoRow> */
         return $this->fetchAll(
-            "SELECT * FROM ibl_trade_info WHERE approval != 'completed' ORDER BY tradeofferid ASC"
+            "SELECT * FROM `ibl_trade_info` WHERE approval != 'completed' ORDER BY tradeofferid ASC"
         );
     }
 
@@ -114,7 +114,7 @@ class TradeOfferRepository extends BaseMysqliRepository implements TradeOfferRep
     public function markTradeInfoCompleted(int $offerId): int
     {
         return $this->execute(
-            "UPDATE ibl_trade_info SET approval = 'completed' WHERE tradeofferid = ?",
+            "UPDATE `ibl_trade_info` SET approval = 'completed' WHERE tradeofferid = ?",
             "i",
             $offerId
         );
@@ -126,7 +126,7 @@ class TradeOfferRepository extends BaseMysqliRepository implements TradeOfferRep
     public function deleteTradeInfoByOfferId(int $offerId): int
     {
         return $this->execute(
-            "DELETE FROM ibl_trade_info WHERE tradeofferid = ?",
+            "DELETE FROM `ibl_trade_info` WHERE tradeofferid = ?",
             "i",
             $offerId
         );
@@ -138,7 +138,7 @@ class TradeOfferRepository extends BaseMysqliRepository implements TradeOfferRep
     public function deleteTradeOfferById(int $offerId): int
     {
         return $this->execute(
-            "DELETE FROM ibl_trade_offers WHERE id = ?",
+            "DELETE FROM `ibl_trade_offers` WHERE id = ?",
             "i",
             $offerId
         );

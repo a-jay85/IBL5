@@ -8,7 +8,7 @@ namespace Trading\Contracts;
  * CashTransactionHandlerInterface - Cash transaction management for trades
  *
  * Handles creation and validation of cash transactions within trades,
- * inserting paired positive/negative entries into ibl_cash_considerations.
+ * inserting paired positive/negative entries into `ibl_cash_considerations`.
  */
 interface CashTransactionHandlerInterface
 {
@@ -51,7 +51,7 @@ interface CashTransactionHandlerInterface
     public function createCashTransaction(string $offeringTeamName, string $listeningTeamName, array $cashYear, int $seasonEndingYear, ?int $tradeOfferId = null): array;
 
     /**
-     * Insert cash trade data into ibl_trade_cash table (pending trade storage).
+     * Insert cash trade data into `ibl_trade_cash` table (pending trade storage).
      *
      * @param int $tradeOfferId Trade offer ID to associate with
      * @param string $offeringTeamName Name of team sending the cash

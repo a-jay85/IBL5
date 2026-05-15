@@ -88,7 +88,7 @@ class TradeDeclineController implements ControllerInterface
         // Delete the trade offer
         $repository->deleteTradeOffer($offerId);
 
-        // Look up offering team's GM Discord ID from ibl_team_info
+        // Look up offering team's GM Discord ID from `ibl_team_info`
         $offeringTeamDiscordId = '';
         if ($offeringTeam !== '') {
             $commonRepo = new \Services\CommonMysqliRepository($this->db);

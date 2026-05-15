@@ -239,7 +239,7 @@ class TradeRosterPreviewApiHandler
      * Fetch player rows by PIDs using prepared statement with IN clause
      *
      * @param list<int> $pids Player IDs
-     * @return list<array<string, mixed>> Player rows from ibl_plr
+     * @return list<array<string, mixed>> Player rows from `ibl_plr`
      */
     private function fetchPlayersByPids(array $pids): array
     {
@@ -250,7 +250,7 @@ class TradeRosterPreviewApiHandler
         $placeholders = implode(',', array_fill(0, count($pids), '?'));
         $types = str_repeat('i', count($pids));
 
-        $stmt = $this->db->prepare("SELECT * FROM ibl_plr WHERE pid IN ({$placeholders})");
+        $stmt = $this->db->prepare("SELECT * FROM `ibl_plr` WHERE pid IN ({$placeholders})");
         if ($stmt === false) {
             return [];
         }

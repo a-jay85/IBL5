@@ -32,7 +32,7 @@ class TeamColorHelper
      */
     public static function getTeamColors(\mysqli $db, int $teamid): array
     {
-        $stmt = $db->prepare('SELECT color1, color2 FROM ibl_team_info WHERE teamid = ?');
+        $stmt = $db->prepare('SELECT color1, color2 FROM `ibl_team_info` WHERE teamid = ?');
         if ($stmt === false) {
             return ['color1' => 'D4AF37', 'color2' => '1e3a5f'];
         }

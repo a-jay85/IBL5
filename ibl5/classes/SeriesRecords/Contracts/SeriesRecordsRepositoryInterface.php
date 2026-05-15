@@ -8,7 +8,7 @@ namespace SeriesRecords\Contracts;
  * SeriesRecordsRepositoryInterface - Contract for Series Records data access operations
  *
  * Defines methods for querying head-to-head series records between teams
- * from the ibl_schedule table and team information from ibl_team_info.
+ * from the ibl_schedule table and team information from `ibl_team_info`.
  *
  * All methods use prepared statements and safe escaping internally.
  * All methods return database result objects or arrays, never throw exceptions.

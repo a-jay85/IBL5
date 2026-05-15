@@ -208,7 +208,7 @@ class LeagueControlPanelProcessor implements LeagueControlPanelProcessorInterfac
     {
         $count = $this->repository->deleteDraftPlaceholders();
 
-        return ['success' => true, 'message' => 'Deleted ' . $count . ' draft placeholder(s) from ibl_plr.'];
+        return ['success' => true, 'message' => 'Deleted ' . $count . ' draft placeholder(s) from `ibl_plr`.'];
     }
 
     /**
@@ -218,7 +218,7 @@ class LeagueControlPanelProcessor implements LeagueControlPanelProcessorInterfac
     {
         $count = $this->repository->deleteOutdatedBuyoutsAndCash();
 
-        return ['success' => true, 'message' => 'Deleted ' . $count . ' outdated buyout/cash consideration(s) from ibl_plr.'];
+        return ['success' => true, 'message' => 'Deleted ' . $count . ' outdated buyout/cash consideration(s) from `ibl_plr`.'];
     }
 
     /**

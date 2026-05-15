@@ -32,7 +32,7 @@ interface TeamRepositoryInterface
     /**
      * Get team information by team ID
      *
-     * @param int $teamid Team ID from ibl_team_info
+     * @param int $teamid Team ID from `ibl_team_info`
      * @return TeamInfoRow|null Team data or null if not found
      */
     public function getTeam(int $teamid): ?array;
@@ -41,7 +41,7 @@ interface TeamRepositoryInterface
      * Get team power ranking data
      *
      * @param string $teamName Team name to search for
-     * @return PowerRow|null Complete row from ibl_power or null if not found
+     * @return PowerRow|null Complete row from `ibl_power` or null if not found
      */
     public function getTeamPowerData(string $teamName): ?array;
 
@@ -160,7 +160,7 @@ interface TeamRepositoryInterface
     /**
      * Get all franchise seasons for a franchise
      *
-     * @param int $franchiseId Franchise ID (teamid from ibl_team_info)
+     * @param int $franchiseId Franchise ID (teamid from `ibl_team_info`)
      * @return list<FranchiseSeasonRow> Rows ordered by season_year ASC
      */
     public function getFranchiseSeasons(int $franchiseId): array;

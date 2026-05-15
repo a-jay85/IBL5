@@ -43,7 +43,7 @@ class FreeAgencyRepository extends BaseMysqliRepository implements FreeAgencyRep
         /** @var OfferRow|null $result */
         $result = $this->fetchOne(
             "SELECT offer1, offer2, offer3, offer4, offer5, offer6
-             FROM ibl_fa_offers
+             FROM `ibl_fa_offers`
              WHERE teamid = ? AND pid = ?",
             "ii",
             $teamid,
@@ -59,7 +59,7 @@ class FreeAgencyRepository extends BaseMysqliRepository implements FreeAgencyRep
     public function deleteOffer(int $teamid, int $pid): int
     {
         return $this->execute(
-            "DELETE FROM ibl_fa_offers WHERE pid = ? AND teamid = ? LIMIT 1",
+            "DELETE FROM `ibl_fa_offers` WHERE pid = ? AND teamid = ? LIMIT 1",
             "ii",
             $pid,
             $teamid
@@ -77,7 +77,7 @@ class FreeAgencyRepository extends BaseMysqliRepository implements FreeAgencyRep
             $this->deleteOffer($offerData['teamid'], $offerData['pid']);
 
             $affected = $this->execute(
-                "INSERT INTO ibl_fa_offers
+                "INSERT INTO `ibl_fa_offers`
                  (name, pid, team, teamid, offer1, offer2, offer3, offer4, offer5, offer6,
                   modifier, random, perceivedvalue, mle, lle, offer_type)
                  VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
@@ -114,8 +114,8 @@ class FreeAgencyRepository extends BaseMysqliRepository implements FreeAgencyRep
         /** @var list<PlayerRow> */
         return $this->fetchAll(
             "SELECT p.*, t.team_name AS teamname, t.color1, t.color2
-            FROM ibl_plr p
-            LEFT JOIN ibl_team_info t ON p.teamid = t.teamid
+            FROM `ibl_plr` p
+            LEFT JOIN `ibl_team_info` t ON p.teamid = t.teamid
             WHERE p.teamid <> ? AND p.retired = 0
             ORDER BY p.ordinal ASC",
             "i",
@@ -130,7 +130,7 @@ class FreeAgencyRepository extends BaseMysqliRepository implements FreeAgencyRep
     {
         /** @var array{cy: int|null, salary_yr1: int|null}|null $row */
         $row = $this->fetchOne(
-            "SELECT cy, salary_yr1 FROM ibl_plr WHERE pid = ?",
+            "SELECT cy, salary_yr1 FROM `ibl_plr` WHERE pid = ?",
             "i",
             $playerId
         );
@@ -152,7 +152,7 @@ class FreeAgencyRepository extends BaseMysqliRepository implements FreeAgencyRep
     {
         /** @var array{pid: int}|null $row */
         $row = $this->fetchOne(
-            "SELECT pid FROM ibl_fa_offers
+            "SELECT pid FROM `ibl_fa_offers`
              WHERE teamid = ? AND mle = 1 AND pid <> ?
              LIMIT 1",
             "ii",
@@ -170,7 +170,7 @@ class FreeAgencyRepository extends BaseMysqliRepository implements FreeAgencyRep
     {
         /** @var array{pid: int}|null $row */
         $row = $this->fetchOne(
-            "SELECT pid FROM ibl_fa_offers
+            "SELECT pid FROM `ibl_fa_offers`
              WHERE teamid = ? AND lle = 1 AND pid <> ?
              LIMIT 1",
             "ii",

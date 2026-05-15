@@ -61,7 +61,7 @@ interface PlrBoxScoreRepositoryInterface
     /**
      * Sum team box-score stats for regular season through an end date.
      *
-     * Aggregates from ibl_box_scores_teams using ROW_NUMBER deduplication
+     * Aggregates from `ibl_box_scores_teams` using ROW_NUMBER deduplication
      * (rn=1 = visitor row, rn=2 = home row). Returns stats keyed by team ID (1-28),
      * with keys matching PlrTeamRowLayout::REGULAR_SEASON_FIELD_MAP.
      *

@@ -21,7 +21,7 @@ use Season\Season;
 interface TeamQueryRepositoryInterface
 {
     /**
-     * Get buyout entries for a team from ibl_cash_considerations
+     * Get buyout entries for a team from `ibl_cash_considerations`
      *
      * @return list<CashConsiderationRow> Array of buyout rows
      */

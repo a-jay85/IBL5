@@ -165,7 +165,7 @@ class VotingRepository extends \BaseMysqliRepository implements VotingRepository
         $placeholders = implode(',', array_fill(0, count($names), '?'));
         $types = str_repeat('s', count($names));
         $rows = $this->fetchAll(
-            "SELECT pid, name FROM ibl_plr WHERE name IN ({$placeholders})",
+            "SELECT pid, name FROM `ibl_plr` WHERE name IN ({$placeholders})",
             $types,
             ...$names
         );

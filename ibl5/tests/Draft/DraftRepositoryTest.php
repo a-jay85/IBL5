@@ -86,7 +86,7 @@ class DraftRepositoryTest extends TestCase
         $this->assertTrue($result);
         $queries = $this->mockDb->getExecutedQueries();
         $this->assertCount(1, $queries);
-        $this->assertStringContainsString('UPDATE `ibl_draft_class`', $queries[0]);
+        $this->assertStringContainsString('UPDATE ibl_draft_class', $queries[0]);
         $this->assertStringContainsString('John Doe', $queries[0]);
         $this->assertStringContainsString('Chicago Bulls', $queries[0]);
         $this->assertStringContainsString('drafted', $queries[0]);

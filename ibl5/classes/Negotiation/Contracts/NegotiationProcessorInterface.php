@@ -40,7 +40,7 @@ interface NegotiationProcessorInterface
      * - Returns header + error message if player not eligible
      *
      * **Team Factors Retrieved:**
-     * - Current season wins/losses from ibl_team_info
+     * - Current season wins/losses from `ibl_team_info`
      * - Tradition wins/losses (contract_avg_w/contract_avg_l)
      * - Money committed at player's position (excluding this player)
      *

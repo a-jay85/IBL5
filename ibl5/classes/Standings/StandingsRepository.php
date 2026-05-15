@@ -11,7 +11,7 @@ use Standings\Contracts\StandingsRepositoryInterface;
 /**
  * StandingsRepository - Data access layer for team standings
  *
- * Retrieves standings data from ibl_standings and ibl_power tables.
+ * Retrieves standings data from `ibl_standings` and ibl_power tables.
  * Supports both conference and division groupings.
  *
  * @phpstan-import-type StandingsRow from StandingsRepositoryInterface
@@ -290,8 +290,8 @@ class StandingsRepository extends \BaseMysqliRepository implements StandingsRepo
             CAST(SUM(bst.game_2gm + bst.game_3gm) AS SIGNED) AS fgm,
             CAST(SUM(bst.game_ftm) AS SIGNED) AS ftm,
             CAST(SUM(bst.game_3gm) AS SIGNED) AS tgm
-        FROM ibl_box_scores_teams bst
-        JOIN ibl_franchise_seasons fs
+        FROM `ibl_box_scores_teams` bst
+        JOIN `ibl_franchise_seasons` fs
             ON fs.team_name = bst.name AND fs.season_ending_year = bst.season_year
         WHERE bst.game_type = 1 AND {$filterClause}
         GROUP BY fs.franchise_id, fs.team_name, bst.season_year";
@@ -306,14 +306,14 @@ class StandingsRepository extends \BaseMysqliRepository implements StandingsRepo
             CAST(SUM(opp.game_2gm + opp.game_3gm) AS SIGNED) AS fgm,
             CAST(SUM(opp.game_ftm) AS SIGNED) AS ftm,
             CAST(SUM(opp.game_3gm) AS SIGNED) AS tgm
-        FROM ibl_box_scores_teams my
-        JOIN ibl_box_scores_teams opp
+        FROM `ibl_box_scores_teams` my
+        JOIN `ibl_box_scores_teams` opp
             ON my.game_date = opp.game_date
             AND my.visitor_teamid = opp.visitor_teamid
             AND my.home_teamid = opp.home_teamid
             AND my.game_of_that_day = opp.game_of_that_day
             AND my.name <> opp.name
-        JOIN ibl_franchise_seasons fs
+        JOIN `ibl_franchise_seasons` fs
             ON fs.team_name = my.name AND fs.season_ending_year = my.season_year
         WHERE my.game_type = 1 AND {$filterClause}
         GROUP BY fs.franchise_id, fs.team_name, my.season_year";

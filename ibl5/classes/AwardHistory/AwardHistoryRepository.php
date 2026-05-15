@@ -56,7 +56,7 @@ class AwardHistoryRepository extends BaseMysqliRepository implements AwardHistor
 
         $sortColumn = self::SORT_COLUMN_MAP[$params['sortby']] ?? 'year';
         $whereClause = $where->toWhereClause();
-        $query = "SELECT a.year, a.award, a.name, a.table_id, p.pid FROM ibl_awards a LEFT JOIN ibl_plr p ON a.name = p.name WHERE $whereClause ORDER BY $sortColumn ASC";
+        $query = "SELECT a.year, a.award, a.name, a.table_id, p.pid FROM `ibl_awards` a LEFT JOIN `ibl_plr` p ON a.name = p.name WHERE $whereClause ORDER BY $sortColumn ASC";
 
         /** @var array<int, array{year: int, award: string, name: string, table_id: int}> $results */
         $results = $this->fetchAll($query, $where->getTypes(), ...$where->getParams());

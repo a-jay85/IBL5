@@ -42,7 +42,7 @@ class FreeAgencyDemandRepository extends BaseMysqliRepository implements FreeAge
         /** @var array{contract_wins: int, contract_losses: int, contract_avg_w: int, contract_avg_l: int}|null $result */
         $result = $this->fetchOne(
             "SELECT contract_wins, contract_losses, contract_avg_w, contract_avg_l
-             FROM ibl_team_info
+             FROM `ibl_team_info`
              WHERE team_name = ?",
             "s",
             $teamName
@@ -93,7 +93,7 @@ class FreeAgencyDemandRepository extends BaseMysqliRepository implements FreeAge
         /** @var array{dem1: int, dem2: int, dem3: int, dem4: int, dem5: int, dem6: int}|null $result */
         $result = $this->fetchOne(
             "SELECT dem1, dem2, dem3, dem4, dem5, dem6
-             FROM ibl_demands
+             FROM `ibl_demands`
              WHERE pid = ?",
             "i",
             $playerID

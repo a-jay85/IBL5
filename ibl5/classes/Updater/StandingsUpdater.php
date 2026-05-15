@@ -9,7 +9,7 @@ use Season\Season;
 
 /**
  * Computes league standings from game results in ibl_schedule
- * and conference/division assignments from ibl_league_config,
+ * and conference/division assignments from `ibl_league_config`,
  * then populates the ibl_standings table.
  *
  * @phpstan-type TeamStanding array{
@@ -55,7 +55,7 @@ class StandingsUpdater extends \BaseMysqliRepository {
         }
 
         $this->execute(
-            "INSERT INTO ibl_team_awards (year, name, award)
+            "INSERT INTO `ibl_team_awards` (year, name, award)
              VALUES (?, ?, ?)
              ON DUPLICATE KEY UPDATE name = VALUES(name)",
             "iss",
@@ -102,7 +102,7 @@ class StandingsUpdater extends \BaseMysqliRepository {
     }
 
     /**
-     * Compute standings from ibl_schedule game results and insert into ibl_standings
+     * Compute standings from `ibl_schedule` game results and insert into `ibl_standings`
      */
     protected function computeAndInsertStandings(): void {
         echo '<p>Computing standings from game results...<p>';
@@ -281,7 +281,7 @@ class StandingsUpdater extends \BaseMysqliRepository {
     }
 
     /**
-     * Compute derived fields (pct, GB, records) and insert all teams into ibl_standings
+     * Compute derived fields (pct, GB, records) and insert all teams into `ibl_standings`
      *
      * @param array<int, TeamStanding> $standings
      * @param array<int, TeamMapping> $teamMap

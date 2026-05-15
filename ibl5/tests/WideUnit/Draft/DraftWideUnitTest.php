@@ -91,7 +91,7 @@ class DraftWideUnitTest extends WideUnitTestCase
         $this->assertQueryExecuted('UPDATE ibl_draft');
 
         // Verify rookie table was updated
-        $this->assertQueryExecuted('UPDATE `ibl_draft_class`');
+        $this->assertQueryExecuted('UPDATE ibl_draft_class');
 
         // Verify player was created in ibl_plr
         $this->assertQueryExecuted('INSERT INTO ibl_plr');
@@ -144,7 +144,7 @@ class DraftWideUnitTest extends WideUnitTestCase
 
         // Verify all database operations
         $this->assertQueryExecuted('UPDATE ibl_draft');
-        $this->assertQueryExecuted('UPDATE `ibl_draft_class`');
+        $this->assertQueryExecuted('UPDATE ibl_draft_class');
         $this->assertQueryExecuted('INSERT INTO ibl_plr');
     }
 
@@ -291,7 +291,7 @@ class DraftWideUnitTest extends WideUnitTestCase
         );
 
         // Assert - Draft class record was updated to mark player as drafted
-        $this->assertQueryExecuted('UPDATE `ibl_draft_class`');
+        $this->assertQueryExecuted('UPDATE ibl_draft_class');
     }
 
     /**

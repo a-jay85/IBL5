@@ -79,7 +79,7 @@ class League extends BaseMysqliRepository
     {
         /** @var array{value: string}|null $result */
         $result = $this->fetchOne(
-            "SELECT value FROM ibl_settings WHERE name = ? LIMIT 1",
+            "SELECT value FROM `ibl_settings` WHERE name = ? LIMIT 1",
             "s",
             "Sim Length in Days"
         );
@@ -112,8 +112,8 @@ class League extends BaseMysqliRepository
         }
 
         $query = "SELECT p.*, t.team_name AS teamname, t.team_city, t.color1, t.color2
-        FROM ibl_plr p
-        JOIN ibl_team_info t ON p.teamid = t.teamid
+        FROM `ibl_plr` p
+        JOIN `ibl_team_info` t ON p.teamid = t.teamid
         WHERE p.pos IN ($positions)
           AND p.teamid IN ('" . $this->formatTidsForSqlQuery($conferenceTids) . "')
           AND p.retired != 1
@@ -134,7 +134,7 @@ class League extends BaseMysqliRepository
         /** @var list<PlayerRow> */
         return $this->fetchAll(
             "SELECT *
-            FROM ibl_plr
+            FROM `ibl_plr`
             WHERE injured > 0
               AND retired = 0
             ORDER BY ordinal ASC"
@@ -152,7 +152,7 @@ class League extends BaseMysqliRepository
         /** @var list<PlayerRow> */
         return $this->fetchAll(
             "SELECT *
-            FROM ibl_plr
+            FROM `ibl_plr`
             WHERE retired = 0
               AND CASE COALESCE(cy, 0) + 1
                   WHEN 1 THEN salary_yr1
@@ -177,7 +177,7 @@ class League extends BaseMysqliRepository
         /** @var list<PlayerRow> */
         return $this->fetchAll(
             "SELECT *
-            FROM ibl_plr
+            FROM `ibl_plr`
             WHERE ordinal > ?
               AND retired = 0
               AND name != '(no starter)'
@@ -197,8 +197,8 @@ class League extends BaseMysqliRepository
         /** @var list<PlayerRow> */
         return $this->fetchAll(
             "SELECT p.*, t.team_name AS teamname, t.team_city, t.color1, t.color2
-            FROM ibl_plr p
-            JOIN ibl_team_info t ON p.teamid = t.teamid
+            FROM `ibl_plr` p
+            JOIN `ibl_team_info` t ON p.teamid = t.teamid
             WHERE p.retired != 1
               AND p.stats_gm >= '41'
               AND p.stats_min / p.stats_gm >= '30'
@@ -216,8 +216,8 @@ class League extends BaseMysqliRepository
         /** @var list<PlayerRow> */
         return $this->fetchAll(
             "SELECT p.*, t.team_name AS teamname, t.team_city, t.color1, t.color2
-            FROM ibl_plr p
-            JOIN ibl_team_info t ON p.teamid = t.teamid
+            FROM `ibl_plr` p
+            JOIN `ibl_team_info` t ON p.teamid = t.teamid
             WHERE p.retired != 1
               AND p.stats_min / p.stats_gm >= 15
               AND p.stats_gs / p.stats_gm <= '.5'
@@ -236,8 +236,8 @@ class League extends BaseMysqliRepository
         /** @var list<PlayerRow> */
         return $this->fetchAll(
             "SELECT p.*, t.team_name AS teamname, t.team_city, t.color1, t.color2
-            FROM ibl_plr p
-            JOIN ibl_team_info t ON p.teamid = t.teamid
+            FROM `ibl_plr` p
+            JOIN `ibl_team_info` t ON p.teamid = t.teamid
             WHERE p.retired != 1
               AND p.exp = '1'
               AND p.stats_gm >= '41'
@@ -254,7 +254,7 @@ class League extends BaseMysqliRepository
     {
         return $this->fetchAll(
             "SELECT owner_name, team_city, team_name
-            FROM ibl_team_info
+            FROM `ibl_team_info`
             WHERE teamid BETWEEN 1 AND ?
             ORDER BY owner_name",
             "i",
@@ -271,7 +271,7 @@ class League extends BaseMysqliRepository
     {
         return $this->fetchAll(
             "SELECT *
-            FROM ibl_team_info
+            FROM `ibl_team_info`
             WHERE teamid BETWEEN 1 AND ?
             ORDER BY teamid ASC",
             "i",

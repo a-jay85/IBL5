@@ -31,10 +31,10 @@ class FranchiseRecordBookRepository extends \BaseMysqliRepository implements Fra
                     COALESCE(r.pid, plr.pid) AS pid,
                     r.stat_value, r.stat_raw,
                     r.team_of_record, r.season_year, r.career_total
-             FROM ibl_rcb_alltime_records r
+             FROM `ibl_rcb_alltime_records` r
              LEFT JOIN (
                SELECT REPLACE(name, '''', '') AS clean_name, MAX(pid) AS pid
-               FROM ibl_plr GROUP BY clean_name
+               FROM `ibl_plr` GROUP BY clean_name
              ) plr ON plr.clean_name = r.player_name
              WHERE r.scope = 'team' AND r.teamid = ? AND r.record_type = 'single_season'
                AND r.ranking <= ?
@@ -61,10 +61,10 @@ class FranchiseRecordBookRepository extends \BaseMysqliRepository implements Fra
                     COALESCE(r.pid, plr.pid) AS pid,
                     r.stat_value, r.stat_raw,
                     r.team_of_record, r.season_year, r.career_total
-             FROM ibl_rcb_alltime_records r
+             FROM `ibl_rcb_alltime_records` r
              LEFT JOIN (
                SELECT REPLACE(name, '''', '') AS clean_name, MAX(pid) AS pid
-               FROM ibl_plr GROUP BY clean_name
+               FROM `ibl_plr` GROUP BY clean_name
              ) plr ON plr.clean_name = r.player_name
              WHERE r.scope = 'league' AND r.record_type = 'career'
                AND r.ranking <= ?
@@ -90,10 +90,10 @@ class FranchiseRecordBookRepository extends \BaseMysqliRepository implements Fra
                     COALESCE(r.pid, plr.pid) AS pid,
                     r.stat_value, r.stat_raw,
                     r.team_of_record, r.season_year, r.career_total
-             FROM ibl_rcb_alltime_records r
+             FROM `ibl_rcb_alltime_records` r
              LEFT JOIN (
                SELECT REPLACE(name, '''', '') AS clean_name, MAX(pid) AS pid
-               FROM ibl_plr GROUP BY clean_name
+               FROM `ibl_plr` GROUP BY clean_name
              ) plr ON plr.clean_name = r.player_name
              WHERE r.scope = 'league' AND r.record_type = 'single_season'
                AND r.ranking <= ?
@@ -126,7 +126,7 @@ class FranchiseRecordBookRepository extends \BaseMysqliRepository implements Fra
         /** @var TeamInfo|null $row */
         $row = $this->fetchOne(
             'SELECT teamid, team_name, color1, color2
-             FROM ibl_team_info
+             FROM `ibl_team_info`
              WHERE teamid = ?',
             'i',
             $teamId

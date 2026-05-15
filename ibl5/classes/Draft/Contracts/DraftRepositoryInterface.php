@@ -132,19 +132,19 @@ interface DraftRepositoryInterface
     public function updateRookieTable(string $playerName, string $teamName): bool;
 
     /**
-     * Create a new player entry in ibl_plr from ibl_draft_class data
+     * Create a new player entry in ibl_plr from `ibl_draft_class` data
      *
      * When a player is drafted, this creates a new ibl_plr record with a temporary
      * PID in the range 90000+. This allows drafted players to appear in rosters
      * immediately. When plrParser.php processes an updated .plr file, it merges
      * the data using the player name and creates permanent JSB-assigned PIDs.
      *
-     * Maps columns from ibl_draft_class to ibl_plr:
+     * Maps columns from `ibl_draft_class` to ibl_plr:
      *  - oo/do/po/to -> oo/do/po/to (offensive ratings)
      *  - od/dd/pd/td -> od/dd/pd/td (defensive ratings)
      *  - age, sta, talent, skill, intangibles -> age, sta, talent, skill, intangibles
      *
-     * @param string $playerName The name of the drafted player (from ibl_draft_class)
+     * @param string $playerName The name of the drafted player (from `ibl_draft_class`)
      * @param string $teamName The name of the team that drafted the player
      * @return bool True if player created successfully, false otherwise
      *
@@ -158,7 +158,7 @@ interface DraftRepositoryInterface
      *  - NEVER throws exceptions
      *
      * Side Effects:
-     *  - Inserts new row into ibl_plr table
+     *  - Inserts new row into `ibl_plr` table
      *  - May affect MAX(pid) calculations for next draft pick PID
      *
      * Database Dependencies:
@@ -195,16 +195,16 @@ interface DraftRepositoryInterface
     /**
      * Get all players in the draft class roster
      *
-     * Retrieves the complete list of available draft prospects from ibl_draft_class.
+     * Retrieves the complete list of available draft prospects from `ibl_draft_class`.
      * Used for rendering player tables and searching available players.
      *
      * @return list<DraftClassPlayerRow> Array of player records
      *
      * IMPORTANT BEHAVIORS:
-     *  - Returns all players from ibl_draft_class table
+     *  - Returns all players from `ibl_draft_class` table
      *  - Ordered by drafted ASC (undrafted first), then name ASC (alphabetical)
      *  - Returns empty array if no players in draft class
-     *  - Each row includes all columns from ibl_draft_class (drafted, name, pos, team, ratings, etc.)
+     *  - Each row includes all columns from `ibl_draft_class` (drafted, name, pos, team, ratings, etc.)
      *  - NEVER throws exceptions
      *
      * Examples:

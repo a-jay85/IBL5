@@ -83,11 +83,10 @@ class Discord
 
         if (file_exists($configPath)) {
             /** @var array{webhooks?: array<string, string>, iblbot_url?: string} $config */
-            $config = require $configPath;
+            $config = require $configPath; /** @phpstan-ignore ibl.requireOnce (config file returns array; not a class) */
         } elseif (file_exists($examplePath)) {
-            // Fallback to example config (e.g., in development without secrets set up)
             /** @var array{webhooks?: array<string, string>, iblbot_url?: string} $config */
-            $config = require $examplePath;
+            $config = require $examplePath; /** @phpstan-ignore ibl.requireOnce (config file returns array; not a class) */
         } else {
             throw new \RuntimeException(
                 'Discord configuration file not found. ' .

@@ -13,24 +13,6 @@ parameters:
 			path: classes/ApiKeys/ApiKeysView.php
 
 		-
-			rawMessage: Direct `include_once` is banned in classes/. All classes under ibl5/classes/ autoload via Composer PSR-4. Remove the statement and rely on autoload instead.
-			identifier: ibl.requireOnce
-			count: 1
-			path: classes/Bootstrap/AuthBootstrap.php
-
-		-
-			rawMessage: Direct `require_once` is banned in classes/. All classes under ibl5/classes/ autoload via Composer PSR-4. Remove the statement and rely on autoload instead.
-			identifier: ibl.requireOnce
-			count: 1
-			path: classes/Bootstrap/AutoloaderBootstrap.php
-
-		-
-			rawMessage: Direct `require` is banned in classes/. All classes under ibl5/classes/ autoload via Composer PSR-4. Remove the statement and rely on autoload instead.
-			identifier: ibl.requireOnce
-			count: 1
-			path: classes/Bootstrap/AutoloaderBootstrap.php
-
-		-
 			rawMessage: '''
 				Call to method sql_fetchrow() of deprecated class Database\MySQL:
 				This class is for PHP-Nuke module backward compatibility only.
@@ -107,12 +89,6 @@ parameters:
 			path: classes/Bootstrap/ConfigBootstrap.php
 
 		-
-			rawMessage: Direct `require_once` is banned in classes/. All classes under ibl5/classes/ autoload via Composer PSR-4. Remove the statement and rely on autoload instead.
-			identifier: ibl.requireOnce
-			count: 2
-			path: classes/Bootstrap/ConfigBootstrap.php
-
-		-
 			rawMessage: '''
 				PHPDoc tag @var references deprecated class Database\MySQL:
 				This class is for PHP-Nuke module backward compatibility only.
@@ -154,12 +130,6 @@ parameters:
 			path: classes/Bootstrap/LeagueBootstrap.php
 
 		-
-			rawMessage: Direct `include_once` is banned in classes/. All classes under ibl5/classes/ autoload via Composer PSR-4. Remove the statement and rely on autoload instead.
-			identifier: ibl.requireOnce
-			count: 1
-			path: classes/Bootstrap/SecurityBootstrap.php
-
-		-
 			rawMessage: 'Unescaped output in View. Wrap the expression in HtmlSanitizer::e() (or another whitelisted safe helper), or cast it to (int)/(float)/(bool) if it is numeric.'
 			identifier: ibl.unescapedOutput
 			count: 9
@@ -182,12 +152,6 @@ parameters:
 			identifier: ibl.unescapedOutput
 			count: 25
 			path: classes/DepthChartEntry/DepthChartEntryView.php
-
-		-
-			rawMessage: Direct `require` is banned in classes/. All classes under ibl5/classes/ autoload via Composer PSR-4. Remove the statement and rely on autoload instead.
-			identifier: ibl.requireOnce
-			count: 2
-			path: classes/Discord/Discord.php
 
 		-
 			rawMessage: 'Unescaped output in View. Wrap the expression in HtmlSanitizer::e() (or another whitelisted safe helper), or cast it to (int)/(float)/(bool) if it is numeric.'
@@ -230,18 +194,6 @@ parameters:
 			identifier: ibl.unescapedOutput
 			count: 16
 			path: classes/LeagueControlPanel/LeagueControlPanelView.php
-
-		-
-			rawMessage: Direct `require` is banned in classes/. All classes under ibl5/classes/ autoload via Composer PSR-4. Remove the statement and rely on autoload instead.
-			identifier: ibl.requireOnce
-			count: 2
-			path: classes/Logging/LoggerFactory.php
-
-		-
-			rawMessage: Direct `require` is banned in classes/. All classes under ibl5/classes/ autoload via Composer PSR-4. Remove the statement and rely on autoload instead.
-			identifier: ibl.requireOnce
-			count: 2
-			path: classes/Mail/MailService.php
 
 		-
 			rawMessage: 'Unescaped output in View. Wrap the expression in HtmlSanitizer::e() (or another whitelisted safe helper), or cast it to (int)/(float)/(bool) if it is numeric.'

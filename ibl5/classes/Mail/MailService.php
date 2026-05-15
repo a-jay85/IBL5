@@ -84,9 +84,9 @@ class MailService implements MailServiceInterface
         $examplePath = self::resolveConfigDir() . '/mail.config.example.php';
 
         if (file_exists($configPath)) {
-            $config = require $configPath;
+            $config = require $configPath; /** @phpstan-ignore ibl.requireOnce (config file returns array; not a class) */
         } elseif (file_exists($examplePath)) {
-            $config = require $examplePath;
+            $config = require $examplePath; /** @phpstan-ignore ibl.requireOnce (config file returns array; not a class) */
         } else {
             $config = self::DEFAULT_CONFIG;
         }

@@ -104,7 +104,7 @@ const PUBLIC_MODULES: ModuleSnapshot[] = [
   { name: 'season-leaderboards', url: 'modules.php?name=SeasonLeaderboards', anchor: '.ibl-data-table',
     elementScreenshot: true },
   { name: 'series-records', url: 'modules.php?name=SeriesRecords', anchor: '.ibl-data-table' },
-{ name: 'standings', url: 'modules.php?name=Standings', anchor: '.ibl-data-table' },
+  { name: 'standings', url: 'modules.php?name=Standings', anchor: '.ibl-data-table' },
   { name: 'team', url: 'modules.php?name=Team&op=team&teamid=1', anchor: '#site-content' },
   { name: 'team-off-def-stats', url: 'modules.php?name=TeamOffDefStats', anchor: '.ibl-data-table' },
   { name: 'topics', url: 'modules.php?name=Topics', anchor: '#site-content' },

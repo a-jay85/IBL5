@@ -254,6 +254,30 @@ class SavedDepthChartServiceTest extends WideUnitTestCase
         $this->assertSame(10, $result);
     }
 
+    // ── getWinLossRecord ─────────────────────────────────────────
+
+    public function testGetWinLossRecordReturnsWinsAndLosses(): void
+    {
+        $this->mockDb->setMockData([
+            ['wins' => 10, 'losses' => 5],
+        ]);
+
+        $result = $this->service->getWinLossRecord(1, '2024-01-01', '2024-03-31');
+
+        $this->assertSame(['wins' => 10, 'losses' => 5], $result);
+    }
+
+    public function testGetWinLossRecordReturnsZerosWhenNoGames(): void
+    {
+        $this->mockDb->setMockData([
+            ['wins' => null, 'losses' => null],
+        ]);
+
+        $result = $this->service->getWinLossRecord(1, '2024-01-01', '2024-03-31');
+
+        $this->assertSame(['wins' => 0, 'losses' => 0], $result);
+    }
+
     // ── nameOrCreateActive ─────────────────────────────────────────
 
     public function testNameOrCreateActiveRenamesExistingActiveDc(): void

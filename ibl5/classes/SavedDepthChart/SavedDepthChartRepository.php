@@ -284,4 +284,33 @@ class SavedDepthChartRepository extends \BaseMysqliRepository implements SavedDe
             $teamid
         );
     }
+
+    /**
+     * @see SavedDepthChartRepositoryInterface::getWinLossRecord()
+     * @return array{wins: int, losses: int}
+     */
+    public function getWinLossRecord(int $teamid, string $startDate, string $endDate): array
+    {
+        $row = $this->fetchOne(
+            "SELECT
+                SUM(CASE WHEN (visitor_teamid = ? AND visitor_score > home_score) OR (home_teamid = ? AND home_score > visitor_score) THEN 1 ELSE 0 END) as wins,
+                SUM(CASE WHEN (visitor_teamid = ? AND visitor_score < home_score) OR (home_teamid = ? AND home_score < visitor_score) THEN 1 ELSE 0 END) as losses
+            FROM `ibl_schedule`
+            WHERE game_date BETWEEN ? AND ?
+              AND (visitor_teamid = ? OR home_teamid = ?)
+              AND (visitor_score > 0 OR home_score > 0)",
+            "iiiissii",
+            $teamid, $teamid, $teamid, $teamid,
+            $startDate, $endDate,
+            $teamid, $teamid
+        );
+
+        $wins = $row['wins'] ?? 0;
+        $losses = $row['losses'] ?? 0;
+
+        return [
+            'wins' => is_int($wins) ? $wins : 0,
+            'losses' => is_int($losses) ? $losses : 0,
+        ];
+    }
 }

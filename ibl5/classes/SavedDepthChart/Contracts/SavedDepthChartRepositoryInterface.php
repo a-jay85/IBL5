@@ -182,4 +182,11 @@ interface SavedDepthChartRepositoryInterface
      * @return SavedDepthChartRow|null
      */
     public function getActiveDepthChartForTeam(int $teamid): ?array;
+
+    /**
+     * Get win-loss record for a team in a date range from ibl_schedule
+     *
+     * @return array{wins: int, losses: int}
+     */
+    public function getWinLossRecord(int $teamid, string $startDate, string $endDate): array;
 }

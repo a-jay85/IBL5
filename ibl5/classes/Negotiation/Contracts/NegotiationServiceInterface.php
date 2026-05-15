@@ -5,12 +5,12 @@ declare(strict_types=1);
 namespace Negotiation\Contracts;
 
 /**
- * NegotiationProcessorInterface - Negotiation workflow orchestration
+ * NegotiationServiceInterface - Negotiation workflow orchestration
  *
  * Orchestrates the complete contract negotiation workflow,
  * coordinating validation, demand calculation, and view rendering.
  */
-interface NegotiationProcessorInterface
+interface NegotiationServiceInterface
 {
     /**
      * Process a contract negotiation request

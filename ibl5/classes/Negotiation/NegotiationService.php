@@ -5,32 +5,27 @@ declare(strict_types=1);
 namespace Negotiation;
 
 use Negotiation\Contracts\NegotiationDemandCalculatorInterface;
-use Negotiation\Contracts\NegotiationProcessorInterface;
 use Negotiation\Contracts\NegotiationRepositoryInterface;
+use Negotiation\Contracts\NegotiationServiceInterface;
+use Negotiation\Contracts\NegotiationValidatorInterface;
 use Player\Player;
 
 /**
- * @see NegotiationProcessorInterface
+ * @see NegotiationServiceInterface
  *
  * @phpstan-import-type TeamFactors from NegotiationDemandCalculatorInterface
  */
-class NegotiationProcessor implements NegotiationProcessorInterface
+class NegotiationService implements NegotiationServiceInterface
 {
-    private \mysqli $db;
-    private NegotiationRepositoryInterface $repository;
-    private NegotiationValidator $validator;
-    private NegotiationDemandCalculator $demandCalculator;
-
-    public function __construct(\mysqli $mysqli_db, ?\Season\Season $season = null)
-    {
-        $this->db = $mysqli_db;
-        $this->repository = new NegotiationRepository($mysqli_db);
-        $this->validator = new NegotiationValidator($mysqli_db, $season);
-        $this->demandCalculator = new NegotiationDemandCalculator($mysqli_db);
-    }
+    public function __construct(
+        private readonly \mysqli $db,
+        private readonly NegotiationRepositoryInterface $repository,
+        private readonly NegotiationValidatorInterface $validator,
+        private readonly NegotiationDemandCalculatorInterface $demandCalculator,
+    ) {}
     
     /**
-     * @see NegotiationProcessorInterface::processNegotiation()
+     * @see NegotiationServiceInterface::processNegotiation()
      */
     public function processNegotiation(int $playerID, string $userTeamName, string $prefix, bool $bypassOwnership = false): string
     {

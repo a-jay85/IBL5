@@ -44,8 +44,8 @@ function negotiate($playerID)
     PageLayout\PageLayout::header();
     OpenTable();
 
-    // Use NegotiationProcessor to handle all business logic
-    $processor = new Negotiation\NegotiationProcessor($db, $mysqli_db);
+    // Use NegotiationService to handle all business logic
+    $processor = new Negotiation\NegotiationService($db, $mysqli_db);
     echo $processor->processNegotiation($playerID, $userTeamName, $prefix);
 
     CloseTable();
@@ -65,7 +65,7 @@ classes/Negotiation/
 │   └── Validates eligibility using existing PlayerContractValidator
 ├── NegotiationViewHelper.php (207 lines)
 │   └── Handles HTML rendering (presentation layer)
-└── NegotiationProcessor.php (229 lines)
+└── NegotiationService.php (229 lines)
     └── Orchestrates the complete workflow
 ```
 
@@ -131,7 +131,7 @@ MAX_RAISE_PERCENTAGE = 0.1 // 10% max annual raise
 - Makes HTML templates easier to modify
 - Enables future templating system integration
 
-### 4. NegotiationProcessor.php
+### 4. NegotiationService.php
 
 **Responsibility**: Orchestrates the complete workflow
 
@@ -327,7 +327,7 @@ $this->assertStringContainsString('form', $html);
 
 ### Integration Tests:
 ```php
-$processor = new NegotiationProcessor($mockDb);
+$processor = new NegotiationService($mockDb);
 $output = $processor->processNegotiation(123, 'Seattle Supersonics', 'nuke');
 $this->assertStringContainsString('Contract Demands', $output);
 ```

@@ -6,10 +6,13 @@ namespace Tests\DatabaseIntegration\Negotiation;
 
 use PHPUnit\Framework\Attributes\Group;
 use Tests\DatabaseIntegration\DatabaseTestCase;
-use Negotiation\NegotiationProcessor;
+use Negotiation\NegotiationDemandCalculator;
+use Negotiation\NegotiationRepository;
+use Negotiation\NegotiationService;
+use Negotiation\NegotiationValidator;
 
 #[Group('database')]
-class NegotiationProcessorIntegrationTest extends DatabaseTestCase
+class NegotiationServiceIntegrationTest extends DatabaseTestCase
 {
     protected function setUp(): void
     {
@@ -28,8 +31,8 @@ class NegotiationProcessorIntegrationTest extends DatabaseTestCase
         $pid = 200050001;
         $this->seedEligiblePlayer($pid, 'Nego Test Star', 1, 'PG', 5);
 
-        $processor = new NegotiationProcessor($this->db);
-        $output = $processor->processNegotiation($pid, 'Metros', 'nego_');
+        $service = $this->buildService();
+        $output = $service->processNegotiation($pid, 'Metros', 'nego_');
 
         self::assertStringContainsString('Nego Test Star', $output);
         self::assertStringNotContainsString('not available during free agency', $output);
@@ -44,8 +47,8 @@ class NegotiationProcessorIntegrationTest extends DatabaseTestCase
         $season = new \Season\Season($this->db);
         $season->phase = 'Free Agency';
 
-        $processor = new NegotiationProcessor($this->db, $season);
-        $output = $processor->processNegotiation($pid, 'Metros', 'nego_');
+        $service = $this->buildService($season);
+        $output = $service->processNegotiation($pid, 'Metros', 'nego_');
 
         self::assertStringContainsString('not available during free agency', $output);
     }
@@ -55,8 +58,8 @@ class NegotiationProcessorIntegrationTest extends DatabaseTestCase
         $pid = 200050003;
         $this->seedEligiblePlayer($pid, 'Nego Test Foreign', 2, 'SF', 3);
 
-        $processor = new NegotiationProcessor($this->db);
-        $output = $processor->processNegotiation($pid, 'Metros', 'nego_');
+        $service = $this->buildService();
+        $output = $service->processNegotiation($pid, 'Metros', 'nego_');
 
         self::assertStringContainsString('is not on your team', $output);
     }
@@ -69,13 +72,23 @@ class NegotiationProcessorIntegrationTest extends DatabaseTestCase
         $this->seedEligiblePlayer($lowPid, 'Nego Lowly', 1, 'PG', 5, 30);
         $this->seedEligiblePlayer($highPid, 'Nego Elite', 1, 'SG', 7, 95);
 
-        $processor = new NegotiationProcessor($this->db);
-        $lowOutput = $processor->processNegotiation($lowPid, 'Metros', 'nego_');
-        $highOutput = $processor->processNegotiation($highPid, 'Metros', 'nego_');
+        $service = $this->buildService();
+        $lowOutput = $service->processNegotiation($lowPid, 'Metros', 'nego_');
+        $highOutput = $service->processNegotiation($highPid, 'Metros', 'nego_');
 
         self::assertStringContainsString('Nego Lowly', $lowOutput);
         self::assertStringContainsString('Nego Elite', $highOutput);
         self::assertNotSame($lowOutput, $highOutput);
+    }
+
+    private function buildService(?\Season\Season $season = null): NegotiationService
+    {
+        return new NegotiationService(
+            $this->db,
+            new NegotiationRepository($this->db),
+            new NegotiationValidator($this->db, $season),
+            new NegotiationDemandCalculator($this->db),
+        );
     }
 
     private function seedEligiblePlayer(

@@ -9,7 +9,10 @@ use RookieOption\RookieOptionValidator;
 use RookieOption\RookieOptionFormView;
 use RookieOption\RookieOptionController;
 use Services\CommonMysqliRepository;
-use Negotiation\NegotiationProcessor;
+use Negotiation\NegotiationDemandCalculator;
+use Negotiation\NegotiationRepository;
+use Negotiation\NegotiationService;
+use Negotiation\NegotiationValidator;
 
 global $mysqli_db;
 
@@ -69,8 +72,13 @@ function negotiate($playerID)
     );
     $bypassOwnership = $debugSession->isViewAllExtensionsEnabled();
 
-    $processor = new NegotiationProcessor($mysqli_db);
-    echo $processor->processNegotiation($playerID, $userTeamName, $prefix, $bypassOwnership);
+    $service = new NegotiationService(
+        $mysqli_db,
+        new NegotiationRepository($mysqli_db),
+        new NegotiationValidator($mysqli_db),
+        new NegotiationDemandCalculator($mysqli_db),
+    );
+    echo $service->processNegotiation($playerID, $userTeamName, $prefix, $bypassOwnership);
 
     PageLayout\PageLayout::footer();
 }

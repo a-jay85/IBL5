@@ -117,7 +117,7 @@ jobs:
       - name: Download master baseline
         id: baseline
         if: always()
-        uses: dawidd6/action-download-artifact@v6
+        uses: dawidd6/action-download-artifact@v21
         continue-on-error: true
         with:
           workflow: lighthouse-baseline.yml

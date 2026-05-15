@@ -170,7 +170,8 @@ try {
     echo $view->renderInitStatus('ScheduleUpdater initialized');
     flush();
 
-    $standingsUpdater = new Updater\StandingsUpdater($mysqli_db, $season, $leagueContext);
+    $standingsRepo = new Standings\StandingsRepository($mysqli_db, $leagueContext);
+    $standingsUpdater = new Updater\StandingsUpdater($standingsRepo, $season, $leagueContext !== null);
     echo $view->renderInitStatus('StandingsUpdater initialized');
     flush();
 

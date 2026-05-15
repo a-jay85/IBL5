@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace Updater;
 
-use League\LeagueContext;
 use Season\Season;
+use Standings\Contracts\StandingsRepositoryInterface;
 
 /**
  * Computes league standings from game results in ibl_schedule
@@ -28,11 +28,11 @@ use Season\Season;
  *     div_wins: int,
  *     div_losses: int
  * }
- * @phpstan-type TeamMapping array{conference: string, division: string, teamName: string}
+ * @phpstan-import-type TeamMapping from StandingsRepositoryInterface
  */
-class StandingsUpdater extends \BaseMysqliRepository {
+class StandingsUpdater {
     /** @var array<string, string> */
-    private const REGION_AWARD_MAP = [
+    public const REGION_AWARD_MAP = [
         'Atlantic' => 'Atlantic Division Champions',
         'Central'  => 'Central Division Champions',
         'Midwest'  => 'Midwest Division Champions',
@@ -42,27 +42,13 @@ class StandingsUpdater extends \BaseMysqliRepository {
     ];
 
     private Season $season;
+    private StandingsRepositoryInterface $repository;
+    private bool $isOlympics;
 
-    public function __construct(\mysqli $db, Season $season, ?LeagueContext $leagueContext = null) {
-        parent::__construct($db, $leagueContext);
+    public function __construct(StandingsRepositoryInterface $repository, Season $season, bool $isOlympics = false) {
+        $this->repository = $repository;
         $this->season = $season;
-    }
-
-    private function upsertTeamAward(string $teamName, string $awardName): void
-    {
-        if ($this->leagueContext !== null) {
-            return;
-        }
-
-        $this->execute(
-            "INSERT INTO `ibl_team_awards` (year, name, award)
-             VALUES (?, ?, ?)
-             ON DUPLICATE KEY UPDATE name = VALUES(name)",
-            "iss",
-            $this->season->endingYear,
-            $teamName,
-            $awardName
-        );
+        $this->isOlympics = $isOlympics;
     }
 
     protected function extractWins(string $record): int {
@@ -82,9 +68,7 @@ class StandingsUpdater extends \BaseMysqliRepository {
     }
 
     public function update(): void {
-        $standingsTable = $this->resolveTable('ibl_standings');
-
-        echo "<p>Updating the {$standingsTable} database table...<p>";
+        echo "<p>Updating the standings database table...<p>";
 
         $this->computeAndInsertStandings();
 
@@ -95,10 +79,10 @@ class StandingsUpdater extends \BaseMysqliRepository {
         $this->updateMagicNumbers('Midwest');
         $this->updateMagicNumbers('Pacific');
 
-        $this->checkIfLeagueClinched();
+        $this->checkClinched(null, null);
 
         echo '<p>Magic numbers for all teams have been updated.<p>';
-        echo "<p>The {$standingsTable} table has been updated.<p>";
+        echo "<p>The standings table has been updated.<p>";
     }
 
     /**
@@ -122,59 +106,22 @@ class StandingsUpdater extends \BaseMysqliRepository {
     }
 
     /**
-     * Fetch conference/division mapping from league config table for the current season
-     *
-     * @return array<int, TeamMapping> Map of teamid → {conference, division, teamName}
+     * @return array<int, TeamMapping>
      */
     protected function fetchTeamMap(): array
     {
-        $leagueConfigTable = $this->resolveTable('ibl_league_config');
-
-        /** @var list<array{team_slot: int, team_name: string, conference: string, division: string}> $rows */
-        $rows = $this->fetchAll(
-            "SELECT team_slot, team_name, conference, division
-            FROM {$leagueConfigTable}
-            WHERE season_ending_year = ?",
-            "i",
-            $this->season->endingYear
-        );
-
-        /** @var array<int, TeamMapping> $map */
-        $map = [];
-        foreach ($rows as $row) {
-            $map[$row['team_slot']] = [
-                'conference' => $row['conference'],
-                'division' => $row['division'],
-                'teamName' => $row['team_name'],
-            ];
-        }
-
-        return $map;
+        return $this->repository->fetchTeamMapForSeason($this->season->endingYear);
     }
 
     /**
-     * Fetch all played games from schedule table for the current season
-     *
      * @return list<array{visitor_teamid: int, visitor_score: int, home_teamid: int, home_score: int}>
      */
     protected function fetchPlayedGames(): array
     {
-        $scheduleTable = $this->resolveTable('ibl_schedule');
         $month = SeasonPhaseHelper::getMonthForPhase($this->season->phase);
         $startDate = $this->season->beginningYear . "-{$month}-01";
         $endDate = $this->season->endingYear . "-05-30";
-
-        /** @var list<array{visitor_teamid: int, visitor_score: int, home_teamid: int, home_score: int}> */
-        return $this->fetchAll(
-            "SELECT visitor_teamid, visitor_score, home_teamid, home_score
-            FROM {$scheduleTable}
-            WHERE visitor_score > 0 AND home_score > 0
-            AND game_date BETWEEN ? AND ?
-            ORDER BY game_date ASC",
-            "ss",
-            $startDate,
-            $endDate
-        );
+        return $this->repository->fetchPlayedGamesForSeason($startDate, $endDate);
     }
 
     /**
@@ -288,7 +235,6 @@ class StandingsUpdater extends \BaseMysqliRepository {
      */
     private function computeAndInsertAll(array $standings, array $teamMap): void
     {
-        // Group teams by conference to compute conference GB
         /** @var array<string, list<TeamStanding>> $byConference */
         $byConference = [];
         /** @var array<string, list<TeamStanding>> $byDivision */
@@ -299,7 +245,6 @@ class StandingsUpdater extends \BaseMysqliRepository {
             $byDivision[$team['division']][] = $team;
         }
 
-        // Sort each group by pct DESC to find leaders
         $pctSorter = static function (array $a, array $b): int {
             /** @var int $winsA */
             $winsA = $a['wins'];
@@ -332,87 +277,48 @@ class StandingsUpdater extends \BaseMysqliRepository {
             $divLeaderGB[$div] = ($leader['wins'] - $leader['losses']) / 2.0;
         }
 
-        $standingsTable = $this->resolveTable('ibl_standings');
         $log = '';
 
         foreach ($standings as $team) {
             $totalGames = $team['wins'] + $team['losses'];
             $pct = $totalGames > 0 ? round($team['wins'] / $totalGames, 3) : 0.000;
-            $games_unplayed = 82 - $team['home_wins'] - $team['home_losses'] - $team['away_wins'] - $team['away_losses'];
+            $gamesUnplayed = 82 - $team['home_wins'] - $team['home_losses'] - $team['away_wins'] - $team['away_losses'];
 
-            $league_record = $team['wins'] . '-' . $team['losses'];
-            $conf_record = $team['conf_wins'] . '-' . $team['conf_losses'];
-            $div_record = $team['div_wins'] . '-' . $team['div_losses'];
-            $home_record = $team['home_wins'] . '-' . $team['home_losses'];
-            $away_record = $team['away_wins'] . '-' . $team['away_losses'];
+            $leagueRecord = $team['wins'] . '-' . $team['losses'];
+            $confRecord = $team['conf_wins'] . '-' . $team['conf_losses'];
+            $divRecord = $team['div_wins'] . '-' . $team['div_losses'];
+            $homeRecord = $team['home_wins'] . '-' . $team['home_losses'];
+            $awayRecord = $team['away_wins'] . '-' . $team['away_losses'];
 
             $teamGB = ($team['wins'] - $team['losses']) / 2.0;
-            $conf_gb = $confLeaderGB[$team['conference']] - $teamGB;
-            $div_gb = $divLeaderGB[$team['division']] - $teamGB;
+            $confGb = $confLeaderGB[$team['conference']] - $teamGB;
+            $divGb = $divLeaderGB[$team['division']] - $teamGB;
 
-            $this->execute(
-                "INSERT INTO {$standingsTable} (
-                    teamid, team_name, league_record, wins, losses, pct, games_unplayed,
-                    conference, conf_gb, conf_record,
-                    division, div_gb, div_record,
-                    home_record, away_record,
-                    conf_wins, conf_losses, div_wins, div_losses,
-                    home_wins, home_losses, away_wins, away_losses
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                ON DUPLICATE KEY UPDATE
-                    team_name = VALUES(team_name),
-                    league_record = VALUES(league_record),
-                    wins = VALUES(wins),
-                    losses = VALUES(losses),
-                    pct = VALUES(pct),
-                    games_unplayed = VALUES(games_unplayed),
-                    conference = VALUES(conference),
-                    conf_gb = VALUES(conf_gb),
-                    conf_record = VALUES(conf_record),
-                    division = VALUES(division),
-                    div_gb = VALUES(div_gb),
-                    div_record = VALUES(div_record),
-                    home_record = VALUES(home_record),
-                    away_record = VALUES(away_record),
-                    conf_wins = VALUES(conf_wins),
-                    conf_losses = VALUES(conf_losses),
-                    div_wins = VALUES(div_wins),
-                    div_losses = VALUES(div_losses),
-                    home_wins = VALUES(home_wins),
-                    home_losses = VALUES(home_losses),
-                    away_wins = VALUES(away_wins),
-                    away_losses = VALUES(away_losses),
-                    conf_magic_number = NULL,
-                    div_magic_number = NULL,
-                    clinched_conference = NULL,
-                    clinched_division = NULL,
-                    clinched_playoffs = NULL,
-                    clinched_league = NULL",
-                "issiidisdssdsssiiiiiiii",
-                $team['teamid'],
-                $team['teamName'],
-                $league_record,
-                $team['wins'],
-                $team['losses'],
-                $pct,
-                $games_unplayed,
-                $team['conference'],
-                $conf_gb,
-                $conf_record,
-                $team['division'],
-                $div_gb,
-                $div_record,
-                $home_record,
-                $away_record,
-                $team['conf_wins'],
-                $team['conf_losses'],
-                $team['div_wins'],
-                $team['div_losses'],
-                $team['home_wins'],
-                $team['home_losses'],
-                $team['away_wins'],
-                $team['away_losses']
-            );
+            $this->repository->upsertStandings([
+                'teamid' => $team['teamid'],
+                'teamName' => $team['teamName'],
+                'leagueRecord' => $leagueRecord,
+                'wins' => $team['wins'],
+                'losses' => $team['losses'],
+                'pct' => $pct,
+                'gamesUnplayed' => $gamesUnplayed,
+                'conference' => $team['conference'],
+                'confGb' => $confGb,
+                'confRecord' => $confRecord,
+                'division' => $team['division'],
+                'divGb' => $divGb,
+                'divRecord' => $divRecord,
+                'homeRecord' => $homeRecord,
+                'awayRecord' => $awayRecord,
+                'confWins' => $team['conf_wins'],
+                'confLosses' => $team['conf_losses'],
+                'divWins' => $team['div_wins'],
+                'divLosses' => $team['div_losses'],
+                'homeWins' => $team['home_wins'],
+                'homeLosses' => $team['home_losses'],
+                'awayWins' => $team['away_wins'],
+                'awayLosses' => $team['away_losses'],
+            ]);
 
             $log .= "Inserted standings for team: {$team['teamName']}<br>";
         }
@@ -421,19 +327,10 @@ class StandingsUpdater extends \BaseMysqliRepository {
     }
 
     private function updateMagicNumbers(string $region): void {
-        $standingsTable = $this->resolveTable('ibl_standings');
-
         echo "<p>Updating the magic numbers for the {$region}...<br>";
         list($grouping, $groupingGB, $groupingMagicNumber) = $this->assignGroupingsFor($region);
 
-        $teams = $this->fetchAll(
-            "SELECT teamid, team_name, home_wins, home_losses, away_wins, away_losses
-            FROM {$standingsTable}
-            WHERE {$grouping} = ?
-            ORDER BY pct DESC",
-            "s",
-            $region
-        );
+        $teams = $this->repository->fetchTeamsByRegion($grouping, $region);
 
         $log = '';
         $numTeams = count($teams);
@@ -455,48 +352,31 @@ class StandingsUpdater extends \BaseMysqliRepository {
 
             $magicNumber = 82 + 1 - $teamTotalWins - $belowTeamTotalLosses;
 
-            $log .= $this->updateTeamMagicNumber($teamid, $teamName, $magicNumber, $groupingMagicNumber);
+            $this->repository->updateMagicNumber($teamid, $magicNumber, $groupingMagicNumber);
+            $log .= "Updated {$groupingMagicNumber} for {$teamName} to {$magicNumber}<br>";
         }
 
         \UI\DebugOutput::display($log, "{$region} Magic Number Update Log");
 
-        $this->checkIfRegionIsClinched($region);
+        $this->checkClinched($grouping, $region);
         if ($grouping === 'conference') {
             $this->checkIfPlayoffsClinched($region);
         }
     }
 
-    private function updateTeamMagicNumber(int $teamid, string $teamName, int $magicNumber, string $groupingMagicNumber): string {
-        $standingsTable = $this->resolveTable('ibl_standings');
-        $log = '';
+    /**
+     * Check if a region (or the league) has been clinched by a team.
+     *
+     * @param string|null $grouping Column name ('conference', 'division'), or null for league-wide
+     * @param string|null $region Region value (e.g. 'Eastern'), or null for league-wide
+     */
+    private function checkClinched(?string $grouping, ?string $region): void {
+        $label = $grouping !== null && $region !== null
+            ? "{$region} {$grouping}"
+            : 'best league record';
+        echo "<p>Checking if the {$label} has been clinched...<br>";
 
-        $this->execute(
-            "UPDATE {$standingsTable} SET {$groupingMagicNumber} = ? WHERE teamid = ?",
-            "ii",
-            $magicNumber,
-            $teamid
-        );
-
-        $log .= "Updated {$groupingMagicNumber} for {$teamName} to {$magicNumber}<br>";
-
-        return $log;
-    }
-
-    private function checkIfRegionIsClinched(string $region): void {
-        $standingsTable = $this->resolveTable('ibl_standings');
-        list($grouping, $groupingGB, $groupingMagicNumber) = $this->assignGroupingsFor($region);
-        echo "<p>Checking if the {$region} {$grouping} has been clinched...<br>";
-
-        /** @var list<array{teamid: int, team_name: string, wins: int}> $topTeams */
-        $topTeams = $this->fetchAll(
-            "SELECT teamid, team_name, home_wins + away_wins AS wins
-            FROM {$standingsTable}
-            WHERE {$grouping} = ?
-            ORDER BY wins DESC
-            LIMIT 2",
-            "s",
-            $region
-        );
+        $topTeams = $this->repository->fetchTopTeamsByWins($grouping, $region);
 
         if (count($topTeams) < 2) {
             return;
@@ -505,9 +385,11 @@ class StandingsUpdater extends \BaseMysqliRepository {
         $first = $topTeams[0];
         $second = $topTeams[1];
 
-        // Head-to-head tiebreaker when tied in wins
         if ($first['wins'] === $second['wins']) {
-            $winnerId = $this->getHeadToHeadWinner($first['teamid'], $second['teamid']);
+            $month = SeasonPhaseHelper::getMonthForPhase($this->season->phase);
+            $startDate = $this->season->beginningYear . "-{$month}-01";
+            $endDate = $this->season->endingYear . '-05-30';
+            $winnerId = $this->repository->getHeadToHeadWinner($first['teamid'], $second['teamid'], $startDate, $endDate);
             if ($winnerId === $second['teamid']) {
                 [$first, $second] = [$second, $first];
             }
@@ -518,17 +400,7 @@ class StandingsUpdater extends \BaseMysqliRepository {
         /** @var int $winningestTeamWins */
         $winningestTeamWins = $first['wins'];
 
-        $leastLosingestTeam = $this->fetchOne(
-            "SELECT home_losses + away_losses AS losses
-            FROM {$standingsTable}
-            WHERE {$grouping} = ?
-                AND team_name <> ?
-            ORDER BY losses ASC
-            LIMIT 1",
-            "ss",
-            $region,
-            $winningestTeamName
-        );
+        $leastLosingestTeam = $this->repository->fetchLeastLosingTeam($winningestTeamName, $grouping, $region);
 
         if ($leastLosingestTeam === null) {
             return;
@@ -539,191 +411,36 @@ class StandingsUpdater extends \BaseMysqliRepository {
 
         $magicNumber = 82 + 1 - $winningestTeamWins - $leastLosingestTeamLosses;
 
-        // When tied at the top and season is over, H2H winner has clinched
         if ($magicNumber > 0 && $first['wins'] === $second['wins']) {
-            if ($this->isRegionSeasonOver($grouping, $region)) {
+            if ($this->repository->isRegionSeasonOver($grouping, $region)) {
                 $magicNumber = 0;
             }
         }
 
         if ($magicNumber <= 0) {
-            $this->execute(
-                "UPDATE {$standingsTable} SET clinched_{$grouping} = 1 WHERE team_name = ?",
-                "s",
-                $winningestTeamName
-            );
-            echo "The {$winningestTeamName} have clinched the {$region} {$grouping}!";
+            $clinchedColumn = $grouping !== null
+                ? "clinched_{$grouping}"
+                : 'clinched_league';
+            $this->repository->updateClinchedFlag($winningestTeamName, $clinchedColumn);
 
-            $awardName = self::REGION_AWARD_MAP[$region] ?? null;
-            if ($awardName !== null) {
-                $this->upsertTeamAward($winningestTeamName, $awardName);
+            if ($grouping !== null && $region !== null) {
+                echo "The {$winningestTeamName} have clinched the {$region} {$grouping}!";
+
+                $awardName = self::REGION_AWARD_MAP[$region] ?? null;
+                if ($awardName !== null && !$this->isOlympics) {
+                    $this->repository->upsertTeamAward($this->season->endingYear, $winningestTeamName, $awardName);
+                }
+            } else {
+                echo "The {$winningestTeamName} have clinched the best record in the league!";
             }
         }
-    }
-
-    private function checkIfLeagueClinched(): void {
-        $standingsTable = $this->resolveTable('ibl_standings');
-        echo '<p>Checking if any team has clinched the best league record...<br>';
-
-        /** @var list<array{teamid: int, team_name: string, wins: int}> $topTeams */
-        $topTeams = $this->fetchAll(
-            "SELECT teamid, team_name, home_wins + away_wins AS wins
-            FROM {$standingsTable}
-            ORDER BY wins DESC
-            LIMIT 2",
-            ""
-        );
-
-        if (count($topTeams) < 2) {
-            return;
-        }
-
-        $first = $topTeams[0];
-        $second = $topTeams[1];
-
-        // Head-to-head tiebreaker when tied in wins
-        if ($first['wins'] === $second['wins']) {
-            $winnerId = $this->getHeadToHeadWinner($first['teamid'], $second['teamid']);
-            if ($winnerId === $second['teamid']) {
-                [$first, $second] = [$second, $first];
-            }
-        }
-
-        /** @var string $winningestTeamName */
-        $winningestTeamName = $first['team_name'];
-        /** @var int $winningestTeamWins */
-        $winningestTeamWins = $first['wins'];
-
-        $leastLosingestTeam = $this->fetchOne(
-            "SELECT home_losses + away_losses AS losses
-            FROM {$standingsTable}
-            WHERE team_name <> ?
-            ORDER BY losses ASC
-            LIMIT 1",
-            "s",
-            $winningestTeamName
-        );
-
-        if ($leastLosingestTeam === null) {
-            return;
-        }
-
-        /** @var int $leastLosingestTeamLosses */
-        $leastLosingestTeamLosses = $leastLosingestTeam['losses'];
-
-        $magicNumber = 82 + 1 - $winningestTeamWins - $leastLosingestTeamLosses;
-
-        // When tied at the top and season is over, H2H winner has clinched
-        if ($magicNumber > 0 && $first['wins'] === $second['wins']) {
-            if ($this->isRegionSeasonOver('', '')) {
-                $magicNumber = 0;
-            }
-        }
-
-        if ($magicNumber <= 0) {
-            $this->execute(
-                "UPDATE {$standingsTable} SET clinched_league = 1 WHERE team_name = ?",
-                "s",
-                $winningestTeamName
-            );
-            echo "The {$winningestTeamName} have clinched the best record in the league!";
-        }
-    }
-
-    /**
-     * Check if all teams in a region (or league-wide) have finished the season
-     *
-     * @param string $grouping Column name ('conference', 'division', or '' for league-wide)
-     * @param string $region Region value (e.g. 'Eastern', 'Atlantic', or '' for league-wide)
-     */
-    private function isRegionSeasonOver(string $grouping, string $region): bool {
-        $standingsTable = $this->resolveTable('ibl_standings');
-        if ($grouping !== '' && $region !== '') {
-            $result = $this->fetchOne(
-                "SELECT MAX(games_unplayed) AS maxLeft FROM {$standingsTable} WHERE {$grouping} = ?",
-                "s",
-                $region
-            );
-        } else {
-            $result = $this->fetchOne(
-                "SELECT MAX(games_unplayed) AS maxLeft FROM {$standingsTable}",
-                ""
-            );
-        }
-
-        return $result !== null && $result['maxLeft'] === 0;
-    }
-
-    /**
-     * Determine the head-to-head winner between two teams for the current season
-     *
-     * Counts wins from games played between the two teams. If the head-to-head
-     * record is also tied, defaults to tid1 (higher seed by database ordering).
-     *
-     * @param int $tid1 First team ID
-     * @param int $tid2 Second team ID
-     * @return int The teamid of the team that won the head-to-head series
-     */
-    private function getHeadToHeadWinner(int $tid1, int $tid2): int {
-        $scheduleTable = $this->resolveTable('ibl_schedule');
-        $month = SeasonPhaseHelper::getMonthForPhase($this->season->phase);
-        $startDate = $this->season->beginningYear . "-{$month}-01";
-        $endDate = $this->season->endingYear . '-05-30';
-
-        $result = $this->fetchOne(
-            "SELECT
-                COUNT(*) AS total_games,
-                SUM(CASE
-                    WHEN (visitor_teamid = ? AND visitor_score > home_score) OR (home_teamid = ? AND home_score > visitor_score) THEN 1
-                    ELSE 0
-                END) AS team1_wins
-            FROM {$scheduleTable}
-            WHERE visitor_score > 0 AND home_score > 0
-            AND game_date BETWEEN ? AND ?
-            AND ((visitor_teamid = ? AND home_teamid = ?) OR (visitor_teamid = ? AND home_teamid = ?))",
-            "iissiiii",
-            $tid1, $tid1,
-            $startDate, $endDate,
-            $tid1, $tid2, $tid2, $tid1
-        );
-
-        if ($result === null) {
-            return $tid1;
-        }
-
-        /** @var int $totalGames */
-        $totalGames = $result['total_games'];
-        /** @var int $team1Wins */
-        $team1Wins = $result['team1_wins'];
-        $team2Wins = $totalGames - $team1Wins;
-
-        return $team1Wins >= $team2Wins ? $tid1 : $tid2;
     }
 
     private function checkIfPlayoffsClinched(string $conference): void {
-        $standingsTable = $this->resolveTable('ibl_standings');
-
         echo "<p>Checking if any teams have clinched playoff spots in the {$conference} Conference...<br>";
 
-        $eightWinningestTeams = $this->fetchAll(
-            "SELECT team_name, home_wins + away_wins AS wins
-            FROM {$standingsTable}
-            WHERE conference = ?
-            ORDER BY wins DESC
-            LIMIT 8",
-            "s",
-            $conference
-        );
-
-        $sixLosingestTeams = $this->fetchAll(
-            "SELECT home_losses + away_losses AS losses
-            FROM {$standingsTable}
-            WHERE conference = ?
-            ORDER BY losses DESC
-            LIMIT 6",
-            "s",
-            $conference
-        );
+        $eightWinningestTeams = $this->repository->fetchWinningestTeams($conference);
+        $sixLosingestTeams = $this->repository->fetchMostLosingTeams($conference);
 
         for ($i = 0; $i < 8; $i++) {
             if (!isset($eightWinningestTeams[$i])) {
@@ -751,11 +468,7 @@ class StandingsUpdater extends \BaseMysqliRepository {
             }
 
             if ($teamsEliminated === 6) {
-                $this->execute(
-                    "UPDATE {$standingsTable} SET clinched_playoffs = 1 WHERE team_name = ?",
-                    "s",
-                    $contendingTeamName
-                );
+                $this->repository->updateClinchedFlag($contendingTeamName, 'clinched_playoffs');
                 echo "The {$contendingTeamName} have clinched a playoff spot!<br>";
             }
         }

@@ -282,7 +282,8 @@ abstract class PipelineIntegrationTestCase extends DatabaseTestCase
             },
         );
         $scheduleUpdater = new \Updater\ScheduleUpdater($this->db, $season, null, $schResolver);
-        $standingsUpdater = new \Updater\StandingsUpdater($this->db, $season);
+        $standingsRepo = new \Standings\StandingsRepository($this->db);
+        $standingsUpdater = new \Updater\StandingsUpdater($standingsRepo, $season);
         $powerRankingsUpdater = new \Updater\PowerRankingsUpdater($this->db, $season);
 
         // Step 0: ExtractFromBackupStep — SKIPPED (files pre-placed in temp dir)

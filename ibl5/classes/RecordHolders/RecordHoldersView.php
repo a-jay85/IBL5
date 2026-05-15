@@ -8,7 +8,7 @@ use RecordHolders\Contracts\RecordHoldersViewInterface;
 use RecordHolders\Contracts\RecordHoldersServiceInterface;
 use Player\PlayerImageHelper;
 use UI\TeamCellHelper;
-use Utilities\HtmlSanitizer;
+use Security\HtmlSanitizer;
 
 /**
  * View class for rendering the all-time IBL record holders page.

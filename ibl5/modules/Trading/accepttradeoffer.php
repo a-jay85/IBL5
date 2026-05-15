@@ -16,7 +16,7 @@ if (!isset($mysqli_db) || !($mysqli_db instanceof mysqli)) {
     die("Error: Database connection failed");
 }
 
-if (!\Utilities\CsrfGuard::validateSubmittedToken('trade_accept')) {
+if (!\Security\CsrfGuard::validateSubmittedToken('trade_accept')) {
     \Utilities\HtmxHelper::redirect('/ibl5/modules.php?name=Trading&error=' . rawurlencode('Invalid or expired form submission. Please try again.'));
 }
 

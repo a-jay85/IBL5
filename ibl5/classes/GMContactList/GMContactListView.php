@@ -6,7 +6,7 @@ namespace GMContactList;
 
 use GMContactList\Contracts\GMContactListViewInterface;
 use UI\TeamCellHelper;
-use Utilities\HtmlSanitizer;
+use Security\HtmlSanitizer;
 
 /**
  * View class for rendering GM contact list table.

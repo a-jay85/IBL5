@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Utilities;
 
+use Security\HtmlSanitizer;
+
 /**
  * Typed adapter for PHP-Nuke global functions.
  *

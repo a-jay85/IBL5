@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace UI\Tables;
 
 use Player\PlayerImageHelper;
-use Utilities\HtmlSanitizer;
+use Security\HtmlSanitizer;
 use Team\Team;
 
 /**

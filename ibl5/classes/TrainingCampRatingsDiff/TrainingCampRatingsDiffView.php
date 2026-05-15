@@ -7,7 +7,7 @@ namespace TrainingCampRatingsDiff;
 use Player\PlayerImageHelper;
 use TrainingCampRatingsDiff\Contracts\TrainingCampRatingsDiffViewInterface;
 use UI\TeamCellHelper;
-use Utilities\HtmlSanitizer;
+use Security\HtmlSanitizer;
 
 /**
  * TrainingCampRatingsDiffView — renders the admin ratings diff page.

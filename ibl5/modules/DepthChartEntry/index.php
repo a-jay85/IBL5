@@ -39,7 +39,7 @@ function submit()
     // Every other outcome (success, validation fail, empty team name)
     // takes the PRG path below so Back never lands on a stale form with
     // a consumed token.
-    if (!\Utilities\CsrfGuard::validateSubmittedToken('depth_chart')) {
+    if (!\Security\CsrfGuard::validateSubmittedToken('depth_chart')) {
         PageLayout\PageLayout::header();
         echo '<strong class="ibl-form-error">Invalid or expired form submission. Please reload and try again.</strong>';
         PageLayout\PageLayout::footer();

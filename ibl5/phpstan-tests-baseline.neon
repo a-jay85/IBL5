@@ -8310,7 +8310,7 @@ parameters:
 			rawMessage: 'You should use assertSame() instead of assertEquals(), because both values are scalars of the same type'
 			identifier: phpunit.assertEquals
 			count: 11
-			path: tests/Utilities/HtmlSanitizerTest.php
+			path: tests/Security/HtmlSanitizerTest.php
 
 		-
 			rawMessage: 'Dynamic call to static method PHPUnit\Framework\Assert::fail().'

@@ -9,7 +9,7 @@ use Trading\Contracts\TradingViewInterface;
 use Player\PlayerImageHelper;
 use UI\TableStyles;
 use UI\TeamCellHelper;
-use Utilities\HtmlSanitizer;
+use Security\HtmlSanitizer;
 use Season\Season;
 
 /**
@@ -74,7 +74,7 @@ class TradingView implements TradingViewInterface
         ], $pageData['error'] ?? null);
         ?>
 <form name="Trade_Offer" method="post" action="/ibl5/modules/Trading/maketradeoffer.php">
-    <?= \Utilities\CsrfGuard::generateToken('trade_offer') ?>
+    <?= \Security\CsrfGuard::generateToken('trade_offer') ?>
     <input type="hidden" name="offeringTeam" value="<?= $userTeam ?>">
     <div class="trading-layout">
         <h2 class="ibl-title">Trading</h2>
@@ -552,7 +552,7 @@ $tradeConfig = [
     <div class="trade-offer-card__actions">
 <?php if ($offer['hasHammer']): ?>
         <form name="tradeaccept" method="post" action="/ibl5/modules/Trading/accepttradeoffer.php" class="trade-offer-card__form">
-            <?= \Utilities\CsrfGuard::generateToken('trade_accept') ?>
+            <?= \Security\CsrfGuard::generateToken('trade_accept') ?>
             <input type="hidden" name="offer" value="<?= $offerId ?>">
             <button type="submit" class="ibl-btn ibl-btn--success">Accept</button>
         </form>
@@ -560,7 +560,7 @@ $tradeConfig = [
         <span class="trade-offer-card__awaiting">Awaiting Approval</span>
 <?php endif; ?>
         <form name="tradereject" method="post" action="/ibl5/modules/Trading/rejecttradeoffer.php" class="trade-offer-card__form">
-            <?= \Utilities\CsrfGuard::generateToken('trade_reject') ?>
+            <?= \Security\CsrfGuard::generateToken('trade_reject') ?>
             <input type="hidden" name="offer" value="<?= $offerId ?>">
             <input type="hidden" name="teamRejecting" value="<?= $userTeam ?>">
             <input type="hidden" name="teamReceiving" value="<?= $oppositeTeam ?>">

@@ -9,7 +9,7 @@ use Player\PlayerStats;
 use Player\Player;
 use Player\PlayerImageHelper;
 use UI\TeamCellHelper;
-use Utilities\HtmlSanitizer;
+use Security\HtmlSanitizer;
 use Team\Team;
 
 /**

@@ -6,7 +6,7 @@ namespace Player\Views;
 
 use Player\PlayerRepository;
 use Player\Contracts\PlayerHeatTotalsViewInterface;
-use Utilities\HtmlSanitizer;
+use Security\HtmlSanitizer;
 
 /**
  * PlayerHeatTotalsView - Renders H.E.A.T. totals table

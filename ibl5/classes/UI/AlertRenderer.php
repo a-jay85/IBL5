@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace UI;
 
-use Utilities\HtmlSanitizer;
+use Security\HtmlSanitizer;
 
 /**
  * AlertRenderer - Shared utility for rendering ibl-alert banners

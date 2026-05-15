@@ -5,8 +5,8 @@ declare(strict_types=1);
 namespace Navigation;
 
 use Navigation\Contracts\NavigationMenuBuilderInterface;
-use Utilities\CsrfGuard;
-use Utilities\HtmlSanitizer;
+use Security\CsrfGuard;
+use Security\HtmlSanitizer;
 
 /**
  * Builds navigation menu data structures from NavigationConfig.

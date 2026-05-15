@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace UI;
 
-use Utilities\HtmlSanitizer;
+use Security\HtmlSanitizer;
 
 /**
  * DebugOutput - Displays debug information in a collapsible panel

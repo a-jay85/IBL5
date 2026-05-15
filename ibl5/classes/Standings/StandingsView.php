@@ -256,7 +256,7 @@ class StandingsView implements StandingsViewInterface
      */
     private function renderHeader(string $region, string $groupingType): string
     {
-        $safeRegion = \Utilities\HtmlSanitizer::safeHtmlOutput($region);
+        $safeRegion = \Security\HtmlSanitizer::safeHtmlOutput($region);
         $title = $safeRegion . ' ' . $groupingType;
 
         ob_start();
@@ -326,7 +326,7 @@ class StandingsView implements StandingsViewInterface
 
         $lastWin = $streakData['last_win'] ?? 0;
         $lastLoss = $streakData['last_loss'] ?? 0;
-        $streakType = \Utilities\HtmlSanitizer::safeHtmlOutput($streakData['streak_type'] ?? '');
+        $streakType = \Security\HtmlSanitizer::safeHtmlOutput($streakData['streak_type'] ?? '');
         $streak = $streakData['streak'] ?? 0;
         $streakSortKey = ($streakData['streak_type'] ?? '') === 'W' ? $streak : -$streak;
         $rating = $streakData['ranking'] ?? 0;
@@ -400,7 +400,7 @@ class StandingsView implements StandingsViewInterface
      */
     private function formatTeamName(array $team): string
     {
-        $teamName = \Utilities\HtmlSanitizer::safeHtmlOutput($team['team_name']);
+        $teamName = \Security\HtmlSanitizer::safeHtmlOutput($team['team_name']);
 
         if ($team['clinched_league'] === 1) {
             return '<span class="ibl-clinched-indicator">W</span>-' . $teamName;

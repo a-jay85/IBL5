@@ -7,7 +7,7 @@ namespace FranchiseHistory;
 use FranchiseHistory\Contracts\FranchiseHistoryRepositoryInterface;
 use FranchiseHistory\Contracts\FranchiseHistoryViewInterface;
 use UI\TeamCellHelper;
-use Utilities\HtmlSanitizer;
+use Security\HtmlSanitizer;
 
 /**
  * FranchiseHistoryView - HTML rendering for franchise history

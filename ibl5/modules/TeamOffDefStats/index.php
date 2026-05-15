@@ -11,7 +11,7 @@
  * - TeamOffDefStats\TeamOffDefStatsService for statistics processing
  * - TeamOffDefStats\TeamOffDefStatsView for HTML rendering
  * - BasketballStats\StatsFormatter for consistent number formatting
- * - Utilities\HtmlSanitizer for XSS protection
+ * - Security\HtmlSanitizer for XSS protection
  */
 
 declare(strict_types=1);

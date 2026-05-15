@@ -7,7 +7,7 @@ namespace ContractList;
 use ContractList\Contracts\ContractListViewInterface;
 use Player\PlayerImageHelper;
 use UI\TeamCellHelper;
-use Utilities\HtmlSanitizer;
+use Security\HtmlSanitizer;
 
 /**
  * View class for rendering master contract list table.

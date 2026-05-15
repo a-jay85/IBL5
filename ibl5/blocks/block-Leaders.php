@@ -6,7 +6,7 @@ if (!defined('BLOCK_FILE')) {
 }
 
 use Player\PlayerImageHelper;
-use Utilities\HtmlSanitizer;
+use Security\HtmlSanitizer;
 
 global $mysqli_db, $leagueContext;
 

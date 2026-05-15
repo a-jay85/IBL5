@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace LeagueControlPanel;
 
 use LeagueControlPanel\Contracts\LeagueControlPanelViewInterface;
-use Utilities\HtmlSanitizer;
+use Security\HtmlSanitizer;
 
 /**
  * @see LeagueControlPanelViewInterface

@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Voting;
 
 use Player\PlayerImageHelper;
-use Utilities\HtmlSanitizer;
+use Security\HtmlSanitizer;
 use Voting\Contracts\VotingBallotViewInterface;
 
 /**
@@ -39,7 +39,7 @@ class VotingBallotView implements VotingBallotViewInterface
 
         $csrfFormName = $isASG ? 'asg_vote' : 'eoy_vote';
         $html = "<form name=\"{$formName}\" method=\"post\" action=\"{$safeFormAction}\">";
-        $html .= \Utilities\CsrfGuard::generateToken($csrfFormName);
+        $html .= \Security\CsrfGuard::generateToken($csrfFormName);
         $html .= '<div class="voting-form-container">';
         $html .= "<img src=\"images/logo/{$teamid}.jpg\" alt=\"Team Logo\" class=\"team-logo-banner\">";
         $html .= '<button type="submit" class="ibl-btn ibl-btn--primary ibl-btn--lg">Submit Votes!</button>';

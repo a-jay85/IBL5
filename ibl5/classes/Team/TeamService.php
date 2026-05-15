@@ -313,9 +313,9 @@ class TeamService implements TeamServiceInterface
             $isWin = ($winner === $teamName);
             $isLoss = ($loser === $teamName);
 
-            $year = \Utilities\HtmlSanitizer::safeHtmlOutput((string) $playoff['year']);
-            $winnerSafe = \Utilities\HtmlSanitizer::safeHtmlOutput($playoff['winner_name_that_year']);
-            $loserSafe = \Utilities\HtmlSanitizer::safeHtmlOutput($playoff['loser_name_that_year']);
+            $year = \Security\HtmlSanitizer::safeHtmlOutput((string) $playoff['year']);
+            $winnerSafe = \Security\HtmlSanitizer::safeHtmlOutput($playoff['winner_name_that_year']);
+            $loserSafe = \Security\HtmlSanitizer::safeHtmlOutput($playoff['loser_name_that_year']);
             $winnerGames = $playoff['winner_games'];
             $loserGames = $playoff['loser_games'];
 
@@ -424,7 +424,7 @@ class TeamService implements TeamServiceInterface
             $totalWins += $wins;
             $totalLosses += $losses;
 
-            $name = \Utilities\HtmlSanitizer::safeHtmlOutput($record['namethatyear']);
+            $name = \Security\HtmlSanitizer::safeHtmlOutput($record['namethatyear']);
             if ($type === 'heat') {
                 $label = $yearwl . ' ' . $name;
             } else {

@@ -48,7 +48,7 @@ switch ($op) {
         exit;
 
     case 'login':
-        if (!\Utilities\CsrfGuard::validateSubmittedToken('login')) {
+        if (!\Security\CsrfGuard::validateSubmittedToken('login')) {
             header("Location: modules.php?name={$module_name}&stop=1");
             die();
         }
@@ -74,7 +74,7 @@ switch ($op) {
         exit;
 
     case 'finish':
-        if (!\Utilities\CsrfGuard::validateSubmittedToken('register')) {
+        if (!\Security\CsrfGuard::validateSubmittedToken('register')) {
             header("Location: modules.php?name={$module_name}&op=new_user");
             die();
         }
@@ -95,7 +95,7 @@ switch ($op) {
         break;
 
     case 'mailpasswd':
-        if (!\Utilities\CsrfGuard::validateSubmittedToken('forgot_password')) {
+        if (!\Security\CsrfGuard::validateSubmittedToken('forgot_password')) {
             header("Location: modules.php?name={$module_name}&op=pass_lost");
             die();
         }
@@ -111,7 +111,7 @@ switch ($op) {
         break;
 
     case 'do_reset_password':
-        if (!\Utilities\CsrfGuard::validateSubmittedToken('reset_password')) {
+        if (!\Security\CsrfGuard::validateSubmittedToken('reset_password')) {
             header("Location: modules.php?name={$module_name}&op=pass_lost");
             die();
         }

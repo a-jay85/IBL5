@@ -6,7 +6,7 @@ namespace Negotiation;
 
 use BasketballStats\StatsFormatter;
 use Negotiation\Contracts\NegotiationDemandCalculatorInterface;
-use Utilities\HtmlSanitizer;
+use Security\HtmlSanitizer;
 
 /**
  * Renders a detailed breakdown of the contract demands formula.

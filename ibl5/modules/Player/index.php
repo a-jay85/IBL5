@@ -104,7 +104,7 @@ function rookieoption($pid)
     // Validate player ownership
     $ownershipValidation = $validator->validatePlayerOwnership($player, $userTeamName);
     if (!$ownershipValidation->isValid()) {
-        echo '<div class="ibl-alert ibl-alert--error">' . \Utilities\HtmlSanitizer::safeHtmlOutput($ownershipValidation->getError()) . '</div>';
+        echo '<div class="ibl-alert ibl-alert--error">' . \Security\HtmlSanitizer::safeHtmlOutput($ownershipValidation->getError()) . '</div>';
         echo '<a href="javascript:history.back()" class="ibl-btn ibl-btn--primary" style="margin-top: 0.5rem; display: inline-block;">Go Back</a>';
         PageLayout\PageLayout::footer();
         return;
@@ -113,7 +113,7 @@ function rookieoption($pid)
     // Validate eligibility and get final year salary
     $eligibilityValidation = $validator->validateEligibilityAndGetSalary($player, $season->phase);
     if (!$eligibilityValidation['valid']) {
-        echo '<div class="ibl-alert ibl-alert--error">' . \Utilities\HtmlSanitizer::safeHtmlOutput($eligibilityValidation['error']) . '</div>';
+        echo '<div class="ibl-alert ibl-alert--error">' . \Security\HtmlSanitizer::safeHtmlOutput($eligibilityValidation['error']) . '</div>';
         echo '<a href="javascript:history.back()" class="ibl-btn ibl-btn--primary" style="margin-top: 0.5rem; display: inline-block;">Go Back</a>';
         PageLayout\PageLayout::footer();
         return;

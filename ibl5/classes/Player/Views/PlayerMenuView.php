@@ -130,29 +130,29 @@ class PlayerMenuView
         ?>
 <tr>
     <td colspan="2">
-        <nav class="plr-nav" style="--plr-nav-accent: <?= \Utilities\HtmlSanitizer::e($primaryColor) ?>; --plr-nav-accent-dark: <?= \Utilities\HtmlSanitizer::e($primaryDark) ?>;" aria-label="Player page navigation">
+        <nav class="plr-nav" style="--plr-nav-accent: <?= \Security\HtmlSanitizer::e($primaryColor) ?>; --plr-nav-accent-dark: <?= \Security\HtmlSanitizer::e($primaryDark) ?>;" aria-label="Player page navigation">
             <?php foreach ($groups as $groupName => $pageTypes): ?>
             <div class="plr-nav__group">
-                <span class="plr-nav__group-label"><?= \Utilities\HtmlSanitizer::e($groupName) ?></span>
+                <span class="plr-nav__group-label"><?= \Security\HtmlSanitizer::e($groupName) ?></span>
                 <div class="plr-nav__pills">
                     <?php foreach ($pageTypes as $pageType):
                         $labelKey = self::getLabelKey($pageType);
                         $label = $shortLabels[$labelKey] ?? PlayerPageType::getDescription($pageType);
                         $isActive = ($currentPageType === $pageType) || ($currentPageType === null && $pageType === PlayerPageType::OVERVIEW);
                     ?>
-                    <a href="<?= \Utilities\HtmlSanitizer::e(PlayerPageType::getUrl($playerID, $pageType)) ?>" class="plr-nav__pill<?= $isActive ? ' plr-nav__pill--active' : '' ?>"><?= \Utilities\HtmlSanitizer::e($label) ?></a>
+                    <a href="<?= \Security\HtmlSanitizer::e(PlayerPageType::getUrl($playerID, $pageType)) ?>" class="plr-nav__pill<?= $isActive ? ' plr-nav__pill--active' : '' ?>"><?= \Security\HtmlSanitizer::e($label) ?></a>
                     <?php endforeach; ?>
                 </div>
             </div>
             <?php endforeach; ?>
             <select class="plr-nav__mobile-select" onchange="if(this.value) window.location.href=this.value;" aria-label="Navigate player pages">
                 <?php foreach ($groups as $groupName => $pageTypes): ?>
-                <optgroup label="<?= \Utilities\HtmlSanitizer::e($groupName) ?>">
+                <optgroup label="<?= \Security\HtmlSanitizer::e($groupName) ?>">
                     <?php foreach ($pageTypes as $pageType):
                         $label = PlayerPageType::getDescription($pageType);
                         $isActive = ($currentPageType === $pageType) || ($currentPageType === null && $pageType === PlayerPageType::OVERVIEW);
                     ?>
-                    <option value="<?= \Utilities\HtmlSanitizer::e(PlayerPageType::getUrl($playerID, $pageType)) ?>" <?= $isActive ? 'selected' : '' ?>><?= \Utilities\HtmlSanitizer::e($label) ?></option>
+                    <option value="<?= \Security\HtmlSanitizer::e(PlayerPageType::getUrl($playerID, $pageType)) ?>" <?= $isActive ? 'selected' : '' ?>><?= \Security\HtmlSanitizer::e($label) ?></option>
                     <?php endforeach; ?>
                 </optgroup>
                 <?php endforeach; ?>

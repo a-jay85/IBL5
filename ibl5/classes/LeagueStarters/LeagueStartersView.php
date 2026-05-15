@@ -7,7 +7,7 @@ namespace LeagueStarters;
 use LeagueStarters\Contracts\LeagueStartersViewInterface;
 use Player\Player;
 use UI\Components\TableViewSwitcher;
-use Utilities\HtmlSanitizer;
+use Security\HtmlSanitizer;
 use Team\Team;
 use Season\Season;
 

@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Navigation\Views;
 
-use Utilities\HtmlSanitizer;
+use Security\HtmlSanitizer;
 
 /**
  * Renders the inline login form for both desktop and mobile navigation.
@@ -99,7 +99,7 @@ class LoginFormView
 
                 <input type="hidden" name="op" value="login">
                 <input type="hidden" name="redirect_query" value="<?= $safeQuery ?>">
-                <?= \Utilities\CsrfGuard::generateToken('login') ?>
+                <?= \Security\CsrfGuard::generateToken('login') ?>
 
                 <button type="submit" class="<?= $buttonClass ?>">
                     Login

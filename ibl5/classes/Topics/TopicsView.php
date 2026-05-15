@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Topics;
 
 use Topics\Contracts\TopicsViewInterface;
-use Utilities\HtmlSanitizer;
+use Security\HtmlSanitizer;
 
 // PHP-Nuke language constants - defined at runtime by the CMS
 if (!defined('_ACTIVETOPICS')) {

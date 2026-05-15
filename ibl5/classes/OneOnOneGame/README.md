@@ -105,5 +105,5 @@ The module is accessed via `modules.php?name=OneOnOneGame`. Users can:
 ## Security
 
 - All database queries use prepared statements via `BaseMysqliRepository`
-- HTML output is escaped using `Utilities\HtmlSanitizer::safeHtmlOutput()`
+- HTML output is escaped using `Security\HtmlSanitizer::safeHtmlOutput()`
 - Input validation for player selection

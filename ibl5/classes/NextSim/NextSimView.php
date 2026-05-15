@@ -10,7 +10,7 @@ use Player\Player;
 use Player\PlayerImageHelper;
 use UI\Components\TooltipLabel;
 use UI\TableStyles;
-use Utilities\HtmlSanitizer;
+use Security\HtmlSanitizer;
 use Team\Team;
 use Season\Season;
 

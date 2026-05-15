@@ -411,7 +411,7 @@ last_verified: 2026-05-04
 | CI/CD | `.github/workflows/tests.yml` |
 | Interface examples | `classes/Player/Contracts/`, `classes/FreeAgency/Contracts/` |
 | Stats formatting | `BasketballStats\StatsFormatter` |
-| XSS protection | `Utilities\HtmlSanitizer::safeHtmlOutput()` |
+| XSS protection | `Security\HtmlSanitizer::safeHtmlOutput()` |
 
 ---
 
@@ -456,5 +456,5 @@ last_verified: 2026-05-04
 
 **Run tests?** `cd ibl5 && vendor/bin/phpunit tests/`  
 **Database changes?** Use `ibl5/migrations/` - never modify schema directly  
-**XSS protection?** `Utilities\HtmlSanitizer::safeHtmlOutput()` on all output  
+**XSS protection?** `Security\HtmlSanitizer::safeHtmlOutput()` on all output  
 **Stats formatting?** `BasketballStats\StatsFormatter` - never `number_format()`

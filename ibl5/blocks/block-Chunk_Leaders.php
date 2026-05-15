@@ -7,7 +7,7 @@ if (!defined('BLOCK_FILE')) {
 
 use Player\PlayerImageHelper;
 use UI\Components\TooltipLabel;
-use Utilities\HtmlSanitizer;
+use Security\HtmlSanitizer;
 
 global $mysqli_db, $leagueContext;
 

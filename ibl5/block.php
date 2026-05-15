@@ -21,8 +21,8 @@ global $mysqli_db;
 
 use FreeAgency\FreeAgencyAdminProcessor;
 use FreeAgency\FreeAgencyAdminRepository;
-use Utilities\CsrfGuard;
-use Utilities\HtmlSanitizer;
+use Security\CsrfGuard;
+use Security\HtmlSanitizer;
 
 // Admin authentication check
 if (!is_admin()) {

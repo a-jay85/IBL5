@@ -259,8 +259,8 @@ class TradeRosterPreviewApiHandler
         }
 
         // Sanitize team names before embedding in HTML labels
-        $userTeam = \Utilities\HtmlSanitizer::safeHtmlOutput($userTeam);
-        $partnerTeam = \Utilities\HtmlSanitizer::safeHtmlOutput($partnerTeam);
+        $userTeam = \Security\HtmlSanitizer::safeHtmlOutput($userTeam);
+        $partnerTeam = \Security\HtmlSanitizer::safeHtmlOutput($partnerTeam);
 
         $partnerTeamId = 0;
         if ($viewingTeamId !== $userTeamId) {

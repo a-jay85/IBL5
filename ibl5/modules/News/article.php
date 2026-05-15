@@ -80,13 +80,13 @@ $catid = (int) ($row['catid'] ?? 0);
 $aaid = $row['aid'] ?? '';
 $time = $row['time'] ?? '';
 /** @var string $title */
-$title = \Utilities\HtmlSanitizer::safeHtmlOutput($row['title'] ?? '');
+$title = \Security\HtmlSanitizer::safeHtmlOutput($row['title'] ?? '');
 $hometext = $row['hometext'] ?? '';
 $bodytext = $row['bodytext'] ?? '';
 $topic = (int) ($row['topic'] ?? 0);
 $informant = $row['informant'] ?? '';
 /** @var string $notes */
-$notes = \Utilities\HtmlSanitizer::safeHtmlOutput($row['notes'] ?? '');
+$notes = \Security\HtmlSanitizer::safeHtmlOutput($row['notes'] ?? '');
 $acomm = (int) ($row['acomm'] ?? 0);
 $haspoll = (int) ($row['haspoll'] ?? 0);
 $pollID = (int) ($row['poll_id'] ?? 0);
@@ -142,9 +142,9 @@ $stmtTopics->execute();
 $topicRow = $stmtTopics->get_result()->fetch_assoc();
 $stmtTopics->close();
 $topicid = (int) ($topicRow['topicid'] ?? 0);
-$topicname = \Utilities\HtmlSanitizer::e($topicRow['topicname'] ?? '');
-$topicimage = \Utilities\HtmlSanitizer::e($topicRow['topicimage'] ?? '');
-$topictext = \Utilities\HtmlSanitizer::e($topicRow['topictext'] ?? '');
+$topicname = \Security\HtmlSanitizer::e($topicRow['topicname'] ?? '');
+$topicimage = \Security\HtmlSanitizer::e($topicRow['topicimage'] ?? '');
+$topictext = \Security\HtmlSanitizer::e($topicRow['topictext'] ?? '');
 
 // Fetch category using prepared statement if catid is set
 if ($catid !== 0) {
@@ -158,7 +158,7 @@ if ($catid !== 0) {
 
         if ($row2 !== null) {
             /** @var string $title1 */
-            $title1 = \Utilities\HtmlSanitizer::safeHtmlOutput($row2['title'] ?? '');
+            $title1 = \Security\HtmlSanitizer::safeHtmlOutput($row2['title'] ?? '');
             $title = "<a href=\"modules.php?name=$module_name&amp;file=categories&amp;op=newindex&amp;catid=$catid\"><font class=\"storycat\">$title1</font></a>: $title";
         }
     }

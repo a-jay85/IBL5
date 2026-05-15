@@ -89,7 +89,7 @@ final class BanRawSuperglobalsRule implements Rule
         return [
             RuleErrorBuilder::message(
                 'Direct $' . $node->name . ' access is banned outside Controllers, '
-                . 'ApiHandlers, and Utilities\CsrfGuard. Accept typed inputs as parameters '
+                . 'ApiHandlers, and Security\CsrfGuard. Accept typed inputs as parameters '
                 . 'from a Controller/ApiHandler instead.'
             )
                 ->identifier('ibl.rawSuperglobal')

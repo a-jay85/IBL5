@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Navigation\Views;
 
 use Navigation\NavigationConfig;
-use Utilities\HtmlSanitizer;
+use Security\HtmlSanitizer;
 
 /**
  * Renders the mobile sliding panel navigation: user greeting, accordion

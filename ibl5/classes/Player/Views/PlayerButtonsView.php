@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Player\Views;
 
-use Utilities\HtmlSanitizer;
+use Security\HtmlSanitizer;
 
 /**
  * PlayerButtonsView - Renders action buttons for player pages

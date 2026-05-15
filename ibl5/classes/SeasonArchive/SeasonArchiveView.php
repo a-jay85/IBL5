@@ -8,7 +8,7 @@ use Player\PlayerImageHelper;
 use SeasonArchive\Contracts\SeasonArchiveServiceInterface;
 use SeasonArchive\Contracts\SeasonArchiveViewInterface;
 use UI\TeamCellHelper;
-use Utilities\HtmlSanitizer;
+use Security\HtmlSanitizer;
 
 /**
  * SeasonArchiveView - HTML rendering for season archive pages

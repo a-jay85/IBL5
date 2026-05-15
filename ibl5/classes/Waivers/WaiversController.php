@@ -87,7 +87,7 @@ class WaiversController implements WaiversControllerInterface
         if (isset($_POST['Action']) && ($_POST['Action'] === 'add' || $_POST['Action'] === 'waive')) {
             $postAction = is_string($_POST['Action']) ? $_POST['Action'] : 'add';
 
-            if (!\Utilities\CsrfGuard::validateSubmittedToken('waivers')) {
+            if (!\Security\CsrfGuard::validateSubmittedToken('waivers')) {
                 \Utilities\HtmxHelper::redirect('modules.php?name=Waivers&action=' . rawurlencode($postAction) . '&error=' . rawurlencode('Invalid or expired form submission. Please try again.'));
             }
 

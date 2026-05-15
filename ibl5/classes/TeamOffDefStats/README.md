@@ -159,7 +159,7 @@ vendor/bin/phpunit tests/TeamOffDefStats/
 ## Dependencies
 
 - `BasketballStats\StatsFormatter` - Number formatting utilities
-- `Utilities\HtmlSanitizer` - XSS protection
+- `Security\HtmlSanitizer` - XSS protection
 - `BaseMysqliRepository` - Database access base class
 
 ## Migration Notes

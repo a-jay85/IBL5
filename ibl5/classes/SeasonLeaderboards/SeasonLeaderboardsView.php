@@ -9,7 +9,7 @@ use SeasonLeaderboards\Contracts\SeasonLeaderboardsRepositoryInterface;
 use UI\TeamCellHelper;
 use SeasonLeaderboards\Contracts\SeasonLeaderboardsServiceInterface;
 use SeasonLeaderboards\Contracts\SeasonLeaderboardsViewInterface;
-use Utilities\HtmlSanitizer;
+use Security\HtmlSanitizer;
 
 /**
  * @see SeasonLeaderboardsViewInterface

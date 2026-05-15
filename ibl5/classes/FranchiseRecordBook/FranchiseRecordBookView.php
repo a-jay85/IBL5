@@ -9,7 +9,7 @@ use FranchiseRecordBook\Contracts\FranchiseRecordBookServiceInterface;
 use BasketballStats\StatsFormatter;
 use Player\PlayerImageHelper;
 use UI\TeamCellHelper;
-use Utilities\HtmlSanitizer;
+use Security\HtmlSanitizer;
 
 /**
  * View for rendering franchise record book pages.

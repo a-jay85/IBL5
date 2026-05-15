@@ -10,7 +10,7 @@ use Player\PlayerStats;
 use Player\Contracts\PlayerOverviewViewInterface;
 use Services\CommonMysqliRepository;
 use BasketballStats\StatsFormatter;
-use Utilities\HtmlSanitizer;
+use Security\HtmlSanitizer;
 use Season\Season;
 
 /**

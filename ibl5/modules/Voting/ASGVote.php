@@ -19,7 +19,7 @@ use Voting\VotingSubmissionView;
 
 PageLayout\PageLayout::header();
 
-if (!\Utilities\CsrfGuard::validateSubmittedToken('asg_vote')) {
+if (!\Security\CsrfGuard::validateSubmittedToken('asg_vote')) {
     echo 'Invalid or expired form submission. Please go back and try again.';
     PageLayout\PageLayout::footer();
     return;

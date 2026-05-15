@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace UI;
 
 use UI\Contracts\TeamCellHelperInterface;
-use Utilities\HtmlSanitizer;
+use Security\HtmlSanitizer;
 
 /**
  * @see TeamCellHelperInterface

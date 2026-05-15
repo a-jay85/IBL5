@@ -13,7 +13,7 @@ use Player\Views\PlayerStatsFlipCardView;
 use Player\Views\PlayerViewFactory;
 use Player\Views\TeamColorHelper;
 use Services\CommonMysqliRepository;
-use Utilities\HtmlSanitizer;
+use Security\HtmlSanitizer;
 use Team\Team;
 use Season\Season;
 

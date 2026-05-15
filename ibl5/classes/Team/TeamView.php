@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Team;
 
 use Team\Contracts\TeamViewInterface;
-use Utilities\HtmlSanitizer;
+use Security\HtmlSanitizer;
 use Discord\Discord;
 
 /**
@@ -23,7 +23,7 @@ class TeamView implements TeamViewInterface
     {
         $teamid = $pageData['teamid'];
         $team = $pageData['team'];
-        $imagesPath = \Utilities\HtmlSanitizer::safeHtmlOutput($pageData['imagesPath']);
+        $imagesPath = \Security\HtmlSanitizer::safeHtmlOutput($pageData['imagesPath']);
         $yr = $pageData['yr'];
         $isActualTeam = $pageData['isActualTeam'];
         $tableOutput = $pageData['tableOutput'];
@@ -46,8 +46,8 @@ class TeamView implements TeamViewInterface
         $franchiseHtml = $isActualTeam ? "<div class=\"franchise-history-wrapper\">$franchiseHistoryCard</div>" : "";
         $raftersHtml = $isActualTeam ? "<div class=\"team-page-rafters\">$rafters</div>" : "";
 
-        $yrSafe = \Utilities\HtmlSanitizer::safeHtmlOutput($yr ?? '');
-        $teamNameSafe = \Utilities\HtmlSanitizer::safeHtmlOutput($team->name);
+        $yrSafe = \Security\HtmlSanitizer::safeHtmlOutput($yr ?? '');
+        $teamNameSafe = \Security\HtmlSanitizer::safeHtmlOutput($team->name);
         $yearHeading = ($yr !== null && $yr !== '')
             ? "<h1 class=\"ibl-title\">$yrSafe $teamNameSafe</h1>"
             : "";
@@ -142,10 +142,10 @@ class TeamView implements TeamViewInterface
                 $tradeButton = '<a href="modules.php?name=Trading&amp;op=reviewtrade" class="team-action-link">' . $tradeInner . '</a>';
                 $discordButton = '<a href="https://discord.com/channels/' . Discord::getGuildID() . '" class="team-action-link team-action-link--discord" target="_blank" rel="noopener noreferrer">' . $discordInner . '</a>';
             } else {
-                $partnerParam = \Utilities\HtmlSanitizer::safeHtmlOutput($team->name);
+                $partnerParam = \Security\HtmlSanitizer::safeHtmlOutput($team->name);
                 $tradeButton = '<a href="modules.php?name=Trading&amp;op=offertrade&amp;partner=' . urlencode($team->name) . '" class="team-action-link">' . $tradeInner . '</a>';
                 if ($team->discord_id !== null) {
-                    $discordIDSafe = \Utilities\HtmlSanitizer::safeHtmlOutput((string) $team->discord_id);
+                    $discordIDSafe = \Security\HtmlSanitizer::safeHtmlOutput((string) $team->discord_id);
                     $discordButton = '<a href="https://discord.com/users/' . $discordIDSafe . '" class="team-action-link team-action-link--discord" target="_blank" rel="noopener noreferrer">' . $discordInner . '</a>';
                 }
             }

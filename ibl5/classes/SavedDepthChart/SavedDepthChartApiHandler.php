@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace SavedDepthChart;
 
-use Utilities\HtmlSanitizer;
+use Security\HtmlSanitizer;
 use Team\Team;
 use Season\Season;
 

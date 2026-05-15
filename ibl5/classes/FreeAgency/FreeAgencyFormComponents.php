@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace FreeAgency;
 
-use Utilities\HtmlSanitizer;
+use Security\HtmlSanitizer;
 
 class FreeAgencyFormComponents
 {

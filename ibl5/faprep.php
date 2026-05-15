@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 require __DIR__ . '/mainfile.php';
 
-use Utilities\HtmlSanitizer;
+use Security\HtmlSanitizer;
 
 /** @var mysqli $mysqli_db */
 

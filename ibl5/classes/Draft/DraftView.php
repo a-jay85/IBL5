@@ -6,7 +6,7 @@ namespace Draft;
 
 use Draft\Contracts\DraftViewInterface;
 use UI\TeamCellHelper;
-use Utilities\HtmlSanitizer;
+use Security\HtmlSanitizer;
 
 /**
  * @see DraftViewInterface

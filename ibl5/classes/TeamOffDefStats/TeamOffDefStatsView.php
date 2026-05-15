@@ -6,7 +6,7 @@ namespace TeamOffDefStats;
 
 use TeamOffDefStats\Contracts\TeamOffDefStatsViewInterface;
 use UI\TeamCellHelper;
-use Utilities\HtmlSanitizer;
+use Security\HtmlSanitizer;
 
 /**
  * View for rendering league-wide team statistics

@@ -46,7 +46,7 @@ function theindex($new_topic = "0")
         $result_a = $db->sql_query("SELECT topictext FROM " . $prefix . "_topics WHERE topicid='$new_topic'");
         $row_a = $db->sql_fetchrow($result_a);
         $numrows_a = $db->sql_numrows($result_a);
-        $topic_title = \Utilities\HtmlSanitizer::safeHtmlOutput($row_a['topictext']);
+        $topic_title = \Security\HtmlSanitizer::safeHtmlOutput($row_a['topictext']);
         OpenTable();
         if ($numrows_a == 0) {
             echo "<center><font class=\"title\">$sitename</font><br><br>" . _NOINFO4TOPIC . "<br><br>[ <a href=\"modules.php?name=News\">" . _GOTONEWSINDEX . "</a> | <a href=\"modules.php?name=Topics\">" . _SELECTNEWTOPIC . "</a> ]</center>";
@@ -68,7 +68,7 @@ function theindex($new_topic = "0")
         $s_sid = intval($row['sid']);
         $catid = intval($row['catid']);
         $aid = $row['aid'];
-        $title = \Utilities\HtmlSanitizer::safeHtmlOutput($row['title']);
+        $title = \Security\HtmlSanitizer::safeHtmlOutput($row['title']);
         $time = $row['time'];
         $hometext = $row['hometext'];
         $bodytext = $row['bodytext'];
@@ -76,11 +76,11 @@ function theindex($new_topic = "0")
         $counter = intval($row['counter']);
         $topic = intval($row['topic']);
         $informant = $row['informant'];
-        $notes = \Utilities\HtmlSanitizer::safeHtmlOutput($row['notes']);
+        $notes = \Security\HtmlSanitizer::safeHtmlOutput($row['notes']);
         $acomm = intval($row['acomm']);
         if ($catid > 0) {
             $row2 = $db->sql_fetchrow($db->sql_query("SELECT title FROM " . $prefix . "_stories_cat WHERE catid='$catid'"));
-            $cattitle = \Utilities\HtmlSanitizer::safeHtmlOutput($row2['title']);
+            $cattitle = \Security\HtmlSanitizer::safeHtmlOutput($row2['title']);
         }
         $stmtTopics = $mysqli_db->prepare(
             "SELECT t.topicid, t.topicname, t.topicimage, t.topictext
@@ -93,9 +93,9 @@ function theindex($new_topic = "0")
         $topicRow = $stmtTopics->get_result()->fetch_assoc();
         $stmtTopics->close();
         $topicid = (int) ($topicRow['topicid'] ?? 0);
-        $topicname = \Utilities\HtmlSanitizer::e($topicRow['topicname'] ?? '');
-        $topicimage = \Utilities\HtmlSanitizer::e($topicRow['topicimage'] ?? '');
-        $topictext = \Utilities\HtmlSanitizer::e($topicRow['topictext'] ?? '');
+        $topicname = \Security\HtmlSanitizer::e($topicRow['topicname'] ?? '');
+        $topicimage = \Security\HtmlSanitizer::e($topicRow['topicimage'] ?? '');
+        $topictext = \Security\HtmlSanitizer::e($topicRow['topictext'] ?? '');
         if (!is_numeric($time)) {
             preg_match('/(\d{4})-(\d{1,2})-(\d{1,2}) (\d{1,2}):(\d{1,2}):(\d{1,2})/', $time, $dtParts);
             $time = gmmktime((int) $dtParts[4], (int) $dtParts[5], (int) $dtParts[6], (int) $dtParts[2], (int) $dtParts[3], (int) $dtParts[1]);
@@ -130,7 +130,7 @@ function theindex($new_topic = "0")
         $sid = intval($s_sid);
         if ($catid != 0) {
             $row3 = $db->sql_fetchrow($db->sql_query("SELECT title FROM " . $prefix . "_stories_cat WHERE catid='$catid'"));
-            $title1 = \Utilities\HtmlSanitizer::safeHtmlOutput($row3['title']);
+            $title1 = \Security\HtmlSanitizer::safeHtmlOutput($row3['title']);
             $catLabel = $title1 !== '' ? $title1 : 'Category';
             $title = "<a class='readmore' href=\"modules.php?name=News&amp;file=categories&amp;op=newindex&amp;catid=$catid\" aria-label=\"$catLabel\"><font class=\"storycat\">$title1</font></a>: $title";
         }

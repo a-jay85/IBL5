@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Utilities;
+namespace Security;
 
 /**
  * CSRF (Cross-Site Request Forgery) Protection Utility

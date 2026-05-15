@@ -71,7 +71,7 @@ flush();
 
 // Set up error handler to catch all errors with XSS-safe output
 set_error_handler(function (int $errno, string $errstr, string $errfile, int $errline) use ($view): bool {
-    $safeMessage = \Utilities\HtmlSanitizer::safeHtmlOutput(
+    $safeMessage = \Security\HtmlSanitizer::safeHtmlOutput(
         "[$errno] $errstr in $errfile on line $errline"
     );
     echo $view->renderStepError('PHP Error', (string) $safeMessage);
@@ -81,9 +81,9 @@ set_error_handler(function (int $errno, string $errstr, string $errfile, int $er
 
 // Set up exception handler with XSS-safe output
 set_exception_handler(function (\Throwable $exception) use ($view): void {
-    $safeMessage = \Utilities\HtmlSanitizer::safeHtmlOutput($exception->getMessage());
-    $safeFile = \Utilities\HtmlSanitizer::safeHtmlOutput($exception->getFile());
-    $safeTrace = \Utilities\HtmlSanitizer::safeHtmlOutput($exception->getTraceAsString());
+    $safeMessage = \Security\HtmlSanitizer::safeHtmlOutput($exception->getMessage());
+    $safeFile = \Security\HtmlSanitizer::safeHtmlOutput($exception->getFile());
+    $safeTrace = \Security\HtmlSanitizer::safeHtmlOutput($exception->getTraceAsString());
 
     echo $view->renderStepError(
         'Uncaught Exception',
@@ -253,8 +253,8 @@ try {
     $controller->run();
 
 } catch (\Exception $e) {
-    $safeMessage = \Utilities\HtmlSanitizer::safeHtmlOutput($e->getMessage());
-    $safeTrace = \Utilities\HtmlSanitizer::safeHtmlOutput($e->getTraceAsString());
+    $safeMessage = \Security\HtmlSanitizer::safeHtmlOutput($e->getMessage());
+    $safeTrace = \Security\HtmlSanitizer::safeHtmlOutput($e->getTraceAsString());
 
     echo $view->renderStepError('Exception', (string) $safeMessage);
     echo $view->renderLog('<pre>' . (string) $safeTrace . '</pre>');

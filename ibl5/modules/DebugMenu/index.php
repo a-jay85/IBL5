@@ -7,7 +7,7 @@ if (stripos($_SERVER['PHP_SELF'], "modules.php") === false) {
 }
 
 use Debug\DebugSession;
-use Utilities\CsrfGuard;
+use Security\CsrfGuard;
 use Utilities\HtmxHelper;
 
 function toggleExtensions(): void

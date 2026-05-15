@@ -7,7 +7,7 @@ namespace ComparePlayers;
 use ComparePlayers\Contracts\ComparePlayersViewInterface;
 use Player\PlayerImageHelper;
 use UI\TeamCellHelper;
-use Utilities\HtmlSanitizer;
+use Security\HtmlSanitizer;
 
 /**
  * ComparePlayersView - HTML rendering for player comparison

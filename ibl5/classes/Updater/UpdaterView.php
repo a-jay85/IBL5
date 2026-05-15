@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Updater;
 
-use Utilities\HtmlSanitizer;
+use Security\HtmlSanitizer;
 
 /**
  * UpdaterView - Renders the admin update page as a clean operations log

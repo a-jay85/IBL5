@@ -6,7 +6,7 @@ namespace CapSpace;
 
 use CapSpace\Contracts\CapSpaceViewInterface;
 use UI\TeamCellHelper;
-use Utilities\HtmlSanitizer;
+use Security\HtmlSanitizer;
 
 /**
  * CapSpaceView - HTML rendering for salary cap information

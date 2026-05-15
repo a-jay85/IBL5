@@ -6,7 +6,7 @@ namespace SeriesRecords;
 
 use SeriesRecords\Contracts\SeriesRecordsViewInterface;
 use UI\TeamCellHelper;
-use Utilities\HtmlSanitizer;
+use Security\HtmlSanitizer;
 
 /**
  * SeriesRecordsView - View rendering for series records

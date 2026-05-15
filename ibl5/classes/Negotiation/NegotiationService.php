@@ -24,16 +24,11 @@ class NegotiationService implements NegotiationServiceInterface
         private readonly NegotiationDemandCalculatorInterface $demandCalculator,
     ) {}
     
-    /**
-     * @see NegotiationServiceInterface::processNegotiation()
-     */
     public function processNegotiation(int $playerID, string $userTeamName, string $prefix, bool $bypassOwnership = false): string
     {
         try {
             $player = Player::withPlayerID($this->db, $playerID);
-        } catch (\Exception $e) {
-            return NegotiationViewHelper::renderError('Player not found.');
-        } catch (\TypeError $e) {
+        } catch (\Exception|\TypeError $e) {
             return NegotiationViewHelper::renderError('Player not found.');
         }
 
@@ -76,14 +71,7 @@ class NegotiationService implements NegotiationServiceInterface
         return $output;
     }
     
-    /**
-     * Get team factors for demand calculation
-     *
-     * @param string $teamName Team name
-     * @param string $playerPosition Player position
-     * @param string $playerName Player name (to exclude from position calculation)
-     * @return TeamFactors Team factors
-     */
+    /** @return TeamFactors */
     private function getTeamFactors(string $teamName, string $playerPosition, string $playerName): array
     {
         $teamData = $this->repository->getTeamPerformance($teamName);

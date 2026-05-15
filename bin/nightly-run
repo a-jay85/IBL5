@@ -218,7 +218,7 @@ while true; do
                 --verbose \
                 --name "nightly-impl-$(date +%Y-%m-%d-%H%M)" \
             2>> "$LOG" \
-            | bin/lib/nightly-stream-filter "$HEARTBEAT_FILE" \
+            | bin/lib/nightly-stream-filter "$HEARTBEAT_FILE" "$CMDPID_FILE" \
             >> "$LOG" || IMPL_STATUS=$?
 
         kill "$WATCHER_PID" 2>/dev/null || true
@@ -294,7 +294,7 @@ PLAN_FILE=$PLAN_NAME" \
                 --verbose \
                 --name "nightly-postplan-$(date +%Y-%m-%d-%H%M)" \
             2>> "$LOG" \
-            | bin/lib/nightly-stream-filter "$HEARTBEAT_FILE" \
+            | bin/lib/nightly-stream-filter "$HEARTBEAT_FILE" "$CMDPID_FILE" \
             >> "$LOG" || PP_STATUS=$?
 
         kill "$WATCHER_PID" 2>/dev/null || true

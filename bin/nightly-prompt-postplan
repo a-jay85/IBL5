@@ -29,7 +29,7 @@ Verify the worktree exists and the branch has commits ahead of master. If not, w
 
 ## Step 3: Run /post-plan
 
-Invoke /post-plan using the Skill tool and let it run to completion. Do NOT invoke /simplify, /commit, /code-review, or /security-audit separately — /post-plan orchestrates all of them.
+Invoke /post-plan using the Skill tool and let it run to completion. Completion means Phase 12 (Background Process Cleanup) has executed — do not end your turn before that. Do NOT invoke /simplify, /commit, /code-review, or /security-audit separately — /post-plan orchestrates all of them.
 
 /post-plan will handle: code review, security audit, commit, push, PR creation, CI monitoring, and auto-merge evaluation.
 

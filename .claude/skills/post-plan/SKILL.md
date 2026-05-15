@@ -8,6 +8,8 @@ last_verified: 2026-05-14
 
 Execute all phases below **sequentially in a single response**. Do NOT stop, ask for input, or return control between phases.
 
+**Phase 12 (Background Process Cleanup) is MANDATORY and must ALWAYS be the last thing you execute before ending your turn.** No phase — including Phase 10 (Retrospective) — is a valid stopping point. If you reach Phase 10 and have nothing to save, continue directly to Phase 11 and Phase 12. Ending your turn before Phase 12 leaves background processes alive, which prevents the `claude` process from exiting and triggers a stall-kill in the nightly runner.
+
 Phase numbers below are local to this skill. The variables computed in Phase 4 (`HAS_PHP`, `NON_CODE_ONLY`, `DOCS_ONLY`, `CSS_ONLY`, `MIGRATION_ONLY`, `HAS_MODIFIED`, `HAS_COMMENTS_IN_DIFF`, `DIFF`, etc.) are consulted by every downstream phase to gate sub-agent launches — never recompute them locally.
 
 ## Incremental Checkpoints
@@ -421,9 +423,11 @@ Phase 9 merged the PR, deleted the branch, and checked out master. The worktree 
 
 ---
 
-## Phase 12: Background Process Cleanup
+## Phase 12: Background Process Cleanup (MANDATORY — never skip)
 
-Background shells from earlier phases (`bin/e2e-wt.sh` in Phase 6, `gh pr checks --watch` in Phase 8) may still be running. If they complete after the conversation goes idle, the deferred tool result forces a full context reload at Opus rates — often for output that is no longer needed.
+**You MUST execute this phase before ending your turn.** This is not optional even if all earlier phases succeeded cleanly.
+
+Background shells from earlier phases (`bin/e2e-wt.sh` in Phase 6, `gh pr checks --watch` in Phase 8) may still be running. If they hold the pipeline open after you emit your final response, the nightly runner's stall-kill fires after 10 minutes and burns an attempt — three burns poison-pill the plan.
 
 Kill known lingering patterns so their tool results deliver immediately (cache warm) rather than hours later (cache miss):
 

@@ -4,172 +4,70 @@ declare(strict_types=1);
 
 namespace Services;
 
-/**
- * NewsService - Centralized service for news story operations
- * 
- * This service consolidates news story creation, category management, and topic
- * operations that were duplicated across multiple repository classes.
- * 
- * Responsibilities:
- * - News story creation with proper escaping
- * - Topic ID lookups by team name
- * - Category ID lookups by title
- * - Category counter increments
- */
-class NewsService
+class NewsService extends \BaseMysqliRepository
 {
-    private \mysqli $db;
-
-    /**
-     * @param \mysqli $db mysqli connection
-     */
-    public function __construct(\mysqli $db)
-    {
-        $this->db = $db;
-    }
-    
-    /**
-     * Creates a news story
-     * 
-     * @param int $categoryID Category ID
-     * @param int $topicID Topic ID
-     * @param string $title Story title
-     * @param string $hometext Story content
-     * @param string $aid Author ID (defaults to 'Associated Press')
-     * @return bool Success status
-     */
     public function createNewsStory(
         int $categoryID,
         int $topicID,
         string $title,
         string $hometext,
         string $aid = 'Associated Press'
-    ): bool {
+    ): int {
         $timestamp = date('Y-m-d H:i:s', time());
-        
-        $query = "INSERT INTO nuke_stories
-                  (catid,
-                   aid,
-                   title,
-                   time,
-                   hometext,
-                   topic,
-                   informant,
-                   counter,
-                   alanguage)
-                  VALUES (?, ?, ?, ?, ?, ?, ?, 0, 'english')";
-        
-        $stmt = $this->db->prepare($query);
-        if ($stmt === false) {
-            \Logging\LoggerFactory::getChannel('db')->error('NewsService: Failed to prepare createNewsStory', ['error' => $this->db->error]);
-            return false;
-        }
-        
-        $stmt->bind_param('issssss', $categoryID, $aid, $title, $timestamp, $hometext, $topicID, $aid);
-        $result = $stmt->execute();
-        $stmt->close();
-        
-        return $result;
+
+        return $this->execute(
+            "INSERT INTO `nuke_stories`
+              (`catid`, `aid`, `title`, `time`, `hometext`, `topic`, `informant`, `counter`, `alanguage`)
+              VALUES (?, ?, ?, ?, ?, ?, ?, 0, 'english')",
+            'issssis',
+            $categoryID,
+            $aid,
+            $title,
+            $timestamp,
+            $hometext,
+            $topicID,
+            $aid
+        );
     }
-    
-    /**
-     * Gets topic ID for a team by team name
-     * 
-     * @param string $teamName Team name
-     * @return int|null Topic ID or null if not found
-     */
+
     public function getTopicIDByTeamName(string $teamName): ?int
     {
-        $query = "SELECT topicid FROM nuke_topics WHERE topicname = ?";
-        $stmt = $this->db->prepare($query);
-        if ($stmt === false) {
-            \Logging\LoggerFactory::getChannel('db')->error('NewsService: Failed to prepare getTopicIDByTeamName', ['error' => $this->db->error]);
-            return null;
-        }
-        
-        $stmt->bind_param('s', $teamName);
-        if (!$stmt->execute()) {
-            \Logging\LoggerFactory::getChannel('db')->error('NewsService: Failed to execute getTopicIDByTeamName', ['error' => $stmt->error]);
-            $stmt->close();
-            return null;
-        }
-        
-        $result = $stmt->get_result();
-        if ($result === false || $result->num_rows === 0) {
-            $stmt->close();
-            return null;
-        }
-        
-        $row = $result->fetch_assoc();
-        $stmt->close();
+        $row = $this->fetchOne(
+            "SELECT `topicid` FROM `nuke_topics` WHERE `topicname` = ?",
+            's',
+            $teamName
+        );
 
-        if (!is_array($row) || !isset($row['topicid'])) {
+        if ($row === null) {
             return null;
         }
-
-        return (int) $row['topicid'];
+        $topicId = $row['topicid'];
+        return is_int($topicId) ? $topicId : (is_string($topicId) ? (int) $topicId : null);
     }
 
-    /**
-     * Gets category ID by category title
-     *
-     * @param string $categoryTitle Category title
-     * @return int|null Category ID or null if not found
-     */
     public function getCategoryIDByTitle(string $categoryTitle): ?int
     {
-        $query = "SELECT catid FROM nuke_stories_cat WHERE title = ?";
-        $stmt = $this->db->prepare($query);
-        if ($stmt === false) {
-            \Logging\LoggerFactory::getChannel('db')->error('NewsService: Failed to prepare getCategoryIDByTitle', ['error' => $this->db->error]);
+        $row = $this->fetchOne(
+            "SELECT `catid` FROM `nuke_stories_cat` WHERE `title` = ?",
+            's',
+            $categoryTitle
+        );
+
+        if ($row === null) {
             return null;
         }
-
-        $stmt->bind_param('s', $categoryTitle);
-        if (!$stmt->execute()) {
-            \Logging\LoggerFactory::getChannel('db')->error('NewsService: Failed to execute getCategoryIDByTitle', ['error' => $stmt->error]);
-            $stmt->close();
-            return null;
-        }
-
-        $result = $stmt->get_result();
-        if ($result === false || $result->num_rows === 0) {
-            $stmt->close();
-            return null;
-        }
-
-        $row = $result->fetch_assoc();
-        $stmt->close();
-
-        if (!is_array($row) || !isset($row['catid'])) {
-            return null;
-        }
-
-        return (int) $row['catid'];
+        $catId = $row['catid'];
+        return is_int($catId) ? $catId : (is_string($catId) ? (int) $catId : null);
     }
-    
-    /**
-     * Increments the counter for a category
-     * 
-     * @param string $categoryTitle Category title
-     * @return bool Success status
-     */
-    public function incrementCategoryCounter(string $categoryTitle): bool
+
+    public function incrementCategoryCounter(string $categoryTitle): int
     {
-        $query = "UPDATE nuke_stories_cat 
-                  SET counter = counter + 1 
-                  WHERE title = ?";
-        
-        $stmt = $this->db->prepare($query);
-        if ($stmt === false) {
-            \Logging\LoggerFactory::getChannel('db')->error('NewsService: Failed to prepare incrementCategoryCounter', ['error' => $this->db->error]);
-            return false;
-        }
-        
-        $stmt->bind_param('s', $categoryTitle);
-        $result = $stmt->execute();
-        $stmt->close();
-        
-        return $result;
+        return $this->execute(
+            "UPDATE `nuke_stories_cat`
+              SET `counter` = `counter` + 1
+              WHERE `title` = ?",
+            's',
+            $categoryTitle
+        );
     }
 }

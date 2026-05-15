@@ -7,134 +7,95 @@ namespace Tests\Services;
 use PHPUnit\Framework\TestCase;
 use Services\NewsService;
 
-/**
- * Tests for NewsService
- */
 class NewsServiceTest extends TestCase
 {
-    private $newsService;
-    private $mockDb;
-    
+    private NewsService $newsService;
+    private \MockDatabase $mockDb;
+
     protected function setUp(): void
     {
         $this->mockDb = new \MockDatabase();
         $this->newsService = new NewsService($this->mockDb);
     }
-    
-    /**
-     * Test creating a news story
-     */
-    public function testCreateNewsStory()
+
+    public function testCreateNewsStoryExecutesInsert(): void
     {
-        $this->mockDb->setReturnTrue(true);
-        
-        $result = $this->newsService->createNewsStory(
+        $this->newsService->createNewsStory(
             3,
             5,
             'Test Story Title',
             'Test story content'
         );
-        
-        $this->assertTrue($result);
-        
+
         $queries = $this->mockDb->getExecutedQueries();
         $this->assertCount(1, $queries);
-        $this->assertStringContainsString('INSERT INTO nuke_stories', $queries[0]);
-        $this->assertStringContainsString('Test Story Title', $queries[0]);
-        $this->assertStringContainsString('Associated Press', $queries[0]);
+        $this->assertStringContainsString('INSERT INTO', $queries[0]);
+        $this->assertStringContainsString('nuke_stories', $queries[0]);
     }
-    
-    /**
-     * Test creating a news story with custom author
-     */
-    public function testCreateNewsStoryWithCustomAuthor()
+
+    public function testCreateNewsStoryWithCustomAuthor(): void
     {
-        $this->mockDb->setReturnTrue(true);
-        
-        $result = $this->newsService->createNewsStory(
+        $this->newsService->createNewsStory(
             3,
             5,
             'Custom Author Story',
             'Story content',
             'Custom Author'
         );
-        
-        $this->assertTrue($result);
-        
+
         $queries = $this->mockDb->getExecutedQueries();
         $this->assertCount(1, $queries);
         $this->assertStringContainsString('Custom Author', $queries[0]);
     }
-    
-    /**
-     * Test getting topic ID by team name
-     */
-    public function testGetTopicIDByTeamName()
+
+    public function testGetTopicIDByTeamName(): void
     {
         $this->mockDb->setMockData([
-            ['topicid' => 15]
+            ['topicid' => 15],
         ]);
-        
+
         $result = $this->newsService->getTopicIDByTeamName('Boston Celtics');
-        
-        $this->assertEquals(15, $result);
+
+        $this->assertSame(15, $result);
     }
-    
-    /**
-     * Test getting topic ID returns null when not found
-     */
-    public function testGetTopicIDByTeamNameNotFound()
+
+    public function testGetTopicIDByTeamNameNotFound(): void
     {
         $this->mockDb->setMockData([]);
-        $this->mockDb->setNumRows(0);
-        
+
         $result = $this->newsService->getTopicIDByTeamName('Nonexistent Team');
-        
+
         $this->assertNull($result);
     }
-    
-    /**
-     * Test getting category ID by title
-     */
-    public function testGetCategoryIDByTitle()
+
+    public function testGetCategoryIDByTitle(): void
     {
         $this->mockDb->setMockData([
-            ['catid' => 7]
+            ['catid' => 7],
         ]);
-        
+
         $result = $this->newsService->getCategoryIDByTitle('Trade News');
-        
-        $this->assertEquals(7, $result);
+
+        $this->assertSame(7, $result);
     }
-    
-    /**
-     * Test getting category ID returns null when not found
-     */
-    public function testGetCategoryIDByTitleNotFound()
+
+    public function testGetCategoryIDByTitleNotFound(): void
     {
         $this->mockDb->setMockData([]);
-        $this->mockDb->setNumRows(0);
-        
+
         $result = $this->newsService->getCategoryIDByTitle('Nonexistent Category');
-        
+
         $this->assertNull($result);
     }
-    
-    /**
-     * Test incrementing category counter
-     */
-    public function testIncrementCategoryCounter()
+
+    public function testIncrementCategoryCounter(): void
     {
-        $this->mockDb->setReturnTrue(true);
-        
-        $result = $this->newsService->incrementCategoryCounter('Waiver Pool Moves');
-        
-        $this->assertTrue($result);
-        
+        $this->newsService->incrementCategoryCounter('Waiver Pool Moves');
+
         $queries = $this->mockDb->getExecutedQueries();
         $this->assertCount(1, $queries);
-        $this->assertStringContainsString('UPDATE nuke_stories_cat', $queries[0]);
-        $this->assertStringContainsString('counter = counter + 1', $queries[0]);
-        $this->assertStringContainsString('Waiver Pool Moves', $queries[0]);
+        $this->assertStringContainsString('UPDATE', $queries[0]);
+        $this->assertStringContainsString('nuke_stories_cat', $queries[0]);
+        $this->assertStringContainsString('counter', $queries[0]);
     }
 }

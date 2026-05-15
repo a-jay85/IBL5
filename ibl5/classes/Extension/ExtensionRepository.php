@@ -130,7 +130,7 @@ class ExtensionRepository extends \BaseMysqliRepository implements ExtensionRepo
         }
         $hometext .= ".";
 
-        return $this->newsService->createNewsStory($categoryID, $topicID, $title, $hometext);
+        return $this->newsService->createNewsStory($categoryID, $topicID, $title, $hometext) > 0;
     }
 
     /**
@@ -153,7 +153,7 @@ class ExtensionRepository extends \BaseMysqliRepository implements ExtensionRepo
         $title = "{$playerName} turns down an extension offer from the {$teamName}";
         $hometext = "{$playerName} today rejected a contract extension offer from the {$teamName} worth {$offerInMillions} million dollars over {$offerYears} years.";
 
-        return $this->newsService->createNewsStory($categoryID, $topicID, $title, $hometext);
+        return $this->newsService->createNewsStory($categoryID, $topicID, $title, $hometext) > 0;
     }
 
     /**

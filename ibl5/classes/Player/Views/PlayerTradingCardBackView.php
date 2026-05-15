@@ -63,86 +63,81 @@ class PlayerTradingCardBackView
 
         $cssProps = CardBaseStyles::getCardCssProperties($colorScheme);
 
-        ob_start();
-        ?>
-<div class="trading-card-back" style="<?= $cssProps ?>">
-<?= CardBaseStyles::renderCardTop($playerData) ?>
-
-    <!-- PLAYER HIGHS SECTION -->
-    <div>
-        <h3 class="section-title">Player Highs</h3>
-        
-        <table class="highs-table">
-            <tr>
-                <th class="highs-header"></th>
-                <th class="highs-header" colspan="2">Regular Season</th>
-                <th class="highs-header" colspan="2">Playoffs</th>
-            </tr>
-            <tr>
-                <td class="category-header"></td>
-                <td class="category-header season-col">Ssn</td>
-                <td class="category-header career-col">Car</td>
-                <td class="category-header season-col">Ssn</td>
-                <td class="category-header career-col">Car</td>
-            </tr>
-            <?= self::renderHighsRow('Points', 
-                $playerStats->seasonHighPoints, 
+        $highsRows = self::renderHighsRow('Points',
+                $playerStats->seasonHighPoints,
                 $playerStats->careerSeasonHighPoints,
                 $playerStats->seasonPlayoffHighPoints,
                 $playerStats->careerPlayoffHighPoints
-            ) ?>
-            <?= self::renderHighsRow('Rebounds', 
-                $playerStats->seasonHighRebounds, 
+            )
+            . self::renderHighsRow('Rebounds',
+                $playerStats->seasonHighRebounds,
                 $playerStats->careerSeasonHighRebounds,
                 $playerStats->seasonPlayoffHighRebounds,
                 $playerStats->careerPlayoffHighRebounds
-            ) ?>
-            <?= self::renderHighsRow('Assists', 
-                $playerStats->seasonHighAssists, 
+            )
+            . self::renderHighsRow('Assists',
+                $playerStats->seasonHighAssists,
                 $playerStats->careerSeasonHighAssists,
                 $playerStats->seasonPlayoffHighAssists,
                 $playerStats->careerPlayoffHighAssists
-            ) ?>
-            <?= self::renderHighsRow('Steals', 
-                $playerStats->seasonHighSteals, 
+            )
+            . self::renderHighsRow('Steals',
+                $playerStats->seasonHighSteals,
                 $playerStats->careerSeasonHighSteals,
                 $playerStats->seasonPlayoffHighSteals,
                 $playerStats->careerPlayoffHighSteals
-            ) ?>
-            <?= self::renderHighsRow('Blocks', 
-                $playerStats->seasonHighBlocks, 
+            )
+            . self::renderHighsRow('Blocks',
+                $playerStats->seasonHighBlocks,
                 $playerStats->careerSeasonHighBlocks,
                 $playerStats->seasonPlayoffHighBlocks,
                 $playerStats->careerPlayoffHighBlocks
-            ) ?>
-            <?= self::renderHighsRow('Double-Doubles', 
-                $playerStats->seasonDoubleDoubles, 
+            )
+            . self::renderHighsRow('Double-Doubles',
+                $playerStats->seasonDoubleDoubles,
                 $playerStats->careerDoubleDoubles,
                 $playerStats->seasonPlayoffDoubleDoubles,
                 $playerStats->careerPlayoffDoubleDoubles
-            ) ?>
-            <?= self::renderHighsRow('Triple-Doubles', 
-                $playerStats->seasonTripleDoubles, 
+            )
+            . self::renderHighsRow('Triple-Doubles',
+                $playerStats->seasonTripleDoubles,
                 $playerStats->careerTripleDoubles,
                 $playerStats->seasonPlayoffTripleDoubles,
                 $playerStats->careerPlayoffTripleDoubles
-            ) ?>
-        </table>
-    </div>
+            );
 
-    <!-- ALL-STAR WEEKEND SECTION -->
-    <div>
-        <h3 class="section-title">All-Star Weekend</h3>
-        <div class="allstar-row">
-            <?= self::renderAllStarPill('All-Star Games', $allStarGames) ?>
-            <?= self::renderAllStarPill('3PT Contest', $threePointContests) ?>
-            <?= self::renderAllStarPill('Dunk Contest', $dunkContests) ?>
-            <?= self::renderAllStarPill('Rookie-Soph', $rookieSophChallenges) ?>
-        </div>
-    </div>
-</div>
-        <?php
-        return (string) ob_get_clean();
+        $allStarPills = self::renderAllStarPill('All-Star Games', $allStarGames)
+            . self::renderAllStarPill('3PT Contest', $threePointContests)
+            . self::renderAllStarPill('Dunk Contest', $dunkContests)
+            . self::renderAllStarPill('Rookie-Soph', $rookieSophChallenges);
+
+        return '<div class="trading-card-back" style="' . $cssProps . '">'
+            . CardBaseStyles::renderCardTop($playerData)
+            . '<div>'
+            . '<h3 class="section-title">Player Highs</h3>'
+            . '<table class="highs-table">'
+            . '<tr>'
+            . '<th class="highs-header"></th>'
+            . '<th class="highs-header" colspan="2">Regular Season</th>'
+            . '<th class="highs-header" colspan="2">Playoffs</th>'
+            . '</tr>'
+            . '<tr>'
+            . '<td class="category-header"></td>'
+            . '<td class="category-header season-col">Ssn</td>'
+            . '<td class="category-header career-col">Car</td>'
+            . '<td class="category-header season-col">Ssn</td>'
+            . '<td class="category-header career-col">Car</td>'
+            . '</tr>'
+            . $highsRows
+            . '</table>'
+            . '</div>'
+            . '<div>'
+            . '<h3 class="section-title">All-Star Weekend</h3>'
+            . '<div class="allstar-row">'
+            . $allStarPills
+            . '</div>'
+            . '</div>'
+            . '</div>';
     }
 
     /**

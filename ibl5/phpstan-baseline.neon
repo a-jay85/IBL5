@@ -174,7 +174,7 @@ parameters:
 		-
 			rawMessage: 'Unescaped output in View. Wrap the expression in HtmlSanitizer::e() (or another whitelisted safe helper), or cast it to (int)/(float)/(bool) if it is numeric.'
 			identifier: ibl.unescapedOutput
-			count: 127
+			count: 123
 			path: classes/FreeAgency/FreeAgencyView.php
 
 		-
@@ -228,7 +228,7 @@ parameters:
 		-
 			rawMessage: 'Unescaped output in View. Wrap the expression in HtmlSanitizer::e() (or another whitelisted safe helper), or cast it to (int)/(float)/(bool) if it is numeric.'
 			identifier: ibl.unescapedOutput
-			count: 8
+			count: 7
 			path: classes/NextSim/NextSimView.php
 
 		-
@@ -238,154 +238,22 @@ parameters:
 			path: classes/PageLayout/PageLayout.php
 
 		-
-			rawMessage: 'Unescaped output in View. Wrap the expression in HtmlSanitizer::e() (or another whitelisted safe helper), or cast it to (int)/(float)/(bool) if it is numeric.'
-			identifier: ibl.unescapedOutput
-			count: 5
-			path: classes/Player/Views/PlayerAwardsAndNewsView.php
-
-		-
-			rawMessage: 'Unescaped output in View. Wrap the expression in HtmlSanitizer::e() (or another whitelisted safe helper), or cast it to (int)/(float)/(bool) if it is numeric.'
-			identifier: ibl.unescapedOutput
-			count: 6
-			path: classes/Player/Views/PlayerAwardsView.php
-
-		-
-			rawMessage: 'Unescaped output in View. Wrap the expression in HtmlSanitizer::e() (or another whitelisted safe helper), or cast it to (int)/(float)/(bool) if it is numeric.'
-			identifier: ibl.unescapedOutput
-			count: 28
-			path: classes/Player/Views/PlayerHeatAveragesView.php
-
-		-
-			rawMessage: 'Unescaped output in View. Wrap the expression in HtmlSanitizer::e() (or another whitelisted safe helper), or cast it to (int)/(float)/(bool) if it is numeric.'
-			identifier: ibl.unescapedOutput
-			count: 38
-			path: classes/Player/Views/PlayerHeatStatsView.php
-
-		-
-			rawMessage: 'Unescaped output in View. Wrap the expression in HtmlSanitizer::e() (or another whitelisted safe helper), or cast it to (int)/(float)/(bool) if it is numeric.'
-			identifier: ibl.unescapedOutput
-			count: 34
-			path: classes/Player/Views/PlayerHeatTotalsView.php
-
-		-
-			rawMessage: 'Unescaped output in View. Wrap the expression in HtmlSanitizer::e() (or another whitelisted safe helper), or cast it to (int)/(float)/(bool) if it is numeric.'
-			identifier: ibl.unescapedOutput
-			count: 8
-			path: classes/Player/Views/PlayerMenuView.php
-
-		-
-			rawMessage: 'Unescaped output in View. Wrap the expression in HtmlSanitizer::e() (or another whitelisted safe helper), or cast it to (int)/(float)/(bool) if it is numeric.'
-			identifier: ibl.unescapedOutput
-			count: 28
-			path: classes/Player/Views/PlayerOlympicAveragesView.php
-
-		-
-			rawMessage: 'Unescaped output in View. Wrap the expression in HtmlSanitizer::e() (or another whitelisted safe helper), or cast it to (int)/(float)/(bool) if it is numeric.'
-			identifier: ibl.unescapedOutput
-			count: 34
-			path: classes/Player/Views/PlayerOlympicTotalsView.php
-
-		-
-			rawMessage: 'Unescaped output in View. Wrap the expression in HtmlSanitizer::e() (or another whitelisted safe helper), or cast it to (int)/(float)/(bool) if it is numeric.'
-			identifier: ibl.unescapedOutput
-			count: 38
-			path: classes/Player/Views/PlayerOlympicsStatsView.php
-
-		-
-			rawMessage: 'Unescaped output in View. Wrap the expression in HtmlSanitizer::e() (or another whitelisted safe helper), or cast it to (int)/(float)/(bool) if it is numeric.'
-			identifier: ibl.unescapedOutput
-			count: 4
-			path: classes/Player/Views/PlayerOneOnOneView.php
-
-		-
-			rawMessage: 'Unescaped output in View. Wrap the expression in HtmlSanitizer::e() (or another whitelisted safe helper), or cast it to (int)/(float)/(bool) if it is numeric.'
-			identifier: ibl.unescapedOutput
-			count: 25
-			path: classes/Player/Views/PlayerOverviewView.php
-
-		-
-			rawMessage: 'Unescaped output in View. Wrap the expression in HtmlSanitizer::e() (or another whitelisted safe helper), or cast it to (int)/(float)/(bool) if it is numeric.'
-			identifier: ibl.unescapedOutput
-			count: 28
-			path: classes/Player/Views/PlayerPlayoffAveragesView.php
-
-		-
-			rawMessage: 'Unescaped output in View. Wrap the expression in HtmlSanitizer::e() (or another whitelisted safe helper), or cast it to (int)/(float)/(bool) if it is numeric.'
-			identifier: ibl.unescapedOutput
-			count: 38
-			path: classes/Player/Views/PlayerPlayoffStatsView.php
-
-		-
-			rawMessage: 'Unescaped output in View. Wrap the expression in HtmlSanitizer::e() (or another whitelisted safe helper), or cast it to (int)/(float)/(bool) if it is numeric.'
-			identifier: ibl.unescapedOutput
-			count: 34
-			path: classes/Player/Views/PlayerPlayoffTotalsView.php
-
-		-
-			rawMessage: 'Unescaped output in View. Wrap the expression in HtmlSanitizer::e() (or another whitelisted safe helper), or cast it to (int)/(float)/(bool) if it is numeric.'
-			identifier: ibl.unescapedOutput
-			count: 25
-			path: classes/Player/Views/PlayerRatingsAndSalaryView.php
-
-		-
-			rawMessage: 'Unescaped output in View. Wrap the expression in HtmlSanitizer::e() (or another whitelisted safe helper), or cast it to (int)/(float)/(bool) if it is numeric.'
-			identifier: ibl.unescapedOutput
-			count: 42
-			path: classes/Player/Views/PlayerRegularSeasonAveragesView.php
-
-		-
-			rawMessage: 'Unescaped output in View. Wrap the expression in HtmlSanitizer::e() (or another whitelisted safe helper), or cast it to (int)/(float)/(bool) if it is numeric.'
-			identifier: ibl.unescapedOutput
-			count: 36
-			path: classes/Player/Views/PlayerRegularSeasonTotalsView.php
-
-		-
-			rawMessage: 'Unescaped output in View. Wrap the expression in HtmlSanitizer::e() (or another whitelisted safe helper), or cast it to (int)/(float)/(bool) if it is numeric.'
-			identifier: ibl.unescapedOutput
-			count: 38
-			path: classes/Player/Views/PlayerSeasonStatsView.php
-
-		-
-			rawMessage: 'Unescaped output in View. Wrap the expression in HtmlSanitizer::e() (or another whitelisted safe helper), or cast it to (int)/(float)/(bool) if it is numeric.'
-			identifier: ibl.unescapedOutput
-			count: 14
-			path: classes/Player/Views/PlayerSimStatsView.php
-
-		-
-			rawMessage: 'Unescaped output in View. Wrap the expression in HtmlSanitizer::e() (or another whitelisted safe helper), or cast it to (int)/(float)/(bool) if it is numeric.'
-			identifier: ibl.unescapedOutput
-			count: 2
+			rawMessage: 'Inline `style="..."` attributes are banned in PHP. Move CSS to ibl5/design/components/. Exception: `style="--foo: ..."` CSS custom properties are allowed.'
+			identifier: ibl.inlineCss
+			count: 1
 			path: classes/Player/Views/PlayerStatsCardView.php
 
 		-
-			rawMessage: 'Unescaped output in View. Wrap the expression in HtmlSanitizer::e() (or another whitelisted safe helper), or cast it to (int)/(float)/(bool) if it is numeric.'
-			identifier: ibl.unescapedOutput
-			count: 7
-			path: classes/Player/Views/PlayerStatsFlipCardView.php
-
-		-
-			rawMessage: 'Unescaped output in View. Wrap the expression in HtmlSanitizer::e() (or another whitelisted safe helper), or cast it to (int)/(float)/(bool) if it is numeric.'
-			identifier: ibl.unescapedOutput
-			count: 13
+			rawMessage: 'Inline `style="..."` attributes are banned in PHP. Move CSS to ibl5/design/components/. Exception: `style="--foo: ..."` CSS custom properties are allowed.'
+			identifier: ibl.inlineCss
+			count: 1
 			path: classes/Player/Views/PlayerTradingCardBackView.php
 
 		-
-			rawMessage: 'Unescaped output in View. Wrap the expression in HtmlSanitizer::e() (or another whitelisted safe helper), or cast it to (int)/(float)/(bool) if it is numeric.'
-			identifier: ibl.unescapedOutput
-			count: 4
-			path: classes/Player/Views/PlayerTradingCardFlipView.php
-
-		-
-			rawMessage: 'Unescaped output in View. Wrap the expression in HtmlSanitizer::e() (or another whitelisted safe helper), or cast it to (int)/(float)/(bool) if it is numeric.'
-			identifier: ibl.unescapedOutput
-			count: 36
+			rawMessage: 'Inline `style="..."` attributes are banned in PHP. Move CSS to ibl5/design/components/. Exception: `style="--foo: ..."` CSS custom properties are allowed.'
+			identifier: ibl.inlineCss
+			count: 1
 			path: classes/Player/Views/PlayerTradingCardFrontView.php
-
-		-
-			rawMessage: 'Unescaped output in View. Wrap the expression in HtmlSanitizer::e() (or another whitelisted safe helper), or cast it to (int)/(float)/(bool) if it is numeric.'
-			identifier: ibl.unescapedOutput
-			count: 4
-			path: classes/PlayerDatabase/PlayerDatabaseView.php
 
 		-
 			rawMessage: 'Unescaped output in View. Wrap the expression in HtmlSanitizer::e() (or another whitelisted safe helper), or cast it to (int)/(float)/(bool) if it is numeric.'
@@ -408,7 +276,7 @@ parameters:
 		-
 			rawMessage: 'Unescaped output in View. Wrap the expression in HtmlSanitizer::e() (or another whitelisted safe helper), or cast it to (int)/(float)/(bool) if it is numeric.'
 			identifier: ibl.unescapedOutput
-			count: 24
+			count: 20
 			path: classes/Standings/StandingsView.php
 
 		-

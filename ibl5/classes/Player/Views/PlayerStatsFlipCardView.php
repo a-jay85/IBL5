@@ -61,42 +61,31 @@ class PlayerStatsFlipCardView
         bool $showAveragesFirst = true,
         ?array $colorScheme = null
     ): string {
-        // Style tables using PlayerStatsCardView
-        $styledAverages = PlayerStatsCardView::styleTable($averagesHtml);
-        $styledTotals = PlayerStatsCardView::styleTable($totalsHtml);
-        
-        // Determine which content goes on front and back
-        $frontContent = $showAveragesFirst ? $styledAverages : $styledTotals;
-        $backContent = $showAveragesFirst ? $styledTotals : $styledAverages;
         $toggleTarget = $showAveragesFirst ? 'Totals' : 'Averages';
 
         if ($colorScheme === null) {
             $colorScheme = TeamColorHelper::getDefaultColorScheme();
         }
-        $cssProps = CardBaseStyles::getCardCssProperties($colorScheme);
-
-        $flipIcon = CardFlipStyles::getFlipIcon();
-        $escapedCategory = HtmlSanitizer::e($statsCategory);
 
         ob_start();
         ?>
-<div class="stats-flip-container" style="<?= $cssProps ?>" data-category="<?= $escapedCategory ?>">
-    <button class="stats-flip-toggle pulse" title="Switch to <?= $toggleTarget ?>">
-        <?= $flipIcon ?>
-        <span class="toggle-label"><?= $toggleTarget ?></span>
+<div class="stats-flip-container" style="<?= CardBaseStyles::getCardCssProperties($colorScheme) ?>" data-category="<?= HtmlSanitizer::e($statsCategory) ?>">
+    <button class="stats-flip-toggle pulse" title="Switch to <?= HtmlSanitizer::e($toggleTarget) ?>">
+        <?= CardFlipStyles::getFlipIcon() ?>
+        <span class="toggle-label"><?= HtmlSanitizer::e($toggleTarget) ?></span>
     </button>
     <div class="stats-flip-inner">
         <!-- Front (Averages by default) -->
         <div class="stats-front">
             <div class="player-stats-card">
-                <?= $frontContent ?>
+                <?= PlayerStatsCardView::styleTable($showAveragesFirst ? $averagesHtml : $totalsHtml) ?>
             </div>
         </div>
 
         <!-- Back (Totals by default) -->
         <div class="stats-back">
             <div class="player-stats-card">
-                <?= $backContent ?>
+                <?= PlayerStatsCardView::styleTable($showAveragesFirst ? $totalsHtml : $averagesHtml) ?>
             </div>
         </div>
     </div>

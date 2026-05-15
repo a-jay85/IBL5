@@ -59,46 +59,20 @@ class PlayerOneOnOneView implements PlayerOneOnOneViewInterface
         // Show wins
         foreach ($wins as $game) {
             /** @var array{gameid: int, winner: string, loser: string, winscore: int, lossscore: int, loser_pid: int|null} $game */
-            $gameId = $game['gameid'];
-            $loser = HtmlSanitizer::safeHtmlOutput($game['loser']);
-            $loserPid = $game['loser_pid'];
-            $winScore = $game['winscore'];
-            $lossScore = $game['lossscore'];
-
-            // Create game link
-            $gameLink = "modules.php?name=OneOnOneGame&amp;gameid={$gameId}";
-
-            // Create opponent link if we have a player ID
-            /** @var string $opponentLink */
-            $opponentLink = $loserPid !== null
-                ? "<a href=\"modules.php?name=Player&amp;pa=showpage&amp;pid={$loserPid}\" style=\"font-family: inherit; font-size: inherit;\">{$loser}</a>"
-                : $loser;
-
-            echo "* def. {$opponentLink}, {$winScore}-{$lossScore} (<a href=\"{$gameLink}\" style=\"font-family: inherit; font-size: inherit;\">Game #{$gameId}</a>)<br>";
+            ?>
+* <?php if ($game['loser_pid'] !== null): ?><a href="modules.php?name=Player&amp;pa=showpage&amp;pid=<?= HtmlSanitizer::e($game['loser_pid']) ?>"><?= HtmlSanitizer::e($game['loser']) ?></a><?php else: ?><?= HtmlSanitizer::e($game['loser']) ?><?php endif; ?>, <?= (int) $game['winscore'] ?>-<?= (int) $game['lossscore'] ?> (<a href="modules.php?name=OneOnOneGame&amp;gameid=<?= (int) $game['gameid'] ?>">Game #<?= (int) $game['gameid'] ?></a>)<br>
+        <?php
         }
 
         // Show losses
         foreach ($losses as $game) {
             /** @var array{gameid: int, winner: string, loser: string, winscore: int, lossscore: int, winner_pid: int|null} $game */
-            $gameId = $game['gameid'];
-            $winner = HtmlSanitizer::safeHtmlOutput($game['winner']);
-            $winnerPid = $game['winner_pid'];
-            $winScore = $game['winscore'];
-            $lossScore = $game['lossscore'];
-
-            // Create game link
-            $gameLink = "modules.php?name=OneOnOneGame&amp;gameid={$gameId}";
-
-            // Create opponent link if we have a player ID
-            /** @var string $opponentLink */
-            $opponentLink = $winnerPid !== null
-                ? "<a href=\"modules.php?name=Player&amp;pa=showpage&amp;pid={$winnerPid}\" style=\"font-family: inherit; font-size: inherit;\">{$winner}</a>"
-                : $winner;
-
-            echo "* lost to {$opponentLink}, {$lossScore}-{$winScore} (<a href=\"{$gameLink}\" style=\"font-family: inherit; font-size: inherit;\">Game #{$gameId}</a>)<br>";
+            ?>
+* lost to <?php if ($game['winner_pid'] !== null): ?><a href="modules.php?name=Player&amp;pa=showpage&amp;pid=<?= HtmlSanitizer::e($game['winner_pid']) ?>"><?= HtmlSanitizer::e($game['winner']) ?></a><?php else: ?><?= HtmlSanitizer::e($game['winner']) ?><?php endif; ?>, <?= (int) $game['lossscore'] ?>-<?= (int) $game['winscore'] ?> (<a href="modules.php?name=OneOnOneGame&amp;gameid=<?= (int) $game['gameid'] ?>">Game #<?= (int) $game['gameid'] ?></a>)<br>
+        <?php
         }
         ?>
-        <div class="text-center font-bold">Record: <?= $winCount ?> - <?= $lossCount ?></div><br>
+        <div class="text-center font-bold">Record: <?= HtmlSanitizer::e($winCount) ?> - <?= HtmlSanitizer::e($lossCount) ?></div><br>
         </td>
     </tr>
 </table>

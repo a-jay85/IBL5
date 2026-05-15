@@ -44,19 +44,19 @@ class PlayerAwardsView implements PlayerAwardsViewInterface
             </tr>
             <tr>
                 <td class="font-bold">All-Star Games:</td>
-                <td><?= $allStarGames ?></td>
+                <td><?= HtmlSanitizer::e($allStarGames) ?></td>
             </tr>
             <tr>
                 <td class="font-bold">Three-Point<br>Contests:</td>
-                <td><?= $threePointContests ?></td>
+                <td><?= HtmlSanitizer::e($threePointContests) ?></td>
             </tr>
             <tr>
                 <td class="font-bold">Slam Dunk<br>Competitions:</td>
-                <td><?= $dunkContests ?></td>
+                <td><?= HtmlSanitizer::e($dunkContests) ?></td>
             </tr>
             <tr>
                 <td class="font-bold">Rookie-Sophomore<br>Challenges:</td>
-                <td><?= $rookieSophChallenges ?></td>
+                <td><?= HtmlSanitizer::e($rookieSophChallenges) ?></td>
             </tr>
         </table>
         <?php
@@ -79,12 +79,10 @@ class PlayerAwardsView implements PlayerAwardsViewInterface
     </tr>
         <?php
         foreach ($awards as $award) {
-            $year = HtmlSanitizer::safeHtmlOutput($award['year']);
-            $awardName = HtmlSanitizer::safeHtmlOutput($award['award']);
             ?>
     <tr>
-        <td class="year-cell"><?= $year ?></td>
-        <td><?= $awardName ?></td>
+        <td class="year-cell"><?= (int) $award['year'] ?></td>
+        <td><?= HtmlSanitizer::e($award['award']) ?></td>
     </tr>
             <?php
         }

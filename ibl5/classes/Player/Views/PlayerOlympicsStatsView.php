@@ -59,33 +59,28 @@ class PlayerOlympicsStatsView implements PlayerOlympicsStatsViewInterface
         <?php
         foreach ($olympicsStats as $stats) {
             /** @var array{team: string, year: int, games: int, minutes: int, fgm: int, fga: int, ftm: int, fta: int, tgm: int, tga: int, orb: int, reb: int, ast: int, stl: int, tvr: int, blk: int, pf: int, pts: int} $stats */
-            $team = HtmlSanitizer::safeHtmlOutput($stats['team']);
             $drb = $stats['reb'] - $stats['orb'];
-
-            $fgPercent = StatsFormatter::formatPercentage($stats['fgm'], $stats['fga']);
-            $ftPercent = StatsFormatter::formatPercentage($stats['ftm'], $stats['fta']);
-            $tgPercent = StatsFormatter::formatPercentage($stats['tgm'], $stats['tga']);
             ?>
     <tr>
-        <td><?= $team ?></td>
-        <td><?= $stats['year'] ?></td>
-        <td><?= $stats['games'] ?></td>
-        <td><?= $stats['minutes'] ?></td>
-        <td><?= $stats['fgm'] ?>-<?= $stats['fga'] ?></td>
-        <td><?= $fgPercent ?></td>
-        <td><?= $stats['ftm'] ?>-<?= $stats['fta'] ?></td>
-        <td><?= $ftPercent ?></td>
-        <td><?= $stats['tgm'] ?>-<?= $stats['tga'] ?></td>
-        <td><?= $tgPercent ?></td>
-        <td><?= $stats['orb'] ?></td>
-        <td><?= $drb ?></td>
-        <td><?= $stats['reb'] ?></td>
-        <td><?= $stats['ast'] ?></td>
-        <td><?= $stats['stl'] ?></td>
-        <td><?= $stats['tvr'] ?></td>
-        <td><?= $stats['blk'] ?></td>
-        <td><?= $stats['pf'] ?></td>
-        <td><?= $stats['pts'] ?></td>
+        <td><?= HtmlSanitizer::e($stats['team']) ?></td>
+        <td><?= (int)$stats['year'] ?></td>
+        <td><?= (int)$stats['games'] ?></td>
+        <td><?= (int)$stats['minutes'] ?></td>
+        <td><?= (int)$stats['fgm'] ?>-<?= (int)$stats['fga'] ?></td>
+        <td><?= StatsFormatter::formatPercentage($stats['fgm'], $stats['fga']) ?></td>
+        <td><?= (int)$stats['ftm'] ?>-<?= (int)$stats['fta'] ?></td>
+        <td><?= StatsFormatter::formatPercentage($stats['ftm'], $stats['fta']) ?></td>
+        <td><?= (int)$stats['tgm'] ?>-<?= (int)$stats['tga'] ?></td>
+        <td><?= StatsFormatter::formatPercentage($stats['tgm'], $stats['tga']) ?></td>
+        <td><?= (int)$stats['orb'] ?></td>
+        <td><?= (int)$drb ?></td>
+        <td><?= (int)$stats['reb'] ?></td>
+        <td><?= (int)$stats['ast'] ?></td>
+        <td><?= (int)$stats['stl'] ?></td>
+        <td><?= (int)$stats['tvr'] ?></td>
+        <td><?= (int)$stats['blk'] ?></td>
+        <td><?= (int)$stats['pf'] ?></td>
+        <td><?= (int)$stats['pts'] ?></td>
     </tr>
             <?php
         }
@@ -134,40 +129,25 @@ class PlayerOlympicsStatsView implements PlayerOlympicsStatsViewInterface
                 continue;
             }
 
-            $team = HtmlSanitizer::safeHtmlOutput($stats['team']);
             $drb = $stats['reb'] - $stats['orb'];
-
-            $avgMinutes = StatsFormatter::formatPerGameAverage($stats['minutes'], $games);
-            $fgPercent = StatsFormatter::formatPercentage($stats['fgm'], $stats['fga']);
-            $ftPercent = StatsFormatter::formatPercentage($stats['ftm'], $stats['fta']);
-            $tgPercent = StatsFormatter::formatPercentage($stats['tgm'], $stats['tga']);
-            $avgOrb = StatsFormatter::formatPerGameAverage($stats['orb'], $games);
-            $avgDrb = StatsFormatter::formatPerGameAverage($drb, $games);
-            $avgReb = StatsFormatter::formatPerGameAverage($stats['reb'], $games);
-            $avgAst = StatsFormatter::formatPerGameAverage($stats['ast'], $games);
-            $avgStl = StatsFormatter::formatPerGameAverage($stats['stl'], $games);
-            $avgTo = StatsFormatter::formatPerGameAverage($stats['tvr'], $games);
-            $avgBlk = StatsFormatter::formatPerGameAverage($stats['blk'], $games);
-            $avgPf = StatsFormatter::formatPerGameAverage($stats['pf'], $games);
-            $avgPts = StatsFormatter::formatPerGameAverage($stats['pts'], $games);
             ?>
     <tr>
-        <td><?= $team ?></td>
-        <td><?= $stats['year'] ?></td>
-        <td><?= $games ?></td>
-        <td><?= $avgMinutes ?></td>
-        <td><?= $fgPercent ?></td>
-        <td><?= $ftPercent ?></td>
-        <td><?= $tgPercent ?></td>
-        <td><?= $avgOrb ?></td>
-        <td><?= $avgDrb ?></td>
-        <td><?= $avgReb ?></td>
-        <td><?= $avgAst ?></td>
-        <td><?= $avgStl ?></td>
-        <td><?= $avgTo ?></td>
-        <td><?= $avgBlk ?></td>
-        <td><?= $avgPf ?></td>
-        <td><?= $avgPts ?></td>
+        <td><?= HtmlSanitizer::e($stats['team']) ?></td>
+        <td><?= (int)$stats['year'] ?></td>
+        <td><?= (int)$games ?></td>
+        <td><?= StatsFormatter::formatPerGameAverage($stats['minutes'], $games) ?></td>
+        <td><?= StatsFormatter::formatPercentage($stats['fgm'], $stats['fga']) ?></td>
+        <td><?= StatsFormatter::formatPercentage($stats['ftm'], $stats['fta']) ?></td>
+        <td><?= StatsFormatter::formatPercentage($stats['tgm'], $stats['tga']) ?></td>
+        <td><?= StatsFormatter::formatPerGameAverage($stats['orb'], $games) ?></td>
+        <td><?= StatsFormatter::formatPerGameAverage($drb, $games) ?></td>
+        <td><?= StatsFormatter::formatPerGameAverage($stats['reb'], $games) ?></td>
+        <td><?= StatsFormatter::formatPerGameAverage($stats['ast'], $games) ?></td>
+        <td><?= StatsFormatter::formatPerGameAverage($stats['stl'], $games) ?></td>
+        <td><?= StatsFormatter::formatPerGameAverage($stats['tvr'], $games) ?></td>
+        <td><?= StatsFormatter::formatPerGameAverage($stats['blk'], $games) ?></td>
+        <td><?= StatsFormatter::formatPerGameAverage($stats['pf'], $games) ?></td>
+        <td><?= StatsFormatter::formatPerGameAverage($stats['pts'], $games) ?></td>
     </tr>
             <?php
         }

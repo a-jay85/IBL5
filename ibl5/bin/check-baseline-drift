@@ -27,7 +27,7 @@ $baselineFiles = [
 
 $updateMode = in_array('--update', $argv, true);
 
-$counter = new \Utilities\PhpstanBaselineCounter();
+$counter = new \Scripts\PhpstanBaselineCounter();
 
 $currentCounts = [];
 foreach ($baselineFiles as $key => $path) {

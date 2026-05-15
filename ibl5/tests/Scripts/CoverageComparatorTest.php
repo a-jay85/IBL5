@@ -2,11 +2,11 @@
 
 declare(strict_types=1);
 
-namespace Tests\Utilities;
+namespace Tests\Scripts;
 
 use PHPUnit\Framework\Attributes\Test;
 use PHPUnit\Framework\TestCase;
-use Utilities\CoverageComparator;
+use Scripts\CoverageComparator;
 
 final class CoverageComparatorTest extends TestCase
 {

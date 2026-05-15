@@ -307,18 +307,6 @@ parameters:
 			path: tests/Bootstrap/ContainerTest.php
 
 		-
-			rawMessage: 'Method Tests\Bootstrap\PhpunitConfigTest::isDirectoryCovered() has parameter $registeredDirs with no value type specified in iterable type array.'
-			identifier: missingType.iterableValue
-			count: 1
-			path: tests/Bootstrap/PhpunitConfigTest.php
-
-		-
-			rawMessage: 'Method Tests\Bootstrap\PhpunitConfigTest::isDirectoryCovered() has parameter $registeredFiles with no value type specified in iterable type array.'
-			identifier: missingType.iterableValue
-			count: 1
-			path: tests/Bootstrap/PhpunitConfigTest.php
-
-		-
 			rawMessage: 'Call to static method PHPUnit\Framework\Assert::assertTrue() with true will always evaluate to true.'
 			identifier: staticMethod.alreadyNarrowedType
 			count: 4
@@ -501,7 +489,7 @@ parameters:
 		-
 			rawMessage: 'Dynamic call to static method PHPUnit\Framework\TestCase::createStub().'
 			identifier: staticMethod.dynamicCall
-			count: 7
+			count: 6
 			path: tests/CareerLeaderboards/CachedCareerLeaderboardsRepositoryTest.php
 
 		-
@@ -539,42 +527,6 @@ parameters:
 			identifier: phpunit.assertEquals
 			count: 31
 			path: tests/CareerLeaderboards/CareerLeaderboardsServiceTest.php
-
-		-
-			rawMessage: Short ternary operator is not allowed. Use null coalesce operator if applicable or consider using long ternary.
-			identifier: ternary.shortNotAllowed
-			count: 1
-			path: tests/Cli/CheckDestructiveMigrationsCliTest.php
-
-		-
-			rawMessage: 'Method Tests\Cli\CheckMasterCiGreenCliTest::runScript() has parameter $args with no value type specified in iterable type array.'
-			identifier: missingType.iterableValue
-			count: 1
-			path: tests/Cli/CheckMasterCiGreenCliTest.php
-
-		-
-			rawMessage: 'Method Tests\Cli\CheckMasterCiGreenCliTest::runScript() has parameter $env with no value type specified in iterable type array.'
-			identifier: missingType.iterableValue
-			count: 1
-			path: tests/Cli/CheckMasterCiGreenCliTest.php
-
-		-
-			rawMessage: 'Method Tests\Cli\CheckMasterCiGreenCliTest::writeFixture() has parameter $checkRuns with no value type specified in iterable type array.'
-			identifier: missingType.iterableValue
-			count: 1
-			path: tests/Cli/CheckMasterCiGreenCliTest.php
-
-		-
-			rawMessage: 'Method Tests\Cli\MergeMasterToProdCliTest::runScript() has parameter $env with no value type specified in iterable type array.'
-			identifier: missingType.iterableValue
-			count: 1
-			path: tests/Cli/MergeMasterToProdCliTest.php
-
-		-
-			rawMessage: Short ternary operator is not allowed. Use null coalesce operator if applicable or consider using long ternary.
-			identifier: ternary.shortNotAllowed
-			count: 6
-			path: tests/Cli/MergeMasterToProdCliTest.php
 
 		-
 			rawMessage: 'Call to function is_array() with array will always evaluate to true.'
@@ -775,24 +727,6 @@ parameters:
 			path: tests/DatabaseIntegration/FranchiseHistoryRepositoryTest.php
 
 		-
-			rawMessage: 'Offset ''fa_signing_flag'' does not exist on array{pid: int, name: string, nickname: string|null, age: int|null, teamid: 1, teamname: string|null, pos: string, stamina: int|null, ...}.'
-			identifier: offsetAccess.notFound
-			count: 1
-			path: tests/DatabaseIntegration/FreeAgency/FreeAgencyRepositoryIntegrationTest.php
-
-		-
-			rawMessage: 'Parameter #1 $offerData of method FreeAgency\FreeAgencyRepository::saveOffer() expects array{pid: int, teamid: int, teamName: string, playerName: string, offer1: int, offer2: int, offer3: int, offer4: int, ...}, array{playerName: ''FA Replace'', pid: 200060402, teamName: ''Metros'', teamid: 1, offer1: 700, offer2: 750, offer3: 800, offer4: 0, ...} given.'
-			identifier: argument.type
-			count: 1
-			path: tests/DatabaseIntegration/FreeAgency/FreeAgencyRepositoryIntegrationTest.php
-
-		-
-			rawMessage: 'Parameter #1 $offerData of method FreeAgency\FreeAgencyRepository::saveOffer() expects array{pid: int, teamid: int, teamName: string, playerName: string, offer1: int, offer2: int, offer3: int, offer4: int, ...}, array{playerName: ''FA Target'', pid: 200060401, teamName: ''Metros'', teamid: 1, offer1: 500, offer2: 550, offer3: 600, offer4: 0, ...} given.'
-			identifier: argument.type
-			count: 1
-			path: tests/DatabaseIntegration/FreeAgency/FreeAgencyRepositoryIntegrationTest.php
-
-		-
 			rawMessage: 'Undefined variable: $pid'
 			identifier: variable.undefined
 			count: 1
@@ -963,7 +897,7 @@ parameters:
 		-
 			rawMessage: Casting to int something that's already int.
 			identifier: cast.useless
-			count: 3
+			count: 2
 			path: tests/DatabaseIntegration/SeasonLeaderboardsRepositoryTest.php
 
 		-
@@ -989,12 +923,6 @@ parameters:
 			identifier: offsetAccess.notFound
 			count: 1
 			path: tests/DatabaseIntegration/TeamScheduleRepositoryTest.php
-
-		-
-			rawMessage: 'Missing call to parent::tearDown() method.'
-			identifier: phpunit.callParent
-			count: 1
-			path: tests/DatabaseIntegration/Trading/TradeProcessorIntegrationTest.php
 
 		-
 			rawMessage: 'Offset ''owner_teamid'' does not exist on array{pickid: int, ownerofpick: ''Sharks'', teampick: string, year: string, round: string, notes: string|null, created_at: string, updated_at: string}.'
@@ -3366,7 +3294,7 @@ parameters:
 		-
 			rawMessage: 'You should use assertSame() instead of assertEquals(), because both values are scalars of the same type'
 			identifier: phpunit.assertEquals
-			count: 15
+			count: 14
 			path: tests/League/LeagueContextIntegrationTest.php
 
 		-
@@ -4451,7 +4379,7 @@ parameters:
 			path: tests/NextSim/NextSimViewTest.php
 
 		-
-			rawMessage: 'Method Tests\NextSim\NextSimViewTest::createGameData() should return array<int, array{game: Game, date: DateTime, dayNumber: int, opposingTeam: Team\Team, locationPrefix: string, opposingStarters: array<string, Player\Player>, opponentTier: string, opponentPowerRanking: float}> but returns array{array{game: LeagueSchedule\Game&PHPUnit\Framework\MockObject\Stub, date: DateTime, dayNumber: 1, opposingTeam: PHPUnit\Framework\MockObject\Stub&Team\Team, locationPrefix: ''@'', opposingStarters: array{PG: PHPUnit\Framework\MockObject\Stub&Player\Player, SG: PHPUnit\Framework\MockObject\Stub&Player\Player, SF: PHPUnit\Framework\MockObject\Stub&Player\Player, PF: PHPUnit\Framework\MockObject\Stub&Player\Player, C: PHPUnit\Framework\MockObject\Stub&Player\Player}, opponentTier: ''strong'', opponentPowerRanking: 75.0}}.'
+			rawMessage: 'Method Tests\NextSim\NextSimViewTest::createGameData() should return array<int, array{game: Game, date: DateTime, dayNumber: int, opposingTeam: Team\Team, locationPrefix: string, opposingStarters: array<string, Player\Player>, opponentTier: string, opponentPowerRanking: float}> but returns array{array{game: LeagueSchedule\Game&PHPUnit\Framework\MockObject\Stub, date: DateTime, dayNumber: 1, opposingTeam: PHPUnit\Framework\MockObject\Stub&Team\Team, locationPrefix: ''@'', opposingStarters: non-empty-array<''C''|''PF''|''PG''|''SF''|''SG'', PHPUnit\Framework\MockObject\Stub&Player\Player>, opponentTier: ''strong'', opponentPowerRanking: 75.0}}.'
 			identifier: return.type
 			count: 1
 			path: tests/NextSim/NextSimViewTest.php
@@ -5639,7 +5567,7 @@ parameters:
 		-
 			rawMessage: 'Dynamic call to static method PHPUnit\Framework\TestCase::createStub().'
 			identifier: staticMethod.dynamicCall
-			count: 14
+			count: 13
 			path: tests/SeasonLeaderboards/CachedSeasonLeaderboardsRepositoryTest.php
 
 		-
@@ -7967,7 +7895,7 @@ parameters:
 		-
 			rawMessage: 'Call to an undefined method JsbParser\Contracts\JsbImportRepositoryInterface::method().'
 			identifier: method.notFound
-			count: 8
+			count: 5
 			path: tests/UpdateAllTheThings/Steps/EndOfSeasonImportStepTest.php
 
 		-
@@ -7979,7 +7907,7 @@ parameters:
 		-
 			rawMessage: 'Call to an undefined method Updater\Contracts\JsbSourceResolverInterface::method().'
 			identifier: method.notFound
-			count: 6
+			count: 4
 			path: tests/UpdateAllTheThings/Steps/EndOfSeasonImportStepTest.php
 
 		-
@@ -8023,12 +7951,6 @@ parameters:
 			identifier: staticMethod.dynamicCall
 			count: 2
 			path: tests/UpdateAllTheThings/Steps/ExtractFromBackupStepTest.php
-
-		-
-			rawMessage: 'Call to method PHPUnit\Framework\Assert::assertInstanceOf() with ''Updater\\Contracts\\PipelineStepInterface'' and Updater\Steps\GenerateSeasonAwardsStep will always evaluate to true.'
-			identifier: method.alreadyNarrowedType
-			count: 1
-			path: tests/UpdateAllTheThings/Steps/GenerateSeasonAwardsStepTest.php
 
 		-
 			rawMessage: 'Call to an undefined method LeagueConfig\LeagueConfigRepository::method().'

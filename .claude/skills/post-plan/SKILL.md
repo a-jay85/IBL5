@@ -305,13 +305,20 @@ Using the Sonnet agent's classifications:
 
 ## Phase 8: CI Monitoring
 
-**BLOCKING GATE — loop until CI is green, PR merges, or 3 fix-push-retry cycles exhausted.**
+**BLOCKING GATE — block on CI until green, or 3 fix-push-retry cycles exhausted.**
 
-0. **Early-exit on merged PR:** Before any polling, run `gh pr view <pr> --json state --jq '.state'`. If `MERGED`, skip the rest of Phase 8 and continue at Phase 9 — auto-merge has already fired (most commonly during Phase 5/6/7) and watching CI to completion adds nothing but wall-clock burn. On a merged PR, the 10-min `--watch` timeout is the single biggest avoidable wait in the nightly loop.
-1. **Wait for checks:** Poll `gh pr checks <pr> --json name,state 2>/dev/null | jq 'length'` up to 4 times with 15s waits. If count stays 0, warn user and stop.
-2. **Block until CI completes OR PR merges:** Poll every 20s (Bash timeout 1200000 = 20 min cap — leaves a 10-min cushion under `MAX_PP_SECS=1800` for Phases 9-12 cleanup), fetching BOTH `gh pr checks <pr> --json name,state,conclusion` and `gh pr view <pr> --json state --jq '.state'` per tick. Exit the loop on whichever happens first: (a) every check has `state == COMPLETED`, or (b) PR `state == MERGED`. The merge check is the escape hatch for the common case where `--auto` fires mid-watch on a green CI run — no point waiting for the watch to notice CI is fully settled when the PR is already gone.
-3. **If all passed OR PR merged** -> Phase 9
-4. **If any failed:** Get failed checks (`jq '[.[] | select(.conclusion == "failure")]'`), download logs (`gh run view <id> --log-failed`), run the 3-step CI failure checklist (is file in my diff? is failing line my change? did it fail on parent?), fix, commit, push, loop back to step 1. After 3 iterations, escalate to user.
+> **Field-shape gotcha — read before editing this phase.**
+> Two `gh` commands return different shapes; mixing them produces unsatisfiable conditions.
+> - `gh pr checks <pr> --json name,state,link` → `state` ∈ `SUCCESS | FAILURE | SKIPPED | PENDING | CANCELLED | NEUTRAL`. **No `conclusion` field, no `COMPLETED` value.**
+> - `gh pr view <pr> --json statusCheckRollup` → `status` ∈ `COMPLETED | IN_PROGRESS | QUEUED`, `conclusion` ∈ `SUCCESS | FAILURE | SKIPPED | …`.
+> Do not write `state == "COMPLETED"` or `conclusion == "failure"` against `gh pr checks` — both are silently false forever.
+
+0. **Early-exit on merged PR:** Before any polling, run `gh pr view <pr> --json state --jq '.state'`. If `MERGED`, skip the rest of Phase 8 and continue at Phase 9 — auto-merge has already fired (most commonly during Phase 5/6/7) and watching CI to completion adds nothing but wall-clock burn. This is the load-bearing optimization that keeps the nightly loop from burning a full watch timeout on an already-shipped PR.
+1. **Wait for checks to register:** Poll `gh pr checks <pr> --json name,state 2>/dev/null | jq 'length'` up to 4 times with 15s waits. If count stays 0, warn user and stop.
+2. **Block until CI settles:** `gh pr checks <pr> --watch --fail-fast --interval 20` (Bash timeout 1200000 = 20 min cap — leaves a 10-min cushion under `MAX_PP_SECS=1800` for Phases 9-12 cleanup). The gh CLI handles the polling and exit logic itself; do not re-implement it in jq. Exit codes: `0` = all checks passed, `8` = at least one failed, other = transport error.
+3. **If exit 0** → Phase 9. (Mid-watch merge detection was intentionally dropped: `gh pr checks --watch` exits as soon as the last check settles, so the only window auto-merge could fire inside the watch is the ~5–30s between final-check-pass and auto-merge action — not worth a hand-rolled poll loop. Step 0 already covers the case where the PR merged before Phase 8 started.)
+4. **If exit 8:** Get failed checks via `gh pr checks <pr> --json name,state,link --jq '[.[] | select(.state == "FAILURE")]'` (uppercase `FAILURE`, field is `state` not `conclusion`). Download logs (`gh run view <id> --log-failed`), run the 3-step CI failure checklist (is file in my diff? is failing line my change? did it fail on parent?), fix, commit, push, loop back to step 1. After 3 iterations, escalate to user.
+5. **If bash times out (20 min elapsed):** Run one final `gh pr checks <pr>` (no `--watch`) to capture settled state. If it now exits 0, continue to Phase 9. If 8, jump to step 4. Otherwise escalate to user — do not re-enter watch.
 
 ---
 

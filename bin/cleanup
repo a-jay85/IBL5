@@ -238,11 +238,11 @@ if [ "$ALL" = true ]; then
     fi
 
     # Clean up bare local branches that are no longer needed.
-    # Three deletion signals (any one is sufficient):
+    # Four deletion signals (any one is sufficient):
     #   1. PR is MERGED — work completed
     #   2. PR is CLOSED — work abandoned
     #   3. Remote tracking ref is [gone] — remote branch deleted
-    # Branches with no PR and a live (or no) remote are left alone.
+    #   4. Local-only (never tracked), ancestor of master, no unique commits
     WORKTREE_BRANCHES=$(git -C "$REPO_ROOT" worktree list --porcelain \
         | awk '/^branch / { sub(/^branch refs\/heads\//, ""); print }')
 
@@ -300,6 +300,21 @@ if [ "$ALL" = true ]; then
             if echo " $GONE_BRANCHES " | grep -q " $bare_branch "; then
                 should_delete=true
                 delete_reason="remote branch deleted"
+            fi
+        fi
+
+        # Check 3: Local-only branch fully merged into origin/master.
+        # Catches branches that were never pushed (no tracking config, no PR)
+        # but whose work landed on master via another branch or local merge.
+        # Requires strict ancestry (branch tip != master tip) to avoid nuking
+        # a freshly created branch used as a name reservation.
+        if [ "$should_delete" = false ]; then
+            local_tracking=$(git -C "$REPO_ROOT" config "branch.$bare_branch.remote" 2>/dev/null || true)
+            if [ -z "$local_tracking" ] \
+               && git -C "$REPO_ROOT" merge-base --is-ancestor "$bare_branch" origin/master 2>/dev/null \
+               && [ "$(git -C "$REPO_ROOT" rev-parse "$bare_branch")" != "$(git -C "$REPO_ROOT" rev-parse origin/master)" ]; then
+                should_delete=true
+                delete_reason="local-only, merged into master"
             fi
         fi
 

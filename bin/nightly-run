@@ -213,7 +213,6 @@ while true; do
             claude -p "$(cat bin/nightly-prompt-impl)" \
                 --dangerously-skip-permissions \
                 --model claude-opus-4-6 \
-                --max-turns 200 \
                 --output-format stream-json \
                 --verbose \
                 --name "nightly-impl-$(date +%Y-%m-%d-%H%M)" \
@@ -289,7 +288,6 @@ while true; do
 PLAN_FILE=$PLAN_NAME" \
                 --dangerously-skip-permissions \
                 --model claude-sonnet-4-6 \
-                --max-turns 120 \
                 --output-format stream-json \
                 --verbose \
                 --name "nightly-postplan-$(date +%Y-%m-%d-%H%M)" \

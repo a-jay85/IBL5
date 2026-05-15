@@ -1,6 +1,6 @@
 ---
 description: Nightly autonomous workflow — launchd fires claude -p at 00:03 and 05:03 daily, running two context-isolated agents per plan (implementation + post-plan) with time guards and incremental checkpoints.
-last_verified: 2026-05-14
+last_verified: 2026-05-15
 paths: "bin/nightly-*"
 ---
 
@@ -68,7 +68,7 @@ Cancelling: `rm queue/<file>.md` removes only the symlink, not the original plan
 - **Per-phase caps:** `MAX_IMPL_SECS=3600` (1h) and `MAX_PP_SECS=1800` (30m) prevent a single phase from consuming the entire session budget.
 - **Stall-kill:** The heartbeat watcher kills a phase (and its children) if no stream events arrive for `STALL_KILL_SECS=600` (10m). Catches orphaned child processes that hold the pipeline open after `claude` finishes.
 - **Poison-pill protection:** Tracks attempts per plan via `.attempts` sidecar files. After 3 failures in one night, the plan is moved to `skipped/` with a report.
-- **Turn caps:** Implementation: `--max-turns 200`. Post-plan: `--max-turns 120`.
+- **No turn caps:** Both phases run without `--max-turns` so the agent can complete long-running plans (per-phase time caps and stall-kill provide the safety net).
 
 ## Handoff Mechanism
 

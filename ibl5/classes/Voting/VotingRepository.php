@@ -40,7 +40,7 @@ class VotingRepository extends \BaseMysqliRepository implements VotingRepository
     public function saveEoyVote(string $teamName, array $ballot): void
     {
         $this->execute(
-            "UPDATE ibl_votes_EOY
+            "UPDATE `ibl_votes_EOY`
              SET mvp_1 = ?, mvp_2 = ?, mvp_3 = ?,
                  six_1 = ?, six_2 = ?, six_3 = ?,
                  roy_1 = ?, roy_2 = ?, roy_3 = ?,
@@ -63,7 +63,7 @@ class VotingRepository extends \BaseMysqliRepository implements VotingRepository
     public function saveAsgVote(string $teamName, array $ballot): void
     {
         $this->execute(
-            "UPDATE ibl_votes_ASG
+            "UPDATE `ibl_votes_ASG`
              SET east_f1 = ?, east_f2 = ?, east_f3 = ?, east_f4 = ?,
                  east_b1 = ?, east_b2 = ?, east_b3 = ?, east_b4 = ?,
                  west_f1 = ?, west_f2 = ?, west_f3 = ?, west_f4 = ?,
@@ -84,7 +84,7 @@ class VotingRepository extends \BaseMysqliRepository implements VotingRepository
     public function markEoyVoteCast(string $teamName): void
     {
         $this->execute(
-            "UPDATE ibl_team_info SET eoy_vote = NOW() + INTERVAL 2 HOUR WHERE team_name = ?",
+            "UPDATE `ibl_team_info` SET eoy_vote = NOW() + INTERVAL 2 HOUR WHERE team_name = ?",
             's',
             $teamName
         );
@@ -96,7 +96,7 @@ class VotingRepository extends \BaseMysqliRepository implements VotingRepository
     public function markAsgVoteCast(string $teamName): void
     {
         $this->execute(
-            "UPDATE ibl_team_info SET asg_vote = NOW() + INTERVAL 2 HOUR WHERE team_name = ?",
+            "UPDATE `ibl_team_info` SET asg_vote = NOW() + INTERVAL 2 HOUR WHERE team_name = ?",
             's',
             $teamName
         );

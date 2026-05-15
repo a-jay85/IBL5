@@ -84,7 +84,7 @@ class MaintenanceRepositoryTest extends TestCase
 
         $this->assertTrue($result);
         $queries = $this->mockDb->getExecutedQueries();
-        $this->assertStringContainsString('UPDATE ibl_team_info', $queries[0]);
+        $this->assertStringContainsString('UPDATE `ibl_team_info`', $queries[0]);
         $this->assertStringContainsString('contract_avg_w', $queries[0]);
         $this->assertStringContainsString('contract_avg_l', $queries[0]);
     }

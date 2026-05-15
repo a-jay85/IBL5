@@ -32,7 +32,7 @@ class WaiversRepositoryTest extends TestCase
         
         $queries = $this->mockDb->getExecutedQueries();
         $this->assertCount(1, $queries);
-        $this->assertStringContainsString('UPDATE ibl_plr', $queries[0]);
+        $this->assertStringContainsString('UPDATE `ibl_plr`', $queries[0]);
         $this->assertStringContainsString('ordinal', $queries[0]);
         $this->assertStringContainsString('1000', $queries[0]);
         $this->assertStringContainsString('droptime', $queries[0]);
@@ -64,7 +64,7 @@ class WaiversRepositoryTest extends TestCase
         
         $queries = $this->mockDb->getExecutedQueries();
         $this->assertCount(1, $queries);
-        $this->assertStringContainsString('UPDATE ibl_plr', $queries[0]);
+        $this->assertStringContainsString('UPDATE `ibl_plr`', $queries[0]);
         $this->assertStringContainsString('ordinal', $queries[0]);
         $this->assertStringContainsString('800', $queries[0]);
         $this->assertStringContainsString('salary_yr1', $queries[0]);
@@ -99,7 +99,7 @@ class WaiversRepositoryTest extends TestCase
         
         $queries = $this->mockDb->getExecutedQueries();
         $this->assertCount(1, $queries);
-        $this->assertStringContainsString('UPDATE ibl_plr', $queries[0]);
+        $this->assertStringContainsString('UPDATE `ibl_plr`', $queries[0]);
         $this->assertStringContainsString('ordinal', $queries[0]);
         $this->assertStringContainsString('800', $queries[0]);
         $this->assertStringNotContainsString('salary_yr1', $queries[0]);
@@ -129,7 +129,7 @@ class WaiversRepositoryTest extends TestCase
         
         $queries = $this->mockDb->getExecutedQueries();
         $this->assertCount(1, $queries);
-        $this->assertStringContainsString('UPDATE ibl_plr', $queries[0]);
+        $this->assertStringContainsString('UPDATE `ibl_plr`', $queries[0]);
         $this->assertStringContainsString('ordinal', $queries[0]);
         $this->assertStringContainsString('800', $queries[0]);
         $this->assertStringContainsString('`salary_yr1` = 76', $queries[0]);

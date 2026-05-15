@@ -248,7 +248,7 @@ class SeasonHighsRepository extends \BaseMysqliRepository implements SeasonHighs
         /** @var list<array{stat_category: string, ranking: int, player_name: string, player_position: string|null, stat_value: int, record_season_year: int}> $rows */
         $rows = $this->fetchAll(
             "SELECT stat_category, ranking, player_name, player_position, stat_value, record_season_year
-             FROM ibl_rcb_season_records
+             FROM `ibl_rcb_season_records`
              WHERE season_year = ? AND scope = 'league' AND context = ?
              ORDER BY stat_category, ranking",
             'is',

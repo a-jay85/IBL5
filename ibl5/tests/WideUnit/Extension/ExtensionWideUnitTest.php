@@ -79,7 +79,7 @@ class ExtensionWideUnitTest extends WideUnitTestCase
         $this->assertStringContainsString('used_extension_this_season = 1', $allQueries);
         
         // Verify player contract was updated
-        $this->assertQueryExecuted('UPDATE ibl_plr');
+        $this->assertQueryExecuted('UPDATE `ibl_plr`');
     }
 
     /**
@@ -183,7 +183,7 @@ class ExtensionWideUnitTest extends WideUnitTestCase
         $queries = $this->getExecutedQueries();
         $this->assertGreaterThanOrEqual(1, count($queries));
         // But should NOT have updated contract
-        $this->assertQueryNotExecuted('UPDATE ibl_plr');
+        $this->assertQueryNotExecuted('UPDATE `ibl_plr`');
     }
 
     /**
@@ -567,7 +567,7 @@ class ExtensionWideUnitTest extends WideUnitTestCase
         $this->assertStringContainsString('already used your extension for this sim', $result['error']);
 
         // Verify no contract updates were made
-        $this->assertQueryNotExecuted('UPDATE ibl_plr');
+        $this->assertQueryNotExecuted('UPDATE `ibl_plr`');
     }
 
     /**

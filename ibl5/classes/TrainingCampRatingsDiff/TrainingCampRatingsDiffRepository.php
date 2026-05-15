@@ -23,7 +23,7 @@ class TrainingCampRatingsDiffRepository extends BaseMysqliRepository implements 
     public function getLatestEndOfSeasonYear(): ?int
     {
         $row = $this->fetchOne(
-            "SELECT MAX(season_year) AS y FROM ibl_plr_snapshots WHERE snapshot_phase = 'end-of-season'",
+            "SELECT MAX(season_year) AS y FROM `ibl_plr_snapshots` WHERE snapshot_phase = 'end-of-season'",
             '',
         );
 
@@ -67,9 +67,9 @@ SELECT
     s.r_orb   AS s_r_orb,   s.r_drb   AS s_r_drb,
     s.r_ast   AS s_r_ast,   s.r_stl   AS s_r_stl,
     s.r_tvr   AS s_r_tvr,   s.r_blk   AS s_r_blk,  s.r_foul AS s_r_foul
-FROM ibl_plr p
-LEFT JOIN ibl_team_info t ON t.teamid = p.teamid
-LEFT JOIN ibl_plr_snapshots s
+FROM `ibl_plr` p
+LEFT JOIN `ibl_team_info` t ON t.teamid = p.teamid
+LEFT JOIN `ibl_plr_snapshots` s
        ON s.pid = p.pid
       AND s.season_year = ?
       AND s.snapshot_phase = 'end-of-season'

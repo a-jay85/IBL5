@@ -34,7 +34,7 @@ class DraftHistoryRepository extends \BaseMysqliRepository implements DraftHisto
     public function getLastDraftYear(): int
     {
         $result = $this->fetchOne(
-            "SELECT draftyear FROM ibl_plr ORDER BY draftyear DESC LIMIT 1"
+            "SELECT draftyear FROM `ibl_plr` ORDER BY draftyear DESC LIMIT 1"
         );
 
         if ($result === null) {
@@ -56,8 +56,8 @@ class DraftHistoryRepository extends \BaseMysqliRepository implements DraftHisto
         return $this->fetchAll(
             "SELECT p.pid, p.name, p.pos, p.draftround, p.draftpickno, p.draftedby, p.college,
                     t.teamid, t.team_city, t.color1, t.color2
-            FROM ibl_plr p
-            LEFT JOIN ibl_team_info t ON p.draftedby = t.team_name
+            FROM `ibl_plr` p
+            LEFT JOIN `ibl_team_info` t ON p.draftedby = t.team_name
             WHERE p.draftyear = ? AND p.draftround > 0
             ORDER BY p.draftround ASC, p.draftpickno ASC",
             "i",
@@ -75,7 +75,7 @@ class DraftHistoryRepository extends \BaseMysqliRepository implements DraftHisto
         /** @var list<DraftPickByTeamRow> */
         return $this->fetchAll(
             "SELECT p.pid, p.name, p.pos, p.draftround, p.draftpickno, p.draftyear, p.college, p.retired
-            FROM ibl_plr p
+            FROM `ibl_plr` p
             WHERE p.draftedby = ? AND p.draftround > 0
             ORDER BY p.draftyear DESC, p.draftround ASC, p.draftpickno ASC",
             "s",

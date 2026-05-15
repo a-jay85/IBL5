@@ -101,7 +101,7 @@ class LeagueConfigRepositoryTest extends WideUnitTestCase
         $result = $repository->getFranchiseTeamsBySeason(2007);
 
         $this->assertSame([1 => 'Celtics', 2 => 'Heat'], $result);
-        $this->assertQueryExecuted('SELECT franchise_id, team_name FROM ibl_franchise_seasons');
+        $this->assertQueryExecuted('SELECT franchise_id, team_name FROM `ibl_franchise_seasons`');
     }
 
     public function testGetFranchiseTeamsBySeasonReturnsEmptyForNoData(): void

@@ -152,7 +152,7 @@ class PlayerDatabaseRepository extends BaseMysqliRepository implements PlayerDat
     {
         // Use fetchOne from BaseMysqliRepository for single-row queries
         return $this->fetchOne(
-            "SELECT * FROM ibl_plr WHERE pid = ?",
+            "SELECT * FROM `ibl_plr` WHERE pid = ?",
             "i",
             $pid
         );

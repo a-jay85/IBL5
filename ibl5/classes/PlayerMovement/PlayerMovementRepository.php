@@ -37,10 +37,10 @@ class PlayerMovementRepository extends \BaseMysqliRepository implements PlayerMo
                 new_info.team_city AS new_city,
                 new_info.color1 AS new_color1,
                 new_info.color2 AS new_color2
-            FROM ibl_hist a
-            JOIN ibl_plr b ON a.pid = b.pid
-            LEFT JOIN ibl_team_info old_hist ON a.teamid = old_hist.teamid
-            LEFT JOIN ibl_team_info new_info ON b.teamid = new_info.teamid
+            FROM `ibl_hist` a
+            JOIN `ibl_plr` b ON a.pid = b.pid
+            LEFT JOIN `ibl_team_info` old_hist ON a.teamid = old_hist.teamid
+            LEFT JOIN `ibl_team_info` new_info ON b.teamid = new_info.teamid
             WHERE a.year = ?
             AND a.teamid != b.teamid
             ORDER BY new_info.team_name",

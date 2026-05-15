@@ -85,8 +85,8 @@ class DepthChartEntryWideUnitTest extends WideUnitTestCase
         $this->assertTrue($historyResult, 'Team history update should succeed');
 
         // Assert - Correct queries executed
-        $this->assertEquals(12, $this->countQueriesMatching('UPDATE ibl_plr'));
-        $this->assertQueryExecuted('UPDATE ibl_team_info');
+        $this->assertEquals(12, $this->countQueriesMatching('UPDATE `ibl_plr`'));
+        $this->assertQueryExecuted('UPDATE `ibl_team_info`');
         $this->assertQueryExecuted('depth = NOW()');
     }
 
@@ -134,7 +134,7 @@ class DepthChartEntryWideUnitTest extends WideUnitTestCase
 
         // Assert - Database update succeeded and included correct data
         $this->assertTrue($updateResult);
-        $this->assertQueryExecuted('UPDATE ibl_plr');
+        $this->assertQueryExecuted('UPDATE `ibl_plr`');
         $this->assertQueryExecuted('dc_pg_depth');
         $this->assertQueryExecuted('dc_of = 0');
         $this->assertQueryExecuted("name = 'John Smith'");
@@ -298,8 +298,8 @@ class DepthChartEntryWideUnitTest extends WideUnitTestCase
 
         // We should NOT update database when validation fails
         // (This tests the workflow - the handler should check validation before saving)
-        $this->assertQueryNotExecuted('UPDATE ibl_plr');
-        $this->assertQueryNotExecuted('UPDATE ibl_team_info');
+        $this->assertQueryNotExecuted('UPDATE `ibl_plr`');
+        $this->assertQueryNotExecuted('UPDATE `ibl_team_info`');
     }
 
     // ========== PLAYOFFS VS REGULAR SEASON RULES ==========
@@ -417,7 +417,7 @@ class DepthChartEntryWideUnitTest extends WideUnitTestCase
         $this->assertCount(2, $result);
         $this->assertEquals('Player One', $result[0]['name']);
         $this->assertEquals('Player Two', $result[1]['name']);
-        $this->assertQueryExecuted('SELECT * FROM ibl_plr');
+        $this->assertQueryExecuted('SELECT * FROM `ibl_plr`');
         $this->assertQueryExecuted("teamid = $teamId");
     }
 
@@ -507,7 +507,7 @@ class DepthChartEntryWideUnitTest extends WideUnitTestCase
 
         // Assert
         $this->assertTrue($allSuccess);
-        $this->assertEquals(3, $this->countQueriesMatching('UPDATE ibl_plr'));
+        $this->assertEquals(3, $this->countQueriesMatching('UPDATE `ibl_plr`'));
     }
 
     // ========== INPUT SANITIZATION ==========
@@ -598,7 +598,7 @@ class DepthChartEntryWideUnitTest extends WideUnitTestCase
         $this->assertEquals(0, $player['bh']);
 
         // Assert - Database update still executed
-        $this->assertQueryExecuted('UPDATE ibl_plr');
+        $this->assertQueryExecuted('UPDATE `ibl_plr`');
     }
 
     // ========== ERROR ACCUMULATION ==========

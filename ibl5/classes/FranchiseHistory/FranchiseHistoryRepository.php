@@ -34,7 +34,7 @@ class FranchiseHistoryRepository extends \BaseMysqliRepository implements Franch
             "SELECT ti.teamid, ti.team_name, ti.color1, ti.color2,
                     fs.totwins, fs.totloss, fs.winpct, fs.playoffs,
                     fs.div_titles, fs.conf_titles, fs.ibl_titles, fs.heat_titles
-             FROM ibl_team_info ti
+             FROM `ibl_team_info` ti
              JOIN vw_franchise_summary fs ON fs.teamid = ti.teamid
              WHERE ti.teamid <> ?
              ORDER BY ti.teamid ASC",
@@ -48,7 +48,7 @@ class FranchiseHistoryRepository extends \BaseMysqliRepository implements Franch
             "SELECT currentname,
                     CAST(SUM(wins) AS UNSIGNED) AS five_season_wins,
                     CAST(SUM(losses) AS UNSIGNED) AS five_season_losses
-             FROM ibl_team_win_loss
+             FROM `ibl_team_win_loss`
              WHERE year BETWEEN ? AND ?
              GROUP BY currentname",
             "ii",
@@ -163,7 +163,7 @@ class FranchiseHistoryRepository extends \BaseMysqliRepository implements Franch
     {
         $rows = $this->fetchAll(
             "SELECT currentname, SUM(wins) AS total_wins, SUM(losses) AS total_losses
-            FROM ibl_heat_win_loss
+            FROM `ibl_heat_win_loss`
             GROUP BY currentname"
         );
 

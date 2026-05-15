@@ -22,8 +22,8 @@ class AllStarAppearancesRepository extends \BaseMysqliRepository implements AllS
     public function getAllStarAppearances(): array
     {
         $query = "SELECT a.name, h.pid, COUNT(*) as appearances
-            FROM ibl_awards a
-            LEFT JOIN (SELECT DISTINCT pid, name FROM ibl_hist) h ON h.name = a.name
+            FROM `ibl_awards` a
+            LEFT JOIN (SELECT DISTINCT pid, name FROM `ibl_hist`) h ON h.name = a.name
             WHERE a.award LIKE '%Conference All-Star'
             GROUP BY a.name, h.pid
             ORDER BY appearances DESC, a.name ASC, COALESCE(h.pid, 0) ASC";

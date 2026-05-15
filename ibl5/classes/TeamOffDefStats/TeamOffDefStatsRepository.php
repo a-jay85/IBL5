@@ -86,7 +86,7 @@ class TeamOffDefStatsRepository extends \BaseMysqliRepository implements TeamOff
                 tds.tvr AS defense_tvr,
                 tds.blk AS defense_blk,
                 tds.pf AS defense_pf
-            FROM ibl_team_info ti
+            FROM `ibl_team_info` ti
             LEFT JOIN (" . self::buildOffenseSubquery('bst.season_year = ?', $gameTypes) . ") tos ON ti.teamid = tos.teamid
             LEFT JOIN (" . self::buildDefenseSubquery('my.season_year = ?', $gameTypes) . ") tds ON ti.teamid = tds.teamid
             WHERE ti.teamid BETWEEN 1 AND " . League::MAX_REAL_TEAMID . "

@@ -25,8 +25,8 @@ class ContractListRepository extends \BaseMysqliRepository implements ContractLi
     {
         $query = "SELECT p.pid, p.name, p.pos, t.team_name AS teamname, p.teamid, p.cy, p.cyt, p.salary_yr1, p.salary_yr2, p.salary_yr3, p.salary_yr4, p.salary_yr5, p.salary_yr6, p.bird,
                          t.team_city, t.color1, t.color2
-            FROM ibl_plr p
-            LEFT JOIN ibl_team_info t ON p.teamid = t.teamid
+            FROM `ibl_plr` p
+            LEFT JOIN `ibl_team_info` t ON p.teamid = t.teamid
             WHERE p.retired = 0
             ORDER BY p.ordinal ASC";
 

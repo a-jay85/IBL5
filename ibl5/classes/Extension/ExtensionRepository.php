@@ -43,7 +43,7 @@ class ExtensionRepository extends \BaseMysqliRepository implements ExtensionRepo
 
         try {
             $this->execute(
-                "UPDATE ibl_plr SET cy = 1, cyt = ?, salary_yr1 = ?, salary_yr2 = ?, salary_yr3 = ?, salary_yr4 = ?, salary_yr5 = ?, salary_yr6 = ? WHERE name = ?",
+                "UPDATE `ibl_plr` SET cy = 1, cyt = ?, salary_yr1 = ?, salary_yr2 = ?, salary_yr3 = ?, salary_yr4 = ?, salary_yr5 = ?, salary_yr6 = ? WHERE name = ?",
                 'iiiiiiis',
                 $totalYears,
                 $currentSalary,
@@ -71,7 +71,7 @@ class ExtensionRepository extends \BaseMysqliRepository implements ExtensionRepo
     {
         try {
             $this->execute(
-                "UPDATE ibl_team_info SET used_extension_this_chunk = 1 WHERE team_name = ?",
+                "UPDATE `ibl_team_info` SET used_extension_this_chunk = 1 WHERE team_name = ?",
                 's',
                 $teamName
             );
@@ -92,7 +92,7 @@ class ExtensionRepository extends \BaseMysqliRepository implements ExtensionRepo
     {
         try {
             $this->execute(
-                "UPDATE ibl_team_info SET used_extension_this_season = 1 WHERE team_name = ?",
+                "UPDATE `ibl_team_info` SET used_extension_this_season = 1 WHERE team_name = ?",
                 's',
                 $teamName
             );
@@ -171,7 +171,7 @@ class ExtensionRepository extends \BaseMysqliRepository implements ExtensionRepo
         try {
             /** @var TeamTraditionDbRow|null $row */
             $row = $this->fetchOne(
-                "SELECT contract_wins, contract_losses, contract_avg_w, contract_avg_l FROM ibl_team_info WHERE team_name = ? LIMIT 1",
+                "SELECT contract_wins, contract_losses, contract_avg_w, contract_avg_l FROM `ibl_team_info` WHERE team_name = ? LIMIT 1",
                 's',
                 $teamName
             );

@@ -37,7 +37,7 @@ class DraftPickLocatorRepository extends \BaseMysqliRepository implements DraftP
         /** @var list<array{ownerofpick: string, year: int, round: int}> */
         return $this->fetchAll(
             "SELECT ownerofpick, year, round
-             FROM ibl_draft_picks
+             FROM `ibl_draft_picks`
              WHERE teampick_teamid = ?
              ORDER BY year, round ASC",
             "i",
@@ -55,7 +55,7 @@ class DraftPickLocatorRepository extends \BaseMysqliRepository implements DraftP
         /** @var list<array{teampick_teamid: int, ownerofpick: string, year: int, round: int}> $rows */
         $rows = $this->fetchAll(
             "SELECT teampick_teamid, ownerofpick, year, round
-             FROM ibl_draft_picks
+             FROM `ibl_draft_picks`
              ORDER BY teampick_teamid, year, round ASC"
         );
 

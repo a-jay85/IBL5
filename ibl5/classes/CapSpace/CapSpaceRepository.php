@@ -39,7 +39,7 @@ class CapSpaceRepository extends \BaseMysqliRepository implements CapSpaceReposi
     {
         /** @var list<ContractRow> */
         return $this->fetchAll(
-            "SELECT cy, cyt FROM ibl_plr
+            "SELECT cy, cyt FROM `ibl_plr`
              WHERE retired = 0
                AND teamid = ?
                AND cy <> cyt",

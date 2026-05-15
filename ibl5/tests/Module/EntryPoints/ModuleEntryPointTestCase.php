@@ -50,9 +50,8 @@ abstract class ModuleEntryPointTestCase extends WideUnitTestCase
             define('MODULE_FILE', true);
         }
 
-        // Use HTMX boosted mode so PageLayout::header() skips SiteStatistics::recordHit()
-        // and PageLayout::footer() skips themeheader/footer. This keeps tests focused on
-        // the module's own parameter handling, not the page chrome.
+        // Use HTMX boosted mode so PageLayout::header() renders the minimal boosted header
+        // and PageLayout::footer() skips themeheader/footer.
         $_SERVER['HTTP_HX_BOOSTED'] = 'true';
 
         // Ensure LegacyFunctions are loaded (get_lang, cookiedecode, is_user, etc.)

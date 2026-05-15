@@ -50,9 +50,6 @@
         <testsuite name="RookieOption Module Tests">
             <directory>tests/RookieOption</directory>
         </testsuite>
-        <testsuite name="SiteStatistics Module Tests">
-            <directory>tests/SiteStatistics</directory>
-        </testsuite>
         <testsuite name="BasketballStats Module Tests">
             <directory>tests/BasketballStats</directory>
         </testsuite>
@@ -281,7 +278,6 @@
         </include>
         <exclude>
             <directory>classes/*/Contracts</directory>
-            <file>classes/SiteStatistics/StatisticsView.php</file>
             <directory>classes/OneOnOneGame</directory>
             <directory>classes/Database</directory>
             <file>classes/MySQL.php</file>

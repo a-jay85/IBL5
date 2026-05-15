@@ -139,6 +139,5 @@ Comprehensive tests are provided in `/ibl5/tests/BasketballStats/`:
 
 ## Related Documentation
 
-- For site/website statistics, see `SiteStatistics\` module
 - For player statistics display, see `Player\` module
 - For team statistics, see `TeamStats` class

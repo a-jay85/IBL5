@@ -35,9 +35,6 @@ New features should follow the Repository-Service-View pattern. See `Waivers/` (
 ### Interface-Driven Modules
 The modules in `ibl5/classes/` follow Repository/Service/View pattern with interfaces in `Contracts/` subdirectories. See `php-classes.md` for structure details. A machine-generated module map (file counts, roles, cross-module dependencies) is in `codebase-map.md` — consult it before broad codebase searches.
 
-### Legacy (Non-IBL) Modules
-- **SiteStatistics:** A legacy PHP-Nuke module for tracking site visitor/page-view statistics. It is **not** basketball- or IBL-related and should be deprioritized against core IBL modules during refactoring or feature work.
-
 ### Key Patterns
 - **Repository:** Database queries via prepared statements
 - **Service:** Business logic, validation, calculations

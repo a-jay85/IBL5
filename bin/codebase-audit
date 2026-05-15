@@ -339,7 +339,6 @@ check_code_quality() {
             mainfile.php|classes/Bootstrap/*|classes/MySQL.php|scripts/updateAllTheThings.php|language/lang-english.php) continue ;;
             classes/Boxscore/BoxscoreProcessor.php) continue ;;   # @fopen with === false check
             classes/Utilities/CoverageChecker.php) continue ;;    # @simplexml_load_file with === false check
-            classes/SiteStatistics/StatisticsView.php) continue ;; # @getimagesize with ?: fallback
         esac
         # Check for @function_call() pattern (not in comments)
         if grep -n -E '^[^/]*@[a-zA-Z_]+\(' "$phpfile" 2>/dev/null | head -1 | grep -q .; then
@@ -609,7 +608,7 @@ check_css_frontend() {
             local rel="${file#$CLASSES_DIR/}"
             # Skip legacy PHP-Nuke code
             case "$rel" in
-                SiteStatistics/*|Bootstrap/*) continue ;;
+                Bootstrap/*) continue ;;
             esac
             local tag
             tag=$(echo "$line" | sed -n 's/.*\(<[bBiIuU]\>[^a-zA-Z]\|<[Cc][Ee][Nn][Tt][Ee][Rr]\|<[Ff][Oo][Nn][Tt]\).*/\1/p' | head -1)
@@ -791,8 +790,8 @@ check_database() {
             if ($file->getExtension() !== "php") continue;
             $path = $file->getPathname();
             $rel = str_replace($dir . "/", "", $path);
-            // Exclusion list — SiteStatistics (legacy), MySQL (wrapper), Bootstrap (config values, not user input)
-            if (strpos($rel, "SiteStatistics/") === 0 || $rel === "MySQL.php" || strpos($rel, "Bootstrap/") === 0) continue;
+            // Exclusion list — MySQL (wrapper), Bootstrap (config values, not user input)
+            if ($rel === "MySQL.php" || strpos($rel, "Bootstrap/") === 0) continue;
             $content = file_get_contents($path);
             if (preg_match("/sql_query\s*\(\s*[\"'"'"'].*\\$/m", $content) ||
                 preg_match("/sql_query\s*\(\s*[\"'"'"'].*\.\s*\\$/m", $content)) {

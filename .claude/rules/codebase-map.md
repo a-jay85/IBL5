@@ -164,6 +164,7 @@ TrainingCampRatingsDiff -> BaseMysqliRepository Player Security UI
 TransactionHistory -> Security
 UI -> BasketballStats League Player Season Security Team TeamOffDefStats
 Updater -> Boxscore BulkImport JsbParser League LeagueConfig PlrParser SavedDepthChart Season Security Shared Standings Statistics StrengthOfSchedule Utilities
+Utilities -> Security
 Voting -> League Player Season Security
 Waivers -> BaseMysqliRepository Discord League Player Season Services Team UI
 YourAccount -> Auth League Logging Mail Security Services

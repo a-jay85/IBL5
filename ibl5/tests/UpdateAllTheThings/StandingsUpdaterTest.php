@@ -3,13 +3,14 @@
 declare(strict_types=1);
 
 use PHPUnit\Framework\TestCase;
+use Standings\StandingsRepository;
 use Updater\StandingsUpdater;
 use Season\Season;
 
 /**
  * Testable subclass that overrides DB methods to inject test data
  *
- * @phpstan-import-type TeamMapping from StandingsUpdater
+ * @phpstan-import-type TeamMapping from \Standings\Contracts\StandingsRepositoryInterface
  */
 class TestableStandingsUpdater extends StandingsUpdater
 {
@@ -64,6 +65,7 @@ class StandingsUpdaterTest extends TestCase
 {
     private MockDatabase $mockDb;
     private Season $mockSeason;
+    private StandingsRepository $repository;
     private TestableStandingsUpdater $updater;
 
     /** @var array<int, array{conference: string, division: string, teamName: string}> */
@@ -77,7 +79,8 @@ class StandingsUpdaterTest extends TestCase
         $this->mockSeason->beginningYear = 2006;
         $this->mockSeason->endingYear = 2007;
 
-        $this->updater = new TestableStandingsUpdater($this->mockDb, $this->mockSeason);
+        $this->repository = new StandingsRepository($this->mockDb);
+        $this->updater = new TestableStandingsUpdater($this->repository, $this->mockSeason);
 
         $this->defaultTeamMap = [
             1 => ['conference' => 'Eastern', 'division' => 'Atlantic', 'teamName' => 'Celtics'],
@@ -92,7 +95,7 @@ class StandingsUpdaterTest extends TestCase
     protected function tearDown(): void
     {
         $this->mockDb->clearQueryPatterns();
-        unset($this->updater, $this->mockDb, $this->mockSeason);
+        unset($this->updater, $this->repository, $this->mockDb, $this->mockSeason);
     }
 
     public function testUpdateDoesNotTruncateStandingsTable(): void
@@ -106,11 +109,9 @@ class StandingsUpdaterTest extends TestCase
         ob_end_clean();
 
         $queries = $this->mockDb->getExecutedQueries();
-        // No TRUNCATE — uses upsert instead
         foreach ($queries as $query) {
             $this->assertStringNotContainsString('TRUNCATE', $query);
         }
-        // Verify upserts were issued
         $upserts = array_filter($queries, static fn (string $q): bool => str_contains($q, 'ON DUPLICATE KEY UPDATE'));
         $this->assertNotEmpty($upserts);
     }
@@ -132,17 +133,14 @@ class StandingsUpdaterTest extends TestCase
         $queries = $this->mockDb->getExecutedQueries();
         $insertQueries = $this->filterInsertQueries($queries);
 
-        // Team 1 (Celtics): 2 wins, 1 loss
         $team1Insert = $this->findInsertForTeam($insertQueries, "'Celtics'");
         $this->assertNotNull($team1Insert, 'Expected INSERT for Celtics');
         $this->assertStringContainsString("'2-1'", $team1Insert);
 
-        // Team 2 (Heat): 0 wins, 2 losses
         $team2Insert = $this->findInsertForTeam($insertQueries, "'Heat'");
         $this->assertNotNull($team2Insert, 'Expected INSERT for Heat');
         $this->assertStringContainsString("'0-2'", $team2Insert);
 
-        // Team 4 (Lakers): 1 win, 0 losses
         $team4Insert = $this->findInsertForTeam($insertQueries, "'Lakers'");
         $this->assertNotNull($team4Insert, 'Expected INSERT for Lakers');
         $this->assertStringContainsString("'1-0'", $team4Insert);
@@ -153,8 +151,8 @@ class StandingsUpdaterTest extends TestCase
         $this->mockDb->setReturnTrue(true);
         $this->updater->setTestTeamMap($this->defaultTeamMap);
         $this->updater->setTestGames([
-            ['visitor_teamid' => 1, 'visitor_score' => 100, 'home_teamid' => 2, 'home_score' => 90],  // Team 1 away win
-            ['visitor_teamid' => 4, 'visitor_score' => 80, 'home_teamid' => 1, 'home_score' => 95],   // Team 1 home win
+            ['visitor_teamid' => 1, 'visitor_score' => 100, 'home_teamid' => 2, 'home_score' => 90],
+            ['visitor_teamid' => 4, 'visitor_score' => 80, 'home_teamid' => 1, 'home_score' => 95],
         ]);
 
         ob_start();
@@ -166,10 +164,6 @@ class StandingsUpdaterTest extends TestCase
 
         $team1Insert = $this->findInsertForTeam($insertQueries, "'Celtics'");
         $this->assertNotNull($team1Insert, 'Expected INSERT for Celtics');
-
-        // Verify the INSERT has home_wins=1, home_losses=0, away_wins=1, away_losses=0
-        // These are the last 4 integer values in the INSERT
-        // home_record should be '1-0', away_record should be '1-0'
         $this->assertStringContainsString("'1-0'", $team1Insert);
     }
 
@@ -178,9 +172,7 @@ class StandingsUpdaterTest extends TestCase
         $this->mockDb->setReturnTrue(true);
         $this->updater->setTestTeamMap($this->defaultTeamMap);
         $this->updater->setTestGames([
-            // Eastern vs Eastern (should count for conf record)
             ['visitor_teamid' => 1, 'visitor_score' => 100, 'home_teamid' => 2, 'home_score' => 90],
-            // Eastern vs Western (should NOT count for conf record)
             ['visitor_teamid' => 1, 'visitor_score' => 100, 'home_teamid' => 4, 'home_score' => 90],
         ]);
 
@@ -193,10 +185,6 @@ class StandingsUpdaterTest extends TestCase
 
         $team1Insert = $this->findInsertForTeam($insertQueries, "'Celtics'");
         $this->assertNotNull($team1Insert, 'Expected INSERT for Celtics');
-
-        // Team 1 total: 2-0, conf_record should be 1-0 (only the Eastern vs Eastern game)
-        // The conf_record '1-0' appears in the query
-        // league_record is '2-0', conf_record is '1-0'
         $this->assertStringContainsString("'2-0'", $team1Insert);
     }
 
@@ -205,9 +193,7 @@ class StandingsUpdaterTest extends TestCase
         $this->mockDb->setReturnTrue(true);
         $this->updater->setTestTeamMap($this->defaultTeamMap);
         $this->updater->setTestGames([
-            // Atlantic vs Atlantic (same division)
             ['visitor_teamid' => 1, 'visitor_score' => 100, 'home_teamid' => 2, 'home_score' => 90],
-            // Atlantic vs Central (same conference, different division)
             ['visitor_teamid' => 1, 'visitor_score' => 100, 'home_teamid' => 3, 'home_score' => 90],
         ]);
 
@@ -220,9 +206,6 @@ class StandingsUpdaterTest extends TestCase
 
         $team1Insert = $this->findInsertForTeam($insertQueries, "'Celtics'");
         $this->assertNotNull($team1Insert, 'Expected INSERT for Celtics');
-
-        // Team 1: total 2-0, conf 2-0, div 1-0 (only vs Heat in Atlantic)
-        // The INSERT should contain the conf_wins=2, div_wins=1 somewhere
         $this->assertStringContainsString("'2-0'", $team1Insert);
     }
 
@@ -246,12 +229,10 @@ class StandingsUpdaterTest extends TestCase
         $queries = $this->mockDb->getExecutedQueries();
         $insertQueries = $this->filterInsertQueries($queries);
 
-        // Team 1: 2 wins, 1 loss → pct = 0.667
         $team1Insert = $this->findInsertForTeam($insertQueries, "'Celtics'");
         $this->assertNotNull($team1Insert, 'Expected INSERT for Celtics');
         $this->assertStringContainsString('0.667', $team1Insert);
 
-        // Team 2: 1 win, 2 losses → pct = 0.333
         $team2Insert = $this->findInsertForTeam($insertQueries, "'Heat'");
         $this->assertNotNull($team2Insert, 'Expected INSERT for Heat');
         $this->assertStringContainsString('0.333', $team2Insert);
@@ -265,7 +246,6 @@ class StandingsUpdaterTest extends TestCase
             2 => ['conference' => 'Eastern', 'division' => 'Atlantic', 'teamName' => 'Heat'],
         ]);
 
-        // 5 games total for team 1 (3 away + 2 home)
         $games = [];
         for ($i = 0; $i < 3; $i++) {
             $games[] = ['visitor_teamid' => 1, 'visitor_score' => 100, 'home_teamid' => 2, 'home_score' => 90];
@@ -284,7 +264,6 @@ class StandingsUpdaterTest extends TestCase
 
         $team1Insert = $this->findInsertForTeam($insertQueries, "'Celtics'");
         $this->assertNotNull($team1Insert, 'Expected INSERT for Celtics');
-        // games_unplayed = 82 - 5 = 77
         $this->assertStringContainsString('77', $team1Insert);
     }
 
@@ -304,15 +283,11 @@ class StandingsUpdaterTest extends TestCase
         $queries = $this->mockDb->getExecutedQueries();
         $insertQueries = $this->filterInsertQueries($queries);
 
-        // Both teams should have INSERT queries
         $this->assertCount(2, $insertQueries);
 
-        // Verify pct is 0 (no division by zero)
         $team1Insert = $this->findInsertForTeam($insertQueries, "'Celtics'");
         $this->assertNotNull($team1Insert, 'Expected INSERT for Celtics');
-        // league_record should be '0-0'
         $this->assertStringContainsString("'0-0'", $team1Insert);
-        // games_unplayed should be 82
         $this->assertStringContainsString('82', $team1Insert);
     }
 
@@ -324,10 +299,8 @@ class StandingsUpdaterTest extends TestCase
             2 => ['conference' => 'Eastern', 'division' => 'Atlantic', 'teamName' => 'Heat'],
         ]);
         $this->updater->setTestGames([
-            // Team 1 wins all 4 games (2-0 record)
             ['visitor_teamid' => 1, 'visitor_score' => 100, 'home_teamid' => 2, 'home_score' => 90],
             ['visitor_teamid' => 1, 'visitor_score' => 100, 'home_teamid' => 2, 'home_score' => 90],
-            // Team 2 is 0-2 after above, add 2 more wins for both teams
             ['visitor_teamid' => 2, 'visitor_score' => 100, 'home_teamid' => 1, 'home_score' => 90],
             ['visitor_teamid' => 2, 'visitor_score' => 100, 'home_teamid' => 1, 'home_score' => 90],
         ]);
@@ -339,12 +312,10 @@ class StandingsUpdaterTest extends TestCase
         $queries = $this->mockDb->getExecutedQueries();
         $insertQueries = $this->filterInsertQueries($queries);
 
-        // Both teams: 2 wins, 2 losses → 0 GB from each other
         $team1Insert = $this->findInsertForTeam($insertQueries, "'Celtics'");
         $team2Insert = $this->findInsertForTeam($insertQueries, "'Heat'");
         $this->assertNotNull($team1Insert);
         $this->assertNotNull($team2Insert);
-        // Both are 2-2 so conf_gb should be 0
         $this->assertStringContainsString("'2-2'", $team1Insert);
         $this->assertStringContainsString("'2-2'", $team2Insert);
     }
@@ -405,7 +376,6 @@ class StandingsUpdaterTest extends TestCase
 
         $queries = $this->mockDb->getExecutedQueries();
 
-        // Should have SELECT queries for magic number regions
         $selectQueries = array_filter($queries, static function (string $q): bool {
             return stripos($q, 'SELECT') === 0 && stripos($q, 'ibl_standings') !== false;
         });
@@ -441,7 +411,6 @@ class StandingsUpdaterTest extends TestCase
         $this->updater->setTestTeamMap([
             1 => ['conference' => 'Eastern', 'division' => 'Atlantic', 'teamName' => 'Celtics'],
         ]);
-        // Game references team 99 which is not in teamMap
         $this->updater->setTestGames([
             ['visitor_teamid' => 1, 'visitor_score' => 100, 'home_teamid' => 99, 'home_score' => 90],
         ]);
@@ -453,7 +422,6 @@ class StandingsUpdaterTest extends TestCase
         $queries = $this->mockDb->getExecutedQueries();
         $insertQueries = $this->filterInsertQueries($queries);
 
-        // Team 1 should still be inserted with 0-0 record (game was skipped)
         $team1Insert = $this->findInsertForTeam($insertQueries, "'Celtics'");
         $this->assertNotNull($team1Insert, 'Expected INSERT for Celtics');
         $this->assertStringContainsString("'0-0'", $team1Insert);
@@ -484,7 +452,6 @@ class StandingsUpdaterTest extends TestCase
             4 => ['conference' => 'Western', 'division' => 'Pacific', 'teamName' => 'Lakers'],
         ]);
         $this->updater->setTestGames([
-            // Team 1 beats team 2 twice → Celtics 2-0, Heat 0-2
             ['visitor_teamid' => 1, 'visitor_score' => 100, 'home_teamid' => 2, 'home_score' => 90],
             ['visitor_teamid' => 1, 'visitor_score' => 100, 'home_teamid' => 2, 'home_score' => 90],
         ]);
@@ -496,15 +463,11 @@ class StandingsUpdaterTest extends TestCase
         $queries = $this->mockDb->getExecutedQueries();
         $insertQueries = $this->filterInsertQueries($queries);
 
-        // Celtics: conf_gb = 0.0 (leader)
         $celticsInsert = $this->findInsertForTeam($insertQueries, "'Celtics'");
         $this->assertNotNull($celticsInsert);
-        // Leader GB formula: leader has (2-0)/2 = 1.0 differential, so GB = 0
-        // Heat: (0-2)/2 = -1.0 differential, GB = 1.0 - (-1.0) = 2.0
         $heatInsert = $this->findInsertForTeam($insertQueries, "'Heat'");
         $this->assertNotNull($heatInsert);
 
-        // Lakers should have 0 GB since they're the only Western team
         $lakersInsert = $this->findInsertForTeam($insertQueries, "'Lakers'");
         $this->assertNotNull($lakersInsert);
     }
@@ -540,7 +503,6 @@ class StandingsUpdaterTest extends TestCase
             ['teamid' => 1, 'team_name' => 'Celtics', 'home_wins' => 40, 'home_losses' => 1, 'away_wins' => 40, 'away_losses' => 1, 'wins' => 80],
             ['teamid' => 2, 'team_name' => 'Heat', 'home_wins' => 1, 'home_losses' => 40, 'away_wins' => 1, 'away_losses' => 40, 'wins' => 2],
         ];
-        // Route clinch-check queries ([\s\S] matches across newlines unlike .)
         $this->mockDb->onQuery('ORDER BY wins DESC', $clinchData);
         $this->mockDb->onQuery('ORDER BY losses ASC', [['losses' => 80]]);
         $this->mockDb->onQuery('ORDER BY losses DESC', [['losses' => 80]]);
@@ -610,7 +572,8 @@ class StandingsUpdaterTest extends TestCase
             }
         );
 
-        $updater = new TestableStandingsUpdater($this->mockDb, $this->mockSeason, $olympicsContext);
+        $olympicsRepo = new StandingsRepository($this->mockDb, $olympicsContext);
+        $updater = new TestableStandingsUpdater($olympicsRepo, $this->mockSeason, true);
         $updater->setTestTeamMap($this->defaultTeamMap);
         $updater->setTestGames([]);
         $this->mockDb->setReturnTrue(true);
@@ -638,9 +601,7 @@ class StandingsUpdaterTest extends TestCase
 
     public function testRegionAwardMapCoversAllSixRegions(): void
     {
-        $reflection = new ReflectionClass(StandingsUpdater::class);
-        $constant = $reflection->getConstant('REGION_AWARD_MAP');
-        $this->assertIsArray($constant);
+        $constant = StandingsUpdater::REGION_AWARD_MAP;
         $this->assertCount(6, $constant);
 
         $expectedRegions = ['Atlantic', 'Central', 'Midwest', 'Pacific', 'Eastern', 'Western'];
@@ -649,16 +610,15 @@ class StandingsUpdaterTest extends TestCase
         }
     }
 
-    public function testConstructorAcceptsOptionalLeagueContext(): void
+    public function testConstructorAcceptsOptionalIsOlympicsFlag(): void
     {
-        $leagueContext = $this->createStub(\League\LeagueContext::class);
-        $updater = new \Updater\StandingsUpdater($this->mockDb, $this->mockSeason, $leagueContext);
+        $updater = new \Updater\StandingsUpdater($this->repository, $this->mockSeason, true);
         $this->assertInstanceOf(\Updater\StandingsUpdater::class, $updater);
     }
 
-    public function testConstructorAcceptsNullLeagueContext(): void
+    public function testConstructorDefaultsToNonOlympics(): void
     {
-        $updater = new \Updater\StandingsUpdater($this->mockDb, $this->mockSeason, null);
+        $updater = new \Updater\StandingsUpdater($this->repository, $this->mockSeason);
         $this->assertInstanceOf(\Updater\StandingsUpdater::class, $updater);
     }
 
@@ -676,7 +636,8 @@ class StandingsUpdaterTest extends TestCase
             }
         );
 
-        $updater = new TestableStandingsUpdater($this->mockDb, $this->mockSeason, $olympicsContext);
+        $olympicsRepo = new StandingsRepository($this->mockDb, $olympicsContext);
+        $updater = new TestableStandingsUpdater($olympicsRepo, $this->mockSeason, true);
         $updater->setTestTeamMap($this->defaultTeamMap);
         $updater->setTestGames([]);
         $this->mockDb->setReturnTrue(true);
@@ -686,7 +647,6 @@ class StandingsUpdaterTest extends TestCase
         ob_end_clean();
 
         $queries = $this->mockDb->getExecutedQueries();
-        // No TRUNCATE — uses upsert into Olympics table
         foreach ($queries as $query) {
             $this->assertStringNotContainsString('TRUNCATE', $query);
         }
@@ -709,8 +669,8 @@ class StandingsUpdaterTest extends TestCase
             }
         );
 
-        // Use the real StandingsUpdater (not the testable subclass) to verify fetchTeamMap
-        $updater = new \Updater\StandingsUpdater($this->mockDb, $this->mockSeason, $olympicsContext);
+        $olympicsRepo = new StandingsRepository($this->mockDb, $olympicsContext);
+        $updater = new \Updater\StandingsUpdater($olympicsRepo, $this->mockSeason, true);
         $this->mockDb->setReturnTrue(true);
         $this->mockDb->setMockData([]);
 
@@ -720,7 +680,6 @@ class StandingsUpdaterTest extends TestCase
 
         $queries = $this->mockDb->getExecutedQueries();
 
-        // fetchTeamMap should query ibl_olympics_league_config, not ibl_league_config
         $leagueConfigQueries = array_filter($queries, static function (string $q): bool {
             return stripos($q, 'league_config') !== false;
         });

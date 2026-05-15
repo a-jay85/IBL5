@@ -31,6 +31,16 @@ The sweep is split into two PRs:
 ## Consequences
 
 - Positive: New code cannot introduce bare table identifiers — the rule fires immediately on any new occurrence outside the baseline.
-- Positive: Future table renames get full static-analysis coverage once PR B lands.
+- Positive: Future table renames get significant static-analysis coverage once PR B lands (see Known Gaps below).
 - Negative: 133 baseline entries added (temporary — PR B will remove them).
 - Negative: Test assertions that match SQL strings must include backticks, adding minor friction.
+
+## Known Gaps
+
+The rule processes `PhpParser\Node\Scalar\String_` nodes only — plain string literals. Two patterns escape detection:
+
+1. **Interpolated strings** (`Encapsed` AST nodes) — e.g., `"SELECT pid, name FROM ibl_plr WHERE name IN ({$placeholders})"`. PHP-Parser emits an `Encapsed` node for any string containing `{$var}` or `$var`. PHPStan will not fire `ibl.bareTableIdentifier` on these. Workaround: use a parameterized `IN (?, ?, ...)` pattern with a plain string literal, or add `@phpstan-ignore-next-line ibl.bareTableIdentifier -- dynamic placeholder` if interpolation is unavoidable.
+
+2. **Constant concatenation** — e.g., `"SELECT col FROM " . self::TABLE`. The `String_` fragment `"SELECT col FROM "` contains no `ibl_` name; the table name lives in a separate constant. The rule cannot see across the concatenation boundary. Workaround: embed the table name directly in the string literal, or use a backtick-prefixed constant value (`private const TABLE = '`ibl_votes_ASG`'`) — though the latter is unusual.
+
+These gaps mean a rename of a table referenced only via interpolation or constant concatenation will not be caught by `ibl.bareTableIdentifier`. Before any `RENAME TABLE` migration, manually grep for both patterns in addition to relying on PHPStan.

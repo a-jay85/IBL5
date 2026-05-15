@@ -196,11 +196,6 @@ class ExtensionRepositoryTest extends TestCase
         LoggerFactory::forTesting($handler);
 
         $repo = new class (new \MockDatabase()) extends ExtensionRepository {
-            public function __construct(\mysqli $db)
-            {
-                parent::__construct($db);
-            }
-
             protected function execute(string $query, string $types = '', mixed ...$params): int
             {
                 throw new \RuntimeException('forced failure', 1003);
@@ -220,11 +215,6 @@ class ExtensionRepositoryTest extends TestCase
         LoggerFactory::forTesting($handler);
 
         $repo = new class (new \MockDatabase()) extends ExtensionRepository {
-            public function __construct(\mysqli $db)
-            {
-                parent::__construct($db);
-            }
-
             protected function execute(string $query, string $types = '', mixed ...$params): int
             {
                 throw new \RuntimeException('forced failure', 1003);
@@ -243,11 +233,6 @@ class ExtensionRepositoryTest extends TestCase
         LoggerFactory::forTesting($handler);
 
         $repo = new class (new \MockDatabase()) extends ExtensionRepository {
-            public function __construct(\mysqli $db)
-            {
-                parent::__construct($db);
-            }
-
             protected function execute(string $query, string $types = '', mixed ...$params): int
             {
                 throw new \RuntimeException('forced failure', 1003);

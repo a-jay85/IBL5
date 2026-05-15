@@ -6,6 +6,7 @@ if (!defined('MODULE_FILE')) {
     die("You can't access this file directly...");
 }
 
+use Auth\AuthRepository;
 use Auth\AuthService;
 use ProjectedDraftOrder\ProjectedDraftOrderRepository;
 use ProjectedDraftOrder\ProjectedDraftOrderService;
@@ -14,7 +15,7 @@ header('Content-Type: application/json');
 
 global $mysqli_db;
 
-$authService = new AuthService($mysqli_db);
+$authService = new AuthService(new AuthRepository($mysqli_db));
 
 if (!$authService->isAdmin()) {
     http_response_code(403);

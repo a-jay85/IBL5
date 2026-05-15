@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Auth;
 
+use Auth\Contracts\AuthRepositoryInterface;
 use Auth\Contracts\AuthServiceInterface;
 use Database\PdoConnection;
 use Delight\Auth\Auth;
@@ -34,7 +35,7 @@ class AuthService implements AuthServiceInterface
     private const SESSION_USER_ID = 'auth_user_id';
     private const SESSION_USERNAME = 'auth_username';
 
-    private \mysqli $db;
+    private AuthRepositoryInterface $repository;
 
     private ?Auth $auth;
 
@@ -43,9 +44,9 @@ class AuthService implements AuthServiceInterface
     /** @var array<string, float|int|string|null>|null Cached user info row */
     private ?array $cachedUserInfo = null;
 
-    public function __construct(\mysqli $db, ?Auth $auth = null)
+    public function __construct(AuthRepositoryInterface $repository, ?Auth $auth = null)
     {
-        $this->db = $db;
+        $this->repository = $repository;
         $this->auth = $auth;
     }
 
@@ -127,23 +128,9 @@ class AuthService implements AuthServiceInterface
             return false;
         }
 
-        $stmt = $this->db->prepare('SELECT roles_mask FROM auth_users WHERE username = ?');
-        if ($stmt === false) {
-            return false;
-        }
-        $stmt->bind_param('s', $username);
-        $stmt->execute();
-        $result = $stmt->get_result();
-        if ($result === false) {
-            $stmt->close();
-            return false;
-        }
-        /** @var array{roles_mask: int}|null $row */
-        $row = $result->fetch_assoc();
-        $stmt->close();
+        $row = $this->repository->findUserRolesByUsername($username);
 
         if ($row === null) {
-            // Cache the miss so we don't re-query on every page load
             $_SESSION['auth_roles'] = 0;
             return false;
         }
@@ -175,20 +162,7 @@ class AuthService implements AuthServiceInterface
             return null;
         }
 
-        $stmt = $this->db->prepare('SELECT id AS user_id, username, email AS user_email FROM auth_users WHERE username = ?');
-        if ($stmt === false) {
-            return null;
-        }
-        $stmt->bind_param('s', $username);
-        $stmt->execute();
-        $result = $stmt->get_result();
-        if ($result === false) {
-            $stmt->close();
-            return null;
-        }
-        /** @var array<string, float|int|string|null>|null $row */
-        $row = $result->fetch_assoc();
-        $stmt->close();
+        $row = $this->repository->findUserInfo($username);
 
         if ($row === null) {
             return null;

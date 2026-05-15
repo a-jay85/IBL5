@@ -6,6 +6,7 @@ if (!defined('MODULE_FILE')) {
     die("You can't access this file directly...");
 }
 
+use Auth\AuthRepository;
 use Auth\AuthService;
 use ProjectedDraftOrder\ProjectedDraftOrderRepository;
 use ProjectedDraftOrder\ProjectedDraftOrderService;
@@ -21,7 +22,7 @@ $repository = new ProjectedDraftOrderRepository($mysqli_db);
 $service = new ProjectedDraftOrderService($repository);
 $view = new ProjectedDraftOrderView();
 
-$authService = new AuthService($mysqli_db);
+$authService = new AuthService(new AuthRepository($mysqli_db));
 $isAdmin = $authService->isAdmin();
 $isFinalized = $repository->isDraftOrderFinalized();
 $isDraftStarted = $isFinalized && $repository->isDraftStarted($season->endingYear);

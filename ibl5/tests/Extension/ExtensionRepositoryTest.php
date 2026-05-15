@@ -6,6 +6,8 @@ namespace Tests\Extension;
 
 use PHPUnit\Framework\TestCase;
 use Extension\ExtensionRepository;
+use Logging\LoggerFactory;
+use Monolog\Handler\TestHandler;
 
 /**
  * Tests for ExtensionRepository
@@ -27,6 +29,11 @@ class ExtensionRepositoryTest extends TestCase
     {
         $this->mockDb = new \MockDatabase();
         $this->repository = new ExtensionRepository($this->mockDb);
+    }
+
+    protected function tearDown(): void
+    {
+        LoggerFactory::reset();
     }
 
     // ============================================
@@ -177,6 +184,80 @@ class ExtensionRepositoryTest extends TestCase
         $this->assertQueryExecuted('UPDATE ibl_plr');
         $this->assertQueryExecuted('used_extension_this_season');
         $this->assertQueryExecuted('nuke_stories');
+    }
+
+    // ============================================
+    // FAILURE PATH LOGGING
+    // ============================================
+
+    public function testUpdatePlayerContractLogsOnFailure(): void
+    {
+        $handler = new TestHandler();
+        LoggerFactory::forTesting($handler);
+
+        $repo = new class (new \MockDatabase()) extends ExtensionRepository {
+            public function __construct(\mysqli $db)
+            {
+                parent::__construct($db);
+            }
+
+            protected function execute(string $query, string $types = '', mixed ...$params): int
+            {
+                throw new \RuntimeException('forced failure', 1003);
+            }
+        };
+
+        $offer = ['year1' => 100, 'year2' => 110, 'year3' => 120, 'year4' => 0, 'year5' => 0];
+        $result = $repo->updatePlayerContract('Test Player', $offer, 80);
+
+        $this->assertFalse($result);
+        $this->assertTrue($handler->hasErrorThatContains('updatePlayerContract failed'));
+    }
+
+    public function testMarkExtensionUsedThisSimLogsOnFailure(): void
+    {
+        $handler = new TestHandler();
+        LoggerFactory::forTesting($handler);
+
+        $repo = new class (new \MockDatabase()) extends ExtensionRepository {
+            public function __construct(\mysqli $db)
+            {
+                parent::__construct($db);
+            }
+
+            protected function execute(string $query, string $types = '', mixed ...$params): int
+            {
+                throw new \RuntimeException('forced failure', 1003);
+            }
+        };
+
+        $result = $repo->markExtensionUsedThisSim('Test Team');
+
+        $this->assertFalse($result);
+        $this->assertTrue($handler->hasErrorThatContains('markExtensionUsedThisSim failed'));
+    }
+
+    public function testMarkExtensionUsedThisSeasonLogsOnFailure(): void
+    {
+        $handler = new TestHandler();
+        LoggerFactory::forTesting($handler);
+
+        $repo = new class (new \MockDatabase()) extends ExtensionRepository {
+            public function __construct(\mysqli $db)
+            {
+                parent::__construct($db);
+            }
+
+            protected function execute(string $query, string $types = '', mixed ...$params): int
+            {
+                throw new \RuntimeException('forced failure', 1003);
+            }
+        };
+
+        $result = $repo->markExtensionUsedThisSeason('Test Team');
+
+        $this->assertFalse($result);
+        $this->assertTrue($handler->hasErrorThatContains('markExtensionUsedThisSeason failed'));
     }
 
     /**

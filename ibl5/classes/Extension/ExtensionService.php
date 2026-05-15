@@ -358,7 +358,11 @@ class ExtensionService implements ExtensionProcessorInterface
         if ($playerID !== null) {
             try {
                 return Player::withPlayerID($this->db, (int) $playerID);
-            } catch (\Exception) {
+            } catch (\Exception $e) {
+                \Logging\LoggerFactory::getChannel('db')->error('getPlayerObject failed', [
+                    'exception' => $e,
+                    'context' => ['playerID' => $playerID],
+                ]);
                 return null;
             }
         }
@@ -384,7 +388,11 @@ class ExtensionService implements ExtensionProcessorInterface
 
         try {
             return Team::initialize($this->db, $teamName);
-        } catch (\Exception) {
+        } catch (\Exception $e) {
+            \Logging\LoggerFactory::getChannel('db')->error('getTeamObject failed', [
+                'exception' => $e,
+                'context' => ['teamName' => $teamName],
+            ]);
             return null;
         }
     }

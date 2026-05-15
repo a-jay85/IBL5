@@ -35,7 +35,7 @@
     "@axe-core/playwright": "^4.11.3",
     "@lhci/cli": "^0.15.1",
     "@playwright/test": "1.60.0",
-    "@tailwindcss/cli": "^4.2.4",
+    "@tailwindcss/cli": "^4.3.0",
     "browser-sync": "^3.0.4",
     "eslint": "^10.3.0",
     "eslint-plugin-playwright": "^2.10.2",

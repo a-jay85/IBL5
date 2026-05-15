@@ -163,44 +163,7 @@ class SavedDepthChartService implements SavedDepthChartServiceInterface
      */
     public function getWinLossRecord(int $teamid, string $startDate, string $endDate): array
     {
-        $query = "SELECT
-            SUM(CASE WHEN (visitor_teamid = ? AND visitor_score > home_score) OR (home_teamid = ? AND home_score > visitor_score) THEN 1 ELSE 0 END) as wins,
-            SUM(CASE WHEN (visitor_teamid = ? AND visitor_score < home_score) OR (home_teamid = ? AND home_score < visitor_score) THEN 1 ELSE 0 END) as losses
-            FROM `ibl_schedule`
-            WHERE game_date BETWEEN ? AND ?
-              AND (visitor_teamid = ? OR home_teamid = ?)
-              AND (visitor_score > 0 OR home_score > 0)";
-
-        $stmt = $this->db->prepare($query);
-        if ($stmt === false) {
-            return ['wins' => 0, 'losses' => 0];
-        }
-
-        $stmt->bind_param(
-            'iiiissii',
-            $teamid, $teamid, $teamid, $teamid,
-            $startDate, $endDate,
-            $teamid, $teamid
-        );
-        $stmt->execute();
-        $result = $stmt->get_result();
-
-        if ($result === false) {
-            $stmt->close();
-            return ['wins' => 0, 'losses' => 0];
-        }
-
-        $row = $result->fetch_assoc();
-        $stmt->close();
-
-        if (!is_array($row)) {
-            return ['wins' => 0, 'losses' => 0];
-        }
-
-        return [
-            'wins' => (int) ($row['wins'] ?? 0),
-            'losses' => (int) ($row['losses'] ?? 0),
-        ];
+        return $this->repository->getWinLossRecord($teamid, $startDate, $endDate);
     }
 
     /**

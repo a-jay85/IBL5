@@ -1,6 +1,6 @@
 ---
 description: Shared review rubric and false-positive filter used by /code-review, /security-audit, and /post-plan.
-last_verified: 2026-04-29
+last_verified: 2026-05-15
 ---
 
 # Review Rubric and False-Positive Filter (shared)
@@ -48,7 +48,7 @@ Catches type errors, loose comparisons (`==`/`!=`), unused imports, unreachable 
 | `ibl.bannedNukeGlobal` | Direct `is_user`/`is_admin`/`cookiedecode`/etc. outside `NukeCompat`/`LegacyFunctions`/`PageLayout` |
 | `ibl.bannedBeginTransaction` | Direct `begin_transaction()` in repository subclasses (use `$this->transactional()`) |
 | `ibl.unescapedOutput` | `echo`/`<?=` in Views without `HtmlSanitizer::e()` wrapping |
-| `ibl.rawSuperglobal` | `$_GET`/`$_POST`/`$_REQUEST`/`$_COOKIE` outside `*Controller.php`, `*ApiHandler.php`, `Utilities/CsrfGuard.php` |
+| `ibl.rawSuperglobal` | `$_GET`/`$_POST`/`$_REQUEST`/`$_COOKIE` outside `*Controller.php`, `*ApiHandler.php`, `Security/CsrfGuard.php` |
 | `ibl.inlineCss` | `<style>` blocks or `style="..."` attributes in PHP string literals (except `style="--` CSS custom properties) |
 | `ibl.deprecatedHtmlTag` | `<b>`, `<i>`, `<center>`, `<font>`, `<u>` in PHP string literals |
 | `ibl.requireOnce` | `require_once`/`require`/`include_once`/`include` in `classes/**` |

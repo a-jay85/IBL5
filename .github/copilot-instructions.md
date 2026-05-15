@@ -14,7 +14,7 @@
 - Fix every instance of identified patterns, not just commented lines
 
 ### XSS Protection (MANDATORY)
-- Use `Utilities\HtmlSanitizer::safeHtmlOutput()` on ALL dynamic content
+- Use `Security\HtmlSanitizer::safeHtmlOutput()` on ALL dynamic content
 - Check: database results, form inputs, player names, error messages
 - **Never skip this check** - applies during ANY code work
 

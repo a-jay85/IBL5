@@ -42,7 +42,7 @@ class NewsService extends \BaseMysqliRepository
             return null;
         }
         $topicId = $row['topicid'];
-        return is_int($topicId) ? $topicId : (is_string($topicId) ? (int) $topicId : null);
+        return is_int($topicId) ? $topicId : null;
     }
 
     public function getCategoryIDByTitle(string $categoryTitle): ?int
@@ -57,7 +57,7 @@ class NewsService extends \BaseMysqliRepository
             return null;
         }
         $catId = $row['catid'];
-        return is_int($catId) ? $catId : (is_string($catId) ? (int) $catId : null);
+        return is_int($catId) ? $catId : null;
     }
 
     public function incrementCategoryCounter(string $categoryTitle): int

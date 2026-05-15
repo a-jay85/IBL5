@@ -18,7 +18,7 @@ namespace PlrParser;
  * (a) byte-diffing `06-07_11_reg-sim05.zip` against `06-07_28_reg-sim22.zip` for
  * the Celtics row to isolate cumulative-counter regions, then (b) cross-referencing
  * each candidate value against the database aggregate
- * `SUM(...) FROM ibl_box_scores_teams WHERE (vTID=1 OR hTID=1) AND game_type=1
+ * `SUM(...) FROM `ibl_box_scores_teams` WHERE (vTID=1 OR hTID=1) AND game_type=1
  * AND Date <= sim05_cutoff` (using a `ROW_NUMBER` window to dedupe the visitor/home
  * pair so the per-team contribution is counted exactly once). All 15 fields below
  * matched byte-for-byte against the database for sim05 Celtics; the same offsets

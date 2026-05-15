@@ -32,7 +32,7 @@ interface PlrParserServiceInterface
      * Process a .plr file with an explicit ending year, bypassing the Season dependency.
      *
      * In Live mode: upserts players + historical stats (same as processPlrFile).
-     * In Snapshot mode: upserts rating snapshots into ibl_plr_snapshots.
+     * In Snapshot mode: upserts rating snapshots into `ibl_plr_snapshots`.
      *
      * @param string $filePath Absolute path to the .plr file
      * @param int $endingYear Season ending year for draft year calculation
@@ -53,7 +53,7 @@ interface PlrParserServiceInterface
      * Process raw .plr file contents with an explicit ending year, bypassing the Season dependency.
      *
      * In Live mode: upserts players + historical stats (same as processPlrData).
-     * In Snapshot mode: upserts rating snapshots into ibl_plr_snapshots.
+     * In Snapshot mode: upserts rating snapshots into `ibl_plr_snapshots`.
      *
      * @param string $data Raw .plr file contents (CRLF-separated 607-byte records)
      * @param int $endingYear Season ending year for draft year calculation

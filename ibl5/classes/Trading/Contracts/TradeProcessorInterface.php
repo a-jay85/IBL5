@@ -29,7 +29,7 @@ interface TradeProcessorInterface
      *         - 'storytitle': string - News story title on success
      *
      * IMPORTANT BEHAVIORS:
-     *  - Fetches all trade items from ibl_trade_info table
+     *  - Fetches all trade items from `ibl_trade_info` table
      *  - Processes each item: player transfers, pick transfers, cash transactions
      *  - For players: Updates teamid in ibl_plr
      *  - For picks: Updates ownerofpick in ibl_draft_picks
@@ -38,7 +38,7 @@ interface TradeProcessorInterface
      *  - Sends email to ibldepthcharts@gmail.com (production only)
      *  - Posts to Discord #trades and #general-chat channels
      *  - Queues queries during Playoffs/Draft/Free Agency phases
-     *  - Deletes trade data from ibl_trade_info and ibl_trade_cash
+     *  - Deletes trade data from `ibl_trade_info` and ibl_trade_cash
      *
      * Trade Queue:
      *  During certain season phases, trade queries are queued in ibl_trade_queue

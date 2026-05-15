@@ -12,7 +12,7 @@ use PlrParser\PlrOrdinalMap;
  * Orchestrator service for JSB file parsing and database import.
  *
  * Coordinates parsing of .car, .trn, .his, and .asw files, resolves player/team IDs,
- * and stores results in the database. Season stats flow from ibl_box_scores via the ibl_hist VIEW.
+ * and stores results in the database. Season stats flow from `ibl_box_scores` via the ibl_hist VIEW.
  */
 class JsbImportService implements JsbImportServiceInterface
 {
@@ -67,7 +67,7 @@ class JsbImportService implements JsbImportServiceInterface
                     continue;
                 }
 
-                // ibl_hist is now a VIEW derived from ibl_box_scores — no direct writes needed.
+                // ibl_hist is now a VIEW derived from `ibl_box_scores` — no direct writes needed.
                 // Season stats are derived from individual game box scores automatically.
                 $result->addInserted();
             }

@@ -21,7 +21,7 @@ class ApiPlayerStatsRepository extends \BaseMysqliRepository
         return $this->fetchOne(
             'SELECT v.*, dt.teamid AS draft_team_id
              FROM vw_player_career_stats v
-             LEFT JOIN ibl_team_info dt ON v.drafted_by_team = dt.team_name
+             LEFT JOIN `ibl_team_info` dt ON v.drafted_by_team = dt.team_name
              WHERE v.player_uuid = ?',
             's',
             $playerUuid
@@ -38,9 +38,9 @@ class ApiPlayerStatsRepository extends \BaseMysqliRepository
         /** @var list<SeasonHistoryRow> */
         return $this->fetchAll(
             'SELECT h.*, p.uuid AS player_uuid, t.uuid AS team_uuid, t.team_city, t.team_name
-             FROM ibl_hist h
-             JOIN ibl_plr p ON h.pid = p.pid
-             LEFT JOIN ibl_team_info t ON h.teamid = t.teamid
+             FROM `ibl_hist` h
+             JOIN `ibl_plr` p ON h.pid = p.pid
+             LEFT JOIN `ibl_team_info` t ON h.teamid = t.teamid
              WHERE p.uuid = ?
              ORDER BY h.year DESC',
             's',

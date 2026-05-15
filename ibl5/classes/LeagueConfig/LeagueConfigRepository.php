@@ -110,7 +110,7 @@ class LeagueConfigRepository extends \BaseMysqliRepository implements LeagueConf
     public function getFranchiseTeamsBySeason(int $seasonEndingYear): array
     {
         $rows = $this->fetchAll(
-            'SELECT franchise_id, team_name FROM ibl_franchise_seasons WHERE season_ending_year = ? ORDER BY franchise_id ASC',
+            'SELECT franchise_id, team_name FROM `ibl_franchise_seasons` WHERE season_ending_year = ? ORDER BY franchise_id ASC',
             'i',
             $seasonEndingYear,
         );

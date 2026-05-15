@@ -150,7 +150,7 @@ interface LeagueControlPanelRepositoryInterface
     public function resetAllMlesAndLles(): bool;
 
     /**
-     * Upsert an award row into ibl_awards.
+     * Upsert an award row into `ibl_awards`.
      *
      * Uses INSERT ... ON DUPLICATE KEY UPDATE on (year, award, name).
      *
@@ -162,7 +162,7 @@ interface LeagueControlPanelRepositoryInterface
     public function upsertAward(int $year, string $award, string $name): int;
 
     /**
-     * Upsert a GM award row into ibl_gm_awards.
+     * Upsert a GM award row into `ibl_gm_awards`.
      *
      * @param int $year Season ending year
      * @param string $name GM username
@@ -179,7 +179,7 @@ interface LeagueControlPanelRepositoryInterface
     public function hasFinalsMvp(int $year): bool;
 
     /**
-     * Delete temporary draft player placeholders from ibl_plr.
+     * Delete temporary draft player placeholders from `ibl_plr`.
      *
      * These are rows with pid >= 90000, created during the draft when a player
      * is selected but before plrParser assigns permanent PIDs.

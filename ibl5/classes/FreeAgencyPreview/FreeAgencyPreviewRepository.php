@@ -32,8 +32,8 @@ class FreeAgencyPreviewRepository extends \BaseMysqliRepository implements FreeA
                          p.oo, p.r_drive_off, p.po, p.r_trans_off, p.od, p.dd, p.pd, p.td,
                          p.loyalty, p.winner, p.playing_time, p.security, p.tradition,
                          t.team_city, t.color1, t.color2
-            FROM ibl_plr p
-            LEFT JOIN ibl_team_info t ON p.teamid = t.teamid
+            FROM `ibl_plr` p
+            LEFT JOIN `ibl_team_info` t ON p.teamid = t.teamid
             WHERE p.retired = 0
             ORDER BY p.ordinal ASC";
 

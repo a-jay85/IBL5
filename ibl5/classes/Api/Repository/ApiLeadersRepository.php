@@ -50,9 +50,9 @@ class ApiLeadersRepository extends \BaseMysqliRepository
         $sortExpr = self::CATEGORY_SORT_MAP[$category];
 
         $query = "SELECT h.*, p.uuid AS player_uuid, t.uuid AS team_uuid, t.team_city, t.team_name
-                  FROM ibl_hist h
-                  JOIN ibl_plr p ON h.pid = p.pid
-                  LEFT JOIN ibl_team_info t ON h.teamid = t.teamid
+                  FROM `ibl_hist` h
+                  JOIN `ibl_plr` p ON h.pid = p.pid
+                  LEFT JOIN `ibl_team_info` t ON h.teamid = t.teamid
                   WHERE {$whereClause}
                   ORDER BY {$sortExpr} DESC
                   LIMIT ? OFFSET ?";
@@ -81,7 +81,7 @@ class ApiLeadersRepository extends \BaseMysqliRepository
 
         /** @var array{total: int}|null $row */
         $row = $this->fetchOne(
-            "SELECT COUNT(*) AS total FROM ibl_hist h WHERE {$whereClause}",
+            "SELECT COUNT(*) AS total FROM `ibl_hist` h WHERE {$whereClause}",
             $types,
             ...$params
         );
@@ -97,7 +97,7 @@ class ApiLeadersRepository extends \BaseMysqliRepository
     public function getAvailableSeasons(): array
     {
         /** @var list<array{year: int}> $rows */
-        $rows = $this->fetchAll('SELECT DISTINCT year FROM ibl_hist ORDER BY year DESC');
+        $rows = $this->fetchAll('SELECT DISTINCT year FROM `ibl_hist` ORDER BY year DESC');
 
         $years = [];
         foreach ($rows as $row) {

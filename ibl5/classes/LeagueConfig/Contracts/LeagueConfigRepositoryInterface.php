@@ -59,7 +59,7 @@ interface LeagueConfigRepositoryInterface
     public function getConfigForSeason(int $seasonEndingYear): array;
 
     /**
-     * Retrieve franchise team names for a season from ibl_franchise_seasons.
+     * Retrieve franchise team names for a season from `ibl_franchise_seasons`.
      *
      * @return array<int, string> Map of franchise_id => team_name
      */

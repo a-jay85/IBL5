@@ -82,7 +82,7 @@ class WaiversWideUnitTest extends WideUnitTestCase
         // Assert
         $this->assertTrue($result);
         $this->assertQueryExecuted('UPDATE ibl_plr');
-        $this->assertQueryExecuted("ordinal` = '1000'");
+        $this->assertQueryExecuted("ordinal = '1000'");
         $this->assertQueryExecuted('droptime');
     }
 
@@ -198,12 +198,12 @@ class WaiversWideUnitTest extends WideUnitTestCase
         // Assert
         $this->assertTrue($result);
         $this->assertQueryExecuted('UPDATE ibl_plr');
-        $this->assertQueryExecuted("ordinal` = '800'");
-        $this->assertQueryExecuted('bird` = 0');
-        $this->assertQueryExecuted('droptime` = 0');
-        $this->assertQueryExecuted('teamid` = 5');
+        $this->assertQueryExecuted("ordinal = '800'");
+        $this->assertQueryExecuted('bird = 0');
+        $this->assertQueryExecuted('droptime = 0');
+        $this->assertQueryExecuted('teamid = 5');
         // Should NOT update contract fields when hasExistingContract = true
-        $this->assertQueryNotExecuted('cy` = 0');
+        $this->assertQueryNotExecuted('cy = 0');
     }
 
     /**
@@ -229,11 +229,11 @@ class WaiversWideUnitTest extends WideUnitTestCase
         // Assert
         $this->assertTrue($result);
         $this->assertQueryExecuted('UPDATE ibl_plr');
-        $this->assertQueryExecuted("ordinal` = '800'");
-        $this->assertQueryExecuted('cy` = 0');
-        $this->assertQueryExecuted('cyt` = 1');
-        $this->assertQueryExecuted("salary_yr1` = 103");
-        $this->assertQueryExecuted('teamid` = 8');
+        $this->assertQueryExecuted("ordinal = '800'");
+        $this->assertQueryExecuted('cy = 0');
+        $this->assertQueryExecuted('cyt = 1');
+        $this->assertQueryExecuted("salary_yr1 = 103");
+        $this->assertQueryExecuted('teamid = 8');
     }
 
     /**

@@ -35,7 +35,7 @@ final class RefreshTeamSeasonRecordsStep implements PipelineStepInterface
         $this->db->begin_transaction();
 
         try {
-            if ($this->db->query('DELETE FROM ibl_team_season_records') === false) {
+            if ($this->db->query('DELETE FROM `ibl_team_season_records`') === false) {
                 throw new \RuntimeException('DELETE failed: ' . $this->db->error);
             }
             if ($this->db->query(self::INSERT_REGULAR_SEASON_SQL) === false) {
@@ -63,7 +63,7 @@ final class RefreshTeamSeasonRecordsStep implements PipelineStepInterface
      * Year boundary: MONTH(game_date) >= 10 ? YEAR+1 : YEAR.
      */
     private const string INSERT_REGULAR_SEASON_SQL = <<<'SQL'
-INSERT INTO ibl_team_season_records
+INSERT INTO `ibl_team_season_records`
     (team_id, `year`, game_type, currentname, namethatyear, wins, losses)
 WITH unique_games AS (
     SELECT
@@ -72,7 +72,7 @@ WITH unique_games AS (
          + COALESCE(visitor_ot_points, 0)) AS visitor_total,
         (home_q1_points + home_q2_points + home_q3_points + home_q4_points
          + COALESCE(home_ot_points, 0)) AS home_total
-    FROM ibl_box_scores_teams
+    FROM `ibl_box_scores_teams`
     WHERE game_type = 1
     GROUP BY game_date, visitor_teamid, home_teamid, game_of_that_day
 ),
@@ -97,8 +97,8 @@ SELECT
     CAST(SUM(tg.win)  AS UNSIGNED) AS wins,
     CAST(SUM(tg.loss) AS UNSIGNED) AS losses
 FROM team_games tg
-JOIN ibl_team_info ti ON ti.teamid = tg.team_id
-LEFT JOIN ibl_franchise_seasons fs
+JOIN `ibl_team_info` ti ON ti.teamid = tg.team_id
+LEFT JOIN `ibl_franchise_seasons` fs
     ON fs.franchise_id = tg.team_id
     AND fs.season_ending_year = (
         CASE WHEN MONTH(tg.game_date) >= 10 THEN YEAR(tg.game_date) + 1
@@ -117,7 +117,7 @@ SQL;
      * 9000+ sentinel year used for unscheduled HEAT games.
      */
     private const string INSERT_HEAT_SQL = <<<'SQL'
-INSERT INTO ibl_team_season_records
+INSERT INTO `ibl_team_season_records`
     (team_id, `year`, game_type, currentname, namethatyear, wins, losses)
 WITH unique_games AS (
     SELECT
@@ -126,7 +126,7 @@ WITH unique_games AS (
          + COALESCE(visitor_ot_points, 0)) AS visitor_total,
         (home_q1_points + home_q2_points + home_q3_points + home_q4_points
          + COALESCE(home_ot_points, 0)) AS home_total
-    FROM ibl_box_scores_teams
+    FROM `ibl_box_scores_teams`
     WHERE game_type = 3
       AND YEAR(game_date) < 9000
     GROUP BY game_date, visitor_teamid, home_teamid, game_of_that_day
@@ -151,8 +151,8 @@ SELECT
     CAST(SUM(tg.win)  AS UNSIGNED) AS wins,
     CAST(SUM(tg.loss) AS UNSIGNED) AS losses
 FROM team_games tg
-JOIN ibl_team_info ti ON ti.teamid = tg.team_id
-LEFT JOIN ibl_franchise_seasons fs
+JOIN `ibl_team_info` ti ON ti.teamid = tg.team_id
+LEFT JOIN `ibl_franchise_seasons` fs
     ON fs.franchise_id = tg.team_id
     AND fs.season_ending_year = (YEAR(tg.game_date) + 1)
 GROUP BY

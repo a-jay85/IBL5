@@ -10,7 +10,7 @@ use PlrParser\Contracts\PlrParserRepositoryInterface;
 /**
  * Repository for PLR file database operations using prepared statements.
  *
- * Handles upserts into ibl_plr and ibl_hist tables.
+ * Handles upserts into `ibl_plr` and ibl_hist tables.
  * League-aware: resolves table names through LeagueContext when provided.
  */
 class PlrParserRepository extends \BaseMysqliRepository implements PlrParserRepositoryInterface

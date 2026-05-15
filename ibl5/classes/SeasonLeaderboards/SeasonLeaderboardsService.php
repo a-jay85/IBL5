@@ -19,7 +19,7 @@ class SeasonLeaderboardsService implements SeasonLeaderboardsServiceInterface
     /**
      * @see SeasonLeaderboardsServiceInterface::processPlayerRow()
      *
-     * @param HistRow $row Database row from ibl_hist table
+     * @param HistRow $row Database row from `ibl_hist` table
      * @return ProcessedStats Formatted player statistics
      */
     public function processPlayerRow(array $row): array

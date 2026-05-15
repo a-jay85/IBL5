@@ -114,7 +114,7 @@ class ApiGameRepository extends \BaseMysqliRepository
         return $this->fetchAll(
             "SELECT b.*, COALESCE(p.name, b.name) AS name, p.uuid AS player_uuid, p.teamid AS player_tid
              FROM {$this->boxScoresTable} b
-             LEFT JOIN ibl_plr p ON b.pid = p.pid
+             LEFT JOIN `ibl_plr` p ON b.pid = p.pid
              WHERE b.game_date = ? AND b.visitor_teamid = ? AND b.home_teamid = ?
              ORDER BY b.id ASC",
             'sii',

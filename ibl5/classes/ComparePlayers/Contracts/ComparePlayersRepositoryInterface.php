@@ -43,7 +43,7 @@ interface ComparePlayersRepositoryInterface
     /**
      * Get complete player data by exact name match
      * 
-     * Retrieves all columns from ibl_plr table for a single player.
+     * Retrieves all columns from `ibl_plr` table for a single player.
      * Uses exact name matching (case-sensitive).
      * Returns a single row or null if player not found.
      * 
@@ -91,7 +91,7 @@ interface ComparePlayersRepositoryInterface
      * IMPORTANT BEHAVIORS:
      *  - Uses prepared statements (SQL injection safe)
      *  - Exact name match required (case-sensitive)
-     *  - Returns ALL columns from ibl_plr table
+     *  - Returns ALL columns from `ibl_plr` table
      *  - Returns null if player name doesn't exist
      *  - LIMIT 1 ensures single row returned
      *  - NEVER throws exceptions

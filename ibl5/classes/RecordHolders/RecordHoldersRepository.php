@@ -90,8 +90,8 @@ class RecordHoldersRepository extends \BaseMysqliRepository implements RecordHol
                 bs.game_stl AS steals,
                 bs.game_blk AS blocks
             FROM {$this->boxScoresTable} bs
-            JOIN ibl_plr p ON p.pid = bs.pid
-            JOIN ibl_hist h ON h.pid = bs.pid AND h.year = (" . self::SEASON_YEAR_EXPRESSION . ")
+            JOIN `ibl_plr` p ON p.pid = bs.pid
+            JOIN `ibl_hist` h ON h.pid = bs.pid AND h.year = (" . self::SEASON_YEAR_EXPRESSION . ")
             LEFT JOIN {$this->scheduleTable} sch ON sch.game_date = bs.game_date
                 AND sch.visitor_teamid = bs.visitor_teamid AND sch.home_teamid = bs.home_teamid
             LEFT JOIN _game_of_day bst ON bst.game_date = bs.game_date
@@ -145,8 +145,8 @@ class RecordHoldersRepository extends \BaseMysqliRepository implements RecordHol
     public function getMostAllStarAppearances(): array
     {
         $query = "SELECT a.name, h.pid, COUNT(*) AS appearances
-            FROM ibl_awards a
-            LEFT JOIN (SELECT DISTINCT pid, name FROM ibl_hist) h ON h.name = a.name
+            FROM `ibl_awards` a
+            LEFT JOIN (SELECT DISTINCT pid, name FROM `ibl_hist`) h ON h.name = a.name
             WHERE a.award LIKE '%Conference All-Star'
             GROUP BY a.name, h.pid
             ORDER BY appearances DESC, a.name ASC
@@ -315,7 +315,7 @@ class RecordHoldersRepository extends \BaseMysqliRepository implements RecordHol
                 twl.year,
                 twl.wins,
                 twl.losses
-            FROM ibl_team_win_loss twl
+            FROM `ibl_team_win_loss` twl
             JOIN {$this->teamInfoTable} ti ON ti.team_name = twl.currentname
             WHERE ti.teamid BETWEEN 1 AND " . League::MAX_REAL_TEAMID . "
                 AND (twl.wins + twl.losses) > 0
@@ -341,7 +341,7 @@ class RecordHoldersRepository extends \BaseMysqliRepository implements RecordHol
     }
 
     /**
-     * Fetch all regular season games from ibl_box_scores_teams, cached for reuse
+     * Fetch all regular season games from `ibl_box_scores_teams`, cached for reuse
      *
      * Both getLongestStreak() and getBestWorstSeasonStart() need the same data.
      *
@@ -639,8 +639,8 @@ class RecordHoldersRepository extends \BaseMysqliRepository implements RecordHol
                     opp.team_name AS opp_team_name,
                     {$expression} AS value
                 FROM {$this->boxScoresTable} bs
-                JOIN ibl_plr p ON p.pid = bs.pid
-                JOIN ibl_hist h ON h.pid = bs.pid AND h.year = (" . self::SEASON_YEAR_EXPRESSION . ")
+                JOIN `ibl_plr` p ON p.pid = bs.pid
+                JOIN `ibl_hist` h ON h.pid = bs.pid AND h.year = (" . self::SEASON_YEAR_EXPRESSION . ")
                 LEFT JOIN {$this->scheduleTable} sch ON sch.game_date = bs.game_date
                     AND sch.visitor_teamid = bs.visitor_teamid AND sch.home_teamid = bs.home_teamid
                 LEFT JOIN _game_of_day bst ON bst.game_date = bs.game_date
@@ -785,7 +785,7 @@ class RecordHoldersRepository extends \BaseMysqliRepository implements RecordHol
                     h.team,
                     h.year,
                     ROUND(h.{$safeColumn} / h.{$safeGames}, 1) AS value
-                FROM ibl_hist h
+                FROM `ibl_hist` h
                 WHERE h.{$safeGames} >= {$minGames}
                     AND h.teamid BETWEEN 1 AND " . League::MAX_REAL_TEAMID . "
                 ORDER BY value DESC
@@ -872,7 +872,7 @@ class RecordHoldersRepository extends \BaseMysqliRepository implements RecordHol
                 GROUP_CONCAT(year ORDER BY year ASC SEPARATOR ', ') AS years
             FROM (
                 SELECT year, name, award
-                FROM ibl_team_awards
+                FROM `ibl_team_awards`
 
                 UNION ALL
 
@@ -906,10 +906,10 @@ class RecordHoldersRepository extends \BaseMysqliRepository implements RecordHol
                             PARTITION BY YEAR(bst.game_date)
                             ORDER BY bst.game_date DESC, bst.game_of_that_day ASC
                         ) AS rn
-                    FROM ibl_box_scores_teams bst
+                    FROM `ibl_box_scores_teams` bst
                     WHERE bst.game_type = 3
                 ) hc
-                JOIN ibl_team_info ti ON ti.teamid = hc.winner_tid
+                JOIN `ibl_team_info` ti ON ti.teamid = hc.winner_tid
                 WHERE hc.rn = 1
             ) all_awards
             WHERE award LIKE ?
@@ -957,10 +957,10 @@ class RecordHoldersRepository extends \BaseMysqliRepository implements RecordHol
      */
     public function getUnannouncedGameDates(?string $lastAnnouncedDate): array
     {
-        // Get the latest sim's date range from ibl_sim_dates
+        // Get the latest sim's date range from `ibl_sim_dates`
         /** @var array{start_date: string, end_date: string}|null $latestSim */
         $latestSim = $this->fetchOne(
-            "SELECT start_date, end_date FROM ibl_sim_dates ORDER BY sim DESC LIMIT 1"
+            "SELECT start_date, end_date FROM `ibl_sim_dates` ORDER BY sim DESC LIMIT 1"
         );
 
         if ($latestSim === null) {

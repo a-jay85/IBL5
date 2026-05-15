@@ -63,7 +63,7 @@ class CommonMysqliRepository extends \BaseMysqliRepository
         // Primary: check ibl_team_info (authoritative for real GMs)
         /** @var array{team_name: string}|null $result */
         $result = $this->fetchOne(
-            "SELECT team_name FROM ibl_team_info WHERE gm_username = ? LIMIT 1",
+            "SELECT team_name FROM `ibl_team_info` WHERE gm_username = ? LIMIT 1",
             "s",
             $username
         );
@@ -81,7 +81,7 @@ class CommonMysqliRepository extends \BaseMysqliRepository
     {
         /** @var array{gm_username: ?string}|null $result */
         $result = $this->fetchOne(
-            "SELECT gm_username FROM ibl_team_info WHERE team_name = ? LIMIT 1",
+            "SELECT gm_username FROM `ibl_team_info` WHERE team_name = ? LIMIT 1",
             "s",
             $teamName
         );
@@ -99,7 +99,7 @@ class CommonMysqliRepository extends \BaseMysqliRepository
     {
         /** @var TeamInfoRow|null */
         return $this->fetchOne(
-            "SELECT * FROM ibl_team_info WHERE team_name = ?",
+            "SELECT * FROM `ibl_team_info` WHERE team_name = ?",
             "s",
             $teamName
         );
@@ -115,7 +115,7 @@ class CommonMysqliRepository extends \BaseMysqliRepository
     {
         /** @var array{teamid: int}|null $result */
         $result = $this->fetchOne(
-            "SELECT teamid FROM ibl_team_info WHERE team_name = ? LIMIT 1",
+            "SELECT teamid FROM `ibl_team_info` WHERE team_name = ? LIMIT 1",
             "s",
             $teamName
         );
@@ -133,7 +133,7 @@ class CommonMysqliRepository extends \BaseMysqliRepository
     {
         /** @var array{team_name: string}|null $result */
         $result = $this->fetchOne(
-            "SELECT team_name FROM ibl_team_info WHERE teamid = ? LIMIT 1",
+            "SELECT team_name FROM `ibl_team_info` WHERE teamid = ? LIMIT 1",
             "i",
             $teamid
         );
@@ -175,8 +175,8 @@ class CommonMysqliRepository extends \BaseMysqliRepository
         /** @var PlayerRow|null */
         return $this->fetchOne(
             "SELECT p.*, t.team_name AS teamname, t.color1, t.color2
-            FROM ibl_plr p
-            LEFT JOIN ibl_team_info t ON p.teamid = t.teamid
+            FROM `ibl_plr` p
+            LEFT JOIN `ibl_team_info` t ON p.teamid = t.teamid
             WHERE p.pid = ?",
             "i",
             $playerID
@@ -193,7 +193,7 @@ class CommonMysqliRepository extends \BaseMysqliRepository
     {
         /** @var array{pid: int}|null $result */
         $result = $this->fetchOne(
-            "SELECT pid FROM ibl_plr WHERE name = ? LIMIT 1",
+            "SELECT pid FROM `ibl_plr` WHERE name = ? LIMIT 1",
             "s",
             $playerName
         );
@@ -212,8 +212,8 @@ class CommonMysqliRepository extends \BaseMysqliRepository
         /** @var PlayerRow|null */
         return $this->fetchOne(
             "SELECT p.*, t.team_name AS teamname, t.color1, t.color2
-            FROM ibl_plr p
-            LEFT JOIN ibl_team_info t ON p.teamid = t.teamid
+            FROM `ibl_plr` p
+            LEFT JOIN `ibl_team_info` t ON p.teamid = t.teamid
             WHERE p.name = ?",
             "s",
             $playerName

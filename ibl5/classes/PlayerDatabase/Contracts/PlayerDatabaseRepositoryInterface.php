@@ -67,11 +67,11 @@ interface PlayerDatabaseRepositoryInterface
     /**
      * Get a single player by ID
      * 
-     * @param int $pid Player ID (pid from ibl_plr table)
+     * @param int $pid Player ID (pid from `ibl_plr` table)
      * @return array<string, mixed>|null Complete player row or null if not found
      * 
      * IMPORTANT BEHAVIORS:
-     *  - Returns a complete row from ibl_plr table (all columns)
+     *  - Returns a complete row from `ibl_plr` table (all columns)
      *  - Returns null if player ID doesn't exist
      *  - Uses prepared statement (safe from SQL injection)
      *  - NEVER throws exceptions

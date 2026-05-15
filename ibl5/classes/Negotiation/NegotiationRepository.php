@@ -26,7 +26,7 @@ class NegotiationRepository extends BaseMysqliRepository implements NegotiationR
         /** @var array{contract_wins?: int, contract_losses?: int, contract_avg_w?: int, contract_avg_l?: int}|null $result */
         $result = $this->fetchOne(
             "SELECT contract_wins, contract_losses, contract_avg_w, contract_avg_l
-             FROM ibl_team_info
+             FROM `ibl_team_info`
              WHERE team_name = ?",
             "s",
             $teamName
@@ -131,7 +131,7 @@ class NegotiationRepository extends BaseMysqliRepository implements NegotiationR
                 MAX(pd)            AS pd,
                 MAX(r_trans_off)   AS r_trans_off,
                 MAX(td)            AS td
-            FROM ibl_plr"
+            FROM `ibl_plr`"
         );
 
         if ($result === null) {

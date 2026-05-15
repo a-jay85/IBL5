@@ -17,7 +17,7 @@ interface TradeOfferRepositoryInterface
     /**
      * Generate the next trade offer ID using AUTO_INCREMENT
      *
-     * Inserts a row into ibl_trade_offers and returns the generated ID.
+     * Inserts a row into `ibl_trade_offers` and returns the generated ID.
      * This is atomic and race-condition-free.
      *
      * @return int New trade offer ID
@@ -63,7 +63,7 @@ interface TradeOfferRepositoryInterface
     /**
      * Get all pending trade offers ordered by offer ID
      *
-     * Returns pending (non-completed) rows from ibl_trade_info for the trade
+     * Returns pending (non-completed) rows from `ibl_trade_info` for the trade
      * review page. Excludes rows with approval='completed' which are preserved
      * only for TRN export.
      *
@@ -93,7 +93,7 @@ interface TradeOfferRepositoryInterface
     /**
      * Delete a trade offer parent row by ID
      *
-     * Removes the parent record from ibl_trade_offers.
+     * Removes the parent record from `ibl_trade_offers`.
      * Called by deleteTradeOffer() after child rows are removed.
      *
      * @param int $offerId Trade offer ID

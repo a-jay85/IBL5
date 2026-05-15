@@ -76,8 +76,8 @@ class SplitStatsRepository extends \BaseMysqliRepository implements SplitStatsRe
             ROUND(SUM(bs.game_blk)/COUNT(DISTINCT bs.`game_date`), 1) as gameBLKavg,
             ROUND(SUM(bs.game_pf)/COUNT(DISTINCT bs.`game_date`), 1) as gamePFavg,
             ROUND(((2 * SUM(bs.game_2gm)) + SUM(bs.game_ftm) + (3 * SUM(bs.game_3gm)))/COUNT(DISTINCT bs.`game_date`), 1) as gamePTSavg
-        FROM ibl_box_scores bs
-        JOIN ibl_plr p ON bs.pid = p.pid
+        FROM `ibl_box_scores` bs
+        JOIN `ibl_plr` p ON bs.pid = p.pid
         " . $splitCondition['joins'] . "
         WHERE bs.season_year = ?
             AND (bs.home_teamid = ? OR bs.visitor_teamid = ?)
@@ -167,7 +167,7 @@ class SplitStatsRepository extends \BaseMysqliRepository implements SplitStatsRe
         if (str_starts_with($splitKey, 'vs_')) {
             $opponentTid = (int) substr($splitKey, 3);
             $row = $this->fetchOne(
-                "SELECT team_name FROM ibl_team_info WHERE teamid = ?",
+                "SELECT team_name FROM `ibl_team_info` WHERE teamid = ?",
                 "i",
                 $opponentTid
             );
@@ -206,7 +206,7 @@ class SplitStatsRepository extends \BaseMysqliRepository implements SplitStatsRe
 
         // Result splits
         if ($splitKey === 'wins') {
-            $result['joins'] = 'JOIN ibl_schedule sch ON bs.`game_date` = sch.`game_date` AND ((sch.home_teamid = bs.home_teamid AND sch.visitor_teamid = bs.visitor_teamid) OR (sch.home_teamid = bs.visitor_teamid AND sch.visitor_teamid = bs.home_teamid))';
+            $result['joins'] = 'JOIN `ibl_schedule` sch ON bs.`game_date` = sch.`game_date` AND ((sch.home_teamid = bs.home_teamid AND sch.visitor_teamid = bs.visitor_teamid) OR (sch.home_teamid = bs.visitor_teamid AND sch.visitor_teamid = bs.home_teamid))';
             $result['where'] = 'AND ((sch.home_teamid = ? AND sch.home_score > sch.visitor_score) OR (sch.visitor_teamid = ? AND sch.visitor_score > sch.home_score))';
             $result['types'] = 'ii';
             $result['params'] = [$teamid, $teamid];
@@ -214,7 +214,7 @@ class SplitStatsRepository extends \BaseMysqliRepository implements SplitStatsRe
         }
 
         if ($splitKey === 'losses') {
-            $result['joins'] = 'JOIN ibl_schedule sch ON bs.`game_date` = sch.`game_date` AND ((sch.home_teamid = bs.home_teamid AND sch.visitor_teamid = bs.visitor_teamid) OR (sch.home_teamid = bs.visitor_teamid AND sch.visitor_teamid = bs.home_teamid))';
+            $result['joins'] = 'JOIN `ibl_schedule` sch ON bs.`game_date` = sch.`game_date` AND ((sch.home_teamid = bs.home_teamid AND sch.visitor_teamid = bs.visitor_teamid) OR (sch.home_teamid = bs.visitor_teamid AND sch.visitor_teamid = bs.home_teamid))';
             $result['where'] = 'AND ((sch.home_teamid = ? AND sch.home_score < sch.visitor_score) OR (sch.visitor_teamid = ? AND sch.visitor_score < sch.home_score))';
             $result['types'] = 'ii';
             $result['params'] = [$teamid, $teamid];
@@ -257,7 +257,7 @@ class SplitStatsRepository extends \BaseMysqliRepository implements SplitStatsRe
                     break;
                 }
             }
-            $result['joins'] = 'JOIN ibl_standings opp_s ON opp_s.teamid = CASE WHEN bs.home_teamid = ' . $teamid . ' THEN bs.visitor_teamid ELSE bs.home_teamid END';
+            $result['joins'] = 'JOIN `ibl_standings` opp_s ON opp_s.teamid = CASE WHEN bs.home_teamid = ' . $teamid . ' THEN bs.visitor_teamid ELSE bs.home_teamid END';
             $result['where'] = 'AND opp_s.division = ?';
             $result['types'] = 's';
             $result['params'] = [$divisionName];
@@ -274,7 +274,7 @@ class SplitStatsRepository extends \BaseMysqliRepository implements SplitStatsRe
                     break;
                 }
             }
-            $result['joins'] = 'JOIN ibl_standings opp_s ON opp_s.teamid = CASE WHEN bs.home_teamid = ' . $teamid . ' THEN bs.visitor_teamid ELSE bs.home_teamid END';
+            $result['joins'] = 'JOIN `ibl_standings` opp_s ON opp_s.teamid = CASE WHEN bs.home_teamid = ' . $teamid . ' THEN bs.visitor_teamid ELSE bs.home_teamid END';
             $result['where'] = 'AND opp_s.conference = ?';
             $result['types'] = 's';
             $result['params'] = [$conferenceName];

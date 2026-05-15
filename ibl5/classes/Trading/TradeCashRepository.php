@@ -38,7 +38,7 @@ class TradeCashRepository extends BaseMysqliRepository implements TradeCashRepos
     {
         /** @var TradeCashRow|null */
         return $this->fetchOne(
-            "SELECT * FROM ibl_trade_cash WHERE trade_offer_id = ? AND sending_team = ?",
+            "SELECT * FROM `ibl_trade_cash` WHERE trade_offer_id = ? AND sending_team = ?",
             "is",
             $offerId,
             $sendingTeam
@@ -51,7 +51,7 @@ class TradeCashRepository extends BaseMysqliRepository implements TradeCashRepos
     public function insertCashTradeOffer(int $tradeOfferId, string $sendingTeam, string $receivingTeam, int $salaryYr1, int $salaryYr2, int $salaryYr3, int $salaryYr4, int $salaryYr5, int $salaryYr6): int
     {
         return $this->execute(
-            "INSERT INTO ibl_trade_cash
+            "INSERT INTO `ibl_trade_cash`
                 (`trade_offer_id`, `sending_team`, `receiving_team`, `salary_yr1`, `salary_yr2`, `salary_yr3`, `salary_yr4`, `salary_yr5`, `salary_yr6`)
              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
             "issiiiiii",
@@ -72,7 +72,7 @@ class TradeCashRepository extends BaseMysqliRepository implements TradeCashRepos
      */
     public function clearTradeCash(): int
     {
-        return $this->execute("DELETE FROM ibl_trade_cash");
+        return $this->execute("DELETE FROM `ibl_trade_cash`");
     }
 
     /**
@@ -91,7 +91,7 @@ class TradeCashRepository extends BaseMysqliRepository implements TradeCashRepos
 
         /** @var list<TradeCashRow> $rows */
         $rows = $this->fetchAll(
-            "SELECT * FROM ibl_trade_cash WHERE trade_offer_id IN ({$placeholders})",
+            "SELECT * FROM `ibl_trade_cash` WHERE trade_offer_id IN ({$placeholders})",
             $types,
             ...$offerIds
         );
@@ -111,7 +111,7 @@ class TradeCashRepository extends BaseMysqliRepository implements TradeCashRepos
     public function deleteTradeCashByOfferId(int $offerId): int
     {
         return $this->execute(
-            "DELETE FROM ibl_trade_cash WHERE trade_offer_id = ?",
+            "DELETE FROM `ibl_trade_cash` WHERE trade_offer_id = ?",
             "i",
             $offerId
         );

@@ -268,7 +268,7 @@ class RecordHoldersService implements RecordHoldersServiceInterface
         // Get the years for this player's all-star appearances
         $years = $this->getAllStarYears($topRecord['name']);
 
-        // Get teams from ibl_hist for this player
+        // Get teams from `ibl_hist` for this player
         $teams = $this->getAllStarTeams($topRecord['name']);
 
         return [

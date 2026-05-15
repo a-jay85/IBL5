@@ -12,7 +12,7 @@ use Updater\Contracts\PipelineStepInterface;
 use Updater\StepResult;
 
 /**
- * Snapshot current-season player stats into ibl_plr_snapshots.
+ * Snapshot current-season player stats into `ibl_plr_snapshots`.
  *
  * Auto-detects the snapshot phase: 'end-of-season' when a champion has been
  * determined, 'mid-season' otherwise. This replaces the PLR snapshot logic

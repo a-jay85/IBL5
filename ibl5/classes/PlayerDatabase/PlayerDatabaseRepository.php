@@ -115,8 +115,8 @@ class PlayerDatabaseRepository extends BaseMysqliRepository implements PlayerDat
 
         $whereClause = $qc->toWhereClause();
         $query = "SELECT ibl_plr.*, ibl_team_info.team_name AS teamname, ibl_team_info.color1, ibl_team_info.color2
-            FROM ibl_plr
-            LEFT JOIN ibl_team_info ON ibl_plr.teamid = ibl_team_info.teamid
+            FROM `ibl_plr`
+            LEFT JOIN `ibl_team_info` ON ibl_plr.teamid = ibl_team_info.teamid
             WHERE $whereClause
             ORDER BY ibl_plr.retired ASC, ibl_plr.ordinal ASC";
 
@@ -152,7 +152,7 @@ class PlayerDatabaseRepository extends BaseMysqliRepository implements PlayerDat
     {
         // Use fetchOne from BaseMysqliRepository for single-row queries
         return $this->fetchOne(
-            "SELECT * FROM ibl_plr WHERE pid = ?",
+            "SELECT * FROM `ibl_plr` WHERE pid = ?",
             "i",
             $pid
         );

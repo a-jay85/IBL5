@@ -28,7 +28,7 @@ class WaiversRepository extends BaseMysqliRepository implements WaiversRepositor
      */
     public function dropPlayerToWaivers(int $playerID, int $timestamp): bool
     {
-        $query = "UPDATE ibl_plr 
+        $query = "UPDATE `ibl_plr`
                   SET `ordinal` = '1000', 
                       `droptime` = ? 
                   WHERE `pid` = ? 
@@ -56,7 +56,7 @@ class WaiversRepository extends BaseMysqliRepository implements WaiversRepositor
             if (!$contractData['hasExistingContract']) {
                 // Need to set contract fields when no existing contract
                 $salary = $contractData['salary'];
-                $query = "UPDATE ibl_plr
+                $query = "UPDATE `ibl_plr`
                           SET `ordinal` = '800', `bird` = 0, `cy` = 0, `cyt` = 1,
                               `salary_yr1` = ?, `salary_yr2` = 0, `salary_yr3` = 0, `salary_yr4` = 0, `salary_yr5` = 0,
                               `salary_yr6` = 0, `teamid` = ?, `droptime` = 0
@@ -64,7 +64,7 @@ class WaiversRepository extends BaseMysqliRepository implements WaiversRepositor
                 $affectedRows = $this->execute($query, 'iii', $salary, $teamid, $playerID);
             } else {
                 // Keep existing contract
-                $query = "UPDATE ibl_plr
+                $query = "UPDATE `ibl_plr`
                           SET `ordinal` = '800', `bird` = 0, `teamid` = ?,
                               `droptime` = 0
                           WHERE `pid` = ? LIMIT 1";

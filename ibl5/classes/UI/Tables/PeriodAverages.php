@@ -84,8 +84,8 @@ class PeriodAverages
             ROUND(SUM(bs.game_blk)/COUNT(DISTINCT bs.game_date), 1) as gameBLKavg,
             ROUND(SUM(bs.game_pf)/COUNT(DISTINCT bs.game_date) , 1) as gamePFavg,
             ROUND(((2 * SUM(bs.game_2gm)) + SUM(bs.game_ftm) + (3 * SUM(bs.game_3gm)))/COUNT(DISTINCT bs.game_date) , 1) as gamePTSavg
-        FROM   ibl_box_scores bs
-        JOIN   ibl_plr p ON bs.pid = p.pid
+        FROM `ibl_box_scores` bs
+        JOIN `ibl_plr` p ON bs.pid = p.pid
         WHERE  bs.game_date BETWEEN ? AND ?
             AND ( bs.home_teamid = ?
                 OR bs.visitor_teamid = ? )

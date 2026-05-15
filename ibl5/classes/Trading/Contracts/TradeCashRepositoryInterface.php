@@ -24,7 +24,7 @@ interface TradeCashRepositoryInterface
     public function getCashTransactionByOffer(int $offerId, string $sendingTeam): ?array;
 
     /**
-     * Insert cash trade offer into ibl_trade_cash
+     * Insert cash trade offer into `ibl_trade_cash`
      *
      * @param int $tradeOfferId Trade offer ID
      * @param string $sendingTeam Sending team name

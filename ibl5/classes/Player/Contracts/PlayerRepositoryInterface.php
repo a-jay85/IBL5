@@ -37,7 +37,7 @@ interface PlayerRepositoryInterface
     /**
      * Fill a PlayerData object from a current player database row
      *
-     * Transforms a raw database row from ibl_plr table into a PlayerData object.
+     * Transforms a raw database row from `ibl_plr` table into a PlayerData object.
      * Maps all database columns to PlayerData properties, including:
      * - Basic fields: pid, name, nickname, position, etc.
      * - Ratings: 22 individual skill/preference ratings
@@ -45,7 +45,7 @@ interface PlayerRepositoryInterface
      * - Draft info: year, round, pick number, college, team
      * - Physical: height, weight
      *
-     * @param PlayerRow $plrRow Database row from ibl_plr
+     * @param PlayerRow $plrRow Database row from `ibl_plr`
      * @return PlayerData Fully populated PlayerData object
      */
     public function fillFromCurrentRow(array $plrRow): PlayerData;
@@ -53,11 +53,11 @@ interface PlayerRepositoryInterface
     /**
      * Fill a PlayerData object from a historical player database row
      * 
-     * Transforms a raw database row from ibl_hist table (historical statistics)
+     * Transforms a raw database row from `ibl_hist` table (historical statistics)
      * into a PlayerData object representing a player in a previous season.
      * Similar to fillFromCurrentRow but handles historical data structure.
      * 
-     * @param HistoricalPlayerRow $histRow Database row from ibl_hist
+     * @param HistoricalPlayerRow $histRow Database row from `ibl_hist`
      * @return PlayerData Fully populated PlayerData object with historical data
      */
     public function fillFromHistoricalRow(array $histRow): PlayerData;

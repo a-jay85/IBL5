@@ -24,7 +24,7 @@ class ComparePlayersRepository extends \BaseMysqliRepository implements CompareP
     public function getAllPlayerNames(): array
     {
         $rows = $this->fetchAll(
-            "SELECT name FROM ibl_plr WHERE ordinal != 0 AND name != '(no starter)' ORDER BY name ASC"
+            "SELECT name FROM `ibl_plr` WHERE ordinal != 0 AND name != '(no starter)' ORDER BY name ASC"
         );
 
         $names = [];
@@ -46,8 +46,8 @@ class ComparePlayersRepository extends \BaseMysqliRepository implements CompareP
         /** @var PlayerRow|null */
         return $this->fetchOne(
             "SELECT p.*, t.team_city, t.color1, t.color2
-            FROM ibl_plr p
-            LEFT JOIN ibl_team_info t ON p.teamid = t.teamid
+            FROM `ibl_plr` p
+            LEFT JOIN `ibl_team_info` t ON p.teamid = t.teamid
             WHERE p.name = ? LIMIT 1",
             "s",
             $playerName

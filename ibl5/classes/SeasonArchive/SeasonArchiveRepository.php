@@ -43,7 +43,7 @@ class SeasonArchiveRepository extends BaseMysqliRepository implements SeasonArch
     public function getAllSeasonYears(): array
     {
         $rows = $this->fetchAll(
-            "SELECT DISTINCT year FROM ibl_awards WHERE year > 1 ORDER BY year ASC"
+            "SELECT DISTINCT year FROM `ibl_awards` WHERE year > 1 ORDER BY year ASC"
         );
 
         $years = [];
@@ -62,7 +62,7 @@ class SeasonArchiveRepository extends BaseMysqliRepository implements SeasonArch
     {
         /** @var list<AwardRow> */
         return $this->fetchAll(
-            "SELECT year, award, name, table_id FROM ibl_awards WHERE year = ? ORDER BY award ASC, table_id ASC",
+            "SELECT year, award, name, table_id FROM `ibl_awards` WHERE year = ? ORDER BY award ASC, table_id ASC",
             "i",
             $year
         );
@@ -104,7 +104,7 @@ class SeasonArchiveRepository extends BaseMysqliRepository implements SeasonArch
     private static function buildTeamAwardsByYearQuery(): string
     {
         return "SELECT year, name, award, id
-            FROM ibl_team_awards
+            FROM `ibl_team_awards`
             WHERE year = ?
 
             UNION ALL
@@ -140,10 +140,10 @@ class SeasonArchiveRepository extends BaseMysqliRepository implements SeasonArch
                         PARTITION BY YEAR(bst.game_date)
                         ORDER BY bst.game_date DESC, bst.game_of_that_day ASC
                     ) AS rn
-                FROM ibl_box_scores_teams bst
+                FROM `ibl_box_scores_teams` bst
                 WHERE bst.game_type = 3 AND YEAR(bst.game_date) = ?
             ) hc
-            JOIN ibl_team_info ti ON ti.teamid = hc.winner_tid
+            JOIN `ibl_team_info` ti ON ti.teamid = hc.winner_tid
             WHERE hc.rn = 1
 
             ORDER BY " . self::AWARD_HIERARCHY_CASE . ", award ASC, name ASC";
@@ -178,8 +178,8 @@ class SeasonArchiveRepository extends BaseMysqliRepository implements SeasonArch
         /** @var list<GmAwardWithTeamRow> */
         return $this->fetchAll(
             "SELECT ga.year, ga.award, ga.name AS gm_display_name, ti.team_name, ga.table_id
-            FROM ibl_gm_awards ga
-            JOIN ibl_gm_tenures gt ON ga.name = gt.gm_display_name
+            FROM `ibl_gm_awards` ga
+            JOIN `ibl_gm_tenures` gt ON ga.name = gt.gm_display_name
                 AND ga.year >= gt.start_season_year
                 AND (gt.end_season_year IS NULL OR ga.year <= gt.end_season_year)
             JOIN {$this->teamInfoTable} ti ON gt.franchise_id = ti.teamid
@@ -195,7 +195,7 @@ class SeasonArchiveRepository extends BaseMysqliRepository implements SeasonArch
         /** @var list<GmTenureWithTeamRow> */
         return $this->fetchAll(
             "SELECT gt.gm_display_name, gt.start_season_year, gt.end_season_year, ti.team_name
-            FROM ibl_gm_tenures gt
+            FROM `ibl_gm_tenures` gt
             JOIN {$this->teamInfoTable} ti ON gt.franchise_id = ti.teamid
             ORDER BY gt.start_season_year ASC"
         );
@@ -209,7 +209,7 @@ class SeasonArchiveRepository extends BaseMysqliRepository implements SeasonArch
         /** @var list<HeatWinLossRow> */
         return $this->fetchAll(
             "SELECT hwl.year, hwl.currentname, hwl.namethatyear, hwl.wins, hwl.losses
-            FROM ibl_heat_win_loss hwl
+            FROM `ibl_heat_win_loss` hwl
             JOIN {$this->teamInfoTable} ti ON ti.team_name = hwl.currentname
             WHERE hwl.year = ?
                 AND ti.teamid BETWEEN 1 AND " . League::MAX_REAL_TEAMID . "
@@ -252,7 +252,7 @@ class SeasonArchiveRepository extends BaseMysqliRepository implements SeasonArch
 
         /** @var \mysqli $db */
         $db = $this->db;
-        $stmt = $db->prepare("SELECT pid, name FROM ibl_plr WHERE name IN ({$placeholders})");
+        $stmt = $db->prepare("SELECT pid, name FROM `ibl_plr` WHERE name IN ({$placeholders})");
         if ($stmt === false) {
             return [];
         }

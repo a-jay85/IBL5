@@ -42,7 +42,7 @@ interface JsbImportRepositoryInterface
     public function upsertAllStarScore(array $record): int;
 
     /**
-     * Upsert an award row into ibl_awards from bulk import.
+     * Upsert an award row into `ibl_awards` from bulk import.
      *
      * @param int $year Season ending year
      * @param string $award Award name (e.g., "Scoring Leader (1st)")

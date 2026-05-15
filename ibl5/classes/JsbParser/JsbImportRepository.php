@@ -10,7 +10,7 @@ use League\LeagueContext;
 /**
  * Repository for database operations related to JSB file imports.
  *
- * Handles upserts into ibl_hist, ibl_jsb_transactions, ibl_jsb_history,
+ * Handles upserts into `ibl_hist`, ibl_jsb_transactions, ibl_jsb_history,
  * ibl_jsb_allstar_rosters, and ibl_jsb_allstar_scores tables.
  * League-aware: resolves table names through LeagueContext when provided.
  */
@@ -182,7 +182,7 @@ class JsbImportRepository extends \BaseMysqliRepository implements JsbImportRepo
     public function upsertAllStarRoster(array $record): int
     {
         return $this->execute(
-            'INSERT INTO ibl_jsb_allstar_rosters
+            'INSERT INTO `ibl_jsb_allstar_rosters`
                 (season_year, event_type, roster_slot, pid, player_name)
             VALUES (?, ?, ?, ?, ?)
             ON DUPLICATE KEY UPDATE
@@ -203,7 +203,7 @@ class JsbImportRepository extends \BaseMysqliRepository implements JsbImportRepo
     public function upsertAllStarScore(array $record): int
     {
         return $this->execute(
-            'INSERT INTO ibl_jsb_allstar_scores
+            'INSERT INTO `ibl_jsb_allstar_scores`
                 (season_year, contest_type, round, participant_slot, pid, score)
             VALUES (?, ?, ?, ?, ?, ?)
             ON DUPLICATE KEY UPDATE
@@ -225,7 +225,7 @@ class JsbImportRepository extends \BaseMysqliRepository implements JsbImportRepo
     public function upsertAward(int $year, string $award, string $name): int
     {
         return $this->execute(
-            "INSERT INTO ibl_awards (year, award, name)
+            "INSERT INTO `ibl_awards` (year, award, name)
             VALUES (?, ?, ?)
             ON DUPLICATE KEY UPDATE name = VALUES(name)",
             'iss',

@@ -166,7 +166,7 @@ class SavedDepthChartService implements SavedDepthChartServiceInterface
         $query = "SELECT
             SUM(CASE WHEN (visitor_teamid = ? AND visitor_score > home_score) OR (home_teamid = ? AND home_score > visitor_score) THEN 1 ELSE 0 END) as wins,
             SUM(CASE WHEN (visitor_teamid = ? AND visitor_score < home_score) OR (home_teamid = ? AND home_score < visitor_score) THEN 1 ELSE 0 END) as losses
-            FROM ibl_schedule
+            FROM `ibl_schedule`
             WHERE game_date BETWEEN ? AND ?
               AND (visitor_teamid = ? OR home_teamid = ?)
               AND (visitor_score > 0 OR home_score > 0)";

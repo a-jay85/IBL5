@@ -25,7 +25,7 @@ class MaintenanceRepository extends \BaseMysqliRepository implements Maintenance
     {
         /** @var array<int, array{team_name: string}> */
         return $this->fetchAll(
-            "SELECT team_name FROM ibl_team_info WHERE teamid BETWEEN 1 AND ?",
+            "SELECT team_name FROM `ibl_team_info` WHERE teamid BETWEEN 1 AND ?",
             "i",
             League::MAX_REAL_TEAMID
         );
@@ -40,7 +40,7 @@ class MaintenanceRepository extends \BaseMysqliRepository implements Maintenance
     {
         /** @var array<int, array{wins: int, losses: int}> */
         return $this->fetchAll(
-            "SELECT wins, losses FROM ibl_team_win_loss
+            "SELECT wins, losses FROM `ibl_team_win_loss`
              WHERE currentname = ? AND (wins + losses = 82)
              ORDER BY year DESC
              LIMIT ?",
@@ -56,7 +56,7 @@ class MaintenanceRepository extends \BaseMysqliRepository implements Maintenance
     public function updateTeamTradition(string $teamName, int $avgWins, int $avgLosses): bool
     {
         $this->execute(
-            "UPDATE ibl_team_info SET contract_avg_w = ?, contract_avg_l = ? WHERE team_name = ?",
+            "UPDATE `ibl_team_info` SET contract_avg_w = ?, contract_avg_l = ? WHERE team_name = ?",
             "iis",
             $avgWins,
             $avgLosses,
@@ -72,7 +72,7 @@ class MaintenanceRepository extends \BaseMysqliRepository implements Maintenance
     public function getSetting(string $name): ?string
     {
         $result = $this->fetchOne(
-            "SELECT value FROM ibl_settings WHERE name = ?",
+            "SELECT value FROM `ibl_settings` WHERE name = ?",
             "s",
             $name
         );

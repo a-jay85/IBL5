@@ -86,7 +86,7 @@ class TeamOffDefStatsRepository extends \BaseMysqliRepository implements TeamOff
                 tds.tvr AS defense_tvr,
                 tds.blk AS defense_blk,
                 tds.pf AS defense_pf
-            FROM ibl_team_info ti
+            FROM `ibl_team_info` ti
             LEFT JOIN (" . self::buildOffenseSubquery('bst.season_year = ?', $gameTypes) . ") tos ON ti.teamid = tos.teamid
             LEFT JOIN (" . self::buildDefenseSubquery('my.season_year = ?', $gameTypes) . ") tds ON ti.teamid = tds.teamid
             WHERE ti.teamid BETWEEN 1 AND " . League::MAX_REAL_TEAMID . "
@@ -300,8 +300,8 @@ class TeamOffDefStatsRepository extends \BaseMysqliRepository implements TeamOff
             CAST(SUM(bst.game_tov) AS SIGNED) AS tvr,
             CAST(SUM(bst.game_blk) AS SIGNED) AS blk,
             CAST(SUM(bst.game_pf) AS SIGNED) AS pf
-        FROM ibl_box_scores_teams bst
-        JOIN ibl_franchise_seasons fs
+        FROM `ibl_box_scores_teams` bst
+        JOIN `ibl_franchise_seasons` fs
             ON fs.team_name = bst.name AND fs.season_ending_year = bst.season_year
         WHERE {$gameTypeFilter}{$filterClause}
         GROUP BY fs.franchise_id, fs.team_name, bst.season_year";
@@ -329,14 +329,14 @@ class TeamOffDefStatsRepository extends \BaseMysqliRepository implements TeamOff
             CAST(SUM(opp.game_tov) AS SIGNED) AS tvr,
             CAST(SUM(opp.game_blk) AS SIGNED) AS blk,
             CAST(SUM(opp.game_pf) AS SIGNED) AS pf
-        FROM ibl_box_scores_teams my
-        JOIN ibl_box_scores_teams opp
+        FROM `ibl_box_scores_teams` my
+        JOIN `ibl_box_scores_teams` opp
             ON my.game_date = opp.game_date
             AND my.visitor_teamid = opp.visitor_teamid
             AND my.home_teamid = opp.home_teamid
             AND my.game_of_that_day = opp.game_of_that_day
             AND my.name <> opp.name
-        JOIN ibl_franchise_seasons fs
+        JOIN `ibl_franchise_seasons` fs
             ON fs.team_name = my.name AND fs.season_ending_year = my.season_year
         WHERE {$gameTypeFilter}{$filterClause}
         GROUP BY fs.franchise_id, fs.team_name, my.season_year";

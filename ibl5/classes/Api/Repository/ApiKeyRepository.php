@@ -16,7 +16,7 @@ class ApiKeyRepository extends \BaseMysqliRepository
         /** @var array{key_hash: string, key_prefix: string, owner_name: string, permission_level: string, rate_limit_tier: string}|null $row */
         $row = $this->fetchOne(
             'SELECT key_hash, key_prefix, owner_name, permission_level, rate_limit_tier
-             FROM ibl_api_keys
+             FROM `ibl_api_keys`
              WHERE key_hash = ? AND is_active = 1',
             's',
             $keyHash
@@ -31,7 +31,7 @@ class ApiKeyRepository extends \BaseMysqliRepository
     public function touchLastUsed(string $keyHash): void
     {
         $this->execute(
-            'UPDATE ibl_api_keys SET last_used_at = NOW() WHERE key_hash = ?',
+            'UPDATE `ibl_api_keys` SET last_used_at = NOW() WHERE key_hash = ?',
             's',
             $keyHash
         );

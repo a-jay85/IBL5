@@ -8,7 +8,7 @@ use Updater\Contracts\PipelineStepInterface;
 use Updater\StepResult;
 
 /**
- * Refresh the materialized ibl_hist table from ibl_plr_snapshots.
+ * Refresh the materialized ibl_hist table from `ibl_plr_snapshots`.
  *
  * Runs DELETE + INSERT inside a transaction so the table is never empty on
  * error. Uses DELETE (not TRUNCATE) because TRUNCATE is DDL and causes an
@@ -33,10 +33,10 @@ final class RefreshIblHistStep implements PipelineStepInterface
         $this->db->begin_transaction();
 
         try {
-            if ($this->db->query('DELETE FROM ibl_hist') === false) {
+            if ($this->db->query('DELETE FROM `ibl_hist`') === false) {
                 throw new \RuntimeException('DELETE failed: ' . $this->db->error);
             }
-            if ($this->db->query('INSERT INTO ibl_hist ' . self::SELECT_SQL) === false) {
+            if ($this->db->query('INSERT INTO `ibl_hist` ' . self::SELECT_SQL) === false) {
                 throw new \RuntimeException('INSERT failed: ' . $this->db->error);
             }
             $rowCount = $this->db->affected_rows;
@@ -141,10 +141,10 @@ FROM (
         END ASC,
         s.id DESC
     ) AS rn
-  FROM ibl_plr_snapshots s
+  FROM `ibl_plr_snapshots` s
   WHERE s.stats_gm > 0
 ) snap
-LEFT JOIN ibl_franchise_seasons fs
+LEFT JOIN `ibl_franchise_seasons` fs
   ON snap.teamid = fs.franchise_id
   AND snap.season_year = fs.season_ending_year
 WHERE snap.rn = 1

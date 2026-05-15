@@ -41,7 +41,7 @@ class Boxscore
     public string $home_q4_points;
     public string $home_ot_points;
 
-    const PLAYERSTATEMENT_PREPARE = "INSERT INTO ibl_box_scores (
+    const PLAYERSTATEMENT_PREPARE = "INSERT INTO `ibl_box_scores` (
         game_date,
         uuid,
         name,
@@ -74,7 +74,7 @@ class Boxscore
     )
     VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)";
 
-    const TEAMSTATEMENT_PREPARE = "INSERT INTO ibl_box_scores_teams (
+    const TEAMSTATEMENT_PREPARE = "INSERT INTO `ibl_box_scores_teams` (
         game_date,
         name,
         game_of_that_day,

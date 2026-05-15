@@ -235,7 +235,7 @@ class DepthChartEntryController implements DepthChartEntryControllerInterface
      * Note: dc_minutes multiplier (×(dc_minutes+100)) is applied client-side since minutes
      * is a dynamic form input.
      *
-     * @param array<string, mixed> $player Player row from ibl_plr
+     * @param array<string, mixed> $player Player row from `ibl_plr`
      */
     private static function computeQualityScore(array $player): float
     {

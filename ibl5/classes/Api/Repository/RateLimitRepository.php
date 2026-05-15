@@ -13,7 +13,7 @@ class RateLimitRepository extends \BaseMysqliRepository
     public function increment(string $keyHash): void
     {
         $this->execute(
-            "INSERT INTO ibl_api_rate_limits (api_key_hash, window_start, request_count)
+            "INSERT INTO `ibl_api_rate_limits` (api_key_hash, window_start, request_count)
              VALUES (?, DATE_FORMAT(NOW(), '%Y-%m-%d %H:%i:00'), 1)
              ON DUPLICATE KEY UPDATE request_count = request_count + 1",
             's',
@@ -27,7 +27,7 @@ class RateLimitRepository extends \BaseMysqliRepository
     public function getRequestCount(string $keyHash): int
     {
         $row = $this->fetchOne(
-            "SELECT request_count FROM ibl_api_rate_limits
+            "SELECT request_count FROM `ibl_api_rate_limits`
              WHERE api_key_hash = ? AND window_start = DATE_FORMAT(NOW(), '%Y-%m-%d %H:%i:00')",
             's',
             $keyHash
@@ -49,7 +49,7 @@ class RateLimitRepository extends \BaseMysqliRepository
     public function pruneOldEntries(): void
     {
         $this->execute(
-            'DELETE FROM ibl_api_rate_limits WHERE window_start < DATE_SUB(NOW(), INTERVAL 5 MINUTE)'
+            'DELETE FROM `ibl_api_rate_limits` WHERE window_start < DATE_SUB(NOW(), INTERVAL 5 MINUTE)'
         );
     }
 }

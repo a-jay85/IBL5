@@ -54,7 +54,7 @@ class SeasonLeaderboardsRepository extends \BaseMysqliRepository implements Seas
 
         // NOTE: $sortBy is validated in getSortColumn() against a strict whitelist
         $query = "SELECT h.*, t.team_city, t.color1, t.color2
-            FROM ibl_hist h
+            FROM `ibl_hist` h
             LEFT JOIN {$this->teamInfoTable} t ON h.teamid = t.teamid
             WHERE {$where->toWhereClause()} ORDER BY $sortBy DESC, h.pid ASC"
             . ($limit > 0 ? " LIMIT $limit" : "");
@@ -90,7 +90,7 @@ class SeasonLeaderboardsRepository extends \BaseMysqliRepository implements Seas
     public function getYears(): array
     {
         /** @var list<array{year: int}> $rows */
-        $rows = $this->fetchAll("SELECT DISTINCT year FROM ibl_hist ORDER BY year DESC");
+        $rows = $this->fetchAll("SELECT DISTINCT year FROM `ibl_hist` ORDER BY year DESC");
 
         $years = [];
         foreach ($rows as $row) {

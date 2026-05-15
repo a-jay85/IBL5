@@ -12,7 +12,7 @@ use BasketballStats\StatsFormatter;
 class LeaderTransformer
 {
     /**
-     * Transform a leader row from ibl_hist joined with player and team tables.
+     * Transform a leader row from `ibl_hist` joined with player and team tables.
      *
      * @param LeaderRow $row
      * @return array<string, mixed>

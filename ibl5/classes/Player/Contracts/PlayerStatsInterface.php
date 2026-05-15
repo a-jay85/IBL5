@@ -56,7 +56,7 @@ interface PlayerStatsInterface
      * Create a PlayerStats instance from a current player database row
      * 
      * @param \mysqli $db Database connection
-     * @param array<string, mixed> $plrRow Raw database row from ibl_plr
+     * @param array<string, mixed> $plrRow Raw database row from `ibl_plr`
      * @return self Populated PlayerStats instance
      */
     public static function withPlrRow(\mysqli $db, array $plrRow): self;
@@ -65,7 +65,7 @@ interface PlayerStatsInterface
      * Create a PlayerStats instance from a historical player database row
      * 
      * @param \mysqli $db Database connection
-     * @param array<string, mixed> $plrRow Raw database row from ibl_hist
+     * @param array<string, mixed> $plrRow Raw database row from `ibl_hist`
      * @return self Populated PlayerStats instance
      */
     public static function withHistoricalPlrRow(\mysqli $db, array $plrRow): self;

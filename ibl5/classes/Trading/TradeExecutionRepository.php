@@ -36,7 +36,7 @@ class TradeExecutionRepository extends BaseMysqliRepository implements TradeExec
     {
         $paramsJson = json_encode($params, JSON_THROW_ON_ERROR);
         return $this->execute(
-            "INSERT INTO ibl_trade_queue (operation_type, params, tradeline) VALUES (?, ?, ?)",
+            "INSERT INTO `ibl_trade_queue` (operation_type, params, tradeline) VALUES (?, ?, ?)",
             "sss",
             $operationType,
             $paramsJson,
@@ -51,7 +51,7 @@ class TradeExecutionRepository extends BaseMysqliRepository implements TradeExec
     {
         /** @var list<array{id: int, operation_type: string, params: string, tradeline: string}> */
         return $this->fetchAll(
-            "SELECT id, operation_type, params, tradeline FROM ibl_trade_queue ORDER BY id ASC"
+            "SELECT id, operation_type, params, tradeline FROM `ibl_trade_queue` ORDER BY id ASC"
         );
     }
 
@@ -61,7 +61,7 @@ class TradeExecutionRepository extends BaseMysqliRepository implements TradeExec
     public function executeQueuedPlayerTransfer(int $playerId, int $teamId): int
     {
         return $this->execute(
-            "UPDATE ibl_plr SET teamid = ? WHERE pid = ?",
+            "UPDATE `ibl_plr` SET teamid = ? WHERE pid = ?",
             "ii",
             $teamId,
             $playerId
@@ -74,7 +74,7 @@ class TradeExecutionRepository extends BaseMysqliRepository implements TradeExec
     public function executeQueuedPickTransfer(int $pickId, string $newOwner, int $newOwnerId): int
     {
         return $this->execute(
-            "UPDATE ibl_draft_picks SET ownerofpick = ?, owner_teamid = ? WHERE pickid = ?",
+            "UPDATE `ibl_draft_picks` SET ownerofpick = ?, owner_teamid = ? WHERE pickid = ?",
             "sii",
             $newOwner,
             $newOwnerId,
@@ -88,7 +88,7 @@ class TradeExecutionRepository extends BaseMysqliRepository implements TradeExec
     public function deleteQueuedTrade(int $queueId): int
     {
         return $this->execute(
-            "DELETE FROM ibl_trade_queue WHERE id = ?",
+            "DELETE FROM `ibl_trade_queue` WHERE id = ?",
             "i",
             $queueId
         );
@@ -107,6 +107,6 @@ class TradeExecutionRepository extends BaseMysqliRepository implements TradeExec
      */
     public function clearTradeInfo(): int
     {
-        return $this->execute("DELETE FROM ibl_trade_info");
+        return $this->execute("DELETE FROM `ibl_trade_info`");
     }
 }

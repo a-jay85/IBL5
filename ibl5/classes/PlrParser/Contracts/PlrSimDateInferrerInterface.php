@@ -33,7 +33,7 @@ interface PlrSimDateInferrerInterface
 
     /**
      * Helper for error diagnostics — returns the latest box-score date for a season, or null
-     * if the season has zero rows (e.g., not yet ingested into ibl_box_scores).
+     * if the season has zero rows (e.g., not yet ingested into `ibl_box_scores`).
      */
     public function getBoxScoreCoverageForSeason(int $seasonYear): ?string;
 }

@@ -12,7 +12,7 @@ use Trading\Contracts\TradeCashRepositoryInterface;
  * CashTransactionHandler - Handles cash considerations in trades
  *
  * Manages the creation of cash entries in trades, inserting paired
- * positive/negative records into ibl_cash_considerations.
+ * positive/negative records into `ibl_cash_considerations`.
  *
  * @see CashTransactionHandlerInterface
  */

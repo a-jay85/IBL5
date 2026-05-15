@@ -21,8 +21,8 @@ class ProjectedDraftOrderRepository extends \BaseMysqliRepository implements Pro
             "SELECT s.teamid, s.team_name, s.wins, s.losses, s.pct, s.conference, s.division,
                     s.conf_wins, s.conf_losses, s.div_wins, s.div_losses, s.clinched_division,
                     t.color1, t.color2
-             FROM ibl_standings s
-             JOIN ibl_team_info t ON s.teamid = t.teamid
+             FROM `ibl_standings` s
+             JOIN `ibl_team_info` t ON s.teamid = t.teamid
              WHERE s.teamid BETWEEN 1 AND ?",
             "i",
             League::MAX_REAL_TEAMID
@@ -35,7 +35,7 @@ class ProjectedDraftOrderRepository extends \BaseMysqliRepository implements Pro
         /** @var list<array{visitor_teamid: int, visitor_score: int, home_teamid: int, home_score: int}> */
         return $this->fetchAll(
             "SELECT visitor_teamid, visitor_score, home_teamid, home_score
-             FROM ibl_schedule
+             FROM `ibl_schedule`
              WHERE season_year = ? AND visitor_score > 0 AND home_score > 0",
             "i",
             $seasonYear
@@ -48,7 +48,7 @@ class ProjectedDraftOrderRepository extends \BaseMysqliRepository implements Pro
         /** @var list<array{ownerofpick: string, teampick: string, round: int, notes: string|null}> */
         return $this->fetchAll(
             "SELECT ownerofpick, teampick, round, notes
-             FROM ibl_draft_picks
+             FROM `ibl_draft_picks`
              WHERE year = ? AND round IN (1, 2)",
             "i",
             $draftYear
@@ -62,10 +62,10 @@ class ProjectedDraftOrderRepository extends \BaseMysqliRepository implements Pro
         return $this->fetchAll(
             "SELECT teamid, SUM(pf) AS pointsFor, SUM(pa) AS pointsAgainst FROM (
                 SELECT visitor_teamid AS teamid, visitor_score AS pf, home_score AS pa
-                FROM ibl_schedule WHERE season_year = ? AND visitor_score > 0 AND home_score > 0
+                FROM `ibl_schedule` WHERE season_year = ? AND visitor_score > 0 AND home_score > 0
                 UNION ALL
                 SELECT home_teamid AS teamid, home_score AS pf, visitor_score AS pa
-                FROM ibl_schedule WHERE season_year = ? AND visitor_score > 0 AND home_score > 0
+                FROM `ibl_schedule` WHERE season_year = ? AND visitor_score > 0 AND home_score > 0
              ) AS g GROUP BY teamid",
             "ii",
             $seasonYear,
@@ -76,7 +76,7 @@ class ProjectedDraftOrderRepository extends \BaseMysqliRepository implements Pro
     public function isDraftOrderFinalized(): bool
     {
         $row = $this->fetchOne(
-            "SELECT value FROM ibl_settings WHERE name = 'Draft Order Finalized'",
+            "SELECT value FROM `ibl_settings` WHERE name = 'Draft Order Finalized'",
         );
 
         return $row !== null && $row['value'] === 'Yes';
@@ -90,21 +90,21 @@ class ProjectedDraftOrderRepository extends \BaseMysqliRepository implements Pro
         $this->transactional(function () use ($year, $picks): void {
             // Delete all draft rows from previous years (out of date)
             $this->execute(
-                "DELETE FROM ibl_draft WHERE year < ?",
+                "DELETE FROM `ibl_draft` WHERE year < ?",
                 "i",
                 $year,
             );
 
             // Delete unfilled slots for this year (both rounds) before inserting new ones
             $this->execute(
-                "DELETE FROM ibl_draft WHERE year = ? AND player = ''",
+                "DELETE FROM `ibl_draft` WHERE year = ? AND player = ''",
                 "i",
                 $year,
             );
 
             foreach ($picks as $pick) {
                 $this->execute(
-                    "INSERT INTO ibl_draft (year, round, pick, team, teamid, player, uuid)
+                    "INSERT INTO `ibl_draft` (year, round, pick, team, teamid, player, uuid)
                      VALUES (?, ?, ?, ?, ?, '', UUID())",
                     "iiisi",
                     $year,
@@ -116,7 +116,7 @@ class ProjectedDraftOrderRepository extends \BaseMysqliRepository implements Pro
             }
 
             $this->execute(
-                "UPDATE ibl_settings SET value = 'Yes' WHERE name = 'Draft Order Finalized'",
+                "UPDATE `ibl_settings` SET value = 'Yes' WHERE name = 'Draft Order Finalized'",
             );
         });
     }
@@ -126,7 +126,7 @@ class ProjectedDraftOrderRepository extends \BaseMysqliRepository implements Pro
     {
         /** @var list<array{pick: int, team: string, teamid: int, player: string}> */
         return $this->fetchAll(
-            "SELECT pick, team, teamid, player FROM ibl_draft
+            "SELECT pick, team, teamid, player FROM `ibl_draft`
              WHERE year = ? AND round = ?
              ORDER BY pick",
             "ii",
@@ -139,7 +139,7 @@ class ProjectedDraftOrderRepository extends \BaseMysqliRepository implements Pro
     public function isDraftStarted(int $year): bool
     {
         $row = $this->fetchOne(
-            "SELECT 1 FROM ibl_draft WHERE year = ? AND player != '' LIMIT 1",
+            "SELECT 1 FROM `ibl_draft` WHERE year = ? AND player != '' LIMIT 1",
             "i",
             $year,
         );
@@ -151,7 +151,7 @@ class ProjectedDraftOrderRepository extends \BaseMysqliRepository implements Pro
     public function upsertLotteryWinnerAward(int $year, string $teamName): void
     {
         $this->execute(
-            "INSERT INTO ibl_team_awards (year, name, award)
+            "INSERT INTO `ibl_team_awards` (year, name, award)
              VALUES (?, ?, 'IBL Draft Lottery Winners')
              ON DUPLICATE KEY UPDATE name = VALUES(name)",
             "is",

@@ -222,7 +222,7 @@ class BoxscoreRepository extends \BaseMysqliRepository implements BoxscoreReposi
         $rows = $this->fetchAll(
             "SELECT COALESCE(p.name, bs.name) AS name
              FROM {$this->playerTable} bs
-             LEFT JOIN ibl_plr p ON bs.pid = p.pid
+             LEFT JOIN `ibl_plr` p ON bs.pid = p.pid
              WHERE bs.game_date = ? AND bs.visitor_teamid = " . League::ALL_STAR_AWAY_TEAMID . " AND bs.home_teamid = " . League::ALL_STAR_HOME_TEAMID . " AND bs.teamid = ?
              ORDER BY bs.id ASC",
             "si",

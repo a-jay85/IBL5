@@ -27,7 +27,7 @@ class DepthChartEntryRepository extends \BaseMysqliRepository implements DepthCh
     {
         /** @var list<PlayerRow> */
         return $this->fetchAll(
-            "SELECT * FROM ibl_plr WHERE teamid = ? AND retired = 0 AND ordinal <= ? ORDER BY ordinal ASC",
+            "SELECT * FROM `ibl_plr` WHERE teamid = ? AND retired = 0 AND ordinal <= ? ORDER BY ordinal ASC",
             "ii",
             $teamid,
             \JSB::WAIVERS_ORDINAL
@@ -50,7 +50,7 @@ class DepthChartEntryRepository extends \BaseMysqliRepository implements DepthCh
 
         try {
             $this->execute(
-                "UPDATE ibl_plr SET
+                "UPDATE `ibl_plr` SET
                     dc_pg_depth = ?,
                     dc_sg_depth = ?,
                     dc_sf_depth = ?,
@@ -92,7 +92,7 @@ class DepthChartEntryRepository extends \BaseMysqliRepository implements DepthCh
     {
         try {
             $this->execute(
-                "UPDATE ibl_team_info SET depth = NOW(), sim_depth = NOW() WHERE team_name = ?",
+                "UPDATE `ibl_team_info` SET depth = NOW(), sim_depth = NOW() WHERE team_name = ?",
                 "s",
                 $teamName
             );

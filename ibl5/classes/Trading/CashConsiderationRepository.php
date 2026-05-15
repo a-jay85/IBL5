@@ -29,7 +29,7 @@ class CashConsiderationRepository extends BaseMysqliRepository implements CashCo
         $counterpartySql = $counterpartyTid !== null ? '?' : 'NULL';
         $tradeOfferSql = $tradeOfferId !== null ? '?' : 'NULL';
 
-        $sql = "INSERT INTO ibl_cash_considerations
+        $sql = "INSERT INTO `ibl_cash_considerations`
                     (teamid, type, label, counterparty_teamid, trade_offer_id, cy, cyt, salary_yr1, salary_yr2, salary_yr3, salary_yr4, salary_yr5, salary_yr6)
                  VALUES (?, ?, ?, {$counterpartySql}, {$tradeOfferSql}, ?, ?, ?, ?, ?, ?, ?, ?)";
 
@@ -62,7 +62,7 @@ class CashConsiderationRepository extends BaseMysqliRepository implements CashCo
     {
         /** @var list<CashConsiderationRow> */
         return $this->fetchAll(
-            "SELECT * FROM ibl_cash_considerations WHERE teamid = ? ORDER BY label ASC",
+            "SELECT * FROM `ibl_cash_considerations` WHERE teamid = ? ORDER BY label ASC",
             "i",
             $teamId
         );
@@ -75,7 +75,7 @@ class CashConsiderationRepository extends BaseMysqliRepository implements CashCo
     {
         /** @var list<CashConsiderationRow> */
         return $this->fetchAll(
-            "SELECT * FROM ibl_cash_considerations WHERE teamid = ? AND type = 'buyout' ORDER BY label ASC",
+            "SELECT * FROM `ibl_cash_considerations` WHERE teamid = ? AND type = 'buyout' ORDER BY label ASC",
             "i",
             $teamId
         );
@@ -89,7 +89,7 @@ class CashConsiderationRepository extends BaseMysqliRepository implements CashCo
         /** @var list<array{cy: int, salary_yr1: int, salary_yr2: int, salary_yr3: int, salary_yr4: int, salary_yr5: int, salary_yr6: int}> */
         return $this->fetchAll(
             "SELECT cy, salary_yr1, salary_yr2, salary_yr3, salary_yr4, salary_yr5, salary_yr6
-             FROM ibl_cash_considerations
+             FROM `ibl_cash_considerations`
              WHERE teamid = ?",
             "i",
             $teamId
@@ -107,7 +107,7 @@ class CashConsiderationRepository extends BaseMysqliRepository implements CashCo
         // (salary_yr1 when cy=1) is irrelevant since it is already being processed.
         // cy >= N means year N is current or in the past; salary_yrN = 0 means no obligation.
         return $this->execute(
-            "DELETE FROM ibl_cash_considerations
+            "DELETE FROM `ibl_cash_considerations`
              WHERE (cy >= 2 OR salary_yr2 = 0)
                AND (cy >= 3 OR salary_yr3 = 0)
                AND (cy >= 4 OR salary_yr4 = 0)

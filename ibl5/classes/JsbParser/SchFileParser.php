@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Utilities;
+namespace JsbParser;
 
 /**
  * SchFileParser - Parse JSB .sch schedule files

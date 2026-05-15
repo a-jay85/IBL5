@@ -2,11 +2,11 @@
 
 declare(strict_types=1);
 
-namespace Tests\Utilities;
+namespace Tests\JsbParser;
 
 use PHPUnit\Framework\TestCase;
 use League\League;
-use Utilities\SchFileParser;
+use JsbParser\SchFileParser;
 
 /**
  * SchFileParserTest - Tests for the JSB .sch file parser

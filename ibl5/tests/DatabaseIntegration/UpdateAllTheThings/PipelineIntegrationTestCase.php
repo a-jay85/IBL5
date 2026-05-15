@@ -21,7 +21,7 @@ use Updater\Contracts\JsbSourceResolverInterface;
 use Updater\Steps;
 use Updater\UpdaterService;
 use Updater\StepResult;
-use Utilities\SchFileParser;
+use JsbParser\SchFileParser;
 
 abstract class PipelineIntegrationTestCase extends DatabaseTestCase
 {

@@ -12,6 +12,27 @@ set -euo pipefail
 # launchd runs with minimal env — ensure our tools are findable
 export PATH="/usr/local/bin:/opt/homebrew/bin:$HOME/.bun/bin:$HOME/.local/bin:/Applications/cmux.app/Contents/Resources/bin:$PATH"
 
+# Burst mode: if NIGHTLY_BURST is set, check cutoff and self-revert when expired.
+if [ "${NIGHTLY_BURST:-}" = "1" ] && [ -n "${NIGHTLY_BURST_CUTOFF:-}" ]; then
+    BURST_PLIST="$HOME/Library/LaunchAgents/com.ibl5.nightly-claude.plist"
+    BURST_BACKUP="$HOME/Library/LaunchAgents/com.ibl5.nightly-claude.plist.backup-pre-burst"
+    # Compare current time against cutoff (both in local time)
+    if [ "$(date +%s)" -ge "$(date -j -f '%Y-%m-%dT%H:%M:%S' "$NIGHTLY_BURST_CUTOFF" +%s 2>/dev/null || echo 0)" ]; then
+        echo "$(date '+%Y-%m-%d %H:%M:%S') Burst cutoff reached ($NIGHTLY_BURST_CUTOFF). Restoring production plist."
+        if [ -f "$BURST_BACKUP" ]; then
+            launchctl remove com.ibl5.nightly-claude 2>/dev/null || true
+            sleep 1
+            cp "$BURST_BACKUP" "$BURST_PLIST"
+            rm -f "$BURST_BACKUP"
+            launchctl load "$BURST_PLIST"
+            echo "$(date '+%Y-%m-%d %H:%M:%S') Production plist restored. Burst schedule removed."
+        else
+            echo "$(date '+%Y-%m-%d %H:%M:%S') WARNING: No backup plist found at $BURST_BACKUP"
+        fi
+        exit 0
+    fi
+fi
+
 # macOS doesn't ship GNU timeout — prefer coreutils gtimeout, else use a shim.
 # The shim must close inherited pipeline fds inside the timer subshell (bash 3.2
 # doesn't reliably apply external redirects on backgrounded subshells in pipes).

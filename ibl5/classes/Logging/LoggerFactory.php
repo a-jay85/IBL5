@@ -62,10 +62,10 @@ class LoggerFactory implements LoggerFactoryInterface
 
         if (file_exists($configPath)) {
             /** @var LoggingConfig $config */
-            $config = require $configPath;
+            $config = require $configPath; /** @phpstan-ignore ibl.requireOnce (config file returns array; not a class) */
         } elseif (file_exists($examplePath)) {
             /** @var LoggingConfig $config */
-            $config = require $examplePath;
+            $config = require $examplePath; /** @phpstan-ignore ibl.requireOnce (config file returns array; not a class) */
         } else {
             $config = self::DEFAULT_CONFIG;
         }

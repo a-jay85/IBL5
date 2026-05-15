@@ -100,6 +100,7 @@ class SecurityBootstrap implements BootstrapStepInterface
         }
 
         if (file_exists($safePath)) {
+            /** @phpstan-ignore ibl.requireOnce (dynamic-path safe-include utility) */
             include_once $safePath;
         }
     }

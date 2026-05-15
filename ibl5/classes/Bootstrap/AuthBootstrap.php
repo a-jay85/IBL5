@@ -47,6 +47,7 @@ class AuthBootstrap implements BootstrapStepInterface
 
         // Custom mainfile extensions
         if (file_exists($this->basePath . '/includes/custom_files/custom_mainfile.php')) {
+            /** @phpstan-ignore ibl.requireOnce (optional user customization hook; not a class) */
             @include_once $this->basePath . '/includes/custom_files/custom_mainfile.php';
         }
     }

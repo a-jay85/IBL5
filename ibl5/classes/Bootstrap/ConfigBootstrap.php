@@ -78,6 +78,7 @@ class ConfigBootstrap implements BootstrapStepInterface
 
     private function loadConfig(): void
     {
+        /** @phpstan-ignore ibl.requireOnce (defines global database/config state; not a class) */
         require_once $this->basePath . '/config.php';
 
         if (!isset($GLOBALS['dbname']) || $GLOBALS['dbname'] === '' || $GLOBALS['dbname'] === false) {
@@ -88,6 +89,7 @@ class ConfigBootstrap implements BootstrapStepInterface
 
     private function loadDatabase(): void
     {
+        /** @phpstan-ignore ibl.requireOnce (initializes $db and $mysqli_db globals; not a class) */
         require_once $this->basePath . '/db/db.php';
     }
 

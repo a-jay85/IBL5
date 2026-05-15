@@ -26,6 +26,7 @@ class AutoloaderBootstrap implements BootstrapStepInterface
      */
     public function boot(ContainerInterface $container): void
     {
+        /** @phpstan-ignore ibl.requireOnce (bootstraps Composer PSR-4 autoloader itself) */
         require_once $this->basePath . '/vendor/autoload.php';
 
         // In git worktrees, vendor/ is symlinked to the main repo. Composer resolves
@@ -38,6 +39,7 @@ class AutoloaderBootstrap implements BootstrapStepInterface
                 spl_autoload_register(static function (string $class) use ($worktreeClasses): void {
                     $file = $worktreeClasses . '/' . str_replace('\\', '/', $class) . '.php';
                     if (file_exists($file)) {
+                        /** @phpstan-ignore ibl.requireOnce (worktree PSR-4 fallback autoloader) */
                         require $file;
                     }
                 }, true, true);

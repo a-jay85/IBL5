@@ -6,6 +6,7 @@ namespace Trading;
 
 use Team\TeamRepository;
 use Team\TeamTableService;
+use Trading\Contracts\TradeAssetRepositoryInterface;
 use UI\Components\TableViewDropdown;
 use Team\Team;
 use Season\Season;
@@ -33,6 +34,7 @@ class TradeRosterPreviewApiHandler
     private const MAX_PIDS = 20;
 
     private \mysqli $db;
+    private TradeAssetRepositoryInterface $tradeAssetRepository;
 
     /**
      * The logged-in user's team ID, used to decide whether eligibility action
@@ -41,9 +43,10 @@ class TradeRosterPreviewApiHandler
      */
     private int $loggedInTeamID;
 
-    public function __construct(\mysqli $db, int $loggedInTeamID = 0)
+    public function __construct(\mysqli $db, TradeAssetRepositoryInterface $tradeAssetRepository, int $loggedInTeamID = 0)
     {
         $this->db = $db;
+        $this->tradeAssetRepository = $tradeAssetRepository;
         $this->loggedInTeamID = $loggedInTeamID;
     }
 
@@ -104,7 +107,7 @@ class TradeRosterPreviewApiHandler
 
             // Fetch and append incoming players
             if ($addPids !== []) {
-                $incomingPlayers = $this->fetchPlayersByPids($addPids);
+                $incomingPlayers = $this->tradeAssetRepository->getPlayersByIds($addPids);
                 foreach ($incomingPlayers as $incoming) {
                     $roster[] = $incoming;
                 }
@@ -233,42 +236,6 @@ class TradeRosterPreviewApiHandler
         }
 
         return 'ratings';
-    }
-
-    /**
-     * Fetch player rows by PIDs using prepared statement with IN clause
-     *
-     * @param list<int> $pids Player IDs
-     * @return list<array<string, mixed>> Player rows from `ibl_plr`
-     */
-    private function fetchPlayersByPids(array $pids): array
-    {
-        if ($pids === []) {
-            return [];
-        }
-
-        $placeholders = implode(',', array_fill(0, count($pids), '?'));
-        $types = str_repeat('i', count($pids));
-
-        $stmt = $this->db->prepare("SELECT * FROM `ibl_plr` WHERE pid IN ({$placeholders})");
-        if ($stmt === false) {
-            return [];
-        }
-
-        $stmt->bind_param($types, ...$pids);
-        $stmt->execute();
-        $result = $stmt->get_result();
-
-        if ($result === false) {
-            $stmt->close();
-            return [];
-        }
-
-        /** @var list<array<string, mixed>> $rows */
-        $rows = $result->fetch_all(MYSQLI_ASSOC);
-        $stmt->close();
-
-        return $rows;
     }
 
     /**

@@ -118,7 +118,8 @@ switch ($op) {
                     $loggedInTeamID = $commonRepo->getTidFromTeamname($loggedInTeamName) ?? 0;
                 }
             }
-            $handler = new Trading\TradeRosterPreviewApiHandler($mysqli_db, $loggedInTeamID);
+            $tradeAssetRepo = new Trading\TradeAssetRepository($mysqli_db);
+            $handler = new Trading\TradeRosterPreviewApiHandler($mysqli_db, $tradeAssetRepo, $loggedInTeamID);
             $handler->handle();
         }
         break;

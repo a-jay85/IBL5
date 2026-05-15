@@ -257,7 +257,9 @@ class LeagueControlPanelRepository extends \BaseMysqliRepository implements Leag
      */
     public function resetAllContractExtensions(): bool
     {
-        $this->execute("UPDATE ibl_team_info SET used_extension_this_season = 0");
+        $this->transactional(function (): void {
+            $this->execute("UPDATE ibl_team_info SET used_extension_this_season = 0");
+        });
 
         return true;
     }
@@ -267,7 +269,9 @@ class LeagueControlPanelRepository extends \BaseMysqliRepository implements Leag
      */
     public function resetAllMlesAndLles(): bool
     {
-        $this->execute("UPDATE ibl_team_info SET has_mle = 1, has_lle = 1");
+        $this->transactional(function (): void {
+            $this->execute("UPDATE ibl_team_info SET has_mle = 1, has_lle = 1");
+        });
 
         return true;
     }

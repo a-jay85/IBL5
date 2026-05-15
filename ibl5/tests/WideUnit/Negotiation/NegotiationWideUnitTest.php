@@ -6,7 +6,10 @@ namespace Tests\WideUnit\Negotiation;
 
 use Tests\WideUnit\WideUnitTestCase;
 use Tests\WideUnit\Mocks\TestDataFactory;
-use Negotiation\NegotiationProcessor;
+use Negotiation\NegotiationDemandCalculator;
+use Negotiation\NegotiationRepository;
+use Negotiation\NegotiationService;
+use Negotiation\NegotiationValidator;
 
 /**
  * Integration tests for complete contract negotiation workflows
@@ -18,14 +21,14 @@ use Negotiation\NegotiationProcessor;
  * - Player ownership validation
  * - Demand calculation accuracy
  *
- * @covers \Negotiation\NegotiationProcessor
+ * @covers \Negotiation\NegotiationService
  * @covers \Negotiation\NegotiationValidator
  * @covers \Negotiation\NegotiationDemandCalculator
  * @covers \Negotiation\NegotiationRepository
  */
 class NegotiationWideUnitTest extends WideUnitTestCase
 {
-    private NegotiationProcessor $processor;
+    private NegotiationService $service;
     private \Season\Season $mockSeason;
 
     protected function setUp(): void
@@ -35,7 +38,13 @@ class NegotiationWideUnitTest extends WideUnitTestCase
         $this->mockSeason->phase = 'Regular Season';
         $this->mockSeason->endingYear = 2026;
         $this->mockSeason->beginningYear = 2025;
-        $this->processor = new NegotiationProcessor($GLOBALS['mysqli_db'], $this->mockSeason);
+        $db = $GLOBALS['mysqli_db'];
+        $this->service = new NegotiationService(
+            $db,
+            new NegotiationRepository($db),
+            new NegotiationValidator($db, $this->mockSeason),
+            new NegotiationDemandCalculator($db),
+        );
 
         // Prevent any external calls during tests
         $_SERVER['SERVER_NAME'] = 'localhost';
@@ -43,7 +52,7 @@ class NegotiationWideUnitTest extends WideUnitTestCase
 
     protected function tearDown(): void
     {
-        unset($this->processor);
+        unset($this->service);
         unset($_SERVER['SERVER_NAME']);
         parent::tearDown();
     }
@@ -60,7 +69,7 @@ class NegotiationWideUnitTest extends WideUnitTestCase
         $this->setupSuccessfulNegotiationScenario();
 
         // Act
-        $result = $this->processor->processNegotiation(1, 'Miami Cyclones', 'ibl5');
+        $result = $this->service->processNegotiation(1, 'Miami Cyclones', 'ibl5');
 
         // Assert - Should render negotiation form with demands
         $this->assertStringContainsString('Test Player', $result);
@@ -79,7 +88,7 @@ class NegotiationWideUnitTest extends WideUnitTestCase
         $this->setupSuccessfulNegotiationScenario();
 
         // Act
-        $result = $this->processor->processNegotiation(1, 'Miami Cyclones', 'ibl5');
+        $result = $this->service->processNegotiation(1, 'Miami Cyclones', 'ibl5');
 
         // Assert - Should include cap space in form
         $this->assertStringContainsString('Test Player', $result);
@@ -100,7 +109,7 @@ class NegotiationWideUnitTest extends WideUnitTestCase
         $this->setupFreeAgencyActiveScenario();
 
         // Act
-        $result = $this->processor->processNegotiation(1, 'Miami Cyclones', 'ibl5');
+        $result = $this->service->processNegotiation(1, 'Miami Cyclones', 'ibl5');
 
         // Assert - Should show free agency error
         $this->assertStringContainsString('free agency', strtolower($result));
@@ -117,7 +126,7 @@ class NegotiationWideUnitTest extends WideUnitTestCase
         $this->setupPlayerOnDifferentTeamScenario();
 
         // Act
-        $result = $this->processor->processNegotiation(1, 'New York Knights', 'ibl5');
+        $result = $this->service->processNegotiation(1, 'New York Knights', 'ibl5');
 
         // Assert - Should show ownership error
         $this->assertStringContainsString('not on your team', strtolower($result));

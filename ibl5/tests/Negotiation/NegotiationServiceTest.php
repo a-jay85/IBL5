@@ -5,17 +5,20 @@ declare(strict_types=1);
 namespace Tests\Negotiation;
 
 use PHPUnit\Framework\TestCase;
-use Negotiation\NegotiationProcessor;
+use Negotiation\NegotiationService;
+use Negotiation\NegotiationRepository;
+use Negotiation\NegotiationValidator;
+use Negotiation\NegotiationDemandCalculator;
 
 /**
- * NegotiationProcessorTest - Tests for the negotiation workflow processor
+ * NegotiationServiceTest - Tests for the negotiation workflow service
  *
  * Tests:
- * - Processor instantiation
+ * - Service instantiation
  * - Player loading and error handling
  * - Validation flow behavior
  */
-class NegotiationProcessorTest extends TestCase
+class NegotiationServiceTest extends TestCase
 {
     private \MockDatabase $mockDb;
     private \mysqli $mockMysqliDb;
@@ -75,11 +78,11 @@ class NegotiationProcessorTest extends TestCase
     // CONSTRUCTOR TESTS
     // ============================================
 
-    public function testProcessorCanBeInstantiated(): void
+    public function testServiceCanBeInstantiated(): void
     {
-        $processor = new NegotiationProcessor($this->mockMysqliDb);
+        $service = $this->buildService();
 
-        $this->assertInstanceOf(NegotiationProcessor::class, $processor);
+        $this->assertInstanceOf(NegotiationService::class, $service);
     }
 
     // ============================================
@@ -88,13 +91,13 @@ class NegotiationProcessorTest extends TestCase
 
     public function testProcessNegotiationReturnsErrorForInvalidPlayer(): void
     {
-        $processor = new NegotiationProcessor($this->mockMysqliDb);
-        
+        $service = $this->buildService();
+
         // Empty mock data means player won't be found
         $this->mockDb->setMockData([]);
-        
-        $result = $processor->processNegotiation(999, 'Test Team', 'prefix');
-        
+
+        $result = $service->processNegotiation(999, 'Test Team', 'prefix');
+
         $this->assertStringContainsString('not found', $result);
     }
 
@@ -104,13 +107,13 @@ class NegotiationProcessorTest extends TestCase
         $mockSeason->phase = 'Regular Season';
         $mockSeason->endingYear = 2026;
         $mockSeason->beginningYear = 2025;
-        $processor = new NegotiationProcessor($this->mockMysqliDb, $mockSeason);
+        $service = $this->buildService(season: $mockSeason);
 
         // Setup complete player data
         $this->mockDb->setMockData([$this->getCompletePlayerData()]);
 
-        $result = $processor->processNegotiation(1, 'Test Team', 'prefix');
-        
+        $result = $service->processNegotiation(1, 'Test Team', 'prefix');
+
         $this->assertIsString($result);
         // Result should contain HTML markup
         $this->assertMatchesRegularExpression('/<.*>/', $result);
@@ -120,19 +123,29 @@ class NegotiationProcessorTest extends TestCase
     // INTERFACE COMPLIANCE TESTS
     // ============================================
 
-    public function testProcessorImplementsCorrectInterface(): void
+    public function testServiceImplementsCorrectInterface(): void
     {
-        $processor = new NegotiationProcessor($this->mockMysqliDb);
-        
+        $service = $this->buildService();
+
         $this->assertInstanceOf(
-            \Negotiation\Contracts\NegotiationProcessorInterface::class,
-            $processor
+            \Negotiation\Contracts\NegotiationServiceInterface::class,
+            $service
         );
     }
 
     // ============================================
     // HELPER METHODS
     // ============================================
+
+    private function buildService(?\Season\Season $season = null): NegotiationService
+    {
+        return new NegotiationService(
+            $this->mockMysqliDb,
+            new NegotiationRepository($this->mockMysqliDb),
+            new NegotiationValidator($this->mockMysqliDb, $season),
+            new NegotiationDemandCalculator($this->mockMysqliDb),
+        );
+    }
 
     /**
      * Get complete player data with all required fields

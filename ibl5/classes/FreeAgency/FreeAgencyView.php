@@ -8,7 +8,7 @@ use Player\Player;
 use Player\PlayerImageHelper;
 use Team\Contracts\TeamQueryRepositoryInterface;
 use UI\TeamCellHelper;
-use Utilities\HtmlSanitizer;
+use Security\HtmlSanitizer;
 use Team\Team;
 use Season\Season;
 

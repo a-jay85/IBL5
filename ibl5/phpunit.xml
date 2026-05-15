@@ -57,6 +57,9 @@
         <testsuite name="SeasonLeaderboards Module Tests">
             <directory>tests/SeasonLeaderboards</directory>
         </testsuite>
+        <testsuite name="Security Tests">
+            <directory>tests/Security</directory>
+        </testsuite>
         <testsuite name="Utilities Tests">
             <directory>tests/Utilities</directory>
         </testsuite>

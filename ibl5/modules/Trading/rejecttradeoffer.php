@@ -11,7 +11,7 @@ try {
 
 global $mysqli_db;
 
-if (!\Utilities\CsrfGuard::validateSubmittedToken('trade_reject')) {
+if (!\Security\CsrfGuard::validateSubmittedToken('trade_reject')) {
     \Utilities\HtmxHelper::redirect('/ibl5/modules.php?name=Trading&error=' . rawurlencode('Invalid or expired form submission. Please try again.'));
 }
 

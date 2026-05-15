@@ -6,7 +6,7 @@ namespace AwardHistory;
 
 use Player\PlayerImageHelper;
 use AwardHistory\Contracts\AwardHistoryViewInterface;
-use Utilities\HtmlSanitizer;
+use Security\HtmlSanitizer;
 
 /**
  * AwardHistoryView - HTML rendering for player awards search interface

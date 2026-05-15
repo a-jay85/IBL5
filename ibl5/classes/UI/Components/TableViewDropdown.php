@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace UI\Components;
 
-use Utilities\HtmlSanitizer;
+use Security\HtmlSanitizer;
 
 /**
  * TableViewDropdown - Dropdown <select> navigation for team page views with split stats

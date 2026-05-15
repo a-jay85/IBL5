@@ -55,8 +55,8 @@ final class RequireEscapedOutputRule implements Rule
     private const SAFE_STATIC_CALLS = [
         'HtmlSanitizer::e',
         'HtmlSanitizer::safeHtmlOutput',
-        'Utilities\HtmlSanitizer::e',
-        'Utilities\HtmlSanitizer::safeHtmlOutput',
+        'Security\HtmlSanitizer::e',
+        'Security\HtmlSanitizer::safeHtmlOutput',
         'PlayerImageHelper::renderFlexiblePlayerCell',
         'PlayerImageHelper::renderPlayerCell',
         'Player\PlayerImageHelper::renderFlexiblePlayerCell',

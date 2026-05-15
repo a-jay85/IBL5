@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Player;
 
 use Player\Contracts\PlayerImageHelperInterface;
-use Utilities\HtmlSanitizer;
+use Security\HtmlSanitizer;
 
 /**
  * @see PlayerImageHelperInterface

@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace UI\Components;
 
-use Utilities\HtmlSanitizer;
+use Security\HtmlSanitizer;
 
 /**
  * Renders a value with a CSS-only hover/focus tooltip.

@@ -8,7 +8,7 @@ use Player\PlayerRepository;
 use Player\PlayerStatsRepository;
 use Player\Contracts\PlayerHeatAveragesViewInterface;
 use BasketballStats\StatsFormatter;
-use Utilities\HtmlSanitizer;
+use Security\HtmlSanitizer;
 
 /**
  * PlayerHeatAveragesView - Renders H.E.A.T. averages table

@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace OneOnOneGame;
 
 use OneOnOneGame\Contracts\OneOnOneGameEngineInterface;
-use Utilities\HtmlSanitizer;
+use Security\HtmlSanitizer;
 
 /**
  * OneOnOneGameEngine - Simulates One-on-One basketball games

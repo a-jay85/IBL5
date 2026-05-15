@@ -10,7 +10,7 @@ use Player\PlayerImageHelper;
 use Player\PlayerStats;
 use TeamOffDefStats\TeamOffDefStatsRepository;
 use UI\TeamCellHelper;
-use Utilities\HtmlSanitizer;
+use Security\HtmlSanitizer;
 use Team\Team;
 use Season\Season;
 

@@ -7,7 +7,7 @@ namespace Player\Views;
 use Player\PlayerRepository;
 use Player\Contracts\PlayerOlympicsStatsViewInterface;
 use BasketballStats\StatsFormatter;
-use Utilities\HtmlSanitizer;
+use Security\HtmlSanitizer;
 
 /**
  * PlayerOlympicsStatsView - Renders Olympics tournament statistics

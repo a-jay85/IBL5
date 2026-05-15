@@ -80,7 +80,7 @@ require __DIR__ . '/../mainfile.php';
 
 use JsbParser\JsbExportRepository;
 use JsbParser\JsbExportService;
-use Utilities\HtmlSanitizer;
+use Security\HtmlSanitizer;
 
 $repository = new JsbExportRepository($mysqli_db);
 $service = new JsbExportService($repository);

@@ -7,7 +7,7 @@ namespace Player\Views;
 use Player\PlayerRepository;
 use Player\Contracts\PlayerPlayoffStatsViewInterface;
 use BasketballStats\StatsFormatter;
-use Utilities\HtmlSanitizer;
+use Security\HtmlSanitizer;
 
 /**
  * PlayerPlayoffStatsView - Renders playoff statistics (totals/averages)

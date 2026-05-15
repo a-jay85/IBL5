@@ -6,7 +6,7 @@ namespace TeamSchedule;
 
 use TeamSchedule\Contracts\TeamScheduleViewInterface;
 use TeamSchedule\Contracts\TeamScheduleServiceInterface;
-use Utilities\HtmlSanitizer;
+use Security\HtmlSanitizer;
 use Team\Team;
 use Season\Season;
 

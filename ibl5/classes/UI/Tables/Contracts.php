@@ -7,7 +7,7 @@ namespace UI\Tables;
 use League\League;
 use Player\Player;
 use Player\PlayerImageHelper;
-use Utilities\HtmlSanitizer;
+use Security\HtmlSanitizer;
 use Team\Team;
 use Season\Season;
 

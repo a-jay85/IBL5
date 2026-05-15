@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Player\Views;
 
 use Player\Player;
-use Utilities\HtmlSanitizer;
+use Security\HtmlSanitizer;
 
 /**
  * PlayerTradingCardFrontView - Renders the front side of player trading card

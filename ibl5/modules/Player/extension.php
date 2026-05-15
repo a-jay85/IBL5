@@ -6,7 +6,7 @@ require __DIR__ . '/../../mainfile.php';
 
 global $mysqli_db;
 
-if (!\Utilities\CsrfGuard::validateSubmittedToken('extension')) {
+if (!\Security\CsrfGuard::validateSubmittedToken('extension')) {
     \Utilities\HtmxHelper::redirect('/ibl5/index.php');
 }
 

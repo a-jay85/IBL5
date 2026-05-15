@@ -6,7 +6,7 @@ namespace LeagueSchedule;
 
 use LeagueSchedule\Contracts\LeagueScheduleServiceInterface;
 use LeagueSchedule\Contracts\LeagueScheduleViewInterface;
-use Utilities\HtmlSanitizer;
+use Security\HtmlSanitizer;
 
 /**
  * LeagueScheduleView - HTML rendering for the league-wide schedule

@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Team\Views;
 
-use Utilities\HtmlSanitizer;
+use Security\HtmlSanitizer;
 
 /**
  * Pure renderer for GM history and team accomplishments.

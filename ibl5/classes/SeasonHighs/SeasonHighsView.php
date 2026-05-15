@@ -8,7 +8,7 @@ use Player\PlayerImageHelper;
 use SeasonHighs\Contracts\SeasonHighsServiceInterface;
 use SeasonHighs\Contracts\SeasonHighsViewInterface;
 use UI\TeamCellHelper;
-use Utilities\HtmlSanitizer;
+use Security\HtmlSanitizer;
 
 /**
  * View class for rendering season highs page.

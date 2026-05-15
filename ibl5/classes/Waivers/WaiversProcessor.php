@@ -172,7 +172,7 @@ class WaiversProcessor implements WaiversProcessorInterface
         $playerName = is_string($player['name'] ?? null) ? $player['name'] : '';
         $this->createWaiverNewsStory($teamName, $playerName, 'waive', '');
 
-        $hometext = "The " . \Utilities\HtmlSanitizer::e($teamName) . " cut " . \Utilities\HtmlSanitizer::e($playerName) . " to waivers.";
+        $hometext = "The " . \Security\HtmlSanitizer::e($teamName) . " cut " . \Security\HtmlSanitizer::e($playerName) . " to waivers.";
         Discord::postToChannel('#waiver-wire', $hometext);
 
         \Logging\LoggerFactory::getChannel('audit')->info('player_waived', [
@@ -223,8 +223,8 @@ class WaiversProcessor implements WaiversProcessorInterface
         $salaryStr = (string) $contractData['salary'];
         $this->createWaiverNewsStory($teamName, $playerName, 'add', $salaryStr);
 
-        $storytitle = \Utilities\HtmlSanitizer::e($teamName) . " make waiver additions";
-        $hometext = "The " . \Utilities\HtmlSanitizer::e($teamName) . " sign " . \Utilities\HtmlSanitizer::e($playerName) . " from waivers for " . \Utilities\HtmlSanitizer::e($salaryStr) . ".";
+        $storytitle = \Security\HtmlSanitizer::e($teamName) . " make waiver additions";
+        $hometext = "The " . \Security\HtmlSanitizer::e($teamName) . " sign " . \Security\HtmlSanitizer::e($playerName) . " from waivers for " . \Security\HtmlSanitizer::e($salaryStr) . ".";
         \Mail\MailService::fromConfig()->send(self::NOTIFICATION_EMAIL_RECIPIENT, $storytitle, $hometext, self::NOTIFICATION_EMAIL_SENDER);
 
         Discord::postToChannel('#waiver-wire', $hometext);
@@ -246,12 +246,12 @@ class WaiversProcessor implements WaiversProcessorInterface
 
         if ($action === 'waive') {
             $topicID = 32;
-            $storytitle = \Utilities\HtmlSanitizer::e($teamName) . " make waiver cuts";
-            $hometext = "The " . \Utilities\HtmlSanitizer::e($teamName) . " cut " . \Utilities\HtmlSanitizer::e($playerName) . " to waivers.";
+            $storytitle = \Security\HtmlSanitizer::e($teamName) . " make waiver cuts";
+            $hometext = "The " . \Security\HtmlSanitizer::e($teamName) . " cut " . \Security\HtmlSanitizer::e($playerName) . " to waivers.";
         } else {
             $topicID = 33;
-            $storytitle = \Utilities\HtmlSanitizer::e($teamName) . " make waiver additions";
-            $hometext = "The " . \Utilities\HtmlSanitizer::e($teamName) . " sign " . \Utilities\HtmlSanitizer::e($playerName) . " from waivers for " . \Utilities\HtmlSanitizer::e($contract) . ".";
+            $storytitle = \Security\HtmlSanitizer::e($teamName) . " make waiver additions";
+            $hometext = "The " . \Security\HtmlSanitizer::e($teamName) . " sign " . \Security\HtmlSanitizer::e($playerName) . " from waivers for " . \Security\HtmlSanitizer::e($contract) . ".";
         }
 
         $categoryID = $this->newsService->getCategoryIDByTitle(self::WAIVER_POOL_MOVES_CATEGORY);

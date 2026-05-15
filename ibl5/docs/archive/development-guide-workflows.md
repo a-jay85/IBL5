@@ -18,7 +18,7 @@
 
 ### Security Audit (Non-Negotiable)
 1. **XSS Protection**
-   - [ ] All database-sourced content wrapped in `Utilities\HtmlSanitizer::safeHtmlOutput()`
+   - [ ] All database-sourced content wrapped in `Security\HtmlSanitizer::safeHtmlOutput()`
    - [ ] All user inputs sanitized before output (player names, game text, form data)
    - [ ] Play-by-play text, error messages, and dynamic content properly escaped
    - [ ] HTML generated in business logic classes sanitized before embedding in output
@@ -159,7 +159,7 @@ public function getPlayer($playerId)
 
 **Security Checklist:**
 - [ ] Prepared statements (SQL injection)
-- [ ] HTML escaping (XSS) - Use `Utilities\HtmlSanitizer::safeHtmlOutput()` instead of `htmlspecialchars()`
+- [ ] HTML escaping (XSS) - Use `Security\HtmlSanitizer::safeHtmlOutput()` instead of `htmlspecialchars()`
 - [ ] Input validation
 - [ ] Authorization checks
 - [ ] CSRF protection

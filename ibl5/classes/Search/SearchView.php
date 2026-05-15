@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Search;
 
 use Search\Contracts\SearchViewInterface;
-use Utilities\HtmlSanitizer;
+use Security\HtmlSanitizer;
 
 /**
  * View class for rendering the Search page.

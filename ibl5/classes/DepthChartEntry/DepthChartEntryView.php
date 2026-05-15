@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace DepthChartEntry;
 
 use DepthChartEntry\Contracts\DepthChartEntryViewInterface;
-use Utilities\HtmlSanitizer;
+use Security\HtmlSanitizer;
 
 /**
  * @phpstan-import-type PlayerRow from \Services\CommonMysqliRepository
@@ -122,7 +122,7 @@ the earlier slot in that order claims them.</p>
     {
         $teamLogoEscaped = HtmlSanitizer::safeHtmlOutput($teamLogo);
         echo '<form name="DepthChartEntry" method="post" action="modules.php?name=DepthChartEntry&amp;op=submit" class="depth-chart-form">
-            ' . \Utilities\CsrfGuard::generateToken('depth_chart') . '
+            ' . \Security\CsrfGuard::generateToken('depth_chart') . '
             <input type="hidden" name="Team_Name" value="' . $teamLogoEscaped . '">
             <input type="hidden" name="loaded_dc_id" id="loaded_dc_id" value="0">';
 

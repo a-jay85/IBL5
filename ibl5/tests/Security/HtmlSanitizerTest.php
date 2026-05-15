@@ -2,10 +2,10 @@
 
 declare(strict_types=1);
 
-namespace Tests\Utilities;
+namespace Tests\Security;
 
 use PHPUnit\Framework\TestCase;
-use Utilities\HtmlSanitizer;
+use Security\HtmlSanitizer;
 
 class HtmlSanitizerTest extends TestCase
 {

@@ -54,7 +54,7 @@ Handles all HTML generation for the series records display.
 - `renderRecordCell()` - Individual win-loss cells
 - `renderDiagonalCell()` - Team vs itself cells
 
-Uses `Utilities\HtmlSanitizer` for XSS protection on all output.
+Uses `Security\HtmlSanitizer` for XSS protection on all output.
 
 ### SeriesRecordsController
 
@@ -106,7 +106,7 @@ $controller->main($user);
 
 - `BaseMysqliRepository` - Base class for prepared statement execution
 - `Services\CommonMysqliRepository` - Team ID lookup from team name
-- `Utilities\HtmlSanitizer` - XSS protection for output
+- `Security\HtmlSanitizer` - XSS protection for output
 - `PageLayout\PageLayout` - Page frame rendering
 
 ## Related Modules

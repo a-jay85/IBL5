@@ -26,8 +26,8 @@ class WaiversView implements WaiversViewInterface
         ?string $result = null,
         ?string $error = null
     ): string {
-        $teamNameEscaped = \Utilities\HtmlSanitizer::safeHtmlOutput($teamName);
-        $actionEscaped = \Utilities\HtmlSanitizer::safeHtmlOutput($action);
+        $teamNameEscaped = \Security\HtmlSanitizer::safeHtmlOutput($teamName);
+        $actionEscaped = \Security\HtmlSanitizer::safeHtmlOutput($action);
 
         ob_start();
         ?>
@@ -37,7 +37,7 @@ class WaiversView implements WaiversViewInterface
             'player_dropped' => ['class' => 'ibl-alert--success', 'message' => 'Player successfully dropped to waivers.'],
         ], $error) ?>
         <form name="Waiver_Move" method="post" action="" class="ibl-form-container">
-            <?= \Utilities\CsrfGuard::generateToken('waivers') ?>
+            <?= \Security\CsrfGuard::generateToken('waivers') ?>
             <input type="hidden" name="Team_Name" value="<?= $teamNameEscaped ?>">
             <div class="text-center">
                 <img src="images/logo/<?= $teamid ?>.jpg" alt="Team Logo" class="team-logo-banner">
@@ -77,9 +77,9 @@ class WaiversView implements WaiversViewInterface
         string $contract,
         string $waitTime = ''
     ): string {
-        $playerNameEscaped = \Utilities\HtmlSanitizer::safeHtmlOutput($playerName);
-        $contractEscaped = \Utilities\HtmlSanitizer::safeHtmlOutput($contract);
-        $waitTimeEscaped = \Utilities\HtmlSanitizer::safeHtmlOutput($waitTime);
+        $playerNameEscaped = \Security\HtmlSanitizer::safeHtmlOutput($playerName);
+        $contractEscaped = \Security\HtmlSanitizer::safeHtmlOutput($contract);
+        $waitTimeEscaped = \Security\HtmlSanitizer::safeHtmlOutput($waitTime);
 
         $displayText = "{$playerNameEscaped} {$contractEscaped}";
         if ($waitTime !== '') {

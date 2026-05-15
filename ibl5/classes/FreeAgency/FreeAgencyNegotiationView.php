@@ -6,7 +6,7 @@ namespace FreeAgency;
 
 use Player\Player;
 use Player\PlayerImageHelper;
-use Utilities\HtmlSanitizer;
+use Security\HtmlSanitizer;
 use Team\Team;
 
 /**
@@ -45,7 +45,7 @@ class FreeAgencyNegotiationView
         // The negotiate page has 16+ forms (custom, delete, quick-offer buttons).
         // CsrfGuard's MAX_TOKENS=10 would evict the custom form's token if each
         // form generated its own. One shared token avoids this.
-        $csrfToken = \Utilities\CsrfGuard::generateRawToken('free_agency');
+        $csrfToken = \Security\CsrfGuard::generateRawToken('free_agency');
         $csrfHtml = '<input type="hidden" name="_csrf_token" value="' . $csrfToken . '">';
         $this->formComponents->setCsrfHtml($csrfHtml);
 
@@ -55,7 +55,7 @@ class FreeAgencyNegotiationView
 
         // Error banner from PRG redirect
         if ($error !== null) {
-            $sanitizedError = \Utilities\HtmlSanitizer::safeHtmlOutput($error);
+            $sanitizedError = \Security\HtmlSanitizer::safeHtmlOutput($error);
             ?>
 <div class="ibl-alert ibl-alert--error"><?= $sanitizedError ?></div>
             <?php

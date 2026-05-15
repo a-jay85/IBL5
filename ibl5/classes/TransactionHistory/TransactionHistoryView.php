@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace TransactionHistory;
 
 use TransactionHistory\Contracts\TransactionHistoryViewInterface;
-use Utilities\HtmlSanitizer;
+use Security\HtmlSanitizer;
 
 /**
  * View class for rendering the Transaction History page.

@@ -102,7 +102,7 @@ class FreeAgencyController
 
     private function processOffer(): void
     {
-        if (!\Utilities\CsrfGuard::validateSubmittedToken('free_agency')) {
+        if (!\Security\CsrfGuard::validateSubmittedToken('free_agency')) {
             \Utilities\HtmxHelper::redirect('modules.php?name=FreeAgency&result=csrf_error');
         }
 
@@ -158,7 +158,7 @@ class FreeAgencyController
 
     private function deleteOffer(): void
     {
-        if (!\Utilities\CsrfGuard::validateSubmittedToken('free_agency')) {
+        if (!\Security\CsrfGuard::validateSubmittedToken('free_agency')) {
             \Utilities\HtmxHelper::redirect('modules.php?name=FreeAgency&result=csrf_error');
         }
 

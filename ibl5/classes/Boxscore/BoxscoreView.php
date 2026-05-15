@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Boxscore;
 
-use Utilities\HtmlSanitizer;
+use Security\HtmlSanitizer;
 
 /**
  * BoxscoreView - Renders parse results and All-Star rename UI for scoParser

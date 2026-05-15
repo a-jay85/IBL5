@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Voting;
 
-use Utilities\HtmlSanitizer;
+use Security\HtmlSanitizer;
 use Voting\Contracts\VotingRepositoryInterface;
 use Voting\Contracts\VotingSubmissionViewInterface;
 

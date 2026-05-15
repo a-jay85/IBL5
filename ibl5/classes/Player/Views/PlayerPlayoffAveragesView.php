@@ -8,7 +8,7 @@ use Player\PlayerRepository;
 use Player\PlayerStatsRepository;
 use Player\Contracts\PlayerPlayoffAveragesViewInterface;
 use BasketballStats\StatsFormatter;
-use Utilities\HtmlSanitizer;
+use Security\HtmlSanitizer;
 
 /**
  * PlayerPlayoffAveragesView - Renders playoff averages table

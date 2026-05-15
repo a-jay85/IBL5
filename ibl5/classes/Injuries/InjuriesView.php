@@ -8,7 +8,7 @@ use Injuries\Contracts\InjuriesViewInterface;
 use Player\PlayerImageHelper;
 use UI\Components\TooltipLabel;
 use UI\TeamCellHelper;
-use Utilities\HtmlSanitizer;
+use Security\HtmlSanitizer;
 
 /**
  * View class for rendering injured players table.

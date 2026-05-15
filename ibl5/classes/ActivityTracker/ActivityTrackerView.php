@@ -6,7 +6,7 @@ namespace ActivityTracker;
 
 use ActivityTracker\Contracts\ActivityTrackerRepositoryInterface;
 use ActivityTracker\Contracts\ActivityTrackerViewInterface;
-use Utilities\HtmlSanitizer;
+use Security\HtmlSanitizer;
 
 /**
  * ActivityTrackerView - HTML rendering for activity tracker

@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace ApiKeys;
 
 use ApiKeys\Contracts\ApiKeysViewInterface;
-use Utilities\HtmlSanitizer;
+use Security\HtmlSanitizer;
 
 /**
  * ApiKeysView - Renders the self-service API key management page
@@ -31,7 +31,7 @@ class ApiKeysView implements ApiKeysViewInterface
         <p class="mb-4">You don't have an API key yet. Generate one to use the Player Export feature with Google Sheets.</p>
         <p class="mb-6 text-sm text-gray-600">An API key lets you pull live player data directly into your spreadsheet using Google Sheets' <code>IMPORTDATA</code> function.</p>
         <form method="post" action="modules.php?name=ApiKeys&amp;op=generate">
-            <?= \Utilities\CsrfGuard::generateToken('api_keys_generate') ?>
+            <?= \Security\CsrfGuard::generateToken('api_keys_generate') ?>
             <button type="submit" class="ibl-btn ibl-btn--primary">Generate API Key</button>
         </form>
     </div>
@@ -115,7 +115,7 @@ class ApiKeysView implements ApiKeysViewInterface
 
         <div class="flex gap-4 items-center">
             <form method="post" action="modules.php?name=ApiKeys&amp;op=revoke" onsubmit="return confirm('Are you sure? You will need to generate a new key and update any spreadsheets that use the current one.');">
-                <?= \Utilities\CsrfGuard::generateToken('api_keys_revoke') ?>
+                <?= \Security\CsrfGuard::generateToken('api_keys_revoke') ?>
                 <button type="submit" class="ibl-btn ibl-btn--danger">Revoke Key</button>
             </form>
 

@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace RookieOption;
 
 use Player\Player;
-use Utilities\HtmlSanitizer;
+use Security\HtmlSanitizer;
 use Player\PlayerImageHelper;
 use RookieOption\Contracts\RookieOptionFormViewInterface;
 

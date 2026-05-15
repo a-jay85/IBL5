@@ -136,7 +136,7 @@ function themeindex($aid, $informant, $time, $title, $counter, $topic, $thetext,
     $safeTitle = str_replace(['<font class="storycat">', '</font>'], ['<span class="ibl-badge">', '</span>'], $title);
     $nukeCompat = new \Utilities\NukeCompat();
     $safeTime = $nukeCompat->formatLocalTime($time);
-    $safeTopictext = \Utilities\HtmlSanitizer::safeHtmlOutput($topictext);
+    $safeTopictext = \Security\HtmlSanitizer::safeHtmlOutput($topictext);
     $safeCounter = (int)$counter;
 
     // Determine if this is a transaction/league news item (topic-based styling)
@@ -151,7 +151,7 @@ function themeindex($aid, $informant, $time, $title, $counter, $topic, $thetext,
 
     $topicIconHtml = '';
     if (!empty($t_image) && file_exists($t_image)) {
-        $topicIconHtml = '<a href="modules.php?name=News&amp;new_topic=' . (int)$topic . '" class="news-article__topic-icon-link" aria-label="' . $topicLinkLabel . '"><img src="' . \Utilities\HtmlSanitizer::safeHtmlOutput($t_image) . '" alt="' . $safeTopictext . '" class="news-article__topic-icon" loading="lazy"></a>';
+        $topicIconHtml = '<a href="modules.php?name=News&amp;new_topic=' . (int)$topic . '" class="news-article__topic-icon-link" aria-label="' . $topicLinkLabel . '"><img src="' . \Security\HtmlSanitizer::safeHtmlOutput($t_image) . '" alt="' . $safeTopictext . '" class="news-article__topic-icon" loading="lazy"></a>';
     }
 
     echo '<article class="' . $articleClass . '">
@@ -166,7 +166,7 @@ function themeindex($aid, $informant, $time, $title, $counter, $topic, $thetext,
                 <span class="news-article__meta-item">
                     <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
                     ';
-    echo \Utilities\HtmlSanitizer::e($aid);
+    echo \Security\HtmlSanitizer::e($aid);
     echo '</span>
                 <span class="news-article__meta-item">
                     <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>
@@ -186,7 +186,7 @@ function themeindex($aid, $informant, $time, $title, $counter, $topic, $thetext,
 
     if ("$aid" != "$informant" && !empty($informant)) {
         echo '<p class="news-article__attribution">
-            ' . _WRITES . ': ' . \Utilities\HtmlSanitizer::safeHtmlOutput($informant) . '
+            ' . _WRITES . ': ' . \Security\HtmlSanitizer::safeHtmlOutput($informant) . '
         </p>';
     }
 
@@ -217,14 +217,14 @@ function themearticle($aid, $informant, $datetime, $title, $thetext, $topic, $to
     $safeTitle = str_replace(['<font class="storycat">', '</font>'], ['<span class="ibl-badge">', '</span>'], $title);
     $nukeCompat = new \Utilities\NukeCompat();
     $safeDatetime = $nukeCompat->formatLocalTime($datetime);
-    $safeTopictext = \Utilities\HtmlSanitizer::safeHtmlOutput($topictext);
-    $safeAid = \Utilities\HtmlSanitizer::safeHtmlOutput($aid);
+    $safeTopictext = \Security\HtmlSanitizer::safeHtmlOutput($topictext);
+    $safeAid = \Security\HtmlSanitizer::safeHtmlOutput($aid);
 
     // Determine contributor info
     $contributorHtml = '';
     if ("$aid" != "$informant") {
         if (!empty($informant)) {
-            $safeInformant = \Utilities\HtmlSanitizer::safeHtmlOutput($informant);
+            $safeInformant = \Security\HtmlSanitizer::safeHtmlOutput($informant);
             $contributorHtml = '<span class="news-article__meta-item">
                 <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
                 ' . _CONTRIBUTEDBY . ' ' . $safeInformant . '
@@ -238,7 +238,7 @@ function themearticle($aid, $informant, $datetime, $title, $thetext, $topic, $to
 
     $topicIconHtml = '';
     if (!empty($t_image) && file_exists($t_image)) {
-        $topicIconHtml = '<a href="modules.php?name=News&amp;new_topic=' . (int)$topic . '" class="news-article__topic-icon-link" aria-label="' . $topicLinkLabel . '"><img src="' . \Utilities\HtmlSanitizer::safeHtmlOutput($t_image) . '" alt="' . $safeTopictext . '" class="news-article__topic-icon" loading="lazy"></a>';
+        $topicIconHtml = '<a href="modules.php?name=News&amp;new_topic=' . (int)$topic . '" class="news-article__topic-icon-link" aria-label="' . $topicLinkLabel . '"><img src="' . \Security\HtmlSanitizer::safeHtmlOutput($t_image) . '" alt="' . $safeTopictext . '" class="news-article__topic-icon" loading="lazy"></a>';
     }
 
     echo '<article class="news-article" style="max-width: 900px;">
@@ -303,7 +303,7 @@ function themecenterbox($title, $content)
         }
     } else {
         // Legacy content needs the box wrapper
-        $safeTitle = \Utilities\HtmlSanitizer::safeHtmlOutput($title);
+        $safeTitle = \Security\HtmlSanitizer::safeHtmlOutput($title);
 
         echo '<section class="ibl-centerbox">
             <header class="ibl-centerbox__header">

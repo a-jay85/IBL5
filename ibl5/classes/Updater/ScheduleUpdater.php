@@ -9,7 +9,7 @@ use League\LeagueContext;
 use Updater\Contracts\JsbSourceResolverInterface;
 use Utilities\UuidGenerator;
 use Utilities\SchFileParser;
-use Utilities\HtmlSanitizer;
+use Security\HtmlSanitizer;
 use Season\Season;
 
 class ScheduleUpdater extends \BaseMysqliRepository {

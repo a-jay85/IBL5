@@ -6,7 +6,7 @@ namespace Player\Views;
 
 use Player\Player;
 use Player\PlayerStats;
-use Utilities\HtmlSanitizer;
+use Security\HtmlSanitizer;
 
 /**
  * PlayerTradingCardBackView - Renders the back side of the player trading card

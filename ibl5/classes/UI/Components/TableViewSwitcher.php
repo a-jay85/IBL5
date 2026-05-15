@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace UI\Components;
 
-use Utilities\HtmlSanitizer;
+use Security\HtmlSanitizer;
 
 /**
  * TableViewSwitcher - Reusable tab navigation for switching table display views

@@ -6,7 +6,7 @@ namespace OneOnOneGame;
 
 use OneOnOneGame\Contracts\OneOnOneGameRepositoryInterface;
 use OneOnOneGame\Contracts\OneOnOneGameViewInterface;
-use Utilities\HtmlSanitizer;
+use Security\HtmlSanitizer;
 
 /**
  * OneOnOneGameView - Renders HTML for the One-on-One game module

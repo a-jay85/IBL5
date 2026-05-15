@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Voting;
 
 use Player\PlayerImageHelper;
-use Utilities\HtmlSanitizer;
+use Security\HtmlSanitizer;
 use Voting\Contracts\VotingResultsTableRendererInterface;
 use Voting\Contracts\VotingResultsServiceInterface;
 

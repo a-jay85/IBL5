@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Player\Views;
 
-use Utilities\HtmlSanitizer;
+use Security\HtmlSanitizer;
 
 /**
  * PlayerStatsCardView - Reusable horizontal stats card wrapper

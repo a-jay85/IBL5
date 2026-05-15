@@ -8,7 +8,7 @@ use FreeAgencyPreview\Contracts\FreeAgencyPreviewServiceInterface;
 use FreeAgencyPreview\Contracts\FreeAgencyPreviewViewInterface;
 use Player\PlayerImageHelper;
 use UI\TeamCellHelper;
-use Utilities\HtmlSanitizer;
+use Security\HtmlSanitizer;
 
 /**
  * View class for rendering free agency preview table.

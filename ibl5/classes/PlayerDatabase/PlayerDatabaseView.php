@@ -7,7 +7,7 @@ namespace PlayerDatabase;
 use Player\PlayerImageHelper;
 use PlayerDatabase\Contracts\PlayerDatabaseViewInterface;
 use UI\TeamCellHelper;
-use Utilities\HtmlSanitizer;
+use Security\HtmlSanitizer;
 
 /**
  * @see PlayerDatabaseViewInterface

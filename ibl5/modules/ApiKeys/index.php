@@ -38,7 +38,7 @@ $service = new ApiKeysService($repository);
 $userId = $authService->getUserId();
 
 if ($op === 'revoke' && $_SERVER['REQUEST_METHOD'] === 'POST' && $userId !== null) {
-    if (\Utilities\CsrfGuard::validateSubmittedToken('api_keys_revoke')) {
+    if (\Security\CsrfGuard::validateSubmittedToken('api_keys_revoke')) {
         $service->revokeKeyForUser($userId);
         header('Location: modules.php?name=ApiKeys');
         return;
@@ -98,7 +98,7 @@ function handleMain(ApiKeysService $service, ApiKeysView $view, int $userId): vo
  */
 function handleGenerate(ApiKeysService $service, ApiKeysView $view, int $userId, \Auth\AuthService $authService): void
 {
-    if (!\Utilities\CsrfGuard::validateSubmittedToken('api_keys_generate')) {
+    if (!\Security\CsrfGuard::validateSubmittedToken('api_keys_generate')) {
         echo '<div class="ibl-alert ibl-alert--error">Invalid or expired form submission. Please try again.</div>';
         return;
     }
@@ -113,6 +113,6 @@ function handleGenerate(ApiKeysService $service, ApiKeysView $view, int $userId,
         $result = $service->generateKeyForUser($userId, $username);
         echo $view->renderNewKeyState($result['raw_key']);
     } catch (\RuntimeException $e) {
-        echo '<div class="ibl-alert ibl-alert--error">' . \Utilities\HtmlSanitizer::e($e->getMessage()) . '</div>';
+        echo '<div class="ibl-alert ibl-alert--error">' . \Security\HtmlSanitizer::e($e->getMessage()) . '</div>';
     }
 }

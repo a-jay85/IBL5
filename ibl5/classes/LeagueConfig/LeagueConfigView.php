@@ -16,7 +16,7 @@ class LeagueConfigView
     {
         $beginningYear = $seasonEndingYear - 1;
         $shortEndingYear = substr((string) $seasonEndingYear, 2);
-        $seasonLabel = \Utilities\HtmlSanitizer::safeHtmlOutput($beginningYear . '-' . $shortEndingYear);
+        $seasonLabel = \Security\HtmlSanitizer::safeHtmlOutput($beginningYear . '-' . $shortEndingYear);
 
         return '<div class="ibl-alert ibl-alert--info">'
             . 'No .lge data found for the ' . $seasonLabel . ' season. '
@@ -33,7 +33,7 @@ class LeagueConfigView
     {
         if (!$result['success']) {
             $error = $result['error'] ?? 'Unknown error';
-            $errorEscaped = \Utilities\HtmlSanitizer::safeHtmlOutput($error);
+            $errorEscaped = \Security\HtmlSanitizer::safeHtmlOutput($error);
             return '<div class="ibl-alert ibl-alert--error">.lge import failed: ' . $errorEscaped . '</div>';
         }
 
@@ -63,7 +63,7 @@ class LeagueConfigView
             . '<strong>League config cross-check warnings:</strong><ul>';
 
         foreach ($discrepancies as $msg) {
-            $msgEscaped = \Utilities\HtmlSanitizer::safeHtmlOutput($msg);
+            $msgEscaped = \Security\HtmlSanitizer::safeHtmlOutput($msg);
             $html .= '<li>' . $msgEscaped . '</li>';
         }
 

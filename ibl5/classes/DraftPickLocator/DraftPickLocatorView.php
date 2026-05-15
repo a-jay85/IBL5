@@ -6,7 +6,7 @@ namespace DraftPickLocator;
 
 use DraftPickLocator\Contracts\DraftPickLocatorViewInterface;
 use UI\TeamCellHelper;
-use Utilities\HtmlSanitizer;
+use Security\HtmlSanitizer;
 
 /**
  * DraftPickLocatorView - HTML rendering for draft pick matrix

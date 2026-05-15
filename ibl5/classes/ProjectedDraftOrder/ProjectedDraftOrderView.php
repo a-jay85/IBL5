@@ -7,7 +7,7 @@ namespace ProjectedDraftOrder;
 use ProjectedDraftOrder\Contracts\ProjectedDraftOrderServiceInterface;
 use ProjectedDraftOrder\Contracts\ProjectedDraftOrderViewInterface;
 use UI\TeamCellHelper;
-use Utilities\HtmlSanitizer;
+use Security\HtmlSanitizer;
 
 /**
  * @phpstan-import-type DraftSlot from ProjectedDraftOrderServiceInterface

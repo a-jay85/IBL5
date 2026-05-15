@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace YourAccount;
 
-use Utilities\CsrfGuard;
-use Utilities\HtmlSanitizer;
+use Security\CsrfGuard;
+use Security\HtmlSanitizer;
 
 /**
  * Renders Breeze-inspired auth pages: Login, Register, Forgot Password,
@@ -113,7 +113,7 @@ class YourAccountView implements Contracts\YourAccountViewInterface
         <div class="ibl-card__body">
             <?php if ($error !== null): ?>
                 <div class="ibl-alert ibl-alert--error">
-                    <?php $sanitizedError = \Utilities\HtmlSanitizer::safeHtmlOutput($error); ?>
+                    <?php $sanitizedError = \Security\HtmlSanitizer::safeHtmlOutput($error); ?>
                     <?= nl2br($sanitizedError) ?>
                 </div>
             <?php endif; ?>

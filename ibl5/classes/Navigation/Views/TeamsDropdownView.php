@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Navigation\Views;
 
-use Utilities\HtmlSanitizer;
+use Security\HtmlSanitizer;
 
 /**
  * Renders the Teams mega-menu/list for both desktop and mobile navigation.

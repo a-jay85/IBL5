@@ -6,7 +6,7 @@ namespace CareerLeaderboards;
 
 use CareerLeaderboards\Contracts\CareerLeaderboardsViewInterface;
 use Player\PlayerImageHelper;
-use Utilities\HtmlSanitizer;
+use Security\HtmlSanitizer;
 
 /**
  * @see CareerLeaderboardsViewInterface

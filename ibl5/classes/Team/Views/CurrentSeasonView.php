@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Team\Views;
 
-use Utilities\HtmlSanitizer;
+use Security\HtmlSanitizer;
 
 /**
  * Pure renderer for the current season team info list.

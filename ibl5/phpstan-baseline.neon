@@ -1,7 +1,7 @@
 parameters:
 	ignoreErrors:
 		-
-			rawMessage: 'Direct $_GET access is banned outside Controllers, ApiHandlers, and Utilities\CsrfGuard. Accept typed inputs as parameters from a Controller/ApiHandler instead.'
+			rawMessage: 'Direct $_GET access is banned outside Controllers, ApiHandlers, and Security\CsrfGuard. Accept typed inputs as parameters from a Controller/ApiHandler instead.'
 			identifier: ibl.rawSuperglobal
 			count: 1
 			path: classes/Api/Middleware/ApiKeyAuthenticator.php
@@ -83,7 +83,7 @@ parameters:
 			path: classes/Bootstrap/ConfigBootstrap.php
 
 		-
-			rawMessage: 'Direct $_REQUEST access is banned outside Controllers, ApiHandlers, and Utilities\CsrfGuard. Accept typed inputs as parameters from a Controller/ApiHandler instead.'
+			rawMessage: 'Direct $_REQUEST access is banned outside Controllers, ApiHandlers, and Security\CsrfGuard. Accept typed inputs as parameters from a Controller/ApiHandler instead.'
 			identifier: ibl.rawSuperglobal
 			count: 1
 			path: classes/Bootstrap/ConfigBootstrap.php
@@ -118,13 +118,13 @@ parameters:
 			path: classes/Bootstrap/ConfigBootstrap.php
 
 		-
-			rawMessage: 'Direct $_COOKIE access is banned outside Controllers, ApiHandlers, and Utilities\CsrfGuard. Accept typed inputs as parameters from a Controller/ApiHandler instead.'
+			rawMessage: 'Direct $_COOKIE access is banned outside Controllers, ApiHandlers, and Security\CsrfGuard. Accept typed inputs as parameters from a Controller/ApiHandler instead.'
 			identifier: ibl.rawSuperglobal
 			count: 2
 			path: classes/Bootstrap/LeagueBootstrap.php
 
 		-
-			rawMessage: 'Direct $_GET access is banned outside Controllers, ApiHandlers, and Utilities\CsrfGuard. Accept typed inputs as parameters from a Controller/ApiHandler instead.'
+			rawMessage: 'Direct $_GET access is banned outside Controllers, ApiHandlers, and Security\CsrfGuard. Accept typed inputs as parameters from a Controller/ApiHandler instead.'
 			identifier: ibl.rawSuperglobal
 			count: 3
 			path: classes/Bootstrap/LeagueBootstrap.php
@@ -178,13 +178,13 @@ parameters:
 			path: classes/FreeAgency/FreeAgencyView.php
 
 		-
-			rawMessage: 'Direct $_COOKIE access is banned outside Controllers, ApiHandlers, and Utilities\CsrfGuard. Accept typed inputs as parameters from a Controller/ApiHandler instead.'
+			rawMessage: 'Direct $_COOKIE access is banned outside Controllers, ApiHandlers, and Security\CsrfGuard. Accept typed inputs as parameters from a Controller/ApiHandler instead.'
 			identifier: ibl.rawSuperglobal
 			count: 1
 			path: classes/League/LeagueContext.php
 
 		-
-			rawMessage: 'Direct $_GET access is banned outside Controllers, ApiHandlers, and Utilities\CsrfGuard. Accept typed inputs as parameters from a Controller/ApiHandler instead.'
+			rawMessage: 'Direct $_GET access is banned outside Controllers, ApiHandlers, and Security\CsrfGuard. Accept typed inputs as parameters from a Controller/ApiHandler instead.'
 			identifier: ibl.rawSuperglobal
 			count: 1
 			path: classes/League/LeagueContext.php
@@ -316,7 +316,7 @@ parameters:
 			path: classes/TransactionHistory/TransactionHistoryView.php
 
 		-
-			rawMessage: 'Direct $_COOKIE access is banned outside Controllers, ApiHandlers, and Utilities\CsrfGuard. Accept typed inputs as parameters from a Controller/ApiHandler instead.'
+			rawMessage: 'Direct $_COOKIE access is banned outside Controllers, ApiHandlers, and Security\CsrfGuard. Accept typed inputs as parameters from a Controller/ApiHandler instead.'
 			identifier: ibl.rawSuperglobal
 			count: 2
 			path: classes/Utilities/TestCookieOverrides.php

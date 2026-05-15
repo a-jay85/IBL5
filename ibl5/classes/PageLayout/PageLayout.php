@@ -26,7 +26,7 @@ class PageLayout
             && is_string($_SESSION['flash_success'])
             && $_SESSION['flash_success'] !== ''
         ) {
-            $flashMessage = \Utilities\HtmlSanitizer::safeHtmlOutput($_SESSION['flash_success']);
+            $flashMessage = \Security\HtmlSanitizer::safeHtmlOutput($_SESSION['flash_success']);
             unset($_SESSION['flash_success']);
             echo '<div class="ibl-alert ibl-alert--success">' . $flashMessage . '</div>';
         }
@@ -45,14 +45,14 @@ class PageLayout
         /** @var string $pagetitle */
         global $pagetitle;
 
-        echo '<title>' . \Utilities\HtmlSanitizer::e($sitename . ' ' . $pagetitle) . '</title>';
+        echo '<title>' . \Security\HtmlSanitizer::e($sitename . ' ' . $pagetitle) . '</title>';
 
         if (
             isset($_SESSION['flash_success'])
             && is_string($_SESSION['flash_success'])
             && $_SESSION['flash_success'] !== ''
         ) {
-            $flashMessage = \Utilities\HtmlSanitizer::safeHtmlOutput($_SESSION['flash_success']);
+            $flashMessage = \Security\HtmlSanitizer::safeHtmlOutput($_SESSION['flash_success']);
             unset($_SESSION['flash_success']);
             echo '<div class="ibl-alert ibl-alert--success">' . $flashMessage . '</div>';
         }
@@ -97,7 +97,7 @@ class PageLayout
         if ($relativePath !== '') {
             echo "<base href=\"{$relativePath}\">\n";
         }
-        echo "<title>" . \Utilities\HtmlSanitizer::e($sitename . ' ' . $pagetitle) . "</title>\n";
+        echo "<title>" . \Security\HtmlSanitizer::e($sitename . ' ' . $pagetitle) . "</title>\n";
         echo '<meta name="google-site-verification" content="3y3xJYDHSYUitn7cbfFfI6C2BiK_q66dtRfykpzHW5w" />';
         $jsFiles = [
             'jslib/htmx.min.js',
@@ -126,10 +126,10 @@ class PageLayout
         echo "<META HTTP-EQUIV=\"EXPIRES\" CONTENT=\"0\">\n";
         echo "<META NAME=\"RESOURCE-TYPE\" CONTENT=\"DOCUMENT\">\n";
         echo "<META NAME=\"DISTRIBUTION\" CONTENT=\"GLOBAL\">\n";
-        echo "<META NAME=\"AUTHOR\" CONTENT=\"" . \Utilities\HtmlSanitizer::e($sitename) . "\">\n";
-        echo "<META NAME=\"COPYRIGHT\" CONTENT=\"Copyright (c) by " . \Utilities\HtmlSanitizer::e($sitename) . "\">\n";
+        echo "<META NAME=\"AUTHOR\" CONTENT=\"" . \Security\HtmlSanitizer::e($sitename) . "\">\n";
+        echo "<META NAME=\"COPYRIGHT\" CONTENT=\"Copyright (c) by " . \Security\HtmlSanitizer::e($sitename) . "\">\n";
         echo "<META NAME=\"KEYWORDS\" CONTENT=\"basketball, fantasy basketball, basketball league, IBL, Internet Basketball League, basketball simulation, basketball stats, NBA, basketball draft, free agency, basketball trading, basketball standings, basketball schedule\">\n";
-        echo "<META NAME=\"DESCRIPTION\" CONTENT=\"" . \Utilities\HtmlSanitizer::e($slogan) . "\">\n";
+        echo "<META NAME=\"DESCRIPTION\" CONTENT=\"" . \Security\HtmlSanitizer::e($slogan) . "\">\n";
         echo "<META NAME=\"ROBOTS\" CONTENT=\"INDEX, FOLLOW\">\n";
         echo "<META NAME=\"REVISIT-AFTER\" CONTENT=\"1 DAYS\">\n";
         echo "<META NAME=\"RATING\" CONTENT=\"GENERAL\">\n";

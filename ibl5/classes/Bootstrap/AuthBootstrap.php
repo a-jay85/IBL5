@@ -29,7 +29,7 @@ class AuthBootstrap implements BootstrapStepInterface
         /** @var \mysqli $mysqliDb */
         $mysqliDb = $GLOBALS['mysqli_db'];
 
-        $authService = new \Auth\AuthService($mysqliDb);
+        $authService = new \Auth\AuthService(new \Auth\AuthRepository($mysqliDb));
         $authService->tryRememberMe();
 
         // Populate legacy $user global for backward compat

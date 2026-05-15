@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Tests\Auth;
 
 use Auth\AuthService;
+use Auth\Contracts\AuthRepositoryInterface;
 use Delight\Auth\Role;
 use PHPUnit\Framework\TestCase;
 
@@ -22,9 +23,8 @@ class AuthServiceTest extends TestCase
     {
         parent::setUp();
 
-        // Create AuthService with a mock mysqli (stub for non-DB tests)
-        $mockMysqli = static::createStub(\mysqli::class);
-        $this->authService = new AuthService($mockMysqli);
+        $stubRepo = static::createStub(AuthRepositoryInterface::class);
+        $this->authService = new AuthService($stubRepo);
 
         // Start a test session if not already started
         if (session_status() === PHP_SESSION_NONE) {
@@ -306,10 +306,8 @@ class AuthServiceTest extends TestCase
         // Authenticate the user but don't set auth_roles in session
         $_SESSION['auth_user_id'] = 1;
         $_SESSION['auth_username'] = 'testuser';
-        // auth_roles is NOT set — so hasRole() should query the DB
-
-        // Since we're using a stub mysqli that won't prepare anything,
-        // the prepare() will return false and the method returns false
+        // auth_roles is NOT set — so hasRole() queries the repository
+        // Stub returns null → hasRole returns false
         self::assertFalse($this->authService->hasRole(Role::ADMIN));
     }
 
@@ -319,8 +317,8 @@ class AuthServiceTest extends TestCase
         $_SESSION['auth_username'] = 'testuser';
         $_SESSION['auth_roles'] = 'not-an-int';
 
-        // Non-int auth_roles should be ignored, falling back to DB path
-        // which returns false because stub mysqli can't prepare
+        // Non-int auth_roles should be ignored, falling back to repository
+        // Stub returns null → isAdmin returns false
         self::assertFalse($this->authService->isAdmin());
     }
 }

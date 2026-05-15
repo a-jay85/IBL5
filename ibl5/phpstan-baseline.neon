@@ -7,6 +7,54 @@ parameters:
 			path: classes/Api/Middleware/ApiKeyAuthenticator.php
 
 		-
+			rawMessage: Table identifier 'ibl_plr' must be wrapped in backticks for PHPStan rename safety.
+			identifier: ibl.bareTableIdentifier
+			count: 1
+			path: classes/Api/Repository/ApiInjuriesRepository.php
+
+		-
+			rawMessage: Table identifier 'ibl_team_info' must be wrapped in backticks for PHPStan rename safety.
+			identifier: ibl.bareTableIdentifier
+			count: 1
+			path: classes/Api/Repository/ApiInjuriesRepository.php
+
+		-
+			rawMessage: Table identifier 'ibl_api_keys' must be wrapped in backticks for PHPStan rename safety.
+			identifier: ibl.bareTableIdentifier
+			count: 2
+			path: classes/Api/Repository/ApiKeyRepository.php
+
+		-
+			rawMessage: Table identifier 'ibl_hist' must be wrapped in backticks for PHPStan rename safety.
+			identifier: ibl.bareTableIdentifier
+			count: 1
+			path: classes/Api/Repository/ApiLeadersRepository.php
+
+		-
+			rawMessage: Table identifier 'ibl_hist' must be wrapped in backticks for PHPStan rename safety.
+			identifier: ibl.bareTableIdentifier
+			count: 1
+			path: classes/Api/Repository/ApiPlayerStatsRepository.php
+
+		-
+			rawMessage: Table identifier 'ibl_plr' must be wrapped in backticks for PHPStan rename safety.
+			identifier: ibl.bareTableIdentifier
+			count: 1
+			path: classes/Api/Repository/ApiPlayerStatsRepository.php
+
+		-
+			rawMessage: Table identifier 'ibl_team_info' must be wrapped in backticks for PHPStan rename safety.
+			identifier: ibl.bareTableIdentifier
+			count: 2
+			path: classes/Api/Repository/ApiPlayerStatsRepository.php
+
+		-
+			rawMessage: Table identifier 'ibl_api_rate_limits' must be wrapped in backticks for PHPStan rename safety.
+			identifier: ibl.bareTableIdentifier
+			count: 3
+			path: classes/Api/Repository/RateLimitRepository.php
+
+		-
 			rawMessage: 'Unescaped output in View. Wrap the expression in HtmlSanitizer::e() (or another whitelisted safe helper), or cast it to (int)/(float)/(bool) if it is numeric.'
 			identifier: ibl.unescapedOutput
 			count: 2
@@ -154,10 +202,70 @@ parameters:
 			path: classes/DepthChartEntry/DepthChartEntryView.php
 
 		-
+			rawMessage: Table identifier 'ibl_draft' must be wrapped in backticks for PHPStan rename safety.
+			identifier: ibl.bareTableIdentifier
+			count: 3
+			path: classes/Draft/DraftRepository.php
+
+		-
+			rawMessage: Table identifier 'ibl_draft_class' must be wrapped in backticks for PHPStan rename safety.
+			identifier: ibl.bareTableIdentifier
+			count: 3
+			path: classes/Draft/DraftRepository.php
+
+		-
+			rawMessage: Table identifier 'ibl_plr' must be wrapped in backticks for PHPStan rename safety.
+			identifier: ibl.bareTableIdentifier
+			count: 2
+			path: classes/Draft/DraftRepository.php
+
+		-
+			rawMessage: Table identifier 'ibl_team_info' must be wrapped in backticks for PHPStan rename safety.
+			identifier: ibl.bareTableIdentifier
+			count: 1
+			path: classes/Draft/DraftRepository.php
+
+		-
+			rawMessage: Table identifier 'ibl_plr' must be wrapped in backticks for PHPStan rename safety.
+			identifier: ibl.bareTableIdentifier
+			count: 3
+			path: classes/FranchiseRecordBook/FranchiseRecordBookRepository.php
+
+		-
+			rawMessage: Table identifier 'ibl_rcb_alltime_records' must be wrapped in backticks for PHPStan rename safety.
+			identifier: ibl.bareTableIdentifier
+			count: 3
+			path: classes/FranchiseRecordBook/FranchiseRecordBookRepository.php
+
+		-
+			rawMessage: Table identifier 'ibl_team_info' must be wrapped in backticks for PHPStan rename safety.
+			identifier: ibl.bareTableIdentifier
+			count: 1
+			path: classes/FranchiseRecordBook/FranchiseRecordBookRepository.php
+
+		-
 			rawMessage: 'Unescaped output in View. Wrap the expression in HtmlSanitizer::e() (or another whitelisted safe helper), or cast it to (int)/(float)/(bool) if it is numeric.'
 			identifier: ibl.unescapedOutput
 			count: 1
 			path: classes/FranchiseRecordBook/FranchiseRecordBookView.php
+
+		-
+			rawMessage: Table identifier 'ibl_fa_offers' must be wrapped in backticks for PHPStan rename safety.
+			identifier: ibl.bareTableIdentifier
+			count: 2
+			path: classes/FreeAgency/FreeAgencyAdminRepository.php
+
+		-
+			rawMessage: Table identifier 'ibl_plr' must be wrapped in backticks for PHPStan rename safety.
+			identifier: ibl.bareTableIdentifier
+			count: 2
+			path: classes/FreeAgency/FreeAgencyAdminRepository.php
+
+		-
+			rawMessage: Table identifier 'ibl_team_info' must be wrapped in backticks for PHPStan rename safety.
+			identifier: ibl.bareTableIdentifier
+			count: 2
+			path: classes/FreeAgency/FreeAgencyAdminRepository.php
 
 		-
 			rawMessage: '$cookie[...] is read before PageLayout::header() in the same method. PageLayout::header() populates $cookie with auth and CSRF state — call it first, otherwise you will read stale or missing values (see CsrfGuard MAX_TOKENS incident).'
@@ -166,16 +274,94 @@ parameters:
 			path: classes/FreeAgency/FreeAgencyController.php
 
 		-
+			rawMessage: Table identifier 'ibl_demands' must be wrapped in backticks for PHPStan rename safety.
+			identifier: ibl.bareTableIdentifier
+			count: 1
+			path: classes/FreeAgency/FreeAgencyDemandRepository.php
+
+		-
+			rawMessage: Table identifier 'ibl_team_info' must be wrapped in backticks for PHPStan rename safety.
+			identifier: ibl.bareTableIdentifier
+			count: 1
+			path: classes/FreeAgency/FreeAgencyDemandRepository.php
+
+		-
 			rawMessage: 'Unescaped output in View. Wrap the expression in HtmlSanitizer::e() (or another whitelisted safe helper), or cast it to (int)/(float)/(bool) if it is numeric.'
 			identifier: ibl.unescapedOutput
 			count: 20
 			path: classes/FreeAgency/FreeAgencyNegotiationView.php
 
 		-
+			rawMessage: Table identifier 'ibl_fa_offers' must be wrapped in backticks for PHPStan rename safety.
+			identifier: ibl.bareTableIdentifier
+			count: 5
+			path: classes/FreeAgency/FreeAgencyRepository.php
+
+		-
+			rawMessage: Table identifier 'ibl_plr' must be wrapped in backticks for PHPStan rename safety.
+			identifier: ibl.bareTableIdentifier
+			count: 2
+			path: classes/FreeAgency/FreeAgencyRepository.php
+
+		-
+			rawMessage: Table identifier 'ibl_team_info' must be wrapped in backticks for PHPStan rename safety.
+			identifier: ibl.bareTableIdentifier
+			count: 1
+			path: classes/FreeAgency/FreeAgencyRepository.php
+
+		-
 			rawMessage: 'Unescaped output in View. Wrap the expression in HtmlSanitizer::e() (or another whitelisted safe helper), or cast it to (int)/(float)/(bool) if it is numeric.'
 			identifier: ibl.unescapedOutput
 			count: 127
 			path: classes/FreeAgency/FreeAgencyView.php
+
+		-
+			rawMessage: Table identifier 'ibl_plr' must be wrapped in backticks for PHPStan rename safety.
+			identifier: ibl.bareTableIdentifier
+			count: 1
+			path: classes/JsbParser/JsbExportRepository.php
+
+		-
+			rawMessage: Table identifier 'ibl_trade_info' must be wrapped in backticks for PHPStan rename safety.
+			identifier: ibl.bareTableIdentifier
+			count: 1
+			path: classes/JsbParser/JsbExportRepository.php
+
+		-
+			rawMessage: Table identifier 'ibl_awards' must be wrapped in backticks for PHPStan rename safety.
+			identifier: ibl.bareTableIdentifier
+			count: 1
+			path: classes/JsbParser/JsbImportRepository.php
+
+		-
+			rawMessage: Table identifier 'ibl_jsb_allstar_rosters' must be wrapped in backticks for PHPStan rename safety.
+			identifier: ibl.bareTableIdentifier
+			count: 1
+			path: classes/JsbParser/JsbImportRepository.php
+
+		-
+			rawMessage: Table identifier 'ibl_jsb_allstar_scores' must be wrapped in backticks for PHPStan rename safety.
+			identifier: ibl.bareTableIdentifier
+			count: 1
+			path: classes/JsbParser/JsbImportRepository.php
+
+		-
+			rawMessage: Table identifier 'ibl_plr' must be wrapped in backticks for PHPStan rename safety.
+			identifier: ibl.bareTableIdentifier
+			count: 6
+			path: classes/League/League.php
+
+		-
+			rawMessage: Table identifier 'ibl_settings' must be wrapped in backticks for PHPStan rename safety.
+			identifier: ibl.bareTableIdentifier
+			count: 1
+			path: classes/League/League.php
+
+		-
+			rawMessage: Table identifier 'ibl_team_info' must be wrapped in backticks for PHPStan rename safety.
+			identifier: ibl.bareTableIdentifier
+			count: 5
+			path: classes/League/League.php
 
 		-
 			rawMessage: 'Direct $_COOKIE access is banned outside Controllers, ApiHandlers, and Utilities\CsrfGuard. Accept typed inputs as parameters from a Controller/ApiHandler instead.'
@@ -188,6 +374,60 @@ parameters:
 			identifier: ibl.rawSuperglobal
 			count: 1
 			path: classes/League/LeagueContext.php
+
+		-
+			rawMessage: Table identifier 'ibl_plr' must be wrapped in backticks for PHPStan rename safety.
+			identifier: ibl.bareTableIdentifier
+			count: 2
+			path: classes/LeagueControlPanel/LeagueControlPanelProcessor.php
+
+		-
+			rawMessage: Table identifier 'ibl_awards' must be wrapped in backticks for PHPStan rename safety.
+			identifier: ibl.bareTableIdentifier
+			count: 3
+			path: classes/LeagueControlPanel/LeagueControlPanelRepository.php
+
+		-
+			rawMessage: Table identifier 'ibl_gm_awards' must be wrapped in backticks for PHPStan rename safety.
+			identifier: ibl.bareTableIdentifier
+			count: 1
+			path: classes/LeagueControlPanel/LeagueControlPanelRepository.php
+
+		-
+			rawMessage: Table identifier 'ibl_plr' must be wrapped in backticks for PHPStan rename safety.
+			identifier: ibl.bareTableIdentifier
+			count: 2
+			path: classes/LeagueControlPanel/LeagueControlPanelRepository.php
+
+		-
+			rawMessage: Table identifier 'ibl_settings' must be wrapped in backticks for PHPStan rename safety.
+			identifier: ibl.bareTableIdentifier
+			count: 8
+			path: classes/LeagueControlPanel/LeagueControlPanelRepository.php
+
+		-
+			rawMessage: Table identifier 'ibl_standings' must be wrapped in backticks for PHPStan rename safety.
+			identifier: ibl.bareTableIdentifier
+			count: 1
+			path: classes/LeagueControlPanel/LeagueControlPanelRepository.php
+
+		-
+			rawMessage: Table identifier 'ibl_team_info' must be wrapped in backticks for PHPStan rename safety.
+			identifier: ibl.bareTableIdentifier
+			count: 6
+			path: classes/LeagueControlPanel/LeagueControlPanelRepository.php
+
+		-
+			rawMessage: Table identifier 'ibl_votes_ASG' must be wrapped in backticks for PHPStan rename safety.
+			identifier: ibl.bareTableIdentifier
+			count: 1
+			path: classes/LeagueControlPanel/LeagueControlPanelRepository.php
+
+		-
+			rawMessage: Table identifier 'ibl_votes_EOY' must be wrapped in backticks for PHPStan rename safety.
+			identifier: ibl.bareTableIdentifier
+			count: 1
+			path: classes/LeagueControlPanel/LeagueControlPanelRepository.php
 
 		-
 			rawMessage: 'Unescaped output in View. Wrap the expression in HtmlSanitizer::e() (or another whitelisted safe helper), or cast it to (int)/(float)/(bool) if it is numeric.'
@@ -232,10 +472,130 @@ parameters:
 			path: classes/NextSim/NextSimView.php
 
 		-
+			rawMessage: Table identifier 'ibl_one_on_one' must be wrapped in backticks for PHPStan rename safety.
+			identifier: ibl.bareTableIdentifier
+			count: 3
+			path: classes/OneOnOneGame/OneOnOneGameRepository.php
+
+		-
+			rawMessage: Table identifier 'ibl_plr' must be wrapped in backticks for PHPStan rename safety.
+			identifier: ibl.bareTableIdentifier
+			count: 2
+			path: classes/OneOnOneGame/OneOnOneGameRepository.php
+
+		-
 			rawMessage: Inline `<style>` blocks are banned in PHP. Move CSS to ibl5/design/components/ and reference the stylesheet instead.
 			identifier: ibl.inlineCss
 			count: 2
 			path: classes/PageLayout/PageLayout.php
+
+		-
+			rawMessage: Table identifier 'ibl_awards' must be wrapped in backticks for PHPStan rename safety.
+			identifier: ibl.bareTableIdentifier
+			count: 2
+			path: classes/Player/PlayerRepository.php
+
+		-
+			rawMessage: Table identifier 'ibl_demands' must be wrapped in backticks for PHPStan rename safety.
+			identifier: ibl.bareTableIdentifier
+			count: 1
+			path: classes/Player/PlayerRepository.php
+
+		-
+			rawMessage: Table identifier 'ibl_hist' must be wrapped in backticks for PHPStan rename safety.
+			identifier: ibl.bareTableIdentifier
+			count: 1
+			path: classes/Player/PlayerRepository.php
+
+		-
+			rawMessage: Table identifier 'ibl_olympics_stats' must be wrapped in backticks for PHPStan rename safety.
+			identifier: ibl.bareTableIdentifier
+			count: 1
+			path: classes/Player/PlayerRepository.php
+
+		-
+			rawMessage: Table identifier 'ibl_one_on_one' must be wrapped in backticks for PHPStan rename safety.
+			identifier: ibl.bareTableIdentifier
+			count: 2
+			path: classes/Player/PlayerRepository.php
+
+		-
+			rawMessage: Table identifier 'ibl_plr' must be wrapped in backticks for PHPStan rename safety.
+			identifier: ibl.bareTableIdentifier
+			count: 5
+			path: classes/Player/PlayerRepository.php
+
+		-
+			rawMessage: Table identifier 'ibl_sim_dates' must be wrapped in backticks for PHPStan rename safety.
+			identifier: ibl.bareTableIdentifier
+			count: 1
+			path: classes/Player/PlayerRepository.php
+
+		-
+			rawMessage: Table identifier 'ibl_team_info' must be wrapped in backticks for PHPStan rename safety.
+			identifier: ibl.bareTableIdentifier
+			count: 1
+			path: classes/Player/PlayerRepository.php
+
+		-
+			rawMessage: Table identifier 'ibl_box_scores' must be wrapped in backticks for PHPStan rename safety.
+			identifier: ibl.bareTableIdentifier
+			count: 1
+			path: classes/Player/PlayerStatsRepository.php
+
+		-
+			rawMessage: Table identifier 'ibl_heat_career_totals' must be wrapped in backticks for PHPStan rename safety.
+			identifier: ibl.bareTableIdentifier
+			count: 1
+			path: classes/Player/PlayerStatsRepository.php
+
+		-
+			rawMessage: Table identifier 'ibl_hist' must be wrapped in backticks for PHPStan rename safety.
+			identifier: ibl.bareTableIdentifier
+			count: 1
+			path: classes/Player/PlayerStatsRepository.php
+
+		-
+			rawMessage: Table identifier 'ibl_olympics_career_avgs' must be wrapped in backticks for PHPStan rename safety.
+			identifier: ibl.bareTableIdentifier
+			count: 1
+			path: classes/Player/PlayerStatsRepository.php
+
+		-
+			rawMessage: Table identifier 'ibl_olympics_career_totals' must be wrapped in backticks for PHPStan rename safety.
+			identifier: ibl.bareTableIdentifier
+			count: 1
+			path: classes/Player/PlayerStatsRepository.php
+
+		-
+			rawMessage: Table identifier 'ibl_olympics_stats' must be wrapped in backticks for PHPStan rename safety.
+			identifier: ibl.bareTableIdentifier
+			count: 1
+			path: classes/Player/PlayerStatsRepository.php
+
+		-
+			rawMessage: Table identifier 'ibl_playoff_career_totals' must be wrapped in backticks for PHPStan rename safety.
+			identifier: ibl.bareTableIdentifier
+			count: 1
+			path: classes/Player/PlayerStatsRepository.php
+
+		-
+			rawMessage: Table identifier 'ibl_plr' must be wrapped in backticks for PHPStan rename safety.
+			identifier: ibl.bareTableIdentifier
+			count: 1
+			path: classes/Player/PlayerStatsRepository.php
+
+		-
+			rawMessage: Table identifier 'ibl_schedule' must be wrapped in backticks for PHPStan rename safety.
+			identifier: ibl.bareTableIdentifier
+			count: 1
+			path: classes/Player/PlayerStatsRepository.php
+
+		-
+			rawMessage: Table identifier 'ibl_sim_dates' must be wrapped in backticks for PHPStan rename safety.
+			identifier: ibl.bareTableIdentifier
+			count: 1
+			path: classes/Player/PlayerStatsRepository.php
 
 		-
 			rawMessage: 'Unescaped output in View. Wrap the expression in HtmlSanitizer::e() (or another whitelisted safe helper), or cast it to (int)/(float)/(bool) if it is numeric.'
@@ -382,16 +742,136 @@ parameters:
 			path: classes/Player/Views/PlayerTradingCardFrontView.php
 
 		-
+			rawMessage: Table identifier 'ibl_team_info' must be wrapped in backticks for PHPStan rename safety.
+			identifier: ibl.bareTableIdentifier
+			count: 1
+			path: classes/Player/Views/TeamColorHelper.php
+
+		-
 			rawMessage: 'Unescaped output in View. Wrap the expression in HtmlSanitizer::e() (or another whitelisted safe helper), or cast it to (int)/(float)/(bool) if it is numeric.'
 			identifier: ibl.unescapedOutput
 			count: 4
 			path: classes/PlayerDatabase/PlayerDatabaseView.php
 
 		-
+			rawMessage: Table identifier 'ibl_draft' must be wrapped in backticks for PHPStan rename safety.
+			identifier: ibl.bareTableIdentifier
+			count: 5
+			path: classes/ProjectedDraftOrder/ProjectedDraftOrderRepository.php
+
+		-
+			rawMessage: Table identifier 'ibl_draft_picks' must be wrapped in backticks for PHPStan rename safety.
+			identifier: ibl.bareTableIdentifier
+			count: 1
+			path: classes/ProjectedDraftOrder/ProjectedDraftOrderRepository.php
+
+		-
+			rawMessage: Table identifier 'ibl_schedule' must be wrapped in backticks for PHPStan rename safety.
+			identifier: ibl.bareTableIdentifier
+			count: 3
+			path: classes/ProjectedDraftOrder/ProjectedDraftOrderRepository.php
+
+		-
+			rawMessage: Table identifier 'ibl_settings' must be wrapped in backticks for PHPStan rename safety.
+			identifier: ibl.bareTableIdentifier
+			count: 2
+			path: classes/ProjectedDraftOrder/ProjectedDraftOrderRepository.php
+
+		-
+			rawMessage: Table identifier 'ibl_standings' must be wrapped in backticks for PHPStan rename safety.
+			identifier: ibl.bareTableIdentifier
+			count: 1
+			path: classes/ProjectedDraftOrder/ProjectedDraftOrderRepository.php
+
+		-
+			rawMessage: Table identifier 'ibl_team_awards' must be wrapped in backticks for PHPStan rename safety.
+			identifier: ibl.bareTableIdentifier
+			count: 1
+			path: classes/ProjectedDraftOrder/ProjectedDraftOrderRepository.php
+
+		-
+			rawMessage: Table identifier 'ibl_team_info' must be wrapped in backticks for PHPStan rename safety.
+			identifier: ibl.bareTableIdentifier
+			count: 1
+			path: classes/ProjectedDraftOrder/ProjectedDraftOrderRepository.php
+
+		-
+			rawMessage: Table identifier 'ibl_awards' must be wrapped in backticks for PHPStan rename safety.
+			identifier: ibl.bareTableIdentifier
+			count: 1
+			path: classes/RecordHolders/RecordHoldersRepository.php
+
+		-
+			rawMessage: Table identifier 'ibl_box_scores_teams' must be wrapped in backticks for PHPStan rename safety.
+			identifier: ibl.bareTableIdentifier
+			count: 1
+			path: classes/RecordHolders/RecordHoldersRepository.php
+
+		-
+			rawMessage: Table identifier 'ibl_hist' must be wrapped in backticks for PHPStan rename safety.
+			identifier: ibl.bareTableIdentifier
+			count: 1
+			path: classes/RecordHolders/RecordHoldersRepository.php
+
+		-
+			rawMessage: Table identifier 'ibl_sim_dates' must be wrapped in backticks for PHPStan rename safety.
+			identifier: ibl.bareTableIdentifier
+			count: 1
+			path: classes/RecordHolders/RecordHoldersRepository.php
+
+		-
+			rawMessage: Table identifier 'ibl_team_awards' must be wrapped in backticks for PHPStan rename safety.
+			identifier: ibl.bareTableIdentifier
+			count: 1
+			path: classes/RecordHolders/RecordHoldersRepository.php
+
+		-
+			rawMessage: Table identifier 'ibl_team_info' must be wrapped in backticks for PHPStan rename safety.
+			identifier: ibl.bareTableIdentifier
+			count: 1
+			path: classes/RecordHolders/RecordHoldersRepository.php
+
+		-
 			rawMessage: 'Unescaped output in View. Wrap the expression in HtmlSanitizer::e() (or another whitelisted safe helper), or cast it to (int)/(float)/(bool) if it is numeric.'
 			identifier: ibl.unescapedOutput
 			count: 9
 			path: classes/RookieOption/RookieOptionFormView.php
+
+		-
+			rawMessage: Table identifier 'ibl_settings' must be wrapped in backticks for PHPStan rename safety.
+			identifier: ibl.bareTableIdentifier
+			count: 5
+			path: classes/Season/SeasonQueryRepository.php
+
+		-
+			rawMessage: Table identifier 'ibl_sim_dates' must be wrapped in backticks for PHPStan rename safety.
+			identifier: ibl.bareTableIdentifier
+			count: 3
+			path: classes/Season/SeasonQueryRepository.php
+
+		-
+			rawMessage: Table identifier 'ibl_awards' must be wrapped in backticks for PHPStan rename safety.
+			identifier: ibl.bareTableIdentifier
+			count: 2
+			path: classes/SeasonArchive/SeasonArchiveRepository.php
+
+		-
+			rawMessage: Table identifier 'ibl_box_scores_teams' must be wrapped in backticks for PHPStan rename safety.
+			identifier: ibl.bareTableIdentifier
+			count: 1
+			path: classes/SeasonArchive/SeasonArchiveRepository.php
+
+		-
+			rawMessage: Table identifier 'ibl_team_awards' must be wrapped in backticks for PHPStan rename safety.
+			identifier: ibl.bareTableIdentifier
+			count: 1
+			path: classes/SeasonArchive/SeasonArchiveRepository.php
+
+		-
+			rawMessage: Table identifier 'ibl_team_info' must be wrapped in backticks for PHPStan rename safety.
+			identifier: ibl.bareTableIdentifier
+			count: 1
+			path: classes/SeasonArchive/SeasonArchiveRepository.php
 
 		-
 			rawMessage: 'Unescaped output in View. Wrap the expression in HtmlSanitizer::e() (or another whitelisted safe helper), or cast it to (int)/(float)/(bool) if it is numeric.'
@@ -406,10 +886,64 @@ parameters:
 			path: classes/SeriesRecords/SeriesRecordsController.php
 
 		-
+			rawMessage: Table identifier 'ibl_plr' must be wrapped in backticks for PHPStan rename safety.
+			identifier: ibl.bareTableIdentifier
+			count: 3
+			path: classes/Services/CommonMysqliRepository.php
+
+		-
+			rawMessage: Table identifier 'ibl_team_info' must be wrapped in backticks for PHPStan rename safety.
+			identifier: ibl.bareTableIdentifier
+			count: 7
+			path: classes/Services/CommonMysqliRepository.php
+
+		-
 			rawMessage: 'Unescaped output in View. Wrap the expression in HtmlSanitizer::e() (or another whitelisted safe helper), or cast it to (int)/(float)/(bool) if it is numeric.'
 			identifier: ibl.unescapedOutput
 			count: 24
 			path: classes/Standings/StandingsView.php
+
+		-
+			rawMessage: Table identifier 'ibl_box_scores' must be wrapped in backticks for PHPStan rename safety.
+			identifier: ibl.bareTableIdentifier
+			count: 1
+			path: classes/Team/SplitStatsRepository.php
+
+		-
+			rawMessage: Table identifier 'ibl_plr' must be wrapped in backticks for PHPStan rename safety.
+			identifier: ibl.bareTableIdentifier
+			count: 1
+			path: classes/Team/SplitStatsRepository.php
+
+		-
+			rawMessage: Table identifier 'ibl_schedule' must be wrapped in backticks for PHPStan rename safety.
+			identifier: ibl.bareTableIdentifier
+			count: 2
+			path: classes/Team/SplitStatsRepository.php
+
+		-
+			rawMessage: Table identifier 'ibl_standings' must be wrapped in backticks for PHPStan rename safety.
+			identifier: ibl.bareTableIdentifier
+			count: 2
+			path: classes/Team/SplitStatsRepository.php
+
+		-
+			rawMessage: Table identifier 'ibl_team_info' must be wrapped in backticks for PHPStan rename safety.
+			identifier: ibl.bareTableIdentifier
+			count: 1
+			path: classes/Team/SplitStatsRepository.php
+
+		-
+			rawMessage: Table identifier 'ibl_standings' must be wrapped in backticks for PHPStan rename safety.
+			identifier: ibl.bareTableIdentifier
+			count: 2
+			path: classes/Team/Team.php
+
+		-
+			rawMessage: Table identifier 'ibl_team_info' must be wrapped in backticks for PHPStan rename safety.
+			identifier: ibl.bareTableIdentifier
+			count: 2
+			path: classes/Team/Team.php
 
 		-
 			rawMessage: '$cookie[...] is read before PageLayout::header() in the same method. PageLayout::header() populates $cookie with auth and CSRF state — call it first, otherwise you will read stale or missing values (see CsrfGuard MAX_TOKENS incident).'
@@ -418,16 +952,178 @@ parameters:
 			path: classes/Team/TeamController.php
 
 		-
+			rawMessage: Table identifier 'ibl_draft_picks' must be wrapped in backticks for PHPStan rename safety.
+			identifier: ibl.bareTableIdentifier
+			count: 1
+			path: classes/Team/TeamQueryRepository.php
+
+		-
+			rawMessage: Table identifier 'ibl_fa_offers' must be wrapped in backticks for PHPStan rename safety.
+			identifier: ibl.bareTableIdentifier
+			count: 1
+			path: classes/Team/TeamQueryRepository.php
+
+		-
+			rawMessage: Table identifier 'ibl_plr' must be wrapped in backticks for PHPStan rename safety.
+			identifier: ibl.bareTableIdentifier
+			count: 10
+			path: classes/Team/TeamQueryRepository.php
+
+		-
+			rawMessage: Table identifier 'ibl_team_info' must be wrapped in backticks for PHPStan rename safety.
+			identifier: ibl.bareTableIdentifier
+			count: 8
+			path: classes/Team/TeamQueryRepository.php
+
+		-
+			rawMessage: Table identifier 'ibl_banners' must be wrapped in backticks for PHPStan rename safety.
+			identifier: ibl.bareTableIdentifier
+			count: 1
+			path: classes/Team/TeamRepository.php
+
+		-
+			rawMessage: Table identifier 'ibl_box_scores_teams' must be wrapped in backticks for PHPStan rename safety.
+			identifier: ibl.bareTableIdentifier
+			count: 1
+			path: classes/Team/TeamRepository.php
+
+		-
+			rawMessage: Table identifier 'ibl_franchise_seasons' must be wrapped in backticks for PHPStan rename safety.
+			identifier: ibl.bareTableIdentifier
+			count: 3
+			path: classes/Team/TeamRepository.php
+
+		-
+			rawMessage: Table identifier 'ibl_gm_awards' must be wrapped in backticks for PHPStan rename safety.
+			identifier: ibl.bareTableIdentifier
+			count: 1
+			path: classes/Team/TeamRepository.php
+
+		-
+			rawMessage: Table identifier 'ibl_gm_tenures' must be wrapped in backticks for PHPStan rename safety.
+			identifier: ibl.bareTableIdentifier
+			count: 1
+			path: classes/Team/TeamRepository.php
+
+		-
+			rawMessage: Table identifier 'ibl_hist' must be wrapped in backticks for PHPStan rename safety.
+			identifier: ibl.bareTableIdentifier
+			count: 1
+			path: classes/Team/TeamRepository.php
+
+		-
+			rawMessage: Table identifier 'ibl_playoff_series_results' must be wrapped in backticks for PHPStan rename safety.
+			identifier: ibl.bareTableIdentifier
+			count: 1
+			path: classes/Team/TeamRepository.php
+
+		-
+			rawMessage: Table identifier 'ibl_plr' must be wrapped in backticks for PHPStan rename safety.
+			identifier: ibl.bareTableIdentifier
+			count: 5
+			path: classes/Team/TeamRepository.php
+
+		-
+			rawMessage: Table identifier 'ibl_team_awards' must be wrapped in backticks for PHPStan rename safety.
+			identifier: ibl.bareTableIdentifier
+			count: 1
+			path: classes/Team/TeamRepository.php
+
+		-
+			rawMessage: Table identifier 'ibl_team_info' must be wrapped in backticks for PHPStan rename safety.
+			identifier: ibl.bareTableIdentifier
+			count: 1
+			path: classes/Team/TeamRepository.php
+
+		-
+			rawMessage: Table identifier 'ibl_team_season_records' must be wrapped in backticks for PHPStan rename safety.
+			identifier: ibl.bareTableIdentifier
+			count: 2
+			path: classes/Team/TeamRepository.php
+
+		-
 			rawMessage: 'Unescaped output in View. Wrap the expression in HtmlSanitizer::e() (or another whitelisted safe helper), or cast it to (int)/(float)/(bool) if it is numeric.'
 			identifier: ibl.unescapedOutput
 			count: 20
 			path: classes/Team/TeamView.php
 
 		-
+			rawMessage: Table identifier 'ibl_cash_considerations' must be wrapped in backticks for PHPStan rename safety.
+			identifier: ibl.bareTableIdentifier
+			count: 4
+			path: classes/Trading/CashConsiderationRepository.php
+
+		-
+			rawMessage: Table identifier 'ibl_draft_picks' must be wrapped in backticks for PHPStan rename safety.
+			identifier: ibl.bareTableIdentifier
+			count: 2
+			path: classes/Trading/TradeAssetRepository.php
+
+		-
+			rawMessage: Table identifier 'ibl_plr' must be wrapped in backticks for PHPStan rename safety.
+			identifier: ibl.bareTableIdentifier
+			count: 4
+			path: classes/Trading/TradeAssetRepository.php
+
+		-
+			rawMessage: Table identifier 'ibl_trade_cash' must be wrapped in backticks for PHPStan rename safety.
+			identifier: ibl.bareTableIdentifier
+			count: 4
+			path: classes/Trading/TradeCashRepository.php
+
+		-
+			rawMessage: Table identifier 'ibl_draft_picks' must be wrapped in backticks for PHPStan rename safety.
+			identifier: ibl.bareTableIdentifier
+			count: 1
+			path: classes/Trading/TradeExecutionRepository.php
+
+		-
+			rawMessage: Table identifier 'ibl_plr' must be wrapped in backticks for PHPStan rename safety.
+			identifier: ibl.bareTableIdentifier
+			count: 1
+			path: classes/Trading/TradeExecutionRepository.php
+
+		-
+			rawMessage: Table identifier 'ibl_trade_info' must be wrapped in backticks for PHPStan rename safety.
+			identifier: ibl.bareTableIdentifier
+			count: 1
+			path: classes/Trading/TradeExecutionRepository.php
+
+		-
+			rawMessage: Table identifier 'ibl_trade_queue' must be wrapped in backticks for PHPStan rename safety.
+			identifier: ibl.bareTableIdentifier
+			count: 3
+			path: classes/Trading/TradeExecutionRepository.php
+
+		-
+			rawMessage: Table identifier 'ibl_draft_picks' must be wrapped in backticks for PHPStan rename safety.
+			identifier: ibl.bareTableIdentifier
+			count: 1
+			path: classes/Trading/TradeFormRepository.php
+
+		-
+			rawMessage: Table identifier 'ibl_plr' must be wrapped in backticks for PHPStan rename safety.
+			identifier: ibl.bareTableIdentifier
+			count: 2
+			path: classes/Trading/TradeFormRepository.php
+
+		-
 			rawMessage: Deprecated HTML tag `<i>` found in string literal. Use <em> instead.
 			identifier: ibl.deprecatedHtmlTag
 			count: 2
 			path: classes/Trading/TradeOffer.php
+
+		-
+			rawMessage: Table identifier 'ibl_trade_info' must be wrapped in backticks for PHPStan rename safety.
+			identifier: ibl.bareTableIdentifier
+			count: 6
+			path: classes/Trading/TradeOfferRepository.php
+
+		-
+			rawMessage: Table identifier 'ibl_trade_offers' must be wrapped in backticks for PHPStan rename safety.
+			identifier: ibl.bareTableIdentifier
+			count: 2
+			path: classes/Trading/TradeOfferRepository.php
 
 		-
 			rawMessage: 'Inline `style="..."` attributes are banned in PHP. Move CSS to ibl5/design/components/. Exception: `style="--foo: ..."` CSS custom properties are allowed.'
@@ -446,6 +1142,108 @@ parameters:
 			identifier: ibl.unescapedOutput
 			count: 10
 			path: classes/TransactionHistory/TransactionHistoryView.php
+
+		-
+			rawMessage: Table identifier 'ibl_team_awards' must be wrapped in backticks for PHPStan rename safety.
+			identifier: ibl.bareTableIdentifier
+			count: 1
+			path: classes/Updater/StandingsUpdater.php
+
+		-
+			rawMessage: Table identifier 'ibl_jsb_history' must be wrapped in backticks for PHPStan rename safety.
+			identifier: ibl.bareTableIdentifier
+			count: 1
+			path: classes/Updater/Steps/PreseasonCleanupRepository.php
+
+		-
+			rawMessage: Table identifier 'ibl_jsb_transactions' must be wrapped in backticks for PHPStan rename safety.
+			identifier: ibl.bareTableIdentifier
+			count: 1
+			path: classes/Updater/Steps/PreseasonCleanupRepository.php
+
+		-
+			rawMessage: Table identifier 'ibl_plr_snapshots' must be wrapped in backticks for PHPStan rename safety.
+			identifier: ibl.bareTableIdentifier
+			count: 1
+			path: classes/Updater/Steps/PreseasonCleanupRepository.php
+
+		-
+			rawMessage: Table identifier 'ibl_rcb_season_records' must be wrapped in backticks for PHPStan rename safety.
+			identifier: ibl.bareTableIdentifier
+			count: 1
+			path: classes/Updater/Steps/PreseasonCleanupRepository.php
+
+		-
+			rawMessage: Table identifier 'ibl_sim_dates' must be wrapped in backticks for PHPStan rename safety.
+			identifier: ibl.bareTableIdentifier
+			count: 1
+			path: classes/Updater/Steps/PreseasonCleanupRepository.php
+
+		-
+			rawMessage: Table identifier 'ibl_team_awards' must be wrapped in backticks for PHPStan rename safety.
+			identifier: ibl.bareTableIdentifier
+			count: 1
+			path: classes/Updater/Steps/PreseasonCleanupRepository.php
+
+		-
+			rawMessage: Table identifier 'ibl_franchise_seasons' must be wrapped in backticks for PHPStan rename safety.
+			identifier: ibl.bareTableIdentifier
+			count: 1
+			path: classes/Updater/Steps/RefreshIblHistStep.php
+
+		-
+			rawMessage: Table identifier 'ibl_hist' must be wrapped in backticks for PHPStan rename safety.
+			identifier: ibl.bareTableIdentifier
+			count: 2
+			path: classes/Updater/Steps/RefreshIblHistStep.php
+
+		-
+			rawMessage: Table identifier 'ibl_plr_snapshots' must be wrapped in backticks for PHPStan rename safety.
+			identifier: ibl.bareTableIdentifier
+			count: 1
+			path: classes/Updater/Steps/RefreshIblHistStep.php
+
+		-
+			rawMessage: Table identifier 'ibl_box_scores_teams' must be wrapped in backticks for PHPStan rename safety.
+			identifier: ibl.bareTableIdentifier
+			count: 1
+			path: classes/Updater/Steps/RefreshPlayoffSeriesResultsStep.php
+
+		-
+			rawMessage: Table identifier 'ibl_playoff_series_results' must be wrapped in backticks for PHPStan rename safety.
+			identifier: ibl.bareTableIdentifier
+			count: 2
+			path: classes/Updater/Steps/RefreshPlayoffSeriesResultsStep.php
+
+		-
+			rawMessage: Table identifier 'ibl_team_info' must be wrapped in backticks for PHPStan rename safety.
+			identifier: ibl.bareTableIdentifier
+			count: 2
+			path: classes/Updater/Steps/RefreshPlayoffSeriesResultsStep.php
+
+		-
+			rawMessage: Table identifier 'ibl_box_scores_teams' must be wrapped in backticks for PHPStan rename safety.
+			identifier: ibl.bareTableIdentifier
+			count: 2
+			path: classes/Updater/Steps/RefreshTeamSeasonRecordsStep.php
+
+		-
+			rawMessage: Table identifier 'ibl_franchise_seasons' must be wrapped in backticks for PHPStan rename safety.
+			identifier: ibl.bareTableIdentifier
+			count: 2
+			path: classes/Updater/Steps/RefreshTeamSeasonRecordsStep.php
+
+		-
+			rawMessage: Table identifier 'ibl_team_info' must be wrapped in backticks for PHPStan rename safety.
+			identifier: ibl.bareTableIdentifier
+			count: 2
+			path: classes/Updater/Steps/RefreshTeamSeasonRecordsStep.php
+
+		-
+			rawMessage: Table identifier 'ibl_team_season_records' must be wrapped in backticks for PHPStan rename safety.
+			identifier: ibl.bareTableIdentifier
+			count: 3
+			path: classes/Updater/Steps/RefreshTeamSeasonRecordsStep.php
 
 		-
 			rawMessage: 'Direct $_COOKIE access is banned outside Controllers, ApiHandlers, and Utilities\CsrfGuard. Accept typed inputs as parameters from a Controller/ApiHandler instead.'

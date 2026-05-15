@@ -8,7 +8,7 @@ use League\League;
 use League\LeagueContext;
 use Updater\Contracts\JsbSourceResolverInterface;
 use Utilities\UuidGenerator;
-use Utilities\SchFileParser;
+use JsbParser\SchFileParser;
 use Security\HtmlSanitizer;
 use Season\Season;
 

@@ -1,6 +1,6 @@
 ---
 description: JSB file reading uses archive-first strategy via JsbSourceResolver — reads all JSB file types directly from backup ZIP without extracting to disk.
-last_verified: 2026-05-03
+last_verified: 2026-05-15
 ---
 
 # ADR-0012: Archive-first JSB file reading
@@ -43,6 +43,6 @@ The migration was completed in three PRs:
 - `ibl5/classes/BulkImport/Contracts/ArchiveExtractorInterface.php` — `extractToString()` addition
 - `ibl5/classes/Boxscore/BoxscoreProcessor.php` — `processScoData()`, `processAllStarGamesData()` methods
 - `ibl5/classes/LeagueConfig/LgeFileParser.php` — `parse(string $data)` method
-- `ibl5/classes/Utilities/SchFileParser.php` — `parse(string $data)` method
+- `ibl5/classes/JsbParser/SchFileParser.php` — `parse(string $data)` method
 - `ibl5/classes/LeagueConfig/LeagueConfigService.php` — `processLgeData(string $data)` method
 - `ibl5/classes/PlrParser/PlrParserService.php` — `processPlrData()`, `processPlrDataForYear()`, `calculateFoulBaselineFromData()` methods

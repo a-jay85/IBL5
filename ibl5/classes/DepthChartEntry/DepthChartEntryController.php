@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace DepthChartEntry;
 
 use DepthChartEntry\Contracts\DepthChartEntryControllerInterface;
+use DepthChartEntry\Contracts\DepthChartEntryServiceInterface;
 use NextSim\NextSimService;
 use NextSim\NextSimView;
 use SavedDepthChart\SavedDepthChartService;
@@ -27,7 +28,7 @@ class DepthChartEntryController implements DepthChartEntryControllerInterface
     private DepthChartEntryView $view;
     private \Services\CommonMysqliRepository $commonRepository;
     private TeamTableServiceInterface $teamTableService;
-    private DepthChartEntryService $service;
+    private DepthChartEntryServiceInterface $service;
 
     public function __construct(\mysqli $db)
     {
@@ -111,10 +112,9 @@ class DepthChartEntryController implements DepthChartEntryControllerInterface
         // Compute quality scores and apply any flash override so the form
         // re-renders with the user's last submitted values after a validation
         // failure, not the stale DB values.
-        $service = $this->service;
         $playersWithQuality = array_map(
-            static function (array $player) use ($override, $service): array {
-                $player['quality_score'] = $service->computeQualityScore($player);
+            function (array $player) use ($override): array {
+                $player['quality_score'] = $this->service->computeQualityScore($player);
                 $pid = $player['pid'];
                 if (isset($override[$pid])) {
                     $player = array_merge($player, $override[$pid]);

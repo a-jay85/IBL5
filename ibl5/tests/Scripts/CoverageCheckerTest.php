@@ -2,11 +2,11 @@
 
 declare(strict_types=1);
 
-namespace Tests\Utilities;
+namespace Tests\Scripts;
 
 use PHPUnit\Framework\Attributes\Test;
 use PHPUnit\Framework\TestCase;
-use Utilities\CoverageChecker;
+use Scripts\CoverageChecker;
 
 final class CoverageCheckerTest extends TestCase
 {

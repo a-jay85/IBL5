@@ -2,11 +2,11 @@
 
 declare(strict_types=1);
 
-namespace Tests\Utilities;
+namespace Tests\Scripts;
 
 use PHPUnit\Framework\Attributes\Test;
 use PHPUnit\Framework\TestCase;
-use Utilities\PhpstanBaselineCounter;
+use Scripts\PhpstanBaselineCounter;
 
 final class PhpstanBaselineCounterTest extends TestCase
 {

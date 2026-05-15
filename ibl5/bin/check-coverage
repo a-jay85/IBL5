@@ -13,7 +13,7 @@ if ($argc < 3) {
 $cloverFile = $argv[1];
 $threshold = (float) $argv[2];
 
-$checker = new \Utilities\CoverageChecker();
+$checker = new \Scripts\CoverageChecker();
 $result = $checker->check($cloverFile, $threshold);
 
 echo $result->getMessage() . "\n";

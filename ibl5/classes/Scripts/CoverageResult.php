@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Utilities;
+namespace Scripts;
 
 final readonly class CoverageResult
 {

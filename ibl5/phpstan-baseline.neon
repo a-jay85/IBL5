@@ -160,12 +160,6 @@ parameters:
 			path: classes/FreeAgency/FreeAgencyController.php
 
 		-
-			rawMessage: 'Unescaped output in View. Wrap the expression in HtmlSanitizer::e() (or another whitelisted safe helper), or cast it to (int)/(float)/(bool) if it is numeric.'
-			identifier: ibl.unescapedOutput
-			count: 118
-			path: classes/FreeAgency/FreeAgencyView.php
-
-		-
 			rawMessage: 'Direct $_COOKIE access is banned outside Controllers, ApiHandlers, and Security\CsrfGuard. Accept typed inputs as parameters from a Controller/ApiHandler instead.'
 			identifier: ibl.rawSuperglobal
 			count: 1

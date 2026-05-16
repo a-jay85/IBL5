@@ -49,14 +49,14 @@ class FreeAgencyView
         ]);
         ?>
 <h2 class="ibl-title">Free Agency</h2>
-<img src="images/logo/<?= $team->teamid ?>.jpg" alt="Team Logo" class="team-logo-banner">
+<img src="images/logo/<?= HtmlSanitizer::e($team->teamid) ?>.jpg" alt="Team Logo" class="team-logo-banner">
 <div class="mt-6"></div>
-<?= $this->renderPlayersUnderContract($team, $season, $capMetrics) ?>
+<?= HtmlSanitizer::trusted($this->renderPlayersUnderContract($team, $season, $capMetrics)) ?>
 <div class="mt-6"></div>
-<?= $this->renderContractOffers($team, $season, $capMetrics) ?>
+<?= HtmlSanitizer::trusted($this->renderContractOffers($team, $season, $capMetrics)) ?>
 <div class="mt-6"></div>
-<?= $this->renderTeamFreeAgents($team, $season, $capMetrics) ?>
-<?= $this->renderOtherFreeAgents($team, $season, $allOtherPlayers) ?>
+<?= HtmlSanitizer::trusted($this->renderTeamFreeAgents($team, $season, $capMetrics)) ?>
+<?= HtmlSanitizer::trusted($this->renderOtherFreeAgents($team, $season, $allOtherPlayers)) ?>
         <?php
         return (string) ob_get_clean();
     }
@@ -76,8 +76,8 @@ class FreeAgencyView
 <div class="table-scroll-wrapper">
 <div class="table-scroll-container" tabindex="0" role="region" aria-label="Players under contract">
 <table class="ibl-data-table team-table fa-table sortable" style="<?= \UI\TableStyles::inlineVars($team->color1, $team->color2) ?>">
-    <?= $this->renderColgroups(false, false) ?>
-    <?= $this->renderTableHeader('Players Under Contract', false, $team, false, false, $season) ?>
+    <?= HtmlSanitizer::trusted($this->renderColgroups(false, false)) ?>
+    <?= HtmlSanitizer::trusted($this->renderTableHeader('Players Under Contract', false, $team, false, false, $season)) ?>
     <tbody>
         <?php
         $rosterRows = $this->teamQueryRepo->getRosterUnderContractOrderedByOrdinal($team->teamid);
@@ -100,31 +100,31 @@ class FreeAgencyView
         <tr>
             <td><?= HtmlSanitizer::e($player->position ?? '') ?></td>
             <?= PlayerImageHelper::renderFlexiblePlayerCell($player->playerID ?? 0, $playerName) ?>
-            <td><?= $player->age ?? 0 ?></td>
-            <?= $this->renderPlayerRatings($player) ?>
-            <td class="col-salary"><?= $futureSalaries[0] ?></td>
+            <td><?= HtmlSanitizer::e($player->age ?? 0) ?></td>
+            <?= HtmlSanitizer::trusted($this->renderPlayerRatings($player)) ?>
+            <td class="col-salary"><?= HtmlSanitizer::e($futureSalaries[0]) ?></td>
             <?php if ($hasRookieOption): ?>
                 <?php $actionUrl = 'modules.php?name=Player&amp;pa=rookieoption&amp;pid=' . ($player->playerID ?? 0) . '&amp;from=fa'; $actionLabel = 'Rookie Option'; ?>
-                <td class="col-salary contract-hint-cell" tabindex="0"><?= $futureSalaries[1] ?><a href="<?= $actionUrl ?>" class="contract-hint-link" data-no-abbreviate><?= $actionLabel ?></a></td>
-                <td class="col-salary contract-hint-cell" tabindex="0"><?= $futureSalaries[2] ?></td>
-                <td class="col-salary contract-hint-cell" tabindex="0"><?= $futureSalaries[3] ?></td>
-                <td class="col-salary contract-hint-cell" tabindex="0"><?= $futureSalaries[4] ?></td>
-                <td class="col-salary contract-hint-cell" tabindex="0"><?= $futureSalaries[5] ?></td>
+                <td class="col-salary contract-hint-cell" tabindex="0"><?= HtmlSanitizer::e($futureSalaries[1]) ?><a href="<?= HtmlSanitizer::trusted($actionUrl) ?>" class="contract-hint-link" data-no-abbreviate><?= HtmlSanitizer::e($actionLabel) ?></a></td>
+                <td class="col-salary contract-hint-cell" tabindex="0"><?= HtmlSanitizer::e($futureSalaries[2]) ?></td>
+                <td class="col-salary contract-hint-cell" tabindex="0"><?= HtmlSanitizer::e($futureSalaries[3]) ?></td>
+                <td class="col-salary contract-hint-cell" tabindex="0"><?= HtmlSanitizer::e($futureSalaries[4]) ?></td>
+                <td class="col-salary contract-hint-cell" tabindex="0"><?= HtmlSanitizer::e($futureSalaries[5]) ?></td>
             <?php elseif ($hasExtension): ?>
                 <?php $actionUrl = 'modules.php?name=Player&amp;pa=negotiate&amp;pid=' . ($player->playerID ?? 0); $actionLabel = 'Contract Extension'; ?>
-                <td class="col-salary contract-hint-cell" tabindex="0"><?= $futureSalaries[1] ?><a href="<?= $actionUrl ?>" class="contract-hint-link" data-no-abbreviate><?= $actionLabel ?></a></td>
-                <td class="col-salary contract-hint-cell" tabindex="0"><?= $futureSalaries[2] ?></td>
-                <td class="col-salary contract-hint-cell" tabindex="0"><?= $futureSalaries[3] ?></td>
-                <td class="col-salary contract-hint-cell" tabindex="0"><?= $futureSalaries[4] ?></td>
-                <td class="col-salary contract-hint-cell" tabindex="0"><?= $futureSalaries[5] ?></td>
+                <td class="col-salary contract-hint-cell" tabindex="0"><?= HtmlSanitizer::e($futureSalaries[1]) ?><a href="<?= HtmlSanitizer::trusted($actionUrl) ?>" class="contract-hint-link" data-no-abbreviate><?= HtmlSanitizer::e($actionLabel) ?></a></td>
+                <td class="col-salary contract-hint-cell" tabindex="0"><?= HtmlSanitizer::e($futureSalaries[2]) ?></td>
+                <td class="col-salary contract-hint-cell" tabindex="0"><?= HtmlSanitizer::e($futureSalaries[3]) ?></td>
+                <td class="col-salary contract-hint-cell" tabindex="0"><?= HtmlSanitizer::e($futureSalaries[4]) ?></td>
+                <td class="col-salary contract-hint-cell" tabindex="0"><?= HtmlSanitizer::e($futureSalaries[5]) ?></td>
             <?php else: ?>
-                <td class="col-salary"><?= $futureSalaries[1] ?></td>
-                <td class="col-salary"><?= $futureSalaries[2] ?></td>
-                <td class="col-salary"><?= $futureSalaries[3] ?></td>
-                <td class="col-salary"><?= $futureSalaries[4] ?></td>
-                <td class="col-salary"><?= $futureSalaries[5] ?></td>
+                <td class="col-salary"><?= HtmlSanitizer::e($futureSalaries[1]) ?></td>
+                <td class="col-salary"><?= HtmlSanitizer::e($futureSalaries[2]) ?></td>
+                <td class="col-salary"><?= HtmlSanitizer::e($futureSalaries[3]) ?></td>
+                <td class="col-salary"><?= HtmlSanitizer::e($futureSalaries[4]) ?></td>
+                <td class="col-salary"><?= HtmlSanitizer::e($futureSalaries[5]) ?></td>
             <?php endif; ?>
-            <?= $this->renderPlayerPreferences($player) ?>
+            <?= HtmlSanitizer::trusted($this->renderPlayerPreferences($player)) ?>
         </tr>
             <?php endif; ?>
         <?php endforeach; ?>
@@ -143,14 +143,14 @@ class FreeAgencyView
             <td></td>
             <?= PlayerImageHelper::renderFlexiblePlayerCell(0, '| ' . $cashLabel) ?>
             <td>0</td>
-            <?= $this->renderPlayerRatings($cashPlayer) ?>
-            <td class="col-salary"><?= $cashFutureSalaries[0] ?></td>
-            <td class="col-salary"><?= $cashFutureSalaries[1] ?></td>
-            <td class="col-salary"><?= $cashFutureSalaries[2] ?></td>
-            <td class="col-salary"><?= $cashFutureSalaries[3] ?></td>
-            <td class="col-salary"><?= $cashFutureSalaries[4] ?></td>
-            <td class="col-salary"><?= $cashFutureSalaries[5] ?></td>
-            <?= $this->renderPlayerPreferences($cashPlayer) ?>
+            <?= HtmlSanitizer::trusted($this->renderPlayerRatings($cashPlayer)) ?>
+            <td class="col-salary"><?= HtmlSanitizer::e($cashFutureSalaries[0]) ?></td>
+            <td class="col-salary"><?= HtmlSanitizer::e($cashFutureSalaries[1]) ?></td>
+            <td class="col-salary"><?= HtmlSanitizer::e($cashFutureSalaries[2]) ?></td>
+            <td class="col-salary"><?= HtmlSanitizer::e($cashFutureSalaries[3]) ?></td>
+            <td class="col-salary"><?= HtmlSanitizer::e($cashFutureSalaries[4]) ?></td>
+            <td class="col-salary"><?= HtmlSanitizer::e($cashFutureSalaries[5]) ?></td>
+            <?= HtmlSanitizer::trusted($this->renderPlayerPreferences($cashPlayer)) ?>
         </tr>
         <?php endforeach; ?>
     </tbody>
@@ -159,7 +159,7 @@ class FreeAgencyView
             <td colspan="17" class="cap-footer-spacer"></td>
             <td colspan="10" class="text-right"><strong><?= HtmlSanitizer::e($team->name) ?> Total Salary</strong></td>
             <?php foreach ($capMetrics['totalSalaries'] as $salary): ?>
-                <td class="col-salary"><strong><?= $salary ?></strong></td>
+                <td class="col-salary"><strong><?= HtmlSanitizer::e($salary) ?></strong></td>
             <?php endforeach; ?>
             <td colspan="5" class="cap-footer-spacer"></td>
         </tr>
@@ -185,8 +185,8 @@ class FreeAgencyView
 <div class="table-scroll-wrapper">
 <div class="table-scroll-container" tabindex="0" role="region" aria-label="Contract offers">
 <table class="ibl-data-table team-table fa-table sortable" style="<?= \UI\TableStyles::inlineVars($team->color1, $team->color2) ?>">
-    <?= $this->renderColgroups(false) ?>
-    <?= $this->renderTableHeader('Contract Offers', false, $team, false, true, $season) ?>
+    <?= HtmlSanitizer::trusted($this->renderColgroups(false)) ?>
+    <?= HtmlSanitizer::trusted($this->renderTableHeader('Contract Offers', false, $team, false, true, $season)) ?>
     <tbody>
         <?php
         $offersResult = $this->teamQueryRepo->getFreeAgencyOffers($team->teamid);
@@ -195,18 +195,18 @@ class FreeAgencyView
             $player = Player::withPlayerID($this->mysqli_db, $offerRow['pid'] ?? 0);
             ?>
         <tr>
-            <td><a href="modules.php?name=FreeAgency&amp;pa=negotiate&amp;pid=<?= $player->playerID ?? 0 ?>">Offer</a></td>
+            <td><a href="modules.php?name=FreeAgency&amp;pa=negotiate&amp;pid=<?= HtmlSanitizer::e($player->playerID ?? 0) ?>">Offer</a></td>
             <td><?= HtmlSanitizer::e($player->position ?? '') ?></td>
             <?= PlayerImageHelper::renderFlexiblePlayerCell($player->playerID ?? 0, $player->name ?? '') ?>
-            <td><?= $player->age ?? 0 ?></td>
-            <?= $this->renderPlayerRatings($player) ?>
-            <td class="col-salary"><?= $offerRow['offer1'] ?></td>
-            <td class="col-salary"><?= $offerRow['offer2'] ?></td>
-            <td class="col-salary"><?= $offerRow['offer3'] ?></td>
-            <td class="col-salary"><?= $offerRow['offer4'] ?></td>
-            <td class="col-salary"><?= $offerRow['offer5'] ?></td>
-            <td class="col-salary"><?= $offerRow['offer6'] ?></td>
-            <?= $this->renderPlayerPreferences($player) ?>
+            <td><?= HtmlSanitizer::e($player->age ?? 0) ?></td>
+            <?= HtmlSanitizer::trusted($this->renderPlayerRatings($player)) ?>
+            <td class="col-salary"><?= HtmlSanitizer::e($offerRow['offer1']) ?></td>
+            <td class="col-salary"><?= HtmlSanitizer::e($offerRow['offer2']) ?></td>
+            <td class="col-salary"><?= HtmlSanitizer::e($offerRow['offer3']) ?></td>
+            <td class="col-salary"><?= HtmlSanitizer::e($offerRow['offer4']) ?></td>
+            <td class="col-salary"><?= HtmlSanitizer::e($offerRow['offer5']) ?></td>
+            <td class="col-salary"><?= HtmlSanitizer::e($offerRow['offer6']) ?></td>
+            <?= HtmlSanitizer::trusted($this->renderPlayerPreferences($player)) ?>
         </tr>
         <?php endforeach; ?>
     </tbody>
@@ -215,11 +215,11 @@ class FreeAgencyView
             <td colspan="18" class="cap-footer-spacer"></td>
             <td colspan="10" class="text-right"><strong><?= HtmlSanitizer::e($team->name) ?> Total Salary Plus Contract Offers</strong></td>
             <?php foreach ($capMetrics['totalSalaries'] as $salary): ?>
-                <td class="col-salary"><strong><?= $salary ?></strong></td>
+                <td class="col-salary"><strong><?= HtmlSanitizer::e($salary) ?></strong></td>
             <?php endforeach; ?>
             <td colspan="5" class="cap-footer-spacer"></td>
         </tr>
-        <?= $this->renderCapSpaceFooter($team, $capMetrics) ?>
+        <?= HtmlSanitizer::trusted($this->renderCapSpaceFooter($team, $capMetrics)) ?>
     </tfoot>
 </table>
 </div>
@@ -243,8 +243,8 @@ class FreeAgencyView
 <div class="table-scroll-wrapper">
 <div class="table-scroll-container" tabindex="0" role="region" aria-label="Unsigned free agents">
 <table class="ibl-data-table team-table fa-table sortable" style="<?= \UI\TableStyles::inlineVars($team->color1, $team->color2) ?>">
-    <?= $this->renderColgroups(false) ?>
-    <?= $this->renderTableHeader('Unsigned Free Agents', true, $team, false, true, $season) ?>
+    <?= HtmlSanitizer::trusted($this->renderColgroups(false)) ?>
+    <?= HtmlSanitizer::trusted($this->renderTableHeader('Unsigned Free Agents', true, $team, false, true, $season)) ?>
     <tbody>
         <?php
         $rosterRows = $this->teamQueryRepo->getRosterUnderContractOrderedByOrdinal($team->teamid);
@@ -258,23 +258,23 @@ class FreeAgencyView
         <tr>
             <td>
                 <?php if ($capMetrics['rosterSpots'][0] > 0): ?>
-                    <a href="modules.php?name=FreeAgency&amp;pa=negotiate&amp;pid=<?= $player->playerID ?? 0 ?>">Offer</a>
+                    <a href="modules.php?name=FreeAgency&amp;pa=negotiate&amp;pid=<?= HtmlSanitizer::e($player->playerID ?? 0) ?>">Offer</a>
                 <?php endif; ?>
             </td>
             <td><?= HtmlSanitizer::e($player->position ?? '') ?></td>
             <?php $resolved = PlayerImageHelper::resolvePlayerDisplay($player->playerID ?? 0, $player->name ?? ''); ?>
-            <td class="ibl-player-cell"><a href="modules.php?name=Player&amp;pa=showpage&amp;pid=<?= $player->playerID ?? 0 ?>">
-                <?= $resolved['thumbnail'] ?>
+            <td class="ibl-player-cell"><a href="modules.php?name=Player&amp;pa=showpage&amp;pid=<?= HtmlSanitizer::e($player->playerID ?? 0) ?>">
+                <?= HtmlSanitizer::trusted($resolved['thumbnail']) ?>
                 <?php if (($player->birdYears ?? 0) >= 3): ?>
                     *<em><?= HtmlSanitizer::e($resolved['name']) ?></em>*
                 <?php else: ?>
                     <?= HtmlSanitizer::e($resolved['name']) ?>
                 <?php endif; ?>
             </a></td>
-            <td><?= $player->age ?? 0 ?></td>
-            <?= $this->renderPlayerRatings($player) ?>
-            <?= $this->renderPlayerDemands($demands) ?>
-            <?= $this->renderPlayerPreferences($player) ?>
+            <td><?= HtmlSanitizer::e($player->age ?? 0) ?></td>
+            <?= HtmlSanitizer::trusted($this->renderPlayerRatings($player)) ?>
+            <?= HtmlSanitizer::trusted($this->renderPlayerDemands($demands)) ?>
+            <?= HtmlSanitizer::trusted($this->renderPlayerPreferences($player)) ?>
         </tr>
             <?php endif; ?>
         <?php endforeach; ?>
@@ -301,8 +301,8 @@ class FreeAgencyView
 <div class="sticky-scroll-wrapper page-sticky">
 <div class="sticky-scroll-container">
 <table class="ibl-data-table team-table fa-table sticky-table sortable" style="<?= \UI\TableStyles::inlineVars('666666', 'ffffff') ?>">
-    <?= $this->renderColgroups() ?>
-    <?= $this->renderTableHeader('All Other Free Agents', false, $team, true, true, $season) ?>
+    <?= HtmlSanitizer::trusted($this->renderColgroups()) ?>
+    <?= HtmlSanitizer::trusted($this->renderTableHeader('All Other Free Agents', false, $team, true, true, $season)) ?>
     <tbody>
         <?php
         foreach ($allOtherPlayers as $playerRow):
@@ -312,14 +312,14 @@ class FreeAgencyView
                 $demands = $player->getFreeAgencyDemands();
         ?>
         <tr>
-            <td><a href="modules.php?name=FreeAgency&amp;pa=negotiate&amp;pid=<?= $player->playerID ?? 0 ?>">Offer</a></td>
+            <td><a href="modules.php?name=FreeAgency&amp;pa=negotiate&amp;pid=<?= HtmlSanitizer::e($player->playerID ?? 0) ?>">Offer</a></td>
             <td><?= HtmlSanitizer::e($player->position ?? '') ?></td>
             <?= PlayerImageHelper::renderFlexiblePlayerCell($player->playerID ?? 0, $player->name ?? '') ?>
-            <?= $this->renderTeamCell($player) ?>
-            <td><?= $player->age ?? 0 ?></td>
-            <?= $this->renderPlayerRatings($player) ?>
-            <?= $this->renderPlayerDemands($demands) ?>
-            <?= $this->renderPlayerPreferences($player) ?>
+            <?= HtmlSanitizer::trusted($this->renderTeamCell($player)) ?>
+            <td><?= HtmlSanitizer::e($player->age ?? 0) ?></td>
+            <?= HtmlSanitizer::trusted($this->renderPlayerRatings($player)) ?>
+            <?= HtmlSanitizer::trusted($this->renderPlayerDemands($demands)) ?>
+            <?= HtmlSanitizer::trusted($this->renderPlayerPreferences($player)) ?>
         </tr>
             <?php endif; ?>
         <?php endforeach; ?>
@@ -385,8 +385,8 @@ class FreeAgencyView
         ?>
     <thead>
         <tr>
-            <th colspan="<?= $colspan ?>">
-                <?= $fullTitle ?>
+            <th colspan="<?= HtmlSanitizer::e($colspan) ?>">
+                <?= HtmlSanitizer::e($fullTitle) ?>
                 <?php if ($showBirdRightsNote): ?>
                     <br><small>(Note: * and <em>italicized</em> indicates player has Bird Rights)</small>
                 <?php endif; ?>
@@ -426,12 +426,12 @@ class FreeAgencyView
             <th>T</th>
             <th>S</th>
             <th class="sep-r-team">I</th>
-            <th class="col-salary"><?= $yearHeaders[0] ?></th>
-            <th class="col-salary"><?= $yearHeaders[1] ?></th>
-            <th class="col-salary"><?= $yearHeaders[2] ?></th>
-            <th class="col-salary"><?= $yearHeaders[3] ?></th>
-            <th class="col-salary"><?= $yearHeaders[4] ?></th>
-            <th class="col-salary sep-r-team"><?= $yearHeaders[5] ?></th>
+            <th class="col-salary"><?= HtmlSanitizer::e($yearHeaders[0]) ?></th>
+            <th class="col-salary"><?= HtmlSanitizer::e($yearHeaders[1]) ?></th>
+            <th class="col-salary"><?= HtmlSanitizer::e($yearHeaders[2]) ?></th>
+            <th class="col-salary"><?= HtmlSanitizer::e($yearHeaders[3]) ?></th>
+            <th class="col-salary"><?= HtmlSanitizer::e($yearHeaders[4]) ?></th>
+            <th class="col-salary sep-r-team"><?= HtmlSanitizer::e($yearHeaders[5]) ?></th>
             <th>Loy</th>
             <th>PFW</th>
             <th>PT</th>
@@ -483,30 +483,30 @@ class FreeAgencyView
     {
         ob_start();
         ?>
-<td><?= $player->ratingFieldGoalAttempts ?? 0 ?></td>
-<td class="sep-r-weak"><?= $player->ratingFieldGoalPercentage ?? 0 ?></td>
-<td><?= $player->ratingFreeThrowAttempts ?? 0 ?></td>
-<td class="sep-r-weak"><?= $player->ratingFreeThrowPercentage ?? 0 ?></td>
-<td><?= $player->ratingThreePointAttempts ?? 0 ?></td>
-<td class="sep-r-team"><?= $player->ratingThreePointPercentage ?? 0 ?></td>
-<td><?= $player->ratingOffensiveRebounds ?? 0 ?></td>
-<td><?= $player->ratingDefensiveRebounds ?? 0 ?></td>
-<td><?= $player->ratingAssists ?? 0 ?></td>
-<td><?= $player->ratingSteals ?? 0 ?></td>
-<td><?= $player->ratingTurnovers ?? 0 ?></td>
-<td><?= $player->ratingBlocks ?? 0 ?></td>
-<td class="sep-r-team"><?= $player->ratingFouls ?? 0 ?></td>
-<td><?= $player->ratingOutsideOffense ?? 0 ?></td>
-<td><?= $player->ratingDriveOffense ?? 0 ?></td>
-<td><?= $player->ratingPostOffense ?? 0 ?></td>
-<td class="sep-r-weak"><?= $player->ratingTransitionOffense ?? 0 ?></td>
-<td><?= $player->ratingOutsideDefense ?? 0 ?></td>
-<td><?= $player->ratingDriveDefense ?? 0 ?></td>
-<td><?= $player->ratingPostDefense ?? 0 ?></td>
-<td class="sep-r-team"><?= $player->ratingTransitionDefense ?? 0 ?></td>
-<td><?= $player->ratingTalent ?? 0 ?></td>
-<td><?= $player->ratingSkill ?? 0 ?></td>
-<td class="sep-r-team"><?= $player->ratingIntangibles ?? 0 ?></td>
+<td><?= HtmlSanitizer::e($player->ratingFieldGoalAttempts ?? 0) ?></td>
+<td class="sep-r-weak"><?= HtmlSanitizer::e($player->ratingFieldGoalPercentage ?? 0) ?></td>
+<td><?= HtmlSanitizer::e($player->ratingFreeThrowAttempts ?? 0) ?></td>
+<td class="sep-r-weak"><?= HtmlSanitizer::e($player->ratingFreeThrowPercentage ?? 0) ?></td>
+<td><?= HtmlSanitizer::e($player->ratingThreePointAttempts ?? 0) ?></td>
+<td class="sep-r-team"><?= HtmlSanitizer::e($player->ratingThreePointPercentage ?? 0) ?></td>
+<td><?= HtmlSanitizer::e($player->ratingOffensiveRebounds ?? 0) ?></td>
+<td><?= HtmlSanitizer::e($player->ratingDefensiveRebounds ?? 0) ?></td>
+<td><?= HtmlSanitizer::e($player->ratingAssists ?? 0) ?></td>
+<td><?= HtmlSanitizer::e($player->ratingSteals ?? 0) ?></td>
+<td><?= HtmlSanitizer::e($player->ratingTurnovers ?? 0) ?></td>
+<td><?= HtmlSanitizer::e($player->ratingBlocks ?? 0) ?></td>
+<td class="sep-r-team"><?= HtmlSanitizer::e($player->ratingFouls ?? 0) ?></td>
+<td><?= HtmlSanitizer::e($player->ratingOutsideOffense ?? 0) ?></td>
+<td><?= HtmlSanitizer::e($player->ratingDriveOffense ?? 0) ?></td>
+<td><?= HtmlSanitizer::e($player->ratingPostOffense ?? 0) ?></td>
+<td class="sep-r-weak"><?= HtmlSanitizer::e($player->ratingTransitionOffense ?? 0) ?></td>
+<td><?= HtmlSanitizer::e($player->ratingOutsideDefense ?? 0) ?></td>
+<td><?= HtmlSanitizer::e($player->ratingDriveDefense ?? 0) ?></td>
+<td><?= HtmlSanitizer::e($player->ratingPostDefense ?? 0) ?></td>
+<td class="sep-r-team"><?= HtmlSanitizer::e($player->ratingTransitionDefense ?? 0) ?></td>
+<td><?= HtmlSanitizer::e($player->ratingTalent ?? 0) ?></td>
+<td><?= HtmlSanitizer::e($player->ratingSkill ?? 0) ?></td>
+<td class="sep-r-team"><?= HtmlSanitizer::e($player->ratingIntangibles ?? 0) ?></td>
         <?php
         return (string) ob_get_clean();
     }
@@ -521,11 +521,11 @@ class FreeAgencyView
     {
         ob_start();
         ?>
-<td><?= $player->freeAgencyLoyalty ?? 0 ?></td>
-<td><?= $player->freeAgencyPlayForWinner ?? 0 ?></td>
-<td><?= $player->freeAgencyPlayingTime ?? 0 ?></td>
-<td><?= $player->freeAgencySecurity ?? 0 ?></td>
-<td><?= $player->freeAgencyTradition ?? 0 ?></td>
+<td><?= HtmlSanitizer::e($player->freeAgencyLoyalty ?? 0) ?></td>
+<td><?= HtmlSanitizer::e($player->freeAgencyPlayForWinner ?? 0) ?></td>
+<td><?= HtmlSanitizer::e($player->freeAgencyPlayingTime ?? 0) ?></td>
+<td><?= HtmlSanitizer::e($player->freeAgencySecurity ?? 0) ?></td>
+<td><?= HtmlSanitizer::e($player->freeAgencyTradition ?? 0) ?></td>
         <?php
         return (string) ob_get_clean();
     }
@@ -546,12 +546,12 @@ class FreeAgencyView
         $dem6 = $demands['dem6'] ?? 0;
 
         ob_start();
-        echo '<td class="col-salary">' . ($dem1 !== 0 ? $dem1 : '') . '</td>';
-        echo '<td class="col-salary">' . ($dem2 !== 0 ? $dem2 : '') . '</td>';
-        echo '<td class="col-salary">' . ($dem3 !== 0 ? $dem3 : '') . '</td>';
-        echo '<td class="col-salary">' . ($dem4 !== 0 ? $dem4 : '') . '</td>';
-        echo '<td class="col-salary">' . ($dem5 !== 0 ? $dem5 : '') . '</td>';
-        echo '<td class="col-salary">' . ($dem6 !== 0 ? $dem6 : '') . '</td>';
+        echo '<td class="col-salary">' . HtmlSanitizer::e($dem1 !== 0 ? $dem1 : '') . '</td>';
+        echo '<td class="col-salary">' . HtmlSanitizer::e($dem2 !== 0 ? $dem2 : '') . '</td>';
+        echo '<td class="col-salary">' . HtmlSanitizer::e($dem3 !== 0 ? $dem3 : '') . '</td>';
+        echo '<td class="col-salary">' . HtmlSanitizer::e($dem4 !== 0 ? $dem4 : '') . '</td>';
+        echo '<td class="col-salary">' . HtmlSanitizer::e($dem5 !== 0 ? $dem5 : '') . '</td>';
+        echo '<td class="col-salary">' . HtmlSanitizer::e($dem6 !== 0 ? $dem6 : '') . '</td>';
         return (string) ob_get_clean();
     }
 
@@ -573,29 +573,29 @@ class FreeAgencyView
     <td colspan="18" class="cap-footer-spacer"></td>
     <td colspan="10" class="cap-footer-label">Soft Cap Space</td>
     <?php foreach ($capMetrics['softCapSpace'] as $capSpace): ?>
-        <td class="col-salary"><?= $capSpace ?></td>
+        <td class="col-salary"><?= HtmlSanitizer::e($capSpace) ?></td>
     <?php endforeach; ?>
     <td class="cap-footer-spacer"></td>
     <td colspan="2" class="cap-footer-label"><strong>MLE:</strong></td>
-    <td><?= $MLEicon ?></td>
+    <td><?= HtmlSanitizer::e($MLEicon) ?></td>
     <td class="cap-footer-spacer"></td>
 </tr>
 <tr class="cap-footer-row">
     <td colspan="18" class="cap-footer-spacer"></td>
     <td colspan="10" class="cap-footer-label">Hard Cap Space</td>
     <?php foreach ($capMetrics['hardCapSpace'] as $capSpace): ?>
-        <td class="col-salary"><?= $capSpace ?></td>
+        <td class="col-salary"><?= HtmlSanitizer::e($capSpace) ?></td>
     <?php endforeach; ?>
     <td class="cap-footer-spacer"></td>
     <td colspan="2" class="cap-footer-label"><strong>LLE:</strong></td>
-    <td><?= $LLEicon ?></td>
+    <td><?= HtmlSanitizer::e($LLEicon) ?></td>
     <td class="cap-footer-spacer"></td>
 </tr>
 <tr class="cap-footer-row">
     <td colspan="18" class="cap-footer-spacer"></td>
     <td colspan="10" class="cap-footer-label">Empty Roster Slots</td>
     <?php foreach ($capMetrics['rosterSpots'] as $spots): ?>
-        <td class="col-salary"><?= $spots ?></td>
+        <td class="col-salary"><?= HtmlSanitizer::e($spots) ?></td>
     <?php endforeach; ?>
     <td colspan="5" class="cap-footer-spacer"></td>
 </tr>

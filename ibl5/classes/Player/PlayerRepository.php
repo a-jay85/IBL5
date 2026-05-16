@@ -24,6 +24,124 @@ use Player\Contracts\PlayerRepositoryInterface;
  */
 class PlayerRepository extends BaseMysqliRepository implements PlayerRepositoryInterface
 {
+    /**
+     * Declarative field map: PlayerData property → DB column for each mapping category.
+     * Used by tests to verify every PlayerData property is accounted for.
+     *
+     * @var array<string, list<array{target: string, source: string}>>
+     */
+    public const FIELD_MAP = [
+        'basic' => [
+            ['target' => 'playerID', 'source' => 'pid'],
+            ['target' => 'ordinal', 'source' => 'ordinal'],
+            ['target' => 'name', 'source' => 'name'],
+            ['target' => 'nickname', 'source' => 'nickname'],
+            ['target' => 'age', 'source' => 'age'],
+            ['target' => 'teamid', 'source' => 'teamid'],
+            ['target' => 'teamName', 'source' => 'teamname'],
+            ['target' => 'teamColor1', 'source' => 'color1'],
+            ['target' => 'teamColor2', 'source' => 'color2'],
+            ['target' => 'position', 'source' => 'pos'],
+        ],
+        'ratings_current' => [
+            ['target' => 'ratingFieldGoalAttempts', 'source' => 'r_fga'],
+            ['target' => 'ratingFieldGoalPercentage', 'source' => 'r_fgp'],
+            ['target' => 'ratingFreeThrowAttempts', 'source' => 'r_fta'],
+            ['target' => 'ratingFreeThrowPercentage', 'source' => 'r_ftp'],
+            ['target' => 'ratingThreePointAttempts', 'source' => 'r_3ga'],
+            ['target' => 'ratingThreePointPercentage', 'source' => 'r_3gp'],
+            ['target' => 'ratingOffensiveRebounds', 'source' => 'r_orb'],
+            ['target' => 'ratingDefensiveRebounds', 'source' => 'r_drb'],
+            ['target' => 'ratingAssists', 'source' => 'r_ast'],
+            ['target' => 'ratingSteals', 'source' => 'r_stl'],
+            ['target' => 'ratingTurnovers', 'source' => 'r_tvr'],
+            ['target' => 'ratingBlocks', 'source' => 'r_blk'],
+            ['target' => 'ratingFouls', 'source' => 'r_foul'],
+            ['target' => 'ratingOutsideOffense', 'source' => 'oo'],
+            ['target' => 'ratingOutsideDefense', 'source' => 'od'],
+            ['target' => 'ratingDriveOffense', 'source' => 'r_drive_off'],
+            ['target' => 'ratingDriveDefense', 'source' => 'dd'],
+            ['target' => 'ratingPostOffense', 'source' => 'po'],
+            ['target' => 'ratingPostDefense', 'source' => 'pd'],
+            ['target' => 'ratingTransitionOffense', 'source' => 'r_trans_off'],
+            ['target' => 'ratingTransitionDefense', 'source' => 'td'],
+            ['target' => 'ratingClutch', 'source' => 'clutch'],
+            ['target' => 'ratingConsistency', 'source' => 'consistency'],
+            ['target' => 'ratingTalent', 'source' => 'talent'],
+            ['target' => 'ratingSkill', 'source' => 'skill'],
+            ['target' => 'ratingIntangibles', 'source' => 'intangibles'],
+        ],
+        'ratings_historical' => [
+            ['target' => 'ratingFieldGoalAttempts', 'source' => 'r_2ga'],
+            ['target' => 'ratingFieldGoalPercentage', 'source' => 'r_2gp'],
+            ['target' => 'ratingFreeThrowAttempts', 'source' => 'r_fta'],
+            ['target' => 'ratingFreeThrowPercentage', 'source' => 'r_ftp'],
+            ['target' => 'ratingThreePointAttempts', 'source' => 'r_3ga'],
+            ['target' => 'ratingThreePointPercentage', 'source' => 'r_3gp'],
+            ['target' => 'ratingOffensiveRebounds', 'source' => 'r_orb'],
+            ['target' => 'ratingDefensiveRebounds', 'source' => 'r_drb'],
+            ['target' => 'ratingAssists', 'source' => 'r_ast'],
+            ['target' => 'ratingSteals', 'source' => 'r_stl'],
+            ['target' => 'ratingBlocks', 'source' => 'r_blk'],
+            ['target' => 'ratingTurnovers', 'source' => 'r_tvr'],
+            ['target' => 'ratingOutsideOffense', 'source' => 'r_oo'],
+            ['target' => 'ratingOutsideDefense', 'source' => 'r_od'],
+            ['target' => 'ratingDriveOffense', 'source' => 'r_drive_off'],
+            ['target' => 'ratingDriveDefense', 'source' => 'r_dd'],
+            ['target' => 'ratingPostOffense', 'source' => 'r_po'],
+            ['target' => 'ratingPostDefense', 'source' => 'r_pd'],
+            ['target' => 'ratingTransitionOffense', 'source' => 'r_trans_off'],
+            ['target' => 'ratingTransitionDefense', 'source' => 'r_td'],
+        ],
+        'free_agency' => [
+            ['target' => 'freeAgencyLoyalty', 'source' => 'loyalty'],
+            ['target' => 'freeAgencyPlayingTime', 'source' => 'playing_time'],
+            ['target' => 'freeAgencyPlayForWinner', 'source' => 'winner'],
+            ['target' => 'freeAgencyTradition', 'source' => 'tradition'],
+            ['target' => 'freeAgencySecurity', 'source' => 'security'],
+        ],
+        'contract' => [
+            ['target' => 'yearsOfExperience', 'source' => 'exp'],
+            ['target' => 'birdYears', 'source' => 'bird'],
+            ['target' => 'contractCurrentYear', 'source' => 'cy'],
+            ['target' => 'contractTotalYears', 'source' => 'cyt'],
+            ['target' => 'contractYear1Salary', 'source' => 'salary_yr1'],
+            ['target' => 'contractYear2Salary', 'source' => 'salary_yr2'],
+            ['target' => 'contractYear3Salary', 'source' => 'salary_yr3'],
+            ['target' => 'contractYear4Salary', 'source' => 'salary_yr4'],
+            ['target' => 'contractYear5Salary', 'source' => 'salary_yr5'],
+            ['target' => 'contractYear6Salary', 'source' => 'salary_yr6'],
+        ],
+        'draft' => [
+            ['target' => 'draftYear', 'source' => 'draftyear'],
+            ['target' => 'draftRound', 'source' => 'draftround'],
+            ['target' => 'draftPickNumber', 'source' => 'draftpickno'],
+            ['target' => 'draftTeamOriginalName', 'source' => 'draftedby'],
+            ['target' => 'draftTeamCurrentName', 'source' => 'draftedbycurrentname'],
+            ['target' => 'collegeName', 'source' => 'college'],
+        ],
+        'physical' => [
+            ['target' => 'heightFeet', 'source' => 'htft'],
+            ['target' => 'heightInches', 'source' => 'htin'],
+            ['target' => 'weightPounds', 'source' => 'wt'],
+        ],
+        'status' => [
+            ['target' => 'daysRemainingForInjury', 'source' => 'injured'],
+            ['target' => 'isRetired', 'source' => 'retired'],
+            ['target' => 'timeDroppedOnWaivers', 'source' => 'droptime'],
+        ],
+    ];
+
+    /** @var list<string> Properties set by non-repository logic or only in specific code paths */
+    public const EXCLUDED_FROM_FIELD_MAP = [
+        'plr',
+        'historicalYear',
+        'currentSeasonSalary',
+        'salaryJSB',
+        'decoratedName',
+        'nameStatusClass',
+    ];
+
     /** @var array{allStar: int, threePoint: int, dunkContest: int, rookieSoph: int}|null */
     private ?array $cachedAllStarWeekendCounts = null;
     private ?string $cachedAllStarWeekendPlayerName = null;
@@ -120,8 +238,6 @@ class PlayerRepository extends BaseMysqliRepository implements PlayerRepositoryI
     }
 
     /**
-     * Map rating fields from current player row
-     *
      * @param PlayerRow $plrRow Database row from `ibl_plr`
      */
     private function mapRatingsFromCurrentRow(PlayerData $playerData, array $plrRow): void
@@ -155,8 +271,6 @@ class PlayerRepository extends BaseMysqliRepository implements PlayerRepositoryI
     }
 
     /**
-     * Map free agency preference fields
-     *
      * @param PlayerRow $plrRow Database row from `ibl_plr`
      */
     private function mapFreeAgencyFields(PlayerData $playerData, array $plrRow): void
@@ -169,8 +283,6 @@ class PlayerRepository extends BaseMysqliRepository implements PlayerRepositoryI
     }
 
     /**
-     * Map contract fields
-     *
      * @param PlayerRow $plrRow Database row from `ibl_plr`
      */
     private function mapContractFields(PlayerData $playerData, array $plrRow): void
@@ -281,9 +393,7 @@ class PlayerRepository extends BaseMysqliRepository implements PlayerRepositoryI
     }
 
     /**
-     * Map rating fields from historical player row (different column names than current)
-     *
-     * @param array{r_2ga: ?int, r_2gp: ?int, r_fta: ?int, r_ftp: ?int, r_3ga: ?int, r_3gp: ?int, r_orb: ?int, r_drb: ?int, r_ast: ?int, r_stl: ?int, r_blk: ?int, r_tvr: ?int, r_oo: ?int, r_od: ?int, r_drive_off: ?int, r_dd: ?int, r_po: ?int, r_pd: ?int, r_trans_off: ?int, r_td: ?int, ...} $plrRow
+     * @param HistoricalPlayerRow $plrRow
      */
     private function mapRatingsFromHistoricalRow(PlayerData $playerData, array $plrRow): void
     {

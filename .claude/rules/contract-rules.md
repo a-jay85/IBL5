@@ -5,9 +5,10 @@ paths:
   - "ibl5/classes/FreeAgency/**/*"
   - "ibl5/classes/FreeAgencyPreview/**/*"
   - "ibl5/classes/Negotiation/**/*"
+  - "ibl5/classes/Player/Contract/**/*"
   - "ibl5/classes/Waivers/**/*"
   - "ibl5/classes/ContractList/**/*"
-last_verified: 2026-04-11
+last_verified: 2026-05-16
 ---
 
 # IBL Contract Rules (CBA)

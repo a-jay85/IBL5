@@ -6,7 +6,7 @@ namespace Voting;
 
 use League\League;
 use Player\Player;
-use Player\PlayerStats;
+use Player\Stats\PlayerStats;
 use Voting\Contracts\VotingBallotServiceInterface;
 use Voting\Contracts\VotingBallotViewInterface;
 use Season\Season;

@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Player;
 
+use Player\Contract\PlayerContractCalculator;
+use Player\Contract\PlayerContractValidator;
 use Player\Contracts\PlayerInterface;
 use Season\Season;
 

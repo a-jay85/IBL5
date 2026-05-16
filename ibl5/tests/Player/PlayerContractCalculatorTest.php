@@ -6,7 +6,7 @@ namespace Tests\Player;
 
 use PHPUnit\Framework\TestCase;
 use PHPUnit\Framework\Attributes\DataProvider;
-use Player\PlayerContractCalculator;
+use Player\Contract\PlayerContractCalculator;
 use Player\PlayerData;
 
 class PlayerContractCalculatorTest extends TestCase

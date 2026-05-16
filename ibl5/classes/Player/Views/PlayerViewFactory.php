@@ -6,7 +6,17 @@ namespace Player\Views;
 
 use Player\PlayerPageType;
 use Player\PlayerRepository;
-use Player\PlayerStatsRepository;
+use Player\Stats\PlayerStatsRepository;
+use Player\Stats\Views\PlayerHeatAveragesView;
+use Player\Stats\Views\PlayerHeatTotalsView;
+use Player\Stats\Views\PlayerOlympicAveragesView;
+use Player\Stats\Views\PlayerOlympicTotalsView;
+use Player\Stats\Views\PlayerPlayoffAveragesView;
+use Player\Stats\Views\PlayerPlayoffTotalsView;
+use Player\Stats\Views\PlayerRatingsAndSalaryView;
+use Player\Stats\Views\PlayerRegularSeasonAveragesView;
+use Player\Stats\Views\PlayerRegularSeasonTotalsView;
+use Player\Stats\Views\PlayerSimStatsView;
 use Player\Contracts\PlayerViewInterface;
 use Services\CommonMysqliRepository;
 

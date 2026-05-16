@@ -7,7 +7,7 @@ namespace UI\Tables;
 use BasketballStats\StatsFormatter;
 use Player\Player;
 use Player\PlayerImageHelper;
-use Player\PlayerStats;
+use Player\Stats\PlayerStats;
 use TeamOffDefStats\TeamOffDefStatsRepository;
 use UI\TeamCellHelper;
 use Security\HtmlSanitizer;

@@ -6,6 +6,7 @@ namespace Player;
 
 use League\League;
 use Player\Contracts\PlayerPageServiceInterface;
+use Player\Stats\PlayerStatsRepository;
 use Player\Views\PlayerViewFactory;
 use Team\Team;
 use Season\Season;

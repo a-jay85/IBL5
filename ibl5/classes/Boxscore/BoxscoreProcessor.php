@@ -7,7 +7,7 @@ namespace Boxscore;
 use Boxscore\Contracts\BoxscoreProcessorInterface;
 use JsbParser\ScoFileParser;
 use League\LeagueContext;
-use Player\PlayerStats;
+use Player\Stats\PlayerStats;
 use Utilities\UuidGenerator;
 use Season\Season;
 

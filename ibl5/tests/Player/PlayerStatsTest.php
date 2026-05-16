@@ -6,10 +6,10 @@ namespace Tests\Player;
 
 use BasketballStats\StatsFormatter;
 use PHPUnit\Framework\TestCase;
-use Player\Contracts\PlayerStatsRepositoryInterface;
+use Player\Stats\Contracts\PlayerStatsRepositoryInterface;
 
 /**
- * @covers \Player\PlayerStats
+ * @covers \Player\Stats\PlayerStats
  */
 class PlayerStatsTest extends TestCase
 {
@@ -401,7 +401,7 @@ class PlayerStatsTest extends TestCase
 /**
  * Testable subclass that exposes protected fill methods.
  */
-class TestablePlayerStats extends \Player\PlayerStats
+class TestablePlayerStats extends \Player\Stats\PlayerStats
 {
     /**
      * @param array<string, mixed> $plrRow

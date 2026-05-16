@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace UI\Tables;
 
 use BasketballStats\StatsFormatter;
-use Player\PlayerStats;
+use Player\Stats\PlayerStats;
 use Player\Player;
 use Player\PlayerImageHelper;
 use UI\TeamCellHelper;

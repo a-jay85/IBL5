@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace UI\Tables;
 
 use Player\Player;
-use Player\PlayerStats;
+use Player\Stats\PlayerStats;
 
 /**
  * PlayerRowTransformer - Resolves Player (and optionally PlayerStats) objects

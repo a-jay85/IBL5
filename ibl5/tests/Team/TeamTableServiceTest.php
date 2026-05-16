@@ -10,6 +10,7 @@ use Team\Contracts\TeamTableServiceInterface;
 use League\League;
 use Team\TeamTableService;
 use Season\Season;
+use Tests\WideUnit\Mocks\MockDatabase;
 
 /**
  * Tests for TeamTableService
@@ -18,12 +19,12 @@ use Season\Season;
  */
 class TeamTableServiceTest extends TestCase
 {
-    private \MockDatabase $mockDb;
+    private MockDatabase $mockDb;
     private TeamTableService $service;
 
     protected function setUp(): void
     {
-        $this->mockDb = new \MockDatabase();
+        $this->mockDb = new MockDatabase();
         $repository = new \Team\TeamRepository($this->mockDb);
         $this->service = new TeamTableService($this->mockDb, $repository);
     }
@@ -133,7 +134,7 @@ class TeamTableServiceTest extends TestCase
      */
     private function createServiceWithTeamData(): TeamTableService
     {
-        $mockDb = new \MockDatabase();
+        $mockDb = new MockDatabase();
         $mockDb->setMockData([
             ['teamid' => 1, 'team_name' => 'Atlanta'],
             ['teamid' => 2, 'team_name' => 'Boston'],

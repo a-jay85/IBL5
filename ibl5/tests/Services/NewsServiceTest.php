@@ -6,15 +6,16 @@ namespace Tests\Services;
 
 use PHPUnit\Framework\TestCase;
 use Services\NewsService;
+use Tests\WideUnit\Mocks\MockDatabase;
 
 class NewsServiceTest extends TestCase
 {
     private NewsService $newsService;
-    private \MockDatabase $mockDb;
+    private MockDatabase $mockDb;
 
     protected function setUp(): void
     {
-        $this->mockDb = new \MockDatabase();
+        $this->mockDb = new MockDatabase();
         $this->newsService = new NewsService($this->mockDb);
     }
 

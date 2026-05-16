@@ -7,14 +7,15 @@ namespace Tests\Player;
 use PHPUnit\Framework\TestCase;
 use Player\Player;
 use Tests\WideUnit\Mocks\TestDataFactory;
+use Tests\WideUnit\Mocks\MockDatabase;
 
 class PlayerSalaryPlaceholderTest extends TestCase
 {
-    private \MockDatabase $mockDb;
+    private MockDatabase $mockDb;
 
     protected function setUp(): void
     {
-        $this->mockDb = new \MockDatabase();
+        $this->mockDb = new MockDatabase();
     }
 
     public function testIsSalaryPlaceholderAlwaysReturnsFalse(): void

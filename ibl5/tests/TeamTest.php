@@ -3,17 +3,18 @@
 declare(strict_types=1);
 
 use Team\Team;
+use Tests\WideUnit\Mocks\MockDatabase;
 
 /**
  * TeamTest - Tests for Team class
  */
 class TeamTest extends \PHPUnit\Framework\TestCase
 {
-    private \MockDatabase $mockDb;
+    private MockDatabase $mockDb;
 
     protected function setUp(): void
     {
-        $this->mockDb = new \MockDatabase();
+        $this->mockDb = new MockDatabase();
         $this->mockDb->setMockData([
             [
                 'teamid' => 1,

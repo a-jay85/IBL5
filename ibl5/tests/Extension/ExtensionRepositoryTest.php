@@ -8,6 +8,7 @@ use PHPUnit\Framework\TestCase;
 use Extension\ExtensionRepository;
 use Logging\LoggerFactory;
 use Monolog\Handler\TestHandler;
+use Tests\WideUnit\Mocks\MockDatabase;
 
 /**
  * Tests for ExtensionRepository
@@ -22,12 +23,12 @@ use Monolog\Handler\TestHandler;
  */
 class ExtensionRepositoryTest extends TestCase
 {
-    private \MockDatabase $mockDb;
+    private MockDatabase $mockDb;
     private ExtensionRepository $repository;
 
     protected function setUp(): void
     {
-        $this->mockDb = new \MockDatabase();
+        $this->mockDb = new MockDatabase();
         $this->repository = new ExtensionRepository($this->mockDb);
     }
 
@@ -195,7 +196,7 @@ class ExtensionRepositoryTest extends TestCase
         $handler = new TestHandler();
         LoggerFactory::forTesting($handler);
 
-        $repo = new class (new \MockDatabase()) extends ExtensionRepository {
+        $repo = new class (new MockDatabase()) extends ExtensionRepository {
             protected function execute(string $query, string $types = '', mixed ...$params): int
             {
                 throw new \RuntimeException('forced failure', 1003);
@@ -214,7 +215,7 @@ class ExtensionRepositoryTest extends TestCase
         $handler = new TestHandler();
         LoggerFactory::forTesting($handler);
 
-        $repo = new class (new \MockDatabase()) extends ExtensionRepository {
+        $repo = new class (new MockDatabase()) extends ExtensionRepository {
             protected function execute(string $query, string $types = '', mixed ...$params): int
             {
                 throw new \RuntimeException('forced failure', 1003);
@@ -232,7 +233,7 @@ class ExtensionRepositoryTest extends TestCase
         $handler = new TestHandler();
         LoggerFactory::forTesting($handler);
 
-        $repo = new class (new \MockDatabase()) extends ExtensionRepository {
+        $repo = new class (new MockDatabase()) extends ExtensionRepository {
             protected function execute(string $query, string $types = '', mixed ...$params): int
             {
                 throw new \RuntimeException('forced failure', 1003);

@@ -8,6 +8,7 @@ use PHPUnit\Framework\TestCase;
 use Updater\PowerRankingsUpdater;
 use Statistics\TeamStatsCalculator;
 use Season\Season;
+use Tests\WideUnit\Mocks\MockDatabase;
 
 /**
  * Testable subclass that exposes protected methods for testing
@@ -39,13 +40,13 @@ class TestablePowerRankingsUpdater extends PowerRankingsUpdater
  */
 class PowerRankingsUpdaterTest extends TestCase
 {
-    private \MockDatabase $mockDb;
+    private MockDatabase $mockDb;
     private Season $mockSeason;
     private TestablePowerRankingsUpdater $powerRankingsUpdater;
 
     protected function setUp(): void
     {
-        $this->mockDb = new \MockDatabase();
+        $this->mockDb = new MockDatabase();
         $this->mockSeason = new Season($this->mockDb);
         $this->powerRankingsUpdater = new TestablePowerRankingsUpdater($this->mockDb, $this->mockSeason);
     }

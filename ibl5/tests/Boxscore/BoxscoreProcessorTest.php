@@ -33,7 +33,7 @@ class TestableBoxscoreProcessor extends BoxscoreProcessor
  */
 class BoxscoreProcessorTest extends TestCase
 {
-    private \MockDatabase $mockDb;
+    private MockDatabase $mockDb;
     private string|false $previousErrorLog = false;
 
     /** @var list<string> Temp files to clean up */
@@ -41,7 +41,7 @@ class BoxscoreProcessorTest extends TestCase
 
     protected function setUp(): void
     {
-        $this->mockDb = new \MockDatabase();
+        $this->mockDb = new MockDatabase();
         // Suppress error logs from Season constructor DB calls
         $this->previousErrorLog = ini_get('error_log') ?: '';
         ini_set('error_log', '/dev/null');
@@ -276,7 +276,7 @@ class BoxscoreProcessorTest extends TestCase
 
     public function testProcessGameUpsertReturnsInsertForNewGame(): void
     {
-        $mockDb = new \MockDatabase();
+        $mockDb = new MockDatabase();
         $mockDb->setReturnTrue(true);
         // findTeamBoxscore returns null (no matching game)
         $mockDb->onQuery('(?s)SELECT.*ibl_box_scores_teams.*WHERE', []);
@@ -292,7 +292,7 @@ class BoxscoreProcessorTest extends TestCase
 
     public function testProcessGameUpsertReturnsSkipWhenScoresMatchAndNoNullTeamId(): void
     {
-        $mockDb = new \MockDatabase();
+        $mockDb = new MockDatabase();
         $mockDb->setReturnTrue(true);
         // findTeamBoxscore returns matching quarter scores
         // buildGameInfoLine defaults: visitor Q scores = 025,030,028,027,000 = 110; home = 022,031,025,030,000 = 108
@@ -316,7 +316,7 @@ class BoxscoreProcessorTest extends TestCase
 
     public function testProcessGameUpsertReturnsUpdateWhenScoresDiffer(): void
     {
-        $mockDb = new \MockDatabase();
+        $mockDb = new MockDatabase();
         $mockDb->setReturnTrue(true);
         // findTeamBoxscore returns different scores (all zeros — clearly different)
         $mockDb->onQuery('(?s)SELECT.*ibl_box_scores_teams.*WHERE', [[
@@ -337,7 +337,7 @@ class BoxscoreProcessorTest extends TestCase
 
     public function testProcessGameUpsertReturnsUpdateWhenScoresMatchButNullTeamId(): void
     {
-        $mockDb = new \MockDatabase();
+        $mockDb = new MockDatabase();
         $mockDb->setReturnTrue(true);
         // findTeamBoxscore returns matching scores
         $mockDb->onQuery('(?s)SELECT.*ibl_box_scores_teams.*WHERE', [[
@@ -362,7 +362,7 @@ class BoxscoreProcessorTest extends TestCase
 
     public function testUpdateSimDatesAdvancesFromLastEndDate(): void
     {
-        $mockDb = new \MockDatabase();
+        $mockDb = new MockDatabase();
         $mockDb->setReturnTrue(true);
 
         $repository = new BoxscoreRepository($mockDb);
@@ -414,7 +414,7 @@ class BoxscoreProcessorTest extends TestCase
 
     public function testUpdateSimDatesFirstSimUsesFirstBoxScoreDate(): void
     {
-        $mockDb = new \MockDatabase();
+        $mockDb = new MockDatabase();
         $mockDb->setReturnTrue(true);
 
         $repository = new BoxscoreRepository($mockDb);
@@ -439,7 +439,7 @@ class BoxscoreProcessorTest extends TestCase
 
     public function testUpdateSimDatesNoChangeWhenDatesUnchanged(): void
     {
-        $mockDb = new \MockDatabase();
+        $mockDb = new MockDatabase();
         $mockDb->setReturnTrue(true);
 
         $repository = new BoxscoreRepository($mockDb);
@@ -465,7 +465,7 @@ class BoxscoreProcessorTest extends TestCase
 
     public function testProcessScoFileInsertsNewGame(): void
     {
-        $mockDb = new \MockDatabase();
+        $mockDb = new MockDatabase();
         $mockDb->setReturnTrue(true);
         // findTeamBoxscore returns null (game not in DB)
         $mockDb->onQuery('(?s)SELECT.*ibl_box_scores_teams.*WHERE', []);
@@ -490,7 +490,7 @@ class BoxscoreProcessorTest extends TestCase
 
     public function testProcessScoFileSkipsMatchingGame(): void
     {
-        $mockDb = new \MockDatabase();
+        $mockDb = new MockDatabase();
         $mockDb->setReturnTrue(true);
         // findTeamBoxscore returns matching scores
         $mockDb->onQuery('(?s)SELECT.*ibl_box_scores_teams.*WHERE', [[
@@ -517,7 +517,7 @@ class BoxscoreProcessorTest extends TestCase
 
     public function testProcessScoFileUpdatesChangedGame(): void
     {
-        $mockDb = new \MockDatabase();
+        $mockDb = new MockDatabase();
         $mockDb->setReturnTrue(true);
         // findTeamBoxscore returns different scores
         $mockDb->onQuery('(?s)SELECT.*ibl_box_scores_teams.*WHERE', [[
@@ -545,7 +545,7 @@ class BoxscoreProcessorTest extends TestCase
 
     public function testProcessAllStarGamesDataSkipsBeforeCutoff(): void
     {
-        $mockDb = new \MockDatabase();
+        $mockDb = new MockDatabase();
         $mockDb->setReturnTrue(true);
 
         $repository = new BoxscoreRepository($mockDb);
@@ -561,7 +561,7 @@ class BoxscoreProcessorTest extends TestCase
 
     public function testProcessAllStarGamesDataSkipsWhenNoBoxScoreDateExists(): void
     {
-        $mockDb = new \MockDatabase();
+        $mockDb = new MockDatabase();
         $mockDb->setReturnTrue(true);
 
         $repository = new BoxscoreRepository($mockDb);
@@ -577,7 +577,7 @@ class BoxscoreProcessorTest extends TestCase
 
     public function testProcessScoDataReturnsErrorForTooShortData(): void
     {
-        $mockDb = new \MockDatabase();
+        $mockDb = new MockDatabase();
         $mockDb->setReturnTrue(true);
 
         $repository = new BoxscoreRepository($mockDb);
@@ -594,7 +594,7 @@ class BoxscoreProcessorTest extends TestCase
 
     public function testProcessScoDataInsertsNewGame(): void
     {
-        $mockDb = new \MockDatabase();
+        $mockDb = new MockDatabase();
         $mockDb->setReturnTrue(true);
         $mockDb->onQuery('(?s)SELECT.*ibl_box_scores_teams.*WHERE', []);
 

@@ -10,6 +10,7 @@ parameters:
         - tests/TeamOffDefStats/TeamOffDefStatsRepositoryTest.php
     bootstrapFiles:
         - phpstan-stubs/nuke-globals.stub.php
+        - phpstan-stubs/mock-aliases.stub.php
     phpVersion: 80300
     treatPhpDocTypesAsCertain: false
 

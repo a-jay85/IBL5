@@ -8,6 +8,7 @@ use PHPUnit\Framework\TestCase;
 use PHPUnit\Framework\Attributes\DataProvider;
 use Trading\CashTransactionHandler;
 use Trading\Contracts\CashTransactionHandlerInterface;
+use Tests\WideUnit\Mocks\MockDatabase;
 
 /**
  * CashTransactionHandlerTest - Tests for CashTransactionHandler
@@ -211,12 +212,12 @@ class CashTransactionHandlerTest extends TestCase
     private function createLegacyMockCashHandler(): \Trading\CashTransactionHandler
     {
         if (!isset($this->legacyMockDb)) {
-            $this->legacyMockDb = new \MockDatabase();
+            $this->legacyMockDb = new MockDatabase();
         }
         return new \Trading\CashTransactionHandler($this->legacyMockDb);
     }
 
-    /** @var \MockDatabase|null */
+    /** @var MockDatabase|null */
     private $legacyMockDb = null;
 
     /**
@@ -293,7 +294,7 @@ class CashTransactionHandlerTest extends TestCase
         $listeningTeamName = 'Golden State Warriors';
         $cashAmounts = [1 => 100, 2 => 200, 3 => 300, 4 => 0, 5 => 0, 6 => 0];
 
-        $this->legacyMockDb = new \MockDatabase();
+        $this->legacyMockDb = new MockDatabase();
         $this->legacyMockDb->setReturnTrue(true); // INSERT should return true
         $cashHandler = new \Trading\CashTransactionHandler($this->legacyMockDb);
 
@@ -320,7 +321,7 @@ class CashTransactionHandlerTest extends TestCase
         $listeningTeamName = 'New York Knicks';
         $partialCashAmounts = [1 => 100, 3 => 300, 5 => 500]; // Missing years 2, 4, 6
 
-        $this->legacyMockDb = new \MockDatabase();
+        $this->legacyMockDb = new MockDatabase();
         $this->legacyMockDb->setReturnTrue(true);
         $cashHandler = new \Trading\CashTransactionHandler($this->legacyMockDb);
 

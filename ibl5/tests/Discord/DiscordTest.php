@@ -6,6 +6,7 @@ namespace Tests\Discord;
 
 use PHPUnit\Framework\TestCase;
 use Discord\Discord;
+use Tests\WideUnit\Mocks\MockDatabase;
 
 /**
  * Tests for Discord class
@@ -16,7 +17,7 @@ class DiscordTest extends TestCase
 
     protected function setUp(): void
     {
-        $this->mockDb = new \MockDatabase();
+        $this->mockDb = new MockDatabase();
     }
 
     /**

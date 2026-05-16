@@ -7,6 +7,7 @@ namespace Tests\Player;
 use PHPUnit\Framework\TestCase;
 use Player\PlayerPageService;
 use Player\Player;
+use Tests\WideUnit\Mocks\MockDatabase;
 
 class PlayerPageServiceTest extends TestCase
 {
@@ -16,7 +17,7 @@ class PlayerPageServiceTest extends TestCase
     protected function setUp(): void
     {
         // Mock database connection
-        $this->db = new \MockDatabase();
+        $this->db = new MockDatabase();
         $this->service = new PlayerPageService($this->db);
     }
 

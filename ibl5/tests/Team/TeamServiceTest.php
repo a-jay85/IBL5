@@ -7,6 +7,7 @@ namespace Tests\Team;
 use PHPUnit\Framework\TestCase;
 use Team\TeamService;
 use Team\Contracts\TeamServiceInterface;
+use Tests\WideUnit\Mocks\MockDatabase;
 
 /**
  * Tests for TeamService
@@ -19,7 +20,7 @@ class TeamServiceTest extends TestCase
 
     protected function setUp(): void
     {
-        $mockDb = new \MockDatabase();
+        $mockDb = new MockDatabase();
         $repository = new \Team\TeamRepository($mockDb);
         $this->service = new TeamService($mockDb, $repository);
     }

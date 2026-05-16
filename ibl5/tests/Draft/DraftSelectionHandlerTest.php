@@ -8,6 +8,9 @@ use PHPUnit\Framework\TestCase;
 use Draft\DraftSelectionHandler;
 use Shared\Contracts\SharedRepositoryInterface;
 use Season\Season;
+use Tests\WideUnit\Mocks\MockDatabase;
+use Tests\WideUnit\Mocks\MockDatabaseResult;
+use Tests\WideUnit\Mocks\MockPreparedStatement;
 
 /**
  * DraftSelectionHandlerTest - Tests for draft pick selection handling
@@ -19,14 +22,14 @@ use Season\Season;
  */
 class DraftSelectionHandlerTest extends TestCase
 {
-    private \MockDatabase $mockDb;
+    private MockDatabase $mockDb;
     private object $mockMysqliDb;
     private SharedRepositoryInterface $mockSharedFunctions;
     private Season $mockSeason;
 
     protected function setUp(): void
     {
-        $this->mockDb = new \MockDatabase();
+        $this->mockDb = new MockDatabase();
         $this->setupMockMysqliDb();
         $this->setupMockDependencies();
     }
@@ -41,27 +44,27 @@ class DraftSelectionHandlerTest extends TestCase
         $mockDb = $this->mockDb;
         
         $this->mockMysqliDb = new class($mockDb) extends \mysqli {
-            private \MockDatabase $mockDb;
+            private MockDatabase $mockDb;
             public int $connect_errno = 0;
             public ?string $connect_error = null;
 
-            public function __construct(\MockDatabase $mockDb)
+            public function __construct(MockDatabase $mockDb)
             {
                 // Don't call parent::__construct() to avoid real DB connection
                 $this->mockDb = $mockDb;
             }
 
             #[\ReturnTypeWillChange]
-            public function prepare(string $query): \MockPreparedStatement|false
+            public function prepare(string $query): MockPreparedStatement|false
             {
-                return new \MockPreparedStatement($this->mockDb, $query);
+                return new MockPreparedStatement($this->mockDb, $query);
             }
 
             #[\ReturnTypeWillChange]
             public function query(string $query, int $resultMode = MYSQLI_STORE_RESULT): \mysqli_result|bool
             {
                 $result = $this->mockDb->sql_query($query);
-                if ($result instanceof \MockDatabaseResult) {
+                if ($result instanceof MockDatabaseResult) {
                     return false;
                 }
                 return (bool) $result;

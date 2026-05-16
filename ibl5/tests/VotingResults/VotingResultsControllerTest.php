@@ -10,6 +10,7 @@ use Voting\VotingResultsController;
 use Voting\VotingResultsService;
 use Voting\VotingResultsTableRenderer;
 use Season\Season;
+use Tests\WideUnit\Mocks\MockDatabase;
 
 final class VotingResultsControllerTest extends TestCase
 {
@@ -62,7 +63,7 @@ final class VotingResultsControllerTest extends TestCase
 
     private function createSeason(string $phase): Season
     {
-        $season = new Season(new \MockDatabase());
+        $season = new Season(new MockDatabase());
         $season->phase = $phase;
 
         return $season;

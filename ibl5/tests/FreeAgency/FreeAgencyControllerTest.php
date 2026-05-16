@@ -6,6 +6,7 @@ namespace Tests\FreeAgency;
 
 use FreeAgency\FreeAgencyController;
 use PHPUnit\Framework\TestCase;
+use Tests\WideUnit\Mocks\MockDatabase;
 
 /**
  * Tests for FreeAgencyController
@@ -18,7 +19,7 @@ class FreeAgencyControllerTest extends TestCase
 {
     public function testUnauthenticatedUserRendersLoginBox(): void
     {
-        $mockDb = new \MockDatabase();
+        $mockDb = new MockDatabase();
 
         $loginBoxCalled = false;
         $nukeCompat = $this->createStub(\Utilities\NukeCompat::class);
@@ -35,7 +36,7 @@ class FreeAgencyControllerTest extends TestCase
 
     public function testControllerCanBeInstantiated(): void
     {
-        $mockDb = new \MockDatabase();
+        $mockDb = new MockDatabase();
         $controller = new FreeAgencyController($mockDb);
 
         $this->assertInstanceOf(FreeAgencyController::class, $controller);

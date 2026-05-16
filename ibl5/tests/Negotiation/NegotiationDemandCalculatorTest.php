@@ -8,6 +8,7 @@ use PHPUnit\Framework\TestCase;
 use PHPUnit\Framework\Attributes\DataProvider;
 use Negotiation\NegotiationDemandCalculator;
 use Player\Player;
+use Tests\WideUnit\Mocks\MockDatabase;
 
 /**
  * Tests for NegotiationDemandCalculator
@@ -25,7 +26,7 @@ class NegotiationDemandCalculatorTest extends TestCase
 
     protected function setUp(): void
     {
-        $this->mockDb = new \MockDatabase();
+        $this->mockDb = new MockDatabase();
         $this->calculator = new NegotiationDemandCalculator($this->mockDb);
     }
 

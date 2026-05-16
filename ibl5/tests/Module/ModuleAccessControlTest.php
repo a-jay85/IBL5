@@ -9,6 +9,7 @@ use Module\ModuleAccessControl;
 use PHPUnit\Framework\TestCase;
 
 use Season\Season;
+use Tests\WideUnit\Mocks\MockDatabase;
 class ModuleAccessControlTest extends TestCase
 {
     private function createAccessControl(string $phase, string $triviaMode = 'Off'): ModuleAccessControl
@@ -19,7 +20,7 @@ class ModuleAccessControlTest extends TestCase
         $leagueContext = $this->createStub(LeagueContext::class);
         $leagueContext->method('isModuleEnabled')->willReturn(true);
 
-        $mockDb = new \MockDatabase();
+        $mockDb = new MockDatabase();
         $mockDb->setMockData([
             ['value' => $triviaMode],
         ]);
@@ -37,7 +38,7 @@ class ModuleAccessControlTest extends TestCase
             static fn (string $module): bool => $module !== $disabledModule
         );
 
-        $mockDb = new \MockDatabase();
+        $mockDb = new MockDatabase();
         $mockDb->setMockData([
             ['value' => 'Off'],
         ]);

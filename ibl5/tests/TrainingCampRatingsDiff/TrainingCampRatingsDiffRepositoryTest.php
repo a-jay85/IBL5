@@ -7,15 +7,17 @@ namespace Tests\TrainingCampRatingsDiff;
 use PHPUnit\Framework\TestCase;
 use TrainingCampRatingsDiff\Contracts\TrainingCampRatingsDiffRepositoryInterface;
 use TrainingCampRatingsDiff\TrainingCampRatingsDiffRepository;
+use Tests\WideUnit\Mocks\MockDatabase;
+use Tests\WideUnit\Mocks\MockPreparedStatement;
 
 class TrainingCampRatingsDiffRepositoryTest extends TestCase
 {
-    private \MockDatabase $mockDb;
+    private MockDatabase $mockDb;
     private \mysqli $mockMysqliDb;
 
     protected function setUp(): void
     {
-        $this->mockDb = new \MockDatabase();
+        $this->mockDb = new MockDatabase();
         $this->mockMysqliDb = $this->buildMockMysqliDb($this->mockDb);
     }
 
@@ -99,22 +101,22 @@ class TrainingCampRatingsDiffRepositoryTest extends TestCase
         self::assertSame('Test Player', $result[0]['name']);
     }
 
-    private function buildMockMysqliDb(\MockDatabase $mockDb): \mysqli
+    private function buildMockMysqliDb(MockDatabase $mockDb): \mysqli
     {
         return new class($mockDb) extends \mysqli {
-            private \MockDatabase $mockDb;
+            private MockDatabase $mockDb;
             public int $connect_errno = 0;
             public ?string $connect_error = null;
 
-            public function __construct(\MockDatabase $mockDb)
+            public function __construct(MockDatabase $mockDb)
             {
                 $this->mockDb = $mockDb;
             }
 
             #[\ReturnTypeWillChange]
-            public function prepare(string $query): \MockPreparedStatement|false
+            public function prepare(string $query): MockPreparedStatement|false
             {
-                return new \MockPreparedStatement($this->mockDb, $query);
+                return new MockPreparedStatement($this->mockDb, $query);
             }
         };
     }

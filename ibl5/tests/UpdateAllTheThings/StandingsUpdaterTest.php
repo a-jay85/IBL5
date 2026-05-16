@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use PHPUnit\Framework\TestCase;
 use Standings\StandingsRepository;
+use Tests\WideUnit\Mocks\MockDatabase;
 use Updater\StandingsUpdater;
 use Season\Season;
 

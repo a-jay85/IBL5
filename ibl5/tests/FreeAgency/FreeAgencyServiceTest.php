@@ -11,6 +11,7 @@ use League\League;
 use PHPUnit\Framework\TestCase;
 use Team\Contracts\TeamQueryRepositoryInterface;
 use Team\Team;
+use Tests\WideUnit\Mocks\MockDatabase;
 
 /**
  * @covers \FreeAgency\FreeAgencyService
@@ -20,7 +21,7 @@ class FreeAgencyServiceTest extends TestCase
     private FreeAgencyRepositoryInterface $stubRepo;
     private FreeAgencyDemandRepositoryInterface $stubDemandRepo;
     private TeamQueryRepositoryInterface $stubTeamQueryRepo;
-    private \MockDatabase $mockDb;
+    private MockDatabase $mockDb;
 
     protected function setUp(): void
     {
@@ -29,7 +30,7 @@ class FreeAgencyServiceTest extends TestCase
         $this->stubTeamQueryRepo = $this->createStub(TeamQueryRepositoryInterface::class);
         $this->stubTeamQueryRepo->method('getRosterUnderContractOrderedByOrdinal')->willReturn([]);
         $this->stubTeamQueryRepo->method('getFreeAgencyOffers')->willReturn([]);
-        $this->mockDb = new \MockDatabase();
+        $this->mockDb = new MockDatabase();
     }
 
     // ── getExistingOffer ─────────────────────────────────────────

@@ -6,6 +6,9 @@ namespace Tests\JsbParser;
 
 use JsbParser\PlayerIdResolver;
 use PHPUnit\Framework\TestCase;
+use Tests\WideUnit\Mocks\MockDatabase;
+use Tests\WideUnit\Mocks\MockDatabaseResult;
+use Tests\WideUnit\Mocks\MockPreparedStatement;
 
 /**
  * Tests for PlayerIdResolver's multi-strategy fallback chain and caching.
@@ -18,12 +21,12 @@ use PHPUnit\Framework\TestCase;
  */
 class PlayerIdResolverTest extends TestCase
 {
-    private \MockDatabase $mockDb;
+    private MockDatabase $mockDb;
     private object $mockMysqliDb;
 
     protected function setUp(): void
     {
-        $this->mockDb = new \MockDatabase();
+        $this->mockDb = new MockDatabase();
         $this->setupMockMysqliDb();
     }
 
@@ -37,26 +40,26 @@ class PlayerIdResolverTest extends TestCase
         $mockDb = $this->mockDb;
 
         $this->mockMysqliDb = new class ($mockDb) extends \mysqli {
-            private \MockDatabase $mockDb;
+            private MockDatabase $mockDb;
             public int $connect_errno = 0;
             public ?string $connect_error = null;
 
-            public function __construct(\MockDatabase $mockDb)
+            public function __construct(MockDatabase $mockDb)
             {
                 $this->mockDb = $mockDb;
             }
 
             #[\ReturnTypeWillChange]
-            public function prepare(string $query): \MockPreparedStatement|false
+            public function prepare(string $query): MockPreparedStatement|false
             {
-                return new \MockPreparedStatement($this->mockDb, $query);
+                return new MockPreparedStatement($this->mockDb, $query);
             }
 
             #[\ReturnTypeWillChange]
             public function query(string $query, int $resultMode = MYSQLI_STORE_RESULT): \mysqli_result|bool
             {
                 $result = $this->mockDb->sql_query($query);
-                if ($result instanceof \MockDatabaseResult) {
+                if ($result instanceof MockDatabaseResult) {
                     return false;
                 }
                 return (bool) $result;

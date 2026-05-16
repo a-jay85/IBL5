@@ -7,6 +7,7 @@ namespace Tests\Statistics;
 use PHPUnit\Framework\TestCase;
 use PHPUnit\Framework\Attributes\DataProvider;
 use Statistics\TeamStatsCalculator;
+use Tests\WideUnit\Mocks\MockDatabase;
 
 /**
  * TeamStatsCalculatorTest - Tests for team statistics calculation
@@ -18,7 +19,7 @@ class TeamStatsCalculatorTest extends TestCase
 
     protected function setUp(): void
     {
-        $this->mockDb = new \MockDatabase();
+        $this->mockDb = new MockDatabase();
         $this->calculator = new TeamStatsCalculator($this->mockDb);
     }
 

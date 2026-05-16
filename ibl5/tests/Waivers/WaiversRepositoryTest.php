@@ -6,6 +6,7 @@ namespace Tests\Waivers;
 
 use PHPUnit\Framework\TestCase;
 use Waivers\WaiversRepository;
+use Tests\WideUnit\Mocks\MockDatabase;
 
 class WaiversRepositoryTest extends TestCase
 {
@@ -15,7 +16,7 @@ class WaiversRepositoryTest extends TestCase
     protected function setUp(): void
     {
         // Create MockDatabase that duck-types mysqli for testing
-        $this->mockDb = new \MockDatabase();
+        $this->mockDb = new MockDatabase();
         $this->repository = new WaiversRepository($this->mockDb);
     }
     

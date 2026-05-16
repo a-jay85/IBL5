@@ -15,7 +15,7 @@ if [ "${1:-}" = "--pr" ]; then
     echo
     echo "=== Files in current PR that grew > 100 LOC ==="
     flagged=0
-    git diff origin/master --numstat -- 'classes/**/*.php' | while read -r added removed file; do
+    while read -r added removed file; do
         if [ "$added" = "-" ]; then
             continue
         fi
@@ -27,7 +27,7 @@ if [ "${1:-}" = "--pr" ]; then
                 flagged=1
             fi
         fi
-    done
+    done < <(git diff origin/master --numstat -- 'classes/**/*.php')
     if [ "$flagged" = "0" ]; then
         echo "No hot-file growth detected in this PR."
     fi

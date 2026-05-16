@@ -24,9 +24,9 @@ final class BanRawSuperglobalsRuleTest extends RuleTestCase
             [__DIR__ . '/Fixtures/classes/SuperglobalInService.php'],
             [
                 [
-                    'Direct $_GET access is banned outside Controllers, ApiHandlers, '
-                    . 'and Security\CsrfGuard. Accept typed inputs as parameters '
-                    . 'from a Controller/ApiHandler instead.',
+                    'Direct $_GET access is banned outside the HTTP '
+                    . 'boundary layer (Controllers, ApiHandlers, Bootstraps, Authenticators). '
+                    . 'Accept typed inputs as parameters instead.',
                     5,
                 ],
             ],
@@ -39,9 +39,9 @@ final class BanRawSuperglobalsRuleTest extends RuleTestCase
             [__DIR__ . '/Fixtures/classes/PostSuperglobalInService.php'],
             [
                 [
-                    'Direct $_POST access is banned outside Controllers, ApiHandlers, '
-                    . 'and Security\CsrfGuard. Accept typed inputs as parameters '
-                    . 'from a Controller/ApiHandler instead.',
+                    'Direct $_POST access is banned outside the HTTP '
+                    . 'boundary layer (Controllers, ApiHandlers, Bootstraps, Authenticators). '
+                    . 'Accept typed inputs as parameters instead.',
                     5,
                 ],
             ],
@@ -68,6 +68,38 @@ final class BanRawSuperglobalsRuleTest extends RuleTestCase
     {
         $this->analyse(
             [__DIR__ . '/Fixtures/classes/CsrfGuard.php'],
+            [],
+        );
+    }
+
+    public function testAllowsSuperglobalAccessInBootstrap(): void
+    {
+        $this->analyse(
+            [__DIR__ . '/Fixtures/classes/FooBootstrap.php'],
+            [],
+        );
+    }
+
+    public function testAllowsSuperglobalAccessInAuthenticator(): void
+    {
+        $this->analyse(
+            [__DIR__ . '/Fixtures/classes/FooAuthenticator.php'],
+            [],
+        );
+    }
+
+    public function testAllowsSuperglobalAccessInLeagueContext(): void
+    {
+        $this->analyse(
+            [__DIR__ . '/Fixtures/classes/LeagueContext.php'],
+            [],
+        );
+    }
+
+    public function testAllowsSuperglobalAccessInTestCookieOverrides(): void
+    {
+        $this->analyse(
+            [__DIR__ . '/Fixtures/classes/TestCookieOverrides.php'],
             [],
         );
     }

@@ -231,7 +231,9 @@ while true; do
         IMPL_STATUS=0
         NIGHTLY_CMDPID_FILE="$CMDPID_FILE" \
         timeout "$REMAINING_SECS" \
-            claude -p "$(cat bin/nightly-prompt-impl)" \
+            claude -p "$(cat bin/nightly-prompt-impl)
+
+PLAN_FILE=$PLAN_NAME" \
                 --dangerously-skip-permissions \
                 --model claude-opus-4-6 \
                 --output-format stream-json \

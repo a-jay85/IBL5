@@ -4,27 +4,40 @@ The outer bash loop in bin/nightly-run fires two claude -p invocations per plan:
 
 Do NOT invoke /post-plan, /simplify, /commit, /code-review, or /security-audit. Your job ends after writing the handoff file.
 
-## Step 1: Check the Queue
+## Step 1: Read the Assigned Plan
 
 NIGHTLY_DIR is: $HOME/.claude/projects/-Users-ajaynicolas-GitHub-IBL5/nightly
 
-List files in $NIGHTLY_DIR/queue/. Pick the OLDEST .md file by modification time (ls -1tr | head -1).
+The plan filename is provided at the end of this prompt as PLAN_FILE=<filename>. Do NOT scan the queue directory yourself — the bash loop has already selected this plan for you.
 
-Read the plan file. If it is a symlink, follow it to read the original content.
-
-## Step 2: Check for Existing Handoff
-
-Check if a handoff file already exists for this plan:
+Read the plan file:
 
 ```bash
-PLAN_NAME=$(basename <plan-file>)
-HANDOFF_FILE="$NIGHTLY_DIR/handoff/${PLAN_NAME}.json"
-if [ -f "$HANDOFF_FILE" ]; then
-    echo "HANDOFF EXISTS — implementation already complete"
+PLAN_FILE="<the PLAN_FILE value from the end of this prompt>"
+PLAN_PATH="$NIGHTLY_DIR/queue/$PLAN_FILE"
+if [ ! -e "$PLAN_PATH" ]; then
+    echo "ERROR: plan file not found at $PLAN_PATH"
 fi
 ```
 
-If the handoff file exists, implementation was already completed by a previous session. Log "Implementation already complete — handoff file exists" and STOP immediately. The bash loop will invoke the post-plan agent.
+If the plan file does not exist in the queue, write an error report to $NIGHTLY_DIR/reports/YYYY-MM-DD-error-unknown.md and STOP.
+
+Read the plan file content. If it is a symlink, follow it to read the original content.
+
+## Step 2: Check for Existing Handoff
+
+Check if a handoff file already exists for THIS SPECIFIC plan:
+
+```bash
+HANDOFF_FILE="$NIGHTLY_DIR/handoff/${PLAN_FILE}.json"
+if [ -f "$HANDOFF_FILE" ]; then
+    echo "HANDOFF EXISTS — implementation already complete for $PLAN_FILE"
+fi
+```
+
+If `$NIGHTLY_DIR/handoff/${PLAN_FILE}.json` exists, implementation was already completed by a previous session. Log "Implementation already complete — handoff file exists for $PLAN_FILE" and STOP immediately. The bash loop will invoke the post-plan agent.
+
+IMPORTANT: Only check for THIS plan's handoff file. Ignore any other .json files in the handoff directory — they belong to other plans being processed by the bash loop.
 
 ## Step 3: Validate the Plan
 

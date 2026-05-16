@@ -275,6 +275,12 @@ while true; do
             fi
             break
         fi
+
+        # Handoff created → impl succeeded, reset attempt counter
+        if [ -f "$HANDOFF_FILE" ]; then
+            echo "Handoff file created — impl succeeded." >> "$LOG"
+            rm -f "$ATTEMPT_FILE"
+        fi
     fi
 
     # --- Phase 2: Post-Plan (only if handoff file exists) ---

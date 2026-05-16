@@ -64,20 +64,18 @@ final class OneOnOneGameServiceTest extends TestCase
         $this->assertStringContainsString('Player 2', $errors[0]);
     }
 
-    public function testValidatePlayerSelectionReturnsErrorWhenPlayer1IsZero(): void
+    public function testValidatePlayerSelectionAcceptsZeroForPlayer1(): void
     {
         $errors = $this->service->validatePlayerSelection(0, 2);
 
-        $this->assertNotEmpty($errors);
-        $this->assertStringContainsString('Player 1', $errors[0]);
+        $this->assertEmpty($errors);
     }
 
-    public function testValidatePlayerSelectionReturnsErrorWhenPlayer2IsZero(): void
+    public function testValidatePlayerSelectionAcceptsZeroForPlayer2(): void
     {
         $errors = $this->service->validatePlayerSelection(1, 0);
 
-        $this->assertNotEmpty($errors);
-        $this->assertStringContainsString('Player 2', $errors[0]);
+        $this->assertEmpty($errors);
     }
 
     public function testValidatePlayerSelectionReturnsErrorWhenBothPlayersAreSame(): void

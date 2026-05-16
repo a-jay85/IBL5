@@ -6,6 +6,7 @@ namespace Tests\ComparePlayers;
 
 use PHPUnit\Framework\TestCase;
 use ComparePlayers\ComparePlayersRepository;
+use Tests\WideUnit\Mocks\MockDatabase;
 
 class ComparePlayersRepositoryTest extends TestCase
 {
@@ -115,6 +116,6 @@ class ComparePlayersRepositoryTest extends TestCase
     private function createMockDatabase(): object
     {
         // Use the centralized MockDatabase that supports both legacy and mysqli interfaces
-        return new \MockDatabase();
+        return new MockDatabase();
     }
 }

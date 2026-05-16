@@ -7,6 +7,8 @@ namespace Tests\Trading;
 use PHPUnit\Framework\TestCase;
 use League\League;
 use PHPUnit\Framework\Attributes\DataProvider;
+use Tests\WideUnit\Mocks\MockDatabase;
+use Tests\WideUnit\Mocks\MockPreparedStatement;
 
 /**
  * Comprehensive unit tests for Trading\TradeValidator class
@@ -26,7 +28,7 @@ class TradeValidatorTest extends TestCase
 
     protected function setUp(): void
     {
-        $this->mockDb = new \MockDatabase();
+        $this->mockDb = new MockDatabase();
         
         // Set up mock mysqli for Trading repository
         $this->mockMysqli = new class($this->mockDb) {
@@ -40,7 +42,7 @@ class TradeValidatorTest extends TestCase
             }
             
             public function prepare($query) {
-                return new \MockPreparedStatement($this->mockDb, $query);
+                return new MockPreparedStatement($this->mockDb, $query);
             }
         };
         

@@ -11,6 +11,7 @@ use Voting\VotingResultsController;
 use Voting\VotingResultsService;
 use Voting\VotingResultsTableRenderer;
 use Season\Season;
+use Tests\WideUnit\Mocks\MockDatabase;
 
 /**
  * Integration tests for complete voting results display workflows
@@ -43,7 +44,7 @@ class VotingWideUnitTest extends TestCase
         $this->service = new VotingResultsService($this->stubRepository);
         $this->renderer = new VotingResultsTableRenderer();
 
-        $mockDb = new \MockDatabase();
+        $mockDb = new MockDatabase();
         $this->season = new \Tests\WideUnit\Mocks\Season($mockDb);
     }
 

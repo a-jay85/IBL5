@@ -6,15 +6,16 @@ namespace Tests\Migration;
 
 use Migration\MigrationRepository;
 use PHPUnit\Framework\TestCase;
+use Tests\WideUnit\Mocks\MockDatabase;
 
 final class MigrationRepositoryTest extends TestCase
 {
-    private \MockDatabase $db;
+    private MockDatabase $db;
     private MigrationRepository $repository;
 
     protected function setUp(): void
     {
-        $this->db = new \MockDatabase();
+        $this->db = new MockDatabase();
         $this->repository = new MigrationRepository($this->db);
     }
 

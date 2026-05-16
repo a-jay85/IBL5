@@ -7,6 +7,7 @@ namespace Tests\Negotiation;
 use PHPUnit\Framework\TestCase;
 use Negotiation\NegotiationValidator;
 use Player\Player;
+use Tests\WideUnit\Mocks\MockDatabase;
 
 /**
  * Tests for NegotiationValidator
@@ -24,7 +25,7 @@ class NegotiationValidatorTest extends TestCase
 
     protected function setUp(): void
     {
-        $this->mockDb = new \MockDatabase();
+        $this->mockDb = new MockDatabase();
         $this->mockSeason = $this->createStub(\Season\Season::class);
         $this->mockSeason->phase = 'Regular Season';
         $this->mockSeason->endingYear = 2026;

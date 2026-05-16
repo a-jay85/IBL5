@@ -8,6 +8,7 @@ use PHPUnit\Framework\TestCase;
 use Updater\ScheduleUpdater;
 use League\LeagueContext;
 use Season\Season;
+use Tests\WideUnit\Mocks\MockDatabase;
 
 /**
  * Tests for ScheduleUpdater class
@@ -19,7 +20,7 @@ use Season\Season;
  */
 class ScheduleUpdaterTest extends TestCase
 {
-    private \MockDatabase $mockDb;
+    private MockDatabase $mockDb;
     private Season $mockSeason;
     private ScheduleUpdater $scheduleUpdater;
     private LeagueContext $leagueContext;
@@ -39,7 +40,7 @@ class ScheduleUpdaterTest extends TestCase
         // Set default league to IBL for tests
         $_SESSION['current_league'] = LeagueContext::LEAGUE_IBL;
 
-        $this->mockDb = new \MockDatabase();
+        $this->mockDb = new MockDatabase();
         $this->mockSeason = new Season($this->mockDb);
         $this->scheduleUpdater = new ScheduleUpdater($this->mockDb, $this->mockSeason);
     }

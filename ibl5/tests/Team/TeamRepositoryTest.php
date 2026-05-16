@@ -6,6 +6,7 @@ namespace Tests\Team;
 
 use PHPUnit\Framework\TestCase;
 use Team\TeamRepository;
+use Tests\WideUnit\Mocks\MockDatabase;
 
 /**
  * Tests for TeamRepository
@@ -14,12 +15,12 @@ use Team\TeamRepository;
  */
 class TeamRepositoryTest extends TestCase
 {
-    private \MockDatabase $db;
+    private MockDatabase $db;
     private TeamRepository $repository;
 
     protected function setUp(): void
     {
-        $this->db = new \MockDatabase();
+        $this->db = new MockDatabase();
         $this->repository = new TeamRepository($this->db);
     }
 

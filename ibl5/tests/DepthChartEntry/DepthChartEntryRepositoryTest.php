@@ -8,6 +8,7 @@ use PHPUnit\Framework\TestCase;
 use DepthChartEntry\DepthChartEntryRepository;
 use Logging\LoggerFactory;
 use Monolog\Handler\TestHandler;
+use Tests\WideUnit\Mocks\MockDatabase;
 
 class DepthChartEntryRepositoryTest extends TestCase
 {
@@ -234,7 +235,7 @@ class DepthChartEntryRepositoryTest extends TestCase
     private function createMockDatabase(): object
     {
         // Use the centralized MockDatabase that supports both legacy and mysqli interfaces
-        return new \MockDatabase();
+        return new MockDatabase();
     }
 
     // --- Merged from DepthChartEntryDatabaseMappingTest ---
@@ -386,7 +387,7 @@ class DepthChartEntryRepositoryTest extends TestCase
         $handler = new TestHandler();
         LoggerFactory::forTesting($handler);
 
-        $repo = new class (new \MockDatabase()) extends DepthChartEntryRepository {
+        $repo = new class (new MockDatabase()) extends DepthChartEntryRepository {
             protected function execute(string $query, string $types = '', mixed ...$params): int
             {
                 throw new \RuntimeException('forced failure', 1003);
@@ -409,7 +410,7 @@ class DepthChartEntryRepositoryTest extends TestCase
         $handler = new TestHandler();
         LoggerFactory::forTesting($handler);
 
-        $repo = new class (new \MockDatabase()) extends DepthChartEntryRepository {
+        $repo = new class (new MockDatabase()) extends DepthChartEntryRepository {
             protected function execute(string $query, string $types = '', mixed ...$params): int
             {
                 throw new \RuntimeException('forced failure', 1003);

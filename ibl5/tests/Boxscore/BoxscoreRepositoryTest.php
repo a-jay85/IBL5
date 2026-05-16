@@ -15,13 +15,13 @@ use Tests\WideUnit\Mocks\MockDatabase;
  */
 class BoxscoreRepositoryTest extends TestCase
 {
-    private \MockDatabase $mockDb;
+    private MockDatabase $mockDb;
     private BoxscoreRepository $repository;
     private string|false $previousErrorLog = false;
 
     protected function setUp(): void
     {
-        $this->mockDb = new \MockDatabase();
+        $this->mockDb = new MockDatabase();
         $this->repository = new BoxscoreRepository($this->mockDb);
     }
 

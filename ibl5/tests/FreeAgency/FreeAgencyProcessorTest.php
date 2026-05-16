@@ -9,6 +9,8 @@ use FreeAgency\FreeAgencyProcessor;
 use FreeAgency\Contracts\FreeAgencyDemandCalculatorInterface;
 use FreeAgency\Contracts\FreeAgencyRepositoryInterface;
 use Player\Player;
+use Tests\WideUnit\Mocks\MockDatabase;
+use Tests\WideUnit\Mocks\MockPreparedStatement;
 
 /**
  * Capturing repository stub — records what was passed to saveOffer().
@@ -111,11 +113,11 @@ class StubDemandCalculator implements FreeAgencyDemandCalculatorInterface
  */
 class FreeAgencyProcessorTest extends TestCase
 {
-    private \MockDatabase $mockDb;
+    private MockDatabase $mockDb;
 
     protected function setUp(): void
     {
-        $this->mockDb = new \MockDatabase();
+        $this->mockDb = new MockDatabase();
         $this->injectGlobalMockDb();
     }
 
@@ -129,18 +131,18 @@ class FreeAgencyProcessorTest extends TestCase
         $mockDb = $this->mockDb;
 
         $GLOBALS['mysqli_db'] = new class ($mockDb) {
-            private \MockDatabase $mockDb;
+            private MockDatabase $mockDb;
             public int $connect_errno = 0;
             public ?string $connect_error = null;
 
-            public function __construct(\MockDatabase $mockDb)
+            public function __construct(MockDatabase $mockDb)
             {
                 $this->mockDb = $mockDb;
             }
 
-            public function prepare(string $query): \MockPreparedStatement
+            public function prepare(string $query): MockPreparedStatement
             {
-                return new \MockPreparedStatement($this->mockDb, $query);
+                return new MockPreparedStatement($this->mockDb, $query);
             }
 
             public function query(string $query): mixed

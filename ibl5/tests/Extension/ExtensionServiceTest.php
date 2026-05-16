@@ -13,6 +13,7 @@ use Extension\Contracts\ExtensionOfferEvaluatorInterface;
 use Player\Player;
 use Team\Contracts\TeamQueryRepositoryInterface;
 use Team\Team;
+use Tests\WideUnit\Mocks\MockDatabase;
 
 /**
  * ExtensionServiceTest - Tests for ExtensionService
@@ -23,11 +24,11 @@ use Team\Team;
  */
 class ExtensionServiceTest extends TestCase
 {
-    private \MockDatabase $mockDb;
+    private MockDatabase $mockDb;
 
     protected function setUp(): void
     {
-        $this->mockDb = new \MockDatabase();
+        $this->mockDb = new MockDatabase();
     }
 
     // ============================================

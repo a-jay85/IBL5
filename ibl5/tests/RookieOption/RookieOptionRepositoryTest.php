@@ -6,6 +6,7 @@ namespace Tests\RookieOption;
 
 use PHPUnit\Framework\TestCase;
 use RookieOption\RookieOptionRepository;
+use Tests\WideUnit\Mocks\MockDatabase;
 
 /**
  * Tests for RookieOptionRepository
@@ -17,7 +18,7 @@ class RookieOptionRepositoryTest extends TestCase
     
     protected function setUp(): void
     {
-        $this->mockDb = new \MockDatabase();
+        $this->mockDb = new MockDatabase();
         $this->repository = new RookieOptionRepository($this->mockDb);
     }
     

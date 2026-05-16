@@ -15,11 +15,11 @@ use Updater\Steps\CleanupPreseasonDataStep;
  */
 class CleanupPreseasonDataStepTest extends TestCase
 {
-    private \MockDatabase $mockDb;
+    private MockDatabase $mockDb;
 
     protected function setUp(): void
     {
-        $this->mockDb = new \MockDatabase();
+        $this->mockDb = new MockDatabase();
     }
 
     public function testSkipsWhenPhaseIsPreseason(): void

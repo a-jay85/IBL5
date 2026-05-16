@@ -7,6 +7,7 @@ namespace Tests\AwardHistory;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use AwardHistory\AwardHistoryRepository;
+use Tests\WideUnit\Mocks\MockDatabase;
 
 /**
  * Tests for AwardHistoryRepository
@@ -15,11 +16,11 @@ use AwardHistory\AwardHistoryRepository;
  */
 final class AwardHistoryRepositoryTest extends TestCase
 {
-    private \MockDatabase $mockDb;
+    private MockDatabase $mockDb;
 
     protected function setUp(): void
     {
-        $this->mockDb = new \MockDatabase();
+        $this->mockDb = new MockDatabase();
     }
 
     // ==================== searchAwards Tests ====================

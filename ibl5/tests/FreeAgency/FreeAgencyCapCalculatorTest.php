@@ -12,6 +12,7 @@ use Team\Contracts\TeamQueryRepositoryInterface;
 use Team\Team;
 use Season\Season;
 use Tests\WideUnit\Mocks\TestDataFactory;
+use Tests\WideUnit\Mocks\MockDatabase;
 
 /**
  * Comprehensive tests for FreeAgencyCapCalculator
@@ -33,7 +34,7 @@ class FreeAgencyCapCalculatorTest extends TestCase
 
     protected function setUp(): void
     {
-        $this->mockDb = new \MockDatabase();
+        $this->mockDb = new MockDatabase();
         $this->mockTeamQueryRepo = $this->createMock(TeamQueryRepositoryInterface::class);
         $mockTeam = $this->createMockTeam();
         $mockSeason = $this->createMock(Season::class);

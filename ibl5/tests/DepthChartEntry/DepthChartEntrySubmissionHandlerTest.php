@@ -6,6 +6,9 @@ namespace Tests\DepthChartEntry;
 
 use PHPUnit\Framework\TestCase;
 use DepthChartEntry\DepthChartEntrySubmissionHandler;
+use Tests\WideUnit\Mocks\MockDatabase;
+use Tests\WideUnit\Mocks\MockDatabaseResult;
+use Tests\WideUnit\Mocks\MockPreparedStatement;
 
 /**
  * DepthChartEntrySubmissionHandlerTest
@@ -18,12 +21,12 @@ use DepthChartEntry\DepthChartEntrySubmissionHandler;
  */
 class DepthChartEntrySubmissionHandlerTest extends TestCase
 {
-    private \MockDatabase $mockDb;
+    private MockDatabase $mockDb;
     private object $mockMysqliDb;
 
     protected function setUp(): void
     {
-        $this->mockDb = new \MockDatabase();
+        $this->mockDb = new MockDatabase();
         $this->setupMockMysqliDb();
 
         // Start with a clean session for every test so flash assertions
@@ -42,27 +45,27 @@ class DepthChartEntrySubmissionHandlerTest extends TestCase
         $mockDb = $this->mockDb;
 
         $this->mockMysqliDb = new class($mockDb) extends \mysqli {
-            private \MockDatabase $mockDb;
+            private MockDatabase $mockDb;
             public int $connect_errno = 0;
             public ?string $connect_error = null;
 
-            public function __construct(\MockDatabase $mockDb)
+            public function __construct(MockDatabase $mockDb)
             {
                 // Don't call parent::__construct() to avoid real DB connection
                 $this->mockDb = $mockDb;
             }
 
             #[\ReturnTypeWillChange]
-            public function prepare(string $query): \MockPreparedStatement|false
+            public function prepare(string $query): MockPreparedStatement|false
             {
-                return new \MockPreparedStatement($this->mockDb, $query);
+                return new MockPreparedStatement($this->mockDb, $query);
             }
 
             #[\ReturnTypeWillChange]
             public function query(string $query, int $resultMode = MYSQLI_STORE_RESULT): \mysqli_result|bool
             {
                 $result = $this->mockDb->sql_query($query);
-                if ($result instanceof \MockDatabaseResult) {
+                if ($result instanceof MockDatabaseResult) {
                     return false;
                 }
                 return (bool) $result;

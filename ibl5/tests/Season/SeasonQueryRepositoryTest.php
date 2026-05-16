@@ -6,15 +6,16 @@ namespace Tests\Season;
 
 use PHPUnit\Framework\TestCase;
 use Season\SeasonQueryRepository;
+use Tests\WideUnit\Mocks\MockDatabase;
 
 class SeasonQueryRepositoryTest extends TestCase
 {
-    private \MockDatabase $mockDb;
+    private MockDatabase $mockDb;
     private SeasonQueryRepository $repository;
 
     protected function setUp(): void
     {
-        $this->mockDb = new \MockDatabase();
+        $this->mockDb = new MockDatabase();
         $this->repository = new SeasonQueryRepository($this->mockDb);
     }
 

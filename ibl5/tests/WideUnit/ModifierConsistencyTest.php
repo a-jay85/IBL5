@@ -8,6 +8,7 @@ use PHPUnit\Framework\TestCase;
 use Extension\ExtensionOfferEvaluator;
 use FreeAgency\FreeAgencyDemandCalculator;
 use Negotiation\NegotiationDemandCalculator;
+use Tests\WideUnit\Mocks\MockDatabase;
 
 /**
  * Cross-module divergence guard for contract modifier formulas.
@@ -83,7 +84,7 @@ class ModifierConsistencyTest extends TestCase
 
     public function testNegotiationModifierMatchesContractRules(): void
     {
-        $mockDb = new \MockDatabase();
+        $mockDb = new MockDatabase();
         $mockDb->onQuery('MAX\(', [
             [
                 'fga' => 100, 'fgp' => 100, 'fta' => 100, 'ftp' => 100,
@@ -119,7 +120,7 @@ class ModifierConsistencyTest extends TestCase
 
     private function createConfiguredPlayer(): \Player\Player
     {
-        $mockDb = new \MockDatabase();
+        $mockDb = new MockDatabase();
         $mockDb->setMockData([
             [
                 'pid' => 1, 'ordinal' => 1, 'name' => 'Consistency Test Player',

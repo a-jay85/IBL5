@@ -1,7 +1,7 @@
 parameters:
 	ignoreErrors:
 		-
-			rawMessage: 'AnonymousClass433f7d00b957fb4836c5523f4f45eb6a::__construct() does not call parent constructor from mysqli.'
+			rawMessage: 'AnonymousClass3681c386dfbb87fa14b8721aa096f559::__construct() does not call parent constructor from mysqli.'
 			identifier: constructor.missingParentCall
 			count: 1
 			path: tests/ActivityTracker/ActivityTrackerRepositoryTest.php
@@ -13,55 +13,13 @@ parameters:
 			path: tests/ActivityTracker/ActivityTrackerRepositoryTest.php
 
 		-
-			rawMessage: 'Call to method setMockData() on an unknown class MockDatabase.'
-			identifier: class.notFound
-			count: 2
-			path: tests/ActivityTracker/ActivityTrackerRepositoryTest.php
-
-		-
-			rawMessage: Instantiated class MockDatabase not found.
-			identifier: class.notFound
-			count: 1
-			path: tests/ActivityTracker/ActivityTrackerRepositoryTest.php
-
-		-
-			rawMessage: Instantiated class MockPreparedStatement not found.
-			identifier: class.notFound
-			count: 1
-			path: tests/ActivityTracker/ActivityTrackerRepositoryTest.php
-
-		-
-			rawMessage: 'Method mysqli@anonymous/ActivityTracker/ActivityTrackerRepositoryTest.php:26::prepare() has invalid return type MockPreparedStatement.'
-			identifier: class.notFound
-			count: 1
-			path: tests/ActivityTracker/ActivityTrackerRepositoryTest.php
-
-		-
-			rawMessage: 'Method mysqli@anonymous/ActivityTracker/ActivityTrackerRepositoryTest.php:26::prepare() never returns false so it can be removed from the return type.'
+			rawMessage: 'Method mysqli@anonymous/ActivityTracker/ActivityTrackerRepositoryTest.php:28::prepare() never returns false so it can be removed from the return type.'
 			identifier: return.unusedType
 			count: 1
 			path: tests/ActivityTracker/ActivityTrackerRepositoryTest.php
 
 		-
-			rawMessage: 'Parameter $mockDb of method mysqli@anonymous/ActivityTracker/ActivityTrackerRepositoryTest.php:26::__construct() has invalid type MockDatabase.'
-			identifier: class.notFound
-			count: 1
-			path: tests/ActivityTracker/ActivityTrackerRepositoryTest.php
-
-		-
-			rawMessage: Property Tests\ActivityTracker\ActivityTrackerRepositoryTest::$mockDb has unknown class MockDatabase as its type.
-			identifier: class.notFound
-			count: 1
-			path: tests/ActivityTracker/ActivityTrackerRepositoryTest.php
-
-		-
-			rawMessage: Property mysqli@anonymous/ActivityTracker/ActivityTrackerRepositoryTest.php:26::$mockDb has unknown class MockDatabase as its type.
-			identifier: class.notFound
-			count: 1
-			path: tests/ActivityTracker/ActivityTrackerRepositoryTest.php
-
-		-
-			rawMessage: 'Return type (MockPreparedStatement|false) of method mysqli@anonymous/ActivityTracker/ActivityTrackerRepositoryTest.php:26::prepare() should be covariant with return type (mysqli_stmt|false) of method mysqli::prepare()'
+			rawMessage: 'Return type (Tests\WideUnit\Mocks\MockPreparedStatement|false) of method mysqli@anonymous/ActivityTracker/ActivityTrackerRepositoryTest.php:28::prepare() should be covariant with return type (mysqli_stmt|false) of method mysqli::prepare()'
 			identifier: method.childReturnType
 			count: 1
 			path: tests/ActivityTracker/ActivityTrackerRepositoryTest.php
@@ -205,6 +163,12 @@ parameters:
 			path: tests/ApiKeys/ApiKeysServiceTest.php
 
 		-
+			rawMessage: 'Call to static method PHPUnit\Framework\Assert::assertInstanceOf() with ''Auth\\Contracts\\AuthRepositoryInterface'' and Auth\AuthRepository will always evaluate to true.'
+			identifier: staticMethod.alreadyNarrowedType
+			count: 1
+			path: tests/Auth/AuthRepositoryTest.php
+
+		-
 			rawMessage: 'Call to static method PHPUnit\Framework\Assert::assertSame() with 12 and 12 will always evaluate to true.'
 			identifier: staticMethod.alreadyNarrowedType
 			count: 1
@@ -221,30 +185,6 @@ parameters:
 			identifier: staticMethod.alreadyNarrowedType
 			count: 1
 			path: tests/Auth/DevAutoLoginTest.php
-
-		-
-			rawMessage: 'Call to method setMockData() on an unknown class MockDatabase.'
-			identifier: class.notFound
-			count: 7
-			path: tests/AwardHistory/AwardHistoryRepositoryTest.php
-
-		-
-			rawMessage: Instantiated class MockDatabase not found.
-			identifier: class.notFound
-			count: 1
-			path: tests/AwardHistory/AwardHistoryRepositoryTest.php
-
-		-
-			rawMessage: 'Parameter #1 $db of class AwardHistory\AwardHistoryRepository constructor expects mysqli, MockDatabase given.'
-			identifier: argument.type
-			count: 7
-			path: tests/AwardHistory/AwardHistoryRepositoryTest.php
-
-		-
-			rawMessage: Property Tests\AwardHistory\AwardHistoryRepositoryTest::$mockDb has unknown class MockDatabase as its type.
-			identifier: class.notFound
-			count: 1
-			path: tests/AwardHistory/AwardHistoryRepositoryTest.php
 
 		-
 			rawMessage: 'You should use assertSame() instead of assertEquals(), because both values are scalars of the same type'
@@ -307,6 +247,18 @@ parameters:
 			path: tests/Bootstrap/ContainerTest.php
 
 		-
+			rawMessage: 'Method Tests\Bootstrap\PhpunitConfigTest::isDirectoryCovered() has parameter $registeredDirs with no value type specified in iterable type array.'
+			identifier: missingType.iterableValue
+			count: 1
+			path: tests/Bootstrap/PhpunitConfigTest.php
+
+		-
+			rawMessage: 'Method Tests\Bootstrap\PhpunitConfigTest::isDirectoryCovered() has parameter $registeredFiles with no value type specified in iterable type array.'
+			identifier: missingType.iterableValue
+			count: 1
+			path: tests/Bootstrap/PhpunitConfigTest.php
+
+		-
 			rawMessage: 'Call to static method PHPUnit\Framework\Assert::assertTrue() with true will always evaluate to true.'
 			identifier: staticMethod.alreadyNarrowedType
 			count: 4
@@ -319,68 +271,14 @@ parameters:
 			path: tests/Boxscore/BoxscoreProcessorTest.php
 
 		-
-			rawMessage: 'Call to method onQuery() on an unknown class MockDatabase.'
-			identifier: class.notFound
-			count: 11
-			path: tests/Boxscore/BoxscoreProcessorTest.php
-
-		-
-			rawMessage: 'Call to method setMockData() on an unknown class MockDatabase.'
-			identifier: class.notFound
-			count: 7
-			path: tests/Boxscore/BoxscoreProcessorTest.php
-
-		-
-			rawMessage: 'Call to method setReturnTrue() on an unknown class MockDatabase.'
-			identifier: class.notFound
-			count: 21
-			path: tests/Boxscore/BoxscoreProcessorTest.php
-
-		-
 			rawMessage: 'Dynamic call to static method PHPUnit\Framework\TestCase::createStub().'
 			identifier: staticMethod.dynamicCall
 			count: 12
 			path: tests/Boxscore/BoxscoreProcessorTest.php
 
 		-
-			rawMessage: Instantiated class MockDatabase not found.
-			identifier: class.notFound
-			count: 15
-			path: tests/Boxscore/BoxscoreProcessorTest.php
-
-		-
 			rawMessage: 'Method Tests\Boxscore\TestableBoxscoreProcessor::exposedUpdateSimDates() return type has no value type specified in iterable type array.'
 			identifier: missingType.iterableValue
-			count: 1
-			path: tests/Boxscore/BoxscoreProcessorTest.php
-
-		-
-			rawMessage: 'Parameter #1 $db of class Boxscore\BoxscoreProcessor constructor expects mysqli, MockDatabase given.'
-			identifier: argument.type
-			count: 14
-			path: tests/Boxscore/BoxscoreProcessorTest.php
-
-		-
-			rawMessage: 'Parameter #1 $db of class Boxscore\BoxscoreRepository constructor expects mysqli, MockDatabase given.'
-			identifier: argument.type
-			count: 14
-			path: tests/Boxscore/BoxscoreProcessorTest.php
-
-		-
-			rawMessage: 'Parameter #1 $db of class Season\Season constructor expects mysqli, MockDatabase given.'
-			identifier: argument.type
-			count: 5
-			path: tests/Boxscore/BoxscoreProcessorTest.php
-
-		-
-			rawMessage: 'Parameter #1 $db of class Tests\Boxscore\TestableBoxscoreProcessor constructor expects mysqli, MockDatabase given.'
-			identifier: argument.type
-			count: 8
-			path: tests/Boxscore/BoxscoreProcessorTest.php
-
-		-
-			rawMessage: Property Tests\Boxscore\BoxscoreProcessorTest::$mockDb has unknown class MockDatabase as its type.
-			identifier: class.notFound
 			count: 1
 			path: tests/Boxscore/BoxscoreProcessorTest.php
 
@@ -397,39 +295,9 @@ parameters:
 			path: tests/Boxscore/BoxscoreRepositoryTest.php
 
 		-
-			rawMessage: 'Call to method getExecutedQueries() on an unknown class MockDatabase.'
-			identifier: class.notFound
-			count: 8
-			path: tests/Boxscore/BoxscoreRepositoryTest.php
-
-		-
-			rawMessage: 'Call to method setReturnTrue() on an unknown class MockDatabase.'
-			identifier: class.notFound
-			count: 9
-			path: tests/Boxscore/BoxscoreRepositoryTest.php
-
-		-
 			rawMessage: 'Dynamic call to static method PHPUnit\Framework\TestCase::createStub().'
 			identifier: staticMethod.dynamicCall
 			count: 2
-			path: tests/Boxscore/BoxscoreRepositoryTest.php
-
-		-
-			rawMessage: Instantiated class MockDatabase not found.
-			identifier: class.notFound
-			count: 1
-			path: tests/Boxscore/BoxscoreRepositoryTest.php
-
-		-
-			rawMessage: 'Parameter #1 $db of class Boxscore\BoxscoreRepository constructor expects mysqli, MockDatabase given.'
-			identifier: argument.type
-			count: 4
-			path: tests/Boxscore/BoxscoreRepositoryTest.php
-
-		-
-			rawMessage: Property Tests\Boxscore\BoxscoreRepositoryTest::$mockDb has unknown class MockDatabase as its type.
-			identifier: class.notFound
-			count: 1
 			path: tests/Boxscore/BoxscoreRepositoryTest.php
 
 		-
@@ -489,32 +357,8 @@ parameters:
 		-
 			rawMessage: 'Dynamic call to static method PHPUnit\Framework\TestCase::createStub().'
 			identifier: staticMethod.dynamicCall
-			count: 6
+			count: 7
 			path: tests/CareerLeaderboards/CachedCareerLeaderboardsRepositoryTest.php
-
-		-
-			rawMessage: 'Call to method getExecutedQueries() on an unknown class MockDatabase.'
-			identifier: class.notFound
-			count: 1
-			path: tests/CareerLeaderboards/CareerLeaderboardsRepositoryTest.php
-
-		-
-			rawMessage: 'Call to method setMockData() on an unknown class MockDatabase.'
-			identifier: class.notFound
-			count: 5
-			path: tests/CareerLeaderboards/CareerLeaderboardsRepositoryTest.php
-
-		-
-			rawMessage: Instantiated class MockDatabase not found.
-			identifier: class.notFound
-			count: 9
-			path: tests/CareerLeaderboards/CareerLeaderboardsRepositoryTest.php
-
-		-
-			rawMessage: 'Parameter #1 $db of class CareerLeaderboards\CareerLeaderboardsRepository constructor expects mysqli, MockDatabase given.'
-			identifier: argument.type
-			count: 9
-			path: tests/CareerLeaderboards/CareerLeaderboardsRepositoryTest.php
 
 		-
 			rawMessage: 'You should use assertSame() instead of assertEquals(), because both values are scalars of the same type'
@@ -527,6 +371,42 @@ parameters:
 			identifier: phpunit.assertEquals
 			count: 31
 			path: tests/CareerLeaderboards/CareerLeaderboardsServiceTest.php
+
+		-
+			rawMessage: Short ternary operator is not allowed. Use null coalesce operator if applicable or consider using long ternary.
+			identifier: ternary.shortNotAllowed
+			count: 1
+			path: tests/Cli/CheckDestructiveMigrationsCliTest.php
+
+		-
+			rawMessage: 'Method Tests\Cli\CheckMasterCiGreenCliTest::runScript() has parameter $args with no value type specified in iterable type array.'
+			identifier: missingType.iterableValue
+			count: 1
+			path: tests/Cli/CheckMasterCiGreenCliTest.php
+
+		-
+			rawMessage: 'Method Tests\Cli\CheckMasterCiGreenCliTest::runScript() has parameter $env with no value type specified in iterable type array.'
+			identifier: missingType.iterableValue
+			count: 1
+			path: tests/Cli/CheckMasterCiGreenCliTest.php
+
+		-
+			rawMessage: 'Method Tests\Cli\CheckMasterCiGreenCliTest::writeFixture() has parameter $checkRuns with no value type specified in iterable type array.'
+			identifier: missingType.iterableValue
+			count: 1
+			path: tests/Cli/CheckMasterCiGreenCliTest.php
+
+		-
+			rawMessage: 'Method Tests\Cli\MergeMasterToProdCliTest::runScript() has parameter $env with no value type specified in iterable type array.'
+			identifier: missingType.iterableValue
+			count: 1
+			path: tests/Cli/MergeMasterToProdCliTest.php
+
+		-
+			rawMessage: Short ternary operator is not allowed. Use null coalesce operator if applicable or consider using long ternary.
+			identifier: ternary.shortNotAllowed
+			count: 6
+			path: tests/Cli/MergeMasterToProdCliTest.php
 
 		-
 			rawMessage: 'Call to function is_array() with array will always evaluate to true.'
@@ -549,12 +429,6 @@ parameters:
 		-
 			rawMessage: 'Construct empty() is not allowed. Use more strict comparison.'
 			identifier: empty.notAllowed
-			count: 1
-			path: tests/ComparePlayers/ComparePlayersRepositoryTest.php
-
-		-
-			rawMessage: Instantiated class MockDatabase not found.
-			identifier: class.notFound
 			count: 1
 			path: tests/ComparePlayers/ComparePlayersRepositoryTest.php
 
@@ -727,6 +601,24 @@ parameters:
 			path: tests/DatabaseIntegration/FranchiseHistoryRepositoryTest.php
 
 		-
+			rawMessage: 'Offset ''fa_signing_flag'' does not exist on array{pid: int, name: string, nickname: string|null, age: int|null, teamid: 1, teamname: string|null, pos: string, stamina: int|null, ...}.'
+			identifier: offsetAccess.notFound
+			count: 1
+			path: tests/DatabaseIntegration/FreeAgency/FreeAgencyRepositoryIntegrationTest.php
+
+		-
+			rawMessage: 'Parameter #1 $offerData of method FreeAgency\FreeAgencyRepository::saveOffer() expects array{pid: int, teamid: int, teamName: string, playerName: string, offer1: int, offer2: int, offer3: int, offer4: int, ...}, array{playerName: ''FA Replace'', pid: 200060402, teamName: ''Metros'', teamid: 1, offer1: 700, offer2: 750, offer3: 800, offer4: 0, ...} given.'
+			identifier: argument.type
+			count: 1
+			path: tests/DatabaseIntegration/FreeAgency/FreeAgencyRepositoryIntegrationTest.php
+
+		-
+			rawMessage: 'Parameter #1 $offerData of method FreeAgency\FreeAgencyRepository::saveOffer() expects array{pid: int, teamid: int, teamName: string, playerName: string, offer1: int, offer2: int, offer3: int, offer4: int, ...}, array{playerName: ''FA Target'', pid: 200060401, teamName: ''Metros'', teamid: 1, offer1: 500, offer2: 550, offer3: 600, offer4: 0, ...} given.'
+			identifier: argument.type
+			count: 1
+			path: tests/DatabaseIntegration/FreeAgency/FreeAgencyRepositoryIntegrationTest.php
+
+		-
 			rawMessage: 'Undefined variable: $pid'
 			identifier: variable.undefined
 			count: 1
@@ -897,7 +789,7 @@ parameters:
 		-
 			rawMessage: Casting to int something that's already int.
 			identifier: cast.useless
-			count: 2
+			count: 3
 			path: tests/DatabaseIntegration/SeasonLeaderboardsRepositoryTest.php
 
 		-
@@ -923,6 +815,12 @@ parameters:
 			identifier: offsetAccess.notFound
 			count: 1
 			path: tests/DatabaseIntegration/TeamScheduleRepositoryTest.php
+
+		-
+			rawMessage: 'Missing call to parent::tearDown() method.'
+			identifier: phpunit.callParent
+			count: 1
+			path: tests/DatabaseIntegration/Trading/TradeProcessorIntegrationTest.php
 
 		-
 			rawMessage: 'Offset ''owner_teamid'' does not exist on array{pickid: int, ownerofpick: ''Sharks'', teampick: string, year: string, round: string, notes: string|null, created_at: string, updated_at: string}.'
@@ -955,7 +853,7 @@ parameters:
 			path: tests/DepthChartEntry/DepthChartEntryApiHandlerTest.php
 
 		-
-			rawMessage: 'AnonymousClass869917a47bf0c3356fecf02c6fe63674::__construct() does not call parent constructor from mysqli.'
+			rawMessage: 'AnonymousClassae4ad6ca45d85484d34b53d54b39f8c0::__construct() does not call parent constructor from mysqli.'
 			identifier: constructor.missingParentCall
 			count: 1
 			path: tests/DepthChartEntry/DepthChartEntryControllerTest.php
@@ -973,67 +871,19 @@ parameters:
 			path: tests/DepthChartEntry/DepthChartEntryControllerTest.php
 
 		-
-			rawMessage: 'Call to method sql_query() on an unknown class MockDatabase.'
-			identifier: class.notFound
-			count: 1
-			path: tests/DepthChartEntry/DepthChartEntryControllerTest.php
-
-		-
-			rawMessage: Class MockDatabaseResult not found.
-			identifier: class.notFound
-			count: 1
-			path: tests/DepthChartEntry/DepthChartEntryControllerTest.php
-
-		-
-			rawMessage: Instantiated class MockDatabase not found.
-			identifier: class.notFound
-			count: 1
-			path: tests/DepthChartEntry/DepthChartEntryControllerTest.php
-
-		-
-			rawMessage: Instantiated class MockPreparedStatement not found.
-			identifier: class.notFound
-			count: 1
-			path: tests/DepthChartEntry/DepthChartEntryControllerTest.php
-
-		-
-			rawMessage: 'Method mysqli@anonymous/DepthChartEntry/DepthChartEntryControllerTest.php:38::prepare() has invalid return type MockPreparedStatement.'
-			identifier: class.notFound
-			count: 1
-			path: tests/DepthChartEntry/DepthChartEntryControllerTest.php
-
-		-
-			rawMessage: 'Method mysqli@anonymous/DepthChartEntry/DepthChartEntryControllerTest.php:38::prepare() never returns false so it can be removed from the return type.'
+			rawMessage: 'Method mysqli@anonymous/DepthChartEntry/DepthChartEntryControllerTest.php:41::prepare() never returns false so it can be removed from the return type.'
 			identifier: return.unusedType
 			count: 1
 			path: tests/DepthChartEntry/DepthChartEntryControllerTest.php
 
 		-
-			rawMessage: 'Method mysqli@anonymous/DepthChartEntry/DepthChartEntryControllerTest.php:38::query() never returns mysqli_result so it can be removed from the return type.'
+			rawMessage: 'Method mysqli@anonymous/DepthChartEntry/DepthChartEntryControllerTest.php:41::query() never returns mysqli_result so it can be removed from the return type.'
 			identifier: return.unusedType
 			count: 1
 			path: tests/DepthChartEntry/DepthChartEntryControllerTest.php
 
 		-
-			rawMessage: 'Parameter $mockDb of method mysqli@anonymous/DepthChartEntry/DepthChartEntryControllerTest.php:38::__construct() has invalid type MockDatabase.'
-			identifier: class.notFound
-			count: 1
-			path: tests/DepthChartEntry/DepthChartEntryControllerTest.php
-
-		-
-			rawMessage: Property Tests\DepthChartEntry\DepthChartEntryControllerTest::$mockDb has unknown class MockDatabase as its type.
-			identifier: class.notFound
-			count: 1
-			path: tests/DepthChartEntry/DepthChartEntryControllerTest.php
-
-		-
-			rawMessage: Property mysqli@anonymous/DepthChartEntry/DepthChartEntryControllerTest.php:38::$mockDb has unknown class MockDatabase as its type.
-			identifier: class.notFound
-			count: 1
-			path: tests/DepthChartEntry/DepthChartEntryControllerTest.php
-
-		-
-			rawMessage: 'Return type (MockPreparedStatement|false) of method mysqli@anonymous/DepthChartEntry/DepthChartEntryControllerTest.php:38::prepare() should be covariant with return type (mysqli_stmt|false) of method mysqli::prepare()'
+			rawMessage: 'Return type (Tests\WideUnit\Mocks\MockPreparedStatement|false) of method mysqli@anonymous/DepthChartEntry/DepthChartEntryControllerTest.php:41::prepare() should be covariant with return type (mysqli_stmt|false) of method mysqli::prepare()'
 			identifier: method.childReturnType
 			count: 1
 			path: tests/DepthChartEntry/DepthChartEntryControllerTest.php
@@ -1153,12 +1003,6 @@ parameters:
 			path: tests/DepthChartEntry/DepthChartEntryProcessorTest.php
 
 		-
-			rawMessage: Instantiated class MockDatabase not found.
-			identifier: class.notFound
-			count: 1
-			path: tests/DepthChartEntry/DepthChartEntryRepositoryTest.php
-
-		-
 			rawMessage: 'Method Tests\DepthChartEntry\DepthChartEntryRepositoryTest::testBindParamOrderMatchesUpdateStatementOrder() has no return type specified.'
 			identifier: missingType.return
 			count: 1
@@ -1197,7 +1041,7 @@ parameters:
 		-
 			rawMessage: 'Parameter #2 $depthChartValues of method DepthChartEntry\DepthChartEntryRepository::updatePlayerDepthChart() expects array{pg: int, sg: int, sf: int, pf: int, c: int, canPlayInGame: int, min: int, of: int, ...}, array{pg: 1, sg: 0, sf: 0, pf: 0, c: 0, canPlayInGame: 1, min: 30} given.'
 			identifier: argument.type
-			count: 1
+			count: 2
 			path: tests/DepthChartEntry/DepthChartEntryRepositoryTest.php
 
 		-
@@ -1219,7 +1063,13 @@ parameters:
 			path: tests/DepthChartEntry/DepthChartEntryRepositoryTest.php
 
 		-
-			rawMessage: 'AnonymousClass38bdce902dc112646168874b802c2170::__construct() does not call parent constructor from mysqli.'
+			rawMessage: 'Call to method PHPUnit\Framework\Assert::assertInstanceOf() with ''DepthChartEntry\\Contracts\\DepthChartEntryServiceInterface'' and DepthChartEntry\DepthChartEntryService will always evaluate to true.'
+			identifier: method.alreadyNarrowedType
+			count: 1
+			path: tests/DepthChartEntry/DepthChartEntryServiceTest.php
+
+		-
+			rawMessage: 'AnonymousClassff992c0813c35f7ee739e4bc87d4a4a5::__construct() does not call parent constructor from mysqli.'
 			identifier: constructor.missingParentCall
 			count: 1
 			path: tests/DepthChartEntry/DepthChartEntrySubmissionHandlerTest.php
@@ -1237,67 +1087,19 @@ parameters:
 			path: tests/DepthChartEntry/DepthChartEntrySubmissionHandlerTest.php
 
 		-
-			rawMessage: 'Call to method sql_query() on an unknown class MockDatabase.'
-			identifier: class.notFound
-			count: 1
-			path: tests/DepthChartEntry/DepthChartEntrySubmissionHandlerTest.php
-
-		-
-			rawMessage: Class MockDatabaseResult not found.
-			identifier: class.notFound
-			count: 1
-			path: tests/DepthChartEntry/DepthChartEntrySubmissionHandlerTest.php
-
-		-
-			rawMessage: Instantiated class MockDatabase not found.
-			identifier: class.notFound
-			count: 1
-			path: tests/DepthChartEntry/DepthChartEntrySubmissionHandlerTest.php
-
-		-
-			rawMessage: Instantiated class MockPreparedStatement not found.
-			identifier: class.notFound
-			count: 1
-			path: tests/DepthChartEntry/DepthChartEntrySubmissionHandlerTest.php
-
-		-
-			rawMessage: 'Method mysqli@anonymous/DepthChartEntry/DepthChartEntrySubmissionHandlerTest.php:44::prepare() has invalid return type MockPreparedStatement.'
-			identifier: class.notFound
-			count: 1
-			path: tests/DepthChartEntry/DepthChartEntrySubmissionHandlerTest.php
-
-		-
-			rawMessage: 'Method mysqli@anonymous/DepthChartEntry/DepthChartEntrySubmissionHandlerTest.php:44::prepare() never returns false so it can be removed from the return type.'
+			rawMessage: 'Method mysqli@anonymous/DepthChartEntry/DepthChartEntrySubmissionHandlerTest.php:47::prepare() never returns false so it can be removed from the return type.'
 			identifier: return.unusedType
 			count: 1
 			path: tests/DepthChartEntry/DepthChartEntrySubmissionHandlerTest.php
 
 		-
-			rawMessage: 'Method mysqli@anonymous/DepthChartEntry/DepthChartEntrySubmissionHandlerTest.php:44::query() never returns mysqli_result so it can be removed from the return type.'
+			rawMessage: 'Method mysqli@anonymous/DepthChartEntry/DepthChartEntrySubmissionHandlerTest.php:47::query() never returns mysqli_result so it can be removed from the return type.'
 			identifier: return.unusedType
 			count: 1
 			path: tests/DepthChartEntry/DepthChartEntrySubmissionHandlerTest.php
 
 		-
-			rawMessage: 'Parameter $mockDb of method mysqli@anonymous/DepthChartEntry/DepthChartEntrySubmissionHandlerTest.php:44::__construct() has invalid type MockDatabase.'
-			identifier: class.notFound
-			count: 1
-			path: tests/DepthChartEntry/DepthChartEntrySubmissionHandlerTest.php
-
-		-
-			rawMessage: Property Tests\DepthChartEntry\DepthChartEntrySubmissionHandlerTest::$mockDb has unknown class MockDatabase as its type.
-			identifier: class.notFound
-			count: 1
-			path: tests/DepthChartEntry/DepthChartEntrySubmissionHandlerTest.php
-
-		-
-			rawMessage: Property mysqli@anonymous/DepthChartEntry/DepthChartEntrySubmissionHandlerTest.php:44::$mockDb has unknown class MockDatabase as its type.
-			identifier: class.notFound
-			count: 1
-			path: tests/DepthChartEntry/DepthChartEntrySubmissionHandlerTest.php
-
-		-
-			rawMessage: 'Return type (MockPreparedStatement|false) of method mysqli@anonymous/DepthChartEntry/DepthChartEntrySubmissionHandlerTest.php:44::prepare() should be covariant with return type (mysqli_stmt|false) of method mysqli::prepare()'
+			rawMessage: 'Return type (Tests\WideUnit\Mocks\MockPreparedStatement|false) of method mysqli@anonymous/DepthChartEntry/DepthChartEntrySubmissionHandlerTest.php:47::prepare() should be covariant with return type (mysqli_stmt|false) of method mysqli::prepare()'
 			identifier: method.childReturnType
 			count: 1
 			path: tests/DepthChartEntry/DepthChartEntrySubmissionHandlerTest.php
@@ -1465,12 +1267,6 @@ parameters:
 			path: tests/Discord/DiscordTest.php
 
 		-
-			rawMessage: Instantiated class MockDatabase not found.
-			identifier: class.notFound
-			count: 1
-			path: tests/Discord/DiscordTest.php
-
-		-
 			rawMessage: Property Tests\Discord\DiscordTest::$mockDb has no type specified.
 			identifier: missingType.property
 			count: 1
@@ -1561,12 +1357,6 @@ parameters:
 			path: tests/Draft/DraftProcessorTest.php
 
 		-
-			rawMessage: Instantiated class MockDatabase not found.
-			identifier: class.notFound
-			count: 1
-			path: tests/Draft/DraftRepositoryTest.php
-
-		-
 			rawMessage: 'Method Tests\Draft\DraftRepositoryTest::testCreatePlayerFromDraftClassHandlesApostrophes() has no return type specified.'
 			identifier: missingType.return
 			count: 1
@@ -1651,12 +1441,6 @@ parameters:
 			path: tests/Draft/DraftRepositoryTest.php
 
 		-
-			rawMessage: 'Parameter #1 $db of class Draft\DraftRepository constructor expects mysqli, MockDatabase given.'
-			identifier: argument.type
-			count: 1
-			path: tests/Draft/DraftRepositoryTest.php
-
-		-
 			rawMessage: Property Tests\Draft\DraftRepositoryTest::$mockDb has no type specified.
 			identifier: missingType.property
 			count: 1
@@ -1669,7 +1453,7 @@ parameters:
 			path: tests/Draft/DraftRepositoryTest.php
 
 		-
-			rawMessage: 'AnonymousClass94dbc231c318c5506c408b3917155838::__construct() does not call parent constructor from mysqli.'
+			rawMessage: 'AnonymousClass6ba3edb7ad05a17dcd6c03646d5927a7::__construct() does not call parent constructor from mysqli.'
 			identifier: constructor.missingParentCall
 			count: 1
 			path: tests/Draft/DraftSelectionHandlerTest.php
@@ -1687,79 +1471,25 @@ parameters:
 			path: tests/Draft/DraftSelectionHandlerTest.php
 
 		-
-			rawMessage: 'Call to method sql_query() on an unknown class MockDatabase.'
-			identifier: class.notFound
-			count: 1
-			path: tests/Draft/DraftSelectionHandlerTest.php
-
-		-
-			rawMessage: Class MockDatabaseResult not found.
-			identifier: class.notFound
-			count: 1
-			path: tests/Draft/DraftSelectionHandlerTest.php
-
-		-
 			rawMessage: 'Dynamic call to static method PHPUnit\Framework\TestCase::createStub().'
 			identifier: staticMethod.dynamicCall
 			count: 2
 			path: tests/Draft/DraftSelectionHandlerTest.php
 
 		-
-			rawMessage: Instantiated class MockDatabase not found.
-			identifier: class.notFound
-			count: 1
-			path: tests/Draft/DraftSelectionHandlerTest.php
-
-		-
-			rawMessage: Instantiated class MockPreparedStatement not found.
-			identifier: class.notFound
-			count: 1
-			path: tests/Draft/DraftSelectionHandlerTest.php
-
-		-
-			rawMessage: 'Method mysqli@anonymous/Draft/DraftSelectionHandlerTest.php:43::prepare() has invalid return type MockPreparedStatement.'
-			identifier: class.notFound
-			count: 1
-			path: tests/Draft/DraftSelectionHandlerTest.php
-
-		-
-			rawMessage: 'Method mysqli@anonymous/Draft/DraftSelectionHandlerTest.php:43::prepare() never returns false so it can be removed from the return type.'
+			rawMessage: 'Method mysqli@anonymous/Draft/DraftSelectionHandlerTest.php:46::prepare() never returns false so it can be removed from the return type.'
 			identifier: return.unusedType
 			count: 1
 			path: tests/Draft/DraftSelectionHandlerTest.php
 
 		-
-			rawMessage: 'Method mysqli@anonymous/Draft/DraftSelectionHandlerTest.php:43::query() never returns mysqli_result so it can be removed from the return type.'
+			rawMessage: 'Method mysqli@anonymous/Draft/DraftSelectionHandlerTest.php:46::query() never returns mysqli_result so it can be removed from the return type.'
 			identifier: return.unusedType
 			count: 1
 			path: tests/Draft/DraftSelectionHandlerTest.php
 
 		-
-			rawMessage: 'Parameter #1 $db of class Draft\DraftSelectionHandler constructor expects mysqli, MockDatabase given.'
-			identifier: argument.type
-			count: 6
-			path: tests/Draft/DraftSelectionHandlerTest.php
-
-		-
-			rawMessage: 'Parameter $mockDb of method mysqli@anonymous/Draft/DraftSelectionHandlerTest.php:43::__construct() has invalid type MockDatabase.'
-			identifier: class.notFound
-			count: 1
-			path: tests/Draft/DraftSelectionHandlerTest.php
-
-		-
-			rawMessage: Property Tests\Draft\DraftSelectionHandlerTest::$mockDb has unknown class MockDatabase as its type.
-			identifier: class.notFound
-			count: 1
-			path: tests/Draft/DraftSelectionHandlerTest.php
-
-		-
-			rawMessage: Property mysqli@anonymous/Draft/DraftSelectionHandlerTest.php:43::$mockDb has unknown class MockDatabase as its type.
-			identifier: class.notFound
-			count: 1
-			path: tests/Draft/DraftSelectionHandlerTest.php
-
-		-
-			rawMessage: 'Return type (MockPreparedStatement|false) of method mysqli@anonymous/Draft/DraftSelectionHandlerTest.php:43::prepare() should be covariant with return type (mysqli_stmt|false) of method mysqli::prepare()'
+			rawMessage: 'Return type (Tests\WideUnit\Mocks\MockPreparedStatement|false) of method mysqli@anonymous/Draft/DraftSelectionHandlerTest.php:46::prepare() should be covariant with return type (mysqli_stmt|false) of method mysqli::prepare()'
 			identifier: method.childReturnType
 			count: 1
 			path: tests/Draft/DraftSelectionHandlerTest.php
@@ -2083,50 +1813,8 @@ parameters:
 			path: tests/Extension/ExtensionRepositoryTest.php
 
 		-
-			rawMessage: 'Call to method getExecutedQueries() on an unknown class MockDatabase.'
-			identifier: class.notFound
-			count: 1
-			path: tests/Extension/ExtensionRepositoryTest.php
-
-		-
-			rawMessage: 'Call to method setMockData() on an unknown class MockDatabase.'
-			identifier: class.notFound
-			count: 5
-			path: tests/Extension/ExtensionRepositoryTest.php
-
-		-
-			rawMessage: 'Call to method setNumRows() on an unknown class MockDatabase.'
-			identifier: class.notFound
-			count: 2
-			path: tests/Extension/ExtensionRepositoryTest.php
-
-		-
-			rawMessage: 'Call to method setReturnTrue() on an unknown class MockDatabase.'
-			identifier: class.notFound
-			count: 3
-			path: tests/Extension/ExtensionRepositoryTest.php
-
-		-
 			rawMessage: 'Dynamic call to static method PHPUnit\Framework\Assert::fail().'
 			identifier: staticMethod.dynamicCall
-			count: 1
-			path: tests/Extension/ExtensionRepositoryTest.php
-
-		-
-			rawMessage: Instantiated class MockDatabase not found.
-			identifier: class.notFound
-			count: 1
-			path: tests/Extension/ExtensionRepositoryTest.php
-
-		-
-			rawMessage: 'Parameter #1 $db of class Extension\ExtensionRepository constructor expects mysqli, MockDatabase given.'
-			identifier: argument.type
-			count: 1
-			path: tests/Extension/ExtensionRepositoryTest.php
-
-		-
-			rawMessage: Property Tests\Extension\ExtensionRepositoryTest::$mockDb has unknown class MockDatabase as its type.
-			identifier: class.notFound
 			count: 1
 			path: tests/Extension/ExtensionRepositoryTest.php
 
@@ -2161,20 +1849,8 @@ parameters:
 			path: tests/Extension/ExtensionServiceTest.php
 
 		-
-			rawMessage: 'Call to method setMockData() on an unknown class MockDatabase.'
-			identifier: class.notFound
-			count: 8
-			path: tests/Extension/ExtensionServiceTest.php
-
-		-
 			rawMessage: 'Dynamic call to static method PHPUnit\Framework\TestCase::createStub().'
 			identifier: staticMethod.dynamicCall
-			count: 1
-			path: tests/Extension/ExtensionServiceTest.php
-
-		-
-			rawMessage: Instantiated class MockDatabase not found.
-			identifier: class.notFound
 			count: 1
 			path: tests/Extension/ExtensionServiceTest.php
 
@@ -2190,24 +1866,6 @@ parameters:
 		-
 			rawMessage: 'Method Tests\Extension\ExtensionServiceTest::getFullMockData() has parameter $overrides with no value type specified in iterable type array.'
 			identifier: missingType.iterableValue
-			count: 1
-			path: tests/Extension/ExtensionServiceTest.php
-
-		-
-			rawMessage: 'Parameter #1 $db of class Extension\ExtensionProcessor constructor expects mysqli, MockDatabase given.'
-			identifier: argument.type
-			count: 1
-			path: tests/Extension/ExtensionServiceTest.php
-
-		-
-			rawMessage: 'Parameter #1 $db of class Extension\ExtensionService constructor expects mysqli, MockDatabase given.'
-			identifier: argument.type
-			count: 11
-			path: tests/Extension/ExtensionServiceTest.php
-
-		-
-			rawMessage: Property Tests\Extension\ExtensionServiceTest::$mockDb has unknown class MockDatabase as its type.
-			identifier: class.notFound
 			count: 1
 			path: tests/Extension/ExtensionServiceTest.php
 
@@ -2416,7 +2074,7 @@ parameters:
 			path: tests/FreeAgency/FreeAgencyAdminProcessorTest.php
 
 		-
-			rawMessage: 'AnonymousClass2b9ec5c270f15c76b24c9cb150778590::__construct() does not call parent constructor from mysqli.'
+			rawMessage: 'AnonymousClassd01a25ef1001b810081aa69769e0a656::__construct() does not call parent constructor from mysqli.'
 			identifier: constructor.missingParentCall
 			count: 1
 			path: tests/FreeAgency/FreeAgencyAdminRepositoryTest.php
@@ -2440,85 +2098,25 @@ parameters:
 			path: tests/FreeAgency/FreeAgencyAdminRepositoryTest.php
 
 		-
-			rawMessage: 'Call to method getExecutedQueries() on an unknown class MockDatabase.'
-			identifier: class.notFound
-			count: 2
-			path: tests/FreeAgency/FreeAgencyAdminRepositoryTest.php
-
-		-
-			rawMessage: 'Call to method setMockData() on an unknown class MockDatabase.'
-			identifier: class.notFound
-			count: 2
-			path: tests/FreeAgency/FreeAgencyAdminRepositoryTest.php
-
-		-
-			rawMessage: 'Call to method sql_query() on an unknown class MockDatabase.'
-			identifier: class.notFound
-			count: 1
-			path: tests/FreeAgency/FreeAgencyAdminRepositoryTest.php
-
-		-
-			rawMessage: Class MockDatabaseResult not found.
-			identifier: class.notFound
-			count: 1
-			path: tests/FreeAgency/FreeAgencyAdminRepositoryTest.php
-
-		-
-			rawMessage: Instantiated class MockDatabase not found.
-			identifier: class.notFound
-			count: 1
-			path: tests/FreeAgency/FreeAgencyAdminRepositoryTest.php
-
-		-
-			rawMessage: Instantiated class MockPreparedStatement not found.
-			identifier: class.notFound
-			count: 1
-			path: tests/FreeAgency/FreeAgencyAdminRepositoryTest.php
-
-		-
 			rawMessage: 'Method FreeAgency\FreeAgencyAdminRepository::updatePlayerContract() invoked with 10 parameters, 9 required.'
 			identifier: arguments.count
 			count: 1
 			path: tests/FreeAgency/FreeAgencyAdminRepositoryTest.php
 
 		-
-			rawMessage: 'Method mysqli@anonymous/FreeAgency/FreeAgencyAdminRepositoryTest.php:36::prepare() has invalid return type MockPreparedStatement.'
-			identifier: class.notFound
-			count: 1
-			path: tests/FreeAgency/FreeAgencyAdminRepositoryTest.php
-
-		-
-			rawMessage: 'Method mysqli@anonymous/FreeAgency/FreeAgencyAdminRepositoryTest.php:36::prepare() never returns false so it can be removed from the return type.'
+			rawMessage: 'Method mysqli@anonymous/FreeAgency/FreeAgencyAdminRepositoryTest.php:39::prepare() never returns false so it can be removed from the return type.'
 			identifier: return.unusedType
 			count: 1
 			path: tests/FreeAgency/FreeAgencyAdminRepositoryTest.php
 
 		-
-			rawMessage: 'Method mysqli@anonymous/FreeAgency/FreeAgencyAdminRepositoryTest.php:36::query() never returns mysqli_result so it can be removed from the return type.'
+			rawMessage: 'Method mysqli@anonymous/FreeAgency/FreeAgencyAdminRepositoryTest.php:39::query() never returns mysqli_result so it can be removed from the return type.'
 			identifier: return.unusedType
 			count: 1
 			path: tests/FreeAgency/FreeAgencyAdminRepositoryTest.php
 
 		-
-			rawMessage: 'Parameter $mockDb of method mysqli@anonymous/FreeAgency/FreeAgencyAdminRepositoryTest.php:36::__construct() has invalid type MockDatabase.'
-			identifier: class.notFound
-			count: 1
-			path: tests/FreeAgency/FreeAgencyAdminRepositoryTest.php
-
-		-
-			rawMessage: Property Tests\FreeAgency\FreeAgencyAdminRepositoryTest::$mockDb has unknown class MockDatabase as its type.
-			identifier: class.notFound
-			count: 1
-			path: tests/FreeAgency/FreeAgencyAdminRepositoryTest.php
-
-		-
-			rawMessage: Property mysqli@anonymous/FreeAgency/FreeAgencyAdminRepositoryTest.php:36::$mockDb has unknown class MockDatabase as its type.
-			identifier: class.notFound
-			count: 1
-			path: tests/FreeAgency/FreeAgencyAdminRepositoryTest.php
-
-		-
-			rawMessage: 'Return type (MockPreparedStatement|false) of method mysqli@anonymous/FreeAgency/FreeAgencyAdminRepositoryTest.php:36::prepare() should be covariant with return type (mysqli_stmt|false) of method mysqli::prepare()'
+			rawMessage: 'Return type (Tests\WideUnit\Mocks\MockPreparedStatement|false) of method mysqli@anonymous/FreeAgency/FreeAgencyAdminRepositoryTest.php:39::prepare() should be covariant with return type (mysqli_stmt|false) of method mysqli::prepare()'
 			identifier: method.childReturnType
 			count: 1
 			path: tests/FreeAgency/FreeAgencyAdminRepositoryTest.php
@@ -2533,18 +2131,6 @@ parameters:
 			rawMessage: 'Dynamic call to static method PHPUnit\Framework\TestCase::createStub().'
 			identifier: staticMethod.dynamicCall
 			count: 3
-			path: tests/FreeAgency/FreeAgencyCapCalculatorTest.php
-
-		-
-			rawMessage: Instantiated class MockDatabase not found.
-			identifier: class.notFound
-			count: 1
-			path: tests/FreeAgency/FreeAgencyCapCalculatorTest.php
-
-		-
-			rawMessage: 'Parameter #1 $mysqli_db of class FreeAgency\FreeAgencyCapCalculator constructor expects mysqli, MockDatabase given.'
-			identifier: argument.type
-			count: 1
 			path: tests/FreeAgency/FreeAgencyCapCalculatorTest.php
 
 		-
@@ -2569,18 +2155,6 @@ parameters:
 			rawMessage: 'Dynamic call to static method PHPUnit\Framework\TestCase::createStub().'
 			identifier: staticMethod.dynamicCall
 			count: 1
-			path: tests/FreeAgency/FreeAgencyControllerTest.php
-
-		-
-			rawMessage: Instantiated class MockDatabase not found.
-			identifier: class.notFound
-			count: 2
-			path: tests/FreeAgency/FreeAgencyControllerTest.php
-
-		-
-			rawMessage: 'Parameter #1 $db of class FreeAgency\FreeAgencyController constructor expects mysqli, MockDatabase given.'
-			identifier: argument.type
-			count: 2
 			path: tests/FreeAgency/FreeAgencyControllerTest.php
 
 		-
@@ -2626,67 +2200,7 @@ parameters:
 			path: tests/FreeAgency/FreeAgencyProcessorTest.php
 
 		-
-			rawMessage: 'Call to method getExecutedQueries() on an unknown class MockDatabase.'
-			identifier: class.notFound
-			count: 1
-			path: tests/FreeAgency/FreeAgencyProcessorTest.php
-
-		-
-			rawMessage: 'Call to method setMockData() on an unknown class MockDatabase.'
-			identifier: class.notFound
-			count: 11
-			path: tests/FreeAgency/FreeAgencyProcessorTest.php
-
-		-
-			rawMessage: 'Call to method sql_query() on an unknown class MockDatabase.'
-			identifier: class.notFound
-			count: 1
-			path: tests/FreeAgency/FreeAgencyProcessorTest.php
-
-		-
-			rawMessage: Instantiated class MockDatabase not found.
-			identifier: class.notFound
-			count: 1
-			path: tests/FreeAgency/FreeAgencyProcessorTest.php
-
-		-
-			rawMessage: Instantiated class MockPreparedStatement not found.
-			identifier: class.notFound
-			count: 1
-			path: tests/FreeAgency/FreeAgencyProcessorTest.php
-
-		-
-			rawMessage: 'Method class@anonymous/FreeAgency/FreeAgencyProcessorTest.php:131::prepare() has invalid return type MockPreparedStatement.'
-			identifier: class.notFound
-			count: 1
-			path: tests/FreeAgency/FreeAgencyProcessorTest.php
-
-		-
-			rawMessage: 'Parameter #1 $mysqli_db of class FreeAgency\FreeAgencyProcessor constructor expects mysqli, MockDatabase given.'
-			identifier: argument.type
-			count: 13
-			path: tests/FreeAgency/FreeAgencyProcessorTest.php
-
-		-
-			rawMessage: 'Parameter $mockDb of method class@anonymous/FreeAgency/FreeAgencyProcessorTest.php:131::__construct() has invalid type MockDatabase.'
-			identifier: class.notFound
-			count: 1
-			path: tests/FreeAgency/FreeAgencyProcessorTest.php
-
-		-
-			rawMessage: Property Tests\FreeAgency\FreeAgencyProcessorTest::$mockDb has unknown class MockDatabase as its type.
-			identifier: class.notFound
-			count: 1
-			path: tests/FreeAgency/FreeAgencyProcessorTest.php
-
-		-
-			rawMessage: Property class@anonymous/FreeAgency/FreeAgencyProcessorTest.php:131::$mockDb has unknown class MockDatabase as its type.
-			identifier: class.notFound
-			count: 1
-			path: tests/FreeAgency/FreeAgencyProcessorTest.php
-
-		-
-			rawMessage: 'AnonymousClass52ca0230f6d03c4131555ad4779ac60b::__construct() does not call parent constructor from mysqli.'
+			rawMessage: 'AnonymousClass05e31732eac53b8905cec8d8f283c32f::__construct() does not call parent constructor from mysqli.'
 			identifier: constructor.missingParentCall
 			count: 1
 			path: tests/FreeAgency/FreeAgencyRepositoryTest.php
@@ -2710,79 +2224,19 @@ parameters:
 			path: tests/FreeAgency/FreeAgencyRepositoryTest.php
 
 		-
-			rawMessage: 'Call to method onQuery() on an unknown class MockDatabase.'
-			identifier: class.notFound
-			count: 3
-			path: tests/FreeAgency/FreeAgencyRepositoryTest.php
-
-		-
-			rawMessage: 'Call to method setMockData() on an unknown class MockDatabase.'
-			identifier: class.notFound
-			count: 4
-			path: tests/FreeAgency/FreeAgencyRepositoryTest.php
-
-		-
-			rawMessage: 'Call to method sql_query() on an unknown class MockDatabase.'
-			identifier: class.notFound
-			count: 1
-			path: tests/FreeAgency/FreeAgencyRepositoryTest.php
-
-		-
-			rawMessage: Class MockDatabaseResult not found.
-			identifier: class.notFound
-			count: 1
-			path: tests/FreeAgency/FreeAgencyRepositoryTest.php
-
-		-
-			rawMessage: Instantiated class MockDatabase not found.
-			identifier: class.notFound
-			count: 1
-			path: tests/FreeAgency/FreeAgencyRepositoryTest.php
-
-		-
-			rawMessage: Instantiated class MockPreparedStatement not found.
-			identifier: class.notFound
-			count: 1
-			path: tests/FreeAgency/FreeAgencyRepositoryTest.php
-
-		-
-			rawMessage: 'Method mysqli@anonymous/FreeAgency/FreeAgencyRepositoryTest.php:38::prepare() has invalid return type MockPreparedStatement.'
-			identifier: class.notFound
-			count: 1
-			path: tests/FreeAgency/FreeAgencyRepositoryTest.php
-
-		-
-			rawMessage: 'Method mysqli@anonymous/FreeAgency/FreeAgencyRepositoryTest.php:38::prepare() never returns false so it can be removed from the return type.'
+			rawMessage: 'Method mysqli@anonymous/FreeAgency/FreeAgencyRepositoryTest.php:41::prepare() never returns false so it can be removed from the return type.'
 			identifier: return.unusedType
 			count: 1
 			path: tests/FreeAgency/FreeAgencyRepositoryTest.php
 
 		-
-			rawMessage: 'Method mysqli@anonymous/FreeAgency/FreeAgencyRepositoryTest.php:38::query() never returns mysqli_result so it can be removed from the return type.'
+			rawMessage: 'Method mysqli@anonymous/FreeAgency/FreeAgencyRepositoryTest.php:41::query() never returns mysqli_result so it can be removed from the return type.'
 			identifier: return.unusedType
 			count: 1
 			path: tests/FreeAgency/FreeAgencyRepositoryTest.php
 
 		-
-			rawMessage: 'Parameter $mockDb of method mysqli@anonymous/FreeAgency/FreeAgencyRepositoryTest.php:38::__construct() has invalid type MockDatabase.'
-			identifier: class.notFound
-			count: 1
-			path: tests/FreeAgency/FreeAgencyRepositoryTest.php
-
-		-
-			rawMessage: Property Tests\FreeAgency\FreeAgencyRepositoryTest::$mockDb has unknown class MockDatabase as its type.
-			identifier: class.notFound
-			count: 1
-			path: tests/FreeAgency/FreeAgencyRepositoryTest.php
-
-		-
-			rawMessage: Property mysqli@anonymous/FreeAgency/FreeAgencyRepositoryTest.php:38::$mockDb has unknown class MockDatabase as its type.
-			identifier: class.notFound
-			count: 1
-			path: tests/FreeAgency/FreeAgencyRepositoryTest.php
-
-		-
-			rawMessage: 'Return type (MockPreparedStatement|false) of method mysqli@anonymous/FreeAgency/FreeAgencyRepositoryTest.php:38::prepare() should be covariant with return type (mysqli_stmt|false) of method mysqli::prepare()'
+			rawMessage: 'Return type (Tests\WideUnit\Mocks\MockPreparedStatement|false) of method mysqli@anonymous/FreeAgency/FreeAgencyRepositoryTest.php:41::prepare() should be covariant with return type (mysqli_stmt|false) of method mysqli::prepare()'
 			identifier: method.childReturnType
 			count: 1
 			path: tests/FreeAgency/FreeAgencyRepositoryTest.php
@@ -2808,38 +2262,26 @@ parameters:
 		-
 			rawMessage: 'Call to an undefined method FreeAgency\Contracts\FreeAgencyRepositoryInterface::method().'
 			identifier: method.notFound
-			count: 11
+			count: 13
 			path: tests/FreeAgency/FreeAgencyServiceTest.php
 
 		-
-			rawMessage: 'Call to method setMockData() on an unknown class MockDatabase.'
-			identifier: class.notFound
-			count: 4
+			rawMessage: 'Call to method PHPUnit\Framework\Assert::assertInstanceOf() with ''Player\\Player'' and Player\Player will always evaluate to true.'
+			identifier: method.alreadyNarrowedType
+			count: 1
 			path: tests/FreeAgency/FreeAgencyServiceTest.php
 
 		-
 			rawMessage: 'Dynamic call to static method PHPUnit\Framework\TestCase::createStub().'
 			identifier: staticMethod.dynamicCall
-			count: 20
+			count: 27
 			path: tests/FreeAgency/FreeAgencyServiceTest.php
 
 		-
-			rawMessage: Instantiated class MockDatabase not found.
-			identifier: class.notFound
-			count: 1
-			path: tests/FreeAgency/FreeAgencyServiceTest.php
-
-		-
-			rawMessage: 'Parameter #3 $mysqli_db of class FreeAgency\FreeAgencyService constructor expects mysqli, MockDatabase given.'
-			identifier: argument.type
-			count: 7
-			path: tests/FreeAgency/FreeAgencyServiceTest.php
-
-		-
-			rawMessage: Property Tests\FreeAgency\FreeAgencyServiceTest::$mockDb has unknown class MockDatabase as its type.
-			identifier: class.notFound
-			count: 1
-			path: tests/FreeAgency/FreeAgencyServiceTest.php
+			rawMessage: 'Dynamic call to static method PHPUnit\Framework\TestCase::createStub().'
+			identifier: staticMethod.dynamicCall
+			count: 4
+			path: tests/FreeAgency/FreeAgencyViewXssTest.php
 
 		-
 			rawMessage: 'You should use assertSame() instead of assertEquals(), because both values are scalars of the same type'
@@ -3022,7 +2464,7 @@ parameters:
 			path: tests/Injuries/InjuriesIntegrationTest.php
 
 		-
-			rawMessage: 'AnonymousClassee962123a72d8e18db719c5d06015631::__construct() does not call parent constructor from mysqli.'
+			rawMessage: 'AnonymousClass73934fbc4af20f599b549638380762c7::__construct() does not call parent constructor from mysqli.'
 			identifier: constructor.missingParentCall
 			count: 1
 			path: tests/Injuries/InjuriesServiceTest.php
@@ -3040,55 +2482,13 @@ parameters:
 			path: tests/Injuries/InjuriesServiceTest.php
 
 		-
-			rawMessage: 'Call to method setMockData() on an unknown class MockDatabase.'
-			identifier: class.notFound
-			count: 1
-			path: tests/Injuries/InjuriesServiceTest.php
-
-		-
-			rawMessage: Instantiated class MockDatabase not found.
-			identifier: class.notFound
-			count: 1
-			path: tests/Injuries/InjuriesServiceTest.php
-
-		-
-			rawMessage: Instantiated class MockPreparedStatement not found.
-			identifier: class.notFound
-			count: 1
-			path: tests/Injuries/InjuriesServiceTest.php
-
-		-
-			rawMessage: 'Method mysqli@anonymous/Injuries/InjuriesServiceTest.php:33::prepare() has invalid return type MockPreparedStatement.'
-			identifier: class.notFound
-			count: 1
-			path: tests/Injuries/InjuriesServiceTest.php
-
-		-
-			rawMessage: 'Method mysqli@anonymous/Injuries/InjuriesServiceTest.php:33::prepare() never returns false so it can be removed from the return type.'
+			rawMessage: 'Method mysqli@anonymous/Injuries/InjuriesServiceTest.php:35::prepare() never returns false so it can be removed from the return type.'
 			identifier: return.unusedType
 			count: 1
 			path: tests/Injuries/InjuriesServiceTest.php
 
 		-
-			rawMessage: 'Parameter $mockDb of method mysqli@anonymous/Injuries/InjuriesServiceTest.php:33::__construct() has invalid type MockDatabase.'
-			identifier: class.notFound
-			count: 1
-			path: tests/Injuries/InjuriesServiceTest.php
-
-		-
-			rawMessage: Property Tests\Injuries\InjuriesServiceTest::$mockDb has unknown class MockDatabase as its type.
-			identifier: class.notFound
-			count: 1
-			path: tests/Injuries/InjuriesServiceTest.php
-
-		-
-			rawMessage: Property mysqli@anonymous/Injuries/InjuriesServiceTest.php:33::$mockDb has unknown class MockDatabase as its type.
-			identifier: class.notFound
-			count: 1
-			path: tests/Injuries/InjuriesServiceTest.php
-
-		-
-			rawMessage: 'Return type (MockPreparedStatement|false) of method mysqli@anonymous/Injuries/InjuriesServiceTest.php:33::prepare() should be covariant with return type (mysqli_stmt|false) of method mysqli::prepare()'
+			rawMessage: 'Return type (Tests\WideUnit\Mocks\MockPreparedStatement|false) of method mysqli@anonymous/Injuries/InjuriesServiceTest.php:35::prepare() should be covariant with return type (mysqli_stmt|false) of method mysqli::prepare()'
 			identifier: method.childReturnType
 			count: 1
 			path: tests/Injuries/InjuriesServiceTest.php
@@ -3154,85 +2554,31 @@ parameters:
 			path: tests/JsbParser/JsbImportServiceTest.php
 
 		-
-			rawMessage: 'AnonymousClassb799687ceec476b1867860cc25b57f4e::__construct() does not call parent constructor from mysqli.'
+			rawMessage: Variable method call on JsbParser\JsbImportService.
+			identifier: method.dynamicName
+			count: 1
+			path: tests/JsbParser/JsbImportServiceTest.php
+
+		-
+			rawMessage: 'AnonymousClass70698db9172ae0afd5d03b244d864cde::__construct() does not call parent constructor from mysqli.'
 			identifier: constructor.missingParentCall
 			count: 1
 			path: tests/JsbParser/PlayerIdResolverTest.php
 
 		-
-			rawMessage: 'Call to method clearQueryPatterns() on an unknown class MockDatabase.'
-			identifier: class.notFound
-			count: 3
-			path: tests/JsbParser/PlayerIdResolverTest.php
-
-		-
-			rawMessage: 'Call to method onQuery() on an unknown class MockDatabase.'
-			identifier: class.notFound
-			count: 25
-			path: tests/JsbParser/PlayerIdResolverTest.php
-
-		-
-			rawMessage: 'Call to method sql_query() on an unknown class MockDatabase.'
-			identifier: class.notFound
-			count: 1
-			path: tests/JsbParser/PlayerIdResolverTest.php
-
-		-
-			rawMessage: Class MockDatabaseResult not found.
-			identifier: class.notFound
-			count: 1
-			path: tests/JsbParser/PlayerIdResolverTest.php
-
-		-
-			rawMessage: Instantiated class MockDatabase not found.
-			identifier: class.notFound
-			count: 1
-			path: tests/JsbParser/PlayerIdResolverTest.php
-
-		-
-			rawMessage: Instantiated class MockPreparedStatement not found.
-			identifier: class.notFound
-			count: 1
-			path: tests/JsbParser/PlayerIdResolverTest.php
-
-		-
-			rawMessage: 'Method mysqli@anonymous/JsbParser/PlayerIdResolverTest.php:39::prepare() has invalid return type MockPreparedStatement.'
-			identifier: class.notFound
-			count: 1
-			path: tests/JsbParser/PlayerIdResolverTest.php
-
-		-
-			rawMessage: 'Method mysqli@anonymous/JsbParser/PlayerIdResolverTest.php:39::prepare() never returns false so it can be removed from the return type.'
+			rawMessage: 'Method mysqli@anonymous/JsbParser/PlayerIdResolverTest.php:42::prepare() never returns false so it can be removed from the return type.'
 			identifier: return.unusedType
 			count: 1
 			path: tests/JsbParser/PlayerIdResolverTest.php
 
 		-
-			rawMessage: 'Method mysqli@anonymous/JsbParser/PlayerIdResolverTest.php:39::query() never returns mysqli_result so it can be removed from the return type.'
+			rawMessage: 'Method mysqli@anonymous/JsbParser/PlayerIdResolverTest.php:42::query() never returns mysqli_result so it can be removed from the return type.'
 			identifier: return.unusedType
 			count: 1
 			path: tests/JsbParser/PlayerIdResolverTest.php
 
 		-
-			rawMessage: 'Parameter $mockDb of method mysqli@anonymous/JsbParser/PlayerIdResolverTest.php:39::__construct() has invalid type MockDatabase.'
-			identifier: class.notFound
-			count: 1
-			path: tests/JsbParser/PlayerIdResolverTest.php
-
-		-
-			rawMessage: Property Tests\JsbParser\PlayerIdResolverTest::$mockDb has unknown class MockDatabase as its type.
-			identifier: class.notFound
-			count: 1
-			path: tests/JsbParser/PlayerIdResolverTest.php
-
-		-
-			rawMessage: Property mysqli@anonymous/JsbParser/PlayerIdResolverTest.php:39::$mockDb has unknown class MockDatabase as its type.
-			identifier: class.notFound
-			count: 1
-			path: tests/JsbParser/PlayerIdResolverTest.php
-
-		-
-			rawMessage: 'Return type (MockPreparedStatement|false) of method mysqli@anonymous/JsbParser/PlayerIdResolverTest.php:39::prepare() should be covariant with return type (mysqli_stmt|false) of method mysqli::prepare()'
+			rawMessage: 'Return type (Tests\WideUnit\Mocks\MockPreparedStatement|false) of method mysqli@anonymous/JsbParser/PlayerIdResolverTest.php:42::prepare() should be covariant with return type (mysqli_stmt|false) of method mysqli::prepare()'
 			identifier: method.childReturnType
 			count: 1
 			path: tests/JsbParser/PlayerIdResolverTest.php
@@ -3248,6 +2594,12 @@ parameters:
 			identifier: identical.alwaysFalse
 			count: 1
 			path: tests/JsbParser/PlbFileParserTest.php
+
+		-
+			rawMessage: 'Dynamic call to static method PHPUnit\Framework\Assert::fail().'
+			identifier: staticMethod.dynamicCall
+			count: 5
+			path: tests/JsbParser/SchFileParserTest.php
 
 		-
 			rawMessage: 'Call to method PHPUnit\Framework\Assert::assertSame() with 1000000 and 1000000 will always evaluate to true.'
@@ -3294,7 +2646,7 @@ parameters:
 		-
 			rawMessage: 'You should use assertSame() instead of assertEquals(), because both values are scalars of the same type'
 			identifier: phpunit.assertEquals
-			count: 14
+			count: 15
 			path: tests/League/LeagueContextIntegrationTest.php
 
 		-
@@ -3407,7 +2759,7 @@ parameters:
 			path: tests/LeagueControlPanel/LeagueControlPanelViewTest.php
 
 		-
-			rawMessage: 'AnonymousClass0c263f71da87038cb4af9758edfc01cd::__construct() does not call parent constructor from mysqli.'
+			rawMessage: 'AnonymousClass39b608d314c1e76812c0232d04bf2484::__construct() does not call parent constructor from mysqli.'
 			identifier: constructor.missingParentCall
 			count: 1
 			path: tests/LeagueSchedule/LeagueScheduleRepositoryTest.php
@@ -3419,55 +2771,13 @@ parameters:
 			path: tests/LeagueSchedule/LeagueScheduleRepositoryTest.php
 
 		-
-			rawMessage: 'Call to method setMockData() on an unknown class MockDatabase.'
-			identifier: class.notFound
-			count: 5
-			path: tests/LeagueSchedule/LeagueScheduleRepositoryTest.php
-
-		-
-			rawMessage: Instantiated class MockDatabase not found.
-			identifier: class.notFound
-			count: 1
-			path: tests/LeagueSchedule/LeagueScheduleRepositoryTest.php
-
-		-
-			rawMessage: Instantiated class MockPreparedStatement not found.
-			identifier: class.notFound
-			count: 1
-			path: tests/LeagueSchedule/LeagueScheduleRepositoryTest.php
-
-		-
-			rawMessage: 'Method mysqli@anonymous/LeagueSchedule/LeagueScheduleRepositoryTest.php:26::prepare() has invalid return type MockPreparedStatement.'
-			identifier: class.notFound
-			count: 1
-			path: tests/LeagueSchedule/LeagueScheduleRepositoryTest.php
-
-		-
-			rawMessage: 'Method mysqli@anonymous/LeagueSchedule/LeagueScheduleRepositoryTest.php:26::prepare() never returns false so it can be removed from the return type.'
+			rawMessage: 'Method mysqli@anonymous/LeagueSchedule/LeagueScheduleRepositoryTest.php:28::prepare() never returns false so it can be removed from the return type.'
 			identifier: return.unusedType
 			count: 1
 			path: tests/LeagueSchedule/LeagueScheduleRepositoryTest.php
 
 		-
-			rawMessage: 'Parameter $mockDb of method mysqli@anonymous/LeagueSchedule/LeagueScheduleRepositoryTest.php:26::__construct() has invalid type MockDatabase.'
-			identifier: class.notFound
-			count: 1
-			path: tests/LeagueSchedule/LeagueScheduleRepositoryTest.php
-
-		-
-			rawMessage: Property Tests\LeagueSchedule\LeagueScheduleRepositoryTest::$mockDb has unknown class MockDatabase as its type.
-			identifier: class.notFound
-			count: 1
-			path: tests/LeagueSchedule/LeagueScheduleRepositoryTest.php
-
-		-
-			rawMessage: Property mysqli@anonymous/LeagueSchedule/LeagueScheduleRepositoryTest.php:26::$mockDb has unknown class MockDatabase as its type.
-			identifier: class.notFound
-			count: 1
-			path: tests/LeagueSchedule/LeagueScheduleRepositoryTest.php
-
-		-
-			rawMessage: 'Return type (MockPreparedStatement|false) of method mysqli@anonymous/LeagueSchedule/LeagueScheduleRepositoryTest.php:26::prepare() should be covariant with return type (mysqli_stmt|false) of method mysqli::prepare()'
+			rawMessage: 'Return type (Tests\WideUnit\Mocks\MockPreparedStatement|false) of method mysqli@anonymous/LeagueSchedule/LeagueScheduleRepositoryTest.php:28::prepare() should be covariant with return type (mysqli_stmt|false) of method mysqli::prepare()'
 			identifier: method.childReturnType
 			count: 1
 			path: tests/LeagueSchedule/LeagueScheduleRepositoryTest.php
@@ -3503,7 +2813,7 @@ parameters:
 			path: tests/LeagueStarters/LeagueStartersApiHandlerTest.php
 
 		-
-			rawMessage: 'AnonymousClass6876c176a57c4e4036889cdf0e971dec::__construct() does not call parent constructor from mysqli.'
+			rawMessage: 'AnonymousClass1168d70942f8499e27d025ff85029d91::__construct() does not call parent constructor from mysqli.'
 			identifier: constructor.missingParentCall
 			count: 1
 			path: tests/LeagueStarters/LeagueStartersServiceTest.php
@@ -3521,67 +2831,25 @@ parameters:
 			path: tests/LeagueStarters/LeagueStartersServiceTest.php
 
 		-
-			rawMessage: 'Call to method onQuery() on an unknown class MockDatabase.'
-			identifier: class.notFound
-			count: 7
-			path: tests/LeagueStarters/LeagueStartersServiceTest.php
-
-		-
 			rawMessage: 'Dynamic call to static method PHPUnit\Framework\TestCase::createStub().'
 			identifier: staticMethod.dynamicCall
 			count: 4
 			path: tests/LeagueStarters/LeagueStartersServiceTest.php
 
 		-
-			rawMessage: Instantiated class MockDatabase not found.
-			identifier: class.notFound
-			count: 1
-			path: tests/LeagueStarters/LeagueStartersServiceTest.php
-
-		-
-			rawMessage: Instantiated class MockPreparedStatement not found.
-			identifier: class.notFound
-			count: 1
-			path: tests/LeagueStarters/LeagueStartersServiceTest.php
-
-		-
-			rawMessage: 'Method mysqli@anonymous/LeagueStarters/LeagueStartersServiceTest.php:35::prepare() has invalid return type MockPreparedStatement.'
-			identifier: class.notFound
-			count: 1
-			path: tests/LeagueStarters/LeagueStartersServiceTest.php
-
-		-
-			rawMessage: 'Method mysqli@anonymous/LeagueStarters/LeagueStartersServiceTest.php:35::prepare() never returns false so it can be removed from the return type.'
+			rawMessage: 'Method mysqli@anonymous/LeagueStarters/LeagueStartersServiceTest.php:37::prepare() never returns false so it can be removed from the return type.'
 			identifier: return.unusedType
 			count: 1
 			path: tests/LeagueStarters/LeagueStartersServiceTest.php
 
 		-
-			rawMessage: 'Parameter $mockDb of method mysqli@anonymous/LeagueStarters/LeagueStartersServiceTest.php:35::__construct() has invalid type MockDatabase.'
-			identifier: class.notFound
-			count: 1
-			path: tests/LeagueStarters/LeagueStartersServiceTest.php
-
-		-
-			rawMessage: Property Tests\LeagueStarters\LeagueStartersServiceTest::$mockDb has unknown class MockDatabase as its type.
-			identifier: class.notFound
-			count: 1
-			path: tests/LeagueStarters/LeagueStartersServiceTest.php
-
-		-
-			rawMessage: Property mysqli@anonymous/LeagueStarters/LeagueStartersServiceTest.php:35::$mockDb has unknown class MockDatabase as its type.
-			identifier: class.notFound
-			count: 1
-			path: tests/LeagueStarters/LeagueStartersServiceTest.php
-
-		-
-			rawMessage: 'Return type (MockPreparedStatement|false) of method mysqli@anonymous/LeagueStarters/LeagueStartersServiceTest.php:35::prepare() should be covariant with return type (mysqli_stmt|false) of method mysqli::prepare()'
+			rawMessage: 'Return type (Tests\WideUnit\Mocks\MockPreparedStatement|false) of method mysqli@anonymous/LeagueStarters/LeagueStartersServiceTest.php:37::prepare() should be covariant with return type (mysqli_stmt|false) of method mysqli::prepare()'
 			identifier: method.childReturnType
 			count: 1
 			path: tests/LeagueStarters/LeagueStartersServiceTest.php
 
 		-
-			rawMessage: 'AnonymousClass1ecdbf6b540bd3f8fe011b0c02d6f0b4::__construct() does not call parent constructor from mysqli.'
+			rawMessage: 'AnonymousClass1a129972668db7ca34c9c71cd8e0ab60::__construct() does not call parent constructor from mysqli.'
 			identifier: constructor.missingParentCall
 			count: 1
 			path: tests/LeagueTest.php
@@ -3623,49 +2891,13 @@ parameters:
 			path: tests/LeagueTest.php
 
 		-
-			rawMessage: Instantiated class MockDatabase not found.
-			identifier: class.notFound
-			count: 1
-			path: tests/LeagueTest.php
-
-		-
-			rawMessage: Instantiated class MockPreparedStatement not found.
-			identifier: class.notFound
-			count: 1
-			path: tests/LeagueTest.php
-
-		-
-			rawMessage: 'Method mysqli@anonymous/LeagueTest.php:33::prepare() has invalid return type MockPreparedStatement.'
-			identifier: class.notFound
-			count: 1
-			path: tests/LeagueTest.php
-
-		-
-			rawMessage: 'Method mysqli@anonymous/LeagueTest.php:33::prepare() never returns false so it can be removed from the return type.'
+			rawMessage: 'Method mysqli@anonymous/LeagueTest.php:35::prepare() never returns false so it can be removed from the return type.'
 			identifier: return.unusedType
 			count: 1
 			path: tests/LeagueTest.php
 
 		-
-			rawMessage: 'Parameter $mockDb of method mysqli@anonymous/LeagueTest.php:33::__construct() has invalid type MockDatabase.'
-			identifier: class.notFound
-			count: 1
-			path: tests/LeagueTest.php
-
-		-
-			rawMessage: Property Tests\LeagueTest::$mockDb has unknown class MockDatabase as its type.
-			identifier: class.notFound
-			count: 1
-			path: tests/LeagueTest.php
-
-		-
-			rawMessage: Property mysqli@anonymous/LeagueTest.php:33::$mockDb has unknown class MockDatabase as its type.
-			identifier: class.notFound
-			count: 1
-			path: tests/LeagueTest.php
-
-		-
-			rawMessage: 'Return type (MockPreparedStatement|false) of method mysqli@anonymous/LeagueTest.php:33::prepare() should be covariant with return type (mysqli_stmt|false) of method mysqli::prepare()'
+			rawMessage: 'Return type (Tests\WideUnit\Mocks\MockPreparedStatement|false) of method mysqli@anonymous/LeagueTest.php:35::prepare() should be covariant with return type (mysqli_stmt|false) of method mysqli::prepare()'
 			identifier: method.childReturnType
 			count: 1
 			path: tests/LeagueTest.php
@@ -3707,36 +2939,6 @@ parameters:
 			path: tests/Migration/MigrationFileIntegrityTest.php
 
 		-
-			rawMessage: 'Call to method getExecutedQueries() on an unknown class MockDatabase.'
-			identifier: class.notFound
-			count: 2
-			path: tests/Migration/MigrationRepositoryTest.php
-
-		-
-			rawMessage: 'Call to method setMockData() on an unknown class MockDatabase.'
-			identifier: class.notFound
-			count: 6
-			path: tests/Migration/MigrationRepositoryTest.php
-
-		-
-			rawMessage: Instantiated class MockDatabase not found.
-			identifier: class.notFound
-			count: 1
-			path: tests/Migration/MigrationRepositoryTest.php
-
-		-
-			rawMessage: 'Parameter #1 $db of class Migration\MigrationRepository constructor expects mysqli, MockDatabase given.'
-			identifier: argument.type
-			count: 1
-			path: tests/Migration/MigrationRepositoryTest.php
-
-		-
-			rawMessage: Property Tests\Migration\MigrationRepositoryTest::$db has unknown class MockDatabase as its type.
-			identifier: class.notFound
-			count: 1
-			path: tests/Migration/MigrationRepositoryTest.php
-
-		-
 			rawMessage: 'Dynamic call to static method PHPUnit\Framework\Assert::fail().'
 			identifier: staticMethod.dynamicCall
 			count: 1
@@ -3773,34 +2975,10 @@ parameters:
 			path: tests/Module/EntryPoints/TeamEntryPointTest.php
 
 		-
-			rawMessage: 'Call to method setMockData() on an unknown class MockDatabase.'
-			identifier: class.notFound
-			count: 2
-			path: tests/Module/ModuleAccessControlTest.php
-
-		-
 			rawMessage: 'Dynamic call to static method PHPUnit\Framework\TestCase::createStub().'
 			identifier: staticMethod.dynamicCall
 			count: 4
 			path: tests/Module/ModuleAccessControlTest.php
-
-		-
-			rawMessage: Instantiated class MockDatabase not found.
-			identifier: class.notFound
-			count: 2
-			path: tests/Module/ModuleAccessControlTest.php
-
-		-
-			rawMessage: 'Parameter #3 $db of class Module\ModuleAccessControl constructor expects mysqli, MockDatabase given.'
-			identifier: argument.type
-			count: 2
-			path: tests/Module/ModuleAccessControlTest.php
-
-		-
-			rawMessage: Instantiated class MockDatabase not found.
-			identifier: class.notFound
-			count: 1
-			path: tests/Negotiation/NegotiationDemandCalculatorTest.php
 
 		-
 			rawMessage: 'Method Tests\Negotiation\NegotiationDemandCalculatorTest::getDefaultTeamFactors() return type has no value type specified in iterable type array.'
@@ -3869,12 +3047,6 @@ parameters:
 			path: tests/Negotiation/NegotiationDemandCalculatorTest.php
 
 		-
-			rawMessage: 'Parameter #1 $db of class Negotiation\NegotiationDemandCalculator constructor expects mysqli, MockDatabase given.'
-			identifier: argument.type
-			count: 1
-			path: tests/Negotiation/NegotiationDemandCalculatorTest.php
-
-		-
 			rawMessage: Property Tests\Negotiation\NegotiationDemandCalculatorTest::$calculator has no type specified.
 			identifier: missingType.property
 			count: 1
@@ -3887,115 +3059,7 @@ parameters:
 			path: tests/Negotiation/NegotiationDemandCalculatorTest.php
 
 		-
-			rawMessage: 'AnonymousClass222000fd8d819d404117d3fcec7c983a::__construct() does not call parent constructor from mysqli.'
-			identifier: constructor.missingParentCall
-			count: 1
-			path: tests/Negotiation/NegotiationServiceTest.php
-
-		-
-			rawMessage: 'Call to method PHPUnit\Framework\Assert::assertInstanceOf() with ''Negotiation\\Contracts\\NegotiationServiceInterface'' and Negotiation\NegotiationService will always evaluate to true.'
-			identifier: method.alreadyNarrowedType
-			count: 1
-			path: tests/Negotiation/NegotiationServiceTest.php
-
-		-
-			rawMessage: 'Call to method PHPUnit\Framework\Assert::assertInstanceOf() with ''Negotiation\\NegotiationService'' and Negotiation\NegotiationService will always evaluate to true.'
-			identifier: method.alreadyNarrowedType
-			count: 1
-			path: tests/Negotiation/NegotiationServiceTest.php
-
-		-
-			rawMessage: 'Call to method setMockData() on an unknown class MockDatabase.'
-			identifier: class.notFound
-			count: 2
-			path: tests/Negotiation/NegotiationServiceTest.php
-
-		-
-			rawMessage: 'Call to method sql_query() on an unknown class MockDatabase.'
-			identifier: class.notFound
-			count: 1
-			path: tests/Negotiation/NegotiationServiceTest.php
-
-		-
-			rawMessage: Class MockDatabaseResult not found.
-			identifier: class.notFound
-			count: 1
-			path: tests/Negotiation/NegotiationServiceTest.php
-
-		-
-			rawMessage: 'Dynamic call to static method PHPUnit\Framework\TestCase::createStub().'
-			identifier: staticMethod.dynamicCall
-			count: 1
-			path: tests/Negotiation/NegotiationServiceTest.php
-
-		-
-			rawMessage: Instantiated class MockDatabase not found.
-			identifier: class.notFound
-			count: 1
-			path: tests/Negotiation/NegotiationServiceTest.php
-
-		-
-			rawMessage: Instantiated class MockPreparedStatement not found.
-			identifier: class.notFound
-			count: 1
-			path: tests/Negotiation/NegotiationServiceTest.php
-
-		-
-			rawMessage: 'Method Tests\Negotiation\NegotiationServiceTest::getCompletePlayerData() has parameter $overrides with no value type specified in iterable type array.'
-			identifier: missingType.iterableValue
-			count: 1
-			path: tests/Negotiation/NegotiationServiceTest.php
-
-		-
-			rawMessage: 'Method Tests\Negotiation\NegotiationServiceTest::getCompletePlayerData() return type has no value type specified in iterable type array.'
-			identifier: missingType.iterableValue
-			count: 1
-			path: tests/Negotiation/NegotiationServiceTest.php
-
-		-
-			rawMessage: 'Method mysqli@anonymous/Negotiation/NegotiationServiceTest.php:38::prepare() has invalid return type MockPreparedStatement.'
-			identifier: class.notFound
-			count: 1
-			path: tests/Negotiation/NegotiationServiceTest.php
-
-		-
-			rawMessage: 'Method mysqli@anonymous/Negotiation/NegotiationServiceTest.php:38::prepare() never returns false so it can be removed from the return type.'
-			identifier: return.unusedType
-			count: 1
-			path: tests/Negotiation/NegotiationServiceTest.php
-
-		-
-			rawMessage: 'Method mysqli@anonymous/Negotiation/NegotiationServiceTest.php:38::query() never returns mysqli_result so it can be removed from the return type.'
-			identifier: return.unusedType
-			count: 1
-			path: tests/Negotiation/NegotiationServiceTest.php
-
-		-
-			rawMessage: 'Parameter $mockDb of method mysqli@anonymous/Negotiation/NegotiationServiceTest.php:38::__construct() has invalid type MockDatabase.'
-			identifier: class.notFound
-			count: 1
-			path: tests/Negotiation/NegotiationServiceTest.php
-
-		-
-			rawMessage: Property Tests\Negotiation\NegotiationServiceTest::$mockDb has unknown class MockDatabase as its type.
-			identifier: class.notFound
-			count: 1
-			path: tests/Negotiation/NegotiationServiceTest.php
-
-		-
-			rawMessage: Property mysqli@anonymous/Negotiation/NegotiationServiceTest.php:38::$mockDb has unknown class MockDatabase as its type.
-			identifier: class.notFound
-			count: 1
-			path: tests/Negotiation/NegotiationServiceTest.php
-
-		-
-			rawMessage: 'Return type (MockPreparedStatement|false) of method mysqli@anonymous/Negotiation/NegotiationServiceTest.php:38::prepare() should be covariant with return type (mysqli_stmt|false) of method mysqli::prepare()'
-			identifier: method.childReturnType
-			count: 1
-			path: tests/Negotiation/NegotiationServiceTest.php
-
-		-
-			rawMessage: 'AnonymousClasse7ec04392add90834704e882cf6b57ea::__construct() does not call parent constructor from mysqli.'
+			rawMessage: 'AnonymousClassa1d74fa8d59aa5eaa50091bfe3075ed7::__construct() does not call parent constructor from mysqli.'
 			identifier: constructor.missingParentCall
 			count: 1
 			path: tests/Negotiation/NegotiationRepositoryTest.php
@@ -4019,73 +3083,19 @@ parameters:
 			path: tests/Negotiation/NegotiationRepositoryTest.php
 
 		-
-			rawMessage: 'Call to method setMockData() on an unknown class MockDatabase.'
-			identifier: class.notFound
-			count: 5
-			path: tests/Negotiation/NegotiationRepositoryTest.php
-
-		-
-			rawMessage: 'Call to method sql_query() on an unknown class MockDatabase.'
-			identifier: class.notFound
-			count: 1
-			path: tests/Negotiation/NegotiationRepositoryTest.php
-
-		-
-			rawMessage: Class MockDatabaseResult not found.
-			identifier: class.notFound
-			count: 1
-			path: tests/Negotiation/NegotiationRepositoryTest.php
-
-		-
-			rawMessage: Instantiated class MockDatabase not found.
-			identifier: class.notFound
-			count: 1
-			path: tests/Negotiation/NegotiationRepositoryTest.php
-
-		-
-			rawMessage: Instantiated class MockPreparedStatement not found.
-			identifier: class.notFound
-			count: 1
-			path: tests/Negotiation/NegotiationRepositoryTest.php
-
-		-
-			rawMessage: 'Method mysqli@anonymous/Negotiation/NegotiationRepositoryTest.php:39::prepare() has invalid return type MockPreparedStatement.'
-			identifier: class.notFound
-			count: 1
-			path: tests/Negotiation/NegotiationRepositoryTest.php
-
-		-
-			rawMessage: 'Method mysqli@anonymous/Negotiation/NegotiationRepositoryTest.php:39::prepare() never returns false so it can be removed from the return type.'
+			rawMessage: 'Method mysqli@anonymous/Negotiation/NegotiationRepositoryTest.php:42::prepare() never returns false so it can be removed from the return type.'
 			identifier: return.unusedType
 			count: 1
 			path: tests/Negotiation/NegotiationRepositoryTest.php
 
 		-
-			rawMessage: 'Method mysqli@anonymous/Negotiation/NegotiationRepositoryTest.php:39::query() never returns mysqli_result so it can be removed from the return type.'
+			rawMessage: 'Method mysqli@anonymous/Negotiation/NegotiationRepositoryTest.php:42::query() never returns mysqli_result so it can be removed from the return type.'
 			identifier: return.unusedType
 			count: 1
 			path: tests/Negotiation/NegotiationRepositoryTest.php
 
 		-
-			rawMessage: 'Parameter $mockDb of method mysqli@anonymous/Negotiation/NegotiationRepositoryTest.php:39::__construct() has invalid type MockDatabase.'
-			identifier: class.notFound
-			count: 1
-			path: tests/Negotiation/NegotiationRepositoryTest.php
-
-		-
-			rawMessage: Property Tests\Negotiation\NegotiationRepositoryTest::$mockDb has unknown class MockDatabase as its type.
-			identifier: class.notFound
-			count: 1
-			path: tests/Negotiation/NegotiationRepositoryTest.php
-
-		-
-			rawMessage: Property mysqli@anonymous/Negotiation/NegotiationRepositoryTest.php:39::$mockDb has unknown class MockDatabase as its type.
-			identifier: class.notFound
-			count: 1
-			path: tests/Negotiation/NegotiationRepositoryTest.php
-
-		-
-			rawMessage: 'Return type (MockPreparedStatement|false) of method mysqli@anonymous/Negotiation/NegotiationRepositoryTest.php:39::prepare() should be covariant with return type (mysqli_stmt|false) of method mysqli::prepare()'
+			rawMessage: 'Return type (Tests\WideUnit\Mocks\MockPreparedStatement|false) of method mysqli@anonymous/Negotiation/NegotiationRepositoryTest.php:42::prepare() should be covariant with return type (mysqli_stmt|false) of method mysqli::prepare()'
 			identifier: method.childReturnType
 			count: 1
 			path: tests/Negotiation/NegotiationRepositoryTest.php
@@ -4097,14 +3107,62 @@ parameters:
 			path: tests/Negotiation/NegotiationRepositoryTest.php
 
 		-
+			rawMessage: 'AnonymousClass9144c77919f170f7d165bd0705dbba23::__construct() does not call parent constructor from mysqli.'
+			identifier: constructor.missingParentCall
+			count: 1
+			path: tests/Negotiation/NegotiationServiceTest.php
+
+		-
+			rawMessage: 'Call to method PHPUnit\Framework\Assert::assertInstanceOf() with ''Negotiation\\Contracts\\NegotiationServiceInterface'' and Negotiation\NegotiationService will always evaluate to true.'
+			identifier: method.alreadyNarrowedType
+			count: 1
+			path: tests/Negotiation/NegotiationServiceTest.php
+
+		-
+			rawMessage: 'Call to method PHPUnit\Framework\Assert::assertInstanceOf() with ''Negotiation\\NegotiationService'' and Negotiation\NegotiationService will always evaluate to true.'
+			identifier: method.alreadyNarrowedType
+			count: 1
+			path: tests/Negotiation/NegotiationServiceTest.php
+
+		-
 			rawMessage: 'Dynamic call to static method PHPUnit\Framework\TestCase::createStub().'
 			identifier: staticMethod.dynamicCall
 			count: 1
-			path: tests/Negotiation/NegotiationValidatorTest.php
+			path: tests/Negotiation/NegotiationServiceTest.php
 
 		-
-			rawMessage: Instantiated class MockDatabase not found.
-			identifier: class.notFound
+			rawMessage: 'Method Tests\Negotiation\NegotiationServiceTest::getCompletePlayerData() has parameter $overrides with no value type specified in iterable type array.'
+			identifier: missingType.iterableValue
+			count: 1
+			path: tests/Negotiation/NegotiationServiceTest.php
+
+		-
+			rawMessage: 'Method Tests\Negotiation\NegotiationServiceTest::getCompletePlayerData() return type has no value type specified in iterable type array.'
+			identifier: missingType.iterableValue
+			count: 1
+			path: tests/Negotiation/NegotiationServiceTest.php
+
+		-
+			rawMessage: 'Method mysqli@anonymous/Negotiation/NegotiationServiceTest.php:44::prepare() never returns false so it can be removed from the return type.'
+			identifier: return.unusedType
+			count: 1
+			path: tests/Negotiation/NegotiationServiceTest.php
+
+		-
+			rawMessage: 'Method mysqli@anonymous/Negotiation/NegotiationServiceTest.php:44::query() never returns mysqli_result so it can be removed from the return type.'
+			identifier: return.unusedType
+			count: 1
+			path: tests/Negotiation/NegotiationServiceTest.php
+
+		-
+			rawMessage: 'Return type (Tests\WideUnit\Mocks\MockPreparedStatement|false) of method mysqli@anonymous/Negotiation/NegotiationServiceTest.php:44::prepare() should be covariant with return type (mysqli_stmt|false) of method mysqli::prepare()'
+			identifier: method.childReturnType
+			count: 1
+			path: tests/Negotiation/NegotiationServiceTest.php
+
+		-
+			rawMessage: 'Dynamic call to static method PHPUnit\Framework\TestCase::createStub().'
+			identifier: staticMethod.dynamicCall
 			count: 1
 			path: tests/Negotiation/NegotiationValidatorTest.php
 
@@ -4159,12 +3217,6 @@ parameters:
 		-
 			rawMessage: 'Method Tests\Negotiation\NegotiationValidatorTest::testRejectsRookieOptionedPlayerInOptionYear() has no return type specified.'
 			identifier: missingType.return
-			count: 1
-			path: tests/Negotiation/NegotiationValidatorTest.php
-
-		-
-			rawMessage: 'Parameter #1 $db of class Negotiation\NegotiationValidator constructor expects mysqli, MockDatabase given.'
-			identifier: argument.type
 			count: 1
 			path: tests/Negotiation/NegotiationValidatorTest.php
 
@@ -4289,7 +3341,7 @@ parameters:
 			path: tests/Negotiation/NegotiationViewHelperTest.php
 
 		-
-			rawMessage: 'AnonymousClass7ff1ee33b1c4fed2909358f83897dd1e::__construct() does not call parent constructor from mysqli.'
+			rawMessage: 'AnonymousClass74f29325097307b95a6bfe8f2d34bc8a::__construct() does not call parent constructor from mysqli.'
 			identifier: constructor.missingParentCall
 			count: 1
 			path: tests/NextSim/NextSimServiceTest.php
@@ -4313,49 +3365,13 @@ parameters:
 			path: tests/NextSim/NextSimServiceTest.php
 
 		-
-			rawMessage: Instantiated class MockDatabase not found.
-			identifier: class.notFound
-			count: 1
-			path: tests/NextSim/NextSimServiceTest.php
-
-		-
-			rawMessage: Instantiated class MockPreparedStatement not found.
-			identifier: class.notFound
-			count: 1
-			path: tests/NextSim/NextSimServiceTest.php
-
-		-
-			rawMessage: 'Method mysqli@anonymous/NextSim/NextSimServiceTest.php:38::prepare() has invalid return type MockPreparedStatement.'
-			identifier: class.notFound
-			count: 1
-			path: tests/NextSim/NextSimServiceTest.php
-
-		-
-			rawMessage: 'Method mysqli@anonymous/NextSim/NextSimServiceTest.php:38::prepare() never returns false so it can be removed from the return type.'
+			rawMessage: 'Method mysqli@anonymous/NextSim/NextSimServiceTest.php:40::prepare() never returns false so it can be removed from the return type.'
 			identifier: return.unusedType
 			count: 1
 			path: tests/NextSim/NextSimServiceTest.php
 
 		-
-			rawMessage: 'Parameter $mockDb of method mysqli@anonymous/NextSim/NextSimServiceTest.php:38::__construct() has invalid type MockDatabase.'
-			identifier: class.notFound
-			count: 1
-			path: tests/NextSim/NextSimServiceTest.php
-
-		-
-			rawMessage: Property Tests\NextSim\NextSimServiceTest::$mockDb has unknown class MockDatabase as its type.
-			identifier: class.notFound
-			count: 1
-			path: tests/NextSim/NextSimServiceTest.php
-
-		-
-			rawMessage: Property mysqli@anonymous/NextSim/NextSimServiceTest.php:38::$mockDb has unknown class MockDatabase as its type.
-			identifier: class.notFound
-			count: 1
-			path: tests/NextSim/NextSimServiceTest.php
-
-		-
-			rawMessage: 'Return type (MockPreparedStatement|false) of method mysqli@anonymous/NextSim/NextSimServiceTest.php:38::prepare() should be covariant with return type (mysqli_stmt|false) of method mysqli::prepare()'
+			rawMessage: 'Return type (Tests\WideUnit\Mocks\MockPreparedStatement|false) of method mysqli@anonymous/NextSim/NextSimServiceTest.php:40::prepare() should be covariant with return type (mysqli_stmt|false) of method mysqli::prepare()'
 			identifier: method.childReturnType
 			count: 1
 			path: tests/NextSim/NextSimServiceTest.php
@@ -4379,7 +3395,7 @@ parameters:
 			path: tests/NextSim/NextSimViewTest.php
 
 		-
-			rawMessage: 'Method Tests\NextSim\NextSimViewTest::createGameData() should return array<int, array{game: Game, date: DateTime, dayNumber: int, opposingTeam: Team\Team, locationPrefix: string, opposingStarters: array<string, Player\Player>, opponentTier: string, opponentPowerRanking: float}> but returns array{array{game: LeagueSchedule\Game&PHPUnit\Framework\MockObject\Stub, date: DateTime, dayNumber: 1, opposingTeam: PHPUnit\Framework\MockObject\Stub&Team\Team, locationPrefix: ''@'', opposingStarters: non-empty-array<''C''|''PF''|''PG''|''SF''|''SG'', PHPUnit\Framework\MockObject\Stub&Player\Player>, opponentTier: ''strong'', opponentPowerRanking: 75.0}}.'
+			rawMessage: 'Method Tests\NextSim\NextSimViewTest::createGameData() should return array<int, array{game: Game, date: DateTime, dayNumber: int, opposingTeam: Team\Team, locationPrefix: string, opposingStarters: array<string, Player\Player>, opponentTier: string, opponentPowerRanking: float}> but returns array{array{game: LeagueSchedule\Game&PHPUnit\Framework\MockObject\Stub, date: DateTime, dayNumber: 1, opposingTeam: PHPUnit\Framework\MockObject\Stub&Team\Team, locationPrefix: ''@'', opposingStarters: array{PG: PHPUnit\Framework\MockObject\Stub&Player\Player, SG: PHPUnit\Framework\MockObject\Stub&Player\Player, SF: PHPUnit\Framework\MockObject\Stub&Player\Player, PF: PHPUnit\Framework\MockObject\Stub&Player\Player, C: PHPUnit\Framework\MockObject\Stub&Player\Player}, opponentTier: ''strong'', opponentPowerRanking: 75.0}}.'
 			identifier: return.type
 			count: 1
 			path: tests/NextSim/NextSimViewTest.php
@@ -4433,7 +3449,7 @@ parameters:
 			path: tests/OneOnOneGame/OneOnOneGamePlayerStatsTest.php
 
 		-
-			rawMessage: 'AnonymousClass4e589b7cc4612118207ea98fd8d93239::__construct() does not call parent constructor from mysqli.'
+			rawMessage: 'AnonymousClassb731f323364b4f20adde72b66c50c14f::__construct() does not call parent constructor from mysqli.'
 			identifier: constructor.missingParentCall
 			count: 1
 			path: tests/OneOnOneGame/OneOnOneGameRepositoryTest.php
@@ -4457,49 +3473,13 @@ parameters:
 			path: tests/OneOnOneGame/OneOnOneGameRepositoryTest.php
 
 		-
-			rawMessage: Instantiated class MockDatabase not found.
-			identifier: class.notFound
-			count: 1
-			path: tests/OneOnOneGame/OneOnOneGameRepositoryTest.php
-
-		-
-			rawMessage: Instantiated class MockPreparedStatement not found.
-			identifier: class.notFound
-			count: 1
-			path: tests/OneOnOneGame/OneOnOneGameRepositoryTest.php
-
-		-
-			rawMessage: 'Method mysqli@anonymous/OneOnOneGame/OneOnOneGameRepositoryTest.php:33::prepare() has invalid return type MockPreparedStatement.'
-			identifier: class.notFound
-			count: 1
-			path: tests/OneOnOneGame/OneOnOneGameRepositoryTest.php
-
-		-
-			rawMessage: 'Method mysqli@anonymous/OneOnOneGame/OneOnOneGameRepositoryTest.php:33::prepare() never returns false so it can be removed from the return type.'
+			rawMessage: 'Method mysqli@anonymous/OneOnOneGame/OneOnOneGameRepositoryTest.php:35::prepare() never returns false so it can be removed from the return type.'
 			identifier: return.unusedType
 			count: 1
 			path: tests/OneOnOneGame/OneOnOneGameRepositoryTest.php
 
 		-
-			rawMessage: 'Parameter $mockDb of method mysqli@anonymous/OneOnOneGame/OneOnOneGameRepositoryTest.php:33::__construct() has invalid type MockDatabase.'
-			identifier: class.notFound
-			count: 1
-			path: tests/OneOnOneGame/OneOnOneGameRepositoryTest.php
-
-		-
-			rawMessage: Property Tests\OneOnOneGame\OneOnOneGameRepositoryTest::$mockDb has unknown class MockDatabase as its type.
-			identifier: class.notFound
-			count: 1
-			path: tests/OneOnOneGame/OneOnOneGameRepositoryTest.php
-
-		-
-			rawMessage: Property mysqli@anonymous/OneOnOneGame/OneOnOneGameRepositoryTest.php:33::$mockDb has unknown class MockDatabase as its type.
-			identifier: class.notFound
-			count: 1
-			path: tests/OneOnOneGame/OneOnOneGameRepositoryTest.php
-
-		-
-			rawMessage: 'Return type (MockPreparedStatement|false) of method mysqli@anonymous/OneOnOneGame/OneOnOneGameRepositoryTest.php:33::prepare() should be covariant with return type (mysqli_stmt|false) of method mysqli::prepare()'
+			rawMessage: 'Return type (Tests\WideUnit\Mocks\MockPreparedStatement|false) of method mysqli@anonymous/OneOnOneGame/OneOnOneGameRepositoryTest.php:35::prepare() should be covariant with return type (mysqli_stmt|false) of method mysqli::prepare()'
 			identifier: method.childReturnType
 			count: 1
 			path: tests/OneOnOneGame/OneOnOneGameRepositoryTest.php
@@ -4877,12 +3857,6 @@ parameters:
 			path: tests/Player/PlayerPageServiceTest.php
 
 		-
-			rawMessage: Instantiated class MockDatabase not found.
-			identifier: class.notFound
-			count: 1
-			path: tests/Player/PlayerPageServiceTest.php
-
-		-
 			rawMessage: 'Method Tests\Player\PlayerPageServiceTest::testCanShowRenegotiationButtonReturnsFalseWhenCannotRenegotiate() has no return type specified.'
 			identifier: missingType.return
 			count: 1
@@ -4967,12 +3941,6 @@ parameters:
 			path: tests/Player/PlayerPageServiceTest.php
 
 		-
-			rawMessage: 'Parameter #1 $db of class Player\PlayerPageService constructor expects mysqli, MockDatabase given.'
-			identifier: argument.type
-			count: 1
-			path: tests/Player/PlayerPageServiceTest.php
-
-		-
 			rawMessage: Property Tests\Player\PlayerPageServiceTest::$db has no type specified.
 			identifier: missingType.property
 			count: 1
@@ -4983,24 +3951,6 @@ parameters:
 			identifier: missingType.property
 			count: 1
 			path: tests/Player/PlayerPageServiceTest.php
-
-		-
-			rawMessage: Instantiated class MockDatabase not found.
-			identifier: class.notFound
-			count: 1
-			path: tests/Player/PlayerSalaryPlaceholderTest.php
-
-		-
-			rawMessage: 'Parameter #1 $db of static method Player\Player::withPlrRow() expects mysqli, MockDatabase given.'
-			identifier: argument.type
-			count: 1
-			path: tests/Player/PlayerSalaryPlaceholderTest.php
-
-		-
-			rawMessage: Property Tests\Player\PlayerSalaryPlaceholderTest::$mockDb has unknown class MockDatabase as its type.
-			identifier: class.notFound
-			count: 1
-			path: tests/Player/PlayerSalaryPlaceholderTest.php
 
 		-
 			rawMessage: 'You should use assertSame() instead of assertEquals(), because both values are scalars of the same type'
@@ -5019,6 +3969,12 @@ parameters:
 			identifier: property.onlyWritten
 			count: 1
 			path: tests/Player/PlayerViewFactoryTest.php
+
+		-
+			rawMessage: 'Dynamic call to static method PHPUnit\Framework\TestCase::createStub().'
+			identifier: staticMethod.dynamicCall
+			count: 2
+			path: tests/Player/Views/CardBaseStylesXssTest.php
 
 		-
 			rawMessage: '''
@@ -5079,7 +4035,7 @@ parameters:
 			path: tests/PlayerDatabase/PlayerDatabaseValidatorTest.php
 
 		-
-			rawMessage: 'AnonymousClassfbb43b23e1b6717beca543c86d99f708::__construct() does not call parent constructor from mysqli.'
+			rawMessage: 'AnonymousClass7f3273afe4f0f1d2b78b33c376f7be9c::__construct() does not call parent constructor from mysqli.'
 			identifier: constructor.missingParentCall
 			count: 1
 			path: tests/PlayerMovement/PlayerMovementRepositoryTest.php
@@ -5091,55 +4047,13 @@ parameters:
 			path: tests/PlayerMovement/PlayerMovementRepositoryTest.php
 
 		-
-			rawMessage: 'Call to method setMockData() on an unknown class MockDatabase.'
-			identifier: class.notFound
-			count: 2
-			path: tests/PlayerMovement/PlayerMovementRepositoryTest.php
-
-		-
-			rawMessage: Instantiated class MockDatabase not found.
-			identifier: class.notFound
-			count: 1
-			path: tests/PlayerMovement/PlayerMovementRepositoryTest.php
-
-		-
-			rawMessage: Instantiated class MockPreparedStatement not found.
-			identifier: class.notFound
-			count: 1
-			path: tests/PlayerMovement/PlayerMovementRepositoryTest.php
-
-		-
-			rawMessage: 'Method mysqli@anonymous/PlayerMovement/PlayerMovementRepositoryTest.php:26::prepare() has invalid return type MockPreparedStatement.'
-			identifier: class.notFound
-			count: 1
-			path: tests/PlayerMovement/PlayerMovementRepositoryTest.php
-
-		-
-			rawMessage: 'Method mysqli@anonymous/PlayerMovement/PlayerMovementRepositoryTest.php:26::prepare() never returns false so it can be removed from the return type.'
+			rawMessage: 'Method mysqli@anonymous/PlayerMovement/PlayerMovementRepositoryTest.php:28::prepare() never returns false so it can be removed from the return type.'
 			identifier: return.unusedType
 			count: 1
 			path: tests/PlayerMovement/PlayerMovementRepositoryTest.php
 
 		-
-			rawMessage: 'Parameter $mockDb of method mysqli@anonymous/PlayerMovement/PlayerMovementRepositoryTest.php:26::__construct() has invalid type MockDatabase.'
-			identifier: class.notFound
-			count: 1
-			path: tests/PlayerMovement/PlayerMovementRepositoryTest.php
-
-		-
-			rawMessage: Property Tests\PlayerMovement\PlayerMovementRepositoryTest::$mockDb has unknown class MockDatabase as its type.
-			identifier: class.notFound
-			count: 1
-			path: tests/PlayerMovement/PlayerMovementRepositoryTest.php
-
-		-
-			rawMessage: Property mysqli@anonymous/PlayerMovement/PlayerMovementRepositoryTest.php:26::$mockDb has unknown class MockDatabase as its type.
-			identifier: class.notFound
-			count: 1
-			path: tests/PlayerMovement/PlayerMovementRepositoryTest.php
-
-		-
-			rawMessage: 'Return type (MockPreparedStatement|false) of method mysqli@anonymous/PlayerMovement/PlayerMovementRepositoryTest.php:26::prepare() should be covariant with return type (mysqli_stmt|false) of method mysqli::prepare()'
+			rawMessage: 'Return type (Tests\WideUnit\Mocks\MockPreparedStatement|false) of method mysqli@anonymous/PlayerMovement/PlayerMovementRepositoryTest.php:28::prepare() should be covariant with return type (mysqli_stmt|false) of method mysqli::prepare()'
 			identifier: method.childReturnType
 			count: 1
 			path: tests/PlayerMovement/PlayerMovementRepositoryTest.php
@@ -5379,12 +4293,6 @@ parameters:
 			path: tests/RookieOption/RookieOptionControllerTest.php
 
 		-
-			rawMessage: Instantiated class MockDatabase not found.
-			identifier: class.notFound
-			count: 1
-			path: tests/RookieOption/RookieOptionRepositoryTest.php
-
-		-
 			rawMessage: 'Method Tests\RookieOption\RookieOptionRepositoryTest::testUpdatePlayerRookieOptionFirstRound() has no return type specified.'
 			identifier: missingType.return
 			count: 1
@@ -5393,12 +4301,6 @@ parameters:
 		-
 			rawMessage: 'Method Tests\RookieOption\RookieOptionRepositoryTest::testUpdatePlayerRookieOptionSecondRound() has no return type specified.'
 			identifier: missingType.return
-			count: 1
-			path: tests/RookieOption/RookieOptionRepositoryTest.php
-
-		-
-			rawMessage: 'Parameter #1 $db of class RookieOption\RookieOptionRepository constructor expects mysqli, MockDatabase given.'
-			identifier: argument.type
 			count: 1
 			path: tests/RookieOption/RookieOptionRepositoryTest.php
 
@@ -5433,42 +4335,6 @@ parameters:
 			path: tests/Scripts/MaintenanceRepositoryTest.php
 
 		-
-			rawMessage: 'Call to method getExecutedQueries() on an unknown class MockDatabase.'
-			identifier: class.notFound
-			count: 3
-			path: tests/Scripts/MaintenanceRepositoryTest.php
-
-		-
-			rawMessage: 'Call to method setMockData() on an unknown class MockDatabase.'
-			identifier: class.notFound
-			count: 6
-			path: tests/Scripts/MaintenanceRepositoryTest.php
-
-		-
-			rawMessage: 'Call to method setReturnTrue() on an unknown class MockDatabase.'
-			identifier: class.notFound
-			count: 1
-			path: tests/Scripts/MaintenanceRepositoryTest.php
-
-		-
-			rawMessage: Instantiated class MockDatabase not found.
-			identifier: class.notFound
-			count: 1
-			path: tests/Scripts/MaintenanceRepositoryTest.php
-
-		-
-			rawMessage: 'Parameter #1 $db of class Scripts\MaintenanceRepository constructor expects mysqli, MockDatabase given.'
-			identifier: argument.type
-			count: 1
-			path: tests/Scripts/MaintenanceRepositoryTest.php
-
-		-
-			rawMessage: Property Tests\Scripts\MaintenanceRepositoryTest::$mockDb has unknown class MockDatabase as its type.
-			identifier: class.notFound
-			count: 1
-			path: tests/Scripts/MaintenanceRepositoryTest.php
-
-		-
 			rawMessage: 'You should use assertSame() instead of assertEquals(), because both values are scalars of the same type'
 			identifier: phpunit.assertEquals
 			count: 3
@@ -5493,30 +4359,6 @@ parameters:
 			path: tests/Search/SearchViewTest.php
 
 		-
-			rawMessage: 'Call to method setMockData() on an unknown class MockDatabase.'
-			identifier: class.notFound
-			count: 21
-			path: tests/Season/SeasonQueryRepositoryTest.php
-
-		-
-			rawMessage: Instantiated class MockDatabase not found.
-			identifier: class.notFound
-			count: 1
-			path: tests/Season/SeasonQueryRepositoryTest.php
-
-		-
-			rawMessage: 'Parameter #1 $db of class Season\SeasonQueryRepository constructor expects mysqli, MockDatabase given.'
-			identifier: argument.type
-			count: 1
-			path: tests/Season/SeasonQueryRepositoryTest.php
-
-		-
-			rawMessage: Property Tests\Season\SeasonQueryRepositoryTest::$mockDb has unknown class MockDatabase as its type.
-			identifier: class.notFound
-			count: 1
-			path: tests/Season/SeasonQueryRepositoryTest.php
-
-		-
 			rawMessage: 'Call to method PHPUnit\Framework\Assert::assertInstanceOf() with ''SeasonArchive\\Contracts\\SeasonArchiveRepositoryInterface'' and SeasonArchive\SeasonArchiveRepository will always evaluate to true.'
 			identifier: method.alreadyNarrowedType
 			count: 1
@@ -5530,6 +4372,12 @@ parameters:
 
 		-
 			rawMessage: 'Dynamic call to static method PHPUnit\Framework\Assert::callback().'
+			identifier: staticMethod.dynamicCall
+			count: 2
+			path: tests/SeasonArchive/SeasonArchiveServiceTest.php
+
+		-
+			rawMessage: 'Dynamic call to static method PHPUnit\Framework\TestCase::createStub().'
 			identifier: staticMethod.dynamicCall
 			count: 1
 			path: tests/SeasonArchive/SeasonArchiveServiceTest.php
@@ -5567,11 +4415,11 @@ parameters:
 		-
 			rawMessage: 'Dynamic call to static method PHPUnit\Framework\TestCase::createStub().'
 			identifier: staticMethod.dynamicCall
-			count: 13
+			count: 2
 			path: tests/SeasonLeaderboards/CachedSeasonLeaderboardsRepositoryTest.php
 
 		-
-			rawMessage: 'AnonymousClassc9c46af83b3334c154e3771e5ae5aa80::__construct() does not call parent constructor from mysqli.'
+			rawMessage: 'AnonymousClass9acfc5e3bd783c7203d5fc93ff35e725::__construct() does not call parent constructor from mysqli.'
 			identifier: constructor.missingParentCall
 			count: 1
 			path: tests/SeasonLeaderboards/SeasonLeaderboardsRepositoryTest.php
@@ -5595,52 +4443,28 @@ parameters:
 			path: tests/SeasonLeaderboards/SeasonLeaderboardsRepositoryTest.php
 
 		-
-			rawMessage: Instantiated class MockDatabase not found.
-			identifier: class.notFound
-			count: 1
-			path: tests/SeasonLeaderboards/SeasonLeaderboardsRepositoryTest.php
-
-		-
-			rawMessage: Instantiated class MockPreparedStatement not found.
-			identifier: class.notFound
-			count: 1
-			path: tests/SeasonLeaderboards/SeasonLeaderboardsRepositoryTest.php
-
-		-
-			rawMessage: 'Method mysqli@anonymous/SeasonLeaderboards/SeasonLeaderboardsRepositoryTest.php:33::prepare() has invalid return type MockPreparedStatement.'
-			identifier: class.notFound
-			count: 1
-			path: tests/SeasonLeaderboards/SeasonLeaderboardsRepositoryTest.php
-
-		-
-			rawMessage: 'Method mysqli@anonymous/SeasonLeaderboards/SeasonLeaderboardsRepositoryTest.php:33::prepare() never returns false so it can be removed from the return type.'
+			rawMessage: 'Method mysqli@anonymous/SeasonLeaderboards/SeasonLeaderboardsRepositoryTest.php:35::prepare() never returns false so it can be removed from the return type.'
 			identifier: return.unusedType
 			count: 1
 			path: tests/SeasonLeaderboards/SeasonLeaderboardsRepositoryTest.php
 
 		-
-			rawMessage: 'Parameter $mockDb of method mysqli@anonymous/SeasonLeaderboards/SeasonLeaderboardsRepositoryTest.php:33::__construct() has invalid type MockDatabase.'
-			identifier: class.notFound
-			count: 1
-			path: tests/SeasonLeaderboards/SeasonLeaderboardsRepositoryTest.php
-
-		-
-			rawMessage: Property Tests\SeasonLeaderboards\SeasonLeaderboardsRepositoryTest::$mockDb has unknown class MockDatabase as its type.
-			identifier: class.notFound
-			count: 1
-			path: tests/SeasonLeaderboards/SeasonLeaderboardsRepositoryTest.php
-
-		-
-			rawMessage: Property mysqli@anonymous/SeasonLeaderboards/SeasonLeaderboardsRepositoryTest.php:33::$mockDb has unknown class MockDatabase as its type.
-			identifier: class.notFound
-			count: 1
-			path: tests/SeasonLeaderboards/SeasonLeaderboardsRepositoryTest.php
-
-		-
-			rawMessage: 'Return type (MockPreparedStatement|false) of method mysqli@anonymous/SeasonLeaderboards/SeasonLeaderboardsRepositoryTest.php:33::prepare() should be covariant with return type (mysqli_stmt|false) of method mysqli::prepare()'
+			rawMessage: 'Return type (Tests\WideUnit\Mocks\MockPreparedStatement|false) of method mysqli@anonymous/SeasonLeaderboards/SeasonLeaderboardsRepositoryTest.php:35::prepare() should be covariant with return type (mysqli_stmt|false) of method mysqli::prepare()'
 			identifier: method.childReturnType
 			count: 1
 			path: tests/SeasonLeaderboards/SeasonLeaderboardsRepositoryTest.php
+
+		-
+			rawMessage: 'Dynamic call to static method PHPUnit\Framework\TestCase::createStub().'
+			identifier: staticMethod.dynamicCall
+			count: 2
+			path: tests/SeasonLeaderboards/SeasonLeaderboardsServiceTest.php
+
+		-
+			rawMessage: 'Method Tests\SeasonLeaderboards\SeasonLeaderboardsServiceTest::buildServiceWithRows() has parameter $rows with no value type specified in iterable type array.'
+			identifier: missingType.iterableValue
+			count: 1
+			path: tests/SeasonLeaderboards/SeasonLeaderboardsServiceTest.php
 
 		-
 			rawMessage: 'Parameter #1 $row of method SeasonLeaderboards\SeasonLeaderboardsService::processPlayerRow() expects array{pid: int, name: string, year: int, team: string, teamid: int, games: int, minutes: int, fgm: int, ...}, array{pid: 123, name: ''Test Player'', year: 2024, team: ''Test Team'', teamid: 1, games: 0, minutes: 0, fgm: 0, ...} given.'
@@ -5667,22 +4491,16 @@ parameters:
 			path: tests/SeasonLeaderboards/SeasonLeaderboardsServiceTest.php
 
 		-
-			rawMessage: 'Parameter #1 $stats of method SeasonLeaderboards\SeasonLeaderboardsView::renderPlayerRow() expects array{pid: int, name: string, year: int, teamname: string, teamid: int, team_city: string, color1: string, color2: string, ...}, array{pid: 123, name: ''Test Player'', year: ''2024'', teamname: ''Test Team'', teamid: 1, team_city: ''Test City'', color1: ''FF0000'', color2: ''000000'', ...} given.'
-			identifier: argument.type
+			rawMessage: 'Dynamic call to static method PHPUnit\Framework\TestCase::createStub().'
+			identifier: staticMethod.dynamicCall
 			count: 1
 			path: tests/SeasonLeaderboards/SeasonLeaderboardsViewTest.php
 
 		-
-			rawMessage: Access to an undefined property Season\Season::$simLengthInDays.
-			identifier: property.notFound
+			rawMessage: 'Parameter #1 $stats of method SeasonLeaderboards\SeasonLeaderboardsView::renderPlayerRow() expects array{pid: int, name: string, year: int, teamname: string, teamid: int, team_city: string, color1: string, color2: string, ...}, array{pid: 123, name: ''Test Player'', year: ''2024'', teamname: ''Test Team'', teamid: 1, team_city: ''Test City'', color1: ''FF0000'', color2: ''000000'', ...} given.'
+			identifier: argument.type
 			count: 1
-			path: tests/SeasonTest.php
-
-		-
-			rawMessage: Access to private property Season\Season::$lastRegularSeasonGameDate.
-			identifier: property.private
-			count: 1
-			path: tests/SeasonTest.php
+			path: tests/SeasonLeaderboards/SeasonLeaderboardsViewTest.php
 
 		-
 			rawMessage: 'AnonymousClass94bf36a589116f369a5b12136f7fafea::__construct() does not call parent constructor from mysqli.'
@@ -5691,13 +4509,13 @@ parameters:
 			path: tests/SeasonTest.php
 
 		-
-			rawMessage: 'Call to function property_exists() with Season\Season and ''showDraftLink'' will always evaluate to true.'
+			rawMessage: 'Call to function property_exists() with Tests\WideUnit\Mocks\Season and ''showDraftLink'' will always evaluate to true.'
 			identifier: function.alreadyNarrowedType
 			count: 1
 			path: tests/SeasonTest.php
 
 		-
-			rawMessage: 'Call to method PHPUnit\Framework\Assert::assertInstanceOf() with ''Season\\Season'' and Season\Season will always evaluate to true.'
+			rawMessage: 'Call to method PHPUnit\Framework\Assert::assertInstanceOf() with ''Season\\Season'' and Tests\WideUnit\Mocks\Season will always evaluate to true.'
 			identifier: method.alreadyNarrowedType
 			count: 1
 			path: tests/SeasonTest.php
@@ -5871,6 +4689,12 @@ parameters:
 			path: tests/SeasonTest.php
 
 		-
+			rawMessage: 'You should use assertSame() instead of assertEquals(), because both values are scalars of the same type'
+			identifier: phpunit.assertEquals
+			count: 11
+			path: tests/Security/HtmlSanitizerTest.php
+
+		-
 			rawMessage: 'AnonymousClass5f05f4cbdbe4082cf8af01303617d929::__construct() does not call parent constructor from mysqli.'
 			identifier: constructor.missingParentCall
 			count: 1
@@ -5979,7 +4803,7 @@ parameters:
 			path: tests/SeriesRecords/SeriesRecordsControllerTest.php
 
 		-
-			rawMessage: 'AnonymousClass7a92156f8c79dd44bc7147a34d4d9292::__construct() does not call parent constructor from mysqli.'
+			rawMessage: 'AnonymousClass488ce1d08edf0466adc81521ecf2edee::__construct() does not call parent constructor from mysqli.'
 			identifier: constructor.missingParentCall
 			count: 1
 			path: tests/SeriesRecords/SeriesRecordsRepositoryTest.php
@@ -6003,49 +4827,13 @@ parameters:
 			path: tests/SeriesRecords/SeriesRecordsRepositoryTest.php
 
 		-
-			rawMessage: Instantiated class MockDatabase not found.
-			identifier: class.notFound
-			count: 1
-			path: tests/SeriesRecords/SeriesRecordsRepositoryTest.php
-
-		-
-			rawMessage: Instantiated class MockPreparedStatement not found.
-			identifier: class.notFound
-			count: 1
-			path: tests/SeriesRecords/SeriesRecordsRepositoryTest.php
-
-		-
-			rawMessage: 'Method mysqli@anonymous/SeriesRecords/SeriesRecordsRepositoryTest.php:33::prepare() has invalid return type MockPreparedStatement.'
-			identifier: class.notFound
-			count: 1
-			path: tests/SeriesRecords/SeriesRecordsRepositoryTest.php
-
-		-
-			rawMessage: 'Method mysqli@anonymous/SeriesRecords/SeriesRecordsRepositoryTest.php:33::prepare() never returns false so it can be removed from the return type.'
+			rawMessage: 'Method mysqli@anonymous/SeriesRecords/SeriesRecordsRepositoryTest.php:35::prepare() never returns false so it can be removed from the return type.'
 			identifier: return.unusedType
 			count: 1
 			path: tests/SeriesRecords/SeriesRecordsRepositoryTest.php
 
 		-
-			rawMessage: 'Parameter $mockDb of method mysqli@anonymous/SeriesRecords/SeriesRecordsRepositoryTest.php:33::__construct() has invalid type MockDatabase.'
-			identifier: class.notFound
-			count: 1
-			path: tests/SeriesRecords/SeriesRecordsRepositoryTest.php
-
-		-
-			rawMessage: Property Tests\SeriesRecords\SeriesRecordsRepositoryTest::$mockDb has unknown class MockDatabase as its type.
-			identifier: class.notFound
-			count: 1
-			path: tests/SeriesRecords/SeriesRecordsRepositoryTest.php
-
-		-
-			rawMessage: Property mysqli@anonymous/SeriesRecords/SeriesRecordsRepositoryTest.php:33::$mockDb has unknown class MockDatabase as its type.
-			identifier: class.notFound
-			count: 1
-			path: tests/SeriesRecords/SeriesRecordsRepositoryTest.php
-
-		-
-			rawMessage: 'Return type (MockPreparedStatement|false) of method mysqli@anonymous/SeriesRecords/SeriesRecordsRepositoryTest.php:33::prepare() should be covariant with return type (mysqli_stmt|false) of method mysqli::prepare()'
+			rawMessage: 'Return type (Tests\WideUnit\Mocks\MockPreparedStatement|false) of method mysqli@anonymous/SeriesRecords/SeriesRecordsRepositoryTest.php:35::prepare() should be covariant with return type (mysqli_stmt|false) of method mysqli::prepare()'
 			identifier: method.childReturnType
 			count: 1
 			path: tests/SeriesRecords/SeriesRecordsRepositoryTest.php
@@ -6105,72 +4893,6 @@ parameters:
 			path: tests/Services/CommonValidatorTest.php
 
 		-
-			rawMessage: Instantiated class MockDatabase not found.
-			identifier: class.notFound
-			count: 1
-			path: tests/Services/NewsServiceTest.php
-
-		-
-			rawMessage: 'Method Tests\Services\NewsServiceTest::testCreateNewsStory() has no return type specified.'
-			identifier: missingType.return
-			count: 1
-			path: tests/Services/NewsServiceTest.php
-
-		-
-			rawMessage: 'Method Tests\Services\NewsServiceTest::testCreateNewsStoryWithCustomAuthor() has no return type specified.'
-			identifier: missingType.return
-			count: 1
-			path: tests/Services/NewsServiceTest.php
-
-		-
-			rawMessage: 'Method Tests\Services\NewsServiceTest::testGetCategoryIDByTitle() has no return type specified.'
-			identifier: missingType.return
-			count: 1
-			path: tests/Services/NewsServiceTest.php
-
-		-
-			rawMessage: 'Method Tests\Services\NewsServiceTest::testGetCategoryIDByTitleNotFound() has no return type specified.'
-			identifier: missingType.return
-			count: 1
-			path: tests/Services/NewsServiceTest.php
-
-		-
-			rawMessage: 'Method Tests\Services\NewsServiceTest::testGetTopicIDByTeamName() has no return type specified.'
-			identifier: missingType.return
-			count: 1
-			path: tests/Services/NewsServiceTest.php
-
-		-
-			rawMessage: 'Method Tests\Services\NewsServiceTest::testGetTopicIDByTeamNameNotFound() has no return type specified.'
-			identifier: missingType.return
-			count: 1
-			path: tests/Services/NewsServiceTest.php
-
-		-
-			rawMessage: 'Method Tests\Services\NewsServiceTest::testIncrementCategoryCounter() has no return type specified.'
-			identifier: missingType.return
-			count: 1
-			path: tests/Services/NewsServiceTest.php
-
-		-
-			rawMessage: 'Parameter #1 $db of class Services\NewsService constructor expects mysqli, MockDatabase given.'
-			identifier: argument.type
-			count: 1
-			path: tests/Services/NewsServiceTest.php
-
-		-
-			rawMessage: Property Tests\Services\NewsServiceTest::$mockDb has no type specified.
-			identifier: missingType.property
-			count: 1
-			path: tests/Services/NewsServiceTest.php
-
-		-
-			rawMessage: Property Tests\Services\NewsServiceTest::$newsService has no type specified.
-			identifier: missingType.property
-			count: 1
-			path: tests/Services/NewsServiceTest.php
-
-		-
 			rawMessage: 'Call to method PHPUnit\Framework\Assert::assertInstanceOf() with ''Player\\PlayerData'' and Player\PlayerData will always evaluate to true.'
 			identifier: method.alreadyNarrowedType
 			count: 1
@@ -6223,18 +4945,6 @@ parameters:
 			identifier: phpunit.assertEquals
 			count: 2
 			path: tests/Standings/StandingsRepositoryTest.php
-
-		-
-			rawMessage: Instantiated class MockDatabase not found.
-			identifier: class.notFound
-			count: 1
-			path: tests/Statistics/TeamStatsCalculatorTest.php
-
-		-
-			rawMessage: 'Parameter #1 $db of class Statistics\TeamStatsCalculator constructor expects mysqli, MockDatabase given.'
-			identifier: argument.type
-			count: 1
-			path: tests/Statistics/TeamStatsCalculatorTest.php
 
 		-
 			rawMessage: 'Parameter #1 $games of method Statistics\TeamStatsCalculator::calculate() expects list<array{visitor_teamid: int, visitor_score: int, home_teamid: int, home_score: int}>, array{array{visitor_score: 100, home_score: 95}} given.'
@@ -6363,30 +5073,6 @@ parameters:
 			path: tests/Team/TeamControllerTest.php
 
 		-
-			rawMessage: 'Call to method getExecutedQueries() on an unknown class MockDatabase.'
-			identifier: class.notFound
-			count: 3
-			path: tests/Team/TeamRepositoryTest.php
-
-		-
-			rawMessage: 'Call to method setMockData() on an unknown class MockDatabase.'
-			identifier: class.notFound
-			count: 5
-			path: tests/Team/TeamRepositoryTest.php
-
-		-
-			rawMessage: 'Call to method setNumRows() on an unknown class MockDatabase.'
-			identifier: class.notFound
-			count: 5
-			path: tests/Team/TeamRepositoryTest.php
-
-		-
-			rawMessage: Instantiated class MockDatabase not found.
-			identifier: class.notFound
-			count: 1
-			path: tests/Team/TeamRepositoryTest.php
-
-		-
 			rawMessage: 'Method Tests\Team\TeamRepositoryTest::testGetFreeAgencyRosterExecutesQuery() has no return type specified.'
 			identifier: missingType.return
 			count: 1
@@ -6429,38 +5115,8 @@ parameters:
 			path: tests/Team/TeamRepositoryTest.php
 
 		-
-			rawMessage: 'Parameter #1 $db of class Team\TeamRepository constructor expects mysqli, MockDatabase given.'
-			identifier: argument.type
-			count: 1
-			path: tests/Team/TeamRepositoryTest.php
-
-		-
-			rawMessage: Property Tests\Team\TeamRepositoryTest::$db has unknown class MockDatabase as its type.
-			identifier: class.notFound
-			count: 1
-			path: tests/Team/TeamRepositoryTest.php
-
-		-
 			rawMessage: 'Call to method PHPUnit\Framework\Assert::assertInstanceOf() with ''Team\\Contracts\\TeamServiceInterface'' and Team\TeamService will always evaluate to true.'
 			identifier: method.alreadyNarrowedType
-			count: 1
-			path: tests/Team/TeamServiceTest.php
-
-		-
-			rawMessage: Instantiated class MockDatabase not found.
-			identifier: class.notFound
-			count: 1
-			path: tests/Team/TeamServiceTest.php
-
-		-
-			rawMessage: 'Parameter #1 $db of class Team\TeamRepository constructor expects mysqli, MockDatabase given.'
-			identifier: argument.type
-			count: 1
-			path: tests/Team/TeamServiceTest.php
-
-		-
-			rawMessage: 'Parameter #1 $db of class Team\TeamService constructor expects mysqli, MockDatabase given.'
-			identifier: argument.type
 			count: 1
 			path: tests/Team/TeamServiceTest.php
 
@@ -6471,38 +5127,8 @@ parameters:
 			path: tests/Team/TeamTableServiceTest.php
 
 		-
-			rawMessage: 'Call to method setMockData() on an unknown class MockDatabase.'
-			identifier: class.notFound
-			count: 1
-			path: tests/Team/TeamTableServiceTest.php
-
-		-
 			rawMessage: 'Dynamic call to static method PHPUnit\Framework\TestCase::createStub().'
 			identifier: staticMethod.dynamicCall
-			count: 1
-			path: tests/Team/TeamTableServiceTest.php
-
-		-
-			rawMessage: Instantiated class MockDatabase not found.
-			identifier: class.notFound
-			count: 2
-			path: tests/Team/TeamTableServiceTest.php
-
-		-
-			rawMessage: 'Parameter #1 $db of class Team\TeamRepository constructor expects mysqli, MockDatabase given.'
-			identifier: argument.type
-			count: 2
-			path: tests/Team/TeamTableServiceTest.php
-
-		-
-			rawMessage: 'Parameter #1 $db of class Team\TeamTableService constructor expects mysqli, MockDatabase given.'
-			identifier: argument.type
-			count: 2
-			path: tests/Team/TeamTableServiceTest.php
-
-		-
-			rawMessage: Property Tests\Team\TeamTableServiceTest::$mockDb has unknown class MockDatabase as its type.
-			identifier: class.notFound
 			count: 1
 			path: tests/Team/TeamTableServiceTest.php
 
@@ -6609,7 +5235,7 @@ parameters:
 			path: tests/TeamOffDefStats/TeamOffDefStatsViewTest.php
 
 		-
-			rawMessage: 'AnonymousClass78c7934b9bf724917742e1bcf6544522::__construct() does not call parent constructor from mysqli.'
+			rawMessage: 'AnonymousClass620c2105dd3fe95bd4a0eeb0a46651aa::__construct() does not call parent constructor from mysqli.'
 			identifier: constructor.missingParentCall
 			count: 1
 			path: tests/TeamSchedule/TeamScheduleServiceTest.php
@@ -6627,67 +5253,19 @@ parameters:
 			path: tests/TeamSchedule/TeamScheduleServiceTest.php
 
 		-
-			rawMessage: 'Call to method setMockData() on an unknown class MockDatabase.'
-			identifier: class.notFound
-			count: 1
-			path: tests/TeamSchedule/TeamScheduleServiceTest.php
-
-		-
 			rawMessage: 'Dynamic call to static method PHPUnit\Framework\TestCase::createStub().'
 			identifier: staticMethod.dynamicCall
 			count: 1
 			path: tests/TeamSchedule/TeamScheduleServiceTest.php
 
 		-
-			rawMessage: Instantiated class MockDatabase not found.
-			identifier: class.notFound
-			count: 1
-			path: tests/TeamSchedule/TeamScheduleServiceTest.php
-
-		-
-			rawMessage: Instantiated class MockPreparedStatement not found.
-			identifier: class.notFound
-			count: 1
-			path: tests/TeamSchedule/TeamScheduleServiceTest.php
-
-		-
-			rawMessage: 'Method mysqli@anonymous/TeamSchedule/TeamScheduleServiceTest.php:39::prepare() has invalid return type MockPreparedStatement.'
-			identifier: class.notFound
-			count: 1
-			path: tests/TeamSchedule/TeamScheduleServiceTest.php
-
-		-
-			rawMessage: 'Method mysqli@anonymous/TeamSchedule/TeamScheduleServiceTest.php:39::prepare() never returns false so it can be removed from the return type.'
+			rawMessage: 'Method mysqli@anonymous/TeamSchedule/TeamScheduleServiceTest.php:41::prepare() never returns false so it can be removed from the return type.'
 			identifier: return.unusedType
 			count: 1
 			path: tests/TeamSchedule/TeamScheduleServiceTest.php
 
 		-
-			rawMessage: 'Parameter #1 $db of class Season\Season constructor expects mysqli, MockDatabase given.'
-			identifier: argument.type
-			count: 7
-			path: tests/TeamSchedule/TeamScheduleServiceTest.php
-
-		-
-			rawMessage: 'Parameter $mockDb of method mysqli@anonymous/TeamSchedule/TeamScheduleServiceTest.php:39::__construct() has invalid type MockDatabase.'
-			identifier: class.notFound
-			count: 1
-			path: tests/TeamSchedule/TeamScheduleServiceTest.php
-
-		-
-			rawMessage: Property Tests\TeamSchedule\TeamScheduleServiceTest::$mockDb has unknown class MockDatabase as its type.
-			identifier: class.notFound
-			count: 1
-			path: tests/TeamSchedule/TeamScheduleServiceTest.php
-
-		-
-			rawMessage: Property mysqli@anonymous/TeamSchedule/TeamScheduleServiceTest.php:39::$mockDb has unknown class MockDatabase as its type.
-			identifier: class.notFound
-			count: 1
-			path: tests/TeamSchedule/TeamScheduleServiceTest.php
-
-		-
-			rawMessage: 'Return type (MockPreparedStatement|false) of method mysqli@anonymous/TeamSchedule/TeamScheduleServiceTest.php:39::prepare() should be covariant with return type (mysqli_stmt|false) of method mysqli::prepare()'
+			rawMessage: 'Return type (Tests\WideUnit\Mocks\MockPreparedStatement|false) of method mysqli@anonymous/TeamSchedule/TeamScheduleServiceTest.php:41::prepare() should be covariant with return type (mysqli_stmt|false) of method mysqli::prepare()'
 			identifier: method.childReturnType
 			count: 1
 			path: tests/TeamSchedule/TeamScheduleServiceTest.php
@@ -6717,30 +5295,6 @@ parameters:
 			path: tests/TeamTest.php
 
 		-
-			rawMessage: 'Call to method setMockData() on an unknown class MockDatabase.'
-			identifier: class.notFound
-			count: 1
-			path: tests/TeamTest.php
-
-		-
-			rawMessage: Instantiated class MockDatabase not found.
-			identifier: class.notFound
-			count: 1
-			path: tests/TeamTest.php
-
-		-
-			rawMessage: 'Parameter #1 $db of class Team\Team constructor expects mysqli, MockDatabase given.'
-			identifier: argument.type
-			count: 1
-			path: tests/TeamTest.php
-
-		-
-			rawMessage: Property TeamTest::$mockDb has unknown class MockDatabase as its type.
-			identifier: class.notFound
-			count: 1
-			path: tests/TeamTest.php
-
-		-
 			rawMessage: 'Call to method PHPUnit\Framework\Assert::assertInstanceOf() with ''Topics\\Contracts\\TopicsRepositoryInterface'' and Topics\TopicsRepository will always evaluate to true.'
 			identifier: method.alreadyNarrowedType
 			count: 1
@@ -6759,7 +5313,7 @@ parameters:
 			path: tests/Topics/TopicsViewTest.php
 
 		-
-			rawMessage: 'AnonymousClass08ec66a0b7aea77ba1f13604ee98cbc6::__construct() does not call parent constructor from mysqli.'
+			rawMessage: 'AnonymousClassdbb76a182eb582d7b195a46f92f37bc5::__construct() does not call parent constructor from mysqli.'
 			identifier: constructor.missingParentCall
 			count: 1
 			path: tests/Trading/CashTransactionHandlerTest.php
@@ -6777,115 +5331,91 @@ parameters:
 			path: tests/Trading/CashTransactionHandlerTest.php
 
 		-
-			rawMessage: 'Call to method setReturnTrue() on an unknown class MockDatabase.'
-			identifier: class.notFound
-			count: 2
-			path: tests/Trading/CashTransactionHandlerTest.php
-
-		-
-			rawMessage: Instantiated class MockDatabase not found.
-			identifier: class.notFound
-			count: 3
-			path: tests/Trading/CashTransactionHandlerTest.php
-
-		-
-			rawMessage: 'Method class@anonymous/Trading/CashTransactionHandlerTest.php:40::__construct() has parameter $mockData with no value type specified in iterable type array.'
+			rawMessage: 'Method class@anonymous/Trading/CashTransactionHandlerTest.php:41::__construct() has parameter $mockData with no value type specified in iterable type array.'
 			identifier: missingType.iterableValue
 			count: 1
 			path: tests/Trading/CashTransactionHandlerTest.php
 
 		-
-			rawMessage: 'Method class@anonymous/Trading/CashTransactionHandlerTest.php:60::__construct() has parameter $rows with no value type specified in iterable type array.'
+			rawMessage: 'Method class@anonymous/Trading/CashTransactionHandlerTest.php:61::__construct() has parameter $rows with no value type specified in iterable type array.'
 			identifier: missingType.iterableValue
 			count: 1
 			path: tests/Trading/CashTransactionHandlerTest.php
 
 		-
-			rawMessage: 'Method class@anonymous/Trading/CashTransactionHandlerTest.php:60::fetch_assoc() return type has no value type specified in iterable type array.'
+			rawMessage: 'Method class@anonymous/Trading/CashTransactionHandlerTest.php:61::fetch_assoc() return type has no value type specified in iterable type array.'
 			identifier: missingType.iterableValue
 			count: 1
 			path: tests/Trading/CashTransactionHandlerTest.php
 
 		-
-			rawMessage: 'Method class@anonymous/Trading/CashTransactionHandlerTest.php:92::__construct() has parameter $rows with no value type specified in iterable type array.'
+			rawMessage: 'Method class@anonymous/Trading/CashTransactionHandlerTest.php:93::__construct() has parameter $rows with no value type specified in iterable type array.'
 			identifier: missingType.iterableValue
 			count: 1
 			path: tests/Trading/CashTransactionHandlerTest.php
 
 		-
-			rawMessage: 'Method class@anonymous/Trading/CashTransactionHandlerTest.php:92::fetch_assoc() return type has no value type specified in iterable type array.'
+			rawMessage: 'Method class@anonymous/Trading/CashTransactionHandlerTest.php:93::fetch_assoc() return type has no value type specified in iterable type array.'
 			identifier: missingType.iterableValue
 			count: 1
 			path: tests/Trading/CashTransactionHandlerTest.php
 
 		-
-			rawMessage: 'Method mysqli@anonymous/Trading/CashTransactionHandlerTest.php:26::prepare() never returns false so it can be removed from the return type.'
+			rawMessage: 'Method mysqli@anonymous/Trading/CashTransactionHandlerTest.php:27::prepare() never returns false so it can be removed from the return type.'
 			identifier: return.unusedType
 			count: 1
 			path: tests/Trading/CashTransactionHandlerTest.php
 
 		-
-			rawMessage: 'Method mysqli@anonymous/Trading/CashTransactionHandlerTest.php:26::prepare() never returns mysqli_stmt so it can be removed from the return type.'
+			rawMessage: 'Method mysqli@anonymous/Trading/CashTransactionHandlerTest.php:27::prepare() never returns mysqli_stmt so it can be removed from the return type.'
 			identifier: return.unusedType
 			count: 1
 			path: tests/Trading/CashTransactionHandlerTest.php
 
 		-
-			rawMessage: 'Method mysqli@anonymous/Trading/CashTransactionHandlerTest.php:26::prepare() should return mysqli_stmt|false but returns class@anonymous/Trading/CashTransactionHandlerTest.php:40.'
+			rawMessage: 'Method mysqli@anonymous/Trading/CashTransactionHandlerTest.php:27::prepare() should return mysqli_stmt|false but returns class@anonymous/Trading/CashTransactionHandlerTest.php:41.'
 			identifier: return.type
 			count: 1
 			path: tests/Trading/CashTransactionHandlerTest.php
 
 		-
-			rawMessage: 'Method mysqli@anonymous/Trading/CashTransactionHandlerTest.php:26::query() never returns bool so it can be removed from the return type.'
+			rawMessage: 'Method mysqli@anonymous/Trading/CashTransactionHandlerTest.php:27::query() never returns bool so it can be removed from the return type.'
 			identifier: return.unusedType
 			count: 1
 			path: tests/Trading/CashTransactionHandlerTest.php
 
 		-
-			rawMessage: 'Method mysqli@anonymous/Trading/CashTransactionHandlerTest.php:26::query() never returns mysqli_result so it can be removed from the return type.'
+			rawMessage: 'Method mysqli@anonymous/Trading/CashTransactionHandlerTest.php:27::query() never returns mysqli_result so it can be removed from the return type.'
 			identifier: return.unusedType
 			count: 1
 			path: tests/Trading/CashTransactionHandlerTest.php
 
 		-
-			rawMessage: 'Parameter #1 $db of class Trading\CashTransactionHandler constructor expects mysqli, MockDatabase given.'
-			identifier: argument.type
-			count: 3
-			path: tests/Trading/CashTransactionHandlerTest.php
-
-		-
-			rawMessage: Property Tests\Trading\CashTransactionHandlerTest::$legacyMockDb has unknown class MockDatabase as its type.
-			identifier: class.notFound
-			count: 1
-			path: tests/Trading/CashTransactionHandlerTest.php
-
-		-
-			rawMessage: Property class@anonymous/Trading/CashTransactionHandlerTest.php:40::$mockData type has no value type specified in iterable type array.
+			rawMessage: Property class@anonymous/Trading/CashTransactionHandlerTest.php:41::$mockData type has no value type specified in iterable type array.
 			identifier: missingType.iterableValue
 			count: 1
 			path: tests/Trading/CashTransactionHandlerTest.php
 
 		-
-			rawMessage: 'Property class@anonymous/Trading/CashTransactionHandlerTest.php:60::$playerExists is never read, only written.'
+			rawMessage: 'Property class@anonymous/Trading/CashTransactionHandlerTest.php:61::$playerExists is never read, only written.'
 			identifier: property.onlyWritten
 			count: 1
 			path: tests/Trading/CashTransactionHandlerTest.php
 
 		-
-			rawMessage: Property class@anonymous/Trading/CashTransactionHandlerTest.php:60::$rows type has no value type specified in iterable type array.
+			rawMessage: Property class@anonymous/Trading/CashTransactionHandlerTest.php:61::$rows type has no value type specified in iterable type array.
 			identifier: missingType.iterableValue
 			count: 1
 			path: tests/Trading/CashTransactionHandlerTest.php
 
 		-
-			rawMessage: Property class@anonymous/Trading/CashTransactionHandlerTest.php:92::$rows type has no value type specified in iterable type array.
+			rawMessage: Property class@anonymous/Trading/CashTransactionHandlerTest.php:93::$rows type has no value type specified in iterable type array.
 			identifier: missingType.iterableValue
 			count: 1
 			path: tests/Trading/CashTransactionHandlerTest.php
 
 		-
-			rawMessage: Property mysqli@anonymous/Trading/CashTransactionHandlerTest.php:26::$mockData type has no value type specified in iterable type array.
+			rawMessage: Property mysqli@anonymous/Trading/CashTransactionHandlerTest.php:27::$mockData type has no value type specified in iterable type array.
 			identifier: missingType.iterableValue
 			count: 1
 			path: tests/Trading/CashTransactionHandlerTest.php
@@ -6897,7 +5427,7 @@ parameters:
 			path: tests/Trading/CashTransactionHandlerTest.php
 
 		-
-			rawMessage: 'AnonymousClass7e71999a0a001ce31f754b66070558ce::__construct() does not call parent constructor from mysqli.'
+			rawMessage: 'AnonymousClasse725bbbf9a0b0ae2e707b64d8ba3a0f5::__construct() does not call parent constructor from mysqli.'
 			identifier: constructor.missingParentCall
 			count: 1
 			path: tests/Trading/TradeCashRepositoryTest.php
@@ -6915,73 +5445,19 @@ parameters:
 			path: tests/Trading/TradeCashRepositoryTest.php
 
 		-
-			rawMessage: 'Call to method setMockData() on an unknown class MockDatabase.'
-			identifier: class.notFound
-			count: 2
-			path: tests/Trading/TradeCashRepositoryTest.php
-
-		-
-			rawMessage: 'Call to method sql_query() on an unknown class MockDatabase.'
-			identifier: class.notFound
-			count: 1
-			path: tests/Trading/TradeCashRepositoryTest.php
-
-		-
-			rawMessage: Class MockDatabaseResult not found.
-			identifier: class.notFound
-			count: 1
-			path: tests/Trading/TradeCashRepositoryTest.php
-
-		-
-			rawMessage: Instantiated class MockDatabase not found.
-			identifier: class.notFound
-			count: 1
-			path: tests/Trading/TradeCashRepositoryTest.php
-
-		-
-			rawMessage: Instantiated class MockPreparedStatement not found.
-			identifier: class.notFound
-			count: 1
-			path: tests/Trading/TradeCashRepositoryTest.php
-
-		-
-			rawMessage: 'Method mysqli@anonymous/Trading/TradeCashRepositoryTest.php:35::prepare() has invalid return type MockPreparedStatement.'
-			identifier: class.notFound
-			count: 1
-			path: tests/Trading/TradeCashRepositoryTest.php
-
-		-
-			rawMessage: 'Method mysqli@anonymous/Trading/TradeCashRepositoryTest.php:35::prepare() never returns false so it can be removed from the return type.'
+			rawMessage: 'Method mysqli@anonymous/Trading/TradeCashRepositoryTest.php:38::prepare() never returns false so it can be removed from the return type.'
 			identifier: return.unusedType
 			count: 1
 			path: tests/Trading/TradeCashRepositoryTest.php
 
 		-
-			rawMessage: 'Method mysqli@anonymous/Trading/TradeCashRepositoryTest.php:35::query() never returns mysqli_result so it can be removed from the return type.'
+			rawMessage: 'Method mysqli@anonymous/Trading/TradeCashRepositoryTest.php:38::query() never returns mysqli_result so it can be removed from the return type.'
 			identifier: return.unusedType
 			count: 1
 			path: tests/Trading/TradeCashRepositoryTest.php
 
 		-
-			rawMessage: 'Parameter $mockDb of method mysqli@anonymous/Trading/TradeCashRepositoryTest.php:35::__construct() has invalid type MockDatabase.'
-			identifier: class.notFound
-			count: 1
-			path: tests/Trading/TradeCashRepositoryTest.php
-
-		-
-			rawMessage: Property Tests\Trading\TradeCashRepositoryTest::$mockDb has unknown class MockDatabase as its type.
-			identifier: class.notFound
-			count: 1
-			path: tests/Trading/TradeCashRepositoryTest.php
-
-		-
-			rawMessage: Property mysqli@anonymous/Trading/TradeCashRepositoryTest.php:35::$mockDb has unknown class MockDatabase as its type.
-			identifier: class.notFound
-			count: 1
-			path: tests/Trading/TradeCashRepositoryTest.php
-
-		-
-			rawMessage: 'Return type (MockPreparedStatement|false) of method mysqli@anonymous/Trading/TradeCashRepositoryTest.php:35::prepare() should be covariant with return type (mysqli_stmt|false) of method mysqli::prepare()'
+			rawMessage: 'Return type (Tests\WideUnit\Mocks\MockPreparedStatement|false) of method mysqli@anonymous/Trading/TradeCashRepositoryTest.php:38::prepare() should be covariant with return type (mysqli_stmt|false) of method mysqli::prepare()'
 			identifier: method.childReturnType
 			count: 1
 			path: tests/Trading/TradeCashRepositoryTest.php
@@ -7131,7 +5607,7 @@ parameters:
 			path: tests/Trading/TradeQueueProcessorTest.php
 
 		-
-			rawMessage: 'AnonymousClassf43f0119afbd157b58c808e83ec48830::__construct() does not call parent constructor from mysqli.'
+			rawMessage: 'AnonymousClass69ff2a639c35219578b019e0e30d3872::__construct() does not call parent constructor from mysqli.'
 			identifier: constructor.missingParentCall
 			count: 1
 			path: tests/Trading/TradeRosterPreviewApiHandlerTest.php
@@ -7139,6 +5615,12 @@ parameters:
 		-
 			rawMessage: 'Call to method PHPUnit\Framework\Assert::assertTrue() with true will always evaluate to true.'
 			identifier: method.alreadyNarrowedType
+			count: 1
+			path: tests/Trading/TradeRosterPreviewApiHandlerTest.php
+
+		-
+			rawMessage: 'Dynamic call to static method PHPUnit\Framework\TestCase::createStub().'
+			identifier: staticMethod.dynamicCall
 			count: 1
 			path: tests/Trading/TradeRosterPreviewApiHandlerTest.php
 
@@ -7151,18 +5633,6 @@ parameters:
 		-
 			rawMessage: 'Class Trading\TradeValidator constructor invoked with 2 parameters, 1 required.'
 			identifier: arguments.count
-			count: 1
-			path: tests/Trading/TradeValidatorTest.php
-
-		-
-			rawMessage: Instantiated class MockDatabase not found.
-			identifier: class.notFound
-			count: 1
-			path: tests/Trading/TradeValidatorTest.php
-
-		-
-			rawMessage: Instantiated class MockPreparedStatement not found.
-			identifier: class.notFound
 			count: 1
 			path: tests/Trading/TradeValidatorTest.php
 
@@ -7275,26 +5745,20 @@ parameters:
 			path: tests/Trading/TradeValidatorTest.php
 
 		-
-			rawMessage: 'Method class@anonymous/Trading/TradeValidatorTest.php:32::__construct() has parameter $mockDb with no type specified.'
+			rawMessage: 'Method class@anonymous/Trading/TradeValidatorTest.php:34::__construct() has parameter $mockDb with no type specified.'
 			identifier: missingType.parameter
 			count: 1
 			path: tests/Trading/TradeValidatorTest.php
 
 		-
-			rawMessage: 'Method class@anonymous/Trading/TradeValidatorTest.php:32::prepare() has no return type specified.'
+			rawMessage: 'Method class@anonymous/Trading/TradeValidatorTest.php:34::prepare() has no return type specified.'
 			identifier: missingType.return
 			count: 1
 			path: tests/Trading/TradeValidatorTest.php
 
 		-
-			rawMessage: 'Method class@anonymous/Trading/TradeValidatorTest.php:32::prepare() has parameter $query with no type specified.'
+			rawMessage: 'Method class@anonymous/Trading/TradeValidatorTest.php:34::prepare() has parameter $query with no type specified.'
 			identifier: missingType.parameter
-			count: 1
-			path: tests/Trading/TradeValidatorTest.php
-
-		-
-			rawMessage: 'Parameter #1 $db of class Trading\TradeValidator constructor expects mysqli, MockDatabase given.'
-			identifier: argument.type
 			count: 1
 			path: tests/Trading/TradeValidatorTest.php
 
@@ -7317,13 +5781,13 @@ parameters:
 			path: tests/Trading/TradeValidatorTest.php
 
 		-
-			rawMessage: Property class@anonymous/Trading/TradeValidatorTest.php:32::$mockDb has no type specified.
+			rawMessage: Property class@anonymous/Trading/TradeValidatorTest.php:34::$mockDb has no type specified.
 			identifier: missingType.property
 			count: 1
 			path: tests/Trading/TradeValidatorTest.php
 
 		-
-			rawMessage: 'AnonymousClassd2abb51aaf2815cfded5877c34280036::__construct() does not call parent constructor from mysqli.'
+			rawMessage: 'AnonymousClassb0d8ff15a6d01fa74fec69063e320558::__construct() does not call parent constructor from mysqli.'
 			identifier: constructor.missingParentCall
 			count: 1
 			path: tests/Trading/TradingRepositoryTest.php
@@ -7389,73 +5853,19 @@ parameters:
 			path: tests/Trading/TradingRepositoryTest.php
 
 		-
-			rawMessage: 'Call to method setMockData() on an unknown class MockDatabase.'
-			identifier: class.notFound
-			count: 6
-			path: tests/Trading/TradingRepositoryTest.php
-
-		-
-			rawMessage: 'Call to method sql_query() on an unknown class MockDatabase.'
-			identifier: class.notFound
-			count: 1
-			path: tests/Trading/TradingRepositoryTest.php
-
-		-
-			rawMessage: Class MockDatabaseResult not found.
-			identifier: class.notFound
-			count: 1
-			path: tests/Trading/TradingRepositoryTest.php
-
-		-
-			rawMessage: Instantiated class MockDatabase not found.
-			identifier: class.notFound
-			count: 1
-			path: tests/Trading/TradingRepositoryTest.php
-
-		-
-			rawMessage: Instantiated class MockPreparedStatement not found.
-			identifier: class.notFound
-			count: 1
-			path: tests/Trading/TradingRepositoryTest.php
-
-		-
-			rawMessage: 'Method mysqli@anonymous/Trading/TradingRepositoryTest.php:40::prepare() has invalid return type MockPreparedStatement.'
-			identifier: class.notFound
-			count: 1
-			path: tests/Trading/TradingRepositoryTest.php
-
-		-
-			rawMessage: 'Method mysqli@anonymous/Trading/TradingRepositoryTest.php:40::prepare() never returns false so it can be removed from the return type.'
+			rawMessage: 'Method mysqli@anonymous/Trading/TradingRepositoryTest.php:43::prepare() never returns false so it can be removed from the return type.'
 			identifier: return.unusedType
 			count: 1
 			path: tests/Trading/TradingRepositoryTest.php
 
 		-
-			rawMessage: 'Method mysqli@anonymous/Trading/TradingRepositoryTest.php:40::query() never returns mysqli_result so it can be removed from the return type.'
+			rawMessage: 'Method mysqli@anonymous/Trading/TradingRepositoryTest.php:43::query() never returns mysqli_result so it can be removed from the return type.'
 			identifier: return.unusedType
 			count: 1
 			path: tests/Trading/TradingRepositoryTest.php
 
 		-
-			rawMessage: 'Parameter $mockDb of method mysqli@anonymous/Trading/TradingRepositoryTest.php:40::__construct() has invalid type MockDatabase.'
-			identifier: class.notFound
-			count: 1
-			path: tests/Trading/TradingRepositoryTest.php
-
-		-
-			rawMessage: Property Tests\Trading\TradingRepositoryTest::$mockDb has unknown class MockDatabase as its type.
-			identifier: class.notFound
-			count: 1
-			path: tests/Trading/TradingRepositoryTest.php
-
-		-
-			rawMessage: Property mysqli@anonymous/Trading/TradingRepositoryTest.php:40::$mockDb has unknown class MockDatabase as its type.
-			identifier: class.notFound
-			count: 1
-			path: tests/Trading/TradingRepositoryTest.php
-
-		-
-			rawMessage: 'Return type (MockPreparedStatement|false) of method mysqli@anonymous/Trading/TradingRepositoryTest.php:40::prepare() should be covariant with return type (mysqli_stmt|false) of method mysqli::prepare()'
+			rawMessage: 'Return type (Tests\WideUnit\Mocks\MockPreparedStatement|false) of method mysqli@anonymous/Trading/TradingRepositoryTest.php:43::prepare() should be covariant with return type (mysqli_stmt|false) of method mysqli::prepare()'
 			identifier: method.childReturnType
 			count: 1
 			path: tests/Trading/TradingRepositoryTest.php
@@ -7515,27 +5925,9 @@ parameters:
 			path: tests/Trading/TradingViewTest.php
 
 		-
-			rawMessage: 'AnonymousClass21f2469fc567c4f8b6648888597d69e9::__construct() does not call parent constructor from mysqli.'
+			rawMessage: 'AnonymousClass2cc53c05b504c5ad105b666f27717cc1::__construct() does not call parent constructor from mysqli.'
 			identifier: constructor.missingParentCall
 			count: 1
-			path: tests/TrainingCampRatingsDiff/TrainingCampRatingsDiffRepositoryTest.php
-
-		-
-			rawMessage: 'Call to method getExecutedQueries() on an unknown class MockDatabase.'
-			identifier: class.notFound
-			count: 2
-			path: tests/TrainingCampRatingsDiff/TrainingCampRatingsDiffRepositoryTest.php
-
-		-
-			rawMessage: 'Call to method onQuery() on an unknown class MockDatabase.'
-			identifier: class.notFound
-			count: 3
-			path: tests/TrainingCampRatingsDiff/TrainingCampRatingsDiffRepositoryTest.php
-
-		-
-			rawMessage: 'Call to method setMockData() on an unknown class MockDatabase.'
-			identifier: class.notFound
-			count: 3
 			path: tests/TrainingCampRatingsDiff/TrainingCampRatingsDiffRepositoryTest.php
 
 		-
@@ -7545,55 +5937,13 @@ parameters:
 			path: tests/TrainingCampRatingsDiff/TrainingCampRatingsDiffRepositoryTest.php
 
 		-
-			rawMessage: Instantiated class MockDatabase not found.
-			identifier: class.notFound
-			count: 1
-			path: tests/TrainingCampRatingsDiff/TrainingCampRatingsDiffRepositoryTest.php
-
-		-
-			rawMessage: Instantiated class MockPreparedStatement not found.
-			identifier: class.notFound
-			count: 1
-			path: tests/TrainingCampRatingsDiff/TrainingCampRatingsDiffRepositoryTest.php
-
-		-
-			rawMessage: 'Method mysqli@anonymous/TrainingCampRatingsDiff/TrainingCampRatingsDiffRepositoryTest.php:104::prepare() has invalid return type MockPreparedStatement.'
-			identifier: class.notFound
-			count: 1
-			path: tests/TrainingCampRatingsDiff/TrainingCampRatingsDiffRepositoryTest.php
-
-		-
-			rawMessage: 'Method mysqli@anonymous/TrainingCampRatingsDiff/TrainingCampRatingsDiffRepositoryTest.php:104::prepare() never returns false so it can be removed from the return type.'
+			rawMessage: 'Method mysqli@anonymous/TrainingCampRatingsDiff/TrainingCampRatingsDiffRepositoryTest.php:106::prepare() never returns false so it can be removed from the return type.'
 			identifier: return.unusedType
 			count: 1
 			path: tests/TrainingCampRatingsDiff/TrainingCampRatingsDiffRepositoryTest.php
 
 		-
-			rawMessage: 'Parameter $mockDb of method Tests\TrainingCampRatingsDiff\TrainingCampRatingsDiffRepositoryTest::buildMockMysqliDb() has invalid type MockDatabase.'
-			identifier: class.notFound
-			count: 1
-			path: tests/TrainingCampRatingsDiff/TrainingCampRatingsDiffRepositoryTest.php
-
-		-
-			rawMessage: 'Parameter $mockDb of method mysqli@anonymous/TrainingCampRatingsDiff/TrainingCampRatingsDiffRepositoryTest.php:104::__construct() has invalid type MockDatabase.'
-			identifier: class.notFound
-			count: 1
-			path: tests/TrainingCampRatingsDiff/TrainingCampRatingsDiffRepositoryTest.php
-
-		-
-			rawMessage: Property Tests\TrainingCampRatingsDiff\TrainingCampRatingsDiffRepositoryTest::$mockDb has unknown class MockDatabase as its type.
-			identifier: class.notFound
-			count: 1
-			path: tests/TrainingCampRatingsDiff/TrainingCampRatingsDiffRepositoryTest.php
-
-		-
-			rawMessage: Property mysqli@anonymous/TrainingCampRatingsDiff/TrainingCampRatingsDiffRepositoryTest.php:104::$mockDb has unknown class MockDatabase as its type.
-			identifier: class.notFound
-			count: 1
-			path: tests/TrainingCampRatingsDiff/TrainingCampRatingsDiffRepositoryTest.php
-
-		-
-			rawMessage: 'Return type (MockPreparedStatement|false) of method mysqli@anonymous/TrainingCampRatingsDiff/TrainingCampRatingsDiffRepositoryTest.php:104::prepare() should be covariant with return type (mysqli_stmt|false) of method mysqli::prepare()'
+			rawMessage: 'Return type (Tests\WideUnit\Mocks\MockPreparedStatement|false) of method mysqli@anonymous/TrainingCampRatingsDiff/TrainingCampRatingsDiffRepositoryTest.php:106::prepare() should be covariant with return type (mysqli_stmt|false) of method mysqli::prepare()'
 			identifier: method.childReturnType
 			count: 1
 			path: tests/TrainingCampRatingsDiff/TrainingCampRatingsDiffRepositoryTest.php
@@ -7701,32 +6051,8 @@ parameters:
 			path: tests/UpdateAllTheThings/PowerRankingsUpdaterTest.php
 
 		-
-			rawMessage: 'Call to method getExecutedQueries() on an unknown class MockDatabase.'
-			identifier: class.notFound
-			count: 1
-			path: tests/UpdateAllTheThings/PowerRankingsUpdaterTest.php
-
-		-
-			rawMessage: 'Call to method setMockData() on an unknown class MockDatabase.'
-			identifier: class.notFound
-			count: 8
-			path: tests/UpdateAllTheThings/PowerRankingsUpdaterTest.php
-
-		-
-			rawMessage: 'Call to method setReturnTrue() on an unknown class MockDatabase.'
-			identifier: class.notFound
-			count: 1
-			path: tests/UpdateAllTheThings/PowerRankingsUpdaterTest.php
-
-		-
 			rawMessage: 'Dynamic call to static method PHPUnit\Framework\TestCase::createStub().'
 			identifier: staticMethod.dynamicCall
-			count: 1
-			path: tests/UpdateAllTheThings/PowerRankingsUpdaterTest.php
-
-		-
-			rawMessage: Instantiated class MockDatabase not found.
-			identifier: class.notFound
 			count: 1
 			path: tests/UpdateAllTheThings/PowerRankingsUpdaterTest.php
 
@@ -7743,30 +6069,6 @@ parameters:
 			path: tests/UpdateAllTheThings/PowerRankingsUpdaterTest.php
 
 		-
-			rawMessage: 'Parameter #1 $db of class Season\Season constructor expects mysqli, MockDatabase given.'
-			identifier: argument.type
-			count: 1
-			path: tests/UpdateAllTheThings/PowerRankingsUpdaterTest.php
-
-		-
-			rawMessage: 'Parameter #1 $db of class Tests\UpdateAllTheThings\TestablePowerRankingsUpdater constructor expects mysqli, MockDatabase given.'
-			identifier: argument.type
-			count: 1
-			path: tests/UpdateAllTheThings/PowerRankingsUpdaterTest.php
-
-		-
-			rawMessage: 'Parameter #1 $db of class Updater\PowerRankingsUpdater constructor expects mysqli, MockDatabase given.'
-			identifier: argument.type
-			count: 2
-			path: tests/UpdateAllTheThings/PowerRankingsUpdaterTest.php
-
-		-
-			rawMessage: Property Tests\UpdateAllTheThings\PowerRankingsUpdaterTest::$mockDb has unknown class MockDatabase as its type.
-			identifier: class.notFound
-			count: 1
-			path: tests/UpdateAllTheThings/PowerRankingsUpdaterTest.php
-
-		-
 			rawMessage: 'You should use assertSame() instead of assertEquals(), because both values are scalars of the same type'
 			identifier: phpunit.assertEquals
 			count: 3
@@ -7779,44 +6081,8 @@ parameters:
 			path: tests/UpdateAllTheThings/ScheduleUpdaterTest.php
 
 		-
-			rawMessage: 'Call to method getExecutedQueries() on an unknown class MockDatabase.'
-			identifier: class.notFound
-			count: 2
-			path: tests/UpdateAllTheThings/ScheduleUpdaterTest.php
-
-		-
-			rawMessage: 'Call to method setReturnTrue() on an unknown class MockDatabase.'
-			identifier: class.notFound
-			count: 2
-			path: tests/UpdateAllTheThings/ScheduleUpdaterTest.php
-
-		-
 			rawMessage: 'Dynamic call to static method PHPUnit\Framework\TestCase::createStub().'
 			identifier: staticMethod.dynamicCall
-			count: 1
-			path: tests/UpdateAllTheThings/ScheduleUpdaterTest.php
-
-		-
-			rawMessage: Instantiated class MockDatabase not found.
-			identifier: class.notFound
-			count: 1
-			path: tests/UpdateAllTheThings/ScheduleUpdaterTest.php
-
-		-
-			rawMessage: 'Parameter #1 $db of class Season\Season constructor expects mysqli, MockDatabase given.'
-			identifier: argument.type
-			count: 1
-			path: tests/UpdateAllTheThings/ScheduleUpdaterTest.php
-
-		-
-			rawMessage: 'Parameter #1 $db of class Updater\ScheduleUpdater constructor expects mysqli, MockDatabase given.'
-			identifier: argument.type
-			count: 4
-			path: tests/UpdateAllTheThings/ScheduleUpdaterTest.php
-
-		-
-			rawMessage: Property Tests\UpdateAllTheThings\ScheduleUpdaterTest::$mockDb has unknown class MockDatabase as its type.
-			identifier: class.notFound
 			count: 1
 			path: tests/UpdateAllTheThings/ScheduleUpdaterTest.php
 
@@ -7827,75 +6093,15 @@ parameters:
 			path: tests/UpdateAllTheThings/StandingsUpdaterTest.php
 
 		-
-			rawMessage: 'Call to method clearQueryPatterns() on an unknown class MockDatabase.'
-			identifier: class.notFound
-			count: 1
-			path: tests/UpdateAllTheThings/StandingsUpdaterTest.php
-
-		-
-			rawMessage: 'Call to method getExecutedQueries() on an unknown class MockDatabase.'
-			identifier: class.notFound
-			count: 19
-			path: tests/UpdateAllTheThings/StandingsUpdaterTest.php
-
-		-
-			rawMessage: 'Call to method onQuery() on an unknown class MockDatabase.'
-			identifier: class.notFound
-			count: 15
-			path: tests/UpdateAllTheThings/StandingsUpdaterTest.php
-
-		-
-			rawMessage: 'Call to method setMockData() on an unknown class MockDatabase.'
-			identifier: class.notFound
-			count: 2
-			path: tests/UpdateAllTheThings/StandingsUpdaterTest.php
-
-		-
-			rawMessage: 'Call to method setReturnTrue() on an unknown class MockDatabase.'
-			identifier: class.notFound
-			count: 19
-			path: tests/UpdateAllTheThings/StandingsUpdaterTest.php
-
-		-
 			rawMessage: 'Dynamic call to static method PHPUnit\Framework\TestCase::createStub().'
 			identifier: staticMethod.dynamicCall
-			count: 4
-			path: tests/UpdateAllTheThings/StandingsUpdaterTest.php
-
-		-
-			rawMessage: Instantiated class MockDatabase not found.
-			identifier: class.notFound
-			count: 1
-			path: tests/UpdateAllTheThings/StandingsUpdaterTest.php
-
-		-
-			rawMessage: 'Parameter #1 $db of class Season\Season constructor expects mysqli, MockDatabase given.'
-			identifier: argument.type
-			count: 1
-			path: tests/UpdateAllTheThings/StandingsUpdaterTest.php
-
-		-
-			rawMessage: 'Parameter #1 $db of class TestableStandingsUpdater constructor expects mysqli, MockDatabase given.'
-			identifier: argument.type
 			count: 3
-			path: tests/UpdateAllTheThings/StandingsUpdaterTest.php
-
-		-
-			rawMessage: 'Parameter #1 $db of class Updater\StandingsUpdater constructor expects mysqli, MockDatabase given.'
-			identifier: argument.type
-			count: 3
-			path: tests/UpdateAllTheThings/StandingsUpdaterTest.php
-
-		-
-			rawMessage: Property StandingsUpdaterTest::$mockDb has unknown class MockDatabase as its type.
-			identifier: class.notFound
-			count: 1
 			path: tests/UpdateAllTheThings/StandingsUpdaterTest.php
 
 		-
 			rawMessage: 'Call to an undefined method JsbParser\Contracts\JsbImportRepositoryInterface::method().'
 			identifier: method.notFound
-			count: 5
+			count: 8
 			path: tests/UpdateAllTheThings/Steps/EndOfSeasonImportStepTest.php
 
 		-
@@ -7907,7 +6113,7 @@ parameters:
 		-
 			rawMessage: 'Call to an undefined method Updater\Contracts\JsbSourceResolverInterface::method().'
 			identifier: method.notFound
-			count: 4
+			count: 6
 			path: tests/UpdateAllTheThings/Steps/EndOfSeasonImportStepTest.php
 
 		-
@@ -7951,6 +6157,12 @@ parameters:
 			identifier: staticMethod.dynamicCall
 			count: 2
 			path: tests/UpdateAllTheThings/Steps/ExtractFromBackupStepTest.php
+
+		-
+			rawMessage: 'Call to method PHPUnit\Framework\Assert::assertInstanceOf() with ''Updater\\Contracts\\PipelineStepInterface'' and Updater\Steps\GenerateSeasonAwardsStep will always evaluate to true.'
+			identifier: method.alreadyNarrowedType
+			count: 1
+			path: tests/UpdateAllTheThings/Steps/GenerateSeasonAwardsStepTest.php
 
 		-
 			rawMessage: 'Call to an undefined method LeagueConfig\LeagueConfigRepository::method().'
@@ -8229,48 +6441,6 @@ parameters:
 			path: tests/UpdateAllTheThings/UpdaterViewTest.php
 
 		-
-			rawMessage: 'Call to method onQuery() on an unknown class MockDatabase.'
-			identifier: class.notFound
-			count: 2
-			path: tests/Updater/CleanupPreseasonDataStepTest.php
-
-		-
-			rawMessage: 'Call to method setReturnTrue() on an unknown class MockDatabase.'
-			identifier: class.notFound
-			count: 1
-			path: tests/Updater/CleanupPreseasonDataStepTest.php
-
-		-
-			rawMessage: Instantiated class MockDatabase not found.
-			identifier: class.notFound
-			count: 1
-			path: tests/Updater/CleanupPreseasonDataStepTest.php
-
-		-
-			rawMessage: PHPDoc tag @var with type Season\Season is not subtype of native type Tests\WideUnit\Mocks\Season.
-			identifier: varTag.nativeType
-			count: 1
-			path: tests/Updater/CleanupPreseasonDataStepTest.php
-
-		-
-			rawMessage: 'Parameter #1 $db of class Boxscore\BoxscoreRepository constructor expects mysqli, MockDatabase given.'
-			identifier: argument.type
-			count: 1
-			path: tests/Updater/CleanupPreseasonDataStepTest.php
-
-		-
-			rawMessage: 'Parameter #3 $db of class Updater\Steps\CleanupPreseasonDataStep constructor expects mysqli, MockDatabase given.'
-			identifier: argument.type
-			count: 1
-			path: tests/Updater/CleanupPreseasonDataStepTest.php
-
-		-
-			rawMessage: Property Tests\Updater\CleanupPreseasonDataStepTest::$mockDb has unknown class MockDatabase as its type.
-			identifier: class.notFound
-			count: 1
-			path: tests/Updater/CleanupPreseasonDataStepTest.php
-
-		-
 			rawMessage: 'You should use assertSame() instead of assertEquals(), because both values are scalars of the same type'
 			identifier: phpunit.assertEquals
 			count: 20
@@ -8307,18 +6477,6 @@ parameters:
 			path: tests/Updater/UpdaterServiceTest.php
 
 		-
-			rawMessage: 'You should use assertSame() instead of assertEquals(), because both values are scalars of the same type'
-			identifier: phpunit.assertEquals
-			count: 11
-			path: tests/Security/HtmlSanitizerTest.php
-
-		-
-			rawMessage: 'Dynamic call to static method PHPUnit\Framework\Assert::fail().'
-			identifier: staticMethod.dynamicCall
-			count: 5
-			path: tests/Utilities/SchFileParserTest.php
-
-		-
 			rawMessage: 'You should use assertNotSame() instead of assertNotEquals(), because both values are scalars of the same type'
 			identifier: phpunit.assertEquals
 			count: 1
@@ -8353,18 +6511,6 @@ parameters:
 			identifier: method.alreadyNarrowedType
 			count: 1
 			path: tests/Voting/VotingSubmissionViewTest.php
-
-		-
-			rawMessage: Instantiated class MockDatabase not found.
-			identifier: class.notFound
-			count: 1
-			path: tests/VotingResults/VotingResultsControllerTest.php
-
-		-
-			rawMessage: 'Parameter #1 $db of class Season\Season constructor expects mysqli, MockDatabase given.'
-			identifier: argument.type
-			count: 1
-			path: tests/VotingResults/VotingResultsControllerTest.php
 
 		-
 			rawMessage: Property Tests\VotingResults\StubVotingResultsService::$allStarResponse type has no value type specified in iterable type array.
@@ -8631,12 +6777,6 @@ parameters:
 			path: tests/Waivers/WaiversProcessorWriteTest.php
 
 		-
-			rawMessage: Instantiated class MockDatabase not found.
-			identifier: class.notFound
-			count: 1
-			path: tests/Waivers/WaiversRepositoryTest.php
-
-		-
 			rawMessage: 'Method Tests\Waivers\WaiversRepositoryTest::testDropPlayerToWaiversExecutesCorrectQuery() has no return type specified.'
 			identifier: missingType.return
 			count: 1
@@ -8657,12 +6797,6 @@ parameters:
 		-
 			rawMessage: 'Method Tests\Waivers\WaiversRepositoryTest::testSignPlayerFromWaiversWithNewContractDuringFreeAgency() has no return type specified.'
 			identifier: missingType.return
-			count: 1
-			path: tests/Waivers/WaiversRepositoryTest.php
-
-		-
-			rawMessage: 'Parameter #1 $db of class Waivers\WaiversRepository constructor expects mysqli, MockDatabase given.'
-			identifier: argument.type
 			count: 1
 			path: tests/Waivers/WaiversRepositoryTest.php
 
@@ -9189,36 +7323,6 @@ parameters:
 			path: tests/WideUnit/ModifierConsistencyTest.php
 
 		-
-			rawMessage: 'Call to method onQuery() on an unknown class MockDatabase.'
-			identifier: class.notFound
-			count: 1
-			path: tests/WideUnit/ModifierConsistencyTest.php
-
-		-
-			rawMessage: 'Call to method setMockData() on an unknown class MockDatabase.'
-			identifier: class.notFound
-			count: 1
-			path: tests/WideUnit/ModifierConsistencyTest.php
-
-		-
-			rawMessage: Instantiated class MockDatabase not found.
-			identifier: class.notFound
-			count: 2
-			path: tests/WideUnit/ModifierConsistencyTest.php
-
-		-
-			rawMessage: 'Parameter #1 $db of class Negotiation\NegotiationDemandCalculator constructor expects mysqli, MockDatabase given.'
-			identifier: argument.type
-			count: 1
-			path: tests/WideUnit/ModifierConsistencyTest.php
-
-		-
-			rawMessage: 'Parameter #1 $db of static method Player\Player::withPlayerID() expects mysqli, MockDatabase given.'
-			identifier: argument.type
-			count: 1
-			path: tests/WideUnit/ModifierConsistencyTest.php
-
-		-
 			rawMessage: 'Dynamic call to static method PHPUnit\Framework\TestCase::createStub().'
 			identifier: staticMethod.dynamicCall
 			count: 1
@@ -9291,12 +7395,6 @@ parameters:
 			path: tests/WideUnit/Voting/VotingWideUnitTest.php
 
 		-
-			rawMessage: Instantiated class MockDatabase not found.
-			identifier: class.notFound
-			count: 1
-			path: tests/WideUnit/Voting/VotingWideUnitTest.php
-
-		-
 			rawMessage: 'Parameter #1 $tables of method Voting\VotingResultsTableRenderer::renderTables() expects list<array{title: string, rows: list<array{name: string, votes: int, pid: int}>}>, array{array{title: ''Category'', rows: array{array{name: ''Player'', votes: 1}}}} given.'
 			identifier: argument.type
 			count: 1
@@ -9339,12 +7437,6 @@ parameters:
 			path: tests/WideUnit/Voting/VotingWideUnitTest.php
 
 		-
-			rawMessage: 'Parameter #3 $season of class Voting\VotingResultsController constructor expects Season\Season, Tests\WideUnit\Mocks\Season given.'
-			identifier: argument.type
-			count: 9
-			path: tests/WideUnit/Voting/VotingWideUnitTest.php
-
-		-
 			rawMessage: 'Trivial assertion `assertTrue(true)` always passes and does not test anything. Delete the call or replace it with an assertion against actual behavior.'
 			identifier: ibl.meaninglessAssertion
 			count: 7
@@ -9375,7 +7467,7 @@ parameters:
 			path: tests/WideUnit/Waivers/WaiversWideUnitTest.php
 
 		-
-			rawMessage: 'AnonymousClass14b7cfd45257a3f672cd08769ad0d0fa::__construct() does not call parent constructor from mysqli.'
+			rawMessage: 'AnonymousClassf81ca2c6816c6895d71bed1fe6551122::__construct() does not call parent constructor from mysqli.'
 			identifier: constructor.missingParentCall
 			count: 1
 			path: tests/WideUnit/WideUnitTestCase.php
@@ -9387,32 +7479,8 @@ parameters:
 			path: tests/WideUnit/WideUnitTestCase.php
 
 		-
-			rawMessage: 'Call to method sql_query() on an unknown class MockDatabase.'
-			identifier: class.notFound
-			count: 1
-			path: tests/WideUnit/WideUnitTestCase.php
-
-		-
-			rawMessage: Class MockDatabaseResult not found.
-			identifier: class.notFound
-			count: 1
-			path: tests/WideUnit/WideUnitTestCase.php
-
-		-
 			rawMessage: 'Dynamic call to static method PHPUnit\Framework\Assert::fail().'
 			identifier: staticMethod.dynamicCall
-			count: 1
-			path: tests/WideUnit/WideUnitTestCase.php
-
-		-
-			rawMessage: Instantiated class MockDatabase not found.
-			identifier: class.notFound
-			count: 1
-			path: tests/WideUnit/WideUnitTestCase.php
-
-		-
-			rawMessage: Instantiated class MockPreparedStatement not found.
-			identifier: class.notFound
 			count: 1
 			path: tests/WideUnit/WideUnitTestCase.php
 
@@ -9423,49 +7491,19 @@ parameters:
 			path: tests/WideUnit/WideUnitTestCase.php
 
 		-
-			rawMessage: 'Method mysqli@anonymous/WideUnit/WideUnitTestCase.php:68::prepare() has invalid return type MockPreparedStatement.'
-			identifier: class.notFound
-			count: 1
-			path: tests/WideUnit/WideUnitTestCase.php
-
-		-
-			rawMessage: 'Method mysqli@anonymous/WideUnit/WideUnitTestCase.php:68::prepare() never returns false so it can be removed from the return type.'
+			rawMessage: 'Method mysqli@anonymous/WideUnit/WideUnitTestCase.php:70::prepare() never returns false so it can be removed from the return type.'
 			identifier: return.unusedType
 			count: 1
 			path: tests/WideUnit/WideUnitTestCase.php
 
 		-
-			rawMessage: 'Method mysqli@anonymous/WideUnit/WideUnitTestCase.php:68::query() never returns mysqli_result so it can be removed from the return type.'
+			rawMessage: 'Method mysqli@anonymous/WideUnit/WideUnitTestCase.php:70::query() never returns mysqli_result so it can be removed from the return type.'
 			identifier: return.unusedType
 			count: 1
 			path: tests/WideUnit/WideUnitTestCase.php
 
 		-
-			rawMessage: 'Parameter #1 $mockDb of class mysqli@anonymous/WideUnit/WideUnitTestCase.php:68 constructor expects MockDatabase, Tests\WideUnit\Mocks\MockDatabase|null given.'
-			identifier: argument.type
-			count: 1
-			path: tests/WideUnit/WideUnitTestCase.php
-
-		-
-			rawMessage: 'Parameter $mockDb of method mysqli@anonymous/WideUnit/WideUnitTestCase.php:68::__construct() has invalid type MockDatabase.'
-			identifier: class.notFound
-			count: 1
-			path: tests/WideUnit/WideUnitTestCase.php
-
-		-
-			rawMessage: 'Property Tests\WideUnit\WideUnitTestCase::$mockDb (Tests\WideUnit\Mocks\MockDatabase|null) does not accept MockDatabase.'
-			identifier: assign.propertyType
-			count: 1
-			path: tests/WideUnit/WideUnitTestCase.php
-
-		-
-			rawMessage: Property mysqli@anonymous/WideUnit/WideUnitTestCase.php:68::$mockDb has unknown class MockDatabase as its type.
-			identifier: class.notFound
-			count: 1
-			path: tests/WideUnit/WideUnitTestCase.php
-
-		-
-			rawMessage: 'Return type (MockPreparedStatement|false) of method mysqli@anonymous/WideUnit/WideUnitTestCase.php:68::prepare() should be covariant with return type (mysqli_stmt|false) of method mysqli::prepare()'
+			rawMessage: 'Return type (Tests\WideUnit\Mocks\MockPreparedStatement|false) of method mysqli@anonymous/WideUnit/WideUnitTestCase.php:70::prepare() should be covariant with return type (mysqli_stmt|false) of method mysqli::prepare()'
 			identifier: method.childReturnType
 			count: 1
 			path: tests/WideUnit/WideUnitTestCase.php

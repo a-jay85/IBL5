@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace UI\Components;
 
 use Security\HtmlSanitizer;
+use UI\Contracts\TableViewDropdownInterface;
 
 /**
  * TableViewDropdown - Dropdown <select> navigation for team page views with split stats
@@ -15,7 +16,7 @@ use Security\HtmlSanitizer;
  * Split values are encoded as "split:{key}" in option values; non-split values
  * are bare strings (e.g. "ratings", "total_s").
  */
-class TableViewDropdown
+class TableViewDropdown implements TableViewDropdownInterface
 {
     /** @var array<string, array<string, string>> Optgroup label => [value => label] */
     private array $groups;

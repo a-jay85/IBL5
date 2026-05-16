@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace UI\Components;
 
 use Security\HtmlSanitizer;
+use UI\Contracts\TooltipLabelInterface;
 
 /**
  * Renders a value with a CSS-only hover/focus tooltip.
@@ -15,7 +16,7 @@ use Security\HtmlSanitizer;
  * Used for injury return dates, sim number context, and any other
  * value that benefits from a hover/tap tooltip.
  */
-class TooltipLabel
+class TooltipLabel implements TooltipLabelInterface
 {
     /**
      * Render a value with an optional tooltip.

@@ -6,6 +6,7 @@ namespace UI\Tables;
 
 use Player\Player;
 use Player\Stats\PlayerStats;
+use UI\Contracts\PlayerRowTransformerInterface;
 
 /**
  * PlayerRowTransformer - Resolves Player (and optionally PlayerStats) objects
@@ -17,7 +18,7 @@ use Player\Stats\PlayerStats;
  * @phpstan-import-type PlayerRow from \Services\CommonMysqliRepository
  * @phpstan-import-type HistoricalPlayerRow from \Player\Contracts\PlayerRepositoryInterface
  */
-class PlayerRowTransformer
+class PlayerRowTransformer implements PlayerRowTransformerInterface
 {
     /**
      * Resolve an iterable of player rows into Player + PlayerStats pairs.

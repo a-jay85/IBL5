@@ -10,13 +10,14 @@ use Player\PlayerImageHelper;
 use Security\HtmlSanitizer;
 use Team\Team;
 use Season\Season;
+use UI\Contracts\ContractsTableInterface;
 
 /**
  * Contracts - Displays team contracts table
  *
  * @phpstan-import-type PlayerRow from \Services\CommonMysqliRepository
  */
-class Contracts
+class Contracts implements ContractsTableInterface
 {
     /**
      * Render the contracts table

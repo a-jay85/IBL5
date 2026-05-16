@@ -5,13 +5,14 @@ declare(strict_types=1);
 namespace UI;
 
 use Security\HtmlSanitizer;
+use UI\Contracts\AlertRendererInterface;
 
 /**
  * AlertRenderer - Shared utility for rendering ibl-alert banners
  *
  * Replaces identical private renderResultBanner() methods across multiple view classes.
  */
-class AlertRenderer
+class AlertRenderer implements AlertRendererInterface
 {
     /**
      * Render an alert banner from a result code using a caller-supplied banner map

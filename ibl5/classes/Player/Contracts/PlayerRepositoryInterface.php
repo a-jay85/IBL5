@@ -75,17 +75,6 @@ interface PlayerRepositoryInterface
     public function getFreeAgencyDemands(int $playerID): array;
 
     /**
-     * Get player statistics by player ID
-     *
-     * Queries ibl_plr table for all player data by ID.
-     * Returns raw database row with all statistics columns.
-     *
-     * @param int $playerID Player ID
-     * @return PlayerRow|null Player statistics row or null if not found
-     */
-    public function getPlayerStats(int $playerID): ?array;
-
-    /**
      * Get All-Star Game appearances count for a player
      * 
      * Counts awards where awardcontains 'Conference All-Star'.
@@ -132,38 +121,6 @@ interface PlayerRepositoryInterface
      * @return list<AwardRow> Award records ordered by year ASC
      */
     public function getAwards(string $playerName): array;
-
-    /**
-     * Get historical stats for a player ordered by year
-     * 
-     * @param int $playerID Player ID
-     * @return array<array<string, mixed>> Array of historical stat records ordered by year ASC
-     */
-    public function getHistoricalStats(int $playerID): array;
-
-    /**
-     * Get playoff stats for a player ordered by year
-     *
-     * @param string $playerName Player name (exact match)
-     * @return list<array{year: int, pos: string, pid: int, name: string, team: string, games: int, minutes: int, fgm: int, fga: int, ftm: int, fta: int, tgm: int, tga: int, orb: int, reb: int, ast: int, stl: int, tvr: int, blk: int, pf: int, pts: int}> Array of playoff stat records ordered by year ASC
-     */
-    public function getPlayoffStats(string $playerName): array;
-
-    /**
-     * Get HEAT stats for a player ordered by year
-     *
-     * @param string $playerName Player name (exact match)
-     * @return list<array{year: int, pos: string, pid: int, name: string, team: string, games: int, minutes: int, fgm: int, fga: int, ftm: int, fta: int, tgm: int, tga: int, orb: int, reb: int, ast: int, stl: int, tvr: int, blk: int, pf: int, pts: int}> Array of HEAT stat records ordered by year ASC
-     */
-    public function getHeatStats(string $playerName): array;
-
-    /**
-     * Get Olympics stats for a player ordered by year
-     * 
-     * @param int $playerID Player ID
-     * @return array<array<string, mixed>> Array of Olympics stat records ordered by year ASC
-     */
-    public function getOlympicsStats(int $playerID): array;
 
     /**
      * Get news articles mentioning a player

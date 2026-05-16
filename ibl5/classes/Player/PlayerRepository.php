@@ -523,107 +523,6 @@ class PlayerRepository extends BaseMysqliRepository implements PlayerRepositoryI
     }
 
     /**
-     * Get all sim dates ordered by sim number
-     *
-     * @return array<int, array<string, mixed>> Array of sim date records (keys: sim, start_date, end_date)
-     */
-    public function getAllSimDates(): array
-    {
-        return $this->fetchAll(
-            "SELECT sim, start_date, end_date FROM `ibl_sim_dates` ORDER BY sim ASC",
-            ""
-        );
-    }
-
-    /**
-     * @see PlayerRepositoryInterface::getHistoricalStats()
-     * @return array<int, array<string, mixed>>
-     */
-    public function getHistoricalStats(int $playerID): array
-    {
-        return $this->fetchAll(
-            "SELECT * FROM `ibl_hist` WHERE pid = ? ORDER BY year ASC",
-            "i",
-            $playerID
-        );
-    }
-
-    /**
-     * @see PlayerRepositoryInterface::getPlayoffStats()
-     * @return list<array{year: int, pos: string, pid: int, name: string, team: string, games: int, minutes: int, fgm: int, fga: int, ftm: int, fta: int, tgm: int, tga: int, orb: int, reb: int, ast: int, stl: int, tvr: int, blk: int, pf: int, pts: int}>
-     */
-    public function getPlayoffStats(string $playerName): array
-    {
-        /** @var list<array{year: int, pos: string, pid: int, name: string, team: string, games: int, minutes: int, fgm: int, fga: int, ftm: int, fta: int, tgm: int, tga: int, orb: int, reb: int, ast: int, stl: int, tvr: int, blk: int, pf: int, pts: int}> */
-        return $this->fetchAll(
-            self::buildPerSeasonStatsQuery(2),
-            "s",
-            $playerName
-        );
-    }
-
-    /**
-     * @see PlayerRepositoryInterface::getHeatStats()
-     * @return list<array{year: int, pos: string, pid: int, name: string, team: string, games: int, minutes: int, fgm: int, fga: int, ftm: int, fta: int, tgm: int, tga: int, orb: int, reb: int, ast: int, stl: int, tvr: int, blk: int, pf: int, pts: int}>
-     */
-    public function getHeatStats(string $playerName): array
-    {
-        /** @var list<array{year: int, pos: string, pid: int, name: string, team: string, games: int, minutes: int, fgm: int, fga: int, ftm: int, fta: int, tgm: int, tga: int, orb: int, reb: int, ast: int, stl: int, tvr: int, blk: int, pf: int, pts: int}> */
-        return $this->fetchAll(
-            self::buildPerSeasonStatsQuery(3),
-            "s",
-            $playerName
-        );
-    }
-
-    /**
-     * Build inlined per-season stats query with predicate pushed before GROUP BY.
-     *
-     * Replaces SELECT from `ibl_playoff_stats` / ibl_heat_stats views.
-     */
-    private static function buildPerSeasonStatsQuery(int $gameType): string
-    {
-        return "SELECT bs.season_year AS year, MIN(bs.pos) AS pos, bs.pid, p.name,
-            fs.team_name AS team,
-            CAST(COUNT(*) AS SIGNED) AS games,
-            CAST(SUM(bs.game_min) AS SIGNED) AS minutes,
-            CAST(SUM(bs.calc_fg_made) AS SIGNED) AS fgm,
-            CAST(SUM(bs.game_2ga + bs.game_3ga) AS SIGNED) AS fga,
-            CAST(SUM(bs.game_ftm) AS SIGNED) AS ftm,
-            CAST(SUM(bs.game_fta) AS SIGNED) AS fta,
-            CAST(SUM(bs.game_3gm) AS SIGNED) AS tgm,
-            CAST(SUM(bs.game_3ga) AS SIGNED) AS tga,
-            CAST(SUM(bs.game_orb) AS SIGNED) AS orb,
-            CAST(SUM(bs.calc_rebounds) AS SIGNED) AS reb,
-            CAST(SUM(bs.game_ast) AS SIGNED) AS ast,
-            CAST(SUM(bs.game_stl) AS SIGNED) AS stl,
-            CAST(SUM(bs.game_tov) AS SIGNED) AS tvr,
-            CAST(SUM(bs.game_blk) AS SIGNED) AS blk,
-            CAST(SUM(bs.game_pf) AS SIGNED) AS pf,
-            CAST(SUM(bs.calc_points) AS SIGNED) AS pts
-        FROM `ibl_box_scores` bs
-        JOIN `ibl_plr` p ON bs.pid = p.pid
-        JOIN `ibl_franchise_seasons` fs ON bs.teamid = fs.franchise_id
-            AND bs.season_year = fs.season_ending_year
-        WHERE bs.game_type = {$gameType} AND p.name = ?
-        GROUP BY bs.pid, p.name, bs.season_year, fs.team_name
-        ORDER BY year ASC";
-    }
-
-    /**
-     * @see PlayerRepositoryInterface::getOlympicsStats()
-     * @return array<int, array<string, mixed>>
-     */
-    public function getOlympicsStats(int $playerID): array
-    {
-        return $this->fetchAll(
-            "SELECT * FROM `ibl_olympics_stats` WHERE pid = ? ORDER BY year ASC",
-            "i",
-            $playerID
-        );
-    }
-
-    /**
      * @see PlayerRepositoryInterface::getAwards()
      *
      * @return list<AwardRow>
@@ -635,20 +534,6 @@ class PlayerRepository extends BaseMysqliRepository implements PlayerRepositoryI
             "SELECT * FROM `ibl_awards` WHERE name = ? ORDER BY year ASC",
             "s",
             $playerName
-        );
-    }
-
-    /**
-     * @see PlayerRepositoryInterface::getPlayerStats()
-     * @return PlayerRow|null
-     */
-    public function getPlayerStats(int $playerID): ?array
-    {
-        /** @var PlayerRow|null */
-        return $this->fetchOne(
-            "SELECT * FROM `ibl_plr` WHERE pid = ? LIMIT 1",
-            "i",
-            $playerID
         );
     }
 

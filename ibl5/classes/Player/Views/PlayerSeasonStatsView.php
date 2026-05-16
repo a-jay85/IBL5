@@ -4,23 +4,23 @@ declare(strict_types=1);
 
 namespace Player\Views;
 
-use Player\PlayerRepository;
+use Player\PlayerStatsRepository;
 use Player\Contracts\PlayerSeasonStatsViewInterface;
 use BasketballStats\StatsFormatter;
 use Security\HtmlSanitizer;
 
 /**
  * PlayerSeasonStatsView - Renders regular season statistics (totals/averages)
- * 
- * Pure rendering with no database logic - all data fetched via PlayerRepository
- * 
+ *
+ * Pure rendering with no database logic - all data fetched via PlayerStatsRepository
+ *
  * @see PlayerSeasonStatsViewInterface
  */
 class PlayerSeasonStatsView implements PlayerSeasonStatsViewInterface
 {
-    private PlayerRepository $repository;
+    private PlayerStatsRepository $repository;
 
-    public function __construct(PlayerRepository $repository)
+    public function __construct(PlayerStatsRepository $repository)
     {
         $this->repository = $repository;
     }
@@ -61,7 +61,7 @@ class PlayerSeasonStatsView implements PlayerSeasonStatsViewInterface
     <tbody>
         <?php
         foreach ($historicalStats as $stats) {
-            /** @var array{team: string, year: int, games: int, minutes: int, fgm: int, fga: int, ftm: int, fta: int, tgm: int, tga: int, orb: int, reb: int, ast: int, stl: int, tvr: int, blk: int, pf: int, pts: int} $stats */
+            /** @var array{pid: int, name: string, year: int, team: string, teamid: int, games: int, minutes: int, fgm: int, fga: int, ftm: int, fta: int, tgm: int, tga: int, orb: int, reb: int, ast: int, stl: int, blk: int, tvr: int, pf: int, pts: int, ...} $stats */
             $drb = $stats['reb'] - $stats['orb'];
             ?>
     <tr>
@@ -127,7 +127,7 @@ class PlayerSeasonStatsView implements PlayerSeasonStatsViewInterface
     <tbody>
         <?php
         foreach ($historicalStats as $stats) {
-            /** @var array{team: string, year: int, games: int, minutes: int, fgm: int, fga: int, ftm: int, fta: int, tgm: int, tga: int, orb: int, reb: int, ast: int, stl: int, tvr: int, blk: int, pf: int, pts: int} $stats */
+            /** @var array{pid: int, name: string, year: int, team: string, teamid: int, games: int, minutes: int, fgm: int, fga: int, ftm: int, fta: int, tgm: int, tga: int, orb: int, reb: int, ast: int, stl: int, blk: int, tvr: int, pf: int, pts: int, ...} $stats */
             $games = $stats['games'];
             if ($games === 0) {
                 continue;

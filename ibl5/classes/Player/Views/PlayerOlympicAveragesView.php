@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace Player\Views;
 
-use Player\PlayerRepository;
 use Player\PlayerStatsRepository;
 use Player\Contracts\PlayerOlympicAveragesViewInterface;
 use BasketballStats\StatsFormatter;
@@ -14,19 +13,17 @@ use Security\HtmlSanitizer;
  * PlayerOlympicAveragesView - Renders Olympics averages table
  *
  * Shows year-by-year Olympics statistics averages with career averages row.
- * Uses PlayerRepository and PlayerStatsRepository for all database access.
+ * Uses PlayerStatsRepository for all database access.
  *
  * @see PlayerOlympicAveragesViewInterface
  */
 class PlayerOlympicAveragesView implements PlayerOlympicAveragesViewInterface
 {
-    private PlayerRepository $repository;
-    private PlayerStatsRepository $statsRepository;
+    private PlayerStatsRepository $repository;
 
-    public function __construct(PlayerRepository $repository, PlayerStatsRepository $statsRepository)
+    public function __construct(PlayerStatsRepository $repository)
     {
         $this->repository = $repository;
-        $this->statsRepository = $statsRepository;
     }
 
     /**
@@ -43,7 +40,7 @@ class PlayerOlympicAveragesView implements PlayerOlympicAveragesViewInterface
     public function renderAverages(int $playerID): string
     {
         $olympicsStats = $this->repository->getOlympicsStats($playerID);
-        $careerAverages = $this->statsRepository->getOlympicsCareerAverages($playerID);
+        $careerAverages = $this->repository->getOlympicsCareerAverages($playerID);
 
         ob_start();
         ?>

@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Player\Views;
 
-use Player\PlayerRepository;
+use Player\PlayerStatsRepository;
 use Player\Contracts\PlayerHeatTotalsViewInterface;
 use Security\HtmlSanitizer;
 
@@ -12,15 +12,15 @@ use Security\HtmlSanitizer;
  * PlayerHeatTotalsView - Renders H.E.A.T. totals table
  *
  * Shows year-by-year H.E.A.T. statistics totals with career totals row.
- * Uses PlayerRepository for all database access.
+ * Uses PlayerStatsRepository for all database access.
  *
  * @see PlayerHeatTotalsViewInterface
  */
 class PlayerHeatTotalsView implements PlayerHeatTotalsViewInterface
 {
-    private PlayerRepository $repository;
+    private PlayerStatsRepository $repository;
 
-    public function __construct(PlayerRepository $repository)
+    public function __construct(PlayerStatsRepository $repository)
     {
         $this->repository = $repository;
     }

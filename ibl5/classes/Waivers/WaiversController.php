@@ -189,9 +189,9 @@ class WaiversController implements WaiversControllerInterface
     private function renderTableForDisplay(string $display, array $result, Team $team, Season $season): string
     {
         return match ($display) {
-            'total_s' => \UI\Tables\SeasonTotals::render($this->db, $result, $team, ''),
-            'avg_s' => \UI\Tables\SeasonAverages::render($this->db, $result, $team, ''),
-            'per36mins' => \UI\Tables\Per36Minutes::render($this->db, $result, $team, ''),
+            'total_s' => \BasketballStats\Tables\SeasonTotals::render($this->db, $result, $team, ''),
+            'avg_s' => \BasketballStats\Tables\SeasonAverages::render($this->db, $result, $team, ''),
+            'per36mins' => \BasketballStats\Tables\Per36Minutes::render($this->db, $result, $team, ''),
             default => \UI\Tables\Ratings::render($this->db, $result, $team, '', $season),
         };
     }

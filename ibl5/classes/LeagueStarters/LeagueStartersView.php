@@ -115,11 +115,11 @@ class LeagueStartersView implements LeagueStartersViewInterface
     {
         switch ($display) {
             case 'total_s':
-                return \UI\Tables\SeasonTotals::render($this->db, $result, $team, '', [], $this->moduleName);
+                return \BasketballStats\Tables\SeasonTotals::render($this->db, $result, $team, '', [], $this->moduleName);
             case 'avg_s':
-                return \UI\Tables\SeasonAverages::render($this->db, $result, $team, '', [], $this->moduleName);
+                return \BasketballStats\Tables\SeasonAverages::render($this->db, $result, $team, '', [], $this->moduleName);
             case 'per36mins':
-                return \UI\Tables\Per36Minutes::render($this->db, $result, $team, '', [], $this->moduleName);
+                return \BasketballStats\Tables\Per36Minutes::render($this->db, $result, $team, '', [], $this->moduleName);
             default:
                 return \UI\Tables\Ratings::render($this->db, $result, $team, '', $this->season, $this->moduleName);
         }

@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace UI\Tables;
+namespace BasketballStats\Tables;
 
 use Player\PlayerImageHelper;
 use Security\HtmlSanitizer;

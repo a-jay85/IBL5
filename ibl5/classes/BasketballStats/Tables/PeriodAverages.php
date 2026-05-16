@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace UI\Tables;
+namespace BasketballStats\Tables;
 
 use BasketballStats\StatsFormatter;
 use Player\PlayerImageHelper;

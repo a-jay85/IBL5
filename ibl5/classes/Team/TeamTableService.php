@@ -178,15 +178,15 @@ class TeamTableService implements TeamTableServiceInterface
         $yrStr = $yr ?? '';
         switch ($display) {
             case 'total_s':
-                return \UI\Tables\SeasonTotals::render($this->db, $result, $team, $yrStr, $starterPids);
+                return \BasketballStats\Tables\SeasonTotals::render($this->db, $result, $team, $yrStr, $starterPids);
             case 'avg_s':
-                return \UI\Tables\SeasonAverages::render($this->db, $result, $team, $yrStr, $starterPids);
+                return \BasketballStats\Tables\SeasonAverages::render($this->db, $result, $team, $yrStr, $starterPids);
             case 'per36mins':
-                return \UI\Tables\Per36Minutes::render($this->db, $result, $team, $yrStr, $starterPids);
+                return \BasketballStats\Tables\Per36Minutes::render($this->db, $result, $team, $yrStr, $starterPids);
             case 'chunk':
-                return \UI\Tables\PeriodAverages::render($this->db, $team, $season, null, null, $starterPids);
+                return \BasketballStats\Tables\PeriodAverages::render($this->db, $team, $season, null, null, $starterPids);
             case 'playoffs':
-                return \UI\Tables\PeriodAverages::render($this->db, $team, $season, $season->playoffsStartDate, $season->playoffsEndDate, $starterPids);
+                return \BasketballStats\Tables\PeriodAverages::render($this->db, $team, $season, $season->playoffsStartDate, $season->playoffsEndDate, $starterPids);
             case 'contracts':
                 $cashRepo = new \Trading\CashConsiderationRepository($this->db);
                 $cashRows = $cashRepo->getTeamCashConsiderations($team->teamid ?? 0);
@@ -299,7 +299,7 @@ class TeamTableService implements TeamTableServiceInterface
         $rows = $splitRepo->getSplitStats($teamid, $season->endingYear, $splitKey);
         $splitLabel = $splitRepo->getSplitLabel($splitKey);
 
-        return \UI\Tables\SplitStats::render($rows, $team, $splitLabel, $starterPids);
+        return \BasketballStats\Tables\SplitStats::render($rows, $team, $splitLabel, $starterPids);
     }
 
     /**

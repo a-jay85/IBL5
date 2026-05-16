@@ -485,16 +485,16 @@ class TradeRosterPreviewApiHandler
             case 'contracts':
                 return \UI\Tables\Contracts::render($this->db, $roster, $team, $season, $starterPids, $removePids, $showActionLinks);
             case 'chunk':
-                return \UI\Tables\PeriodAverages::render($this->db, $team, $season, null, null, $starterPids, $rosterPids);
+                return \BasketballStats\Tables\PeriodAverages::render($this->db, $team, $season, null, null, $starterPids, $rosterPids);
             case 'playoffs':
-                return \UI\Tables\PeriodAverages::render($this->db, $team, $season, $season->playoffsStartDate, $season->playoffsEndDate, $starterPids, $rosterPids);
+                return \BasketballStats\Tables\PeriodAverages::render($this->db, $team, $season, $season->playoffsStartDate, $season->playoffsEndDate, $starterPids, $rosterPids);
             case 'split':
                 $splitRepo = new \Team\SplitStatsRepository($this->db);
                 $splitKey = $split ?? 'home';
                 $rows = $splitRepo->getSplitStats($team->teamid, $season->endingYear, $splitKey);
                 $rows = array_values(array_filter($rows, static fn (array $r): bool => in_array($r['pid'], $rosterPids, true)));
                 $splitLabel = $splitRepo->getSplitLabel($splitKey);
-                return \UI\Tables\SplitStats::render($rows, $team, $splitLabel, $starterPids);
+                return \BasketballStats\Tables\SplitStats::render($rows, $team, $splitLabel, $starterPids);
             default:
                 return $teamTableService->renderTableForDisplay($display, $roster, $team, null, $season, $starterPids, $split);
         }

@@ -1191,6 +1191,13 @@ INSERT INTO ibl_schedule (season_year, game_date, visitor_teamid, home_teamid, v
   (2026, '2026-02-26', 1, 2, 108, 99, 0, 'c1000000-0000-0000-0000-000000000001')
 ON DUPLICATE KEY UPDATE visitor_score=VALUES(visitor_score);
 
+-- Metros win as visitor in the last-sim window (matches box_scores_teams below).
+-- Required for the Last-Sim Recap card on the News page: card visibility is
+-- gated on `ibl_schedule` rows inside the sim window.
+INSERT INTO ibl_schedule (season_year, game_date, visitor_teamid, home_teamid, visitor_score, home_score, box_id, uuid) VALUES
+  (2026, '2026-03-03', 1, 3, 107, 91, 0, 'sched-recap-01')
+ON DUPLICATE KEY UPDATE visitor_score=VALUES(visitor_score);
+
 -- ============================================================
 -- Box score team pairs (offense/defense footer stats)
 -- Each game needs TWO rows (one per team) for the defense subquery self-JOIN.
@@ -1246,17 +1253,23 @@ ON DUPLICATE KEY UPDATE game_2gm=VALUES(game_2gm), game_2ga=VALUES(game_2ga),
   home_q3_points=VALUES(home_q3_points), home_q4_points=VALUES(home_q4_points);
 
 -- Sim-range pair: 2026-03-03 (inside last sim [2026-03-01..2026-03-07]), Metros vs Cougars
+-- Quarter and pre-game-record columns populated for the Last-Sim Recap card.
 INSERT INTO ibl_box_scores_teams (game_date, visitor_teamid, home_teamid, game_of_that_day, name,
+  visitor_q1_points, visitor_q2_points, visitor_q3_points, visitor_q4_points, visitor_ot_points,
+  home_q1_points, home_q2_points, home_q3_points, home_q4_points, home_ot_points,
+  visitor_wins, visitor_losses, home_wins, home_losses,
   game_2gm, game_2ga, game_ftm, game_fta, game_3gm, game_3ga,
-  game_orb, game_drb, game_ast, game_stl, game_tov, game_blk, game_pf,
-  visitor_q1_points, visitor_q2_points, visitor_q3_points, visitor_q4_points,
-  home_q1_points, home_q2_points, home_q3_points, home_q4_points) VALUES
+  game_orb, game_drb, game_ast, game_stl, game_tov, game_blk, game_pf) VALUES
   ('2026-03-03', 1, 3, 1, 'Metros',
-   30, 60, 20, 24, 9, 20, 11, 30, 24, 8, 10, 5, 15,
-   27, 29, 25, 28, 22, 24, 23, 23),
+   28, 25, 30, 24, 0,
+   22, 26, 21, 22, 0,
+   38, 22, 30, 30,
+   30, 60, 20, 24, 9, 20, 11, 30, 24, 8, 10, 5, 15),
   ('2026-03-03', 1, 3, 1, 'Cougars',
-   27, 56, 16, 21, 7, 19, 8, 26, 20, 5, 14, 2, 19,
-   27, 29, 25, 28, 22, 24, 23, 23)
+   28, 25, 30, 24, 0,
+   22, 26, 21, 22, 0,
+   38, 22, 30, 30,
+   27, 56, 16, 21, 7, 19, 8, 26, 20, 5, 14, 2, 19)
 ON DUPLICATE KEY UPDATE game_2gm=VALUES(game_2gm), game_2ga=VALUES(game_2ga),
   game_ftm=VALUES(game_ftm), game_fta=VALUES(game_fta), game_3gm=VALUES(game_3gm),
   game_3ga=VALUES(game_3ga), game_orb=VALUES(game_orb), game_drb=VALUES(game_drb),

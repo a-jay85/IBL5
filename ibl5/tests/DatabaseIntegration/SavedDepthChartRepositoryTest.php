@@ -279,4 +279,50 @@ class SavedDepthChartRepositoryTest extends DatabaseTestCase
         self::assertArrayHasKey('dc_of', $first);
         self::assertArrayHasKey('dc_bh', $first);
     }
+
+    // ── findActiveChartForTeamOnDate ───────────────────────────────
+
+    public function testFindActiveChartForTeamOnDateReturnsChartCoveringDate(): void
+    {
+        $id = $this->repo->createSavedDepthChart(1, 'testgm', 'In Window', 'Regular Season', 2024, '2024-01-10', 10);
+        $this->repo->extendActiveDepthCharts('2024-01-20', 11);
+
+        $result = $this->repo->findActiveChartForTeamOnDate(1, '2024-01-15');
+
+        self::assertNotNull($result);
+        self::assertSame($id, $result['header']['id']);
+    }
+
+    public function testFindActiveChartForTeamOnDateReturnsNullWhenDateOutsideWindow(): void
+    {
+        $this->repo->createSavedDepthChart(1, 'testgm', 'Old Chart', 'Regular Season', 2024, '2024-01-10', 10);
+        $this->repo->extendActiveDepthCharts('2024-01-12', 11);
+
+        $result = $this->repo->findActiveChartForTeamOnDate(1, '2024-01-15');
+
+        self::assertNull($result);
+    }
+
+    public function testFindActiveChartForTeamOnDateExtractsStarters(): void
+    {
+        $id = $this->repo->createSavedDepthChart(1, 'testgm', 'With Starters', 'Regular Season', 2024, '2024-01-10', 10);
+        $this->repo->saveDepthChartPlayers($id, [
+            ['pid' => 101, 'player_name' => 'PG One', 'ordinal' => 1,
+             'dc_pg_depth' => 1, 'dc_sg_depth' => 0, 'dc_sf_depth' => 0, 'dc_pf_depth' => 0, 'dc_c_depth' => 0,
+             'dc_can_play_in_game' => 1, 'dc_minutes' => 32, 'dc_of' => 0, 'dc_df' => 0, 'dc_oi' => 0, 'dc_di' => 0, 'dc_bh' => 0],
+            ['pid' => 102, 'player_name' => 'SG One', 'ordinal' => 2,
+             'dc_pg_depth' => 0, 'dc_sg_depth' => 1, 'dc_sf_depth' => 0, 'dc_pf_depth' => 0, 'dc_c_depth' => 0,
+             'dc_can_play_in_game' => 1, 'dc_minutes' => 30, 'dc_of' => 0, 'dc_df' => 0, 'dc_oi' => 0, 'dc_di' => 0, 'dc_bh' => 0],
+            ['pid' => 103, 'player_name' => 'Bench', 'ordinal' => 3,
+             'dc_pg_depth' => 2, 'dc_sg_depth' => 0, 'dc_sf_depth' => 0, 'dc_pf_depth' => 0, 'dc_c_depth' => 0,
+             'dc_can_play_in_game' => 1, 'dc_minutes' => 12, 'dc_of' => 0, 'dc_df' => 0, 'dc_oi' => 0, 'dc_di' => 0, 'dc_bh' => 0],
+        ]);
+
+        $result = $this->repo->findActiveChartForTeamOnDate(1, '2024-01-15');
+
+        self::assertNotNull($result);
+        self::assertSame(101, $result['starters']['PG']);
+        self::assertSame(102, $result['starters']['SG']);
+        self::assertNull($result['starters']['SF']);
+    }
 }

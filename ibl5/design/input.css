@@ -25,7 +25,9 @@
   /* Fill in missing palette steps */
   --color-accent-700: #c2410c;
   --color-success-400: #4ade80;
+  --color-success-700: #15803d;
   --color-error-400: #f87171;
+  --color-error-700: #991b1b;
 
   /* Status: Success */
   --color-success-600: #16a34a;
@@ -157,6 +159,7 @@
 @import './components/ratings-diff.css';
 @import './components/htmx.css';
 @import './components/debug.css';
+@import './components/last-sim-recap.css';
 
 /* Site-wide layout wrapper (replaces legacy themeheader table) */
 @layer components {

@@ -189,4 +189,21 @@ interface SavedDepthChartRepositoryInterface
      * @return array{wins: int, losses: int}
      */
     public function getWinLossRecord(int $teamid, string $startDate, string $endDate): array;
+
+    /**
+     * Find the saved depth chart whose active window covers the given date.
+     *
+     * Returns the chart where `sim_start_date <= $date AND
+     * (sim_end_date >= $date OR sim_end_date IS NULL)`. Used by the Last-Sim
+     * Recap card to identify the depth chart that produced each game.
+     *
+     * Joins player rows tagged as the depth-chart starter at each position
+     * (`dc_pg_depth = 1`, `dc_sg_depth = 1`, …, `dc_c_depth = 1`).
+     *
+     * @return array{
+     *   header: SavedDepthChartRow,
+     *   starters: array{PG:int|null,SG:int|null,SF:int|null,PF:int|null,C:int|null}
+     * }|null
+     */
+    public function findActiveChartForTeamOnDate(int $tid, string $date): ?array;
 }

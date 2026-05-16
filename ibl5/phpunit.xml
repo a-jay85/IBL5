@@ -186,6 +186,9 @@
         <testsuite name="SavedDepthChart Module Tests">
             <directory>tests/SavedDepthChart</directory>
         </testsuite>
+        <testsuite name="LastSimRecap Module Tests">
+            <directory>tests/LastSimRecap</directory>
+        </testsuite>
         <testsuite name="Search Module Tests">
             <directory>tests/Search</directory>
         </testsuite>

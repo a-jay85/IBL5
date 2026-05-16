@@ -33,6 +33,24 @@ function theindex($new_topic = "0")
         $querylang = "";
     }
     PageLayout\PageLayout::header();
+
+    if (is_user($user)) {
+        $commonRepo = new \Services\CommonMysqliRepository($mysqli_db);
+        $teamName = $commonRepo->getTeamnameFromUsername($userinfo['username'] ?? null);
+        if ($teamName !== null && $teamName !== \League\League::FREE_AGENTS_TEAM_NAME) {
+            $tid = $commonRepo->getTidFromTeamname($teamName);
+            if ($tid !== null && \League\League::isRealFranchise($tid)) {
+                $recapService = new \LastSimRecap\LastSimRecapService(
+                    new \LastSimRecap\LastSimRecapRepository($mysqli_db)
+                );
+                $slate = $recapService->buildSlateForTeam($tid);
+                if ($slate !== null) {
+                    echo (new \LastSimRecap\LastSimRecapView())->render($slate);
+                }
+            }
+        }
+    }
+
     if (isset($userinfo['storynum']) and $user_news == 1) {
         $storynum = $userinfo['storynum'];
     } else {

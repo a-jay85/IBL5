@@ -4,7 +4,7 @@
         "ibl.deprecatedHtmlTag": 3,
         "ibl.inlineCss": 6,
         "ibl.rawSuperglobal": 7,
-        "ibl.unescapedOutput": 22,
+        "ibl.unescapedOutput": 17,
         "method.deprecatedClass": 2,
         "varTag.deprecatedClass": 1
     },
@@ -69,5 +69,5 @@
         "varTag.type": 1,
         "variable.undefined": 25
     },
-    "as_of": "2026-05-15"
+    "as_of": "2026-05-16"
 }

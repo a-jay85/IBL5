@@ -465,9 +465,9 @@ Effort scale:
 **Risk if untouched:** No error output on localhost; debugging painful; regressions hidden.
 
 ### 3.4 `configOlympics.php` Is Dead-Code Credential File
-**Location:** `ibl5/configOlympics.php`
-**Problem:** Identical production credentials, never `require`d. Olympics now uses the same DB via `LeagueContext`. Only reference is a `bin/e2e-local.sh` guard comment.
-**Suggested direction:** Delete; update `bin/e2e-local.sh`; add to `.gitignore` as safety.
+**Location:** ibl5/configOlympics.php
+**Problem:** Identical production credentials, never `require`d. Olympics now uses the same DB via `LeagueContext`. Only reference is a `ibl5/bin/e2e-local.sh` guard comment.
+**Suggested direction:** Delete; update `ibl5/bin/e2e-local.sh`; add to `.gitignore` as safety.
 **Est. effort:** S
 **Risk if untouched:** Dead credential file confuses; risks recommit.
 
@@ -1202,7 +1202,7 @@ Effort scale:
 **Risk if untouched:** Copy-paste errors from inconsistent examples.
 
 ### 8.4 `shellScripts/` Has No Shell Scripts
-**Location:** `ibl5/shellScripts/`
+**Location:** ibl5/shellScripts/
 **Problem:** Only contains DB dumps + a `.env` file. No `.sh` files. Misleading name.
 **Suggested direction:** Delete dir after removing dumps from history.
 **Est. effort:** M
@@ -1225,7 +1225,7 @@ Effort scale:
 ### 8.7 Symlink Strategy Undocumented
 **Location:** `/bin/db-query` → `../ibl5/bin/db-query`
 **Problem:** One-off symlink; no manifest or convention.
-**Suggested direction:** `bin/README.md` documenting the pattern; optional `.symlinks` manifest.
+**Suggested direction:** bin/README.md documenting the pattern; optional `.symlinks` manifest.
 **Est. effort:** S
 **Risk if untouched:** Symlinks rot when scripts move.
 
@@ -1239,26 +1239,26 @@ Effort scale:
 ### 8.9 `bin/lib/` Has No Manifest
 **Location:** `/bin/lib/`
 **Problem:** 4 shared shell helpers (`db-helpers.sh`, `git-helpers.sh`, `wt-guards.sh`, `nightly-stream-filter`). Inconsistent: filter has no `.sh`.
-**Suggested direction:** Rename for consistency; add `bin/lib/README.md`.
+**Suggested direction:** Rename for consistency; add bin/lib/README.md.
 **Est. effort:** S
 **Risk if untouched:** Devs unsure which helpers exist; duplication.
 
 ### 8.10 No Convention for Interactive vs CI Scripts
 **Location:** `/bin/`
 **Problem:** Mix of user-facing (`wt-new`, `e2e-for-file`) and CI automation (`check-docs`, `adr-check`, `refactor-flag`). Same naming style.
-**Suggested direction:** Prefix `check-*`/`test-*` for CI; or `bin/ci/` subdirectory; document.
+**Suggested direction:** Prefix `check-*`/`test-*` for CI; or bin/ci/ subdirectory; document.
 **Est. effort:** M
 **Risk if untouched:** Accidental human runs of CI scripts; CI-tuned scripts break locally.
 
 ### 8.11 Nightly Workflow Scripts Have Complex State
 **Location:** `/bin/nightly-*` (4 files)
 **Problem:** `nightly-run`, `nightly-queue` are executables; `nightly-prompt-impl`, `nightly-prompt-postplan` are templates. No README.
-**Suggested direction:** Move to `bin/nightly/`; add README explaining data flow.
+**Suggested direction:** Move to bin/nightly/; add README explaining data flow.
 **Est. effort:** M
 **Risk if untouched:** Workflow opaque; debugging hard.
 
 ### 8.12 Plaintext Credentials in `.env`
-**Location:** `ibl5/shellScripts/.env`
+**Location:** ibl5/shellScripts/.env
 **Problem:** Production SSH + MariaDB credentials in plaintext.
 **Suggested direction:** Rotate; remove from history; use GitHub Secrets for CI; CLAUDE.md note "no credentials in git ever."
 **Est. effort:** M
@@ -1281,14 +1281,14 @@ Effort scale:
 ### 8.15 Two E2E Drivers
 **Location:** `/bin/e2e-wt.sh` (worktrees) vs `ibl5/bin/e2e-local.sh` (local)
 **Problem:** Both do similar work; developer must know which.
-**Suggested direction:** Consolidate into single `bin/e2e` that detects context.
+**Suggested direction:** Consolidate into single bin/e2e that detects context.
 **Est. effort:** M
 **Risk if untouched:** Devs run the wrong script.
 
 ### 8.16 Check Scripts Have Inconsistent Output / Exit Codes
 **Location:** `/bin/check-*` and `ibl5/bin/check-*`
 **Problem:** No standardized "pass" output format.
-**Suggested direction:** Define check-script standard in `bin/README.md` or `bin/lib/check-helpers.sh`.
+**Suggested direction:** Define check-script standard in bin/README.md or bin/lib/check-helpers.sh.
 **Est. effort:** S
 **Risk if untouched:** CI jobs misinterpret check results.
 
@@ -1331,7 +1331,7 @@ Effort scale:
 **Est. effort:** M
 **Risk if untouched:** Agents treat the API as absent and reimplement endpoints.
 
-### 9.5 `docs/README.md` Lists API_GUIDE as "(planned)"
+### 9.5 `ibl5/docs/README.md` Lists API_GUIDE as "(planned)"
 **Location:** `ibl5/docs/README.md` line 23
 **Problem:** Index contradicts the 17-controller API reality.
 **Suggested direction:** Update description after 9.4.
@@ -1359,16 +1359,16 @@ Effort scale:
 **Est. effort:** S
 **Risk if untouched:** Inconsistent canonical pointers confuse agents.
 
-### 9.9 DEVELOPMENT_GUIDE Refers to `.github/skills/` — Doesn't Exist
+### 9.9 DEVELOPMENT_GUIDE Refers to .github/skills/ — Doesn't Exist
 **Location:** `ibl5/docs/DEVELOPMENT_GUIDE.md` lines 10, 82, 435
-**Problem:** Skills live at `.claude/skills/`, not `.github/skills/`.
+**Problem:** Skills live at `.claude/skills/`, not .github/skills/.
 **Suggested direction:** Find-replace; fix `.github/copilot-instructions.md` too.
 **Est. effort:** S
-**Risk if untouched:** Agent looks in wrong dir; may create `.github/skills/`.
+**Risk if untouched:** Agent looks in wrong dir; may create .github/skills/.
 
 ### 9.10 `copilot-instructions.md` Loaded by Claude Code But Stale
 **Location:** `.github/copilot-instructions.md`
-**Problem:** Uses `HtmlSanitizer::safeHtmlOutput()` instead of canonical `e()`. References `.github/skills/`. Loads on every session.
+**Problem:** Uses `HtmlSanitizer::safeHtmlOutput()` instead of canonical `e()`. References .github/skills/. Loads on every session.
 **Suggested direction:** Archive (if superseded) or sync with current canonical.
 **Est. effort:** S
 **Risk if untouched:** Agent uses older XSS-helper style; PHPStan violations.
@@ -1411,7 +1411,7 @@ Effort scale:
 ### 9.16 REFACTORING_HISTORY — Living Doc Indexed in Onboarding
 **Location:** `ibl5/docs/REFACTORING_HISTORY.md`
 **Problem:** "100% complete" — purely historical; indexed under "For New Contributors."
-**Suggested direction:** Move to `docs/archive/`; replace onboarding pointer with a one-line summary.
+**Suggested direction:** Move to `ibl5/docs/archive/`; replace onboarding pointer with a one-line summary.
 **Est. effort:** S
 **Risk if untouched:** New contributors read 600 LOC of completed history instead of architecture.
 
@@ -1443,7 +1443,7 @@ Effort scale:
 **Est. effort:** S (frontmatter) / M (CI)
 **Risk if untouched:** Class READMEs silently become wrong.
 
-### 9.21 `migrations/README.md` — Dead Reference to Dropped Table FK
+### 9.21 `ibl5/migrations/README.md` — Dead Reference to Dropped Table FK
 **Location:** `ibl5/migrations/README.md` line 282
 **Problem:** Lists `ibl_plr_chunk.pid → ibl_plr.pid` (dropped in 035).
 **Suggested direction:** Remove the stale FK row.
@@ -1667,7 +1667,7 @@ Effort scale:
 ### 10.25 Baseline Burn-Down Targets (no new rule)
 **Location:** `phpstan-baseline.neon` — `ibl.unescapedOutput` (17), `ibl.cookieBeforeHeader` (4), `ibl.inlineCss` (6), `ibl.deprecatedHtmlTag` (3)
 **Problem:** Existing rules have actionable backlogs; staleness of `rawSuperglobal` (10.1) shows snapshot drift.
-**Suggested direction:** Sprint focus + `bin/check-baseline-drift --update`.
+**Suggested direction:** Sprint focus + `ibl5/bin/check-baseline-drift --update`.
 **Est. effort:** M (cumulative burn-down)
 **Risk if untouched:** Baselines stagnate; new violations indistinguishable from inherited.
 
@@ -1792,7 +1792,7 @@ Effort scale:
 ## Axis 12: Data Files Committed to Repo
 
 ### 12.1 `IBL5.log` — 1.1 GB Runtime Log On Disk
-**Location:** `ibl5/IBL5.log`
+**Location:** ibl5/IBL5.log
 **Problem:** 1.1 GB simulation log; correctly gitignored via `*.log` but undocumented next to source.
 **Suggested direction:** Add a comment in `.gitignore` clarifying it's runtime-generated.
 **Est. effort:** S
@@ -1815,7 +1815,7 @@ Effort scale:
 ### 12.4 `ibl5/ibl/IBL/Schedule.htm` — 284 KB HTML, 86 Commits
 **Location:** `ibl5/ibl/IBL/Schedule.htm`
 **Problem:** JSB-generated HTML parsed at runtime by `ScheduleUpdater`. Updated after every sim — 86 commits in history. ~2 MB accumulated bloat.
-**Suggested direction:** Move to `ibl5/backups/` (gitignored); have ScheduleUpdater source from there.
+**Suggested direction:** Move to ibl5/backups/ (gitignored); have ScheduleUpdater source from there.
 **Est. effort:** M
 **Risk if untouched:** Weekly merge conflicts during active season; ongoing bloat.
 
@@ -1864,7 +1864,7 @@ Effort scale:
 
 ### 12.11 Orphaned Large Objects in Git History (~80 MB)
 **Location:** Git pack file
-**Problem:** Deleted but historically present: `2003olympics/spreadsheets/` (~50 MB), `wordpress/` (~15 MB), `ibl5/ibl-laravel/node_modules/` (~15 MB), `composer.phar` (~2 MB).
+**Problem:** Deleted but historically present: `2003olympics/spreadsheets/` (~50 MB), `wordpress/` (~15 MB), ibl5/ibl-laravel/node_modules/ (~15 MB), `composer.phar` (~2 MB).
 **Suggested direction:** `git filter-repo --invert-paths ...`; force-push; coordinate rebase. Add patterns to `.gitignore` to prevent recurrence.
 **Est. effort:** L (history rewrite + coordination)
 **Risk if untouched:** Clone bandwidth grows; no functional impact.
@@ -2224,7 +2224,7 @@ Effort scale:
 **Est. effort:** S
 **Risk if untouched:** Native-type annotation drift could surface surprises.
 
-### 15.18 `migrations/README.md` — Documents Migration 009 as "PENDING" Feb 2026
+### 15.18 `ibl5/migrations/README.md` — Documents Migration 009 as "PENDING" Feb 2026
 **Location:** `ibl5/migrations/README.md` line 238
 **Problem:** Today is May 2026; migration list runs to 126. Roadmap content mixed with operational. Dead references to `DATABASE_SCHEMA_IMPROVEMENTS.md` and `SCHEMA_IMPLEMENTATION_REVIEW.md`.
 **Suggested direction:** Strip roadmap to archive; keep only runner / naming / bypass docs.

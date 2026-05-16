@@ -27,41 +27,42 @@ class RecordHoldersService implements RecordHoldersServiceInterface
     private RecordHoldersRepositoryInterface $repository;
 
     /**
-     * Team ID to logo abbreviation mapping.
+     * Single source of truth for team ID → abbreviation + name.
      *
-     * These abbreviations correspond to image files in images/topics/{abbr}.png
+     * Abbreviations correspond to image files in images/topics/{abbr}.png.
+     * Derive all team lookups from this registry so a rebrand is a one-line edit.
      *
-     * @var array<int, string>
+     * @var array<int, array{abbr: string, name: string}>
      */
-    private const TEAM_ABBREVIATIONS = [
-        1 => 'bos',
-        2 => 'mia',
-        3 => 'nyk',
-        4 => 'bkn',
-        5 => 'orl',
-        6 => 'mil',
-        7 => 'chi',
-        8 => 'nor',
-        9 => 'atl',
-        10 => 'cha',
-        11 => 'ind',
-        12 => 'tor',
-        13 => 'uta',
-        14 => 'min',
-        15 => 'den',
-        16 => 'lva',
-        17 => 'hou',
-        18 => 'por',
-        19 => 'lac',
-        20 => 'van',
-        21 => 'lal',
-        22 => 'braves',
-        23 => 'phx',
-        24 => 'gsw',
-        25 => 'det',
-        26 => 'sac',
-        27 => 'was',
-        28 => 'dal',
+    private const TEAM_REGISTRY = [
+        1  => ['abbr' => 'bos', 'name' => 'Celtics'],
+        2  => ['abbr' => 'mia', 'name' => 'Heat'],
+        3  => ['abbr' => 'nyk', 'name' => 'Knicks'],
+        4  => ['abbr' => 'bkn', 'name' => 'Nets'],
+        5  => ['abbr' => 'orl', 'name' => 'Magic'],
+        6  => ['abbr' => 'mil', 'name' => 'Bucks'],
+        7  => ['abbr' => 'chi', 'name' => 'Bulls'],
+        8  => ['abbr' => 'nor', 'name' => 'Pelicans'],
+        9  => ['abbr' => 'atl', 'name' => 'Hawks'],
+        10 => ['abbr' => 'cha', 'name' => 'Sting'],
+        11 => ['abbr' => 'ind', 'name' => 'Pacers'],
+        12 => ['abbr' => 'tor', 'name' => 'Raptors'],
+        13 => ['abbr' => 'uta', 'name' => 'Jazz'],
+        14 => ['abbr' => 'min', 'name' => 'Timberwolves'],
+        15 => ['abbr' => 'den', 'name' => 'Nuggets'],
+        16 => ['abbr' => 'lva', 'name' => 'Aces'],
+        17 => ['abbr' => 'hou', 'name' => 'Rockets'],
+        18 => ['abbr' => 'por', 'name' => 'Trailblazers'],
+        19 => ['abbr' => 'lac', 'name' => 'Clippers'],
+        20 => ['abbr' => 'van', 'name' => 'Grizzlies'],
+        21 => ['abbr' => 'lal', 'name' => 'Lakers'],
+        22 => ['abbr' => 'braves', 'name' => 'Braves'],
+        23 => ['abbr' => 'phx', 'name' => 'Suns'],
+        24 => ['abbr' => 'gsw', 'name' => 'Warriors'],
+        25 => ['abbr' => 'det', 'name' => 'Pistons'],
+        26 => ['abbr' => 'sac', 'name' => 'Kings'],
+        27 => ['abbr' => 'was', 'name' => 'Bullets'],
+        28 => ['abbr' => 'dal', 'name' => 'Mavericks'],
     ];
 
     /**
@@ -620,7 +621,7 @@ class RecordHoldersService implements RecordHoldersServiceInterface
      */
     private function getTeamAbbreviation(int $teamId): string
     {
-        return self::TEAM_ABBREVIATIONS[$teamId] ?? '';
+        return self::TEAM_REGISTRY[$teamId]['abbr'] ?? '';
     }
 
     /** @var array<string, int>|null */
@@ -629,16 +630,10 @@ class RecordHoldersService implements RecordHoldersServiceInterface
     private function getTeamAbbreviationByName(string $teamName): string
     {
         if ($this->nameToIdCache === null) {
-            $this->nameToIdCache = [
-                'Celtics' => 1, 'Heat' => 2, 'Knicks' => 3, 'Nets' => 4,
-                'Magic' => 5, 'Bucks' => 6, 'Bulls' => 7, 'Pelicans' => 8,
-                'Hawks' => 9, 'Sting' => 10, 'Pacers' => 11, 'Raptors' => 12,
-                'Jazz' => 13, 'Timberwolves' => 14, 'Nuggets' => 15, 'Aces' => 16,
-                'Rockets' => 17, 'Trailblazers' => 18, 'Clippers' => 19,
-                'Grizzlies' => 20, 'Lakers' => 21, 'Braves' => 22,
-                'Suns' => 23, 'Warriors' => 24, 'Pistons' => 25,
-                'Kings' => 26, 'Bullets' => 27, 'Mavericks' => 28,
-            ];
+            $this->nameToIdCache = [];
+            foreach (self::TEAM_REGISTRY as $id => $info) {
+                $this->nameToIdCache[$info['name']] = $id;
+            }
         }
 
         $teamId = $this->nameToIdCache[$teamName] ?? 0;

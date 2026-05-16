@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\RecordHolders;
 
+use League\League;
 use PHPUnit\Framework\TestCase;
 use RecordHolders\RecordHoldersService;
 use RecordHolders\Contracts\RecordHoldersRepositoryInterface;
@@ -437,6 +438,91 @@ final class RecordHoldersServiceTest extends TestCase
         $this->assertArrayHasKey('Most Division Championships', $franchise);
         $this->assertArrayHasKey('Most IBL Finals Appearances', $franchise);
         $this->assertArrayHasKey('Most IBL Championships', $franchise);
+    }
+
+    public function testTeamRegistryContainsExactlyMaxRealTeamidEntries(): void
+    {
+        $reflection = new \ReflectionClass(RecordHoldersService::class);
+        $registry = $reflection->getConstant('TEAM_REGISTRY');
+        $this->assertIsArray($registry);
+        $this->assertCount(League::MAX_REAL_TEAMID, $registry);
+    }
+
+    public function testTeamRegistryEachEntryHasAbbrAndName(): void
+    {
+        $reflection = new \ReflectionClass(RecordHoldersService::class);
+        /** @var array<int, array{abbr: string, name: string}> $registry */
+        $registry = $reflection->getConstant('TEAM_REGISTRY');
+        $this->assertIsArray($registry);
+
+        foreach ($registry as $id => $info) {
+            $this->assertArrayHasKey('abbr', $info, "Team {$id} missing 'abbr'");
+            $this->assertArrayHasKey('name', $info, "Team {$id} missing 'name'");
+            $this->assertNotEmpty($info['abbr'], "Team {$id} has empty abbreviation");
+            $this->assertNotEmpty($info['name'], "Team {$id} has empty name");
+        }
+    }
+
+    public function testUnknownTeamIdReturnsEmptyAbbreviation(): void
+    {
+        $record = $this->createPlayerRecord(1, 'Unknown', 50, 999);
+
+        $batchResult = $this->buildBatchPlayerResult([$record]);
+        $this->mockRepository->method('getTopPlayerSingleGameBatch')
+            ->willReturn($batchResult);
+        $this->configureOtherMocksEmpty();
+
+        $result = $this->service->getAllRecords();
+
+        $regSeason = $result['playerSingleGame']['regularSeason'];
+        $firstCategory = array_values($regSeason)[0];
+        $this->assertSame('', $firstCategory[0]['teamAbbr']);
+    }
+
+    public function testNameToIdDerivedFromRegistryMatchesTeamSeasonRecords(): void
+    {
+        $seasonRecord = [
+            'team_name' => 'Lakers',
+            'year' => 2001,
+            'wins' => 65,
+            'losses' => 17,
+        ];
+
+        $this->mockRepository->method('getBestWorstSeasonRecord')
+            ->willReturn([$seasonRecord]);
+        $this->mockRepository->method('getBestWorstSeasonStart')->willReturn([]);
+        $this->mockRepository->method('getLongestStreak')->willReturn([]);
+        $this->configureNonSeasonMocksEmpty();
+
+        $result = $this->service->getAllRecords();
+
+        $bestRecord = $result['teamSeasonRecords']['Best Season Record'];
+        $this->assertCount(1, $bestRecord);
+        $this->assertSame(21, $bestRecord[0]['teamTid']);
+        $this->assertSame('lal', $bestRecord[0]['teamAbbr']);
+    }
+
+    public function testUnknownTeamNameReturnsZeroTidAndEmptyAbbr(): void
+    {
+        $seasonRecord = [
+            'team_name' => 'NonexistentTeam',
+            'year' => 2001,
+            'wins' => 50,
+            'losses' => 32,
+        ];
+
+        $this->mockRepository->method('getBestWorstSeasonRecord')
+            ->willReturn([$seasonRecord]);
+        $this->mockRepository->method('getBestWorstSeasonStart')->willReturn([]);
+        $this->mockRepository->method('getLongestStreak')->willReturn([]);
+        $this->configureNonSeasonMocksEmpty();
+
+        $result = $this->service->getAllRecords();
+
+        $bestRecord = $result['teamSeasonRecords']['Best Season Record'];
+        $this->assertCount(1, $bestRecord);
+        $this->assertSame(0, $bestRecord[0]['teamTid']);
+        $this->assertSame('', $bestRecord[0]['teamAbbr']);
     }
 
     /**

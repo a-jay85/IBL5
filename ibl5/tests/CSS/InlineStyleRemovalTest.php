@@ -49,11 +49,11 @@ class InlineStyleRemovalTest extends TestCase
         return [
             'NextSimView' => [$base . '/NextSim/NextSimView.php'],
             'Ratings' => [$base . '/UI/Tables/Ratings.php'],
-            'Per36Minutes' => [$base . '/UI/Tables/Per36Minutes.php'],
-            'SeasonAverages' => [$base . '/UI/Tables/SeasonAverages.php'],
-            'PeriodAverages' => [$base . '/UI/Tables/PeriodAverages.php'],
-            'SplitStats' => [$base . '/UI/Tables/SplitStats.php'],
-            'SeasonTotals' => [$base . '/UI/Tables/SeasonTotals.php'],
+            'Per36Minutes' => [$base . '/BasketballStats/Tables/Per36Minutes.php'],
+            'SeasonAverages' => [$base . '/BasketballStats/Tables/SeasonAverages.php'],
+            'PeriodAverages' => [$base . '/BasketballStats/Tables/PeriodAverages.php'],
+            'SplitStats' => [$base . '/BasketballStats/Tables/SplitStats.php'],
+            'SeasonTotals' => [$base . '/BasketballStats/Tables/SeasonTotals.php'],
             'Contracts' => [$base . '/UI/Tables/Contracts.php'],
         ];
     }

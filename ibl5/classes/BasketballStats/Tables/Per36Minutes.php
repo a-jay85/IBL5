@@ -2,12 +2,13 @@
 
 declare(strict_types=1);
 
-namespace UI\Tables;
+namespace BasketballStats\Tables;
 
 use BasketballStats\StatsFormatter;
 use Player\Stats\PlayerStats;
 use Player\Player;
 use Player\PlayerImageHelper;
+use UI\Tables\PlayerRowTransformer;
 use UI\TeamCellHelper;
 use Security\HtmlSanitizer;
 use Team\Team;

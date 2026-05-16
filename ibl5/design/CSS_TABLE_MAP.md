@@ -47,11 +47,11 @@ Affects ALL data tables site-wide:
 
 - FreeAgencyView (4 tables)
 - UI/Tables/Ratings
-- UI/Tables/SeasonTotals
-- UI/Tables/SeasonAverages
-- UI/Tables/Per36Minutes
+- BasketballStats/Tables/SeasonTotals
+- BasketballStats/Tables/SeasonAverages
+- BasketballStats/Tables/Per36Minutes
 - UI/Tables/Contracts
-- UI/Tables/PeriodAverages
+- BasketballStats/Tables/PeriodAverages
 
 ### `.responsive-table` + `.sticky-col*` — Medium impact (mobile only)
 

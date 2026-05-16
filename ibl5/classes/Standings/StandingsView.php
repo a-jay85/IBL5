@@ -576,41 +576,22 @@ class StandingsView implements StandingsViewInterface
     private function sortTiedGroup(array $group): array
     {
         $tids = array_map(static fn (array $t): int => $t['teamid'], $group);
+        $matrix = $this->seriesMatrix;
 
-        /** @var array<int, float> */
-        $aggregateH2HPct = [];
-        foreach ($group as $team) {
-            $totalWins = 0;
-            $totalLosses = 0;
-            foreach ($tids as $opponentTid) {
-                if ($opponentTid === $team['teamid']) {
-                    continue;
-                }
-                $totalWins += $this->seriesMatrix[$team['teamid']][$opponentTid]['wins'] ?? 0;
-                $totalLosses += $this->seriesMatrix[$team['teamid']][$opponentTid]['losses'] ?? 0;
-            }
-            $aggregateH2HPct[$team['teamid']] = $this->safeWinPct($totalWins, $totalLosses);
-        }
+        $aggregateH2HPct = AggregateTiebreaker::computeAggregateH2HPcts(
+            $tids,
+            /** @return array{wins: int, losses: int} */
+            static fn (int $tid, int $oppTid): array => [
+                'wins' => $matrix[$tid][$oppTid]['wins'] ?? 0,
+                'losses' => $matrix[$tid][$oppTid]['losses'] ?? 0,
+            ],
+        );
 
-        // Sort descending by H2H pct (best first for standings)
         usort($group, static function (array $a, array $b) use ($aggregateH2HPct): int {
             return $aggregateH2HPct[$b['teamid']] <=> $aggregateH2HPct[$a['teamid']];
         });
 
         return $group;
-    }
-
-    /**
-     * Safe division for win percentage calculation
-     */
-    private function safeWinPct(int $wins, int $losses): float
-    {
-        $total = $wins + $losses;
-        if ($total === 0) {
-            return 0.0;
-        }
-
-        return $wins / $total;
     }
 
     /**

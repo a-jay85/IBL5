@@ -437,31 +437,21 @@ class ProjectedDraftOrderService implements ProjectedDraftOrderServiceInterface
     {
         $tids = array_map(static fn (array $t): int => $t['teamid'], $group);
 
-        // Compute each team's aggregate H2H win pct against all other teams in the group
-        /** @var array<int, float> */
-        $aggregateH2HPct = [];
-        foreach ($group as $team) {
-            $totalWins = 0;
-            $totalLosses = 0;
-            foreach ($tids as $opponentTid) {
-                if ($opponentTid === $team['teamid']) {
-                    continue;
-                }
-                $totalWins += $h2h[$team['teamid']][$opponentTid] ?? 0;
-                $totalLosses += $h2h[$opponentTid][$team['teamid']] ?? 0;
-            }
-            $aggregateH2HPct[$team['teamid']] = $this->safeWinPct($totalWins, $totalLosses);
-        }
+        $aggregateH2HPct = \Standings\AggregateTiebreaker::computeAggregateH2HPcts(
+            $tids,
+            /** @return array{wins: int, losses: int} */
+            static fn (int $tid, int $oppTid): array => [
+                'wins' => $h2h[$tid][$oppTid] ?? 0,
+                'losses' => $h2h[$oppTid][$tid] ?? 0,
+            ],
+        );
 
-        // Sort ascending by aggregate H2H pct (worse H2H → earlier draft pick)
-        // For sub-ties, fall through to non-H2H tiebreakers
         usort($group, function (array $a, array $b) use ($aggregateH2HPct, $pointDiffs): int {
             $h2hDiff = $aggregateH2HPct[$a['teamid']] <=> $aggregateH2HPct[$b['teamid']];
             if ($h2hDiff !== 0) {
                 return $h2hDiff;
             }
 
-            // Sub-tie: use non-H2H tiebreakers (negated for draft order)
             return -$this->applyNonH2HTiebreakers($a, $b, $pointDiffs);
         });
 

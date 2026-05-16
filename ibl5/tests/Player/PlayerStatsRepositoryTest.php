@@ -6,7 +6,7 @@ namespace Tests\Player;
 
 use PHPUnit\Framework\Attributes\AllowMockObjectsWithoutExpectations;
 use PHPUnit\Framework\TestCase;
-use Player\PlayerStatsRepository;
+use Player\Stats\PlayerStatsRepository;
 
 /**
  * PlayerStatsRepositoryTest - Tests for the PlayerStatsRepository class

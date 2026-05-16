@@ -1,0 +1,204 @@
+<?php
+
+declare(strict_types=1);
+
+namespace Player\Contract;
+
+use Player\Contract\Contracts\PlayerContractValidatorInterface;
+use Player\PlayerData;
+use Season\Season;
+
+/**
+ * @see PlayerContractValidatorInterface
+ */
+class PlayerContractValidator implements PlayerContractValidatorInterface
+{
+    // Rookie option experience requirements
+    private const ROOKIE_OPTION_ROUND1_FA_EXPERIENCE = 2;
+    private const ROOKIE_OPTION_ROUND1_INSEASON_EXPERIENCE = 3;
+    private const ROOKIE_OPTION_ROUND2_FA_EXPERIENCE = 1;
+    private const ROOKIE_OPTION_ROUND2_INSEASON_EXPERIENCE = 2;
+
+    /**
+     * @see PlayerContractValidatorInterface::canRenegotiateContract()
+     */
+    public function canRenegotiateContract(PlayerData $playerData, ?Season $season = null): bool
+    {
+        $currentYear = $playerData->contractCurrentYear ?? 0;
+
+        // During the Draft and Free Agency phases, evaluate eligibility from the
+        // incoming season's perspective — contractCurrentYear will advance by one
+        // when the new season officially starts. Any contract extension used in the
+        // past season is disregarded, since the used_extension_this_season flag also
+        // resets at season rollover.
+        if ($season !== null && $season->isOffseasonPhase()) {
+            $currentYear++;
+        }
+
+        // Check if player was rookie optioned and is currently in the rookie option year
+        if ($this->wasRookieOptioned($playerData)) {
+            $round = $playerData->draftRound;
+            // First round: rookie option is year 4
+            if ($round === 1 && $currentYear === 4) {
+                return false;
+            }
+            // Second round: rookie option is year 3
+            if ($round === 2 && $currentYear === 3) {
+                return false;
+            }
+        }
+
+        // In final year (year 6) or beyond - always eligible
+        if ($currentYear >= 6) {
+            return true;
+        }
+
+        // Check if next year has no salary (eligible for renegotiation)
+        $nextYearSalary = $this->getContractYearSalary($playerData, $currentYear + 1);
+        return $nextYearSalary === 0;
+    }
+
+    /**
+     * @see PlayerContractValidatorInterface::canRookieOption()
+     */
+    public function canRookieOption(PlayerData $playerData, string $seasonPhase): bool
+    {
+        $round = $playerData->draftRound;
+        
+        // Only first and second round picks are eligible
+        if ($round !== 1 && $round !== 2) {
+            return false;
+        }
+        
+        // Players with more than 3 years of experience are not eligible
+        if ($playerData->yearsOfExperience > 3) {
+            return false;
+        }
+        
+        if ($seasonPhase === "Free Agency") {
+            return $this->checkRookieOptionEligibility($playerData, $round, $seasonPhase);
+        } elseif ($seasonPhase === "Preseason" || $seasonPhase === "HEAT") {
+            return $this->checkRookieOptionEligibility($playerData, $round, $seasonPhase);
+        }
+        
+        return false;
+    }
+    
+    /**
+     * @see PlayerContractValidatorInterface::getFinalYearRookieContractSalary()
+     */
+    public function getFinalYearRookieContractSalary(PlayerData $playerData): int
+    {
+        $round = $playerData->draftRound;
+
+        // First round picks have a 3-year contract (salary_yr3 is final year)
+        if ($round === 1) {
+            return $playerData->contractYear3Salary ?? 0;
+        }
+
+        // Second round picks have a 2-year contract (salary_yr2 is final year)
+        if ($round === 2) {
+            return $playerData->contractYear2Salary ?? 0;
+        }
+
+        // Not a draft pick
+        return 0;
+    }
+
+    /**
+     * Check rookie option eligibility for a specific round and experience level
+     * 
+     * @param PlayerData $playerData The player data
+     * @param int $round Draft round (1 or 2)
+     * @param string $seasonPhase Current season phase ("Free Agency", "Preseason", or "HEAT")
+     */
+    private function checkRookieOptionEligibility(
+        PlayerData $playerData, 
+        int $round,
+        string $seasonPhase
+    ): bool {
+        if ($round === 1) {
+            $requiredExperience = ($seasonPhase === "Free Agency")
+                ? self::ROOKIE_OPTION_ROUND1_FA_EXPERIENCE
+                : self::ROOKIE_OPTION_ROUND1_INSEASON_EXPERIENCE;
+            return $playerData->yearsOfExperience === $requiredExperience
+                && $playerData->contractYear4Salary === 0;
+        }
+
+        if ($round === 2) {
+            $requiredExperience = ($seasonPhase === "Free Agency")
+                ? self::ROOKIE_OPTION_ROUND2_FA_EXPERIENCE
+                : self::ROOKIE_OPTION_ROUND2_INSEASON_EXPERIENCE;
+            return $playerData->yearsOfExperience === $requiredExperience
+                && $playerData->contractYear3Salary === 0;
+        }
+        
+        return false;
+    }
+
+    /**
+     * @see PlayerContractValidatorInterface::isPlayerFreeAgent()
+     */
+    public function isPlayerFreeAgent(PlayerData $playerData, Season $season): bool
+    {
+        $nextYear = ($playerData->contractCurrentYear ?? 0) + 1;
+
+        return $this->getContractYearSalary($playerData, $nextYear) === 0;
+    }
+
+    /**
+     * @see PlayerContractValidatorInterface::wasRookieOptioned()
+     */
+    public function wasRookieOptioned(PlayerData $playerData): bool
+    {
+        $round = $playerData->draftRound;
+        $experience = $playerData->yearsOfExperience;
+        
+        // First round: Check in year 4
+        if ($round === 1 && $experience === 4) {
+            return $this->isRookieOptionExercised($playerData, 3, 4);
+        }
+
+        // Second round: Check in year 3
+        if ($round === 2 && $experience === 3) {
+            return $this->isRookieOptionExercised($playerData, 2, 3);
+        }
+        
+        return false;
+    }
+
+    /**
+     * Check if rookie option was exercised by comparing salary years
+     * 
+     * @param PlayerData $playerData The player data
+     * @param int $baseYear The year to check as base
+     * @param int $optionYear The year that should be double the base
+     */
+    private function isRookieOptionExercised(PlayerData $playerData, int $baseYear, int $optionYear): bool
+    {
+        $baseSalary = $this->getContractYearSalary($playerData, $baseYear);
+        $optionSalary = $this->getContractYearSalary($playerData, $optionYear);
+
+        return $optionSalary !== 0 && $baseSalary * 2 === $optionSalary;
+    }
+
+    /**
+     * Get the salary for a specific contract year from PlayerData
+     *
+     * @param PlayerData $playerData The player data
+     * @param int $year Contract year number (1-6)
+     * @return int Salary for the specified year, or 0 if not set
+     */
+    private function getContractYearSalary(PlayerData $playerData, int $year): int
+    {
+        return match ($year) {
+            1 => $playerData->contractYear1Salary ?? 0,
+            2 => $playerData->contractYear2Salary ?? 0,
+            3 => $playerData->contractYear3Salary ?? 0,
+            4 => $playerData->contractYear4Salary ?? 0,
+            5 => $playerData->contractYear5Salary ?? 0,
+            6 => $playerData->contractYear6Salary ?? 0,
+            default => 0,
+        };
+    }
+}

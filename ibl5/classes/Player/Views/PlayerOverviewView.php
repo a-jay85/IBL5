@@ -5,8 +5,8 @@ declare(strict_types=1);
 namespace Player\Views;
 
 use Player\Player;
-use Player\PlayerStatsRepository;
-use Player\PlayerStats;
+use Player\Stats\PlayerStatsRepository;
+use Player\Stats\PlayerStats;
 use Player\Contracts\PlayerOverviewViewInterface;
 use Services\CommonMysqliRepository;
 use BasketballStats\StatsFormatter;

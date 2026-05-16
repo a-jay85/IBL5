@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace Player;
 
 use League\League;
+use Player\Stats\PlayerStats;
+use Player\Stats\PlayerStatsRepository;
 use Player\Views\PlayerButtonsView;
 use Player\Views\PlayerMenuView;
 use Player\Views\PlayerTradingCardFlipView;

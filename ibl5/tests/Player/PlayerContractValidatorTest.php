@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Tests\Player;
 
 use PHPUnit\Framework\TestCase;
-use Player\PlayerContractValidator;
+use Player\Contract\PlayerContractValidator;
 use Player\PlayerData;
 use Season\Season;
 

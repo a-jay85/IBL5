@@ -180,7 +180,7 @@ function ShowAndHide{$categoryCode}() {
         if ($isGM) {
             $html .= "<td>{$safeName}</td><td>{$safeTeamName}</td>";
         } else {
-            /** @var \Player\PlayerStats $stats */
+            /** @var \Player\Stats\PlayerStats $stats */
             $stats = $candidate['stats'];
             /** @var int $playerID */
             $playerID = $candidate['playerID'];

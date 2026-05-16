@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Player\Views;
 
 use Player\Player;
-use Player\PlayerStats;
+use Player\Stats\PlayerStats;
 use Security\HtmlSanitizer;
 
 /**

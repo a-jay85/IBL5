@@ -6,7 +6,7 @@ namespace Waivers;
 
 use Discord\Discord;
 use Player\Player;
-use Player\PlayerContractCalculator;
+use Player\Contract\PlayerContractCalculator;
 use Season\Season;
 use Services\PlayerDataConverter;
 use Waivers\Contracts\WaiversProcessorInterface;

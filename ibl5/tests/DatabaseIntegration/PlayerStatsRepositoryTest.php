@@ -6,7 +6,7 @@ namespace Tests\DatabaseIntegration;
 
 use PHPUnit\Framework\Attributes\Group;
 
-use Player\PlayerStatsRepository;
+use Player\Stats\PlayerStatsRepository;
 
 /**
  * Database integration tests for PlayerStatsRepository.

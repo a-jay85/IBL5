@@ -83,11 +83,11 @@ class OneOnOneGameService implements OneOnOneGameServiceInterface
     {
         $errors = [];
 
-        if ($player1Id === null || $player1Id === 0) {
+        if ($player1Id === null) {
             $errors[] = "Please select a Player from the Player 1 Category.";
         }
 
-        if ($player2Id === null || $player2Id === 0) {
+        if ($player2Id === null) {
             $errors[] = "Please select a Player from the Player 2 Category.";
         }
 

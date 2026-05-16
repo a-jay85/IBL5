@@ -1,6 +1,6 @@
 ---
 description: Root Claude Code instructions for IBL5: commands, mandatory rules, and architecture pointers.
-last_verified: 2026-05-04
+last_verified: 2026-05-16
 ---
 
 # CLAUDE.md
@@ -94,4 +94,7 @@ Every repo-tracked `.md` that an agent may read is validated by `bin/check-docs`
 
 ### Architecture Decisions
 Load-bearing decisions are captured as ADRs in `ibl5/docs/decisions/`. PRs that touch mechanical-enforcement surfaces (new PHPStan rule, new `.claude/rules/*.md`, new CI workflow, destructive migration, new `bin/` script ≥ 50 lines, new composer dependency) must add an ADR or a bypass marker — enforced by `bin/adr-check` (CI workflow `adr-required.yml`). See `ibl5/docs/decisions/README.md` for the policy.
+
+### Hot-File Threshold
+Files over 500 LOC in `classes/` are flagged by `bin/check-hot-files`. Plans adding > 100 LOC to a hot file must propose extraction or justify inline. See `.claude/rules/plan-verification.md`.
 

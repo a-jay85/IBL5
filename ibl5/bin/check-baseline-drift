@@ -29,6 +29,13 @@ $updateMode = in_array('--update', $argv, true);
 
 $counter = new \Scripts\PhpstanBaselineCounter();
 
+$zeroFloorFiles = [
+    'classes/Trading/TradingView.php',
+    'classes/FreeAgency/FreeAgencyView.php',
+    'classes/FreeAgency/FreeAgencyNegotiationView.php',
+    'classes/Waivers/WaiversView.php',
+];
+
 $currentCounts = [];
 foreach ($baselineFiles as $key => $path) {
     if (!file_exists($path)) {
@@ -39,6 +46,18 @@ foreach ($baselineFiles as $key => $path) {
 }
 
 if ($updateMode) {
+    $mainBaseline = $baselineFiles['phpstan-baseline.neon'] ?? '';
+    if (file_exists($mainBaseline)) {
+        $floorViolations = $counter->countByPathForIdentifier($mainBaseline, 'ibl.unescapedOutput');
+        foreach ($zeroFloorFiles as $floorFile) {
+            $count = $floorViolations[$floorFile] ?? 0;
+            if ($count > 0) {
+                fwrite(STDERR, "BLOCKED: {$floorFile} has {$count} ibl.unescapedOutput entries but is in the zero-floor list.\n");
+                fwrite(STDERR, "Fix the violations before updating the snapshot.\n");
+                exit(1);
+            }
+        }
+    }
     $currentCounts['as_of'] = date('Y-m-d');
     $json = json_encode($currentCounts, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE);
     if ($json === false) {
@@ -112,9 +131,32 @@ foreach ($currentCounts as $file => $counts) {
     }
 }
 
-if ($hasIncrease) {
-    echo "\nFAILED: baseline entry count increased for one or more identifiers.\n";
-    echo "If this increase is intentional, run: php bin/check-baseline-drift --update\n";
+$mainBaseline = $baselineFiles['phpstan-baseline.neon'] ?? '';
+$floorFailed = false;
+if (file_exists($mainBaseline)) {
+    $floorViolations = $counter->countByPathForIdentifier($mainBaseline, 'ibl.unescapedOutput');
+    foreach ($zeroFloorFiles as $floorFile) {
+        $count = $floorViolations[$floorFile] ?? 0;
+        if ($count > 0) {
+            echo "ZERO-FLOOR VIOLATION: {$floorFile} has {$count} ibl.unescapedOutput entries (must be 0)\n";
+            $floorFailed = true;
+        }
+    }
+}
+
+if ($floorFailed) {
+    $exitCode = 1;
+}
+
+if ($hasIncrease || $floorFailed) {
+    if ($hasIncrease) {
+        echo "\nFAILED: baseline entry count increased for one or more identifiers.\n";
+        echo "If this increase is intentional, run: php bin/check-baseline-drift --update\n";
+    }
+    if ($floorFailed) {
+        echo "\nFAILED: per-file zero-floor check found violations.\n";
+        echo "These files must have zero ibl.unescapedOutput entries in the baseline.\n";
+    }
     $exitCode = 1;
 } elseif ($staleWarning) {
     echo "\nPASSED (with stale-snapshot warnings — consider running --update)\n";

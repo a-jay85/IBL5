@@ -4,6 +4,14 @@ declare(strict_types=1);
 
 namespace Player\Views;
 
+use Player\Stats\Views\PlayerHeatAveragesView;
+use Player\Stats\Views\PlayerHeatTotalsView;
+use Player\Stats\Views\PlayerOlympicAveragesView;
+use Player\Stats\Views\PlayerOlympicTotalsView;
+use Player\Stats\Views\PlayerPlayoffAveragesView;
+use Player\Stats\Views\PlayerPlayoffTotalsView;
+use Player\Stats\Views\PlayerRegularSeasonAveragesView;
+use Player\Stats\Views\PlayerRegularSeasonTotalsView;
 use Security\HtmlSanitizer;
 
 /**

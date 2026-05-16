@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace UI\Components;
 
 use Security\HtmlSanitizer;
+use UI\Contracts\TableViewSwitcherInterface;
 
 /**
  * TableViewSwitcher - Reusable tab navigation for switching table display views
@@ -16,7 +17,7 @@ use Security\HtmlSanitizer;
  * - Single table: $switcher->wrap($tableHtml) — tabs injected as <caption>
  * - Multiple tables: $switcher->renderTabs() — rendered standalone above all tables
  */
-class TableViewSwitcher
+class TableViewSwitcher implements TableViewSwitcherInterface
 {
     /** @var array<string, string> Tab keys mapped to display labels */
     private array $tabs;

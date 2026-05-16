@@ -11,11 +11,12 @@ use UI\TeamCellHelper;
 use Security\HtmlSanitizer;
 use Team\Team;
 use Season\Season;
+use UI\Contracts\RatingsInterface;
 
 /**
  * Ratings - Displays player ratings table
  */
-class Ratings
+class Ratings implements RatingsInterface
 {
     /**
      * Render the ratings table

@@ -4,13 +4,15 @@ declare(strict_types=1);
 
 namespace UI;
 
+use UI\Contracts\TableStylesInterface;
+
 /**
  * TableStyles - Generates inline CSS custom property values for team-colored tables
  *
  * Used with the .team-table modifier class in tables.css.
  * Outputs only --team-color-primary and --team-color-secondary as inline style values.
  */
-class TableStyles
+class TableStyles implements TableStylesInterface
 {
     /**
      * Generate inline CSS custom property declarations for team colors

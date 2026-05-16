@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace UI;
 
 use Security\HtmlSanitizer;
+use UI\Contracts\DebugOutputInterface;
 
 /**
  * DebugOutput - Displays debug information in a collapsible panel
@@ -12,7 +13,7 @@ use Security\HtmlSanitizer;
  * SECURITY: Debug output is only shown to admin users to prevent
  * information disclosure to regular users.
  */
-class DebugOutput
+class DebugOutput implements DebugOutputInterface
 {
     private static int $debugId = 0;
 

@@ -12,7 +12,8 @@ use PHPStan\Rules\RuleErrorBuilder;
 
 /**
  * Bans direct access to `$_GET`, `$_POST`, `$_REQUEST`, and `$_COOKIE` outside
- * the sanctioned input-boundary layer (Controllers, ApiHandlers, and CsrfGuard).
+ * the sanctioned input-boundary layer (Controllers, ApiHandlers, Bootstraps,
+ * Authenticators, CsrfGuard, LeagueContext, and TestCookieOverrides).
  *
  * Services, Repositories, Views, Calculators, and other inner-layer classes
  * must receive validated, typed inputs from a Controller or ApiHandler rather
@@ -34,18 +35,22 @@ final class BanRawSuperglobalsRule implements Rule
 
     /**
      * File-basename patterns that are allowed to read superglobals.
-     * The sanctioned input-boundary layer: Controllers, ApiHandlers, and CsrfGuard.
+     * The sanctioned input-boundary layer.
      *
      * @var list<string>
      */
     private const ALLOWED_FILE_SUFFIXES = [
         'Controller.php',
         'ApiHandler.php',
+        'Bootstrap.php',
+        'Authenticator.php',
     ];
 
     /** @var list<string> */
     private const ALLOWED_FILES = [
         'CsrfGuard.php',
+        'LeagueContext.php',
+        'TestCookieOverrides.php',
     ];
 
     public function getNodeType(): string
@@ -88,9 +93,9 @@ final class BanRawSuperglobalsRule implements Rule
 
         return [
             RuleErrorBuilder::message(
-                'Direct $' . $node->name . ' access is banned outside Controllers, '
-                . 'ApiHandlers, and Security\CsrfGuard. Accept typed inputs as parameters '
-                . 'from a Controller/ApiHandler instead.'
+                'Direct $' . $node->name . ' access is banned outside the HTTP '
+                . 'boundary layer (Controllers, ApiHandlers, Bootstraps, Authenticators). '
+                . 'Accept typed inputs as parameters instead.'
             )
                 ->identifier('ibl.rawSuperglobal')
                 ->build(),

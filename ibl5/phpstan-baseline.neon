@@ -1,12 +1,6 @@
 parameters:
 	ignoreErrors:
 		-
-			rawMessage: 'Direct $_GET access is banned outside Controllers, ApiHandlers, and Security\CsrfGuard. Accept typed inputs as parameters from a Controller/ApiHandler instead.'
-			identifier: ibl.rawSuperglobal
-			count: 1
-			path: classes/Api/Middleware/ApiKeyAuthenticator.php
-
-		-
 			rawMessage: '''
 				Call to method sql_fetchrow() of deprecated class Database\MySQL:
 				This class is for PHP-Nuke module backward compatibility only.
@@ -77,12 +71,6 @@ parameters:
 			path: classes/Bootstrap/ConfigBootstrap.php
 
 		-
-			rawMessage: 'Direct $_REQUEST access is banned outside Controllers, ApiHandlers, and Security\CsrfGuard. Accept typed inputs as parameters from a Controller/ApiHandler instead.'
-			identifier: ibl.rawSuperglobal
-			count: 1
-			path: classes/Bootstrap/ConfigBootstrap.php
-
-		-
 			rawMessage: '''
 				PHPDoc tag @var references deprecated class Database\MySQL:
 				This class is for PHP-Nuke module backward compatibility only.
@@ -110,18 +98,6 @@ parameters:
 			identifier: varTag.deprecatedClass
 			count: 1
 			path: classes/Bootstrap/ConfigBootstrap.php
-
-		-
-			rawMessage: 'Direct $_COOKIE access is banned outside Controllers, ApiHandlers, and Security\CsrfGuard. Accept typed inputs as parameters from a Controller/ApiHandler instead.'
-			identifier: ibl.rawSuperglobal
-			count: 2
-			path: classes/Bootstrap/LeagueBootstrap.php
-
-		-
-			rawMessage: 'Direct $_GET access is banned outside Controllers, ApiHandlers, and Security\CsrfGuard. Accept typed inputs as parameters from a Controller/ApiHandler instead.'
-			identifier: ibl.rawSuperglobal
-			count: 3
-			path: classes/Bootstrap/LeagueBootstrap.php
 
 		-
 			rawMessage: 'Unescaped output in View. Wrap the expression in HtmlSanitizer::e() (or another whitelisted safe helper), or cast it to (int)/(float)/(bool) if it is numeric.'
@@ -158,18 +134,6 @@ parameters:
 			identifier: ibl.cookieBeforeHeader
 			count: 2
 			path: classes/FreeAgency/FreeAgencyController.php
-
-		-
-			rawMessage: 'Direct $_COOKIE access is banned outside Controllers, ApiHandlers, and Security\CsrfGuard. Accept typed inputs as parameters from a Controller/ApiHandler instead.'
-			identifier: ibl.rawSuperglobal
-			count: 1
-			path: classes/League/LeagueContext.php
-
-		-
-			rawMessage: 'Direct $_GET access is banned outside Controllers, ApiHandlers, and Security\CsrfGuard. Accept typed inputs as parameters from a Controller/ApiHandler instead.'
-			identifier: ibl.rawSuperglobal
-			count: 1
-			path: classes/League/LeagueContext.php
 
 		-
 			rawMessage: 'Unescaped output in View. Wrap the expression in HtmlSanitizer::e() (or another whitelisted safe helper), or cast it to (int)/(float)/(bool) if it is numeric.'
@@ -290,12 +254,6 @@ parameters:
 			identifier: ibl.unescapedOutput
 			count: 10
 			path: classes/TransactionHistory/TransactionHistoryView.php
-
-		-
-			rawMessage: 'Direct $_COOKIE access is banned outside Controllers, ApiHandlers, and Security\CsrfGuard. Accept typed inputs as parameters from a Controller/ApiHandler instead.'
-			identifier: ibl.rawSuperglobal
-			count: 2
-			path: classes/Utilities/TestCookieOverrides.php
 
 		-
 			rawMessage: '$cookie[...] is read before PageLayout::header() in the same method. PageLayout::header() populates $cookie with auth and CSRF state — call it first, otherwise you will read stale or missing values (see CsrfGuard MAX_TOKENS incident).'

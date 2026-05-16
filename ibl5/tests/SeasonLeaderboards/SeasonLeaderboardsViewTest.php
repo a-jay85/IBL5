@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Tests\SeasonLeaderboards;
 
 use PHPUnit\Framework\TestCase;
+use SeasonLeaderboards\Contracts\SeasonLeaderboardsRepositoryInterface;
 use SeasonLeaderboards\SeasonLeaderboardsView;
 use SeasonLeaderboards\SeasonLeaderboardsService;
 
@@ -15,8 +16,9 @@ final class SeasonLeaderboardsViewTest extends TestCase
 
     protected function setUp(): void
     {
-        $this->service = new SeasonLeaderboardsService();
-        
+        $stubRepo = $this->createStub(SeasonLeaderboardsRepositoryInterface::class);
+        $this->service = new SeasonLeaderboardsService($stubRepo);
+
         $this->view = new SeasonLeaderboardsView($this->service);
     }
 

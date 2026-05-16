@@ -20,7 +20,7 @@ $pagetitle = "Season Stats";
 $dbCache = new \Cache\DatabaseCache($mysqli_db);
 $innerRepository = new SeasonLeaderboardsRepository($mysqli_db);
 $repository = new CachedSeasonLeaderboardsRepository($innerRepository, $dbCache);
-$service = new SeasonLeaderboardsService();
+$service = new SeasonLeaderboardsService($repository);
 $view = new SeasonLeaderboardsView($service);
 
 // Get filter parameters from POST
@@ -53,7 +53,7 @@ $years = $repository->getYears();
 echo $view->renderFilterForm($teams, $years, $filters);
 
 // Get and render season leaders
-$leadersData = $repository->getSeasonLeaders($filters, $limit);
+$leadersData = $service->getFilteredLeaderboard($filters, $limit);
 $rows = $leadersData['results'];
 $numRows = $leadersData['count'];
 

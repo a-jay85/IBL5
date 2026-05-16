@@ -12,10 +12,73 @@ use SeasonLeaderboards\Contracts\SeasonLeaderboardsServiceInterface;
  * @see SeasonLeaderboardsServiceInterface
  *
  * @phpstan-import-type HistRow from SeasonLeaderboardsRepositoryInterface
+ * @phpstan-import-type LeaderboardFilters from SeasonLeaderboardsRepositoryInterface
+ * @phpstan-import-type LeaderboardResult from SeasonLeaderboardsRepositoryInterface
  * @phpstan-import-type ProcessedStats from SeasonLeaderboardsServiceInterface
  */
 class SeasonLeaderboardsService implements SeasonLeaderboardsServiceInterface
 {
+    private SeasonLeaderboardsRepositoryInterface $repository;
+
+    public function __construct(SeasonLeaderboardsRepositoryInterface $repository)
+    {
+        $this->repository = $repository;
+    }
+
+    /**
+     * @see SeasonLeaderboardsServiceInterface::getFilteredLeaderboard()
+     *
+     * @param LeaderboardFilters $filters
+     * @return LeaderboardResult
+     */
+    public function getFilteredLeaderboard(array $filters, int $limit = 0): array
+    {
+        $result = $this->repository->getSeasonLeaders([], 0);
+        /** @var list<HistRow> $rows */
+        $rows = $result['results'];
+
+        // Filter by year
+        $yearFilter = (string) ($filters['year'] ?? '');
+        if ($yearFilter !== '') {
+            $yearInt = (int) $yearFilter;
+            $rows = array_values(array_filter(
+                $rows,
+                static fn (array $row): bool => $row['year'] === $yearInt
+            ));
+        }
+
+        // Filter by team
+        $teamId = (int) ($filters['team'] ?? 0);
+        if ($teamId !== 0) {
+            $rows = array_values(array_filter(
+                $rows,
+                static fn (array $row): bool => $row['teamid'] === $teamId
+            ));
+        }
+
+        // Sort by the requested stat DESC
+        $sortBy = (string) ($filters['sortby'] ?? 'PPG');
+        usort($rows, static function (array $a, array $b) use ($sortBy): int {
+            $aVal = self::getSortValue($a, $sortBy);
+            $bVal = self::getSortValue($b, $sortBy);
+            $cmp = $bVal <=> $aVal;
+            if ($cmp !== 0) {
+                return $cmp;
+            }
+            return $a['pid'] <=> $b['pid'];
+        });
+
+        // Apply limit
+        if ($limit > 0) {
+            $rows = array_slice($rows, 0, $limit);
+        }
+
+        return [
+            'results' => $rows,
+            'count' => count($rows),
+        ];
+    }
+
     /**
      * @see SeasonLeaderboardsServiceInterface::processPlayerRow()
      *
@@ -171,5 +234,66 @@ class SeasonLeaderboardsService implements SeasonLeaderboardsServiceInterface
             'TGM' => 'TGM', 'TGA' => 'TGA', 'TGP' => 'TG%', 'GAMES' => 'GAMES',
             'MIN' => 'MIN',
         ];
+    }
+
+    /**
+     * @param HistRow $row
+     */
+    private static function getSortValue(array $row, string $sortBy): float
+    {
+        $games = $row['games'];
+        if ($games === 0 && $sortBy !== 'GAMES') {
+            return 0.0;
+        }
+
+        $fgm = $row['fgm'];
+        $fga = $row['fga'];
+        $ftm = $row['ftm'];
+        $fta = $row['fta'];
+        $tgm = $row['tgm'];
+        $tga = $row['tga'];
+
+        return match ($sortBy) {
+            'PPG' => (2 * $fgm + $ftm + $tgm) / $games,
+            'REB' => $row['reb'] / $games,
+            'OREB' => $row['orb'] / $games,
+            'DREB' => ($row['reb'] - $row['orb']) / $games,
+            'AST' => $row['ast'] / $games,
+            'STL' => $row['stl'] / $games,
+            'BLK' => $row['blk'] / $games,
+            'TO' => $row['tvr'] / $games,
+            'FOUL' => $row['pf'] / $games,
+            'QA' => self::computeQaPerGame($row, $games),
+            'FGM' => $fgm / $games,
+            'FGA' => $fga / $games,
+            'FGP' => $fga > 0 ? $fgm / $fga : 0.0,
+            'FTM' => $ftm / $games,
+            'FTA' => $fta / $games,
+            'FTP' => $fta > 0 ? $ftm / $fta : 0.0,
+            'TGM' => $tgm / $games,
+            'TGA' => $tga / $games,
+            'TGP' => $tga > 0 ? $tgm / $tga : 0.0,
+            'GAMES' => (float) $games,
+            'MIN' => $row['minutes'] / $games,
+            default => (2 * $fgm + $ftm + $tgm) / $games,
+        };
+    }
+
+    /**
+     * @param HistRow $row
+     */
+    private static function computeQaPerGame(array $row, int $games): float
+    {
+        $fgm = $row['fgm'];
+        $fga = $row['fga'];
+        $ftm = $row['ftm'];
+        $fta = $row['fta'];
+        $tgm = $row['tgm'];
+
+        $pts = 2 * $fgm + $ftm + $tgm;
+        $positive = $pts + $row['reb'] + (2 * $row['ast']) + (2 * $row['stl']) + (2 * $row['blk']);
+        $negative = ($fga - $fgm) + ($fta - $ftm) + $row['tvr'] + $row['pf'];
+
+        return ($positive - $negative) / $games;
     }
 }

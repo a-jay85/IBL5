@@ -5,16 +5,220 @@ declare(strict_types=1);
 namespace Tests\SeasonLeaderboards;
 
 use PHPUnit\Framework\TestCase;
+use SeasonLeaderboards\Contracts\SeasonLeaderboardsRepositoryInterface;
 use SeasonLeaderboards\SeasonLeaderboardsService;
 
 final class SeasonLeaderboardsServiceTest extends TestCase
 {
+    private SeasonLeaderboardsRepositoryInterface $stubRepo;
     private SeasonLeaderboardsService $service;
 
     protected function setUp(): void
     {
-        $this->service = new SeasonLeaderboardsService();
+        $this->stubRepo = $this->createStub(SeasonLeaderboardsRepositoryInterface::class);
+        $this->stubRepo->method('getSeasonLeaders')
+            ->willReturn(['results' => [], 'count' => 0]);
+        $this->service = new SeasonLeaderboardsService($this->stubRepo);
     }
+
+    private function buildServiceWithRows(array $rows): SeasonLeaderboardsService
+    {
+        $stub = $this->createStub(SeasonLeaderboardsRepositoryInterface::class);
+        $stub->method('getSeasonLeaders')
+            ->willReturn(['results' => $rows, 'count' => count($rows)]);
+        return new SeasonLeaderboardsService($stub);
+    }
+
+    // --- getFilteredLeaderboard: filter tests ---
+
+    public function testFiltersByYear(): void
+    {
+        $service = $this->buildServiceWithRows([
+            $this->createRow(1, 'Player A', 2024, 1, 80, 1200),
+            $this->createRow(2, 'Player B', 2025, 2, 70, 1000),
+            $this->createRow(3, 'Player C', 2024, 3, 60, 900),
+        ]);
+
+        $result = $service->getFilteredLeaderboard(['year' => '2024', 'sortby' => 'PPG']);
+
+        $this->assertSame(2, $result['count']);
+        $pids = array_column($result['results'], 'pid');
+        $this->assertContains(1, $pids);
+        $this->assertContains(3, $pids);
+    }
+
+    public function testFiltersByTeam(): void
+    {
+        $service = $this->buildServiceWithRows([
+            $this->createRow(1, 'Player A', 2024, 5, 80, 1200),
+            $this->createRow(2, 'Player B', 2024, 10, 70, 1000),
+            $this->createRow(3, 'Player C', 2024, 5, 60, 900),
+        ]);
+
+        $result = $service->getFilteredLeaderboard(['team' => 5, 'sortby' => 'PPG']);
+
+        $this->assertSame(2, $result['count']);
+        $pids = array_column($result['results'], 'pid');
+        $this->assertContains(1, $pids);
+        $this->assertContains(3, $pids);
+    }
+
+    // --- getFilteredLeaderboard: sort tests ---
+
+    public function testSortsByPpgDesc(): void
+    {
+        $service = $this->buildServiceWithRows([
+            $this->createRow(1, 'Low Scorer', 2024, 1, 80, 800, fgm: 200, ftm: 100, tgm: 50),
+            $this->createRow(2, 'High Scorer', 2024, 2, 80, 1600, fgm: 500, ftm: 200, tgm: 100),
+            $this->createRow(3, 'Mid Scorer', 2024, 3, 80, 1200, fgm: 350, ftm: 150, tgm: 75),
+        ]);
+
+        $result = $service->getFilteredLeaderboard(['sortby' => 'PPG']);
+
+        $this->assertSame(2, $result['results'][0]['pid']);
+        $this->assertSame(3, $result['results'][1]['pid']);
+        $this->assertSame(1, $result['results'][2]['pid']);
+    }
+
+    public function testSortsByReboundsPerGame(): void
+    {
+        $service = $this->buildServiceWithRows([
+            $this->createRow(1, 'Few Boards', 2024, 1, 80, 800, reb: 200),
+            $this->createRow(2, 'Many Boards', 2024, 2, 80, 800, reb: 600),
+            $this->createRow(3, 'Mid Boards', 2024, 3, 80, 800, reb: 400),
+        ]);
+
+        $result = $service->getFilteredLeaderboard(['sortby' => 'REB']);
+
+        $this->assertSame(2, $result['results'][0]['pid']);
+        $this->assertSame(3, $result['results'][1]['pid']);
+        $this->assertSame(1, $result['results'][2]['pid']);
+    }
+
+    public function testSortsByDefensiveReboundsPerGame(): void
+    {
+        $service = $this->buildServiceWithRows([
+            $this->createRow(1, 'Low DREB', 2024, 1, 80, 800, orb: 50, reb: 200),
+            $this->createRow(2, 'High DREB', 2024, 2, 80, 800, orb: 50, reb: 600),
+            $this->createRow(3, 'Mid DREB', 2024, 3, 80, 800, orb: 100, reb: 500),
+        ]);
+
+        $result = $service->getFilteredLeaderboard(['sortby' => 'DREB']);
+
+        $this->assertSame(2, $result['results'][0]['pid']);
+        $this->assertSame(3, $result['results'][1]['pid']);
+        $this->assertSame(1, $result['results'][2]['pid']);
+    }
+
+    public function testSortsByFgPct(): void
+    {
+        $service = $this->buildServiceWithRows([
+            $this->createRow(1, 'Bad Shooter', 2024, 1, 80, 800, fgm: 200, fga: 600),
+            $this->createRow(2, 'Good Shooter', 2024, 2, 80, 800, fgm: 400, fga: 600),
+            $this->createRow(3, 'Ok Shooter', 2024, 3, 80, 800, fgm: 300, fga: 600),
+        ]);
+
+        $result = $service->getFilteredLeaderboard(['sortby' => 'FGP']);
+
+        $this->assertSame(2, $result['results'][0]['pid']);
+        $this->assertSame(3, $result['results'][1]['pid']);
+        $this->assertSame(1, $result['results'][2]['pid']);
+    }
+
+    public function testSortsByGamesPlayed(): void
+    {
+        $service = $this->buildServiceWithRows([
+            $this->createRow(1, 'Few Games', 2024, 1, 40, 400),
+            $this->createRow(2, 'Many Games', 2024, 2, 82, 800),
+            $this->createRow(3, 'Mid Games', 2024, 3, 60, 600),
+        ]);
+
+        $result = $service->getFilteredLeaderboard(['sortby' => 'GAMES']);
+
+        $this->assertSame(2, $result['results'][0]['pid']);
+        $this->assertSame(3, $result['results'][1]['pid']);
+        $this->assertSame(1, $result['results'][2]['pid']);
+    }
+
+    public function testDefaultSortIsPpg(): void
+    {
+        $service = $this->buildServiceWithRows([
+            $this->createRow(1, 'Low', 2024, 1, 80, 800, fgm: 200, ftm: 100, tgm: 50),
+            $this->createRow(2, 'High', 2024, 2, 80, 1600, fgm: 500, ftm: 200, tgm: 100),
+        ]);
+
+        $result = $service->getFilteredLeaderboard([]);
+
+        $this->assertSame(2, $result['results'][0]['pid']);
+    }
+
+    // --- getFilteredLeaderboard: limit tests ---
+
+    public function testLimitRestrictsResultCount(): void
+    {
+        $service = $this->buildServiceWithRows($this->createSampleRows());
+
+        $result = $service->getFilteredLeaderboard(['sortby' => 'PPG'], 2);
+
+        $this->assertSame(2, $result['count']);
+    }
+
+    public function testZeroLimitReturnsAllRows(): void
+    {
+        $service = $this->buildServiceWithRows($this->createSampleRows());
+
+        $result = $service->getFilteredLeaderboard(['sortby' => 'PPG'], 0);
+
+        $this->assertSame(3, $result['count']);
+    }
+
+    public function testCombinesYearFilterSortAndLimit(): void
+    {
+        $service = $this->buildServiceWithRows([
+            $this->createRow(1, 'P1 2024', 2024, 1, 80, 800, fgm: 200, ftm: 100, tgm: 50),
+            $this->createRow(2, 'P2 2024', 2024, 2, 80, 1600, fgm: 500, ftm: 200, tgm: 100),
+            $this->createRow(3, 'P3 2025', 2025, 3, 80, 1200, fgm: 400, ftm: 180, tgm: 90),
+            $this->createRow(4, 'P4 2024', 2024, 1, 80, 1400, fgm: 450, ftm: 190, tgm: 95),
+        ]);
+
+        $result = $service->getFilteredLeaderboard(['year' => '2024', 'sortby' => 'PPG'], 2);
+
+        $this->assertSame(2, $result['count']);
+        $this->assertSame(2, $result['results'][0]['pid']);
+        $this->assertSame(4, $result['results'][1]['pid']);
+    }
+
+    // --- getFilteredLeaderboard: edge cases ---
+
+    public function testTiesResolveByPidAsc(): void
+    {
+        $service = $this->buildServiceWithRows([
+            $this->createRow(30, 'Player C', 2024, 1, 80, 800, fgm: 200, ftm: 100, tgm: 50),
+            $this->createRow(10, 'Player A', 2024, 2, 80, 800, fgm: 200, ftm: 100, tgm: 50),
+            $this->createRow(20, 'Player B', 2024, 3, 80, 800, fgm: 200, ftm: 100, tgm: 50),
+        ]);
+
+        $result = $service->getFilteredLeaderboard(['sortby' => 'PPG']);
+
+        $this->assertSame(10, $result['results'][0]['pid']);
+        $this->assertSame(20, $result['results'][1]['pid']);
+        $this->assertSame(30, $result['results'][2]['pid']);
+    }
+
+    public function testZeroGamesPlayerDoesNotCauseDivisionByZero(): void
+    {
+        $service = $this->buildServiceWithRows([
+            $this->createRow(1, 'No Games', 2024, 1, 0, 0),
+            $this->createRow(2, 'Has Games', 2024, 2, 80, 1600, fgm: 500, ftm: 200, tgm: 100),
+        ]);
+
+        $result = $service->getFilteredLeaderboard(['sortby' => 'PPG']);
+
+        $this->assertSame(2, $result['results'][0]['pid']);
+        $this->assertSame(1, $result['results'][1]['pid']);
+    }
+
+    // --- processPlayerRow tests ---
 
     public function testProcessPlayerRowCalculatesCorrectly(): void
     {
@@ -43,26 +247,17 @@ final class SeasonLeaderboardsServiceTest extends TestCase
 
         $stats = $this->service->processPlayerRow($row);
 
-        // Check basic info
         $this->assertEquals(123, $stats['pid']);
         $this->assertEquals('Test Player', $stats['name']);
         $this->assertEquals(2024, $stats['year']);
-
-        // Check points calculation: 2*50 + 20 + 15 = 135
         $this->assertEquals(135, $stats['points']);
-
-        // Check per-game averages
-        $this->assertEquals('30.0', $stats['mpg']); // 300/10
-        $this->assertEquals('5.0', $stats['fgmpg']); // 50/10
-        $this->assertEquals('13.5', $stats['ppg']); // 135/10
-
-        // Check defensive rebounds per game: (80-30)/10 = 5.0
+        $this->assertEquals('30.0', $stats['mpg']);
+        $this->assertEquals('5.0', $stats['fgmpg']);
+        $this->assertEquals('13.5', $stats['ppg']);
         $this->assertEquals('5.0', $stats['drebpg']);
-
-        // Check percentages (0-1 range with 3 decimals)
-        $this->assertEquals('0.500', $stats['fgp']); // 50/100
-        $this->assertEquals('0.800', $stats['ftp']); // 20/25
-        $this->assertEquals('0.375', $stats['tgp']); // 15/40
+        $this->assertEquals('0.500', $stats['fgp']);
+        $this->assertEquals('0.800', $stats['ftp']);
+        $this->assertEquals('0.375', $stats['tgp']);
     }
 
     public function testProcessPlayerRowHandlesZeroGames(): void
@@ -92,7 +287,6 @@ final class SeasonLeaderboardsServiceTest extends TestCase
 
         $stats = $this->service->processPlayerRow($row);
 
-        // Check that per-game stats default to 0.0
         $this->assertEquals('0.0', $stats['mpg']);
         $this->assertEquals('0.0', $stats['ppg']);
         $this->assertEquals('0.0', $stats['qa']);
@@ -109,7 +303,7 @@ final class SeasonLeaderboardsServiceTest extends TestCase
             'games' => 10,
             'minutes' => 300,
             'fgm' => 0,
-            'fga' => 0, // Zero attempts
+            'fga' => 0,
             'ftm' => 0,
             'fta' => 0,
             'tgm' => 0,
@@ -125,7 +319,6 @@ final class SeasonLeaderboardsServiceTest extends TestCase
 
         $stats = $this->service->processPlayerRow($row);
 
-        // Check that percentages default to 0.000
         $this->assertEquals('0.000', $stats['fgp']);
         $this->assertEquals('0.000', $stats['ftp']);
         $this->assertEquals('0.000', $stats['tgp']);
@@ -133,7 +326,6 @@ final class SeasonLeaderboardsServiceTest extends TestCase
 
     public function testQualityAssessmentCalculation(): void
     {
-        // QA = (pts + reb + 2*ast + 2*stl + 2*blk - (fga-fgm) - (fta-ftm) - tvr - pf) / games
         $row = [
             'pid' => 123,
             'name' => 'Test Player',
@@ -142,27 +334,23 @@ final class SeasonLeaderboardsServiceTest extends TestCase
             'teamid' => 1,
             'games' => 10,
             'minutes' => 300,
-            'fgm' => 50, // 50 misses (100-50)
+            'fgm' => 50,
             'fga' => 100,
-            'ftm' => 20, // 5 misses (25-20)
+            'ftm' => 20,
             'fta' => 25,
             'tgm' => 15,
             'tga' => 40,
             'orb' => 30,
             'reb' => 80,
-            'ast' => 40, // *2 = 80
-            'stl' => 10, // *2 = 20
-            'tvr' => 15, // -15
-            'blk' => 5,  // *2 = 10
-            'pf' => 20   // -20
+            'ast' => 40,
+            'stl' => 10,
+            'tvr' => 15,
+            'blk' => 5,
+            'pf' => 20
         ];
 
         $stats = $this->service->processPlayerRow($row);
 
-        // Points = 2*50 + 20 + 15 = 135
-        // Positives = 135 + 80 + 80 + 20 + 10 = 325
-        // Negatives = 50 + 5 + 15 + 20 = 90
-        // QA = (325 - 90) / 10 = 23.5
         $this->assertEquals('23.5', $stats['qa']);
     }
 
@@ -176,5 +364,70 @@ final class SeasonLeaderboardsServiceTest extends TestCase
         $this->assertArrayHasKey('MIN', $options);
         $this->assertSame('PPG', $options['PPG']);
         $this->assertSame('FG%', $options['FGP']);
+    }
+
+    // --- Test helpers ---
+
+    /**
+     * @return list<array<string, mixed>>
+     */
+    private function createSampleRows(): array
+    {
+        return [
+            $this->createRow(1, 'Player 1', 2024, 1, 80, 1200, fgm: 400, ftm: 150, tgm: 75),
+            $this->createRow(2, 'Player 2', 2024, 2, 70, 1000, fgm: 300, ftm: 120, tgm: 60),
+            $this->createRow(3, 'Player 3', 2025, 3, 60, 900, fgm: 250, ftm: 100, tgm: 50),
+        ];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function createRow(
+        int $pid,
+        string $name,
+        int $year,
+        int $teamid,
+        int $games,
+        int $minutes,
+        int $fgm = 0,
+        int $fga = 0,
+        int $ftm = 0,
+        int $fta = 0,
+        int $tgm = 0,
+        int $tga = 0,
+        int $orb = 0,
+        int $reb = 0,
+        int $ast = 0,
+        int $stl = 0,
+        int $blk = 0,
+        int $tvr = 0,
+        int $pf = 0,
+    ): array {
+        return [
+            'pid' => $pid,
+            'name' => $name,
+            'year' => $year,
+            'team' => "Team $teamid",
+            'teamid' => $teamid,
+            'games' => $games,
+            'minutes' => $minutes,
+            'fgm' => $fgm,
+            'fga' => $fga,
+            'ftm' => $ftm,
+            'fta' => $fta,
+            'tgm' => $tgm,
+            'tga' => $tga,
+            'orb' => $orb,
+            'reb' => $reb,
+            'ast' => $ast,
+            'stl' => $stl,
+            'blk' => $blk,
+            'tvr' => $tvr,
+            'pf' => $pf,
+            'team_city' => null,
+            'color1' => null,
+            'color2' => null,
+        ];
     }
 }

@@ -1,6 +1,6 @@
 #!/bin/bash
-# Lists files in classes/ over THRESHOLD lines; with --pr, flags files in the
-# current PR that grew > 100 LOC past the threshold.
+# Lists files in classes/ over THRESHOLD lines; with --pr, flags files that
+# are currently over THRESHOLD and received > 100 new lines in the current PR.
 set -euo pipefail
 
 THRESHOLD=${HOT_FILE_THRESHOLD:-500}
@@ -20,7 +20,7 @@ if [ "${1:-}" = "--pr" ]; then
             continue
         fi
         if [ "$added" -gt 100 ]; then
-            current=$(wc -l < "$file" 2>/dev/null || echo 0)
+            current=$(wc -l < "$ROOT/$file" 2>/dev/null || echo 0)
             current=$(echo "$current" | tr -d ' ')
             if [ "$current" -gt "$THRESHOLD" ]; then
                 echo "FLAG: $file (now $current LOC, +$added in this PR)"

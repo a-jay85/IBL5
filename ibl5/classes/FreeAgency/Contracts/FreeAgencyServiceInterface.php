@@ -20,12 +20,9 @@ interface FreeAgencyServiceInterface
     /**
      * Assemble all data needed by the main Free Agency page
      *
-     * Returns cap metrics and team data needed by FreeAgencyView::render().
-     * The view uses this data to render the four main tables:
-     * - Players under contract
-     * - Contract offers
-     * - Team free agents
-     * - All other free agents
+     * Returns cap metrics, team data, and pre-built player collections needed by
+     * FreeAgencyView::render(). The view receives pre-built Player objects and
+     * never queries the database for the team-specific tables.
      *
      * @param Team $team Team object
      * @param Season $season Current season
@@ -33,7 +30,11 @@ interface FreeAgencyServiceInterface
      *     capMetrics: array{totalSalaries: array<int, int>, softCapSpace: array<int, int>, hardCapSpace: array<int, int>, rosterSpots: array<int, int>},
      *     team: Team,
      *     season: Season,
-     *     allOtherPlayers: list<PlayerRow>
+     *     allOtherPlayers: list<PlayerRow>,
+     *     playersUnderContract: list<\Player\Player>,
+     *     unsignedFreeAgents: list<\Player\Player>,
+     *     offerPlayers: list<array{player: \Player\Player, offer: array<string, int>}>,
+     *     cashPlayers: list<array{player: \Player\Player, label: string}>
      * }
      */
     public function getMainPageData(Team $team, Season $season): array;

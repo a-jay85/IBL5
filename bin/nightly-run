@@ -239,7 +239,7 @@ PLAN_FILE=$PLAN_NAME" \
                 --output-format stream-json \
                 --verbose \
                 --name "nightly-impl-$(date +%Y-%m-%d-%H%M)" \
-            2>> "$LOG" \
+            2> >(grep -v 'thinking.type=enabled' >> "$LOG") \
             | bin/lib/nightly-stream-filter "$HEARTBEAT_FILE" "$CMDPID_FILE" \
             >> "$LOG" || IMPL_STATUS=$?
 
@@ -320,7 +320,7 @@ PLAN_FILE=$PLAN_NAME" \
                 --output-format stream-json \
                 --verbose \
                 --name "nightly-postplan-$(date +%Y-%m-%d-%H%M)" \
-            2>> "$LOG" \
+            2> >(grep -v 'thinking.type=enabled' >> "$LOG") \
             | bin/lib/nightly-stream-filter "$HEARTBEAT_FILE" "$CMDPID_FILE" \
             >> "$LOG" || PP_STATUS=$?
 

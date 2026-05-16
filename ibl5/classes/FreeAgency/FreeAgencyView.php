@@ -6,7 +6,6 @@ namespace FreeAgency;
 
 use Player\Player;
 use Player\PlayerImageHelper;
-use Team\Contracts\TeamQueryRepositoryInterface;
 use UI\TeamCellHelper;
 use Security\HtmlSanitizer;
 use Team\Team;
@@ -19,16 +18,14 @@ use Season\Season;
 class FreeAgencyView
 {
     private \mysqli $mysqli_db;
-    private TeamQueryRepositoryInterface $teamQueryRepo;
 
     public function __construct(\mysqli $mysqli_db)
     {
         $this->mysqli_db = $mysqli_db;
-        $this->teamQueryRepo = new \Team\TeamQueryRepository($mysqli_db);
     }
 
     /**
-     * @param array{team: Team, season: Season, capMetrics: CapMetrics, allOtherPlayers: list<PlayerRow>} $mainPageData
+     * @param array{team: Team, season: Season, capMetrics: CapMetrics, allOtherPlayers: list<PlayerRow>, playersUnderContract: list<Player>, unsignedFreeAgents: list<Player>, offerPlayers: list<array{player: Player, offer: array<string, int>}>, cashPlayers: list<array{player: Player, label: string}>} $mainPageData
      */
     public function render(array $mainPageData, ?string $result = null): string
     {
@@ -36,6 +33,10 @@ class FreeAgencyView
         $season = $mainPageData['season'];
         $capMetrics = $mainPageData['capMetrics'];
         $allOtherPlayers = $mainPageData['allOtherPlayers'];
+        $playersUnderContract = $mainPageData['playersUnderContract'];
+        $unsignedFreeAgents = $mainPageData['unsignedFreeAgents'];
+        $offerPlayers = $mainPageData['offerPlayers'];
+        $cashPlayers = $mainPageData['cashPlayers'];
 
         ob_start();
         echo \UI\AlertRenderer::fromCode($result, [
@@ -51,11 +52,11 @@ class FreeAgencyView
 <h2 class="ibl-title">Free Agency</h2>
 <img src="images/logo/<?= HtmlSanitizer::e($team->teamid) ?>.jpg" alt="Team Logo" class="team-logo-banner">
 <div class="mt-6"></div>
-<?= HtmlSanitizer::trusted($this->renderPlayersUnderContract($team, $season, $capMetrics)) ?>
+<?= HtmlSanitizer::trusted($this->renderPlayersUnderContract($team, $season, $capMetrics, $playersUnderContract, $cashPlayers)) ?>
 <div class="mt-6"></div>
-<?= HtmlSanitizer::trusted($this->renderContractOffers($team, $season, $capMetrics)) ?>
+<?= HtmlSanitizer::trusted($this->renderContractOffers($team, $season, $capMetrics, $offerPlayers)) ?>
 <div class="mt-6"></div>
-<?= HtmlSanitizer::trusted($this->renderTeamFreeAgents($team, $season, $capMetrics)) ?>
+<?= HtmlSanitizer::trusted($this->renderTeamFreeAgents($team, $season, $capMetrics, $unsignedFreeAgents)) ?>
 <?= HtmlSanitizer::trusted($this->renderOtherFreeAgents($team, $season, $allOtherPlayers)) ?>
         <?php
         return (string) ob_get_clean();
@@ -67,9 +68,11 @@ class FreeAgencyView
      * @param Team $team Team object
      * @param Season $season Season object
      * @param CapMetrics $capMetrics Cap metrics from service
+     * @param list<Player> $players Pre-built contracted player objects
+     * @param list<array{player: Player, label: string}> $cashPlayers Pre-built cash consideration players
      * @return string HTML table
      */
-    private function renderPlayersUnderContract(Team $team, Season $season, array $capMetrics): string
+    private function renderPlayersUnderContract(Team $team, Season $season, array $capMetrics, array $players, array $cashPlayers): string
     {
         ob_start();
         ?>
@@ -79,12 +82,8 @@ class FreeAgencyView
     <?= HtmlSanitizer::trusted($this->renderColgroups(false, false)) ?>
     <?= HtmlSanitizer::trusted($this->renderTableHeader('Players Under Contract', false, $team, false, false, $season)) ?>
     <tbody>
-        <?php
-        $rosterRows = $this->teamQueryRepo->getRosterUnderContractOrderedByOrdinal($team->teamid);
-        foreach ($rosterRows as $playerRow): ?>
+        <?php foreach ($players as $player): ?>
             <?php
-            $player = Player::withPlrRow($this->mysqli_db, $playerRow);
-
             if (!$player->isPlayerFreeAgent($season) || $player->isSalaryPlaceholder()):
                 $futureSalaries = $player->getFutureSalaries();
                 $playerName = $player->name ?? '';
@@ -128,16 +127,10 @@ class FreeAgencyView
         </tr>
             <?php endif; ?>
         <?php endforeach; ?>
-        <?php
-        // Append cash considerations and buyouts from dedicated table
-        $cashRepo = new \Trading\CashConsiderationRepository($this->mysqli_db);
-        $cashRows = $cashRepo->getTeamCashConsiderations($team->teamid);
-        foreach ($cashRows as $cashRow):
-            $cashPlayerRow = \Team\TeamTableService::cashConsiderationToRosterRow($cashRow);
-            /** @phpstan-ignore argument.type (cashConsiderationToRosterRow produces a PlayerRow-shaped array) */
-            $cashPlayer = Player::withPlrRow($this->mysqli_db, $cashPlayerRow);
+        <?php foreach ($cashPlayers as $cashEntry):
+            $cashPlayer = $cashEntry['player'];
+            $cashLabel = $cashEntry['label'];
             $cashFutureSalaries = $cashPlayer->getFutureSalaries();
-            $cashLabel = is_string($cashRow['label'] ?? null) ? $cashRow['label'] : '';
         ?>
         <tr>
             <td></td>
@@ -175,10 +168,12 @@ class FreeAgencyView
      * Render contract offers table
      *
      * @param Team $team Team object
+     * @param Season $season Season object
      * @param CapMetrics $capMetrics Cap metrics from service
+     * @param list<array{player: Player, offer: array<string, int>}> $offerPlayers Pre-built offer data
      * @return string HTML table
      */
-    private function renderContractOffers(Team $team, Season $season, array $capMetrics): string
+    private function renderContractOffers(Team $team, Season $season, array $capMetrics, array $offerPlayers): string
     {
         ob_start();
         ?>
@@ -188,24 +183,22 @@ class FreeAgencyView
     <?= HtmlSanitizer::trusted($this->renderColgroups(false)) ?>
     <?= HtmlSanitizer::trusted($this->renderTableHeader('Contract Offers', false, $team, false, true, $season)) ?>
     <tbody>
-        <?php
-        $offersResult = $this->teamQueryRepo->getFreeAgencyOffers($team->teamid);
-        foreach ($offersResult as $offerRow): ?>
-            <?php
-            $player = Player::withPlayerID($this->mysqli_db, $offerRow['pid'] ?? 0);
-            ?>
+        <?php foreach ($offerPlayers as $offerEntry):
+            $player = $offerEntry['player'];
+            $offer = $offerEntry['offer'];
+        ?>
         <tr>
             <td><a href="modules.php?name=FreeAgency&amp;pa=negotiate&amp;pid=<?= HtmlSanitizer::e($player->playerID ?? 0) ?>">Offer</a></td>
             <td><?= HtmlSanitizer::e($player->position ?? '') ?></td>
             <?= PlayerImageHelper::renderFlexiblePlayerCell($player->playerID ?? 0, $player->name ?? '') ?>
             <td><?= HtmlSanitizer::e($player->age ?? 0) ?></td>
             <?= HtmlSanitizer::trusted($this->renderPlayerRatings($player)) ?>
-            <td class="col-salary"><?= HtmlSanitizer::e($offerRow['offer1']) ?></td>
-            <td class="col-salary"><?= HtmlSanitizer::e($offerRow['offer2']) ?></td>
-            <td class="col-salary"><?= HtmlSanitizer::e($offerRow['offer3']) ?></td>
-            <td class="col-salary"><?= HtmlSanitizer::e($offerRow['offer4']) ?></td>
-            <td class="col-salary"><?= HtmlSanitizer::e($offerRow['offer5']) ?></td>
-            <td class="col-salary"><?= HtmlSanitizer::e($offerRow['offer6']) ?></td>
+            <td class="col-salary"><?= HtmlSanitizer::e($offer['offer1']) ?></td>
+            <td class="col-salary"><?= HtmlSanitizer::e($offer['offer2']) ?></td>
+            <td class="col-salary"><?= HtmlSanitizer::e($offer['offer3']) ?></td>
+            <td class="col-salary"><?= HtmlSanitizer::e($offer['offer4']) ?></td>
+            <td class="col-salary"><?= HtmlSanitizer::e($offer['offer5']) ?></td>
+            <td class="col-salary"><?= HtmlSanitizer::e($offer['offer6']) ?></td>
             <?= HtmlSanitizer::trusted($this->renderPlayerPreferences($player)) ?>
         </tr>
         <?php endforeach; ?>
@@ -234,9 +227,10 @@ class FreeAgencyView
      * @param Team $team Team object
      * @param Season $season Season object
      * @param CapMetrics $capMetrics Cap metrics from service
+     * @param list<Player> $unsignedPlayers Pre-built unsigned free agent players
      * @return string HTML table
      */
-    private function renderTeamFreeAgents(Team $team, Season $season, array $capMetrics): string
+    private function renderTeamFreeAgents(Team $team, Season $season, array $capMetrics, array $unsignedPlayers): string
     {
         ob_start();
         ?>
@@ -246,15 +240,9 @@ class FreeAgencyView
     <?= HtmlSanitizer::trusted($this->renderColgroups(false)) ?>
     <?= HtmlSanitizer::trusted($this->renderTableHeader('Unsigned Free Agents', true, $team, false, true, $season)) ?>
     <tbody>
-        <?php
-        $rosterRows = $this->teamQueryRepo->getRosterUnderContractOrderedByOrdinal($team->teamid);
-        foreach ($rosterRows as $playerRow): ?>
-            <?php
-            $player = Player::withPlrRow($this->mysqli_db, $playerRow);
-
-            if ($player->isPlayerFreeAgent($season) && !$player->isSalaryPlaceholder()):
-                $demands = $player->getFreeAgencyDemands();
-            ?>
+        <?php foreach ($unsignedPlayers as $player):
+            $demands = $player->getFreeAgencyDemands();
+        ?>
         <tr>
             <td>
                 <?php if ($capMetrics['rosterSpots'][0] > 0): ?>
@@ -276,7 +264,6 @@ class FreeAgencyView
             <?= HtmlSanitizer::trusted($this->renderPlayerDemands($demands)) ?>
             <?= HtmlSanitizer::trusted($this->renderPlayerPreferences($player)) ?>
         </tr>
-            <?php endif; ?>
         <?php endforeach; ?>
     </tbody>
 </table>

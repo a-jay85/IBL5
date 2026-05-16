@@ -414,6 +414,97 @@ class SeasonArchiveServiceTest extends TestCase
         $this->assertSame(1, $result['playerIds']['MVP Player']);
     }
 
+    public function testPlayerNamesAutoCollectedFromAllExtractAwardCalls(): void
+    {
+        $this->mockRepository->method('getAwardsByYear')->willReturn([
+            ['year' => 1989, 'award' => 'Most Valuable Player (1st)', 'name' => 'MVP Player', 'table_id' => 1],
+            ['year' => 1989, 'award' => 'Scoring Leader (1st)', 'name' => 'Scorer', 'table_id' => 2],
+            ['year' => 1989, 'award' => 'All-Star Game MVP', 'name' => 'ASG MVP', 'table_id' => 3],
+            ['year' => 1989, 'award' => 'One-on-One Tournament Champion', 'name' => '1v1 Champ', 'table_id' => 4],
+            ['year' => 1989, 'award' => 'All-League First Team', 'name' => 'First Teamer', 'table_id' => 5],
+            ['year' => 1989, 'award' => 'All-Defensive Team (1st)', 'name' => 'Defender', 'table_id' => 6],
+            ['year' => 1989, 'award' => 'All-Rookie Team (1st)', 'name' => 'Rookie', 'table_id' => 7],
+            ['year' => 1989, 'award' => 'IBL Champion', 'name' => 'Champ Player', 'table_id' => 8],
+            ['year' => 1989, 'award' => 'Eastern Conference All-Star', 'name' => 'East Star', 'table_id' => 9],
+            ['year' => 1989, 'award' => 'Slam Dunk Competition - Winner', 'name' => 'Dunker', 'table_id' => 10],
+            ['year' => 1989, 'award' => 'Three-Point Contest', 'name' => 'Shooter', 'table_id' => 11],
+        ]);
+        $this->mockRepository->method('getPlayoffResultsByYear')->willReturn([]);
+        $this->mockRepository->method('getTeamAwardsByYear')->willReturn([]);
+        $this->mockRepository->method('getAllGmAwardsWithTeams')->willReturn([]);
+        $this->mockRepository->method('getAllGmTenuresWithTeams')->willReturn([]);
+        $this->mockRepository->method('getHeatWinLossByYear')->willReturn([]);
+        $this->mockRepository->method('getTeamColors')->willReturn([]);
+
+        $expectedNames = [
+            'MVP Player', 'Scorer', 'ASG MVP', '1v1 Champ',
+            'First Teamer', 'Defender', 'Rookie', 'Champ Player',
+            'East Star', 'Dunker', 'Shooter',
+        ];
+
+        $this->mockRepository->expects($this->once())
+            ->method('getPlayerIdsByNames')
+            ->with($this->callback(static function (array $names) use ($expectedNames): bool {
+                foreach ($expectedNames as $expected) {
+                    if (!in_array($expected, $names, true)) {
+                        return false;
+                    }
+                }
+
+                return true;
+            }))
+            ->willReturn([]);
+
+        $this->service->getSeasonDetail(1989);
+    }
+
+    public function testAccumulatorResetsBetweenCalls(): void
+    {
+        $stubRepo = $this->createStub(SeasonArchiveRepositoryInterface::class);
+        $stubRepo->method('getTeamConferences')->willReturn([]);
+        $stubRepo->method('getPlayoffResultsByYear')->willReturn([]);
+        $stubRepo->method('getTeamAwardsByYear')->willReturn([]);
+        $stubRepo->method('getAllGmAwardsWithTeams')->willReturn([]);
+        $stubRepo->method('getAllGmTenuresWithTeams')->willReturn([]);
+        $stubRepo->method('getHeatWinLossByYear')->willReturn([]);
+        $stubRepo->method('getTeamColors')->willReturn([]);
+
+        $callCount = 0;
+        $stubRepo->method('getAwardsByYear')->willReturnCallback(
+            static function (int $year) use (&$callCount): array {
+                $callCount++;
+                if ($callCount === 1) {
+                    return [
+                        ['year' => 1989, 'award' => 'Most Valuable Player (1st)', 'name' => 'Season1 MVP', 'table_id' => 1],
+                    ];
+                }
+
+                return [
+                    ['year' => 1990, 'award' => 'Most Valuable Player (1st)', 'name' => 'Season2 MVP', 'table_id' => 2],
+                ];
+            },
+        );
+
+        $capturedNames = [];
+        $stubRepo->method('getPlayerIdsByNames')->willReturnCallback(
+            static function (array $names) use (&$capturedNames): array {
+                $capturedNames[] = $names;
+
+                return [];
+            },
+        );
+
+        $service = new SeasonArchiveService($stubRepo);
+        $service->getSeasonDetail(1989);
+        $service->getSeasonDetail(1990);
+
+        $this->assertCount(2, $capturedNames);
+        $this->assertContains('Season1 MVP', $capturedNames[0]);
+        $this->assertNotContains('Season2 MVP', $capturedNames[0]);
+        $this->assertContains('Season2 MVP', $capturedNames[1]);
+        $this->assertNotContains('Season1 MVP', $capturedNames[1]);
+    }
+
     public function testAllStarCoachesIncludedInSeasonDetail(): void
     {
         $mockRepo = $this->createMock(SeasonArchiveRepositoryInterface::class);

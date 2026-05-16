@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace Player\Views;
 
-use Player\PlayerRepository;
 use Player\PlayerStatsRepository;
 use Player\Contracts\PlayerHeatAveragesViewInterface;
 use BasketballStats\StatsFormatter;
@@ -14,19 +13,17 @@ use Security\HtmlSanitizer;
  * PlayerHeatAveragesView - Renders H.E.A.T. averages table
  *
  * Shows year-by-year H.E.A.T. statistics averages with career averages row.
- * Uses PlayerRepository and PlayerStatsRepository for all database access.
+ * Uses PlayerStatsRepository for all database access.
  *
  * @see PlayerHeatAveragesViewInterface
  */
 class PlayerHeatAveragesView implements PlayerHeatAveragesViewInterface
 {
-    private PlayerRepository $repository;
-    private PlayerStatsRepository $statsRepository;
+    private PlayerStatsRepository $repository;
 
-    public function __construct(PlayerRepository $repository, PlayerStatsRepository $statsRepository)
+    public function __construct(PlayerStatsRepository $repository)
     {
         $this->repository = $repository;
-        $this->statsRepository = $statsRepository;
     }
 
     /**
@@ -43,7 +40,7 @@ class PlayerHeatAveragesView implements PlayerHeatAveragesViewInterface
     public function renderAverages(string $playerName): string
     {
         $heatStats = $this->repository->getHeatStats($playerName);
-        $careerAverages = $this->statsRepository->getHeatCareerAverages($playerName);
+        $careerAverages = $this->repository->getHeatCareerAverages($playerName);
 
         ob_start();
         ?>

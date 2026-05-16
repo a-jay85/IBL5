@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Player\Views;
 
-use Player\PlayerRepository;
+use Player\PlayerStatsRepository;
 use Player\Contracts\PlayerHeatStatsViewInterface;
 use BasketballStats\StatsFormatter;
 use Security\HtmlSanitizer;
@@ -12,15 +12,15 @@ use Security\HtmlSanitizer;
 /**
  * PlayerHeatStatsView - Renders Heat tournament statistics
  *
- * Pure rendering with no database logic - all data fetched via PlayerRepository
+ * Pure rendering with no database logic - all data fetched via PlayerStatsRepository
  *
  * @see PlayerHeatStatsViewInterface
  */
 class PlayerHeatStatsView implements PlayerHeatStatsViewInterface
 {
-    private PlayerRepository $repository;
+    private PlayerStatsRepository $repository;
 
-    public function __construct(PlayerRepository $repository)
+    public function __construct(PlayerStatsRepository $repository)
     {
         $this->repository = $repository;
     }

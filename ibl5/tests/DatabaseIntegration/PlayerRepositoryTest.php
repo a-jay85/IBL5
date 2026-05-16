@@ -48,28 +48,6 @@ class PlayerRepositoryTest extends DatabaseTestCase
         $this->repo->loadByID(99999);
     }
 
-    public function testGetPlayerStatsReturnsRowWithNativeTypes(): void
-    {
-        $this->insertTestPlayer(200010003, 'PLR StatsTest', [
-            'teamid' => 2,
-            'pos' => 'SG',
-        ]);
-
-        $row = $this->repo->getPlayerStats(200010003);
-
-        self::assertNotNull($row);
-        self::assertSame(200010003, $row['pid']);
-        self::assertSame(2, $row['teamid']);
-        self::assertSame('SG', $row['pos']);
-    }
-
-    public function testGetPlayerStatsReturnsNullForUnknownPlayer(): void
-    {
-        $row = $this->repo->getPlayerStats(99999);
-
-        self::assertNull($row);
-    }
-
     public function testGetFreeAgencyDemandsReturnsZeroesWhenNoDemandRow(): void
     {
         $this->insertTestPlayer(200010004, 'PLR DemandTst');
@@ -154,57 +132,6 @@ class PlayerRepositoryTest extends DatabaseTestCase
 
         self::assertSame(1, $this->repo->getAllStarGameCount('PLR CacheTest'));
         self::assertSame(1, $this->repo->getThreePointContestCount('PLR CacheTest'));
-    }
-
-    // ── Historical stats ────────────────────────────────────────
-
-    public function testGetHistoricalStatsReturnsOrderedByYear(): void
-    {
-        $this->insertTestPlayer(200010010, 'PLR HistStats');
-        $this->insertHistRow(200010010, 'PLR HistStats', 2025, ['teamid' => 1]);
-        $this->insertHistRow(200010010, 'PLR HistStats', 2023, ['teamid' => 1]);
-        $this->insertHistRow(200010010, 'PLR HistStats', 2024, ['teamid' => 1]);
-
-        $stats = $this->repo->getHistoricalStats(200010010);
-
-        self::assertCount(3, $stats);
-        self::assertSame(2023, $stats[0]['year']);
-        self::assertSame(2024, $stats[1]['year']);
-        self::assertSame(2025, $stats[2]['year']);
-    }
-
-    public function testGetHistoricalStatsReturnsEmptyForNoHistory(): void
-    {
-        self::assertSame([], $this->repo->getHistoricalStats(999999999));
-    }
-
-    // ── Playoff / Heat / Olympics stats ─────────────────────────
-
-    public function testGetPlayoffStatsReturnsEmptyForNoData(): void
-    {
-        self::assertSame([], $this->repo->getPlayoffStats('PLR NoPlayoffs'));
-    }
-
-    public function testGetHeatStatsReturnsEmptyForNoData(): void
-    {
-        self::assertSame([], $this->repo->getHeatStats('PLR NoHeat'));
-    }
-
-    public function testGetOlympicsStatsReturnsEmptyForNoData(): void
-    {
-        self::assertSame([], $this->repo->getOlympicsStats(999999999));
-    }
-
-    // ── getAllSimDates ───────────────────────────────────────────
-
-    public function testGetAllSimDatesReturnsArray(): void
-    {
-        $dates = $this->repo->getAllSimDates();
-
-        self::assertIsArray($dates);
-        if ($dates !== []) {
-            self::assertArrayHasKey('sim', $dates[0]);
-        }
     }
 
     // ── One-on-One wins/losses ──────────────────────────────────

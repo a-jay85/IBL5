@@ -105,7 +105,7 @@ class PlayerViewFactory
      */
     public function createPlayoffTotalsView(): PlayerPlayoffTotalsView
     {
-        return new PlayerPlayoffTotalsView($this->repository);
+        return new PlayerPlayoffTotalsView($this->statsRepository);
     }
 
     /**
@@ -113,7 +113,7 @@ class PlayerViewFactory
      */
     public function createPlayoffAveragesView(): PlayerPlayoffAveragesView
     {
-        return new PlayerPlayoffAveragesView($this->repository, $this->statsRepository);
+        return new PlayerPlayoffAveragesView($this->statsRepository);
     }
 
     /**
@@ -121,7 +121,7 @@ class PlayerViewFactory
      */
     public function createHeatTotalsView(): PlayerHeatTotalsView
     {
-        return new PlayerHeatTotalsView($this->repository);
+        return new PlayerHeatTotalsView($this->statsRepository);
     }
 
     /**
@@ -129,7 +129,7 @@ class PlayerViewFactory
      */
     public function createHeatAveragesView(): PlayerHeatAveragesView
     {
-        return new PlayerHeatAveragesView($this->repository, $this->statsRepository);
+        return new PlayerHeatAveragesView($this->statsRepository);
     }
 
     /**
@@ -137,7 +137,7 @@ class PlayerViewFactory
      */
     public function createOlympicTotalsView(): PlayerOlympicTotalsView
     {
-        return new PlayerOlympicTotalsView($this->repository);
+        return new PlayerOlympicTotalsView($this->statsRepository);
     }
 
     /**
@@ -145,7 +145,7 @@ class PlayerViewFactory
      */
     public function createOlympicAveragesView(): PlayerOlympicAveragesView
     {
-        return new PlayerOlympicAveragesView($this->repository, $this->statsRepository);
+        return new PlayerOlympicAveragesView($this->statsRepository);
     }
 
     /**

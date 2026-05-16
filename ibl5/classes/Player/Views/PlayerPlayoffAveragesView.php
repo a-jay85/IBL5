@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace Player\Views;
 
-use Player\PlayerRepository;
 use Player\PlayerStatsRepository;
 use Player\Contracts\PlayerPlayoffAveragesViewInterface;
 use BasketballStats\StatsFormatter;
@@ -14,19 +13,17 @@ use Security\HtmlSanitizer;
  * PlayerPlayoffAveragesView - Renders playoff averages table
  *
  * Shows year-by-year playoff statistics averages with career averages row.
- * Uses PlayerRepository and PlayerStatsRepository for all database access.
+ * Uses PlayerStatsRepository for all database access.
  *
  * @see PlayerPlayoffAveragesViewInterface
  */
 class PlayerPlayoffAveragesView implements PlayerPlayoffAveragesViewInterface
 {
-    private PlayerRepository $repository;
-    private PlayerStatsRepository $statsRepository;
+    private PlayerStatsRepository $repository;
 
-    public function __construct(PlayerRepository $repository, PlayerStatsRepository $statsRepository)
+    public function __construct(PlayerStatsRepository $repository)
     {
         $this->repository = $repository;
-        $this->statsRepository = $statsRepository;
     }
 
     /**
@@ -43,7 +40,7 @@ class PlayerPlayoffAveragesView implements PlayerPlayoffAveragesViewInterface
     public function renderAverages(string $playerName): string
     {
         $playoffStats = $this->repository->getPlayoffStats($playerName);
-        $careerAverages = $this->statsRepository->getPlayoffCareerAverages($playerName);
+        $careerAverages = $this->repository->getPlayoffCareerAverages($playerName);
 
         ob_start();
         ?>

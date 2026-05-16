@@ -94,6 +94,51 @@ class ProjectedDraftOrderRepositoryTest extends TestCase
         $this->assertSame(1, $result[0]['teamid']);
     }
 
+    public function testSaveFinalDraftOrderExecutesInsert(): void
+    {
+        $picks = [
+            ['round' => 1, 'pick' => 1, 'team' => 'Heat', 'teamid' => 1],
+            ['round' => 1, 'pick' => 2, 'team' => 'Celtics', 'teamid' => 2],
+        ];
+
+        $this->repository->saveFinalDraftOrder(2026, $picks);
+
+        $queries = $this->db->getExecutedQueries();
+        $insertQueries = array_filter($queries, static fn (string $q): bool => str_contains($q, 'INSERT INTO ibl_draft'));
+        $this->assertCount(1, $insertQueries);
+    }
+
+    public function testSaveFinalDraftOrderWithEmptyPicksSkipsInsert(): void
+    {
+        $this->repository->saveFinalDraftOrder(2026, []);
+
+        $queries = $this->db->getExecutedQueries();
+        $insertQueries = array_filter($queries, static fn (string $q): bool => str_contains($q, 'INSERT INTO ibl_draft'));
+        $this->assertCount(0, $insertQueries);
+    }
+
+    public function testSaveFinalDraftOrderUpdatesSettings(): void
+    {
+        $picks = [
+            ['round' => 1, 'pick' => 1, 'team' => 'Heat', 'teamid' => 1],
+        ];
+
+        $this->repository->saveFinalDraftOrder(2026, $picks);
+
+        $queries = $this->db->getExecutedQueries();
+        $settingsQueries = array_filter($queries, static fn (string $q): bool => str_contains($q, 'ibl_settings'));
+        $this->assertNotEmpty($settingsQueries);
+    }
+
+    public function testSaveFinalDraftOrderDeletesOldDraftRows(): void
+    {
+        $this->repository->saveFinalDraftOrder(2026, []);
+
+        $queries = $this->db->getExecutedQueries();
+        $deleteQueries = array_filter($queries, static fn (string $q): bool => str_contains($q, 'DELETE FROM ibl_draft'));
+        $this->assertCount(2, $deleteQueries);
+    }
+
     public function testExtendsBaseMysqliRepository(): void
     {
         $this->assertInstanceOf(\BaseMysqliRepository::class, $this->repository);

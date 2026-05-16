@@ -55,8 +55,10 @@ final class RequireEscapedOutputRule implements Rule
     private const SAFE_STATIC_CALLS = [
         'HtmlSanitizer::e',
         'HtmlSanitizer::safeHtmlOutput',
+        'HtmlSanitizer::trusted',
         'Security\HtmlSanitizer::e',
         'Security\HtmlSanitizer::safeHtmlOutput',
+        'Security\HtmlSanitizer::trusted',
         'PlayerImageHelper::renderFlexiblePlayerCell',
         'PlayerImageHelper::renderPlayerCell',
         'Player\PlayerImageHelper::renderFlexiblePlayerCell',
@@ -85,6 +87,12 @@ final class RequireEscapedOutputRule implements Rule
         'Player\Views\CardFlipStyles::getFlipIcon',
         'PlayerStatsCardView::styleTable',
         'Player\Views\PlayerStatsCardView::styleTable',
+        'CsrfGuard::generateToken',
+        'Security\CsrfGuard::generateToken',
+        'AlertRenderer::fromCode',
+        'UI\AlertRenderer::fromCode',
+        'TableStyles::inlineVars',
+        'UI\TableStyles::inlineVars',
     ];
 
     /**

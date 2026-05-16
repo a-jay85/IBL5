@@ -64,4 +64,19 @@ class HtmlSanitizer
     {
         return self::safeHtmlOutput($value);
     }
+
+    /**
+     * Mark a string as trusted pre-built HTML that should not be escaped.
+     *
+     * Use this for HTML returned by internal render methods (instance methods
+     * whose output is already escaped at construction time). The PHPStan
+     * RequireEscapedOutputRule whitelists this method, so wrapping in
+     * trusted() satisfies the rule without double-escaping.
+     *
+     * NEVER pass user input directly to this method.
+     */
+    public static function trusted(string $html): string
+    {
+        return $html;
+    }
 }

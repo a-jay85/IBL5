@@ -26,9 +26,6 @@ class WaiversView implements WaiversViewInterface
         ?string $result = null,
         ?string $error = null
     ): string {
-        $teamNameEscaped = \Security\HtmlSanitizer::safeHtmlOutput($teamName);
-        $actionEscaped = \Security\HtmlSanitizer::safeHtmlOutput($action);
-
         ob_start();
         ?>
         <h2 class="ibl-title">Waivers</h2>
@@ -38,27 +35,27 @@ class WaiversView implements WaiversViewInterface
         ], $error) ?>
         <form name="Waiver_Move" method="post" action="" class="ibl-form-container">
             <?= \Security\CsrfGuard::generateToken('waivers') ?>
-            <input type="hidden" name="Team_Name" value="<?= $teamNameEscaped ?>">
+            <input type="hidden" name="Team_Name" value="<?= \Security\HtmlSanitizer::e($teamName) ?>">
             <div class="text-center">
-                <img src="images/logo/<?= $teamid ?>.jpg" alt="Team Logo" class="team-logo-banner">
+                <img src="images/logo/<?= \Security\HtmlSanitizer::e($teamid) ?>.jpg" alt="Team Logo" class="team-logo-banner">
                 <div class="ibl-card">
                     <div class="ibl-card__header">
-                        <h2 class="ibl-card__title"><?= $openRosterSpots ?> OPEN SPOTS / <?= $healthyOpenRosterSpots ?> HEALTHY SPOTS</h2>
+                        <h2 class="ibl-card__title"><?= \Security\HtmlSanitizer::e($openRosterSpots) ?> OPEN SPOTS / <?= \Security\HtmlSanitizer::e($healthyOpenRosterSpots) ?> HEALTHY SPOTS</h2>
                     </div>
                     <div class="ibl-card__body">
                         <div class="ibl-form-group">
                             <select name="Player_ID" class="ibl-select" aria-label="Select player">
                                 <option value="">Select player...</option>
                                 <?php foreach ($players as $optionHtml): ?>
-                                <?= $optionHtml ?>
+                                <?= \Security\HtmlSanitizer::trusted($optionHtml) ?>
                                 <?php endforeach; ?>
                             </select>
                         </div>
-                        <input type="hidden" name="Action" value="<?= $actionEscaped ?>">
-                        <input type="hidden" name="rosterslots" value="<?= $openRosterSpots ?>">
-                        <input type="hidden" name="healthyrosterslots" value="<?= $healthyOpenRosterSpots ?>">
+                        <input type="hidden" name="Action" value="<?= \Security\HtmlSanitizer::e($action) ?>">
+                        <input type="hidden" name="rosterslots" value="<?= \Security\HtmlSanitizer::e($openRosterSpots) ?>">
+                        <input type="hidden" name="healthyrosterslots" value="<?= \Security\HtmlSanitizer::e($healthyOpenRosterSpots) ?>">
                         <button type="submit" class="ibl-btn ibl-btn--primary ibl-btn--block">
-                            Click to <?= $actionEscaped ?> player(s) to/from Waiver Pool
+                            Click to <?= \Security\HtmlSanitizer::e($action) ?> player(s) to/from Waiver Pool
                         </button>
                     </div>
                 </div>

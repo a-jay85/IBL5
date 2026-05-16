@@ -55,9 +55,8 @@ class FreeAgencyNegotiationView
 
         // Error banner from PRG redirect
         if ($error !== null) {
-            $sanitizedError = \Security\HtmlSanitizer::safeHtmlOutput($error);
             ?>
-<div class="ibl-alert ibl-alert--error"><?= $sanitizedError ?></div>
+<div class="ibl-alert ibl-alert--error"><?= HtmlSanitizer::e($error) ?></div>
             <?php
         }
 
@@ -78,7 +77,7 @@ class FreeAgencyNegotiationView
     <div class="ibl-card__body">
         <div class="offer-player-info">
             <img src="<?= HtmlSanitizer::e(PlayerImageHelper::getImageUrl($player->playerID)) ?>" alt="<?= HtmlSanitizer::e($player->name ?? '') ?>" class="offer-player-img">
-            <?= $this->formComponents->renderPlayerRatings() ?>
+            <?= HtmlSanitizer::trusted($this->formComponents->renderPlayerRatings()) ?>
         </div>
     </div>
 </div>
@@ -92,16 +91,16 @@ class FreeAgencyNegotiationView
         <div class="ibl-field-group">
             <span class="ibl-label">Player Demands (base, before team modifiers):</span>
             <div class="ibl-field-group__content">
-                <?= $this->formComponents->renderDemandDisplay($demands) ?>
+                <?= HtmlSanitizer::trusted($this->formComponents->renderDemandDisplay($demands)) ?>
             </div>
         </div>
 
         <form name="FAOffer" method="post" action="modules.php?name=FreeAgency&pa=processoffer">
-            <?= $csrfHtml ?>
+            <?= HtmlSanitizer::trusted($csrfHtml) ?>
             <div class="ibl-field-group">
                 <span class="ibl-label">Your Custom Offer:</span>
                 <div class="ibl-field-group__content">
-                    <?= $this->formComponents->renderOfferInputs($existingOffer, $raisePercentage) ?>
+                    <?= HtmlSanitizer::trusted($this->formComponents->renderOfferInputs($existingOffer, $raisePercentage)) ?>
                 </div>
             </div>
 
@@ -120,18 +119,18 @@ class FreeAgencyNegotiationView
         <h2 class="ibl-card__title">Quick Offer Presets</h2>
     </div>
     <div class="ibl-card__body">
-        <?= $this->renderOfferButtons($player, $team) ?>
+        <?= HtmlSanitizer::trusted($this->renderOfferButtons($player, $team)) ?>
     </div>
 </div>
 
 <?php // Card 4: Notes & Reminders ?>
-<?= $this->renderNotesReminders($maxContract, $veteranMinimum, $amendedCapSpace, $capMetrics, $birdYears) ?>
+<?= HtmlSanitizer::trusted($this->renderNotesReminders($maxContract, $veteranMinimum, $amendedCapSpace, $capMetrics, $birdYears)) ?>
 
 <?php // Delete Offer (conditional) ?>
 <?php if ($hasExistingOffer): ?>
 <div class="offer-delete-section">
     <form method="post" action="modules.php?name=FreeAgency&pa=deleteoffer">
-        <?= $csrfHtml ?>
+        <?= HtmlSanitizer::trusted($csrfHtml) ?>
         <input type="hidden" name="teamname" value="<?= HtmlSanitizer::e($team->name) ?>">
         <input type="hidden" name="playerID" value="<?= (int) $player->playerID ?>">
         <button type="submit" class="ibl-btn ibl-btn--danger">Delete This Offer</button>
@@ -168,10 +167,10 @@ class FreeAgencyNegotiationView
         ];
 
         ob_start();
-        echo $this->formComponents->renderMaxContractButtons($maxSalaries, $birdYears);
-        echo $this->formComponents->renderExceptionButtons('MLE');
-        echo $this->formComponents->renderExceptionButtons('LLE');
-        echo $this->formComponents->renderExceptionButtons('VET');
+        echo HtmlSanitizer::trusted($this->formComponents->renderMaxContractButtons($maxSalaries, $birdYears));
+        echo HtmlSanitizer::trusted($this->formComponents->renderExceptionButtons('MLE'));
+        echo HtmlSanitizer::trusted($this->formComponents->renderExceptionButtons('LLE'));
+        echo HtmlSanitizer::trusted($this->formComponents->renderExceptionButtons('VET'));
         return (string) ob_get_clean();
     }
 
@@ -219,18 +218,18 @@ class FreeAgencyNegotiationView
     </div>
     <div class="ibl-card__body">
         <ul class="ibl-notes">
-            <li>The maximum contract permitted for this player (based on years of service) starts at <?= $maxContract ?> in Year 1.</li>
-            <li>You have <strong><?= $amendedCapSpace ?></strong> in <strong>soft cap</strong> space available; the amount you offer in year 1 cannot exceed this unless you are using one of the exceptions.</li>
+            <li>The maximum contract permitted for this player (based on years of service) starts at <?= HtmlSanitizer::e($maxContract) ?> in Year 1.</li>
+            <li>You have <strong><?= HtmlSanitizer::e($amendedCapSpace) ?></strong> in <strong>soft cap</strong> space available; the amount you offer in year 1 cannot exceed this unless you are using one of the exceptions.</li>
             <?php for ($year = 1; $year < 6; $year++): ?>
-            <li>You have <strong><?= $softCapSpace[$year] ?></strong> in <strong>soft cap</strong> space available; the amount you offer in year <?= $year + 1 ?> cannot exceed this unless you are using one of the exceptions.</li>
+            <li>You have <strong><?= HtmlSanitizer::e($softCapSpace[$year]) ?></strong> in <strong>soft cap</strong> space available; the amount you offer in year <?= HtmlSanitizer::e($year + 1) ?> cannot exceed this unless you are using one of the exceptions.</li>
             <?php endfor; ?>
             <?php for ($year = 0; $year < 6; $year++): ?>
-            <li>You have <strong><?= $hardCapSpace[$year] ?></strong> in <strong>hard cap</strong> space available; the amount you offer in year <?= $year + 1 ?> cannot exceed this.</li>
+            <li>You have <strong><?= HtmlSanitizer::e($hardCapSpace[$year]) ?></strong> in <strong>hard cap</strong> space available; the amount you offer in year <?= HtmlSanitizer::e($year + 1) ?> cannot exceed this.</li>
             <?php endfor; ?>
             <li>Enter "0" for years you do not want to offer a contract.</li>
             <li>The amounts offered each year must equal or exceed the previous year.</li>
-            <li>The first year of the contract must be at least the veteran's minimum (<?= $veteranMinimum ?> for this player).</li>
-            <li><?= $birdRightsText ?></li>
+            <li>The first year of the contract must be at least the veteran's minimum (<?= HtmlSanitizer::e($veteranMinimum) ?> for this player).</li>
+            <li><?= HtmlSanitizer::trusted($birdRightsText) ?></li>
         </ul>
     </div>
 </div>

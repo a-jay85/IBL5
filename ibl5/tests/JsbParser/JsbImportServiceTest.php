@@ -450,4 +450,46 @@ class JsbImportServiceTest extends TestCase
         $result = $this->makeService()->processHofData(str_repeat(' ', 7000));
         $this->assertSame(0, $result->errors);
     }
+
+    // ── processXxxFile — file-not-found characterization ────────
+
+    /**
+     * @return array<string, array{string, string}>
+     */
+    public static function fileNotFoundProvider(): array
+    {
+        return [
+            'CAR' => ['processCarFile', 'CAR file not found: /nonexistent'],
+            'TRN' => ['processTrnFile', 'TRN file not found: /nonexistent'],
+            'HIS' => ['processHisFile', 'HIS file not found: /nonexistent'],
+            'ASW' => ['processAswFile', 'ASW file not found: /nonexistent'],
+            'RCB' => ['processRcbFile', 'RCB file not found: /nonexistent'],
+            'PLB' => ['processPlbFile', 'PLB file not found: /nonexistent'],
+            'DRA' => ['processDraFile', 'DRA file not found: /nonexistent'],
+            'RET' => ['processRetFile', 'RET file not found: /nonexistent'],
+            'HOF' => ['processHofFile', 'HOF file not found: /nonexistent'],
+        ];
+    }
+
+    #[\PHPUnit\Framework\Attributes\DataProvider('fileNotFoundProvider')]
+    public function testProcessFileReturnsErrorWhenFileNotFound(string $method, string $expectedMessage): void
+    {
+        $service = $this->makeService();
+        $args = ['/nonexistent'];
+
+        // Methods with extra required parameters
+        match ($method) {
+            'processCarFile' => $args[] = null,
+            'processAswFile' => $args[] = 2006,
+            'processRcbFile' => array_push($args, 2006, null),
+            'processPlbFile' => array_push($args, \PlrParser\PlrOrdinalMap::empty(), 2006, 1, 'test'),
+            'processRetFile' => $args[] = 2006,
+            default => null,
+        };
+
+        /** @var \JsbParser\JsbImportResult $result */
+        $result = $service->$method(...$args);
+        $this->assertSame(1, $result->errors);
+        $this->assertSame('ERROR: ' . $expectedMessage, $result->messages[0]);
+    }
 }

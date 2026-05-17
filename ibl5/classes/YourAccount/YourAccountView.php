@@ -113,7 +113,7 @@ class YourAccountView implements Contracts\YourAccountViewInterface
         <div class="ibl-card__body">
             <?php if ($error !== null): ?>
                 <div class="ibl-alert ibl-alert--error">
-                    <?= nl2br(HtmlSanitizer::e($error)) ?>
+                    <?= HtmlSanitizer::trusted(nl2br(HtmlSanitizer::e($error))) ?>
                 </div>
             <?php endif; ?>
 

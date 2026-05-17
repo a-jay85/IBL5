@@ -53,7 +53,7 @@ for ($j = 0; $j < $tradeData['fieldsCounter']; $j++) {
 // Create trade offer using existing class
 try {
     $commonRepository = new \Repositories\TeamIdentityRepository($mysqli_db);
-    $tradeOffer = new Trading\TradeOffer($mysqli_db, $commonRepository);
+    $tradeOffer = new Trading\TradeOffer($mysqli_db, $commonRepository, $_SERVER['SERVER_NAME'] ?? '');
     $result = $tradeOffer->createTradeOffer($tradeData);
 } catch (Exception $e) {
     \Logging\LoggerFactory::getChannel('trade')->error('Failed to create trade offer', ['error' => $e->getMessage()]);

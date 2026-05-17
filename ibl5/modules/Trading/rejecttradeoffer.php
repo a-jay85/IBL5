@@ -30,7 +30,7 @@ $teamRejecting = $_POST['teamRejecting'] ?? '';
 $teamReceiving = $_POST['teamReceiving'] ?? '';
 
 // Check if trade still exists (may have been accepted/declined via Discord)
-$repository = new Trading\TradeOfferRepository($mysqli_db);
+$repository = new Trading\TradeOfferRepository($mysqli_db, $_SERVER['SERVER_NAME'] ?? '');
 $tradeRows = $repository->getTradesByOfferId($offerId);
 
 if ($tradeRows === []) {

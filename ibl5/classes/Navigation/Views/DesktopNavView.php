@@ -50,29 +50,29 @@ class DesktopNavView
                     <!-- Desktop Navigation (right-aligned) -->
                     <div class="nav-desktop">
                         <?php foreach ($menus as $title => $menu): ?>
-                            <?= $this->renderDropdown(
+                            <?= HtmlSanitizer::trusted($this->renderDropdown(
                                 $title,
                                 $menu,
                                 false,
                                 $title === 'Season'
-                            ) ?>
+                            )) ?>
                         <?php endforeach; ?>
 
                         <!-- Teams + My Team wrapper (positioning context for Teams mega-menu) -->
                         <div class="relative flex items-center self-stretch">
                             <?php if ($this->config->teamsData !== null): ?>
-                                <?= $this->teamsDropdownView->renderDesktop($this->config->teamsData) ?>
+                                <?= HtmlSanitizer::trusted($this->teamsDropdownView->renderDesktop($this->config->teamsData)) ?>
                             <?php endif; ?>
 
                             <?php if ($myTeamMenu !== null): ?>
-                                <?= $this->renderDropdown(
+                                <?= HtmlSanitizer::trusted($this->renderDropdown(
                                     'My Team',
                                     $myTeamMenu,
                                     false,
                                     false,
                                     true,
                                     $mergeAccountIntoMyTeam
-                                ) ?>
+                                )) ?>
                             <?php endif; ?>
                         </div>
 
@@ -81,7 +81,7 @@ class DesktopNavView
                             <div class="w-px h-6 bg-white/10 mx-2"></div>
 
                             <!-- Account dropdown (right-aligned to stay within viewport) -->
-                            <?= $this->renderDropdown(
+                            <?= HtmlSanitizer::trusted($this->renderDropdown(
                                 $this->config->isLoggedIn ? ($this->config->username ?? 'Account') : 'Login',
                                 [
                                     'icon' => '<svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/></svg>',
@@ -90,7 +90,7 @@ class DesktopNavView
                                 !$this->config->isLoggedIn,
                                 false,
                                 true
-                            ) ?>
+                            )) ?>
                         <?php endif; ?>
 
                         <!-- Mobile view toggle (visible only in forced desktop mode) -->
@@ -124,7 +124,7 @@ class DesktopNavView
 
         ob_start();
         ?>
-            <a href="<?= $safeUrl ?>" class="absolute left-1.5 top-1/2 -translate-y-1/2 z-10 w-10 h-10 flex items-center justify-center rounded-full opacity-40 hover:opacity-100 transition-opacity duration-200 overflow-visible nav-dev-switch" title="<?= $safeTitle ?>">
+            <a href="<?= HtmlSanitizer::trusted($safeUrl) ?>" class="absolute left-1.5 top-1/2 -translate-y-1/2 z-10 w-10 h-10 flex items-center justify-center rounded-full opacity-40 hover:opacity-100 transition-opacity duration-200 overflow-visible nav-dev-switch" title="<?= HtmlSanitizer::trusted($safeTitle) ?>">
                 <svg class="w-7 h-7" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
                     <circle cx="12" cy="12" r="10"/>
                     <ellipse cx="12" cy="12" rx="4" ry="10"/>
@@ -155,30 +155,30 @@ class DesktopNavView
         <div class="relative group self-stretch flex items-center"<?= $includeLoginForm ? ' data-nav-login' : '' ?>>
             <button class="nav-trigger">
                 <?php if ($icon !== ''): ?>
-                    <span class="text-accent-500 group-hover:text-accent-400 transition-colors"><?= $icon ?></span>
+                    <span class="text-accent-500 group-hover:text-accent-400 transition-colors"><?= HtmlSanitizer::trusted($icon) ?></span>
                 <?php endif; ?>
                 <span><?= HtmlSanitizer::e($title) ?></span>
                 <svg class="w-3 h-3 opacity-50 group-hover:opacity-100 transition-all duration-200 group-hover:translate-y-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
             </button>
 
-            <div class="nav-dropdown <?= $dropdownModifier ?>">
-                <div class="nav-dropdown__card <?= $cardModifier ?>">
+            <div class="nav-dropdown <?= HtmlSanitizer::e($dropdownModifier) ?>">
+                <div class="nav-dropdown__card <?= HtmlSanitizer::e($cardModifier) ?>">
                     <?php if ($includeLoginForm): ?>
-                        <?= $this->loginFormView->render('desktop', $this->config->requestUri) ?>
+                        <?= HtmlSanitizer::trusted($this->loginFormView->render('desktop', $this->config->requestUri)) ?>
                     <?php endif; ?>
 
                     <div class="py-1">
                         <?php foreach ($links as $link): ?>
-                            <?= $this->renderDropdownLink($link) ?>
+                            <?= HtmlSanitizer::trusted($this->renderDropdownLink($link)) ?>
                         <?php endforeach; ?>
                     </div>
 
                     <?php if ($includeLeagueSwitcher): ?>
-                        <?= $this->renderLeagueSwitcher() ?>
+                        <?= HtmlSanitizer::trusted($this->renderLeagueSwitcher()) ?>
                     <?php endif; ?>
 
                     <?php if ($includeLogoutFooter): ?>
-                        <?= $this->renderLogoutFooter() ?>
+                        <?= HtmlSanitizer::trusted($this->renderLogoutFooter()) ?>
                     <?php endif; ?>
                 </div>
             </div>
@@ -235,8 +235,8 @@ class DesktopNavView
             <label for="desktop-league-select" class="block text-base font-semibold tracking-widest uppercase text-gray-500 mb-2">League</label>
             <div class="relative">
                 <select id="desktop-league-select" name="league" onchange="window.location.href=this.value" class="nav-select">
-                    <option value="index.php?league=ibl"<?= $iblSelected ?> class="bg-navy-800 text-white">IBL</option>
-                    <option value="index.php?league=olympics"<?= $olympicsSelected ?> class="bg-navy-800 text-white">Olympics</option>
+                    <option value="index.php?league=ibl"<?= HtmlSanitizer::e($iblSelected) ?> class="bg-navy-800 text-white">IBL</option>
+                    <option value="index.php?league=olympics"<?= HtmlSanitizer::e($olympicsSelected) ?> class="bg-navy-800 text-white">Olympics</option>
                 </select>
                 <svg class="absolute right-2 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
             </div>

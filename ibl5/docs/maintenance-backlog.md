@@ -808,12 +808,8 @@ Effort scale:
 **Est. effort:** M
 **Risk if untouched:** XSS via career stat rows.
 
-### 5.7 Navigation Views — 58 `ibl.unescapedOutput` Across 5 Files (Widest Blast Radius)
-**Location:** `Navigation/Views/LoginFormView.php` (18), `MobileNavView.php` (16), `DesktopNavView.php` (15), `TeamsDropdownView.php` (6), `NavigationView.php` (3)
-**Problem:** Navigation renders on every page. Username/team-name display affects every authenticated session.
-**Suggested direction:** Fix navigation before any other XSS group.
-**Est. effort:** M
-**Risk if untouched:** Reflected/stored XSS on every page load.
+### ~~5.7 Navigation Views — 58 `ibl.unescapedOutput` Across 5 Files~~ ✅ RESOLVED
+**Resolved:** 2026-05-17 via PR `xss-navigation-views-zero-floor`. All 58 violations fixed; files added to zero-floor ratchet (ADR-0031) preventing regression.
 
 ### 5.8 YourAccountView — 27 `ibl.unescapedOutput`
 **Location:** `ibl5/classes/YourAccount/YourAccountView.php`

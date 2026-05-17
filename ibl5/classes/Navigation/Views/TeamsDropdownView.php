@@ -26,7 +26,7 @@ class TeamsDropdownView
         ?>
         <div class="group">
             <button class="nav-trigger">
-                <span class="text-accent-500 group-hover:text-accent-400 transition-colors"><?= $icon ?></span>
+                <span class="text-accent-500 group-hover:text-accent-400 transition-colors"><?= HtmlSanitizer::trusted($icon) ?></span>
                 <span>Teams</span>
                 <svg class="w-3 h-3 opacity-50 group-hover:opacity-100 transition-all duration-200 group-hover:translate-y-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
             </button>
@@ -49,8 +49,8 @@ class TeamsDropdownView
                                     <?php if ($divIndex > 0): ?><div class="mt-3"></div><?php endif; ?>
                                     <div class="uppercase font-display text-xs tracking-wider text-gray-400 mb-1.5"><?= HtmlSanitizer::e($division) ?></div>
                                     <?php foreach ($teams as $team): ?>
-                                        <a href="modules.php?name=Team&amp;op=team&amp;teamid=<?= $team['teamid'] ?>" hx-boost="true" hx-target="#site-content" hx-swap="innerHTML show:window:top" hx-indicator="#site-content" class="nav-dropdown-item nav-dropdown-item--team">
-                                            <span class="inline-flex items-center justify-center nav-team-logo-container"><img src="images/logo/new<?= $team['teamid'] ?>.png" alt="" class="nav-team-logo-img" loading="lazy"></span>
+                                        <a href="modules.php?name=Team&amp;op=team&amp;teamid=<?= (int) $team['teamid'] ?>" hx-boost="true" hx-target="#site-content" hx-swap="innerHTML show:window:top" hx-indicator="#site-content" class="nav-dropdown-item nav-dropdown-item--team">
+                                            <span class="inline-flex items-center justify-center nav-team-logo-container"><img src="images/logo/new<?= (int) $team['teamid'] ?>.png" alt="" class="nav-team-logo-img" loading="lazy"></span>
                                             <span><?= HtmlSanitizer::e($team['team_city'] . ' ' . $team['team_name']) ?></span>
                                         </a>
                                     <?php endforeach; ?>
@@ -106,7 +106,7 @@ class TeamsDropdownView
         <div class="mobile-section">
             <button class="mobile-dropdown-btn">
                 <span class="flex items-center gap-3">
-                    <span class="text-accent-500"><?= $icon ?></span>
+                    <span class="text-accent-500"><?= HtmlSanitizer::trusted($icon) ?></span>
                     <span class="font-display text-lg font-semibold">Teams</span>
                 </span>
                 <svg class="dropdown-arrow w-4 h-4 text-gray-500 transition-transform duration-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
@@ -131,8 +131,8 @@ class TeamsDropdownView
                             <div class="uppercase font-display text-xs tracking-wider text-gray-400"><?= HtmlSanitizer::e($division) ?></div>
                         </div>
                         <?php foreach ($teams as $team): ?>
-                            <a href="modules.php?name=Team&amp;op=team&amp;teamid=<?= $team['teamid'] ?>" hx-boost="true" hx-target="#site-content" hx-swap="innerHTML show:window:top" hx-indicator="#site-content" class="flex items-center gap-2.5 px-5 py-2.5 pl-10 text-base font-display text-gray-400 hover:text-white hover:bg-white/5 border-l-2 border-transparent hover:border-accent-500 transition-all">
-                                <span class="inline-flex items-center justify-center nav-team-logo-container"><img src="images/logo/new<?= $team['teamid'] ?>.png" alt="" class="nav-team-logo-img" loading="lazy"></span>
+                            <a href="modules.php?name=Team&amp;op=team&amp;teamid=<?= (int) $team['teamid'] ?>" hx-boost="true" hx-target="#site-content" hx-swap="innerHTML show:window:top" hx-indicator="#site-content" class="flex items-center gap-2.5 px-5 py-2.5 pl-10 text-base font-display text-gray-400 hover:text-white hover:bg-white/5 border-l-2 border-transparent hover:border-accent-500 transition-all">
+                                <span class="inline-flex items-center justify-center nav-team-logo-container"><img src="images/logo/new<?= (int) $team['teamid'] ?>.png" alt="" class="nav-team-logo-img" loading="lazy"></span>
                                 <span><?= HtmlSanitizer::e($team['team_city'] . ' ' . $team['team_name']) ?></span>
                             </a>
                         <?php endforeach; ?>

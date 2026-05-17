@@ -25,7 +25,6 @@ use Discord\Discord;
  * @phpstan-import-type TradeInfoRow from \Trading\Contracts\TradeOfferRepositoryInterface
  * @phpstan-import-type TradeCashRow from \Trading\Contracts\TradeCashRepositoryInterface
  * @phpstan-import-type DraftPickRow from \Trading\Contracts\TradeAssetRepositoryInterface
- * @phpstan-import-type PlayerRow from \Services\CommonMysqliRepository
  */
 class TradeProcessor implements TradeProcessorInterface
 {

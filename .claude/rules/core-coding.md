@@ -9,9 +9,9 @@ Quick reference for frequently-used patterns not covered in CLAUDE.md.
 
 ## Common Repository Helpers
 
-`CommonMysqliRepository` was split into three narrow repositories in `ibl5/classes/Services/`:
+`CommonMysqliRepository` was split into three narrow repositories in `ibl5/classes/Repositories/`:
 
-**`TeamIdentityRepository`** (`Services\Contracts\TeamIdentityRepositoryInterface`):
+**`TeamIdentityRepository`** (`Repositories\Contracts\TeamIdentityRepositoryInterface`):
 ```php
 $repo->getUserByUsername(string $username): ?array
 $repo->getTeamByName(string $teamName): ?array
@@ -21,14 +21,14 @@ $repo->getTeamDiscordID(string $teamName): ?int
 $repo->getAllRealTeams(string $orderBy = 'team_name ASC'): array
 ```
 
-**`PlayerLookupRepository`** (`Services\Contracts\PlayerLookupRepositoryInterface`):
+**`PlayerLookupRepository`** (`Repositories\Contracts\PlayerLookupRepositoryInterface`):
 ```php
 $repo->getPlayerByID(int $playerID): ?array
 $repo->getPlayerByName(string $playerName): ?array
 $repo->getPlayerIDFromPlayerName(string $playerName): ?int
 ```
 
-**`SalaryCapRepository`** (`Services\Contracts\SalaryCapRepositoryInterface`):
+**`SalaryCapRepository`** (`Repositories\Contracts\SalaryCapRepositoryInterface`):
 ```php
 $repo->getTeamTotalSalary(string $teamName): int
 $repo->getTeamNextYearSalary(string $teamName): int

@@ -14,8 +14,8 @@
         <testsuite name="Auth Module Tests">
             <directory>tests/Auth</directory>
         </testsuite>
-        <testsuite name="Services Tests">
-            <directory>tests/Services</directory>
+        <testsuite name="Validation Module Tests">
+            <directory>tests/Validation</directory>
         </testsuite>
         <testsuite name="Player Module Tests">
             <directory>tests/Player</directory>
@@ -148,9 +148,6 @@
         </testsuite>
         <testsuite name="FranchiseHistory Module Tests">
             <directory>tests/FranchiseHistory</directory>
-        </testsuite>
-        <testsuite name="Shared Module Tests">
-            <directory>tests/Shared</directory>
         </testsuite>
         <testsuite name="Statistics Module Tests">
             <directory>tests/Statistics</directory>

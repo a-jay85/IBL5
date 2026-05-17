@@ -321,7 +321,7 @@ Effort scale:
 **Risk if untouched:** Search by module name fails; PHPStan can't enforce module-boundary rules.
 
 ### 2.22 `Services/` — Catch-All Mixing Cross-Cutting and Domain
-**Location:** `classes/Services/`
+**Location:** deleted (2026-05-16)
 **Problem:** Contains both legitimate utilities (`CommonMysqliRepository`, `CommonValidator`, `ValidationResult`, `QueryConditions`) and domain classes (`NewsService`, `PlayerDataConverter`, `CommonContractValidator`). Contracts/ only covers one.
 **Suggested direction:** Move domain classes to their home modules; keep cross-cutting utilities; add interfaces.
 **Est. effort:** M
@@ -329,7 +329,7 @@ Effort scale:
 **Status:** Completed (2026-05-16) — domain classes relocated to home modules; cross-cutting to Validation/ and Repositories/; Services/ deleted entirely.
 
 ### 2.23 `Shared/` — Minimal Catch-All
-**Location:** `classes/Shared/`
+**Location:** deleted (2026-05-16)
 **Problem:** `SharedRepository` (draft picks + extension) and `SalaryConverter` (utility) with no shared concern.
 **Suggested direction:** Move `SalaryConverter` to `BasketballStats/`; split `SharedRepository` into module repositories.
 **Est. effort:** S
@@ -583,7 +583,7 @@ Effort scale:
 **Risk if untouched:** New cash queries land in the wrong repo; domains drift into each other.
 
 ### 4.3 `Services/` Module Is a Dumping Ground
-**Location:** `ibl5/classes/Services/`
+**Location:** deleted (2026-05-16)
 **Problem:** `CommonMysqliRepository`, `CommonValidator`, `CommonContractValidator`, `NewsService`, `PlayerDataConverter`, `QueryConditions`, `ValidationResult` — no shared trait except "we couldn't decide where to put it."
 **Suggested direction:** Split: cross-cutting → `Shared/`; `NewsService` → `Topics/News/`; `PlayerDataConverter` → `Player/`; deprecate `Services/`.
 **Est. effort:** L
@@ -739,7 +739,7 @@ Effort scale:
 **Risk if untouched:** New injury DB logic lands as raw SQL in the Service.
 
 ### 4.25 `Services/NewsService` Misplaced
-**Location:** `ibl5/classes/Services/NewsService.php`
+**Location:** `ibl5/classes/Topics/News/NewsService.php` (relocated)
 **Problem:** Creates news stories, manages topic IDs — functionally part of `Topics/`.
 **Suggested direction:** Move to `Topics/NewsStoryService.php` or extract a `News/` module.
 **Est. effort:** S
@@ -1056,7 +1056,7 @@ Effort scale:
 ## Axis 7: Repository Contract Gaps / Shared Abstractions
 
 ### 7.1 `CommonMysqliRepository` Has No Interface
-**Location:** `ibl5/classes/Services/Contracts/` (interfaces extracted here)
+**Location:** `ibl5/classes/Repositories/Contracts/` (interfaces extracted here)
 **Problem:** Concrete class with no `Contracts/CommonMysqliRepositoryInterface`. Every caller depends on the concrete class.
 **Suggested direction:** Extract interface; split into `TeamIdentityRepositoryInterface`, `PlayerLookupRepositoryInterface`, `SalaryCapRepositoryInterface`.
 **Est. effort:** M
@@ -1116,7 +1116,7 @@ Effort scale:
 **Status:** Completed (2026-05-16) — resolved by the DI sweep; `NegotiationRepository` now receives `CommonMysqliRepositoryInterface` via constructor.
 
 ### 7.9 `CommonMysqliRepository` Mixes 3 Domains
-**Location:** `ibl5/classes/Services/PlayerLookupRepository.php`, `ibl5/classes/Services/SalaryCapRepository.php`, `ibl5/classes/Services/TeamIdentityRepository.php`
+**Location:** `ibl5/classes/Repositories/PlayerLookupRepository.php`, `ibl5/classes/Repositories/SalaryCapRepository.php`, `ibl5/classes/Repositories/TeamIdentityRepository.php`
 **Problem:** Identity lookups + salary cap + player lookups all in one class. Callers needing only one get all three.
 **Suggested direction:** Split: `TeamIdentityRepository`, `PlayerLookupRepository`, `SalaryCapRepository`.
 **Est. effort:** M

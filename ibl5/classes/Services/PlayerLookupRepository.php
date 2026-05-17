@@ -36,7 +36,7 @@ class PlayerLookupRepository extends \BaseMysqliRepository implements PlayerLook
             $playerName
         );
 
-        return $result !== null ? ($result['pid'] ?? null) : null;
+        return $result !== null ? $result['pid'] : null;
     }
 
     /**

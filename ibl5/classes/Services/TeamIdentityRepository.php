@@ -81,7 +81,7 @@ class TeamIdentityRepository extends \BaseMysqliRepository implements TeamIdenti
             $teamName
         );
 
-        return $result !== null ? ($result['teamid'] ?? 0) : null;
+        return $result !== null ? $result['teamid'] : null;
     }
 
     public function getTeamnameFromTeamID(int $teamid): ?string

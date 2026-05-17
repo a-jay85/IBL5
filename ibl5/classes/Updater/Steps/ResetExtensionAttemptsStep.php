@@ -31,7 +31,9 @@ class ResetExtensionAttemptsStep implements PipelineStepInterface
             if ($stmt === false) {
                 throw new \RuntimeException('Prepare failed: ' . $this->db->error);
             }
-            $stmt->execute();
+            if ($stmt->execute() === false) {
+                throw new \RuntimeException('Execute failed: ' . $stmt->error, 1003);
+            }
             $stmt->close();
         } catch (\Exception $e) {
             $errorMessage = 'Failed to reset sim contract extension attempts: ' . $e->getMessage();

@@ -1,6 +1,6 @@
 ---
 description: Common repository helpers and gotchas for IBL5 PHP code.
-last_verified: 2026-04-11
+last_verified: 2026-05-16
 ---
 
 # Core Coding Reference
@@ -9,16 +9,31 @@ Quick reference for frequently-used patterns not covered in CLAUDE.md.
 
 ## Common Repository Helpers
 
-`CommonMysqliRepository` provides these frequently-used queries:
+`CommonMysqliRepository` was split into three narrow repositories in `ibl5/classes/Services/`:
 
+**`TeamIdentityRepository`** (`Services\Contracts\TeamIdentityRepositoryInterface`):
 ```php
 $repo->getUserByUsername(string $username): ?array
 $repo->getTeamByName(string $teamName): ?array
-$repo->getPlayerByID(int $playerID): ?array
 $repo->getTeamnameFromUsername(?string $username): ?string  // Returns League::FREE_AGENTS_TEAM_NAME if null/empty; null if not found
 $repo->getTidFromTeamname(string $teamName): ?int
-$repo->getTeamTotalSalary(string $teamName): int
 $repo->getTeamDiscordID(string $teamName): ?int
+$repo->getAllRealTeams(string $orderBy = 'team_name ASC'): array
+```
+
+**`PlayerLookupRepository`** (`Services\Contracts\PlayerLookupRepositoryInterface`):
+```php
+$repo->getPlayerByID(int $playerID): ?array
+$repo->getPlayerByName(string $playerName): ?array
+$repo->getPlayerIDFromPlayerName(string $playerName): ?int
+```
+
+**`SalaryCapRepository`** (`Services\Contracts\SalaryCapRepositoryInterface`):
+```php
+$repo->getTeamTotalSalary(string $teamName): int
+$repo->getTeamNextYearSalary(string $teamName): int
+$repo->getTeamSalarySummary(string $teamName): array  // {current: int, nextYear: int}
+$repo->getTeamCapSpaceNextSeason(string $teamName): int
 ```
 
 ## Common Gotchas

@@ -15,7 +15,7 @@ use UI\Contracts\ContractsTableInterface;
 /**
  * Contracts - Displays team contracts table
  *
- * @phpstan-import-type PlayerRow from \Services\CommonMysqliRepository
+ * @phpstan-import-type PlayerRow from \Services\Contracts\PlayerLookupRepositoryInterface
  */
 class Contracts implements ContractsTableInterface
 {

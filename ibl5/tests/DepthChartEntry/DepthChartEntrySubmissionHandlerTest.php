@@ -6,7 +6,7 @@ namespace Tests\DepthChartEntry;
 
 use PHPUnit\Framework\TestCase;
 use DepthChartEntry\DepthChartEntrySubmissionHandler;
-use Services\Contracts\CommonMysqliRepositoryInterface;
+use Services\Contracts\TeamIdentityRepositoryInterface;
 use Tests\WideUnit\Mocks\MockDatabase;
 use Tests\WideUnit\Mocks\MockDatabaseResult;
 use Tests\WideUnit\Mocks\MockPreparedStatement;
@@ -24,13 +24,13 @@ class DepthChartEntrySubmissionHandlerTest extends TestCase
 {
     private MockDatabase $mockDb;
     private object $mockMysqliDb;
-    private CommonMysqliRepositoryInterface $stubCommonRepo;
+    private TeamIdentityRepositoryInterface $stubCommonRepo;
 
     protected function setUp(): void
     {
         $this->mockDb = new MockDatabase();
         $this->setupMockMysqliDb();
-        $this->stubCommonRepo = $this->createStub(CommonMysqliRepositoryInterface::class);
+        $this->stubCommonRepo = $this->createStub(TeamIdentityRepositoryInterface::class);
 
         // Start with a clean session for every test so flash assertions
         // aren't polluted by earlier runs.

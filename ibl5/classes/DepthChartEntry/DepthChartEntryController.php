@@ -9,7 +9,7 @@ use DepthChartEntry\Contracts\DepthChartEntryServiceInterface;
 use NextSim\NextSimService;
 use NextSim\NextSimView;
 use SavedDepthChart\SavedDepthChartService;
-use Services\Contracts\CommonMysqliRepositoryInterface;
+use Services\Contracts\TeamIdentityRepositoryInterface;
 use Standings\StandingsRepository;
 use Team\Contracts\TeamTableServiceInterface;
 use Team\TeamRepository;
@@ -27,11 +27,11 @@ class DepthChartEntryController implements DepthChartEntryControllerInterface
     private \mysqli $db;
     private DepthChartEntryRepository $repository;
     private DepthChartEntryView $view;
-    private CommonMysqliRepositoryInterface $commonRepository;
+    private TeamIdentityRepositoryInterface $commonRepository;
     private TeamTableServiceInterface $teamTableService;
     private DepthChartEntryServiceInterface $service;
 
-    public function __construct(\mysqli $db, CommonMysqliRepositoryInterface $commonRepository)
+    public function __construct(\mysqli $db, TeamIdentityRepositoryInterface $commonRepository)
     {
         $this->db = $db;
         $this->repository = new DepthChartEntryRepository($db);

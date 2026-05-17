@@ -13,8 +13,8 @@ namespace Team\Contracts;
  * All methods use prepared statements internally.
  * All methods return arrays, never throw exceptions.
  *
- * @phpstan-import-type TeamInfoRow from \Services\CommonMysqliRepository
- * @phpstan-import-type PlayerRow from \Services\CommonMysqliRepository
+ * @phpstan-import-type TeamInfoRow from \Services\Contracts\TeamIdentityRepositoryInterface
+ * @phpstan-import-type PlayerRow from \Services\Contracts\PlayerLookupRepositoryInterface
  *
  * @phpstan-type PowerRow array{teamid: int, team_name: string, league_record: string, wins: int, losses: int, pct: float|string, conference: string, division: string, conf_record: string, div_record: string, div_gb: float|string|null, home_record: string, away_record: string, games_unplayed: int, ranking: float, last_win: int, last_loss: int, streak_type: string, streak: int, sos: float|string, remaining_sos: float|string}
  * @phpstan-type BannerRow array{year: int, currentname: string, bannername: string, bannertype: int}

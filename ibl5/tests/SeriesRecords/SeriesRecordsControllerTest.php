@@ -7,7 +7,7 @@ namespace Tests\SeriesRecords;
 use PHPUnit\Framework\TestCase;
 use SeriesRecords\SeriesRecordsController;
 use SeriesRecords\Contracts\SeriesRecordsControllerInterface;
-use Services\Contracts\CommonMysqliRepositoryInterface;
+use Services\Contracts\TeamIdentityRepositoryInterface;
 
 /**
  * SeriesRecordsControllerTest - Tests for SeriesRecordsController
@@ -110,14 +110,14 @@ class SeriesRecordsControllerTest extends TestCase
 
     public function testCanBeInstantiated(): void
     {
-        $controller = new SeriesRecordsController($this->mockDb, $this->createStub(CommonMysqliRepositoryInterface::class));
+        $controller = new SeriesRecordsController($this->mockDb, $this->createStub(TeamIdentityRepositoryInterface::class));
 
         $this->assertInstanceOf(SeriesRecordsController::class, $controller);
     }
 
     public function testImplementsInterface(): void
     {
-        $controller = new SeriesRecordsController($this->mockDb, $this->createStub(CommonMysqliRepositoryInterface::class));
+        $controller = new SeriesRecordsController($this->mockDb, $this->createStub(TeamIdentityRepositoryInterface::class));
 
         $this->assertInstanceOf(SeriesRecordsControllerInterface::class, $controller);
     }

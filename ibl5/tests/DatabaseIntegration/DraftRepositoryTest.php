@@ -7,7 +7,7 @@ namespace Tests\DatabaseIntegration;
 use PHPUnit\Framework\Attributes\Group;
 
 use Draft\DraftRepository;
-use Services\CommonMysqliRepository;
+use Services\TeamIdentityRepository;
 
 /**
  * Tests DraftRepository against real MariaDB — draft picks, draft class, player creation.
@@ -20,7 +20,7 @@ class DraftRepositoryTest extends DatabaseTestCase
     protected function setUp(): void
     {
         parent::setUp();
-        $this->repo = new DraftRepository($this->db, new CommonMysqliRepository($this->db));
+        $this->repo = new DraftRepository($this->db, new TeamIdentityRepository($this->db));
     }
 
     public function testGetCurrentDraftSelectionReturnsPlayerName(): void

@@ -6,7 +6,7 @@ namespace Tests\Draft;
 
 use PHPUnit\Framework\TestCase;
 use Draft\DraftSelectionHandler;
-use Services\Contracts\CommonMysqliRepositoryInterface;
+use Services\Contracts\TeamIdentityRepositoryInterface;
 use Shared\Contracts\SharedRepositoryInterface;
 use Season\Season;
 use Tests\WideUnit\Mocks\MockDatabase;
@@ -25,7 +25,7 @@ class DraftSelectionHandlerTest extends TestCase
 {
     private MockDatabase $mockDb;
     private object $mockMysqliDb;
-    private CommonMysqliRepositoryInterface $mockCommonRepository;
+    private TeamIdentityRepositoryInterface $mockCommonRepository;
     private SharedRepositoryInterface $mockSharedFunctions;
     private Season $mockSeason;
 
@@ -84,7 +84,7 @@ class DraftSelectionHandlerTest extends TestCase
     private function setupMockDependencies(): void
     {
         // Stub CommonMysqliRepository (no expectations needed)
-        $this->mockCommonRepository = $this->createStub(CommonMysqliRepositoryInterface::class);
+        $this->mockCommonRepository = $this->createStub(TeamIdentityRepositoryInterface::class);
 
         // Stub SharedRepository (no expectations needed)
         $stub = $this->createStub(SharedRepositoryInterface::class);

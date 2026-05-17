@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Tests\DepthChartEntry;
 
 use DepthChartEntry\DepthChartEntryApiHandler;
-use Services\Contracts\CommonMysqliRepositoryInterface;
+use Services\Contracts\TeamIdentityRepositoryInterface;
 use Tests\WideUnit\WideUnitTestCase;
 
 /**
@@ -19,7 +19,7 @@ class DepthChartEntryApiHandlerTest extends WideUnitTestCase
     {
         $handler = new DepthChartEntryApiHandler(
             $this->mockDb,
-            $this->createStub(CommonMysqliRepositoryInterface::class)
+            $this->createStub(TeamIdentityRepositoryInterface::class)
         );
 
         $this->assertInstanceOf(DepthChartEntryApiHandler::class, $handler);

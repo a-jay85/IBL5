@@ -10,18 +10,18 @@ use UI\TeamCellHelper;
 use Security\HtmlSanitizer;
 use Team\Team;
 use Season\Season;
-use Services\Contracts\CommonMysqliRepositoryInterface;
+use Services\Contracts\TeamIdentityRepositoryInterface;
 
 /**
- * @phpstan-import-type PlayerRow from \Services\CommonMysqliRepository
+ * @phpstan-import-type PlayerRow from \Services\Contracts\PlayerLookupRepositoryInterface
  * @phpstan-type CapMetrics array{totalSalaries: array<int, int>, softCapSpace: array<int, int>, hardCapSpace: array<int, int>, rosterSpots: array<int, int>}
  */
 class FreeAgencyView
 {
     private \mysqli $mysqli_db;
-    private CommonMysqliRepositoryInterface $commonRepo;
+    private TeamIdentityRepositoryInterface $commonRepo;
 
-    public function __construct(\mysqli $mysqli_db, CommonMysqliRepositoryInterface $commonRepo)
+    public function __construct(\mysqli $mysqli_db, TeamIdentityRepositoryInterface $commonRepo)
     {
         $this->mysqli_db = $mysqli_db;
         $this->commonRepo = $commonRepo;

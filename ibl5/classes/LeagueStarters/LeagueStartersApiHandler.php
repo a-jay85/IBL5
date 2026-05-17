@@ -6,7 +6,7 @@ namespace LeagueStarters;
 
 use League\League;
 use Season\Season;
-use Services\Contracts\CommonMysqliRepositoryInterface;
+use Services\Contracts\TeamIdentityRepositoryInterface;
 use Team\Team;
 use Utilities\NukeCompat;
 
@@ -21,9 +21,9 @@ class LeagueStartersApiHandler
     private const VALID_DISPLAY_MODES = ['ratings', 'total_s', 'avg_s', 'per36mins'];
 
     private \mysqli $db;
-    private CommonMysqliRepositoryInterface $commonRepo;
+    private TeamIdentityRepositoryInterface $commonRepo;
 
-    public function __construct(\mysqli $db, CommonMysqliRepositoryInterface $commonRepo)
+    public function __construct(\mysqli $db, TeamIdentityRepositoryInterface $commonRepo)
     {
         $this->db = $db;
         $this->commonRepo = $commonRepo;

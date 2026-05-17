@@ -15,7 +15,7 @@ use Season\Season;
  * VotingBallotService - Assembles ballot candidate data for voting
  *
  * @phpstan-import-type BallotCategory from VotingBallotViewInterface
- * @phpstan-import-type PlayerRow from \Services\CommonMysqliRepository
+ * @phpstan-import-type PlayerRow from \Services\Contracts\PlayerLookupRepositoryInterface
  *
  * @see VotingBallotServiceInterface For the interface contract
  */

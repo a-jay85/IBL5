@@ -19,8 +19,8 @@ class PlrParserServiceTest extends TestCase
     /** @var PlrParserRepositoryInterface&\PHPUnit\Framework\MockObject\Stub */
     private PlrParserRepositoryInterface $stubRepository;
 
-    /** @var \Services\CommonMysqliRepository&\PHPUnit\Framework\MockObject\Stub */
-    private \Services\CommonMysqliRepository $stubCommonRepo;
+    /** @var \Services\Contracts\TeamIdentityRepositoryInterface&\PHPUnit\Framework\MockObject\Stub */
+    private \Services\Contracts\TeamIdentityRepositoryInterface $stubCommonRepo;
 
     /** @var Season&\PHPUnit\Framework\MockObject\Stub */
     private Season $stubSeason;
@@ -29,7 +29,7 @@ class PlrParserServiceTest extends TestCase
     {
         $this->stubRepository = $this->createStub(PlrParserRepositoryInterface::class);
 
-        $this->stubCommonRepo = $this->createStub(\Services\CommonMysqliRepository::class);
+        $this->stubCommonRepo = $this->createStub(\Services\Contracts\TeamIdentityRepositoryInterface::class);
         $this->stubCommonRepo->method('getTeamnameFromTeamID')->willReturn('Test Team');
 
         $this->stubSeason = $this->createStub(Season::class);

@@ -8,7 +8,7 @@ use DepthChartEntry\Contracts\DepthChartEntryViewInterface;
 use Security\HtmlSanitizer;
 
 /**
- * @phpstan-import-type PlayerRow from \Services\CommonMysqliRepository
+ * @phpstan-import-type PlayerRow from \Services\Contracts\PlayerLookupRepositoryInterface
  *
  * @see DepthChartEntryViewInterface
  */

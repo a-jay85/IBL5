@@ -7,7 +7,7 @@ namespace ComparePlayers;
 use ComparePlayers\Contracts\ComparePlayersRepositoryInterface;
 
 /**
- * @phpstan-import-type PlayerRow from \Services\CommonMysqliRepository
+ * @phpstan-import-type PlayerRow from \Services\Contracts\PlayerLookupRepositoryInterface
  *
  * @see ComparePlayersRepositoryInterface
  */

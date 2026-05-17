@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Draft;
 
 use Draft\Contracts\DraftRepositoryInterface;
-use Services\Contracts\CommonMysqliRepositoryInterface;
+use Services\Contracts\TeamIdentityRepositoryInterface;
 
 /**
  * @see DraftRepositoryInterface
@@ -15,13 +15,13 @@ use Services\Contracts\CommonMysqliRepositoryInterface;
  */
 class DraftRepository extends \BaseMysqliRepository implements DraftRepositoryInterface
 {
-    private CommonMysqliRepositoryInterface $commonRepository;
+    private TeamIdentityRepositoryInterface $commonRepository;
 
     // Constants for player name matching
     const IBL_PLR_NAME_MAX_LENGTH = 32;  // Matches varchar(32) in ibl_plr.name
     const PARTIAL_NAME_MATCH_LENGTH = 30;  // For LIKE queries with diacritical differences
 
-    public function __construct(\mysqli $db, CommonMysqliRepositoryInterface $commonRepository)
+    public function __construct(\mysqli $db, TeamIdentityRepositoryInterface $commonRepository)
     {
         parent::__construct($db);
         $this->commonRepository = $commonRepository;

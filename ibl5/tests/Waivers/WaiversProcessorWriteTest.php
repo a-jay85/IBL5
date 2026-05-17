@@ -12,7 +12,8 @@ use Waivers\WaiversProcessor;
 class WaiversProcessorWriteTest extends TestCase
 {
     private WaiversRepositoryInterface $repoStub;
-    private \Services\CommonMysqliRepository $commonRepoStub;
+    private \Services\Contracts\TeamIdentityRepositoryInterface $teamIdentityRepoStub;
+    private \Services\Contracts\PlayerLookupRepositoryInterface $playerLookupRepoStub;
     private WaiversValidatorInterface $validatorStub;
     private \Services\NewsService $newsServiceStub;
     private WaiversProcessor $processor;
@@ -20,14 +21,16 @@ class WaiversProcessorWriteTest extends TestCase
     protected function setUp(): void
     {
         $this->repoStub = $this->createStub(WaiversRepositoryInterface::class);
-        $this->commonRepoStub = $this->createStub(\Services\CommonMysqliRepository::class);
+        $this->teamIdentityRepoStub = $this->createStub(\Services\Contracts\TeamIdentityRepositoryInterface::class);
+        $this->playerLookupRepoStub = $this->createStub(\Services\Contracts\PlayerLookupRepositoryInterface::class);
         $this->validatorStub = $this->createStub(WaiversValidatorInterface::class);
         $this->newsServiceStub = $this->createStub(\Services\NewsService::class);
         $dbStub = $this->createStub(\mysqli::class);
 
         $this->processor = new WaiversProcessor(
             $this->repoStub,
-            $this->commonRepoStub,
+            $this->teamIdentityRepoStub,
+            $this->playerLookupRepoStub,
             $this->validatorStub,
             $this->newsServiceStub,
             $dbStub
@@ -41,7 +44,7 @@ class WaiversProcessorWriteTest extends TestCase
     public function testProcessDropReturnsSuccessWhenRepoSucceeds(): void
     {
         $this->validatorStub->method('validateDrop')->willReturn(true);
-        $this->commonRepoStub->method('getPlayerByID')->willReturn(['name' => 'Test Player', 'pid' => 1]);
+        $this->playerLookupRepoStub->method('getPlayerByID')->willReturn(['name' => 'Test Player', 'pid' => 1]);
         $this->repoStub->method('dropPlayerToWaivers')->willReturn(true);
 
         $result = $this->processor->processDrop(1, 'Test Team', 3, 5000);
@@ -84,7 +87,7 @@ class WaiversProcessorWriteTest extends TestCase
     public function testProcessDropReturnsErrorWhenPlayerNotFound(): void
     {
         $this->validatorStub->method('validateDrop')->willReturn(true);
-        $this->commonRepoStub->method('getPlayerByID')->willReturn(null);
+        $this->playerLookupRepoStub->method('getPlayerByID')->willReturn(null);
 
         $result = $this->processor->processDrop(999, 'Test Team', 3, 5000);
 
@@ -95,7 +98,7 @@ class WaiversProcessorWriteTest extends TestCase
     public function testProcessDropReturnsErrorWhenRepoFails(): void
     {
         $this->validatorStub->method('validateDrop')->willReturn(true);
-        $this->commonRepoStub->method('getPlayerByID')->willReturn(['name' => 'Test Player', 'pid' => 1]);
+        $this->playerLookupRepoStub->method('getPlayerByID')->willReturn(['name' => 'Test Player', 'pid' => 1]);
         $this->repoStub->method('dropPlayerToWaivers')->willReturn(false);
 
         $result = $this->processor->processDrop(1, 'Test Team', 3, 5000);
@@ -118,7 +121,7 @@ class WaiversProcessorWriteTest extends TestCase
 
     public function testProcessAddReturnsErrorWhenPlayerNotFound(): void
     {
-        $this->commonRepoStub->method('getPlayerByID')->willReturn(null);
+        $this->playerLookupRepoStub->method('getPlayerByID')->willReturn(null);
 
         $result = $this->processor->processAdd(999, 'Test Team', 5, 3000);
 
@@ -128,7 +131,7 @@ class WaiversProcessorWriteTest extends TestCase
 
     public function testProcessAddReturnsErrorWhenValidationFails(): void
     {
-        $this->commonRepoStub->method('getPlayerByID')->willReturn([
+        $this->playerLookupRepoStub->method('getPlayerByID')->willReturn([
             'name' => 'Test Player', 'pid' => 1, 'salary_yr1' => 0, 'exp' => 5,
         ]);
         $this->validatorStub->method('validateAdd')->willReturn(false);
@@ -142,11 +145,11 @@ class WaiversProcessorWriteTest extends TestCase
 
     public function testProcessAddReturnsErrorWhenTeamNotFound(): void
     {
-        $this->commonRepoStub->method('getPlayerByID')->willReturn([
+        $this->playerLookupRepoStub->method('getPlayerByID')->willReturn([
             'name' => 'Test Player', 'pid' => 1, 'salary_yr1' => 0, 'exp' => 5,
         ]);
         $this->validatorStub->method('validateAdd')->willReturn(true);
-        $this->commonRepoStub->method('getTeamByName')->willReturn(null);
+        $this->teamIdentityRepoStub->method('getTeamByName')->willReturn(null);
 
         $result = $this->processor->processAdd(1, 'Fake Team', 5, 3000);
 
@@ -156,11 +159,11 @@ class WaiversProcessorWriteTest extends TestCase
 
     public function testProcessAddReturnsErrorWhenRepoSignFails(): void
     {
-        $this->commonRepoStub->method('getPlayerByID')->willReturn([
+        $this->playerLookupRepoStub->method('getPlayerByID')->willReturn([
             'name' => 'Test Player', 'pid' => 1, 'salary_yr1' => 0, 'exp' => 5,
         ]);
         $this->validatorStub->method('validateAdd')->willReturn(true);
-        $this->commonRepoStub->method('getTeamByName')->willReturn(['team_name' => 'Test Team', 'teamid' => 1]);
+        $this->teamIdentityRepoStub->method('getTeamByName')->willReturn(['team_name' => 'Test Team', 'teamid' => 1]);
         $this->repoStub->method('signPlayerFromWaivers')->willReturn(false);
 
         $result = $this->processor->processAdd(1, 'Test Team', 5, 3000);
@@ -171,11 +174,11 @@ class WaiversProcessorWriteTest extends TestCase
 
     public function testProcessAddReturnsSuccessWhenAllValid(): void
     {
-        $this->commonRepoStub->method('getPlayerByID')->willReturn([
+        $this->playerLookupRepoStub->method('getPlayerByID')->willReturn([
             'name' => 'Test Player', 'pid' => 1, 'salary_yr1' => 0, 'exp' => 5,
         ]);
         $this->validatorStub->method('validateAdd')->willReturn(true);
-        $this->commonRepoStub->method('getTeamByName')->willReturn(['team_name' => 'Test Team', 'teamid' => 1]);
+        $this->teamIdentityRepoStub->method('getTeamByName')->willReturn(['team_name' => 'Test Team', 'teamid' => 1]);
         $this->repoStub->method('signPlayerFromWaivers')->willReturn(true);
 
         $result = $this->processor->processAdd(1, 'Test Team', 5, 3000);

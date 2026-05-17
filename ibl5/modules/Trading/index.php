@@ -18,7 +18,7 @@ get_lang($module_name);
 $pagetitle = "- Team Pages";
 
 global $mysqli_db, $commonRepository;
-$commonRepository = new \Services\CommonMysqliRepository($mysqli_db);
+$commonRepository = new \Services\TeamIdentityRepository($mysqli_db);
 
 function tradeoffer($username)
 {

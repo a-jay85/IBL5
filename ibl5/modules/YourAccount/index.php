@@ -14,7 +14,7 @@ if (isset($username) && is_string($username) && preg_match('/[^a-zA-Z0-9_-]/', $
 }
 
 // Wire dependencies
-$commonRepository = new \Services\CommonMysqliRepository($mysqli_db);
+$commonRepository = new \Services\TeamIdentityRepository($mysqli_db);
 $service = new \YourAccount\YourAccountService(
     $authService,
     $commonRepository,

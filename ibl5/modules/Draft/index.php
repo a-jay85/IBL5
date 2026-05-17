@@ -20,7 +20,7 @@ get_lang($module_name);
 function userinfo($username)
 {
     global $user_prefix, $mysqli_db;
-    $commonRepository = new \Services\CommonMysqliRepository($mysqli_db);
+    $commonRepository = new \Services\TeamIdentityRepository($mysqli_db);
     $season = new \Season\Season($mysqli_db);
     $repository = new DraftRepository($mysqli_db, $commonRepository);
     $view = new DraftView();

@@ -22,7 +22,7 @@ use Season\Season;
  * @phpstan-import-type TradingDraftPickRow from \Trading\Contracts\TradeFormRepositoryInterface
  * @phpstan-import-type TradingPlayerRow from \Trading\Contracts\TradeFormRepositoryInterface
  * @phpstan-import-type TeamWithCityRow from \Trading\Contracts\TradeFormRepositoryInterface
- * @phpstan-import-type PlayerRow from \Services\CommonMysqliRepository
+ * @phpstan-import-type PlayerRow from \Services\Contracts\PlayerLookupRepositoryInterface
  */
 class TradingService implements TradingServiceInterface
 {
@@ -31,14 +31,14 @@ class TradingService implements TradingServiceInterface
     private TradeFormRepositoryInterface $formRepository;
     private TradeCashRepositoryInterface $cashRepository;
     private CashConsiderationRepositoryInterface $cashConsiderationRepository;
-    private \Services\CommonMysqliRepository $commonRepository;
+    private \Services\Contracts\TeamIdentityRepositoryInterface $commonRepository;
     private \mysqli $mysqli_db;
 
     public function __construct(
         TradeOfferRepositoryInterface $offerRepository,
         TradeAssetRepositoryInterface $assetRepository,
         TradeFormRepositoryInterface $formRepository,
-        \Services\CommonMysqliRepository $commonRepository,
+        \Services\Contracts\TeamIdentityRepositoryInterface $commonRepository,
         \mysqli $mysqli_db,
         ?TradeCashRepositoryInterface $cashRepository = null
     ) {

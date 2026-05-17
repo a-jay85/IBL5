@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Team;
 
-use Services\Contracts\CommonMysqliRepositoryInterface;
+use Services\Contracts\TeamIdentityRepositoryInterface;
 use Team\Contracts\TeamControllerInterface;
 use Team\Contracts\TeamServiceInterface;
 use Team\Contracts\TeamViewInterface;
@@ -20,9 +20,9 @@ class TeamController implements TeamControllerInterface
     private TeamServiceInterface $service;
     private TeamViewInterface $view;
     private \Utilities\NukeCompat $nukeCompat;
-    private CommonMysqliRepositoryInterface $commonRepo;
+    private TeamIdentityRepositoryInterface $commonRepo;
 
-    public function __construct(\mysqli $db, CommonMysqliRepositoryInterface $commonRepo, ?\Utilities\NukeCompat $nukeCompat = null)
+    public function __construct(\mysqli $db, TeamIdentityRepositoryInterface $commonRepo, ?\Utilities\NukeCompat $nukeCompat = null)
     {
         $this->db = $db;
         $repository = new TeamRepository($db);

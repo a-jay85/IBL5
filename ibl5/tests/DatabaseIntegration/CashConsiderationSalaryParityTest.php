@@ -6,7 +6,7 @@ namespace Tests\DatabaseIntegration;
 
 use PHPUnit\Framework\Attributes\Group;
 
-use Services\CommonMysqliRepository;
+use Services\SalaryCapRepository;
 use Trading\CashConsiderationRepository;
 
 /**
@@ -21,13 +21,13 @@ use Trading\CashConsiderationRepository;
 #[Group('database')]
 class CashConsiderationSalaryParityTest extends DatabaseTestCase
 {
-    private CommonMysqliRepository $commonRepo;
+    private SalaryCapRepository $commonRepo;
     private CashConsiderationRepository $cashRepo;
 
     protected function setUp(): void
     {
         parent::setUp();
-        $this->commonRepo = new CommonMysqliRepository($this->db);
+        $this->commonRepo = new SalaryCapRepository($this->db);
         $this->cashRepo = new CashConsiderationRepository($this->db);
     }
 

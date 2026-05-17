@@ -8,7 +8,7 @@ use League\League;
 use Player\Contracts\PlayerPageServiceInterface;
 use Player\Stats\PlayerStatsRepository;
 use Player\Views\PlayerViewFactory;
-use Services\Contracts\CommonMysqliRepositoryInterface;
+use Services\Contracts\TeamIdentityRepositoryInterface;
 use Team\Team;
 use Season\Season;
 
@@ -21,7 +21,7 @@ class PlayerPageService implements PlayerPageServiceInterface
     private PlayerStatsRepository $statsRepository;
     private PlayerViewFactory $viewFactory;
 
-    public function __construct(\mysqli $db, CommonMysqliRepositoryInterface $commonRepo)
+    public function __construct(\mysqli $db, TeamIdentityRepositoryInterface $commonRepo)
     {
         $this->repository = new PlayerRepository($db);
         $this->statsRepository = new PlayerStatsRepository($db);

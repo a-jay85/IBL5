@@ -5,25 +5,17 @@ declare(strict_types=1);
 namespace Tests\Trading;
 
 use PHPUnit\Framework\TestCase;
-use Services\CommonMysqliRepository;
+use Services\Contracts\TeamIdentityRepositoryInterface;
 use Trading\Contracts\TradeExecutionRepositoryInterface;
 use Trading\TradeQueueProcessor;
 
 class TradeQueueProcessorTest extends TestCase
 {
-    private CommonMysqliRepository $stubCommonRepo;
+    private TeamIdentityRepositoryInterface $stubCommonRepo;
 
     protected function setUp(): void
     {
-        $mockDb = new class extends \mysqli {
-            public int $connect_errno = 0;
-            public ?string $connect_error = null;
-
-            public function __construct()
-            {
-            }
-        };
-        $this->stubCommonRepo = new CommonMysqliRepository($mockDb);
+        $this->stubCommonRepo = $this->createStub(TeamIdentityRepositoryInterface::class);
     }
 
     // ============================================

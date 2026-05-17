@@ -5,7 +5,8 @@ declare(strict_types=1);
 namespace Tests\DatabaseIntegration\Waivers;
 
 use PHPUnit\Framework\Attributes\Group;
-use Services\CommonMysqliRepository;
+use Services\TeamIdentityRepository;
+use Services\PlayerLookupRepository;
 use Services\NewsService;
 use Tests\DatabaseIntegration\DatabaseTestCase;
 use Waivers\WaiversProcessor;
@@ -16,7 +17,8 @@ use Waivers\WaiversValidator;
 class WaiversProcessorIntegrationTest extends DatabaseTestCase
 {
     private WaiversProcessor $processor;
-    private CommonMysqliRepository $commonRepository;
+    private TeamIdentityRepository $teamIdentityRepository;
+    private PlayerLookupRepository $playerLookupRepository;
 
     private const TEST_PID_BASE = 200060100;
 
@@ -27,13 +29,15 @@ class WaiversProcessorIntegrationTest extends DatabaseTestCase
         $_SERVER['SERVER_NAME'] = 'localhost';
 
         $repository = new WaiversRepository($this->db);
-        $this->commonRepository = new CommonMysqliRepository($this->db);
+        $this->teamIdentityRepository = new TeamIdentityRepository($this->db);
+        $this->playerLookupRepository = new PlayerLookupRepository($this->db);
         $validator = new WaiversValidator();
         $newsService = new NewsService($this->db);
 
         $this->processor = new WaiversProcessor(
             $repository,
-            $this->commonRepository,
+            $this->teamIdentityRepository,
+            $this->playerLookupRepository,
             $validator,
             $newsService,
             $this->db

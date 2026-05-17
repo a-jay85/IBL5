@@ -7,7 +7,7 @@ namespace Negotiation;
 use Negotiation\Contracts\NegotiationDemandCalculatorInterface;
 use Negotiation\Contracts\NegotiationRepositoryInterface;
 use Player\Player;
-use Services\Contracts\CommonMysqliRepositoryInterface;
+use Services\Contracts\SalaryCapRepositoryInterface;
 
 /**
  * @see NegotiationDemandCalculatorInterface
@@ -29,9 +29,9 @@ class NegotiationDemandCalculator implements NegotiationDemandCalculatorInterfac
     private const RAW_SCORE_BASELINE = 700; // Sam Mack's baseline score
     private const DEMANDS_FACTOR = 3; // Trial-and-error multiplier
 
-    public function __construct(\mysqli $db, CommonMysqliRepositoryInterface $commonRepo)
+    public function __construct(\mysqli $db, SalaryCapRepositoryInterface $salaryCapRepo)
     {
-        $this->repository = new NegotiationRepository($db, $commonRepo);
+        $this->repository = new NegotiationRepository($db, $salaryCapRepo);
     }
     
     /**

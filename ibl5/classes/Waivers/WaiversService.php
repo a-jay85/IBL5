@@ -17,18 +17,18 @@ use Waivers\Contracts\WaiversViewInterface;
  * @see WaiversServiceInterface
  *
  * @phpstan-import-type WaiverFormData from WaiversServiceInterface
- * @phpstan-import-type PlayerRow from \Services\CommonMysqliRepository
+ * @phpstan-import-type PlayerRow from \Services\Contracts\PlayerLookupRepositoryInterface
  */
 class WaiversService implements WaiversServiceInterface
 {
-    private \Services\CommonMysqliRepository $commonRepository;
+    private \Services\Contracts\TeamIdentityRepositoryInterface $commonRepository;
     private WaiversProcessorInterface $processor;
     private WaiversViewInterface $view;
     private TeamQueryRepositoryInterface $teamQueryRepo;
     private \mysqli $db;
 
     public function __construct(
-        \Services\CommonMysqliRepository $commonRepository,
+        \Services\Contracts\TeamIdentityRepositoryInterface $commonRepository,
         WaiversProcessorInterface $processor,
         WaiversViewInterface $view,
         TeamQueryRepositoryInterface $teamQueryRepo,

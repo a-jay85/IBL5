@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Draft;
 
 use Draft\Contracts\DraftSelectionHandlerInterface;
-use Services\Contracts\CommonMysqliRepositoryInterface;
+use Services\Contracts\TeamIdentityRepositoryInterface;
 use Shared\Contracts\SharedRepositoryInterface;
 use Season\Season;
 use Discord\Discord;
@@ -18,13 +18,13 @@ class DraftSelectionHandler implements DraftSelectionHandlerInterface
     private \mysqli $db;
     private DraftValidator $validator;
     private DraftRepository $repository;
-    private CommonMysqliRepositoryInterface $commonRepository;
+    private TeamIdentityRepositoryInterface $commonRepository;
     private DraftProcessor $processor;
     private DraftView $view;
     private SharedRepositoryInterface $sharedRepository;
     private Season $season;
 
-    public function __construct(\mysqli $db, CommonMysqliRepositoryInterface $commonRepository, SharedRepositoryInterface $sharedRepository, Season $season)
+    public function __construct(\mysqli $db, TeamIdentityRepositoryInterface $commonRepository, SharedRepositoryInterface $sharedRepository, Season $season)
     {
         $this->db = $db;
         $this->commonRepository = $commonRepository;

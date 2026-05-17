@@ -46,7 +46,7 @@ $processor = new \Extension\ExtensionProcessor($mysqli_db);
 $result = $processor->processExtension($extensionData);
 
 // Look up team ID for redirect
-$commonRepo = new \Services\CommonMysqliRepository($mysqli_db);
+$commonRepo = new \Services\TeamIdentityRepository($mysqli_db);
 $teamid = $commonRepo->getTidFromTeamname($teamName);
 
 if ($teamid === null) {

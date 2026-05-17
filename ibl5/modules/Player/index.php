@@ -8,15 +8,17 @@ use Player\PlayerRepository;
 use RookieOption\RookieOptionValidator;
 use RookieOption\RookieOptionFormView;
 use RookieOption\RookieOptionController;
-use Services\CommonMysqliRepository;
+use Services\TeamIdentityRepository;
+use Services\SalaryCapRepository;
 use Negotiation\NegotiationDemandCalculator;
 use Negotiation\NegotiationRepository;
 use Negotiation\NegotiationService;
 use Negotiation\NegotiationValidator;
 
-global $mysqli_db, $commonRepository;
+global $mysqli_db, $commonRepository, $salaryCapRepo;
 
-$commonRepository = new CommonMysqliRepository($mysqli_db);
+$commonRepository = new TeamIdentityRepository($mysqli_db);
+$salaryCapRepo = new SalaryCapRepository($mysqli_db);
 
 if (stripos($_SERVER['PHP_SELF'], "modules.php") === false) {
     die("You can't access this file directly...");
@@ -57,7 +59,7 @@ function showpage($playerID, $pageView): void
 
 function negotiate($playerID)
 {
-    global $prefix, $mysqli_db, $cookie, $commonRepository;
+    global $prefix, $mysqli_db, $cookie, $commonRepository, $salaryCapRepo;
 
     $playerID = intval($playerID);
 
@@ -75,9 +77,9 @@ function negotiate($playerID)
 
     $service = new NegotiationService(
         $mysqli_db,
-        new NegotiationRepository($mysqli_db, $commonRepository),
+        new NegotiationRepository($mysqli_db, $salaryCapRepo),
         new NegotiationValidator($mysqli_db),
-        new NegotiationDemandCalculator($mysqli_db, $commonRepository),
+        new NegotiationDemandCalculator($mysqli_db, $salaryCapRepo),
     );
     echo $service->processNegotiation($playerID, $userTeamName, $prefix, $bypassOwnership);
 

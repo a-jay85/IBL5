@@ -14,7 +14,7 @@ use Player\Views\PlayerStatsCardView;
 use Player\Views\PlayerStatsFlipCardView;
 use Player\Views\PlayerViewFactory;
 use Player\Views\TeamColorHelper;
-use Services\Contracts\CommonMysqliRepositoryInterface;
+use Services\Contracts\TeamIdentityRepositoryInterface;
 use Security\HtmlSanitizer;
 use Team\Team;
 use Season\Season;
@@ -28,13 +28,13 @@ use Season\Season;
 class PlayerPageController
 {
     private \mysqli $mysqliDb;
-    private CommonMysqliRepositoryInterface $commonRepo;
+    private TeamIdentityRepositoryInterface $commonRepo;
 
     /**
      * @param \mysqli $mysqliDb MySQLi database connection
-     * @param CommonMysqliRepositoryInterface $commonRepo Common repository for shared queries
+     * @param TeamIdentityRepositoryInterface $commonRepo Common repository for shared queries
      */
-    public function __construct(\mysqli $mysqliDb, CommonMysqliRepositoryInterface $commonRepo)
+    public function __construct(\mysqli $mysqliDb, TeamIdentityRepositoryInterface $commonRepo)
     {
         $this->mysqliDb = $mysqliDb;
         $this->commonRepo = $commonRepo;

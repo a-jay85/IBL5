@@ -16,7 +16,7 @@ use FreeAgency\Contracts\FreeAgencyRepositoryInterface;
  * @see FreeAgencyRepositoryInterface For method contracts
  * @see BaseMysqliRepository For base class documentation and error codes
  *
- * @phpstan-import-type PlayerRow from \Services\CommonMysqliRepository
+ * @phpstan-import-type PlayerRow from \Services\Contracts\PlayerLookupRepositoryInterface
  * @phpstan-import-type OfferRow from \FreeAgency\Contracts\FreeAgencyRepositoryInterface
  * @phpstan-import-type OfferData from \FreeAgency\Contracts\FreeAgencyRepositoryInterface
  */

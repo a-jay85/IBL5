@@ -16,7 +16,7 @@ use Waivers\Contracts\WaiversViewInterface;
 /**
  * @see WaiversControllerInterface
  *
- * @phpstan-import-type UserRow from \Services\CommonMysqliRepository
+ * @phpstan-import-type UserRow from \Services\Contracts\TeamIdentityRepositoryInterface
  * @phpstan-import-type WaiverFormData from WaiversServiceInterface
  */
 class WaiversController implements WaiversControllerInterface
@@ -26,7 +26,8 @@ class WaiversController implements WaiversControllerInterface
     private WaiversServiceInterface $service;
     private WaiversProcessorInterface $processor;
     private WaiversViewInterface $view;
-    private \Services\CommonMysqliRepository $commonRepository;
+    private \Services\Contracts\TeamIdentityRepositoryInterface $teamIdentityRepo;
+    private \Services\Contracts\SalaryCapRepositoryInterface $salaryCapRepo;
     private \Utilities\NukeCompat $nukeCompat;
     private \mysqli $db;
 
@@ -34,14 +35,16 @@ class WaiversController implements WaiversControllerInterface
         WaiversServiceInterface $service,
         WaiversProcessorInterface $processor,
         WaiversViewInterface $view,
-        \Services\CommonMysqliRepository $commonRepository,
+        \Services\Contracts\TeamIdentityRepositoryInterface $teamIdentityRepo,
+        \Services\Contracts\SalaryCapRepositoryInterface $salaryCapRepo,
         \Utilities\NukeCompat $nukeCompat,
         \mysqli $db
     ) {
         $this->service = $service;
         $this->processor = $processor;
         $this->view = $view;
-        $this->commonRepository = $commonRepository;
+        $this->teamIdentityRepo = $teamIdentityRepo;
+        $this->salaryCapRepo = $salaryCapRepo;
         $this->nukeCompat = $nukeCompat;
         $this->db = $db;
     }
@@ -76,7 +79,7 @@ class WaiversController implements WaiversControllerInterface
      */
     public function executeWaiverOperation(string $username, string $action): void
     {
-        $userInfo = $this->commonRepository->getUserByUsername($username);
+        $userInfo = $this->teamIdentityRepo->getUserByUsername($username);
 
         if ($userInfo === null) {
             $this->nukeCompat->loginBox();
@@ -133,7 +136,7 @@ class WaiversController implements WaiversControllerInterface
             return ['success' => false, 'error' => 'Invalid submission data.'];
         }
 
-        $totalSalary = $this->commonRepository->getTeamTotalSalary($teamName);
+        $totalSalary = $this->salaryCapRepo->getTeamTotalSalary($teamName);
 
         if ($action === 'waive') {
             return $this->processor->processDrop($playerID, $teamName, $rosterSlots, $totalSalary);

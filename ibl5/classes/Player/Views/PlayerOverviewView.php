@@ -8,7 +8,7 @@ use Player\Player;
 use Player\Stats\PlayerStatsRepository;
 use Player\Stats\PlayerStats;
 use Player\Contracts\PlayerOverviewViewInterface;
-use Services\Contracts\CommonMysqliRepositoryInterface;
+use Services\Contracts\TeamIdentityRepositoryInterface;
 use BasketballStats\StatsFormatter;
 use Security\HtmlSanitizer;
 use Season\Season;
@@ -24,11 +24,11 @@ use Season\Season;
 class PlayerOverviewView implements PlayerOverviewViewInterface
 {
     private PlayerStatsRepository $statsRepository;
-    private CommonMysqliRepositoryInterface $commonRepository;
+    private TeamIdentityRepositoryInterface $commonRepository;
 
     public function __construct(
         PlayerStatsRepository $statsRepository,
-        CommonMysqliRepositoryInterface $commonRepository
+        TeamIdentityRepositoryInterface $commonRepository
     ) {
         $this->statsRepository = $statsRepository;
         $this->commonRepository = $commonRepository;

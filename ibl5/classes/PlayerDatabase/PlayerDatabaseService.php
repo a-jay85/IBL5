@@ -16,7 +16,7 @@ use PlayerDatabase\Contracts\PlayerDatabaseRepositoryInterface;
  * Implements the service contract defined in PlayerDatabaseServiceInterface.
  * See the interface for detailed behavior documentation.
  *
- * @phpstan-import-type PlayerRow from \Services\CommonMysqliRepository
+ * @phpstan-import-type PlayerRow from \Services\Contracts\PlayerLookupRepositoryInterface
  */
 class PlayerDatabaseService implements PlayerDatabaseServiceInterface
 {

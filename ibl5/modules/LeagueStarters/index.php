@@ -24,7 +24,7 @@ global $cookie, $mysqli_db;
 
 // Route HTMX API requests (no PageLayout, returns HTML fragment only)
 $op = is_string($_GET['op'] ?? null) ? $_GET['op'] : '';
-$commonRepository = new Services\CommonMysqliRepository($mysqli_db);
+$commonRepository = new Services\TeamIdentityRepository($mysqli_db);
 
 if ($op === 'api') {
     $handler = new LeagueStarters\LeagueStartersApiHandler($mysqli_db, $commonRepository);

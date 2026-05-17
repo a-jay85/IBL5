@@ -38,11 +38,12 @@ class WaiversWideUnitTest extends WideUnitTestCase
         parent::setUp();
         $this->repository = new WaiversRepository($this->mockDb);
         $repoStub = $this->createStub(\Waivers\Contracts\WaiversRepositoryInterface::class);
-        $commonRepoStub = $this->createStub(\Services\CommonMysqliRepository::class);
+        $teamIdentityRepoStub = $this->createStub(\Services\Contracts\TeamIdentityRepositoryInterface::class);
+        $playerLookupRepoStub = $this->createStub(\Services\Contracts\PlayerLookupRepositoryInterface::class);
         $validatorStub = $this->createStub(\Waivers\Contracts\WaiversValidatorInterface::class);
         $newsServiceStub = $this->createStub(\Services\NewsService::class);
         $dbStub = $this->createStub(\mysqli::class);
-        $this->processor = new WaiversProcessor($repoStub, $commonRepoStub, $validatorStub, $newsServiceStub, $dbStub);
+        $this->processor = new WaiversProcessor($repoStub, $teamIdentityRepoStub, $playerLookupRepoStub, $validatorStub, $newsServiceStub, $dbStub);
         $this->validator = new WaiversValidator();
 
         // Prevent Discord notifications during tests

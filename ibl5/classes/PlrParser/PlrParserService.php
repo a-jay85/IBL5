@@ -18,12 +18,12 @@ use Season\Season;
 class PlrParserService implements PlrParserServiceInterface
 {
     private PlrParserRepositoryInterface $repository;
-    private \Services\CommonMysqliRepository $commonRepository;
+    private \Services\Contracts\TeamIdentityRepositoryInterface $commonRepository;
     private Season $season;
 
     public function __construct(
         PlrParserRepositoryInterface $repository,
-        \Services\CommonMysqliRepository $commonRepository,
+        \Services\Contracts\TeamIdentityRepositoryInterface $commonRepository,
         Season $season,
     ) {
         $this->repository = $repository;

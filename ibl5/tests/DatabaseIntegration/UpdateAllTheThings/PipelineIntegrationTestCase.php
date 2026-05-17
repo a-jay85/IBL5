@@ -14,7 +14,7 @@ use PlrParser\PlrParserRepository;
 use PlrParser\PlrParserService;
 use SavedDepthChart\SavedDepthChartRepository;
 use Season\Season;
-use Services\CommonMysqliRepository;
+use Services\TeamIdentityRepository;
 use Shared\SharedRepository;
 use Tests\DatabaseIntegration\DatabaseTestCase;
 use Updater\Contracts\JsbSourceResolverInterface;
@@ -256,7 +256,7 @@ abstract class PipelineIntegrationTestCase extends DatabaseTestCase
     ): UpdaterService {
         $service = new UpdaterService();
 
-        $commonRepo = new CommonMysqliRepository($this->db);
+        $commonRepo = new TeamIdentityRepository($this->db);
         $plrRepo = new PlrParserRepository($this->db);
         $plrService = new PlrParserService($plrRepo, $commonRepo, $season);
 

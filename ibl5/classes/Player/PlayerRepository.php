@@ -12,7 +12,7 @@ use Player\Contracts\PlayerRepositoryInterface;
  *
  * Extends BaseMysqliRepository for standardized prepared statement handling.
  *
- * @phpstan-import-type PlayerRow from \Services\CommonMysqliRepository
+ * @phpstan-import-type PlayerRow from \Services\Contracts\PlayerLookupRepositoryInterface
  * @phpstan-import-type HistoricalPlayerRow from PlayerRepositoryInterface
  * @phpstan-import-type AwardRow from PlayerRepositoryInterface
  * @phpstan-import-type PlayerNewsRow from PlayerRepositoryInterface

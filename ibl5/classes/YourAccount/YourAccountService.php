@@ -8,7 +8,7 @@ use Auth\Contracts\AuthServiceInterface;
 use League\League;
 use Logging\LoggerFactory;
 use Mail\Contracts\MailServiceInterface;
-use Services\CommonMysqliRepository;
+use Services\Contracts\TeamIdentityRepositoryInterface;
 use YourAccount\Contracts\YourAccountServiceInterface;
 
 /**
@@ -20,7 +20,7 @@ class YourAccountService implements YourAccountServiceInterface
     private const AUTO_PASSWORD_LENGTH = 10;
 
     private AuthServiceInterface $authService;
-    private CommonMysqliRepository $commonRepository;
+    private TeamIdentityRepositoryInterface $commonRepository;
     private MailServiceInterface $mailService;
     private string $siteUrl;
     private string $siteName;
@@ -29,7 +29,7 @@ class YourAccountService implements YourAccountServiceInterface
 
     public function __construct(
         AuthServiceInterface $authService,
-        CommonMysqliRepository $commonRepository,
+        TeamIdentityRepositoryInterface $commonRepository,
         MailServiceInterface $mailService,
         string $siteUrl,
         string $siteName,

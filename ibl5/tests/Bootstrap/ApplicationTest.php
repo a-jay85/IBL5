@@ -110,4 +110,58 @@ final class ApplicationTest extends TestCase
         // No exception — empty boot is valid
         self::assertInstanceOf(ContainerInterface::class, $app->getContainer());
     }
+
+    public function testBootStopsOnTermination(): void
+    {
+        $order = [];
+
+        $terminatingStep = new class ($order) implements BootstrapStepInterface {
+            /** @var list<string> */
+            private array $order;
+
+            /** @param list<string> $order */
+            public function __construct(array &$order)
+            {
+                $this->order = &$order;
+            }
+
+            public function boot(ContainerInterface $container): void
+            {
+                $this->order[] = 'terminator';
+                $container->set('app.terminated', true);
+            }
+        };
+
+        $neverReached = new class ($order) implements BootstrapStepInterface {
+            /** @var list<string> */
+            private array $order;
+
+            /** @param list<string> $order */
+            public function __construct(array &$order)
+            {
+                $this->order = &$order;
+            }
+
+            public function boot(ContainerInterface $container): void
+            {
+                $this->order[] = 'should_not_run';
+            }
+        };
+
+        $app = new Application();
+        $app->addStep($terminatingStep);
+        $app->addStep($neverReached);
+        $app->boot();
+
+        self::assertSame(['terminator'], $order);
+        self::assertTrue($app->isTerminated());
+    }
+
+    public function testIsTerminatedReturnsFalseWhenNotTerminated(): void
+    {
+        $app = new Application();
+        $app->boot();
+
+        self::assertFalse($app->isTerminated());
+    }
 }

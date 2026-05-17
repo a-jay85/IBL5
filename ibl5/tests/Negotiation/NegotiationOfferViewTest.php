@@ -5,19 +5,19 @@ declare(strict_types=1);
 namespace Tests\Negotiation;
 
 use PHPUnit\Framework\TestCase;
-use Negotiation\NegotiationViewHelper;
+use Negotiation\NegotiationOfferView;
 use Player\Player;
 
 /**
- * Tests for NegotiationViewHelper
- * 
+ * Tests for NegotiationOfferView
+ *
  * Tests HTML rendering for negotiation interface:
  * - Form rendering with proper escaping
  * - Demand display formatting
  * - Error message rendering
  * - Header rendering
  */
-class NegotiationViewHelperTest extends TestCase
+class NegotiationOfferViewTest extends TestCase
 {
     /**
      * @group view
@@ -41,7 +41,7 @@ class NegotiationViewHelperTest extends TestCase
         $maxYearOneSalary = \ContractRules::getMaxContractSalary(0);
 
         // Act
-        $html = NegotiationViewHelper::renderNegotiationForm($player, $demands, $capSpace, $maxYearOneSalary);
+        $html = NegotiationOfferView::renderNegotiationForm($player, $demands, $capSpace, $maxYearOneSalary);
 
         // Assert
         $this->assertStringContainsString('<form', $html);
@@ -71,7 +71,7 @@ class NegotiationViewHelperTest extends TestCase
         $maxYearOneSalary = \ContractRules::getMaxContractSalary(0);
 
         // Act
-        $html = NegotiationViewHelper::renderNegotiationForm($player, $demands, $capSpace, $maxYearOneSalary);
+        $html = NegotiationOfferView::renderNegotiationForm($player, $demands, $capSpace, $maxYearOneSalary);
 
         // Assert
         $this->assertStringContainsString('name="maxyr1"', $html);
@@ -98,7 +98,7 @@ class NegotiationViewHelperTest extends TestCase
         $maxYearOneSalary = \ContractRules::getMaxContractSalary(0);
 
         // Act
-        $html = NegotiationViewHelper::renderNegotiationForm($player, $demands, $capSpace, $maxYearOneSalary);
+        $html = NegotiationOfferView::renderNegotiationForm($player, $demands, $capSpace, $maxYearOneSalary);
 
         // Assert
         $this->assertStringNotContainsString('<script>', $html);
@@ -120,7 +120,7 @@ class NegotiationViewHelperTest extends TestCase
         $maxYearOneSalary = \ContractRules::getMaxContractSalary(0);
 
         // Act
-        $html = NegotiationViewHelper::renderNegotiationForm($player, $demands, $capSpace, $maxYearOneSalary);
+        $html = NegotiationOfferView::renderNegotiationForm($player, $demands, $capSpace, $maxYearOneSalary);
 
         // Assert — the injected tag's angle brackets are escaped, preventing injection
         $this->assertStringContainsString('&lt;img', $html);
@@ -150,7 +150,7 @@ class NegotiationViewHelperTest extends TestCase
         $maxYearOneSalary = \ContractRules::getMaxContractSalary(0);
 
         // Act
-        $html = NegotiationViewHelper::renderNegotiationForm($player, $demands, $capSpace, $maxYearOneSalary);
+        $html = NegotiationOfferView::renderNegotiationForm($player, $demands, $capSpace, $maxYearOneSalary);
 
         // Assert
         $this->assertStringContainsString('name="maxyr1"', $html);
@@ -182,7 +182,7 @@ class NegotiationViewHelperTest extends TestCase
         $maxYearOneSalary = \ContractRules::getMaxContractSalary(0);
 
         // Act
-        $html = NegotiationViewHelper::renderNegotiationForm($player, $demands, $capSpace, $maxYearOneSalary);
+        $html = NegotiationOfferView::renderNegotiationForm($player, $demands, $capSpace, $maxYearOneSalary);
 
         // Assert
         $this->assertStringContainsString('value="1063"', $html); // Max year 1
@@ -203,7 +203,7 @@ class NegotiationViewHelperTest extends TestCase
         $maxYearOneSalary = \ContractRules::getMaxContractSalary(0);
 
         // Act
-        $html = NegotiationViewHelper::renderNegotiationForm($player, $demands, $capSpace, $maxYearOneSalary);
+        $html = NegotiationOfferView::renderNegotiationForm($player, $demands, $capSpace, $maxYearOneSalary);
 
         // Assert
         $this->assertStringContainsString('12.5%', $html); // Bird rights percentage
@@ -223,7 +223,7 @@ class NegotiationViewHelperTest extends TestCase
         $maxYearOneSalary = \ContractRules::getMaxContractSalary(0);
 
         // Act
-        $html = NegotiationViewHelper::renderNegotiationForm($player, $demands, $capSpace, $maxYearOneSalary);
+        $html = NegotiationOfferView::renderNegotiationForm($player, $demands, $capSpace, $maxYearOneSalary);
 
         // Assert
         $this->assertStringContainsString('10%', $html); // No bird rights percentage
@@ -242,7 +242,7 @@ class NegotiationViewHelperTest extends TestCase
         $maxYearOneSalary = \ContractRules::getMaxContractSalary(0);
 
         // Act
-        $html = NegotiationViewHelper::renderNegotiationForm($player, $demands, $capSpace, $maxYearOneSalary);
+        $html = NegotiationOfferView::renderNegotiationForm($player, $demands, $capSpace, $maxYearOneSalary);
 
         // Assert
         $this->assertStringContainsString('1234', $html);
@@ -258,7 +258,7 @@ class NegotiationViewHelperTest extends TestCase
         $errorMessage = "This is a test error";
 
         // Act
-        $html = NegotiationViewHelper::renderError($errorMessage);
+        $html = NegotiationOfferView::renderError($errorMessage);
 
         // Assert
         $this->assertStringContainsString('ibl-alert ibl-alert--error', $html);
@@ -276,7 +276,7 @@ class NegotiationViewHelperTest extends TestCase
         $errorMessage = "<script>alert('xss')</script>";
 
         // Act
-        $html = NegotiationViewHelper::renderError($errorMessage);
+        $html = NegotiationOfferView::renderError($errorMessage);
 
         // Assert
         $this->assertStringNotContainsString('<script>', $html);
@@ -295,7 +295,7 @@ class NegotiationViewHelperTest extends TestCase
         $player->position = "PG";
 
         // Act
-        $html = NegotiationViewHelper::renderHeader($player);
+        $html = NegotiationOfferView::renderHeader($player);
 
         // Assert
         $this->assertStringContainsString('ibl-title', $html);
@@ -312,7 +312,7 @@ class NegotiationViewHelperTest extends TestCase
         $player = $this->createMockPlayer();
 
         // Act
-        $html = NegotiationViewHelper::renderHeader($player);
+        $html = NegotiationOfferView::renderHeader($player);
 
         // Assert — header is a static title, player name is in the card
         $this->assertStringContainsString('<h2', $html);

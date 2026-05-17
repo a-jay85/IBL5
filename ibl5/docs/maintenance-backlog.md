@@ -252,8 +252,8 @@ Effort scale:
 
 ### 2.12 Negotiation — No Standalone Module; Six Non-Standard Role Names
 **Location:** `classes/Negotiation/`
-**Problem:** `NegotiationDemandCalculator`, `NegotiationDemandsBreakdownView`, `NegotiationViewHelper` are non-canonical. No `modules/Negotiation/`.
-**Suggested direction:** Merge `ViewHelper` into `NegotiationView`; consolidate `BreakdownView` as a sub-view; document the Player sub-domain relationship.
+**Problem:** `NegotiationDemandCalculator`, `NegotiationDemandsBreakdownView`, `NegotiationOfferView` are non-canonical. No `modules/Negotiation/`.
+**Suggested direction:** Consolidate `BreakdownView` as a sub-view; document the Player sub-domain relationship.
 **Est. effort:** S
 **Risk if untouched:** Three view-ish files with different conventions confuse the View boundary.
 
@@ -273,7 +273,7 @@ Effort scale:
 
 ### 2.15 Voting — Split Across Two `modules/` Dirs But One `classes/` Namespace
 **Location:** `modules/Voting/`, `modules/VotingResults/`, `classes/Voting/`
-**Problem:** `modules/VotingResults/` exists but `classes/VotingResults/` does not. `VotingResultsTableRenderer` non-canonical role name.
+**Problem:** `modules/VotingResults/` exists but `classes/VotingResults/` does not.
 **Suggested direction:** Either merge module dirs or create `classes/VotingResults/` and split the namespace.
 **Est. effort:** S (rename) / M (namespace split)
 **Risk if untouched:** Module/namespace mismatch breaks codebase-map searches; duplicates likely.
@@ -613,12 +613,9 @@ Effort scale:
 **Est. effort:** S
 **Risk if untouched:** Wrong module opened when looking for transaction queries.
 
-### 4.7 `FreeAgency/FreeAgencyNegotiationView` Overlaps `Negotiation/` Module
-**Location:** `ibl5/classes/FreeAgency/FreeAgencyNegotiationView.php`
-**Problem:** "Negotiation View" in `FreeAgency/` suggests it belongs in `Negotiation/`.
-**Suggested direction:** Rename to `FreeAgencyOfferView.php`.
-**Est. effort:** S
-**Risk if untouched:** FA vs extension UI duplication harder to spot.
+### 4.7 ~~`FreeAgencyNegotiationView`~~ → `FreeAgencyOfferView` ✅ Done
+**Status:** Renamed to `FreeAgencyOfferView` (2026-05-17).
+**Location:** `ibl5/classes/FreeAgency/FreeAgencyOfferView.php`
 
 ### 4.8 `FreeAgencyDemandCalculator` vs `NegotiationDemandCalculator`
 **Location:** Both modules' `*DemandCalculator`
@@ -718,19 +715,13 @@ Effort scale:
 **Est. effort:** M
 **Risk if untouched:** PLR export gets re-implemented in `PlrParser/`.
 
-### 4.22 `NegotiationViewHelper` vs `NegotiationDemandsBreakdownView`
+### 4.22 ~~`NegotiationViewHelper`~~ → `NegotiationOfferView` ✅ Done
 **Location:** `ibl5/classes/Negotiation/`
-**Problem:** "ViewHelper" suggests a utility, but it's the primary view class. Inconsistent with the `*View` convention.
-**Suggested direction:** Rename to `NegotiationOfferView`.
-**Est. effort:** S
-**Risk if untouched:** Devs look for `NegotiationView` and don't find it.
+**Resolved:** Renamed to `NegotiationOfferView` / `NegotiationOfferViewInterface`.
 
-### 4.23 `VotingResultsTableRenderer` Breaks the `*View` Convention
-**Location:** `ibl5/classes/Voting/VotingResultsTableRenderer.php`
-**Problem:** Effectively the voting results View, but named `TableRenderer`.
-**Suggested direction:** Rename to `VotingResultsView`.
-**Est. effort:** S
-**Risk if untouched:** Devs search for `VotingResultsView.php` and miss it.
+### 4.23 ~~`VotingResultsTableRenderer`~~ → `VotingResultsView` ✅ Done
+**Location:** `ibl5/classes/Voting/`
+**Resolved:** Renamed to `VotingResultsView` / `VotingResultsViewInterface`.
 
 ### 4.24 `InjuriesService` Has No `InjuriesRepository`
 **Location:** `ibl5/classes/Injuries/InjuriesService.php`
@@ -1568,7 +1559,7 @@ Effort scale:
 **Risk if untouched:** Double-encoding or missed XSS vectors.
 
 ### 10.10 `HtmlSanitizer::trusted()` Is a 70-Site Escape Hatch
-**Location:** 70 calls across `FreeAgencyView`, `FreeAgencyNegotiationView`, `TradingView`, `WaiversView`
+**Location:** 70 calls across `FreeAgencyView`, `FreeAgencyOfferView`, `TradingView`, `WaiversView`
 **Problem:** `trusted()` is no-op whitelisted in `RequireEscapedOutputRule::SAFE_STATIC_CALLS`. Distinguishes only by code review whether arg is composed `$this->renderX()` (safe) or raw DB value (unsafe).
 **Suggested direction:** New `RequireTrustedAnnotationRule` — require `// @trusted` comment when arg is a variable (not method call on `$this`).
 **Est. effort:** M

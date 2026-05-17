@@ -13,7 +13,7 @@
             "Voting/VotingRepository.php",
             // Views without companion tests (Pass 2 — deferred)
             "Boxscore/BoxscoreView.php",
-            "FreeAgency/FreeAgencyNegotiationView.php",
+            "FreeAgency/FreeAgencyOfferView.php",
             "FreeAgency/FreeAgencyView.php",
             "FreeAgency/FreeAgencyFormComponents.php",
             "LeagueConfig/LeagueConfigView.php",

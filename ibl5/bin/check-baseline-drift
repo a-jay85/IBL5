@@ -32,7 +32,7 @@ $counter = new \Scripts\PhpstanBaselineCounter();
 $zeroFloorFiles = [
     'classes/Trading/TradingView.php',
     'classes/FreeAgency/FreeAgencyView.php',
-    'classes/FreeAgency/FreeAgencyNegotiationView.php',
+    'classes/FreeAgency/FreeAgencyOfferView.php',
     'classes/Waivers/WaiversView.php',
 ];
 

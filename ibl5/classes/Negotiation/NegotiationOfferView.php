@@ -6,20 +6,20 @@ namespace Negotiation;
 
 use League\League;
 use Negotiation\Contracts\NegotiationDemandCalculatorInterface;
-use Negotiation\Contracts\NegotiationViewHelperInterface;
+use Negotiation\Contracts\NegotiationOfferViewInterface;
 use Player\Player;
 use Player\PlayerImageHelper;
 use Security\HtmlSanitizer;
 
 /**
- * @see NegotiationViewHelperInterface
+ * @see NegotiationOfferViewInterface
  *
  * @phpstan-import-type DemandResult from NegotiationDemandCalculatorInterface
  */
-class NegotiationViewHelper implements NegotiationViewHelperInterface
+class NegotiationOfferView implements NegotiationOfferViewInterface
 {
     /**
-     * @see NegotiationViewHelperInterface::renderNegotiationForm()
+     * @see NegotiationOfferViewInterface::renderNegotiationForm()
      *
      * @param Player $player The player object
      * @param DemandResult $demands Calculated demands
@@ -212,7 +212,7 @@ class NegotiationViewHelper implements NegotiationViewHelperInterface
     }
 
     /**
-     * @see NegotiationViewHelperInterface::renderError()
+     * @see NegotiationOfferViewInterface::renderError()
      */
     public static function renderError(string $error): string
     {
@@ -221,7 +221,7 @@ class NegotiationViewHelper implements NegotiationViewHelperInterface
     }
 
     /**
-     * @see NegotiationViewHelperInterface::renderHeader()
+     * @see NegotiationOfferViewInterface::renderHeader()
      */
     public static function renderHeader(Player $player): string
     {

@@ -8,6 +8,7 @@ use LastSimRecap\Contracts\LastSimRecapRepositoryInterface;
 use LastSimRecap\Dto\RecapSlate;
 use LastSimRecap\LastSimRecapService;
 use PHPUnit\Framework\TestCase;
+use Repositories\Contracts\PlayerLookupRepositoryInterface;
 
 /**
  * Module-integration coverage for the Last-Sim Recap card on the News page.
@@ -21,7 +22,9 @@ class NewsModuleIntegrationTest extends TestCase
     public function testServiceReturnsNullForTeamWithNoGames(): void
     {
         $repo = $this->repoWithGames([]);
-        $svc = new LastSimRecapService($repo);
+        $playerLookup = $this->createStub(PlayerLookupRepositoryInterface::class);
+        $playerLookup->method('getPlayerByID')->willReturn(null);
+        $svc = new LastSimRecapService($repo, $playerLookup);
 
         self::assertNull($svc->buildSlateForTeam(7));
     }
@@ -35,7 +38,9 @@ class NewsModuleIntegrationTest extends TestCase
                 'year' => 2026,
             ],
         ]);
-        $svc = new LastSimRecapService($repo);
+        $playerLookup = $this->createStub(PlayerLookupRepositoryInterface::class);
+        $playerLookup->method('getPlayerByID')->willReturn(null);
+        $svc = new LastSimRecapService($repo, $playerLookup);
 
         $slate = $svc->buildSlateForTeam(1);
 

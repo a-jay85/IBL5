@@ -7,13 +7,22 @@ namespace Tests\LastSimRecap;
 use LastSimRecap\Contracts\LastSimRecapRepositoryInterface;
 use LastSimRecap\LastSimRecapService;
 use PHPUnit\Framework\TestCase;
+use Repositories\Contracts\PlayerLookupRepositoryInterface;
 
 class LastSimRecapServiceTest extends TestCase
 {
+    private PlayerLookupRepositoryInterface $playerLookup;
+
+    protected function setUp(): void
+    {
+        $this->playerLookup = $this->createStub(PlayerLookupRepositoryInterface::class);
+        $this->playerLookup->method('getPlayerByID')->willReturn(null);
+    }
+
     public function testReturnsNullWhenNoWindow(): void
     {
         $repo = $this->buildRepo(window: null);
-        $svc = new LastSimRecapService($repo);
+        $svc = new LastSimRecapService($repo, $this->playerLookup);
 
         self::assertNull($svc->buildSlateForTeam(1));
     }
@@ -21,7 +30,7 @@ class LastSimRecapServiceTest extends TestCase
     public function testReturnsNullWhenTeamHasNoGames(): void
     {
         $repo = $this->buildRepo(games: []);
-        $svc = new LastSimRecapService($repo);
+        $svc = new LastSimRecapService($repo, $this->playerLookup);
 
         self::assertNull($svc->buildSlateForTeam(1));
     }
@@ -40,7 +49,7 @@ class LastSimRecapServiceTest extends TestCase
                 98 => $this->makeLines(),
             ],
         );
-        $svc = new LastSimRecapService($repo);
+        $svc = new LastSimRecapService($repo, $this->playerLookup);
 
         $slate = $svc->buildSlateForTeam(1);
 
@@ -63,7 +72,7 @@ class LastSimRecapServiceTest extends TestCase
                 199 => $this->makeLines(),
             ],
         );
-        $svc = new LastSimRecapService($repo);
+        $svc = new LastSimRecapService($repo, $this->playerLookup);
 
         $slate = $svc->buildSlateForTeam(1);
 
@@ -88,7 +97,7 @@ class LastSimRecapServiceTest extends TestCase
                 299 => $this->makeLines(),
             ],
         );
-        $svc = new LastSimRecapService($repo);
+        $svc = new LastSimRecapService($repo, $this->playerLookup);
 
         $slate = $svc->buildSlateForTeam(1);
 
@@ -107,7 +116,7 @@ class LastSimRecapServiceTest extends TestCase
             ],
             quarterLines: [400 => $linesWithOt],
         );
-        $svc = new LastSimRecapService($repo);
+        $svc = new LastSimRecapService($repo, $this->playerLookup);
 
         $slate = $svc->buildSlateForTeam(1);
 
@@ -142,7 +151,7 @@ class LastSimRecapServiceTest extends TestCase
                 '101|500' => ['pid' => 101, 'name' => 'Star Player', 'pos' => 'PG', 'pts' => 0, 'minutes' => 0],
             ],
         );
-        $svc = new LastSimRecapService($repo);
+        $svc = new LastSimRecapService($repo, $this->playerLookup);
 
         $slate = $svc->buildSlateForTeam(1);
 

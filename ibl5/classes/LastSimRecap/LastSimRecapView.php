@@ -9,6 +9,7 @@ use LastSimRecap\Dto\RecapGame;
 use LastSimRecap\Dto\RecapInjury;
 use LastSimRecap\Dto\RecapSlate;
 use LastSimRecap\Dto\RecapStarter;
+use Player\PlayerImageHelper;
 use Security\HtmlSanitizer;
 
 class LastSimRecapView implements LastSimRecapViewInterface
@@ -362,9 +363,7 @@ class LastSimRecapView implements LastSimRecapViewInterface
     private function renderPlayerRow(bool $isYou, int $pid, string $name, int $pts, bool $hurt): string
     {
         $youMod = $isYou ? ' last-sim-recap__player--you' : '';
-        $imgSrc = $pid > 0
-            ? './images/player/' . $pid . '.png'
-            : './images/player/0.png';
+        $imgSrc = PlayerImageHelper::getImageUrl($pid);
 
         $h  = '<div class="last-sim-recap__player' . $youMod . '">';
         $h .= '  <span class="last-sim-recap__avatar-wrap">';

@@ -41,7 +41,8 @@ function theindex($new_topic = "0")
             $tid = $teamRepo->getTidFromTeamname($teamName);
             if ($tid !== null && \League\League::isRealFranchise($tid)) {
                 $recapService = new \LastSimRecap\LastSimRecapService(
-                    new \LastSimRecap\LastSimRecapRepository($mysqli_db)
+                    new \LastSimRecap\LastSimRecapRepository($mysqli_db),
+                    new \Repositories\PlayerLookupRepository($mysqli_db),
                 );
                 $slate = $recapService->buildSlateForTeam($tid);
                 if ($slate !== null) {

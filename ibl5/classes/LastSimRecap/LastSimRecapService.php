@@ -10,6 +10,7 @@ use LastSimRecap\Dto\RecapGame;
 use LastSimRecap\Dto\RecapInjury;
 use LastSimRecap\Dto\RecapSlate;
 use LastSimRecap\Dto\RecapStarter;
+use Repositories\Contracts\PlayerLookupRepositoryInterface;
 
 class LastSimRecapService implements LastSimRecapServiceInterface
 {
@@ -17,6 +18,7 @@ class LastSimRecapService implements LastSimRecapServiceInterface
 
     public function __construct(
         private readonly LastSimRecapRepositoryInterface $repo,
+        private readonly PlayerLookupRepositoryInterface $playerLookup,
     ) {}
 
     public function buildSlateForTeam(int $tid): ?RecapSlate
@@ -170,11 +172,11 @@ class LastSimRecapService implements LastSimRecapServiceInterface
             $starters[] = new RecapStarter(
                 pos: $pos,
                 youPid: $yourPid,
-                youName: $this->shortName($yourLine['name'] ?? ''),
+                youName: $this->shortName($yourLine['name'] ?? $this->lookupPlayerName($yourPid)),
                 youPts: $yourLine['pts'] ?? 0,
                 youHurt: isset($hurtPids[$yourPid]),
                 oppPid: $oppPid,
-                oppName: $this->shortName($oppLine['name'] ?? ''),
+                oppName: $this->shortName($oppLine['name'] ?? $this->lookupPlayerName($oppPid)),
                 oppPts: $oppLine['pts'] ?? 0,
             );
         }
@@ -221,6 +223,15 @@ class LastSimRecapService implements LastSimRecapServiceInterface
             );
         }
         return $out;
+    }
+
+    private function lookupPlayerName(int $pid): string
+    {
+        if ($pid === 0) {
+            return '';
+        }
+        $player = $this->playerLookup->getPlayerByID($pid);
+        return is_string($player['name'] ?? null) ? $player['name'] : '';
     }
 
     /**

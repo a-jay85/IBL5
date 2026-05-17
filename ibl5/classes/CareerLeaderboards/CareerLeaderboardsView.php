@@ -112,26 +112,26 @@ class CareerLeaderboardsView implements CareerLeaderboardsViewInterface
         <tr>
             <th class="sticky-col-1">Rank</th>
             <th class="sticky-col-2">Name</th>
-            <th<?= HtmlSanitizer::e($this->sortAttr('games')) ?>>Games</th>
-            <th<?= HtmlSanitizer::e($this->sortAttr('minutes')) ?>>Minutes</th>
-            <th<?= HtmlSanitizer::e($this->sortAttr('fgm')) ?>>FGM</th>
-            <th<?= HtmlSanitizer::e($this->sortAttr('fga')) ?>>FGA</th>
-            <th<?= HtmlSanitizer::e($this->sortAttr('fgp')) ?>>FG%</th>
-            <th<?= HtmlSanitizer::e($this->sortAttr('ftm')) ?>>FTM</th>
-            <th<?= HtmlSanitizer::e($this->sortAttr('fta')) ?>>FTA</th>
-            <th<?= HtmlSanitizer::e($this->sortAttr('ftp')) ?>>FT%</th>
-            <th<?= HtmlSanitizer::e($this->sortAttr('tgm')) ?>>3GM</th>
-            <th<?= HtmlSanitizer::e($this->sortAttr('tga')) ?>>3GA</th>
-            <th<?= HtmlSanitizer::e($this->sortAttr('tgp')) ?>>3P%</th>
-            <th<?= HtmlSanitizer::e($this->sortAttr('orb')) ?>>ORB</th>
-            <th<?= HtmlSanitizer::e($this->sortAttr('drb')) ?>>DRB</th>
-            <th<?= HtmlSanitizer::e($this->sortAttr('reb')) ?>>REB</th>
-            <th<?= HtmlSanitizer::e($this->sortAttr('ast')) ?>>AST</th>
-            <th<?= HtmlSanitizer::e($this->sortAttr('stl')) ?>>STL</th>
-            <th<?= HtmlSanitizer::e($this->sortAttr('tvr')) ?>>TVR</th>
-            <th<?= HtmlSanitizer::e($this->sortAttr('blk')) ?>>BLK</th>
-            <th<?= HtmlSanitizer::e($this->sortAttr('pf')) ?>>FOULS</th>
-            <th<?= HtmlSanitizer::e($this->sortAttr('pts')) ?>>PTS</th>
+            <th<?= HtmlSanitizer::trusted($this->sortAttr('games')) ?>>Games</th>
+            <th<?= HtmlSanitizer::trusted($this->sortAttr('minutes')) ?>>Minutes</th>
+            <th<?= HtmlSanitizer::trusted($this->sortAttr('fgm')) ?>>FGM</th>
+            <th<?= HtmlSanitizer::trusted($this->sortAttr('fga')) ?>>FGA</th>
+            <th<?= HtmlSanitizer::trusted($this->sortAttr('fgp')) ?>>FG%</th>
+            <th<?= HtmlSanitizer::trusted($this->sortAttr('ftm')) ?>>FTM</th>
+            <th<?= HtmlSanitizer::trusted($this->sortAttr('fta')) ?>>FTA</th>
+            <th<?= HtmlSanitizer::trusted($this->sortAttr('ftp')) ?>>FT%</th>
+            <th<?= HtmlSanitizer::trusted($this->sortAttr('tgm')) ?>>3GM</th>
+            <th<?= HtmlSanitizer::trusted($this->sortAttr('tga')) ?>>3GA</th>
+            <th<?= HtmlSanitizer::trusted($this->sortAttr('tgp')) ?>>3P%</th>
+            <th<?= HtmlSanitizer::trusted($this->sortAttr('orb')) ?>>ORB</th>
+            <th<?= HtmlSanitizer::trusted($this->sortAttr('drb')) ?>>DRB</th>
+            <th<?= HtmlSanitizer::trusted($this->sortAttr('reb')) ?>>REB</th>
+            <th<?= HtmlSanitizer::trusted($this->sortAttr('ast')) ?>>AST</th>
+            <th<?= HtmlSanitizer::trusted($this->sortAttr('stl')) ?>>STL</th>
+            <th<?= HtmlSanitizer::trusted($this->sortAttr('tvr')) ?>>TVR</th>
+            <th<?= HtmlSanitizer::trusted($this->sortAttr('blk')) ?>>BLK</th>
+            <th<?= HtmlSanitizer::trusted($this->sortAttr('pf')) ?>>FOULS</th>
+            <th<?= HtmlSanitizer::trusted($this->sortAttr('pts')) ?>>PTS</th>
         </tr>
     </thead>
     <tbody>
@@ -151,26 +151,26 @@ class CareerLeaderboardsView implements CareerLeaderboardsViewInterface
 <tr>
     <td class="rank-cell sticky-col-1"><?= HtmlSanitizer::e($rank) ?></td>
     <?= PlayerImageHelper::renderFlexiblePlayerCell($stats['pid'], $stats['name'], 'sticky-col-2') ?>
-    <td<?= HtmlSanitizer::e($this->sortAttr('games')) ?>><?= HtmlSanitizer::e((string) $stats['games']) ?></td>
-    <td<?= HtmlSanitizer::e($this->sortAttr('minutes')) ?>><?= HtmlSanitizer::e($stats['minutes']) ?></td>
-    <td<?= HtmlSanitizer::e($this->sortAttr('fgm')) ?>><?= HtmlSanitizer::e($stats['fgm']) ?></td>
-    <td<?= HtmlSanitizer::e($this->sortAttr('fga')) ?>><?= HtmlSanitizer::e($stats['fga']) ?></td>
-    <td<?= HtmlSanitizer::e($this->sortAttr('fgp')) ?>><?= HtmlSanitizer::e($stats['fgp']) ?></td>
-    <td<?= HtmlSanitizer::e($this->sortAttr('ftm')) ?>><?= HtmlSanitizer::e($stats['ftm']) ?></td>
-    <td<?= HtmlSanitizer::e($this->sortAttr('fta')) ?>><?= HtmlSanitizer::e($stats['fta']) ?></td>
-    <td<?= HtmlSanitizer::e($this->sortAttr('ftp')) ?>><?= HtmlSanitizer::e($stats['ftp']) ?></td>
-    <td<?= HtmlSanitizer::e($this->sortAttr('tgm')) ?>><?= HtmlSanitizer::e($stats['tgm']) ?></td>
-    <td<?= HtmlSanitizer::e($this->sortAttr('tga')) ?>><?= HtmlSanitizer::e($stats['tga']) ?></td>
-    <td<?= HtmlSanitizer::e($this->sortAttr('tgp')) ?>><?= HtmlSanitizer::e($stats['tgp']) ?></td>
-    <td<?= HtmlSanitizer::e($this->sortAttr('orb')) ?>><?= HtmlSanitizer::e($stats['orb']) ?></td>
-    <td<?= HtmlSanitizer::e($this->sortAttr('drb')) ?>><?= HtmlSanitizer::e($stats['drb']) ?></td>
-    <td<?= HtmlSanitizer::e($this->sortAttr('reb')) ?>><?= HtmlSanitizer::e($stats['reb']) ?></td>
-    <td<?= HtmlSanitizer::e($this->sortAttr('ast')) ?>><?= HtmlSanitizer::e($stats['ast']) ?></td>
-    <td<?= HtmlSanitizer::e($this->sortAttr('stl')) ?>><?= HtmlSanitizer::e($stats['stl']) ?></td>
-    <td<?= HtmlSanitizer::e($this->sortAttr('tvr')) ?>><?= HtmlSanitizer::e($stats['tvr']) ?></td>
-    <td<?= HtmlSanitizer::e($this->sortAttr('blk')) ?>><?= HtmlSanitizer::e($stats['blk']) ?></td>
-    <td<?= HtmlSanitizer::e($this->sortAttr('pf')) ?>><?= HtmlSanitizer::e($stats['pf']) ?></td>
-    <td<?= HtmlSanitizer::e($this->sortAttr('pts')) ?>><?= HtmlSanitizer::e($stats['pts']) ?></td>
+    <td<?= HtmlSanitizer::trusted($this->sortAttr('games')) ?>><?= HtmlSanitizer::e((string) $stats['games']) ?></td>
+    <td<?= HtmlSanitizer::trusted($this->sortAttr('minutes')) ?>><?= HtmlSanitizer::e($stats['minutes']) ?></td>
+    <td<?= HtmlSanitizer::trusted($this->sortAttr('fgm')) ?>><?= HtmlSanitizer::e($stats['fgm']) ?></td>
+    <td<?= HtmlSanitizer::trusted($this->sortAttr('fga')) ?>><?= HtmlSanitizer::e($stats['fga']) ?></td>
+    <td<?= HtmlSanitizer::trusted($this->sortAttr('fgp')) ?>><?= HtmlSanitizer::e($stats['fgp']) ?></td>
+    <td<?= HtmlSanitizer::trusted($this->sortAttr('ftm')) ?>><?= HtmlSanitizer::e($stats['ftm']) ?></td>
+    <td<?= HtmlSanitizer::trusted($this->sortAttr('fta')) ?>><?= HtmlSanitizer::e($stats['fta']) ?></td>
+    <td<?= HtmlSanitizer::trusted($this->sortAttr('ftp')) ?>><?= HtmlSanitizer::e($stats['ftp']) ?></td>
+    <td<?= HtmlSanitizer::trusted($this->sortAttr('tgm')) ?>><?= HtmlSanitizer::e($stats['tgm']) ?></td>
+    <td<?= HtmlSanitizer::trusted($this->sortAttr('tga')) ?>><?= HtmlSanitizer::e($stats['tga']) ?></td>
+    <td<?= HtmlSanitizer::trusted($this->sortAttr('tgp')) ?>><?= HtmlSanitizer::e($stats['tgp']) ?></td>
+    <td<?= HtmlSanitizer::trusted($this->sortAttr('orb')) ?>><?= HtmlSanitizer::e($stats['orb']) ?></td>
+    <td<?= HtmlSanitizer::trusted($this->sortAttr('drb')) ?>><?= HtmlSanitizer::e($stats['drb']) ?></td>
+    <td<?= HtmlSanitizer::trusted($this->sortAttr('reb')) ?>><?= HtmlSanitizer::e($stats['reb']) ?></td>
+    <td<?= HtmlSanitizer::trusted($this->sortAttr('ast')) ?>><?= HtmlSanitizer::e($stats['ast']) ?></td>
+    <td<?= HtmlSanitizer::trusted($this->sortAttr('stl')) ?>><?= HtmlSanitizer::e($stats['stl']) ?></td>
+    <td<?= HtmlSanitizer::trusted($this->sortAttr('tvr')) ?>><?= HtmlSanitizer::e($stats['tvr']) ?></td>
+    <td<?= HtmlSanitizer::trusted($this->sortAttr('blk')) ?>><?= HtmlSanitizer::e($stats['blk']) ?></td>
+    <td<?= HtmlSanitizer::trusted($this->sortAttr('pf')) ?>><?= HtmlSanitizer::e($stats['pf']) ?></td>
+    <td<?= HtmlSanitizer::trusted($this->sortAttr('pts')) ?>><?= HtmlSanitizer::e($stats['pts']) ?></td>
 </tr>
         <?php
         return (string) ob_get_clean();

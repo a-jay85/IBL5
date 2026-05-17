@@ -130,12 +130,6 @@ parameters:
 			path: classes/FranchiseRecordBook/FranchiseRecordBookView.php
 
 		-
-			rawMessage: '$cookie[...] is read before PageLayout::header() in the same method. PageLayout::header() populates $cookie with auth and CSRF state — call it first, otherwise you will read stale or missing values (see CsrfGuard MAX_TOKENS incident).'
-			identifier: ibl.cookieBeforeHeader
-			count: 2
-			path: classes/FreeAgency/FreeAgencyController.php
-
-		-
 			rawMessage: 'Unescaped output in View. Wrap the expression in HtmlSanitizer::e() (or another whitelisted safe helper), or cast it to (int)/(float)/(bool) if it is numeric.'
 			identifier: ibl.unescapedOutput
 			count: 16
@@ -184,22 +178,10 @@ parameters:
 			path: classes/RookieOption/RookieOptionFormView.php
 
 		-
-			rawMessage: '$cookie[...] is read before PageLayout::header() in the same method. PageLayout::header() populates $cookie with auth and CSRF state — call it first, otherwise you will read stale or missing values (see CsrfGuard MAX_TOKENS incident).'
-			identifier: ibl.cookieBeforeHeader
-			count: 1
-			path: classes/SeriesRecords/SeriesRecordsController.php
-
-		-
 			rawMessage: 'Unescaped output in View. Wrap the expression in HtmlSanitizer::e() (or another whitelisted safe helper), or cast it to (int)/(float)/(bool) if it is numeric.'
 			identifier: ibl.unescapedOutput
 			count: 20
 			path: classes/Standings/StandingsView.php
-
-		-
-			rawMessage: '$cookie[...] is read before PageLayout::header() in the same method. PageLayout::header() populates $cookie with auth and CSRF state — call it first, otherwise you will read stale or missing values (see CsrfGuard MAX_TOKENS incident).'
-			identifier: ibl.cookieBeforeHeader
-			count: 1
-			path: classes/Team/TeamController.php
 
 		-
 			rawMessage: 'Unescaped output in View. Wrap the expression in HtmlSanitizer::e() (or another whitelisted safe helper), or cast it to (int)/(float)/(bool) if it is numeric.'
@@ -224,12 +206,6 @@ parameters:
 			identifier: ibl.unescapedOutput
 			count: 10
 			path: classes/TransactionHistory/TransactionHistoryView.php
-
-		-
-			rawMessage: '$cookie[...] is read before PageLayout::header() in the same method. PageLayout::header() populates $cookie with auth and CSRF state — call it first, otherwise you will read stale or missing values (see CsrfGuard MAX_TOKENS incident).'
-			identifier: ibl.cookieBeforeHeader
-			count: 2
-			path: classes/Waivers/WaiversController.php
 
 		-
 			rawMessage: 'Unescaped output in View. Wrap the expression in HtmlSanitizer::e() (or another whitelisted safe helper), or cast it to (int)/(float)/(bool) if it is numeric.'

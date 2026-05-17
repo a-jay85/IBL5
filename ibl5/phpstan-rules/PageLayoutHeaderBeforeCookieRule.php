@@ -34,6 +34,14 @@ use PHPStan\Rules\RuleErrorBuilder;
  */
 final class PageLayoutHeaderBeforeCookieRule implements Rule
 {
+    /** @var list<string> */
+    private const ZERO_FLOOR_FILES = [
+        'classes/FreeAgency/FreeAgencyController.php',
+        'classes/SeriesRecords/SeriesRecordsController.php',
+        'classes/Team/TeamController.php',
+        'classes/Waivers/WaiversController.php',
+    ];
+
     public function getNodeType(): string
     {
         return ClassMethod::class;
@@ -73,7 +81,8 @@ final class PageLayoutHeaderBeforeCookieRule implements Rule
                     if (!$inner->name instanceof Identifier) {
                         return false;
                     }
-                    return $inner->class->toString() === 'PageLayout'
+                    $className = $inner->class->toString();
+                    return ($className === 'PageLayout' || $className === 'PageLayout\PageLayout')
                         && $inner->name->name === 'header';
                 });
                 if (count($headerCalls) > 0) {
@@ -120,19 +129,36 @@ final class PageLayoutHeaderBeforeCookieRule implements Rule
                     if (in_array($cookieRead, $writeTargets, true)) {
                         continue;
                     }
-                    $errors[] = RuleErrorBuilder::message(
+                    $builder = RuleErrorBuilder::message(
                         '$cookie[...] is read before PageLayout::header() in the same '
                         . 'method. PageLayout::header() populates $cookie with auth and '
                         . 'CSRF state — call it first, otherwise you will read stale or '
                         . 'missing values (see CsrfGuard MAX_TOKENS incident).'
                     )
                         ->identifier('ibl.cookieBeforeHeader')
-                        ->line($cookieRead->getStartLine())
-                        ->build();
+                        ->line($cookieRead->getStartLine());
+
+                    if ($this->isZeroFloorFile($file)) {
+                        $builder->nonIgnorable();
+                        $builder->tip('Zero-floor file — baseline suppression is disabled.');
+                    }
+
+                    $errors[] = $builder->build();
                 }
             }
         }
 
         return $errors;
+    }
+
+    private function isZeroFloorFile(string $file): bool
+    {
+        $normalized = str_replace('\\', '/', $file);
+        foreach (self::ZERO_FLOOR_FILES as $suffix) {
+            if (str_ends_with($normalized, $suffix)) {
+                return true;
+            }
+        }
+        return false;
     }
 }

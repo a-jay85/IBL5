@@ -20,3 +20,4 @@ require_once __DIR__ . '/classes/CookieBeforeHeader.php';
 require_once __DIR__ . '/classes/CookieAfterHeader.php';
 require_once __DIR__ . '/classes/CookieWithoutHeader.php';
 require_once __DIR__ . '/classes/CookieWriteBeforeHeader.php';
+require_once __DIR__ . '/classes/FreeAgency/FreeAgencyController.php';

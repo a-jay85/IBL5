@@ -76,8 +76,8 @@ class SeriesRecordsController implements SeriesRecordsControllerInterface
     public function main(mixed $user): void
     {
         if ($this->nukeCompat->isUser($user)) {
-            $cookie = $this->nukeCompat->cookieDecode($user);
-            $username = $cookie[1] ?? '';
+            $decoded = $this->nukeCompat->cookieDecode($user);
+            $username = $decoded[1] ?? '';
 
             if ($username !== '') {
                 $this->displayForUser($username);

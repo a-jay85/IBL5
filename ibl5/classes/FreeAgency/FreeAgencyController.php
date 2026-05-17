@@ -6,7 +6,7 @@ namespace FreeAgency;
 
 use Team\Team;
 use Season\Season;
-use Services\Contracts\TeamIdentityRepositoryInterface;
+use Repositories\Contracts\TeamIdentityRepositoryInterface;
 
 class FreeAgencyController
 {

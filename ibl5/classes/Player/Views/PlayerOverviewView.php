@@ -8,7 +8,7 @@ use Player\Player;
 use Player\Stats\PlayerStatsRepository;
 use Player\Stats\PlayerStats;
 use Player\Contracts\PlayerOverviewViewInterface;
-use Services\Contracts\TeamIdentityRepositoryInterface;
+use Repositories\Contracts\TeamIdentityRepositoryInterface;
 use BasketballStats\StatsFormatter;
 use Security\HtmlSanitizer;
 use Season\Season;

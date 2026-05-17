@@ -8,7 +8,7 @@ use PHPUnit\Framework\TestCase;
 use PHPUnit\Framework\Attributes\DataProvider;
 use Negotiation\NegotiationDemandCalculator;
 use Player\Player;
-use Services\Contracts\SalaryCapRepositoryInterface;
+use Repositories\Contracts\SalaryCapRepositoryInterface;
 use Tests\WideUnit\Mocks\MockDatabase;
 
 /**

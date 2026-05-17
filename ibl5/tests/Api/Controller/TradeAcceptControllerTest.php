@@ -6,7 +6,7 @@ namespace Tests\Api\Controller;
 
 use Api\Controller\TradeAcceptController;
 use Api\Response\JsonResponder;
-use Services\Contracts\TeamIdentityRepositoryInterface;
+use Repositories\Contracts\TeamIdentityRepositoryInterface;
 use Tests\WideUnit\WideUnitTestCase;
 
 class TradeAcceptControllerTest extends WideUnitTestCase

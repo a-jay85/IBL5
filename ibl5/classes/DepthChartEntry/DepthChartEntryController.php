@@ -9,7 +9,7 @@ use DepthChartEntry\Contracts\DepthChartEntryServiceInterface;
 use NextSim\NextSimService;
 use NextSim\NextSimView;
 use SavedDepthChart\SavedDepthChartService;
-use Services\Contracts\TeamIdentityRepositoryInterface;
+use Repositories\Contracts\TeamIdentityRepositoryInterface;
 use Standings\StandingsRepository;
 use Team\Contracts\TeamTableServiceInterface;
 use Team\TeamRepository;

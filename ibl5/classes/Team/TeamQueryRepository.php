@@ -17,7 +17,7 @@ use Trading\Contracts\CashConsiderationRepositoryInterface;
  * Extracted from the Team entity class to separate query concerns from entity state.
  * Extends BaseMysqliRepository for standardized database access via fetchAll/fetchOne.
  *
- * @phpstan-import-type PlayerRow from \Services\Contracts\PlayerLookupRepositoryInterface
+ * @phpstan-import-type PlayerRow from \Repositories\Contracts\PlayerLookupRepositoryInterface
  * @phpstan-import-type CashConsiderationRow from \Trading\Contracts\CashConsiderationRepositoryInterface
  * @phpstan-import-type DraftPickRow from TeamQueryRepositoryInterface
  * @phpstan-import-type FreeAgencyOfferRow from TeamQueryRepositoryInterface

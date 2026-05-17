@@ -7,7 +7,7 @@ namespace Tests\WideUnit\Draft;
 use Tests\WideUnit\WideUnitTestCase;
 use Tests\WideUnit\Mocks\TestDataFactory;
 use Draft\DraftSelectionHandler;
-use Services\Contracts\TeamIdentityRepositoryInterface;
+use Repositories\Contracts\TeamIdentityRepositoryInterface;
 use Season\Season;
 
 /**

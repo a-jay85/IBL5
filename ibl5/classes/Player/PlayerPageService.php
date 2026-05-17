@@ -8,7 +8,7 @@ use League\League;
 use Player\Contracts\PlayerPageServiceInterface;
 use Player\Stats\PlayerStatsRepository;
 use Player\Views\PlayerViewFactory;
-use Services\Contracts\TeamIdentityRepositoryInterface;
+use Repositories\Contracts\TeamIdentityRepositoryInterface;
 use Team\Team;
 use Season\Season;
 

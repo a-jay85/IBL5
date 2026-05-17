@@ -10,7 +10,7 @@ use Trading\Contracts\TradeAssetRepositoryInterface;
 use Trading\Contracts\TradeCashRepositoryInterface;
 use Trading\Contracts\TradeExecutionRepositoryInterface;
 use Trading\Contracts\CashConsiderationRepositoryInterface;
-use Services\Contracts\TeamIdentityRepositoryInterface;
+use Repositories\Contracts\TeamIdentityRepositoryInterface;
 use Season\Season;
 use Discord\Discord;
 
@@ -37,7 +37,7 @@ class TradeProcessor implements TradeProcessorInterface
     protected TeamIdentityRepositoryInterface $commonRepository;
     protected Season $season;
     protected CashTransactionHandler $cashHandler;
-    protected \Services\NewsService $newsService;
+    protected \Topics\News\NewsService $newsService;
     protected ?Discord $discord;
 
     public function __construct(
@@ -55,7 +55,7 @@ class TradeProcessor implements TradeProcessorInterface
         $this->executionRepository = new TradeExecutionRepository($db);
         $this->season = new Season($db);
         $this->cashHandler = new CashTransactionHandler($db, $this->commonRepository, $this->cashConsiderationRepository, $this->cashRepository);
-        $this->newsService = new \Services\NewsService($db);
+        $this->newsService = new \Topics\News\NewsService($db);
 
         // Initialize Discord with error handling
         try {

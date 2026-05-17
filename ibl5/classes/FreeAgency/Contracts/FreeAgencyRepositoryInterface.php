@@ -10,7 +10,7 @@ namespace FreeAgency\Contracts;
  * Defines contracts for all database operations in the FreeAgency module.
  * All methods use prepared statements via BaseMysqliRepository.
  *
- * @phpstan-import-type PlayerRow from \Services\Contracts\PlayerLookupRepositoryInterface
+ * @phpstan-import-type PlayerRow from \Repositories\Contracts\PlayerLookupRepositoryInterface
  *
  * @phpstan-type OfferRow array{offer1: int, offer2: int, offer3: int, offer4: int, offer5: int, offer6: int}
  * @phpstan-type OfferData array{pid: int, teamid: int, teamName: string, playerName: string, offer1: int, offer2: int, offer3: int, offer4: int, offer5: int, offer6: int, modifier: float, random: int, perceivedValue: float, mle: int, lle: int, offerType: int}

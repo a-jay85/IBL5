@@ -6,7 +6,7 @@ namespace Tests\Trading;
 
 use PHPUnit\Framework\TestCase;
 use PHPUnit\Framework\Attributes\DataProvider;
-use Services\Contracts\TeamIdentityRepositoryInterface;
+use Repositories\Contracts\TeamIdentityRepositoryInterface;
 use Trading\CashTransactionHandler;
 use Trading\Contracts\CashTransactionHandlerInterface;
 use Tests\WideUnit\Mocks\MockDatabase;

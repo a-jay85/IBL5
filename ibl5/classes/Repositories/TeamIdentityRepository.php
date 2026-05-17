@@ -2,10 +2,10 @@
 
 declare(strict_types=1);
 
-namespace Services;
+namespace Repositories;
 
 use League\League;
-use Services\Contracts\TeamIdentityRepositoryInterface;
+use Repositories\Contracts\TeamIdentityRepositoryInterface;
 
 /**
  * @phpstan-import-type UserRow from TeamIdentityRepositoryInterface

@@ -16,7 +16,7 @@ use Season\Season;
  * delegating to specialized calculator and validator classes for business logic.
  *
  * @see PlayerInterface
- * @phpstan-import-type PlayerRow from \Services\Contracts\PlayerLookupRepositoryInterface
+ * @phpstan-import-type PlayerRow from \Repositories\Contracts\PlayerLookupRepositoryInterface
  * @phpstan-import-type HistoricalPlayerRow from \Player\Contracts\PlayerRepositoryInterface
  */
 class Player implements PlayerInterface

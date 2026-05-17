@@ -8,7 +8,7 @@ use Auth\Contracts\AuthServiceInterface;
 use League\League;
 use Logging\LoggerFactory;
 use Mail\Contracts\MailServiceInterface;
-use Services\Contracts\TeamIdentityRepositoryInterface;
+use Repositories\Contracts\TeamIdentityRepositoryInterface;
 use YourAccount\Contracts\YourAccountServiceInterface;
 
 /**

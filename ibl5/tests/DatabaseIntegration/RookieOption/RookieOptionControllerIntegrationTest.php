@@ -6,7 +6,7 @@ namespace Tests\DatabaseIntegration\RookieOption;
 
 use PHPUnit\Framework\Attributes\Group;
 use RookieOption\RookieOptionRepository;
-use Services\PlayerLookupRepository;
+use Repositories\PlayerLookupRepository;
 use Tests\DatabaseIntegration\DatabaseTestCase;
 
 #[Group('database')]

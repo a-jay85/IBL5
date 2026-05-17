@@ -7,7 +7,7 @@ namespace Tests\RookieOption;
 use PHPUnit\Framework\TestCase;
 use RookieOption\RookieOptionController;
 use RookieOption\Contracts\RookieOptionControllerInterface;
-use Services\Contracts\TeamIdentityRepositoryInterface;
+use Repositories\Contracts\TeamIdentityRepositoryInterface;
 
 /**
  * RookieOptionControllerTest - Tests for RookieOptionController

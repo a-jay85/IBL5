@@ -34,7 +34,7 @@ if ($offerId !== null) {
     }
 
     try {
-        $tradeProcessor = new Trading\TradeProcessor($mysqli_db, new \Services\TeamIdentityRepository($mysqli_db));
+        $tradeProcessor = new Trading\TradeProcessor($mysqli_db, new \Repositories\TeamIdentityRepository($mysqli_db));
         $result = $tradeProcessor->processTrade($offerId);
 
         if ($result['success']) {

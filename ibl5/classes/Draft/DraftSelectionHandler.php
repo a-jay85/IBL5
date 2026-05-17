@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Draft;
 
 use Draft\Contracts\DraftSelectionHandlerInterface;
-use Services\Contracts\TeamIdentityRepositoryInterface;
+use Repositories\Contracts\TeamIdentityRepositoryInterface;
 use Season\Season;
 use Discord\Discord;
 

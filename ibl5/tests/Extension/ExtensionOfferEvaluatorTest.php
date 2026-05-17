@@ -7,8 +7,8 @@ namespace Tests\Extension;
 use PHPUnit\Framework\TestCase;
 use Extension\ExtensionOfferEvaluator;
 use Extension\Contracts\ExtensionOfferEvaluatorInterface;
-use Services\CommonContractValidator;
-use Shared\SalaryConverter;
+use FreeAgency\CommonContractValidator;
+use BasketballStats\SalaryConverter;
 
 /**
  * ExtensionOfferEvaluatorTest - Tests for ExtensionOfferEvaluator

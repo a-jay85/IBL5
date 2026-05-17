@@ -9,7 +9,7 @@ use FreeAgency\FreeAgencyProcessor;
 use FreeAgency\Contracts\FreeAgencyDemandCalculatorInterface;
 use FreeAgency\Contracts\FreeAgencyRepositoryInterface;
 use Player\Player;
-use Services\Contracts\TeamIdentityRepositoryInterface;
+use Repositories\Contracts\TeamIdentityRepositoryInterface;
 use Tests\WideUnit\Mocks\MockDatabase;
 use Tests\WideUnit\Mocks\MockPreparedStatement;
 

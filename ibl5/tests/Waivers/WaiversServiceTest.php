@@ -12,7 +12,7 @@ class WaiversServiceTest extends TestCase
 {
     public function testImplementsInterface(): void
     {
-        $commonRepoStub = $this->createStub(\Services\Contracts\TeamIdentityRepositoryInterface::class);
+        $commonRepoStub = $this->createStub(\Repositories\Contracts\TeamIdentityRepositoryInterface::class);
         $processorStub = $this->createStub(\Waivers\Contracts\WaiversProcessorInterface::class);
         $viewStub = $this->createStub(\Waivers\Contracts\WaiversViewInterface::class);
         $teamQueryRepoStub = $this->createStub(\Team\Contracts\TeamQueryRepositoryInterface::class);

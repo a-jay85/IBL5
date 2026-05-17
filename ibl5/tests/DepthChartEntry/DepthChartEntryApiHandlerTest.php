@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Tests\DepthChartEntry;
 
 use DepthChartEntry\DepthChartEntryApiHandler;
-use Services\Contracts\TeamIdentityRepositoryInterface;
+use Repositories\Contracts\TeamIdentityRepositoryInterface;
 use Tests\WideUnit\WideUnitTestCase;
 
 /**

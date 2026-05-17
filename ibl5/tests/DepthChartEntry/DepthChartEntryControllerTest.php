@@ -6,7 +6,7 @@ namespace Tests\DepthChartEntry;
 
 use PHPUnit\Framework\TestCase;
 use DepthChartEntry\DepthChartEntryController;
-use Services\Contracts\TeamIdentityRepositoryInterface;
+use Repositories\Contracts\TeamIdentityRepositoryInterface;
 use Tests\WideUnit\Mocks\MockDatabase;
 use Tests\WideUnit\Mocks\MockDatabaseResult;
 use Tests\WideUnit\Mocks\MockPreparedStatement;

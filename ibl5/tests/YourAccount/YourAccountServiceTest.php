@@ -7,7 +7,7 @@ namespace Tests\YourAccount;
 use Auth\Contracts\AuthServiceInterface;
 use Mail\Contracts\MailServiceInterface;
 use PHPUnit\Framework\TestCase;
-use Services\Contracts\TeamIdentityRepositoryInterface;
+use Repositories\Contracts\TeamIdentityRepositoryInterface;
 use Tests\Support\AuthLogAssertions;
 use YourAccount\YourAccountService;
 

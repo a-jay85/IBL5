@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Services\Contracts;
+namespace FreeAgency\Contracts;
 
 /**
  * CommonContractValidatorInterface - Shared contract validation logic
@@ -11,7 +11,7 @@ namespace Services\Contracts;
  * Extension, FreeAgency, and Negotiation modules. Centralizes CBA rules
  * for offer amount validation, raise calculations, and salary decreases.
  * 
- * @package Services\Contracts
+ * @package FreeAgency\Contracts
  */
 interface CommonContractValidatorInterface
 {

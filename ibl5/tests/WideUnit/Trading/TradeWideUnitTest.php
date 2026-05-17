@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\WideUnit\Trading;
 
-use Services\Contracts\TeamIdentityRepositoryInterface;
+use Repositories\Contracts\TeamIdentityRepositoryInterface;
 use Tests\WideUnit\WideUnitTestCase;
 use Trading\TradeProcessor;
 

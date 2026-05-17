@@ -15,7 +15,7 @@ use Season\Season;
  *
  * Processes team salary data and calculates available cap space.
  *
- * @phpstan-import-type PlayerRow from \Services\Contracts\PlayerLookupRepositoryInterface
+ * @phpstan-import-type PlayerRow from \Repositories\Contracts\PlayerLookupRepositoryInterface
  * @phpstan-type AvailableSalary array{year1: int, year2: int, year3: int, year4: int, year5: int, year6: int}
  * @phpstan-type PositionSalaries array<string, int>
  * @phpstan-type CapSpaceTeamData array{team: Team, teamId: int, teamName: string, teamCity: string, color1: string, color2: string, availableSalary: AvailableSalary, positionSalaries: PositionSalaries, freeAgencySlots: int, has_mle: bool, has_lle: bool}

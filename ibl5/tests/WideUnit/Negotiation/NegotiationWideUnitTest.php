@@ -10,7 +10,7 @@ use Negotiation\NegotiationDemandCalculator;
 use Negotiation\NegotiationRepository;
 use Negotiation\NegotiationService;
 use Negotiation\NegotiationValidator;
-use Services\Contracts\SalaryCapRepositoryInterface;
+use Repositories\Contracts\SalaryCapRepositoryInterface;
 
 /**
  * Integration tests for complete contract negotiation workflows

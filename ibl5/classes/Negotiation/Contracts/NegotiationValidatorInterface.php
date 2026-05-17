@@ -22,19 +22,19 @@ interface NegotiationValidatorInterface
      * @param Player $player The player to check
      * @param string $userTeamName The user's team name for ownership validation
      */
-    public function validateNegotiationEligibility(Player $player, string $userTeamName): \Services\ValidationResult;
+    public function validateNegotiationEligibility(Player $player, string $userTeamName): \Validation\ValidationResult;
 
     /**
      * Check if free agency module is active
      *
      * Contract extensions are not allowed during the free agency period.
      */
-    public function validateFreeAgencyNotActive(): \Services\ValidationResult;
+    public function validateFreeAgencyNotActive(): \Validation\ValidationResult;
 
     /**
      * Validate renegotiation eligibility without ownership check.
      *
      * Used by admin debug bypass to inspect any player's demands.
      */
-    public function validateRenegotiationEligibility(Player $player): \Services\ValidationResult;
+    public function validateRenegotiationEligibility(Player $player): \Validation\ValidationResult;
 }

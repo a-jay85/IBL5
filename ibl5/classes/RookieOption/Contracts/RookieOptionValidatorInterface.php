@@ -24,7 +24,7 @@ interface RookieOptionValidatorInterface
      * @param Player $player Player object with teamName property
      * @param string $userTeamName The user's team name
      */
-    public function validatePlayerOwnership(Player $player, string $userTeamName): \Services\ValidationResult;
+    public function validatePlayerOwnership(Player $player, string $userTeamName): \Validation\ValidationResult;
 
     /**
      * Validates rookie option eligibility and returns final year salary if eligible

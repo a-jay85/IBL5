@@ -7,7 +7,7 @@ namespace Tests\WideUnit\FreeAgency;
 use Tests\WideUnit\WideUnitTestCase;
 use Tests\WideUnit\Mocks\TestDataFactory;
 use FreeAgency\FreeAgencyProcessor;
-use Services\Contracts\TeamIdentityRepositoryInterface;
+use Repositories\Contracts\TeamIdentityRepositoryInterface;
 
 /**
  * Integration tests for complete free agency offer workflows

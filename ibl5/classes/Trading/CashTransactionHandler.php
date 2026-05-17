@@ -7,7 +7,7 @@ namespace Trading;
 use Trading\Contracts\CashTransactionHandlerInterface;
 use Trading\Contracts\CashConsiderationRepositoryInterface;
 use Trading\Contracts\TradeCashRepositoryInterface;
-use Services\Contracts\TeamIdentityRepositoryInterface;
+use Repositories\Contracts\TeamIdentityRepositoryInterface;
 
 /**
  * CashTransactionHandler - Handles cash considerations in trades

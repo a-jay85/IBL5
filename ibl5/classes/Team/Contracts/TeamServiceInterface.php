@@ -13,7 +13,7 @@ use Team\Team;
  * and sub-components. The view receives a pre-computed data array and never
  * touches the database.
  *
- * @phpstan-import-type PlayerRow from \Services\Contracts\PlayerLookupRepositoryInterface
+ * @phpstan-import-type PlayerRow from \Repositories\Contracts\PlayerLookupRepositoryInterface
  *
  * @phpstan-type TeamPageData array{
  *     teamid: int,

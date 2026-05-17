@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Trading;
 
-use Services\Contracts\TeamIdentityRepositoryInterface;
+use Repositories\Contracts\TeamIdentityRepositoryInterface;
 use Trading\Contracts\TradeExecutionRepositoryInterface;
 
 /**

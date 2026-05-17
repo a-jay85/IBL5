@@ -15,7 +15,7 @@ use UI\Contracts\PlayerRowTransformerInterface;
  * Eliminates the duplicated ~30-line initialization block that was copy-pasted
  * across SeasonTotals, SeasonAverages, Per36Minutes, and Ratings.
  *
- * @phpstan-import-type PlayerRow from \Services\Contracts\PlayerLookupRepositoryInterface
+ * @phpstan-import-type PlayerRow from \Repositories\Contracts\PlayerLookupRepositoryInterface
  * @phpstan-import-type HistoricalPlayerRow from \Player\Contracts\PlayerRepositoryInterface
  */
 class PlayerRowTransformer implements PlayerRowTransformerInterface

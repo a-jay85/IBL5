@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Services\Contracts;
+namespace Repositories\Contracts;
 
 /**
  * @phpstan-type UserRow array{user_id: int, username: string, user_email: string}

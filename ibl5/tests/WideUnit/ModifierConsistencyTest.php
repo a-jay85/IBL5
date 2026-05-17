@@ -8,7 +8,7 @@ use PHPUnit\Framework\TestCase;
 use Extension\ExtensionOfferEvaluator;
 use FreeAgency\FreeAgencyDemandCalculator;
 use Negotiation\NegotiationDemandCalculator;
-use Services\Contracts\SalaryCapRepositoryInterface;
+use Repositories\Contracts\SalaryCapRepositoryInterface;
 use Tests\WideUnit\Mocks\MockDatabase;
 
 /**

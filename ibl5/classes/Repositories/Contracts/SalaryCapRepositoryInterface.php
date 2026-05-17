@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Services\Contracts;
+namespace Repositories\Contracts;
 
 interface SalaryCapRepositoryInterface
 {

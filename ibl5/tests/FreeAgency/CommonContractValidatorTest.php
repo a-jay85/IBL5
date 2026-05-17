@@ -6,7 +6,7 @@ namespace Tests\Services;
 
 use PHPUnit\Framework\TestCase;
 use PHPUnit\Framework\Attributes\DataProvider;
-use Services\CommonContractValidator;
+use FreeAgency\CommonContractValidator;
 
 /**
  * CommonContractValidatorTest - Unit tests for shared contract validation

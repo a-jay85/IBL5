@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Tests\Trading;
 
 use PHPUnit\Framework\TestCase;
-use Services\Contracts\TeamIdentityRepositoryInterface;
+use Repositories\Contracts\TeamIdentityRepositoryInterface;
 use Trading\TradingService;
 use Trading\Contracts\TradeOfferRepositoryInterface;
 use Trading\Contracts\TradeAssetRepositoryInterface;

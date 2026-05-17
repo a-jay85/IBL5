@@ -17,7 +17,7 @@ use Player\Stats\Contracts\PlayerStatsRepositoryInterface;
  * @see PlayerStatsRepositoryInterface For method contracts
  * @see BaseMysqliRepository For base class documentation
  *
- * @phpstan-import-type PlayerRow from \Services\Contracts\PlayerLookupRepositoryInterface
+ * @phpstan-import-type PlayerRow from \Repositories\Contracts\PlayerLookupRepositoryInterface
  * @phpstan-import-type StatsRow from \Player\Stats\Contracts\PlayerStatsRepositoryInterface
  * @phpstan-import-type CareerTotalsRow from \Player\Stats\Contracts\PlayerStatsRepositoryInterface
  * @phpstan-import-type CareerAveragesRow from \Player\Stats\Contracts\PlayerStatsRepositoryInterface

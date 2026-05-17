@@ -10,7 +10,7 @@ namespace DepthChartEntry\Contracts;
  * Defines database operations for reading and updating depth chart data,
  * including player positions, team history, and submission tracking.
  *
- * @phpstan-import-type PlayerRow from \Services\Contracts\PlayerLookupRepositoryInterface
+ * @phpstan-import-type PlayerRow from \Repositories\Contracts\PlayerLookupRepositoryInterface
  *
  * @phpstan-type DepthChartValues array{pg: int, sg: int, sf: int, pf: int, c: int, canPlayInGame: int, min: int, of: int, df: int, oi: int, di: int, bh: int}
  */

@@ -23,11 +23,11 @@ function waivers($user)
     cookiedecode($user);
 
     $repo = new Waivers\WaiversRepository($mysqli_db);
-    $teamIdentityRepo = new Services\TeamIdentityRepository($mysqli_db);
-    $playerLookupRepo = new Services\PlayerLookupRepository($mysqli_db);
-    $salaryCapRepo = new Services\SalaryCapRepository($mysqli_db);
+    $teamIdentityRepo = new Repositories\TeamIdentityRepository($mysqli_db);
+    $playerLookupRepo = new Repositories\PlayerLookupRepository($mysqli_db);
+    $salaryCapRepo = new Repositories\SalaryCapRepository($mysqli_db);
     $validator = new Waivers\WaiversValidator();
-    $newsService = new Services\NewsService($mysqli_db);
+    $newsService = new Topics\News\NewsService($mysqli_db);
     $processor = new Waivers\WaiversProcessor($repo, $teamIdentityRepo, $playerLookupRepo, $validator, $newsService, $mysqli_db);
     $view = new Waivers\WaiversView();
     $teamQueryRepo = new Team\TeamQueryRepository($mysqli_db);

@@ -11,7 +11,7 @@ namespace Waivers\Contracts;
  * with contract display and wait times, roster spot counts, and player
  * table data for the stat view switcher.
  *
- * @phpstan-import-type PlayerRow from \Services\Contracts\PlayerLookupRepositoryInterface
+ * @phpstan-import-type PlayerRow from \Repositories\Contracts\PlayerLookupRepositoryInterface
  *
  * @phpstan-type WaiverFormData array{
  *     team: \Team\Team,

@@ -10,7 +10,7 @@ use Player\PlayerPageType;
 use Player\Views\PlayerViewFactory;
 use Player\PlayerRepository;
 use Player\Stats\PlayerStatsRepository;
-use Services\Contracts\TeamIdentityRepositoryInterface;
+use Repositories\Contracts\TeamIdentityRepositoryInterface;
 use Player\Views\PlayerOverviewView;
 use Player\Stats\Views\PlayerSimStatsView;
 use Player\Stats\Views\PlayerRegularSeasonTotalsView;

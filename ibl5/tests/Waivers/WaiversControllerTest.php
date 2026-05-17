@@ -8,8 +8,8 @@ use PHPUnit\Framework\TestCase;
 use Waivers\Contracts\WaiversProcessorInterface;
 use Waivers\Contracts\WaiversServiceInterface;
 use Waivers\Contracts\WaiversViewInterface;
-use Services\Contracts\TeamIdentityRepositoryInterface;
-use Services\Contracts\SalaryCapRepositoryInterface;
+use Repositories\Contracts\TeamIdentityRepositoryInterface;
+use Repositories\Contracts\SalaryCapRepositoryInterface;
 use Waivers\WaiversController;
 
 class WaiversControllerTest extends TestCase

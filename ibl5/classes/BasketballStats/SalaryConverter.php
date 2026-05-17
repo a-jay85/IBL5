@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Shared;
+namespace BasketballStats;
 
 /**
  * SalaryConverter - Converts salary values between different representations

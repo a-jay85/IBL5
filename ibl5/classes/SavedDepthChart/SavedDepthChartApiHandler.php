@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace SavedDepthChart;
 
 use Security\HtmlSanitizer;
-use Services\Contracts\TeamIdentityRepositoryInterface;
+use Repositories\Contracts\TeamIdentityRepositoryInterface;
 use Team\Team;
 use Season\Season;
 

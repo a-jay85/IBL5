@@ -15,7 +15,7 @@ use Season\Season;
  * Provides league configuration, voting candidates, and team operations.
  *
  * @see BaseMysqliRepository For base class documentation and error codes
- * @phpstan-import-type PlayerRow from \Services\Contracts\PlayerLookupRepositoryInterface
+ * @phpstan-import-type PlayerRow from \Repositories\Contracts\PlayerLookupRepositoryInterface
  */
 class League extends BaseMysqliRepository
 {

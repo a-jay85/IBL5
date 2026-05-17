@@ -7,7 +7,7 @@ namespace Tests\DatabaseIntegration;
 use PHPUnit\Framework\Attributes\Group;
 
 use Negotiation\NegotiationRepository;
-use Services\SalaryCapRepository;
+use Repositories\SalaryCapRepository;
 
 /**
  * Tests NegotiationRepository against real MariaDB — team performance, salary queries, FA status.

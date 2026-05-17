@@ -7,7 +7,7 @@ namespace Tests\Extension;
 use PHPUnit\Framework\TestCase;
 use PHPUnit\Framework\Attributes\DataProvider;
 use Extension\ExtensionValidator;
-use Services\CommonContractValidator;
+use FreeAgency\CommonContractValidator;
 
 /**
  * Comprehensive tests for contract extension validation logic

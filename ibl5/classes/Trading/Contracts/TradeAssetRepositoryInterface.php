@@ -10,7 +10,7 @@ namespace Trading\Contracts;
  * Handles lookups and updates for players and draft picks involved in trades.
  * Extracted from TradingRepositoryInterface to follow single-responsibility principle.
  *
- * @phpstan-import-type PlayerRow from \Services\Contracts\PlayerLookupRepositoryInterface
+ * @phpstan-import-type PlayerRow from \Repositories\Contracts\PlayerLookupRepositoryInterface
  *
  * @phpstan-type TradeValidationRow array{ordinal: ?int, cy: ?int}
  * @phpstan-type DraftPickRow array{pickid: int, ownerofpick: string, teampick: string, year: string, round: string, notes: ?string, created_at: string, updated_at: string}

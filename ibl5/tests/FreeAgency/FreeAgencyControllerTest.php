@@ -6,7 +6,7 @@ namespace Tests\FreeAgency;
 
 use FreeAgency\FreeAgencyController;
 use PHPUnit\Framework\TestCase;
-use Services\Contracts\TeamIdentityRepositoryInterface;
+use Repositories\Contracts\TeamIdentityRepositoryInterface;
 use Tests\WideUnit\Mocks\MockDatabase;
 
 /**

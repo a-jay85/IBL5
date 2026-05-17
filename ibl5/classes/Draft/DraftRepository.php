@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Draft;
 
 use Draft\Contracts\DraftRepositoryInterface;
-use Services\Contracts\TeamIdentityRepositoryInterface;
+use Repositories\Contracts\TeamIdentityRepositoryInterface;
 
 /**
  * @see DraftRepositoryInterface

@@ -7,7 +7,7 @@ namespace Tests\Services;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\Test;
 use PHPUnit\Framework\TestCase;
-use Services\QueryConditions;
+use Validation\QueryConditions;
 
 #[CoversClass(QueryConditions::class)]
 class QueryConditionsTest extends TestCase

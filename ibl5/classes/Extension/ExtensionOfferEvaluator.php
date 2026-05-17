@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Extension;
 
 use Extension\Contracts\ExtensionOfferEvaluatorInterface;
-use Services\CommonContractValidator;
+use FreeAgency\CommonContractValidator;
 
 /**
  * ExtensionOfferEvaluator - Evaluates contract extension offers

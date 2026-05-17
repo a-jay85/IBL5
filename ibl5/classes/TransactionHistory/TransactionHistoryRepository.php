@@ -43,7 +43,7 @@ class TransactionHistoryRepository extends \BaseMysqliRepository implements Tran
      */
     public function getTransactions(?int $categoryId, ?int $year, ?int $month): array
     {
-        $where = new \Services\QueryConditions(["catid IN (" . self::CATEGORY_IDS . ")"]);
+        $where = new \Validation\QueryConditions(["catid IN (" . self::CATEGORY_IDS . ")"]);
         $where->addIfNotNull('catid = ?', 'i', $categoryId);
 
         // Use sargable date range instead of YEAR()/MONTH() to allow index usage

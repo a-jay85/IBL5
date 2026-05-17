@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Tests\Services;
 
 use PHPUnit\Framework\TestCase;
-use Services\PlayerDataConverter;
+use Player\PlayerDataConverter;
 use Player\PlayerData;
 
 /**

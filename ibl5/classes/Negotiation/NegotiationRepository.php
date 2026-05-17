@@ -6,7 +6,7 @@ namespace Negotiation;
 
 use BaseMysqliRepository;
 use Negotiation\Contracts\NegotiationRepositoryInterface;
-use Services\Contracts\SalaryCapRepositoryInterface;
+use Repositories\Contracts\SalaryCapRepositoryInterface;
 
 /**
  * @see NegotiationRepositoryInterface

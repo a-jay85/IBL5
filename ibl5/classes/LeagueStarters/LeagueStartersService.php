@@ -17,7 +17,7 @@ use Team\Team;
  * instead of per-team/per-position individual lookups.
  *
  * @see LeagueStartersServiceInterface For the interface contract
- * @phpstan-import-type PlayerRow from \Services\Contracts\PlayerLookupRepositoryInterface
+ * @phpstan-import-type PlayerRow from \Repositories\Contracts\PlayerLookupRepositoryInterface
  */
 class LeagueStartersService implements LeagueStartersServiceInterface
 {

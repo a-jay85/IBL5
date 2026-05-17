@@ -38,7 +38,7 @@ class SeasonLeaderboardsRepository extends \BaseMysqliRepository implements Seas
      */
     public function getSeasonLeaders(array $filters, int $limit = 0): array
     {
-        $where = new \Services\QueryConditions(["h.name IS NOT NULL"]);
+        $where = new \Validation\QueryConditions(["h.name IS NOT NULL"]);
 
         $yearFilter = (string) ($filters['year'] ?? '');
         if ($yearFilter !== '') {

@@ -5,12 +5,12 @@ declare(strict_types=1);
 namespace Extension;
 
 use Player\Player;
-use Shared\SalaryConverter;
+use BasketballStats\SalaryConverter;
 use Extension\Contracts\ExtensionProcessorInterface;
 use Extension\Contracts\ExtensionRepositoryInterface;
 use Extension\Contracts\ExtensionValidatorInterface;
 use Extension\Contracts\ExtensionOfferEvaluatorInterface;
-use Services\CommonContractValidator;
+use FreeAgency\CommonContractValidator;
 use Team\Contracts\TeamQueryRepositoryInterface;
 use Team\Team;
 use Discord\Discord;

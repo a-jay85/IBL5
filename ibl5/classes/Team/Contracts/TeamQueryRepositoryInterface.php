@@ -13,7 +13,7 @@ use Season\Season;
  * Provides standardized access to team roster, salary, draft, and free agency data.
  * Extracted from the Team entity class to separate query concerns from entity state.
  *
- * @phpstan-import-type PlayerRow from \Services\Contracts\PlayerLookupRepositoryInterface
+ * @phpstan-import-type PlayerRow from \Repositories\Contracts\PlayerLookupRepositoryInterface
  * @phpstan-import-type CashConsiderationRow from \Trading\Contracts\CashConsiderationRepositoryInterface
  * @phpstan-type DraftPickRow array{pickid: int, ownerofpick: string, owner_teamid: int, teampick: string, teampick_teamid: int, year: string, round: string, notes: ?string, created_at: string, updated_at: string}
  * @phpstan-type FreeAgencyOfferRow array{pid: int, teamid: int, team: string, name: string, offer1: int, offer2: int, offer3: int, offer4: int, offer5: int, offer6: int, ...}

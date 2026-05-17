@@ -6,7 +6,7 @@ namespace LeagueStarters;
 
 use League\League;
 use Season\Season;
-use Services\Contracts\TeamIdentityRepositoryInterface;
+use Repositories\Contracts\TeamIdentityRepositoryInterface;
 use Team\Team;
 use Utilities\NukeCompat;
 

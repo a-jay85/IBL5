@@ -6,7 +6,7 @@ namespace SeriesRecords;
 
 use League\League;
 use SeriesRecords\Contracts\SeriesRecordsControllerInterface;
-use Services\Contracts\TeamIdentityRepositoryInterface;
+use Repositories\Contracts\TeamIdentityRepositoryInterface;
 
 /**
  * SeriesRecordsController - Main controller for Series Records module

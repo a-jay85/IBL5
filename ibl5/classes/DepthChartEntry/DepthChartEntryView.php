@@ -206,7 +206,7 @@ the earlier slot in that order claims them.</p>
             . '<input type="hidden" name="Injury' . (int) $depthCount . '" value="' . (int) ($player['injured'] ?? 0) . '">'
             . '<input type="hidden" name="Name' . (int) $depthCount . '" value="' . HtmlSanitizer::e($playerName) . '">'
             . '<a href="./modules.php?name=Player&amp;pa=showpage&amp;pid=' . (int) $player['pid'] . '">'
-            . HtmlSanitizer::safeHtmlOutput($thumbnail) . HtmlSanitizer::e($playerName)
+            . HtmlSanitizer::trusted($thumbnail) . HtmlSanitizer::e($playerName)
             . '</a>'
             . '</td>';
 

@@ -13,11 +13,13 @@ final class WebApplicationFactory
 {
     public static function build(string $basePath): Application
     {
+        // AutoloaderBootstrap is NOT included here — the Composer autoloader
+        // must already be loaded before this factory class can be resolved.
+        // mainfile.php handles autoloader setup inline before calling build().
         $app = new Application();
-        $app->addStep(new AutoloaderBootstrap($basePath));
+        $app->addStep(new SecurityBootstrap());
         $app->addStep(new SessionBootstrap());
         $app->addStep(new HeadersBootstrap());
-        $app->addStep(new SecurityBootstrap());
         $app->addStep(new LeagueBootstrap());
         $app->addStep(new ConfigBootstrap($basePath));
         $app->addStep(new AuthBootstrap($basePath));

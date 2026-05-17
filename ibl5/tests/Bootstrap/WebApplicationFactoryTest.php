@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace Tests\Bootstrap;
 
 use Bootstrap\AuthBootstrap;
-use Bootstrap\AutoloaderBootstrap;
 use Bootstrap\ConfigBootstrap;
 use Bootstrap\DemoModeBootstrap;
 use Bootstrap\HeadersBootstrap;
@@ -25,14 +24,13 @@ final class WebApplicationFactoryTest extends TestCase
         /** @var list<\Bootstrap\Contracts\BootstrapStepInterface> $steps */
         $steps = $reflection->getValue($app);
 
-        self::assertCount(8, $steps);
-        self::assertInstanceOf(AutoloaderBootstrap::class, $steps[0]);
+        self::assertCount(7, $steps);
+        self::assertInstanceOf(SecurityBootstrap::class, $steps[0]);
         self::assertInstanceOf(SessionBootstrap::class, $steps[1]);
         self::assertInstanceOf(HeadersBootstrap::class, $steps[2]);
-        self::assertInstanceOf(SecurityBootstrap::class, $steps[3]);
-        self::assertInstanceOf(LeagueBootstrap::class, $steps[4]);
-        self::assertInstanceOf(ConfigBootstrap::class, $steps[5]);
-        self::assertInstanceOf(AuthBootstrap::class, $steps[6]);
-        self::assertInstanceOf(DemoModeBootstrap::class, $steps[7]);
+        self::assertInstanceOf(LeagueBootstrap::class, $steps[3]);
+        self::assertInstanceOf(ConfigBootstrap::class, $steps[4]);
+        self::assertInstanceOf(AuthBootstrap::class, $steps[5]);
+        self::assertInstanceOf(DemoModeBootstrap::class, $steps[6]);
     }
 }

@@ -12,81 +12,25 @@
 /* the Free Software Foundation; either version 2 of the License.       */
 /************************************************************************/
 
-$ua = $_SERVER['HTTP_USER_AGENT'];
-if (preg_match('/facebookexternalhit/si',$ua)) {
-    http_response_code(403);
-    header('Content-Type: text/plain');
-    echo 'Forbidden';
-    die();
-}
-
-// End the transaction
-if (!defined('END_TRANSACTION')) {
-    define('END_TRANSACTION', 2);
-}
-
-// SECURITY: Safe include function with path traversal protection
-// Note: This function is legacy. New code should use explicit includes with verified paths.
-function include_secure($file_name)
-{
-    // Remove any path traversal attempts
-    $file_name = preg_replace("/\.[\.\/]*\//", "", $file_name);
-
-    // Additional protection: use basename to strip directory components
-    // and verify the file exists in expected location
-    $base_name = basename($file_name);
-
-    // Only allow alphanumeric, underscore, dash, and .php extension
-    if (!preg_match('/^[a-zA-Z0-9_\-]+\.php$/', $base_name)) {
-        return;
-    }
-
-    // Reconstruct with just the directory and safe basename
-    $dir = dirname($file_name);
-    if ($dir === '.' || $dir === '') {
-        $safe_path = $base_name;
-    } else {
-        // Validate directory doesn't contain traversal
-        $dir = str_replace(['..', "\0"], '', $dir);
-        $safe_path = $dir . '/' . $base_name;
-    }
-
-    if (file_exists($safe_path)) {
-        include_once $safe_path;
-    }
-}
-
 // Check if this file isn't being accessed directly
-
 if (realpath(__FILE__) === realpath($_SERVER['SCRIPT_FILENAME'])) {
     header("Location: index.php");
     exit();
 }
 
-if (isset($_SERVER['HTTP_USER_AGENT']) && strstr($_SERVER['HTTP_USER_AGENT'], 'compatible')) {
-    if (extension_loaded('zlib')) {
-        @ob_end_clean();
-        ob_start('ob_gzhandler');
-    }
-} elseif (isset($_SERVER['HTTP_ACCEPT_ENCODING']) && $_SERVER['HTTP_ACCEPT_ENCODING'] !== '') {
-    if (strstr($_SERVER['HTTP_ACCEPT_ENCODING'], 'gzip')) {
-        if (extension_loaded('zlib')) {
-            $do_gzip_compress = true;
-            ob_start('ob_gzhandler', 5);
-            ob_implicit_flush(0);
-            if (str_contains($_SERVER['HTTP_USER_AGENT'], 'MSIE')) {
-                header('Content-Encoding: gzip');
-            }
-        }
-    }
-}
+// --- Bootstrap: Application pipeline replaces procedural blocks ---
+// SecurityBootstrap handles: FB bot early-exit, END_TRANSACTION constant, gzip ob_start
+// SessionBootstrap handles: session cookie params + session_start
+// HeadersBootstrap handles: X-Frame-Options, CSP, HSTS
+// LeagueBootstrap handles: league context hydration from cookie/URL
+// ConfigBootstrap handles: protected globals, config.php, db.php, LoggerFactory, nuke_config query, error reporting
+// AuthBootstrap handles: AuthService init, remember-me, dev auto-login, legacy $user global
+// DemoModeBootstrap handles: demo mode POST blocking
 
-// Load Composer autoloader for IBL5 classes and third-party packages
 require_once __DIR__ . '/vendor/autoload.php';
 
-// In git worktrees, vendor/ is symlinked to the main repo. Composer resolves __DIR__
-// through the symlink, so it loads classes from the main repo instead of the worktree.
-// Prepend the worktree's classes/ directory so modified files are used at runtime.
+// In git worktrees, vendor/ is symlinked to the main repo. Prepend the worktree's
+// classes/ directory so modified files are used at runtime.
 if (is_link(__DIR__ . '/vendor')) {
     $worktreeClasses = realpath(__DIR__ . '/classes');
     if ($worktreeClasses !== false) {
@@ -99,235 +43,17 @@ if (is_link(__DIR__ . '/vendor')) {
     }
 }
 
-// SECURITY: Configure secure session cookie parameters before session_start()
-if (session_status() === PHP_SESSION_NONE) {
-    // Detect HTTPS
-    $isHttps = (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off')
-        || (isset($_SERVER['HTTP_X_FORWARDED_PROTO']) && $_SERVER['HTTP_X_FORWARDED_PROTO'] === 'https')
-        || (isset($_SERVER['SERVER_PORT']) && $_SERVER['SERVER_PORT'] === 443);
+$bootApp = \Bootstrap\WebApplicationFactory::build(__DIR__);
+$bootApp->boot();
 
-    // Set secure session cookie options
-    session_set_cookie_params([
-        'lifetime' => 15552000,  // 6 months (180 days)
-        'path' => '/',
-        'domain' => '',
-        'secure' => $isHttps,          // Only HTTPS
-        'httponly' => true,            // Prevent JavaScript access
-        'samesite' => 'Lax',           // CSRF protection (Lax for login redirects)
-    ]);
+// --- Legacy function definitions ---
+// These remain as global functions for PHP-Nuke module compatibility.
+// Plan C (LegacyFunctions reconciliation) will consolidate them.
 
-    // Match server-side session lifetime to cookie lifetime (6 months)
-    ini_set('session.gc_maxlifetime', '15552000');
-
-    session_start();
-}
-
-// SECURITY: Set HTTP security headers (only if headers haven't been sent)
-if (!headers_sent()) {
-    // Prevent MIME-sniffing attacks
-    header('X-Content-Type-Options: nosniff');
-
-    // Prevent clickjacking by disallowing framing
-    header('X-Frame-Options: SAMEORIGIN');
-
-    // Control referrer information leakage
-    header('Referrer-Policy: strict-origin-when-cross-origin');
-
-    // Basic Content Security Policy (allows inline scripts/styles for legacy compatibility)
-    // Note: A stricter CSP with nonces would require refactoring all inline scripts
-    header("Content-Security-Policy: default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://www.google.com https://www.gstatic.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: https:; frame-src https://www.google.com; connect-src 'self'");
-
-    // Enable HTTPS-only in production (HSTS)
-    $isProduction = ($_SERVER['SERVER_NAME'] ?? '') !== 'localhost';
-    if ($isProduction && isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') {
-        header('Strict-Transport-Security: max-age=31536000; includeSubDomains');
-    }
-}
-
-// Hydrate session from cookie if not set
-if (!isset($_SESSION['current_league']) && isset($_COOKIE[\League\LeagueContext::COOKIE_NAME])) {
-    $cookieLeague = $_COOKIE[\League\LeagueContext::COOKIE_NAME];
-    if (in_array($cookieLeague, [\League\LeagueContext::LEAGUE_IBL, \League\LeagueContext::LEAGUE_OLYMPICS], true)) {
-        $_SESSION['current_league'] = $cookieLeague;
-    }
-}
-
-// Initialize global LeagueContext instance for application-wide use
-$leagueContext = new \League\LeagueContext();
-
-// Persist league selection when user switches leagues via URL parameter
-if (isset($_GET['league']) && in_array($_GET['league'], [\League\LeagueContext::LEAGUE_IBL, \League\LeagueContext::LEAGUE_OLYMPICS], true)) {
-    $leagueContext->setLeague($_GET['league']);
-}
-
-// SECURITY: Denylist of critical globals that MUST NEVER be overwritten via $_REQUEST
-// These include database credentials, connection objects, and authentication variables
-$_protected_globals = [
-    // Database credentials (from config.php)
-    'dbhost', 'dbuname', 'dbpass', 'dbname', 'prefix', 'user_prefix',
-    // Database connection objects
-    'db', 'mysqli_db',
-    // Authentication state
-    'user', 'cookie', 'userinfo',
-    // PHP-Nuke core configuration
-    'nukeurl', 'sitename', 'adminmail',
-    // Session/superglobals
-    '_SESSION', '_COOKIE', '_SERVER', '_ENV', '_FILES', '_GET', '_POST', '_REQUEST',
-    // Internal PHP
-    'GLOBALS', 'this',
-    // League context
-    'leagueContext',
-    // Authentication service
-    'authService',
-];
-
-$sanitize_rules = array("newlang" => "/[a-z][a-z]/i", "redirect" => "/[a-z0-9]*/i");
-foreach ($_REQUEST as $key => $value) {
-    // Skip protected globals entirely
-    if (in_array($key, $_protected_globals, true)) {
-        continue;
-    }
-    if (!isset($sanitize_rules[$key]) || preg_match($sanitize_rules[$key], $value)) {
-        $GLOBALS[$key] = $value;
-    }
-}
-
-// Auth is now session-based via AuthService — legacy admin/user cookies are ignored
-
-// Include the required files - single config for all leagues
-// Olympics uses the same database with different table names (handled by LeagueContext)
-require_once __DIR__ . '/config.php';
-
-if (!$dbname) {
-    die("<br><br><center><img src=images/logo.gif><br><br><b>There seems that PHP-Nuke isn't installed yet.<br>(The values in config.php file are the default ones)<br><br>You can proceed with the <a href='./install/index.php'>web installation</a> now.</center></b>");
-}
-
-require_once __DIR__ . "/db/db.php";
-
-// Initialize structured logging (Monolog with daily rotation + JSON output)
-\Logging\LoggerFactory::fromConfig();
-
-// Initialize session-based AuthService for user authentication
-$authService = new \Auth\AuthService(new \Auth\AuthRepository($mysqli_db));
-
-// Attempt to restore session from "remember me" cookie for returning users
-$authService->tryRememberMe();
-
-// Dev-only auto-login: bypasses login forms on localhost when DEV_AUTO_LOGIN is set in .env.test.
-// E2E tests set _no_auto_login cookie to opt out (tests that need unauthenticated state).
-$noAutoLogin = isset($_COOKIE['_no_auto_login']) && $_COOKIE['_no_auto_login'] === '1';
-if (!$authService->isAuthenticated() && !$noAutoLogin) {
-    \Auth\DevAutoLogin::tryAutoLogin($mysqli_db);
-}
-
-// Populate legacy $user global so modules.php and other code that calls
-// base64_decode($user) continues to work during the migration period.
-$user = '';
-if ($authService->isAuthenticated()) {
-    $cookieArray = $authService->getCookieArray();
-    if ($cookieArray !== null) {
-        $user = base64_encode(implode(':', $cookieArray));
-    }
-}
-
-// Demo mode: block all state-mutating requests with a user-friendly page
-// Uses 200 instead of 403 because Chrome replaces 403 response bodies
-// with its own "Access Denied" error page, hiding our explanation.
-// Must flush/end output buffers since ob_start('ob_gzhandler') was called earlier.
-if (($_SESSION['demo_mode'] ?? false) === true && $_SERVER['REQUEST_METHOD'] === 'POST') {
-    while (ob_get_level() > 0) {
-        ob_end_clean();
-    }
-    require_once __DIR__ . '/includes/demo-403.php';
-    exit;
-}
-
-
-if (file_exists(__DIR__ . "/includes/custom_files/custom_mainfile.php")) {
-    @include_once __DIR__ . "/includes/custom_files/custom_mainfile.php";
-}
-
-if (!defined('NUKE_FILE')) {
-    define('NUKE_FILE', true);
-}
-$row = $db->sql_fetchrow($db->sql_query("SELECT * FROM " . $prefix . "_config"));
-$sitename = filter($row['sitename'], "nohtml");
-$nukeurl = filter($row['nukeurl'], "nohtml");
-$site_logo = filter($row['site_logo'], "nohtml");
-$slogan = filter($row['slogan'], "nohtml");
-$startdate = filter($row['startdate'], "nohtml");
-$adminmail = filter($row['adminmail'], "nohtml");
-$anonpost = intval($row['anonpost']);
-$Default_Theme = filter($row['default_theme'], "nohtml");
-$foot1 = filter($row['foot1']);
-$foot2 = filter($row['foot2']);
-$foot3 = filter($row['foot3']);
-$commentlimit = intval($row['commentlimit']);
-$anonymous = filter($row['anonymous'], "nohtml");
-$minpass = intval($row['minpass']);
-$pollcomm = intval($row['pollcomm']);
-$articlecomm = intval($row['articlecomm']);
-$broadcast_msg = intval($row['broadcast_msg']);
-$my_headlines = intval($row['my_headlines']);
-$top = intval($row['top']);
-$storyhome = intval($row['storyhome']);
-$user_news = intval($row['user_news']);
-$oldnum = intval($row['oldnum']);
-$ultramode = intval($row['ultramode']);
-$banners = intval($row['banners']);
-$backend_title = filter($row['backend_title'], "nohtml");
-$backend_language = filter($row['backend_language'], "nohtml");
-$language = filter($row['language'], "nohtml");
-$locale = filter($row['locale'], "nohtml");
-$multilingual = intval($row['multilingual']);
-$useflags = intval($row['useflags']);
-$notify = intval($row['notify']);
-$notify_email = filter($row['notify_email'], "nohtml");
-$notify_subject = filter($row['notify_subject'], "nohtml");
-$notify_message = filter($row['notify_message'], "nohtml");
-$notify_from = filter($row['notify_from'], "nohtml");
-$moderate = intval($row['moderate']);
-$admingraphic = intval($row['admingraphic']);
-$CensorMode = intval($row['censor_mode']);
-$CensorReplace = filter($row['censor_replace'], "nohtml");
-$copyright = filter($row['copyright']);
-$Version_Num = floatval($row['version_num']);
-$domain = str_replace("http://", "", $nukeurl);
-$display_errors = filter($row['display_errors']);
-$nuke_editor = intval($row['nuke_editor']);
-$mtime = microtime();
-$mtime = explode(" ", $mtime);
-$mtime = $mtime[1] + $mtime[0];
-$start_time = $mtime;
-$pagetitle = "";
-
-// Error reporting, to be set in config.php
-error_reporting(E_ERROR);
-if ($display_errors == 1) {
-    @ini_set('display_errors', 1);
-} else {
-    @ini_set('display_errors', 0);
-}
-
-if (!defined('FORUM_ADMIN')) {
-    if ((isset($newlang)) and (stristr($newlang, "."))) {
-        if (file_exists("language/lang-" . $newlang . ".php")) {
-            setcookie("lang", $newlang, time() + 31536000);
-            include_secure("language/lang-" . $newlang . ".php");
-            $currentlang = $newlang;
-        } else {
-            setcookie("lang", $language, time() + 31536000);
-            include_secure("language/lang-" . $language . ".php");
-            $currentlang = $language;
-        }
-    } elseif (isset($lang)) {
-        include_secure("language/lang-" . $lang . ".php");
-        $currentlang = $lang;
-    } else {
-        setcookie("lang", $language, time() + 31536000);
-        include_secure("language/lang-" . $language . ".php");
-        $currentlang = $language;
-    }
+// SECURITY: Safe include function with path traversal protection
+function include_secure($file_name)
+{
+    \Bootstrap\SecurityBootstrap::includeSafe($file_name);
 }
 
 function get_lang($module)
@@ -633,6 +359,28 @@ function filter($what, $strip = "", $save = "", $type = "")
 }
 
 
+// --- Post-bootstrap runtime setup ---
+
+if (!defined('FORUM_ADMIN')) {
+    if ((isset($newlang)) and (stristr($newlang, "."))) {
+        if (file_exists("language/lang-" . $newlang . ".php")) {
+            setcookie("lang", $newlang, time() + 31536000);
+            include_secure("language/lang-" . $newlang . ".php");
+            $currentlang = $newlang;
+        } else {
+            setcookie("lang", $language, time() + 31536000);
+            include_secure("language/lang-" . $language . ".php");
+            $currentlang = $language;
+        }
+    } elseif (isset($lang)) {
+        include_secure("language/lang-" . $lang . ".php");
+        $currentlang = $lang;
+    } else {
+        setcookie("lang", $language, time() + 31536000);
+        include_secure("language/lang-" . $language . ".php");
+        $currentlang = $language;
+    }
+}
 
 if (!defined('FORUM_ADMIN')) {
     $ThemeSel = 'IBL';
@@ -659,8 +407,3 @@ function loginbox(): void
 }
 
 require_once __DIR__ . '/includes/buildRedirectUrl.php';
-
-
-
-
-

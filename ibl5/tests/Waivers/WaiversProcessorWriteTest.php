@@ -12,19 +12,19 @@ use Waivers\WaiversProcessor;
 class WaiversProcessorWriteTest extends TestCase
 {
     private WaiversRepositoryInterface $repoStub;
-    private \Services\Contracts\TeamIdentityRepositoryInterface $teamIdentityRepoStub;
-    private \Services\Contracts\PlayerLookupRepositoryInterface $playerLookupRepoStub;
+    private \Repositories\Contracts\TeamIdentityRepositoryInterface $teamIdentityRepoStub;
+    private \Repositories\Contracts\PlayerLookupRepositoryInterface $playerLookupRepoStub;
     private WaiversValidatorInterface $validatorStub;
-    private \Services\NewsService $newsServiceStub;
+    private \Topics\News\NewsService $newsServiceStub;
     private WaiversProcessor $processor;
 
     protected function setUp(): void
     {
         $this->repoStub = $this->createStub(WaiversRepositoryInterface::class);
-        $this->teamIdentityRepoStub = $this->createStub(\Services\Contracts\TeamIdentityRepositoryInterface::class);
-        $this->playerLookupRepoStub = $this->createStub(\Services\Contracts\PlayerLookupRepositoryInterface::class);
+        $this->teamIdentityRepoStub = $this->createStub(\Repositories\Contracts\TeamIdentityRepositoryInterface::class);
+        $this->playerLookupRepoStub = $this->createStub(\Repositories\Contracts\PlayerLookupRepositoryInterface::class);
         $this->validatorStub = $this->createStub(WaiversValidatorInterface::class);
-        $this->newsServiceStub = $this->createStub(\Services\NewsService::class);
+        $this->newsServiceStub = $this->createStub(\Topics\News\NewsService::class);
         $dbStub = $this->createStub(\mysqli::class);
 
         $this->processor = new WaiversProcessor(

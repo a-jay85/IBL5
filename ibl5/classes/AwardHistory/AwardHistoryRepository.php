@@ -45,7 +45,7 @@ class AwardHistoryRepository extends BaseMysqliRepository implements AwardHistor
      */
     public function searchAwards(array $params): array
     {
-        $where = new \Services\QueryConditions();
+        $where = new \Validation\QueryConditions();
         $where->addIfNotNull('a.year = ?', 'i', $params['year']);
         if ($params['award'] !== null) {
             $where->add('a.award LIKE ?', 's', '%' . $params['award'] . '%');

@@ -7,7 +7,7 @@ namespace Tests\Team;
 use PHPUnit\Framework\TestCase;
 use Team\TeamController;
 use Team\Contracts\TeamControllerInterface;
-use Services\Contracts\TeamIdentityRepositoryInterface;
+use Repositories\Contracts\TeamIdentityRepositoryInterface;
 
 /**
  * TeamControllerTest - Tests for TeamController

@@ -8,14 +8,14 @@ use Discord\Discord;
 use Player\Player;
 use Player\Contract\PlayerContractCalculator;
 use Season\Season;
-use Services\PlayerDataConverter;
+use Player\PlayerDataConverter;
 use Waivers\Contracts\WaiversProcessorInterface;
 use Waivers\Contracts\WaiversRepositoryInterface;
 use Waivers\Contracts\WaiversValidatorInterface;
 
 /**
  * @see WaiversProcessorInterface
- * @phpstan-import-type PlayerRow from \Services\Contracts\PlayerLookupRepositoryInterface
+ * @phpstan-import-type PlayerRow from \Repositories\Contracts\PlayerLookupRepositoryInterface
  */
 class WaiversProcessor implements WaiversProcessorInterface
 {
@@ -26,18 +26,18 @@ class WaiversProcessor implements WaiversProcessorInterface
 
     private PlayerContractCalculator $contractCalculator;
     private WaiversRepositoryInterface $repository;
-    private \Services\Contracts\TeamIdentityRepositoryInterface $teamIdentityRepo;
-    private \Services\Contracts\PlayerLookupRepositoryInterface $playerLookupRepo;
+    private \Repositories\Contracts\TeamIdentityRepositoryInterface $teamIdentityRepo;
+    private \Repositories\Contracts\PlayerLookupRepositoryInterface $playerLookupRepo;
     private WaiversValidatorInterface $validator;
-    private \Services\NewsService $newsService;
+    private \Topics\News\NewsService $newsService;
     private \mysqli $db;
 
     public function __construct(
         WaiversRepositoryInterface $repository,
-        \Services\Contracts\TeamIdentityRepositoryInterface $teamIdentityRepo,
-        \Services\Contracts\PlayerLookupRepositoryInterface $playerLookupRepo,
+        \Repositories\Contracts\TeamIdentityRepositoryInterface $teamIdentityRepo,
+        \Repositories\Contracts\PlayerLookupRepositoryInterface $playerLookupRepo,
         WaiversValidatorInterface $validator,
-        \Services\NewsService $newsService,
+        \Topics\News\NewsService $newsService,
         \mysqli $db
     ) {
         $this->repository = $repository;

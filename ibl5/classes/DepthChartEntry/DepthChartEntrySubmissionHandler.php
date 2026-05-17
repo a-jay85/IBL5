@@ -7,7 +7,7 @@ namespace DepthChartEntry;
 use DepthChartEntry\Contracts\DepthChartEntrySubmissionHandlerInterface;
 use SavedDepthChart\SavedDepthChartService;
 use Season\Season;
-use Services\Contracts\TeamIdentityRepositoryInterface;
+use Repositories\Contracts\TeamIdentityRepositoryInterface;
 
 /**
  * @phpstan-import-type ProcessedPlayerData from Contracts\DepthChartEntryProcessorInterface

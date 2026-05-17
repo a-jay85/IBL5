@@ -14,7 +14,7 @@ use PlrParser\PlrParserRepository;
 use PlrParser\PlrParserService;
 use SavedDepthChart\SavedDepthChartRepository;
 use Season\Season;
-use Services\TeamIdentityRepository;
+use Repositories\TeamIdentityRepository;
 use Tests\DatabaseIntegration\DatabaseTestCase;
 use Updater\Contracts\JsbSourceResolverInterface;
 use Updater\Steps;

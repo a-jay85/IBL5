@@ -7,8 +7,8 @@ namespace Tests\DatabaseIntegration\FreeAgency;
 use FreeAgency\FreeAgencyAdminRepository;
 use FreeAgency\FreeAgencyRepository;
 use PHPUnit\Framework\Attributes\Group;
-use Services\PlayerLookupRepository;
-use Services\TeamIdentityRepository;
+use Repositories\PlayerLookupRepository;
+use Repositories\TeamIdentityRepository;
 use Tests\DatabaseIntegration\DatabaseTestCase;
 
 #[Group('database')]

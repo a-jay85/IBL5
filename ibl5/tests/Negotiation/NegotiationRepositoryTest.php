@@ -7,7 +7,7 @@ namespace Tests\Negotiation;
 use PHPUnit\Framework\TestCase;
 use League\League;
 use Negotiation\NegotiationRepository;
-use Services\Contracts\SalaryCapRepositoryInterface;
+use Repositories\Contracts\SalaryCapRepositoryInterface;
 use Tests\WideUnit\Mocks\MockDatabase;
 use Tests\WideUnit\Mocks\MockDatabaseResult;
 use Tests\WideUnit\Mocks\MockPreparedStatement;

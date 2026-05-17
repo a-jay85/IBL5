@@ -6,8 +6,8 @@ namespace Tests\DatabaseIntegration;
 
 use PHPUnit\Framework\Attributes\Group;
 
-use Services\SalaryCapRepository;
-use Services\TeamIdentityRepository;
+use Repositories\SalaryCapRepository;
+use Repositories\TeamIdentityRepository;
 use Trading\CashConsiderationRepository;
 
 /**

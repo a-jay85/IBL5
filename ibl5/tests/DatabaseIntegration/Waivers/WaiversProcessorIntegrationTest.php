@@ -5,9 +5,9 @@ declare(strict_types=1);
 namespace Tests\DatabaseIntegration\Waivers;
 
 use PHPUnit\Framework\Attributes\Group;
-use Services\TeamIdentityRepository;
-use Services\PlayerLookupRepository;
-use Services\NewsService;
+use Repositories\TeamIdentityRepository;
+use Repositories\PlayerLookupRepository;
+use Topics\News\NewsService;
 use Tests\DatabaseIntegration\DatabaseTestCase;
 use Waivers\WaiversProcessor;
 use Waivers\WaiversRepository;

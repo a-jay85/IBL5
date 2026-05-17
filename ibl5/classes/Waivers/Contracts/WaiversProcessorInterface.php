@@ -15,7 +15,7 @@ use Season\Season;
  * the waiver claiming process.
  *
  * @package Waivers\Contracts
- * @phpstan-import-type PlayerRow from \Services\Contracts\PlayerLookupRepositoryInterface
+ * @phpstan-import-type PlayerRow from \Repositories\Contracts\PlayerLookupRepositoryInterface
  */
 interface WaiversProcessorInterface
 {

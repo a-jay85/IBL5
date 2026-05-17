@@ -2,15 +2,15 @@
 
 declare(strict_types=1);
 
-namespace Tests\Shared;
+namespace Tests\BasketballStats;
 
 use PHPUnit\Framework\TestCase;
-use Shared\SalaryConverter;
+use BasketballStats\SalaryConverter;
 
 /**
  * SalaryConverterTest - Tests for SalaryConverter utility class
  *
- * @covers \Shared\SalaryConverter
+ * @covers \BasketballStats\SalaryConverter
  */
 class SalaryConverterTest extends TestCase
 {

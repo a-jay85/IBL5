@@ -13,7 +13,7 @@ $playerToBeDrafted = $_POST['player'] ?? null;
 $draft_round = (int)$_POST['draft_round'];
 $draft_pick = (int)$_POST['draft_pick'];
 
-$commonRepository = new \Services\TeamIdentityRepository($mysqli_db);
+$commonRepository = new \Repositories\TeamIdentityRepository($mysqli_db);
 $season = new \Season\Season($mysqli_db);
 
 $handler = new DraftSelectionHandler($mysqli_db, $commonRepository, $season);

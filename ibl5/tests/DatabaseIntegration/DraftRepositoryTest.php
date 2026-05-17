@@ -7,7 +7,7 @@ namespace Tests\DatabaseIntegration;
 use PHPUnit\Framework\Attributes\Group;
 
 use Draft\DraftRepository;
-use Services\TeamIdentityRepository;
+use Repositories\TeamIdentityRepository;
 
 /**
  * Tests DraftRepository against real MariaDB — draft picks, draft class, player creation.

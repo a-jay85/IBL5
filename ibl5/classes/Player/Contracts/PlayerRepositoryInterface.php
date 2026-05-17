@@ -12,7 +12,7 @@ use Player\PlayerData;
  * Defines the interface for loading and persisting player data from/to the database.
  * Handles all data transformation from raw database rows to PlayerData objects.
  *
- * @phpstan-import-type PlayerRow from \Services\Contracts\PlayerLookupRepositoryInterface
+ * @phpstan-import-type PlayerRow from \Repositories\Contracts\PlayerLookupRepositoryInterface
  *
  * @phpstan-type HistoricalPlayerRow array{pid: ?int, year: ?int, name: ?string, team: ?string, teamid: ?int, salary: ?int, r_2ga: ?int, r_2gp: ?int, r_fta: ?int, r_ftp: ?int, r_3ga: ?int, r_3gp: ?int, r_orb: ?int, r_drb: ?int, r_ast: ?int, r_stl: ?int, r_blk: ?int, r_tvr: ?int, r_oo: ?int, r_od: ?int, r_drive_off: ?int, r_dd: ?int, r_po: ?int, r_pd: ?int, r_trans_off: ?int, r_td: ?int, ...}
  * @phpstan-type AwardRow array{year: int, name: string, award: string}

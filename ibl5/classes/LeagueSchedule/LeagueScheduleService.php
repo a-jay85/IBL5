@@ -47,7 +47,7 @@ class LeagueScheduleService implements LeagueScheduleServiceInterface
     public function getSchedulePageData(
         Season $season,
         League $league,
-        \Services\Contracts\TeamIdentityRepositoryInterface $commonRepo
+        \Repositories\Contracts\TeamIdentityRepositoryInterface $commonRepo
     ): array {
         $projectedNextSimEndDate = $season->projectedNextSimEndDate;
         $simLengthDays = $league->getSimLengthInDays();

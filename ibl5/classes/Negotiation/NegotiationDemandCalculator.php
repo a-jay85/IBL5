@@ -7,7 +7,7 @@ namespace Negotiation;
 use Negotiation\Contracts\NegotiationDemandCalculatorInterface;
 use Negotiation\Contracts\NegotiationRepositoryInterface;
 use Player\Player;
-use Services\Contracts\SalaryCapRepositoryInterface;
+use Repositories\Contracts\SalaryCapRepositoryInterface;
 
 /**
  * @see NegotiationDemandCalculatorInterface

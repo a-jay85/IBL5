@@ -2,10 +2,10 @@
 
 declare(strict_types=1);
 
-namespace Tests\Services;
+namespace Tests\Topics\News;
 
 use PHPUnit\Framework\TestCase;
-use Services\NewsService;
+use Topics\News\NewsService;
 use Tests\WideUnit\Mocks\MockDatabase;
 
 class NewsServiceTest extends TestCase

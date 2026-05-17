@@ -6,7 +6,7 @@ namespace Api\Controller;
 
 use Api\Contracts\ControllerInterface;
 use Api\Response\JsonResponder;
-use Services\Contracts\TeamIdentityRepositoryInterface;
+use Repositories\Contracts\TeamIdentityRepositoryInterface;
 use Trading\TradeProcessor;
 use Trading\TradeOfferRepository;
 use Discord\Discord;

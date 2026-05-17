@@ -7,7 +7,7 @@ namespace DepthChartEntry;
 use DepthChartEntry\Contracts\DepthChartEntryRepositoryInterface;
 
 /**
- * @phpstan-import-type PlayerRow from \Services\Contracts\PlayerLookupRepositoryInterface
+ * @phpstan-import-type PlayerRow from \Repositories\Contracts\PlayerLookupRepositoryInterface
  * @phpstan-import-type DepthChartValues from Contracts\DepthChartEntryRepositoryInterface
  *
  * @see DepthChartEntryRepositoryInterface

@@ -22,10 +22,10 @@ class WaiversProcessorTest extends TestCase
     protected function setUp(): void
     {
         $repoStub = $this->createStub(WaiversRepositoryInterface::class);
-        $teamIdentityRepoStub = $this->createStub(\Services\Contracts\TeamIdentityRepositoryInterface::class);
-        $playerLookupRepoStub = $this->createStub(\Services\Contracts\PlayerLookupRepositoryInterface::class);
+        $teamIdentityRepoStub = $this->createStub(\Repositories\Contracts\TeamIdentityRepositoryInterface::class);
+        $playerLookupRepoStub = $this->createStub(\Repositories\Contracts\PlayerLookupRepositoryInterface::class);
         $validatorStub = $this->createStub(WaiversValidatorInterface::class);
-        $newsServiceStub = $this->createStub(\Services\NewsService::class);
+        $newsServiceStub = $this->createStub(\Topics\News\NewsService::class);
         $dbStub = $this->createStub(\mysqli::class);
 
         $this->processor = new WaiversProcessor(

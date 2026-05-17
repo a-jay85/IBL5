@@ -7,7 +7,7 @@ namespace Tests\SeriesRecords;
 use PHPUnit\Framework\TestCase;
 use SeriesRecords\SeriesRecordsController;
 use SeriesRecords\Contracts\SeriesRecordsControllerInterface;
-use Services\Contracts\TeamIdentityRepositoryInterface;
+use Repositories\Contracts\TeamIdentityRepositoryInterface;
 
 /**
  * SeriesRecordsControllerTest - Tests for SeriesRecordsController

@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace DepthChartEntry;
 
-use Services\Contracts\TeamIdentityRepositoryInterface;
+use Repositories\Contracts\TeamIdentityRepositoryInterface;
 
 /**
  * HTMX endpoint handler for depth chart entry tab switching

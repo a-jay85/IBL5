@@ -9,7 +9,7 @@ use Negotiation\NegotiationService;
 use Negotiation\NegotiationRepository;
 use Negotiation\NegotiationValidator;
 use Negotiation\NegotiationDemandCalculator;
-use Services\Contracts\SalaryCapRepositoryInterface;
+use Repositories\Contracts\SalaryCapRepositoryInterface;
 use Tests\WideUnit\Mocks\MockDatabase;
 use Tests\WideUnit\Mocks\MockDatabaseResult;
 use Tests\WideUnit\Mocks\MockPreparedStatement;

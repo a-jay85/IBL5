@@ -2,9 +2,11 @@
 
 declare(strict_types=1);
 
-namespace Services;
+namespace Topics\News;
 
-class NewsService extends \BaseMysqliRepository
+use Topics\News\Contracts\NewsServiceInterface;
+
+class NewsService extends \BaseMysqliRepository implements NewsServiceInterface
 {
     public function createNewsStory(
         int $categoryID,

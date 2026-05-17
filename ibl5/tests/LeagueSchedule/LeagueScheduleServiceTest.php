@@ -34,7 +34,7 @@ class LeagueScheduleServiceTest extends TestCase
         $league = $this->createStub(League::class);
         $league->method('getSimLengthInDays')->willReturn(7);
 
-        $commonRepo = $this->createStub(\Services\Contracts\TeamIdentityRepositoryInterface::class);
+        $commonRepo = $this->createStub(\Repositories\Contracts\TeamIdentityRepositoryInterface::class);
 
         $service = new LeagueScheduleService($mockRepo);
         $result = $service->getSchedulePageData($season, $league, $commonRepo);
@@ -90,7 +90,7 @@ class LeagueScheduleServiceTest extends TestCase
         $league = $this->createStub(League::class);
         $league->method('getSimLengthInDays')->willReturn(7);
 
-        $commonRepo = $this->createStub(\Services\Contracts\TeamIdentityRepositoryInterface::class);
+        $commonRepo = $this->createStub(\Repositories\Contracts\TeamIdentityRepositoryInterface::class);
         $commonRepo->method('getTeamnameFromTeamID')->willReturnMap([
             [1, 'Team A'],
             [2, 'Team B'],
@@ -131,7 +131,7 @@ class LeagueScheduleServiceTest extends TestCase
         $league = $this->createStub(League::class);
         $league->method('getSimLengthInDays')->willReturn(7);
 
-        $commonRepo = $this->createStub(\Services\Contracts\TeamIdentityRepositoryInterface::class);
+        $commonRepo = $this->createStub(\Repositories\Contracts\TeamIdentityRepositoryInterface::class);
         $commonRepo->method('getTeamnameFromTeamID')->willReturn('Team');
 
         $service = new LeagueScheduleService($mockRepo);
@@ -177,7 +177,7 @@ class LeagueScheduleServiceTest extends TestCase
         $league = $this->createStub(League::class);
         $league->method('getSimLengthInDays')->willReturn(7);
 
-        $commonRepo = $this->createStub(\Services\Contracts\TeamIdentityRepositoryInterface::class);
+        $commonRepo = $this->createStub(\Repositories\Contracts\TeamIdentityRepositoryInterface::class);
         $commonRepo->method('getTeamnameFromTeamID')->willReturn('Team');
 
         $service = new LeagueScheduleService($mockRepo);
@@ -216,7 +216,7 @@ class LeagueScheduleServiceTest extends TestCase
         $league = $this->createStub(League::class);
         $league->method('getSimLengthInDays')->willReturn(7);
 
-        $commonRepo = $this->createStub(\Services\Contracts\TeamIdentityRepositoryInterface::class);
+        $commonRepo = $this->createStub(\Repositories\Contracts\TeamIdentityRepositoryInterface::class);
         $commonRepo->method('getTeamnameFromTeamID')->willReturn('Team');
 
         $service = new LeagueScheduleService($mockRepo);
@@ -240,7 +240,7 @@ class LeagueScheduleServiceTest extends TestCase
         $league = $this->createStub(League::class);
         $league->method('getSimLengthInDays')->willReturn(7);
 
-        $commonRepo = $this->createStub(\Services\Contracts\TeamIdentityRepositoryInterface::class);
+        $commonRepo = $this->createStub(\Repositories\Contracts\TeamIdentityRepositoryInterface::class);
 
         $service = new LeagueScheduleService($mockRepo);
         $result = $service->getSchedulePageData($season, $league, $commonRepo);

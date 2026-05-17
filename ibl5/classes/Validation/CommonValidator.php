@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Services;
+namespace Validation;
 
 /**
  * Common Validator Service

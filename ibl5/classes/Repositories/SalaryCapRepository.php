@@ -2,10 +2,10 @@
 
 declare(strict_types=1);
 
-namespace Services;
+namespace Repositories;
 
 use League\League;
-use Services\Contracts\SalaryCapRepositoryInterface;
+use Repositories\Contracts\SalaryCapRepositoryInterface;
 
 class SalaryCapRepository extends \BaseMysqliRepository implements SalaryCapRepositoryInterface
 {

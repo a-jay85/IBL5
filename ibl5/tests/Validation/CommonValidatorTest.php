@@ -2,10 +2,10 @@
 
 declare(strict_types=1);
 
-namespace Tests\Services;
+namespace Tests\Validation;
 
 use PHPUnit\Framework\TestCase;
-use Services\CommonValidator;
+use Validation\CommonValidator;
 
 /**
  * CommonValidatorTest - Tests for CommonValidator static methods

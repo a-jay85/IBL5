@@ -13,7 +13,7 @@ use Season\Season;
  * Assembles data needed by views from repositories, calculators, and domain objects.
  * Views receive pre-computed data arrays and never touch the database.
  *
- * @phpstan-import-type PlayerRow from \Services\Contracts\PlayerLookupRepositoryInterface
+ * @phpstan-import-type PlayerRow from \Repositories\Contracts\PlayerLookupRepositoryInterface
  */
 interface FreeAgencyServiceInterface
 {

@@ -16,7 +16,7 @@ use Waivers\Contracts\WaiversViewInterface;
 /**
  * @see WaiversControllerInterface
  *
- * @phpstan-import-type UserRow from \Services\Contracts\TeamIdentityRepositoryInterface
+ * @phpstan-import-type UserRow from \Repositories\Contracts\TeamIdentityRepositoryInterface
  * @phpstan-import-type WaiverFormData from WaiversServiceInterface
  */
 class WaiversController implements WaiversControllerInterface
@@ -26,8 +26,8 @@ class WaiversController implements WaiversControllerInterface
     private WaiversServiceInterface $service;
     private WaiversProcessorInterface $processor;
     private WaiversViewInterface $view;
-    private \Services\Contracts\TeamIdentityRepositoryInterface $teamIdentityRepo;
-    private \Services\Contracts\SalaryCapRepositoryInterface $salaryCapRepo;
+    private \Repositories\Contracts\TeamIdentityRepositoryInterface $teamIdentityRepo;
+    private \Repositories\Contracts\SalaryCapRepositoryInterface $salaryCapRepo;
     private \Utilities\NukeCompat $nukeCompat;
     private \mysqli $db;
 
@@ -35,8 +35,8 @@ class WaiversController implements WaiversControllerInterface
         WaiversServiceInterface $service,
         WaiversProcessorInterface $processor,
         WaiversViewInterface $view,
-        \Services\Contracts\TeamIdentityRepositoryInterface $teamIdentityRepo,
-        \Services\Contracts\SalaryCapRepositoryInterface $salaryCapRepo,
+        \Repositories\Contracts\TeamIdentityRepositoryInterface $teamIdentityRepo,
+        \Repositories\Contracts\SalaryCapRepositoryInterface $salaryCapRepo,
         \Utilities\NukeCompat $nukeCompat,
         \mysqli $db
     ) {

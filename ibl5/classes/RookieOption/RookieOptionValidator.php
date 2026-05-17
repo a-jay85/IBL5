@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace RookieOption;
 
 use Player\Player;
-use Services\CommonValidator;
+use Validation\CommonValidator;
 use RookieOption\Contracts\RookieOptionValidatorInterface;
 
 /**
@@ -16,7 +16,7 @@ class RookieOptionValidator implements RookieOptionValidatorInterface
     /**
      * @see RookieOptionValidatorInterface::validatePlayerOwnership()
      */
-    public function validatePlayerOwnership(Player $player, string $userTeamName): \Services\ValidationResult
+    public function validatePlayerOwnership(Player $player, string $userTeamName): \Validation\ValidationResult
     {
         return CommonValidator::validatePlayerOwnership($player, $userTeamName);
     }

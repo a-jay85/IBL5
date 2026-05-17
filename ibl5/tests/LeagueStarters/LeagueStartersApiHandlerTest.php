@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Tests\LeagueStarters;
 
 use LeagueStarters\LeagueStartersApiHandler;
-use Services\Contracts\TeamIdentityRepositoryInterface;
+use Repositories\Contracts\TeamIdentityRepositoryInterface;
 use Tests\WideUnit\WideUnitTestCase;
 
 /**

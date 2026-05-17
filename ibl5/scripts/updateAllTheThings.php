@@ -104,7 +104,7 @@ try {
     echo $view->renderInitStatus('mainfile.php loaded');
     flush();
 
-    $commonRepository = new \Services\TeamIdentityRepository($mysqli_db);
+    $commonRepository = new \Repositories\TeamIdentityRepository($mysqli_db);
     echo $view->renderInitStatus('CommonRepository initialized');
     flush();
 

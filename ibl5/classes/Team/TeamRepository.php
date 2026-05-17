@@ -8,8 +8,8 @@ use League\LeagueContext;
 use Team\Contracts\TeamRepositoryInterface;
 
 /**
- * @phpstan-import-type TeamInfoRow from \Services\Contracts\TeamIdentityRepositoryInterface
- * @phpstan-import-type PlayerRow from \Services\Contracts\PlayerLookupRepositoryInterface
+ * @phpstan-import-type TeamInfoRow from \Repositories\Contracts\TeamIdentityRepositoryInterface
+ * @phpstan-import-type PlayerRow from \Repositories\Contracts\PlayerLookupRepositoryInterface
  * @phpstan-import-type PowerRow from Contracts\TeamRepositoryInterface
  * @phpstan-import-type BannerRow from Contracts\TeamRepositoryInterface
  * @phpstan-import-type GMTenureRow from Contracts\TeamRepositoryInterface

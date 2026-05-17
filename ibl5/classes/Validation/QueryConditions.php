@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Services;
+namespace Validation;
 
 /**
  * QueryConditions - Lightweight builder for dynamic WHERE clauses

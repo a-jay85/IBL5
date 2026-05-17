@@ -7,7 +7,7 @@ namespace Tests\Discord;
 use PHPUnit\Framework\Attributes\AllowMockObjectsWithoutExpectations;
 use Tests\WideUnit\WideUnitTestCase;
 use Discord\Discord;
-use Services\Contracts\TeamIdentityRepositoryInterface;
+use Repositories\Contracts\TeamIdentityRepositoryInterface;
 
 /**
  * DiscordIntegrationTest - Integration tests for Discord class

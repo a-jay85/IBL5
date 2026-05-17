@@ -28,7 +28,7 @@ class TradeOfferTest extends TestCase
         TradeAssetRepositoryInterface $assetRepository,
         TradeValidator $validator,
         CashTransactionHandler $cashHandler,
-        \Services\Contracts\TeamIdentityRepositoryInterface $commonRepo,
+        \Repositories\Contracts\TeamIdentityRepositoryInterface $commonRepo,
         Season $season,
         ?Discord $discord = null,
         ?TradeCashRepositoryInterface $cashRepo = null,
@@ -43,7 +43,7 @@ class TradeOfferTest extends TestCase
                 TradeAssetRepositoryInterface $assetRepository,
                 TradeValidator $validator,
                 CashTransactionHandler $cashHandler,
-                \Services\Contracts\TeamIdentityRepositoryInterface $commonRepo,
+                \Repositories\Contracts\TeamIdentityRepositoryInterface $commonRepo,
                 Season $season,
                 ?Discord $discord,
                 TradeCashRepositoryInterface $cashRepo,
@@ -90,7 +90,7 @@ class TradeOfferTest extends TestCase
     }
 
     /**
-     * @return array{TradeOfferRepositoryInterface&\PHPUnit\Framework\MockObject\MockObject, TradeAssetRepositoryInterface&\PHPUnit\Framework\MockObject\Stub, TradeValidator&\PHPUnit\Framework\MockObject\Stub, CashTransactionHandler&\PHPUnit\Framework\MockObject\Stub, \Services\Contracts\TeamIdentityRepositoryInterface&\PHPUnit\Framework\MockObject\Stub, Season&\PHPUnit\Framework\MockObject\Stub}
+     * @return array{TradeOfferRepositoryInterface&\PHPUnit\Framework\MockObject\MockObject, TradeAssetRepositoryInterface&\PHPUnit\Framework\MockObject\Stub, TradeValidator&\PHPUnit\Framework\MockObject\Stub, CashTransactionHandler&\PHPUnit\Framework\MockObject\Stub, \Repositories\Contracts\TeamIdentityRepositoryInterface&\PHPUnit\Framework\MockObject\Stub, Season&\PHPUnit\Framework\MockObject\Stub}
      */
     private function makeStubs(): array
     {
@@ -98,7 +98,7 @@ class TradeOfferTest extends TestCase
         $assetRepository = $this->createStub(TradeAssetRepositoryInterface::class);
         $validator = $this->createStub(TradeValidator::class);
         $cashHandler = $this->createStub(CashTransactionHandler::class);
-        $commonRepo = $this->createStub(\Services\Contracts\TeamIdentityRepositoryInterface::class);
+        $commonRepo = $this->createStub(\Repositories\Contracts\TeamIdentityRepositoryInterface::class);
         $season = $this->createStub(Season::class);
 
         return [$offerRepository, $assetRepository, $validator, $cashHandler, $commonRepo, $season];
@@ -243,7 +243,7 @@ class TradeOfferTest extends TestCase
         $assetRepository = $this->createStub(TradeAssetRepositoryInterface::class);
         $validator = $this->createMock(TradeValidator::class);
         $cashHandler = $this->createStub(CashTransactionHandler::class);
-        $commonRepo = $this->createStub(\Services\Contracts\TeamIdentityRepositoryInterface::class);
+        $commonRepo = $this->createStub(\Repositories\Contracts\TeamIdentityRepositoryInterface::class);
         $season = $this->createStub(Season::class);
 
         $offerRepository->expects($this->once())->method('generateNextTradeOfferId')->willReturn(1);
@@ -408,7 +408,7 @@ class TradeOfferTest extends TestCase
         $assetRepository = $this->createStub(TradeAssetRepositoryInterface::class);
         $validator = $this->createMock(TradeValidator::class);
         $cashHandler = $this->createStub(CashTransactionHandler::class);
-        $commonRepo = $this->createStub(\Services\Contracts\TeamIdentityRepositoryInterface::class);
+        $commonRepo = $this->createStub(\Repositories\Contracts\TeamIdentityRepositoryInterface::class);
         $season = $this->createStub(Season::class);
 
         $offerRepository->expects($this->once())->method('generateNextTradeOfferId')->willReturn(1);

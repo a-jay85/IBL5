@@ -6,8 +6,8 @@ namespace Tests\DatabaseIntegration\Extension;
 
 use Extension\ExtensionRepository;
 use PHPUnit\Framework\Attributes\Group;
-use Services\PlayerLookupRepository;
-use Services\TeamIdentityRepository;
+use Repositories\PlayerLookupRepository;
+use Repositories\TeamIdentityRepository;
 use Tests\DatabaseIntegration\DatabaseTestCase;
 
 #[Group('database')]

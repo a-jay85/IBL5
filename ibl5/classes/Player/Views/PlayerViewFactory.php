@@ -18,7 +18,7 @@ use Player\Stats\Views\PlayerRegularSeasonAveragesView;
 use Player\Stats\Views\PlayerRegularSeasonTotalsView;
 use Player\Stats\Views\PlayerSimStatsView;
 use Player\Contracts\PlayerViewInterface;
-use Services\Contracts\TeamIdentityRepositoryInterface;
+use Repositories\Contracts\TeamIdentityRepositoryInterface;
 
 /**
  * PlayerViewFactory - Creates view instances with repository injection

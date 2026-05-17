@@ -34,7 +34,7 @@ if (!is_user($user)) {
 }
 cookiedecode($user);
 $username = (string) ($cookie[1] ?? '');
-$commonRepository = new \Services\TeamIdentityRepository($mysqli_db);
+$commonRepository = new \Repositories\TeamIdentityRepository($mysqli_db);
 $teamName = $commonRepository->getTeamnameFromUsername($username) ?? '';
 
 // Parse checkbox arrays (0-indexed from HTML) into typed ballot (1-indexed field names)

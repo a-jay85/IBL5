@@ -2,9 +2,9 @@
 
 declare(strict_types=1);
 
-namespace Services;
+namespace Repositories;
 
-use Services\Contracts\PlayerLookupRepositoryInterface;
+use Repositories\Contracts\PlayerLookupRepositoryInterface;
 
 /**
  * @phpstan-import-type PlayerRow from PlayerLookupRepositoryInterface

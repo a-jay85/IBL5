@@ -2,9 +2,9 @@
 
 declare(strict_types=1);
 
-namespace Services;
+namespace FreeAgency;
 
-use Services\Contracts\CommonContractValidatorInterface;
+use FreeAgency\Contracts\CommonContractValidatorInterface;
 
 /**
  * CommonContractValidator - Shared contract validation logic

@@ -24,7 +24,7 @@ get_lang($module_name);
 function userinfo($username, $bypass = 0, $hid = 0, $url = 0): void
 {
     global $user, $prefix, $user_prefix, $mysqli_db;
-    $commonRepository = new \Services\TeamIdentityRepository($mysqli_db);
+    $commonRepository = new \Repositories\TeamIdentityRepository($mysqli_db);
 
     if (!$bypass) {
         cookiedecode($user);

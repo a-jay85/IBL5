@@ -29,7 +29,7 @@ function userinfo(string $username): void
 {
     global $mysqli_db;
 
-    $commonRepository = new \Services\TeamIdentityRepository($mysqli_db);
+    $commonRepository = new \Repositories\TeamIdentityRepository($mysqli_db);
     $season = new \Season\Season($mysqli_db);
     $league = new \League\League($mysqli_db);
 

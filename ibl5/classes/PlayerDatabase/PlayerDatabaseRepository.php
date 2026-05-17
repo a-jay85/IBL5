@@ -6,7 +6,7 @@ namespace PlayerDatabase;
 
 use BaseMysqliRepository;
 use PlayerDatabase\Contracts\PlayerDatabaseRepositoryInterface;
-use Services\QueryConditions;
+use Validation\QueryConditions;
 
 /**
  * PlayerDatabaseRepository - Database operations for player search

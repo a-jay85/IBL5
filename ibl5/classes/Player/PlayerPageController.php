@@ -14,7 +14,7 @@ use Player\Views\PlayerStatsCardView;
 use Player\Views\PlayerStatsFlipCardView;
 use Player\Views\PlayerViewFactory;
 use Player\Views\TeamColorHelper;
-use Services\Contracts\TeamIdentityRepositoryInterface;
+use Repositories\Contracts\TeamIdentityRepositoryInterface;
 use Security\HtmlSanitizer;
 use Team\Team;
 use Season\Season;

@@ -6,7 +6,7 @@ namespace Tests\Discord;
 
 use PHPUnit\Framework\TestCase;
 use Discord\Discord;
-use Services\Contracts\TeamIdentityRepositoryInterface;
+use Repositories\Contracts\TeamIdentityRepositoryInterface;
 
 /**
  * Tests for Discord class

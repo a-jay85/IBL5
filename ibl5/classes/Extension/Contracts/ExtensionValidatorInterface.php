@@ -14,11 +14,11 @@ namespace Extension\Contracts;
  * (Free Agency, Rookie Options, Waivers) do not require the first three years to
  * have non-zero amounts.
  * 
- * Delegates other validation logic to Services\CommonContractValidator for
+ * Delegates other validation logic to FreeAgency\CommonContractValidator for
  * consistency across Extension, FreeAgency, and Negotiation modules.
  * 
  * @package Extension\Contracts
- * @see \Services\Contracts\CommonContractValidatorInterface
+ * @see \FreeAgency\Contracts\CommonContractValidatorInterface
  */
 interface ExtensionValidatorInterface
 {

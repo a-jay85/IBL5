@@ -15,7 +15,7 @@ use Season\Season;
 /**
  * @see FreeAgencyServiceInterface
  *
- * @phpstan-import-type PlayerRow from \Services\Contracts\PlayerLookupRepositoryInterface
+ * @phpstan-import-type PlayerRow from \Repositories\Contracts\PlayerLookupRepositoryInterface
  */
 class FreeAgencyService implements FreeAgencyServiceInterface
 {

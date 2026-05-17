@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Team;
 
-use Services\Contracts\TeamIdentityRepositoryInterface;
+use Repositories\Contracts\TeamIdentityRepositoryInterface;
 use Team\Contracts\TeamControllerInterface;
 use Team\Contracts\TeamServiceInterface;
 use Team\Contracts\TeamViewInterface;

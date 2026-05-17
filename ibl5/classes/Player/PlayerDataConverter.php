@@ -2,9 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Services;
-
-use Player\PlayerData;
+namespace Player;
 
 /**
  * PlayerDataConverter - Converts raw player data arrays to PlayerData objects

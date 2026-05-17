@@ -12,7 +12,7 @@ use UI\Components\TableViewSwitcher;
 use Season\Season;
 
 /**
- * @phpstan-import-type PlayerRow from \Services\Contracts\PlayerLookupRepositoryInterface
+ * @phpstan-import-type PlayerRow from \Repositories\Contracts\PlayerLookupRepositoryInterface
  * @phpstan-import-type StartersData from Contracts\TeamServiceInterface
  *
  * @see TeamTableServiceInterface

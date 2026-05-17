@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Discord;
 
-use Services\Contracts\TeamIdentityRepositoryInterface;
+use Repositories\Contracts\TeamIdentityRepositoryInterface;
 
 class Discord
 {

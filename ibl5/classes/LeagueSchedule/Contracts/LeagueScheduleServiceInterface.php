@@ -50,12 +50,12 @@ interface LeagueScheduleServiceInterface
      *
      * @param Season $season Current season
      * @param League $league Current league
-     * @param \Services\Contracts\TeamIdentityRepositoryInterface $commonRepo Common repository for team name lookups
+     * @param \Repositories\Contracts\TeamIdentityRepositoryInterface $commonRepo Common repository for team name lookups
      * @return SchedulePageData
      */
     public function getSchedulePageData(
         Season $season,
         League $league,
-        \Services\Contracts\TeamIdentityRepositoryInterface $commonRepo
+        \Repositories\Contracts\TeamIdentityRepositoryInterface $commonRepo
     ): array;
 }

@@ -8,8 +8,8 @@ use Negotiation\Contracts\NegotiationValidatorInterface;
 use Player\Player;
 use Player\Contract\PlayerContractValidator;
 use Player\PlayerData;
-use Services\CommonValidator;
-use Services\ValidationResult;
+use Validation\CommonValidator;
+use Validation\ValidationResult;
 
 /**
  * @see NegotiationValidatorInterface

@@ -10,7 +10,7 @@ use Negotiation\NegotiationDemandCalculator;
 use Negotiation\NegotiationRepository;
 use Negotiation\NegotiationService;
 use Negotiation\NegotiationValidator;
-use Services\SalaryCapRepository;
+use Repositories\SalaryCapRepository;
 
 #[Group('database')]
 class NegotiationServiceIntegrationTest extends DatabaseTestCase

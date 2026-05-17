@@ -7,7 +7,7 @@ namespace Tests\Player;
 use PHPUnit\Framework\TestCase;
 use Player\PlayerPageService;
 use Player\Player;
-use Services\Contracts\TeamIdentityRepositoryInterface;
+use Repositories\Contracts\TeamIdentityRepositoryInterface;
 use Tests\WideUnit\Mocks\MockDatabase;
 
 class PlayerPageServiceTest extends TestCase

@@ -5,4 +5,4 @@ declare(strict_types=1);
 namespace PHPStanRules\Fixtures;
 
 $db = new \mysqli();
-$repo = new \Services\TeamIdentityRepository($db);
+$repo = new \Repositories\TeamIdentityRepository($db);

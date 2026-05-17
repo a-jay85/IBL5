@@ -91,6 +91,8 @@ class ConfigBootstrap implements BootstrapStepInterface
     {
         /** @phpstan-ignore ibl.requireOnce (initializes $db and $mysqli_db globals; not a class) */
         require_once $this->basePath . '/db/db.php';
+
+        \Logging\LoggerFactory::fromConfig();
     }
 
     private function loadNukeConfig(ContainerInterface $container): void

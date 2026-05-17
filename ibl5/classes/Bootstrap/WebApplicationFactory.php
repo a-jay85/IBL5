@@ -1,0 +1,27 @@
+<?php
+
+declare(strict_types=1);
+
+namespace Bootstrap;
+
+/**
+ * Composition root for web (mainfile.php) bootstrap.
+ *
+ * Step order mirrors the original mainfile.php procedural sequence.
+ */
+final class WebApplicationFactory
+{
+    public static function build(string $basePath): Application
+    {
+        $app = new Application();
+        $app->addStep(new AutoloaderBootstrap($basePath));
+        $app->addStep(new SessionBootstrap());
+        $app->addStep(new HeadersBootstrap());
+        $app->addStep(new SecurityBootstrap());
+        $app->addStep(new LeagueBootstrap());
+        $app->addStep(new ConfigBootstrap($basePath));
+        $app->addStep(new AuthBootstrap($basePath));
+        $app->addStep(new DemoModeBootstrap($basePath));
+        return $app;
+    }
+}

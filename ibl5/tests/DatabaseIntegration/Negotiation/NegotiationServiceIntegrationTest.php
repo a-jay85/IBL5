@@ -88,7 +88,7 @@ class NegotiationServiceIntegrationTest extends DatabaseTestCase
             $this->db,
             new NegotiationRepository($this->db, new CommonMysqliRepository($this->db)),
             new NegotiationValidator($this->db, $season),
-            new NegotiationDemandCalculator($this->db),
+            new NegotiationDemandCalculator($this->db, new CommonMysqliRepository($this->db)),
         );
     }
 

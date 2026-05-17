@@ -1,13 +1,13 @@
 ---
 description: ADR for wiring Bootstrap\Application as mainfile.php composition root (web mode)
-last_verified: 2026-05-16
+last_verified: 2026-05-17
 ---
 
 # 0029 — Bootstrap\Application wired as mainfile.php composition root (web)
 
 ## Status
 
-Accepted (2026-05-16)
+**Status:** Superseded by ADR-0030 (2026-05-17)
 
 ## Context
 
@@ -37,3 +37,7 @@ Replace procedural bootstrap blocks in mainfile.php with `WebApplicationFactory:
 - Rollback is a single `git revert` of the mainfile.php commit
 - `mainfile.php` dropped from 667 lines to ~320 lines (function defs + post-boot runtime)
 - Plans B and C depend on this landing first
+
+## Superseded by
+
+[ADR-0030](0030-bootstrap-unified-composition.md) — completes the work by extending the pattern to tests, consolidating LegacyFunctions, and deleting mainfile.php function duplicates.

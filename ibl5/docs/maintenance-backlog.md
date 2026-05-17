@@ -535,7 +535,7 @@ Effort scale:
 **Suggested direction:** Complete the migration OR mark classes `@internal not-yet-wired` with an ADR note.
 **Est. effort:** L (complete) / S (mark)
 **Risk if untouched:** Developers updating bootstrap miss the parallel classes; classes accumulate drift.
-**Status:** In progress (web mode wired in Bootstrap A PR, 2026-05-16); ADR-0029. api/test paths and dup-code deletion in Plans B/C.
+**Status:** Completed (2026-05-17) — Bootstrap\Application is composition root for web/api/test. ADR-0030.
 
 ### 3.14 `leagueControlPanel.php` Uses `$_SERVER['DOCUMENT_ROOT']`
 **Location:** `ibl5/leagueControlPanel.php:5`
@@ -2006,7 +2006,7 @@ Effort scale:
 **Suggested direction:** Wire `Application` into `mainfile.php` as the composition root; delete duplicated procedural code.
 **Est. effort:** M
 **Risk if untouched:** Every bootstrap concern added twice; the two copies diverge.
-**Status:** In progress (web + api wired in Bootstrap A + B PRs, 2026-05-17); ADR-0029. dup-code deletion in Plan C.
+**Status:** Completed (2026-05-17) — web + api + test wired via factories; duplicate procedural code deleted. ADR-0030.
 
 ### 14.2 Duplicate Bootstrap Logic — mainfile.php and Step Classes in Parallel
 **Location:** `mainfile.php` lines 102-243 vs `Bootstrap/SessionBootstrap.php`, `HeadersBootstrap.php`, `ConfigBootstrap.php`, `AuthBootstrap.php`
@@ -2014,6 +2014,7 @@ Effort scale:
 **Suggested direction:** After wiring `Application` (14.1), delete blocks from `mainfile.php`.
 **Est. effort:** S (post 14.1)
 **Risk if untouched:** Updates to one copy don't reach the other.
+**Status:** Completed (2026-05-17) — duplicate session/header/auth blocks removed; mainfile.php reduced to 65 lines. ADR-0030.
 
 ### 14.3 `LegacyFunctions.php` Duplicates `mainfile.php` but Is Always Suppressed
 **Location:** `classes/Bootstrap/LegacyFunctions.php`
@@ -2021,6 +2022,7 @@ Effort scale:
 **Suggested direction:** After eliminating mainfile copies, LegacyFunctions is the only source; keep guard for test safety.
 **Est. effort:** S
 **Risk if untouched:** Test/prod divergence on function fixes.
+**Status:** Completed (2026-05-17) — LegacyFunctions is single source; mainfile delegates via require_once. ADR-0030.
 
 ### 14.4 Three Separate Bootstrap Paths — mainfile / api / tests
 **Location:** `ibl5/mainfile.php`, `ibl5/api.php`, `ibl5/tests/bootstrap.php`
@@ -2028,7 +2030,7 @@ Effort scale:
 **Suggested direction:** `Bootstrap\Kernel::boot(string $mode)` factory accepting `'web'|'api'|'test'`; all three entry points call it.
 **Est. effort:** M
 **Risk if untouched:** Cross-cutting concerns silently missing in one path; API behaves differently from web.
-**Status:** Completed (2026-05-17) — Bootstrap\Application now drives web + api; tests path covered in Plan C.
+**Status:** Completed (2026-05-17) — three modes via Factory pattern (WebApplicationFactory, ApiApplicationFactory, TestApplicationFactory). ADR-0030.
 
 ### 14.5 Module `index.php` Files Are the Real Composition Root (42 of 47)
 **Location:** `ibl5/modules/*/index.php`

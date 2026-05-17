@@ -1,59 +1,31 @@
 <?php
-/**
- * PHPUnit Bootstrap for IBL5 Tests
- *
- * This bootstrap file sets up the testing environment for all IBL5 tests
- * without requiring the full IBL5 application context.
- */
 
-// PHPStan RuleTestCase boots the full PHPStan container per analyse() call.
-// Its reflection/signature map needs ~256MB+ headroom — raise the limit so
-// the PHPStanRules test suite can run alongside the rest of the suite.
-ini_set('memory_limit', '1G');
+declare(strict_types=1);
 
-// Define that we're running in PHPUnit - prevents Discord HTTP calls, etc.
-if (!defined('PHPUNIT_RUNNING')) {
-    define('PHPUNIT_RUNNING', true);
-}
-
-// Define constants that might be needed
-if (!defined('DIRECTORY_SEPARATOR')) {
-    define('DIRECTORY_SEPARATOR', '/');
-}
-
-// Load Composer autoloader (handles both application classes and test helpers via PSR-4)
 require_once __DIR__ . '/../vendor/autoload.php';
 
-// In git worktrees, vendor/ is symlinked to the main repo. Composer resolves $baseDir
-// through the symlink, so it loads classes from the main repo instead of the worktree.
-// Prepend the worktree's classes/, tests/, and phpstan-rules/ directories so modified
-// files are used.
 if (is_link(__DIR__ . '/../vendor')) {
     $worktreeClasses = realpath(__DIR__ . '/../classes');
     $worktreeTests = realpath(__DIR__ . '/../tests');
     $worktreePhpstanRules = realpath(__DIR__ . '/../phpstan-rules');
     if ($worktreeClasses !== false || $worktreeTests !== false || $worktreePhpstanRules !== false) {
-        // Register a prepend autoloader that checks the worktree's directories first
         spl_autoload_register(static function (string $class) use ($worktreeClasses, $worktreeTests, $worktreePhpstanRules): void {
-            // Check Tests\ namespace in worktree tests/ dir
             if ($worktreeTests !== false && str_starts_with($class, 'Tests\\')) {
-                $relative = substr($class, 6); // Strip 'Tests\' prefix
+                $relative = substr($class, 6);
                 $file = $worktreeTests . '/' . str_replace('\\', '/', $relative) . '.php';
                 if (file_exists($file)) {
                     require $file;
                     return;
                 }
             }
-            // Check PHPStanRules\ namespace in worktree phpstan-rules/ dir
             if ($worktreePhpstanRules !== false && str_starts_with($class, 'PHPStanRules\\')) {
-                $relative = substr($class, 13); // Strip 'PHPStanRules\' prefix
+                $relative = substr($class, 13);
                 $file = $worktreePhpstanRules . '/' . str_replace('\\', '/', $relative) . '.php';
                 if (file_exists($file)) {
                     require $file;
                     return;
                 }
             }
-            // Check fallback namespace in worktree classes/ dir
             if ($worktreeClasses !== false) {
                 $file = $worktreeClasses . '/' . str_replace('\\', '/', $class) . '.php';
                 if (file_exists($file)) {
@@ -61,36 +33,8 @@ if (is_link(__DIR__ . '/../vendor')) {
                     return;
                 }
             }
-        }, true, true); // throw = true, prepend = true
+        }, true, true);
     }
 }
 
-// Use NullHandler logger in tests — no file I/O, no console output
-\Logging\LoggerFactory::forTests();
-
-// Now that autoloader is registered, define class aliases for backward compatibility
-// This maps the old global mock classes to the new namespaced ones
-class_alias('Tests\\WideUnit\\Mocks\\MockDatabase', 'MockDatabase');
-class_alias('Tests\\WideUnit\\Mocks\\MockDatabaseResult', 'MockDatabaseResult');
-class_alias('Tests\\WideUnit\\Mocks\\MockPreparedStatement', 'MockPreparedStatement');
-class_alias('Tests\\WideUnit\\Mocks\\MockMysqliResult', 'MockMysqliResult');
-class_alias('Tests\\WideUnit\\Mocks\\UI', 'UI');
-class_alias('Tests\\WideUnit\\Mocks\\Season', 'Season\\Season');
-
-// Set up $_SERVER variables needed by config.php
-if (!isset($_SERVER['SERVER_NAME'])) {
-    $_SERVER['SERVER_NAME'] = 'localhost';
-}
-if (!isset($_SERVER['SCRIPT_FILENAME'])) {
-    $_SERVER['SCRIPT_FILENAME'] = __DIR__ . '/../index.php';
-}
-
-// Load the configuration for database access
-require_once __DIR__ . '/../config.php';
-
-// Set up global $mysqli_db mock for tests that use Player or other refactored classes
-// Note: WideUnit tests should set up their own $mysqli_db that shares the same MockDatabase
-// instance used by the test. See ExtensionWideUnitTest for example.
-//
-// Unit tests that directly mock Player/PlayerRepository don't need this global.
-
+\Bootstrap\TestApplicationFactory::build(__DIR__ . '/..')->boot();

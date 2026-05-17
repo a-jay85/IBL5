@@ -12,10 +12,14 @@ use Bootstrap\Contracts\ContainerInterface;
  * config.php loading, database init, nuke_config query, error reporting.
  *
  * Extracted from mainfile.php lines 166-293.
+ *
+ * Pass $includeNukeConfig = false for API bootstrap: nuke_config queries call
+ * filter() which is only defined in the web (mainfile.php) context.
  */
 class ConfigBootstrap implements BootstrapStepInterface
 {
     private string $basePath;
+    private bool $includeNukeConfig;
 
     /** @var list<string> Critical globals that must never be overwritten via $_REQUEST */
     private const PROTECTED_GLOBALS = [
@@ -37,9 +41,10 @@ class ConfigBootstrap implements BootstrapStepInterface
         'authService',
     ];
 
-    public function __construct(string $basePath)
+    public function __construct(string $basePath, bool $includeNukeConfig = true)
     {
         $this->basePath = $basePath;
+        $this->includeNukeConfig = $includeNukeConfig;
     }
 
     /**
@@ -50,7 +55,9 @@ class ConfigBootstrap implements BootstrapStepInterface
         $this->extractRequestToGlobals();
         $this->loadConfig();
         $this->loadDatabase();
-        $this->loadNukeConfig($container);
+        if ($this->includeNukeConfig) {
+            $this->loadNukeConfig($container);
+        }
         $this->configureErrorReporting();
     }
 

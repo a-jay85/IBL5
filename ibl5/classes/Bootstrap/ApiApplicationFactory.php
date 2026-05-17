@@ -31,7 +31,7 @@ final class ApiApplicationFactory
         });
 
         $app->addStep(new CorsBootstrap());
-        $app->addStep(new ConfigBootstrap($basePath));
+        $app->addStep(new ConfigBootstrap($basePath, false));
         $app->addStep(new RequestParsingBootstrap());
         $app->addStep(new ApiKeyAuthBootstrap());
         $app->addStep(new RateLimitingBootstrap());

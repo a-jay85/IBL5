@@ -1,6 +1,6 @@
 ---
 description: Long-running backlog of maintenance-cost reduction opportunities, organized by axis. Each item is a candidate for a future plan.
-last_verified: 2026-05-16
+last_verified: 2026-05-17
 ---
 
 # Maintenance-Cost Reduction Backlog
@@ -2006,7 +2006,7 @@ Effort scale:
 **Suggested direction:** Wire `Application` into `mainfile.php` as the composition root; delete duplicated procedural code.
 **Est. effort:** M
 **Risk if untouched:** Every bootstrap concern added twice; the two copies diverge.
-**Status:** In progress (web wired in Bootstrap A PR, 2026-05-16); ADR-0029. api/test paths and dup-code deletion in Plans B/C.
+**Status:** In progress (web + api wired in Bootstrap A + B PRs, 2026-05-17); ADR-0029. dup-code deletion in Plan C.
 
 ### 14.2 Duplicate Bootstrap Logic — mainfile.php and Step Classes in Parallel
 **Location:** `mainfile.php` lines 102-243 vs `Bootstrap/SessionBootstrap.php`, `HeadersBootstrap.php`, `ConfigBootstrap.php`, `AuthBootstrap.php`
@@ -2028,6 +2028,7 @@ Effort scale:
 **Suggested direction:** `Bootstrap\Kernel::boot(string $mode)` factory accepting `'web'|'api'|'test'`; all three entry points call it.
 **Est. effort:** M
 **Risk if untouched:** Cross-cutting concerns silently missing in one path; API behaves differently from web.
+**Status:** Completed (2026-05-17) — Bootstrap\Application now drives web + api; tests path covered in Plan C.
 
 ### 14.5 Module `index.php` Files Are the Real Composition Root (42 of 47)
 **Location:** `ibl5/modules/*/index.php`
@@ -2077,6 +2078,7 @@ Effort scale:
 **Suggested direction:** Extend `Bootstrap\Application` with `'api'` mode; replace dynamic instantiation with container-resolved factories.
 **Est. effort:** M
 **Risk if untouched:** API controllers can't share bootstrap state (LeagueContext, logging context, feature flags).
+**Status:** Completed (2026-05-17) — api.php is ~40 lines, all bootstrap via ApiApplicationFactory.
 
 ### 14.12 `$_REQUEST → $GLOBALS` Wholesale Injection
 **Location:** `mainfile.php:185-193`, `Bootstrap/ConfigBootstrap.php:62-76`

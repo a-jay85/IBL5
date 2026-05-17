@@ -35,12 +35,27 @@ class Application
 
     /**
      * Execute all registered bootstrap steps in order.
+     *
+     * Steps may signal early termination by setting 'app.terminated' in the container.
+     * When terminated, remaining steps are skipped. Production entry points should
+     * call exit after boot() when isTerminated() is true.
      */
     public function boot(): void
     {
         foreach ($this->steps as $step) {
             $step->boot($this->container);
+            if ($this->container->has('app.terminated')) {
+                return;
+            }
         }
+    }
+
+    /**
+     * Whether a bootstrap step signaled early termination.
+     */
+    public function isTerminated(): bool
+    {
+        return $this->container->has('app.terminated');
     }
 
     /**

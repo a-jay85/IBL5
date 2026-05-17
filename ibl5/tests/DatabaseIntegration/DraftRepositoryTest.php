@@ -166,4 +166,22 @@ class DraftRepositoryTest extends DatabaseTestCase
         self::assertSame(1, $pick['round']);
         self::assertSame(2, $pick['pick']);
     }
+
+    // ── getCurrentOwnerOfDraftPick ──────────────────────────────
+
+    public function testGetCurrentOwnerOfDraftPickReturnsOwner(): void
+    {
+        $this->insertDraftPickRow(1, 2, 2099, 1, ['ownerofpick' => 'Metros', 'teampick' => 'Stars']);
+
+        $result = $this->repo->getCurrentOwnerOfDraftPick(2099, 1, 2);
+
+        self::assertSame('Metros', $result);
+    }
+
+    public function testGetCurrentOwnerOfDraftPickReturnsNullWhenNotFound(): void
+    {
+        $result = $this->repo->getCurrentOwnerOfDraftPick(9999, 9, 99);
+
+        self::assertNull($result);
+    }
 }

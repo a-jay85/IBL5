@@ -6,7 +6,6 @@ namespace Draft;
 
 use Draft\Contracts\DraftSelectionHandlerInterface;
 use Services\Contracts\TeamIdentityRepositoryInterface;
-use Shared\Contracts\SharedRepositoryInterface;
 use Season\Season;
 use Discord\Discord;
 
@@ -21,14 +20,12 @@ class DraftSelectionHandler implements DraftSelectionHandlerInterface
     private TeamIdentityRepositoryInterface $commonRepository;
     private DraftProcessor $processor;
     private DraftView $view;
-    private SharedRepositoryInterface $sharedRepository;
     private Season $season;
 
-    public function __construct(\mysqli $db, TeamIdentityRepositoryInterface $commonRepository, SharedRepositoryInterface $sharedRepository, Season $season)
+    public function __construct(\mysqli $db, TeamIdentityRepositoryInterface $commonRepository, Season $season)
     {
         $this->db = $db;
         $this->commonRepository = $commonRepository;
-        $this->sharedRepository = $sharedRepository;
         $this->season = $season;
 
         $this->validator = new DraftValidator();
@@ -105,7 +102,7 @@ class DraftSelectionHandler implements DraftSelectionHandlerInterface
         try {
             $nextPick = $this->repository->getCurrentDraftPick();
             if ($nextPick !== null) {
-                $teamOnTheClock = $this->sharedRepository->getCurrentOwnerOfDraftPick(
+                $teamOnTheClock = $this->repository->getCurrentOwnerOfDraftPick(
                     $this->season->endingYear,
                     $nextPick['round'],
                     $nextPick['teamid']

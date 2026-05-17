@@ -15,7 +15,6 @@ use PlrParser\PlrParserService;
 use SavedDepthChart\SavedDepthChartRepository;
 use Season\Season;
 use Services\TeamIdentityRepository;
-use Shared\SharedRepository;
 use Tests\DatabaseIntegration\DatabaseTestCase;
 use Updater\Contracts\JsbSourceResolverInterface;
 use Updater\Steps;
@@ -265,7 +264,6 @@ abstract class PipelineIntegrationTestCase extends DatabaseTestCase
         $boxscoreView = new BoxscoreView();
 
         $savedDcRepo = new SavedDepthChartRepository($this->db);
-        $sharedRepo = new SharedRepository($this->db);
 
         $jsbRepo = new JsbImportRepository($this->db);
         $jsbResolver = new PlayerIdResolver($this->db);
@@ -312,7 +310,7 @@ abstract class PipelineIntegrationTestCase extends DatabaseTestCase
         $service->addStep(new Steps\UpdateStandingsStep($standingsUpdater));
         $service->addStep(new Steps\UpdatePowerRankingsStep($powerRankingsUpdater));
 
-        $service->addStep(new Steps\ResetExtensionAttemptsStep($sharedRepo));
+        $service->addStep(new Steps\ResetExtensionAttemptsStep($this->db));
 
         $service->addStep(new Steps\ExtendDepthChartsStep(
             $savedDcRepo, $season->lastSimEndDate, $season->lastSimNumber,

@@ -799,12 +799,6 @@ parameters:
 			path: tests/DatabaseIntegration/SeasonQueryRepositoryTest.php
 
 		-
-			rawMessage: 'Undefined variable: $tn'
-			identifier: variable.undefined
-			count: 1
-			path: tests/DatabaseIntegration/SharedRepositoryTest.php
-
-		-
 			rawMessage: 'Call to static method PHPUnit\Framework\Assert::assertNull() with null will always evaluate to true.'
 			identifier: staticMethod.alreadyNarrowedType
 			count: 3

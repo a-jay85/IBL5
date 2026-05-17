@@ -8,7 +8,6 @@ use Tests\WideUnit\WideUnitTestCase;
 use Tests\WideUnit\Mocks\TestDataFactory;
 use Draft\DraftSelectionHandler;
 use Services\Contracts\TeamIdentityRepositoryInterface;
-use Shared\Contracts\SharedRepositoryInterface;
 use Season\Season;
 
 /**
@@ -30,7 +29,6 @@ class DraftWideUnitTest extends WideUnitTestCase
 {
     private DraftSelectionHandler $handler;
     private TeamIdentityRepositoryInterface $mockCommonRepository;
-    private SharedRepositoryInterface $mockSharedFunctions;
     private Season $mockSeason;
 
     protected function setUp(): void
@@ -41,11 +39,6 @@ class DraftWideUnitTest extends WideUnitTestCase
         $this->mockCommonRepository = $this->createStub(TeamIdentityRepositoryInterface::class);
         $this->mockCommonRepository->method('getTidFromTeamname')->willReturn(1);
 
-        // Stub SharedRepository (no expectations needed)
-        $stub = $this->createStub(SharedRepositoryInterface::class);
-        $stub->method('getCurrentOwnerOfDraftPick')->willReturn('Miami Cyclones');
-        $this->mockSharedFunctions = $stub;
-
         // Create mock Season
         $this->mockSeason = $this->createStub(Season::class);
         $this->mockSeason->endingYear = 2025;
@@ -54,7 +47,6 @@ class DraftWideUnitTest extends WideUnitTestCase
         $this->handler = new DraftSelectionHandler(
             $this->mockDb,
             $this->mockCommonRepository,
-            $this->mockSharedFunctions,
             $this->mockSeason
         );
 

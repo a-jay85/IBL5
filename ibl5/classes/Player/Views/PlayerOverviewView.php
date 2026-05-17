@@ -51,7 +51,6 @@ class PlayerOverviewView implements PlayerOverviewViewInterface
         Player $player,
         PlayerStats $playerStats,
         Season $season,
-        \Shared\Contracts\SharedRepositoryInterface $sharedRepository,
         ?array $colorScheme = null
     ): string {
         // Calculate date range based on season phase

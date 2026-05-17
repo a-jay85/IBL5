@@ -210,4 +210,21 @@ class DraftRepository extends \BaseMysqliRepository implements DraftRepositoryIn
 
         return null;
     }
+
+    /**
+     * @see DraftRepositoryInterface::getCurrentOwnerOfDraftPick()
+     */
+    public function getCurrentOwnerOfDraftPick(int $draftYear, int $draftRound, int $teamIdOfDraftPickOrigin): ?string
+    {
+        /** @var array{ownerofpick: string}|null $result */
+        $result = $this->fetchOne(
+            "SELECT ownerofpick FROM `ibl_draft_picks` WHERE year = ? AND round = ? AND teampick_teamid = ? LIMIT 1",
+            "iii",
+            $draftYear,
+            $draftRound,
+            $teamIdOfDraftPickOrigin
+        );
+
+        return $result !== null ? $result['ownerofpick'] : null;
+    }
 }

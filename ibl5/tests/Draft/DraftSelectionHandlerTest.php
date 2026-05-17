@@ -7,7 +7,6 @@ namespace Tests\Draft;
 use PHPUnit\Framework\TestCase;
 use Draft\DraftSelectionHandler;
 use Services\Contracts\TeamIdentityRepositoryInterface;
-use Shared\Contracts\SharedRepositoryInterface;
 use Season\Season;
 use Tests\WideUnit\Mocks\MockDatabase;
 use Tests\WideUnit\Mocks\MockDatabaseResult;
@@ -26,7 +25,6 @@ class DraftSelectionHandlerTest extends TestCase
     private MockDatabase $mockDb;
     private object $mockMysqliDb;
     private TeamIdentityRepositoryInterface $mockCommonRepository;
-    private SharedRepositoryInterface $mockSharedFunctions;
     private Season $mockSeason;
 
     protected function setUp(): void
@@ -86,11 +84,6 @@ class DraftSelectionHandlerTest extends TestCase
         // Stub CommonMysqliRepository (no expectations needed)
         $this->mockCommonRepository = $this->createStub(TeamIdentityRepositoryInterface::class);
 
-        // Stub SharedRepository (no expectations needed)
-        $stub = $this->createStub(SharedRepositoryInterface::class);
-        $stub->method('getCurrentOwnerOfDraftPick')->willReturn('Test Team');
-        $this->mockSharedFunctions = $stub;
-
         // Mock Season object
         $this->mockSeason = $this->createStub(Season::class);
         $this->mockSeason->beginningYear = 2024;
@@ -107,7 +100,6 @@ class DraftSelectionHandlerTest extends TestCase
         $handler = new DraftSelectionHandler(
             $this->mockDb,
             $this->mockCommonRepository,
-            $this->mockSharedFunctions,
             $this->mockSeason
         );
         
@@ -119,7 +111,6 @@ class DraftSelectionHandlerTest extends TestCase
         $handler = new DraftSelectionHandler(
             $this->mockDb,
             $this->mockCommonRepository,
-            $this->mockSharedFunctions,
             $this->mockSeason
         );
         
@@ -138,7 +129,6 @@ class DraftSelectionHandlerTest extends TestCase
         $handler = new DraftSelectionHandler(
             $this->mockDb,
             $this->mockCommonRepository,
-            $this->mockSharedFunctions,
             $this->mockSeason
         );
 
@@ -154,7 +144,6 @@ class DraftSelectionHandlerTest extends TestCase
         $handler = new DraftSelectionHandler(
             $this->mockDb,
             $this->mockCommonRepository,
-            $this->mockSharedFunctions,
             $this->mockSeason
         );
 
@@ -172,13 +161,11 @@ class DraftSelectionHandlerTest extends TestCase
         $handler1 = new DraftSelectionHandler(
             $this->mockDb,
             $this->mockCommonRepository,
-            $this->mockSharedFunctions,
             $this->mockSeason
         );
         $handler2 = new DraftSelectionHandler(
             $this->mockDb,
             $this->mockCommonRepository,
-            $this->mockSharedFunctions,
             $this->mockSeason
         );
         

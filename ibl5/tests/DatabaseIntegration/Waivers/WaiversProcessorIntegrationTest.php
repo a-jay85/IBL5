@@ -64,7 +64,7 @@ class WaiversProcessorIntegrationTest extends DatabaseTestCase
         $this->assertTrue($result['success']);
         $this->assertSame('player_dropped', $result['result']);
 
-        $player = $this->commonRepository->getPlayerByID($pid);
+        $player = $this->playerLookupRepository->getPlayerByID($pid);
         $this->assertNotNull($player);
         $this->assertSame(1000, $player['ordinal']);
         $this->assertGreaterThan(0, $player['droptime']);
@@ -90,7 +90,7 @@ class WaiversProcessorIntegrationTest extends DatabaseTestCase
         $this->assertTrue($result['success']);
         $this->assertSame('player_added', $result['result']);
 
-        $player = $this->commonRepository->getPlayerByID($pid);
+        $player = $this->playerLookupRepository->getPlayerByID($pid);
         $this->assertNotNull($player);
         $this->assertSame(1, $player['teamid']);
         $this->assertSame(800, $player['ordinal']);
@@ -124,7 +124,7 @@ class WaiversProcessorIntegrationTest extends DatabaseTestCase
         $this->assertTrue($result['success']);
         $this->assertSame('player_added', $result['result']);
 
-        $player = $this->commonRepository->getPlayerByID($pid);
+        $player = $this->playerLookupRepository->getPlayerByID($pid);
         $this->assertNotNull($player);
         $this->assertSame(1, $player['teamid']);
         $this->assertSame(800, $player['ordinal']);

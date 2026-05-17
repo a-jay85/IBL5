@@ -19,12 +19,20 @@ use PHPUnit\Framework\Attributes\PreserveGlobalState;
 #[PreserveGlobalState(false)]
 class DraftEntryPointTest extends ModuleEntryPointTestCase
 {
-    public function testDefaultOpRendersDraftBoard(): void
+    protected function setUp(): void
     {
+        parent::setUp();
         $this->authenticateAs('testgm');
         $this->mockDb->setMockTeamData([self::fullTeamData()]);
         $this->mockDb->setMockData([]);
+        // The ibl_draft_class JOIN query contains 'ibl_team_info', which would otherwise
+        // be intercepted by MockDatabase's team-info special handler. Route it explicitly
+        // so the renderer receives an empty prospect list rather than stray team rows.
+        $this->mockDb->onQuery('ibl_draft_class', []);
+    }
 
+    public function testDefaultOpRendersDraftBoard(): void
+    {
         $output = $this->runModule('Draft', [], [], [
             'user' => $GLOBALS['user'],
             'op' => '',
@@ -35,10 +43,6 @@ class DraftEntryPointTest extends ModuleEntryPointTestCase
 
     public function testUnknownOpFallsToMain(): void
     {
-        $this->authenticateAs('testgm');
-        $this->mockDb->setMockTeamData([self::fullTeamData()]);
-        $this->mockDb->setMockData([]);
-
         $output = $this->runModule('Draft', [], [], [
             'user' => $GLOBALS['user'],
             'op' => 'bogus',

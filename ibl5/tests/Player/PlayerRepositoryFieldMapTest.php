@@ -14,7 +14,7 @@ class PlayerRepositoryFieldMapTest extends TestCase
 
     protected function setUp(): void
     {
-        $db = $this->createMock(\mysqli::class);
+        $db = $this->createStub(\mysqli::class);
         $this->repository = new PlayerRepository($db);
     }
 

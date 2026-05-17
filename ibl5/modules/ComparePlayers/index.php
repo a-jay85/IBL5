@@ -82,6 +82,8 @@ function main($user): void
     }
 }
 
+global $user;
+
 switch ($op) {
     default:
         main($user);

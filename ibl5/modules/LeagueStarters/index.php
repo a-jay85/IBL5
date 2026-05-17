@@ -20,14 +20,14 @@ if (!defined('MODULE_FILE')) {
 use LeagueStarters\LeagueStartersService;
 use LeagueStarters\LeagueStartersView;
 
-global $cookie, $mysqli_db;
+global $cookie, $mysqli_db, $authService;
 
 // Route HTMX API requests (no PageLayout, returns HTML fragment only)
 $op = is_string($_GET['op'] ?? null) ? $_GET['op'] : '';
 $commonRepository = new Repositories\TeamIdentityRepository($mysqli_db);
 
 if ($op === 'api') {
-    $handler = new LeagueStarters\LeagueStartersApiHandler($mysqli_db, $commonRepository);
+    $handler = new LeagueStarters\LeagueStartersApiHandler($mysqli_db, $commonRepository, $authService);
     $handler->handle();
     return;
 }

@@ -19,7 +19,8 @@ class DepthChartEntryApiHandlerTest extends WideUnitTestCase
     {
         $handler = new DepthChartEntryApiHandler(
             $this->mockDb,
-            $this->createStub(TeamIdentityRepositoryInterface::class)
+            $this->createStub(TeamIdentityRepositoryInterface::class),
+            $this->createStub(\League\LeagueContext::class)
         );
 
         $this->assertInstanceOf(DepthChartEntryApiHandler::class, $handler);

@@ -29,9 +29,8 @@ class TradingRepositoryTest extends DatabaseTestCase
     protected function setUp(): void
     {
         parent::setUp();
-        $_SERVER['SERVER_NAME'] = 'localhost';
         $cashRepo = new TradeCashRepository($this->db);
-        $this->offerRepo = new TradeOfferRepository($this->db, $cashRepo);
+        $this->offerRepo = new TradeOfferRepository($this->db, 'localhost', $cashRepo);
         $this->assetRepo = new TradeAssetRepository($this->db);
         $this->formRepo = new TradeFormRepository($this->db);
     }

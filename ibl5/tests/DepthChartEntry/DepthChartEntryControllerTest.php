@@ -83,14 +83,14 @@ class DepthChartEntryControllerTest extends TestCase
 
     public function testControllerCanBeInstantiated(): void
     {
-        $controller = new DepthChartEntryController($this->mockMysqliDb, $this->stubCommonRepo);
+        $controller = new DepthChartEntryController($this->mockMysqliDb, $this->stubCommonRepo, $this->createStub(\League\LeagueContext::class));
         
         $this->assertInstanceOf(DepthChartEntryController::class, $controller);
     }
 
     public function testControllerImplementsCorrectInterface(): void
     {
-        $controller = new DepthChartEntryController($this->mockMysqliDb, $this->stubCommonRepo);
+        $controller = new DepthChartEntryController($this->mockMysqliDb, $this->stubCommonRepo, $this->createStub(\League\LeagueContext::class));
         
         $this->assertInstanceOf(
             \DepthChartEntry\Contracts\DepthChartEntryControllerInterface::class,
@@ -104,8 +104,8 @@ class DepthChartEntryControllerTest extends TestCase
 
     public function testMultipleControllersCanBeInstantiated(): void
     {
-        $controller1 = new DepthChartEntryController($this->mockMysqliDb, $this->stubCommonRepo);
-        $controller2 = new DepthChartEntryController($this->mockMysqliDb, $this->stubCommonRepo);
+        $controller1 = new DepthChartEntryController($this->mockMysqliDb, $this->stubCommonRepo, $this->createStub(\League\LeagueContext::class));
+        $controller2 = new DepthChartEntryController($this->mockMysqliDb, $this->stubCommonRepo, $this->createStub(\League\LeagueContext::class));
 
         $this->assertInstanceOf(DepthChartEntryController::class, $controller1);
         $this->assertInstanceOf(DepthChartEntryController::class, $controller2);

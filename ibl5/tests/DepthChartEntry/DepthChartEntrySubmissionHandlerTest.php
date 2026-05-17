@@ -14,11 +14,11 @@ use Tests\WideUnit\Mocks\MockPreparedStatement;
 /**
  * DepthChartEntrySubmissionHandlerTest
  *
- * The handler no longer emits HTML — on failure it stashes
- * `$_SESSION['_ibl_depth_chart_flash']` for the PRG GET to consume, and
- * returns a bool indicating success. These tests exercise the failure
- * paths that don't require a real DB (success paths need a real DB due
- * to MockDatabase's `insert_id` limitation — covered by E2E instead).
+ * The handler returns a result array on all paths — success and failure.
+ * It never writes to $_SESSION directly; that responsibility belongs to the
+ * controller. These tests exercise the failure paths that don't require a
+ * real DB (success paths need a real DB due to MockDatabase's `insert_id`
+ * limitation — covered by E2E instead).
  */
 class DepthChartEntrySubmissionHandlerTest extends TestCase
 {
@@ -31,16 +31,11 @@ class DepthChartEntrySubmissionHandlerTest extends TestCase
         $this->mockDb = new MockDatabase();
         $this->setupMockMysqliDb();
         $this->stubCommonRepo = $this->createStub(TeamIdentityRepositoryInterface::class);
-
-        // Start with a clean session for every test so flash assertions
-        // aren't polluted by earlier runs.
-        $_SESSION = [];
     }
 
     protected function tearDown(): void
     {
         unset($GLOBALS['mysqli_db']);
-        $_SESSION = [];
     }
 
     private function setupMockMysqliDb(): void
@@ -105,41 +100,32 @@ class DepthChartEntrySubmissionHandlerTest extends TestCase
     }
 
     // ============================================
-    // EMPTY TEAM NAME — stashes flash, returns false
+    // EMPTY TEAM NAME — returns failure result
     // ============================================
 
-    public function testEmptyTeamNameReturnsFalseAndStashesFlash(): void
+    public function testEmptyTeamNameReturnsFailureResult(): void
     {
         $handler = new DepthChartEntrySubmissionHandler($this->mockMysqliDb, $this->stubCommonRepo);
 
-        $success = $handler->handleSubmission(['Team_Name' => '']);
+        $result = $handler->handleSubmission(['Team_Name' => '']);
 
-        $this->assertFalse($success);
-        $this->assertArrayHasKey('_ibl_depth_chart_flash', $_SESSION);
-        $flash = $_SESSION['_ibl_depth_chart_flash'];
-        $this->assertIsArray($flash);
-        $this->assertArrayHasKey('errors_html', $flash);
-        $this->assertIsString($flash['errors_html']);
-        $this->assertStringContainsString('Missing required team information', $flash['errors_html']);
-        $this->assertArrayHasKey('post_data', $flash);
-        $this->assertSame(['Team_Name' => ''], $flash['post_data']);
+        $this->assertFalse($result['success']);
+        $this->assertStringContainsString('Missing required team information', $result['errorsHtml']);
+        $this->assertSame(['Team_Name' => ''], $result['postData']);
+        $this->assertArrayNotHasKey('_ibl_depth_chart_flash', $_SESSION ?? []);
     }
 
-    public function testMissingTeamNameReturnsFalseAndStashesFlash(): void
+    public function testMissingTeamNameReturnsFailureResult(): void
     {
         $handler = new DepthChartEntrySubmissionHandler($this->mockMysqliDb, $this->stubCommonRepo);
 
         $postData = ['pg1' => '1', 'sg1' => '0'];
-        $success = $handler->handleSubmission($postData);
+        $result = $handler->handleSubmission($postData);
 
-        $this->assertFalse($success);
-        $this->assertArrayHasKey('_ibl_depth_chart_flash', $_SESSION);
-        $flash = $_SESSION['_ibl_depth_chart_flash'];
-        $this->assertIsArray($flash);
-        $this->assertStringContainsString('Missing required team information', $flash['errors_html']);
-        // The caller's POST is echoed back into the flash so the
-        // redirected GET can re-populate the form.
-        $this->assertSame($postData, $flash['post_data']);
+        $this->assertFalse($result['success']);
+        $this->assertStringContainsString('Missing required team information', $result['errorsHtml']);
+        $this->assertSame($postData, $result['postData']);
+        $this->assertArrayNotHasKey('_ibl_depth_chart_flash', $_SESSION ?? []);
     }
 
     public function testHandlerEmitsNoOutputOnFailure(): void
@@ -147,12 +133,10 @@ class DepthChartEntrySubmissionHandlerTest extends TestCase
         $handler = new DepthChartEntrySubmissionHandler($this->mockMysqliDb, $this->stubCommonRepo);
 
         ob_start();
-        $success = $handler->handleSubmission(['Team_Name' => '']);
+        $result = $handler->handleSubmission(['Team_Name' => '']);
         $output = (string) ob_get_clean();
 
-        // The handler now communicates exclusively via return value + session
-        // flash — no premature output that would break PRG headers.
-        $this->assertFalse($success);
+        $this->assertFalse($result['success']);
         $this->assertSame('', $output);
     }
 

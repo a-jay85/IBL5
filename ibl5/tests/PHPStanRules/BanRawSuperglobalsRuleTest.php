@@ -111,4 +111,73 @@ final class BanRawSuperglobalsRuleTest extends RuleTestCase
             [],
         );
     }
+
+    public function testFlagsSessionAccessOutsideAllowlist(): void
+    {
+        $this->analyse(
+            [__DIR__ . '/Fixtures/classes/SessionInService.php'],
+            [
+                [
+                    'Direct $_SESSION access is banned outside the HTTP '
+                    . 'boundary layer (Controllers, ApiHandlers, Bootstraps, Authenticators). '
+                    . 'Accept typed inputs as parameters instead.',
+                    5,
+                ],
+            ],
+        );
+    }
+
+    public function testAllowsSessionAccessInCsrfGuard(): void
+    {
+        $this->analyse(
+            [__DIR__ . '/Fixtures/classes/Allowed/CsrfGuard.php'],
+            [],
+        );
+    }
+
+    public function testFlagsServerAccessOutsideAllowlist(): void
+    {
+        $this->analyse(
+            [__DIR__ . '/Fixtures/classes/ServerInRepository.php'],
+            [
+                [
+                    'Direct $_SERVER access is banned outside the HTTP '
+                    . 'boundary layer (Controllers, ApiHandlers, Bootstraps, Authenticators). '
+                    . 'Accept typed inputs as parameters instead.',
+                    5,
+                ],
+            ],
+        );
+    }
+
+    public function testAllowsServerAccessInHtmxHelper(): void
+    {
+        $this->analyse(
+            [__DIR__ . '/Fixtures/classes/Allowed/HtmxHelper.php'],
+            [],
+        );
+    }
+
+    public function testFlagsGlobalsAccessOutsideBootstrap(): void
+    {
+        $this->analyse(
+            [__DIR__ . '/Fixtures/classes/GlobalsInService.php'],
+            [
+                [
+                    'Direct $GLOBALS access is banned outside the HTTP '
+                    . 'boundary layer (Controllers, ApiHandlers, Bootstraps, Authenticators). '
+                    . 'Accept typed inputs as parameters instead.',
+                    5,
+                ],
+            ],
+        );
+    }
+
+    public function testAllowsFilesAccessInController(): void
+    {
+        $this->analyse(
+            [__DIR__ . '/Fixtures/classes/FilesInController.php'],
+            [],
+        );
+    }
 }

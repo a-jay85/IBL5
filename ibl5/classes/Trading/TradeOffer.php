@@ -42,12 +42,13 @@ class TradeOffer implements TradeOfferInterface
     public function __construct(
         \mysqli $db,
         TeamIdentityRepositoryInterface $commonRepository,
+        string $serverName = '',
         ?TradeOfferRepositoryInterface $offerRepository = null,
         ?TradeAssetRepositoryInterface $assetRepository = null
     ) {
         $this->db = $db;
         $this->commonRepository = $commonRepository;
-        $this->offerRepository = $offerRepository ?? new TradeOfferRepository($db);
+        $this->offerRepository = $offerRepository ?? new TradeOfferRepository($db, $serverName);
         $this->assetRepository = $assetRepository ?? new TradeAssetRepository($db);
         $this->cashRepository = new TradeCashRepository($db);
         $this->cashConsiderationRepository = new CashConsiderationRepository($db);

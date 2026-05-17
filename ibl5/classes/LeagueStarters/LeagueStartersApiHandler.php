@@ -4,11 +4,11 @@ declare(strict_types=1);
 
 namespace LeagueStarters;
 
+use Auth\Contracts\AuthServiceInterface;
 use League\League;
 use Season\Season;
 use Repositories\Contracts\TeamIdentityRepositoryInterface;
 use Team\Team;
-use Utilities\NukeCompat;
 
 /**
  * HTMX endpoint handler for league starters display tab switching.
@@ -22,11 +22,13 @@ class LeagueStartersApiHandler
 
     private \mysqli $db;
     private TeamIdentityRepositoryInterface $commonRepo;
+    private AuthServiceInterface $authService;
 
-    public function __construct(\mysqli $db, TeamIdentityRepositoryInterface $commonRepo)
+    public function __construct(\mysqli $db, TeamIdentityRepositoryInterface $commonRepo, AuthServiceInterface $authService)
     {
         $this->db = $db;
         $this->commonRepo = $commonRepo;
+        $this->authService = $authService;
     }
 
     public function handle(): void
@@ -43,12 +45,7 @@ class LeagueStartersApiHandler
 
         header('HX-Push-Url: modules.php?name=LeagueStarters&display=' . $display);
 
-        // Resolve user team from session cookie (same pattern as full-page flow)
-        /** @var mixed $user */
-        global $user;
-        $nuke = new NukeCompat();
-        $cookieData = $nuke->cookieDecode($user);
-        $username = $cookieData[1] ?? '';
+        $username = $this->authService->getUsername() ?? '';
 
         $userTeamName = $this->commonRepo->getTeamnameFromUsername($username);
         $userTeam = Team::initialize($this->db, $userTeamName ?? '');

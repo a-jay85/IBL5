@@ -68,8 +68,7 @@ class WaiversController implements WaiversControllerInterface
             return;
         }
 
-        /** @var array<int, string> $cookie */
-        global $cookie;
+        $cookie = $this->nukeCompat->cookieDecode($user);
         $username = is_string($cookie[1] ?? null) ? $cookie[1] : '';
         $this->executeWaiverOperation($username, $action);
     }

@@ -25,6 +25,20 @@ class Discord
     /** @var bool Whether config has been loaded */
     private static bool $configLoaded = false;
 
+    /** @var string SERVER_NAME injected at bootstrap; empty string means non-production */
+    private static string $serverName = '';
+
+    /**
+     * Inject the server name at bootstrap so Discord never reads superglobals.
+     *
+     * Call once from the web/API bootstrap factory before any Discord method runs.
+     * Modules and scripts that go through mainfile.php get this for free.
+     */
+    public static function init(string $serverName): void
+    {
+        self::$serverName = $serverName;
+    }
+
     /**
      * Check if running under PHPUnit.
      */
@@ -42,7 +56,7 @@ class Discord
      */
     private static function isProduction(): bool
     {
-        $serverName = $_SERVER['SERVER_NAME'] ?? '';
+        $serverName = self::$serverName;
 
         return $serverName === 'iblhoops.net' || $serverName === 'www.iblhoops.net';
     }

@@ -22,7 +22,7 @@ class TeamServiceTest extends TestCase
     {
         $mockDb = new MockDatabase();
         $repository = new \Team\TeamRepository($mockDb);
-        $this->service = new TeamService($mockDb, $repository);
+        $this->service = new TeamService($mockDb, $repository, $this->createStub(\League\LeagueContext::class));
     }
 
     public function testImplementsInterface(): void

@@ -793,22 +793,14 @@ Effort scale:
 **Risk if untouched:** Stored XSS via player/team text fields.
 **Status:** Completed (2026-05-17) — 71 entries cleared; file in zero-floor.
 
-### 5.6 CareerLeaderboardsView — 44 `ibl.unescapedOutput`
-**Location:** `ibl5/classes/CareerLeaderboards/CareerLeaderboardsView.php`
-**Problem:** Second-largest XSS surface. Same pattern as 5.5.
-**Suggested direction:** Same as 5.5; prioritize name/label columns.
-**Est. effort:** M
-**Risk if untouched:** XSS via career stat rows.
+### ~~5.6 CareerLeaderboardsView — 44 `ibl.unescapedOutput`~~ ✅ RESOLVED
+**Resolved:** 2026-05-17 via `xss-c-career-leaderboards-remainder`. All 44 entries cleared; file added to zero-floor.
 
 ### ~~5.7 Navigation Views — 58 `ibl.unescapedOutput` Across 5 Files~~ ✅ RESOLVED
 **Resolved:** 2026-05-17 via PR `xss-navigation-views-zero-floor`. All 58 violations fixed; files added to zero-floor ratchet (ADR-0031) preventing regression.
 
-### 5.8 YourAccountView — 27 `ibl.unescapedOutput`
-**Location:** `ibl5/classes/YourAccount/YourAccountView.php`
-**Problem:** Account pages render user-supplied profile fields.
-**Suggested direction:** Prioritize fields that echo submitted profile data.
-**Est. effort:** S-M
-**Risk if untouched:** Self-XSS or stored XSS if profile fields are rendered to others.
+### ~~5.8 YourAccountView — 27 `ibl.unescapedOutput`~~ ✅ RESOLVED
+**Resolved:** 2026-05-17 via `xss-c-career-leaderboards-remainder`. All 27 entries cleared; file added to zero-floor.
 
 ### 5.9 Bootstrap Layer — 7 `ibl.rawSuperglobal` in Non-Controller Classes
 **Location:** `Bootstrap/ConfigBootstrap.php` ($_REQUEST), `Bootstrap/LeagueBootstrap.php` ($_GET×3 + $_COOKIE×2), `League/LeagueContext.php` ($_GET + $_COOKIE), `Api/Middleware/ApiKeyAuthenticator.php` ($_GET)
@@ -1602,12 +1594,8 @@ Effort scale:
 **Est. effort:** S
 **Risk if untouched:** Nested output buffer corruption.
 
-### 10.16 `ibl.unescapedOutput` Baseline: 11 Entries Remaining
-**Location:** `BoxscoreView`, `CareerLeaderboardsView`, `DepthChartEntryView` (2), `FranchiseRecordBookView`, `LeagueControlPanelView`, `NextSimView`, `RookieOptionFormView`, `StandingsView`, `TeamView`, `TransactionHistoryView`, `YourAccountView`
-**Problem:** Zero-floor enforces 6 files (Navigation views + SeasonLeaderboardsView). 11 grandfathered entries remain.
-**Suggested direction:** Burn-down per sprint; expand `$zeroFloorFiles` array. Plan A cleared Navigation (58 entries); Plan B cleared SeasonLeaderboards (71 entries). CareerLeaderboards + remainder in Plan C.
-**Est. effort:** M
-**Risk if untouched:** Each entry is a potential live XSS; rate never decreases without pressure.
+### ~~10.16 `ibl.unescapedOutput` Baseline: 11 Entries Remaining~~ ✅ RESOLVED
+**Resolved:** 2026-05-17 via `xss-c-career-leaderboards-remainder`. All view-level baseline entries cleared across Plans A/B/C; 11 files now in zero-floor. Zero `ibl.unescapedOutput` entries remain in baseline.
 
 ### 10.17 `ibl.cookieBeforeHeader` Baseline: 4 Controllers
 **Location:** `FreeAgencyController.php`, `SeriesRecordsController.php`, `TeamController.php`, `WaiversController.php`

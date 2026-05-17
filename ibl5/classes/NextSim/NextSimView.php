@@ -225,11 +225,20 @@ window.IBL_initNextSimHighlight();
      */
     public function renderPositionTable(array $games, string $position, Team $userTeam, array $userStarters): string
     {
-        $tableStyle = TableStyles::inlineVars($userTeam->color1, $userTeam->color2);
+        $rows = '';
+        if (isset($userStarters[$position])) {
+            $rows .= $this->renderPlayerRow($userStarters[$position], $userTeam, null);
+        }
+        foreach ($games as $gameData) {
+            $oppStarter = $gameData['opposingStarters'][$position] ?? null;
+            if ($oppStarter instanceof Player) {
+                $rows .= $this->renderPlayerRow($oppStarter, $gameData['opposingTeam'], $gameData);
+            }
+        }
 
         ob_start();
         ?>
-<table class="ibl-data-table team-table responsive-table" style="<?= $tableStyle ?>">
+<table class="ibl-data-table team-table responsive-table" style="<?= TableStyles::inlineVars($userTeam->color1, $userTeam->color2) ?>">
 <colgroup span="2"></colgroup><colgroup span="2"></colgroup><colgroup span="6"></colgroup><colgroup span="6"></colgroup><colgroup span="4"></colgroup><colgroup span="4"></colgroup><colgroup span="1"></colgroup>
     <thead>
         <tr>
@@ -271,25 +280,10 @@ window.IBL_initNextSimHighlight();
             <th>Days Injured</th>
         </tr>
     </thead>
-    <tbody>
-<?php
-        // User's starter row
-        if (isset($userStarters[$position])) {
-            echo $this->renderPlayerRow($userStarters[$position], $userTeam, null);
-        }
-
-        // Opponent rows in chronological order
-        foreach ($games as $gameData) {
-            $oppStarter = $gameData['opposingStarters'][$position] ?? null;
-            if ($oppStarter instanceof Player) {
-                echo $this->renderPlayerRow($oppStarter, $gameData['opposingTeam'], $gameData);
-            }
-        }
-?>
-    </tbody>
-</table>
         <?php
-        return (string) ob_get_clean();
+        $header = (string) ob_get_clean();
+
+        return $header . '<tbody>' . $rows . '</tbody></table>';
     }
 
     /**
@@ -306,52 +300,50 @@ window.IBL_initNextSimHighlight();
         $injuryReturnDate = $player->getInjuryReturnDate($this->season->lastSimEndDate);
         $injuryDays = $player->daysRemainingForInjury ?? 0;
 
-        $gameInfoCell = $this->renderGameInfoCell($team, $gameData);
+        $injuryCell = ($injuryDays > 0 && $injuryReturnDate !== '')
+            ? TooltipLabel::render((string) $injuryDays, 'Returns: ' . $injuryReturnDate)
+            : (string) $injuryDays;
 
-        ob_start();
-        ?>
-        <tr class="<?= $rowClass ?>" style="<?= $rowStyle ?>">
-            <?= $gameInfoCell ?>
-            <?= PlayerImageHelper::renderPlayerCell($player->playerID ?? 0, $player->decoratedName ?? '', [], $player->nameStatusClass) ?>
-            <td><?= HtmlSanitizer::e($player->position ?? '') ?></td>
-            <td><?= (int)$player->age ?></td>
-            <td class="sep-team"></td>
-            <td><?= (int)$player->ratingFieldGoalAttempts ?></td>
-            <td><?= (int)$player->ratingFieldGoalPercentage ?></td>
-            <td class="sep-weak"></td>
-            <td><?= (int)$player->ratingFreeThrowAttempts ?></td>
-            <td><?= (int)$player->ratingFreeThrowPercentage ?></td>
-            <td class="sep-weak"></td>
-            <td><?= (int)$player->ratingThreePointAttempts ?></td>
-            <td><?= (int)$player->ratingThreePointPercentage ?></td>
-            <td class="sep-team"></td>
-            <td><?= (int)$player->ratingOffensiveRebounds ?></td>
-            <td><?= (int)$player->ratingDefensiveRebounds ?></td>
-            <td><?= (int)$player->ratingAssists ?></td>
-            <td><?= (int)$player->ratingSteals ?></td>
-            <td><?= (int)$player->ratingTurnovers ?></td>
-            <td><?= (int)$player->ratingBlocks ?></td>
-            <td><?= (int)$player->ratingFouls ?></td>
-            <td class="sep-team"></td>
-            <td><?= (int)$player->ratingOutsideOffense ?></td>
-            <td><?= (int)$player->ratingDriveOffense ?></td>
-            <td><?= (int)$player->ratingPostOffense ?></td>
-            <td><?= (int)$player->ratingTransitionOffense ?></td>
-            <td class="sep-weak"></td>
-            <td><?= (int)$player->ratingOutsideDefense ?></td>
-            <td><?= (int)$player->ratingDriveDefense ?></td>
-            <td><?= (int)$player->ratingPostDefense ?></td>
-            <td><?= (int)$player->ratingTransitionDefense ?></td>
-            <td class="sep-team"></td>
-            <td><?= (int)$player->ratingClutch ?></td>
-            <td><?= (int)$player->ratingConsistency ?></td>
-            <td class="sep-team"></td>
-            <td><?= ($injuryDays > 0 && $injuryReturnDate !== '')
-                ? TooltipLabel::render((string) $injuryDays, 'Returns: ' . $injuryReturnDate)
-                : (string) $injuryDays ?></td>
-        </tr>
-        <?php
-        return (string) ob_get_clean();
+        $html = '<tr class="' . $rowClass . '" style="' . $rowStyle . '">';
+        $html .= $this->renderGameInfoCell($team, $gameData);
+        $html .= PlayerImageHelper::renderPlayerCell($player->playerID ?? 0, $player->decoratedName ?? '', [], $player->nameStatusClass);
+        $html .= '<td>' . HtmlSanitizer::e($player->position ?? '') . '</td>';
+        $html .= '<td>' . (int) $player->age . '</td>';
+        $html .= '<td class="sep-team"></td>';
+        $html .= '<td>' . (int) $player->ratingFieldGoalAttempts . '</td>';
+        $html .= '<td>' . (int) $player->ratingFieldGoalPercentage . '</td>';
+        $html .= '<td class="sep-weak"></td>';
+        $html .= '<td>' . (int) $player->ratingFreeThrowAttempts . '</td>';
+        $html .= '<td>' . (int) $player->ratingFreeThrowPercentage . '</td>';
+        $html .= '<td class="sep-weak"></td>';
+        $html .= '<td>' . (int) $player->ratingThreePointAttempts . '</td>';
+        $html .= '<td>' . (int) $player->ratingThreePointPercentage . '</td>';
+        $html .= '<td class="sep-team"></td>';
+        $html .= '<td>' . (int) $player->ratingOffensiveRebounds . '</td>';
+        $html .= '<td>' . (int) $player->ratingDefensiveRebounds . '</td>';
+        $html .= '<td>' . (int) $player->ratingAssists . '</td>';
+        $html .= '<td>' . (int) $player->ratingSteals . '</td>';
+        $html .= '<td>' . (int) $player->ratingTurnovers . '</td>';
+        $html .= '<td>' . (int) $player->ratingBlocks . '</td>';
+        $html .= '<td>' . (int) $player->ratingFouls . '</td>';
+        $html .= '<td class="sep-team"></td>';
+        $html .= '<td>' . (int) $player->ratingOutsideOffense . '</td>';
+        $html .= '<td>' . (int) $player->ratingDriveOffense . '</td>';
+        $html .= '<td>' . (int) $player->ratingPostOffense . '</td>';
+        $html .= '<td>' . (int) $player->ratingTransitionOffense . '</td>';
+        $html .= '<td class="sep-weak"></td>';
+        $html .= '<td>' . (int) $player->ratingOutsideDefense . '</td>';
+        $html .= '<td>' . (int) $player->ratingDriveDefense . '</td>';
+        $html .= '<td>' . (int) $player->ratingPostDefense . '</td>';
+        $html .= '<td>' . (int) $player->ratingTransitionDefense . '</td>';
+        $html .= '<td class="sep-team"></td>';
+        $html .= '<td>' . (int) $player->ratingClutch . '</td>';
+        $html .= '<td>' . (int) $player->ratingConsistency . '</td>';
+        $html .= '<td class="sep-team"></td>';
+        $html .= '<td>' . $injuryCell . '</td>';
+        $html .= '</tr>';
+
+        return $html;
     }
 
     /**

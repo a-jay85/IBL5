@@ -71,7 +71,7 @@ class TransactionHistoryView implements TransactionHistoryViewInterface
             <select id="txn-cat" name="cat">
                 <option value="0">All Categories</option>
                 <?php foreach ($categories as $catId => $catName): ?>
-                    <option value="<?= $catId ?>"<?= $selectedCategory === $catId ? ' selected' : '' ?>><?php $catNameSafe = HtmlSanitizer::safeHtmlOutput($catName); echo $catNameSafe; ?></option>
+                    <option value="<?= (int) $catId ?>"<?= $selectedCategory === $catId ? ' selected' : '' ?>><?= HtmlSanitizer::e($catName) ?></option>
                 <?php endforeach; ?>
             </select>
         </div>
@@ -80,7 +80,7 @@ class TransactionHistoryView implements TransactionHistoryViewInterface
             <select id="txn-year" name="year">
                 <option value="0">All Years</option>
                 <?php foreach ($availableYears as $year): ?>
-                    <option value="<?= $year ?>"<?= $selectedYear === $year ? ' selected' : '' ?>><?= $year ?></option>
+                    <option value="<?= (int) $year ?>"<?= $selectedYear === $year ? ' selected' : '' ?>><?= (int) $year ?></option>
                 <?php endforeach; ?>
             </select>
         </div>
@@ -89,7 +89,7 @@ class TransactionHistoryView implements TransactionHistoryViewInterface
             <select id="txn-month" name="month">
                 <option value="0">All Months</option>
                 <?php foreach ($monthNames as $num => $name): ?>
-                    <option value="<?= $num ?>"<?= $selectedMonth === $num ? ' selected' : '' ?>><?php $nameSafe = HtmlSanitizer::safeHtmlOutput($name); echo $nameSafe; ?></option>
+                    <option value="<?= (int) $num ?>"<?= $selectedMonth === $num ? ' selected' : '' ?>><?= HtmlSanitizer::e($name) ?></option>
                 <?php endforeach; ?>
             </select>
         </div>
@@ -126,14 +126,11 @@ class TransactionHistoryView implements TransactionHistoryViewInterface
             $catName = $categories[$catId] ?? 'Unknown';
             $timestamp = strtotime($row['time']);
             $date = date('M j, Y', $timestamp !== false ? $timestamp : 0);
-            $dateSafe = HtmlSanitizer::safeHtmlOutput($date);
-            $catNameSafe = HtmlSanitizer::safeHtmlOutput($catName);
-            $titleSafe = HtmlSanitizer::safeHtmlOutput($row['title']);
             ?>
             <tr>
-                <td class="date-cell"><?= $dateSafe ?></td>
-                <td><span class="txn-badge txn-badge--<?= $catId ?>"><?= $catNameSafe ?></span></td>
-                <td><a href="modules.php?name=News&file=article&sid=<?= (int) $row['sid'] ?>"><?= $titleSafe ?></a></td>
+                <td class="date-cell"><?= HtmlSanitizer::e($date) ?></td>
+                <td><span class="txn-badge txn-badge--<?= (int) $catId ?>"><?= HtmlSanitizer::e($catName) ?></span></td>
+                <td><a href="modules.php?name=News&file=article&sid=<?= (int) $row['sid'] ?>"><?= HtmlSanitizer::e($row['title']) ?></a></td>
             </tr>
         <?php endforeach; ?>
     </tbody>

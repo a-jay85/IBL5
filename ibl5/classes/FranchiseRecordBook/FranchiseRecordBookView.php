@@ -104,7 +104,6 @@ class FranchiseRecordBookView
     {
         if ($data['team'] !== null) {
             $teamId = (int) $data['team']['teamid'];
-            /** @var string $teamName */
             $teamName = HtmlSanitizer::safeHtmlOutput($data['team']['team_name']);
             return '<h2 class="ibl-title">' . $teamName . ' Franchise Record Book</h2>'
                 . '<img src="images/logo/' . $teamId . '.jpg" alt="" class="team-logo-banner">';
@@ -136,12 +135,8 @@ class FranchiseRecordBookView
         onchange="if(window.htmx)return;this.form.requestSubmit()">
         <option value="0"<?= $selectedId === 0 ? ' selected' : '' ?>>League-Wide</option>
         <?php foreach ($teams as $team): ?>
-        <?php
-            /** @var string $safeTeamName */
-            $safeTeamName = HtmlSanitizer::safeHtmlOutput($team['team_name']);
-        ?>
         <option value="<?= (int) $team['teamid'] ?>"<?= (int) $team['teamid'] === $selectedId ? ' selected' : '' ?>>
-            <?= $safeTeamName ?>
+            <?= HtmlSanitizer::e($team['team_name']) ?>
         </option>
         <?php endforeach; ?>
     </select>
@@ -208,7 +203,6 @@ class FranchiseRecordBookView
             $colCount++; // + team (always shown for career)
         }
 
-        /** @var string $safeLabel */
         $safeLabel = HtmlSanitizer::safeHtmlOutput($label);
 
         $html = '<div class="stat-table-wrapper">';
@@ -248,7 +242,6 @@ class FranchiseRecordBookView
      */
     private function renderPlayerNameCell(string $playerName, ?int $pid): string
     {
-        /** @var string $safeName */
         $safeName = HtmlSanitizer::safeHtmlOutput($playerName);
 
         if ($pid !== null && $pid > 0) {

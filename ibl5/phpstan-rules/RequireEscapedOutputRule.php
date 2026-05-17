@@ -110,12 +110,26 @@ final class RequireEscapedOutputRule implements Rule
      * @var list<string>
      */
     private const ZERO_FLOOR_FILES = [
+        // Plan A (Navigation):
         'Navigation/NavigationView.php',
         'Navigation/Views/DesktopNavView.php',
         'Navigation/Views/LoginFormView.php',
         'Navigation/Views/MobileNavView.php',
         'Navigation/Views/TeamsDropdownView.php',
+        // Plan B (SeasonLeaderboards):
         'SeasonLeaderboards/SeasonLeaderboardsView.php',
+        // Plan C (CareerLeaderboards + 10.16 remainder):
+        'Boxscore/BoxscoreView.php',
+        'CareerLeaderboards/CareerLeaderboardsView.php',
+        'DepthChartEntry/DepthChartEntryView.php',
+        'FranchiseRecordBook/FranchiseRecordBookView.php',
+        'LeagueControlPanel/LeagueControlPanelView.php',
+        'NextSim/NextSimView.php',
+        'RookieOption/RookieOptionFormView.php',
+        'Standings/StandingsView.php',
+        'Team/TeamView.php',
+        'TransactionHistory/TransactionHistoryView.php',
+        'YourAccount/YourAccountView.php',
     ];
 
     public function getNodeType(): string

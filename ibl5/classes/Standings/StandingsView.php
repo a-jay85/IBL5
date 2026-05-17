@@ -256,12 +256,9 @@ class StandingsView implements StandingsViewInterface
      */
     private function renderHeader(string $region, string $groupingType): string
     {
-        $safeRegion = \Security\HtmlSanitizer::safeHtmlOutput($region);
-        $title = $safeRegion . ' ' . $groupingType;
-
         ob_start();
         ?>
-        <h2 class="ibl-title"><?= $title; ?></h2>
+        <h2 class="ibl-title"><?= \Security\HtmlSanitizer::e($region) . ' ' . \Security\HtmlSanitizer::e($groupingType); ?></h2>
         <div class="table-scroll-wrapper">
         <div class="table-scroll-container" tabindex="0" role="region" aria-label="Standings">
         <table class="sortable ibl-data-table">
@@ -326,7 +323,6 @@ class StandingsView implements StandingsViewInterface
 
         $lastWin = $streakData['last_win'] ?? 0;
         $lastLoss = $streakData['last_loss'] ?? 0;
-        $streakType = \Security\HtmlSanitizer::safeHtmlOutput($streakData['streak_type'] ?? '');
         $streak = $streakData['streak'] ?? 0;
         $streakSortKey = ($streakData['streak_type'] ?? '') === 'W' ? $streak : -$streak;
         $rating = $streakData['ranking'] ?? 0;
@@ -362,27 +358,26 @@ class StandingsView implements StandingsViewInterface
         } else {
             $rowClass = $this->getClinchTierClass($team);
         }
-        $classAttr = $rowClass !== '' ? ' class="' . $rowClass . '"' : '';
 
         ob_start();
         ?>
-        <tr data-team-id="<?= $teamId; ?>"<?= $classAttr; ?>>
+        <tr data-team-id="<?= \Security\HtmlSanitizer::e($teamId); ?>"<?= $rowClass !== '' ? ' class="' . \Security\HtmlSanitizer::e($rowClass) . '"' : ''; ?>>
             <?= TeamCellHelper::renderTeamCell($teamId, $team['team_name'], $team['color1'], $team['color2'], 'sticky-col', '', $teamName) ?>
-            <td><?= $leagueRecord; ?></td>
+            <td><?= \Security\HtmlSanitizer::e($leagueRecord); ?></td>
             <td><?= \BasketballStats\StatsFormatter::formatWithDecimals((float)$pct, 3); ?></td>
-            <td><?= $pythagoreanPct; ?></td>
-            <td><?= $gamesBack; ?></td>
-            <td><?= $magicNumber; ?></td>
-            <td><?= $gamesUnplayed; ?></td>
-            <td><?= $confRecord; ?></td>
-            <td><?= $divRecord; ?></td>
-            <td><?= $homeRecord; ?></td>
-            <td><?= $awayRecord; ?></td>
-            <td><?= $homeGames; ?></td>
-            <td><?= $awayGames; ?></td>
-            <td><?= $lastWin; ?>-<?= $lastLoss; ?></td>
-            <td sorttable_customkey="<?= $streakSortKey; ?>"><?= $streakType; ?> <?= $streak; ?></td>
-            <td><span class="ibl-stat-highlight"><?= $rating; ?></span></td>
+            <td><?= \Security\HtmlSanitizer::e($pythagoreanPct); ?></td>
+            <td><?= \Security\HtmlSanitizer::e($gamesBack); ?></td>
+            <td><?= \Security\HtmlSanitizer::e($magicNumber); ?></td>
+            <td><?= \Security\HtmlSanitizer::e($gamesUnplayed); ?></td>
+            <td><?= \Security\HtmlSanitizer::e($confRecord); ?></td>
+            <td><?= \Security\HtmlSanitizer::e($divRecord); ?></td>
+            <td><?= \Security\HtmlSanitizer::e($homeRecord); ?></td>
+            <td><?= \Security\HtmlSanitizer::e($awayRecord); ?></td>
+            <td><?= \Security\HtmlSanitizer::e($homeGames); ?></td>
+            <td><?= \Security\HtmlSanitizer::e($awayGames); ?></td>
+            <td><?= \Security\HtmlSanitizer::e($lastWin); ?>-<?= \Security\HtmlSanitizer::e($lastLoss); ?></td>
+            <td sorttable_customkey="<?= \Security\HtmlSanitizer::e($streakSortKey); ?>"><?= \Security\HtmlSanitizer::e($streakData['streak_type'] ?? ''); ?> <?= \Security\HtmlSanitizer::e($streak); ?></td>
+            <td><span class="ibl-stat-highlight"><?= \Security\HtmlSanitizer::e($rating); ?></span></td>
             <td><?= \BasketballStats\StatsFormatter::formatWithDecimals((float)$sos, 3); ?></td>
             <td><?= \BasketballStats\StatsFormatter::formatWithDecimals((float)$remainingSos, 3); ?></td>
         </tr>

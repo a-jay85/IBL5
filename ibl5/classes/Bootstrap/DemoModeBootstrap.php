@@ -7,11 +7,7 @@ namespace Bootstrap;
 use Bootstrap\Contracts\BootstrapStepInterface;
 use Bootstrap\Contracts\ContainerInterface;
 
-/**
- * Demo mode: block all state-mutating requests with a user-friendly page.
- *
- * Extracted from mainfile.php lines 233-243.
- */
+/** Demo mode: block all state-mutating requests with a user-friendly page. */
 class DemoModeBootstrap implements BootstrapStepInterface
 {
     private string $basePath;

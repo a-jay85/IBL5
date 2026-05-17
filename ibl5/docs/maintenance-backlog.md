@@ -593,6 +593,7 @@ Effort scale:
 **Suggested direction:** Merge or rename one to `CrossModuleRepository` with explicit scope.
 **Est. effort:** M
 **Risk if untouched:** Duplicate lookups written in each.
+**Status:** Completed (2026-05-16) — Shared/SharedRepository deleted; methods relocated to Draft/Updater.
 
 ### 4.5 `Player/` vs `PlayerDatabase/` vs `PlayerMovement/`
 **Location:** Three modules, confusable scope
@@ -1116,6 +1117,7 @@ Effort scale:
 **Suggested direction:** Split: `TeamIdentityRepository`, `PlayerLookupRepository`, `SalaryCapRepository`.
 **Est. effort:** M
 **Risk if untouched:** Junk-drawer growth; salary drift with `CapSpace/`.
+**Status:** Completed (2026-05-16) — split into TeamIdentity/PlayerLookup/SalaryCap repos.
 
 ### 7.10 `WaiversRepositoryInterface` Lacks `@phpstan-type` Shapes
 **Location:** `ibl5/classes/Waivers/Contracts/WaiversRepositoryInterface.php`

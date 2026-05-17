@@ -1896,18 +1896,12 @@ Effort scale:
 ## Axis 13: Duplication Across Modules
 
 ### 13.1 Player Averages Views — Near-Identical Quartet
-**Location:** `Player/Views/PlayerPlayoffAveragesView.php`, `PlayerHeatAveragesView.php`, `PlayerOlympicAveragesView.php`, `PlayerRegularSeasonAveragesView.php`
-**Problem:** All four are structurally identical: same 31 `StatsFormatter::` call sequence, same per-season loop + career footer. Differ only in title/method/repo.
-**Suggested direction:** Extract `AbstractPlayerAveragesView` (or strategy `PlayerAveragesTableRenderer`) parameterized by title + fetch callables.
-**Est. effort:** M
-**Risk if untouched:** Formatting fix in one drifts the other three silently.
+**Status:** RESOLVED (PR `player-averages-stats-renderer`)
+**Solution:** Extracted `PlayerSeasonTableRenderer` with `PlayerSeasonTableMode::AVERAGES`/`TOTALS` enum and `PlayerSeasonTableConfig` value object. All 6 views (3 averages + 3 totals) delegate to the shared renderer.
 
 ### 13.2 Player Stats (Totals) Views — Near-Identical Triplet
-**Location:** `Player/Views/PlayerHeatStatsView.php`, `PlayerOlympicsStatsView.php`, `PlayerPlayoffStatsView.php`
-**Problem:** 159 LOC each; differ only in title/repo method. 17+ `StatsFormatter::` calls copy-pasted.
-**Suggested direction:** Parameterized `PlayerTournamentStatsTableRenderer`; or merge with 13.1 as a single renderer with totals/averages mode.
-**Est. effort:** M
-**Risk if untouched:** Same drift risk as 13.1.
+**Status:** RESOLVED (PR `player-averages-stats-renderer`)
+**Solution:** Merged with 13.1 — single `PlayerSeasonTableRenderer` handles both averages and totals mode via config.
 
 ### 13.3 `game_of_that_day` Subquery Copy-Pasted 5 Times
 **Location:** `LeagueSchedule/LeagueScheduleRepository.php:42`, `TeamSchedule/TeamScheduleRepository.php:42`, `RecordHolders/RecordHoldersRepository.php:73,245,660`

@@ -41,3 +41,6 @@ $app->getContainer()->set('api.controllerFactory', static function (): \Closure 
 });
 
 $app->boot();
+if ($app->isTerminated()) {
+    exit;
+}

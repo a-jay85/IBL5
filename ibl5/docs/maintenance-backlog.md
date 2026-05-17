@@ -872,6 +872,7 @@ Effort scale:
 **Suggested direction:** Investigate the three controllers; fix ordering or add explicit `@phpstan-ignore` with reason.
 **Est. effort:** S
 **Risk if untouched:** Reading stale/missing CSRF or session state — security-relevant.
+**Status:** Completed (2026-05-17) — 4 baselines cleared, 4 files added to zero-floor. Rule namespace detection fixed. See [ADR-0032](decisions/0032-cookie-before-header-zero-floor.md).
 
 ### 5.18 ConfigBootstrap — 6 Baseline Entries Block Deprecated `Database\MySQL` Removal
 **Location:** `ibl5/classes/Bootstrap/ConfigBootstrap.php`
@@ -1613,6 +1614,7 @@ Effort scale:
 **Suggested direction:** Burn down in one PR (one-line reorder each); add to zero-floor.
 **Est. effort:** S
 **Risk if untouched:** Stale CSRF/auth read in 4 controllers.
+**Status:** Completed (2026-05-17) — 4 baselines cleared, 4 files added to zero-floor. See [ADR-0032](decisions/0032-cookie-before-header-zero-floor.md).
 
 ### 10.18 ADR-0001: No Rule Blocks `Service extends BaseMysqliRepository`
 **Location:** No existing rule
@@ -1664,7 +1666,7 @@ Effort scale:
 **Risk if untouched:** Rule files self-exempt; coercion bugs in rules.
 
 ### 10.25 Baseline Burn-Down Targets (no new rule)
-**Location:** `phpstan-baseline.neon` — `ibl.unescapedOutput` (17), `ibl.cookieBeforeHeader` (4), `ibl.inlineCss` (6), `ibl.deprecatedHtmlTag` (3)
+**Location:** `phpstan-baseline.neon` — `ibl.unescapedOutput` (17), `ibl.cookieBeforeHeader` (0 — zero-floored), `ibl.inlineCss` (6), `ibl.deprecatedHtmlTag` (3)
 **Problem:** Existing rules have actionable backlogs; staleness of `rawSuperglobal` (10.1) shows snapshot drift.
 **Suggested direction:** Sprint focus + `ibl5/bin/check-baseline-drift --update`.
 **Est. effort:** M (cumulative burn-down)

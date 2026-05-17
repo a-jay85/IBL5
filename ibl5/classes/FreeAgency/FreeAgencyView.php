@@ -10,6 +10,7 @@ use UI\TeamCellHelper;
 use Security\HtmlSanitizer;
 use Team\Team;
 use Season\Season;
+use Services\Contracts\CommonMysqliRepositoryInterface;
 
 /**
  * @phpstan-import-type PlayerRow from \Services\CommonMysqliRepository
@@ -18,10 +19,12 @@ use Season\Season;
 class FreeAgencyView
 {
     private \mysqli $mysqli_db;
+    private CommonMysqliRepositoryInterface $commonRepo;
 
-    public function __construct(\mysqli $mysqli_db)
+    public function __construct(\mysqli $mysqli_db, CommonMysqliRepositoryInterface $commonRepo)
     {
         $this->mysqli_db = $mysqli_db;
+        $this->commonRepo = $commonRepo;
     }
 
     /**
@@ -446,8 +449,7 @@ class FreeAgencyView
 
         $teamName = $player->teamName ?? '';
         if ($teamName === '') {
-            $commonRepo = new \Services\CommonMysqliRepository($this->mysqli_db);
-            $teamName = $commonRepo->getTeamnameFromTeamID($teamId) ?? '';
+            $teamName = $this->commonRepo->getTeamnameFromTeamID($teamId) ?? '';
         }
 
         $teamColors = \Player\Views\TeamColorHelper::getTeamColors($this->mysqli_db, $teamId);

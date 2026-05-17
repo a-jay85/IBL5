@@ -6,6 +6,7 @@ namespace Tests\DepthChartEntry;
 
 use PHPUnit\Framework\TestCase;
 use DepthChartEntry\DepthChartEntrySubmissionHandler;
+use Services\Contracts\CommonMysqliRepositoryInterface;
 use Tests\WideUnit\Mocks\MockDatabase;
 use Tests\WideUnit\Mocks\MockDatabaseResult;
 use Tests\WideUnit\Mocks\MockPreparedStatement;
@@ -23,11 +24,13 @@ class DepthChartEntrySubmissionHandlerTest extends TestCase
 {
     private MockDatabase $mockDb;
     private object $mockMysqliDb;
+    private CommonMysqliRepositoryInterface $stubCommonRepo;
 
     protected function setUp(): void
     {
         $this->mockDb = new MockDatabase();
         $this->setupMockMysqliDb();
+        $this->stubCommonRepo = $this->createStub(CommonMysqliRepositoryInterface::class);
 
         // Start with a clean session for every test so flash assertions
         // aren't polluted by earlier runs.
@@ -86,14 +89,14 @@ class DepthChartEntrySubmissionHandlerTest extends TestCase
 
     public function testHandlerCanBeInstantiated(): void
     {
-        $handler = new DepthChartEntrySubmissionHandler($this->mockMysqliDb);
+        $handler = new DepthChartEntrySubmissionHandler($this->mockMysqliDb, $this->stubCommonRepo);
 
         $this->assertInstanceOf(DepthChartEntrySubmissionHandler::class, $handler);
     }
 
     public function testHandlerImplementsCorrectInterface(): void
     {
-        $handler = new DepthChartEntrySubmissionHandler($this->mockMysqliDb);
+        $handler = new DepthChartEntrySubmissionHandler($this->mockMysqliDb, $this->stubCommonRepo);
 
         $this->assertInstanceOf(
             \DepthChartEntry\Contracts\DepthChartEntrySubmissionHandlerInterface::class,
@@ -107,7 +110,7 @@ class DepthChartEntrySubmissionHandlerTest extends TestCase
 
     public function testEmptyTeamNameReturnsFalseAndStashesFlash(): void
     {
-        $handler = new DepthChartEntrySubmissionHandler($this->mockMysqliDb);
+        $handler = new DepthChartEntrySubmissionHandler($this->mockMysqliDb, $this->stubCommonRepo);
 
         $success = $handler->handleSubmission(['Team_Name' => '']);
 
@@ -124,7 +127,7 @@ class DepthChartEntrySubmissionHandlerTest extends TestCase
 
     public function testMissingTeamNameReturnsFalseAndStashesFlash(): void
     {
-        $handler = new DepthChartEntrySubmissionHandler($this->mockMysqliDb);
+        $handler = new DepthChartEntrySubmissionHandler($this->mockMysqliDb, $this->stubCommonRepo);
 
         $postData = ['pg1' => '1', 'sg1' => '0'];
         $success = $handler->handleSubmission($postData);
@@ -141,7 +144,7 @@ class DepthChartEntrySubmissionHandlerTest extends TestCase
 
     public function testHandlerEmitsNoOutputOnFailure(): void
     {
-        $handler = new DepthChartEntrySubmissionHandler($this->mockMysqliDb);
+        $handler = new DepthChartEntrySubmissionHandler($this->mockMysqliDb, $this->stubCommonRepo);
 
         ob_start();
         $success = $handler->handleSubmission(['Team_Name' => '']);
@@ -159,8 +162,8 @@ class DepthChartEntrySubmissionHandlerTest extends TestCase
 
     public function testMultipleHandlersCanBeInstantiated(): void
     {
-        $handler1 = new DepthChartEntrySubmissionHandler($this->mockMysqliDb);
-        $handler2 = new DepthChartEntrySubmissionHandler($this->mockMysqliDb);
+        $handler1 = new DepthChartEntrySubmissionHandler($this->mockMysqliDb, $this->stubCommonRepo);
+        $handler2 = new DepthChartEntrySubmissionHandler($this->mockMysqliDb, $this->stubCommonRepo);
 
         $this->assertInstanceOf(DepthChartEntrySubmissionHandler::class, $handler1);
         $this->assertInstanceOf(DepthChartEntrySubmissionHandler::class, $handler2);

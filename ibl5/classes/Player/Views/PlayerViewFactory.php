@@ -18,7 +18,7 @@ use Player\Stats\Views\PlayerRegularSeasonAveragesView;
 use Player\Stats\Views\PlayerRegularSeasonTotalsView;
 use Player\Stats\Views\PlayerSimStatsView;
 use Player\Contracts\PlayerViewInterface;
-use Services\CommonMysqliRepository;
+use Services\Contracts\CommonMysqliRepositoryInterface;
 
 /**
  * PlayerViewFactory - Creates view instances with repository injection
@@ -31,12 +31,12 @@ class PlayerViewFactory
 {
     private PlayerRepository $repository;
     private PlayerStatsRepository $statsRepository;
-    private ?CommonMysqliRepository $commonRepository;
+    private CommonMysqliRepositoryInterface $commonRepository;
 
     public function __construct(
         PlayerRepository $repository,
         PlayerStatsRepository $statsRepository,
-        ?CommonMysqliRepository $commonRepository = null
+        CommonMysqliRepositoryInterface $commonRepository
     ) {
         $this->repository = $repository;
         $this->statsRepository = $statsRepository;
@@ -74,16 +74,7 @@ class PlayerViewFactory
      */
     public function createOverviewView(): PlayerOverviewView
     {
-        $commonRepo = $this->commonRepository;
-        if ($commonRepo === null && isset($GLOBALS['mysqli_db']) && $GLOBALS['mysqli_db'] instanceof \mysqli) {
-            $commonRepo = new CommonMysqliRepository($GLOBALS['mysqli_db']);
-        }
-        
-        if ($commonRepo === null) {
-            throw new \RuntimeException('CommonMysqliRepository is required for PlayerOverviewView');
-        }
-        
-        return new PlayerOverviewView($this->statsRepository, $commonRepo);
+        return new PlayerOverviewView($this->statsRepository, $this->commonRepository);
     }
 
     /**

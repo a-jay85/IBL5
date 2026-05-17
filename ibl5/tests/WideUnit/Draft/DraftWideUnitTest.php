@@ -7,6 +7,7 @@ namespace Tests\WideUnit\Draft;
 use Tests\WideUnit\WideUnitTestCase;
 use Tests\WideUnit\Mocks\TestDataFactory;
 use Draft\DraftSelectionHandler;
+use Services\Contracts\CommonMysqliRepositoryInterface;
 use Shared\Contracts\SharedRepositoryInterface;
 use Season\Season;
 
@@ -28,13 +29,18 @@ use Season\Season;
 class DraftWideUnitTest extends WideUnitTestCase
 {
     private DraftSelectionHandler $handler;
+    private CommonMysqliRepositoryInterface $mockCommonRepository;
     private SharedRepositoryInterface $mockSharedFunctions;
     private Season $mockSeason;
 
     protected function setUp(): void
     {
         parent::setUp();
-        
+
+        // Stub CommonMysqliRepository (no expectations needed)
+        $this->mockCommonRepository = $this->createStub(CommonMysqliRepositoryInterface::class);
+        $this->mockCommonRepository->method('getTidFromTeamname')->willReturn(1);
+
         // Stub SharedRepository (no expectations needed)
         $stub = $this->createStub(SharedRepositoryInterface::class);
         $stub->method('getCurrentOwnerOfDraftPick')->willReturn('Miami Cyclones');
@@ -47,6 +53,7 @@ class DraftWideUnitTest extends WideUnitTestCase
 
         $this->handler = new DraftSelectionHandler(
             $this->mockDb,
+            $this->mockCommonRepository,
             $this->mockSharedFunctions,
             $this->mockSeason
         );
@@ -58,6 +65,7 @@ class DraftWideUnitTest extends WideUnitTestCase
     protected function tearDown(): void
     {
         unset($this->handler);
+        unset($this->mockCommonRepository);
         unset($this->mockSharedFunctions);
         unset($this->mockSeason);
         unset($_SERVER['SERVER_NAME']);

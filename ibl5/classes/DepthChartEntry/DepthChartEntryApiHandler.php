@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace DepthChartEntry;
 
+use Services\Contracts\CommonMysqliRepositoryInterface;
+
 /**
  * HTMX endpoint handler for depth chart entry tab switching
  *
@@ -24,10 +26,12 @@ class DepthChartEntryApiHandler
     ];
 
     private \mysqli $db;
+    private CommonMysqliRepositoryInterface $commonRepo;
 
-    public function __construct(\mysqli $db)
+    public function __construct(\mysqli $db, CommonMysqliRepositoryInterface $commonRepo)
     {
         $this->db = $db;
+        $this->commonRepo = $commonRepo;
     }
 
     public function handle(): void
@@ -65,7 +69,7 @@ class DepthChartEntryApiHandler
         }
         header('HX-Push-Url: ' . $pushUrl);
 
-        $controller = new DepthChartEntryController($this->db);
+        $controller = new DepthChartEntryController($this->db, $this->commonRepo);
         echo $controller->getTableOutput($teamid, $display, $split);
     }
 }

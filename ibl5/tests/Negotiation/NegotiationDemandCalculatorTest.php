@@ -8,6 +8,7 @@ use PHPUnit\Framework\TestCase;
 use PHPUnit\Framework\Attributes\DataProvider;
 use Negotiation\NegotiationDemandCalculator;
 use Player\Player;
+use Services\Contracts\CommonMysqliRepositoryInterface;
 use Tests\WideUnit\Mocks\MockDatabase;
 
 /**
@@ -27,7 +28,7 @@ class NegotiationDemandCalculatorTest extends TestCase
     protected function setUp(): void
     {
         $this->mockDb = new MockDatabase();
-        $this->calculator = new NegotiationDemandCalculator($this->mockDb);
+        $this->calculator = new NegotiationDemandCalculator($this->mockDb, $this->createStub(CommonMysqliRepositoryInterface::class));
     }
 
     protected function tearDown(): void

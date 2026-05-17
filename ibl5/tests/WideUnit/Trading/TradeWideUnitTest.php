@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\WideUnit\Trading;
 
+use Services\Contracts\CommonMysqliRepositoryInterface;
 use Tests\WideUnit\WideUnitTestCase;
 use Trading\TradeProcessor;
 
@@ -32,7 +33,8 @@ class TradeWideUnitTest extends WideUnitTestCase
     protected function setUp(): void
     {
         parent::setUp();
-        $this->processor = new TradeProcessor($this->mockDb);
+        $commonRepo = $this->createStub(CommonMysqliRepositoryInterface::class);
+        $this->processor = new TradeProcessor($this->mockDb, $commonRepo);
         
         // Prevent Discord notifications during tests
         $_SERVER['SERVER_NAME'] = 'localhost';

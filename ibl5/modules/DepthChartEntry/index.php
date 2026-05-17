@@ -11,11 +11,14 @@ get_lang($module_name);
 
 $pagetitle = " - Depth Chart Entry";
 
+global $mysqli_db, $commonRepo;
+$commonRepo = new Services\CommonMysqliRepository($mysqli_db);
+
 function userinfo($username)
 {
-    global $mysqli_db;
+    global $mysqli_db, $commonRepo;
 
-    $controller = new DepthChartEntry\DepthChartEntryController($mysqli_db);
+    $controller = new DepthChartEntry\DepthChartEntryController($mysqli_db, $commonRepo);
     $controller->displayForm($username);
 }
 
@@ -32,7 +35,7 @@ function main($user)
 
 function submit()
 {
-    global $mysqli_db;
+    global $mysqli_db, $commonRepo;
 
     // CSRF failure stays inline — no in-flight edits to preserve, and
     // "Please reload and try again" is already the correct instruction.
@@ -46,7 +49,7 @@ function submit()
         return;
     }
 
-    $handler = new DepthChartEntry\DepthChartEntrySubmissionHandler($mysqli_db);
+    $handler = new DepthChartEntry\DepthChartEntrySubmissionHandler($mysqli_db, $commonRepo);
     $success = $handler->handleSubmission($_POST);
 
     if ($success && !isset($_SESSION['flash_success'])) {
@@ -59,9 +62,9 @@ function submit()
 
 function tabApi()
 {
-    global $mysqli_db;
+    global $mysqli_db, $commonRepo;
 
-    $handler = new DepthChartEntry\DepthChartEntryApiHandler($mysqli_db);
+    $handler = new DepthChartEntry\DepthChartEntryApiHandler($mysqli_db, $commonRepo);
     $handler->handle();
 }
 
@@ -75,7 +78,7 @@ function nextSimApi()
 
 function api($user)
 {
-    global $mysqli_db, $cookie;
+    global $mysqli_db, $cookie, $commonRepo;
 
     if (!is_user($user)) {
         header('Content-Type: application/json; charset=utf-8');
@@ -87,7 +90,6 @@ function api($user)
     cookiedecode($user);
     $username = $cookie[1];
 
-    $commonRepo = new Services\CommonMysqliRepository($mysqli_db);
     $teamName = $commonRepo->getTeamnameFromUsername($username);
     if ($teamName === null || $teamName === '' || $teamName === 'Free Agents') {
         header('Content-Type: application/json; charset=utf-8');
@@ -117,7 +119,7 @@ function api($user)
         $params = $_GET;
     }
 
-    $handler = new SavedDepthChart\SavedDepthChartApiHandler($mysqli_db);
+    $handler = new SavedDepthChart\SavedDepthChartApiHandler($mysqli_db, $commonRepo);
     $handler->handle($action, $teamid, $username, $params);
 }
 

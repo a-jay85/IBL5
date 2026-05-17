@@ -14,7 +14,9 @@ use Negotiation\NegotiationRepository;
 use Negotiation\NegotiationService;
 use Negotiation\NegotiationValidator;
 
-global $mysqli_db;
+global $mysqli_db, $commonRepository;
+
+$commonRepository = new CommonMysqliRepository($mysqli_db);
 
 if (stripos($_SERVER['PHP_SELF'], "modules.php") === false) {
     die("You can't access this file directly...");
@@ -33,7 +35,7 @@ $pagetitle = "- Player Archives";
  */
 function showpage($playerID, $pageView): void
 {
-    global $mysqli_db, $cookie;
+    global $mysqli_db, $cookie, $commonRepository;
 
     // Resolve UUID to numeric PID if a UUID string was passed instead of an integer
     if (!is_numeric($playerID) && preg_match('/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i', (string) $playerID)) {
@@ -46,7 +48,7 @@ function showpage($playerID, $pageView): void
     $playerID = (int) $playerID;
     $pageView = ($pageView !== null) ? intval($pageView) : null;
 
-    $controller = new PlayerPageController($mysqli_db);
+    $controller = new PlayerPageController($mysqli_db, $commonRepository);
 
     PageLayout\PageLayout::header();
     echo $controller->renderPage($playerID, $pageView, strval($cookie[1] ?? ''));
@@ -55,14 +57,13 @@ function showpage($playerID, $pageView): void
 
 function negotiate($playerID)
 {
-    global $prefix, $mysqli_db, $cookie;
+    global $prefix, $mysqli_db, $cookie, $commonRepository;
 
     $playerID = intval($playerID);
 
     PageLayout\PageLayout::header();
 
     // Get user's team name using existing CommonRepository (must be after header() which populates $cookie)
-    $commonRepository = new CommonMysqliRepository($mysqli_db);
     $userTeamName = $commonRepository->getTeamnameFromUsername(strval($cookie[1] ?? ''));
 
     $debugSession = new \Debug\DebugSession(
@@ -74,9 +75,9 @@ function negotiate($playerID)
 
     $service = new NegotiationService(
         $mysqli_db,
-        new NegotiationRepository($mysqli_db),
+        new NegotiationRepository($mysqli_db, $commonRepository),
         new NegotiationValidator($mysqli_db),
-        new NegotiationDemandCalculator($mysqli_db),
+        new NegotiationDemandCalculator($mysqli_db, $commonRepository),
     );
     echo $service->processNegotiation($playerID, $userTeamName, $prefix, $bypassOwnership);
 
@@ -85,10 +86,9 @@ function negotiate($playerID)
 
 function rookieoption($pid)
 {
-    global $cookie, $mysqli_db;
+    global $cookie, $mysqli_db, $commonRepository;
 
     // Initialize dependencies
-    $commonRepository = new CommonMysqliRepository($mysqli_db);
     $season = new \Season\Season($mysqli_db);
     $validator = new RookieOptionValidator();
     $formView = new RookieOptionFormView();
@@ -135,7 +135,7 @@ function rookieoption($pid)
 
 function processrookieoption()
 {
-    global $mysqli_db;
+    global $mysqli_db, $commonRepository;
 
     // Get POST parameters
     $teamName = $_POST['teamname'] ?? '';
@@ -149,7 +149,7 @@ function processrookieoption()
     }
 
     // Process rookie option using controller
-    $controller = new RookieOptionController($mysqli_db);
+    $controller = new RookieOptionController($mysqli_db, $commonRepository);
     $result = $controller->processRookieOption($teamName, $playerID, $extensionAmount);
 
     $resultParam = '';

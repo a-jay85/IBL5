@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Tests\SavedDepthChart;
 
 use SavedDepthChart\SavedDepthChartApiHandler;
+use Services\Contracts\CommonMysqliRepositoryInterface;
 use Tests\WideUnit\WideUnitTestCase;
 
 /**
@@ -17,7 +18,7 @@ class SavedDepthChartApiHandlerTest extends WideUnitTestCase
     protected function setUp(): void
     {
         parent::setUp();
-        $this->handler = new SavedDepthChartApiHandler($this->mockDb);
+        $this->handler = new SavedDepthChartApiHandler($this->mockDb, $this->createStub(CommonMysqliRepositoryInterface::class));
     }
 
     public function testHandleUnknownActionReturnsError(): void

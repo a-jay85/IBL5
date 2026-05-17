@@ -29,7 +29,8 @@ class TradeProcessorIntegrationTest extends DatabaseTestCase
         parent::setUp();
         $this->db->commit();
         $_SERVER['SERVER_NAME'] = 'localhost';
-        $this->processor = new TradeProcessor($this->db);
+        $commonRepository = new \Services\CommonMysqliRepository($this->db);
+        $this->processor = new TradeProcessor($this->db, $commonRepository);
     }
 
     protected function tearDown(): void

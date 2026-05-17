@@ -6,6 +6,7 @@ namespace Tests\Trading;
 
 use PHPUnit\Framework\TestCase;
 use PHPUnit\Framework\Attributes\DataProvider;
+use Services\Contracts\CommonMysqliRepositoryInterface;
 use Trading\CashTransactionHandler;
 use Trading\Contracts\CashTransactionHandlerInterface;
 use Tests\WideUnit\Mocks\MockDatabase;
@@ -16,10 +17,12 @@ use Tests\WideUnit\Mocks\MockDatabase;
 class CashTransactionHandlerTest extends TestCase
 {
     private object $mockDb;
+    private CommonMysqliRepositoryInterface $mockCommonRepo;
 
     protected function setUp(): void
     {
         $this->mockDb = $this->createMockDatabase();
+        $this->mockCommonRepo = $this->createStub(CommonMysqliRepositoryInterface::class);
     }
 
     private function createMockDatabase(): object
@@ -121,14 +124,14 @@ class CashTransactionHandlerTest extends TestCase
 
     public function testCanBeInstantiated(): void
     {
-        $handler = new CashTransactionHandler($this->mockDb);
+        $handler = new CashTransactionHandler($this->mockDb, $this->mockCommonRepo);
 
         $this->assertInstanceOf(CashTransactionHandler::class, $handler);
     }
 
     public function testImplementsInterface(): void
     {
-        $handler = new CashTransactionHandler($this->mockDb);
+        $handler = new CashTransactionHandler($this->mockDb, $this->mockCommonRepo);
 
         $this->assertInstanceOf(CashTransactionHandlerInterface::class, $handler);
     }
@@ -139,7 +142,7 @@ class CashTransactionHandlerTest extends TestCase
 
     public function testCalculateContractTotalYearsReturnsOneForOneYearContract(): void
     {
-        $handler = new CashTransactionHandler($this->mockDb);
+        $handler = new CashTransactionHandler($this->mockDb, $this->mockCommonRepo);
         $cashYear = [1 => 5000000];
 
         $result = $handler->calculateContractTotalYears($cashYear);
@@ -149,7 +152,7 @@ class CashTransactionHandlerTest extends TestCase
 
     public function testCalculateContractTotalYearsReturnsTwoForTwoYearContract(): void
     {
-        $handler = new CashTransactionHandler($this->mockDb);
+        $handler = new CashTransactionHandler($this->mockDb, $this->mockCommonRepo);
         $cashYear = [1 => 5000000, 2 => 5500000];
 
         $result = $handler->calculateContractTotalYears($cashYear);
@@ -159,7 +162,7 @@ class CashTransactionHandlerTest extends TestCase
 
     public function testCalculateContractTotalYearsReturnsThreeForThreeYearContract(): void
     {
-        $handler = new CashTransactionHandler($this->mockDb);
+        $handler = new CashTransactionHandler($this->mockDb, $this->mockCommonRepo);
         $cashYear = [1 => 5000000, 2 => 5500000, 3 => 6000000];
 
         $result = $handler->calculateContractTotalYears($cashYear);
@@ -169,7 +172,7 @@ class CashTransactionHandlerTest extends TestCase
 
     public function testCalculateContractTotalYearsReturnsFourForFourYearContract(): void
     {
-        $handler = new CashTransactionHandler($this->mockDb);
+        $handler = new CashTransactionHandler($this->mockDb, $this->mockCommonRepo);
         $cashYear = [1 => 5000000, 2 => 5500000, 3 => 6000000, 4 => 6500000];
 
         $result = $handler->calculateContractTotalYears($cashYear);
@@ -179,7 +182,7 @@ class CashTransactionHandlerTest extends TestCase
 
     public function testCalculateContractTotalYearsReturnsFiveForFiveYearContract(): void
     {
-        $handler = new CashTransactionHandler($this->mockDb);
+        $handler = new CashTransactionHandler($this->mockDb, $this->mockCommonRepo);
         $cashYear = [1 => 5000000, 2 => 5500000, 3 => 6000000, 4 => 6500000, 5 => 7000000];
 
         $result = $handler->calculateContractTotalYears($cashYear);
@@ -189,7 +192,7 @@ class CashTransactionHandlerTest extends TestCase
 
     public function testCalculateContractTotalYearsReturnsSixForSixYearContract(): void
     {
-        $handler = new CashTransactionHandler($this->mockDb);
+        $handler = new CashTransactionHandler($this->mockDb, $this->mockCommonRepo);
         $cashYear = [1 => 5000000, 2 => 5500000, 3 => 6000000, 4 => 6500000, 5 => 7000000, 6 => 7500000];
 
         $result = $handler->calculateContractTotalYears($cashYear);
@@ -199,7 +202,7 @@ class CashTransactionHandlerTest extends TestCase
 
     public function testCalculateContractTotalYearsHandlesEmptyArray(): void
     {
-        $handler = new CashTransactionHandler($this->mockDb);
+        $handler = new CashTransactionHandler($this->mockDb, $this->mockCommonRepo);
         $cashYear = [];
 
         $result = $handler->calculateContractTotalYears($cashYear);
@@ -214,7 +217,7 @@ class CashTransactionHandlerTest extends TestCase
         if (!isset($this->legacyMockDb)) {
             $this->legacyMockDb = new MockDatabase();
         }
-        return new \Trading\CashTransactionHandler($this->legacyMockDb);
+        return new \Trading\CashTransactionHandler($this->legacyMockDb, $this->mockCommonRepo);
     }
 
     /** @var MockDatabase|null */
@@ -296,7 +299,7 @@ class CashTransactionHandlerTest extends TestCase
 
         $this->legacyMockDb = new MockDatabase();
         $this->legacyMockDb->setReturnTrue(true); // INSERT should return true
-        $cashHandler = new \Trading\CashTransactionHandler($this->legacyMockDb);
+        $cashHandler = new \Trading\CashTransactionHandler($this->legacyMockDb, $this->mockCommonRepo);
 
         // Act
         $result = $cashHandler->insertCashTradeData(
@@ -323,7 +326,7 @@ class CashTransactionHandlerTest extends TestCase
 
         $this->legacyMockDb = new MockDatabase();
         $this->legacyMockDb->setReturnTrue(true);
-        $cashHandler = new \Trading\CashTransactionHandler($this->legacyMockDb);
+        $cashHandler = new \Trading\CashTransactionHandler($this->legacyMockDb, $this->mockCommonRepo);
 
         // Act
         $result = $cashHandler->insertCashTradeData(

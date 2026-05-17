@@ -6,7 +6,7 @@ namespace SeriesRecords;
 
 use League\League;
 use SeriesRecords\Contracts\SeriesRecordsControllerInterface;
-use Services\CommonMysqliRepository;
+use Services\Contracts\CommonMysqliRepositoryInterface;
 
 /**
  * SeriesRecordsController - Main controller for Series Records module
@@ -21,15 +21,15 @@ class SeriesRecordsController implements SeriesRecordsControllerInterface
     private SeriesRecordsRepository $repository;
     private SeriesRecordsService $service;
     private SeriesRecordsView $view;
-    private CommonMysqliRepository $commonRepository;
+    private CommonMysqliRepositoryInterface $commonRepository;
     private \Utilities\NukeCompat $nukeCompat;
 
-    public function __construct(\mysqli $db, ?\Utilities\NukeCompat $nukeCompat = null)
+    public function __construct(\mysqli $db, CommonMysqliRepositoryInterface $commonRepository, ?\Utilities\NukeCompat $nukeCompat = null)
     {
         $this->repository = new SeriesRecordsRepository($db);
         $this->service = new SeriesRecordsService();
         $this->view = new SeriesRecordsView($this->service);
-        $this->commonRepository = new CommonMysqliRepository($db);
+        $this->commonRepository = $commonRepository;
         $this->nukeCompat = $nukeCompat ?? new \Utilities\NukeCompat();
     }
 

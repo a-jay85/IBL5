@@ -84,5 +84,14 @@ if ($match === null) {
 $controllerClass = $match['controller'];
 
 /** @var \Api\Contracts\ControllerInterface $controller */
-$controller = new $controllerClass($mysqli_db);
+$tradeControllers = [
+    \Api\Controller\TradeAcceptController::class,
+    \Api\Controller\TradeDeclineController::class,
+];
+if (in_array($controllerClass, $tradeControllers, true)) {
+    $commonRepo = new \Services\CommonMysqliRepository($mysqli_db);
+    $controller = new $controllerClass($mysqli_db, $commonRepo);
+} else {
+    $controller = new $controllerClass($mysqli_db);
+}
 $controller->handle($match['params'], $_GET, $responder, $body);

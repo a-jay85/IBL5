@@ -7,6 +7,7 @@ namespace DepthChartEntry;
 use DepthChartEntry\Contracts\DepthChartEntrySubmissionHandlerInterface;
 use SavedDepthChart\SavedDepthChartService;
 use Season\Season;
+use Services\Contracts\CommonMysqliRepositoryInterface;
 
 /**
  * @phpstan-import-type ProcessedPlayerData from Contracts\DepthChartEntryProcessorInterface
@@ -21,14 +22,16 @@ class DepthChartEntrySubmissionHandler implements DepthChartEntrySubmissionHandl
     private DepthChartEntryProcessor $processor;
     private DepthChartEntryValidator $validator;
     private SavedDepthChartService $savedDcService;
+    private CommonMysqliRepositoryInterface $commonRepo;
 
-    public function __construct(\mysqli $db)
+    public function __construct(\mysqli $db, CommonMysqliRepositoryInterface $commonRepo)
     {
         $this->db = $db;
         $this->repository = new DepthChartEntryRepository($db);
         $this->processor = new DepthChartEntryProcessor();
         $this->validator = new DepthChartEntryValidator();
         $this->savedDcService = new SavedDepthChartService($db);
+        $this->commonRepo = $commonRepo;
     }
 
     /**
@@ -118,14 +121,13 @@ class DepthChartEntrySubmissionHandler implements DepthChartEntrySubmissionHandl
     private function saveDepthChartSnapshot(string $teamName, array $postData, Season $season): void
     {
         try {
-            $commonRepo = new \Services\CommonMysqliRepository($this->db);
-            $teamid = $commonRepo->getTidFromTeamname($teamName) ?? 0;
+            $teamid = $this->commonRepo->getTidFromTeamname($teamName) ?? 0;
             if ($teamid === 0) {
                 return;
             }
 
             // Resolve username from team name
-            $username = $commonRepo->getUsernameFromTeamname($teamName) ?? '';
+            $username = $this->commonRepo->getUsernameFromTeamname($teamName) ?? '';
             if ($username === '') {
                 return;
             }

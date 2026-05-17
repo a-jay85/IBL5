@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace RookieOption;
 
 use Player\Player;
+use Services\Contracts\CommonMysqliRepositoryInterface;
 use Shared\SalaryConverter;
 use RookieOption\Contracts\RookieOptionControllerInterface;
 use Season\Season;
@@ -24,12 +25,14 @@ class RookieOptionController implements RookieOptionControllerInterface
     private \mysqli $db;
     private RookieOptionRepository $repository;
     private \Services\NewsService $newsService;
+    private CommonMysqliRepositoryInterface $commonRepository;
 
-    public function __construct(\mysqli $db)
+    public function __construct(\mysqli $db, CommonMysqliRepositoryInterface $commonRepository)
     {
         $this->db = $db;
         $this->repository = new RookieOptionRepository($db);
         $this->newsService = new \Services\NewsService($db);
+        $this->commonRepository = $commonRepository;
     }
 
     /**
@@ -37,7 +40,6 @@ class RookieOptionController implements RookieOptionControllerInterface
      */
     public function processRookieOption(string $teamName, int $playerID, int $extensionAmount): array
     {
-        $commonRepository = new \Services\CommonMysqliRepository($this->db);
         $season = new Season($this->db);
         $player = Player::withPlayerID($this->db, $playerID);
 
@@ -63,7 +65,7 @@ class RookieOptionController implements RookieOptionControllerInterface
         }
 
         // Get team ID for redirect link
-        $teamid = $commonRepository->getTidFromTeamname($teamName) ?? 0;
+        $teamid = $this->commonRepository->getTidFromTeamname($teamName) ?? 0;
 
         // Send Discord notification
         $playerName = $player->name ?? 'Unknown';

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace SavedDepthChart;
 
 use Security\HtmlSanitizer;
+use Services\Contracts\CommonMysqliRepositoryInterface;
 use Team\Team;
 use Season\Season;
 
@@ -18,12 +19,14 @@ class SavedDepthChartApiHandler
     private \mysqli $db;
     private SavedDepthChartService $service;
     private SavedDepthChartRepository $repository;
+    private CommonMysqliRepositoryInterface $commonRepo;
 
-    public function __construct(\mysqli $db)
+    public function __construct(\mysqli $db, CommonMysqliRepositoryInterface $commonRepo)
     {
         $this->db = $db;
         $this->service = new SavedDepthChartService($db);
         $this->repository = new SavedDepthChartRepository($db);
+        $this->commonRepo = $commonRepo;
     }
 
     /**
@@ -103,8 +106,7 @@ class SavedDepthChartApiHandler
         }
 
         // Get current roster PIDs
-        $commonRepo = new \Services\CommonMysqliRepository($this->db);
-        $teamName = $commonRepo->getTeamnameFromTeamID($teamid) ?? '';
+        $teamName = $this->commonRepo->getTeamnameFromTeamID($teamid) ?? '';
 
         $depthChartRepo = new \DepthChartEntry\DepthChartEntryRepository($this->db);
         $rosterPlayers = ($teamid > 0) ? $depthChartRepo->getPlayersOnTeam($teamid) : [];

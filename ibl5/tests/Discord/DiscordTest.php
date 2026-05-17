@@ -6,18 +6,18 @@ namespace Tests\Discord;
 
 use PHPUnit\Framework\TestCase;
 use Discord\Discord;
-use Tests\WideUnit\Mocks\MockDatabase;
+use Services\Contracts\CommonMysqliRepositoryInterface;
 
 /**
  * Tests for Discord class
  */
 class DiscordTest extends TestCase
 {
-    private $mockDb;
+    private CommonMysqliRepositoryInterface $mockCommonRepo;
 
     protected function setUp(): void
     {
-        $this->mockDb = new MockDatabase();
+        $this->mockCommonRepo = $this->createStub(CommonMysqliRepositoryInterface::class);
     }
 
     /**
@@ -25,7 +25,7 @@ class DiscordTest extends TestCase
      */
     public function testGetDiscordIDFromTeamnameReturnsString(): void
     {
-        $discord = new Discord($this->mockDb);
+        $discord = new Discord($this->mockCommonRepo);
         $result = $discord->getDiscordIDFromTeamname('NonExistentTeam');
         
         // Mock returns '123456789', real implementation would return '' for non-existent team

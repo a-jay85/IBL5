@@ -6,29 +6,37 @@ namespace Tests\Discord;
 
 use PHPUnit\Framework\Attributes\AllowMockObjectsWithoutExpectations;
 use Tests\WideUnit\WideUnitTestCase;
-use Tests\WideUnit\Mocks\TestDataFactory;
 use Discord\Discord;
+use Services\Contracts\CommonMysqliRepositoryInterface;
 
 /**
  * DiscordIntegrationTest - Integration tests for Discord class
  *
- * Tests database interactions and message processing logic.
+ * Tests message processing logic and Discord class delegation to CommonMysqliRepository.
  *
  * @covers \Discord
  */
 #[AllowMockObjectsWithoutExpectations]
 class DiscordIntegrationTest extends WideUnitTestCase
 {
+    private CommonMysqliRepositoryInterface $mockCommonRepo;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+        $this->mockCommonRepo = $this->createStub(CommonMysqliRepositoryInterface::class);
+    }
+
     // ============================================
     // CONSTRUCTOR TESTS
     // ============================================
 
     /**
-     * Test Discord class can be instantiated with mock database
+     * Test Discord class can be instantiated with mock common repo
      */
-    public function testConstructorAcceptsMockDatabase(): void
+    public function testConstructorAcceptsMockCommonRepo(): void
     {
-        $discord = new Discord($this->mockDb);
+        $discord = new Discord($this->mockCommonRepo);
 
         $this->assertInstanceOf(Discord::class, $discord);
     }
@@ -40,7 +48,7 @@ class DiscordIntegrationTest extends WideUnitTestCase
     {
         // If config is not available, this should still work
         // because the example config should exist
-        $discord = new Discord($this->mockDb);
+        $discord = new Discord($this->mockCommonRepo);
 
         $this->assertInstanceOf(Discord::class, $discord);
     }
@@ -50,15 +58,13 @@ class DiscordIntegrationTest extends WideUnitTestCase
     // ============================================
 
     /**
-     * Test getDiscordIDFromTeamname returns string from database
+     * Test getDiscordIDFromTeamname returns string from common repo
      */
-    public function testGetDiscordIDFromTeamnameReturnsStringFromDatabase(): void
+    public function testGetDiscordIDFromTeamnameReturnsStringFromCommonRepo(): void
     {
-        $this->mockDb->setMockData([
-            ['discord_id' => '123456789012345678']
-        ]);
+        $this->mockCommonRepo->method('getTeamDiscordID')->willReturn(123456789012345678);
 
-        $discord = new Discord($this->mockDb);
+        $discord = new Discord($this->mockCommonRepo);
         $result = $discord->getDiscordIDFromTeamname('Test Team');
 
         $this->assertEquals('123456789012345678', $result);
@@ -69,9 +75,9 @@ class DiscordIntegrationTest extends WideUnitTestCase
      */
     public function testGetDiscordIDFromTeamnameReturnsEmptyForNonExistentTeam(): void
     {
-        $this->mockDb->setMockData([]);
+        $this->mockCommonRepo->method('getTeamDiscordID')->willReturn(null);
 
-        $discord = new Discord($this->mockDb);
+        $discord = new Discord($this->mockCommonRepo);
         $result = $discord->getDiscordIDFromTeamname('NonExistent Team');
 
         $this->assertEquals('', $result);
@@ -82,33 +88,27 @@ class DiscordIntegrationTest extends WideUnitTestCase
      */
     public function testGetDiscordIDFromTeamnameReturnsEmptyForNullDiscordID(): void
     {
-        $this->mockDb->setMockData([
-            ['discord_id' => null]
-        ]);
+        $this->mockCommonRepo->method('getTeamDiscordID')->willReturn(null);
 
-        $discord = new Discord($this->mockDb);
+        $discord = new Discord($this->mockCommonRepo);
         $result = $discord->getDiscordIDFromTeamname('Team With Null ID');
 
         $this->assertEquals('', $result);
     }
 
     /**
-     * Test getDiscordIDFromTeamname executes correct query
+     * Test getDiscordIDFromTeamname delegates to common repo
      */
-    public function testGetDiscordIDFromTeamnameExecutesCorrectQuery(): void
+    public function testGetDiscordIDFromTeamdelegatesToCommonRepo(): void
     {
-        $this->mockDb->setMockData([]);
+        $mockRepo = $this->createMock(CommonMysqliRepositoryInterface::class);
+        $mockRepo->expects($this->once())
+            ->method('getTeamDiscordID')
+            ->with('Miami')
+            ->willReturn(null);
 
-        $discord = new Discord($this->mockDb);
-        $this->mockDb->clearQueries(); // Clear any queries from constructor
+        $discord = new Discord($mockRepo);
         $discord->getDiscordIDFromTeamname('Miami');
-
-        $queries = $this->mockDb->getExecutedQueries();
-        // MockPreparedStatement calls sql_query in both execute() and get_result()
-        $this->assertGreaterThanOrEqual(1, count($queries));
-        $this->assertStringContainsString('ibl_team_info', $queries[0]);
-        $this->assertStringContainsString('discord_id', $queries[0]);
-        $this->assertStringContainsString('team_name', $queries[0]);
     }
 
     /**
@@ -116,28 +116,12 @@ class DiscordIntegrationTest extends WideUnitTestCase
      */
     public function testGetDiscordIDFromTeamnameHandlesSpecialCharacters(): void
     {
-        $this->mockDb->setMockData([
-            ['discord_id' => '999888777666555444']
-        ]);
+        $this->mockCommonRepo->method('getTeamDiscordID')->willReturn(999888777666555444);
 
-        $discord = new Discord($this->mockDb);
+        $discord = new Discord($this->mockCommonRepo);
         $result = $discord->getDiscordIDFromTeamname("Team's Name");
 
         $this->assertEquals('999888777666555444', $result);
-    }
-
-    /**
-     * Test getDiscordIDFromTeamname uses LIMIT 1
-     */
-    public function testGetDiscordIDFromTeamnameUsesLimit(): void
-    {
-        $this->mockDb->setMockData([]);
-
-        $discord = new Discord($this->mockDb);
-        $discord->getDiscordIDFromTeamname('Test');
-
-        $queries = $this->mockDb->getExecutedQueries();
-        $this->assertStringContainsString('LIMIT 1', $queries[0]);
     }
 
     /**
@@ -145,12 +129,9 @@ class DiscordIntegrationTest extends WideUnitTestCase
      */
     public function testGetDiscordIDFromTeamnameConvertsToString(): void
     {
-        // Even if database returns integer-ish value
-        $this->mockDb->setMockData([
-            ['discord_id' => 123456789]
-        ]);
+        $this->mockCommonRepo->method('getTeamDiscordID')->willReturn(123456789);
 
-        $discord = new Discord($this->mockDb);
+        $discord = new Discord($this->mockCommonRepo);
         $result = $discord->getDiscordIDFromTeamname('Team');
 
         $this->assertIsString($result);

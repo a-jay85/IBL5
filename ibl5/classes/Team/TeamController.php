@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Team;
 
+use Services\Contracts\CommonMysqliRepositoryInterface;
 use Team\Contracts\TeamControllerInterface;
 use Team\Contracts\TeamServiceInterface;
 use Team\Contracts\TeamViewInterface;
@@ -19,13 +20,15 @@ class TeamController implements TeamControllerInterface
     private TeamServiceInterface $service;
     private TeamViewInterface $view;
     private \Utilities\NukeCompat $nukeCompat;
+    private CommonMysqliRepositoryInterface $commonRepo;
 
-    public function __construct(\mysqli $db, ?\Utilities\NukeCompat $nukeCompat = null)
+    public function __construct(\mysqli $db, CommonMysqliRepositoryInterface $commonRepo, ?\Utilities\NukeCompat $nukeCompat = null)
     {
         $this->db = $db;
         $repository = new TeamRepository($db);
         $this->service = new TeamService($db, $repository);
         $this->view = new TeamView();
+        $this->commonRepo = $commonRepo;
         $this->nukeCompat = $nukeCompat ?? new \Utilities\NukeCompat();
     }
 
@@ -93,8 +96,7 @@ class TeamController implements TeamControllerInterface
             $cookie = $this->nukeCompat->cookieDecode($user);
             $username = (string) ($cookie[1] ?? '');
             if ($username !== '') {
-                $commonRepo = new \Services\CommonMysqliRepository($this->db);
-                $userTeamName = $commonRepo->getTeamnameFromUsername($username) ?? '';
+                $userTeamName = $this->commonRepo->getTeamnameFromUsername($username) ?? '';
             }
         }
 

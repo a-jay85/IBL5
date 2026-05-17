@@ -7,6 +7,7 @@ namespace Tests\RookieOption;
 use PHPUnit\Framework\TestCase;
 use RookieOption\RookieOptionController;
 use RookieOption\Contracts\RookieOptionControllerInterface;
+use Services\Contracts\CommonMysqliRepositoryInterface;
 
 /**
  * RookieOptionControllerTest - Tests for RookieOptionController
@@ -110,14 +111,14 @@ class RookieOptionControllerTest extends TestCase
 
     public function testCanBeInstantiated(): void
     {
-        $controller = new RookieOptionController($this->mockDb);
+        $controller = new RookieOptionController($this->mockDb, $this->createStub(CommonMysqliRepositoryInterface::class));
 
         $this->assertInstanceOf(RookieOptionController::class, $controller);
     }
 
     public function testImplementsInterface(): void
     {
-        $controller = new RookieOptionController($this->mockDb);
+        $controller = new RookieOptionController($this->mockDb, $this->createStub(CommonMysqliRepositoryInterface::class));
 
         $this->assertInstanceOf(RookieOptionControllerInterface::class, $controller);
     }

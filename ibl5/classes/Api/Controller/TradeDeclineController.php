@@ -6,16 +6,19 @@ namespace Api\Controller;
 
 use Api\Contracts\ControllerInterface;
 use Api\Response\JsonResponder;
+use Services\Contracts\CommonMysqliRepositoryInterface;
 use Trading\TradeOfferRepository;
 use Discord\Discord;
 
 class TradeDeclineController implements ControllerInterface
 {
     private \mysqli $db;
+    private CommonMysqliRepositoryInterface $commonRepository;
 
-    public function __construct(\mysqli $db)
+    public function __construct(\mysqli $db, CommonMysqliRepositoryInterface $commonRepository)
     {
         $this->db = $db;
+        $this->commonRepository = $commonRepository;
     }
 
     /**
@@ -64,7 +67,7 @@ class TradeDeclineController implements ControllerInterface
         // and decline notification (no real GM to notify)
         if ($approvalTeam !== 'test') {
             // Verify the Discord user is the GM of the approval team
-            $discord = new Discord($this->db);
+            $discord = new Discord($this->commonRepository);
             $gmDiscordId = $discord->getDiscordIDFromTeamname($approvalTeam);
 
             if ($gmDiscordId === '' || $gmDiscordId !== $discordUserId) {
@@ -91,8 +94,7 @@ class TradeDeclineController implements ControllerInterface
         // Look up offering team's GM Discord ID from `ibl_team_info`
         $offeringTeamDiscordId = '';
         if ($offeringTeam !== '') {
-            $commonRepo = new \Services\CommonMysqliRepository($this->db);
-            $offeringTeamDiscordId = (string) ($commonRepo->getTeamDiscordID($offeringTeam) ?? '');
+            $offeringTeamDiscordId = (string) ($this->commonRepository->getTeamDiscordID($offeringTeam) ?? '');
         }
 
         $responder->success([

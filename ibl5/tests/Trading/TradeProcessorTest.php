@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Tests\Trading;
 
 use PHPUnit\Framework\TestCase;
+use Services\Contracts\CommonMysqliRepositoryInterface;
 use Trading\TradeProcessor;
 use Trading\Contracts\TradeProcessorInterface;
 
@@ -14,10 +15,12 @@ use Trading\Contracts\TradeProcessorInterface;
 class TradeProcessorTest extends TestCase
 {
     private object $mockDb;
+    private CommonMysqliRepositoryInterface $mockCommonRepo;
 
     protected function setUp(): void
     {
         $this->mockDb = $this->createMockDatabase();
+        $this->mockCommonRepo = $this->createStub(CommonMysqliRepositoryInterface::class);
     }
 
     private function createMockDatabase(): object
@@ -127,14 +130,14 @@ class TradeProcessorTest extends TestCase
 
     public function testCanBeInstantiated(): void
     {
-        $processor = new TradeProcessor($this->mockDb);
+        $processor = new TradeProcessor($this->mockDb, $this->mockCommonRepo);
 
         $this->assertInstanceOf(TradeProcessor::class, $processor);
     }
 
     public function testImplementsInterface(): void
     {
-        $processor = new TradeProcessor($this->mockDb);
+        $processor = new TradeProcessor($this->mockDb, $this->mockCommonRepo);
 
         $this->assertInstanceOf(TradeProcessorInterface::class, $processor);
     }
@@ -145,7 +148,7 @@ class TradeProcessorTest extends TestCase
 
     public function testProcessTradeReturnsErrorWhenNoTradeDataFound(): void
     {
-        $processor = new TradeProcessor($this->mockDb);
+        $processor = new TradeProcessor($this->mockDb, $this->mockCommonRepo);
 
         $result = $processor->processTrade(99999);
 

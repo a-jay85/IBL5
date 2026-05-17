@@ -9,7 +9,7 @@ use PHPUnit\Framework\TestCase;
 use Voting\Contracts\VotingRepositoryInterface;
 use Voting\VotingResultsController;
 use Voting\VotingResultsService;
-use Voting\VotingResultsTableRenderer;
+use Voting\VotingResultsView;
 use Season\Season;
 use Tests\WideUnit\Mocks\MockDatabase;
 
@@ -26,13 +26,13 @@ use Tests\WideUnit\Mocks\MockDatabase;
  *
  * @covers \Voting\VotingResultsController
  * @covers \Voting\VotingResultsService
- * @covers \Voting\VotingResultsTableRenderer
+ * @covers \Voting\VotingResultsView
  */
 #[AllowMockObjectsWithoutExpectations]
 class VotingWideUnitTest extends TestCase
 {
     private VotingResultsService $service;
-    private VotingResultsTableRenderer $renderer;
+    private VotingResultsView $renderer;
     private StubVotingRepository $stubRepository;
 
     /** @var \Tests\WideUnit\Mocks\Season */
@@ -42,7 +42,7 @@ class VotingWideUnitTest extends TestCase
     {
         $this->stubRepository = new StubVotingRepository();
         $this->service = new VotingResultsService($this->stubRepository);
-        $this->renderer = new VotingResultsTableRenderer();
+        $this->renderer = new VotingResultsView();
 
         $mockDb = new MockDatabase();
         $this->season = new \Tests\WideUnit\Mocks\Season($mockDb);

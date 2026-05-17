@@ -5,7 +5,7 @@ declare(strict_types=1);
 use Voting\VotingRepository;
 use Voting\VotingResultsController;
 use Voting\VotingResultsService;
-use Voting\VotingResultsTableRenderer;
+use Voting\VotingResultsView;
 
 /************************************************************************/
 /* PHP-NUKE: Web Portal System                                          */
@@ -32,7 +32,7 @@ global $mysqli_db;
 $season = new \Season\Season($mysqli_db);
 $repository = new VotingRepository($mysqli_db);
 $service = new VotingResultsService($repository);
-$renderer = new VotingResultsTableRenderer();
+$renderer = new VotingResultsView();
 $controller = new VotingResultsController($service, $renderer, $season);
 
 echo $controller->render();

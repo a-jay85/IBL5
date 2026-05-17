@@ -8,7 +8,7 @@ use PHPUnit\Framework\TestCase;
 use Voting\Contracts\VotingRepositoryInterface;
 use Voting\VotingResultsController;
 use Voting\VotingResultsService;
-use Voting\VotingResultsTableRenderer;
+use Voting\VotingResultsView;
 use Season\Season;
 use Tests\WideUnit\Mocks\MockDatabase;
 
@@ -104,7 +104,7 @@ final class StubVotingResultsService extends VotingResultsService
     }
 }
 
-final class StubVotingResultsRenderer extends VotingResultsTableRenderer
+final class StubVotingResultsRenderer extends VotingResultsView
 {
     /** @var array<int, array{title: string, rows: array<int, array{name: string, votes: int}>}> */
     public array $lastRenderedTables = [];

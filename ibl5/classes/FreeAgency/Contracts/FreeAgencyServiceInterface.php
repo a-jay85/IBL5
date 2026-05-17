@@ -44,7 +44,7 @@ interface FreeAgencyServiceInterface
      *
      * Loads the player, calculates cap metrics (excluding current offer),
      * fetches demands, existing offer, and salary limits needed by
-     * FreeAgencyNegotiationView::render().
+     * FreeAgencyOfferView::render().
      *
      * @param int $playerID Player ID to negotiate with
      * @param Team $team Team making the offer

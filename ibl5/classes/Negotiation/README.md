@@ -63,7 +63,7 @@ classes/Negotiation/
 │   └── Calculates contract demands based on player ratings
 ├── NegotiationValidator.php (91 lines)
 │   └── Validates eligibility using existing PlayerContractValidator
-├── NegotiationViewHelper.php (207 lines)
+├── NegotiationOfferView.php (207 lines)
 │   └── Handles HTML rendering (presentation layer)
 └── NegotiationService.php (229 lines)
     └── Orchestrates the complete workflow
@@ -109,7 +109,7 @@ MAX_RAISE_PERCENTAGE = 0.1 // 10% max annual raise
 - This ensures consistency with contract validation logic used elsewhere
 - Eliminates duplicate validation code (16 lines of if/else checks replaced with method call)
 
-### 3. NegotiationViewHelper.php
+### 3. NegotiationOfferView.php
 
 **Responsibility**: Presentation layer (HTML rendering)
 
@@ -143,7 +143,7 @@ MAX_RAISE_PERCENTAGE = 0.1 // 10% max annual raise
 5. Calculate contract demands (delegates to NegotiationDemandCalculator)
 6. Calculate available cap space
 7. Determine max first year salary based on experience
-8. Render negotiation form (delegates to NegotiationViewHelper)
+8. Render negotiation form (delegates to NegotiationOfferView)
 
 **Key Methods**:
 - `processNegotiation(int $playerID, string $userTeamName, string $prefix): string`
@@ -174,7 +174,7 @@ MAX_RAISE_PERCENTAGE = 0.1 // 10% max annual raise
 ### 3. Extensibility ✅
 - Easy to add new validation rules (just add methods to NegotiationValidator)
 - Easy to modify demand calculation (isolated in NegotiationDemandCalculator)
-- Easy to change presentation (isolated in NegotiationViewHelper)
+- Easy to change presentation (isolated in NegotiationOfferView)
 - Can easily add new factors to modifier calculation
 
 ### 4. Testability ✅
@@ -211,7 +211,7 @@ MAX_RAISE_PERCENTAGE = 0.1 // 10% max annual raise
 1. **21 lines** in main function (94.5% reduction)
 2. **0 uses** of `stripslashes(check_html())` - replaced with DatabaseService methods
 3. **Database queries optimized** and properly escaped
-4. **HTML separated** into NegotiationViewHelper
+4. **HTML separated** into NegotiationOfferView
 5. **Full reuse** of Player class and CommonRepository
 6. **Delegation to existing** PlayerContractValidator
 7. **Fully testable** - can mock database and test each class independently
@@ -269,7 +269,7 @@ $validator = new NegotiationValidator($db);
 $result = $validator->validateNegotiationEligibility($player, $userTeam);
 
 // Render view independently
-$html = NegotiationViewHelper::renderNegotiationForm($player, $demands, $capSpace, $maxSalary);
+$html = NegotiationOfferView::renderNegotiationForm($player, $demands, $capSpace, $maxSalary);
 ```
 
 ### As a User:
@@ -321,7 +321,7 @@ $result = $validator->validateNegotiationEligibility($player, 'Seattle Supersoni
 $this->assertTrue($result['valid']);
 
 // Test view rendering
-$html = NegotiationViewHelper::renderNegotiationForm($player, $demands, 1000, 1063);
+$html = NegotiationOfferView::renderNegotiationForm($player, $demands, 1000, 1063);
 $this->assertStringContainsString('form', $html);
 ```
 

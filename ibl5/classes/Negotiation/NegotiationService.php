@@ -29,14 +29,14 @@ class NegotiationService implements NegotiationServiceInterface
         try {
             $player = Player::withPlayerID($this->db, $playerID);
         } catch (\Exception|\TypeError $e) {
-            return NegotiationViewHelper::renderError('Player not found.');
+            return NegotiationOfferView::renderError('Player not found.');
         }
 
-        $output = NegotiationViewHelper::renderHeader($player);
+        $output = NegotiationOfferView::renderHeader($player);
 
         $freeAgencyValidation = $this->validator->validateFreeAgencyNotActive();
         if (!$freeAgencyValidation->isValid()) {
-            return $output . NegotiationViewHelper::renderError($freeAgencyValidation->getError() ?? '');
+            return $output . NegotiationOfferView::renderError($freeAgencyValidation->getError() ?? '');
         }
 
         if ($bypassOwnership) {
@@ -45,7 +45,7 @@ class NegotiationService implements NegotiationServiceInterface
             $eligibilityValidation = $this->validator->validateNegotiationEligibility($player, $userTeamName);
         }
         if (!$eligibilityValidation->isValid()) {
-            return $output . NegotiationViewHelper::renderError($eligibilityValidation->getError() ?? '');
+            return $output . NegotiationOfferView::renderError($eligibilityValidation->getError() ?? '');
         }
 
         $factorsTeamName = $bypassOwnership ? ($player->teamName ?? '') : $userTeamName;
@@ -61,7 +61,7 @@ class NegotiationService implements NegotiationServiceInterface
         $capSpace = $this->repository->getTeamCapSpaceNextSeason($userTeamName);
         $maxYearOneSalary = \ContractRules::getMaxContractSalary($player->yearsOfExperience ?? 0);
 
-        $output .= NegotiationViewHelper::renderNegotiationForm(
+        $output .= NegotiationOfferView::renderNegotiationForm(
             $player,
             $demands,
             $capSpace,

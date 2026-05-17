@@ -5,13 +5,13 @@ declare(strict_types=1);
 namespace Voting\Contracts;
 
 /**
- * VotingResultsTableRendererInterface - Voting results HTML rendering
+ * VotingResultsViewInterface - Voting results HTML rendering
  *
  * Renders voting results tables using legacy module styling.
  *
  * @phpstan-import-type VoteTable from VotingResultsServiceInterface
  */
-interface VotingResultsTableRendererInterface
+interface VotingResultsViewInterface
 {
     /**
      * Renders multiple voting result tables

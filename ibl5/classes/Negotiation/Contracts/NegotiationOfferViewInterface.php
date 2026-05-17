@@ -8,14 +8,14 @@ use Negotiation\Contracts\NegotiationDemandCalculatorInterface;
 use Player\Player;
 
 /**
- * NegotiationViewHelperInterface - Negotiation page HTML rendering
+ * NegotiationOfferViewInterface - Negotiation page HTML rendering
  *
  * Handles HTML rendering for the negotiation page, separating
  * presentation logic from business logic. All methods are static.
  *
  * @phpstan-import-type DemandResult from NegotiationDemandCalculatorInterface
  */
-interface NegotiationViewHelperInterface
+interface NegotiationOfferViewInterface
 {
     /**
      * Render the negotiation form

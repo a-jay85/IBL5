@@ -58,12 +58,12 @@ class NegotiationOfferView implements NegotiationOfferViewInterface
         ?>
 <div class="ibl-card">
     <div class="ibl-card__header">
-        <h2 class="ibl-card__title"><?= $playerPos ?> <?= $playerName ?> - Contract Extension</h2>
+        <h2 class="ibl-card__title"><?= HtmlSanitizer::trusted($playerPos) ?> <?= HtmlSanitizer::trusted($playerName) ?> - Contract Extension</h2>
     </div>
     <div class="ibl-card__body">
         <div class="offer-player-info">
-            <img src="<?= PlayerImageHelper::getImageUrl($player->playerID) ?>" alt="<?= $playerName ?>" class="offer-player-img">
-            <?= self::renderPlayerRatings($player) ?>
+            <img src="<?= HtmlSanitizer::e(PlayerImageHelper::getImageUrl($player->playerID)) ?>" alt="<?= HtmlSanitizer::trusted($playerName) ?>" class="offer-player-img">
+            <?= HtmlSanitizer::trusted(self::renderPlayerRatings($player)) ?>
         </div>
     </div>
 </div>
@@ -79,7 +79,7 @@ class NegotiationOfferView implements NegotiationOfferViewInterface
         <div class="ibl-field-group">
             <span class="ibl-label">Player Demands:</span>
             <div class="ibl-field-group__content">
-                <?= self::buildDemandDisplay($demands) ?>
+                <?= HtmlSanitizer::trusted(self::buildDemandDisplay($demands)) ?>
             </div>
         </div>
 
@@ -89,19 +89,19 @@ class NegotiationOfferView implements NegotiationOfferViewInterface
                 <span class="ibl-label">Your Offer:</span>
                 <div class="ibl-field-group__content">
                     <?php if (!$demandsExceedMax): ?>
-                        <?= self::renderEditableOfferFields($demands) ?>
+                        <?= HtmlSanitizer::trusted(self::renderEditableOfferFields($demands)) ?>
                     <?php else: ?>
-                        <?= self::renderMaxSalaryFields($maxYearOneSalary, $maxRaise, $demands) ?>
+                        <?= HtmlSanitizer::trusted(self::renderMaxSalaryFields($maxYearOneSalary, $maxRaise, $demands)) ?>
                     <?php endif; ?>
                 </div>
             </div>
 
-            <input type="hidden" name="maxyr1" value="<?= $maxYearOneSalary ?>">
-            <input type="hidden" name="demandsTotal" value="<?= $demands['total'] ?>">
-            <input type="hidden" name="demandsYears" value="<?= $demands['years'] ?>">
-            <input type="hidden" name="teamName" value="<?= $teamName ?>">
-            <input type="hidden" name="playerName" value="<?= $playerName ?>">
-            <input type="hidden" name="playerID" value="<?= $playerID ?>">
+            <input type="hidden" name="maxyr1" value="<?= (int) $maxYearOneSalary ?>">
+            <input type="hidden" name="demandsTotal" value="<?= (int) $demands['total'] ?>">
+            <input type="hidden" name="demandsYears" value="<?= (int) $demands['years'] ?>">
+            <input type="hidden" name="teamName" value="<?= HtmlSanitizer::trusted($teamName) ?>">
+            <input type="hidden" name="playerName" value="<?= HtmlSanitizer::trusted($playerName) ?>">
+            <input type="hidden" name="playerID" value="<?= (int) $playerID ?>">
 
             <button type="submit" class="ibl-btn ibl-btn--primary">Offer Extension</button>
         </form>
@@ -115,17 +115,17 @@ class NegotiationOfferView implements NegotiationOfferViewInterface
     </div>
     <div class="ibl-card__body">
         <ul class="ibl-notes">
-            <li>You have <strong><?= $capSpace ?></strong> in cap space available; the amount you offer in year 1 cannot exceed this.</li>
-            <li>Based on years of service, the maximum amount you can offer in year 1 is <strong><?= $maxYearOneSalary ?></strong>.</li>
+            <li>You have <strong><?= (int) $capSpace ?></strong> in cap space available; the amount you offer in year 1 cannot exceed this.</li>
+            <li>Based on years of service, the maximum amount you can offer in year 1 is <strong><?= (int) $maxYearOneSalary ?></strong>.</li>
             <li>Enter "0" for years you do not want to offer a contract.</li>
             <li>Contract extensions must be at least three years in length.</li>
             <li>The amounts offered each year must equal or exceed the previous year.</li>
             <?php if ($hasBirdRights): ?>
-                <li><strong>Bird Rights Player:</strong> You may add no more than <?= $raisePercentageDisplay ?>% of the amount you offer in the first year as a raise between years (for instance, if you offer <?= $exampleSalary ?> in Year 1, you cannot offer a raise of more than <?= $exampleRaise ?> between any two subsequent years.)</li>
+                <li><strong>Bird Rights Player:</strong> You may add no more than <?= HtmlSanitizer::e($raisePercentageDisplay) ?>% of the amount you offer in the first year as a raise between years (for instance, if you offer <?= (int) $exampleSalary ?> in Year 1, you cannot offer a raise of more than <?= (int) $exampleRaise ?> between any two subsequent years.)</li>
             <?php else: ?>
-                <li><strong>No Bird Rights:</strong> You may add no more than <?= $raisePercentageDisplay ?>% of the amount you offer in the first year as a raise between years (for instance, if you offer <?= $exampleSalary ?> in Year 1, you cannot offer a raise of more than <?= $exampleRaise ?> between any two subsequent years.)</li>
+                <li><strong>No Bird Rights:</strong> You may add no more than <?= HtmlSanitizer::e($raisePercentageDisplay) ?>% of the amount you offer in the first year as a raise between years (for instance, if you offer <?= (int) $exampleSalary ?> in Year 1, you cannot offer a raise of more than <?= (int) $exampleRaise ?> between any two subsequent years.)</li>
             <?php endif; ?>
-            <li>When re-signing your own players, you can go over the soft cap and up to the hard cap (<?= League::HARD_CAP_MAX ?>).</li>
+            <li>When re-signing your own players, you can go over the soft cap and up to the hard cap (<?= (int) League::HARD_CAP_MAX ?>).</li>
         </ul>
     </div>
 </div>
@@ -149,7 +149,7 @@ class NegotiationOfferView implements NegotiationOfferViewInterface
     <?php foreach ($yearKeys as $index => $key): ?>
         <?php if ($demands[$key] !== 0): ?>
         <div class="offer-salary-cell">
-            <div class="ibl-label ibl-label--sm">Yr <?= $index + 1 ?></div>
+            <div class="ibl-label ibl-label--sm">Yr <?= (int) ($index + 1) ?></div>
             <div class="offer-salary-cell__value"><?= (int) $demands[$key] ?></div>
         </div>
         <?php endif; ?>
@@ -172,8 +172,8 @@ class NegotiationOfferView implements NegotiationOfferViewInterface
 <div class="offer-salary-row offer-salary-row--inputs">
     <?php for ($i = 1; $i <= 5; $i++): ?>
     <div class="offer-salary-cell">
-        <label for="offerYear<?= $i ?>" class="ibl-label ibl-label--sm">Yr <?= $i ?></label>
-        <input type="number" id="offerYear<?= $i ?>" class="ibl-input ibl-input--sm offer-salary-input" name="offerYear<?= $i ?>" value="<?= (int) $demands['year' . $i] ?>" min="0" max="9999">
+        <label for="offerYear<?= (int) $i ?>" class="ibl-label ibl-label--sm">Yr <?= (int) $i ?></label>
+        <input type="number" id="offerYear<?= (int) $i ?>" class="ibl-input ibl-input--sm offer-salary-input" name="offerYear<?= (int) $i ?>" value="<?= (int) $demands['year' . $i] ?>" min="0" max="9999">
     </div>
     <?php endfor; ?>
 </div>
@@ -202,8 +202,8 @@ class NegotiationOfferView implements NegotiationOfferViewInterface
 <div class="offer-salary-row offer-salary-row--inputs">
     <?php for ($i = 0; $i < 5; $i++): ?>
     <div class="offer-salary-cell">
-        <label for="offerYear<?= $i + 1 ?>" class="ibl-label ibl-label--sm">Yr <?= $i + 1 ?></label>
-        <input type="number" id="offerYear<?= $i + 1 ?>" class="ibl-input ibl-input--sm offer-salary-input" name="offerYear<?= $i + 1 ?>" value="<?= $maxValues[$i] ?>" min="0" max="9999">
+        <label for="offerYear<?= (int) ($i + 1) ?>" class="ibl-label ibl-label--sm">Yr <?= (int) ($i + 1) ?></label>
+        <input type="number" id="offerYear<?= (int) ($i + 1) ?>" class="ibl-input ibl-input--sm offer-salary-input" name="offerYear<?= (int) ($i + 1) ?>" value="<?= (int) $maxValues[$i] ?>" min="0" max="9999">
     </div>
     <?php endfor; ?>
 </div>

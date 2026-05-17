@@ -1,6 +1,12 @@
 parameters:
 	ignoreErrors:
 		-
+			rawMessage: Cannot cast mixed to string.
+			identifier: cast.string
+			count: 1
+			path: classes/Bootstrap/ApiApplicationFactory.php
+
+		-
 			rawMessage: '''
 				Call to method sql_fetchrow() of deprecated class Database\MySQL:
 				This class is for PHP-Nuke module backward compatibility only.
@@ -100,6 +106,12 @@ parameters:
 			path: classes/Bootstrap/ConfigBootstrap.php
 
 		-
+			rawMessage: Cannot cast mixed to string.
+			identifier: cast.string
+			count: 1
+			path: classes/Bootstrap/WebApplicationFactory.php
+
+		-
 			rawMessage: Casting to int something that's already int.
 			identifier: cast.useless
 			count: 17
@@ -118,10 +130,16 @@ parameters:
 			path: classes/DepthChartEntry/DepthChartEntryView.php
 
 		-
-			rawMessage: '$cookie[...] is read before PageLayout::header() in the same method. PageLayout::header() populates $cookie with auth and CSRF state — call it first, otherwise you will read stale or missing values (see CsrfGuard MAX_TOKENS incident).'
-			identifier: ibl.cookieBeforeHeader
-			count: 2
-			path: classes/FreeAgency/FreeAgencyController.php
+			rawMessage: Casting to int something that's already int.
+			identifier: cast.useless
+			count: 11
+			path: classes/Negotiation/NegotiationOfferView.php
+
+		-
+			rawMessage: 'Casting to int something that''s already int<1, 5>.'
+			identifier: cast.useless
+			count: 8
+			path: classes/Negotiation/NegotiationOfferView.php
 
 		-
 			rawMessage: 'Inline `style="..."` attributes are banned in PHP. Move CSS to ibl5/design/components/. Exception: `style="--foo: ..."` CSS custom properties are allowed.'
@@ -160,18 +178,6 @@ parameters:
 			path: classes/RookieOption/RookieOptionFormView.php
 
 		-
-			rawMessage: '$cookie[...] is read before PageLayout::header() in the same method. PageLayout::header() populates $cookie with auth and CSRF state — call it first, otherwise you will read stale or missing values (see CsrfGuard MAX_TOKENS incident).'
-			identifier: ibl.cookieBeforeHeader
-			count: 1
-			path: classes/SeriesRecords/SeriesRecordsController.php
-
-		-
-			rawMessage: '$cookie[...] is read before PageLayout::header() in the same method. PageLayout::header() populates $cookie with auth and CSRF state — call it first, otherwise you will read stale or missing values (see CsrfGuard MAX_TOKENS incident).'
-			identifier: ibl.cookieBeforeHeader
-			count: 1
-			path: classes/Team/TeamController.php
-
-		-
 			rawMessage: Deprecated HTML tag `<i>` found in string literal. Use <em> instead.
 			identifier: ibl.deprecatedHtmlTag
 			count: 2
@@ -188,9 +194,3 @@ parameters:
 			identifier: cast.useless
 			count: 1
 			path: classes/TransactionHistory/TransactionHistoryView.php
-
-		-
-			rawMessage: '$cookie[...] is read before PageLayout::header() in the same method. PageLayout::header() populates $cookie with auth and CSRF state — call it first, otherwise you will read stale or missing values (see CsrfGuard MAX_TOKENS incident).'
-			identifier: ibl.cookieBeforeHeader
-			count: 2
-			path: classes/Waivers/WaiversController.php

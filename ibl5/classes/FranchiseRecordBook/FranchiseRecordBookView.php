@@ -104,7 +104,6 @@ class FranchiseRecordBookView
     {
         if ($data['team'] !== null) {
             $teamId = (int) $data['team']['teamid'];
-            /** @var string $teamName */
             $teamName = HtmlSanitizer::safeHtmlOutput($data['team']['team_name']);
             return '<h2 class="ibl-title">' . $teamName . ' Franchise Record Book</h2>'
                 . '<img src="images/logo/' . $teamId . '.jpg" alt="" class="team-logo-banner">';
@@ -204,7 +203,6 @@ class FranchiseRecordBookView
             $colCount++; // + team (always shown for career)
         }
 
-        /** @var string $safeLabel */
         $safeLabel = HtmlSanitizer::safeHtmlOutput($label);
 
         $html = '<div class="stat-table-wrapper">';
@@ -244,7 +242,6 @@ class FranchiseRecordBookView
      */
     private function renderPlayerNameCell(string $playerName, ?int $pid): string
     {
-        /** @var string $safeName */
         $safeName = HtmlSanitizer::safeHtmlOutput($playerName);
 
         if ($pid !== null && $pid > 0) {

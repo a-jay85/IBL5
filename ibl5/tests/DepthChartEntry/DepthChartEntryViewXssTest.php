@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Tests\DepthChartEntry;
 
 use DepthChartEntry\DepthChartEntryView;
+use League\LeagueContext;
 use PHPUnit\Framework\TestCase;
 
 final class DepthChartEntryViewXssTest extends TestCase
@@ -13,7 +14,8 @@ final class DepthChartEntryViewXssTest extends TestCase
 
     protected function setUp(): void
     {
-        $this->view = new DepthChartEntryView();
+        $leagueContext = $this->createStub(LeagueContext::class);
+        $this->view = new DepthChartEntryView($leagueContext);
     }
 
     /**

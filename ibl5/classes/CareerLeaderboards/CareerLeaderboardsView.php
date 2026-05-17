@@ -66,7 +66,7 @@ class CareerLeaderboardsView implements CareerLeaderboardsViewInterface
         <div class="ibl-filter-form__group">
             <label for="cl-type" class="ibl-filter-form__label">Type:</label>
             <select id="cl-type" name="boards_type">
-                <?php foreach ($boardTypes as $key => $value): ?>
+                <?php foreach ($boardTypes as $value): ?>
                     <option value="<?= HtmlSanitizer::e($value) ?>"<?= ($boardsType === $value) ? ' selected' : '' ?>><?= HtmlSanitizer::e($value) ?></option>
                 <?php endforeach; ?>
             </select>
@@ -74,7 +74,7 @@ class CareerLeaderboardsView implements CareerLeaderboardsViewInterface
         <div class="ibl-filter-form__group">
             <label for="cl-category" class="ibl-filter-form__label">Category:</label>
             <select id="cl-category" name="sort_cat">
-                <?php foreach ($sortCategories as $key => $value): ?>
+                <?php foreach ($sortCategories as $value): ?>
                     <option value="<?= HtmlSanitizer::e($value) ?>"<?= ($sortCat === $value) ? ' selected' : '' ?>><?= HtmlSanitizer::e($value) ?></option>
                 <?php endforeach; ?>
             </select>

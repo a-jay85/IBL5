@@ -31,10 +31,10 @@ if (is_link(__DIR__ . '/vendor')) {
     }
 }
 
+require_once __DIR__ . '/classes/Bootstrap/LegacyFunctions.php';
+
 $bootApp = \Bootstrap\WebApplicationFactory::build(__DIR__);
 $bootApp->boot();
-
-require_once __DIR__ . '/classes/Bootstrap/LegacyFunctions.php';
 
 if (!defined('FORUM_ADMIN')) {
     if ((isset($newlang)) and (stristr($newlang, "."))) {

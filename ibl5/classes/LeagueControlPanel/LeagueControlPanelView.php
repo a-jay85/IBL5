@@ -34,14 +34,14 @@ class LeagueControlPanelView implements LeagueControlPanelViewInterface
 <div class="updater">
     <h1 class="updater__title">League Control Panel</h1>
 
-    <?= $this->renderFlashMessage($resultMessage, $resultSuccess) ?>
-    <?= $this->renderLeagueSwitcher($leagueConfig, $currentLeague) ?>
+    <?= HtmlSanitizer::trusted($this->renderFlashMessage($resultMessage, $resultSuccess)) ?>
+    <?= HtmlSanitizer::trusted($this->renderLeagueSwitcher($leagueConfig, $currentLeague)) ?>
 
     <form action="leagueControlPanel.php" method="POST">
         <input type="hidden" name="current_phase" value="<?= HtmlSanitizer::e($panelData['phase']) ?>">
 
-        <?= $this->renderSeasonPhaseControls($currentLeague, $panelData) ?>
-        <?= $this->renderPhaseControls($currentLeague, $panelData) ?>
+        <?= HtmlSanitizer::trusted($this->renderSeasonPhaseControls($currentLeague, $panelData)) ?>
+        <?= HtmlSanitizer::trusted($this->renderPhaseControls($currentLeague, $panelData)) ?>
 
         <section class="updater-section">
             <div class="updater-section__label">Quick Links</div>
@@ -50,7 +50,7 @@ class LeagueControlPanelView implements LeagueControlPanelViewInterface
             </div>
         </section>
 
-        <?= $this->renderTriviaControls() ?>
+        <?= HtmlSanitizer::trusted($this->renderTriviaControls()) ?>
     </form>
 
     <a href="/ibl5/index.php" class="updater__return underline">Return to IBL</a>
@@ -67,8 +67,6 @@ class LeagueControlPanelView implements LeagueControlPanelViewInterface
     private function renderLeagueSwitcher(array $leagueConfig, string $currentLeague): string
     {
         $badgeClass = $currentLeague === 'ibl' ? 'league-badge-ibl' : 'league-badge-olympics';
-        $iblSelected = $currentLeague === 'ibl' ? ' selected' : '';
-        $olympicsSelected = $currentLeague === 'olympics' ? ' selected' : '';
 
         ob_start();
         ?>
@@ -77,8 +75,8 @@ class LeagueControlPanelView implements LeagueControlPanelViewInterface
     <span class="league-badge <?= HtmlSanitizer::e($badgeClass) ?>"><?= HtmlSanitizer::e(strtoupper($leagueConfig['short_name'])) ?></span>
     <label>Switch to:</label>
     <select onchange="window.location.href=this.value" class="ibl-select ibl-select--auto">
-        <option value="leagueControlPanel.php?league=ibl"<?= $iblSelected ?>>IBL</option>
-        <option value="leagueControlPanel.php?league=olympics"<?= $olympicsSelected ?>>Olympics</option>
+        <option value="leagueControlPanel.php?league=ibl"<?= $currentLeague === 'ibl' ? ' selected' : '' ?>>IBL</option>
+        <option value="leagueControlPanel.php?league=olympics"<?= $currentLeague === 'olympics' ? ' selected' : '' ?>>Olympics</option>
     </select>
 </div>
         <?php
@@ -159,7 +157,7 @@ class LeagueControlPanelView implements LeagueControlPanelViewInterface
         <a href="/ibl5/scripts/updateAllTheThings.php">Update All The Things</a>
     </div>
     <div class="lcp-note">Upload sim backup to <strong>backups/</strong> before running</div>
-    <?= $this->renderWaiversSelect($panelData) ?>
+    <?= HtmlSanitizer::trusted($this->renderWaiversSelect($panelData)) ?>
     <div class="lcp-control-row">
         <button type="submit" name="action" value="set_waivers_to_free_agents" class="ibl-btn ibl-btn--secondary ibl-btn--sm">Set all players on waivers to Free Agents and reset their Bird years</button>
     </div>
@@ -225,8 +223,8 @@ class LeagueControlPanelView implements LeagueControlPanelViewInterface
     <div class="lcp-control-row">
         <button type="submit" name="action" value="reset_eoy_voting" class="ibl-btn ibl-btn--secondary ibl-btn--sm">Reset End of the Year Voting</button>
     </div>
-    <?= $this->renderTradesSelect($panelData) ?>
-    <?= $this->renderDraftLinkSelect($panelData) ?>
+    <?= HtmlSanitizer::trusted($this->renderTradesSelect($panelData)) ?>
+    <?= HtmlSanitizer::trusted($this->renderDraftLinkSelect($panelData)) ?>
 <?php endif; ?>
 </section>
         <?php
@@ -257,8 +255,8 @@ class LeagueControlPanelView implements LeagueControlPanelViewInterface
     <div class="lcp-control-row">
         <a href="/ibl5/import-demands.php">Free Agency Demands CSV Uploader</a>
     </div>
-    <?= $this->renderDraftLinkSelect($panelData) ?>
-    <?= $this->renderAwardsControls($panelData) ?>
+    <?= HtmlSanitizer::trusted($this->renderDraftLinkSelect($panelData)) ?>
+    <?= HtmlSanitizer::trusted($this->renderAwardsControls($panelData)) ?>
 </section>
         <?php
         return (string) ob_get_clean();
@@ -273,8 +271,8 @@ class LeagueControlPanelView implements LeagueControlPanelViewInterface
         ?>
 <section class="updater-section">
     <div class="updater-section__label">Draft Operations</div>
-    <?= $this->renderWaiversSelect($panelData) ?>
-    <?= $this->renderAwardsControls($panelData) ?>
+    <?= HtmlSanitizer::trusted($this->renderWaiversSelect($panelData)) ?>
+    <?= HtmlSanitizer::trusted($this->renderAwardsControls($panelData)) ?>
 </section>
         <?php
         return (string) ob_get_clean();
@@ -310,8 +308,8 @@ class LeagueControlPanelView implements LeagueControlPanelViewInterface
     <div class="lcp-control-row">
         <a href="/ibl5/import-demands.php">Free Agency Demands CSV Uploader</a>
     </div>
-    <?= $this->renderFaNotificationsSelect($panelData) ?>
-    <?= $this->renderWaiversSelect($panelData) ?>
+    <?= HtmlSanitizer::trusted($this->renderFaNotificationsSelect($panelData)) ?>
+    <?= HtmlSanitizer::trusted($this->renderWaiversSelect($panelData)) ?>
     <div class="lcp-control-row">
         <button type="submit" name="action" value="set_waivers_to_free_agents" class="ibl-btn ibl-btn--secondary ibl-btn--sm">Set all players on waivers to Free Agents and reset their Bird years</button>
     </div>

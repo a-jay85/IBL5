@@ -61,19 +61,19 @@ class TeamView implements TeamViewInterface
 <div class="team-page-layout">
     <div class="team-page-main">
         <div class="team-stats-block">
-            <?= $yearHeading ?>
-            <?= $bannerHtml ?>
-            <?= $this->renderExtensionResultBanner($extensionResult, $extensionMsg) ?>
+            <?= HtmlSanitizer::trusted($yearHeading) ?>
+            <?= HtmlSanitizer::trusted($bannerHtml) ?>
+            <?= HtmlSanitizer::trusted($this->renderExtensionResultBanner($extensionResult, $extensionMsg)) ?>
             <div class="table-scroll-wrapper">
                 <div class="table-scroll-container" tabindex="0" role="region" aria-label="Team roster">
-                    <?= $tableOutput ?>
+                    <?= HtmlSanitizer::trusted($tableOutput) ?>
                 </div>
             </div>
         </div>
-        <?= $draftPicksHtml ?>
-        <?= $cardsRowHtml ?>
-        <?= $franchiseHtml ?>
-        <?= $raftersHtml ?>
+        <?= HtmlSanitizer::trusted($draftPicksHtml) ?>
+        <?= HtmlSanitizer::trusted($cardsRowHtml) ?>
+        <?= HtmlSanitizer::trusted($franchiseHtml) ?>
+        <?= HtmlSanitizer::trusted($raftersHtml) ?>
     </div>
 </div>
         <?php
@@ -153,14 +153,14 @@ class TeamView implements TeamViewInterface
 
         ob_start();
         ?>
-<div class="team-banner-row" style="--team-tab-bg-color: #<?= $color1 ?>; --team-tab-active-color: #<?= $color2 ?>;">
-    <?= $tradeButton ?>
-    <a href="modules.php?name=Schedule&amp;teamid=<?= $teamid ?>" class="team-action-link"><?= $scheduleInner ?></a>
+<div class="team-banner-row" style="--team-tab-bg-color: #<?= HtmlSanitizer::e($color1) ?>; --team-tab-active-color: #<?= HtmlSanitizer::e($color2) ?>;">
+    <?= HtmlSanitizer::trusted($tradeButton) ?>
+    <a href="modules.php?name=Schedule&amp;teamid=<?= HtmlSanitizer::e($teamid) ?>" class="team-action-link"><?= HtmlSanitizer::trusted($scheduleInner) ?></a>
     <div class="team-banner-logo">
-        <img src="./<?= $imagesPath ?>logo/<?= $teamid ?>.jpg" alt="<?= HtmlSanitizer::e($team->name ?? '') ?> logo">
+        <img src="./<?= HtmlSanitizer::trusted($imagesPath) ?>logo/<?= HtmlSanitizer::e($teamid) ?>.jpg" alt="<?= HtmlSanitizer::e($team->name ?? '') ?> logo">
     </div>
-    <a href="modules.php?name=DraftHistory&amp;teamid=<?= $teamid ?>" class="team-action-link"><?= $draftHistoryInner ?></a>
-    <?= $discordButton ?>
+    <a href="modules.php?name=DraftHistory&amp;teamid=<?= HtmlSanitizer::e($teamid) ?>" class="team-action-link"><?= HtmlSanitizer::trusted($draftHistoryInner) ?></a>
+    <?= HtmlSanitizer::trusted($discordButton) ?>
 </div>
         <?php
         return (string) ob_get_clean();
@@ -181,7 +181,7 @@ class TeamView implements TeamViewInterface
         <h3 class="team-card__title">Draft Picks</h3>
     </div>
     <div class="team-card__body--flush">
-        <?= $draftPicksTable ?>
+        <?= HtmlSanitizer::trusted($draftPicksTable) ?>
     </div>
 </div>
         <?php

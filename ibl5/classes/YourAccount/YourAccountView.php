@@ -104,7 +104,7 @@ class YourAccountView implements Contracts\YourAccountViewInterface
         ob_start();
         ?>
 <div class="auth-page">
-    <?= $this->renderLogo() ?>
+    <?= HtmlSanitizer::safeHtmlOutput($this->renderLogo()) ?>
     <div class="auth-card ibl-card">
         <div class="ibl-card__header">
             <h1 class="ibl-card__title">Sign In</h1>
@@ -113,8 +113,7 @@ class YourAccountView implements Contracts\YourAccountViewInterface
         <div class="ibl-card__body">
             <?php if ($error !== null): ?>
                 <div class="ibl-alert ibl-alert--error">
-                    <?php $sanitizedError = \Security\HtmlSanitizer::safeHtmlOutput($error); ?>
-                    <?= nl2br($sanitizedError) ?>
+                    <?= HtmlSanitizer::safeHtmlOutput(nl2br(HtmlSanitizer::e($error))) ?>
                 </div>
             <?php endif; ?>
 
@@ -122,7 +121,7 @@ class YourAccountView implements Contracts\YourAccountViewInterface
                 <div class="ibl-form-group">
                     <label class="ibl-label" for="login-username">Username</label>
                     <div class="auth-input-wrapper">
-                        <?= $this->userIcon() ?>
+                        <?= HtmlSanitizer::safeHtmlOutput($this->userIcon()) ?>
                         <input type="text" name="username" id="login-username" class="ibl-input auth-input--with-icon" maxlength="25" required placeholder="Enter your username" autocomplete="username">
                     </div>
                 </div>
@@ -130,7 +129,7 @@ class YourAccountView implements Contracts\YourAccountViewInterface
                 <div class="ibl-form-group">
                     <label class="ibl-label" for="login-password">Password</label>
                     <div class="auth-input-wrapper">
-                        <?= $this->lockIcon() ?>
+                        <?= HtmlSanitizer::safeHtmlOutput($this->lockIcon()) ?>
                         <input type="password" name="user_password" id="login-password" class="ibl-input auth-input--with-icon" maxlength="20" required placeholder="Enter your password" autocomplete="current-password">
                     </div>
                 </div>
@@ -171,7 +170,7 @@ class YourAccountView implements Contracts\YourAccountViewInterface
         ob_start();
         ?>
 <div class="auth-page">
-    <?= $this->renderLogo() ?>
+    <?= HtmlSanitizer::safeHtmlOutput($this->renderLogo()) ?>
     <div class="auth-card ibl-card">
         <div class="ibl-card__header">
             <h1 class="ibl-card__title">Create Account</h1>
@@ -182,7 +181,7 @@ class YourAccountView implements Contracts\YourAccountViewInterface
                 <div class="ibl-form-group">
                     <label class="ibl-label ibl-label--required" for="register-username">Username</label>
                     <div class="auth-input-wrapper">
-                        <?= $this->userIcon() ?>
+                        <?= HtmlSanitizer::safeHtmlOutput($this->userIcon()) ?>
                         <input type="text" name="username" id="register-username" class="ibl-input auth-input--with-icon" maxlength="25" required placeholder="Choose a username" autocomplete="username">
                     </div>
                 </div>
@@ -190,7 +189,7 @@ class YourAccountView implements Contracts\YourAccountViewInterface
                 <div class="ibl-form-group">
                     <label class="ibl-label ibl-label--required" for="register-email">Email Address</label>
                     <div class="auth-input-wrapper">
-                        <?= $this->emailIcon() ?>
+                        <?= HtmlSanitizer::safeHtmlOutput($this->emailIcon()) ?>
                         <input type="email" name="user_email" id="register-email" class="ibl-input auth-input--with-icon" maxlength="255" required placeholder="Enter your email" autocomplete="email">
                     </div>
                 </div>
@@ -198,7 +197,7 @@ class YourAccountView implements Contracts\YourAccountViewInterface
                 <div class="ibl-form-group">
                     <label class="ibl-label" for="register-password">Password</label>
                     <div class="auth-input-wrapper">
-                        <?= $this->lockIcon() ?>
+                        <?= HtmlSanitizer::safeHtmlOutput($this->lockIcon()) ?>
                         <input type="password" name="user_password" id="register-password" class="ibl-input auth-input--with-icon" maxlength="40" placeholder="Choose a password" autocomplete="new-password">
                     </div>
                     <div class="ibl-form-help">Leave blank to auto-generate a password.</div>
@@ -207,7 +206,7 @@ class YourAccountView implements Contracts\YourAccountViewInterface
                 <div class="ibl-form-group">
                     <label class="ibl-label" for="register-password2">Confirm Password</label>
                     <div class="auth-input-wrapper">
-                        <?= $this->lockIcon() ?>
+                        <?= HtmlSanitizer::safeHtmlOutput($this->lockIcon()) ?>
                         <input type="password" name="user_password2" id="register-password2" class="ibl-input auth-input--with-icon" maxlength="40" placeholder="Re-enter your password" autocomplete="new-password">
                     </div>
                 </div>
@@ -237,8 +236,6 @@ class YourAccountView implements Contracts\YourAccountViewInterface
      */
     public function renderRegistrationCompletePage(string $siteName): string
     {
-        $safeSiteName = HtmlSanitizer::safeHtmlOutput($siteName);
-
         ob_start();
         ?>
 <div class="auth-page">
@@ -246,9 +243,9 @@ class YourAccountView implements Contracts\YourAccountViewInterface
         <div class="ibl-card__body">
             <div class="auth-status">
                 <div class="auth-status__icon auth-status__icon--success">
-                    <?= $this->checkIcon() ?>
+                    <?= HtmlSanitizer::safeHtmlOutput($this->checkIcon()) ?>
                 </div>
-                <div class="auth-status__title"><?= $safeSiteName ?> Account Created</div>
+                <div class="auth-status__title"><?= HtmlSanitizer::e($siteName) ?> Account Created</div>
                 <div class="auth-status__message">
                     An activation email has been sent.<br><br>
                     Please click the link in your email to activate your account.<br><br>
@@ -270,8 +267,6 @@ class YourAccountView implements Contracts\YourAccountViewInterface
      */
     public function renderRegistrationErrorPage(string $error): string
     {
-        $safeError = HtmlSanitizer::safeHtmlOutput($error);
-
         ob_start();
         ?>
 <div class="auth-page">
@@ -280,7 +275,7 @@ class YourAccountView implements Contracts\YourAccountViewInterface
             <h1 class="ibl-card__title">Registration Error</h1>
         </div>
         <div class="ibl-card__body">
-            <div class="ibl-alert ibl-alert--error"><?= $safeError ?></div>
+            <div class="ibl-alert ibl-alert--error"><?= HtmlSanitizer::e($error) ?></div>
             <div class="auth-links">
                 <a href="modules.php?name=YourAccount&amp;op=new_user">Try again</a>
             </div>
@@ -299,7 +294,7 @@ class YourAccountView implements Contracts\YourAccountViewInterface
         ob_start();
         ?>
 <div class="auth-page">
-    <?= $this->renderLogo() ?>
+    <?= HtmlSanitizer::safeHtmlOutput($this->renderLogo()) ?>
     <div class="auth-card ibl-card">
         <div class="ibl-card__header">
             <h1 class="ibl-card__title">Reset Password</h1>
@@ -314,7 +309,7 @@ class YourAccountView implements Contracts\YourAccountViewInterface
                 <div class="ibl-form-group">
                     <label class="ibl-label ibl-label--required" for="reset-email">Email Address</label>
                     <div class="auth-input-wrapper">
-                        <?= $this->emailIcon() ?>
+                        <?= HtmlSanitizer::safeHtmlOutput($this->emailIcon()) ?>
                         <input type="email" name="user_email" id="reset-email" class="ibl-input auth-input--with-icon" maxlength="255" required placeholder="Enter your email address" autocomplete="email">
                     </div>
                 </div>
@@ -351,7 +346,7 @@ class YourAccountView implements Contracts\YourAccountViewInterface
         <div class="ibl-card__body">
             <div class="auth-status">
                 <div class="auth-status__icon auth-status__icon--info">
-                    <?= $this->infoIcon() ?>
+                    <?= HtmlSanitizer::safeHtmlOutput($this->infoIcon()) ?>
                 </div>
                 <div class="auth-status__title">Check Your Email</div>
                 <div class="auth-status__message">
@@ -373,13 +368,10 @@ class YourAccountView implements Contracts\YourAccountViewInterface
      */
     public function renderResetPasswordPage(string $selector, string $token): string
     {
-        $safeSelector = HtmlSanitizer::safeHtmlOutput($selector);
-        $safeToken = HtmlSanitizer::safeHtmlOutput($token);
-
         ob_start();
         ?>
 <div class="auth-page">
-    <?= $this->renderLogo() ?>
+    <?= HtmlSanitizer::safeHtmlOutput($this->renderLogo()) ?>
     <div class="auth-card ibl-card">
         <div class="ibl-card__header">
             <h1 class="ibl-card__title">Reset Password</h1>
@@ -390,7 +382,7 @@ class YourAccountView implements Contracts\YourAccountViewInterface
                 <div class="ibl-form-group">
                     <label class="ibl-label ibl-label--required" for="reset-new-password">New Password</label>
                     <div class="auth-input-wrapper">
-                        <?= $this->lockIcon() ?>
+                        <?= HtmlSanitizer::safeHtmlOutput($this->lockIcon()) ?>
                         <input type="password" name="new_password" id="reset-new-password" class="ibl-input auth-input--with-icon" maxlength="60" required placeholder="Enter new password" autocomplete="new-password">
                     </div>
                 </div>
@@ -398,13 +390,13 @@ class YourAccountView implements Contracts\YourAccountViewInterface
                 <div class="ibl-form-group">
                     <label class="ibl-label ibl-label--required" for="reset-confirm-password">Confirm Password</label>
                     <div class="auth-input-wrapper">
-                        <?= $this->lockIcon() ?>
+                        <?= HtmlSanitizer::safeHtmlOutput($this->lockIcon()) ?>
                         <input type="password" name="new_password2" id="reset-confirm-password" class="ibl-input auth-input--with-icon" maxlength="60" required placeholder="Re-enter new password" autocomplete="new-password">
                     </div>
                 </div>
 
-                <input type="hidden" name="selector" value="<?= $safeSelector ?>">
-                <input type="hidden" name="token" value="<?= $safeToken ?>">
+                <input type="hidden" name="selector" value="<?= HtmlSanitizer::e($selector) ?>">
+                <input type="hidden" name="token" value="<?= HtmlSanitizer::e($token) ?>">
                 <?= CsrfGuard::generateToken('reset_password') ?>
                 <input type="hidden" name="op" value="do_reset_password">
                 <button type="submit" class="ibl-btn ibl-btn--primary ibl-btn--block">Reset Password</button>
@@ -433,7 +425,7 @@ class YourAccountView implements Contracts\YourAccountViewInterface
         <div class="ibl-card__body">
             <div class="auth-status">
                 <div class="auth-status__icon auth-status__icon--success">
-                    <?= $this->checkIcon() ?>
+                    <?= HtmlSanitizer::safeHtmlOutput($this->checkIcon()) ?>
                 </div>
                 <div class="auth-status__title">Password Changed</div>
                 <div class="auth-status__message">
@@ -455,8 +447,6 @@ class YourAccountView implements Contracts\YourAccountViewInterface
      */
     public function renderPasswordResetErrorPage(string $error): string
     {
-        $safeError = HtmlSanitizer::safeHtmlOutput($error);
-
         ob_start();
         ?>
 <div class="auth-page">
@@ -464,10 +454,10 @@ class YourAccountView implements Contracts\YourAccountViewInterface
         <div class="ibl-card__body">
             <div class="auth-status">
                 <div class="auth-status__icon auth-status__icon--error">
-                    <?= $this->errorIcon() ?>
+                    <?= HtmlSanitizer::safeHtmlOutput($this->errorIcon()) ?>
                 </div>
                 <div class="auth-status__title">Reset Error</div>
-                <div class="auth-status__message"><?= $safeError ?></div>
+                <div class="auth-status__message"><?= HtmlSanitizer::e($error) ?></div>
                 <div class="auth-status__action">
                     <a href="modules.php?name=YourAccount&amp;op=pass_lost" class="ibl-btn ibl-btn--primary">Try Again</a>
                 </div>
@@ -484,8 +474,6 @@ class YourAccountView implements Contracts\YourAccountViewInterface
      */
     public function renderActivationSuccessPage(string $username): string
     {
-        $safeUsername = HtmlSanitizer::safeHtmlOutput($username);
-
         ob_start();
         ?>
 <div class="auth-page">
@@ -493,11 +481,11 @@ class YourAccountView implements Contracts\YourAccountViewInterface
         <div class="ibl-card__body">
             <div class="auth-status">
                 <div class="auth-status__icon auth-status__icon--success">
-                    <?= $this->checkIcon() ?>
+                    <?= HtmlSanitizer::safeHtmlOutput($this->checkIcon()) ?>
                 </div>
                 <div class="auth-status__title">Account Activated</div>
                 <div class="auth-status__message">
-                    <strong><?= $safeUsername ?></strong>, your account has been activated successfully. You can now sign in.
+                    <strong><?= HtmlSanitizer::e($username) ?></strong>, your account has been activated successfully. You can now sign in.
                 </div>
                 <div class="auth-status__action">
                     <a href="modules.php?name=YourAccount" class="ibl-btn ibl-btn--primary">Sign In</a>
@@ -530,10 +518,10 @@ class YourAccountView implements Contracts\YourAccountViewInterface
         <div class="ibl-card__body">
             <div class="auth-status">
                 <div class="auth-status__icon auth-status__icon--error">
-                    <?= $this->errorIcon() ?>
+                    <?= HtmlSanitizer::safeHtmlOutput($this->errorIcon()) ?>
                 </div>
                 <div class="auth-status__title">Activation Error</div>
-                <div class="auth-status__message"><?= $message ?></div>
+                <div class="auth-status__message"><?= HtmlSanitizer::e($message) ?></div>
                 <div class="auth-status__action">
                     <a href="modules.php?name=YourAccount&amp;op=new_user" class="ibl-btn ibl-btn--primary">Register Again</a>
                 </div>

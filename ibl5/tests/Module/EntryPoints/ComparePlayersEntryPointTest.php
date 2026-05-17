@@ -6,6 +6,7 @@ namespace Tests\Module\EntryPoints;
 
 use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 use PHPUnit\Framework\Attributes\PreserveGlobalState;
+use Tests\WideUnit\Mocks\TestDataFactory;
 
 /**
  * ComparePlayers/index.php defines global functions (userinfo, main) that
@@ -26,8 +27,14 @@ class ComparePlayersEntryPointTest extends ModuleEntryPointTestCase
 
     public function testPostWithBothPlayersRunsComparison(): void
     {
-        $player1 = ['pid' => 1, 'name' => 'Player One', 'pos' => 'G', 'teamid' => 1, 'color1' => '000000', 'color2' => 'FFFFFF'];
-        $player2 = ['pid' => 2, 'name' => 'Player Two', 'pos' => 'F', 'teamid' => 2, 'color1' => 'FF0000', 'color2' => '000000'];
+        $player1 = TestDataFactory::createPlayer([
+            'pid' => 1, 'name' => 'Player One', 'pos' => 'G', 'teamid' => 1,
+            'color1' => '000000', 'color2' => 'FFFFFF',
+        ]);
+        $player2 = TestDataFactory::createPlayer([
+            'pid' => 2, 'name' => 'Player Two', 'pos' => 'F', 'teamid' => 2,
+            'color1' => 'FF0000', 'color2' => '000000',
+        ]);
         // MockPreparedStatement interpolates bound params into SQL, so 'Player One' appears
         // literally in the WHERE clause — onQuery routes each lookup to a distinct row.
         $this->mockDb->onQuery('Player One', [$player1]);

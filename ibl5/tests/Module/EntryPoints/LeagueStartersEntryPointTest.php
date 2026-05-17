@@ -12,7 +12,13 @@ class LeagueStartersEntryPointTest extends ModuleEntryPointTestCase
     {
         parent::setUp();
         $this->mockDb->setMockTeamData([self::fullTeamData()]);
-        $this->mockDb->onQuery('ibl_plr', [TestDataFactory::createPlayer(['pid' => 4040404, 'name' => 'Placeholder'])]);
+        $this->mockDb->onQuery('ibl_plr', [TestDataFactory::createPlayer([
+            'pid' => 4040404,
+            'name' => 'Placeholder',
+            'teamname' => 'Test Team',
+            'color1' => 'FFFFFF',
+            'color2' => '000000',
+        ])]);
         $this->mockDb->setMockData([]);
     }
 

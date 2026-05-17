@@ -171,6 +171,8 @@ function processrookieoption()
     }
 }
 
+global $pa;
+
 switch ($pa) {
 
     case "negotiate":

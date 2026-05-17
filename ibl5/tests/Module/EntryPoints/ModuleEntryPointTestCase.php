@@ -162,8 +162,16 @@ abstract class ModuleEntryPointTestCase extends WideUnitTestCase
         $authStub->method('getCookieArray')->willReturn(null);
         $GLOBALS['authService'] = $authStub;
 
-        // League context stub
+        // League context stub. getConfig() must return the keys callers read
+        // (notably 'images_path' for views that render team logos).
         $lcStub = $this->createStub(\League\LeagueContext::class);
+        $lcStub->method('getConfig')->willReturn([
+            'title' => 'Internet Basketball League',
+            'short_name' => 'IBL',
+            'primary_color' => '#1a365d',
+            'logo_path' => 'images/ibl/logo.png',
+            'images_path' => 'images/',
+        ]);
         $GLOBALS['leagueContext'] = $lcStub;
 
         // PHP-Nuke globals

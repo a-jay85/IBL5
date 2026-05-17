@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Tests\Services;
+namespace Tests\Topics\News;
 
 use PHPUnit\Framework\TestCase;
 use Topics\News\NewsService;

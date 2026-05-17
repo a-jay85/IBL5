@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Tests\Services;
+namespace Tests\Validation;
 
 use PHPUnit\Framework\TestCase;
 use Validation\CommonValidator;

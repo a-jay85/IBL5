@@ -35,10 +35,10 @@ function theindex($new_topic = "0")
     PageLayout\PageLayout::header();
 
     if (is_user($user)) {
-        $commonRepo = new \Services\CommonMysqliRepository($mysqli_db);
-        $teamName = $commonRepo->getTeamnameFromUsername($userinfo['username'] ?? null);
+        $teamRepo = new \Repositories\TeamIdentityRepository($mysqli_db);
+        $teamName = $teamRepo->getTeamnameFromUsername($userinfo['username'] ?? null);
         if ($teamName !== null && $teamName !== \League\League::FREE_AGENTS_TEAM_NAME) {
-            $tid = $commonRepo->getTidFromTeamname($teamName);
+            $tid = $teamRepo->getTidFromTeamname($teamName);
             if ($tid !== null && \League\League::isRealFranchise($tid)) {
                 $recapService = new \LastSimRecap\LastSimRecapService(
                     new \LastSimRecap\LastSimRecapRepository($mysqli_db)

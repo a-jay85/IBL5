@@ -110,7 +110,6 @@ class LastSimRecapService implements LastSimRecapServiceInterface
         $oppInfo = $this->repo->getTeamInfo($oppTid);
         $oppCity = $oppInfo['city'] ?? '';
         $oppName = $oppInfo['name'] ?? '';
-        $oppCode = strtoupper(substr($oppName, 0, 3));
 
         $lines = $this->repo->getTeamBoxscoreLines($g['visitor'], $g['home'], $g['date']);
         $margins = [];
@@ -195,7 +194,6 @@ class LastSimRecapService implements LastSimRecapServiceInterface
             oppTid: $oppTid,
             oppCity: $oppCity,
             oppName: $oppName,
-            oppCode: $oppCode,
             oppPreWins: $oppPreWins,
             oppPreLosses: $oppPreLosses,
             yourInjuries: $yourInjuries,

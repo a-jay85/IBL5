@@ -27,7 +27,6 @@ final class RecapGame
         public readonly int $oppTid,
         public readonly string $oppCity,
         public readonly string $oppName,
-        public readonly string $oppCode,
         public readonly int $oppPreWins,
         public readonly int $oppPreLosses,
         public readonly array $yourInjuries,

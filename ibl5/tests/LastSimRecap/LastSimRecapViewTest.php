@@ -209,7 +209,6 @@ class LastSimRecapViewTest extends TestCase
             oppTid: 2,
             oppCity: 'Detroit',
             oppName: 'Pistons',
-            oppCode: 'PIS',
             oppPreWins: 60,
             oppPreLosses: 22,
             yourInjuries: $yourInjuries,

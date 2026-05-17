@@ -24,8 +24,8 @@ final class BanDirectCommonMysqliInstantiationRuleTest extends RuleTestCase
             [__DIR__ . '/../../phpstan-rules/Fixtures/DirectCommonMysqliInstantiation.php'],
             [
                 [
-                    'Direct instantiation of CommonMysqliRepository is banned in class files. '
-                    . 'Inject CommonMysqliRepositoryInterface via the constructor instead.',
+                    'Direct instantiation of TeamIdentityRepository is banned in class files. '
+                    . 'Inject the corresponding interface via the constructor instead.',
                     8,
                 ],
             ],
@@ -35,7 +35,7 @@ final class BanDirectCommonMysqliInstantiationRuleTest extends RuleTestCase
     public function testAllowsInstantiationInTestFile(): void
     {
         $this->analyse(
-            [__DIR__ . '/../DatabaseIntegration/CommonMysqliRepositoryTest.php'],
+            [__DIR__ . '/../DatabaseIntegration/Extension/ExtensionRepositoryIntegrationTest.php'],
             [],
         );
     }

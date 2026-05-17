@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Trading;
 
-use Services\CommonMysqliRepository;
+use Services\Contracts\TeamIdentityRepositoryInterface;
 use Trading\Contracts\TradeExecutionRepositoryInterface;
 
 /**
@@ -21,11 +21,11 @@ use Trading\Contracts\TradeExecutionRepositoryInterface;
 class TradeQueueProcessor
 {
     private TradeExecutionRepositoryInterface $executionRepository;
-    private CommonMysqliRepository $commonRepository;
+    private TeamIdentityRepositoryInterface $commonRepository;
 
     public function __construct(
         TradeExecutionRepositoryInterface $executionRepository,
-        CommonMysqliRepository $commonRepository
+        TeamIdentityRepositoryInterface $commonRepository
     ) {
         $this->executionRepository = $executionRepository;
         $this->commonRepository = $commonRepository;

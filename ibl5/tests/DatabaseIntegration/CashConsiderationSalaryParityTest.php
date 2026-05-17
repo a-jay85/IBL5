@@ -6,7 +6,8 @@ namespace Tests\DatabaseIntegration;
 
 use PHPUnit\Framework\Attributes\Group;
 
-use Services\CommonMysqliRepository;
+use Services\SalaryCapRepository;
+use Services\TeamIdentityRepository;
 use Trading\CashConsiderationRepository;
 
 /**
@@ -21,13 +22,15 @@ use Trading\CashConsiderationRepository;
 #[Group('database')]
 class CashConsiderationSalaryParityTest extends DatabaseTestCase
 {
-    private CommonMysqliRepository $commonRepo;
+    private SalaryCapRepository $commonRepo;
+    private TeamIdentityRepository $teamIdentityRepo;
     private CashConsiderationRepository $cashRepo;
 
     protected function setUp(): void
     {
         parent::setUp();
-        $this->commonRepo = new CommonMysqliRepository($this->db);
+        $this->commonRepo = new SalaryCapRepository($this->db);
+        $this->teamIdentityRepo = new TeamIdentityRepository($this->db);
         $this->cashRepo = new CashConsiderationRepository($this->db);
     }
 
@@ -236,7 +239,7 @@ class CashConsiderationSalaryParityTest extends DatabaseTestCase
         )[0]['cnt'] ?? 0);
 
         // Execute a cash transaction through the real handler
-        $handler = new \Trading\CashTransactionHandler($this->db, $this->commonRepo);
+        $handler = new \Trading\CashTransactionHandler($this->db, $this->teamIdentityRepo);
         $result = $handler->createCashTransaction(
             $team1['team_name'],
             $team2['team_name'],

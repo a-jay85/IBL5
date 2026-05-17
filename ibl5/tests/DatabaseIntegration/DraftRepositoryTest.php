@@ -7,7 +7,7 @@ namespace Tests\DatabaseIntegration;
 use PHPUnit\Framework\Attributes\Group;
 
 use Draft\DraftRepository;
-use Services\CommonMysqliRepository;
+use Services\TeamIdentityRepository;
 
 /**
  * Tests DraftRepository against real MariaDB — draft picks, draft class, player creation.
@@ -20,7 +20,7 @@ class DraftRepositoryTest extends DatabaseTestCase
     protected function setUp(): void
     {
         parent::setUp();
-        $this->repo = new DraftRepository($this->db, new CommonMysqliRepository($this->db));
+        $this->repo = new DraftRepository($this->db, new TeamIdentityRepository($this->db));
     }
 
     public function testGetCurrentDraftSelectionReturnsPlayerName(): void
@@ -165,5 +165,23 @@ class DraftRepositoryTest extends DatabaseTestCase
         self::assertSame(2, $pick['teamid']);
         self::assertSame(1, $pick['round']);
         self::assertSame(2, $pick['pick']);
+    }
+
+    // ── getCurrentOwnerOfDraftPick ──────────────────────────────
+
+    public function testGetCurrentOwnerOfDraftPickReturnsOwner(): void
+    {
+        $this->insertDraftPickRow(1, 2, 2099, 1, ['ownerofpick' => 'Metros', 'teampick' => 'Stars']);
+
+        $result = $this->repo->getCurrentOwnerOfDraftPick(2099, 1, 2);
+
+        self::assertSame('Metros', $result);
+    }
+
+    public function testGetCurrentOwnerOfDraftPickReturnsNullWhenNotFound(): void
+    {
+        $result = $this->repo->getCurrentOwnerOfDraftPick(9999, 9, 99);
+
+        self::assertNull($result);
     }
 }

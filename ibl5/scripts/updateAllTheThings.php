@@ -104,15 +104,11 @@ try {
     echo $view->renderInitStatus('mainfile.php loaded');
     flush();
 
-    $commonRepository = new \Services\CommonMysqliRepository($mysqli_db);
+    $commonRepository = new \Services\TeamIdentityRepository($mysqli_db);
     echo $view->renderInitStatus('CommonRepository initialized');
     flush();
 
     $season = new \Season\Season($mysqli_db);
-
-    $sharedRepository = new Shared\SharedRepository($mysqli_db, $leagueContext);
-    echo $view->renderInitStatus('Shared repository initialized');
-    flush();
 
     // Season year override for historical imports (e.g., Olympics 2003)
     $seasonYearOverride = isset($_GET['season_year']) && is_string($_GET['season_year'])
@@ -197,7 +193,7 @@ try {
 
     // IBL-only: contract extensions don't exist in Olympics (ibl_olympics_team_info lacks used_extension_this_chunk)
     if (!$isOlympics) {
-        $updaterService->addStep(new Updater\Steps\ResetExtensionAttemptsStep($sharedRepository));
+        $updaterService->addStep(new Updater\Steps\ResetExtensionAttemptsStep($mysqli_db));
     }
     $updaterService->addStep(new Updater\Steps\ExtendDepthChartsStep(
         $savedDcRepo, $season->lastSimEndDate, $season->lastSimNumber,

@@ -6,7 +6,7 @@ namespace Negotiation;
 
 use BaseMysqliRepository;
 use Negotiation\Contracts\NegotiationRepositoryInterface;
-use Services\Contracts\CommonMysqliRepositoryInterface;
+use Services\Contracts\SalaryCapRepositoryInterface;
 
 /**
  * @see NegotiationRepositoryInterface
@@ -14,12 +14,12 @@ use Services\Contracts\CommonMysqliRepositoryInterface;
  */
 class NegotiationRepository extends BaseMysqliRepository implements NegotiationRepositoryInterface
 {
-    private CommonMysqliRepositoryInterface $commonRepo;
+    private SalaryCapRepositoryInterface $salaryCapRepo;
 
-    public function __construct(\mysqli $db, CommonMysqliRepositoryInterface $commonRepo)
+    public function __construct(\mysqli $db, SalaryCapRepositoryInterface $salaryCapRepo)
     {
         parent::__construct($db);
-        $this->commonRepo = $commonRepo;
+        $this->salaryCapRepo = $salaryCapRepo;
     }
 
     /**
@@ -79,7 +79,7 @@ class NegotiationRepository extends BaseMysqliRepository implements NegotiationR
      */
     public function getTeamCapSpaceNextSeason(string $teamName): int
     {
-        return $this->commonRepo->getTeamCapSpaceNextSeason($teamName);
+        return $this->salaryCapRepo->getTeamCapSpaceNextSeason($teamName);
     }
 
     /**

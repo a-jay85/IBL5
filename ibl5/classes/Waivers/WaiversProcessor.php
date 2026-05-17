@@ -15,7 +15,7 @@ use Waivers\Contracts\WaiversValidatorInterface;
 
 /**
  * @see WaiversProcessorInterface
- * @phpstan-import-type PlayerRow from \Services\CommonMysqliRepository
+ * @phpstan-import-type PlayerRow from \Services\Contracts\PlayerLookupRepositoryInterface
  */
 class WaiversProcessor implements WaiversProcessorInterface
 {
@@ -26,20 +26,23 @@ class WaiversProcessor implements WaiversProcessorInterface
 
     private PlayerContractCalculator $contractCalculator;
     private WaiversRepositoryInterface $repository;
-    private \Services\CommonMysqliRepository $commonRepository;
+    private \Services\Contracts\TeamIdentityRepositoryInterface $teamIdentityRepo;
+    private \Services\Contracts\PlayerLookupRepositoryInterface $playerLookupRepo;
     private WaiversValidatorInterface $validator;
     private \Services\NewsService $newsService;
     private \mysqli $db;
 
     public function __construct(
         WaiversRepositoryInterface $repository,
-        \Services\CommonMysqliRepository $commonRepository,
+        \Services\Contracts\TeamIdentityRepositoryInterface $teamIdentityRepo,
+        \Services\Contracts\PlayerLookupRepositoryInterface $playerLookupRepo,
         WaiversValidatorInterface $validator,
         \Services\NewsService $newsService,
         \mysqli $db
     ) {
         $this->repository = $repository;
-        $this->commonRepository = $commonRepository;
+        $this->teamIdentityRepo = $teamIdentityRepo;
+        $this->playerLookupRepo = $playerLookupRepo;
         $this->validator = $validator;
         $this->newsService = $newsService;
         $this->db = $db;
@@ -158,7 +161,7 @@ class WaiversProcessor implements WaiversProcessorInterface
             return ['success' => false, 'error' => "You didn't select a valid player. Please select a player and try again."];
         }
 
-        $player = $this->commonRepository->getPlayerByID($playerID);
+        $player = $this->playerLookupRepo->getPlayerByID($playerID);
         if ($player === null) {
             return ['success' => false, 'error' => 'Player not found.'];
         }
@@ -196,7 +199,7 @@ class WaiversProcessor implements WaiversProcessorInterface
             return ['success' => false, 'error' => "You didn't select a valid player. Please select a player and try again."];
         }
 
-        $player = $this->commonRepository->getPlayerByID($playerID);
+        $player = $this->playerLookupRepo->getPlayerByID($playerID);
         if ($player === null) {
             return ['success' => false, 'error' => 'Player not found.'];
         }
@@ -210,7 +213,7 @@ class WaiversProcessor implements WaiversProcessorInterface
             return ['success' => false, 'error' => implode(' ', $this->validator->getErrors())];
         }
 
-        $team = $this->commonRepository->getTeamByName($teamName);
+        $team = $this->teamIdentityRepo->getTeamByName($teamName);
         if ($team === null) {
             return ['success' => false, 'error' => 'Team not found.'];
         }

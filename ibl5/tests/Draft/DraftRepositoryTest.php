@@ -6,19 +6,19 @@ namespace Tests\Draft;
 
 use PHPUnit\Framework\TestCase;
 use Draft\DraftRepository;
-use Services\Contracts\CommonMysqliRepositoryInterface;
+use Services\Contracts\TeamIdentityRepositoryInterface;
 use Tests\WideUnit\Mocks\MockDatabase;
 
 class DraftRepositoryTest extends TestCase
 {
     private $repository;
     private $mockDb;
-    private CommonMysqliRepositoryInterface $mockCommonRepository;
+    private TeamIdentityRepositoryInterface $mockCommonRepository;
 
     protected function setUp(): void
     {
         $this->mockDb = new MockDatabase();
-        $this->mockCommonRepository = $this->createStub(CommonMysqliRepositoryInterface::class);
+        $this->mockCommonRepository = $this->createStub(TeamIdentityRepositoryInterface::class);
         $this->mockCommonRepository->method('getTidFromTeamname')->willReturn(1);
         $this->repository = new DraftRepository($this->mockDb, $this->mockCommonRepository);
     }
@@ -196,7 +196,7 @@ class DraftRepositoryTest extends TestCase
 
     public function testCreatePlayerFromDraftClassReturnsFalseWhenTeamNotFound()
     {
-        $stubNoTeam = $this->createStub(CommonMysqliRepositoryInterface::class);
+        $stubNoTeam = $this->createStub(TeamIdentityRepositoryInterface::class);
         $stubNoTeam->method('getTidFromTeamname')->willReturn(null);
         $repository = new DraftRepository($this->mockDb, $stubNoTeam);
 

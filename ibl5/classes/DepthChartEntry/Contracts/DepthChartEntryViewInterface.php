@@ -10,7 +10,7 @@ namespace DepthChartEntry\Contracts;
  * Renders all HTML components for depth chart entry forms and submission results.
  * Uses output buffering for form rendering, direct echo for option rendering.
  *
- * @phpstan-import-type PlayerRow from \Services\CommonMysqliRepository
+ * @phpstan-import-type PlayerRow from \Services\Contracts\PlayerLookupRepositoryInterface
  */
 interface DepthChartEntryViewInterface
 {

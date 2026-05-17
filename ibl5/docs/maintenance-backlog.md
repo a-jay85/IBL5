@@ -593,6 +593,7 @@ Effort scale:
 **Suggested direction:** Merge or rename one to `CrossModuleRepository` with explicit scope.
 **Est. effort:** M
 **Risk if untouched:** Duplicate lookups written in each.
+**Status:** Completed (2026-05-16) — Shared/SharedRepository deleted; methods relocated to Draft/Updater.
 
 ### 4.5 `Player/` vs `PlayerDatabase/` vs `PlayerMovement/`
 **Location:** Three modules, confusable scope
@@ -1051,7 +1052,7 @@ Effort scale:
 ## Axis 7: Repository Contract Gaps / Shared Abstractions
 
 ### 7.1 `CommonMysqliRepository` Has No Interface
-**Location:** `ibl5/classes/Services/CommonMysqliRepository.php`
+**Location:** `ibl5/classes/Services/Contracts/` (interfaces extracted here)
 **Problem:** Concrete class with no `Contracts/CommonMysqliRepositoryInterface`. Every caller depends on the concrete class.
 **Suggested direction:** Extract interface; split into `TeamIdentityRepositoryInterface`, `PlayerLookupRepositoryInterface`, `SalaryCapRepositoryInterface`.
 **Est. effort:** M
@@ -1111,11 +1112,12 @@ Effort scale:
 **Status:** Completed (2026-05-16) — resolved by the DI sweep; `NegotiationRepository` now receives `CommonMysqliRepositoryInterface` via constructor.
 
 ### 7.9 `CommonMysqliRepository` Mixes 3 Domains
-**Location:** `ibl5/classes/Services/CommonMysqliRepository.php`
+**Location:** `ibl5/classes/Services/PlayerLookupRepository.php`, `ibl5/classes/Services/SalaryCapRepository.php`, `ibl5/classes/Services/TeamIdentityRepository.php`
 **Problem:** Identity lookups + salary cap + player lookups all in one class. Callers needing only one get all three.
 **Suggested direction:** Split: `TeamIdentityRepository`, `PlayerLookupRepository`, `SalaryCapRepository`.
 **Est. effort:** M
 **Risk if untouched:** Junk-drawer growth; salary drift with `CapSpace/`.
+**Status:** Completed (2026-05-16) — split into TeamIdentity/PlayerLookup/SalaryCap repos.
 
 ### 7.10 `WaiversRepositoryInterface` Lacks `@phpstan-type` Shapes
 **Location:** `ibl5/classes/Waivers/Contracts/WaiversRepositoryInterface.php`

@@ -9,7 +9,7 @@ use FreeAgency\FreeAgencyProcessor;
 use FreeAgency\Contracts\FreeAgencyDemandCalculatorInterface;
 use FreeAgency\Contracts\FreeAgencyRepositoryInterface;
 use Player\Player;
-use Services\Contracts\CommonMysqliRepositoryInterface;
+use Services\Contracts\TeamIdentityRepositoryInterface;
 use Tests\WideUnit\Mocks\MockDatabase;
 use Tests\WideUnit\Mocks\MockPreparedStatement;
 
@@ -169,7 +169,7 @@ class FreeAgencyProcessorTest extends TestCase
 
         $processor = new FreeAgencyProcessor(
             $this->mockDb,
-            $this->createStub(CommonMysqliRepositoryInterface::class),
+            $this->createStub(TeamIdentityRepositoryInterface::class),
             $calculator,
             $capturingRepo,
         );
@@ -190,7 +190,7 @@ class FreeAgencyProcessorTest extends TestCase
 
         $processor = new FreeAgencyProcessor(
             $this->mockDb,
-            $this->createStub(CommonMysqliRepositoryInterface::class),
+            $this->createStub(TeamIdentityRepositoryInterface::class),
             $calculator,
             $capturingRepo,
         );
@@ -210,7 +210,7 @@ class FreeAgencyProcessorTest extends TestCase
 
         $processor = new FreeAgencyProcessor(
             $this->mockDb,
-            $this->createStub(CommonMysqliRepositoryInterface::class),
+            $this->createStub(TeamIdentityRepositoryInterface::class),
             $calculator,
             $capturingRepo,
         );
@@ -231,7 +231,7 @@ class FreeAgencyProcessorTest extends TestCase
 
         $processor = new FreeAgencyProcessor(
             $this->mockDb,
-            $this->createStub(CommonMysqliRepositoryInterface::class),
+            $this->createStub(TeamIdentityRepositoryInterface::class),
             $calculator,
             $capturingRepo,
         );
@@ -251,7 +251,7 @@ class FreeAgencyProcessorTest extends TestCase
 
         $processor = new FreeAgencyProcessor(
             $this->mockDb,
-            $this->createStub(CommonMysqliRepositoryInterface::class),
+            $this->createStub(TeamIdentityRepositoryInterface::class),
             $calculator,
             $capturingRepo,
         );
@@ -275,7 +275,7 @@ class FreeAgencyProcessorTest extends TestCase
 
         $processor = new FreeAgencyProcessor(
             $this->mockDb,
-            $this->createStub(CommonMysqliRepositoryInterface::class),
+            $this->createStub(TeamIdentityRepositoryInterface::class),
             $calculator,
             $capturingRepo,
         );
@@ -299,7 +299,7 @@ class FreeAgencyProcessorTest extends TestCase
 
     public function testProcessorAcceptsDatabaseAndCommonRepoInConstructor(): void
     {
-        $processor = new FreeAgencyProcessor($this->mockDb, $this->createStub(CommonMysqliRepositoryInterface::class));
+        $processor = new FreeAgencyProcessor($this->mockDb, $this->createStub(TeamIdentityRepositoryInterface::class));
         $this->assertInstanceOf(FreeAgencyProcessor::class, $processor);
     }
 
@@ -308,7 +308,7 @@ class FreeAgencyProcessorTest extends TestCase
         $calculator = new StubDemandCalculator();
         $repository = new CapturingRepository();
 
-        $processor = new FreeAgencyProcessor($this->mockDb, $this->createStub(CommonMysqliRepositoryInterface::class), $calculator, $repository);
+        $processor = new FreeAgencyProcessor($this->mockDb, $this->createStub(TeamIdentityRepositoryInterface::class), $calculator, $repository);
         $this->assertInstanceOf(FreeAgencyProcessor::class, $processor);
     }
 
@@ -320,7 +320,7 @@ class FreeAgencyProcessorTest extends TestCase
     {
         $this->mockDb->setMockData([$this->getCompletePlayerData()]);
 
-        $processor = new FreeAgencyProcessor($this->mockDb, $this->createStub(CommonMysqliRepositoryInterface::class));
+        $processor = new FreeAgencyProcessor($this->mockDb, $this->createStub(TeamIdentityRepositoryInterface::class));
         $result = $processor->deleteOffers('Test Team', 1);
 
         $this->assertIsArray($result);
@@ -331,7 +331,7 @@ class FreeAgencyProcessorTest extends TestCase
     {
         $this->mockDb->setMockData([$this->getCompletePlayerData()]);
 
-        $processor = new FreeAgencyProcessor($this->mockDb, $this->createStub(CommonMysqliRepositoryInterface::class));
+        $processor = new FreeAgencyProcessor($this->mockDb, $this->createStub(TeamIdentityRepositoryInterface::class));
         $processor->deleteOffers('Test Team', 1);
 
         $queries = $this->mockDb->getExecutedQueries();
@@ -355,7 +355,7 @@ class FreeAgencyProcessorTest extends TestCase
 
         $processor = new FreeAgencyProcessor(
             $this->mockDb,
-            $this->createStub(CommonMysqliRepositoryInterface::class),
+            $this->createStub(TeamIdentityRepositoryInterface::class),
             new StubDemandCalculator(),
             $capturingRepo,
         );
@@ -382,7 +382,7 @@ class FreeAgencyProcessorTest extends TestCase
 
         $processor = new FreeAgencyProcessor(
             $this->mockDb,
-            $this->createStub(CommonMysqliRepositoryInterface::class),
+            $this->createStub(TeamIdentityRepositoryInterface::class),
             new StubDemandCalculator(),
             $capturingRepo,
         );
@@ -419,7 +419,7 @@ class FreeAgencyProcessorTest extends TestCase
 
         $processor = new FreeAgencyProcessor(
             $this->mockDb,
-            $this->createStub(CommonMysqliRepositoryInterface::class),
+            $this->createStub(TeamIdentityRepositoryInterface::class),
             new StubDemandCalculator(),
             $signingRepo,
         );

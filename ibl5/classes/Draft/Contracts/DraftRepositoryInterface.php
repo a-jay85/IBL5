@@ -246,4 +246,12 @@ interface DraftRepositoryInterface
      *  // Returns null if draft complete (all picks filled)
      */
     public function getCurrentDraftPick(): ?array;
+
+    /**
+     * @param int $draftYear Draft year
+     * @param int $draftRound Draft round number
+     * @param int $teamIdOfDraftPickOrigin Team ID of the original team for the draft pick
+     * @return string|null Team name of current draft pick owner, or null if not found
+     */
+    public function getCurrentOwnerOfDraftPick(int $draftYear, int $draftRound, int $teamIdOfDraftPickOrigin): ?string;
 }

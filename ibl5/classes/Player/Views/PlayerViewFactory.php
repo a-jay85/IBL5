@@ -18,7 +18,7 @@ use Player\Stats\Views\PlayerRegularSeasonAveragesView;
 use Player\Stats\Views\PlayerRegularSeasonTotalsView;
 use Player\Stats\Views\PlayerSimStatsView;
 use Player\Contracts\PlayerViewInterface;
-use Services\Contracts\CommonMysqliRepositoryInterface;
+use Services\Contracts\TeamIdentityRepositoryInterface;
 
 /**
  * PlayerViewFactory - Creates view instances with repository injection
@@ -31,12 +31,12 @@ class PlayerViewFactory
 {
     private PlayerRepository $repository;
     private PlayerStatsRepository $statsRepository;
-    private CommonMysqliRepositoryInterface $commonRepository;
+    private TeamIdentityRepositoryInterface $commonRepository;
 
     public function __construct(
         PlayerRepository $repository,
         PlayerStatsRepository $statsRepository,
-        CommonMysqliRepositoryInterface $commonRepository
+        TeamIdentityRepositoryInterface $commonRepository
     ) {
         $this->repository = $repository;
         $this->statsRepository = $statsRepository;

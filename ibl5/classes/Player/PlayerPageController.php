@@ -14,7 +14,7 @@ use Player\Views\PlayerStatsCardView;
 use Player\Views\PlayerStatsFlipCardView;
 use Player\Views\PlayerViewFactory;
 use Player\Views\TeamColorHelper;
-use Services\Contracts\CommonMysqliRepositoryInterface;
+use Services\Contracts\TeamIdentityRepositoryInterface;
 use Security\HtmlSanitizer;
 use Team\Team;
 use Season\Season;
@@ -28,13 +28,13 @@ use Season\Season;
 class PlayerPageController
 {
     private \mysqli $mysqliDb;
-    private CommonMysqliRepositoryInterface $commonRepo;
+    private TeamIdentityRepositoryInterface $commonRepo;
 
     /**
      * @param \mysqli $mysqliDb MySQLi database connection
-     * @param CommonMysqliRepositoryInterface $commonRepo Common repository for shared queries
+     * @param TeamIdentityRepositoryInterface $commonRepo Common repository for shared queries
      */
-    public function __construct(\mysqli $mysqliDb, CommonMysqliRepositoryInterface $commonRepo)
+    public function __construct(\mysqli $mysqliDb, TeamIdentityRepositoryInterface $commonRepo)
     {
         $this->mysqliDb = $mysqliDb;
         $this->commonRepo = $commonRepo;
@@ -50,7 +50,6 @@ class PlayerPageController
      */
     public function renderPage(int $playerID, ?int $pageView, string $username): string
     {
-        $sharedRepository = new \Shared\SharedRepository($this->mysqliDb);
         $season = new Season($this->mysqliDb);
 
         $player = Player::withPlayerID($this->mysqliDb, $playerID);
@@ -121,7 +120,6 @@ class PlayerPageController
             $player,
             $playerStats,
             $season,
-            $sharedRepository,
             $colorScheme
         );
 
@@ -169,7 +167,6 @@ class PlayerPageController
         Player $player,
         PlayerStats $playerStats,
         Season $season,
-        \Shared\Contracts\SharedRepositoryInterface $sharedRepository,
         array $colorScheme
     ): string {
         $playerName = $player->name ?? '';
@@ -185,7 +182,7 @@ class PlayerPageController
                 );
             }
             $view = $viewFactory->createOverviewView();
-            return $view->renderOverview($playerID, $player, $playerStats, $season, $sharedRepository, $colorScheme);
+            return $view->renderOverview($playerID, $player, $playerStats, $season, $colorScheme);
         }
 
         if ($pageView === PlayerPageType::SIM_STATS) {
@@ -267,7 +264,7 @@ class PlayerPageController
             );
         }
         $view = $viewFactory->createOverviewView();
-        return $view->renderOverview($playerID, $player, $playerStats, $season, $sharedRepository, $colorScheme);
+        return $view->renderOverview($playerID, $player, $playerStats, $season, $colorScheme);
     }
 
     /**

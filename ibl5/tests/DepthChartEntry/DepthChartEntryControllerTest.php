@@ -6,7 +6,7 @@ namespace Tests\DepthChartEntry;
 
 use PHPUnit\Framework\TestCase;
 use DepthChartEntry\DepthChartEntryController;
-use Services\Contracts\CommonMysqliRepositoryInterface;
+use Services\Contracts\TeamIdentityRepositoryInterface;
 use Tests\WideUnit\Mocks\MockDatabase;
 use Tests\WideUnit\Mocks\MockDatabaseResult;
 use Tests\WideUnit\Mocks\MockPreparedStatement;
@@ -23,13 +23,13 @@ class DepthChartEntryControllerTest extends TestCase
 {
     private MockDatabase $mockDb;
     private object $mockMysqliDb;
-    private CommonMysqliRepositoryInterface $stubCommonRepo;
+    private TeamIdentityRepositoryInterface $stubCommonRepo;
 
     protected function setUp(): void
     {
         $this->mockDb = new MockDatabase();
         $this->setupMockMysqliDb();
-        $this->stubCommonRepo = $this->createStub(CommonMysqliRepositoryInterface::class);
+        $this->stubCommonRepo = $this->createStub(TeamIdentityRepositoryInterface::class);
     }
 
     protected function tearDown(): void

@@ -6,14 +6,14 @@ namespace Tests\Api\Controller;
 
 use Api\Controller\TradeDeclineController;
 use Api\Response\JsonResponder;
-use Services\Contracts\CommonMysqliRepositoryInterface;
+use Services\Contracts\TeamIdentityRepositoryInterface;
 use Tests\WideUnit\WideUnitTestCase;
 
 class TradeDeclineControllerTest extends WideUnitTestCase
 {
     public function testReturns400WhenOfferIdMissing(): void
     {
-        $controller = new TradeDeclineController($this->mockDb, $this->createStub(CommonMysqliRepositoryInterface::class));
+        $controller = new TradeDeclineController($this->mockDb, $this->createStub(TeamIdentityRepositoryInterface::class));
         $responder = $this->createMock(JsonResponder::class);
 
         $responder->expects($this->once())
@@ -25,7 +25,7 @@ class TradeDeclineControllerTest extends WideUnitTestCase
 
     public function testReturns400WhenDiscordUserIdMissing(): void
     {
-        $controller = new TradeDeclineController($this->mockDb, $this->createStub(CommonMysqliRepositoryInterface::class));
+        $controller = new TradeDeclineController($this->mockDb, $this->createStub(TeamIdentityRepositoryInterface::class));
         $responder = $this->createMock(JsonResponder::class);
 
         $responder->expects($this->once())
@@ -39,7 +39,7 @@ class TradeDeclineControllerTest extends WideUnitTestCase
     {
         $this->mockDb->setMockData([]);
 
-        $controller = new TradeDeclineController($this->mockDb, $this->createStub(CommonMysqliRepositoryInterface::class));
+        $controller = new TradeDeclineController($this->mockDb, $this->createStub(TeamIdentityRepositoryInterface::class));
         $responder = $this->createMock(JsonResponder::class);
 
         $responder->expects($this->once())
@@ -72,7 +72,7 @@ class TradeDeclineControllerTest extends WideUnitTestCase
             ],
         ]);
 
-        $controller = new TradeDeclineController($this->mockDb, $this->createStub(CommonMysqliRepositoryInterface::class));
+        $controller = new TradeDeclineController($this->mockDb, $this->createStub(TeamIdentityRepositoryInterface::class));
         $responder = $this->createMock(JsonResponder::class);
 
         $responder->expects($this->once())

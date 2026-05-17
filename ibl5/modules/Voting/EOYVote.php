@@ -34,7 +34,7 @@ if (!is_user($user)) {
 }
 cookiedecode($user);
 $username = (string) ($cookie[1] ?? '');
-$commonRepository = new \Services\CommonMysqliRepository($mysqli_db);
+$commonRepository = new \Services\TeamIdentityRepository($mysqli_db);
 $teamName = $commonRepository->getTeamnameFromUsername($username) ?? '';
 
 /** @var array{mvp_1: string, mvp_2: string, mvp_3: string, six_1: string, six_2: string, six_3: string, roy_1: string, roy_2: string, roy_3: string, gm_1: string, gm_2: string, gm_3: string} $ballot */

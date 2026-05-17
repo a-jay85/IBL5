@@ -14,7 +14,7 @@ use Season\Season;
  * starter extraction logic. Extracted from TeamServiceInterface to
  * separate table concerns from page orchestration.
  *
- * @phpstan-import-type PlayerRow from \Services\CommonMysqliRepository
+ * @phpstan-import-type PlayerRow from \Services\Contracts\PlayerLookupRepositoryInterface
  * @phpstan-import-type StartersData from TeamServiceInterface
  */
 interface TeamTableServiceInterface

@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Tests\Trading;
 
 use PHPUnit\Framework\TestCase;
-use Services\Contracts\CommonMysqliRepositoryInterface;
+use Services\Contracts\TeamIdentityRepositoryInterface;
 use Trading\TradeProcessor;
 use Trading\Contracts\TradeProcessorInterface;
 
@@ -15,12 +15,12 @@ use Trading\Contracts\TradeProcessorInterface;
 class TradeProcessorTest extends TestCase
 {
     private object $mockDb;
-    private CommonMysqliRepositoryInterface $mockCommonRepo;
+    private TeamIdentityRepositoryInterface $mockCommonRepo;
 
     protected function setUp(): void
     {
         $this->mockDb = $this->createMockDatabase();
-        $this->mockCommonRepo = $this->createStub(CommonMysqliRepositoryInterface::class);
+        $this->mockCommonRepo = $this->createStub(TeamIdentityRepositoryInterface::class);
     }
 
     private function createMockDatabase(): object

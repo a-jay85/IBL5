@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace SavedDepthChart;
 
 use Security\HtmlSanitizer;
-use Services\Contracts\CommonMysqliRepositoryInterface;
+use Services\Contracts\TeamIdentityRepositoryInterface;
 use Team\Team;
 use Season\Season;
 
@@ -19,9 +19,9 @@ class SavedDepthChartApiHandler
     private \mysqli $db;
     private SavedDepthChartService $service;
     private SavedDepthChartRepository $repository;
-    private CommonMysqliRepositoryInterface $commonRepo;
+    private TeamIdentityRepositoryInterface $commonRepo;
 
-    public function __construct(\mysqli $db, CommonMysqliRepositoryInterface $commonRepo)
+    public function __construct(\mysqli $db, TeamIdentityRepositoryInterface $commonRepo)
     {
         $this->db = $db;
         $this->service = new SavedDepthChartService($db);

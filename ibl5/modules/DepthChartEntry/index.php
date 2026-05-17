@@ -12,7 +12,7 @@ get_lang($module_name);
 $pagetitle = " - Depth Chart Entry";
 
 global $mysqli_db, $commonRepo;
-$commonRepo = new Services\CommonMysqliRepository($mysqli_db);
+$commonRepo = new Services\TeamIdentityRepository($mysqli_db);
 
 function userinfo($username)
 {

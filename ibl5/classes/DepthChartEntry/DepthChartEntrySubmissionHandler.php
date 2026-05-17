@@ -7,7 +7,7 @@ namespace DepthChartEntry;
 use DepthChartEntry\Contracts\DepthChartEntrySubmissionHandlerInterface;
 use SavedDepthChart\SavedDepthChartService;
 use Season\Season;
-use Services\Contracts\CommonMysqliRepositoryInterface;
+use Services\Contracts\TeamIdentityRepositoryInterface;
 
 /**
  * @phpstan-import-type ProcessedPlayerData from Contracts\DepthChartEntryProcessorInterface
@@ -22,9 +22,9 @@ class DepthChartEntrySubmissionHandler implements DepthChartEntrySubmissionHandl
     private DepthChartEntryProcessor $processor;
     private DepthChartEntryValidator $validator;
     private SavedDepthChartService $savedDcService;
-    private CommonMysqliRepositoryInterface $commonRepo;
+    private TeamIdentityRepositoryInterface $commonRepo;
 
-    public function __construct(\mysqli $db, CommonMysqliRepositoryInterface $commonRepo)
+    public function __construct(\mysqli $db, TeamIdentityRepositoryInterface $commonRepo)
     {
         $this->db = $db;
         $this->repository = new DepthChartEntryRepository($db);

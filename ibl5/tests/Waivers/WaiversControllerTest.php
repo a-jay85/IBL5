@@ -8,6 +8,8 @@ use PHPUnit\Framework\TestCase;
 use Waivers\Contracts\WaiversProcessorInterface;
 use Waivers\Contracts\WaiversServiceInterface;
 use Waivers\Contracts\WaiversViewInterface;
+use Services\Contracts\TeamIdentityRepositoryInterface;
+use Services\Contracts\SalaryCapRepositoryInterface;
 use Waivers\WaiversController;
 
 class WaiversControllerTest extends TestCase
@@ -19,7 +21,8 @@ class WaiversControllerTest extends TestCase
         $serviceStub = $this->createStub(WaiversServiceInterface::class);
         $processorStub = $this->createStub(WaiversProcessorInterface::class);
         $viewStub = $this->createStub(WaiversViewInterface::class);
-        $commonRepoStub = $this->createStub(\Services\CommonMysqliRepository::class);
+        $teamIdentityRepoStub = $this->createStub(TeamIdentityRepositoryInterface::class);
+        $salaryCapRepoStub = $this->createStub(SalaryCapRepositoryInterface::class);
         $nukeCompatStub = $this->createStub(\Utilities\NukeCompat::class);
         $dbStub = $this->createStub(\mysqli::class);
 
@@ -27,7 +30,8 @@ class WaiversControllerTest extends TestCase
             $serviceStub,
             $processorStub,
             $viewStub,
-            $commonRepoStub,
+            $teamIdentityRepoStub,
+            $salaryCapRepoStub,
             $nukeCompatStub,
             $dbStub
         );

@@ -20,11 +20,10 @@ get_lang($module_name);
 function userinfo($username)
 {
     global $user_prefix, $mysqli_db;
-    $commonRepository = new \Services\CommonMysqliRepository($mysqli_db);
+    $commonRepository = new \Services\TeamIdentityRepository($mysqli_db);
     $season = new \Season\Season($mysqli_db);
     $repository = new DraftRepository($mysqli_db, $commonRepository);
     $view = new DraftView();
-    $sharedRepository = new \Shared\SharedRepository($mysqli_db);
 
     PageLayout\PageLayout::header();
 
@@ -42,7 +41,7 @@ function userinfo($username)
 
     $pickOwner = null;
     if ($draft_round !== null && $draft_tid !== 0) {
-        $pickOwner = $sharedRepository->getCurrentOwnerOfDraftPick($season->endingYear, $draft_round, $draft_tid);
+        $pickOwner = $repository->getCurrentOwnerOfDraftPick($season->endingYear, $draft_round, $draft_tid);
     }
 
     // Get all draft class players

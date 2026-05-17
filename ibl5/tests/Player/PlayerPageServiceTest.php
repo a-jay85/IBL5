@@ -7,7 +7,7 @@ namespace Tests\Player;
 use PHPUnit\Framework\TestCase;
 use Player\PlayerPageService;
 use Player\Player;
-use Services\Contracts\CommonMysqliRepositoryInterface;
+use Services\Contracts\TeamIdentityRepositoryInterface;
 use Tests\WideUnit\Mocks\MockDatabase;
 
 class PlayerPageServiceTest extends TestCase
@@ -19,7 +19,7 @@ class PlayerPageServiceTest extends TestCase
     {
         // Mock database connection
         $this->db = new MockDatabase();
-        $this->service = new PlayerPageService($this->db, $this->createStub(CommonMysqliRepositoryInterface::class));
+        $this->service = new PlayerPageService($this->db, $this->createStub(TeamIdentityRepositoryInterface::class));
     }
 
     public function testCanShowRenegotiationButtonReturnsTrueWhenAllConditionsMet()

@@ -10,7 +10,7 @@ use Trading\Contracts\TradeAssetRepositoryInterface;
 use Trading\Contracts\TradeCashRepositoryInterface;
 use Trading\Contracts\TradeExecutionRepositoryInterface;
 use Trading\Contracts\CashConsiderationRepositoryInterface;
-use Services\Contracts\CommonMysqliRepositoryInterface;
+use Services\Contracts\TeamIdentityRepositoryInterface;
 use Season\Season;
 use Discord\Discord;
 
@@ -34,7 +34,7 @@ class TradeProcessor implements TradeProcessorInterface
     protected TradeCashRepositoryInterface $cashRepository;
     protected CashConsiderationRepositoryInterface $cashConsiderationRepository;
     protected TradeExecutionRepositoryInterface $executionRepository;
-    protected CommonMysqliRepositoryInterface $commonRepository;
+    protected TeamIdentityRepositoryInterface $commonRepository;
     protected Season $season;
     protected CashTransactionHandler $cashHandler;
     protected \Services\NewsService $newsService;
@@ -42,7 +42,7 @@ class TradeProcessor implements TradeProcessorInterface
 
     public function __construct(
         \mysqli $db,
-        CommonMysqliRepositoryInterface $commonRepository,
+        TeamIdentityRepositoryInterface $commonRepository,
         ?TradeOfferRepositoryInterface $offerRepository = null,
         ?TradeAssetRepositoryInterface $assetRepository = null
     ) {

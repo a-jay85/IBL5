@@ -7,7 +7,7 @@ namespace Tests\YourAccount;
 use Auth\Contracts\AuthServiceInterface;
 use Mail\Contracts\MailServiceInterface;
 use PHPUnit\Framework\TestCase;
-use Services\CommonMysqliRepository;
+use Services\Contracts\TeamIdentityRepositoryInterface;
 use Tests\Support\AuthLogAssertions;
 use YourAccount\YourAccountService;
 
@@ -17,8 +17,8 @@ class YourAccountServiceTest extends TestCase
     /** @var AuthServiceInterface&\PHPUnit\Framework\MockObject\Stub */
     private AuthServiceInterface $stubAuthService;
 
-    /** @var CommonMysqliRepository&\PHPUnit\Framework\MockObject\Stub */
-    private CommonMysqliRepository $stubCommonRepository;
+    /** @var TeamIdentityRepositoryInterface&\PHPUnit\Framework\MockObject\Stub */
+    private TeamIdentityRepositoryInterface $stubCommonRepository;
 
     /** @var MailServiceInterface&\PHPUnit\Framework\MockObject\Stub */
     private MailServiceInterface $stubMailService;
@@ -30,7 +30,7 @@ class YourAccountServiceTest extends TestCase
         $this->setUpAuthLogCapture();
 
         $this->stubAuthService = $this->createStub(AuthServiceInterface::class);
-        $this->stubCommonRepository = $this->createStub(CommonMysqliRepository::class);
+        $this->stubCommonRepository = $this->createStub(TeamIdentityRepositoryInterface::class);
         $this->stubMailService = $this->createStub(MailServiceInterface::class);
 
         $this->service = $this->buildService();

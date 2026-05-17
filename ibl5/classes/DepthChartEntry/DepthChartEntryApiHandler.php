@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace DepthChartEntry;
 
-use Services\Contracts\CommonMysqliRepositoryInterface;
+use Services\Contracts\TeamIdentityRepositoryInterface;
 
 /**
  * HTMX endpoint handler for depth chart entry tab switching
@@ -26,9 +26,9 @@ class DepthChartEntryApiHandler
     ];
 
     private \mysqli $db;
-    private CommonMysqliRepositoryInterface $commonRepo;
+    private TeamIdentityRepositoryInterface $commonRepo;
 
-    public function __construct(\mysqli $db, CommonMysqliRepositoryInterface $commonRepo)
+    public function __construct(\mysqli $db, TeamIdentityRepositoryInterface $commonRepo)
     {
         $this->db = $db;
         $this->commonRepo = $commonRepo;

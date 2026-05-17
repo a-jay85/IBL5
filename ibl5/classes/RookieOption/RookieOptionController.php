@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace RookieOption;
 
 use Player\Player;
-use Services\Contracts\CommonMysqliRepositoryInterface;
+use Services\Contracts\TeamIdentityRepositoryInterface;
 use Shared\SalaryConverter;
 use RookieOption\Contracts\RookieOptionControllerInterface;
 use Season\Season;
@@ -25,9 +25,9 @@ class RookieOptionController implements RookieOptionControllerInterface
     private \mysqli $db;
     private RookieOptionRepository $repository;
     private \Services\NewsService $newsService;
-    private CommonMysqliRepositoryInterface $commonRepository;
+    private TeamIdentityRepositoryInterface $commonRepository;
 
-    public function __construct(\mysqli $db, CommonMysqliRepositoryInterface $commonRepository)
+    public function __construct(\mysqli $db, TeamIdentityRepositoryInterface $commonRepository)
     {
         $this->db = $db;
         $this->repository = new RookieOptionRepository($db);

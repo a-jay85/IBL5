@@ -46,7 +46,7 @@ $repository->deleteTradeOffer($offerId);
 
 // Attempt Discord notification (gracefully fail if not available)
 try {
-    $commonRepo = new \Services\CommonMysqliRepository($mysqli_db);
+    $commonRepo = new \Services\TeamIdentityRepository($mysqli_db);
     $discord = new \Discord\Discord($commonRepo);
     $rejectingUserDiscordID = $discord->getDiscordIDFromTeamname($teamRejecting);
     $receivingUserDiscordID = $discord->getDiscordIDFromTeamname($teamReceiving);

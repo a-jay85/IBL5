@@ -9,7 +9,7 @@ use Negotiation\NegotiationService;
 use Negotiation\NegotiationRepository;
 use Negotiation\NegotiationValidator;
 use Negotiation\NegotiationDemandCalculator;
-use Services\Contracts\CommonMysqliRepositoryInterface;
+use Services\Contracts\SalaryCapRepositoryInterface;
 use Tests\WideUnit\Mocks\MockDatabase;
 use Tests\WideUnit\Mocks\MockDatabaseResult;
 use Tests\WideUnit\Mocks\MockPreparedStatement;
@@ -143,7 +143,7 @@ class NegotiationServiceTest extends TestCase
 
     private function buildService(?\Season\Season $season = null): NegotiationService
     {
-        $commonRepo = $this->createStub(CommonMysqliRepositoryInterface::class);
+        $commonRepo = $this->createStub(SalaryCapRepositoryInterface::class);
         return new NegotiationService(
             $this->mockMysqliDb,
             new NegotiationRepository($this->mockMysqliDb, $commonRepo),

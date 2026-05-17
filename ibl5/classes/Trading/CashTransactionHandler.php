@@ -7,7 +7,7 @@ namespace Trading;
 use Trading\Contracts\CashTransactionHandlerInterface;
 use Trading\Contracts\CashConsiderationRepositoryInterface;
 use Trading\Contracts\TradeCashRepositoryInterface;
-use Services\Contracts\CommonMysqliRepositoryInterface;
+use Services\Contracts\TeamIdentityRepositoryInterface;
 
 /**
  * CashTransactionHandler - Handles cash considerations in trades
@@ -22,11 +22,11 @@ class CashTransactionHandler implements CashTransactionHandlerInterface
     protected \mysqli $db;
     protected CashConsiderationRepositoryInterface $cashConsiderationRepository;
     protected TradeCashRepositoryInterface $cashRepository;
-    protected CommonMysqliRepositoryInterface $commonRepository;
+    protected TeamIdentityRepositoryInterface $commonRepository;
 
     public function __construct(
         \mysqli $db,
-        CommonMysqliRepositoryInterface $commonRepository,
+        TeamIdentityRepositoryInterface $commonRepository,
         ?CashConsiderationRepositoryInterface $cashConsiderationRepository = null,
         ?TradeCashRepositoryInterface $cashRepository = null
     ) {

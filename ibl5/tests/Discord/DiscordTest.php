@@ -6,18 +6,18 @@ namespace Tests\Discord;
 
 use PHPUnit\Framework\TestCase;
 use Discord\Discord;
-use Services\Contracts\CommonMysqliRepositoryInterface;
+use Services\Contracts\TeamIdentityRepositoryInterface;
 
 /**
  * Tests for Discord class
  */
 class DiscordTest extends TestCase
 {
-    private CommonMysqliRepositoryInterface $mockCommonRepo;
+    private TeamIdentityRepositoryInterface $mockCommonRepo;
 
     protected function setUp(): void
     {
-        $this->mockCommonRepo = $this->createStub(CommonMysqliRepositoryInterface::class);
+        $this->mockCommonRepo = $this->createStub(TeamIdentityRepositoryInterface::class);
     }
 
     /**

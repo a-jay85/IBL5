@@ -10,7 +10,7 @@ use Player\PlayerPageType;
 use Player\Views\PlayerViewFactory;
 use Player\PlayerRepository;
 use Player\Stats\PlayerStatsRepository;
-use Services\CommonMysqliRepository;
+use Services\Contracts\TeamIdentityRepositoryInterface;
 use Player\Views\PlayerOverviewView;
 use Player\Stats\Views\PlayerSimStatsView;
 use Player\Stats\Views\PlayerRegularSeasonTotalsView;
@@ -42,8 +42,8 @@ class PlayerViewFactoryTest extends TestCase
     /** @var PlayerStatsRepository&\PHPUnit\Framework\MockObject\MockObject */
     private PlayerStatsRepository $mockStatsRepository;
     
-    /** @var CommonMysqliRepository&\PHPUnit\Framework\MockObject\MockObject */
-    private CommonMysqliRepository $mockCommonRepository;
+    /** @var TeamIdentityRepositoryInterface&\PHPUnit\Framework\MockObject\MockObject */
+    private TeamIdentityRepositoryInterface $mockCommonRepository;
     
     private PlayerViewFactory $factory;
 
@@ -55,9 +55,9 @@ class PlayerViewFactoryTest extends TestCase
         // Create mock repositories
         $this->mockRepository = $this->createMock(PlayerRepository::class);
         $this->mockStatsRepository = $this->createMock(PlayerStatsRepository::class);
-        $this->mockCommonRepository = $this->createMock(CommonMysqliRepository::class);
+        $this->mockCommonRepository = $this->createMock(TeamIdentityRepositoryInterface::class);
         
-        // Create factory with mocked dependencies including CommonMysqliRepository
+        // Create factory with mocked dependencies including TeamIdentityRepositoryInterface
         $this->factory = new PlayerViewFactory(
             $this->mockRepository,
             $this->mockStatsRepository,

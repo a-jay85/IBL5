@@ -6,14 +6,14 @@ namespace Tests\DatabaseIntegration\RookieOption;
 
 use PHPUnit\Framework\Attributes\Group;
 use RookieOption\RookieOptionRepository;
-use Services\CommonMysqliRepository;
+use Services\PlayerLookupRepository;
 use Tests\DatabaseIntegration\DatabaseTestCase;
 
 #[Group('database')]
 class RookieOptionControllerIntegrationTest extends DatabaseTestCase
 {
     private RookieOptionRepository $repository;
-    private CommonMysqliRepository $commonRepository;
+    private PlayerLookupRepository $commonRepository;
 
     private const TEST_PID_BASE = 200060200;
 
@@ -22,7 +22,7 @@ class RookieOptionControllerIntegrationTest extends DatabaseTestCase
         parent::setUp();
 
         $this->repository = new RookieOptionRepository($this->db);
-        $this->commonRepository = new CommonMysqliRepository($this->db);
+        $this->commonRepository = new PlayerLookupRepository($this->db);
     }
 
     public function testRound1OptionSetsSalaryYr4(): void

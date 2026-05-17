@@ -28,7 +28,7 @@ use Team\Views\SidebarView;
  * @phpstan-import-type WinLossRecord from Contracts\TeamServiceInterface
  * @phpstan-import-type DraftPickItemData from Contracts\TeamServiceInterface
  * @phpstan-import-type FranchiseSeasonRow from Contracts\TeamRepositoryInterface
- * @phpstan-import-type TeamInfoRow from \Services\CommonMysqliRepository
+ * @phpstan-import-type TeamInfoRow from \Services\Contracts\TeamIdentityRepositoryInterface
  *
  * @see TeamServiceInterface
  */

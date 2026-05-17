@@ -15,7 +15,7 @@ global $mysqli_db;
 
 $teamid = isset($teamid) ? (int) $teamid : 0;
 
-$commonRepo = new \Services\CommonMysqliRepository($mysqli_db);
+$commonRepo = new \Services\TeamIdentityRepository($mysqli_db);
 $controller = new Team\TeamController($mysqli_db, $commonRepo);
 
 switch ($op) {

@@ -6,16 +6,16 @@ namespace Api\Controller;
 
 use Api\Contracts\ControllerInterface;
 use Api\Response\JsonResponder;
-use Services\Contracts\CommonMysqliRepositoryInterface;
+use Services\Contracts\TeamIdentityRepositoryInterface;
 use Trading\TradeOfferRepository;
 use Discord\Discord;
 
 class TradeDeclineController implements ControllerInterface
 {
     private \mysqli $db;
-    private CommonMysqliRepositoryInterface $commonRepository;
+    private TeamIdentityRepositoryInterface $commonRepository;
 
-    public function __construct(\mysqli $db, CommonMysqliRepositoryInterface $commonRepository)
+    public function __construct(\mysqli $db, TeamIdentityRepositoryInterface $commonRepository)
     {
         $this->db = $db;
         $this->commonRepository = $commonRepository;

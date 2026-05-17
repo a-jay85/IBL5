@@ -7,7 +7,7 @@ namespace Tests\Discord;
 use PHPUnit\Framework\Attributes\AllowMockObjectsWithoutExpectations;
 use Tests\WideUnit\WideUnitTestCase;
 use Discord\Discord;
-use Services\Contracts\CommonMysqliRepositoryInterface;
+use Services\Contracts\TeamIdentityRepositoryInterface;
 
 /**
  * DiscordIntegrationTest - Integration tests for Discord class
@@ -19,12 +19,12 @@ use Services\Contracts\CommonMysqliRepositoryInterface;
 #[AllowMockObjectsWithoutExpectations]
 class DiscordIntegrationTest extends WideUnitTestCase
 {
-    private CommonMysqliRepositoryInterface $mockCommonRepo;
+    private TeamIdentityRepositoryInterface $mockCommonRepo;
 
     protected function setUp(): void
     {
         parent::setUp();
-        $this->mockCommonRepo = $this->createStub(CommonMysqliRepositoryInterface::class);
+        $this->mockCommonRepo = $this->createStub(TeamIdentityRepositoryInterface::class);
     }
 
     // ============================================
@@ -101,7 +101,7 @@ class DiscordIntegrationTest extends WideUnitTestCase
      */
     public function testGetDiscordIDFromTeamdelegatesToCommonRepo(): void
     {
-        $mockRepo = $this->createMock(CommonMysqliRepositoryInterface::class);
+        $mockRepo = $this->createMock(TeamIdentityRepositoryInterface::class);
         $mockRepo->expects($this->once())
             ->method('getTeamDiscordID')
             ->with('Miami')

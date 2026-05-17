@@ -13,7 +13,7 @@ use Trading\CashConsiderationRepository;
 use Trading\Contracts\CashConsiderationRepositoryInterface;
 
 /**
- * @phpstan-import-type PlayerRow from \Services\CommonMysqliRepository
+ * @phpstan-import-type PlayerRow from \Services\Contracts\PlayerLookupRepositoryInterface
  */
 class FreeAgencyCapCalculator
 {

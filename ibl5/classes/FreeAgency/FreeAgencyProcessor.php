@@ -7,7 +7,7 @@ namespace FreeAgency;
 use FreeAgency\Contracts\FreeAgencyDemandCalculatorInterface;
 use FreeAgency\Contracts\FreeAgencyProcessorInterface;
 use FreeAgency\Contracts\FreeAgencyRepositoryInterface;
-use Services\Contracts\CommonMysqliRepositoryInterface;
+use Services\Contracts\TeamIdentityRepositoryInterface;
 use Team\Team;
 use Season\Season;
 use Discord\Discord;
@@ -21,11 +21,11 @@ class FreeAgencyProcessor implements FreeAgencyProcessorInterface
     private FreeAgencyDemandCalculatorInterface $calculator;
     private FreeAgencyRepositoryInterface $repository;
     private Season $season;
-    private CommonMysqliRepositoryInterface $commonRepo;
+    private TeamIdentityRepositoryInterface $commonRepo;
 
     public function __construct(
         \mysqli $mysqli_db,
-        CommonMysqliRepositoryInterface $commonRepo,
+        TeamIdentityRepositoryInterface $commonRepo,
         ?FreeAgencyDemandCalculatorInterface $calculator = null,
         ?FreeAgencyRepositoryInterface $repository = null
     ) {

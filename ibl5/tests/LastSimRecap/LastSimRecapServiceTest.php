@@ -78,10 +78,10 @@ class LastSimRecapServiceTest extends TestCase
 
         self::assertNotNull($slate);
         self::assertStringContainsString('+21', $slate->bestLabel);
-        self::assertStringContainsString('STA', $slate->bestLabel); // opponent code
+        self::assertStringContainsString('Stars', $slate->bestLabel);
         self::assertStringContainsString('@', $slate->bestLabel);   // visitor → @
         self::assertStringContainsString('−10', $slate->worstLabel);
-        self::assertStringContainsString('COU', $slate->worstLabel);
+        self::assertStringContainsString('Cougars', $slate->worstLabel);
         self::assertStringContainsString('vs', $slate->worstLabel); // home → vs
     }
 
@@ -104,7 +104,7 @@ class LastSimRecapServiceTest extends TestCase
         self::assertNotNull($slate);
         // Service iterates in input order (already desc by date), and uses `>` for best so
         // the FIRST max (i.e. the most recent) wins ties. Best label should show MIN.
-        self::assertStringContainsString('MIN', $slate->bestLabel);
+        self::assertStringContainsString('Minutemen', $slate->bestLabel);
     }
 
     public function testOtGameProducesFiveMargins(): void

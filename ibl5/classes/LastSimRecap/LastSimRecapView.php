@@ -98,7 +98,7 @@ class LastSimRecapView implements LastSimRecapViewInterface
         $h .= ' data-tab-index="' . $idx . '">';
         $h .= '  <span class="last-sim-recap__tab-top">';
         $h .= '    <span class="last-sim-recap__tab-where">' . HtmlSanitizer::e($where) . '</span>';
-        $h .= '    <span class="last-sim-recap__tab-opp">' . HtmlSanitizer::e($g->oppCode) . '</span>';
+        $h .= '    <span class="last-sim-recap__tab-opp">' . HtmlSanitizer::e($g->oppName) . '</span>';
         $h .= '    <span class="last-sim-recap__tab-date">' . HtmlSanitizer::e($dateLabel) . '</span>';
         $h .= '  </span>';
         $h .= '  <span class="last-sim-recap__tab-score">';

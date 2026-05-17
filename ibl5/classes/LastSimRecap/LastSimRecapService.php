@@ -257,6 +257,6 @@ class LastSimRecapService implements LastSimRecapServiceInterface
         $sign = $g->margin >= 0 ? '+' : '−';
         $abs = abs($g->margin);
         $venue = $g->home ? 'vs' : '@';
-        return $sign . $abs . ' ' . $venue . ' ' . $g->oppCode;
+        return $sign . $abs . ' ' . $venue . ' ' . $g->oppName;
     }
 }

@@ -10,6 +10,7 @@ use Negotiation\NegotiationDemandCalculator;
 use Negotiation\NegotiationRepository;
 use Negotiation\NegotiationService;
 use Negotiation\NegotiationValidator;
+use Services\CommonMysqliRepository;
 
 #[Group('database')]
 class NegotiationServiceIntegrationTest extends DatabaseTestCase
@@ -85,7 +86,7 @@ class NegotiationServiceIntegrationTest extends DatabaseTestCase
     {
         return new NegotiationService(
             $this->db,
-            new NegotiationRepository($this->db),
+            new NegotiationRepository($this->db, new CommonMysqliRepository($this->db)),
             new NegotiationValidator($this->db, $season),
             new NegotiationDemandCalculator($this->db),
         );

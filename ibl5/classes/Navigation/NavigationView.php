@@ -9,6 +9,7 @@ use Navigation\Views\DesktopNavView;
 use Navigation\Views\LoginFormView;
 use Navigation\Views\MobileNavView;
 use Navigation\Views\TeamsDropdownView;
+use Security\HtmlSanitizer;
 
 /**
  * Thin orchestrator that composes the full navigation bar from sub-views.
@@ -59,7 +60,7 @@ class NavigationView
             <!-- Bottom accent line (above cover) -->
             <div class="absolute bottom-0 left-0 right-0 h-[1px] z-[61] bg-accent-500"></div>
 
-            <?= $this->desktopNavView->renderDevSwitch() ?>
+            <?= HtmlSanitizer::trusted($this->desktopNavView->renderDevSwitch()) ?>
 
             <div class="relative max-w-7xl mx-auto px-4 sm:px-6 h-full">
                 <div class="flex items-center justify-between h-full">
@@ -82,7 +83,7 @@ class NavigationView
                         </div>
                     </a>
 
-                    <?= $this->desktopNavView->render($menus, $myTeamMenu, $accountMenu) ?>
+                    <?= HtmlSanitizer::trusted($this->desktopNavView->render($menus, $myTeamMenu, $accountMenu)) ?>
 
                     <!-- Mobile controls -->
                     <div class="lg:hidden flex items-center gap-1">
@@ -108,7 +109,7 @@ class NavigationView
             </div>
         </nav>
 
-        <?= $this->mobileNavView->render($menus, $myTeamMenu, $accountMenu) ?>
+        <?= HtmlSanitizer::trusted($this->mobileNavView->render($menus, $myTeamMenu, $accountMenu)) ?>
         <script src="jslib/navigation.js"></script>
         <?php
         return (string) ob_get_clean();

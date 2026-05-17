@@ -104,6 +104,19 @@ final class RequireEscapedOutputRule implements Rule
         'json_encode',
     ];
 
+    /**
+     * View files with zero violations — errors are non-ignorable (cannot be baselined).
+     *
+     * @var list<string>
+     */
+    private const ZERO_FLOOR_FILES = [
+        'Navigation/NavigationView.php',
+        'Navigation/Views/DesktopNavView.php',
+        'Navigation/Views/LoginFormView.php',
+        'Navigation/Views/MobileNavView.php',
+        'Navigation/Views/TeamsDropdownView.php',
+    ];
+
     public function getNodeType(): string
     {
         return Echo_::class;
@@ -126,20 +139,27 @@ final class RequireEscapedOutputRule implements Rule
             return [];
         }
 
+        $isZeroFloor = $this->isZeroFloorFile($file);
+
         $errors = [];
         foreach ($node->exprs as $expr) {
             if ($this->isSafeExpression($expr)) {
                 continue;
             }
 
-            $errors[] = RuleErrorBuilder::message(
+            $builder = RuleErrorBuilder::message(
                 'Unescaped output in View. Wrap the expression in '
                 . 'HtmlSanitizer::e() (or another whitelisted safe helper), '
                 . 'or cast it to (int)/(float)/(bool) if it is numeric.'
             )
                 ->identifier('ibl.unescapedOutput')
-                ->line($expr->getStartLine())
-                ->build();
+                ->line($expr->getStartLine());
+
+            if ($isZeroFloor) {
+                $builder->nonIgnorable();
+            }
+
+            $errors[] = $builder->build();
         }
 
         return $errors;
@@ -223,6 +243,17 @@ final class RequireEscapedOutputRule implements Rule
 
         // Everything else is unsafe by default (Variable, PropertyFetch,
         // MethodCall on instances, InterpolatedString, array accesses, etc.)
+        return false;
+    }
+
+    private function isZeroFloorFile(string $file): bool
+    {
+        $normalized = str_replace('\\', '/', $file);
+        foreach (self::ZERO_FLOOR_FILES as $pattern) {
+            if (str_ends_with($normalized, $pattern)) {
+                return true;
+            }
+        }
         return false;
     }
 }

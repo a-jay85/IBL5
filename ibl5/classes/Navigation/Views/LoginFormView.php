@@ -42,66 +42,66 @@ class LoginFormView
 
         ob_start();
         ?>
-        <div class="<?= $containerClass ?>">
+        <div class="<?= HtmlSanitizer::e($containerClass) ?>">
             <form action="modules.php?name=YourAccount" method="post" hx-boost="false" class="space-y-3">
                 <div>
-                    <label for="<?= $idPrefix ?>-username" class="<?= $labelClass ?>">Username</label>
+                    <label for="<?= HtmlSanitizer::e($idPrefix) ?>-username" class="<?= HtmlSanitizer::e($labelClass) ?>">Username</label>
                     <div class="relative">
                         <span class="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500">
-                            <svg class="<?= $iconSize ?>" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <svg class="<?= HtmlSanitizer::e($iconSize) ?>" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/>
                             </svg>
                         </span>
                         <input
                             type="text"
                             name="username"
-                            id="<?= $idPrefix ?>-username"
+                            id="<?= HtmlSanitizer::e($idPrefix) ?>-username"
                             maxlength="25"
                             required
                             placeholder="Enter username"
-                            class="<?= $inputClass ?>"
+                            class="<?= HtmlSanitizer::e($inputClass) ?>"
                         >
                     </div>
                 </div>
 
                 <div>
-                    <label for="<?= $idPrefix ?>-password" class="<?= $labelClass ?>">Password</label>
+                    <label for="<?= HtmlSanitizer::e($idPrefix) ?>-password" class="<?= HtmlSanitizer::e($labelClass) ?>">Password</label>
                     <div class="relative">
                         <span class="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500">
-                            <svg class="<?= $iconSize ?>" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <svg class="<?= HtmlSanitizer::e($iconSize) ?>" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/>
                             </svg>
                         </span>
                         <input
                             type="password"
                             name="user_password"
-                            id="<?= $idPrefix ?>-password"
+                            id="<?= HtmlSanitizer::e($idPrefix) ?>-password"
                             maxlength="20"
                             required
                             placeholder="Enter password"
-                            class="<?= $inputClass ?>"
+                            class="<?= HtmlSanitizer::e($inputClass) ?>"
                         >
                     </div>
                 </div>
 
-                <label class="flex items-center <?= $rememberGap ?> cursor-pointer group/remember py-0.5">
-                    <span class="relative inline-flex items-center justify-center <?= $checkboxSize ?> shrink-0">
+                <label class="flex items-center <?= HtmlSanitizer::e($rememberGap) ?> cursor-pointer group/remember py-0.5">
+                    <span class="relative inline-flex items-center justify-center <?= HtmlSanitizer::e($checkboxSize) ?> shrink-0">
                         <input
                             type="checkbox"
                             name="remember_me"
                             value="1"
-                            class="peer nav-login-checkbox <?= $checkboxSize ?>"
+                            class="peer nav-login-checkbox <?= HtmlSanitizer::e($checkboxSize) ?>"
                         >
-                        <svg class="absolute <?= $checkmarkSize ?> text-white pointer-events-none opacity-0 peer-checked:opacity-100 transition-opacity duration-150" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="3"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>
+                        <svg class="absolute <?= HtmlSanitizer::e($checkmarkSize) ?> text-white pointer-events-none opacity-0 peer-checked:opacity-100 transition-opacity duration-150" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="3"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>
                     </span>
-                    <span class="<?= $rememberTextSize ?> text-gray-400 group-hover/remember:text-gray-300 transition-colors duration-150 select-none">Remember me</span>
+                    <span class="<?= HtmlSanitizer::e($rememberTextSize) ?> text-gray-400 group-hover/remember:text-gray-300 transition-colors duration-150 select-none">Remember me</span>
                 </label>
 
                 <input type="hidden" name="op" value="login">
-                <input type="hidden" name="redirect_query" value="<?= $safeQuery ?>">
+                <input type="hidden" name="redirect_query" value="<?= HtmlSanitizer::trusted($safeQuery) ?>">
                 <?= \Security\CsrfGuard::generateToken('login') ?>
 
-                <button type="submit" class="<?= $buttonClass ?>">
+                <button type="submit" class="<?= HtmlSanitizer::e($buttonClass) ?>">
                     Login
                 </button>
             </form>

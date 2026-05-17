@@ -144,36 +144,6 @@ parameters:
 		-
 			rawMessage: 'Unescaped output in View. Wrap the expression in HtmlSanitizer::e() (or another whitelisted safe helper), or cast it to (int)/(float)/(bool) if it is numeric.'
 			identifier: ibl.unescapedOutput
-			count: 3
-			path: classes/Navigation/NavigationView.php
-
-		-
-			rawMessage: 'Unescaped output in View. Wrap the expression in HtmlSanitizer::e() (or another whitelisted safe helper), or cast it to (int)/(float)/(bool) if it is numeric.'
-			identifier: ibl.unescapedOutput
-			count: 15
-			path: classes/Navigation/Views/DesktopNavView.php
-
-		-
-			rawMessage: 'Unescaped output in View. Wrap the expression in HtmlSanitizer::e() (or another whitelisted safe helper), or cast it to (int)/(float)/(bool) if it is numeric.'
-			identifier: ibl.unescapedOutput
-			count: 18
-			path: classes/Navigation/Views/LoginFormView.php
-
-		-
-			rawMessage: 'Unescaped output in View. Wrap the expression in HtmlSanitizer::e() (or another whitelisted safe helper), or cast it to (int)/(float)/(bool) if it is numeric.'
-			identifier: ibl.unescapedOutput
-			count: 16
-			path: classes/Navigation/Views/MobileNavView.php
-
-		-
-			rawMessage: 'Unescaped output in View. Wrap the expression in HtmlSanitizer::e() (or another whitelisted safe helper), or cast it to (int)/(float)/(bool) if it is numeric.'
-			identifier: ibl.unescapedOutput
-			count: 6
-			path: classes/Navigation/Views/TeamsDropdownView.php
-
-		-
-			rawMessage: 'Unescaped output in View. Wrap the expression in HtmlSanitizer::e() (or another whitelisted safe helper), or cast it to (int)/(float)/(bool) if it is numeric.'
-			identifier: ibl.unescapedOutput
 			count: 7
 			path: classes/NextSim/NextSimView.php
 

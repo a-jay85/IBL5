@@ -76,35 +76,35 @@ class MobileNavView
 
                 <!-- My Team section first for thumb reachability (if user has a team) -->
                 <?php if ($myTeamMenu !== null): ?>
-                    <?= $this->renderDropdown(
+                    <?= HtmlSanitizer::trusted($this->renderDropdown(
                         'My Team',
                         $myTeamMenu,
                         $index++,
                         false,
                         false,
                         $mergeAccountIntoMyTeam
-                    ) ?>
+                    )) ?>
                 <?php endif; ?>
 
                 <!-- Teams mega-menu -->
                 <?php if ($this->config->teamsData !== null): ?>
-                    <?= $this->teamsDropdownView->renderMobile($this->config->teamsData, $this->config->teamId) ?>
+                    <?= HtmlSanitizer::trusted($this->teamsDropdownView->renderMobile($this->config->teamsData, $this->config->teamId)) ?>
                 <?php endif; ?>
 
                 <!-- Menu sections -->
                 <?php foreach ($menus as $title => $menu): ?>
-                    <?= $this->renderDropdown(
+                    <?= HtmlSanitizer::trusted($this->renderDropdown(
                         $title,
                         $menu,
                         $index++,
                         false,
                         $title === 'Season'
-                    ) ?>
+                    )) ?>
                 <?php endforeach; ?>
 
                 <?php if (!$mergeAccountIntoMyTeam): ?>
                     <!-- Account section -->
-                    <?= $this->renderDropdown(
+                    <?= HtmlSanitizer::trusted($this->renderDropdown(
                         $this->config->isLoggedIn ? 'Account' : 'Login',
                         [
                             'icon' => '<svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/></svg>',
@@ -112,7 +112,7 @@ class MobileNavView
                         ],
                         $index++,
                         !$this->config->isLoggedIn
-                    ) ?>
+                    )) ?>
                 <?php endif; ?>
             </div>
         </nav>
@@ -136,7 +136,7 @@ class MobileNavView
             <button class="mobile-dropdown-btn">
                 <span class="flex items-center gap-3">
                     <?php if ($icon !== ''): ?>
-                        <span class="text-accent-500"><?= $icon ?></span>
+                        <span class="text-accent-500"><?= HtmlSanitizer::trusted($icon) ?></span>
                     <?php endif; ?>
                     <span class="font-display text-lg font-semibold"><?= HtmlSanitizer::e($title) ?></span>
                 </span>
@@ -145,13 +145,13 @@ class MobileNavView
 
             <div class="hidden bg-black/20">
                 <?php if ($includeLoginForm): ?>
-                    <?= $this->loginFormView->render('mobile', $this->config->requestUri) ?>
+                    <?= HtmlSanitizer::trusted($this->loginFormView->render('mobile', $this->config->requestUri)) ?>
                     <div class="border-t border-white/10 mx-5 my-2"></div>
                 <?php endif; ?>
 
                 <?php foreach ($links as $link): ?>
                     <?php if (isset($link['rawHtml'])): ?>
-                        <span class="mobile-dropdown-link"><?= $link['rawHtml'] ?></span>
+                        <span class="mobile-dropdown-link"><?= HtmlSanitizer::trusted($link['rawHtml']) ?></span>
                     <?php else: ?>
                         <?php
                         $label = HtmlSanitizer::e($link['label'] ?? '');
@@ -166,19 +166,19 @@ class MobileNavView
                             ? '<span class="nav-badge">' . HtmlSanitizer::e($badge) . '</span>'
                             : '';
                         ?>
-                        <a href="<?= $url ?>"<?= $target ?><?= $htmxAttrs ?> class="mobile-dropdown-link flex items-center justify-between">
-                            <span><?= $label . $badgeHtml ?></span>
-                            <?= $externalIcon ?>
+                        <a href="<?= HtmlSanitizer::trusted($url) ?>"<?= HtmlSanitizer::trusted($target) ?><?= HtmlSanitizer::trusted($htmxAttrs) ?> class="mobile-dropdown-link flex items-center justify-between">
+                            <span><?= HtmlSanitizer::trusted($label . $badgeHtml) ?></span>
+                            <?= HtmlSanitizer::trusted($externalIcon) ?>
                         </a>
                     <?php endif; ?>
                 <?php endforeach; ?>
 
                 <?php if ($includeLeagueSwitcher): ?>
-                    <?= $this->renderLeagueSwitcher() ?>
+                    <?= HtmlSanitizer::trusted($this->renderLeagueSwitcher()) ?>
                 <?php endif; ?>
 
                 <?php if ($includeLogoutFooter): ?>
-                    <?= $this->renderLogoutFooter() ?>
+                    <?= HtmlSanitizer::trusted($this->renderLogoutFooter()) ?>
                 <?php endif; ?>
             </div>
         </div>
@@ -200,8 +200,8 @@ class MobileNavView
             <label for="mobile-league-select" class="block text-base font-semibold tracking-widest uppercase text-gray-500 mb-2">League</label>
             <div class="relative">
                 <select id="mobile-league-select" name="league" onchange="window.location.href=this.value" class="nav-select">
-                    <option value="index.php?league=ibl"<?= $iblSelected ?> class="bg-navy-800 text-white">IBL</option>
-                    <option value="index.php?league=olympics"<?= $olympicsSelected ?> class="bg-navy-800 text-white">Olympics</option>
+                    <option value="index.php?league=ibl"<?= HtmlSanitizer::e($iblSelected) ?> class="bg-navy-800 text-white">IBL</option>
+                    <option value="index.php?league=olympics"<?= HtmlSanitizer::e($olympicsSelected) ?> class="bg-navy-800 text-white">Olympics</option>
                 </select>
                 <svg class="absolute right-2 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
             </div>

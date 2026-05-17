@@ -82,14 +82,14 @@ class TradingRepositoryTest extends TestCase
 
     public function testTradeOfferRepositoryCanBeInstantiated(): void
     {
-        $repository = new TradeOfferRepository($this->mockMysqliDb);
+        $repository = new TradeOfferRepository($this->mockMysqliDb, 'localhost');
 
         $this->assertInstanceOf(TradeOfferRepository::class, $repository);
     }
 
     public function testTradeOfferRepositoryImplementsCorrectInterface(): void
     {
-        $repository = new TradeOfferRepository($this->mockMysqliDb);
+        $repository = new TradeOfferRepository($this->mockMysqliDb, 'localhost');
 
         $this->assertInstanceOf(
             \Trading\Contracts\TradeOfferRepositoryInterface::class,
@@ -99,7 +99,7 @@ class TradingRepositoryTest extends TestCase
 
     public function testTradeOfferRepositoryExtendsBaseMysqliRepository(): void
     {
-        $repository = new TradeOfferRepository($this->mockMysqliDb);
+        $repository = new TradeOfferRepository($this->mockMysqliDb, 'localhost');
 
         $this->assertInstanceOf(
             \BaseMysqliRepository::class,
@@ -259,7 +259,7 @@ class TradingRepositoryTest extends TestCase
 
     public function testMultipleRepositoriesCanBeInstantiated(): void
     {
-        $repo1 = new TradeOfferRepository($this->mockMysqliDb);
+        $repo1 = new TradeOfferRepository($this->mockMysqliDb, 'localhost');
         $repo2 = new TradeAssetRepository($this->mockMysqliDb);
         $repo3 = new TradeFormRepository($this->mockMysqliDb);
 

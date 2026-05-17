@@ -111,14 +111,14 @@ class TeamControllerTest extends TestCase
 
     public function testCanBeInstantiated(): void
     {
-        $controller = new TeamController($this->mockDb, $this->createStub(TeamIdentityRepositoryInterface::class));
+        $controller = new TeamController($this->mockDb, $this->createStub(TeamIdentityRepositoryInterface::class), $this->createStub(\Auth\AuthService::class), $this->createStub(\League\LeagueContext::class));
 
         $this->assertInstanceOf(TeamController::class, $controller);
     }
 
     public function testImplementsInterface(): void
     {
-        $controller = new TeamController($this->mockDb, $this->createStub(TeamIdentityRepositoryInterface::class));
+        $controller = new TeamController($this->mockDb, $this->createStub(TeamIdentityRepositoryInterface::class), $this->createStub(\Auth\AuthService::class), $this->createStub(\League\LeagueContext::class));
 
         $this->assertInstanceOf(TeamControllerInterface::class, $controller);
     }

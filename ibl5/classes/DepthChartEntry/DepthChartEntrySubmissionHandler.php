@@ -12,6 +12,7 @@ use Repositories\Contracts\TeamIdentityRepositoryInterface;
 /**
  * @phpstan-import-type ProcessedPlayerData from Contracts\DepthChartEntryProcessorInterface
  * @phpstan-import-type ProcessedSubmission from Contracts\DepthChartEntryProcessorInterface
+ * @phpstan-import-type SubmissionResult from Contracts\DepthChartEntrySubmissionHandlerInterface
  *
  * @see DepthChartEntrySubmissionHandlerInterface
  */
@@ -37,8 +38,9 @@ class DepthChartEntrySubmissionHandler implements DepthChartEntrySubmissionHandl
     /**
      * @see DepthChartEntrySubmissionHandlerInterface::handleSubmission()
      * @param array<string, mixed> $postData
+     * @return array{success: bool, fileOk: bool, errorsHtml: string, postData: array<string, mixed>}
      */
-    public function handleSubmission(array $postData): bool
+    public function handleSubmission(array $postData): array
     {
         $season = new Season($this->db);
 
@@ -47,19 +49,24 @@ class DepthChartEntrySubmissionHandler implements DepthChartEntrySubmissionHandl
         $teamName = $this->sanitizeInput($rawTeamName);
 
         if ($teamName === '') {
-            $this->stashFailure(
-                '<strong class="ibl-form-error">Error: Missing required team information.</strong>',
-                $postData
-            );
-            return false;
+            return [
+                'success' => false,
+                'fileOk' => false,
+                'errorsHtml' => '<strong class="ibl-form-error">Error: Missing required team information.</strong>',
+                'postData' => $postData,
+            ];
         }
 
         /** @var ProcessedSubmission $processedData */
         $processedData = $this->processor->processSubmission($postData);
 
         if (!$this->validator->validate($processedData, $season->phase)) {
-            $this->stashFailure($this->validator->getErrorMessagesHtml(), $postData);
-            return false;
+            return [
+                'success' => false,
+                'fileOk' => false,
+                'errorsHtml' => $this->validator->getErrorMessagesHtml(),
+                'postData' => $postData,
+            ];
         }
 
         $this->saveDepthChart($processedData['playerData'], $teamName);
@@ -68,31 +75,16 @@ class DepthChartEntrySubmissionHandler implements DepthChartEntrySubmissionHandl
 
         $this->saveDepthChartSnapshot($teamName, $postData, $season);
 
-        if (!$fileOk) {
-            $_SESSION['flash_success'] = 'Depth chart saved, but the file/email could not be sent. Please contact the commissioner.';
-        }
-
         \Logging\LoggerFactory::getChannel('audit')->info('depth_chart_submitted', [
             'action' => 'depth_chart_submitted',
             'team_name' => $teamName,
         ]);
 
-        return true;
-    }
-
-    /**
-     * Stash the submission failure for the redirected GET to re-render.
-     *
-     * Key: `$_SESSION['_ibl_depth_chart_flash']` — module-scoped so it doesn't
-     * collide with the generic `flash_success` PageLayout already renders.
-     *
-     * @param array<string, mixed> $postData
-     */
-    private function stashFailure(string $errorsHtml, array $postData): void
-    {
-        $_SESSION['_ibl_depth_chart_flash'] = [
-            'errors_html' => $errorsHtml,
-            'post_data' => $postData,
+        return [
+            'success' => true,
+            'fileOk' => $fileOk,
+            'errorsHtml' => '',
+            'postData' => [],
         ];
     }
 

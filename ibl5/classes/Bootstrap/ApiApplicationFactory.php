@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Bootstrap;
 
 use Api\Response\JsonResponder;
+use Discord\Discord;
 
 /**
  * Composition root for API (api.php) bootstrap.
@@ -17,6 +18,7 @@ final class ApiApplicationFactory
 {
     public static function build(string $basePath): Application
     {
+        Discord::init((string) ($_SERVER['SERVER_NAME'] ?? ''));
         $app = new Application();
         $container = $app->getContainer();
 

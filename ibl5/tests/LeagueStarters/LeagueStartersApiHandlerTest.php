@@ -17,7 +17,8 @@ class LeagueStartersApiHandlerTest extends WideUnitTestCase
     {
         $handler = new LeagueStartersApiHandler(
             $this->mockDb,
-            $this->createStub(TeamIdentityRepositoryInterface::class)
+            $this->createStub(TeamIdentityRepositoryInterface::class),
+            $this->createStub(\Auth\AuthService::class)
         );
 
         $this->assertInstanceOf(LeagueStartersApiHandler::class, $handler);

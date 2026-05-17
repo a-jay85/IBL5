@@ -658,7 +658,7 @@ class TradingServiceTest extends TestCase
         $_SERVER['SERVER_NAME'] = 'localhost';
 
         $commonRepo = $this->createStub(TeamIdentityRepositoryInterface::class);
-        $tradeOffer = new \Trading\TradeOffer($db, $commonRepo);
+        $tradeOffer = new \Trading\TradeOffer($db, $commonRepo, 'localhost');
 
         // Prepare trade data: Team A offers to Team B
         // Team A sends cash only (no players or picks)
@@ -724,7 +724,7 @@ class TradingServiceTest extends TestCase
         $_SERVER['SERVER_NAME'] = 'localhost';
 
         $commonRepo = $this->createStub(TeamIdentityRepositoryInterface::class);
-        $tradeOffer = new \Trading\TradeOffer($db, $commonRepo);
+        $tradeOffer = new \Trading\TradeOffer($db, $commonRepo, 'localhost');
 
         // Team A offers cash to Team B
         // Team B sends cash back to Team A
@@ -777,7 +777,7 @@ class TradingServiceTest extends TestCase
         $db = new QueryAwareMockDatabase();
         $_SERVER['SERVER_NAME'] = 'localhost';
         $commonRepo = $this->createStub(TeamIdentityRepositoryInterface::class);
-        $tradeOffer = new \Trading\TradeOffer($db, $commonRepo);
+        $tradeOffer = new \Trading\TradeOffer($db, $commonRepo, 'localhost');
 
         // Team A sends Player 1 to Team B
         // Team B sends Player 2 back to Team A
@@ -823,7 +823,7 @@ class TradingServiceTest extends TestCase
         $db = new QueryAwareMockDatabase();
         $_SERVER['SERVER_NAME'] = 'localhost';
         $commonRepo = $this->createStub(TeamIdentityRepositoryInterface::class);
-        $tradeOffer = new \Trading\TradeOffer($db, $commonRepo);
+        $tradeOffer = new \Trading\TradeOffer($db, $commonRepo, 'localhost');
 
         // Team A sends Player 1 + cash to Team B
         // Team B sends Player 2 + cash back to Team A
@@ -876,7 +876,7 @@ class TradingServiceTest extends TestCase
         $db = new QueryAwareMockDatabase();
         $_SERVER['SERVER_NAME'] = 'localhost';
         $commonRepo = $this->createStub(TeamIdentityRepositoryInterface::class);
-        $tradeOffer = new \Trading\TradeOffer($db, $commonRepo);
+        $tradeOffer = new \Trading\TradeOffer($db, $commonRepo, 'localhost');
 
         // Team A sends 2025 1st round pick to Team B
         // Team B sends 2026 1st round pick back to Team A

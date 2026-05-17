@@ -30,7 +30,8 @@ class FreeAgencyControllerTest extends TestCase
         });
 
         $commonRepo = $this->createStub(TeamIdentityRepositoryInterface::class);
-        $controller = new FreeAgencyController($mockDb, $commonRepo, $nukeCompat);
+        $authService = $this->createStub(\Auth\AuthService::class);
+        $controller = new FreeAgencyController($mockDb, $commonRepo, $authService, $nukeCompat);
         $controller->handleRequest(null, '', 0);
 
         $this->assertTrue($loginBoxCalled);
@@ -40,7 +41,8 @@ class FreeAgencyControllerTest extends TestCase
     {
         $mockDb = new MockDatabase();
         $commonRepo = $this->createStub(TeamIdentityRepositoryInterface::class);
-        $controller = new FreeAgencyController($mockDb, $commonRepo);
+        $authService = $this->createStub(\Auth\AuthService::class);
+        $controller = new FreeAgencyController($mockDb, $commonRepo, $authService);
 
         $this->assertInstanceOf(FreeAgencyController::class, $controller);
     }

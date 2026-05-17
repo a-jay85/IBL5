@@ -293,6 +293,7 @@ class ExtensionServiceTest extends TestCase
 
         $service = new ExtensionService(
             $this->mockDb,
+            'localhost',
             null,
             null,
             null,

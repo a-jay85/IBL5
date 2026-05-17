@@ -38,6 +38,7 @@ class ExtensionService implements ExtensionProcessorInterface
     private ExtensionOfferEvaluatorInterface $evaluator;
     private CommonContractValidator $contractValidator;
     private TeamQueryRepositoryInterface $teamQueryRepo;
+    private string $serverName;
 
     /**
      * @param \mysqli $db mysqli connection
@@ -48,12 +49,14 @@ class ExtensionService implements ExtensionProcessorInterface
      */
     public function __construct(
         \mysqli $db,
+        string $serverName = '',
         ?ExtensionRepositoryInterface $repository = null,
         ?ExtensionValidatorInterface $validator = null,
         ?ExtensionOfferEvaluatorInterface $evaluator = null,
         ?TeamQueryRepositoryInterface $teamQueryRepo = null
     ) {
         $this->db = $db;
+        $this->serverName = $serverName;
         $this->repository = $repository ?? new ExtensionRepository($db);
         $this->validator = $validator ?? new ExtensionValidator();
         $this->evaluator = $evaluator ?? new ExtensionOfferEvaluator();
@@ -264,8 +267,7 @@ class ExtensionService implements ExtensionProcessorInterface
             $hometext = "{$playerName} today accepted a contract extension offer from the {$teamName} worth $offerInMillions million dollars over $offerYears years:<br>" . $offerDetails;
             Discord::postToChannel('#extensions', $hometext);
 
-            $serverName = $_SERVER['SERVER_NAME'] ?? 'localhost';
-            if ($serverName !== 'localhost' && $serverName !== '127.0.0.1') {
+            if ($this->serverName !== 'localhost' && $this->serverName !== '127.0.0.1') {
                 Discord::postToChannel('#general-chat', $hometext);
             }
         }

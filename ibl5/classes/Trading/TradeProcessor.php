@@ -39,16 +39,19 @@ class TradeProcessor implements TradeProcessorInterface
     protected CashTransactionHandler $cashHandler;
     protected \Topics\News\NewsService $newsService;
     protected ?Discord $discord;
+    protected string $serverName;
 
     public function __construct(
         \mysqli $db,
         TeamIdentityRepositoryInterface $commonRepository,
+        string $serverName = '',
         ?TradeOfferRepositoryInterface $offerRepository = null,
         ?TradeAssetRepositoryInterface $assetRepository = null
     ) {
         $this->db = $db;
         $this->commonRepository = $commonRepository;
-        $this->offerRepository = $offerRepository ?? new TradeOfferRepository($db);
+        $this->serverName = $serverName;
+        $this->offerRepository = $offerRepository ?? new TradeOfferRepository($db, $serverName);
         $this->assetRepository = $assetRepository ?? new TradeAssetRepository($db);
         $this->cashRepository = new TradeCashRepository($db);
         $this->cashConsiderationRepository = new CashConsiderationRepository($db);
@@ -376,8 +379,7 @@ class TradeProcessor implements TradeProcessorInterface
 
             Discord::postToChannel('#trades', $discordText);
 
-            $serverName = $_SERVER['SERVER_NAME'] ?? 'localhost';
-            if ($serverName !== 'localhost' && $serverName !== '127.0.0.1') {
+            if ($this->serverName !== 'localhost' && $this->serverName !== '127.0.0.1') {
                 Discord::postToChannel('#general-chat', $storytext);
             }
         } catch (\Exception $e) {

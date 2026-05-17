@@ -36,11 +36,13 @@ class TeamService implements TeamServiceInterface
 {
     private \mysqli $db;
     private TeamRepositoryInterface $repository;
+    private \League\LeagueContext $leagueContext;
 
-    public function __construct(\mysqli $db, TeamRepositoryInterface $repository)
+    public function __construct(\mysqli $db, TeamRepositoryInterface $repository, \League\LeagueContext $leagueContext)
     {
         $this->db = $db;
         $this->repository = $repository;
+        $this->leagueContext = $leagueContext;
     }
 
     /**
@@ -49,10 +51,7 @@ class TeamService implements TeamServiceInterface
      */
     public function getTeamPageData(int $teamid, ?string $yr, string $display, string $userTeamName = '', ?string $split = null): array
     {
-        global $leagueContext;
-        /** @var \League\LeagueContext $leagueContext */
-
-        $leagueConfig = $leagueContext->getConfig();
+        $leagueConfig = $this->leagueContext->getConfig();
         /** @var string $imagesPath */
         $imagesPath = $leagueConfig['images_path'];
 

@@ -816,6 +816,7 @@ Effort scale:
 **Suggested direction:** Extract PSR-7-style `ServerRequest` injected at bootstrap; bootstrap reads superglobals once.
 **Est. effort:** L
 **Risk if untouched:** `ApiKeyAuthenticator` raw GET access — harder to add input validation; league selection untestable.
+**Status:** Gated (2026-05-17) — BanRawSuperglobalsRule expanded to all superglobals with per-variable allowlists; BanGlobalKeywordRule added. Bootstrap files remain on allowlist by design. ADR-0032.
 
 ### 5.10 229 `missingType.return` on Test Methods
 **Location:** Top: Player (50), Waivers (41), Negotiation (32), Draft (31), Extension (19), DepthChartEntry (14)

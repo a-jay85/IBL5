@@ -22,17 +22,20 @@ use Trading\Contracts\TradeCashRepositoryInterface;
 class TradeOfferRepository extends BaseMysqliRepository implements TradeOfferRepositoryInterface
 {
     private TradeCashRepositoryInterface $cashRepository;
+    private string $serverName;
 
     /**
      * Constructor
      *
      * @param \mysqli $db Active mysqli connection
+     * @param string $serverName SERVER_NAME from bootstrap boundary (e.g. 'localhost', 'iblhoops.net')
      * @param TradeCashRepositoryInterface|null $cashRepository Cash repository for deleteTradeOffer coordination
      * @throws \RuntimeException If connection is invalid (error code 1002)
      */
-    public function __construct(\mysqli $db, ?TradeCashRepositoryInterface $cashRepository = null)
+    public function __construct(\mysqli $db, string $serverName, ?TradeCashRepositoryInterface $cashRepository = null)
     {
         parent::__construct($db);
+        $this->serverName = $serverName;
         $this->cashRepository = $cashRepository ?? new TradeCashRepository($db);
     }
 
@@ -55,7 +58,7 @@ class TradeOfferRepository extends BaseMysqliRepository implements TradeOfferRep
      */
     public function insertTradeItem(int $tradeOfferId, int $itemId, TradeItemType $itemType, string $fromTeam, string $toTeam, string $approvalTeam): int
     {
-        if ($_SERVER['SERVER_NAME'] === "localhost") {
+        if ($this->serverName === 'localhost') {
             $approvalTeam = 'test';
         }
 

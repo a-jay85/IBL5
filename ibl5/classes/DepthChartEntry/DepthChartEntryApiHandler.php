@@ -27,11 +27,13 @@ class DepthChartEntryApiHandler
 
     private \mysqli $db;
     private TeamIdentityRepositoryInterface $commonRepo;
+    private \League\LeagueContext $leagueContext;
 
-    public function __construct(\mysqli $db, TeamIdentityRepositoryInterface $commonRepo)
+    public function __construct(\mysqli $db, TeamIdentityRepositoryInterface $commonRepo, \League\LeagueContext $leagueContext)
     {
         $this->db = $db;
         $this->commonRepo = $commonRepo;
+        $this->leagueContext = $leagueContext;
     }
 
     public function handle(): void
@@ -69,7 +71,7 @@ class DepthChartEntryApiHandler
         }
         header('HX-Push-Url: ' . $pushUrl);
 
-        $controller = new DepthChartEntryController($this->db, $this->commonRepo);
+        $controller = new DepthChartEntryController($this->db, $this->commonRepo, $this->leagueContext);
         echo $controller->getTableOutput($teamid, $display, $split);
     }
 }

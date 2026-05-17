@@ -14,11 +14,13 @@ class TradeDeclineController implements ControllerInterface
 {
     private \mysqli $db;
     private TeamIdentityRepositoryInterface $commonRepository;
+    private string $serverName;
 
-    public function __construct(\mysqli $db, TeamIdentityRepositoryInterface $commonRepository)
+    public function __construct(\mysqli $db, TeamIdentityRepositoryInterface $commonRepository, string $serverName = '')
     {
         $this->db = $db;
         $this->commonRepository = $commonRepository;
+        $this->serverName = $serverName;
     }
 
     /**
@@ -38,7 +40,7 @@ class TradeDeclineController implements ControllerInterface
             return;
         }
 
-        $repository = new TradeOfferRepository($this->db);
+        $repository = new TradeOfferRepository($this->db, $this->serverName);
         $tradeRows = $repository->getTradesByOfferId($offerId);
 
         if ($tradeRows === []) {

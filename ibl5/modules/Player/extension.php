@@ -42,7 +42,7 @@ $extensionData = [
 ];
 
 // Process extension using new architecture
-$processor = new \Extension\ExtensionProcessor($mysqli_db);
+$processor = new \Extension\ExtensionProcessor($mysqli_db, $_SERVER['SERVER_NAME'] ?? '');
 $result = $processor->processExtension($extensionData);
 
 // Look up team ID for redirect

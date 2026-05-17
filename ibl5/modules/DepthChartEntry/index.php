@@ -16,9 +16,9 @@ $commonRepo = new Repositories\TeamIdentityRepository($mysqli_db);
 
 function userinfo($username)
 {
-    global $mysqli_db, $commonRepo;
+    global $mysqli_db, $commonRepo, $leagueContext;
 
-    $controller = new DepthChartEntry\DepthChartEntryController($mysqli_db, $commonRepo);
+    $controller = new DepthChartEntry\DepthChartEntryController($mysqli_db, $commonRepo, $leagueContext);
     $controller->displayForm($username);
 }
 
@@ -35,7 +35,7 @@ function main($user)
 
 function submit()
 {
-    global $mysqli_db, $commonRepo;
+    global $mysqli_db, $commonRepo, $leagueContext;
 
     // CSRF failure stays inline — no in-flight edits to preserve, and
     // "Please reload and try again" is already the correct instruction.
@@ -49,22 +49,15 @@ function submit()
         return;
     }
 
-    $handler = new DepthChartEntry\DepthChartEntrySubmissionHandler($mysqli_db, $commonRepo);
-    $success = $handler->handleSubmission($_POST);
-
-    if ($success && !isset($_SESSION['flash_success'])) {
-        $_SESSION['flash_success'] = 'Depth chart saved and e-mailed successfully.';
-    }
-    // Failure flash (errors_html + post_data) was stashed by the handler
-    // under `_ibl_depth_chart_flash` for the redirected GET to consume.
-    \Utilities\HtmxHelper::redirect('modules.php?name=DepthChartEntry');
+    $controller = new DepthChartEntry\DepthChartEntryController($mysqli_db, $commonRepo, $leagueContext);
+    $controller->handleSubmit($_POST);
 }
 
 function tabApi()
 {
-    global $mysqli_db, $commonRepo;
+    global $mysqli_db, $commonRepo, $leagueContext;
 
-    $handler = new DepthChartEntry\DepthChartEntryApiHandler($mysqli_db, $commonRepo);
+    $handler = new DepthChartEntry\DepthChartEntryApiHandler($mysqli_db, $commonRepo, $leagueContext);
     $handler->handle();
 }
 

@@ -18,6 +18,8 @@ get_lang($module_name);
 
 $pagetitle = "- Free Agency System";
 
+global $authService;
+
 $commonRepo = new Repositories\TeamIdentityRepository($mysqli_db);
-$controller = new FreeAgencyController($mysqli_db, $commonRepo);
+$controller = new FreeAgencyController($mysqli_db, $commonRepo, $authService);
 $controller->handleRequest($user, $pa ?? '', (int) ($pid ?? 0));

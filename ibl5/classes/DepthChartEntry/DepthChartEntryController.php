@@ -31,15 +31,40 @@ class DepthChartEntryController implements DepthChartEntryControllerInterface
     private TeamTableServiceInterface $teamTableService;
     private DepthChartEntryServiceInterface $service;
 
-    public function __construct(\mysqli $db, TeamIdentityRepositoryInterface $commonRepository)
+    public function __construct(\mysqli $db, TeamIdentityRepositoryInterface $commonRepository, \League\LeagueContext $leagueContext)
     {
         $this->db = $db;
         $this->repository = new DepthChartEntryRepository($db);
-        $this->view = new DepthChartEntryView();
+        $this->view = new DepthChartEntryView($leagueContext);
         $this->commonRepository = $commonRepository;
         $teamRepository = new TeamRepository($db);
         $this->teamTableService = new TeamTableService($db, $teamRepository);
         $this->service = new DepthChartEntryService();
+    }
+
+    /**
+     * @see DepthChartEntryControllerInterface::handleSubmit()
+     * @param array<string, mixed> $postData
+     */
+    public function handleSubmit(array $postData): void
+    {
+        $handler = new DepthChartEntrySubmissionHandler($this->db, $this->commonRepository);
+        $result = $handler->handleSubmission($postData);
+
+        if ($result['success']) {
+            if ($result['fileOk']) {
+                $_SESSION['flash_success'] = 'Depth chart saved and e-mailed successfully.';
+            } else {
+                $_SESSION['flash_success'] = 'Depth chart saved, but the file/email could not be sent. Please contact the commissioner.';
+            }
+        } else {
+            $_SESSION['_ibl_depth_chart_flash'] = [
+                'errors_html' => $result['errorsHtml'],
+                'post_data' => $result['postData'],
+            ];
+        }
+
+        \Utilities\HtmxHelper::redirect('modules.php?name=DepthChartEntry');
     }
 
     /**

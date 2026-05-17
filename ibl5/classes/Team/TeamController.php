@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Team;
 
+use Auth\Contracts\AuthServiceInterface;
+use League\LeagueContext;
 use Repositories\Contracts\TeamIdentityRepositoryInterface;
 use Team\Contracts\TeamControllerInterface;
 use Team\Contracts\TeamServiceInterface;
@@ -19,17 +21,17 @@ class TeamController implements TeamControllerInterface
     private \mysqli $db;
     private TeamServiceInterface $service;
     private TeamViewInterface $view;
-    private \Utilities\NukeCompat $nukeCompat;
     private TeamIdentityRepositoryInterface $commonRepo;
+    private AuthServiceInterface $authService;
 
-    public function __construct(\mysqli $db, TeamIdentityRepositoryInterface $commonRepo, ?\Utilities\NukeCompat $nukeCompat = null)
+    public function __construct(\mysqli $db, TeamIdentityRepositoryInterface $commonRepo, AuthServiceInterface $authService, LeagueContext $leagueContext)
     {
         $this->db = $db;
         $repository = new TeamRepository($db);
-        $this->service = new TeamService($db, $repository);
+        $this->service = new TeamService($db, $repository, $leagueContext);
         $this->view = new TeamView();
         $this->commonRepo = $commonRepo;
-        $this->nukeCompat = $nukeCompat ?? new \Utilities\NukeCompat();
+        $this->authService = $authService;
     }
 
     /**
@@ -91,13 +93,9 @@ class TeamController implements TeamControllerInterface
         \PageLayout\PageLayout::header();
 
         $userTeamName = '';
-        global $user;
-        if ($this->nukeCompat->isUser($user)) {
-            $cookie = $this->nukeCompat->cookieDecode($user);
-            $username = (string) ($cookie[1] ?? '');
-            if ($username !== '') {
-                $userTeamName = $this->commonRepo->getTeamnameFromUsername($username) ?? '';
-            }
+        $username = $this->authService->getUsername();
+        if ($username !== null && $username !== '') {
+            $userTeamName = $this->commonRepo->getTeamnameFromUsername($username) ?? '';
         }
 
         try {

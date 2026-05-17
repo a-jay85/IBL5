@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace FreeAgency;
 
+use Auth\Contracts\AuthServiceInterface;
 use Team\Team;
 use Season\Season;
 use Repositories\Contracts\TeamIdentityRepositoryInterface;
@@ -18,14 +19,17 @@ class FreeAgencyController
     private FreeAgencyProcessor $processor;
     private TeamIdentityRepositoryInterface $commonRepository;
     private \Utilities\NukeCompat $nukeCompat;
+    private AuthServiceInterface $authService;
 
     public function __construct(
         \mysqli $db,
         TeamIdentityRepositoryInterface $commonRepository,
+        AuthServiceInterface $authService,
         ?\Utilities\NukeCompat $nukeCompat = null
     ) {
         $this->db = $db;
         $this->commonRepository = $commonRepository;
+        $this->authService = $authService;
         $this->repository = new FreeAgencyRepository($db);
         $this->demandRepository = new FreeAgencyDemandRepository($db);
         $this->service = new FreeAgencyService($this->repository, $this->demandRepository, $db);
@@ -53,12 +57,9 @@ class FreeAgencyController
 
     private function display(): void
     {
-        /** @var array<int, string> $cookie */
-        global $cookie;
+        \PageLayout\PageLayout::header();
 
-        \PageLayout\PageLayout::header(); // Must come first — populates $cookie via cookiedecode()
-
-        $username = (string) ($cookie[1] ?? '');
+        $username = $this->authService->getUsername() ?? '';
         $teamName = $this->commonRepository->getTeamnameFromUsername($username) ?? '';
         $team = Team::initialize($this->db, $teamName);
         $season = new Season($this->db);
@@ -72,12 +73,9 @@ class FreeAgencyController
 
     private function negotiate(int $pid): void
     {
-        /** @var array<int, string> $cookie */
-        global $cookie;
-
         \PageLayout\PageLayout::header();
 
-        $username = (string) ($cookie[1] ?? '');
+        $username = $this->authService->getUsername() ?? '';
         $userTeamName = $this->commonRepository->getTeamnameFromUsername($username) ?? '';
         $teamid = $this->commonRepository->getTidFromTeamname($userTeamName) ?? 0;
 

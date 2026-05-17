@@ -13,6 +13,15 @@ namespace DepthChartEntry\Contracts;
 interface DepthChartEntryControllerInterface
 {
     /**
+     * Handle a depth chart form submission.
+     *
+     * Calls the submission handler, writes session flash, and redirects via PRG.
+     *
+     * @param array<string, mixed> $postData Raw POST data from the form.
+     */
+    public function handleSubmit(array $postData): void;
+
+    /**
      * Display the depth chart entry form for a user's team
      * 
      * Renders the complete depth chart entry interface including:

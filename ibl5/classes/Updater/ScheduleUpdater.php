@@ -51,14 +51,9 @@ class ScheduleUpdater extends \BaseMysqliRepository {
      * @return array{date: string, year: int, month: int, day: int}|null
      */
     protected function extractDate(string $rawDate): ?array {
-        // Use injected LeagueContext, fall back to global, then default to IBL
-        if ($this->leagueContext !== null) {
-            $currentLeague = $this->leagueContext->getCurrentLeague();
-        } else {
-            global $leagueContext;
-            /** @var LeagueContext|null $leagueContext */
-            $currentLeague = $leagueContext !== null ? $leagueContext->getCurrentLeague() : 'IBL';
-        }
+        $currentLeague = $this->leagueContext !== null
+            ? $this->leagueContext->getCurrentLeague()
+            : 'IBL';
 
         if ($rawDate === '') {
             return null;

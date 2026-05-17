@@ -11,12 +11,12 @@ get_lang($module_name);
 
 $pagetitle = "- Team Pages";
 
-global $mysqli_db;
+global $mysqli_db, $authService, $leagueContext;
 
 $teamid = isset($teamid) ? (int) $teamid : 0;
 
 $commonRepo = new \Repositories\TeamIdentityRepository($mysqli_db);
-$controller = new Team\TeamController($mysqli_db, $commonRepo);
+$controller = new Team\TeamController($mysqli_db, $commonRepo, $authService, $leagueContext);
 
 switch ($op) {
     case "team":

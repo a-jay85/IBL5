@@ -106,14 +106,14 @@ ApiKeys -> BaseMysqliRepository Security
 Auth -> Database Logging
 AwardHistory -> BaseMysqliRepository Player Security
 BasketballStats -> Player Season Security Team TeamOffDefStats UI
-Bootstrap -> Api League
+Bootstrap -> Api Discord League
 Boxscore -> JSB JsbParser League Player Season Security Utilities
 BulkImport -> Boxscore JsbParser LeagueConfig PlrParser
 CapSpace -> League Season Security Team UI
 CareerLeaderboards -> BasketballStats Cache Player Security
 ComparePlayers -> Player Security UI
 ContractList -> Player Security UI
-DepthChartEntry -> NextSim Repositories SavedDepthChart Season Security Standings Team TeamSchedule UI
+DepthChartEntry -> League NextSim Repositories SavedDepthChart Season Security Standings Team TeamSchedule UI
 Discord -> Repositories
 Draft -> Discord Repositories Season Security UI
 DraftHistory -> Player Security Team UI
@@ -121,7 +121,7 @@ DraftPickLocator -> Security UI
 Extension -> BasketballStats Discord FreeAgency Player Team
 FranchiseHistory -> League Security UI
 FranchiseRecordBook -> BasketballStats League Player Security UI
-FreeAgency -> BaseMysqliRepository Discord League Player Repositories Season Security Team Trading UI
+FreeAgency -> Auth BaseMysqliRepository Discord League Player Repositories Season Security Team Trading UI
 FreeAgencyPreview -> Player Security UI
 GMContactList -> League Security UI
 Injuries -> League Player Season Security Team UI
@@ -130,7 +130,7 @@ League -> BaseMysqliRepository JSB Season
 LeagueConfig -> League
 LeagueControlPanel -> Discord JsbParser League Security Trading Voting
 LeagueSchedule -> League Season Security StrengthOfSchedule
-LeagueStarters -> League Player Repositories Season Security Team UI Utilities
+LeagueStarters -> Auth League Player Repositories Season Security Team UI
 Logging -> Bootstrap
 Module -> League Season
 Navigation -> League Security
@@ -157,7 +157,7 @@ SeriesRecords -> League Repositories Security UI
 Settings -> Season
 Standings -> League SeriesRecords UI
 Statistics -> League
-Team -> BasketballStats Discord League Player Repositories Season Security Trading UI
+Team -> Auth BasketballStats Discord League Player Repositories Season Security Trading UI
 TeamOffDefStats -> BasketballStats League Security UI
 TeamSchedule -> League LeagueSchedule Season Security StrengthOfSchedule Team
 Topics -> BaseMysqliRepository Security

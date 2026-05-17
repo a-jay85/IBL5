@@ -11,46 +11,55 @@ use PHPStan\Rules\Rule;
 use PHPStan\Rules\RuleErrorBuilder;
 
 /**
- * Bans direct access to `$_GET`, `$_POST`, `$_REQUEST`, and `$_COOKIE` outside
- * the sanctioned input-boundary layer (Controllers, ApiHandlers, Bootstraps,
- * Authenticators, CsrfGuard, LeagueContext, and TestCookieOverrides).
+ * Bans direct access to superglobals outside the sanctioned input-boundary layer.
  *
- * Services, Repositories, Views, Calculators, and other inner-layer classes
- * must receive validated, typed inputs from a Controller or ApiHandler rather
- * than reading superglobals directly. This keeps the validation surface area
- * small and enforces the Repository-Service-View architecture documented in
- * CLAUDE.md.
+ * Each superglobal has its own allowlist because the legitimate access sites differ:
+ * $_GET/$_POST are boundary-input; $_SESSION is auth/flash; $_SERVER is environment.
+ * A single merged allowlist would allow any boundary file to read any superglobal,
+ * defeating the purpose of narrowing the access surface.
  *
  * @implements Rule<Variable>
  */
 final class BanRawSuperglobalsRule implements Rule
 {
-    /** @var list<string> */
-    private const BANNED_SUPERGLOBALS = [
-        '_GET',
-        '_POST',
-        '_REQUEST',
-        '_COOKIE',
-    ];
-
     /**
-     * File-basename patterns that are allowed to read superglobals.
-     * The sanctioned input-boundary layer.
+     * Per-superglobal allowlists.
      *
-     * @var list<string>
+     * @var array<string, array{suffixes: list<string>, files: list<string>}>
      */
-    private const ALLOWED_FILE_SUFFIXES = [
-        'Controller.php',
-        'ApiHandler.php',
-        'Bootstrap.php',
-        'Authenticator.php',
-    ];
-
-    /** @var list<string> */
-    private const ALLOWED_FILES = [
-        'CsrfGuard.php',
-        'LeagueContext.php',
-        'TestCookieOverrides.php',
+    private const ALLOWLIST_BY_SUPERGLOBAL = [
+        '_GET' => [
+            'suffixes' => ['Controller.php', 'ApiHandler.php', 'Bootstrap.php', 'Authenticator.php'],
+            'files' => ['CsrfGuard.php', 'LeagueContext.php', 'TestCookieOverrides.php'],
+        ],
+        '_POST' => [
+            'suffixes' => ['Controller.php', 'ApiHandler.php', 'Bootstrap.php', 'Authenticator.php'],
+            'files' => ['CsrfGuard.php', 'TestCookieOverrides.php'],
+        ],
+        '_REQUEST' => [
+            'suffixes' => ['Controller.php', 'ApiHandler.php', 'Bootstrap.php'],
+            'files' => [],
+        ],
+        '_COOKIE' => [
+            'suffixes' => ['Controller.php', 'ApiHandler.php', 'Bootstrap.php', 'Authenticator.php'],
+            'files' => ['CsrfGuard.php', 'LeagueContext.php', 'TestCookieOverrides.php'],
+        ],
+        '_SESSION' => [
+            'suffixes' => ['Bootstrap.php'],
+            'files' => ['CsrfGuard.php', 'AuthService.php', 'DevAutoLogin.php', 'LeagueContext.php', 'PageLayout.php', 'UserContextProcessor.php', 'DepthChartEntryController.php', 'DebugSession.php'],
+        ],
+        '_SERVER' => [
+            'suffixes' => ['Bootstrap.php', 'ApiHandler.php', 'Controller.php', 'Authenticator.php'],
+            'files' => ['HtmxHelper.php', 'ETagHandler.php', 'LeagueContext.php', 'PageLayout.php', 'DevAutoLogin.php', 'ApiApplicationFactory.php', 'WebApplicationFactory.php'],
+        ],
+        '_FILES' => [
+            'suffixes' => ['Bootstrap.php', 'Controller.php'],
+            'files' => [],
+        ],
+        'GLOBALS' => [
+            'suffixes' => ['Bootstrap.php'],
+            'files' => ['ApiApplicationFactory.php'],
+        ],
     ];
 
     public function getNodeType(): string
@@ -68,24 +77,24 @@ final class BanRawSuperglobalsRule implements Rule
             return [];
         }
 
-        if (!in_array($node->name, self::BANNED_SUPERGLOBALS, true)) {
+        if (!isset(self::ALLOWLIST_BY_SUPERGLOBAL[$node->name])) {
             return [];
         }
 
         $file = $scope->getFile();
 
-        // Only enforce in classes/
         if (!str_contains($file, DIRECTORY_SEPARATOR . 'classes' . DIRECTORY_SEPARATOR)) {
             return [];
         }
 
-        // Allow in sanctioned input-boundary files
-        foreach (self::ALLOWED_FILE_SUFFIXES as $suffix) {
+        $allowlist = self::ALLOWLIST_BY_SUPERGLOBAL[$node->name];
+
+        foreach ($allowlist['suffixes'] as $suffix) {
             if (str_ends_with($file, $suffix)) {
                 return [];
             }
         }
-        foreach (self::ALLOWED_FILES as $allowedFile) {
+        foreach ($allowlist['files'] as $allowedFile) {
             if (str_ends_with($file, DIRECTORY_SEPARATOR . $allowedFile)) {
                 return [];
             }

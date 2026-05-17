@@ -24,7 +24,7 @@ function tradeoffer($username)
 {
     global $partner, $mysqli_db, $commonRepository;
 
-    $offerRepository = new TradeOfferRepository($mysqli_db);
+    $offerRepository = new TradeOfferRepository($mysqli_db, $_SERVER['SERVER_NAME'] ?? '');
     $assetRepository = new TradeAssetRepository($mysqli_db);
     $formRepository = new TradeFormRepository($mysqli_db);
     $service = new TradingService($offerRepository, $assetRepository, $formRepository, $commonRepository, $mysqli_db);
@@ -47,7 +47,7 @@ function tradereview($username)
 {
     global $mysqli_db, $commonRepository;
 
-    $offerRepository = new TradeOfferRepository($mysqli_db);
+    $offerRepository = new TradeOfferRepository($mysqli_db, $_SERVER['SERVER_NAME'] ?? '');
     $assetRepository = new TradeAssetRepository($mysqli_db);
     $formRepository = new TradeFormRepository($mysqli_db);
     $service = new TradingService($offerRepository, $assetRepository, $formRepository, $commonRepository, $mysqli_db);

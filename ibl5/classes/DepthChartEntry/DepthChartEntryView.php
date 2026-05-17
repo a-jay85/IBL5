@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace DepthChartEntry;
 
 use DepthChartEntry\Contracts\DepthChartEntryViewInterface;
+use League\LeagueContext;
 use Security\HtmlSanitizer;
 
 /**
@@ -14,6 +15,8 @@ use Security\HtmlSanitizer;
  */
 class DepthChartEntryView implements DepthChartEntryViewInterface
 {
+    private LeagueContext $leagueContext;
+
     private const POSITION_SLOTS = [
         ['label' => 'PG', 'field' => 'pg', 'dbKey' => 'dc_pg_depth'],
         ['label' => 'SG', 'field' => 'sg', 'dbKey' => 'dc_sg_depth'],
@@ -22,15 +25,17 @@ class DepthChartEntryView implements DepthChartEntryViewInterface
         ['label' => 'C',  'field' => 'c',  'dbKey' => 'dc_c_depth'],
     ];
 
+    public function __construct(LeagueContext $leagueContext)
+    {
+        $this->leagueContext = $leagueContext;
+    }
+
     /**
      * @see DepthChartEntryViewInterface::renderTeamLogo()
      */
     public function renderTeamLogo(int $teamid): void
     {
-        /** @var \League\LeagueContext $leagueContext */
-        global $leagueContext;
-
-        $leagueConfig = $leagueContext->getConfig();
+        $leagueConfig = $this->leagueContext->getConfig();
         /** @var string $imagesPath */
         $imagesPath = $leagueConfig['images_path'];
 

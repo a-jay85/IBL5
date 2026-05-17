@@ -1,2 +1,196 @@
 parameters:
-    ignoreErrors: []
+	ignoreErrors:
+		-
+			rawMessage: '''
+				Call to method sql_fetchrow() of deprecated class Database\MySQL:
+				This class is for PHP-Nuke module backward compatibility only.
+
+				All IBL5 classes in /ibl5/classes/ and scripts in /ibl5/scripts/ have been
+				migrated to modern mysqli with prepared statements via BaseMysqliRepository.
+
+				This class is ONLY used by legacy PHP-Nuke code in:
+				- /ibl5/modules/
+				- /ibl5/admin/modules/
+				- /ibl5/blocks/
+
+				DO NOT use this class for new code. Instead:
+				- Extend BaseMysqliRepository for repository classes
+				- Use $mysqli_db global with prepared statements
+
+				Example:
+				  $stmt = $mysqli_db->prepare("SELECT * FROM table WHERE id = ?");
+				  $stmt->bind_param("i", $id);
+				  $stmt->execute();
+				  $result = $stmt->get_result();
+
+				Scheduled for removal once PHP-Nuke modules are deprecated.
+			'''
+			identifier: method.deprecatedClass
+			count: 1
+			path: classes/Bootstrap/ConfigBootstrap.php
+
+		-
+			rawMessage: '''
+				Call to method sql_query() of deprecated class Database\MySQL:
+				This class is for PHP-Nuke module backward compatibility only.
+
+				All IBL5 classes in /ibl5/classes/ and scripts in /ibl5/scripts/ have been
+				migrated to modern mysqli with prepared statements via BaseMysqliRepository.
+
+				This class is ONLY used by legacy PHP-Nuke code in:
+				- /ibl5/modules/
+				- /ibl5/admin/modules/
+				- /ibl5/blocks/
+
+				DO NOT use this class for new code. Instead:
+				- Extend BaseMysqliRepository for repository classes
+				- Use $mysqli_db global with prepared statements
+
+				Example:
+				  $stmt = $mysqli_db->prepare("SELECT * FROM table WHERE id = ?");
+				  $stmt->bind_param("i", $id);
+				  $stmt->execute();
+				  $result = $stmt->get_result();
+
+				Scheduled for removal once PHP-Nuke modules are deprecated.
+			'''
+			identifier: method.deprecatedClass
+			count: 1
+			path: classes/Bootstrap/ConfigBootstrap.php
+
+		-
+			rawMessage: Deprecated HTML tag `<b>` found in string literal. Use <strong> instead.
+			identifier: ibl.deprecatedHtmlTag
+			count: 1
+			path: classes/Bootstrap/ConfigBootstrap.php
+
+		-
+			rawMessage: 'Deprecated HTML tag `<center>` found in string literal. Use CSS `text-align: center` instead.'
+			identifier: ibl.deprecatedHtmlTag
+			count: 1
+			path: classes/Bootstrap/ConfigBootstrap.php
+
+		-
+			rawMessage: '''
+				PHPDoc tag @var references deprecated class Database\MySQL:
+				This class is for PHP-Nuke module backward compatibility only.
+
+				All IBL5 classes in /ibl5/classes/ and scripts in /ibl5/scripts/ have been
+				migrated to modern mysqli with prepared statements via BaseMysqliRepository.
+
+				This class is ONLY used by legacy PHP-Nuke code in:
+				- /ibl5/modules/
+				- /ibl5/admin/modules/
+				- /ibl5/blocks/
+
+				DO NOT use this class for new code. Instead:
+				- Extend BaseMysqliRepository for repository classes
+				- Use $mysqli_db global with prepared statements
+
+				Example:
+				  $stmt = $mysqli_db->prepare("SELECT * FROM table WHERE id = ?");
+				  $stmt->bind_param("i", $id);
+				  $stmt->execute();
+				  $result = $stmt->get_result();
+
+				Scheduled for removal once PHP-Nuke modules are deprecated.
+			'''
+			identifier: varTag.deprecatedClass
+			count: 1
+			path: classes/Bootstrap/ConfigBootstrap.php
+
+		-
+			rawMessage: Casting to int something that's already int.
+			identifier: cast.useless
+			count: 17
+			path: classes/DepthChartEntry/DepthChartEntryView.php
+
+		-
+			rawMessage: 'Casting to int something that''s already int<0, 5>.'
+			identifier: cast.useless
+			count: 1
+			path: classes/DepthChartEntry/DepthChartEntryView.php
+
+		-
+			rawMessage: 'Inline `style="..."` attributes are banned in PHP. Move CSS to ibl5/design/components/. Exception: `style="--foo: ..."` CSS custom properties are allowed.'
+			identifier: ibl.inlineCss
+			count: 2
+			path: classes/DepthChartEntry/DepthChartEntryView.php
+
+		-
+			rawMessage: '$cookie[...] is read before PageLayout::header() in the same method. PageLayout::header() populates $cookie with auth and CSRF state — call it first, otherwise you will read stale or missing values (see CsrfGuard MAX_TOKENS incident).'
+			identifier: ibl.cookieBeforeHeader
+			count: 2
+			path: classes/FreeAgency/FreeAgencyController.php
+
+		-
+			rawMessage: 'Inline `style="..."` attributes are banned in PHP. Move CSS to ibl5/design/components/. Exception: `style="--foo: ..."` CSS custom properties are allowed.'
+			identifier: ibl.inlineCss
+			count: 1
+			path: classes/NextSim/NextSimView.php
+
+		-
+			rawMessage: Inline `<style>` blocks are banned in PHP. Move CSS to ibl5/design/components/ and reference the stylesheet instead.
+			identifier: ibl.inlineCss
+			count: 2
+			path: classes/PageLayout/PageLayout.php
+
+		-
+			rawMessage: 'Inline `style="..."` attributes are banned in PHP. Move CSS to ibl5/design/components/. Exception: `style="--foo: ..."` CSS custom properties are allowed.'
+			identifier: ibl.inlineCss
+			count: 1
+			path: classes/Player/Views/PlayerStatsCardView.php
+
+		-
+			rawMessage: 'Inline `style="..."` attributes are banned in PHP. Move CSS to ibl5/design/components/. Exception: `style="--foo: ..."` CSS custom properties are allowed.'
+			identifier: ibl.inlineCss
+			count: 1
+			path: classes/Player/Views/PlayerTradingCardBackView.php
+
+		-
+			rawMessage: 'Inline `style="..."` attributes are banned in PHP. Move CSS to ibl5/design/components/. Exception: `style="--foo: ..."` CSS custom properties are allowed.'
+			identifier: ibl.inlineCss
+			count: 1
+			path: classes/Player/Views/PlayerTradingCardFrontView.php
+
+		-
+			rawMessage: Casting to int something that's already int.
+			identifier: cast.useless
+			count: 3
+			path: classes/RookieOption/RookieOptionFormView.php
+
+		-
+			rawMessage: '$cookie[...] is read before PageLayout::header() in the same method. PageLayout::header() populates $cookie with auth and CSRF state — call it first, otherwise you will read stale or missing values (see CsrfGuard MAX_TOKENS incident).'
+			identifier: ibl.cookieBeforeHeader
+			count: 1
+			path: classes/SeriesRecords/SeriesRecordsController.php
+
+		-
+			rawMessage: '$cookie[...] is read before PageLayout::header() in the same method. PageLayout::header() populates $cookie with auth and CSRF state — call it first, otherwise you will read stale or missing values (see CsrfGuard MAX_TOKENS incident).'
+			identifier: ibl.cookieBeforeHeader
+			count: 1
+			path: classes/Team/TeamController.php
+
+		-
+			rawMessage: Deprecated HTML tag `<i>` found in string literal. Use <em> instead.
+			identifier: ibl.deprecatedHtmlTag
+			count: 2
+			path: classes/Trading/TradeOffer.php
+
+		-
+			rawMessage: 'Inline `style="..."` attributes are banned in PHP. Move CSS to ibl5/design/components/. Exception: `style="--foo: ..."` CSS custom properties are allowed.'
+			identifier: ibl.inlineCss
+			count: 1
+			path: classes/Trading/TradingView.php
+
+		-
+			rawMessage: Casting to int something that's already int.
+			identifier: cast.useless
+			count: 1
+			path: classes/TransactionHistory/TransactionHistoryView.php
+
+		-
+			rawMessage: '$cookie[...] is read before PageLayout::header() in the same method. PageLayout::header() populates $cookie with auth and CSRF state — call it first, otherwise you will read stale or missing values (see CsrfGuard MAX_TOKENS incident).'
+			identifier: ibl.cookieBeforeHeader
+			count: 2
+			path: classes/Waivers/WaiversController.php

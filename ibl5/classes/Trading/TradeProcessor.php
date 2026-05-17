@@ -10,6 +10,7 @@ use Trading\Contracts\TradeAssetRepositoryInterface;
 use Trading\Contracts\TradeCashRepositoryInterface;
 use Trading\Contracts\TradeExecutionRepositoryInterface;
 use Trading\Contracts\CashConsiderationRepositoryInterface;
+use Services\Contracts\CommonMysqliRepositoryInterface;
 use Season\Season;
 use Discord\Discord;
 
@@ -24,7 +25,6 @@ use Discord\Discord;
  * @phpstan-import-type TradeInfoRow from \Trading\Contracts\TradeOfferRepositoryInterface
  * @phpstan-import-type TradeCashRow from \Trading\Contracts\TradeCashRepositoryInterface
  * @phpstan-import-type DraftPickRow from \Trading\Contracts\TradeAssetRepositoryInterface
- * @phpstan-import-type PlayerRow from \Services\CommonMysqliRepository
  */
 class TradeProcessor implements TradeProcessorInterface
 {
@@ -34,7 +34,7 @@ class TradeProcessor implements TradeProcessorInterface
     protected TradeCashRepositoryInterface $cashRepository;
     protected CashConsiderationRepositoryInterface $cashConsiderationRepository;
     protected TradeExecutionRepositoryInterface $executionRepository;
-    protected \Services\CommonMysqliRepository $commonRepository;
+    protected CommonMysqliRepositoryInterface $commonRepository;
     protected Season $season;
     protected CashTransactionHandler $cashHandler;
     protected \Services\NewsService $newsService;
@@ -42,23 +42,24 @@ class TradeProcessor implements TradeProcessorInterface
 
     public function __construct(
         \mysqli $db,
+        CommonMysqliRepositoryInterface $commonRepository,
         ?TradeOfferRepositoryInterface $offerRepository = null,
         ?TradeAssetRepositoryInterface $assetRepository = null
     ) {
         $this->db = $db;
+        $this->commonRepository = $commonRepository;
         $this->offerRepository = $offerRepository ?? new TradeOfferRepository($db);
         $this->assetRepository = $assetRepository ?? new TradeAssetRepository($db);
         $this->cashRepository = new TradeCashRepository($db);
         $this->cashConsiderationRepository = new CashConsiderationRepository($db);
         $this->executionRepository = new TradeExecutionRepository($db);
-        $this->commonRepository = new \Services\CommonMysqliRepository($db);
         $this->season = new Season($db);
-        $this->cashHandler = new CashTransactionHandler($db, $this->cashConsiderationRepository, $this->cashRepository);
+        $this->cashHandler = new CashTransactionHandler($db, $this->commonRepository, $this->cashConsiderationRepository, $this->cashRepository);
         $this->newsService = new \Services\NewsService($db);
 
         // Initialize Discord with error handling
         try {
-            $this->discord = new Discord($db);
+            $this->discord = new Discord($this->commonRepository);
         } catch (\Exception $e) {
             // Discord unavailable - will skip notifications
             \Logging\LoggerFactory::getChannel('trade')->warning('Discord initialization failed in TradeProcessor', ['error' => $e->getMessage()]);

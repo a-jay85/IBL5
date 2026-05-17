@@ -236,7 +236,7 @@ class CashConsiderationSalaryParityTest extends DatabaseTestCase
         )[0]['cnt'] ?? 0);
 
         // Execute a cash transaction through the real handler
-        $handler = new \Trading\CashTransactionHandler($this->db);
+        $handler = new \Trading\CashTransactionHandler($this->db, $this->commonRepo);
         $result = $handler->createCashTransaction(
             $team1['team_name'],
             $team2['team_name'],

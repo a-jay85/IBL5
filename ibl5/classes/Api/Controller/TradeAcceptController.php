@@ -6,6 +6,7 @@ namespace Api\Controller;
 
 use Api\Contracts\ControllerInterface;
 use Api\Response\JsonResponder;
+use Services\Contracts\CommonMysqliRepositoryInterface;
 use Trading\TradeProcessor;
 use Trading\TradeOfferRepository;
 use Discord\Discord;
@@ -13,10 +14,12 @@ use Discord\Discord;
 class TradeAcceptController implements ControllerInterface
 {
     private \mysqli $db;
+    private CommonMysqliRepositoryInterface $commonRepository;
 
-    public function __construct(\mysqli $db)
+    public function __construct(\mysqli $db, CommonMysqliRepositoryInterface $commonRepository)
     {
         $this->db = $db;
+        $this->commonRepository = $commonRepository;
     }
 
     /**
@@ -52,7 +55,7 @@ class TradeAcceptController implements ControllerInterface
 
         if (!$isLocalhostTestTrade) {
             // Verify the Discord user is the GM of the approval team
-            $discord = new Discord($this->db);
+            $discord = new Discord($this->commonRepository);
             $gmDiscordId = $discord->getDiscordIDFromTeamname($approvalTeam);
 
             if ($gmDiscordId === '' || $gmDiscordId !== $discordUserId) {
@@ -61,7 +64,7 @@ class TradeAcceptController implements ControllerInterface
             }
         }
 
-        $processor = new TradeProcessor($this->db);
+        $processor = new TradeProcessor($this->db, $this->commonRepository);
         $result = $processor->processTrade($offerId);
 
         if ($result['success'] !== true) {

@@ -21,5 +21,6 @@ get_lang($module_name);
 // Use global mysqli database connection
 global $mysqli_db, $user;
 
-$controller = new \SeriesRecords\SeriesRecordsController($mysqli_db);
+$commonRepo = new \Services\CommonMysqliRepository($mysqli_db);
+$controller = new \SeriesRecords\SeriesRecordsController($mysqli_db, $commonRepo);
 $controller->main($user);

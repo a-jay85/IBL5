@@ -7,6 +7,7 @@ namespace FreeAgency;
 use FreeAgency\Contracts\FreeAgencyDemandCalculatorInterface;
 use FreeAgency\Contracts\FreeAgencyProcessorInterface;
 use FreeAgency\Contracts\FreeAgencyRepositoryInterface;
+use Services\Contracts\CommonMysqliRepositoryInterface;
 use Team\Team;
 use Season\Season;
 use Discord\Discord;
@@ -20,15 +21,18 @@ class FreeAgencyProcessor implements FreeAgencyProcessorInterface
     private FreeAgencyDemandCalculatorInterface $calculator;
     private FreeAgencyRepositoryInterface $repository;
     private Season $season;
+    private CommonMysqliRepositoryInterface $commonRepo;
 
     public function __construct(
         \mysqli $mysqli_db,
+        CommonMysqliRepositoryInterface $commonRepo,
         ?FreeAgencyDemandCalculatorInterface $calculator = null,
         ?FreeAgencyRepositoryInterface $repository = null
     ) {
         $this->mysqli_db = $mysqli_db;
         $this->season = new Season($mysqli_db);
 
+        $this->commonRepo = $commonRepo;
         $this->calculator = $calculator ?? new FreeAgencyDemandCalculator(
             new FreeAgencyDemandRepository($this->mysqli_db)
         );
@@ -285,15 +289,13 @@ class FreeAgencyProcessor implements FreeAgencyProcessorInterface
      */
     private function postOfferToDiscord(string $teamName, \Player\Player $player): void
     {
-        /** @var \mysqli $mysqliDb */
-        $mysqliDb = $this->mysqli_db;
         $season = $this->season;
 
         if ($season->freeAgencyNotificationsState !== "On") {
             return;
         }
 
-        $discord = new Discord($mysqliDb);
+        $discord = new Discord($this->commonRepo);
         $playerTeamName = $player->teamName ?? '';
         $playerTeamDiscordID = $discord->getDiscordIDFromTeamname($playerTeamName);
 
@@ -313,8 +315,7 @@ _**{$player->teamName}** GM <@!$playerTeamDiscordID> could not be reached for co
      */
     public function deleteOffers(string $teamName, int $playerID): array
     {
-        $commonRepo = new \Services\CommonMysqliRepository($this->mysqli_db);
-        $teamid = $commonRepo->getTidFromTeamname($teamName) ?? 0;
+        $teamid = $this->commonRepo->getTidFromTeamname($teamName) ?? 0;
 
         $this->repository->deleteOffer($teamid, $playerID);
 

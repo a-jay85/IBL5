@@ -14,7 +14,7 @@ use Player\Views\PlayerStatsCardView;
 use Player\Views\PlayerStatsFlipCardView;
 use Player\Views\PlayerViewFactory;
 use Player\Views\TeamColorHelper;
-use Services\CommonMysqliRepository;
+use Services\Contracts\CommonMysqliRepositoryInterface;
 use Security\HtmlSanitizer;
 use Team\Team;
 use Season\Season;
@@ -28,13 +28,16 @@ use Season\Season;
 class PlayerPageController
 {
     private \mysqli $mysqliDb;
+    private CommonMysqliRepositoryInterface $commonRepo;
 
     /**
      * @param \mysqli $mysqliDb MySQLi database connection
+     * @param CommonMysqliRepositoryInterface $commonRepo Common repository for shared queries
      */
-    public function __construct(\mysqli $mysqliDb)
+    public function __construct(\mysqli $mysqliDb, CommonMysqliRepositoryInterface $commonRepo)
     {
         $this->mysqliDb = $mysqliDb;
+        $this->commonRepo = $commonRepo;
     }
 
     /**
@@ -48,12 +51,11 @@ class PlayerPageController
     public function renderPage(int $playerID, ?int $pageView, string $username): string
     {
         $sharedRepository = new \Shared\SharedRepository($this->mysqliDb);
-        $commonRepository = new CommonMysqliRepository($this->mysqliDb);
         $season = new Season($this->mysqliDb);
 
         $player = Player::withPlayerID($this->mysqliDb, $playerID);
         $playerStats = PlayerStats::withPlayerID($this->mysqliDb, $playerID);
-        $pageService = new PlayerPageService($this->mysqliDb);
+        $pageService = new PlayerPageService($this->mysqliDb, $this->commonRepo);
 
         $html = '';
 
@@ -97,7 +99,7 @@ class PlayerPageController
         $html .= '</td></tr>';
 
         // Action buttons
-        $userTeamName = $commonRepository->getTeamnameFromUsername($username) ?? League::FREE_AGENTS_TEAM_NAME;
+        $userTeamName = $this->commonRepo->getTeamnameFromUsername($username) ?? League::FREE_AGENTS_TEAM_NAME;
         $userTeam = Team::initialize($this->mysqliDb, $userTeamName);
 
         $actionButtons = $this->renderActionButtons($pageService, $player, $playerID, $userTeam, $season);
@@ -110,7 +112,7 @@ class PlayerPageController
 
         // Content view
         $statsRepository = new PlayerStatsRepository($this->mysqliDb);
-        $viewFactory = new PlayerViewFactory($playerRepository, $statsRepository, $commonRepository);
+        $viewFactory = new PlayerViewFactory($playerRepository, $statsRepository, $this->commonRepo);
 
         $html .= $this->renderContentView(
             $viewFactory,

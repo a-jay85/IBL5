@@ -8,6 +8,7 @@ use PHPUnit\Framework\TestCase;
 use Extension\ExtensionOfferEvaluator;
 use FreeAgency\FreeAgencyDemandCalculator;
 use Negotiation\NegotiationDemandCalculator;
+use Services\Contracts\CommonMysqliRepositoryInterface;
 use Tests\WideUnit\Mocks\MockDatabase;
 
 /**
@@ -95,7 +96,7 @@ class ModifierConsistencyTest extends TestCase
             ],
         ]);
 
-        $calculator = new NegotiationDemandCalculator($mockDb);
+        $calculator = new NegotiationDemandCalculator($mockDb, $this->createStub(CommonMysqliRepositoryInterface::class));
 
         $expectedWinner = \ContractRules::calculateWinnerModifier(self::WINS, self::LOSSES, self::WINNER_PREF);
         $expectedTradition = \ContractRules::calculateTraditionModifier(self::TRAD_WINS, self::TRAD_LOSSES, self::TRADITION_PREF);

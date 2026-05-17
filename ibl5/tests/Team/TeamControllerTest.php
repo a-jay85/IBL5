@@ -7,6 +7,7 @@ namespace Tests\Team;
 use PHPUnit\Framework\TestCase;
 use Team\TeamController;
 use Team\Contracts\TeamControllerInterface;
+use Services\Contracts\CommonMysqliRepositoryInterface;
 
 /**
  * TeamControllerTest - Tests for TeamController
@@ -110,14 +111,14 @@ class TeamControllerTest extends TestCase
 
     public function testCanBeInstantiated(): void
     {
-        $controller = new TeamController($this->mockDb);
+        $controller = new TeamController($this->mockDb, $this->createStub(CommonMysqliRepositoryInterface::class));
 
         $this->assertInstanceOf(TeamController::class, $controller);
     }
 
     public function testImplementsInterface(): void
     {
-        $controller = new TeamController($this->mockDb);
+        $controller = new TeamController($this->mockDb, $this->createStub(CommonMysqliRepositoryInterface::class));
 
         $this->assertInstanceOf(TeamControllerInterface::class, $controller);
     }

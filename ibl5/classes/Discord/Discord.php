@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Discord;
 
+use Services\Contracts\CommonMysqliRepositoryInterface;
+
 class Discord
 {
     /** @var string Production IBL Discord server (guild) snowflake ID */
@@ -12,7 +14,7 @@ class Discord
     /** @var string Testing/development Discord server snowflake ID */
     public const IBL_GUILD_ID_TESTING = '399119059771195392';
 
-    private \mysqli $db;
+    private CommonMysqliRepositoryInterface $commonRepo;
 
     /** @var array<string, string> Discord webhook URLs loaded from config */
     private static array $webhooks = [];
@@ -55,12 +57,9 @@ class Discord
         return self::isProduction() ? self::IBL_GUILD_ID : self::IBL_GUILD_ID_TESTING;
     }
 
-    /**
-     * @param \mysqli $db Database connection
-     */
-    public function __construct(\mysqli $db)
+    public function __construct(CommonMysqliRepositoryInterface $commonRepo)
     {
-        $this->db = $db;
+        $this->commonRepo = $commonRepo;
         self::loadConfig();
     }
 
@@ -105,9 +104,7 @@ class Discord
 
     public function getDiscordIDFromTeamname(string $teamname): string
     {
-        $repo = new \Services\CommonMysqliRepository($this->db);
-
-        return (string) ($repo->getTeamDiscordID($teamname) ?? '');
+        return (string) ($this->commonRepo->getTeamDiscordID($teamname) ?? '');
     }
 
     /**

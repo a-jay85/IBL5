@@ -15,7 +15,8 @@ global $mysqli_db;
 
 $teamid = isset($teamid) ? (int) $teamid : 0;
 
-$controller = new Team\TeamController($mysqli_db);
+$commonRepo = new \Services\CommonMysqliRepository($mysqli_db);
+$controller = new Team\TeamController($mysqli_db, $commonRepo);
 
 switch ($op) {
     case "team":

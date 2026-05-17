@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Tests\Trading;
 
 use PHPUnit\Framework\TestCase;
+use Services\Contracts\CommonMysqliRepositoryInterface;
 use Trading\TradingService;
 use Trading\Contracts\TradeOfferRepositoryInterface;
 use Trading\Contracts\TradeAssetRepositoryInterface;
@@ -656,7 +657,8 @@ class TradingServiceTest extends TestCase
         $db->onQuery('ibl_cash_considerations', []);
         $_SERVER['SERVER_NAME'] = 'localhost';
 
-        $tradeOffer = new \Trading\TradeOffer($db);
+        $commonRepo = $this->createStub(CommonMysqliRepositoryInterface::class);
+        $tradeOffer = new \Trading\TradeOffer($db, $commonRepo);
 
         // Prepare trade data: Team A offers to Team B
         // Team A sends cash only (no players or picks)
@@ -721,7 +723,8 @@ class TradingServiceTest extends TestCase
         $db->onQuery('ibl_cash_considerations', []);
         $_SERVER['SERVER_NAME'] = 'localhost';
 
-        $tradeOffer = new \Trading\TradeOffer($db);
+        $commonRepo = $this->createStub(CommonMysqliRepositoryInterface::class);
+        $tradeOffer = new \Trading\TradeOffer($db, $commonRepo);
 
         // Team A offers cash to Team B
         // Team B sends cash back to Team A
@@ -773,7 +776,8 @@ class TradingServiceTest extends TestCase
     {
         $db = new QueryAwareMockDatabase();
         $_SERVER['SERVER_NAME'] = 'localhost';
-        $tradeOffer = new \Trading\TradeOffer($db);
+        $commonRepo = $this->createStub(CommonMysqliRepositoryInterface::class);
+        $tradeOffer = new \Trading\TradeOffer($db, $commonRepo);
 
         // Team A sends Player 1 to Team B
         // Team B sends Player 2 back to Team A
@@ -818,7 +822,8 @@ class TradingServiceTest extends TestCase
     {
         $db = new QueryAwareMockDatabase();
         $_SERVER['SERVER_NAME'] = 'localhost';
-        $tradeOffer = new \Trading\TradeOffer($db);
+        $commonRepo = $this->createStub(CommonMysqliRepositoryInterface::class);
+        $tradeOffer = new \Trading\TradeOffer($db, $commonRepo);
 
         // Team A sends Player 1 + cash to Team B
         // Team B sends Player 2 + cash back to Team A
@@ -870,7 +875,8 @@ class TradingServiceTest extends TestCase
     {
         $db = new QueryAwareMockDatabase();
         $_SERVER['SERVER_NAME'] = 'localhost';
-        $tradeOffer = new \Trading\TradeOffer($db);
+        $commonRepo = $this->createStub(CommonMysqliRepositoryInterface::class);
+        $tradeOffer = new \Trading\TradeOffer($db, $commonRepo);
 
         // Team A sends 2025 1st round pick to Team B
         // Team B sends 2026 1st round pick back to Team A

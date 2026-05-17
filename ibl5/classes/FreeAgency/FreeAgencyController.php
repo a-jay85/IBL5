@@ -6,6 +6,7 @@ namespace FreeAgency;
 
 use Team\Team;
 use Season\Season;
+use Services\Contracts\CommonMysqliRepositoryInterface;
 
 class FreeAgencyController
 {
@@ -15,18 +16,21 @@ class FreeAgencyController
     private FreeAgencyService $service;
     private FreeAgencyView $view;
     private FreeAgencyProcessor $processor;
-    private \Services\CommonMysqliRepository $commonRepository;
+    private CommonMysqliRepositoryInterface $commonRepository;
     private \Utilities\NukeCompat $nukeCompat;
 
-    public function __construct(\mysqli $db, ?\Utilities\NukeCompat $nukeCompat = null)
-    {
+    public function __construct(
+        \mysqli $db,
+        CommonMysqliRepositoryInterface $commonRepository,
+        ?\Utilities\NukeCompat $nukeCompat = null
+    ) {
         $this->db = $db;
+        $this->commonRepository = $commonRepository;
         $this->repository = new FreeAgencyRepository($db);
         $this->demandRepository = new FreeAgencyDemandRepository($db);
         $this->service = new FreeAgencyService($this->repository, $this->demandRepository, $db);
-        $this->view = new FreeAgencyView($db);
-        $this->processor = new FreeAgencyProcessor($db);
-        $this->commonRepository = new \Services\CommonMysqliRepository($db);
+        $this->view = new FreeAgencyView($db, $commonRepository);
+        $this->processor = new FreeAgencyProcessor($db, $commonRepository);
         $this->nukeCompat = $nukeCompat ?? new \Utilities\NukeCompat();
     }
 

@@ -9,6 +9,7 @@ parameters:
         - phpstan-rules
     excludePaths:
         - classes/Bootstrap/LegacyFunctions.php
+        - phpstan-rules/Fixtures
     bootstrapFiles:
         - phpstan-stubs/nuke-globals.stub.php
     phpVersion: 80300
@@ -25,6 +26,10 @@ services:
             - phpstan.rules.rule
     -
         class: PHPStanRules\BanDirectNukeGlobalsRule
+        tags:
+            - phpstan.rules.rule
+    -
+        class: PHPStanRules\BanDirectCommonMysqliInstantiationRule
         tags:
             - phpstan.rules.rule
     -

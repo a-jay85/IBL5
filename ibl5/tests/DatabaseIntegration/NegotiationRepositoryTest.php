@@ -7,6 +7,7 @@ namespace Tests\DatabaseIntegration;
 use PHPUnit\Framework\Attributes\Group;
 
 use Negotiation\NegotiationRepository;
+use Services\CommonMysqliRepository;
 
 /**
  * Tests NegotiationRepository against real MariaDB — team performance, salary queries, FA status.
@@ -19,7 +20,7 @@ class NegotiationRepositoryTest extends DatabaseTestCase
     protected function setUp(): void
     {
         parent::setUp();
-        $this->repo = new NegotiationRepository($this->db);
+        $this->repo = new NegotiationRepository($this->db, new CommonMysqliRepository($this->db));
     }
 
     public function testGetTeamPerformanceReturnsContractFields(): void

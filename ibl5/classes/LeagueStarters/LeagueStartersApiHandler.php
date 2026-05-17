@@ -6,6 +6,7 @@ namespace LeagueStarters;
 
 use League\League;
 use Season\Season;
+use Services\Contracts\CommonMysqliRepositoryInterface;
 use Team\Team;
 use Utilities\NukeCompat;
 
@@ -20,10 +21,12 @@ class LeagueStartersApiHandler
     private const VALID_DISPLAY_MODES = ['ratings', 'total_s', 'avg_s', 'per36mins'];
 
     private \mysqli $db;
+    private CommonMysqliRepositoryInterface $commonRepo;
 
-    public function __construct(\mysqli $db)
+    public function __construct(\mysqli $db, CommonMysqliRepositoryInterface $commonRepo)
     {
         $this->db = $db;
+        $this->commonRepo = $commonRepo;
     }
 
     public function handle(): void
@@ -47,8 +50,7 @@ class LeagueStartersApiHandler
         $cookieData = $nuke->cookieDecode($user);
         $username = $cookieData[1] ?? '';
 
-        $commonRepo = new \Services\CommonMysqliRepository($this->db);
-        $userTeamName = $commonRepo->getTeamnameFromUsername($username);
+        $userTeamName = $this->commonRepo->getTeamnameFromUsername($username);
         $userTeam = Team::initialize($this->db, $userTeamName ?? '');
 
         $season = new Season($this->db);

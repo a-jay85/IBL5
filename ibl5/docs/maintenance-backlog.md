@@ -1056,6 +1056,7 @@ Effort scale:
 **Suggested direction:** Extract interface; split into `TeamIdentityRepositoryInterface`, `PlayerLookupRepositoryInterface`, `SalaryCapRepositoryInterface`.
 **Est. effort:** M
 **Risk if untouched:** Behavior changes can't be mocked; regressions only caught at integration time.
+**Status:** Completed (2026-05-16) — interface extracted, all 34 sites inject via `CommonMysqliRepositoryInterface`.
 
 ### 7.2 `CommonMysqliRepository` Instantiated Directly at 40+ Sites
 **Location:** Pattern across `classes/` and `modules/` — Trading, FreeAgency, DepthChartEntry, Player, etc.
@@ -1063,6 +1064,7 @@ Effort scale:
 **Suggested direction:** Constructor-inject; one factory/DI helper for the shared instance.
 **Est. effort:** M
 **Risk if untouched:** Duplicate queries per request; can't add caching decorator.
+**Status:** Completed (2026-05-16) — bare instantiation banned by `ibl.directCommonMysqliInstantiation` PHPStan rule.
 
 ### 7.3 `PlayerViewFactory` Reaches Into `$GLOBALS['mysqli_db']`
 **Location:** `ibl5/classes/Player/Views/PlayerViewFactory.php` lines 68-69
@@ -1070,6 +1072,7 @@ Effort scale:
 **Suggested direction:** Remove fallback; make `CommonMysqliRepository` mandatory.
 **Est. effort:** S
 **Risk if untouched:** Silent break in CLI/test contexts.
+**Status:** Completed (2026-05-16) — PlayerViewFactory fallback removed; constructor requires `CommonMysqliRepositoryInterface`.
 
 ### 7.4 `SeasonArchiveRepository::getPlayerIdsByNames` Bypasses `BaseMysqliRepository`
 **Location:** `ibl5/classes/SeasonArchive/SeasonArchiveRepository.php` lines 251-279
@@ -1105,6 +1108,7 @@ Effort scale:
 **Suggested direction:** Inline the salary view query or inject `CommonMysqliRepository`.
 **Est. effort:** S
 **Risk if untouched:** Hidden dependency; harder integration tests.
+**Status:** Completed (2026-05-16) — resolved by the DI sweep; `NegotiationRepository` now receives `CommonMysqliRepositoryInterface` via constructor.
 
 ### 7.9 `CommonMysqliRepository` Mixes 3 Domains
 **Location:** `ibl5/classes/Services/CommonMysqliRepository.php`

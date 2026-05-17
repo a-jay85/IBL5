@@ -10,6 +10,7 @@ use Negotiation\NegotiationDemandCalculator;
 use Negotiation\NegotiationRepository;
 use Negotiation\NegotiationService;
 use Negotiation\NegotiationValidator;
+use Services\Contracts\CommonMysqliRepositoryInterface;
 
 /**
  * Integration tests for complete contract negotiation workflows
@@ -38,12 +39,13 @@ class NegotiationWideUnitTest extends WideUnitTestCase
         $this->mockSeason->phase = 'Regular Season';
         $this->mockSeason->endingYear = 2026;
         $this->mockSeason->beginningYear = 2025;
-        $db = $GLOBALS['mysqli_db'];
+        $db = $this->mockDb;
+        $commonRepo = $this->createStub(CommonMysqliRepositoryInterface::class);
         $this->service = new NegotiationService(
             $db,
-            new NegotiationRepository($db),
+            new NegotiationRepository($db, $commonRepo),
             new NegotiationValidator($db, $this->mockSeason),
-            new NegotiationDemandCalculator($db),
+            new NegotiationDemandCalculator($db, $commonRepo),
         );
 
         // Prevent any external calls during tests

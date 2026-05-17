@@ -9,6 +9,7 @@ use Trading\Contracts\TradeOfferRepositoryInterface;
 use Trading\Contracts\TradeAssetRepositoryInterface;
 use Trading\Contracts\TradeCashRepositoryInterface;
 use Trading\Contracts\CashConsiderationRepositoryInterface;
+use Services\Contracts\CommonMysqliRepositoryInterface;
 use Season\Season;
 use Discord\Discord;
 
@@ -32,7 +33,7 @@ class TradeOffer implements TradeOfferInterface
     protected TradeAssetRepositoryInterface $assetRepository;
     protected TradeCashRepositoryInterface $cashRepository;
     protected CashConsiderationRepositoryInterface $cashConsiderationRepository;
-    protected \Services\CommonMysqliRepository $commonRepository;
+    protected CommonMysqliRepositoryInterface $commonRepository;
     protected Season $season;
     protected CashTransactionHandler $cashHandler;
     protected TradeValidator $validator;
@@ -40,22 +41,23 @@ class TradeOffer implements TradeOfferInterface
 
     public function __construct(
         \mysqli $db,
+        CommonMysqliRepositoryInterface $commonRepository,
         ?TradeOfferRepositoryInterface $offerRepository = null,
         ?TradeAssetRepositoryInterface $assetRepository = null
     ) {
         $this->db = $db;
+        $this->commonRepository = $commonRepository;
         $this->offerRepository = $offerRepository ?? new TradeOfferRepository($db);
         $this->assetRepository = $assetRepository ?? new TradeAssetRepository($db);
         $this->cashRepository = new TradeCashRepository($db);
         $this->cashConsiderationRepository = new CashConsiderationRepository($db);
-        $this->commonRepository = new \Services\CommonMysqliRepository($db);
         $this->season = new Season($db);
-        $this->cashHandler = new CashTransactionHandler($db, $this->cashConsiderationRepository, $this->cashRepository);
+        $this->cashHandler = new CashTransactionHandler($db, $this->commonRepository, $this->cashConsiderationRepository, $this->cashRepository);
         $this->validator = new TradeValidator($db);
 
         // Initialize Discord with error handling (may fail if column doesn't exist)
         try {
-            $this->discord = new Discord($db);
+            $this->discord = new Discord($this->commonRepository);
         } catch (\Exception $e) {
             // Discord unavailable - will skip notifications
             \Logging\LoggerFactory::getChannel('trade')->warning('Discord initialization failed in TradeOffer', ['error' => $e->getMessage()]);

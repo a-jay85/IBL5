@@ -18,5 +18,6 @@ get_lang($module_name);
 
 $pagetitle = "- Free Agency System";
 
-$controller = new FreeAgencyController($mysqli_db);
+$commonRepo = new Services\CommonMysqliRepository($mysqli_db);
+$controller = new FreeAgencyController($mysqli_db, $commonRepo);
 $controller->handleRequest($user, $pa ?? '', (int) ($pid ?? 0));

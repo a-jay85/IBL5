@@ -7,6 +7,7 @@ namespace Tests\WideUnit\FreeAgency;
 use Tests\WideUnit\WideUnitTestCase;
 use Tests\WideUnit\Mocks\TestDataFactory;
 use FreeAgency\FreeAgencyProcessor;
+use Services\Contracts\CommonMysqliRepositoryInterface;
 
 /**
  * Integration tests for complete free agency offer workflows
@@ -31,7 +32,7 @@ class FreeAgencyWideUnitTest extends WideUnitTestCase
     protected function setUp(): void
     {
         parent::setUp();
-        $this->processor = new FreeAgencyProcessor($this->mockDb);
+        $this->processor = new FreeAgencyProcessor($this->mockDb, $this->createStub(CommonMysqliRepositoryInterface::class));
 
         // Prevent Discord notifications during tests
         $_SERVER['SERVER_NAME'] = 'localhost';

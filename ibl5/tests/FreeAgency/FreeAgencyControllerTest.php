@@ -6,6 +6,7 @@ namespace Tests\FreeAgency;
 
 use FreeAgency\FreeAgencyController;
 use PHPUnit\Framework\TestCase;
+use Services\Contracts\CommonMysqliRepositoryInterface;
 use Tests\WideUnit\Mocks\MockDatabase;
 
 /**
@@ -28,7 +29,8 @@ class FreeAgencyControllerTest extends TestCase
             $loginBoxCalled = true;
         });
 
-        $controller = new FreeAgencyController($mockDb, $nukeCompat);
+        $commonRepo = $this->createStub(CommonMysqliRepositoryInterface::class);
+        $controller = new FreeAgencyController($mockDb, $commonRepo, $nukeCompat);
         $controller->handleRequest(null, '', 0);
 
         $this->assertTrue($loginBoxCalled);
@@ -37,7 +39,8 @@ class FreeAgencyControllerTest extends TestCase
     public function testControllerCanBeInstantiated(): void
     {
         $mockDb = new MockDatabase();
-        $controller = new FreeAgencyController($mockDb);
+        $commonRepo = $this->createStub(CommonMysqliRepositoryInterface::class);
+        $controller = new FreeAgencyController($mockDb, $commonRepo);
 
         $this->assertInstanceOf(FreeAgencyController::class, $controller);
     }

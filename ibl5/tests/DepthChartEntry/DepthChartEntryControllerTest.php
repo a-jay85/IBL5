@@ -6,6 +6,7 @@ namespace Tests\DepthChartEntry;
 
 use PHPUnit\Framework\TestCase;
 use DepthChartEntry\DepthChartEntryController;
+use Services\Contracts\CommonMysqliRepositoryInterface;
 use Tests\WideUnit\Mocks\MockDatabase;
 use Tests\WideUnit\Mocks\MockDatabaseResult;
 use Tests\WideUnit\Mocks\MockPreparedStatement;
@@ -22,11 +23,13 @@ class DepthChartEntryControllerTest extends TestCase
 {
     private MockDatabase $mockDb;
     private object $mockMysqliDb;
+    private CommonMysqliRepositoryInterface $stubCommonRepo;
 
     protected function setUp(): void
     {
         $this->mockDb = new MockDatabase();
         $this->setupMockMysqliDb();
+        $this->stubCommonRepo = $this->createStub(CommonMysqliRepositoryInterface::class);
     }
 
     protected function tearDown(): void
@@ -80,14 +83,14 @@ class DepthChartEntryControllerTest extends TestCase
 
     public function testControllerCanBeInstantiated(): void
     {
-        $controller = new DepthChartEntryController($this->mockMysqliDb);
+        $controller = new DepthChartEntryController($this->mockMysqliDb, $this->stubCommonRepo);
         
         $this->assertInstanceOf(DepthChartEntryController::class, $controller);
     }
 
     public function testControllerImplementsCorrectInterface(): void
     {
-        $controller = new DepthChartEntryController($this->mockMysqliDb);
+        $controller = new DepthChartEntryController($this->mockMysqliDb, $this->stubCommonRepo);
         
         $this->assertInstanceOf(
             \DepthChartEntry\Contracts\DepthChartEntryControllerInterface::class,
@@ -101,8 +104,8 @@ class DepthChartEntryControllerTest extends TestCase
 
     public function testMultipleControllersCanBeInstantiated(): void
     {
-        $controller1 = new DepthChartEntryController($this->mockMysqliDb);
-        $controller2 = new DepthChartEntryController($this->mockMysqliDb);
+        $controller1 = new DepthChartEntryController($this->mockMysqliDb, $this->stubCommonRepo);
+        $controller2 = new DepthChartEntryController($this->mockMysqliDb, $this->stubCommonRepo);
 
         $this->assertInstanceOf(DepthChartEntryController::class, $controller1);
         $this->assertInstanceOf(DepthChartEntryController::class, $controller2);

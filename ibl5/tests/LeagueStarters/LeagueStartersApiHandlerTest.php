@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Tests\LeagueStarters;
 
 use LeagueStarters\LeagueStartersApiHandler;
+use Services\Contracts\CommonMysqliRepositoryInterface;
 use Tests\WideUnit\WideUnitTestCase;
 
 /**
@@ -14,7 +15,10 @@ class LeagueStartersApiHandlerTest extends WideUnitTestCase
 {
     public function testCanBeInstantiated(): void
     {
-        $handler = new LeagueStartersApiHandler($GLOBALS['mysqli_db']);
+        $handler = new LeagueStartersApiHandler(
+            $this->mockDb,
+            $this->createStub(CommonMysqliRepositoryInterface::class)
+        );
 
         $this->assertInstanceOf(LeagueStartersApiHandler::class, $handler);
     }

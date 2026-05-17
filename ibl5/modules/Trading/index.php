@@ -17,14 +17,16 @@ get_lang($module_name);
 
 $pagetitle = "- Team Pages";
 
+global $mysqli_db, $commonRepository;
+$commonRepository = new \Services\CommonMysqliRepository($mysqli_db);
+
 function tradeoffer($username)
 {
-    global $partner, $mysqli_db;
+    global $partner, $mysqli_db, $commonRepository;
 
     $offerRepository = new TradeOfferRepository($mysqli_db);
     $assetRepository = new TradeAssetRepository($mysqli_db);
     $formRepository = new TradeFormRepository($mysqli_db);
-    $commonRepository = new \Services\CommonMysqliRepository($mysqli_db);
     $service = new TradingService($offerRepository, $assetRepository, $formRepository, $commonRepository, $mysqli_db);
     $view = new TradingView();
 
@@ -43,12 +45,11 @@ function tradeoffer($username)
 
 function tradereview($username)
 {
-    global $mysqli_db;
+    global $mysqli_db, $commonRepository;
 
     $offerRepository = new TradeOfferRepository($mysqli_db);
     $assetRepository = new TradeAssetRepository($mysqli_db);
     $formRepository = new TradeFormRepository($mysqli_db);
-    $commonRepository = new \Services\CommonMysqliRepository($mysqli_db);
     $service = new TradingService($offerRepository, $assetRepository, $formRepository, $commonRepository, $mysqli_db);
     $view = new TradingView();
 
@@ -112,10 +113,9 @@ switch ($op) {
             $loggedInUsername = strval($cookie[1] ?? '');
             $loggedInTeamID = 0;
             if ($loggedInUsername !== '') {
-                $commonRepo = new \Services\CommonMysqliRepository($mysqli_db);
-                $loggedInTeamName = $commonRepo->getTeamnameFromUsername($loggedInUsername);
+                $loggedInTeamName = $commonRepository->getTeamnameFromUsername($loggedInUsername);
                 if ($loggedInTeamName !== null) {
-                    $loggedInTeamID = $commonRepo->getTidFromTeamname($loggedInTeamName) ?? 0;
+                    $loggedInTeamID = $commonRepository->getTidFromTeamname($loggedInTeamName) ?? 0;
                 }
             }
             $tradeAssetRepo = new Trading\TradeAssetRepository($mysqli_db);

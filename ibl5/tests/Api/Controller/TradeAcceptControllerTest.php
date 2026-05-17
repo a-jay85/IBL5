@@ -6,13 +6,14 @@ namespace Tests\Api\Controller;
 
 use Api\Controller\TradeAcceptController;
 use Api\Response\JsonResponder;
+use Services\Contracts\CommonMysqliRepositoryInterface;
 use Tests\WideUnit\WideUnitTestCase;
 
 class TradeAcceptControllerTest extends WideUnitTestCase
 {
     public function testReturns400WhenOfferIdMissing(): void
     {
-        $controller = new TradeAcceptController($this->mockDb);
+        $controller = new TradeAcceptController($this->mockDb, $this->createStub(CommonMysqliRepositoryInterface::class));
         $responder = $this->createMock(JsonResponder::class);
 
         $responder->expects($this->once())
@@ -24,7 +25,7 @@ class TradeAcceptControllerTest extends WideUnitTestCase
 
     public function testReturns400WhenDiscordUserIdMissing(): void
     {
-        $controller = new TradeAcceptController($this->mockDb);
+        $controller = new TradeAcceptController($this->mockDb, $this->createStub(CommonMysqliRepositoryInterface::class));
         $responder = $this->createMock(JsonResponder::class);
 
         $responder->expects($this->once())
@@ -36,7 +37,7 @@ class TradeAcceptControllerTest extends WideUnitTestCase
 
     public function testReturns400WhenBodyIsNull(): void
     {
-        $controller = new TradeAcceptController($this->mockDb);
+        $controller = new TradeAcceptController($this->mockDb, $this->createStub(CommonMysqliRepositoryInterface::class));
         $responder = $this->createMock(JsonResponder::class);
 
         $responder->expects($this->once())
@@ -50,7 +51,7 @@ class TradeAcceptControllerTest extends WideUnitTestCase
     {
         $this->mockDb->setMockData([]);
 
-        $controller = new TradeAcceptController($this->mockDb);
+        $controller = new TradeAcceptController($this->mockDb, $this->createStub(CommonMysqliRepositoryInterface::class));
         $responder = $this->createMock(JsonResponder::class);
 
         $responder->expects($this->once())
@@ -85,7 +86,7 @@ class TradeAcceptControllerTest extends WideUnitTestCase
             ],
         ]);
 
-        $controller = new TradeAcceptController($this->mockDb);
+        $controller = new TradeAcceptController($this->mockDb, $this->createStub(CommonMysqliRepositoryInterface::class));
         $responder = $this->createMock(JsonResponder::class);
 
         $responder->expects($this->once())

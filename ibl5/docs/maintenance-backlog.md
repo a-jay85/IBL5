@@ -326,6 +326,7 @@ Effort scale:
 **Suggested direction:** Move domain classes to their home modules; keep cross-cutting utilities; add interfaces.
 **Est. effort:** M
 **Risk if untouched:** Dumping ground grows; missing interfaces block tests.
+**Status:** Completed (2026-05-16) — domain classes relocated to home modules; cross-cutting to Validation/ and Repositories/; Services/ deleted entirely.
 
 ### 2.23 `Shared/` — Minimal Catch-All
 **Location:** `classes/Shared/`
@@ -333,6 +334,7 @@ Effort scale:
 **Suggested direction:** Move `SalaryConverter` to `BasketballStats/`; split `SharedRepository` into module repositories.
 **Est. effort:** S
 **Risk if untouched:** `SharedRepository` will accumulate misfits into a god repo.
+**Status:** Completed (2026-05-16) — SalaryConverter moved to BasketballStats/; Shared/ deleted entirely.
 
 ### 2.24 Navigation — Interface Files Stranded Outside `Contracts/`
 **Location:** `classes/Navigation/Contracts/`
@@ -586,6 +588,7 @@ Effort scale:
 **Suggested direction:** Split: cross-cutting → `Shared/`; `NewsService` → `Topics/News/`; `PlayerDataConverter` → `Player/`; deprecate `Services/`.
 **Est. effort:** L
 **Risk if untouched:** Every new utility class lands here, accelerating sprawl.
+**Status:** Completed (2026-05-16) — Services/ deleted entirely; all classes relocated to domain or purpose-named homes.
 
 ### 4.4 `Shared/SharedRepository` vs `Services/CommonMysqliRepository`
 **Location:** Both extend `BaseMysqliRepository`
@@ -741,6 +744,7 @@ Effort scale:
 **Suggested direction:** Move to `Topics/NewsStoryService.php` or extract a `News/` module.
 **Est. effort:** S
 **Risk if untouched:** `Services/` continues as catch-all.
+**Status:** Completed (2026-05-16) — moved to Topics\News\NewsService with NewsServiceInterface.
 
 ### 4.26 `Module/ModuleAccessControl` — Directory Name Misleading
 **Location:** `ibl5/classes/Module/ModuleAccessControl.php`

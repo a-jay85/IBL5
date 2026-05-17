@@ -22,9 +22,9 @@ final class BanDirectCommonMysqliInstantiationRule implements Rule
 {
     /** @var list<string> */
     private const TARGET_CLASSES = [
-        'Services\TeamIdentityRepository',
-        'Services\PlayerLookupRepository',
-        'Services\SalaryCapRepository',
+        'Repositories\TeamIdentityRepository',
+        'Repositories\PlayerLookupRepository',
+        'Repositories\SalaryCapRepository',
     ];
 
     /** @var list<string> Patterns that are allowed to instantiate directly */

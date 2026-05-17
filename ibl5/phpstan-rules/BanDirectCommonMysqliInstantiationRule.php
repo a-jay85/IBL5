@@ -12,14 +12,20 @@ use PHPStan\Rules\Rule;
 use PHPStan\Rules\RuleErrorBuilder;
 
 /**
- * Bans `new CommonMysqliRepository(...)` outside composition roots and tests.
- * Use constructor injection via CommonMysqliRepositoryInterface instead.
+ * Bans `new TeamIdentityRepository(...)`, `new PlayerLookupRepository(...)`, and
+ * `new SalaryCapRepository(...)` outside composition roots and tests.
+ * Use constructor injection via the narrow interfaces instead.
  *
  * @implements Rule<New_>
  */
 final class BanDirectCommonMysqliInstantiationRule implements Rule
 {
-    private const TARGET_CLASS = 'Services\CommonMysqliRepository';
+    /** @var list<string> */
+    private const TARGET_CLASSES = [
+        'Services\TeamIdentityRepository',
+        'Services\PlayerLookupRepository',
+        'Services\SalaryCapRepository',
+    ];
 
     /** @var list<string> Patterns that are allowed to instantiate directly */
     private const ALLOWED_PATTERNS = [
@@ -46,8 +52,9 @@ final class BanDirectCommonMysqliInstantiationRule implements Rule
         }
 
         $className = $node->class->toString();
+        $normalizedName = ltrim($className, '\\');
 
-        if ($className !== self::TARGET_CLASS && $className !== '\\' . self::TARGET_CLASS) {
+        if (!in_array($normalizedName, self::TARGET_CLASSES, true)) {
             return [];
         }
 
@@ -58,12 +65,15 @@ final class BanDirectCommonMysqliInstantiationRule implements Rule
             }
         }
 
+        $lastSlash = strrpos($normalizedName, '\\');
+        $shortName = $lastSlash !== false ? substr($normalizedName, $lastSlash + 1) : $normalizedName;
+
         return [
             RuleErrorBuilder::message(
-                'Direct instantiation of CommonMysqliRepository is banned in class files. '
-                . 'Inject CommonMysqliRepositoryInterface via the constructor instead.'
+                "Direct instantiation of $shortName is banned in class files. "
+                . 'Inject the corresponding interface via the constructor instead.'
             )
-                ->identifier('ibl.directCommonMysqliInstantiation')
+                ->identifier('ibl.directRepoInstantiation')
                 ->build(),
         ];
     }

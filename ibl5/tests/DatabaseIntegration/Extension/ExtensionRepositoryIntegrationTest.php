@@ -6,14 +6,16 @@ namespace Tests\DatabaseIntegration\Extension;
 
 use Extension\ExtensionRepository;
 use PHPUnit\Framework\Attributes\Group;
-use Services\CommonMysqliRepository;
+use Services\PlayerLookupRepository;
+use Services\TeamIdentityRepository;
 use Tests\DatabaseIntegration\DatabaseTestCase;
 
 #[Group('database')]
 class ExtensionRepositoryIntegrationTest extends DatabaseTestCase
 {
     private ExtensionRepository $repository;
-    private CommonMysqliRepository $commonRepository;
+    private PlayerLookupRepository $playerRepo;
+    private TeamIdentityRepository $teamRepo;
 
     private const TEST_PID_BASE = 200060300;
 
@@ -22,7 +24,8 @@ class ExtensionRepositoryIntegrationTest extends DatabaseTestCase
         parent::setUp();
 
         $this->repository = new ExtensionRepository($this->db);
-        $this->commonRepository = new CommonMysqliRepository($this->db);
+        $this->playerRepo = new PlayerLookupRepository($this->db);
+        $this->teamRepo = new TeamIdentityRepository($this->db);
     }
 
     public function testSaveAcceptedExtensionUpdatesPlayerContract(): void
@@ -62,7 +65,7 @@ class ExtensionRepositoryIntegrationTest extends DatabaseTestCase
             '800 850 900'
         );
 
-        $player = $this->commonRepository->getPlayerByID($pid);
+        $player = $this->playerRepo->getPlayerByID($pid);
         $this->assertNotNull($player);
         $this->assertSame(1, $player['cy']);
         $this->assertSame(4, $player['cyt']);
@@ -98,20 +101,20 @@ class ExtensionRepositoryIntegrationTest extends DatabaseTestCase
             '800 850 900'
         );
 
-        $team = $this->commonRepository->getTeamByName('Metros');
+        $team = $this->teamRepo->getTeamByName('Metros');
         $this->assertNotNull($team);
         $this->assertSame(1, $team['used_extension_this_season']);
     }
 
     public function testMarkExtensionUsedThisSimSetsChunkFlag(): void
     {
-        $teamBefore = $this->commonRepository->getTeamByName('Metros');
+        $teamBefore = $this->teamRepo->getTeamByName('Metros');
         $this->assertNotNull($teamBefore);
         $this->assertSame(0, $teamBefore['used_extension_this_chunk']);
 
         $this->repository->markExtensionUsedThisSim('Metros');
 
-        $teamAfter = $this->commonRepository->getTeamByName('Metros');
+        $teamAfter = $this->teamRepo->getTeamByName('Metros');
         $this->assertNotNull($teamAfter);
         $this->assertSame(1, $teamAfter['used_extension_this_chunk']);
     }
@@ -143,7 +146,7 @@ class ExtensionRepositoryIntegrationTest extends DatabaseTestCase
 
         $this->repository->updatePlayerContract($playerName, $offer, 400);
 
-        $player = $this->commonRepository->getPlayerByID($pid);
+        $player = $this->playerRepo->getPlayerByID($pid);
         $this->assertNotNull($player);
         $this->assertSame(1, $player['cy']);
         $this->assertSame(6, $player['cyt']);

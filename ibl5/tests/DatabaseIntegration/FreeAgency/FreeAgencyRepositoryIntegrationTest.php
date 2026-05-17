@@ -7,7 +7,8 @@ namespace Tests\DatabaseIntegration\FreeAgency;
 use FreeAgency\FreeAgencyAdminRepository;
 use FreeAgency\FreeAgencyRepository;
 use PHPUnit\Framework\Attributes\Group;
-use Services\CommonMysqliRepository;
+use Services\PlayerLookupRepository;
+use Services\TeamIdentityRepository;
 use Tests\DatabaseIntegration\DatabaseTestCase;
 
 #[Group('database')]
@@ -15,7 +16,8 @@ class FreeAgencyRepositoryIntegrationTest extends DatabaseTestCase
 {
     private FreeAgencyRepository $repository;
     private FreeAgencyAdminRepository $adminRepository;
-    private CommonMysqliRepository $commonRepository;
+    private PlayerLookupRepository $playerRepo;
+    private TeamIdentityRepository $teamRepo;
 
     private const TEST_PID_BASE = 200060400;
 
@@ -25,7 +27,8 @@ class FreeAgencyRepositoryIntegrationTest extends DatabaseTestCase
 
         $this->repository = new FreeAgencyRepository($this->db);
         $this->adminRepository = new FreeAgencyAdminRepository($this->db);
-        $this->commonRepository = new CommonMysqliRepository($this->db);
+        $this->playerRepo = new PlayerLookupRepository($this->db);
+        $this->teamRepo = new TeamIdentityRepository($this->db);
     }
 
     public function testSaveOfferInsertsNewOffer(): void
@@ -155,7 +158,7 @@ class FreeAgencyRepositoryIntegrationTest extends DatabaseTestCase
         $this->assertSame(3, $result['successCount']);
         $this->assertSame(0, $result['errorCount']);
 
-        $player1 = $this->commonRepository->getPlayerByID($pid1);
+        $player1 = $this->playerRepo->getPlayerByID($pid1);
         $this->assertNotNull($player1);
         $this->assertSame(1, $player1['teamid']);
         $this->assertSame(3, $player1['cyt']);
@@ -164,7 +167,7 @@ class FreeAgencyRepositoryIntegrationTest extends DatabaseTestCase
         $this->assertSame(600, $player1['salary_yr3']);
         $this->assertSame(1, $player1['fa_signing_flag']);
 
-        $player2 = $this->commonRepository->getPlayerByID($pid2);
+        $player2 = $this->playerRepo->getPlayerByID($pid2);
         $this->assertNotNull($player2);
         $this->assertSame(2, $player2['teamid']);
         $this->assertSame(2, $player2['cyt']);
@@ -204,7 +207,7 @@ class FreeAgencyRepositoryIntegrationTest extends DatabaseTestCase
             'Details'
         );
 
-        $team = $this->commonRepository->getTeamByName('Metros');
+        $team = $this->teamRepo->getTeamByName('Metros');
         $this->assertNotNull($team);
         $this->assertSame(0, $team['has_mle']);
     }

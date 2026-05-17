@@ -89,7 +89,7 @@ $tradeControllers = [
     \Api\Controller\TradeDeclineController::class,
 ];
 if (in_array($controllerClass, $tradeControllers, true)) {
-    $commonRepo = new \Services\CommonMysqliRepository($mysqli_db);
+    $commonRepo = new \Services\TeamIdentityRepository($mysqli_db);
     $controller = new $controllerClass($mysqli_db, $commonRepo);
 } else {
     $controller = new $controllerClass($mysqli_db);

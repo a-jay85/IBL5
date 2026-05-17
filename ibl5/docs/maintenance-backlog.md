@@ -535,6 +535,7 @@ Effort scale:
 **Suggested direction:** Complete the migration OR mark classes `@internal not-yet-wired` with an ADR note.
 **Est. effort:** L (complete) / S (mark)
 **Risk if untouched:** Developers updating bootstrap miss the parallel classes; classes accumulate drift.
+**Status:** In progress (web mode wired in Bootstrap A PR, 2026-05-16); ADR-0029. api/test paths and dup-code deletion in Plans B/C.
 
 ### 3.14 `leagueControlPanel.php` Uses `$_SERVER['DOCUMENT_ROOT']`
 **Location:** `ibl5/leagueControlPanel.php:5`
@@ -2005,6 +2006,7 @@ Effort scale:
 **Suggested direction:** Wire `Application` into `mainfile.php` as the composition root; delete duplicated procedural code.
 **Est. effort:** M
 **Risk if untouched:** Every bootstrap concern added twice; the two copies diverge.
+**Status:** In progress (web wired in Bootstrap A PR, 2026-05-16); ADR-0029. api/test paths and dup-code deletion in Plans B/C.
 
 ### 14.2 Duplicate Bootstrap Logic — mainfile.php and Step Classes in Parallel
 **Location:** `mainfile.php` lines 102-243 vs `Bootstrap/SessionBootstrap.php`, `HeadersBootstrap.php`, `ConfigBootstrap.php`, `AuthBootstrap.php`

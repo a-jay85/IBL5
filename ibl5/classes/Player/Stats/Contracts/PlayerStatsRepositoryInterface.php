@@ -131,11 +131,11 @@ interface PlayerStatsRepositoryInterface
 
     /**
      * Get Olympics stats for a player ordered by year
-     * 
+     *
      * Queries ibl_olympics_stats table for all Olympics season records.
-     * 
+     *
      * @param int $playerID Player ID
-     * @return array<array<string, mixed>> Array of Olympics stat records ordered by year ASC
+     * @return list<array{year: int, pos: string, pid: int, name: string, team: string, games: int, minutes: int, fgm: int, fga: int, ftm: int, fta: int, tgm: int, tga: int, orb: int, reb: int, ast: int, stl: int, tvr: int, blk: int, pf: int, pts: int}> Array of Olympics stat records ordered by year ASC
      */
     public function getOlympicsStats(int $playerID): array;
 

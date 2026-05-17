@@ -252,8 +252,8 @@ Effort scale:
 
 ### 2.12 Negotiation — No Standalone Module; Six Non-Standard Role Names
 **Location:** `classes/Negotiation/`
-**Problem:** `NegotiationDemandCalculator`, `NegotiationDemandsBreakdownView`, `NegotiationViewHelper` are non-canonical. No `modules/Negotiation/`.
-**Suggested direction:** Merge `ViewHelper` into `NegotiationView`; consolidate `BreakdownView` as a sub-view; document the Player sub-domain relationship.
+**Problem:** `NegotiationDemandCalculator`, `NegotiationDemandsBreakdownView`, `NegotiationOfferView` are non-canonical. No `modules/Negotiation/`.
+**Suggested direction:** Consolidate `BreakdownView` as a sub-view; document the Player sub-domain relationship.
 **Est. effort:** S
 **Risk if untouched:** Three view-ish files with different conventions confuse the View boundary.
 
@@ -273,7 +273,7 @@ Effort scale:
 
 ### 2.15 Voting — Split Across Two `modules/` Dirs But One `classes/` Namespace
 **Location:** `modules/Voting/`, `modules/VotingResults/`, `classes/Voting/`
-**Problem:** `modules/VotingResults/` exists but `classes/VotingResults/` does not. `VotingResultsTableRenderer` non-canonical role name.
+**Problem:** `modules/VotingResults/` exists but `classes/VotingResults/` does not.
 **Suggested direction:** Either merge module dirs or create `classes/VotingResults/` and split the namespace.
 **Est. effort:** S (rename) / M (namespace split)
 **Risk if untouched:** Module/namespace mismatch breaks codebase-map searches; duplicates likely.
@@ -613,12 +613,9 @@ Effort scale:
 **Est. effort:** S
 **Risk if untouched:** Wrong module opened when looking for transaction queries.
 
-### 4.7 `FreeAgency/FreeAgencyNegotiationView` Overlaps `Negotiation/` Module
-**Location:** `ibl5/classes/FreeAgency/FreeAgencyNegotiationView.php`
-**Problem:** "Negotiation View" in `FreeAgency/` suggests it belongs in `Negotiation/`.
-**Suggested direction:** Rename to `FreeAgencyOfferView.php`.
-**Est. effort:** S
-**Risk if untouched:** FA vs extension UI duplication harder to spot.
+### 4.7 ~~`FreeAgencyNegotiationView`~~ → `FreeAgencyOfferView` ✅ Done
+**Status:** Renamed to `FreeAgencyOfferView` (2026-05-17).
+**Location:** `ibl5/classes/FreeAgency/FreeAgencyOfferView.php`
 
 ### 4.8 `FreeAgencyDemandCalculator` vs `NegotiationDemandCalculator`
 **Location:** Both modules' `*DemandCalculator`
@@ -718,19 +715,13 @@ Effort scale:
 **Est. effort:** M
 **Risk if untouched:** PLR export gets re-implemented in `PlrParser/`.
 
-### 4.22 `NegotiationViewHelper` vs `NegotiationDemandsBreakdownView`
+### 4.22 ~~`NegotiationViewHelper`~~ → `NegotiationOfferView` ✅ Done
 **Location:** `ibl5/classes/Negotiation/`
-**Problem:** "ViewHelper" suggests a utility, but it's the primary view class. Inconsistent with the `*View` convention.
-**Suggested direction:** Rename to `NegotiationOfferView`.
-**Est. effort:** S
-**Risk if untouched:** Devs look for `NegotiationView` and don't find it.
+**Resolved:** Renamed to `NegotiationOfferView` / `NegotiationOfferViewInterface`.
 
-### 4.23 `VotingResultsTableRenderer` Breaks the `*View` Convention
-**Location:** `ibl5/classes/Voting/VotingResultsTableRenderer.php`
-**Problem:** Effectively the voting results View, but named `TableRenderer`.
-**Suggested direction:** Rename to `VotingResultsView`.
-**Est. effort:** S
-**Risk if untouched:** Devs search for `VotingResultsView.php` and miss it.
+### 4.23 ~~`VotingResultsTableRenderer`~~ → `VotingResultsView` ✅ Done
+**Location:** `ibl5/classes/Voting/`
+**Resolved:** Renamed to `VotingResultsView` / `VotingResultsViewInterface`.
 
 ### 4.24 `InjuriesService` Has No `InjuriesRepository`
 **Location:** `ibl5/classes/Injuries/InjuriesService.php`
@@ -882,6 +873,7 @@ Effort scale:
 **Suggested direction:** Investigate the three controllers; fix ordering or add explicit `@phpstan-ignore` with reason.
 **Est. effort:** S
 **Risk if untouched:** Reading stale/missing CSRF or session state — security-relevant.
+**Status:** Completed (2026-05-17) — 4 baselines cleared, 4 files added to zero-floor. Rule namespace detection fixed. See [ADR-0032](decisions/0032-cookie-before-header-zero-floor.md).
 
 ### 5.18 ConfigBootstrap — 6 Baseline Entries Block Deprecated `Database\MySQL` Removal
 **Location:** `ibl5/classes/Bootstrap/ConfigBootstrap.php`
@@ -1569,7 +1561,7 @@ Effort scale:
 **Risk if untouched:** Double-encoding or missed XSS vectors.
 
 ### 10.10 `HtmlSanitizer::trusted()` Is a 70-Site Escape Hatch
-**Location:** 70 calls across `FreeAgencyView`, `FreeAgencyNegotiationView`, `TradingView`, `WaiversView`
+**Location:** 70 calls across `FreeAgencyView`, `FreeAgencyOfferView`, `TradingView`, `WaiversView`
 **Problem:** `trusted()` is no-op whitelisted in `RequireEscapedOutputRule::SAFE_STATIC_CALLS`. Distinguishes only by code review whether arg is composed `$this->renderX()` (safe) or raw DB value (unsafe).
 **Suggested direction:** New `RequireTrustedAnnotationRule` — require `// @trusted` comment when arg is a variable (not method call on `$this`).
 **Est. effort:** M
@@ -1623,6 +1615,7 @@ Effort scale:
 **Suggested direction:** Burn down in one PR (one-line reorder each); add to zero-floor.
 **Est. effort:** S
 **Risk if untouched:** Stale CSRF/auth read in 4 controllers.
+**Status:** Completed (2026-05-17) — 4 baselines cleared, 4 files added to zero-floor. See [ADR-0032](decisions/0032-cookie-before-header-zero-floor.md).
 
 ### 10.18 ADR-0001: No Rule Blocks `Service extends BaseMysqliRepository`
 **Location:** No existing rule
@@ -1674,7 +1667,7 @@ Effort scale:
 **Risk if untouched:** Rule files self-exempt; coercion bugs in rules.
 
 ### 10.25 Baseline Burn-Down Targets (no new rule)
-**Location:** `phpstan-baseline.neon` — `ibl.unescapedOutput` (17), `ibl.cookieBeforeHeader` (4), `ibl.inlineCss` (6), `ibl.deprecatedHtmlTag` (3)
+**Location:** `phpstan-baseline.neon` — `ibl.unescapedOutput` (17), `ibl.cookieBeforeHeader` (0 — zero-floored), `ibl.inlineCss` (6), `ibl.deprecatedHtmlTag` (3)
 **Problem:** Existing rules have actionable backlogs; staleness of `rawSuperglobal` (10.1) shows snapshot drift.
 **Suggested direction:** Sprint focus + `ibl5/bin/check-baseline-drift --update`.
 **Est. effort:** M (cumulative burn-down)
@@ -1904,18 +1897,12 @@ Effort scale:
 ## Axis 13: Duplication Across Modules
 
 ### 13.1 Player Averages Views — Near-Identical Quartet
-**Location:** `Player/Views/PlayerPlayoffAveragesView.php`, `PlayerHeatAveragesView.php`, `PlayerOlympicAveragesView.php`, `PlayerRegularSeasonAveragesView.php`
-**Problem:** All four are structurally identical: same 31 `StatsFormatter::` call sequence, same per-season loop + career footer. Differ only in title/method/repo.
-**Suggested direction:** Extract `AbstractPlayerAveragesView` (or strategy `PlayerAveragesTableRenderer`) parameterized by title + fetch callables.
-**Est. effort:** M
-**Risk if untouched:** Formatting fix in one drifts the other three silently.
+**Status:** RESOLVED (PR `player-averages-stats-renderer`)
+**Solution:** Extracted `PlayerSeasonTableRenderer` with `PlayerSeasonTableMode::AVERAGES`/`TOTALS` enum and `PlayerSeasonTableConfig` value object. All 6 views (3 averages + 3 totals) delegate to the shared renderer.
 
 ### 13.2 Player Stats (Totals) Views — Near-Identical Triplet
-**Location:** `Player/Views/PlayerHeatStatsView.php`, `PlayerOlympicsStatsView.php`, `PlayerPlayoffStatsView.php`
-**Problem:** 159 LOC each; differ only in title/repo method. 17+ `StatsFormatter::` calls copy-pasted.
-**Suggested direction:** Parameterized `PlayerTournamentStatsTableRenderer`; or merge with 13.1 as a single renderer with totals/averages mode.
-**Est. effort:** M
-**Risk if untouched:** Same drift risk as 13.1.
+**Status:** RESOLVED (PR `player-averages-stats-renderer`)
+**Solution:** Merged with 13.1 — single `PlayerSeasonTableRenderer` handles both averages and totals mode via config.
 
 ### 13.3 `game_of_that_day` Subquery Copy-Pasted 5 Times
 **Location:** `LeagueSchedule/LeagueScheduleRepository.php:42`, `TeamSchedule/TeamScheduleRepository.php:42`, `RecordHolders/RecordHoldersRepository.php:73,245,660`

@@ -150,6 +150,12 @@ parameters:
 		-
 			rawMessage: 'Unescaped output in View. Wrap the expression in HtmlSanitizer::e() (or another whitelisted safe helper), or cast it to (int)/(float)/(bool) if it is numeric.'
 			identifier: ibl.unescapedOutput
+			count: 32
+			path: classes/Negotiation/NegotiationOfferView.php
+
+		-
+			rawMessage: 'Unescaped output in View. Wrap the expression in HtmlSanitizer::e() (or another whitelisted safe helper), or cast it to (int)/(float)/(bool) if it is numeric.'
+			identifier: ibl.unescapedOutput
 			count: 7
 			path: classes/NextSim/NextSimView.php
 

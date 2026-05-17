@@ -3233,106 +3233,106 @@ parameters:
 			path: tests/Negotiation/NegotiationValidatorTest.php
 
 		-
-			rawMessage: 'Method Tests\Negotiation\NegotiationViewHelperTest::getDefaultDemands() return type has no value type specified in iterable type array.'
+			rawMessage: 'Method Tests\Negotiation\NegotiationOfferViewTest::getDefaultDemands() return type has no value type specified in iterable type array.'
 			identifier: missingType.iterableValue
 			count: 1
-			path: tests/Negotiation/NegotiationViewHelperTest.php
+			path: tests/Negotiation/NegotiationOfferViewTest.php
 
 		-
-			rawMessage: 'Method Tests\Negotiation\NegotiationViewHelperTest::testDisplaysBirdRightsMessageWhenApplicable() has no return type specified.'
+			rawMessage: 'Method Tests\Negotiation\NegotiationOfferViewTest::testDisplaysBirdRightsMessageWhenApplicable() has no return type specified.'
 			identifier: missingType.return
 			count: 1
-			path: tests/Negotiation/NegotiationViewHelperTest.php
+			path: tests/Negotiation/NegotiationOfferViewTest.php
 
 		-
-			rawMessage: 'Method Tests\Negotiation\NegotiationViewHelperTest::testDisplaysCapSpaceInformation() has no return type specified.'
+			rawMessage: 'Method Tests\Negotiation\NegotiationOfferViewTest::testDisplaysCapSpaceInformation() has no return type specified.'
 			identifier: missingType.return
 			count: 1
-			path: tests/Negotiation/NegotiationViewHelperTest.php
+			path: tests/Negotiation/NegotiationOfferViewTest.php
 
 		-
-			rawMessage: 'Method Tests\Negotiation\NegotiationViewHelperTest::testDisplaysNonBirdRightsMessageWhenNotApplicable() has no return type specified.'
+			rawMessage: 'Method Tests\Negotiation\NegotiationOfferViewTest::testDisplaysNonBirdRightsMessageWhenNotApplicable() has no return type specified.'
 			identifier: missingType.return
 			count: 1
-			path: tests/Negotiation/NegotiationViewHelperTest.php
+			path: tests/Negotiation/NegotiationOfferViewTest.php
 
 		-
-			rawMessage: 'Method Tests\Negotiation\NegotiationViewHelperTest::testEscapesErrorMessage() has no return type specified.'
+			rawMessage: 'Method Tests\Negotiation\NegotiationOfferViewTest::testEscapesErrorMessage() has no return type specified.'
 			identifier: missingType.return
 			count: 1
-			path: tests/Negotiation/NegotiationViewHelperTest.php
+			path: tests/Negotiation/NegotiationOfferViewTest.php
 
 		-
-			rawMessage: 'Method Tests\Negotiation\NegotiationViewHelperTest::testEscapesPlayerNameInForm() has no return type specified.'
+			rawMessage: 'Method Tests\Negotiation\NegotiationOfferViewTest::testEscapesPlayerNameInForm() has no return type specified.'
 			identifier: missingType.return
 			count: 1
-			path: tests/Negotiation/NegotiationViewHelperTest.php
+			path: tests/Negotiation/NegotiationOfferViewTest.php
 
 		-
-			rawMessage: 'Method Tests\Negotiation\NegotiationViewHelperTest::testEscapesTeamNameInForm() has no return type specified.'
+			rawMessage: 'Method Tests\Negotiation\NegotiationOfferViewTest::testEscapesTeamNameInForm() has no return type specified.'
 			identifier: missingType.return
 			count: 1
-			path: tests/Negotiation/NegotiationViewHelperTest.php
+			path: tests/Negotiation/NegotiationOfferViewTest.php
 
 		-
-			rawMessage: 'Method Tests\Negotiation\NegotiationViewHelperTest::testFormContainsAllHiddenFields() has no return type specified.'
+			rawMessage: 'Method Tests\Negotiation\NegotiationOfferViewTest::testFormContainsAllHiddenFields() has no return type specified.'
 			identifier: missingType.return
 			count: 1
-			path: tests/Negotiation/NegotiationViewHelperTest.php
+			path: tests/Negotiation/NegotiationOfferViewTest.php
 
 		-
-			rawMessage: 'Method Tests\Negotiation\NegotiationViewHelperTest::testHeaderReturnsStaticTitle() has no return type specified.'
+			rawMessage: 'Method Tests\Negotiation\NegotiationOfferViewTest::testHeaderReturnsStaticTitle() has no return type specified.'
 			identifier: missingType.return
 			count: 1
-			path: tests/Negotiation/NegotiationViewHelperTest.php
+			path: tests/Negotiation/NegotiationOfferViewTest.php
 
 		-
-			rawMessage: 'Method Tests\Negotiation\NegotiationViewHelperTest::testRendersErrorMessage() has no return type specified.'
+			rawMessage: 'Method Tests\Negotiation\NegotiationOfferViewTest::testRendersErrorMessage() has no return type specified.'
 			identifier: missingType.return
 			count: 1
-			path: tests/Negotiation/NegotiationViewHelperTest.php
+			path: tests/Negotiation/NegotiationOfferViewTest.php
 
 		-
-			rawMessage: 'Method Tests\Negotiation\NegotiationViewHelperTest::testRendersHeader() has no return type specified.'
+			rawMessage: 'Method Tests\Negotiation\NegotiationOfferViewTest::testRendersHeader() has no return type specified.'
 			identifier: missingType.return
 			count: 1
-			path: tests/Negotiation/NegotiationViewHelperTest.php
+			path: tests/Negotiation/NegotiationOfferViewTest.php
 
 		-
-			rawMessage: 'Method Tests\Negotiation\NegotiationViewHelperTest::testRendersNegotiationFormWithAllFields() has no return type specified.'
+			rawMessage: 'Method Tests\Negotiation\NegotiationOfferViewTest::testRendersNegotiationFormWithAllFields() has no return type specified.'
 			identifier: missingType.return
 			count: 1
-			path: tests/Negotiation/NegotiationViewHelperTest.php
+			path: tests/Negotiation/NegotiationOfferViewTest.php
 
 		-
-			rawMessage: 'Method Tests\Negotiation\NegotiationViewHelperTest::testShowsEditableFieldsWhenDemandsUnderMax() has no return type specified.'
+			rawMessage: 'Method Tests\Negotiation\NegotiationOfferViewTest::testShowsEditableFieldsWhenDemandsUnderMax() has no return type specified.'
 			identifier: missingType.return
 			count: 1
-			path: tests/Negotiation/NegotiationViewHelperTest.php
+			path: tests/Negotiation/NegotiationOfferViewTest.php
 
 		-
-			rawMessage: 'Method Tests\Negotiation\NegotiationViewHelperTest::testShowsMaxSalaryFieldsWhenDemandsExceedMax() has no return type specified.'
+			rawMessage: 'Method Tests\Negotiation\NegotiationOfferViewTest::testShowsMaxSalaryFieldsWhenDemandsExceedMax() has no return type specified.'
 			identifier: missingType.return
 			count: 1
-			path: tests/Negotiation/NegotiationViewHelperTest.php
+			path: tests/Negotiation/NegotiationOfferViewTest.php
 
 		-
-			rawMessage: 'Parameter #2 $demands of static method Negotiation\NegotiationViewHelper::renderNegotiationForm() expects array{year1: float|int, year2: float|int, year3: float|int, year4: float|int, year5: float|int, year6: int, years: int, total: float|int, ...}, array{year1: 1100, year2: 1200, year3: 1300, year4: 0, year5: 0, year6: 0, years: 3, total: 3600} given.'
+			rawMessage: 'Parameter #2 $demands of static method Negotiation\NegotiationOfferView::renderNegotiationForm() expects array{year1: float|int, year2: float|int, year3: float|int, year4: float|int, year5: float|int, year6: int, years: int, total: float|int, ...}, array{year1: 1100, year2: 1200, year3: 1300, year4: 0, year5: 0, year6: 0, years: 3, total: 3600} given.'
 			identifier: argument.type
 			count: 1
-			path: tests/Negotiation/NegotiationViewHelperTest.php
+			path: tests/Negotiation/NegotiationOfferViewTest.php
 
 		-
-			rawMessage: 'Parameter #2 $demands of static method Negotiation\NegotiationViewHelper::renderNegotiationForm() expects array{year1: float|int, year2: float|int, year3: float|int, year4: float|int, year5: float|int, year6: int, years: int, total: float|int, ...}, array{year1: 500, year2: 550, year3: 600, year4: 0, year5: 0, year6: 0, years: 3, total: 1650} given.'
+			rawMessage: 'Parameter #2 $demands of static method Negotiation\NegotiationOfferView::renderNegotiationForm() expects array{year1: float|int, year2: float|int, year3: float|int, year4: float|int, year5: float|int, year6: int, years: int, total: float|int, ...}, array{year1: 500, year2: 550, year3: 600, year4: 0, year5: 0, year6: 0, years: 3, total: 1650} given.'
 			identifier: argument.type
 			count: 1
-			path: tests/Negotiation/NegotiationViewHelperTest.php
+			path: tests/Negotiation/NegotiationOfferViewTest.php
 
 		-
-			rawMessage: 'Parameter #2 $demands of static method Negotiation\NegotiationViewHelper::renderNegotiationForm() expects array{year1: float|int, year2: float|int, year3: float|int, year4: float|int, year5: float|int, year6: int, years: int, total: float|int, ...}, array{year1: 500, year2: 550, year3: 600, year4: 650, year5: 700, year6: 0, years: 5, total: 3000} given.'
+			rawMessage: 'Parameter #2 $demands of static method Negotiation\NegotiationOfferView::renderNegotiationForm() expects array{year1: float|int, year2: float|int, year3: float|int, year4: float|int, year5: float|int, year6: int, years: int, total: float|int, ...}, array{year1: 500, year2: 550, year3: 600, year4: 650, year5: 700, year6: 0, years: 5, total: 3000} given.'
 			identifier: argument.type
 			count: 1
-			path: tests/Negotiation/NegotiationViewHelperTest.php
+			path: tests/Negotiation/NegotiationOfferViewTest.php
 
 		-
 			rawMessage: 'AnonymousClass74f29325097307b95a6bfe8f2d34bc8a::__construct() does not call parent constructor from mysqli.'
@@ -6525,10 +6525,10 @@ parameters:
 			path: tests/VotingResults/VotingResultsServiceTest.php
 
 		-
-			rawMessage: 'Parameter #1 $tables of method Voting\VotingResultsTableRenderer::renderTables() expects list<array{title: string, rows: list<array{name: string, votes: int, pid: int}>}>, array{array{title: ''Test & Title'', rows: array{array{name: ''Alice <One>'', votes: 10}, array{name: ''Bob "Two"'', votes: 5}}}} given.'
+			rawMessage: 'Parameter #1 $tables of method Voting\VotingResultsView::renderTables() expects list<array{title: string, rows: list<array{name: string, votes: int, pid: int}>}>, array{array{title: ''Test & Title'', rows: array{array{name: ''Alice <One>'', votes: 10}, array{name: ''Bob "Two"'', votes: 5}}}} given.'
 			identifier: argument.type
 			count: 1
-			path: tests/VotingResults/VotingResultsTableRendererTest.php
+			path: tests/VotingResults/VotingResultsViewTest.php
 
 		-
 			rawMessage: 'Call to method PHPUnit\Framework\Assert::assertInstanceOf() with ''Waivers\\Contracts\\WaiversControllerInterface'' and Waivers\WaiversController will always evaluate to true.'
@@ -7389,43 +7389,43 @@ parameters:
 			path: tests/WideUnit/Voting/VotingWideUnitTest.php
 
 		-
-			rawMessage: 'Parameter #1 $tables of method Voting\VotingResultsTableRenderer::renderTables() expects list<array{title: string, rows: list<array{name: string, votes: int, pid: int}>}>, array{array{title: ''Category'', rows: array{array{name: ''Player'', votes: 1}}}} given.'
+			rawMessage: 'Parameter #1 $tables of method Voting\VotingResultsView::renderTables() expects list<array{title: string, rows: list<array{name: string, votes: int, pid: int}>}>, array{array{title: ''Category'', rows: array{array{name: ''Player'', votes: 1}}}} given.'
 			identifier: argument.type
 			count: 1
 			path: tests/WideUnit/Voting/VotingWideUnitTest.php
 
 		-
-			rawMessage: 'Parameter #1 $tables of method Voting\VotingResultsTableRenderer::renderTables() expects list<array{title: string, rows: list<array{name: string, votes: int, pid: int}>}>, array{array{title: ''MVP Voting'', rows: array{array{name: ''Star Player'', votes: 25}, array{name: ''Runner Up'', votes: 18}}}} given.'
+			rawMessage: 'Parameter #1 $tables of method Voting\VotingResultsView::renderTables() expects list<array{title: string, rows: list<array{name: string, votes: int, pid: int}>}>, array{array{title: ''MVP Voting'', rows: array{array{name: ''Star Player'', votes: 25}, array{name: ''Runner Up'', votes: 18}}}} given.'
 			identifier: argument.type
 			count: 1
 			path: tests/WideUnit/Voting/VotingWideUnitTest.php
 
 		-
-			rawMessage: 'Parameter #1 $tables of method Voting\VotingResultsTableRenderer::renderTables() expects list<array{title: string, rows: list<array{name: string, votes: int, pid: int}>}>, array{array{title: ''Styled Table'', rows: array{array{name: ''Row 1'', votes: 1}, array{name: ''Row 2'', votes: 2}, array{name: ''Row 3'', votes: 3}}}} given.'
+			rawMessage: 'Parameter #1 $tables of method Voting\VotingResultsView::renderTables() expects list<array{title: string, rows: list<array{name: string, votes: int, pid: int}>}>, array{array{title: ''Styled Table'', rows: array{array{name: ''Row 1'', votes: 1}, array{name: ''Row 2'', votes: 2}, array{name: ''Row 3'', votes: 3}}}} given.'
 			identifier: argument.type
 			count: 1
 			path: tests/WideUnit/Voting/VotingWideUnitTest.php
 
 		-
-			rawMessage: 'Parameter #1 $tables of method Voting\VotingResultsTableRenderer::renderTables() expects list<array{title: string, rows: list<array{name: string, votes: int, pid: int}>}>, array{array{title: ''Test Category'', rows: array{array{name: ''Player One'', votes: 10}}}} given.'
+			rawMessage: 'Parameter #1 $tables of method Voting\VotingResultsView::renderTables() expects list<array{title: string, rows: list<array{name: string, votes: int, pid: int}>}>, array{array{title: ''Test Category'', rows: array{array{name: ''Player One'', votes: 10}}}} given.'
 			identifier: argument.type
 			count: 1
 			path: tests/WideUnit/Voting/VotingWideUnitTest.php
 
 		-
-			rawMessage: 'Parameter #1 $tables of method Voting\VotingResultsTableRenderer::renderTables() expects list<array{title: string, rows: list<array{name: string, votes: int, pid: int}>}>, array{array{title: ''Test'', rows: array{array{name: ''<script>alert("xss"…'', votes: 1}}}} given.'
+			rawMessage: 'Parameter #1 $tables of method Voting\VotingResultsView::renderTables() expects list<array{title: string, rows: list<array{name: string, votes: int, pid: int}>}>, array{array{title: ''Test'', rows: array{array{name: ''<script>alert("xss"…'', votes: 1}}}} given.'
 			identifier: argument.type
 			count: 1
 			path: tests/WideUnit/Voting/VotingWideUnitTest.php
 
 		-
-			rawMessage: 'Parameter #1 $tables of method Voting\VotingResultsTableRenderer::renderTables() expects list<array{title: string, rows: list<array{name: string, votes: int, pid: int}>}>, array{array{title: ''Test'', rows: array{array{name: ''Player "The Great"…'', votes: 5}}}} given.'
+			rawMessage: 'Parameter #1 $tables of method Voting\VotingResultsView::renderTables() expects list<array{title: string, rows: list<array{name: string, votes: int, pid: int}>}>, array{array{title: ''Test'', rows: array{array{name: ''Player "The Great"…'', votes: 5}}}} given.'
 			identifier: argument.type
 			count: 1
 			path: tests/WideUnit/Voting/VotingWideUnitTest.php
 
 		-
-			rawMessage: 'Parameter #1 $tables of method Voting\VotingResultsTableRenderer::renderTables() expects list<array{title: string, rows: list<array{name: string, votes: int, pid: int}>}>, array{array{title: ''Test'', rows: array{array{name: ''Player'', votes: 1}}}} given.'
+			rawMessage: 'Parameter #1 $tables of method Voting\VotingResultsView::renderTables() expects list<array{title: string, rows: list<array{name: string, votes: int, pid: int}>}>, array{array{title: ''Test'', rows: array{array{name: ''Player'', votes: 1}}}} given.'
 			identifier: argument.type
 			count: 1
 			path: tests/WideUnit/Voting/VotingWideUnitTest.php

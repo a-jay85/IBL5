@@ -96,7 +96,7 @@ class FreeAgencyController
         }
 
         $formComponents = new FreeAgencyFormComponents($team->name, $negotiationData['player']);
-        $negotiationView = new FreeAgencyNegotiationView($formComponents);
+        $negotiationView = new FreeAgencyOfferView($formComponents);
         echo $negotiationView->render($negotiationData, $error);
 
         \PageLayout\PageLayout::footer();

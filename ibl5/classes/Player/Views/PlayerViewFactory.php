@@ -13,6 +13,7 @@ use Player\Stats\Views\PlayerOlympicAveragesView;
 use Player\Stats\Views\PlayerOlympicTotalsView;
 use Player\Stats\Views\PlayerPlayoffAveragesView;
 use Player\Stats\Views\PlayerPlayoffTotalsView;
+use Player\Stats\Views\PlayerSeasonTableRenderer;
 use Player\Stats\Views\PlayerRatingsAndSalaryView;
 use Player\Stats\Views\PlayerRegularSeasonAveragesView;
 use Player\Stats\Views\PlayerRegularSeasonTotalsView;
@@ -32,6 +33,7 @@ class PlayerViewFactory
     private PlayerRepository $repository;
     private PlayerStatsRepository $statsRepository;
     private TeamIdentityRepositoryInterface $commonRepository;
+    private PlayerSeasonTableRenderer $seasonTableRenderer;
 
     public function __construct(
         PlayerRepository $repository,
@@ -41,6 +43,7 @@ class PlayerViewFactory
         $this->repository = $repository;
         $this->statsRepository = $statsRepository;
         $this->commonRepository = $commonRepository;
+        $this->seasonTableRenderer = new PlayerSeasonTableRenderer();
     }
 
     /**
@@ -106,7 +109,7 @@ class PlayerViewFactory
      */
     public function createPlayoffTotalsView(): PlayerPlayoffTotalsView
     {
-        return new PlayerPlayoffTotalsView($this->statsRepository);
+        return new PlayerPlayoffTotalsView($this->statsRepository, $this->seasonTableRenderer);
     }
 
     /**
@@ -114,7 +117,7 @@ class PlayerViewFactory
      */
     public function createPlayoffAveragesView(): PlayerPlayoffAveragesView
     {
-        return new PlayerPlayoffAveragesView($this->statsRepository);
+        return new PlayerPlayoffAveragesView($this->statsRepository, $this->seasonTableRenderer);
     }
 
     /**
@@ -122,7 +125,7 @@ class PlayerViewFactory
      */
     public function createHeatTotalsView(): PlayerHeatTotalsView
     {
-        return new PlayerHeatTotalsView($this->statsRepository);
+        return new PlayerHeatTotalsView($this->statsRepository, $this->seasonTableRenderer);
     }
 
     /**
@@ -130,7 +133,7 @@ class PlayerViewFactory
      */
     public function createHeatAveragesView(): PlayerHeatAveragesView
     {
-        return new PlayerHeatAveragesView($this->statsRepository);
+        return new PlayerHeatAveragesView($this->statsRepository, $this->seasonTableRenderer);
     }
 
     /**
@@ -138,7 +141,7 @@ class PlayerViewFactory
      */
     public function createOlympicTotalsView(): PlayerOlympicTotalsView
     {
-        return new PlayerOlympicTotalsView($this->statsRepository);
+        return new PlayerOlympicTotalsView($this->statsRepository, $this->seasonTableRenderer);
     }
 
     /**
@@ -146,7 +149,7 @@ class PlayerViewFactory
      */
     public function createOlympicAveragesView(): PlayerOlympicAveragesView
     {
-        return new PlayerOlympicAveragesView($this->statsRepository);
+        return new PlayerOlympicAveragesView($this->statsRepository, $this->seasonTableRenderer);
     }
 
     /**

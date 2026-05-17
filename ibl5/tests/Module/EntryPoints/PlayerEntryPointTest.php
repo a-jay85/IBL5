@@ -90,6 +90,9 @@ class PlayerEntryPointTest extends ModuleEntryPointTestCase
         $player = TestDataFactory::createPlayer(['pid' => 1]);
         $this->mockDb->setMockTeamData([self::fullTeamData()]);
         $this->mockDb->setMockData([$player]);
+        // PlayerRepository::loadByID JOINs ibl_team_info; route it before the
+        // team-info special handler intercepts the response.
+        $this->mockDb->onQuery('FROM ibl_plr', [$player]);
         $this->mockDb->onQuery('ibl_settings', [['value' => 'Regular Season']]);
 
         $output = $this->runModule('Player', [], [], ['pa' => 'negotiate', 'pid' => '1']);
@@ -103,6 +106,7 @@ class PlayerEntryPointTest extends ModuleEntryPointTestCase
         $player = TestDataFactory::createPlayer(['pid' => 1]);
         $this->mockDb->setMockTeamData([self::fullTeamData()]);
         $this->mockDb->setMockData([$player]);
+        $this->mockDb->onQuery('FROM ibl_plr', [$player]);
         $this->mockDb->onQuery('ibl_settings', [['value' => 'Regular Season']]);
 
         $output = $this->runModule('Player', [], [], ['pa' => 'negotiate', 'pid' => '1']);

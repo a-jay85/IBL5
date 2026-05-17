@@ -19,9 +19,9 @@ declare(strict_types=1);
 /* And, if you use HTML code, please double check it.                     */
 /**************************************************************************/
 
-define("_ACTIVETOPICS", "Current Active Topics");
-define("_CLICK2LIST", "Click to list all articles in this topic");
-define("_TOTNEWS", "Total News");
-define("_TOTREADS", "Total Reads");
-define("_MORE", "More");
-define("_NONEWSYET", "...There aren't any news yet for this topic...");
+defined("_ACTIVETOPICS") || define("_ACTIVETOPICS", "Current Active Topics");
+defined("_CLICK2LIST") || define("_CLICK2LIST", "Click to list all articles in this topic");
+defined("_TOTNEWS") || define("_TOTNEWS", "Total News");
+defined("_TOTREADS") || define("_TOTREADS", "Total Reads");
+defined("_MORE") || define("_MORE", "More");
+defined("_NONEWSYET") || define("_NONEWSYET", "...There aren't any news yet for this topic...");

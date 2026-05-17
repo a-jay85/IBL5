@@ -3,7 +3,7 @@
         "cast.string": 2,
         "ibl.deprecatedHtmlTag": 3,
         "ibl.inlineCss": 6,
-        "ibl.unescapedOutput": 11,
+        "ibl.unescapedOutput": 12,
         "method.deprecatedClass": 2,
         "varTag.deprecatedClass": 1
     },

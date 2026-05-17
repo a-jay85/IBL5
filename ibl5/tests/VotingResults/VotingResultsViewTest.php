@@ -6,13 +6,13 @@ namespace Tests\VotingResults;
 require_once __DIR__ . '/../bootstrap.php';
 
 use PHPUnit\Framework\TestCase;
-use Voting\VotingResultsTableRenderer;
+use Voting\VotingResultsView;
 
-final class VotingResultsTableRendererTest extends TestCase
+final class VotingResultsViewTest extends TestCase
 {
     public function testRenderTablesEscapesContentAndPreservesStructure(): void
     {
-        $renderer = new VotingResultsTableRenderer();
+        $renderer = new VotingResultsView();
 
         $html = $renderer->renderTables([
             [
@@ -45,7 +45,7 @@ final class VotingResultsTableRendererTest extends TestCase
 
     public function testRenderTablesOutputsEmptyTableWhenNoRows(): void
     {
-        $renderer = new VotingResultsTableRenderer();
+        $renderer = new VotingResultsView();
 
         $html = $renderer->renderTables([
             [

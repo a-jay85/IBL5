@@ -58,7 +58,7 @@ class PlayerOlympicsStatsView implements PlayerOlympicsStatsViewInterface
     </tr>
         <?php
         foreach ($olympicsStats as $stats) {
-            /** @var array{team: string, year: int, games: int, minutes: int, fgm: int, fga: int, ftm: int, fta: int, tgm: int, tga: int, orb: int, reb: int, ast: int, stl: int, tvr: int, blk: int, pf: int, pts: int} $stats */
+            /** @var array{year: int, pos: string, pid: int, name: string, team: string, games: int, minutes: int, fgm: int, fga: int, ftm: int, fta: int, tgm: int, tga: int, orb: int, reb: int, ast: int, stl: int, tvr: int, blk: int, pf: int, pts: int} $stats */
             $drb = $stats['reb'] - $stats['orb'];
             ?>
     <tr>
@@ -123,7 +123,7 @@ class PlayerOlympicsStatsView implements PlayerOlympicsStatsViewInterface
     </tr>
         <?php
         foreach ($olympicsStats as $stats) {
-            /** @var array{team: string, year: int, games: int, minutes: int, fgm: int, fga: int, ftm: int, fta: int, tgm: int, tga: int, orb: int, reb: int, ast: int, stl: int, tvr: int, blk: int, pf: int, pts: int} $stats */
+            /** @var array{year: int, pos: string, pid: int, name: string, team: string, games: int, minutes: int, fgm: int, fga: int, ftm: int, fta: int, tgm: int, tga: int, orb: int, reb: int, ast: int, stl: int, tvr: int, blk: int, pf: int, pts: int} $stats */
             $games = $stats['games'];
             if ($games === 0) {
                 continue;

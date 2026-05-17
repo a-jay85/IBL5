@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Tests\Module\EntryPoints;
 
+use Tests\WideUnit\Mocks\TestDataFactory;
+
 class PlayerDatabaseEntryPointTest extends ModuleEntryPointTestCase
 {
     public function testEmptyPostRendersDefaultSearchForm(): void
@@ -18,7 +20,7 @@ class PlayerDatabaseEntryPointTest extends ModuleEntryPointTestCase
     public function testPostWithFilterRunsSearch(): void
     {
         $this->mockDb->setMockData([
-            ['pid' => 1, 'name' => 'Test Player', 'pos' => 'G', 'teamid' => 1],
+            TestDataFactory::createPlayer(['pid' => 1, 'name' => 'Test Player', 'pos' => 'G', 'teamid' => 1]),
         ]);
         $output = $this->runModule('PlayerDatabase', [], ['search_name' => 'Test']);
 

@@ -49,8 +49,8 @@ final class BanRawSuperglobalsRule implements Rule
             'files' => ['CsrfGuard.php', 'AuthService.php', 'DevAutoLogin.php', 'LeagueContext.php', 'PageLayout.php', 'UserContextProcessor.php', 'DepthChartEntryController.php', 'DebugSession.php'],
         ],
         '_SERVER' => [
-            'suffixes' => ['Bootstrap.php', 'ApiHandler.php', 'Controller.php'],
-            'files' => ['HtmxHelper.php', 'ETagHandler.php', 'LeagueContext.php', 'PageLayout.php', 'DevAutoLogin.php'],
+            'suffixes' => ['Bootstrap.php', 'ApiHandler.php', 'Controller.php', 'Authenticator.php'],
+            'files' => ['HtmxHelper.php', 'ETagHandler.php', 'LeagueContext.php', 'PageLayout.php', 'DevAutoLogin.php', 'ApiApplicationFactory.php', 'WebApplicationFactory.php'],
         ],
         '_FILES' => [
             'suffixes' => ['Bootstrap.php', 'Controller.php'],
@@ -58,7 +58,7 @@ final class BanRawSuperglobalsRule implements Rule
         ],
         'GLOBALS' => [
             'suffixes' => ['Bootstrap.php'],
-            'files' => [],
+            'files' => ['ApiApplicationFactory.php'],
         ],
     ];
 

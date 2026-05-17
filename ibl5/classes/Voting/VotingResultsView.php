@@ -6,21 +6,21 @@ namespace Voting;
 
 use Player\PlayerImageHelper;
 use Security\HtmlSanitizer;
-use Voting\Contracts\VotingResultsTableRendererInterface;
+use Voting\Contracts\VotingResultsViewInterface;
 use Voting\Contracts\VotingResultsServiceInterface;
 
 /**
  * @phpstan-import-type VoteRow from VotingResultsServiceInterface
  * @phpstan-import-type VoteTable from VotingResultsServiceInterface
  *
- * @see VotingResultsTableRendererInterface
+ * @see VotingResultsViewInterface
  */
-class VotingResultsTableRenderer implements VotingResultsTableRendererInterface
+class VotingResultsView implements VotingResultsViewInterface
 {
     private const METRIC_LABEL = 'Votes';
 
     /**
-     * @see VotingResultsTableRendererInterface::renderTables()
+     * @see VotingResultsViewInterface::renderTables()
      *
      * @param list<VoteTable> $tables
      */

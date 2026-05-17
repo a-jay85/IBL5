@@ -14,7 +14,7 @@ class VotingResultsController implements VotingResultsControllerInterface
 {
     public function __construct(
         private readonly VotingResultsService $service,
-        private readonly VotingResultsTableRenderer $renderer,
+        private readonly VotingResultsView $renderer,
         private readonly Season $season
     ) {
     }

@@ -75,4 +75,37 @@ final class PageLayoutHeaderBeforeCookieRuleTest extends RuleTestCase
             [],
         );
     }
+
+    public function testZeroFloorFileEmitsNonIgnorableError(): void
+    {
+        $this->analyse(
+            [__DIR__ . '/Fixtures/classes/FreeAgency/FreeAgencyController.php'],
+            [
+                [
+                    '$cookie[...] is read before PageLayout::header() in the same '
+                    . 'method. PageLayout::header() populates $cookie with auth and '
+                    . 'CSRF state — call it first, otherwise you will read stale or '
+                    . 'missing values (see CsrfGuard MAX_TOKENS incident).',
+                    10,
+                    'Zero-floor file — baseline suppression is disabled.',
+                ],
+            ],
+        );
+    }
+
+    public function testNonZeroFloorFileEmitsIgnorableError(): void
+    {
+        $this->analyse(
+            [__DIR__ . '/Fixtures/classes/CookieBeforeHeader.php'],
+            [
+                [
+                    '$cookie[...] is read before PageLayout::header() in the same '
+                    . 'method. PageLayout::header() populates $cookie with auth and '
+                    . 'CSRF state — call it first, otherwise you will read stale or '
+                    . 'missing values (see CsrfGuard MAX_TOKENS incident).',
+                    10,
+                ],
+            ],
+        );
+    }
 }

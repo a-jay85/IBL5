@@ -13,7 +13,7 @@ use Team\Team;
  * @phpstan-type CapMetrics array{totalSalaries: array<int, int>, softCapSpace: array<int, int>, hardCapSpace: array<int, int>, rosterSpots: array<int, int>}
  * @phpstan-type NegotiationData array{player: Player, capMetrics: CapMetrics, demands: array<string, int>, existingOffer: array<string, int>, amendedCapSpace: int, hasExistingOffer: bool, veteranMinimum: int, maxContract: int, team: Team}
  */
-class FreeAgencyNegotiationView
+class FreeAgencyOfferView
 {
     private FreeAgencyFormComponents $formComponents;
 

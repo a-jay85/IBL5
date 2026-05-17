@@ -20,15 +20,7 @@ class RookieOptionFormView implements RookieOptionFormViewInterface
     public function renderForm(Player $player, string $teamName, int $rookieOptionValue, ?string $error = null, ?string $result = null, ?string $from = null): string
     {
         $playerID = $player->playerID ?? 0;
-        $playerPosition = HtmlSanitizer::safeHtmlOutput($player->position ?? '');
-        $playerName = HtmlSanitizer::safeHtmlOutput($player->name ?? '');
-        $teamNameEscaped = HtmlSanitizer::safeHtmlOutput($teamName);
         $playerImageUrl = PlayerImageHelper::getImageUrl($playerID);
-        if ($from !== null) {
-            $fromEscaped = HtmlSanitizer::safeHtmlOutput($from);
-        } else {
-            $fromEscaped = '';
-        }
 
         ob_start();
         ?>
@@ -45,13 +37,13 @@ class RookieOptionFormView implements RookieOptionFormViewInterface
 
 <div class="ibl-card">
     <div class="ibl-card__header">
-        <h2 class="ibl-card__title"><?= $playerPosition ?> <?= $playerName ?> - Rookie Option</h2>
+        <h2 class="ibl-card__title"><?= HtmlSanitizer::e($player->position ?? '') ?> <?= HtmlSanitizer::e($player->name ?? '') ?> - Rookie Option</h2>
     </div>
     <div class="ibl-card__body text-center">
-        <img src="<?= HtmlSanitizer::e($playerImageUrl) ?>" alt="<?= $playerName ?>" class="rookie-option-img">
+        <img src="<?= HtmlSanitizer::e($playerImageUrl) ?>" alt="<?= HtmlSanitizer::e($player->name ?? '') ?>" class="rookie-option-img">
         <div>
             <span class="ibl-label">Rookie Option Value:</span>
-            <strong><?= $rookieOptionValue ?></strong>
+            <strong><?= (int) $rookieOptionValue ?></strong>
         </div>
     </div>
 </div>
@@ -61,10 +53,10 @@ class RookieOptionFormView implements RookieOptionFormViewInterface
 </div>
 
 <form name="RookieExtend" method="post" action="modules.php?name=Player&amp;pa=processrookieoption" class="text-center">
-    <input type="hidden" name="teamname" value="<?= $teamNameEscaped ?>">
-    <input type="hidden" name="playerID" value="<?= $playerID ?>">
-    <input type="hidden" name="rookieOptionValue" value="<?= $rookieOptionValue ?>">
-    <input type="hidden" name="from" value="<?= $fromEscaped ?>">
+    <input type="hidden" name="teamname" value="<?= HtmlSanitizer::e($teamName) ?>">
+    <input type="hidden" name="playerID" value="<?= (int) $playerID ?>">
+    <input type="hidden" name="rookieOptionValue" value="<?= (int) $rookieOptionValue ?>">
+    <input type="hidden" name="from" value="<?= HtmlSanitizer::e($from ?? '') ?>">
     <button type="submit" class="ibl-btn ibl-btn--danger">Exercise Rookie Option</button>
 </form>
 

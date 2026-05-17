@@ -23,15 +23,6 @@ class BoxscoreView
      */
     public function renderParseLog(array $result): string
     {
-        /** @var int $gamesInserted */
-        $gamesInserted = (int) $result['gamesInserted'];
-        /** @var int $gamesUpdated */
-        $gamesUpdated = (int) $result['gamesUpdated'];
-        /** @var int $gamesSkipped */
-        $gamesSkipped = (int) $result['gamesSkipped'];
-        /** @var int $linesProcessed */
-        $linesProcessed = (int) $result['linesProcessed'];
-
         ob_start();
         ?>
 <div class="ibl-card sco-parse-result">
@@ -40,22 +31,20 @@ class BoxscoreView
     </div>
     <div class="ibl-card__body">
         <div class="sco-summary">
-            <span class="ibl-badge ibl-badge--success"><?= $gamesInserted ?> Inserted</span>
-            <span class="ibl-badge ibl-badge--info"><?= $gamesUpdated ?> Updated</span>
-            <span class="ibl-badge ibl-badge--warning"><?= $gamesSkipped ?> Skipped</span>
-            <span class="sco-summary__lines"><?= $linesProcessed ?> lines processed</span>
+            <span class="ibl-badge ibl-badge--success"><?= (int) $result['gamesInserted'] ?> Inserted</span>
+            <span class="ibl-badge ibl-badge--info"><?= (int) $result['gamesUpdated'] ?> Updated</span>
+            <span class="ibl-badge ibl-badge--warning"><?= (int) $result['gamesSkipped'] ?> Skipped</span>
+            <span class="sco-summary__lines"><?= (int) $result['linesProcessed'] ?> lines processed</span>
         </div>
         <?php if ($result['messages'] !== []): ?>
         <div class="sco-log">
             <?php foreach ($result['messages'] as $message): ?>
-            <?php $safeMessage = HtmlSanitizer::safeHtmlOutput($message); ?>
-            <p class="sco-log__message"><?= $safeMessage ?></p>
+            <p class="sco-log__message"><?= HtmlSanitizer::safeHtmlOutput($message) ?></p>
             <?php endforeach; ?>
         </div>
         <?php endif; ?>
         <?php if (isset($result['error']) && $result['error'] !== ''): ?>
-        <?php $safeError = HtmlSanitizer::safeHtmlOutput($result['error']); ?>
-        <div class="ibl-alert ibl-alert--error"><strong>Error:</strong> <?= $safeError ?></div>
+        <div class="ibl-alert ibl-alert--error"><strong>Error:</strong> <?= HtmlSanitizer::safeHtmlOutput($result['error']) ?></div>
         <?php endif; ?>
     </div>
 </div>
@@ -82,8 +71,7 @@ class BoxscoreView
     <div class="ibl-card__body">
         <div class="sco-log">
             <?php foreach ($result['messages'] as $message): ?>
-            <?php $safeMessage = HtmlSanitizer::safeHtmlOutput($message); ?>
-            <p class="sco-log__message"><?= $safeMessage ?></p>
+            <p class="sco-log__message"><?= HtmlSanitizer::safeHtmlOutput($message) ?></p>
             <?php endforeach; ?>
         </div>
     </div>
@@ -118,13 +106,11 @@ class BoxscoreView
         <div class="all-star-rename" data-record-id="<?= (int) $entry['id'] ?>">
             <h3 class="all-star-rename__heading">
                 <?= (int) $entry['seasonYear'] ?> All-Star Game &mdash;
-                <?php $safeLabel = HtmlSanitizer::safeHtmlOutput($entry['teamLabel']); ?>
-                <?= $safeLabel ?>
+                <?= HtmlSanitizer::safeHtmlOutput($entry['teamLabel']) ?>
             </h3>
             <div class="all-star-rename__players">
                 <?php foreach ($entry['players'] as $player): ?>
-                <?php $safeName = HtmlSanitizer::safeHtmlOutput($player); ?>
-                <span class="all-star-rename__chip"><?= $safeName ?></span>
+                <span class="all-star-rename__chip"><?= HtmlSanitizer::safeHtmlOutput($player) ?></span>
                 <?php endforeach; ?>
             </div>
             <div class="all-star-rename__form">

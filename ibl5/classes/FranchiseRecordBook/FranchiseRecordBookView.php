@@ -136,12 +136,8 @@ class FranchiseRecordBookView
         onchange="if(window.htmx)return;this.form.requestSubmit()">
         <option value="0"<?= $selectedId === 0 ? ' selected' : '' ?>>League-Wide</option>
         <?php foreach ($teams as $team): ?>
-        <?php
-            /** @var string $safeTeamName */
-            $safeTeamName = HtmlSanitizer::safeHtmlOutput($team['team_name']);
-        ?>
         <option value="<?= (int) $team['teamid'] ?>"<?= (int) $team['teamid'] === $selectedId ? ' selected' : '' ?>>
-            <?= $safeTeamName ?>
+            <?= HtmlSanitizer::e($team['team_name']) ?>
         </option>
         <?php endforeach; ?>
     </select>

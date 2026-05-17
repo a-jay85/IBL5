@@ -800,6 +800,7 @@ Effort scale:
 **Suggested direction:** Wrap echoes in `HtmlSanitizer::e()`; cast numerics to `(int)/(float)` for zero-overhead path.
 **Est. effort:** M
 **Risk if untouched:** Stored XSS via player/team text fields.
+**Status:** Completed (2026-05-17) — 71 entries cleared; file in zero-floor.
 
 ### 5.6 CareerLeaderboardsView — 44 `ibl.unescapedOutput`
 **Location:** `ibl5/classes/CareerLeaderboards/CareerLeaderboardsView.php`
@@ -1608,10 +1609,10 @@ Effort scale:
 **Est. effort:** S
 **Risk if untouched:** Nested output buffer corruption.
 
-### 10.16 `ibl.unescapedOutput` Baseline: 17 Entries Across 20 Views
-**Location:** `BoxscoreView`, `CareerLeaderboardsView`, `DepthChartEntryView` (2), `FranchiseRecordBookView`, `LeagueControlPanelView`, navigation views, `NextSimView`, `RookieOptionFormView`, `SeasonLeaderboardsView`, `StandingsView`, `TeamView`, `TransactionHistoryView`, `YourAccountView`
-**Problem:** Zero-floor only enforces 4 files. 17 grandfathered XSS vectors in high-traffic Views.
-**Suggested direction:** Burn-down per sprint; expand `$zeroFloorFiles` array; or add `RequireViewOutputFloor` for zero-floored files.
+### 10.16 `ibl.unescapedOutput` Baseline: 11 Entries Remaining
+**Location:** `BoxscoreView`, `CareerLeaderboardsView`, `DepthChartEntryView` (2), `FranchiseRecordBookView`, `LeagueControlPanelView`, `NextSimView`, `RookieOptionFormView`, `StandingsView`, `TeamView`, `TransactionHistoryView`, `YourAccountView`
+**Problem:** Zero-floor enforces 6 files (Navigation views + SeasonLeaderboardsView). 11 grandfathered entries remain.
+**Suggested direction:** Burn-down per sprint; expand `$zeroFloorFiles` array. Plan A cleared Navigation (58 entries); Plan B cleared SeasonLeaderboards (71 entries). CareerLeaderboards + remainder in Plan C.
 **Est. effort:** M
 **Risk if untouched:** Each entry is a potential live XSS; rate never decreases without pressure.
 

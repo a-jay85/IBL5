@@ -32,6 +32,8 @@ class SeasonLeaderboardsView implements SeasonLeaderboardsViewInterface
         'MIN' => 'mpg',
     ];
 
+    private const SORTED_ATTR = ' class="sorted-col"';
+
     public function __construct(SeasonLeaderboardsService $service)
     {
         $this->service = $service;
@@ -40,11 +42,6 @@ class SeasonLeaderboardsView implements SeasonLeaderboardsViewInterface
     public function setSortBy(string $sortBy): void
     {
         $this->activeSortColumn = self::SORT_TO_COLUMN[$sortBy] ?? 'ppg';
-    }
-
-    private function sortAttr(string $statKey): string
-    {
-        return $this->activeSortColumn === $statKey ? ' class="sorted-col"' : '';
     }
 
     /**
@@ -60,6 +57,7 @@ class SeasonLeaderboardsView implements SeasonLeaderboardsViewInterface
         $selectedYear = (string) ($currentFilters['year'] ?? '');
         $selectedSort = (string) ($currentFilters['sortby'] ?? 'PPG');
         $limitValue = (string) ($currentFilters['limit'] ?? '');
+        $sortOptions = $this->service->getSortOptions();
 
         ob_start();
         ?>
@@ -68,19 +66,27 @@ class SeasonLeaderboardsView implements SeasonLeaderboardsViewInterface
         <div class="ibl-filter-form__group">
             <label for="sl-team" class="ibl-filter-form__label">Team:</label>
             <select id="sl-team" name="team">
-                <?php echo $this->renderTeamOptions($teams, $selectedTeam); ?>
+                <option value="0">All</option>
+                <?php foreach ($teams as $team): ?>
+                <option value="<?= (int)$team['teamid'] ?>"<?= ($selectedTeam === (int)$team['teamid']) ? ' selected' : '' ?>><?= HtmlSanitizer::e($team['Team']) ?></option>
+                <?php endforeach; ?>
             </select>
         </div>
         <div class="ibl-filter-form__group">
             <label for="sl-year" class="ibl-filter-form__label">Year:</label>
             <select id="sl-year" name="year">
-                <?php echo $this->renderYearOptions($years, $selectedYear); ?>
+                <option value="">All</option>
+                <?php foreach ($years as $year): ?>
+                <option value="<?= (int)$year ?>"<?= ($selectedYear === (string)$year) ? ' selected' : '' ?>><?= (int)$year ?></option>
+                <?php endforeach; ?>
             </select>
         </div>
         <div class="ibl-filter-form__group">
             <label for="sl-sortby" class="ibl-filter-form__label">Sort By:</label>
             <select id="sl-sortby" name="sortby">
-                <?php echo $this->renderSortOptions($selectedSort); ?>
+                <?php foreach ($sortOptions as $key => $label): ?>
+                <option value="<?= HtmlSanitizer::e($key) ?>"<?= ($key === $selectedSort) ? ' selected' : '' ?>><?= HtmlSanitizer::e($label) ?></option>
+                <?php endforeach; ?>
             </select>
         </div>
         <div class="ibl-filter-form__group">
@@ -93,59 +99,6 @@ class SeasonLeaderboardsView implements SeasonLeaderboardsViewInterface
 </form>
         <?php
         return (string) ob_get_clean();
-    }
-
-    /**
-     * Render team dropdown options
-     *
-     * @param list<TeamRow> $teams Array of team data
-     * @param int $selectedTeam Selected team ID
-     * @return string HTML options
-     */
-    private function renderTeamOptions(array $teams, int $selectedTeam): string
-    {
-        $html = '<option value="0">All</option>' . "\n";
-        foreach ($teams as $team) {
-            $teamid = $team['teamid'];
-            $teamName = $team['Team'];
-            $selected = ($selectedTeam === $teamid) ? ' selected' : '';
-            $html .= '<option value="' . $teamid . '"' . $selected . '>' . HtmlSanitizer::e($teamName) . '</option>' . "\n";
-        }
-        return $html;
-    }
-
-    /**
-     * Render year dropdown options
-     *
-     * @param list<int> $years Available years
-     * @param string $selectedYear Selected year
-     * @return string HTML options
-     */
-    private function renderYearOptions(array $years, string $selectedYear): string
-    {
-        $html = '<option value="">All</option>' . "\n";
-        foreach ($years as $year) {
-            $selected = ($selectedYear === (string) $year) ? ' selected' : '';
-            $html .= '<option value="' . $year . '"' . $selected . '>' . $year . '</option>' . "\n";
-        }
-        return $html;
-    }
-
-    /**
-     * Render sort by dropdown options
-     *
-     * @param string $selectedSort Selected sort option
-     * @return string HTML options
-     */
-    private function renderSortOptions(string $selectedSort): string
-    {
-        $html = '';
-        $sortOptions = $this->service->getSortOptions();
-        foreach ($sortOptions as $key => $label) {
-            $selected = ($key === $selectedSort) ? ' selected' : '';
-            $html .= '<option value="' . HtmlSanitizer::e($key) . '"' . $selected . '>' . HtmlSanitizer::e($label) . '</option>' . "\n";
-        }
-        return $html;
     }
 
     /**
@@ -163,27 +116,27 @@ class SeasonLeaderboardsView implements SeasonLeaderboardsViewInterface
             <th>Year</th>
             <th class="sticky-col-2">Name</th>
             <th>Team</th>
-            <th<?= $this->sortAttr('games') ?>>G</th>
-            <th<?= $this->sortAttr('mpg') ?>>Min</th>
-            <th<?= $this->sortAttr('fgmpg') ?>>fgm</th>
-            <th<?= $this->sortAttr('fgapg') ?>>fga</th>
-            <th<?= $this->sortAttr('fgp') ?>>fg%</th>
-            <th<?= $this->sortAttr('ftmpg') ?>>ftm</th>
-            <th<?= $this->sortAttr('ftapg') ?>>fta</th>
-            <th<?= $this->sortAttr('ftp') ?>>ft%</th>
-            <th<?= $this->sortAttr('tgmpg') ?>>tgm</th>
-            <th<?= $this->sortAttr('tgapg') ?>>tga</th>
-            <th<?= $this->sortAttr('tgp') ?>>tg%</th>
-            <th<?= $this->sortAttr('orbpg') ?>>orb</th>
-            <th<?= $this->sortAttr('drebpg') ?>>dreb</th>
-            <th<?= $this->sortAttr('rpg') ?>>reb</th>
-            <th<?= $this->sortAttr('apg') ?>>ast</th>
-            <th<?= $this->sortAttr('spg') ?>>stl</th>
-            <th<?= $this->sortAttr('tpg') ?>>to</th>
-            <th<?= $this->sortAttr('bpg') ?>>blk</th>
-            <th<?= $this->sortAttr('fpg') ?>>pf</th>
-            <th<?= $this->sortAttr('ppg') ?>>ppg</th>
-            <th<?= $this->sortAttr('qa') ?>>qa</th>
+            <th<?= $this->activeSortColumn === 'games' ? self::SORTED_ATTR : '' ?>>G</th>
+            <th<?= $this->activeSortColumn === 'mpg' ? self::SORTED_ATTR : '' ?>>Min</th>
+            <th<?= $this->activeSortColumn === 'fgmpg' ? self::SORTED_ATTR : '' ?>>fgm</th>
+            <th<?= $this->activeSortColumn === 'fgapg' ? self::SORTED_ATTR : '' ?>>fga</th>
+            <th<?= $this->activeSortColumn === 'fgp' ? self::SORTED_ATTR : '' ?>>fg%</th>
+            <th<?= $this->activeSortColumn === 'ftmpg' ? self::SORTED_ATTR : '' ?>>ftm</th>
+            <th<?= $this->activeSortColumn === 'ftapg' ? self::SORTED_ATTR : '' ?>>fta</th>
+            <th<?= $this->activeSortColumn === 'ftp' ? self::SORTED_ATTR : '' ?>>ft%</th>
+            <th<?= $this->activeSortColumn === 'tgmpg' ? self::SORTED_ATTR : '' ?>>tgm</th>
+            <th<?= $this->activeSortColumn === 'tgapg' ? self::SORTED_ATTR : '' ?>>tga</th>
+            <th<?= $this->activeSortColumn === 'tgp' ? self::SORTED_ATTR : '' ?>>tg%</th>
+            <th<?= $this->activeSortColumn === 'orbpg' ? self::SORTED_ATTR : '' ?>>orb</th>
+            <th<?= $this->activeSortColumn === 'drebpg' ? self::SORTED_ATTR : '' ?>>dreb</th>
+            <th<?= $this->activeSortColumn === 'rpg' ? self::SORTED_ATTR : '' ?>>reb</th>
+            <th<?= $this->activeSortColumn === 'apg' ? self::SORTED_ATTR : '' ?>>ast</th>
+            <th<?= $this->activeSortColumn === 'spg' ? self::SORTED_ATTR : '' ?>>stl</th>
+            <th<?= $this->activeSortColumn === 'tpg' ? self::SORTED_ATTR : '' ?>>to</th>
+            <th<?= $this->activeSortColumn === 'bpg' ? self::SORTED_ATTR : '' ?>>blk</th>
+            <th<?= $this->activeSortColumn === 'fpg' ? self::SORTED_ATTR : '' ?>>pf</th>
+            <th<?= $this->activeSortColumn === 'ppg' ? self::SORTED_ATTR : '' ?>>ppg</th>
+            <th<?= $this->activeSortColumn === 'qa' ? self::SORTED_ATTR : '' ?>>qa</th>
         </tr>
     </thead>
     <tbody>
@@ -198,38 +151,34 @@ class SeasonLeaderboardsView implements SeasonLeaderboardsViewInterface
      */
     public function renderPlayerRow(array $stats, int $rank): string
     {
-        $teamId = $stats['teamid'];
-        $teamCell = TeamCellHelper::renderTeamCellOrFreeAgent($teamId, $stats['teamname'], $stats['color1'], $stats['color2']);
-        $playerCell = PlayerImageHelper::renderFlexiblePlayerCell($stats['pid'], $stats['name'], 'sticky-col-2');
-
         ob_start();
         ?>
-<tr data-team-id="<?= $teamId ?>">
-    <td class="rank-cell sticky-col-1"><?= $rank ?>.</td>
-    <td><?= $stats['year'] ?></td>
-    <?= $playerCell ?>
-    <?= $teamCell ?>
-    <td<?= $this->sortAttr('games') ?>><?= $stats['games'] ?></td>
-    <td<?= $this->sortAttr('mpg') ?>><?= $stats['mpg'] ?></td>
-    <td<?= $this->sortAttr('fgmpg') ?>><?= $stats['fgmpg'] ?></td>
-    <td<?= $this->sortAttr('fgapg') ?>><?= $stats['fgapg'] ?></td>
-    <td<?= $this->sortAttr('fgp') ?>><?= $stats['fgp'] ?></td>
-    <td<?= $this->sortAttr('ftmpg') ?>><?= $stats['ftmpg'] ?></td>
-    <td<?= $this->sortAttr('ftapg') ?>><?= $stats['ftapg'] ?></td>
-    <td<?= $this->sortAttr('ftp') ?>><?= $stats['ftp'] ?></td>
-    <td<?= $this->sortAttr('tgmpg') ?>><?= $stats['tgmpg'] ?></td>
-    <td<?= $this->sortAttr('tgapg') ?>><?= $stats['tgapg'] ?></td>
-    <td<?= $this->sortAttr('tgp') ?>><?= $stats['tgp'] ?></td>
-    <td<?= $this->sortAttr('orbpg') ?>><?= $stats['orbpg'] ?></td>
-    <td<?= $this->sortAttr('drebpg') ?>><?= $stats['drebpg'] ?></td>
-    <td<?= $this->sortAttr('rpg') ?>><?= $stats['rpg'] ?></td>
-    <td<?= $this->sortAttr('apg') ?>><?= $stats['apg'] ?></td>
-    <td<?= $this->sortAttr('spg') ?>><?= $stats['spg'] ?></td>
-    <td<?= $this->sortAttr('tpg') ?>><?= $stats['tpg'] ?></td>
-    <td<?= $this->sortAttr('bpg') ?>><?= $stats['bpg'] ?></td>
-    <td<?= $this->sortAttr('fpg') ?>><?= $stats['fpg'] ?></td>
-    <td<?= $this->sortAttr('ppg') ?>><?= $stats['ppg'] ?></td>
-    <td<?= $this->sortAttr('qa') ?>><?= $stats['qa'] ?></td>
+<tr data-team-id="<?= (int)$stats['teamid'] ?>">
+    <td class="rank-cell sticky-col-1"><?= HtmlSanitizer::e($rank) ?>.</td>
+    <td><?= (int)$stats['year'] ?></td>
+    <?= PlayerImageHelper::renderFlexiblePlayerCell((int)$stats['pid'], $stats['name'], 'sticky-col-2') ?>
+    <?= TeamCellHelper::renderTeamCellOrFreeAgent((int)$stats['teamid'], $stats['teamname'], $stats['color1'], $stats['color2']) ?>
+    <td<?= $this->activeSortColumn === 'games' ? self::SORTED_ATTR : '' ?>><?= (int)$stats['games'] ?></td>
+    <td<?= $this->activeSortColumn === 'mpg' ? self::SORTED_ATTR : '' ?>><?= HtmlSanitizer::e($stats['mpg']) ?></td>
+    <td<?= $this->activeSortColumn === 'fgmpg' ? self::SORTED_ATTR : '' ?>><?= HtmlSanitizer::e($stats['fgmpg']) ?></td>
+    <td<?= $this->activeSortColumn === 'fgapg' ? self::SORTED_ATTR : '' ?>><?= HtmlSanitizer::e($stats['fgapg']) ?></td>
+    <td<?= $this->activeSortColumn === 'fgp' ? self::SORTED_ATTR : '' ?>><?= HtmlSanitizer::e($stats['fgp']) ?></td>
+    <td<?= $this->activeSortColumn === 'ftmpg' ? self::SORTED_ATTR : '' ?>><?= HtmlSanitizer::e($stats['ftmpg']) ?></td>
+    <td<?= $this->activeSortColumn === 'ftapg' ? self::SORTED_ATTR : '' ?>><?= HtmlSanitizer::e($stats['ftapg']) ?></td>
+    <td<?= $this->activeSortColumn === 'ftp' ? self::SORTED_ATTR : '' ?>><?= HtmlSanitizer::e($stats['ftp']) ?></td>
+    <td<?= $this->activeSortColumn === 'tgmpg' ? self::SORTED_ATTR : '' ?>><?= HtmlSanitizer::e($stats['tgmpg']) ?></td>
+    <td<?= $this->activeSortColumn === 'tgapg' ? self::SORTED_ATTR : '' ?>><?= HtmlSanitizer::e($stats['tgapg']) ?></td>
+    <td<?= $this->activeSortColumn === 'tgp' ? self::SORTED_ATTR : '' ?>><?= HtmlSanitizer::e($stats['tgp']) ?></td>
+    <td<?= $this->activeSortColumn === 'orbpg' ? self::SORTED_ATTR : '' ?>><?= HtmlSanitizer::e($stats['orbpg']) ?></td>
+    <td<?= $this->activeSortColumn === 'drebpg' ? self::SORTED_ATTR : '' ?>><?= HtmlSanitizer::e($stats['drebpg']) ?></td>
+    <td<?= $this->activeSortColumn === 'rpg' ? self::SORTED_ATTR : '' ?>><?= HtmlSanitizer::e($stats['rpg']) ?></td>
+    <td<?= $this->activeSortColumn === 'apg' ? self::SORTED_ATTR : '' ?>><?= HtmlSanitizer::e($stats['apg']) ?></td>
+    <td<?= $this->activeSortColumn === 'spg' ? self::SORTED_ATTR : '' ?>><?= HtmlSanitizer::e($stats['spg']) ?></td>
+    <td<?= $this->activeSortColumn === 'tpg' ? self::SORTED_ATTR : '' ?>><?= HtmlSanitizer::e($stats['tpg']) ?></td>
+    <td<?= $this->activeSortColumn === 'bpg' ? self::SORTED_ATTR : '' ?>><?= HtmlSanitizer::e($stats['bpg']) ?></td>
+    <td<?= $this->activeSortColumn === 'fpg' ? self::SORTED_ATTR : '' ?>><?= HtmlSanitizer::e($stats['fpg']) ?></td>
+    <td<?= $this->activeSortColumn === 'ppg' ? self::SORTED_ATTR : '' ?>><?= HtmlSanitizer::e($stats['ppg']) ?></td>
+    <td<?= $this->activeSortColumn === 'qa' ? self::SORTED_ATTR : '' ?>><?= HtmlSanitizer::e($stats['qa']) ?></td>
 </tr>
         <?php
         return (string) ob_get_clean();
@@ -240,6 +189,6 @@ class SeasonLeaderboardsView implements SeasonLeaderboardsViewInterface
      */
     public function renderTableFooter(): string
     {
-        return '</tbody></table></div>'; // Close table and scroll container
+        return '</tbody></table></div>';
     }
 }

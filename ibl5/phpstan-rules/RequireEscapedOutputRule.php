@@ -115,6 +115,7 @@ final class RequireEscapedOutputRule implements Rule
         'Navigation/Views/LoginFormView.php',
         'Navigation/Views/MobileNavView.php',
         'Navigation/Views/TeamsDropdownView.php',
+        'SeasonLeaderboards/SeasonLeaderboardsView.php',
     ];
 
     public function getNodeType(): string

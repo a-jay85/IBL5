@@ -12,6 +12,7 @@ if (stripos($_SERVER['PHP_SELF'], "modules.php") === false) {
 }
 
 use Draft\DraftRepository;
+use Draft\DraftSelectionHandler;
 use Draft\DraftView;
 
 $module_name = basename(dirname(__FILE__));
@@ -64,10 +65,27 @@ function main($user)
     }
 }
 
-switch ($op) {
+function submitDraftSelection(): void
+{
+    global $mysqli_db;
 
+    $teamname = $_POST['teamname'] ?? '';
+    $playerToBeDrafted = $_POST['player'] ?? null;
+    $draft_round = (int) ($_POST['draft_round'] ?? 0);
+    $draft_pick = (int) ($_POST['draft_pick'] ?? 0);
+
+    $commonRepository = new \Repositories\TeamIdentityRepository($mysqli_db);
+    $season = new \Season\Season($mysqli_db);
+
+    $handler = new DraftSelectionHandler($mysqli_db, $commonRepository, $season);
+    echo $handler->handleDraftSelection($teamname, $playerToBeDrafted, $draft_round, $draft_pick);
+}
+
+switch ($op) {
+    case 'select':
+        submitDraftSelection();
+        break;
     default:
         main($user);
         break;
-
 }

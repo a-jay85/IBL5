@@ -68,7 +68,7 @@ interface DraftViewInterface
      *    * Current user owns the current pick ($teamLogo == $pickOwner)
      *    * AND there are undrafted players available
      *  - Draft button disabled on submit to prevent double-click
-     *  - Form POSTs to /ibl5/modules/Draft/draft_selection.php
+     *  - Form POSTs to /ibl5/modules.php?name=Draft&op=select
      *  - Includes hidden form fields: teamname, draft_round, draft_pick
      *  - Uses renderPlayerTable() for actual table content
      *  - NEVER throws exceptions

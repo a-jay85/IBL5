@@ -72,7 +72,7 @@ class LastSimRecapRepository extends \BaseMysqliRepository implements LastSimRec
              FROM {$this->scheduleTable}
              WHERE game_date BETWEEN ? AND ?
                AND (visitor_teamid = ? OR home_teamid = ?)
-             ORDER BY game_date DESC, id DESC",
+             ORDER BY game_date ASC, id ASC",
             "ssii",
             $startDate,
             $endDate,

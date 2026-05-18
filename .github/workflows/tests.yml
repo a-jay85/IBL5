@@ -431,7 +431,6 @@ jobs:
         php -r '
           echo json_encode([
               "percentage" => (float) $argv[1],
-              "as_of" => date("Y-m-d"),
               "tolerance" => (float) $argv[2],
           ], JSON_PRETTY_PRINT) . "\n";
         ' "$COVERAGE" "$TOLERANCE" > coverage-baseline.json

@@ -66,6 +66,5 @@
         "ternary.shortNotAllowed": 8,
         "varTag.type": 1,
         "variable.undefined": 24
-    },
-    "as_of": "2026-05-18"
+    }
 }

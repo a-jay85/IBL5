@@ -58,7 +58,6 @@ if ($updateMode) {
             }
         }
     }
-    $currentCounts['as_of'] = date('Y-m-d');
     $json = json_encode($currentCounts, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE);
     if ($json === false) {
         fwrite(STDERR, "Error encoding JSON\n");

@@ -114,12 +114,28 @@ class FileTypeHandlerTest extends TestCase
         $this->assertSame(8, $result->inserted);
     }
 
-    public function testRcbDispatchesToProcessRcbFile(): void
+    public function testRcbDispatchesToProcessRcbFileWithoutAlltime(): void
     {
         $expected = $this->makeResult(12);
-        $this->stubJsb->method('processRcbFile')->willReturn($expected);
+        $mockJsb = $this->createMock(JsbImportServiceInterface::class);
+        $mockJsb->expects($this->once())
+            ->method('processRcbFile')
+            ->with(
+                $this->anything(),
+                $this->anything(),
+                $this->anything(),
+                false,
+            )
+            ->willReturn($expected);
 
-        $result = $this->handler->process(JsbFileType::Rcb, '/tmp/IBL5.rcb', $this->makeEntry());
+        $handler = new FileTypeHandler(
+            $mockJsb,
+            $this->stubBoxscore,
+            $this->stubPlr,
+            $this->stubLge,
+        );
+
+        $result = $handler->process(JsbFileType::Rcb, '/tmp/IBL5.rcb', $this->makeEntry());
 
         $this->assertSame(12, $result->inserted);
     }

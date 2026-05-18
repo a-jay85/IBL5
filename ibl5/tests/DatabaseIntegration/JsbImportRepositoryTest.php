@@ -7,6 +7,9 @@ namespace Tests\DatabaseIntegration;
 use PHPUnit\Framework\Attributes\Group;
 
 use JsbParser\JsbImportRepository;
+use JsbParser\JsbImportService;
+use JsbParser\PlayerIdResolver;
+use JsbParser\RcbFileParser;
 
 /**
  * Tests JsbImportRepository against real MariaDB — upserts into ibl_hist,
@@ -207,51 +210,230 @@ class JsbImportRepositoryTest extends DatabaseTestCase
         self::assertGreaterThanOrEqual(1, $affected);
     }
 
-    // ── upsertRcbAlltimeRecord ──────────────────────────────────
+    // ── replaceRcbAlltimeRecords ──────────────────────────────────
 
-    public function testUpsertRcbAlltimeRecordInsertsNewRow(): void
+    public function testReplaceRcbAlltimeRecordsInsertsAllRows(): void
     {
-        $affected = $this->repo->upsertRcbAlltimeRecord([
+        $records = [];
+        for ($i = 1; $i <= 3; $i++) {
+            $records[] = [
+                'scope' => 'league',
+                'teamid' => 0,
+                'record_type' => 'single_season',
+                'stat_category' => 'ppg',
+                'ranking' => 90 + $i,
+                'player_name' => "Test Player $i",
+                'car_block_id' => $i,
+                'pid' => null,
+                'stat_value' => 20.0 + $i,
+                'stat_raw' => 200 + $i,
+                'team_of_record' => 1,
+                'season_year' => 2099,
+                'career_total' => null,
+                'source_file' => 'test.rcb',
+            ];
+        }
+
+        $inserted = $this->repo->replaceRcbAlltimeRecords($records);
+
+        self::assertSame(3, $inserted);
+    }
+
+    public function testReplaceRcbAlltimeRecordsPrunesPreviousRows(): void
+    {
+        $seedRecords = [];
+        for ($rank = 1; $rank <= 10; $rank++) {
+            $seedRecords[] = [
+                'scope' => 'team',
+                'teamid' => 4,
+                'record_type' => 'single_season',
+                'stat_category' => 'ppg',
+                'ranking' => $rank,
+                'player_name' => "Old Plyr $rank",
+                'car_block_id' => $rank,
+                'pid' => null,
+                'stat_value' => 20.0,
+                'stat_raw' => 200,
+                'team_of_record' => 4,
+                'season_year' => 2099,
+                'career_total' => null,
+                'source_file' => 'old.rcb',
+            ];
+        }
+        $this->repo->replaceRcbAlltimeRecords($seedRecords);
+
+        $newRecords = [[
+            'scope' => 'team',
+            'teamid' => 4,
+            'record_type' => 'single_season',
+            'stat_category' => 'ppg',
+            'ranking' => 1,
+            'player_name' => 'New Rank One',
+            'car_block_id' => 1,
+            'pid' => null,
+            'stat_value' => 30.0,
+            'stat_raw' => 300,
+            'team_of_record' => 4,
+            'season_year' => 2099,
+            'career_total' => null,
+            'source_file' => 'new.rcb',
+        ]];
+        $this->repo->replaceRcbAlltimeRecords($newRecords);
+
+        $stmt = $this->db->prepare("SELECT COUNT(*) AS cnt FROM ibl_rcb_alltime_records");
+        self::assertNotFalse($stmt);
+        $stmt->execute();
+        $row = $stmt->get_result()->fetch_assoc();
+        self::assertNotNull($row);
+        self::assertSame(1, (int) $row['cnt']);
+    }
+
+    public function testReplaceRcbAlltimeRecordsIsAtomic(): void
+    {
+        $seedRecords = [[
             'scope' => 'league',
             'teamid' => 0,
             'record_type' => 'single_season',
             'stat_category' => 'ppg',
             'ranking' => 99,
-            'player_name' => 'RCB Alltime Plyr',
-            'car_block_id' => 5,
-            'pid' => 200050001,
-            'stat_value' => 28.5,
-            'stat_raw' => 285,
+            'player_name' => 'Seed Player',
+            'car_block_id' => 1,
+            'pid' => null,
+            'stat_value' => 25.0,
+            'stat_raw' => 250,
             'team_of_record' => 1,
             'season_year' => 2099,
-            'career_total' => 0,
-            'source_file' => 'test.rcb',
-        ]);
+            'career_total' => null,
+            'source_file' => 'seed.rcb',
+        ]];
+        $this->repo->replaceRcbAlltimeRecords($seedRecords);
 
-        self::assertGreaterThanOrEqual(1, $affected);
+        $badRecords = [[
+            'scope' => 'league',
+            'teamid' => 0,
+            'record_type' => 'single_season',
+            'stat_category' => 'ppg',
+            'ranking' => 1,
+            'player_name' => 'Good Row',
+            'car_block_id' => 1,
+            'pid' => null,
+            'stat_value' => 30.0,
+            'stat_raw' => 300,
+            'team_of_record' => 1,
+            'season_year' => 2099,
+            'career_total' => null,
+            'source_file' => 'bad.rcb',
+        ], [
+            'scope' => 'league',
+            'teamid' => 0,
+            'record_type' => 'single_season',
+            'stat_category' => 'ppg',
+            'ranking' => 1,
+            'player_name' => 'Duplicate Rank',
+            'car_block_id' => 2,
+            'pid' => null,
+            'stat_value' => 35.0,
+            'stat_raw' => 350,
+            'team_of_record' => 1,
+            'season_year' => 2099,
+            'career_total' => null,
+            'source_file' => 'bad.rcb',
+        ]];
+
+        try {
+            $this->repo->replaceRcbAlltimeRecords($badRecords);
+            self::fail('Expected exception for duplicate ranking');
+        } catch (\RuntimeException) {
+            // expected
+        }
+
+        $stmt = $this->db->prepare(
+            "SELECT player_name FROM ibl_rcb_alltime_records
+             WHERE scope = 'league' AND teamid = 0 AND record_type = 'single_season'
+               AND stat_category = 'ppg' AND ranking = 99"
+        );
+        self::assertNotFalse($stmt);
+        $stmt->execute();
+        $row = $stmt->get_result()->fetch_assoc();
+        self::assertNotNull($row, 'Seed data survives failed replace (rollback worked)');
+        self::assertSame('Seed Player', $row['player_name']);
     }
 
-    // ── upsertRcbSeasonRecord ───────────────────────────────────
+    // ── replaceRcbSeasonRecords ─────────────────────────────────
 
-    public function testUpsertRcbSeasonRecordInsertsNewRow(): void
+    public function testReplaceRcbSeasonRecordsScopedToSeasonYear(): void
     {
-        $affected = $this->repo->upsertRcbSeasonRecord([
+        $records2024 = [];
+        for ($i = 1; $i <= 3; $i++) {
+            $records2024[] = [
+                'season_year' => 2098,
+                'scope' => 'league',
+                'teamid' => 0,
+                'context' => 'home',
+                'stat_category' => 'pts',
+                'ranking' => $i,
+                'player_name' => "Player24 $i",
+                'player_position' => 'PG',
+                'car_block_id' => $i,
+                'pid' => null,
+                'stat_value' => 50 + $i,
+                'record_season_year' => 2098,
+                'source_file' => 'test.rcb',
+            ];
+        }
+        $this->repo->replaceRcbSeasonRecords(2098, $records2024);
+
+        $records2025 = [[
             'season_year' => 2099,
             'scope' => 'league',
             'teamid' => 0,
             'context' => 'home',
             'stat_category' => 'pts',
-            'ranking' => 99,
-            'player_name' => 'RCB Season Plyr',
-            'player_position' => 'PG',
-            'car_block_id' => 5,
-            'pid' => 200050001,
-            'stat_value' => 52,
+            'ranking' => 1,
+            'player_name' => 'Player25',
+            'player_position' => 'SG',
+            'car_block_id' => 1,
+            'pid' => null,
+            'stat_value' => 60,
             'record_season_year' => 2099,
             'source_file' => 'test.rcb',
-        ]);
+        ]];
+        $this->repo->replaceRcbSeasonRecords(2099, $records2025);
 
-        self::assertGreaterThanOrEqual(1, $affected);
+        $newRecords2098 = [[
+            'season_year' => 2098,
+            'scope' => 'league',
+            'teamid' => 0,
+            'context' => 'home',
+            'stat_category' => 'pts',
+            'ranking' => 1,
+            'player_name' => 'NewPlayer24',
+            'player_position' => 'PF',
+            'car_block_id' => 10,
+            'pid' => null,
+            'stat_value' => 70,
+            'record_season_year' => 2098,
+            'source_file' => 'test.rcb',
+        ]];
+        $this->repo->replaceRcbSeasonRecords(2098, $newRecords2098);
+
+        $stmt = $this->db->prepare(
+            "SELECT COUNT(*) AS cnt FROM ibl_rcb_season_records WHERE season_year = 2098"
+        );
+        self::assertNotFalse($stmt);
+        $stmt->execute();
+        $row = $stmt->get_result()->fetch_assoc();
+        self::assertNotNull($row);
+        self::assertSame(1, (int) $row['cnt'], '2098 replaced to 1 row');
+
+        $stmt2 = $this->db->prepare(
+            "SELECT COUNT(*) AS cnt FROM ibl_rcb_season_records WHERE season_year = 2099"
+        );
+        self::assertNotFalse($stmt2);
+        $stmt2->execute();
+        $row2 = $stmt2->get_result()->fetch_assoc();
+        self::assertNotNull($row2);
+        self::assertSame(1, (int) $row2['cnt'], '2099 unchanged');
     }
 
     // ── resolveTeamIdByName ─────────────────────────────────────
@@ -334,5 +516,137 @@ class JsbImportRepositoryTest extends DatabaseTestCase
 
         self::assertSame('JSB Name Lookup', $this->repo->getPlayerName(200100010));
         self::assertNull($this->repo->getPlayerName(999999999));
+    }
+
+    // ── End-to-end RCB replace integration ─────────────────────
+
+    public function testCurrentSeasonRcbImportPrunesAllPreviousAlltimeRows(): void
+    {
+        $seedRecords = [];
+        for ($teamid = 1; $teamid <= 3; $teamid++) {
+            for ($rank = 1; $rank <= 5; $rank++) {
+                $seedRecords[] = [
+                    'scope' => 'team',
+                    'teamid' => $teamid,
+                    'record_type' => 'single_season',
+                    'stat_category' => 'ppg',
+                    'ranking' => $rank,
+                    'player_name' => "Stale T{$teamid}R{$rank}",
+                    'car_block_id' => $rank,
+                    'pid' => null,
+                    'stat_value' => 20.0,
+                    'stat_raw' => 200,
+                    'team_of_record' => $teamid,
+                    'season_year' => 2090,
+                    'career_total' => null,
+                    'source_file' => 'stale.rcb',
+                ];
+            }
+        }
+        $this->repo->replaceRcbAlltimeRecords($seedRecords);
+
+        $rcbData = $this->buildMinimalRcbData();
+        $resolver = new PlayerIdResolver($this->db);
+        $service = new JsbImportService($this->repo, $resolver);
+
+        $result = $service->processRcbData($rcbData, 2026, 'current-season', includeAlltime: true);
+
+        self::assertSame(0, $result->errors);
+
+        $stmt = $this->db->prepare(
+            "SELECT COUNT(*) AS cnt FROM ibl_rcb_alltime_records
+             WHERE source_file = 'stale.rcb'"
+        );
+        self::assertNotFalse($stmt);
+        $stmt->execute();
+        $row = $stmt->get_result()->fetch_assoc();
+        self::assertNotNull($row);
+        self::assertSame(0, (int) $row['cnt'], 'All stale alltime rows pruned');
+    }
+
+    public function testHistoricalRcbBulkImportDoesNotTouchAlltimeTable(): void
+    {
+        $seedRecords = [];
+        for ($rank = 1; $rank <= 5; $rank++) {
+            $seedRecords[] = [
+                'scope' => 'league',
+                'teamid' => 0,
+                'record_type' => 'single_season',
+                'stat_category' => 'ppg',
+                'ranking' => $rank,
+                'player_name' => "Keep Plyr $rank",
+                'car_block_id' => $rank,
+                'pid' => null,
+                'stat_value' => 25.0,
+                'stat_raw' => 250,
+                'team_of_record' => 1,
+                'season_year' => 2099,
+                'career_total' => null,
+                'source_file' => 'keep.rcb',
+            ];
+        }
+        $this->repo->replaceRcbAlltimeRecords($seedRecords);
+
+        $rcbData = $this->buildMinimalRcbData();
+        $resolver = new PlayerIdResolver($this->db);
+        $service = new JsbImportService($this->repo, $resolver);
+
+        $result = $service->processRcbData($rcbData, 2007, '06-07', includeAlltime: false);
+
+        self::assertSame(0, $result->errors);
+
+        $stmt = $this->db->prepare(
+            "SELECT COUNT(*) AS cnt FROM ibl_rcb_alltime_records
+             WHERE source_file = 'keep.rcb'"
+        );
+        self::assertNotFalse($stmt);
+        $stmt->execute();
+        $row = $stmt->get_result()->fetch_assoc();
+        self::assertNotNull($row);
+        self::assertSame(5, (int) $row['cnt'], 'Alltime rows untouched by historical import');
+
+        $stmt2 = $this->db->prepare(
+            "SELECT COUNT(*) AS cnt FROM ibl_rcb_season_records WHERE season_year = 2007"
+        );
+        self::assertNotFalse($stmt2);
+        $stmt2->execute();
+        $row2 = $stmt2->get_result()->fetch_assoc();
+        self::assertNotNull($row2);
+        self::assertGreaterThan(0, (int) $row2['cnt'], 'Season records for 2007 were inserted');
+    }
+
+    /**
+     * @return string Valid .rcb file data with one alltime and one season entry
+     */
+    private function buildMinimalRcbData(): string
+    {
+        $alltimeEntry = str_pad('Stephen Curry', 33, ' ', STR_PAD_LEFT)
+            . str_pad('3851', 5, ' ', STR_PAD_LEFT)
+            . str_pad('3611', 6, ' ', STR_PAD_LEFT)
+            . str_pad('19', 2, ' ', STR_PAD_LEFT)
+            . str_pad('2005', 4);
+        $blankAlltime = str_repeat(' ', RcbFileParser::ALLTIME_ENTRY_SIZE);
+        $alltimeLine0 = $alltimeEntry . str_repeat($blankAlltime, RcbFileParser::ENTRIES_PER_ALLTIME_LINE - 1);
+        $blankAlltimeLine = str_repeat($blankAlltime, RcbFileParser::ENTRIES_PER_ALLTIME_LINE);
+        $alltimeLines = [$alltimeLine0];
+        for ($i = 1; $i < RcbFileParser::ALLTIME_LINE_COUNT; $i++) {
+            $alltimeLines[] = $blankAlltimeLine;
+        }
+
+        $seasonEntry = str_pad('PG Stephen Curry', 33, ' ', STR_PAD_LEFT)
+            . str_pad('3851', 5, ' ', STR_PAD_LEFT)
+            . str_pad('73', 3, ' ', STR_PAD_LEFT)
+            . str_pad('2006', 4)
+            . str_repeat(' ', 45);
+        $blankSeason = str_repeat(' ', RcbFileParser::SEASON_ENTRY_SIZE);
+        $seasonLine0 = $seasonEntry . str_repeat($blankSeason, RcbFileParser::ENTRIES_PER_SEASON_LINE - 1);
+        $blankSeasonLine = str_repeat($blankSeason, RcbFileParser::ENTRIES_PER_SEASON_LINE);
+        $seasonLines = [$seasonLine0];
+        for ($i = 1; $i < RcbFileParser::SEASON_LINE_COUNT; $i++) {
+            $seasonLines[] = $blankSeasonLine;
+        }
+
+        $trailing = [str_repeat(' ', 110), str_repeat(' ', 56), str_repeat(' ', 22)];
+        return implode("\r\n", array_merge($alltimeLines, $seasonLines, $trailing)) . "\r\n";
     }
 }

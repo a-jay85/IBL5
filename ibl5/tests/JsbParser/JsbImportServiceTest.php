@@ -8,6 +8,7 @@ use JsbParser\CarFileParser;
 use JsbParser\Contracts\JsbImportRepositoryInterface;
 use JsbParser\JsbImportService;
 use JsbParser\PlayerIdResolver;
+use JsbParser\RcbFileParser;
 use JsbParser\TrnFileParser;
 use PHPUnit\Framework\TestCase;
 
@@ -83,6 +84,41 @@ class JsbImportServiceTest extends TestCase
         $this->assertIsString($tmpFile);
         file_put_contents($tmpFile, $data);
         return $tmpFile;
+    }
+
+    /**
+     * @return string Valid .rcb file data with one alltime and one season entry
+     */
+    private function buildMinimalRcbData(): string
+    {
+        $alltimeEntry = str_pad('Stephen Curry', 33, ' ', STR_PAD_LEFT)
+            . str_pad('3851', 5, ' ', STR_PAD_LEFT)
+            . str_pad('3611', 6, ' ', STR_PAD_LEFT)
+            . str_pad('19', 2, ' ', STR_PAD_LEFT)
+            . str_pad('2005', 4);
+        $blankAlltime = str_repeat(' ', RcbFileParser::ALLTIME_ENTRY_SIZE);
+        $alltimeLine0 = $alltimeEntry . str_repeat($blankAlltime, RcbFileParser::ENTRIES_PER_ALLTIME_LINE - 1);
+        $blankAlltimeLine = str_repeat($blankAlltime, RcbFileParser::ENTRIES_PER_ALLTIME_LINE);
+        $alltimeLines = [$alltimeLine0];
+        for ($i = 1; $i < RcbFileParser::ALLTIME_LINE_COUNT; $i++) {
+            $alltimeLines[] = $blankAlltimeLine;
+        }
+
+        $seasonEntry = str_pad('PG Stephen Curry', 33, ' ', STR_PAD_LEFT)
+            . str_pad('3851', 5, ' ', STR_PAD_LEFT)
+            . str_pad('73', 3, ' ', STR_PAD_LEFT)
+            . str_pad('2006', 4)
+            . str_repeat(' ', 45);
+        $blankSeason = str_repeat(' ', RcbFileParser::SEASON_ENTRY_SIZE);
+        $seasonLine0 = $seasonEntry . str_repeat($blankSeason, RcbFileParser::ENTRIES_PER_SEASON_LINE - 1);
+        $blankSeasonLine = str_repeat($blankSeason, RcbFileParser::ENTRIES_PER_SEASON_LINE);
+        $seasonLines = [$seasonLine0];
+        for ($i = 1; $i < RcbFileParser::SEASON_LINE_COUNT; $i++) {
+            $seasonLines[] = $blankSeasonLine;
+        }
+
+        $trailing = [str_repeat(' ', 110), str_repeat(' ', 56), str_repeat(' ', 22)];
+        return implode("\r\n", array_merge($alltimeLines, $seasonLines, $trailing)) . "\r\n";
     }
 
     // ── processCarFile ───────────────────────────────────────────
@@ -426,6 +462,69 @@ class JsbImportServiceTest extends TestCase
         $result = $this->makeService()->processRcbData('invalid', 2006);
         $this->assertSame(1, $result->errors);
         $this->assertStringContainsString('RCB parse failed', $result->messages[0]);
+    }
+
+    public function testProcessRcbDataCallsBothReplaceMethodsByDefault(): void
+    {
+        $mockRepo = $this->createMock(JsbImportRepositoryInterface::class);
+        $mockRepo->expects($this->once())->method('replaceRcbAlltimeRecords')->willReturn(1);
+        $mockRepo->expects($this->once())->method('replaceRcbSeasonRecords')->willReturn(1);
+
+        $this->stubRepo = $mockRepo;
+        $service = $this->makeService();
+
+        $rcbData = $this->buildMinimalRcbData();
+        $result = $service->processRcbData($rcbData, 2026, 'test-source');
+
+        $this->assertSame(0, $result->errors);
+    }
+
+    public function testProcessRcbDataSkipsAlltimeWhenIncludeAlltimeFalse(): void
+    {
+        $mockRepo = $this->createMock(JsbImportRepositoryInterface::class);
+        $mockRepo->expects($this->never())->method('replaceRcbAlltimeRecords');
+        $mockRepo->expects($this->once())->method('replaceRcbSeasonRecords')->willReturn(1);
+
+        $this->stubRepo = $mockRepo;
+        $service = $this->makeService();
+
+        $rcbData = $this->buildMinimalRcbData();
+        $result = $service->processRcbData($rcbData, 2026, 'test-source', includeAlltime: false);
+
+        $this->assertSame(0, $result->errors);
+    }
+
+    public function testProcessRcbDataSkipsAlltimeReplaceWhenParsedSetEmpty(): void
+    {
+        $mockRepo = $this->createMock(JsbImportRepositoryInterface::class);
+        $mockRepo->expects($this->never())->method('replaceRcbAlltimeRecords');
+        $mockRepo->expects($this->never())->method('replaceRcbSeasonRecords');
+
+        $this->stubRepo = $mockRepo;
+        $service = $this->makeService();
+
+        $blankAlltime = str_repeat(' ', RcbFileParser::ALLTIME_ENTRY_SIZE);
+        $blankAlltimeLine = str_repeat($blankAlltime, RcbFileParser::ENTRIES_PER_ALLTIME_LINE);
+        $blankSeason = str_repeat(' ', RcbFileParser::SEASON_ENTRY_SIZE);
+        $blankSeasonLine = str_repeat($blankSeason, RcbFileParser::ENTRIES_PER_SEASON_LINE);
+
+        $lines = [];
+        for ($i = 0; $i < RcbFileParser::ALLTIME_LINE_COUNT; $i++) {
+            $lines[] = $blankAlltimeLine;
+        }
+        for ($i = 0; $i < RcbFileParser::SEASON_LINE_COUNT; $i++) {
+            $lines[] = $blankSeasonLine;
+        }
+        $lines[] = str_repeat(' ', 110);
+        $lines[] = str_repeat(' ', 56);
+        $lines[] = str_repeat(' ', 22);
+        $emptyRcb = implode("\r\n", $lines) . "\r\n";
+
+        $result = $service->processRcbData($emptyRcb, 2026, 'test-source');
+
+        $this->assertSame(0, $result->errors);
+        $this->assertNotEmpty($result->messages);
+        $this->assertStringContainsString('alltime section empty', $result->messages[0]);
     }
 
     public function testProcessDraDataReturnsNoErrorForEmptyData(): void

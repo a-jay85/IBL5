@@ -106,23 +106,25 @@ interface JsbImportServiceInterface
     public function processAwaFile(string $awaPath, string $carPath, ?int $filterYear = null): JsbImportResult;
 
     /**
-     * Process raw .rcb data and upsert records into `ibl_rcb_alltime_records` and ibl_rcb_season_records.
+     * Process raw .rcb data using cumulative-authoritative replace semantics.
      *
      * @param int $seasonYear Season year for current season records
      * @param string|null $sourceLabel Label for the source_file column
+     * @param bool $includeAlltime When false, skips alltime records (historical bulk imports)
      * @return JsbImportResult Summary of import results
      */
-    public function processRcbData(string $data, int $seasonYear, ?string $sourceLabel = null): JsbImportResult;
+    public function processRcbData(string $data, int $seasonYear, ?string $sourceLabel = null, bool $includeAlltime = true): JsbImportResult;
 
     /**
-     * Process an .rcb file and upsert records into `ibl_rcb_alltime_records` and ibl_rcb_season_records.
+     * Process an .rcb file using cumulative-authoritative replace semantics.
      *
      * @param string $filePath Path to the .rcb file
      * @param int $seasonYear Season year for current season records
      * @param string|null $sourceLabel Label for the source_file column
+     * @param bool $includeAlltime When false, skips alltime records (historical bulk imports)
      * @return JsbImportResult Summary of import results
      */
-    public function processRcbFile(string $filePath, int $seasonYear, ?string $sourceLabel = null): JsbImportResult;
+    public function processRcbFile(string $filePath, int $seasonYear, ?string $sourceLabel = null, bool $includeAlltime = true): JsbImportResult;
 
     /**
      * Process raw .plb data and upsert depth chart snapshots into `ibl_plb_snapshots`.

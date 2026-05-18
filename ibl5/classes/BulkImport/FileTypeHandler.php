@@ -42,7 +42,8 @@ final class FileTypeHandler
             JsbFileType::His => $this->jsbService->processHisFile($filePath, $entry->sourceLabel),
             JsbFileType::Asw => $this->jsbService->processAswFile($filePath, $entry->year),
             JsbFileType::Awa => $this->processAwa($filePath, $entry),
-            JsbFileType::Rcb => $this->jsbService->processRcbFile($filePath, $entry->year, $entry->sourceLabel),
+            // Historical .rcb files are stale snapshots of the cumulative alltime ledger; only their per-season records are valuable.
+            JsbFileType::Rcb => $this->jsbService->processRcbFile($filePath, $entry->year, $entry->sourceLabel, includeAlltime: false),
             JsbFileType::Sco => $this->processSco($filePath, $entry),
             JsbFileType::Dra => $this->jsbService->processDraFile($filePath),
             JsbFileType::Ret => $this->jsbService->processRetFile($filePath, $entry->year),

@@ -68,20 +68,20 @@ interface JsbImportRepositoryInterface
     public function resolveTeamIdByName(string $teamName): ?int;
 
     /**
-     * Upsert an all-time record from .rcb data.
+     * Replace ALL alltime records with the given set, atomically.
      *
-     * @param array{scope: string, teamid: int, record_type: string, stat_category: string, ranking: int, player_name: string, car_block_id: int, pid: int|null, stat_value: float, stat_raw: int, team_of_record: int|null, season_year: int|null, career_total: int|null, source_file: string|null} $record
-     * @return int Affected rows (1=inserted, 2=updated, 0=unchanged)
+     * @param list<array{scope: string, teamid: int, record_type: string, stat_category: string, ranking: int, player_name: string, car_block_id: int, pid: int|null, stat_value: float, stat_raw: int, team_of_record: int|null, season_year: int|null, career_total: int|null, source_file: string|null}> $records
+     * @return int Number of rows inserted
      */
-    public function upsertRcbAlltimeRecord(array $record): int;
+    public function replaceRcbAlltimeRecords(array $records): int;
 
     /**
-     * Upsert a current season record from .rcb data.
+     * Replace all season records for a given season_year, atomically.
      *
-     * @param array{season_year: int, scope: string, teamid: int, context: string, stat_category: string, ranking: int, player_name: string, player_position: string|null, car_block_id: int, pid: int|null, stat_value: int, record_season_year: int, source_file: string|null} $record
-     * @return int Affected rows (1=inserted, 2=updated, 0=unchanged)
+     * @param list<array{season_year: int, scope: string, teamid: int, context: string, stat_category: string, ranking: int, player_name: string, player_position: string|null, car_block_id: int, pid: int|null, stat_value: int, record_season_year: int, source_file: string|null}> $records
+     * @return int Number of rows inserted
      */
-    public function upsertRcbSeasonRecord(array $record): int;
+    public function replaceRcbSeasonRecords(int $seasonYear, array $records): int;
 
     /**
      * Get the maximum trade_group_id currently in the database.

@@ -283,12 +283,17 @@
 }
 
 /* Final score */
-.last-sim-recap__final { display: flex; flex-direction: column; gap: .4rem }
-.last-sim-recap__final-row {
+.last-sim-recap__final {
     display: grid;
     grid-template-columns: 30px 1fr auto;
+    row-gap: .4rem;
+    column-gap: .6rem;
+}
+.last-sim-recap__final-row {
+    display: grid;
+    grid-template-columns: subgrid;
+    grid-column: 1 / -1;
     align-items: center;
-    gap: .6rem;
     padding: .2rem 0;
 }
 .last-sim-recap__final-row + .last-sim-recap__final-row {
@@ -303,6 +308,7 @@
     letter-spacing: .02em;
     color: var(--navy-800);
     line-height: 1;
+    text-align: center;
 }
 .last-sim-recap__final-rec {
     display: block;
@@ -321,17 +327,20 @@
     color: var(--gray-400);
     line-height: .95;
     font-variant-numeric: tabular-nums;
+    justify-self: end;
 }
-.last-sim-recap__final-row--win .last-sim-recap__final-pts { color: var(--navy-900) }
-/* Orange arrow pointing INTO the winning score (left side) */
+.last-sim-recap__final-row--win .last-sim-recap__final-pts {
+    color: var(--navy-900);
+    display: flex;
+    align-items: center;
+}
 .last-sim-recap__final-row--win .last-sim-recap__final-pts::before {
     content: "";
-    display: inline-block;
+    flex-shrink: 0;
     margin-right: 6px;
     border-style: solid;
     border-width: 6px 0 6px 7px;
     border-color: transparent transparent transparent var(--accent-500);
-    transform: translateY(-1px);
 }
 
 /* Quarter-margin bar chart (per-quarter point differential) */

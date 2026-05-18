@@ -365,6 +365,7 @@
 .last-sim-recap__mom-bar-shape {
     display: block;
     width: 55%;
+    height: var(--last-sim-recap-bar-h, 0px);
     border-radius: 3px;
     position: absolute;
     left: 22.5%;

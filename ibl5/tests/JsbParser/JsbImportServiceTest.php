@@ -464,11 +464,11 @@ class JsbImportServiceTest extends TestCase
         $this->assertStringContainsString('RCB parse failed', $result->messages[0]);
     }
 
-    public function testProcessRcbDataWritesBothAlltimeAndSeasonRecords(): void
+    public function testProcessRcbDataCallsBothReplaceMethodsByDefault(): void
     {
         $mockRepo = $this->createMock(JsbImportRepositoryInterface::class);
-        $mockRepo->expects($this->atLeastOnce())->method('upsertRcbAlltimeRecord')->willReturn(1);
-        $mockRepo->expects($this->atLeastOnce())->method('upsertRcbSeasonRecord')->willReturn(1);
+        $mockRepo->expects($this->once())->method('replaceRcbAlltimeRecords')->willReturn(1);
+        $mockRepo->expects($this->once())->method('replaceRcbSeasonRecords')->willReturn(1);
 
         $this->stubRepo = $mockRepo;
         $service = $this->makeService();
@@ -477,6 +477,54 @@ class JsbImportServiceTest extends TestCase
         $result = $service->processRcbData($rcbData, 2026, 'test-source');
 
         $this->assertSame(0, $result->errors);
+    }
+
+    public function testProcessRcbDataSkipsAlltimeWhenIncludeAlltimeFalse(): void
+    {
+        $mockRepo = $this->createMock(JsbImportRepositoryInterface::class);
+        $mockRepo->expects($this->never())->method('replaceRcbAlltimeRecords');
+        $mockRepo->expects($this->once())->method('replaceRcbSeasonRecords')->willReturn(1);
+
+        $this->stubRepo = $mockRepo;
+        $service = $this->makeService();
+
+        $rcbData = $this->buildMinimalRcbData();
+        $result = $service->processRcbData($rcbData, 2026, 'test-source', includeAlltime: false);
+
+        $this->assertSame(0, $result->errors);
+    }
+
+    public function testProcessRcbDataSkipsAlltimeReplaceWhenParsedSetEmpty(): void
+    {
+        $mockRepo = $this->createMock(JsbImportRepositoryInterface::class);
+        $mockRepo->expects($this->never())->method('replaceRcbAlltimeRecords');
+        $mockRepo->expects($this->never())->method('replaceRcbSeasonRecords');
+
+        $this->stubRepo = $mockRepo;
+        $service = $this->makeService();
+
+        $blankAlltime = str_repeat(' ', RcbFileParser::ALLTIME_ENTRY_SIZE);
+        $blankAlltimeLine = str_repeat($blankAlltime, RcbFileParser::ENTRIES_PER_ALLTIME_LINE);
+        $blankSeason = str_repeat(' ', RcbFileParser::SEASON_ENTRY_SIZE);
+        $blankSeasonLine = str_repeat($blankSeason, RcbFileParser::ENTRIES_PER_SEASON_LINE);
+
+        $lines = [];
+        for ($i = 0; $i < RcbFileParser::ALLTIME_LINE_COUNT; $i++) {
+            $lines[] = $blankAlltimeLine;
+        }
+        for ($i = 0; $i < RcbFileParser::SEASON_LINE_COUNT; $i++) {
+            $lines[] = $blankSeasonLine;
+        }
+        $lines[] = str_repeat(' ', 110);
+        $lines[] = str_repeat(' ', 56);
+        $lines[] = str_repeat(' ', 22);
+        $emptyRcb = implode("\r\n", $lines) . "\r\n";
+
+        $result = $service->processRcbData($emptyRcb, 2026, 'test-source');
+
+        $this->assertSame(0, $result->errors);
+        $this->assertNotEmpty($result->messages);
+        $this->assertStringContainsString('alltime section empty', $result->messages[0]);
     }
 
     public function testProcessDraDataReturnsNoErrorForEmptyData(): void

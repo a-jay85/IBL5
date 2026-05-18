@@ -363,7 +363,7 @@ class JsbImportService implements JsbImportServiceInterface
     /**
      * @see JsbImportServiceInterface::processRcbData()
      */
-    public function processRcbData(string $data, int $seasonYear, ?string $sourceLabel = null): JsbImportResult
+    public function processRcbData(string $data, int $seasonYear, ?string $sourceLabel = null, bool $includeAlltime = true): JsbImportResult
     {
         $result = new JsbImportResult();
 
@@ -374,35 +374,43 @@ class JsbImportService implements JsbImportServiceInterface
             return $result;
         }
 
-        // Import all-time records
-        foreach ($parsed['alltime'] as $record) {
-            try {
-                $affected = $this->repository->upsertRcbAlltimeRecord([
-                    'scope' => $record['scope'],
-                    'teamid' => $record['teamid'],
-                    'record_type' => $record['record_type'],
-                    'stat_category' => $record['stat_category'],
-                    'ranking' => $record['ranking'],
-                    'player_name' => $record['player_name'],
-                    'car_block_id' => $record['car_block_id'],
-                    'pid' => null,
-                    'stat_value' => $record['stat_value'],
-                    'stat_raw' => $record['stat_raw'],
-                    'team_of_record' => $record['team_of_record'],
-                    'season_year' => $record['season_year'],
-                    'career_total' => $record['career_total'],
-                    'source_file' => $sourceLabel,
-                ]);
-                $this->recordUpsertResult($affected, $result);
-            } catch (\RuntimeException $e) {
-                $result->addError('RCB alltime upsert failed for ' . $record['player_name'] . ': ' . $e->getMessage());
+        if ($includeAlltime) {
+            if ($parsed['alltime'] === []) {
+                $result->addMessage('RCB alltime section empty — skipping replace to avoid wiping authoritative state');
+            } else {
+                $alltimeRecords = array_map(
+                    static fn (array $record): array => [
+                        'scope' => $record['scope'],
+                        'teamid' => $record['teamid'],
+                        'record_type' => $record['record_type'],
+                        'stat_category' => $record['stat_category'],
+                        'ranking' => $record['ranking'],
+                        'player_name' => $record['player_name'],
+                        'car_block_id' => $record['car_block_id'],
+                        'pid' => null,
+                        'stat_value' => $record['stat_value'],
+                        'stat_raw' => $record['stat_raw'],
+                        'team_of_record' => $record['team_of_record'],
+                        'season_year' => $record['season_year'],
+                        'career_total' => $record['career_total'],
+                        'source_file' => $sourceLabel,
+                    ],
+                    $parsed['alltime']
+                );
+                try {
+                    $inserted = $this->repository->replaceRcbAlltimeRecords($alltimeRecords);
+                    $result->addInserted($inserted);
+                } catch (\RuntimeException $e) {
+                    $result->addError('RCB alltime replace failed: ' . $e->getMessage());
+                }
             }
         }
 
-        // Import current season records
-        foreach ($parsed['currentSeason'] as $record) {
-            try {
-                $affected = $this->repository->upsertRcbSeasonRecord([
+        if ($parsed['currentSeason'] === []) {
+            $result->addMessage('RCB season section empty — skipping replace');
+        } else {
+            $seasonRecords = array_map(
+                static fn (array $record): array => [
                     'season_year' => $seasonYear,
                     'scope' => $record['scope'],
                     'teamid' => $record['teamid'],
@@ -416,10 +424,14 @@ class JsbImportService implements JsbImportServiceInterface
                     'stat_value' => $record['stat_value'],
                     'record_season_year' => $record['season_year'],
                     'source_file' => $sourceLabel,
-                ]);
-                $this->recordUpsertResult($affected, $result);
+                ],
+                $parsed['currentSeason']
+            );
+            try {
+                $inserted = $this->repository->replaceRcbSeasonRecords($seasonYear, $seasonRecords);
+                $result->addInserted($inserted);
             } catch (\RuntimeException $e) {
-                $result->addError('RCB season upsert failed for ' . $record['player_name'] . ': ' . $e->getMessage());
+                $result->addError('RCB season replace failed: ' . $e->getMessage());
             }
         }
 
@@ -429,9 +441,9 @@ class JsbImportService implements JsbImportServiceInterface
     /**
      * @see JsbImportServiceInterface::processRcbFile()
      */
-    public function processRcbFile(string $filePath, int $seasonYear, ?string $sourceLabel = null): JsbImportResult
+    public function processRcbFile(string $filePath, int $seasonYear, ?string $sourceLabel = null, bool $includeAlltime = true): JsbImportResult
     {
-        return $this->loadFileAndProcess($filePath, fn (string $c) => $this->processRcbData($c, $seasonYear, $sourceLabel), 'RCB');
+        return $this->loadFileAndProcess($filePath, fn (string $c) => $this->processRcbData($c, $seasonYear, $sourceLabel, $includeAlltime), 'RCB');
     }
 
     /**

@@ -254,7 +254,7 @@ until docker exec "$PHP_CONTAINER" php /var/www/html/ibl5/bin/validate-schema &>
         echo "  WARNING: Schema validation failed!"
         docker exec "$PHP_CONTAINER" php /var/www/html/ibl5/bin/validate-schema 2>&1 || true
         echo ""
-        echo "  The prod-seed may predate migrations that the code depends on."
+        echo "  The seeded data may predate migrations that the code depends on."
         echo "  Manually apply the missing migration."
         echo ""
         break

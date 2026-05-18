@@ -547,9 +547,9 @@
 .last-sim-recap__player {
     display: grid;
     grid-template-columns: 24px minmax(0, 1fr) auto;
-    align-items: baseline;
+    align-items: center;
     gap: .5rem;
-    height: 32px;
+    min-height: 28px;
 }
 .last-sim-recap__player + .last-sim-recap__player { margin-top: 6px }
 
@@ -560,6 +560,7 @@
     flex: 0 0 auto;
     width: 24px;
     height: 24px;
+    transform: translateY(2px);
 }
 .last-sim-recap__player--you .ibl-player-photo {
     box-shadow: 0 0 0 2px var(--accent-500), 0 0 0 3px var(--gray-50);
@@ -592,6 +593,7 @@
     text-overflow: ellipsis;
     min-width: 0;
 }
+.last-sim-recap__player-lname { display: none }
 .last-sim-recap__player-pts {
     font-family: var(--font-mono);
     font-size: .88rem;
@@ -634,14 +636,27 @@
     }
     .last-sim-recap__cell:first-child { border-top: none }
 
-    /* Battles: hide player names and points, show only avatars + position */
+    /* Battles: hide full name and points, show last name below avatar */
     .last-sim-recap__player-name,
     .last-sim-recap__player-pts { display: none }
+    .last-sim-recap__player-lname {
+        display: block;
+        font-size: .58rem;
+        font-weight: 600;
+        color: var(--navy-800);
+        text-align: center;
+        line-height: 1.1;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        max-width: 100%;
+    }
     .last-sim-recap__player {
         grid-template-columns: 24px;
         justify-items: center;
         justify-content: center;
         height: auto;
+        gap: .2rem;
     }
 
     /* Tighten battle cell padding */

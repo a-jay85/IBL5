@@ -363,6 +363,8 @@ class LastSimRecapView implements LastSimRecapViewInterface
     private function renderPlayerRow(bool $isYou, int $pid, string $name, int $pts, bool $hurt): string
     {
         $youMod = $isYou ? ' last-sim-recap__player--you' : '';
+        $parts = explode(' ', $name);
+        $lastName = end($parts);
 
         $h  = '<div class="last-sim-recap__player' . $youMod . '">';
         $h .= '  <span class="last-sim-recap__avatar-wrap">';
@@ -372,6 +374,7 @@ class LastSimRecapView implements LastSimRecapViewInterface
         }
         $h .= '  </span>';
         $h .= '  <span class="last-sim-recap__player-name">' . HtmlSanitizer::e($name) . '</span>';
+        $h .= '  <span class="last-sim-recap__player-lname">' . HtmlSanitizer::e($lastName) . '</span>';
         $h .= '  <span class="last-sim-recap__player-pts">' . HtmlSanitizer::e((string) $pts) . '</span>';
         $h .= '</div>';
 

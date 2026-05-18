@@ -96,8 +96,8 @@ fi
 if [ "$NEEDS_SEED" = "true" ] && [ "${SKIP_PROD_SEED:-}" != "1" ]; then
     PROD_SEED="$APP_DIR/fixtures/prod-seed.sql"
     if [ -f "$PROD_SEED" ]; then
-        echo "[entrypoint] Empty or unseeded database detected. Importing prod-seed.sql..."
-        echo "[entrypoint] This may take 1-2 minutes for the 87MB dump."
+        echo "[entrypoint] Empty or unseeded database detected. Importing prod-seed.sql (offline fallback — use bin/dev-up for live prod data)..."
+        echo "[entrypoint] This may take 2-4 minutes for the ~334MB dump."
         # The prod-seed is a two-part dump (schema then data). The schema
         # section's footer restores FOREIGN_KEY_CHECKS=1 before data inserts
         # begin, causing FK violations on tables with cross-references.
@@ -122,9 +122,10 @@ if [ "$NEEDS_SEED" = "true" ] && [ "${SKIP_PROD_SEED:-}" != "1" ]; then
         rm -f /tmp/import-errors.log
         echo "[entrypoint] Prod-seed import complete."
     else
-        echo "[entrypoint] WARNING: Empty database and no prod-seed.sql found."
+        echo "[entrypoint] WARNING: Empty database and no prod-seed.sql found (offline fallback unavailable)."
         echo "[entrypoint] The app will not work until data is imported."
-        echo "[entrypoint] Provide ibl5/fixtures/prod-seed.sql or run migrations manually."
+        echo "[entrypoint] For live prod data, run bin/dev-up from the host (canonical path)."
+        echo "[entrypoint] For offline use, regenerate the fallback with bin/db-export-prod."
     fi
 else
     echo "[entrypoint] Database has $TABLE_COUNT tables with data — skipping prod-seed import."

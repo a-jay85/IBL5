@@ -1,7 +1,19 @@
 #!/bin/bash
-# Export production database for use in worktree Docker environments.
-# Box score tables (ibl_box_scores, ibl_box_scores_teams) are excluded due to
-# STORED GENERATED columns that cause ERROR 1906 on import.
+# Generate the OFFLINE-FALLBACK prod-seed dump (ibl5/fixtures/prod-seed.sql).
+#
+# This is NOT the canonical seed path for local dev. The canonical path is
+# `bin/db-sync-prod`, which is invoked by `bin/dev-up` (main stack) and
+# `bin/wt-up --prod` (worktrees) and streams a full live copy directly into
+# the running MariaDB container — including the box-score tables that this
+# script skips.
+#
+# This script exists for environments without prod credentials: it produces
+# a static .sql file the docker/entrypoint.sh import block can consume when
+# `bin/dev-up --no-sync` (or a bare `docker compose up`) is used.
+#
+# Box-score tables (ibl_box_scores, ibl_box_scores_teams) are excluded due to
+# STORED GENERATED columns that cause ERROR 1906 on import — the live-sync
+# path handles them via dedicated `--no-create-info` passes.
 #
 # Connection: reads REMOTE_* from .env for production, falls back to local Docker.
 # Output: ibl5/fixtures/prod-seed.sql (gitignored)

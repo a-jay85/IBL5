@@ -17,6 +17,7 @@
     "test:e2e:visual:update": "./bin/visual-regression.sh --update-snapshots",
     "lint:e2e": "bunx eslint tests/e2e playwright.config.ts",
     "docker:up": "cd .. && docker compose up -d",
+    "dev:up": "cd .. && bin/dev-up",
     "docker:down": "cd .. && docker compose down",
     "docker:logs": "cd .. && docker compose logs -f php",
     "wt:up": "cd .. && bin/wt-up",

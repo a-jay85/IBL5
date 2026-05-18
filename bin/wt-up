@@ -31,9 +31,10 @@ if [ -z "$WORKTREE_NAME" ]; then
     echo "Options:" >&2
     echo "  --pr            Use PR number as URL slug (e.g., pr-42.localhost)" >&2
     echo "  --seed          Import ci-seed.sql for test data (schema + CI seed)" >&2
-    echo "  --prod          Import prod-seed.sql data (default if no data flag given)" >&2
+    echo "  --prod          Sync live production DB via bin/db-sync-prod (default; requires .env REMOTE_* creds)" >&2
     echo "  --no-data       Schema only, no seed data" >&2
     echo "" >&2
+    echo "Without prod creds, use --seed or --no-data." >&2
     echo "The DB volume is always purged to ensure a clean database." >&2
     exit 1
 fi
@@ -187,11 +188,10 @@ docker compose -f "$COMPOSE_FILE" $ENV_FILE_FLAG -p "ibl5-$SLUG" down 2>/dev/nul
 echo "Purging DB volume..."
 docker volume rm "ibl5-${SLUG}_db-data" 2>/dev/null || true
 
-# When using --seed or --no-data, skip the entrypoint's auto prod-seed import —
-# wt-up handles data seeding explicitly after migrations.
-if [ "$SEED_DB" = true ] || [ "$NO_DATA" = true ]; then
-    export SKIP_PROD_SEED=1
-fi
+# The entrypoint's auto prod-seed import is now reserved for the offline fallback
+# only — wt-up always handles seeding itself (db-sync-prod for --prod, ci-seed
+# for --seed, nothing for --no-data), so suppress the entrypoint path here.
+export SKIP_PROD_SEED=1
 
 docker compose -f "$COMPOSE_FILE" $ENV_FILE_FLAG -p "ibl5-$SLUG" up -d --build
 
@@ -212,47 +212,21 @@ echo "MariaDB is ready."
 DB_CONTAINER="ibl5-db-$SLUG"
 DB_CMD="mariadb -u root -proot iblhoops_ibl5"
 
-# Always run migrations first (idempotent — skips already-applied ones).
-# This ensures the full schema exists before any data import, matching the
-# CI pipeline order: baseline → migrations → seed data.
-# For --prod, this is critical: if prod-seed.sql was exported data-only
-# (missing CREATE TABLE statements), the tables must already exist.
-"$REPO_ROOT/bin/db-migrate" "$DB_CONTAINER" "$WORKTREE_PATH/ibl5/migrations"
-
-if [ "$PROD_DB" = true ]; then
-    # --prod: overlay production data onto the migration-created schema.
-    # If prod-seed.sql contains CREATE TABLE statements (well-formed export),
-    # they harmlessly recreate existing tables. If it's data-only, the tables
-    # already exist from migrations above.
-    PROD_SEED="$REPO_ROOT/ibl5/fixtures/prod-seed.sql"
-    if [ ! -f "$PROD_SEED" ]; then
-        echo "prod-seed.sql not found — falling back to ci-seed.sql..."
-        PROD_DB=false
-        SEED_DB=true
-    fi
+# For --seed/--no-data, run migrations first so the schema exists before any
+# data import. For --prod, db-sync-prod ships its own schema + a backfill +
+# migration replay, so this pre-pass is skipped to avoid wasted work.
+if [ "$PROD_DB" = false ]; then
+    "$REPO_ROOT/bin/db-migrate" "$DB_CONTAINER" "$WORKTREE_PATH/ibl5/migrations"
 fi
 
 if [ "$PROD_DB" = true ]; then
-    echo "Importing prod-seed.sql..."
-    if ! db_import_sql "$DB_CONTAINER" < "$PROD_SEED"; then
+    echo "Syncing live production data into $DB_CONTAINER (via bin/db-sync-prod)..."
+    if ! "$REPO_ROOT/bin/db-sync-prod" "$WORKTREE_NAME"; then
+        echo "Error: db-sync-prod failed. The worktree is up but the database may be empty." >&2
+        echo "  Fix REMOTE_* creds in $REPO_ROOT/.env and re-run: bin/db-sync-prod $WORKTREE_NAME" >&2
+        echo "  Or rerun wt-up with --seed (ci fixtures) or --no-data (schema only)." >&2
         exit 1
     fi
-
-    # Backfill schema_migrations so future db-migrate runs skip already-applied ones.
-    # The prod dump tracks applied migrations in 'migrations' (id, migration, batch),
-    # but db-migrate uses 'schema_migrations' (version). Bridge the two.
-    echo "Backfilling schema_migrations from prod dump..."
-    db_exec "$DB_CONTAINER" $DB_CMD \
-        -e "INSERT IGNORE INTO schema_migrations (version) SELECT migration FROM migrations;" 2>/dev/null || true
-
-    # Replay any local migrations newer than the prod dump's cutoff.
-    # The prod-seed import above DROP-and-recreated every table, rolling the schema
-    # back to whatever was frozen at export time. Any migration that landed locally
-    # after the export has its file on disk but no matching row in schema_migrations
-    # (the backfill above only copied what prod had applied), so db-migrate will
-    # run it now. Idempotent — migrations already in schema_migrations are skipped.
-    echo "Replaying migrations not yet applied to prod seed..."
-    "$REPO_ROOT/bin/db-migrate" "$DB_CONTAINER" "$WORKTREE_PATH/ibl5/migrations"
 fi
 
 # Optionally seed with CI test data (after migrations so renamed columns exist)

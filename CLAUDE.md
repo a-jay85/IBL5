@@ -33,7 +33,7 @@ PHPStan and PHPUnit auto-run via PostToolUse hooks on task completion when PHP f
 New features should follow the Repository-Service-View pattern. See `Waivers/` (Repository, Service, Processor, Validator, View, Controller) as the canonical refactored example.
 
 ### Interface-Driven Modules
-The modules in `ibl5/classes/` follow Repository/Service/View pattern with interfaces in `Contracts/` subdirectories. See `php-classes.md` for structure details. A machine-generated module map (file counts, roles, cross-module dependencies) is in `codebase-map.md` — consult it before broad codebase searches.
+The modules in `ibl5/classes/` follow Repository/Service/View pattern with interfaces in `Contracts/` subdirectories. See `php-classes.md` for structure details. A machine-generated module map (file counts, roles, cross-module dependencies) is in `codebase-map.md` (gitignored, regenerated each session) — consult it before broad codebase searches.
 
 ### Key Patterns
 - **Repository:** Database queries via prepared statements

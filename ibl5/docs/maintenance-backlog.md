@@ -1,6 +1,6 @@
 ---
 description: Long-running backlog of maintenance-cost reduction opportunities, organized by axis. Each item is a candidate for a future plan.
-last_verified: 2026-05-17
+last_verified: 2026-05-18
 ---
 
 # Maintenance-Cost Reduction Backlog
@@ -407,14 +407,16 @@ Effort scale:
 **Risk if untouched:** Security function shadowable as a global; properties not in interface.
 
 ### 2.34 Draft Selection — Standalone POST Handler
-**Location:** `modules/Draft/draft_selection.php`
+**Status:** Completed — collapsed into `modules/Draft/index.php?op=select`.
+**Location:** `modules/Draft/draft_selection.php` (deleted)
 **Problem:** `require __DIR__/../../mainfile.php` directly; returns bare JSON/HTML. Same anti-pattern as Voting handlers.
 **Suggested direction:** Move into `modules/Draft/index.php?op=select` or `DraftController::handleSelection()`.
 **Est. effort:** S
 **Risk if untouched:** Bootstrap changes must be applied to standalone files separately.
 
 ### 2.35 ASGVote / EOYVote — Duplicate Standalone Handlers
-**Location:** `modules/Voting/ASGVote.php`, `EOYVote.php`
+**Status:** Completed — collapsed into `modules/Voting/index.php?op=submit_asg` and `?op=submit_eoy`.
+**Location:** `modules/Voting/ASGVote.php`, `EOYVote.php` (deleted)
 **Problem:** Both `require mainfile.php`; nearly identical, differing only by vote-type constant.
 **Suggested direction:** Merge into `modules/Voting/index.php` as `?op=submit_asg|submit_eoy`; `VotingSubmissionService` already accepts vote-type param.
 **Est. effort:** S

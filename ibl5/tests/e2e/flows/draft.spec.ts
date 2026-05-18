@@ -108,11 +108,10 @@ test.describe('Draft selection: submission', () => {
     await expect(firstRadio).toBeVisible();
     await firstRadio.check();
 
-    // Submit the form — navigates to draft_selection.php
+    // Submit the form — POSTs to modules.php?name=Draft&op=select
     const submitBtn = page.locator('button, input[type="submit"]').filter({
       hasText: /draft player/i,
     });
-    // Submit — wait for navigation to draft_selection.php
     await Promise.all([
       page.waitForNavigation({ waitUntil: 'domcontentloaded' }),
       submitBtn.first().click(),
@@ -121,14 +120,13 @@ test.describe('Draft selection: submission', () => {
     // The response page should contain draft-related content.
     // Success: "With pick #N ... select PlayerName!"
     // Error: "Oops, ..." or "didn't select a player"
-    // In CI, draft_selection.php may return a blank page (PHP fatal swallowed).
     const html = await page.content();
     const hasDraftContent =
       /select|drafted|pick\s*#|Draft|oops|error|didn.t/i.test(html);
 
-    // Verify the form navigated away from the draft board URL
-    const navigated = !page.url().includes('name=Draft');
-    expect(hasDraftContent || navigated).toBeTruthy();
+    // Verify the form submitted to the op=select route
+    const submittedToOp = page.url().includes('op=select');
+    expect(hasDraftContent || submittedToOp).toBeTruthy();
   });
 
   test('validation: no player selected', async ({ appState, page }) => {

@@ -533,7 +533,7 @@
 /* Player row */
 .last-sim-recap__player {
     display: grid;
-    grid-template-columns: 28px minmax(0, 1fr) auto;
+    grid-template-columns: 24px minmax(0, 1fr) auto;
     align-items: center;
     gap: .5rem;
     height: 32px;
@@ -545,16 +545,10 @@
     position: relative;
     display: inline-flex;
     flex: 0 0 auto;
-    width: 28px;
-    height: 28px;
+    width: 24px;
+    height: 24px;
 }
-.last-sim-recap__avatar {
-    width: 28px;
-    height: 28px;
-    border-radius: 50%;
-    display: block;
-}
-.last-sim-recap__player--you .last-sim-recap__avatar {
+.last-sim-recap__player--you .ibl-player-photo {
     box-shadow: 0 0 0 2px var(--accent-500), 0 0 0 3px var(--gray-50);
 }
 .last-sim-recap__injdot {

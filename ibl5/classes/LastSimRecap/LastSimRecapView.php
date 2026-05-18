@@ -363,11 +363,10 @@ class LastSimRecapView implements LastSimRecapViewInterface
     private function renderPlayerRow(bool $isYou, int $pid, string $name, int $pts, bool $hurt): string
     {
         $youMod = $isYou ? ' last-sim-recap__player--you' : '';
-        $imgSrc = PlayerImageHelper::getImageUrl($pid);
 
         $h  = '<div class="last-sim-recap__player' . $youMod . '">';
         $h .= '  <span class="last-sim-recap__avatar-wrap">';
-        $h .= '    <img src="' . HtmlSanitizer::e($imgSrc) . '" alt="" class="last-sim-recap__avatar" width="28" height="28" loading="lazy">';
+        $h .= '    ' . PlayerImageHelper::renderThumbnail($pid);
         if ($hurt) {
             $h .= '    <span class="last-sim-recap__injdot" aria-label="Injured">!</span>';
         }

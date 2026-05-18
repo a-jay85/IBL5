@@ -231,6 +231,48 @@ class JsbImportRepositoryTest extends DatabaseTestCase
         self::assertGreaterThanOrEqual(1, $affected);
     }
 
+    public function testCurrentUpsertLeavesOrphanRowsAtRanksAboveLatestImport(): void
+    {
+        $baseRecord = [
+            'scope' => 'team',
+            'teamid' => 4,
+            'record_type' => 'single_season',
+            'stat_category' => 'ppg',
+            'player_name' => 'Orphan Test Plyr',
+            'car_block_id' => 5,
+            'pid' => null,
+            'stat_value' => 20.0,
+            'stat_raw' => 200,
+            'team_of_record' => 4,
+            'season_year' => 2099,
+            'career_total' => null,
+            'source_file' => 'test.rcb',
+        ];
+
+        for ($rank = 91; $rank <= 99; $rank++) {
+            $this->repo->upsertRcbAlltimeRecord(array_merge($baseRecord, [
+                'ranking' => $rank,
+                'player_name' => "Orphan Plyr $rank",
+            ]));
+        }
+
+        $this->repo->upsertRcbAlltimeRecord(array_merge($baseRecord, [
+            'ranking' => 91,
+            'player_name' => 'Updated RankOne',
+        ]));
+
+        $stmt = $this->db->prepare(
+            "SELECT COUNT(*) AS cnt FROM ibl_rcb_alltime_records
+             WHERE scope = 'team' AND teamid = 4 AND record_type = 'single_season'
+               AND stat_category = 'ppg' AND ranking BETWEEN 91 AND 99"
+        );
+        self::assertNotFalse($stmt);
+        $stmt->execute();
+        $row = $stmt->get_result()->fetch_assoc();
+        self::assertNotNull($row);
+        self::assertSame(9, (int) $row['cnt'], 'Orphan rows at ranks 92-99 survive (bug)');
+    }
+
     // ── upsertRcbSeasonRecord ───────────────────────────────────
 
     public function testUpsertRcbSeasonRecordInsertsNewRow(): void

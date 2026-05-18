@@ -525,6 +525,7 @@
 .last-sim-recap__poslbl {
     display: flex;
     align-items: center;
+    justify-content: center;
     font-family: var(--font-mono);
     font-size: .6rem;
     font-weight: 700;
@@ -546,7 +547,7 @@
 .last-sim-recap__player {
     display: grid;
     grid-template-columns: 24px minmax(0, 1fr) auto;
-    align-items: center;
+    align-items: baseline;
     gap: .5rem;
     height: 32px;
 }
@@ -639,12 +640,16 @@
     .last-sim-recap__player {
         grid-template-columns: 24px;
         justify-items: center;
+        justify-content: center;
         height: auto;
     }
 
-    /* Tighten battle cell padding on mobile */
+    /* Tighten battle cell padding */
     .last-sim-recap__battle {
         padding: .5rem .45rem .55rem;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
     }
 }
 

@@ -2,6 +2,11 @@
 # Sync production database directly into a running Docker MariaDB container.
 # No prod-seed.sql intermediate — streams mariadb-dump → docker exec stdin.
 #
+# This is the canonical seed path for local dev: bin/dev-up (main stack)
+# and bin/wt-up --prod (worktrees) both invoke it. Unlike the offline
+# fallback (bin/db-export-prod → prod-seed.sql), this captures STORED
+# GENERATED tables like ibl_box_scores via dedicated --no-create-info passes.
+#
 # Usage: bin/db-sync-prod [worktree-name]
 #
 # Target resolution (in order):
@@ -18,11 +23,19 @@ source "$REPO_ROOT/bin/lib/db-helpers.sh"
 
 WORKTREE_ARG="${1:-}"
 
-# Load .env for REMOTE_* creds
+# Load .env for REMOTE_* creds.
+# When invoked from a worktree's bin/, REPO_ROOT is the worktree root, which
+# has no .env (only the main worktree does). Fall back to the main worktree
+# in that case so `bin/wt-up --prod` works from any CWD.
 ENV_FILE="$REPO_ROOT/.env"
 if [ ! -f "$ENV_FILE" ]; then
-    echo "Error: $ENV_FILE not found — REMOTE_* credentials required." >&2
-    exit 1
+    MAIN_WT="$(git -C "$REPO_ROOT" worktree list --porcelain 2>/dev/null | awk '/^worktree / {print $2; exit}')"
+    if [ -n "$MAIN_WT" ] && [ -f "$MAIN_WT/.env" ]; then
+        ENV_FILE="$MAIN_WT/.env"
+    else
+        echo "Error: $REPO_ROOT/.env not found — REMOTE_* credentials required." >&2
+        exit 1
+    fi
 fi
 set -a
 # shellcheck disable=SC1090

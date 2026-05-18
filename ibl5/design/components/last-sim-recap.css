@@ -599,4 +599,53 @@
     font-variant-numeric: tabular-nums;
 }
 
+/* ============================================================
+   Mobile overrides
+   ============================================================ */
+@media (max-width: 768px) {
+
+    /* Header: stack Net/Best/Worst vertically */
+    .last-sim-recap__meta {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: .15rem;
+    }
+
+    /* Tabs: hide W/L letter to make room for scores */
+    .last-sim-recap__tab-wl { display: none }
+
+    /* Tabs: date on its own line below @/vs TEAM */
+    .last-sim-recap__tab-top {
+        flex-wrap: wrap;
+    }
+    .last-sim-recap__tab-date {
+        flex-basis: 100%;
+        margin-left: 0;
+    }
+
+    /* Stack Final / Quarter Margin / Injury Report vertically */
+    .last-sim-recap__main {
+        grid-template-columns: 1fr;
+    }
+    .last-sim-recap__cell {
+        border-left: none;
+        border-top: 1px solid var(--gray-100);
+    }
+    .last-sim-recap__cell:first-child { border-top: none }
+
+    /* Battles: hide player names and points, show only avatars + position */
+    .last-sim-recap__player-name,
+    .last-sim-recap__player-pts { display: none }
+    .last-sim-recap__player {
+        grid-template-columns: 24px;
+        justify-items: center;
+        height: auto;
+    }
+
+    /* Tighten battle cell padding on mobile */
+    .last-sim-recap__battle {
+        padding: .5rem .45rem .55rem;
+    }
+}
+
 } /* end @layer components */

@@ -42,6 +42,7 @@ const REFERENCE_PREFIXES = [
 const REFERENCE_ALLOWLIST = [
     '.claude/settings.json',
     '.claude/settings.local.json',
+    '.claude/rules/codebase-map.md',  // gitignored — machine-generated per session (see CLAUDE.md §Interface-Driven Modules)
 ];
 
 function usage(): string

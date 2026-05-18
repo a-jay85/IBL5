@@ -445,7 +445,7 @@
     padding: 1px 5px;
     border-radius: 3px;
     letter-spacing: .06em;
-    vertical-align: 1px;
+    vertical-align: 3px;
 }
 .last-sim-recap__inj-new {
     display: inline-flex;
@@ -461,7 +461,7 @@
     font-weight: 800;
     margin-left: 5px;
     line-height: 1;
-    vertical-align: 1px;
+    vertical-align: 3px;
 }
 .last-sim-recap__inj-why {
     display: block;

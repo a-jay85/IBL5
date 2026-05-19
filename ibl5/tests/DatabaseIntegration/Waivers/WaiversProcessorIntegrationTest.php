@@ -7,7 +7,7 @@ namespace Tests\DatabaseIntegration\Waivers;
 use PHPUnit\Framework\Attributes\Group;
 use Repositories\TeamIdentityRepository;
 use Repositories\PlayerLookupRepository;
-use Topics\News\NewsService;
+use Topics\News\NewsRepository;
 use Tests\DatabaseIntegration\DatabaseTestCase;
 use Waivers\WaiversProcessor;
 use Waivers\WaiversRepository;
@@ -32,7 +32,7 @@ class WaiversProcessorIntegrationTest extends DatabaseTestCase
         $this->teamIdentityRepository = new TeamIdentityRepository($this->db);
         $this->playerLookupRepository = new PlayerLookupRepository($this->db);
         $validator = new WaiversValidator();
-        $newsService = new NewsService($this->db);
+        $newsService = new NewsRepository($this->db);
 
         $this->processor = new WaiversProcessor(
             $repository,

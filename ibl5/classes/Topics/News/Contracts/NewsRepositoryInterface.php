@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Topics\News\Contracts;
 
-interface NewsServiceInterface
+interface NewsRepositoryInterface
 {
     public function createNewsStory(
         int $categoryID,

@@ -27,7 +27,7 @@ function waivers($user)
     $playerLookupRepo = new Repositories\PlayerLookupRepository($mysqli_db);
     $salaryCapRepo = new Repositories\SalaryCapRepository($mysqli_db);
     $validator = new Waivers\WaiversValidator();
-    $newsService = new Topics\News\NewsService($mysqli_db);
+    $newsService = new Topics\News\NewsRepository($mysqli_db);
     $processor = new Waivers\WaiversProcessor($repo, $teamIdentityRepo, $playerLookupRepo, $validator, $newsService, $mysqli_db);
     $view = new Waivers\WaiversView();
     $teamQueryRepo = new Team\TeamQueryRepository($mysqli_db);

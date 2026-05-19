@@ -5,18 +5,18 @@ declare(strict_types=1);
 namespace Tests\Topics\News;
 
 use PHPUnit\Framework\TestCase;
-use Topics\News\NewsService;
+use Topics\News\NewsRepository;
 use Tests\WideUnit\Mocks\MockDatabase;
 
-class NewsServiceTest extends TestCase
+class NewsRepositoryTest extends TestCase
 {
-    private NewsService $newsService;
+    private NewsRepository $newsService;
     private MockDatabase $mockDb;
 
     protected function setUp(): void
     {
         $this->mockDb = new MockDatabase();
-        $this->newsService = new NewsService($this->mockDb);
+        $this->newsService = new NewsRepository($this->mockDb);
     }
 
     public function testCreateNewsStoryExecutesInsert(): void

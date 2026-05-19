@@ -69,11 +69,7 @@ class RecordHoldersRepository extends \BaseMysqliRepository implements RecordHol
      */
     public function getQuadrupleDoubles(): array
     {
-        $query = "WITH _game_of_day AS (
-                SELECT game_date, visitor_teamid, home_teamid, MIN(game_of_that_day) AS game_of_that_day
-                FROM {$this->boxScoresTeamsTable}
-                GROUP BY game_date, visitor_teamid, home_teamid
-            )
+        $query = "WITH _game_of_day AS " . $this->gameOfThatDaySubquery() . "
             SELECT
                 bs.pid,
                 p.name,
@@ -241,11 +237,7 @@ class RecordHoldersRepository extends \BaseMysqliRepository implements RecordHol
      */
     public function getLargestMarginOfVictory(string $dateFilter): array
     {
-        $query = "WITH _game_of_day AS (
-                SELECT game_date, visitor_teamid, home_teamid, MIN(game_of_that_day) AS game_of_that_day
-                FROM {$this->boxScoresTeamsTable}
-                GROUP BY game_date, visitor_teamid, home_teamid
-            )
+        $query = "WITH _game_of_day AS " . $this->gameOfThatDaySubquery() . "
             SELECT
                 winner_t.teamid AS winner_tid,
                 winner_t.team_name AS winner_name,
@@ -656,11 +648,7 @@ class RecordHoldersRepository extends \BaseMysqliRepository implements RecordHol
         }
 
         // CTE materializes game_of_that_day lookup once instead of per UNION ALL branch
-        $cte = "WITH _game_of_day AS (
-            SELECT game_date, visitor_teamid, home_teamid, MIN(game_of_that_day) AS game_of_that_day
-            FROM {$this->boxScoresTeamsTable}
-            GROUP BY game_date, visitor_teamid, home_teamid
-        )\n";
+        $cte = "WITH _game_of_day AS " . $this->gameOfThatDaySubquery() . "\n";
         $query = $cte . implode("\nUNION ALL\n", $unions);
         $rows = $this->fetchAll($query);
 

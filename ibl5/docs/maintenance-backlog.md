@@ -1528,6 +1528,7 @@ Effort scale:
 **Suggested direction:** New `BanEchoOutsideViewRule`; allow `LegacyFunctions.php`, `PageLayout.php`, `DebugOutput.php`, `BulkImport/`, `UI/Tables/`.
 **Est. effort:** S
 **Risk if untouched:** Controller output un-bufferable; regression magnet.
+**Status:** Rule landed (2026-05-19) — `BanEchoInNonViewClassesRule` (`ibl.echoInNonView`). 16 baseline violations in Controllers/ApiHandlers; burndown deferred to incremental follow-up PRs.
 
 ### 10.5 `global` Keyword Outside Bootstrap/PageLayout/NukeCompat
 **Location:** `UI/DebugOutput.php:26`, `DepthChartEntry/DepthChartEntryView.php:31`, `Team/TeamController.php:91`, `Team/TeamService.php:52`, `Waivers/WaiversController.php:69`, `Updater/ScheduleUpdater.php:58`, several more
@@ -1549,6 +1550,7 @@ Effort scale:
 **Suggested direction:** New `BanExitInNonCliRule`; allow Bootstrap + `LegacyFunctions.php`.
 **Est. effort:** S
 **Risk if untouched:** Audit logging post-redirect never runs.
+**Status:** Rule landed (2026-05-19) — `BanDieExitInProductionRule` (`ibl.dieExit`). 0 baseline violations. HtmxHelper.php allowlisted pending module lifecycle refactor.
 
 ### 10.8 `intval` / `floatval` / `strval` Instead of Casts
 **Location:** `Bootstrap/LegacyFunctions.php` (~20), `Bootstrap/ConfigBootstrap.php` (~15)
@@ -1556,6 +1558,7 @@ Effort scale:
 **Suggested direction:** New `BanCastFunctionsRule`; allow `LegacyFunctions.php`, `ConfigBootstrap.php`.
 **Est. effort:** S
 **Risk if untouched:** Implicit-radix bugs (`intval('08')` → 0); narrower type inference.
+**Status:** Rule landed (2026-05-19) — `BanCastFunctionsRule` (`ibl.castFunction`). 0 baseline violations. Boxscore and NegotiationDemandCalculator intval→(int) burned down. StatsSanitizer allowlisted.
 
 ### 10.9 `htmlspecialchars` / `htmlentities` Direct Calls
 **Location:** `UI/DebugOutput.php:57`, `Bootstrap/LegacyFunctions.php:293`
@@ -1623,6 +1626,7 @@ Effort scale:
 **Suggested direction:** New `BanServiceExtendsRepositoryRule`; flag `*Service` whose parent chain includes `BaseMysqliRepository`.
 **Est. effort:** M
 **Risk if untouched:** Architectural boundary unenforced.
+**Status:** Rule landed (2026-05-19) — `BanServiceExtendsBaseRepositoryRule` (`ibl.serviceExtendsRepository`). 0 baseline violations. NewsService renamed to NewsRepository (sole violation).
 
 ### 10.19 ADR-0014: No Rule Blocks Forking Modifier Formulas
 **Location:** No existing rule
@@ -1651,6 +1655,7 @@ Effort scale:
 **Suggested direction:** New `RequireJsonThrowOnErrorRule` checking bitmask arg.
 **Est. effort:** M
 **Risk if untouched:** Corrupted cache/JSON columns mis-traced.
+**Status:** Rule landed (2026-05-19) — `BanJsonDecodeWithoutThrowFlagRule` (`ibl.jsonDecodeWithoutThrow`). 0 baseline violations. All 4 sites burned down with try/catch fallbacks.
 
 ### 10.23 Hardcoded Environment Strings in Domain Classes
 **Location:** `Trading/TradeOfferRepository.php:58` (`SERVER_NAME === "localhost"`), `Trading/TradeProcessor.php:378`, `Extension/ExtensionService.php:267`, `Discord/Discord.php:43`

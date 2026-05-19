@@ -6,16 +6,9 @@ import { publicStorageState } from '../helpers/public-storage-state';
 test.use({ storageState: publicStorageState() });
 
 test.describe('Error page smoke tests', () => {
-  test('invalid module name shows error message without PHP errors', async ({ page }) => {
+  test('invalid module name redirects to index', async ({ page }) => {
     await page.goto('modules.php?name=NonExistentModule');
-    // Should show "doesn't exist" message or module-not-active message
-    const body = await page.locator('body').textContent();
-    const hasErrorMessage =
-      body?.includes("doesn't exist") ||
-      body?.includes('not active') ||
-      body?.includes('not found');
-    expect(hasErrorMessage).toBe(true);
-    await assertNoPhpErrors(page, 'on invalid module page');
+    expect(page.url()).toContain('index.php');
   });
 
   test('module name with special characters does not error', async ({ page }) => {

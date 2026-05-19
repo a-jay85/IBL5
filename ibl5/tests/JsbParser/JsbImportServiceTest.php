@@ -255,6 +255,36 @@ class JsbImportServiceTest extends TestCase
         return $record;
     }
 
+    /**
+     * @param list<array{marker: int, from_team: int, to_team: int, player_id: int|null, draft_year: int|null}> $tradeItems
+     */
+    private function buildTradeRecord(int $month, int $day, int $year, array $tradeItems): string
+    {
+        $record = str_repeat(' ', TrnFileParser::RECORD_SIZE);
+        $record = substr_replace($record, str_pad((string) $month, 2, ' ', STR_PAD_LEFT), 17, 2);
+        $record = substr_replace($record, str_pad((string) $day, 2, ' ', STR_PAD_LEFT), 19, 2);
+        $record = substr_replace($record, str_pad((string) ($year - 1), 4, ' ', STR_PAD_LEFT), 21, 4);
+        $record = substr_replace($record, (string) TrnFileParser::TYPE_TRADE, 26, 1);
+
+        $tradeAreaStart = 27;
+        foreach ($tradeItems as $i => $item) {
+            $offset = $tradeAreaStart + $i * TrnFileParser::TRADE_ITEM_SIZE;
+            $itemStr = (string) $item['marker'];
+            if ($item['marker'] === TrnFileParser::TRADE_MARKER_PLAYER) {
+                $itemStr .= str_pad((string) $item['from_team'], 6, ' ', STR_PAD_LEFT);
+                $itemStr .= str_pad((string) $item['to_team'], 6, ' ', STR_PAD_LEFT);
+                $itemStr .= str_pad((string) ($item['player_id'] ?? 0), 6, ' ', STR_PAD_LEFT);
+            } else {
+                $itemStr .= str_pad((string) ($item['draft_year'] ?? 0), 6, ' ', STR_PAD_LEFT);
+                $itemStr .= str_pad((string) $item['from_team'], 6, ' ', STR_PAD_LEFT);
+                $itemStr .= str_pad((string) $item['to_team'], 6, ' ', STR_PAD_LEFT);
+            }
+            $record = substr_replace($record, $itemStr, $offset, TrnFileParser::TRADE_ITEM_SIZE);
+        }
+
+        return $record;
+    }
+
     public function testProcessTrnFileReturnsErrorOnParseFailure(): void
     {
         $tmpFile = $this->writeTmpFile('invalid data');
@@ -548,6 +578,116 @@ class JsbImportServiceTest extends TestCase
     {
         $result = $this->makeService()->processHofData(str_repeat(' ', 7000));
         $this->assertSame(0, $result->errors);
+    }
+
+    // ── processAwaFile — dual-path characterization ────────────
+
+    public function testProcessAwaFileReturnsErrorWhenAwaPathMissing(): void
+    {
+        $carFile = $this->writeTmpFile('dummy car data');
+
+        try {
+            $result = $this->makeService()->processAwaFile('/nonexistent-awa', $carFile);
+            $this->assertSame(1, $result->errors);
+            $this->assertStringContainsString('AWA or CAR file not found', $result->messages[0]);
+        } finally {
+            unlink($carFile);
+        }
+    }
+
+    public function testProcessAwaFileReturnsErrorWhenCarPathMissing(): void
+    {
+        $awaFile = $this->writeTmpFile('dummy awa data');
+
+        try {
+            $result = $this->makeService()->processAwaFile($awaFile, '/nonexistent-car');
+            $this->assertSame(1, $result->errors);
+            $this->assertStringContainsString('AWA or CAR file not found', $result->messages[0]);
+        } finally {
+            unlink($awaFile);
+        }
+    }
+
+    public function testProcessAwaFileDelegatesToProcessAwaDataOnBothReadable(): void
+    {
+        $seasonRecord = $this->buildSeasonRecord(2006);
+        $playerBlock = $this->buildPlayerBlock(1, 100, 'Test Player', $seasonRecord);
+        $carData = $this->buildCarFile(1, $playerBlock);
+        $carFile = $this->writeTmpFile($carData);
+
+        $awaData = str_repeat("\x00", 100);
+        $awaFile = $this->writeTmpFile($awaData);
+
+        try {
+            $result = $this->makeService()->processAwaFile($awaFile, $carFile, 2006);
+            // AWA parse will fail on the binary data, proving delegation happened
+            $this->assertSame(1, $result->errors);
+            $this->assertStringContainsString('AWA parse failed', $result->messages[0]);
+        } finally {
+            unlink($awaFile);
+            unlink($carFile);
+        }
+    }
+
+    // ── processTrnData — trade-group ID characterization ────────
+
+    public function testProcessTrnDataIncrementsTradeGroupIdFromMaxPlusOne(): void
+    {
+        $mockRepo = $this->createMock(JsbImportRepositoryInterface::class);
+        $mockRepo->expects($this->once())->method('fetchMaxTradeGroupId')->willReturn(42);
+        $mockRepo->method('getPlayerName')->willReturn('Traded Player');
+
+        $capturedTradeGroupId = null;
+        $mockRepo->method('upsertTransaction')->willReturnCallback(
+            static function (array $data) use (&$capturedTradeGroupId): int {
+                if ($data['trade_group_id'] !== null) {
+                    $capturedTradeGroupId = $data['trade_group_id'];
+                }
+                return 1;
+            }
+        );
+
+        $this->stubRepo = $mockRepo;
+        $service = $this->makeService();
+
+        $tradeRecord = $this->buildTradeRecord(10, 15, 2006, [
+            ['marker' => TrnFileParser::TRADE_MARKER_PLAYER, 'from_team' => 1, 'to_team' => 5, 'player_id' => 100, 'draft_year' => null],
+        ]);
+        $trnData = $this->buildTrnFile(1, [$tradeRecord]);
+
+        $result = $service->processTrnData($trnData);
+        $this->assertSame(0, $result->errors);
+        $this->assertSame(43, $capturedTradeGroupId);
+    }
+
+    public function testProcessTrnDataTradeGroupIdFallsBackToOneOnRepoException(): void
+    {
+        $mockRepo = $this->createMock(JsbImportRepositoryInterface::class);
+        $mockRepo->expects($this->once())->method('fetchMaxTradeGroupId')
+            ->willThrowException(new \RuntimeException('DB error'));
+        $mockRepo->method('getPlayerName')->willReturn('Traded Player');
+
+        $capturedTradeGroupId = null;
+        $mockRepo->method('upsertTransaction')->willReturnCallback(
+            static function (array $data) use (&$capturedTradeGroupId): int {
+                if ($data['trade_group_id'] !== null) {
+                    $capturedTradeGroupId = $data['trade_group_id'];
+                }
+                return 1;
+            }
+        );
+
+        $this->stubRepo = $mockRepo;
+        $service = $this->makeService();
+
+        $tradeRecord = $this->buildTradeRecord(10, 15, 2006, [
+            ['marker' => TrnFileParser::TRADE_MARKER_PLAYER, 'from_team' => 1, 'to_team' => 5, 'player_id' => 200, 'draft_year' => null],
+        ]);
+        $trnData = $this->buildTrnFile(1, [$tradeRecord]);
+
+        $result = $service->processTrnData($trnData);
+        $this->assertSame(0, $result->errors);
+        $this->assertSame(1, $capturedTradeGroupId);
     }
 
     // ── processXxxFile — file-not-found characterization ────────

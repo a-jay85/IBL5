@@ -59,12 +59,12 @@ class BaseMysqliRepositoryHelpersTest extends DatabaseTestCase
         $result = $this->repo->callFetchAllInList(
             "SELECT teamid, team_name FROM `ibl_team_info` WHERE team_name IN ({IN}) ORDER BY teamid",
             's',
-            ['Celtics', 'Heat']
+            ['Metros', 'Stars']
         );
 
         self::assertCount(2, $result);
-        self::assertSame('Celtics', $result[0]['team_name']);
-        self::assertSame('Heat', $result[1]['team_name']);
+        self::assertSame('Metros', $result[0]['team_name']);
+        self::assertSame('Stars', $result[1]['team_name']);
     }
 
     public function testFetchAllInListRejectsMultiCharType(): void
@@ -90,8 +90,8 @@ class BaseMysqliRepositoryHelpersTest extends DatabaseTestCase
         );
 
         self::assertCount(1, $result);
-        self::assertSame(3, $result[0]['teamid']);
-        self::assertSame('Knicks', $result[0]['team_name']);
+        self::assertSame(1, $result[0]['teamid']);
+        self::assertSame('Metros', $result[0]['team_name']);
     }
 
     public function testGameOfThatDaySubqueryProducesValidSql(): void

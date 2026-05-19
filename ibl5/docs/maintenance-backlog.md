@@ -1,6 +1,6 @@
 ---
 description: Long-running backlog of maintenance-cost reduction opportunities, organized by axis. Each item is a candidate for a future plan.
-last_verified: 2026-05-18
+last_verified: 2026-05-19
 ---
 
 # Maintenance-Cost Reduction Backlog
@@ -1304,6 +1304,7 @@ Effort scale:
 **Suggested direction:** Update counts; remove `ibl_plr_chunk`; remove MyISAM section; sync dates.
 **Est. effort:** S
 **Risk if untouched:** Agent writes queries against dropped tables.
+**Status:** Completed branch `doc-freshness-catchup` (2026-05-19) — table counts refreshed (93 InnoDB/27 views/33 FKs), ibl_plr_chunk removed, MyISAM section deleted, Schema Version line removed, PostgreSQL section removed, body date removed.
 
 ### 9.2 DATABASE_GUIDE — Dead PostgreSQL Compatibility Section
 **Location:** `ibl5/docs/DATABASE_GUIDE.md` lines 100-105
@@ -1318,6 +1319,7 @@ Effort scale:
 **Suggested direction:** Replace with `auth_users`; add `gm_username` mapping note.
 **Est. effort:** S
 **Risk if untouched:** Agent JOINs against nonexistent table; auth queries fail.
+**Status:** Completed branch `doc-freshness-catchup` (2026-05-19) — schema-reference.md now cites auth_users with ibl_team_info.gm_username mapping.
 
 ### 9.4 API_GUIDE Claims API "Not Yet Implemented" — It's Fully Built
 **Location:** `ibl5/docs/API_GUIDE.md`
@@ -1325,6 +1327,7 @@ Effort scale:
 **Suggested direction:** Rewrite as endpoint reference; archive design content.
 **Est. effort:** M
 **Risk if untouched:** Agents treat the API as absent and reimplement endpoints.
+**Status:** Partially completed branch `doc-freshness-catchup` (2026-05-19) — header/"planned" framing fixed; rewrote as architectural overview with controller inventory. Full endpoint-by-endpoint reference deferred. Re-open as 9.4b when an endpoint reference is authored.
 
 ### 9.5 `ibl5/docs/README.md` Lists API_GUIDE as "(planned)"
 **Location:** `ibl5/docs/README.md` line 23
@@ -1332,6 +1335,7 @@ Effort scale:
 **Suggested direction:** Update description after 9.4.
 **Est. effort:** S
 **Risk if untouched:** Agents skip API_GUIDE assuming nothing's implemented.
+**Status:** Completed branch `doc-freshness-catchup` (2026-05-19) — index row reflects built API.
 
 ### 9.6 DEVELOPMENT_GUIDE — Internally Inconsistent Test Counts
 **Location:** `ibl5/docs/DEVELOPMENT_GUIDE.md` lines 8, 25, 46
@@ -1339,6 +1343,7 @@ Effort scale:
 **Suggested direction:** Remove inline counts; point to `composer test`.
 **Est. effort:** S
 **Risk if untouched:** Inconsistent counts cited in PRs.
+**Status:** Completed branch `doc-freshness-catchup` (2026-05-19) — inline test counts removed; doc points to `composer test`.
 
 ### 9.7 DEVELOPMENT_GUIDE — "Power_Rankings" Module Doesn't Exist
 **Location:** `ibl5/docs/DEVELOPMENT_GUIDE.md` lines 20, 422
@@ -1346,6 +1351,7 @@ Effort scale:
 **Suggested direction:** Remove from display-modules list; update count from 8 to 7.
 **Est. effort:** S
 **Risk if untouched:** Agent searches for nonexistent dir.
+**Status:** Completed branch `doc-freshness-catchup` (2026-05-19) — Power_Rankings removed from display-modules list; count corrected to 7.
 
 ### 9.8 ARCHITECTURE_PATTERNS — Outdated "Established" Modules
 **Location:** `ibl5/docs/ARCHITECTURE_PATTERNS.md` line 15
@@ -1353,6 +1359,7 @@ Effort scale:
 **Suggested direction:** Align with CLAUDE.md's Waivers designation.
 **Est. effort:** S
 **Risk if untouched:** Inconsistent canonical pointers confuse agents.
+**Status:** Completed branch `doc-freshness-catchup` (2026-05-19) — "Established" example aligned with ADR-0001 / CLAUDE.md (Waivers).
 
 ### 9.9 DEVELOPMENT_GUIDE Refers to .github/skills/ — Doesn't Exist
 **Location:** `ibl5/docs/DEVELOPMENT_GUIDE.md` lines 10, 82, 435
@@ -1367,6 +1374,7 @@ Effort scale:
 **Suggested direction:** Archive (if superseded) or sync with current canonical.
 **Est. effort:** S
 **Risk if untouched:** Agent uses older XSS-helper style; PHPStan violations.
+**Status:** Completed branch `doc-freshness-catchup` (2026-05-19) — safeHtmlOutput → e(); .github/skills/ → .claude/skills/. NOTE: file is out of bin/check-docs scope; no frontmatter added until CI gates it (separate backlog item).
 
 ### 9.11 DOCUMENTATION_STANDARDS — Stranded `SECURITY.md` Example
 **Location:** `ibl5/docs/DOCUMENTATION_STANDARDS.md` line 35
@@ -1423,6 +1431,7 @@ Effort scale:
 **Suggested direction:** Run coverage, align docs; identify enforcement location.
 **Est. effort:** S
 **Risk if untouched:** Wrong coverage target cited in PR reviews.
+**Status:** Completed branch `doc-freshness-catchup` (2026-05-19) — coverage figures aligned across STRATEGIC_PRIORITIES + DEVELOPMENT_GUIDE (~80%, 70% threshold).
 
 ### 9.19 65 of 80 Module Directories Have No README
 **Location:** `ibl5/classes/` (65 dirs)
@@ -1472,6 +1481,7 @@ Effort scale:
 **Suggested direction:** Process change: strike completed items per drop PR; add "Completed drops" subsection.
 **Est. effort:** S per PR
 **Risk if untouched:** Agent re-audits already-completed work.
+**Status:** Completed branch `doc-freshness-catchup` (2026-05-19) — Section 1 audited; nuke_users drop moved to explicit "Completed drops" subsection with migration numbers. Remaining count updated to 10 tables. Stale intro text ("~20 tables", "Nine DROP migrations") corrected.
 
 ### 9.26 No CHANGELOG Exists
 **Location:** `ibl5/` (absent)

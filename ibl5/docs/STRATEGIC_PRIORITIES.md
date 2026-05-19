@@ -1,11 +1,9 @@
 ---
 description: Post-refactoring roadmap and priority queue.
-last_verified: 2026-04-11
+last_verified: 2026-05-19
 ---
 
 # Strategic Development Priorities for IBL5
-
-**Last Updated:** March 25, 2026
 
 ## Current State
 
@@ -26,7 +24,7 @@ IBL5 has completed its full-stack modernization from a PHP-Nuke monolith to an i
 
 - PHPStan level `max` with `strict-rules` and `bleedingEdge` — zero errors
 - PHPUnit — full suite green, zero skips
-- Coverage threshold — 70% (ratcheted; actual ~72%)
+- Coverage threshold — 70% (ratcheted; actual ~80%)
 - Mutation testing — 100% MSI / 100% Covered MSI (weekly + on-demand)
 - Playwright E2E — 4-shard parallel, visual regression baselines
 - Lighthouse — performance audits on every PR
@@ -37,11 +35,13 @@ IBL5 has completed its full-stack modernization from a PHP-Nuke monolith to an i
 
 ### 1. PHP-Nuke Legacy Retirement
 
-The baseline schema still defines ~20 `nuke_*` tables. Nine DROP migrations have shipped so far (`nuke_session`, `nuke_antiflood`, `nuke_banned_ip`, `nuke_modules`, `nuke_comments`, plus 5 others). Each drop requires auditing code references, migrating any live reads to IBL-native tables (`ibl_settings`, `ibl_users`), and removing dead writes.
+10 `nuke_*` tables remain (`nuke_blocks`, `nuke_config`, `nuke_counter`, `nuke_stats_date`, `nuke_stats_hour`, `nuke_stats_month`, `nuke_stats_year`, `nuke_stories`, `nuke_stories_cat`, `nuke_topics`). Over 20 others have been dropped across migrations 050–102. Each drop requires auditing code references, migrating any live reads to IBL-native tables (`ibl_settings`, `auth_users`), and removing dead writes.
+
+**Completed drops:** `nuke_users` (migration 102, PRs #599/#600), `nuke_session` (070), `nuke_comments` (073), `nuke_modules` (074), `nuke_authors`/`nuke_pages`/`nuke_poll_desc` (071), `nuke_headlines`/`nuke_main`/`nuke_queue` (050), `nuke_autonews`/`nuke_groups`/`nuke_message` (051), `nuke_referer` (052), plus others in 035/072.
 
 **Remaining work:**
-- Audit and drop remaining `nuke_*` tables where code references are dead
-- Migrate live `nuke_stories` reads to IBL-native equivalents (`nuke_users` dropped — PRs #599, #600, migration 102)
+- Audit and drop remaining 10 `nuke_*` tables where code references are dead
+- Migrate live `nuke_stories` reads to IBL-native equivalents
 - Remove PHP-Nuke framework functions still called from bootstrap (`mainfile.php`)
 - Goal: eliminate `nuke_*` dependency entirely so the schema only contains `ibl_*` and `auth_*` tables
 
@@ -65,7 +65,7 @@ HTMX is partially adopted — boosted navigation, tab switching, and form boost 
 
 ### 4. Test Coverage Expansion
 
-Coverage is at ~72% with the 70% CI threshold. The test suite is mature (PHPUnit, Playwright, mutation testing all enforced), but there are still gaps in integration test coverage for some modules.
+Coverage is at ~80% with the 70% CI threshold. The test suite is mature (PHPUnit, Playwright, mutation testing all enforced), but there are still gaps in integration test coverage for some modules.
 
 **Remaining work:**
 - Ratchet coverage threshold as new tests are added (next target: 75%)
@@ -96,4 +96,4 @@ The REST API has 17 controllers covering players, teams, games, standings, sched
 - **Oct 2025 – Mar 2026**: All IBL modules refactored to Repository/Service/View with interfaces
 - **Jan 2026**: 80% test coverage target achieved; all display modules refactored
 - **Feb 2026**: REST API launched with auth, rate limiting, caching
-- **Mar 2026**: HTMX frontend phases 1-3 shipped; mutation testing at 100% MSI; 9 legacy `nuke_*` tables dropped; TradingRepository god class split; CSV player export; production deploy smoke tests; worktree Docker simplification
+- **Mar 2026**: HTMX frontend phases 1-3 shipped; mutation testing at 100% MSI; legacy `nuke_*` tables reduced to 10 (from 30+); TradingRepository god class split; CSV player export; production deploy smoke tests; worktree Docker simplification

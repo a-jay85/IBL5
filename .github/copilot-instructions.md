@@ -1,6 +1,6 @@
 # IBL5 Universal Coding Rules
 
-**Progressive loading enabled:** Detailed specifications are in `.claude/rules/` and `.github/skills/`. See [SKILLS_GUIDE.md](SKILLS_GUIDE.md) for architecture details.
+**Progressive loading enabled:** Detailed specifications are in `.claude/rules/` and `.claude/skills/`. See [SKILLS_GUIDE.md](SKILLS_GUIDE.md) for architecture details.
 
 ---
 
@@ -14,7 +14,7 @@
 - Fix every instance of identified patterns, not just commented lines
 
 ### XSS Protection (MANDATORY)
-- Use `Security\HtmlSanitizer::safeHtmlOutput()` on ALL dynamic content
+- Use `Security\HtmlSanitizer::e()` on ALL dynamic content
 - Check: database results, form inputs, player names, error messages
 - **Never skip this check** - applies during ANY code work
 
@@ -79,4 +79,4 @@ After refactoring, compare localhost against iblhoops.net. Output must match exa
 - [DATABASE_GUIDE.md](../ibl5/docs/DATABASE_GUIDE.md) - Schema reference
 - [SKILLS_GUIDE.md](SKILLS_GUIDE.md) - Progressive loading architecture
 - `.claude/rules/` - Path-conditional rules (auto-load by file)
-- `.github/skills/` - Task-discovery skills (auto-load by intent)
+- `.claude/skills/` - Task-discovery skills (auto-load by intent)

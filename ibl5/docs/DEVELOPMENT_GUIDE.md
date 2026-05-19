@@ -1,11 +1,11 @@
 ---
 description: Development standards, priorities, and workflow for IBL5.
-last_verified: 2026-05-04
+last_verified: 2026-05-19
 ---
 
 # Development Guide
 
-**Status:** 31/31 total modules refactored (100% complete) ✅ • 4393 tests • ~80% coverage • Goal: 80% ✅
+**Status:** 31/31 total modules refactored (100% complete) ✅ • ~80% coverage • Goal: 80% ✅ • See `composer test` for current test count.
 
 > 📘 **Progressive Loading:** Detailed workflows are in `.claude/rules/` and `.claude/skills/`. See [SKILLS_GUIDE.md](.github/SKILLS_GUIDE.md).
 
@@ -17,12 +17,12 @@ last_verified: 2026-05-04
 
 **Modules Included:**
 - 22 Core IBL modules (Player, Statistics, Team, Draft, Waivers, Extension, RookieOption, Trading, Negotiation, DepthChart, Voting, Schedule, Season Leaders, Free Agency, PlayerDatabase, Compare_Players, Leaderboards, Standings, League_Stats, AwardHistory, Series_Records, One-on-One)
-- 8 Display modules (CapSpace, Draft_Pick_Locator, Franchise_History, Injuries, League_Starters, Next_Sim, Power_Rankings, Team_Schedule)
+- 7 Display modules (CapSpace, Draft_Pick_Locator, Franchise_History, Injuries, League_Starters, Next_Sim, Team_Schedule)
 - 1 Admin module (LeagueControlPanel)
 
 ### 🚀 Post-Refactoring Phase
 
-1. **Test Coverage → 80%** - ✅ Goal achieved with 3033 tests (~80% coverage). Comprehensive edge case testing complete.
+1. **Test Coverage → 80%** - ✅ Goal achieved (~80% coverage). Comprehensive edge case testing complete. See `composer test` for current count.
 
    **Priority WideUnit Tests:** ✅ All Complete
    - ~~Waivers, DepthChart, RookieOption, Schedule, Standings, Voting~~
@@ -43,7 +43,7 @@ last_verified: 2026-05-04
 
 ### LeagueControlPanel: Admin Module Refactoring (Mar 2, 2026)
 
-**Impact:** Refactored admin LeagueControlPanel from 353-line monolithic script to Repository-Service-Processor-View architecture, bringing total from 3033 to 3089 tests (+56 tests)
+**Impact:** Refactored admin LeagueControlPanel from 353-line monolithic script to Repository-Service-Processor-View architecture (+56 tests)
 
 **Changes:**
 - Created 4 classes + 4 interfaces with separation of concerns
@@ -60,11 +60,11 @@ last_verified: 2026-05-04
 - LeagueControlPanelProcessorTest: 18 tests
 - LeagueControlPanelViewTest: 14 tests
 
-**Status:** All 3089 tests passing • LeagueControlPanel now fully refactored
+**Status:** All tests passing • LeagueControlPanel now fully refactored
 
 ### Navigation: View Split into Controller/Service/View Architecture (Feb 27, 2026)
 
-**Impact:** Split 927-line monolithic NavigationView into 10 focused files following Repository/Service/View pattern, bringing total to 3370 tests
+**Impact:** Split 927-line monolithic NavigationView into 10 focused files following Repository/Service/View pattern
 
 **Changes:**
 - Extracted `NavigationConfig` DTO replacing 10 constructor parameters
@@ -85,13 +85,13 @@ last_verified: 2026-05-04
 - NavigationConfigTest: 3 tests (construction, defaults, readonly)
 - NavigationViewTest: 9 tests (6 existing Draft link + 3 new orchestration tests)
 
-**Status:** All 3370 tests passing, PHPStan clean (0 errors)
+**Status:** All tests passing, PHPStan clean (0 errors)
 
 ---
 
 ### StandingsUpdater: Database-Driven Computation (Feb 14, 2026)
 
-**Impact:** Replaced HTML file parsing with database-driven standings computation, bringing total from 2164 to 3033 tests
+**Impact:** Replaced HTML file parsing with database-driven standings computation
 
 **Changes:**
 - `StandingsUpdater` now computes standings from `ibl_schedule` game results instead of parsing `Standings.htm`
@@ -103,13 +103,13 @@ last_verified: 2026-05-04
 **Test Coverage:**
 - StandingsUpdaterTest: 18 tests (total W/L, home/away splits, conf/div records, pct, GB, edge cases)
 
-**Status:** All 2892 tests passing ✅
+**Status:** All tests passing ✅
 
 ---
 
 ### Calculator Edge Case Tests Added (Jan 26, 2026)
 
-**Impact:** Added 127 edge case tests for 4 calculator classes, bringing total from 1935 to 2164 tests (~80% coverage)
+**Impact:** Added 127 edge case tests for 4 calculator classes
 
 **New Test Files:**
 - **PlayerInjuryCalculatorEdgeCaseTest** (26 tests) - Negative days, year/month boundaries, leap years
@@ -124,13 +124,13 @@ last_verified: 2026-05-04
 - Floating-point precision: ranking score rounding, games back calculations
 - Null/missing data: null preferences, missing game fields
 
-**Status:** All 2164 tests passing ✅ • 80% coverage goal achieved
+**Status:** All tests passing ✅ • 80% coverage goal achieved
 
 ---
 
 ### Validator Edge Case Tests Added (Jan 26, 2026)
 
-**Impact:** Added 183 edge case tests for 5 high-priority validators, bringing total from 1754 to 1935 tests (~79% coverage)
+**Impact:** Added 183 edge case tests for 5 high-priority validators
 
 **New Test Files:**
 - **TradeValidatorEdgeCaseTest** (32 tests) - Salary cap boundaries, cash minimums, player tradability
@@ -150,7 +150,7 @@ last_verified: 2026-05-04
 - Refactored 5 CSS implementation-detail tests to check behavior (design system classes) instead
 - Removed inline CSS checks that were invalidated by design system refactoring
 
-**Status:** All 1935 tests passing ✅
+**Status:** All tests passing ✅
 
 ---
 
@@ -411,7 +411,7 @@ last_verified: 2026-05-04
 | CI/CD | `.github/workflows/tests.yml` |
 | Interface examples | `classes/Player/Contracts/`, `classes/FreeAgency/Contracts/` |
 | Stats formatting | `BasketballStats\StatsFormatter` |
-| XSS protection | `Security\HtmlSanitizer::safeHtmlOutput()` |
+| XSS protection | `Security\HtmlSanitizer::e()` |
 
 ---
 
@@ -419,7 +419,9 @@ last_verified: 2026-05-04
 
 **Core Modules (22):** Player • Statistics • Team • Draft • Waivers • Extension • RookieOption • Trading • Negotiation • DepthChart • Voting • Schedule • Season Leaders • Free Agency • PlayerDatabase • Compare_Players • Leaderboards • Standings • League_Stats • AwardHistory • Series_Records • One-on-One
 
-**Display Modules (8):** CapSpace • Draft_Pick_Locator • Franchise_History • Injuries • League_Starters • Next_Sim • Power_Rankings • Team_Schedule
+**Display Modules (7):** CapSpace • Draft_Pick_Locator • Franchise_History • Injuries • League_Starters • Next_Sim • Team_Schedule
+
+Power Rankings is computed by `classes/Updater/PowerRankingsUpdater.php` (not a display module).
 
 **Admin Modules (1):** LeagueControlPanel
 
@@ -456,5 +458,5 @@ last_verified: 2026-05-04
 
 **Run tests?** `cd ibl5 && vendor/bin/phpunit tests/`  
 **Database changes?** Use `ibl5/migrations/` - never modify schema directly  
-**XSS protection?** `Security\HtmlSanitizer::safeHtmlOutput()` on all output  
+**XSS protection?** `Security\HtmlSanitizer::e()` on all output  
 **Stats formatting?** `BasketballStats\StatsFormatter` - never `number_format()`

@@ -1,6 +1,6 @@
 ---
 description: Index of all IBL5 project documentation.
-last_verified: 2026-04-11
+last_verified: 2026-05-19
 ---
 
 # IBL5 Documentation Index
@@ -20,7 +20,7 @@ This directory is the primary home for all project documentation.
 |----------|-------------|
 | [DEVELOPMENT_GUIDE.md](DEVELOPMENT_GUIDE.md) | Development standards, priorities, and workflow |
 | [DATABASE_GUIDE.md](DATABASE_GUIDE.md) | Schema reference and query patterns |
-| [API_GUIDE.md](API_GUIDE.md) | REST API design and development (planned) |
+| [API_GUIDE.md](API_GUIDE.md) | REST API overview — auth, rate limiting, ETag caching, controller inventory |
 | [DEVELOPMENT_ENVIRONMENT.md](DEVELOPMENT_ENVIRONMENT.md) | Docker setup, dependency caching, database connection |
 | [DOCUMENTATION_STANDARDS.md](DOCUMENTATION_STANDARDS.md) | Documentation organization and lifecycle |
 | [TESTING_STANDARDS.md](TESTING_STANDARDS.md) | Testing philosophy and conventions |
@@ -70,5 +70,3 @@ Root-level `.archive/` contains 40+ older historical documents.
 | `.archive/` | Older historical documents |
 
 ---
-
-**Last Updated:** February 16, 2026

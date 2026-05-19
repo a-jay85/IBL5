@@ -130,6 +130,24 @@ parameters:
 			path: classes/DepthChartEntry/DepthChartEntryView.php
 
 		-
+			rawMessage: DB-touching construction inside a View class. Move to the corresponding Service and pass the pre-built object as a render parameter.
+			identifier: ibl.dbInView
+			count: 2
+			path: classes/FreeAgency/FreeAgencyView.php
+
+		-
+			rawMessage: View classes must not hold a \mysqli property. Inject pre-built domain objects via render parameters instead.
+			identifier: ibl.dbInView
+			count: 1
+			path: classes/FreeAgency/FreeAgencyView.php
+
+		-
+			rawMessage: View classes must not hold a \mysqli property. Inject pre-built domain objects via render parameters instead.
+			identifier: ibl.dbInView
+			count: 1
+			path: classes/LeagueStarters/LeagueStartersView.php
+
+		-
 			rawMessage: Casting to int something that's already int.
 			identifier: cast.useless
 			count: 11

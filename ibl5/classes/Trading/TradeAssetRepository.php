@@ -53,18 +53,11 @@ class TradeAssetRepository extends BaseMysqliRepository implements TradeAssetRep
      */
     public function getPlayersByIds(array $playerIds): array
     {
-        if ($playerIds === []) {
-            return [];
-        }
-
-        $placeholders = implode(',', array_fill(0, count($playerIds), '?'));
-        $types = str_repeat('i', count($playerIds));
-
         /** @var list<PlayerRow> $rows */
-        $rows = $this->fetchAll(
-            "SELECT * FROM `ibl_plr` WHERE pid IN ({$placeholders})",
-            $types,
-            ...$playerIds
+        $rows = $this->fetchAllInList(
+            "SELECT * FROM `ibl_plr` WHERE pid IN ({IN})",
+            'i',
+            $playerIds
         );
 
         $result = [];
@@ -95,18 +88,11 @@ class TradeAssetRepository extends BaseMysqliRepository implements TradeAssetRep
      */
     public function getDraftPicksByIds(array $pickIds): array
     {
-        if ($pickIds === []) {
-            return [];
-        }
-
-        $placeholders = implode(',', array_fill(0, count($pickIds), '?'));
-        $types = str_repeat('i', count($pickIds));
-
         /** @var list<DraftPickRow> $rows */
-        $rows = $this->fetchAll(
-            "SELECT * FROM `ibl_draft_picks` WHERE pickid IN ({$placeholders})",
-            $types,
-            ...$pickIds
+        $rows = $this->fetchAllInList(
+            "SELECT * FROM `ibl_draft_picks` WHERE pickid IN ({IN})",
+            'i',
+            $pickIds
         );
 
         $result = [];

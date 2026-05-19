@@ -45,18 +45,11 @@ class FreeAgencyAdminRepository extends BaseMysqliRepository implements FreeAgen
      */
     public function getPlayerDemandsBatch(array $playerIds): array
     {
-        if ($playerIds === []) {
-            return [];
-        }
-
-        $placeholders = implode(',', array_fill(0, count($playerIds), '?'));
-        $types = str_repeat('i', count($playerIds));
-
         /** @var list<array{pid: int, dem1: int, dem2: int, dem3: int, dem4: int, dem5: int, dem6: int}> $rows */
-        $rows = $this->fetchAll(
-            "SELECT pid, dem1, dem2, dem3, dem4, dem5, dem6 FROM `ibl_demands` WHERE pid IN ({$placeholders})",
-            $types,
-            ...$playerIds
+        $rows = $this->fetchAllInList(
+            "SELECT pid, dem1, dem2, dem3, dem4, dem5, dem6 FROM `ibl_demands` WHERE pid IN ({IN})",
+            'i',
+            $playerIds
         );
 
         $result = [];

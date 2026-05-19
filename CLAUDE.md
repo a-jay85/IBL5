@@ -1,9 +1,4 @@
----
-description: Root Claude Code instructions for IBL5: commands, mandatory rules, and architecture pointers.
-last_verified: 2026-05-19
----
+# Worktree: base-repo-helpers-query-dedup
 
-# Worktree: bootstrap-controller-di-sweep
-
-This worktree's Docker instance is at `bootstrap-controller-di-sweep.localhost`.
+This worktree's Docker instance is at `base-repo-helpers-query-dedup.localhost`.
 Use this hostname for all browser checks, curl, and E2E — never `main.localhost`.

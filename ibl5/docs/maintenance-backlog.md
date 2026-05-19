@@ -2058,6 +2058,7 @@ Effort scale:
 **Suggested direction:** Move identity resolution out of header; use injected `AuthService`.
 **Est. effort:** S
 **Risk if untouched:** Refactors reorder calls; silent null usernames.
+**Status:** In progress — side-effect removal deferred to PR3 (boosted HTMX requests on modules without their own cookiedecode call would lose `$cookie` population; `auth.username` container accessor registered in PR1, 2026-05-19).
 
 ### 14.11 `api.php` Is Its Own Composition Root Bypassing Bootstrap
 **Location:** `ibl5/api.php` lines 27-88
@@ -2080,6 +2081,7 @@ Effort scale:
 **Suggested direction:** Register as shared factory in container; or cache `SeasonQueryRepository` results.
 **Est. effort:** S
 **Risk if untouched:** Every new season-aware feature adds another redundant query.
+**Status:** In progress — shared `Season` factory registered in container via `ConfigBootstrap::registerSharedServices()` (PR1, 2026-05-19); call-site migration to follow in PR2/PR3.
 
 ### 14.14 `LoggerFactory` Static Service Locator Used in 20+ Sites
 **Location:** `Logging/LoggerFactory.php`; called via `LoggerFactory::getChannel('audit')` across controllers
@@ -2087,6 +2089,7 @@ Effort scale:
 **Suggested direction:** Inject `LoggerInterface` (PSR-3) per channel at construction; retire static calls outside bootstrap.
 **Est. effort:** M
 **Risk if untouched:** Log impl swaps require editing factory class; mock injection impossible in tests.
+**Status:** In progress — per-channel `logger.<channel>` bindings registered in container (PR1, 2026-05-19); static call-site burndown to follow in PR4.
 
 ### 14.15 `AppPaths::root()` Stateful Static Singleton
 **Location:** `Bootstrap/AppPaths.php`; consumed by `Cache/PageCache.php:156`, `Mail/MailService.php:225`, `Logging/LoggerFactory.php:223,233`, `Auth/DevAutoLogin.php:89`

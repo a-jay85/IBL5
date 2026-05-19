@@ -429,12 +429,6 @@ class FreeAgencyView
     }
 
     /**
-     * Render a team cell with colors and logo
-     *
-     * @param Player $player Player with team data
-     * @return string HTML table cell
-     */
-    /**
      * @param array{color1: string, color2: string}|null $teamColors
      */
     private function renderTeamCell(Player $player, ?array $teamColors = null): string

@@ -56,19 +56,6 @@ class CarImporter
 
     public function importFile(string $filePath, ?int $filterYear = null): JsbImportResult
     {
-        if (!file_exists($filePath)) {
-            $result = new JsbImportResult();
-            $result->addError('CAR file not found: ' . $filePath);
-            return $result;
-        }
-
-        $data = file_get_contents($filePath);
-        if ($data === false) {
-            $result = new JsbImportResult();
-            $result->addError('Failed to read CAR file: ' . $filePath);
-            return $result;
-        }
-
-        return $this->import($data, $filterYear);
+        return FileReader::readOrFail($filePath, 'CAR', fn (string $data) => $this->import($data, $filterYear));
     }
 }

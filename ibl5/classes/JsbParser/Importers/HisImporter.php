@@ -57,19 +57,6 @@ class HisImporter
 
     public function importFile(string $filePath, ?string $sourceLabel = null): JsbImportResult
     {
-        if (!file_exists($filePath)) {
-            $result = new JsbImportResult();
-            $result->addError('HIS file not found: ' . $filePath);
-            return $result;
-        }
-
-        $data = file_get_contents($filePath);
-        if ($data === false) {
-            $result = new JsbImportResult();
-            $result->addError('Failed to read HIS file: ' . $filePath);
-            return $result;
-        }
-
-        return $this->import($data, $sourceLabel);
+        return FileReader::readOrFail($filePath, 'HIS', fn (string $data) => $this->import($data, $sourceLabel));
     }
 }

@@ -57,20 +57,7 @@ class TrnImporter
 
     public function importFile(string $filePath, ?string $sourceLabel = null): JsbImportResult
     {
-        if (!file_exists($filePath)) {
-            $result = new JsbImportResult();
-            $result->addError('TRN file not found: ' . $filePath);
-            return $result;
-        }
-
-        $data = file_get_contents($filePath);
-        if ($data === false) {
-            $result = new JsbImportResult();
-            $result->addError('Failed to read TRN file: ' . $filePath);
-            return $result;
-        }
-
-        return $this->import($data, $sourceLabel);
+        return FileReader::readOrFail($filePath, 'TRN', fn (string $data) => $this->import($data, $sourceLabel));
     }
 
     private function initTradeGroupId(): void

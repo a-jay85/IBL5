@@ -112,6 +112,18 @@ parameters:
 			path: classes/Bootstrap/WebApplicationFactory.php
 
 		-
+			rawMessage: 'echo is banned outside View classes, Responders, and Bootstrap/Updater emitters. Move HTML/text output into a *View.php (composed by the Controller) or a Responder (composed by the ApiHandler).'
+			identifier: ibl.echoInNonView
+			count: 1
+			path: classes/DepthChartEntry/DepthChartEntryApiHandler.php
+
+		-
+			rawMessage: 'echo is banned outside View classes, Responders, and Bootstrap/Updater emitters. Move HTML/text output into a *View.php (composed by the Controller) or a Responder (composed by the ApiHandler).'
+			identifier: ibl.echoInNonView
+			count: 19
+			path: classes/DepthChartEntry/DepthChartEntryController.php
+
+		-
 			rawMessage: Casting to int something that's already int.
 			identifier: cast.useless
 			count: 17
@@ -130,6 +142,30 @@ parameters:
 			path: classes/DepthChartEntry/DepthChartEntryView.php
 
 		-
+			rawMessage: 'echo is banned outside View classes, Responders, and Bootstrap/Updater emitters. Move HTML/text output into a *View.php (composed by the Controller) or a Responder (composed by the ApiHandler).'
+			identifier: ibl.echoInNonView
+			count: 1
+			path: classes/DraftHistory/DraftHistoryApiHandler.php
+
+		-
+			rawMessage: 'echo is banned outside View classes, Responders, and Bootstrap/Updater emitters. Move HTML/text output into a *View.php (composed by the Controller) or a Responder (composed by the ApiHandler).'
+			identifier: ibl.echoInNonView
+			count: 1
+			path: classes/FranchiseRecordBook/FranchiseRecordBookApiHandler.php
+
+		-
+			rawMessage: 'echo is banned outside View classes, Responders, and Bootstrap/Updater emitters. Move HTML/text output into a *View.php (composed by the Controller) or a Responder (composed by the ApiHandler).'
+			identifier: ibl.echoInNonView
+			count: 2
+			path: classes/FreeAgency/FreeAgencyController.php
+
+		-
+			rawMessage: 'echo is banned outside View classes, Responders, and Bootstrap/Updater emitters. Move HTML/text output into a *View.php (composed by the Controller) or a Responder (composed by the ApiHandler).'
+			identifier: ibl.echoInNonView
+			count: 1
+			path: classes/LeagueStarters/LeagueStartersApiHandler.php
+
+		-
 			rawMessage: Casting to int something that's already int.
 			identifier: cast.useless
 			count: 11
@@ -142,6 +178,12 @@ parameters:
 			path: classes/Negotiation/NegotiationOfferView.php
 
 		-
+			rawMessage: 'echo is banned outside View classes, Responders, and Bootstrap/Updater emitters. Move HTML/text output into a *View.php (composed by the Controller) or a Responder (composed by the ApiHandler).'
+			identifier: ibl.echoInNonView
+			count: 1
+			path: classes/NextSim/NextSimTabApiHandler.php
+
+		-
 			rawMessage: 'Inline `style="..."` attributes are banned in PHP. Move CSS to ibl5/design/components/. Exception: `style="--foo: ..."` CSS custom properties are allowed.'
 			identifier: ibl.inlineCss
 			count: 1
@@ -152,6 +194,12 @@ parameters:
 			identifier: ibl.inlineCss
 			count: 2
 			path: classes/PageLayout/PageLayout.php
+
+		-
+			rawMessage: 'echo is banned outside View classes, Responders, and Bootstrap/Updater emitters. Move HTML/text output into a *View.php (composed by the Controller) or a Responder (composed by the ApiHandler).'
+			identifier: ibl.echoInNonView
+			count: 68
+			path: classes/Player/Stats/Views/PlayerSeasonTableRenderer.php
 
 		-
 			rawMessage: 'Inline `style="..."` attributes are banned in PHP. Move CSS to ibl5/design/components/. Exception: `style="--foo: ..."` CSS custom properties are allowed.'
@@ -178,10 +226,40 @@ parameters:
 			path: classes/RookieOption/RookieOptionFormView.php
 
 		-
+			rawMessage: 'echo is banned outside View classes, Responders, and Bootstrap/Updater emitters. Move HTML/text output into a *View.php (composed by the Controller) or a Responder (composed by the ApiHandler).'
+			identifier: ibl.echoInNonView
+			count: 5
+			path: classes/SavedDepthChart/SavedDepthChartApiHandler.php
+
+		-
+			rawMessage: 'echo is banned outside View classes, Responders, and Bootstrap/Updater emitters. Move HTML/text output into a *View.php (composed by the Controller) or a Responder (composed by the ApiHandler).'
+			identifier: ibl.echoInNonView
+			count: 1
+			path: classes/SeriesRecords/SeriesRecordsController.php
+
+		-
+			rawMessage: 'echo is banned outside View classes, Responders, and Bootstrap/Updater emitters. Move HTML/text output into a *View.php (composed by the Controller) or a Responder (composed by the ApiHandler).'
+			identifier: ibl.echoInNonView
+			count: 1
+			path: classes/Team/TeamApiHandler.php
+
+		-
+			rawMessage: 'echo is banned outside View classes, Responders, and Bootstrap/Updater emitters. Move HTML/text output into a *View.php (composed by the Controller) or a Responder (composed by the ApiHandler).'
+			identifier: ibl.echoInNonView
+			count: 2
+			path: classes/Team/TeamController.php
+
+		-
 			rawMessage: Deprecated HTML tag `<i>` found in string literal. Use <em> instead.
 			identifier: ibl.deprecatedHtmlTag
 			count: 2
 			path: classes/Trading/TradeOffer.php
+
+		-
+			rawMessage: 'echo is banned outside View classes, Responders, and Bootstrap/Updater emitters. Move HTML/text output into a *View.php (composed by the Controller) or a Responder (composed by the ApiHandler).'
+			identifier: ibl.echoInNonView
+			count: 5
+			path: classes/Trading/TradeRosterPreviewApiHandler.php
 
 		-
 			rawMessage: 'Inline `style="..."` attributes are banned in PHP. Move CSS to ibl5/design/components/. Exception: `style="--foo: ..."` CSS custom properties are allowed.'
@@ -194,3 +272,21 @@ parameters:
 			identifier: cast.useless
 			count: 1
 			path: classes/TransactionHistory/TransactionHistoryView.php
+
+		-
+			rawMessage: 'echo is banned outside View classes, Responders, and Bootstrap/Updater emitters. Move HTML/text output into a *View.php (composed by the Controller) or a Responder (composed by the ApiHandler).'
+			identifier: ibl.echoInNonView
+			count: 53
+			path: classes/UI/Tables/Contracts.php
+
+		-
+			rawMessage: 'echo is banned outside View classes, Responders, and Bootstrap/Updater emitters. Move HTML/text output into a *View.php (composed by the Controller) or a Responder (composed by the ApiHandler).'
+			identifier: ibl.echoInNonView
+			count: 2
+			path: classes/Updater/Steps/GenerateSeasonAwardsStep.php
+
+		-
+			rawMessage: 'echo is banned outside View classes, Responders, and Bootstrap/Updater emitters. Move HTML/text output into a *View.php (composed by the Controller) or a Responder (composed by the ApiHandler).'
+			identifier: ibl.echoInNonView
+			count: 3
+			path: classes/Waivers/WaiversController.php

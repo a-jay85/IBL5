@@ -84,3 +84,23 @@ services:
         class: PHPStanRules\BanBareTableIdentifierRule
         tags:
             - phpstan.rules.rule
+    -
+        class: PHPStanRules\BanCastFunctionsRule
+        tags:
+            - phpstan.rules.rule
+    -
+        class: PHPStanRules\BanDieExitInProductionRule
+        tags:
+            - phpstan.rules.rule
+    -
+        class: PHPStanRules\BanEchoInNonViewClassesRule
+        tags:
+            - phpstan.rules.rule
+    -
+        class: PHPStanRules\BanJsonDecodeWithoutThrowFlagRule
+        tags:
+            - phpstan.rules.rule
+    -
+        class: PHPStanRules\BanServiceExtendsBaseRepositoryRule
+        tags:
+            - phpstan.rules.rule

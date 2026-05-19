@@ -20,7 +20,6 @@ settings.local.json
 
 config.json
 config.php
-configOlympics.php
 config.inc.php
 database_dump_*.sql
 localDbUpdate.sh

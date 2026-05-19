@@ -45,26 +45,22 @@ E2E_GUARD='if (file_exists(__DIR__ . "/.e2e-active")) { require __DIR__ . "/conf
 
 inject_config_guard() {
     local config
-    for config in "$CONFIG_DIR/config.php" "$CONFIG_DIR/configOlympics.php"; do
-        [[ -f "$config" ]] || continue
-        if ! grep -q '.e2e-active' "$config" 2>/dev/null; then
-            sed -i '' '1 a\
+    local config="$CONFIG_DIR/config.php"
+    if [[ -f "$config" ]] && ! grep -q '.e2e-active' "$config" 2>/dev/null; then
+        sed -i '' '1 a\
 '"$E2E_GUARD"'
 ' "$config"
-            echo "==> Injected E2E config guard into $(basename "$config")"
-        fi
-    done
+        echo "==> Injected E2E config guard into $(basename "$config")"
+    fi
 }
 
 remove_config_guard() {
     local config
-    for config in "$CONFIG_DIR/config.php" "$CONFIG_DIR/configOlympics.php"; do
-        [[ -f "$config" ]] || continue
-        if grep -q '.e2e-active' "$config" 2>/dev/null; then
-            sed -i '' '/.e2e-active/d' "$config"
-            echo "Removed E2E config guard from $(basename "$config")"
-        fi
-    done
+    local config="$CONFIG_DIR/config.php"
+    if [[ -f "$config" ]] && grep -q '.e2e-active' "$config" 2>/dev/null; then
+        sed -i '' '/.e2e-active/d' "$config"
+        echo "Removed E2E config guard from $(basename "$config")"
+    fi
 }
 
 cleanup() {

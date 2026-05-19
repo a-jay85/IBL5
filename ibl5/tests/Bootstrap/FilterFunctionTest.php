@@ -58,6 +58,18 @@ final class FilterFunctionTest extends TestCase
         self::assertStringNotContainsString('<p>', $result);
     }
 
+    public function testFilterNohtmlEscapesAndDecodesEntities(): void
+    {
+        $result = filter('Hello & "World"', 'nohtml');
+        self::assertSame('Hello & "World"', $result);
+    }
+
+    public function testFilterEmptyStringWithNohtmlReturnsEmpty(): void
+    {
+        $result = filter('', 'nohtml');
+        self::assertSame('', $result);
+    }
+
     public function testCheckWordsReturnsOriginalWhenNoCensoring(): void
     {
         $GLOBALS['CensorMode'] = 0;

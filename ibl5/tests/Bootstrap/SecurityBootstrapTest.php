@@ -9,6 +9,22 @@ use PHPUnit\Framework\TestCase;
 
 final class SecurityBootstrapTest extends TestCase
 {
+    public function testBootDoesNotStartOutputBuffer(): void
+    {
+        $level = ob_get_level();
+        $_SERVER['HTTP_USER_AGENT'] = 'Mozilla/5.0';
+        $_SERVER['HTTP_ACCEPT_ENCODING'] = 'gzip, deflate, br';
+
+        $container = $this->createStub(\Bootstrap\Contracts\ContainerInterface::class);
+        $bootstrap = new SecurityBootstrap();
+
+        // redirectFacebookBot calls exit() on FB UA — use a normal UA
+        // boot() should NOT add any output buffers
+        $bootstrap->boot($container);
+
+        self::assertSame($level, ob_get_level());
+    }
+
     public function testIncludeSafeBlocksPathTraversal(): void
     {
         // Create a temp file to test inclusion

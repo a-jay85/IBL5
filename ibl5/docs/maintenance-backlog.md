@@ -35,6 +35,7 @@ Effort scale:
 **Suggested direction:** Extract `TeamRegistry` (or reuse `League`/`TeamQueryRepository`); implement or delete the two silent stubs.
 **Est. effort:** M
 **Risk if untouched:** Team rename requires DB and constant update; silent stubs create invisible display gaps.
+**Status:** Completed (2026-05-19) — collapsed `nameToIdCache` into static lookup; deleted `getAllStarYears`/`getAllStarTeams` stubs (data not trivially queryable against seed); net −39 LOC.
 
 ### 1.2 RecordHoldersRepository — Streak/Season-Start Logic in Repository Layer
 **Location:** `ibl5/classes/RecordHolders/RecordHoldersRepository.php` lines 401-566

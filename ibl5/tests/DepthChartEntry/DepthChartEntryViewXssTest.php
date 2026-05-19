@@ -15,7 +15,7 @@ final class DepthChartEntryViewXssTest extends TestCase
     protected function setUp(): void
     {
         $leagueContext = $this->createStub(LeagueContext::class);
-        $this->view = new DepthChartEntryView($leagueContext);
+        $this->view = new DepthChartEntryView($leagueContext, new \DepthChartEntry\DepthChartEntryService());
     }
 
     /**

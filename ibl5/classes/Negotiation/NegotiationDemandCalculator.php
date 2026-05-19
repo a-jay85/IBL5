@@ -110,7 +110,7 @@ class NegotiationDemandCalculator implements NegotiationDemandCalculatorInterfac
         $totalRawScore = 0;
         foreach ($playerRatings as $key => $value) {
             $max = $marketMaximums[$key] ?? 0;
-            $rawScore = ($max > 0) ? intval(round($value / $max * 100)) : 0;
+            $rawScore = ($max > 0) ? (int) round($value / $max * 100) : 0;
             $totalRawScore += $rawScore;
             $ratingsBreakdown[] = [
                 'name' => self::RATING_NAMES[$key] ?? $key,
@@ -290,7 +290,7 @@ class NegotiationDemandCalculator implements NegotiationDemandCalculatorInterfac
         
         foreach ($playerRatings as $key => $value) {
             if (isset($marketMaximums[$key]) && $marketMaximums[$key] > 0) {
-                $rawScore = intval(round($value / $marketMaximums[$key] * 100));
+                $rawScore = (int) round($value / $marketMaximums[$key] * 100);
                 $totalRawScore += $rawScore;
             }
         }

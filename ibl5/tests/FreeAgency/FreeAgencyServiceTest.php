@@ -134,6 +134,7 @@ class FreeAgencyServiceTest extends TestCase
         $this->assertArrayHasKey('unsignedFreeAgents', $result);
         $this->assertArrayHasKey('offerPlayers', $result);
         $this->assertArrayHasKey('cashPlayers', $result);
+        $this->assertArrayHasKey('teamColorsByTeamId', $result);
     }
 
     public function testGetMainPageDataIncludesAllOtherPlayers(): void
@@ -154,7 +155,8 @@ class FreeAgencyServiceTest extends TestCase
 
         $result = $service->getMainPageData($team, $season);
 
-        $this->assertSame($testPlayers, $result['allOtherPlayers']);
+        $this->assertCount(2, $result['allOtherPlayers']);
+        $this->assertContainsOnlyInstancesOf(\Player\Player::class, $result['allOtherPlayers']);
     }
 
     public function testGetMainPageDataCapMetricsHasRequiredKeys(): void

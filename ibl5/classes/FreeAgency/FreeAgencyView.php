@@ -18,17 +18,15 @@ use Repositories\Contracts\TeamIdentityRepositoryInterface;
  */
 class FreeAgencyView
 {
-    private \mysqli $mysqli_db;
     private TeamIdentityRepositoryInterface $commonRepo;
 
-    public function __construct(\mysqli $mysqli_db, TeamIdentityRepositoryInterface $commonRepo)
+    public function __construct(TeamIdentityRepositoryInterface $commonRepo)
     {
-        $this->mysqli_db = $mysqli_db;
         $this->commonRepo = $commonRepo;
     }
 
     /**
-     * @param array{team: Team, season: Season, capMetrics: CapMetrics, allOtherPlayers: list<PlayerRow>, playersUnderContract: list<Player>, unsignedFreeAgents: list<Player>, offerPlayers: list<array{player: Player, offer: array<string, int>}>, cashPlayers: list<array{player: Player, label: string}>} $mainPageData
+     * @param array{team: Team, season: Season, capMetrics: CapMetrics, allOtherPlayers: list<Player>, teamColorsByTeamId: array<int, array{color1: string, color2: string}>, playersUnderContract: list<Player>, unsignedFreeAgents: list<Player>, offerPlayers: list<array{player: Player, offer: array<string, int>}>, cashPlayers: list<array{player: Player, label: string}>} $mainPageData
      */
     public function render(array $mainPageData, ?string $result = null): string
     {
@@ -36,6 +34,7 @@ class FreeAgencyView
         $season = $mainPageData['season'];
         $capMetrics = $mainPageData['capMetrics'];
         $allOtherPlayers = $mainPageData['allOtherPlayers'];
+        $teamColorsByTeamId = $mainPageData['teamColorsByTeamId'];
         $playersUnderContract = $mainPageData['playersUnderContract'];
         $unsignedFreeAgents = $mainPageData['unsignedFreeAgents'];
         $offerPlayers = $mainPageData['offerPlayers'];
@@ -60,7 +59,7 @@ class FreeAgencyView
 <?= HtmlSanitizer::trusted($this->renderContractOffers($team, $season, $capMetrics, $offerPlayers)) ?>
 <div class="mt-6"></div>
 <?= HtmlSanitizer::trusted($this->renderTeamFreeAgents($team, $season, $capMetrics, $unsignedFreeAgents)) ?>
-<?= HtmlSanitizer::trusted($this->renderOtherFreeAgents($team, $season, $allOtherPlayers)) ?>
+<?= HtmlSanitizer::trusted($this->renderOtherFreeAgents($team, $season, $allOtherPlayers, $teamColorsByTeamId)) ?>
         <?php
         return (string) ob_get_clean();
     }
@@ -277,14 +276,10 @@ class FreeAgencyView
     }
 
     /**
-     * Render other free agents table
-     *
-     * @param Team $team Team object
-     * @param Season $season Season object
-     * @param list<PlayerRow> $allOtherPlayers Pre-fetched player rows from service
-     * @return string HTML table
+     * @param list<Player> $allOtherPlayers Pre-built Player objects from service
+     * @param array<int, array{color1: string, color2: string}> $teamColorsByTeamId
      */
-    private function renderOtherFreeAgents(Team $team, Season $season, array $allOtherPlayers): string
+    private function renderOtherFreeAgents(Team $team, Season $season, array $allOtherPlayers, array $teamColorsByTeamId): string
     {
         ob_start();
         ?>
@@ -295,17 +290,17 @@ class FreeAgencyView
     <?= HtmlSanitizer::trusted($this->renderTableHeader('All Other Free Agents', false, $team, true, true, $season)) ?>
     <tbody>
         <?php
-        foreach ($allOtherPlayers as $playerRow):
-            $player = Player::withPlrRow($this->mysqli_db, $playerRow);
+        foreach ($allOtherPlayers as $player):
 
             if ($player->isPlayerFreeAgent($season) && !$player->isSalaryPlaceholder()):
                 $demands = $player->getFreeAgencyDemands();
+                $teamColors = $teamColorsByTeamId[$player->teamid ?? 0] ?? null;
         ?>
         <tr>
             <td><a href="modules.php?name=FreeAgency&amp;pa=negotiate&amp;pid=<?= HtmlSanitizer::e($player->playerID ?? 0) ?>">Offer</a></td>
             <td><?= HtmlSanitizer::e($player->position ?? '') ?></td>
             <?= PlayerImageHelper::renderFlexiblePlayerCell($player->playerID ?? 0, $player->name ?? '') ?>
-            <?= HtmlSanitizer::trusted($this->renderTeamCell($player)) ?>
+            <?= HtmlSanitizer::trusted($this->renderTeamCell($player, $teamColors)) ?>
             <td><?= HtmlSanitizer::e($player->age ?? 0) ?></td>
             <?= HtmlSanitizer::trusted($this->renderPlayerRatings($player)) ?>
             <?= HtmlSanitizer::trusted($this->renderPlayerDemands($demands)) ?>
@@ -439,7 +434,10 @@ class FreeAgencyView
      * @param Player $player Player with team data
      * @return string HTML table cell
      */
-    private function renderTeamCell(Player $player): string
+    /**
+     * @param array{color1: string, color2: string}|null $teamColors
+     */
+    private function renderTeamCell(Player $player, ?array $teamColors = null): string
     {
         $teamId = $player->teamid ?? 0;
 
@@ -451,8 +449,6 @@ class FreeAgencyView
         if ($teamName === '') {
             $teamName = $this->commonRepo->getTeamnameFromTeamID($teamId) ?? '';
         }
-
-        $teamColors = \Player\Views\TeamColorHelper::getTeamColors($this->mysqli_db, $teamId);
 
         return TeamCellHelper::renderTeamCellOrFreeAgent(
             $teamId,

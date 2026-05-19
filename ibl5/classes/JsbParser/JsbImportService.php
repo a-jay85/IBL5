@@ -6,6 +6,7 @@ namespace JsbParser;
 
 use JsbParser\Contracts\JsbImportRepositoryInterface;
 use JsbParser\Contracts\JsbImportServiceInterface;
+use JsbParser\Importers\AwaImporter;
 use PlrParser\PlrOrdinalMap;
 
 /**
@@ -18,14 +19,16 @@ class JsbImportService implements JsbImportServiceInterface
 {
     private JsbImportRepositoryInterface $repository;
     private PlayerIdResolver $resolver;
+    private AwaImporter $awa;
 
     /** @var int Auto-incrementing trade group ID for grouping trade items */
     private int $nextTradeGroupId = 1;
 
-public function __construct(JsbImportRepositoryInterface $repository, PlayerIdResolver $resolver)
+    public function __construct(JsbImportRepositoryInterface $repository, PlayerIdResolver $resolver)
     {
         $this->repository = $repository;
         $this->resolver = $resolver;
+        $this->awa = new AwaImporter($repository);
     }
 
     /**
@@ -265,71 +268,12 @@ public function __construct(JsbImportRepositoryInterface $repository, PlayerIdRe
         return $this->loadFileAndProcess($filePath, fn (string $c) => $this->processAswData($c, $seasonYear), 'ASW');
     }
 
-    /** @var list<string> Rank suffixes for award names */
-    private const RANK_SUFFIXES = ['(1st)', '(2nd)', '(3rd)', '(4th)', '(5th)'];
-
     /**
      * @see JsbImportServiceInterface::processAwaData()
      */
     public function processAwaData(string $awaData, string $carData, ?int $filterYear = null): JsbImportResult
     {
-        $result = new JsbImportResult();
-
-        try {
-            $awaParsed = AwaFileParser::parse($awaData);
-        } catch (\RuntimeException $e) {
-            $result->addError('AWA parse failed: ' . $e->getMessage());
-            return $result;
-        }
-
-        // Build PID → name map from .car data
-        try {
-            $carParsed = CarFileParser::parse($carData);
-        } catch (\RuntimeException $e) {
-            $result->addError('CAR parse failed (for AWA name resolution): ' . $e->getMessage());
-            return $result;
-        }
-
-        /** @var array<int, string> $pidNameMap */
-        $pidNameMap = [];
-        foreach ($carParsed['players'] as $player) {
-            // .car stores names in CP1252; convert to UTF-8 for DB storage
-            $name = mb_convert_encoding($player['name'], 'UTF-8', 'Windows-1252');
-            $pidNameMap[$player['block_index']] = $name;
-        }
-
-        foreach ($awaParsed['seasons'] as $season) {
-            if ($filterYear !== null && $season['year'] !== $filterYear) {
-                continue;
-            }
-
-            foreach ($season['stat_leaders'] as $category => $leaders) {
-                foreach ($leaders as $leader) {
-                    $playerName = $pidNameMap[$leader['pid']] ?? null;
-                    if ($playerName === null) {
-                        $result->addSkipped();
-                        continue;
-                    }
-
-                    $rankIndex = $leader['rank'] - 1;
-                    if ($rankIndex < 0 || $rankIndex >= 5) {
-                        $result->addSkipped();
-                        continue;
-                    }
-
-                    $awardName = $category . ' ' . self::RANK_SUFFIXES[$rankIndex];
-
-                    try {
-                        $affected = $this->repository->upsertAward($season['year'], $awardName, $playerName);
-                        $result->recordUpsert($affected);
-                    } catch (\RuntimeException $e) {
-                        $result->addError('Award upsert failed for ' . $playerName . ': ' . $e->getMessage());
-                    }
-                }
-            }
-        }
-
-        return $result;
+        return $this->awa->import($awaData, $carData, $filterYear);
     }
 
     /**
@@ -337,21 +281,7 @@ public function __construct(JsbImportRepositoryInterface $repository, PlayerIdRe
      */
     public function processAwaFile(string $awaPath, string $carPath, ?int $filterYear = null): JsbImportResult
     {
-        if (!file_exists($awaPath) || !file_exists($carPath)) {
-            $result = new JsbImportResult();
-            $result->addError('AWA or CAR file not found');
-            return $result;
-        }
-
-        $awaData = file_get_contents($awaPath);
-        $carData = file_get_contents($carPath);
-        if ($awaData === false || $carData === false) {
-            $result = new JsbImportResult();
-            $result->addError('Failed to read AWA or CAR file');
-            return $result;
-        }
-
-        return $this->processAwaData($awaData, $carData, $filterYear);
+        return $this->awa->importFiles($awaPath, $carPath, $filterYear);
     }
 
     /**

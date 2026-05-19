@@ -23,6 +23,18 @@ interface DepthChartEntryServiceInterface
     public function computeQualityScore(array $player): float;
 
     /**
+     * Compute the JSB production sum for a player's stat line.
+     *
+     * Formula: 2 × FGM + 3GM + FTM + ORB + DRB + AST + STL + BLK
+     *
+     * The `(dc_minutes + 100) ×` multiplier is applied client-side so it stays
+     * live as the GM edits dc_minutes.
+     *
+     * @param array<string, mixed> $player Player row from `ibl_plr`
+     */
+    public function computeJsbProduction(array $player): int;
+
+    /**
      * Build a PID-keyed override map from a submission's raw POST data.
      *
      * Called after a validation-failure redirect so `displayForm()` can

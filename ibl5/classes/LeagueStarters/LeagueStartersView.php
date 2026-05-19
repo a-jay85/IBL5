@@ -20,8 +20,6 @@ use Season\Season;
  */
 class LeagueStartersView implements LeagueStartersViewInterface
 {
-    private \mysqli $db;
-    private Season $season;
     private string $moduleName;
 
     /** @var array<string, string> Position labels */
@@ -33,17 +31,8 @@ class LeagueStartersView implements LeagueStartersViewInterface
         'C' => 'Centers',
     ];
 
-    /**
-     * Constructor
-     *
-     * @param \mysqli $db Database connection
-     * @param Season $season Current season
-     * @param string $moduleName Module name
-     */
-    public function __construct(\mysqli $db, Season $season, string $moduleName)
+    public function __construct(string $moduleName)
     {
-        $this->db = $db;
-        $this->season = $season;
         $this->moduleName = $moduleName;
     }
 
@@ -52,7 +41,7 @@ class LeagueStartersView implements LeagueStartersViewInterface
      *
      * @param array<string, array<int, Player>> $startersByPosition
      */
-    public function render(array $startersByPosition, Team $userTeam, string $display = 'ratings'): string
+    public function render(\mysqli $db, Season $season, array $startersByPosition, Team $userTeam, string $display = 'ratings'): string
     {
         $tabDefinitions = [
             'ratings' => 'Ratings',
@@ -76,7 +65,7 @@ class LeagueStartersView implements LeagueStartersViewInterface
         $html = '<div class="text-center"><h2 class="ibl-title">League Starters</h2></div>';
         $html .= $switcher->renderTabs();
         $html .= '<div id="league-starters-tables">';
-        $html .= $this->renderTableContent($startersByPosition, $userTeam, $display);
+        $html .= $this->renderTableContent($db, $season, $startersByPosition, $userTeam, $display);
         $html .= '</div>';
 
         return $html;
@@ -89,7 +78,7 @@ class LeagueStartersView implements LeagueStartersViewInterface
      *
      * @param array<string, array<int, Player>> $startersByPosition
      */
-    public function renderTableContent(array $startersByPosition, Team $userTeam, string $display = 'ratings'): string
+    public function renderTableContent(\mysqli $db, Season $season, array $startersByPosition, Team $userTeam, string $display = 'ratings'): string
     {
         $html = '<div class="space-y-4">';
 
@@ -97,7 +86,7 @@ class LeagueStartersView implements LeagueStartersViewInterface
             $labelSafe = HtmlSanitizer::safeHtmlOutput($label);
             $html .= '<div>';
             $html .= '<h2 class="ibl-table-title">' . $labelSafe . '</h2>';
-            $html .= $this->renderTableForDisplay($display, $startersByPosition[$position], $userTeam);
+            $html .= $this->renderTableForDisplay($db, $season, $display, $startersByPosition[$position], $userTeam);
             $html .= '</div>';
         }
 
@@ -111,17 +100,17 @@ class LeagueStartersView implements LeagueStartersViewInterface
      *
      * @param array<int, Player> $result
      */
-    private function renderTableForDisplay(string $display, array $result, Team $team): string
+    private function renderTableForDisplay(\mysqli $db, Season $season, string $display, array $result, Team $team): string
     {
         switch ($display) {
             case 'total_s':
-                return \BasketballStats\Tables\SeasonTotals::render($this->db, $result, $team, '', [], $this->moduleName);
+                return \BasketballStats\Tables\SeasonTotals::render($db, $result, $team, '', [], $this->moduleName);
             case 'avg_s':
-                return \BasketballStats\Tables\SeasonAverages::render($this->db, $result, $team, '', [], $this->moduleName);
+                return \BasketballStats\Tables\SeasonAverages::render($db, $result, $team, '', [], $this->moduleName);
             case 'per36mins':
-                return \BasketballStats\Tables\Per36Minutes::render($this->db, $result, $team, '', [], $this->moduleName);
+                return \BasketballStats\Tables\Per36Minutes::render($db, $result, $team, '', [], $this->moduleName);
             default:
-                return \UI\Tables\Ratings::render($this->db, $result, $team, '', $this->season, $this->moduleName);
+                return \UI\Tables\Ratings::render($db, $result, $team, '', $season, $this->moduleName);
         }
     }
 }

@@ -35,11 +35,11 @@ class DepthChartEntryController implements DepthChartEntryControllerInterface
     {
         $this->db = $db;
         $this->repository = new DepthChartEntryRepository($db);
-        $this->view = new DepthChartEntryView($leagueContext);
+        $this->service = new DepthChartEntryService();
+        $this->view = new DepthChartEntryView($leagueContext, $this->service);
         $this->commonRepository = $commonRepository;
         $teamRepository = new TeamRepository($db);
         $this->teamTableService = new TeamTableService($db, $teamRepository);
-        $this->service = new DepthChartEntryService();
     }
 
     /**

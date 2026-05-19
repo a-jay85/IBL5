@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace DepthChartEntry;
 
+use DepthChartEntry\Contracts\DepthChartEntryServiceInterface;
 use DepthChartEntry\Contracts\DepthChartEntryViewInterface;
 use League\LeagueContext;
 use Security\HtmlSanitizer;
@@ -16,6 +17,7 @@ use Security\HtmlSanitizer;
 class DepthChartEntryView implements DepthChartEntryViewInterface
 {
     private LeagueContext $leagueContext;
+    private DepthChartEntryServiceInterface $service;
 
     private const POSITION_SLOTS = [
         ['label' => 'PG', 'field' => 'pg', 'dbKey' => 'dc_pg_depth'],
@@ -25,9 +27,10 @@ class DepthChartEntryView implements DepthChartEntryViewInterface
         ['label' => 'C',  'field' => 'c',  'dbKey' => 'dc_c_depth'],
     ];
 
-    public function __construct(LeagueContext $leagueContext)
+    public function __construct(LeagueContext $leagueContext, DepthChartEntryServiceInterface $service)
     {
         $this->leagueContext = $leagueContext;
+        $this->service = $service;
     }
 
     /**
@@ -147,55 +150,13 @@ the earlier slot in that order claims them.</p>
     }
 
     /**
-     * Compute the JSB production composite used by FUN_0040af90's roster sort.
-     *
-     * Per the verified formula at jsb560_decompiled.c:5723-5728 and the field
-     * offset table in 00_MASTER_REFERENCE.md "Season Stats (0x60C-0x640+)":
-     *
-     *   production = 2 × FGM_2pt + 3 × FGM_3pt + FTM + ORB + DRB + AST + STL + BLK
-     *
-     * `ibl_plr` stores TOTAL FGM (2pt + 3pt combined) in `stats_fgm` and 3pt
-     * FGM separately in `stats_3gm`, so the JSB-side `2 × FGM_2pt + 3 × FGM_3pt`
-     * simplifies to `2 × stats_fgm + stats_3gm` (the algebra:
-     * `2(stats_fgm − stats_3gm) + 3 × stats_3gm = 2 × stats_fgm + stats_3gm`).
-     *
-     * The result is the inner production sum only — the
-     * `(dc_minutes + 100) ×` multiplier is applied client-side so it stays
-     * live as the GM edits dc_minutes. The global scale `_DAT_00669ab8` is a
-     * constant and doesn't affect sort order.
-     *
-     * @param PlayerRow $player
-     */
-    private function computeJsbProduction(array $player): int
-    {
-        /** @var int $fgm */
-        $fgm = $player['stats_fgm'] ?? 0;
-        /** @var int $tgm */
-        $tgm = $player['stats_3gm'] ?? 0;
-        /** @var int $ftm */
-        $ftm = $player['stats_ftm'] ?? 0;
-        /** @var int $orb */
-        $orb = $player['stats_orb'] ?? 0;
-        /** @var int $drb */
-        $drb = $player['stats_drb'] ?? 0;
-        /** @var int $ast */
-        $ast = $player['stats_ast'] ?? 0;
-        /** @var int $stl */
-        $stl = $player['stats_stl'] ?? 0;
-        /** @var int $blk */
-        $blk = $player['stats_blk'] ?? 0;
-
-        return 2 * $fgm + $tgm + $ftm + $orb + $drb + $ast + $stl + $blk;
-    }
-
-    /**
      * @see DepthChartEntryViewInterface::renderPlayerRow()
      * @param PlayerRow $player
      */
     public function renderPlayerRow(array $player, int $depthCount): void
     {
         $playerName = $player['name'];
-        $jsbProduction = $this->computeJsbProduction($player);
+        $jsbProduction = $this->service->computeJsbProduction($player);
 
         $thumbnail = \Player\PlayerImageHelper::renderThumbnail((int) $player['pid']);
 
@@ -364,7 +325,7 @@ JAVASCRIPT;
     private function renderMobilePlayerCard(array $player, int $depthCount): void
     {
         $playerName = $player['name'];
-        $jsbProduction = $this->computeJsbProduction($player);
+        $jsbProduction = $this->service->computeJsbProduction($player);
 
         $imageUrl = \Player\PlayerImageHelper::getImageUrl((int) $player['pid']);
 

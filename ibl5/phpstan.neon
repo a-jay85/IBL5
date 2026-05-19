@@ -84,3 +84,15 @@ services:
         class: PHPStanRules\BanBareTableIdentifierRule
         tags:
             - phpstan.rules.rule
+    -
+        class: PHPStanRules\BanMysqliInViewClassesRule
+        tags:
+            - phpstan.rules.rule
+    -
+        class: PHPStanRules\BanDbTouchingCallInViewRule
+        tags:
+            - phpstan.rules.rule
+    -
+        class: PHPStanRules\BanDbTouchingNewInViewRule
+        tags:
+            - phpstan.rules.rule

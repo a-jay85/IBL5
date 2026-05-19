@@ -51,6 +51,7 @@ class AuthBootstrap implements BootstrapStepInterface
         $GLOBALS['authService'] = $authService;
         $GLOBALS['user'] = $user;
         $container->set('authService', $authService);
+        $container->set('auth.username', static fn (): string => $authService->getUsername() ?? '');
 
         // Custom mainfile extensions
         if (file_exists($this->basePath . '/includes/custom_files/custom_mainfile.php')) {

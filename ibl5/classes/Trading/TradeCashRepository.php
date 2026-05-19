@@ -82,18 +82,11 @@ class TradeCashRepository extends BaseMysqliRepository implements TradeCashRepos
      */
     public function getCashTransactionsByOfferIds(array $offerIds): array
     {
-        if ($offerIds === []) {
-            return [];
-        }
-
-        $placeholders = implode(',', array_fill(0, count($offerIds), '?'));
-        $types = str_repeat('i', count($offerIds));
-
         /** @var list<TradeCashRow> $rows */
-        $rows = $this->fetchAll(
-            "SELECT * FROM `ibl_trade_cash` WHERE trade_offer_id IN ({$placeholders})",
-            $types,
-            ...$offerIds
+        $rows = $this->fetchAllInList(
+            "SELECT * FROM `ibl_trade_cash` WHERE trade_offer_id IN ({IN})",
+            'i',
+            $offerIds
         );
 
         $result = [];

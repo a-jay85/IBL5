@@ -34,14 +34,11 @@ class SeasonQueryRepository extends \BaseMysqliRepository implements SeasonQuery
      */
     public function getBulkSettings(array $names): array
     {
-        $placeholders = implode(',', array_fill(0, count($names), '?'));
-        $types = str_repeat('s', count($names));
-
         /** @var list<array{name: string, value: string}> $rows */
-        $rows = $this->fetchAll(
-            "SELECT name, value FROM `ibl_settings` WHERE name IN ({$placeholders})",
-            $types,
-            ...$names
+        $rows = $this->fetchAllInList(
+            "SELECT name, value FROM `ibl_settings` WHERE name IN ({IN})",
+            's',
+            $names
         );
 
         /** @var array<string, string> $map */

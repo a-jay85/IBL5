@@ -17,14 +17,12 @@ use LeagueSchedule\Contracts\LeagueScheduleRepositoryInterface;
 class LeagueScheduleRepository extends \BaseMysqliRepository implements LeagueScheduleRepositoryInterface
 {
     private string $scheduleTable;
-    private string $boxScoresTeamsTable;
     private string $standingsTable;
 
     public function __construct(\mysqli $db, ?LeagueContext $leagueContext = null)
     {
         parent::__construct($db, $leagueContext);
         $this->scheduleTable = $this->resolveTable('ibl_schedule');
-        $this->boxScoresTeamsTable = $this->resolveTable('ibl_box_scores_teams');
         $this->standingsTable = $this->resolveTable('ibl_standings');
     }
 
@@ -38,11 +36,7 @@ class LeagueScheduleRepository extends \BaseMysqliRepository implements LeagueSc
         $query = "SELECT s.id, s.game_date, s.visitor_teamid, s.visitor_score, s.home_teamid, s.home_score, s.box_id,
                   bst.game_of_that_day
                   FROM {$this->scheduleTable} s
-                  LEFT JOIN (
-                      SELECT game_date, visitor_teamid, home_teamid, MIN(game_of_that_day) AS game_of_that_day
-                      FROM {$this->boxScoresTeamsTable}
-                      GROUP BY game_date, visitor_teamid, home_teamid
-                  ) bst ON bst.game_date = s.game_date AND bst.visitor_teamid = s.visitor_teamid AND bst.home_teamid = s.home_teamid
+                  LEFT JOIN " . $this->gameOfThatDaySubquery() . " bst ON bst.game_date = s.game_date AND bst.visitor_teamid = s.visitor_teamid AND bst.home_teamid = s.home_teamid
                   ORDER BY s.game_date ASC, s.id ASC";
 
         /** @var list<ScheduleRow> $rows */

@@ -17,19 +17,16 @@ if (!defined('MODULE_FILE')) {
 }
 require_once __DIR__ . '/mainfile.php';
 
-if (isset($name) && $name == $_REQUEST['name']) {
-    $name = trim($name);
+$requestName = $_GET['name'] ?? null;
+if (is_string($requestName) && $requestName !== '') {
+    $name = trim(basename($requestName));
 
-    // SECURITY: Validate module name - must be alphanumeric with underscores only
-    // Also use basename() to strip any path components
-    $name = basename($name);
     if (!preg_match('/^[a-zA-Z0-9_]+$/', $name)) {
         header("Location: index.php");
         exit;
     }
 
-    // Legacy check for path traversal (kept for defense in depth)
-    if (str_contains($name, "..")) {
+    if (!\Module\ModuleRegistry::isValid($name)) {
         header("Location: index.php");
         exit;
     }
@@ -98,20 +95,10 @@ if (isset($name) && $name == $_REQUEST['name']) {
         if (!$isModuleAccessible) {
             define('ADMIN_PHASE_GATE_NOTICE', true);
         }
-        if (!isset($file) or $file != $_REQUEST['file']) {
-            $file = "index";
-        }
-
-        // SECURITY: Validate file name - must be alphanumeric with underscores only
-        // Also use basename() to strip any path components
-        $file = basename($file);
+        $requestFile = $_GET['file'] ?? null;
+        $file = (is_string($requestFile) && $requestFile !== '') ? trim(basename($requestFile)) : 'index';
         if (!preg_match('/^[a-zA-Z0-9_]+$/', $file)) {
             die("Invalid file name");
-        }
-
-        // Legacy check for path traversal (kept for defense in depth)
-        if (str_contains($file, "..")) {
-            die("You are so cool...");
         }
 
         $ThemeSel = 'IBL';

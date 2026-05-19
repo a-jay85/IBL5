@@ -286,28 +286,24 @@ function check_html($str, $strip = "")
     return $str;
 }
 
-function filter($what, $strip = "", $save = "", $type = "")
+function filter($what, $strip = "", $type = "")
 {
     if ($strip == "nohtml") {
         $what = check_html($what, $strip);
         $what = htmlentities(trim($what), ENT_QUOTES);
-        if ($type != "preview" and $save != 1) {
+        if ($type != "preview") {
             $what = html_entity_decode($what, ENT_QUOTES);
         }
     }
-    if ($save == 1) {
-        $what = check_words($what);
-        $what = check_html($what, $strip);
-        $what = addslashes($what);
-    } else {
-        $fixedWhat = $what;
-        while (stristr($fixedWhat, "\\\\'")) {
-            $fixedWhat = str_replace("\\\\'", "'", $fixedWhat);
-        }
-        $what = stripslashes($fixedWhat);
-        $what = check_words($what);
-        $what = check_html($what, $strip);
+
+    $fixedWhat = $what;
+    while (stristr($fixedWhat, "\\\\'")) {
+        $fixedWhat = str_replace("\\\\'", "'", $fixedWhat);
     }
+    $what = stripslashes($fixedWhat);
+    $what = check_words($what);
+    $what = check_html($what, $strip);
+
     return ($what);
 }
 

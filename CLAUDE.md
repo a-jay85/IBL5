@@ -1,3 +1,8 @@
+---
+description: Worktree instructions for the unify-career-stat-column-names branch.
+last_verified: 2026-05-20
+---
+
 # Worktree: unify-career-stat-column-names
 
 This worktree's Docker instance is at `unify-career-stat-column-names.localhost`.

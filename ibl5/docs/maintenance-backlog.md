@@ -651,18 +651,10 @@ Effort scale:
 **Risk if untouched:** Batch logic bleeds into single-trade path or vice versa.
 
 ### 4.12 `ibl_plr.car_to` vs `stats_tvr` — Turnover Intra-Table Inconsistency
-**Location:** `ibl_plr` schema
-**Problem:** ADR-0009 unified `stats_to` → `stats_tvr`; career `car_to` was intentionally left. Same table, two conventions.
-**Suggested direction:** Tier 2.5 migration: `car_to` → `car_tvr`; extend `BanInconsistentColumnNamesRule`.
-**Est. effort:** M
-**Risk if untouched:** Career+season turnover joins must alias one column; new code anchors `car_to`.
+**Status:** Completed (2026-05-20) — migration 128 renamed `car_to` → `car_tvr` on `ibl_plr`, `ibl_plr_snapshots`, `ibl_olympics_plr`. `BanInconsistentColumnNamesRule` extended.
 
 ### 4.13 `car_tgm`/`car_tga` vs `stats_3gm`/`stats_3ga` — 3-Point Naming Split
-**Location:** `ibl_plr` schema
-**Problem:** Season uses `3g*`; career uses `tg*`. ADR-0009 renamed rating columns but left career counting stats.
-**Suggested direction:** Tier 2.5 migration: `car_tgm` → `car_3gm`, `car_tga` → `car_3ga`.
-**Est. effort:** M
-**Risk if untouched:** Sum across layers requires special-casing.
+**Status:** Completed (2026-05-20) — migration 128 renamed `car_tgm` → `car_3gm`, `car_tga` → `car_3ga` on the same 3 tables. View `vw_player_career_stats` recreated with new names.
 
 ### 4.14 Undocumented Two-Letter Rating Columns (`oo`, `od`, `dd`, `po`, `pd`, `td`)
 **Location:** `ibl_plr` schema

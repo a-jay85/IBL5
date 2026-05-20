@@ -146,14 +146,14 @@ class PlayerStatsTest extends TestCase
             'car_fga' => 20000,
             'car_ftm' => 7000,
             'car_fta' => 8000,
-            'car_tgm' => 2000,
-            'car_tga' => 5000,
+            'car_3gm' => 2000,
+            'car_3ga' => 5000,
             'car_orb' => 1000,
             'car_drb' => 6000,
             'car_reb' => 7000,
             'car_ast' => 9000,
             'car_stl' => 2000,
-            'car_to' => 3000,
+            'car_tvr' => 3000,
             'car_blk' => 800,
             'car_pf' => 2500,
         ]);
@@ -171,7 +171,7 @@ class PlayerStatsTest extends TestCase
         $row = $this->makeCurrentPlayerRow([
             'car_fgm' => 10000,
             'car_ftm' => 7000,
-            'car_tgm' => 2000,
+            'car_3gm' => 2000,
         ]);
         $this->stats->exposedFill($row);
 
@@ -348,14 +348,14 @@ class PlayerStatsTest extends TestCase
             'car_fga' => 20000,
             'car_ftm' => 7000,
             'car_fta' => 8000,
-            'car_tgm' => 2000,
-            'car_tga' => 5000,
+            'car_3gm' => 2000,
+            'car_3ga' => 5000,
             'car_orb' => 1000,
             'car_drb' => 6000,
             'car_reb' => 7000,
             'car_ast' => 9000,
             'car_stl' => 2000,
-            'car_to' => 3000,
+            'car_tvr' => 3000,
             'car_blk' => 800,
             'car_pf' => 2500,
         ], $overrides);

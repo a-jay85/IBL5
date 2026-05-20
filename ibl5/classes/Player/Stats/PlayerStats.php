@@ -303,14 +303,14 @@ class PlayerStats implements PlayerStatsInterface
         $this->careerFieldGoalsAttempted = (int) ($plrRow['car_fga'] ?? 0);
         $this->careerFreeThrowsMade = (int) ($plrRow['car_ftm'] ?? 0);
         $this->careerFreeThrowsAttempted = (int) ($plrRow['car_fta'] ?? 0);
-        $this->careerThreePointersMade = (int) ($plrRow['car_tgm'] ?? 0);
-        $this->careerThreePointersAttempted = (int) ($plrRow['car_tga'] ?? 0);
+        $this->careerThreePointersMade = (int) ($plrRow['car_3gm'] ?? 0);
+        $this->careerThreePointersAttempted = (int) ($plrRow['car_3ga'] ?? 0);
         $this->careerOffensiveRebounds = (int) ($plrRow['car_orb'] ?? 0);
         $this->careerDefensiveRebounds = (int) ($plrRow['car_drb'] ?? 0);
         $this->careerTotalRebounds = (int) ($plrRow['car_reb'] ?? 0);
         $this->careerAssists = (int) ($plrRow['car_ast'] ?? 0);
         $this->careerSteals = (int) ($plrRow['car_stl'] ?? 0);
-        $this->careerTurnovers = (int) ($plrRow['car_to'] ?? 0);
+        $this->careerTurnovers = (int) ($plrRow['car_tvr'] ?? 0);
         $this->careerBlocks = (int) ($plrRow['car_blk'] ?? 0);
         $this->careerPersonalFouls = (int) ($plrRow['car_pf'] ?? 0);
         $this->careerPoints = StatsFormatter::calculatePoints($this->careerFieldGoalsMade, $this->careerFreeThrowsMade, $this->careerThreePointersMade);

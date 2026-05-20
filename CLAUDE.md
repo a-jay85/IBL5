@@ -1,9 +1,9 @@
 ---
-description: Worktree-local Claude Code instructions for player-facade-collapse.
+description: Worktree instructions for the unify-career-stat-column-names branch.
 last_verified: 2026-05-20
 ---
 
-# Worktree: player-facade-collapse
+# Worktree: unify-career-stat-column-names
 
-This worktree's Docker instance is at `player-facade-collapse.localhost`.
+This worktree's Docker instance is at `unify-career-stat-column-names.localhost`.
 Use this hostname for all browser checks, curl, and E2E — never `main.localhost`.

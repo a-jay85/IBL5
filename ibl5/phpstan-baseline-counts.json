@@ -6,6 +6,7 @@
         "ibl.echoInNonView": 16,
         "ibl.inlineCss": 7,
         "method.deprecatedClass": 2,
+        "property.deprecated": 1,
         "varTag.deprecatedClass": 1
     },
     "phpstan-tests-baseline.neon": {

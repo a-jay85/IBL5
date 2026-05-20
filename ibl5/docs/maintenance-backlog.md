@@ -1,6 +1,6 @@
 ---
 description: Long-running backlog of maintenance-cost reduction opportunities, organized by axis. Each item is a candidate for a future plan.
-last_verified: 2026-05-19
+last_verified: 2026-05-20
 ---
 
 # Maintenance-Cost Reduction Backlog
@@ -35,6 +35,7 @@ Effort scale:
 **Suggested direction:** Extract `TeamRegistry` (or reuse `League`/`TeamQueryRepository`); implement or delete the two silent stubs.
 **Est. effort:** M
 **Risk if untouched:** Team rename requires DB and constant update; silent stubs create invisible display gaps.
+**Status:** Completed (2026-05-19) — collapsed `nameToIdCache` into static lookup; deleted `getAllStarYears`/`getAllStarTeams` stubs (data not trivially queryable against seed); net −39 LOC.
 
 ### 1.2 RecordHoldersRepository — Streak/Season-Start Logic in Repository Layer
 **Location:** `ibl5/classes/RecordHolders/RecordHoldersRepository.php` lines 401-566
@@ -56,6 +57,7 @@ Effort scale:
 **Suggested direction:** Extract per-format importers injected into a thin `JsbImportOrchestrator`.
 **Est. effort:** L
 **Risk if untouched:** Adding/changing one format requires reading 800+ lines; bug in one importer's type handling cascades into adjacent code during reviews.
+**Status:** Completed (2026-05-19) — split into 10 per-format importers under `JsbParser/Importers/`; `JsbImportService` is a 177-LOC thin facade. `JsbImportServiceInterface` unchanged.
 
 ### 1.5 ProjectedDraftOrderService — Sorting + Tiebreaker Logic at 600+ Lines
 **Location:** `ibl5/classes/ProjectedDraftOrder/ProjectedDraftOrderService.php` (615 lines)
@@ -80,7 +82,7 @@ Effort scale:
 
 ### 1.8 FreeAgencyView — Direct DB Access Inside View Layer
 **Location:** `ibl5/classes/FreeAgency/FreeAgencyView.php` (605 lines)
-**Problem:** Directly instantiates `TeamQueryRepository` (L26) and `CashConsiderationRepository` (L133) inside `renderPlayersUnderContract()`; creates `Player` objects via `Player::withPlrRow()` inside renders — executing DB queries during HTML generation.
+**Problem:** Directly instantiates `TeamQueryRepository` (L26) and `BuyoutLedgerRepository` (L133) inside `renderPlayersUnderContract()`; creates `Player` objects via `Player::withPlrRow()` inside renders — executing DB queries during HTML generation.
 **Suggested direction:** Move roster/cash fetching to the service layer; pass pre-fetched arrays into render methods.
 **Est. effort:** M
 **Risk if untouched:** Slow queries inside renders block page output; view can't be unit-tested or screenshotted without a live DB.
@@ -579,11 +581,12 @@ Effort scale:
 **Risk if untouched:** Wrong prefix on new classes; grep returns partial results.
 
 ### 4.2 `CashConsiderationRepository` vs `TradeCashRepository`
-**Location:** `ibl5/classes/Trading/CashConsiderationRepository.php`, `TradeCashRepository.php`
+**Location:** `ibl5/classes/Trading/BuyoutLedgerRepository.php`, `TradeCashRepository.php`
 **Problem:** Both handle trade-context cash. Boundary is a table name, not a concept name.
-**Suggested direction:** Rename to `BuyoutConsiderationRepository` and `TradeCashRepository` (kept).
+**Suggested direction:** Rename to `BuyoutLedgerRepository` and `TradeCashRepository` (kept).
 **Est. effort:** M
 **Risk if untouched:** New cash queries land in the wrong repo; domains drift into each other.
+**Status:** Completed (2026-05-20) — Renamed `CashConsiderationRepository` → `BuyoutLedgerRepository`.
 
 ### 4.3 `Services/` Module Is a Dumping Ground
 **Location:** deleted (2026-05-16)
@@ -648,18 +651,10 @@ Effort scale:
 **Risk if untouched:** Batch logic bleeds into single-trade path or vice versa.
 
 ### 4.12 `ibl_plr.car_to` vs `stats_tvr` — Turnover Intra-Table Inconsistency
-**Location:** `ibl_plr` schema
-**Problem:** ADR-0009 unified `stats_to` → `stats_tvr`; career `car_to` was intentionally left. Same table, two conventions.
-**Suggested direction:** Tier 2.5 migration: `car_to` → `car_tvr`; extend `BanInconsistentColumnNamesRule`.
-**Est. effort:** M
-**Risk if untouched:** Career+season turnover joins must alias one column; new code anchors `car_to`.
+**Status:** Completed (2026-05-20) — migration 128 renamed `car_to` → `car_tvr` on `ibl_plr`, `ibl_plr_snapshots`, `ibl_olympics_plr`. `BanInconsistentColumnNamesRule` extended.
 
 ### 4.13 `car_tgm`/`car_tga` vs `stats_3gm`/`stats_3ga` — 3-Point Naming Split
-**Location:** `ibl_plr` schema
-**Problem:** Season uses `3g*`; career uses `tg*`. ADR-0009 renamed rating columns but left career counting stats.
-**Suggested direction:** Tier 2.5 migration: `car_tgm` → `car_3gm`, `car_tga` → `car_3ga`.
-**Est. effort:** M
-**Risk if untouched:** Sum across layers requires special-casing.
+**Status:** Completed (2026-05-20) — migration 128 renamed `car_tgm` → `car_3gm`, `car_tga` → `car_3ga` on the same 3 tables. View `vw_player_career_stats` recreated with new names.
 
 ### 4.14 Undocumented Two-Letter Rating Columns (`oo`, `od`, `dd`, `po`, `pd`, `td`)
 **Location:** `ibl_plr` schema
@@ -733,12 +728,12 @@ Effort scale:
 **Risk if untouched:** New injury DB logic lands as raw SQL in the Service.
 
 ### 4.25 `Services/NewsService` Misplaced
-**Location:** `ibl5/classes/Topics/News/NewsService.php` (relocated)
+**Location:** `ibl5/classes/Topics/News/NewsRepository.php` (relocated and renamed)
 **Problem:** Creates news stories, manages topic IDs — functionally part of `Topics/`.
 **Suggested direction:** Move to `Topics/NewsStoryService.php` or extract a `News/` module.
 **Est. effort:** S
 **Risk if untouched:** `Services/` continues as catch-all.
-**Status:** Completed (2026-05-16) — moved to Topics\News\NewsService with NewsServiceInterface.
+**Status:** Completed (2026-05-16) — moved to `Topics\News\NewsService`. Renamed to `Topics\News\NewsRepository` on 2026-05-19 per ADR-0001 (Service classes may not extend `BaseMysqliRepository`).
 
 ### 4.26 `Module/ModuleAccessControl` — Directory Name Misleading
 **Location:** `ibl5/classes/Module/ModuleAccessControl.php`

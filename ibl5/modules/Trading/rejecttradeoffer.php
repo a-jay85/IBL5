@@ -11,50 +11,24 @@ try {
 
 global $mysqli_db;
 
-if (!\Security\CsrfGuard::validateSubmittedToken('trade_reject')) {
-    \Utilities\HtmxHelper::redirect('/ibl5/modules.php?name=Trading&error=' . rawurlencode('Invalid or expired form submission. Please try again.'));
-}
-
-if (!isset($_POST['offer']) || empty($_POST['offer'])) {
-    \Logging\LoggerFactory::getChannel('trade')->warning('Missing offer ID in POST data');
-    die("Error: Missing trade offer ID");
-}
-
 if (!isset($mysqli_db) || !($mysqli_db instanceof mysqli)) {
     \Logging\LoggerFactory::getChannel('trade')->critical('Database connection not available');
     die("Error: Database connection failed");
 }
 
-$offerId = (int) $_POST['offer'];
-$teamRejecting = $_POST['teamRejecting'] ?? '';
-$teamReceiving = $_POST['teamReceiving'] ?? '';
+$serverName = $_SERVER['SERVER_NAME'] ?? '';
+$teamIdentityRepo = new \Repositories\TeamIdentityRepository($mysqli_db);
+$offerRepo = new \Trading\TradeOfferRepository($mysqli_db, $serverName);
+$assetRepo = new \Trading\TradeAssetRepository($mysqli_db);
+$formRepo = new \Trading\TradeFormRepository($mysqli_db);
+$service = new \Trading\TradingService($offerRepo, $assetRepo, $formRepo, $teamIdentityRepo, $mysqli_db);
+$processor = new \Trading\TradeProcessor($mysqli_db, $teamIdentityRepo, $serverName, $offerRepo, $assetRepo);
+$tradeOffer = new \Trading\TradeOffer($mysqli_db, $teamIdentityRepo, $serverName);
+$view = new \Trading\TradingView();
+$nukeCompat = new \Utilities\NukeCompat();
+$controller = new \Trading\TradingController(
+    $service, $processor, $offerRepo, $tradeOffer, $view,
+    $teamIdentityRepo, $nukeCompat, $mysqli_db
+);
 
-// Check if trade still exists (may have been accepted/declined via Discord)
-$repository = new Trading\TradeOfferRepository($mysqli_db, $_SERVER['SERVER_NAME'] ?? '');
-$tradeRows = $repository->getTradesByOfferId($offerId);
-
-if ($tradeRows === []) {
-    \Utilities\HtmxHelper::redirect('/ibl5/modules.php?name=Trading&op=reviewtrade&result=already_processed');
-}
-
-// Delete trade offer
-$repository->deleteTradeOffer($offerId);
-
-\Logging\LoggerFactory::getChannel('audit')->info('trade_offer_rejected', [
-    'offer_id' => $offerId,
-]);
-
-// Attempt Discord notification (gracefully fail if not available)
-try {
-    $commonRepo = new \Repositories\TeamIdentityRepository($mysqli_db);
-    $discord = new \Discord\Discord($commonRepo);
-    $rejectingUserDiscordID = $discord->getDiscordIDFromTeamname($teamRejecting);
-    $receivingUserDiscordID = $discord->getDiscordIDFromTeamname($teamReceiving);
-    $declineMessage = Trading\TradingService::buildDeclineMessage($rejectingUserDiscordID, $teamRejecting);
-    \Discord\Discord::sendDM($receivingUserDiscordID, $declineMessage);
-} catch (Exception $e) {
-    // Silently fail if Discord notification fails
-    // The trade rejection itself has already succeeded
-}
-
-\Utilities\HtmxHelper::redirect('/ibl5/modules.php?name=Trading&op=reviewtrade&result=trade_rejected');
+$controller->rejectTradeOffer($_POST);

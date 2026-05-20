@@ -46,7 +46,7 @@ final class BanRawSuperglobalsRule implements Rule
         ],
         '_SESSION' => [
             'suffixes' => ['Bootstrap.php'],
-            'files' => ['CsrfGuard.php', 'AuthService.php', 'DevAutoLogin.php', 'LeagueContext.php', 'PageLayout.php', 'UserContextProcessor.php', 'DepthChartEntryController.php', 'DebugSession.php'],
+            'files' => ['CsrfGuard.php', 'AuthService.php', 'DevAutoLogin.php', 'LeagueContext.php', 'PageLayout.php', 'UserContextProcessor.php', 'DepthChartEntryController.php', 'TradingController.php', 'DebugSession.php'],
         ],
         '_SERVER' => [
             'suffixes' => ['Bootstrap.php', 'ApiHandler.php', 'Controller.php', 'Authenticator.php'],

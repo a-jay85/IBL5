@@ -16,36 +16,19 @@ if (!isset($mysqli_db) || !($mysqli_db instanceof mysqli)) {
     die("Error: Database connection failed");
 }
 
-if (!\Security\CsrfGuard::validateSubmittedToken('trade_accept')) {
-    \Utilities\HtmxHelper::redirect('/ibl5/modules.php?name=Trading&error=' . rawurlencode('Invalid or expired form submission. Please try again.'));
-}
+$serverName = $_SERVER['SERVER_NAME'] ?? '';
+$teamIdentityRepo = new \Repositories\TeamIdentityRepository($mysqli_db);
+$offerRepo = new \Trading\TradeOfferRepository($mysqli_db, $serverName);
+$assetRepo = new \Trading\TradeAssetRepository($mysqli_db);
+$formRepo = new \Trading\TradeFormRepository($mysqli_db);
+$service = new \Trading\TradingService($offerRepo, $assetRepo, $formRepo, $teamIdentityRepo, $mysqli_db);
+$processor = new \Trading\TradeProcessor($mysqli_db, $teamIdentityRepo, $serverName, $offerRepo, $assetRepo);
+$tradeOffer = new \Trading\TradeOffer($mysqli_db, $teamIdentityRepo, $serverName);
+$view = new \Trading\TradingView();
+$nukeCompat = new \Utilities\NukeCompat();
+$controller = new \Trading\TradingController(
+    $service, $processor, $offerRepo, $tradeOffer, $view,
+    $teamIdentityRepo, $nukeCompat, $mysqli_db
+);
 
-$offerId = $_POST['offer'] ?? null;
-
-if ($offerId !== null) {
-    $offerId = (int) $offerId;
-
-    // Check if trade still exists (may have been accepted/declined via Discord)
-    $repository = new Trading\TradeOfferRepository($mysqli_db, $_SERVER['SERVER_NAME'] ?? '');
-    $tradeRows = $repository->getTradesByOfferId($offerId);
-
-    if ($tradeRows === []) {
-        \Utilities\HtmxHelper::redirect('/ibl5/modules.php?name=Trading&op=reviewtrade&result=already_processed');
-    }
-
-    try {
-        $tradeProcessor = new Trading\TradeProcessor($mysqli_db, new \Repositories\TeamIdentityRepository($mysqli_db), $_SERVER['SERVER_NAME'] ?? '');
-        $result = $tradeProcessor->processTrade($offerId);
-
-        if ($result['success']) {
-            \Utilities\HtmxHelper::redirect('/ibl5/modules.php?name=Trading&op=reviewtrade&result=trade_accepted');
-        } else {
-            \Utilities\HtmxHelper::redirect('/ibl5/modules.php?name=Trading&op=reviewtrade&result=accept_error&error=' . rawurlencode($result['error'] ?? 'Unknown error'));
-        }
-    } catch (Exception $e) {
-        \Logging\LoggerFactory::getChannel('trade')->error('Failed to process trade', ['error' => $e->getMessage()]);
-        \Utilities\HtmxHelper::redirect('/ibl5/modules.php?name=Trading&op=reviewtrade&result=accept_error&error=' . rawurlencode($e->getMessage()));
-    }
-} else {
-    \Utilities\HtmxHelper::redirect('/ibl5/modules.php?name=Trading&op=reviewtrade');
-}
+$controller->acceptTradeOffer($_POST);

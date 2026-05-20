@@ -77,6 +77,31 @@ final class DepthChartEntryService implements DepthChartEntryServiceInterface
     }
 
     /**
+     * @see DepthChartEntryServiceInterface::computeJsbProduction()
+     */
+    public function computeJsbProduction(array $player): int
+    {
+        /** @var int $fgm */
+        $fgm = $player['stats_fgm'] ?? 0;
+        /** @var int $tgm */
+        $tgm = $player['stats_3gm'] ?? 0;
+        /** @var int $ftm */
+        $ftm = $player['stats_ftm'] ?? 0;
+        /** @var int $orb */
+        $orb = $player['stats_orb'] ?? 0;
+        /** @var int $drb */
+        $drb = $player['stats_drb'] ?? 0;
+        /** @var int $ast */
+        $ast = $player['stats_ast'] ?? 0;
+        /** @var int $stl */
+        $stl = $player['stats_stl'] ?? 0;
+        /** @var int $blk */
+        $blk = $player['stats_blk'] ?? 0;
+
+        return 2 * $fgm + $tgm + $ftm + $orb + $drb + $ast + $stl + $blk;
+    }
+
+    /**
      * @see DepthChartEntryServiceInterface::buildFormOverride()
      */
     public function buildFormOverride(array $postData): array

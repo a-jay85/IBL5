@@ -227,6 +227,9 @@ final class RecordHoldersServiceTest extends TestCase
         $this->assertSame('Mitch Richmond', $allStar['name']);
         $this->assertSame(304, $allStar['pid']);
         $this->assertSame(10, $allStar['amount']);
+        $this->assertSame('', $allStar['teams']);
+        $this->assertSame('', $allStar['teamTids']);
+        $this->assertSame('', $allStar['years']);
     }
 
     public function testEmptyAllStarRecordHandledGracefully(): void
@@ -241,6 +244,9 @@ final class RecordHoldersServiceTest extends TestCase
         $this->assertSame('', $allStar['name']);
         $this->assertNull($allStar['pid']);
         $this->assertSame(0, $allStar['amount']);
+        $this->assertSame('', $allStar['teams']);
+        $this->assertSame('', $allStar['teamTids']);
+        $this->assertSame('', $allStar['years']);
     }
 
     public function testTeamAbbreviationMapping(): void

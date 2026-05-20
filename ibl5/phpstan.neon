@@ -85,6 +85,30 @@ services:
         tags:
             - phpstan.rules.rule
     -
+        class: PHPStanRules\BanAddslashesRule
+        tags:
+            - phpstan.rules.rule
+    -
+        class: PHPStanRules\BanFilterSaveArgRule
+        tags:
+            - phpstan.rules.rule
+    -
+        class: PHPStanRules\BanMysqliInViewClassesRule
+        tags:
+            - phpstan.rules.rule
+    -
+        class: PHPStanRules\BanDbTouchingCallInViewRule
+        tags:
+            - phpstan.rules.rule
+    -
+        class: PHPStanRules\BanDbTouchingNewInViewRule
+        tags:
+            - phpstan.rules.rule
+    -
+        class: PHPStanRules\TradingPrefixConventionRule
+        tags:
+            - phpstan.rules.rule
+    -
         class: PHPStanRules\BanCastFunctionsRule
         tags:
             - phpstan.rules.rule

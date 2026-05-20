@@ -189,7 +189,7 @@ class RecordHoldersService implements RecordHoldersServiceInterface
         /** @var list<FormattedPlayerRecord> $formatted */
         $formatted = [];
         foreach ($dbRecords as $record) {
-            $teamAbbr = $this->getTeamAbbreviation($record['teamid']);
+            $teamAbbr = self::teamAbbreviation($record['teamid']);
             $seasonYear = IblSeasonDateHelper::dateToSeasonEndingYear($record['date']);
             $formatted[] = [
                 'pid' => $record['pid'],
@@ -199,7 +199,7 @@ class RecordHoldersService implements RecordHoldersServiceInterface
                 'teamYr' => (string) $seasonYear,
                 'boxScoreUrl' => $this->buildBoxScoreUrl($record['date'], $record['game_of_that_day'], $record['box_id']),
                 'dateDisplay' => $this->formatDateDisplay($record['date'], $gameType),
-                'oppAbbr' => $this->getTeamAbbreviation($record['oppTid']),
+                'oppAbbr' => self::teamAbbreviation($record['oppTid']),
                 'oppTid' => $record['oppTid'],
                 'oppYr' => (string) $seasonYear,
                 'amount' => (string) $record['value'],
@@ -222,7 +222,7 @@ class RecordHoldersService implements RecordHoldersServiceInterface
         foreach ($dbRecords as $record) {
             $gameType = IblSeasonDateHelper::getGameTypeFromDate($record['date']);
             $seasonYear = IblSeasonDateHelper::dateToSeasonEndingYear($record['date']);
-            $teamAbbr = $this->getTeamAbbreviation($record['teamid']);
+            $teamAbbr = self::teamAbbreviation($record['teamid']);
 
             // Build multi-line amount string
             $amount = $record['points'] . "pts\n"
@@ -241,7 +241,7 @@ class RecordHoldersService implements RecordHoldersServiceInterface
                 'teamYr' => (string) $seasonYear,
                 'boxScoreUrl' => $this->buildBoxScoreUrl($record['date'], $record['game_of_that_day'], $record['box_id']),
                 'dateDisplay' => $this->formatDateDisplay($record['date'], $gameType),
-                'oppAbbr' => $this->getTeamAbbreviation($record['oppTid']),
+                'oppAbbr' => self::teamAbbreviation($record['oppTid']),
                 'oppTid' => $record['oppTid'],
                 'oppYr' => (string) $seasonYear,
                 'amount' => $amount,
@@ -266,41 +266,14 @@ class RecordHoldersService implements RecordHoldersServiceInterface
 
         $topRecord = $dbRecords[0];
 
-        // Get the years for this player's all-star appearances
-        $years = $this->getAllStarYears($topRecord['name']);
-
-        // Get teams from `ibl_hist` for this player
-        $teams = $this->getAllStarTeams($topRecord['name']);
-
         return [
             'name' => $topRecord['name'],
             'pid' => $topRecord['pid'],
-            'teams' => $teams['abbrs'],
-            'teamTids' => $teams['tids'],
+            'teams' => '',
+            'teamTids' => '',
             'amount' => $topRecord['appearances'],
-            'years' => $years,
+            'years' => '',
         ];
-    }
-
-    /**
-     * Get all-star years for a player.
-     */
-    private function getAllStarYears(string $playerName): string
-    {
-        // The repository returns the count; for years, we'd need another query.
-        // For now, return empty — the view can handle displaying just the count.
-        return '';
-    }
-
-    /**
-     * Get teams a player was an all-star for.
-     *
-     * @return array{abbrs: string, tids: string}
-     */
-    private function getAllStarTeams(string $playerName): array
-    {
-        // Would need additional repository query for team info during all-star years
-        return ['abbrs' => '', 'tids' => ''];
     }
 
     /**
@@ -320,7 +293,7 @@ class RecordHoldersService implements RecordHoldersServiceInterface
                 $formatted[] = [
                     'pid' => $record['pid'],
                     'name' => $record['name'],
-                    'teamAbbr' => $this->getTeamAbbreviation($record['teamid']),
+                    'teamAbbr' => self::teamAbbreviation($record['teamid']),
                     'teamTid' => $record['teamid'],
                     'teamYr' => (string) $record['year'],
                     'season' => $this->formatSeasonYearRange($record['year']),
@@ -406,12 +379,12 @@ class RecordHoldersService implements RecordHoldersServiceInterface
         foreach ($dbRecords as $record) {
             $seasonYear = IblSeasonDateHelper::dateToSeasonEndingYear($record['date']);
             $formatted[] = [
-                'teamAbbr' => $this->getTeamAbbreviation($record['teamid']),
+                'teamAbbr' => self::teamAbbreviation($record['teamid']),
                 'teamTid' => $record['teamid'],
                 'teamYr' => (string) $seasonYear,
                 'boxScoreUrl' => $this->buildBoxScoreUrl($record['date'], $record['game_of_that_day'], $record['box_id']),
                 'dateDisplay' => $this->formatDateDisplay($record['date'], 'regularSeason'),
-                'oppAbbr' => $this->getTeamAbbreviation($record['oppTid']),
+                'oppAbbr' => self::teamAbbreviation($record['oppTid']),
                 'oppTid' => $record['oppTid'],
                 'oppYr' => (string) $seasonYear,
                 'amount' => (string) $record['value'],
@@ -433,12 +406,12 @@ class RecordHoldersService implements RecordHoldersServiceInterface
         foreach ($dbRecords as $record) {
             $seasonYear = IblSeasonDateHelper::dateToSeasonEndingYear($record['date']);
             $formatted[] = [
-                'teamAbbr' => $this->getTeamAbbreviation($record['winner_tid']),
+                'teamAbbr' => self::teamAbbreviation($record['winner_tid']),
                 'teamTid' => $record['winner_tid'],
                 'teamYr' => (string) $seasonYear,
                 'boxScoreUrl' => $this->buildBoxScoreUrl($record['date'], $record['game_of_that_day'], $record['box_id']),
                 'dateDisplay' => $this->formatDateDisplay($record['date'], 'regularSeason'),
-                'oppAbbr' => $this->getTeamAbbreviation($record['loser_tid']),
+                'oppAbbr' => self::teamAbbreviation($record['loser_tid']),
                 'oppTid' => $record['loser_tid'],
                 'oppYr' => (string) $seasonYear,
                 'amount' => (string) $record['margin'],
@@ -493,8 +466,8 @@ class RecordHoldersService implements RecordHoldersServiceInterface
         foreach ($dbRecords as $record) {
             $endingYear = $record['year'];
             $formatted[] = [
-                'teamAbbr' => $this->getTeamAbbreviationByName($record['team_name']),
-                'teamTid' => $this->getTeamIdByName($record['team_name']),
+                'teamAbbr' => self::teamAbbreviationByName($record['team_name']),
+                'teamTid' => self::teamIdByName($record['team_name']),
                 'teamYr' => (string) $endingYear,
                 'season' => $this->formatSeasonYearRange($endingYear),
                 'amount' => $record['wins'] . '-' . $record['losses'],
@@ -518,8 +491,8 @@ class RecordHoldersService implements RecordHoldersServiceInterface
         $formatted = [];
         foreach ($dbRecords as $record) {
             $formatted[] = [
-                'teamAbbr' => $this->getTeamAbbreviationByName($record['team_name']),
-                'teamTid' => $this->getTeamIdByName($record['team_name']),
+                'teamAbbr' => self::teamAbbreviationByName($record['team_name']),
+                'teamTid' => self::teamIdByName($record['team_name']),
                 'teamYr' => (string) $record['year'],
                 'season' => $this->formatSeasonYearRange($record['year']),
                 'amount' => $record['wins'] . '-' . $record['losses'],
@@ -546,8 +519,8 @@ class RecordHoldersService implements RecordHoldersServiceInterface
                 $season .= ', ' . $this->formatSeasonYearRange($record['end_year']);
             }
             $formatted[] = [
-                'teamAbbr' => $this->getTeamAbbreviationByName($record['team_name']),
-                'teamTid' => $this->getTeamIdByName($record['team_name']),
+                'teamAbbr' => self::teamAbbreviationByName($record['team_name']),
+                'teamTid' => self::teamIdByName($record['team_name']),
                 'teamYr' => (string) $record['start_year'],
                 'season' => $season,
                 'amount' => (string) $record['streak'],
@@ -607,8 +580,8 @@ class RecordHoldersService implements RecordHoldersServiceInterface
         $formatted = [];
         foreach ($dbRecords as $record) {
             $formatted[] = [
-                'teamAbbr' => $this->getTeamAbbreviationByName($record['team_name']),
-                'teamTid' => $this->getTeamIdByName($record['team_name']),
+                'teamAbbr' => self::teamAbbreviationByName($record['team_name']),
+                'teamTid' => self::teamIdByName($record['team_name']),
                 'amount' => (string) $record['count'],
                 'years' => strip_tags($record['years']),
             ];
@@ -616,39 +589,27 @@ class RecordHoldersService implements RecordHoldersServiceInterface
         return $formatted;
     }
 
-    /**
-     * Get team abbreviation from team ID.
-     */
-    private function getTeamAbbreviation(int $teamId): string
+    private static function teamAbbreviation(int $teamId): string
     {
         return self::TEAM_REGISTRY[$teamId]['abbr'] ?? '';
     }
 
-    /** @var array<string, int>|null */
-    private ?array $nameToIdCache = null;
-
-    private function getTeamAbbreviationByName(string $teamName): string
+    private static function teamIdByName(string $teamName): int
     {
-        if ($this->nameToIdCache === null) {
-            $this->nameToIdCache = [];
+        /** @var array<string, int>|null $byName */
+        static $byName = null;
+        if ($byName === null) {
+            $byName = [];
             foreach (self::TEAM_REGISTRY as $id => $info) {
-                $this->nameToIdCache[$info['name']] = $id;
+                $byName[$info['name']] = $id;
             }
         }
-
-        $teamId = $this->nameToIdCache[$teamName] ?? 0;
-        return $this->getTeamAbbreviation($teamId);
+        return $byName[$teamName] ?? 0;
     }
 
-    /**
-     * Get team ID from team name, using the same cache as getTeamAbbreviationByName().
-     */
-    private function getTeamIdByName(string $teamName): int
+    private static function teamAbbreviationByName(string $teamName): string
     {
-        // Ensure cache is populated
-        $this->getTeamAbbreviationByName($teamName);
-
-        return $this->nameToIdCache[$teamName] ?? 0;
+        return self::teamAbbreviation(self::teamIdByName($teamName));
     }
 
     /**

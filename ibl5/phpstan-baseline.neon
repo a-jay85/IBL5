@@ -290,3 +290,11 @@ parameters:
 			identifier: ibl.echoInNonView
 			count: 3
 			path: classes/Waivers/WaiversController.php
+
+		# Player facade collapse PR1: @deprecated properties trigger property.deprecated
+		# across the entire codebase. PR2 replaces this blanket ignore with a custom
+		# PHPStan rule + per-file advisory baseline for burndown tracking.
+		-
+			message: '#Access to deprecated property .+ of class Player\\Player#'
+			identifier: property.deprecated
+			reportUnmatched: false

@@ -21,7 +21,6 @@ class SecurityBootstrap implements BootstrapStepInterface
     {
         $this->redirectFacebookBot();
         $this->defineConstants();
-        $this->startGzipCompression();
     }
 
     private function redirectFacebookBot(): void
@@ -40,30 +39,6 @@ class SecurityBootstrap implements BootstrapStepInterface
     {
         if (!defined('END_TRANSACTION')) {
             define('END_TRANSACTION', 2);
-        }
-    }
-
-    private function startGzipCompression(): void
-    {
-        $rawUa = $_SERVER['HTTP_USER_AGENT'] ?? '';
-        $ua = is_string($rawUa) ? $rawUa : '';
-        $rawEncoding = $_SERVER['HTTP_ACCEPT_ENCODING'] ?? '';
-        $acceptEncoding = is_string($rawEncoding) ? $rawEncoding : '';
-
-        if (str_contains($ua, 'compatible')) {
-            if (extension_loaded('zlib')) {
-                @ob_end_clean();
-                ob_start('ob_gzhandler');
-            }
-        } elseif ($acceptEncoding !== '') {
-            if (str_contains($acceptEncoding, 'gzip') && extension_loaded('zlib')) {
-                $GLOBALS['do_gzip_compress'] = true;
-                ob_start('ob_gzhandler', 5);
-                ob_implicit_flush(false);
-                if (str_contains($ua, 'MSIE')) {
-                    header('Content-Encoding: gzip');
-                }
-            }
         }
     }
 

@@ -16,71 +16,19 @@ if (!isset($mysqli_db) || !($mysqli_db instanceof mysqli)) {
     die("Error: Database connection failed");
 }
 
-if (!\Security\CsrfGuard::validateSubmittedToken('trade_offer')) {
-    \Utilities\HtmxHelper::redirect('/ibl5/modules.php?name=Trading&error=' . rawurlencode('Invalid or expired form submission. Please try again.'));
-}
+$serverName = $_SERVER['SERVER_NAME'] ?? '';
+$teamIdentityRepo = new \Repositories\TeamIdentityRepository($mysqli_db);
+$offerRepo = new \Trading\TradeOfferRepository($mysqli_db, $serverName);
+$assetRepo = new \Trading\TradeAssetRepository($mysqli_db);
+$formRepo = new \Trading\TradeFormRepository($mysqli_db);
+$service = new \Trading\TradingService($offerRepo, $assetRepo, $formRepo, $teamIdentityRepo, $mysqli_db);
+$processor = new \Trading\TradeProcessor($mysqli_db, $teamIdentityRepo, $serverName, $offerRepo, $assetRepo);
+$tradeOffer = new \Trading\TradeOffer($mysqli_db, $teamIdentityRepo, $serverName);
+$view = new \Trading\TradingView();
+$nukeCompat = new \Utilities\NukeCompat();
+$controller = new \Trading\TradingController(
+    $service, $processor, $offerRepo, $tradeOffer, $view,
+    $teamIdentityRepo, $nukeCompat, $mysqli_db
+);
 
-// Prepare trade data from POST
-$tradeData = [
-    'offeringTeam' => $_POST['offeringTeam'],
-    'listeningTeam' => $_POST['listeningTeam'],
-    'switchCounter' => $_POST['switchCounter'],
-    'fieldsCounter' => $_POST['fieldsCounter'] + 1,
-    'userSendsCash' => [],
-    'partnerSendsCash' => [],
-    'check' => [],
-    'contract' => [],
-    'index' => [],
-    'type' => []
-];
-
-// Extract cash data
-$i = 0;
-while ($i < 7) {
-    $tradeData['userSendsCash'][$i] = (int) ($_POST['userSendsCash' . $i] ?? 0);
-    $tradeData['partnerSendsCash'][$i] = (int) ($_POST['partnerSendsCash' . $i] ?? 0);
-    $i++;
-}
-
-// Extract form field data
-for ($j = 0; $j < $tradeData['fieldsCounter']; $j++) {
-    $tradeData['check'][$j] = $_POST['check' . $j] ?? null;
-    $tradeData['contract'][$j] = $_POST['contract' . $j] ?? 0;
-    $tradeData['index'][$j] = $_POST['index' . $j] ?? 0;
-    $tradeData['type'][$j] = $_POST['type' . $j] ?? 0;
-}
-
-// Create trade offer using existing class
-try {
-    $commonRepository = new \Repositories\TeamIdentityRepository($mysqli_db);
-    $tradeOffer = new Trading\TradeOffer($mysqli_db, $commonRepository, $_SERVER['SERVER_NAME'] ?? '');
-    $result = $tradeOffer->createTradeOffer($tradeData);
-} catch (Exception $e) {
-    \Logging\LoggerFactory::getChannel('trade')->error('Failed to create trade offer', ['error' => $e->getMessage()]);
-    $result = ['success' => false, 'error' => $e->getMessage()];
-}
-
-if ($result['success']) {
-    \Logging\LoggerFactory::getChannel('audit')->info('trade_offer_created', [
-        'offering_team' => $tradeData['offeringTeam'],
-        'listening_team' => $tradeData['listeningTeam'],
-    ]);
-    \Utilities\HtmxHelper::redirect('/ibl5/modules.php?name=Trading&op=reviewtrade&result=offer_sent');
-} else {
-    // Store checked items and cash amounts in session so the form can restore them
-    $checkedItems = [];
-    for ($j = 0; $j < $tradeData['fieldsCounter']; $j++) {
-        if (($tradeData['check'][$j] ?? null) === 'on') {
-            $itemKey = ($tradeData['type'][$j] ?? '0') . ':' . ($tradeData['index'][$j] ?? '0');
-            $checkedItems[$itemKey] = true;
-        }
-    }
-    $_SESSION['tradeFormData'] = [
-        'checkedItems' => $checkedItems,
-        'userSendsCash' => $tradeData['userSendsCash'],
-        'partnerSendsCash' => $tradeData['partnerSendsCash'],
-    ];
-
-    $error = $result['error'] ?? ($result['errors'] ? implode('; ', $result['errors']) : 'Unknown error');
-    \Utilities\HtmxHelper::redirect('/ibl5/modules.php?name=Trading&op=offertrade&partner=' . rawurlencode($tradeData['listeningTeam']) . '&error=' . rawurlencode($error));
-}
+$controller->submitTradeOffer($_POST);

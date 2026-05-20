@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 // Post-migration-114 canonical names: should not trigger the rule.
+$careerStats = "SELECT `car_tvr`, `car_3gm`, `car_3ga` FROM ibl_plr";
 $turnover = "SELECT `stats_tvr` FROM ibl_plr";
 $rating = "SELECT `r_3ga`, `r_3gp` FROM ibl_plr";
 $teamId = "SELECT * FROM ibl_plr WHERE `teamid` = 1";

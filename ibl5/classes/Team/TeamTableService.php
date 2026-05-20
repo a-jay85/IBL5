@@ -188,7 +188,7 @@ class TeamTableService implements TeamTableServiceInterface
             case 'playoffs':
                 return \BasketballStats\Tables\PeriodAverages::render($this->db, $team, $season, $season->playoffsStartDate, $season->playoffsEndDate, $starterPids);
             case 'contracts':
-                $cashRepo = new \Trading\CashConsiderationRepository($this->db);
+                $cashRepo = new \Trading\BuyoutLedgerRepository($this->db);
                 $cashRows = $cashRepo->getTeamCashConsiderations($team->teamid ?? 0);
                 foreach ($cashRows as $cashRow) {
                     $result[] = self::cashConsiderationToRosterRow($cashRow);

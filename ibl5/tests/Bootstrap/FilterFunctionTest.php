@@ -27,12 +27,6 @@ final class FilterFunctionTest extends TestCase
         self::assertSame('plain text', $result);
     }
 
-    public function testFilterSaveModeAddsSlashes(): void
-    {
-        $result = filter("it's a test", '', '1');
-        self::assertStringContainsString("it\\'s a test", $result);
-    }
-
     public function testFilterDefaultModeStripsSlashes(): void
     {
         $result = filter("it\\'s a test");
@@ -56,6 +50,28 @@ final class FilterFunctionTest extends TestCase
     {
         $result = check_html('<p>Hello</p>', 'nohtml');
         self::assertStringNotContainsString('<p>', $result);
+    }
+
+    public function testFilterNohtmlEscapesAndDecodesEntities(): void
+    {
+        $result = filter('Hello & "World"', 'nohtml');
+        self::assertSame('Hello & "World"', $result);
+    }
+
+    public function testFilterEmptyStringWithNohtmlReturnsEmpty(): void
+    {
+        $result = filter('', 'nohtml');
+        self::assertSame('', $result);
+    }
+
+    public function testFilterAcceptsOnlyThreeParameters(): void
+    {
+        $ref = new \ReflectionFunction('filter');
+        self::assertSame(3, $ref->getNumberOfParameters());
+        self::assertSame(['what', 'strip', 'type'], array_map(
+            static fn(\ReflectionParameter $p): string => $p->getName(),
+            $ref->getParameters()
+        ));
     }
 
     public function testCheckWordsReturnsOriginalWhenNoCensoring(): void

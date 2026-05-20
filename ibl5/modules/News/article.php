@@ -34,14 +34,18 @@ $optionbox = "";
 $module_name = basename(dirname(__FILE__));
 get_lang($module_name);
 
-// Validate and sanitize $sid parameter
-$sid = isset($sid) && is_numeric($sid) ? (int) $sid : 0;
+// Legacy globals previously populated by ConfigBootstrap::extractRequestToGlobals().
+// PR2 narrowed that extraction to a 2-key allowlist (newlang, redirect), so module
+// inputs are now read from $_REQUEST explicitly here.
+$sid    = is_numeric($_REQUEST['sid']    ?? null) ? (int) $_REQUEST['sid']    : 0;
+$teamid = is_numeric($_REQUEST['teamid'] ?? null) ? (int) $_REQUEST['teamid'] : null;
+
 $REQUEST_URI = $_SERVER['REQUEST_URI'] ?? '';
 
 if (stristr($REQUEST_URI, "mainfile")) {
     Header("Location: modules.php?name=$module_name&file=article&sid=$sid");
     exit;
-} elseif ($sid === 0 && !isset($teamid)) {
+} elseif ($sid === 0 && $teamid === null) {
     Header("Location: index.php");
     exit;
 }

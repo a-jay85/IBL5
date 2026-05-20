@@ -33,7 +33,7 @@ class FreeAgencyController
         $this->repository = new FreeAgencyRepository($db);
         $this->demandRepository = new FreeAgencyDemandRepository($db);
         $this->service = new FreeAgencyService($this->repository, $this->demandRepository, $db);
-        $this->view = new FreeAgencyView($db, $commonRepository);
+        $this->view = new FreeAgencyView($commonRepository);
         $this->processor = new FreeAgencyProcessor($db, $commonRepository);
         $this->nukeCompat = $nukeCompat ?? new \Utilities\NukeCompat();
     }

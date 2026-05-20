@@ -9,7 +9,7 @@ use Trading\CashTransactionHandler;
 use Trading\Contracts\TradeOfferRepositoryInterface;
 use Trading\Contracts\TradeAssetRepositoryInterface;
 use Trading\Contracts\TradeCashRepositoryInterface;
-use Trading\Contracts\CashConsiderationRepositoryInterface;
+use Trading\Contracts\BuyoutLedgerRepositoryInterface;
 use Trading\TradeOffer;
 use Trading\TradeValidator;
 use Season\Season;
@@ -32,10 +32,10 @@ class TradeOfferTest extends TestCase
         Season $season,
         ?Discord $discord = null,
         ?TradeCashRepositoryInterface $cashRepo = null,
-        ?CashConsiderationRepositoryInterface $cashConsiderationRepo = null,
+        ?BuyoutLedgerRepositoryInterface $cashConsiderationRepo = null,
     ): TradeOffer {
         $cashRepoStub = $cashRepo ?? $this->createStub(TradeCashRepositoryInterface::class);
-        $cashConsiderationRepoStub = $cashConsiderationRepo ?? $this->createStub(CashConsiderationRepositoryInterface::class);
+        $cashConsiderationRepoStub = $cashConsiderationRepo ?? $this->createStub(BuyoutLedgerRepositoryInterface::class);
 
         return new class ($offerRepository, $assetRepository, $validator, $cashHandler, $commonRepo, $season, $discord, $cashRepoStub, $cashConsiderationRepoStub) extends TradeOffer {
             public function __construct(
@@ -47,7 +47,7 @@ class TradeOfferTest extends TestCase
                 Season $season,
                 ?Discord $discord,
                 TradeCashRepositoryInterface $cashRepo,
-                CashConsiderationRepositoryInterface $cashConsiderationRepo,
+                BuyoutLedgerRepositoryInterface $cashConsiderationRepo,
             ) {
                 // Skip parent constructor — inject directly
                 $this->db = new class extends \mysqli {

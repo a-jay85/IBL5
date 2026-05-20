@@ -6,622 +6,118 @@ namespace JsbParser;
 
 use JsbParser\Contracts\JsbImportRepositoryInterface;
 use JsbParser\Contracts\JsbImportServiceInterface;
+use JsbParser\Importers\AswImporter;
+use JsbParser\Importers\AwaImporter;
+use JsbParser\Importers\CarImporter;
+use JsbParser\Importers\DraImporter;
+use JsbParser\Importers\HisImporter;
+use JsbParser\Importers\HofImporter;
+use JsbParser\Importers\PlbImporter;
+use JsbParser\Importers\RcbImporter;
+use JsbParser\Importers\RetImporter;
+use JsbParser\Importers\TrnImporter;
 use PlrParser\PlrOrdinalMap;
 
-/**
- * Orchestrator service for JSB file parsing and database import.
- *
- * Coordinates parsing of .car, .trn, .his, and .asw files, resolves player/team IDs,
- * and stores results in the database. Season stats flow from `ibl_box_scores` via the ibl_hist VIEW.
- */
 class JsbImportService implements JsbImportServiceInterface
 {
-    private JsbImportRepositoryInterface $repository;
-    private PlayerIdResolver $resolver;
-
-    /** @var int Auto-incrementing trade group ID for grouping trade items */
-    private int $nextTradeGroupId = 1;
-
-    /**
-     * MySQL affected_rows for INSERT ... ON DUPLICATE KEY UPDATE:
-     * 1 = new row inserted, 2 = existing row updated, 0 = no change.
-     */
-    private const AFFECTED_ROWS_INSERTED = 1;
+    private CarImporter $car;
+    private TrnImporter $trn;
+    private HisImporter $his;
+    private AswImporter $asw;
+    private AwaImporter $awa;
+    private RcbImporter $rcb;
+    private PlbImporter $plb;
+    private DraImporter $dra;
+    private RetImporter $ret;
+    private HofImporter $hof;
 
     public function __construct(JsbImportRepositoryInterface $repository, PlayerIdResolver $resolver)
     {
-        $this->repository = $repository;
-        $this->resolver = $resolver;
+        $this->car = new CarImporter($repository, $resolver);
+        $this->trn = new TrnImporter($repository);
+        $this->his = new HisImporter($repository);
+        $this->asw = new AswImporter($repository);
+        $this->awa = new AwaImporter($repository);
+        $this->rcb = new RcbImporter($repository);
+        $this->plb = new PlbImporter($repository);
+        $this->dra = new DraImporter($repository);
+        $this->ret = new RetImporter($repository);
+        $this->hof = new HofImporter($repository);
     }
 
-    /**
-     * @see JsbImportServiceInterface::processCarData()
-     */
+    /** @see JsbImportServiceInterface::processCarData() */
     public function processCarData(string $data, ?int $filterYear = null): JsbImportResult
     {
-        $result = new JsbImportResult();
-
-        try {
-            $parsed = CarFileParser::parse($data);
-        } catch (\RuntimeException $e) {
-            $result->addError('CAR parse failed: ' . $e->getMessage());
-            return $result;
-        }
-
-        foreach ($parsed['players'] as $player) {
-            foreach ($player['seasons'] as $season) {
-                if ($filterYear !== null && $season['year'] !== $filterYear) {
-                    continue;
-                }
-
-                $histData = CarFileParser::convertToHistFormat($season);
-
-                // Resolve team ID
-                $resolvedTeamId = $this->repository->resolveTeamIdByName($histData['team']);
-                $teamId = $resolvedTeamId ?? 0;
-
-                // Resolve player ID (pass resolvedTeamId for teamid-based ibl_plr lookup; null skips Strategy 2)
-                $pid = $this->resolver->resolve($histData['name'], $histData['team'], $histData['year'], $resolvedTeamId);
-                if ($pid === null) {
-                    $result->addSkipped();
-                    continue;
-                }
-
-                // ibl_hist is now a VIEW derived from `ibl_box_scores` — no direct writes needed.
-                // Season stats are derived from individual game box scores automatically.
-                $result->addInserted();
-            }
-        }
-
-        return $result;
+        return $this->car->import($data, $filterYear);
     }
 
-    /**
-     * @see JsbImportServiceInterface::processCarFile()
-     */
+    /** @see JsbImportServiceInterface::processCarFile() */
     public function processCarFile(string $filePath, ?int $filterYear = null): JsbImportResult
     {
-        return $this->loadFileAndProcess($filePath, fn (string $c) => $this->processCarData($c, $filterYear), 'CAR');
+        return $this->car->importFile($filePath, $filterYear);
     }
 
-    /**
-     * @see JsbImportServiceInterface::processTrnData()
-     */
+    /** @see JsbImportServiceInterface::processTrnData() */
     public function processTrnData(string $data, ?string $sourceLabel = null): JsbImportResult
     {
-        $result = new JsbImportResult();
-
-        try {
-            $parsed = TrnFileParser::parse($data);
-        } catch (\RuntimeException $e) {
-            $result->addError('TRN parse failed: ' . $e->getMessage());
-            return $result;
-        }
-
-        // Get the max existing trade_group_id to avoid collisions
-        $this->initTradeGroupId();
-
-        foreach ($parsed['transactions'] as $transaction) {
-            $type = $transaction['type'];
-
-            switch ($type) {
-                case TrnFileParser::TYPE_INJURY:
-                    $this->importInjuryTransaction($transaction, $sourceLabel, $result);
-                    break;
-
-                case TrnFileParser::TYPE_TRADE:
-                    $this->importTradeTransaction($transaction, $sourceLabel, $result);
-                    break;
-
-                case TrnFileParser::TYPE_WAIVER_CLAIM:
-                case TrnFileParser::TYPE_WAIVER_RELEASE:
-                    $this->importWaiverTransaction($transaction, $sourceLabel, $result);
-                    break;
-            }
-        }
-
-        return $result;
+        return $this->trn->import($data, $sourceLabel);
     }
 
-    /**
-     * @see JsbImportServiceInterface::processTrnFile()
-     */
+    /** @see JsbImportServiceInterface::processTrnFile() */
     public function processTrnFile(string $filePath, ?string $sourceLabel = null): JsbImportResult
     {
-        return $this->loadFileAndProcess($filePath, fn (string $c) => $this->processTrnData($c, $sourceLabel), 'TRN');
+        return $this->trn->importFile($filePath, $sourceLabel);
     }
 
-    /**
-     * @see JsbImportServiceInterface::processHisData()
-     */
+    /** @see JsbImportServiceInterface::processHisData() */
     public function processHisData(string $data, ?string $sourceLabel = null): JsbImportResult
     {
-        $result = new JsbImportResult();
-
-        try {
-            $parsed = HisFileParser::parse($data);
-        } catch (\RuntimeException $e) {
-            $result->addError('HIS parse failed: ' . $e->getMessage());
-            return $result;
-        }
-
-        foreach ($parsed as $season) {
-            foreach ($season['teams'] as $team) {
-                $teamId = $this->repository->resolveTeamIdByName($team['name']);
-
-                try {
-                    $affected = $this->repository->upsertHistoryRecord([
-                        'season_year' => $season['year'],
-                        'team_name' => $team['name'],
-                        'teamid' => $teamId,
-                        'wins' => $team['wins'],
-                        'losses' => $team['losses'],
-                        'made_playoffs' => $team['made_playoffs'],
-                        'playoff_result' => $team['playoff_result'] !== '' ? $team['playoff_result'] : null,
-                        'playoff_round_reached' => $team['playoff_round_reached'] !== '' ? $team['playoff_round_reached'] : null,
-                        'won_championship' => $team['won_championship'],
-                        'source_file' => $sourceLabel,
-                    ]);
-                    $this->recordUpsertResult($affected, $result);
-                } catch (\RuntimeException $e) {
-                    $result->addError('History upsert failed for ' . $team['name'] . ' (' . $season['year'] . '): ' . $e->getMessage());
-                }
-            }
-        }
-
-        return $result;
+        return $this->his->import($data, $sourceLabel);
     }
 
-    /**
-     * @see JsbImportServiceInterface::processHisFile()
-     */
+    /** @see JsbImportServiceInterface::processHisFile() */
     public function processHisFile(string $filePath, ?string $sourceLabel = null): JsbImportResult
     {
-        return $this->loadFileAndProcess($filePath, fn (string $c) => $this->processHisData($c, $sourceLabel), 'HIS');
+        return $this->his->importFile($filePath, $sourceLabel);
     }
 
-    /**
-     * @see JsbImportServiceInterface::processAswData()
-     */
+    /** @see JsbImportServiceInterface::processAswData() */
     public function processAswData(string $data, int $seasonYear): JsbImportResult
     {
-        $result = new JsbImportResult();
-
-        try {
-            $parsed = AswFileParser::parse($data);
-        } catch (\RuntimeException $e) {
-            $result->addError('ASW parse failed: ' . $e->getMessage());
-            return $result;
-        }
-
-        // Import rosters
-        /** @var array<string, list<int>> $rosters */
-        $rosters = $parsed['rosters'];
-        foreach ($rosters as $eventType => $playerIds) {
-            foreach ($playerIds as $slot => $pid) {
-                $playerName = $this->repository->getPlayerName($pid);
-
-                try {
-                    $affected = $this->repository->upsertAllStarRoster([
-                        'season_year' => $seasonYear,
-                        'event_type' => $eventType,
-                        'roster_slot' => $slot + 1,
-                        'pid' => $pid,
-                        'player_name' => $playerName,
-                    ]);
-                    $this->recordUpsertResult($affected, $result);
-                } catch (\RuntimeException $e) {
-                    $result->addError('All-Star roster upsert failed: ' . $e->getMessage());
-                }
-            }
-        }
-
-        // Import dunk contest scores
-        $this->importContestScores(
-            $parsed['scores']['dunk_round1'],
-            'dunk_contest',
-            1,
-            $seasonYear,
-            $rosters['dunk_contest'],
-            $result
-        );
-        $this->importContestScores(
-            $parsed['scores']['dunk_finals'],
-            'dunk_contest',
-            3, // finals
-            $seasonYear,
-            $rosters['dunk_contest'],
-            $result
-        );
-
-        // Import 3-point shootout scores
-        $this->importContestScores(
-            $parsed['scores']['three_pt_round1'],
-            'three_point',
-            1,
-            $seasonYear,
-            $rosters['three_point'],
-            $result
-        );
-        $this->importContestScores(
-            $parsed['scores']['three_pt_semis'],
-            'three_point',
-            2, // semifinals
-            $seasonYear,
-            $rosters['three_point'],
-            $result
-        );
-        $this->importContestScores(
-            $parsed['scores']['three_pt_finals'],
-            'three_point',
-            3, // finals
-            $seasonYear,
-            $rosters['three_point'],
-            $result
-        );
-
-        return $result;
+        return $this->asw->import($data, $seasonYear);
     }
 
-    /**
-     * @see JsbImportServiceInterface::processAswFile()
-     */
+    /** @see JsbImportServiceInterface::processAswFile() */
     public function processAswFile(string $filePath, int $seasonYear): JsbImportResult
     {
-        return $this->loadFileAndProcess($filePath, fn (string $c) => $this->processAswData($c, $seasonYear), 'ASW');
+        return $this->asw->importFile($filePath, $seasonYear);
     }
 
-    /** @var list<string> Rank suffixes for award names */
-    private const RANK_SUFFIXES = ['(1st)', '(2nd)', '(3rd)', '(4th)', '(5th)'];
-
-    /**
-     * @see JsbImportServiceInterface::processAwaData()
-     */
+    /** @see JsbImportServiceInterface::processAwaData() */
     public function processAwaData(string $awaData, string $carData, ?int $filterYear = null): JsbImportResult
     {
-        $result = new JsbImportResult();
-
-        try {
-            $awaParsed = AwaFileParser::parse($awaData);
-        } catch (\RuntimeException $e) {
-            $result->addError('AWA parse failed: ' . $e->getMessage());
-            return $result;
-        }
-
-        // Build PID → name map from .car data
-        try {
-            $carParsed = CarFileParser::parse($carData);
-        } catch (\RuntimeException $e) {
-            $result->addError('CAR parse failed (for AWA name resolution): ' . $e->getMessage());
-            return $result;
-        }
-
-        /** @var array<int, string> $pidNameMap */
-        $pidNameMap = [];
-        foreach ($carParsed['players'] as $player) {
-            // .car stores names in CP1252; convert to UTF-8 for DB storage
-            $name = mb_convert_encoding($player['name'], 'UTF-8', 'Windows-1252');
-            $pidNameMap[$player['block_index']] = $name;
-        }
-
-        foreach ($awaParsed['seasons'] as $season) {
-            if ($filterYear !== null && $season['year'] !== $filterYear) {
-                continue;
-            }
-
-            foreach ($season['stat_leaders'] as $category => $leaders) {
-                foreach ($leaders as $leader) {
-                    $playerName = $pidNameMap[$leader['pid']] ?? null;
-                    if ($playerName === null) {
-                        $result->addSkipped();
-                        continue;
-                    }
-
-                    $rankIndex = $leader['rank'] - 1;
-                    if ($rankIndex < 0 || $rankIndex >= 5) {
-                        $result->addSkipped();
-                        continue;
-                    }
-
-                    $awardName = $category . ' ' . self::RANK_SUFFIXES[$rankIndex];
-
-                    try {
-                        $affected = $this->repository->upsertAward($season['year'], $awardName, $playerName);
-                        $this->recordUpsertResult($affected, $result);
-                    } catch (\RuntimeException $e) {
-                        $result->addError('Award upsert failed for ' . $playerName . ': ' . $e->getMessage());
-                    }
-                }
-            }
-        }
-
-        return $result;
+        return $this->awa->import($awaData, $carData, $filterYear);
     }
 
-    /**
-     * @see JsbImportServiceInterface::processAwaFile()
-     */
+    /** @see JsbImportServiceInterface::processAwaFile() */
     public function processAwaFile(string $awaPath, string $carPath, ?int $filterYear = null): JsbImportResult
     {
-        if (!file_exists($awaPath) || !file_exists($carPath)) {
-            $result = new JsbImportResult();
-            $result->addError('AWA or CAR file not found');
-            return $result;
-        }
-
-        $awaData = file_get_contents($awaPath);
-        $carData = file_get_contents($carPath);
-        if ($awaData === false || $carData === false) {
-            $result = new JsbImportResult();
-            $result->addError('Failed to read AWA or CAR file');
-            return $result;
-        }
-
-        return $this->processAwaData($awaData, $carData, $filterYear);
+        return $this->awa->importFiles($awaPath, $carPath, $filterYear);
     }
 
-    /**
-     * @see JsbImportServiceInterface::processRcbData()
-     */
+    /** @see JsbImportServiceInterface::processRcbData() */
     public function processRcbData(string $data, int $seasonYear, ?string $sourceLabel = null, bool $includeAlltime = true): JsbImportResult
     {
-        $result = new JsbImportResult();
-
-        try {
-            $parsed = RcbFileParser::parse($data);
-        } catch (\RuntimeException $e) {
-            $result->addError('RCB parse failed: ' . $e->getMessage());
-            return $result;
-        }
-
-        if ($includeAlltime) {
-            if ($parsed['alltime'] === []) {
-                $result->addMessage('RCB alltime section empty — skipping replace to avoid wiping authoritative state');
-            } else {
-                $alltimeRecords = array_map(
-                    static fn (array $record): array => [
-                        'scope' => $record['scope'],
-                        'teamid' => $record['teamid'],
-                        'record_type' => $record['record_type'],
-                        'stat_category' => $record['stat_category'],
-                        'ranking' => $record['ranking'],
-                        'player_name' => $record['player_name'],
-                        'car_block_id' => $record['car_block_id'],
-                        'pid' => null,
-                        'stat_value' => $record['stat_value'],
-                        'stat_raw' => $record['stat_raw'],
-                        'team_of_record' => $record['team_of_record'],
-                        'season_year' => $record['season_year'],
-                        'career_total' => $record['career_total'],
-                        'source_file' => $sourceLabel,
-                    ],
-                    $parsed['alltime']
-                );
-                try {
-                    $inserted = $this->repository->replaceRcbAlltimeRecords($alltimeRecords);
-                    $result->addInserted($inserted);
-                } catch (\RuntimeException $e) {
-                    $result->addError('RCB alltime replace failed: ' . $e->getMessage());
-                }
-            }
-        }
-
-        if ($parsed['currentSeason'] === []) {
-            $result->addMessage('RCB season section empty — skipping replace');
-        } else {
-            $seasonRecords = array_map(
-                static fn (array $record): array => [
-                    'season_year' => $seasonYear,
-                    'scope' => $record['scope'],
-                    'teamid' => $record['teamid'],
-                    'context' => $record['context'],
-                    'stat_category' => $record['stat_category'],
-                    'ranking' => $record['ranking'],
-                    'player_name' => $record['player_name'],
-                    'player_position' => $record['player_position'],
-                    'car_block_id' => $record['car_block_id'],
-                    'pid' => null,
-                    'stat_value' => $record['stat_value'],
-                    'record_season_year' => $record['season_year'],
-                    'source_file' => $sourceLabel,
-                ],
-                $parsed['currentSeason']
-            );
-            try {
-                $inserted = $this->repository->replaceRcbSeasonRecords($seasonYear, $seasonRecords);
-                $result->addInserted($inserted);
-            } catch (\RuntimeException $e) {
-                $result->addError('RCB season replace failed: ' . $e->getMessage());
-            }
-        }
-
-        return $result;
+        return $this->rcb->import($data, $seasonYear, $sourceLabel, $includeAlltime);
     }
 
-    /**
-     * @see JsbImportServiceInterface::processRcbFile()
-     */
+    /** @see JsbImportServiceInterface::processRcbFile() */
     public function processRcbFile(string $filePath, int $seasonYear, ?string $sourceLabel = null, bool $includeAlltime = true): JsbImportResult
     {
-        return $this->loadFileAndProcess($filePath, fn (string $c) => $this->processRcbData($c, $seasonYear, $sourceLabel, $includeAlltime), 'RCB');
+        return $this->rcb->importFile($filePath, $seasonYear, $sourceLabel, $includeAlltime);
     }
 
-    /**
-     * Import contest scores for a specific round.
-     *
-     * @param list<int> $scores Score values
-     * @param string $contestType 'dunk_contest' or 'three_point'
-     * @param int $round Round number (1=round1, 2=semis, 3=finals)
-     * @param int $seasonYear Season year
-     * @param list<int> $participants Participant PIDs from roster section
-     */
-    private function importContestScores(
-        array $scores,
-        string $contestType,
-        int $round,
-        int $seasonYear,
-        array $participants,
-        JsbImportResult $result,
-    ): void {
-        foreach ($scores as $slot => $score) {
-            // Try to match score slot to participant
-            $pid = $participants[$slot] ?? null;
-
-            try {
-                $affected = $this->repository->upsertAllStarScore([
-                    'season_year' => $seasonYear,
-                    'contest_type' => $contestType,
-                    'round' => $round,
-                    'participant_slot' => $slot + 1,
-                    'pid' => $pid,
-                    'score' => $score,
-                ]);
-                $this->recordUpsertResult($affected, $result);
-            } catch (\RuntimeException $e) {
-                $result->addError('All-Star score upsert failed: ' . $e->getMessage());
-            }
-        }
-    }
-
-    /**
-     * Import an injury transaction.
-     *
-     * @param array{index: int, month: int, day: int, year: int, type: int, pid: int|null, team_id: int|null, games_missed: int|null, injury_description: string|null, trade_items: list<array{marker: int, from_team: int, to_team: int, player_id: int|null, draft_year: int|null}>|null} $transaction
-     */
-    private function importInjuryTransaction(array $transaction, ?string $sourceLabel, JsbImportResult $result): void
-    {
-        $pid = $transaction['pid'];
-        $playerName = null;
-        if ($pid !== null) {
-            $playerName = $this->repository->getPlayerName($pid);
-        }
-
-        try {
-            $affected = $this->repository->upsertTransaction([
-                'season_year' => $transaction['year'],
-                'transaction_month' => $transaction['month'],
-                'transaction_day' => $transaction['day'],
-                'transaction_type' => TrnFileParser::TYPE_INJURY,
-                'pid' => $pid ?? 0,
-                'player_name' => $playerName,
-                'from_teamid' => $transaction['team_id'] ?? 0,
-                'to_teamid' => 0,
-                'injury_games_missed' => $transaction['games_missed'],
-                'injury_description' => $transaction['injury_description'],
-                'trade_group_id' => null,
-                'is_draft_pick' => 0,
-                'draft_pick_year' => null,
-                'source_file' => $sourceLabel,
-            ]);
-            $this->recordUpsertResult($affected, $result);
-        } catch (\RuntimeException $e) {
-            $result->addError('Injury transaction upsert failed: ' . $e->getMessage());
-        }
-    }
-
-    /**
-     * Import a trade transaction (may contain multiple items).
-     *
-     * @param array{index: int, month: int, day: int, year: int, type: int, pid: int|null, team_id: int|null, games_missed: int|null, injury_description: string|null, trade_items: list<array{marker: int, from_team: int, to_team: int, player_id: int|null, draft_year: int|null}>|null} $transaction
-     */
-    private function importTradeTransaction(array $transaction, ?string $sourceLabel, JsbImportResult $result): void
-    {
-        $items = $transaction['trade_items'];
-        if ($items === null || $items === []) {
-            // Separator record — skip
-            return;
-        }
-
-        $tradeGroupId = $this->nextTradeGroupId++;
-
-        foreach ($items as $item) {
-            $pid = $item['player_id'];
-            $playerName = null;
-            if ($pid !== null) {
-                $playerName = $this->repository->getPlayerName($pid);
-            }
-
-            $isDraftPick = $item['marker'] === TrnFileParser::TRADE_MARKER_DRAFT_PICK ? 1 : 0;
-
-            try {
-                $affected = $this->repository->upsertTransaction([
-                    'season_year' => $transaction['year'],
-                    'transaction_month' => $transaction['month'],
-                    'transaction_day' => $transaction['day'],
-                    'transaction_type' => TrnFileParser::TYPE_TRADE,
-                    'pid' => $pid ?? 0,
-                    'player_name' => $playerName,
-                    'from_teamid' => $item['from_team'],
-                    'to_teamid' => $item['to_team'],
-                    'injury_games_missed' => null,
-                    'injury_description' => null,
-                    'trade_group_id' => $tradeGroupId,
-                    'is_draft_pick' => $isDraftPick,
-                    'draft_pick_year' => $item['draft_year'],
-                    'source_file' => $sourceLabel,
-                ]);
-                $this->recordUpsertResult($affected, $result);
-            } catch (\RuntimeException $e) {
-                $result->addError('Trade transaction upsert failed: ' . $e->getMessage());
-            }
-        }
-    }
-
-    /**
-     * Import a waiver claim or release transaction.
-     *
-     * @param array{index: int, month: int, day: int, year: int, type: int, pid: int|null, team_id: int|null, games_missed: int|null, injury_description: string|null, trade_items: list<array{marker: int, from_team: int, to_team: int, player_id: int|null, draft_year: int|null}>|null} $transaction
-     */
-    private function importWaiverTransaction(array $transaction, ?string $sourceLabel, JsbImportResult $result): void
-    {
-        $pid = $transaction['pid'];
-        $playerName = null;
-        if ($pid !== null) {
-            $playerName = $this->repository->getPlayerName($pid);
-        }
-
-        $isRelease = $transaction['type'] === TrnFileParser::TYPE_WAIVER_RELEASE;
-
-        try {
-            $affected = $this->repository->upsertTransaction([
-                'season_year' => $transaction['year'],
-                'transaction_month' => $transaction['month'],
-                'transaction_day' => $transaction['day'],
-                'transaction_type' => $transaction['type'],
-                'pid' => $pid ?? 0,
-                'player_name' => $playerName,
-                'from_teamid' => $isRelease ? ($transaction['team_id'] ?? 0) : 0,
-                'to_teamid' => $isRelease ? 0 : ($transaction['team_id'] ?? 0),
-                'injury_games_missed' => null,
-                'injury_description' => null,
-                'trade_group_id' => null,
-                'is_draft_pick' => 0,
-                'draft_pick_year' => null,
-                'source_file' => $sourceLabel,
-            ]);
-            $this->recordUpsertResult($affected, $result);
-        } catch (\RuntimeException $e) {
-            $result->addError('Waiver transaction upsert failed: ' . $e->getMessage());
-        }
-    }
-
-    /**
-     * Record an upsert result based on MySQL affected_rows.
-     *
-     * @param int $affectedRows 1=inserted, 2=updated, 0=unchanged
-     */
-    private function recordUpsertResult(int $affectedRows, JsbImportResult $result): void
-    {
-        if ($affectedRows === self::AFFECTED_ROWS_INSERTED) {
-            $result->addInserted();
-        } else {
-            $result->addUpdated();
-        }
-    }
-
-    /**
-     * @see JsbImportServiceInterface::processPlbData()
-     */
+    /** @see JsbImportServiceInterface::processPlbData() */
     public function processPlbData(
         string $data,
         PlrOrdinalMap $map,
@@ -629,65 +125,10 @@ class JsbImportService implements JsbImportServiceInterface
         int $simNumber,
         string $sourceArchive,
     ): JsbImportResult {
-        $result = new JsbImportResult();
-
-        try {
-            $parsed = PlbFileParser::parse($data);
-        } catch (\RuntimeException $e) {
-            $result->addError('PLB parse failed: ' . $e->getMessage());
-            return $result;
-        }
-
-        foreach ($parsed as $lineIndex => $slots) {
-            // .plb line index is 0-based; teamid = lineIndex + 1 (1-based team ID)
-            $teamid = $lineIndex + 1;
-
-            // Skip special teams (teamid > 28 = rookies, all-stars, etc.)
-            if ($teamid > 28) {
-                continue;
-            }
-
-            foreach ($slots as $slot) {
-                // Skip empty slots (zero minutes)
-                if ($slot['dc_minutes'] === 0) {
-                    $result->addSkipped();
-                    continue;
-                }
-
-                // Resolve player identity from ordinal map
-                $player = $map->getSlotPlayer($teamid, $slot['slot_index']);
-                $pid = $player !== null ? $player['pid'] : null;
-                $playerName = $player !== null ? $player['name'] : null;
-
-                try {
-                    $affected = $this->repository->upsertPlbSnapshot([
-                        'season_year' => $seasonYear,
-                        'sim_number' => $simNumber,
-                        'source_archive' => $sourceArchive,
-                        'teamid' => $teamid,
-                        'slot_index' => $slot['slot_index'],
-                        'pid' => $pid,
-                        'player_name' => $playerName,
-                        'dc_minutes' => $slot['dc_minutes'],
-                        'dc_of' => $slot['dc_of'],
-                        'dc_df' => $slot['dc_df'],
-                        'dc_oi' => $slot['dc_oi'],
-                        'dc_di' => $slot['dc_di'],
-                        'dc_bh' => $slot['dc_bh'],
-                    ]);
-                    $this->recordUpsertResult($affected, $result);
-                } catch (\RuntimeException $e) {
-                    $result->addError('PLB upsert failed for teamid=' . $teamid . ' slot=' . $slot['slot_index'] . ': ' . $e->getMessage());
-                }
-            }
-        }
-
-        return $result;
+        return $this->plb->import($data, $map, $seasonYear, $simNumber, $sourceArchive);
     }
 
-    /**
-     * @see JsbImportServiceInterface::processPlbFile()
-     */
+    /** @see JsbImportServiceInterface::processPlbFile() */
     public function processPlbFile(
         string $filePath,
         PlrOrdinalMap $map,
@@ -695,171 +136,42 @@ class JsbImportService implements JsbImportServiceInterface
         int $simNumber,
         string $sourceArchive,
     ): JsbImportResult {
-        return $this->loadFileAndProcess($filePath, fn (string $c) => $this->processPlbData($c, $map, $seasonYear, $simNumber, $sourceArchive), 'PLB');
+        return $this->plb->importFile($filePath, $map, $seasonYear, $simNumber, $sourceArchive);
     }
 
-    /**
-     * Initialize trade group ID counter from existing data.
-     */
-    private function initTradeGroupId(): void
-    {
-        try {
-            $row = $this->repository->fetchMaxTradeGroupId();
-            $this->nextTradeGroupId = $row + 1;
-        } catch (\RuntimeException) {
-            $this->nextTradeGroupId = 1;
-        }
-    }
-
-    /**
-     * @see JsbImportServiceInterface::processDraData()
-     */
+    /** @see JsbImportServiceInterface::processDraData() */
     public function processDraData(string $data): JsbImportResult
     {
-        $result = new JsbImportResult();
-
-        try {
-            $parsed = DraFileParser::parse($data);
-        } catch (\RuntimeException $e) {
-            $result->addError('DRA parse failed: ' . $e->getMessage());
-            return $result;
-        }
-
-        foreach ($parsed as $draft) {
-            foreach ($draft['picks'] as $pick) {
-                try {
-                    $affected = $this->repository->upsertDraftResult([
-                        'draft_year' => $draft['draft_year'],
-                        'round' => $pick['round'],
-                        'pick' => $pick['pick'],
-                        'team_name' => $pick['team_name'],
-                        'pos' => $pick['pos'],
-                        'player_name' => $pick['player_name'],
-                        'pid' => null,
-                    ]);
-                    $this->recordUpsertResult($affected, $result);
-                } catch (\RuntimeException $e) {
-                    $result->addError('Draft upsert failed for ' . $pick['player_name'] . ': ' . $e->getMessage());
-                }
-            }
-        }
-
-        return $result;
+        return $this->dra->import($data);
     }
 
-    /**
-     * @see JsbImportServiceInterface::processDraFile()
-     */
+    /** @see JsbImportServiceInterface::processDraFile() */
     public function processDraFile(string $filePath): JsbImportResult
     {
-        return $this->loadFileAndProcess($filePath, fn (string $c) => $this->processDraData($c), 'DRA');
+        return $this->dra->importFile($filePath);
     }
 
-    /**
-     * @see JsbImportServiceInterface::processRetData()
-     */
+    /** @see JsbImportServiceInterface::processRetData() */
     public function processRetData(string $data, int $retirementYear): JsbImportResult
     {
-        $result = new JsbImportResult();
-
-        try {
-            $parsed = RetFileParser::parse($data);
-        } catch (\RuntimeException $e) {
-            $result->addError('RET parse failed: ' . $e->getMessage());
-            return $result;
-        }
-
-        foreach ($parsed as $entry) {
-            $pid = $this->repository->getPlayerName($entry['jsb_pid']) !== null
-                ? $entry['jsb_pid']
-                : null;
-
-            try {
-                $affected = $this->repository->upsertRetiredPlayer([
-                    'jsb_pid' => $entry['jsb_pid'],
-                    'retirement_year' => $retirementYear,
-                    'player_name' => $entry['player_name'],
-                    'pid' => $pid,
-                ]);
-                $this->recordUpsertResult($affected, $result);
-            } catch (\RuntimeException $e) {
-                $result->addError('Retired player upsert failed for ' . $entry['player_name'] . ': ' . $e->getMessage());
-            }
-        }
-
-        return $result;
+        return $this->ret->import($data, $retirementYear);
     }
 
-    /**
-     * @see JsbImportServiceInterface::processRetFile()
-     */
+    /** @see JsbImportServiceInterface::processRetFile() */
     public function processRetFile(string $filePath, int $retirementYear): JsbImportResult
     {
-        return $this->loadFileAndProcess($filePath, fn (string $c) => $this->processRetData($c, $retirementYear), 'RET');
+        return $this->ret->importFile($filePath, $retirementYear);
     }
 
-    /**
-     * @see JsbImportServiceInterface::processHofData()
-     */
+    /** @see JsbImportServiceInterface::processHofData() */
     public function processHofData(string $data): JsbImportResult
     {
-        $result = new JsbImportResult();
-
-        try {
-            $parsed = HofFileParser::parse($data);
-        } catch (\RuntimeException $e) {
-            $result->addError('HOF parse failed: ' . $e->getMessage());
-            return $result;
-        }
-
-        foreach ($parsed as $entry) {
-            $pid = $this->repository->getPlayerName($entry['jsb_pid']) !== null
-                ? $entry['jsb_pid']
-                : null;
-
-            try {
-                $affected = $this->repository->upsertHofInductee([
-                    'jsb_pid' => $entry['jsb_pid'],
-                    'player_name' => $entry['player_name'],
-                    'pos' => $entry['pos'],
-                    'induction_year' => $entry['induction_year'],
-                    'pid' => $pid,
-                ]);
-                $this->recordUpsertResult($affected, $result);
-            } catch (\RuntimeException $e) {
-                $result->addError('HoF upsert failed for ' . $entry['player_name'] . ': ' . $e->getMessage());
-            }
-        }
-
-        return $result;
+        return $this->hof->import($data);
     }
 
-    /**
-     * @see JsbImportServiceInterface::processHofFile()
-     */
+    /** @see JsbImportServiceInterface::processHofFile() */
     public function processHofFile(string $filePath): JsbImportResult
     {
-        return $this->loadFileAndProcess($filePath, fn (string $c) => $this->processHofData($c), 'HOF');
-    }
-
-    /**
-     * @param callable(string): JsbImportResult $processor
-     */
-    private function loadFileAndProcess(string $filePath, callable $processor, string $label): JsbImportResult
-    {
-        if (!file_exists($filePath)) {
-            $result = new JsbImportResult();
-            $result->addError($label . ' file not found: ' . $filePath);
-            return $result;
-        }
-
-        $data = file_get_contents($filePath);
-        if ($data === false) {
-            $result = new JsbImportResult();
-            $result->addError('Failed to read ' . $label . ' file: ' . $filePath);
-            return $result;
-        }
-
-        return $processor($data);
+        return $this->hof->importFile($filePath);
     }
 }

@@ -39,7 +39,7 @@ class FreeAgencyService implements FreeAgencyServiceInterface
     /**
      * @see FreeAgencyServiceInterface::getMainPageData()
      *
-     * @return array{capMetrics: array{totalSalaries: array<int, int>, softCapSpace: array<int, int>, hardCapSpace: array<int, int>, rosterSpots: array<int, int>}, team: Team, season: Season, allOtherPlayers: list<PlayerRow>, playersUnderContract: list<Player>, unsignedFreeAgents: list<Player>, offerPlayers: list<array{player: Player, offer: array<string, int>}>, cashPlayers: list<array{player: Player, label: string}>}
+     * @return array{capMetrics: array{totalSalaries: array<int, int>, softCapSpace: array<int, int>, hardCapSpace: array<int, int>, rosterSpots: array<int, int>}, team: Team, season: Season, allOtherPlayers: list<Player>, teamColorsByTeamId: array<int, array{color1: string, color2: string}>, playersUnderContract: list<Player>, unsignedFreeAgents: list<Player>, offerPlayers: list<array{player: Player, offer: array<string, int>}>, cashPlayers: list<array{player: Player, label: string}>}
      */
     public function getMainPageData(Team $team, Season $season): array
     {
@@ -47,7 +47,22 @@ class FreeAgencyService implements FreeAgencyServiceInterface
         /** @var array{totalSalaries: array<int, int>, softCapSpace: array<int, int>, hardCapSpace: array<int, int>, rosterSpots: array<int, int>} $capMetrics */
         $capMetrics = $capCalculator->calculateTeamCapMetrics();
 
-        $allOtherPlayers = $this->repository->getAllPlayersExcludingTeam($team->teamid);
+        $allOtherPlayerRows = $this->repository->getAllPlayersExcludingTeam($team->teamid);
+        $allOtherPlayers = [];
+        $teamIds = [];
+        foreach ($allOtherPlayerRows as $row) {
+            $player = Player::withPlrRow($this->mysqli_db, $row);
+            $allOtherPlayers[] = $player;
+            $tid = $player->teamid ?? 0;
+            if ($tid !== 0) {
+                $teamIds[$tid] = true;
+            }
+        }
+
+        $teamColorsByTeamId = [];
+        foreach (array_keys($teamIds) as $tid) {
+            $teamColorsByTeamId[$tid] = \Player\Views\TeamColorHelper::getTeamColors($this->mysqli_db, $tid);
+        }
 
         $rosterPartition = $this->buildRosterPartition($team->teamid, $season);
         $offerPlayers = $this->buildOfferPlayers($team->teamid);
@@ -58,6 +73,7 @@ class FreeAgencyService implements FreeAgencyServiceInterface
             'team' => $team,
             'season' => $season,
             'allOtherPlayers' => $allOtherPlayers,
+            'teamColorsByTeamId' => $teamColorsByTeamId,
             'playersUnderContract' => $rosterPartition['playersUnderContract'],
             'unsignedFreeAgents' => $rosterPartition['unsignedFreeAgents'],
             'offerPlayers' => $offerPlayers,
@@ -120,7 +136,7 @@ class FreeAgencyService implements FreeAgencyServiceInterface
      */
     private function buildCashPlayers(int $teamId): array
     {
-        $cashRepo = new \Trading\CashConsiderationRepository($this->mysqli_db);
+        $cashRepo = new \Trading\BuyoutLedgerRepository($this->mysqli_db);
         $cashRows = $cashRepo->getTeamCashConsiderations($teamId);
         $result = [];
 

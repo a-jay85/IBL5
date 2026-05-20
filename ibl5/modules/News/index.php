@@ -140,8 +140,11 @@ function theindex($new_topic = "0")
     PageLayout\PageLayout::footer();
 }
 
-if (!(isset($new_topic))) {$new_topic = 0;}
-if (!(isset($op))) {$op = "";}
+// Legacy globals previously populated by ConfigBootstrap::extractRequestToGlobals().
+// PR2 narrowed that extraction to a 2-key allowlist (newlang, redirect), so module
+// inputs are now read from $_REQUEST explicitly here.
+$op        = is_string($_REQUEST['op']        ?? null) ? $_REQUEST['op']        : '';
+$new_topic = is_numeric($_REQUEST['new_topic'] ?? null) ? (int) $_REQUEST['new_topic'] : 0;
 
 switch ($op) {
 

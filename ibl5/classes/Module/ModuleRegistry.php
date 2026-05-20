@@ -1,0 +1,63 @@
+<?php
+
+declare(strict_types=1);
+
+namespace Module;
+
+final class ModuleRegistry
+{
+    /** @var list<string> */
+    private const VALID_MODULES = [
+        'ActivityTracker',
+        'AllStarAppearances',
+        'ApiKeys',
+        'AwardHistory',
+        'CapSpace',
+        'CareerLeaderboards',
+        'ComparePlayers',
+        'ContractList',
+        'DebugMenu',
+        'DepthChartEntry',
+        'Draft',
+        'DraftHistory',
+        'DraftPickLocator',
+        'FranchiseHistory',
+        'FranchiseRecordBook',
+        'FreeAgency',
+        'FreeAgencyPreview',
+        'GMContactList',
+        'Injuries',
+        'LeagueStarters',
+        'News',
+        'NextSim',
+        'OneOnOneGame',
+        'Player',
+        'PlayerDatabase',
+        'PlayerExportGuide',
+        'PlayerMovement',
+        'ProjectedDraftOrder',
+        'RecordHolders',
+        'Schedule',
+        'Search',
+        'SeasonArchive',
+        'SeasonHighs',
+        'SeasonLeaderboards',
+        'SeriesRecords',
+        'Standings',
+        'Team',
+        'TeamOffDefStats',
+        'Topics',
+        'Trading',
+        'TrainingCampRatingsDiff',
+        'TransactionHistory',
+        'Voting',
+        'VotingResults',
+        'Waivers',
+        'YourAccount',
+    ];
+
+    public static function isValid(string $name): bool
+    {
+        return in_array($name, self::VALID_MODULES, true);
+    }
+}

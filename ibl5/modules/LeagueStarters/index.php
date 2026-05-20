@@ -41,7 +41,7 @@ $league = new \League\League($mysqli_db);
 
 // Initialize services
 $service = new LeagueStartersService($mysqli_db, $league);
-$view = new LeagueStartersView($mysqli_db, $season, $module_name);
+$view = new LeagueStartersView($module_name);
 
 // Get starters by position
 $startersByPosition = $service->getAllStartersByPosition();
@@ -58,6 +58,6 @@ $username = strval($cookie[1] ?? '');
 $userTeamName = $commonRepository->getTeamnameFromUsername($username);
 $userTeam = \Team\Team::initialize($mysqli_db, $userTeamName);
 
-echo $view->render($startersByPosition, $userTeam, $display);
+echo $view->render($mysqli_db, $season, $startersByPosition, $userTeam, $display);
 
 PageLayout\PageLayout::footer();

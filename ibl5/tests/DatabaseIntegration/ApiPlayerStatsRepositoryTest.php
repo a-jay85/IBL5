@@ -35,8 +35,8 @@ class ApiPlayerStatsRepositoryTest extends DatabaseTestCase
             'car_fga' => 800,
             'car_ftm' => 150,
             'car_fta' => 180,
-            'car_tgm' => 60,
-            'car_tga' => 160,
+            'car_3gm' => 60,
+            'car_3ga' => 160,
             'car_orb' => 50,
             'car_drb' => 250,
             'car_ast' => 300,
@@ -70,8 +70,8 @@ class ApiPlayerStatsRepositoryTest extends DatabaseTestCase
             'car_fga' => 400,
             'car_ftm' => 80,
             'car_fta' => 100,
-            'car_tgm' => 30,
-            'car_tga' => 80,
+            'car_3gm' => 30,
+            'car_3ga' => 80,
             'car_orb' => 25,
             'car_drb' => 125,
             'car_ast' => 150,
@@ -89,7 +89,7 @@ class ApiPlayerStatsRepositoryTest extends DatabaseTestCase
         self::assertArrayHasKey('ft_pct_career', $stats);
         self::assertArrayHasKey('three_pt_pct_career', $stats);
 
-        // career_points = round(car_fgm * 2 + car_tgm + car_ftm) = round(200*2 + 30 + 80) = 510
+        // career_points = round(car_fgm * 2 + car_3gm + car_ftm) = round(200*2 + 30 + 80) = 510
         self::assertSame(510, (int) $stats['career_points']);
         // career_rebounds = car_orb + car_drb = 25 + 125 = 150
         self::assertSame(150, $stats['career_rebounds']);

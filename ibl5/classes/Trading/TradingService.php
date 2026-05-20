@@ -10,7 +10,7 @@ use Trading\Contracts\TradeOfferRepositoryInterface;
 use Trading\Contracts\TradeAssetRepositoryInterface;
 use Trading\Contracts\TradeFormRepositoryInterface;
 use Trading\Contracts\TradeCashRepositoryInterface;
-use Trading\Contracts\CashConsiderationRepositoryInterface;
+use Trading\Contracts\BuyoutLedgerRepositoryInterface;
 use Season\Season;
 
 /**
@@ -30,7 +30,7 @@ class TradingService implements TradingServiceInterface
     private TradeAssetRepositoryInterface $assetRepository;
     private TradeFormRepositoryInterface $formRepository;
     private TradeCashRepositoryInterface $cashRepository;
-    private CashConsiderationRepositoryInterface $cashConsiderationRepository;
+    private BuyoutLedgerRepositoryInterface $cashConsiderationRepository;
     private \Repositories\Contracts\TeamIdentityRepositoryInterface $commonRepository;
     private \mysqli $mysqli_db;
 
@@ -46,7 +46,7 @@ class TradingService implements TradingServiceInterface
         $this->assetRepository = $assetRepository;
         $this->formRepository = $formRepository;
         $this->cashRepository = $cashRepository ?? new TradeCashRepository($mysqli_db);
-        $this->cashConsiderationRepository = new CashConsiderationRepository($mysqli_db);
+        $this->cashConsiderationRepository = new BuyoutLedgerRepository($mysqli_db);
         $this->commonRepository = $commonRepository;
         $this->mysqli_db = $mysqli_db;
     }

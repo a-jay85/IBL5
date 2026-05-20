@@ -9,7 +9,7 @@ use Trading\Contracts\TradeOfferRepositoryInterface;
 use Trading\Contracts\TradeAssetRepositoryInterface;
 use Trading\Contracts\TradeCashRepositoryInterface;
 use Trading\Contracts\TradeExecutionRepositoryInterface;
-use Trading\Contracts\CashConsiderationRepositoryInterface;
+use Trading\Contracts\BuyoutLedgerRepositoryInterface;
 use Repositories\Contracts\TeamIdentityRepositoryInterface;
 use Season\Season;
 use Discord\Discord;
@@ -32,7 +32,7 @@ class TradeProcessor implements TradeProcessorInterface
     protected TradeOfferRepositoryInterface $offerRepository;
     protected TradeAssetRepositoryInterface $assetRepository;
     protected TradeCashRepositoryInterface $cashRepository;
-    protected CashConsiderationRepositoryInterface $cashConsiderationRepository;
+    protected BuyoutLedgerRepositoryInterface $cashConsiderationRepository;
     protected TradeExecutionRepositoryInterface $executionRepository;
     protected TeamIdentityRepositoryInterface $commonRepository;
     protected Season $season;
@@ -54,7 +54,7 @@ class TradeProcessor implements TradeProcessorInterface
         $this->offerRepository = $offerRepository ?? new TradeOfferRepository($db, $serverName);
         $this->assetRepository = $assetRepository ?? new TradeAssetRepository($db);
         $this->cashRepository = new TradeCashRepository($db);
-        $this->cashConsiderationRepository = new CashConsiderationRepository($db);
+        $this->cashConsiderationRepository = new BuyoutLedgerRepository($db);
         $this->executionRepository = new TradeExecutionRepository($db);
         $this->season = new Season($db);
         $this->cashHandler = new CashTransactionHandler($db, $this->commonRepository, $this->cashConsiderationRepository, $this->cashRepository);

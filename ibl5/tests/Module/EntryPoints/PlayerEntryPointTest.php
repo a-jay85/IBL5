@@ -28,7 +28,7 @@ class PlayerEntryPointTest extends ModuleEntryPointTestCase
     public function testInvalidPaShowsNothing(): void
     {
         $this->mockDb->setMockData([]);
-        $output = $this->runModule('Player', [], [], ['pa' => 'bogus']);
+        $output = $this->runModule('Player', ['pa' => 'bogus']);
 
         $this->assertSame('', $output);
     }
@@ -62,9 +62,7 @@ class PlayerEntryPointTest extends ModuleEntryPointTestCase
 
         $output = $this->runModule(
             'Player',
-            [],
-            [],
-            ['pa' => 'showpage', 'pid' => '1', 'pageView' => null],
+            ['pa' => 'showpage', 'pid' => '1'],
         );
 
         $this->assertNotEmpty($output);
@@ -77,9 +75,7 @@ class PlayerEntryPointTest extends ModuleEntryPointTestCase
 
         $output = $this->runModule(
             'Player',
-            [],
-            [],
-            ['pa' => 'showpage', 'pid' => 'garbage', 'pageView' => null],
+            ['pa' => 'showpage', 'pid' => 'garbage'],
         );
 
         $this->assertQueryExecuted('ibl_plr');
@@ -95,7 +91,7 @@ class PlayerEntryPointTest extends ModuleEntryPointTestCase
         $this->mockDb->onQuery('FROM ibl_plr', [$player]);
         $this->mockDb->onQuery('ibl_settings', [['value' => 'Regular Season']]);
 
-        $output = $this->runModule('Player', [], [], ['pa' => 'negotiate', 'pid' => '1']);
+        $output = $this->runModule('Player', ['pa' => 'negotiate', 'pid' => '1']);
 
         $this->assertNotEmpty($output);
     }
@@ -109,7 +105,7 @@ class PlayerEntryPointTest extends ModuleEntryPointTestCase
         $this->mockDb->onQuery('FROM ibl_plr', [$player]);
         $this->mockDb->onQuery('ibl_settings', [['value' => 'Regular Season']]);
 
-        $output = $this->runModule('Player', [], [], ['pa' => 'negotiate', 'pid' => '1']);
+        $output = $this->runModule('Player', ['pa' => 'negotiate', 'pid' => '1']);
 
         $this->assertNotEmpty($output);
     }

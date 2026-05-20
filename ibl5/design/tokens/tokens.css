@@ -135,4 +135,20 @@
     --gradient-accent: linear-gradient(135deg, var(--accent-500), var(--accent-600));
 }
 
+/* ========================================================================
+   Team-Color CSS Custom Property Aliases
+   Canonical pair: --team-color-primary / --team-color-secondary
+   Emitted by TableStyles::inlineTeamVars() which sanitizes via hex allow-list.
+   Legacy names below are kept for existing CSS selectors in navigation.css,
+   schedule.css, banners.css, team-splits.css.
+   ======================================================================== */
+[style*="--team-color-primary"] {
+    --team-tab-bg-color: var(--team-color-primary);
+    --team-tab-active-color: var(--team-color-secondary);
+    --team-primary: var(--team-color-primary);
+    --team-secondary: var(--team-color-secondary);
+    --banner-primary: var(--team-color-primary);
+    --banner-secondary: var(--team-color-secondary);
+}
+
 } /* end @layer components */

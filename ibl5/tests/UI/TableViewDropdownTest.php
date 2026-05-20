@@ -77,8 +77,8 @@ class TableViewDropdownTest extends TestCase
         $dropdown = $this->createDropdown('ratings', '1a2e5a', 'ffffff');
         $html = $dropdown->renderDropdown();
 
-        $this->assertStringContainsString('--team-tab-bg-color: #1a2e5a', $html);
-        $this->assertStringContainsString('--team-tab-active-color: #ffffff', $html);
+        $this->assertStringContainsString('--team-color-primary: #1a2e5a', $html);
+        $this->assertStringContainsString('--team-color-secondary: #ffffff', $html);
     }
 
     public function testRenderDropdownSplitValueEncodedCorrectly(): void

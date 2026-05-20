@@ -71,7 +71,7 @@ class TableViewDropdown implements TableViewDropdownInterface
      */
     public function renderDropdown(): string
     {
-        $html = '<div class="ibl-view-dropdown" style="--team-tab-bg-color: #' . $this->color1 . '; --team-tab-active-color: #' . $this->color2 . '">';
+        $html = '<div class="ibl-view-dropdown" style="' . \UI\TableStyles::inlineTeamVars($this->color1, $this->color2) . '">';
         // Inline onchange provides a fallback when HTMX/JS is unavailable.
         // When HTMX is loaded it handles the change event; the fallback returns early.
         $safeBaseUrl = HtmlSanitizer::safeHtmlOutput($this->baseUrl);

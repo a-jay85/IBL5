@@ -153,7 +153,7 @@ class TeamView implements TeamViewInterface
 
         ob_start();
         ?>
-<div class="team-banner-row" style="--team-tab-bg-color: #<?= HtmlSanitizer::e($color1) ?>; --team-tab-active-color: #<?= HtmlSanitizer::e($color2) ?>;">
+<div class="team-banner-row" style="<?= \UI\TableStyles::inlineTeamVars($color1, $color2) ?>">
     <?= HtmlSanitizer::trusted($tradeButton) ?>
     <a href="modules.php?name=Schedule&amp;teamid=<?= HtmlSanitizer::e($teamid) ?>" class="team-action-link"><?= HtmlSanitizer::trusted($scheduleInner) ?></a>
     <div class="team-banner-logo">
@@ -176,7 +176,7 @@ class TeamView implements TeamViewInterface
         /** @var Team $team */
         ob_start();
         ?>
-<div class="team-card" style="<?= \UI\TableStyles::inlineVars($team->color1, $team->color2) ?>">
+<div class="team-card" style="<?= \UI\TableStyles::inlineTeamVars($team->color1, $team->color2) ?>">
     <div class="team-card__header">
         <h3 class="team-card__title">Draft Picks</h3>
     </div>

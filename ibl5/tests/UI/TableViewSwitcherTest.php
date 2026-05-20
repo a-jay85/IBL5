@@ -107,8 +107,8 @@ class TableViewSwitcherTest extends TestCase
 
         $result = $switcher->renderTabs();
 
-        $this->assertStringContainsString('--team-tab-bg-color: #FF0000', $result);
-        $this->assertStringContainsString('--team-tab-active-color: #0000FF', $result);
+        $this->assertStringContainsString('--team-color-primary: #FF0000', $result);
+        $this->assertStringContainsString('--team-color-secondary: #0000FF', $result);
     }
 
     public function testLabelsAreXssEscaped(): void
@@ -143,8 +143,8 @@ class TableViewSwitcherTest extends TestCase
 
         $result = $switcher->renderTabs();
 
-        $this->assertStringContainsString('--team-tab-bg-color: #000000', $result);
-        $this->assertStringContainsString('--team-tab-active-color: #000000', $result);
+        $this->assertStringContainsString('--team-color-primary: #000000', $result);
+        $this->assertStringContainsString('--team-color-secondary: #000000', $result);
     }
 
     public function testBaseUrlWithAmpersandsIsHtmlEncoded(): void
@@ -193,8 +193,8 @@ class TableViewSwitcherTest extends TestCase
 
         $result = $switcher->renderTabs();
 
-        $this->assertStringContainsString('--team-tab-bg-color: #F00', $result);
-        $this->assertStringContainsString('--team-tab-active-color: #FFF', $result);
+        $this->assertStringContainsString('--team-color-primary: #F00', $result);
+        $this->assertStringContainsString('--team-color-secondary: #FFF', $result);
     }
 
     public function testColorsWithHashPrefixHandled(): void
@@ -209,8 +209,8 @@ class TableViewSwitcherTest extends TestCase
 
         $result = $switcher->renderTabs();
 
-        $this->assertStringContainsString('--team-tab-bg-color: #00FF00', $result);
-        $this->assertStringContainsString('--team-tab-active-color: #FFFFFF', $result);
+        $this->assertStringContainsString('--team-color-primary: #00FF00', $result);
+        $this->assertStringContainsString('--team-color-secondary: #FFFFFF', $result);
     }
 
     public function testAllTabsRenderedInOrder(): void

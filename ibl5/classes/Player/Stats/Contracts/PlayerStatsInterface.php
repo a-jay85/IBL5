@@ -26,9 +26,9 @@ use Player\Player;
  *     c_dd: ?int, c_td: ?int,
  *     cp_pts: ?int, cp_reb: ?int, cp_ast: ?int, cp_stl: ?int, cp_blk: ?int,
  *     car_gm: ?int, car_min: ?int, car_fgm: ?int, car_fga: ?int,
- *     car_ftm: ?int, car_fta: ?int, car_tgm: ?int, car_tga: ?int,
+ *     car_ftm: ?int, car_fta: ?int, car_3gm: ?int, car_3ga: ?int,
  *     car_orb: ?int, car_drb: ?int, car_reb: ?int,
- *     car_ast: ?int, car_stl: ?int, car_to: ?int, car_blk: ?int, car_pf: ?int,
+ *     car_ast: ?int, car_stl: ?int, car_tvr: ?int, car_blk: ?int, car_pf: ?int,
  *     ...
  * }
  */

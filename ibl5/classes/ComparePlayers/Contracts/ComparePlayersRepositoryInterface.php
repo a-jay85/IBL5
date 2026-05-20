@@ -83,9 +83,9 @@ interface ComparePlayersRepositoryInterface
      *   - car_min: Career minutes (int)
      *   - car_fgm, car_fga: Career field goals (int)
      *   - car_ftm, car_fta: Career free throws (int)
-     *   - car_tgm, car_tga: Career 3-pointers (int)
+     *   - car_3gm, car_3ga: Career 3-pointers (int)
      *   - car_orb, car_drb, car_reb: Career rebounds (int)
-     *   - car_ast, car_stl, car_to, car_blk, car_pf: Career stats (int)
+     *   - car_ast, car_stl, car_tvr, car_blk, car_pf: Career stats (int)
      *   - car_pts: Career points (int)
      * 
      * IMPORTANT BEHAVIORS:

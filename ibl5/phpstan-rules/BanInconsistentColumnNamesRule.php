@@ -45,6 +45,11 @@ final class BanInconsistentColumnNamesRule implements Rule
         '`r_tga`' => 'Rename to `r_3ga` (3P attempts rating); migration 114 unified the rating to match `ibl_hist`.',
         '`r_tgp`' => 'Rename to `r_3gp` (3P percentage rating); migration 114 unified the rating to match `ibl_hist`.',
 
+        // Career stats — Tier 2.5 migration 128 unified career names.
+        '`car_to`' => 'Rename to `car_tvr` (career turnovers); migration 128 unified career names with `stats_tvr`.',
+        '`car_tgm`' => 'Rename to `car_3gm` (career 3-pointers made); migration 128 aligned with `game_3gm` family.',
+        '`car_tga`' => 'Rename to `car_3ga` (career 3-pointers attempted); migration 128 aligned with `game_3ga` family.',
+
         // Team-id (bare)
         '`tid`' => 'Rename to `teamid`; migration 114 unified team-id spelling across the schema.',
         '`team_id`' => 'Rename to `teamid`; migration 114 dropped the underscore variant.',

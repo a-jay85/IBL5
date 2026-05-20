@@ -33,9 +33,8 @@ class DraftEntryPointTest extends ModuleEntryPointTestCase
 
     public function testDefaultOpRendersDraftBoard(): void
     {
-        $output = $this->runModule('Draft', [], [], [
+        $output = $this->runModule('Draft', ['op' => ''], [], [
             'user' => $GLOBALS['user'],
-            'op' => '',
         ]);
 
         $this->assertNotEmpty($output);
@@ -43,9 +42,8 @@ class DraftEntryPointTest extends ModuleEntryPointTestCase
 
     public function testUnknownOpFallsToMain(): void
     {
-        $output = $this->runModule('Draft', [], [], [
+        $output = $this->runModule('Draft', ['op' => 'bogus'], [], [
             'user' => $GLOBALS['user'],
-            'op' => 'bogus',
         ]);
 
         $this->assertNotEmpty($output);

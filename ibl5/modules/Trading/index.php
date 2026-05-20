@@ -9,6 +9,12 @@ if (stripos($_SERVER['PHP_SELF'], "modules.php") === false) {
 $module_name = basename(dirname(__FILE__));
 get_lang($module_name);
 
+// Legacy globals previously populated by ConfigBootstrap::extractRequestToGlobals().
+// PR2 narrowed that extraction to a 2-key allowlist (newlang, redirect), so module
+// inputs are now read from $_REQUEST explicitly here.
+$op      = is_string($_REQUEST['op']      ?? null) ? $_REQUEST['op']      : '';
+$partner = is_string($_REQUEST['partner'] ?? null) ? $_REQUEST['partner'] : null;
+
 $pagetitle = "- Team Pages";
 
 global $mysqli_db;
@@ -33,7 +39,7 @@ switch ($op) {
         $controller->handleTradeReview($user);
         break;
     case "offertrade":
-        $controller->handleTradeOffer($user, $partner ?? null);
+        $controller->handleTradeOffer($user, $partner);
         break;
     case "roster-preview-api":
         $controller->handleRosterPreviewApi($user);

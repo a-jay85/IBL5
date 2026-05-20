@@ -43,9 +43,8 @@ class TradingEntryPointTest extends ModuleEntryPointTestCase
         $this->mockDb->setMockTeamData([self::fullTeamData()]);
         $this->mockDb->setMockData([]);
 
-        $output = $this->runModule('Trading', [], [], [
+        $output = $this->runModule('Trading', ['op' => ''], [], [
             'user' => $GLOBALS['user'],
-            'op' => '',
         ]);
 
         $this->assertNotEmpty($output);
@@ -58,9 +57,8 @@ class TradingEntryPointTest extends ModuleEntryPointTestCase
         $this->mockDb->setMockTeamData([self::fullTeamData()]);
         $this->mockDb->setMockData([]);
 
-        $output = $this->runModule('Trading', [], [], [
+        $output = $this->runModule('Trading', ['op' => 'reviewtrade'], [], [
             'user' => $GLOBALS['user'],
-            'op' => 'reviewtrade',
         ]);
 
         $this->assertNotEmpty($output);
@@ -73,9 +71,8 @@ class TradingEntryPointTest extends ModuleEntryPointTestCase
         $this->mockDb->setMockTeamData([self::fullTeamData()]);
         $this->mockDb->setMockData([]);
 
-        $output = $this->runModule('Trading', ['result' => 'success'], [], [
+        $output = $this->runModule('Trading', ['op' => 'reviewtrade', 'result' => 'success'], [], [
             'user' => $GLOBALS['user'],
-            'op' => 'reviewtrade',
         ]);
 
         $this->assertNotEmpty($output);
@@ -88,9 +85,8 @@ class TradingEntryPointTest extends ModuleEntryPointTestCase
         $this->mockDb->setMockTeamData([self::fullTeamData()]);
         $this->mockDb->setMockData([]);
 
-        $output = $this->runModule('Trading', ['error' => 'invalid'], [], [
+        $output = $this->runModule('Trading', ['op' => 'reviewtrade', 'error' => 'invalid'], [], [
             'user' => $GLOBALS['user'],
-            'op' => 'reviewtrade',
         ]);
 
         $this->assertNotEmpty($output);
@@ -102,9 +98,8 @@ class TradingEntryPointTest extends ModuleEntryPointTestCase
         $this->mockDb->setMockTeamData([self::fullTeamData()]);
         $this->mockDb->setMockData([]);
 
-        $output = $this->runModule('Trading', ['teamid' => '1'], [], array_merge($this->dbGlobals(), [
+        $output = $this->runModule('Trading', ['teamid' => '1', 'op' => 'roster-preview-api'], [], array_merge($this->dbGlobals(), [
             'user' => $GLOBALS['user'],
-            'op' => 'roster-preview-api',
         ]));
 
         $decoded = json_decode($output, true);
@@ -115,9 +110,8 @@ class TradingEntryPointTest extends ModuleEntryPointTestCase
     {
         $this->mockDb->setMockData([]);
 
-        $output = $this->runModule('Trading', [], [], [
+        $output = $this->runModule('Trading', ['op' => 'roster-preview-api'], [], [
             'user' => '',
-            'op' => 'roster-preview-api',
         ]);
 
         $decoded = json_decode($output, true);
@@ -132,9 +126,8 @@ class TradingEntryPointTest extends ModuleEntryPointTestCase
         $this->mockDb->setMockTeamData([self::fullTeamData()]);
         $this->mockDb->setMockData([]);
 
-        $output = $this->runModule('Trading', [], [], [
+        $output = $this->runModule('Trading', ['op' => 'bogus'], [], [
             'user' => $GLOBALS['user'],
-            'op' => 'bogus',
         ]);
 
         $this->assertNotEmpty($output);
@@ -148,10 +141,8 @@ class TradingEntryPointTest extends ModuleEntryPointTestCase
         $this->mockDb->setMockData([]);
         $_SESSION['tradeFormData'] = ['players' => [1, 2]];
 
-        $output = $this->runModule('Trading', [], [], [
+        $output = $this->runModule('Trading', ['op' => 'offertrade', 'partner' => ''], [], [
             'user' => $GLOBALS['user'],
-            'op' => 'offertrade',
-            'partner' => '',
         ]);
 
         $this->assertNotEmpty($output);

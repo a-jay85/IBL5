@@ -27,9 +27,8 @@ class DepthChartEntryEntryPointTest extends ModuleEntryPointTestCase
         $this->mockDb->setMockTeamData([self::fullTeamData()]);
         $this->mockDb->setMockData([]);
 
-        $output = $this->runModule('DepthChartEntry', [], [], [
+        $output = $this->runModule('DepthChartEntry', ['op' => ''], [], [
             'user' => $GLOBALS['user'],
-            'op' => '',
         ]);
 
         $this->assertNotEmpty($output);
@@ -40,9 +39,7 @@ class DepthChartEntryEntryPointTest extends ModuleEntryPointTestCase
         $this->mockDb->setMockTeamData([self::fullTeamData()]);
         $this->mockDb->setMockData([]);
 
-        $output = $this->runModule('DepthChartEntry', ['teamid' => '1', 'display' => 'ratings'], [], [
-            'op' => 'tab-api',
-        ]);
+        $output = $this->runModule('DepthChartEntry', ['teamid' => '1', 'display' => 'ratings', 'op' => 'tab-api'], [], []);
 
         $this->assertNotEmpty($output);
     }
@@ -53,9 +50,8 @@ class DepthChartEntryEntryPointTest extends ModuleEntryPointTestCase
         $this->mockDb->setMockTeamData([self::fullTeamData()]);
         $this->mockDb->setMockData([]);
 
-        $output = $this->runModule('DepthChartEntry', ['teamid' => '1'], [], [
+        $output = $this->runModule('DepthChartEntry', ['teamid' => '1', 'op' => 'nextsim-api'], [], [
             'user' => $GLOBALS['user'],
-            'op' => 'nextsim-api',
         ]);
 
         $this->assertNotEmpty($output);
@@ -63,9 +59,8 @@ class DepthChartEntryEntryPointTest extends ModuleEntryPointTestCase
 
     public function testOpApiWithoutAuthReturnsUnauthorizedJson(): void
     {
-        $output = $this->runModule('DepthChartEntry', [], [], [
+        $output = $this->runModule('DepthChartEntry', ['op' => 'api'], [], [
             'user' => '',
-            'op' => 'api',
         ]);
 
         $decoded = json_decode($output, true);
@@ -79,9 +74,8 @@ class DepthChartEntryEntryPointTest extends ModuleEntryPointTestCase
         $this->mockDb->setMockTeamData([self::fullTeamData()]);
         $this->mockDb->setMockData([]);
 
-        $output = $this->runModule('DepthChartEntry', [], [], [
+        $output = $this->runModule('DepthChartEntry', ['op' => 'bogus'], [], [
             'user' => $GLOBALS['user'],
-            'op' => 'bogus',
         ]);
 
         $this->assertNotEmpty($output);

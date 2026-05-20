@@ -1,3 +1,8 @@
+---
+description: Worktree-local Claude Code instructions for jsb-import-service-split.
+last_verified: 2026-05-20
+---
+
 # Worktree: jsb-import-service-split
 
 This worktree's Docker instance is at `jsb-import-service-split.localhost`.

@@ -1,6 +1,6 @@
 ---
 description: Long-running backlog of maintenance-cost reduction opportunities, organized by axis. Each item is a candidate for a future plan.
-last_verified: 2026-05-18
+last_verified: 2026-05-20
 ---
 
 # Maintenance-Cost Reduction Backlog
@@ -35,6 +35,7 @@ Effort scale:
 **Suggested direction:** Extract `TeamRegistry` (or reuse `League`/`TeamQueryRepository`); implement or delete the two silent stubs.
 **Est. effort:** M
 **Risk if untouched:** Team rename requires DB and constant update; silent stubs create invisible display gaps.
+**Status:** Completed (2026-05-19) — collapsed `nameToIdCache` into static lookup; deleted `getAllStarYears`/`getAllStarTeams` stubs (data not trivially queryable against seed); net −39 LOC.
 
 ### 1.2 RecordHoldersRepository — Streak/Season-Start Logic in Repository Layer
 **Location:** `ibl5/classes/RecordHolders/RecordHoldersRepository.php` lines 401-566
@@ -56,6 +57,7 @@ Effort scale:
 **Suggested direction:** Extract per-format importers injected into a thin `JsbImportOrchestrator`.
 **Est. effort:** L
 **Risk if untouched:** Adding/changing one format requires reading 800+ lines; bug in one importer's type handling cascades into adjacent code during reviews.
+**Status:** Completed (2026-05-19) — split into 10 per-format importers under `JsbParser/Importers/`; `JsbImportService` is a 177-LOC thin facade. `JsbImportServiceInterface` unchanged.
 
 ### 1.5 ProjectedDraftOrderService — Sorting + Tiebreaker Logic at 600+ Lines
 **Location:** `ibl5/classes/ProjectedDraftOrder/ProjectedDraftOrderService.php` (615 lines)
@@ -80,7 +82,7 @@ Effort scale:
 
 ### 1.8 FreeAgencyView — Direct DB Access Inside View Layer
 **Location:** `ibl5/classes/FreeAgency/FreeAgencyView.php` (605 lines)
-**Problem:** Directly instantiates `TeamQueryRepository` (L26) and `CashConsiderationRepository` (L133) inside `renderPlayersUnderContract()`; creates `Player` objects via `Player::withPlrRow()` inside renders — executing DB queries during HTML generation.
+**Problem:** Directly instantiates `TeamQueryRepository` (L26) and `BuyoutLedgerRepository` (L133) inside `renderPlayersUnderContract()`; creates `Player` objects via `Player::withPlrRow()` inside renders — executing DB queries during HTML generation.
 **Suggested direction:** Move roster/cash fetching to the service layer; pass pre-fetched arrays into render methods.
 **Est. effort:** M
 **Risk if untouched:** Slow queries inside renders block page output; view can't be unit-tested or screenshotted without a live DB.
@@ -579,11 +581,12 @@ Effort scale:
 **Risk if untouched:** Wrong prefix on new classes; grep returns partial results.
 
 ### 4.2 `CashConsiderationRepository` vs `TradeCashRepository`
-**Location:** `ibl5/classes/Trading/CashConsiderationRepository.php`, `TradeCashRepository.php`
+**Location:** `ibl5/classes/Trading/BuyoutLedgerRepository.php`, `TradeCashRepository.php`
 **Problem:** Both handle trade-context cash. Boundary is a table name, not a concept name.
-**Suggested direction:** Rename to `BuyoutConsiderationRepository` and `TradeCashRepository` (kept).
+**Suggested direction:** Rename to `BuyoutLedgerRepository` and `TradeCashRepository` (kept).
 **Est. effort:** M
 **Risk if untouched:** New cash queries land in the wrong repo; domains drift into each other.
+**Status:** Completed (2026-05-20) — Renamed `CashConsiderationRepository` → `BuyoutLedgerRepository`.
 
 ### 4.3 `Services/` Module Is a Dumping Ground
 **Location:** deleted (2026-05-16)
@@ -648,18 +651,10 @@ Effort scale:
 **Risk if untouched:** Batch logic bleeds into single-trade path or vice versa.
 
 ### 4.12 `ibl_plr.car_to` vs `stats_tvr` — Turnover Intra-Table Inconsistency
-**Location:** `ibl_plr` schema
-**Problem:** ADR-0009 unified `stats_to` → `stats_tvr`; career `car_to` was intentionally left. Same table, two conventions.
-**Suggested direction:** Tier 2.5 migration: `car_to` → `car_tvr`; extend `BanInconsistentColumnNamesRule`.
-**Est. effort:** M
-**Risk if untouched:** Career+season turnover joins must alias one column; new code anchors `car_to`.
+**Status:** Completed (2026-05-20) — migration 128 renamed `car_to` → `car_tvr` on `ibl_plr`, `ibl_plr_snapshots`, `ibl_olympics_plr`. `BanInconsistentColumnNamesRule` extended.
 
 ### 4.13 `car_tgm`/`car_tga` vs `stats_3gm`/`stats_3ga` — 3-Point Naming Split
-**Location:** `ibl_plr` schema
-**Problem:** Season uses `3g*`; career uses `tg*`. ADR-0009 renamed rating columns but left career counting stats.
-**Suggested direction:** Tier 2.5 migration: `car_tgm` → `car_3gm`, `car_tga` → `car_3ga`.
-**Est. effort:** M
-**Risk if untouched:** Sum across layers requires special-casing.
+**Status:** Completed (2026-05-20) — migration 128 renamed `car_tgm` → `car_3gm`, `car_tga` → `car_3ga` on the same 3 tables. View `vw_player_career_stats` recreated with new names.
 
 ### 4.14 Undocumented Two-Letter Rating Columns (`oo`, `od`, `dd`, `po`, `pd`, `td`)
 **Location:** `ibl_plr` schema
@@ -1304,6 +1299,7 @@ Effort scale:
 **Suggested direction:** Update counts; remove `ibl_plr_chunk`; remove MyISAM section; sync dates.
 **Est. effort:** S
 **Risk if untouched:** Agent writes queries against dropped tables.
+**Status:** Completed branch `doc-freshness-catchup` (2026-05-19) — table counts refreshed (93 InnoDB/27 views/33 FKs), ibl_plr_chunk removed, MyISAM section deleted, Schema Version line removed, PostgreSQL section removed, body date removed.
 
 ### 9.2 DATABASE_GUIDE — Dead PostgreSQL Compatibility Section
 **Location:** `ibl5/docs/DATABASE_GUIDE.md` lines 100-105
@@ -1318,6 +1314,7 @@ Effort scale:
 **Suggested direction:** Replace with `auth_users`; add `gm_username` mapping note.
 **Est. effort:** S
 **Risk if untouched:** Agent JOINs against nonexistent table; auth queries fail.
+**Status:** Completed branch `doc-freshness-catchup` (2026-05-19) — schema-reference.md now cites auth_users with ibl_team_info.gm_username mapping.
 
 ### 9.4 API_GUIDE Claims API "Not Yet Implemented" — It's Fully Built
 **Location:** `ibl5/docs/API_GUIDE.md`
@@ -1325,6 +1322,7 @@ Effort scale:
 **Suggested direction:** Rewrite as endpoint reference; archive design content.
 **Est. effort:** M
 **Risk if untouched:** Agents treat the API as absent and reimplement endpoints.
+**Status:** Partially completed branch `doc-freshness-catchup` (2026-05-19) — header/"planned" framing fixed; rewrote as architectural overview with controller inventory. Full endpoint-by-endpoint reference deferred. Re-open as 9.4b when an endpoint reference is authored.
 
 ### 9.5 `ibl5/docs/README.md` Lists API_GUIDE as "(planned)"
 **Location:** `ibl5/docs/README.md` line 23
@@ -1332,6 +1330,7 @@ Effort scale:
 **Suggested direction:** Update description after 9.4.
 **Est. effort:** S
 **Risk if untouched:** Agents skip API_GUIDE assuming nothing's implemented.
+**Status:** Completed branch `doc-freshness-catchup` (2026-05-19) — index row reflects built API.
 
 ### 9.6 DEVELOPMENT_GUIDE — Internally Inconsistent Test Counts
 **Location:** `ibl5/docs/DEVELOPMENT_GUIDE.md` lines 8, 25, 46
@@ -1339,6 +1338,7 @@ Effort scale:
 **Suggested direction:** Remove inline counts; point to `composer test`.
 **Est. effort:** S
 **Risk if untouched:** Inconsistent counts cited in PRs.
+**Status:** Completed branch `doc-freshness-catchup` (2026-05-19) — inline test counts removed; doc points to `composer test`.
 
 ### 9.7 DEVELOPMENT_GUIDE — "Power_Rankings" Module Doesn't Exist
 **Location:** `ibl5/docs/DEVELOPMENT_GUIDE.md` lines 20, 422
@@ -1346,6 +1346,7 @@ Effort scale:
 **Suggested direction:** Remove from display-modules list; update count from 8 to 7.
 **Est. effort:** S
 **Risk if untouched:** Agent searches for nonexistent dir.
+**Status:** Completed branch `doc-freshness-catchup` (2026-05-19) — Power_Rankings removed from display-modules list; count corrected to 7.
 
 ### 9.8 ARCHITECTURE_PATTERNS — Outdated "Established" Modules
 **Location:** `ibl5/docs/ARCHITECTURE_PATTERNS.md` line 15
@@ -1353,6 +1354,7 @@ Effort scale:
 **Suggested direction:** Align with CLAUDE.md's Waivers designation.
 **Est. effort:** S
 **Risk if untouched:** Inconsistent canonical pointers confuse agents.
+**Status:** Completed branch `doc-freshness-catchup` (2026-05-19) — "Established" example aligned with ADR-0001 / CLAUDE.md (Waivers).
 
 ### 9.9 DEVELOPMENT_GUIDE Refers to .github/skills/ — Doesn't Exist
 **Location:** `ibl5/docs/DEVELOPMENT_GUIDE.md` lines 10, 82, 435
@@ -1367,6 +1369,7 @@ Effort scale:
 **Suggested direction:** Archive (if superseded) or sync with current canonical.
 **Est. effort:** S
 **Risk if untouched:** Agent uses older XSS-helper style; PHPStan violations.
+**Status:** Completed branch `doc-freshness-catchup` (2026-05-19) — safeHtmlOutput → e(); .github/skills/ → .claude/skills/. NOTE: file is out of bin/check-docs scope; no frontmatter added until CI gates it (separate backlog item).
 
 ### 9.11 DOCUMENTATION_STANDARDS — Stranded `SECURITY.md` Example
 **Location:** `ibl5/docs/DOCUMENTATION_STANDARDS.md` line 35
@@ -1423,6 +1426,7 @@ Effort scale:
 **Suggested direction:** Run coverage, align docs; identify enforcement location.
 **Est. effort:** S
 **Risk if untouched:** Wrong coverage target cited in PR reviews.
+**Status:** Completed branch `doc-freshness-catchup` (2026-05-19) — coverage figures aligned across STRATEGIC_PRIORITIES + DEVELOPMENT_GUIDE (~80%, 70% threshold).
 
 ### 9.19 65 of 80 Module Directories Have No README
 **Location:** `ibl5/classes/` (65 dirs)
@@ -1472,6 +1476,7 @@ Effort scale:
 **Suggested direction:** Process change: strike completed items per drop PR; add "Completed drops" subsection.
 **Est. effort:** S per PR
 **Risk if untouched:** Agent re-audits already-completed work.
+**Status:** Completed branch `doc-freshness-catchup` (2026-05-19) — Section 1 audited; nuke_users drop moved to explicit "Completed drops" subsection with migration numbers. Remaining count updated to 10 tables. Stale intro text ("~20 tables", "Nine DROP migrations") corrected.
 
 ### 9.26 No CHANGELOG Exists
 **Location:** `ibl5/` (absent)
@@ -2048,6 +2053,7 @@ Effort scale:
 **Suggested direction:** Move identity resolution out of header; use injected `AuthService`.
 **Est. effort:** S
 **Risk if untouched:** Refactors reorder calls; silent null usernames.
+**Status:** In progress — side-effect removal deferred to PR3 (boosted HTMX requests on modules without their own cookiedecode call would lose `$cookie` population; `auth.username` container accessor registered in PR1, 2026-05-19).
 
 ### 14.11 `api.php` Is Its Own Composition Root Bypassing Bootstrap
 **Location:** `ibl5/api.php` lines 27-88
@@ -2070,6 +2076,7 @@ Effort scale:
 **Suggested direction:** Register as shared factory in container; or cache `SeasonQueryRepository` results.
 **Est. effort:** S
 **Risk if untouched:** Every new season-aware feature adds another redundant query.
+**Status:** In progress — shared `Season` factory registered in container via `ConfigBootstrap::registerSharedServices()` (PR1, 2026-05-19); call-site migration to follow in PR2/PR3.
 
 ### 14.14 `LoggerFactory` Static Service Locator Used in 20+ Sites
 **Location:** `Logging/LoggerFactory.php`; called via `LoggerFactory::getChannel('audit')` across controllers
@@ -2077,6 +2084,7 @@ Effort scale:
 **Suggested direction:** Inject `LoggerInterface` (PSR-3) per channel at construction; retire static calls outside bootstrap.
 **Est. effort:** M
 **Risk if untouched:** Log impl swaps require editing factory class; mock injection impossible in tests.
+**Status:** In progress — per-channel `logger.<channel>` bindings registered in container (PR1, 2026-05-19); static call-site burndown to follow in PR4.
 
 ### 14.15 `AppPaths::root()` Stateful Static Singleton
 **Location:** `Bootstrap/AppPaths.php`; consumed by `Cache/PageCache.php:156`, `Mail/MailService.php:225`, `Logging/LoggerFactory.php:223,233`, `Auth/DevAutoLogin.php:89`

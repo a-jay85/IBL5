@@ -2,6 +2,9 @@
 
 declare(strict_types=1);
 
+$careerTurnover = "SELECT `car_to` FROM ibl_plr";
+$careerThreeGm = "SELECT `car_tgm` FROM ibl_plr";
+$careerThreeGa = "SELECT `car_tga` FROM ibl_plr";
 $turnover = "SELECT `stats_to` FROM ibl_plr";
 $rating3a = "SELECT `r_tga` FROM ibl_plr";
 $rating3p = "SELECT `r_tgp` FROM ibl_plr";

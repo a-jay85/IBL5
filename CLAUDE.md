@@ -1,9 +1,9 @@
 ---
-description: Root Claude Code instructions for IBL5: commands, mandatory rules, and architecture pointers.
-last_verified: 2026-05-18
+description: Worktree instructions for the unify-career-stat-column-names branch.
+last_verified: 2026-05-20
 ---
 
-# Worktree: cumulative-rcb-handlers
+# Worktree: unify-career-stat-column-names
 
-This worktree's Docker instance is at `cumulative-rcb-handlers.localhost`.
+This worktree's Docker instance is at `unify-career-stat-column-names.localhost`.
 Use this hostname for all browser checks, curl, and E2E — never `main.localhost`.

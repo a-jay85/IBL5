@@ -1,12 +1,9 @@
 ---
 description: Schema reference and query patterns for IBL5 database work.
-last_verified: 2026-04-11
+last_verified: 2026-05-19
 ---
 
 # IBL5 Database Guide
-
-**Last Updated:** February 12, 2026
-**Schema Version:** v1.5 - Production Ready
 
 ## Quick Reference
 
@@ -14,13 +11,13 @@ last_verified: 2026-04-11
 **Always reference `ibl5/migrations/000_baseline_schema.sql` (and subsequent migrations) for table/column names and relationships.** Never assume database structures exist without verification. This prevents hallucination of non-existent tables.
 
 ### Current Status
-- **Total Tables:** 136 (51 InnoDB, 84 MyISAM legacy, 23 views)
-- **Foreign Keys:** 24 constraints implemented
-- **Indexes:** 56+ performance indexes + 4 composite
+- **93 Base Tables** (all InnoDB) + **27 Views**
+- **Foreign Keys:** 33 constraints implemented
+- **Indexes:** 447+ (including primary keys)
 - **API Ready:** ✅ Complete (Timestamps, UUIDs, Views)
 
 ### Key Tables
-- **Players:** `ibl_plr` (main), `ibl_hist` (history), `ibl_plr_chunk` (stats)
+- **Players:** `ibl_plr` (main), `ibl_hist` (VIEW over `ibl_plr_snapshots`)
 - **Teams:** `ibl_team_info`, `ibl_standings`
 - **Games:** `ibl_schedule`, `ibl_box_scores`, `ibl_box_scores_teams`
 - **Contracts:** `ibl_fa_offers`, `ibl_trade_*` tables
@@ -33,14 +30,13 @@ last_verified: 2026-04-11
 ## Database Architecture
 
 ### Engine Status
-- **InnoDB Tables (51):** All critical IBL tables - ACID transactions, row-level locking
-- **MyISAM Tables (84):** Legacy PhpNuke CMS tables - evaluate before converting
-- **Views (23):** Computed views replacing denormalized tables (stats, win/loss, awards, franchise history)
+- **InnoDB Tables (93):** All base tables — ACID transactions, row-level locking
+- **Views (27):** Computed views replacing denormalized tables (stats, win/loss, awards, franchise history)
 
 ### API-Ready Features ✅
 1. **Timestamps:** 19 tables have `created_at`, `updated_at` for caching/ETags
 2. **UUIDs:** 5 critical tables (players, teams, games, etc.) for secure public IDs
-3. **Views:** 23 database views replacing denormalized tables and optimizing API queries
+3. **Views:** 27 database views replacing denormalized tables and optimizing API queries
    - `vw_player_current` - Current season player data
    - `vw_team_standings` - Real-time standings
    - `vw_team_awards` - All team awards (Div/Conf/Lottery from `ibl_team_awards`, IBL Champions from `vw_playoff_series_results`, HEAT Champions from `ibl_box_scores_teams`)
@@ -51,12 +47,12 @@ last_verified: 2026-04-11
    - `vw_series_records` - Head-to-head records
    - Plus 15 additional views for stats, win/loss, and schedule data
 
-### Foreign Key Relationships (24)
+### Foreign Key Relationships (33)
 Core data integrity constraints implemented:
 - `ibl_hist.pid` → `ibl_plr.pid`
 - `ibl_draft_picks.tid` → `ibl_team_info.teamid`
 - `ibl_box_scores.gameid` → `ibl_schedule.Date`
-- And 21 more... (see `000_baseline_schema.sql` for complete list)
+- And 30 more... (see `000_baseline_schema.sql` for complete list)
 
 ## Best Practices
 
@@ -97,17 +93,10 @@ Core data integrity constraints implemented:
 - Composite indexes provide 5-25x speedup on multi-column queries
 - Row-level locking enables API concurrency without bottlenecks
 
-## PostgreSQL Compatibility Notes
-When writing new queries, avoid MySQL-specific features:
-- Avoid `MEDIUMINT`, `TINYINT` (use standard INT/SMALLINT)
-- Avoid AUTO_INCREMENT (use SERIAL/SEQUENCE)
-- Test DATE/DATETIME handling differences
-- Prepare for future ORM migration (Eloquent/Doctrine)
-
 ## Table Categories
 
 ### IBL Core Tables (`ibl_*` prefix)
-- **Player Data:** plr, plr_chunk, hist (80+ columns total)
+- **Player Data:** plr (main), hist (VIEW over plr_snapshots)
 - **Statistics:** *_stats, *_career_avgs, *_career_totals (multiple seasons)
 - **Games:** schedule, box_scores, box_scores_teams
 - **Team Management:** team_info, standings (team_history dropped Feb 2026, replaced by `vw_franchise_summary` and `vw_team_awards` views)
@@ -115,14 +104,12 @@ When writing new queries, avoid MySQL-specific features:
 - **Awards/Voting:** awards, votes_ASG, votes_EOY
 
 ### PhpNuke Legacy (`nuke_*` prefix)
-- **Forum:** bb* tables (phpBB integration)
-- **Users:** users, authors
-- **CMS:** stories, modules, blocks
-- **Status:** Low priority for refactoring
+- **CMS:** stories, stories_cat, topics, blocks, config, counter, stats_*
+- **Status:** Being retired; 10 tables remain (see STRATEGIC_PRIORITIES.md Section 1)
 
-### Laravel Tables (no prefix)
-- **Modern:** cache, jobs, migrations, sessions, users
-- **Purpose:** Future framework migration
+### Auth Tables
+- **`auth_users`:** Authentication (email, password, username, roles)
+- **User-to-team mapping:** `ibl_team_info.gm_username`
 
 ## Common Query Patterns
 
@@ -159,7 +146,7 @@ $query = "SELECT * FROM vw_player_current WHERE uuid = ?";
 - Migration Scripts: `/ibl5/migrations/`
 - **[Development Guide](DEVELOPMENT_GUIDE.md)** - Refactoring and testing
 - **[API Guide](API_GUIDE.md)** - API development best practices
-- **[Refactoring History](ibl5/docs/REFACTORING_HISTORY.md)** - Complete refactoring timeline
+- **[Refactoring History](REFACTORING_HISTORY.md)** - Complete refactoring timeline
 
 ## Need Help?
 - Check `000_baseline_schema.sql` for table structures and relationships

@@ -53,9 +53,9 @@ class LeagueStartersApiHandler
         $season = new Season($this->db);
         $league = new League($this->db);
         $service = new LeagueStartersService($this->db, $league);
-        $view = new LeagueStartersView($this->db, $season, 'LeagueStarters');
+        $view = new LeagueStartersView('LeagueStarters');
 
         $startersByPosition = $service->getAllStartersByPosition();
-        echo $view->renderTableContent($startersByPosition, $userTeam, $display);
+        echo $view->renderTableContent($this->db, $season, $startersByPosition, $userTeam, $display);
     }
 }

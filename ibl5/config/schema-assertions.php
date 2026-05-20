@@ -110,6 +110,18 @@ return [
     new SchemaAssertion('ibl_draft_picks', 'owner_teamid'),
     new SchemaAssertion('ibl_draft_picks', 'teampick_teamid'),
 
+    // Migration 128: Tier 2.5 — career stat column naming unification.
+    // car_to → car_tvr, car_tgm → car_3gm, car_tga → car_3ga.
+    new SchemaAssertion('ibl_plr', 'car_tvr'),
+    new SchemaAssertion('ibl_plr', 'car_3gm'),
+    new SchemaAssertion('ibl_plr', 'car_3ga'),
+    new SchemaAssertion('ibl_plr_snapshots', 'car_tvr'),
+    new SchemaAssertion('ibl_plr_snapshots', 'car_3gm'),
+    new SchemaAssertion('ibl_plr_snapshots', 'car_3ga'),
+    new SchemaAssertion('ibl_olympics_plr', 'car_tvr'),
+    new SchemaAssertion('ibl_olympics_plr', 'car_3gm'),
+    new SchemaAssertion('ibl_olympics_plr', 'car_3ga'),
+
     // Migration 116: Tier 3a cosmetic case-consistency renames (ADR-0010).
     // Player rating columns (ibl_plr + ibl_olympics_plr; already lowercase on
     // ibl_plr_snapshots / ibl_hist).

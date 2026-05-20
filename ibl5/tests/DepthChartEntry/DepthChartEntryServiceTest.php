@@ -17,6 +17,43 @@ class DepthChartEntryServiceTest extends TestCase
     }
 
     // ============================================
+    // computeJsbProduction()
+    // ============================================
+
+    public function testComputeJsbProductionAllZeroStats(): void
+    {
+        $this->assertSame(0, $this->service->computeJsbProduction([]));
+    }
+
+    public function testComputeJsbProductionReferencePlayer(): void
+    {
+        $player = [
+            'stats_fgm' => 1000,
+            'stats_3gm' => 200,
+            'stats_ftm' => 500,
+            'stats_orb' => 300,
+            'stats_drb' => 700,
+            'stats_ast' => 400,
+            'stats_stl' => 100,
+            'stats_blk' => 50,
+        ];
+
+        // 2*1000 + 200 + 500 + 300 + 700 + 400 + 100 + 50 = 4250
+        $this->assertSame(4250, $this->service->computeJsbProduction($player));
+    }
+
+    public function testComputeJsbProductionMissingFieldsDefaultToZero(): void
+    {
+        $player = [
+            'stats_fgm' => 10,
+            'stats_3gm' => 5,
+        ];
+
+        // 2*10 + 5 + 0 + 0 + 0 + 0 + 0 + 0 = 25
+        $this->assertSame(25, $this->service->computeJsbProduction($player));
+    }
+
+    // ============================================
     // computeQualityScore()
     // ============================================
 

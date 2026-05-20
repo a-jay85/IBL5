@@ -83,6 +83,28 @@ final class CrossTableColumnNamingTest extends DatabaseTestCase
         self::assertTrue(true, 'Team-id family is fully unified after migration 114.');
     }
 
+    public function testCareerStatsUseUnifiedNames(): void
+    {
+        $this->fetchAll("SELECT car_tvr, car_3gm, car_3ga FROM ibl_plr LIMIT 1");
+        $this->fetchAll("SELECT car_tvr, car_3gm, car_3ga FROM ibl_plr_snapshots LIMIT 1");
+        $this->fetchAll("SELECT car_tvr, car_3gm, car_3ga FROM ibl_olympics_plr LIMIT 1");
+
+        self::assertTrue(true, 'Career stat columns unified: car_tvr, car_3gm, car_3ga.');
+    }
+
+    public function testOldCareerStatNamesAreGone(): void
+    {
+        $this->assertColumnAbsent('ibl_plr', 'car_to');
+        $this->assertColumnAbsent('ibl_plr', 'car_tgm');
+        $this->assertColumnAbsent('ibl_plr', 'car_tga');
+        $this->assertColumnAbsent('ibl_plr_snapshots', 'car_to');
+        $this->assertColumnAbsent('ibl_plr_snapshots', 'car_tgm');
+        $this->assertColumnAbsent('ibl_plr_snapshots', 'car_tga');
+        $this->assertColumnAbsent('ibl_olympics_plr', 'car_to');
+        $this->assertColumnAbsent('ibl_olympics_plr', 'car_tgm');
+        $this->assertColumnAbsent('ibl_olympics_plr', 'car_tga');
+    }
+
     public function testPlayerToTeamJoinUsesUnifiedTeamid(): void
     {
         // The whole point of the team-id rename: same column name on both

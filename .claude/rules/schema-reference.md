@@ -1,7 +1,7 @@
 ---
 description: Canonical database schema reference derived from migrations.
 paths: ibl5/migrations/000_baseline_schema.sql
-last_verified: 2026-04-12
+last_verified: 2026-05-19
 ---
 
 # Database Schema Reference
@@ -15,7 +15,7 @@ last_verified: 2026-04-12
 | Games | `ibl_schedule`, `ibl_box_scores`, `ibl_box_scores_teams` |
 | Contracts | `ibl_fa_offers`, `ibl_trade_*` tables |
 | Draft | `ibl_draft`, `ibl_draft_picks` |
-| Users | `nuke_users` (`username`), `ibl_team_info` (`gm_username` — user-to-team mapping) |
+| Users | `auth_users` (`username`, `password`), `ibl_team_info` (`gm_username` — user-to-team mapping) |
 
 ## Quick Table Reference
 
@@ -23,7 +23,7 @@ last_verified: 2026-04-12
 |---------|-------|------------|
 | Players | `ibl_plr` | `pid`, `tid`, `name`, `cy`, `cy1-cy6` |
 | Teams | `ibl_team_info` | `teamid`, `team_name`, `gm_username` |
-| Users | `nuke_users` | `username` (legacy — `user_ibl_team` being phased out) |
+| Users | `auth_users` | `username`, `email`, `password` (team mapping via `ibl_team_info.gm_username`) |
 | History | `ibl_hist` (VIEW) | Historical player stats (sourced from `ibl_plr_snapshots`) |
 | Schedule | `ibl_schedule` | Game schedule |
 

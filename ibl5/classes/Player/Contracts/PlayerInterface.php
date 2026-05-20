@@ -15,6 +15,150 @@ use Season\Season;
  */
 interface PlayerInterface
 {
+    // --- Typed getters for deprecated public properties ---
+
+    /** @see Player::getPlayerID() */
+    public function getPlayerID(): ?int;
+
+    /** @return array<string, mixed>|null */
+    public function getPlrRow(): ?array;
+
+    public function getOrdinal(): ?int;
+
+    public function getName(): ?string;
+
+    public function getNickname(): ?string;
+
+    public function getAge(): ?int;
+
+    public function getHistoricalYear(): ?int;
+
+    public function getTeamid(): ?int;
+
+    public function getTeamName(): ?string;
+
+    public function getTeamCity(): ?string;
+
+    public function getTeamColor1(): ?string;
+
+    public function getTeamColor2(): ?string;
+
+    public function getPosition(): ?string;
+
+    public function getRatingFieldGoalAttempts(): ?int;
+
+    public function getRatingFieldGoalPercentage(): ?int;
+
+    public function getRatingFreeThrowAttempts(): ?int;
+
+    public function getRatingFreeThrowPercentage(): ?int;
+
+    public function getRatingThreePointAttempts(): ?int;
+
+    public function getRatingThreePointPercentage(): ?int;
+
+    public function getRatingOffensiveRebounds(): ?int;
+
+    public function getRatingDefensiveRebounds(): ?int;
+
+    public function getRatingAssists(): ?int;
+
+    public function getRatingSteals(): ?int;
+
+    public function getRatingTurnovers(): ?int;
+
+    public function getRatingBlocks(): ?int;
+
+    public function getRatingFouls(): ?int;
+
+    public function getRatingOutsideOffense(): ?int;
+
+    public function getRatingOutsideDefense(): ?int;
+
+    public function getRatingDriveOffense(): ?int;
+
+    public function getRatingDriveDefense(): ?int;
+
+    public function getRatingPostOffense(): ?int;
+
+    public function getRatingPostDefense(): ?int;
+
+    public function getRatingTransitionOffense(): ?int;
+
+    public function getRatingTransitionDefense(): ?int;
+
+    public function getRatingClutch(): ?int;
+
+    public function getRatingConsistency(): ?int;
+
+    public function getRatingTalent(): ?int;
+
+    public function getRatingSkill(): ?int;
+
+    public function getRatingIntangibles(): ?int;
+
+    public function getFreeAgencyLoyalty(): ?int;
+
+    public function getFreeAgencyPlayingTime(): ?int;
+
+    public function getFreeAgencyPlayForWinner(): ?int;
+
+    public function getFreeAgencyTradition(): ?int;
+
+    public function getFreeAgencySecurity(): ?int;
+
+    public function getYearsOfExperience(): ?int;
+
+    public function getBirdYears(): ?int;
+
+    public function getContractCurrentYear(): ?int;
+
+    public function getContractTotalYears(): ?int;
+
+    public function getContractYear1Salary(): ?int;
+
+    public function getContractYear2Salary(): ?int;
+
+    public function getContractYear3Salary(): ?int;
+
+    public function getContractYear4Salary(): ?int;
+
+    public function getContractYear5Salary(): ?int;
+
+    public function getContractYear6Salary(): ?int;
+
+    public function getSalaryJSB(): ?int;
+
+    public function getDraftYear(): ?int;
+
+    public function getDraftRound(): ?int;
+
+    public function getDraftPickNumber(): ?int;
+
+    public function getDraftTeamOriginalName(): ?string;
+
+    public function getDraftTeamCurrentName(): ?string;
+
+    public function getCollegeName(): ?string;
+
+    public function getDaysRemainingForInjury(): ?int;
+
+    public function getHeightFeet(): ?int;
+
+    public function getHeightInches(): ?int;
+
+    public function getWeightPounds(): ?int;
+
+    public function getIsRetired(): ?int;
+
+    public function getTimeDroppedOnWaivers(): ?int;
+
+    public function getDecoratedName(): ?string;
+
+    public function getNameStatusClass(): string;
+
+    // --- Existing interface methods ---
+
     /**
      * Decorate player name with status indicators
      *

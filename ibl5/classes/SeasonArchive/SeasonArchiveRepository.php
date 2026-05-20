@@ -244,37 +244,19 @@ class SeasonArchiveRepository extends BaseMysqliRepository implements SeasonArch
      */
     public function getPlayerIdsByNames(array $names): array
     {
-        if ($names === []) {
-            return [];
-        }
-
-        $placeholders = implode(',', array_fill(0, count($names), '?'));
-
-        /** @var \mysqli $db */
-        $db = $this->db;
-        $stmt = $db->prepare("SELECT pid, name FROM `ibl_plr` WHERE name IN ({$placeholders})");
-        if ($stmt === false) {
-            return [];
-        }
-
-        $stmt->execute($names);
-        $result = $stmt->get_result();
-
-        if ($result === false) {
-            $stmt->close();
-            return [];
-        }
+        $rows = $this->fetchAllInList(
+            "SELECT pid, name FROM `ibl_plr` WHERE name IN ({IN})",
+            's',
+            $names
+        );
 
         /** @var array<string, int> $map */
         $map = [];
-        while (true) {
-            $row = $result->fetch_assoc();
-            if (!is_array($row)) {
-                break;
-            }
-            $map[(string) $row['name']] = (int) $row['pid'];
+        foreach ($rows as $row) {
+            $name = is_string($row['name']) ? $row['name'] : '';
+            $pid = is_int($row['pid']) ? $row['pid'] : 0;
+            $map[$name] = $pid;
         }
-        $stmt->close();
 
         return $map;
     }

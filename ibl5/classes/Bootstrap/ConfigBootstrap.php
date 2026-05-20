@@ -45,6 +45,7 @@ class ConfigBootstrap implements BootstrapStepInterface
             $this->loadNukeConfig($container);
         }
         $this->configureErrorReporting();
+        $this->registerSharedServices($container);
     }
 
     private function extractRequestToGlobals(): void
@@ -169,6 +170,29 @@ class ConfigBootstrap implements BootstrapStepInterface
             @ini_set('display_errors', '1');
         } else {
             @ini_set('display_errors', '0');
+        }
+    }
+
+    private function registerSharedServices(ContainerInterface $container): void
+    {
+        $container->set('season', static function (): \Season\Season {
+            /** @var \mysqli $db */
+            $db = $GLOBALS['mysqli_db'];
+            return new \Season\Season($db);
+        });
+
+        $container->set('mysqli_db', static function (): \mysqli {
+            /** @var \mysqli $db */
+            $db = $GLOBALS['mysqli_db'];
+            return $db;
+        });
+
+        $channels = ['app', 'audit', 'db', 'discord', 'draft', 'admin', 'perf'];
+        foreach ($channels as $channel) {
+            $container->set(
+                "logger.{$channel}",
+                static fn (): \Psr\Log\LoggerInterface => \Logging\LoggerFactory::getChannel($channel),
+            );
         }
     }
 }

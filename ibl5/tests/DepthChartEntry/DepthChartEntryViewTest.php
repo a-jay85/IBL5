@@ -16,7 +16,7 @@ class DepthChartEntryViewTest extends TestCase
 
     protected function setUp(): void
     {
-        $this->view = new DepthChartEntryView($this->createStub(\League\LeagueContext::class));
+        $this->view = new DepthChartEntryView($this->createStub(\League\LeagueContext::class), new \DepthChartEntry\DepthChartEntryService());
     }
 
     /**

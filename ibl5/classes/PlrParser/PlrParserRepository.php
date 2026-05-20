@@ -48,8 +48,8 @@ class PlrParserRepository extends \BaseMysqliRepository implements PlrParserRepo
              `ch_pts`, `ch_reb`, `ch_ast`, `ch_stl`, `ch_blk`, `c_dd`, `c_td`,
              `cp_pts`, `cp_reb`, `cp_ast`, `cp_stl`, `cp_blk`,
              `car_gm`, `car_min`, `car_fgm`, `car_fga`, `car_ftm`, `car_fta`,
-             `car_tgm`, `car_tga`, `car_orb`, `car_drb`, `car_reb`,
-             `car_ast`, `car_stl`, `car_to`, `car_blk`, `car_pf`, `car_pts`,
+             `car_3gm`, `car_3ga`, `car_orb`, `car_drb`, `car_reb`,
+             `car_ast`, `car_stl`, `car_tvr`, `car_blk`, `car_pf`, `car_pts`,
              `r_fga`, `r_fgp`, `r_fta`, `r_ftp`, `r_3ga`, `r_3gp`,
              `r_orb`, `r_drb`, `r_ast`, `r_stl`, `r_tvr`, `r_blk`,
              `draftround`, `draftpickno`, `injured`,
@@ -165,14 +165,14 @@ class PlrParserRepository extends \BaseMysqliRepository implements PlrParserRepo
             `car_fga` = VALUES(`car_fga`),
             `car_ftm` = VALUES(`car_ftm`),
             `car_fta` = VALUES(`car_fta`),
-            `car_tgm` = VALUES(`car_tgm`),
-            `car_tga` = VALUES(`car_tga`),
+            `car_3gm` = VALUES(`car_3gm`),
+            `car_3ga` = VALUES(`car_3ga`),
             `car_orb` = VALUES(`car_orb`),
             `car_drb` = VALUES(`car_drb`),
             `car_reb` = VALUES(`car_reb`),
             `car_ast` = VALUES(`car_ast`),
             `car_stl` = VALUES(`car_stl`),
-            `car_to` = VALUES(`car_to`),
+            `car_tvr` = VALUES(`car_tvr`),
             `car_blk` = VALUES(`car_blk`),
             `car_pf` = VALUES(`car_pf`),
             `car_pts` = VALUES(`car_pts`),
@@ -216,7 +216,7 @@ class PlrParserRepository extends \BaseMysqliRepository implements PlrParserRepo
             . 'iiiiiii'      // ch_pts..c_td
             . 'iiiii'        // cp_pts..cp_blk
             . 'iiiiii'       // car_gm..car_fta
-            . 'iiiii'        // car_tgm..car_reb
+            . 'iiiii'        // car_3gm..car_reb
             . 'iiiiii'       // car_ast..car_pts
             . 'iiiiii'       // r_fga..r_3gp
             . 'iiiiii'       // r_orb..r_blk
@@ -428,8 +428,8 @@ class PlrParserRepository extends \BaseMysqliRepository implements PlrParserRepo
         'po_stats_tvr', 'po_stats_blk', 'po_stats_pf',
         // Career stats
         'car_gm', 'car_min', 'car_fgm', 'car_fga', 'car_ftm', 'car_fta',
-        'car_tgm', 'car_tga', 'car_orb', 'car_drb', 'car_reb',
-        'car_ast', 'car_stl', 'car_to', 'car_blk', 'car_pf', 'car_pts',
+        'car_3gm', 'car_3ga', 'car_orb', 'car_drb', 'car_reb',
+        'car_ast', 'car_stl', 'car_tvr', 'car_blk', 'car_pf', 'car_pts',
         // Season highs
         'sh_pts', 'sh_reb', 'sh_ast', 'sh_stl', 'sh_blk', 's_dd', 's_td',
         // Playoff highs

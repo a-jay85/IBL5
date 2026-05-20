@@ -262,6 +262,9 @@
         <testsuite name="Cli Tests">
             <directory>tests/Cli</directory>
         </testsuite>
+        <testsuite name="PageLayout Module Tests">
+            <directory>tests/PageLayout</directory>
+        </testsuite>
     </testsuites>
     <groups>
         <exclude>

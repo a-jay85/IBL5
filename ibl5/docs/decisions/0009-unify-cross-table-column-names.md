@@ -1,6 +1,6 @@
 ---
 description: Rationale for unifying turnover, 3-pointer rating, and team-id column names across the schema (Tier 2 of the sql-column-naming audit), enforced by a new PHPStan rule.
-last_verified: 2026-04-28
+last_verified: 2026-05-20
 ---
 
 # ADR-0009: Unify Cross-Table Column Names
@@ -56,3 +56,4 @@ Migration 114 unifies all three concepts:
 - `ibl5/tests/DatabaseIntegration/CrossTableColumnNamingTest.php` — cross-layer parity test.
 - `ibl5/docs/decisions/0008-ban-reserved-word-rating-columns.md` — Tier 1 precedent.
 - PR #632 (Tier 1 implementation).
+- `ibl5/migrations/128_unify_career_stat_column_names.sql` — Tier 2.5 career stat name unification (`car_to` → `car_tvr`, `car_tgm` → `car_3gm`, `car_tga` → `car_3ga`).

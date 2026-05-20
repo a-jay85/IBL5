@@ -92,3 +92,19 @@ services:
         class: PHPStanRules\BanFilterSaveArgRule
         tags:
             - phpstan.rules.rule
+    -
+        class: PHPStanRules\BanMysqliInViewClassesRule
+        tags:
+            - phpstan.rules.rule
+    -
+        class: PHPStanRules\BanDbTouchingCallInViewRule
+        tags:
+            - phpstan.rules.rule
+    -
+        class: PHPStanRules\BanDbTouchingNewInViewRule
+        tags:
+            - phpstan.rules.rule
+    -
+        class: PHPStanRules\TradingPrefixConventionRule
+        tags:
+            - phpstan.rules.rule

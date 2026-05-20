@@ -114,6 +114,33 @@ class JsbImportResultTest extends TestCase
         $this->assertSame('No changes', $result->summary());
     }
 
+    public function testRecordUpsertInserted(): void
+    {
+        $result = new JsbImportResult();
+        $result->recordUpsert(JsbImportResult::AFFECTED_ROWS_INSERTED);
+
+        $this->assertSame(1, $result->inserted);
+        $this->assertSame(0, $result->updated);
+    }
+
+    public function testRecordUpsertUpdated(): void
+    {
+        $result = new JsbImportResult();
+        $result->recordUpsert(2);
+
+        $this->assertSame(0, $result->inserted);
+        $this->assertSame(1, $result->updated);
+    }
+
+    public function testRecordUpsertUnchanged(): void
+    {
+        $result = new JsbImportResult();
+        $result->recordUpsert(0);
+
+        $this->assertSame(0, $result->inserted);
+        $this->assertSame(1, $result->updated);
+    }
+
     public function testFromScoResultMapsFields(): void
     {
         $scoResult = [

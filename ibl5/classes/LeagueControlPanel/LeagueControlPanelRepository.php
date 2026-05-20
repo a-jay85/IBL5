@@ -6,7 +6,7 @@ namespace LeagueControlPanel;
 
 use League\League;
 use LeagueControlPanel\Contracts\LeagueControlPanelRepositoryInterface;
-use Trading\CashConsiderationRepository;
+use Trading\BuyoutLedgerRepository;
 
 /**
  * @see LeagueControlPanelRepositoryInterface
@@ -37,17 +37,10 @@ class LeagueControlPanelRepository extends \BaseMysqliRepository implements Leag
      */
     public function getBulkSettings(array $names): array
     {
-        if ($names === []) {
-            return [];
-        }
-
-        $placeholders = implode(', ', array_fill(0, count($names), '?'));
-        $types = str_repeat('s', count($names));
-
-        $rows = $this->fetchAll(
-            "SELECT name, value FROM `ibl_settings` WHERE name IN ($placeholders)",
-            $types,
-            ...$names
+        $rows = $this->fetchAllInList(
+            "SELECT name, value FROM `ibl_settings` WHERE name IN ({IN})",
+            's',
+            $names
         );
 
         $settings = [];
@@ -322,7 +315,7 @@ class LeagueControlPanelRepository extends \BaseMysqliRepository implements Leag
      */
     public function deleteOutdatedBuyoutsAndCash(): int
     {
-        $cashRepo = new CashConsiderationRepository($this->db);
+        $cashRepo = new BuyoutLedgerRepository($this->db);
         return $cashRepo->deleteExpiredCashConsiderations();
     }
 

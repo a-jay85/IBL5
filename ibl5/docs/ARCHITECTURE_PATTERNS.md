@@ -1,6 +1,6 @@
 ---
 description: Canonical interface-driven Repository/Service/View patterns for new modules.
-last_verified: 2026-04-11
+last_verified: 2026-05-19
 ---
 
 # IBL5 Architecture Patterns
@@ -12,7 +12,7 @@ last_verified: 2026-04-11
 
 ## Interface-Driven Architecture Pattern
 
-**Established Pattern (Implemented in PlayerDatabase, FreeAgency, Player modules)**
+**Established Pattern (canonical example: `ibl5/classes/Waivers/` — Repository, Service, Processor, Validator, View, Controller — see ADR-0001)**
 
 The codebase uses **interface contracts** as the single source of truth for class responsibilities. This pattern maximizes LLM readability and maintainability.
 

@@ -158,16 +158,10 @@ class VotingRepository extends \BaseMysqliRepository implements VotingRepository
      */
     public function fetchPlayerIdsByNames(array $names): array
     {
-        if ($names === []) {
-            return [];
-        }
-
-        $placeholders = implode(',', array_fill(0, count($names), '?'));
-        $types = str_repeat('s', count($names));
-        $rows = $this->fetchAll(
-            "SELECT pid, name FROM `ibl_plr` WHERE name IN ({$placeholders})",
-            $types,
-            ...$names
+        $rows = $this->fetchAllInList(
+            "SELECT pid, name FROM `ibl_plr` WHERE name IN ({IN})",
+            's',
+            $names
         );
 
         /** @var array<string, int> $pidMap */

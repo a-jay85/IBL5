@@ -21,13 +21,14 @@ test.describe('Parameter edge cases', () => {
     await assertNoPhpErrors(page, 'on Player with pid=0');
   });
 
-  test('non-existent module shows not-active message', async ({ page }) => {
+  test('non-existent module redirects to index', async ({ page }) => {
+    // PR2 module-dispatch lockdown: ModuleRegistry::isValid() blocks unknown
+    // module names at modules.php and redirects to index.php instead of
+    // letting the include fall through. The "doesn't exist" message no longer
+    // appears for unknown names.
     await page.goto('modules.php?name=NonExistentModule');
     await assertNoPhpErrors(page, 'on non-existent module');
-
-    // Should show a "doesn't exist" or similar error message
-    const body = await page.locator('body').textContent();
-    expect(body).toMatch(/doesn.t exist|not.*active|not.*found/i);
+    await expect(page).toHaveURL(/index\.php($|\?)/);
   });
 
   test('DraftHistory with invalid teamID shows no PHP errors', async ({ page }) => {

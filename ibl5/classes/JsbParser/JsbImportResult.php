@@ -43,6 +43,17 @@ class JsbImportResult
         $this->messages[] = $message;
     }
 
+    public const AFFECTED_ROWS_INSERTED = 1;
+
+    public function recordUpsert(int $affectedRows): void
+    {
+        if ($affectedRows === self::AFFECTED_ROWS_INSERTED) {
+            $this->addInserted();
+        } else {
+            $this->addUpdated();
+        }
+    }
+
     /**
      * Create a JsbImportResult from a BoxscoreProcessor::processScoFile() result array.
      *

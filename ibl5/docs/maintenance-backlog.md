@@ -57,6 +57,7 @@ Effort scale:
 **Suggested direction:** Extract per-format importers injected into a thin `JsbImportOrchestrator`.
 **Est. effort:** L
 **Risk if untouched:** Adding/changing one format requires reading 800+ lines; bug in one importer's type handling cascades into adjacent code during reviews.
+**Status:** Completed (2026-05-19) — split into 10 per-format importers under `JsbParser/Importers/`; `JsbImportService` is a 177-LOC thin facade. `JsbImportServiceInterface` unchanged.
 
 ### 1.5 ProjectedDraftOrderService — Sorting + Tiebreaker Logic at 600+ Lines
 **Location:** `ibl5/classes/ProjectedDraftOrder/ProjectedDraftOrderService.php` (615 lines)

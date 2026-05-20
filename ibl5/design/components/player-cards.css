@@ -474,12 +474,12 @@
     box-sizing: border-box;
 }
 
-/* Stats Table Styling - Override .ibl-data-table base styles for card context */
+/* Stats Table Styling - Override .ibl-data-table and legacy .player-table styles */
 .player-stats-card table,
-.player-stats-card .ibl-data-table.player-view-table,
-.player-stats-card table.sortable {
+.player-stats-card .stats-table,
+.player-stats-card table.sortable,
+.player-stats-card table.player-table {
     width: 100%;
-    min-width: max-content;
     border-collapse: collapse;
     table-layout: auto;
     font-size: 13px;
@@ -505,9 +505,9 @@
     border-radius: var(--pc-radius-lg) var(--pc-radius-lg) 0 0;
 }
 
-/* Column headers — specificity must beat .ibl-data-table.player-view-table th (0,2,1) */
-.player-stats-card .ibl-data-table.player-view-table th,
-.player-stats-card table th {
+/* Column headers */
+.player-stats-card table th,
+.player-stats-card .stats-table th {
     color: var(--card-accent);
     font-weight: 600;
     font-size: var(--pc-text-sm);
@@ -521,9 +521,9 @@
     border-bottom: 1px solid color-mix(in srgb, var(--card-border) 30%, transparent);
 }
 
-/* Table cells — specificity must beat .ibl-data-table.player-view-table td (0,2,1) */
-.player-stats-card .ibl-data-table.player-view-table td,
-.player-stats-card table td {
+/* Table cells */
+.player-stats-card table td,
+.player-stats-card .stats-table td {
     padding: var(--pc-pad-md) var(--pc-pad-md);
     text-align: center;
     border: none;
@@ -536,22 +536,27 @@
 }
 
 /* Row hover effect */
-.player-stats-card table tbody tr:hover td {
+.player-stats-card table tbody tr:hover td,
+.player-stats-card .stats-table tbody tr:hover td {
     background: color-mix(in srgb, var(--card-border) 8%, transparent);
 }
 
 /* Alternating row colors */
-.player-stats-card table tbody tr:nth-child(even) td {
+.player-stats-card table tbody tr:nth-child(even) td,
+.player-stats-card .stats-table tbody tr:nth-child(even) td {
     background: rgba(0, 0, 0, 0.15);
 }
 
-.player-stats-card table tbody tr:nth-child(even):hover td {
+.player-stats-card table tbody tr:nth-child(even):hover td,
+.player-stats-card .stats-table tbody tr:nth-child(even):hover td {
     background: color-mix(in srgb, var(--card-border) 12%, transparent);
 }
 
 /* Career/Total Row Styling */
 .player-stats-card .career-row td,
-.player-stats-card tr.player-table-row-bold td {
+.player-stats-card tr.player-table-row-bold td,
+.player-stats-card .stats-table .career-row td,
+.player-stats-card .stats-table tr.player-table-row-bold td {
     font-weight: 700;
     color: var(--card-text);
     border-top: 2px solid var(--card-border);
@@ -559,7 +564,8 @@
 }
 
 /* Footer Row (e.g., Total Salary) */
-.player-stats-card .footer-row td {
+.player-stats-card .footer-row td,
+.player-stats-card .stats-table .footer-row td {
     background: rgba(0, 0, 0, 0.3);
     color: var(--card-accent);
     font-weight: 600;
@@ -570,7 +576,8 @@
 }
 
 /* Team Links */
-.player-stats-card table a {
+.player-stats-card table a,
+.player-stats-card .stats-table a {
     color: var(--card-accent);
     text-decoration: none;
     transition: color 0.2s ease;
@@ -585,7 +592,8 @@
     pointer-events: none;
 }
 
-.player-stats-card table a:hover {
+.player-stats-card table a:hover,
+.player-stats-card .stats-table a:hover {
     color: var(--card-text);
     text-decoration: underline;
 }
@@ -598,10 +606,10 @@
         border-radius: var(--pc-radius-lg);
     }
 
-    .player-stats-card .ibl-data-table.player-view-table th,
-    .player-stats-card .ibl-data-table.player-view-table td,
     .player-stats-card table th,
-    .player-stats-card table td {
+    .player-stats-card table td,
+    .player-stats-card .stats-table th,
+    .player-stats-card .stats-table td {
         padding: 4px 4px;
         font-size: var(--pc-text-xs);
     }

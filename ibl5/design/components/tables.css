@@ -476,63 +476,6 @@ tr:has(.contract-hint-cell):focus-within .contract-hint-cell {
 }
 
 /* ==========================================================================
-   Legacy Player-View Table Modifier (.player-view-table)
-
-   Retro appearance for Player module tables. Overrides .ibl-data-table
-   base styling with black borders, collapse, and the legacy blue header.
-   ========================================================================== */
-
-.ibl-data-table.player-view-table {
-    border: 1px solid #000;
-    border-collapse: collapse;
-    border-spacing: 0;
-    border-radius: 0;
-    overflow: visible;
-    box-shadow: none;
-}
-
-.ibl-data-table.player-view-table thead {
-    background: none;
-}
-
-.ibl-data-table.player-view-table th {
-    font-family: var(--font-sans);
-    font-size: 1rem;
-    text-transform: none;
-    letter-spacing: normal;
-    line-height: normal;
-    padding: 4px 8px;
-    border: 1px solid #000;
-    color: var(--gray-800);
-    font-weight: bold;
-}
-
-.ibl-data-table.player-view-table td {
-    text-align: center;
-    padding: 4px 8px;
-    border: 1px solid #000;
-}
-
-.ibl-data-table.player-view-table tbody tr:hover td {
-    background-color: transparent;
-}
-
-.ibl-data-table.player-view-table tbody tr:nth-child(even) td {
-    background-color: transparent;
-}
-
-.ibl-data-table.player-view-table .player-table-header {
-    background-color: var(--player-legacy-header);
-    color: white;
-    font-weight: bold;
-    text-align: center;
-}
-
-.ibl-data-table.player-view-table .player-table-row-bold {
-    font-weight: bold;
-}
-
-/* ==========================================================================
    Mobile Sticky Column Support
 
    Use .responsive-table class on tables with sticky columns.

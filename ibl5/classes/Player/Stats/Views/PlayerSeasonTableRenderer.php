@@ -29,7 +29,7 @@ class PlayerSeasonTableRenderer implements PlayerSeasonTableRendererInterface
     {
         ob_start();
         ?>
-<table class="ibl-data-table player-view-table sortable">
+<table class="sortable player-table">
     <tr>
         <td colspan=<?= $config->getColspan() ?> class="player-table-header"><?= HtmlSanitizer::e($config->title) ?></td>
     </tr>
@@ -117,7 +117,7 @@ class PlayerSeasonTableRenderer implements PlayerSeasonTableRendererInterface
 
         ob_start();
         ?>
-<table class="ibl-data-table player-view-table sortable">
+<table class="sortable player-table">
     <tr>
         <td colspan=<?= $config->getColspan() ?> class="player-table-header"><?= HtmlSanitizer::e($config->title) ?></td>
     </tr>

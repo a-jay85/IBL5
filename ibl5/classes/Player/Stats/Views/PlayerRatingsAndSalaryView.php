@@ -43,7 +43,7 @@ class PlayerRatingsAndSalaryView implements PlayerRatingsAndSalaryViewInterface
 
         ob_start();
         ?>
-<table class="ibl-data-table player-view-table sortable">
+<table class="sortable player-table">
     <tr>
         <td colspan=24 class="player-table-header">Ratings by Year</td>
     </tr>

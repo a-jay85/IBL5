@@ -45,7 +45,7 @@ class PlayerStatsCardView
         if ($colorScheme === null) {
             $colorScheme = TeamColorHelper::getDefaultColorScheme();
         }
-        $html = '<div class="player-stats-card" tabindex="0" style="' . CardBaseStyles::getCardCssProperties($colorScheme) . '">';
+        $html = '<div class="player-stats-card" style="' . CardBaseStyles::getCardCssProperties($colorScheme) . '">';
         if ($statsType !== '') {
             $html .= '<div class="stats-type-indicator">' . HtmlSanitizer::e($statsType) . '</div>';
         }
@@ -57,27 +57,41 @@ class PlayerStatsCardView
     /**
      * Apply stats card styling to an existing table by adding appropriate classes
      * 
+     * This method transforms standard player-table markup to use stats-card styling.
+     * 
      * @param string $tableHtml The original table HTML
      * @return string Modified table HTML with stats-card classes
      */
     public static function styleTable(string $tableHtml): string
     {
-        $styled = $tableHtml;
-
+        // Replace sortable player-table with stats-table
+        $styled = str_replace(
+            'class="sortable player-table"',
+            'class="stats-table sortable"',
+            $tableHtml
+        );
+        
+        // Also handle sim-stats-table variant
+        $styled = str_replace(
+            'class="sortable player-table sim-stats-table"',
+            'class="stats-table sortable sim-stats-table"',
+            $styled
+        );
+        
         // Replace player-table-header with stats-table-header
         $styled = str_replace(
             'class="player-table-header"',
             'class="stats-table-header"',
             $styled
         );
-
+        
         // Add career-row class to bold rows for additional styling
         $styled = str_replace(
             'class="player-table-row-bold"',
             'class="player-table-row-bold career-row"',
             $styled
         );
-
+        
         return $styled;
     }
 

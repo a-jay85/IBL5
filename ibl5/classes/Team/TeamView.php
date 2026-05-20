@@ -123,6 +123,9 @@ class TeamView implements TeamViewInterface
     private function renderTeamBanner(int $teamid, object $team, string $imagesPath, string $userTeamName, bool $isOwnTeam): string
     {
         /** @var Team $team */
+        $color1 = \UI\TableStyles::sanitizeColor($team->color1);
+        $color2 = \UI\TableStyles::sanitizeColor($team->color2);
+
         $tradeInner = '<span class="team-action-link__text">Trade</span>'
             . '<img src="./' . $imagesPath . 'trade-icon.svg" alt="Trade" class="team-action-link__icon">';
         $scheduleInner = '<span class="team-action-link__text">Schedule</span>'
@@ -150,7 +153,7 @@ class TeamView implements TeamViewInterface
 
         ob_start();
         ?>
-<div class="team-banner-row" style="<?= \UI\TableStyles::inlineTeamVars($team->color1, $team->color2) ?>">
+<div class="team-banner-row" style="<?= \UI\TableStyles::inlineTeamVars($color1, $color2) ?>">
     <?= HtmlSanitizer::trusted($tradeButton) ?>
     <a href="modules.php?name=Schedule&amp;teamid=<?= HtmlSanitizer::e($teamid) ?>" class="team-action-link"><?= HtmlSanitizer::trusted($scheduleInner) ?></a>
     <div class="team-banner-logo">

@@ -1,8 +1,65 @@
 @layer components {
 
 
+/* Legacy player page colors (intentionally retro) */
+:root {
+    --player-legacy-header: #0000cc;
+    --player-legacy-danger: #ff0000;
+    --player-legacy-highlight: #ffbb00;
+}
+
 /* ==========================================================================
-   Component-Specific Styles (Player Module)
+   Shared Table Base — all player-view tables share these properties
+   ========================================================================== */
+
+.player-table,
+.stats-table,
+.awards-table,
+.sim-stats-table {
+    margin: 0 auto;
+    border: 1px solid #000;
+    border-collapse: collapse;
+}
+
+.player-table td, .player-table th,
+.stats-table td, .stats-table th,
+.awards-table td, .awards-table th,
+.sim-stats-table td, .sim-stats-table th {
+    text-align: center;
+    padding: 4px 8px;
+    border: 1px solid #000;
+}
+
+.player-table-header {
+    background-color: var(--player-legacy-header);
+    color: white;
+    font-weight: bold;
+    text-align: center;
+}
+
+/* Bold row for career/total summaries */
+.player-table-row-bold {
+    font-weight: bold;
+}
+
+.player-table th {
+    font-weight: bold;
+}
+
+.content-header {
+    font-weight: bold;
+    text-align: center;
+}
+
+.player-table ~ .section-title {
+    font-size: 2em;
+    font-weight: bold;
+    text-align: center;
+    margin: 1em 0;
+}
+
+/* ==========================================================================
+   Component-Specific Styles
    ========================================================================== */
 
 /* All-Star activity table */
@@ -23,13 +80,8 @@
     padding: 4px 8px;
 }
 
-/* Awards table year column */
+/* Awards table — unique rule (shared base above handles the rest) */
 .awards-table .year-cell {
-    text-align: center;
-}
-
-.content-header {
-    font-weight: bold;
     text-align: center;
 }
 
@@ -38,6 +90,16 @@
     text-align: center;
 }
 
+/* Stats table — unique rule */
+.stats-table .header-cell {
+    font-weight: bold;
+    text-align: center;
+}
+
+/* Sortable tables - extends existing .sortable class */
+.sortable.player-table {
+    margin: 0 auto;
+}
 
 /* ==========================================================================
    Player Action Buttons

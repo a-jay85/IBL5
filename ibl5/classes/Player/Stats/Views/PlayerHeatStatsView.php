@@ -34,7 +34,7 @@ class PlayerHeatStatsView implements PlayerHeatStatsViewInterface
 
         ob_start();
         ?>
-<table class="ibl-data-table player-view-table">
+<table class="stats-table">
     <tr>
         <td class="content-header">Team</td>
         <td class="content-header">Year</td>
@@ -102,7 +102,7 @@ class PlayerHeatStatsView implements PlayerHeatStatsViewInterface
 
         ob_start();
         ?>
-<table class="ibl-data-table player-view-table">
+<table class="stats-table">
     <tr>
         <td class="content-header">Team</td>
         <td class="content-header">Year</td>

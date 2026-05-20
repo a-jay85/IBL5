@@ -44,7 +44,7 @@ class PlayerSimStatsView implements PlayerSimStatsViewInterface
 
         ob_start();
         ?>
-<table class="ibl-data-table player-view-table sortable">
+<table class="sortable player-table sim-stats-table">
     <tr>
         <td colspan=16 class="player-table-header">Sim Averages</td>
     </tr>

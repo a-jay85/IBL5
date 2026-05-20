@@ -1,6 +1,222 @@
 parameters:
 	ignoreErrors:
 		-
+			rawMessage: '''
+				Access to deprecated property $decoratedName of class Player\Player:
+				Use $player->getDecoratedName() instead.
+			'''
+			identifier: property.deprecated
+			count: 1
+			path: classes/BasketballStats/Tables/Per36Minutes.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $nameStatusClass of class Player\Player:
+				Use $player->getNameStatusClass() instead.
+			'''
+			identifier: property.deprecated
+			count: 1
+			path: classes/BasketballStats/Tables/Per36Minutes.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $playerID of class Player\Player:
+				Use $player->getPlayerID() instead.
+			'''
+			identifier: property.deprecated
+			count: 1
+			path: classes/BasketballStats/Tables/Per36Minutes.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $position of class Player\Player:
+				Use $player->getPosition() instead.
+			'''
+			identifier: property.deprecated
+			count: 1
+			path: classes/BasketballStats/Tables/Per36Minutes.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $teamColor1 of class Player\Player:
+				Use $player->getTeamColor1() instead.
+			'''
+			identifier: property.deprecated
+			count: 1
+			path: classes/BasketballStats/Tables/Per36Minutes.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $teamColor2 of class Player\Player:
+				Use $player->getTeamColor2() instead.
+			'''
+			identifier: property.deprecated
+			count: 1
+			path: classes/BasketballStats/Tables/Per36Minutes.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $teamName of class Player\Player:
+				Use $player->getTeamName() instead.
+			'''
+			identifier: property.deprecated
+			count: 1
+			path: classes/BasketballStats/Tables/Per36Minutes.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $teamid of class Player\Player:
+				Use $player->getTeamid() instead.
+			'''
+			identifier: property.deprecated
+			count: 1
+			path: classes/BasketballStats/Tables/Per36Minutes.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $decoratedName of class Player\Player:
+				Use $player->getDecoratedName() instead.
+			'''
+			identifier: property.deprecated
+			count: 1
+			path: classes/BasketballStats/Tables/SeasonAverages.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $nameStatusClass of class Player\Player:
+				Use $player->getNameStatusClass() instead.
+			'''
+			identifier: property.deprecated
+			count: 1
+			path: classes/BasketballStats/Tables/SeasonAverages.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $playerID of class Player\Player:
+				Use $player->getPlayerID() instead.
+			'''
+			identifier: property.deprecated
+			count: 1
+			path: classes/BasketballStats/Tables/SeasonAverages.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $position of class Player\Player:
+				Use $player->getPosition() instead.
+			'''
+			identifier: property.deprecated
+			count: 1
+			path: classes/BasketballStats/Tables/SeasonAverages.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $teamColor1 of class Player\Player:
+				Use $player->getTeamColor1() instead.
+			'''
+			identifier: property.deprecated
+			count: 1
+			path: classes/BasketballStats/Tables/SeasonAverages.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $teamColor2 of class Player\Player:
+				Use $player->getTeamColor2() instead.
+			'''
+			identifier: property.deprecated
+			count: 1
+			path: classes/BasketballStats/Tables/SeasonAverages.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $teamName of class Player\Player:
+				Use $player->getTeamName() instead.
+			'''
+			identifier: property.deprecated
+			count: 1
+			path: classes/BasketballStats/Tables/SeasonAverages.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $teamid of class Player\Player:
+				Use $player->getTeamid() instead.
+			'''
+			identifier: property.deprecated
+			count: 1
+			path: classes/BasketballStats/Tables/SeasonAverages.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $decoratedName of class Player\Player:
+				Use $player->getDecoratedName() instead.
+			'''
+			identifier: property.deprecated
+			count: 1
+			path: classes/BasketballStats/Tables/SeasonTotals.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $nameStatusClass of class Player\Player:
+				Use $player->getNameStatusClass() instead.
+			'''
+			identifier: property.deprecated
+			count: 1
+			path: classes/BasketballStats/Tables/SeasonTotals.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $playerID of class Player\Player:
+				Use $player->getPlayerID() instead.
+			'''
+			identifier: property.deprecated
+			count: 1
+			path: classes/BasketballStats/Tables/SeasonTotals.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $position of class Player\Player:
+				Use $player->getPosition() instead.
+			'''
+			identifier: property.deprecated
+			count: 1
+			path: classes/BasketballStats/Tables/SeasonTotals.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $teamColor1 of class Player\Player:
+				Use $player->getTeamColor1() instead.
+			'''
+			identifier: property.deprecated
+			count: 1
+			path: classes/BasketballStats/Tables/SeasonTotals.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $teamColor2 of class Player\Player:
+				Use $player->getTeamColor2() instead.
+			'''
+			identifier: property.deprecated
+			count: 1
+			path: classes/BasketballStats/Tables/SeasonTotals.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $teamName of class Player\Player:
+				Use $player->getTeamName() instead.
+			'''
+			identifier: property.deprecated
+			count: 1
+			path: classes/BasketballStats/Tables/SeasonTotals.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $teamid of class Player\Player:
+				Use $player->getTeamid() instead.
+			'''
+			identifier: property.deprecated
+			count: 1
+			path: classes/BasketballStats/Tables/SeasonTotals.php
+
+		-
 			rawMessage: Cannot cast mixed to string.
 			identifier: cast.string
 			count: 1
@@ -148,10 +364,118 @@ parameters:
 			path: classes/DraftHistory/DraftHistoryApiHandler.php
 
 		-
+			rawMessage: '''
+				Access to deprecated property $birdYears of class Player\Player:
+				Use $player->getBirdYears() instead.
+			'''
+			identifier: property.deprecated
+			count: 1
+			path: classes/Extension/ExtensionService.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $currentSeasonSalary of class Player\Player:
+				Use $player->getCurrentSeasonSalary() instead.
+			'''
+			identifier: property.deprecated
+			count: 1
+			path: classes/Extension/ExtensionService.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $freeAgencyLoyalty of class Player\Player:
+				Use $player->getFreeAgencyLoyalty() instead.
+			'''
+			identifier: property.deprecated
+			count: 1
+			path: classes/Extension/ExtensionService.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $freeAgencyPlayForWinner of class Player\Player:
+				Use $player->getFreeAgencyPlayForWinner() instead.
+			'''
+			identifier: property.deprecated
+			count: 1
+			path: classes/Extension/ExtensionService.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $freeAgencyPlayingTime of class Player\Player:
+				Use $player->getFreeAgencyPlayingTime() instead.
+			'''
+			identifier: property.deprecated
+			count: 1
+			path: classes/Extension/ExtensionService.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $freeAgencyTradition of class Player\Player:
+				Use $player->getFreeAgencyTradition() instead.
+			'''
+			identifier: property.deprecated
+			count: 1
+			path: classes/Extension/ExtensionService.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $name of class Player\Player:
+				Use $player->getName() instead.
+			'''
+			identifier: property.deprecated
+			count: 2
+			path: classes/Extension/ExtensionService.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $playerID of class Player\Player:
+				Use $player->getPlayerID() instead.
+			'''
+			identifier: property.deprecated
+			count: 1
+			path: classes/Extension/ExtensionService.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $position of class Player\Player:
+				Use $player->getPosition() instead.
+			'''
+			identifier: property.deprecated
+			count: 1
+			path: classes/Extension/ExtensionService.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $teamName of class Player\Player:
+				Use $player->getTeamName() instead.
+			'''
+			identifier: property.deprecated
+			count: 1
+			path: classes/Extension/ExtensionService.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $yearsOfExperience of class Player\Player:
+				Use $player->getYearsOfExperience() instead.
+			'''
+			identifier: property.deprecated
+			count: 1
+			path: classes/Extension/ExtensionService.php
+
+		-
 			rawMessage: 'echo is banned outside View classes, Responders, and Bootstrap/Updater emitters. Move HTML/text output into a *View.php (composed by the Controller) or a Responder (composed by the ApiHandler).'
 			identifier: ibl.echoInNonView
 			count: 1
 			path: classes/FranchiseRecordBook/FranchiseRecordBookApiHandler.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $teamName of class Player\Player:
+				Use $player->getTeamName() instead.
+			'''
+			identifier: property.deprecated
+			count: 2
+			path: classes/FreeAgency/FreeAgencyAdminProcessor.php
 
 		-
 			rawMessage: 'echo is banned outside View classes, Responders, and Bootstrap/Updater emitters. Move HTML/text output into a *View.php (composed by the Controller) or a Responder (composed by the ApiHandler).'
@@ -160,10 +484,1288 @@ parameters:
 			path: classes/FreeAgency/FreeAgencyController.php
 
 		-
+			rawMessage: '''
+				Access to deprecated property $freeAgencyLoyalty of class Player\Player:
+				Use $player->getFreeAgencyLoyalty() instead.
+			'''
+			identifier: property.deprecated
+			count: 1
+			path: classes/FreeAgency/FreeAgencyDemandCalculator.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $freeAgencyPlayForWinner of class Player\Player:
+				Use $player->getFreeAgencyPlayForWinner() instead.
+			'''
+			identifier: property.deprecated
+			count: 1
+			path: classes/FreeAgency/FreeAgencyDemandCalculator.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $freeAgencyPlayingTime of class Player\Player:
+				Use $player->getFreeAgencyPlayingTime() instead.
+			'''
+			identifier: property.deprecated
+			count: 1
+			path: classes/FreeAgency/FreeAgencyDemandCalculator.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $freeAgencySecurity of class Player\Player:
+				Use $player->getFreeAgencySecurity() instead.
+			'''
+			identifier: property.deprecated
+			count: 1
+			path: classes/FreeAgency/FreeAgencyDemandCalculator.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $freeAgencyTradition of class Player\Player:
+				Use $player->getFreeAgencyTradition() instead.
+			'''
+			identifier: property.deprecated
+			count: 1
+			path: classes/FreeAgency/FreeAgencyDemandCalculator.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $playerID of class Player\Player:
+				Use $player->getPlayerID() instead.
+			'''
+			identifier: property.deprecated
+			count: 1
+			path: classes/FreeAgency/FreeAgencyDemandCalculator.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $position of class Player\Player:
+				Use $player->getPosition() instead.
+			'''
+			identifier: property.deprecated
+			count: 1
+			path: classes/FreeAgency/FreeAgencyDemandCalculator.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $teamName of class Player\Player:
+				Use $player->getTeamName() instead.
+			'''
+			identifier: property.deprecated
+			count: 1
+			path: classes/FreeAgency/FreeAgencyDemandCalculator.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $playerID of class Player\Player:
+				Use $player->getPlayerID() instead.
+			'''
+			identifier: property.deprecated
+			count: 1
+			path: classes/FreeAgency/FreeAgencyFormComponents.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $ratingAssists of class Player\Player:
+				Use $player->getRatingAssists() instead.
+			'''
+			identifier: property.deprecated
+			count: 1
+			path: classes/FreeAgency/FreeAgencyFormComponents.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $ratingBlocks of class Player\Player:
+				Use $player->getRatingBlocks() instead.
+			'''
+			identifier: property.deprecated
+			count: 1
+			path: classes/FreeAgency/FreeAgencyFormComponents.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $ratingDefensiveRebounds of class Player\Player:
+				Use $player->getRatingDefensiveRebounds() instead.
+			'''
+			identifier: property.deprecated
+			count: 1
+			path: classes/FreeAgency/FreeAgencyFormComponents.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $ratingDriveDefense of class Player\Player:
+				Use $player->getRatingDriveDefense() instead.
+			'''
+			identifier: property.deprecated
+			count: 1
+			path: classes/FreeAgency/FreeAgencyFormComponents.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $ratingDriveOffense of class Player\Player:
+				Use $player->getRatingDriveOffense() instead.
+			'''
+			identifier: property.deprecated
+			count: 1
+			path: classes/FreeAgency/FreeAgencyFormComponents.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $ratingFieldGoalAttempts of class Player\Player:
+				Use $player->getRatingFieldGoalAttempts() instead.
+			'''
+			identifier: property.deprecated
+			count: 1
+			path: classes/FreeAgency/FreeAgencyFormComponents.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $ratingFieldGoalPercentage of class Player\Player:
+				Use $player->getRatingFieldGoalPercentage() instead.
+			'''
+			identifier: property.deprecated
+			count: 1
+			path: classes/FreeAgency/FreeAgencyFormComponents.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $ratingFouls of class Player\Player:
+				Use $player->getRatingFouls() instead.
+			'''
+			identifier: property.deprecated
+			count: 1
+			path: classes/FreeAgency/FreeAgencyFormComponents.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $ratingFreeThrowAttempts of class Player\Player:
+				Use $player->getRatingFreeThrowAttempts() instead.
+			'''
+			identifier: property.deprecated
+			count: 1
+			path: classes/FreeAgency/FreeAgencyFormComponents.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $ratingFreeThrowPercentage of class Player\Player:
+				Use $player->getRatingFreeThrowPercentage() instead.
+			'''
+			identifier: property.deprecated
+			count: 1
+			path: classes/FreeAgency/FreeAgencyFormComponents.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $ratingOffensiveRebounds of class Player\Player:
+				Use $player->getRatingOffensiveRebounds() instead.
+			'''
+			identifier: property.deprecated
+			count: 1
+			path: classes/FreeAgency/FreeAgencyFormComponents.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $ratingOutsideDefense of class Player\Player:
+				Use $player->getRatingOutsideDefense() instead.
+			'''
+			identifier: property.deprecated
+			count: 1
+			path: classes/FreeAgency/FreeAgencyFormComponents.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $ratingOutsideOffense of class Player\Player:
+				Use $player->getRatingOutsideOffense() instead.
+			'''
+			identifier: property.deprecated
+			count: 1
+			path: classes/FreeAgency/FreeAgencyFormComponents.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $ratingPostDefense of class Player\Player:
+				Use $player->getRatingPostDefense() instead.
+			'''
+			identifier: property.deprecated
+			count: 1
+			path: classes/FreeAgency/FreeAgencyFormComponents.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $ratingPostOffense of class Player\Player:
+				Use $player->getRatingPostOffense() instead.
+			'''
+			identifier: property.deprecated
+			count: 1
+			path: classes/FreeAgency/FreeAgencyFormComponents.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $ratingSteals of class Player\Player:
+				Use $player->getRatingSteals() instead.
+			'''
+			identifier: property.deprecated
+			count: 1
+			path: classes/FreeAgency/FreeAgencyFormComponents.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $ratingThreePointAttempts of class Player\Player:
+				Use $player->getRatingThreePointAttempts() instead.
+			'''
+			identifier: property.deprecated
+			count: 1
+			path: classes/FreeAgency/FreeAgencyFormComponents.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $ratingThreePointPercentage of class Player\Player:
+				Use $player->getRatingThreePointPercentage() instead.
+			'''
+			identifier: property.deprecated
+			count: 1
+			path: classes/FreeAgency/FreeAgencyFormComponents.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $ratingTransitionDefense of class Player\Player:
+				Use $player->getRatingTransitionDefense() instead.
+			'''
+			identifier: property.deprecated
+			count: 1
+			path: classes/FreeAgency/FreeAgencyFormComponents.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $ratingTransitionOffense of class Player\Player:
+				Use $player->getRatingTransitionOffense() instead.
+			'''
+			identifier: property.deprecated
+			count: 1
+			path: classes/FreeAgency/FreeAgencyFormComponents.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $ratingTurnovers of class Player\Player:
+				Use $player->getRatingTurnovers() instead.
+			'''
+			identifier: property.deprecated
+			count: 1
+			path: classes/FreeAgency/FreeAgencyFormComponents.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $yearsOfExperience of class Player\Player:
+				Use $player->getYearsOfExperience() instead.
+			'''
+			identifier: property.deprecated
+			count: 1
+			path: classes/FreeAgency/FreeAgencyFormComponents.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $birdYears of class Player\Player:
+				Use $player->getBirdYears() instead.
+			'''
+			identifier: property.deprecated
+			count: 2
+			path: classes/FreeAgency/FreeAgencyOfferView.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $name of class Player\Player:
+				Use $player->getName() instead.
+			'''
+			identifier: property.deprecated
+			count: 2
+			path: classes/FreeAgency/FreeAgencyOfferView.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $playerID of class Player\Player:
+				Use $player->getPlayerID() instead.
+			'''
+			identifier: property.deprecated
+			count: 3
+			path: classes/FreeAgency/FreeAgencyOfferView.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $position of class Player\Player:
+				Use $player->getPosition() instead.
+			'''
+			identifier: property.deprecated
+			count: 1
+			path: classes/FreeAgency/FreeAgencyOfferView.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $teamName of class Player\Player:
+				Use $player->getTeamName() instead.
+			'''
+			identifier: property.deprecated
+			count: 2
+			path: classes/FreeAgency/FreeAgencyOfferView.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $yearsOfExperience of class Player\Player:
+				Use $player->getYearsOfExperience() instead.
+			'''
+			identifier: property.deprecated
+			count: 1
+			path: classes/FreeAgency/FreeAgencyOfferView.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $birdYears of class Player\Player:
+				Use $player->getBirdYears() instead.
+			'''
+			identifier: property.deprecated
+			count: 1
+			path: classes/FreeAgency/FreeAgencyProcessor.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $name of class Player\Player:
+				Use $player->getName() instead.
+			'''
+			identifier: property.deprecated
+			count: 3
+			path: classes/FreeAgency/FreeAgencyProcessor.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $playerID of class Player\Player:
+				Use $player->getPlayerID() instead.
+			'''
+			identifier: property.deprecated
+			count: 3
+			path: classes/FreeAgency/FreeAgencyProcessor.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $teamName of class Player\Player:
+				Use $player->getTeamName() instead.
+			'''
+			identifier: property.deprecated
+			count: 7
+			path: classes/FreeAgency/FreeAgencyProcessor.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $yearsOfExperience of class Player\Player:
+				Use $player->getYearsOfExperience() instead.
+			'''
+			identifier: property.deprecated
+			count: 2
+			path: classes/FreeAgency/FreeAgencyProcessor.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $playerID of class Player\Player:
+				Use $player->getPlayerID() instead.
+			'''
+			identifier: property.deprecated
+			count: 3
+			path: classes/FreeAgency/FreeAgencyService.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $teamid of class Player\Player:
+				Use $player->getTeamid() instead.
+			'''
+			identifier: property.deprecated
+			count: 1
+			path: classes/FreeAgency/FreeAgencyService.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $yearsOfExperience of class Player\Player:
+				Use $player->getYearsOfExperience() instead.
+			'''
+			identifier: property.deprecated
+			count: 2
+			path: classes/FreeAgency/FreeAgencyService.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $age of class Player\Player:
+				Use $player->getAge() instead.
+			'''
+			identifier: property.deprecated
+			count: 4
+			path: classes/FreeAgency/FreeAgencyView.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $birdYears of class Player\Player:
+				Use $player->getBirdYears() instead.
+			'''
+			identifier: property.deprecated
+			count: 1
+			path: classes/FreeAgency/FreeAgencyView.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $freeAgencyLoyalty of class Player\Player:
+				Use $player->getFreeAgencyLoyalty() instead.
+			'''
+			identifier: property.deprecated
+			count: 1
+			path: classes/FreeAgency/FreeAgencyView.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $freeAgencyPlayForWinner of class Player\Player:
+				Use $player->getFreeAgencyPlayForWinner() instead.
+			'''
+			identifier: property.deprecated
+			count: 1
+			path: classes/FreeAgency/FreeAgencyView.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $freeAgencyPlayingTime of class Player\Player:
+				Use $player->getFreeAgencyPlayingTime() instead.
+			'''
+			identifier: property.deprecated
+			count: 1
+			path: classes/FreeAgency/FreeAgencyView.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $freeAgencySecurity of class Player\Player:
+				Use $player->getFreeAgencySecurity() instead.
+			'''
+			identifier: property.deprecated
+			count: 1
+			path: classes/FreeAgency/FreeAgencyView.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $freeAgencyTradition of class Player\Player:
+				Use $player->getFreeAgencyTradition() instead.
+			'''
+			identifier: property.deprecated
+			count: 1
+			path: classes/FreeAgency/FreeAgencyView.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $name of class Player\Player:
+				Use $player->getName() instead.
+			'''
+			identifier: property.deprecated
+			count: 4
+			path: classes/FreeAgency/FreeAgencyView.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $ordinal of class Player\Player:
+				Use $player->getOrdinal() instead.
+			'''
+			identifier: property.deprecated
+			count: 1
+			path: classes/FreeAgency/FreeAgencyView.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $playerID of class Player\Player:
+				Use $player->getPlayerID() instead.
+			'''
+			identifier: property.deprecated
+			count: 10
+			path: classes/FreeAgency/FreeAgencyView.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $position of class Player\Player:
+				Use $player->getPosition() instead.
+			'''
+			identifier: property.deprecated
+			count: 4
+			path: classes/FreeAgency/FreeAgencyView.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $ratingAssists of class Player\Player:
+				Use $player->getRatingAssists() instead.
+			'''
+			identifier: property.deprecated
+			count: 1
+			path: classes/FreeAgency/FreeAgencyView.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $ratingBlocks of class Player\Player:
+				Use $player->getRatingBlocks() instead.
+			'''
+			identifier: property.deprecated
+			count: 1
+			path: classes/FreeAgency/FreeAgencyView.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $ratingDefensiveRebounds of class Player\Player:
+				Use $player->getRatingDefensiveRebounds() instead.
+			'''
+			identifier: property.deprecated
+			count: 1
+			path: classes/FreeAgency/FreeAgencyView.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $ratingDriveDefense of class Player\Player:
+				Use $player->getRatingDriveDefense() instead.
+			'''
+			identifier: property.deprecated
+			count: 1
+			path: classes/FreeAgency/FreeAgencyView.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $ratingDriveOffense of class Player\Player:
+				Use $player->getRatingDriveOffense() instead.
+			'''
+			identifier: property.deprecated
+			count: 1
+			path: classes/FreeAgency/FreeAgencyView.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $ratingFieldGoalAttempts of class Player\Player:
+				Use $player->getRatingFieldGoalAttempts() instead.
+			'''
+			identifier: property.deprecated
+			count: 1
+			path: classes/FreeAgency/FreeAgencyView.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $ratingFieldGoalPercentage of class Player\Player:
+				Use $player->getRatingFieldGoalPercentage() instead.
+			'''
+			identifier: property.deprecated
+			count: 1
+			path: classes/FreeAgency/FreeAgencyView.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $ratingFouls of class Player\Player:
+				Use $player->getRatingFouls() instead.
+			'''
+			identifier: property.deprecated
+			count: 1
+			path: classes/FreeAgency/FreeAgencyView.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $ratingFreeThrowAttempts of class Player\Player:
+				Use $player->getRatingFreeThrowAttempts() instead.
+			'''
+			identifier: property.deprecated
+			count: 1
+			path: classes/FreeAgency/FreeAgencyView.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $ratingFreeThrowPercentage of class Player\Player:
+				Use $player->getRatingFreeThrowPercentage() instead.
+			'''
+			identifier: property.deprecated
+			count: 1
+			path: classes/FreeAgency/FreeAgencyView.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $ratingIntangibles of class Player\Player:
+				Use $player->getRatingIntangibles() instead.
+			'''
+			identifier: property.deprecated
+			count: 1
+			path: classes/FreeAgency/FreeAgencyView.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $ratingOffensiveRebounds of class Player\Player:
+				Use $player->getRatingOffensiveRebounds() instead.
+			'''
+			identifier: property.deprecated
+			count: 1
+			path: classes/FreeAgency/FreeAgencyView.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $ratingOutsideDefense of class Player\Player:
+				Use $player->getRatingOutsideDefense() instead.
+			'''
+			identifier: property.deprecated
+			count: 1
+			path: classes/FreeAgency/FreeAgencyView.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $ratingOutsideOffense of class Player\Player:
+				Use $player->getRatingOutsideOffense() instead.
+			'''
+			identifier: property.deprecated
+			count: 1
+			path: classes/FreeAgency/FreeAgencyView.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $ratingPostDefense of class Player\Player:
+				Use $player->getRatingPostDefense() instead.
+			'''
+			identifier: property.deprecated
+			count: 1
+			path: classes/FreeAgency/FreeAgencyView.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $ratingPostOffense of class Player\Player:
+				Use $player->getRatingPostOffense() instead.
+			'''
+			identifier: property.deprecated
+			count: 1
+			path: classes/FreeAgency/FreeAgencyView.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $ratingSkill of class Player\Player:
+				Use $player->getRatingSkill() instead.
+			'''
+			identifier: property.deprecated
+			count: 1
+			path: classes/FreeAgency/FreeAgencyView.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $ratingSteals of class Player\Player:
+				Use $player->getRatingSteals() instead.
+			'''
+			identifier: property.deprecated
+			count: 1
+			path: classes/FreeAgency/FreeAgencyView.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $ratingTalent of class Player\Player:
+				Use $player->getRatingTalent() instead.
+			'''
+			identifier: property.deprecated
+			count: 1
+			path: classes/FreeAgency/FreeAgencyView.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $ratingThreePointAttempts of class Player\Player:
+				Use $player->getRatingThreePointAttempts() instead.
+			'''
+			identifier: property.deprecated
+			count: 1
+			path: classes/FreeAgency/FreeAgencyView.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $ratingThreePointPercentage of class Player\Player:
+				Use $player->getRatingThreePointPercentage() instead.
+			'''
+			identifier: property.deprecated
+			count: 1
+			path: classes/FreeAgency/FreeAgencyView.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $ratingTransitionDefense of class Player\Player:
+				Use $player->getRatingTransitionDefense() instead.
+			'''
+			identifier: property.deprecated
+			count: 1
+			path: classes/FreeAgency/FreeAgencyView.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $ratingTransitionOffense of class Player\Player:
+				Use $player->getRatingTransitionOffense() instead.
+			'''
+			identifier: property.deprecated
+			count: 1
+			path: classes/FreeAgency/FreeAgencyView.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $ratingTurnovers of class Player\Player:
+				Use $player->getRatingTurnovers() instead.
+			'''
+			identifier: property.deprecated
+			count: 1
+			path: classes/FreeAgency/FreeAgencyView.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $teamName of class Player\Player:
+				Use $player->getTeamName() instead.
+			'''
+			identifier: property.deprecated
+			count: 1
+			path: classes/FreeAgency/FreeAgencyView.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $teamid of class Player\Player:
+				Use $player->getTeamid() instead.
+			'''
+			identifier: property.deprecated
+			count: 2
+			path: classes/FreeAgency/FreeAgencyView.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $daysRemainingForInjury of class Player\Player:
+				Use $player->getDaysRemainingForInjury() instead.
+			'''
+			identifier: property.deprecated
+			count: 1
+			path: classes/Injuries/InjuriesService.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $name of class Player\Player:
+				Use $player->getName() instead.
+			'''
+			identifier: property.deprecated
+			count: 1
+			path: classes/Injuries/InjuriesService.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $playerID of class Player\Player:
+				Use $player->getPlayerID() instead.
+			'''
+			identifier: property.deprecated
+			count: 1
+			path: classes/Injuries/InjuriesService.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $position of class Player\Player:
+				Use $player->getPosition() instead.
+			'''
+			identifier: property.deprecated
+			count: 1
+			path: classes/Injuries/InjuriesService.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $teamid of class Player\Player:
+				Use $player->getTeamid() instead.
+			'''
+			identifier: property.deprecated
+			count: 2
+			path: classes/Injuries/InjuriesService.php
+
+		-
 			rawMessage: 'echo is banned outside View classes, Responders, and Bootstrap/Updater emitters. Move HTML/text output into a *View.php (composed by the Controller) or a Responder (composed by the ApiHandler).'
 			identifier: ibl.echoInNonView
 			count: 1
 			path: classes/LeagueStarters/LeagueStartersApiHandler.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $teamCity of class Player\Player:
+				Use $player->getTeamCity() instead.
+			'''
+			identifier: property.deprecated
+			count: 2
+			path: classes/LeagueStarters/LeagueStartersService.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $teamColor1 of class Player\Player:
+				Use $player->getTeamColor1() instead.
+			'''
+			identifier: property.deprecated
+			count: 2
+			path: classes/LeagueStarters/LeagueStartersService.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $teamColor2 of class Player\Player:
+				Use $player->getTeamColor2() instead.
+			'''
+			identifier: property.deprecated
+			count: 2
+			path: classes/LeagueStarters/LeagueStartersService.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $teamName of class Player\Player:
+				Use $player->getTeamName() instead.
+			'''
+			identifier: property.deprecated
+			count: 2
+			path: classes/LeagueStarters/LeagueStartersService.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $freeAgencyLoyalty of class Player\Player:
+				Use $player->getFreeAgencyLoyalty() instead.
+			'''
+			identifier: property.deprecated
+			count: 2
+			path: classes/Negotiation/NegotiationDemandCalculator.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $freeAgencyPlayForWinner of class Player\Player:
+				Use $player->getFreeAgencyPlayForWinner() instead.
+			'''
+			identifier: property.deprecated
+			count: 2
+			path: classes/Negotiation/NegotiationDemandCalculator.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $freeAgencyPlayingTime of class Player\Player:
+				Use $player->getFreeAgencyPlayingTime() instead.
+			'''
+			identifier: property.deprecated
+			count: 2
+			path: classes/Negotiation/NegotiationDemandCalculator.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $freeAgencyTradition of class Player\Player:
+				Use $player->getFreeAgencyTradition() instead.
+			'''
+			identifier: property.deprecated
+			count: 2
+			path: classes/Negotiation/NegotiationDemandCalculator.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $ratingAssists of class Player\Player:
+				Use $player->getRatingAssists() instead.
+			'''
+			identifier: property.deprecated
+			count: 1
+			path: classes/Negotiation/NegotiationDemandCalculator.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $ratingBlocks of class Player\Player:
+				Use $player->getRatingBlocks() instead.
+			'''
+			identifier: property.deprecated
+			count: 1
+			path: classes/Negotiation/NegotiationDemandCalculator.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $ratingDefensiveRebounds of class Player\Player:
+				Use $player->getRatingDefensiveRebounds() instead.
+			'''
+			identifier: property.deprecated
+			count: 1
+			path: classes/Negotiation/NegotiationDemandCalculator.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $ratingDriveDefense of class Player\Player:
+				Use $player->getRatingDriveDefense() instead.
+			'''
+			identifier: property.deprecated
+			count: 1
+			path: classes/Negotiation/NegotiationDemandCalculator.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $ratingDriveOffense of class Player\Player:
+				Use $player->getRatingDriveOffense() instead.
+			'''
+			identifier: property.deprecated
+			count: 1
+			path: classes/Negotiation/NegotiationDemandCalculator.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $ratingFieldGoalAttempts of class Player\Player:
+				Use $player->getRatingFieldGoalAttempts() instead.
+			'''
+			identifier: property.deprecated
+			count: 1
+			path: classes/Negotiation/NegotiationDemandCalculator.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $ratingFieldGoalPercentage of class Player\Player:
+				Use $player->getRatingFieldGoalPercentage() instead.
+			'''
+			identifier: property.deprecated
+			count: 1
+			path: classes/Negotiation/NegotiationDemandCalculator.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $ratingFouls of class Player\Player:
+				Use $player->getRatingFouls() instead.
+			'''
+			identifier: property.deprecated
+			count: 1
+			path: classes/Negotiation/NegotiationDemandCalculator.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $ratingFreeThrowAttempts of class Player\Player:
+				Use $player->getRatingFreeThrowAttempts() instead.
+			'''
+			identifier: property.deprecated
+			count: 1
+			path: classes/Negotiation/NegotiationDemandCalculator.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $ratingFreeThrowPercentage of class Player\Player:
+				Use $player->getRatingFreeThrowPercentage() instead.
+			'''
+			identifier: property.deprecated
+			count: 1
+			path: classes/Negotiation/NegotiationDemandCalculator.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $ratingOffensiveRebounds of class Player\Player:
+				Use $player->getRatingOffensiveRebounds() instead.
+			'''
+			identifier: property.deprecated
+			count: 1
+			path: classes/Negotiation/NegotiationDemandCalculator.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $ratingOutsideDefense of class Player\Player:
+				Use $player->getRatingOutsideDefense() instead.
+			'''
+			identifier: property.deprecated
+			count: 1
+			path: classes/Negotiation/NegotiationDemandCalculator.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $ratingOutsideOffense of class Player\Player:
+				Use $player->getRatingOutsideOffense() instead.
+			'''
+			identifier: property.deprecated
+			count: 1
+			path: classes/Negotiation/NegotiationDemandCalculator.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $ratingPostDefense of class Player\Player:
+				Use $player->getRatingPostDefense() instead.
+			'''
+			identifier: property.deprecated
+			count: 1
+			path: classes/Negotiation/NegotiationDemandCalculator.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $ratingPostOffense of class Player\Player:
+				Use $player->getRatingPostOffense() instead.
+			'''
+			identifier: property.deprecated
+			count: 1
+			path: classes/Negotiation/NegotiationDemandCalculator.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $ratingSteals of class Player\Player:
+				Use $player->getRatingSteals() instead.
+			'''
+			identifier: property.deprecated
+			count: 1
+			path: classes/Negotiation/NegotiationDemandCalculator.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $ratingThreePointAttempts of class Player\Player:
+				Use $player->getRatingThreePointAttempts() instead.
+			'''
+			identifier: property.deprecated
+			count: 1
+			path: classes/Negotiation/NegotiationDemandCalculator.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $ratingThreePointPercentage of class Player\Player:
+				Use $player->getRatingThreePointPercentage() instead.
+			'''
+			identifier: property.deprecated
+			count: 1
+			path: classes/Negotiation/NegotiationDemandCalculator.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $ratingTransitionDefense of class Player\Player:
+				Use $player->getRatingTransitionDefense() instead.
+			'''
+			identifier: property.deprecated
+			count: 1
+			path: classes/Negotiation/NegotiationDemandCalculator.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $ratingTransitionOffense of class Player\Player:
+				Use $player->getRatingTransitionOffense() instead.
+			'''
+			identifier: property.deprecated
+			count: 1
+			path: classes/Negotiation/NegotiationDemandCalculator.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $ratingTurnovers of class Player\Player:
+				Use $player->getRatingTurnovers() instead.
+			'''
+			identifier: property.deprecated
+			count: 1
+			path: classes/Negotiation/NegotiationDemandCalculator.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $birdYears of class Player\Player:
+				Use $player->getBirdYears() instead.
+			'''
+			identifier: property.deprecated
+			count: 1
+			path: classes/Negotiation/NegotiationOfferView.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $name of class Player\Player:
+				Use $player->getName() instead.
+			'''
+			identifier: property.deprecated
+			count: 1
+			path: classes/Negotiation/NegotiationOfferView.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $playerID of class Player\Player:
+				Use $player->getPlayerID() instead.
+			'''
+			identifier: property.deprecated
+			count: 2
+			path: classes/Negotiation/NegotiationOfferView.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $position of class Player\Player:
+				Use $player->getPosition() instead.
+			'''
+			identifier: property.deprecated
+			count: 1
+			path: classes/Negotiation/NegotiationOfferView.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $ratingAssists of class Player\Player:
+				Use $player->getRatingAssists() instead.
+			'''
+			identifier: property.deprecated
+			count: 1
+			path: classes/Negotiation/NegotiationOfferView.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $ratingBlocks of class Player\Player:
+				Use $player->getRatingBlocks() instead.
+			'''
+			identifier: property.deprecated
+			count: 1
+			path: classes/Negotiation/NegotiationOfferView.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $ratingDefensiveRebounds of class Player\Player:
+				Use $player->getRatingDefensiveRebounds() instead.
+			'''
+			identifier: property.deprecated
+			count: 1
+			path: classes/Negotiation/NegotiationOfferView.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $ratingDriveDefense of class Player\Player:
+				Use $player->getRatingDriveDefense() instead.
+			'''
+			identifier: property.deprecated
+			count: 1
+			path: classes/Negotiation/NegotiationOfferView.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $ratingDriveOffense of class Player\Player:
+				Use $player->getRatingDriveOffense() instead.
+			'''
+			identifier: property.deprecated
+			count: 1
+			path: classes/Negotiation/NegotiationOfferView.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $ratingFieldGoalAttempts of class Player\Player:
+				Use $player->getRatingFieldGoalAttempts() instead.
+			'''
+			identifier: property.deprecated
+			count: 1
+			path: classes/Negotiation/NegotiationOfferView.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $ratingFieldGoalPercentage of class Player\Player:
+				Use $player->getRatingFieldGoalPercentage() instead.
+			'''
+			identifier: property.deprecated
+			count: 1
+			path: classes/Negotiation/NegotiationOfferView.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $ratingFouls of class Player\Player:
+				Use $player->getRatingFouls() instead.
+			'''
+			identifier: property.deprecated
+			count: 1
+			path: classes/Negotiation/NegotiationOfferView.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $ratingFreeThrowAttempts of class Player\Player:
+				Use $player->getRatingFreeThrowAttempts() instead.
+			'''
+			identifier: property.deprecated
+			count: 1
+			path: classes/Negotiation/NegotiationOfferView.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $ratingFreeThrowPercentage of class Player\Player:
+				Use $player->getRatingFreeThrowPercentage() instead.
+			'''
+			identifier: property.deprecated
+			count: 1
+			path: classes/Negotiation/NegotiationOfferView.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $ratingOffensiveRebounds of class Player\Player:
+				Use $player->getRatingOffensiveRebounds() instead.
+			'''
+			identifier: property.deprecated
+			count: 1
+			path: classes/Negotiation/NegotiationOfferView.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $ratingOutsideDefense of class Player\Player:
+				Use $player->getRatingOutsideDefense() instead.
+			'''
+			identifier: property.deprecated
+			count: 1
+			path: classes/Negotiation/NegotiationOfferView.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $ratingOutsideOffense of class Player\Player:
+				Use $player->getRatingOutsideOffense() instead.
+			'''
+			identifier: property.deprecated
+			count: 1
+			path: classes/Negotiation/NegotiationOfferView.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $ratingPostDefense of class Player\Player:
+				Use $player->getRatingPostDefense() instead.
+			'''
+			identifier: property.deprecated
+			count: 1
+			path: classes/Negotiation/NegotiationOfferView.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $ratingPostOffense of class Player\Player:
+				Use $player->getRatingPostOffense() instead.
+			'''
+			identifier: property.deprecated
+			count: 1
+			path: classes/Negotiation/NegotiationOfferView.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $ratingSteals of class Player\Player:
+				Use $player->getRatingSteals() instead.
+			'''
+			identifier: property.deprecated
+			count: 1
+			path: classes/Negotiation/NegotiationOfferView.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $ratingThreePointAttempts of class Player\Player:
+				Use $player->getRatingThreePointAttempts() instead.
+			'''
+			identifier: property.deprecated
+			count: 1
+			path: classes/Negotiation/NegotiationOfferView.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $ratingThreePointPercentage of class Player\Player:
+				Use $player->getRatingThreePointPercentage() instead.
+			'''
+			identifier: property.deprecated
+			count: 1
+			path: classes/Negotiation/NegotiationOfferView.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $ratingTransitionDefense of class Player\Player:
+				Use $player->getRatingTransitionDefense() instead.
+			'''
+			identifier: property.deprecated
+			count: 1
+			path: classes/Negotiation/NegotiationOfferView.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $ratingTransitionOffense of class Player\Player:
+				Use $player->getRatingTransitionOffense() instead.
+			'''
+			identifier: property.deprecated
+			count: 1
+			path: classes/Negotiation/NegotiationOfferView.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $ratingTurnovers of class Player\Player:
+				Use $player->getRatingTurnovers() instead.
+			'''
+			identifier: property.deprecated
+			count: 1
+			path: classes/Negotiation/NegotiationOfferView.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $teamName of class Player\Player:
+				Use $player->getTeamName() instead.
+			'''
+			identifier: property.deprecated
+			count: 1
+			path: classes/Negotiation/NegotiationOfferView.php
 
 		-
 			rawMessage: Casting to int something that's already int.
@@ -178,10 +1780,388 @@ parameters:
 			path: classes/Negotiation/NegotiationOfferView.php
 
 		-
+			rawMessage: '''
+				Access to deprecated property $name of class Player\Player:
+				Use $player->getName() instead.
+			'''
+			identifier: property.deprecated
+			count: 1
+			path: classes/Negotiation/NegotiationService.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $position of class Player\Player:
+				Use $player->getPosition() instead.
+			'''
+			identifier: property.deprecated
+			count: 1
+			path: classes/Negotiation/NegotiationService.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $teamName of class Player\Player:
+				Use $player->getTeamName() instead.
+			'''
+			identifier: property.deprecated
+			count: 1
+			path: classes/Negotiation/NegotiationService.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $yearsOfExperience of class Player\Player:
+				Use $player->getYearsOfExperience() instead.
+			'''
+			identifier: property.deprecated
+			count: 1
+			path: classes/Negotiation/NegotiationService.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $contractCurrentYear of class Player\Player:
+				Use $player->getContractCurrentYear() instead.
+			'''
+			identifier: property.deprecated
+			count: 1
+			path: classes/Negotiation/NegotiationValidator.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $contractYear1Salary of class Player\Player:
+				Use $player->getContractYear1Salary() instead.
+			'''
+			identifier: property.deprecated
+			count: 1
+			path: classes/Negotiation/NegotiationValidator.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $contractYear2Salary of class Player\Player:
+				Use $player->getContractYear2Salary() instead.
+			'''
+			identifier: property.deprecated
+			count: 1
+			path: classes/Negotiation/NegotiationValidator.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $contractYear3Salary of class Player\Player:
+				Use $player->getContractYear3Salary() instead.
+			'''
+			identifier: property.deprecated
+			count: 1
+			path: classes/Negotiation/NegotiationValidator.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $contractYear4Salary of class Player\Player:
+				Use $player->getContractYear4Salary() instead.
+			'''
+			identifier: property.deprecated
+			count: 1
+			path: classes/Negotiation/NegotiationValidator.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $contractYear5Salary of class Player\Player:
+				Use $player->getContractYear5Salary() instead.
+			'''
+			identifier: property.deprecated
+			count: 1
+			path: classes/Negotiation/NegotiationValidator.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $contractYear6Salary of class Player\Player:
+				Use $player->getContractYear6Salary() instead.
+			'''
+			identifier: property.deprecated
+			count: 1
+			path: classes/Negotiation/NegotiationValidator.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $draftRound of class Player\Player:
+				Use $player->getDraftRound() instead.
+			'''
+			identifier: property.deprecated
+			count: 1
+			path: classes/Negotiation/NegotiationValidator.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $yearsOfExperience of class Player\Player:
+				Use $player->getYearsOfExperience() instead.
+			'''
+			identifier: property.deprecated
+			count: 1
+			path: classes/Negotiation/NegotiationValidator.php
+
+		-
 			rawMessage: 'echo is banned outside View classes, Responders, and Bootstrap/Updater emitters. Move HTML/text output into a *View.php (composed by the Controller) or a Responder (composed by the ApiHandler).'
 			identifier: ibl.echoInNonView
 			count: 1
 			path: classes/NextSim/NextSimTabApiHandler.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $age of class Player\Player:
+				Use $player->getAge() instead.
+			'''
+			identifier: property.deprecated
+			count: 1
+			path: classes/NextSim/NextSimView.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $daysRemainingForInjury of class Player\Player:
+				Use $player->getDaysRemainingForInjury() instead.
+			'''
+			identifier: property.deprecated
+			count: 1
+			path: classes/NextSim/NextSimView.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $decoratedName of class Player\Player:
+				Use $player->getDecoratedName() instead.
+			'''
+			identifier: property.deprecated
+			count: 1
+			path: classes/NextSim/NextSimView.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $nameStatusClass of class Player\Player:
+				Use $player->getNameStatusClass() instead.
+			'''
+			identifier: property.deprecated
+			count: 1
+			path: classes/NextSim/NextSimView.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $playerID of class Player\Player:
+				Use $player->getPlayerID() instead.
+			'''
+			identifier: property.deprecated
+			count: 1
+			path: classes/NextSim/NextSimView.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $position of class Player\Player:
+				Use $player->getPosition() instead.
+			'''
+			identifier: property.deprecated
+			count: 1
+			path: classes/NextSim/NextSimView.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $ratingAssists of class Player\Player:
+				Use $player->getRatingAssists() instead.
+			'''
+			identifier: property.deprecated
+			count: 1
+			path: classes/NextSim/NextSimView.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $ratingBlocks of class Player\Player:
+				Use $player->getRatingBlocks() instead.
+			'''
+			identifier: property.deprecated
+			count: 1
+			path: classes/NextSim/NextSimView.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $ratingClutch of class Player\Player:
+				Use $player->getRatingClutch() instead.
+			'''
+			identifier: property.deprecated
+			count: 1
+			path: classes/NextSim/NextSimView.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $ratingConsistency of class Player\Player:
+				Use $player->getRatingConsistency() instead.
+			'''
+			identifier: property.deprecated
+			count: 1
+			path: classes/NextSim/NextSimView.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $ratingDefensiveRebounds of class Player\Player:
+				Use $player->getRatingDefensiveRebounds() instead.
+			'''
+			identifier: property.deprecated
+			count: 1
+			path: classes/NextSim/NextSimView.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $ratingDriveDefense of class Player\Player:
+				Use $player->getRatingDriveDefense() instead.
+			'''
+			identifier: property.deprecated
+			count: 1
+			path: classes/NextSim/NextSimView.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $ratingDriveOffense of class Player\Player:
+				Use $player->getRatingDriveOffense() instead.
+			'''
+			identifier: property.deprecated
+			count: 1
+			path: classes/NextSim/NextSimView.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $ratingFieldGoalAttempts of class Player\Player:
+				Use $player->getRatingFieldGoalAttempts() instead.
+			'''
+			identifier: property.deprecated
+			count: 1
+			path: classes/NextSim/NextSimView.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $ratingFieldGoalPercentage of class Player\Player:
+				Use $player->getRatingFieldGoalPercentage() instead.
+			'''
+			identifier: property.deprecated
+			count: 1
+			path: classes/NextSim/NextSimView.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $ratingFouls of class Player\Player:
+				Use $player->getRatingFouls() instead.
+			'''
+			identifier: property.deprecated
+			count: 1
+			path: classes/NextSim/NextSimView.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $ratingFreeThrowAttempts of class Player\Player:
+				Use $player->getRatingFreeThrowAttempts() instead.
+			'''
+			identifier: property.deprecated
+			count: 1
+			path: classes/NextSim/NextSimView.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $ratingFreeThrowPercentage of class Player\Player:
+				Use $player->getRatingFreeThrowPercentage() instead.
+			'''
+			identifier: property.deprecated
+			count: 1
+			path: classes/NextSim/NextSimView.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $ratingOffensiveRebounds of class Player\Player:
+				Use $player->getRatingOffensiveRebounds() instead.
+			'''
+			identifier: property.deprecated
+			count: 1
+			path: classes/NextSim/NextSimView.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $ratingOutsideDefense of class Player\Player:
+				Use $player->getRatingOutsideDefense() instead.
+			'''
+			identifier: property.deprecated
+			count: 1
+			path: classes/NextSim/NextSimView.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $ratingOutsideOffense of class Player\Player:
+				Use $player->getRatingOutsideOffense() instead.
+			'''
+			identifier: property.deprecated
+			count: 1
+			path: classes/NextSim/NextSimView.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $ratingPostDefense of class Player\Player:
+				Use $player->getRatingPostDefense() instead.
+			'''
+			identifier: property.deprecated
+			count: 1
+			path: classes/NextSim/NextSimView.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $ratingPostOffense of class Player\Player:
+				Use $player->getRatingPostOffense() instead.
+			'''
+			identifier: property.deprecated
+			count: 1
+			path: classes/NextSim/NextSimView.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $ratingSteals of class Player\Player:
+				Use $player->getRatingSteals() instead.
+			'''
+			identifier: property.deprecated
+			count: 1
+			path: classes/NextSim/NextSimView.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $ratingThreePointAttempts of class Player\Player:
+				Use $player->getRatingThreePointAttempts() instead.
+			'''
+			identifier: property.deprecated
+			count: 1
+			path: classes/NextSim/NextSimView.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $ratingThreePointPercentage of class Player\Player:
+				Use $player->getRatingThreePointPercentage() instead.
+			'''
+			identifier: property.deprecated
+			count: 1
+			path: classes/NextSim/NextSimView.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $ratingTransitionDefense of class Player\Player:
+				Use $player->getRatingTransitionDefense() instead.
+			'''
+			identifier: property.deprecated
+			count: 1
+			path: classes/NextSim/NextSimView.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $ratingTransitionOffense of class Player\Player:
+				Use $player->getRatingTransitionOffense() instead.
+			'''
+			identifier: property.deprecated
+			count: 1
+			path: classes/NextSim/NextSimView.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $ratingTurnovers of class Player\Player:
+				Use $player->getRatingTurnovers() instead.
+			'''
+			identifier: property.deprecated
+			count: 1
+			path: classes/NextSim/NextSimView.php
 
 		-
 			rawMessage: Inline `<style>` blocks are banned in PHP. Move CSS to ibl5/design/components/ and reference the stylesheet instead.
@@ -190,16 +2170,1159 @@ parameters:
 			path: classes/PageLayout/PageLayout.php
 
 		-
+			rawMessage: '''
+				Access to deprecated property $age of class Player\Player:
+				Use $player->getAge() instead.
+			'''
+			identifier: property.deprecated
+			count: 1
+			path: classes/Player/Player.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $birdYears of class Player\Player:
+				Use $player->getBirdYears() instead.
+			'''
+			identifier: property.deprecated
+			count: 1
+			path: classes/Player/Player.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $collegeName of class Player\Player:
+				Use $player->getCollegeName() instead.
+			'''
+			identifier: property.deprecated
+			count: 1
+			path: classes/Player/Player.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $contractCurrentYear of class Player\Player:
+				Use $player->getContractCurrentYear() instead.
+			'''
+			identifier: property.deprecated
+			count: 1
+			path: classes/Player/Player.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $contractTotalYears of class Player\Player:
+				Use $player->getContractTotalYears() instead.
+			'''
+			identifier: property.deprecated
+			count: 1
+			path: classes/Player/Player.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $contractYear1Salary of class Player\Player:
+				Use $player->getContractYear1Salary() instead.
+			'''
+			identifier: property.deprecated
+			count: 1
+			path: classes/Player/Player.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $contractYear2Salary of class Player\Player:
+				Use $player->getContractYear2Salary() instead.
+			'''
+			identifier: property.deprecated
+			count: 1
+			path: classes/Player/Player.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $contractYear3Salary of class Player\Player:
+				Use $player->getContractYear3Salary() instead.
+			'''
+			identifier: property.deprecated
+			count: 1
+			path: classes/Player/Player.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $contractYear4Salary of class Player\Player:
+				Use $player->getContractYear4Salary() instead.
+			'''
+			identifier: property.deprecated
+			count: 1
+			path: classes/Player/Player.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $contractYear5Salary of class Player\Player:
+				Use $player->getContractYear5Salary() instead.
+			'''
+			identifier: property.deprecated
+			count: 1
+			path: classes/Player/Player.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $contractYear6Salary of class Player\Player:
+				Use $player->getContractYear6Salary() instead.
+			'''
+			identifier: property.deprecated
+			count: 1
+			path: classes/Player/Player.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $currentSeasonSalary of class Player\Player:
+				Use $player->getCurrentSeasonSalary() instead.
+			'''
+			identifier: property.deprecated
+			count: 1
+			path: classes/Player/Player.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $daysRemainingForInjury of class Player\Player:
+				Use $player->getDaysRemainingForInjury() instead.
+			'''
+			identifier: property.deprecated
+			count: 1
+			path: classes/Player/Player.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $decoratedName of class Player\Player:
+				Use $player->getDecoratedName() instead.
+			'''
+			identifier: property.deprecated
+			count: 1
+			path: classes/Player/Player.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $draftPickNumber of class Player\Player:
+				Use $player->getDraftPickNumber() instead.
+			'''
+			identifier: property.deprecated
+			count: 1
+			path: classes/Player/Player.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $draftRound of class Player\Player:
+				Use $player->getDraftRound() instead.
+			'''
+			identifier: property.deprecated
+			count: 1
+			path: classes/Player/Player.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $draftTeamCurrentName of class Player\Player:
+				Use $player->getDraftTeamCurrentName() instead.
+			'''
+			identifier: property.deprecated
+			count: 1
+			path: classes/Player/Player.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $draftTeamOriginalName of class Player\Player:
+				Use $player->getDraftTeamOriginalName() instead.
+			'''
+			identifier: property.deprecated
+			count: 1
+			path: classes/Player/Player.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $draftYear of class Player\Player:
+				Use $player->getDraftYear() instead.
+			'''
+			identifier: property.deprecated
+			count: 1
+			path: classes/Player/Player.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $freeAgencyLoyalty of class Player\Player:
+				Use $player->getFreeAgencyLoyalty() instead.
+			'''
+			identifier: property.deprecated
+			count: 1
+			path: classes/Player/Player.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $freeAgencyPlayForWinner of class Player\Player:
+				Use $player->getFreeAgencyPlayForWinner() instead.
+			'''
+			identifier: property.deprecated
+			count: 1
+			path: classes/Player/Player.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $freeAgencyPlayingTime of class Player\Player:
+				Use $player->getFreeAgencyPlayingTime() instead.
+			'''
+			identifier: property.deprecated
+			count: 1
+			path: classes/Player/Player.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $freeAgencySecurity of class Player\Player:
+				Use $player->getFreeAgencySecurity() instead.
+			'''
+			identifier: property.deprecated
+			count: 1
+			path: classes/Player/Player.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $freeAgencyTradition of class Player\Player:
+				Use $player->getFreeAgencyTradition() instead.
+			'''
+			identifier: property.deprecated
+			count: 1
+			path: classes/Player/Player.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $heightFeet of class Player\Player:
+				Use $player->getHeightFeet() instead.
+			'''
+			identifier: property.deprecated
+			count: 1
+			path: classes/Player/Player.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $heightInches of class Player\Player:
+				Use $player->getHeightInches() instead.
+			'''
+			identifier: property.deprecated
+			count: 1
+			path: classes/Player/Player.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $historicalYear of class Player\Player:
+				Use $player->getHistoricalYear() instead.
+			'''
+			identifier: property.deprecated
+			count: 1
+			path: classes/Player/Player.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $isRetired of class Player\Player:
+				Use $player->getIsRetired() instead.
+			'''
+			identifier: property.deprecated
+			count: 1
+			path: classes/Player/Player.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $name of class Player\Player:
+				Use $player->getName() instead.
+			'''
+			identifier: property.deprecated
+			count: 1
+			path: classes/Player/Player.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $nameStatusClass of class Player\Player:
+				Use $player->getNameStatusClass() instead.
+			'''
+			identifier: property.deprecated
+			count: 1
+			path: classes/Player/Player.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $nickname of class Player\Player:
+				Use $player->getNickname() instead.
+			'''
+			identifier: property.deprecated
+			count: 1
+			path: classes/Player/Player.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $ordinal of class Player\Player:
+				Use $player->getOrdinal() instead.
+			'''
+			identifier: property.deprecated
+			count: 1
+			path: classes/Player/Player.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $playerID of class Player\Player:
+				Use $player->getPlayerID() instead.
+			'''
+			identifier: property.deprecated
+			count: 2
+			path: classes/Player/Player.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $position of class Player\Player:
+				Use $player->getPosition() instead.
+			'''
+			identifier: property.deprecated
+			count: 1
+			path: classes/Player/Player.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $ratingAssists of class Player\Player:
+				Use $player->getRatingAssists() instead.
+			'''
+			identifier: property.deprecated
+			count: 1
+			path: classes/Player/Player.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $ratingBlocks of class Player\Player:
+				Use $player->getRatingBlocks() instead.
+			'''
+			identifier: property.deprecated
+			count: 1
+			path: classes/Player/Player.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $ratingClutch of class Player\Player:
+				Use $player->getRatingClutch() instead.
+			'''
+			identifier: property.deprecated
+			count: 1
+			path: classes/Player/Player.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $ratingConsistency of class Player\Player:
+				Use $player->getRatingConsistency() instead.
+			'''
+			identifier: property.deprecated
+			count: 1
+			path: classes/Player/Player.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $ratingDefensiveRebounds of class Player\Player:
+				Use $player->getRatingDefensiveRebounds() instead.
+			'''
+			identifier: property.deprecated
+			count: 1
+			path: classes/Player/Player.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $ratingDriveDefense of class Player\Player:
+				Use $player->getRatingDriveDefense() instead.
+			'''
+			identifier: property.deprecated
+			count: 1
+			path: classes/Player/Player.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $ratingDriveOffense of class Player\Player:
+				Use $player->getRatingDriveOffense() instead.
+			'''
+			identifier: property.deprecated
+			count: 1
+			path: classes/Player/Player.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $ratingFieldGoalAttempts of class Player\Player:
+				Use $player->getRatingFieldGoalAttempts() instead.
+			'''
+			identifier: property.deprecated
+			count: 1
+			path: classes/Player/Player.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $ratingFieldGoalPercentage of class Player\Player:
+				Use $player->getRatingFieldGoalPercentage() instead.
+			'''
+			identifier: property.deprecated
+			count: 1
+			path: classes/Player/Player.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $ratingFouls of class Player\Player:
+				Use $player->getRatingFouls() instead.
+			'''
+			identifier: property.deprecated
+			count: 1
+			path: classes/Player/Player.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $ratingFreeThrowAttempts of class Player\Player:
+				Use $player->getRatingFreeThrowAttempts() instead.
+			'''
+			identifier: property.deprecated
+			count: 1
+			path: classes/Player/Player.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $ratingFreeThrowPercentage of class Player\Player:
+				Use $player->getRatingFreeThrowPercentage() instead.
+			'''
+			identifier: property.deprecated
+			count: 1
+			path: classes/Player/Player.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $ratingIntangibles of class Player\Player:
+				Use $player->getRatingIntangibles() instead.
+			'''
+			identifier: property.deprecated
+			count: 1
+			path: classes/Player/Player.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $ratingOffensiveRebounds of class Player\Player:
+				Use $player->getRatingOffensiveRebounds() instead.
+			'''
+			identifier: property.deprecated
+			count: 1
+			path: classes/Player/Player.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $ratingOutsideDefense of class Player\Player:
+				Use $player->getRatingOutsideDefense() instead.
+			'''
+			identifier: property.deprecated
+			count: 1
+			path: classes/Player/Player.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $ratingOutsideOffense of class Player\Player:
+				Use $player->getRatingOutsideOffense() instead.
+			'''
+			identifier: property.deprecated
+			count: 1
+			path: classes/Player/Player.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $ratingPostDefense of class Player\Player:
+				Use $player->getRatingPostDefense() instead.
+			'''
+			identifier: property.deprecated
+			count: 1
+			path: classes/Player/Player.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $ratingPostOffense of class Player\Player:
+				Use $player->getRatingPostOffense() instead.
+			'''
+			identifier: property.deprecated
+			count: 1
+			path: classes/Player/Player.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $ratingSkill of class Player\Player:
+				Use $player->getRatingSkill() instead.
+			'''
+			identifier: property.deprecated
+			count: 1
+			path: classes/Player/Player.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $ratingSteals of class Player\Player:
+				Use $player->getRatingSteals() instead.
+			'''
+			identifier: property.deprecated
+			count: 1
+			path: classes/Player/Player.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $ratingTalent of class Player\Player:
+				Use $player->getRatingTalent() instead.
+			'''
+			identifier: property.deprecated
+			count: 1
+			path: classes/Player/Player.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $ratingThreePointAttempts of class Player\Player:
+				Use $player->getRatingThreePointAttempts() instead.
+			'''
+			identifier: property.deprecated
+			count: 1
+			path: classes/Player/Player.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $ratingThreePointPercentage of class Player\Player:
+				Use $player->getRatingThreePointPercentage() instead.
+			'''
+			identifier: property.deprecated
+			count: 1
+			path: classes/Player/Player.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $ratingTransitionDefense of class Player\Player:
+				Use $player->getRatingTransitionDefense() instead.
+			'''
+			identifier: property.deprecated
+			count: 1
+			path: classes/Player/Player.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $ratingTransitionOffense of class Player\Player:
+				Use $player->getRatingTransitionOffense() instead.
+			'''
+			identifier: property.deprecated
+			count: 1
+			path: classes/Player/Player.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $ratingTurnovers of class Player\Player:
+				Use $player->getRatingTurnovers() instead.
+			'''
+			identifier: property.deprecated
+			count: 1
+			path: classes/Player/Player.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $salaryJSB of class Player\Player:
+				Use $player->getSalaryJSB() instead.
+			'''
+			identifier: property.deprecated
+			count: 1
+			path: classes/Player/Player.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $teamName of class Player\Player:
+				Use $player->getTeamName() instead.
+			'''
+			identifier: property.deprecated
+			count: 1
+			path: classes/Player/Player.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $teamid of class Player\Player:
+				Use $player->getTeamid() instead.
+			'''
+			identifier: property.deprecated
+			count: 1
+			path: classes/Player/Player.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $timeDroppedOnWaivers of class Player\Player:
+				Use $player->getTimeDroppedOnWaivers() instead.
+			'''
+			identifier: property.deprecated
+			count: 1
+			path: classes/Player/Player.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $weightPounds of class Player\Player:
+				Use $player->getWeightPounds() instead.
+			'''
+			identifier: property.deprecated
+			count: 1
+			path: classes/Player/Player.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $yearsOfExperience of class Player\Player:
+				Use $player->getYearsOfExperience() instead.
+			'''
+			identifier: property.deprecated
+			count: 1
+			path: classes/Player/Player.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $isRetired of class Player\Player:
+				Use $player->getIsRetired() instead.
+			'''
+			identifier: property.deprecated
+			count: 4
+			path: classes/Player/PlayerPageController.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $name of class Player\Player:
+				Use $player->getName() instead.
+			'''
+			identifier: property.deprecated
+			count: 2
+			path: classes/Player/PlayerPageController.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $teamid of class Player\Player:
+				Use $player->getTeamid() instead.
+			'''
+			identifier: property.deprecated
+			count: 1
+			path: classes/Player/PlayerPageController.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $teamid of class Player\Player:
+				Use $player->getTeamid() instead.
+			'''
+			identifier: property.deprecated
+			count: 2
+			path: classes/Player/PlayerPageService.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $playerID of class Player\Player:
+				Use $player->getPlayerID() instead.
+			'''
+			identifier: property.deprecated
+			count: 1
+			path: classes/Player/Stats/PlayerStats.php
+
+		-
 			rawMessage: 'echo is banned outside View classes, Responders, and Bootstrap/Updater emitters. Move HTML/text output into a *View.php (composed by the Controller) or a Responder (composed by the ApiHandler).'
 			identifier: ibl.echoInNonView
 			count: 68
 			path: classes/Player/Stats/Views/PlayerSeasonTableRenderer.php
 
 		-
+			rawMessage: '''
+				Access to deprecated property $age of class Player\Player:
+				Use $player->getAge() instead.
+			'''
+			identifier: property.deprecated
+			count: 1
+			path: classes/Player/Views/CardBaseStyles.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $collegeName of class Player\Player:
+				Use $player->getCollegeName() instead.
+			'''
+			identifier: property.deprecated
+			count: 1
+			path: classes/Player/Views/CardBaseStyles.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $draftPickNumber of class Player\Player:
+				Use $player->getDraftPickNumber() instead.
+			'''
+			identifier: property.deprecated
+			count: 1
+			path: classes/Player/Views/CardBaseStyles.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $draftRound of class Player\Player:
+				Use $player->getDraftRound() instead.
+			'''
+			identifier: property.deprecated
+			count: 1
+			path: classes/Player/Views/CardBaseStyles.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $draftTeamOriginalName of class Player\Player:
+				Use $player->getDraftTeamOriginalName() instead.
+			'''
+			identifier: property.deprecated
+			count: 1
+			path: classes/Player/Views/CardBaseStyles.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $draftYear of class Player\Player:
+				Use $player->getDraftYear() instead.
+			'''
+			identifier: property.deprecated
+			count: 1
+			path: classes/Player/Views/CardBaseStyles.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $heightFeet of class Player\Player:
+				Use $player->getHeightFeet() instead.
+			'''
+			identifier: property.deprecated
+			count: 1
+			path: classes/Player/Views/CardBaseStyles.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $heightInches of class Player\Player:
+				Use $player->getHeightInches() instead.
+			'''
+			identifier: property.deprecated
+			count: 1
+			path: classes/Player/Views/CardBaseStyles.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $name of class Player\Player:
+				Use $player->getName() instead.
+			'''
+			identifier: property.deprecated
+			count: 1
+			path: classes/Player/Views/CardBaseStyles.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $nickname of class Player\Player:
+				Use $player->getNickname() instead.
+			'''
+			identifier: property.deprecated
+			count: 1
+			path: classes/Player/Views/CardBaseStyles.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $position of class Player\Player:
+				Use $player->getPosition() instead.
+			'''
+			identifier: property.deprecated
+			count: 1
+			path: classes/Player/Views/CardBaseStyles.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $teamName of class Player\Player:
+				Use $player->getTeamName() instead.
+			'''
+			identifier: property.deprecated
+			count: 1
+			path: classes/Player/Views/CardBaseStyles.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $teamid of class Player\Player:
+				Use $player->getTeamid() instead.
+			'''
+			identifier: property.deprecated
+			count: 1
+			path: classes/Player/Views/CardBaseStyles.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $weightPounds of class Player\Player:
+				Use $player->getWeightPounds() instead.
+			'''
+			identifier: property.deprecated
+			count: 1
+			path: classes/Player/Views/CardBaseStyles.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $teamid of class Player\Player:
+				Use $player->getTeamid() instead.
+			'''
+			identifier: property.deprecated
+			count: 1
+			path: classes/Player/Views/PlayerTradingCardBackView.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $birdYears of class Player\Player:
+				Use $player->getBirdYears() instead.
+			'''
+			identifier: property.deprecated
+			count: 1
+			path: classes/Player/Views/PlayerTradingCardFrontView.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $freeAgencyLoyalty of class Player\Player:
+				Use $player->getFreeAgencyLoyalty() instead.
+			'''
+			identifier: property.deprecated
+			count: 1
+			path: classes/Player/Views/PlayerTradingCardFrontView.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $freeAgencyPlayForWinner of class Player\Player:
+				Use $player->getFreeAgencyPlayForWinner() instead.
+			'''
+			identifier: property.deprecated
+			count: 1
+			path: classes/Player/Views/PlayerTradingCardFrontView.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $freeAgencyPlayingTime of class Player\Player:
+				Use $player->getFreeAgencyPlayingTime() instead.
+			'''
+			identifier: property.deprecated
+			count: 1
+			path: classes/Player/Views/PlayerTradingCardFrontView.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $freeAgencySecurity of class Player\Player:
+				Use $player->getFreeAgencySecurity() instead.
+			'''
+			identifier: property.deprecated
+			count: 1
+			path: classes/Player/Views/PlayerTradingCardFrontView.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $freeAgencyTradition of class Player\Player:
+				Use $player->getFreeAgencyTradition() instead.
+			'''
+			identifier: property.deprecated
+			count: 1
+			path: classes/Player/Views/PlayerTradingCardFrontView.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $ratingAssists of class Player\Player:
+				Use $player->getRatingAssists() instead.
+			'''
+			identifier: property.deprecated
+			count: 1
+			path: classes/Player/Views/PlayerTradingCardFrontView.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $ratingBlocks of class Player\Player:
+				Use $player->getRatingBlocks() instead.
+			'''
+			identifier: property.deprecated
+			count: 1
+			path: classes/Player/Views/PlayerTradingCardFrontView.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $ratingClutch of class Player\Player:
+				Use $player->getRatingClutch() instead.
+			'''
+			identifier: property.deprecated
+			count: 1
+			path: classes/Player/Views/PlayerTradingCardFrontView.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $ratingConsistency of class Player\Player:
+				Use $player->getRatingConsistency() instead.
+			'''
+			identifier: property.deprecated
+			count: 1
+			path: classes/Player/Views/PlayerTradingCardFrontView.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $ratingDefensiveRebounds of class Player\Player:
+				Use $player->getRatingDefensiveRebounds() instead.
+			'''
+			identifier: property.deprecated
+			count: 1
+			path: classes/Player/Views/PlayerTradingCardFrontView.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $ratingDriveDefense of class Player\Player:
+				Use $player->getRatingDriveDefense() instead.
+			'''
+			identifier: property.deprecated
+			count: 1
+			path: classes/Player/Views/PlayerTradingCardFrontView.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $ratingDriveOffense of class Player\Player:
+				Use $player->getRatingDriveOffense() instead.
+			'''
+			identifier: property.deprecated
+			count: 1
+			path: classes/Player/Views/PlayerTradingCardFrontView.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $ratingFieldGoalAttempts of class Player\Player:
+				Use $player->getRatingFieldGoalAttempts() instead.
+			'''
+			identifier: property.deprecated
+			count: 1
+			path: classes/Player/Views/PlayerTradingCardFrontView.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $ratingFieldGoalPercentage of class Player\Player:
+				Use $player->getRatingFieldGoalPercentage() instead.
+			'''
+			identifier: property.deprecated
+			count: 1
+			path: classes/Player/Views/PlayerTradingCardFrontView.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $ratingFouls of class Player\Player:
+				Use $player->getRatingFouls() instead.
+			'''
+			identifier: property.deprecated
+			count: 1
+			path: classes/Player/Views/PlayerTradingCardFrontView.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $ratingFreeThrowAttempts of class Player\Player:
+				Use $player->getRatingFreeThrowAttempts() instead.
+			'''
+			identifier: property.deprecated
+			count: 1
+			path: classes/Player/Views/PlayerTradingCardFrontView.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $ratingFreeThrowPercentage of class Player\Player:
+				Use $player->getRatingFreeThrowPercentage() instead.
+			'''
+			identifier: property.deprecated
+			count: 1
+			path: classes/Player/Views/PlayerTradingCardFrontView.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $ratingIntangibles of class Player\Player:
+				Use $player->getRatingIntangibles() instead.
+			'''
+			identifier: property.deprecated
+			count: 1
+			path: classes/Player/Views/PlayerTradingCardFrontView.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $ratingOffensiveRebounds of class Player\Player:
+				Use $player->getRatingOffensiveRebounds() instead.
+			'''
+			identifier: property.deprecated
+			count: 1
+			path: classes/Player/Views/PlayerTradingCardFrontView.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $ratingOutsideDefense of class Player\Player:
+				Use $player->getRatingOutsideDefense() instead.
+			'''
+			identifier: property.deprecated
+			count: 1
+			path: classes/Player/Views/PlayerTradingCardFrontView.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $ratingOutsideOffense of class Player\Player:
+				Use $player->getRatingOutsideOffense() instead.
+			'''
+			identifier: property.deprecated
+			count: 1
+			path: classes/Player/Views/PlayerTradingCardFrontView.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $ratingPostDefense of class Player\Player:
+				Use $player->getRatingPostDefense() instead.
+			'''
+			identifier: property.deprecated
+			count: 1
+			path: classes/Player/Views/PlayerTradingCardFrontView.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $ratingPostOffense of class Player\Player:
+				Use $player->getRatingPostOffense() instead.
+			'''
+			identifier: property.deprecated
+			count: 1
+			path: classes/Player/Views/PlayerTradingCardFrontView.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $ratingSkill of class Player\Player:
+				Use $player->getRatingSkill() instead.
+			'''
+			identifier: property.deprecated
+			count: 1
+			path: classes/Player/Views/PlayerTradingCardFrontView.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $ratingSteals of class Player\Player:
+				Use $player->getRatingSteals() instead.
+			'''
+			identifier: property.deprecated
+			count: 1
+			path: classes/Player/Views/PlayerTradingCardFrontView.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $ratingTalent of class Player\Player:
+				Use $player->getRatingTalent() instead.
+			'''
+			identifier: property.deprecated
+			count: 1
+			path: classes/Player/Views/PlayerTradingCardFrontView.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $ratingThreePointAttempts of class Player\Player:
+				Use $player->getRatingThreePointAttempts() instead.
+			'''
+			identifier: property.deprecated
+			count: 1
+			path: classes/Player/Views/PlayerTradingCardFrontView.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $ratingThreePointPercentage of class Player\Player:
+				Use $player->getRatingThreePointPercentage() instead.
+			'''
+			identifier: property.deprecated
+			count: 1
+			path: classes/Player/Views/PlayerTradingCardFrontView.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $ratingTransitionDefense of class Player\Player:
+				Use $player->getRatingTransitionDefense() instead.
+			'''
+			identifier: property.deprecated
+			count: 1
+			path: classes/Player/Views/PlayerTradingCardFrontView.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $ratingTransitionOffense of class Player\Player:
+				Use $player->getRatingTransitionOffense() instead.
+			'''
+			identifier: property.deprecated
+			count: 1
+			path: classes/Player/Views/PlayerTradingCardFrontView.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $ratingTurnovers of class Player\Player:
+				Use $player->getRatingTurnovers() instead.
+			'''
+			identifier: property.deprecated
+			count: 1
+			path: classes/Player/Views/PlayerTradingCardFrontView.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $teamid of class Player\Player:
+				Use $player->getTeamid() instead.
+			'''
+			identifier: property.deprecated
+			count: 1
+			path: classes/Player/Views/PlayerTradingCardFrontView.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $yearsOfExperience of class Player\Player:
+				Use $player->getYearsOfExperience() instead.
+			'''
+			identifier: property.deprecated
+			count: 1
+			path: classes/Player/Views/PlayerTradingCardFrontView.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $draftRound of class Player\Player:
+				Use $player->getDraftRound() instead.
+			'''
+			identifier: property.deprecated
+			count: 6
+			path: classes/RookieOption/RookieOptionController.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $name of class Player\Player:
+				Use $player->getName() instead.
+			'''
+			identifier: property.deprecated
+			count: 1
+			path: classes/RookieOption/RookieOptionController.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $name of class Player\Player:
+				Use $player->getName() instead.
+			'''
+			identifier: property.deprecated
+			count: 2
+			path: classes/RookieOption/RookieOptionFormView.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $playerID of class Player\Player:
+				Use $player->getPlayerID() instead.
+			'''
+			identifier: property.deprecated
+			count: 1
+			path: classes/RookieOption/RookieOptionFormView.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $position of class Player\Player:
+				Use $player->getPosition() instead.
+			'''
+			identifier: property.deprecated
+			count: 1
+			path: classes/RookieOption/RookieOptionFormView.php
+
+		-
 			rawMessage: Casting to int something that's already int.
 			identifier: cast.useless
 			count: 3
 			path: classes/RookieOption/RookieOptionFormView.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $name of class Player\Player:
+				Use $player->getName() instead.
+			'''
+			identifier: property.deprecated
+			count: 1
+			path: classes/RookieOption/RookieOptionValidator.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $position of class Player\Player:
+				Use $player->getPosition() instead.
+			'''
+			identifier: property.deprecated
+			count: 1
+			path: classes/RookieOption/RookieOptionValidator.php
 
 		-
 			rawMessage: 'echo is banned outside View classes, Responders, and Bootstrap/Updater emitters. Move HTML/text output into a *View.php (composed by the Controller) or a Responder (composed by the ApiHandler).'
@@ -250,10 +3373,532 @@ parameters:
 			path: classes/TransactionHistory/TransactionHistoryView.php
 
 		-
+			rawMessage: '''
+				Access to deprecated property $age of class Player\Player:
+				Use $player->getAge() instead.
+			'''
+			identifier: property.deprecated
+			count: 1
+			path: classes/UI/Tables/Contracts.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $birdYears of class Player\Player:
+				Use $player->getBirdYears() instead.
+			'''
+			identifier: property.deprecated
+			count: 1
+			path: classes/UI/Tables/Contracts.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $contractCurrentYear of class Player\Player:
+				Use $player->getContractCurrentYear() instead.
+			'''
+			identifier: property.deprecated
+			count: 1
+			path: classes/UI/Tables/Contracts.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $contractYear1Salary of class Player\Player:
+				Use $player->getContractYear1Salary() instead.
+			'''
+			identifier: property.deprecated
+			count: 1
+			path: classes/UI/Tables/Contracts.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $contractYear2Salary of class Player\Player:
+				Use $player->getContractYear2Salary() instead.
+			'''
+			identifier: property.deprecated
+			count: 1
+			path: classes/UI/Tables/Contracts.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $contractYear3Salary of class Player\Player:
+				Use $player->getContractYear3Salary() instead.
+			'''
+			identifier: property.deprecated
+			count: 1
+			path: classes/UI/Tables/Contracts.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $contractYear4Salary of class Player\Player:
+				Use $player->getContractYear4Salary() instead.
+			'''
+			identifier: property.deprecated
+			count: 1
+			path: classes/UI/Tables/Contracts.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $contractYear5Salary of class Player\Player:
+				Use $player->getContractYear5Salary() instead.
+			'''
+			identifier: property.deprecated
+			count: 1
+			path: classes/UI/Tables/Contracts.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $contractYear6Salary of class Player\Player:
+				Use $player->getContractYear6Salary() instead.
+			'''
+			identifier: property.deprecated
+			count: 1
+			path: classes/UI/Tables/Contracts.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $decoratedName of class Player\Player:
+				Use $player->getDecoratedName() instead.
+			'''
+			identifier: property.deprecated
+			count: 1
+			path: classes/UI/Tables/Contracts.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $freeAgencyLoyalty of class Player\Player:
+				Use $player->getFreeAgencyLoyalty() instead.
+			'''
+			identifier: property.deprecated
+			count: 1
+			path: classes/UI/Tables/Contracts.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $freeAgencyPlayForWinner of class Player\Player:
+				Use $player->getFreeAgencyPlayForWinner() instead.
+			'''
+			identifier: property.deprecated
+			count: 1
+			path: classes/UI/Tables/Contracts.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $freeAgencyPlayingTime of class Player\Player:
+				Use $player->getFreeAgencyPlayingTime() instead.
+			'''
+			identifier: property.deprecated
+			count: 1
+			path: classes/UI/Tables/Contracts.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $freeAgencySecurity of class Player\Player:
+				Use $player->getFreeAgencySecurity() instead.
+			'''
+			identifier: property.deprecated
+			count: 1
+			path: classes/UI/Tables/Contracts.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $freeAgencyTradition of class Player\Player:
+				Use $player->getFreeAgencyTradition() instead.
+			'''
+			identifier: property.deprecated
+			count: 1
+			path: classes/UI/Tables/Contracts.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $name of class Player\Player:
+				Use $player->getName() instead.
+			'''
+			identifier: property.deprecated
+			count: 1
+			path: classes/UI/Tables/Contracts.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $nameStatusClass of class Player\Player:
+				Use $player->getNameStatusClass() instead.
+			'''
+			identifier: property.deprecated
+			count: 1
+			path: classes/UI/Tables/Contracts.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $playerID of class Player\Player:
+				Use $player->getPlayerID() instead.
+			'''
+			identifier: property.deprecated
+			count: 3
+			path: classes/UI/Tables/Contracts.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $position of class Player\Player:
+				Use $player->getPosition() instead.
+			'''
+			identifier: property.deprecated
+			count: 1
+			path: classes/UI/Tables/Contracts.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $ratingIntangibles of class Player\Player:
+				Use $player->getRatingIntangibles() instead.
+			'''
+			identifier: property.deprecated
+			count: 1
+			path: classes/UI/Tables/Contracts.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $ratingSkill of class Player\Player:
+				Use $player->getRatingSkill() instead.
+			'''
+			identifier: property.deprecated
+			count: 1
+			path: classes/UI/Tables/Contracts.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $ratingTalent of class Player\Player:
+				Use $player->getRatingTalent() instead.
+			'''
+			identifier: property.deprecated
+			count: 1
+			path: classes/UI/Tables/Contracts.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $yearsOfExperience of class Player\Player:
+				Use $player->getYearsOfExperience() instead.
+			'''
+			identifier: property.deprecated
+			count: 1
+			path: classes/UI/Tables/Contracts.php
+
+		-
 			rawMessage: 'echo is banned outside View classes, Responders, and Bootstrap/Updater emitters. Move HTML/text output into a *View.php (composed by the Controller) or a Responder (composed by the ApiHandler).'
 			identifier: ibl.echoInNonView
 			count: 53
 			path: classes/UI/Tables/Contracts.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $name of class Player\Player:
+				Use $player->getName() instead.
+			'''
+			identifier: property.deprecated
+			count: 2
+			path: classes/UI/Tables/PlayerRowTransformer.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $playerID of class Player\Player:
+				Use $player->getPlayerID() instead.
+			'''
+			identifier: property.deprecated
+			count: 1
+			path: classes/UI/Tables/PlayerRowTransformer.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $age of class Player\Player:
+				Use $player->getAge() instead.
+			'''
+			identifier: property.deprecated
+			count: 1
+			path: classes/UI/Tables/Ratings.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $daysRemainingForInjury of class Player\Player:
+				Use $player->getDaysRemainingForInjury() instead.
+			'''
+			identifier: property.deprecated
+			count: 1
+			path: classes/UI/Tables/Ratings.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $decoratedName of class Player\Player:
+				Use $player->getDecoratedName() instead.
+			'''
+			identifier: property.deprecated
+			count: 1
+			path: classes/UI/Tables/Ratings.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $nameStatusClass of class Player\Player:
+				Use $player->getNameStatusClass() instead.
+			'''
+			identifier: property.deprecated
+			count: 1
+			path: classes/UI/Tables/Ratings.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $playerID of class Player\Player:
+				Use $player->getPlayerID() instead.
+			'''
+			identifier: property.deprecated
+			count: 1
+			path: classes/UI/Tables/Ratings.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $position of class Player\Player:
+				Use $player->getPosition() instead.
+			'''
+			identifier: property.deprecated
+			count: 1
+			path: classes/UI/Tables/Ratings.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $ratingAssists of class Player\Player:
+				Use $player->getRatingAssists() instead.
+			'''
+			identifier: property.deprecated
+			count: 1
+			path: classes/UI/Tables/Ratings.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $ratingBlocks of class Player\Player:
+				Use $player->getRatingBlocks() instead.
+			'''
+			identifier: property.deprecated
+			count: 1
+			path: classes/UI/Tables/Ratings.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $ratingClutch of class Player\Player:
+				Use $player->getRatingClutch() instead.
+			'''
+			identifier: property.deprecated
+			count: 1
+			path: classes/UI/Tables/Ratings.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $ratingConsistency of class Player\Player:
+				Use $player->getRatingConsistency() instead.
+			'''
+			identifier: property.deprecated
+			count: 1
+			path: classes/UI/Tables/Ratings.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $ratingDefensiveRebounds of class Player\Player:
+				Use $player->getRatingDefensiveRebounds() instead.
+			'''
+			identifier: property.deprecated
+			count: 1
+			path: classes/UI/Tables/Ratings.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $ratingDriveDefense of class Player\Player:
+				Use $player->getRatingDriveDefense() instead.
+			'''
+			identifier: property.deprecated
+			count: 1
+			path: classes/UI/Tables/Ratings.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $ratingDriveOffense of class Player\Player:
+				Use $player->getRatingDriveOffense() instead.
+			'''
+			identifier: property.deprecated
+			count: 1
+			path: classes/UI/Tables/Ratings.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $ratingFieldGoalAttempts of class Player\Player:
+				Use $player->getRatingFieldGoalAttempts() instead.
+			'''
+			identifier: property.deprecated
+			count: 1
+			path: classes/UI/Tables/Ratings.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $ratingFieldGoalPercentage of class Player\Player:
+				Use $player->getRatingFieldGoalPercentage() instead.
+			'''
+			identifier: property.deprecated
+			count: 1
+			path: classes/UI/Tables/Ratings.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $ratingFouls of class Player\Player:
+				Use $player->getRatingFouls() instead.
+			'''
+			identifier: property.deprecated
+			count: 1
+			path: classes/UI/Tables/Ratings.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $ratingFreeThrowAttempts of class Player\Player:
+				Use $player->getRatingFreeThrowAttempts() instead.
+			'''
+			identifier: property.deprecated
+			count: 1
+			path: classes/UI/Tables/Ratings.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $ratingFreeThrowPercentage of class Player\Player:
+				Use $player->getRatingFreeThrowPercentage() instead.
+			'''
+			identifier: property.deprecated
+			count: 1
+			path: classes/UI/Tables/Ratings.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $ratingOffensiveRebounds of class Player\Player:
+				Use $player->getRatingOffensiveRebounds() instead.
+			'''
+			identifier: property.deprecated
+			count: 1
+			path: classes/UI/Tables/Ratings.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $ratingOutsideDefense of class Player\Player:
+				Use $player->getRatingOutsideDefense() instead.
+			'''
+			identifier: property.deprecated
+			count: 1
+			path: classes/UI/Tables/Ratings.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $ratingOutsideOffense of class Player\Player:
+				Use $player->getRatingOutsideOffense() instead.
+			'''
+			identifier: property.deprecated
+			count: 1
+			path: classes/UI/Tables/Ratings.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $ratingPostDefense of class Player\Player:
+				Use $player->getRatingPostDefense() instead.
+			'''
+			identifier: property.deprecated
+			count: 1
+			path: classes/UI/Tables/Ratings.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $ratingPostOffense of class Player\Player:
+				Use $player->getRatingPostOffense() instead.
+			'''
+			identifier: property.deprecated
+			count: 1
+			path: classes/UI/Tables/Ratings.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $ratingSteals of class Player\Player:
+				Use $player->getRatingSteals() instead.
+			'''
+			identifier: property.deprecated
+			count: 1
+			path: classes/UI/Tables/Ratings.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $ratingThreePointAttempts of class Player\Player:
+				Use $player->getRatingThreePointAttempts() instead.
+			'''
+			identifier: property.deprecated
+			count: 1
+			path: classes/UI/Tables/Ratings.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $ratingThreePointPercentage of class Player\Player:
+				Use $player->getRatingThreePointPercentage() instead.
+			'''
+			identifier: property.deprecated
+			count: 1
+			path: classes/UI/Tables/Ratings.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $ratingTransitionDefense of class Player\Player:
+				Use $player->getRatingTransitionDefense() instead.
+			'''
+			identifier: property.deprecated
+			count: 1
+			path: classes/UI/Tables/Ratings.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $ratingTransitionOffense of class Player\Player:
+				Use $player->getRatingTransitionOffense() instead.
+			'''
+			identifier: property.deprecated
+			count: 1
+			path: classes/UI/Tables/Ratings.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $ratingTurnovers of class Player\Player:
+				Use $player->getRatingTurnovers() instead.
+			'''
+			identifier: property.deprecated
+			count: 1
+			path: classes/UI/Tables/Ratings.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $teamColor1 of class Player\Player:
+				Use $player->getTeamColor1() instead.
+			'''
+			identifier: property.deprecated
+			count: 1
+			path: classes/UI/Tables/Ratings.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $teamColor2 of class Player\Player:
+				Use $player->getTeamColor2() instead.
+			'''
+			identifier: property.deprecated
+			count: 1
+			path: classes/UI/Tables/Ratings.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $teamName of class Player\Player:
+				Use $player->getTeamName() instead.
+			'''
+			identifier: property.deprecated
+			count: 1
+			path: classes/UI/Tables/Ratings.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $teamid of class Player\Player:
+				Use $player->getTeamid() instead.
+			'''
+			identifier: property.deprecated
+			count: 2
+			path: classes/UI/Tables/Ratings.php
 
 		-
 			rawMessage: 'echo is banned outside View classes, Responders, and Bootstrap/Updater emitters. Move HTML/text output into a *View.php (composed by the Controller) or a Responder (composed by the ApiHandler).'
@@ -262,15 +3907,169 @@ parameters:
 			path: classes/Updater/Steps/GenerateSeasonAwardsStep.php
 
 		-
+			rawMessage: '''
+				Access to deprecated property $name of class Player\Player:
+				Use $player->getName() instead.
+			'''
+			identifier: property.deprecated
+			count: 1
+			path: classes/Validation/CommonValidator.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $position of class Player\Player:
+				Use $player->getPosition() instead.
+			'''
+			identifier: property.deprecated
+			count: 1
+			path: classes/Validation/CommonValidator.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $teamName of class Player\Player:
+				Use $player->getTeamName() instead.
+			'''
+			identifier: property.deprecated
+			count: 1
+			path: classes/Validation/CommonValidator.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $name of class Player\Player:
+				Use $player->getName() instead.
+			'''
+			identifier: property.deprecated
+			count: 1
+			path: classes/Voting/VotingBallotService.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $playerID of class Player\Player:
+				Use $player->getPlayerID() instead.
+			'''
+			identifier: property.deprecated
+			count: 1
+			path: classes/Voting/VotingBallotService.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $teamName of class Player\Player:
+				Use $player->getTeamName() instead.
+			'''
+			identifier: property.deprecated
+			count: 1
+			path: classes/Voting/VotingBallotService.php
+
+		-
 			rawMessage: 'echo is banned outside View classes, Responders, and Bootstrap/Updater emitters. Move HTML/text output into a *View.php (composed by the Controller) or a Responder (composed by the ApiHandler).'
 			identifier: ibl.echoInNonView
 			count: 3
 			path: classes/Waivers/WaiversController.php
 
-		# Player facade collapse PR1: @deprecated properties trigger property.deprecated
-		# across the entire codebase. PR2 replaces this blanket ignore with a custom
-		# PHPStan rule + per-file advisory baseline for burndown tracking.
 		-
-			message: '#Access to deprecated property .+ of class Player\\Player#'
+			rawMessage: '''
+				Access to deprecated property $contractCurrentYear of class Player\Player:
+				Use $player->getContractCurrentYear() instead.
+			'''
 			identifier: property.deprecated
-			reportUnmatched: false
+			count: 1
+			path: classes/Waivers/WaiversProcessor.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $contractTotalYears of class Player\Player:
+				Use $player->getContractTotalYears() instead.
+			'''
+			identifier: property.deprecated
+			count: 1
+			path: classes/Waivers/WaiversProcessor.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $contractYear1Salary of class Player\Player:
+				Use $player->getContractYear1Salary() instead.
+			'''
+			identifier: property.deprecated
+			count: 1
+			path: classes/Waivers/WaiversProcessor.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $contractYear2Salary of class Player\Player:
+				Use $player->getContractYear2Salary() instead.
+			'''
+			identifier: property.deprecated
+			count: 1
+			path: classes/Waivers/WaiversProcessor.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $contractYear3Salary of class Player\Player:
+				Use $player->getContractYear3Salary() instead.
+			'''
+			identifier: property.deprecated
+			count: 1
+			path: classes/Waivers/WaiversProcessor.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $contractYear4Salary of class Player\Player:
+				Use $player->getContractYear4Salary() instead.
+			'''
+			identifier: property.deprecated
+			count: 1
+			path: classes/Waivers/WaiversProcessor.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $contractYear5Salary of class Player\Player:
+				Use $player->getContractYear5Salary() instead.
+			'''
+			identifier: property.deprecated
+			count: 1
+			path: classes/Waivers/WaiversProcessor.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $contractYear6Salary of class Player\Player:
+				Use $player->getContractYear6Salary() instead.
+			'''
+			identifier: property.deprecated
+			count: 1
+			path: classes/Waivers/WaiversProcessor.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $yearsOfExperience of class Player\Player:
+				Use $player->getYearsOfExperience() instead.
+			'''
+			identifier: property.deprecated
+			count: 1
+			path: classes/Waivers/WaiversProcessor.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $name of class Player\Player:
+				Use $player->getName() instead.
+			'''
+			identifier: property.deprecated
+			count: 1
+			path: classes/Waivers/WaiversService.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $playerID of class Player\Player:
+				Use $player->getPlayerID() instead.
+			'''
+			identifier: property.deprecated
+			count: 1
+			path: classes/Waivers/WaiversService.php
+
+		-
+			rawMessage: '''
+				Access to deprecated property $timeDroppedOnWaivers of class Player\Player:
+				Use $player->getTimeDroppedOnWaivers() instead.
+			'''
+			identifier: property.deprecated
+			count: 3
+			path: classes/Waivers/WaiversService.php

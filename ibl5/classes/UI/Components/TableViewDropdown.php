@@ -60,8 +60,8 @@ class TableViewDropdown implements TableViewDropdownInterface
         $this->groups = $groups;
         $this->activeValue = $activeValue;
         $this->baseUrl = $baseUrl;
-        $this->color1 = $color1;
-        $this->color2 = $color2;
+        $this->color1 = \UI\TableStyles::sanitizeColor($color1);
+        $this->color2 = \UI\TableStyles::sanitizeColor($color2);
         $this->htmxGetUrl = $htmxGetUrl;
         $this->htmxTarget = $htmxTarget;
     }

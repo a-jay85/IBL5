@@ -9,8 +9,8 @@ use Player\Player;
 use Team\Contracts\TeamQueryRepositoryInterface;
 use Team\Team;
 use Season\Season;
-use Trading\CashConsiderationRepository;
-use Trading\Contracts\CashConsiderationRepositoryInterface;
+use Trading\BuyoutLedgerRepository;
+use Trading\Contracts\BuyoutLedgerRepositoryInterface;
 
 /**
  * @phpstan-import-type PlayerRow from \Repositories\Contracts\PlayerLookupRepositoryInterface
@@ -21,22 +21,22 @@ class FreeAgencyCapCalculator
     private Team $team;
     private Season $season;
     private TeamQueryRepositoryInterface $teamQueryRepo;
-    private CashConsiderationRepositoryInterface $cashConsiderationRepo;
+    private BuyoutLedgerRepositoryInterface $cashConsiderationRepo;
 
     /**
      * @param \mysqli $mysqli_db Database connection
      * @param Team $team Team entity
      * @param Season $season Season entity
      * @param TeamQueryRepositoryInterface|null $teamQueryRepo Team query repository (created internally if not provided)
-     * @param CashConsiderationRepositoryInterface|null $cashConsiderationRepo Cash consideration repository (created internally if not provided)
+     * @param BuyoutLedgerRepositoryInterface|null $cashConsiderationRepo Cash consideration repository (created internally if not provided)
      */
-    public function __construct(\mysqli $mysqli_db, Team $team, Season $season, ?TeamQueryRepositoryInterface $teamQueryRepo = null, ?CashConsiderationRepositoryInterface $cashConsiderationRepo = null)
+    public function __construct(\mysqli $mysqli_db, Team $team, Season $season, ?TeamQueryRepositoryInterface $teamQueryRepo = null, ?BuyoutLedgerRepositoryInterface $cashConsiderationRepo = null)
     {
         $this->mysqli_db = $mysqli_db;
         $this->team = $team;
         $this->season = $season;
         $this->teamQueryRepo = $teamQueryRepo ?? new \Team\TeamQueryRepository($mysqli_db);
-        $this->cashConsiderationRepo = $cashConsiderationRepo ?? new CashConsiderationRepository($mysqli_db);
+        $this->cashConsiderationRepo = $cashConsiderationRepo ?? new BuyoutLedgerRepository($mysqli_db);
     }
 
     /**

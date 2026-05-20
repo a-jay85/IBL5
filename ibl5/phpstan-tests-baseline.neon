@@ -532,7 +532,7 @@ parameters:
 			rawMessage: Casting to int something that's already int.
 			identifier: cast.useless
 			count: 4
-			path: tests/DatabaseIntegration/CashConsiderationSalaryParityTest.php
+			path: tests/DatabaseIntegration/BuyoutLedgerSalaryParityTest.php
 
 		-
 			rawMessage: 'Call to function is_int() with int will always evaluate to true.'

@@ -8,7 +8,7 @@ use PHPUnit\Framework\Attributes\Group;
 
 use Repositories\SalaryCapRepository;
 use Repositories\TeamIdentityRepository;
-use Trading\CashConsiderationRepository;
+use Trading\BuyoutLedgerRepository;
 
 /**
  * Verifies that cash considerations in ibl_cash_considerations are correctly
@@ -20,18 +20,18 @@ use Trading\CashConsiderationRepository;
  * table structure, or salary calculation logic diverges.
  */
 #[Group('database')]
-class CashConsiderationSalaryParityTest extends DatabaseTestCase
+class BuyoutLedgerSalaryParityTest extends DatabaseTestCase
 {
     private SalaryCapRepository $commonRepo;
     private TeamIdentityRepository $teamIdentityRepo;
-    private CashConsiderationRepository $cashRepo;
+    private BuyoutLedgerRepository $cashRepo;
 
     protected function setUp(): void
     {
         parent::setUp();
         $this->commonRepo = new SalaryCapRepository($this->db);
         $this->teamIdentityRepo = new TeamIdentityRepository($this->db);
-        $this->cashRepo = new CashConsiderationRepository($this->db);
+        $this->cashRepo = new BuyoutLedgerRepository($this->db);
     }
 
     /**

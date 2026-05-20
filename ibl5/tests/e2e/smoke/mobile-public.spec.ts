@@ -39,7 +39,13 @@ const PAGES = [
   { name: 'team off/def stats', url: 'modules.php?name=TeamOffDefStats', selector: '.ibl-data-table, .ibl-title', hasWideTables: true },
   { name: 'transaction history', url: 'modules.php?name=TransactionHistory', selector: '.ibl-title, .ibl-data-table, table', hasWideTables: false },
   { name: 'search', url: 'modules.php?name=Search', selector: 'input[type="radio"]', hasWideTables: false, skipOverflow: true },
-  { name: 'boxscore', url: 'modules.php?name=Boxscore&boxid=1', selector: '.ibl-data-table, table', hasWideTables: false },
+  // 'Boxscore' is not a real module — modules.php?name=Boxscore previously passed
+  // only because the "Sorry, such file doesn't exist" fallback rendered an OpenTable
+  // wrapper that matched the `table` selector. PR2 module-dispatch lockdown
+  // (ModuleRegistry::isValid) now redirects unknown module names to index, which
+  // exposes the test as testing a non-existent module. Box scores are served as
+  // static IBL6 SvelteKit URLs or legacy box{N}.htm files (see BoxScoreUrlBuilder),
+  // never via modules.php.
   { name: 'season archive', url: 'modules.php?name=SeasonArchive', selector: '.ibl-title, .ibl-data-table, table', hasWideTables: false },
   { name: 'one-on-one game', url: 'modules.php?name=OneOnOneGame', selector: '#pid1', hasWideTables: false, skipOverflow: true },
   { name: 'topics', url: 'modules.php?name=Topics', selector: '.ibl-title, table, a', hasWideTables: false, skipOverflow: true },

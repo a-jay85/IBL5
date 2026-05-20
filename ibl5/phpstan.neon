@@ -96,3 +96,7 @@ services:
         class: PHPStanRules\BanDbTouchingNewInViewRule
         tags:
             - phpstan.rules.rule
+    -
+        class: PHPStanRules\TradingPrefixConventionRule
+        tags:
+            - phpstan.rules.rule

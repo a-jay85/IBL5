@@ -34,7 +34,7 @@ class PlayerSeasonStatsView implements PlayerSeasonStatsViewInterface
 
         ob_start();
         ?>
-<table class="stats-table">
+<table class="ibl-data-table player-view-table">
     <thead>
         <tr>
             <th>Team</th>
@@ -103,7 +103,7 @@ class PlayerSeasonStatsView implements PlayerSeasonStatsViewInterface
 
         ob_start();
         ?>
-<table class="stats-table">
+<table class="ibl-data-table player-view-table">
     <thead>
         <tr>
             <th>Team</th>

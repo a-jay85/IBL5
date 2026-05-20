@@ -83,6 +83,11 @@
     --success-400: var(--color-success-400);
     --error-400: var(--color-error-400);
 
+    /* Player page legacy colors (retro aesthetic) */
+    --player-legacy-header: #0000cc;
+    --player-legacy-danger: #ff0000;
+    --player-legacy-highlight: #ffbb00;
+
     /* ========================================================================
        Typography
        ======================================================================== */

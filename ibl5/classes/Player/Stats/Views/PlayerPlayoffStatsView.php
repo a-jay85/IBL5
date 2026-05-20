@@ -34,7 +34,7 @@ class PlayerPlayoffStatsView implements PlayerPlayoffStatsViewInterface
 
         ob_start();
         ?>
-<table class="stats-table">
+<table class="ibl-data-table player-view-table">
     <tr>
         <td class="content-header">Team</td>
         <td class="content-header">Year</td>
@@ -102,7 +102,7 @@ class PlayerPlayoffStatsView implements PlayerPlayoffStatsViewInterface
 
         ob_start();
         ?>
-<table class="stats-table">
+<table class="ibl-data-table player-view-table">
     <tr>
         <td class="content-header">Team</td>
         <td class="content-header">Year</td>

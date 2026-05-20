@@ -72,7 +72,7 @@ class PlayerAwardsView implements PlayerAwardsViewInterface
 
         ob_start();
         ?>
-<table class="awards-table">
+<table class="ibl-data-table player-view-table awards-table">
     <tr>
         <td class="content-header">Year</td>
         <td class="content-header">Award</td>

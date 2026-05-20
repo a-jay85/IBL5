@@ -79,7 +79,7 @@ class PlayerOverviewView implements PlayerOverviewViewInterface
 
         ob_start();
         ?>
-<table class="sortable player-table">
+<table class="ibl-data-table player-view-table sortable">
     <tr>
         <td colspan=22 class="player-table-header">Game Log</td>
     </tr>

@@ -43,7 +43,7 @@ class PlayerAwardsAndNewsView implements PlayerAwardsAndNewsViewInterface
 
         ob_start();
         ?>
-<table class="sortable player-table">
+<table class="ibl-data-table player-view-table sortable">
     <tr>
         <td class="player-table-header">AWARDS</td>
     </tr>

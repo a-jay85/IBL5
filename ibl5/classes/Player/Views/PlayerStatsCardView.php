@@ -64,20 +64,8 @@ class PlayerStatsCardView
      */
     public static function styleTable(string $tableHtml): string
     {
-        // Replace sortable player-table with stats-table
-        $styled = str_replace(
-            'class="sortable player-table"',
-            'class="stats-table sortable"',
-            $tableHtml
-        );
-        
-        // Also handle sim-stats-table variant
-        $styled = str_replace(
-            'class="sortable player-table sim-stats-table"',
-            'class="stats-table sortable sim-stats-table"',
-            $styled
-        );
-        
+        $styled = $tableHtml;
+
         // Replace player-table-header with stats-table-header
         $styled = str_replace(
             'class="player-table-header"',

@@ -46,7 +46,7 @@ class PlayerRegularSeasonAveragesView implements PlayerRegularSeasonAveragesView
 
         ob_start();
         ?>
-<table class="sortable player-table">
+<table class="ibl-data-table player-view-table sortable">
     <tr>
         <td colspan=21 class="player-table-header">Regular Season Averages</td>
     </tr>

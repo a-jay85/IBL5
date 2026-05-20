@@ -25,7 +25,7 @@ class WaiversProcessorTest extends TestCase
         $teamIdentityRepoStub = $this->createStub(\Repositories\Contracts\TeamIdentityRepositoryInterface::class);
         $playerLookupRepoStub = $this->createStub(\Repositories\Contracts\PlayerLookupRepositoryInterface::class);
         $validatorStub = $this->createStub(WaiversValidatorInterface::class);
-        $newsServiceStub = $this->createStub(\Topics\News\NewsService::class);
+        $newsServiceStub = $this->createStub(\Topics\News\NewsRepository::class);
         $dbStub = $this->createStub(\mysqli::class);
 
         $this->processor = new WaiversProcessor(

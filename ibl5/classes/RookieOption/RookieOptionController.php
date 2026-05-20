@@ -24,14 +24,14 @@ class RookieOptionController implements RookieOptionControllerInterface
 
     private \mysqli $db;
     private RookieOptionRepository $repository;
-    private \Topics\News\NewsService $newsService;
+    private \Topics\News\NewsRepository $newsService;
     private TeamIdentityRepositoryInterface $commonRepository;
 
     public function __construct(\mysqli $db, TeamIdentityRepositoryInterface $commonRepository)
     {
         $this->db = $db;
         $this->repository = new RookieOptionRepository($db);
-        $this->newsService = new \Topics\News\NewsService($db);
+        $this->newsService = new \Topics\News\NewsRepository($db);
         $this->commonRepository = $commonRepository;
     }
 

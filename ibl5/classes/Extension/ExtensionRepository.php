@@ -21,16 +21,16 @@ use Extension\Contracts\ExtensionRepositoryInterface;
  */
 class ExtensionRepository extends \BaseMysqliRepository implements ExtensionRepositoryInterface
 {
-    private \Topics\News\NewsService $newsService;
+    private \Topics\News\NewsRepository $newsService;
 
     /**
      * @param \mysqli $db Active mysqli connection
-     * @param \Topics\News\NewsService|null $newsService Optional NewsService injection
+     * @param \Topics\News\NewsRepository|null $newsService Optional NewsRepository injection
      */
-    public function __construct(\mysqli $db, ?\Topics\News\NewsService $newsService = null)
+    public function __construct(\mysqli $db, ?\Topics\News\NewsRepository $newsService = null)
     {
         parent::__construct($db);
-        $this->newsService = $newsService ?? new \Topics\News\NewsService($db);
+        $this->newsService = $newsService ?? new \Topics\News\NewsRepository($db);
     }
 
     /**

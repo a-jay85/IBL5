@@ -29,7 +29,7 @@ class WaiversProcessor implements WaiversProcessorInterface
     private \Repositories\Contracts\TeamIdentityRepositoryInterface $teamIdentityRepo;
     private \Repositories\Contracts\PlayerLookupRepositoryInterface $playerLookupRepo;
     private WaiversValidatorInterface $validator;
-    private \Topics\News\NewsService $newsService;
+    private \Topics\News\NewsRepository $newsService;
     private \mysqli $db;
 
     public function __construct(
@@ -37,7 +37,7 @@ class WaiversProcessor implements WaiversProcessorInterface
         \Repositories\Contracts\TeamIdentityRepositoryInterface $teamIdentityRepo,
         \Repositories\Contracts\PlayerLookupRepositoryInterface $playerLookupRepo,
         WaiversValidatorInterface $validator,
-        \Topics\News\NewsService $newsService,
+        \Topics\News\NewsRepository $newsService,
         \mysqli $db
     ) {
         $this->repository = $repository;

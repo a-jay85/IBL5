@@ -60,8 +60,11 @@ final class TestCookieOverrides
             return self::$cache;
         }
 
-        // PHP auto-decodes URL-encoded cookie values, so $raw is already decoded JSON
-        $decoded = json_decode($raw, true);
+        try {
+            $decoded = json_decode($raw, true, 512, JSON_THROW_ON_ERROR);
+        } catch (\JsonException) {
+            return self::$cache;
+        }
         if (!is_array($decoded)) {
             return self::$cache;
         }

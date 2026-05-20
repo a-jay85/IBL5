@@ -196,8 +196,12 @@ class NegotiationRepository extends BaseMysqliRepository implements NegotiationR
             return null;
         }
 
-        /** @var mixed $decoded */
-        $decoded = json_decode($row['value'], true);
+        try {
+            /** @var mixed $decoded */
+            $decoded = json_decode($row['value'], true, 512, JSON_THROW_ON_ERROR);
+        } catch (\JsonException) {
+            return null;
+        }
         if (!is_array($decoded)) {
             return null;
         }

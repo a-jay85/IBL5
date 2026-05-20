@@ -37,7 +37,7 @@ class TradeProcessor implements TradeProcessorInterface
     protected TeamIdentityRepositoryInterface $commonRepository;
     protected Season $season;
     protected CashTransactionHandler $cashHandler;
-    protected \Topics\News\NewsService $newsService;
+    protected \Topics\News\NewsRepository $newsService;
     protected ?Discord $discord;
     protected string $serverName;
 
@@ -58,7 +58,7 @@ class TradeProcessor implements TradeProcessorInterface
         $this->executionRepository = new TradeExecutionRepository($db);
         $this->season = new Season($db);
         $this->cashHandler = new CashTransactionHandler($db, $this->commonRepository, $this->cashConsiderationRepository, $this->cashRepository);
-        $this->newsService = new \Topics\News\NewsService($db);
+        $this->newsService = new \Topics\News\NewsRepository($db);
 
         // Initialize Discord with error handling
         try {
@@ -342,7 +342,7 @@ class TradeProcessor implements TradeProcessorInterface
         $categoryID = 2;
         $topicID = 31;
 
-        // NewsService handles escaping internally, so pass raw strings
+        // NewsRepository handles escaping internally, so pass raw strings
         $this->newsService->createNewsStory($categoryID, $topicID, $storytitle, $storytext);
 
         // Send email notification

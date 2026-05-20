@@ -35,7 +35,15 @@ class RequestParsingBootstrap implements BootstrapStepInterface
         if ($method === 'POST') {
             $rawBody = file_get_contents('php://input');
             if ($rawBody !== false && $rawBody !== '') {
-                $body = json_decode($rawBody, true);
+                try {
+                    $body = json_decode($rawBody, true, 512, JSON_THROW_ON_ERROR);
+                } catch (\JsonException) {
+                    /** @var JsonResponder $responder */
+                    $responder = $container->get('api.responder');
+                    $responder->error(400, 'bad_request', 'Request body must be valid JSON.');
+                    $container->set('app.terminated', true);
+                    return;
+                }
                 if (!is_array($body)) {
                     /** @var JsonResponder $responder */
                     $responder = $container->get('api.responder');

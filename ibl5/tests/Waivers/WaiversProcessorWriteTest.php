@@ -15,7 +15,7 @@ class WaiversProcessorWriteTest extends TestCase
     private \Repositories\Contracts\TeamIdentityRepositoryInterface $teamIdentityRepoStub;
     private \Repositories\Contracts\PlayerLookupRepositoryInterface $playerLookupRepoStub;
     private WaiversValidatorInterface $validatorStub;
-    private \Topics\News\NewsService $newsServiceStub;
+    private \Topics\News\NewsRepository $newsServiceStub;
     private WaiversProcessor $processor;
 
     protected function setUp(): void
@@ -24,7 +24,7 @@ class WaiversProcessorWriteTest extends TestCase
         $this->teamIdentityRepoStub = $this->createStub(\Repositories\Contracts\TeamIdentityRepositoryInterface::class);
         $this->playerLookupRepoStub = $this->createStub(\Repositories\Contracts\PlayerLookupRepositoryInterface::class);
         $this->validatorStub = $this->createStub(WaiversValidatorInterface::class);
-        $this->newsServiceStub = $this->createStub(\Topics\News\NewsService::class);
+        $this->newsServiceStub = $this->createStub(\Topics\News\NewsRepository::class);
         $dbStub = $this->createStub(\mysqli::class);
 
         $this->processor = new WaiversProcessor(

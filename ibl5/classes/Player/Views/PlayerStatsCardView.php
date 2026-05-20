@@ -57,21 +57,12 @@ class PlayerStatsCardView
     /**
      * Apply stats card styling to an existing table by adding appropriate classes
      * 
-     * This method transforms standard player-table markup to use stats-card styling.
-     * 
      * @param string $tableHtml The original table HTML
      * @return string Modified table HTML with stats-card classes
      */
     public static function styleTable(string $tableHtml): string
     {
         $styled = $tableHtml;
-
-        // Replace "sortable player-table" with "stats-table sortable" (preserves extra classes like sim-stats-table)
-        $styled = (string) preg_replace(
-            '/class="sortable player-table([^"]*)"/',
-            'class="stats-table sortable$1"',
-            $styled
-        );
 
         // Replace player-table-header with stats-table-header
         $styled = str_replace(

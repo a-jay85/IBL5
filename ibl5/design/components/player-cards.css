@@ -504,7 +504,8 @@
     border-radius: var(--pc-radius-lg) var(--pc-radius-lg) 0 0;
 }
 
-/* Column headers */
+/* Column headers — specificity must beat .ibl-data-table.player-view-table th (0,2,1) */
+.player-stats-card .ibl-data-table.player-view-table th,
 .player-stats-card table th {
     color: var(--card-accent);
     font-weight: 600;
@@ -519,7 +520,8 @@
     border-bottom: 1px solid color-mix(in srgb, var(--card-border) 30%, transparent);
 }
 
-/* Table cells */
+/* Table cells — specificity must beat .ibl-data-table.player-view-table td (0,2,1) */
+.player-stats-card .ibl-data-table.player-view-table td,
 .player-stats-card table td {
     padding: var(--pc-pad-md) var(--pc-pad-md);
     text-align: center;
@@ -595,6 +597,8 @@
         border-radius: var(--pc-radius-lg);
     }
 
+    .player-stats-card .ibl-data-table.player-view-table th,
+    .player-stats-card .ibl-data-table.player-view-table td,
     .player-stats-card table th,
     .player-stats-card table td {
         padding: 4px 4px;

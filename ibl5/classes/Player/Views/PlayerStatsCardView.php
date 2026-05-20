@@ -45,7 +45,7 @@ class PlayerStatsCardView
         if ($colorScheme === null) {
             $colorScheme = TeamColorHelper::getDefaultColorScheme();
         }
-        $html = '<div class="player-stats-card" style="' . CardBaseStyles::getCardCssProperties($colorScheme) . '">';
+        $html = '<div class="player-stats-card" tabindex="0" style="' . CardBaseStyles::getCardCssProperties($colorScheme) . '">';
         if ($statsType !== '') {
             $html .= '<div class="stats-type-indicator">' . HtmlSanitizer::e($statsType) . '</div>';
         }

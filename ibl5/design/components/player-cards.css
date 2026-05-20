@@ -479,6 +479,7 @@
 .player-stats-card .ibl-data-table.player-view-table,
 .player-stats-card table.sortable {
     width: 100%;
+    min-width: max-content;
     border-collapse: collapse;
     table-layout: auto;
     font-size: 13px;

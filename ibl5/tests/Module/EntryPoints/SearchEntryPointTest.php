@@ -29,7 +29,7 @@ class SearchEntryPointTest extends ModuleEntryPointTestCase
     public function testQlenFlagShowsErrorMessage(): void
     {
         $this->mockDb->setMockData([]);
-        $output = $this->runModule('Search', [], [], ['qlen' => '1']);
+        $output = $this->runModule('Search', ['qlen' => '1']);
 
         $this->assertNotEmpty($output);
         $this->assertStringContainsString('3 characters', $output);
@@ -38,7 +38,7 @@ class SearchEntryPointTest extends ModuleEntryPointTestCase
     public function testValidQueryExecutesSearch(): void
     {
         $this->mockDb->setMockData([]);
-        $output = $this->runModule('Search', [], [], ['query' => 'test player']);
+        $output = $this->runModule('Search', ['query' => 'test player']);
 
         $this->assertNotEmpty($output);
         $this->assertQueryExecuted('nuke_stories');
@@ -47,7 +47,7 @@ class SearchEntryPointTest extends ModuleEntryPointTestCase
     public function testEmptyQueryDoesNotSearch(): void
     {
         $this->mockDb->setMockData([]);
-        $output = $this->runModule('Search', [], [], ['query' => '']);
+        $output = $this->runModule('Search', ['query' => '']);
 
         $this->assertNotEmpty($output);
         $this->assertQueryNotExecuted('LIKE');
@@ -57,7 +57,7 @@ class SearchEntryPointTest extends ModuleEntryPointTestCase
     {
         // intval('abc') === 0, meaning no date filter applied
         $this->mockDb->setMockData([]);
-        $output = $this->runModule('Search', [], [], [
+        $output = $this->runModule('Search', [
             'query' => 'test player',
             'days' => 'abc',
         ]);
@@ -70,7 +70,7 @@ class SearchEntryPointTest extends ModuleEntryPointTestCase
     {
         // intval('invalid') === 0, meaning no topic filter
         $this->mockDb->setMockData([]);
-        $output = $this->runModule('Search', [], [], [
+        $output = $this->runModule('Search', [
             'query' => 'test player',
             'topic' => 'invalid',
         ]);
@@ -82,7 +82,7 @@ class SearchEntryPointTest extends ModuleEntryPointTestCase
     public function testTypeUsersDispatchesToUserSearch(): void
     {
         $this->mockDb->setMockData([]);
-        $output = $this->runModule('Search', [], [], [
+        $output = $this->runModule('Search', [
             'query' => 'testuser',
             'type' => 'users',
         ]);
@@ -95,7 +95,7 @@ class SearchEntryPointTest extends ModuleEntryPointTestCase
     {
         // intval('abc') === 0, meaning pagination starts at 0
         $this->mockDb->setMockData([]);
-        $output = $this->runModule('Search', [], [], [
+        $output = $this->runModule('Search', [
             'query' => 'test player',
             'min' => 'abc',
         ]);
@@ -107,7 +107,7 @@ class SearchEntryPointTest extends ModuleEntryPointTestCase
     public function testQueryWithSpecialCharsEscaped(): void
     {
         $this->mockDb->setMockData([]);
-        $output = $this->runModule('Search', [], [], ['query' => '<script>alert(1)</script>']);
+        $output = $this->runModule('Search', ['query' => '<script>alert(1)</script>']);
 
         $this->assertNotEmpty($output);
         $this->assertStringNotContainsString('<script>', $output);

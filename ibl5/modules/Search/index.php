@@ -24,15 +24,17 @@ use Search\SearchView;
 $module_name = basename(dirname(__FILE__));
 get_lang($module_name);
 
-// Collect and sanitize parameters
-$query = isset($query) ? stripslashes(check_html((string) $query, "nohtml")) : '';
-$type = isset($type) ? (string) $type : '';
-$topic = isset($topic) ? intval($topic) : 0;
-$category = isset($category) ? intval($category) : 0;
-$author = isset($author) ? (string) $author : '';
-$days = isset($days) ? intval($days) : 0;
-$min = isset($min) ? intval($min) : 0;
-$qlen = isset($qlen) ? intval($qlen) : 0;
+// Legacy globals previously populated by ConfigBootstrap::extractRequestToGlobals().
+// PR2 narrowed that extraction to a 2-key allowlist (newlang, redirect), so module
+// inputs are now read from $_REQUEST explicitly here.
+$query    = is_string($_REQUEST['query']    ?? null) ? stripslashes(check_html($_REQUEST['query'], 'nohtml')) : '';
+$type     = is_string($_REQUEST['type']     ?? null) ? $_REQUEST['type']     : '';
+$topic    = is_numeric($_REQUEST['topic']    ?? null) ? (int) $_REQUEST['topic']    : 0;
+$category = is_numeric($_REQUEST['category'] ?? null) ? (int) $_REQUEST['category'] : 0;
+$author   = is_string($_REQUEST['author']   ?? null) ? $_REQUEST['author']   : '';
+$days     = is_numeric($_REQUEST['days']     ?? null) ? (int) $_REQUEST['days']     : 0;
+$min      = is_numeric($_REQUEST['min']      ?? null) ? (int) $_REQUEST['min']      : 0;
+$qlen     = is_numeric($_REQUEST['qlen']     ?? null) ? (int) $_REQUEST['qlen']     : 0;
 
 $offset = 10;
 $max = $min + $offset;

@@ -21,24 +21,10 @@ class ConfigBootstrap implements BootstrapStepInterface
     private string $basePath;
     private bool $includeNukeConfig;
 
-    /** @var list<string> Critical globals that must never be overwritten via $_REQUEST */
-    private const PROTECTED_GLOBALS = [
-        // Database credentials (from config.php)
-        'dbhost', 'dbuname', 'dbpass', 'dbname', 'prefix', 'user_prefix',
-        // Database connection objects
-        'db', 'mysqli_db',
-        // Authentication state
-        'user', 'cookie', 'userinfo',
-        // PHP-Nuke core configuration
-        'nukeurl', 'sitename', 'adminmail',
-        // Session/superglobals
-        '_SESSION', '_COOKIE', '_SERVER', '_ENV', '_FILES', '_GET', '_POST', '_REQUEST',
-        // Internal PHP
-        'GLOBALS', 'this',
-        // League context
-        'leagueContext',
-        // Authentication service
-        'authService',
+    /** @var array<string, string> Allowlist of $_REQUEST keys that may flow into $GLOBALS, with their sanitize regex. */
+    private const ALLOWED_REQUEST_TO_GLOBALS = [
+        'newlang'  => '/^[a-z]{2}$/i',
+        'redirect' => '/^[a-z0-9]*$/i',
     ];
 
     public function __construct(string $basePath, bool $includeNukeConfig = true)
@@ -64,22 +50,12 @@ class ConfigBootstrap implements BootstrapStepInterface
 
     private function extractRequestToGlobals(): void
     {
-        /** @var array<string, string> */
-        $sanitizeRules = ['newlang' => '/[a-z][a-z]/i', 'redirect' => '/[a-z0-9]*/i'];
-
-        foreach ($_REQUEST as $key => $value) {
-            if (in_array($key, self::PROTECTED_GLOBALS, true)) {
+        foreach (self::ALLOWED_REQUEST_TO_GLOBALS as $key => $regex) {
+            if (!isset($_REQUEST[$key]) || !is_string($_REQUEST[$key])) {
                 continue;
             }
-            if (!is_string($key)) {
-                continue;
-            }
-            if (!is_string($value)) {
-                $GLOBALS[$key] = $value;
-                continue;
-            }
-            if (!isset($sanitizeRules[$key]) || preg_match($sanitizeRules[$key], $value) === 1) {
-                $GLOBALS[$key] = $value;
+            if (preg_match($regex, $_REQUEST[$key]) === 1) {
+                $GLOBALS[$key] = $_REQUEST[$key];
             }
         }
     }

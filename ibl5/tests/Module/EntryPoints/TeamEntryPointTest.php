@@ -44,7 +44,7 @@ class TeamEntryPointTest extends ModuleEntryPointTestCase
     public function testDefaultOpRendersMenu(): void
     {
         $this->mockDb->setMockData([]);
-        $output = $this->runModule('Team', [], [], ['op' => '']);
+        $output = $this->runModule('Team', ['op' => '']);
 
         $this->assertNotEmpty($output);
     }
@@ -52,7 +52,7 @@ class TeamEntryPointTest extends ModuleEntryPointTestCase
     public function testUnknownOpFallsToMenu(): void
     {
         $this->mockDb->setMockData([]);
-        $output = $this->runModule('Team', [], [], ['op' => 'bogus']);
+        $output = $this->runModule('Team', ['op' => 'bogus']);
 
         $this->assertNotEmpty($output);
     }
@@ -61,7 +61,7 @@ class TeamEntryPointTest extends ModuleEntryPointTestCase
     {
         $this->seedTeamPageMocks();
 
-        $output = $this->runModule('Team', [], [], ['op' => 'team', 'teamid' => 1]);
+        $output = $this->runModule('Team', ['op' => 'team', 'teamid' => '1']);
 
         $this->assertNotEmpty($output);
         $this->assertQueryExecuted('ibl_team_info');
@@ -72,7 +72,7 @@ class TeamEntryPointTest extends ModuleEntryPointTestCase
         $this->mockDb->setMockTeamData([]);
         $this->mockDb->setMockData([]);
 
-        $output = $this->runModule('Team', [], [], ['op' => 'team', 'teamid' => 0]);
+        $output = $this->runModule('Team', ['op' => 'team', 'teamid' => '0']);
 
         $this->assertStringContainsString('Team not found', $output);
     }
@@ -91,8 +91,6 @@ class TeamEntryPointTest extends ModuleEntryPointTestCase
         $output = $this->runModule(
             'Team',
             ['op' => 'api', 'teamid' => '1', 'display' => 'ratings'],
-            [],
-            ['op' => 'api'],
         );
 
         $this->assertNotEmpty($output);

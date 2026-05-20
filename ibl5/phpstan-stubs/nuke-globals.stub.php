@@ -92,4 +92,4 @@ function is_admin(mixed $admin = null): int { return 0; }
  * PHP-Nuke filter function — sanitizes input.
  * @return string
  */
-function filter(mixed $what, string $strip = '', mixed $save = '', string $type = ''): string { return ''; }
+function filter(mixed $what, string $strip = '', string $type = ''): string { return ''; }

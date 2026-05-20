@@ -9,6 +9,12 @@ if (!defined('MODULE_FILE')) {
 $module_name = basename(dirname(__FILE__));
 get_lang($module_name);
 
+// Legacy globals previously populated by ConfigBootstrap::extractRequestToGlobals().
+// PR2 narrowed that extraction to a 2-key allowlist (newlang, redirect), so module
+// inputs are now read from $_REQUEST explicitly here. Leave $action unset (null)
+// so the downstream `$action ?? 'add'` fallback inside waivers() still applies.
+$action = (is_string($_REQUEST['action'] ?? null) && $_REQUEST['action'] !== '') ? $_REQUEST['action'] : null;
+
 $pagetitle = "- Team Pages";
 
 /**

@@ -9,7 +9,15 @@ if (!defined('MODULE_FILE')) {
 $module_name = basename(dirname(__FILE__));
 get_lang($module_name);
 
-if (isset($username) && is_string($username) && preg_match('/[^a-zA-Z0-9_-]/', $username) === 1) {
+// Legacy globals previously populated by ConfigBootstrap::extractRequestToGlobals().
+// PR2 narrowed that extraction to a 2-key allowlist (newlang, redirect), so module
+// inputs are now read from $_REQUEST explicitly here.
+$op            = is_string($_REQUEST['op']            ?? null) ? $_REQUEST['op']            : '';
+$username      = is_string($_REQUEST['username']      ?? null) ? $_REQUEST['username']      : '';
+$user_password = is_string($_REQUEST['user_password'] ?? null) ? $_REQUEST['user_password'] : '';
+$stop          = is_string($_REQUEST['stop']          ?? null) ? $_REQUEST['stop']          : '';
+
+if ($username !== '' && preg_match('/[^a-zA-Z0-9_-]/', $username) === 1) {
     die("Illegal username...");
 }
 
@@ -25,10 +33,6 @@ $service = new \YourAccount\YourAccountService(
     (int) ($minpass ?? 5),
 );
 $accountView = new \YourAccount\YourAccountView();
-
-if (!isset($op) || !is_string($op)) {
-    $op = '';
-}
 
 switch ($op) {
     case 'logout':
@@ -52,8 +56,8 @@ switch ($op) {
             header("Location: modules.php?name={$module_name}&stop=1");
             die();
         }
-        $loginUsername = isset($username) && is_string($username) ? $username : '';
-        $loginPassword = isset($user_password) && is_string($user_password) ? stripslashes($user_password) : '';
+        $loginUsername = $username;
+        $loginPassword = $user_password !== '' ? stripslashes($user_password) : '';
         $redirectQuery = $_POST['redirect_query'] ?? '';
         if (is_string($redirectQuery) && $redirectQuery !== '') {
             $_SESSION['redirect_after_login'] = $redirectQuery;
@@ -208,7 +212,7 @@ switch ($op) {
             if (isset($_SESSION['login_error']) && is_string($_SESSION['login_error'])) {
                 $errorMessage = $_SESSION['login_error'];
                 unset($_SESSION['login_error']);
-            } elseif (isset($stop) && $stop !== '' && $stop !== false && $stop !== 0) {
+            } elseif ($stop !== '') {
                 $errorMessage = 'Login was incorrect. Please try again.';
             }
             echo $accountView->renderLoginPage($errorMessage);

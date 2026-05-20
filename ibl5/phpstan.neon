@@ -85,6 +85,14 @@ services:
         tags:
             - phpstan.rules.rule
     -
+        class: PHPStanRules\BanAddslashesRule
+        tags:
+            - phpstan.rules.rule
+    -
+        class: PHPStanRules\BanFilterSaveArgRule
+        tags:
+            - phpstan.rules.rule
+    -
         class: PHPStanRules\BanMysqliInViewClassesRule
         tags:
             - phpstan.rules.rule

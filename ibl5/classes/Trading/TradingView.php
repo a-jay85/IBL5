@@ -81,17 +81,17 @@ class TradingView implements TradingViewInterface
         <div class="team-cards-row">
             <div class="trading-layout__card">
                 <details class="trading-roster-details" open>
-                    <summary class="trading-roster-details__summary" style="--team-color-primary: #<?= HtmlSanitizer::e($userColor1) ?>; --team-color-secondary: #<?= HtmlSanitizer::e($userColor2) ?>">
+                    <summary class="trading-roster-details__summary" style="<?= TableStyles::inlineTeamVars($userColor1, $userColor2) ?>">
                         <img src="images/logo/<?= HtmlSanitizer::e($userTeamId) ?>.jpg" alt="<?= HtmlSanitizer::trusted($userTeam) ?>" class="trading-roster-details__logo">
                         <span class="trading-roster-details__chevron"></span>
                     </summary>
-                    <div class="trading-roster-details__tabs ibl-tabs" role="tablist" style="--team-tab-bg-color: #<?= HtmlSanitizer::e($userColor1) ?>; --team-tab-active-color: #<?= HtmlSanitizer::e($userColor1) ?>">
+                    <div class="trading-roster-details__tabs ibl-tabs" role="tablist" style="<?= TableStyles::inlineTeamVars($userColor1, $userColor1) ?>">
                         <button type="button" class="ibl-tab ibl-tab--active" data-panel="players" role="tab">Players</button>
                         <button type="button" class="ibl-tab" data-panel="picks" role="tab">Picks</button>
                         <button type="button" class="ibl-tab" data-panel="cash" role="tab">Cash</button>
                     </div>
                     <div class="trading-roster-details__panel trading-roster-details__panel--active" data-panel-id="players">
-                        <table class="ibl-data-table trading-roster team-table" data-team-id="<?= HtmlSanitizer::e($userTeamId) ?>" style="<?= TableStyles::inlineVars($pageData['userTeamColor1'], $pageData['userTeamColor2']) ?>">
+                        <table class="ibl-data-table trading-roster team-table" data-team-id="<?= HtmlSanitizer::e($userTeamId) ?>" style="<?= TableStyles::inlineTeamVars($pageData['userTeamColor1'], $pageData['userTeamColor2']) ?>">
                             <colgroup>
                                 <col class="trading-col--checkbox">
                                 <col>
@@ -127,17 +127,17 @@ class TradingView implements TradingViewInterface
                 <input type="hidden" name="switchCounter" value="<?= HtmlSanitizer::e($switchCounter) ?>">
                 <input type="hidden" name="listeningTeam" value="<?= HtmlSanitizer::trusted($partnerTeam) ?>">
                 <details class="trading-roster-details" open>
-                    <summary class="trading-roster-details__summary" style="--team-color-primary: #<?= HtmlSanitizer::e($partnerColor1) ?>; --team-color-secondary: #<?= HtmlSanitizer::e($partnerColor2) ?>">
+                    <summary class="trading-roster-details__summary" style="<?= TableStyles::inlineTeamVars($partnerColor1, $partnerColor2) ?>">
                         <img src="images/logo/<?= HtmlSanitizer::e($partnerTeamId) ?>.jpg" alt="<?= HtmlSanitizer::trusted($partnerTeam) ?>" class="trading-roster-details__logo">
                         <span class="trading-roster-details__chevron"></span>
                     </summary>
-                    <div class="trading-roster-details__tabs ibl-tabs" role="tablist" style="--team-tab-bg-color: #<?= HtmlSanitizer::e($partnerColor1) ?>; --team-tab-active-color: #<?= HtmlSanitizer::e($partnerColor1) ?>">
+                    <div class="trading-roster-details__tabs ibl-tabs" role="tablist" style="<?= TableStyles::inlineTeamVars($partnerColor1, $partnerColor1) ?>">
                         <button type="button" class="ibl-tab ibl-tab--active" data-panel="players" role="tab">Players</button>
                         <button type="button" class="ibl-tab" data-panel="picks" role="tab">Picks</button>
                         <button type="button" class="ibl-tab" data-panel="cash" role="tab">Cash</button>
                     </div>
                     <div class="trading-roster-details__panel trading-roster-details__panel--active" data-panel-id="players">
-                        <table class="ibl-data-table trading-roster team-table" data-team-id="<?= HtmlSanitizer::e($partnerTeamId) ?>" style="<?= TableStyles::inlineVars($pageData['partnerTeamColor1'], $pageData['partnerTeamColor2']) ?>">
+                        <table class="ibl-data-table trading-roster team-table" data-team-id="<?= HtmlSanitizer::e($partnerTeamId) ?>" style="<?= TableStyles::inlineTeamVars($pageData['partnerTeamColor1'], $pageData['partnerTeamColor2']) ?>">
                             <colgroup>
                                 <col class="trading-col--checkbox">
                                 <col>
@@ -494,7 +494,7 @@ $tradeConfig = [
         <div class="trade-roster-preview__title">Roster Preview</div>
         <img src="images/logo/new<?= HtmlSanitizer::e($partnerTeamId) ?>.png" alt="<?= HtmlSanitizer::trusted($partnerTeam) ?>" class="trade-roster-preview__logo" data-team-id="<?= HtmlSanitizer::e($partnerTeamId) ?>">
     </div>
-    <div class="trade-roster-preview__tabs ibl-tabs" role="tablist" style="--team-tab-bg-color: #<?= HtmlSanitizer::e($safeUserColor) ?>; --team-tab-active-color: #<?= HtmlSanitizer::e($safeUserColor) ?>">
+    <div class="trade-roster-preview__tabs ibl-tabs" role="tablist" style="<?= TableStyles::inlineTeamVars($safeUserColor, $safeUserColor) ?>">
         <button type="button" class="ibl-tab ibl-tab--active" data-display="ratings" role="tab">Ratings</button>
         <button type="button" class="ibl-tab" data-display="total_s" role="tab">Totals</button>
         <button type="button" class="ibl-tab" data-display="avg_s" role="tab">Averages</button>
@@ -616,7 +616,7 @@ $tradeConfig = [
         <div class="trade-roster-preview__title">Roster Preview</div>
         <img src="images/logo/new<?= HtmlSanitizer::e($toTeamId) ?>.png" alt="To Team" class="trade-roster-preview__logo<?= $initialTeamId === $toTeamId ? ' trade-roster-preview__logo--active' : '' ?>" data-team-id="<?= HtmlSanitizer::e($toTeamId) ?>">
     </div>
-    <div class="trade-roster-preview__tabs ibl-tabs" role="tablist" style="--team-tab-bg-color: #<?= HtmlSanitizer::e($initialColor) ?>; --team-tab-active-color: #<?= HtmlSanitizer::e($initialColor) ?>">
+    <div class="trade-roster-preview__tabs ibl-tabs" role="tablist" style="<?= TableStyles::inlineTeamVars($initialColor, $initialColor) ?>">
         <button type="button" class="ibl-tab ibl-tab--active" data-display="ratings" role="tab">Ratings</button>
         <button type="button" class="ibl-tab" data-display="total_s" role="tab">Totals</button>
         <button type="button" class="ibl-tab" data-display="avg_s" role="tab">Averages</button>

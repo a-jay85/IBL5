@@ -111,7 +111,7 @@ class TeamService implements TeamServiceInterface
      */
     private function renderTeamInfoRight(Team $team): array
     {
-        $teamColorStyle = \UI\TableStyles::inlineVars($team->color1, $team->color2);
+        $teamColorStyle = \UI\TableStyles::inlineTeamVars($team->color1, $team->color2);
 
         $sidebarView = new SidebarView();
 

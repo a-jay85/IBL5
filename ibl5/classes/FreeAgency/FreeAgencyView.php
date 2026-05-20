@@ -80,7 +80,7 @@ class FreeAgencyView
         ?>
 <div class="table-scroll-wrapper">
 <div class="table-scroll-container" tabindex="0" role="region" aria-label="Players under contract">
-<table class="ibl-data-table team-table fa-table sortable" style="<?= \UI\TableStyles::inlineVars($team->color1, $team->color2) ?>">
+<table class="ibl-data-table team-table fa-table sortable" style="<?= \UI\TableStyles::inlineTeamVars($team->color1, $team->color2) ?>">
     <?= HtmlSanitizer::trusted($this->renderColgroups(false, false)) ?>
     <?= HtmlSanitizer::trusted($this->renderTableHeader('Players Under Contract', false, $team, false, false, $season)) ?>
     <tbody>
@@ -181,7 +181,7 @@ class FreeAgencyView
         ?>
 <div class="table-scroll-wrapper">
 <div class="table-scroll-container" tabindex="0" role="region" aria-label="Contract offers">
-<table class="ibl-data-table team-table fa-table sortable" style="<?= \UI\TableStyles::inlineVars($team->color1, $team->color2) ?>">
+<table class="ibl-data-table team-table fa-table sortable" style="<?= \UI\TableStyles::inlineTeamVars($team->color1, $team->color2) ?>">
     <?= HtmlSanitizer::trusted($this->renderColgroups(false)) ?>
     <?= HtmlSanitizer::trusted($this->renderTableHeader('Contract Offers', false, $team, false, true, $season)) ?>
     <tbody>
@@ -238,7 +238,7 @@ class FreeAgencyView
         ?>
 <div class="table-scroll-wrapper">
 <div class="table-scroll-container" tabindex="0" role="region" aria-label="Unsigned free agents">
-<table class="ibl-data-table team-table fa-table sortable" style="<?= \UI\TableStyles::inlineVars($team->color1, $team->color2) ?>">
+<table class="ibl-data-table team-table fa-table sortable" style="<?= \UI\TableStyles::inlineTeamVars($team->color1, $team->color2) ?>">
     <?= HtmlSanitizer::trusted($this->renderColgroups(false)) ?>
     <?= HtmlSanitizer::trusted($this->renderTableHeader('Unsigned Free Agents', true, $team, false, true, $season)) ?>
     <tbody>
@@ -285,7 +285,7 @@ class FreeAgencyView
         ?>
 <div class="sticky-scroll-wrapper page-sticky">
 <div class="sticky-scroll-container">
-<table class="ibl-data-table team-table fa-table sticky-table sortable" style="<?= \UI\TableStyles::inlineVars('666666', 'ffffff') ?>">
+<table class="ibl-data-table team-table fa-table sticky-table sortable" style="<?= \UI\TableStyles::inlineTeamVars('666666', 'ffffff') ?>">
     <?= HtmlSanitizer::trusted($this->renderColgroups()) ?>
     <?= HtmlSanitizer::trusted($this->renderTableHeader('All Other Free Agents', false, $team, true, true, $season)) ?>
     <tbody>

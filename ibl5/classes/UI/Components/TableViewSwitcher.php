@@ -104,7 +104,7 @@ class TableViewSwitcher implements TableViewSwitcherInterface
             $tabLinks .= $this->buildTab($tabKey, $tabLabel);
         }
 
-        return '<div class="ibl-tabs" style="--team-tab-bg-color: #' . $this->color1 . '; --team-tab-active-color: #' . $this->color2 . '">' . $tabLinks . '</div>';
+        return '<div class="ibl-tabs" style="' . \UI\TableStyles::inlineTeamVars($this->color1, $this->color2) . '">' . $tabLinks . '</div>';
     }
 
     /**

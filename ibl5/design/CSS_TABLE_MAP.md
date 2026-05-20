@@ -157,6 +157,57 @@ These are used inside multiple table types.
 </div>
 ```
 
+## Team-Color CSS Custom Properties
+
+Canonical pair: `--team-color-primary` / `--team-color-secondary`
+
+All team-colored elements must emit these via `TableStyles::inlineTeamVars($color1, $color2)`, which sanitizes through a hex allow-list (`sanitizeColor()`). Do NOT emit team-color CSS variables directly — always route through `inlineTeamVars()`.
+
+### Alias mapping (defined in `tokens/tokens.css`)
+
+Legacy variable names are mapped to the canonical pair via CSS aliases on any element with `style*="--team-color-primary"`:
+
+| Legacy name | Maps to | Consumed by |
+|---|---|---|
+| `--team-tab-bg-color` | `var(--team-color-primary)` | `navigation.css`, `team-splits.css` |
+| `--team-tab-active-color` | `var(--team-color-secondary)` | `navigation.css`, `team-splits.css` |
+| `--team-primary` | `var(--team-color-primary)` | `schedule.css` |
+| `--team-secondary` | `var(--team-color-secondary)` | `schedule.css` |
+| `--banner-primary` | `var(--team-color-primary)` | `banners.css` |
+| `--banner-secondary` | `var(--team-color-secondary)` | `banners.css` |
+
+### Cell-scope variables (intentionally separate)
+
+`--team-cell-bg` / `--team-cell-color` are scoped to individual `<td>` cells via `TeamCellHelper::renderTeamCell()`. They use `TableStyles::sanitizeColor()` directly and remain separate from the container-level canonical pair because they target a different element scope.
+
+## Per-Feature CSS Partials
+
+Module-specific table styles live in `design/components/tables/<feature>.css`. Each file wraps its rules in `@layer components { ... }` and is imported via `design/input.css` immediately after `tables.css`.
+
+| File | Covers |
+|------|--------|
+| `tables/season-highs.css` | `.stat-table`, `.season-highs-discrepancy-panel` |
+| `tables/voting.css` | `.voting-results-table`, `.voting-form-table`, `.voting-submission-feedback` |
+| `tables/trading.css` | Trading module tables (`.trade-table`, `.trade-offer-table`, etc.) |
+| `tables/draft-history.css` | `.draft-history-table` |
+| `tables/league-stats.css` | `.league-stats-table` |
+| `tables/contact-list.css` | `.contact-table` |
+| `tables/transaction-history.css` | `.transaction-history-table` |
+| `tables/depth-chart.css` | Depth Chart table mobile rules extracted from `tables.css` |
+| `tables/draft-pick-locator.css` | `.draft-pick-table` |
+| `tables/record-holders.css` | `.record-holders-table` |
+| `tables/projected-draft-order.css` | `.projected-draft-order-table` |
+| `tables/player-movement.css` | `.player-movement-table` |
+| `tables/franchise-record-book.css` | `.record-book-*` selectors |
+| `tables/free-agency.css` | `.fa-table`, `.fa-*` selectors |
+
+### When to add a new module file
+
+If a new module needs table styling beyond `.ibl-data-table` base:
+1. Create `design/components/tables/<module>.css` with `@layer components { ... }`.
+2. Add `@import './components/tables/<module>.css';` in `design/input.css` after the existing `tables/` import block.
+3. Add a row to this table.
+
 ## Key Gotchas
 
 ### Sticky positioning and overflow

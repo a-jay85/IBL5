@@ -36,7 +36,7 @@ class BannersView
             return '';
         }
 
-        return '<div class="banners-container" style="--banner-primary: #' . HtmlSanitizer::e($color1) . '; --banner-secondary: #' . HtmlSanitizer::e($color2) . ';">'
+        return '<div class="banners-container" style="' . \UI\TableStyles::inlineTeamVars($color1, $color2) . '">'
             . '<div class="banners-header"><h2>' . HtmlSanitizer::e($teamName) . ' Banners</h2></div>'
             . $bannerOutput . '</div>';
     }

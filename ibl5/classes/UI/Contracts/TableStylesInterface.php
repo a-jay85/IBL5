@@ -16,7 +16,7 @@ interface TableStylesInterface
      * @param string $teamColor2 Secondary team color (hex without #)
      * @return string Inline style value (e.g. "--team-color-primary: #1e3a5f; --team-color-secondary: #D4AF37;")
      */
-    public static function inlineVars(string $teamColor, string $teamColor2): string;
+    public static function inlineTeamVars(string $teamColor, string $teamColor2): string;
 
     /**
      * Sanitize color value to prevent injection

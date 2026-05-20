@@ -62,7 +62,7 @@ test.describe('Team Schedule — team colors', () => {
     await appState({ 'Current Season Phase': 'Regular Season' });
     await page.goto(TEAM_SCHEDULE_URL);
     const html = await page.content();
-    expect(html).toContain('--team-primary');
+    expect(html).toContain('--team-color-primary');
   });
 });
 

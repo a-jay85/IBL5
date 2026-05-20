@@ -238,7 +238,7 @@ window.IBL_initNextSimHighlight();
 
         ob_start();
         ?>
-<table class="ibl-data-table team-table responsive-table" style="<?= TableStyles::inlineVars($userTeam->color1, $userTeam->color2) ?>">
+<table class="ibl-data-table team-table responsive-table" style="<?= TableStyles::inlineTeamVars($userTeam->color1, $userTeam->color2) ?>">
 <colgroup span="2"></colgroup><colgroup span="2"></colgroup><colgroup span="6"></colgroup><colgroup span="6"></colgroup><colgroup span="4"></colgroup><colgroup span="4"></colgroup><colgroup span="1"></colgroup>
     <thead>
         <tr>
@@ -295,7 +295,7 @@ window.IBL_initNextSimHighlight();
     {
         $isUserRow = ($gameData === null);
         $rowClass = $isUserRow ? 'next-sim-row--user' : 'next-sim-row--opponent';
-        $rowStyle = TableStyles::inlineVars($team->color1, $team->color2);
+        $rowStyle = TableStyles::inlineTeamVars($team->color1, $team->color2);
 
         $injuryReturnDate = $player->getInjuryReturnDate($this->season->lastSimEndDate);
         $injuryDays = $player->daysRemainingForInjury ?? 0;

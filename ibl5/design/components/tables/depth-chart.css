@@ -1,0 +1,59 @@
+@layer components {
+
+/* ==========================================================================
+   Depth Chart Table
+
+   Overrides for .ibl-data-table on the Depth Chart page.
+   Source: class="depth-chart-table ibl-data-table"
+   Only unique overrides — redundant base-table properties removed.
+   ========================================================================== */
+
+.depth-chart-table {
+    max-width: none;
+    margin-bottom: 1rem;
+}
+
+.depth-chart-table td {
+    padding: 0.25rem;
+    border-bottom: 1px solid var(--gray-100);
+}
+
+.depth-chart-table td:first-child,
+.depth-chart-table td:last-child {
+    padding: 0.25rem;
+}
+
+.depth-chart-table select {
+    padding: 0.25rem;
+    border: 1px solid var(--gray-300);
+    border-radius: var(--radius-sm);
+    font-size: var(--text-sm);
+}
+
+/* Minutes number input — matches the role-slot select's size/appearance.
+   The native browser stepper sits to the right of the digits. */
+.depth-chart-table input[type="number"].dc-minutes-input {
+    padding: 0.25rem;
+    border: 1px solid var(--gray-300);
+    border-radius: var(--radius-sm);
+    font-size: var(--text-sm);
+    width: 4rem;
+    text-align: center;
+}
+
+/* Active checkbox cell — centered horizontally and vertically. */
+.depth-chart-table td.dc-active-cell {
+    text-align: center;
+    vertical-align: middle;
+}
+
+.depth-chart-table input[type="checkbox"].dc-active-cb {
+    display: block;
+    width: 1.125rem;
+    height: 1.125rem;
+    margin: 0 auto;
+    cursor: pointer;
+    accent-color: var(--color-accent-500);
+}
+
+} /* end @layer components */

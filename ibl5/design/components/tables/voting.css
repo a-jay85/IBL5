@@ -1,0 +1,137 @@
+@layer components {
+
+/* ==========================================================================
+   Voting Results Table
+
+   Narrower table optimized for vote counts (two columns: Player, Votes).
+   Centers on the page with constrained width.
+   ========================================================================== */
+
+.voting-results-table {
+    max-width: 420px;
+}
+
+.voting-results-table th,
+.voting-results-table td {
+    text-align: left;
+}
+
+.voting-results-table th:last-child,
+.voting-results-table td:last-child {
+    text-align: right;
+}
+
+/* ==========================================================================
+   Voting Form Table
+
+   Wide table for voting ballots with player stats. Features:
+   - Checkbox/radio inputs for vote selection
+   - Sticky name column on mobile for context while scrolling
+   - Collapsible sections for each voting category
+   ========================================================================== */
+
+.voting-form-container {
+    text-align: center;
+    max-width: 100%;
+}
+
+.voting-form-table {
+    margin: 0 auto var(--space-6);
+}
+
+.voting-form-table th,
+.voting-form-table td {
+    text-align: center;
+    white-space: nowrap;
+    padding: 0.5rem 0.375rem;
+}
+
+/* Voting input cells */
+.voting-form-table input[type="checkbox"],
+.voting-form-table input[type="radio"] {
+    width: 1.125rem;
+    height: 1.125rem;
+    accent-color: var(--accent-500);
+    cursor: pointer;
+}
+
+/* Voting category header (collapsible trigger) */
+.voting-category {
+    cursor: pointer;
+    margin: var(--space-4) 0;
+    padding: var(--space-3);
+    background: var(--gray-50);
+    border-radius: var(--radius-md);
+    transition: background-color var(--transition-fast);
+}
+
+.voting-category:hover {
+    background: var(--gray-100);
+}
+
+.voting-category-title {
+    margin: 0;
+    display: block;
+    text-align: center;
+    border-bottom: none;
+    padding-bottom: 0;
+}
+
+.voting-category-instruction {
+    margin: var(--space-1) 0 0 0;
+    font-size: 1rem;
+    font-style: italic;
+    color: var(--gray-500);
+}
+
+/* Mobile adjustments for voting form - keep full table display */
+@media (max-width: 768px) {
+    .voting-category {
+        padding: var(--space-2);
+    }
+
+    .voting-category-title {
+        font-size: var(--text-xl);
+    }
+
+    /* Override mobile table reductions - keep full size for voting tables */
+    .voting-form-table th,
+    .voting-form-table td {
+        font-size: 1rem;
+        padding: 0.5rem 0.375rem;
+    }
+
+    /* Ensure voting results tables also stay full size */
+    .voting-results-table th,
+    .voting-results-table td {
+        font-size: 1rem;
+        padding: 0.5rem 0.375rem;
+    }
+}
+
+/* ==========================================================================
+   Voting Submission Feedback
+
+   Styles for vote submission confirmation and error pages.
+   ========================================================================== */
+
+.voting-submission-error {
+    color: var(--error-600);
+    font-weight: 600;
+    margin: var(--space-2) 0;
+}
+
+.voting-submission-success {
+    margin: var(--space-4) 0;
+}
+
+.voting-submission-confirmation {
+    max-width: 600px;
+    margin: 0 auto;
+}
+
+.voting-submission-confirmation p {
+    margin: var(--space-1) 0;
+}
+
+} /* end @layer components */

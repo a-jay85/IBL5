@@ -91,8 +91,8 @@ final class RequireEscapedOutputRule implements Rule
         'Security\CsrfGuard::generateToken',
         'AlertRenderer::fromCode',
         'UI\AlertRenderer::fromCode',
-        'TableStyles::inlineVars',
-        'UI\TableStyles::inlineVars',
+        'TableStyles::inlineTeamVars',
+        'UI\TableStyles::inlineTeamVars',
     ];
 
     /**

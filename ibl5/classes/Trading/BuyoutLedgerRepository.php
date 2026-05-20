@@ -5,20 +5,20 @@ declare(strict_types=1);
 namespace Trading;
 
 use BaseMysqliRepository;
-use Trading\Contracts\CashConsiderationRepositoryInterface;
+use Trading\Contracts\BuyoutLedgerRepositoryInterface;
 
 /**
  * Repository for ibl_cash_considerations table.
  *
- * @see CashConsiderationRepositoryInterface For method contracts
+ * @see BuyoutLedgerRepositoryInterface For method contracts
  *
- * @phpstan-import-type CashConsiderationRow from CashConsiderationRepositoryInterface
- * @phpstan-import-type CashConsiderationInsert from CashConsiderationRepositoryInterface
+ * @phpstan-import-type CashConsiderationRow from BuyoutLedgerRepositoryInterface
+ * @phpstan-import-type CashConsiderationInsert from BuyoutLedgerRepositoryInterface
  */
-class CashConsiderationRepository extends BaseMysqliRepository implements CashConsiderationRepositoryInterface
+class BuyoutLedgerRepository extends BaseMysqliRepository implements BuyoutLedgerRepositoryInterface
 {
     /**
-     * @see CashConsiderationRepositoryInterface::insertCashConsideration()
+     * @see BuyoutLedgerRepositoryInterface::insertCashConsideration()
      */
     public function insertCashConsideration(array $data): int
     {
@@ -56,7 +56,7 @@ class CashConsiderationRepository extends BaseMysqliRepository implements CashCo
     }
 
     /**
-     * @see CashConsiderationRepositoryInterface::getTeamCashConsiderations()
+     * @see BuyoutLedgerRepositoryInterface::getTeamCashConsiderations()
      */
     public function getTeamCashConsiderations(int $teamId): array
     {
@@ -69,7 +69,7 @@ class CashConsiderationRepository extends BaseMysqliRepository implements CashCo
     }
 
     /**
-     * @see CashConsiderationRepositoryInterface::getTeamBuyouts()
+     * @see BuyoutLedgerRepositoryInterface::getTeamBuyouts()
      */
     public function getTeamBuyouts(int $teamId): array
     {
@@ -82,7 +82,7 @@ class CashConsiderationRepository extends BaseMysqliRepository implements CashCo
     }
 
     /**
-     * @see CashConsiderationRepositoryInterface::getTeamCashForSalary()
+     * @see BuyoutLedgerRepositoryInterface::getTeamCashForSalary()
      */
     public function getTeamCashForSalary(int $teamId): array
     {
@@ -97,7 +97,7 @@ class CashConsiderationRepository extends BaseMysqliRepository implements CashCo
     }
 
     /**
-     * @see CashConsiderationRepositoryInterface::deleteExpiredCashConsiderations()
+     * @see BuyoutLedgerRepositoryInterface::deleteExpiredCashConsiderations()
      */
     public function deleteExpiredCashConsiderations(): int
     {

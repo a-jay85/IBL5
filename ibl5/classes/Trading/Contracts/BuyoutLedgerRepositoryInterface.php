@@ -45,7 +45,7 @@ namespace Trading\Contracts;
  *     salary_yr6: int
  * }
  */
-interface CashConsiderationRepositoryInterface
+interface BuyoutLedgerRepositoryInterface
 {
     /**
      * Insert a new cash consideration or buyout entry.

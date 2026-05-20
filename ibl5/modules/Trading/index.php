@@ -2,12 +2,6 @@
 
 declare(strict_types=1);
 
-use Trading\TradeOfferRepository;
-use Trading\TradeAssetRepository;
-use Trading\TradeFormRepository;
-use Trading\TradingService;
-use Trading\TradingView;
-
 if (stripos($_SERVER['PHP_SELF'], "modules.php") === false) {
     die("You can't access this file directly...");
 }
@@ -17,114 +11,34 @@ get_lang($module_name);
 
 $pagetitle = "- Team Pages";
 
-global $mysqli_db, $commonRepository;
-$commonRepository = new \Repositories\TeamIdentityRepository($mysqli_db);
+global $mysqli_db;
 
-function tradeoffer($username)
-{
-    global $partner, $mysqli_db, $commonRepository;
-
-    $offerRepository = new TradeOfferRepository($mysqli_db, $_SERVER['SERVER_NAME'] ?? '');
-    $assetRepository = new TradeAssetRepository($mysqli_db);
-    $formRepository = new TradeFormRepository($mysqli_db);
-    $service = new TradingService($offerRepository, $assetRepository, $formRepository, $commonRepository, $mysqli_db);
-    $view = new TradingView();
-
-    $pageData = $service->getTradeOfferPageData($username, $partner);
-    $pageData['result'] = $_GET['result'] ?? null;
-    $pageData['error'] = $_GET['error'] ?? null;
-
-    // Restore previous form selections from session (after a failed trade attempt)
-    $pageData['previousFormData'] = $_SESSION['tradeFormData'] ?? null;
-    unset($_SESSION['tradeFormData']);
-
-    PageLayout\PageLayout::header();
-    echo $view->renderTradeOfferForm($pageData);
-    PageLayout\PageLayout::footer();
-}
-
-function tradereview($username)
-{
-    global $mysqli_db, $commonRepository;
-
-    $offerRepository = new TradeOfferRepository($mysqli_db, $_SERVER['SERVER_NAME'] ?? '');
-    $assetRepository = new TradeAssetRepository($mysqli_db);
-    $formRepository = new TradeFormRepository($mysqli_db);
-    $service = new TradingService($offerRepository, $assetRepository, $formRepository, $commonRepository, $mysqli_db);
-    $view = new TradingView();
-
-    $pageData = $service->getTradeReviewPageData($username);
-    $pageData['result'] = $_GET['result'] ?? null;
-    $pageData['error'] = $_GET['error'] ?? null;
-
-    PageLayout\PageLayout::header();
-    echo $view->renderTradeReview($pageData);
-    PageLayout\PageLayout::footer();
-}
-
-function reviewtrade($user)
-{
-    global $mysqli_db;
-    $season = new \Season\Season($mysqli_db);
-
-    if (!is_user($user)) {
-        loginbox();
-    } else {
-        if ($season->areTradesAllowed()) {
-            global $cookie;
-            cookiedecode($user);
-            tradereview(strval($cookie[1] ?? ''));
-        } else {
-            $view = new TradingView();
-            PageLayout\PageLayout::header();
-            echo $view->renderTradesClosed($season);
-            PageLayout\PageLayout::footer();
-        }
-    }
-}
-
-function offertrade($user)
-{
-    if (!is_user($user)) {
-        loginbox();
-    } else {
-        global $cookie;
-        cookiedecode($user);
-        tradeoffer(strval($cookie[1] ?? ''));
-    }
-}
+$serverName = $_SERVER['SERVER_NAME'] ?? '';
+$teamIdentityRepo = new \Repositories\TeamIdentityRepository($mysqli_db);
+$offerRepo = new \Trading\TradeOfferRepository($mysqli_db, $serverName);
+$assetRepo = new \Trading\TradeAssetRepository($mysqli_db);
+$formRepo = new \Trading\TradeFormRepository($mysqli_db);
+$service = new \Trading\TradingService($offerRepo, $assetRepo, $formRepo, $teamIdentityRepo, $mysqli_db);
+$processor = new \Trading\TradeProcessor($mysqli_db, $teamIdentityRepo, $serverName, $offerRepo, $assetRepo);
+$tradeOffer = new \Trading\TradeOffer($mysqli_db, $teamIdentityRepo, $serverName);
+$view = new \Trading\TradingView();
+$nukeCompat = new \Utilities\NukeCompat();
+$controller = new \Trading\TradingController(
+    $service, $processor, $offerRepo, $tradeOffer, $view,
+    $teamIdentityRepo, $nukeCompat, $mysqli_db
+);
 
 switch ($op) {
     case "reviewtrade":
-        reviewtrade($user);
+        $controller->handleTradeReview($user);
         break;
-
     case "offertrade":
-        offertrade($user);
+        $controller->handleTradeOffer($user, $partner ?? null);
         break;
-
     case "roster-preview-api":
-        if (!is_user($user)) {
-            header('Content-Type: application/json; charset=utf-8');
-            echo json_encode(['html' => ''], JSON_THROW_ON_ERROR);
-        } else {
-            global $cookie;
-            cookiedecode($user);
-            $loggedInUsername = strval($cookie[1] ?? '');
-            $loggedInTeamID = 0;
-            if ($loggedInUsername !== '') {
-                $loggedInTeamName = $commonRepository->getTeamnameFromUsername($loggedInUsername);
-                if ($loggedInTeamName !== null) {
-                    $loggedInTeamID = $commonRepository->getTidFromTeamname($loggedInTeamName) ?? 0;
-                }
-            }
-            $tradeAssetRepo = new Trading\TradeAssetRepository($mysqli_db);
-            $handler = new Trading\TradeRosterPreviewApiHandler($mysqli_db, $tradeAssetRepo, $loggedInTeamID);
-            $handler->handle();
-        }
+        $controller->handleRosterPreviewApi($user);
         break;
-
     default:
-        reviewtrade($user);
+        $controller->handleTradeReview($user);
         break;
 }

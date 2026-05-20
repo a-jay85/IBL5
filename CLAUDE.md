@@ -1,9 +1,9 @@
 ---
-description: Worktree-local Claude Code instructions for jsb-import-service-split.
+description: Worktree-local Claude Code instructions for trading-module-naming-di.
 last_verified: 2026-05-20
 ---
 
-# Worktree: jsb-import-service-split
+# Worktree: trading-module-naming-di
 
-This worktree's Docker instance is at `jsb-import-service-split.localhost`.
+This worktree's Docker instance is at `trading-module-naming-di.localhost`.
 Use this hostname for all browser checks, curl, and E2E — never `main.localhost`.

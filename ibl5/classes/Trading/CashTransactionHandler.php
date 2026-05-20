@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Trading;
 
 use Trading\Contracts\CashTransactionHandlerInterface;
-use Trading\Contracts\CashConsiderationRepositoryInterface;
+use Trading\Contracts\BuyoutLedgerRepositoryInterface;
 use Trading\Contracts\TradeCashRepositoryInterface;
 use Repositories\Contracts\TeamIdentityRepositoryInterface;
 
@@ -20,19 +20,19 @@ use Repositories\Contracts\TeamIdentityRepositoryInterface;
 class CashTransactionHandler implements CashTransactionHandlerInterface
 {
     protected \mysqli $db;
-    protected CashConsiderationRepositoryInterface $cashConsiderationRepository;
+    protected BuyoutLedgerRepositoryInterface $cashConsiderationRepository;
     protected TradeCashRepositoryInterface $cashRepository;
     protected TeamIdentityRepositoryInterface $commonRepository;
 
     public function __construct(
         \mysqli $db,
         TeamIdentityRepositoryInterface $commonRepository,
-        ?CashConsiderationRepositoryInterface $cashConsiderationRepository = null,
+        ?BuyoutLedgerRepositoryInterface $cashConsiderationRepository = null,
         ?TradeCashRepositoryInterface $cashRepository = null
     ) {
         $this->db = $db;
         $this->commonRepository = $commonRepository;
-        $this->cashConsiderationRepository = $cashConsiderationRepository ?? new CashConsiderationRepository($db);
+        $this->cashConsiderationRepository = $cashConsiderationRepository ?? new BuyoutLedgerRepository($db);
         $this->cashRepository = $cashRepository ?? new TradeCashRepository($db);
     }
 

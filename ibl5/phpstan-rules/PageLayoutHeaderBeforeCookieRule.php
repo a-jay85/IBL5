@@ -39,6 +39,7 @@ final class PageLayoutHeaderBeforeCookieRule implements Rule
         'classes/FreeAgency/FreeAgencyController.php',
         'classes/SeriesRecords/SeriesRecordsController.php',
         'classes/Team/TeamController.php',
+        'classes/Trading/TradingController.php',
         'classes/Waivers/WaiversController.php',
     ];
 

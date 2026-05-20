@@ -1,6 +1,6 @@
 ---
 description: Long-running backlog of maintenance-cost reduction opportunities, organized by axis. Each item is a candidate for a future plan.
-last_verified: 2026-05-19
+last_verified: 2026-05-20
 ---
 
 # Maintenance-Cost Reduction Backlog
@@ -82,7 +82,7 @@ Effort scale:
 
 ### 1.8 FreeAgencyView — Direct DB Access Inside View Layer
 **Location:** `ibl5/classes/FreeAgency/FreeAgencyView.php` (605 lines)
-**Problem:** Directly instantiates `TeamQueryRepository` (L26) and `CashConsiderationRepository` (L133) inside `renderPlayersUnderContract()`; creates `Player` objects via `Player::withPlrRow()` inside renders — executing DB queries during HTML generation.
+**Problem:** Directly instantiates `TeamQueryRepository` (L26) and `BuyoutLedgerRepository` (L133) inside `renderPlayersUnderContract()`; creates `Player` objects via `Player::withPlrRow()` inside renders — executing DB queries during HTML generation.
 **Suggested direction:** Move roster/cash fetching to the service layer; pass pre-fetched arrays into render methods.
 **Est. effort:** M
 **Risk if untouched:** Slow queries inside renders block page output; view can't be unit-tested or screenshotted without a live DB.
@@ -581,11 +581,12 @@ Effort scale:
 **Risk if untouched:** Wrong prefix on new classes; grep returns partial results.
 
 ### 4.2 `CashConsiderationRepository` vs `TradeCashRepository`
-**Location:** `ibl5/classes/Trading/CashConsiderationRepository.php`, `TradeCashRepository.php`
+**Location:** `ibl5/classes/Trading/BuyoutLedgerRepository.php`, `TradeCashRepository.php`
 **Problem:** Both handle trade-context cash. Boundary is a table name, not a concept name.
-**Suggested direction:** Rename to `BuyoutConsiderationRepository` and `TradeCashRepository` (kept).
+**Suggested direction:** Rename to `BuyoutLedgerRepository` and `TradeCashRepository` (kept).
 **Est. effort:** M
 **Risk if untouched:** New cash queries land in the wrong repo; domains drift into each other.
+**Status:** Completed (2026-05-20) — Renamed `CashConsiderationRepository` → `BuyoutLedgerRepository`.
 
 ### 4.3 `Services/` Module Is a Dumping Ground
 **Location:** deleted (2026-05-16)

@@ -8,8 +8,8 @@ use League\League;
 use Player\Player;
 use Team\Contracts\TeamQueryRepositoryInterface;
 use Season\Season;
-use Trading\CashConsiderationRepository;
-use Trading\Contracts\CashConsiderationRepositoryInterface;
+use Trading\BuyoutLedgerRepository;
+use Trading\Contracts\BuyoutLedgerRepositoryInterface;
 
 /**
  * TeamQueryRepository - Query methods for team-related data
@@ -18,7 +18,7 @@ use Trading\Contracts\CashConsiderationRepositoryInterface;
  * Extends BaseMysqliRepository for standardized database access via fetchAll/fetchOne.
  *
  * @phpstan-import-type PlayerRow from \Repositories\Contracts\PlayerLookupRepositoryInterface
- * @phpstan-import-type CashConsiderationRow from \Trading\Contracts\CashConsiderationRepositoryInterface
+ * @phpstan-import-type CashConsiderationRow from \Trading\Contracts\BuyoutLedgerRepositoryInterface
  * @phpstan-import-type DraftPickRow from TeamQueryRepositoryInterface
  * @phpstan-import-type FreeAgencyOfferRow from TeamQueryRepositoryInterface
  *
@@ -27,12 +27,12 @@ use Trading\Contracts\CashConsiderationRepositoryInterface;
  */
 class TeamQueryRepository extends \BaseMysqliRepository implements TeamQueryRepositoryInterface
 {
-    private CashConsiderationRepositoryInterface $cashConsiderationRepo;
+    private BuyoutLedgerRepositoryInterface $cashConsiderationRepo;
 
-    public function __construct(\mysqli $db, ?\League\LeagueContext $leagueContext = null, ?CashConsiderationRepositoryInterface $cashConsiderationRepo = null)
+    public function __construct(\mysqli $db, ?\League\LeagueContext $leagueContext = null, ?BuyoutLedgerRepositoryInterface $cashConsiderationRepo = null)
     {
         parent::__construct($db, $leagueContext);
-        $this->cashConsiderationRepo = $cashConsiderationRepo ?? new CashConsiderationRepository($db);
+        $this->cashConsiderationRepo = $cashConsiderationRepo ?? new BuyoutLedgerRepository($db);
     }
 
     /**

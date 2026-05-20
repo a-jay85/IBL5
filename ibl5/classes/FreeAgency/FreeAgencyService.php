@@ -136,7 +136,7 @@ class FreeAgencyService implements FreeAgencyServiceInterface
      */
     private function buildCashPlayers(int $teamId): array
     {
-        $cashRepo = new \Trading\CashConsiderationRepository($this->mysqli_db);
+        $cashRepo = new \Trading\BuyoutLedgerRepository($this->mysqli_db);
         $cashRows = $cashRepo->getTeamCashConsiderations($teamId);
         $result = [];
 

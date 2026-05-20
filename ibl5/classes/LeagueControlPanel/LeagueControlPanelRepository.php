@@ -6,7 +6,7 @@ namespace LeagueControlPanel;
 
 use League\League;
 use LeagueControlPanel\Contracts\LeagueControlPanelRepositoryInterface;
-use Trading\CashConsiderationRepository;
+use Trading\BuyoutLedgerRepository;
 
 /**
  * @see LeagueControlPanelRepositoryInterface
@@ -315,7 +315,7 @@ class LeagueControlPanelRepository extends \BaseMysqliRepository implements Leag
      */
     public function deleteOutdatedBuyoutsAndCash(): int
     {
-        $cashRepo = new CashConsiderationRepository($this->db);
+        $cashRepo = new BuyoutLedgerRepository($this->db);
         return $cashRepo->deleteExpiredCashConsiderations();
     }
 

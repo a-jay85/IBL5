@@ -116,7 +116,7 @@ class TradeRosterPreviewApiHandler
             // Append cash rows when viewing contracts
             if ($display === 'contracts') {
                 // Existing cash entries from the database
-                $cashRepo = new CashConsiderationRepository($this->db);
+                $cashRepo = new BuyoutLedgerRepository($this->db);
                 $existingCash = $cashRepo->getTeamCashConsiderations($teamid);
                 foreach ($existingCash as $cashRow) {
                     $roster[] = \Team\TeamTableService::cashConsiderationToRosterRow($cashRow);

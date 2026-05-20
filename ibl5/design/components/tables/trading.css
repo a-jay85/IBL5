@@ -1,0 +1,377 @@
+@layer components {
+
+/* ==========================================================================
+   Trading Module Tables
+
+   Specialized tables for the Trading module including:
+   - Team selection list with logos and colors
+   - Roster tables for trade form
+   - Cap totals and cash exchange tables
+   - Trade offer review cards
+   ========================================================================== */
+
+/* Trading layout — page container */
+.trading-layout {
+    text-align: center;
+    margin: 0 auto;
+}
+
+/* Roster card flex sizing — wider than .team-cards-row > .team-card default */
+.trading-layout__card {
+    flex: 1 1 0;
+    max-width: 450px;
+}
+
+/* Show partner team first (the team you're trading with) */
+.trading-layout__card:last-child {
+    order: -1;
+}
+
+/* Team selection table with logos — 2-column grid on all screen sizes */
+.trading-team-select {
+    margin: 0 auto;
+}
+
+.trading-team-select thead {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    column-gap: 1px;
+}
+
+.trading-team-select tbody {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    column-gap: 1px;
+    background: var(--gray-100);
+}
+
+.trading-team-select tr {
+    display: contents;
+}
+
+.trading-team-select .ibl-team-cell--colored {
+    text-align: left;
+    padding-left: 0.75rem;
+    padding-right: 0.75rem;
+}
+
+.trading-team-select .ibl-team-cell--colored .ibl-team-cell__name {
+    justify-content: flex-start;
+}
+
+.trading-team-select td.ibl-team-cell--colored,
+.trading-team-select th.ibl-team-cell--colored {
+    width: auto;
+    min-width: auto;
+    max-width: none;
+}
+
+/* Roster tables for player/pick selection */
+.trading-roster {
+    width: 100%;
+    table-layout: auto;
+}
+
+.trading-roster td {
+    text-align: center;
+    padding: 0.375rem 0.5rem;
+}
+
+.trading-roster td:nth-child(4) {
+    text-align: right;
+}
+
+/* Player names: no-wrap, abbreviate via JS; draft pick cells: allow wrapping */
+.trading-roster .ibl-player-cell a[href*="pid="] {
+    white-space: nowrap;
+}
+
+/* Override flex with grid on pick/player cells so the 1fr track gives the
+   text column a definite width, enabling overflow-wrap to actually wrap. */
+.trading-roster .ibl-player-cell {
+    display: grid;
+    grid-template-columns: 24px 1fr;
+    gap: 6px;
+}
+
+/* Draft pick link: inline so year/round/team stay on one line */
+.ibl-player-cell a.trading-roster__pick-link {
+    display: inline;
+}
+
+.trading-roster .draft-picks-list__notes {
+    white-space: normal;
+    overflow-wrap: break-word;
+    word-break: break-word;
+}
+
+/* Cash exchange number input */
+.trading-cash-exchange input[type="number"] {
+    width: 80px;
+    padding: 0.25rem 0.5rem;
+    border: 1px solid var(--gray-300);
+    border-radius: var(--radius-sm);
+    text-align: right;
+}
+
+/* Trade offer cards */
+.trade-offer-card {
+    margin-bottom: 1rem;
+    padding: 1rem;
+    border: 1px solid var(--gray-200);
+    border-radius: var(--radius-md);
+    background: white;
+    box-shadow: var(--shadow-sm);
+}
+
+.trade-offer-card p {
+    margin: 0.25rem 0;
+}
+
+/* Trading button variants (base .ibl-btn defined in forms.css) */
+.ibl-btn--primary {
+    background: var(--gradient-navy-header);
+    color: white;
+}
+
+.ibl-btn--primary:hover {
+    background: linear-gradient(135deg, var(--navy-700), var(--navy-800));
+}
+
+/* Submit button uses site accent orange */
+.trading-layout__submit .ibl-btn--primary {
+    background: var(--gradient-accent);
+}
+
+.trading-layout__submit .ibl-btn--primary:hover:not(:disabled) {
+    background: linear-gradient(135deg, var(--accent-600), var(--accent-700, var(--accent-600)));
+}
+
+.ibl-btn--success {
+    background: linear-gradient(135deg, var(--success-500), var(--success-600));
+    color: white;
+}
+
+.ibl-btn--success:hover {
+    background: linear-gradient(135deg, var(--success-400), var(--success-500));
+}
+
+.ibl-btn--danger {
+    background: linear-gradient(135deg, var(--error-500), var(--error-600));
+    color: white;
+}
+
+.ibl-btn--danger:hover {
+    background: linear-gradient(135deg, var(--error-400), var(--error-500));
+}
+
+/* Link styling for Trading */
+.ibl-link {
+    color: var(--navy-700);
+    text-decoration: none;
+    font-weight: 500;
+    transition: color 150ms ease;
+}
+
+.ibl-link:hover {
+    color: var(--accent-500);
+}
+
+/* ---------- Trading layout: inline-style replacements ---------- */
+
+.trading-layout__submit {
+    text-align: center;
+    padding: 1rem;
+    position: sticky;
+    bottom: 0;
+    background: var(--page-bg);
+    border-top: 1px solid var(--gray-200);
+    z-index: 10;
+}
+
+.trading-layout__header {
+    text-align: center;
+}
+
+.trading-review-wrapper {
+    max-width: 600px;
+    margin: 0 auto;
+}
+
+.trading-review-offers {
+    margin-bottom: var(--space-4);
+}
+
+.trade-offer-card__header {
+    margin-bottom: 0.5rem;
+}
+
+.trade-offer-card__actions {
+    display: flex;
+    justify-content: center;
+    gap: 0.5rem;
+    margin-bottom: 0.5rem;
+}
+
+.trade-offer-card__form {
+    margin: 0;
+}
+
+.trade-offer-card__awaiting {
+    color: var(--gray-500);
+    font-style: italic;
+}
+
+.trade-offer-card__notes {
+    margin-left: 1rem;
+    font-style: italic;
+    color: var(--gray-600);
+}
+
+.trade-offer-card__preview-wrap {
+    text-align: center;
+    margin-top: 0.5rem;
+}
+
+/* ---------- Collapsible roster details ---------- */
+
+.trading-roster-details {
+    border: none;
+}
+
+.trading-roster-details__summary {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+    padding: 0.5rem 0.75rem;
+    background: linear-gradient(90deg,
+        var(--team-color-primary),
+        color-mix(in srgb, var(--team-color-primary) 70%, black));
+    color: var(--team-color-secondary, white);
+    font-family: var(--font-display);
+    font-weight: 700;
+    font-size: 1rem;
+    letter-spacing: var(--tracking-display);
+    cursor: pointer;
+    list-style: none;
+    border-radius: var(--radius-md) var(--radius-md) 0 0;
+    user-select: none;
+}
+
+.trading-roster-details__summary::-webkit-details-marker {
+    display: none;
+}
+
+.trading-roster-details__logo {
+    height: 32px;
+    width: auto;
+    object-fit: contain;
+}
+
+.trading-roster-details__chevron {
+    position: absolute;
+    right: 0.75rem;
+    display: inline-block;
+    width: 0.6em;
+    height: 0.6em;
+    border-right: 2px solid currentColor;
+    border-bottom: 2px solid currentColor;
+    transform: rotate(45deg);
+    transition: transform 0.2s ease;
+}
+
+.trading-roster-details[open] > .trading-roster-details__summary .trading-roster-details__chevron {
+    transform: rotate(-135deg);
+}
+
+/* Table inside details: summary provides the top visual edge */
+.trading-roster-details .ibl-data-table {
+    border-radius: 0 0 var(--radius-md) var(--radius-md);
+    border-top: none;
+    border-left: none;
+    border-right: none;
+}
+
+/* When one roster is collapsed and the other is open, stack vertically
+   so the expanded table gets full width instead of being squeezed to 50% */
+.team-cards-row:has(.trading-roster-details:not([open])):has(.trading-roster-details[open]) .trading-layout__card {
+    flex-basis: 100%;
+    max-width: 100%;
+}
+
+/* ---------- Roster details tabs & panels ---------- */
+
+.trading-roster-details .trading-roster-details__tabs {
+    border-radius: 0;
+}
+
+.trading-roster-details__panel {
+    display: none;
+}
+
+.trading-roster-details__panel--active {
+    display: block;
+}
+
+/* ---------- Checkbox tap targets ---------- */
+
+.trading-roster input[type="checkbox"] {
+    width: 20px;
+    height: 20px;
+    cursor: pointer;
+    accent-color: var(--accent-500);
+}
+
+/* ---------- Trading mobile responsive ---------- */
+
+@media (max-width: 768px) {
+    /* Stack roster cards vertically so the open one gets full width */
+    .trading-layout__card {
+        flex-basis: 100%;
+        max-width: 100%;
+    }
+
+    /* Fixed submit bar on mobile — always at viewport bottom regardless of scroll */
+    .trading-layout__submit {
+        position: fixed;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        padding: var(--space-3) var(--space-4);
+    }
+
+    /* Offset form content so it's never hidden under the fixed bar */
+    .trading-layout {
+        padding-bottom: 4.5rem;
+    }
+
+    /* Roster table adjustments */
+    .trading-roster td:nth-child(1) {
+        width: 44px;
+        min-width: 44px;
+    }
+
+    .trading-roster td:nth-child(4) {
+        min-width: 40px;
+    }
+
+    /* Bigger checkbox tap area */
+    .trading-roster td:nth-child(1) {
+        padding: 0.5rem;
+    }
+
+    /* Team selection — full width on mobile */
+    .trading-team-select {
+        min-width: 0;
+        max-width: 100%;
+        width: 100%;
+    }
+
+    /* Cash exchange wider inputs */
+    .trading-cash-exchange input[type="number"] {
+        width: 100px;
+    }
+}
+
+} /* end @layer components */

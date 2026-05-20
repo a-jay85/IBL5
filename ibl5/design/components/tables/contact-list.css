@@ -1,0 +1,31 @@
+@layer components {
+
+/* ==========================================================================
+   Contact List Table
+
+   Overrides for .ibl-data-table on the Contact List page.
+   Source: class="sortable ibl-data-table contact-table"
+   ========================================================================== */
+
+.contact-table {
+    max-width: 800px;
+}
+
+.contact-table .team-cell {
+    border-radius: var(--radius-sm);
+    padding: 0.5rem 0.75rem;
+}
+
+.contact-table .team-cell a {
+    font-weight: 600;
+}
+
+.contact-table .gm-cell a {
+    color: var(--gray-700);
+}
+
+.contact-table .gm-cell a:hover {
+    color: var(--accent-600);
+}
+
+} /* end @layer components */

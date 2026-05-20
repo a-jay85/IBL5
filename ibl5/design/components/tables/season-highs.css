@@ -1,0 +1,59 @@
+@layer components {
+
+/* ==========================================================================
+   Season Highs Stat Tables (.stat-table)
+
+   Small tables showing stat leaders with columns: rank, name, date, value.
+   Used in .ibl-grid--3col layouts. Needs min-width to prevent long player
+   names (e.g., "Karl-Anthony Towns", "Anfernee Hardaway") from being clipped.
+   ========================================================================== */
+
+.stat-table-wrapper {
+    min-width: 0;
+    overflow-x: auto;
+}
+
+.stat-table-wrapper .stat-table {
+    width: 100%;
+}
+
+.stat-table .name-cell {
+    text-align: left;
+    white-space: nowrap;
+}
+
+.stat-table .name-cell a {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+}
+
+
+/* ==========================================================================
+   Season Highs Discrepancy Panel
+
+   Shows mismatches between box score data and RCB (Record Book) data
+   for admin cross-validation purposes.
+   ========================================================================== */
+
+.season-highs-discrepancy-panel {
+    margin-top: var(--space-6);
+    padding: var(--space-4);
+    border: 1px solid var(--warning-200);
+    border-radius: var(--radius-lg);
+    background: var(--warning-50);
+}
+
+.discrepancy-panel-title {
+    font-family: var(--font-display);
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--warning-600);
+    margin-bottom: var(--space-3);
+}
+
+.season-highs-discrepancy-panel .ibl-data-table {
+    font-size: var(--text-sm);
+}
+
+} /* end @layer components */

@@ -1,0 +1,13 @@
+@layer components {
+
+/* ==========================================================================
+   Player Movement Table (.player-movement-table)
+   Module: PlayerMovement
+   ========================================================================== */
+
+/* Vertical separator between Old and New columns */
+.player-movement-table tbody td:nth-child(3) {
+    border-left: 1px solid var(--gray-100);
+}
+
+} /* end @layer components */

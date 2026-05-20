@@ -1,0 +1,90 @@
+@layer components {
+
+/* ==========================================================================
+   Draft Pick Locator Table
+
+   Standalone table styled to match .ibl-data-table appearance, but uses
+   .draft-pick-table (not .ibl-data-table) to preserve sticky-scroll
+   compatibility on mobile.
+   Source: class="draft-pick-table sticky-table"
+   ========================================================================== */
+
+.draft-pick-locator-container {
+    text-align: center;
+}
+
+.draft-pick-table {
+    border-collapse: separate;
+    border-spacing: 0;
+    margin: 0 auto;
+}
+
+/* Match ibl-data-table cell styling: bottom borders, centered text */
+.draft-pick-table th,
+.draft-pick-table td {
+    border-bottom: 1px solid var(--gray-100);
+    text-align: center;
+    font-size: var(--text-sm);
+}
+
+/* Match ibl-data-table header styling */
+.draft-pick-table th {
+    background: var(--gradient-navy-header);
+    color: white;
+    font-family: var(--font-display);
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: var(--tracking-display);
+    padding: 0.25rem 0.2rem;
+}
+
+/* Team name cell padding (mirrors .ibl-data-table .ibl-team-cell--colored) */
+.draft-pick-table .ibl-team-cell--colored {
+    padding-inline: 0.5rem;
+    border-right: 1px solid var(--gray-100);
+}
+
+/* Year group separator — heavier left border between each year's R1/R2 pair */
+.draft-pick-table .draft-pick-year-sep {
+    border-left: 1px solid var(--gray-300);
+}
+
+/* Pick matrix cells: column borders, uniform square sizing */
+.draft-pick-own,
+.draft-pick-traded {
+    padding: 4px;
+    width: 37px;
+    height: 37px;
+    border-right: 1px solid var(--gray-100);
+}
+
+.draft-pick-own {
+    background-color: var(--gray-100);
+}
+
+.draft-pick-own img {
+    filter: grayscale(100%);
+    opacity: 0.45;
+}
+
+.draft-pick-logo {
+    display: block;
+    margin: 0 auto;
+    object-fit: contain;
+}
+
+/* Alternating row colors (match ibl-data-table) */
+.draft-pick-table tbody tr:nth-child(even) {
+    background-color: var(--gray-50);
+}
+
+.draft-pick-table tbody tr:hover {
+    background-color: var(--gray-100);
+}
+
+/* Draft Pick Locator: highlight cells containing user's team name in their row */
+.draft-pick-table tbody tr.user-team-row .draft-pick-own {
+    background-color: var(--warning-100);
+}
+
+} /* end @layer components */

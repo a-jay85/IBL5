@@ -1,0 +1,41 @@
+@layer components {
+
+/* ==========================================================================
+   Draft History Table
+   ========================================================================== */
+
+.draft-history-table .name-cell {
+    white-space: nowrap;
+    text-align: left;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.draft-history-table .name-cell a {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+}
+
+/* Constrain Round and Pick columns on mobile */
+@media (max-width: 768px) {
+    .draft-history-table .name-cell {
+        white-space: normal;
+    }
+
+    .draft-history-table th:last-child {
+        text-align: center;
+    }
+
+    .draft-history-table th:nth-child(1),
+    .draft-history-table td:nth-child(1),
+    .draft-history-table th:nth-child(2),
+    .draft-history-table td:nth-child(2) {
+        width: 36px;
+        min-width: 36px;
+        max-width: 36px;
+    }
+}
+
+} /* end @layer components */

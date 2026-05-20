@@ -1,0 +1,13 @@
+@layer components {
+
+/* ==========================================================================
+   Transaction History Table
+
+   Overrides for .ibl-data-table on Transaction History pages.
+   Source: class="ibl-data-table responsive-table txn-table"
+   ========================================================================== */
+
+.txn-table td:nth-child(3) { text-align: left; }
+.txn-table th:nth-child(3) { text-align: left; }
+
+} /* end @layer components */

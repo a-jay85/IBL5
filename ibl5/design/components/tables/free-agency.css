@@ -1,0 +1,144 @@
+@layer components {
+
+/* ==========================================================================
+   Free Agency Tables (.fa-table)
+
+   Overrides for .ibl-data-table on the Free Agency page.
+   Wide tables with many rating columns need max-width: none and
+   border-based separators instead of empty separator cells.
+   ========================================================================== */
+
+.fa-table {
+    max-width: none;
+}
+
+/* Shrink all columns to content in FA and Contracts tables.
+   width: 1px prevents auto-layout from distributing extra space;
+   white-space: nowrap ensures content still forces the minimum needed width. */
+.fa-table th,
+.fa-table td,
+.contracts-table th,
+.contracts-table td {
+    width: 1px;
+    white-space: nowrap;
+    vertical-align: middle;
+}
+
+/* Fill thead cells with a solid background to eliminate subpixel gradient seams.
+   With border-collapse: separate, transparent th cells expose hairline gaps where
+   the thead gradient bleeds through on retina displays.  A solid fill covers them.
+   sep-r-team / sep-r-weak classes add explicit borders on cells that need them. */
+.contracts-table thead th {
+    background-color: var(--team-color-primary);
+}
+
+.contracts-table th,
+.contracts-table td {
+    border-left: 0;
+    border-right: 0;
+}
+
+/* Right-border separators — applied to the last cell before a column group boundary.
+   Coexists with the empty-cell .sep-team/.sep-weak pattern used by other modules. */
+.team-table td.sep-r-team {
+    border-right: 2px solid color-mix(in srgb, var(--team-color-primary) 30%, var(--gray-300));
+}
+
+/* In thead, the sep border must contrast against the dark header background */
+.team-table th.sep-r-team {
+    border-right: 2px solid rgba(255, 255, 255, 0.3);
+}
+
+.team-table th.sep-r-weak,
+.team-table td.sep-r-weak {
+    border-right: 2px solid var(--gray-200);
+}
+
+/* FA tables: logo-only team cell — visually hidden but copyable to clipboard */
+.fa-table .ibl-team-cell__text {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    clip-path: inset(50%);
+    white-space: nowrap;
+}
+
+.fa-table td.ibl-team-cell--colored {
+    border-right: 2px solid var(--team-sep-color);
+    text-align: center;
+    padding-left: 0;
+    padding-right: 0;
+}
+
+.fa-table .ibl-team-cell--colored .ibl-team-cell__name {
+    justify-content: center;
+}
+
+/* Separator between Yr6 and Loy (6th from last td = last salary cell) */
+.fa-table tbody td:nth-last-child(6) {
+    border-right: 2px solid var(--team-sep-color);
+}
+
+/* Cap space footer */
+.ibl-data-table td.cap-footer-label {
+    text-align: right;
+    font-weight: 400;
+}
+.cap-footer-spacer {
+    background-color: var(--team-row-highlight-bg);
+}
+
+/* Team-table + sticky-table combo: use team header colors */
+.team-table.sticky-table thead th {
+    background: var(--team-header-bg);
+    color: var(--team-color-secondary);
+}
+
+/* --------------------------------------------------------------------------
+   Sort indicators (sorttable.js)
+   -------------------------------------------------------------------------- */
+
+.ibl-data-table th[aria-sort] {
+    cursor: pointer;
+    user-select: none;
+}
+
+#sorttable_sortfwdind,
+#sorttable_sortrevind {
+    font-size: inherit;
+    vertical-align: baseline;
+    opacity: 0.7;
+}
+
+/* Ratings table headers */
+table.sortable thead th {
+    font-size: 1rem;
+}
+
+.table-empty-message {
+    padding: 2rem;
+    color: var(--gray-500);
+}
+
+.series-logo-img {
+    object-fit: contain;
+}
+
+/* Draft pick traded cell — dynamic background via custom property */
+.draft-pick-traded {
+    background-color: var(--pick-bg);
+}
+
+/* Series record cell — dynamic background via custom property */
+.series-record-cell {
+    background-color: var(--series-cell-bg);
+}
+
+/* Career/total row bold styling */
+.career-row {
+    font-weight: bold;
+}
+
+} /* end @layer components */

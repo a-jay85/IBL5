@@ -1,0 +1,132 @@
+@layer components {
+
+/* ==========================================================================
+   Projected Draft Order Table (.projected-draft-order-table)
+   ========================================================================== */
+
+.projected-draft-order-description {
+    color: var(--gray-600);
+    font-size: var(--text-sm);
+    line-height: 1.5;
+    margin-bottom: var(--space-4);
+}
+
+.projected-draft-order-separator td {
+    background-color: var(--gray-200);
+}
+
+.projected-draft-order-lottery-results td {
+    background-color: var(--accent-500);
+    color: var(--navy-900);
+}
+
+/* Vertical separator between Team and Record columns */
+.projected-draft-order-table tbody td:nth-child(3) {
+    border-left: 1px solid var(--gray-100);
+}
+
+.projected-draft-order-table .projected-draft-order-notes {
+    max-width: 550px;
+    padding-inline: 0.5rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    cursor: pointer;
+}
+
+.projected-draft-order-notes.is-expanded {
+    white-space: normal;
+    overflow: visible;
+    text-overflow: clip;
+}
+
+/* On mobile, keep record text visible alongside logo (overrides global .ibl-team-cell__text hide) */
+@media (max-width: 768px) {
+    .projected-draft-order-table td:nth-child(3) .ibl-team-cell__text {
+        display: inline;
+    }
+
+    .projected-draft-order-table td:nth-child(3).ibl-team-cell--colored {
+        width: auto;
+        min-width: auto;
+        max-width: none;
+    }
+
+    .projected-draft-order-notes {
+        max-width: 136px;
+    }
+}
+
+/* Raise team cell above adjacent cells so tooltip renders on top */
+.projected-draft-order-table td.ibl-team-cell--colored {
+    position: relative;
+    z-index: 1;
+}
+
+/* Position tooltip to the right (default is left) — stays within table bounds */
+.projected-draft-order-table .ibl-tooltip::after {
+    right: auto;
+    left: 100%;
+    margin-right: 0;
+    margin-left: 8px;
+}
+
+.projected-draft-order-table .ibl-tooltip::before {
+    right: auto;
+    left: 100%;
+    margin-right: 0;
+    margin-left: -2px;
+    border-left-color: transparent;
+    border-right-color: var(--navy-900);
+}
+
+/* Draft Order Movement Highlights */
+.draft-moved-up td {
+    background-color: var(--success-100);
+}
+
+.draft-moved-down td {
+    background-color: var(--error-100);
+}
+
+/* Draft Order Drag-and-Drop (admin) */
+.draft-pick-cell {
+    position: relative;
+}
+
+.draft-drag-handle {
+    position: absolute;
+    left: 0.25rem;
+    top: 50%;
+    transform: translateY(-50%);
+    color: var(--gray-400);
+    font-size: 1rem;
+    line-height: 1;
+    pointer-events: none;
+}
+
+.draft-draggable:hover .draft-drag-handle {
+    color: var(--gray-600);
+}
+
+.draft-draggable {
+    cursor: grab;
+    user-select: none;
+}
+
+.draft-draggable a {
+    pointer-events: none;
+    cursor: grab;
+}
+
+.draft-draggable:hover td {
+    background-color: var(--gray-50);
+}
+
+.draft-drag-placeholder td {
+    background-color: var(--gray-200);
+    box-shadow: inset 0 1px 4px rgba(0, 0, 0, 0.12);
+    height: 2.5rem;
+}
+
+} /* end @layer components */

@@ -184,12 +184,6 @@ parameters:
 			path: classes/NextSim/NextSimTabApiHandler.php
 
 		-
-			rawMessage: 'Inline `style="..."` attributes are banned in PHP. Move CSS to ibl5/design/components/. Exception: `style="--foo: ..."` CSS custom properties are allowed.'
-			identifier: ibl.inlineCss
-			count: 1
-			path: classes/NextSim/NextSimView.php
-
-		-
 			rawMessage: Inline `<style>` blocks are banned in PHP. Move CSS to ibl5/design/components/ and reference the stylesheet instead.
 			identifier: ibl.inlineCss
 			count: 2
@@ -200,24 +194,6 @@ parameters:
 			identifier: ibl.echoInNonView
 			count: 68
 			path: classes/Player/Stats/Views/PlayerSeasonTableRenderer.php
-
-		-
-			rawMessage: 'Inline `style="..."` attributes are banned in PHP. Move CSS to ibl5/design/components/. Exception: `style="--foo: ..."` CSS custom properties are allowed.'
-			identifier: ibl.inlineCss
-			count: 1
-			path: classes/Player/Views/PlayerStatsCardView.php
-
-		-
-			rawMessage: 'Inline `style="..."` attributes are banned in PHP. Move CSS to ibl5/design/components/. Exception: `style="--foo: ..."` CSS custom properties are allowed.'
-			identifier: ibl.inlineCss
-			count: 1
-			path: classes/Player/Views/PlayerTradingCardBackView.php
-
-		-
-			rawMessage: 'Inline `style="..."` attributes are banned in PHP. Move CSS to ibl5/design/components/. Exception: `style="--foo: ..."` CSS custom properties are allowed.'
-			identifier: ibl.inlineCss
-			count: 1
-			path: classes/Player/Views/PlayerTradingCardFrontView.php
 
 		-
 			rawMessage: Casting to int something that's already int.
@@ -266,12 +242,6 @@ parameters:
 			identifier: ibl.echoInNonView
 			count: 4
 			path: classes/Trading/TradingController.php
-
-		-
-			rawMessage: 'Inline `style="..."` attributes are banned in PHP. Move CSS to ibl5/design/components/. Exception: `style="--foo: ..."` CSS custom properties are allowed.'
-			identifier: ibl.inlineCss
-			count: 1
-			path: classes/Trading/TradingView.php
 
 		-
 			rawMessage: Casting to int something that's already int.

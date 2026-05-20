@@ -71,8 +71,8 @@ class TableViewSwitcher implements TableViewSwitcherInterface
         $this->tabs = $tabs;
         $this->activeTab = $activeTab;
         $this->baseUrl = $baseUrl;
-        $this->color1 = \UI\TableStyles::sanitizeColor($color1);
-        $this->color2 = \UI\TableStyles::sanitizeColor($color2);
+        $this->color1 = $color1;
+        $this->color2 = $color2;
         $this->htmxGetUrl = $htmxGetUrl;
         $this->htmxTarget = $htmxTarget;
         $this->htmxParamName = $htmxParamName;

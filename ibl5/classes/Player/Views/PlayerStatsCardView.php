@@ -66,20 +66,27 @@ class PlayerStatsCardView
     {
         $styled = $tableHtml;
 
+        // Replace "sortable player-table" with "stats-table sortable" (preserves extra classes like sim-stats-table)
+        $styled = (string) preg_replace(
+            '/class="sortable player-table([^"]*)"/',
+            'class="stats-table sortable$1"',
+            $styled
+        );
+
         // Replace player-table-header with stats-table-header
         $styled = str_replace(
             'class="player-table-header"',
             'class="stats-table-header"',
             $styled
         );
-        
+
         // Add career-row class to bold rows for additional styling
         $styled = str_replace(
             'class="player-table-row-bold"',
             'class="player-table-row-bold career-row"',
             $styled
         );
-        
+
         return $styled;
     }
 

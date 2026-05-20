@@ -6,21 +6,10 @@ namespace UI;
 
 use UI\Contracts\TableStylesInterface;
 
-/**
- * TableStyles - Generates inline CSS custom property values for team-colored tables
- *
- * Used with the .team-table modifier class in tables.css.
- * Outputs only --team-color-primary and --team-color-secondary as inline style values.
- */
+/** @see TableStylesInterface */
 class TableStyles implements TableStylesInterface
 {
-    /**
-     * Generate inline CSS custom property declarations for team colors
-     *
-     * @param string $teamColor Primary team color (hex without #)
-     * @param string $teamColor2 Secondary team color (hex without #)
-     * @return string Inline style value (e.g. "--team-color-primary: #1e3a5f; --team-color-secondary: #D4AF37;")
-     */
+    /** @see TableStylesInterface::inlineTeamVars() */
     public static function inlineTeamVars(string $teamColor, string $teamColor2): string
     {
         $teamColor = self::sanitizeColor($teamColor);
@@ -29,12 +18,7 @@ class TableStyles implements TableStylesInterface
         return '--team-color-primary: #' . $teamColor . '; --team-color-secondary: #' . $teamColor2 . ';';
     }
 
-    /**
-     * Sanitize color value to prevent injection
-     *
-     * @param string $color Hex color value
-     * @return string Sanitized hex color
-     */
+    /** @see TableStylesInterface::sanitizeColor() */
     public static function sanitizeColor(string $color): string
     {
         $color = ltrim($color, '#');

@@ -4,7 +4,7 @@
         "cast.useless": 6,
         "ibl.deprecatedHtmlTag": 3,
         "ibl.echoInNonView": 17,
-        "ibl.inlineCss": 7,
+        "ibl.inlineCss": 2,
         "method.deprecatedClass": 2,
         "property.deprecated": 1,
         "varTag.deprecatedClass": 1

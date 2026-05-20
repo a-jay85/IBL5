@@ -48,9 +48,7 @@ class YourAccountEntryPointTest extends ModuleEntryPointTestCase
     {
         $this->mockDb->setMockData([]);
 
-        $output = $this->runModule('YourAccount', [], [], array_merge($this->accountGlobals(), [
-            'op' => 'pass_lost',
-        ]));
+        $output = $this->runModule('YourAccount', ['op' => 'pass_lost'], [], $this->accountGlobals());
 
         $this->assertNotEmpty($output);
     }
@@ -59,9 +57,7 @@ class YourAccountEntryPointTest extends ModuleEntryPointTestCase
     {
         $this->mockDb->setMockData([]);
 
-        $output = $this->runModule('YourAccount', [], [], array_merge($this->accountGlobals(), [
-            'op' => 'new_user',
-        ]));
+        $output = $this->runModule('YourAccount', ['op' => 'new_user'], [], $this->accountGlobals());
 
         $this->assertNotEmpty($output);
     }
@@ -74,7 +70,7 @@ class YourAccountEntryPointTest extends ModuleEntryPointTestCase
             'YourAccount',
             ['selector' => 'abc123', 'token' => 'xyz789', 'op' => 'confirm_email'],
             [],
-            array_merge($this->accountGlobals(), ['op' => 'confirm_email']),
+            $this->accountGlobals(),
         );
 
         $this->assertNotEmpty($output);
@@ -84,9 +80,7 @@ class YourAccountEntryPointTest extends ModuleEntryPointTestCase
     {
         $this->mockDb->setMockData([]);
 
-        $output = $this->runModule('YourAccount', [], [], array_merge($this->accountGlobals(), [
-            'op' => 'bogus',
-        ]));
+        $output = $this->runModule('YourAccount', ['op' => 'bogus'], [], $this->accountGlobals());
 
         $this->assertNotEmpty($output);
     }

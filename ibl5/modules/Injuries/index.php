@@ -26,7 +26,10 @@ get_lang($module_name);
 
 $pagetitle = "- Injured Players";
 
-$teamid = isset($teamid) ? (int) $teamid : 0;
+// Legacy globals previously populated by ConfigBootstrap::extractRequestToGlobals().
+// PR2 narrowed that extraction to a 2-key allowlist (newlang, redirect), so module
+// inputs are now read from $_REQUEST explicitly here.
+$teamid = is_numeric($_REQUEST['teamid'] ?? null) ? (int) $_REQUEST['teamid'] : 0;
 
 global $mysqli_db;
 

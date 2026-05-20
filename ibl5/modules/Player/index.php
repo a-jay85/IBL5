@@ -27,6 +27,13 @@ if (stripos($_SERVER['PHP_SELF'], "modules.php") === false) {
 $module_name = basename(dirname(__FILE__));
 get_lang($module_name);
 
+// Legacy globals previously populated by ConfigBootstrap::extractRequestToGlobals().
+// PR2 narrowed that extraction to a 2-key allowlist (newlang, redirect), so module
+// inputs are now read from $_REQUEST explicitly here.
+$pa       = is_string($_REQUEST['pa']       ?? null) ? $_REQUEST['pa']       : '';
+$pid      = is_string($_REQUEST['pid']      ?? null) ? $_REQUEST['pid']      : null;
+$pageView = is_string($_REQUEST['pageView'] ?? null) ? $_REQUEST['pageView'] : null;
+
 $pagetitle = "- Player Archives";
 
 /**
@@ -170,8 +177,6 @@ function processrookieoption()
         \Utilities\HtmxHelper::redirect('modules.php?name=Player&pa=rookieoption&pid=' . $playerID . '&from=' . rawurlencode($from) . '&error=' . rawurlencode($result['message']));
     }
 }
-
-global $pa;
 
 switch ($pa) {
 

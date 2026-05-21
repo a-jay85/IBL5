@@ -30,16 +30,14 @@
 }
 .last-sim-recap__head-center {
     display: flex;
-    align-items: center;
-    gap: .7rem;
-}
-.last-sim-recap__lbl {
+    align-items: baseline;
+    gap: .35rem;
     font-family: var(--font-display);
-    font-weight: 700;
-    font-size: 1rem;
-    text-transform: uppercase;
-    letter-spacing: .06em;
+    font-weight: 800;
+    font-size: 1.6rem;
     line-height: 1;
+    letter-spacing: .04em;
+    text-transform: uppercase;
 }
 .last-sim-recap__sub {
     font-family: var(--font-mono);
@@ -48,14 +46,6 @@
     color: rgba(255, 255, 255, .55);
     letter-spacing: .12em;
     text-transform: uppercase;
-}
-.last-sim-recap__rec {
-    font-family: var(--font-display);
-    font-weight: 800;
-    font-size: 1.6rem;
-    line-height: 1;
-    letter-spacing: .04em;
-    color: #fff;
 }
 .last-sim-recap__record-w { color: var(--accent-400) }
 .last-sim-recap__record-sep { color: rgba(255, 255, 255, .3); margin: 0 4px }

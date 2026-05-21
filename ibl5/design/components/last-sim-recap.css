@@ -564,8 +564,8 @@ a.last-sim-recap__player-lname:hover { text-decoration: underline }
 .last-sim-recap__inj-group:last-of-type {
     align-content: start;
 }
-/* "No injuries" empty state */
-.last-sim-recap__inj-row--empty .last-sim-recap__inj-pname {
+.last-sim-recap__inj-healthy {
+    margin-left: auto;
     color: var(--gray-500);
     font-weight: 500;
     font-style: italic;

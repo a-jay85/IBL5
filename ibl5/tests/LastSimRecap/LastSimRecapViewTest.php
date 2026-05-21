@@ -95,12 +95,13 @@ class LastSimRecapViewTest extends TestCase
         self::assertStringNotContainsString('last-sim-recap__strip--win', $html);
     }
 
-    public function testNoInjuriesPlaceholderRenders(): void
+    public function testHealthyLabelRendersWhenNoInjuries(): void
     {
         $html = (new LastSimRecapView())->render($this->makeSlate(games: [$this->makeGame()]));
 
-        self::assertStringContainsString('last-sim-recap__inj-row--empty', $html);
-        self::assertStringContainsString('No injuries', $html);
+        self::assertStringContainsString('last-sim-recap__inj-healthy', $html);
+        self::assertStringContainsString('Healthy', $html);
+        self::assertStringNotContainsString('inj-row--empty', $html);
     }
 
     public function testMaliciousInjuryDescriptionIsEscaped(): void

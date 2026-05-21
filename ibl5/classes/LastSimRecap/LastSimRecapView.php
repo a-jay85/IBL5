@@ -267,23 +267,11 @@ class LastSimRecapView implements LastSimRecapViewInterface
         $yourTeamUrl = 'modules.php?name=Team&amp;op=team&amp;teamid=' . $slate->teamTid;
         $oppTeamUrl = 'modules.php?name=Team&amp;op=team&amp;teamid=' . $g->oppTid;
 
-        $h .= '    <div class="last-sim-recap__inj-group">';
-        $h .= '      <div class="last-sim-recap__inj-grouphead">';
-        $h .= '        <span class="last-sim-recap__inj-dot last-sim-recap__inj-dot--you"></span>';
-        $h .= '        <a href="' . $yourTeamUrl . '" class="last-sim-recap__team-link">' . HtmlSanitizer::e($slate->teamName) . '</a>';
-        $h .= '      </div>';
-        $h .= $this->renderInjuryList($g->yourInjuries);
-        $h .= '    </div>';
+        $h .= $this->renderInjuryGroup($yourTeamUrl, $slate->teamName, $g->yourInjuries, 'you');
 
         $h .= '    <div class="last-sim-recap__inj-divider"></div>';
 
-        $h .= '    <div class="last-sim-recap__inj-group">';
-        $h .= '      <div class="last-sim-recap__inj-grouphead">';
-        $h .= '        <span class="last-sim-recap__inj-dot last-sim-recap__inj-dot--opp"></span>';
-        $h .= '        <a href="' . $oppTeamUrl . '" class="last-sim-recap__team-link">' . HtmlSanitizer::e($g->oppName) . '</a>';
-        $h .= '      </div>';
-        $h .= $this->renderInjuryList($g->oppInjuries);
-        $h .= '    </div>';
+        $h .= $this->renderInjuryGroup($oppTeamUrl, $g->oppName, $g->oppInjuries, 'opp');
 
         $h .= '  </div>';
         $h .= '</div>';
@@ -294,20 +282,25 @@ class LastSimRecapView implements LastSimRecapViewInterface
     /**
      * @param list<RecapInjury> $injuries
      */
-    private function renderInjuryList(array $injuries): string
+    private function renderInjuryGroup(string $teamUrl, string $teamName, array $injuries, string $side): string
     {
-        if ($injuries === []) {
-            return '<div class="last-sim-recap__inj-row last-sim-recap__inj-row--empty">'
-                . '<div class="last-sim-recap__inj-pname">No injuries</div>'
-                . '<div></div>'
-                . '</div>';
-        }
+        $dotClass = 'last-sim-recap__inj-dot last-sim-recap__inj-dot--' . $side;
+        $healthy = $injuries === [];
 
-        // Already sorted new-first by service.
-        $h = '';
+        $h  = '    <div class="last-sim-recap__inj-group">';
+        $h .= '      <div class="last-sim-recap__inj-grouphead">';
+        $h .= '        <span class="' . $dotClass . '"></span>';
+        $h .= '        <a href="' . $teamUrl . '" class="last-sim-recap__team-link">' . HtmlSanitizer::e($teamName) . '</a>';
+        if ($healthy) {
+            $h .= '        <span class="last-sim-recap__inj-healthy">Healthy</span>';
+        }
+        $h .= '      </div>';
+
         foreach ($injuries as $inj) {
             $h .= $this->renderInjuryRow($inj);
         }
+
+        $h .= '    </div>';
         return $h;
     }
 

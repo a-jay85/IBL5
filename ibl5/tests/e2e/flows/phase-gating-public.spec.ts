@@ -1,9 +1,10 @@
 import { test, expect } from '../fixtures/public';
 import { assertNoPhpErrors } from '../helpers/php-errors';
 
-// Phase-gating tests as unauthenticated (public) user.
-// The admin test user bypasses phase gates, so these tests use the public
-// fixture to verify that features are properly gated when disabled.
+// Phase-gating DENY tests as unauthenticated (public) user.
+// ALLOW-path tests are not possible here: all gated modules check is_user()
+// before evaluating the gate, so public users always see loginBox().
+
 test.describe('Trading disabled', () => {
   test('trading page shows disabled message when trades off', async ({
     appState,

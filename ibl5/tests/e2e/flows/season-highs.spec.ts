@@ -28,6 +28,9 @@ test.describe('Season Highs flow', () => {
     const tables = page.locator('.stat-table, .ibl-data-table');
     const count = await tables.count();
     expect(count).toBeGreaterThanOrEqual(3);
+
+    const firstTableRows = tables.first().locator('tbody tr');
+    await expect(firstTableRows.first()).toBeVisible();
   });
 
   test('stat tables have header content', async ({ page }) => {

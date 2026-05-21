@@ -25,6 +25,9 @@ test.describe('Player Movement flow', () => {
     expect(headerText).toContain('Player');
     expect(headerText).toContain('Old');
     expect(headerText).toContain('New');
+
+    const rows = table.first().locator('tbody tr');
+    await expect(rows.first()).toBeVisible();
   });
 
   test('player links navigate to player page', async ({ page }) => {

@@ -29,7 +29,7 @@ test.describe('Cap Space flow', () => {
   test('team rows have data-team-id attributes', async ({ page }) => {
     const teamRows = page.locator('tr[data-team-id]');
     const count = await teamRows.count();
-    expect(count).toBeGreaterThanOrEqual(1);
+    expect(count).toBeGreaterThanOrEqual(28);
   });
 
   test('MLE/LLE status indicators are present', async ({ page }) => {

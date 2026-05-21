@@ -117,8 +117,6 @@ const PUBLIC_MODULES: ModuleSnapshot[] = [
 const AUTH_MODULES: ModuleSnapshot[] = [
   { name: 'api-keys', url: 'modules.php?name=ApiKeys', anchor: 'form[action*="ApiKeys"]' },
   { name: 'cap-space', url: 'modules.php?name=CapSpace&teamid=1', anchor: '.ibl-data-table' },
-  { name: 'debug-menu', url: 'modules.php?name=DebugMenu', anchor: '#site-content',
-    notes: 'Redirect-only module — all code paths call HtmxHelper::redirect(). No module-rendered content to anchor on; #site-content is intentionally kept.' },
   { name: 'depth-chart-entry', url: 'modules.php?name=DepthChartEntry', anchor: 'form[name="DepthChartEntry"]' },
   { name: 'depth-chart-entry-mobile', url: 'modules.php?name=DepthChartEntry',
     anchor: 'form[name="DepthChartEntry"]', mobile: true },

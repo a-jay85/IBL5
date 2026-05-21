@@ -57,7 +57,6 @@ const PUBLIC_ANCHORS: AnchorRow[] = [
 const AUTH_ANCHORS: AnchorRow[] = [
   { name: 'api-keys', url: 'modules.php?name=ApiKeys', anchor: 'form[action*="ApiKeys"]' },
   { name: 'cap-space', url: 'modules.php?name=CapSpace&teamid=1', anchor: '.ibl-data-table' },
-  { name: 'debug-menu', url: 'modules.php?name=DebugMenu', anchor: '#site-content' },
   { name: 'depth-chart-entry', url: 'modules.php?name=DepthChartEntry', anchor: 'form[name="DepthChartEntry"]' },
   { name: 'draft', url: 'modules.php?name=Draft', anchor: '.draft-container',
     state: { 'Show Draft Link': 'Yes' } },

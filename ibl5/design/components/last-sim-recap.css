@@ -308,7 +308,7 @@
     justify-content: space-between;
     gap: .5rem;
 }
-.last-sim-recap__cell-head-row .last-sim-recap__cell-head { margin: 0 }
+.last-sim-recap__cell-head-row .last-sim-recap__cell-head { margin: 0; padding: 0 }
 .last-sim-recap__box-link {
     font-family: var(--font-mono);
     font-size: .65rem;

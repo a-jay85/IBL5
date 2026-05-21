@@ -9,6 +9,7 @@ test.describe('Extended authenticated page smoke tests', () => {
     await page.goto('modules.php?name=FreeAgency');
     await assertNoPhpErrors(page, 'on modules.php?name=FreeAgency');
     await expect(page.getByText('Sign In')).not.toBeVisible();
+    await expect(page.locator('table.fa-table').first()).toBeVisible();
   });
 
   test('draft page loads', async ({ appState, page }) => {
@@ -19,12 +20,14 @@ test.describe('Extended authenticated page smoke tests', () => {
     await page.goto('modules.php?name=Draft');
     await assertNoPhpErrors(page, 'on modules.php?name=Draft');
     await expect(page.getByText('Sign In')).not.toBeVisible();
+    await expect(page.locator('div.draft-container')).toBeVisible();
   });
 
   test('waivers page loads', async ({ page }) => {
     await page.goto('modules.php?name=Waivers');
     await assertNoPhpErrors(page, 'on modules.php?name=Waivers');
     await expect(page.getByText('Sign In')).not.toBeVisible();
+    await expect(page.locator('div.waivers-page')).toBeVisible();
   });
 
   test('voting page loads', async ({ appState, page }) => {
@@ -32,6 +35,7 @@ test.describe('Extended authenticated page smoke tests', () => {
     await page.goto('modules.php?name=Voting');
     await assertNoPhpErrors(page, 'on modules.php?name=Voting');
     await expect(page.getByText('Sign In')).not.toBeVisible();
+    await expect(page.locator('div.voting-form-container')).toBeVisible();
   });
 
   test('next sim page loads', async ({ page }) => {

@@ -359,6 +359,7 @@
     text-transform: uppercase;
 }
 .last-sim-recap__final-pts {
+    position: relative;
     font-family: var(--font-display);
     font-weight: 700;
     font-size: 1.75rem;
@@ -366,16 +367,18 @@
     line-height: .95;
     font-variant-numeric: tabular-nums;
     justify-self: end;
+    text-align: right;
+    min-width: 3.5ch;
 }
 .last-sim-recap__final-row--win .last-sim-recap__final-pts {
     color: var(--navy-900);
-    display: flex;
-    align-items: center;
 }
 .last-sim-recap__final-row--win .last-sim-recap__final-pts::before {
     content: "";
-    flex-shrink: 0;
-    margin-right: 6px;
+    position: absolute;
+    right: 100%;
+    top: 50%;
+    translate: -6px -50%;
     border-style: solid;
     border-width: 6px 0 6px 7px;
     border-color: transparent transparent transparent var(--accent-500);

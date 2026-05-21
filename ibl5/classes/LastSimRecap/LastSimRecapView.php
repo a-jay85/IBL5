@@ -36,7 +36,7 @@ class LastSimRecapView implements LastSimRecapViewInterface
         $windowLabel = $this->formatDateRange($slate->startDate, $slate->endDate);
         $gameCount = count($slate->games);
         $gameWord = $gameCount === 1 ? 'game' : 'games';
-        $subtitle = $windowLabel . ' · ' . $gameCount . ' ' . $gameWord;
+        $subtitle = $windowLabel . ' (' . $gameCount . ' ' . $gameWord . ')';
 
         $netSign = $slate->netMargin >= 0 ? '+' : '−';
         $netAbs = abs($slate->netMargin);
@@ -53,9 +53,11 @@ class LastSimRecapView implements LastSimRecapViewInterface
         $h .= '    ' . HtmlSanitizer::e((string) $slate->losses);
         $h .= '  </div>';
         $h .= '  <div class="last-sim-recap__meta">';
-        $h .= '    <span>Net margin · <span class="last-sim-recap__meta-value">' . HtmlSanitizer::e($netValue) . '</span></span>';
-        $h .= '    <span>Best · <span class="last-sim-recap__meta-value">' . HtmlSanitizer::e($slate->bestLabel) . '</span></span>';
-        $h .= '    <span>Worst · <span class="last-sim-recap__meta-value">' . HtmlSanitizer::e($slate->worstLabel) . '</span></span>';
+        $h .= '    <span>Net margin: <span class="last-sim-recap__meta-value">' . HtmlSanitizer::e($netValue) . '</span></span>';
+        $h .= '    <span class="last-sim-recap__meta-bw">';
+        $h .= '      <span class="last-sim-recap__meta-bw-row"><span class="last-sim-recap__meta-bw-label">&nbsp;Best:</span>&nbsp;<span class="last-sim-recap__meta-value">' . HtmlSanitizer::e($slate->bestLabel) . '</span></span>';
+        $h .= '      <span class="last-sim-recap__meta-bw-row"><span class="last-sim-recap__meta-bw-label">Worst:</span>&nbsp;<span class="last-sim-recap__meta-value">' . HtmlSanitizer::e($slate->worstLabel) . '</span></span>';
+        $h .= '    </span>';
         $h .= '  </div>';
         $h .= '</header>';
 
@@ -146,7 +148,7 @@ class LastSimRecapView implements LastSimRecapViewInterface
 
         $h  = '<div class="last-sim-recap__strip last-sim-recap__strip--' . $resultMod . '">';
         $h .= '  <span class="last-sim-recap__verdict">';
-        $h .= '    ' . ($g->won ? 'W' : 'L') . ' · <span class="last-sim-recap__verdict-margin">' . HtmlSanitizer::e($marginLabel) . '</span>';
+        $h .= '    ' . ($g->won ? 'W' : 'L') . ' <span class="last-sim-recap__verdict-margin">' . HtmlSanitizer::e($marginLabel) . '</span>';
         $h .= '  </span>';
         $h .= '  <span class="last-sim-recap__vs">' . HtmlSanitizer::e($venueWord . ' ' . $g->oppName) . '</span>';
         $h .= '  <div class="last-sim-recap__strip-right">';

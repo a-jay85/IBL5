@@ -63,6 +63,16 @@
     letter-spacing: .1em;
 }
 .last-sim-recap__meta-value { color: #fff; font-weight: 700 }
+.last-sim-recap__meta-bw {
+    display: flex;
+    flex-direction: column;
+    gap: .1rem;
+}
+.last-sim-recap__meta-bw-row { display: flex; gap: .35em }
+.last-sim-recap__meta-bw-label {
+    text-align: right;
+    width: 5.5ch;
+}
 
 /* Tabs (one per game, max 7) */
 .last-sim-recap__tabs {

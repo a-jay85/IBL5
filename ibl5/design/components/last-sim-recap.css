@@ -9,9 +9,10 @@
     border: 1px solid var(--gray-200);
     border-radius: var(--radius-xl);
     overflow: hidden;
-    box-shadow: 0 1px 3px rgb(0 0 0 / .04), 0 8px 24px -8px rgb(0 0 0 / .08);
+    box-shadow: var(--shadow-md);
     font-family: var(--font-sans);
     max-width: 1400px;
+    margin-bottom: var(--space-4);
     margin-inline: auto;
 }
 

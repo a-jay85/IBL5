@@ -225,7 +225,7 @@ class LastSimRecapView implements LastSimRecapViewInterface
         foreach ($g->margins as $m) {
             $maxAbs = max($maxAbs, abs($m));
         }
-        $maxH = 32;
+        $maxH = 22;
 
         $h  = '<div class="last-sim-recap__cell">';
         $h .= '  <h4 class="last-sim-recap__cell-head">Quarter margin</h4>';

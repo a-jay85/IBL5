@@ -400,12 +400,11 @@ a.last-sim-recap__player-lname:hover { text-decoration: underline }
 .last-sim-recap__mom-chart {
     position: relative;
     grid-row: 2 / 4;
-    border-radius: 6px;
-    min-height: 60px;
+    min-height: 122px;
 }
 .last-sim-recap__mom-bars {
     position: absolute;
-    inset: 14px 4px;
+    inset: 18px 4px;
     display: grid;
     grid-template-columns: repeat(var(--last-sim-recap-quarters, 4), 1fr);
     align-items: center;
@@ -712,7 +711,7 @@ a.last-sim-recap__player-lname:hover { text-decoration: underline }
     .last-sim-recap__final { display: grid; grid-template-columns: 30px 1fr auto; row-gap: .4rem; column-gap: .6rem }
     .last-sim-recap__final-row { grid-column: 1 / -1; align-content: initial }
     .last-sim-recap__mom { display: block }
-    .last-sim-recap__mom-chart { height: 120px; padding-bottom: 14px; grid-row: auto; min-height: auto }
+    .last-sim-recap__mom-chart { height: 120px; grid-row: auto; min-height: auto }
     .last-sim-recap__mom-bars { inset: 0 4px 18px 4px }
     .last-sim-recap__inj { display: flex; flex-direction: column; gap: .45rem }
     .last-sim-recap__inj-divider {

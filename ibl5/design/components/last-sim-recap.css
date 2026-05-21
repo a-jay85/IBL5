@@ -388,7 +388,7 @@ a.last-sim-recap__player-lname:hover { text-decoration: underline }
 
 /* Quarter-margin bar chart (per-quarter point differential) */
 .last-sim-recap__mom { display: block }
-.last-sim-recap__mom-chart { position: relative; height: 108px; border-radius: 6px }
+.last-sim-recap__mom-chart { position: relative; height: 120px; padding-bottom: 14px; border-radius: 6px }
 .last-sim-recap__mom-bars {
     position: absolute;
     inset: 0 4px 18px 4px;

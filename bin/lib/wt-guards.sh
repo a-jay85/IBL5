@@ -80,9 +80,16 @@ get_worktree_path() {
 }
 
 # Check if a directory has uncommitted or staged changes.
-# Returns 0 (has changes) or 1 (clean).
+# Returns 0 (has changes) or 1 (clean / not a valid git repo).
 has_uncommitted_changes() {
     local dir="${1:-.}"
-    ! git -C "$dir" diff --quiet 2>/dev/null ||
-        ! git -C "$dir" diff --cached --quiet 2>/dev/null
+    local rc
+    git -C "$dir" diff --quiet 2>/dev/null
+    rc=$?
+    # Exit 1 = has diffs; exit 128 = broken/missing gitdir (not "dirty")
+    if [ "$rc" -eq 1 ]; then return 0; fi
+    git -C "$dir" diff --cached --quiet 2>/dev/null
+    rc=$?
+    if [ "$rc" -eq 1 ]; then return 0; fi
+    return 1
 }

@@ -85,6 +85,6 @@ ceiling.
 ## What the plan must NOT do
 
 - List "verify manually" or "check by hand" for any item that can be asserted by PHPUnit, an API test, E2E, or visual-regression.
-- Defer test classification to post-plan Phase 7. Phase 7 is a safety net, not the primary classification point.
+- Defer test classification to post-plan Phase 6. Phase 6 is a safety net, not the primary classification point.
 - Add a standalone "Testing" or "Verification" section with prose descriptions instead of the matrix.
 - Use "run X and check Y" without specifying the test type and file path.

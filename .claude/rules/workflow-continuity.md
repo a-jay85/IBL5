@@ -1,6 +1,6 @@
 ---
 description: Worktree setup and /post-plan workflow rules for multi-step implementation work.
-last_verified: 2026-04-26
+last_verified: 2026-05-21
 ---
 
 # Workflow Continuity Rule
@@ -26,5 +26,5 @@ Use `--base <branch>` for stacked PRs. Work in `worktrees/<slug>/ibl5/`. Skip if
 The post-plan workflow is consolidated into a single `/post-plan` skill. This eliminates inter-skill stopping points — all phases execute within one skill invocation. The final phase kills lingering background shells (E2E, CI watch) so their deferred results don't revive the CLI after the cache has gone cold. (The skill maintains its own internal Phase 1-12 numbering — see `.claude/skills/post-plan/SKILL.md`.)
 
 - After the implementation work is done (post–worktree-setup coding), invoke `/post-plan` and let it run to completion.
-- Do NOT invoke `/simplify`, `/commit`, `/code-review:code-review`, or `/security-audit` separately during the post-plan workflow. `/post-plan` handles all of them internally using direct tool calls (Bash, Agent, Read, Edit).
+- Do NOT invoke `/pr-review`, `/commit`, or `/security-audit` separately during the post-plan workflow. `/post-plan` handles all of them internally using direct tool calls (Bash, Agent, Read, Edit).
 - Those individual skills remain available for standalone use outside the workflow.

@@ -1,16 +1,16 @@
 ---
 name: post-plan
-description: Single orchestrator for the post-plan workflow. Runs simplify, commit/push/PR, diff classification, code review, security audit, verification, CI monitoring, retrospective, worktree teardown, and background process cleanup as one uninterrupted sequence.
-last_verified: 2026-05-15
+description: Single orchestrator for the post-plan workflow. Runs commit/push/PR, diff classification, code review, security audit, verification, CI monitoring, retrospective, worktree teardown, and background process cleanup as one uninterrupted sequence.
+last_verified: 2026-05-21
 ---
 
 # Post-Plan Orchestrator
 
 Execute all phases below **sequentially in a single response**. Do NOT stop, ask for input, or return control between phases.
 
-**Phase 12 (Background Process Cleanup) is MANDATORY and must ALWAYS be the last thing you execute before ending your turn.** No phase — including Phase 10 (Retrospective) — is a valid stopping point. If you reach Phase 10 and have nothing to save, continue directly to Phase 11 and Phase 12. Ending your turn before Phase 12 leaves background processes alive, which prevents the `claude` process from exiting and triggers a stall-kill in the nightly runner.
+**Phase 11 (Background Process Cleanup) is MANDATORY and must ALWAYS be the last thing you execute before ending your turn.** No phase — including Phase 9 (Retrospective) — is a valid stopping point. If you reach Phase 9 and have nothing to save, continue directly to Phase 10 and Phase 11. Ending your turn before Phase 11 leaves background processes alive, which prevents the `claude` process from exiting and triggers a stall-kill in the nightly runner.
 
-Phase numbers below are local to this skill. The variables computed in Phase 4 (`HAS_PHP`, `NON_CODE_ONLY`, `DOCS_ONLY`, `CSS_ONLY`, `MIGRATION_ONLY`, `HAS_MODIFIED`, `HAS_COMMENTS_IN_DIFF`, `DIFF`, etc.) are consulted by every downstream phase to gate sub-agent launches — never recompute them locally.
+Phase numbers below are local to this skill. The variables computed in Phase 3 (`HAS_PHP`, `NON_CODE_ONLY`, `DOCS_ONLY`, `CSS_ONLY`, `MIGRATION_ONLY`, `HAS_MODIFIED`, `HAS_COMMENTS_IN_DIFF`, `DIFF`, etc.) are consulted by every downstream phase to gate sub-agent launches — never recompute them locally.
 
 ## Incremental Checkpoints
 
@@ -25,7 +25,7 @@ if ! git diff --cached --quiet; then
 fi
 ```
 
-Phase 3 makes the initial commit and opens the PR. Phase 2 (simplify) runs against the working tree before that commit, so its changes fold into the initial commit naturally. Phases that may modify files after Phase 3 (Phase 5D follow-up fixes if review identifies real bugs, Phase 6 fix-and-rerun loops, Phase 7 test writing, Phase 8 CI fixes) MUST checkpoint before continuing. Squash-merge in Phase 9 collapses the chain.
+Phase 2 makes the initial commit and opens the PR. Phases that may modify files after Phase 2 (Phase 4D follow-up fixes if review identifies real bugs, Phase 5 fix-and-rerun loops, Phase 6 test writing, Phase 7 CI fixes) MUST checkpoint before continuing. Squash-merge in Phase 8 collapses the chain.
 
 ---
 
@@ -39,24 +39,18 @@ rm -f /tmp/claude-plan-active-$PPID
 
 ---
 
-## Phase 2: Simplify
+## Phase 2: Commit, Push & PR
 
-Review changed files (`git diff --name-only origin/master` — covers both committed and uncommitted work) for reuse opportunities and over-engineering. Mandatory CLAUDE.md rules are enforced by PHPStan custom rules (see `.claude/commands/_review-rubric.md` for the full list) — assume they hold and focus on judgment-level issues like duplication, awkward abstractions, and dead code.
-
-This phase runs before commit so simplify changes fold into the initial commit. If the working tree is clean and `git diff origin/master...HEAD` is also empty (nothing to ship), abort the entire skill — there is nothing to post-plan.
-
----
-
-## Phase 3: Commit, Push & PR
+If the working tree is clean and `git diff origin/master...HEAD` is also empty (nothing to ship), abort the entire skill — there is nothing to post-plan.
 
 1. **If working tree has uncommitted changes:** stage relevant changes, review with `git diff --staged`, commit (CLAUDE.md conventions), push. Skip this sub-step if the working tree is already clean (user committed before invoking the skill).
 2. **If no PR exists for the current branch:** create one with `gh pr create`. **Stacked PRs:** If branched from a feature branch (not `master`), use `--base <parent-branch>`. Skip if a PR already exists.
-3. **Manual testing in PR description:** Check the plan file for a Verification Matrix. If one exists, copy only the rows classified as `Truly-manual` into the PR's `## Manual Testing` section. If the matrix has zero truly-manual rows (or the plan says "All verification is automated"), write: `No manual testing needed — all changes are covered by unit and E2E tests.` If no plan file or no matrix exists, fall back to the original rule: list only steps requiring subjective human judgment on new or redesigned UI/UX ("does this look/feel good?", "does this flow work well?"). Production comparison and "does output still match?" are visual-regression-replaceable, not manual. Do NOT list CLI commands or script invocations — Phase 7 executes those.
+3. **Manual testing in PR description:** Check the plan file for a Verification Matrix. If one exists, copy only the rows classified as `Truly-manual` into the PR's `## Manual Testing` section. If the matrix has zero truly-manual rows (or the plan says "All verification is automated"), write: `No manual testing needed — all changes are covered by unit and E2E tests.` If no plan file or no matrix exists, fall back to the original rule: list only steps requiring subjective human judgment on new or redesigned UI/UX ("does this look/feel good?", "does this flow work well?"). Production comparison and "does output still match?" are visual-regression-replaceable, not manual. Do NOT list CLI commands or script invocations — Phase 6 executes those.
 4. Use Haiku agents for commit message generation if delegating
 
 ---
 
-## Phase 4: Classify Diff
+## Phase 3: Classify Diff
 
 Run this bash block once. It computes classification flags and writes the filtered diff to `/tmp/post-plan-diff-$PPID` (same `$PPID` pattern Phase 1 uses — stable across Bash tool calls in the session). Uses `gh pr diff` when a PR exists (correct base for stacked PRs), falls back to `git diff origin/master...HEAD` pre-PR. Every later phase consults these flags and reads the diff file — do not recompute.
 
@@ -100,7 +94,7 @@ MIGRATION_ONLY=$([ "$COUNT_TOTAL" -gt 0 ] && [ "$COUNT_MIGRATION" -eq "$COUNT_TO
 TEST_ONLY=$([ "$COUNT_TOTAL" -gt 0 ] && [ "$COUNT_TEST" -eq "$COUNT_TOTAL" ] && echo true || echo false)
 NON_CODE_ONLY=$([ "$COUNT_TOTAL" -gt 0 ] && [ "$COUNT_NON_CODE" -eq "$COUNT_TOTAL" ] && echo true || echo false)
 
-# "Has modified (not added) files" — gates Phase 5B Agent 4 (previous PRs)
+# "Has modified (not added) files" — gates Phase 4B Agent C (previous PRs)
 MODIFIED_COUNT=$(git diff --diff-filter=M --name-only origin/master...HEAD 2>/dev/null | grep -c . || true)
 HAS_MODIFIED=$([ "$MODIFIED_COUNT" -gt 0 ] && echo true || echo false)
 
@@ -124,11 +118,11 @@ if [ "$(wc -c < "$DIFF_FILE")" -gt 102400 ] && $HAS_PR; then
     > "$DIFF_FILE"
 fi
 
-# Code-comment detection on added lines only (gates Phase 5B Agent 5)
+# Code-comment detection on added lines only (gates Phase 4B Agent B)
 COMMENT_COUNT=$(grep -cE '^\+[[:space:]]*(//|#|/\*|\*)' "$DIFF_FILE" || true)
 HAS_COMMENTS_IN_DIFF=$([ "$COMMENT_COUNT" -gt 0 ] && echo true || echo false)
 
-# PHP lines changed (gates Phase 5B Agents 3-4 size threshold)
+# PHP lines changed (gates Phase 4B Agents B-C size threshold)
 LINES_PHP_CHANGED=$(git diff origin/master...HEAD -- '*.php' | grep -cE '^\+[^+]' || true)
 
 # Classification summary for the run log (Claude reads these and remembers them for later phases)
@@ -143,24 +137,24 @@ Each Bash tool call runs in a fresh shell, so the classification flags are **not
 
 ---
 
-## Phase 5: Code Review + Security Audit
+## Phase 4: Code Review + Security Audit
 
-Agent definitions and scoring rubric live in shared include files under `.claude/commands/` so this skill, `/code-review`, and `/security-audit` all share one source of truth. Read them as instructed below — do NOT inline the definitions or duplicate them.
+Agent definitions and scoring rubric live in shared include files under `.claude/commands/` so this skill, `/pr-review`, and `/security-audit` all share one source of truth. Read them as instructed below — do NOT inline the definitions or duplicate them.
 
-### 5A: Fetch PR data (shared by both)
+### 4A: Fetch PR data (shared by both)
 
 Run these commands yourself (not via agents):
 
 ```bash
 gh pr view --json number,headRefOid,headRefName,baseRefName,title,body,author
-cat /tmp/post-plan-diff-$PPID   # filtered diff written by Phase 4 (already < 100KB after the fallback)
+cat /tmp/post-plan-diff-$PPID   # filtered diff written by Phase 3 (already < 100KB after the fallback)
 ```
 
 Capture the `cat` output — that is `$DIFF` for every sub-agent prompt below. No sub-agent calls `gh pr diff`.
 
 **Do not forward CLAUDE.md content in agent prompts** — sub-agents auto-load CLAUDE.md on init, so forwarding it doubles the token cost (~5K × N agents). If directory-specific `CLAUDE.md` files exist for modified directories, read them and forward only those (they are not auto-loaded).
 
-### 5B: Code Review — up to 3 parallel agents (merged by tier)
+### 4B: Code Review — up to 3 parallel agents (merged by tier)
 
 **Read** `.claude/commands/_review-agents.md` — the canonical agent definitions (3 merged agents: A=architecture+bugs+DB, B=git history+code comments, C=previous PRs).
 
@@ -172,15 +166,15 @@ Pass each agent: PR metadata, file list, and filtered `$DIFF`. **No agent calls 
 - Agent B (Git history + Code comments): **Sonnet**
 - Agent C (Previous PRs): **Haiku**
 
-**Launch gates** (consult Phase 4 variables — skip the launch entirely, don't let the agent exit early):
+**Launch gates** (consult Phase 3 variables — skip the launch entirely, don't let the agent exit early):
 
 - Agent A: skip if `$NON_CODE_ONLY`. If `$MIGRATION_ONLY`, instruct agent to skip Section 2 (bug detection). If `! $HAS_PHP`, instruct agent to skip Section 3 (DB performance).
 - Agent B: skip if BOTH sub-gates fail: (`! $HAS_PHP` or `$LINES_PHP_CHANGED <= 50`) AND (`$NON_CODE_ONLY` or `! $HAS_COMMENTS_IN_DIFF`). If only one sub-gate passes, instruct agent to run only that section.
 - Agent C: skip if `$NON_CODE_ONLY` or `! $HAS_MODIFIED` or `$LINES_PHP_CHANGED <= 50`
 
-### 5C: Security Audit — single conditional Haiku agent
+### 4C: Security Audit — single conditional Haiku agent
 
-**Skip entire 5C if** `! $HAS_PHP`. CSS, markdown, migrations, and lockfile bumps cannot introduce SQLi/CSRF/auth vulnerabilities.
+**Skip entire 4C if** `! $HAS_PHP`. CSS, markdown, migrations, and lockfile bumps cannot introduce SQLi/CSRF/auth vulnerabilities.
 
 **Read** `.claude/commands/_security-agents.md` — the canonical security agent definition and pattern-detection bash block.
 
@@ -188,11 +182,11 @@ Run the pattern-detection block from that file to get SQL and Forms category cou
 
 **XSS and Input Validation are NOT audited here** — they're deterministically enforced by `RequireEscapedOutputRule` and `BanRawSuperglobalsRule` (run in PostToolUse and CI).
 
-### 5D: Score, filter, and post
+### 4D: Score, filter, and post
 
 **Read** `.claude/commands/_review-rubric.md` — the canonical rubric, thresholds (`< 80` for code review, `< 75` for security), Automatic-Zero rule list, and IBL5 false-positive list.
 
-Combine ALL issues from 5B and 5C into one numbered list.
+Combine ALL issues from 4B and 4C into one numbered list.
 
 **Skip the scoring agent if the combined list is empty** — jump straight to posting "No issues found." comments in the two `gh pr comment` steps below.
 
@@ -202,7 +196,7 @@ Otherwise launch a **single Haiku agent**, pass it the issues list plus the **Sc
 
 **Re-check PR state:** `gh pr view --json state --jq '.state'` — skip posting if not `OPEN`.
 
-**Post two `gh pr comment` entries** (code review + security audit) using full SHA from 5A.
+**Post two `gh pr comment` entries** (code review + security audit) using full SHA from 4A.
 
 Code review format (issues found): `### Code review\n\nFound N issues:\n\n1. <description> (CLAUDE.md says "<rule>")\n\n<link>`
 
@@ -218,7 +212,7 @@ Both comments end with: `Generated with [Claude Code](https://claude.ai/code)` a
 
 ---
 
-## Phase 6: Final Verification
+## Phase 5: Final Verification
 
 **PHPUnit + PHPStan — direct Bash (no agent):** **Skip if** `! $HAS_PHP`. The PostToolUse hook already ran both during edits, and a PHP-less diff cannot regress either suite. Run both as direct Bash calls with `run_in_background: true` so they execute in parallel with the E2E agent below. Output is ~5 lines each — agent overhead (~25K tokens) is never justified.
 
@@ -247,7 +241,7 @@ If either fails, fix in worktree, commit, push, and re-run the failing track.
 
 ---
 
-## Phase 7: Manual Testing Automation
+## Phase 6: Manual Testing Automation
 
 **Skip if** PR description says "No manual testing needed."
 
@@ -258,7 +252,7 @@ EXTRACTED=$(gh pr view --json body --jq '.body' | sed -n '/## Manual Testing/,/^
 echo "$EXTRACTED"
 ```
 
-**Also skip Phase 7 entirely if `$EXTRACTED` is empty or whitespace-only** — the section is absent or was already cleared. Do not launch the Sonnet review gate on empty input.
+**Also skip Phase 6 entirely if `$EXTRACTED` is empty or whitespace-only** — the section is absent or was already cleared. Do not launch the Sonnet review gate on empty input.
 
 ### Step 2: Sonnet Review Gate
 
@@ -269,7 +263,7 @@ Launch a **single Sonnet agent** with this prompt (substitute the extracted step
 > **PR manual testing steps:**
 > {extracted steps from Step 1}
 >
-> **Changed files:** {file list from Phase 5A}
+> **Changed files:** {file list from Phase 4A}
 >
 > Classify each step into exactly one category:
 >
@@ -299,11 +293,11 @@ Using the Sonnet agent's classifications:
 2. **PHPUnit/API-test/E2E-replaceable:** Write the appropriate test type. Fix until green; reclassify as truly manual after 2 failed attempts.
 3. **Truly manual:** Keep in PR description.
 4. **Update PR:** Remove verified/automated steps. If none remain, replace section with `No manual testing needed — all changes are covered by automated tests.` Apply: `gh pr edit --body "<updated>"`
-5. **Checkpoint:** If any new tests were written or files modified, commit and push before continuing to Phase 8.
+5. **Checkpoint:** If any new tests were written or files modified, commit and push before continuing to Phase 7.
 
 ---
 
-## Phase 8: CI Monitoring
+## Phase 7: CI Monitoring
 
 **BLOCKING GATE — block on CI until green, or 3 fix-push-retry cycles exhausted.**
 
@@ -313,18 +307,18 @@ Using the Sonnet agent's classifications:
 > - `gh pr view <pr> --json statusCheckRollup` → `status` ∈ `COMPLETED | IN_PROGRESS | QUEUED`, `conclusion` ∈ `SUCCESS | FAILURE | SKIPPED | …`.
 > Do not write `state == "COMPLETED"` or `conclusion == "failure"` against `gh pr checks` — both are silently false forever.
 
-0. **Early-exit on merged PR:** Before any polling, run `gh pr view <pr> --json state --jq '.state'`. If `MERGED`, skip the rest of Phase 8 and continue at Phase 9 — auto-merge has already fired (most commonly during Phase 5/6/7) and watching CI to completion adds nothing but wall-clock burn. This is the load-bearing optimization that keeps the nightly loop from burning a full watch timeout on an already-shipped PR.
+0. **Early-exit on merged PR:** Before any polling, run `gh pr view <pr> --json state --jq '.state'`. If `MERGED`, skip the rest of Phase 7 and continue at Phase 8 — auto-merge has already fired (most commonly during Phase 4/5/6) and watching CI to completion adds nothing but wall-clock burn. This is the load-bearing optimization that keeps the nightly loop from burning a full watch timeout on an already-shipped PR.
 1. **Wait for checks to register:** Poll `gh pr checks <pr> --json name,state 2>/dev/null | jq 'length'` up to 4 times with 15s waits. If count stays 0, warn user and stop.
-2. **Block until CI settles:** `gh pr checks <pr> --watch --fail-fast --interval 20` (Bash timeout 1200000 = 20 min cap — leaves a 10-min cushion under `MAX_PP_SECS=1800` for Phases 9-12 cleanup). The gh CLI handles the polling and exit logic itself; do not re-implement it in jq. Exit codes: `0` = all checks passed, `8` = at least one failed, other = transport error.
-3. **If exit 0** → Phase 9. (Mid-watch merge detection was intentionally dropped: `gh pr checks --watch` exits as soon as the last check settles, so the only window auto-merge could fire inside the watch is the ~5–30s between final-check-pass and auto-merge action — not worth a hand-rolled poll loop. Step 0 already covers the case where the PR merged before Phase 8 started.)
+2. **Block until CI settles:** `gh pr checks <pr> --watch --fail-fast --interval 20` (Bash timeout 1200000 = 20 min cap — leaves a 10-min cushion under `MAX_PP_SECS=1800` for Phases 8-11 cleanup). The gh CLI handles the polling and exit logic itself; do not re-implement it in jq. Exit codes: `0` = all checks passed, `8` = at least one failed, other = transport error.
+3. **If exit 0** → Phase 8. (Mid-watch merge detection was intentionally dropped: `gh pr checks --watch` exits as soon as the last check settles, so the only window auto-merge could fire inside the watch is the ~5–30s between final-check-pass and auto-merge action — not worth a hand-rolled poll loop. Step 0 already covers the case where the PR merged before Phase 7 started.)
 4. **If exit 8:** Get failed checks via `gh pr checks <pr> --json name,state,link --jq '[.[] | select(.state == "FAILURE")]'` (uppercase `FAILURE`, field is `state` not `conclusion`). Download logs (`gh run view <id> --log-failed`), run the 3-step CI failure checklist (is file in my diff? is failing line my change? did it fail on parent?), fix, commit, push, loop back to step 1. After 3 iterations, escalate to user.
-5. **If bash times out (20 min elapsed):** Run one final `gh pr checks <pr>` (no `--watch`) to capture settled state. If it now exits 0, continue to Phase 9. If 8, jump to step 4. Otherwise escalate to user — do not re-enter watch.
+5. **If bash times out (20 min elapsed):** Run one final `gh pr checks <pr>` (no `--watch`) to capture settled state. If it now exits 0, continue to Phase 8. If 8, jump to step 4. Otherwise escalate to user — do not re-enter watch.
 
 ---
 
-## Phase 9: Auto-Merge
+## Phase 8: Auto-Merge
 
-**Already merged?** If `gh pr view --json state --jq '.state'` returns `MERGED`, skip the merge call entirely. Run `cd <repo-root> && git checkout master && git pull origin master` to sync local, then continue to Phase 10. Do not treat this as an error — it's the expected outcome when auto-merge fires during Phase 8.
+**Already merged?** If `gh pr view --json state --jq '.state'` returns `MERGED`, skip the merge call entirely. Run `cd <repo-root> && git checkout master && git pull origin master` to sync local, then continue to Phase 9. Do not treat this as an error — it's the expected outcome when auto-merge fires during Phase 7.
 
 All three conditions must be true: (1) CI passed, (2) PR says "No manual testing needed", (3) no review/audit findings scored >= 80.
 
@@ -334,7 +328,7 @@ If not: report which condition(s) blocked. User merges manually.
 
 ---
 
-## Phase 10: Retrospective
+## Phase 9: Retrospective
 
 Before saving any memory, ask: **"Can this be a PHPStan rule instead?"** If the mistake is mechanical and deterministic, it belongs in `ibl5/phpstan-rules/` as a new custom rule — open a TODO comment in the plan file rather than a memory entry. Memories are for things a linter cannot express (architectural judgment, environment quirks, incident context).
 
@@ -342,11 +336,11 @@ Save to memory only if something was learned that would **prevent a bug** in a f
 
 ---
 
-## Phase 11: Preview Environment
+## Phase 10: Preview Environment
 
 **Skip entirely if** `$CLAUDE_HEADLESS` is set (nightly autonomous mode — no human present to verify).
 
-Check the PR state using the PR number captured in Phase 5A:
+Check the PR state using the PR number captured in Phase 4A:
 
 ```bash
 PR_STATE=$(gh pr view <PR_NUMBER> --json state --jq '.state')
@@ -354,7 +348,7 @@ PR_STATE=$(gh pr view <PR_NUMBER> --json state --jq '.state')
 
 ### Path A: Main-stack rebuild (when `$PR_STATE` = `MERGED`)
 
-Phase 9 merged the PR, deleted the branch, and checked out master. The worktree branch no longer exists — rebuild the main Docker stack with fresh prod data.
+Phase 8 merged the PR, deleted the branch, and checked out master. The worktree branch no longer exists — rebuild the main Docker stack with fresh prod data.
 
 1. **Update vendor** (may be stale after merge):
    ```bash
@@ -367,7 +361,7 @@ Phase 9 merged the PR, deleted the branch, and checked out master. The worktree 
      && grep -q '^REMOTE_USER=' <repo-root>/.env \
      && grep -q '^REMOTE_PASSWORD=' <repo-root>/.env
    ```
-   If any `REMOTE_*` credential is missing: warn "Fresh prod data unavailable — REMOTE_* credentials not found in .env. Skipping main-stack rebuild." and **stop Phase 11** (leave the existing main stack untouched).
+   If any `REMOTE_*` credential is missing: warn "Fresh prod data unavailable — REMOTE_* credentials not found in .env. Skipping main-stack rebuild." and **stop Phase 10** (leave the existing main stack untouched).
 
 3. **Tear down and restart** with stale seed skipped:
    ```bash
@@ -433,11 +427,11 @@ Phase 9 merged the PR, deleted the branch, and checked out master. The worktree 
 
 ---
 
-## Phase 12: Background Process Cleanup (MANDATORY — never skip)
+## Phase 11: Background Process Cleanup (MANDATORY — never skip)
 
 **You MUST execute this phase before ending your turn.** This is not optional even if all earlier phases succeeded cleanly.
 
-Background shells from earlier phases (`bin/e2e-wt.sh` in Phase 6, `gh pr checks --watch` in Phase 8) may still be running. If they hold the pipeline open after you emit your final response, the nightly runner's stall-kill fires after 10 minutes and burns an attempt — three burns poison-pill the plan.
+Background shells from earlier phases (`bin/e2e-wt.sh` in Phase 5, `gh pr checks --watch` in Phase 7) may still be running. If they hold the pipeline open after you emit your final response, the nightly runner's stall-kill fires after 10 minutes and burns an attempt — three burns poison-pill the plan.
 
 Kill known lingering patterns so their tool results deliver immediately (cache warm) rather than hours later (cache miss):
 

@@ -106,7 +106,7 @@ The main launchd plist fires `nightly-run` at both 00:03 and 05:03 daily. Both r
 
 ## Headless Mode
 
-`bin/nightly-run` sets `CLAUDE_HEADLESS=1`. This environment variable gates `/post-plan` Phase 11 (Worktree Preview Environment), which is skipped since no human is present to verify visually. All other phases run normally.
+`bin/nightly-run` sets `CLAUDE_HEADLESS=1`. This environment variable gates `/post-plan` Phase 10 (Preview Environment), which is skipped since no human is present to verify visually. All other phases run normally.
 
 ## Files
 

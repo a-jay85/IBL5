@@ -1,11 +1,11 @@
 ---
 description: Shared security-audit agent definitions used by /security-audit and /post-plan.
-last_verified: 2026-04-29
+last_verified: 2026-05-21
 ---
 
 # Security Audit Agent (shared definition)
 
-Source of truth for security-audit agent prompt. Used by `/security-audit` Step 3 and `/post-plan` Phase 5C. Do not edit without updating both callers.
+Source of truth for security-audit agent prompt. Used by `/security-audit` Step 3 and `/post-plan` Phase 4C. Do not edit without updating both callers.
 
 **XSS and Input Validation are deterministically enforced** by `RequireEscapedOutputRule` and `BanRawSuperglobalsRule` respectively. No review agents run for those categories — the linter catches them in PostToolUse and CI.
 

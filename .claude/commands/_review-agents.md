@@ -1,11 +1,11 @@
 ---
-description: Shared code-review agent definitions used by /code-review and /post-plan.
-last_verified: 2026-04-29
+description: Shared code-review agent definitions used by /pr-review and /post-plan.
+last_verified: 2026-05-21
 ---
 
 # Code Review Agents (shared definitions)
 
-Source of truth for code-review agent prompts. Used by `/code-review` Step 3, and `/post-plan` Phase 5B. Do not edit without updating both callers.
+Source of truth for code-review agent prompts. Used by `/pr-review` Step 3, and `/post-plan` Phase 4B. Do not edit without updating both callers.
 
 ## Token-efficiency design
 

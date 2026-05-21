@@ -1,3 +1,8 @@
+---
+description: Worktree instructions for the e2e-auth-pages-extended-content-selectors branch.
+last_verified: 2026-05-20
+---
+
 # Worktree: e2e-auth-pages-extended-content-selectors
 
 This worktree's Docker instance is at `e2e-auth-pages-extended-content-selectors.localhost`.

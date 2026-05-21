@@ -255,6 +255,7 @@
     color: rgba(255, 255, 255, .85);
     letter-spacing: .06em;
     text-transform: uppercase;
+    line-height: 1;
 }
 .last-sim-recap__strip-right {
     margin-left: auto;

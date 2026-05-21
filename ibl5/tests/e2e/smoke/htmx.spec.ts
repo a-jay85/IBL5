@@ -11,6 +11,7 @@ test.describe('HTMX hx-boost navigation', () => {
   test.use({ actionTimeout: 15_000, navigationTimeout: 20_000 });
   test('boosted link swaps content without full page reload', async ({ page }) => {
     await page.goto('index.php');
+    await assertNoPhpErrors(page, 'on index.php');
 
     // Store a reference to the nav element — it should persist across navigations
     const nav = page.locator('nav.fixed').first();
@@ -42,6 +43,7 @@ test.describe('HTMX hx-boost navigation', () => {
 
   test('URL updates via pushState on boosted navigation', async ({ page }) => {
     await page.goto('index.php');
+    await assertNoPhpErrors(page, 'on index.php');
 
     // Navigate to a page by clicking a visible boosted link within site-content
     const contentLink = page
@@ -72,6 +74,7 @@ test.describe('HTMX hx-boost navigation', () => {
 
   test('browser back/forward works after HTMX navigation', async ({ page }) => {
     await page.goto('index.php');
+    await assertNoPhpErrors(page, 'on index.php');
 
     // Navigate via a visible boosted link
     const contentLink = page
@@ -93,22 +96,14 @@ test.describe('HTMX hx-boost navigation', () => {
     expect(page.url()).toContain('modules.php');
   });
 
-  test('no PHP errors on pages loaded via HTMX', async ({ page }) => {
-    const urls = [
-      'index.php',
-      'modules.php?name=Standings',
-      'modules.php?name=Roster',
-    ];
-
-    for (const url of urls) {
-      await page.goto(url);
-      await assertNoPhpErrors(page, `on ${url}`);
-    }
+  test('roster page loads without PHP errors', async ({ page }) => {
+    await page.goto('modules.php?name=Roster');
+    await assertNoPhpErrors(page, 'on modules.php?name=Roster');
   });
 
   test('boosted form submission swaps content without full page reload', async ({ page }) => {
-    // Navigate to Search page which has a public POST form
     await page.goto('modules.php?name=Search');
+    await assertNoPhpErrors(page, 'on modules.php?name=Search');
 
     // Mark the nav to verify it persists (no full reload)
     await page.evaluate(() => {

@@ -17,6 +17,7 @@ test.describe('TrainingCampRatingsDiff admin page', () => {
 
   test('renders empty-state block when no end-of-season baseline exists', async ({ page }) => {
     await page.goto('modules.php?name=TrainingCampRatingsDiff');
+    await assertNoPhpErrors(page, 'on modules.php?name=TrainingCampRatingsDiff');
     await expect(page.locator('.ibl-card')).toBeVisible();
     await expect(page.locator('.ibl-card')).toContainText(/No prior-season baseline found/i);
   });

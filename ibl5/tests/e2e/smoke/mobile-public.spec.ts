@@ -61,6 +61,7 @@ test.describe('Mobile public page smoke tests', () => {
     test(`${pageInfo.name} — no horizontal overflow on mobile`, async ({ page }) => {
       test.setTimeout(60_000);
       await gotoWithRetry(page, pageInfo.url);
+      await assertNoPhpErrors(page, `on ${pageInfo.url} (mobile)`);
 
       await expect(page.locator(pageInfo.selector).first()).toBeVisible();
 
@@ -77,6 +78,7 @@ test.describe('Mobile public page smoke tests', () => {
   test('team schedule — no horizontal overflow on mobile', async ({ page }) => {
     test.setTimeout(60_000);
     await gotoWithRetry(page, 'modules.php?name=Schedule&teamid=1');
+    await assertNoPhpErrors(page, 'on modules.php?name=Schedule&teamid=1 (mobile)');
     await expect(page.locator('.schedule-container, .schedule-game, table').first()).toBeVisible();
     await assertNoHorizontalOverflow(page, 'on team schedule');
   });
@@ -84,6 +86,7 @@ test.describe('Mobile public page smoke tests', () => {
   test('draft history year detail — no horizontal overflow on mobile', async ({ page }) => {
     test.setTimeout(60_000);
     await gotoWithRetry(page, 'modules.php?name=DraftHistory&year=2026');
+    await assertNoPhpErrors(page, 'on modules.php?name=DraftHistory&year=2026 (mobile)');
     const table = page.locator('.ibl-data-table').first();
     await expect(table).toBeVisible();
     await assertNoHorizontalOverflow(page, 'on draft history year detail');
@@ -94,6 +97,7 @@ test.describe('Mobile public page smoke tests', () => {
   test('draft history team view — no horizontal overflow on mobile', async ({ page }) => {
     test.setTimeout(60_000);
     await gotoWithRetry(page, 'modules.php?name=DraftHistory&teamid=1');
+    await assertNoPhpErrors(page, 'on modules.php?name=DraftHistory&teamid=1 (mobile)');
     await expect(page.locator('.ibl-title').first()).toBeVisible();
     await assertNoHorizontalOverflow(page, 'on draft history team view');
   });
@@ -101,6 +105,7 @@ test.describe('Mobile public page smoke tests', () => {
   test('franchise record book team view — no horizontal overflow on mobile', async ({ page }) => {
     test.setTimeout(60_000);
     await gotoWithRetry(page, 'modules.php?name=FranchiseRecordBook&teamid=1');
+    await assertNoPhpErrors(page, 'on modules.php?name=FranchiseRecordBook&teamid=1 (mobile)');
     await expect(page.locator('.ibl-title, .ibl-data-table, table').first()).toBeVisible();
     await assertNoHorizontalOverflow(page, 'on franchise record book team view');
   });
@@ -108,39 +113,25 @@ test.describe('Mobile public page smoke tests', () => {
   test('season archive year detail — no horizontal overflow on mobile', async ({ page }) => {
     test.setTimeout(60_000);
     await gotoWithRetry(page, 'modules.php?name=SeasonArchive&year=2026');
+    await assertNoPhpErrors(page, 'on modules.php?name=SeasonArchive&year=2026 (mobile)');
     await expect(page.locator('.ibl-title').first()).toBeVisible();
     await assertNoHorizontalOverflow(page, 'on season archive year detail');
   });
 
   test('registration form — no horizontal overflow on mobile', async ({ page }) => {
     await gotoWithRetry(page, 'modules.php?name=YourAccount&op=new_user');
+    await assertNoPhpErrors(page, 'on modules.php?name=YourAccount&op=new_user (mobile)');
     await expect(page.locator('#register-username')).toBeVisible();
     await assertNoHorizontalOverflow(page, 'on registration form');
   });
 
   test('forgot password form — no horizontal overflow on mobile', async ({ page }) => {
     await gotoWithRetry(page, 'modules.php?name=YourAccount&op=pass_lost');
+    await assertNoPhpErrors(page, 'on modules.php?name=YourAccount&op=pass_lost (mobile)');
     await expect(page.locator('#reset-email')).toBeVisible();
     await assertNoHorizontalOverflow(page, 'on forgot password form');
   });
 
-  test('no PHP errors on mobile public pages', async ({ page }) => {
-    test.setTimeout(120_000);
-    const urls = [
-      ...PAGES.map(p => p.url),
-      'modules.php?name=Schedule&teamid=1',
-      'modules.php?name=DraftHistory&year=2026',
-      'modules.php?name=DraftHistory&teamid=1',
-      'modules.php?name=FranchiseRecordBook&teamid=1',
-      'modules.php?name=SeasonArchive&year=2026',
-      'modules.php?name=YourAccount&op=new_user',
-      'modules.php?name=YourAccount&op=pass_lost',
-    ];
-    for (const url of urls) {
-      await gotoWithRetry(page, url);
-      await assertNoPhpErrors(page, `on ${url} (mobile)`);
-    }
-  });
 });
 
 test.describe('Responsive scroll container tests', () => {
@@ -151,6 +142,7 @@ test.describe('Responsive scroll container tests', () => {
   test('standings — scroll container is scrollable on mobile', async ({ page }) => {
     test.setTimeout(60_000);
     await gotoWithRetry(page, 'modules.php?name=Standings');
+    await assertNoPhpErrors(page, 'on modules.php?name=Standings (mobile)');
     await expect(page.locator('.ibl-data-table').first()).toBeVisible();
     await assertScrollContainerIsScrollable(page, page.locator('.table-scroll-container').first(), 'on standings');
   });
@@ -158,6 +150,7 @@ test.describe('Responsive scroll container tests', () => {
   test('season leaderboards — scroll container is scrollable on mobile', async ({ page }) => {
     test.setTimeout(60_000);
     await gotoWithRetry(page, 'modules.php?name=SeasonLeaderboards');
+    await assertNoPhpErrors(page, 'on modules.php?name=SeasonLeaderboards (mobile)');
     await expect(page.locator('.ibl-data-table').first()).toBeVisible();
     await assertScrollContainerIsScrollable(page, page.locator('.table-scroll-container').first(), 'on season leaderboards');
   });
@@ -165,6 +158,7 @@ test.describe('Responsive scroll container tests', () => {
   test('contract list — scroll container is scrollable on mobile', async ({ page }) => {
     test.setTimeout(60_000);
     await gotoWithRetry(page, 'modules.php?name=ContractList');
+    await assertNoPhpErrors(page, 'on modules.php?name=ContractList (mobile)');
     await expect(page.locator('.ibl-data-table').first()).toBeVisible();
     await assertScrollContainerIsScrollable(page, page.locator('.table-scroll-container').first(), 'on contract list');
   });
@@ -172,6 +166,7 @@ test.describe('Responsive scroll container tests', () => {
   test('standings — sticky column stays visible after scroll', async ({ page }) => {
     test.setTimeout(60_000);
     await gotoWithRetry(page, 'modules.php?name=Standings');
+    await assertNoPhpErrors(page, 'on modules.php?name=Standings (mobile)');
     // Wait for tbody rows to render (query JOINs ibl_team_info) — toBeAttached
     // retries for up to 10s and works even if the element is below the fold
     await expect(page.locator('.table-scroll-container tbody td.sticky-col').first())
@@ -194,6 +189,7 @@ test.describe('Responsive scroll container tests', () => {
   test('season leaderboards — scroll shadow indicator present on load', async ({ page }) => {
     test.setTimeout(60_000);
     await gotoWithRetry(page, 'modules.php?name=SeasonLeaderboards');
+    await assertNoPhpErrors(page, 'on modules.php?name=SeasonLeaderboards (mobile)');
     await expect(page.locator('.table-scroll-wrapper').first()).toBeAttached();
     await expect(page.locator('.table-scroll-wrapper').first()).not.toHaveClass(/scrolled-end/);
   });
@@ -201,6 +197,7 @@ test.describe('Responsive scroll container tests', () => {
   test('season leaderboards — scroll shadow disappears after scrolling to end', async ({ page }) => {
     test.setTimeout(60_000);
     await gotoWithRetry(page, 'modules.php?name=SeasonLeaderboards');
+    await assertNoPhpErrors(page, 'on modules.php?name=SeasonLeaderboards (mobile)');
     await expect(page.locator('.table-scroll-container').first()).toBeAttached();
     await page.locator('.table-scroll-container').first().evaluate((el: Element) => {
       const container = el as HTMLElement;

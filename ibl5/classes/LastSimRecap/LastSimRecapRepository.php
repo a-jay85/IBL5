@@ -328,9 +328,9 @@ class LastSimRecapRepository extends \BaseMysqliRepository implements LastSimRec
             return null;
         }
 
-        /** @var array{pid:int,name:string,pos:string,calc_points:int|null,game_min:int|null}|null $row */
+        /** @var array{pid:int,name:string,pos:string,calc_points:int|null,calc_rebounds:int|null,game_ast:int|null,game_stl:int|null,game_blk:int|null,game_min:int|null}|null $row */
         $row = $this->fetchOne(
-            "SELECT pid, name, pos, calc_points, game_min
+            "SELECT pid, name, pos, calc_points, calc_rebounds, game_ast, game_stl, game_blk, game_min
              FROM {$this->boxScoresTable}
              WHERE game_date = ?
                AND visitor_teamid = ?
@@ -354,6 +354,10 @@ class LastSimRecapRepository extends \BaseMysqliRepository implements LastSimRec
             'name' => $row['name'],
             'pos' => $row['pos'],
             'pts' => (int) ($row['calc_points'] ?? 0),
+            'reb' => (int) ($row['calc_rebounds'] ?? 0),
+            'ast' => (int) ($row['game_ast'] ?? 0),
+            'stl' => (int) ($row['game_stl'] ?? 0),
+            'blk' => (int) ($row['game_blk'] ?? 0),
             'minutes' => (int) ($row['game_min'] ?? 0),
         ];
     }

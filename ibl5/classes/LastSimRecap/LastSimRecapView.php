@@ -354,6 +354,10 @@ class LastSimRecapView implements LastSimRecapViewInterface
             pid: $s->youPid,
             name: $s->youName,
             pts: $s->youPts,
+            reb: $s->youReb,
+            ast: $s->youAst,
+            stl: $s->youStl,
+            blk: $s->youBlk,
             hurt: $s->youHurt,
         );
         $h .= $this->renderPlayerRow(
@@ -361,6 +365,10 @@ class LastSimRecapView implements LastSimRecapViewInterface
             pid: $s->oppPid,
             name: $s->oppName,
             pts: $s->oppPts,
+            reb: $s->oppReb,
+            ast: $s->oppAst,
+            stl: $s->oppStl,
+            blk: $s->oppBlk,
             hurt: false,
         );
         $h .= '</div>';
@@ -368,12 +376,13 @@ class LastSimRecapView implements LastSimRecapViewInterface
         return $h;
     }
 
-    private function renderPlayerRow(bool $isYou, int $pid, string $name, int $pts, bool $hurt): string
+    private function renderPlayerRow(bool $isYou, int $pid, string $name, int $pts, int $reb, int $ast, int $stl, int $blk, bool $hurt): string
     {
         $youMod = $isYou ? ' last-sim-recap__player--you' : '';
         $parts = explode(' ', $name);
         $lastName = end($parts);
         $playerUrl = 'modules.php?name=Player&amp;pa=showpage&amp;pid=' . $pid;
+        $statline = $pts . '/' . $reb . '/' . $ast . '/' . $stl . '/' . $blk;
 
         $h  = '<div class="last-sim-recap__player' . $youMod . '">';
         $h .= '  <a href="' . $playerUrl . '" class="last-sim-recap__avatar-wrap">';
@@ -384,7 +393,7 @@ class LastSimRecapView implements LastSimRecapViewInterface
         $h .= '  </a>';
         $h .= '  <a href="' . $playerUrl . '" class="last-sim-recap__player-name">' . HtmlSanitizer::e($name) . '</a>';
         $h .= '  <a href="' . $playerUrl . '" class="last-sim-recap__player-lname">' . HtmlSanitizer::e($lastName) . '</a>';
-        $h .= '  <span class="last-sim-recap__player-pts">' . HtmlSanitizer::e((string) $pts) . '</span>';
+        $h .= '  <span class="last-sim-recap__player-statline">' . HtmlSanitizer::e($statline) . '</span>';
         $h .= '</div>';
 
         return $h;

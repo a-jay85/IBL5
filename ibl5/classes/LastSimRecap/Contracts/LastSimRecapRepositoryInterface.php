@@ -50,6 +50,10 @@ namespace LastSimRecap\Contracts;
  *   name:string,
  *   pos:string,
  *   pts:int,
+ *   reb:int,
+ *   ast:int,
+ *   stl:int,
+ *   blk:int,
  *   minutes:int
  * }
  *

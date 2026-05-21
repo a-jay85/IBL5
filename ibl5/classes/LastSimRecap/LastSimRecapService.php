@@ -175,10 +175,18 @@ class LastSimRecapService implements LastSimRecapServiceInterface
                 youPid: $yourPid,
                 youName: $this->shortName($this->lookupPlayerName($yourPid) ?: ($yourLine['name'] ?? '')),
                 youPts: $yourLine['pts'] ?? 0,
+                youReb: $yourLine['reb'] ?? 0,
+                youAst: $yourLine['ast'] ?? 0,
+                youStl: $yourLine['stl'] ?? 0,
+                youBlk: $yourLine['blk'] ?? 0,
                 youHurt: isset($hurtPids[$yourPid]),
                 oppPid: $oppPid,
                 oppName: $this->shortName($this->lookupPlayerName($oppPid) ?: ($oppLine['name'] ?? '')),
                 oppPts: $oppLine['pts'] ?? 0,
+                oppReb: $oppLine['reb'] ?? 0,
+                oppAst: $oppLine['ast'] ?? 0,
+                oppStl: $oppLine['stl'] ?? 0,
+                oppBlk: $oppLine['blk'] ?? 0,
             );
         }
 

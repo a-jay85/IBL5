@@ -175,8 +175,8 @@ class LastSimRecapViewTest extends TestCase
     {
         return new RecapStarter(
             pos: $pos,
-            youPid: 1, youName: 'D. Garland', youPts: 18, youHurt: false,
-            oppPid: 2, oppName: 'C. Cunningham', oppPts: 24,
+            youPid: 1, youName: 'D. Garland', youPts: 18, youReb: 5, youAst: 7, youStl: 2, youBlk: 0, youHurt: false,
+            oppPid: 2, oppName: 'C. Cunningham', oppPts: 24, oppReb: 8, oppAst: 4, oppStl: 1, oppBlk: 3,
         );
     }
 

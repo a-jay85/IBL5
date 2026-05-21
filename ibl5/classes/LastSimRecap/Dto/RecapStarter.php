@@ -11,9 +11,17 @@ final class RecapStarter
         public readonly int $youPid,
         public readonly string $youName,
         public readonly int $youPts,
+        public readonly int $youReb,
+        public readonly int $youAst,
+        public readonly int $youStl,
+        public readonly int $youBlk,
         public readonly bool $youHurt,
         public readonly int $oppPid,
         public readonly string $oppName,
         public readonly int $oppPts,
+        public readonly int $oppReb,
+        public readonly int $oppAst,
+        public readonly int $oppStl,
+        public readonly int $oppBlk,
     ) {}
 }

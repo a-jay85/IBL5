@@ -1,9 +1,4 @@
----
-description: Worktree instructions for the css-architecture-cleanup branch.
-last_verified: 2026-05-20
----
+# Worktree: e2e-status-check-in-goto-retry
 
-# Worktree: css-architecture-cleanup
-
-This worktree's Docker instance is at `css-architecture-cleanup.localhost`.
+This worktree's Docker instance is at `e2e-status-check-in-goto-retry.localhost`.
 Use this hostname for all browser checks, curl, and E2E — never `main.localhost`.

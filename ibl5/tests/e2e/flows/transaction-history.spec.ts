@@ -36,7 +36,6 @@ test.describe('Transaction History flow', () => {
     await expect(table).toBeVisible();
     const rows = table.locator('tbody tr');
     await expect(rows.first()).toBeVisible();
-    expect(await rows.count()).toBeGreaterThanOrEqual(1);
   });
 
   test('filtering by category shows matching badge spans', async ({

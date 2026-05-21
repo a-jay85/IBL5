@@ -27,7 +27,7 @@ test.describe('Player Movement flow', () => {
     expect(headerText).toContain('New');
 
     const rows = table.first().locator('tbody tr');
-    expect(await rows.count()).toBeGreaterThanOrEqual(1);
+    await expect(rows.first()).toBeVisible();
   });
 
   test('player links navigate to player page', async ({ page }) => {

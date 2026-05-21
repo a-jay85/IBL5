@@ -73,7 +73,7 @@ test.describe('Draft History flow', () => {
     const table = page.locator('.draft-history-table');
     await expect(table.first()).toBeVisible();
     const rows = table.first().locator('tbody tr');
-    expect(await rows.count()).toBeGreaterThanOrEqual(1);
+    await expect(rows.first()).toBeVisible();
   });
 
   test('draft table has responsive-table class', async ({ page }) => {

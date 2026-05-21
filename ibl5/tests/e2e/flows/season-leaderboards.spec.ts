@@ -25,7 +25,6 @@ test.describe('Season Leaderboards flow', () => {
     await expect(table.first()).toBeVisible();
     const rows = table.first().locator('tbody tr');
     await expect(rows.first()).toBeVisible();
-    expect(await rows.count()).toBeGreaterThanOrEqual(1);
   });
 
   test('table has sticky rank and name columns', async ({ page }) => {

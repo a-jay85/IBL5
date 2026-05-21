@@ -30,7 +30,7 @@ test.describe('Season Highs flow', () => {
     expect(count).toBeGreaterThanOrEqual(3);
 
     const firstTableRows = tables.first().locator('tbody tr');
-    expect(await firstTableRows.count()).toBeGreaterThanOrEqual(1);
+    await expect(firstTableRows.first()).toBeVisible();
   });
 
   test('stat tables have header content', async ({ page }) => {

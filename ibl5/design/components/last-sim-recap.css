@@ -279,7 +279,7 @@
     border-bottom: 1px solid var(--gray-100);
 }
 .last-sim-recap__cell {
-    padding: 0 1.2rem;
+    padding: .9rem 1.2rem 0;
     border-left: 1px solid var(--gray-100);
     grid-row: 1 / -1;
     display: grid;
@@ -292,11 +292,11 @@
     justify-content: space-between;
     gap: .5rem;
     margin: 0;
-    padding: .9rem 0 .5rem;
+    padding: 0 0 .5rem;
 }
 .last-sim-recap__cell-head {
     margin: 0;
-    padding: .9rem 0 .5rem;
+    padding: 0 0 .5rem;
     font-family: var(--font-display);
     font-weight: 700;
     font-size: .78rem;
@@ -702,9 +702,7 @@ a.last-sim-recap__player-lname:hover { text-decoration: underline }
     .last-sim-recap__cell:first-child { border-top: none }
     .last-sim-recap__final { display: grid; grid-template-columns: 30px 1fr auto; row-gap: .4rem; column-gap: .6rem }
     .last-sim-recap__final-row { grid-column: 1 / -1; align-content: initial }
-    .last-sim-recap__cell { padding: .9rem 1.2rem }
-    .last-sim-recap__cell-head-row,
-    .last-sim-recap__cell-head { padding-top: 0 }
+    .last-sim-recap__cell { padding-bottom: .9rem }
     .last-sim-recap__final-row + .last-sim-recap__final-row { padding-bottom: 0 }
     .last-sim-recap__mom { display: block }
     .last-sim-recap__mom-chart { height: 120px; padding-bottom: 14px; grid-row: auto; min-height: auto }

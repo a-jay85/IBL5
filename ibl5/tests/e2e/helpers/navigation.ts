@@ -17,13 +17,18 @@ export async function openMobileMenu(page: Page): Promise<Locator> {
 export async function gotoWithRetry(page: Page, url: string): Promise<void> {
   for (let attempt = 0; attempt < 5; attempt++) {
     if (attempt > 0) await page.waitForTimeout(attempt * 1000);
+    let response: Awaited<ReturnType<Page['goto']>>;
     try {
-      await page.goto(url, { timeout: 15_000 });
+      response = await page.goto(url, { timeout: 15_000 });
     } catch {
       continue;
     }
     const body = await page.locator('body').innerText();
-    if (body.trim().length >= 20) return;
+    if (body.trim().length < 20) continue;
+    if (response && response.status() >= 400) {
+      throw new Error(`Page returned HTTP ${response.status()} for ${url}`);
+    }
+    return;
   }
   throw new Error(`Page returned blank content after 5 attempts: ${url}`);
 }

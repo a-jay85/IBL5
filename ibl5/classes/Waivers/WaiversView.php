@@ -28,6 +28,7 @@ class WaiversView implements WaiversViewInterface
     ): string {
         ob_start();
         ?>
+        <div class="waivers-page">
         <h2 class="ibl-title">Waivers</h2>
         <?= \UI\AlertRenderer::fromCode($result, [
             'player_added'   => ['class' => 'ibl-alert--success', 'message' => 'Player successfully signed from waivers.'],
@@ -61,6 +62,7 @@ class WaiversView implements WaiversViewInterface
                 </div>
             </div>
         </form>
+        </div>
         <?php
         return (string) ob_get_clean();
     }
@@ -91,6 +93,9 @@ class WaiversView implements WaiversViewInterface
      */
     public function renderWaiversClosed(): string
     {
-        return "Sorry, but players may not be added from or dropped to waivers at the present time.";
+        return '<div class="waivers-page">'
+            . '<h2 class="ibl-title">Waivers</h2>'
+            . '<p>Sorry, but players may not be added from or dropped to waivers at the present time.</p>'
+            . '</div>';
     }
 }

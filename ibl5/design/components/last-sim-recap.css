@@ -651,16 +651,18 @@ a.last-sim-recap__player-lname:hover { text-decoration: underline }
     overflow: hidden;
     text-overflow: ellipsis;
     min-width: 0;
+    text-align: left;
 }
 .last-sim-recap__player-lname { display: none }
 .last-sim-recap__player-statline {
-    font-size: .86rem;
+    font-size: .75rem;
     font-weight: 700;
     color: var(--navy-900);
     text-align: right;
     white-space: nowrap;
-    width: 11ch;
     flex-shrink: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
     font-variant-numeric: tabular-nums;
 }
 

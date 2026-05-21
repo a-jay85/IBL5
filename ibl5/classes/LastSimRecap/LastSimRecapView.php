@@ -382,7 +382,20 @@ class LastSimRecapView implements LastSimRecapViewInterface
         $parts = explode(' ', $name);
         $lastName = end($parts);
         $playerUrl = 'modules.php?name=Player&amp;pa=showpage&amp;pid=' . $pid;
-        $statline = $pts . '/' . $reb . '/' . $ast . '/' . $stl . '/' . $blk;
+        $parts = [$pts . ' pts'];
+        if ($reb >= 5) {
+            $parts[] = $reb . ' reb';
+        }
+        if ($ast >= 5) {
+            $parts[] = $ast . ' ast';
+        }
+        if ($stl >= 2) {
+            $parts[] = $stl . ' stl';
+        }
+        if ($blk >= 2) {
+            $parts[] = $blk . ' blk';
+        }
+        $statline = implode(', ', $parts);
 
         $h  = '<div class="last-sim-recap__player' . $youMod . '">';
         $h .= '  <a href="' . $playerUrl . '" class="last-sim-recap__avatar-wrap">';

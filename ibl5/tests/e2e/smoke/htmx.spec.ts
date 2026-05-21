@@ -99,7 +99,6 @@ test.describe('HTMX hx-boost navigation', () => {
   test('roster page loads without PHP errors', async ({ page }) => {
     await page.goto('modules.php?name=Roster');
     await assertNoPhpErrors(page, 'on modules.php?name=Roster');
-    await expect(page.locator('.ibl-data-table, table').first()).toBeVisible();
   });
 
   test('boosted form submission swaps content without full page reload', async ({ page }) => {

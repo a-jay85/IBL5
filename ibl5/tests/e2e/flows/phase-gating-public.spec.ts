@@ -1,9 +1,16 @@
 import { test, expect } from '../fixtures/public';
 import { assertNoPhpErrors } from '../helpers/php-errors';
 
-// Phase-gating tests as unauthenticated (public) user.
-// The admin test user bypasses phase gates, so these tests use the public
-// fixture to verify that features are properly gated when disabled.
+/**
+ * Each phase gate is tested in BOTH directions:
+ *  - DENY: feature off / wrong phase → element must NOT be visible (catches gate regressions).
+ *  - ALLOW: feature on / correct phase → element MUST be visible (catches selector renames
+ *    that would silently make the DENY test trivially pass).
+ *
+ * If you rename a gated form or table, both the DENY selector and the ALLOW selector
+ * must be updated. The ALLOW test will fail loudly if you forget.
+ */
+
 test.describe('Trading disabled', () => {
   test('trading page shows disabled message when trades off', async ({
     appState,
@@ -18,6 +25,20 @@ test.describe('Trading disabled', () => {
     expect(teamSelectVisible).toBe(false);
 
     await assertNoPhpErrors(page, 'on Trading with trades disabled');
+  });
+
+  test('trading page shows trade form when trades on', async ({
+    appState,
+    page,
+  }) => {
+    await appState({ 'Allow Trades': 'Yes' });
+    await page.goto('modules.php?name=Trading');
+
+    await expect(
+      page.locator('.trading-team-select, form[name="trade_propose"]')
+    ).toBeVisible();
+
+    await assertNoPhpErrors(page, 'on Trading with trades enabled');
   });
 });
 
@@ -39,6 +60,21 @@ test.describe('Draft hidden', () => {
 
     await assertNoPhpErrors(page, 'on Draft when hidden');
   });
+
+  test('draft page shows draft table when in draft phase and link on', async ({
+    appState,
+    page,
+  }) => {
+    await appState({
+      'Current Season Phase': 'Draft',
+      'Show Draft Link': 'On',
+    });
+    await page.goto('modules.php?name=Draft');
+
+    await expect(page.locator('table.draft-table')).toBeVisible();
+
+    await assertNoPhpErrors(page, 'on Draft when enabled');
+  });
 });
 
 test.describe('Voting closed (ASG)', () => {
@@ -58,6 +94,21 @@ test.describe('Voting closed (ASG)', () => {
     expect(formVisible).toBe(false);
 
     await assertNoPhpErrors(page, 'on Voting with ASG voting off');
+  });
+
+  test('ASG voting shows ballot form when voting enabled', async ({
+    appState,
+    page,
+  }) => {
+    await appState({
+      'Current Season Phase': 'Regular Season',
+      'ASG Voting': 'Yes',
+    });
+    await page.goto('modules.php?name=Voting');
+
+    await expect(page.locator('form[name="ASGVote"]')).toBeVisible();
+
+    await assertNoPhpErrors(page, 'on Voting with ASG voting on');
   });
 });
 
@@ -79,6 +130,21 @@ test.describe('Voting closed (EOY)', () => {
 
     await assertNoPhpErrors(page, 'on Voting with EOY voting off');
   });
+
+  test('EOY voting shows ballot form when voting enabled', async ({
+    appState,
+    page,
+  }) => {
+    await appState({
+      'Current Season Phase': 'Free Agency',
+      'EOY Voting': 'Yes',
+    });
+    await page.goto('modules.php?name=Voting');
+
+    await expect(page.locator('form[name="EOYVote"]')).toBeVisible();
+
+    await assertNoPhpErrors(page, 'on Voting with EOY voting on');
+  });
 });
 
 test.describe('Waivers disabled', () => {
@@ -95,5 +161,19 @@ test.describe('Waivers disabled', () => {
     expect(formVisible).toBe(false);
 
     await assertNoPhpErrors(page, 'on Waivers with moves disabled');
+  });
+
+  test('waivers page shows form when waiver moves on', async ({
+    appState,
+    page,
+  }) => {
+    await appState({ 'Allow Waiver Moves': 'Yes' });
+    await page.goto('modules.php?name=Waivers');
+
+    await expect(
+      page.locator('form[name="waiver_add"], .waiver-form')
+    ).toBeVisible();
+
+    await assertNoPhpErrors(page, 'on Waivers with moves enabled');
   });
 });

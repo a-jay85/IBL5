@@ -1,8 +1,5 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from '../fixtures/public';
 import { gotoWithRetry } from '../helpers/navigation';
-import { publicStorageState } from '../helpers/public-storage-state';
-
-test.use({ storageState: publicStorageState() });
 
 test.describe('gotoWithRetry helper', () => {
   test('throws on HTTP 500 with non-blank body', async ({ page }) => {

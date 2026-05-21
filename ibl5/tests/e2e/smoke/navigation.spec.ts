@@ -11,19 +11,21 @@ test.use({ storageState: publicStorageState() });
 test.describe('Navigation bar smoke tests (public)', () => {
   test('nav bar is visible on homepage', async ({ page }) => {
     await page.goto('index.php');
+    await assertNoPhpErrors(page, 'on index.php');
     await expect(page.locator('nav.fixed').first()).toBeVisible();
   });
 
   test('logo links to homepage and displays IBL branding', async ({ page }) => {
     await page.goto('index.php');
+    await assertNoPhpErrors(page, 'on index.php');
     const logo = page.locator('nav a[href="index.php"]').first();
     await expect(logo).toBeVisible();
     await expect(logo.locator('text=IBL')).toBeVisible();
   });
 
   test('desktop menu buttons are visible', async ({ page }) => {
-    // Default viewport (1280x720) is above lg breakpoint — desktop nav shows
     await page.goto('index.php');
+    await assertNoPhpErrors(page, 'on index.php');
     const nav = desktopNav(page);
     await expect(nav).toBeVisible();
 
@@ -39,6 +41,7 @@ test.describe('Navigation bar smoke tests (public)', () => {
 
   test('login button shown for unauthenticated users', async ({ page }) => {
     await page.goto('index.php');
+    await assertNoPhpErrors(page, 'on index.php');
     await expect(
       desktopNav(page).getByRole('button', { name: 'Login' }),
     ).toBeVisible();
@@ -46,20 +49,22 @@ test.describe('Navigation bar smoke tests (public)', () => {
 
   test('my team menu not shown for unauthenticated users', async ({ page }) => {
     await page.goto('index.php');
+    await assertNoPhpErrors(page, 'on index.php');
     await expect(
       desktopNav(page).getByRole('button', { name: 'My Team' }),
     ).not.toBeAttached();
   });
 
   test('mobile hamburger and menu panel exist in DOM', async ({ page }) => {
-    // On desktop viewport these are in the DOM but hidden (lg:hidden)
     await page.goto('index.php');
+    await assertNoPhpErrors(page, 'on index.php');
     await expect(page.locator('#nav-hamburger')).toBeAttached();
     await expect(page.locator('#nav-mobile-menu')).toBeAttached();
   });
 
   test('desktop dropdown opens on click and shows links', async ({ page }) => {
     await page.goto('index.php');
+    await assertNoPhpErrors(page, 'on index.php');
     const nav = desktopNav(page);
     await nav.getByRole('button', { name: 'Season' }).click();
 
@@ -72,6 +77,7 @@ test.describe('Navigation bar smoke tests (public)', () => {
 
   test('league switcher is inside season dropdown', async ({ page }) => {
     await page.goto('index.php');
+    await assertNoPhpErrors(page, 'on index.php');
     const nav = desktopNav(page);
     await nav.getByRole('button', { name: 'Season' }).click();
 
@@ -82,16 +88,13 @@ test.describe('Navigation bar smoke tests (public)', () => {
 
   test('login form appears in login dropdown', async ({ page }) => {
     await page.goto('index.php');
+    await assertNoPhpErrors(page, 'on index.php');
     await desktopNav(page).getByRole('button', { name: 'Login' }).click();
 
     await expect(page.locator('#nav-username')).toBeVisible();
     await expect(page.locator('#nav-password')).toBeVisible();
   });
 
-  test('no PHP errors on homepage', async ({ page }) => {
-    await page.goto('index.php');
-    await assertNoPhpErrors(page);
-  });
 });
 
 test.describe('Navigation bar smoke tests (mobile viewport)', () => {
@@ -100,21 +103,25 @@ test.describe('Navigation bar smoke tests (mobile viewport)', () => {
 
   test('hamburger button is visible on mobile', async ({ page }) => {
     await page.goto('index.php');
+    await assertNoPhpErrors(page, 'on index.php');
     await expect(page.locator('#nav-hamburger')).toBeVisible();
   });
 
   test('desktop nav is hidden on mobile', async ({ page }) => {
     await page.goto('index.php');
+    await assertNoPhpErrors(page, 'on index.php');
     await expect(desktopNav(page)).not.toBeVisible();
   });
 
   test('desktop view toggle button is visible on mobile', async ({ page }) => {
     await page.goto('index.php');
+    await assertNoPhpErrors(page, 'on index.php');
     await expect(page.locator('#desktop-view-toggle')).toBeVisible();
   });
 
   test('mobile menu sections exist when panel is opened', async ({ page }) => {
     await page.goto('index.php');
+    await assertNoPhpErrors(page, 'on index.php');
     const mobileMenu = await openMobileMenu(page);
 
     // Static sections (always present regardless of DB state)
@@ -132,6 +139,7 @@ test.describe('Navigation bar smoke tests (mobile viewport)', () => {
 
   test('mobile accordion expands on tap', async ({ page }) => {
     await page.goto('index.php');
+    await assertNoPhpErrors(page, 'on index.php');
     const mobileMenu = await openMobileMenu(page);
 
     await mobileMenu.locator('.mobile-dropdown-btn', {
@@ -146,6 +154,7 @@ test.describe('Navigation bar smoke tests (mobile viewport)', () => {
 
   test('login section appears for unauthenticated mobile users', async ({ page }) => {
     await page.goto('index.php');
+    await assertNoPhpErrors(page, 'on index.php');
     const mobileMenu = await openMobileMenu(page);
 
     await expect(

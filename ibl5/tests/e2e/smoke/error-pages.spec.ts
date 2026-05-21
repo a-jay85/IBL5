@@ -8,13 +8,13 @@ test.use({ storageState: publicStorageState() });
 test.describe('Error page smoke tests', () => {
   test('invalid module name redirects to index', async ({ page }) => {
     await page.goto('modules.php?name=NonExistentModule');
+    await assertNoPhpErrors(page, 'on invalid module name redirect');
     expect(page.url()).toContain('index.php');
   });
 
   test('module name with special characters does not error', async ({ page }) => {
-    // modules.php validates module names — special chars trigger redirect or safe error
     await page.goto('modules.php?name=<script>alert(1)</script>');
-    // Should redirect to index.php (regex rejects non-alphanumeric)
+    await assertNoPhpErrors(page, 'on special characters module name');
     expect(page.url()).toContain('index.php');
   });
 
@@ -27,7 +27,7 @@ test.describe('Error page smoke tests', () => {
 
   test('missing module name parameter redirects to index', async ({ page }) => {
     await page.goto('modules.php');
-    // Should redirect to index.php
+    await assertNoPhpErrors(page, 'on missing module name redirect');
     expect(page.url()).toContain('index.php');
   });
 

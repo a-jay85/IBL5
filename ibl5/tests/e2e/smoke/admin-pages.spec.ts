@@ -3,11 +3,6 @@ import { assertNoPhpErrors } from '../helpers/php-errors';
 
 // Admin-only page smoke tests — require roles_mask = 1 (ADMIN) on the test user.
 
-const ADMIN_URLS = [
-  'scripts/updateAllTheThings.php',
-  'block.php',
-];
-
 test.describe('Admin page smoke tests', () => {
   test('updateAllTheThings page loads for admin', async ({ page }) => {
     const response = await page.goto('scripts/updateAllTheThings.php', {
@@ -16,6 +11,7 @@ test.describe('Admin page smoke tests', () => {
     const status = response?.status() ?? 0;
 
     expect(status, 'Test user must have admin privileges — ensure roles_mask=1').not.toBe(403);
+    await assertNoPhpErrors(page, 'on scripts/updateAllTheThings.php');
 
     // The page renders an Initialization section on success
     await expect(page.getByText('Initialization')).toBeVisible();
@@ -28,6 +24,7 @@ test.describe('Admin page smoke tests', () => {
     const status = response?.status() ?? 0;
 
     expect(status, 'Test user must have admin privileges — ensure roles_mask=1').not.toBe(403);
+    await assertNoPhpErrors(page, 'on scripts/updateAllTheThings.php');
 
     // Pipeline renders a summary: "X steps completed" or "X succeeded"
     await expect(
@@ -40,20 +37,10 @@ test.describe('Admin page smoke tests', () => {
     const status = response?.status() ?? 0;
 
     expect(status, 'Test user must have admin privileges — ensure roles_mask=1').not.toBe(403);
+    await assertNoPhpErrors(page, 'on block.php');
 
     // block.php is the Free Agency admin page — it should render without crashing
     // Content depends on season phase, so just verify no access denial
     expect(status).toBeLessThan(500);
-  });
-
-  test('no PHP errors on admin pages', async ({ page }) => {
-    for (const url of ADMIN_URLS) {
-      const response = await page.goto(url, { timeout: 60_000 });
-      const status = response?.status() ?? 0;
-
-      expect(status, 'Test user must have admin privileges — ensure roles_mask=1').not.toBe(403);
-
-      await assertNoPhpErrors(page, `on ${url}`);
-    }
   });
 });

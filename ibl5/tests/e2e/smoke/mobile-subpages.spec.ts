@@ -60,6 +60,7 @@ test.describe('Player stat view mobile smoke tests', () => {
       test.setTimeout(60_000);
       const url = `${PLAYER_BASE_URL}&${view.param}`;
       await gotoWithRetry(page, url);
+      await assertNoPhpErrors(page, `on player ${view.name} (mobile)`);
 
       const content = page.locator('.player-stats-card, h2, h3').first();
       await expect(content).toBeVisible();
@@ -77,6 +78,7 @@ test.describe('Player stat view mobile smoke tests', () => {
   test('player RS Totals — stats card is scrollable on mobile', async ({ page }) => {
     test.setTimeout(60_000);
     await gotoWithRetry(page, `${PLAYER_BASE_URL}&pageView=3`);
+    await assertNoPhpErrors(page, 'on player RS Totals (mobile)');
     // Player stats tables use .player-stats-card (overflow-x: auto), not .table-scroll-container
     await expect(page.locator('.player-stats-card').first()).toBeVisible();
     await assertScrollContainerIsScrollable(
@@ -86,14 +88,6 @@ test.describe('Player stat view mobile smoke tests', () => {
     );
   });
 
-  test('no PHP errors on player stat view pages', async ({ page }) => {
-    test.setTimeout(120_000);
-    for (const view of PLAYER_VIEWS) {
-      const url = `${PLAYER_BASE_URL}&${view.param}`;
-      await gotoWithRetry(page, url);
-      await assertNoPhpErrors(page, `on player ${view.name} (mobile)`);
-    }
-  });
 });
 
 test.describe('Team display mode mobile smoke tests', () => {
@@ -106,6 +100,7 @@ test.describe('Team display mode mobile smoke tests', () => {
       test.setTimeout(60_000);
       const url = `${TEAM_BASE_URL}&${view.param}`;
       await gotoWithRetry(page, url);
+      await assertNoPhpErrors(page, `on team ${view.name} (mobile)`);
 
       const content = page.locator('.ibl-data-table, table, h2, h3').first();
       await expect(content).toBeVisible();
@@ -120,6 +115,7 @@ test.describe('Team display mode mobile smoke tests', () => {
   test('team Season Totals — scroll container is scrollable on mobile', async ({ page }) => {
     test.setTimeout(60_000);
     await gotoWithRetry(page, `${TEAM_BASE_URL}&display=total_s`);
+    await assertNoPhpErrors(page, 'on team Season Totals (mobile)');
     await expect(page.locator('.ibl-data-table').first()).toBeVisible();
     await assertScrollContainerIsScrollable(
       page,
@@ -128,14 +124,6 @@ test.describe('Team display mode mobile smoke tests', () => {
     );
   });
 
-  test('no PHP errors on team display mode pages', async ({ page }) => {
-    test.setTimeout(120_000);
-    for (const view of TEAM_VIEWS) {
-      const url = `${TEAM_BASE_URL}&${view.param}`;
-      await gotoWithRetry(page, url);
-      await assertNoPhpErrors(page, `on team ${view.name} (mobile)`);
-    }
-  });
 });
 
 test.describe('Olympics mobile smoke tests', () => {
@@ -147,6 +135,7 @@ test.describe('Olympics mobile smoke tests', () => {
     test(`olympics ${entry.name} — loads on mobile`, async ({ page }) => {
       test.setTimeout(60_000);
       await gotoWithRetry(page, entry.url);
+      await assertNoPhpErrors(page, `on olympics ${entry.name} (mobile)`);
       const body = await page.locator('body').textContent();
       expect(body?.length, `olympics ${entry.name} body too short`).toBeGreaterThan(100);
     });
@@ -155,6 +144,7 @@ test.describe('Olympics mobile smoke tests', () => {
   test('olympics Standings — no horizontal overflow on mobile', async ({ page }) => {
     test.setTimeout(60_000);
     await gotoWithRetry(page, 'modules.php?name=Standings&league=olympics');
+    await assertNoPhpErrors(page, 'on olympics Standings (mobile)');
     const body = await page.locator('body').textContent();
     expect(body?.length, 'olympics Standings body too short').toBeGreaterThan(100);
     await assertNoHorizontalOverflow(page, 'on olympics Standings');
@@ -163,16 +153,10 @@ test.describe('Olympics mobile smoke tests', () => {
   test('olympics Team — no horizontal overflow on mobile', async ({ page }) => {
     test.setTimeout(60_000);
     await gotoWithRetry(page, 'modules.php?name=Team&op=team&teamid=1&league=olympics');
+    await assertNoPhpErrors(page, 'on olympics Team (mobile)');
     const body = await page.locator('body').textContent();
     expect(body?.length, 'olympics Team body too short').toBeGreaterThan(100);
     await assertNoHorizontalOverflow(page, 'on olympics Team');
   });
 
-  test('no PHP errors on Olympics mobile pages', async ({ page }) => {
-    test.setTimeout(120_000);
-    for (const entry of OLYMPICS_URLS) {
-      await gotoWithRetry(page, entry.url);
-      await assertNoPhpErrors(page, `on olympics ${entry.name} (mobile)`);
-    }
-  });
 });

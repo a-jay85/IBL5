@@ -141,6 +141,7 @@ const AUTH_MODULES: ModuleSnapshot[] = [
 
 async function captureSnapshot(page: Page, row: ModuleSnapshot): Promise<void> {
   await page.goto(row.url);
+  await assertNoPhpErrors(page, `on ${row.url}`);
   await page.waitForLoadState('networkidle');
   const anchor = page.locator(row.anchor).first();
   await anchor.waitFor({ state: 'visible' });
@@ -182,12 +183,6 @@ publicTest.describe('Visual regression — public pages (full-page)', () => {
     });
   }
 
-  publicTest('no PHP errors on visual regression pages', async ({ page }) => {
-    for (const row of PUBLIC_MODULES) {
-      await page.goto(row.url);
-      await assertNoPhpErrors(page, `on ${row.url}`);
-    }
-  });
 });
 
 // ============================================================
@@ -210,15 +205,4 @@ authTest.describe('Visual regression — authenticated pages (full-page)', () =>
     });
   }
 
-  authTest('no PHP errors on visual regression pages', async ({ appState, page }) => {
-    await appState({
-      'Allow Trades': 'Yes',
-      'Current Season Phase': 'Free Agency',
-      'Show Draft Link': 'Yes',
-    });
-    for (const row of AUTH_MODULES) {
-      await page.goto(row.url);
-      await assertNoPhpErrors(page, `on ${row.url}`);
-    }
-  });
 });

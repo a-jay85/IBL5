@@ -2,9 +2,10 @@
  * Full-page visual regression matrix.
  *
  * One screenshot per module under `ibl5/modules/` (47 modules) plus the
- * homepage (`index.php`) and one mobile-only repeat of DepthChartEntry at
- * 375×812. All other shots use the desktop 1280×900 viewport from
- * `playwright.visual.config.ts`. Total: 49 baselines.
+ * homepage (`index.php`) and seven mobile-only repeats at 375×812 (Standings,
+ * Player, Team, Schedule, FreeAgency, Trading, DepthChartEntry). All other
+ * shots use the desktop 1280×900 viewport from `playwright.visual.config.ts`.
+ * Total: 53 baselines.
  *
  * - Public-fixture modules render without authentication.
  * - Auth-fixture modules use the CI test user (admin role, Metros GM).
@@ -90,12 +91,15 @@ const PUBLIC_MODULES: ModuleSnapshot[] = [
   { name: 'news', url: 'modules.php?name=News', anchor: 'article',
     extraMask: ['article time'] },
   { name: 'player', url: 'modules.php?name=Player&pa=showpage&pid=1', anchor: '.stats-grid' },
+  { name: 'player-mobile', url: 'modules.php?name=Player&pa=showpage&pid=1', anchor: '.stats-grid', mobile: true },
   { name: 'player-database', url: 'modules.php?name=PlayerDatabase', anchor: 'form[action*="PlayerDatabase"]' },
   { name: 'player-movement', url: 'modules.php?name=PlayerMovement', anchor: '.ibl-data-table' },
   { name: 'projected-draft-order', url: 'modules.php?name=ProjectedDraftOrder', anchor: '.ibl-data-table' },
   { name: 'record-holders', url: 'modules.php?name=RecordHolders', anchor: '.record-section' },
   { name: 'schedule', url: 'modules.php?name=Schedule', anchor: '.schedule-header',
     extraMask: ['.schedule-today-highlight'] },
+  { name: 'league-schedule-mobile', url: 'modules.php?name=Schedule', anchor: '.schedule-header',
+    extraMask: ['.schedule-today-highlight'], mobile: true },
   { name: 'search', url: 'modules.php?name=Search', anchor: '.search-page' },
   { name: 'season-archive', url: 'modules.php?name=SeasonArchive', anchor: '.ibl-data-table' },
   { name: 'season-highs', url: 'modules.php?name=SeasonHighs', anchor: '.ibl-data-table' },
@@ -103,7 +107,9 @@ const PUBLIC_MODULES: ModuleSnapshot[] = [
     elementScreenshot: true },
   { name: 'series-records', url: 'modules.php?name=SeriesRecords', anchor: '.ibl-data-table' },
   { name: 'standings', url: 'modules.php?name=Standings', anchor: '.ibl-data-table' },
+  { name: 'standings-mobile', url: 'modules.php?name=Standings', anchor: '.ibl-data-table', mobile: true },
   { name: 'team', url: 'modules.php?name=Team&op=team&teamid=1', anchor: '.team-page-layout' },
+  { name: 'team-mobile', url: 'modules.php?name=Team&op=team&teamid=1', anchor: '.team-page-layout', mobile: true },
   { name: 'team-off-def-stats', url: 'modules.php?name=TeamOffDefStats', anchor: '.ibl-data-table' },
   { name: 'topics', url: 'modules.php?name=Topics', anchor: '.topics-page' },
   { name: 'transaction-history', url: 'modules.php?name=TransactionHistory', anchor: '.ibl-data-table',
@@ -123,6 +129,8 @@ const AUTH_MODULES: ModuleSnapshot[] = [
     notes: 'Outside Draft phase, requires Show Draft Link toggle to render.' },
   { name: 'free-agency', url: 'modules.php?name=FreeAgency', anchor: '.fa-table',
     state: { 'Current Season Phase': 'Free Agency' } },
+  { name: 'free-agency-mobile', url: 'modules.php?name=FreeAgency', anchor: '.fa-table',
+    state: { 'Current Season Phase': 'Free Agency' }, mobile: true },
   { name: 'next-sim', url: 'modules.php?name=NextSim', anchor: '.next-sim-container',
     extraMask: ['time.local-time'] },
   { name: 'one-on-one-game', url: 'modules.php?name=OneOnOneGame', anchor: 'form[name="OneOnOneGame"]',
@@ -131,6 +139,8 @@ const AUTH_MODULES: ModuleSnapshot[] = [
     notes: 'Admin-only documentation; static content.' },
   { name: 'trading', url: 'modules.php?name=Trading', anchor: '.trading-team-select',
     state: { 'Allow Trades': 'Yes' } },
+  { name: 'trading-mobile', url: 'modules.php?name=Trading', anchor: '.trading-team-select',
+    state: { 'Allow Trades': 'Yes' }, mobile: true },
   { name: 'training-camp-ratings-diff', url: 'modules.php?name=TrainingCampRatingsDiff', anchor: '.ratings-diff-page',
     notes: 'Admin-only; renders empty state unless ratings snapshot exists.' },
   { name: 'voting', url: 'modules.php?name=Voting', anchor: '.voting-form-container' },
@@ -138,6 +148,9 @@ const AUTH_MODULES: ModuleSnapshot[] = [
 ];
 
 async function captureSnapshot(page: Page, row: ModuleSnapshot): Promise<void> {
+  if (row.mobile) {
+    await page.setViewportSize({ width: 375, height: 812 });
+  }
   await page.goto(row.url);
   await assertNoPhpErrors(page, `on ${row.url}`);
   await page.waitForLoadState('networkidle');
@@ -192,9 +205,6 @@ authTest.describe('Visual regression — authenticated pages (full-page)', () =>
     authTest(`${row.name}`, async ({ appState, page }) => {
       if (row.state) {
         await appState(row.state);
-      }
-      if (row.mobile) {
-        await page.setViewportSize({ width: 375, height: 812 });
       }
       if (row.notes) {
         console.log(`[visual-regression] ${row.name}: ${row.notes}`);

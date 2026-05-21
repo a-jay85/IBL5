@@ -117,6 +117,7 @@ class LastSimRecapService implements LastSimRecapServiceInterface
         $ot = false;
         $oppPreWins = 0;
         $oppPreLosses = 0;
+        $gameOfThatDay = 0;
 
         if ($lines !== null) {
             $ot = $lines['visOT'] > 0 || $lines['homeOT'] > 0;
@@ -134,6 +135,7 @@ class LastSimRecapService implements LastSimRecapServiceInterface
             }
             $oppPreWins = $home ? $lines['visitorPreWins'] : $lines['homePreWins'];
             $oppPreLosses = $home ? $lines['visitorPreLosses'] : $lines['homePreLosses'];
+            $gameOfThatDay = $lines['gameOfThatDay'];
         }
 
         // Active injuries as of game date for both teams.
@@ -182,6 +184,8 @@ class LastSimRecapService implements LastSimRecapServiceInterface
 
         return new RecapGame(
             schedId: $g['schedId'],
+            boxId: $g['boxId'],
+            gameOfThatDay: $gameOfThatDay,
             date: $g['date'],
             home: $home,
             won: $won,

@@ -11,6 +11,7 @@ use LastSimRecap\Dto\RecapSlate;
 use LastSimRecap\Dto\RecapStarter;
 use Player\PlayerImageHelper;
 use Security\HtmlSanitizer;
+use Utilities\BoxScoreUrlBuilder;
 
 class LastSimRecapView implements LastSimRecapViewInterface
 {
@@ -178,24 +179,32 @@ class LastSimRecapView implements LastSimRecapViewInterface
         $oppLogo = 'images/logo/new' . $g->oppTid . '.png';
         $yourRowMod = $g->won ? ' last-sim-recap__final-row--win' : '';
         $oppRowMod = $g->won ? '' : ' last-sim-recap__final-row--win';
+        $yourTeamUrl = 'modules.php?name=Team&amp;op=team&amp;teamid=' . $slate->teamTid;
+        $oppTeamUrl = 'modules.php?name=Team&amp;op=team&amp;teamid=' . $g->oppTid;
+        $boxUrl = BoxScoreUrlBuilder::buildUrl($g->date, $g->gameOfThatDay, $g->boxId);
 
         $h  = '<div class="last-sim-recap__cell">';
-        $h .= '  <h4 class="last-sim-recap__cell-head">Final</h4>';
+        $h .= '  <div class="last-sim-recap__cell-head-row">';
+        $h .= '    <h4 class="last-sim-recap__cell-head">Final</h4>';
+        if ($boxUrl !== '') {
+            $h .= '    <a href="' . HtmlSanitizer::e($boxUrl) . '" class="last-sim-recap__box-link">Box score</a>';
+        }
+        $h .= '  </div>';
         $h .= '  <div class="last-sim-recap__final">';
 
         $h .= '    <div class="last-sim-recap__final-row' . $yourRowMod . '">';
         $h .= '      <img src="' . HtmlSanitizer::e($yourLogo) . '" alt="" class="last-sim-recap__team-mark" width="30" height="30" loading="lazy">';
-        $h .= '      <span class="last-sim-recap__final-name">' . HtmlSanitizer::e($slate->teamName);
+        $h .= '      <a href="' . $yourTeamUrl . '" class="last-sim-recap__final-name">' . HtmlSanitizer::e($slate->teamName);
         $h .= '        <span class="last-sim-recap__final-rec">' . HtmlSanitizer::e($yourRec) . '</span>';
-        $h .= '      </span>';
+        $h .= '      </a>';
         $h .= '      <span class="last-sim-recap__final-pts">' . HtmlSanitizer::e((string) $g->yourScore) . '</span>';
         $h .= '    </div>';
 
         $h .= '    <div class="last-sim-recap__final-row' . $oppRowMod . '">';
         $h .= '      <img src="' . HtmlSanitizer::e($oppLogo) . '" alt="" class="last-sim-recap__team-mark" width="30" height="30" loading="lazy">';
-        $h .= '      <span class="last-sim-recap__final-name">' . HtmlSanitizer::e($g->oppName);
+        $h .= '      <a href="' . $oppTeamUrl . '" class="last-sim-recap__final-name">' . HtmlSanitizer::e($g->oppName);
         $h .= '        <span class="last-sim-recap__final-rec">' . HtmlSanitizer::e($oppRec) . '</span>';
-        $h .= '      </span>';
+        $h .= '      </a>';
         $h .= '      <span class="last-sim-recap__final-pts">' . HtmlSanitizer::e((string) $g->oppScore) . '</span>';
         $h .= '    </div>';
 
@@ -255,10 +264,13 @@ class LastSimRecapView implements LastSimRecapViewInterface
         $h .= '  <h4 class="last-sim-recap__cell-head">Injury report</h4>';
         $h .= '  <div class="last-sim-recap__inj">';
 
+        $yourTeamUrl = 'modules.php?name=Team&amp;op=team&amp;teamid=' . $slate->teamTid;
+        $oppTeamUrl = 'modules.php?name=Team&amp;op=team&amp;teamid=' . $g->oppTid;
+
         $h .= '    <div class="last-sim-recap__inj-group">';
         $h .= '      <div class="last-sim-recap__inj-grouphead">';
         $h .= '        <span class="last-sim-recap__inj-dot last-sim-recap__inj-dot--you"></span>';
-        $h .= '        ' . HtmlSanitizer::e($slate->teamName);
+        $h .= '        <a href="' . $yourTeamUrl . '" class="last-sim-recap__team-link">' . HtmlSanitizer::e($slate->teamName) . '</a>';
         $h .= '      </div>';
         $h .= $this->renderInjuryList($g->yourInjuries);
         $h .= '    </div>';
@@ -268,7 +280,7 @@ class LastSimRecapView implements LastSimRecapViewInterface
         $h .= '    <div class="last-sim-recap__inj-group">';
         $h .= '      <div class="last-sim-recap__inj-grouphead">';
         $h .= '        <span class="last-sim-recap__inj-dot last-sim-recap__inj-dot--opp"></span>';
-        $h .= '        ' . HtmlSanitizer::e($g->oppName);
+        $h .= '        <a href="' . $oppTeamUrl . '" class="last-sim-recap__team-link">' . HtmlSanitizer::e($g->oppName) . '</a>';
         $h .= '      </div>';
         $h .= $this->renderInjuryList($g->oppInjuries);
         $h .= '    </div>';
@@ -301,11 +313,12 @@ class LastSimRecapView implements LastSimRecapViewInterface
 
     private function renderInjuryRow(RecapInjury $inj): string
     {
+        $playerUrl = 'modules.php?name=Player&amp;pa=showpage&amp;pid=' . $inj->pid;
         $rowMod = $inj->isNew ? ' last-sim-recap__inj-row--new' : '';
         $h  = '<div class="last-sim-recap__inj-row' . $rowMod . '">';
         $h .= '  <div class="last-sim-recap__inj-pname">';
         $h .= '    <span class="last-sim-recap__inj-pos">' . HtmlSanitizer::e($inj->pos) . '</span>';
-        $h .= '    ' . HtmlSanitizer::e($inj->name);
+        $h .= '    <a href="' . $playerUrl . '" class="last-sim-recap__player-link">' . HtmlSanitizer::e($inj->name) . '</a>';
         if ($inj->isNew) {
             $h .= '    <span class="last-sim-recap__inj-new" aria-label="New injury this game">!</span>';
         }
@@ -367,16 +380,17 @@ class LastSimRecapView implements LastSimRecapViewInterface
         $youMod = $isYou ? ' last-sim-recap__player--you' : '';
         $parts = explode(' ', $name);
         $lastName = end($parts);
+        $playerUrl = 'modules.php?name=Player&amp;pa=showpage&amp;pid=' . $pid;
 
         $h  = '<div class="last-sim-recap__player' . $youMod . '">';
-        $h .= '  <span class="last-sim-recap__avatar-wrap">';
+        $h .= '  <a href="' . $playerUrl . '" class="last-sim-recap__avatar-wrap">';
         $h .= '    ' . PlayerImageHelper::renderThumbnail($pid);
         if ($hurt) {
             $h .= '    <span class="last-sim-recap__injdot" aria-label="Injured">!</span>';
         }
-        $h .= '  </span>';
-        $h .= '  <span class="last-sim-recap__player-name">' . HtmlSanitizer::e($name) . '</span>';
-        $h .= '  <span class="last-sim-recap__player-lname">' . HtmlSanitizer::e($lastName) . '</span>';
+        $h .= '  </a>';
+        $h .= '  <a href="' . $playerUrl . '" class="last-sim-recap__player-name">' . HtmlSanitizer::e($name) . '</a>';
+        $h .= '  <a href="' . $playerUrl . '" class="last-sim-recap__player-lname">' . HtmlSanitizer::e($lastName) . '</a>';
         $h .= '  <span class="last-sim-recap__player-pts">' . HtmlSanitizer::e((string) $pts) . '</span>';
         $h .= '</div>';
 

@@ -235,7 +235,7 @@ class LastSimRecapServiceTest extends TestCase
         ];
     }
 
-    /** @return array{visQ:array{0:int,1:int,2:int,3:int},homeQ:array{0:int,1:int,2:int,3:int},visOT:int,homeOT:int,visitorPreWins:int,visitorPreLosses:int,homePreWins:int,homePreLosses:int} */
+    /** @return array{visQ:array{0:int,1:int,2:int,3:int},homeQ:array{0:int,1:int,2:int,3:int},visOT:int,homeOT:int,visitorPreWins:int,visitorPreLosses:int,homePreWins:int,homePreLosses:int,gameOfThatDay:int} */
     private function makeLines(int $visOt = 0, int $homeOt = 0): array
     {
         return [
@@ -245,6 +245,7 @@ class LastSimRecapServiceTest extends TestCase
             'homeOT' => $homeOt,
             'visitorPreWins' => 10, 'visitorPreLosses' => 5,
             'homePreWins' => 8, 'homePreLosses' => 7,
+            'gameOfThatDay' => 1,
         ];
     }
 }

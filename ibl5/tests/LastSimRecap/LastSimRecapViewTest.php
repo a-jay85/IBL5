@@ -154,8 +154,8 @@ class LastSimRecapViewTest extends TestCase
             games: [$this->makeGame()],
         ));
 
-        self::assertStringContainsString('Best · <span class="last-sim-recap__meta-value">+11 vs CLE', $html);
-        self::assertStringContainsString('Worst · <span class="last-sim-recap__meta-value">−13 @ MIA', $html);
+        self::assertStringContainsString('Best:</span>&nbsp;<span class="last-sim-recap__meta-value">+11 vs CLE', $html);
+        self::assertStringContainsString('Worst:</span>&nbsp;<span class="last-sim-recap__meta-value">−13 @ MIA', $html);
     }
 
     private function makeInjury(
@@ -197,6 +197,8 @@ class LastSimRecapViewTest extends TestCase
         $oppScore = $yourScore - $margin;
         return new RecapGame(
             schedId: $schedId,
+            boxId: 0,
+            gameOfThatDay: 1,
             date: $date,
             home: $home,
             won: $won,

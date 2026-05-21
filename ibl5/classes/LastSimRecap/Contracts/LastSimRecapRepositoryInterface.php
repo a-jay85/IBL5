@@ -28,7 +28,8 @@ namespace LastSimRecap\Contracts;
  *   visitorPreWins:int,
  *   visitorPreLosses:int,
  *   homePreWins:int,
- *   homePreLosses:int
+ *   homePreLosses:int,
+ *   gameOfThatDay:int
  * }
  *
  * @phpstan-type InjuryRow array{

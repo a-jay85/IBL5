@@ -15,6 +15,8 @@ final class RecapGame
      */
     public function __construct(
         public readonly int $schedId,
+        public readonly int $boxId,
+        public readonly int $gameOfThatDay,
         public readonly string $date,
         public readonly bool $home,
         public readonly bool $won,

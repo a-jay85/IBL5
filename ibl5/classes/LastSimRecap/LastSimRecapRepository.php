@@ -105,13 +105,15 @@ class LastSimRecapRepository extends \BaseMysqliRepository implements LastSimRec
         /** @var array{
          *   visitor_q1_points:int|null,visitor_q2_points:int|null,visitor_q3_points:int|null,visitor_q4_points:int|null,visitor_ot_points:int|null,
          *   home_q1_points:int|null,home_q2_points:int|null,home_q3_points:int|null,home_q4_points:int|null,home_ot_points:int|null,
-         *   visitor_wins:int|null,visitor_losses:int|null,home_wins:int|null,home_losses:int|null
+         *   visitor_wins:int|null,visitor_losses:int|null,home_wins:int|null,home_losses:int|null,
+         *   game_of_that_day:int|null
          * }|null $row
          */
         $row = $this->fetchOne(
             "SELECT visitor_q1_points, visitor_q2_points, visitor_q3_points, visitor_q4_points, visitor_ot_points,
                     home_q1_points, home_q2_points, home_q3_points, home_q4_points, home_ot_points,
-                    visitor_wins, visitor_losses, home_wins, home_losses
+                    visitor_wins, visitor_losses, home_wins, home_losses,
+                    COALESCE(game_of_that_day, 0) AS game_of_that_day
              FROM {$this->boxScoresTeamsTable}
              WHERE game_date = ? AND visitor_teamid = ? AND home_teamid = ?
              ORDER BY id ASC
@@ -145,6 +147,7 @@ class LastSimRecapRepository extends \BaseMysqliRepository implements LastSimRec
             'visitorPreLosses' => (int) ($row['visitor_losses'] ?? 0),
             'homePreWins' => (int) ($row['home_wins'] ?? 0),
             'homePreLosses' => (int) ($row['home_losses'] ?? 0),
+            'gameOfThatDay' => (int) ($row['game_of_that_day'] ?? 0),
         ];
     }
 

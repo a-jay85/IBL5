@@ -65,6 +65,7 @@ class NewsModuleIntegrationTest extends TestCase
                     'visOT' => 0, 'homeOT' => 0,
                     'visitorPreWins' => 60, 'visitorPreLosses' => 22,
                     'homePreWins' => 52, 'homePreLosses' => 30,
+                    'gameOfThatDay' => 1,
                 ];
             }
             public function getActiveInjuriesForPlayers(array $playerIds, string $date): array { return []; }

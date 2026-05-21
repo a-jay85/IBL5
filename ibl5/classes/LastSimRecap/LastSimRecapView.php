@@ -44,14 +44,16 @@ class LastSimRecapView implements LastSimRecapViewInterface
         $netValue = $netSign . $netAbs;
 
         $h  = '<header class="last-sim-recap__head">';
-        $h .= '  <div class="last-sim-recap__lbl">';
-        $h .= '    Last sim';
+        $h .= '  <div class="last-sim-recap__head-dates">';
         $h .= '    <span class="last-sim-recap__sub">' . HtmlSanitizer::e($subtitle) . '</span>';
         $h .= '  </div>';
-        $h .= '  <div class="last-sim-recap__rec">';
-        $h .= '    <span class="last-sim-recap__record-w">' . HtmlSanitizer::e((string) $slate->wins) . '</span>';
-        $h .= '    <span class="last-sim-recap__record-sep">–</span>';
-        $h .= '    ' . HtmlSanitizer::e((string) $slate->losses);
+        $h .= '  <div class="last-sim-recap__head-center">';
+        $h .= '    <span class="last-sim-recap__lbl">Last sim</span>';
+        $h .= '    <span class="last-sim-recap__rec">';
+        $h .= '      <span class="last-sim-recap__record-w">' . HtmlSanitizer::e((string) $slate->wins) . '</span>';
+        $h .= '      <span class="last-sim-recap__record-sep">–</span>';
+        $h .= '      ' . HtmlSanitizer::e((string) $slate->losses);
+        $h .= '    </span>';
         $h .= '  </div>';
         $h .= '  <div class="last-sim-recap__meta">';
         $h .= '    <span>Net margin: <span class="last-sim-recap__meta-value">' . HtmlSanitizer::e($netValue) . '</span></span>';

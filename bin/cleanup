@@ -56,6 +56,7 @@ get_branch_for_worktree() {
 cleanup_worktree() {
     local wt_name="$1"
     local branch="$2"
+    local wt_path="$3"
 
     if [ "$DRY_RUN" = true ]; then
         echo "  WOULD clean: $wt_name (branch: $branch)"
@@ -64,8 +65,15 @@ cleanup_worktree() {
     fi
 
     echo "Cleaning: $wt_name (branch: $branch)..."
-    "$REPO_ROOT/bin/wt-remove" --force --volumes "$wt_name" 2>/dev/null \
-        || git -C "$REPO_ROOT" worktree prune 2>/dev/null || true
+    if [[ "$wt_path" == "$REPO_ROOT/.claude/worktrees/"* ]]; then
+        # Agent worktrees have no Docker env; remove directly
+        chmod -R -N "$wt_path" 2>/dev/null || true
+        git -C "$REPO_ROOT" worktree remove --force "$wt_path" 2>/dev/null \
+            || rm -rf "$wt_path"
+    else
+        "$REPO_ROOT/bin/wt-remove" --force --volumes "$wt_name" 2>/dev/null \
+            || git -C "$REPO_ROOT" worktree prune 2>/dev/null || true
+    fi
     git -C "$REPO_ROOT" branch -D "$branch" 2>/dev/null || \
         echo "  Note: local branch '$branch' already deleted or not found"
     CLEANED=$((CLEANED + 1))
@@ -93,33 +101,31 @@ check_worktree() {
         return
     fi
 
-    # If the worktree directory is gone (prunable), skip process/diff checks —
-    # there's nothing on disk to protect. Jump straight to merge detection.
-    if [ -d "$wt_path" ]; then
-        # Kill infrastructure processes (browser-sync, CSS watcher) before checking.
-        # These are background watchers that should not block cleanup.
-        kill_infra_processes "$wt_path"
-
-        # Never tear down a worktree that is actively in use
-        if is_worktree_in_use "$wt_path"; then
-            echo "  SKIP $wt_name: worktree is in active use (processes detected)"
+    # Check for git worktree lock. Claude Code agent worktrees are locked with
+    # a reason containing the PID. If that PID is dead, the lock is stale.
+    local lock_reason
+    lock_reason=$(git -C "$REPO_ROOT" worktree list --porcelain \
+        | awk -v wt="$wt_path" '
+            /^worktree / { cur = substr($0, 10) }
+            /^locked/ && cur == wt { print substr($0, 8); exit }
+        ')
+    if [ -n "$lock_reason" ]; then
+        local lock_pid
+        lock_pid=$(echo "$lock_reason" | grep -oE 'pid [0-9]+' | awk '{print $2}')
+        if [ -n "$lock_pid" ] && kill -0 "$lock_pid" 2>/dev/null; then
+            echo "  SKIP $wt_name: locked by active process (pid $lock_pid)"
             SKIPPED=$((SKIPPED + 1))
             return
         fi
-
-        # Never tear down a worktree with uncommitted or staged changes.
-        # A freshly created worktree (branch tip == master) passes merge-base --is-ancestor
-        # even though work is in progress. This guard prevents data loss.
-        if has_uncommitted_changes "$wt_path"; then
-            echo "  SKIP $wt_name: has uncommitted changes"
-            SKIPPED=$((SKIPPED + 1))
-            return
+        # Lock holder is dead — unlock so removal can proceed
+        if [ "$DRY_RUN" = false ]; then
+            git -C "$REPO_ROOT" worktree unlock "$wt_path" 2>/dev/null || true
         fi
     fi
 
-    # Determine if branch has been merged to master.
-    # Require positive evidence of merge completion — never rely on merge-base alone,
-    # because a freshly-created branch at master tip is trivially an ancestor.
+    # Determine if branch has been merged to master BEFORE checking uncommitted
+    # changes. This ordering lets us discard harmless dirtiness (e.g. worktree-
+    # specific CLAUDE.md frontmatter) on confirmed-merged branches.
     local is_merged=false
 
     # Check 1: PR state via GitHub CLI (handles squash merges)
@@ -138,11 +144,6 @@ check_worktree() {
     fi
 
     # Check 2: Direct ancestor of master AND remote branch was pushed then deleted.
-    # merge-base alone is insufficient — a branch created from master tip with no
-    # new commits is also an ancestor. We need two additional signals:
-    #   a) Branch was previously pushed (has tracking config)
-    #   b) Remote branch is now gone (deleted after PR merge)
-    # A never-pushed branch has no tracking config, so it won't match.
     if [ "$is_merged" = false ]; then
         local was_tracked
         was_tracked=$(git -C "$REPO_ROOT" config "branch.$branch.remote" 2>/dev/null || true)
@@ -153,13 +154,59 @@ check_worktree() {
         fi
     fi
 
+    # Check 3: Local-only (never pushed), ancestor of master, with unique commits.
+    # Catches agent worktrees whose work landed on master via another branch.
+    if [ "$is_merged" = false ]; then
+        local local_tracking
+        local_tracking=$(git -C "$REPO_ROOT" config "branch.$branch.remote" 2>/dev/null || true)
+        if [ -z "$local_tracking" ] \
+           && git -C "$REPO_ROOT" merge-base --is-ancestor "$branch" origin/master 2>/dev/null \
+           && [ "$(git -C "$REPO_ROOT" rev-parse "$branch")" != "$(git -C "$REPO_ROOT" rev-parse origin/master)" ]; then
+            is_merged=true
+        fi
+    fi
+
     if [ "$is_merged" = false ]; then
         echo "  SKIP $wt_name: branch '$branch' not merged to master"
         SKIPPED=$((SKIPPED + 1))
         return
     fi
 
-    cleanup_worktree "$wt_name" "$branch"
+    # If the worktree directory is gone (prunable), skip process/diff checks —
+    # there's nothing on disk to protect.
+    if [ -d "$wt_path" ]; then
+        kill_infra_processes "$wt_path"
+
+        if is_worktree_in_use "$wt_path"; then
+            echo "  SKIP $wt_name: worktree is in active use (processes detected)"
+            SKIPPED=$((SKIPPED + 1))
+            return
+        fi
+
+        if has_uncommitted_changes "$wt_path"; then
+            # On merged branches, discard changes to generated/worktree-local
+            # files that are never real work product.
+            local dirty_files
+            dirty_files=$(git -C "$wt_path" diff --name-only 2>/dev/null; \
+                          git -C "$wt_path" diff --cached --name-only 2>/dev/null)
+            dirty_files=$(echo "$dirty_files" | sort -u | grep -v '^$' || true)
+            local non_discardable
+            non_discardable=$(echo "$dirty_files" \
+                | grep -v -E '^(CLAUDE\.md|ibl5/bun\.lock)$' || true)
+            if [ -z "$non_discardable" ]; then
+                echo "  Discarding generated files: $dirty_files"
+                if [ "$DRY_RUN" = false ]; then
+                    git -C "$wt_path" reset --hard HEAD 2>/dev/null || true
+                fi
+            else
+                echo "  SKIP $wt_name: has uncommitted changes"
+                SKIPPED=$((SKIPPED + 1))
+                return
+            fi
+        fi
+    fi
+
+    cleanup_worktree "$wt_name" "$branch" "$wt_path"
 }
 
 # Fetch to ensure origin/master is current
@@ -183,15 +230,16 @@ if [ "$ALL" = true ]; then
     shopt -s nocasematch
     while IFS= read -r wt_path; do
         [[ "$wt_path" == "$REPO_ROOT" ]] && continue
-        # Only process worktrees under our worktrees/ directory
-        [[ "$wt_path" == "$REPO_ROOT/worktrees/"* ]] || continue
+        # Process worktrees under worktrees/ or .claude/worktrees/
+        [[ "$wt_path" == "$REPO_ROOT/worktrees/"* || "$wt_path" == "$REPO_ROOT/.claude/worktrees/"* ]] || continue
         check_worktree "$wt_path"
     done < <(git -C "$REPO_ROOT" worktree list --porcelain | awk '/^worktree / { print substr($0, 10) }')
     shopt -u nocasematch
 
     # Clean up orphaned directories (exist on disk but not registered with git)
-    if [ -d "$REPO_ROOT/worktrees" ]; then
-        for dir in "$REPO_ROOT"/worktrees/*/; do
+    for wt_root in "$REPO_ROOT/worktrees" "$REPO_ROOT/.claude/worktrees"; do
+        [ -d "$wt_root" ] || continue
+        for dir in "$wt_root"/*/; do
             [ -d "$dir" ] || continue
             dir="${dir%/}"
             dir_name="$(basename "$dir")"
@@ -235,7 +283,7 @@ if [ "$ALL" = true ]; then
             fi
             CLEANED=$((CLEANED + 1))
         done
-    fi
+    done
 
     # Clean up bare local branches that are no longer needed.
     # Four deletion signals (any one is sufficient):
@@ -446,7 +494,10 @@ if [ "$ALL" = true ]; then
 else
     WT_PATH="$REPO_ROOT/worktrees/$TARGET_NAME"
     if [ ! -d "$WT_PATH" ]; then
-        echo "Error: Worktree '$TARGET_NAME' not found at $WT_PATH" >&2
+        WT_PATH="$REPO_ROOT/.claude/worktrees/$TARGET_NAME"
+    fi
+    if [ ! -d "$WT_PATH" ]; then
+        echo "Error: Worktree '$TARGET_NAME' not found" >&2
         exit 1
     fi
     check_worktree "$WT_PATH"

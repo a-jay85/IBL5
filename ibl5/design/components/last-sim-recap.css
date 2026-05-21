@@ -89,7 +89,7 @@
     font: inherit;
     color: inherit;
     position: relative;
-    padding: .65rem .85rem .8rem;
+    padding: .65rem .85rem;
     border-left: 1px solid var(--gray-100);
     display: flex;
     flex-direction: column;
@@ -605,7 +605,7 @@ a.last-sim-recap__player-lname:hover { text-decoration: underline }
 /* Player row */
 .last-sim-recap__player {
     display: grid;
-    grid-template-columns: 24px minmax(0, 1fr) 24px;
+    grid-template-columns: 24px minmax(0, 1fr) auto;
     align-items: center;
     gap: .5rem;
     min-height: 28px;

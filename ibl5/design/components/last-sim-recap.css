@@ -274,7 +274,7 @@
 .last-sim-recap__main {
     display: grid;
     grid-template-columns: 1.05fr 1.1fr 1.15fr;
-    grid-template-rows: auto minmax(0, 1fr) minmax(0, 1fr);
+    grid-template-rows: auto minmax(0, 1fr) minmax(0, 1fr) .9rem;
     gap: 0;
     border-bottom: 1px solid var(--gray-100);
 }
@@ -336,7 +336,6 @@
 .last-sim-recap__final-row + .last-sim-recap__final-row {
     border-top: 1px dashed var(--gray-200);
     align-content: start;
-    padding-bottom: .9rem;
 }
 .last-sim-recap__final-name {
     font-family: var(--font-display);
@@ -564,7 +563,6 @@ a.last-sim-recap__player-lname:hover { text-decoration: underline }
 }
 .last-sim-recap__inj-group:last-of-type {
     align-content: start;
-    padding-bottom: .9rem;
 }
 /* "No injuries" empty state */
 .last-sim-recap__inj-row--empty .last-sim-recap__inj-pname {
@@ -700,10 +698,9 @@ a.last-sim-recap__player-lname:hover { text-decoration: underline }
         display: block;
     }
     .last-sim-recap__cell:first-child { border-top: none }
+    .last-sim-recap__cell { padding-bottom: .9rem }
     .last-sim-recap__final { display: grid; grid-template-columns: 30px 1fr auto; row-gap: .4rem; column-gap: .6rem }
     .last-sim-recap__final-row { grid-column: 1 / -1; align-content: initial }
-    .last-sim-recap__cell { padding-bottom: .9rem }
-    .last-sim-recap__final-row + .last-sim-recap__final-row { padding-bottom: 0 }
     .last-sim-recap__mom { display: block }
     .last-sim-recap__mom-chart { height: 120px; padding-bottom: 14px; grid-row: auto; min-height: auto }
     .last-sim-recap__mom-bars { inset: 0 4px 18px 4px }
@@ -722,7 +719,7 @@ a.last-sim-recap__player-lname:hover { text-decoration: underline }
         padding-top: 0;
     }
     .last-sim-recap__inj-group:first-of-type,
-    .last-sim-recap__inj-group:last-of-type { align-content: initial; padding-bottom: 0 }
+    .last-sim-recap__inj-group:last-of-type { align-content: initial }
 
     /* Battles: hide full name and points, show last name below avatar */
     .last-sim-recap__player-name,

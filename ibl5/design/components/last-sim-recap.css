@@ -36,7 +36,7 @@
     display: block;
     margin-top: 3px;
     font-family: var(--font-mono);
-    font-size: .62rem;
+    font-size: .667rem;
     font-weight: 500;
     color: rgba(255, 255, 255, .55);
     letter-spacing: .12em;
@@ -135,7 +135,7 @@
 }
 .last-sim-recap__tab-where {
     font-family: var(--font-mono);
-    font-size: .62rem;
+    font-size: .667rem;
     font-weight: 700;
     color: var(--gray-400);
     letter-spacing: .1em;
@@ -157,7 +157,7 @@
 .last-sim-recap__tab-date {
     margin-left: auto;
     font-family: var(--font-mono);
-    font-size: .62rem;
+    font-size: .667rem;
     font-weight: 600;
     color: var(--gray-500);
     text-transform: uppercase;
@@ -188,7 +188,7 @@
 }
 .last-sim-recap__tab--loss .last-sim-recap__tab-wl { color: var(--error-600) }
 .last-sim-recap__tab-ot {
-    font-size: .62rem;
+    font-size: .667rem;
     color: var(--accent-600);
     font-family: var(--font-mono);
     letter-spacing: .08em;
@@ -314,7 +314,7 @@
     display: block;
     margin-top: 3px;
     font-family: var(--font-mono);
-    font-size: .6rem;
+    font-size: .667rem;
     font-weight: 500;
     color: var(--gray-500);
     letter-spacing: .06em;
@@ -387,7 +387,7 @@
     right: 0;
     text-align: center;
     font-family: var(--font-mono);
-    font-size: .62rem;
+    font-size: .667rem;
     font-weight: 700;
     color: var(--navy-900);
 }
@@ -406,7 +406,7 @@
     text-align: center;
     line-height: 18px;
     font-family: var(--font-mono);
-    font-size: .58rem;
+    font-size: .667rem;
     color: var(--gray-500);
     letter-spacing: .06em;
     text-transform: uppercase;
@@ -420,7 +420,7 @@
     align-items: center;
     gap: .45rem;
     font-family: var(--font-mono);
-    font-size: .6rem;
+    font-size: .667rem;
     font-weight: 700;
     text-transform: uppercase;
     letter-spacing: .1em;
@@ -447,7 +447,7 @@
     display: inline-block;
     margin-right: 6px;
     font-family: var(--font-mono);
-    font-size: .6rem;
+    font-size: .667rem;
     font-weight: 700;
     color: var(--gray-500);
     background: var(--gray-100);
@@ -476,7 +476,7 @@
     display: block;
     margin-top: 2px;
     font-family: var(--font-mono);
-    font-size: .6rem;
+    font-size: .667rem;
     color: var(--gray-500);
     text-transform: uppercase;
     letter-spacing: .06em;
@@ -527,7 +527,7 @@
     align-items: center;
     justify-content: center;
     font-family: var(--font-mono);
-    font-size: .6rem;
+    font-size: .667rem;
     font-weight: 700;
     color: var(--gray-500);
     text-transform: uppercase;
@@ -540,7 +540,7 @@
     padding: 1px 6px;
     border-radius: 3px;
     letter-spacing: .1em;
-    font-size: .58rem;
+    font-size: .667rem;
 }
 
 /* Player row */
@@ -641,7 +641,7 @@
     .last-sim-recap__player-pts { display: none }
     .last-sim-recap__player-lname {
         display: block;
-        font-size: .58rem;
+        font-size: .667rem;
         font-weight: 600;
         color: var(--navy-800);
         text-align: center;

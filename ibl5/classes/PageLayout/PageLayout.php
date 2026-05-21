@@ -33,9 +33,6 @@ class PageLayout
         if (defined('ADMIN_PHASE_GATE_NOTICE')) {
             echo '<div class="ibl-alert ibl-alert--warning">Admin mode: You can view this module, but it is currently closed to non-admin GMs.</div>';
         }
-        if (defined('HOME_FILE')) {
-            blocks("Center");
-        }
     }
 
     private static function renderBoostedHeader(): void

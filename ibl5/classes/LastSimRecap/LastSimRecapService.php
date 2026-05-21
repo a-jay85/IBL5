@@ -171,11 +171,11 @@ class LastSimRecapService implements LastSimRecapServiceInterface
             $starters[] = new RecapStarter(
                 pos: $pos,
                 youPid: $yourPid,
-                youName: $this->shortName($yourLine['name'] ?? $this->lookupPlayerName($yourPid)),
+                youName: $this->shortName($this->lookupPlayerName($yourPid) ?: ($yourLine['name'] ?? '')),
                 youPts: $yourLine['pts'] ?? 0,
                 youHurt: isset($hurtPids[$yourPid]),
                 oppPid: $oppPid,
-                oppName: $this->shortName($oppLine['name'] ?? $this->lookupPlayerName($oppPid)),
+                oppName: $this->shortName($this->lookupPlayerName($oppPid) ?: ($oppLine['name'] ?? '')),
                 oppPts: $oppLine['pts'] ?? 0,
             );
         }

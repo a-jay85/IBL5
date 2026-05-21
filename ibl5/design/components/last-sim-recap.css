@@ -547,7 +547,7 @@
 /* Player row */
 .last-sim-recap__player {
     display: grid;
-    grid-template-columns: 24px minmax(0, 1fr) auto;
+    grid-template-columns: 24px minmax(0, 1fr) 24px;
     align-items: center;
     gap: .5rem;
     min-height: 28px;
@@ -596,11 +596,10 @@
 }
 .last-sim-recap__player-lname { display: none }
 .last-sim-recap__player-pts {
-    font-family: var(--font-mono);
-    font-size: .88rem;
+    font-size: .86rem;
     font-weight: 700;
     color: var(--navy-900);
-    font-variant-numeric: tabular-nums;
+    text-align: right;
 }
 
 /* ============================================================

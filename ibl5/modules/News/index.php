@@ -52,6 +52,10 @@ function theindex($new_topic = "0")
         }
     }
 
+    if (defined('HOME_FILE')) {
+        blocks("Center");
+    }
+
     if (isset($userinfo['storynum']) and $user_news == 1) {
         $storynum = $userinfo['storynum'];
     } else {

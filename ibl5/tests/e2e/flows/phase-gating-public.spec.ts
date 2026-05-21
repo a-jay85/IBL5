@@ -1,7 +1,9 @@
 import { test, expect } from '../fixtures/public';
 import { assertNoPhpErrors } from '../helpers/php-errors';
 
-// Each public-accessible gate tested in both DENY (off→hidden) and ALLOW (on→visible) directions.
+// Phase-gating DENY tests as unauthenticated (public) user.
+// ALLOW-path tests are not possible here: all gated modules check is_user()
+// before evaluating the gate, so public users always see loginBox().
 
 test.describe('Trading disabled', () => {
   test('trading page shows disabled message when trades off', async ({
@@ -38,21 +40,6 @@ test.describe('Draft hidden', () => {
 
     await assertNoPhpErrors(page, 'on Draft when hidden');
   });
-
-  test('draft page shows draft table when in draft phase and link on', async ({
-    appState,
-    page,
-  }) => {
-    await appState({
-      'Current Season Phase': 'Draft',
-      'Show Draft Link': 'On',
-    });
-    await page.goto('modules.php?name=Draft');
-
-    await expect(page.locator('table.draft-table')).toBeVisible();
-
-    await assertNoPhpErrors(page, 'on Draft when enabled');
-  });
 });
 
 test.describe('Voting closed (ASG)', () => {
@@ -73,21 +60,6 @@ test.describe('Voting closed (ASG)', () => {
 
     await assertNoPhpErrors(page, 'on Voting with ASG voting off');
   });
-
-  test('ASG voting shows ballot form when voting enabled', async ({
-    appState,
-    page,
-  }) => {
-    await appState({
-      'Current Season Phase': 'Regular Season',
-      'ASG Voting': 'Yes',
-    });
-    await page.goto('modules.php?name=Voting');
-
-    await expect(page.locator('form[name="ASGVote"]')).toBeVisible();
-
-    await assertNoPhpErrors(page, 'on Voting with ASG voting on');
-  });
 });
 
 test.describe('Voting closed (EOY)', () => {
@@ -107,21 +79,6 @@ test.describe('Voting closed (EOY)', () => {
     expect(formVisible).toBe(false);
 
     await assertNoPhpErrors(page, 'on Voting with EOY voting off');
-  });
-
-  test('EOY voting shows ballot form when voting enabled', async ({
-    appState,
-    page,
-  }) => {
-    await appState({
-      'Current Season Phase': 'Free Agency',
-      'EOY Voting': 'Yes',
-    });
-    await page.goto('modules.php?name=Voting');
-
-    await expect(page.locator('form[name="EOYVote"]')).toBeVisible();
-
-    await assertNoPhpErrors(page, 'on Voting with EOY voting on');
   });
 });
 

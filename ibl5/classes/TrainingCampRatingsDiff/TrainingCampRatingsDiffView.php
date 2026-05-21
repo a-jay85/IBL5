@@ -57,10 +57,10 @@ class TrainingCampRatingsDiffView implements TrainingCampRatingsDiffViewInterfac
     public function render(?int $baselineYear, array $rows, string $filterStatus = ''): string
     {
         if ($baselineYear === null || $rows === []) {
-            return '<div class="ibl-card"><p>No prior-season baseline found. This page is meaningful after at least one <code>end-of-season</code> snapshot has been captured.</p></div>';
+            return '<div class="ratings-diff-page"><div class="ibl-card"><p>No prior-season baseline found. This page is meaningful after at least one <code>end-of-season</code> snapshot has been captured.</p></div></div>';
         }
 
-        return $this->renderTable($baselineYear, $rows, $filterStatus);
+        return '<div class="ratings-diff-page">' . $this->renderTable($baselineYear, $rows, $filterStatus) . '</div>';
     }
 
     /**

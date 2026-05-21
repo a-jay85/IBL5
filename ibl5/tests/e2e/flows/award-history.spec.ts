@@ -39,6 +39,7 @@ test.describe('Award History flow', () => {
     await expect(table.first()).toBeVisible();
     const rows = table.first().locator('tbody tr');
     await expect(rows.first()).toBeVisible();
+    expect(await rows.count()).toBeGreaterThanOrEqual(1);
   });
 
   test('searching by partial name returns results', async ({ page }) => {

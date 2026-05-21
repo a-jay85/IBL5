@@ -26,6 +26,7 @@ test.describe('Career Leaderboards flow', () => {
     await expect(page.locator('.ibl-data-table').first()).toBeVisible();
     const rows = page.locator('.ibl-data-table').first().locator('tbody tr');
     await expect(rows.first()).toBeVisible();
+    expect(await rows.count()).toBeGreaterThanOrEqual(1);
   });
 
   test('table has sticky rank and name columns', async ({ page }) => {

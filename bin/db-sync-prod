@@ -1,11 +1,10 @@
 #!/bin/bash
 # Sync production database directly into a running Docker MariaDB container.
-# No prod-seed.sql intermediate — streams mariadb-dump → docker exec stdin.
+# Streams mariadb-dump → docker exec stdin (no intermediate file).
 #
 # This is the canonical seed path for local dev: bin/dev-up (main stack)
-# and bin/wt-up --prod (worktrees) both invoke it. Unlike the offline
-# fallback (bin/db-export-prod → prod-seed.sql), this captures STORED
-# GENERATED tables like ibl_box_scores via dedicated --no-create-info passes.
+# and bin/wt-up --prod (worktrees) both invoke it. Handles STORED GENERATED
+# tables like ibl_box_scores via dedicated --no-create-info passes.
 #
 # Usage: bin/db-sync-prod [worktree-name]
 #

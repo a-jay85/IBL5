@@ -366,7 +366,7 @@ Phase 8 merged the PR, deleted the branch, and checked out master. The worktree 
 3. **Tear down and restart** with stale seed skipped:
    ```bash
    cd <repo-root> && docker compose down -v
-   SKIP_PROD_SEED=1 docker compose up -d
+   docker compose up -d
    ```
    `docker compose down -v` removes only the main project's volume (`ibl5-mariadb-data`) — worktree volumes are in separate compose projects and are not affected.
 

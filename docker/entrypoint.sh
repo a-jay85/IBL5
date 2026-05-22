@@ -71,64 +71,26 @@ MAILCONF
     echo "[entrypoint] Created mail.config.php (Mailpit SMTP)."
 fi
 
-# ── Phase 2: DB initialization (only on empty database) ─────────────────────
+# ── Phase 2: DB status check (warn if empty, never auto-import) ───────────
 TABLE_COUNT=$(db_exec -N -e "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema='$DB_NAME';" | tr -d '[:space:]')
 
 if ! echo "$TABLE_COUNT" | grep -qE '^[0-9]+$'; then
     echo "[entrypoint] ERROR: Could not query table count (got: $TABLE_COUNT). Check DB connection."
-    echo "[entrypoint] Continuing without DB initialization..."
+    echo "[entrypoint] Continuing without DB status check..."
     TABLE_COUNT="-1"
 fi
 
-# Detect "schema exists but no data" — tables were created by migrations
-# but seed data was never loaded (e.g. volume was wiped and recreated).
-NEEDS_SEED="false"
 if [ "$TABLE_COUNT" = "0" ]; then
-    NEEDS_SEED="true"
+    echo "[entrypoint] WARNING: Database is empty (0 tables)."
+    echo "[entrypoint] Populate it with: bin/dev-up (main stack) or bin/db-sync-prod"
 elif [ "$TABLE_COUNT" != "-1" ]; then
     CONFIG_ROWS=$(db_exec -N -e "SELECT COUNT(*) FROM nuke_config;" 2>/dev/null | tr -d '[:space:]')
     if [ "$CONFIG_ROWS" = "0" ]; then
         echo "[entrypoint] WARNING: $TABLE_COUNT tables exist but nuke_config is empty — data was lost."
-        NEEDS_SEED="true"
-    fi
-fi
-
-if [ "$NEEDS_SEED" = "true" ] && [ "${SKIP_PROD_SEED:-}" != "1" ]; then
-    PROD_SEED="$APP_DIR/fixtures/prod-seed.sql"
-    if [ -f "$PROD_SEED" ]; then
-        echo "[entrypoint] Empty or unseeded database detected. Importing prod-seed.sql (offline fallback — use bin/dev-up for live prod data)..."
-        echo "[entrypoint] This may take 2-4 minutes for the ~334MB dump."
-        # The prod-seed is a two-part dump (schema then data). The schema
-        # section's footer restores FOREIGN_KEY_CHECKS=1 before data inserts
-        # begin, causing FK violations on tables with cross-references.
-        # Fix: wrap the entire import in FOREIGN_KEY_CHECKS=0.
-        # --force: continue past non-fatal errors (e.g. ERROR 1906 for
-        # generated-column values that MariaDB safely ignores).
-        # Also strip DEFINER clauses — prod exports contain DEFINER=user@host
-        # that don't exist in Docker MariaDB, causing ERROR 1449 on import.
-        { echo "SET FOREIGN_KEY_CHECKS=0;"; sed 's/ DEFINER=[^ ]* / /g' "$PROD_SEED"; echo "SET FOREIGN_KEY_CHECKS=1;"; } \
-            | mariadb --force -h "$DB_HOST" --skip-ssl -u root -proot "$DB_NAME" 2>&1 \
-            | grep -v '\[Warning\].*password' \
-            | grep -i 'ERROR' > /tmp/import-errors.log || true
-        if [ -s /tmp/import-errors.log ]; then
-            if grep -v 'ERROR 1906' /tmp/import-errors.log | grep -qi 'ERROR'; then
-                echo "[entrypoint] ERROR: Prod-seed import had fatal errors:"
-                grep -v 'ERROR 1906' /tmp/import-errors.log
-                exit 1
-            fi
-            WARN_COUNT=$(wc -l < /tmp/import-errors.log | tr -d '[:space:]')
-            echo "[entrypoint] Import completed with $WARN_COUNT generated-column warnings (harmless)."
-        fi
-        rm -f /tmp/import-errors.log
-        echo "[entrypoint] Prod-seed import complete."
+        echo "[entrypoint] Re-populate with: bin/db-sync-prod"
     else
-        echo "[entrypoint] WARNING: Empty database and no prod-seed.sql found (offline fallback unavailable)."
-        echo "[entrypoint] The app will not work until data is imported."
-        echo "[entrypoint] For live prod data, run bin/dev-up from the host (canonical path)."
-        echo "[entrypoint] For offline use, regenerate the fallback with bin/db-export-prod."
+        echo "[entrypoint] Database has $TABLE_COUNT tables with data — ready."
     fi
-else
-    echo "[entrypoint] Database has $TABLE_COUNT tables with data — skipping prod-seed import."
 fi
 
 # ── Phase 3: Migrations (always, idempotent) ────────────────────────────────

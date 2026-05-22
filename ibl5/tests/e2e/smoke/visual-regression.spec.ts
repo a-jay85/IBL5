@@ -2,10 +2,11 @@
  * Full-page visual regression matrix.
  *
  * One screenshot per module under `ibl5/modules/` (47 modules) plus the
- * homepage (`index.php`) and seven mobile-only repeats at 375×812 (Standings,
- * Player, Team, Schedule, FreeAgency, Trading, DepthChartEntry). All other
- * shots use the desktop 1280×900 viewport from `playwright.visual.config.ts`.
- * Total: 53 baselines.
+ * homepage (`index.php`) and thirteen mobile-only repeats at 375×812 (Standings,
+ * Player, Team, Schedule, FreeAgency, Trading, DepthChartEntry, News, Search,
+ * Draft, Voting, ProjectedDraftOrder, DraftHistory). All other shots use the
+ * desktop 1280×900 viewport from `playwright.visual.config.ts`.
+ * Total: 59 baselines.
  *
  * - Public-fixture modules render without authentication.
  * - Auth-fixture modules use the CI test user (admin role, Metros GM).
@@ -81,6 +82,8 @@ const PUBLIC_MODULES: ModuleSnapshot[] = [
   { name: 'compare-players', url: 'modules.php?name=ComparePlayers', anchor: 'form[action*="ComparePlayers"]' },
   { name: 'contract-list', url: 'modules.php?name=ContractList', anchor: '.totals-row' },
   { name: 'draft-history', url: 'modules.php?name=DraftHistory', anchor: '.ibl-data-table' },
+  { name: 'draft-history-mobile', url: 'modules.php?name=DraftHistory',
+    anchor: '.ibl-data-table', mobile: true },
   { name: 'draft-pick-locator', url: 'modules.php?name=DraftPickLocator', anchor: '.draft-pick-locator-container' },
   { name: 'franchise-history', url: 'modules.php?name=FranchiseHistory&teamid=1', anchor: '.ibl-data-table' },
   { name: 'franchise-record-book', url: 'modules.php?name=FranchiseRecordBook&teamid=1', anchor: '.ibl-data-table' },
@@ -90,17 +93,22 @@ const PUBLIC_MODULES: ModuleSnapshot[] = [
   { name: 'league-starters', url: 'modules.php?name=LeagueStarters', anchor: '#league-starters-tables' },
   { name: 'news', url: 'modules.php?name=News', anchor: 'article',
     extraMask: ['article time'] },
+  { name: 'news-mobile', url: 'modules.php?name=News', anchor: 'article',
+    extraMask: ['article time'], mobile: true },
   { name: 'player', url: 'modules.php?name=Player&pa=showpage&pid=1', anchor: '.stats-grid' },
   { name: 'player-mobile', url: 'modules.php?name=Player&pa=showpage&pid=1', anchor: '.stats-grid', mobile: true },
   { name: 'player-database', url: 'modules.php?name=PlayerDatabase', anchor: 'form[action*="PlayerDatabase"]' },
   { name: 'player-movement', url: 'modules.php?name=PlayerMovement', anchor: '.ibl-data-table' },
   { name: 'projected-draft-order', url: 'modules.php?name=ProjectedDraftOrder', anchor: '.ibl-data-table' },
+  { name: 'projected-draft-order-mobile', url: 'modules.php?name=ProjectedDraftOrder',
+    anchor: '.ibl-data-table', mobile: true },
   { name: 'record-holders', url: 'modules.php?name=RecordHolders', anchor: '.record-section' },
   { name: 'schedule', url: 'modules.php?name=Schedule', anchor: '.schedule-header',
     extraMask: ['.schedule-today-highlight'] },
   { name: 'league-schedule-mobile', url: 'modules.php?name=Schedule', anchor: '.schedule-header',
     extraMask: ['.schedule-today-highlight'], mobile: true },
   { name: 'search', url: 'modules.php?name=Search', anchor: '.search-page' },
+  { name: 'search-mobile', url: 'modules.php?name=Search', anchor: '.search-page', mobile: true },
   { name: 'season-archive', url: 'modules.php?name=SeasonArchive', anchor: '.ibl-data-table' },
   { name: 'season-highs', url: 'modules.php?name=SeasonHighs', anchor: '.ibl-data-table' },
   { name: 'season-leaderboards', url: 'modules.php?name=SeasonLeaderboards', anchor: '.ibl-data-table',
@@ -127,6 +135,9 @@ const AUTH_MODULES: ModuleSnapshot[] = [
   { name: 'draft', url: 'modules.php?name=Draft', anchor: '.draft-container',
     state: { 'Show Draft Link': 'Yes' },
     notes: 'Outside Draft phase, requires Show Draft Link toggle to render.' },
+  { name: 'draft-mobile', url: 'modules.php?name=Draft', anchor: '.draft-container',
+    state: { 'Show Draft Link': 'Yes' }, mobile: true,
+    notes: 'Outside Draft phase, requires Show Draft Link toggle to render.' },
   { name: 'free-agency', url: 'modules.php?name=FreeAgency', anchor: '.fa-table',
     state: { 'Current Season Phase': 'Free Agency' } },
   { name: 'free-agency-mobile', url: 'modules.php?name=FreeAgency', anchor: '.fa-table',
@@ -144,6 +155,8 @@ const AUTH_MODULES: ModuleSnapshot[] = [
   { name: 'training-camp-ratings-diff', url: 'modules.php?name=TrainingCampRatingsDiff', anchor: '.ratings-diff-page',
     notes: 'Admin-only; renders empty state unless ratings snapshot exists.' },
   { name: 'voting', url: 'modules.php?name=Voting', anchor: '.voting-form-container' },
+  { name: 'voting-mobile', url: 'modules.php?name=Voting',
+    anchor: '.voting-form-container', mobile: true },
   { name: 'waivers', url: 'modules.php?name=Waivers', anchor: '.waivers-page' },
 ];
 

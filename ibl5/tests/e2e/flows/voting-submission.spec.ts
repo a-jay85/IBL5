@@ -14,6 +14,7 @@ test.describe('ASG Voting: submission', () => {
     await appState({
       'Current Season Phase': 'Regular Season',
       'ASG Voting': 'Yes',
+      'Current Season Ending Year': '2026',
     });
     await page.goto('modules.php?name=Voting');
 
@@ -52,16 +53,8 @@ test.describe('ASG Voting: submission', () => {
     });
     await submitBtn.first().click();
 
-    await page.waitForLoadState('domcontentloaded');
-    const body = await page.locator('body').textContent();
-
-    // Should see success or validation message
-    // Success: "Thank you for voting"
-    // If not enough candidates: validation error
-    const hasSuccess = body?.includes('Thank you for voting');
-    const hasError = body?.match(/select|must|error|cannot/i);
-
-    expect(hasSuccess || hasError).toBeTruthy();
+    await expect(page.locator('.voting-submission-success')).toBeVisible();
+    await expect(page.locator('.voting-submission-success')).toContainText('Thank you for voting');
     await assertNoPhpErrors(page, 'after ASG vote submission');
   });
 });
@@ -282,6 +275,7 @@ test.describe('EOY Voting: submission', () => {
     await appState({
       'Current Season Phase': 'Free Agency',
       'EOY Voting': 'Yes',
+      'Current Season Ending Year': '2026',
     });
     await page.goto('modules.php?name=Voting');
 
@@ -320,13 +314,8 @@ test.describe('EOY Voting: submission', () => {
     });
     await submitBtn.first().click();
 
-    await page.waitForLoadState('domcontentloaded');
-    const body = await page.locator('body').textContent();
-
-    const hasSuccess = body?.includes('Thank you for voting');
-    const hasError = body?.match(/select|must|error|cannot|duplicate/i);
-
-    expect(hasSuccess || hasError).toBeTruthy();
+    await expect(page.locator('.voting-submission-success')).toBeVisible();
+    await expect(page.locator('.voting-submission-success')).toContainText('Thank you for voting');
     await assertNoPhpErrors(page, 'after EOY vote submission');
   });
 });

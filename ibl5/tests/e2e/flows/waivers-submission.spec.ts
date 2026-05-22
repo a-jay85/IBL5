@@ -40,7 +40,9 @@ test.describe('Waivers: add player', () => {
     const playerOption = playerSelect.locator('option[value]:not([value=""])').first();
     await expect(playerOption).toBeAttached({ timeout: 5000 });
     const optionValue = await playerOption.getAttribute('value');
+    const optionLabel = (await playerOption.textContent())?.trim() ?? '';
     expect(optionValue, 'Expected at least one player option with a value').toBeTruthy();
+    expect(optionLabel, 'Expected player option to carry a display label').toBeTruthy();
     await playerSelect.selectOption(optionValue!);
 
     // Capture POST response for diagnostics (CI returns 500 with empty body —
@@ -63,11 +65,14 @@ test.describe('Waivers: add player', () => {
     const url = page.url();
     const bodySnippet = postBody.substring(0, 500).replace(/\s+/g, ' ').trim();
 
-    expect(
-      url,
-      `POST status=${postStatus} body=${bodySnippet}`,
-    ).toMatch(/(result|error)=/);
+    expect(url, `POST status=${postStatus} body=${bodySnippet}`).toContain('result=player_added');
+    await expect(page.locator('.ibl-alert--success')).toBeVisible();
     await assertNoPhpErrors(page, 'after waiver add');
+
+    // Option label format: "PlayerName salary1 salary2 salary3" — strip salary tail to get just the name.
+    const playerNameOnly = optionLabel.replace(/\s+\d.*$/, '').trim();
+    await page.goto('modules.php?name=Team&op=team&teamid=1');
+    await expect(page.locator('body')).toContainText(playerNameOnly, { timeout: 5000 });
   });
 
   test('success banner shows on successful add', async ({

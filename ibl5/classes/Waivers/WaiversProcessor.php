@@ -176,7 +176,11 @@ class WaiversProcessor implements WaiversProcessorInterface
         $this->createWaiverNewsStory($teamName, $playerName, 'waive', '');
 
         $hometext = "The " . \Security\HtmlSanitizer::e($teamName) . " cut " . \Security\HtmlSanitizer::e($playerName) . " to waivers.";
-        Discord::postToChannel('#waiver-wire', $hometext);
+        try {
+            Discord::postToChannel('#waiver-wire', $hometext);
+        } catch (\Throwable $discordErr) {
+            \Logging\LoggerFactory::getChannel('audit')->warning('waiver_discord_notification_failed', ['error' => $discordErr->getMessage()]);
+        }
 
         \Logging\LoggerFactory::getChannel('audit')->info('player_waived', [
             'action' => 'player_waived',
@@ -230,7 +234,11 @@ class WaiversProcessor implements WaiversProcessorInterface
         $hometext = "The " . \Security\HtmlSanitizer::e($teamName) . " sign " . \Security\HtmlSanitizer::e($playerName) . " from waivers for " . \Security\HtmlSanitizer::e($salaryStr) . ".";
         \Mail\MailService::fromConfig()->send(self::NOTIFICATION_EMAIL_RECIPIENT, $storytitle, $hometext, self::NOTIFICATION_EMAIL_SENDER);
 
-        Discord::postToChannel('#waiver-wire', $hometext);
+        try {
+            Discord::postToChannel('#waiver-wire', $hometext);
+        } catch (\Throwable $discordErr) {
+            \Logging\LoggerFactory::getChannel('audit')->warning('waiver_discord_notification_failed', ['error' => $discordErr->getMessage()]);
+        }
 
         \Logging\LoggerFactory::getChannel('audit')->info('player_signed_from_waivers', [
             'action' => 'player_signed_from_waivers',

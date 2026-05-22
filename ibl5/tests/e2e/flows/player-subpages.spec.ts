@@ -41,9 +41,10 @@ test.describe('Player negotiate sub-page', () => {
     await page.goto('modules.php?name=Player&pa=negotiate&pid=1');
     await assertNoPhpErrors(page, 'on Player negotiate page');
 
-    // Should render either negotiation content or an error/message
-    const body = await page.locator('body').textContent();
-    expect(body!.length).toBeGreaterThan(50);
+    await expect(
+      page.locator('h2.ibl-title').filter({ hasText: 'Contract Extension' }),
+    ).toBeVisible();
+    await expect(page.locator('.ibl-alert--error').first()).toBeVisible();
   });
 
   test('negotiate with invalid PID shows no PHP errors', async ({

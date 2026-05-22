@@ -148,11 +148,9 @@ services:
       dockerfile: docker/Dockerfile.tailwind
     container_name: ibl5-tailwind
     restart: unless-stopped
-    environment:
-      CHOKIDAR_USEPOLLING: "true"
-      CHOKIDAR_INTERVAL: "300"
     volumes:
       - ./ibl5:/var/www/html/ibl5
+      - /var/www/html/ibl5/node_modules
     networks:
       - default
 

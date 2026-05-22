@@ -1,6 +1,7 @@
 FROM oven/bun:1-alpine
-RUN bun add -g @tailwindcss/cli@^4.3.0
 WORKDIR /var/www/html/ibl5
+COPY ibl5/package.json ibl5/bun.lock ./
+RUN bun install
 CMD ["bunx", "@tailwindcss/cli", \
      "-i", "design/input.css", \
      "-o", "themes/IBL/style/style.css", \

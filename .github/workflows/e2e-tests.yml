@@ -404,14 +404,14 @@ jobs:
 
       - name: Wait for ibl6 healthy
         run: |
-          deadline=$((SECONDS + 300))
-          while ! docker compose -f docker-compose.ci.yml exec -T ibl6 wget -qO /dev/null http://localhost:3001/health 2>/dev/null; do
+          deadline=$((SECONDS + 120))
+          while ! docker compose -f docker-compose.ci.yml exec -T ibl6 wget -qO /dev/null http://127.0.0.1:3001/health 2>/dev/null; do
             if [ $SECONDS -ge $deadline ]; then
-              echo "::error::ibl6 container not healthy after 5 min"
+              echo "::error::ibl6 container not healthy after 2 min"
               docker compose -f docker-compose.ci.yml logs ibl6
               exit 1
             fi
-            sleep 3
+            sleep 2
           done
           echo "ibl6 is healthy"
 
@@ -495,14 +495,14 @@ jobs:
 
       - name: Wait for ibl6 healthy
         run: |
-          deadline=$((SECONDS + 300))
-          while ! docker compose -f docker-compose.ci.yml exec -T ibl6 wget -qO /dev/null http://localhost:3001/health 2>/dev/null; do
+          deadline=$((SECONDS + 120))
+          while ! docker compose -f docker-compose.ci.yml exec -T ibl6 wget -qO /dev/null http://127.0.0.1:3001/health 2>/dev/null; do
             if [ $SECONDS -ge $deadline ]; then
-              echo "::error::ibl6 container not healthy after 5 min"
+              echo "::error::ibl6 container not healthy after 2 min"
               docker compose -f docker-compose.ci.yml logs ibl6
               exit 1
             fi
-            sleep 3
+            sleep 2
           done
           echo "ibl6 is healthy"
 

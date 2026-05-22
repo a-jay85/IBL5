@@ -106,6 +106,8 @@ test.describe('Draft selection: submission', () => {
       .locator('input[type="radio"][name="player"]')
       .first();
     await expect(firstRadio).toBeVisible();
+    const playerName = await firstRadio.getAttribute('value');
+    expect(playerName, 'Radio must carry the player name as its value').toBeTruthy();
     await firstRadio.check();
 
     // Submit the form — POSTs to modules.php?name=Draft&op=select
@@ -117,16 +119,13 @@ test.describe('Draft selection: submission', () => {
       submitBtn.first().click(),
     ]);
 
-    // The response page should contain draft-related content.
-    // Success: "With pick #N ... select PlayerName!"
-    // Error: "Oops, ..." or "didn't select a player"
-    const html = await page.content();
-    const hasDraftContent =
-      /select|drafted|pick\s*#|Draft|oops|error|didn.t/i.test(html);
+    expect(page.url()).toContain('op=select');
 
-    // Verify the form submitted to the op=select route
-    const submittedToOp = page.url().includes('op=select');
-    expect(hasDraftContent || submittedToOp).toBeTruthy();
+    const escapedName = playerName!.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    await expect(page.locator('body')).toContainText(
+      new RegExp(`select\\s*\\*\\*${escapedName}!\\*\\*`),
+    );
+    await expect(page.locator('.draft-error')).toHaveCount(0);
   });
 
   test('validation: no player selected', async ({ appState, page }) => {

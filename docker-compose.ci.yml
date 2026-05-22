@@ -51,8 +51,3 @@ services:
     depends_on:
       mariadb:
         condition: service_healthy
-    healthcheck:
-      test: ["CMD", "wget", "-q", "--spider", "http://localhost:3001/health"]
-      interval: 5s
-      timeout: 5s
-      retries: 10

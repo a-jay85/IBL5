@@ -16,7 +16,9 @@ test.describe('Password reset flow', () => {
     await expect(
       page.locator('input[name="op"][value="mailpasswd"]'),
     ).toBeAttached();
-    await expect(page.locator('input[name="_csrf_token"]')).toBeAttached();
+    await expect(
+      page.locator('form:has(input[name="user_email"]) input[name="_csrf_token"]'),
+    ).toBeAttached();
   });
 
   test('POST mailpasswd with valid email returns generic status page', async ({

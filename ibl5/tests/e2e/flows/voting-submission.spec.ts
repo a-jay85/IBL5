@@ -14,6 +14,7 @@ test.describe('ASG Voting: submission', () => {
     await appState({
       'Current Season Phase': 'Regular Season',
       'ASG Voting': 'Yes',
+      'Current Season Ending Year': '2026',
     });
     await page.goto('modules.php?name=Voting');
 
@@ -274,6 +275,7 @@ test.describe('EOY Voting: submission', () => {
     await appState({
       'Current Season Phase': 'Free Agency',
       'EOY Voting': 'Yes',
+      'Current Season Ending Year': '2026',
     });
     await page.goto('modules.php?name=Voting');
 

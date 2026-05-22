@@ -1,9 +1,4 @@
----
-description: Worktree-local Claude Code instructions for visual-mobile-baselines-batch2.
-last_verified: 2026-05-22
----
+# Worktree: visual-regular-user-and-empty-state
 
-# Worktree: visual-mobile-baselines-batch2
-
-This worktree's Docker instance is at `visual-mobile-baselines-batch2.localhost`.
+This worktree's Docker instance is at `visual-regular-user-and-empty-state.localhost`.
 Use this hostname for all browser checks, curl, and E2E — never `main.localhost`.

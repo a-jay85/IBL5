@@ -175,6 +175,19 @@ async function getCsrfToken(page: Page): Promise<string> {
 }
 
 /**
+ * Extract a valid trade_accept CSRF token from the review page.
+ * The trade_accept token is generated per accept form, not the offer form.
+ */
+async function getAcceptCsrfToken(page: Page): Promise<string> {
+  await gotoWithRetry(page, 'modules.php?name=Trading&op=reviewtrade');
+  const tokenInput = page.locator(
+    '.trade-offer-card form[action*="accepttradeoffer"] input[name="_csrf_token"]',
+  );
+  if ((await tokenInput.count()) === 0) return '';
+  return (await tokenInput.first().getAttribute('value')) ?? '';
+}
+
+/**
  * Build the POST form body from extracted form data, checking specified indices.
  */
 function buildFormBody(
@@ -694,5 +707,81 @@ test.describe('Trade review page: no PHP errors after mutations', () => {
     await appState({ 'Allow Trades': 'Yes', 'Current Season Ending Year': '2026' });
     await gotoWithRetry(page, 'modules.php?name=Trading&op=reviewtrade');
     await assertNoPhpErrors(page, 'on review page after mutations');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Block 8: Trade accept: error branches (API)
+// ---------------------------------------------------------------------------
+
+test.describe('Trade accept: error branches (API)', () => {
+  test('accept with stale offer ID returns already_processed', async ({
+    appState,
+    page,
+    request,
+  }) => {
+    await appState({
+      'Allow Trades': 'Yes',
+      'Current Season Ending Year': '2026',
+    });
+    const token = await getAcceptCsrfToken(page);
+    expect(
+      token,
+      'CI seed must provide offers with accept forms on review page',
+    ).toBeTruthy();
+
+    const response = await request.post(
+      '/ibl5/modules/Trading/accepttradeoffer.php',
+      {
+        form: { offer: '999999', _csrf_token: token },
+        maxRedirects: 0,
+      },
+    );
+    const location = response.headers()['location'] ?? '';
+    expect(location).toContain('result=already_processed');
+  });
+
+  test('accept with non-numeric offer redirects to reviewtrade', async ({
+    appState,
+    page,
+    request,
+  }) => {
+    await appState({
+      'Allow Trades': 'Yes',
+      'Current Season Ending Year': '2026',
+    });
+    const token = await getAcceptCsrfToken(page);
+    expect(token).toBeTruthy();
+
+    const response = await request.post(
+      '/ibl5/modules/Trading/accepttradeoffer.php',
+      {
+        form: { offer: 'not-a-number', _csrf_token: token },
+        maxRedirects: 0,
+      },
+    );
+    const location = response.headers()['location'] ?? '';
+    expect(location).toContain('op=reviewtrade');
+    expect(location).not.toContain('result=');
+  });
+
+  test('accept without CSRF token returns error', async ({
+    appState,
+    request,
+  }) => {
+    await appState({
+      'Allow Trades': 'Yes',
+      'Current Season Ending Year': '2026',
+    });
+
+    const response = await request.post(
+      '/ibl5/modules/Trading/accepttradeoffer.php',
+      {
+        form: { offer: '1' },
+        maxRedirects: 0,
+      },
+    );
+    const location = response.headers()['location'] ?? '';
+    expect(location).toContain('error=');
   });
 });

@@ -25,7 +25,7 @@ test.describe('Free Agency -- submit and manage offers', () => {
     await page.getByRole('button', { name: /Offer.*Free Agent Contract/i }).click();
     // CI seed has Metros under soft cap — custom offer must succeed
     await page.waitForURL(/result=offer_success/);
-    await expect(page.locator('.ibl-alert--success')).toBeVisible();
+    await expect(page.locator('.ibl-alert--success', { hasText: /offer.*saved/i })).toBeVisible();
   });
 
   test('amend existing offer', async ({ page }) => {
@@ -39,7 +39,7 @@ test.describe('Free Agency -- submit and manage offers', () => {
     await yr1Input.fill('250');
     await page.getByRole('button', { name: /Offer.*Free Agent Contract/i }).click();
     await page.waitForURL(/result=offer_success/);
-    await expect(page.locator('.ibl-alert--success')).toBeVisible();
+    await expect(page.locator('.ibl-alert--success', { hasText: /offer.*saved/i })).toBeVisible();
   });
 
   test('delete existing offer', async ({ page }) => {
@@ -60,7 +60,7 @@ test.describe('Free Agency -- submit and manage offers', () => {
     await page.getByRole('button', { name: /Offer.*Free Agent Contract/i }).click();
     // CI seed has Metros under soft cap — multi-year offer must succeed
     await page.waitForURL(/result=offer_success/);
-    await expect(page.locator('.ibl-alert--success')).toBeVisible();
+    await expect(page.locator('.ibl-alert--success', { hasText: /offer.*saved/i })).toBeVisible();
   });
 
   test('offer appears in Contract Offers table on main page', async ({ page }) => {
@@ -79,7 +79,7 @@ test.describe('Free Agency -- submit and manage offers', () => {
     await page.getByRole('button', { name: /Offer.*Free Agent Contract/i }).click();
     // CI seed has Metros under soft cap — offer must succeed
     await page.waitForURL(/result=offer_success/);
-    await expect(page.locator('.ibl-alert--success')).toBeVisible();
+    await expect(page.locator('.ibl-alert--success', { hasText: /offer.*saved/i })).toBeVisible();
 
     // Verify the offer row appears in the Contract Offers section on the main page
     await page.goto('modules.php?name=FreeAgency');
@@ -122,7 +122,7 @@ test.describe('Free Agency -- quick offer buttons', () => {
     const vetBtn = page.getByTestId('quick-offer-vetmin');
     await vetBtn.click();
     await page.waitForURL(/result=offer_success/);
-    await expect(page.locator('.ibl-alert--success')).toBeVisible();
+    await expect(page.locator('.ibl-alert--success', { hasText: /offer.*saved/i })).toBeVisible();
   });
 
   test('submit MLE offer', async ({ page }) => {
@@ -131,7 +131,7 @@ test.describe('Free Agency -- quick offer buttons', () => {
     const mleBtn = page.getByTestId('quick-offer-mle-yr1');
     await mleBtn.click();
     await page.waitForURL(/result=offer_success/);
-    await expect(page.locator('.ibl-alert--success')).toBeVisible();
+    await expect(page.locator('.ibl-alert--success', { hasText: /offer.*saved/i })).toBeVisible();
   });
 
   // LLE test after MLE — delete MLE offer first so HasMLE remains available
@@ -150,7 +150,7 @@ test.describe('Free Agency -- quick offer buttons', () => {
     const lleBtn = page.getByTestId('quick-offer-lle');
     await lleBtn.click();
     await page.waitForURL(/result=offer_success/);
-    await expect(page.locator('.ibl-alert--success')).toBeVisible();
+    await expect(page.locator('.ibl-alert--success', { hasText: /offer.*saved/i })).toBeVisible();
   });
 
   // Delete LLE offer before max contract test
@@ -170,7 +170,7 @@ test.describe('Free Agency -- quick offer buttons', () => {
     await maxBtn.click();
     // CI seed has Metros under soft cap — max contract offer must succeed
     await page.waitForURL(/result=offer_success/);
-    await expect(page.locator('.ibl-alert--success')).toBeVisible();
+    await expect(page.locator('.ibl-alert--success', { hasText: /offer.*saved/i })).toBeVisible();
   });
 
   // Cleanup: delete all offers made during this describe block

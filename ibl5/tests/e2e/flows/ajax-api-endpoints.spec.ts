@@ -378,3 +378,83 @@ test.describe('FranchiseRecordBook API', () => {
     expect(pushUrl).toContain('FranchiseRecordBook');
   });
 });
+
+// ============================================================
+// Saved Depth Chart API: load and rename
+// Validation-failure tests for load, rename, and rename-active actions.
+// No successful rename — that would require a cleanup endpoint.
+// ============================================================
+
+test.describe('Saved Depth Chart API: load and rename', () => {
+  test('action=load with invalid id returns 400 JSON error', async ({
+    request,
+  }) => {
+    const { status, body, contentType } = await fetchJson(
+      request,
+      'modules.php?name=DepthChartEntry&op=api&action=load&id=0',
+    );
+    expect(contentType).toContain('json');
+    expect(status).toBe(400);
+    expect(body).toHaveProperty('error', 'Invalid depth chart ID');
+  });
+
+  test('action=load with nonexistent id returns 404 JSON', async ({
+    request,
+  }) => {
+    const { status, body, contentType } = await fetchJson(
+      request,
+      'modules.php?name=DepthChartEntry&op=api&action=load&id=999999',
+    );
+    expect(contentType).toContain('json');
+    expect(status).toBe(404);
+    expect(body).toHaveProperty('error', 'Depth chart not found');
+  });
+
+  test('action=rename with empty name returns 400 JSON', async ({
+    request,
+  }) => {
+    const response = await request.post(
+      'modules.php?name=DepthChartEntry&op=api&action=rename',
+      { data: { id: 1, name: '' } },
+    );
+    expect(response.status()).toBe(400);
+    const body = await response.json();
+    expect(body).toHaveProperty('error', 'Name cannot be empty');
+  });
+
+  test('action=rename with invalid id returns 400 JSON', async ({
+    request,
+  }) => {
+    const response = await request.post(
+      'modules.php?name=DepthChartEntry&op=api&action=rename',
+      { data: { id: 0, name: 'x' } },
+    );
+    expect(response.status()).toBe(400);
+    const body = await response.json();
+    expect(body).toHaveProperty('error', 'Invalid depth chart ID');
+  });
+
+  test('action=rename-active with empty name returns 400 JSON', async ({
+    request,
+  }) => {
+    const response = await request.post(
+      'modules.php?name=DepthChartEntry&op=api&action=rename-active',
+      { data: { name: '   ' } },
+    );
+    expect(response.status()).toBe(400);
+    const body = await response.json();
+    expect(body).toHaveProperty('error', 'Name cannot be empty');
+  });
+
+  test('unauthenticated load returns 401 JSON', async ({ request }) => {
+    const response = await request.get(
+      'modules.php?name=DepthChartEntry&op=api&action=load&id=1',
+      { headers: { Cookie: '_no_auto_login=1' } },
+    );
+    expect(response.status()).toBe(401);
+    const contentType = response.headers()['content-type'] ?? '';
+    expect(contentType).toContain('json');
+    const body = await response.json();
+    expect(body).toHaveProperty('error');
+  });
+});

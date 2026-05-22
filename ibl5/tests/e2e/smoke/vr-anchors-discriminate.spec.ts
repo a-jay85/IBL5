@@ -14,13 +14,14 @@ type AnchorRow = {
   url: string;
   anchor: string;
   state?: Record<string, string>;
+  skipContentCheck?: boolean; // CI seed renders empty — anchor visibility is the strongest available check
 };
 
 const PUBLIC_ANCHORS: AnchorRow[] = [
   { name: 'index', url: 'index.php', anchor: 'article' },
   { name: 'activity-tracker', url: 'modules.php?name=ActivityTracker', anchor: '.ibl-data-table' },
   { name: 'all-star-appearances', url: 'modules.php?name=AllStarAppearances', anchor: '.ibl-data-table' },
-  { name: 'award-history', url: 'modules.php?name=AwardHistory', anchor: '.ibl-data-table' },
+  { name: 'award-history', url: 'modules.php?name=AwardHistory', anchor: '.ibl-data-table', skipContentCheck: true },
   { name: 'career-leaderboards', url: 'modules.php?name=CareerLeaderboards', anchor: 'form[name="CareerLeaderboards"]' },
   { name: 'compare-players', url: 'modules.php?name=ComparePlayers', anchor: 'form[action*="ComparePlayers"]' },
   { name: 'contract-list', url: 'modules.php?name=ContractList', anchor: '.totals-row' },
@@ -54,7 +55,7 @@ const PUBLIC_ANCHORS: AnchorRow[] = [
 ];
 
 const AUTH_ANCHORS: AnchorRow[] = [
-  { name: 'api-keys', url: 'modules.php?name=ApiKeys', anchor: 'form[action*="ApiKeys"]' },
+  { name: 'api-keys', url: 'modules.php?name=ApiKeys', anchor: 'form[action*="ApiKeys"]', skipContentCheck: true },
   { name: 'cap-space', url: 'modules.php?name=CapSpace&teamid=1', anchor: '.ibl-data-table' },
   { name: 'depth-chart-entry', url: 'modules.php?name=DepthChartEntry', anchor: 'form[name="DepthChartEntry"]' },
   { name: 'draft', url: 'modules.php?name=Draft', anchor: '.draft-container',
@@ -84,6 +85,15 @@ publicTest.describe('VR anchor discrimination — public pages', () => {
       await page.goto(row.url);
       await assertNoPhpErrors(page, `on ${row.url}`);
       await expect(page.locator(row.anchor).first()).toBeVisible();
+
+      if (!row.skipContentCheck) {
+        const anchor = page.locator(row.anchor).first();
+        if (row.anchor === '.ibl-data-table' || row.anchor.startsWith('table.')) {
+          await expect(anchor.locator('tbody tr').first()).toBeVisible();
+        } else if (row.anchor.startsWith('form[')) {
+          await expect(anchor.locator('input:not([type="hidden"]), select, textarea').first()).toBeVisible();
+        }
+      }
     });
   }
 });
@@ -97,6 +107,15 @@ authTest.describe('VR anchor discrimination — authenticated pages', () => {
       await page.goto(row.url);
       await assertNoPhpErrors(page, `on ${row.url}`);
       await expect(page.locator(row.anchor).first()).toBeVisible();
+
+      if (!row.skipContentCheck) {
+        const anchor = page.locator(row.anchor).first();
+        if (row.anchor === '.ibl-data-table' || row.anchor.startsWith('table.')) {
+          await expect(anchor.locator('tbody tr').first()).toBeVisible();
+        } else if (row.anchor.startsWith('form[')) {
+          await expect(anchor.locator('input:not([type="hidden"]), select, textarea').first()).toBeVisible();
+        }
+      }
     });
   }
 });

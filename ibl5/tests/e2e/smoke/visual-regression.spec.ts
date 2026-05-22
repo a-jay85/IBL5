@@ -2,13 +2,17 @@
  * Full-page visual regression matrix.
  *
  * One screenshot per module under `ibl5/modules/` (47 modules) plus the
- * homepage (`index.php`) and seven mobile-only repeats at 375×812 (Standings,
- * Player, Team, Schedule, FreeAgency, Trading, DepthChartEntry). All other
- * shots use the desktop 1280×900 viewport from `playwright.visual.config.ts`.
- * Total: 53 baselines.
+ * homepage (`index.php`) and thirteen mobile-only repeats at 375×812 (Standings,
+ * Player, Team, Schedule, FreeAgency, Trading, DepthChartEntry, News, Search,
+ * Draft, Voting, ProjectedDraftOrder, DraftHistory). All other shots use the
+ * desktop 1280×900 viewport from `playwright.visual.config.ts`.
+ * Total: 62 baselines.
  *
  * - Public-fixture modules render without authentication.
  * - Auth-fixture modules use the CI test user (admin role, Metros GM).
+ * - Non-admin (roles_mask=0, no team) coverage gated on `IBL_TEST_USER_REGULAR`.
+ * - Empty-state baselines for data-driven pages (PlayerMovement empty via
+ *   `Current Season Ending Year=1900`).
  * - Each row anchors on a content-specific selector inside the module's
  *   render block; if the module fails to render its primary content,
  *   `anchor.waitFor()` times out before any screenshot diff runs.
@@ -24,6 +28,7 @@
 import type { Locator, Page } from '@playwright/test';
 import { test as publicTest } from '../fixtures/public';
 import { test as authTest } from '../fixtures/auth';
+import { test as authRegularTest } from '../fixtures/auth-regular';
 import { expect } from '../fixtures/base';
 import { assertNoPhpErrors } from '../helpers/php-errors';
 
@@ -81,6 +86,8 @@ const PUBLIC_MODULES: ModuleSnapshot[] = [
   { name: 'compare-players', url: 'modules.php?name=ComparePlayers', anchor: 'form[action*="ComparePlayers"]' },
   { name: 'contract-list', url: 'modules.php?name=ContractList', anchor: '.totals-row' },
   { name: 'draft-history', url: 'modules.php?name=DraftHistory', anchor: '.ibl-data-table' },
+  { name: 'draft-history-mobile', url: 'modules.php?name=DraftHistory',
+    anchor: '.ibl-data-table', mobile: true },
   { name: 'draft-pick-locator', url: 'modules.php?name=DraftPickLocator', anchor: '.draft-pick-locator-container' },
   { name: 'franchise-history', url: 'modules.php?name=FranchiseHistory&teamid=1', anchor: '.ibl-data-table' },
   { name: 'franchise-record-book', url: 'modules.php?name=FranchiseRecordBook&teamid=1', anchor: '.ibl-data-table' },
@@ -90,17 +97,25 @@ const PUBLIC_MODULES: ModuleSnapshot[] = [
   { name: 'league-starters', url: 'modules.php?name=LeagueStarters', anchor: '#league-starters-tables' },
   { name: 'news', url: 'modules.php?name=News', anchor: 'article',
     extraMask: ['article time'] },
+  { name: 'news-mobile', url: 'modules.php?name=News', anchor: 'article',
+    extraMask: ['article time'], mobile: true },
   { name: 'player', url: 'modules.php?name=Player&pa=showpage&pid=1', anchor: '.stats-grid' },
   { name: 'player-mobile', url: 'modules.php?name=Player&pa=showpage&pid=1', anchor: '.stats-grid', mobile: true },
   { name: 'player-database', url: 'modules.php?name=PlayerDatabase', anchor: 'form[action*="PlayerDatabase"]' },
   { name: 'player-movement', url: 'modules.php?name=PlayerMovement', anchor: '.ibl-data-table' },
+  { name: 'player-movement-empty', url: 'modules.php?name=PlayerMovement', anchor: '.ibl-data-table',
+    state: { 'Current Season Ending Year': '1900' },
+    notes: 'Forces previousSeasonEndingYear=1899 → zero rows; locks empty-state render.' },
   { name: 'projected-draft-order', url: 'modules.php?name=ProjectedDraftOrder', anchor: '.ibl-data-table' },
+  { name: 'projected-draft-order-mobile', url: 'modules.php?name=ProjectedDraftOrder',
+    anchor: '.ibl-data-table', mobile: true },
   { name: 'record-holders', url: 'modules.php?name=RecordHolders', anchor: '.record-section' },
   { name: 'schedule', url: 'modules.php?name=Schedule', anchor: '.schedule-header',
     extraMask: ['.schedule-today-highlight'] },
   { name: 'league-schedule-mobile', url: 'modules.php?name=Schedule', anchor: '.schedule-header',
     extraMask: ['.schedule-today-highlight'], mobile: true },
   { name: 'search', url: 'modules.php?name=Search', anchor: '.search-page' },
+  { name: 'search-mobile', url: 'modules.php?name=Search', anchor: '.search-page', mobile: true },
   { name: 'season-archive', url: 'modules.php?name=SeasonArchive', anchor: '.ibl-data-table' },
   { name: 'season-highs', url: 'modules.php?name=SeasonHighs', anchor: '.ibl-data-table' },
   { name: 'season-leaderboards', url: 'modules.php?name=SeasonLeaderboards', anchor: '.ibl-data-table',
@@ -127,6 +142,9 @@ const AUTH_MODULES: ModuleSnapshot[] = [
   { name: 'draft', url: 'modules.php?name=Draft', anchor: '.draft-container',
     state: { 'Show Draft Link': 'Yes' },
     notes: 'Outside Draft phase, requires Show Draft Link toggle to render.' },
+  { name: 'draft-mobile', url: 'modules.php?name=Draft', anchor: '.draft-container',
+    state: { 'Show Draft Link': 'Yes' }, mobile: true,
+    notes: 'Outside Draft phase, requires Show Draft Link toggle to render.' },
   { name: 'free-agency', url: 'modules.php?name=FreeAgency', anchor: '.fa-table',
     state: { 'Current Season Phase': 'Free Agency' } },
   { name: 'free-agency-mobile', url: 'modules.php?name=FreeAgency', anchor: '.fa-table',
@@ -144,6 +162,8 @@ const AUTH_MODULES: ModuleSnapshot[] = [
   { name: 'training-camp-ratings-diff', url: 'modules.php?name=TrainingCampRatingsDiff', anchor: '.ratings-diff-page',
     notes: 'Admin-only; renders empty state unless ratings snapshot exists.' },
   { name: 'voting', url: 'modules.php?name=Voting', anchor: '.voting-form-container' },
+  { name: 'voting-mobile', url: 'modules.php?name=Voting',
+    anchor: '.voting-form-container', mobile: true },
   { name: 'waivers', url: 'modules.php?name=Waivers', anchor: '.waivers-page' },
 ];
 
@@ -213,4 +233,29 @@ authTest.describe('Visual regression — authenticated pages (full-page)', () =>
     });
   }
 
+});
+
+// ============================================================
+// Non-admin visual regression — roles_mask=0, no franchise
+// ============================================================
+
+const AUTH_REGULAR_MODULES: ModuleSnapshot[] = [
+  { name: 'team-non-admin', url: 'modules.php?name=Team&op=team&teamid=1', anchor: '.team-page-layout',
+    notes: 'Authenticated non-admin viewing another team — exercises nav/personalization deltas vs. public baseline.' },
+  { name: 'next-sim-non-admin', url: 'modules.php?name=NextSim', anchor: '.next-sim-container',
+    notes: 'Free-Agents fallback team path. If PHP errors, assertNoPhpErrors fails loudly in first CI run.' },
+];
+
+authRegularTest.describe('Visual regression — non-admin authenticated pages', () => {
+  for (const row of AUTH_REGULAR_MODULES) {
+    authRegularTest(`${row.name}`, async ({ appState, page }) => {
+      if (row.state) {
+        await appState(row.state);
+      }
+      if (row.notes) {
+        console.log(`[visual-regression] ${row.name}: ${row.notes}`);
+      }
+      await captureSnapshot(page, row);
+    });
+  }
 });

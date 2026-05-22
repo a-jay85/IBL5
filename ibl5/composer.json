@@ -13,7 +13,7 @@
         "phpstan/phpstan-phpunit": "^2.0",
         "phpstan/phpstan-strict-rules": "^2.0",
         "phpstan/phpstan-deprecation-rules": "^2.0",
-        "infection/infection": "^0.32.6"
+        "infection/infection": "^0.33.2"
     },
     "scripts": {
         "pre-autoload-dump": "if [ -L vendor ]; then echo 'ERROR: vendor/ is a symlink (worktree). Do not run composer install/dump-autoload here — it corrupts shared autoload paths. Run from the main repo instead.' && exit 1; fi",

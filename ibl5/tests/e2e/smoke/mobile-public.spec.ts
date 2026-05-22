@@ -28,7 +28,7 @@ const PAGES = [
   { name: 'player movement', url: 'modules.php?name=PlayerMovement', selector: '.ibl-data-table', hasWideTables: false },
   { name: 'league starters', url: 'modules.php?name=LeagueStarters', selector: '#league-starters-tables', hasWideTables: true },
   { name: 'compare players', url: 'modules.php?name=ComparePlayers', selector: 'form[action*="ComparePlayers"]', hasWideTables: false },
-  { name: 'season highs', url: 'modules.php?name=SeasonHighs', selector: '.ibl-data-table', hasWideTables: false, skipOverflow: true },
+  { name: 'season highs', url: 'modules.php?name=SeasonHighs', selector: '.ibl-data-table', hasWideTables: false },
   { name: 'series records', url: 'modules.php?name=SeriesRecords', selector: '.ibl-data-table', hasWideTables: false },
   { name: 'franchise history', url: 'modules.php?name=FranchiseHistory', selector: '.ibl-data-table', hasWideTables: false },
   { name: 'activity tracker', url: 'modules.php?name=ActivityTracker', selector: '.ibl-data-table', hasWideTables: true },
@@ -38,7 +38,7 @@ const PAGES = [
   { name: 'franchise record book', url: 'modules.php?name=FranchiseRecordBook', selector: '.ibl-data-table', hasWideTables: false },
   { name: 'team off/def stats', url: 'modules.php?name=TeamOffDefStats', selector: '.ibl-data-table', hasWideTables: true },
   { name: 'transaction history', url: 'modules.php?name=TransactionHistory', selector: '.ibl-data-table', hasWideTables: false },
-  { name: 'search', url: 'modules.php?name=Search', selector: '.search-page', hasWideTables: false, skipOverflow: true },
+  { name: 'search', url: 'modules.php?name=Search', selector: '.search-page', hasWideTables: false },
   // 'Boxscore' is not a real module — modules.php?name=Boxscore previously passed
   // only because the "Sorry, such file doesn't exist" fallback rendered an OpenTable
   // wrapper that matched the `table` selector. PR2 module-dispatch lockdown
@@ -47,8 +47,8 @@ const PAGES = [
   // static IBL6 SvelteKit URLs or legacy box{N}.htm files (see BoxScoreUrlBuilder),
   // never via modules.php.
   { name: 'season archive', url: 'modules.php?name=SeasonArchive', selector: '.ibl-data-table', hasWideTables: false },
-  { name: 'one-on-one game', url: 'modules.php?name=OneOnOneGame', selector: 'form[name="OneOnOneGame"]', hasWideTables: false, skipOverflow: true },
-  { name: 'topics', url: 'modules.php?name=Topics', selector: '.topics-page', hasWideTables: false, skipOverflow: true },
+  { name: 'one-on-one game', url: 'modules.php?name=OneOnOneGame', selector: 'form[name="OneOnOneGame"]', hasWideTables: false },
+  { name: 'topics', url: 'modules.php?name=Topics', selector: '.topics-page', hasWideTables: false },
   { name: 'news', url: 'modules.php?name=News', selector: 'article', hasWideTables: false },
 ] as const;
 
@@ -65,9 +65,7 @@ test.describe('Mobile public page smoke tests', () => {
 
       await expect(page.locator(pageInfo.selector).first()).toBeVisible();
 
-      if (!('skipOverflow' in pageInfo)) {
-        await assertNoHorizontalOverflow(page, `on ${pageInfo.name}`);
-      }
+      await assertNoHorizontalOverflow(page, `on ${pageInfo.name}`);
 
       if (pageInfo.hasWideTables) {
         await assertScrollWrappersPresent(page, `on ${pageInfo.name}`);

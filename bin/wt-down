@@ -69,16 +69,6 @@ teardown_worktree() {
         env_flag="--env-file $REPO_ROOT/.env"
     fi
 
-    # Stop CSS watcher if running
-    local css_pid_file="$wt_path/.css-watch.pid"
-    if [ -f "$css_pid_file" ]; then
-        local css_pid
-        css_pid=$(cat "$css_pid_file")
-        kill -9 "$css_pid" 2>/dev/null || true
-        rm -f "$css_pid_file" "$wt_path/.css-watch.log"
-        echo "  Stopped CSS watcher (PID $css_pid)"
-    fi
-
     # Stop browser-sync if running
     local bs_pid_file="$wt_path/.bs-sync.pid"
     if [ -f "$bs_pid_file" ]; then

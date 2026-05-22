@@ -1,0 +1,7 @@
+FROM oven/bun:1-alpine
+RUN bun add -g @tailwindcss/cli@^4.3.0
+WORKDIR /var/www/html/ibl5
+CMD ["bunx", "@tailwindcss/cli", \
+     "-i", "design/input.css", \
+     "-o", "themes/IBL/style/style.css", \
+     "--watch=always"]

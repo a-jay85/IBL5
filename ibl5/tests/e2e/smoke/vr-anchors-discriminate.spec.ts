@@ -84,6 +84,13 @@ publicTest.describe('VR anchor discrimination — public pages', () => {
       await page.goto(row.url);
       await assertNoPhpErrors(page, `on ${row.url}`);
       await expect(page.locator(row.anchor).first()).toBeVisible();
+
+      const anchor = page.locator(row.anchor).first();
+      if (row.anchor === '.ibl-data-table' || row.anchor.startsWith('table.')) {
+        await expect(anchor.locator('tbody tr').first()).toBeVisible();
+      } else if (row.anchor.startsWith('form[')) {
+        await expect(anchor.locator('input, select, textarea').first()).toBeVisible();
+      }
     });
   }
 });
@@ -97,6 +104,13 @@ authTest.describe('VR anchor discrimination — authenticated pages', () => {
       await page.goto(row.url);
       await assertNoPhpErrors(page, `on ${row.url}`);
       await expect(page.locator(row.anchor).first()).toBeVisible();
+
+      const anchor = page.locator(row.anchor).first();
+      if (row.anchor === '.ibl-data-table' || row.anchor.startsWith('table.')) {
+        await expect(anchor.locator('tbody tr').first()).toBeVisible();
+      } else if (row.anchor.startsWith('form[')) {
+        await expect(anchor.locator('input, select, textarea').first()).toBeVisible();
+      }
     });
   }
 });

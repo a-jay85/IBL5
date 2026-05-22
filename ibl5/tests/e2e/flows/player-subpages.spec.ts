@@ -90,6 +90,33 @@ test.describe('Player rookie option sub-page', () => {
     await page.goto('modules.php?name=Player&pa=rookieoption&pid=99999');
     await assertNoPhpErrors(page, 'on rookie option with invalid PID');
   });
+
+  // Success path not covered — would mutate pid=25's contract; no reset endpoint exists.
+  test('POST to processrookieoption with ineligible player returns error redirect', async ({
+    appState,
+    request,
+  }) => {
+    await appState({
+      'Current Season Phase': 'Regular Season',
+      'Current Season Ending Year': '2026',
+    });
+
+    const response = await request.post(
+      '/ibl5/modules.php?name=Player&pa=processrookieoption',
+      {
+        form: {
+          teamname: 'Metros',
+          playerID: '25',
+          rookieOptionValue: '1000',
+          from: '',
+        },
+        maxRedirects: 0,
+      },
+    );
+    const location = response.headers()['location'] ?? '';
+    expect(location).toContain('error=');
+    expect(location).toContain('pa=rookieoption');
+  });
 });
 
 test.describe('Player extension sub-page (POST handler)', () => {

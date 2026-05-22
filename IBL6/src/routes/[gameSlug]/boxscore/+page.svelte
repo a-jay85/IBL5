@@ -142,7 +142,7 @@
     </div>
 {:else}
     <!-- Game header -->
-    <div class="bg-gradient-to-r text-white p-6 rounded-lg shadow-lg mb-6"
+    <div data-testid="boxscore-game-header" class="bg-gradient-to-r text-white p-6 rounded-lg shadow-lg mb-6"
          style="background: linear-gradient(to right, {awayTeamColor}aa, {homeTeamColor}aa)">
         <div class="flex justify-around items-center">
             <!-- Away Team -->
@@ -191,7 +191,7 @@
     </div>
 
     <!-- Team Selector -->
-    <div class="flex justify-center p-4">
+    <div data-testid="boxscore-team-selector" class="flex justify-center p-4">
         <SlideButtonSelector 
             options={[awayTeamName, homeTeamName]} 
             selected={selectedTeamName || homeTeamName}
@@ -207,7 +207,7 @@
             <p class="text-base-content/60">Choose a team above to view player statistics.</p>
         </div>
     {:else if filteredPlayers.length === 0}
-        <div class="flex flex-col items-center justify-center p-12 text-center">
+        <div data-testid="boxscore-empty" class="flex flex-col items-center justify-center p-12 text-center">
             <div class="text-6xl mb-4">🏀</div>
             <h3 class="text-lg font-semibold mb-2">No Players Found</h3>
             <p class="text-base-content/60">
@@ -224,7 +224,7 @@
             </p>
         </div>
         <div class="overflow-x-auto border border-base-300 rounded-lg shadow-sm">
-            <table class="table table-zebra table-pin-rows table-xs min-w-full">
+            <table data-testid="boxscore-player-table" class="table table-zebra table-pin-rows table-xs min-w-full">
                 <thead>
                     <StatsHorizontal {headers} bind:sortColumn bind:sortDirection />
                 </thead>

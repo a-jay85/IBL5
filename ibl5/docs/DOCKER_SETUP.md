@@ -1,6 +1,6 @@
 ---
 description: Docker Compose setup for local PHP-Apache + MariaDB stack.
-last_verified: 2026-05-18
+last_verified: 2026-05-22
 ---
 
 # Docker Development Setup
@@ -60,7 +60,7 @@ If another web server is bound to port 80, stop it before `docker compose up -d`
 
 Tools that run on the **host** (not inside Docker):
 
-- **CSS:** `bun run css:watch` — file changes are instantly visible via the bind mount
+- **CSS:** The `ibl5-tailwind` sidecar container handles Tailwind rebuilds automatically — no manual `bun run css:watch` needed
 - **PHPUnit:** `cd ibl5 && vendor/bin/phpunit` — connects to Docker MariaDB on localhost:3306
 - **Playwright:** `bun run test:e2e` — hits http://main.localhost/ibl5/ served by Docker PHP
 - **PHPStan:** `cd ibl5 && composer run analyse`

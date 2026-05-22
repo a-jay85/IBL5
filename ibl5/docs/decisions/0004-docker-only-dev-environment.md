@@ -1,6 +1,6 @@
 ---
 description: Why IBL5 local dev is Docker-only, with MAMP sunset and native PHP stacks rejected.
-last_verified: 2026-04-12
+last_verified: 2026-05-22
 ---
 
 # ADR-0004: Docker-only development environment
@@ -31,6 +31,7 @@ Local development uses Docker Compose only. `docker compose up -d` starts PHP-Ap
 - Positive: Playwright E2E tests can rely on `http://main.localhost/ibl5/` being the single canonical URL.
 - Negative: Docker Desktop is a heavyweight prerequisite for onboarding. Accepted because the alternative was worse.
 - Negative: First-time setup requires creating the shared `ibl5-proxy` Docker network manually. Documented in `ibl5/docs/DOCKER_SETUP.md`.
+- Positive: Tailwind CSS watcher runs as a Docker sidecar (`ibl5-tailwind` / `ibl5-tailwind-${SLUG}`); developers no longer keep a Terminal window open running `bun run css:watch`.
 - Negative: Running the full dev stack consumes ~2-3 GB RAM. Accepted for the other properties.
 
 ## References
@@ -38,4 +39,5 @@ Local development uses Docker Compose only. `docker compose up -d` starts PHP-Ap
 - `ibl5/docs/DOCKER_SETUP.md` — the step-by-step onboarding guide.
 - `docker-compose.yml` — the canonical service definition.
 - `bin/wt-new`, `bin/wt-up`, `bin/wt-down` — worktree lifecycle commands that assume Docker.
+- `docker/Dockerfile.tailwind` — the Tailwind CSS watcher sidecar image.
 - `.claude/rules/workflow-continuity.md` — the agent-facing worktree rule (cites this ADR).

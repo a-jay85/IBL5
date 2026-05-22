@@ -69,12 +69,10 @@ test.describe('Waivers: add player', () => {
     await expect(page.locator('.ibl-alert--success')).toBeVisible();
     await assertNoPhpErrors(page, 'after waiver add');
 
-    // Cross-page confirmation: signed player appears on the team roster.
+    // Option label format: "PlayerName salary1 salary2 salary3" — strip salary tail to get just the name.
+    const playerNameOnly = optionLabel.replace(/\s+\d.*$/, '').trim();
     await page.goto('modules.php?name=Team&op=team&teamid=1');
-    await expect(page.locator('body')).toContainText(
-      optionLabel.split(/[—\-–:]/)[0].trim(),
-      { timeout: 5000 },
-    );
+    await expect(page.locator('body')).toContainText(playerNameOnly, { timeout: 5000 });
   });
 
   test('success banner shows on successful add', async ({

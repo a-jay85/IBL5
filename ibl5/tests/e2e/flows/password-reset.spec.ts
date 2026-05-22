@@ -24,7 +24,9 @@ test.describe('Password reset flow', () => {
   }) => {
     await page.goto('modules.php?name=YourAccount&op=pass_lost');
     await page.locator('input[name="user_email"]').fill('ci-test@example.com');
-    await page.locator('button[type="submit"]').click();
+    await page
+      .locator('form:has(input[name="user_email"]) button[type="submit"]')
+      .click();
 
     await expect(page.locator('body')).toContainText('Check Your Email');
     await assertNoPhpErrors(page, 'after valid email submission');
@@ -37,7 +39,9 @@ test.describe('Password reset flow', () => {
     await page
       .locator('input[name="user_email"]')
       .fill('no-such-user-99999@example.com');
-    await page.locator('button[type="submit"]').click();
+    await page
+      .locator('form:has(input[name="user_email"]) button[type="submit"]')
+      .click();
 
     await expect(page.locator('body')).toContainText('Check Your Email');
     await assertNoPhpErrors(page, 'after nonexistent email submission');
@@ -50,7 +54,9 @@ test.describe('Password reset flow', () => {
     await page
       .locator('input[name="user_email"]')
       .evaluate((el) => el.removeAttribute('required'));
-    await page.locator('button[type="submit"]').click();
+    await page
+      .locator('form:has(input[name="user_email"]) button[type="submit"]')
+      .click();
 
     await expect(page.locator('body')).toContainText(
       'Please enter your email address.',

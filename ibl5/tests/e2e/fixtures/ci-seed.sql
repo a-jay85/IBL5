@@ -607,6 +607,60 @@ INSERT INTO ibl_box_scores (
    3, 5, 3, 2, 1, 2, 2,
    '00000000-0000-0000-0000-000000000002');
 
+-- IBL6 boxscore coverage: player-level rows for 2026-02-20 game 1 (Metros@Stars)
+-- 4 Metros (visitor, tid=1) + 3 Stars (home, tid=2) = 7 rows
+-- calc_points, calc_rebounds, calc_fg_made are generated columns
+INSERT INTO ibl_box_scores (
+  `game_date`, pid, name, pos, visitor_teamid, home_teamid, teamid,
+  game_of_that_day, game_min, game_2gm, game_2ga, game_ftm, game_fta, game_3gm, game_3ga,
+  game_orb, game_drb, game_ast, game_stl, game_tov, game_blk, game_pf,
+  `uuid`
+) VALUES
+  ('2026-02-20', 1, 'Test Player', 'SG', 1, 2, 1,
+   1, 34, 6, 12, 4, 5, 3, 7,
+   2, 5, 6, 2, 3, 1, 3,
+   'b0000000-0000-0000-0000-000000000101'),
+  ('2026-02-20', 2, 'Test Player Two', 'PF', 1, 2, 1,
+   1, 30, 5, 11, 3, 4, 2, 5,
+   3, 6, 4, 1, 2, 2, 4,
+   'b0000000-0000-0000-0000-000000000102'),
+  ('2026-02-20', 20, 'Metros PG', 'PG', 1, 2, 1,
+   1, 36, 7, 14, 5, 6, 4, 9,
+   1, 4, 8, 3, 4, 0, 2,
+   'b0000000-0000-0000-0000-000000000103'),
+  ('2026-02-20', 21, 'Metros SF', 'SF', 1, 2, 1,
+   1, 28, 4, 10, 2, 3, 1, 4,
+   3, 4, 3, 1, 2, 1, 3,
+   'b0000000-0000-0000-0000-000000000104'),
+  ('2026-02-20', 22, 'Metros Center', 'C', 1, 2, 1,
+   1, 25, 4, 9, 3, 4, 0, 2,
+   4, 5, 2, 1, 1, 1, 3,
+   'b0000000-0000-0000-0000-000000000108'),
+  ('2026-02-20', 25, 'Metros Backup PG', 'PG', 1, 2, 1,
+   1, 18, 2, 6, 1, 2, 0, 3,
+   0, 2, 4, 0, 1, 0, 1,
+   'b0000000-0000-0000-0000-000000000109'),
+  ('2026-02-20', 26, 'Metros Backup SF', 'SF', 1, 2, 1,
+   1, 15, 2, 5, 1, 2, 1, 1,
+   1, 3, 1, 0, 0, 2, 2,
+   'b0000000-0000-0000-0000-000000000110'),
+  ('2026-02-20', 27, 'Metros Utility', 'PF', 1, 2, 1,
+   1, 12, 1, 4, 0, 1, 0, 1,
+   2, 2, 0, 1, 0, 1, 1,
+   'b0000000-0000-0000-0000-000000000111'),
+  ('2026-02-20', 4, 'Stars Guard', 'PG', 1, 2, 2,
+   1, 35, 6, 13, 4, 5, 3, 8,
+   2, 5, 7, 2, 3, 0, 3,
+   'b0000000-0000-0000-0000-000000000105'),
+  ('2026-02-20', 5, 'Stars Forward', 'SF', 1, 2, 2,
+   1, 32, 5, 11, 3, 4, 2, 6,
+   4, 6, 5, 1, 2, 2, 4,
+   'b0000000-0000-0000-0000-000000000106'),
+  ('2026-02-20', 12, 'FA Forward', 'SF', 1, 2, 2,
+   1, 26, 3, 8, 2, 3, 1, 4,
+   2, 3, 3, 2, 1, 1, 2,
+   'b0000000-0000-0000-0000-000000000107');
+
 -- ============================================================
 -- Player history (SeasonLeaderboards needs current-year stats)
 -- ============================================================
@@ -1108,46 +1162,72 @@ ON DUPLICATE KEY UPDATE visitor_score=VALUES(visitor_score);
 -- ============================================================
 
 -- Regular season pair: 2026-02-20, Metros(visitor=1) vs Stars(home=2), game_type=1
+-- Quarter-points backfilled so IBL6 boxscore page header shows real scores
+-- (q1+q2+q3+q4+COALESCE(ot,0)): Metros 28+26+27+24=105, Stars 24+25+24+25=98
 INSERT INTO ibl_box_scores_teams (game_date, visitor_teamid, home_teamid, game_of_that_day, name,
   game_2gm, game_2ga, game_ftm, game_fta, game_3gm, game_3ga,
-  game_orb, game_drb, game_ast, game_stl, game_tov, game_blk, game_pf) VALUES
+  game_orb, game_drb, game_ast, game_stl, game_tov, game_blk, game_pf,
+  visitor_q1_points, visitor_q2_points, visitor_q3_points, visitor_q4_points,
+  home_q1_points, home_q2_points, home_q3_points, home_q4_points) VALUES
   ('2026-02-20', 1, 2, 1, 'Metros',
-   28, 55, 18, 22, 10, 25, 9, 28, 22, 7, 11, 4, 16),
+   28, 55, 18, 22, 10, 25, 9, 28, 22, 7, 11, 4, 16,
+   28, 26, 27, 24, 24, 25, 24, 25),
   ('2026-02-20', 1, 2, 1, 'Stars',
-   25, 58, 15, 20, 8, 22, 7, 25, 19, 6, 13, 3, 18)
+   25, 58, 15, 20, 8, 22, 7, 25, 19, 6, 13, 3, 18,
+   28, 26, 27, 24, 24, 25, 24, 25)
 ON DUPLICATE KEY UPDATE game_2gm=VALUES(game_2gm), game_2ga=VALUES(game_2ga),
   game_ftm=VALUES(game_ftm), game_fta=VALUES(game_fta), game_3gm=VALUES(game_3gm),
   game_3ga=VALUES(game_3ga), game_orb=VALUES(game_orb), game_drb=VALUES(game_drb),
   game_ast=VALUES(game_ast), game_stl=VALUES(game_stl), game_tov=VALUES(game_tov),
-  game_blk=VALUES(game_blk), game_pf=VALUES(game_pf);
+  game_blk=VALUES(game_blk), game_pf=VALUES(game_pf),
+  visitor_q1_points=VALUES(visitor_q1_points), visitor_q2_points=VALUES(visitor_q2_points),
+  visitor_q3_points=VALUES(visitor_q3_points), visitor_q4_points=VALUES(visitor_q4_points),
+  home_q1_points=VALUES(home_q1_points), home_q2_points=VALUES(home_q2_points),
+  home_q3_points=VALUES(home_q3_points), home_q4_points=VALUES(home_q4_points);
 
 -- Sim-range pair: 2026-03-03 (inside last sim [2026-03-01..2026-03-07]), Metros vs Cougars
 INSERT INTO ibl_box_scores_teams (game_date, visitor_teamid, home_teamid, game_of_that_day, name,
   game_2gm, game_2ga, game_ftm, game_fta, game_3gm, game_3ga,
-  game_orb, game_drb, game_ast, game_stl, game_tov, game_blk, game_pf) VALUES
+  game_orb, game_drb, game_ast, game_stl, game_tov, game_blk, game_pf,
+  visitor_q1_points, visitor_q2_points, visitor_q3_points, visitor_q4_points,
+  home_q1_points, home_q2_points, home_q3_points, home_q4_points) VALUES
   ('2026-03-03', 1, 3, 1, 'Metros',
-   30, 60, 20, 24, 9, 20, 11, 30, 24, 8, 10, 5, 15),
+   30, 60, 20, 24, 9, 20, 11, 30, 24, 8, 10, 5, 15,
+   27, 29, 25, 28, 22, 24, 23, 23),
   ('2026-03-03', 1, 3, 1, 'Cougars',
-   27, 56, 16, 21, 7, 19, 8, 26, 20, 5, 14, 2, 19)
+   27, 56, 16, 21, 7, 19, 8, 26, 20, 5, 14, 2, 19,
+   27, 29, 25, 28, 22, 24, 23, 23)
 ON DUPLICATE KEY UPDATE game_2gm=VALUES(game_2gm), game_2ga=VALUES(game_2ga),
   game_ftm=VALUES(game_ftm), game_fta=VALUES(game_fta), game_3gm=VALUES(game_3gm),
   game_3ga=VALUES(game_3ga), game_orb=VALUES(game_orb), game_drb=VALUES(game_drb),
   game_ast=VALUES(game_ast), game_stl=VALUES(game_stl), game_tov=VALUES(game_tov),
-  game_blk=VALUES(game_blk), game_pf=VALUES(game_pf);
+  game_blk=VALUES(game_blk), game_pf=VALUES(game_pf),
+  visitor_q1_points=VALUES(visitor_q1_points), visitor_q2_points=VALUES(visitor_q2_points),
+  visitor_q3_points=VALUES(visitor_q3_points), visitor_q4_points=VALUES(visitor_q4_points),
+  home_q1_points=VALUES(home_q1_points), home_q2_points=VALUES(home_q2_points),
+  home_q3_points=VALUES(home_q3_points), home_q4_points=VALUES(home_q4_points);
 
 -- Playoffs pair: 2026-06-05 (June → game_type=2), Metros vs Stars
 INSERT INTO ibl_box_scores_teams (game_date, visitor_teamid, home_teamid, game_of_that_day, name,
   game_2gm, game_2ga, game_ftm, game_fta, game_3gm, game_3ga,
-  game_orb, game_drb, game_ast, game_stl, game_tov, game_blk, game_pf) VALUES
+  game_orb, game_drb, game_ast, game_stl, game_tov, game_blk, game_pf,
+  visitor_q1_points, visitor_q2_points, visitor_q3_points, visitor_q4_points,
+  home_q1_points, home_q2_points, home_q3_points, home_q4_points) VALUES
   ('2026-06-05', 1, 2, 1, 'Metros',
-   26, 52, 14, 18, 11, 28, 10, 27, 21, 9, 12, 6, 17),
+   26, 52, 14, 18, 11, 28, 10, 27, 21, 9, 12, 6, 17,
+   25, 23, 26, 24, 22, 24, 23, 22),
   ('2026-06-05', 1, 2, 1, 'Stars',
-   24, 50, 12, 16, 9, 24, 6, 24, 18, 5, 15, 4, 20)
+   24, 50, 12, 16, 9, 24, 6, 24, 18, 5, 15, 4, 20,
+   25, 23, 26, 24, 22, 24, 23, 22)
 ON DUPLICATE KEY UPDATE game_2gm=VALUES(game_2gm), game_2ga=VALUES(game_2ga),
   game_ftm=VALUES(game_ftm), game_fta=VALUES(game_fta), game_3gm=VALUES(game_3gm),
   game_3ga=VALUES(game_3ga), game_orb=VALUES(game_orb), game_drb=VALUES(game_drb),
   game_ast=VALUES(game_ast), game_stl=VALUES(game_stl), game_tov=VALUES(game_tov),
-  game_blk=VALUES(game_blk), game_pf=VALUES(game_pf);
+  game_blk=VALUES(game_blk), game_pf=VALUES(game_pf),
+  visitor_q1_points=VALUES(visitor_q1_points), visitor_q2_points=VALUES(visitor_q2_points),
+  visitor_q3_points=VALUES(visitor_q3_points), visitor_q4_points=VALUES(visitor_q4_points),
+  home_q1_points=VALUES(home_q1_points), home_q2_points=VALUES(home_q2_points),
+  home_q3_points=VALUES(home_q3_points), home_q4_points=VALUES(home_q4_points);
 
 -- ============================================================
 -- Power rankings (covers SOS tier dots, SOS summary)

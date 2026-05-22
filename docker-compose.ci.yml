@@ -36,3 +36,18 @@ services:
       interval: 5s
       timeout: 5s
       retries: 10
+
+  ibl6:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.ibl6
+    environment:
+      DB_HOST: mariadb
+      DB_NAME: ibl5
+      DB_USER: root
+      DB_PASSWORD: root
+      NODE_ENV: production
+      PORT: 3001
+    depends_on:
+      mariadb:
+        condition: service_healthy

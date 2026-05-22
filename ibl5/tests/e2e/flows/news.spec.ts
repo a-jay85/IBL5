@@ -69,6 +69,14 @@ test.describe('News module flow', () => {
     const href = await link.getAttribute('href');
     await page.goto(href!);
     await assertNoPhpErrors(page, 'on News article view');
+    await expect(page.locator('.news-article')).toBeVisible();
+    await expect(page.locator('.news-article__title').first()).toBeVisible();
+    const body = page.locator('.news-article__body');
+    await expect(body).toBeVisible();
+    const bodyText = await body.textContent();
+    expect((bodyText ?? '').trim().length).toBeGreaterThan(50);
+    await expect(page.locator('.news-article__meta')).toBeVisible();
+    await expect(page.locator('.news-article__meta .news-article__meta-item').first()).toBeVisible();
   });
 
   test('categories page loads', async ({ page }) => {

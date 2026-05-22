@@ -235,6 +235,53 @@ class LastSimRecapRepository extends \BaseMysqliRepository implements LastSimRec
     /**
      * @return StarterMap|null
      */
+    public function getStarterPidsFromLastSim(int $tid): ?array
+    {
+        /** @var list<array{pid:int,pos:string}> $rows */
+        $rows = $this->fetchAll(
+            "SELECT pid,
+                    CASE
+                        WHEN pg_depth = 1 THEN 'PG'
+                        WHEN sg_depth = 1 THEN 'SG'
+                        WHEN sf_depth = 1 THEN 'SF'
+                        WHEN pf_depth = 1 THEN 'PF'
+                        WHEN c_depth  = 1 THEN 'C'
+                    END AS pos
+             FROM {$this->plrTable}
+             WHERE teamid = ?
+               AND retired = 0
+               AND (pg_depth = 1 OR sg_depth = 1 OR sf_depth = 1 OR pf_depth = 1 OR c_depth = 1)",
+            "i",
+            $tid
+        );
+
+        $starters = ['PG' => null, 'SG' => null, 'SF' => null, 'PF' => null, 'C' => null];
+        foreach ($rows as $row) {
+            $pos = $row['pos'];
+            if (in_array($pos, ['PG', 'SG', 'SF', 'PF', 'C'], true) && $starters[$pos] === null) {
+                $starters[$pos] = $row['pid'];
+            }
+        }
+
+        if ($starters['PG'] === null || $starters['SG'] === null
+            || $starters['SF'] === null || $starters['PF'] === null
+            || $starters['C']  === null
+        ) {
+            return null;
+        }
+
+        return [
+            'PG' => $starters['PG'],
+            'SG' => $starters['SG'],
+            'SF' => $starters['SF'],
+            'PF' => $starters['PF'],
+            'C'  => $starters['C'],
+        ];
+    }
+
+    /**
+     * @return StarterMap|null
+     */
     public function getStarterPidsFromSnapshot(int $tid, string $date): ?array
     {
         // Use the SavedDepthChart repo to find a chart whose window covers

@@ -85,6 +85,9 @@ interface LastSimRecapRepositoryInterface
     public function getTeamRosterPids(int $tid): array;
 
     /** @return StarterMap|null */
+    public function getStarterPidsFromLastSim(int $tid): ?array;
+
+    /** @return StarterMap|null */
     public function getStarterPidsFromSnapshot(int $tid, string $date): ?array;
 
     /** @return StarterMap */

@@ -149,10 +149,13 @@ class LastSimRecapService implements LastSimRecapServiceInterface
             $oppRoster === [] ? [] : $this->repo->getActiveInjuriesForPlayers($oppRoster, $g['date'])
         );
 
-        // Position-battle starters: snapshot for your team, fallback to box.
-        $yourStarters = $this->repo->getStarterPidsFromSnapshot($tid, $g['date'])
+        // Position-battle starters: last-sim depth columns (primary),
+        // saved snapshot, then box-score minutes as final fallback.
+        $yourStarters = $this->repo->getStarterPidsFromLastSim($tid)
+            ?? $this->repo->getStarterPidsFromSnapshot($tid, $g['date'])
             ?? $this->repo->getStarterPidsFromBoxScores($g['schedId'], $tid);
-        $oppStarters = $this->repo->getStarterPidsFromSnapshot($oppTid, $g['date'])
+        $oppStarters = $this->repo->getStarterPidsFromLastSim($oppTid)
+            ?? $this->repo->getStarterPidsFromSnapshot($oppTid, $g['date'])
             ?? $this->repo->getStarterPidsFromBoxScores($g['schedId'], $oppTid);
 
         // Build a set of pids with a NEW injury today for quick hurt-flag lookup.

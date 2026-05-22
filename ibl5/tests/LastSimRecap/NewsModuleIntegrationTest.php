@@ -70,6 +70,7 @@ class NewsModuleIntegrationTest extends TestCase
             }
             public function getActiveInjuriesForPlayers(array $playerIds, string $date): array { return []; }
             public function getTeamRosterPids(int $tid): array { return []; }
+            public function getStarterPidsFromLastSim(int $tid): ?array { return null; }
             public function getStarterPidsFromSnapshot(int $tid, string $date): ?array { return null; }
             public function getStarterPidsFromBoxScores(int $schedId, int $tid): array {
                 return ['PG' => 0, 'SG' => 0, 'SF' => 0, 'PF' => 0, 'C' => 0];

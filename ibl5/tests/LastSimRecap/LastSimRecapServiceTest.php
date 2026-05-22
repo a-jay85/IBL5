@@ -161,12 +161,63 @@ class LastSimRecapServiceTest extends TestCase
         self::assertTrue($pgStarter->youHurt);
     }
 
+    public function testLastSimDepthColumnsUsedAsStarterPrimary(): void
+    {
+        $repo = $this->buildRepo(
+            games: [
+                $this->makeGameRow(schedId: 600, date: '2030-06-01', visitor: 1, vScore: 100, home: 2, hScore: 90),
+            ],
+            quarterLines: [600 => $this->makeLines()],
+            lastSimStarters: [
+                1 => ['PG' => 10, 'SG' => 11, 'SF' => 12, 'PF' => 13, 'C' => 14],
+            ],
+            starterSnapshots: [
+                '1|2030-06-01' => ['PG' => 20, 'SG' => 21, 'SF' => 22, 'PF' => 23, 'C' => 24],
+            ],
+            playerLines: [
+                '13|600' => ['pid' => 13, 'name' => 'George Mikan', 'pos' => 'C', 'pts' => 22, 'reb' => 10, 'ast' => 2, 'stl' => 0, 'blk' => 3, 'minutes' => 32],
+            ],
+        );
+        $svc = new LastSimRecapService($repo, $this->playerLookup);
+
+        $slate = $svc->buildSlateForTeam(1);
+
+        self::assertNotNull($slate);
+        $pfStarter = $slate->games[0]->starters[3]; // PF is index 3
+        self::assertSame(13, $pfStarter->youPid);
+    }
+
+    public function testFallsBackToSnapshotWhenLastSimNull(): void
+    {
+        $repo = $this->buildRepo(
+            games: [
+                $this->makeGameRow(schedId: 700, date: '2030-07-01', visitor: 1, vScore: 95, home: 2, hScore: 88),
+            ],
+            quarterLines: [700 => $this->makeLines()],
+            lastSimStarters: [],
+            starterSnapshots: [
+                '1|2030-07-01' => ['PG' => 30, 'SG' => 31, 'SF' => 32, 'PF' => 33, 'C' => 34],
+            ],
+            playerLines: [
+                '33|700' => ['pid' => 33, 'name' => 'PF Player', 'pos' => 'PF', 'pts' => 15, 'reb' => 8, 'ast' => 1, 'stl' => 1, 'blk' => 0, 'minutes' => 28],
+            ],
+        );
+        $svc = new LastSimRecapService($repo, $this->playerLookup);
+
+        $slate = $svc->buildSlateForTeam(1);
+
+        self::assertNotNull($slate);
+        $pfStarter = $slate->games[0]->starters[3];
+        self::assertSame(33, $pfStarter->youPid);
+    }
+
     private function buildRepo(
         ?array $window = ['sim' => 1, 'startDate' => '2030-03-01', 'endDate' => '2030-03-31'],
         array $games = [],
         array $quarterLines = [],
         array $rosterByTid = [],
         array $injuriesByPidAndDate = [],
+        array $lastSimStarters = [],
         array $starterSnapshots = [],
         array $playerLines = [],
     ): LastSimRecapRepositoryInterface {
@@ -180,7 +231,7 @@ class LastSimRecapServiceTest extends TestCase
 
         return new class(
             $window, $games, $quarterLines, $rosterByTid,
-            $injuriesByPidAndDate, $starterSnapshots, $playerLines, $teamInfo,
+            $injuriesByPidAndDate, $lastSimStarters, $starterSnapshots, $playerLines, $teamInfo,
         ) implements LastSimRecapRepositoryInterface {
             public function __construct(
                 private ?array $window,
@@ -188,6 +239,7 @@ class LastSimRecapServiceTest extends TestCase
                 private array $quarterLines,
                 private array $rosterByTid,
                 private array $injuriesByPidAndDate,
+                private array $lastSimStarters,
                 private array $starterSnapshots,
                 private array $playerLines,
                 private array $teamInfo,
@@ -196,8 +248,6 @@ class LastSimRecapServiceTest extends TestCase
             public function getLastSimWindow(): ?array { return $this->window; }
             public function getGamesForTeamInWindow(int $tid, string $startDate, string $endDate): array { return $this->games; }
             public function getTeamBoxscoreLines(int $visitor, int $home, string $date): ?array {
-                // Look up by date — tests key fixtures by schedId, but the
-                // production query no longer needs schedId.
                 foreach ($this->quarterLines as $lines) {
                     return $lines;
                 }
@@ -213,6 +263,7 @@ class LastSimRecapServiceTest extends TestCase
                 return $out;
             }
             public function getTeamRosterPids(int $tid): array { return $this->rosterByTid[$tid] ?? []; }
+            public function getStarterPidsFromLastSim(int $tid): ?array { return $this->lastSimStarters[$tid] ?? null; }
             public function getStarterPidsFromSnapshot(int $tid, string $date): ?array { return $this->starterSnapshots[$tid . '|' . $date] ?? null; }
             public function getStarterPidsFromBoxScores(int $schedId, int $tid): array {
                 return ['PG' => 0, 'SG' => 0, 'SF' => 0, 'PF' => 0, 'C' => 0];

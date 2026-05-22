@@ -208,7 +208,7 @@ if [ "$SEED_DB" = true ]; then
 fi
 
 # Validate schema integrity — catches migrations that were marked as applied
-# (via prod-seed backfill) but whose DDL was never actually executed.
+# (via db-sync-prod backfill) but whose DDL was never actually executed.
 PHP_CONTAINER="ibl5-php-$SLUG"
 echo "Validating schema integrity..."
 RETRIES=0

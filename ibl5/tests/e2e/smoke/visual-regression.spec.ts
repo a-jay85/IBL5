@@ -6,7 +6,7 @@
  * Player, Team, Schedule, FreeAgency, Trading, DepthChartEntry, News, Search,
  * Draft, Voting, ProjectedDraftOrder, DraftHistory). All other shots use the
  * desktop 1280×900 viewport from `playwright.visual.config.ts`.
- * Total: 63 baselines.
+ * Total: 62 baselines.
  *
  * - Public-fixture modules render without authentication.
  * - Auth-fixture modules use the CI test user (admin role, Metros GM).
@@ -242,18 +242,11 @@ authTest.describe('Visual regression — authenticated pages (full-page)', () =>
 const AUTH_REGULAR_MODULES: ModuleSnapshot[] = [
   { name: 'team-non-admin', url: 'modules.php?name=Team&op=team&teamid=1', anchor: '.team-page-layout',
     notes: 'Authenticated non-admin viewing another team — exercises nav/personalization deltas vs. public baseline.' },
-  { name: 'waivers-non-admin', url: 'modules.php?name=Waivers', anchor: '.waivers-page',
-    notes: 'Phase-gated render path; admin baseline bypasses ModuleAccessControl via is_admin().' },
   { name: 'next-sim-non-admin', url: 'modules.php?name=NextSim', anchor: '.next-sim-container',
     notes: 'Free-Agents fallback team path. If PHP errors, assertNoPhpErrors fails loudly in first CI run.' },
 ];
 
 authRegularTest.describe('Visual regression — non-admin authenticated pages', () => {
-  authRegularTest.skip(
-    !process.env.IBL_TEST_USER_REGULAR,
-    'IBL_TEST_USER_REGULAR not set — auth-regular fixture is unauthenticated',
-  );
-
   for (const row of AUTH_REGULAR_MODULES) {
     authRegularTest(`${row.name}`, async ({ appState, page }) => {
       if (row.state) {

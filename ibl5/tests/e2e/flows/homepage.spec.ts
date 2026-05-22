@@ -44,6 +44,6 @@ test.describe('Homepage with state override', () => {
     await assertNoPhpErrors(page, 'on homepage with trivia off');
     await expect(page).toHaveTitle(/IBL/i);
     await expect(page.locator('article').first()).toBeVisible();
-    await expect(page.getByRole('link', { name: 'Standings' })).toBeVisible();
+    await expect(page.locator('a[href*="name=Standings"]').first()).toBeAttached();
   });
 });

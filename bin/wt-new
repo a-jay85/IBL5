@@ -65,14 +65,6 @@ ln -sf "$MAIN_IBL5/node_modules" "$WT_IBL5/node_modules"
 git -C "$WT_ROOT" update-index --skip-worktree docker-compose.yml
 rm -f "$WT_ROOT/docker-compose.yml"
 
-# Generate worktree-local CLAUDE.md so Claude Code knows the correct hostname
-cat > "$WT_ROOT/CLAUDE.md" <<EOF
-# Worktree: $NAME
-
-This worktree's Docker instance is at \`$NAME.localhost\`.
-Use this hostname for all browser checks, curl, and E2E — never \`main.localhost\`.
-EOF
-
 # Build CSS
 echo "Building CSS..."
 mkdir -p "$WT_IBL5/themes/IBL/style"

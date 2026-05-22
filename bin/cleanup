@@ -124,8 +124,8 @@ check_worktree() {
     fi
 
     # Determine if branch has been merged to master BEFORE checking uncommitted
-    # changes. This ordering lets us discard harmless dirtiness (e.g. worktree-
-    # specific CLAUDE.md frontmatter) on confirmed-merged branches.
+    # changes. This ordering lets us discard harmless dirtiness on confirmed-
+    # merged branches.
     local is_merged=false
 
     # Check 1: PR state via GitHub CLI (handles squash merges)

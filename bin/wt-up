@@ -160,11 +160,6 @@ docker compose -f "$COMPOSE_FILE" $ENV_FILE_FLAG -p "ibl5-$SLUG" down 2>/dev/nul
 echo "Purging DB volume..."
 docker volume rm "ibl5-${SLUG}_db-data" 2>/dev/null || true
 
-# The entrypoint's auto prod-seed import is now reserved for the offline fallback
-# only — wt-up always handles seeding itself (db-sync-prod for --prod, ci-seed
-# for --seed, nothing for --no-data), so suppress the entrypoint path here.
-export SKIP_PROD_SEED=1
-
 docker compose -f "$COMPOSE_FILE" $ENV_FILE_FLAG -p "ibl5-$SLUG" up -d --build
 
 # Wait for MariaDB to be healthy
@@ -213,7 +208,7 @@ if [ "$SEED_DB" = true ]; then
 fi
 
 # Validate schema integrity — catches migrations that were marked as applied
-# (via prod-seed backfill) but whose DDL was never actually executed.
+# (via db-sync-prod backfill) but whose DDL was never actually executed.
 PHP_CONTAINER="ibl5-php-$SLUG"
 echo "Validating schema integrity..."
 RETRIES=0

@@ -29,5 +29,3 @@ test-results.json
 
 # Page cache (generated at runtime)
 cache/page/
-
-fixtures/prod-seed.sql

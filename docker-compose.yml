@@ -51,7 +51,6 @@ services:
       DB_USER: root
       DB_PASS: root
       DB_NAME: iblhoops_ibl5
-      SKIP_PROD_SEED: ${SKIP_PROD_SEED:-}
       MAIL_TRANSPORT: smtp
       MAIL_SMTP_HOST: mailpit
       MAIL_SMTP_PORT: 1025

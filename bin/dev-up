@@ -4,24 +4,11 @@
 # copy of production (including STORED-GENERATED-column tables like
 # ibl_box_scores) into the ibl5-mariadb container.
 #
-# Usage: bin/dev-up [--no-sync]
-#   --no-sync   Skip bin/db-sync-prod; fall back to the entrypoint's offline
-#               prod-seed.sql import (the partial dump without box scores).
+# Usage: bin/dev-up
 
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-
-SYNC=true
-if [ "${1:-}" = "--no-sync" ]; then
-    SYNC=false
-fi
-
-# Suppress entrypoint's auto prod-seed import when we plan to sync from the
-# host — the live sync replaces the offline fallback.
-if [ "$SYNC" = true ]; then
-    export SKIP_PROD_SEED=1
-fi
 
 docker compose -f "$REPO_ROOT/docker-compose.yml" up -d --build
 
@@ -38,13 +25,10 @@ until docker exec ibl5-mariadb healthcheck.sh --connect --innodb_initialized &>/
 done
 echo "MariaDB is ready."
 
-if [ "$SYNC" = true ]; then
-    if ! "$REPO_ROOT/bin/db-sync-prod"; then
-        echo "Error: db-sync-prod failed. The stack is up but the database may be empty." >&2
-        echo "  Fix REMOTE_* creds in $REPO_ROOT/.env and re-run: bin/db-sync-prod" >&2
-        echo "  Or rerun with --no-sync to use the offline prod-seed.sql fallback." >&2
-        exit 1
-    fi
+if ! "$REPO_ROOT/bin/db-sync-prod"; then
+    echo "Error: db-sync-prod failed. The stack is up but the database may be empty." >&2
+    echo "  Fix REMOTE_* creds in $REPO_ROOT/.env and re-run: bin/db-sync-prod" >&2
+    exit 1
 fi
 
 echo "Stack up at http://main.localhost/ibl5/"

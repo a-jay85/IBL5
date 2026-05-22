@@ -4,10 +4,8 @@ declare(strict_types=1);
 
 require $_SERVER['DOCUMENT_ROOT'] . '/ibl5/mainfile.php';
 
-$allowedFiles = ['Schedule.htm', 'Standings.htm'];
-
 $file = $_GET['file'] ?? 'Standings.htm';
-if (!is_string($file) || !in_array($file, $allowedFiles, true)) {
+if (!is_string($file) || !preg_match('/^[A-Za-z0-9_-]+\.htm$/', $file) || !file_exists(__DIR__ . '/' . $file)) {
     http_response_code(404);
     exit;
 }

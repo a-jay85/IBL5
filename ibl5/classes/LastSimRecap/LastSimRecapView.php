@@ -379,8 +379,8 @@ class LastSimRecapView implements LastSimRecapViewInterface
     private function renderPlayerRow(bool $isYou, int $pid, string $name, int $pts, int $reb, int $ast, int $stl, int $blk, bool $hurt): string
     {
         $youMod = $isYou ? ' last-sim-recap__player--you' : '';
-        $parts = explode(' ', $name);
-        $lastName = end($parts);
+        $nameParts = explode(' ', $name);
+        $lastName = end($nameParts);
         $playerUrl = 'modules.php?name=Player&amp;pa=showpage&amp;pid=' . $pid;
         $parts = [$pts . ' pts'];
         if ($reb >= 5) {
@@ -404,8 +404,7 @@ class LastSimRecapView implements LastSimRecapViewInterface
             $h .= '    <span class="last-sim-recap__injdot" aria-label="Injured">!</span>';
         }
         $h .= '  </a>';
-        $h .= '  <a href="' . $playerUrl . '" class="last-sim-recap__player-name">' . HtmlSanitizer::e($name) . '</a>';
-        $h .= '  <a href="' . $playerUrl . '" class="last-sim-recap__player-lname">' . HtmlSanitizer::e($lastName) . '</a>';
+        $h .= '  <a href="' . $playerUrl . '" class="last-sim-recap__player-name">' . HtmlSanitizer::e($lastName) . '</a>';
         $h .= '  <span class="last-sim-recap__player-statline">' . HtmlSanitizer::e($statline) . '</span>';
         $h .= '</div>';
 

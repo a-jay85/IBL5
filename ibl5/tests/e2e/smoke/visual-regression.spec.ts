@@ -6,10 +6,13 @@
  * Player, Team, Schedule, FreeAgency, Trading, DepthChartEntry, News, Search,
  * Draft, Voting, ProjectedDraftOrder, DraftHistory). All other shots use the
  * desktop 1280×900 viewport from `playwright.visual.config.ts`.
- * Total: 59 baselines.
+ * Total: 62 baselines.
  *
  * - Public-fixture modules render without authentication.
  * - Auth-fixture modules use the CI test user (admin role, Metros GM).
+ * - Non-admin (roles_mask=0, no team) coverage gated on `IBL_TEST_USER_REGULAR`.
+ * - Empty-state baselines for data-driven pages (PlayerMovement empty via
+ *   `Current Season Ending Year=1900`).
  * - Each row anchors on a content-specific selector inside the module's
  *   render block; if the module fails to render its primary content,
  *   `anchor.waitFor()` times out before any screenshot diff runs.
@@ -25,6 +28,7 @@
 import type { Locator, Page } from '@playwright/test';
 import { test as publicTest } from '../fixtures/public';
 import { test as authTest } from '../fixtures/auth';
+import { test as authRegularTest } from '../fixtures/auth-regular';
 import { expect } from '../fixtures/base';
 import { assertNoPhpErrors } from '../helpers/php-errors';
 
@@ -99,6 +103,9 @@ const PUBLIC_MODULES: ModuleSnapshot[] = [
   { name: 'player-mobile', url: 'modules.php?name=Player&pa=showpage&pid=1', anchor: '.stats-grid', mobile: true },
   { name: 'player-database', url: 'modules.php?name=PlayerDatabase', anchor: 'form[action*="PlayerDatabase"]' },
   { name: 'player-movement', url: 'modules.php?name=PlayerMovement', anchor: '.ibl-data-table' },
+  { name: 'player-movement-empty', url: 'modules.php?name=PlayerMovement', anchor: '.ibl-data-table',
+    state: { 'Current Season Ending Year': '1900' },
+    notes: 'Forces previousSeasonEndingYear=1899 → zero rows; locks empty-state render.' },
   { name: 'projected-draft-order', url: 'modules.php?name=ProjectedDraftOrder', anchor: '.ibl-data-table' },
   { name: 'projected-draft-order-mobile', url: 'modules.php?name=ProjectedDraftOrder',
     anchor: '.ibl-data-table', mobile: true },
@@ -226,4 +233,29 @@ authTest.describe('Visual regression — authenticated pages (full-page)', () =>
     });
   }
 
+});
+
+// ============================================================
+// Non-admin visual regression — roles_mask=0, no franchise
+// ============================================================
+
+const AUTH_REGULAR_MODULES: ModuleSnapshot[] = [
+  { name: 'team-non-admin', url: 'modules.php?name=Team&op=team&teamid=1', anchor: '.team-page-layout',
+    notes: 'Authenticated non-admin viewing another team — exercises nav/personalization deltas vs. public baseline.' },
+  { name: 'next-sim-non-admin', url: 'modules.php?name=NextSim', anchor: '.next-sim-container',
+    notes: 'Free-Agents fallback team path. If PHP errors, assertNoPhpErrors fails loudly in first CI run.' },
+];
+
+authRegularTest.describe('Visual regression — non-admin authenticated pages', () => {
+  for (const row of AUTH_REGULAR_MODULES) {
+    authRegularTest(`${row.name}`, async ({ appState, page }) => {
+      if (row.state) {
+        await appState(row.state);
+      }
+      if (row.notes) {
+        console.log(`[visual-regression] ${row.name}: ${row.notes}`);
+      }
+      await captureSnapshot(page, row);
+    });
+  }
 });

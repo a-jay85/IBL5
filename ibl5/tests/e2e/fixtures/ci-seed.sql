@@ -887,11 +887,13 @@ UPDATE ibl_team_info SET owner_name = 'GM Thunder'  WHERE teamid = 28;
 
 -- ============================================================
 -- Additional players for voting candidate coverage
--- Need players on non-Metros teams across conferences/positions
--- for ASG ballot categories (ECF, ECB, WCF, WCB)
--- Existing: pid 4,5 (Stars/Western), pid 6,7 (Phoenixes/Eastern),
---           pid 23,24 (Cougars/Eastern)
--- Need more Western backcourt + frontcourt candidates
+-- NOTE: ASG ballot conference split uses League::WESTERN_CONFERENCE_TEAMIDS
+-- constant (ids 6,13-21,23,24,26,28), NOT ibl_standings.conference.
+-- pid 6,7 (Phoenixes/teamid=14) → WCF/WCB (teamid 14 is in WESTERN constant)
+-- pid 30-33 (Spurs/Flames/Minutemen/Royals) → ECF/ECB (teamids 10,9,5,12
+--   are in EASTERN constant despite ibl_standings.conference saying Western)
+-- WCF needs: pid 7 (C/t14) = 1 → need 3 more on WESTERN teamids
+-- WCB needs: pid 6 (PG/t14) = 1 → need 3 more on WESTERN teamids
 -- ============================================================
 
 INSERT INTO ibl_plr (
@@ -951,11 +953,99 @@ INSERT INTO ibl_plr (
    60, 30, 90,
    'a0000000-0000-0000-0000-000000000033');
 
+-- WCF/WCB players on WESTERN constant teams (ids 13,16,19,20,21).
+-- Needed so ASG ballot has 4 WCF and 4 WCB candidates.
+INSERT INTO ibl_plr (
+  pid, name, age, peak, teamid, pos, ordinal,
+  stamina, oo, od, r_drive_off, dd, po, pd, r_trans_off, r_tvr,
+  cy, cyt, salary_yr1, salary_yr2,
+  retired, exp,
+  htft, htin, wt, college,
+  draftround, draftpickno, draftyear, draftedby, draftedbycurrentname,
+  stats_gm, stats_min, stats_fgm, stats_fga, stats_ftm, stats_fta,
+  stats_3gm, stats_3ga, stats_orb, stats_drb, stats_ast, stats_stl,
+  stats_tvr, stats_blk, stats_pf,
+  uuid
+) VALUES
+  -- Apollos SF (WCF — teamid=13 is in WESTERN_CONFERENCE_TEAMIDS)
+  (34, 'Apollos Forward', 26, 27, 13, 'SF', 1,
+   77, 72, 67, 63, 57, 69, 65, 67, 62,
+   1, 2, 550, 605,
+   0, 4,
+   6, 6, 210, 'Apollos College',
+   1, 12, 2022, 'Apollos', 'Apollos',
+   41, 1260, 182, 410, 90, 108,
+   40, 122, 44, 138, 155, 46,
+   63, 21, 86,
+   'a0000000-0000-0000-0000-000000000034'),
+  -- Blizzard PF (WCF — teamid=16 is in WESTERN_CONFERENCE_TEAMIDS)
+  (35, 'Blizzard Forward', 28, 29, 16, 'PF', 1,
+   82, 77, 72, 67, 63, 74, 70, 72, 67,
+   1, 2, 750, 825,
+   0, 6,
+   6, 9, 228, 'Blizzard College',
+   1, 6, 2020, 'Blizzard', 'Blizzard',
+   41, 1290, 215, 468, 108, 128,
+   28, 76, 52, 154, 118, 43,
+   62, 32, 91,
+   'a0000000-0000-0000-0000-000000000035'),
+  -- Nuggets C (WCF — teamid=19 is in WESTERN_CONFERENCE_TEAMIDS)
+  (36, 'Nuggets Center', 29, 29, 19, 'C', 1,
+   83, 78, 73, 68, 64, 75, 71, 73, 68,
+   1, 2, 900, 990,
+   0, 7,
+   6, 11, 240, 'Nuggets College',
+   1, 4, 2019, 'Nuggets', 'Nuggets',
+   41, 1310, 225, 490, 118, 140,
+   22, 60, 58, 168, 108, 40,
+   58, 38, 94,
+   'a0000000-0000-0000-0000-000000000036'),
+  -- Pilots PG (WCB — teamid=20 is in WESTERN_CONFERENCE_TEAMIDS)
+  (37, 'Pilots Guard', 25, 27, 20, 'PG', 1,
+   78, 73, 68, 62, 58, 70, 66, 68, 63,
+   1, 2, 480, 528,
+   0, 3,
+   6, 1, 185, 'Pilots Academy',
+   1, 16, 2023, 'Pilots', 'Pilots',
+   41, 1240, 210, 462, 102, 122,
+   62, 154, 38, 118, 188, 52,
+   78, 18, 88,
+   'a0000000-0000-0000-0000-000000000037'),
+  -- Mavericks SG (WCB — teamid=21 is in WESTERN_CONFERENCE_TEAMIDS)
+  (38, 'Mavericks Guard', 27, 28, 21, 'SG', 1,
+   80, 75, 70, 64, 60, 72, 68, 70, 65,
+   1, 2, 650, 715,
+   0, 5,
+   6, 4, 192, 'Mavericks Academy',
+   1, 10, 2021, 'Mavericks', 'Mavericks',
+   41, 1260, 196, 444, 96, 114,
+   58, 148, 36, 112, 182, 50,
+   72, 16, 82,
+   'a0000000-0000-0000-0000-000000000038'),
+  -- Apollos PG (WCB — teamid=13 is in WESTERN_CONFERENCE_TEAMIDS)
+  (39, 'Apollos Guard', 26, 27, 13, 'PG', 2,
+   79, 74, 69, 63, 59, 71, 67, 69, 64,
+   1, 2, 520, 572,
+   0, 4,
+   6, 3, 188, 'Apollos Academy',
+   1, 13, 2022, 'Apollos', 'Apollos',
+   41, 1255, 205, 456, 100, 120,
+   60, 150, 37, 115, 185, 51,
+   74, 17, 85,
+   'a0000000-0000-0000-0000-000000000039');
+
 -- Starters for new players (needed to appear in voting)
 UPDATE ibl_plr SET dc_pg_depth = 1, pg_depth = 1 WHERE pid = 30;
 UPDATE ibl_plr SET dc_sf_depth = 1, sf_depth = 1 WHERE pid = 31;
 UPDATE ibl_plr SET dc_sg_depth = 1, sg_depth = 1 WHERE pid = 32;
 UPDATE ibl_plr SET dc_pf_depth = 1, pf_depth = 1 WHERE pid = 33;
+-- WCF/WCB players on Western constant teams
+UPDATE ibl_plr SET dc_sf_depth = 1, sf_depth = 1 WHERE pid = 34;
+UPDATE ibl_plr SET dc_pf_depth = 1, pf_depth = 1 WHERE pid = 35;
+UPDATE ibl_plr SET dc_c_depth  = 1, c_depth  = 1 WHERE pid = 36;
+UPDATE ibl_plr SET dc_pg_depth = 1, pg_depth = 1 WHERE pid = 37;
+UPDATE ibl_plr SET dc_sg_depth = 1, sg_depth = 1 WHERE pid = 38;
+UPDATE ibl_plr SET dc_pg_depth = 2, pg_depth = 2 WHERE pid = 39;
 
 -- Player history for voting candidates (must have current year stats)
 INSERT INTO ibl_plr_snapshots (

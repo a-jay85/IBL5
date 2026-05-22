@@ -110,20 +110,18 @@ test.describe('Draft selection: submission', () => {
     expect(playerName, 'Radio must carry the player name as its value').toBeTruthy();
     await firstRadio.check();
 
-    // Submit the form — POSTs to modules.php?name=Draft&op=select
+    // Submit the form — HTMX hx-boost intercepts the POST so waitForNavigation
+    // doesn't reliably capture the op=select navigation. Just click and wait
+    // for the success message to appear in the swapped body.
     const submitBtn = page.locator('button, input[type="submit"]').filter({
       hasText: /draft player/i,
     });
-    await Promise.all([
-      page.waitForNavigation({ waitUntil: 'domcontentloaded' }),
-      submitBtn.first().click(),
-    ]);
-
-    expect(page.url()).toContain('op=select');
+    await submitBtn.first().click();
 
     const escapedName = playerName!.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
     await expect(page.locator('body')).toContainText(
       new RegExp(`select\\s*\\*\\*${escapedName}!\\*\\*`),
+      { timeout: 10000 },
     );
     await expect(page.locator('.draft-error')).toHaveCount(0);
   });

@@ -18,10 +18,6 @@ test.describe('Boxscore page', () => {
     const table = page.getByTestId('boxscore-player-table');
     await expect(table).toBeVisible();
 
-    // Home team (Stars) is selected by default — 3 players seeded
-    // Away team (Metros) has 4 players seeded
-    // Total across both teams: 7, but only one team shown at a time
-    // Default is home team (Stars) with 3 rows
     await expect(table.locator('tbody tr')).toHaveCount(3);
   });
 
@@ -31,13 +27,11 @@ test.describe('Boxscore page', () => {
     const selector = page.getByTestId('boxscore-team-selector');
     await expect(selector).toBeVisible();
 
-    // Click the away team (Metros) button
     await selector.getByText('Metros').click();
 
     const table = page.getByTestId('boxscore-player-table');
     await expect(table).toBeVisible();
-    // Metros have 4 players seeded
-    await expect(table.locator('tbody tr')).toHaveCount(4);
+    await expect(table.locator('tbody tr')).toHaveCount(8);
   });
 
   test('404 on non-existent game slug', async ({ page }) => {

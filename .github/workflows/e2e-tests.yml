@@ -481,9 +481,65 @@ jobs:
         if: always()
         run: docker compose -f docker-compose.ci.yml down
 
+  ibl6-e2e:
+    name: IBL6 E2E Tests
+    needs: [changes]
+    if: needs.changes.outputs.src == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: ./.github/actions/setup-docker-e2e
+
+      - name: Wait for ibl6 healthy
+        run: |
+          deadline=$((SECONDS + 120))
+          while ! docker compose -f docker-compose.ci.yml exec -T ibl6 wget -q --spider http://localhost:3001/ 2>/dev/null; do
+            if [ $SECONDS -ge $deadline ]; then
+              echo "::error::ibl6 container not healthy after 2 min"
+              docker compose -f docker-compose.ci.yml logs ibl6
+              exit 1
+            fi
+            sleep 3
+          done
+          echo "ibl6 is healthy"
+
+      - name: Pull Playwright image
+        run: docker pull mcr.microsoft.com/playwright:v1.60.0-jammy
+
+      - name: Install IBL6 dependencies
+        working-directory: IBL6
+        run: npm ci
+
+      - name: Run IBL6 E2E tests
+        run: |
+          docker run --rm \
+            --network ibl5-e2e \
+            --user "$(id -u):$(id -g)" \
+            -v "${{ github.workspace }}/IBL6:/IBL6" \
+            -w /IBL6 \
+            -e "BASE_URL=http://ibl6:3001" \
+            -e "HOME=/tmp" \
+            mcr.microsoft.com/playwright:v1.60.0-jammy \
+            npx playwright test
+
+      - name: Upload IBL6 E2E report
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: ibl6-e2e-report
+          path: IBL6/test-results/
+          retention-days: 7
+
+      - name: Stop Docker containers
+        if: always()
+        run: docker compose -f docker-compose.ci.yml down
+
   merge-reports:
     name: Merge E2E Reports
-    needs: [changes, e2e, e2e-shards, api-e2e, ibl6-visual]
+    needs: [changes, e2e, e2e-shards, api-e2e, ibl6-visual, ibl6-e2e]
     if: always() && needs.changes.outputs.src == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 5
@@ -575,7 +631,7 @@ jobs:
   gate:
     name: E2E Tests
     if: always()
-    needs: [changes, e2e, api-e2e, e2e-shards, ibl6-visual]
+    needs: [changes, e2e, api-e2e, e2e-shards, ibl6-visual, ibl6-e2e]
     runs-on: ubuntu-latest
     steps:
       - run: exit 1

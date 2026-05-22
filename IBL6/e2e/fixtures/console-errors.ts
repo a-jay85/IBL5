@@ -1,6 +1,10 @@
 import type { ConsoleMessage, Page, TestInfo } from '@playwright/test';
 
-export const CONSOLE_ALLOWLIST: RegExp[] = [];
+export const CONSOLE_ALLOWLIST: RegExp[] = [
+  // Browsers log "Failed to load resource" for any non-2xx response. 404/4xx
+  // routes are first-class behavior tested explicitly — these logs are noise.
+  /Failed to load resource:.*status of 4\d\d/,
+];
 
 export interface ConsoleErrorWatcher {
   assertNoConsoleErrors(testInfo?: TestInfo): void;

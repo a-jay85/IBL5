@@ -1,0 +1,29 @@
+{
+  "index": [
+    "mobile"
+  ],
+  "draft-history": [
+    "htmx-tabs"
+  ],
+  "franchise-record-book": [
+    "htmx-tabs"
+  ],
+  "voting-results": [
+    "mobile"
+  ],
+  "error-invalid-module": [
+    "mobile"
+  ],
+  "error-nonexistent-file": [
+    "mobile"
+  ],
+  "player-export-guide": [
+    "mobile"
+  ],
+  "team-non-admin": [
+    "mobile"
+  ],
+  "next-sim-non-admin": [
+    "mobile"
+  ]
+}

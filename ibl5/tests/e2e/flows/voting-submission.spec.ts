@@ -1,5 +1,7 @@
 import { test, expect } from '../fixtures/auth';
 import { assertNoPhpErrors } from '../helpers/php-errors';
+import { submitFormAndAssertEffect } from '../helpers/submit-form';
+import { getVotes, resetVote } from '../helpers/test-state';
 
 // Voting submission tests — ASG and EOY ballot submission + validation.
 // Serial: submission tests mutate server-side vote records.
@@ -10,7 +12,11 @@ test.describe.configure({ mode: 'serial' });
 // ============================================================
 
 test.describe('ASG Voting: submission', () => {
-  test('submit valid ASG votes', async ({ appState, page }) => {
+  test.beforeEach(async ({ request }) => {
+    await resetVote(request, 'Metros', 'asg');
+  });
+
+  test('submit valid ASG votes', async ({ appState, page, request }) => {
     await appState({
       'Current Season Phase': 'Regular Season',
       'ASG Voting': 'Yes',
@@ -50,15 +56,24 @@ test.describe('ASG Voting: submission', () => {
       }
     }
 
-    // Submit
     const submitBtn = page.locator('button, input[type="submit"]').filter({
       hasText: /submit votes/i,
     });
-    await submitBtn.first().click();
 
-    await expect(page.locator('.voting-submission-success')).toBeVisible();
-    await expect(page.locator('.voting-submission-success')).toContainText('Thank you for voting');
-    await assertNoPhpErrors(page, 'after ASG vote submission');
+    await submitFormAndAssertEffect(page, {
+      submit: async () => {
+        await submitBtn.first().click();
+      },
+      expectSameSpot: async () => {
+        await expect(page.locator('.voting-submission-success')).toBeVisible();
+        await expect(page.locator('.voting-submission-success')).toContainText('Thank you for voting');
+        await assertNoPhpErrors(page, 'after ASG vote submission');
+      },
+      readBack: async () => {
+        const votes = await getVotes(request, 'Metros');
+        expect(votes.asg_voted, 'ASG vote should be recorded in DB').toBe(true);
+      },
+    });
   });
 });
 
@@ -280,7 +295,11 @@ test.describe('EOY Voting: validation errors', () => {
 // ============================================================
 
 test.describe('EOY Voting: submission', () => {
-  test('submit valid EOY votes', async ({ appState, page }) => {
+  test.beforeEach(async ({ request }) => {
+    await resetVote(request, 'Metros', 'eoy');
+  });
+
+  test('submit valid EOY votes', async ({ appState, page, request }) => {
     await appState({
       'Current Season Phase': 'Free Agency',
       'EOY Voting': 'Yes',
@@ -314,20 +333,28 @@ test.describe('EOY Voting: submission', () => {
         const radios = table.locator(`input[type="radio"][name="${cat}[${slot}]"]`);
         const count = await radios.count();
         if (count >= slot) {
-          // Pick the slot-th radio to avoid duplicates
           await radios.nth(slot - 1).check();
         }
       }
     }
 
-    // Submit
     const submitBtn = page.locator('button, input[type="submit"]').filter({
       hasText: /submit votes/i,
     });
-    await submitBtn.first().click();
 
-    await expect(page.locator('.voting-submission-success')).toBeVisible();
-    await expect(page.locator('.voting-submission-success')).toContainText('Thank you for voting');
-    await assertNoPhpErrors(page, 'after EOY vote submission');
+    await submitFormAndAssertEffect(page, {
+      submit: async () => {
+        await submitBtn.first().click();
+      },
+      expectSameSpot: async () => {
+        await expect(page.locator('.voting-submission-success')).toBeVisible();
+        await expect(page.locator('.voting-submission-success')).toContainText('Thank you for voting');
+        await assertNoPhpErrors(page, 'after EOY vote submission');
+      },
+      readBack: async () => {
+        const votes = await getVotes(request, 'Metros');
+        expect(votes.eoy_voted, 'EOY vote should be recorded in DB').toBe(true);
+      },
+    });
   });
 });

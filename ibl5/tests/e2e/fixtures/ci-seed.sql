@@ -810,6 +810,15 @@ INSERT INTO ibl_trade_info (tradeofferid, itemid, itemtype, trade_from, trade_to
   (6, 24, '1', 'Cougars', 'Metros', 'Metros'),
   (6, 10, '1', 'Metros', 'Cougars', 'Metros');
 
+-- Offers 7-8 reserved for api-v1-rest.spec.ts (REST trade accept/decline happy paths).
+-- approval='test' bypasses the Discord-ID gate in TradeAcceptController / TradeDeclineController.
+INSERT INTO ibl_trade_offers (id) VALUES (7), (8);
+INSERT INTO ibl_trade_info (tradeofferid, itemid, itemtype, trade_from, trade_to, approval) VALUES
+  (7, 4, '1', 'Stars',  'Metros', 'test'),
+  (7, 2, '1', 'Metros', 'Stars',  'test'),
+  (8, 5, '1', 'Stars',  'Metros', 'test'),
+  (8, 1, '1', 'Metros', 'Stars',  'test');
+
 -- ============================================================
 -- Stories for search pagination (need >10 results for "the")
 -- ============================================================
@@ -1154,6 +1163,11 @@ INSERT INTO ibl_schedule (season_year, game_date, visitor_teamid, home_teamid, v
   (2026, '2026-02-24', 1, 4, 102, 95, 42, 'sched-played-03')
 ON DUPLICATE KEY UPDATE visitor_score=VALUES(visitor_score);
 
+-- Played game with router-compatible UUID for api/v1/games/{uuid}/boxscore E2E coverage.
+INSERT INTO ibl_schedule (season_year, game_date, visitor_teamid, home_teamid, visitor_score, home_score, box_id, uuid) VALUES
+  (2026, '2026-02-26', 1, 2, 108, 99, 0, 'c1000000-0000-0000-0000-000000000001')
+ON DUPLICATE KEY UPDATE visitor_score=VALUES(visitor_score);
+
 -- ============================================================
 -- Box score team pairs (offense/defense footer stats)
 -- Each game needs TWO rows (one per team) for the defense subquery self-JOIN.
@@ -1175,6 +1189,29 @@ INSERT INTO ibl_box_scores_teams (game_date, visitor_teamid, home_teamid, game_o
   ('2026-02-20', 1, 2, 1, 'Stars',
    25, 58, 15, 20, 8, 22, 7, 25, 19, 6, 13, 3, 18,
    28, 26, 27, 24, 24, 25, 24, 25)
+ON DUPLICATE KEY UPDATE game_2gm=VALUES(game_2gm), game_2ga=VALUES(game_2ga),
+  game_ftm=VALUES(game_ftm), game_fta=VALUES(game_fta), game_3gm=VALUES(game_3gm),
+  game_3ga=VALUES(game_3ga), game_orb=VALUES(game_orb), game_drb=VALUES(game_drb),
+  game_ast=VALUES(game_ast), game_stl=VALUES(game_stl), game_tov=VALUES(game_tov),
+  game_blk=VALUES(game_blk), game_pf=VALUES(game_pf),
+  visitor_q1_points=VALUES(visitor_q1_points), visitor_q2_points=VALUES(visitor_q2_points),
+  visitor_q3_points=VALUES(visitor_q3_points), visitor_q4_points=VALUES(visitor_q4_points),
+  home_q1_points=VALUES(home_q1_points), home_q2_points=VALUES(home_q2_points),
+  home_q3_points=VALUES(home_q3_points), home_q4_points=VALUES(home_q4_points);
+
+-- Router-compatible UUID pair: 2026-02-26, Metros(visitor=1) vs Stars(home=2)
+-- Quarter sums: Metros 29+27+26+26=108, Stars 25+24+25+25=99
+INSERT INTO ibl_box_scores_teams (game_date, visitor_teamid, home_teamid, game_of_that_day, name,
+  game_2gm, game_2ga, game_ftm, game_fta, game_3gm, game_3ga,
+  game_orb, game_drb, game_ast, game_stl, game_tov, game_blk, game_pf,
+  visitor_q1_points, visitor_q2_points, visitor_q3_points, visitor_q4_points,
+  home_q1_points, home_q2_points, home_q3_points, home_q4_points) VALUES
+  ('2026-02-26', 1, 2, 1, 'Metros',
+   30, 57, 19, 23, 11, 26, 10, 29, 23, 8, 10, 5, 17,
+   29, 27, 26, 26, 25, 24, 25, 25),
+  ('2026-02-26', 1, 2, 1, 'Stars',
+   26, 59, 16, 21, 9, 23, 8, 26, 20, 7, 12, 4, 19,
+   29, 27, 26, 26, 25, 24, 25, 25)
 ON DUPLICATE KEY UPDATE game_2gm=VALUES(game_2gm), game_2ga=VALUES(game_2ga),
   game_ftm=VALUES(game_ftm), game_fta=VALUES(game_fta), game_3gm=VALUES(game_3gm),
   game_3ga=VALUES(game_3ga), game_orb=VALUES(game_orb), game_drb=VALUES(game_drb),

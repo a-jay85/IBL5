@@ -1,6 +1,6 @@
 ---
 description: Shared review rubric and false-positive filter used by /pr-review, /security-audit, and /post-plan.
-last_verified: 2026-05-15
+last_verified: 2026-05-23
 ---
 
 # Review Rubric and False-Positive Filter (shared)
@@ -57,6 +57,20 @@ Catches type errors, loose comparisons (`==`/`!=`), unused imports, unreachable 
 
 ---
 
+## E2E spec patterns to flag (Agent D)
+
+When Agent D reports a finding, the scoring agent should anchor on these named anti-patterns:
+
+| Anti-pattern | Detection signal | Section |
+|---|---|---|
+| Same-page-success-only | Happy-path `*-submission.spec.ts` test asserts on `.alert--success`/`.voting-submission-success`/etc. without a cross-page navigation, API read-back, or `submitFormAndAssertEffect` call | 1 |
+| Generic-fallback assertion | `expect(loc).toBeVisible()` on `body`, `.ibl-content`, `#main`, or selectors present on every error template | 2 |
+| Header-text assertion | `toContain('IBL')`, `toHaveTitle(/IBL/i)` as the only discrimination in a non-smoke test | 2 |
+| Uncounted `.first()` | `.first()` used where the test name implies multiple items, with no `toHaveCount` or count check | 2 |
+| New UI branch w/o spec | Production diff adds a new phase-gated state / admin-only module / HTMX-swapped tab / conditional `<details>`/modal, spec diff has no matching `test(...)` block setting that state | 3 |
+
+---
+
 ## IBL5-specific false positives (score 0-25)
 
 Apply after the Automatic Zero list.
@@ -71,3 +85,9 @@ Apply after the Automatic Zero list.
 - Pre-existing issues on lines the PR did not modify
 - Changes in functionality that are likely intentional or directly related to the broader change
 - Issues called out in CLAUDE.md but silenced by explicit opt-out comments (e.g. `// phpcs:ignore`, `@phpstan-ignore-next-line`)
+- `tests/e2e/smoke/**/*.ts` flagged for Section 2 generic-visibility assertions — smoke tests legitimately assert "page loads" via generic selectors; Agent D should already exempt these, but if one slips through it scores 0
+- Error-path tests (`test('...invalid...'/'...too few...'/'...duplicate...')`) flagged for missing POST-effect — they intentionally verify absence of effect
+- Helpers returning null/empty arrays as legitimate sentinels (`getOptional…`, `findIf…`) flagged for "missing assertion" — sentinel returns are by design
+- Section 3 findings when `ibl5/tests/e2e/vr-manifest.ts` does not exist in the repo (Layer 3b not landed)
+- Section 1 findings when `submitFormAndAssertEffect` helper does not exist AND the test uses cross-page navigation + destination assertion (Layer 3a not landed, underlying pattern present)
+- Pre-existing assertion patterns on lines the PR did not modify (restated from above for E2E clarity)

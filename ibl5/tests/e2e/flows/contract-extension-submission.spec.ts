@@ -1,5 +1,6 @@
 import { test, expect } from '../fixtures/auth';
 import { resetExtension } from '../helpers/cleanup';
+import { submitFormAndAssertEffect } from '../helpers/submit-form';
 
 /**
  * Contract Extension submission flow — exercises the actual POST to
@@ -134,22 +135,25 @@ test.describe('Contract Extension submission: happy path', () => {
     test.skip(fields === null, 'IBL_TEST_USER does not own Metros — extension form not rendered');
     if (fields === null) return;
 
-    // The rendered offer fields default to the player's demands, which is
-    // exactly the input the processor expects for a successful submission.
-    const response = await request.post(EXTENSION_ENDPOINT, {
-      form: buildFormBody(fields),
-      maxRedirects: 0,
+    let location = '';
+
+    await submitFormAndAssertEffect(page, {
+      submit: async () => {
+        const response = await request.post(EXTENSION_ENDPOINT, {
+          form: buildFormBody(fields!),
+          maxRedirects: 0,
+        });
+        expect([301, 302, 303]).toContain(response.status());
+        location = response.headers()['location'] ?? '';
+        expect(location).toMatch(/result=extension_(accepted|rejected)/);
+        expect(location).toContain('display=contracts');
+      },
+      readBack: async () => {
+        await page.goto(location.replace('/ibl5/', ''));
+        const banner = page.locator('.ibl-alert--success, .ibl-alert--info');
+        await expect(banner.first()).toBeVisible();
+      },
     });
-
-    expect([301, 302, 303]).toContain(response.status());
-    const location = response.headers()['location'] ?? '';
-    expect(location).toMatch(/result=extension_(accepted|rejected)/);
-    expect(location).toContain('display=contracts');
-
-    // Follow the redirect manually and confirm the team page renders a banner.
-    await page.goto(location.replace('/ibl5/', ''));
-    const banner = page.locator('.ibl-alert--success, .ibl-alert--info');
-    await expect(banner.first()).toBeVisible();
   });
 });
 

@@ -255,6 +255,58 @@ if ($method === 'DELETE' && $action === 'set-eoy-votes') {
     exit;
 }
 
+// GET ?action=get-votes&team=X — query ASG/EOY vote status for a team
+if ($method === 'GET' && $action === 'get-votes') {
+    $team = $_GET['team'] ?? '';
+    if ($team === '') {
+        http_response_code(400);
+        echo json_encode(['error' => 'get-votes requires team parameter']);
+        $db->close();
+        exit;
+    }
+    $stmt = $db->prepare('SELECT asg_vote, eoy_vote FROM ibl_team_info WHERE team_name = ?');
+    $stmt->bind_param('s', $team);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    $row = $result->fetch_assoc();
+    $stmt->close();
+    if ($row === null) {
+        http_response_code(404);
+        echo json_encode(['error' => "Team not found: $team"]);
+        $db->close();
+        exit;
+    }
+    echo json_encode([
+        'asg_vote' => $row['asg_vote'],
+        'eoy_vote' => $row['eoy_vote'],
+        'asg_voted' => $row['asg_vote'] !== 'No Vote' && $row['asg_vote'] !== '',
+        'eoy_voted' => $row['eoy_vote'] !== 'No Vote' && $row['eoy_vote'] !== '',
+    ]);
+    $db->close();
+    exit;
+}
+
+// DELETE ?action=reset-vote&team=X&type=asg|eoy — reset a team's vote flag
+if ($method === 'DELETE' && $action === 'reset-vote') {
+    $team = $_GET['team'] ?? '';
+    $type = $_GET['type'] ?? '';
+    if ($team === '' || !in_array($type, ['asg', 'eoy'], true)) {
+        http_response_code(400);
+        echo json_encode(['error' => 'reset-vote requires team and type=asg|eoy']);
+        $db->close();
+        exit;
+    }
+    $column = $type === 'asg' ? 'asg_vote' : 'eoy_vote';
+    $stmt = $db->prepare("UPDATE ibl_team_info SET $column = 'No Vote' WHERE team_name = ?");
+    $stmt->bind_param('s', $team);
+    $stmt->execute();
+    $affected = $stmt->affected_rows;
+    $stmt->close();
+    echo json_encode(['reset' => $column, 'team' => $team, 'affected' => $affected]);
+    $db->close();
+    exit;
+}
+
 if ($method === 'GET') {
     $result = $db->query('SELECT name, value FROM ibl_settings');
     $settings = [];

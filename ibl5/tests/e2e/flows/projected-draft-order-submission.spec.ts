@@ -1,5 +1,6 @@
 import { test, expect } from '../fixtures/auth';
 import { resetDraftOrder } from '../helpers/cleanup';
+import { submitFormAndAssertEffect } from '../helpers/submit-form';
 
 /**
  * ProjectedDraftOrder save_order submission flow — exercises the POST that
@@ -44,38 +45,39 @@ test.describe('save_order: admin happy path', () => {
     });
 
     const order = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
-    const response = await request.post(SAVE_ORDER_URL, {
-      data: { order },
-      headers: { 'Content-Type': 'application/json' },
+
+    await submitFormAndAssertEffect(page, {
+      submit: async () => {
+        const response = await request.post(SAVE_ORDER_URL, {
+          data: { order },
+          headers: { 'Content-Type': 'application/json' },
+        });
+        expect(response.status()).toBe(200);
+        const body = (await response.json()) as SaveOrderResponse;
+        expect(body.success).toBe(true);
+      },
+      readBack: async () => {
+        await page.goto('modules.php?name=ProjectedDraftOrder');
+        const table = page
+          .locator('.projected-draft-order-table, .ibl-data-table')
+          .first();
+        await expect(table).toBeVisible();
+
+        const lotteryRows = table
+          .locator('tbody tr:not(.projected-draft-order-separator)')
+          .filter({ has: page.locator('td a[href*="teamid="]') });
+
+        for (let i = 0; i < order.length; i++) {
+          const row = lotteryRows.nth(i);
+          const teamLink = row.locator('a[href*="teamid="]').first();
+          const href = await teamLink.getAttribute('href');
+          expect(
+            href,
+            `pick ${i + 1} should link to teamid=${order[i]} (saved order)`,
+          ).toMatch(new RegExp(`teamid=${order[i]}(\\D|$)`));
+        }
+      },
     });
-    expect(response.status()).toBe(200);
-    const body = (await response.json()) as SaveOrderResponse;
-    expect(body.success).toBe(true);
-
-    // Persistence verification: saveLotteryOrder also flips
-    // `Draft Order Finalized` to 'Yes' in ibl_settings as part of its
-    // transaction, so the page now reads saved picks. The lottery rows
-    // (pick 1..12) must link to the teams we just wrote, in order. The
-    // afterAll hook resets both `ibl_draft` rows and the finalized flag.
-    await page.goto('modules.php?name=ProjectedDraftOrder');
-    const table = page
-      .locator('.projected-draft-order-table, .ibl-data-table')
-      .first();
-    await expect(table).toBeVisible();
-
-    const lotteryRows = table
-      .locator('tbody tr:not(.projected-draft-order-separator)')
-      .filter({ has: page.locator('td a[href*="teamid="]') });
-
-    for (let i = 0; i < order.length; i++) {
-      const row = lotteryRows.nth(i);
-      const teamLink = row.locator('a[href*="teamid="]').first();
-      const href = await teamLink.getAttribute('href');
-      expect(
-        href,
-        `pick ${i + 1} should link to teamid=${order[i]} (saved order)`,
-      ).toMatch(new RegExp(`teamid=${order[i]}(\\D|$)`));
-    }
   });
 });
 

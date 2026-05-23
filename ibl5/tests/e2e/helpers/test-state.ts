@@ -100,6 +100,43 @@ export async function setAward(
   }
 }
 
+export interface TeamVoteStatus {
+  asg_vote: string;
+  eoy_vote: string;
+  asg_voted: boolean;
+  eoy_voted: boolean;
+}
+
+export async function getVotes(
+  request: APIRequestContext,
+  team: string,
+): Promise<TeamVoteStatus> {
+  const response = await request.get(
+    `test-state.php?action=get-votes&team=${encodeURIComponent(team)}`,
+  );
+  if (!response.ok()) {
+    throw new Error(
+      `test-state.php get-votes failed: ${response.status()} ${await response.text()}`,
+    );
+  }
+  return (await response.json()) as TeamVoteStatus;
+}
+
+export async function resetVote(
+  request: APIRequestContext,
+  team: string,
+  type: 'asg' | 'eoy',
+): Promise<void> {
+  const response = await request.delete(
+    `test-state.php?action=reset-vote&team=${encodeURIComponent(team)}&type=${type}`,
+  );
+  if (!response.ok()) {
+    throw new Error(
+      `test-state.php reset-vote failed: ${response.status()} ${await response.text()}`,
+    );
+  }
+}
+
 export type SetStateFn = (settings: Settings) => Promise<SetStateResult>;
 
 /**

@@ -1,4 +1,5 @@
 import { test, expect } from '../fixtures/auth';
+import { submitFormAndAssertEffect } from '../helpers/submit-form';
 
 // Free Agency submission tests — create, amend, delete offers + quick offer buttons.
 // Serial: describe blocks share FA offer state (pid=11, pid=12).
@@ -20,12 +21,22 @@ test.describe('Free Agency -- submit and manage offers', () => {
   test('submit valid 1-year custom offer', async ({ page }) => {
     await page.goto('modules.php?name=FreeAgency&pa=negotiate&pid=11');
     const form = offerForm(page);
-    // FA Center has exp=8, vet min = 89
     await form.locator('input[name="offeryear1"]').fill('200');
-    await page.getByRole('button', { name: /Offer.*Free Agent Contract/i }).click();
-    // CI seed has Metros under soft cap — custom offer must succeed
-    await page.waitForURL(/result=offer_success/);
-    await expect(page.locator('.ibl-alert--success', { hasText: /offer.*saved/i })).toBeVisible();
+
+    await submitFormAndAssertEffect(page, {
+      submit: async () => {
+        await page.getByRole('button', { name: /Offer.*Free Agent Contract/i }).click();
+        await page.waitForURL(/result=offer_success/);
+      },
+      expectSameSpot: async () => {
+        await expect(page.locator('.ibl-alert--success', { hasText: /offer.*saved/i })).toBeVisible();
+      },
+      readBack: async () => {
+        await page.goto('modules.php?name=FreeAgency&pa=negotiate&pid=11');
+        const deleteBtn = page.getByRole('button', { name: /Delete This Offer/i });
+        await expect(deleteBtn).toBeVisible();
+      },
+    });
   });
 
   test('amend existing offer', async ({ page }) => {
@@ -54,13 +65,23 @@ test.describe('Free Agency -- submit and manage offers', () => {
   test('submit valid 2-year custom offer', async ({ page }) => {
     await page.goto('modules.php?name=FreeAgency&pa=negotiate&pid=11');
     const form = offerForm(page);
-    // yr1=200, yr2=210 (raise=10, under 10% max raise of 20)
     await form.locator('input[name="offeryear1"]').fill('200');
     await form.locator('input[name="offeryear2"]').fill('210');
-    await page.getByRole('button', { name: /Offer.*Free Agent Contract/i }).click();
-    // CI seed has Metros under soft cap — multi-year offer must succeed
-    await page.waitForURL(/result=offer_success/);
-    await expect(page.locator('.ibl-alert--success', { hasText: /offer.*saved/i })).toBeVisible();
+
+    await submitFormAndAssertEffect(page, {
+      submit: async () => {
+        await page.getByRole('button', { name: /Offer.*Free Agent Contract/i }).click();
+        await page.waitForURL(/result=offer_success/);
+      },
+      expectSameSpot: async () => {
+        await expect(page.locator('.ibl-alert--success', { hasText: /offer.*saved/i })).toBeVisible();
+      },
+      readBack: async () => {
+        await page.goto('modules.php?name=FreeAgency&pa=negotiate&pid=11');
+        const deleteBtn = page.getByRole('button', { name: /Delete This Offer/i });
+        await expect(deleteBtn).toBeVisible();
+      },
+    });
   });
 
   test('offer appears in Contract Offers table on main page', async ({ page }) => {
@@ -117,21 +138,41 @@ test.describe('Free Agency -- quick offer buttons', () => {
   });
 
   test('submit veteran minimum offer', async ({ page }) => {
-    // FA Forward pid=12 (exp=3, vet min=61)
     await page.goto('modules.php?name=FreeAgency&pa=negotiate&pid=12');
-    const vetBtn = page.getByTestId('quick-offer-vetmin');
-    await vetBtn.click();
-    await page.waitForURL(/result=offer_success/);
-    await expect(page.locator('.ibl-alert--success', { hasText: /offer.*saved/i })).toBeVisible();
+
+    await submitFormAndAssertEffect(page, {
+      submit: async () => {
+        await page.getByTestId('quick-offer-vetmin').click();
+        await page.waitForURL(/result=offer_success/);
+      },
+      expectSameSpot: async () => {
+        await expect(page.locator('.ibl-alert--success', { hasText: /offer.*saved/i })).toBeVisible();
+      },
+      readBack: async () => {
+        await page.goto('modules.php?name=FreeAgency&pa=negotiate&pid=12');
+        const deleteBtn = page.getByRole('button', { name: /Delete This Offer/i });
+        await expect(deleteBtn).toBeVisible();
+      },
+    });
   });
 
   test('submit MLE offer', async ({ page }) => {
-    // FA Center pid=11 — team has HasMLE=1
     await page.goto('modules.php?name=FreeAgency&pa=negotiate&pid=11');
-    const mleBtn = page.getByTestId('quick-offer-mle-yr1');
-    await mleBtn.click();
-    await page.waitForURL(/result=offer_success/);
-    await expect(page.locator('.ibl-alert--success', { hasText: /offer.*saved/i })).toBeVisible();
+
+    await submitFormAndAssertEffect(page, {
+      submit: async () => {
+        await page.getByTestId('quick-offer-mle-yr1').click();
+        await page.waitForURL(/result=offer_success/);
+      },
+      expectSameSpot: async () => {
+        await expect(page.locator('.ibl-alert--success', { hasText: /offer.*saved/i })).toBeVisible();
+      },
+      readBack: async () => {
+        await page.goto('modules.php?name=FreeAgency&pa=negotiate&pid=11');
+        const deleteBtn = page.getByRole('button', { name: /Delete This Offer/i });
+        await expect(deleteBtn).toBeVisible();
+      },
+    });
   });
 
   // LLE test after MLE — delete MLE offer first so HasMLE remains available
@@ -145,12 +186,22 @@ test.describe('Free Agency -- quick offer buttons', () => {
   });
 
   test('submit LLE offer', async ({ page }) => {
-    // FA Center pid=11 — team has HasLLE=1
     await page.goto('modules.php?name=FreeAgency&pa=negotiate&pid=11');
-    const lleBtn = page.getByTestId('quick-offer-lle');
-    await lleBtn.click();
-    await page.waitForURL(/result=offer_success/);
-    await expect(page.locator('.ibl-alert--success', { hasText: /offer.*saved/i })).toBeVisible();
+
+    await submitFormAndAssertEffect(page, {
+      submit: async () => {
+        await page.getByTestId('quick-offer-lle').click();
+        await page.waitForURL(/result=offer_success/);
+      },
+      expectSameSpot: async () => {
+        await expect(page.locator('.ibl-alert--success', { hasText: /offer.*saved/i })).toBeVisible();
+      },
+      readBack: async () => {
+        await page.goto('modules.php?name=FreeAgency&pa=negotiate&pid=11');
+        const deleteBtn = page.getByRole('button', { name: /Delete This Offer/i });
+        await expect(deleteBtn).toBeVisible();
+      },
+    });
   });
 
   // Delete LLE offer before max contract test
@@ -164,13 +215,22 @@ test.describe('Free Agency -- quick offer buttons', () => {
   });
 
   test('submit max contract offer', async ({ page }) => {
-    // pid=11: max contract buttons are always present under "Max Level Contract" label
     await page.goto('modules.php?name=FreeAgency&pa=negotiate&pid=11');
-    const maxBtn = page.getByTestId('quick-offer-max-yr1');
-    await maxBtn.click();
-    // CI seed has Metros under soft cap — max contract offer must succeed
-    await page.waitForURL(/result=offer_success/);
-    await expect(page.locator('.ibl-alert--success', { hasText: /offer.*saved/i })).toBeVisible();
+
+    await submitFormAndAssertEffect(page, {
+      submit: async () => {
+        await page.getByTestId('quick-offer-max-yr1').click();
+        await page.waitForURL(/result=offer_success/);
+      },
+      expectSameSpot: async () => {
+        await expect(page.locator('.ibl-alert--success', { hasText: /offer.*saved/i })).toBeVisible();
+      },
+      readBack: async () => {
+        await page.goto('modules.php?name=FreeAgency&pa=negotiate&pid=11');
+        const deleteBtn = page.getByRole('button', { name: /Delete This Offer/i });
+        await expect(deleteBtn).toBeVisible();
+      },
+    });
   });
 
   // Cleanup: delete all offers made during this describe block

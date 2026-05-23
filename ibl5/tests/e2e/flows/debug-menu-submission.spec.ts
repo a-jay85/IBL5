@@ -73,6 +73,7 @@ test.describe('DebugMenu direct POST submission', () => {
       '/ibl5/modules.php?name=Standings',
     );
 
+    await page.goto('modules.php?name=Standings');
     const cookies = await page.context().cookies();
     const debugCookie = cookies.find(
       (c) => c.name === 'ibl_debug_extensions',
@@ -80,7 +81,6 @@ test.describe('DebugMenu direct POST submission', () => {
     expect(debugCookie).toBeDefined();
     expect(debugCookie!.value).toBe('1');
 
-    await page.goto('modules.php?name=Standings');
     const afterLabel = await getToggleLabel(page);
     expect(afterLabel).toContain('ON');
 
@@ -110,13 +110,13 @@ test.describe('DebugMenu direct POST submission', () => {
     expect([301, 302, 303]).toContain(response.status());
     expect(response.headers()['location']).toBe('/ibl5/');
 
+    await page.goto('index.php');
     const cookies = await page.context().cookies();
     const debugCookie = cookies.find(
       (c) => c.name === 'ibl_debug_extensions',
     );
     expect(debugCookie).toBeUndefined();
 
-    await page.goto('index.php');
     const afterLabel = await getToggleLabel(page);
     expect(afterLabel).toContain('OFF');
 

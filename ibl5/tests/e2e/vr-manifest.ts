@@ -152,12 +152,7 @@ export const VR_MANIFEST: VrRow[] = [
   { name: 'next-sim', auth: 'auth', url: 'modules.php?name=NextSim',
     anchor: '.next-sim-container', extraMask: ['time.local-time'],
     viewports: ['desktop', 'mobile'],
-    htmxTabs: [
-      { key: 'SG', trigger: 'a.ibl-tab[data-display="SG"]', swapTarget: '.nextsim-tab-container' },
-      { key: 'SF', trigger: 'a.ibl-tab[data-display="SF"]', swapTarget: '.nextsim-tab-container' },
-      { key: 'PF', trigger: 'a.ibl-tab[data-display="PF"]', swapTarget: '.nextsim-tab-container' },
-      { key: 'C', trigger: 'a.ibl-tab[data-display="C"]', swapTarget: '.nextsim-tab-container' },
-    ] },
+    notes: 'CI user is on Free Agents — position tabs (SG/SF/PF/C) require an assigned team; htmx-tabs VR not applicable under seed data.' },
   { name: 'one-on-one-game', auth: 'auth', url: 'modules.php?name=OneOnOneGame',
     anchor: 'form[name="OneOnOneGame"]', viewports: ['desktop', 'mobile'],
     notes: 'Admin-only game-runner; baseline reflects empty state under CI seed.' },

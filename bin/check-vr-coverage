@@ -18,7 +18,6 @@ type Dimension = 'desktop' | 'mobile' | 'empty-state' | 'htmx-tabs';
 
 const HTMX_MODULES = new Set([
   'league-starters',
-  'next-sim',
   'franchise-record-book',
   'draft-history',
 ]);

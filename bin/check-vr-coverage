@@ -1,0 +1,150 @@
+#!/usr/bin/env bun
+// Reports VR coverage as a property of the manifest. Add a row to
+// vr-manifest.ts → coverage is automatically tracked. Existing gaps are
+// advisory; new gaps fail CI (exit 1).
+import { readFileSync, writeFileSync, existsSync } from 'fs';
+import { resolve, dirname } from 'path';
+import { fileURLToPath } from 'url';
+
+const __dir = dirname(fileURLToPath(import.meta.url));
+const ibl5Dir = resolve(__dir, '..', 'ibl5');
+
+// Dynamic import so this works from the repo root
+const { VR_MANIFEST, DEFAULT_STATE } = await import(
+  resolve(ibl5Dir, 'tests/e2e/vr-manifest.ts')
+);
+
+type Dimension = 'desktop' | 'mobile' | 'empty-state' | 'htmx-tabs';
+
+const HTMX_MODULES = new Set([
+  'league-starters',
+  'franchise-record-book',
+  'draft-history',
+]);
+
+const baselinePath = resolve(ibl5Dir, 'tests/e2e/vr-coverage-baseline.json');
+const updateBaseline = process.argv.includes('--update-baseline');
+
+type MissingMap = Record<string, Dimension[]>;
+
+function computeMissing(): MissingMap {
+  const missing: MissingMap = {};
+
+  for (const row of VR_MANIFEST) {
+    const gaps: Dimension[] = [];
+    const viewports = row.viewports ?? ['desktop'];
+
+    if (!viewports.includes('desktop')) gaps.push('desktop');
+    if (!viewports.includes('mobile')) gaps.push('mobile');
+
+    if (row.dataDriven) {
+      const states = row.states ?? [DEFAULT_STATE];
+      const hasNonDefault = states.some(
+        (s: { name: string }) => s.name !== 'default',
+      );
+      if (!hasNonDefault) gaps.push('empty-state');
+    }
+
+    if (HTMX_MODULES.has(row.name)) {
+      if (!row.htmxTabs || row.htmxTabs.length === 0) gaps.push('htmx-tabs');
+    }
+
+    if (gaps.length > 0) {
+      missing[row.name] = gaps;
+    }
+  }
+
+  return missing;
+}
+
+function loadBaseline(): MissingMap {
+  if (!existsSync(baselinePath)) return {};
+  const raw = readFileSync(baselinePath, 'utf-8');
+  return JSON.parse(raw) as MissingMap;
+}
+
+function saveBaseline(current: MissingMap): void {
+  writeFileSync(baselinePath, JSON.stringify(current, null, 2) + '\n');
+}
+
+function printTable(): void {
+  const header = `${'Module'.padEnd(40)} | ${'desktop'.padEnd(7)} | ${'mobile'.padEnd(7)} | ${'empty-state'.padEnd(13)} | htmx-tabs`;
+  const sep = '-'.repeat(header.length);
+  console.log(header);
+  console.log(sep);
+
+  for (const row of VR_MANIFEST) {
+    const viewports = row.viewports ?? ['desktop'];
+    const states = row.states ?? [DEFAULT_STATE];
+    const hasNonDefault = states.some(
+      (s: { name: string }) => s.name !== 'default',
+    );
+
+    const desktop = viewports.includes('desktop') ? '✓' : '—';
+    const mobile = viewports.includes('mobile') ? '✓' : '—';
+
+    let emptyState: string;
+    if (row.dataDriven) {
+      emptyState = hasNonDefault
+        ? `✓ (${states.filter((s: { name: string }) => s.name !== 'default').length}/${states.filter((s: { name: string }) => s.name !== 'default').length})`
+        : '—';
+    } else {
+      emptyState = 'N/A';
+    }
+
+    let htmxTabs: string;
+    if (HTMX_MODULES.has(row.name)) {
+      const tabs = row.htmxTabs ?? [];
+      htmxTabs = tabs.length > 0 ? `✓ (${tabs.length})` : '—';
+    } else {
+      htmxTabs = 'N/A';
+    }
+
+    console.log(
+      `${row.name.padEnd(40)} | ${desktop.padEnd(7)} | ${mobile.padEnd(7)} | ${emptyState.padEnd(13)} | ${htmxTabs}`,
+    );
+  }
+}
+
+// Main
+const currentMissing = computeMissing();
+const baseline = loadBaseline();
+
+printTable();
+console.log('');
+
+if (updateBaseline) {
+  saveBaseline(currentMissing);
+  console.log(`Baseline updated: ${baselinePath}`);
+  process.exit(0);
+}
+
+// Find NEW gaps: present in currentMissing but not in baseline
+const newGaps: Array<{ name: string; dimensions: Dimension[] }> = [];
+for (const [name, dims] of Object.entries(currentMissing)) {
+  const baselineDims = new Set(baseline[name] ?? []);
+  const novel = dims.filter((d) => !baselineDims.has(d));
+  if (novel.length > 0) {
+    newGaps.push({ name, dimensions: novel });
+  }
+}
+
+if (newGaps.length > 0) {
+  console.log('NEW coverage gaps (not in baseline):');
+  for (const gap of newGaps) {
+    console.log(`  ${gap.name}: ${gap.dimensions.join(', ')}`);
+  }
+  console.log('');
+  console.log('Run `bin/check-vr-coverage --update-baseline` to acknowledge.');
+  process.exit(1);
+}
+
+const existingGapCount = Object.keys(currentMissing).length;
+if (existingGapCount > 0) {
+  console.log(
+    `${existingGapCount} existing gap(s) in baseline (advisory, non-blocking).`,
+  );
+}
+
+console.log('No new coverage gaps.');
+process.exit(0);

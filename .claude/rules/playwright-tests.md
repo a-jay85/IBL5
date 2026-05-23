@@ -354,3 +354,31 @@ Before considering an E2E test task complete:
 3. **No `.only`** in any spec file
 4. **PHP error coverage** — every smoke file includes PHP error pattern checks
 5. **Correct auth pattern** — public tests use empty storageState, authenticated tests import from fixtures/auth
+
+## Visual Regression Manifest
+
+`ibl5/tests/e2e/vr-manifest.ts` is the single source of truth for visual regression coverage. The spec file (`visual-regression.spec.ts`) consumes the manifest — do not add rows directly to the spec.
+
+### Filename derivation
+
+Snapshot filenames are derived mechanically by `snapshotFilename()`:
+
+```
+Base:     {name}.png                          // desktop, default state
+Mobile:   {name}-mobile.png                   // viewport === 'mobile'
+State:    {name}-{state.name}.png             // state.name !== 'default'
+Tab:      {name}-tab-{tab.key}.png            // htmx tab snapshot
+Combined: {name}-{state.name}-mobile.png      // state + mobile
+          {name}-tab-{tab.key}-mobile.png     // tab + mobile
+```
+
+- Desktop viewport suffix is elided (no `-desktop` in filenames).
+- `default` state name is elided.
+
+### Adding a new module
+
+Add one `VrRow` to `VR_MANIFEST` in `ibl5/tests/e2e/vr-manifest.ts`. Set `viewports`, `states`, `htmxTabs` as needed. Run with `--update-snapshots` to generate the baseline PNG.
+
+### Coverage tool
+
+`bin/check-vr-coverage` reports which manifest rows are missing dimensions (mobile, empty-state, htmx-tabs). New gaps fail CI (exit 1); existing gaps in `ibl5/tests/e2e/vr-coverage-baseline.json` are advisory. Run `bin/check-vr-coverage --update-baseline` to acknowledge current gaps.

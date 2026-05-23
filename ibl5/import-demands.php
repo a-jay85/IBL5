@@ -21,8 +21,13 @@ if (!is_admin()) {
  */
 function stripAccents(string $str): string
 {
-    $transliterated = transliterator_transliterate('Any-Latin; Latin-ASCII; Lower()', $str);
-    return $transliterated !== false ? $transliterated : mb_strtolower($str);
+    if (function_exists('transliterator_transliterate')) {
+        $transliterated = transliterator_transliterate('Any-Latin; Latin-ASCII; Lower()', $str);
+        if ($transliterated !== false) {
+            return $transliterated;
+        }
+    }
+    return mb_strtolower($str);
 }
 
 /** @var list<array{csv_name: string, reason: string}> $skipped */

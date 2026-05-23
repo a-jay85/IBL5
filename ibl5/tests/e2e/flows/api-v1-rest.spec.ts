@@ -96,7 +96,7 @@ test.describe('api/v1 REST contract', () => {
   // --- Teams ---
 
   test('GET api/v1/teams returns 200 with 28 franchises', async ({ request }) => {
-    const response = await getJson(request, 'api/v1/teams');
+    const response = await getJson(request, 'api/v1/teams?per_page=100');
     expectJsonEnvelope(response);
     const body = await response.json();
     expect(body).toMatchObject({ status: 'success' });

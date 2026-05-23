@@ -1,5 +1,6 @@
 import { test, expect } from '../fixtures/auth';
 import { assertNoPhpErrors } from '../helpers/php-errors';
+import { submitFormAndAssertEffect } from '../helpers/submit-form';
 
 // Waivers submission flow — tests that actually submit waiver moves.
 // Serial: add/waive mutate roster state.
@@ -45,8 +46,6 @@ test.describe('Waivers: add player', () => {
     expect(optionLabel, 'Expected player option to carry a display label').toBeTruthy();
     await playerSelect.selectOption(optionValue!);
 
-    // Capture POST response for diagnostics (CI returns 500 with empty body —
-    // the actual error is in Apache stderr, captured by "Dump Docker PHP logs" CI step)
     const responsePromise = page.waitForResponse(
       resp => resp.url().includes('modules.php') && resp.request().method() === 'POST',
     );
@@ -55,24 +54,29 @@ test.describe('Waivers: add player', () => {
     // races with Playwright's navigation tracking
     const submitBtn = form.locator('button[type="submit"], input[type="submit"]').first();
     await submitBtn.evaluate(btn => (btn as HTMLElement).removeAttribute('onclick'));
-    await submitBtn.click();
 
-    const response = await responsePromise;
-    const postStatus = response.status();
-    const postBody = await response.text().catch(() => '');
-
-    await page.waitForLoadState('networkidle');
-    const url = page.url();
-    const bodySnippet = postBody.substring(0, 500).replace(/\s+/g, ' ').trim();
-
-    expect(url, `POST status=${postStatus} body=${bodySnippet}`).toContain('result=player_added');
-    await expect(page.locator('.ibl-alert--success')).toBeVisible();
-    await assertNoPhpErrors(page, 'after waiver add');
-
-    // Option label format: "PlayerName salary1 salary2 salary3" — strip salary tail to get just the name.
     const playerNameOnly = optionLabel.replace(/\s+\d.*$/, '').trim();
-    await page.goto('modules.php?name=Team&op=team&teamid=1');
-    await expect(page.locator('body')).toContainText(playerNameOnly, { timeout: 5000 });
+
+    await submitFormAndAssertEffect(page, {
+      submit: async () => {
+        await submitBtn.click();
+        const response = await responsePromise;
+        const postStatus = response.status();
+        const postBody = await response.text().catch(() => '');
+        await page.waitForLoadState('networkidle');
+        const url = page.url();
+        const bodySnippet = postBody.substring(0, 500).replace(/\s+/g, ' ').trim();
+        expect(url, `POST status=${postStatus} body=${bodySnippet}`).toContain('result=player_added');
+      },
+      expectSameSpot: async () => {
+        await expect(page.locator('.ibl-alert--success')).toBeVisible();
+        await assertNoPhpErrors(page, 'after waiver add');
+      },
+      readBack: async () => {
+        await page.goto('modules.php?name=Team&op=team&teamid=1');
+        await expect(page.locator('body')).toContainText(playerNameOnly, { timeout: 5000 });
+      },
+    });
   });
 
   test('success banner shows on successful add', async ({

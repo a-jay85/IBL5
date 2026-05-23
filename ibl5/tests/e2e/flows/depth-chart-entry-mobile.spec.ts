@@ -366,12 +366,11 @@ test.describe('DCE mobile: saved depth chart loading', () => {
 
     // Wait for AJAX to complete — loaded_dc_id should update
     const loadedId = page.locator('#loaded_dc_id, input[name="loaded_dc_id"]');
-    if ((await loadedId.count()) > 0) {
-      await expect(async () => {
-        const val = await loadedId.first().inputValue();
-        expect(val).not.toBe('0');
-      }).toPass({ timeout: 5000 });
-    }
+    await expect(loadedId.first(), 'loaded_dc_id hidden field must exist in form').toBeAttached();
+    await expect(async () => {
+      const val = await loadedId.first().inputValue();
+      expect(val).not.toBe('0');
+    }).toPass({ timeout: 5000 });
 
     // Mobile card selects should reflect the loaded config
     // The AJAX success is verified by assertNoPhpErrors — values may match live

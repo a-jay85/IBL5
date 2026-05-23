@@ -67,7 +67,7 @@ test.describe('Free Agency -- submit and manage offers', () => {
     // Clean up any leftover offer from prior tests before submitting
     await page.goto('modules.php?name=FreeAgency&pa=negotiate&pid=11');
     const existingDelete = page.getByRole('button', { name: /Delete This Offer/i });
-    if (await existingDelete.count() > 0) {
+    if (await existingDelete.count() > 0) { // e2e-hygiene-allow: cleanup precondition — element may not exist depending on prior test state
       await existingDelete.click();
       await page.waitForURL(/result=deleted/);
     }
@@ -93,7 +93,7 @@ test.describe('Free Agency -- submit and manage offers', () => {
     // Cleanup: delete the offer
     await page.goto('modules.php?name=FreeAgency&pa=negotiate&pid=11');
     const deleteBtn = page.getByRole('button', { name: /Delete This Offer/i });
-    if (await deleteBtn.count() > 0) {
+    if (await deleteBtn.count() > 0) { // e2e-hygiene-allow: cleanup precondition — element may not exist depending on prior test state
       await deleteBtn.click();
       await page.waitForURL(/result=deleted/);
     }
@@ -102,7 +102,7 @@ test.describe('Free Agency -- submit and manage offers', () => {
   test('cleanup 2-year offer', async ({ page }) => {
     await page.goto('modules.php?name=FreeAgency&pa=negotiate&pid=11');
     const deleteBtn = page.getByRole('button', { name: /Delete This Offer/i });
-    if (await deleteBtn.count() > 0) {
+    if (await deleteBtn.count() > 0) { // e2e-hygiene-allow: cleanup precondition — element may not exist depending on prior test state
       await deleteBtn.click();
       await page.waitForURL(/result=deleted/);
     }
@@ -138,7 +138,7 @@ test.describe('Free Agency -- quick offer buttons', () => {
   test('delete MLE offer before LLE test', async ({ page }) => {
     await page.goto('modules.php?name=FreeAgency&pa=negotiate&pid=11');
     const deleteBtn = page.getByRole('button', { name: /Delete This Offer/i });
-    if (await deleteBtn.count() > 0) {
+    if (await deleteBtn.count() > 0) { // e2e-hygiene-allow: cleanup precondition — element may not exist depending on prior test state
       await deleteBtn.click();
       await page.waitForURL(/result=deleted/);
     }
@@ -157,7 +157,7 @@ test.describe('Free Agency -- quick offer buttons', () => {
   test('delete LLE offer before max contract test', async ({ page }) => {
     await page.goto('modules.php?name=FreeAgency&pa=negotiate&pid=11');
     const deleteBtn = page.getByRole('button', { name: /Delete This Offer/i });
-    if (await deleteBtn.count() > 0) {
+    if (await deleteBtn.count() > 0) { // e2e-hygiene-allow: cleanup precondition — element may not exist depending on prior test state
       await deleteBtn.click();
       await page.waitForURL(/result=deleted/);
     }

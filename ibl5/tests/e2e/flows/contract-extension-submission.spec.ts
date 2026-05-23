@@ -48,7 +48,7 @@ async function readExtensionForm(
   page: import('@playwright/test').Page,
 ): Promise<ExtensionFormFields | null> {
   const form = page.locator('form[name="ExtensionOffer"]');
-  if (!(await form.isVisible().catch(() => false))) {
+  if (!(await form.isVisible().catch(() => false))) { // e2e-hygiene-allow: helper returns null sentinel — callers now hard-assert with expect().not.toBeNull()
     return null;
   }
 
@@ -130,7 +130,7 @@ test.describe('Contract Extension submission: happy path', () => {
     await page.goto(NEGOTIATE_URL);
 
     const fields = await readExtensionForm(page);
-    test.skip(fields === null, 'IBL_TEST_USER does not own Metros — extension form not rendered');
+    expect(fields, 'IBL_TEST_USER must own Metros (CI seed); extension form must render').not.toBeNull();
     if (fields === null) return;
 
     // The rendered offer fields default to the player's demands, which is
@@ -169,7 +169,7 @@ test.describe('Contract Extension submission: bad CSRF', () => {
     await page.goto(NEGOTIATE_URL);
 
     const fields = await readExtensionForm(page);
-    test.skip(fields === null, 'IBL_TEST_USER does not own Metros — extension form not rendered');
+    expect(fields, 'IBL_TEST_USER must own Metros (CI seed); extension form must render').not.toBeNull();
     if (fields === null) return;
     const body = buildFormBody(fields, { _csrf_token: undefined });
     const response = await request.post(EXTENSION_ENDPOINT, {
@@ -200,7 +200,7 @@ test.describe('Contract Extension submission: bogus teamName', () => {
     await page.goto(NEGOTIATE_URL);
 
     const fields = await readExtensionForm(page);
-    test.skip(fields === null, 'IBL_TEST_USER does not own Metros — extension form not rendered');
+    expect(fields, 'IBL_TEST_USER must own Metros (CI seed); extension form must render').not.toBeNull();
     if (fields === null) return;
     const body = buildFormBody(fields, { teamName: 'NonExistentTeam' });
     const response = await request.post(EXTENSION_ENDPOINT, {
@@ -231,7 +231,7 @@ test.describe('Contract Extension submission: zero offer', () => {
     await page.goto(NEGOTIATE_URL);
 
     const fields = await readExtensionForm(page);
-    test.skip(fields === null, 'IBL_TEST_USER does not own Metros — extension form not rendered');
+    expect(fields, 'IBL_TEST_USER must own Metros (CI seed); extension form must render').not.toBeNull();
     if (fields === null) return;
     const body = buildFormBody(fields, {
       offerYear1: '0',

@@ -24,7 +24,7 @@ test.describe('Unauthenticated redirect tests', () => {
       await page.goto(`modules.php?name=${name}`);
       // loginbox() emits a JS redirect: window.location.href="modules.php?name=YourAccount"
       await page.waitForURL(/name=YourAccount/, { timeout: 10_000 });
-      await expect(page.locator('body')).toBeVisible();
+      await expect(page.locator('input[name="username"]'), 'YourAccount login form must render after redirect').toBeVisible();
     });
   }
 });

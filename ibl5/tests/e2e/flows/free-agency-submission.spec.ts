@@ -7,6 +7,14 @@ import { submitFormAndAssertEffect } from '../helpers/submit-form';
 // causing race conditions where one block's delete removes another block's offer.
 test.describe.configure({ mode: 'serial' });
 
+test.beforeAll(async ({ request }) => {
+  await request.delete('test-state.php?action=clear-fa-offers');
+});
+
+test.afterAll(async ({ request }) => {
+  await request.delete('test-state.php?action=reset-fa-offers');
+});
+
 // Helper: scope form inputs to the visible custom offer form (not hidden quick-offer forms)
 const offerForm = (page: import('@playwright/test').Page) =>
   page.locator('form[name="FAOffer"]').filter({ has: page.locator('input[type="number"]') });

@@ -307,6 +307,14 @@ if ($method === 'DELETE' && $action === 'reset-vote') {
     exit;
 }
 
+// DELETE ?action=clear-fa-offers — wipe ibl_fa_offers without re-inserting
+if ($method === 'DELETE' && $action === 'clear-fa-offers') {
+    $db->query('DELETE FROM ibl_fa_offers');
+    echo json_encode(['cleared' => $db->affected_rows]);
+    $db->close();
+    exit;
+}
+
 // DELETE ?action=reset-fa-offers — wipe and re-insert the three seed FA offer rows
 if ($method === 'DELETE' && $action === 'reset-fa-offers') {
     $db->query('DELETE FROM ibl_fa_offers');

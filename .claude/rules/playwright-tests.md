@@ -1,7 +1,7 @@
 ---
 description: Playwright E2E testing rules, Docker requirements, and actionability pitfalls.
 paths: ibl5/tests/e2e/**/*.ts
-last_verified: 2026-04-30
+last_verified: 2026-05-23
 ---
 
 # Playwright E2E Testing Rules
@@ -296,6 +296,8 @@ test.describe('Public module flow', () => {
 14. **Don't** write `if (count > 0) { assert }` with no else — the test silently passes when the element is absent. Use a hard assertion instead
 
 ## Mandatory: No Skips, No Silent Passes
+
+These rules are mechanically enforced by `bin/check-e2e-hygiene` (CI workflow `.github/workflows/e2e-hygiene.yml`). Legitimate exceptions go in `.e2e-hygiene-skip-allowlist` (file-level) or as inline `// e2e-hygiene-allow: <reason >= 20 chars>` markers.
 
 The rules below (DON'Ts 10-14) are the most common E2E anti-patterns. Banned examples:
 

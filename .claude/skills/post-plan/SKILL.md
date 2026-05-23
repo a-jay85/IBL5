@@ -1,7 +1,7 @@
 ---
 name: post-plan
 description: Single orchestrator for the post-plan workflow. Runs commit/push/PR, diff classification, code review, security audit, verification, CI monitoring, retrospective, worktree teardown, and background process cleanup as one uninterrupted sequence.
-last_verified: 2026-05-21
+last_verified: 2026-05-23
 ---
 
 # Post-Plan Orchestrator
@@ -77,6 +77,7 @@ COUNT_CSS=$(echo "$FILES" | grep -cE '\.css$|^ibl5/design/' || true)
 COUNT_MD=$(echo "$FILES" | grep -cE '\.md$' || true)
 COUNT_MIGRATION=$(echo "$FILES" | grep -cE '^ibl5/migrations/.*\.sql$' || true)
 COUNT_TEST=$(echo "$FILES" | grep -cE '^ibl5/tests/|\.test\.(ts|js|php)$|\.spec\.(ts|js)$' || true)
+COUNT_E2E_SPECS=$(echo "$FILES" | grep -cE '^ibl5/tests/e2e/.*\.ts$' || true)
 COUNT_LOCK=$(echo "$FILES" | grep -cE '(composer|package|bun)\.lock$' || true)
 COUNT_SNAPSHOT=$(echo "$FILES" | grep -cE '__snapshots__/|\.snap$' || true)
 COUNT_NON_CODE=$(( COUNT_MD + COUNT_LOCK + COUNT_SNAPSHOT ))
@@ -86,6 +87,29 @@ HAS_PHP=$([ "$COUNT_PHP" -gt 0 ] && echo true || echo false)
 HAS_CSS=$([ "$COUNT_CSS" -gt 0 ] && echo true || echo false)
 HAS_MIGRATION=$([ "$COUNT_MIGRATION" -gt 0 ] && echo true || echo false)
 HAS_TEST=$([ "$COUNT_TEST" -gt 0 ] && echo true || echo false)
+HAS_E2E_SPECS=$([ "$COUNT_E2E_SPECS" -gt 0 ] && echo true || echo false)
+
+# E2E spec module extraction (drives Agent D cross-reference)
+E2E_SPEC_MODULES=""
+HAS_E2E_PROD_OVERLAP=false
+if [ "$COUNT_E2E_SPECS" -gt 0 ]; then
+    E2E_SPEC_FILES=$(echo "$FILES" | grep -E '^ibl5/tests/e2e/.*\.ts$')
+    E2E_SPEC_MODULES=$(
+      git diff origin/master...HEAD -- $E2E_SPEC_FILES \
+        | grep -E '^\+' \
+        | grep -oE "(modules\.php\?name=[A-Za-z][A-Za-z0-9_]*|modules/[A-Za-z][A-Za-z0-9_]*/)" \
+        | sed -E 's#modules\.php\?name=##; s#modules/##; s#/##' \
+        | sort -u
+    )
+    if [ -n "$E2E_SPEC_MODULES" ]; then
+        for M in $E2E_SPEC_MODULES; do
+            if echo "$FILES" | grep -qE "^ibl5/modules/$M/"; then
+                HAS_E2E_PROD_OVERLAP=true
+                break
+            fi
+        done
+    fi
+fi
 
 # "X-only" means every file in $FILES matches that category
 DOCS_ONLY=$([ "$COUNT_TOTAL" -gt 0 ] && [ "$COUNT_MD" -eq "$COUNT_TOTAL" ] && echo true || echo false)
@@ -130,6 +154,8 @@ echo "=== Diff classification ==="
 echo "  total=$COUNT_TOTAL php=$COUNT_PHP css=$COUNT_CSS md=$COUNT_MD migration=$COUNT_MIGRATION test=$COUNT_TEST lock=$COUNT_LOCK snapshot=$COUNT_SNAPSHOT"
 echo "  DOCS_ONLY=$DOCS_ONLY CSS_ONLY=$CSS_ONLY MIGRATION_ONLY=$MIGRATION_ONLY TEST_ONLY=$TEST_ONLY NON_CODE_ONLY=$NON_CODE_ONLY"
 echo "  HAS_PHP=$HAS_PHP HAS_CSS=$HAS_CSS HAS_MODIFIED=$HAS_MODIFIED HAS_COMMENTS_IN_DIFF=$HAS_COMMENTS_IN_DIFF LINES_PHP_CHANGED=$LINES_PHP_CHANGED"
+echo "  HAS_E2E_SPECS=$HAS_E2E_SPECS HAS_E2E_PROD_OVERLAP=$HAS_E2E_PROD_OVERLAP"
+echo "  E2E_SPEC_MODULES=$(echo $E2E_SPEC_MODULES | tr '\n' ' ')"
 echo "  DIFF_FILE=$DIFF_FILE ($(wc -c < "$DIFF_FILE") bytes)"
 ```
 
@@ -156,7 +182,7 @@ Capture the `cat` output — that is `$DIFF` for every sub-agent prompt below. N
 
 ### 4B: Code Review — up to 3 parallel agents (merged by tier)
 
-**Read** `.claude/commands/_review-agents.md` — the canonical agent definitions (3 merged agents: A=architecture+bugs+DB, B=git history+code comments, C=previous PRs).
+**Read** `.claude/commands/_review-agents.md` (Agents A/B/C) and `.claude/commands/_test-spec-agent.md` (Agent D — E2E specs). The canonical agent definitions.
 
 Pass each agent: PR metadata, file list, and filtered `$DIFF`. **No agent calls `gh pr diff`.** Do not forward CLAUDE.md content (auto-loaded).
 
@@ -165,12 +191,35 @@ Pass each agent: PR metadata, file list, and filtered `$DIFF`. **No agent calls 
 - Agent A (Architecture + Bug detection + DB performance): **Sonnet**
 - Agent B (Git history + Code comments): **Sonnet**
 - Agent C (Previous PRs): **Haiku**
+- Agent D (E2E specs — POST-effect + assertion discrimination + coverage-branch): **Sonnet**
 
 **Launch gates** (consult Phase 3 variables — skip the launch entirely, don't let the agent exit early):
 
 - Agent A: skip if `$NON_CODE_ONLY`. If `$MIGRATION_ONLY`, instruct agent to skip Section 2 (bug detection). If `! $HAS_PHP`, instruct agent to skip Section 3 (DB performance).
 - Agent B: skip if BOTH sub-gates fail: (`! $HAS_PHP` or `$LINES_PHP_CHANGED <= 50`) AND (`$NON_CODE_ONLY` or `! $HAS_COMMENTS_IN_DIFF`). If only one sub-gate passes, instruct agent to run only that section.
 - Agent C: skip if `$NON_CODE_ONLY` or `! $HAS_MODIFIED` or `$LINES_PHP_CHANGED <= 50`
+- Agent D: skip if `! $HAS_E2E_SPECS`. When launched, pre-slice the diff into two temp files before forwarding to the agent:
+  ```bash
+  # Spec portion of the diff (only .ts under ibl5/tests/e2e/)
+  awk '
+    /^diff --git.*ibl5\/tests\/e2e\/.*\.ts/ {keep=1; print; next}
+    /^diff --git/ {keep=0}
+    keep==1 {print}
+  ' "$DIFF_FILE" > /tmp/post-plan-spec-diff-$PPID
+
+  # Production portion: only files under ibl5/modules/<M>/ for M in E2E_SPEC_MODULES
+  MODULES_REGEX=$(echo "$E2E_SPEC_MODULES" | tr '\n' '|' | sed 's/|$//')
+  if [ -n "$MODULES_REGEX" ]; then
+      awk -v re="ibl5/modules/($MODULES_REGEX)/" '
+        $0 ~ "^diff --git.*"re {keep=1; print; next}
+        /^diff --git/ {keep=0}
+        keep==1 {print}
+      ' "$DIFF_FILE" > /tmp/post-plan-spec-prod-diff-$PPID
+  else
+      : > /tmp/post-plan-spec-prod-diff-$PPID
+  fi
+  ```
+  Pass Agent D: PR metadata, the spec file list, `/tmp/post-plan-spec-diff-$PPID`, `/tmp/post-plan-spec-prod-diff-$PPID`, and `$HAS_E2E_PROD_OVERLAP`. The agent does **not** call `gh pr diff`.
 
 ### 4C: Security Audit — single conditional Haiku agent
 
@@ -439,6 +488,7 @@ Kill known lingering patterns so their tool results deliver immediately (cache w
 pkill -f 'bin/e2e-wt\.sh' 2>/dev/null
 pkill -f 'bunx.*playwright' 2>/dev/null
 pkill -f 'gh pr checks.*--watch' 2>/dev/null
+rm -f /tmp/post-plan-spec-diff-$PPID /tmp/post-plan-spec-prod-diff-$PPID 2>/dev/null
 echo "Background process cleanup complete"
 ```
 

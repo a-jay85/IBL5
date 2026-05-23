@@ -1,6 +1,6 @@
 ---
 description: Shared code-review agent definitions used by /pr-review and /post-plan.
-last_verified: 2026-05-21
+last_verified: 2026-05-23
 ---
 
 # Code Review Agents (shared definitions)
@@ -21,7 +21,7 @@ Each agent receives: filtered PR diff, file list, and PR metadata from the paren
 
 **Assume PHPStan `level: max` + `phpstan-strict-rules` + the custom rules listed in `_review-rubric.md` are satisfied.** Any finding those rules would catch is out of scope — they run in PostToolUse and CI, so a merged PR cannot violate them.
 
-**Playwright `.spec.ts` files are lint-enforced by `bun run lint:e2e` (CI job `ESLint (e2e specs)`).** Reviewers should not duplicate `playwright/*` or `@typescript-eslint/*` rule checks — the preset already covers missing `await`, `{ force: true }`, `waitForTimeout`, `networkidle`, web-first assertions, etc.
+**Playwright `.spec.ts` files are lint-enforced by `bun run lint:e2e` (CI job `ESLint (e2e specs)`).** Reviewers should not duplicate `playwright/*` or `@typescript-eslint/*` rule checks — the preset already covers missing `await`, `{ force: true }`, `waitForTimeout`, `networkidle`, web-first assertions, etc. Semantic E2E spec review (POST-effect verification, assertion discrimination, coverage-branch check) is handled by **Agent D**, defined in `.claude/commands/_test-spec-agent.md` and launched from `/post-plan` Phase 4B. Do not duplicate its checks here.
 
 ---
 

@@ -71,6 +71,12 @@ Tests that need authentication import from `./fixtures/auth.ts`. Tests for publi
 2. **Authenticated page test** — import `{ test, expect }` from `../fixtures/auth` and add to `smoke/auth-pages.spec.ts`
 3. **Interactive flow test** — create a new `.spec.ts` in `flows/`
 
+## Visual Regression
+
+Visual regression tests use `vr-manifest.ts` as the single source of truth for which modules, viewports, states, and HTMX tabs are screenshot-tested. The spec (`smoke/visual-regression.spec.ts`) reads the manifest and generates tests automatically.
+
+To add a module: add a `VrRow` entry to `VR_MANIFEST` in `vr-manifest.ts`. Run `bin/check-vr-coverage` to see coverage gaps.
+
 ## Troubleshooting
 
 ### Trading tests skipped

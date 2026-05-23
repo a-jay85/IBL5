@@ -1,7 +1,4 @@
-import { test, expect } from '@playwright/test';
-import { publicStorageState } from '../helpers/public-storage-state';
-
-test.use({ storageState: publicStorageState() });
+import { test, expect } from '../fixtures/public';
 
 const API_KEY = 'e2e-test-key-do-not-use-in-production'; // ci-seed.sql:1524
 const AUTH_HEADERS = { 'X-API-Key': API_KEY };
@@ -9,7 +6,7 @@ const AUTH_HEADERS = { 'X-API-Key': API_KEY };
 const PLAYER_UUID = 'a0000000-0000-0000-0000-000000000001'; // pid=1, Test Player
 const TEAM_UUID = 'b0000000-0000-0000-0000-000000000001'; // teamid=1, Metros
 const UNPLAYED_GAME_UUID = 'c0000000-0000-0000-0000-000000000001';
-const PLAYED_GAME_UUID = 'c1000000-0000-0000-0000-000000000001'; // Phase 1 seed
+const PLAYED_GAME_UUID = 'c1000000-0000-0000-0000-000000000001'; // seeded in ci-seed.sql: played game with router-compatible UUID
 const ACCEPT_OFFER_ID = 7;
 const DECLINE_OFFER_ID = 8;
 const UNKNOWN_UUID = 'ffffffff-ffff-ffff-ffff-ffffffffffff';

@@ -1,0 +1,10 @@
+# File-level skips: env-var gating (legitimate CI-config gating).
+# These tests do nothing useful when the gating env var is unset; running
+# them anyway would assert against an unauthenticated session.
+ibl5/tests/e2e/flows/role-gating-non-admin.spec.ts
+ibl5/tests/e2e/smoke/auth-regular.spec.ts
+ibl5/tests/e2e/smoke/auth-regular-user-provisioned.spec.ts
+
+# File-level skip: this spec's purpose is to assert element absence in
+# wrong-phase states. Documented exception in playwright-tests.md DON'T #11.
+ibl5/tests/e2e/flows/phase-gating-public.spec.ts

@@ -36,7 +36,18 @@ export default [
       // Prefer web-first assertions over manual waits on selectors.
       'playwright/no-wait-for-selector': 'error',
 
+      // --- Enforced: Layer 2 hygiene gate (zero pre-existing violations) ---
+      'playwright/no-element-handle': 'error',
+
       // --- Burn-down: pre-existing violations tracked as warnings ---
+      // TODO: tighten playwright/no-conditional-in-test to error after burn-down (78 violations)
+      'playwright/no-conditional-in-test': 'warn',
+      // TODO: tighten playwright/no-conditional-expect to error after burn-down (21 violations)
+      'playwright/no-conditional-expect': 'warn',
+      // TODO: tighten playwright/no-skipped-test to error after burn-down (5 violations in env-gated specs)
+      'playwright/no-skipped-test': 'warn',
+      // TODO: tighten playwright/expect-expect to error after burn-down (113 violations)
+      'playwright/expect-expect': 'warn',
       // TODO: tighten playwright/no-wait-for-timeout to error after burn-down (7 violations)
       'playwright/no-wait-for-timeout': 'warn',
       // TODO: tighten playwright/prefer-web-first-assertions to error after burn-down (27 violations)

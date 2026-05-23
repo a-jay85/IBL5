@@ -31,7 +31,7 @@ async function navigateToDraftYearWithData(page: Page): Promise<boolean> {
     if (val && /^\d{4}$/.test(val)) {
       await page.goto(`modules.php?name=DraftHistory&year=${val}`);
       const table = page.locator('.draft-history-table');
-      if ((await table.count()) > 0) {
+      if ((await table.count()) > 0) { // e2e-hygiene-allow: helper probes years until data found, returns boolean to caller
         return true;
       }
     }

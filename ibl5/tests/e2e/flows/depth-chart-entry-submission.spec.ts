@@ -174,7 +174,7 @@ test.describe('Depth Chart submission', () => {
         break;
       }
     }
-    expect(uncheckedIndex).toBeGreaterThanOrEqual(0);
+    expect(uncheckedIndex, 'findIndex must locate an unchecked slot').not.toBe(-1);
 
     // Distinctive non-starter value so we can verify the form re-renders
     // with POST, not DB. The first form row is already a starter at some
@@ -307,12 +307,11 @@ test.describe('Depth Chart submission', () => {
 
     // Wait for AJAX to update the hidden field
     const loadedId = page.locator('#loaded_dc_id, input[name="loaded_dc_id"]');
-    if ((await loadedId.count()) > 0) {
-      await expect(async () => {
-        const val = await loadedId.first().inputValue();
-        expect(val).not.toBe('0');
-      }).toPass({ timeout: 5000 });
-    }
+    await expect(loadedId.first(), 'loaded_dc_id hidden field must exist in form').toBeAttached();
+    await expect(async () => {
+      const val = await loadedId.first().inputValue();
+      expect(val).not.toBe('0');
+    }).toPass({ timeout: 5000 });
   });
 
   test('no PHP errors on depth chart page', async ({ page }) => {

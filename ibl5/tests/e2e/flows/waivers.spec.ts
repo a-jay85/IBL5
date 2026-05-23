@@ -84,17 +84,15 @@ test.describe('Waivers: view switcher tabs', () => {
 
   test('clicking tab switches displayed table', async ({ page }) => {
     const totalTab = page.locator('.ibl-tab').filter({ hasText: /total/i });
-    if ((await totalTab.count()) > 0) {
-      await totalTab.first().click();
-    }
-    await expect(page.locator('.ibl-data-table, table').first()).toBeVisible();
+    await expect(totalTab.first(), 'Waivers must render the "Total" tab').toBeVisible();
+    await totalTab.first().click();
+    await expect(page.locator('.ibl-data-table').first()).toBeVisible();
   });
 
   test('no PHP errors after tab switch', async ({ page }) => {
     const tab = page.locator('.ibl-tab').nth(1);
-    if (await tab.isVisible()) {
-      await tab.click();
-    }
+    await expect(tab, 'Waivers tab index 1 must render').toBeVisible();
+    await tab.click();
     await assertNoPhpErrors(page, 'after tab switch');
   });
 });

@@ -39,7 +39,7 @@ test.describe('Record Holders flow', () => {
       const tableCount = await tables.count();
       if (tableCount > 0) {
         const rows = tables.first().locator('tbody tr');
-        if ((await rows.count()) > 0) {
+        if ((await rows.count()) > 0) { // e2e-hygiene-allow: counts cards with rows; outer expect asserts at least one card matches
           cardsWithRows++;
         }
       }

@@ -271,6 +271,6 @@ publicTest.describe('Free Agency -- unauthenticated access', () => {
     await page.goto('modules.php?name=FreeAgency');
     // Unauthenticated users are redirected to YourAccount (login) module
     await page.waitForURL(/name=YourAccount/);
-    await publicExpect(page.locator('body')).toBeVisible();
+    await publicExpect(page.locator('#login-username'), 'YourAccount login form must render after redirect').toBeVisible();
   });
 });

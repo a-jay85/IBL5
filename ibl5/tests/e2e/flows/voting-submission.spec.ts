@@ -30,7 +30,10 @@ test.describe('ASG Voting: submission', () => {
           'Western.*Backcourt|WCB', 'i'),
       });
 
-      if ((await header.count()) > 0) {
+      await expect(header.first(), 'voting category header must render').toBeVisible();
+      const isExpanded = await header.first().getAttribute('aria-expanded');
+      // e2e-hygiene-allow: branch is an observable-state toggle, not a silent guard
+      if (isExpanded !== 'true') {
         await header.first().click();
       }
 
@@ -156,7 +159,10 @@ test.describe('EOY Voting: validation errors', () => {
         ),
       });
 
-      if ((await header.count()) > 0) {
+      await expect(header.first(), 'voting category header must render').toBeVisible();
+      const isExpanded = await header.first().getAttribute('aria-expanded');
+      // e2e-hygiene-allow: branch is an observable-state toggle, not a silent guard
+      if (isExpanded !== 'true') {
         await header.first().click();
       }
 
@@ -210,7 +216,10 @@ test.describe('EOY Voting: validation errors', () => {
         ),
       });
 
-      if ((await header.count()) > 0) {
+      await expect(header.first(), 'voting category header must render').toBeVisible();
+      const isExpanded = await header.first().getAttribute('aria-expanded');
+      // e2e-hygiene-allow: branch is an observable-state toggle, not a silent guard
+      if (isExpanded !== 'true') {
         await header.first().click();
       }
 
@@ -290,7 +299,10 @@ test.describe('EOY Voting: submission', () => {
           'GM|General Manager', 'i'),
       });
 
-      if ((await header.count()) > 0) {
+      await expect(header.first(), 'voting category header must render').toBeVisible();
+      const isExpanded = await header.first().getAttribute('aria-expanded');
+      // e2e-hygiene-allow: branch is an observable-state toggle, not a silent guard
+      if (isExpanded !== 'true') {
         await header.first().click();
       }
 

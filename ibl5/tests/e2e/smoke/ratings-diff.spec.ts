@@ -12,7 +12,6 @@ test.describe('TrainingCampRatingsDiff admin page', () => {
   test('loads without PHP errors for admin user', async ({ page }) => {
     await page.goto('modules.php?name=TrainingCampRatingsDiff');
     await assertNoPhpErrors(page, 'on TrainingCampRatingsDiff page');
-    await expect(page.locator('body')).toBeVisible();
   });
 
   test('renders empty-state block when no end-of-season baseline exists', async ({ page }) => {

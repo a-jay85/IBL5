@@ -238,9 +238,8 @@ test.describe('Trade offer form: roster preview interactions', () => {
         .nth(i)
         .locator('input[type="checkbox"]')
         .first();
-      if (await checkbox.isVisible()) {
-        await checkbox.check();
-      }
+      await expect(checkbox, 'trading roster checkbox must render for this team').toBeVisible();
+      await checkbox.check();
     }
 
     // Preview should now be visible
@@ -350,9 +349,8 @@ test.describe('Trade offer form: roster preview interactions', () => {
         .nth(i)
         .locator('input[type="checkbox"]')
         .first();
-      if (await checkbox.isVisible()) {
-        await checkbox.check();
-      }
+      await expect(checkbox, 'trading roster checkbox must render for this team').toBeVisible();
+      await checkbox.check();
     }
 
     await expect(preview).toBeVisible();
@@ -434,9 +432,8 @@ test.describe('Trade offer form: cap warnings', () => {
     const partnerCheckbox = partnerRoster
       .locator('input[type="checkbox"]')
       .first();
-    if (await partnerCheckbox.isVisible()) {
-      await partnerCheckbox.check();
-    }
+    await expect(partnerCheckbox, 'trading roster checkbox must render for this team').toBeVisible();
+    await partnerCheckbox.check();
 
     // Cap warning should appear on the user team's preview logo
     const config = await page.evaluate(

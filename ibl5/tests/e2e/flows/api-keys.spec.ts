@@ -17,7 +17,7 @@ test.describe('API Keys flow', () => {
     await page.goto('modules.php?name=ApiKeys');
 
     const revokeButton = page.getByRole('button', { name: /Revoke Key/i });
-    if (await revokeButton.isVisible({ timeout: 1000 }).catch(() => false)) {
+    if (await revokeButton.isVisible({ timeout: 1000 }).catch(() => false)) { // e2e-hygiene-allow: cleanup precondition — revoke button presence depends on prior test state
       // Accept the confirmation dialog
       page.once('dialog', (dialog) => dialog.accept());
       await revokeButton.click();

@@ -1,0 +1,32 @@
+name: E2E Hygiene Gate
+
+on:
+  pull_request:
+    branches: [master, develop]
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - 'ibl5/tests/e2e/**'
+      - 'bin/check-e2e-hygiene'
+      - '.e2e-hygiene-skip-allowlist'
+      - '.github/workflows/e2e-hygiene.yml'
+
+permissions:
+  contents: read
+  pull-requests: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  e2e-hygiene-gate:
+    name: E2E hygiene gate
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+      - name: Run bin/check-e2e-hygiene
+        env:
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: bin/check-e2e-hygiene --pr

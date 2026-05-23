@@ -181,7 +181,9 @@ test.describe('Responsive scroll container tests', () => {
       };
     });
     expect(result).not.toBeNull();
+    // e2e-hygiene-allow: viewport coordinate has 0 as a meaningful lower bound
     expect(result!.stickyLeft, 'sticky column scrolled out of viewport').toBeGreaterThanOrEqual(0);
+    expect(result!.stickyLeft, 'sticky column must be within viewport').toBeLessThan(375);
   });
 
   test('season leaderboards — scroll shadow indicator present on load', async ({ page }) => {

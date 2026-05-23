@@ -105,7 +105,7 @@ async function revokeIfPresent(page: import('@playwright/test').Page): Promise<v
   if (await revokeButton.isVisible({ timeout: 1000 }).catch(() => false)) { // e2e-hygiene-allow: cleanup precondition — revoke button presence depends on prior test state
     page.once('dialog', (dialog) => dialog.accept());
     await revokeButton.click();
-    await page.waitForURL(/name=ApiKeys/);
+    await page.waitForLoadState('load');
   }
 }
 

@@ -1,0 +1,294 @@
+#!/bin/bash
+# Scans E2E specs for anti-patterns banned by .claude/rules/playwright-tests.md
+# DON'Ts 10-14. Exits 0 (clean) or 1 (blocking violations found).
+set -euo pipefail
+
+ROOT=$(git rev-parse --show-toplevel)
+ALLOWLIST="$ROOT/.e2e-hygiene-skip-allowlist"
+E2E_DIR="$ROOT/ibl5/tests/e2e"
+
+usage() {
+  cat <<'EOF'
+Usage: bin/check-e2e-hygiene [--pr] [--help|-h]
+
+Scans E2E specs for anti-patterns (silent passes, body.toBeVisible,
+test.skip, weak assertions). Comma-fallback locators are advisory.
+
+Modes:
+  (no args)  Scan all ibl5/tests/e2e/**/*.ts
+  --pr       Scan only files changed vs origin/master
+
+Exceptions:
+  File-level: .e2e-hygiene-skip-allowlist (one glob per line, # comments)
+  Per-line:   // e2e-hygiene-allow: <reason >= 20 chars>
+
+See .claude/rules/playwright-tests.md DON'Ts 10-14.
+EOF
+  exit 0
+}
+
+MODE="all"
+for arg in "$@"; do
+  case "$arg" in
+    --help|-h) usage ;;
+    --pr) MODE="pr" ;;
+    *) echo "Unknown argument: $arg" >&2; exit 2 ;;
+  esac
+done
+
+# --- Build file list ---
+if [ "$MODE" = "pr" ]; then
+  FILES=()
+  while IFS= read -r f; do
+    [ -f "$ROOT/$f" ] && FILES+=("$ROOT/$f")
+  done < <(git -C "$ROOT" diff origin/master --name-only -- 'ibl5/tests/e2e/**/*.ts')
+else
+  FILES=()
+  while IFS= read -r f; do
+    FILES+=("$f")
+  done < <(find "$E2E_DIR" -name '*.ts' -type f | sort)
+fi
+
+if [ ${#FILES[@]} -eq 0 ]; then
+  echo "PASS: no E2E files to scan."
+  exit 0
+fi
+
+# --- Load allowlist (file-level globs) ---
+SKIP_PATHS=()
+if [ -f "$ALLOWLIST" ]; then
+  while IFS= read -r line; do
+    line="${line%%#*}"
+    line="$(echo "$line" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')"
+    [ -z "$line" ] && continue
+    SKIP_PATHS+=("$line")
+  done < "$ALLOWLIST"
+fi
+
+is_skipped() {
+  local file="$1"
+  local rel
+  rel="${file#"$ROOT/"}"
+  for pat in "${SKIP_PATHS[@]}"; do
+    # shellcheck disable=SC2254
+    case "$rel" in
+      $pat) return 0 ;;
+    esac
+  done
+  return 1
+}
+
+# --- Filter files ---
+SCAN_FILES=()
+for f in "${FILES[@]}"; do
+  if ! is_skipped "$f"; then
+    SCAN_FILES+=("$f")
+  fi
+done
+
+if [ ${#SCAN_FILES[@]} -eq 0 ]; then
+  echo "PASS: all files in scope are allowlisted."
+  exit 0
+fi
+
+# --- Shared helpers ---
+has_inline_allow() {
+  local line="$1"
+  local file="$2"
+  local lineno="$3"
+
+  if echo "$line" | grep -qE '// e2e-hygiene-allow: .{20,}'; then
+    return 0
+  fi
+  if [ "$lineno" -gt 1 ]; then
+    local prev
+    prev=$(sed -n "$((lineno - 1))p" "$file")
+    if echo "$prev" | grep -qE '// e2e-hygiene-allow: .{20,}'; then
+      return 0
+    fi
+  fi
+  return 1
+}
+
+# --- Pattern runners ---
+BLOCKING_HITS=()
+BLOCKING_TOTAL=0
+ADVISORY_HITS=()
+ADVISORY_TOTAL=0
+
+run_pattern() {
+  local severity="$1"
+  local label="$2"
+  shift 2
+  local grep_args=("$@")
+
+  for f in "${SCAN_FILES[@]}"; do
+    while IFS=: read -r line_num matched_line; do
+      [ -z "$line_num" ] && continue
+      if has_inline_allow "$matched_line" "$f" "$line_num"; then
+        continue
+      fi
+      local rel="${f#"$ROOT/"}"
+      local entry="[$label] $rel:$line_num: $matched_line"
+      if [ "$severity" = "blocking" ]; then
+        BLOCKING_HITS+=("$entry")
+        BLOCKING_TOTAL=$((BLOCKING_TOTAL + 1))
+      else
+        ADVISORY_HITS+=("$entry")
+        ADVISORY_TOTAL=$((ADVISORY_TOTAL + 1))
+      fi
+    done < <(grep -nE "${grep_args[@]}" "$f" 2>/dev/null || true)
+  done
+}
+
+run_pattern_pipe() {
+  local severity="$1"
+  local label="$2"
+  local pattern1="$3"
+  local exclude="$4"
+
+  for f in "${SCAN_FILES[@]}"; do
+    while IFS=: read -r line_num matched_line; do
+      [ -z "$line_num" ] && continue
+      if has_inline_allow "$matched_line" "$f" "$line_num"; then
+        continue
+      fi
+      local rel="${f#"$ROOT/"}"
+      local entry="[$label] $rel:$line_num: $matched_line"
+      if [ "$severity" = "blocking" ]; then
+        BLOCKING_HITS+=("$entry")
+        BLOCKING_TOTAL=$((BLOCKING_TOTAL + 1))
+      else
+        ADVISORY_HITS+=("$entry")
+        ADVISORY_TOTAL=$((ADVISORY_TOTAL + 1))
+      fi
+    done < <(grep -nE "$pattern1" "$f" 2>/dev/null | grep -vE "$exclude" || true)
+  done
+}
+
+# --- Silent-pass: if (count > 0) with no else ---
+check_count_no_else() {
+  local label="silent-pass count>0"
+  for f in "${SCAN_FILES[@]}"; do
+    while IFS=: read -r line_num matched_line; do
+      [ -z "$line_num" ] && continue
+      if has_inline_allow "$matched_line" "$f" "$line_num"; then
+        continue
+      fi
+      local has_else=false
+      local end_line=$((line_num + 20))
+      local file_lines
+      file_lines=$(wc -l < "$f" | tr -d ' ')
+      [ "$end_line" -gt "$file_lines" ] && end_line=$file_lines
+      local block
+      block=$(sed -n "${line_num},${end_line}p" "$f")
+      if echo "$block" | grep -qE '}\s*else\s*\{'; then
+        has_else=true
+      fi
+      if [ "$has_else" = false ]; then
+        local rel="${f#"$ROOT/"}"
+        BLOCKING_HITS+=("[$label] $rel:$line_num: $matched_line")
+        BLOCKING_TOTAL=$((BLOCKING_TOTAL + 1))
+      fi
+    done < <(grep -nE 'if\s*\(.*\.count\(\).*>\s*0\s*\)' "$f" 2>/dev/null || true)
+  done
+}
+
+# --- Silent-pass: if (await isVisible()) with no else ---
+check_visible_no_else() {
+  local label="silent-pass isVisible"
+  for f in "${SCAN_FILES[@]}"; do
+    while IFS=: read -r line_num matched_line; do
+      [ -z "$line_num" ] && continue
+      if has_inline_allow "$matched_line" "$f" "$line_num"; then
+        continue
+      fi
+      local has_else=false
+      local end_line=$((line_num + 20))
+      local file_lines
+      file_lines=$(wc -l < "$f" | tr -d ' ')
+      [ "$end_line" -gt "$file_lines" ] && end_line=$file_lines
+      local block
+      block=$(sed -n "${line_num},${end_line}p" "$f")
+      if echo "$block" | grep -qE '}\s*else\s*\{'; then
+        has_else=true
+      fi
+      if [ "$has_else" = false ]; then
+        local rel="${f#"$ROOT/"}"
+        BLOCKING_HITS+=("[$label] $rel:$line_num: $matched_line")
+        BLOCKING_TOTAL=$((BLOCKING_TOTAL + 1))
+      fi
+    done < <(grep -nE 'if\s*\(await\s+.*\.isVisible\(\)\)' "$f" 2>/dev/null || true)
+  done
+}
+
+# === BLOCKING patterns (exit 1 if any found) ===
+
+run_pattern blocking "body.length" 'body\.length'
+
+run_pattern blocking "body-toBeVisible" \
+  "[Ee]xpect\(page\.locator\(['\"]body['\"]\)\)\.toBeVisible\(\)"
+
+run_pattern blocking "catch-false" \
+  '\.catch\(\(\)\s*=>\s*(false|null)\)'
+
+run_pattern blocking "test-skip" \
+  '^\s*test\.skip\('
+
+run_pattern blocking "weak-gte-zero" \
+  'toBeGreaterThanOrEqual\(0\)'
+
+run_pattern blocking "weak-gt-neg1" \
+  'toBeGreaterThan\(-1\)'
+
+check_count_no_else
+check_visible_no_else
+
+# === ADVISORY patterns (reported but non-blocking) ===
+
+# TODO: tighten comma-fallback-locator to blocking after burn-down
+run_pattern_pipe advisory "comma-fallback-locator" \
+  "locator\((['\"])[^'\"]*,[^'\"]*\1\)" \
+  "locator\([^)]*\[[^]]*,[^]]*\][^)]*\)"
+
+# --- Report ---
+if [ "$ADVISORY_TOTAL" -gt 0 ]; then
+  echo "=== Advisory (non-blocking) ==="
+  echo ""
+  for hit in "${ADVISORY_HITS[@]}"; do
+    echo "  $hit"
+  done
+  echo ""
+  echo "Advisory: $ADVISORY_TOTAL comma-fallback locator hits (burn-down tracked)."
+  echo ""
+fi
+
+if [ "$BLOCKING_TOTAL" -eq 0 ]; then
+  echo "PASS: 0 blocking hits"
+  exit 0
+fi
+
+# Count unique files in blocking hits
+declare -a HIT_FILES=()
+for hit in "${BLOCKING_HITS[@]}"; do
+  local_file=$(echo "$hit" | sed 's/^\[[^]]*\] //' | cut -d: -f1)
+  found=false
+  for hf in "${HIT_FILES[@]+"${HIT_FILES[@]}"}"; do
+    if [ "$hf" = "$local_file" ]; then
+      found=true
+      break
+    fi
+  done
+  if [ "$found" = false ]; then
+    HIT_FILES+=("$local_file")
+  fi
+done
+
+echo "=== E2E Hygiene Gate ==="
+echo ""
+for hit in "${BLOCKING_HITS[@]}"; do
+  echo "  $hit"
+done
+echo ""
+echo "FAIL: $BLOCKING_TOTAL blocking hits across ${#HIT_FILES[@]} files. See .claude/rules/playwright-tests.md DOs/DON'Ts 10-14."
+exit 1

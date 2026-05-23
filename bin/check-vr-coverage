@@ -17,7 +17,6 @@ const { VR_MANIFEST, DEFAULT_STATE } = await import(
 type Dimension = 'desktop' | 'mobile' | 'empty-state' | 'htmx-tabs';
 
 const HTMX_MODULES = new Set([
-  'team',
   'league-starters',
   'next-sim',
   'franchise-record-book',

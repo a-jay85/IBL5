@@ -32,6 +32,7 @@ test.describe('Free Agency -- submit and manage offers', () => {
         await expect(page.locator('.ibl-alert--success', { hasText: /offer.*saved/i })).toBeVisible();
       },
       readBack: async () => {
+        await page.goto('modules.php?name=FreeAgency&pa=negotiate&pid=11');
         const deleteBtn = page.getByRole('button', { name: /Delete This Offer/i });
         await expect(deleteBtn).toBeVisible();
       },
@@ -76,6 +77,7 @@ test.describe('Free Agency -- submit and manage offers', () => {
         await expect(page.locator('.ibl-alert--success', { hasText: /offer.*saved/i })).toBeVisible();
       },
       readBack: async () => {
+        await page.goto('modules.php?name=FreeAgency&pa=negotiate&pid=11');
         const deleteBtn = page.getByRole('button', { name: /Delete This Offer/i });
         await expect(deleteBtn).toBeVisible();
       },
@@ -147,6 +149,7 @@ test.describe('Free Agency -- quick offer buttons', () => {
         await expect(page.locator('.ibl-alert--success', { hasText: /offer.*saved/i })).toBeVisible();
       },
       readBack: async () => {
+        await page.goto('modules.php?name=FreeAgency&pa=negotiate&pid=12');
         const deleteBtn = page.getByRole('button', { name: /Delete This Offer/i });
         await expect(deleteBtn).toBeVisible();
       },
@@ -165,6 +168,7 @@ test.describe('Free Agency -- quick offer buttons', () => {
         await expect(page.locator('.ibl-alert--success', { hasText: /offer.*saved/i })).toBeVisible();
       },
       readBack: async () => {
+        await page.goto('modules.php?name=FreeAgency&pa=negotiate&pid=11');
         const deleteBtn = page.getByRole('button', { name: /Delete This Offer/i });
         await expect(deleteBtn).toBeVisible();
       },
@@ -193,6 +197,7 @@ test.describe('Free Agency -- quick offer buttons', () => {
         await expect(page.locator('.ibl-alert--success', { hasText: /offer.*saved/i })).toBeVisible();
       },
       readBack: async () => {
+        await page.goto('modules.php?name=FreeAgency&pa=negotiate&pid=11');
         const deleteBtn = page.getByRole('button', { name: /Delete This Offer/i });
         await expect(deleteBtn).toBeVisible();
       },
@@ -221,6 +226,7 @@ test.describe('Free Agency -- quick offer buttons', () => {
         await expect(page.locator('.ibl-alert--success', { hasText: /offer.*saved/i })).toBeVisible();
       },
       readBack: async () => {
+        await page.goto('modules.php?name=FreeAgency&pa=negotiate&pid=11');
         const deleteBtn = page.getByRole('button', { name: /Delete This Offer/i });
         await expect(deleteBtn).toBeVisible();
       },

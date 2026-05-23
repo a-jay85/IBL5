@@ -122,6 +122,7 @@ test.describe('API Keys direct POST submission', () => {
     await revokeIfPresent(page);
 
     await page.goto('modules.php?name=ApiKeys');
+    await expect(page.locator('form[action*="op=generate"]')).toBeVisible();
     const token = await page
       .locator('form[action*="op=generate"] input[name="_csrf_token"]')
       .getAttribute('value');
@@ -169,6 +170,7 @@ test.describe('API Keys direct POST submission', () => {
     }
 
     await page.goto('modules.php?name=ApiKeys');
+    await expect(page.locator('form[action*="op=revoke"]')).toBeVisible();
     const token = await page
       .locator('form[action*="op=revoke"] input[name="_csrf_token"]')
       .getAttribute('value');

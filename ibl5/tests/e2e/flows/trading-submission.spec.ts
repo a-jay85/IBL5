@@ -2,6 +2,7 @@ import { test, expect } from '../fixtures/auth';
 import type { Page, APIRequestContext } from '../fixtures/base';
 import { assertNoPhpErrors } from '../helpers/php-errors';
 import { gotoWithRetry } from '../helpers/navigation';
+import { submitFormAndAssertEffect } from '../helpers/submit-form';
 
 // Serial: tests create and consume trade offers sequentially.
 test.describe.configure({ mode: 'serial' });
@@ -339,25 +340,31 @@ test.describe('Trade submission: players-only (UI)', () => {
     const submitBtn = page.locator(
       'form[name="Trade_Offer"] button[type="submit"]',
     );
-    await Promise.all([
-      page.waitForURL(/result=offer_sent/),
-      submitBtn.click(),
-    ]);
 
-    await expect(page.locator('.ibl-alert--success')).toBeVisible();
-    await assertNoPhpErrors(page, 'after player trade submission');
-
-    // Track only the NEW offer ID for cleanup (exclude pre-existing seed offers)
-    const buttons = page.locator('[data-preview-offer]');
-    const count = await buttons.count();
-    // The newest offer has the highest ID — only clean up that one
-    let maxId = 0;
-    for (let i = 0; i < count; i++) {
-      const idStr = await buttons.nth(i).getAttribute('data-preview-offer');
-      const id = parseInt(idStr ?? '0', 10);
-      if (id > maxId) maxId = id;
-    }
-    if (maxId > 0) createdOfferIds.push(maxId);
+    await submitFormAndAssertEffect(page, {
+      submit: async () => {
+        await Promise.all([
+          page.waitForURL(/result=offer_sent/),
+          submitBtn.click(),
+        ]);
+      },
+      expectSameSpot: async () => {
+        await expect(page.locator('.ibl-alert--success')).toBeVisible();
+        await assertNoPhpErrors(page, 'after player trade submission');
+      },
+      readBack: async () => {
+        const buttons = page.locator('[data-preview-offer]');
+        const count = await buttons.count();
+        let maxId = 0;
+        for (let i = 0; i < count; i++) {
+          const idStr = await buttons.nth(i).getAttribute('data-preview-offer');
+          const id = parseInt(idStr ?? '0', 10);
+          if (id > maxId) maxId = id;
+        }
+        expect(maxId, 'new offer ID should be positive').toBeGreaterThan(0);
+        createdOfferIds.push(maxId);
+      },
+    });
   });
 
   test.afterAll(async ({ request }) => {
@@ -627,13 +634,25 @@ test.describe('Trade submission: accept and reject', () => {
     await expect(offerBCard).toBeVisible();
 
     const rejectBtn = offerBCard.locator('.ibl-btn--danger');
-    await Promise.all([
-      page.waitForURL(/result=trade_rejected/),
-      rejectBtn.click(),
-    ]);
 
-    await expect(page.locator('.ibl-alert--info')).toBeVisible();
-    await assertNoPhpErrors(page, 'after reject');
+    await submitFormAndAssertEffect(page, {
+      submit: async () => {
+        await Promise.all([
+          page.waitForURL(/result=trade_rejected/),
+          rejectBtn.click(),
+        ]);
+      },
+      expectSameSpot: async () => {
+        await expect(page.locator('.ibl-alert--info')).toBeVisible();
+        await assertNoPhpErrors(page, 'after reject');
+      },
+      readBack: async () => {
+        const rejectedCard = page.locator('.trade-offer-card').filter({
+          has: page.locator(`[data-preview-offer="${offerBId}"]`),
+        });
+        await expect(rejectedCard).toHaveCount(0);
+      },
+    });
   });
 
   test('rejecting already-processed offer returns warning', async ({
@@ -683,13 +702,21 @@ test.describe('Trade submission: accept and reject', () => {
 
     const acceptBtn = acceptableCard.first().locator('.ibl-btn--success');
 
-    await Promise.all([
-      page.waitForURL(/result=trade_accepted/),
-      acceptBtn.click(),
-    ]);
-
-    await expect(page.locator('.ibl-alert--success')).toBeVisible();
-    await assertNoPhpErrors(page, 'after accept');
+    await submitFormAndAssertEffect(page, {
+      submit: async () => {
+        await Promise.all([
+          page.waitForURL(/result=trade_accepted/),
+          acceptBtn.click(),
+        ]);
+      },
+      expectSameSpot: async () => {
+        await expect(page.locator('.ibl-alert--success')).toBeVisible();
+        await assertNoPhpErrors(page, 'after accept');
+      },
+      readBack: async () => {
+        expect(page.url()).toContain('result=trade_accepted');
+      },
+    });
 
     // Clean up offer A if it still exists
     if (setupDone && offerAId > 0) {

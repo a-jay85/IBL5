@@ -1,5 +1,6 @@
 import { test, expect } from '../fixtures/auth-isolated';
 import { assertNoPhpErrors } from '../helpers/php-errors';
+import { submitFormAndAssertEffect } from '../helpers/submit-form';
 
 // Depth Chart submission flow — these tests mutate shared DB state via form
 // POSTs, so they run serially. They collectively exercise the Post-Redirect-
@@ -62,31 +63,27 @@ test.describe('Depth Chart submission', () => {
   test('submit redirects back to module URL with success flash and fresh form', async ({ page }) => {
     await expect(page.locator('.depth-chart-form')).toBeVisible({ timeout: 15000 });
 
-    // Distinctive but non-starter value (3 = "3rd backup") so we don't
-    // create a "starter at multiple positions" validation failure for a
-    // player who may already be a 1st at another position in the seed.
     const firstPg = page
       .locator('.depth-chart-table select[name^="pg"]')
       .first();
     await firstPg.selectOption('3');
 
-    await page.locator('.depth-chart-buttons .depth-chart-submit-btn').click();
-
-    // PRG: URL lands back at the module base — no `&op=submit` artifact.
-    await expect(page).toHaveURL(/modules\.php\?name=DepthChartEntry(?!.*op=submit)/);
-
-    // Flash success visible with expected copy.
-    await expect(page.locator('.ibl-alert--success', { hasText: /depth chart saved/i })).toBeVisible({ timeout: 15000 });
-
-    // Form is still visible (fresh GET re-renders it).
-    await expect(page.locator('.depth-chart-form')).toBeVisible();
-
-    // Submitted value persisted — the fresh GET reads from DB.
-    await expect(
-      page.locator('.depth-chart-table select[name^="pg"]').first(),
-    ).toHaveValue('3');
-
-    await assertNoPhpErrors(page, 'after depth chart submission');
+    await submitFormAndAssertEffect(page, {
+      submit: async () => {
+        await page.locator('.depth-chart-buttons .depth-chart-submit-btn').click();
+      },
+      expectSameSpot: async () => {
+        await expect(page).toHaveURL(/modules\.php\?name=DepthChartEntry(?!.*op=submit)/);
+        await expect(page.locator('.ibl-alert--success', { hasText: /depth chart saved/i })).toBeVisible({ timeout: 15000 });
+        await expect(page.locator('.depth-chart-form')).toBeVisible();
+        await assertNoPhpErrors(page, 'after depth chart submission');
+      },
+      readBack: async () => {
+        await expect(
+          page.locator('.depth-chart-table select[name^="pg"]').first(),
+        ).toHaveValue('3');
+      },
+    });
   });
 
   test('CSRF token rotates across submit', async ({ page }) => {

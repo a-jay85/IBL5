@@ -668,19 +668,15 @@ a.last-sim-recap__player-name:hover { text-decoration: underline }
    ============================================================ */
 @media (max-width: 768px) {
 
-    /* Header: stack into 2×2 grid on mobile */
+    /* Header: stack vertically on mobile */
     .last-sim-recap__head {
-        grid-template-columns: 1fr auto;
+        grid-template-columns: 1fr;
         row-gap: .3rem;
+        justify-items: center;
     }
-    .last-sim-recap__head-dates { order: 2; grid-column: 1 / -1 }
+    .last-sim-recap__head-dates { order: 2; justify-self: center; text-align: center }
     .last-sim-recap__head-center { order: 0 }
-    .last-sim-recap__meta {
-        order: 1;
-        flex-direction: column;
-        align-items: flex-end;
-        gap: .15rem;
-    }
+    .last-sim-recap__meta { display: none }
 
     /* Tabs: hide W/L letter to make room for scores */
     .last-sim-recap__tab-wl { display: none }

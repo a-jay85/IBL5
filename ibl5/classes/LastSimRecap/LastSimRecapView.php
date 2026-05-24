@@ -346,16 +346,12 @@ class LastSimRecapView implements LastSimRecapViewInterface
         }
         $h .= '  </div>';
         $h .= '  <div class="last-sim-recap__inj-eta">';
-        if ($inj->isNew) {
-            $h .= '<span class="last-sim-recap__eta-num">DTD</span>';
+        $num = HtmlSanitizer::e((string) $inj->daysRemaining);
+        $unit = '<span class="last-sim-recap__eta-unit">d</span>';
+        if ($inj->daysRemaining > 0 && $inj->returnDate !== '') {
+            $h .= TooltipLabel::render($num . $unit, 'Returns: ' . $inj->returnDate, 'last-sim-recap__eta-num');
         } else {
-            $num = HtmlSanitizer::e((string) $inj->daysRemaining);
-            $unit = '<span class="last-sim-recap__eta-unit">d</span>';
-            if ($inj->daysRemaining > 0 && $inj->returnDate !== '') {
-                $h .= TooltipLabel::render($num . $unit, 'Returns: ' . $inj->returnDate, 'last-sim-recap__eta-num');
-            } else {
-                $h .= '<span class="last-sim-recap__eta-num">' . $num . '</span>' . $unit;
-            }
+            $h .= '<span class="last-sim-recap__eta-num">' . $num . '</span>' . $unit;
         }
         $h .= '  </div>';
         $h .= '</div>';

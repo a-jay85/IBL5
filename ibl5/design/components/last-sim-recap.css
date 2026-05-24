@@ -397,6 +397,9 @@ a.last-sim-recap__final-pts:hover { text-decoration: underline }
 a.last-sim-recap__player-name { color: inherit; text-decoration: none }
 a.last-sim-recap__player-name:hover { text-decoration: underline }
 
+/* Responsive team names — short variant hidden on desktop, shown on mobile */
+.last-sim-recap__name-short { display: none }
+
 /* Quarter-margin bar chart (per-quarter point differential) */
 .last-sim-recap__mom { display: contents }
 .last-sim-recap__mom-chart {
@@ -738,6 +741,10 @@ a.last-sim-recap__player-name:hover { text-decoration: underline }
     }
     .last-sim-recap__inj-group:first-of-type,
     .last-sim-recap__inj-group:last-of-type { align-content: initial }
+
+    /* Responsive team names: swap full → short on mobile */
+    .last-sim-recap__name-full { display: none }
+    .last-sim-recap__name-short { display: inline }
 
     /* Battles: hide statline, restyle name below avatar */
     .last-sim-recap__player-statline { display: none }

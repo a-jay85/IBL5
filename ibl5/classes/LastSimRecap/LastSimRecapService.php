@@ -16,6 +16,7 @@ class LastSimRecapService implements LastSimRecapServiceInterface
 {
     private const POSITIONS = ['PG', 'SG', 'SF', 'PF', 'C'];
 
+
     public function __construct(
         private readonly LastSimRecapRepositoryInterface $repo,
         private readonly PlayerLookupRepositoryInterface $playerLookup,

@@ -16,6 +16,10 @@ use Utilities\BoxScoreUrlBuilder;
 
 class LastSimRecapView implements LastSimRecapViewInterface
 {
+    private const MOBILE_SHORT_NAMES = [
+        'Trailblazers' => 'Blazers',
+        'Timberwolves' => 'Wolves',
+    ];
     public function render(RecapSlate $slate): string
     {
         $games = $slate->games;
@@ -156,7 +160,7 @@ class LastSimRecapView implements LastSimRecapViewInterface
         $h .= '  <span class="last-sim-recap__verdict">';
         $h .= '    ' . ($g->won ? 'W' : 'L') . ' <span class="last-sim-recap__verdict-margin">' . HtmlSanitizer::e($marginLabel) . '</span>';
         $h .= '  </span>';
-        $h .= '  <span class="last-sim-recap__vs">' . HtmlSanitizer::e($venueWord . ' ' . $g->oppName) . '</span>';
+        $h .= '  <span class="last-sim-recap__vs">' . HtmlSanitizer::e($venueWord . ' ') . $this->responsiveTeamName($g->oppName) . '</span>';
         $h .= '  <div class="last-sim-recap__strip-right">';
         $h .= '    <span>' . HtmlSanitizer::e($dateText) . '</span>';
         $h .= '  </div>';
@@ -212,7 +216,7 @@ class LastSimRecapView implements LastSimRecapViewInterface
 
         $h .= '    <div class="last-sim-recap__final-row' . $awayRowMod . '">';
         $h .= '      <a href="' . $awayUrl . '" class="last-sim-recap__team-link"><img src="' . HtmlSanitizer::e($awayLogo) . '" alt="" class="last-sim-recap__team-mark" width="50" height="50" loading="lazy"></a>';
-        $h .= '      <a href="' . $awayUrl . '" class="last-sim-recap__final-name">' . HtmlSanitizer::e($awayName);
+        $h .= '      <a href="' . $awayUrl . '" class="last-sim-recap__final-name">' . $this->responsiveTeamName($awayName);
         $h .= '        <span class="last-sim-recap__final-rec">' . HtmlSanitizer::e($awayRec) . '</span>';
         $h .= '      </a>';
         if ($boxLink !== '') {
@@ -224,7 +228,7 @@ class LastSimRecapView implements LastSimRecapViewInterface
 
         $h .= '    <div class="last-sim-recap__final-row' . $homeRowMod . '">';
         $h .= '      <a href="' . $homeUrl . '" class="last-sim-recap__team-link"><img src="' . HtmlSanitizer::e($homeLogo) . '" alt="" class="last-sim-recap__team-mark" width="50" height="50" loading="lazy"></a>';
-        $h .= '      <a href="' . $homeUrl . '" class="last-sim-recap__final-name">' . HtmlSanitizer::e($homeName);
+        $h .= '      <a href="' . $homeUrl . '" class="last-sim-recap__final-name">' . $this->responsiveTeamName($homeName);
         $h .= '        <span class="last-sim-recap__final-rec">' . HtmlSanitizer::e($homeRec) . '</span>';
         $h .= '      </a>';
         if ($boxLink !== '') {
@@ -477,5 +481,15 @@ class LastSimRecapView implements LastSimRecapViewInterface
         $endLabel = date('M j', $eTs);
         $year = date('Y', $eTs);
         return $startLabel . ' – ' . $endLabel . ', ' . $year;
+    }
+
+    private function responsiveTeamName(string $name): string
+    {
+        $short = self::MOBILE_SHORT_NAMES[$name] ?? null;
+        if ($short === null) {
+            return HtmlSanitizer::e($name);
+        }
+        return '<span class="last-sim-recap__name-full">' . HtmlSanitizer::e($name) . '</span>'
+             . '<span class="last-sim-recap__name-short">' . HtmlSanitizer::e($short) . '</span>';
     }
 }

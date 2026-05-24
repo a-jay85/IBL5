@@ -307,6 +307,119 @@ if ($method === 'DELETE' && $action === 'reset-vote') {
     exit;
 }
 
+// DELETE ?action=clear-fa-offers — wipe ibl_fa_offers without re-inserting
+if ($method === 'DELETE' && $action === 'clear-fa-offers') {
+    $db->query('DELETE FROM ibl_fa_offers');
+    echo json_encode(['cleared' => $db->affected_rows]);
+    $db->close();
+    exit;
+}
+
+// DELETE ?action=reset-fa-offers — wipe and re-insert the three seed FA offer rows
+if ($method === 'DELETE' && $action === 'reset-fa-offers') {
+    $db->query('DELETE FROM ibl_fa_offers');
+    $db->query(
+        "INSERT INTO ibl_fa_offers (name, pid, team, teamid, offer1, offer2, offer3, offer4, offer5, offer6,
+                                    modifier, random, perceivedvalue, mle, lle, offer_type) VALUES
+          ('FA Guard',   10, 'Metros', 1, 700, 770, 840, 0, 0, 0,  1.0, 0.5, 700.0, 0, 0, 0),
+          ('FA Center',  11, 'Metros', 1, 480, 528, 0,   0, 0, 0,  1.0, 0.5, 480.0, 0, 0, 0),
+          ('FA Forward', 12, 'Metros', 1, 380, 418, 460, 0, 0, 0,  1.0, 0.5, 380.0, 0, 0, 0)"
+    );
+    echo json_encode(['reset' => $db->affected_rows]);
+    $db->close();
+    exit;
+}
+
+// DELETE ?action=reset-demands — wipe and re-insert the three seed demand rows
+if ($method === 'DELETE' && $action === 'reset-demands') {
+    $db->query('DELETE FROM ibl_demands');
+    $db->query(
+        "INSERT INTO ibl_demands (name, pid, dem1, dem2, dem3, dem4, dem5, dem6) VALUES
+          ('FA Guard',   10, 800, 880, 960, 1040, 0, 0),
+          ('FA Center',  11, 500, 550, 600, 0, 0, 0),
+          ('FA Forward', 12, 400, 440, 480, 520, 560, 600)"
+    );
+    echo json_encode(['reset' => $db->affected_rows]);
+    $db->close();
+    exit;
+}
+
+// GET ?action=count-demands — return current row count for ibl_demands
+if ($method === 'GET' && $action === 'count-demands') {
+    $result = $db->query('SELECT COUNT(*) AS cnt FROM ibl_demands');
+    $row = $result ? $result->fetch_assoc() : null;
+    echo json_encode(['count' => $row !== null ? (int) $row['cnt'] : 0]);
+    $db->close();
+    exit;
+}
+
+// DELETE ?action=reset-allstar-names — delete and re-insert the ASG seed rows
+// (delete+insert is idempotent even after partial renames)
+if ($method === 'DELETE' && $action === 'reset-allstar-names') {
+    $db->query(
+        "DELETE FROM ibl_box_scores_teams
+         WHERE visitor_teamid = 50 AND home_teamid = 51 AND game_date = '2026-02-15'"
+    );
+    $deleted = $db->affected_rows;
+    $db->query(
+        "INSERT INTO ibl_box_scores_teams (game_date, visitor_teamid, home_teamid, game_of_that_day, name,
+          game_2gm, game_2ga, game_ftm, game_fta, game_3gm, game_3ga,
+          game_orb, game_drb, game_ast, game_stl, game_tov, game_blk, game_pf,
+          visitor_q1_points, visitor_q2_points, visitor_q3_points, visitor_q4_points,
+          home_q1_points, home_q2_points, home_q3_points, home_q4_points) VALUES
+          ('2026-02-15', 50, 51, 1, 'Team Away',
+           30, 60, 18, 22, 12, 28, 10, 28, 24, 8, 10, 5, 16,
+           28, 26, 27, 24, 24, 25, 24, 25),
+          ('2026-02-15', 50, 51, 1, 'Team Home',
+           28, 58, 20, 25, 10, 25, 9, 26, 22, 7, 12, 4, 17,
+           28, 26, 27, 24, 24, 25, 24, 25)"
+    );
+    echo json_encode(['reset' => $deleted]);
+    $db->close();
+    exit;
+}
+
+// GET ?action=get-allstar-name&id=N — read back a single row's name from ibl_box_scores_teams
+if ($method === 'GET' && $action === 'get-allstar-name') {
+    $id = (int) ($_GET['id'] ?? 0);
+    if ($id <= 0) {
+        http_response_code(400);
+        echo json_encode(['error' => 'get-allstar-name requires a positive id']);
+        $db->close();
+        exit;
+    }
+    $stmt = $db->prepare('SELECT name FROM ibl_box_scores_teams WHERE id = ?');
+    $stmt->bind_param('i', $id);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    $row = $result->fetch_assoc();
+    $stmt->close();
+    echo json_encode(['name' => $row !== null ? $row['name'] : null]);
+    $db->close();
+    exit;
+}
+
+// GET ?action=get-allstar-ids — return ids for ASG seed rows with default names
+if ($method === 'GET' && $action === 'get-allstar-ids') {
+    $result = $db->query(
+        "SELECT id, name FROM ibl_box_scores_teams
+         WHERE visitor_teamid = 50 AND home_teamid = 51
+           AND game_date = '2026-02-15'
+           AND name IN ('Team Away', 'Team Home')
+         ORDER BY id ASC"
+    );
+    $ids = [];
+    if ($result) {
+        while ($row = $result->fetch_assoc()) {
+            $ids[] = ['id' => (int) $row['id'], 'name' => $row['name']];
+        }
+        $result->free();
+    }
+    echo json_encode(['rows' => $ids]);
+    $db->close();
+    exit;
+}
+
 if ($method === 'GET') {
     $result = $db->query('SELECT name, value FROM ibl_settings');
     $settings = [];

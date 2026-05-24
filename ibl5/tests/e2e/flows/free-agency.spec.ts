@@ -181,6 +181,14 @@ test.describe('Free Agency -- Bird Rights negotiation', () => {
 });
 
 test.describe('Free Agency -- validation errors', () => {
+  test.beforeAll(async ({ request }) => {
+    await request.delete('test-state.php?action=clear-fa-offers');
+  });
+
+  test.afterAll(async ({ request }) => {
+    await request.delete('test-state.php?action=reset-fa-offers');
+  });
+
   test.beforeEach(async ({ appState, page }) => {
     await appState({ 'Current Season Phase': 'Free Agency', 'Current Season Ending Year': '2026' });
     // Use FA Center pid=11 for validation tests

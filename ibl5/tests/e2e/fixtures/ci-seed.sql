@@ -357,6 +357,29 @@ INSERT INTO ibl_demands (name, pid, dem1, dem2, dem3, dem4, dem5, dem6) VALUES
   ('FA Center',  11, 500, 550, 600, 0, 0, 0),
   ('FA Forward', 12, 400, 440, 480, 520, 560, 600);
 
+-- Free agency offers (block.php clear_offers test)
+-- Three pending offers — Metros bidding on the three FA players.
+INSERT INTO ibl_fa_offers (name, pid, team, teamid, offer1, offer2, offer3, offer4, offer5, offer6,
+                           modifier, random, perceivedvalue, mle, lle, offer_type) VALUES
+  ('FA Guard',   10, 'Metros', 1, 700, 770, 840, 0, 0, 0,  1.0, 0.5, 700.0, 0, 0, 0),
+  ('FA Center',  11, 'Metros', 1, 480, 528, 0,   0, 0, 0,  1.0, 0.5, 480.0, 0, 0, 0),
+  ('FA Forward', 12, 'Metros', 1, 380, 418, 460, 0, 0, 0,  1.0, 0.5, 380.0, 0, 0, 0);
+
+-- All-Star Game team rows with default names (allStarRename test)
+-- visitor_teamid=50 (ALL_STAR_AWAY_TEAMID), home_teamid=51 (ALL_STAR_HOME_TEAMID)
+-- Names 'Team Away' / 'Team Home' make findAllStarGamesWithDefaultNames() return them.
+INSERT INTO ibl_box_scores_teams (game_date, visitor_teamid, home_teamid, game_of_that_day, name,
+  game_2gm, game_2ga, game_ftm, game_fta, game_3gm, game_3ga,
+  game_orb, game_drb, game_ast, game_stl, game_tov, game_blk, game_pf,
+  visitor_q1_points, visitor_q2_points, visitor_q3_points, visitor_q4_points,
+  home_q1_points, home_q2_points, home_q3_points, home_q4_points) VALUES
+  ('2026-02-15', 50, 51, 1, 'Team Away',
+   30, 60, 18, 22, 12, 28, 10, 28, 24, 8, 10, 5, 16,
+   28, 26, 27, 24, 24, 25, 24, 25),
+  ('2026-02-15', 50, 51, 1, 'Team Home',
+   28, 58, 20, 25, 10, 25, 9, 26, 22, 7, 12, 4, 17,
+   28, 26, 27, 24, 24, 25, 24, 25);
+
 -- Free agent player history (needed for SeasonLeaderboards)
 INSERT INTO ibl_plr_snapshots (
   pid, name, season_year, snapshot_phase, source_archive, teamid,

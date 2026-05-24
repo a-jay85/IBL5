@@ -104,24 +104,29 @@ class LastSimRecapView implements LastSimRecapViewInterface
         $h .= ' aria-selected="' . $ariaSelected . '"';
         $h .= ' tabindex="' . $tabIndex . '"';
         $h .= ' data-tab-index="' . $idx . '">';
+        $oppLogo = 'images/logo/new' . $g->oppTid . '.png';
         $h .= '  <span class="last-sim-recap__tab-top">';
         $h .= '    <span class="last-sim-recap__tab-where">' . HtmlSanitizer::e($where) . '</span>';
-        $h .= '    <span class="last-sim-recap__tab-opp">' . HtmlSanitizer::e($g->oppName) . '</span>';
-        $oppLogo = 'images/logo/new' . $g->oppTid . '.png';
+        $h .= '    <img src="' . HtmlSanitizer::e($oppLogo) . '" alt="" class="last-sim-recap__tab-logo" width="24" height="24" loading="lazy">';
+        $h .= '    <span class="last-sim-recap__tab-opp">' . $this->responsiveTeamName($g->oppName) . '</span>';
         $h .= '    <span class="last-sim-recap__tab-date">' . HtmlSanitizer::e($dateLabel) . '</span>';
         $h .= '  </span>';
         $h .= '  <span class="last-sim-recap__tab-score">';
         $h .= '    <span class="last-sim-recap__tab-wl">' . ($g->won ? 'W' : 'L') . '</span>';
         $awayScore = $g->home ? $g->oppScore : $g->yourScore;
         $homeScore = $g->home ? $g->yourScore : $g->oppScore;
-        $h .= '    <span class="last-sim-recap__tab-num">' . HtmlSanitizer::e((string) $awayScore) . '–' . HtmlSanitizer::e((string) $homeScore) . '</span>';
+        $topYou = $g->home ? '' : ' last-sim-recap__tab-num-you';
+        $botYou = $g->home ? ' last-sim-recap__tab-num-you' : '';
+        $h .= '    <span class="last-sim-recap__tab-num">'
+            . '<span class="last-sim-recap__tab-num-top' . $topYou . '">' . HtmlSanitizer::e((string) $awayScore) . '</span>'
+            . '<span class="last-sim-recap__tab-num-bot' . $botYou . '">' . HtmlSanitizer::e((string) $homeScore) . '</span>'
+            . '</span>';
         if ($g->ot) {
             $h .= '    <span class="last-sim-recap__tab-ot">OT</span>';
         }
         if ($tabFlagVisible) {
             $h .= '    <span class="last-sim-recap__tab-flag" aria-label="New injury this game">!</span>';
         }
-        $h .= '    <img src="' . HtmlSanitizer::e($oppLogo) . '" alt="" class="last-sim-recap__tab-logo" width="24" height="24" loading="lazy">';
         $h .= '  </span>';
         $h .= '</button>';
 
@@ -153,7 +158,7 @@ class LastSimRecapView implements LastSimRecapViewInterface
         $sign = $g->margin >= 0 ? '+' : '−';
         $abs = abs($g->margin);
         $venueWord = $g->home ? 'vs' : '@';
-        $marginLabel = $sign . $abs . ($g->ot ? ' / OT' : '');
+        $marginLabel = $sign . $abs . ($g->ot ? ' OT' : '');
         $dateText = $this->formatLongDate($g->date);
 
         $h  = '<div class="last-sim-recap__strip last-sim-recap__strip--' . $resultMod . '">';

@@ -7,16 +7,17 @@ import { assertNoPhpErrors } from '../../helpers/php-errors';
  *
  * The CI seed (`tests/e2e/fixtures/ci-seed.sql`) populates:
  *   - ibl_sim_dates row: sim 689, 2026-03-01 → 2026-03-07
- *   - ibl_schedule row: Metros (1) @ Cougars (3) on 2026-03-03
- *   - ibl_box_scores_teams pair with quarter scores for that game
+ *   - ibl_schedule rows: Metros (1) @ Cougars (3) on 2026-03-03 (W 107-91),
+ *                         Stars (2) @ Metros (1) on 2026-03-05 (L 88-95)
+ *   - ibl_box_scores_teams pairs with quarter scores for both games
  *   - gm_username = `IBL_TEST_USER` mapped to Metros (teamid=1)
  *
- * So the test user (admin GM of Metros) has exactly 1 game in the last sim
- * window — the card should render with 1 tab.
+ * So the test user (admin GM of Metros) has 2 games in the last sim
+ * window — the card renders with 2 tabs.
  */
 
 test.describe('Last-Sim Recap card (authenticated GM)', () => {
-  test('card renders with 1 tab for GM with games in last sim', async ({ page }) => {
+  test('card renders with 2 tabs for GM with games in last sim', async ({ page }) => {
     await page.goto('modules.php?name=News');
     await assertNoPhpErrors(page, 'on News with recap card');
 
@@ -24,15 +25,16 @@ test.describe('Last-Sim Recap card (authenticated GM)', () => {
     await expect(card).toBeVisible();
 
     const tabs = page.locator('.last-sim-recap__tab');
-    await expect(tabs).toHaveCount(1);
+    await expect(tabs).toHaveCount(2);
 
     // Tab 0 must be the active tab.
     await expect(tabs.first()).toHaveAttribute('aria-selected', 'true');
 
-    // Active panel for index 0 must be visible; no other panels exist (1 game).
+    // Active panel for index 0 must be visible; panel 1 hidden.
     const panels = page.locator('.last-sim-recap__panel');
-    await expect(panels).toHaveCount(1);
+    await expect(panels).toHaveCount(2);
     await expect(panels.first()).toBeVisible();
+    await expect(panels.nth(1)).toBeHidden();
   });
 
   test('verdict strip shows the game result', async ({ page }) => {
@@ -45,21 +47,11 @@ test.describe('Last-Sim Recap card (authenticated GM)', () => {
   });
 });
 
-// ─────────────────────────────────────────────────────────────────
-// Tab keyboard navigation (requires ≥2 tabs to exercise wrap, etc.)
-//
-// The current CI seed only has 1 schedule row in the sim window. The
-// keyboard-nav tests below are runtime-skipped when the card renders
-// only a single tab — they exist as forward-compatible coverage for
-// when the seed grows additional sim-window games.
-// ─────────────────────────────────────────────────────────────────
-
 test.describe('Last-Sim Recap card · tab keyboard nav', () => {
   test('arrow keys move active tab with wraparound', async ({ page }) => {
     await page.goto('modules.php?name=News');
     const tabs = page.locator('.last-sim-recap__tab');
     const count = await tabs.count();
-    test.skip(count < 2, 'Need ≥2 tabs to exercise arrow-key nav');
 
     await tabs.first().focus();
     await page.keyboard.press('ArrowRight');
@@ -77,7 +69,6 @@ test.describe('Last-Sim Recap card · tab keyboard nav', () => {
     await page.goto('modules.php?name=News');
     const tabs = page.locator('.last-sim-recap__tab');
     const count = await tabs.count();
-    test.skip(count < 2, 'Need ≥2 tabs to exercise Home/End nav');
 
     await tabs.first().focus();
     await page.keyboard.press('End');
@@ -89,8 +80,6 @@ test.describe('Last-Sim Recap card · tab keyboard nav', () => {
   test('clicking a tab swaps the visible panel', async ({ page }) => {
     await page.goto('modules.php?name=News');
     const tabs = page.locator('.last-sim-recap__tab');
-    const count = await tabs.count();
-    test.skip(count < 2, 'Need ≥2 tabs to exercise click-to-switch');
 
     await tabs.nth(1).click();
     await expect(tabs.nth(1)).toHaveAttribute('aria-selected', 'true');

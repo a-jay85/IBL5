@@ -39,7 +39,7 @@ class LastSimRecapRepositoryTest extends DatabaseTestCase
         self::assertSame('2030-01-10', $window['endDate']);
     }
 
-    public function testGetGamesForTeamInWindowReturnsVisitorAndHomeGamesDesc(): void
+    public function testGetGamesForTeamInWindowReturnsVisitorAndHomeGamesAsc(): void
     {
         // Two games for team 1 in the window — one home, one visitor.
         $this->insertScheduleRow(2030, '2030-03-01', visitorTid: 1, visitorScore: 90, homeTid: 2, homeScore: 100);
@@ -52,11 +52,11 @@ class LastSimRecapRepositoryTest extends DatabaseTestCase
         $games = $this->repo->getGamesForTeamInWindow(1, '2030-03-01', '2030-03-05');
 
         self::assertCount(2, $games);
-        // Ordered desc by date.
-        self::assertSame('2030-03-03', $games[0]['date']);
-        self::assertSame('2030-03-01', $games[1]['date']);
-        self::assertSame(1, $games[0]['home']);
-        self::assertSame(1, $games[1]['visitor']);
+        // Ordered asc by date.
+        self::assertSame('2030-03-01', $games[0]['date']);
+        self::assertSame('2030-03-03', $games[1]['date']);
+        self::assertSame(1, $games[0]['visitor']);
+        self::assertSame(1, $games[1]['home']);
     }
 
     public function testGetTeamBoxscoreLinesReturnsQuartersAndPreGameRecords(): void

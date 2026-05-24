@@ -166,9 +166,10 @@ class LastSimRecapViewTest extends TestCase
         string $description = 'Hamstring',
         int $gamesMissed = 5,
         int $daysRemaining = 5,
+        string $returnDate = '2030-06-01',
         bool $isNew = false,
     ): RecapInjury {
-        return new RecapInjury($pid, $name, $pos, $description, $gamesMissed, $daysRemaining, $isNew);
+        return new RecapInjury($pid, $name, $pos, $description, $gamesMissed, $daysRemaining, $returnDate, $isNew);
     }
 
     private function makeStarter(string $pos = 'PG'): RecapStarter

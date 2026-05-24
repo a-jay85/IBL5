@@ -173,10 +173,13 @@ class LastSimRecapService implements LastSimRecapServiceInterface
             $yourLine = $yourPid !== 0 ? $this->repo->getPlayerLineForGame($yourPid, $g['schedId']) : null;
             $oppLine = $oppPid !== 0 ? $this->repo->getPlayerLineForGame($oppPid, $g['schedId']) : null;
 
+            $yourLookup = $this->lookupPlayerName($yourPid);
+            $oppLookup = $this->lookupPlayerName($oppPid);
+
             $starters[] = new RecapStarter(
                 pos: $pos,
                 youPid: $yourPid,
-                youName: $this->shortName($this->lookupPlayerName($yourPid) ?: ($yourLine['name'] ?? '')),
+                youName: $this->shortName($yourLookup !== '' ? $yourLookup : ($yourLine['name'] ?? '')),
                 youPts: $yourLine['pts'] ?? 0,
                 youReb: $yourLine['reb'] ?? 0,
                 youAst: $yourLine['ast'] ?? 0,
@@ -184,7 +187,7 @@ class LastSimRecapService implements LastSimRecapServiceInterface
                 youBlk: $yourLine['blk'] ?? 0,
                 youHurt: isset($hurtPids[$yourPid]),
                 oppPid: $oppPid,
-                oppName: $this->shortName($this->lookupPlayerName($oppPid) ?: ($oppLine['name'] ?? '')),
+                oppName: $this->shortName($oppLookup !== '' ? $oppLookup : ($oppLine['name'] ?? '')),
                 oppPts: $oppLine['pts'] ?? 0,
                 oppReb: $oppLine['reb'] ?? 0,
                 oppAst: $oppLine['ast'] ?? 0,

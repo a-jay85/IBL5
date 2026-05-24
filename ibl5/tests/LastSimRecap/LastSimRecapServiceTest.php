@@ -141,7 +141,7 @@ class LastSimRecapServiceTest extends TestCase
                 '101|2030-05-01' => [[
                     'pid' => 101, 'name' => 'Star Player', 'pos' => 'PG',
                     'date' => '2030-05-01', 'injuryDescription' => 'Sprain',
-                    'injuryGamesMissed' => 5, 'daysRemaining' => 5, 'isNew' => true,
+                    'injuryGamesMissed' => 5, 'daysRemaining' => 5, 'returnDate' => '2030-06-01', 'isNew' => true,
                 ]],
             ],
             starterSnapshots: [

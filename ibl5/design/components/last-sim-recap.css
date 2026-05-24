@@ -733,7 +733,7 @@ a.last-sim-recap__player-name:hover { text-decoration: underline }
         max-width: 100%;
     }
     .last-sim-recap__player {
-        grid-template-columns: 24px;
+        grid-template-columns: 1fr;
         justify-items: center;
         justify-content: center;
         height: auto;
@@ -745,7 +745,7 @@ a.last-sim-recap__player-name:hover { text-decoration: underline }
         padding: .5rem .45rem .55rem;
         display: flex;
         flex-direction: column;
-        align-items: center;
+        align-items: stretch;
     }
 }
 

@@ -150,6 +150,14 @@ function walkSuites(suites, titlePath = []) {
   return results;
 }
 
+function classifyScreenshot(path) {
+  const lower = path.toLowerCase();
+  if (lower.includes('-diff.')) return 'diff';
+  if (lower.includes('-actual.')) return 'actual';
+  if (lower.includes('-expected.')) return 'expected';
+  return 'other';
+}
+
 function truncateError(msg) {
   if (!msg) return '';
   // Strip ANSI codes
@@ -237,11 +245,46 @@ function generateSectionMarkdown(label, report, screenshotsDir) {
       lines.push('');
       lines.push(`\`${test.errorMessage}\``);
 
-      for (const screenshot of test.screenshots) {
-        // Use absolute paths so CML --publish can find files regardless of CWD
-        const absPath = resolve(screenshot);
+      if (test.screenshots.length > 0) {
+        const byKind = { expected: [], actual: [], diff: [], other: [] };
+        for (const s of test.screenshots) {
+          // Use absolute paths so CML --publish can find files regardless of CWD
+          byKind[classifyScreenshot(s)].push(resolve(s));
+        }
+        const hasTriplet =
+          byKind.expected.length && byKind.actual.length && byKind.diff.length;
+
         lines.push('');
-        lines.push(`![${test.title}](${absPath})`);
+        lines.push('<details><summary>Screenshots</summary>');
+        lines.push('');
+
+        if (hasTriplet) {
+          lines.push('| Expected | Actual | Diff |');
+          lines.push('|---|---|---|');
+          const rowCount = Math.max(
+            byKind.expected.length,
+            byKind.actual.length,
+            byKind.diff.length,
+          );
+          for (let i = 0; i < rowCount; i++) {
+            const e = byKind.expected[i] ? `![expected](${byKind.expected[i]})` : '';
+            const a = byKind.actual[i] ? `![actual](${byKind.actual[i]})` : '';
+            const d = byKind.diff[i] ? `![diff](${byKind.diff[i]})` : '';
+            lines.push(`| ${e} | ${a} | ${d} |`);
+          }
+          for (const s of byKind.other) {
+            lines.push('');
+            lines.push(`![${test.title}](${s})`);
+          }
+        } else {
+          for (const s of test.screenshots) {
+            lines.push('');
+            lines.push(`![${test.title}](${resolve(s)})`);
+          }
+        }
+
+        lines.push('');
+        lines.push('</details>');
       }
 
       lines.push('');

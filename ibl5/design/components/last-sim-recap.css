@@ -163,7 +163,13 @@
     text-overflow: ellipsis;
     min-width: 0;
 }
-.last-sim-recap__tab-logo { display: none }
+.last-sim-recap__tab-logo {
+    margin-left: auto;
+    width: 24px;
+    height: 24px;
+    flex-shrink: 0;
+    align-self: center;
+}
 .last-sim-recap__tab-date {
     margin-left: auto;
     font-family: var(--font-mono);
@@ -688,14 +694,8 @@ a.last-sim-recap__player-name:hover { text-decoration: underline }
     /* Tabs: hide W/L letter to make room for scores */
     .last-sim-recap__tab-wl { display: none }
 
-    /* Tabs: show logo instead of team name on mobile */
+    /* Tabs: hide team name on mobile (logo in score row serves as identifier) */
     .last-sim-recap__tab-opp { display: none }
-    .last-sim-recap__tab-logo {
-        display: block;
-        width: 22px;
-        height: 22px;
-        flex-shrink: 0;
-    }
     .last-sim-recap__tab-top {
         flex-wrap: wrap;
         justify-content: center;

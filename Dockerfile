@@ -16,6 +16,9 @@ RUN a2enmod rewrite headers
 RUN printf '<Directory /var/www/html>\n\
     AllowOverride None\n\
     Require all granted\n\
+    RewriteEngine On\n\
+    RewriteCond %%{REQUEST_URI} ^/?$\n\
+    RewriteRule ^$ /ibl5/index.php [R=301,L]\n\
 </Directory>\n\
 \n\
 <Directory /var/www/html/ibl5>\n\

@@ -27,12 +27,20 @@ class LastSimRecapServiceTest extends TestCase
         self::assertNull($svc->buildSlateForTeam(1));
     }
 
-    public function testReturnsNullWhenTeamHasNoGames(): void
+    public function testReturnsSlateWithEmptyGamesWhenTeamHasNoGames(): void
     {
         $repo = $this->buildRepo(games: []);
         $svc = new LastSimRecapService($repo, $this->playerLookup);
 
-        self::assertNull($svc->buildSlateForTeam(1));
+        $slate = $svc->buildSlateForTeam(1);
+
+        self::assertNotNull($slate);
+        self::assertSame([], $slate->games);
+        self::assertSame(0, $slate->wins);
+        self::assertSame(0, $slate->losses);
+        self::assertSame(0, $slate->netMargin);
+        self::assertSame('', $slate->bestLabel);
+        self::assertSame('', $slate->worstLabel);
     }
 
     public function testSlateAggregatesWinsLossesNetMargin(): void

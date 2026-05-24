@@ -14,12 +14,13 @@ use Repositories\Contracts\PlayerLookupRepositoryInterface;
  * Module-integration coverage for the Last-Sim Recap card on the News page.
  *
  * Verifies that the service contract surface that News/index.php depends on
- * returns the documented shapes — null for a team that didn't play in the
- * last sim, a populated RecapSlate otherwise.
+ * returns the documented shapes — null for an unknown team, a slate with
+ * empty games for a known team that didn't play, and a populated slate
+ * for a team with games.
  */
 class NewsModuleIntegrationTest extends TestCase
 {
-    public function testServiceReturnsNullForTeamWithNoGames(): void
+    public function testServiceReturnsNullForUnknownTeam(): void
     {
         $repo = $this->repoWithGames([]);
         $playerLookup = $this->createStub(PlayerLookupRepositoryInterface::class);
@@ -27,6 +28,21 @@ class NewsModuleIntegrationTest extends TestCase
         $svc = new LastSimRecapService($repo, $playerLookup);
 
         self::assertNull($svc->buildSlateForTeam(7));
+    }
+
+    public function testServiceReturnsEmptySlateForTeamWithNoGames(): void
+    {
+        $repo = $this->repoWithGames([]);
+        $playerLookup = $this->createStub(PlayerLookupRepositoryInterface::class);
+        $playerLookup->method('getPlayerByID')->willReturn(null);
+        $svc = new LastSimRecapService($repo, $playerLookup);
+
+        $slate = $svc->buildSlateForTeam(1);
+
+        self::assertInstanceOf(RecapSlate::class, $slate);
+        self::assertSame([], $slate->games);
+        self::assertSame(0, $slate->wins);
+        self::assertSame(0, $slate->losses);
     }
 
     public function testServiceReturnsPopulatedSlateForTeamWithGames(): void

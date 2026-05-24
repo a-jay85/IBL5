@@ -13,6 +13,30 @@ use PHPUnit\Framework\TestCase;
 
 class LastSimRecapViewTest extends TestCase
 {
+    public function testEmptySlateRendersNoGamesMessage(): void
+    {
+        $html = (new LastSimRecapView())->render($this->makeSlate(games: []));
+
+        self::assertStringContainsString('No games this last sim.', $html);
+        self::assertStringNotContainsString('role="tablist"', $html);
+        self::assertStringNotContainsString('role="tab"', $html);
+        self::assertStringNotContainsString('role="tabpanel"', $html);
+        self::assertStringNotContainsString('last-sim-recap__meta', $html);
+        self::assertStringNotContainsString('Net margin', $html);
+        self::assertStringNotContainsString('Best:', $html);
+        self::assertStringNotContainsString('Worst:', $html);
+        self::assertStringNotContainsString('last-sim-recap-tabs.js', $html);
+    }
+
+    public function testEmptySlateStillRendersDateRange(): void
+    {
+        $html = (new LastSimRecapView())->render($this->makeSlate(games: []));
+
+        self::assertStringContainsString('Last sim:', $html);
+        self::assertStringContainsString('May 1', $html);
+        self::assertStringContainsString('May 13', $html);
+    }
+
     public function testHtmlHasTablistAriaRoles(): void
     {
         $html = (new LastSimRecapView())->render($this->makeSlate(games: [$this->makeGame()]));

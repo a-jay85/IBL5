@@ -29,14 +29,30 @@ class LastSimRecapService implements LastSimRecapServiceInterface
             return null;
         }
 
-        $games = $this->repo->getGamesForTeamInWindow($tid, $window['startDate'], $window['endDate']);
-        if ($games === []) {
-            return null;
-        }
-
         $teamInfo = $this->repo->getTeamInfo($tid);
         if ($teamInfo === null) {
             return null;
+        }
+
+        $games = $this->repo->getGamesForTeamInWindow($tid, $window['startDate'], $window['endDate']);
+
+        if ($games === []) {
+            return new RecapSlate(
+                teamTid: $tid,
+                teamCity: $teamInfo['city'],
+                teamName: $teamInfo['name'],
+                simNumber: $window['sim'],
+                startDate: $window['startDate'],
+                endDate: $window['endDate'],
+                wins: 0,
+                losses: 0,
+                netMargin: 0,
+                bestLabel: '',
+                worstLabel: '',
+                teamWins: 0,
+                teamLosses: 0,
+                games: [],
+            );
         }
 
         $recapGames = [];

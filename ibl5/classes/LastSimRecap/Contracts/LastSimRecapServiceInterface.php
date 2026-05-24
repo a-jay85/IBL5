@@ -9,8 +9,9 @@ use LastSimRecap\Dto\RecapSlate;
 interface LastSimRecapServiceInterface
 {
     /**
-     * Build the Last-Sim Recap slate for a team, or return null when the
-     * team did not play in the last sim window.
+     * Build the Last-Sim Recap slate for a team. Returns null when no sim
+     * window exists or the team is unknown. Returns a slate with empty
+     * games when the window exists but the team had no games.
      */
     public function buildSlateForTeam(int $tid): ?RecapSlate;
 }

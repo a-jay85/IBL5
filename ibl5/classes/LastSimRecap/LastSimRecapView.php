@@ -23,16 +23,22 @@ class LastSimRecapView implements LastSimRecapViewInterface
     public function render(RecapSlate $slate): string
     {
         $games = $slate->games;
-        $tabCount = count($games);
 
         $html = '<section class="last-sim-recap" data-component="last-sim-recap">';
         $html .= $this->renderHeader($slate);
-        $html .= $this->renderTabs($games, $tabCount);
-        foreach ($games as $idx => $game) {
-            $html .= $this->renderPanel($slate, $game, $idx);
+
+        if ($games === []) {
+            $html .= '<div class="last-sim-recap__empty">No games this last sim.</div>';
+        } else {
+            $tabCount = count($games);
+            $html .= $this->renderTabs($games, $tabCount);
+            foreach ($games as $idx => $game) {
+                $html .= $this->renderPanel($slate, $game, $idx);
+            }
+            $html .= '<script src="jslib/last-sim-recap-tabs.js" defer></script>';
         }
+
         $html .= '</section>';
-        $html .= '<script src="jslib/last-sim-recap-tabs.js" defer></script>';
 
         return $html;
     }
@@ -40,13 +46,15 @@ class LastSimRecapView implements LastSimRecapViewInterface
     private function renderHeader(RecapSlate $slate): string
     {
         $windowLabel = $this->formatDateRange($slate->startDate, $slate->endDate);
-        $gameCount = count($slate->games);
-        $gameWord = $gameCount === 1 ? 'game' : 'games';
-        $subtitle = $windowLabel . ' (' . $gameCount . ' ' . $gameWord . ')';
+        $hasGames = $slate->games !== [];
 
-        $netSign = $slate->netMargin >= 0 ? '+' : '−';
-        $netAbs = abs($slate->netMargin);
-        $netValue = $netSign . $netAbs;
+        if ($hasGames) {
+            $gameCount = count($slate->games);
+            $gameWord = $gameCount === 1 ? 'game' : 'games';
+            $subtitle = $windowLabel . ' (' . $gameCount . ' ' . $gameWord . ')';
+        } else {
+            $subtitle = $windowLabel;
+        }
 
         $h  = '<header class="last-sim-recap__head">';
         $h .= '  <div class="last-sim-recap__head-dates">';
@@ -54,17 +62,27 @@ class LastSimRecapView implements LastSimRecapViewInterface
         $h .= '  </div>';
         $h .= '  <div class="last-sim-recap__head-center">';
         $h .= '    Last sim:';
-        $h .= '    <span class="last-sim-recap__record-w">' . HtmlSanitizer::e((string) $slate->wins) . '</span>';
-        $h .= '    <span class="last-sim-recap__record-sep">–</span>';
-        $h .= '    ' . HtmlSanitizer::e((string) $slate->losses);
+        if ($hasGames) {
+            $h .= '    <span class="last-sim-recap__record-w">' . HtmlSanitizer::e((string) $slate->wins) . '</span>';
+            $h .= '    <span class="last-sim-recap__record-sep">–</span>';
+            $h .= '    ' . HtmlSanitizer::e((string) $slate->losses);
+        }
         $h .= '  </div>';
-        $h .= '  <div class="last-sim-recap__meta">';
-        $h .= '    <span>Net margin: <span class="last-sim-recap__meta-value">' . HtmlSanitizer::e($netValue) . '</span></span>';
-        $h .= '    <span class="last-sim-recap__meta-bw">';
-        $h .= '      <span class="last-sim-recap__meta-bw-row"><span class="last-sim-recap__meta-bw-label">&nbsp;Best:</span>&nbsp;<span class="last-sim-recap__meta-value">' . HtmlSanitizer::e($slate->bestLabel) . '</span></span>';
-        $h .= '      <span class="last-sim-recap__meta-bw-row"><span class="last-sim-recap__meta-bw-label">Worst:</span>&nbsp;<span class="last-sim-recap__meta-value">' . HtmlSanitizer::e($slate->worstLabel) . '</span></span>';
-        $h .= '    </span>';
-        $h .= '  </div>';
+
+        if ($hasGames) {
+            $netSign = $slate->netMargin >= 0 ? '+' : '−';
+            $netAbs = abs($slate->netMargin);
+            $netValue = $netSign . $netAbs;
+
+            $h .= '  <div class="last-sim-recap__meta">';
+            $h .= '    <span>Net margin: <span class="last-sim-recap__meta-value">' . HtmlSanitizer::e($netValue) . '</span></span>';
+            $h .= '    <span class="last-sim-recap__meta-bw">';
+            $h .= '      <span class="last-sim-recap__meta-bw-row"><span class="last-sim-recap__meta-bw-label">&nbsp;Best:</span>&nbsp;<span class="last-sim-recap__meta-value">' . HtmlSanitizer::e($slate->bestLabel) . '</span></span>';
+            $h .= '      <span class="last-sim-recap__meta-bw-row"><span class="last-sim-recap__meta-bw-label">Worst:</span>&nbsp;<span class="last-sim-recap__meta-value">' . HtmlSanitizer::e($slate->worstLabel) . '</span></span>';
+            $h .= '    </span>';
+            $h .= '  </div>';
+        }
+
         $h .= '</header>';
 
         return $h;

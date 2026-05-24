@@ -804,4 +804,11 @@ a.last-sim-recap__player-name:hover { text-decoration: underline }
     }
 }
 
+.last-sim-recap__empty {
+    padding: 1.5rem;
+    text-align: center;
+    color: var(--color-gray-500, #6b7280);
+    font-size: .95rem;
+}
+
 } /* end @layer components */

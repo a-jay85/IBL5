@@ -1,3 +1,8 @@
+---
+description: Tailwind CSS is auto-rebuilt by the ibl5-tailwind Docker container — never run manual build commands.
+last_verified: 2026-05-24
+---
+
 # CSS Auto-Rebuild (Tailwind)
 
 The `ibl5-tailwind` Docker container runs `@tailwindcss/cli --watch=always` continuously. Any saved change to a CSS source file (`.css` in `design/`, or any file Tailwind scans for classes) triggers an automatic rebuild of `themes/IBL/style/style.css`.

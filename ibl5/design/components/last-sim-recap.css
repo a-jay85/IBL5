@@ -368,6 +368,7 @@
     justify-self: end;
     text-align: right;
     min-width: 3.5ch;
+    text-box: trim-both cap alphabetic;
 }
 .last-sim-recap__final-row--win .last-sim-recap__final-pts {
     color: var(--navy-900);
@@ -376,7 +377,7 @@
     content: "";
     position: absolute;
     right: 100%;
-    top: 50%;
+    top: calc(50% + 2px);
     translate: -6px -50%;
     border-style: solid;
     border-width: 6px 0 6px 7px;

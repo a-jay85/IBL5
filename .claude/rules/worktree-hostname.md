@@ -1,6 +1,6 @@
 ---
 description: How to derive the correct Docker hostname for the current worktree or main repo. Prevents using stale slugs.
-last_verified: 2026-05-22
+last_verified: 2026-05-24
 ---
 
 # Worktree Hostname
@@ -20,6 +20,17 @@ basename "$(dirname "$(git rev-parse --show-toplevel)")"
 ```
 
 This returns the worktree directory name, which matches the Traefik route configured by `bin/wt-up`.
+
+## URL paths
+
+Always navigate to `/ibl5/` paths — never the bare root (`/`). The application lives under `/ibl5/`, and the root directory returns a redirect (or 403 if the Docker image hasn't been rebuilt). Going to root wastes a round-trip; go directly to `/ibl5/` or a deeper path.
+
+```
+# Wrong
+curl http://main.localhost/
+# Right
+curl http://main.localhost/ibl5/
+```
 
 ## Rules
 

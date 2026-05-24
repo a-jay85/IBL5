@@ -218,7 +218,7 @@ class LastSimRecapService implements LastSimRecapServiceInterface
     }
 
     /**
-     * @param list<array{pid:int,name:string,pos:string,date:string,injuryDescription:string,injuryGamesMissed:int,daysRemaining:int,isNew:bool}> $rows
+     * @param list<array{pid:int,name:string,pos:string,date:string,injuryDescription:string,injuryGamesMissed:int,daysRemaining:int,returnDate:string,isNew:bool}> $rows
      * @return list<RecapInjury>
      */
     private function mapInjuries(array $rows): array
@@ -232,6 +232,7 @@ class LastSimRecapService implements LastSimRecapServiceInterface
                 description: $r['injuryDescription'],
                 gamesMissed: $r['injuryGamesMissed'],
                 daysRemaining: $r['daysRemaining'],
+                returnDate: $r['returnDate'],
                 isNew: $r['isNew'],
             );
         }

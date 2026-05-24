@@ -11,6 +11,7 @@ use LastSimRecap\Dto\RecapSlate;
 use LastSimRecap\Dto\RecapStarter;
 use Player\PlayerImageHelper;
 use Security\HtmlSanitizer;
+use UI\Components\TooltipLabel;
 use Utilities\BoxScoreUrlBuilder;
 
 class LastSimRecapView implements LastSimRecapViewInterface
@@ -102,11 +103,15 @@ class LastSimRecapView implements LastSimRecapViewInterface
         $h .= '  <span class="last-sim-recap__tab-top">';
         $h .= '    <span class="last-sim-recap__tab-where">' . HtmlSanitizer::e($where) . '</span>';
         $h .= '    <span class="last-sim-recap__tab-opp">' . HtmlSanitizer::e($g->oppName) . '</span>';
+        $oppLogo = 'images/logo/new' . $g->oppTid . '.png';
+        $h .= '    <img src="' . HtmlSanitizer::e($oppLogo) . '" alt="" class="last-sim-recap__tab-logo" width="22" height="22" loading="lazy">';
         $h .= '    <span class="last-sim-recap__tab-date">' . HtmlSanitizer::e($dateLabel) . '</span>';
         $h .= '  </span>';
         $h .= '  <span class="last-sim-recap__tab-score">';
         $h .= '    <span class="last-sim-recap__tab-wl">' . ($g->won ? 'W' : 'L') . '</span>';
-        $h .= '    <span class="last-sim-recap__tab-num">' . HtmlSanitizer::e((string) $g->yourScore) . '–' . HtmlSanitizer::e((string) $g->oppScore) . '</span>';
+        $awayScore = $g->home ? $g->oppScore : $g->yourScore;
+        $homeScore = $g->home ? $g->yourScore : $g->oppScore;
+        $h .= '    <span class="last-sim-recap__tab-num">' . HtmlSanitizer::e((string) $awayScore) . '–' . HtmlSanitizer::e((string) $homeScore) . '</span>';
         if ($g->ot) {
             $h .= '    <span class="last-sim-recap__tab-ot">OT</span>';
         }
@@ -177,8 +182,6 @@ class LastSimRecapView implements LastSimRecapViewInterface
         $oppRec = $g->oppPreWins . '–' . $g->oppPreLosses;
         $yourLogo = 'images/logo/new' . $slate->teamTid . '.png';
         $oppLogo = 'images/logo/new' . $g->oppTid . '.png';
-        $yourRowMod = $g->won ? ' last-sim-recap__final-row--win' : '';
-        $oppRowMod = $g->won ? '' : ' last-sim-recap__final-row--win';
         $yourTeamUrl = 'modules.php?name=Team&amp;op=team&amp;teamid=' . $slate->teamTid;
         $oppTeamUrl = 'modules.php?name=Team&amp;op=team&amp;teamid=' . $g->oppTid;
         $boxUrl = BoxScoreUrlBuilder::buildUrl($g->date, $g->gameOfThatDay, $g->boxId);
@@ -192,20 +195,43 @@ class LastSimRecapView implements LastSimRecapViewInterface
         $h .= '  </div>';
         $h .= '  <div class="last-sim-recap__final">';
 
-        $h .= '    <div class="last-sim-recap__final-row' . $yourRowMod . '">';
-        $h .= '      <img src="' . HtmlSanitizer::e($yourLogo) . '" alt="" class="last-sim-recap__team-mark" width="30" height="30" loading="lazy">';
-        $h .= '      <a href="' . $yourTeamUrl . '" class="last-sim-recap__final-name">' . HtmlSanitizer::e($slate->teamName);
-        $h .= '        <span class="last-sim-recap__final-rec">' . HtmlSanitizer::e($yourRec) . '</span>';
+        $awayLogo = $g->home ? $oppLogo : $yourLogo;
+        $homeLogo = $g->home ? $yourLogo : $oppLogo;
+        $awayUrl = $g->home ? $oppTeamUrl : $yourTeamUrl;
+        $homeUrl = $g->home ? $yourTeamUrl : $oppTeamUrl;
+        $awayName = $g->home ? $g->oppName : $slate->teamName;
+        $homeName = $g->home ? $slate->teamName : $g->oppName;
+        $awayRec = $g->home ? $oppRec : $yourRec;
+        $homeRec = $g->home ? $yourRec : $oppRec;
+        $awayScore = $g->home ? $g->oppScore : $g->yourScore;
+        $homeScore = $g->home ? $g->yourScore : $g->oppScore;
+        $awayRowMod = ($awayScore > $homeScore) ? ' last-sim-recap__final-row--win' : '';
+        $homeRowMod = ($homeScore > $awayScore) ? ' last-sim-recap__final-row--win' : '';
+
+        $boxLink = $boxUrl !== '' ? $boxUrl : '';
+
+        $h .= '    <div class="last-sim-recap__final-row' . $awayRowMod . '">';
+        $h .= '      <a href="' . $awayUrl . '" class="last-sim-recap__team-link"><img src="' . HtmlSanitizer::e($awayLogo) . '" alt="" class="last-sim-recap__team-mark" width="50" height="50" loading="lazy"></a>';
+        $h .= '      <a href="' . $awayUrl . '" class="last-sim-recap__final-name">' . HtmlSanitizer::e($awayName);
+        $h .= '        <span class="last-sim-recap__final-rec">' . HtmlSanitizer::e($awayRec) . '</span>';
         $h .= '      </a>';
-        $h .= '      <span class="last-sim-recap__final-pts">' . HtmlSanitizer::e((string) $g->yourScore) . '</span>';
+        if ($boxLink !== '') {
+            $h .= '      <a href="' . HtmlSanitizer::e($boxLink) . '" class="last-sim-recap__final-pts">' . HtmlSanitizer::e((string) $awayScore) . '</a>';
+        } else {
+            $h .= '      <span class="last-sim-recap__final-pts">' . HtmlSanitizer::e((string) $awayScore) . '</span>';
+        }
         $h .= '    </div>';
 
-        $h .= '    <div class="last-sim-recap__final-row' . $oppRowMod . '">';
-        $h .= '      <img src="' . HtmlSanitizer::e($oppLogo) . '" alt="" class="last-sim-recap__team-mark" width="30" height="30" loading="lazy">';
-        $h .= '      <a href="' . $oppTeamUrl . '" class="last-sim-recap__final-name">' . HtmlSanitizer::e($g->oppName);
-        $h .= '        <span class="last-sim-recap__final-rec">' . HtmlSanitizer::e($oppRec) . '</span>';
+        $h .= '    <div class="last-sim-recap__final-row' . $homeRowMod . '">';
+        $h .= '      <a href="' . $homeUrl . '" class="last-sim-recap__team-link"><img src="' . HtmlSanitizer::e($homeLogo) . '" alt="" class="last-sim-recap__team-mark" width="50" height="50" loading="lazy"></a>';
+        $h .= '      <a href="' . $homeUrl . '" class="last-sim-recap__final-name">' . HtmlSanitizer::e($homeName);
+        $h .= '        <span class="last-sim-recap__final-rec">' . HtmlSanitizer::e($homeRec) . '</span>';
         $h .= '      </a>';
-        $h .= '      <span class="last-sim-recap__final-pts">' . HtmlSanitizer::e((string) $g->oppScore) . '</span>';
+        if ($boxLink !== '') {
+            $h .= '      <a href="' . HtmlSanitizer::e($boxLink) . '" class="last-sim-recap__final-pts">' . HtmlSanitizer::e((string) $homeScore) . '</a>';
+        } else {
+            $h .= '      <span class="last-sim-recap__final-pts">' . HtmlSanitizer::e((string) $homeScore) . '</span>';
+        }
         $h .= '    </div>';
 
         $h .= '  </div>';
@@ -323,8 +349,13 @@ class LastSimRecapView implements LastSimRecapViewInterface
         if ($inj->isNew) {
             $h .= '<span class="last-sim-recap__eta-num">DTD</span>';
         } else {
-            $h .= '<span class="last-sim-recap__eta-num">' . HtmlSanitizer::e((string) $inj->daysRemaining) . '</span>';
-            $h .= '<span class="last-sim-recap__eta-unit">d</span>';
+            $num = HtmlSanitizer::e((string) $inj->daysRemaining);
+            $unit = '<span class="last-sim-recap__eta-unit">d</span>';
+            if ($inj->daysRemaining > 0 && $inj->returnDate !== '') {
+                $h .= TooltipLabel::render($num . $unit, 'Returns: ' . $inj->returnDate, 'last-sim-recap__eta-num');
+            } else {
+                $h .= '<span class="last-sim-recap__eta-num">' . $num . '</span>' . $unit;
+            }
         }
         $h .= '  </div>';
         $h .= '</div>';

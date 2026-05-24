@@ -13,6 +13,7 @@ final class RecapInjury
         public readonly string $description,
         public readonly int $gamesMissed,
         public readonly int $daysRemaining,
+        public readonly string $returnDate,
         public readonly bool $isNew,
     ) {}
 }

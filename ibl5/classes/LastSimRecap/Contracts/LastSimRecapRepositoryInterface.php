@@ -40,6 +40,7 @@ namespace LastSimRecap\Contracts;
  *   injuryDescription:string,
  *   injuryGamesMissed:int,
  *   daysRemaining:int,
+ *   returnDate:string,
  *   isNew:bool
  * }
  *

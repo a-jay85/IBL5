@@ -178,6 +178,7 @@ class LastSimRecapRepository extends \BaseMysqliRepository implements LastSimRec
                        t.injury_description,
                        t.injury_games_missed,
                        DATEDIFF(DATE_ADD({$dateExpr}, INTERVAL t.injury_games_missed DAY), ?) AS days_remaining,
+                       DATE_FORMAT(DATE_ADD({$dateExpr}, INTERVAL t.injury_games_missed DAY), '%Y-%m-%d') AS return_date,
                        ({$dateExpr} = ?) AS is_new
                 FROM {$this->transactionsTable} t
                 JOIN {$this->plrTable} p ON p.pid = t.pid
@@ -192,7 +193,7 @@ class LastSimRecapRepository extends \BaseMysqliRepository implements LastSimRec
         $types = 'ss' . str_repeat('i', count($playerIds)) . 'ss';
         $params = array_merge([$date, $date], $playerIds, [$date, $date]);
 
-        /** @var list<array{pid:int,name:string,pos:string,injury_date:string,injury_description:string|null,injury_games_missed:int,days_remaining:int,is_new:int}> $rows */
+        /** @var list<array{pid:int,name:string,pos:string,injury_date:string,injury_description:string|null,injury_games_missed:int,days_remaining:int,return_date:string,is_new:int}> $rows */
         $rows = $this->fetchAll($sql, $types, ...$params);
 
         $out = [];
@@ -205,6 +206,7 @@ class LastSimRecapRepository extends \BaseMysqliRepository implements LastSimRec
                 'injuryDescription' => $row['injury_description'] ?? '',
                 'injuryGamesMissed' => $row['injury_games_missed'],
                 'daysRemaining' => max(0, $row['days_remaining']),
+                'returnDate' => $row['return_date'],
                 'isNew' => $row['is_new'] === 1,
             ];
         }

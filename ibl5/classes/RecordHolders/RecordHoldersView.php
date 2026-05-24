@@ -236,7 +236,7 @@ class RecordHoldersView implements RecordHoldersViewInterface
 
         $output = '<div class="record-category">';
         $output .= $this->renderCategoryHeading($category);
-        $output .= '<table class="ibl-data-table record-table ibl-table-subheading record-table--5col">';
+        $output .= '<table class="ibl-data-table record-table ibl-table-subheading record-table--5col" data-no-responsive>';
         $output .= '<colgroup><col class="col-player"><col class="col-team"><col class="col-date"><col class="col-opponent"><col class="col-amount"></colgroup>';
         $safeStatLabel = HtmlSanitizer::safeHtmlOutput($statLabel);
         $output .= '<thead><tr><th>Player</th><th>Team</th><th>Date</th><th>Opponent</th><th>' . $safeStatLabel . '</th></tr></thead>';
@@ -262,7 +262,7 @@ class RecordHoldersView implements RecordHoldersViewInterface
 
         $output = '<div class="record-category">';
         $output .= $this->renderCategoryHeading($category);
-        $output .= '<table class="ibl-data-table record-table ibl-table-subheading record-table--4col-season">';
+        $output .= '<table class="ibl-data-table record-table ibl-table-subheading record-table--4col-season" data-no-responsive>';
         $output .= '<colgroup><col class="col-player"><col class="col-team"><col class="col-season"><col class="col-amount"></colgroup>';
         $safeStatLabel = HtmlSanitizer::safeHtmlOutput($statLabel);
         $output .= '<thead><tr><th>Player</th><th>Team</th><th>Season</th><th>' . $safeStatLabel . '</th></tr></thead>';
@@ -303,7 +303,7 @@ class RecordHoldersView implements RecordHoldersViewInterface
 
         $output = '<div class="record-category">';
         $output .= $this->renderCategoryHeading($category);
-        $output .= '<table class="ibl-data-table record-table ibl-table-subheading record-table--4col-team">';
+        $output .= '<table class="ibl-data-table record-table ibl-table-subheading record-table--4col-team" data-no-responsive>';
         $output .= '<colgroup><col class="col-team"><col class="col-date"><col class="col-opponent"><col class="col-amount"></colgroup>';
         $safeStatLabel = HtmlSanitizer::safeHtmlOutput($statLabel);
         $output .= '<thead><tr><th>Team</th><th>Date</th><th>Opponent</th><th>' . $safeStatLabel . '</th></tr></thead>';
@@ -329,7 +329,7 @@ class RecordHoldersView implements RecordHoldersViewInterface
 
         $output = '<div class="record-category">';
         $output .= $this->renderCategoryHeading($category);
-        $output .= '<table class="ibl-data-table record-table ibl-table-subheading record-table--3col-team-season">';
+        $output .= '<table class="ibl-data-table record-table ibl-table-subheading record-table--3col-team-season" data-no-responsive>';
         $output .= '<colgroup><col class="col-team"><col class="col-season"><col class="col-amount"></colgroup>';
         $safeStatLabel = HtmlSanitizer::safeHtmlOutput($statLabel);
         $output .= '<thead><tr><th>Team</th><th>Season</th><th>' . $safeStatLabel . '</th></tr></thead>';
@@ -368,7 +368,7 @@ class RecordHoldersView implements RecordHoldersViewInterface
 
         $output = '<div class="record-category">';
         $output .= $this->renderCategoryHeading($category);
-        $output .= '<table class="ibl-data-table record-table ibl-table-subheading record-table--3col-franchise">';
+        $output .= '<table class="ibl-data-table record-table ibl-table-subheading record-table--3col-franchise" data-no-responsive>';
         $output .= '<colgroup><col class="col-team"><col class="col-amount"><col class="col-years"></colgroup>';
         $safeStatLabel = HtmlSanitizer::safeHtmlOutput($statLabel);
         $output .= '<thead><tr><th>Team</th><th>' . $safeStatLabel . '</th><th>Years</th></tr></thead>';
@@ -407,7 +407,7 @@ class RecordHoldersView implements RecordHoldersViewInterface
     {
         $output = '<div class="record-category">';
         $output .= $this->renderCategoryHeading('Most All-Star Appearances');
-        $output .= '<table class="ibl-data-table record-table ibl-table-subheading record-table--5col">';
+        $output .= '<table class="ibl-data-table record-table ibl-table-subheading record-table--5col" data-no-responsive>';
         $output .= '<colgroup><col class="col-player"><col class="col-team"><col class="col-amount"><col class="col-date" span="2"></colgroup>';
         $output .= '<thead><tr><th>Player</th><th>Team</th><th>Apps</th><th colspan="2">Years</th></tr></thead>';
         $output .= '<tbody>';

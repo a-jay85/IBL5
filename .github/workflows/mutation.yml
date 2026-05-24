@@ -213,10 +213,11 @@ jobs:
 
     - name: Run Infection on diff
       if: steps.changes.outputs.skip == 'false'
+      working-directory: ibl5
       run: |
-        ibl5/vendor/bin/infection \
-          --configuration=ibl5/infection.json5 \
-          --coverage=ibl5/coverage \
+        vendor/bin/infection \
+          --configuration=infection.json5 \
+          --coverage=coverage \
           --git-diff-base=origin/${{ github.base_ref }} \
           --git-diff-lines \
           --map-source-class-to-test \
@@ -226,26 +227,31 @@ jobs:
           --no-progress \
           --min-msi=100
 
-    - name: Post PR comment with summary
-      if: always() && steps.changes.outputs.skip == 'false'
-      uses: actions/github-script@v9
+    - name: Build mutation comment body
+      if: always() && steps.changes.outputs.skip == 'false' && hashFiles('ibl5/infection-summary.log') != ''
+      working-directory: ibl5
+      run: |
+        {
+          echo "## Mutation Testing (Diff)"
+          echo ""
+          echo '```'
+          cat infection-summary.log
+          echo '```'
+        } > /tmp/mutation-comment.md
+
+    - name: Post sticky mutation comment
+      if: always() && steps.changes.outputs.skip == 'false' && hashFiles('ibl5/infection-summary.log') != ''
+      uses: marocchino/sticky-pull-request-comment@v3
       with:
-        script: |
-          const fs = require('fs');
-          const path = 'ibl5/infection-summary.log';
-          let body;
-          if (fs.existsSync(path)) {
-            const summary = fs.readFileSync(path, 'utf8');
-            body = `## Mutation Testing (Diff)\n\`\`\`\n${summary}\n\`\`\``;
-          } else {
-            body = `## Mutation Testing (Diff)\n\nInfection did not produce a summary log. Check the workflow run for details.`;
-          }
-          github.rest.issues.createComment({
-            issue_number: context.issue.number,
-            owner: context.repo.owner,
-            repo: context.repo.repo,
-            body
-          });
+        header: mutation-comment
+        path: /tmp/mutation-comment.md
+
+    - name: Remove stale mutation comment
+      if: always() && hashFiles('ibl5/infection-summary.log') == ''
+      uses: marocchino/sticky-pull-request-comment@v3
+      with:
+        header: mutation-comment
+        delete: true
 
     - name: Post summary
       if: always() && steps.changes.outputs.skip == 'false'

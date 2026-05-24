@@ -40,8 +40,9 @@ test.describe('Last-Sim Recap card (authenticated GM)', () => {
   test('verdict strip shows the game result', async ({ page }) => {
     await page.goto('modules.php?name=News');
 
-    // Metros won 107–91 on 2026-03-03 (seed). Verdict strip is the win variant.
-    const verdictStrip = page.locator('.last-sim-recap__strip');
+    // Metros won 107–91 on 2026-03-03 (seed). Verdict strip in the active panel is the win variant.
+    const activePanel = page.locator('.last-sim-recap__panel:not([hidden])');
+    const verdictStrip = activePanel.locator('.last-sim-recap__strip');
     await expect(verdictStrip).toBeVisible();
     await expect(verdictStrip).toHaveClass(/last-sim-recap__strip(?!--loss)/);
   });

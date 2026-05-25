@@ -73,38 +73,38 @@ class Ratings implements RatingsInterface
     </thead>
     <tbody>
 <?php foreach ($players as $player): ?>
-        <tr<?php if ($moduleName === "LeagueStarters"): ?> data-team-id="<?= $player->teamid ?? 0 ?>"<?php endif; ?>>
+        <tr<?php if ($moduleName === "LeagueStarters"): ?> data-team-id="<?= $player->getTeamid() ?? 0 ?>"<?php endif; ?>>
 <?php if ($moduleName === "LeagueStarters"):
-    echo TeamCellHelper::renderTeamCellOrFreeAgent($player->teamid ?? 0, $player->teamName ?? '', $player->teamColor1 ?? 'FFFFFF', $player->teamColor2 ?? '000000');
+    echo TeamCellHelper::renderTeamCellOrFreeAgent($player->getTeamid() ?? 0, $player->getTeamName() ?? '', $player->getTeamColor1() ?? 'FFFFFF', $player->getTeamColor2() ?? '000000');
 endif; ?>
-            <?= PlayerImageHelper::renderPlayerCell((int)$player->playerID, $player->decoratedName ?? '', $starterPids, $player->nameStatusClass) ?>
-            <td><?= HtmlSanitizer::e($player->position ?? '') ?></td>
-            <td class="sep-r-team"><?= (int)$player->age ?></td>
-            <td><?= (int)$player->ratingFieldGoalAttempts ?></td>
-            <td class="sep-r-weak"><?= (int)$player->ratingFieldGoalPercentage ?></td>
-            <td><?= (int)$player->ratingFreeThrowAttempts ?></td>
-            <td class="sep-r-weak"><?= (int)$player->ratingFreeThrowPercentage ?></td>
-            <td><?= (int)$player->ratingThreePointAttempts ?></td>
-            <td class="sep-r-team"><?= (int)$player->ratingThreePointPercentage ?></td>
-            <td><?= (int)$player->ratingOffensiveRebounds ?></td>
-            <td><?= (int)$player->ratingDefensiveRebounds ?></td>
-            <td><?= (int)$player->ratingAssists ?></td>
-            <td><?= (int)$player->ratingSteals ?></td>
-            <td><?= (int)$player->ratingTurnovers ?></td>
-            <td><?= (int)$player->ratingBlocks ?></td>
-            <td class="sep-r-team"><?= (int)$player->ratingFouls ?></td>
-            <td><?= (int)$player->ratingOutsideOffense ?></td>
-            <td><?= (int)$player->ratingDriveOffense ?></td>
-            <td><?= (int)$player->ratingPostOffense ?></td>
-            <td class="sep-r-weak"><?= (int)$player->ratingTransitionOffense ?></td>
-            <td><?= (int)$player->ratingOutsideDefense ?></td>
-            <td><?= (int)$player->ratingDriveDefense ?></td>
-            <td><?= (int)$player->ratingPostDefense ?></td>
-            <td class="sep-r-team"><?= (int)$player->ratingTransitionDefense ?></td>
-            <td><?= (int)$player->ratingClutch ?></td>
-            <td class="sep-r-team"><?= (int)$player->ratingConsistency ?></td>
+            <?= PlayerImageHelper::renderPlayerCell((int)$player->getPlayerID(), $player->getDecoratedName() ?? '', $starterPids, $player->getNameStatusClass()) ?>
+            <td><?= HtmlSanitizer::e($player->getPosition() ?? '') ?></td>
+            <td class="sep-r-team"><?= (int)$player->getAge() ?></td>
+            <td><?= (int)$player->getRatingFieldGoalAttempts() ?></td>
+            <td class="sep-r-weak"><?= (int)$player->getRatingFieldGoalPercentage() ?></td>
+            <td><?= (int)$player->getRatingFreeThrowAttempts() ?></td>
+            <td class="sep-r-weak"><?= (int)$player->getRatingFreeThrowPercentage() ?></td>
+            <td><?= (int)$player->getRatingThreePointAttempts() ?></td>
+            <td class="sep-r-team"><?= (int)$player->getRatingThreePointPercentage() ?></td>
+            <td><?= (int)$player->getRatingOffensiveRebounds() ?></td>
+            <td><?= (int)$player->getRatingDefensiveRebounds() ?></td>
+            <td><?= (int)$player->getRatingAssists() ?></td>
+            <td><?= (int)$player->getRatingSteals() ?></td>
+            <td><?= (int)$player->getRatingTurnovers() ?></td>
+            <td><?= (int)$player->getRatingBlocks() ?></td>
+            <td class="sep-r-team"><?= (int)$player->getRatingFouls() ?></td>
+            <td><?= (int)$player->getRatingOutsideOffense() ?></td>
+            <td><?= (int)$player->getRatingDriveOffense() ?></td>
+            <td><?= (int)$player->getRatingPostOffense() ?></td>
+            <td class="sep-r-weak"><?= (int)$player->getRatingTransitionOffense() ?></td>
+            <td><?= (int)$player->getRatingOutsideDefense() ?></td>
+            <td><?= (int)$player->getRatingDriveDefense() ?></td>
+            <td><?= (int)$player->getRatingPostDefense() ?></td>
+            <td class="sep-r-team"><?= (int)$player->getRatingTransitionDefense() ?></td>
+            <td><?= (int)$player->getRatingClutch() ?></td>
+            <td class="sep-r-team"><?= (int)$player->getRatingConsistency() ?></td>
             <?php
-                $injDays = (int) $player->daysRemainingForInjury;
+                $injDays = (int) $player->getDaysRemainingForInjury();
                 $injReturn = $player->getInjuryReturnDate($season->lastSimEndDate);
             ?>
             <td><?= ($injDays > 0 && $injReturn !== '')

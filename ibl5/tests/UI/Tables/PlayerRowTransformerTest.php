@@ -36,7 +36,7 @@ class PlayerRowTransformerTest extends TestCase
         $db = $this->createStub(\mysqli::class);
 
         $player = $this->createStub(Player::class);
-        $player->name = '|Placeholder';
+        $player->method('getName')->willReturn('|Placeholder');
 
         $result = PlayerRowTransformer::resolvePlayers($db, [$player], '');
 
@@ -48,7 +48,7 @@ class PlayerRowTransformerTest extends TestCase
         $db = $this->createStub(\mysqli::class);
 
         $player = $this->createStub(Player::class);
-        $player->name = 'John Doe';
+        $player->method('getName')->willReturn('John Doe');
 
         $result = PlayerRowTransformer::resolvePlayers($db, [$player], '');
 

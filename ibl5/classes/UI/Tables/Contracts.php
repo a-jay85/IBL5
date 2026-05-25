@@ -57,19 +57,19 @@ class Contracts implements ContractsTableInterface
 
             // Build salary lookup from explicit properties
             $salaryByYear = [
-                1 => $player->contractYear1Salary ?? 0,
-                2 => $player->contractYear2Salary ?? 0,
-                3 => $player->contractYear3Salary ?? 0,
-                4 => $player->contractYear4Salary ?? 0,
-                5 => $player->contractYear5Salary ?? 0,
-                6 => $player->contractYear6Salary ?? 0,
+                1 => $player->getContractYear1Salary() ?? 0,
+                2 => $player->getContractYear2Salary() ?? 0,
+                3 => $player->getContractYear3Salary() ?? 0,
+                4 => $player->getContractYear4Salary() ?? 0,
+                5 => $player->getContractYear5Salary() ?? 0,
+                6 => $player->getContractYear6Salary() ?? 0,
             ];
 
             // Calculate contract values for each year
             /** @var array<int, int> $contracts */
             $contracts = [];
             for ($y = 1; $y <= 6; $y++) {
-                $contractCurrentYear = $player->contractCurrentYear ?? 0;
+                $contractCurrentYear = $player->getContractCurrentYear() ?? 0;
                 $yearNum = $contractCurrentYear + ($y - 1) + $yearOffset;
                 if ($yearNum < 7) {
                     if ($contractCurrentYear === 0) {
@@ -133,7 +133,7 @@ class Contracts implements ContractsTableInterface
     <tbody>
 <?php foreach ($playerRows as $row):
     $player = $row['player'];
-    $isCashPlayer = $row['isCashRow'] || str_contains($player->name ?? '', '|');
+    $isCashPlayer = $row['isCashRow'] || str_contains($player->getName() ?? '', '|');
     $hasRookieOption = !$isCashPlayer && $player->canRookieOption($season->phase);
     // Pass $season so eligibility reflects the incoming season's state during Draft / Free Agency.
     $hasExtension = !$isCashPlayer && !$hasRookieOption && $player->canRenegotiateContract($season);
@@ -142,21 +142,21 @@ class Contracts implements ContractsTableInterface
     $hintActionLabel = '';
     $renderHintAsLink = false;
     if ($hasRookieOption) {
-        $hintActionUrl = 'modules.php?name=Player&amp;pa=rookieoption&amp;pid=' . (int)$player->playerID . '&amp;from=team';
+        $hintActionUrl = 'modules.php?name=Player&amp;pa=rookieoption&amp;pid=' . (int)$player->getPlayerID() . '&amp;from=team';
         $hintActionLabel = 'Rookie Option';
         $renderHintAsLink = $showActionLinks;
     } elseif ($hasExtension) {
-        $hintActionUrl = 'modules.php?name=Player&amp;pa=negotiate&amp;pid=' . (int)$player->playerID;
+        $hintActionUrl = 'modules.php?name=Player&amp;pa=negotiate&amp;pid=' . (int)$player->getPlayerID();
         $hintActionLabel = 'Contract Extension';
         $renderHintAsLink = $showActionLinks && $isExtensionActionablePhase;
     }
 ?>
         <tr<?= $row['isCashRow'] ? ' data-cash-row' : '' ?>>
-            <td><?= HtmlSanitizer::e($player->position ?? '') ?></td>
-            <?= PlayerImageHelper::renderPlayerCell((int)$player->playerID, $player->decoratedName ?? '', $starterPids, $player->nameStatusClass) ?>
-            <td><?= (int)$player->age ?></td>
-            <td><?= (int)$player->yearsOfExperience ?></td>
-            <td class="sep-r-team"><?= (int)$player->birdYears ?></td>
+            <td><?= HtmlSanitizer::e($player->getPosition() ?? '') ?></td>
+            <?= PlayerImageHelper::renderPlayerCell((int)$player->getPlayerID(), $player->getDecoratedName() ?? '', $starterPids, $player->getNameStatusClass()) ?>
+            <td><?= (int)$player->getAge() ?></td>
+            <td><?= (int)$player->getYearsOfExperience() ?></td>
+            <td class="sep-r-team"><?= (int)$player->getBirdYears() ?></td>
             <td class="col-salary"><?= $row['con1'] ?></td>
             <?php if ($hasRookieOption || $hasExtension): ?>
             <td class="col-salary contract-hint-cell" tabindex="0"><?= $row['con2'] === 0 ? '0*' : $row['con2'] ?><?php if ($renderHintAsLink): ?><a href="<?= $hintActionUrl ?>" class="contract-hint-link" data-no-abbreviate><?= $hintActionLabel ?></a><?php else: ?><span class="contract-hint-link" data-no-abbreviate><?= $hintActionLabel ?></span><?php endif; ?></td>
@@ -171,14 +171,14 @@ class Contracts implements ContractsTableInterface
             <td class="col-salary"><?= $row['con5'] ?></td>
             <td class="col-salary sep-r-team"><?= $row['con6'] ?></td>
             <?php endif; ?>
-            <td><?= (int)$player->ratingTalent ?></td>
-            <td><?= (int)$player->ratingSkill ?></td>
-            <td class="sep-r-team"><?= (int)$player->ratingIntangibles ?></td>
-            <td><?= (int)$player->freeAgencyLoyalty ?></td>
-            <td><?= (int)$player->freeAgencyPlayForWinner ?></td>
-            <td><?= (int)$player->freeAgencyPlayingTime ?></td>
-            <td><?= (int)$player->freeAgencySecurity ?></td>
-            <td><?= (int)$player->freeAgencyTradition ?></td>
+            <td><?= (int)$player->getRatingTalent() ?></td>
+            <td><?= (int)$player->getRatingSkill() ?></td>
+            <td class="sep-r-team"><?= (int)$player->getRatingIntangibles() ?></td>
+            <td><?= (int)$player->getFreeAgencyLoyalty() ?></td>
+            <td><?= (int)$player->getFreeAgencyPlayForWinner() ?></td>
+            <td><?= (int)$player->getFreeAgencyPlayingTime() ?></td>
+            <td><?= (int)$player->getFreeAgencySecurity() ?></td>
+            <td><?= (int)$player->getFreeAgencyTradition() ?></td>
         </tr>
 <?php endforeach; ?>
     </tbody>

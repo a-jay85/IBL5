@@ -1,6 +1,6 @@
 #!/bin/bash
 # Run pending SQL migrations against a running Docker MariaDB container.
-# Usage: bin/db-migrate <db-container> <migrations-dir>
+# Usage: bin/db-migrate <db-container> <migrations-dir> [db-name]
 #
 # Migrations are tracked in schema_migrations(version VARCHAR(255) PRIMARY KEY).
 # Already-applied migrations are skipped (idempotent).
@@ -12,8 +12,10 @@ source "$(dirname "$0")/lib/db-helpers.sh"
 DB_CONTAINER="${1:-}"
 MIGRATIONS_DIR="${2:-}"
 
+DB_NAME="${3:-iblhoops_ibl5}"
+
 if [ -z "$DB_CONTAINER" ] || [ -z "$MIGRATIONS_DIR" ]; then
-    echo "Usage: bin/db-migrate <db-container> <migrations-dir>" >&2
+    echo "Usage: bin/db-migrate <db-container> <migrations-dir> [db-name]" >&2
     exit 1
 fi
 
@@ -28,7 +30,7 @@ if ! ls "$MIGRATIONS_DIR"/*.sql &>/dev/null; then
     exit 0
 fi
 
-DB_CMD="mariadb -u root -proot iblhoops_ibl5"
+DB_CMD="mariadb -u root -proot $DB_NAME"
 
 echo "Running migrations..."
 db_exec "$DB_CONTAINER" $DB_CMD \

@@ -36,7 +36,7 @@ class PlayerRowTransformer implements PlayerRowTransformerInterface
             if ($yr === "") {
                 if ($plrRow instanceof Player) {
                     $player = $plrRow;
-                    $playerStats = PlayerStats::withPlayerID($db, $player->playerID ?? 0);
+                    $playerStats = PlayerStats::withPlayerID($db, $player->getPlayerID() ?? 0);
                 } elseif (is_array($plrRow)) {
                     /** @var PlayerRow $plrRow */
                     $player = Player::withPlrRow($db, $plrRow);
@@ -46,7 +46,7 @@ class PlayerRowTransformer implements PlayerRowTransformerInterface
                     continue;
                 }
 
-                if (str_starts_with($player->name ?? '', '|')) {
+                if (str_starts_with($player->getName() ?? '', '|')) {
                     continue;
                 }
             } else {
@@ -90,7 +90,7 @@ class PlayerRowTransformer implements PlayerRowTransformerInterface
                     continue;
                 }
 
-                if (str_starts_with($player->name ?? '', '|')) {
+                if (str_starts_with($player->getName() ?? '', '|')) {
                     continue;
                 }
             } else {

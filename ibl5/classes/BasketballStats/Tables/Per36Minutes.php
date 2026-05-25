@@ -103,10 +103,10 @@ class Per36Minutes
 ?>
         <tr>
 <?php if ($moduleName === "LeagueStarters"):
-    echo TeamCellHelper::renderTeamCellOrFreeAgent($player->teamid ?? 0, $player->teamName ?? '', $player->teamColor1 ?? 'FFFFFF', $player->teamColor2 ?? '000000');
+    echo TeamCellHelper::renderTeamCellOrFreeAgent($player->getTeamid() ?? 0, $player->getTeamName() ?? '', $player->getTeamColor1() ?? 'FFFFFF', $player->getTeamColor2() ?? '000000');
 endif; ?>
-            <td><?= HtmlSanitizer::e($player->position ?? '') ?></td>
-            <?= PlayerImageHelper::renderPlayerCell($player->playerID ?? 0, $player->decoratedName ?? '', $starterPids, $player->nameStatusClass) ?>
+            <td><?= HtmlSanitizer::e($player->getPosition() ?? '') ?></td>
+            <?= PlayerImageHelper::renderPlayerCell($player->getPlayerID() ?? 0, $player->getDecoratedName() ?? '', $starterPids, $player->getNameStatusClass()) ?>
             <td><?= $playerStats->seasonGamesPlayed ?></td>
             <td><?= $playerStats->seasonGamesStarted ?></td>
             <td><?= $row['stats_mpg'] ?></td>

@@ -21,11 +21,11 @@ use SeasonArchive\SeasonArchiveRepository;
 use SeasonArchive\SeasonArchiveService;
 use SeasonArchive\SeasonArchiveView;
 
-global $mysqli_db;
+global $mysqli_db, $leagueContext;
 
 PageLayout\PageLayout::header();
 
-$repository = new SeasonArchiveRepository($mysqli_db);
+$repository = new SeasonArchiveRepository($mysqli_db, $leagueContext);
 $service = new SeasonArchiveService($repository);
 $view = new SeasonArchiveView();
 

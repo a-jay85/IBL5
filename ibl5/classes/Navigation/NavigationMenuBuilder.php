@@ -17,6 +17,20 @@ use Security\HtmlSanitizer;
  */
 class NavigationMenuBuilder implements NavigationMenuBuilderInterface
 {
+    private const OLYMPICS_HIDDEN_NAV_MODULES = [
+        'CapSpace',
+        'ProjectedDraftOrder',
+        'DraftPickLocator',
+        'TrainingCampRatingsDiff',
+        'FreeAgencyPreview',
+        'ContractList',
+        'PlayerMovement',
+        'FranchiseHistory',
+        'DraftHistory',
+        'AllStarAppearances',
+        'OneOnOneGame',
+    ];
+
     private NavigationConfig $config;
 
     public function __construct(NavigationConfig $config)
@@ -99,6 +113,10 @@ class NavigationMenuBuilder implements NavigationMenuBuilderInterface
                 ], static fn (mixed $item): bool => $item !== null)),
             ],
         ];
+
+        if ($this->config->currentLeague === 'olympics') {
+            $menus = $this->filterOlympicsMenus($menus);
+        }
 
         return $menus;
     }
@@ -206,6 +224,38 @@ class NavigationMenuBuilder implements NavigationMenuBuilderInterface
             'icon' => '<img src="/ibl5/images/logo/new' . $teamId . '.png" alt="Team Logo" class="w-6 h-6 object-contain">',
             'links' => $links,
         ];
+    }
+
+    /**
+     * @param array<string, NavMenuData> $menus
+     * @return array<string, NavMenuData>
+     */
+    private function filterOlympicsMenus(array $menus): array
+    {
+        foreach ($menus as $menuName => &$menu) {
+            $menu['links'] = array_values(array_filter(
+                $menu['links'],
+                static function (array $link): bool {
+                    if (($link['external'] ?? false) && ($link['url'] ?? '') === 'ibl/IBL') {
+                        return false;
+                    }
+
+                    $url = $link['url'] ?? '';
+                    if (preg_match('/modules\.php\?name=(\w+)/', $url, $matches) === 1) {
+                        return !in_array($matches[1], self::OLYMPICS_HIDDEN_NAV_MODULES, true);
+                    }
+
+                    return true;
+                }
+            ));
+
+            if ($menu['links'] === []) {
+                unset($menus[$menuName]);
+            }
+        }
+        unset($menu);
+
+        return $menus;
     }
 
     /**

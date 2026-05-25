@@ -28,9 +28,9 @@ get_lang($module_name);
 
 $pagetitle = '- Record Holders';
 
-global $mysqli_db;
+global $mysqli_db, $leagueContext;
 
-$repository = new RecordHoldersRepository($mysqli_db);
+$repository = new RecordHoldersRepository($mysqli_db, $leagueContext);
 $innerService = new RecordHoldersService($repository);
 $cache = new DatabaseCache($mysqli_db);
 $service = new CachedRecordHoldersService($innerService, $cache);

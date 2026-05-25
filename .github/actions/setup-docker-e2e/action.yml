@@ -64,7 +64,28 @@ runs:
         docker pull ghcr.io/a-jay85/ibl5/php-apache:latest || \
         docker build -t ghcr.io/a-jay85/ibl5/php-apache:latest .
 
-    - name: Start Docker containers
+    - name: Start MariaDB first (schema must be ready before Apache serves)
+      shell: bash
+      run: docker compose -f docker-compose.ci.yml up -d mariadb --wait
+
+    - name: Pull Playwright image (background)
+      if: inputs.with-playwright == 'true'
+      shell: bash
+      run: nohup docker pull mcr.microsoft.com/playwright:v1.60.0-jammy > /tmp/playwright-pull.log 2>&1 &
+
+    - name: Create database and apply migrations
+      shell: bash
+      run: |
+        chmod +x ibl5/bin/run-migrations-ci.sh
+        ibl5/bin/run-migrations-ci.sh -h 127.0.0.1 -u root -proot ibl5
+
+    - name: Import seed data
+      shell: bash
+      run: |
+        docker compose -f docker-compose.ci.yml exec -T mariadb \
+          mariadb -u root -proot ibl5 < ibl5/tests/e2e/fixtures/ci-seed.sql
+
+    - name: Start remaining containers (Apache sees fully-migrated schema)
       shell: bash
       run: docker compose -f docker-compose.ci.yml up -d --wait
 
@@ -84,23 +105,6 @@ runs:
            echo 'log_errors = On' >> /usr/local/etc/php/conf.d/zz-error-log.ini && \
            touch /tmp/php_errors.log && chmod 666 /tmp/php_errors.log && \
            apache2ctl graceful"
-
-    - name: Pull Playwright image (background)
-      if: inputs.with-playwright == 'true'
-      shell: bash
-      run: nohup docker pull mcr.microsoft.com/playwright:v1.60.0-jammy > /tmp/playwright-pull.log 2>&1 &
-
-    - name: Create database and apply migrations
-      shell: bash
-      run: |
-        chmod +x ibl5/bin/run-migrations-ci.sh
-        ibl5/bin/run-migrations-ci.sh -h 127.0.0.1 -u root -proot ibl5
-
-    - name: Import seed data
-      shell: bash
-      run: |
-        docker compose -f docker-compose.ci.yml exec -T mariadb \
-          mariadb -u root -proot ibl5 < ibl5/tests/e2e/fixtures/ci-seed.sql
 
     - name: Create test user
       if: inputs.with-playwright == 'true'

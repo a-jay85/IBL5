@@ -26,14 +26,14 @@ use TeamSchedule\TeamScheduleRepository;
 use TeamSchedule\TeamScheduleService;
 use TeamSchedule\TeamScheduleView;
 
-global $cookie, $mysqli_db;
+global $cookie, $mysqli_db, $leagueContext;
 
 $commonRepository = new Repositories\TeamIdentityRepository($mysqli_db);
-$season = new \Season\Season($mysqli_db);
+$season = new \Season\Season($mysqli_db, $leagueContext);
 $league = new \League\League($mysqli_db);
 
 // Load power rankings for SOS tier indicators
-$standingsRepo = new StandingsRepository($mysqli_db);
+$standingsRepo = new StandingsRepository($mysqli_db, $leagueContext);
 $allStreakData = $standingsRepo->getAllStreakData();
 /** @var array<int, float> $teamPowerRankings */
 $teamPowerRankings = [];
@@ -55,7 +55,7 @@ PageLayout\PageLayout::header();
 
 if ($isValidTeam) {
     // Team-specific schedule with colors, logo, and win/loss tracking
-    $teamScheduleRepository = new TeamScheduleRepository($mysqli_db);
+    $teamScheduleRepository = new TeamScheduleRepository($mysqli_db, $leagueContext);
     $service = new TeamScheduleService($mysqli_db, $teamScheduleRepository, $teamPowerRankings);
     $view = new TeamScheduleView();
 
@@ -72,7 +72,7 @@ if ($isValidTeam) {
     echo $view->render($team, $games, $league->getSimLengthInDays(), $season->phase);
 } else {
     // League-wide schedule
-    $repository = new LeagueScheduleRepository($mysqli_db);
+    $repository = new LeagueScheduleRepository($mysqli_db, $leagueContext);
     $service = new LeagueScheduleService($repository, $teamPowerRankings);
     $view = new LeagueScheduleView();
     $pageData = $service->getSchedulePageData($season, $league, $commonRepository);

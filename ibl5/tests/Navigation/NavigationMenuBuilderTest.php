@@ -216,6 +216,78 @@ class NavigationMenuBuilderTest extends TestCase
         $this->assertNotContains('Trading', $labels);
     }
 
+    public function testIblModeMenuStructureContainsAllSeasonLinks(): void
+    {
+        $builder = new NavigationMenuBuilder($this->createConfig(currentLeague: 'ibl'));
+        $menus = $builder->getMenuStructure();
+
+        $seasonLabels = array_map(
+            static fn (array $link): string => $link['label'] ?? '',
+            $menus['Season']['links']
+        );
+
+        $expectedSeasonLinks = [
+            'Standings', 'Schedule', 'Injuries', 'Player Database', 'Player Export',
+            'Cap Space', 'Draft Pick Locator', 'Training Camp Ratings Diff',
+            'Free Agency Preview', 'Contract List', 'Player Movement',
+        ];
+        foreach ($expectedSeasonLinks as $label) {
+            $this->assertContains($label, $seasonLabels, "Season menu should contain '$label'");
+        }
+
+        $jsbExport = array_filter(
+            $menus['Season']['links'],
+            static fn (array $link): bool => ($link['label'] ?? '') === 'JSB Export'
+        );
+        $this->assertNotEmpty($jsbExport, 'Season menu should contain JSB Export');
+        $jsbLink = array_values($jsbExport)[0];
+        $this->assertTrue($jsbLink['external'] ?? false, 'JSB Export should be external');
+
+        $historyLabels = array_map(
+            static fn (array $link): string => $link['label'] ?? '',
+            $menus['History']['links']
+        );
+
+        $expectedHistoryLinks = [
+            'Franchise History', 'Draft History', 'All-Star Appearances', '1-On-1 Game',
+        ];
+        foreach ($expectedHistoryLinks as $label) {
+            $this->assertContains($label, $historyLabels, "History menu should contain '$label'");
+        }
+    }
+
+    public function testOlympicsModeFiltersIblOnlyLinksFromMenuStructure(): void
+    {
+        $builder = new NavigationMenuBuilder($this->createConfig(currentLeague: 'olympics'));
+        $menus = $builder->getMenuStructure();
+
+        $allLabels = [];
+        foreach ($menus as $menu) {
+            foreach ($menu['links'] as $link) {
+                $allLabels[] = $link['label'] ?? ($link['rawHtml'] ?? '');
+            }
+        }
+
+        $shouldBeAbsent = [
+            'Cap Space', 'Projected Draft Order', 'Draft Pick Locator',
+            'Training Camp Ratings Diff', 'Free Agency Preview', 'Contract List',
+            'Player Movement', 'Franchise History', 'Draft History',
+            'All-Star Appearances', '1-On-1 Game', 'JSB Export',
+        ];
+        foreach ($shouldBeAbsent as $label) {
+            $this->assertNotContains($label, $allLabels, "'$label' should be filtered in Olympics mode");
+        }
+
+        $shouldBePresent = [
+            'Standings', 'Schedule', 'Injuries', 'Player Database', 'Player Export',
+            'Award History', 'Record Holders', 'Season Leaderboards',
+            'Career Leaderboards', 'Season Archive',
+        ];
+        foreach ($shouldBePresent as $label) {
+            $this->assertContains($label, $allLabels, "'$label' should remain in Olympics mode");
+        }
+    }
+
     // --- Draft Order Finalization Tests ---
 
     public function testProjectedDraftOrderLabelWhenNotFinalized(): void

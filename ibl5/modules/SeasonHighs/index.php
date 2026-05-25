@@ -26,10 +26,10 @@ use SeasonHighs\SeasonHighsView;
 $module_name = basename(dirname(__FILE__));
 get_lang($module_name);
 
-global $mysqli_db;
+global $mysqli_db, $leagueContext;
 
 // Get current season info
-$season = new \Season\Season($mysqli_db);
+$season = new \Season\Season($mysqli_db, $leagueContext);
 
 // Determine season phase (from request or current phase)
 $seasonPhase = isset($_GET['seasonPhase']) && !empty($_GET['seasonPhase'])
@@ -39,7 +39,7 @@ $seasonPhase = isset($_GET['seasonPhase']) && !empty($_GET['seasonPhase'])
 $pagetitle = "- $seasonPhase Stat Leaders";
 
 // Initialize services
-$repository = new SeasonHighsRepository($mysqli_db);
+$repository = new SeasonHighsRepository($mysqli_db, $leagueContext);
 $service = new SeasonHighsService($repository, $season);
 $view = new SeasonHighsView();
 

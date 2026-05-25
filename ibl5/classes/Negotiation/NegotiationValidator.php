@@ -77,16 +77,16 @@ class NegotiationValidator implements NegotiationValidatorInterface
     {
         $playerData = new PlayerData();
 
-        $playerData->contractCurrentYear = $player->contractCurrentYear ?? 0;
-        $playerData->contractYear1Salary = $player->contractYear1Salary ?? 0;
-        $playerData->contractYear2Salary = $player->contractYear2Salary ?? 0;
-        $playerData->contractYear3Salary = $player->contractYear3Salary ?? 0;
-        $playerData->contractYear4Salary = $player->contractYear4Salary ?? 0;
-        $playerData->contractYear5Salary = $player->contractYear5Salary ?? 0;
-        $playerData->contractYear6Salary = $player->contractYear6Salary ?? 0;
+        $playerData->contractCurrentYear = $player->getContractCurrentYear() ?? 0;
+        $playerData->contractYear1Salary = $player->getContractYear1Salary() ?? 0;
+        $playerData->contractYear2Salary = $player->getContractYear2Salary() ?? 0;
+        $playerData->contractYear3Salary = $player->getContractYear3Salary() ?? 0;
+        $playerData->contractYear4Salary = $player->getContractYear4Salary() ?? 0;
+        $playerData->contractYear5Salary = $player->getContractYear5Salary() ?? 0;
+        $playerData->contractYear6Salary = $player->getContractYear6Salary() ?? 0;
 
-        $playerData->draftRound = $player->draftRound ?? 0;
-        $playerData->yearsOfExperience = $player->yearsOfExperience ?? 0;
+        $playerData->draftRound = $player->getDraftRound() ?? 0;
+        $playerData->yearsOfExperience = $player->getYearsOfExperience() ?? 0;
 
         return $playerData;
     }

@@ -8,10 +8,11 @@ use PHPUnit\Framework\TestCase;
 use Negotiation\NegotiationValidator;
 use Player\Player;
 use Tests\WideUnit\Mocks\MockDatabase;
+use Tests\WideUnit\Mocks\TestDataFactory;
 
 /**
  * Tests for NegotiationValidator
- * 
+ *
  * Validates contract negotiation eligibility rules:
  * - Player must be on user's team
  * - Player must be eligible for contract renegotiation (delegates to PlayerContractValidator)
@@ -19,7 +20,7 @@ use Tests\WideUnit\Mocks\MockDatabase;
  */
 class NegotiationValidatorTest extends TestCase
 {
-    private $mockDb;
+    private MockDatabase $mockDb;
     private $validator;
     private $mockSeason;
 
@@ -36,7 +37,6 @@ class NegotiationValidatorTest extends TestCase
     protected function tearDown(): void
     {
         $this->validator = null;
-        $this->mockDb = null;
     }
 
     /**
@@ -64,9 +64,19 @@ class NegotiationValidatorTest extends TestCase
     public function testAcceptsPlayerOnUsersTeamWhenEligible()
     {
         // Arrange
-        $player = $this->createMockPlayer('Test Player', 'Seattle Supersonics');
-        $player->contractCurrentYear = 5;
-        $player->contractYear6Salary = 0; // Can renegotiate - in last year
+        $player = Player::withPlrRow($this->mockDb, TestDataFactory::createPlayer([
+            'name' => 'Test Player',
+            'teamname' => 'Seattle Supersonics',
+            'cy' => 5,
+            'salary_yr1' => 500,
+            'salary_yr2' => 0,
+            'salary_yr3' => 0,
+            'salary_yr4' => 0,
+            'salary_yr5' => 0,
+            'salary_yr6' => 0,
+            'draftround' => 1,
+            'exp' => 5,
+        ]));
         $userTeamName = 'Seattle Supersonics';
 
         // Act
@@ -83,9 +93,19 @@ class NegotiationValidatorTest extends TestCase
     public function testRejectsPlayerNotEligibleForRenegotiation()
     {
         // Arrange - player has multiple years left on contract
-        $player = $this->createMockPlayer('Test Player', 'Seattle Supersonics');
-        $player->contractCurrentYear = 2;
-        $player->contractYear3Salary = 1000; // Has next year salary, cannot renegotiate
+        $player = Player::withPlrRow($this->mockDb, TestDataFactory::createPlayer([
+            'name' => 'Test Player',
+            'teamname' => 'Seattle Supersonics',
+            'cy' => 2,
+            'salary_yr1' => 500,
+            'salary_yr2' => 0,
+            'salary_yr3' => 1000,
+            'salary_yr4' => 0,
+            'salary_yr5' => 0,
+            'salary_yr6' => 0,
+            'draftround' => 1,
+            'exp' => 5,
+        ]));
         $userTeamName = 'Seattle Supersonics';
 
         // Act
@@ -103,8 +123,19 @@ class NegotiationValidatorTest extends TestCase
     public function testAcceptsPlayerInLastContractYear()
     {
         // Arrange
-        $player = $this->createMockPlayer('Test Player', 'Seattle Supersonics');
-        $player->contractCurrentYear = 6; // Last possible year
+        $player = Player::withPlrRow($this->mockDb, TestDataFactory::createPlayer([
+            'name' => 'Test Player',
+            'teamname' => 'Seattle Supersonics',
+            'cy' => 6,
+            'salary_yr1' => 500,
+            'salary_yr2' => 0,
+            'salary_yr3' => 0,
+            'salary_yr4' => 0,
+            'salary_yr5' => 0,
+            'salary_yr6' => 0,
+            'draftround' => 1,
+            'exp' => 5,
+        ]));
         $userTeamName = 'Seattle Supersonics';
 
         // Act
@@ -121,9 +152,19 @@ class NegotiationValidatorTest extends TestCase
     public function testAcceptsPlayerWithNoNextYearSalary()
     {
         // Arrange
-        $player = $this->createMockPlayer('Test Player', 'Seattle Supersonics');
-        $player->contractCurrentYear = 3;
-        $player->contractYear4Salary = 0; // No next year, can renegotiate
+        $player = Player::withPlrRow($this->mockDb, TestDataFactory::createPlayer([
+            'name' => 'Test Player',
+            'teamname' => 'Seattle Supersonics',
+            'cy' => 3,
+            'salary_yr1' => 500,
+            'salary_yr2' => 0,
+            'salary_yr3' => 0,
+            'salary_yr4' => 0,
+            'salary_yr5' => 0,
+            'salary_yr6' => 0,
+            'draftround' => 1,
+            'exp' => 5,
+        ]));
         $userTeamName = 'Seattle Supersonics';
 
         // Act
@@ -140,13 +181,19 @@ class NegotiationValidatorTest extends TestCase
     public function testRejectsRookieOptionedPlayerInOptionYear()
     {
         // Arrange - First round rookie optioned player in year 4
-        $player = $this->createMockPlayer('Test Player', 'Seattle Supersonics');
-        $player->draftRound = 1;
-        $player->yearsOfExperience = 4;
-        $player->contractCurrentYear = 4;
-        $player->contractYear3Salary = 369;
-        $player->contractYear4Salary = 738; // Doubled = rookie option
-        $player->contractYear5Salary = 0;
+        $player = Player::withPlrRow($this->mockDb, TestDataFactory::createPlayer([
+            'name' => 'Test Player',
+            'teamname' => 'Seattle Supersonics',
+            'cy' => 4,
+            'salary_yr1' => 500,
+            'salary_yr2' => 0,
+            'salary_yr3' => 369,
+            'salary_yr4' => 738, // Doubled = rookie option
+            'salary_yr5' => 0,
+            'salary_yr6' => 0,
+            'draftround' => 1,
+            'exp' => 4,
+        ]));
         $userTeamName = 'Seattle Supersonics';
 
         // Act
@@ -212,9 +259,19 @@ class NegotiationValidatorTest extends TestCase
      */
     public function testRenegotiationEligibilitySkipsOwnershipCheck(): void
     {
-        $player = $this->createMockPlayer('Test Player', 'Seattle Supersonics');
-        $player->contractCurrentYear = 5;
-        $player->contractYear6Salary = 0;
+        $player = Player::withPlrRow($this->mockDb, TestDataFactory::createPlayer([
+            'name' => 'Test Player',
+            'teamname' => 'Seattle Supersonics',
+            'cy' => 5,
+            'salary_yr1' => 500,
+            'salary_yr2' => 0,
+            'salary_yr3' => 0,
+            'salary_yr4' => 0,
+            'salary_yr5' => 0,
+            'salary_yr6' => 0,
+            'draftround' => 1,
+            'exp' => 5,
+        ]));
 
         $result = $this->validator->validateRenegotiationEligibility($player);
 
@@ -226,9 +283,19 @@ class NegotiationValidatorTest extends TestCase
      */
     public function testRenegotiationEligibilityRejectsIneligibleContract(): void
     {
-        $player = $this->createMockPlayer('Test Player', 'Seattle Supersonics');
-        $player->contractCurrentYear = 2;
-        $player->contractYear3Salary = 1000;
+        $player = Player::withPlrRow($this->mockDb, TestDataFactory::createPlayer([
+            'name' => 'Test Player',
+            'teamname' => 'Seattle Supersonics',
+            'cy' => 2,
+            'salary_yr1' => 500,
+            'salary_yr2' => 0,
+            'salary_yr3' => 1000,
+            'salary_yr4' => 0,
+            'salary_yr5' => 0,
+            'salary_yr6' => 0,
+            'draftround' => 1,
+            'exp' => 5,
+        ]));
 
         $result = $this->validator->validateRenegotiationEligibility($player);
 
@@ -240,48 +307,70 @@ class NegotiationValidatorTest extends TestCase
 
     public function testValidatesPlayerWithNullContractSalaryFields(): void
     {
-        // Player with ALL contract salary fields null → should default to 0 via null coalescing
-        $player = new Player();
-        $player->name = 'Null Salary Player';
-        $player->teamName = 'Seattle Supersonics';
-        $player->contractCurrentYear = 6; // Last year → eligible
-        // All contractYear*Salary fields are null (not set)
+        // Player with ALL contract salary fields 0 → getters return 0 via null coalescing
+        $player = Player::withPlrRow($this->mockDb, TestDataFactory::createPlayer([
+            'name' => 'Null Salary Player',
+            'teamname' => 'Seattle Supersonics',
+            'cy' => 6, // Last year → eligible
+            'salary_yr1' => 0,
+            'salary_yr2' => 0,
+            'salary_yr3' => 0,
+            'salary_yr4' => 0,
+            'salary_yr5' => 0,
+            'salary_yr6' => 0,
+            'draftround' => 1,
+            'exp' => 5,
+        ]));
 
         $result = $this->validator->validateNegotiationEligibility($player, 'Seattle Supersonics');
 
-        // Should succeed — null salaries default to 0, and year 6 is the last year
+        // Should succeed — zero salaries and year 6 is the last year
         $this->assertTrue($result->isValid());
     }
 
     public function testValidatesPlayerWithNullDraftAndExperienceFields(): void
     {
-        // Player with null draftRound and yearsOfExperience
-        $player = new Player();
-        $player->name = 'Null Draft Player';
-        $player->teamName = 'Seattle Supersonics';
-        $player->contractCurrentYear = 5;
-        $player->contractYear6Salary = 0; // Can renegotiate
-        // draftRound and yearsOfExperience are null
+        // Player where draftRound and yearsOfExperience do not trigger rookie option
+        $player = Player::withPlrRow($this->mockDb, TestDataFactory::createPlayer([
+            'name' => 'Null Draft Player',
+            'teamname' => 'Seattle Supersonics',
+            'cy' => 5,
+            'salary_yr1' => 500,
+            'salary_yr2' => 0,
+            'salary_yr3' => 0,
+            'salary_yr4' => 0,
+            'salary_yr5' => 0,
+            'salary_yr6' => 0,
+            'draftround' => 1,
+            'exp' => 5, // exp=5, not 4, so wasRookieOptioned returns false
+        ]));
 
         $result = $this->validator->validateNegotiationEligibility($player, 'Seattle Supersonics');
 
-        // Should succeed — null draft round defaults to 0 (not a first rounder),
-        // null experience defaults to 0
+        // Should succeed — not a rookie option candidate, year 6 salary is 0
         $this->assertTrue($result->isValid());
     }
 
     public function testValidatesPlayerWithNullContractCurrentYear(): void
     {
-        // Player with null contractCurrentYear → defaults to 0
-        $player = new Player();
-        $player->name = 'Null CY Player';
-        $player->teamName = 'Seattle Supersonics';
-        // contractCurrentYear is null → defaults to 0
+        // Player with contractCurrentYear = 0 and no next-year salary → eligible
+        $player = Player::withPlrRow($this->mockDb, TestDataFactory::createPlayer([
+            'name' => 'Null CY Player',
+            'teamname' => 'Seattle Supersonics',
+            'cy' => 0, // No active contract year
+            'salary_yr1' => 0, // Next-year (year 1) salary = 0 → eligible
+            'salary_yr2' => 0,
+            'salary_yr3' => 0,
+            'salary_yr4' => 0,
+            'salary_yr5' => 0,
+            'salary_yr6' => 0,
+            'draftround' => 1,
+            'exp' => 5,
+        ]));
 
         $result = $this->validator->validateNegotiationEligibility($player, 'Seattle Supersonics');
 
-        // contractCurrentYear 0 means no active contract year,
-        // next year salary check uses contractYear1Salary (null → 0) → eligible
+        // contractCurrentYear 0 → next year salary check uses year 1 (0) → eligible
         $this->assertTrue($result->isValid());
     }
 
@@ -290,19 +379,18 @@ class NegotiationValidatorTest extends TestCase
      */
     private function createMockPlayer(string $name, string $teamName): Player
     {
-        $player = new Player();
-        $player->name = $name;
-        $player->teamName = $teamName;
-        $player->contractCurrentYear = 1;
-        $player->contractYear1Salary = 500;
-        $player->contractYear2Salary = 0;
-        $player->contractYear3Salary = 0;
-        $player->contractYear4Salary = 0;
-        $player->contractYear5Salary = 0;
-        $player->contractYear6Salary = 0;
-        $player->draftRound = 1;
-        $player->yearsOfExperience = 5;
-
-        return $player;
+        return Player::withPlrRow($this->mockDb, TestDataFactory::createPlayer([
+            'name' => $name,
+            'teamname' => $teamName,
+            'cy' => 1,
+            'salary_yr1' => 500,
+            'salary_yr2' => 0,
+            'salary_yr3' => 0,
+            'salary_yr4' => 0,
+            'salary_yr5' => 0,
+            'salary_yr6' => 0,
+            'draftround' => 1,
+            'exp' => 5,
+        ]));
     }
 }

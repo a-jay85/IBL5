@@ -126,10 +126,10 @@ class NegotiationDemandCalculator implements NegotiationDemandCalculatorInterfac
         $baseDemands = $totalDemands / 6;
         $maxRaise = floor($baseDemands * \ContractRules::STANDARD_RAISE_PERCENTAGE);
 
-        $pfwPref = $player->freeAgencyPlayForWinner ?? 1;
-        $tradPref = $player->freeAgencyTradition ?? 1;
-        $loyPref = $player->freeAgencyLoyalty ?? 1;
-        $ptPref = $player->freeAgencyPlayingTime ?? 1;
+        $pfwPref = $player->getFreeAgencyPlayForWinner() ?? 1;
+        $tradPref = $player->getFreeAgencyTradition() ?? 1;
+        $loyPref = $player->getFreeAgencyLoyalty() ?? 1;
+        $ptPref = $player->getFreeAgencyPlayingTime() ?? 1;
 
         $pfwFactor = \ContractRules::calculateWinnerModifier(
             $teamFactors['wins'] ?? 41,
@@ -253,27 +253,27 @@ class NegotiationDemandCalculator implements NegotiationDemandCalculatorInterfac
     private function getPlayerRatings(Player $player): array
     {
         return [
-            'fga' => $player->ratingFieldGoalAttempts ?? 0,
-            'fgp' => $player->ratingFieldGoalPercentage ?? 0,
-            'fta' => $player->ratingFreeThrowAttempts ?? 0,
-            'ftp' => $player->ratingFreeThrowPercentage ?? 0,
-            'tga' => $player->ratingThreePointAttempts ?? 0,
-            'tgp' => $player->ratingThreePointPercentage ?? 0,
-            'orb' => $player->ratingOffensiveRebounds ?? 0,
-            'drb' => $player->ratingDefensiveRebounds ?? 0,
-            'ast' => $player->ratingAssists ?? 0,
-            'stl' => $player->ratingSteals ?? 0,
-            'tov' => $player->ratingTurnovers ?? 0,
-            'blk' => $player->ratingBlocks ?? 0,
-            'foul' => $player->ratingFouls ?? 0,
-            'oo' => $player->ratingOutsideOffense ?? 0,
-            'od' => $player->ratingOutsideDefense ?? 0,
-            'do' => $player->ratingDriveOffense ?? 0,
-            'dd' => $player->ratingDriveDefense ?? 0,
-            'po' => $player->ratingPostOffense ?? 0,
-            'pd' => $player->ratingPostDefense ?? 0,
-            'to' => $player->ratingTransitionOffense ?? 0,
-            'td' => $player->ratingTransitionDefense ?? 0
+            'fga' => $player->getRatingFieldGoalAttempts() ?? 0,
+            'fgp' => $player->getRatingFieldGoalPercentage() ?? 0,
+            'fta' => $player->getRatingFreeThrowAttempts() ?? 0,
+            'ftp' => $player->getRatingFreeThrowPercentage() ?? 0,
+            'tga' => $player->getRatingThreePointAttempts() ?? 0,
+            'tgp' => $player->getRatingThreePointPercentage() ?? 0,
+            'orb' => $player->getRatingOffensiveRebounds() ?? 0,
+            'drb' => $player->getRatingDefensiveRebounds() ?? 0,
+            'ast' => $player->getRatingAssists() ?? 0,
+            'stl' => $player->getRatingSteals() ?? 0,
+            'tov' => $player->getRatingTurnovers() ?? 0,
+            'blk' => $player->getRatingBlocks() ?? 0,
+            'foul' => $player->getRatingFouls() ?? 0,
+            'oo' => $player->getRatingOutsideOffense() ?? 0,
+            'od' => $player->getRatingOutsideDefense() ?? 0,
+            'do' => $player->getRatingDriveOffense() ?? 0,
+            'dd' => $player->getRatingDriveDefense() ?? 0,
+            'po' => $player->getRatingPostOffense() ?? 0,
+            'pd' => $player->getRatingPostDefense() ?? 0,
+            'to' => $player->getRatingTransitionOffense() ?? 0,
+            'td' => $player->getRatingTransitionDefense() ?? 0
         ];
     }
     
@@ -310,20 +310,20 @@ class NegotiationDemandCalculator implements NegotiationDemandCalculatorInterfac
         $PFWFactor = \ContractRules::calculateWinnerModifier(
             $teamFactors['wins'] ?? 41,
             $teamFactors['losses'] ?? 41,
-            $player->freeAgencyPlayForWinner ?? 1
+            $player->getFreeAgencyPlayForWinner() ?? 1
         );
 
         $traditionFactor = \ContractRules::calculateTraditionModifier(
             $teamFactors['tradition_wins'] ?? 41,
             $teamFactors['tradition_losses'] ?? 41,
-            $player->freeAgencyTradition ?? 1
+            $player->getFreeAgencyTradition() ?? 1
         );
 
-        $loyaltyFactor = \ContractRules::calculateLoyaltyModifier($player->freeAgencyLoyalty ?? 1);
+        $loyaltyFactor = \ContractRules::calculateLoyaltyModifier($player->getFreeAgencyLoyalty() ?? 1);
 
         $PTFactor = \ContractRules::calculatePlayingTimeModifier(
             $teamFactors['money_committed_at_position'] ?? 0,
-            $player->freeAgencyPlayingTime ?? 1
+            $player->getFreeAgencyPlayingTime() ?? 1
         );
 
         return 1 + $PFWFactor + $traditionFactor + $loyaltyFactor + $PTFactor;

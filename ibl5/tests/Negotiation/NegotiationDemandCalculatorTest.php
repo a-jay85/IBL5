@@ -10,6 +10,7 @@ use Negotiation\NegotiationDemandCalculator;
 use Player\Player;
 use Repositories\Contracts\SalaryCapRepositoryInterface;
 use Tests\WideUnit\Mocks\MockDatabase;
+use Tests\WideUnit\Mocks\TestDataFactory;
 
 /**
  * Tests for NegotiationDemandCalculator
@@ -242,11 +243,9 @@ class NegotiationDemandCalculatorTest extends TestCase
     public function testModifierReducesDemandsForLoyalPlayer()
     {
         // Arrange
-        $mercenaryPlayer = $this->createPlayerWithRatings(50);
-        $mercenaryPlayer->freeAgencyLoyalty = 1; // No loyalty
-        
-        $loyalPlayer = $this->createPlayerWithRatings(50);
-        $loyalPlayer->freeAgencyLoyalty = 5; // Maximum loyalty
+        $mercenaryPlayer = $this->createPlayerWithRatings(50, ['loyalty' => 1]);
+
+        $loyalPlayer = $this->createPlayerWithRatings(50, ['loyalty' => 5]);
         
         $this->setupMarketMaximums(100);
         $teamFactors = $this->getDefaultTeamFactors();
@@ -345,40 +344,19 @@ class NegotiationDemandCalculatorTest extends TestCase
     /**
      * Helper to create a player with uniform ratings
      */
-    private function createPlayerWithRatings(int $rating): Player
+    private function createPlayerWithRatings(int $rating, array $overrides = []): Player
     {
-        $player = new Player();
-        
-        // Set all ratings to the same value
-        $player->ratingFieldGoalAttempts = $rating;
-        $player->ratingFieldGoalPercentage = $rating;
-        $player->ratingFreeThrowAttempts = $rating;
-        $player->ratingFreeThrowPercentage = $rating;
-        $player->ratingThreePointAttempts = $rating;
-        $player->ratingThreePointPercentage = $rating;
-        $player->ratingOffensiveRebounds = $rating;
-        $player->ratingDefensiveRebounds = $rating;
-        $player->ratingAssists = $rating;
-        $player->ratingSteals = $rating;
-        $player->ratingTurnovers = $rating;
-        $player->ratingBlocks = $rating;
-        $player->ratingFouls = $rating;
-        $player->ratingOutsideOffense = $rating;
-        $player->ratingOutsideDefense = $rating;
-        $player->ratingDriveOffense = $rating;
-        $player->ratingDriveDefense = $rating;
-        $player->ratingPostOffense = $rating;
-        $player->ratingPostDefense = $rating;
-        $player->ratingTransitionOffense = $rating;
-        $player->ratingTransitionDefense = $rating;
-        
-        // Set default preferences
-        $player->freeAgencyPlayForWinner = 3;
-        $player->freeAgencyTradition = 3;
-        $player->freeAgencyLoyalty = 3;
-        $player->freeAgencyPlayingTime = 3;
-        
-        return $player;
+        $row = TestDataFactory::createPlayer(array_merge([
+            'r_fga' => $rating, 'r_fgp' => $rating, 'r_fta' => $rating, 'r_ftp' => $rating,
+            'r_3ga' => $rating, 'r_3gp' => $rating, 'r_orb' => $rating, 'r_drb' => $rating,
+            'r_ast' => $rating, 'r_stl' => $rating, 'r_tvr' => $rating, 'r_blk' => $rating,
+            'r_foul' => $rating,
+            'oo' => $rating, 'od' => $rating, 'r_drive_off' => $rating, 'dd' => $rating,
+            'po' => $rating, 'pd' => $rating, 'r_trans_off' => $rating, 'td' => $rating,
+            'winner' => 3, 'tradition' => 3, 'loyalty' => 3, 'playing_time' => 3,
+        ], $overrides));
+
+        return Player::withPlrRow($this->mockDb, $row);
     }
 
     /**
@@ -386,9 +364,7 @@ class NegotiationDemandCalculatorTest extends TestCase
      */
     private function createPlayerWithHighWinnerPreference(): Player
     {
-        $player = $this->createPlayerWithRatings(50);
-        $player->freeAgencyPlayForWinner = 5; // Maximum preference
-        return $player;
+        return $this->createPlayerWithRatings(50, ['winner' => 5]);
     }
 
     /**
@@ -396,9 +372,7 @@ class NegotiationDemandCalculatorTest extends TestCase
      */
     private function createPlayerWithHighTraditionPreference(): Player
     {
-        $player = $this->createPlayerWithRatings(50);
-        $player->freeAgencyTradition = 5;
-        return $player;
+        return $this->createPlayerWithRatings(50, ['tradition' => 5]);
     }
 
     /**
@@ -406,9 +380,7 @@ class NegotiationDemandCalculatorTest extends TestCase
      */
     private function createPlayerWithHighPlayingTimePreference(): Player
     {
-        $player = $this->createPlayerWithRatings(50);
-        $player->freeAgencyPlayingTime = 5;
-        return $player;
+        return $this->createPlayerWithRatings(50, ['playing_time' => 5]);
     }
 
     /**
@@ -475,11 +447,9 @@ class NegotiationDemandCalculatorTest extends TestCase
     public function testHandlesExtremeLoyaltyWithWinningTeam(): void
     {
         // Maximum loyalty + winning team could create very high modifier
-        $player = $this->createPlayerWithRatings(50);
-        $player->freeAgencyLoyalty = 5; // Maximum
-        $player->freeAgencyPlayForWinner = 5;
-        $player->freeAgencyTradition = 5;
-        $player->freeAgencyPlayingTime = 1; // Doesn't care about PT
+        $player = $this->createPlayerWithRatings(50, [
+            'loyalty' => 5, 'winner' => 5, 'tradition' => 5, 'playing_time' => 1,
+        ]);
 
         $this->setupMarketMaximums(100);
 
@@ -614,8 +584,7 @@ class NegotiationDemandCalculatorTest extends TestCase
 
     public function testHandlesNegativeMoneyCommitted(): void
     {
-        $player = $this->createPlayerWithRatings(50);
-        $player->freeAgencyPlayingTime = 5; // High PT preference
+        $player = $this->createPlayerWithRatings(50, ['playing_time' => 5]);
         $this->setupMarketMaximums(100);
 
         // Technically shouldn't be negative, but test robustness
@@ -634,8 +603,7 @@ class NegotiationDemandCalculatorTest extends TestCase
 
     public function testHandlesVeryLargeMoneyCommitted(): void
     {
-        $player = $this->createPlayerWithRatings(50);
-        $player->freeAgencyPlayingTime = 5;
+        $player = $this->createPlayerWithRatings(50, ['playing_time' => 5]);
         $this->setupMarketMaximums(100);
 
         $teamFactors = [
@@ -658,12 +626,9 @@ class NegotiationDemandCalculatorTest extends TestCase
 
     public function testHandlesNullPlayerPreferences(): void
     {
-        $player = $this->createPlayerWithRatings(50);
-        // Leave preferences as null (default)
-        $player->freeAgencyPlayForWinner = null;
-        $player->freeAgencyTradition = null;
-        $player->freeAgencyLoyalty = null;
-        $player->freeAgencyPlayingTime = null;
+        $player = $this->createPlayerWithRatings(50, [
+            'winner' => null, 'tradition' => null, 'loyalty' => null, 'playing_time' => null,
+        ]);
 
         $this->setupMarketMaximums(100);
         $teamFactors = $this->getDefaultTeamFactors();
@@ -676,11 +641,9 @@ class NegotiationDemandCalculatorTest extends TestCase
 
     public function testHandlesAllMaximumPreferences(): void
     {
-        $player = $this->createPlayerWithRatings(50);
-        $player->freeAgencyPlayForWinner = 5;
-        $player->freeAgencyTradition = 5;
-        $player->freeAgencyLoyalty = 5;
-        $player->freeAgencyPlayingTime = 5;
+        $player = $this->createPlayerWithRatings(50, [
+            'winner' => 5, 'tradition' => 5, 'loyalty' => 5, 'playing_time' => 5,
+        ]);
 
         $this->setupMarketMaximums(100);
         $teamFactors = $this->getDefaultTeamFactors();
@@ -692,11 +655,9 @@ class NegotiationDemandCalculatorTest extends TestCase
 
     public function testHandlesAllMinimumPreferences(): void
     {
-        $player = $this->createPlayerWithRatings(50);
-        $player->freeAgencyPlayForWinner = 1;
-        $player->freeAgencyTradition = 1;
-        $player->freeAgencyLoyalty = 1;
-        $player->freeAgencyPlayingTime = 1;
+        $player = $this->createPlayerWithRatings(50, [
+            'winner' => 1, 'tradition' => 1, 'loyalty' => 1, 'playing_time' => 1,
+        ]);
 
         $this->setupMarketMaximums(100);
         $teamFactors = $this->getDefaultTeamFactors();
@@ -782,8 +743,7 @@ class NegotiationDemandCalculatorTest extends TestCase
     #[DataProvider('winLossDifferentialProvider')]
     public function testHandlesVariousWinLossDifferentials(int $wins, int $losses): void
     {
-        $player = $this->createPlayerWithRatings(50);
-        $player->freeAgencyPlayForWinner = 5;
+        $player = $this->createPlayerWithRatings(50, ['winner' => 5]);
         $this->setupMarketMaximums(100);
 
         $teamFactors = [
@@ -815,12 +775,9 @@ class NegotiationDemandCalculatorTest extends TestCase
 
     private function createPlayerWithMinimalPreferences(): Player
     {
-        $player = $this->createPlayerWithRatings(50);
-        $player->freeAgencyPlayForWinner = 1;
-        $player->freeAgencyTradition = 1;
-        $player->freeAgencyLoyalty = 1;
-        $player->freeAgencyPlayingTime = 1;
-        return $player;
+        return $this->createPlayerWithRatings(50, [
+            'winner' => 1, 'tradition' => 1, 'loyalty' => 1, 'playing_time' => 1,
+        ]);
     }
 
     // ============================================
@@ -835,8 +792,9 @@ class NegotiationDemandCalculatorTest extends TestCase
      */
     public function testPlayingTimeModifierExactValueAtMc500(): void
     {
-        $player = $this->createPlayerWithMinimalPreferences();
-        $player->freeAgencyPlayingTime = 5;
+        $player = $this->createPlayerWithRatings(50, [
+            'winner' => 1, 'tradition' => 1, 'loyalty' => 1, 'playing_time' => 5,
+        ]);
         $this->setupMarketMaximums(100);
 
         $teamFactors = [
@@ -859,8 +817,9 @@ class NegotiationDemandCalculatorTest extends TestCase
      */
     public function testPlayingTimeModifierExactValueAtMc1500(): void
     {
-        $player = $this->createPlayerWithMinimalPreferences();
-        $player->freeAgencyPlayingTime = 5;
+        $player = $this->createPlayerWithRatings(50, [
+            'winner' => 1, 'tradition' => 1, 'loyalty' => 1, 'playing_time' => 5,
+        ]);
         $this->setupMarketMaximums(100);
 
         $teamFactors = [
@@ -883,8 +842,9 @@ class NegotiationDemandCalculatorTest extends TestCase
      */
     public function testWinnerModifierExactValueRawDifferential(): void
     {
-        $player = $this->createPlayerWithMinimalPreferences();
-        $player->freeAgencyPlayForWinner = 5;
+        $player = $this->createPlayerWithRatings(50, [
+            'winner' => 5, 'tradition' => 1, 'loyalty' => 1, 'playing_time' => 1,
+        ]);
         $this->setupMarketMaximums(100);
 
         $teamFactors = [
@@ -908,8 +868,9 @@ class NegotiationDemandCalculatorTest extends TestCase
      */
     public function testTraditionModifierExactValueRawDifferential(): void
     {
-        $player = $this->createPlayerWithMinimalPreferences();
-        $player->freeAgencyTradition = 5;
+        $player = $this->createPlayerWithRatings(50, [
+            'winner' => 1, 'tradition' => 5, 'loyalty' => 1, 'playing_time' => 1,
+        ]);
         $this->setupMarketMaximums(100);
 
         $teamFactors = [
@@ -1019,11 +980,9 @@ class NegotiationDemandCalculatorTest extends TestCase
 
     public function testBreakdownFaPreferencesMatchPlayer(): void
     {
-        $player = $this->createPlayerWithRatings(50);
-        $player->freeAgencyPlayForWinner = 7;
-        $player->freeAgencyTradition = 8;
-        $player->freeAgencyLoyalty = 3;
-        $player->freeAgencyPlayingTime = 5;
+        $player = $this->createPlayerWithRatings(50, [
+            'winner' => 7, 'tradition' => 8, 'loyalty' => 3, 'playing_time' => 5,
+        ]);
         $this->setupMarketMaximums(100);
         $teamFactors = $this->getDefaultTeamFactors();
 

@@ -48,8 +48,8 @@ class NegotiationService implements NegotiationServiceInterface
             return $output . NegotiationOfferView::renderError($eligibilityValidation->getError() ?? '');
         }
 
-        $factorsTeamName = $bypassOwnership ? ($player->teamName ?? '') : $userTeamName;
-        $teamFactors = $this->getTeamFactors($factorsTeamName, $player->position ?? '', $player->name ?? '');
+        $factorsTeamName = $bypassOwnership ? ($player->getTeamName() ?? '') : $userTeamName;
+        $teamFactors = $this->getTeamFactors($factorsTeamName, $player->getPosition() ?? '', $player->getName() ?? '');
 
         if ($bypassOwnership) {
             $breakdown = $this->demandCalculator->calculateDemandsWithBreakdown($player, $teamFactors);
@@ -59,7 +59,7 @@ class NegotiationService implements NegotiationServiceInterface
 
         $demands = $this->demandCalculator->calculateDemands($player, $teamFactors);
         $capSpace = $this->repository->getTeamCapSpaceNextSeason($userTeamName);
-        $maxYearOneSalary = \ContractRules::getMaxContractSalary($player->yearsOfExperience ?? 0);
+        $maxYearOneSalary = \ContractRules::getMaxContractSalary($player->getYearsOfExperience() ?? 0);
 
         $output .= NegotiationOfferView::renderNegotiationForm(
             $player,

@@ -32,16 +32,16 @@ class NegotiationOfferView implements NegotiationOfferViewInterface
         int $capSpace,
         int $maxYearOneSalary
     ): string {
-        $playerName = HtmlSanitizer::e($player->name ?? '');
-        $playerID = $player->playerID ?? 0;
-        $teamName = HtmlSanitizer::e($player->teamName ?? '');
-        $playerPos = HtmlSanitizer::e($player->position ?? '');
+        $playerName = HtmlSanitizer::e($player->getName() ?? '');
+        $playerID = $player->getPlayerID() ?? 0;
+        $teamName = HtmlSanitizer::e($player->getTeamName() ?? '');
+        $playerPos = HtmlSanitizer::e($player->getPosition() ?? '');
 
         // Check if player demands exceed max
         $demandsExceedMax = $demands['year1'] >= $maxYearOneSalary;
 
         // Calculate max raises
-        $birdYears = $player->birdYears ?? 0;
+        $birdYears = $player->getBirdYears() ?? 0;
         $raisePercentage = \ContractRules::getMaxRaisePercentage($birdYears);
         $maxRaise = \ContractRules::calculateMaxRaise($maxYearOneSalary, $birdYears);
         $rawPercentage = $raisePercentage * 100;
@@ -62,7 +62,7 @@ class NegotiationOfferView implements NegotiationOfferViewInterface
     </div>
     <div class="ibl-card__body">
         <div class="offer-player-info">
-            <img src="<?= HtmlSanitizer::e(PlayerImageHelper::getImageUrl($player->playerID)) ?>" alt="<?= HtmlSanitizer::trusted($playerName) ?>" class="offer-player-img">
+            <img src="<?= HtmlSanitizer::e(PlayerImageHelper::getImageUrl($player->getPlayerID())) ?>" alt="<?= HtmlSanitizer::trusted($playerName) ?>" class="offer-player-img">
             <?= HtmlSanitizer::trusted(self::renderPlayerRatings($player)) ?>
         </div>
     </div>
@@ -266,27 +266,27 @@ class NegotiationOfferView implements NegotiationOfferViewInterface
     </thead>
     <tbody>
         <tr>
-            <td><?= (int) $player->ratingFieldGoalAttempts ?></td>
-            <td><?= (int) $player->ratingFieldGoalPercentage ?></td>
-            <td><?= (int) $player->ratingFreeThrowAttempts ?></td>
-            <td><?= (int) $player->ratingFreeThrowPercentage ?></td>
-            <td><?= (int) $player->ratingThreePointAttempts ?></td>
-            <td><?= (int) $player->ratingThreePointPercentage ?></td>
-            <td><?= (int) $player->ratingOffensiveRebounds ?></td>
-            <td><?= (int) $player->ratingDefensiveRebounds ?></td>
-            <td><?= (int) $player->ratingAssists ?></td>
-            <td><?= (int) $player->ratingSteals ?></td>
-            <td><?= (int) $player->ratingTurnovers ?></td>
-            <td><?= (int) $player->ratingBlocks ?></td>
-            <td><?= (int) $player->ratingFouls ?></td>
-            <td><?= (int) $player->ratingOutsideOffense ?></td>
-            <td><?= (int) $player->ratingDriveOffense ?></td>
-            <td><?= (int) $player->ratingPostOffense ?></td>
-            <td><?= (int) $player->ratingTransitionOffense ?></td>
-            <td><?= (int) $player->ratingOutsideDefense ?></td>
-            <td><?= (int) $player->ratingDriveDefense ?></td>
-            <td><?= (int) $player->ratingPostDefense ?></td>
-            <td><?= (int) $player->ratingTransitionDefense ?></td>
+            <td><?= (int) $player->getRatingFieldGoalAttempts() ?></td>
+            <td><?= (int) $player->getRatingFieldGoalPercentage() ?></td>
+            <td><?= (int) $player->getRatingFreeThrowAttempts() ?></td>
+            <td><?= (int) $player->getRatingFreeThrowPercentage() ?></td>
+            <td><?= (int) $player->getRatingThreePointAttempts() ?></td>
+            <td><?= (int) $player->getRatingThreePointPercentage() ?></td>
+            <td><?= (int) $player->getRatingOffensiveRebounds() ?></td>
+            <td><?= (int) $player->getRatingDefensiveRebounds() ?></td>
+            <td><?= (int) $player->getRatingAssists() ?></td>
+            <td><?= (int) $player->getRatingSteals() ?></td>
+            <td><?= (int) $player->getRatingTurnovers() ?></td>
+            <td><?= (int) $player->getRatingBlocks() ?></td>
+            <td><?= (int) $player->getRatingFouls() ?></td>
+            <td><?= (int) $player->getRatingOutsideOffense() ?></td>
+            <td><?= (int) $player->getRatingDriveOffense() ?></td>
+            <td><?= (int) $player->getRatingPostOffense() ?></td>
+            <td><?= (int) $player->getRatingTransitionOffense() ?></td>
+            <td><?= (int) $player->getRatingOutsideDefense() ?></td>
+            <td><?= (int) $player->getRatingDriveDefense() ?></td>
+            <td><?= (int) $player->getRatingPostDefense() ?></td>
+            <td><?= (int) $player->getRatingTransitionDefense() ?></td>
         </tr>
     </tbody>
 </table>

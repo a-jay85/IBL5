@@ -72,7 +72,7 @@ class ConfigBootstrap implements BootstrapStepInterface
         require_once $this->basePath . '/config.php';
 
         if (!isset($GLOBALS['dbname']) || $GLOBALS['dbname'] === '' || $GLOBALS['dbname'] === false) {
-            echo "<br><br><center><img src=images/logo.gif alt=\"\"><br><br><b>There seems that PHP-Nuke isn't installed yet.<br>(The values in config.php file are the default ones)<br><br>You can proceed with the <a href='./install/index.php'>web installation</a> now.</center></b>";
+            echo "<br><br><div class=\"text-center\"><img src=images/logo.gif alt=\"\"><br><br><strong>There seems that PHP-Nuke isn't installed yet.<br>(The values in config.php file are the default ones)<br><br>You can proceed with the <a href='./install/index.php'>web installation</a> now.</strong></div>";
             exit();
         }
     }
@@ -91,16 +91,27 @@ class ConfigBootstrap implements BootstrapStepInterface
 
     private function loadNukeConfig(ContainerInterface $container): void
     {
-        /** @var \Database\MySQL $db */
-        $db = $GLOBALS['db'];
+        /** @var \mysqli $mysqli */
+        $mysqli = $GLOBALS['mysqli_db'];
         $rawPrefix = $GLOBALS['prefix'] ?? 'nuke';
         $prefix = is_string($rawPrefix) ? $rawPrefix : 'nuke';
 
         if (!defined('NUKE_FILE')) {
             define('NUKE_FILE', true);
         }
-        $result = $db->sql_query("SELECT * FROM " . $prefix . "_config");
-        $fetchedRow = $db->sql_fetchrow($result);
+        $table = $prefix . '_config';
+        $stmt = $mysqli->prepare("SELECT * FROM `$table`");
+        if ($stmt === false) {
+            return;
+        }
+        $stmt->execute();
+        $result = $stmt->get_result();
+        if ($result === false) {
+            $stmt->close();
+            return;
+        }
+        $fetchedRow = $result->fetch_assoc();
+        $stmt->close();
 
         if (!is_array($fetchedRow)) {
             return;

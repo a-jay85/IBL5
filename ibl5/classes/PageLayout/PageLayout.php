@@ -174,7 +174,7 @@ class PageLayout
         echo '<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>';
         echo '<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700;800&family=Barlow:wght@400;500;600;700&display=block" rel="stylesheet">';
 
-        // Font loading styles
+        // @phpstan-ignore ibl.inlineCss (FOUT prevention: must load before external stylesheet)
         echo '<style id="font-loading-styles">
 .fonts-loading {
     visibility: hidden;
@@ -219,7 +219,7 @@ if (document.fonts && document.fonts.check("1em Barlow")) {
 }
 </script>';
 
-        // FOUT prevention inline styles
+        // @phpstan-ignore ibl.inlineCss (FOUT prevention: must load before external stylesheet)
         echo '<style>
 /* FOUT Prevention - Hide body until fonts are loaded */
 .fonts-loading body {

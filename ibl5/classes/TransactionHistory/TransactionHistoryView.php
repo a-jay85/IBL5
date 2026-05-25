@@ -129,7 +129,7 @@ class TransactionHistoryView implements TransactionHistoryViewInterface
             ?>
             <tr>
                 <td class="date-cell"><?= HtmlSanitizer::e($date) ?></td>
-                <td><span class="txn-badge txn-badge--<?= (int) $catId ?>"><?= HtmlSanitizer::e($catName) ?></span></td>
+                <td><span class="txn-badge txn-badge--<?= HtmlSanitizer::e($catId) ?>"><?= HtmlSanitizer::e($catName) ?></span></td>
                 <td><a href="modules.php?name=News&file=article&sid=<?= (int) $row['sid'] ?>"><?= HtmlSanitizer::e($row['title']) ?></a></td>
             </tr>
         <?php endforeach; ?>

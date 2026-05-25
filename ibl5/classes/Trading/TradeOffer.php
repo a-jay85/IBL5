@@ -416,7 +416,7 @@ class TradeOffer implements TradeOfferInterface
 
         $tradeText = "The $offeringTeamName send the $pickTeam $pickYear Round $pickRound draft pick to the $listeningTeamName.<br>";
         if ($pickNotes !== null) {
-            $tradeText .= "<i>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;" . $pickNotes . "</i><br>";
+            $tradeText .= "<em>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;" . $pickNotes . "</em><br>";
         }
 
         return $tradeText;
@@ -518,7 +518,7 @@ class TradeOffer implements TradeOfferInterface
                 return;
             }
 
-            $cleanTradeText = str_replace(['<br>', '&nbsp;', '<i>', '</i>'], ["\n", " ", "_", "_"], $tradeText);
+            $cleanTradeText = str_replace(['<br>', '&nbsp;', '<em>', '</em>'], ["\n", " ", "_", "_"], $tradeText);
 
             Discord::sendTradeDM($receivingUserDiscordID, $tradeOfferId, $offeringTeamName, $cleanTradeText);
         } catch (\Exception $e) {

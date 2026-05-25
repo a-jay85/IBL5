@@ -141,10 +141,10 @@ class FreeAgencyAdminProcessor implements FreeAgencyAdminProcessorInterface
                 // Get team info for IDs
                 $offeringTeam = Team::initialize($this->db, $offeringTeamName);
                 $player = Player::withPlayerID($this->db, $playerId);
-                $playerTeam = Team::initialize($this->db, $player->teamName ?? '');
+                $playerTeam = Team::initialize($this->db, $player->getTeamName() ?? '');
 
                 // Buffer Discord header
-                $pendingHeader = "**" . strtoupper("{$playerName}, {$playerTeam->city} {$player->teamName}") . "** <@!{$playerTeam->discord_id}>\n";
+                $pendingHeader = "**" . strtoupper("{$playerName}, {$playerTeam->city} {$player->getTeamName()}") . "** <@!{$playerTeam->discord_id}>\n";
 
                 $offeringTeamDiscordId = (string) ($offeringTeam->discord_id ?? '');
                 $pendingOfferLines[] = [

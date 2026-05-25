@@ -71,27 +71,27 @@ class FreeAgencyFormComponents
     </thead>
     <tbody>
         <tr>
-            <td><?= (int) $this->player->ratingFieldGoalAttempts ?></td>
-            <td><?= (int) $this->player->ratingFieldGoalPercentage ?></td>
-            <td><?= (int) $this->player->ratingFreeThrowAttempts ?></td>
-            <td><?= (int) $this->player->ratingFreeThrowPercentage ?></td>
-            <td><?= (int) $this->player->ratingThreePointAttempts ?></td>
-            <td><?= (int) $this->player->ratingThreePointPercentage ?></td>
-            <td><?= (int) $this->player->ratingOffensiveRebounds ?></td>
-            <td><?= (int) $this->player->ratingDefensiveRebounds ?></td>
-            <td><?= (int) $this->player->ratingAssists ?></td>
-            <td><?= (int) $this->player->ratingSteals ?></td>
-            <td><?= (int) $this->player->ratingTurnovers ?></td>
-            <td><?= (int) $this->player->ratingBlocks ?></td>
-            <td><?= (int) $this->player->ratingFouls ?></td>
-            <td><?= (int) $this->player->ratingOutsideOffense ?></td>
-            <td><?= (int) $this->player->ratingDriveOffense ?></td>
-            <td><?= (int) $this->player->ratingPostOffense ?></td>
-            <td><?= (int) $this->player->ratingTransitionOffense ?></td>
-            <td><?= (int) $this->player->ratingOutsideDefense ?></td>
-            <td><?= (int) $this->player->ratingDriveDefense ?></td>
-            <td><?= (int) $this->player->ratingPostDefense ?></td>
-            <td><?= (int) $this->player->ratingTransitionDefense ?></td>
+            <td><?= (int) $this->player->getRatingFieldGoalAttempts() ?></td>
+            <td><?= (int) $this->player->getRatingFieldGoalPercentage() ?></td>
+            <td><?= (int) $this->player->getRatingFreeThrowAttempts() ?></td>
+            <td><?= (int) $this->player->getRatingFreeThrowPercentage() ?></td>
+            <td><?= (int) $this->player->getRatingThreePointAttempts() ?></td>
+            <td><?= (int) $this->player->getRatingThreePointPercentage() ?></td>
+            <td><?= (int) $this->player->getRatingOffensiveRebounds() ?></td>
+            <td><?= (int) $this->player->getRatingDefensiveRebounds() ?></td>
+            <td><?= (int) $this->player->getRatingAssists() ?></td>
+            <td><?= (int) $this->player->getRatingSteals() ?></td>
+            <td><?= (int) $this->player->getRatingTurnovers() ?></td>
+            <td><?= (int) $this->player->getRatingBlocks() ?></td>
+            <td><?= (int) $this->player->getRatingFouls() ?></td>
+            <td><?= (int) $this->player->getRatingOutsideOffense() ?></td>
+            <td><?= (int) $this->player->getRatingDriveOffense() ?></td>
+            <td><?= (int) $this->player->getRatingPostOffense() ?></td>
+            <td><?= (int) $this->player->getRatingTransitionOffense() ?></td>
+            <td><?= (int) $this->player->getRatingOutsideDefense() ?></td>
+            <td><?= (int) $this->player->getRatingDriveDefense() ?></td>
+            <td><?= (int) $this->player->getRatingPostDefense() ?></td>
+            <td><?= (int) $this->player->getRatingTransitionDefense() ?></td>
         </tr>
     </tbody>
 </table>
@@ -184,7 +184,7 @@ class FreeAgencyFormComponents
 
         // Essential form data - uses player properties
         echo "<input type=\"hidden\" name=\"teamname\" value=\"" . HtmlSanitizer::e($this->teamName) . "\">\n";
-        echo "<input type=\"hidden\" name=\"playerID\" value=\"" . (int) $this->player->playerID . "\">\n";
+        echo "<input type=\"hidden\" name=\"playerID\" value=\"" . (int) $this->player->getPlayerID() . "\">\n";
         echo "<input type=\"hidden\" name=\"offerType\" value=\"" . $offerType . "\">\n";
 
         return (string) ob_get_clean();
@@ -289,7 +289,7 @@ class FreeAgencyFormComponents
     {
         $contractOfferConfigs = [
             [
-                'offers' => [\ContractRules::getVeteranMinimumSalary($this->player->yearsOfExperience ?? 0)],
+                'offers' => [\ContractRules::getVeteranMinimumSalary($this->player->getYearsOfExperience() ?? 0)],
                 'offerType' => (string) OfferType::VETERAN_MINIMUM,
             ],
         ];

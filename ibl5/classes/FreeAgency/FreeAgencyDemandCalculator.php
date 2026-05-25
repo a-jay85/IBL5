@@ -56,13 +56,13 @@ class FreeAgencyDemandCalculator implements FreeAgencyDemandCalculatorInterface
             $teamPerformance['losses'],
             $teamPerformance['tradWins'],
             $teamPerformance['tradLosses'],
-            $player->freeAgencyPlayForWinner ?? 0,
-            $player->freeAgencyTradition ?? 0,
-            $player->freeAgencyLoyalty ?? 0,
-            $player->freeAgencySecurity ?? 0,
-            $player->freeAgencyPlayingTime ?? 0,
+            $player->getFreeAgencyPlayForWinner() ?? 0,
+            $player->getFreeAgencyTradition() ?? 0,
+            $player->getFreeAgencyLoyalty() ?? 0,
+            $player->getFreeAgencySecurity() ?? 0,
+            $player->getFreeAgencyPlayingTime() ?? 0,
             $teamName,
-            $player->teamName ?? '',
+            $player->getTeamName() ?? '',
             $yearsInOffer,
             $positionSalary
         );
@@ -104,8 +104,8 @@ class FreeAgencyDemandCalculator implements FreeAgencyDemandCalculatorInterface
     ): int {
         return $this->repository->getPositionSalaryCommitment(
             $teamName,
-            $player->position ?? '',
-            $player->playerID ?? 0
+            $player->getPosition() ?? '',
+            $player->getPlayerID() ?? 0
         );
     }
 

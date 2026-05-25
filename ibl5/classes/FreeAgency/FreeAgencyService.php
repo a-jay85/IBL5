@@ -53,7 +53,7 @@ class FreeAgencyService implements FreeAgencyServiceInterface
         foreach ($allOtherPlayerRows as $row) {
             $player = Player::withPlrRow($this->mysqli_db, $row);
             $allOtherPlayers[] = $player;
-            $tid = $player->teamid ?? 0;
+            $tid = $player->getTeamid() ?? 0;
             if ($tid !== 0) {
                 $teamIds[$tid] = true;
             }
@@ -165,19 +165,19 @@ class FreeAgencyService implements FreeAgencyServiceInterface
 
         $capCalculator = new FreeAgencyCapCalculator($this->mysqli_db, $team, $season);
         /** @var array{totalSalaries: array<int, int>, softCapSpace: array<int, int>, hardCapSpace: array<int, int>, rosterSpots: array<int, int>} $capMetrics */
-        $capMetrics = $capCalculator->calculateTeamCapMetrics($player->playerID);
+        $capMetrics = $capCalculator->calculateTeamCapMetrics($player->getPlayerID());
 
-        $demands = $this->demandRepository->getPlayerDemands($player->playerID ?? 0);
+        $demands = $this->demandRepository->getPlayerDemands($player->getPlayerID() ?? 0);
 
-        $existingOffer = $this->getExistingOffer($team->teamid, $player->playerID ?? 0);
+        $existingOffer = $this->getExistingOffer($team->teamid, $player->getPlayerID() ?? 0);
 
         // calculateTeamCapMetrics() already excludes this player's existing offer,
         // so softCapSpace[0] is the true available cap space for a new/replacement offer.
         $amendedCapSpace = $capMetrics['softCapSpace'][0];
         $hasExistingOffer = $existingOffer['offer1'] > 0;
 
-        $veteranMinimum = \ContractRules::getVeteranMinimumSalary($player->yearsOfExperience ?? 0);
-        $maxContract = \ContractRules::getMaxContractSalary($player->yearsOfExperience ?? 0);
+        $veteranMinimum = \ContractRules::getVeteranMinimumSalary($player->getYearsOfExperience() ?? 0);
+        $maxContract = \ContractRules::getMaxContractSalary($player->getYearsOfExperience() ?? 0);
 
         return [
             'player' => $player,

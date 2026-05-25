@@ -101,6 +101,9 @@ class Season
         $this->phase = $settings['Current Season Phase'] ?? '';
 
         $this->endingYear = (int)($settings['Current Season Ending Year'] ?? '0');
+        if ($this->endingYear <= 0) {
+            $this->endingYear = (int)date('Y') + 1;
+        }
         $this->beginningYear = $this->endingYear - 1;
 
         $this->regularSeasonStartDate = new \DateTime("$this->beginningYear-" . Season::IBL_REGULAR_SEASON_STARTING_MONTH . "-01");

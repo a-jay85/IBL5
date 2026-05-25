@@ -18,7 +18,8 @@ final class ApiApplicationFactory
 {
     public static function build(string $basePath): Application
     {
-        Discord::init((string) ($_SERVER['SERVER_NAME'] ?? ''));
+        $serverName = $_SERVER['SERVER_NAME'] ?? '';
+        Discord::init(is_string($serverName) ? $serverName : '');
         $app = new Application();
         $container = $app->getContainer();
 

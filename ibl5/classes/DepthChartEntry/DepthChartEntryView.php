@@ -42,7 +42,7 @@ class DepthChartEntryView implements DepthChartEntryViewInterface
         /** @var string $imagesPath */
         $imagesPath = $leagueConfig['images_path'];
 
-        echo '<div class="depth-chart-logo"><img src="./' . HtmlSanitizer::e($imagesPath) . 'logo/' . (int) $teamid . '.jpg" alt="Team Logo"></div>';
+        echo '<div class="depth-chart-logo"><img src="./' . HtmlSanitizer::e($imagesPath) . 'logo/' . HtmlSanitizer::e($teamid) . '.jpg" alt="Team Logo"></div>';
     }
 
     /**
@@ -60,7 +60,7 @@ class DepthChartEntryView implements DepthChartEntryViewInterface
     {
         $labels = ['No', '1st', '2nd', '3rd', '4th', 'ok'];
         for ($i = 0; $i <= 5; $i++) {
-            echo '<option value="' . (int) $i . '"' . (($selectedValue === $i) ? ' SELECTED' : '') . '>' . HtmlSanitizer::e($labels[$i]) . '</option>';
+            echo '<option value="' . HtmlSanitizer::e($i) . '"' . (($selectedValue === $i) ? ' SELECTED' : '') . '>' . HtmlSanitizer::e($labels[$i]) . '</option>';
         }
     }
 
@@ -160,13 +160,13 @@ the earlier slot in that order claims them.</p>
 
         $thumbnail = \Player\PlayerImageHelper::renderThumbnail((int) $player['pid']);
 
-        echo '<tr data-pid="' . (int) $player['pid'] . '" data-pos="' . HtmlSanitizer::e($player['pos']) . '" data-jsb-production="' . (int) $jsbProduction . '">'
+        echo '<tr data-pid="' . HtmlSanitizer::e($player['pid']) . '" data-pos="' . HtmlSanitizer::e($player['pos']) . '" data-jsb-production="' . HtmlSanitizer::e($jsbProduction) . '">'
             . '<td>' . HtmlSanitizer::e($player['pos']) . '</td>'
             . '<td class="ibl-player-cell">'
-            . '<input type="hidden" name="pid' . (int) $depthCount . '" value="' . (int) $player['pid'] . '">'
-            . '<input type="hidden" name="Injury' . (int) $depthCount . '" value="' . (int) ($player['injured'] ?? 0) . '">'
-            . '<input type="hidden" name="Name' . (int) $depthCount . '" value="' . HtmlSanitizer::e($playerName) . '">'
-            . '<a href="./modules.php?name=Player&amp;pa=showpage&amp;pid=' . (int) $player['pid'] . '">'
+            . '<input type="hidden" name="pid' . HtmlSanitizer::e($depthCount) . '" value="' . HtmlSanitizer::e($player['pid']) . '">'
+            . '<input type="hidden" name="Injury' . HtmlSanitizer::e($depthCount) . '" value="' . HtmlSanitizer::e($player['injured'] ?? 0) . '">'
+            . '<input type="hidden" name="Name' . HtmlSanitizer::e($depthCount) . '" value="' . HtmlSanitizer::e($playerName) . '">'
+            . '<a href="./modules.php?name=Player&amp;pa=showpage&amp;pid=' . HtmlSanitizer::e($player['pid']) . '">'
             . HtmlSanitizer::trusted($thumbnail) . HtmlSanitizer::e($playerName)
             . '</a>'
             . '</td>';
@@ -175,8 +175,8 @@ the earlier slot in that order claims them.</p>
         // the checkbox submits "1" when checked. Two fields share the same
         // name so the form posts the right value regardless of checkbox state.
         echo '<td class="dc-active-cell">';
-        echo '<input type="hidden" name="canPlayInGame' . (int) $depthCount . '" value="0">';
-        echo '<input type="checkbox" name="canPlayInGame' . (int) $depthCount . '" value="1" class="dc-active-cb"' . ((int) ($player['dc_can_play_in_game'] ?? 0) === 1 ? ' checked' : '') . ' aria-label="Active status for ' . HtmlSanitizer::e($playerName) . '">';
+        echo '<input type="hidden" name="canPlayInGame' . HtmlSanitizer::e($depthCount) . '" value="0">';
+        echo '<input type="checkbox" name="canPlayInGame' . HtmlSanitizer::e($depthCount) . '" value="1" class="dc-active-cb"' . ((int) ($player['dc_can_play_in_game'] ?? 0) === 1 ? ' checked' : '') . ' aria-label="Active status for ' . HtmlSanitizer::e($playerName) . '">';
         echo '</td>';
 
         foreach (self::POSITION_SLOTS as $slot) {
@@ -187,7 +187,7 @@ the earlier slot in that order claims them.</p>
             if ($dcValue > 5) {
                 $dcValue = 5;
             }
-            $fieldName = $slot['field'] . (int) $depthCount;
+            $fieldName = $slot['field'] . $depthCount;
             $ariaLabel = $slot['label'] . ' depth for ' . $playerName;
 
             echo '<td><select name="' . HtmlSanitizer::e($fieldName) . '" aria-label="' . HtmlSanitizer::e($ariaLabel) . '">';
@@ -198,7 +198,7 @@ the earlier slot in that order claims them.</p>
         // Minutes — number input constrained to 0-40 with native browser
         // stepper. The server sanitizes to the same 0-40 range in
         // DepthChartEntryProcessor::sanitizeMinutesValue().
-        echo '<td class="dc-minutes-cell"><input type="number" name="min' . (int) $depthCount . '" value="' . (int) ($player['dc_minutes'] ?? 0) . '" min="0" max="40" step="1" class="dc-minutes-input" aria-label="Minutes for ' . HtmlSanitizer::e($playerName) . '"></td>';
+        echo '<td class="dc-minutes-cell"><input type="number" name="min' . HtmlSanitizer::e($depthCount) . '" value="' . HtmlSanitizer::e($player['dc_minutes'] ?? 0) . '" min="0" max="40" step="1" class="dc-minutes-input" aria-label="Minutes for ' . HtmlSanitizer::e($playerName) . '"></td>';
 
         echo '</tr>';
     }
@@ -288,9 +288,9 @@ JAVASCRIPT;
             echo '<option value="' . (int) $option['id'] . '">' . HtmlSanitizer::e($option['label']) . '</option>';
         }
         echo '</select>';
-        echo '<button type="button" id="saved-dc-rename-btn" class="saved-dc-rename-btn" title="Rename selected depth chart" style="display:none;">&#9998;</button>';
+        echo '<button type="button" id="saved-dc-rename-btn" class="saved-dc-rename-btn hidden" title="Rename selected depth chart">&#9998;</button>';
         echo '</div>';
-        echo '<div id="saved-dc-loading" class="saved-dc-loading" style="display:none;">Loading...</div>';
+        echo '<div id="saved-dc-loading" class="saved-dc-loading hidden">Loading...</div>';
         echo '</div>';
     }
 
@@ -329,23 +329,23 @@ JAVASCRIPT;
 
         $imageUrl = \Player\PlayerImageHelper::getImageUrl((int) $player['pid']);
 
-        echo '<div class="dc-card" data-pid="' . (int) $player['pid'] . '" data-pos="' . HtmlSanitizer::e($player['pos']) . '" data-jsb-production="' . (int) $jsbProduction . '">';
+        echo '<div class="dc-card" data-pid="' . HtmlSanitizer::e($player['pid']) . '" data-pos="' . HtmlSanitizer::e($player['pos']) . '" data-jsb-production="' . HtmlSanitizer::e($jsbProduction) . '">';
 
         // Header: photo + pos badge + name + active toggle
         echo '<div class="dc-card__header">';
         echo '<img class="dc-card__photo" src="' . HtmlSanitizer::e($imageUrl) . '" alt="" width="48" height="48" loading="lazy">';
         echo '<span class="dc-card__pos-badge">' . HtmlSanitizer::e($player['pos']) . '</span>';
-        echo '<a href="./modules.php?name=Player&amp;pa=showpage&amp;pid=' . (int) $player['pid'] . '" class="dc-card__name">' . HtmlSanitizer::e($playerName) . '</a>';
+        echo '<a href="./modules.php?name=Player&amp;pa=showpage&amp;pid=' . HtmlSanitizer::e($player['pid']) . '" class="dc-card__name">' . HtmlSanitizer::e($playerName) . '</a>';
 
-        echo '<input type="hidden" name="pid' . (int) $depthCount . '" value="' . (int) $player['pid'] . '" disabled>';
-        echo '<input type="hidden" name="Injury' . (int) $depthCount . '" value="' . (int) ($player['injured'] ?? 0) . '" disabled>';
-        echo '<input type="hidden" name="Name' . (int) $depthCount . '" value="' . HtmlSanitizer::e($playerName) . '" disabled>';
+        echo '<input type="hidden" name="pid' . HtmlSanitizer::e($depthCount) . '" value="' . HtmlSanitizer::e($player['pid']) . '" disabled>';
+        echo '<input type="hidden" name="Injury' . HtmlSanitizer::e($depthCount) . '" value="' . HtmlSanitizer::e($player['injured'] ?? 0) . '" disabled>';
+        echo '<input type="hidden" name="Name' . HtmlSanitizer::e($depthCount) . '" value="' . HtmlSanitizer::e($playerName) . '" disabled>';
         // Active checkbox — native checkbox styled with an orange accent to
         // match the desktop view. Hidden input submits "0" when unchecked; the
         // checkbox submits "1" when checked. Both share the same field name so
         // the form posts the right value regardless of checkbox state.
-        echo '<input type="hidden" name="canPlayInGame' . (int) $depthCount . '" value="0" disabled>';
-        echo '<input type="checkbox" name="canPlayInGame' . (int) $depthCount . '" value="1" class="dc-card__active-cb"' . ((int) ($player['dc_can_play_in_game'] ?? 0) === 1 ? ' checked' : '') . ' aria-label="Active status for ' . HtmlSanitizer::e($playerName) . '" disabled>';
+        echo '<input type="hidden" name="canPlayInGame' . HtmlSanitizer::e($depthCount) . '" value="0" disabled>';
+        echo '<input type="checkbox" name="canPlayInGame' . HtmlSanitizer::e($depthCount) . '" value="1" class="dc-card__active-cb"' . ((int) ($player['dc_can_play_in_game'] ?? 0) === 1 ? ' checked' : '') . ' aria-label="Active status for ' . HtmlSanitizer::e($playerName) . '" disabled>';
         echo '</div>';
 
         // Body — role slots + minutes grid (6 columns). Min sits on the
@@ -364,7 +364,7 @@ JAVASCRIPT;
             if ($dcValue > 5) {
                 $dcValue = 5;
             }
-            $fieldName = $slot['field'] . (int) $depthCount;
+            $fieldName = $slot['field'] . $depthCount;
             $valueLabel = $depthLabels[$dcValue];
             $slotAriaRaw = $slot['label'] . ' depth for ' . $playerName;
 
@@ -393,8 +393,8 @@ JAVASCRIPT;
         echo '<div class="dc-card__stepper">';
         echo '<button type="button" class="dc-card__stepper-arrow dc-card__stepper-arrow--up" aria-label="Increase '
             . HtmlSanitizer::e($minAriaRaw) . '"></button>';
-        echo '<input type="number" name="min' . (int) $depthCount
-            . '" value="' . (int) ($player['dc_minutes'] ?? 0)
+        echo '<input type="number" name="min' . HtmlSanitizer::e($depthCount)
+            . '" value="' . HtmlSanitizer::e($player['dc_minutes'] ?? 0)
             . '" min="0" max="40" step="1" class="dc-minutes-input dc-card__stepper-input" aria-label="'
             . HtmlSanitizer::e($minAriaRaw) . '" disabled>';
         echo '<button type="button" class="dc-card__stepper-arrow dc-card__stepper-arrow--down" aria-label="Decrease '

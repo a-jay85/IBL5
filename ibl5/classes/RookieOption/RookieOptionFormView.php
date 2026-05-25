@@ -43,7 +43,7 @@ class RookieOptionFormView implements RookieOptionFormViewInterface
         <img src="<?= HtmlSanitizer::e($playerImageUrl) ?>" alt="<?= HtmlSanitizer::e($player->name ?? '') ?>" class="rookie-option-img">
         <div>
             <span class="ibl-label">Rookie Option Value:</span>
-            <strong><?= (int) $rookieOptionValue ?></strong>
+            <strong><?= HtmlSanitizer::e($rookieOptionValue) ?></strong>
         </div>
     </div>
 </div>
@@ -54,8 +54,8 @@ class RookieOptionFormView implements RookieOptionFormViewInterface
 
 <form name="RookieExtend" method="post" action="modules.php?name=Player&amp;pa=processrookieoption" class="text-center">
     <input type="hidden" name="teamname" value="<?= HtmlSanitizer::e($teamName) ?>">
-    <input type="hidden" name="playerID" value="<?= (int) $playerID ?>">
-    <input type="hidden" name="rookieOptionValue" value="<?= (int) $rookieOptionValue ?>">
+    <input type="hidden" name="playerID" value="<?= HtmlSanitizer::e($playerID) ?>">
+    <input type="hidden" name="rookieOptionValue" value="<?= HtmlSanitizer::e($rookieOptionValue) ?>">
     <input type="hidden" name="from" value="<?= HtmlSanitizer::e($from ?? '') ?>">
     <button type="submit" class="ibl-btn ibl-btn--danger">Exercise Rookie Option</button>
 </form>

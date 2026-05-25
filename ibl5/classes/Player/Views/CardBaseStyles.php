@@ -133,29 +133,29 @@ HTML;
      */
     public static function preparePlayerData(Player $player, int $playerID): array
     {
-        $name = HtmlSanitizer::safeHtmlOutput($player->name);
-        $nickname = HtmlSanitizer::safeHtmlOutput($player->nickname ?? '');
-        $position = HtmlSanitizer::safeHtmlOutput($player->position);
-        $teamName = HtmlSanitizer::safeHtmlOutput($player->teamName);
-        $age = HtmlSanitizer::safeHtmlOutput((string) ($player->age ?? 0));
-        $height = HtmlSanitizer::safeHtmlOutput(($player->heightFeet ?? 0) . "'" . ($player->heightInches ?? 0) . '"');
-        $weight = HtmlSanitizer::safeHtmlOutput((string) ($player->weightPounds ?? 0));
-        $college = HtmlSanitizer::safeHtmlOutput($player->collegeName ?? 'N/A');
-        $draftRound = HtmlSanitizer::safeHtmlOutput((string) ($player->draftRound ?? 0));
-        $draftPick = HtmlSanitizer::safeHtmlOutput((string) ($player->draftPickNumber ?? 0));
-        $draftTeam = HtmlSanitizer::safeHtmlOutput($player->draftTeamOriginalName ?? '');
+        $name = HtmlSanitizer::safeHtmlOutput($player->getName());
+        $nickname = HtmlSanitizer::safeHtmlOutput($player->getNickname() ?? '');
+        $position = HtmlSanitizer::safeHtmlOutput($player->getPosition());
+        $teamName = HtmlSanitizer::safeHtmlOutput($player->getTeamName());
+        $age = HtmlSanitizer::safeHtmlOutput((string) ($player->getAge() ?? 0));
+        $height = HtmlSanitizer::safeHtmlOutput(($player->getHeightFeet() ?? 0) . "'" . ($player->getHeightInches() ?? 0) . '"');
+        $weight = HtmlSanitizer::safeHtmlOutput((string) ($player->getWeightPounds() ?? 0));
+        $college = HtmlSanitizer::safeHtmlOutput($player->getCollegeName() ?? 'N/A');
+        $draftRound = HtmlSanitizer::safeHtmlOutput((string) ($player->getDraftRound() ?? 0));
+        $draftPick = HtmlSanitizer::safeHtmlOutput((string) ($player->getDraftPickNumber() ?? 0));
+        $draftTeam = HtmlSanitizer::safeHtmlOutput($player->getDraftTeamOriginalName() ?? '');
 
         return [
             'name' => $name,
             'nickname' => $nickname,
             'position' => $position,
             'teamName' => $teamName,
-            'teamid' => $player->teamid ?? 0,
+            'teamid' => $player->getTeamid() ?? 0,
             'age' => $age,
             'height' => $height,
             'weight' => $weight,
             'college' => $college,
-            'draftYear' => $player->draftYear ?? 0,
+            'draftYear' => $player->getDraftYear() ?? 0,
             'draftRound' => $draftRound,
             'draftPick' => $draftPick,
             'draftTeam' => $draftTeam,

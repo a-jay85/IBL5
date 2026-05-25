@@ -163,7 +163,7 @@ class PlayerStats implements PlayerStatsInterface
     {
         $repository = new PlayerStatsRepository($db);
         $instance = new self($repository);
-        $instance->loadByID($player->playerID ?? 0);
+        $instance->loadByID($player->getPlayerID() ?? 0);
         return $instance;
     }
 

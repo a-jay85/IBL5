@@ -190,7 +190,7 @@ class PlayerPageServiceTest extends TestCase
         $stub->method('wasRookieOptioned')->willReturn($wasRookieOptioned);
         $stub->method('canRenegotiateContract')->willReturn($canRenegotiate);
         $stub->method('canRookieOption')->willReturn($canRookieOpt);
-        $stub->teamid = $teamid;
+        $stub->method('getTeamid')->willReturn($teamid);
 
         return $stub;
     }

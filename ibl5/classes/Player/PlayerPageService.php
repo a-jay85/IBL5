@@ -62,7 +62,7 @@ class PlayerPageService implements PlayerPageServiceInterface
         return $userTeam->name !== League::FREE_AGENTS_TEAM_NAME
             && $userTeam->hasUsedExtensionThisSeason === 0
             && $player->canRenegotiateContract()
-            && $player->teamid === $userTeam->teamid
+            && $player->getTeamid() === $userTeam->teamid
             && $season->phase !== 'Draft'
             && $season->phase !== 'Free Agency';
     }
@@ -84,6 +84,6 @@ class PlayerPageService implements PlayerPageServiceInterface
         /** @var Season $season */
         return $userTeam->name !== League::FREE_AGENTS_TEAM_NAME
             && $player->canRookieOption($season->phase)
-            && $player->teamid === $userTeam->teamid;
+            && $player->getTeamid() === $userTeam->teamid;
     }
 }

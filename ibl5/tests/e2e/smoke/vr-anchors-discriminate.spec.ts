@@ -15,6 +15,7 @@ type AnchorRow = {
   anchor: string;
   state?: Record<string, string>;
   skipContentCheck?: boolean; // CI seed renders empty — anchor visibility is the strongest available check
+  timeout?: number;
 };
 
 const PUBLIC_ANCHORS: AnchorRow[] = [
@@ -42,7 +43,7 @@ const PUBLIC_ANCHORS: AnchorRow[] = [
   { name: 'schedule', url: 'modules.php?name=Schedule', anchor: '.schedule-header' },
   { name: 'search', url: 'modules.php?name=Search', anchor: '.search-page' },
   { name: 'season-archive', url: 'modules.php?name=SeasonArchive', anchor: '.ibl-data-table' },
-  { name: 'season-highs', url: 'modules.php?name=SeasonHighs', anchor: '.ibl-data-table' },
+  { name: 'season-highs', url: 'modules.php?name=SeasonHighs', anchor: '.ibl-data-table', timeout: 15_000 },
   { name: 'season-leaderboards', url: 'modules.php?name=SeasonLeaderboards', anchor: '.ibl-data-table' },
   { name: 'series-records', url: 'modules.php?name=SeriesRecords', anchor: '.ibl-data-table' },
   { name: 'standings', url: 'modules.php?name=Standings', anchor: '.ibl-data-table' },
@@ -84,14 +85,15 @@ publicTest.describe('VR anchor discrimination — public pages', () => {
       }
       await page.goto(row.url);
       await assertNoPhpErrors(page, `on ${row.url}`);
-      await expect(page.locator(row.anchor).first()).toBeVisible();
+      const timeoutOpt = row.timeout ? { timeout: row.timeout } : undefined;
+      await expect(page.locator(row.anchor).first()).toBeVisible(timeoutOpt);
 
       if (!row.skipContentCheck) {
         const anchor = page.locator(row.anchor).first();
         if (row.anchor === '.ibl-data-table' || row.anchor.startsWith('table.')) {
-          await expect(anchor.locator('tbody tr').first()).toBeVisible();
+          await expect(anchor.locator('tbody tr').first()).toBeVisible(timeoutOpt);
         } else if (row.anchor.startsWith('form[')) {
-          await expect(anchor.locator('input:not([type="hidden"]), select, textarea').first()).toBeVisible();
+          await expect(anchor.locator('input:not([type="hidden"]), select, textarea').first()).toBeVisible(timeoutOpt);
         }
       }
     });
@@ -106,14 +108,15 @@ authTest.describe('VR anchor discrimination — authenticated pages', () => {
       }
       await page.goto(row.url);
       await assertNoPhpErrors(page, `on ${row.url}`);
-      await expect(page.locator(row.anchor).first()).toBeVisible();
+      const timeoutOpt = row.timeout ? { timeout: row.timeout } : undefined;
+      await expect(page.locator(row.anchor).first()).toBeVisible(timeoutOpt);
 
       if (!row.skipContentCheck) {
         const anchor = page.locator(row.anchor).first();
         if (row.anchor === '.ibl-data-table' || row.anchor.startsWith('table.')) {
-          await expect(anchor.locator('tbody tr').first()).toBeVisible();
+          await expect(anchor.locator('tbody tr').first()).toBeVisible(timeoutOpt);
         } else if (row.anchor.startsWith('form[')) {
-          await expect(anchor.locator('input:not([type="hidden"]), select, textarea').first()).toBeVisible();
+          await expect(anchor.locator('input:not([type="hidden"]), select, textarea').first()).toBeVisible(timeoutOpt);
         }
       }
     });

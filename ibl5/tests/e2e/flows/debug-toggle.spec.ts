@@ -8,21 +8,21 @@ import type { Page } from '../fixtures/base';
 test.describe.configure({ mode: 'serial' });
 
 async function clickToggle(page: Page): Promise<void> {
-  await page.waitForLoadState('networkidle');
+  await page.waitForLoadState('load');
   const debugBtn = desktopNav(page).getByRole('button', { name: 'Debug' });
   await debugBtn.click();
   const toggleBtn = page.getByRole('button', { name: /View All Extensions/ });
   await expect(toggleBtn).toBeVisible();
   await toggleBtn.click();
-  await page.waitForLoadState('networkidle');
+  await page.waitForLoadState('load');
 }
 
 async function getToggleLabel(page: Page): Promise<string> {
-  await page.waitForLoadState('networkidle');
+  await page.waitForLoadState('load');
   const debugBtn = desktopNav(page).getByRole('button', { name: 'Debug' });
   await debugBtn.click();
   const toggleBtn = page.getByRole('button', { name: /View All Extensions/ });
-  await expect(toggleBtn).toBeVisible();
+  await expect(toggleBtn).toContainText(/ON|OFF/);
   return (await toggleBtn.textContent()) ?? '';
 }
 

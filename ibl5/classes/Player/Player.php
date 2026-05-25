@@ -639,7 +639,7 @@ class Player implements PlayerInterface
     /** @see PlayerInterface::getPlayerID() */
     public function getPlayerID(): ?int
     {
-        return $this->getPlayerData()->playerID;
+        return $this->playerData?->playerID;
     }
 
     /** @see PlayerInterface::getPlrRow() */
@@ -651,43 +651,43 @@ class Player implements PlayerInterface
     /** @see PlayerInterface::getOrdinal() */
     public function getOrdinal(): ?int
     {
-        return $this->getPlayerData()->ordinal;
+        return $this->playerData?->ordinal;
     }
 
     /** @see PlayerInterface::getName() */
     public function getName(): ?string
     {
-        return $this->getPlayerData()->name;
+        return $this->playerData?->name;
     }
 
     /** @see PlayerInterface::getNickname() */
     public function getNickname(): ?string
     {
-        return $this->getPlayerData()->nickname;
+        return $this->playerData?->nickname;
     }
 
     /** @see PlayerInterface::getAge() */
     public function getAge(): ?int
     {
-        return $this->getPlayerData()->age;
+        return $this->playerData?->age;
     }
 
     /** @see PlayerInterface::getHistoricalYear() */
     public function getHistoricalYear(): ?int
     {
-        return $this->getPlayerData()->historicalYear;
+        return $this->playerData?->historicalYear;
     }
 
     /** @see PlayerInterface::getTeamid() */
     public function getTeamid(): ?int
     {
-        return $this->getPlayerData()->teamid;
+        return $this->playerData?->teamid;
     }
 
     /** @see PlayerInterface::getTeamName() */
     public function getTeamName(): ?string
     {
-        return $this->getPlayerData()->teamName;
+        return $this->playerData?->teamName;
     }
 
     /** @see PlayerInterface::getTeamCity() */
@@ -711,331 +711,331 @@ class Player implements PlayerInterface
     /** @see PlayerInterface::getPosition() */
     public function getPosition(): ?string
     {
-        return $this->getPlayerData()->position;
+        return $this->playerData?->position;
     }
 
     /** @see PlayerInterface::getRatingFieldGoalAttempts() */
     public function getRatingFieldGoalAttempts(): ?int
     {
-        return $this->getPlayerData()->ratingFieldGoalAttempts;
+        return $this->playerData?->ratingFieldGoalAttempts;
     }
 
     /** @see PlayerInterface::getRatingFieldGoalPercentage() */
     public function getRatingFieldGoalPercentage(): ?int
     {
-        return $this->getPlayerData()->ratingFieldGoalPercentage;
+        return $this->playerData?->ratingFieldGoalPercentage;
     }
 
     /** @see PlayerInterface::getRatingFreeThrowAttempts() */
     public function getRatingFreeThrowAttempts(): ?int
     {
-        return $this->getPlayerData()->ratingFreeThrowAttempts;
+        return $this->playerData?->ratingFreeThrowAttempts;
     }
 
     /** @see PlayerInterface::getRatingFreeThrowPercentage() */
     public function getRatingFreeThrowPercentage(): ?int
     {
-        return $this->getPlayerData()->ratingFreeThrowPercentage;
+        return $this->playerData?->ratingFreeThrowPercentage;
     }
 
     /** @see PlayerInterface::getRatingThreePointAttempts() */
     public function getRatingThreePointAttempts(): ?int
     {
-        return $this->getPlayerData()->ratingThreePointAttempts;
+        return $this->playerData?->ratingThreePointAttempts;
     }
 
     /** @see PlayerInterface::getRatingThreePointPercentage() */
     public function getRatingThreePointPercentage(): ?int
     {
-        return $this->getPlayerData()->ratingThreePointPercentage;
+        return $this->playerData?->ratingThreePointPercentage;
     }
 
     /** @see PlayerInterface::getRatingOffensiveRebounds() */
     public function getRatingOffensiveRebounds(): ?int
     {
-        return $this->getPlayerData()->ratingOffensiveRebounds;
+        return $this->playerData?->ratingOffensiveRebounds;
     }
 
     /** @see PlayerInterface::getRatingDefensiveRebounds() */
     public function getRatingDefensiveRebounds(): ?int
     {
-        return $this->getPlayerData()->ratingDefensiveRebounds;
+        return $this->playerData?->ratingDefensiveRebounds;
     }
 
     /** @see PlayerInterface::getRatingAssists() */
     public function getRatingAssists(): ?int
     {
-        return $this->getPlayerData()->ratingAssists;
+        return $this->playerData?->ratingAssists;
     }
 
     /** @see PlayerInterface::getRatingSteals() */
     public function getRatingSteals(): ?int
     {
-        return $this->getPlayerData()->ratingSteals;
+        return $this->playerData?->ratingSteals;
     }
 
     /** @see PlayerInterface::getRatingTurnovers() */
     public function getRatingTurnovers(): ?int
     {
-        return $this->getPlayerData()->ratingTurnovers;
+        return $this->playerData?->ratingTurnovers;
     }
 
     /** @see PlayerInterface::getRatingBlocks() */
     public function getRatingBlocks(): ?int
     {
-        return $this->getPlayerData()->ratingBlocks;
+        return $this->playerData?->ratingBlocks;
     }
 
     /** @see PlayerInterface::getRatingFouls() */
     public function getRatingFouls(): ?int
     {
-        return $this->getPlayerData()->ratingFouls;
+        return $this->playerData?->ratingFouls;
     }
 
     /** @see PlayerInterface::getRatingOutsideOffense() */
     public function getRatingOutsideOffense(): ?int
     {
-        return $this->getPlayerData()->ratingOutsideOffense;
+        return $this->playerData?->ratingOutsideOffense;
     }
 
     /** @see PlayerInterface::getRatingOutsideDefense() */
     public function getRatingOutsideDefense(): ?int
     {
-        return $this->getPlayerData()->ratingOutsideDefense;
+        return $this->playerData?->ratingOutsideDefense;
     }
 
     /** @see PlayerInterface::getRatingDriveOffense() */
     public function getRatingDriveOffense(): ?int
     {
-        return $this->getPlayerData()->ratingDriveOffense;
+        return $this->playerData?->ratingDriveOffense;
     }
 
     /** @see PlayerInterface::getRatingDriveDefense() */
     public function getRatingDriveDefense(): ?int
     {
-        return $this->getPlayerData()->ratingDriveDefense;
+        return $this->playerData?->ratingDriveDefense;
     }
 
     /** @see PlayerInterface::getRatingPostOffense() */
     public function getRatingPostOffense(): ?int
     {
-        return $this->getPlayerData()->ratingPostOffense;
+        return $this->playerData?->ratingPostOffense;
     }
 
     /** @see PlayerInterface::getRatingPostDefense() */
     public function getRatingPostDefense(): ?int
     {
-        return $this->getPlayerData()->ratingPostDefense;
+        return $this->playerData?->ratingPostDefense;
     }
 
     /** @see PlayerInterface::getRatingTransitionOffense() */
     public function getRatingTransitionOffense(): ?int
     {
-        return $this->getPlayerData()->ratingTransitionOffense;
+        return $this->playerData?->ratingTransitionOffense;
     }
 
     /** @see PlayerInterface::getRatingTransitionDefense() */
     public function getRatingTransitionDefense(): ?int
     {
-        return $this->getPlayerData()->ratingTransitionDefense;
+        return $this->playerData?->ratingTransitionDefense;
     }
 
     /** @see PlayerInterface::getRatingClutch() */
     public function getRatingClutch(): ?int
     {
-        return $this->getPlayerData()->ratingClutch;
+        return $this->playerData?->ratingClutch;
     }
 
     /** @see PlayerInterface::getRatingConsistency() */
     public function getRatingConsistency(): ?int
     {
-        return $this->getPlayerData()->ratingConsistency;
+        return $this->playerData?->ratingConsistency;
     }
 
     /** @see PlayerInterface::getRatingTalent() */
     public function getRatingTalent(): ?int
     {
-        return $this->getPlayerData()->ratingTalent;
+        return $this->playerData?->ratingTalent;
     }
 
     /** @see PlayerInterface::getRatingSkill() */
     public function getRatingSkill(): ?int
     {
-        return $this->getPlayerData()->ratingSkill;
+        return $this->playerData?->ratingSkill;
     }
 
     /** @see PlayerInterface::getRatingIntangibles() */
     public function getRatingIntangibles(): ?int
     {
-        return $this->getPlayerData()->ratingIntangibles;
+        return $this->playerData?->ratingIntangibles;
     }
 
     /** @see PlayerInterface::getFreeAgencyLoyalty() */
     public function getFreeAgencyLoyalty(): ?int
     {
-        return $this->getPlayerData()->freeAgencyLoyalty;
+        return $this->playerData?->freeAgencyLoyalty;
     }
 
     /** @see PlayerInterface::getFreeAgencyPlayingTime() */
     public function getFreeAgencyPlayingTime(): ?int
     {
-        return $this->getPlayerData()->freeAgencyPlayingTime;
+        return $this->playerData?->freeAgencyPlayingTime;
     }
 
     /** @see PlayerInterface::getFreeAgencyPlayForWinner() */
     public function getFreeAgencyPlayForWinner(): ?int
     {
-        return $this->getPlayerData()->freeAgencyPlayForWinner;
+        return $this->playerData?->freeAgencyPlayForWinner;
     }
 
     /** @see PlayerInterface::getFreeAgencyTradition() */
     public function getFreeAgencyTradition(): ?int
     {
-        return $this->getPlayerData()->freeAgencyTradition;
+        return $this->playerData?->freeAgencyTradition;
     }
 
     /** @see PlayerInterface::getFreeAgencySecurity() */
     public function getFreeAgencySecurity(): ?int
     {
-        return $this->getPlayerData()->freeAgencySecurity;
+        return $this->playerData?->freeAgencySecurity;
     }
 
     /** @see PlayerInterface::getYearsOfExperience() */
     public function getYearsOfExperience(): ?int
     {
-        return $this->getPlayerData()->yearsOfExperience;
+        return $this->playerData?->yearsOfExperience;
     }
 
     /** @see PlayerInterface::getBirdYears() */
     public function getBirdYears(): ?int
     {
-        return $this->getPlayerData()->birdYears;
+        return $this->playerData?->birdYears;
     }
 
     /** @see PlayerInterface::getContractCurrentYear() */
     public function getContractCurrentYear(): ?int
     {
-        return $this->getPlayerData()->contractCurrentYear;
+        return $this->playerData?->contractCurrentYear;
     }
 
     /** @see PlayerInterface::getContractTotalYears() */
     public function getContractTotalYears(): ?int
     {
-        return $this->getPlayerData()->contractTotalYears;
+        return $this->playerData?->contractTotalYears;
     }
 
     /** @see PlayerInterface::getContractYear1Salary() */
     public function getContractYear1Salary(): ?int
     {
-        return $this->getPlayerData()->contractYear1Salary;
+        return $this->playerData?->contractYear1Salary;
     }
 
     /** @see PlayerInterface::getContractYear2Salary() */
     public function getContractYear2Salary(): ?int
     {
-        return $this->getPlayerData()->contractYear2Salary;
+        return $this->playerData?->contractYear2Salary;
     }
 
     /** @see PlayerInterface::getContractYear3Salary() */
     public function getContractYear3Salary(): ?int
     {
-        return $this->getPlayerData()->contractYear3Salary;
+        return $this->playerData?->contractYear3Salary;
     }
 
     /** @see PlayerInterface::getContractYear4Salary() */
     public function getContractYear4Salary(): ?int
     {
-        return $this->getPlayerData()->contractYear4Salary;
+        return $this->playerData?->contractYear4Salary;
     }
 
     /** @see PlayerInterface::getContractYear5Salary() */
     public function getContractYear5Salary(): ?int
     {
-        return $this->getPlayerData()->contractYear5Salary;
+        return $this->playerData?->contractYear5Salary;
     }
 
     /** @see PlayerInterface::getContractYear6Salary() */
     public function getContractYear6Salary(): ?int
     {
-        return $this->getPlayerData()->contractYear6Salary;
+        return $this->playerData?->contractYear6Salary;
     }
 
     /** @see PlayerInterface::getSalaryJSB() */
     public function getSalaryJSB(): ?int
     {
-        return $this->getPlayerData()->salaryJSB;
+        return $this->playerData?->salaryJSB;
     }
 
     /** @see PlayerInterface::getDraftYear() */
     public function getDraftYear(): ?int
     {
-        return $this->getPlayerData()->draftYear;
+        return $this->playerData?->draftYear;
     }
 
     /** @see PlayerInterface::getDraftRound() */
     public function getDraftRound(): ?int
     {
-        return $this->getPlayerData()->draftRound;
+        return $this->playerData?->draftRound;
     }
 
     /** @see PlayerInterface::getDraftPickNumber() */
     public function getDraftPickNumber(): ?int
     {
-        return $this->getPlayerData()->draftPickNumber;
+        return $this->playerData?->draftPickNumber;
     }
 
     /** @see PlayerInterface::getDraftTeamOriginalName() */
     public function getDraftTeamOriginalName(): ?string
     {
-        return $this->getPlayerData()->draftTeamOriginalName;
+        return $this->playerData?->draftTeamOriginalName;
     }
 
     /** @see PlayerInterface::getDraftTeamCurrentName() */
     public function getDraftTeamCurrentName(): ?string
     {
-        return $this->getPlayerData()->draftTeamCurrentName;
+        return $this->playerData?->draftTeamCurrentName;
     }
 
     /** @see PlayerInterface::getCollegeName() */
     public function getCollegeName(): ?string
     {
-        return $this->getPlayerData()->collegeName;
+        return $this->playerData?->collegeName;
     }
 
     /** @see PlayerInterface::getDaysRemainingForInjury() */
     public function getDaysRemainingForInjury(): ?int
     {
-        return $this->getPlayerData()->daysRemainingForInjury;
+        return $this->playerData?->daysRemainingForInjury;
     }
 
     /** @see PlayerInterface::getHeightFeet() */
     public function getHeightFeet(): ?int
     {
-        return $this->getPlayerData()->heightFeet;
+        return $this->playerData?->heightFeet;
     }
 
     /** @see PlayerInterface::getHeightInches() */
     public function getHeightInches(): ?int
     {
-        return $this->getPlayerData()->heightInches;
+        return $this->playerData?->heightInches;
     }
 
     /** @see PlayerInterface::getWeightPounds() */
     public function getWeightPounds(): ?int
     {
-        return $this->getPlayerData()->weightPounds;
+        return $this->playerData?->weightPounds;
     }
 
     /** @see PlayerInterface::getIsRetired() */
     public function getIsRetired(): ?int
     {
-        return $this->getPlayerData()->isRetired;
+        return $this->playerData?->isRetired;
     }
 
     /** @see PlayerInterface::getTimeDroppedOnWaivers() */
     public function getTimeDroppedOnWaivers(): ?int
     {
-        return $this->getPlayerData()->timeDroppedOnWaivers;
+        return $this->playerData?->timeDroppedOnWaivers;
     }
 
     /** @see PlayerInterface::getDecoratedName() */

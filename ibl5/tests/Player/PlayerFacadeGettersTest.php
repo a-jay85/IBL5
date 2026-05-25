@@ -9,13 +9,20 @@ use Player\Player;
 
 class PlayerFacadeGettersTest extends TestCase
 {
-    public function testGetterThrowsWhenPlayerDataNotLoaded(): void
+    public function testGettersReturnNullWhenPlayerDataNotLoaded(): void
     {
         $player = new Player();
 
-        $this->expectException(\RuntimeException::class);
-        $this->expectExceptionMessage('Player data has not been loaded');
-        $player->getPlayerID();
+        self::assertNull($player->getPlayerID());
+        self::assertNull($player->getName());
+        self::assertNull($player->getTeamid());
+        self::assertNull($player->getPosition());
+        self::assertNull($player->getRatingFieldGoalAttempts());
+        self::assertNull($player->getRatingClutch());
+        self::assertNull($player->getContractYear1Salary());
+        self::assertNull($player->getBirdYears());
+        self::assertNull($player->getDraftYear());
+        self::assertNull($player->getCollegeName());
     }
 
     public function testGetNameStatusClassReturnsEmptyStringWhenPlayerDataNotLoaded(): void

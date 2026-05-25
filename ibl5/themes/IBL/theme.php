@@ -74,10 +74,15 @@ function themeheader()
     $showDraftLink = '';
     $isDraftOrderFinalized = false;
     if ($mysqli_db) {
-        $season = new \Season\Season($mysqli_db, $leagueContext);
-        $seasonPhase = $season->phase;
-        $allowWaivers = $season->allowWaivers;
-        $showDraftLink = $season->showDraftLink;
+        try {
+            $season = new \Season\Season($mysqli_db, $leagueContext);
+            $seasonPhase = $season->phase;
+            $allowWaivers = $season->allowWaivers;
+            $showDraftLink = $season->showDraftLink;
+        } catch (\Throwable) {
+            // Graceful degradation: Season init can fail during CI migration
+            // window when column renames are in progress. Nav renders with defaults.
+        }
 
         $draftOrderRepo = new \ProjectedDraftOrder\ProjectedDraftOrderRepository($mysqli_db);
         $isDraftOrderFinalized = $draftOrderRepo->isDraftOrderFinalized();

@@ -151,6 +151,7 @@ CAFFEINATE_PID=$!
 
 START=$(date +%s)
 PLANS_RUN=0
+AUTH_FAILED=false
 
 echo "=== Nightly session starting at $(date) ===" >> "$LOG"
 
@@ -175,6 +176,12 @@ while true; do
         break
     fi
 
+    # Session-level auth breaker — if auth failed on a prior plan, stop entirely
+    if $AUTH_FAILED; then
+        echo "Auth failure detected in prior plan — stopping session." >> "$LOG"
+        break
+    fi
+
     # Pick the oldest queued plan
     NEXT_PLAN=$(ls -1tr "$QUEUE_DIR"/*.md 2>/dev/null | head -1)
     PLAN_NAME=$(basename "$NEXT_PLAN")
@@ -193,9 +200,13 @@ while true; do
         REPORTS_DIR="$NIGHTLY_DIR/reports"
         mkdir -p "$REPORTS_DIR"
         SLUG=$(basename "$PLAN_NAME" .md)
-        printf 'Plan "%s" skipped after %d failed attempts in one night. Needs human review.\n' \
-            "$SLUG" "$ATTEMPTS" \
-            > "$REPORTS_DIR/$(date +%Y-%m-%d)-skipped-$SLUG.md"
+        {
+            printf 'Plan "%s" skipped after %d failed attempts in one night. Needs human review.\n\n' \
+                "$SLUG" "$ATTEMPTS"
+            printf '## Last attempt log tail\n\n```\n'
+            tail -30 "$LOG"
+            printf '\n```\n'
+        } > "$REPORTS_DIR/$(date +%Y-%m-%d)-skipped-$SLUG.md"
         continue
     fi
 
@@ -257,6 +268,7 @@ PLAN_FILE=$PLAN_NAME" \
         # Auth-error circuit breaker — transient, not a plan failure; stop immediately
         if tail -n +"$((IMPL_LOG_BEFORE + 1))" "$LOG" | grep -q "authentication_error"; then
             echo "Auth error during impl — stopping loop (not a plan failure)." >> "$LOG"
+            AUTH_FAILED=true
             CURRENT=$(cat "$ATTEMPT_FILE" 2>/dev/null || echo 0)
             if [ "$CURRENT" -le 1 ]; then
                 rm -f "$ATTEMPT_FILE"
@@ -338,6 +350,7 @@ PLAN_FILE=$PLAN_NAME" \
         # Auth-error circuit breaker — transient, not a plan failure; stop immediately
         if tail -n +"$((PP_LOG_BEFORE + 1))" "$LOG" | grep -q "authentication_error"; then
             echo "Auth error during postplan — stopping loop (not a plan failure)." >> "$LOG"
+            AUTH_FAILED=true
             CURRENT=$(cat "$ATTEMPT_FILE" 2>/dev/null || echo 0)
             if [ "$CURRENT" -le 1 ]; then
                 rm -f "$ATTEMPT_FILE"

@@ -42,8 +42,13 @@ while IFS= read -r line; do
             stop_reason=$(printf '%s' "$line" | jq -r '.stop_reason // "unknown"' 2>/dev/null) || true
             num_turns=$(printf '%s' "$line" | jq -r '.num_turns // "?"' 2>/dev/null) || true
             duration_ms=$(printf '%s' "$line" | jq -r '.duration_ms // "?"' 2>/dev/null) || true
-            printf '%s exit: stop_reason=%s turns=%s tools=%d duration=%sms\n' \
-                "$(elapsed_ts)" "$stop_reason" "$num_turns" "$TOOL_COUNT" "$duration_ms"
+            cost_usd=$(printf '%s' "$line" | jq -r '.total_cost_usd // "?"' 2>/dev/null) || true
+            in_tokens=$(printf '%s' "$line" | jq -r '.usage.input_tokens // "?"' 2>/dev/null) || true
+            out_tokens=$(printf '%s' "$line" | jq -r '.usage.output_tokens // "?"' 2>/dev/null) || true
+            cache_tokens=$(printf '%s' "$line" | jq -r '.usage.cache_read_input_tokens // "?"' 2>/dev/null) || true
+            printf '%s exit: stop_reason=%s turns=%s tools=%d duration=%sms cost=$%s in=%s out=%s cache=%s\n' \
+                "$(elapsed_ts)" "$stop_reason" "$num_turns" "$TOOL_COUNT" "$duration_ms" \
+                "$cost_usd" "$in_tokens" "$out_tokens" "$cache_tokens"
             # result is the final stream-json event — terminate claude and exit
             if [ -n "$CMDPID_FILE" ]; then
                 _target_pid=$(cat "$CMDPID_FILE" 2>/dev/null) || true

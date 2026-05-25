@@ -7,6 +7,8 @@ namespace Tests\Negotiation;
 use PHPUnit\Framework\TestCase;
 use Negotiation\NegotiationOfferView;
 use Player\Player;
+use Tests\WideUnit\Mocks\MockDatabase;
+use Tests\WideUnit\Mocks\TestDataFactory;
 
 /**
  * Tests for NegotiationOfferView
@@ -19,6 +21,13 @@ use Player\Player;
  */
 class NegotiationOfferViewTest extends TestCase
 {
+    private MockDatabase $mockDb;
+
+    protected function setUp(): void
+    {
+        $this->mockDb = new MockDatabase();
+    }
+
     /**
      * @group view
      * @group rendering
@@ -26,7 +35,7 @@ class NegotiationOfferViewTest extends TestCase
     public function testRendersNegotiationFormWithAllFields()
     {
         // Arrange
-        $player = $this->createMockPlayer();
+        $player = $this->createTestPlayer();
         $demands = [
             'year1' => 500,
             'year2' => 550,
@@ -61,10 +70,7 @@ class NegotiationOfferViewTest extends TestCase
     public function testFormContainsAllHiddenFields()
     {
         // Arrange
-        $player = $this->createMockPlayer();
-        $player->playerID = 123;
-        $player->name = "Test Player";
-        $player->teamName = "Seattle Supersonics";
+        $player = $this->createTestPlayer(['pid' => 123, 'teamname' => 'Seattle Supersonics']);
         
         $demands = $this->getDefaultDemands();
         $capSpace = 1000;
@@ -91,8 +97,7 @@ class NegotiationOfferViewTest extends TestCase
     public function testEscapesPlayerNameInForm()
     {
         // Arrange
-        $player = $this->createMockPlayer();
-        $player->name = "O'Neal <script>alert('xss')</script>";
+        $player = $this->createTestPlayer(['name' => "O'Neal <script>alert('xss')</script>"]);
         $demands = $this->getDefaultDemands();
         $capSpace = 1000;
         $maxYearOneSalary = \ContractRules::getMaxContractSalary(0);
@@ -113,8 +118,7 @@ class NegotiationOfferViewTest extends TestCase
     public function testEscapesTeamNameInForm()
     {
         // Arrange
-        $player = $this->createMockPlayer();
-        $player->teamName = "Team <img src=x onerror=alert(1)>";
+        $player = $this->createTestPlayer(['teamname' => "Team <img src=x onerror=alert(1)>"]);
         $demands = $this->getDefaultDemands();
         $capSpace = 1000;
         $maxYearOneSalary = \ContractRules::getMaxContractSalary(0);
@@ -135,7 +139,7 @@ class NegotiationOfferViewTest extends TestCase
     public function testShowsEditableFieldsWhenDemandsUnderMax()
     {
         // Arrange
-        $player = $this->createMockPlayer();
+        $player = $this->createTestPlayer();
         $demands = [
             'year1' => 500, // Under max of 1063
             'year2' => 550,
@@ -166,8 +170,7 @@ class NegotiationOfferViewTest extends TestCase
     public function testShowsMaxSalaryFieldsWhenDemandsExceedMax()
     {
         // Arrange
-        $player = $this->createMockPlayer();
-        $player->birdYears = 2; // No Bird rights
+        $player = $this->createTestPlayer(['bird' => 2]); // No Bird rights
         $demands = [
             'year1' => 1100, // Over max contract salary
             'year2' => 1200,
@@ -196,8 +199,7 @@ class NegotiationOfferViewTest extends TestCase
     public function testDisplaysBirdRightsMessageWhenApplicable()
     {
         // Arrange
-        $player = $this->createMockPlayer();
-        $player->birdYears = 3; // Has Bird rights
+        $player = $this->createTestPlayer(['bird' => 3]); // Has Bird rights
         $demands = $this->getDefaultDemands();
         $capSpace = 3000;
         $maxYearOneSalary = \ContractRules::getMaxContractSalary(0);
@@ -216,8 +218,7 @@ class NegotiationOfferViewTest extends TestCase
     public function testDisplaysNonBirdRightsMessageWhenNotApplicable()
     {
         // Arrange
-        $player = $this->createMockPlayer();
-        $player->birdYears = 2; // No Bird rights
+        $player = $this->createTestPlayer(['bird' => 2]); // No Bird rights
         $demands = $this->getDefaultDemands();
         $capSpace = 1000;
         $maxYearOneSalary = \ContractRules::getMaxContractSalary(0);
@@ -236,7 +237,7 @@ class NegotiationOfferViewTest extends TestCase
     public function testDisplaysCapSpaceInformation()
     {
         // Arrange
-        $player = $this->createMockPlayer();
+        $player = $this->createTestPlayer();
         $demands = $this->getDefaultDemands();
         $capSpace = 1234;
         $maxYearOneSalary = \ContractRules::getMaxContractSalary(0);
@@ -290,9 +291,7 @@ class NegotiationOfferViewTest extends TestCase
     public function testRendersHeader()
     {
         // Arrange
-        $player = $this->createMockPlayer();
-        $player->name = "Test Player";
-        $player->position = "PG";
+        $player = $this->createTestPlayer();
 
         // Act
         $html = NegotiationOfferView::renderHeader($player);
@@ -309,7 +308,7 @@ class NegotiationOfferViewTest extends TestCase
     public function testHeaderReturnsStaticTitle()
     {
         // Arrange
-        $player = $this->createMockPlayer();
+        $player = $this->createTestPlayer();
 
         // Act
         $html = NegotiationOfferView::renderHeader($player);
@@ -320,18 +319,22 @@ class NegotiationOfferViewTest extends TestCase
     }
 
     /**
-     * Helper to create a mock player
+     * Helper to create a test player using Player::withPlrRow and TestDataFactory
+     *
+     * @param array<string, mixed> $overrides
      */
-    private function createMockPlayer(): Player
+    private function createTestPlayer(array $overrides = []): Player
     {
-        $player = new Player();
-        $player->playerID = 1;
-        $player->name = "Test Player";
-        $player->position = "PG";
-        $player->teamName = "Test Team";
-        $player->birdYears = 3;
-        
-        return $player;
+        $defaults = [
+            'pid' => 1,
+            'name' => 'Test Player',
+            'position' => 'PG',
+            'pos' => 'PG',
+            'teamname' => 'Test Team',
+            'bird' => 3,
+        ];
+
+        return Player::withPlrRow($this->mockDb, TestDataFactory::createPlayer(array_merge($defaults, $overrides)));
     }
 
     /**

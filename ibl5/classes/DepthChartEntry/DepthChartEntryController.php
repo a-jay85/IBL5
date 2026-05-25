@@ -117,10 +117,11 @@ class DepthChartEntryController implements DepthChartEntryControllerInterface
 
         \PageLayout\PageLayout::header();
 
-        echo '<h2 class="ibl-title">Depth Chart Entry</h2>';
+        $responder = new \Api\Response\HtmlResponder();
+        $responder->html('<h2 class="ibl-title">Depth Chart Entry</h2>');
 
         if ($flashErrorsHtml !== '') {
-            echo '<div class="ibl-alert ibl-alert--error">' . $flashErrorsHtml . '</div>';
+            $responder->html('<div class="ibl-alert ibl-alert--error">' . $flashErrorsHtml . '</div>');
         }
 
         $this->view->renderTeamLogo($teamid);
@@ -170,9 +171,9 @@ class DepthChartEntryController implements DepthChartEntryControllerInterface
         $this->view->renderFormFooter();
         $this->view->renderMobileView($playersWithQuality, $slotNames);
 
-        echo '<div class="table-scroll-wrapper"><div class="table-scroll-container" tabindex="0" role="region" aria-label="Player ratings">';
-        echo $this->getTableOutput($teamid, $display, $split);
-        echo '</div></div>';
+        $responder->html('<div class="table-scroll-wrapper"><div class="table-scroll-container" tabindex="0" role="region" aria-label="Player ratings">');
+        $responder->html($this->getTableOutput($teamid, $display, $split));
+        $responder->html('</div></div>');
 
         // Output JS configuration for saved depth charts
         $jsConfig = json_encode([
@@ -180,14 +181,14 @@ class DepthChartEntryController implements DepthChartEntryControllerInterface
             'apiBaseUrl' => 'modules.php?name=DepthChartEntry&op=api',
             'currentRosterPids' => $currentRosterPids,
         ], JSON_THROW_ON_ERROR);
-        echo '<script>window.IBL_DEPTH_CHART_CONFIG = ' . $jsConfig . ';</script>';
-        echo '<script src="jslib/depth-chart-changes.js"></script>';
-        echo '<script src="jslib/depth-chart-lineup-preview.js"></script>';
-        echo '<script src="jslib/saved-depth-charts.js"></script>';
-        echo '<script src="jslib/depth-chart-mobile.js"></script>';
+        $responder->html('<script>window.IBL_DEPTH_CHART_CONFIG = ' . $jsConfig . ';</script>');
+        $responder->html('<script src="jslib/depth-chart-changes.js"></script>');
+        $responder->html('<script src="jslib/depth-chart-lineup-preview.js"></script>');
+        $responder->html('<script src="jslib/saved-depth-charts.js"></script>');
+        $responder->html('<script src="jslib/depth-chart-mobile.js"></script>');
 
         // NextSim position tables section
-        $this->renderNextSimSection($teamid, $team, $season);
+        $this->renderNextSimSection($teamid, $team, $season, $responder);
 
         \PageLayout\PageLayout::footer();
     }
@@ -214,7 +215,7 @@ class DepthChartEntryController implements DepthChartEntryControllerInterface
         return $dropdown->wrap($tableHtml);
     }
 
-    private function renderNextSimSection(int $teamid, Team $team, Season $season): void
+    private function renderNextSimSection(int $teamid, Team $team, Season $season, \Api\Response\HtmlResponder $responder): void
     {
         // Load power rankings for SOS tier indicators
         $standingsRepo = new StandingsRepository($this->db);
@@ -232,20 +233,20 @@ class DepthChartEntryController implements DepthChartEntryControllerInterface
         $games = $nextSimService->getNextSimGames($teamid, $season);
         $userStarters = $nextSimService->getUserStartingLineup($team);
 
-        echo '<div class="next-sim-depth-chart-section">';
-        echo '<h2 class="ibl-title">Next Sim</h2>';
+        $responder->html('<div class="next-sim-depth-chart-section">');
+        $responder->html('<h2 class="ibl-title">Next Sim</h2>');
 
         if ($games === []) {
-            echo '<div class="next-sim-empty">No games projected next sim!</div>';
+            $responder->html('<div class="next-sim-empty">No games projected next sim!</div>');
         } else {
-            echo $nextSimView->renderScheduleStrip($games);
-            echo '<div class="nextsim-tab-container">';
-            echo $nextSimView->renderTabbedPositionTable($games, 'PG', $team, $userStarters);
-            echo '</div>';
-            echo $nextSimView->renderColumnHighlightScript();
+            $responder->html($nextSimView->renderScheduleStrip($games));
+            $responder->html('<div class="nextsim-tab-container">');
+            $responder->html($nextSimView->renderTabbedPositionTable($games, 'PG', $team, $userStarters));
+            $responder->html('</div>');
+            $responder->html($nextSimView->renderColumnHighlightScript());
         }
 
-        echo '</div>';
+        $responder->html('</div>');
     }
 
 }

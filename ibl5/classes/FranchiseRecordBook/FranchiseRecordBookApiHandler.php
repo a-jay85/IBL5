@@ -50,6 +50,7 @@ class FranchiseRecordBookApiHandler
             $data = $service->getLeagueRecordBook();
         }
 
-        echo $view->renderContent($data);
+        $responder = new \Api\Response\HtmlResponder();
+        $responder->html($view->renderContent($data));
     }
 }

@@ -1,6 +1,5 @@
 {
     "phpstan-baseline.neon": {
-        "ibl.echoInNonView": 17,
         "property.deprecated": 423
     },
     "phpstan-tests-baseline.neon": {

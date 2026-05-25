@@ -53,22 +53,23 @@ class TradeRosterPreviewApiHandler
     public function handle(): void
     {
         header('Content-Type: application/json; charset=utf-8');
+        $responder = new \Api\Response\HtmlResponder();
 
         $teamid = $this->validateTeamID();
         if ($teamid === 0) {
-            echo json_encode(['html' => ''], JSON_THROW_ON_ERROR);
+            $responder->json(['html' => '']);
             return;
         }
 
         $addPids = $this->validatePidList('addPids');
         if ($addPids === null) {
-            echo json_encode(['html' => ''], JSON_THROW_ON_ERROR);
+            $responder->json(['html' => '']);
             return;
         }
 
         $removePids = $this->validatePidList('removePids');
         if ($removePids === null) {
-            echo json_encode(['html' => ''], JSON_THROW_ON_ERROR);
+            $responder->json(['html' => '']);
             return;
         }
 
@@ -158,13 +159,13 @@ class TradeRosterPreviewApiHandler
             $dropdown = new TableViewDropdown($dropdownGroups, $activeValue, '', $color1, $color2);
             $wrappedHtml = $dropdown->wrap($tableHtml);
 
-            echo json_encode(['html' => $wrappedHtml], JSON_THROW_ON_ERROR);
+            $responder->json(['html' => $wrappedHtml]);
         } catch (\Throwable) {
             // Clean up any output buffers left open by rendering code
             while (ob_get_level() > $bufferLevel) {
                 ob_end_clean();
             }
-            echo json_encode(['html' => ''], JSON_THROW_ON_ERROR);
+            $responder->json(['html' => '']);
         }
     }
 

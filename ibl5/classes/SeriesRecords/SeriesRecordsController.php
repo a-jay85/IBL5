@@ -49,7 +49,8 @@ class SeriesRecordsController implements SeriesRecordsControllerInterface
         $seriesMatrix = $this->service->buildSeriesMatrix($seriesRecords);
 
         // Render the table
-        echo $this->view->renderSeriesRecordsTable($teams, $seriesMatrix, $userTeamId, $numTeams);
+        $responder = new \Api\Response\HtmlResponder();
+        $responder->html($this->view->renderSeriesRecordsTable($teams, $seriesMatrix, $userTeamId, $numTeams));
 
         \PageLayout\PageLayout::footer();
     }

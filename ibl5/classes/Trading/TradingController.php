@@ -59,7 +59,8 @@ class TradingController implements TradingControllerInterface
 
         if (!$season->areTradesAllowed()) {
             \PageLayout\PageLayout::header();
-            echo $this->view->renderTradesClosed($season);
+            $responder = new \Api\Response\HtmlResponder();
+            $responder->html($this->view->renderTradesClosed($season));
             \PageLayout\PageLayout::footer();
             return;
         }
@@ -91,7 +92,8 @@ class TradingController implements TradingControllerInterface
     {
         if (!$this->nukeCompat->isUser($user)) {
             header('Content-Type: application/json; charset=utf-8');
-            echo json_encode(['html' => ''], JSON_THROW_ON_ERROR);
+            $responder = new \Api\Response\HtmlResponder();
+            $responder->json(['html' => '']);
             return;
         }
 
@@ -304,7 +306,8 @@ class TradingController implements TradingControllerInterface
         $pageData['result'] = isset($_GET['result']) && is_string($_GET['result']) ? $_GET['result'] : null;
         $pageData['error'] = isset($_GET['error']) && is_string($_GET['error']) ? $_GET['error'] : null;
         \PageLayout\PageLayout::header();
-        echo $this->view->renderTradeReview($pageData);
+        $responder = new \Api\Response\HtmlResponder();
+        $responder->html($this->view->renderTradeReview($pageData));
         \PageLayout\PageLayout::footer();
     }
 
@@ -316,7 +319,8 @@ class TradingController implements TradingControllerInterface
         $pageData['previousFormData'] = $_SESSION['tradeFormData'] ?? null;
         unset($_SESSION['tradeFormData']);
         \PageLayout\PageLayout::header();
-        echo $this->view->renderTradeOfferForm($pageData);
+        $responder = new \Api\Response\HtmlResponder();
+        $responder->html($this->view->renderTradeOfferForm($pageData));
         \PageLayout\PageLayout::footer();
     }
 }

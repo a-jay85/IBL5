@@ -217,24 +217,6 @@ parameters:
 			path: classes/BasketballStats/Tables/SeasonTotals.php
 
 		-
-			rawMessage: 'echo is banned outside View classes, Responders, and Bootstrap/Updater emitters. Move HTML/text output into a *View.php (composed by the Controller) or a Responder (composed by the ApiHandler).'
-			identifier: ibl.echoInNonView
-			count: 1
-			path: classes/DepthChartEntry/DepthChartEntryApiHandler.php
-
-		-
-			rawMessage: 'echo is banned outside View classes, Responders, and Bootstrap/Updater emitters. Move HTML/text output into a *View.php (composed by the Controller) or a Responder (composed by the ApiHandler).'
-			identifier: ibl.echoInNonView
-			count: 19
-			path: classes/DepthChartEntry/DepthChartEntryController.php
-
-		-
-			rawMessage: 'echo is banned outside View classes, Responders, and Bootstrap/Updater emitters. Move HTML/text output into a *View.php (composed by the Controller) or a Responder (composed by the ApiHandler).'
-			identifier: ibl.echoInNonView
-			count: 1
-			path: classes/DraftHistory/DraftHistoryApiHandler.php
-
-		-
 			rawMessage: '''
 				Access to deprecated property $birdYears of class Player\Player:
 				Use $player->getBirdYears() instead.
@@ -334,12 +316,6 @@ parameters:
 			path: classes/Extension/ExtensionService.php
 
 		-
-			rawMessage: 'echo is banned outside View classes, Responders, and Bootstrap/Updater emitters. Move HTML/text output into a *View.php (composed by the Controller) or a Responder (composed by the ApiHandler).'
-			identifier: ibl.echoInNonView
-			count: 1
-			path: classes/FranchiseRecordBook/FranchiseRecordBookApiHandler.php
-
-		-
 			rawMessage: '''
 				Access to deprecated property $teamName of class Player\Player:
 				Use $player->getTeamName() instead.
@@ -347,12 +323,6 @@ parameters:
 			identifier: property.deprecated
 			count: 2
 			path: classes/FreeAgency/FreeAgencyAdminProcessor.php
-
-		-
-			rawMessage: 'echo is banned outside View classes, Responders, and Bootstrap/Updater emitters. Move HTML/text output into a *View.php (composed by the Controller) or a Responder (composed by the ApiHandler).'
-			identifier: ibl.echoInNonView
-			count: 2
-			path: classes/FreeAgency/FreeAgencyController.php
 
 		-
 			rawMessage: '''
@@ -1138,12 +1108,6 @@ parameters:
 			path: classes/Injuries/InjuriesService.php
 
 		-
-			rawMessage: 'echo is banned outside View classes, Responders, and Bootstrap/Updater emitters. Move HTML/text output into a *View.php (composed by the Controller) or a Responder (composed by the ApiHandler).'
-			identifier: ibl.echoInNonView
-			count: 1
-			path: classes/LeagueStarters/LeagueStartersApiHandler.php
-
-		-
 			rawMessage: '''
 				Access to deprecated property $teamCity of class Player\Player:
 				Use $player->getTeamCity() instead.
@@ -1754,12 +1718,6 @@ parameters:
 			identifier: property.deprecated
 			count: 1
 			path: classes/Negotiation/NegotiationValidator.php
-
-		-
-			rawMessage: 'echo is banned outside View classes, Responders, and Bootstrap/Updater emitters. Move HTML/text output into a *View.php (composed by the Controller) or a Responder (composed by the ApiHandler).'
-			identifier: ibl.echoInNonView
-			count: 1
-			path: classes/NextSim/NextSimTabApiHandler.php
 
 		-
 			rawMessage: '''
@@ -2662,12 +2620,6 @@ parameters:
 			path: classes/Player/Stats/PlayerStats.php
 
 		-
-			rawMessage: 'echo is banned outside View classes, Responders, and Bootstrap/Updater emitters. Move HTML/text output into a *View.php (composed by the Controller) or a Responder (composed by the ApiHandler).'
-			identifier: ibl.echoInNonView
-			count: 68
-			path: classes/Player/Stats/Views/PlayerSeasonTableRenderer.php
-
-		-
 			rawMessage: '''
 				Access to deprecated property $age of class Player\Player:
 				Use $player->getAge() instead.
@@ -3172,42 +3124,6 @@ parameters:
 			path: classes/RookieOption/RookieOptionValidator.php
 
 		-
-			rawMessage: 'echo is banned outside View classes, Responders, and Bootstrap/Updater emitters. Move HTML/text output into a *View.php (composed by the Controller) or a Responder (composed by the ApiHandler).'
-			identifier: ibl.echoInNonView
-			count: 5
-			path: classes/SavedDepthChart/SavedDepthChartApiHandler.php
-
-		-
-			rawMessage: 'echo is banned outside View classes, Responders, and Bootstrap/Updater emitters. Move HTML/text output into a *View.php (composed by the Controller) or a Responder (composed by the ApiHandler).'
-			identifier: ibl.echoInNonView
-			count: 1
-			path: classes/SeriesRecords/SeriesRecordsController.php
-
-		-
-			rawMessage: 'echo is banned outside View classes, Responders, and Bootstrap/Updater emitters. Move HTML/text output into a *View.php (composed by the Controller) or a Responder (composed by the ApiHandler).'
-			identifier: ibl.echoInNonView
-			count: 1
-			path: classes/Team/TeamApiHandler.php
-
-		-
-			rawMessage: 'echo is banned outside View classes, Responders, and Bootstrap/Updater emitters. Move HTML/text output into a *View.php (composed by the Controller) or a Responder (composed by the ApiHandler).'
-			identifier: ibl.echoInNonView
-			count: 2
-			path: classes/Team/TeamController.php
-
-		-
-			rawMessage: 'echo is banned outside View classes, Responders, and Bootstrap/Updater emitters. Move HTML/text output into a *View.php (composed by the Controller) or a Responder (composed by the ApiHandler).'
-			identifier: ibl.echoInNonView
-			count: 5
-			path: classes/Trading/TradeRosterPreviewApiHandler.php
-
-		-
-			rawMessage: 'echo is banned outside View classes, Responders, and Bootstrap/Updater emitters. Move HTML/text output into a *View.php (composed by the Controller) or a Responder (composed by the ApiHandler).'
-			identifier: ibl.echoInNonView
-			count: 4
-			path: classes/Trading/TradingController.php
-
-		-
 			rawMessage: '''
 				Access to deprecated property $age of class Player\Player:
 				Use $player->getAge() instead.
@@ -3412,12 +3328,6 @@ parameters:
 			'''
 			identifier: property.deprecated
 			count: 1
-			path: classes/UI/Tables/Contracts.php
-
-		-
-			rawMessage: 'echo is banned outside View classes, Responders, and Bootstrap/Updater emitters. Move HTML/text output into a *View.php (composed by the Controller) or a Responder (composed by the ApiHandler).'
-			identifier: ibl.echoInNonView
-			count: 53
 			path: classes/UI/Tables/Contracts.php
 
 		-
@@ -3736,12 +3646,6 @@ parameters:
 			path: classes/UI/Tables/Ratings.php
 
 		-
-			rawMessage: 'echo is banned outside View classes, Responders, and Bootstrap/Updater emitters. Move HTML/text output into a *View.php (composed by the Controller) or a Responder (composed by the ApiHandler).'
-			identifier: ibl.echoInNonView
-			count: 2
-			path: classes/Updater/Steps/GenerateSeasonAwardsStep.php
-
-		-
 			rawMessage: '''
 				Access to deprecated property $name of class Player\Player:
 				Use $player->getName() instead.
@@ -3794,12 +3698,6 @@ parameters:
 			identifier: property.deprecated
 			count: 1
 			path: classes/Voting/VotingBallotService.php
-
-		-
-			rawMessage: 'echo is banned outside View classes, Responders, and Bootstrap/Updater emitters. Move HTML/text output into a *View.php (composed by the Controller) or a Responder (composed by the ApiHandler).'
-			identifier: ibl.echoInNonView
-			count: 3
-			path: classes/Waivers/WaiversController.php
 
 		-
 			rawMessage: '''

@@ -63,7 +63,8 @@ class WaiversController implements WaiversControllerInterface
 
         if (!$season->areWaiversAllowed()) {
             \PageLayout\PageLayout::header();
-            echo $this->view->renderWaiversClosed();
+            $responder = new \Api\Response\HtmlResponder();
+            $responder->html($this->view->renderWaiversClosed());
             \PageLayout\PageLayout::footer();
             return;
         }
@@ -159,7 +160,8 @@ class WaiversController implements WaiversControllerInterface
 
         \PageLayout\PageLayout::header();
 
-        echo $this->view->renderWaiverForm(
+        $responder = new \Api\Response\HtmlResponder();
+        $responder->html($this->view->renderWaiverForm(
             $formData['team']->name,
             $formData['team']->teamid,
             $action,
@@ -168,7 +170,7 @@ class WaiversController implements WaiversControllerInterface
             $formData['healthyOpenRosterSpots'],
             $resultParam,
             $errorParam
-        );
+        ));
 
         $tabDefinitions = [
             'ratings' => 'Ratings',
@@ -180,7 +182,7 @@ class WaiversController implements WaiversControllerInterface
         $baseUrl = 'modules.php?name=Waivers&action=' . $action;
         $switcher = new TableViewSwitcher($tabDefinitions, $display, $baseUrl, $formData['styleTeam']->color1, $formData['styleTeam']->color2);
         $tableHtml = $this->renderTableForDisplay($display, $formData['tableResult'], $formData['styleTeam'], $formData['season']);
-        echo $switcher->wrap($tableHtml);
+        $responder->html($switcher->wrap($tableHtml));
 
         \PageLayout\PageLayout::footer();
     }

@@ -218,10 +218,63 @@
         }
     }
 
+    function lastNameOnly(fullName) {
+        var parts = fullName.trim().split(/\s+/);
+        if (parts.length < 2) return fullName;
+        var suffixes = ['Jr.', 'Jr', 'Sr.', 'Sr', 'II', 'III', 'IV', 'V'];
+        var suffix = '';
+        while (parts.length > 1 && suffixes.indexOf(parts[parts.length - 1]) !== -1) {
+            suffix = ' ' + parts.pop() + suffix;
+        }
+        return parts.length >= 2 ? parts.pop() + suffix : fullName;
+    }
+
+    function processLeaderRunnerNames() {
+        var links = document.querySelectorAll('.leaders-tabbed__runner-name');
+        if (links.length === 0) return;
+        var isMobile = window.innerWidth <= MOBILE_BREAKPOINT;
+
+        var fontKey = null;
+        var candidates = [];
+
+        for (var i = 0; i < links.length; i++) {
+            var link = links[i];
+            if (!link.dataset.fullName) {
+                link.dataset.fullName = link.textContent.trim();
+            }
+            link.textContent = abbreviateName(link.dataset.fullName);
+
+            if (link.textContent !== link.dataset.fullName) {
+                if (!fontKey) fontKey = getFontKey(link);
+                candidates.push(link);
+            }
+        }
+
+        if (candidates.length === 0 || !fontKey) return;
+
+        for (var j = 0; j < candidates.length; j++) {
+            var cl = candidates[j];
+            var available = cl.getBoundingClientRect().width;
+            var fullWidth = getTextWidth(cl.dataset.fullName, fontKey);
+            if (fullWidth <= available) {
+                cl.textContent = cl.dataset.fullName;
+            } else if (isMobile) {
+                var abbrWidth = getTextWidth(cl.textContent, fontKey);
+                if (abbrWidth > available) {
+                    var last = lastNameOnly(cl.dataset.fullName);
+                    if (getTextWidth(last, fontKey) <= available) {
+                        cl.textContent = last;
+                    }
+                }
+            }
+        }
+    }
+
     function processAll() {
         processPlayerNames();
         processTeamNames();
         processScheduleTeamNames();
+        processLeaderRunnerNames();
     }
 
     // Debounce resize handling

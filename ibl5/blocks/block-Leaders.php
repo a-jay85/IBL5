@@ -203,6 +203,7 @@ $content .= '</div>
             tab.setAttribute("aria-selected", "true");
             var panel = document.getElementById(tab.getAttribute("aria-controls"));
             if (panel) panel.classList.add("leaders-tabbed__panel--active");
+            if (window.IBL_refreshNameAbbreviations) window.IBL_refreshNameAbbreviations();
         });
     });
 })();

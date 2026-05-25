@@ -218,7 +218,7 @@
 }
 
 .leaders-tabbed__runner-name {
-    font-size: 1rem;
+    font-size: .86rem;
     font-weight: 600;
     color: var(--navy-800);
     text-decoration: none;
@@ -242,5 +242,11 @@
     line-height: 1.2;
 }
 
+
+@media (max-width: 768px) {
+    .leaders-tabbed__runner-name {
+        font-size: .667rem;
+    }
+}
 
 } /* end @layer components */

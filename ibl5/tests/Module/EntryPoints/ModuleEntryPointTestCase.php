@@ -172,6 +172,9 @@ abstract class ModuleEntryPointTestCase extends WideUnitTestCase
             'logo_path' => 'images/ibl/logo.png',
             'images_path' => 'images/',
         ]);
+        $lcStub->method('getCurrentLeague')->willReturn('ibl');
+        $lcStub->method('isOlympics')->willReturn(false);
+        $lcStub->method('getTableName')->willReturnArgument(0);
         $GLOBALS['leagueContext'] = $lcStub;
 
         // PHP-Nuke globals

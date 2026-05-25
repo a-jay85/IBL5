@@ -14,11 +14,13 @@ if (!defined('MODULE_FILE')) {
 $module_name = basename(dirname(__FILE__));
 get_lang($module_name);
 
+global $leagueContext;
+
 $pagetitle = "Season Stats";
 
 // Initialize classes
 $dbCache = new \Cache\DatabaseCache($mysqli_db);
-$innerRepository = new SeasonLeaderboardsRepository($mysqli_db);
+$innerRepository = new SeasonLeaderboardsRepository($mysqli_db, $leagueContext);
 $repository = new CachedSeasonLeaderboardsRepository($innerRepository, $dbCache);
 $service = new SeasonLeaderboardsService($repository);
 $view = new SeasonLeaderboardsView($service);

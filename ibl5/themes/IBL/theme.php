@@ -58,7 +58,7 @@ function themeheader()
     }
 
     if ($mysqli_db) {
-        $navRepo = new \Navigation\NavigationRepository($mysqli_db);
+        $navRepo = new \Navigation\NavigationRepository($mysqli_db, $leagueContext);
 
         if ($isLoggedIn && $username !== null) {
             $teamId = $navRepo->resolveTeamId($username);
@@ -74,7 +74,7 @@ function themeheader()
     $showDraftLink = '';
     $isDraftOrderFinalized = false;
     if ($mysqli_db) {
-        $season = new \Season\Season($mysqli_db);
+        $season = new \Season\Season($mysqli_db, $leagueContext);
         $seasonPhase = $season->phase;
         $allowWaivers = $season->allowWaivers;
         $showDraftLink = $season->showDraftLink;

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Season;
 
 use League\League;
+use League\LeagueContext;
 
 /**
  * Season - IBL season information and configuration
@@ -76,10 +77,10 @@ class Season
      *
      * @param \mysqli $db Active mysqli connection
      */
-    public function __construct(\mysqli $db)
+    public function __construct(\mysqli $db, ?LeagueContext $leagueContext = null)
     {
         $this->db = $db;
-        $this->queryRepo = new SeasonQueryRepository($db);
+        $this->queryRepo = new SeasonQueryRepository($db, $leagueContext);
 
         // Bulk-fetch all needed settings in a single query
         $settings = $this->queryRepo->getBulkSettings([

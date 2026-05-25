@@ -17,7 +17,7 @@ if (!preg_match('/modules\.php/i', $_SERVER['PHP_SELF'])) {
 }
 
 // Get database connection from the global context
-global $mysqli_db;
+global $mysqli_db, $leagueContext;
 
 // Ensure database connection is available
 if (!isset($mysqli_db) || !$mysqli_db) {
@@ -26,8 +26,8 @@ if (!isset($mysqli_db) || !$mysqli_db) {
 }
 
 // Create repository and view instances
-$repository = new Standings\StandingsRepository($mysqli_db);
-$season = new \Season\Season($mysqli_db);
+$repository = new Standings\StandingsRepository($mysqli_db, $leagueContext);
+$season = new \Season\Season($mysqli_db, $leagueContext);
 $seriesRecordsService = new SeriesRecords\SeriesRecordsService();
 $view = new Standings\StandingsView($repository, $season->endingYear, $seriesRecordsService);
 

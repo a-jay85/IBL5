@@ -71,12 +71,12 @@ class PlayerPageController
         }
 
         // Generate team color scheme
-        $teamColors = TeamColorHelper::getTeamColors($this->mysqliDb, $player->teamid ?? 0);
+        $teamColors = TeamColorHelper::getTeamColors($this->mysqliDb, $player->getTeamid() ?? 0);
         $colorScheme = TeamColorHelper::generateColorScheme($teamColors['color1'], $teamColors['color2']);
 
         // Trading card
         $playerRepository = new PlayerRepository($this->mysqliDb);
-        $playerName = $player->name ?? '';
+        $playerName = $player->getName() ?? '';
         $asg = $playerRepository->getAllStarGameCount($playerName);
         $threepointcontests = $playerRepository->getThreePointContestCount($playerName);
         $dunkcontests = $playerRepository->getDunkContestCount($playerName);
@@ -169,10 +169,10 @@ class PlayerPageController
         Season $season,
         array $colorScheme
     ): string {
-        $playerName = $player->name ?? '';
+        $playerName = $player->getName() ?? '';
 
         if ($pageView === PlayerPageType::OVERVIEW) {
-            if ($player->isRetired !== null && $player->isRetired !== 0) {
+            if ($player->getIsRetired() !== null && $player->getIsRetired() !== 0) {
                 return $this->renderFlipCardView(
                     $viewFactory->createRegularSeasonAveragesView()->renderAverages($playerID),
                     $viewFactory->createRegularSeasonTotalsView()->renderTotals($playerID),
@@ -254,7 +254,7 @@ class PlayerPageController
         }
 
         // Default to overview
-        if ($player->isRetired !== null && $player->isRetired !== 0) {
+        if ($player->getIsRetired() !== null && $player->getIsRetired() !== 0) {
             return $this->renderFlipCardView(
                 $viewFactory->createRegularSeasonAveragesView()->renderAverages($playerID),
                 $viewFactory->createRegularSeasonTotalsView()->renderTotals($playerID),

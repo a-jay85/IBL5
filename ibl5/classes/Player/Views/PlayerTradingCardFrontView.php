@@ -45,50 +45,50 @@ class PlayerTradingCardFrontView
     public static function render(Player $player, int $playerID, string $contractDisplay, ?\mysqli $db = null): string
     {
         // Get color scheme and prepare player data
-        $colorScheme = CardBaseStyles::getColorSchemeForTeam($db, $player->teamid ?? 0);
+        $colorScheme = CardBaseStyles::getColorSchemeForTeam($db, $player->getTeamid() ?? 0);
         $playerData = CardBaseStyles::preparePlayerData($player, $playerID);
 
         $cssProps = CardBaseStyles::getCardCssProperties($colorScheme);
         $cardTop = CardBaseStyles::renderCardTop($playerData);
 
         // Render rating cells inline
-        $rc2ga  = self::renderRatingCell('2ga', $player->ratingFieldGoalAttempts);
-        $rc2gp  = self::renderRatingCell('2gp', $player->ratingFieldGoalPercentage);
-        $rcFta  = self::renderRatingCell('fta', $player->ratingFreeThrowAttempts);
-        $rcFtp  = self::renderRatingCell('ftp', $player->ratingFreeThrowPercentage);
-        $rc3ga  = self::renderRatingCell('3ga', $player->ratingThreePointAttempts);
-        $rc3gp  = self::renderRatingCell('3gp', $player->ratingThreePointPercentage);
-        $rcOrb  = self::renderRatingCell('orb', $player->ratingOffensiveRebounds);
-        $rcDrb  = self::renderRatingCell('drb', $player->ratingDefensiveRebounds);
-        $rcAst  = self::renderRatingCell('ast', $player->ratingAssists);
-        $rcStl  = self::renderRatingCell('stl', $player->ratingSteals);
-        $rcTvr  = self::renderRatingCell('tvr', $player->ratingTurnovers);
-        $rcBlk  = self::renderRatingCell('blk', $player->ratingBlocks);
-        $rcFoul = self::renderRatingCell('foul', $player->ratingFouls);
-        $rcOo   = self::renderRatingCell('oo', $player->ratingOutsideOffense);
-        $rcDo   = self::renderRatingCell('do', $player->ratingDriveOffense);
-        $rcPo   = self::renderRatingCell('po', $player->ratingPostOffense);
-        $rcTo   = self::renderRatingCell('to', $player->ratingTransitionOffense);
-        $rcOd   = self::renderRatingCell('od', $player->ratingOutsideDefense);
-        $rcDd   = self::renderRatingCell('dd', $player->ratingDriveDefense);
-        $rcPd   = self::renderRatingCell('pd', $player->ratingPostDefense);
-        $rcTd   = self::renderRatingCell('td', $player->ratingTransitionDefense);
+        $rc2ga  = self::renderRatingCell('2ga', $player->getRatingFieldGoalAttempts());
+        $rc2gp  = self::renderRatingCell('2gp', $player->getRatingFieldGoalPercentage());
+        $rcFta  = self::renderRatingCell('fta', $player->getRatingFreeThrowAttempts());
+        $rcFtp  = self::renderRatingCell('ftp', $player->getRatingFreeThrowPercentage());
+        $rc3ga  = self::renderRatingCell('3ga', $player->getRatingThreePointAttempts());
+        $rc3gp  = self::renderRatingCell('3gp', $player->getRatingThreePointPercentage());
+        $rcOrb  = self::renderRatingCell('orb', $player->getRatingOffensiveRebounds());
+        $rcDrb  = self::renderRatingCell('drb', $player->getRatingDefensiveRebounds());
+        $rcAst  = self::renderRatingCell('ast', $player->getRatingAssists());
+        $rcStl  = self::renderRatingCell('stl', $player->getRatingSteals());
+        $rcTvr  = self::renderRatingCell('tvr', $player->getRatingTurnovers());
+        $rcBlk  = self::renderRatingCell('blk', $player->getRatingBlocks());
+        $rcFoul = self::renderRatingCell('foul', $player->getRatingFouls());
+        $rcOo   = self::renderRatingCell('oo', $player->getRatingOutsideOffense());
+        $rcDo   = self::renderRatingCell('do', $player->getRatingDriveOffense());
+        $rcPo   = self::renderRatingCell('po', $player->getRatingPostOffense());
+        $rcTo   = self::renderRatingCell('to', $player->getRatingTransitionOffense());
+        $rcOd   = self::renderRatingCell('od', $player->getRatingOutsideDefense());
+        $rcDd   = self::renderRatingCell('dd', $player->getRatingDriveDefense());
+        $rcPd   = self::renderRatingCell('pd', $player->getRatingPostDefense());
+        $rcTd   = self::renderRatingCell('td', $player->getRatingTransitionDefense());
 
         // Render pills inline
-        $pTal = self::renderPill('TAL', $player->ratingTalent);
-        $pSkl = self::renderPill('SKL', $player->ratingSkill);
-        $pInt = self::renderPill('INT', $player->ratingIntangibles);
-        $pClu = self::renderPill('CLU', $player->ratingClutch);
-        $pCon = self::renderPill('CON', $player->ratingConsistency);
-        $pLoy = self::renderPill('LOY', $player->freeAgencyLoyalty, true);
-        $pWin = self::renderPill('WIN', $player->freeAgencyPlayForWinner, true);
-        $pPt  = self::renderPill('PT', $player->freeAgencyPlayingTime, true);
-        $pSec = self::renderPill('SEC', $player->freeAgencySecurity, true);
-        $pTrd = self::renderPill('TRD', $player->freeAgencyTradition, true);
+        $pTal = self::renderPill('TAL', $player->getRatingTalent());
+        $pSkl = self::renderPill('SKL', $player->getRatingSkill());
+        $pInt = self::renderPill('INT', $player->getRatingIntangibles());
+        $pClu = self::renderPill('CLU', $player->getRatingClutch());
+        $pCon = self::renderPill('CON', $player->getRatingConsistency());
+        $pLoy = self::renderPill('LOY', $player->getFreeAgencyLoyalty(), true);
+        $pWin = self::renderPill('WIN', $player->getFreeAgencyPlayForWinner(), true);
+        $pPt  = self::renderPill('PT', $player->getFreeAgencyPlayingTime(), true);
+        $pSec = self::renderPill('SEC', $player->getFreeAgencySecurity(), true);
+        $pTrd = self::renderPill('TRD', $player->getFreeAgencyTradition(), true);
 
         // Contract data
-        $expYears = $player->yearsOfExperience ?? 0;
-        $birdYears = $player->birdYears ?? 0;
+        $expYears = $player->getYearsOfExperience() ?? 0;
+        $birdYears = $player->getBirdYears() ?? 0;
         $contractSafe = HtmlSanitizer::e($contractDisplay);
 
         return '<div class="trading-card" style="' . $cssProps . '">'

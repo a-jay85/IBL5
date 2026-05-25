@@ -19,20 +19,20 @@ class CardBaseStylesXssTest extends TestCase
     public function testPreparePlayerDataEscapesPlayerName(): void
     {
         $player = $this->createStub(Player::class);
-        $player->name = self::XSS_PAYLOAD;
-        $player->nickname = '';
-        $player->position = 'PG';
-        $player->teamName = 'Test Team';
-        $player->teamid = 1;
-        $player->age = 25;
-        $player->heightFeet = 6;
-        $player->heightInches = 3;
-        $player->weightPounds = 200;
-        $player->collegeName = 'Test U';
-        $player->draftRound = 1;
-        $player->draftPickNumber = 1;
-        $player->draftTeamOriginalName = 'Test';
-        $player->draftYear = 2020;
+        $player->method('getName')->willReturn(self::XSS_PAYLOAD);
+        $player->method('getNickname')->willReturn('');
+        $player->method('getPosition')->willReturn('PG');
+        $player->method('getTeamName')->willReturn('Test Team');
+        $player->method('getTeamid')->willReturn(1);
+        $player->method('getAge')->willReturn(25);
+        $player->method('getHeightFeet')->willReturn(6);
+        $player->method('getHeightInches')->willReturn(3);
+        $player->method('getWeightPounds')->willReturn(200);
+        $player->method('getCollegeName')->willReturn('Test U');
+        $player->method('getDraftRound')->willReturn(1);
+        $player->method('getDraftPickNumber')->willReturn(1);
+        $player->method('getDraftTeamOriginalName')->willReturn('Test');
+        $player->method('getDraftYear')->willReturn(2020);
 
         $data = CardBaseStyles::preparePlayerData($player, 1);
 
@@ -43,20 +43,20 @@ class CardBaseStylesXssTest extends TestCase
     public function testPreparePlayerDataEscapesNickname(): void
     {
         $player = $this->createStub(Player::class);
-        $player->name = 'Normal Name';
-        $player->nickname = self::XSS_PAYLOAD;
-        $player->position = 'PG';
-        $player->teamName = 'Test Team';
-        $player->teamid = 1;
-        $player->age = 25;
-        $player->heightFeet = 6;
-        $player->heightInches = 3;
-        $player->weightPounds = 200;
-        $player->collegeName = 'Test U';
-        $player->draftRound = 1;
-        $player->draftPickNumber = 1;
-        $player->draftTeamOriginalName = 'Test';
-        $player->draftYear = 2020;
+        $player->method('getName')->willReturn('Normal Name');
+        $player->method('getNickname')->willReturn(self::XSS_PAYLOAD);
+        $player->method('getPosition')->willReturn('PG');
+        $player->method('getTeamName')->willReturn('Test Team');
+        $player->method('getTeamid')->willReturn(1);
+        $player->method('getAge')->willReturn(25);
+        $player->method('getHeightFeet')->willReturn(6);
+        $player->method('getHeightInches')->willReturn(3);
+        $player->method('getWeightPounds')->willReturn(200);
+        $player->method('getCollegeName')->willReturn('Test U');
+        $player->method('getDraftRound')->willReturn(1);
+        $player->method('getDraftPickNumber')->willReturn(1);
+        $player->method('getDraftTeamOriginalName')->willReturn('Test');
+        $player->method('getDraftYear')->willReturn(2020);
 
         $data = CardBaseStyles::preparePlayerData($player, 1);
 

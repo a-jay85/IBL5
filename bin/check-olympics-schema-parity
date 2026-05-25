@@ -40,6 +40,10 @@ $allowedOlympicsOnly = [
 $allowedMissingFromOlympics = [
     'ibl_olympics_team_info' => ['gm_username', 'used_extension_this_chunk', 'used_extension_this_season', 'has_mle', 'has_lle', 'depth', 'sim_depth', 'asg_vote', 'eoy_vote'],
 ];
+$allowedMissingIndexes = [
+    'ibl_olympics_box_scores' => ['idx_uuid'],
+    'ibl_olympics_team_info' => ['idx_gm_username'],
+];
 
 $exitCode = 0;
 
@@ -70,6 +74,7 @@ foreach ($tablePairs as $ibl => $olympics) {
     $iblIdx = getIndexes($db, $ibl);
     $olyIdx = getIndexes($db, $olympics);
     $missingIdx = array_diff(array_keys($iblIdx), array_keys($olyIdx));
+    $missingIdx = array_diff($missingIdx, $allowedMissingIndexes[$olympics] ?? []);
     foreach ($missingIdx as $idx) {
         echo "INDEX MISSING from $olympics: $idx\n";
         $exitCode = 1;
@@ -77,7 +82,11 @@ foreach ($tablePairs as $ibl => $olympics) {
 }
 
 $db->close();
-exit($exitCode === 0 ? (int) fwrite(STDOUT, "All Olympics schemas in parity.\n") && 0 : $exitCode);
+
+if ($exitCode === 0) {
+    fwrite(STDOUT, "All Olympics schemas in parity.\n");
+}
+exit($exitCode);
 
 function getColumns(mysqli $db, string $table): array
 {

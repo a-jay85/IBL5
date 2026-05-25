@@ -313,4 +313,62 @@ class SavedDepthChartRepository extends \BaseMysqliRepository implements SavedDe
             'losses' => is_int($losses) ? $losses : 0,
         ];
     }
+
+    /**
+     * @see SavedDepthChartRepositoryInterface::findActiveChartForTeamOnDate()
+     * @return array{
+     *   header: SavedDepthChartRow,
+     *   starters: array{PG:int|null,SG:int|null,SF:int|null,PF:int|null,C:int|null}
+     * }|null
+     */
+    public function findActiveChartForTeamOnDate(int $tid, string $date): ?array
+    {
+        /** @var SavedDepthChartRow|null $header */
+        $header = $this->fetchOne(
+            "SELECT * FROM {$this->headerTable}
+             WHERE teamid = ?
+               AND sim_start_date <= ?
+               AND (sim_end_date >= ? OR sim_end_date IS NULL)
+             ORDER BY sim_start_date DESC, id DESC
+             LIMIT 1",
+            "iss",
+            $tid,
+            $date,
+            $date
+        );
+
+        if ($header === null) {
+            return null;
+        }
+
+        /** @var list<array{pid:int,pos:string}> $rows */
+        $rows = $this->fetchAll(
+            "SELECT pid,
+                    CASE
+                        WHEN dc_pg_depth = 1 THEN 'PG'
+                        WHEN dc_sg_depth = 1 THEN 'SG'
+                        WHEN dc_sf_depth = 1 THEN 'SF'
+                        WHEN dc_pf_depth = 1 THEN 'PF'
+                        WHEN dc_c_depth  = 1 THEN 'C'
+                    END AS pos
+             FROM {$this->playersTable}
+             WHERE depth_chart_id = ?
+               AND (dc_pg_depth = 1 OR dc_sg_depth = 1 OR dc_sf_depth = 1 OR dc_pf_depth = 1 OR dc_c_depth = 1)",
+            "i",
+            $header['id']
+        );
+
+        $starters = ['PG' => null, 'SG' => null, 'SF' => null, 'PF' => null, 'C' => null];
+        foreach ($rows as $row) {
+            $pos = $row['pos'];
+            if (in_array($pos, ['PG', 'SG', 'SF', 'PF', 'C'], true) && $starters[$pos] === null) {
+                $starters[$pos] = $row['pid'];
+            }
+        }
+
+        return [
+            'header' => $header,
+            'starters' => $starters,
+        ];
+    }
 }

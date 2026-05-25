@@ -81,7 +81,9 @@
     /* Missing palette steps */
     --accent-700: var(--color-accent-700);
     --success-400: var(--color-success-400);
+    --success-700: var(--color-success-700);
     --error-400: var(--color-error-400);
+    --error-700: var(--color-error-700);
 
     /* ========================================================================
        Typography

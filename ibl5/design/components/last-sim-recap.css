@@ -1,0 +1,814 @@
+@layer components {
+
+/* ============================================================
+   Last-Sim Recap Card
+   ============================================================ */
+
+.last-sim-recap {
+    background: #fff;
+    border: 1px solid var(--gray-200);
+    border-radius: var(--radius-xl);
+    overflow: hidden;
+    box-shadow: var(--shadow-md);
+    font-family: var(--font-sans);
+    max-width: 1400px;
+    margin-bottom: var(--space-4);
+    margin-inline: auto;
+}
+
+/* Header bar — slate-wide summary (3-section grid) */
+.last-sim-recap__head {
+    display: grid;
+    grid-template-columns: 1fr auto 1fr;
+    align-items: center;
+    padding: .65rem 1.2rem;
+    background: linear-gradient(90deg, var(--navy-900), var(--navy-800));
+    color: #fff;
+}
+.last-sim-recap__head-dates {
+    justify-self: start;
+}
+.last-sim-recap__head-center {
+    display: flex;
+    align-items: baseline;
+    gap: .35rem;
+    font-family: var(--font-display);
+    font-weight: 800;
+    font-size: 1.6rem;
+    line-height: 1;
+    letter-spacing: .04em;
+    text-transform: uppercase;
+}
+.last-sim-recap__sub {
+    font-family: var(--font-mono);
+    font-size: .667rem;
+    font-weight: 500;
+    color: rgba(255, 255, 255, .55);
+    letter-spacing: .12em;
+    text-transform: uppercase;
+}
+.last-sim-recap__record-w { color: var(--accent-400) }
+.last-sim-recap__record-sep { color: rgba(255, 255, 255, .3); margin: 0 4px }
+.last-sim-recap__meta {
+    justify-self: end;
+    display: flex;
+    gap: 1.1rem;
+    align-items: center;
+    font-family: var(--font-mono);
+    font-size: .66rem;
+    color: rgba(255, 255, 255, .6);
+    text-transform: uppercase;
+    letter-spacing: .1em;
+}
+.last-sim-recap__meta-value { color: #fff; font-weight: 700 }
+.last-sim-recap__meta-bw {
+    display: flex;
+    flex-direction: column;
+    gap: .1rem;
+}
+.last-sim-recap__meta-bw-row { display: flex; gap: .35em }
+.last-sim-recap__meta-bw-label {
+    text-align: right;
+    width: 5.5ch;
+}
+
+/* Tabs (one per game, max 7) */
+.last-sim-recap__tabs {
+    display: grid;
+    grid-template-columns: repeat(var(--last-sim-recap-tab-count, 7), 1fr);
+    background: #fff;
+    border-bottom: 1px solid var(--gray-200);
+    position: relative;
+}
+.last-sim-recap__tab {
+    appearance: none;
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    text-align: left;
+    font: inherit;
+    color: inherit;
+    position: relative;
+    padding: .65rem .85rem;
+    border-left: 1px solid var(--gray-100);
+    display: flex;
+    flex-direction: column;
+    gap: .3rem;
+    min-width: 0;
+    outline: none;
+    transition: background .15s ease;
+}
+.last-sim-recap__tab:first-child { border-left: none }
+
+/* Top color bar — green on wins, red on losses */
+.last-sim-recap__tab::before {
+    content: "";
+    position: absolute;
+    left: 0;
+    top: 0;
+    right: 0;
+    height: 3px;
+    background: var(--success-500);
+    transition: height .15s;
+}
+.last-sim-recap__tab--loss::before { background: var(--error-500) }
+
+.last-sim-recap__tab:hover { background: var(--gray-50) }
+.last-sim-recap__tab:focus-visible { box-shadow: inset 0 0 0 2px var(--accent-500) }
+
+/* Active tab — tinted bg, thicker top bar, downward notch into panel */
+.last-sim-recap__tab--active { background: var(--gray-50) }
+.last-sim-recap__tab--active.last-sim-recap__tab--win { background: var(--success-50) }
+.last-sim-recap__tab--active.last-sim-recap__tab--loss { background: var(--error-50) }
+.last-sim-recap__tab--active::before { height: 5px }
+.last-sim-recap__tab--active::after {
+    content: "";
+    position: absolute;
+    left: 50%;
+    bottom: -1px;
+    transform: translate(-50%, 50%) rotate(45deg);
+    width: 10px;
+    height: 10px;
+    background: inherit;
+    border-right: 1px solid var(--gray-200);
+    border-bottom: 1px solid var(--gray-200);
+    z-index: 2;
+}
+
+/* Tab row 1: vs/@ + opponent + date pulled right */
+.last-sim-recap__tab-top {
+    display: flex;
+    align-items: center;
+    gap: .45rem;
+    min-width: 0;
+}
+.last-sim-recap__tab-where {
+    font-family: var(--font-mono);
+    font-size: .667rem;
+    font-weight: 700;
+    color: var(--gray-400);
+    letter-spacing: .1em;
+    text-transform: uppercase;
+}
+.last-sim-recap__tab-opp {
+    font-family: var(--font-display);
+    font-weight: 700;
+    font-size: .95rem;
+    text-transform: uppercase;
+    letter-spacing: .02em;
+    color: var(--navy-800);
+    line-height: 1;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    min-width: 0;
+}
+.last-sim-recap__tab-logo {
+    position: absolute;
+    right: .85rem;
+    bottom: .65rem;
+    width: 24px;
+    height: 24px;
+}
+.last-sim-recap__tab-date {
+    margin-left: auto;
+    font-family: var(--font-mono);
+    font-size: .667rem;
+    font-weight: 600;
+    color: var(--gray-500);
+    text-transform: uppercase;
+    letter-spacing: .08em;
+    white-space: nowrap;
+}
+
+/* Tab row 2: W/L letter + score + OT chip + right-aligned injury flag */
+.last-sim-recap__tab-score {
+    display: flex;
+    align-items: baseline;
+    gap: 6px;
+    font-family: var(--font-display);
+    font-weight: 700;
+    font-size: 1.35rem;
+    line-height: 1;
+    color: var(--navy-900);
+    font-variant-numeric: tabular-nums;
+    letter-spacing: .01em;
+}
+.last-sim-recap__tab-num-top::after { content: "\2013" }
+.last-sim-recap__tab-wl {
+    font-family: var(--font-display);
+    font-weight: 800;
+    font-size: 1.35rem;
+    line-height: 1;
+    color: var(--success-600);
+    letter-spacing: .04em;
+}
+.last-sim-recap__tab--loss .last-sim-recap__tab-wl { color: var(--error-600) }
+.last-sim-recap__tab-ot {
+    font-size: .667rem;
+    color: var(--accent-600);
+    font-family: var(--font-mono);
+    letter-spacing: .08em;
+}
+.last-sim-recap__tab-flag {
+    align-self: center;
+    margin-left: auto;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    background: var(--error-600);
+    color: #fff;
+    font-family: var(--font-mono);
+    font-size: 9px;
+    font-weight: 800;
+    line-height: 1;
+}
+
+/* ============================================================
+   Panel under the active tab — single-game detail.
+   ============================================================ */
+.last-sim-recap__panel { background: #fff; animation: last-sim-recap-fade .22s ease-out }
+@keyframes last-sim-recap-fade {
+    from { opacity: 0; transform: translateY(-3px) }
+    to   { opacity: 1; transform: none }
+}
+
+/* Verdict strip */
+.last-sim-recap__strip {
+    display: flex;
+    align-items: center;
+    gap: .7rem;
+    padding: .5rem 1.2rem;
+    background: linear-gradient(90deg, var(--success-700) 0%, var(--success-600) 100%);
+    color: #fff;
+}
+.last-sim-recap__strip--loss {
+    background: linear-gradient(90deg, var(--error-700) 0%, var(--error-600) 100%);
+}
+.last-sim-recap__verdict {
+    font-family: var(--font-display);
+    font-weight: 800;
+    font-size: 1.15rem;
+    letter-spacing: .06em;
+    text-transform: uppercase;
+    line-height: 1;
+}
+.last-sim-recap__vs {
+    font-family: var(--font-mono);
+    font-size: .74rem;
+    font-weight: 600;
+    color: rgba(255, 255, 255, .85);
+    letter-spacing: .06em;
+    text-transform: uppercase;
+    line-height: 1;
+}
+.last-sim-recap__strip-right {
+    margin-left: auto;
+    display: flex;
+    gap: 1.1rem;
+    align-items: center;
+    font-family: var(--font-mono);
+    font-size: .7rem;
+    color: rgba(255, 255, 255, .85);
+    text-transform: uppercase;
+    letter-spacing: .08em;
+}
+
+/* 3-cell main row — subgrid aligns dividers across columns */
+.last-sim-recap__main {
+    display: grid;
+    grid-template-columns: 1.05fr 1.1fr 1.15fr;
+    grid-template-rows: auto minmax(0, 1fr) minmax(0, 1fr) .9rem;
+    gap: 0;
+    border-bottom: 1px solid var(--gray-100);
+}
+.last-sim-recap__cell {
+    padding: .9rem 1.2rem 0;
+    border-left: 1px solid var(--gray-100);
+    grid-row: 1 / -1;
+    display: grid;
+    grid-template-rows: subgrid;
+}
+.last-sim-recap__cell:first-child { border-left: none }
+.last-sim-recap__cell-head-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: .5rem;
+    margin: 0;
+    padding: 0 0 .5rem;
+}
+.last-sim-recap__cell-head {
+    margin: 0;
+    padding: 0 0 .5rem;
+    font-family: var(--font-display);
+    font-weight: 700;
+    font-size: .78rem;
+    text-transform: uppercase;
+    letter-spacing: .08em;
+    color: var(--gray-600);
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: .5rem;
+}
+.last-sim-recap__cell-head-row .last-sim-recap__cell-head { margin: 0; padding: 0 }
+.last-sim-recap__box-link {
+    font-family: var(--font-mono);
+    font-size: .65rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: .1em;
+    color: var(--accent-500);
+    text-decoration: none;
+    white-space: nowrap;
+}
+.last-sim-recap__box-link:hover { text-decoration: underline }
+
+/* Final score */
+.last-sim-recap__final {
+    display: contents;
+}
+.last-sim-recap__final-row {
+    display: grid;
+    grid-template-columns: 50px 1fr auto;
+    column-gap: .6rem;
+    align-items: center;
+    align-content: end;
+    padding: .4rem 0;
+}
+.last-sim-recap__final-row + .last-sim-recap__final-row {
+    border-top: 1px dashed var(--gray-200);
+    align-content: start;
+}
+.last-sim-recap__final-name {
+    font-family: var(--font-display);
+    font-weight: 700;
+    font-size: 1.05rem;
+    text-transform: uppercase;
+    letter-spacing: .02em;
+    color: var(--navy-800);
+    line-height: 1;
+    text-align: center;
+}
+.last-sim-recap__final-rec {
+    display: block;
+    margin-top: 3px;
+    font-family: var(--font-mono);
+    font-size: .667rem;
+    font-weight: 500;
+    color: var(--gray-500);
+    letter-spacing: .06em;
+    text-transform: uppercase;
+}
+.last-sim-recap__final-pts {
+    position: relative;
+    font-family: var(--font-display);
+    font-weight: 700;
+    font-size: 1.75rem;
+    color: var(--gray-400);
+    line-height: .95;
+    font-variant-numeric: tabular-nums;
+    justify-self: end;
+    text-align: right;
+    min-width: 3.5ch;
+    text-box: trim-both cap alphabetic;
+}
+.last-sim-recap__final-row--win .last-sim-recap__final-pts {
+    color: var(--navy-900);
+}
+.last-sim-recap__final-row--win .last-sim-recap__final-pts::before {
+    content: "";
+    position: absolute;
+    right: 100%;
+    top: calc(50% + 2px);
+    translate: -6px -50%;
+    border-style: solid;
+    border-width: 6px 0 6px 7px;
+    border-color: transparent transparent transparent var(--accent-500);
+}
+
+/* Links (team, player) */
+a.last-sim-recap__final-name { text-decoration: none; color: inherit }
+a.last-sim-recap__final-name:hover { text-decoration: underline }
+.last-sim-recap__team-link { color: inherit; text-decoration: none }
+.last-sim-recap__team-link:hover { text-decoration: underline }
+.last-sim-recap__player-link { color: inherit; text-decoration: none }
+.last-sim-recap__player-link:hover { text-decoration: underline }
+a.last-sim-recap__avatar-wrap { text-decoration: none }
+a.last-sim-recap__final-pts { color: inherit; text-decoration: none }
+a.last-sim-recap__final-pts:hover { text-decoration: underline }
+a.last-sim-recap__player-name { color: inherit; text-decoration: none }
+a.last-sim-recap__player-name:hover { text-decoration: underline }
+
+/* Responsive team names — short variant hidden on desktop, shown on mobile */
+.last-sim-recap__name-short { display: none }
+/* Tabs always prefer abbreviated names (space is tighter than verdict/final) */
+.last-sim-recap__tab .last-sim-recap__name-full { display: none }
+.last-sim-recap__tab .last-sim-recap__name-short { display: inline }
+
+/* Quarter-margin bar chart (per-quarter point differential) */
+.last-sim-recap__mom { display: contents }
+.last-sim-recap__mom-chart {
+    position: relative;
+    grid-row: 2 / 4;
+    min-height: 122px;
+}
+.last-sim-recap__mom-bars {
+    position: absolute;
+    inset: 18px 4px;
+    display: grid;
+    grid-template-columns: repeat(var(--last-sim-recap-quarters, 4), 1fr);
+    align-items: center;
+}
+.last-sim-recap__mom-bars::before {
+    content: "";
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 50%;
+    height: 1px;
+    background: var(--gray-200);
+    transform: translateY(-0.5px);
+    pointer-events: none;
+}
+.last-sim-recap__mom-bar {
+    position: relative;
+    height: 100%;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+.last-sim-recap__mom-bar-shape {
+    display: block;
+    width: 55%;
+    height: var(--last-sim-recap-bar-h, 0px);
+    border-radius: 3px;
+    position: absolute;
+    left: 22.5%;
+}
+.last-sim-recap__mom-bar-shape--pos { background: var(--accent-500); bottom: 50% }
+.last-sim-recap__mom-bar-shape--neg { background: var(--navy-700); top: 50% }
+.last-sim-recap__mom-bar-val {
+    position: absolute;
+    left: 0;
+    right: 0;
+    text-align: center;
+    font-family: var(--font-mono);
+    font-size: .667rem;
+    font-weight: 700;
+    color: var(--navy-900);
+}
+.last-sim-recap__mom-bar-val--pos { bottom: calc(50% + var(--last-sim-recap-bar-h, 0px) + 2px) }
+.last-sim-recap__mom-bar-val--neg { top: calc(50% + var(--last-sim-recap-bar-h, 0px) + 2px) }
+.last-sim-recap__mom-labels {
+    position: absolute;
+    left: 4px;
+    right: 4px;
+    bottom: 0;
+    height: 18px;
+    display: grid;
+    grid-template-columns: repeat(var(--last-sim-recap-quarters, 4), 1fr);
+}
+.last-sim-recap__mom-labels span {
+    text-align: center;
+    line-height: 18px;
+    font-family: var(--font-mono);
+    font-size: .667rem;
+    color: var(--gray-500);
+    letter-spacing: .06em;
+    text-transform: uppercase;
+}
+
+/* Injury report — pre-existing + new (this game) merged */
+.last-sim-recap__inj { display: contents }
+.last-sim-recap__inj-group { display: flex; flex-direction: column; gap: .25rem }
+.last-sim-recap__inj-grouphead {
+    display: flex;
+    align-items: center;
+    gap: .45rem;
+    font-family: var(--font-mono);
+    font-size: .667rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: .1em;
+    color: var(--gray-500);
+    margin-bottom: 1px;
+}
+.last-sim-recap__inj-dot { width: 6px; height: 6px; border-radius: 50% }
+.last-sim-recap__inj-dot--you { background: var(--accent-500) }
+.last-sim-recap__inj-dot--opp { background: var(--navy-700) }
+.last-sim-recap__inj-row {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    align-items: center;
+    gap: .5rem;
+    padding: .18rem 0;
+}
+.last-sim-recap__inj-pname {
+    font-weight: 600;
+    font-size: .86rem;
+    color: var(--navy-800);
+    line-height: 1.15;
+}
+.last-sim-recap__inj-pos {
+    display: inline-block;
+    margin-right: 6px;
+    font-family: var(--font-mono);
+    font-size: .667rem;
+    font-weight: 700;
+    color: var(--gray-500);
+    background: var(--gray-100);
+    padding: 1px 5px;
+    border-radius: 3px;
+    letter-spacing: .06em;
+    vertical-align: 3px;
+}
+.last-sim-recap__inj-new {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    background: var(--error-600);
+    color: #fff;
+    font-family: var(--font-mono);
+    font-size: 9px;
+    font-weight: 800;
+    margin-left: 5px;
+    line-height: 1;
+    vertical-align: 3px;
+}
+.last-sim-recap__inj-why {
+    display: block;
+    margin-top: 2px;
+    font-family: var(--font-mono);
+    font-size: .667rem;
+    color: var(--gray-500);
+    text-transform: uppercase;
+    letter-spacing: .06em;
+    font-weight: 500;
+}
+.last-sim-recap__inj-row--new .last-sim-recap__inj-why { color: var(--error-600) }
+.last-sim-recap__inj-eta {
+    font-family: var(--font-mono);
+    font-size: .72rem;
+    font-weight: 700;
+    color: var(--gray-700);
+    text-align: right;
+    letter-spacing: .04em;
+    white-space: nowrap;
+}
+.last-sim-recap__inj-row--new .last-sim-recap__inj-eta { color: var(--error-600) }
+.last-sim-recap__eta-num { color: var(--navy-900); font-weight: 800 }
+.last-sim-recap__inj-row--new .last-sim-recap__eta-num { color: var(--error-600) }
+.last-sim-recap__inj-divider { display: none }
+.last-sim-recap__inj-group + .last-sim-recap__inj-divider + .last-sim-recap__inj-group {
+    border-top: 1px dashed var(--gray-200);
+    padding-top: .25rem;
+}
+.last-sim-recap__inj-group:first-of-type {
+    align-content: end;
+}
+.last-sim-recap__inj-group:last-of-type {
+    align-content: start;
+}
+.last-sim-recap__inj-healthy {
+    margin-left: auto;
+    color: var(--gray-500);
+    font-weight: 500;
+    font-style: italic;
+}
+
+/* Position battles — 5 cells across (PG/SG/SF/PF/C), two stacked player rows each */
+.last-sim-recap__battles {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    background: var(--gray-50);
+    border-top: 1px solid var(--gray-200);
+}
+.last-sim-recap__battle {
+    padding: .6rem .85rem .7rem;
+    border-left: 1px solid var(--gray-200);
+}
+.last-sim-recap__battle:first-child { border-left: none }
+.last-sim-recap__poslbl {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: var(--font-mono);
+    font-size: .667rem;
+    font-weight: 700;
+    color: var(--gray-500);
+    text-transform: uppercase;
+    letter-spacing: .12em;
+    margin-bottom: .45rem;
+}
+.last-sim-recap__pos-chip {
+    background: var(--navy-800);
+    color: #fff;
+    padding: 1px 6px;
+    border-radius: 3px;
+    letter-spacing: .1em;
+    font-size: .667rem;
+}
+
+/* Player row */
+.last-sim-recap__player {
+    display: grid;
+    grid-template-columns: 24px minmax(0, 1fr) auto;
+    align-items: center;
+    gap: .5rem;
+    min-height: 28px;
+}
+.last-sim-recap__player + .last-sim-recap__player { margin-top: 6px }
+
+/* Avatar wrapper (positions the injdot relative to the img) */
+.last-sim-recap__avatar-wrap {
+    position: relative;
+    display: inline-flex;
+    flex: 0 0 auto;
+    width: 24px;
+    height: 24px;
+    transform: translateY(2px);
+}
+.last-sim-recap__player--you .ibl-player-photo {
+    box-shadow: 0 0 0 2px var(--accent-500), 0 0 0 3px var(--gray-50);
+}
+.last-sim-recap__injdot {
+    position: absolute;
+    right: -2px;
+    bottom: -2px;
+    width: 11px;
+    height: 11px;
+    border-radius: 50%;
+    background: var(--error-600);
+    color: #fff;
+    border: 2px solid var(--gray-50);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: var(--font-mono);
+    font-size: 7px;
+    font-weight: 800;
+    line-height: 1;
+}
+.last-sim-recap__player-name {
+    font-size: .86rem;
+    font-weight: 600;
+    color: var(--navy-800);
+    line-height: 1.1;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    min-width: 0;
+    text-align: left;
+}
+.last-sim-recap__player-statline {
+    font-size: .75rem;
+    font-weight: 700;
+    color: var(--navy-900);
+    text-align: right;
+    white-space: nowrap;
+    flex-shrink: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    font-variant-numeric: tabular-nums;
+}
+
+/* ============================================================
+   Mobile overrides
+   ============================================================ */
+@media (max-width: 768px) {
+
+    /* Header: stack vertically on mobile */
+    .last-sim-recap__head {
+        grid-template-columns: 1fr;
+        row-gap: .3rem;
+        justify-items: center;
+    }
+    .last-sim-recap__head-dates { order: 2; justify-self: center; text-align: center }
+    .last-sim-recap__head-center { order: 0 }
+    .last-sim-recap__meta { display: none }
+
+    /* Tabs: tighten padding + shrink scores on mobile */
+    .last-sim-recap__tab { padding: .45rem .35rem }
+    .last-sim-recap__tab-score {
+        font-size: .95rem;
+        justify-content: center;
+        gap: 0;
+    }
+    .last-sim-recap__tab-num {
+        display: inline-flex;
+        flex-direction: column;
+        align-items: flex-end;
+    }
+    .last-sim-recap__tab-num-top::after { display: none }
+    .last-sim-recap__tab-where { font-size: .58rem; letter-spacing: .04em }
+    .last-sim-recap__tab-date { font-size: .58rem }
+    .last-sim-recap__tab-ot {
+        align-self: flex-end;
+        font-size: .55rem;
+        margin-left: 0;
+    }
+    .last-sim-recap__tab--win .last-sim-recap__tab-num-you { color: var(--success-600) }
+    .last-sim-recap__tab--loss .last-sim-recap__tab-num-you { color: var(--error-600) }
+
+    /* Tabs: hide W/L letter to make room for scores */
+    .last-sim-recap__tab-wl { display: none }
+
+    /* Tabs: hide team name on mobile (logo in top row serves as identifier) */
+    .last-sim-recap__tab-opp { display: none }
+    .last-sim-recap__tab-top {
+        flex-wrap: wrap;
+        justify-content: center;
+        align-items: center;
+        gap: .25rem;
+    }
+    .last-sim-recap__tab-logo {
+        position: static;
+        order: 0;
+        width: 16px;
+        height: 16px;
+    }
+    .last-sim-recap__tab-date {
+        flex-basis: 100%;
+        margin-left: 0;
+        text-align: center;
+    }
+
+    /* Stack Final / Quarter Margin / Injury Report vertically */
+    .last-sim-recap__main {
+        grid-template-columns: 1fr;
+        grid-template-rows: none;
+    }
+    .last-sim-recap__cell {
+        border-left: none;
+        border-top: 1px solid var(--gray-100);
+        grid-row: auto;
+        display: block;
+    }
+    .last-sim-recap__cell:first-child { border-top: none }
+    .last-sim-recap__cell { padding: .5rem 1.2rem }
+    .last-sim-recap__final { display: grid; grid-template-columns: 50px 1fr auto; row-gap: 0; column-gap: .6rem }
+    .last-sim-recap__final-row { grid-column: 1 / -1; align-content: initial; padding: .15rem 0 }
+    .last-sim-recap__mom { display: block }
+    .last-sim-recap__mom-chart { height: 120px; grid-row: auto; min-height: auto }
+    .last-sim-recap__mom-bars { inset: 0 4px 18px 4px }
+    .last-sim-recap__inj { display: flex; flex-direction: column; gap: .45rem }
+    .last-sim-recap__inj-divider {
+        display: block;
+        height: 1px;
+        margin: .15rem 0;
+        background-image: linear-gradient(to right, var(--gray-200) 50%, transparent 50%);
+        background-size: 6px 1px;
+        background-repeat: repeat-x;
+        background-color: transparent;
+    }
+    .last-sim-recap__inj-group + .last-sim-recap__inj-divider + .last-sim-recap__inj-group {
+        border-top: none;
+        padding-top: 0;
+    }
+    .last-sim-recap__inj-group:first-of-type,
+    .last-sim-recap__inj-group:last-of-type { align-content: initial }
+
+    /* Responsive team names: swap full → short on mobile */
+    .last-sim-recap__name-full { display: none }
+    .last-sim-recap__name-short { display: inline }
+
+    /* Battles: hide statline, restyle name below avatar */
+    .last-sim-recap__player-statline { display: none }
+    .last-sim-recap__player-name {
+        font-size: .667rem;
+        text-align: center;
+        max-width: 100%;
+    }
+    .last-sim-recap__player {
+        grid-template-columns: 1fr;
+        justify-items: center;
+        justify-content: center;
+        height: auto;
+        gap: .2rem;
+    }
+
+    /* Tighten battle cell padding */
+    .last-sim-recap__battle {
+        padding: .5rem .45rem .55rem;
+        display: flex;
+        flex-direction: column;
+        align-items: stretch;
+    }
+}
+
+.last-sim-recap__empty {
+    padding: 1.5rem;
+    text-align: center;
+    color: var(--color-gray-500, #6b7280);
+    font-size: .95rem;
+}
+
+} /* end @layer components */

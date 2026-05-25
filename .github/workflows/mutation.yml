@@ -215,6 +215,7 @@ jobs:
       if: steps.changes.outputs.skip == 'false'
       working-directory: ibl5
       run: |
+        git config diff.relative true
         vendor/bin/infection \
           --configuration=infection.json5 \
           --coverage=coverage \

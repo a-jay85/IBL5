@@ -19,7 +19,7 @@ class RookieOptionFormView implements RookieOptionFormViewInterface
      */
     public function renderForm(Player $player, string $teamName, int $rookieOptionValue, ?string $error = null, ?string $result = null, ?string $from = null): string
     {
-        $playerID = $player->playerID ?? 0;
+        $playerID = $player->getPlayerID() ?? 0;
         $playerImageUrl = PlayerImageHelper::getImageUrl($playerID);
 
         ob_start();
@@ -37,10 +37,10 @@ class RookieOptionFormView implements RookieOptionFormViewInterface
 
 <div class="ibl-card">
     <div class="ibl-card__header">
-        <h2 class="ibl-card__title"><?= HtmlSanitizer::e($player->position ?? '') ?> <?= HtmlSanitizer::e($player->name ?? '') ?> - Rookie Option</h2>
+        <h2 class="ibl-card__title"><?= HtmlSanitizer::e($player->getPosition() ?? '') ?> <?= HtmlSanitizer::e($player->getName() ?? '') ?> - Rookie Option</h2>
     </div>
     <div class="ibl-card__body text-center">
-        <img src="<?= HtmlSanitizer::e($playerImageUrl) ?>" alt="<?= HtmlSanitizer::e($player->name ?? '') ?>" class="rookie-option-img">
+        <img src="<?= HtmlSanitizer::e($playerImageUrl) ?>" alt="<?= HtmlSanitizer::e($player->getName() ?? '') ?>" class="rookie-option-img">
         <div>
             <span class="ibl-label">Rookie Option Value:</span>
             <strong><?= HtmlSanitizer::e($rookieOptionValue) ?></strong>

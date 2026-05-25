@@ -28,9 +28,9 @@ class RookieOptionFormViewTest extends TestCase
     private function createPlayerMock(int $playerID = 123, string $position = 'PG', string $name = 'Test Player'): Player
     {
         $mockPlayer = $this->createMock(Player::class);
-        $mockPlayer->playerID = $playerID;
-        $mockPlayer->position = $position;
-        $mockPlayer->name = $name;
+        $mockPlayer->method('getPlayerID')->willReturn($playerID);
+        $mockPlayer->method('getPosition')->willReturn($position);
+        $mockPlayer->method('getName')->willReturn($name);
 
         return $mockPlayer;
     }

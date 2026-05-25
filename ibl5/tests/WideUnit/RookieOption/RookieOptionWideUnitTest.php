@@ -826,10 +826,10 @@ class RookieOptionWideUnitTest extends WideUnitTestCase
         $finalYearSalary = ($draftRound === 1) ? $cy3Salary : $cy2Salary;
 
         $mockPlayer = $this->createMock(Player::class);
-        $mockPlayer->teamName = $teamName;
-        $mockPlayer->position = $position;
-        $mockPlayer->name = $name;
-        $mockPlayer->draftRound = $draftRound;
+        $mockPlayer->method('getTeamName')->willReturn($teamName);
+        $mockPlayer->method('getPosition')->willReturn($position);
+        $mockPlayer->method('getName')->willReturn($name);
+        $mockPlayer->method('getDraftRound')->willReturn($draftRound);
         $mockPlayer->method('canRookieOption')
             ->willReturn($canRookieOption);
         $mockPlayer->method('getFinalYearRookieContractSalary')

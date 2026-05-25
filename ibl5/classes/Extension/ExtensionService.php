@@ -103,7 +103,7 @@ class ExtensionService implements ExtensionProcessorInterface
         $offerInMillions = SalaryConverter::convertToMillions($offerTotal);
         $offerDetails = $offer['year1'] . " " . $offer['year2'] . " " . $offer['year3'] . " " . $offer['year4'] . " " . $offer['year5'];
 
-        $playerName = $player->name ?? '';
+        $playerName = $player->getName() ?? '';
         $teamName = $team->name;
 
         // Phase 5: Handle acceptance or rejection
@@ -138,12 +138,12 @@ class ExtensionService implements ExtensionProcessorInterface
             return ['success' => false, 'error' => (string) $eligibilityValidation['error']];
         }
 
-        $maxOfferValidation = $this->contractValidator->validateMaximumYearOne($offer, $player->yearsOfExperience ?? 0);
+        $maxOfferValidation = $this->contractValidator->validateMaximumYearOne($offer, $player->getYearsOfExperience() ?? 0);
         if ($maxOfferValidation['valid'] !== true) {
             return ['success' => false, 'error' => (string) $maxOfferValidation['error']];
         }
 
-        $raisesValidation = $this->contractValidator->validateRaises($offer, $player->birdYears ?? 0);
+        $raisesValidation = $this->contractValidator->validateRaises($offer, $player->getBirdYears() ?? 0);
         if ($raisesValidation['valid'] !== true) {
             return ['success' => false, 'error' => (string) $raisesValidation['error']];
         }
@@ -167,10 +167,10 @@ class ExtensionService implements ExtensionProcessorInterface
     {
         $this->repository->markExtensionUsedThisSim($team->name);
 
-        $posResult = $this->teamQueryRepo->getPlayersUnderContractByPosition($team->teamid, $player->position ?? '');
+        $posResult = $this->teamQueryRepo->getPlayersUnderContractByPosition($team->teamid, $player->getPosition() ?? '');
         $filteredResult = array_filter(
             $posResult,
-            static fn(array $row): bool => $row['pid'] !== $player->playerID
+            static fn(array $row): bool => $row['pid'] !== $player->getPlayerID()
         );
         $moneyCommitted = $this->teamQueryRepo->getTotalNextSeasonSalaries(array_values($filteredResult));
 
@@ -185,10 +185,10 @@ class ExtensionService implements ExtensionProcessorInterface
         ];
 
         $playerPreferences = [
-            'winner' => $player->freeAgencyPlayForWinner ?? 3,
-            'tradition' => $player->freeAgencyTradition ?? 3,
-            'loyalty' => $player->freeAgencyLoyalty ?? 3,
-            'playing_time' => $player->freeAgencyPlayingTime ?? 3,
+            'winner' => $player->getFreeAgencyPlayForWinner() ?? 3,
+            'tradition' => $player->getFreeAgencyTradition() ?? 3,
+            'loyalty' => $player->getFreeAgencyLoyalty() ?? 3,
+            'playing_time' => $player->getFreeAgencyPlayingTime() ?? 3,
         ];
 
         if ($demands === null) {
@@ -240,9 +240,9 @@ class ExtensionService implements ExtensionProcessorInterface
         int $offerYears,
         string $offerDetails
     ): array {
-        $playerName = $player->name ?? '';
+        $playerName = $player->getName() ?? '';
         $teamName = $team->name;
-        $currentSalary = $player->currentSeasonSalary ?? 0;
+        $currentSalary = $player->getCurrentSeasonSalary();
 
         $this->repository->saveAcceptedExtension(
             $playerName,
@@ -383,7 +383,7 @@ class ExtensionService implements ExtensionProcessorInterface
             return $extensionData['team'];
         }
 
-        $teamName = $extensionData['teamName'] ?? $player->teamName ?? null;
+        $teamName = $extensionData['teamName'] ?? $player->getTeamName() ?? null;
         if ($teamName === null) {
             return null;
         }

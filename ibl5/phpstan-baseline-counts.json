@@ -1,6 +1,6 @@
 {
     "phpstan-baseline.neon": {
-        "property.deprecated": 140
+        "property.deprecated": 70
     },
     "phpstan-tests-baseline.neon": {
         "argument.named": 1,

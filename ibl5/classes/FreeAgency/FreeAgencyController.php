@@ -66,7 +66,8 @@ class FreeAgencyController
 
         $mainPageData = $this->service->getMainPageData($team, $season);
         $result = isset($_GET['result']) && is_string($_GET['result']) ? $_GET['result'] : null;
-        echo $this->view->render($mainPageData, $result);
+        $responder = new \Api\Response\HtmlResponder();
+        $responder->html($this->view->render($mainPageData, $result));
 
         \PageLayout\PageLayout::footer();
     }
@@ -97,7 +98,8 @@ class FreeAgencyController
 
         $formComponents = new FreeAgencyFormComponents($team->name, $negotiationData['player']);
         $negotiationView = new FreeAgencyOfferView($formComponents);
-        echo $negotiationView->render($negotiationData, $error);
+        $responder = new \Api\Response\HtmlResponder();
+        $responder->html($negotiationView->render($negotiationData, $error));
 
         \PageLayout\PageLayout::footer();
     }

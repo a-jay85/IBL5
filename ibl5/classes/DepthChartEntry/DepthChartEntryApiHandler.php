@@ -72,6 +72,7 @@ class DepthChartEntryApiHandler
         header('HX-Push-Url: ' . $pushUrl);
 
         $controller = new DepthChartEntryController($this->db, $this->commonRepo, $this->leagueContext);
-        echo $controller->getTableOutput($teamid, $display, $split);
+        $responder = new \Api\Response\HtmlResponder();
+        $responder->html($controller->getTableOutput($teamid, $display, $split));
     }
 }

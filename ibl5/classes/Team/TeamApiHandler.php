@@ -79,6 +79,7 @@ class TeamApiHandler
         }
         header('HX-Push-Url: ' . $pushUrl);
 
-        echo $this->tableService->getTableOutput($teamid, $yr, $display, $split);
+        $responder = new \Api\Response\HtmlResponder();
+        $responder->html($this->tableService->getTableOutput($teamid, $yr, $display, $split));
     }
 }

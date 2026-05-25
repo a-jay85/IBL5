@@ -40,6 +40,7 @@ class DraftHistoryApiHandler
 
         $draftPicks = $repository->getDraftPicksByYear($year);
         $view = new DraftHistoryView();
-        echo $view->renderYearTable($draftPicks);
+        $responder = new \Api\Response\HtmlResponder();
+        $responder->html($view->renderYearTable($draftPicks));
     }
 }

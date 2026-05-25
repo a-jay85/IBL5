@@ -20,6 +20,7 @@ class SavedDepthChartApiHandler
     private SavedDepthChartService $service;
     private SavedDepthChartRepository $repository;
     private TeamIdentityRepositoryInterface $commonRepo;
+    private \Api\Response\HtmlResponder $responder;
 
     public function __construct(\mysqli $db, TeamIdentityRepositoryInterface $commonRepo)
     {
@@ -27,6 +28,7 @@ class SavedDepthChartApiHandler
         $this->service = new SavedDepthChartService($db);
         $this->repository = new SavedDepthChartRepository($db);
         $this->commonRepo = $commonRepo;
+        $this->responder = new \Api\Response\HtmlResponder();
     }
 
     /**
@@ -86,11 +88,11 @@ class SavedDepthChartApiHandler
 
         $currentLiveLabel = $this->service->buildCurrentLiveLabel($teamid, $season);
 
-        echo json_encode([
+        $this->responder->json([
             'depthCharts' => $depthCharts,
             'options' => $options,
             'currentLiveLabel' => $currentLiveLabel,
-        ], JSON_THROW_ON_ERROR);
+        ]);
     }
 
     /**
@@ -184,7 +186,7 @@ class SavedDepthChartApiHandler
             'statsHtml' => $statsHtml,
         ];
 
-        echo json_encode($response, JSON_THROW_ON_ERROR);
+        $this->responder->json($response);
     }
 
     /**
@@ -214,7 +216,7 @@ class SavedDepthChartApiHandler
 
         $success = $this->repository->updateName($dcId, $teamid, $newName);
 
-        echo json_encode(['success' => $success, 'name' => $newName], JSON_THROW_ON_ERROR);
+        $this->responder->json(['success' => $success, 'name' => $newName]);
     }
 
     /**
@@ -238,12 +240,12 @@ class SavedDepthChartApiHandler
         $season = new Season($this->db);
         $result = $this->service->nameOrCreateActive($teamid, $username, $newName, $season);
 
-        echo json_encode($result, JSON_THROW_ON_ERROR);
+        $this->responder->json($result);
     }
 
     private function sendError(string $message, int $httpCode): void
     {
         http_response_code($httpCode);
-        echo json_encode(['error' => $message], JSON_THROW_ON_ERROR);
+        $this->responder->json(['error' => $message]);
     }
 }

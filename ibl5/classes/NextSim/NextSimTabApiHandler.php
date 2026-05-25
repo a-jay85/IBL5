@@ -56,6 +56,7 @@ class NextSimTabApiHandler
         $games = $service->getNextSimGames($teamid, $season);
         $userStarters = $service->getUserStartingLineup($team);
 
-        echo $view->renderTabbedPositionTable($games, $position, $team, $userStarters);
+        $responder = new \Api\Response\HtmlResponder();
+        $responder->html($view->renderTabbedPositionTable($games, $position, $team, $userStarters));
     }
 }

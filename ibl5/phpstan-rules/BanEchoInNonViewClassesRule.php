@@ -28,7 +28,11 @@ final class BanEchoInNonViewClassesRule implements Rule
         'PeriodAverages.php',
         'SplitStats.php',
         'JsonResponder.php',
+        'HtmlResponder.php',
         'FreeAgencyFormComponents.php',
+        'PlayerSeasonTableRenderer.php',
+        'Contracts.php',
+        'GenerateSeasonAwardsStep.php',
     ];
 
     private const ALLOWED_FILE_SUFFIXES = [

@@ -56,6 +56,7 @@ class LeagueStartersApiHandler
         $view = new LeagueStartersView('LeagueStarters');
 
         $startersByPosition = $service->getAllStartersByPosition();
-        echo $view->renderTableContent($this->db, $season, $startersByPosition, $userTeam, $display);
+        $responder = new \Api\Response\HtmlResponder();
+        $responder->html($view->renderTableContent($this->db, $season, $startersByPosition, $userTeam, $display));
     }
 }

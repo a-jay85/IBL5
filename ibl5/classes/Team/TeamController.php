@@ -98,17 +98,19 @@ class TeamController implements TeamControllerInterface
             $userTeamName = $this->commonRepo->getTeamnameFromUsername($username) ?? '';
         }
 
+        $responder = new \Api\Response\HtmlResponder();
+
         try {
             $pageData = $this->service->getTeamPageData($teamid, $yr, $display, $userTeamName, $split);
             $pageData['extensionResult'] = isset($_GET['result']) && is_string($_GET['result']) ? $_GET['result'] : null;
             $pageData['extensionMsg'] = isset($_GET['msg']) && is_string($_GET['msg']) ? $_GET['msg'] : null;
         } catch (\RuntimeException $e) {
-            echo '<div class="ibl-alert ibl-alert--error">Team not found.</div>';
+            $responder->html('<div class="ibl-alert ibl-alert--error">Team not found.</div>');
             \PageLayout\PageLayout::footer();
             return;
         }
 
-        echo $this->view->render($pageData);
+        $responder->html($this->view->render($pageData));
 
         \PageLayout\PageLayout::footer();
     }

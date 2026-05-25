@@ -58,7 +58,7 @@ function themeheader()
     }
 
     if ($mysqli_db) {
-        $navRepo = new \Navigation\NavigationRepository($mysqli_db, $leagueContext);
+        $navRepo = new \Navigation\NavigationRepository($mysqli_db);
 
         if ($isLoggedIn && $username !== null) {
             $teamId = $navRepo->resolveTeamId($username);

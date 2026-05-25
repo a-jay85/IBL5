@@ -7,7 +7,7 @@ paths:
   - "**/db/**"
   - "**/seed*.php"
   - "**/seed*.sql"
-last_verified: 2026-04-23
+last_verified: 2026-05-25
 ---
 
 # Database Access Reference
@@ -54,10 +54,18 @@ mariadb -h 127.0.0.1 --skip-ssl -u root -proot iblhoops_ibl5
 ## Migration Runner
 
 ```bash
-bin/db-migrate <db-container> <migrations-dir>
+bin/db-migrate <db-container> <migrations-dir> [db-name]
 ```
 
-Runs pending SQL migrations against a Docker MariaDB container. Tracks applied migrations in `schema_migrations(version VARCHAR PRIMARY KEY)`. Idempotent — skips already-applied migrations. Used internally by `bin/wt-up` to apply migrations after seeding.
+Runs pending SQL migrations against a Docker MariaDB container. Tracks applied migrations in `schema_migrations(version VARCHAR PRIMARY KEY)`. Idempotent — skips already-applied migrations. Optional third arg overrides the target database (defaults to `iblhoops_ibl5`). Used internally by `bin/wt-up` and `bin/db-test-up`.
+
+## Local Database Integration Tests
+
+```bash
+bin/db-test-up [worktree-name] [--no-run]
+```
+
+Bootstraps a sibling `ibl5_test` database for `phpunit --group database` runs. Drops and recreates `ibl5_test` each run; never touches `iblhoops_ibl5`. Without arguments, uses the main checkout Docker environment. With a worktree name, uses the worktree's Docker stack. `--no-run` bootstraps the database only.
 
 ## MariaDB Strict Mode & Triggers
 

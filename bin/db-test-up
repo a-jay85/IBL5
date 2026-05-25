@@ -1,0 +1,94 @@
+#!/bin/bash
+# Bootstrap a sibling ibl5_test database and optionally run database integration
+# tests against it. Resets ibl5_test on each run; never touches iblhoops_ibl5.
+#
+# Usage: bin/db-test-up [worktree-name] [--no-run]
+#
+# Without arguments: uses the main checkout Docker environment (ibl5-mariadb / ibl5-php).
+# With a worktree name: uses the worktree's Docker environment (ibl5-db-<slug> / ibl5-php-<slug>).
+# --no-run: bootstrap the database only, skip running phpunit.
+
+set -euo pipefail
+
+REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+source "$REPO_ROOT/bin/lib/db-helpers.sh"
+
+WORKTREE_NAME=""
+NO_RUN=false
+
+for arg in "$@"; do
+    case "$arg" in
+        --no-run) NO_RUN=true ;;
+        -*) echo "Unknown option: $arg" >&2; exit 1 ;;
+        *) WORKTREE_NAME="$arg" ;;
+    esac
+done
+
+TEST_DB="ibl5_test"
+DB_CMD="mariadb -u root -proot"
+
+if [ -z "$WORKTREE_NAME" ]; then
+    DB_CONTAINER="ibl5-mariadb"
+    PHP_CONTAINER="ibl5-php"
+    DB_SERVICE_HOST="mariadb"
+    MIGRATIONS_DIR="$REPO_ROOT/ibl5/migrations"
+    DB_SEED="$REPO_ROOT/ibl5/tests/DatabaseIntegration/Fixtures/db-seed.sql"
+    PHP_WORKDIR="/var/www/html/ibl5"
+else
+    WORKTREE_PATH="$REPO_ROOT/worktrees/$WORKTREE_NAME"
+    if [ ! -d "$WORKTREE_PATH" ]; then
+        echo "Error: Worktree not found at $WORKTREE_PATH" >&2
+        exit 1
+    fi
+    SLUG_FILE="$WORKTREE_PATH/.wt-slug"
+    if [ ! -f "$SLUG_FILE" ]; then
+        echo "Error: No .wt-slug file — run bin/wt-up $WORKTREE_NAME first" >&2
+        exit 1
+    fi
+    SLUG=$(cat "$SLUG_FILE")
+    DB_CONTAINER="ibl5-db-$SLUG"
+    PHP_CONTAINER="ibl5-php-$SLUG"
+    DB_SERVICE_HOST="db"
+    MIGRATIONS_DIR="$WORKTREE_PATH/ibl5/migrations"
+    DB_SEED="$WORKTREE_PATH/ibl5/tests/DatabaseIntegration/Fixtures/db-seed.sql"
+    PHP_WORKDIR="/var/www/html/ibl5"
+fi
+
+if ! docker inspect "$DB_CONTAINER" &>/dev/null; then
+    echo "Error: DB container $DB_CONTAINER not running" >&2
+    exit 1
+fi
+if ! docker inspect "$PHP_CONTAINER" &>/dev/null; then
+    echo "Error: PHP container $PHP_CONTAINER not running" >&2
+    exit 1
+fi
+if [ ! -f "$DB_SEED" ]; then
+    echo "Error: db-seed.sql not found at $DB_SEED" >&2
+    exit 1
+fi
+
+echo "=== Bootstrapping $TEST_DB database ==="
+
+echo "Resetting $TEST_DB..."
+db_exec "$DB_CONTAINER" $DB_CMD -e "DROP DATABASE IF EXISTS $TEST_DB; CREATE DATABASE $TEST_DB;"
+
+echo "Running migrations..."
+"$REPO_ROOT/bin/db-migrate" "$DB_CONTAINER" "$MIGRATIONS_DIR" "$TEST_DB"
+
+echo "Applying db-seed.sql..."
+db_exec_stdin_stream "$DB_CONTAINER" $DB_CMD "$TEST_DB" < "$DB_SEED"
+
+echo ""
+echo "=== $TEST_DB database ready ==="
+
+if [ "$NO_RUN" = false ]; then
+    echo ""
+    echo "=== Running database integration tests ==="
+    echo ""
+    docker exec -w "$PHP_WORKDIR" \
+        -e DB_HOST="$DB_SERVICE_HOST" \
+        -e DB_USER=root \
+        -e DB_PASS=root \
+        -e DB_NAME="$TEST_DB" \
+        "$PHP_CONTAINER" vendor/bin/phpunit --group database
+fi

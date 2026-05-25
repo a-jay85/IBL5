@@ -21,9 +21,9 @@ class CommonValidator
     public static function validatePlayerOwnership(object $player, string $userTeamName): ValidationResult
     {
         /** @var \Player\Player $player */
-        if ($player->teamName !== $userTeamName) {
-            $position = $player->position ?? '';
-            $name = $player->name ?? '';
+        if ($player->getTeamName() !== $userTeamName) {
+            $position = $player->getPosition() ?? '';
+            $name = $player->getName() ?? '';
             $playerDescription = ($position !== '' && $name !== '')
                 ? "{$position} {$name}"
                 : "This player";

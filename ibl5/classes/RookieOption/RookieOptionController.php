@@ -51,16 +51,16 @@ class RookieOptionController implements RookieOptionControllerInterface
         }
 
         // Determine which contract year to update based on draft round
-        if ($player->draftRound !== 1 && $player->draftRound !== 2) {
+        if ($player->getDraftRound() !== 1 && $player->getDraftRound() !== 2) {
             $errorMessage = "This player's experience doesn't match their rookie status; please let the commish know about this error.";
-            \Logging\LoggerFactory::getChannel('app')->warning('RookieOption draft round validation error', ['player_id' => $playerID, 'draft_round' => $player->draftRound]);
+            \Logging\LoggerFactory::getChannel('app')->warning('RookieOption draft round validation error', ['player_id' => $playerID, 'draft_round' => $player->getDraftRound()]);
             return ['success' => false, 'type' => 'validation_error', 'message' => $errorMessage, 'playerID' => $playerID];
         }
 
         // Update player's contract
-        if (!$this->repository->updatePlayerRookieOption($playerID, $player->draftRound, $extensionAmount)) {
+        if (!$this->repository->updatePlayerRookieOption($playerID, $player->getDraftRound(), $extensionAmount)) {
             $errorMessage = "Failed to update player contract. Please contact the commissioner.";
-            \Logging\LoggerFactory::getChannel('app')->error('RookieOption database update failed', ['player_id' => $playerID, 'draft_round' => $player->draftRound, 'extension_amount' => $extensionAmount]);
+            \Logging\LoggerFactory::getChannel('app')->error('RookieOption database update failed', ['player_id' => $playerID, 'draft_round' => $player->getDraftRound(), 'extension_amount' => $extensionAmount]);
             return ['success' => false, 'type' => 'database_error', 'message' => $errorMessage, 'playerID' => $playerID];
         }
 
@@ -68,7 +68,7 @@ class RookieOptionController implements RookieOptionControllerInterface
         $teamid = $this->commonRepository->getTidFromTeamname($teamName) ?? 0;
 
         // Send Discord notification
-        $playerName = $player->name ?? 'Unknown';
+        $playerName = $player->getName() ?? 'Unknown';
         $discordMessage = $teamName . " exercise the rookie extension option on " . $playerName . " in the amount of " . $extensionAmount . ".";
         Discord::postToChannel(self::DISCORD_CHANNEL, $discordMessage);
 
@@ -88,7 +88,7 @@ class RookieOptionController implements RookieOptionControllerInterface
             'player_name' => $playerName,
             'team_name' => $teamName,
             'extension_amount' => $extensionAmount,
-            'draft_round' => $player->draftRound,
+            'draft_round' => $player->getDraftRound(),
         ]);
 
         return [

@@ -63,15 +63,15 @@ class WaiversProcessor implements WaiversProcessorInterface
     public function getPlayerContractDisplay(Player $player, Season $season): string
     {
         $playerArray = [
-            'cy' => $player->contractCurrentYear,
-            'cyt' => $player->contractTotalYears,
-            'salary_yr1' => $player->contractYear1Salary,
-            'salary_yr2' => $player->contractYear2Salary,
-            'salary_yr3' => $player->contractYear3Salary,
-            'salary_yr4' => $player->contractYear4Salary,
-            'salary_yr5' => $player->contractYear5Salary,
-            'salary_yr6' => $player->contractYear6Salary,
-            'exp' => $player->yearsOfExperience,
+            'cy' => $player->getContractCurrentYear(),
+            'cyt' => $player->getContractTotalYears(),
+            'salary_yr1' => $player->getContractYear1Salary(),
+            'salary_yr2' => $player->getContractYear2Salary(),
+            'salary_yr3' => $player->getContractYear3Salary(),
+            'salary_yr4' => $player->getContractYear4Salary(),
+            'salary_yr5' => $player->getContractYear5Salary(),
+            'salary_yr6' => $player->getContractYear6Salary(),
+            'exp' => $player->getYearsOfExperience(),
         ];
         $playerData = PlayerDataConverter::arrayToPlayerData($playerArray);
 

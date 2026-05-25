@@ -89,12 +89,12 @@ class WaiversService implements WaiversServiceInterface
             $contract = $this->processor->getPlayerContractDisplay($player, $season);
             $waitTime = '';
 
-            if ($action === 'add' && $player->timeDroppedOnWaivers !== null && $player->timeDroppedOnWaivers > 0) {
-                $waitTime = $this->processor->getWaiverWaitTime($player->timeDroppedOnWaivers, $timeNow);
+            if ($action === 'add' && $player->getTimeDroppedOnWaivers() !== null && $player->getTimeDroppedOnWaivers() > 0) {
+                $waitTime = $this->processor->getWaiverWaitTime($player->getTimeDroppedOnWaivers(), $timeNow);
             }
 
-            $playerID = $player->playerID ?? 0;
-            $playerName = $player->name ?? '';
+            $playerID = $player->getPlayerID() ?? 0;
+            $playerName = $player->getName() ?? '';
             $players[] = $this->view->buildPlayerOption(
                 $playerID,
                 $playerName,

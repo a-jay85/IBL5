@@ -27,10 +27,10 @@ class RookieOptionValidatorTest extends TestCase
      */
     public function testValidatePlayerOwnershipSuccess(): void
     {
-        $mockPlayer = $this->createMock(Player::class);
-        $mockPlayer->teamName = 'Test Team';
-        $mockPlayer->position = 'PG';
-        $mockPlayer->name = 'Test Player';
+        $mockPlayer = $this->createStub(Player::class);
+        $mockPlayer->method('getTeamName')->willReturn('Test Team');
+        $mockPlayer->method('getPosition')->willReturn('PG');
+        $mockPlayer->method('getName')->willReturn('Test Player');
 
         $result = $this->validator->validatePlayerOwnership($mockPlayer, 'Test Team');
 
@@ -43,10 +43,10 @@ class RookieOptionValidatorTest extends TestCase
      */
     public function testValidatePlayerOwnershipFailure(): void
     {
-        $mockPlayer = $this->createMock(Player::class);
-        $mockPlayer->teamName = 'Other Team';
-        $mockPlayer->position = 'SG';
-        $mockPlayer->name = 'Other Player';
+        $mockPlayer = $this->createStub(Player::class);
+        $mockPlayer->method('getTeamName')->willReturn('Other Team');
+        $mockPlayer->method('getPosition')->willReturn('SG');
+        $mockPlayer->method('getName')->willReturn('Other Player');
 
         $result = $this->validator->validatePlayerOwnership($mockPlayer, 'Test Team');
 
@@ -61,9 +61,9 @@ class RookieOptionValidatorTest extends TestCase
      */
     public function testValidateEligibilityNotEligible(): void
     {
-        $mockPlayer = $this->createMock(Player::class);
-        $mockPlayer->position = 'SF';
-        $mockPlayer->name = 'Ineligible Player';
+        $mockPlayer = $this->createStub(Player::class);
+        $mockPlayer->method('getPosition')->willReturn('SF');
+        $mockPlayer->method('getName')->willReturn('Ineligible Player');
         $mockPlayer->method('canRookieOption')
             ->willReturn(false);
         $mockPlayer->method('getFinalYearRookieContractSalary')
@@ -81,9 +81,9 @@ class RookieOptionValidatorTest extends TestCase
      */
     public function testValidateEligibilityFirstRoundSuccess(): void
     {
-        $mockPlayer = $this->createMock(Player::class);
-        $mockPlayer->position = 'PF';
-        $mockPlayer->name = 'Eligible Player';
+        $mockPlayer = $this->createStub(Player::class);
+        $mockPlayer->method('getPosition')->willReturn('PF');
+        $mockPlayer->method('getName')->willReturn('Eligible Player');
         $mockPlayer->method('canRookieOption')
             ->willReturn(true);
         $mockPlayer->method('getFinalYearRookieContractSalary')
@@ -101,9 +101,9 @@ class RookieOptionValidatorTest extends TestCase
      */
     public function testValidateEligibilitySecondRoundSuccess(): void
     {
-        $mockPlayer = $this->createMock(Player::class);
-        $mockPlayer->position = 'C';
-        $mockPlayer->name = 'Second Round Player';
+        $mockPlayer = $this->createStub(Player::class);
+        $mockPlayer->method('getPosition')->willReturn('C');
+        $mockPlayer->method('getName')->willReturn('Second Round Player');
         $mockPlayer->method('canRookieOption')
             ->willReturn(true);
         $mockPlayer->method('getFinalYearRookieContractSalary')

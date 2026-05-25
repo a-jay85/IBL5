@@ -50,41 +50,33 @@ class WaiversProcessorTest extends TestCase
     
     /**
      * Helper method to create a mock Player object with contract properties
-     * Maps array keys to Player properties:
-     * - 'cy' => contractCurrentYear
-     * - 'cyt' => contractTotalYears  
-     * - 'salary_yr1' => contractYear1Salary
-     * - 'salary_yr2' => contractYear2Salary
-     * - 'salary_yr3' => contractYear3Salary
-     * - 'salary_yr4' => contractYear4Salary
-     * - 'salary_yr5' => contractYear5Salary
-     * - 'salary_yr6' => contractYear6Salary
-     * - 'exp' => yearsOfExperience
+     * Maps array keys to Player getter methods.
      */
     private function createMockPlayer(array $properties): Player
     {
         $player = $this->getMockBuilder(Player::class)
             ->disableOriginalConstructor()
             ->getMock();
-        
-        // Map database array keys to Player property names
-        $propertyMap = [
-            'cy' => 'contractCurrentYear',
-            'cyt' => 'contractTotalYears',
-            'salary_yr1' => 'contractYear1Salary',
-            'salary_yr2' => 'contractYear2Salary',
-            'salary_yr3' => 'contractYear3Salary',
-            'salary_yr4' => 'contractYear4Salary',
-            'salary_yr5' => 'contractYear5Salary',
-            'salary_yr6' => 'contractYear6Salary',
-            'exp' => 'yearsOfExperience',
+
+        $getterMap = [
+            'cy' => 'getContractCurrentYear',
+            'cyt' => 'getContractTotalYears',
+            'salary_yr1' => 'getContractYear1Salary',
+            'salary_yr2' => 'getContractYear2Salary',
+            'salary_yr3' => 'getContractYear3Salary',
+            'salary_yr4' => 'getContractYear4Salary',
+            'salary_yr5' => 'getContractYear5Salary',
+            'salary_yr6' => 'getContractYear6Salary',
+            'exp' => 'getYearsOfExperience',
         ];
-        
+
         foreach ($properties as $key => $value) {
-            $propertyName = $propertyMap[$key] ?? $key;
-            $player->{$propertyName} = $value;
+            $getter = $getterMap[$key] ?? null;
+            if ($getter !== null) {
+                $player->method($getter)->willReturn($value);
+            }
         }
-        
+
         return $player;
     }
     

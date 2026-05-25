@@ -95,9 +95,9 @@ class VotingBallotService implements VotingBallotServiceInterface
             $playerStats = PlayerStats::withPlrRow($this->db, $row);
             $candidates[] = [
                 'type' => 'player',
-                'name' => $player->name,
-                'teamName' => $player->teamName,
-                'playerID' => $player->playerID,
+                'name' => $player->getName(),
+                'teamName' => $player->getTeamName(),
+                'playerID' => $player->getPlayerID(),
                 'stats' => $playerStats,
             ];
         }

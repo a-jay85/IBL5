@@ -104,6 +104,7 @@ test.describe('Depth Chart submission', () => {
     await firstPg.selectOption(before === '3' ? '4' : '3');
 
     await page.locator('.depth-chart-buttons .depth-chart-submit-btn').click();
+    await page.waitForURL(/modules\.php\?name=DepthChartEntry(?!.*op=submit)/, { timeout: 15_000 });
     await expect(page.locator('.ibl-alert--success', { hasText: /depth chart saved/i })).toBeVisible({ timeout: 15000 });
 
     const tokenAfter = await page
@@ -128,6 +129,7 @@ test.describe('Depth Chart submission', () => {
       .first();
     await firstPg.selectOption('3');
     await page.locator('.depth-chart-buttons .depth-chart-submit-btn').click();
+    await page.waitForURL(/modules\.php\?name=DepthChartEntry(?!.*op=submit)/, { timeout: 15_000 });
     await expect(page.locator('.ibl-alert--success', { hasText: /depth chart saved/i })).toBeVisible({ timeout: 15000 });
 
     // Leave the depth chart page and come back — minimal reliable repro of
@@ -142,6 +144,7 @@ test.describe('Depth Chart submission', () => {
       .first()
       .selectOption('4');
     await page.locator('.depth-chart-buttons .depth-chart-submit-btn').click();
+    await page.waitForURL(/modules\.php\?name=DepthChartEntry(?!.*op=submit)/, { timeout: 15_000 });
 
     await expect(page.locator('.ibl-alert--success', { hasText: /depth chart saved/i })).toBeVisible({ timeout: 15000 });
     await expect(page.getByText(/Invalid or expired/i)).not.toBeVisible();

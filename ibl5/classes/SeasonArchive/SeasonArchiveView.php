@@ -50,7 +50,7 @@ class SeasonArchiveView implements SeasonArchiveViewInterface
             $html .= $this->renderStyles();
         }
         $html .= '<h2 class="ibl-title">IBL Season Archive</h2>';
-        $html .= '<table class="sortable ibl-data-table season-archive-index-table">';
+        $html .= '<table class="sortable ibl-data-table season-archive-index-table" data-no-responsive>';
         $html .= '<thead><tr><th>Season</th><th>HEAT Champion</th><th>IBL Champion</th><th>MVP</th></tr></thead>';
         $html .= '<tbody>';
 
@@ -212,7 +212,7 @@ class SeasonArchiveView implements SeasonArchiveViewInterface
 
         $html = '<div class="season-archive-section"><h3>Tournaments</h3>';
         $html .= '<p class="season-archive-bracket-hint">Click an event name to view its Challonge bracket.</p>';
-        $html .= '<table class="ibl-data-table"><thead><tr><th>Event</th><th>Champion</th></tr></thead><tbody>';
+        $html .= '<table class="ibl-data-table" data-no-responsive><thead><tr><th>Event</th><th>Champion</th></tr></thead><tbody>';
 
         // H.E.A.T. Championship — team champion
         $html .= '<tr><td><a href="' . self::esc($t['heatUrl']) . '" class="bracket-link" target="_blank" rel="noopener noreferrer">H.E.A.T. Championship</a></td>';
@@ -248,7 +248,7 @@ class SeasonArchiveView implements SeasonArchiveViewInterface
         );
 
         $html = '<div class="season-archive-section"><h3>All-Star Weekend</h3>';
-        $html .= '<table class="ibl-data-table"><thead><tr><th>Event</th><th>Winner</th></tr></thead><tbody>';
+        $html .= '<table class="ibl-data-table" data-no-responsive><thead><tr><th>Event</th><th>Winner</th></tr></thead><tbody>';
         $html .= '<tr><td>Three-Point Contest</td><td>' . self::renderPlayerName($asw['threePointWinner'], $playerIds) . '</td></tr>';
         $html .= '<tr><td>Slam Dunk Competition</td><td>' . self::renderPlayerName($asw['slamDunkWinner'], $playerIds) . '</td></tr>';
         $html .= '<tr><td>Rookie-Sophomore Challenge MVP</td><td>' . self::renderPlayerName($asw['rookieSophomoreMvp'], $playerIds) . '</td></tr>';
@@ -282,7 +282,7 @@ class SeasonArchiveView implements SeasonArchiveViewInterface
         }
 
         $html = '<div class="season-archive-section"><h3>Major Awards</h3>';
-        $html .= '<table class="ibl-data-table"><thead><tr><th>Award</th><th>Winner</th></tr></thead><tbody>';
+        $html .= '<table class="ibl-data-table" data-no-responsive><thead><tr><th>Award</th><th>Winner</th></tr></thead><tbody>';
         $html .= '<tr><td>Most Valuable Player</td><td>' . self::renderPlayerName($awards['mvp'], $playerIds) . '</td></tr>';
         $html .= '<tr><td>Defensive Player of the Year</td><td>' . self::renderPlayerName($awards['dpoy'], $playerIds) . '</td></tr>';
         $html .= '<tr><td>Rookie of the Year</td><td>' . self::renderPlayerName($awards['roy'], $playerIds) . '</td></tr>';
@@ -301,7 +301,7 @@ class SeasonArchiveView implements SeasonArchiveViewInterface
     private function renderStatisticalLeaders(array $leaders, array $playerIds): string
     {
         $html = '<div class="season-archive-section"><h3>Statistical Leaders</h3>';
-        $html .= '<table class="ibl-data-table"><thead><tr><th>Category</th><th>Leader</th></tr></thead><tbody>';
+        $html .= '<table class="ibl-data-table" data-no-responsive><thead><tr><th>Category</th><th>Leader</th></tr></thead><tbody>';
         $html .= '<tr><td>Scoring</td><td>' . self::renderPlayerName($leaders['scoring'], $playerIds) . '</td></tr>';
         $html .= '<tr><td>Rebounds</td><td>' . self::renderPlayerName($leaders['rebounds'], $playerIds) . '</td></tr>';
         $html .= '<tr><td>Assists</td><td>' . self::renderPlayerName($leaders['assists'], $playerIds) . '</td></tr>';
@@ -319,7 +319,7 @@ class SeasonArchiveView implements SeasonArchiveViewInterface
     private function renderTeamSelection(array $teams, string $title, array $playerIds): string
     {
         $html = '<div class="season-archive-section"><h3>' . self::esc($title) . '</h3>';
-        $html .= '<table class="ibl-data-table"><thead><tr><th>First Team</th><th>Second Team</th><th>Third Team</th></tr></thead><tbody>';
+        $html .= '<table class="ibl-data-table" data-no-responsive><thead><tr><th>First Team</th><th>Second Team</th><th>Third Team</th></tr></thead><tbody>';
 
         $maxRows = max(count($teams['first']), count($teams['second']), count($teams['third']));
         for ($i = 0; $i < $maxRows; $i++) {
@@ -345,7 +345,7 @@ class SeasonArchiveView implements SeasonArchiveViewInterface
         }
 
         $html = '<div class="season-archive-section"><h3>Playoff Bracket</h3>';
-        $html .= '<table class="ibl-data-table"><thead><tr><th>Round</th><th>Winner</th><th>Loser</th><th>Result</th></tr></thead><tbody>';
+        $html .= '<table class="ibl-data-table" data-no-responsive><thead><tr><th>Round</th><th>Winner</th><th>Loser</th><th>Result</th></tr></thead><tbody>';
 
         $isFirstRound = true;
         foreach ($bracket as $round => $seriesList) {
@@ -380,7 +380,7 @@ class SeasonArchiveView implements SeasonArchiveViewInterface
         }
 
         $html = '<div class="season-archive-section"><h3>H.E.A.T. Standings</h3>';
-        $html .= '<table class="ibl-data-table"><thead><tr><th>Team</th><th>W-L</th></tr></thead><tbody>';
+        $html .= '<table class="ibl-data-table" data-no-responsive><thead><tr><th>Team</th><th>W-L</th></tr></thead><tbody>';
 
         foreach ($standings as $row) {
             $teamName = $row['team'];
@@ -406,7 +406,7 @@ class SeasonArchiveView implements SeasonArchiveViewInterface
         }
 
         $html = '<div class="season-archive-section"><h3>Champions &amp; Awards</h3>';
-        $html .= '<table class="ibl-data-table"><thead><tr><th>Award</th><th>Team</th></tr></thead><tbody>';
+        $html .= '<table class="ibl-data-table" data-no-responsive><thead><tr><th>Award</th><th>Team</th></tr></thead><tbody>';
 
         foreach ($teamAwards as $awardName => $teamName) {
             $html .= '<tr><td>' . self::esc($awardName) . '</td>';
@@ -542,7 +542,7 @@ class SeasonArchiveView implements SeasonArchiveViewInterface
      */
     private function renderRosterTable(array $players, array $playerIds): string
     {
-        $html = '<table class="ibl-data-table"><thead><tr><th>Player</th></tr></thead><tbody>';
+        $html = '<table class="ibl-data-table" data-no-responsive><thead><tr><th>Player</th></tr></thead><tbody>';
         foreach ($players as $player) {
             $html .= '<tr><td>' . self::renderPlayerName($player, $playerIds) . '</td></tr>';
         }

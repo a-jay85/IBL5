@@ -99,8 +99,15 @@ test.describe('LeagueControlPanel — Generate Season Awards', () => {
   test('generate_awards shows error when Leaders.htm absent', async ({
     page,
   }) => {
-    // Phase is already Playoffs from the previous test (serial mode)
+    // Explicitly set Playoffs phase (self-sufficient — no reliance on prior test)
     await page.goto('leagueControlPanel.php');
+    const phaseSelect = page.locator('select[name="SeasonPhase"]');
+    await phaseSelect.selectOption('Playoffs');
+    const phaseButton = page.locator('button[value="set_season_phase"]');
+    await Promise.all([
+      page.waitForURL(/success=/),
+      phaseButton.click(),
+    ]);
     await assertNoPhpErrors(page, 'before clicking generate awards');
 
     const generateButton = page.locator('button[value="generate_awards"]');

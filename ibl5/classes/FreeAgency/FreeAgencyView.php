@@ -88,8 +88,8 @@ class FreeAgencyView
             <?php
             if (!$player->isPlayerFreeAgent($season) || $player->isSalaryPlaceholder()):
                 $futureSalaries = $player->getFutureSalaries();
-                $playerName = $player->name ?? '';
-                if (($player->ordinal ?? 0) > \JSB::WAIVERS_ORDINAL) {
+                $playerName = $player->getName() ?? '';
+                if (($player->getOrdinal() ?? 0) > \JSB::WAIVERS_ORDINAL) {
                     $playerName .= "*";
                 }
             ?>
@@ -99,20 +99,20 @@ class FreeAgencyView
         $hasExtension = !$hasRookieOption && $isExtensionPhase && $player->canRenegotiateContract();
         ?>
         <tr>
-            <td><?= HtmlSanitizer::e($player->position ?? '') ?></td>
-            <?= PlayerImageHelper::renderFlexiblePlayerCell($player->playerID ?? 0, $playerName) ?>
-            <td><?= HtmlSanitizer::e($player->age ?? 0) ?></td>
+            <td><?= HtmlSanitizer::e($player->getPosition() ?? '') ?></td>
+            <?= PlayerImageHelper::renderFlexiblePlayerCell($player->getPlayerID() ?? 0, $playerName) ?>
+            <td><?= HtmlSanitizer::e($player->getAge() ?? 0) ?></td>
             <?= HtmlSanitizer::trusted($this->renderPlayerRatings($player)) ?>
             <td class="col-salary"><?= HtmlSanitizer::e($futureSalaries[0]) ?></td>
             <?php if ($hasRookieOption): ?>
-                <?php $actionUrl = 'modules.php?name=Player&amp;pa=rookieoption&amp;pid=' . ($player->playerID ?? 0) . '&amp;from=fa'; $actionLabel = 'Rookie Option'; ?>
+                <?php $actionUrl = 'modules.php?name=Player&amp;pa=rookieoption&amp;pid=' . ($player->getPlayerID() ?? 0) . '&amp;from=fa'; $actionLabel = 'Rookie Option'; ?>
                 <td class="col-salary contract-hint-cell" tabindex="0"><?= HtmlSanitizer::e($futureSalaries[1]) ?><a href="<?= HtmlSanitizer::trusted($actionUrl) ?>" class="contract-hint-link" data-no-abbreviate><?= HtmlSanitizer::e($actionLabel) ?></a></td>
                 <td class="col-salary contract-hint-cell" tabindex="0"><?= HtmlSanitizer::e($futureSalaries[2]) ?></td>
                 <td class="col-salary contract-hint-cell" tabindex="0"><?= HtmlSanitizer::e($futureSalaries[3]) ?></td>
                 <td class="col-salary contract-hint-cell" tabindex="0"><?= HtmlSanitizer::e($futureSalaries[4]) ?></td>
                 <td class="col-salary contract-hint-cell" tabindex="0"><?= HtmlSanitizer::e($futureSalaries[5]) ?></td>
             <?php elseif ($hasExtension): ?>
-                <?php $actionUrl = 'modules.php?name=Player&amp;pa=negotiate&amp;pid=' . ($player->playerID ?? 0); $actionLabel = 'Contract Extension'; ?>
+                <?php $actionUrl = 'modules.php?name=Player&amp;pa=negotiate&amp;pid=' . ($player->getPlayerID() ?? 0); $actionLabel = 'Contract Extension'; ?>
                 <td class="col-salary contract-hint-cell" tabindex="0"><?= HtmlSanitizer::e($futureSalaries[1]) ?><a href="<?= HtmlSanitizer::trusted($actionUrl) ?>" class="contract-hint-link" data-no-abbreviate><?= HtmlSanitizer::e($actionLabel) ?></a></td>
                 <td class="col-salary contract-hint-cell" tabindex="0"><?= HtmlSanitizer::e($futureSalaries[2]) ?></td>
                 <td class="col-salary contract-hint-cell" tabindex="0"><?= HtmlSanitizer::e($futureSalaries[3]) ?></td>
@@ -190,10 +190,10 @@ class FreeAgencyView
             $offer = $offerEntry['offer'];
         ?>
         <tr>
-            <td><a href="modules.php?name=FreeAgency&amp;pa=negotiate&amp;pid=<?= HtmlSanitizer::e($player->playerID ?? 0) ?>">Offer</a></td>
-            <td><?= HtmlSanitizer::e($player->position ?? '') ?></td>
-            <?= PlayerImageHelper::renderFlexiblePlayerCell($player->playerID ?? 0, $player->name ?? '') ?>
-            <td><?= HtmlSanitizer::e($player->age ?? 0) ?></td>
+            <td><a href="modules.php?name=FreeAgency&amp;pa=negotiate&amp;pid=<?= HtmlSanitizer::e($player->getPlayerID() ?? 0) ?>">Offer</a></td>
+            <td><?= HtmlSanitizer::e($player->getPosition() ?? '') ?></td>
+            <?= PlayerImageHelper::renderFlexiblePlayerCell($player->getPlayerID() ?? 0, $player->getName() ?? '') ?>
+            <td><?= HtmlSanitizer::e($player->getAge() ?? 0) ?></td>
             <?= HtmlSanitizer::trusted($this->renderPlayerRatings($player)) ?>
             <td class="col-salary"><?= HtmlSanitizer::e($offer['offer1']) ?></td>
             <td class="col-salary"><?= HtmlSanitizer::e($offer['offer2']) ?></td>
@@ -248,20 +248,20 @@ class FreeAgencyView
         <tr>
             <td>
                 <?php if ($capMetrics['rosterSpots'][0] > 0): ?>
-                    <a href="modules.php?name=FreeAgency&amp;pa=negotiate&amp;pid=<?= HtmlSanitizer::e($player->playerID ?? 0) ?>">Offer</a>
+                    <a href="modules.php?name=FreeAgency&amp;pa=negotiate&amp;pid=<?= HtmlSanitizer::e($player->getPlayerID() ?? 0) ?>">Offer</a>
                 <?php endif; ?>
             </td>
-            <td><?= HtmlSanitizer::e($player->position ?? '') ?></td>
-            <?php $resolved = PlayerImageHelper::resolvePlayerDisplay($player->playerID ?? 0, $player->name ?? ''); ?>
-            <td class="ibl-player-cell"><a href="modules.php?name=Player&amp;pa=showpage&amp;pid=<?= HtmlSanitizer::e($player->playerID ?? 0) ?>">
+            <td><?= HtmlSanitizer::e($player->getPosition() ?? '') ?></td>
+            <?php $resolved = PlayerImageHelper::resolvePlayerDisplay($player->getPlayerID() ?? 0, $player->getName() ?? ''); ?>
+            <td class="ibl-player-cell"><a href="modules.php?name=Player&amp;pa=showpage&amp;pid=<?= HtmlSanitizer::e($player->getPlayerID() ?? 0) ?>">
                 <?= HtmlSanitizer::trusted($resolved['thumbnail']) ?>
-                <?php if (($player->birdYears ?? 0) >= 3): ?>
+                <?php if (($player->getBirdYears() ?? 0) >= 3): ?>
                     *<em><?= HtmlSanitizer::e($resolved['name']) ?></em>*
                 <?php else: ?>
                     <?= HtmlSanitizer::e($resolved['name']) ?>
                 <?php endif; ?>
             </a></td>
-            <td><?= HtmlSanitizer::e($player->age ?? 0) ?></td>
+            <td><?= HtmlSanitizer::e($player->getAge() ?? 0) ?></td>
             <?= HtmlSanitizer::trusted($this->renderPlayerRatings($player)) ?>
             <?= HtmlSanitizer::trusted($this->renderPlayerDemands($demands)) ?>
             <?= HtmlSanitizer::trusted($this->renderPlayerPreferences($player)) ?>
@@ -294,14 +294,14 @@ class FreeAgencyView
 
             if ($player->isPlayerFreeAgent($season) && !$player->isSalaryPlaceholder()):
                 $demands = $player->getFreeAgencyDemands();
-                $teamColors = $teamColorsByTeamId[$player->teamid ?? 0] ?? null;
+                $teamColors = $teamColorsByTeamId[$player->getTeamid() ?? 0] ?? null;
         ?>
         <tr>
-            <td><a href="modules.php?name=FreeAgency&amp;pa=negotiate&amp;pid=<?= HtmlSanitizer::e($player->playerID ?? 0) ?>">Offer</a></td>
-            <td><?= HtmlSanitizer::e($player->position ?? '') ?></td>
-            <?= PlayerImageHelper::renderFlexiblePlayerCell($player->playerID ?? 0, $player->name ?? '') ?>
+            <td><a href="modules.php?name=FreeAgency&amp;pa=negotiate&amp;pid=<?= HtmlSanitizer::e($player->getPlayerID() ?? 0) ?>">Offer</a></td>
+            <td><?= HtmlSanitizer::e($player->getPosition() ?? '') ?></td>
+            <?= PlayerImageHelper::renderFlexiblePlayerCell($player->getPlayerID() ?? 0, $player->getName() ?? '') ?>
             <?= HtmlSanitizer::trusted($this->renderTeamCell($player, $teamColors)) ?>
-            <td><?= HtmlSanitizer::e($player->age ?? 0) ?></td>
+            <td><?= HtmlSanitizer::e($player->getAge() ?? 0) ?></td>
             <?= HtmlSanitizer::trusted($this->renderPlayerRatings($player)) ?>
             <?= HtmlSanitizer::trusted($this->renderPlayerDemands($demands)) ?>
             <?= HtmlSanitizer::trusted($this->renderPlayerPreferences($player)) ?>
@@ -433,13 +433,13 @@ class FreeAgencyView
      */
     private function renderTeamCell(Player $player, ?array $teamColors = null): string
     {
-        $teamId = $player->teamid ?? 0;
+        $teamId = $player->getTeamid() ?? 0;
 
         if ($teamId === 0) {
             return '<td>FA</td>';
         }
 
-        $teamName = $player->teamName ?? '';
+        $teamName = $player->getTeamName() ?? '';
         if ($teamName === '') {
             $teamName = $this->commonRepo->getTeamnameFromTeamID($teamId) ?? '';
         }
@@ -462,30 +462,30 @@ class FreeAgencyView
     {
         ob_start();
         ?>
-<td><?= HtmlSanitizer::e($player->ratingFieldGoalAttempts ?? 0) ?></td>
-<td class="sep-r-weak"><?= HtmlSanitizer::e($player->ratingFieldGoalPercentage ?? 0) ?></td>
-<td><?= HtmlSanitizer::e($player->ratingFreeThrowAttempts ?? 0) ?></td>
-<td class="sep-r-weak"><?= HtmlSanitizer::e($player->ratingFreeThrowPercentage ?? 0) ?></td>
-<td><?= HtmlSanitizer::e($player->ratingThreePointAttempts ?? 0) ?></td>
-<td class="sep-r-team"><?= HtmlSanitizer::e($player->ratingThreePointPercentage ?? 0) ?></td>
-<td><?= HtmlSanitizer::e($player->ratingOffensiveRebounds ?? 0) ?></td>
-<td><?= HtmlSanitizer::e($player->ratingDefensiveRebounds ?? 0) ?></td>
-<td><?= HtmlSanitizer::e($player->ratingAssists ?? 0) ?></td>
-<td><?= HtmlSanitizer::e($player->ratingSteals ?? 0) ?></td>
-<td><?= HtmlSanitizer::e($player->ratingTurnovers ?? 0) ?></td>
-<td><?= HtmlSanitizer::e($player->ratingBlocks ?? 0) ?></td>
-<td class="sep-r-team"><?= HtmlSanitizer::e($player->ratingFouls ?? 0) ?></td>
-<td><?= HtmlSanitizer::e($player->ratingOutsideOffense ?? 0) ?></td>
-<td><?= HtmlSanitizer::e($player->ratingDriveOffense ?? 0) ?></td>
-<td><?= HtmlSanitizer::e($player->ratingPostOffense ?? 0) ?></td>
-<td class="sep-r-weak"><?= HtmlSanitizer::e($player->ratingTransitionOffense ?? 0) ?></td>
-<td><?= HtmlSanitizer::e($player->ratingOutsideDefense ?? 0) ?></td>
-<td><?= HtmlSanitizer::e($player->ratingDriveDefense ?? 0) ?></td>
-<td><?= HtmlSanitizer::e($player->ratingPostDefense ?? 0) ?></td>
-<td class="sep-r-team"><?= HtmlSanitizer::e($player->ratingTransitionDefense ?? 0) ?></td>
-<td><?= HtmlSanitizer::e($player->ratingTalent ?? 0) ?></td>
-<td><?= HtmlSanitizer::e($player->ratingSkill ?? 0) ?></td>
-<td class="sep-r-team"><?= HtmlSanitizer::e($player->ratingIntangibles ?? 0) ?></td>
+<td><?= HtmlSanitizer::e($player->getRatingFieldGoalAttempts() ?? 0) ?></td>
+<td class="sep-r-weak"><?= HtmlSanitizer::e($player->getRatingFieldGoalPercentage() ?? 0) ?></td>
+<td><?= HtmlSanitizer::e($player->getRatingFreeThrowAttempts() ?? 0) ?></td>
+<td class="sep-r-weak"><?= HtmlSanitizer::e($player->getRatingFreeThrowPercentage() ?? 0) ?></td>
+<td><?= HtmlSanitizer::e($player->getRatingThreePointAttempts() ?? 0) ?></td>
+<td class="sep-r-team"><?= HtmlSanitizer::e($player->getRatingThreePointPercentage() ?? 0) ?></td>
+<td><?= HtmlSanitizer::e($player->getRatingOffensiveRebounds() ?? 0) ?></td>
+<td><?= HtmlSanitizer::e($player->getRatingDefensiveRebounds() ?? 0) ?></td>
+<td><?= HtmlSanitizer::e($player->getRatingAssists() ?? 0) ?></td>
+<td><?= HtmlSanitizer::e($player->getRatingSteals() ?? 0) ?></td>
+<td><?= HtmlSanitizer::e($player->getRatingTurnovers() ?? 0) ?></td>
+<td><?= HtmlSanitizer::e($player->getRatingBlocks() ?? 0) ?></td>
+<td class="sep-r-team"><?= HtmlSanitizer::e($player->getRatingFouls() ?? 0) ?></td>
+<td><?= HtmlSanitizer::e($player->getRatingOutsideOffense() ?? 0) ?></td>
+<td><?= HtmlSanitizer::e($player->getRatingDriveOffense() ?? 0) ?></td>
+<td><?= HtmlSanitizer::e($player->getRatingPostOffense() ?? 0) ?></td>
+<td class="sep-r-weak"><?= HtmlSanitizer::e($player->getRatingTransitionOffense() ?? 0) ?></td>
+<td><?= HtmlSanitizer::e($player->getRatingOutsideDefense() ?? 0) ?></td>
+<td><?= HtmlSanitizer::e($player->getRatingDriveDefense() ?? 0) ?></td>
+<td><?= HtmlSanitizer::e($player->getRatingPostDefense() ?? 0) ?></td>
+<td class="sep-r-team"><?= HtmlSanitizer::e($player->getRatingTransitionDefense() ?? 0) ?></td>
+<td><?= HtmlSanitizer::e($player->getRatingTalent() ?? 0) ?></td>
+<td><?= HtmlSanitizer::e($player->getRatingSkill() ?? 0) ?></td>
+<td class="sep-r-team"><?= HtmlSanitizer::e($player->getRatingIntangibles() ?? 0) ?></td>
         <?php
         return (string) ob_get_clean();
     }
@@ -500,11 +500,11 @@ class FreeAgencyView
     {
         ob_start();
         ?>
-<td><?= HtmlSanitizer::e($player->freeAgencyLoyalty ?? 0) ?></td>
-<td><?= HtmlSanitizer::e($player->freeAgencyPlayForWinner ?? 0) ?></td>
-<td><?= HtmlSanitizer::e($player->freeAgencyPlayingTime ?? 0) ?></td>
-<td><?= HtmlSanitizer::e($player->freeAgencySecurity ?? 0) ?></td>
-<td><?= HtmlSanitizer::e($player->freeAgencyTradition ?? 0) ?></td>
+<td><?= HtmlSanitizer::e($player->getFreeAgencyLoyalty() ?? 0) ?></td>
+<td><?= HtmlSanitizer::e($player->getFreeAgencyPlayForWinner() ?? 0) ?></td>
+<td><?= HtmlSanitizer::e($player->getFreeAgencyPlayingTime() ?? 0) ?></td>
+<td><?= HtmlSanitizer::e($player->getFreeAgencySecurity() ?? 0) ?></td>
+<td><?= HtmlSanitizer::e($player->getFreeAgencyTradition() ?? 0) ?></td>
         <?php
         return (string) ob_get_clean();
     }

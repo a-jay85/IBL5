@@ -38,7 +38,7 @@ class FreeAgencyOfferView
         $team = $negotiationData['team'];
 
         // Bird years are 0 unless the offering team is the player's current team
-        $birdYears = $player->teamName === $team->name ? ($player->birdYears ?? 0) : 0;
+        $birdYears = $player->getTeamName() === $team->name ? ($player->getBirdYears() ?? 0) : 0;
         $raisePercentage = \ContractRules::getMaxRaisePercentage($birdYears);
 
         // Generate a single CSRF token for all forms on this page.
@@ -72,11 +72,11 @@ class FreeAgencyOfferView
         ?>
 <div class="ibl-card">
     <div class="ibl-card__header">
-        <h2 class="ibl-card__title"><?= HtmlSanitizer::e($player->position ?? '') ?> <?= HtmlSanitizer::e($player->name ?? '') ?> - Contract Negotiation</h2>
+        <h2 class="ibl-card__title"><?= HtmlSanitizer::e($player->getPosition() ?? '') ?> <?= HtmlSanitizer::e($player->getName() ?? '') ?> - Contract Negotiation</h2>
     </div>
     <div class="ibl-card__body">
         <div class="offer-player-info">
-            <img src="<?= HtmlSanitizer::e(PlayerImageHelper::getImageUrl($player->playerID)) ?>" alt="<?= HtmlSanitizer::e($player->name ?? '') ?>" class="offer-player-img">
+            <img src="<?= HtmlSanitizer::e(PlayerImageHelper::getImageUrl($player->getPlayerID())) ?>" alt="<?= HtmlSanitizer::e($player->getName() ?? '') ?>" class="offer-player-img">
             <?= HtmlSanitizer::trusted($this->formComponents->renderPlayerRatings()) ?>
         </div>
     </div>
@@ -105,7 +105,7 @@ class FreeAgencyOfferView
             </div>
 
             <input type="hidden" name="teamname" value="<?= HtmlSanitizer::e($team->name) ?>">
-            <input type="hidden" name="playerID" value="<?= (int) $player->playerID ?>">
+            <input type="hidden" name="playerID" value="<?= (int) $player->getPlayerID() ?>">
             <input type="hidden" name="offerType" value="0">
 
             <button type="submit" class="ibl-btn ibl-btn--primary">Offer / Amend Free Agent Contract</button>
@@ -132,7 +132,7 @@ class FreeAgencyOfferView
     <form method="post" action="modules.php?name=FreeAgency&pa=deleteoffer">
         <?= HtmlSanitizer::trusted($csrfHtml) ?>
         <input type="hidden" name="teamname" value="<?= HtmlSanitizer::e($team->name) ?>">
-        <input type="hidden" name="playerID" value="<?= (int) $player->playerID ?>">
+        <input type="hidden" name="playerID" value="<?= (int) $player->getPlayerID() ?>">
         <button type="submit" class="ibl-btn ibl-btn--danger">Delete This Offer</button>
     </form>
 </div>
@@ -151,9 +151,9 @@ class FreeAgencyOfferView
     private function renderOfferButtons(Player $player, Team $team): string
     {
         // Calculate max contract salary and raises based on bird years
-        $maxContract = \ContractRules::getMaxContractSalary($player->yearsOfExperience ?? 0);
+        $maxContract = \ContractRules::getMaxContractSalary($player->getYearsOfExperience() ?? 0);
         // Only use player's bird years if offering team is player's current team
-        $birdYears = $player->teamName === $team->name ? ($player->birdYears ?? 0) : 0;
+        $birdYears = $player->getTeamName() === $team->name ? ($player->getBirdYears() ?? 0) : 0;
         $raisePercentage = \ContractRules::getMaxRaisePercentage($birdYears);
         $maxRaise = \ContractRules::calculateMaxRaise($maxContract, $birdYears);
 

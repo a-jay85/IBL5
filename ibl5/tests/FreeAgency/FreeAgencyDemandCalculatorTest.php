@@ -714,14 +714,14 @@ class FreeAgencyDemandCalculatorTest extends TestCase
     ): Player {
         $player = $this->createStub(Player::class);
 
-        $player->freeAgencyPlayForWinner = $playForWinner;
-        $player->freeAgencyTradition = $tradition;
-        $player->freeAgencyLoyalty = $loyalty;
-        $player->freeAgencySecurity = $security;
-        $player->freeAgencyPlayingTime = $playingTime;
-        $player->position = $position;
-        $player->playerID = $playerID;
-        $player->teamName = $currentTeam;
+        $player->method('getFreeAgencyPlayForWinner')->willReturn($playForWinner);
+        $player->method('getFreeAgencyTradition')->willReturn($tradition);
+        $player->method('getFreeAgencyLoyalty')->willReturn($loyalty);
+        $player->method('getFreeAgencySecurity')->willReturn($security);
+        $player->method('getFreeAgencyPlayingTime')->willReturn($playingTime);
+        $player->method('getPosition')->willReturn($position);
+        $player->method('getPlayerID')->willReturn($playerID);
+        $player->method('getTeamName')->willReturn($currentTeam);
 
         return $player;
     }

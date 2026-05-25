@@ -121,13 +121,13 @@ class FreeAgencyProcessor implements FreeAgencyProcessorInterface
     private function parseOfferData(\Player\Player $player, array $postData, Team $team): array
     {
         // Reconstruct derived values from player object
-        $birdYears = $player->teamName === $team->name ? ($player->birdYears ?? 0) : 0;
-        $veteranMinimum = \ContractRules::getVeteranMinimumSalary($player->yearsOfExperience ?? 0);
-        $maxContractYear1 = \ContractRules::getMaxContractSalary($player->yearsOfExperience ?? 0);
+        $birdYears = $player->getTeamName() === $team->name ? ($player->getBirdYears() ?? 0) : 0;
+        $veteranMinimum = \ContractRules::getVeteranMinimumSalary($player->getYearsOfExperience() ?? 0);
+        $maxContractYear1 = \ContractRules::getMaxContractSalary($player->getYearsOfExperience() ?? 0);
 
         // Reconstruct cap space data using provided team object
         $capCalculator = new FreeAgencyCapCalculator($this->mysqli_db, $team, $this->season);
-        $capMetrics = $capCalculator->calculateTeamCapMetrics($player->playerID);
+        $capMetrics = $capCalculator->calculateTeamCapMetrics($player->getPlayerID());
 
         // calculateTeamCapMetrics() already excludes this player's existing offer,
         // so softCapSpace[0] is the true available cap space for a new/replacement offer.
@@ -225,10 +225,10 @@ class FreeAgencyProcessor implements FreeAgencyProcessorInterface
         $mle = OfferType::isMLE($offerData['offerType']) ? 1 : 0;
         $lle = OfferType::isLLE($offerData['offerType']) ? 1 : 0;
 
-        $playerName = $player->name ?? '';
+        $playerName = $player->getName() ?? '';
 
         $saved = $this->repository->saveOffer([
-            'pid' => $player->playerID ?? 0,
+            'pid' => $player->getPlayerID() ?? 0,
             'teamid' => $team->teamid,
             'teamName' => $teamName,
             'playerName' => $playerName,
@@ -254,7 +254,7 @@ class FreeAgencyProcessor implements FreeAgencyProcessorInterface
         if ($saved) {
             \Logging\LoggerFactory::getChannel('audit')->info('fa_offer_submitted', [
                 'action' => 'fa_offer_submitted',
-                'player_id' => $player->playerID ?? 0,
+                'player_id' => $player->getPlayerID() ?? 0,
                 'player_name' => $playerName,
                 'team_name' => $teamName,
                 'offer1' => $offerData['offer1'],
@@ -296,15 +296,19 @@ class FreeAgencyProcessor implements FreeAgencyProcessorInterface
         }
 
         $discord = new Discord($this->commonRepo);
-        $playerTeamName = $player->teamName ?? '';
+        $playerTeamName = $player->getTeamName() ?? '';
         $playerTeamDiscordID = $discord->getDiscordIDFromTeamname($playerTeamName);
 
-        if ($teamName === $player->teamName) {
-            $message = "Free agent **{$player->name}** has been offered a contract to _stay_ with the **{$player->teamName}**.
-_**{$player->teamName}** GM <@!$playerTeamDiscordID> could not be reached for comment._";
+        if ($teamName === $player->getTeamName()) {
+            $playerName = $player->getName();
+            $playerTeam = $player->getTeamName();
+            $message = "Free agent **{$playerName}** has been offered a contract to _stay_ with the **{$playerTeam}**.
+_**{$playerTeam}** GM <@!$playerTeamDiscordID> could not be reached for comment._";
         } else {
-            $message = "Free agent **{$player->name}** has been offered a contract to _leave_ the **{$player->teamName}**.
-_**{$player->teamName}** GM <@!$playerTeamDiscordID> could not be reached for comment._";
+            $playerName = $player->getName();
+            $playerTeam = $player->getTeamName();
+            $message = "Free agent **{$playerName}** has been offered a contract to _leave_ the **{$playerTeam}**.
+_**{$playerTeam}** GM <@!$playerTeamDiscordID> could not be reached for comment._";
         }
 
         Discord::postToChannel('#free-agency', $message);

@@ -62,49 +62,62 @@ VALUES (2, 'admin@example.com', '$2y$04$mFS8uV7f1CVkCMug3cn9Rup8sGVb0qUDlZsgKB.E
 ON DUPLICATE KEY UPDATE roles_mask = VALUES(roles_mask), password = VALUES(password);
 
 -- Settings: commonly read by services
-INSERT INTO ibl_settings (name, value)
-VALUES ('Allow Trades', 'Yes')
+INSERT INTO ibl_settings (name, value, league)
+VALUES ('Allow Trades', 'Yes', 'ibl')
 ON DUPLICATE KEY UPDATE value = VALUES(value);
 
-INSERT INTO ibl_settings (name, value)
-VALUES ('Phase', 'Regular Season')
+INSERT INTO ibl_settings (name, value, league)
+VALUES ('Phase', 'Regular Season', 'ibl')
 ON DUPLICATE KEY UPDATE value = VALUES(value);
 
 -- Additional settings needed by LeagueControlPanel and SeasonQuery tests
-INSERT INTO ibl_settings (name, value)
-VALUES ('Current Season Phase', 'Regular Season')
+INSERT INTO ibl_settings (name, value, league)
+VALUES ('Current Season Phase', 'Regular Season', 'ibl')
 ON DUPLICATE KEY UPDATE value = VALUES(value);
 
-INSERT INTO ibl_settings (name, value)
-VALUES ('Current Season Ending Year', '2026')
+INSERT INTO ibl_settings (name, value, league)
+VALUES ('Current Season Ending Year', '2026', 'ibl')
 ON DUPLICATE KEY UPDATE value = VALUES(value);
 
-INSERT INTO ibl_settings (name, value)
-VALUES ('Sim Length in Days', '3')
+INSERT INTO ibl_settings (name, value, league)
+VALUES ('Sim Length in Days', '3', 'ibl')
 ON DUPLICATE KEY UPDATE value = VALUES(value);
 
-INSERT INTO ibl_settings (name, value)
-VALUES ('Allow Waiver Moves', 'Yes')
+INSERT INTO ibl_settings (name, value, league)
+VALUES ('Allow Waiver Moves', 'Yes', 'ibl')
 ON DUPLICATE KEY UPDATE value = VALUES(value);
 
-INSERT INTO ibl_settings (name, value)
-VALUES ('Show Draft Link', 'Off')
+INSERT INTO ibl_settings (name, value, league)
+VALUES ('Show Draft Link', 'Off', 'ibl')
 ON DUPLICATE KEY UPDATE value = VALUES(value);
 
-INSERT INTO ibl_settings (name, value)
-VALUES ('ASG Voting', 'No')
+INSERT INTO ibl_settings (name, value, league)
+VALUES ('ASG Voting', 'No', 'ibl')
 ON DUPLICATE KEY UPDATE value = VALUES(value);
 
-INSERT INTO ibl_settings (name, value)
-VALUES ('EOY Voting', 'No')
+INSERT INTO ibl_settings (name, value, league)
+VALUES ('EOY Voting', 'No', 'ibl')
 ON DUPLICATE KEY UPDATE value = VALUES(value);
 
-INSERT INTO ibl_settings (name, value)
-VALUES ('Free Agency Notifications', 'Yes')
+INSERT INTO ibl_settings (name, value, league)
+VALUES ('Free Agency Notifications', 'Yes', 'ibl')
 ON DUPLICATE KEY UPDATE value = VALUES(value);
 
-INSERT INTO ibl_settings (name, value)
-VALUES ('Trivia Mode', 'Off')
+INSERT INTO ibl_settings (name, value, league)
+VALUES ('Trivia Mode', 'Off', 'ibl')
+ON DUPLICATE KEY UPDATE value = VALUES(value);
+
+-- Olympics settings
+INSERT INTO ibl_settings (name, value, league)
+VALUES ('Current Season Phase', 'Preseason', 'olympics')
+ON DUPLICATE KEY UPDATE value = VALUES(value);
+
+INSERT INTO ibl_settings (name, value, league)
+VALUES ('Current Season Ending Year', '2026', 'olympics')
+ON DUPLICATE KEY UPDATE value = VALUES(value);
+
+INSERT INTO ibl_settings (name, value, league)
+VALUES ('Sim Length in Days', '3', 'olympics')
 ON DUPLICATE KEY UPDATE value = VALUES(value);
 
 -- ============================================================
@@ -360,6 +373,6 @@ VALUES (2024, 'Metros', 'Best Record')
 ON DUPLICATE KEY UPDATE name = VALUES(name);
 
 -- Draft Order Finalized: needed by ProjectedDraftOrderRepository
-INSERT INTO ibl_settings (name, value)
-VALUES ('Draft Order Finalized', 'No')
+INSERT INTO ibl_settings (name, value, league)
+VALUES ('Draft Order Finalized', 'No', 'ibl')
 ON DUPLICATE KEY UPDATE value = VALUES(value);

@@ -72,7 +72,7 @@ class MaintenanceRepository extends \BaseMysqliRepository implements Maintenance
     public function getSetting(string $name): ?string
     {
         $result = $this->fetchOne(
-            "SELECT value FROM `ibl_settings` WHERE name = ?",
+            "SELECT value FROM `ibl_settings` WHERE name = ? AND league = 'ibl'",
             "s",
             $name
         );

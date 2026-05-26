@@ -261,16 +261,122 @@ class LeagueControlPanelViewTest extends TestCase
         $this->assertStringContainsString('&lt;script&gt;', $html);
     }
 
-    public function testRenderTriviaButtonsAlwaysPresent(): void
+    public function testRenderTriviaButtonsAlwaysPresentForIbl(): void
     {
         foreach (['Preseason', 'Regular Season', 'Playoffs', 'Draft', 'Free Agency', 'HEAT'] as $phase) {
             $html = $this->renderWithDefaults([
+                'currentLeague' => 'ibl',
                 'panelData' => self::createPanelData(['phase' => $phase]),
             ]);
 
             $this->assertStringContainsString('value="activate_trivia"', $html, "Missing activate_trivia for phase: $phase");
             $this->assertStringContainsString('value="deactivate_trivia"', $html, "Missing deactivate_trivia for phase: $phase");
         }
+    }
+
+    public function testOlympicsHidesTriviaControls(): void
+    {
+        $html = $this->renderWithDefaults([
+            'currentLeague' => 'olympics',
+            'panelData' => self::createPanelData(['phase' => 'Regular Season']),
+        ]);
+
+        $this->assertStringNotContainsString('value="activate_trivia"', $html);
+        $this->assertStringNotContainsString('value="deactivate_trivia"', $html);
+    }
+
+    public function testOlympicsHidesQuickLinks(): void
+    {
+        $html = $this->renderWithDefaults([
+            'currentLeague' => 'olympics',
+            'panelData' => self::createPanelData(['phase' => 'Regular Season']),
+        ]);
+
+        $this->assertStringNotContainsString('Quick Links', $html);
+        $this->assertStringNotContainsString('Season Highs', $html);
+    }
+
+    public function testOlympicsRegularSeasonShowsUattAndSimLength(): void
+    {
+        $html = $this->renderWithDefaults([
+            'currentLeague' => 'olympics',
+            'panelData' => self::createPanelData(['phase' => 'Regular Season']),
+        ]);
+
+        $this->assertStringContainsString('updateAllTheThings', $html);
+        $this->assertStringContainsString('value="set_sim_length"', $html);
+    }
+
+    public function testOlympicsRegularSeasonHidesTradesWaiversAsgEoy(): void
+    {
+        $html = $this->renderWithDefaults([
+            'currentLeague' => 'olympics',
+            'panelData' => self::createPanelData(['phase' => 'Regular Season']),
+        ]);
+
+        $this->assertStringNotContainsString('value="set_allow_trades"', $html);
+        $this->assertStringNotContainsString('value="reset_asg_voting"', $html);
+        $this->assertStringNotContainsString('value="reset_eoy_voting"', $html);
+        $this->assertStringNotContainsString('value="set_show_draft_link"', $html);
+    }
+
+    public function testOlympicsPlayoffsHidesEoyAwardsAndDraftLink(): void
+    {
+        $html = $this->renderWithDefaults([
+            'currentLeague' => 'olympics',
+            'panelData' => self::createPanelData(['phase' => 'Playoffs']),
+        ]);
+
+        $this->assertStringNotContainsString('value="reset_eoy_voting"', $html);
+        $this->assertStringNotContainsString('value="generate_awards"', $html);
+        $this->assertStringNotContainsString('value="set_show_draft_link"', $html);
+    }
+
+    public function testOlympicsPlayoffsShowsUattAndSimLength(): void
+    {
+        $html = $this->renderWithDefaults([
+            'currentLeague' => 'olympics',
+            'panelData' => self::createPanelData(['phase' => 'Playoffs']),
+        ]);
+
+        $this->assertStringContainsString('updateAllTheThings', $html);
+        $this->assertStringContainsString('value="set_sim_length"', $html);
+    }
+
+    public function testOlympicsDraftHidesAllControls(): void
+    {
+        $html = $this->renderWithDefaults([
+            'currentLeague' => 'olympics',
+            'panelData' => self::createPanelData(['phase' => 'Draft']),
+        ]);
+
+        $this->assertStringNotContainsString('Draft Operations', $html);
+        $this->assertStringNotContainsString('value="set_allow_waivers"', $html);
+        $this->assertStringNotContainsString('value="generate_awards"', $html);
+    }
+
+    public function testOlympicsFreeAgencyHidesAllControls(): void
+    {
+        $html = $this->renderWithDefaults([
+            'currentLeague' => 'olympics',
+            'panelData' => self::createPanelData(['phase' => 'Free Agency']),
+        ]);
+
+        $this->assertStringNotContainsString('Free Agency Operations', $html);
+    }
+
+    public function testOlympicsPreseasonHidesIblOnlyControls(): void
+    {
+        $html = $this->renderWithDefaults([
+            'currentLeague' => 'olympics',
+            'panelData' => self::createPanelData(['phase' => 'Preseason']),
+        ]);
+
+        $this->assertStringNotContainsString('value="set_allow_waivers"', $html);
+        $this->assertStringNotContainsString('value="set_waivers_to_free_agents"', $html);
+        $this->assertStringNotContainsString('value="reset_contract_extensions"', $html);
+        $this->assertStringNotContainsString('value="reset_mles_lles"', $html);
+        $this->assertStringContainsString('updateAllTheThings', $html);
     }
 
     public function testRenderContainsHiddenCurrentPhase(): void

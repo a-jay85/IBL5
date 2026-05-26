@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\DatabaseIntegration;
 
+use League\LeagueContext;
 use PHPUnit\Framework\Attributes\Group;
 
 use LeagueControlPanel\LeagueControlPanelRepository;
@@ -391,5 +392,33 @@ class LeagueControlPanelRepositoryTest extends DatabaseTestCase
         self::assertNotNull($row);
         self::assertSame(42, $row['contract_wins']);
         self::assertSame(8, $row['contract_losses']);
+    }
+
+    // ── League-scoped (Olympics) tests ──────────────────────────
+
+    public function testUpdateSettingOnlyUpdatesCorrectLeagueRow(): void
+    {
+        $olympicsContext = $this->createStub(LeagueContext::class);
+        $olympicsContext->method('getCurrentLeague')->willReturn(LeagueContext::LEAGUE_OLYMPICS);
+        $olympicsRepo = new LeagueControlPanelRepository($this->db, $olympicsContext);
+
+        $olympicsRepo->updateSetting('Sim Length in Days', '10');
+
+        self::assertSame(10, $olympicsRepo->getSimLengthInDays());
+        self::assertSame(3, $this->repo->getSimLengthInDays());
+    }
+
+    public function testSetSeasonPhaseOlympicsDoesNotResetIblShowDraftLink(): void
+    {
+        $this->repo->setShowDraftLink('On');
+        self::assertSame('On', $this->repo->getSetting('Show Draft Link'));
+
+        $olympicsContext = $this->createStub(LeagueContext::class);
+        $olympicsContext->method('getCurrentLeague')->willReturn(LeagueContext::LEAGUE_OLYMPICS);
+        $olympicsRepo = new LeagueControlPanelRepository($this->db, $olympicsContext);
+
+        $olympicsRepo->setSeasonPhase('Preseason');
+
+        self::assertSame('On', $this->repo->getSetting('Show Draft Link'));
     }
 }

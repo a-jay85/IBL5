@@ -43,6 +43,7 @@ class LeagueControlPanelView implements LeagueControlPanelViewInterface
         <?= HtmlSanitizer::trusted($this->renderSeasonPhaseControls($currentLeague, $panelData)) ?>
         <?= HtmlSanitizer::trusted($this->renderPhaseControls($currentLeague, $panelData)) ?>
 
+<?php if ($currentLeague === 'ibl'): ?>
         <section class="updater-section">
             <div class="updater-section__label">Quick Links</div>
             <div class="lcp-control-row">
@@ -51,6 +52,7 @@ class LeagueControlPanelView implements LeagueControlPanelViewInterface
         </section>
 
         <?= HtmlSanitizer::trusted($this->renderTriviaControls()) ?>
+<?php endif; ?>
     </form>
 
     <a href="/ibl5/index.php" class="updater__return underline">Return to IBL</a>
@@ -134,12 +136,12 @@ class LeagueControlPanelView implements LeagueControlPanelViewInterface
     private function renderPhaseControls(string $currentLeague, array $panelData): string
     {
         return match ($panelData['phase']) {
-            'Preseason' => $this->renderPreseasonControls($panelData),
-            'HEAT' => $this->renderHeatControls($panelData),
+            'Preseason' => $this->renderPreseasonControls($currentLeague, $panelData),
+            'HEAT' => $this->renderHeatControls($currentLeague, $panelData),
             'Regular Season' => $this->renderRegularSeasonControls($currentLeague, $panelData),
-            'Playoffs' => $this->renderPlayoffsControls($panelData),
-            'Draft' => $this->renderDraftControls($panelData),
-            'Free Agency' => $this->renderFreeAgencyControls($panelData),
+            'Playoffs' => $this->renderPlayoffsControls($currentLeague, $panelData),
+            'Draft' => $this->renderDraftControls($currentLeague, $panelData),
+            'Free Agency' => $this->renderFreeAgencyControls($currentLeague, $panelData),
             default => '',
         };
     }
@@ -147,7 +149,7 @@ class LeagueControlPanelView implements LeagueControlPanelViewInterface
     /**
      * @param array{phase: string, allowTrades: string, allowWaivers: string, showDraftLink: string, freeAgencyNotifications: string, triviaMode: string, simLengthInDays: int, seasonEndingYear: int, hasFinalsMvp: bool} $panelData
      */
-    private function renderPreseasonControls(array $panelData): string
+    private function renderPreseasonControls(string $currentLeague, array $panelData): string
     {
         ob_start();
         ?>
@@ -157,6 +159,12 @@ class LeagueControlPanelView implements LeagueControlPanelViewInterface
         <a href="/ibl5/scripts/updateAllTheThings.php">Update All The Things</a>
     </div>
     <div class="lcp-note">Upload sim backup to <strong>backups/</strong> before running</div>
+    <div class="lcp-control-row">
+        <input type="number" name="SimLengthInDays" min="1" max="180" size="3" value="<?= HtmlSanitizer::e((string) $panelData['simLengthInDays']) ?>" class="ibl-input ibl-input--sm w-20">
+        <button type="submit" name="action" value="set_sim_length" class="ibl-btn ibl-btn--secondary ibl-btn--sm">Set Sim Length in Days</button>
+    </div>
+    <div class="lcp-note">You must click the button — pressing Enter will not work</div>
+<?php if ($currentLeague === 'ibl'): ?>
     <?= HtmlSanitizer::trusted($this->renderWaiversSelect($panelData)) ?>
     <div class="lcp-control-row">
         <button type="submit" name="action" value="set_waivers_to_free_agents" class="ibl-btn ibl-btn--secondary ibl-btn--sm">Set all players on waivers to Free Agents and reset their Bird years</button>
@@ -170,6 +178,7 @@ class LeagueControlPanelView implements LeagueControlPanelViewInterface
     <div class="lcp-control-row">
         <button type="submit" name="action" value="reset_mles_lles" class="ibl-btn ibl-btn--secondary ibl-btn--sm">Reset All MLEs/LLEs</button>
     </div>
+<?php endif; ?>
 </section>
         <?php
         return (string) ob_get_clean();
@@ -178,7 +187,7 @@ class LeagueControlPanelView implements LeagueControlPanelViewInterface
     /**
      * @param array{phase: string, allowTrades: string, allowWaivers: string, showDraftLink: string, freeAgencyNotifications: string, triviaMode: string, simLengthInDays: int, seasonEndingYear: int, hasFinalsMvp: bool} $panelData
      */
-    private function renderHeatControls(array $panelData): string
+    private function renderHeatControls(string $currentLeague, array $panelData): string
     {
         ob_start();
         ?>
@@ -234,7 +243,7 @@ class LeagueControlPanelView implements LeagueControlPanelViewInterface
     /**
      * @param array{phase: string, allowTrades: string, allowWaivers: string, showDraftLink: string, freeAgencyNotifications: string, triviaMode: string, simLengthInDays: int, seasonEndingYear: int, hasFinalsMvp: bool} $panelData
      */
-    private function renderPlayoffsControls(array $panelData): string
+    private function renderPlayoffsControls(string $currentLeague, array $panelData): string
     {
         ob_start();
         ?>
@@ -249,6 +258,7 @@ class LeagueControlPanelView implements LeagueControlPanelViewInterface
         <button type="submit" name="action" value="set_sim_length" class="ibl-btn ibl-btn--secondary ibl-btn--sm">Set Sim Length in Days</button>
     </div>
     <div class="lcp-note">You must click the button — pressing Enter will not work</div>
+<?php if ($currentLeague === 'ibl'): ?>
     <div class="lcp-control-row">
         <button type="submit" name="action" value="reset_eoy_voting" class="ibl-btn ibl-btn--secondary ibl-btn--sm">Reset End of the Year Voting</button>
     </div>
@@ -257,6 +267,7 @@ class LeagueControlPanelView implements LeagueControlPanelViewInterface
     </div>
     <?= HtmlSanitizer::trusted($this->renderDraftLinkSelect($panelData)) ?>
     <?= HtmlSanitizer::trusted($this->renderAwardsControls($panelData)) ?>
+<?php endif; ?>
 </section>
         <?php
         return (string) ob_get_clean();
@@ -265,8 +276,12 @@ class LeagueControlPanelView implements LeagueControlPanelViewInterface
     /**
      * @param array{phase: string, allowTrades: string, allowWaivers: string, showDraftLink: string, freeAgencyNotifications: string, triviaMode: string, simLengthInDays: int, seasonEndingYear: int, hasFinalsMvp: bool} $panelData
      */
-    private function renderDraftControls(array $panelData): string
+    private function renderDraftControls(string $currentLeague, array $panelData): string
     {
+        if ($currentLeague !== 'ibl') {
+            return '';
+        }
+
         ob_start();
         ?>
 <section class="updater-section">
@@ -281,8 +296,12 @@ class LeagueControlPanelView implements LeagueControlPanelViewInterface
     /**
      * @param array{phase: string, allowTrades: string, allowWaivers: string, showDraftLink: string, freeAgencyNotifications: string, triviaMode: string, simLengthInDays: int, seasonEndingYear: int, hasFinalsMvp: bool} $panelData
      */
-    private function renderFreeAgencyControls(array $panelData): string
+    private function renderFreeAgencyControls(string $currentLeague, array $panelData): string
     {
+        if ($currentLeague !== 'ibl') {
+            return '';
+        }
+
         ob_start();
         ?>
 <section class="updater-section">

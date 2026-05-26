@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace LeagueControlPanel;
 
+use League\LeagueContext;
 use LeagueControlPanel\Contracts\LeagueControlPanelRepositoryInterface;
 use LeagueControlPanel\Contracts\LeagueControlPanelServiceInterface;
 
@@ -13,10 +14,12 @@ use LeagueControlPanel\Contracts\LeagueControlPanelServiceInterface;
 class LeagueControlPanelService implements LeagueControlPanelServiceInterface
 {
     private LeagueControlPanelRepositoryInterface $repository;
+    private string $league;
 
-    public function __construct(LeagueControlPanelRepositoryInterface $repository)
+    public function __construct(LeagueControlPanelRepositoryInterface $repository, string $league = LeagueContext::LEAGUE_IBL)
     {
         $this->repository = $repository;
+        $this->league = $league;
     }
 
     /**
@@ -38,6 +41,8 @@ class LeagueControlPanelService implements LeagueControlPanelServiceInterface
 
         $seasonEndingYear = (int) ($settings['Current Season Ending Year'] ?? '0');
 
+        $isOlympics = $this->league === LeagueContext::LEAGUE_OLYMPICS;
+
         return [
             'phase' => $settings['Current Season Phase'] ?? 'Preseason',
             'allowTrades' => $settings['Allow Trades'] ?? 'No',
@@ -47,7 +52,7 @@ class LeagueControlPanelService implements LeagueControlPanelServiceInterface
             'triviaMode' => $settings['Trivia Mode'] ?? 'Off',
             'simLengthInDays' => $simLengthInDays,
             'seasonEndingYear' => $seasonEndingYear,
-            'hasFinalsMvp' => $this->repository->hasFinalsMvp($seasonEndingYear),
+            'hasFinalsMvp' => $isOlympics ? false : $this->repository->hasFinalsMvp($seasonEndingYear),
         ];
     }
 }

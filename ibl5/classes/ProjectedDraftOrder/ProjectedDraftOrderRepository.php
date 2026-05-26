@@ -76,7 +76,7 @@ class ProjectedDraftOrderRepository extends \BaseMysqliRepository implements Pro
     public function isDraftOrderFinalized(): bool
     {
         $row = $this->fetchOne(
-            "SELECT value FROM `ibl_settings` WHERE name = 'Draft Order Finalized'",
+            "SELECT value FROM `ibl_settings` WHERE name = 'Draft Order Finalized' AND league = 'ibl'",
         );
 
         return $row !== null && $row['value'] === 'Yes';
@@ -122,7 +122,7 @@ class ProjectedDraftOrderRepository extends \BaseMysqliRepository implements Pro
             }
 
             $this->execute(
-                "UPDATE `ibl_settings` SET value = 'Yes' WHERE name = 'Draft Order Finalized'",
+                "UPDATE `ibl_settings` SET value = 'Yes' WHERE name = 'Draft Order Finalized' AND league = 'ibl'",
             );
         });
     }

@@ -4,12 +4,14 @@ declare(strict_types=1);
 
 namespace Tests\LeagueControlPanel;
 
+use League\LeagueContext;
 use LeagueControlPanel\Contracts\AwardGenerationServiceInterface;
 use LeagueControlPanel\Contracts\LeagueControlPanelProcessorInterface;
 use LeagueControlPanel\Contracts\LeagueControlPanelRepositoryInterface;
 use LeagueControlPanel\LeagueControlPanelProcessor;
 use Logging\LoggerFactory;
 use Monolog\Handler\TestHandler;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 
 /**
@@ -562,10 +564,76 @@ class LeagueControlPanelProcessorTest extends TestCase
         $this->assertFalse($handler->hasInfoRecords());
     }
 
+    public function testOlympicsRejectsSetAllowTrades(): void
+    {
+        $processor = $this->createOlympicsProcessorWithStub();
+        $result = $processor->dispatch('set_allow_trades', ['Trades' => 'Yes']);
+
+        $this->assertFalse($result['success']);
+        $this->assertStringContainsString('not available', $result['message']);
+    }
+
+    public function testOlympicsAllowsSetSimLength(): void
+    {
+        $mock = $this->createMock(LeagueControlPanelRepositoryInterface::class);
+        $mock->expects($this->once())->method('setSimLengthInDays')->with(5);
+
+        $processor = new LeagueControlPanelProcessor(
+            $mock,
+            $this->createStub(AwardGenerationServiceInterface::class),
+            LeagueContext::LEAGUE_OLYMPICS,
+        );
+        $result = $processor->dispatch('set_sim_length', ['SimLengthInDays' => '5']);
+
+        $this->assertTrue($result['success']);
+    }
+
+    /**
+     * @return list<array{string}>
+     */
+    public static function iblOnlyActionsProvider(): array
+    {
+        return [
+            ['set_allow_trades'],
+            ['set_allow_waivers'],
+            ['set_show_draft_link'],
+            ['toggle_fa_notifications'],
+            ['activate_trivia'],
+            ['deactivate_trivia'],
+            ['delete_draft_placeholders'],
+            ['delete_outdated_buyouts_cash'],
+            ['reset_contract_extensions'],
+            ['reset_mles_lles'],
+            ['reset_asg_voting'],
+            ['reset_eoy_voting'],
+            ['set_waivers_to_free_agents'],
+            ['set_fa_factors_pfw'],
+            ['generate_awards'],
+            ['set_finals_mvp'],
+        ];
+    }
+
+    #[DataProvider('iblOnlyActionsProvider')]
+    public function testOlympicsRejectsIblOnlyAction(string $action): void
+    {
+        $processor = $this->createOlympicsProcessorWithStub();
+        $result = $processor->dispatch($action, []);
+
+        $this->assertFalse($result['success']);
+        $this->assertStringContainsString('not available', $result['message']);
+    }
+
     private function createProcessorWithStub(): LeagueControlPanelProcessor
     {
         $stub = $this->createStub(LeagueControlPanelRepositoryInterface::class);
         $awardStub = $this->createStub(AwardGenerationServiceInterface::class);
         return new LeagueControlPanelProcessor($stub, $awardStub);
+    }
+
+    private function createOlympicsProcessorWithStub(): LeagueControlPanelProcessor
+    {
+        $stub = $this->createStub(LeagueControlPanelRepositoryInterface::class);
+        $awardStub = $this->createStub(AwardGenerationServiceInterface::class);
+        return new LeagueControlPanelProcessor($stub, $awardStub, LeagueContext::LEAGUE_OLYMPICS);
     }
 }

@@ -43,6 +43,10 @@ jobs:
     - name: Checkout code
       uses: actions/checkout@v6
 
+    - name: Check infection excludes
+      working-directory: ibl5
+      run: bin/check-infection-excludes
+
     - name: Setup PHP
       uses: shivammathur/setup-php@v2
       with:
@@ -147,6 +151,10 @@ jobs:
       uses: actions/checkout@v6
       with:
         fetch-depth: 0
+
+    - name: Check infection excludes
+      working-directory: ibl5
+      run: bin/check-infection-excludes
 
     - name: Setup PHP
       uses: shivammathur/setup-php@v2

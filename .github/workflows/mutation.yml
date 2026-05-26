@@ -192,6 +192,27 @@ jobs:
           echo "skip=false" >> $GITHUB_OUTPUT
         fi
 
+    - name: Check new files for test coverage
+      if: steps.changes.outputs.skip == 'false'
+      id: new-files
+      working-directory: ibl5
+      run: |
+        GAPS=$(bin/check-new-class-coverage --base origin/${{ github.base_ref }})
+        if [ -n "$GAPS" ]; then
+          echo "has_gaps=true" >> $GITHUB_OUTPUT
+          {
+            echo "## New Classes Without Test Coverage"
+            echo ""
+            echo "These new files have no test referencing their class name:"
+            echo '```'
+            echo "$GAPS"
+            echo '```'
+            echo "_This is advisory — mutation testing cannot catch bugs in untested new code._"
+          } > /tmp/new-class-warning.md
+        else
+          echo "has_gaps=false" >> $GITHUB_OUTPUT
+        fi
+
     - name: Apply migrations
       if: steps.changes.outputs.skip == 'false'
       working-directory: ibl5
@@ -247,6 +268,10 @@ jobs:
           cat infection-summary.log
           echo '```'
         } > /tmp/mutation-comment.md
+        if [ -f /tmp/new-class-warning.md ]; then
+          echo "" >> /tmp/mutation-comment.md
+          cat /tmp/new-class-warning.md >> /tmp/mutation-comment.md
+        fi
 
     - name: Post sticky mutation comment
       if: always() && steps.changes.outputs.skip == 'false' && hashFiles('ibl5/infection-summary.log') != ''

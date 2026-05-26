@@ -1,0 +1,62 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+BASE="origin/master"
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        --base) BASE="$2"; shift 2 ;;
+        *) echo "Usage: bin/check-new-class-coverage [--base <ref>]" >&2; exit 0 ;;
+    esac
+done
+
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+REPO_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
+
+ADDED=$(git diff --name-only --diff-filter=A "$BASE"...HEAD \
+    -- 'classes/**/*.php' 2>/dev/null || true)
+if [ -z "$ADDED" ]; then
+    exit 0
+fi
+
+INFECTION_CFG="$REPO_DIR/infection.json5"
+EXCLUDES=""
+if [ -f "$INFECTION_CFG" ]; then
+    EXCLUDES=$(sed 's|//.*||' "$INFECTION_CFG" \
+        | sed -n '/"excludes"/,/]/p' \
+        | grep -v '"excludes"' \
+        | tr ',' '\n' \
+        | sed -n 's/.*"\([^"]*\)".*/\1/p')
+fi
+
+gaps=""
+while IFS= read -r file; do
+    [ -z "$file" ] && continue
+    # git output may include parent-dir prefix; strip to classes-relative path
+    rel="${file##*classes/}"
+
+    skip=false
+    while IFS= read -r pattern; do
+        [ -z "$pattern" ] && continue
+        # shellcheck disable=SC2254
+        case "$rel" in
+            $pattern|$pattern/*) skip=true; break ;;
+        esac
+    done <<< "$EXCLUDES"
+    $skip && continue
+
+    classname="${file##*/}"
+    classname="${classname%.php}"
+
+    if ! grep -rql "$classname" "$REPO_DIR/tests/" --include='*.php' 2>/dev/null; then
+        if [ -n "$gaps" ]; then
+            gaps="$gaps"$'\n'"$file"
+        else
+            gaps="$file"
+        fi
+    fi
+done <<< "$ADDED"
+
+if [ -n "$gaps" ]; then
+    echo "$gaps"
+fi
+exit 0

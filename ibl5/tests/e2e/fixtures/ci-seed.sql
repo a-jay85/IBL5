@@ -42,17 +42,20 @@ INSERT INTO nuke_config (
 -- IBL season bootstrap
 -- ============================================================
 
-INSERT INTO ibl_settings (name, value) VALUES
-  ('Current Season Phase',        'Free Agency'),
-  ('Current Season Ending Year',  '2026'),
-  ('Allow Trades',                'No'),
-  ('Allow Waiver Moves',          'No'),
-  ('Show Draft Link',             'Off'),
-  ('Free Agency Notifications',   'Off'),
-  ('Trivia Mode',                 'Off'),
-  ('ASG Voting',                  'No'),
-  ('EOY Voting',                  'No'),
-  ('Sim Length in Days',            '7')
+INSERT INTO ibl_settings (name, value, league) VALUES
+  ('Current Season Phase',        'Free Agency',  'ibl'),
+  ('Current Season Ending Year',  '2026',         'ibl'),
+  ('Allow Trades',                'No',           'ibl'),
+  ('Allow Waiver Moves',          'No',           'ibl'),
+  ('Show Draft Link',             'Off',          'ibl'),
+  ('Free Agency Notifications',   'Off',          'ibl'),
+  ('Trivia Mode',                 'Off',          'ibl'),
+  ('ASG Voting',                  'No',           'ibl'),
+  ('EOY Voting',                  'No',           'ibl'),
+  ('Sim Length in Days',           '7',            'ibl'),
+  ('Current Season Phase',        'Preseason',    'olympics'),
+  ('Current Season Ending Year',  '2026',         'olympics'),
+  ('Sim Length in Days',           '3',            'olympics')
 ON DUPLICATE KEY UPDATE value = VALUES(value);
 
 INSERT INTO ibl_sim_dates (sim, start_date, end_date) VALUES

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\LeagueControlPanel;
 
+use League\LeagueContext;
 use LeagueControlPanel\Contracts\LeagueControlPanelRepositoryInterface;
 use LeagueControlPanel\Contracts\LeagueControlPanelServiceInterface;
 use LeagueControlPanel\LeagueControlPanelService;
@@ -83,5 +84,39 @@ class LeagueControlPanelServiceTest extends TestCase
         $result = $service->getPanelData();
 
         $this->assertSame(2025, $result['seasonEndingYear']);
+    }
+
+    public function testGetPanelDataOlympicsReturnsDefaultsForIblOnlySettings(): void
+    {
+        $stub = $this->createStub(LeagueControlPanelRepositoryInterface::class);
+        $stub->method('getBulkSettings')->willReturn([
+            'Current Season Phase' => 'Regular Season',
+            'Current Season Ending Year' => '2026',
+        ]);
+        $stub->method('getSimLengthInDays')->willReturn(5);
+
+        $service = new LeagueControlPanelService($stub, LeagueContext::LEAGUE_OLYMPICS);
+        $result = $service->getPanelData();
+
+        $this->assertSame('No', $result['allowTrades']);
+        $this->assertSame('No', $result['allowWaivers']);
+        $this->assertSame('Off', $result['showDraftLink']);
+        $this->assertSame('Off', $result['freeAgencyNotifications']);
+        $this->assertSame('Off', $result['triviaMode']);
+    }
+
+    public function testGetPanelDataOlympicsReturnsFalseForHasFinalsMvp(): void
+    {
+        $stub = $this->createStub(LeagueControlPanelRepositoryInterface::class);
+        $stub->method('getBulkSettings')->willReturn([
+            'Current Season Ending Year' => '2026',
+        ]);
+        $stub->method('getSimLengthInDays')->willReturn(3);
+        $stub->method('hasFinalsMvp')->willReturn(true);
+
+        $service = new LeagueControlPanelService($stub, LeagueContext::LEAGUE_OLYMPICS);
+        $result = $service->getPanelData();
+
+        $this->assertFalse($result['hasFinalsMvp']);
     }
 }

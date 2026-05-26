@@ -131,7 +131,7 @@ if ($method === 'DELETE' && $action === 'reset-draft-order') {
     $stmt->execute();
     $cleared = $stmt->affected_rows;
     $stmt->close();
-    $db->query("UPDATE ibl_settings SET value = 'No' WHERE name = 'Draft Order Finalized'");
+    $db->query("UPDATE ibl_settings SET value = 'No' WHERE name = 'Draft Order Finalized' AND league = 'ibl'");
     echo json_encode(['cleared' => $cleared]);
     $db->close();
     exit;
@@ -420,8 +420,13 @@ if ($method === 'GET' && $action === 'get-allstar-ids') {
     exit;
 }
 
+$settingsLeague = is_string($_GET['league'] ?? null) ? $_GET['league'] : 'ibl';
+
 if ($method === 'GET') {
-    $result = $db->query('SELECT name, value FROM ibl_settings');
+    $stmt = $db->prepare('SELECT name, value FROM ibl_settings WHERE league = ?');
+    $stmt->bind_param('s', $settingsLeague);
+    $stmt->execute();
+    $result = $stmt->get_result();
     $settings = [];
     if ($result) {
         while ($row = $result->fetch_assoc()) {
@@ -429,6 +434,7 @@ if ($method === 'GET') {
         }
         $result->free();
     }
+    $stmt->close();
     echo json_encode($settings);
     $db->close();
     exit;
@@ -456,21 +462,21 @@ if ($method === 'POST') {
     $previous = [];
     $applied = [];
 
-    $selectStmt = $db->prepare('SELECT value FROM ibl_settings WHERE name = ?');
+    $selectStmt = $db->prepare('SELECT value FROM ibl_settings WHERE name = ? AND league = ?');
     $upsertStmt = $db->prepare(
-        'INSERT INTO ibl_settings (name, value) VALUES (?, ?) ON DUPLICATE KEY UPDATE value = VALUES(value)'
+        'INSERT INTO ibl_settings (name, value, league) VALUES (?, ?, ?) ON DUPLICATE KEY UPDATE value = VALUES(value)'
     );
 
     foreach ($input as $name => $value) {
         // Get current value
-        $selectStmt->bind_param('s', $name);
+        $selectStmt->bind_param('ss', $name, $settingsLeague);
         $selectStmt->execute();
         $result = $selectStmt->get_result();
         $row = $result->fetch_assoc();
         $previous[$name] = $row !== null ? $row['value'] : null;
 
         // Upsert new value
-        $upsertStmt->bind_param('ss', $name, $value);
+        $upsertStmt->bind_param('sss', $name, $value, $settingsLeague);
         $upsertStmt->execute();
 
         $applied[$name] = $value;

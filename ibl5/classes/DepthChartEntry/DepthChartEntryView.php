@@ -160,7 +160,7 @@ the earlier slot in that order claims them.</p>
 
         $thumbnail = \Player\PlayerImageHelper::renderThumbnail((int) $player['pid']);
 
-        echo '<tr data-pid="' . HtmlSanitizer::e($player['pid']) . '" data-pos="' . HtmlSanitizer::e($player['pos']) . '" data-jsb-production="' . HtmlSanitizer::e($jsbProduction) . '">'
+        echo '<tr data-pid="' . HtmlSanitizer::e($player['pid']) . '" data-pos="' . HtmlSanitizer::e($player['pos']) . '" data-jsb-production="' . HtmlSanitizer::e($jsbProduction) . '" data-quality-score="' . HtmlSanitizer::e($player['quality_score'] ?? 0.0) . '">'
             . '<td>' . HtmlSanitizer::e($player['pos']) . '</td>'
             . '<td class="ibl-player-cell">'
             . '<input type="hidden" name="pid' . HtmlSanitizer::e($depthCount) . '" value="' . HtmlSanitizer::e($player['pid']) . '">'
@@ -329,7 +329,7 @@ JAVASCRIPT;
 
         $imageUrl = \Player\PlayerImageHelper::getImageUrl((int) $player['pid']);
 
-        echo '<div class="dc-card" data-pid="' . HtmlSanitizer::e($player['pid']) . '" data-pos="' . HtmlSanitizer::e($player['pos']) . '" data-jsb-production="' . HtmlSanitizer::e($jsbProduction) . '">';
+        echo '<div class="dc-card" data-pid="' . HtmlSanitizer::e($player['pid']) . '" data-pos="' . HtmlSanitizer::e($player['pos']) . '" data-jsb-production="' . HtmlSanitizer::e($jsbProduction) . '" data-quality-score="' . HtmlSanitizer::e($player['quality_score'] ?? 0.0) . '">';
 
         // Header: photo + pos badge + name + active toggle
         echo '<div class="dc-card__header">';

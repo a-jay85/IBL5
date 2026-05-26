@@ -228,6 +228,42 @@ class DepthChartEntryViewTest extends TestCase
         $this->assertStringContainsString('data-jsb-production="0"', $output);
     }
 
+    public function testRenderPlayerRowEmitsQualityScoreAttribute(): void
+    {
+        $player = $this->buildTestPlayer();
+        $player['quality_score'] = 12.34;
+
+        ob_start();
+        $this->view->renderPlayerRow($player, 1);
+        $output = (string) ob_get_clean();
+
+        $this->assertStringContainsString('data-quality-score="12.34"', $output);
+    }
+
+    public function testRenderPlayerRowQualityScoreDefaultsToZero(): void
+    {
+        $player = $this->buildTestPlayer();
+        unset($player['quality_score']);
+
+        ob_start();
+        $this->view->renderPlayerRow($player, 1);
+        $output = (string) ob_get_clean();
+
+        $this->assertStringContainsString('data-quality-score="0"', $output);
+    }
+
+    public function testMobileCardEmitsQualityScoreAttribute(): void
+    {
+        $player = $this->buildTestPlayer();
+        $player['quality_score'] = 5.67;
+
+        ob_start();
+        $this->view->renderMobileView([$player], ['PG', 'SG', 'SF', 'PF', 'C']);
+        $output = (string) ob_get_clean();
+
+        $this->assertStringContainsString('data-quality-score="5.67"', $output);
+    }
+
     // =====================================================================
     // Existing renderFormFooter tests
     // =====================================================================

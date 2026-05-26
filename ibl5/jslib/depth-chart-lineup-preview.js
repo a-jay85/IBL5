@@ -59,10 +59,13 @@
  *       dc_minutes < 12 → score = dc_minutes (no bonus)
  *       dc values of -2, -1, and 0 are all identical (code only checks dc > 0).
  *
- *   The "duplicate-bonus" branch (dc > 0 AND already in another slot →
- *   dc_minutes + 96, line 91710) is dead code in the actual binary because
- *   greedy pool removal evicts already-taken players before the scoring step,
- *   so we mirror that here by skipping `taken[p.pid]` early.
+ *   DUPLICATE BONUS path (dc > 0 AND already selected as a starter in an
+ *   earlier pass → dc_minutes + 96, line 91710): JSB does NOT remove already-
+ *   taken players from the scoring step — they are added as candidates with
+ *   the reduced 96 bonus. This enriches the per-slot candidate buffer so the
+ *   backup ladder (sort1/sort2/sort3) sees them in the correct rank order.
+ *   The starter-pick itself skips taken players (greedy pool removal), so the
+ *   96-bonus path only affects backup ordering.
  *
  *   After collection, candidates are sorted in TWO separate passes (matching
  *   JSB's two bubble sorts at lines 91751-91788 and 91789-91863):
@@ -74,11 +77,13 @@
  *   dc > 0 candidate strictly dominates any dc = 0 candidate (min gap = 96).
  *   Within the same dc value, higher dc_minutes wins (tiebreak via pass 1).
  *
- *   The first candidate is selected, marked as taken, and removed from the
- *   pool for all later passes. If no candidates exist, the engine falls back
- *   to its preliminary (dVar58-based) selection — we don't have season stats
- *   client-side, so we approximate with roster-order default (matches the
- *   spec's reference Python pseudocode in the strategy guide).
+ *   The first UNTAKEN candidate is selected, marked as taken, and removed
+ *   from the pool for all later passes. Taken players remain in the list
+ *   (with BONUS_DUPLICATE) so the backup ladder sees them. If no untaken
+ *   candidates exist, the engine falls back to its preliminary (dVar58-based)
+ *   selection. The PHP-computed quality score (dVar58) is exposed via the
+ *   `data-quality-score` attribute, so we select the untaken active player
+ *   with the highest quality score.
  *
  * BACKUP SELECTION — JSB DISPATCHER LADDER MODEL:
  *
@@ -231,6 +236,7 @@
             // from ibl_plr stat columns. Used by benchScanFallback() to
             // produce a live JSB roster ordering as the GM edits dc_minutes.
             var jsbProduction = parseInt(row.getAttribute('data-jsb-production') || '0', 10);
+            var qualityScore = parseFloat(row.getAttribute('data-quality-score') || '0');
 
             // Read player name from the hidden Name input
             var nameInput = row.querySelector('input[name^="Name"]');
@@ -263,6 +269,7 @@
                 active: active,
                 dc: dcValues,
                 jsbProduction: jsbProduction,
+                qualityScore: qualityScore,
                 index: idx
             });
         }
@@ -293,6 +300,7 @@
     var DC_MIN_THRESHOLD = 12;   // dc_minutes threshold for the higher bonus tier
     var BONUS_DC_HIGH    = 192;  // dc > 0, dc < 5, dc_minutes >= 12
     var BONUS_DC_LOW     = 144;  // dc > 0, dc < 5, dc_minutes <  12
+    var BONUS_DUPLICATE  = 96;   // dc > 0, already taken as starter → dc_minutes + 96
     var BONUS_POS_HIGH   = 48;   // dc <= 0, position match, dc_minutes >= 12
     var BONUS_POS_LOW    = 0;    // dc <= 0, position match, dc_minutes <  12
 
@@ -325,13 +333,23 @@
 
             for (var i = 0; i < activePlayers.length; i++) {
                 var p = activePlayers[i];
-                // Greedy pool removal — mirrors JSB's check that the player is
-                // not already in another lineup slot. This makes the binary's
-                // "duplicate bonus 96" branch (line 91710) dead code, so we
-                // omit it here for the same reason.
-                if (taken[p.pid]) continue;
-
                 var dc = p.dc[fieldKey];
+
+                if (taken[p.pid]) {
+                    // Player already selected as a starter in an earlier pass.
+                    // JSB's duplicate-bonus path (line 91710): add them to the
+                    // candidate list with BONUS_DUPLICATE so the backup ladder
+                    // (sort1/sort2/sort3) includes them. The starter-pick loop
+                    // below skips taken players.
+                    if (dc > 0 && dc < 5) {
+                        candidates.push({
+                            player: p,
+                            score: p.dcMinutes + BONUS_DUPLICATE,
+                            dc: dc
+                        });
+                    }
+                    continue;
+                }
 
                 if (dc > 0 && dc < 5) {
                     // BRANCH A — BONUS path: any position, dc_minutes + bonus
@@ -345,8 +363,6 @@
                     });
                 } else if (dc >= 5) {
                     // BRANCH B — DC>=5 path: any position, no bonus.
-                    // Unreachable from valid form input (max dc = 3) but kept
-                    // for spec fidelity / legacy data / auto-fill at dc=6.
                     candidates.push({
                         player: p,
                         score: p.dcMinutes,
@@ -364,7 +380,6 @@
                         dc: 0
                     });
                 }
-                // Else: dc <= 0 with position mismatch — not eligible this pass.
             }
 
             // Two-pass sort, matching JSB's two separate bubble sorts at
@@ -392,19 +407,25 @@
             // the backup display to extract sort1, sort2, sort3, etc.
             slotCandidates.push(candidates);
 
+            // Pick the first UNTAKEN candidate. Taken players remain in the
+            // list (with BONUS_DUPLICATE) so the backup ladder sees them.
             var starter = null;
-            if (candidates.length > 0) {
-                starter = candidates[0].player;
-            } else {
-                // No viable candidate — JSB falls back to its preliminary
-                // (dVar58-based) selection. We don't have season stats client
-                // side, so we use the spec's reference fallback (roster-order
-                // default — first untaken active player). See the strategy
-                // guide's Python pseudocode in "Complete Lineup Selection".
+            for (var si = 0; si < candidates.length; si++) {
+                if (!taken[candidates[si].player.pid]) {
+                    starter = candidates[si].player;
+                    break;
+                }
+            }
+            if (!starter) {
+                // No untaken candidate — JSB falls back to its preliminary
+                // (dVar58-based) selection. Pick the untaken active player
+                // with the highest quality score.
+                var bestQuality = -Infinity;
                 for (var f = 0; f < activePlayers.length; f++) {
-                    if (!taken[activePlayers[f].pid]) {
+                    if (!taken[activePlayers[f].pid] &&
+                        activePlayers[f].qualityScore > bestQuality) {
+                        bestQuality = activePlayers[f].qualityScore;
                         starter = activePlayers[f];
-                        break;
                     }
                 }
             }
@@ -960,6 +981,8 @@
      * Update the debug score annotations in the form.
      * Shows the candidate score next to each role slot select, computed per
      * the same scoring branches as selectLineup(). Only renders on localhost.
+     * NOTE: does not show BONUS_DUPLICATE (96) because it runs per-cell
+     * without the cross-pass `taken` state.
      */
     function updateScoreDebug(players) {
         if (!isLocalhost()) return;

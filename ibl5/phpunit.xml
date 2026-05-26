@@ -262,7 +262,7 @@
         <testsuite name="Database Integration Tests">
             <directory>tests/DatabaseIntegration</directory>
         </testsuite>
-        <testsuite name="Cli Tests">
+        <testsuite name="Cli Module Tests">
             <directory>tests/Cli</directory>
         </testsuite>
         <testsuite name="PageLayout Module Tests">

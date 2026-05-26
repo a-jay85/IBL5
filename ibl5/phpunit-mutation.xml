@@ -267,6 +267,12 @@
         <testsuite name="Database Integration Tests">
             <directory>tests/DatabaseIntegration</directory>
         </testsuite>
+        <testsuite name="Security Tests">
+            <directory>tests/Security</directory>
+        </testsuite>
+        <testsuite name="PageLayout Module Tests">
+            <directory>tests/PageLayout</directory>
+        </testsuite>
     </testsuites>
     <!-- No <groups><exclude> — DB integration tests run for repository coverage -->
     <source>

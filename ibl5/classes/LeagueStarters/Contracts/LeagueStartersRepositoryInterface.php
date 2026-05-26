@@ -20,4 +20,11 @@ interface LeagueStartersRepositoryInterface
      * @return array<int, array<string, mixed>> Player rows with team data
      */
     public function getAllStartersWithTeamData(): array;
+
+    /**
+     * Fetch the raw placeholder player row (pid 4040404) with team data
+     *
+     * @return array<string, mixed>|null Player row or null if not found
+     */
+    public function getPlaceholderRow(): ?array;
 }

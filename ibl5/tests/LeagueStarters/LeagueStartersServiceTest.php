@@ -145,9 +145,9 @@ class LeagueStartersServiceTest extends TestCase
         $this->assertCount(1, $result['PF']);
         $this->assertCount(1, $result['C']);
 
-        $this->assertSame(101, $result['PG'][0]->playerID);
-        $this->assertSame(102, $result['SG'][0]->playerID);
-        $this->assertSame(105, $result['C'][0]->playerID);
+        $this->assertSame(101, $result['PG'][0]->getPlayerID());
+        $this->assertSame(102, $result['SG'][0]->getPlayerID());
+        $this->assertSame(105, $result['C'][0]->getPlayerID());
     }
 
     public function testMissingSlotsUsePlaceholder(): void
@@ -156,60 +156,56 @@ class LeagueStartersServiceTest extends TestCase
         $mockRepo->method('getAllStartersWithTeamData')->willReturn([
             $this->makeStarterRow(101, 1, 'PG', 'Test Team'),
         ]);
+        $mockRepo->method('getPlaceholderRow')->willReturn(
+            TestDataFactory::createPlayer(['pid' => 4040404, 'teamid' => 0, 'name' => 'Placeholder', 'loyalty' => 0, 'playing_time' => 0, 'winner' => 0, 'tradition' => 0, 'security' => 0])
+        );
 
         $this->mockDb->onQuery('SELECT[\s\S]*ibl_team_info[\s\S]*teamid BETWEEN', [
             $this->makeTeamRow(1, 'Test Team', 'Test City'),
         ]);
 
-        $this->mockDb->onQuery('SELECT[\s\S]*ibl_plr[\s\S]*pid', [
-            TestDataFactory::createPlayer(['pid' => 4040404, 'teamid' => 0, 'name' => 'Placeholder', 'loyalty' => 0, 'playing_time' => 0, 'winner' => 0, 'tradition' => 0, 'security' => 0]),
-        ]);
-
         $service = new LeagueStartersService($this->mockMysqliDb, $this->mockLeague, $mockRepo);
         $result = $service->getAllStartersByPosition();
 
-        $this->assertSame(101, $result['PG'][0]->playerID);
-        $this->assertSame(4040404, $result['SG'][0]->playerID);
-        $this->assertSame(4040404, $result['SF'][0]->playerID);
-        $this->assertSame(4040404, $result['PF'][0]->playerID);
-        $this->assertSame(4040404, $result['C'][0]->playerID);
+        $this->assertSame(101, $result['PG'][0]->getPlayerID());
+        $this->assertSame(4040404, $result['SG'][0]->getPlayerID());
+        $this->assertSame(4040404, $result['SF'][0]->getPlayerID());
+        $this->assertSame(4040404, $result['PF'][0]->getPlayerID());
+        $this->assertSame(4040404, $result['C'][0]->getPlayerID());
     }
 
     public function testPlaceholderSetsTeamProperties(): void
     {
         $mockRepo = $this->createStub(LeagueStartersRepositoryInterface::class);
         $mockRepo->method('getAllStartersWithTeamData')->willReturn([]);
+        $mockRepo->method('getPlaceholderRow')->willReturn(
+            TestDataFactory::createPlayer(['pid' => 4040404, 'teamid' => 0, 'name' => 'Placeholder', 'loyalty' => 0, 'playing_time' => 0, 'winner' => 0, 'tradition' => 0, 'security' => 0])
+        );
 
         $this->mockDb->onQuery('SELECT[\s\S]*ibl_team_info[\s\S]*teamid BETWEEN', [
             $this->makeTeamRow(1, 'Test Team', 'Test City'),
-        ]);
-
-        $this->mockDb->onQuery('SELECT[\s\S]*ibl_plr[\s\S]*pid', [
-            TestDataFactory::createPlayer(['pid' => 4040404, 'teamid' => 0, 'name' => 'Placeholder', 'loyalty' => 0, 'playing_time' => 0, 'winner' => 0, 'tradition' => 0, 'security' => 0]),
         ]);
 
         $service = new LeagueStartersService($this->mockMysqliDb, $this->mockLeague, $mockRepo);
         $result = $service->getAllStartersByPosition();
 
         $pgPlayer = $result['PG'][0];
-        $this->assertSame('Test Team', $pgPlayer->teamName);
-        $this->assertSame('Test City', $pgPlayer->teamCity);
-        $this->assertSame('#000000', $pgPlayer->teamColor1);
-        $this->assertSame('#FFFFFF', $pgPlayer->teamColor2);
+        $this->assertSame('Test Team', $pgPlayer->getTeamName());
+        $this->assertSame('#000000', $pgPlayer->getTeamColor1());
+        $this->assertSame('#FFFFFF', $pgPlayer->getTeamColor2());
     }
 
     public function testPlaceholderLoadedOnlyOnce(): void
     {
         $mockRepo = $this->createStub(LeagueStartersRepositoryInterface::class);
         $mockRepo->method('getAllStartersWithTeamData')->willReturn([]);
+        $mockRepo->method('getPlaceholderRow')->willReturn(
+            TestDataFactory::createPlayer(['pid' => 4040404, 'teamid' => 0, 'name' => 'Placeholder', 'loyalty' => 0, 'playing_time' => 0, 'winner' => 0, 'tradition' => 0, 'security' => 0])
+        );
 
         $this->mockDb->onQuery('SELECT[\s\S]*ibl_team_info[\s\S]*teamid BETWEEN', [
             $this->makeTeamRow(1, 'Team A', 'City A'),
             $this->makeTeamRow(2, 'Team B', 'City B'),
-        ]);
-
-        $this->mockDb->onQuery('SELECT[\s\S]*ibl_plr[\s\S]*pid', [
-            TestDataFactory::createPlayer(['pid' => 4040404, 'teamid' => 0, 'name' => 'Placeholder', 'loyalty' => 0, 'playing_time' => 0, 'winner' => 0, 'tradition' => 0, 'security' => 0]),
         ]);
 
         $service = new LeagueStartersService($this->mockMysqliDb, $this->mockLeague, $mockRepo);
@@ -218,8 +214,8 @@ class LeagueStartersServiceTest extends TestCase
         $this->assertCount(2, $result['PG']);
         $this->assertCount(2, $result['SG']);
 
-        $this->assertSame('Team A', $result['PG'][0]->teamName);
-        $this->assertSame('Team B', $result['PG'][1]->teamName);
+        $this->assertSame('Team A', $result['PG'][0]->getTeamName());
+        $this->assertSame('Team B', $result['PG'][1]->getTeamName());
         $this->assertNotSame($result['PG'][0], $result['PG'][1]);
     }
 

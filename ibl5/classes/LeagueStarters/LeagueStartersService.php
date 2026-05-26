@@ -24,7 +24,8 @@ class LeagueStartersService implements LeagueStartersServiceInterface
     private \mysqli $db;
     private League $league;
     private LeagueStartersRepositoryInterface $repository;
-    private ?Player $placeholderPlayer = null;
+    /** @var array<string, mixed>|null Cached raw row for the placeholder player */
+    private ?array $placeholderRow = null;
 
     /**
      * @param \mysqli $db Database connection
@@ -78,10 +79,6 @@ class LeagueStartersService implements LeagueStartersServiceInterface
             if (!is_int($teamid)) {
                 continue;
             }
-            $teamname = is_string($row['teamname']) ? $row['teamname'] : '';
-            $color1 = is_string($row['color1']) ? $row['color1'] : '';
-            $color2 = is_string($row['color2']) ? $row['color2'] : '';
-
             foreach ($depthColumns as $position => $column) {
                 if (($row[$column] ?? 0) !== 1) {
                     continue;
@@ -91,9 +88,6 @@ class LeagueStartersService implements LeagueStartersServiceInterface
                 }
                 /** @var PlayerRow $row */
                 $player = Player::withPlrRow($this->db, $row);
-                $player->teamName = $teamname;
-                $player->teamColor1 = $color1;
-                $player->teamColor2 = $color2;
                 $starterMap[$teamid][$position] = $player;
             }
         }
@@ -105,13 +99,8 @@ class LeagueStartersService implements LeagueStartersServiceInterface
             foreach ($positions as $position) {
                 if (isset($starterMap[$team->teamid][$position])) {
                     $player = $starterMap[$team->teamid][$position];
-                    $player->teamCity = $team->city;
                 } else {
-                    $player = clone $this->getOrLoadPlaceholder();
-                    $player->teamName = $team->name;
-                    $player->teamCity = $team->city;
-                    $player->teamColor1 = $team->color1;
-                    $player->teamColor2 = $team->color2;
+                    $player = $this->buildPlaceholderForTeam($team);
                 }
                 $startersByPosition[$position][] = $player;
             }
@@ -120,11 +109,17 @@ class LeagueStartersService implements LeagueStartersServiceInterface
         return $startersByPosition;
     }
 
-    private function getOrLoadPlaceholder(): Player
+    private function buildPlaceholderForTeam(Team $team): Player
     {
-        if ($this->placeholderPlayer === null) {
-            $this->placeholderPlayer = Player::withPlayerID($this->db, 4040404);
+        if ($this->placeholderRow === null) {
+            $this->placeholderRow = $this->repository->getPlaceholderRow() ?? [];
         }
-        return $this->placeholderPlayer;
+        $row = $this->placeholderRow;
+        $row['teamid'] = $team->teamid;
+        $row['teamname'] = $team->name;
+        $row['color1'] = $team->color1;
+        $row['color2'] = $team->color2;
+        /** @var PlayerRow $row */
+        return Player::withPlrRow($this->db, $row);
     }
 }

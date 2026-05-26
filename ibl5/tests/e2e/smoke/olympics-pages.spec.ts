@@ -11,8 +11,10 @@ test.describe('Olympics page smoke tests', () => {
   test('standings page loads in Olympics context', async ({ page }) => {
     await page.goto('modules.php?name=Standings&league=olympics');
     await assertNoPhpErrors(page, 'on modules.php?name=Standings&league=olympics');
+    await expect(page.locator('.ibl-title')).toContainText(/Olympics Standings/i);
     const body = await page.locator('body').textContent();
-    expect(body?.length).toBeGreaterThan(100);
+    expect(body ?? '').not.toContain('Eastern Conference');
+    expect(body ?? '').not.toContain('Western Conference');
   });
 
   test('team page loads in Olympics context', async ({ page }) => {

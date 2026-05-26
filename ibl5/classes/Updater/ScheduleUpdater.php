@@ -74,13 +74,22 @@ class ScheduleUpdater extends \BaseMysqliRepository {
     private function preloadTeamNameMap(): void
     {
         $teamInfoTable = $this->resolveTable('ibl_team_info');
+        $isOlympics = $this->leagueContext !== null && $this->leagueContext->isOlympics();
 
-        /** @var list<array{team_name: string, teamid: int}> $rows */
-        $rows = $this->fetchAll(
-            "SELECT team_name, teamid FROM {$teamInfoTable} WHERE teamid BETWEEN 1 AND ?",
-            "i",
-            League::MAX_REAL_TEAMID
-        );
+        if ($isOlympics) {
+            /** @var list<array{team_name: string, teamid: int}> $rows */
+            $rows = $this->fetchAll(
+                "SELECT team_name, teamid FROM {$teamInfoTable}",
+                "",
+            );
+        } else {
+            /** @var list<array{team_name: string, teamid: int}> $rows */
+            $rows = $this->fetchAll(
+                "SELECT team_name, teamid FROM {$teamInfoTable} WHERE teamid BETWEEN 1 AND ?",
+                "i",
+                League::MAX_REAL_TEAMID,
+            );
+        }
 
         foreach ($rows as $row) {
             $this->teamIdToNameMap[$row['teamid']] = $row['team_name'];

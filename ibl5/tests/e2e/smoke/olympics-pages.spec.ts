@@ -11,8 +11,11 @@ test.describe('Olympics page smoke tests', () => {
   test('standings page loads in Olympics context', async ({ page }) => {
     await page.goto('modules.php?name=Standings&league=olympics');
     await assertNoPhpErrors(page, 'on modules.php?name=Standings&league=olympics');
-    const body = await page.locator('body').textContent();
-    expect(body?.length).toBeGreaterThan(100);
+    await expect(page.locator('.ibl-title')).toContainText(/Olympics Standings/i);
+    await expect(page.locator('.ibl-data-table')).toBeVisible();
+    const tableText = await page.locator('.ibl-data-table').textContent();
+    expect(tableText ?? '').not.toContain('Eastern Conference');
+    expect(tableText ?? '').not.toContain('Western Conference');
   });
 
   test('team page loads in Olympics context', async ({ page }) => {

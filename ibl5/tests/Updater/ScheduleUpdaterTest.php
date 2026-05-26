@@ -21,7 +21,7 @@ class ScheduleUpdaterTest extends TestCase
         $this->mockDb = new MockDatabase();
     }
 
-    private function createUpdater(string $phase = 'Regular Season', int $endingYear = 2025): TestableScheduleUpdater
+    private function createUpdater(string $phase = 'Regular Season', int $endingYear = 2025, bool $olympics = false): TestableScheduleUpdater
     {
         $season = $this->createStub(Season::class);
         $season->endingYear = $endingYear;
@@ -29,7 +29,13 @@ class ScheduleUpdaterTest extends TestCase
         $season->phase = $phase;
 
         $leagueContext = $this->createStub(LeagueContext::class);
-        $leagueContext->method('getCurrentLeague')->willReturn('IBL');
+        $leagueContext->method('getCurrentLeague')->willReturn($olympics ? 'olympics' : 'IBL');
+        $leagueContext->method('isOlympics')->willReturn($olympics);
+        $leagueContext->method('getTableName')->willReturnCallback(
+            static fn (string $table): string => $olympics
+                ? str_replace('ibl_', 'ibl_olympics_', $table)
+                : $table,
+        );
 
         return new TestableScheduleUpdater($this->mockDb, $season, $leagueContext);
     }
@@ -76,6 +82,37 @@ class ScheduleUpdaterTest extends TestCase
         $this->assertSame(15, $result['day']);
         $this->assertSame(2025, $result['year']);
     }
+
+    public function testOlympicsPreloadLoadsAllTeamsWithoutFilter(): void
+    {
+        $this->mockDb->setMockData([
+            ['team_name' => 'Eagles', 'teamid' => 1],
+            ['team_name' => 'Maple', 'teamid' => 2],
+            ['team_name' => 'Filler29', 'teamid' => 29],
+        ]);
+
+        $updater = $this->createUpdater(olympics: true);
+        $updater->exposedPreloadTeamNameMap();
+
+        $map = $updater->getTeamNameToIdMap();
+        $this->assertCount(3, $map);
+        $this->assertSame(29, $map['Filler29']);
+    }
+
+    public function testIblPreloadFiltersToMaxRealTeamId(): void
+    {
+        $this->mockDb->setMockData([
+            ['team_name' => 'Celtics', 'teamid' => 1],
+            ['team_name' => 'Lakers', 'teamid' => 2],
+        ]);
+
+        $updater = $this->createUpdater(olympics: false);
+        $updater->exposedPreloadTeamNameMap();
+
+        $queries = $this->mockDb->getExecutedQueries();
+        $matched = array_filter($queries, static fn (string $q): bool => str_contains($q, 'BETWEEN 1 AND'));
+        $this->assertNotEmpty($matched);
+    }
 }
 
 /**
@@ -89,5 +126,19 @@ class TestableScheduleUpdater extends \Updater\ScheduleUpdater
     public function exposedExtractDate(string $rawDate): ?array
     {
         return $this->extractDate($rawDate);
+    }
+
+    public function exposedPreloadTeamNameMap(): void
+    {
+        $reflection = new \ReflectionMethod(parent::class, 'preloadTeamNameMap');
+        $reflection->invoke($this);
+    }
+
+    /** @return array<string, int> */
+    public function getTeamNameToIdMap(): array
+    {
+        $prop = new \ReflectionProperty(parent::class, 'teamNameToIdMap');
+        /** @var array<string, int> */
+        return $prop->getValue($this);
     }
 }

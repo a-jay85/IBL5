@@ -13,22 +13,6 @@ class PlayerFacadePropertyValuesTest extends DatabaseTestCase
 {
     private const int TEST_PID = 200_000_001;
 
-    private const array ORPHAN_PROPERTIES = [
-        'plr',
-        'teamCity',
-    ];
-
-    private const array UNSYNCED_PROPERTIES = [
-        'teamColor1',
-        'teamColor2',
-    ];
-
-    private const array CALCULATED_PROPERTIES = [
-        'currentSeasonSalary',
-        'decoratedName',
-        'nameStatusClass',
-    ];
-
     protected function setUp(): void
     {
         parent::setUp();
@@ -53,20 +37,20 @@ class PlayerFacadePropertyValuesTest extends DatabaseTestCase
     {
         $player = Player::withPlayerID($this->db, self::TEST_PID);
 
-        self::assertSame(self::TEST_PID, $player->playerID);
-        self::assertSame('Facade Test Player', $player->name);
-        self::assertSame(27, $player->age);
-        self::assertSame(1, $player->teamid);
-        self::assertSame('PG', $player->position);
-        self::assertSame(5, $player->yearsOfExperience);
-        self::assertSame(3, $player->birdYears);
-        self::assertSame(1, $player->contractCurrentYear);
-        self::assertSame(3, $player->contractTotalYears);
-        self::assertSame(1500, $player->contractYear1Salary);
-        self::assertSame(1600, $player->contractYear2Salary);
-        self::assertSame(0, $player->isRetired);
-        self::assertSame(1, $player->ordinal);
-        self::assertSame(0, $player->timeDroppedOnWaivers);
+        self::assertSame(self::TEST_PID, $player->getPlayerID());
+        self::assertSame('Facade Test Player', $player->getName());
+        self::assertSame(27, $player->getAge());
+        self::assertSame(1, $player->getTeamid());
+        self::assertSame('PG', $player->getPosition());
+        self::assertSame(5, $player->getYearsOfExperience());
+        self::assertSame(3, $player->getBirdYears());
+        self::assertSame(1, $player->getContractCurrentYear());
+        self::assertSame(3, $player->getContractTotalYears());
+        self::assertSame(1500, $player->getContractYear1Salary());
+        self::assertSame(1600, $player->getContractYear2Salary());
+        self::assertSame(0, $player->getIsRetired());
+        self::assertSame(1, $player->getOrdinal());
+        self::assertSame(0, $player->getTimeDroppedOnWaivers());
     }
 
     public function testWithPlrRowPopulatesAllSyncedProperties(): void
@@ -74,11 +58,11 @@ class PlayerFacadePropertyValuesTest extends DatabaseTestCase
         $row = $this->loadPlrRow(self::TEST_PID);
         $player = Player::withPlrRow($this->db, $row);
 
-        self::assertSame(self::TEST_PID, $player->playerID);
-        self::assertSame('Facade Test Player', $player->name);
-        self::assertSame(27, $player->age);
-        self::assertSame(1, $player->teamid);
-        self::assertSame('PG', $player->position);
+        self::assertSame(self::TEST_PID, $player->getPlayerID());
+        self::assertSame('Facade Test Player', $player->getName());
+        self::assertSame(27, $player->getAge());
+        self::assertSame(1, $player->getTeamid());
+        self::assertSame('PG', $player->getPosition());
     }
 
     public function testWithHistoricalPlrRowPopulatesExpectedSubset(): void
@@ -92,59 +76,11 @@ class PlayerFacadePropertyValuesTest extends DatabaseTestCase
         $histRow = $this->loadHistRow(self::TEST_PID, 2025);
         $player = Player::withHistoricalPlrRow($this->db, $histRow);
 
-        self::assertSame(self::TEST_PID, $player->playerID);
-        self::assertSame('Facade Test Player', $player->name);
-        self::assertSame(2025, $player->historicalYear);
-        self::assertSame('Metros', $player->teamName);
-        self::assertSame(1500, $player->salaryJSB);
-    }
-
-    public function testOrphanPropertiesAreAlwaysNull(): void
-    {
-        $player = Player::withPlayerID($this->db, self::TEST_PID);
-
-        foreach (self::ORPHAN_PROPERTIES as $prop) {
-            self::assertNull(
-                $player->$prop,
-                "Orphan property \$player->$prop should be null (never synced from PlayerData)"
-            );
-        }
-    }
-
-    public function testGetterParityWithProperties(): void
-    {
-        $player = Player::withPlayerID($this->db, self::TEST_PID);
-        $skip = array_merge(self::ORPHAN_PROPERTIES, self::UNSYNCED_PROPERTIES, self::CALCULATED_PROPERTIES);
-
-        $reflection = new \ReflectionClass($player);
-        $publicProps = $reflection->getProperties(\ReflectionProperty::IS_PUBLIC);
-
-        foreach ($publicProps as $prop) {
-            $propName = $prop->getName();
-            if (in_array($propName, $skip, true)) {
-                continue;
-            }
-
-            $getterName = 'get' . ucfirst($propName);
-            self::assertTrue(
-                method_exists($player, $getterName),
-                "Missing getter: Player::$getterName() for property \$$propName"
-            );
-            self::assertSame(
-                $player->$propName,
-                $player->$getterName(),
-                "Getter parity failed: \$player->$propName !== \$player->$getterName()"
-            );
-        }
-    }
-
-    public function testGetterParityForCalculatedProperties(): void
-    {
-        $player = Player::withPlayerID($this->db, self::TEST_PID);
-
-        self::assertSame($player->currentSeasonSalary, $player->getCurrentSeasonSalary());
-        self::assertSame($player->decoratedName, $player->getDecoratedName());
-        self::assertSame($player->nameStatusClass, $player->getNameStatusClass());
+        self::assertSame(self::TEST_PID, $player->getPlayerID());
+        self::assertSame('Facade Test Player', $player->getName());
+        self::assertSame(2025, $player->getHistoricalYear());
+        self::assertSame('Metros', $player->getTeamName());
+        self::assertSame(1500, $player->getSalaryJSB());
     }
 
     public function testGetterParityForOrphanProperties(): void
@@ -155,15 +91,21 @@ class PlayerFacadePropertyValuesTest extends DatabaseTestCase
         self::assertNull($player->getTeamCity());
     }
 
-    public function testUnsyncedPropertiesGetterReturnsPlayerDataValue(): void
+    public function testCalculatedGettersReturnValues(): void
     {
         $player = Player::withPlayerID($this->db, self::TEST_PID);
 
-        self::assertNull($player->teamColor1, 'Property is always null (never synced)');
-        self::assertNotNull($player->getTeamColor1(), 'Getter reads from PlayerData (populated by repo)');
+        self::assertNotNull($player->getCurrentSeasonSalary());
+        self::assertNotNull($player->getDecoratedName());
+        self::assertNotNull($player->getNameStatusClass());
+    }
 
-        self::assertNull($player->teamColor2, 'Property is always null (never synced)');
-        self::assertNotNull($player->getTeamColor2(), 'Getter reads from PlayerData (populated by repo)');
+    public function testColorGettersReadFromPlayerData(): void
+    {
+        $player = Player::withPlayerID($this->db, self::TEST_PID);
+
+        self::assertNotNull($player->getTeamColor1(), 'getTeamColor1() reads from PlayerData (populated by repo)');
+        self::assertNotNull($player->getTeamColor2(), 'getTeamColor2() reads from PlayerData (populated by repo)');
     }
 
     /**

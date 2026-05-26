@@ -86,9 +86,9 @@ class ScheduleUpdaterTest extends TestCase
     public function testOlympicsPreloadLoadsAllTeamsWithoutFilter(): void
     {
         $this->mockDb->setMockData([
-            ['team_name' => 'Eagles', 'teamid' => 1],
-            ['team_name' => 'Maple', 'teamid' => 2],
-            ['team_name' => 'Filler29', 'teamid' => 29],
+            ['team_name' => 'Eagles', 'teamid' => 1, 'is_real_team' => 1],
+            ['team_name' => 'Maple', 'teamid' => 2, 'is_real_team' => 1],
+            ['team_name' => 'Filler29', 'teamid' => 29, 'is_real_team' => 0],
         ]);
 
         $updater = $this->createUpdater(olympics: true);

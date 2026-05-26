@@ -339,7 +339,7 @@ Launch a **single Sonnet agent** with this prompt (substitute the extracted step
 Using the Sonnet agent's classifications:
 
 1. **CLI-executable:** Run directly in the worktree. Fix failures, commit.
-2. **PHPUnit/API-test/E2E-replaceable:** Write the appropriate test type. Fix until green; reclassify as truly manual after 2 failed attempts.
+2. **PHPUnit/API-test/E2E-replaceable:** Write the appropriate test type. Fix until green. Do not reclassify as truly manual — if the test is hard to write, that's a reason to spend more effort, not less. After 3 failed attempts, keep the item in the PR description as-is (not reclassified) and note what was tried.
 3. **Truly manual:** Keep in PR description.
 4. **Update PR:** Remove verified/automated steps. If none remain, replace section with `No manual testing needed — all changes are covered by automated tests.` Apply: `gh pr edit --body "<updated>"`
 5. **Checkpoint:** If any new tests were written or files modified, commit and push before continuing to Phase 7.
@@ -397,7 +397,7 @@ PR_STATE=$(gh pr view <PR_NUMBER> --json state --jq '.state')
 
 ### Path A: Main-stack rebuild (when `$PR_STATE` = `MERGED`)
 
-Phase 8 merged the PR, deleted the branch, and checked out master. The worktree branch no longer exists — rebuild the main Docker stack with fresh prod data.
+The PR has been merged (either auto-merge fired during CI watch, or it was already merged before post-plan started). Run `cd <repo-root> && git checkout master && git pull origin master` to sync local, then rebuild the main Docker stack with fresh prod data.
 
 1. **Update vendor** (may be stale after merge):
    ```bash

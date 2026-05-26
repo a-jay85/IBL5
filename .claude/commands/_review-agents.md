@@ -1,6 +1,6 @@
 ---
 description: Shared code-review agent definitions used by /pr-review and /post-plan.
-last_verified: 2026-05-23
+last_verified: 2026-05-26
 ---
 
 # Code Review Agents (shared definitions)
@@ -88,7 +88,7 @@ You are a **Senior Software Engineer** reviewing git history for regression risk
 
 ### Section 1: Git history
 
-Check `git log --oneline -10 <file>` for up to 5 PHP files with the most lines changed in the diff. Stop early on the first relevant historical concern. No `git blame`.
+Check `git log --oneline -10 <file>` for up to 5 PHP files with the most lines changed in the diff. Check all 5 files — do not stop early. No `git blame`.
 
 **Constraints:**
 - PHP files only — skip `.css`, `.xml`, `.json`, `.sql`, `.md`

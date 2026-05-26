@@ -600,6 +600,34 @@ class StandingsRepository extends \BaseMysqliRepository implements StandingsRepo
     }
 
     /**
+     * @see StandingsRepositoryInterface::fetchScheduledGameCountsPerTeam()
+     *
+     * @return array<int, int>
+     */
+    public function fetchScheduledGameCountsPerTeam(string $startDate, string $endDate): array
+    {
+        /** @var list<array{teamid: int, game_count: int}> $rows */
+        $rows = $this->fetchAll(
+            "SELECT teamid, COUNT(*) AS game_count FROM (
+                SELECT visitor_teamid AS teamid FROM {$this->scheduleTable}
+                WHERE game_date BETWEEN ? AND ?
+                UNION ALL
+                SELECT home_teamid AS teamid FROM {$this->scheduleTable}
+                WHERE game_date BETWEEN ? AND ?
+            ) AS all_games
+            GROUP BY teamid",
+            "ssss",
+            $startDate, $endDate, $startDate, $endDate
+        );
+
+        $result = [];
+        foreach ($rows as $row) {
+            $result[$row['teamid']] = $row['game_count'];
+        }
+        return $result;
+    }
+
+    /**
      * Calculate Pythagorean stats from raw shooting data
      *
      * @param array{off_fgm: int, off_ftm: int, off_tgm: int, def_fgm: int, def_ftm: int, def_tgm: int} $stats

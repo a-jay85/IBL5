@@ -18,12 +18,14 @@ class SeasonQueryRepository extends \BaseMysqliRepository implements SeasonQuery
 {
     private string $boxScoresTable;
     private string $scheduleTable;
+    private string $league;
 
     public function __construct(\mysqli $db, ?LeagueContext $leagueContext = null)
     {
         parent::__construct($db, $leagueContext);
         $this->boxScoresTable = $this->resolveTable('ibl_box_scores');
         $this->scheduleTable = $this->resolveTable('ibl_schedule');
+        $this->league = $leagueContext !== null ? $leagueContext->getCurrentLeague() : LeagueContext::LEAGUE_IBL;
     }
 
     /**
@@ -36,9 +38,11 @@ class SeasonQueryRepository extends \BaseMysqliRepository implements SeasonQuery
     {
         /** @var list<array{name: string, value: string}> $rows */
         $rows = $this->fetchAllInList(
-            "SELECT name, value FROM `ibl_settings` WHERE name IN ({IN})",
+            "SELECT name, value FROM `ibl_settings` WHERE league = ? AND name IN ({IN})",
             's',
-            $names
+            $names,
+            's',
+            $this->league
         );
 
         /** @var array<string, string> $map */
@@ -59,9 +63,10 @@ class SeasonQueryRepository extends \BaseMysqliRepository implements SeasonQuery
     {
         /** @var array{value: string}|null $result */
         $result = $this->fetchOne(
-            "SELECT value FROM `ibl_settings` WHERE name = ? LIMIT 1",
-            "s",
-            "Current Season Phase"
+            "SELECT value FROM `ibl_settings` WHERE name = ? AND league = ? LIMIT 1",
+            "ss",
+            "Current Season Phase",
+            $this->league
         );
 
         return $result['value'] ?? '';
@@ -76,9 +81,10 @@ class SeasonQueryRepository extends \BaseMysqliRepository implements SeasonQuery
     {
         /** @var array{value: string}|null $result */
         $result = $this->fetchOne(
-            "SELECT value FROM `ibl_settings` WHERE name = ? LIMIT 1",
-            "s",
-            "Current Season Ending Year"
+            "SELECT value FROM `ibl_settings` WHERE name = ? AND league = ? LIMIT 1",
+            "ss",
+            "Current Season Ending Year",
+            $this->league
         );
 
         return $result['value'] ?? '';
@@ -184,9 +190,10 @@ class SeasonQueryRepository extends \BaseMysqliRepository implements SeasonQuery
     {
         /** @var array{value: string}|null $result */
         $result = $this->fetchOne(
-            "SELECT value FROM `ibl_settings` WHERE name = ? LIMIT 1",
-            "s",
-            "Allow Trades"
+            "SELECT value FROM `ibl_settings` WHERE name = ? AND league = ? LIMIT 1",
+            "ss",
+            "Allow Trades",
+            $this->league
         );
 
         return $result['value'] ?? '';
@@ -201,9 +208,10 @@ class SeasonQueryRepository extends \BaseMysqliRepository implements SeasonQuery
     {
         /** @var array{value: string}|null $result */
         $result = $this->fetchOne(
-            "SELECT value FROM `ibl_settings` WHERE name = ? LIMIT 1",
-            "s",
-            "Allow Waiver Moves"
+            "SELECT value FROM `ibl_settings` WHERE name = ? AND league = ? LIMIT 1",
+            "ss",
+            "Allow Waiver Moves",
+            $this->league
         );
 
         return $result['value'] ?? '';
@@ -218,9 +226,10 @@ class SeasonQueryRepository extends \BaseMysqliRepository implements SeasonQuery
     {
         /** @var array{value: string}|null $result */
         $result = $this->fetchOne(
-            "SELECT value FROM `ibl_settings` WHERE name = ? LIMIT 1",
-            "s",
-            "Free Agency Notifications"
+            "SELECT value FROM `ibl_settings` WHERE name = ? AND league = ? LIMIT 1",
+            "ss",
+            "Free Agency Notifications",
+            $this->league
         );
 
         return $result['value'] ?? '';

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace LeagueControlPanel;
 
+use League\LeagueContext;
 use LeagueControlPanel\Contracts\AwardGenerationServiceInterface;
 use LeagueControlPanel\Contracts\LeagueControlPanelProcessorInterface;
 use LeagueControlPanel\Contracts\LeagueControlPanelRepositoryInterface;
@@ -29,15 +30,20 @@ class LeagueControlPanelProcessor implements LeagueControlPanelProcessorInterfac
     private const SIM_LENGTH_MIN = 1;
     private const SIM_LENGTH_MAX = 180;
 
+    private const OLYMPICS_ALLOWED_ACTIONS = ['set_sim_length', 'set_season_phase'];
+
     private LeagueControlPanelRepositoryInterface $repository;
     private AwardGenerationServiceInterface $awardGenerationService;
+    private string $league;
 
     public function __construct(
         LeagueControlPanelRepositoryInterface $repository,
         AwardGenerationServiceInterface $awardGenerationService,
+        string $league = LeagueContext::LEAGUE_IBL,
     ) {
         $this->repository = $repository;
         $this->awardGenerationService = $awardGenerationService;
+        $this->league = $league;
     }
 
     /**
@@ -45,6 +51,10 @@ class LeagueControlPanelProcessor implements LeagueControlPanelProcessorInterfac
      */
     public function dispatch(string $action, array $postData): array
     {
+        if ($this->league !== LeagueContext::LEAGUE_IBL && !in_array($action, self::OLYMPICS_ALLOWED_ACTIONS, true)) {
+            return ['success' => false, 'message' => 'Action not available for this league: ' . $action];
+        }
+
         $result = match ($action) {
             'set_season_phase' => $this->setSeasonPhase($postData),
             'set_sim_length' => $this->setSimLength($postData),

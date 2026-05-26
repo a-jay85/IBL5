@@ -53,9 +53,12 @@ class League extends BaseMysqliRepository
      * @param \mysqli $db Active mysqli connection
      * @throws \RuntimeException If connection is invalid (error code 1002)
      */
-    public function __construct(\mysqli $db)
+    private string $league;
+
+    public function __construct(\mysqli $db, ?LeagueContext $leagueContext = null)
     {
-        parent::__construct($db);
+        parent::__construct($db, $leagueContext);
+        $this->league = $leagueContext !== null ? $leagueContext->getCurrentLeague() : LeagueContext::LEAGUE_IBL;
     }
 
     /**
@@ -79,9 +82,10 @@ class League extends BaseMysqliRepository
     {
         /** @var array{value: string}|null $result */
         $result = $this->fetchOne(
-            "SELECT value FROM `ibl_settings` WHERE name = ? LIMIT 1",
-            "s",
-            "Sim Length in Days"
+            "SELECT value FROM `ibl_settings` WHERE name = ? AND league = ? LIMIT 1",
+            "ss",
+            "Sim Length in Days",
+            $this->league
         );
 
         if ($result === null) {

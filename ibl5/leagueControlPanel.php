@@ -17,12 +17,13 @@ if (!is_admin()) {
 }
 
 // Wire dependencies
-$repository = new LeagueControlPanel\LeagueControlPanelRepository($mysqli_db);
-$service    = new LeagueControlPanel\LeagueControlPanelService($repository);
+$currentLeague = $leagueContext->getCurrentLeague();
+$repository = new LeagueControlPanel\LeagueControlPanelRepository($mysqli_db, $leagueContext);
+$service    = new LeagueControlPanel\LeagueControlPanelService($repository, $currentLeague);
 $votingRepository     = new Voting\VotingRepository($mysqli_db);
 $votingResultsService = new Voting\VotingResultsService($votingRepository);
 $awardGenerationService = new LeagueControlPanel\AwardGenerationService($repository, $votingResultsService);
-$processor  = new LeagueControlPanel\LeagueControlPanelProcessor($repository, $awardGenerationService);
+$processor  = new LeagueControlPanel\LeagueControlPanelProcessor($repository, $awardGenerationService, $currentLeague);
 $view       = new LeagueControlPanel\LeagueControlPanelView();
 
 // POST → Processor → PRG redirect
@@ -36,7 +37,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
 // GET → Service + View → render
 $leagueConfig  = $leagueContext->getConfig();
-$currentLeague = $leagueContext->getCurrentLeague();
 $panelData     = $service->getPanelData();
 
 // Flash message from PRG redirect

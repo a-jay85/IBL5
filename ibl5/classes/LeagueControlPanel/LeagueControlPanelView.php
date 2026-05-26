@@ -159,6 +159,11 @@ class LeagueControlPanelView implements LeagueControlPanelViewInterface
         <a href="/ibl5/scripts/updateAllTheThings.php">Update All The Things</a>
     </div>
     <div class="lcp-note">Upload sim backup to <strong>backups/</strong> before running</div>
+    <div class="lcp-control-row">
+        <input type="number" name="SimLengthInDays" min="1" max="180" size="3" value="<?= HtmlSanitizer::e((string) $panelData['simLengthInDays']) ?>" class="ibl-input ibl-input--sm w-20">
+        <button type="submit" name="action" value="set_sim_length" class="ibl-btn ibl-btn--secondary ibl-btn--sm">Set Sim Length in Days</button>
+    </div>
+    <div class="lcp-note">You must click the button — pressing Enter will not work</div>
 <?php if ($currentLeague === 'ibl'): ?>
     <?= HtmlSanitizer::trusted($this->renderWaiversSelect($panelData)) ?>
     <div class="lcp-control-row">

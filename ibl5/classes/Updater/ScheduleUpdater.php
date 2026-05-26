@@ -21,6 +21,9 @@ class ScheduleUpdater extends \BaseMysqliRepository {
     /** @var array<string, int> Team name to ID lookup (for Schedule.htm parsing) */
     private array $teamNameToIdMap = [];
 
+    /** @var array<int, true> Olympics real-team IDs (empty for IBL — all teams pass) */
+    private array $realTeamIds = [];
+
     private const UNPLAYED_BOX_ID = 100000;
 
     /** @var array<int, string> Calendar month number to name for date string construction */
@@ -77,9 +80,9 @@ class ScheduleUpdater extends \BaseMysqliRepository {
         $isOlympics = $this->leagueContext !== null && $this->leagueContext->isOlympics();
 
         if ($isOlympics) {
-            /** @var list<array{team_name: string, teamid: int}> $rows */
+            /** @var list<array{team_name: string, teamid: int, is_real_team: int}> $rows */
             $rows = $this->fetchAll(
-                "SELECT team_name, teamid FROM {$teamInfoTable}",
+                "SELECT team_name, teamid, is_real_team FROM {$teamInfoTable}",
                 "",
             );
         } else {
@@ -94,6 +97,14 @@ class ScheduleUpdater extends \BaseMysqliRepository {
         foreach ($rows as $row) {
             $this->teamIdToNameMap[$row['teamid']] = $row['team_name'];
             $this->teamNameToIdMap[$row['team_name']] = $row['teamid'];
+        }
+
+        if ($isOlympics) {
+            foreach ($rows as $row) {
+                if ($row['is_real_team'] === 1) {
+                    $this->realTeamIds[$row['teamid']] = true;
+                }
+            }
         }
     }
 
@@ -115,6 +126,14 @@ class ScheduleUpdater extends \BaseMysqliRepository {
     private function getTeamNameById(int $teamId): string
     {
         return $this->teamIdToNameMap[$teamId] ?? "Team #{$teamId}";
+    }
+
+    private function isRealTeamGame(int $visitorId, int $homeId): bool
+    {
+        if ($this->realTeamIds === []) {
+            return true;
+        }
+        return isset($this->realTeamIds[$visitorId]) && isset($this->realTeamIds[$homeId]);
     }
 
     /**
@@ -156,6 +175,10 @@ class ScheduleUpdater extends \BaseMysqliRepository {
 
             if ($visitor_teamid === null || $home_teamid === null) {
                 $log .= "Unknown team in playoff game: {$game['visitor']} @ {$game['home']}<br>";
+                continue;
+            }
+
+            if (!$this->isRealTeamGame($visitor_teamid, $home_teamid)) {
                 continue;
             }
 
@@ -257,6 +280,11 @@ class ScheduleUpdater extends \BaseMysqliRepository {
 
             $visitor_teamid = $game['visitor'];
             $home_teamid = $game['home'];
+
+            if (!$this->isRealTeamGame($visitor_teamid, $home_teamid)) {
+                continue;
+            }
+
             $vScore = $game['visitor_score'];
             $hScore = $game['home_score'];
 

@@ -231,6 +231,66 @@ class ScheduleUpdaterTest extends TestCase
      * @group schedule-updater
      * @group league-context
      */
+    public function testIsRealTeamGamePassesAllTeamsForIbl(): void
+    {
+        $updater = new ScheduleUpdater($this->mockDb, $this->mockSeason, null);
+
+        $reflection = new \ReflectionClass($updater);
+        $method = $reflection->getMethod('isRealTeamGame');
+
+        $this->assertTrue($method->invoke($updater, 1, 2));
+        $this->assertTrue($method->invoke($updater, 99, 100));
+    }
+
+    /**
+     * @group schedule-updater
+     * @group league-context
+     */
+    public function testIsRealTeamGameFiltersPlaceholderTeamsForOlympics(): void
+    {
+        $olympicsContext = $this->createStub(LeagueContext::class);
+        $olympicsContext->method('getCurrentLeague')->willReturn(LeagueContext::LEAGUE_OLYMPICS);
+        $olympicsContext->method('isOlympics')->willReturn(true);
+        $olympicsContext->method('getTableName')->willReturnCallback(
+            static function (string $table): string {
+                return match ($table) {
+                    'ibl_schedule' => 'ibl_olympics_schedule',
+                    'ibl_team_info' => 'ibl_olympics_team_info',
+                    default => $table,
+                };
+            }
+        );
+
+        $updater = new ScheduleUpdater($this->mockDb, $this->mockSeason, $olympicsContext);
+
+        // Simulate preloadTeamNameMap loading real + placeholder teams
+        $this->mockDb->setMockData([
+            ['team_name' => 'USA', 'teamid' => 1, 'is_real_team' => 1],
+            ['team_name' => 'Canada', 'teamid' => 2, 'is_real_team' => 1],
+            ['team_name' => 'Placeholder A', 'teamid' => 9, 'is_real_team' => 0],
+            ['team_name' => 'Placeholder B', 'teamid' => 10, 'is_real_team' => 0],
+        ]);
+
+        $reflection = new \ReflectionClass($updater);
+        $preload = $reflection->getMethod('preloadTeamNameMap');
+        $preload->invoke($updater);
+
+        $isReal = $reflection->getMethod('isRealTeamGame');
+
+        // Both real → pass
+        $this->assertTrue($isReal->invoke($updater, 1, 2));
+        // Real vs placeholder → reject
+        $this->assertFalse($isReal->invoke($updater, 1, 9));
+        // Placeholder vs real → reject
+        $this->assertFalse($isReal->invoke($updater, 10, 2));
+        // Both placeholder → reject
+        $this->assertFalse($isReal->invoke($updater, 9, 10));
+    }
+
+    /**
+     * @group schedule-updater
+     * @group league-context
+     */
     public function testOlympicsContextTruncatesOlympicsScheduleTable(): void
     {
         $olympicsContext = $this->createStub(LeagueContext::class);

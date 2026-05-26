@@ -1,7 +1,7 @@
 ---
 name: post-plan
 description: Single orchestrator for the post-plan workflow. Runs commit/push/PR, diff classification, code review, security audit, verification, CI monitoring, retrospective, worktree teardown, and background process cleanup as one uninterrupted sequence.
-last_verified: 2026-05-23
+last_verified: 2026-05-26
 ---
 
 # Post-Plan Orchestrator
@@ -348,7 +348,7 @@ Using the Sonnet agent's classifications:
 
 ## Phase 7: CI Monitoring
 
-**BLOCKING GATE — block on CI until green, or 3 fix-push-retry cycles exhausted.**
+**Monitor CI and attempt fixes, then always continue to Phase 8.**
 
 > **Field-shape gotcha — read before editing this phase.**
 > Two `gh` commands return different shapes; mixing them produces unsatisfiable conditions.
@@ -357,11 +357,11 @@ Using the Sonnet agent's classifications:
 > Do not write `state == "COMPLETED"` or `conclusion == "failure"` against `gh pr checks` — both are silently false forever.
 
 0. **Early-exit on merged PR:** Before any polling, run `gh pr view <pr> --json state --jq '.state'`. If `MERGED`, skip the rest of Phase 7 and continue at Phase 8 — auto-merge has already fired (most commonly during Phase 4/5/6) and watching CI to completion adds nothing but wall-clock burn. This is the load-bearing optimization that keeps the nightly loop from burning a full watch timeout on an already-shipped PR.
-1. **Wait for checks to register:** Poll `gh pr checks <pr> --json name,state 2>/dev/null | jq 'length'` up to 4 times with 15s waits. If count stays 0, warn user and stop.
+1. **Wait for checks to register:** Poll `gh pr checks <pr> --json name,state 2>/dev/null | jq 'length'` up to 4 times with 15s waits. If count stays 0, warn user and continue to Phase 8.
 2. **Block until CI settles:** `gh pr checks <pr> --watch --fail-fast --interval 20` (Bash timeout 1200000 = 20 min cap — leaves a 10-min cushion under `MAX_PP_SECS=1800` for Phases 8-11 cleanup). The gh CLI handles the polling and exit logic itself; do not re-implement it in jq. Exit codes: `0` = all checks passed, `8` = at least one failed, other = transport error.
 3. **If exit 0** → Phase 8. (Mid-watch merge detection was intentionally dropped: `gh pr checks --watch` exits as soon as the last check settles, so the only window auto-merge could fire inside the watch is the ~5–30s between final-check-pass and auto-merge action — not worth a hand-rolled poll loop. Step 0 already covers the case where the PR merged before Phase 7 started.)
-4. **If exit 8:** Get failed checks via `gh pr checks <pr> --json name,state,link --jq '[.[] | select(.state == "FAILURE")]'` (uppercase `FAILURE`, field is `state` not `conclusion`). Download logs (`gh run view <id> --log-failed`), run the 3-step CI failure checklist (is file in my diff? is failing line my change? did it fail on parent?), fix, commit, push, loop back to step 1. After 3 iterations, escalate to user.
-5. **If bash times out (20 min elapsed):** Run one final `gh pr checks <pr>` (no `--watch`) to capture settled state. If it now exits 0, continue to Phase 8. If 8, jump to step 4. Otherwise escalate to user — do not re-enter watch.
+4. **If exit 8:** Get failed checks via `gh pr checks <pr> --json name,state,link --jq '[.[] | select(.state == "FAILURE")]'` (uppercase `FAILURE`, field is `state` not `conclusion`). Download logs (`gh run view <id> --log-failed`), run the 3-step CI failure checklist (is file in my diff? is failing line my change? did it fail on parent?), fix, commit, push, loop back to step 1. After 3 iterations, report failures to user and continue to Phase 8 — auto-merge will fire when CI eventually passes.
+5. **If bash times out (20 min elapsed):** Run one final `gh pr checks <pr>` (no `--watch`) to capture settled state. If it now exits 0, continue to Phase 8. If 8, jump to step 4. Otherwise report to user and continue to Phase 8 — do not re-enter watch.
 
 ---
 
@@ -369,9 +369,9 @@ Using the Sonnet agent's classifications:
 
 **Already merged?** If `gh pr view --json state --jq '.state'` returns `MERGED`, skip the merge call entirely. Run `cd <repo-root> && git checkout master && git pull origin master` to sync local, then continue to Phase 9. Do not treat this as an error — it's the expected outcome when auto-merge fires during Phase 7.
 
-All three conditions must be true: (1) CI passed, (2) PR says "No manual testing needed", (3) no review/audit findings scored >= 80.
+Both conditions must be true: (1) PR says "No manual testing needed", (2) no review/audit findings scored >= 80.
 
-If met: `gh pr merge --squash --auto --delete-branch` then `cd <repo-root> && git checkout master && git pull origin master`.
+If met: `gh pr merge --squash --auto --delete-branch`. The `--auto` flag queues the merge — GitHub executes it once all required status checks pass. Do not sync local to master here; the merge has not happened yet.
 
 If not: report which condition(s) blocked. User merges manually.
 

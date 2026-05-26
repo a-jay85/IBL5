@@ -346,8 +346,8 @@ class FreeAgencyServiceTest extends TestCase
 
         $this->assertCount(1, $result['playersUnderContract']);
         $this->assertCount(1, $result['unsignedFreeAgents']);
-        $this->assertSame(10, $result['playersUnderContract'][0]->playerID);
-        $this->assertSame(20, $result['unsignedFreeAgents'][0]->playerID);
+        $this->assertSame(10, $result['playersUnderContract'][0]->getPlayerID());
+        $this->assertSame(20, $result['unsignedFreeAgents'][0]->getPlayerID());
     }
 
     public function testGetMainPageDataPreBuildsOfferPlayers(): void

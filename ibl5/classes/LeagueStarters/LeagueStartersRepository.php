@@ -32,4 +32,21 @@ class LeagueStartersRepository extends \BaseMysqliRepository implements LeagueSt
             League::MAX_REAL_TEAMID
         );
     }
+
+    /**
+     * @see LeagueStartersRepositoryInterface::getPlaceholderRow()
+     *
+     * @return array<string, mixed>|null
+     */
+    public function getPlaceholderRow(): ?array
+    {
+        return $this->fetchOne(
+            "SELECT p.*, t.team_name AS teamname, t.color1, t.color2
+            FROM `ibl_plr` p
+            LEFT JOIN `ibl_team_info` t ON p.teamid = t.teamid
+            WHERE p.pid = ?",
+            'i',
+            4040404
+        );
+    }
 }

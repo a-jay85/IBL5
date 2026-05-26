@@ -110,6 +110,37 @@ class ImportLeagueConfigStepTest extends TestCase
         $this->assertStringContainsString('<div>Discrepancy</div>', $result->inlineHtml);
     }
 
+    public function testIblContextCallsCrossCheckAfterSuccessfulImport(): void
+    {
+        $this->stubRepo->method('hasConfigForSeason')->willReturn(false);
+        $this->stubResolver->method('getContents')->willReturn('lge-data');
+
+        $mockService = $this->createMock(LeagueConfigService::class);
+        $mockService->method('processLgeData')->willReturn([
+            'success' => true,
+            'season_ending_year' => 2026,
+            'teams_stored' => 28,
+            'messages' => [],
+        ]);
+        $mockService->expects($this->once())
+            ->method('crossCheckWithFranchiseSeasons')
+            ->with(2026)
+            ->willReturn([]);
+
+        $this->stubView->method('renderParseResult')->willReturn('');
+
+        $step = new ImportLeagueConfigStep(
+            $this->stubRepo,
+            $mockService,
+            $this->stubView,
+            2026,
+            $this->stubResolver,
+        );
+        $result = $step->execute();
+
+        $this->assertTrue($result->success);
+    }
+
     public function testFailedImportReturnsFailure(): void
     {
         $this->stubRepo->method('hasConfigForSeason')->willReturn(false);

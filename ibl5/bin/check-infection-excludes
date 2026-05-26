@@ -1,0 +1,31 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+CONFIG="infection.json5"
+
+if [ ! -f "$CONFIG" ]; then
+    echo "ERROR: $CONFIG not found (run from ibl5/ directory)" >&2
+    exit 1
+fi
+
+excludes=$(grep -v '^\s*//' "$CONFIG" | grep -oE '"[^"]+\.php"' | tr -d '"')
+
+broken=()
+for path in $excludes; do
+    if [ ! -f "classes/$path" ]; then
+        broken+=("$path")
+    fi
+done
+
+if [ ${#broken[@]} -eq 0 ]; then
+    echo "OK: all file excludes in $CONFIG resolve."
+    exit 0
+else
+    echo "ERROR: ${#broken[@]} stale exclude(s) in $CONFIG:" >&2
+    for p in "${broken[@]}"; do
+        echo "  - $p  (classes/$p not found)" >&2
+    done
+    echo "" >&2
+    echo "Fix: update or remove these entries in $CONFIG." >&2
+    exit 1
+fi

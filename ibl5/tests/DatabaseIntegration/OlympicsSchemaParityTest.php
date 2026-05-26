@@ -20,6 +20,7 @@ class OlympicsSchemaParityTest extends DatabaseTestCase
         'ibl_olympics_schedule'  => ['round'],
         'ibl_olympics_standings' => ['group_name', 'medal'],
         'ibl_olympics_hist'      => ['nuke_iblhist', 'created_at', 'updated_at'],
+        'ibl_olympics_team_info' => ['is_real_team'],
     ];
 
     /** @var array<string, list<string>> */

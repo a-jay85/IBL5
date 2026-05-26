@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Updater\Steps;
 
+use League\LeagueContext;
 use LeagueConfig\LeagueConfigRepository;
 use LeagueConfig\LeagueConfigService;
 use LeagueConfig\LeagueConfigView;
@@ -25,6 +26,7 @@ class ImportLeagueConfigStep implements PipelineStepInterface
         private readonly LeagueConfigView $view,
         private readonly int $seasonEndingYear,
         private readonly JsbSourceResolverInterface $sourceResolver,
+        private readonly ?LeagueContext $leagueContext = null,
     ) {
     }
 
@@ -52,11 +54,13 @@ class ImportLeagueConfigStep implements PipelineStepInterface
             return StepResult::failure($this->getLabel() . ' import failed', $error);
         }
 
-        $discrepancies = $this->service->crossCheckWithFranchiseSeasons(
-            $lgeResult['season_ending_year'],
-        );
-        if ($discrepancies !== []) {
-            $inlineHtml .= $this->view->renderCrossCheckResults($discrepancies);
+        if ($this->leagueContext === null || !$this->leagueContext->isOlympics()) {
+            $discrepancies = $this->service->crossCheckWithFranchiseSeasons(
+                $lgeResult['season_ending_year'],
+            );
+            if ($discrepancies !== []) {
+                $inlineHtml .= $this->view->renderCrossCheckResults($discrepancies);
+            }
         }
 
         return StepResult::success($this->getLabel() . ' imported', inlineHtml: $inlineHtml);

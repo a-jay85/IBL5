@@ -147,27 +147,39 @@ try {
     // Step 0: Extract JSB files from latest backup archive
     $archiveExtractor = new BulkImport\ArchiveExtractor();
     $backupLocator = new BulkImport\BackupArchiveLocator($archiveExtractor);
-    $updaterService->addStep(new Updater\Steps\ExtractFromBackupStep(
-        $backupLocator, $season, $basePath,
-    ));
-
     // JsbSourceResolver reads .lge/.sch directly from archive (disk-fallback)
     $seasonLabel = BulkImport\BackupArchiveLocator::seasonLabel($season->beginningYear, $season->endingYear);
-    $seasonBackupDir = $basePath . '/backups/' . $seasonLabel;
+    $seasonBackupDir = $basePath . '/backups/' . ($isOlympics ? 'olympics/' : '') . $seasonLabel;
+
+    $updaterService->addStep(new Updater\Steps\ExtractFromBackupStep(
+        $backupLocator, $season, $basePath,
+        $isOlympics ? $seasonBackupDir : null,
+        $isOlympics,
+    ));
     $sourceResolver = new Updater\JsbSourceResolver(
         $backupLocator, $archiveExtractor, $seasonBackupDir, $basePath, $filePrefix,
     );
 
     $updaterService->addStep(new Updater\Steps\ImportLeagueConfigStep(
-        $lgeRepo, $lgeService, $lgeView, $season->endingYear, $sourceResolver,
+        $lgeRepo, $lgeService, $lgeView, $season->endingYear, $sourceResolver, $leagueContext,
     ));
+
+    if ($isOlympics) {
+        $realTeamCountParam = isset($_GET['real_team_count']) && is_string($_GET['real_team_count'])
+            ? (int) $_GET['real_team_count'] : null;
+        $updaterService->addStep(new Updater\Steps\AutoSeedOlympicsTeamInfoStep(
+            $mysqli_db, $season->endingYear, $realTeamCountParam,
+        ));
+    }
 
     $scheduleUpdater = new Updater\ScheduleUpdater($mysqli_db, $season, $leagueContext, $sourceResolver);
     echo $view->renderInitStatus('ScheduleUpdater initialized');
     flush();
 
     $standingsRepo = new Standings\StandingsRepository($mysqli_db, $leagueContext);
-    $standingsUpdater = new Updater\StandingsUpdater($standingsRepo, $season, $leagueContext !== null);
+    $standingsUpdater = $isOlympics
+        ? new Updater\OlympicsFlatStandingsUpdater($standingsRepo, $season, true)
+        : new Updater\StandingsUpdater($standingsRepo, $season);
     echo $view->renderInitStatus('StandingsUpdater initialized');
     flush();
 

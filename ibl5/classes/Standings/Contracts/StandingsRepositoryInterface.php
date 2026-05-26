@@ -188,4 +188,13 @@ interface StandingsRepositoryInterface
      * @return list<array{losses: int}>
      */
     public function fetchMostLosingTeams(string $conference): array;
+
+    /**
+     * Fetch the total number of scheduled games per team within a date range
+     *
+     * @param string $startDate Season start date (YYYY-MM-DD)
+     * @param string $endDate Season end date (YYYY-MM-DD)
+     * @return array<int, int> Map of teamid => total scheduled games
+     */
+    public function fetchScheduledGameCountsPerTeam(string $startDate, string $endDate): array;
 }

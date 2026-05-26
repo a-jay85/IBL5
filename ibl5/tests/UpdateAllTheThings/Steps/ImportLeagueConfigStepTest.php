@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\UpdateAllTheThings\Steps;
 
+use League\LeagueContext;
 use LeagueConfig\LeagueConfigRepository;
 use LeagueConfig\LeagueConfigService;
 use LeagueConfig\LeagueConfigView;
@@ -110,6 +111,37 @@ class ImportLeagueConfigStepTest extends TestCase
         $this->assertStringContainsString('<div>Discrepancy</div>', $result->inlineHtml);
     }
 
+    public function testIblContextCallsCrossCheckAfterSuccessfulImport(): void
+    {
+        $this->stubRepo->method('hasConfigForSeason')->willReturn(false);
+        $this->stubResolver->method('getContents')->willReturn('lge-data');
+
+        $mockService = $this->createMock(LeagueConfigService::class);
+        $mockService->method('processLgeData')->willReturn([
+            'success' => true,
+            'season_ending_year' => 2026,
+            'teams_stored' => 28,
+            'messages' => [],
+        ]);
+        $mockService->expects($this->once())
+            ->method('crossCheckWithFranchiseSeasons')
+            ->with(2026)
+            ->willReturn([]);
+
+        $this->stubView->method('renderParseResult')->willReturn('');
+
+        $step = new ImportLeagueConfigStep(
+            $this->stubRepo,
+            $mockService,
+            $this->stubView,
+            2026,
+            $this->stubResolver,
+        );
+        $result = $step->execute();
+
+        $this->assertTrue($result->success);
+    }
+
     public function testFailedImportReturnsFailure(): void
     {
         $this->stubRepo->method('hasConfigForSeason')->willReturn(false);
@@ -130,6 +162,39 @@ class ImportLeagueConfigStepTest extends TestCase
 
         $this->assertFalse($result->success);
         $this->assertSame('Invalid file format', $result->errorMessage);
+    }
+
+    public function testOlympicsContextSkipsCrossCheck(): void
+    {
+        $this->stubRepo->method('hasConfigForSeason')->willReturn(false);
+        $this->stubResolver->method('getContents')->willReturn('lge-data');
+
+        $mockService = $this->createMock(LeagueConfigService::class);
+        $mockService->method('processLgeData')->willReturn([
+            'success' => true,
+            'season_ending_year' => 2003,
+            'teams_stored' => 8,
+            'messages' => [],
+        ]);
+        $mockService->expects($this->never())
+            ->method('crossCheckWithFranchiseSeasons');
+
+        $this->stubView->method('renderParseResult')->willReturn('');
+
+        $leagueContext = new LeagueContext();
+        $leagueContext->setLeague(LeagueContext::LEAGUE_OLYMPICS);
+
+        $step = new ImportLeagueConfigStep(
+            $this->stubRepo,
+            $mockService,
+            $this->stubView,
+            2003,
+            $this->stubResolver,
+            $leagueContext,
+        );
+        $result = $step->execute();
+
+        $this->assertTrue($result->success);
     }
 
     private function createStep(?JsbSourceResolverInterface $resolver = null): ImportLeagueConfigStep

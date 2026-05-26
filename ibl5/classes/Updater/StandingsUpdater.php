@@ -41,8 +41,8 @@ class StandingsUpdater {
         'Western'  => 'Western Conference Champions',
     ];
 
-    private Season $season;
-    private StandingsRepositoryInterface $repository;
+    protected Season $season;
+    protected StandingsRepositoryInterface $repository;
     private bool $isOlympics;
 
     public function __construct(StandingsRepositoryInterface $repository, Season $season, bool $isOlympics = false) {
@@ -233,7 +233,7 @@ class StandingsUpdater {
      * @param array<int, TeamStanding> $standings
      * @param array<int, TeamMapping> $teamMap
      */
-    private function computeAndInsertAll(array $standings, array $teamMap): void
+    protected function computeAndInsertAll(array $standings, array $teamMap): void
     {
         /** @var array<string, list<TeamStanding>> $byConference */
         $byConference = [];

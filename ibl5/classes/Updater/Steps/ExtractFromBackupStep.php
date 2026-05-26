@@ -32,6 +32,8 @@ final class ExtractFromBackupStep implements PipelineStepInterface
         private readonly BackupArchiveLocatorInterface $locator,
         private readonly Season $season,
         private readonly string $basePath,
+        private readonly ?string $backupDir = null,
+        private readonly bool $isOlympics = false,
     ) {
     }
 
@@ -46,7 +48,7 @@ final class ExtractFromBackupStep implements PipelineStepInterface
             $this->season->beginningYear,
             $this->season->endingYear,
         );
-        $backupDir = $this->basePath . '/backups/' . $seasonLabel;
+        $backupDir = $this->backupDir ?? ($this->basePath . '/backups/' . $seasonLabel);
 
         $archivePath = $this->locator->findLatestArchive($backupDir);
         if ($archivePath === null) {
@@ -118,13 +120,19 @@ final class ExtractFromBackupStep implements PipelineStepInterface
             $this->season->beginningYear,
             $this->season->endingYear,
         );
-        $newName = $this->locator->generateStandardizedName(
-            $backupDir,
-            $extension,
-            $seasonLabel,
-            $this->season->phase,
-            $this->season->getPhaseSpecificSimNumber(),
-        );
+        if ($this->isOlympics) {
+            $existing = glob($backupDir . '/' . $seasonLabel . '_*');
+            $nextSeq = count($existing !== false ? $existing : []) + 1;
+            $newName = sprintf('%s_%02d.%s', $seasonLabel, $nextSeq, $extension);
+        } else {
+            $newName = $this->locator->generateStandardizedName(
+                $backupDir,
+                $extension,
+                $seasonLabel,
+                $this->season->phase,
+                $this->season->getPhaseSpecificSimNumber(),
+            );
+        }
 
         $newPath = $backupDir . '/' . $newName;
 

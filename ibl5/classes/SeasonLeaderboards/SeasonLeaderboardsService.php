@@ -273,7 +273,7 @@ class SeasonLeaderboardsService implements SeasonLeaderboardsServiceInterface
             'TGM' => $tgm / $games,
             'TGA' => $tga / $games,
             'TGP' => $tga > 0 ? $tgm / $tga : 0.0,
-            'GAMES' => (float) $games,
+            'GAMES' => $games,
             'MIN' => $row['minutes'] / $games,
             default => (2 * $fgm + $ftm + $tgm) / $games,
         };

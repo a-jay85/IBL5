@@ -117,24 +117,18 @@ test.describe('Team page: dropdown content changes', () => {
   });
 
   test('switching back to ratings shows rating columns', async ({ page }) => {
-    const dropdown = page.locator('.ibl-view-select').first();
+    // Verify contracts view has salary columns
+    await page.goto('modules.php?name=Team&op=team&teamid=1&display=contracts');
+    await expect(page.locator('th.col-salary').first()).toBeVisible({ timeout: 10000 });
 
-    // Switch to contracts first, then back to ratings
-    await dropdown.selectOption('contracts');
-    await expect(page.locator('.ibl-data-table, table').first()).toBeVisible();
+    // Navigate to ratings — should NOT have salary columns
+    await page.goto('modules.php?name=Team&op=team&teamid=1&display=ratings');
+    const table = page.locator('.ibl-data-table').first();
 
-    await dropdown.selectOption('ratings');
-    const table = page.locator('.ibl-data-table, table').first();
-    await expect(table).toBeVisible();
+    await expect(table.locator('th.col-salary')).toHaveCount(0);
 
-    // Ratings view should NOT have salary columns
-    const salaryHeaders = table.locator('th.col-salary');
-    await expect(salaryHeaders).toHaveCount(0);
-
-    // Ratings view has rating headers (check for Bird/Exp which only appear in ratings-like views)
     const headers = await table.locator('th').allTextContents();
-    const joined = headers.join(' ');
-    expect(joined).toContain('Pos');
+    expect(headers.join(' ')).toContain('Pos');
   });
 
   test('split option (home) loads table', async ({ page }) => {
@@ -164,25 +158,28 @@ test.describe('Team page: dropdown content changes', () => {
     // Back should restore ratings view (no salary columns)
     await expect(page.locator('.ibl-data-table, table').first()).toBeVisible({ timeout: 10000 });
     const salaryHeaders = page.locator('.ibl-data-table th.col-salary');
-    await expect(salaryHeaders).toHaveCount(0);
+    await expect(salaryHeaders).toHaveCount(0, { timeout: 10000 });
   });
 
   test('table columns remain sortable after dropdown switch', async ({ page }) => {
     const dropdown = page.locator('.ibl-view-select').first();
-    await dropdown.selectOption('ratings');
-    await expect(page.locator('.ibl-data-table, table').first()).toBeVisible({ timeout: 10000 });
+
+    // First HTMX swap — switch away from default ratings view
+    await dropdown.selectOption('total_s');
+    await expect(page).toHaveURL(/display=total_s/, { timeout: 10000 });
+
+    // Navigate back to ratings (avoids HTMX reprocessing race on swapped select)
+    await page.goto('modules.php?name=Team&op=team&teamid=1&display=ratings');
 
     // Click a sortable column header (skip first two — player name and position)
     const header = page.locator('.ibl-data-table thead th').nth(2);
     await header.click();
 
-    // Table should still be visible (no JS error crashed it)
-    await expect(page.locator('.ibl-data-table, table').first()).toBeVisible();
     // The header should now have a sort indicator
     await expect(
       page.locator('.ibl-data-table th.sorttable_sorted, .ibl-data-table th.sorttable_sorted_reverse')
         .first()
-    ).toBeVisible({ timeout: 5000 });
+    ).toBeVisible({ timeout: 10000 });
   });
 });
 

@@ -129,7 +129,7 @@ test.describe('Team page: dropdown content changes', () => {
 
     // Ratings view should NOT have salary columns
     const salaryHeaders = table.locator('th.col-salary');
-    expect(await salaryHeaders.count()).toBe(0);
+    await expect(salaryHeaders).toHaveCount(0);
 
     // Ratings view has rating headers (check for Bird/Exp which only appear in ratings-like views)
     const headers = await table.locator('th').allTextContents();
@@ -164,7 +164,7 @@ test.describe('Team page: dropdown content changes', () => {
     // Back should restore ratings view (no salary columns)
     await expect(page.locator('.ibl-data-table, table').first()).toBeVisible({ timeout: 10000 });
     const salaryHeaders = page.locator('.ibl-data-table th.col-salary');
-    expect(await salaryHeaders.count()).toBe(0);
+    await expect(salaryHeaders).toHaveCount(0);
   });
 
   test('table columns remain sortable after dropdown switch', async ({ page }) => {
@@ -226,8 +226,7 @@ test.describe('Team page: historical year view', () => {
 // ===========================================================================
 
 publicTest.describe('Team page: offense/defense footer stats', () => {
-  publicTest('avg_s shows offense/defense footer rows', async ({ appState, page }) => {
-    await appState({ 'Current Season Ending Year': '2026' });
+  publicTest('avg_s shows offense/defense footer rows', async ({ page }) => {
     await page.goto('modules.php?name=Team&op=team&teamid=1');
     const dropdown = page.locator('.ibl-view-select').first();
     await dropdown.selectOption('avg_s');
@@ -236,16 +235,14 @@ publicTest.describe('Team page: offense/defense footer stats', () => {
     await publicExpect(tfoot).toContainText(/\S.*\sDefense\b/);
   });
 
-  publicTest('historical year avg_s shows offense/defense footer', async ({ appState, page }) => {
-    await appState({ 'Current Season Ending Year': '2026' });
-    await page.goto('modules.php?name=Team&op=team&teamid=1&yr=2026&display=avg_s');
+  publicTest('direct URL avg_s shows offense/defense footer', async ({ page }) => {
+    await page.goto('modules.php?name=Team&op=team&teamid=1&display=avg_s');
     const tfoot = page.locator('.ibl-data-table tfoot');
     await publicExpect(tfoot).toContainText(/\S.*\sOffense\b/);
     await publicExpect(tfoot).toContainText(/\S.*\sDefense\b/);
   });
 
-  publicTest('chunk shows offense/defense footer rows', async ({ appState, page }) => {
-    await appState({ 'Current Season Ending Year': '2026' });
+  publicTest('chunk shows offense/defense footer rows', async ({ page }) => {
     await page.goto('modules.php?name=Team&op=team&teamid=1');
     const dropdown = page.locator('.ibl-view-select').first();
     await dropdown.selectOption('chunk');
@@ -255,7 +252,7 @@ publicTest.describe('Team page: offense/defense footer stats', () => {
   });
 
   publicTest('playoffs shows offense/defense footer rows', async ({ appState, page }) => {
-    await appState({ 'Current Season Phase': 'Playoffs', 'Current Season Ending Year': '2026' });
+    await appState({ 'Current Season Phase': 'Playoffs' });
     await page.goto('modules.php?name=Team&op=team&teamid=1');
     const dropdown = page.locator('.ibl-view-select').first();
     await dropdown.selectOption('playoffs');

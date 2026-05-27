@@ -38,7 +38,9 @@ as the escape hatch. A future SKIP_CHECKS env var (comma-separated names
 to ignore) may be added but is out of scope for v1.
 
 Limitation: fetches one page of check-runs (100 results). IBL5's combined
-workflow count is well under 50, so a single page suffices.
+workflow count is well under 50, so a single page suffices. Results are
+deduplicated by check name (most recent run wins), so re-runs of flaky
+checks are handled correctly.
 
 Exit codes: 0 = pass, 1 = CI failure, 2 = usage error.
 EOF
@@ -101,6 +103,12 @@ JSON="$(bash -c "$GH_API_CMD \"repos/$REPO/commits/$SHA/check-runs?per_page=100\
     exit 2
 }
 
+# Keep only the most recent run per check name (re-runs supersede earlier failures)
+JSON="$(echo "$JSON" | jq '{
+  total_count: ([.check_runs | group_by(.name) | .[] | sort_by(.completed_at // .started_at) | last] | length),
+  check_runs: [.check_runs | group_by(.name) | .[] | sort_by(.completed_at // .started_at) | last]
+}')"
+
 TOTAL="$(echo "$JSON" | jq '.check_runs | length')"
 
 if [ "$TOTAL" -eq 0 ]; then
@@ -108,6 +116,10 @@ if [ "$TOTAL" -eq 0 ]; then
     FOUND=0
     for ANCESTOR_SHA in $(git log --format=%H "$SHA" --skip=1 --max-count="$MAX_WALKBACK"); do
         ANCESTOR_JSON="$(bash -c "$GH_API_CMD \"repos/$REPO/commits/$ANCESTOR_SHA/check-runs?per_page=100\"" 2>/dev/null)" || continue
+        ANCESTOR_JSON="$(echo "$ANCESTOR_JSON" | jq '{
+          total_count: ([.check_runs | group_by(.name) | .[] | sort_by(.completed_at // .started_at) | last] | length),
+          check_runs: [.check_runs | group_by(.name) | .[] | sort_by(.completed_at // .started_at) | last]
+        }')"
         ANCESTOR_TOTAL="$(echo "$ANCESTOR_JSON" | jq '.check_runs | length')"
         if [ "$ANCESTOR_TOTAL" -ge "$MIN_REQUIRED_CHECKS" ]; then
             echo "HEAD ${SHA:0:11} has no check-runs (path-filtered). Falling back to ancestor ${ANCESTOR_SHA:0:11} ($ANCESTOR_TOTAL run(s))."

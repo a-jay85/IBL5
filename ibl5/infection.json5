@@ -42,19 +42,6 @@
             "Player/Views/PlayerTradingCardBackView.php",
             "Player/Views/PlayerTradingCardFlipView.php",
             "Player/Views/PlayerTradingCardFrontView.php",
-            // Controllers without direct test coverage (Pass 2 — deferred)
-            "Player/PlayerPageController.php",
-            "Updater/UpdaterController.php",
-            "Api/Controller/PlayerExportController.php",
-            "Api/Controller/TeamDetailController.php",
-            "Api/Controller/GameDetailController.php",
-            "Api/Controller/PlayerDetailController.php",
-            "Api/Controller/TeamListController.php",
-            "Api/Controller/PlayerHistoryController.php",
-            "Api/Controller/SeasonController.php",
-            "Api/Controller/TeamRosterController.php",
-            "Api/Controller/PlayerListController.php",
-            "Api/Controller/GameBoxscoreController.php",
             // Handlers without direct test coverage (Pass 2 — deferred)
             "NextSim/NextSimTabApiHandler.php",
             "Team/TeamApiHandler.php"

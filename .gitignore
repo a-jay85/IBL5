@@ -16,6 +16,7 @@ settings.local.json
 .claude/.workflow-pending
 .claude/scheduled_tasks.lock
 .claude/nightly/handoff/
+.nightly/
 .claude/rules/codebase-map.md
 
 config.json

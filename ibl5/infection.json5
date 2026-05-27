@@ -6,11 +6,6 @@
             "*/Contracts/*",
             "Bootstrap", "Database",
             "OneOnOneGame",
-            // Repositories without direct test coverage (Pass 2 — deferred)
-            "ApiKeys/ApiKeysRepository.php",
-            "BaseMysqliRepository.php",
-            "PlrParser/PlrBoxScoreRepository.php",
-            "Voting/VotingRepository.php",
             // Views without companion tests (Pass 2 — deferred)
             "Boxscore/BoxscoreView.php",
             "FreeAgency/FreeAgencyOfferView.php",
@@ -41,10 +36,7 @@
             "Player/Stats/Views/PlayerSimStatsView.php",
             "Player/Views/PlayerTradingCardBackView.php",
             "Player/Views/PlayerTradingCardFlipView.php",
-            "Player/Views/PlayerTradingCardFrontView.php",
-            // Handlers without direct test coverage (Pass 2 — deferred)
-            "NextSim/NextSimTabApiHandler.php",
-            "Team/TeamApiHandler.php"
+            "Player/Views/PlayerTradingCardFrontView.php"
         ]
     },
     "phpUnit": {

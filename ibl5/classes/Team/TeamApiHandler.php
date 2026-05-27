@@ -61,7 +61,7 @@ class TeamApiHandler
         $responder->html($this->tableService->getTableOutput($teamid, $yr, $display, $split));
     }
 
-    /** @param array<string, mixed> $params */
+    /** @param array<mixed> $params */
     public static function extractValidatedDisplay(array $params): string
     {
         if (isset($params['display']) && is_string($params['display'])) {
@@ -74,7 +74,7 @@ class TeamApiHandler
         return 'ratings';
     }
 
-    /** @param array<string, mixed> $params */
+    /** @param array<mixed> $params */
     public static function extractValidatedYr(array $params): ?string
     {
         if (isset($params['yr']) && is_string($params['yr']) && $params['yr'] !== '') {

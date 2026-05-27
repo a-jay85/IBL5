@@ -53,13 +53,13 @@ class NextSimTabApiHandler
         $responder->html($view->renderTabbedPositionTable($games, $position, $team, $userStarters));
     }
 
-    /** @param array<string, mixed> $params */
+    /** @param array<mixed> $params */
     public static function extractValidatedTeamid(array $params): int
     {
         return isset($params['teamid']) && is_string($params['teamid']) ? (int) $params['teamid'] : 0;
     }
 
-    /** @param array<string, mixed> $params */
+    /** @param array<mixed> $params */
     public static function extractValidatedPosition(array $params): string
     {
         if (isset($params['position']) && is_string($params['position'])) {

@@ -1,6 +1,9 @@
 ---
 description: "Plan an implementation task with mandatory test classification. Wraps the built-in plan mode with the verification matrix rule injected so subagents can't skip it."
-last_verified: 2026-04-29
+disallowed-tools:
+  - EnterPlanMode
+  - ExitPlanMode
+last_verified: 2026-05-27
 ---
 
 # /plan — Implementation Planning with Verification Matrix
@@ -77,5 +80,3 @@ Tell the user:
 - The plan file path
 - A one-line matrix summary (e.g., "12 items: 7 PHPUnit, 3 E2E, 2 CLI-executable, 0 truly-manual")
 - Whether the plan is ready for implementation or has open questions
-
-Do NOT call `EnterPlanMode` or `ExitPlanMode`. This skill replaces the built-in plan mode workflow for implementation tasks.

@@ -39,23 +39,9 @@ class TeamApiHandler
 
         $teamid = isset($_GET['teamid']) && is_string($_GET['teamid']) ? (int) $_GET['teamid'] : 0;
 
-        $display = 'ratings';
-        if (isset($_GET['display']) && is_string($_GET['display'])) {
-            $rawDisplay = $_GET['display'];
-            if (in_array($rawDisplay, self::VALID_DISPLAY_MODES, true)) {
-                $display = $rawDisplay;
-            }
-        }
+        $display = self::extractValidatedDisplay($_GET);
+        $yr = self::extractValidatedYr($_GET);
 
-        $yr = null;
-        if (isset($_GET['yr']) && is_string($_GET['yr']) && $_GET['yr'] !== '') {
-            $rawYr = $_GET['yr'];
-            if (preg_match('/^\d{4}(-\d{2})?$/', $rawYr) === 1) {
-                $yr = $rawYr;
-            }
-        }
-
-        // Validate split parameter when display=split
         $split = null;
         if ($display === 'split' && isset($_GET['split']) && is_string($_GET['split'])) {
             $splitRepo = new SplitStatsRepository($this->db);
@@ -69,17 +55,47 @@ class TeamApiHandler
             $display = 'ratings';
         }
 
-        // Emit HX-Push-Url so HTMX pushes the user-friendly URL
-        $pushUrl = 'modules.php?name=Team&op=team&teamid=' . $teamid . '&display=' . $display;
-        if ($split !== null) {
-            $pushUrl .= '&split=' . $split;
-        }
-        if ($yr !== null) {
-            $pushUrl .= '&yr=' . $yr;
-        }
-        header('HX-Push-Url: ' . $pushUrl);
+        header('HX-Push-Url: ' . self::buildPushUrl($teamid, $display, $split, $yr));
 
         $responder = new \Api\Response\HtmlResponder();
         $responder->html($this->tableService->getTableOutput($teamid, $yr, $display, $split));
+    }
+
+    /** @param array<string, mixed> $params */
+    public static function extractValidatedDisplay(array $params): string
+    {
+        if (isset($params['display']) && is_string($params['display'])) {
+            $raw = $params['display'];
+            if (in_array($raw, self::VALID_DISPLAY_MODES, true)) {
+                return $raw;
+            }
+        }
+
+        return 'ratings';
+    }
+
+    /** @param array<string, mixed> $params */
+    public static function extractValidatedYr(array $params): ?string
+    {
+        if (isset($params['yr']) && is_string($params['yr']) && $params['yr'] !== '') {
+            $raw = $params['yr'];
+            if (preg_match('/^\d{4}(-\d{2})?$/', $raw) === 1) {
+                return $raw;
+            }
+        }
+
+        return null;
+    }
+
+    public static function buildPushUrl(int $teamid, string $display, ?string $split, ?string $yr): string
+    {
+        $url = 'modules.php?name=Team&op=team&teamid=' . $teamid . '&display=' . $display;
+        if ($split !== null) {
+            $url .= '&split=' . $split;
+        }
+        if ($yr !== null) {
+            $url .= '&yr=' . $yr;
+        }
+        return $url;
     }
 }

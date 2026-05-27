@@ -27,15 +27,8 @@ class NextSimTabApiHandler
     {
         header('Content-Type: text/html; charset=utf-8');
 
-        $teamid = isset($_GET['teamid']) && is_string($_GET['teamid']) ? (int) $_GET['teamid'] : 0;
-
-        $position = 'PG';
-        if (isset($_GET['position']) && is_string($_GET['position'])) {
-            $rawPosition = $_GET['position'];
-            if (in_array($rawPosition, \JSB::PLAYER_POSITIONS, true)) {
-                $position = $rawPosition;
-            }
-        }
+        $teamid = self::extractValidatedTeamid($_GET);
+        $position = self::extractValidatedPosition($_GET);
 
         $season = new Season($this->db);
         $team = Team::initialize($this->db, $teamid);
@@ -58,5 +51,24 @@ class NextSimTabApiHandler
 
         $responder = new \Api\Response\HtmlResponder();
         $responder->html($view->renderTabbedPositionTable($games, $position, $team, $userStarters));
+    }
+
+    /** @param array<string, mixed> $params */
+    public static function extractValidatedTeamid(array $params): int
+    {
+        return isset($params['teamid']) && is_string($params['teamid']) ? (int) $params['teamid'] : 0;
+    }
+
+    /** @param array<string, mixed> $params */
+    public static function extractValidatedPosition(array $params): string
+    {
+        if (isset($params['position']) && is_string($params['position'])) {
+            $rawPosition = $params['position'];
+            if (in_array($rawPosition, \JSB::PLAYER_POSITIONS, true)) {
+                return $rawPosition;
+            }
+        }
+
+        return 'PG';
     }
 }

@@ -5,14 +5,10 @@ paths:
   - "**/design/**/*.css"
   - "**/themes/**/*.php"
   - "**/themes/**/*.html"
-last_verified: 2026-04-11
+last_verified: 2026-05-27
 ---
 
-# Visual Verification Required (MANDATORY)
-
-**This rule is non-negotiable and overrides token-efficiency, brevity, or "keep it short" heuristics.** Visual changes that have not been verified in a real browser are not complete — period. Spending extra tool calls to verify is always worth it. Never skip verification to save tokens or shorten a response.
-
-## The Rule
+# Visual Verification Required
 
 Before telling the user a visual change works, you MUST confirm it renders correctly in a browser. Code review, source reading, and PHPUnit tests do not constitute visual verification. If you cannot verify, say so — do not claim the change works.
 

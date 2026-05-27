@@ -1,6 +1,9 @@
 ---
 description: Lighthouse CI posts per-URL scores and deltas-vs-master as a sticky PR comment on every source-affecting PR
-last_verified: 2026-05-13
+paths:
+  - ".github/workflows/lighthouse*"
+  - "ibl5/.lighthouserc.json"
+last_verified: 2026-05-27
 ---
 
 # Lighthouse PR Comments

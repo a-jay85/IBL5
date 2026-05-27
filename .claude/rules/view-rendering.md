@@ -1,12 +1,10 @@
 ---
 description: HTML View class standards: output buffering, HtmlSanitizer::e(), and structural conventions.
 paths: "**/*View.php"
-last_verified: 2026-04-11
+last_verified: 2026-05-27
 ---
 
 # View Rendering Rules
-
-> **Why this exists:** [ADR-0002](../../ibl5/docs/decisions/0002-xss-enforcement-via-phpstan.md) explains why XSS is enforced mechanically by the `RequireEscapedOutputRule` PHPStan rule instead of a runtime convention or templating engine.
 
 ## Canonical View Examples
 Reference these before building new Views:

@@ -1,17 +1,11 @@
 ---
 description: Sub-agent decision rules — when to spawn, when to skip, and which model to pick
-last_verified: 2026-04-28
+last_verified: 2026-05-27
 ---
 
 # Agent Tiering
 
 When spawning sub-agents or writing plans that will spawn them, always tier by the reasoning the task actually needs — never default everything to Opus.
-
-## Core Principle
-
-The dividing line between Haiku and Sonnet is **synthesis**. Haiku reliably runs commands, matches patterns against checklists, and formats structured output. Sonnet is needed when the agent must judge whether two things are semantically related — connecting a past commit to the current change's collision zone, deciding whether a docstring's intent matches renamed code, or tracing how data flows across multiple files.
-
-Haiku's specific failure mode: it produces confident, well-structured "all clean" results while missing issues that require connecting dots across files. A scoring filter catches Haiku's false positives but cannot recover its misses.
 
 ## Skip the Agent — Direct Tool Calls
 
@@ -67,10 +61,6 @@ Choose the tier per prompt — do not default all Explore agents to one tier:
 | **Sonnet** | Multi-hop traces, cross-module synthesis, open-ended investigation | "trace the encoding pipeline from .plr read to Team page display", "how does module A interact with B", "what patterns does this module use" |
 
 **Decision heuristic:** if the prompt asks the agent to notice connections, judge relevance, or trace data flow — use Sonnet. If the prompt can be answered by running a grep and formatting the output — use Haiku.
-
-## Post-Plan Agents
-
-See `/post-plan` SKILL.md for authoritative model assignments per phase.
 
 ## In Plans
 

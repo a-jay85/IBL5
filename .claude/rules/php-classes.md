@@ -1,12 +1,10 @@
 ---
 description: Interface-driven PHP class standards, XSS rules, and PHPStan gotchas for ibl5/classes.
 paths: ibl5/classes/**/*.php
-last_verified: 2026-04-30
+last_verified: 2026-05-27
 ---
 
 # PHP Class Development Rules
-
-> **Why this exists:** [ADR-0001](../../ibl5/docs/decisions/0001-interface-driven-architecture.md) explains why every module uses Repository/Service/View with `Contracts/` interfaces. [ADR-0005](../../ibl5/docs/decisions/0005-strict-types-enforcement.md) explains the `declare(strict_types=1)` mandate and PHPStan level `max` + strict-rules floor.
 
 ## Interface Standards
 - Method signatures with full PHPDoc

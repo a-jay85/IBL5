@@ -4,7 +4,7 @@
       "url": [
         "http://localhost:8080/ibl5/index.php",
         "http://localhost:8080/ibl5/modules.php?name=Standings",
-        "http://localhost:8080/ibl5/modules.php?name=Team&op=team&teamID=1",
+        "http://localhost:8080/ibl5/modules.php?name=Team&op=team&teamid=1",
         "http://localhost:8080/ibl5/modules.php?name=Player&pa=showpage&pid=1",
         "http://localhost:8080/ibl5/modules.php?name=SeasonLeaderboards"
       ],

@@ -58,7 +58,8 @@ class NextSimService implements NextSimServiceInterface
         $projectedGames = $this->teamScheduleRepository->getProjectedGamesNextSimResult(
             $teamId,
             $season->lastSimEndDate,
-            $season->projectedNextSimEndDate->format('Y-m-d')
+            $season->projectedNextSimEndDate->format('Y-m-d'),
+            $season->endingYear
         );
 
         $lastSimEndDateObject = new \DateTime($season->lastSimEndDate);

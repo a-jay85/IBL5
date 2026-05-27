@@ -193,7 +193,7 @@ class ScheduleUpdater extends \BaseMysqliRepository {
                     season_year, box_id, game_date, visitor_teamid, visitor_score, home_teamid, home_score, uuid
                 ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
                 "iisiiiis",
-                $fullDate['year'],
+                $this->season->endingYear,
                 $boxId,
                 $fullDate['date'],
                 $visitor_teamid,
@@ -306,7 +306,7 @@ class ScheduleUpdater extends \BaseMysqliRepository {
                         uuid
                     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
                     "iisiiiis",
-                    $year,
+                    $this->season->endingYear,
                     $boxID,
                     $date,
                     $visitor_teamid,

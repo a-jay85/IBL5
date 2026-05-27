@@ -23,7 +23,7 @@ class LeagueScheduleRepositoryTest extends DatabaseTestCase
     {
         $schedId = $this->insertScheduleRow(2090, '2090-01-15', 1, 100, 2, 95);
 
-        $results = $this->repo->getAllGamesWithBoxScoreInfo();
+        $results = $this->repo->getAllGamesWithBoxScoreInfo(2090);
 
         $found = $this->findBySchedId($results, $schedId);
         self::assertNotNull($found);
@@ -36,7 +36,7 @@ class LeagueScheduleRepositoryTest extends DatabaseTestCase
         $schedId = $this->insertScheduleRow(2090, '2090-02-15', 1, 100, 2, 95);
         $this->insertTeamBoxscoreRow('2090-02-15', 'test-game', 3, 1, 2);
 
-        $results = $this->repo->getAllGamesWithBoxScoreInfo();
+        $results = $this->repo->getAllGamesWithBoxScoreInfo(2090);
 
         $found = $this->findBySchedId($results, $schedId);
         self::assertNotNull($found);
@@ -47,7 +47,7 @@ class LeagueScheduleRepositoryTest extends DatabaseTestCase
     {
         $schedId = $this->insertScheduleRow(2090, '2090-03-15', 3, 80, 4, 90);
 
-        $results = $this->repo->getAllGamesWithBoxScoreInfo();
+        $results = $this->repo->getAllGamesWithBoxScoreInfo(2090);
 
         $found = $this->findBySchedId($results, $schedId);
         self::assertNotNull($found);
@@ -60,7 +60,7 @@ class LeagueScheduleRepositoryTest extends DatabaseTestCase
         $this->insertTeamBoxscoreRow('2090-04-15', 'game-a', 5, 1, 2);
         $this->insertTeamBoxscoreRow('2090-04-15', 'game-b', 2, 1, 2);
 
-        $results = $this->repo->getAllGamesWithBoxScoreInfo();
+        $results = $this->repo->getAllGamesWithBoxScoreInfo(2090);
 
         $found = $this->findBySchedId($results, $schedId);
         self::assertNotNull($found);
@@ -71,7 +71,7 @@ class LeagueScheduleRepositoryTest extends DatabaseTestCase
     {
         $schedId = $this->insertScheduleRow(2090, '2090-05-15', 1, 90, 2, 85);
 
-        $results = $this->repo->getAllGamesWithBoxScoreInfo();
+        $results = $this->repo->getAllGamesWithBoxScoreInfo(2090);
 
         $found = $this->findBySchedId($results, $schedId);
         self::assertNotNull($found);
@@ -86,7 +86,7 @@ class LeagueScheduleRepositoryTest extends DatabaseTestCase
         $schedId1 = $this->insertScheduleRow(2090, '2090-06-20', 1, 90, 2, 85);
         $schedId2 = $this->insertScheduleRow(2090, '2090-06-15', 3, 90, 4, 85);
 
-        $results = $this->repo->getAllGamesWithBoxScoreInfo();
+        $results = $this->repo->getAllGamesWithBoxScoreInfo(2090);
 
         $pos1 = null;
         $pos2 = null;
@@ -102,6 +102,19 @@ class LeagueScheduleRepositoryTest extends DatabaseTestCase
         self::assertNotNull($pos2);
         // June 15 before June 20
         self::assertLessThan($pos1, $pos2);
+    }
+
+    public function testGetAllGamesFiltersBySeasonYear(): void
+    {
+        $currentSeason = $this->insertScheduleRow(2090, '2090-01-15', 1, 100, 2, 95);
+        $otherSeason = $this->insertScheduleRow(2089, '2089-06-01', 3, 110, 4, 105);
+
+        $results = $this->repo->getAllGamesWithBoxScoreInfo(2090);
+
+        $foundCurrent = $this->findBySchedId($results, $currentSeason);
+        $foundOther = $this->findBySchedId($results, $otherSeason);
+        self::assertNotNull($foundCurrent, 'Current season game should appear');
+        self::assertNull($foundOther, 'Other season game should be filtered out');
     }
 
     public function testGetTeamRecordsKeyedByIntTid(): void

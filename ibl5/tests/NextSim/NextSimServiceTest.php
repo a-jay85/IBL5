@@ -100,4 +100,52 @@ class NextSimServiceTest extends TestCase
 
         $this->assertNotSame($service1, $service2);
     }
+
+    // ============================================
+    // SEASON YEAR FILTERING
+    // ============================================
+
+    public function testGetNextSimGamesPassesSeasonEndingYearToRepository(): void
+    {
+        $this->setupTeamMockData();
+        $season = new \Season\Season($this->mockDb);
+
+        $mockRepository = $this->createMock(TeamScheduleRepositoryInterface::class);
+        $mockRepository->expects($this->once())
+            ->method('getProjectedGamesNextSimResult')
+            ->with(
+                1,
+                $season->lastSimEndDate,
+                $season->projectedNextSimEndDate->format('Y-m-d'),
+                $season->endingYear
+            )
+            ->willReturn([]);
+
+        $service = new NextSimService($this->mockMysqliDb, $mockRepository);
+
+        $service->getNextSimGames(1, $season);
+    }
+
+    private function setupTeamMockData(): void
+    {
+        $this->mockDb->setMockData([
+            [
+                'teamid' => 1,
+                'team_city' => 'Test City',
+                'team_name' => 'TestTeam',
+                'color1' => 'FF0000',
+                'color2' => '0000FF',
+                'arena' => 'Test Arena',
+                'capacity' => 20000,
+                'owner_name' => 'Test Owner',
+                'owner_email' => 'test@test.com',
+                'discord_id' => null,
+                'used_extension_this_chunk' => 0,
+                'used_extension_this_season' => 0,
+                'has_mle' => 0,
+                'has_lle' => 0,
+                'league_record' => '30-10',
+            ],
+        ]);
+    }
 }

@@ -223,6 +223,25 @@ class TeamScheduleServiceTest extends TestCase
     }
 
     // ============================================
+    // SEASON YEAR FILTERING
+    // ============================================
+
+    public function testGetProcessedSchedulePassesSeasonEndingYearToRepository(): void
+    {
+        $mockRepository = $this->createMock(TeamScheduleRepositoryInterface::class);
+        $season = new Season($this->mockDb);
+
+        $mockRepository->expects($this->once())
+            ->method('getSchedule')
+            ->with(1, $season->endingYear)
+            ->willReturn([]);
+
+        $service = new TeamScheduleService($this->mockMysqliDb, $mockRepository);
+
+        $service->getProcessedSchedule(1, $season);
+    }
+
+    // ============================================
     // HELPERS
     // ============================================
 

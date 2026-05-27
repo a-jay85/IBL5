@@ -53,7 +53,7 @@ class TeamScheduleService implements TeamScheduleServiceInterface
      */
     public function getProcessedSchedule(int $teamId, Season $season): array
     {
-        $teamSchedule = $this->repository->getSchedule($teamId);
+        $teamSchedule = $this->repository->getSchedule($teamId, $season->endingYear);
 
         /** @var list<ScheduleGameRow> $rows */
         $rows = [];

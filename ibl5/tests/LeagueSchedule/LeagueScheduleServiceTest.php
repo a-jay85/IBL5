@@ -227,6 +227,29 @@ class LeagueScheduleServiceTest extends TestCase
         $this->assertFalse($game['homeWon']);
     }
 
+    public function testGetSchedulePageDataPassesSeasonEndingYearToRepository(): void
+    {
+        $mockRepo = $this->createMock(LeagueScheduleRepositoryInterface::class);
+        $mockRepo->expects($this->once())
+            ->method('getAllGamesWithBoxScoreInfo')
+            ->with(2026)
+            ->willReturn([]);
+        $mockRepo->method('getTeamRecords')->willReturn([]);
+
+        $season = $this->createStub(Season::class);
+        $season->endingYear = 2026;
+        $season->projectedNextSimEndDate = new \DateTime('2025-11-15');
+        $season->phase = 'Regular Season';
+
+        $league = $this->createStub(League::class);
+        $league->method('getSimLengthInDays')->willReturn(7);
+
+        $commonRepo = $this->createStub(\Repositories\Contracts\TeamIdentityRepositoryInterface::class);
+
+        $service = new LeagueScheduleService($mockRepo);
+        $service->getSchedulePageData($season, $league, $commonRepo);
+    }
+
     public function testRegularSeasonIsNotPlayoffPhase(): void
     {
         $mockRepo = $this->createStub(LeagueScheduleRepositoryInterface::class);

@@ -1,7 +1,11 @@
 ---
 name: post-plan
 description: Single orchestrator for the post-plan workflow. Runs commit/push/PR, diff classification, code review, security audit, verification, CI monitoring, retrospective, worktree teardown, and background process cleanup as one uninterrupted sequence.
-last_verified: 2026-05-26
+disallowed-tools:
+  - EnterPlanMode
+  - ExitPlanMode
+  - Skill
+last_verified: 2026-05-27
 ---
 
 # Post-Plan Orchestrator

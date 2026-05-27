@@ -23,9 +23,10 @@ interface TeamScheduleRepositoryInterface
      * joined with box score data to include gameOfThatDay.
      *
      * @param int $teamid Team ID to get schedule for
+     * @param int $seasonYear Season ending year to filter by
      * @return list<ScheduleRow> Schedule rows ordered by date ascending
      */
-    public function getSchedule(int $teamid): array;
+    public function getSchedule(int $teamid, int $seasonYear): array;
 
     /**
      * Get projected games for next simulation result
@@ -36,7 +37,8 @@ interface TeamScheduleRepositoryInterface
      * @param int $teamid Team ID to get schedule for
      * @param string $lastSimEndDate Date string (YYYY-MM-DD) of last sim end
      * @param string $projectedNextSimEndDate Date string (YYYY-MM-DD) of projected next sim end (break-aware)
+     * @param int $seasonYear Season ending year to filter by
      * @return list<ProjectedGameRow> Upcoming game rows ordered by date ascending
      */
-    public function getProjectedGamesNextSimResult(int $teamid, string $lastSimEndDate, string $projectedNextSimEndDate): array;
+    public function getProjectedGamesNextSimResult(int $teamid, string $lastSimEndDate, string $projectedNextSimEndDate, int $seasonYear): array;
 }

@@ -31,16 +31,17 @@ class LeagueScheduleRepository extends \BaseMysqliRepository implements LeagueSc
      *
      * @return list<ScheduleRow>
      */
-    public function getAllGamesWithBoxScoreInfo(): array
+    public function getAllGamesWithBoxScoreInfo(int $seasonYear): array
     {
         $query = "SELECT s.id, s.game_date, s.visitor_teamid, s.visitor_score, s.home_teamid, s.home_score, s.box_id,
                   bst.game_of_that_day
                   FROM {$this->scheduleTable} s
                   LEFT JOIN " . $this->gameOfThatDaySubquery() . " bst ON bst.game_date = s.game_date AND bst.visitor_teamid = s.visitor_teamid AND bst.home_teamid = s.home_teamid
+                  WHERE s.season_year = ?
                   ORDER BY s.game_date ASC, s.id ASC";
 
         /** @var list<ScheduleRow> $rows */
-        $rows = $this->fetchAll($query);
+        $rows = $this->fetchAll($query, 'i', $seasonYear);
 
         // Normalize game_of_that_day — the LEFT JOIN can return null
         foreach ($rows as $index => $row) {

@@ -55,7 +55,7 @@ class LeagueScheduleRepositoryTest extends TestCase
         $this->mockDb->setMockData([]);
         $repository = new LeagueScheduleRepository($this->mockMysqliDb);
 
-        $result = $repository->getAllGamesWithBoxScoreInfo();
+        $result = $repository->getAllGamesWithBoxScoreInfo(2026);
 
         $this->assertSame([], $result);
     }
@@ -76,7 +76,7 @@ class LeagueScheduleRepositoryTest extends TestCase
         ]);
         $repository = new LeagueScheduleRepository($this->mockMysqliDb);
 
-        $result = $repository->getAllGamesWithBoxScoreInfo();
+        $result = $repository->getAllGamesWithBoxScoreInfo(2026);
 
         $this->assertCount(1, $result);
         $this->assertSame('2025-11-01', $result[0]['game_date']);
@@ -100,7 +100,7 @@ class LeagueScheduleRepositoryTest extends TestCase
         ]);
         $repository = new LeagueScheduleRepository($this->mockMysqliDb);
 
-        $result = $repository->getAllGamesWithBoxScoreInfo();
+        $result = $repository->getAllGamesWithBoxScoreInfo(2026);
 
         $this->assertSame(0, $result[0]['game_of_that_day']);
     }

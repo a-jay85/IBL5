@@ -108,7 +108,7 @@ class ScheduleWideUnitTest extends WideUnitTestCase
         $this->mockDb->setMockData([]);
 
         // Act
-        $this->repository->getSchedule($teamId);
+        $this->repository->getSchedule($teamId, 2025);
 
         // Assert
         $this->assertQueryExecuted('ibl_schedule');
@@ -132,7 +132,7 @@ class ScheduleWideUnitTest extends WideUnitTestCase
         $this->mockDb->setMockData($scheduleData);
 
         // Act
-        $result = $this->repository->getSchedule($teamId);
+        $result = $this->repository->getSchedule($teamId, 2025);
 
         // Assert - Result should be an array
         $this->assertIsArray($result);
@@ -151,7 +151,7 @@ class ScheduleWideUnitTest extends WideUnitTestCase
         $this->mockDb->setMockData([]);
 
         // Act
-        $this->repository->getSchedule($teamId);
+        $this->repository->getSchedule($teamId, 2025);
 
         // Assert
         $this->assertQueryExecuted('ORDER BY s.game_date ASC');
@@ -169,7 +169,7 @@ class ScheduleWideUnitTest extends WideUnitTestCase
         $this->mockDb->setMockData([]);
 
         // Act
-        $result = $this->repository->getSchedule($teamId);
+        $result = $this->repository->getSchedule($teamId, 2025);
 
         // Assert
         $this->assertSame([], $result);
@@ -189,7 +189,7 @@ class ScheduleWideUnitTest extends WideUnitTestCase
         $this->mockDb->setMockData([]);
 
         // Act
-        $this->repository->getProjectedGamesNextSimResult($teamId, $lastSimEndDate, $projectedNextSimEndDate);
+        $this->repository->getProjectedGamesNextSimResult($teamId, $lastSimEndDate, $projectedNextSimEndDate, 2025);
 
         // Assert - Verify query was executed against ibl_schedule
         $this->assertQueryExecuted('ibl_schedule');

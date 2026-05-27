@@ -52,7 +52,7 @@ class LeagueScheduleService implements LeagueScheduleServiceInterface
         $projectedNextSimEndDate = $season->projectedNextSimEndDate;
         $simLengthDays = $league->getSimLengthInDays();
 
-        $rawGames = $this->repository->getAllGamesWithBoxScoreInfo();
+        $rawGames = $this->repository->getAllGamesWithBoxScoreInfo($season->endingYear);
         $teamRecords = $this->repository->getTeamRecords();
 
         /** @var array<string, MonthData> $gamesByMonth */

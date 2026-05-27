@@ -23,11 +23,12 @@ namespace LeagueSchedule\Contracts;
 interface LeagueScheduleRepositoryInterface
 {
     /**
-     * Get all scheduled games with box score info
+     * Get all scheduled games with box score info for a given season
      *
+     * @param int $seasonYear Season ending year to filter by
      * @return list<ScheduleRow> Games ordered by date ascending, then id ascending
      */
-    public function getAllGamesWithBoxScoreInfo(): array;
+    public function getAllGamesWithBoxScoreInfo(int $seasonYear): array;
 
     /**
      * Get team records indexed by team ID

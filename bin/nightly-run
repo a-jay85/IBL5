@@ -6,11 +6,103 @@
 #
 # To test manually: bin/nightly-run
 # To force-trigger via launchd: launchctl start com.ibl5.nightly-claude
+# To schedule a one-shot run: bin/nightly-run schedule "2026-05-28 20:00 PDT"
 
 set -euo pipefail
 
 # launchd runs with minimal env — ensure our tools are findable
 export PATH="/usr/local/bin:/opt/homebrew/bin:$HOME/.bun/bin:$HOME/.local/bin:/Applications/cmux.app/Contents/Resources/bin:$PATH"
+
+# --- One-shot scheduler subcommand ----------------------------------------
+# Usage: bin/nightly-run schedule "YYYY-MM-DD HH:MM [TZ]"
+# Creates a self-cleaning launchd agent that fires bin/nightly-run once at the
+# given time, then removes its own plist and boots itself out. The timezone
+# abbreviation is optional and defaults to the system's local zone.
+# Example: bin/nightly-run schedule "2026-05-28 20:00 PDT"
+if [ "${1:-}" = "schedule" ]; then
+    WHEN="${2:-}"
+    if [ -z "$WHEN" ]; then
+        echo "usage: bin/nightly-run schedule \"YYYY-MM-DD HH:MM [TZ]\"" >&2
+        echo "example: bin/nightly-run schedule \"2026-05-28 20:00 PDT\"" >&2
+        exit 1
+    fi
+
+    # Resolve to an epoch — try with a timezone abbreviation first, then local.
+    EPOCH=$(date -j -f '%Y-%m-%d %H:%M %Z' "$WHEN" +%s 2>/dev/null || true)
+    if [ -z "$EPOCH" ]; then
+        EPOCH=$(date -j -f '%Y-%m-%d %H:%M' "$WHEN" +%s 2>/dev/null || true)
+    fi
+    if [ -z "$EPOCH" ]; then
+        echo "error: could not parse time '$WHEN'" >&2
+        echo "expected: YYYY-MM-DD HH:MM [TZ]  (e.g. 2026-05-28 20:00 PDT)" >&2
+        exit 1
+    fi
+
+    if [ "$EPOCH" -le "$(date +%s)" ]; then
+        echo "error: '$WHEN' resolves to the past ($(date -r "$EPOCH" '+%Y-%m-%d %H:%M %Z'))" >&2
+        exit 1
+    fi
+
+    # launchd StartCalendarInterval is interpreted in system-local time — derive
+    # local calendar components from the resolved epoch. 10# forces base-10 so
+    # values like 08/09 don't trip bash's octal parser.
+    CAL_MONTH=$((10#$(date -r "$EPOCH" +%m)))
+    CAL_DAY=$((10#$(date -r "$EPOCH" +%d)))
+    CAL_HOUR=$((10#$(date -r "$EPOCH" +%H)))
+    CAL_MIN=$((10#$(date -r "$EPOCH" +%M)))
+    LOCAL_STR=$(date -r "$EPOCH" '+%Y-%m-%d %H:%M %Z')
+
+    LABEL="com.ibl5.nightly-oneshot-$EPOCH"
+    PLIST="$HOME/Library/LaunchAgents/$LABEL.plist"
+    SELF="/Users/ajaynicolas/GitHub/IBL5/bin/nightly-run"
+    OUT_LOG="$HOME/.claude/projects/-Users-ajaynicolas-GitHub-IBL5/nightly/logs/launchd-oneshot-stdout.log"
+    ERR_LOG="$HOME/.claude/projects/-Users-ajaynicolas-GitHub-IBL5/nightly/logs/launchd-oneshot-stderr.log"
+    mkdir -p "$(dirname "$OUT_LOG")"
+
+    cat > "$PLIST" <<PLIST_EOF
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>Label</key>
+	<string>$LABEL</string>
+	<key>ProgramArguments</key>
+	<array>
+		<string>/bin/bash</string>
+		<string>-lc</string>
+		<string>$SELF; rm -f "$PLIST"; launchctl bootout gui/\$(id -u)/$LABEL</string>
+	</array>
+	<key>StartCalendarInterval</key>
+	<dict>
+		<key>Month</key>
+		<integer>$CAL_MONTH</integer>
+		<key>Day</key>
+		<integer>$CAL_DAY</integer>
+		<key>Hour</key>
+		<integer>$CAL_HOUR</integer>
+		<key>Minute</key>
+		<integer>$CAL_MIN</integer>
+	</dict>
+	<key>WorkingDirectory</key>
+	<string>/Users/ajaynicolas/GitHub/IBL5</string>
+	<key>StandardOutPath</key>
+	<string>$OUT_LOG</string>
+	<key>StandardErrorPath</key>
+	<string>$ERR_LOG</string>
+</dict>
+</plist>
+PLIST_EOF
+
+    launchctl bootout "gui/$(id -u)/$LABEL" 2>/dev/null || true
+    launchctl bootstrap "gui/$(id -u)" "$PLIST"
+
+    echo "Scheduled one-shot nightly-run:"
+    echo "  fires:  $LOCAL_STR  (local time)"
+    echo "  label:  $LABEL"
+    echo "  plist:  $PLIST"
+    echo "  note:   runs only if the Mac is awake then; self-removes after firing."
+    exit 0
+fi
 
 # Burst mode: if NIGHTLY_BURST is set, check cutoff and self-revert when expired.
 if [ "${NIGHTLY_BURST:-}" = "1" ] && [ -n "${NIGHTLY_BURST_CUTOFF:-}" ]; then

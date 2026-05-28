@@ -17,6 +17,7 @@ A headless `claude -p` process runs twice daily via macOS `launchd`. It loops th
 | Remove a plan from queue | `bin/nightly-queue remove <slug>` |
 | Check morning results | `ls ~/.claude/projects/-Users-ajaynicolas-GitHub-IBL5/nightly/reports/` |
 | Cancel tonight's run | `rm ~/.claude/projects/-Users-ajaynicolas-GitHub-IBL5/nightly/queue/*.md` |
+| Schedule a one-shot run | `bin/nightly-run schedule "2026-05-28 20:00 PDT"` (self-cleaning launchd agent; TZ optional) |
 | Disable nightly job | `launchctl unload ~/Library/LaunchAgents/com.ibl5.nightly-claude.plist` |
 | Re-enable nightly job | `launchctl load ~/Library/LaunchAgents/com.ibl5.nightly-claude.plist` |
 | Force-trigger now | `launchctl start com.ibl5.nightly-claude` |

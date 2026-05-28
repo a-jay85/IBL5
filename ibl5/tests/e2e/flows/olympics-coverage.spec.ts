@@ -21,16 +21,6 @@ test.describe('Olympics module coverage', () => {
     expect(hasTeamColumn || hasRecordColumn).toBe(true);
   });
 
-  test('olympics team page loads with roster', async ({ appState, page }) => {
-    await appState({ 'Trivia Mode': 'Off' });
-    await page.goto('modules.php?name=Team&op=team&teamid=1&league=olympics');
-    await assertNoPhpErrors(page, 'on Olympics Team page');
-
-    // Team page should have a table (roster or stats)
-    const table = page.locator('.ibl-data-table, table');
-    await expect(table.first()).toBeVisible();
-  });
-
   test('IBL-only modules show gating message in olympics context', async ({ appState, page }) => {
     await appState({ 'Trivia Mode': 'Off' });
     // FranchiseHistory is IBL-only

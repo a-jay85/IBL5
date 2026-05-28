@@ -1,0 +1,14 @@
+[
+  {
+    "url": "http://localhost:8080/ibl5/index.php",
+    "summary": { "performance": 0.92, "accessibility": 0.96, "best-practices": 0.91 }
+  },
+  {
+    "url": "http://localhost:8080/ibl5/modules.php?name=Standings",
+    "summary": { "performance": 0.55, "accessibility": 0.90, "best-practices": 0.85 }
+  },
+  {
+    "url": "http://localhost:8080/ibl5/modules.php?name=Player&pa=showpage&pid=1",
+    "summary": { "performance": 0.70, "accessibility": 0.75, "best-practices": 0.82 }
+  }
+]

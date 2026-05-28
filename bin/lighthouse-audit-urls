@@ -1,0 +1,74 @@
+#!/usr/bin/env php
+<?php
+
+declare(strict_types=1);
+
+require_once __DIR__ . '/../ibl5/vendor/autoload.php';
+
+$worktreeClasses = realpath(__DIR__ . '/../ibl5/classes');
+if ($worktreeClasses !== false && is_link(__DIR__ . '/../ibl5/vendor')) {
+    spl_autoload_register(static function (string $class) use ($worktreeClasses): void {
+        $file = $worktreeClasses . '/' . str_replace('\\', '/', $class) . '.php';
+        if (file_exists($file)) {
+            require $file;
+        }
+    }, true, true);
+}
+
+use Module\ModuleRegistry;
+
+$baseUrl = 'http://localhost:8080';
+$jsonOutput = false;
+
+foreach ($argv as $i => $arg) {
+    if ($i === 0) {
+        continue;
+    }
+    if (str_starts_with($arg, '--base-url=')) {
+        $baseUrl = substr($arg, strlen('--base-url='));
+    } elseif ($arg === '--json') {
+        $jsonOutput = true;
+    } elseif ($arg === '--help') {
+        fwrite(STDOUT, "Usage: bin/lighthouse-audit-urls [--base-url=URL] [--json]\n");
+        exit(0);
+    } else {
+        fwrite(STDERR, "Unknown argument: $arg\n");
+        fwrite(STDERR, "Usage: bin/lighthouse-audit-urls [--base-url=URL] [--json]\n");
+        exit(2);
+    }
+}
+
+$baseUrl = rtrim($baseUrl, '/');
+
+$subPages = [
+    'Team'                => '&op=team&teamid=1',
+    'Player'              => '&pa=showpage&pid=1',
+    'Schedule'            => '&teamid=1',
+    'DraftHistory'        => '&year=2025',
+    'FranchiseRecordBook' => '&op=team&teamid=1',
+    'SeasonArchive'       => '&year=2025',
+    'Injuries'            => '&teamid=1',
+    'OneOnOneGame'        => '&gameid=1',
+];
+
+$urls = [];
+
+$urls[] = $baseUrl . '/ibl5/index.php';
+
+foreach (ModuleRegistry::getAllModules() as $module) {
+    $urls[] = $baseUrl . '/ibl5/modules.php?name=' . $module;
+
+    if (isset($subPages[$module])) {
+        $urls[] = $baseUrl . '/ibl5/modules.php?name=' . $module . $subPages[$module];
+    }
+}
+
+if ($jsonOutput) {
+    fwrite(STDOUT, json_encode($urls, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES) . "\n");
+} else {
+    foreach ($urls as $url) {
+        fwrite(STDOUT, $url . "\n");
+    }
+}
+
+exit(0);

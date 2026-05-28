@@ -1,0 +1,85 @@
+#!/usr/bin/env php
+<?php
+
+declare(strict_types=1);
+
+require_once __DIR__ . '/../ibl5/vendor/autoload.php';
+
+$worktreeClasses = realpath(__DIR__ . '/../ibl5/classes');
+if ($worktreeClasses !== false && is_link(__DIR__ . '/../ibl5/vendor')) {
+    spl_autoload_register(static function (string $class) use ($worktreeClasses): void {
+        $file = $worktreeClasses . '/' . str_replace('\\', '/', $class) . '.php';
+        if (file_exists($file)) {
+            require $file;
+        }
+    }, true, true);
+}
+
+use Cli\LighthouseAuditReportFormatter;
+
+$manifestPath = null;
+$sha = null;
+$workflowUrl = null;
+$outTitle = null;
+$outBody = null;
+
+foreach ($argv as $i => $arg) {
+    if ($i === 0) {
+        continue;
+    }
+    if (str_starts_with($arg, '--manifest=')) {
+        $manifestPath = substr($arg, strlen('--manifest='));
+    } elseif (str_starts_with($arg, '--sha=')) {
+        $sha = substr($arg, strlen('--sha='));
+    } elseif (str_starts_with($arg, '--workflow-url=')) {
+        $workflowUrl = substr($arg, strlen('--workflow-url='));
+    } elseif (str_starts_with($arg, '--out-title=')) {
+        $outTitle = substr($arg, strlen('--out-title='));
+    } elseif (str_starts_with($arg, '--out-body=')) {
+        $outBody = substr($arg, strlen('--out-body='));
+    } elseif ($arg === '--help') {
+        fwrite(STDOUT, "Usage: bin/lighthouse-audit-report --manifest=PATH [--sha=HASH] [--workflow-url=URL] [--out-title=PATH] [--out-body=PATH]\n");
+        exit(0);
+    } else {
+        fwrite(STDERR, "Unknown argument: $arg\n");
+        fwrite(STDERR, "Usage: bin/lighthouse-audit-report --manifest=PATH [--sha=HASH] [--workflow-url=URL] [--out-title=PATH] [--out-body=PATH]\n");
+        exit(2);
+    }
+}
+
+if ($manifestPath === null) {
+    fwrite(STDERR, "--manifest is required\n");
+    fwrite(STDERR, "Usage: bin/lighthouse-audit-report --manifest=PATH [--sha=HASH] [--workflow-url=URL] [--out-title=PATH] [--out-body=PATH]\n");
+    exit(2);
+}
+
+if (!file_exists($manifestPath)) {
+    fwrite(STDERR, "Manifest file not found: $manifestPath\n");
+    exit(2);
+}
+
+$manifestJson = file_get_contents($manifestPath);
+if ($manifestJson === false) {
+    fwrite(STDERR, "Could not read manifest file: $manifestPath\n");
+    exit(2);
+}
+
+/** @var list<array{url: string, summary: array<string, float>}> $manifest */
+$manifest = json_decode($manifestJson, true, 512, JSON_THROW_ON_ERROR);
+
+$formatter = new LighthouseAuditReportFormatter();
+$result = $formatter->format($manifest, $sha, $workflowUrl);
+
+if ($outTitle !== null) {
+    file_put_contents($outTitle, $result['title']);
+}
+
+if ($outBody !== null) {
+    file_put_contents($outBody, $result['body']);
+}
+
+if ($outTitle === null && $outBody === null) {
+    fwrite(STDOUT, "# " . $result['title'] . "\n\n" . $result['body']);
+}
+
+exit(0);

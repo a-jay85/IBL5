@@ -1,0 +1,132 @@
+name: Weekly Lighthouse Audit
+
+on:
+  schedule:
+    - cron: '0 3 * * 0'  # Sunday 3am UTC
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+concurrency:
+  group: lighthouse-audit
+  cancel-in-progress: false
+
+jobs:
+  audit:
+    name: Full-Site Lighthouse Audit
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+
+      - name: Cache vendor directory
+        uses: actions/cache@v5
+        with:
+          path: ibl5/vendor
+          key: ${{ runner.os }}-vendor-${{ hashFiles('ibl5/composer.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-vendor-
+
+      - name: Cache node_modules
+        uses: actions/cache@v5
+        with:
+          path: ibl5/node_modules
+          key: ${{ runner.os }}-bun-${{ hashFiles('ibl5/bun.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-bun-
+
+      - name: Install dependencies
+        working-directory: ibl5
+        run: |
+          composer install --no-interaction --no-progress --prefer-dist --ignore-platform-reqs
+          bun install
+
+      - uses: ./.github/actions/setup-docker-e2e
+        with:
+          build-css: 'true'
+
+      - name: Generate URL list
+        run: bin/lighthouse-audit-urls --json > /tmp/urls.json
+
+      - name: Generate Lighthouse config
+        run: |
+          jq -n --argjson urls "$(cat /tmp/urls.json)" '{
+            ci: {
+              collect: {
+                url: $urls,
+                numberOfRuns: 1,
+                settings: {
+                  onlyCategories: ["performance", "accessibility", "best-practices"]
+                }
+              }
+            }
+          }' > .lighthouserc-audit.json
+
+      - name: Run Lighthouse CI
+        working-directory: ibl5
+        run: bunx @lhci/cli collect --config=../.lighthouserc-audit.json
+        env:
+          CHROME_PATH: /usr/bin/google-chrome-stable
+
+      - name: Write manifest
+        working-directory: ibl5
+        run: |
+          bunx @lhci/cli upload \
+            --target=filesystem \
+            --outputDir=.lighthouseci
+          jq '[.[] | select(.isRepresentativeRun == true)]' \
+            .lighthouseci/manifest.json > .lighthouseci/manifest-filtered.json
+
+      - name: Generate report
+        run: |
+          bin/lighthouse-audit-report \
+            --manifest=ibl5/.lighthouseci/manifest-filtered.json \
+            --sha=${{ github.sha }} \
+            --workflow-url=${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }} \
+            --out-title=/tmp/issue-title.txt \
+            --out-body=/tmp/issue-body.md
+
+      - name: Ensure lighthouse-audit label exists
+        run: gh label create lighthouse-audit --color 0075ca --force 2>/dev/null || true
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Close previous audit issue
+        run: |
+          PREV=$(gh issue list \
+            --label lighthouse-audit \
+            --state open \
+            --json number \
+            --jq '.[].number' \
+          )
+          for num in $PREV; do
+            gh issue close "$num" \
+              --comment "Superseded by new weekly audit."
+          done
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Create audit issue
+        run: |
+          gh issue create \
+            --title "$(cat /tmp/issue-title.txt)" \
+            --body-file /tmp/issue-body.md \
+            --label lighthouse-audit
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Publish to job summary
+        run: |
+          echo "# $(cat /tmp/issue-title.txt)" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          cat /tmp/issue-body.md >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Teardown
+        if: always()
+        run: docker compose -f docker-compose.ci.yml down --volumes

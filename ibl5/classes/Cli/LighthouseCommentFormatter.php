@@ -6,15 +6,6 @@ namespace Cli;
 
 final class LighthouseCommentFormatter
 {
-    private const THRESHOLDS = [
-        'performance' => ['level' => 'warn', 'minScore' => 0.6],
-        'accessibility' => ['level' => 'error', 'minScore' => 0.85],
-        'best-practices' => ['level' => 'warn', 'minScore' => 0.8],
-    ];
-
-    private const REGRESSION_THRESHOLD = 0.03;
-
-    private const CATEGORIES = ['performance', 'accessibility', 'best-practices'];
 
     /**
      * @param list<array{url: string, summary: array<string, float>}> $manifest
@@ -56,7 +47,7 @@ final class LighthouseCommentFormatter
             $reportLink = isset($links[$url]) ? '[view ↗](' . $links[$url] . ')' : '';
 
             $cells = [];
-            foreach (self::CATEGORIES as $category) {
+            foreach (LighthouseThresholds::CATEGORIES as $category) {
                 $score = $summary[$category] ?? null;
                 if ($score === null) {
                     $cells[] = 'n/a';
@@ -70,7 +61,7 @@ final class LighthouseCommentFormatter
 
                 $cells[] = $this->formatCell($category, $score, $delta);
 
-                $threshold = self::THRESHOLDS[$category];
+                $threshold = LighthouseThresholds::THRESHOLDS[$category];
                 if ($threshold['level'] === 'error' && $score < $threshold['minScore']) {
                     $hasErrorViolation = true;
                 }
@@ -99,11 +90,11 @@ final class LighthouseCommentFormatter
     }
 
     /**
-     * @param key-of<self::THRESHOLDS> $category
+     * @param key-of<LighthouseThresholds::THRESHOLDS> $category
      */
     private function formatCell(string $category, float $score, ?float $delta): string
     {
-        $threshold = self::THRESHOLDS[$category];
+        $threshold = LighthouseThresholds::THRESHOLDS[$category];
         $scoreStr = sprintf('%.2f', $score);
 
         $isErrorViolation = $threshold['level'] === 'error'
@@ -112,7 +103,7 @@ final class LighthouseCommentFormatter
         $isWarnViolation = $threshold['level'] === 'warn'
             && $score < $threshold['minScore'];
 
-        $isRegression = $delta !== null && $delta < -self::REGRESSION_THRESHOLD;
+        $isRegression = $delta !== null && $delta < -LighthouseThresholds::REGRESSION_THRESHOLD;
 
         if ($isErrorViolation) {
             $marker = "\u{1F534} ";

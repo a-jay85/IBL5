@@ -56,6 +56,12 @@ final class ModuleRegistry
         'YourAccount',
     ];
 
+    /** @return list<string> */
+    public static function getAllModules(): array
+    {
+        return self::VALID_MODULES;
+    }
+
     public static function isValid(string $name): bool
     {
         return in_array($name, self::VALID_MODULES, true);

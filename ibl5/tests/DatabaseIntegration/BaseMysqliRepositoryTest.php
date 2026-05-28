@@ -378,8 +378,12 @@ class BaseMysqliRepositoryTest extends DatabaseTestCase
         self::assertStringContainsString('`ibl_olympics_saved_depth_charts`', $result);
     }
 
-    public function testRewriteTableNamesLeavesBareNamesAlone(): void
+    public function testRewriteTableNamesRewritesColumnQualifiedReferences(): void
     {
+        // Regression: a table-qualified column reference (ibl_plr.name) MUST be
+        // rewritten alongside its FROM clause. The previous backtick-only
+        // str_replace left it dangling, so rewriting `FROM `ibl_plr`` while
+        // leaving `ibl_plr.name` produced "Unknown table 'ibl_plr'".
         $context = $this->createStub(LeagueContext::class);
         $context->method('isOlympics')->willReturn(true);
 
@@ -389,7 +393,92 @@ class BaseMysqliRepositoryTest extends DatabaseTestCase
         $result = $repo->callRewriteTableNames($query);
 
         self::assertStringContainsString('`ibl_olympics_plr`', $result);
-        self::assertStringContainsString('ibl_plr.name AS ibl_plr_name', $result);
+        self::assertStringContainsString('ibl_olympics_plr.name', $result);
+        // The qualified column ref is rewritten; the column alias, which merely
+        // contains the table name as a substring, is left untouched.
+        self::assertStringContainsString('AS ibl_plr_name', $result);
+        self::assertDoesNotMatchRegularExpression('/(?<![A-Za-z0-9_])ibl_plr\./', $result);
+    }
+
+    public function testRewriteTableNamesLeavesBareReferencesOnIbl(): void
+    {
+        // Regression guard for the NavigationRepository::resolveTeamId fatal:
+        // identity/GM lookups reference the table BARE (no backticks) precisely
+        // so they stay on IBL even in Olympics context — the IBL-only
+        // `gm_username` column does not exist on ibl_olympics_team_info.
+        // Backtick-quoting is the opt-in signal; bare references must NOT be
+        // rewritten.
+        $context = $this->createStub(LeagueContext::class);
+        $context->method('isOlympics')->willReturn(true);
+
+        $repo = new TestableBaseMysqliRepository($this->db, $context);
+
+        $query = "SELECT teamid FROM ibl_team_info WHERE gm_username = ?";
+        $result = $repo->callRewriteTableNames($query);
+
+        self::assertSame($query, $result, 'bare (non-backticked) table refs must stay on IBL');
+
+        // This bare query must remain executable against the live IBL schema.
+        $stmt = $this->db->prepare($result);
+        self::assertNotFalse($stmt, 'bare IBL query failed to prepare: ' . $result);
+        $stmt->close();
+    }
+
+    public function testRewriteTableNamesIsIdempotent(): void
+    {
+        $context = $this->createStub(LeagueContext::class);
+        $context->method('isOlympics')->willReturn(true);
+
+        $repo = new TestableBaseMysqliRepository($this->db, $context);
+
+        $query = "SELECT ibl_team_info.* FROM `ibl_team_info` "
+            . "LEFT JOIN `ibl_standings` ON ibl_team_info.teamid = ibl_standings.teamid";
+        $once = $repo->callRewriteTableNames($query);
+        $twice = $repo->callRewriteTableNames($once);
+
+        self::assertSame($once, $twice, 'rewriteTableNames must be idempotent');
+        self::assertNoUnprefixedIblTable($once);
+    }
+
+    public function testRewriteTableNamesProducesExecutableQueryForColumnQualifiedJoin(): void
+    {
+        // Gold-standard regression: the exact Team::load() shape that fataled in
+        // CI ("Unknown table 'ibl5.ibl_team_info'"). After rewriting it must run.
+        $context = $this->createStub(LeagueContext::class);
+        $context->method('isOlympics')->willReturn(true);
+
+        $repo = new TestableBaseMysqliRepository($this->db, $context);
+
+        $query = "SELECT ibl_team_info.*, ibl_standings.league_record "
+            . "FROM `ibl_team_info` "
+            . "LEFT JOIN `ibl_standings` ON ibl_team_info.teamid = ibl_standings.teamid "
+            . "WHERE ibl_team_info.teamid = ? LIMIT 1";
+        $rewritten = $repo->callRewriteTableNames($query);
+
+        self::assertNoUnprefixedIblTable($rewritten);
+
+        // Executing the rewritten query against the live schema must not throw.
+        $stmt = $this->db->prepare($rewritten);
+        self::assertNotFalse($stmt, 'rewritten query failed to prepare: ' . $rewritten);
+        $teamid = 1;
+        $stmt->bind_param('i', $teamid);
+        $stmt->execute();
+        $stmt->close();
+    }
+
+    /**
+     * Assert no mapped IBL table name survives as a standalone identifier token.
+     */
+    private static function assertNoUnprefixedIblTable(string $query): void
+    {
+        foreach (array_keys(LeagueContext::TABLE_MAP) as $iblTable) {
+            $pattern = '/(?<![A-Za-z0-9_])' . preg_quote($iblTable, '/') . '(?![A-Za-z0-9_])/';
+            self::assertDoesNotMatchRegularExpression(
+                $pattern,
+                $query,
+                "Un-rewritten IBL table '$iblTable' survived: $query"
+            );
+        }
     }
 
     public function testRewriteTableNamesUsesSharedContextFallback(): void

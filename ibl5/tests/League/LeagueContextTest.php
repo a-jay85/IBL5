@@ -349,6 +349,30 @@ class LeagueContextTest extends TestCase
         $this->assertSame('some_other_table', $this->leagueContext->getTableName('some_other_table'));
     }
 
+    public function testTableMapIsTheSingleSourceOfTruthForGetTableName(): void
+    {
+        $_SESSION['current_league'] = 'olympics';
+
+        // getTableName() must be a thin lookup over TABLE_MAP (the shared map
+        // also consumed by BaseMysqliRepository::rewriteTableNames). Guards
+        // against the two diverging, which is how Olympics tables silently
+        // stopped being rewritten.
+        foreach (LeagueContext::TABLE_MAP as $iblTable => $olympicsTable) {
+            $this->assertSame($olympicsTable, $this->leagueContext->getTableName($iblTable));
+        }
+    }
+
+    public function testTableMapEntriesAreWellFormed(): void
+    {
+        foreach (LeagueContext::TABLE_MAP as $iblTable => $olympicsTable) {
+            $this->assertStringStartsWith('ibl_', $iblTable, "Key '$iblTable' must be an IBL table");
+            $this->assertStringStartsWith('ibl_olympics_', $olympicsTable, "Value '$olympicsTable' must be Olympics-prefixed");
+            $this->assertNotSame($iblTable, $olympicsTable, "'$iblTable' must map to a distinct Olympics table");
+            // The Olympics name is the IBL name with the olympics_ infix.
+            $this->assertSame('ibl_olympics_' . substr($iblTable, strlen('ibl_')), $olympicsTable);
+        }
+    }
+
     public function testGetTableNameReturnsIblTableNamesByDefault(): void
     {
         // No league set — defaults to IBL

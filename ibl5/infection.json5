@@ -44,10 +44,7 @@
         "customPath": "vendor/bin/phpunit"
     },
     "mutators": {
-        "@default": true,
-        "CastFloat": false,
-        "CastInt": false,
-        "CastString": false
+        "@default": true
     },
     "testFramework": "phpunit",
     "testFrameworkOptions": "--configuration=phpunit-mutation.xml",

@@ -1,5 +1,6 @@
 ---
 description: Docker MariaDB connection details, query patterns, and schema verification rules.
+last_verified: 2026-05-28
 paths:
   - "**/*Repository.php"
   - "**/migrations/000_baseline_schema.sql"
@@ -66,6 +67,8 @@ bin/db-test-up [worktree-name] [--no-run]
 ```
 
 Bootstraps a sibling `ibl5_test` database for `phpunit --group database` runs. Drops and recreates `ibl5_test` each run; never touches `iblhoops_ibl5`. Without arguments, uses the main checkout Docker environment. With a worktree name, uses the worktree's Docker stack. `--no-run` bootstraps the database only.
+
+**In a worktree, ALWAYS run DB-integration tests via `bin/db-test-up <slug>` — never hand-run `DB_HOST=127.0.0.1 vendor/bin/phpunit --group database` from the host.** Only the main stack's `ibl5-mariadb` publishes host port 3306; worktree DB containers (`ibl5-db-<slug>`) are reachable on the Docker network only. So a host-side `127.0.0.1` connection silently targets the **main** stack's `ibl5_test` — typically a stale DB from an earlier run — producing phantom failures (wrong counts, duplicate-key errors) that don't reproduce in CI. `bin/db-test-up <slug>` runs phpunit inside the worktree php container against `DB_HOST=db`, hitting the freshly-built worktree DB. Verify port ownership with `docker ps --format '{{.Names}} {{.Ports}}' | grep 3306`.
 
 ## MariaDB Strict Mode & Triggers
 

@@ -16,7 +16,7 @@ test.describe('Team page flow', () => {
     // Current-season teams use a dropdown, not tabs
     const dropdown = page.locator('.ibl-view-select').first();
     await expect(dropdown).toBeVisible();
-    await expect(page.locator('.ibl-data-table, table').first()).toBeVisible();
+    await expect(page.locator('.ibl-data-table').first()).toBeVisible();
   });
 
   test('team banner shows logo and action links', async ({ page }) => {
@@ -33,7 +33,7 @@ test.describe('Team page flow', () => {
 
     await dropdown.selectOption('total_s');
     // Table should update (AJAX or page reload)
-    await expect(page.locator('.ibl-data-table, table').first()).toBeVisible();
+    await expect(page.locator('.ibl-data-table').first()).toBeVisible();
   });
 
   test('dropdown switches view to contracts', async ({ page }) => {
@@ -41,7 +41,7 @@ test.describe('Team page flow', () => {
     await expect(dropdown).toBeVisible();
 
     await dropdown.selectOption('contracts');
-    await expect(page.locator('.ibl-data-table, table').first()).toBeVisible();
+    await expect(page.locator('.ibl-data-table').first()).toBeVisible();
   });
 
   test('dropdown switches view to averages', async ({ page }) => {
@@ -49,7 +49,7 @@ test.describe('Team page flow', () => {
     await expect(dropdown).toBeVisible();
 
     await dropdown.selectOption('avg_s');
-    await expect(page.locator('.ibl-data-table, table').first()).toBeVisible();
+    await expect(page.locator('.ibl-data-table').first()).toBeVisible();
   });
 
   test('team cards display sidebar info', async ({ page }) => {
@@ -78,13 +78,13 @@ test.describe('Team page: additional display modes', () => {
   test('dropdown switches to per36mins', async ({ page }) => {
     const dropdown = page.locator('.ibl-view-select').first();
     await dropdown.selectOption('per36mins');
-    await expect(page.locator('.ibl-data-table, table').first()).toBeVisible();
+    await expect(page.locator('.ibl-data-table').first()).toBeVisible();
   });
 
   test('dropdown switches to chunk', async ({ page }) => {
     const dropdown = page.locator('.ibl-view-select').first();
     await dropdown.selectOption('chunk');
-    await expect(page.locator('.ibl-data-table, table').first()).toBeVisible();
+    await expect(page.locator('.ibl-data-table').first()).toBeVisible();
   });
 });
 
@@ -95,7 +95,7 @@ publicTest.describe('Team page: playoffs display mode', () => {
     await page.goto('modules.php?name=Team&op=team&teamid=1');
     const dropdown = page.locator('.ibl-view-select').first();
     await dropdown.selectOption('playoffs');
-    await publicExpect(page.locator('.ibl-data-table, table').first()).toBeVisible();
+    await publicExpect(page.locator('.ibl-data-table').first()).toBeVisible();
   });
 });
 
@@ -135,7 +135,7 @@ test.describe('Team page: dropdown content changes', () => {
     const dropdown = page.locator('.ibl-view-select').first();
 
     await dropdown.selectOption('split:home');
-    await expect(page.locator('.ibl-data-table, table').first()).toBeVisible();
+    await expect(page.locator('.ibl-data-table').first()).toBeVisible();
     await assertNoPhpErrors(page, 'after switching to split:home');
   });
 
@@ -156,7 +156,7 @@ test.describe('Team page: dropdown content changes', () => {
     await page.goBack();
 
     // Back should restore ratings view (no salary columns)
-    await expect(page.locator('.ibl-data-table, table').first()).toBeVisible({ timeout: 10000 });
+    await expect(page.locator('.ibl-data-table').first()).toBeVisible({ timeout: 10000 });
     const salaryHeaders = page.locator('.ibl-data-table th.col-salary');
     await expect(salaryHeaders).toHaveCount(0, { timeout: 10000 });
   });
@@ -213,7 +213,7 @@ test.describe('Team page: error and banner states', () => {
 test.describe('Team page: historical year view', () => {
   test('historical year view renders with year in title', async ({ page }) => {
     await page.goto('modules.php?name=Team&op=team&teamid=1&yr=2024');
-    await expect(page.locator('.ibl-data-table, table').first()).toBeVisible();
+    await expect(page.locator('.ibl-data-table').first()).toBeVisible();
     await assertNoPhpErrors(page, 'on historical year view');
   });
 });

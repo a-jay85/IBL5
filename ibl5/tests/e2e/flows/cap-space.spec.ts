@@ -15,12 +15,12 @@ test.describe('Cap Space flow', () => {
   });
 
   test('cap space table is visible', async ({ page }) => {
-    const table = page.locator('.ibl-data-table, .sticky-table, table').first();
+    const table = page.locator('.sticky-table').first();
     await expect(table).toBeVisible();
   });
 
   test('table has expected salary columns', async ({ page }) => {
-    const table = page.locator('.ibl-data-table, .sticky-table').first();
+    const table = page.locator('.sticky-table').first();
     await expect(table).toBeVisible();
     const headerText = await table.locator('thead').textContent();
     expect(headerText).toContain('Team');
@@ -33,7 +33,7 @@ test.describe('Cap Space flow', () => {
   });
 
   test('MLE/LLE status indicators are present', async ({ page }) => {
-    const table = page.locator('.ibl-data-table, .sticky-table').first();
+    const table = page.locator('.sticky-table').first();
     await expect(table).toBeVisible();
     const headerText = await table.locator('thead').textContent();
     // Should contain MLE and LLE columns

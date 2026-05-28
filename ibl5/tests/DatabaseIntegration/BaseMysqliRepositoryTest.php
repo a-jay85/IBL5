@@ -412,12 +412,10 @@ class BaseMysqliRepositoryTest extends DatabaseTestCase
         $context->method('isOlympics')->willReturn(true);
 
         $repo = new TestableBaseMysqliRepository($this->db, $context);
-
-        $this->expectException(\RuntimeException::class);
-        $this->expectExceptionCode(1002);
-        $this->expectExceptionMessageMatches('/ibl_olympics_team_info/');
-
         $repo->callFetchAllRealTeams();
+
+        self::assertNotNull($repo->lastPreparedQuery);
+        self::assertStringContainsString('`ibl_olympics_team_info`', $repo->lastPreparedQuery);
     }
 
     // ==================== setLogger ====================
@@ -442,6 +440,14 @@ class BaseMysqliRepositoryTest extends DatabaseTestCase
  */
 class TestableBaseMysqliRepository extends \BaseMysqliRepository
 {
+    public ?string $lastPreparedQuery = null;
+
+    protected function executeQuery(string $query, string $types = '', mixed ...$params): \mysqli_stmt
+    {
+        $this->lastPreparedQuery = $this->rewriteTableNames($query);
+        return parent::executeQuery($query, $types, ...$params);
+    }
+
     public function callRewriteTableNames(string $query): string
     {
         return $this->rewriteTableNames($query);

@@ -1,5 +1,5 @@
 ---
-description: "Plan an implementation task with mandatory test classification. Wraps the built-in plan mode with the verification matrix rule injected so subagents can't skip it."
+description: "Plan an implementation task: enforces a verification matrix, directs code reuse, flags security surfaces, and requires negative-path tests so plans drive clean, secure, well-tested implementations."
 disallowed-tools:
   - EnterPlanMode
   - ExitPlanMode
@@ -35,7 +35,7 @@ You are planning an implementation task. The user's request follows this skill's
 
 Provide each agent a single concrete question, pre-resolved paths, and a response cap (under 150 lines).
 
-Collect: file paths, existing patterns, dependencies, blast radius, existing test coverage for affected code.
+Collect: file paths, existing patterns, dependencies, blast radius, existing test coverage for affected code, **the specific existing helpers/services/repositories the implementation should reuse** (name the exact methods — e.g. `SalaryCapRepository::getTeamTotalSalary()` — so the plan directs reuse instead of leaving the impl agent to rediscover them), and **which security surfaces the change touches** (SQL queries, POST/form endpoints, auth/authz-gated routes, user-facing output rendering). If none of these surfaces are touched, record that explicitly.
 
 ## Step 2.5: Scope into PRs
 
@@ -66,6 +66,17 @@ The Plan agent MUST produce:
 - Implementation steps with tests woven inline (pre-impl before their step, post-impl after)
 - A full Verification Matrix in the exact format specified by `$VERIFICATION_RULE`
 - File paths for every test to be written or modified
+- A **Reuse** note in each implementation step that should call existing code: name the exact helper/service/repository method to use (from Step 2 findings) so the impl agent reuses rather than reinvents. Omit only when the step genuinely introduces new infrastructure.
+- For every behavior-changing step, at least one **negative-path, boundary, or failure-case** matrix row — not only the happy path (e.g. "rejects over-cap trade", "returns null for unknown player", "empty roster"). Happy-path-only coverage is insufficient.
+
+Conditionally — include a section **only when it applies**; never emit an empty header:
+- **Approach** (non-trivial changes only): one short paragraph naming the chosen design and the main alternative rejected, with the reason. Skip for trivial single-file edits.
+- **Security** (only when Step 2 flagged a touched surface): for each surface, an implementation step encoding the defense AND a matching matrix row —
+  - SQL → prepared statement / `bind_param` (mind native-type binding); row asserts the query is parameterized.
+  - POST/form endpoint → `CsrfGuard` token validation (share one raw token across forms when a page has ≥10, per `MAX_TOKENS=10`); E2E or API-test row asserts a missing/invalid token is rejected.
+  - Auth/authz-gated route → guard present on the state-changing endpoint; row asserts an unauthorized request is refused.
+  - Output rendering → escaped output (enforced by `RequireEscapedOutputRule`); note it so the impl agent doesn't fight the PHPStan rule.
+  XSS and input validation are deterministically enforced by PHPStan custom rules — note which apply, do not write redundant manual checks.
 
 ## Step 4: Validate the matrix
 
@@ -85,6 +96,10 @@ After receiving the Plan agent's output, check these gates yourself — do NOT d
    - `subject to review`
    If any match is found, resolve the decision in-place before saving the plan. The nightly agent cannot make judgment calls — every table cell must contain a concrete action, not a deferred question.
 8. **Decision-trigger pre-classified** — scan implementation phases for file additions matching `bin/adr-check` trigger patterns (listed in `plan-verification.md` § Decision-trigger pre-classification). If any trigger fires, verify the plan includes a resolution step (ADR or bypass marker). If missing, add the appropriate resolution step and update the verification matrix.
+9. **Negative-path coverage** — every behavior-changing step has at least one matrix row asserting a failure, boundary, or rejection case, not only happy-path. If a step has only happy-path rows, add the missing negative-path row.
+10. **Hot-file extraction** — if any step adds > 100 LOC to a file `bin/check-hot-files` lists as hot (> 500 LOC under `classes/`), the plan must either propose an extraction step or carry an inline justification (per `plan-verification.md` § Hot-file thresholds). If neither is present, add one.
+11. **Refactor characterization** — if any step under `ibl5/classes/**` carries a refactor signal (file rename, method signature change, visibility narrowing, class removal, or > 30-line deletion per `refactor-flag.md`), the matrix must include a pre-impl characterization row for the affected code. If missing, add it.
+12. **Security surface resolved** — if Step 2 flagged a touched security surface, the plan contains a Security section with a defense step and matching matrix row for each. If a flagged surface has no resolution, add it.
 
 If validation fails on any gate, fix the matrix yourself rather than re-running the Plan agent.
 
@@ -105,5 +120,6 @@ Write the validated plan (with corrected matrix if Step 4 required fixes) to the
 Tell the user:
 - The plan file path — **all of them** when the work was split into multiple PRs
 - A one-line matrix summary per plan (e.g., "12 items: 7 PHPUnit, 3 E2E, 2 CLI-executable, 0 truly-manual")
+- Whether any security surface was flagged and how each is defended (or "no security surface touched")
 - For a multi-PR split: the PR sequence and dependency order (which lands first, what each stacks on)
 - Whether each plan is ready for implementation or has open questions

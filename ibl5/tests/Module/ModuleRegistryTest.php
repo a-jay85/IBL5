@@ -28,6 +28,27 @@ final class ModuleRegistryTest extends TestCase
         self::assertFalse(ModuleRegistry::isValid('NEWS'));
     }
 
+    public function testGetAllModulesReturnsNonEmptyList(): void
+    {
+        $modules = ModuleRegistry::getAllModules();
+
+        self::assertIsArray($modules);
+        self::assertGreaterThanOrEqual(46, count($modules));
+        self::assertContains('Standings', $modules);
+        self::assertContains('Player', $modules);
+        self::assertContains('Team', $modules);
+    }
+
+    public function testGetAllModulesMatchesIsValid(): void
+    {
+        foreach (ModuleRegistry::getAllModules() as $module) {
+            self::assertTrue(
+                ModuleRegistry::isValid($module),
+                "getAllModules() entry '$module' should pass isValid()"
+            );
+        }
+    }
+
     public function testEveryModuleDirectoryIsRegistered(): void
     {
         $modulesDir = __DIR__ . '/../../modules';

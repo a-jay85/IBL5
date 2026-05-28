@@ -1,6 +1,7 @@
 ---
 description: Tailwind CSS is auto-rebuilt by the ibl5-tailwind Docker container — never run manual build commands.
-last_verified: 2026-05-24
+paths: "**/*.css"
+last_verified: 2026-05-28
 ---
 
 # CSS Auto-Rebuild (Tailwind)

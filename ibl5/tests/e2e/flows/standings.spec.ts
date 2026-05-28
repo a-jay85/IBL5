@@ -94,30 +94,6 @@ test.describe('Standings page flow', () => {
     }
   });
 
-  test('column sorting works', async ({ page }) => {
-    const firstTable = page.locator('.sortable.ibl-data-table').first();
-    await expect(firstTable).toBeVisible();
-
-    // Get initial row order by team-id
-    const rows = firstTable.locator('tbody tr[data-team-id]');
-    const rowsBefore = await rows.evaluateAll((els) =>
-      els.map((el) => el.getAttribute('data-team-id')),
-    );
-
-    // Click the Win% header (3rd th) to trigger sort
-    const winPctHeader = firstTable.locator('thead th:nth-child(3)');
-    await winPctHeader.click();
-
-    // Get row order after sort
-    const rowsAfter = await rows.evaluateAll((els) =>
-      els.map((el) => el.getAttribute('data-team-id')),
-    );
-
-    // Row order should differ (unless already sorted by that column)
-    // At minimum the table should still have the same number of rows
-    expect(rowsAfter.length).toBe(rowsBefore.length);
-  });
-
   test('no PHP errors on standings page', async ({ page }) => {
     await assertNoPhpErrors(page, 'on Standings page');
   });

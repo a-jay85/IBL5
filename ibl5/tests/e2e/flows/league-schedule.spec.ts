@@ -1,5 +1,10 @@
 import { test, expect } from '../fixtures/auth';
-import { assertNoPhpErrors } from '../helpers/php-errors';
+import {
+  assertScheduleStructure,
+  assertUnplayedGameDash,
+  assertPlayedGameScores,
+  assertPlayoffPhaseLabels,
+} from '../helpers/schedule-page';
 
 const SCHEDULE_URL = 'modules.php?name=Schedule';
 
@@ -13,38 +18,16 @@ test.describe('League Schedule — smoke', () => {
     await page.goto(SCHEDULE_URL);
   });
 
-  test('page loads with title', async ({ page }) => {
-    await expect(page.locator('.ibl-title').first()).toBeVisible();
-  });
-
-  test('no PHP errors', async ({ page }) => {
-    await assertNoPhpErrors(page, 'on League Schedule');
-  });
-
-  test('sim length note visible', async ({ page }) => {
-    await expect(page.locator('.schedule-highlight-note')).toBeVisible();
-  });
-
-  test('SOS legend shows 5 tiers', async ({ page }) => {
-    await expect(page.locator('.sos-legend__item')).toHaveCount(5);
-  });
-
-  test('month nav renders', async ({ page }) => {
-    await expect(page.locator('.schedule-months__link').first()).toBeVisible();
-  });
-
-  test('game rows present', async ({ page }) => {
-    const count = await page.locator('.schedule-game').count();
-    expect(count).toBeGreaterThanOrEqual(3);
+  test('shared schedule structure (title, legend, month nav, game rows, no PHP errors)', async ({ page }) => {
+    await assertScheduleStructure(page, { minGames: 3 });
   });
 
   test('unplayed game shows dash', async ({ page }) => {
-    // Unplayed games render scores as "–" in <span> elements
-    const dashScore = page.locator(
-      '.schedule-game span.schedule-game__score-link',
-      { hasText: '–' },
-    );
-    await expect(dashScore.first()).toBeVisible();
+    await assertUnplayedGameDash(page);
+  });
+
+  test('played games show numeric scores with win class', async ({ page }) => {
+    await assertPlayedGameScores(page);
   });
 
   test('team links point to Team module', async ({ page }) => {
@@ -52,10 +35,6 @@ test.describe('League Schedule — smoke', () => {
     await expect(teamLink).toBeVisible();
     const href = await teamLink.getAttribute('href');
     expect(href).toContain('name=Team');
-  });
-
-  test('team logos present', async ({ page }) => {
-    await expect(page.locator('.schedule-game__logo').first()).toBeAttached();
   });
 });
 
@@ -81,29 +60,13 @@ test.describe('League Schedule — Next Games button', () => {
 });
 
 // ============================================================
-// League Schedule — played games
+// League Schedule — box score links
 // ============================================================
 
-test.describe('League Schedule — played games', () => {
+test.describe('League Schedule — box score links', () => {
   test.beforeEach(async ({ appState, page }) => {
     await appState({ 'Current Season Phase': 'Regular Season', 'Current Season Ending Year': '2026' });
     await page.goto(SCHEDULE_URL);
-  });
-
-  test('played game shows numeric scores', async ({ page }) => {
-    // Feb 20 game: Metros 105 @ Stars 98
-    const scoreLinks = page.locator(
-      '.schedule-game .schedule-game__score-link',
-    );
-    const allTexts = await scoreLinks.allTextContents();
-    const numericScores = allTexts.filter((t) => /\d+/.test(t));
-    expect(numericScores.length).toBeGreaterThanOrEqual(2);
-  });
-
-  test('winning team has win class', async ({ page }) => {
-    await expect(
-      page.locator('.schedule-game__team--win').first(),
-    ).toBeVisible();
   });
 
   test('played game with game_of_that_day has IBL6 link', async ({ page }) => {
@@ -120,14 +83,6 @@ test.describe('League Schedule — played games', () => {
       '.schedule-game a.schedule-game__score-link[href*=".htm"]',
     );
     await expect(legacyLink.first()).toBeVisible();
-  });
-
-  test('unplayed game score is span not link', async ({ page }) => {
-    // March unplayed games should render as spans, not <a> tags
-    const unplayedSpan = page.locator(
-      '.schedule-game span.schedule-game__score-link',
-    );
-    await expect(unplayedSpan.first()).toBeVisible();
   });
 });
 
@@ -172,20 +127,8 @@ test.describe('League Schedule — Playoff phase', () => {
     await page.goto(SCHEDULE_URL);
   });
 
-  test('no PHP errors in playoff phase', async ({ page }) => {
-    await assertNoPhpErrors(page, 'on League Schedule (Playoffs)');
-  });
-
-  test('June relabeled Playoffs', async ({ page }) => {
-    // In playoff phase, the first month header should be "Playoffs" (June moved to front)
-    const firstHeader = page.locator('.schedule-month__header').first();
-    await expect(firstHeader).toContainText('Playoffs');
-  });
-
-  test('Playoffs header has --playoffs class', async ({ page }) => {
-    await expect(
-      page.locator('.schedule-month__header--playoffs').first(),
-    ).toBeVisible();
+  test('playoff phase labels render without PHP errors', async ({ page }) => {
+    await assertPlayoffPhaseLabels(page);
   });
 
   test('June skipped in month nav', async ({ page }) => {

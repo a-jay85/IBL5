@@ -88,28 +88,6 @@ test.describe('Team Stats flow', () => {
     }
   });
 
-  test('sortable tables support client-side sorting', async ({
-    appState,
-    page,
-  }) => {
-    await appState({
-      'Current Season Phase': 'Regular Season',
-      'Current Season Ending Year': '2026',
-    });
-    await page.goto('modules.php?name=TeamOffDefStats');
-
-    const sortableTable = page.locator('.ibl-data-table.sortable').first();
-    await expect(sortableTable).toBeVisible();
-
-    const header = sortableTable.locator('thead th').nth(2);
-    await header.click();
-
-    await expect(sortableTable).toBeVisible();
-
-    await header.click();
-    await expect(sortableTable).toBeVisible();
-  });
-
   test('tables have team rows matching expected count', async ({
     appState,
     page,

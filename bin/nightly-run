@@ -246,7 +246,7 @@ while true; do
 
 PLAN_FILE=$PLAN_NAME" \
                 --dangerously-skip-permissions \
-                --model claude-opus-4-6 \
+                --model claude-opus-4-8 \
                 --output-format stream-json \
                 --verbose \
                 --name "nightly-impl-$(date +%Y-%m-%d-%H%M)" \

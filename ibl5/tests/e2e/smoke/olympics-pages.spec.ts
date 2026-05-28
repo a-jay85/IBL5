@@ -25,13 +25,6 @@ test.describe('Olympics page smoke tests', () => {
     expect(body?.length).toBeGreaterThan(100);
   });
 
-  test('season leaderboards loads in Olympics context', async ({ page }) => {
-    await page.goto('modules.php?name=SeasonLeaderboards&league=olympics');
-    await assertNoPhpErrors(page, 'on modules.php?name=SeasonLeaderboards&league=olympics');
-    const body = await page.locator('body').textContent();
-    expect(body?.length).toBeGreaterThan(100);
-  });
-
   test('player page loads in Olympics context', async ({ page }) => {
     await page.goto('modules.php?name=Player&pa=showpage&pid=1&league=olympics');
     await assertNoPhpErrors(page, 'on modules.php?name=Player&pa=showpage&pid=1&league=olympics');
@@ -58,7 +51,12 @@ test.describe('Olympics nav filtering', () => {
     const nav = desktopNav(page);
     await nav.getByRole('button', { name: 'History' }).click();
 
-    await expect(nav.locator('.nav-dropdown-item', { hasText: 'Record Holders' }).first()).toBeVisible();
+    await expect(nav.locator('.nav-dropdown-item', { hasText: 'Transaction History' }).first()).toBeVisible();
+    await expect(nav.locator('.nav-dropdown-item', { hasText: 'Record Holders' })).not.toBeAttached();
+    await expect(nav.locator('.nav-dropdown-item', { hasText: 'Award History' })).not.toBeAttached();
+    await expect(nav.locator('.nav-dropdown-item', { hasText: 'Season Leaderboards' })).not.toBeAttached();
+    await expect(nav.locator('.nav-dropdown-item', { hasText: 'Career Leaderboards' })).not.toBeAttached();
+    await expect(nav.locator('.nav-dropdown-item', { hasText: 'Franchise Record Book' })).not.toBeAttached();
     await expect(nav.locator('.nav-dropdown-item', { hasText: 'Franchise History' })).not.toBeAttached();
     await expect(nav.locator('.nav-dropdown-item', { hasText: 'All-Star Appearances' })).not.toBeAttached();
   });

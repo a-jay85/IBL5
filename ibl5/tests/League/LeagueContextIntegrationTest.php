@@ -372,23 +372,28 @@ class LeagueContextIntegrationTest extends TestCase
     // ============================================
 
     /**
-     * Test setLeague updates session
+     * Test setLeague makes the selection immediately observable
+     *
+     * setLeague stores the league in-memory (request-scoped) rather than in
+     * $_SESSION, so it must not leak into the shared E2E server session.
      */
     public function testSetLeagueUpdatesSession(): void
     {
         $this->leagueContext->setLeague('olympics');
 
-        $this->assertEquals('olympics', $_SESSION['current_league']);
+        $this->assertEquals('olympics', $this->leagueContext->getCurrentLeague());
+        $this->assertArrayNotHasKey('current_league', $_SESSION);
     }
 
     /**
-     * Test setLeague with IBL updates session
+     * Test setLeague with IBL makes the selection immediately observable
      */
     public function testSetLeagueWithIblUpdatesSession(): void
     {
         $this->leagueContext->setLeague('ibl');
 
-        $this->assertEquals('ibl', $_SESSION['current_league']);
+        $this->assertEquals('ibl', $this->leagueContext->getCurrentLeague());
+        $this->assertArrayNotHasKey('current_league', $_SESSION);
     }
 
     /**

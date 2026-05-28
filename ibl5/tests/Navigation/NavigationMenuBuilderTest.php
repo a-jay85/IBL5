@@ -273,6 +273,8 @@ class NavigationMenuBuilderTest extends TestCase
             'Training Camp Ratings Diff', 'Free Agency Preview', 'Contract List',
             'Player Movement', 'Franchise History', 'Draft History',
             'All-Star Appearances', '1-On-1 Game', 'JSB Export',
+            'Award History', 'Record Holders', 'Season Leaderboards',
+            'Career Leaderboards', 'Franchise Record Book',
         ];
         foreach ($shouldBeAbsent as $label) {
             $this->assertNotContains($label, $allLabels, "'$label' should be filtered in Olympics mode");
@@ -280,8 +282,7 @@ class NavigationMenuBuilderTest extends TestCase
 
         $shouldBePresent = [
             'Standings', 'Schedule', 'Injuries', 'Player Database', 'Player Export',
-            'Award History', 'Record Holders', 'Season Leaderboards',
-            'Career Leaderboards', 'Season Archive',
+            'Season Archive',
         ];
         foreach ($shouldBePresent as $label) {
             $this->assertContains($label, $allLabels, "'$label' should remain in Olympics mode");

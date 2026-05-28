@@ -16,6 +16,7 @@ class BaseMysqliRepositoryTest extends DatabaseTestCase
     protected function setUp(): void
     {
         parent::setUp();
+        \BaseMysqliRepository::clearSharedLeagueContext();
         $this->repo = new TestableBaseMysqliRepository($this->db);
     }
 
@@ -302,6 +303,121 @@ class BaseMysqliRepositoryTest extends DatabaseTestCase
         self::assertSame('Before', $row['team_city']);
     }
 
+    // ==================== rewriteTableNames ====================
+
+    public function testRewriteTableNamesNoOpWithoutLeagueContext(): void
+    {
+        $query = "SELECT * FROM `ibl_plr` WHERE pid = ?";
+        self::assertSame($query, $this->repo->callRewriteTableNames($query));
+    }
+
+    public function testRewriteTableNamesNoOpForIblContext(): void
+    {
+        $context = $this->createStub(LeagueContext::class);
+        $context->method('isOlympics')->willReturn(false);
+
+        $repo = new TestableBaseMysqliRepository($this->db, $context);
+        $query = "SELECT * FROM `ibl_plr` WHERE pid = ?";
+        self::assertSame($query, $repo->callRewriteTableNames($query));
+    }
+
+    public function testRewriteTableNamesRewritesAllSixteenTablesForOlympics(): void
+    {
+        $context = $this->createStub(LeagueContext::class);
+        $context->method('isOlympics')->willReturn(true);
+
+        $repo = new TestableBaseMysqliRepository($this->db, $context);
+
+        $tables = [
+            'ibl_saved_depth_chart_players',
+            'ibl_saved_depth_charts',
+            'ibl_box_scores_teams',
+            'ibl_box_scores',
+            'ibl_rcb_alltime_records',
+            'ibl_rcb_season_records',
+            'ibl_jsb_transactions',
+            'ibl_jsb_history',
+            'ibl_plr_snapshots',
+            'ibl_league_config',
+            'ibl_team_info',
+            'ibl_standings',
+            'ibl_schedule',
+            'ibl_power',
+            'ibl_hist',
+            'ibl_plr',
+        ];
+
+        $parts = array_map(static fn (string $t): string => "SELECT * FROM `$t`", $tables);
+        $query = implode(' UNION ALL ', $parts);
+        $result = $repo->callRewriteTableNames($query);
+
+        foreach ($tables as $table) {
+            $olympicsTable = str_replace('ibl_', 'ibl_olympics_', $table);
+            self::assertStringContainsString("`$olympicsTable`", $result, "Failed to rewrite $table");
+            self::assertStringNotContainsString("`$table`", $result, "$table should not remain");
+        }
+    }
+
+    public function testRewriteTableNamesHandlesSubstringCollisions(): void
+    {
+        $context = $this->createStub(LeagueContext::class);
+        $context->method('isOlympics')->willReturn(true);
+
+        $repo = new TestableBaseMysqliRepository($this->db, $context);
+
+        $query = "SELECT bt.* FROM `ibl_box_scores_teams` bt "
+            . "JOIN `ibl_box_scores` bs ON bt.game_id = bs.game_id "
+            . "JOIN `ibl_saved_depth_chart_players` sdcp ON sdcp.pid = bs.pid "
+            . "JOIN `ibl_saved_depth_charts` sdc ON sdc.id = sdcp.chart_id";
+
+        $result = $repo->callRewriteTableNames($query);
+
+        self::assertStringContainsString('`ibl_olympics_box_scores_teams`', $result);
+        self::assertStringContainsString('`ibl_olympics_box_scores`', $result);
+        self::assertStringContainsString('`ibl_olympics_saved_depth_chart_players`', $result);
+        self::assertStringContainsString('`ibl_olympics_saved_depth_charts`', $result);
+    }
+
+    public function testRewriteTableNamesLeavesBareNamesAlone(): void
+    {
+        $context = $this->createStub(LeagueContext::class);
+        $context->method('isOlympics')->willReturn(true);
+
+        $repo = new TestableBaseMysqliRepository($this->db, $context);
+
+        $query = "SELECT ibl_plr.name AS ibl_plr_name FROM `ibl_plr`";
+        $result = $repo->callRewriteTableNames($query);
+
+        self::assertStringContainsString('`ibl_olympics_plr`', $result);
+        self::assertStringContainsString('ibl_plr.name AS ibl_plr_name', $result);
+    }
+
+    public function testRewriteTableNamesUsesSharedContextFallback(): void
+    {
+        $context = $this->createStub(LeagueContext::class);
+        $context->method('isOlympics')->willReturn(true);
+
+        \BaseMysqliRepository::setSharedLeagueContext($context);
+
+        $repo = new TestableBaseMysqliRepository($this->db);
+        $query = "SELECT * FROM `ibl_plr` WHERE pid = ?";
+        $result = $repo->callRewriteTableNames($query);
+
+        self::assertStringContainsString('`ibl_olympics_plr`', $result);
+    }
+
+    public function testFetchAllRealTeamsUsesOlympicsTableWithOlympicsContext(): void
+    {
+        $context = $this->createStub(LeagueContext::class);
+        $context->method('isOlympics')->willReturn(true);
+
+        $repo = new TestableBaseMysqliRepository($this->db, $context);
+        $repo->callFetchAllRealTeams();
+
+        self::assertNotNull($repo->lastPreparedQuery);
+        self::assertStringContainsString('`ibl_olympics_team_info`', $repo->lastPreparedQuery);
+    }
+
     // ==================== setLogger ====================
 
     public function testSetLoggerOverridesDefaultChannel(): void
@@ -324,6 +440,19 @@ class BaseMysqliRepositoryTest extends DatabaseTestCase
  */
 class TestableBaseMysqliRepository extends \BaseMysqliRepository
 {
+    public ?string $lastPreparedQuery = null;
+
+    protected function executeQuery(string $query, string $types = '', mixed ...$params): \mysqli_stmt
+    {
+        $this->lastPreparedQuery = $this->rewriteTableNames($query);
+        return parent::executeQuery($query, $types, ...$params);
+    }
+
+    public function callRewriteTableNames(string $query): string
+    {
+        return $this->rewriteTableNames($query);
+    }
+
     public function callResolveTable(string $table): string
     {
         return $this->resolveTable($table);

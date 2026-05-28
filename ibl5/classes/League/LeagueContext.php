@@ -17,19 +17,34 @@ class LeagueContext
     const COOKIE_NAME = 'ibl_league';
 
     /**
+     * Request-scoped league selection set via setLeague().
+     *
+     * Holds the value for the remainder of the current request so that an
+     * explicit setLeague() call is immediately observable, without writing
+     * to $_SESSION. Persistence across requests is handled by the cookie.
+     */
+    private ?string $currentLeague = null;
+
+    /**
      * Get the current active league
-     * 
+     *
      * Priority order:
-     * 1. URL parameter ($_GET['league'])
-     * 2. Session variable ($_SESSION['current_league'])
-     * 3. Cookie (ibl_league)
-     * 4. Default to 'ibl'
-     * 
+     * 1. In-memory selection set via setLeague() this request
+     * 2. URL parameter ($_GET['league'])
+     * 3. Session variable ($_SESSION['current_league'])
+     * 4. Cookie (ibl_league)
+     * 5. Default to 'ibl'
+     *
      * @return string The current league identifier ('ibl' or 'olympics')
      */
     public function getCurrentLeague(): string
     {
-        // Check URL override first
+        // Check explicit in-memory selection first (request-scoped)
+        if ($this->currentLeague !== null) {
+            return $this->currentLeague;
+        }
+
+        // Check URL override
         $getLeague = $_GET['league'] ?? null;
         if (is_string($getLeague) && $this->isValidLeague($getLeague)) {
             return $getLeague;
@@ -53,9 +68,17 @@ class LeagueContext
 
     /**
      * Set the active league
-     * 
-     * Sets both session variable and cookie with 30-day expiry
-     * 
+     *
+     * Stores the selection in-memory for the current request and in a cookie
+     * for cross-request persistence (30-day expiry).
+     *
+     * NOTE: This intentionally does NOT write to $_SESSION. In the E2E test
+     * harness all authenticated workers share a single server-side session, so
+     * persisting league there leaks one test's Olympics switch into every other
+     * concurrent test. The cookie is per-browser-context (isolated per test) and
+     * the in-memory value covers same-request reads, so the session write is
+     * both unnecessary and harmful.
+     *
      * @param string $league League identifier ('ibl' or 'olympics')
      * @return void
      * @throws \InvalidArgumentException If league is not valid
@@ -66,8 +89,8 @@ class LeagueContext
             throw new \InvalidArgumentException("Invalid league: {$league}");
         }
 
-        // Set session
-        $_SESSION['current_league'] = $league;
+        // Set request-scoped in-memory selection
+        $this->currentLeague = $league;
 
         // Set cookie with 30-day expiry (skip in CLI/test mode to avoid header errors)
         // SECURITY: Use secure cookie options
@@ -113,7 +136,12 @@ class LeagueContext
                 'Voting',
                 'VotingResults',
                 'CapSpace',
-                'FranchiseHistory'
+                'FranchiseHistory',
+                'AwardHistory',
+                'FranchiseRecordBook',
+                'CareerLeaderboards',
+                'SeasonLeaderboards',
+                'RecordHolders',
             ];
 
             return !in_array($moduleName, $iblOnlyModules, true);

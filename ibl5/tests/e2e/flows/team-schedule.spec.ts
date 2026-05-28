@@ -1,5 +1,9 @@
 import { test, expect } from '../fixtures/auth';
 import { assertNoPhpErrors } from '../helpers/php-errors';
+import {
+  assertScheduleStructure,
+  assertUnplayedGameDash,
+} from '../helpers/schedule-page';
 
 const TEAM_SCHEDULE_URL = 'modules.php?name=Schedule&teamid=1'; // Metros
 
@@ -13,12 +17,8 @@ test.describe('Team Schedule — smoke', () => {
     await page.goto(TEAM_SCHEDULE_URL);
   });
 
-  test('page loads with title', async ({ page }) => {
-    await expect(page.locator('.ibl-title').first()).toBeVisible();
-  });
-
-  test('no PHP errors', async ({ page }) => {
-    await assertNoPhpErrors(page, 'on Team Schedule');
+  test('shared schedule structure (title, legend, month nav, game rows, no PHP errors)', async ({ page }) => {
+    await assertScheduleStructure(page, { minGames: 1 });
   });
 
   test('team banner visible', async ({ page }) => {
@@ -29,19 +29,6 @@ test.describe('Team Schedule — smoke', () => {
     await expect(
       page.locator('.schedule-container--team').first(),
     ).toBeVisible();
-  });
-
-  test('SOS legend shows 5 tiers', async ({ page }) => {
-    await expect(page.locator('.sos-legend__item')).toHaveCount(5);
-  });
-
-  test('month nav renders', async ({ page }) => {
-    await expect(page.locator('.schedule-months__link').first()).toBeVisible();
-  });
-
-  test('game rows present', async ({ page }) => {
-    const count = await page.locator('.schedule-game').count();
-    expect(count).toBeGreaterThanOrEqual(1);
   });
 
   test('streak column rendered', async ({ page }) => {
@@ -77,13 +64,9 @@ test.describe('Team Schedule — jump button', () => {
   });
 
   test('jump button visible when unplayed games exist', async ({ page }) => {
-    // Jump button only renders when there are unplayed (upcoming) games
-    const hasUnplayed = await page.locator('.schedule-game--upcoming').count() > 0;
-    if (hasUnplayed) {
-      await expect(page.locator('.schedule-jump-btn')).toBeVisible();
-    } else {
-      await expect(page.locator('.schedule-jump-btn')).not.toBeVisible();
-    }
+    // CI seed guarantees unplayed (upcoming) Metros games, so the jump button
+    // must render unconditionally — no dual-path branch.
+    await expect(page.locator('.schedule-jump-btn')).toBeVisible();
   });
 
   test('upcoming games are highlighted', async ({ page }) => {
@@ -105,11 +88,8 @@ test.describe('Team Schedule — unplayed game rows', () => {
 
   test('dash scores shown for unplayed games', async ({ page }) => {
     // CI seed has unplayed games — scores render as "–" in <span> elements
-    const dashScore = page.locator(
-      '.schedule-game span.schedule-game__score-link',
-      { hasText: '–' },
-    );
-    await expect(dashScore.first()).toBeVisible();
+    // (also proves the unplayed score is a <span>, not an <a> link).
+    await assertUnplayedGameDash(page);
   });
 
   test('no cumulative record on unplayed games', async ({ page }) => {
@@ -124,14 +104,6 @@ test.describe('Team Schedule — unplayed game rows', () => {
     const records = first.locator('.schedule-game__record');
     const recordCount = await records.count();
     expect(recordCount).toBeLessThanOrEqual(1);
-  });
-
-  test('score is span not link when unplayed', async ({ page }) => {
-    // CI seed has unplayed games — scores render as <span>, not <a>
-    const spanScore = page.locator(
-      '.schedule-game span.schedule-game__score-link',
-    );
-    await expect(spanScore.first()).toBeVisible();
   });
 });
 

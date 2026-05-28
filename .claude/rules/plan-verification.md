@@ -1,6 +1,6 @@
 ---
 description: Requires plans to classify every verification step into the test-type taxonomy at plan-write time, preventing manual-testing items from deferring to post-plan cleanup.
-last_verified: 2026-05-16
+last_verified: 2026-05-28
 ---
 
 # Plan Verification Matrix
@@ -81,6 +81,26 @@ flags the PR (advisory comment, non-blocking).
 This rule is advisory — gated growth is acceptable when justified. The goal is
 to force a structural conversation at plan-write time, not to enforce a hard
 ceiling.
+
+## Decision-trigger pre-classification
+
+`bin/adr-check` fires on PRs that add files matching specific trigger patterns. When a plan phase adds any of these, the plan must pre-decide the resolution:
+
+| Trigger | File pattern |
+|---------|-------------|
+| PHPStan rule | `ibl5/phpstan-rules/*.php` |
+| Agent rule | `.claude/rules/*.md` |
+| CI workflow | `.github/workflows/*.yml` |
+| Destructive migration | Migration SQL containing `DROP TABLE`, `DROP COLUMN`, or `DROP INDEX` |
+| Tool script | `bin/*` (new file, ≥50 lines) |
+| New dependency | New entry in `ibl5/composer.json` `require` or `require-dev` |
+
+**Resolution — exactly one of:**
+
+- **ADR:** Add an implementation step to write an ADR under `ibl5/docs/decisions/`. Use when the change introduces a genuinely new architectural constraint not covered by an existing ADR.
+- **Bypass:** Add an implementation step to include `<!-- no-adr: reason at least 15 characters -->` in the PR body. Use when the decision is already captured in an existing ADR (e.g., new PHPStan rules enforcing ADR-0001's architecture split).
+
+If the plan has no phases adding trigger-pattern files, no action is needed.
 
 ## What the plan must NOT do
 

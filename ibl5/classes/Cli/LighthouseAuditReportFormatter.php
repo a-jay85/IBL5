@@ -35,7 +35,7 @@ final class LighthouseAuditReportFormatter
         $passCount = 0;
 
         foreach ($ranked as $entry) {
-            $status = $this->classifyEntry($entry['summary']);
+            $status = self::classifyEntry($entry['summary']);
             if ($status === 'error') {
                 $errorCount++;
             } elseif ($status === 'warn') {

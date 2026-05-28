@@ -8,6 +8,8 @@ use League\LeagueContext;
 use PHPUnit\Framework\TestCase;
 use Tests\WideUnit\Mocks\MockDatabase;
 use Season\Season;
+use Updater\Contracts\JsbSourceResolverInterface;
+use JsbParser\SchFileParser;
 
 /**
  * @covers \Updater\ScheduleUpdater
@@ -21,8 +23,12 @@ class ScheduleUpdaterTest extends TestCase
         $this->mockDb = new MockDatabase();
     }
 
-    private function createUpdater(string $phase = 'Regular Season', int $endingYear = 2025, bool $olympics = false): TestableScheduleUpdater
-    {
+    private function createUpdater(
+        string $phase = 'Regular Season',
+        int $endingYear = 2025,
+        bool $olympics = false,
+        ?JsbSourceResolverInterface $sourceResolver = null,
+    ): TestableScheduleUpdater {
         $season = $this->createStub(Season::class);
         $season->endingYear = $endingYear;
         $season->beginningYear = $endingYear - 1;
@@ -37,7 +43,135 @@ class ScheduleUpdaterTest extends TestCase
                 : $table,
         );
 
-        return new TestableScheduleUpdater($this->mockDb, $season, $leagueContext);
+        return new TestableScheduleUpdater($this->mockDb, $season, $leagueContext, $sourceResolver);
+    }
+
+    /**
+     * Build raw .sch bytes (80,000 bytes) containing the given games, for driving
+     * the full update() path through a stubbed resolver without touching disk.
+     *
+     * @param list<array{date_slot: int, game_index: int, visitor: int, home: int, visitor_score: int, home_score: int}> $games
+     */
+    private function buildSchBytes(array $games): string
+    {
+        $empty = str_repeat('0   0     ', SchFileParser::SLOTS_PER_DATE);
+        $data = str_repeat($empty, (int) (SchFileParser::FILE_SIZE / (SchFileParser::SLOTS_PER_DATE * SchFileParser::RECORD_SIZE)));
+
+        foreach ($games as $game) {
+            $offset = ($game['date_slot'] * SchFileParser::SLOTS_PER_DATE + $game['game_index']) * SchFileParser::RECORD_SIZE;
+
+            $home = str_pad((string) $game['home'], 2, '0', STR_PAD_LEFT);
+            $teamsField = str_pad((string) $game['visitor'] . $home, SchFileParser::TEAMS_FIELD_SIZE);
+
+            if ($game['visitor_score'] === 0 && $game['home_score'] === 0) {
+                $scoresField = str_pad('0', SchFileParser::SCORES_FIELD_SIZE);
+            } else {
+                $homeScore = str_pad((string) $game['home_score'], 3, '0', STR_PAD_LEFT);
+                $scoresField = str_pad((string) $game['visitor_score'] . $homeScore, SchFileParser::SCORES_FIELD_SIZE);
+            }
+
+            $data = substr_replace($data, $teamsField . $scoresField, $offset, SchFileParser::RECORD_SIZE);
+        }
+
+        return $data;
+    }
+
+    /** @param list<string> $queries */
+    private function firstIndexContaining(array $queries, string $needle): ?int
+    {
+        foreach ($queries as $i => $q) {
+            if (str_contains($q, $needle)) {
+                return $i;
+            }
+        }
+        return null;
+    }
+
+    /** @param list<string> $queries */
+    private function lastIndexContaining(array $queries, string $needle): ?int
+    {
+        $found = null;
+        foreach ($queries as $i => $q) {
+            if (str_contains($q, $needle)) {
+                $found = $i;
+            }
+        }
+        return $found;
+    }
+
+    /**
+     * @param list<array{team_name: string, teamid: int}> $teams
+     * @param list<array{date_slot: int, game_index: int, visitor: int, home: int, visitor_score: int, home_score: int}> $games
+     */
+    private function createUpdaterForFullRun(array $teams, array $games): TestableScheduleUpdater
+    {
+        $this->mockDb->setMockData($teams);
+        $resolver = $this->createStub(JsbSourceResolverInterface::class);
+        $resolver->method('getContents')->willReturn($this->buildSchBytes($games));
+
+        return $this->createUpdater(sourceResolver: $resolver);
+    }
+
+    public function testUpdateWrapsRebuildInCommittedTransaction(): void
+    {
+        $updater = $this->createUpdaterForFullRun(
+            [
+                ['team_name' => 'Alpha', 'teamid' => 1],
+                ['team_name' => 'Beta', 'teamid' => 2],
+            ],
+            [
+                ['date_slot' => 103, 'game_index' => 0, 'visitor' => 1, 'home' => 2, 'visitor_score' => 100, 'home_score' => 95],
+                ['date_slot' => 103, 'game_index' => 1, 'visitor' => 2, 'home' => 1, 'visitor_score' => 88, 'home_score' => 90],
+            ],
+        );
+
+        ob_start();
+        $updater->update();
+        ob_end_clean();
+
+        $log = $this->mockDb->getOperationLog();
+        $beginIdx = array_search('BEGIN', $log, true);
+        $commitIdx = array_search('COMMIT', $log, true);
+        $deleteIdx = $this->firstIndexContaining($log, 'DELETE FROM ibl_schedule');
+        $lastInsertIdx = $this->lastIndexContaining($log, 'INSERT INTO ibl_schedule');
+
+        $this->assertNotFalse($beginIdx, 'expected a BEGIN');
+        $this->assertNotFalse($commitIdx, 'expected a COMMIT');
+        $this->assertNotContains('ROLLBACK', $log, 'a committed run must not roll back');
+        $this->assertNotNull($deleteIdx);
+        $this->assertNotNull($lastInsertIdx);
+        $this->assertLessThan($deleteIdx, $beginIdx, 'BEGIN must precede the DELETE');
+        $this->assertGreaterThan($lastInsertIdx, $commitIdx, 'COMMIT must follow the last INSERT');
+    }
+
+    public function testUpdateRollsBackWhenAnInsertFails(): void
+    {
+        $updater = $this->createUpdaterForFullRun(
+            [
+                ['team_name' => 'Alpha', 'teamid' => 1],
+                ['team_name' => 'Beta', 'teamid' => 2],
+            ],
+            [
+                ['date_slot' => 103, 'game_index' => 0, 'visitor' => 1, 'home' => 2, 'visitor_score' => 100, 'home_score' => 95],
+                ['date_slot' => 103, 'game_index' => 1, 'visitor' => 2, 'home' => 1, 'visitor_score' => 88, 'home_score' => 90],
+            ],
+        );
+        $this->mockDb->failOnNthInsert(2);
+
+        ob_start();
+        try {
+            $updater->update();
+            $threw = false;
+        } catch (\RuntimeException) {
+            $threw = true;
+        } finally {
+            ob_end_clean();
+        }
+
+        $log = $this->mockDb->getOperationLog();
+        $this->assertTrue($threw, 'update() must rethrow when an insert fails');
+        $this->assertContains('ROLLBACK', $log, 'a failed run must roll back');
+        $this->assertNotContains('COMMIT', $log, 'a failed run must not commit');
     }
 
     public function testExtractDateReturnsNullForEmptyString(): void

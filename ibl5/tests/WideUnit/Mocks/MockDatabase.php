@@ -27,7 +27,16 @@ class MockDatabase extends \mysqli
     private ?int $numRows = null;
     private bool $returnTrue = true;
     private array $executedQueries = [];
+    /**
+     * Ordered log of SQL queries AND transaction lifecycle markers
+     * (BEGIN/COMMIT/ROLLBACK), kept separate from $executedQueries so callers
+     * that assert on the SQL-only log are unaffected by transaction recording.
+     * @var list<string>
+     */
+    private array $operationLog = [];
     private int $affectedRows = 0;
+    private ?int $failOnNthInsert = null;
+    private int $insertCount = 0;
 
     /**
      * Pattern-based query routing: maps SQL regex patterns to specific result sets.
@@ -60,6 +69,7 @@ class MockDatabase extends \mysqli
     {
         // Track all executed queries for verification
         $this->executedQueries[] = $query;
+        $this->operationLog[] = $query;
 
         // Strip backticks for pattern matching (SQL table names may be backtick-quoted)
         $normalized = str_replace('`', '', $query);
@@ -68,6 +78,14 @@ class MockDatabase extends \mysqli
         if (stripos($normalized, 'INSERT') === 0 ||
             stripos($normalized, 'UPDATE') === 0 ||
             stripos($normalized, 'DELETE') === 0) {
+            // Optional failure injection: make the Nth INSERT fail, simulating a
+            // constraint violation mid-import so tests can exercise rollback.
+            if (stripos($normalized, 'INSERT') === 0) {
+                $this->insertCount++;
+                if ($this->failOnNthInsert !== null && $this->insertCount === $this->failOnNthInsert) {
+                    return false;
+                }
+            }
             // Set affected rows for UPDATE/DELETE operations (default to 1 for successful operations)
             if ($this->returnTrue) {
                 $this->affectedRows = 1;
@@ -293,6 +311,15 @@ class MockDatabase extends \mysqli
     {
         $this->returnTrue = $returnTrue;
     }
+
+    /**
+     * Configure the mock so the Nth INSERT (1-based, counting only INSERTs)
+     * returns false, mimicking a constraint violation mid-import.
+     */
+    public function failOnNthInsert(int $n): void
+    {
+        $this->failOnNthInsert = $n;
+    }
     
     public function getExecutedQueries(): array
     {
@@ -301,10 +328,25 @@ class MockDatabase extends \mysqli
             $this->executedQueries
         );
     }
-    
+
+    /**
+     * SQL queries interleaved with transaction markers (BEGIN/COMMIT/ROLLBACK),
+     * in execution order. Use this to assert transactional wrapping/ordering.
+     *
+     * @return list<string>
+     */
+    public function getOperationLog(): array
+    {
+        return array_map(
+            static fn (string $q): string => str_replace('`', '', $q),
+            $this->operationLog
+        );
+    }
+
     public function clearQueries(): void
     {
         $this->executedQueries = [];
+        $this->operationLog = [];
     }
     
     public function sql_escape_string(string $string): string
@@ -323,20 +365,25 @@ class MockDatabase extends \mysqli
     }
 
     /**
-     * Mock transaction support - no-op stubs to prevent "object is already closed" errors
+     * Mock transaction support — record lifecycle into the operation log (not the
+     * SQL-only executed-query log) so tests can assert the BEGIN/COMMIT/ROLLBACK
+     * ordering around a unit of work without perturbing getExecutedQueries().
      */
     public function begin_transaction(int $flags = 0, ?string $name = null): bool
     {
+        $this->operationLog[] = 'BEGIN';
         return true;
     }
 
     public function commit(int $flags = 0, ?string $name = null): bool
     {
+        $this->operationLog[] = 'COMMIT';
         return true;
     }
 
     public function rollback(int $flags = 0, ?string $name = null): bool
     {
+        $this->operationLog[] = 'ROLLBACK';
         return true;
     }
 

@@ -461,15 +461,6 @@ tr:has(.contract-hint-cell):focus-within .contract-hint-cell {
     border-top-color: color-mix(in srgb, var(--team-color-primary) 30%, var(--gray-200));
 }
 
-/* Ratings highlight rows (team-colored) */
-.team-table tr.ratings-highlight {
-    background-color: var(--team-row-highlight-bg);
-}
-
-.team-table tr.ratings-highlight:hover {
-    background-color: var(--team-row-highlight-hover-bg);
-}
-
 /* Ratings separator row (zero-padding divider) */
 .team-table tr.ratings-separator td {
     padding: 0;
@@ -574,15 +565,6 @@ tr:has(.contract-hint-cell):focus-within .contract-hint-cell {
     /* Drafted row sticky backgrounds - consolidated */
     .responsive-table tbody tr.drafted td[class*="sticky-col"] {
         background-color: var(--gray-100);
-    }
-
-    /* Ratings highlight row sticky backgrounds (team-colored in Next Sim, League Starters) */
-    .responsive-table tbody tr.ratings-highlight td[class*="sticky-col"] {
-        background-color: var(--team-row-highlight-bg);
-    }
-
-    .responsive-table tbody tr.ratings-highlight:hover td[class*="sticky-col"] {
-        background-color: var(--team-row-highlight-hover-bg, var(--gray-100));
     }
 
     /* User team highlight sticky backgrounds */
@@ -790,11 +772,6 @@ tr:has(.contract-hint-cell):focus-within .contract-hint-cell {
 
     .table-scroll-wrapper {
         padding: 0;
-        margin-left: 0;
-        margin-right: 0;
-    }
-
-    .standings-table {
         margin-left: 0;
         margin-right: 0;
     }
@@ -1148,12 +1125,6 @@ tbody tr.user-team-row:nth-child(even):hover {
    Team Name Cell
    ========================================================================== */
 
-.ibl-team-cell {
-    display: flex;
-    align-items: center;
-    gap: var(--space-2);
-}
-
 .ibl-team-cell__logo {
     width: 24px;
     height: 24px;
@@ -1275,19 +1246,6 @@ td.ibl-team-cell--colored {
     gap: 6px;
 }
 
-.ibl-player-cell__img {
-    width: 32px;
-    height: 40px;
-    object-fit: cover;
-    border-radius: var(--radius-sm);
-    border: 1px solid var(--gray-200);
-    flex-shrink: 0;
-}
-
-.ibl-player-cell__info {
-    min-width: 0;
-}
-
 .ibl-player-cell__name {
     font-weight: 600;
     color: inherit;
@@ -1309,16 +1267,6 @@ td.ibl-team-cell--colored {
 
 .ibl-player-cell__name.player-expiring::after {
     content: '^';
-}
-
-.ibl-player-cell__team {
-    font-size: 1rem;
-    color: var(--gray-500);
-    text-decoration: none;
-}
-
-.ibl-player-cell__team:hover {
-    color: var(--accent-500);
 }
 
 /* Player Photo (circular thumbnail in name cells) */

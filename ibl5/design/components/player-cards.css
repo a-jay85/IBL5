@@ -629,24 +629,6 @@
 
 @layer components {
 
-/* Card Title Badge */
-.player-stats-card .card-title-badge {
-    display: inline-flex;
-    align-items: center;
-    gap: var(--pc-pad-md);
-}
-
-.player-stats-card .card-title-badge .badge {
-    background: rgba(0, 0, 0, 0.3);
-    color: white;
-    font-size: var(--pc-text-xs);
-    padding: 2px 6px;
-    border-radius: var(--pc-radius-sm);
-    font-weight: 400;
-    text-transform: none;
-    letter-spacing: normal;
-}
-
 /* Stats Type Indicator */
 .player-stats-card .stats-type-indicator {
     position: absolute;

@@ -3,7 +3,7 @@ description: "Plan an implementation task with mandatory test classification. Wr
 disallowed-tools:
   - EnterPlanMode
   - ExitPlanMode
-last_verified: 2026-05-27
+last_verified: 2026-05-28
 ---
 
 # /plan — Implementation Planning with Verification Matrix
@@ -59,6 +59,13 @@ After receiving the Plan agent's output, check these gates yourself — do NOT d
 4. **Tests woven inline** — pre-impl tests appear before their implementation step, not collected in a bottom appendix
 5. **Production comparison classified correctly** — any "compare against production" or "match iblhoops.net" row must be Visual-regression, not Truly-manual
 6. **Test file paths present** — every PHPUnit/API-test/E2E/Visual-regression row names a concrete test file path, not just a category
+7. **No unresolved decisions** — scan all table rows (lines matching `^\s*\|`) for these tokens (case-insensitive):
+   - `DECIDE` (whole word)
+   - `TBD` (whole word)
+   - `(or ` (literal — indicates unresolved alternative, e.g., "STAY (or move)")
+   - `subject to validation`
+   - `subject to review`
+   If any match is found, resolve the decision in-place before saving the plan. The nightly agent cannot make judgment calls — every table cell must contain a concrete action, not a deferred question.
 
 If validation fails on any gate, fix the matrix yourself rather than re-running the Plan agent.
 

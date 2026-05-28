@@ -8,6 +8,10 @@ parameters:
         - tests
     excludePaths:
         - tests/TeamOffDefStats/TeamOffDefStatsRepositoryTest.php
+        # Rule-test fixtures are deliberately-broken inputs to RuleTestCase
+        # (intentional rule violations, missing strict_types, etc.). They are
+        # loaded by path inside the rule tests, never analysed as real code.
+        - tests/PHPStanRules/Fixtures/*
     bootstrapFiles:
         - phpstan-stubs/nuke-globals.stub.php
         - phpstan-stubs/mock-aliases.stub.php

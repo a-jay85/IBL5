@@ -43,6 +43,54 @@ parameters:
 			path: tests/AllStarAppearances/AllStarAppearancesViewTest.php
 
 		-
+			rawMessage: 'Dynamic call to static method PHPUnit\Framework\Assert::callback().'
+			identifier: staticMethod.dynamicCall
+			count: 3
+			path: tests/Api/Controller/GameBoxscoreControllerTest.php
+
+		-
+			rawMessage: 'Dynamic call to static method PHPUnit\Framework\Assert::isArray().'
+			identifier: staticMethod.dynamicCall
+			count: 3
+			path: tests/Api/Controller/GameBoxscoreControllerTest.php
+
+		-
+			rawMessage: 'Method Tests\Api\Controller\GameBoxscoreControllerTest::gameRow() return type has no value type specified in iterable type array.'
+			identifier: missingType.iterableValue
+			count: 1
+			path: tests/Api/Controller/GameBoxscoreControllerTest.php
+
+		-
+			rawMessage: 'Method Tests\Api\Controller\GameBoxscoreControllerTest::playerBoxscoreRow() return type has no value type specified in iterable type array.'
+			identifier: missingType.iterableValue
+			count: 1
+			path: tests/Api/Controller/GameBoxscoreControllerTest.php
+
+		-
+			rawMessage: 'Method Tests\Api\Controller\GameBoxscoreControllerTest::teamBoxscoreRow() return type has no value type specified in iterable type array.'
+			identifier: missingType.iterableValue
+			count: 1
+			path: tests/Api/Controller/GameBoxscoreControllerTest.php
+
+		-
+			rawMessage: 'Dynamic call to static method PHPUnit\Framework\Assert::callback().'
+			identifier: staticMethod.dynamicCall
+			count: 3
+			path: tests/Api/Controller/GameDetailControllerTest.php
+
+		-
+			rawMessage: 'Dynamic call to static method PHPUnit\Framework\Assert::isArray().'
+			identifier: staticMethod.dynamicCall
+			count: 3
+			path: tests/Api/Controller/GameDetailControllerTest.php
+
+		-
+			rawMessage: 'Method Tests\Api\Controller\GameDetailControllerTest::gameRow() return type has no value type specified in iterable type array.'
+			identifier: missingType.iterableValue
+			count: 1
+			path: tests/Api/Controller/GameDetailControllerTest.php
+
+		-
 			rawMessage: 'Dynamic call to static method PHPUnit\Framework\Assert::anything().'
 			identifier: staticMethod.dynamicCall
 			count: 1
@@ -91,6 +139,90 @@ parameters:
 			path: tests/Api/Controller/LeadersControllerTest.php
 
 		-
+			rawMessage: 'Dynamic call to static method PHPUnit\Framework\Assert::callback().'
+			identifier: staticMethod.dynamicCall
+			count: 3
+			path: tests/Api/Controller/PlayerDetailControllerTest.php
+
+		-
+			rawMessage: 'Dynamic call to static method PHPUnit\Framework\Assert::isArray().'
+			identifier: staticMethod.dynamicCall
+			count: 3
+			path: tests/Api/Controller/PlayerDetailControllerTest.php
+
+		-
+			rawMessage: 'Method Tests\Api\Controller\PlayerDetailControllerTest::playerRow() return type has no value type specified in iterable type array.'
+			identifier: missingType.iterableValue
+			count: 1
+			path: tests/Api/Controller/PlayerDetailControllerTest.php
+
+		-
+			rawMessage: 'Call to function array_filter() requires parameter #2 to be passed to avoid loose comparison semantics.'
+			identifier: arrayFilter.strict
+			count: 1
+			path: tests/Api/Controller/PlayerExportControllerTest.php
+
+		-
+			rawMessage: 'Dynamic call to static method PHPUnit\Framework\TestCase::createStub().'
+			identifier: staticMethod.dynamicCall
+			count: 3
+			path: tests/Api/Controller/PlayerExportControllerTest.php
+
+		-
+			rawMessage: 'Method Tests\Api\Controller\PlayerExportControllerTest::playerRow() return type has no value type specified in iterable type array.'
+			identifier: missingType.iterableValue
+			count: 1
+			path: tests/Api/Controller/PlayerExportControllerTest.php
+
+		-
+			rawMessage: Short ternary operator is not allowed. Use null coalesce operator if applicable or consider using long ternary.
+			identifier: ternary.shortNotAllowed
+			count: 1
+			path: tests/Api/Controller/PlayerExportControllerTest.php
+
+		-
+			rawMessage: 'Dynamic call to static method PHPUnit\Framework\Assert::callback().'
+			identifier: staticMethod.dynamicCall
+			count: 4
+			path: tests/Api/Controller/PlayerHistoryControllerTest.php
+
+		-
+			rawMessage: 'Dynamic call to static method PHPUnit\Framework\Assert::isArray().'
+			identifier: staticMethod.dynamicCall
+			count: 2
+			path: tests/Api/Controller/PlayerHistoryControllerTest.php
+
+		-
+			rawMessage: 'Method Tests\Api\Controller\PlayerHistoryControllerTest::historyRow() return type has no value type specified in iterable type array.'
+			identifier: missingType.iterableValue
+			count: 1
+			path: tests/Api/Controller/PlayerHistoryControllerTest.php
+
+		-
+			rawMessage: 'Method Tests\Api\Controller\PlayerHistoryControllerTest::twoHistoryRows() return type has no value type specified in iterable type array.'
+			identifier: missingType.iterableValue
+			count: 1
+			path: tests/Api/Controller/PlayerHistoryControllerTest.php
+
+		-
+			rawMessage: 'Dynamic call to static method PHPUnit\Framework\Assert::callback().'
+			identifier: staticMethod.dynamicCall
+			count: 1
+			path: tests/Api/Controller/PlayerListControllerTest.php
+
+		-
+			rawMessage: 'Dynamic call to static method PHPUnit\Framework\Assert::isArray().'
+			identifier: staticMethod.dynamicCall
+			count: 2
+			path: tests/Api/Controller/PlayerListControllerTest.php
+
+		-
+			rawMessage: 'Method Tests\Api\Controller\PlayerListControllerTest::playerRow() return type has no value type specified in iterable type array.'
+			identifier: missingType.iterableValue
+			count: 1
+			path: tests/Api/Controller/PlayerListControllerTest.php
+
+		-
 			rawMessage: 'Dynamic call to static method PHPUnit\Framework\Assert::anything().'
 			identifier: staticMethod.dynamicCall
 			count: 1
@@ -112,6 +244,18 @@ parameters:
 			rawMessage: 'Dynamic call to static method PHPUnit\Framework\Assert::callback().'
 			identifier: staticMethod.dynamicCall
 			count: 2
+			path: tests/Api/Controller/SeasonControllerTest.php
+
+		-
+			rawMessage: 'Dynamic call to static method PHPUnit\Framework\Assert::isArray().'
+			identifier: staticMethod.dynamicCall
+			count: 4
+			path: tests/Api/Controller/SeasonControllerTest.php
+
+		-
+			rawMessage: 'Dynamic call to static method PHPUnit\Framework\Assert::callback().'
+			identifier: staticMethod.dynamicCall
+			count: 2
 			path: tests/Api/Controller/StandingsControllerTest.php
 
 		-
@@ -121,13 +265,79 @@ parameters:
 			path: tests/Api/Controller/StandingsControllerTest.php
 
 		-
+			rawMessage: 'Dynamic call to static method PHPUnit\Framework\Assert::callback().'
+			identifier: staticMethod.dynamicCall
+			count: 3
+			path: tests/Api/Controller/TeamDetailControllerTest.php
+
+		-
+			rawMessage: 'Dynamic call to static method PHPUnit\Framework\Assert::isArray().'
+			identifier: staticMethod.dynamicCall
+			count: 3
+			path: tests/Api/Controller/TeamDetailControllerTest.php
+
+		-
+			rawMessage: 'Method Tests\Api\Controller\TeamDetailControllerTest::teamRow() return type has no value type specified in iterable type array.'
+			identifier: missingType.iterableValue
+			count: 1
+			path: tests/Api/Controller/TeamDetailControllerTest.php
+
+		-
+			rawMessage: 'Dynamic call to static method PHPUnit\Framework\Assert::callback().'
+			identifier: staticMethod.dynamicCall
+			count: 2
+			path: tests/Api/Controller/TeamListControllerTest.php
+
+		-
+			rawMessage: 'Dynamic call to static method PHPUnit\Framework\Assert::isArray().'
+			identifier: staticMethod.dynamicCall
+			count: 4
+			path: tests/Api/Controller/TeamListControllerTest.php
+
+		-
+			rawMessage: 'Method Tests\Api\Controller\TeamListControllerTest::teamRow() return type has no value type specified in iterable type array.'
+			identifier: missingType.iterableValue
+			count: 1
+			path: tests/Api/Controller/TeamListControllerTest.php
+
+		-
+			rawMessage: 'Dynamic call to static method PHPUnit\Framework\Assert::callback().'
+			identifier: staticMethod.dynamicCall
+			count: 1
+			path: tests/Api/Controller/TeamRosterControllerTest.php
+
+		-
+			rawMessage: 'Dynamic call to static method PHPUnit\Framework\Assert::isArray().'
+			identifier: staticMethod.dynamicCall
+			count: 2
+			path: tests/Api/Controller/TeamRosterControllerTest.php
+
+		-
+			rawMessage: 'Method Tests\Api\Controller\TeamRosterControllerTest::playerRow() return type has no value type specified in iterable type array.'
+			identifier: missingType.iterableValue
+			count: 1
+			path: tests/Api/Controller/TeamRosterControllerTest.php
+
+		-
 			rawMessage: 'Dynamic call to static method PHPUnit\Framework\Assert::stringContains().'
 			identifier: staticMethod.dynamicCall
 			count: 5
 			path: tests/Api/Controller/TradeAcceptControllerTest.php
 
 		-
+			rawMessage: 'Dynamic call to static method PHPUnit\Framework\TestCase::createStub().'
+			identifier: staticMethod.dynamicCall
+			count: 5
+			path: tests/Api/Controller/TradeAcceptControllerTest.php
+
+		-
 			rawMessage: 'Dynamic call to static method PHPUnit\Framework\Assert::stringContains().'
+			identifier: staticMethod.dynamicCall
+			count: 4
+			path: tests/Api/Controller/TradeDeclineControllerTest.php
+
+		-
+			rawMessage: 'Dynamic call to static method PHPUnit\Framework\TestCase::createStub().'
 			identifier: staticMethod.dynamicCall
 			count: 4
 			path: tests/Api/Controller/TradeDeclineControllerTest.php
@@ -143,6 +353,12 @@ parameters:
 			identifier: cast.useless
 			count: 3
 			path: tests/Api/Response/CsvResponderTest.php
+
+		-
+			rawMessage: 'Call to method PHPUnit\Framework\Assert::assertInstanceOf() with ''Api\\Response\\Contracts\\HtmlResponderInterface'' and Api\Response\HtmlResponder will always evaluate to true.'
+			identifier: method.alreadyNarrowedType
+			count: 1
+			path: tests/Api/Response/HtmlResponderTest.php
 
 		-
 			rawMessage: 'Parameter #1 $row of method Api\Transformer\GameTransformer::transform() expects array{game_uuid: string, season_year: int, game_date: string, game_status: string, box_score_id: int, game_of_that_day: int, visitor_uuid: string, visitor_city: string, ...}, non-empty-array<string, mixed> given.'
@@ -181,6 +397,12 @@ parameters:
 			path: tests/Auth/AuthServiceTest.php
 
 		-
+			rawMessage: 'Dynamic call to static method PHPUnit\Framework\TestCase::createStub().'
+			identifier: staticMethod.dynamicCall
+			count: 1
+			path: tests/Auth/AuthServiceUsernameTest.php
+
+		-
 			rawMessage: 'Call to static method PHPUnit\Framework\Assert::assertSame() with 42 and 42 will always evaluate to true.'
 			identifier: staticMethod.alreadyNarrowedType
 			count: 1
@@ -213,6 +435,12 @@ parameters:
 		-
 			rawMessage: 'You should use assertSame() instead of assertEquals(), because both values are scalars of the same type'
 			identifier: phpunit.assertEquals
+			count: 13
+			path: tests/BasketballStats/SalaryConverterTest.php
+
+		-
+			rawMessage: 'You should use assertSame() instead of assertEquals(), because both values are scalars of the same type'
+			identifier: phpunit.assertEquals
 			count: 50
 			path: tests/BasketballStats/StatsFormatterTest.php
 
@@ -223,8 +451,44 @@ parameters:
 			path: tests/BasketballStats/StatsSanitizerTest.php
 
 		-
+			rawMessage: 'Dynamic call to static method PHPUnit\Framework\TestCase::createStub().'
+			identifier: staticMethod.dynamicCall
+			count: 2
+			path: tests/Bootstrap/Api/ApiKeyAuthBootstrapTest.php
+
+		-
+			rawMessage: 'Dynamic call to static method PHPUnit\Framework\TestCase::createStub().'
+			identifier: staticMethod.dynamicCall
+			count: 2
+			path: tests/Bootstrap/Api/ApiRoutingBootstrapTest.php
+
+		-
+			rawMessage: 'Call to static method PHPUnit\Framework\Assert::assertInstanceOf() with ''Bootstrap\\Contracts\\BootstrapStepInterface'' and Bootstrap\RateLimitingBootstrap will always evaluate to true.'
+			identifier: staticMethod.alreadyNarrowedType
+			count: 1
+			path: tests/Bootstrap/Api/RateLimitingBootstrapTest.php
+
+		-
+			rawMessage: 'Dynamic call to static method PHPUnit\Framework\TestCase::createStub().'
+			identifier: staticMethod.dynamicCall
+			count: 1
+			path: tests/Bootstrap/Api/RequestParsingBootstrapTest.php
+
+		-
 			rawMessage: 'Call to static method PHPUnit\Framework\Assert::assertInstanceOf() with ''Bootstrap\\Contracts\\ContainerInterface'' and Bootstrap\Contracts\ContainerInterface will always evaluate to true.'
 			identifier: staticMethod.alreadyNarrowedType
+			count: 1
+			path: tests/Bootstrap/ApplicationTest.php
+
+		-
+			rawMessage: 'Property Bootstrap\Contracts\BootstrapStepInterface@anonymous/Bootstrap/ApplicationTest.php:118::$order is never read, only written.'
+			identifier: property.onlyWritten
+			count: 1
+			path: tests/Bootstrap/ApplicationTest.php
+
+		-
+			rawMessage: 'Property Bootstrap\Contracts\BootstrapStepInterface@anonymous/Bootstrap/ApplicationTest.php:135::$order is never read, only written.'
+			identifier: property.onlyWritten
 			count: 1
 			path: tests/Bootstrap/ApplicationTest.php
 
@@ -241,10 +505,46 @@ parameters:
 			path: tests/Bootstrap/ApplicationTest.php
 
 		-
+			rawMessage: 'Dynamic call to static method PHPUnit\Framework\TestCase::createStub().'
+			identifier: staticMethod.dynamicCall
+			count: 2
+			path: tests/Bootstrap/AuthUsernameAccessorTest.php
+
+		-
+			rawMessage: Property Tests\Bootstrap\ConfigBootstrapExtractRequestTest::$originalGlobals type has no value type specified in iterable type array.
+			identifier: missingType.iterableValue
+			count: 1
+			path: tests/Bootstrap/ConfigBootstrapExtractRequestTest.php
+
+		-
+			rawMessage: Property Tests\Bootstrap\ConfigBootstrapExtractRequestTest::$originalRequest type has no value type specified in iterable type array.
+			identifier: missingType.iterableValue
+			count: 1
+			path: tests/Bootstrap/ConfigBootstrapExtractRequestTest.php
+
+		-
 			rawMessage: 'Call to static method PHPUnit\Framework\Assert::assertSame() with 1 and 0 will always evaluate to false.'
 			identifier: staticMethod.impossibleType
 			count: 1
 			path: tests/Bootstrap/ContainerTest.php
+
+		-
+			rawMessage: 'Dynamic call to static method PHPUnit\Framework\TestCase::createStub().'
+			identifier: staticMethod.dynamicCall
+			count: 3
+			path: tests/Bootstrap/CookieDecodeTest.php
+
+		-
+			rawMessage: Function check_html not found.
+			identifier: function.notFound
+			count: 2
+			path: tests/Bootstrap/FilterFunctionTest.php
+
+		-
+			rawMessage: Function check_words not found.
+			identifier: function.notFound
+			count: 1
+			path: tests/Bootstrap/FilterFunctionTest.php
 
 		-
 			rawMessage: 'Method Tests\Bootstrap\PhpunitConfigTest::isDirectoryCovered() has parameter $registeredDirs with no value type specified in iterable type array.'
@@ -263,6 +563,18 @@ parameters:
 			identifier: staticMethod.alreadyNarrowedType
 			count: 4
 			path: tests/Bootstrap/SecurityBootstrapTest.php
+
+		-
+			rawMessage: 'Dynamic call to static method PHPUnit\Framework\TestCase::createStub().'
+			identifier: staticMethod.dynamicCall
+			count: 1
+			path: tests/Bootstrap/SecurityBootstrapTest.php
+
+		-
+			rawMessage: 'Call to static method PHPUnit\Framework\Assert::assertInstanceOf() with ''Bootstrap\\Application'' and Bootstrap\Application will always evaluate to true.'
+			identifier: staticMethod.alreadyNarrowedType
+			count: 1
+			path: tests/Bootstrap/TestApplicationFactoryTest.php
 
 		-
 			rawMessage: 'Call to method PHPUnit\Framework\Assert::assertInstanceOf() with ''Boxscore\\Contracts\\BoxscoreProcessorInterface'' and Boxscore\BoxscoreProcessor will always evaluate to true.'
@@ -373,6 +685,12 @@ parameters:
 			path: tests/CareerLeaderboards/CareerLeaderboardsServiceTest.php
 
 		-
+			rawMessage: 'Method Tests\CareerLeaderboards\CareerLeaderboardsViewXssTest::makeStats() has parameter $overrides with no value type specified in iterable type array.'
+			identifier: missingType.iterableValue
+			count: 1
+			path: tests/CareerLeaderboards/CareerLeaderboardsViewXssTest.php
+
+		-
 			rawMessage: Short ternary operator is not allowed. Use null coalesce operator if applicable or consider using long ternary.
 			identifier: ternary.shortNotAllowed
 			count: 1
@@ -395,6 +713,54 @@ parameters:
 			identifier: missingType.iterableValue
 			count: 1
 			path: tests/Cli/CheckMasterCiGreenCliTest.php
+
+		-
+			rawMessage: 'Call to function array_filter() requires parameter #2 to be passed to avoid loose comparison semantics.'
+			identifier: arrayFilter.strict
+			count: 1
+			path: tests/Cli/LighthouseAuditUrlsTest.php
+
+		-
+			rawMessage: 'Call to static method PHPUnit\Framework\Assert::assertSame() with ''error'' and ''error'' will always evaluate to true.'
+			identifier: staticMethod.alreadyNarrowedType
+			count: 1
+			path: tests/Cli/LighthouseThresholdsTest.php
+
+		-
+			rawMessage: 'Call to static method PHPUnit\Framework\Assert::assertSame() with ''warn'' and ''warn'' will always evaluate to true.'
+			identifier: staticMethod.alreadyNarrowedType
+			count: 2
+			path: tests/Cli/LighthouseThresholdsTest.php
+
+		-
+			rawMessage: 'Call to static method PHPUnit\Framework\Assert::assertSame() with 0.03 and 0.03 will always evaluate to true.'
+			identifier: staticMethod.alreadyNarrowedType
+			count: 1
+			path: tests/Cli/LighthouseThresholdsTest.php
+
+		-
+			rawMessage: 'Call to static method PHPUnit\Framework\Assert::assertSame() with 0.6 and 0.6 will always evaluate to true.'
+			identifier: staticMethod.alreadyNarrowedType
+			count: 1
+			path: tests/Cli/LighthouseThresholdsTest.php
+
+		-
+			rawMessage: 'Call to static method PHPUnit\Framework\Assert::assertSame() with 0.8 and 0.8 will always evaluate to true.'
+			identifier: staticMethod.alreadyNarrowedType
+			count: 1
+			path: tests/Cli/LighthouseThresholdsTest.php
+
+		-
+			rawMessage: 'Call to static method PHPUnit\Framework\Assert::assertSame() with 0.85 and 0.85 will always evaluate to true.'
+			identifier: staticMethod.alreadyNarrowedType
+			count: 1
+			path: tests/Cli/LighthouseThresholdsTest.php
+
+		-
+			rawMessage: 'Call to static method PHPUnit\Framework\Assert::assertSame() with array{''performance'', ''accessibility'', ''best-practices''} and array{''performance'', ''accessibility'', ''best-practices''} will always evaluate to true.'
+			identifier: staticMethod.alreadyNarrowedType
+			count: 1
+			path: tests/Cli/LighthouseThresholdsTest.php
 
 		-
 			rawMessage: 'Method Tests\Cli\MergeMasterToProdCliTest::runScript() has parameter $env with no value type specified in iterable type array.'
@@ -529,19 +895,61 @@ parameters:
 			path: tests/DatabaseIntegration/AwardHistoryRepositoryTest.php
 
 		-
+			rawMessage: 'Method Tests\DatabaseIntegration\QueryCountingRepository::callFetchAllInList() return type has no value type specified in iterable type array.'
+			identifier: missingType.iterableValue
+			count: 1
+			path: tests/DatabaseIntegration/BaseMysqliRepositoryHelpersTest.php
+
+		-
+			rawMessage: 'Method Tests\DatabaseIntegration\TestableRepository::callFetchAllInList() return type has no value type specified in iterable type array.'
+			identifier: missingType.iterableValue
+			count: 1
+			path: tests/DatabaseIntegration/BaseMysqliRepositoryHelpersTest.php
+
+		-
+			rawMessage: 'Method Tests\DatabaseIntegration\TestableRepository::callFetchAllInListWithPrefix() return type has no value type specified in iterable type array.'
+			identifier: missingType.iterableValue
+			count: 1
+			path: tests/DatabaseIntegration/BaseMysqliRepositoryHelpersTest.php
+
+		-
+			rawMessage: 'Dynamic call to static method PHPUnit\Framework\TestCase::createStub().'
+			identifier: staticMethod.dynamicCall
+			count: 1
+			path: tests/DatabaseIntegration/BaseMysqliRepositoryTest.php
+
+		-
+			rawMessage: 'Method Tests\DatabaseIntegration\TestableBaseMysqliRepository::callFetchAll() return type has no value type specified in iterable type array.'
+			identifier: missingType.iterableValue
+			count: 1
+			path: tests/DatabaseIntegration/BaseMysqliRepositoryTest.php
+
+		-
+			rawMessage: 'Method Tests\DatabaseIntegration\TestableBaseMysqliRepository::callFetchAllRealTeams() return type has no value type specified in iterable type array.'
+			identifier: missingType.iterableValue
+			count: 1
+			path: tests/DatabaseIntegration/BaseMysqliRepositoryTest.php
+
+		-
+			rawMessage: 'Method Tests\DatabaseIntegration\TestableBaseMysqliRepository::callFetchOne() return type has no value type specified in iterable type array.'
+			identifier: missingType.iterableValue
+			count: 1
+			path: tests/DatabaseIntegration/BaseMysqliRepositoryTest.php
+
+		-
 			rawMessage: Casting to int something that's already int.
 			identifier: cast.useless
 			count: 4
 			path: tests/DatabaseIntegration/BuyoutLedgerSalaryParityTest.php
 
 		-
-			rawMessage: 'Call to function is_int() with int will always evaluate to true.'
-			identifier: function.alreadyNarrowedType
+			rawMessage: 'Call to static method PHPUnit\Framework\Assert::assertTrue() with true and ''All live-layer…'' will always evaluate to true.'
+			identifier: staticMethod.alreadyNarrowedType
 			count: 1
-			path: tests/DatabaseIntegration/CommonMysqliRepositoryTest.php
+			path: tests/DatabaseIntegration/CrossTableColumnNamingTest.php
 
 		-
-			rawMessage: 'Call to static method PHPUnit\Framework\Assert::assertTrue() with true and ''All live-layer…'' will always evaluate to true.'
+			rawMessage: 'Call to static method PHPUnit\Framework\Assert::assertTrue() with true and ''Career stat columns…'' will always evaluate to true.'
 			identifier: staticMethod.alreadyNarrowedType
 			count: 1
 			path: tests/DatabaseIntegration/CrossTableColumnNamingTest.php
@@ -727,6 +1135,12 @@ parameters:
 			path: tests/DatabaseIntegration/JsbImportRepositoryTest.php
 
 		-
+			rawMessage: 'Dynamic call to static method PHPUnit\Framework\TestCase::createStub().'
+			identifier: staticMethod.dynamicCall
+			count: 2
+			path: tests/DatabaseIntegration/LeagueControlPanelRepositoryTest.php
+
+		-
 			rawMessage: 'Undefined variable: $tn'
 			identifier: variable.undefined
 			count: 1
@@ -743,6 +1157,18 @@ parameters:
 			identifier: variable.undefined
 			count: 1
 			path: tests/DatabaseIntegration/NavigationRepositoryTest.php
+
+		-
+			rawMessage: 'Call to static method PHPUnit\Framework\Assert::assertNotNull() with int will always evaluate to true.'
+			identifier: staticMethod.alreadyNarrowedType
+			count: 1
+			path: tests/DatabaseIntegration/Player/PlayerFacadePropertyValuesTest.php
+
+		-
+			rawMessage: 'Call to static method PHPUnit\Framework\Assert::assertNotNull() with string will always evaluate to true.'
+			identifier: staticMethod.alreadyNarrowedType
+			count: 1
+			path: tests/DatabaseIntegration/Player/PlayerFacadePropertyValuesTest.php
 
 		-
 			rawMessage: 'Undefined variable: $pid'
@@ -805,12 +1231,6 @@ parameters:
 			path: tests/DatabaseIntegration/TeamOffDefStatsRepositoryTest.php
 
 		-
-			rawMessage: 'Offset ''Year'' does not exist on array{season_year: int, box_id: int, game_date: string, visitor_teamid: int, visitor_score: int, home_teamid: int, home_score: int, id: int, ...}.'
-			identifier: offsetAccess.notFound
-			count: 1
-			path: tests/DatabaseIntegration/TeamScheduleRepositoryTest.php
-
-		-
 			rawMessage: 'Missing call to parent::tearDown() method.'
 			identifier: phpunit.callParent
 			count: 1
@@ -841,13 +1261,31 @@ parameters:
 			path: tests/DatabaseIntegration/UpdateAllTheThings/PipelineIntegrationTestCase.php
 
 		-
+			rawMessage: 'Dynamic call to static method PHPUnit\Framework\TestCase::createStub().'
+			identifier: staticMethod.dynamicCall
+			count: 1
+			path: tests/DatabaseIntegration/UpdateAllTheThings/ScheduleAtomicityTest.php
+
+		-
+			rawMessage: 'Method Tests\DatabaseIntegration\VotingRepositoryTest::fetchRow() return type has no value type specified in iterable type array.'
+			identifier: missingType.iterableValue
+			count: 1
+			path: tests/DatabaseIntegration/VotingRepositoryTest.php
+
+		-
 			rawMessage: 'Call to method PHPUnit\Framework\Assert::assertInstanceOf() with ''DepthChartEntry\\DepthChartEntryApiHandler'' and DepthChartEntry\DepthChartEntryApiHandler will always evaluate to true.'
 			identifier: method.alreadyNarrowedType
 			count: 1
 			path: tests/DepthChartEntry/DepthChartEntryApiHandlerTest.php
 
 		-
-			rawMessage: 'AnonymousClassae4ad6ca45d85484d34b53d54b39f8c0::__construct() does not call parent constructor from mysqli.'
+			rawMessage: 'Dynamic call to static method PHPUnit\Framework\TestCase::createStub().'
+			identifier: staticMethod.dynamicCall
+			count: 2
+			path: tests/DepthChartEntry/DepthChartEntryApiHandlerTest.php
+
+		-
+			rawMessage: 'AnonymousClass58da200f0dfac4a568b2ea46839a3256::__construct() does not call parent constructor from mysqli.'
 			identifier: constructor.missingParentCall
 			count: 1
 			path: tests/DepthChartEntry/DepthChartEntryControllerTest.php
@@ -865,22 +1303,34 @@ parameters:
 			path: tests/DepthChartEntry/DepthChartEntryControllerTest.php
 
 		-
-			rawMessage: 'Method mysqli@anonymous/DepthChartEntry/DepthChartEntryControllerTest.php:41::prepare() never returns false so it can be removed from the return type.'
+			rawMessage: 'Dynamic call to static method PHPUnit\Framework\TestCase::createStub().'
+			identifier: staticMethod.dynamicCall
+			count: 5
+			path: tests/DepthChartEntry/DepthChartEntryControllerTest.php
+
+		-
+			rawMessage: 'Method mysqli@anonymous/DepthChartEntry/DepthChartEntryControllerTest.php:44::prepare() never returns false so it can be removed from the return type.'
 			identifier: return.unusedType
 			count: 1
 			path: tests/DepthChartEntry/DepthChartEntryControllerTest.php
 
 		-
-			rawMessage: 'Method mysqli@anonymous/DepthChartEntry/DepthChartEntryControllerTest.php:41::query() never returns mysqli_result so it can be removed from the return type.'
+			rawMessage: 'Method mysqli@anonymous/DepthChartEntry/DepthChartEntryControllerTest.php:44::query() never returns mysqli_result so it can be removed from the return type.'
 			identifier: return.unusedType
 			count: 1
 			path: tests/DepthChartEntry/DepthChartEntryControllerTest.php
 
 		-
-			rawMessage: 'Return type (Tests\WideUnit\Mocks\MockPreparedStatement|false) of method mysqli@anonymous/DepthChartEntry/DepthChartEntryControllerTest.php:41::prepare() should be covariant with return type (mysqli_stmt|false) of method mysqli::prepare()'
+			rawMessage: 'Return type (Tests\WideUnit\Mocks\MockPreparedStatement|false) of method mysqli@anonymous/DepthChartEntry/DepthChartEntryControllerTest.php:44::prepare() should be covariant with return type (mysqli_stmt|false) of method mysqli::prepare()'
 			identifier: method.childReturnType
 			count: 1
 			path: tests/DepthChartEntry/DepthChartEntryControllerTest.php
+
+		-
+			rawMessage: 'Dynamic call to static method PHPUnit\Framework\TestCase::createStub().'
+			identifier: staticMethod.dynamicCall
+			count: 3
+			path: tests/DepthChartEntry/DepthChartEntryProcessorTest.php
 
 		-
 			rawMessage: 'Method Tests\DepthChartEntry\DepthChartEntryProcessorTest::testBlankMinutesSubmissionIsConvertedToZero() has no return type specified.'
@@ -1063,7 +1513,7 @@ parameters:
 			path: tests/DepthChartEntry/DepthChartEntryServiceTest.php
 
 		-
-			rawMessage: 'AnonymousClassff992c0813c35f7ee739e4bc87d4a4a5::__construct() does not call parent constructor from mysqli.'
+			rawMessage: 'AnonymousClassa6c09346776dd84b3f5df73dafc8ee53::__construct() does not call parent constructor from mysqli.'
 			identifier: constructor.missingParentCall
 			count: 1
 			path: tests/DepthChartEntry/DepthChartEntrySubmissionHandlerTest.php
@@ -1081,19 +1531,25 @@ parameters:
 			path: tests/DepthChartEntry/DepthChartEntrySubmissionHandlerTest.php
 
 		-
-			rawMessage: 'Method mysqli@anonymous/DepthChartEntry/DepthChartEntrySubmissionHandlerTest.php:47::prepare() never returns false so it can be removed from the return type.'
+			rawMessage: 'Dynamic call to static method PHPUnit\Framework\TestCase::createStub().'
+			identifier: staticMethod.dynamicCall
+			count: 1
+			path: tests/DepthChartEntry/DepthChartEntrySubmissionHandlerTest.php
+
+		-
+			rawMessage: 'Method mysqli@anonymous/DepthChartEntry/DepthChartEntrySubmissionHandlerTest.php:45::prepare() never returns false so it can be removed from the return type.'
 			identifier: return.unusedType
 			count: 1
 			path: tests/DepthChartEntry/DepthChartEntrySubmissionHandlerTest.php
 
 		-
-			rawMessage: 'Method mysqli@anonymous/DepthChartEntry/DepthChartEntrySubmissionHandlerTest.php:47::query() never returns mysqli_result so it can be removed from the return type.'
+			rawMessage: 'Method mysqli@anonymous/DepthChartEntry/DepthChartEntrySubmissionHandlerTest.php:45::query() never returns mysqli_result so it can be removed from the return type.'
 			identifier: return.unusedType
 			count: 1
 			path: tests/DepthChartEntry/DepthChartEntrySubmissionHandlerTest.php
 
 		-
-			rawMessage: 'Return type (Tests\WideUnit\Mocks\MockPreparedStatement|false) of method mysqli@anonymous/DepthChartEntry/DepthChartEntrySubmissionHandlerTest.php:47::prepare() should be covariant with return type (mysqli_stmt|false) of method mysqli::prepare()'
+			rawMessage: 'Return type (Tests\WideUnit\Mocks\MockPreparedStatement|false) of method mysqli@anonymous/DepthChartEntry/DepthChartEntrySubmissionHandlerTest.php:45::prepare() should be covariant with return type (mysqli_stmt|false) of method mysqli::prepare()'
 			identifier: method.childReturnType
 			count: 1
 			path: tests/DepthChartEntry/DepthChartEntrySubmissionHandlerTest.php
@@ -1171,9 +1627,39 @@ parameters:
 			path: tests/DepthChartEntry/DepthChartEntryValidatorTest.php
 
 		-
+			rawMessage: 'Dynamic call to static method PHPUnit\Framework\TestCase::createStub().'
+			identifier: staticMethod.dynamicCall
+			count: 1
+			path: tests/DepthChartEntry/DepthChartEntryViewTest.php
+
+		-
+			rawMessage: 'Dynamic call to static method PHPUnit\Framework\TestCase::createStub().'
+			identifier: staticMethod.dynamicCall
+			count: 1
+			path: tests/DepthChartEntry/DepthChartEntryViewXssTest.php
+
+		-
+			rawMessage: 'Method Tests\DepthChartEntry\DepthChartEntryViewXssTest::makePlayer() has parameter $overrides with no value type specified in iterable type array.'
+			identifier: missingType.iterableValue
+			count: 1
+			path: tests/DepthChartEntry/DepthChartEntryViewXssTest.php
+
+		-
+			rawMessage: 'Parameter #1 $player of method DepthChartEntry\DepthChartEntryView::renderPlayerRow() expects array{pid: int, name: string, nickname: string|null, age: int|null, teamid: int, teamname: string|null, pos: string, stamina: int|null, ...}, array{pid: int, name: string, pos: string, injured: int, dc_can_play_in_game: int, dc_pg_depth: int, dc_sg_depth: int, dc_sf_depth: int, ...} given.'
+			identifier: argument.type
+			count: 1
+			path: tests/DepthChartEntry/DepthChartEntryViewXssTest.php
+
+		-
 			rawMessage: @@covers value \Discord references an invalid class or function.
 			identifier: phpunit.covers
 			count: 1
+			path: tests/Discord/DiscordIntegrationTest.php
+
+		-
+			rawMessage: 'Call to an undefined method Repositories\Contracts\TeamIdentityRepositoryInterface::method().'
+			identifier: method.notFound
+			count: 5
 			path: tests/Discord/DiscordIntegrationTest.php
 
 		-
@@ -1198,6 +1684,12 @@ parameters:
 			rawMessage: 'Construct empty() is not allowed. Use more strict comparison.'
 			identifier: empty.notAllowed
 			count: 2
+			path: tests/Discord/DiscordIntegrationTest.php
+
+		-
+			rawMessage: 'Dynamic call to static method PHPUnit\Framework\TestCase::createStub().'
+			identifier: staticMethod.dynamicCall
+			count: 1
 			path: tests/Discord/DiscordIntegrationTest.php
 
 		-
@@ -1261,8 +1753,8 @@ parameters:
 			path: tests/Discord/DiscordTest.php
 
 		-
-			rawMessage: Property Tests\Discord\DiscordTest::$mockDb has no type specified.
-			identifier: missingType.property
+			rawMessage: 'Dynamic call to static method PHPUnit\Framework\TestCase::createStub().'
+			identifier: staticMethod.dynamicCall
 			count: 1
 			path: tests/Discord/DiscordTest.php
 
@@ -1349,6 +1841,12 @@ parameters:
 			identifier: missingType.property
 			count: 1
 			path: tests/Draft/DraftProcessorTest.php
+
+		-
+			rawMessage: 'Dynamic call to static method PHPUnit\Framework\TestCase::createStub().'
+			identifier: staticMethod.dynamicCall
+			count: 2
+			path: tests/Draft/DraftRepositoryTest.php
 
 		-
 			rawMessage: 'Method Tests\Draft\DraftRepositoryTest::testCreatePlayerFromDraftClassHandlesApostrophes() has no return type specified.'
@@ -1687,7 +2185,7 @@ parameters:
 			path: tests/Extension/ExtensionOfferEvaluatorTest.php
 
 		-
-			rawMessage: 'Parameter #1 $offer of method Services\CommonContractValidator::calculateOfferValue() expects array{year1: int, year2: int, year3: int, year4?: int, year5?: int, year6?: int}, array{1: 5000000, 2: 5500000} given.'
+			rawMessage: 'Parameter #1 $offer of method FreeAgency\CommonContractValidator::calculateOfferValue() expects array{year1: int, year2: int, year3: int, year4?: int, year5?: int, year6?: int}, array{1: 5000000, 2: 5500000} given.'
 			identifier: argument.type
 			count: 2
 			path: tests/Extension/ExtensionOfferEvaluatorTest.php
@@ -2056,6 +2554,48 @@ parameters:
 			path: tests/FranchiseRecordBook/FranchiseRecordBookServiceTest.php
 
 		-
+			rawMessage: 'Parameter #1 $data of method FranchiseRecordBook\FranchiseRecordBookView::render() expects array{singleSeason: array<string, list<array{id: int, scope: string, teamid: int, record_type: string, stat_category: string, ranking: int, player_name: string, car_block_id: int|null, ...}>>, career: array<string, list<array{id: int, scope: string, teamid: int, record_type: string, stat_category: string, ranking: int, player_name: string, car_block_id: int|null, ...}>>, team: array{teamid: int, team_name: string, color1: string, color2: string}|null, teams: list<array{teamid: int, team_name: string, color1: string, color2: string}>, scope: string}, array{teams: array{array{teamid: 1, team_name: ''<script>alert(1)<…'', color1: ''FF0000'', color2: ''000000''}}, team: array{teamid: 1, team_name: ''<script>alert(1)<…'', color1: ''FF0000'', color2: ''000000''}, singleSeason: array{}, career: array{}} given.'
+			identifier: argument.type
+			count: 1
+			path: tests/FranchiseRecordBook/FranchiseRecordBookViewXssTest.php
+
+		-
+			rawMessage: 'Parameter #1 $offer of method FreeAgency\CommonContractValidator::calculateOfferValue() expects array{year1: int, year2: int, year3: int, year4?: int, year5?: int, year6?: int}, array{} given.'
+			identifier: argument.type
+			count: 1
+			path: tests/FreeAgency/CommonContractValidatorTest.php
+
+		-
+			rawMessage: 'Parameter #1 $offer of method FreeAgency\CommonContractValidator::validateMaximumYearOne() expects array{year1: int, year2?: int, year3?: int, year4?: int, year5?: int, year6?: int}, array{} given.'
+			identifier: argument.type
+			count: 1
+			path: tests/FreeAgency/CommonContractValidatorTest.php
+
+		-
+			rawMessage: 'Parameter #1 $offer of method FreeAgency\CommonContractValidator::validateNoGaps() expects array{year1: int, year2: int, year3: int, year4?: int, year5?: int, year6?: int}, array{} given.'
+			identifier: argument.type
+			count: 1
+			path: tests/FreeAgency/CommonContractValidatorTest.php
+
+		-
+			rawMessage: 'Parameter #1 $offer of method FreeAgency\CommonContractValidator::validateRaises() expects array{year1: int, year2: int, year3: int, year4?: int, year5?: int, year6?: int}, array{} given.'
+			identifier: argument.type
+			count: 1
+			path: tests/FreeAgency/CommonContractValidatorTest.php
+
+		-
+			rawMessage: 'Parameter #1 $offer of method FreeAgency\CommonContractValidator::validateSalaryDecreases() expects array{year1: int, year2: int, year3: int, year4?: int, year5?: int, year6?: int}, array{} given.'
+			identifier: argument.type
+			count: 1
+			path: tests/FreeAgency/CommonContractValidatorTest.php
+
+		-
+			rawMessage: 'You should use assertSame() instead of assertEquals(), because both values are scalars of the same type'
+			identifier: phpunit.assertEquals
+			count: 42
+			path: tests/FreeAgency/CommonContractValidatorTest.php
+
+		-
 			rawMessage: 'Dynamic call to static method PHPUnit\Framework\TestCase::createStub().'
 			identifier: staticMethod.dynamicCall
 			count: 12
@@ -2148,7 +2688,7 @@ parameters:
 		-
 			rawMessage: 'Dynamic call to static method PHPUnit\Framework\TestCase::createStub().'
 			identifier: staticMethod.dynamicCall
-			count: 1
+			count: 5
 			path: tests/FreeAgency/FreeAgencyControllerTest.php
 
 		-
@@ -2191,6 +2731,12 @@ parameters:
 			rawMessage: 'Call to method PHPUnit\Framework\Assert::assertInstanceOf() with ''FreeAgency\\FreeAgencyProcessor'' and FreeAgency\FreeAgencyProcessor will always evaluate to true.'
 			identifier: method.alreadyNarrowedType
 			count: 2
+			path: tests/FreeAgency/FreeAgencyProcessorTest.php
+
+		-
+			rawMessage: 'Dynamic call to static method PHPUnit\Framework\TestCase::createStub().'
+			identifier: staticMethod.dynamicCall
+			count: 13
 			path: tests/FreeAgency/FreeAgencyProcessorTest.php
 
 		-
@@ -2270,6 +2816,42 @@ parameters:
 			identifier: staticMethod.dynamicCall
 			count: 27
 			path: tests/FreeAgency/FreeAgencyServiceTest.php
+
+		-
+			rawMessage: Access to an undefined property PHPUnit\Framework\MockObject\Stub&Player\Player::$birdYears.
+			identifier: property.notFound
+			count: 2
+			path: tests/FreeAgency/FreeAgencyViewXssTest.php
+
+		-
+			rawMessage: Access to an undefined property PHPUnit\Framework\MockObject\Stub&Player\Player::$name.
+			identifier: property.notFound
+			count: 2
+			path: tests/FreeAgency/FreeAgencyViewXssTest.php
+
+		-
+			rawMessage: Access to an undefined property PHPUnit\Framework\MockObject\Stub&Player\Player::$playerID.
+			identifier: property.notFound
+			count: 2
+			path: tests/FreeAgency/FreeAgencyViewXssTest.php
+
+		-
+			rawMessage: Access to an undefined property PHPUnit\Framework\MockObject\Stub&Player\Player::$position.
+			identifier: property.notFound
+			count: 2
+			path: tests/FreeAgency/FreeAgencyViewXssTest.php
+
+		-
+			rawMessage: Access to an undefined property PHPUnit\Framework\MockObject\Stub&Player\Player::$teamName.
+			identifier: property.notFound
+			count: 2
+			path: tests/FreeAgency/FreeAgencyViewXssTest.php
+
+		-
+			rawMessage: Access to an undefined property PHPUnit\Framework\MockObject\Stub&Player\Player::$yearsOfExperience.
+			identifier: property.notFound
+			count: 2
+			path: tests/FreeAgency/FreeAgencyViewXssTest.php
 
 		-
 			rawMessage: 'Dynamic call to static method PHPUnit\Framework\TestCase::createStub().'
@@ -2638,6 +3220,156 @@ parameters:
 			path: tests/JsbParser/ScoFileParserTest.php
 
 		-
+			rawMessage: 'Dynamic call to static method PHPUnit\Framework\TestCase::createStub().'
+			identifier: staticMethod.dynamicCall
+			count: 1
+			path: tests/LastSimRecap/LastSimRecapServiceTest.php
+
+		-
+			rawMessage: 'Method LastSimRecap\Contracts\LastSimRecapRepositoryInterface@anonymous/LastSimRecap/LastSimRecapServiceTest.php:240::__construct() has parameter $games with no value type specified in iterable type array.'
+			identifier: missingType.iterableValue
+			count: 1
+			path: tests/LastSimRecap/LastSimRecapServiceTest.php
+
+		-
+			rawMessage: 'Method LastSimRecap\Contracts\LastSimRecapRepositoryInterface@anonymous/LastSimRecap/LastSimRecapServiceTest.php:240::__construct() has parameter $injuriesByPidAndDate with no value type specified in iterable type array.'
+			identifier: missingType.iterableValue
+			count: 1
+			path: tests/LastSimRecap/LastSimRecapServiceTest.php
+
+		-
+			rawMessage: 'Method LastSimRecap\Contracts\LastSimRecapRepositoryInterface@anonymous/LastSimRecap/LastSimRecapServiceTest.php:240::__construct() has parameter $lastSimStarters with no value type specified in iterable type array.'
+			identifier: missingType.iterableValue
+			count: 1
+			path: tests/LastSimRecap/LastSimRecapServiceTest.php
+
+		-
+			rawMessage: 'Method LastSimRecap\Contracts\LastSimRecapRepositoryInterface@anonymous/LastSimRecap/LastSimRecapServiceTest.php:240::__construct() has parameter $playerLines with no value type specified in iterable type array.'
+			identifier: missingType.iterableValue
+			count: 1
+			path: tests/LastSimRecap/LastSimRecapServiceTest.php
+
+		-
+			rawMessage: 'Method LastSimRecap\Contracts\LastSimRecapRepositoryInterface@anonymous/LastSimRecap/LastSimRecapServiceTest.php:240::__construct() has parameter $quarterLines with no value type specified in iterable type array.'
+			identifier: missingType.iterableValue
+			count: 1
+			path: tests/LastSimRecap/LastSimRecapServiceTest.php
+
+		-
+			rawMessage: 'Method LastSimRecap\Contracts\LastSimRecapRepositoryInterface@anonymous/LastSimRecap/LastSimRecapServiceTest.php:240::__construct() has parameter $rosterByTid with no value type specified in iterable type array.'
+			identifier: missingType.iterableValue
+			count: 1
+			path: tests/LastSimRecap/LastSimRecapServiceTest.php
+
+		-
+			rawMessage: 'Method LastSimRecap\Contracts\LastSimRecapRepositoryInterface@anonymous/LastSimRecap/LastSimRecapServiceTest.php:240::__construct() has parameter $starterSnapshots with no value type specified in iterable type array.'
+			identifier: missingType.iterableValue
+			count: 1
+			path: tests/LastSimRecap/LastSimRecapServiceTest.php
+
+		-
+			rawMessage: 'Method LastSimRecap\Contracts\LastSimRecapRepositoryInterface@anonymous/LastSimRecap/LastSimRecapServiceTest.php:240::__construct() has parameter $teamInfo with no value type specified in iterable type array.'
+			identifier: missingType.iterableValue
+			count: 1
+			path: tests/LastSimRecap/LastSimRecapServiceTest.php
+
+		-
+			rawMessage: 'Method LastSimRecap\Contracts\LastSimRecapRepositoryInterface@anonymous/LastSimRecap/LastSimRecapServiceTest.php:240::__construct() has parameter $window with no value type specified in iterable type array.'
+			identifier: missingType.iterableValue
+			count: 1
+			path: tests/LastSimRecap/LastSimRecapServiceTest.php
+
+		-
+			rawMessage: 'Method Tests\LastSimRecap\LastSimRecapServiceTest::buildRepo() has parameter $games with no value type specified in iterable type array.'
+			identifier: missingType.iterableValue
+			count: 1
+			path: tests/LastSimRecap/LastSimRecapServiceTest.php
+
+		-
+			rawMessage: 'Method Tests\LastSimRecap\LastSimRecapServiceTest::buildRepo() has parameter $injuriesByPidAndDate with no value type specified in iterable type array.'
+			identifier: missingType.iterableValue
+			count: 1
+			path: tests/LastSimRecap/LastSimRecapServiceTest.php
+
+		-
+			rawMessage: 'Method Tests\LastSimRecap\LastSimRecapServiceTest::buildRepo() has parameter $lastSimStarters with no value type specified in iterable type array.'
+			identifier: missingType.iterableValue
+			count: 1
+			path: tests/LastSimRecap/LastSimRecapServiceTest.php
+
+		-
+			rawMessage: 'Method Tests\LastSimRecap\LastSimRecapServiceTest::buildRepo() has parameter $playerLines with no value type specified in iterable type array.'
+			identifier: missingType.iterableValue
+			count: 1
+			path: tests/LastSimRecap/LastSimRecapServiceTest.php
+
+		-
+			rawMessage: 'Method Tests\LastSimRecap\LastSimRecapServiceTest::buildRepo() has parameter $quarterLines with no value type specified in iterable type array.'
+			identifier: missingType.iterableValue
+			count: 1
+			path: tests/LastSimRecap/LastSimRecapServiceTest.php
+
+		-
+			rawMessage: 'Method Tests\LastSimRecap\LastSimRecapServiceTest::buildRepo() has parameter $rosterByTid with no value type specified in iterable type array.'
+			identifier: missingType.iterableValue
+			count: 1
+			path: tests/LastSimRecap/LastSimRecapServiceTest.php
+
+		-
+			rawMessage: 'Method Tests\LastSimRecap\LastSimRecapServiceTest::buildRepo() has parameter $starterSnapshots with no value type specified in iterable type array.'
+			identifier: missingType.iterableValue
+			count: 1
+			path: tests/LastSimRecap/LastSimRecapServiceTest.php
+
+		-
+			rawMessage: 'Method Tests\LastSimRecap\LastSimRecapServiceTest::buildRepo() has parameter $window with no value type specified in iterable type array.'
+			identifier: missingType.iterableValue
+			count: 1
+			path: tests/LastSimRecap/LastSimRecapServiceTest.php
+
+		-
+			rawMessage: 'Call to function array_filter() requires parameter #2 to be passed to avoid loose comparison semantics.'
+			identifier: arrayFilter.strict
+			count: 1
+			path: tests/LastSimRecap/LastSimRecapViewTest.php
+
+		-
+			rawMessage: 'Call to static method PHPUnit\Framework\Assert::assertTrue() with true will always evaluate to true.'
+			identifier: staticMethod.alreadyNarrowedType
+			count: 1
+			path: tests/LastSimRecap/LastSimRecapViewTest.php
+
+		-
+			rawMessage: 'Dynamic call to static method PHPUnit\Framework\TestCase::createStub().'
+			identifier: staticMethod.dynamicCall
+			count: 3
+			path: tests/LastSimRecap/NewsModuleIntegrationTest.php
+
+		-
+			rawMessage: 'Method LastSimRecap\Contracts\LastSimRecapRepositoryInterface@anonymous/LastSimRecap/NewsModuleIntegrationTest.php:72::__construct() has parameter $games with no value type specified in iterable type array.'
+			identifier: missingType.iterableValue
+			count: 1
+			path: tests/LastSimRecap/NewsModuleIntegrationTest.php
+
+		-
+			rawMessage: 'Method LastSimRecap\Contracts\LastSimRecapRepositoryInterface@anonymous/LastSimRecap/NewsModuleIntegrationTest.php:72::getLastSimWindow() never returns null so it can be removed from the return type.'
+			identifier: return.unusedType
+			count: 1
+			path: tests/LastSimRecap/NewsModuleIntegrationTest.php
+
+		-
+			rawMessage: 'Method LastSimRecap\Contracts\LastSimRecapRepositoryInterface@anonymous/LastSimRecap/NewsModuleIntegrationTest.php:72::getTeamBoxscoreLines() never returns null so it can be removed from the return type.'
+			identifier: return.unusedType
+			count: 1
+			path: tests/LastSimRecap/NewsModuleIntegrationTest.php
+
+		-
+			rawMessage: 'Method Tests\LastSimRecap\NewsModuleIntegrationTest::repoWithGames() has parameter $games with no value type specified in iterable type array.'
+			identifier: missingType.iterableValue
+			count: 1
+			path: tests/LastSimRecap/NewsModuleIntegrationTest.php
+
+		-
 			rawMessage: 'You should use assertSame() instead of assertEquals(), because both values are scalars of the same type'
 			identifier: phpunit.assertEquals
 			count: 15
@@ -2706,7 +3438,7 @@ parameters:
 		-
 			rawMessage: 'Dynamic call to static method PHPUnit\Framework\TestCase::createStub().'
 			identifier: staticMethod.dynamicCall
-			count: 34
+			count: 37
 			path: tests/LeagueControlPanel/LeagueControlPanelProcessorTest.php
 
 		-
@@ -2743,7 +3475,7 @@ parameters:
 		-
 			rawMessage: 'Dynamic call to static method PHPUnit\Framework\TestCase::createStub().'
 			identifier: staticMethod.dynamicCall
-			count: 4
+			count: 6
 			path: tests/LeagueControlPanel/LeagueControlPanelServiceTest.php
 
 		-
@@ -2785,7 +3517,7 @@ parameters:
 		-
 			rawMessage: 'Dynamic call to static method PHPUnit\Framework\TestCase::createStub().'
 			identifier: staticMethod.dynamicCall
-			count: 25
+			count: 28
 			path: tests/LeagueSchedule/LeagueScheduleServiceTest.php
 
 		-
@@ -2804,6 +3536,12 @@ parameters:
 			rawMessage: 'Call to method PHPUnit\Framework\Assert::assertInstanceOf() with ''LeagueStarters\\LeagueStartersApiHandler'' and LeagueStarters\LeagueStartersApiHandler will always evaluate to true.'
 			identifier: method.alreadyNarrowedType
 			count: 1
+			path: tests/LeagueStarters/LeagueStartersApiHandlerTest.php
+
+		-
+			rawMessage: 'Dynamic call to static method PHPUnit\Framework\TestCase::createStub().'
+			identifier: staticMethod.dynamicCall
+			count: 2
 			path: tests/LeagueStarters/LeagueStartersApiHandlerTest.php
 
 		-
@@ -2966,6 +3704,12 @@ parameters:
 			rawMessage: 'Dynamic call to static method PHPUnit\Framework\TestCase::createStub().'
 			identifier: staticMethod.dynamicCall
 			count: 1
+			path: tests/Module/EntryPoints/StandingsEntryPointTest.php
+
+		-
+			rawMessage: 'Dynamic call to static method PHPUnit\Framework\TestCase::createStub().'
+			identifier: staticMethod.dynamicCall
+			count: 1
 			path: tests/Module/EntryPoints/TeamEntryPointTest.php
 
 		-
@@ -2973,6 +3717,30 @@ parameters:
 			identifier: staticMethod.dynamicCall
 			count: 4
 			path: tests/Module/ModuleAccessControlTest.php
+
+		-
+			rawMessage: Short ternary operator is not allowed. Use null coalesce operator if applicable or consider using long ternary.
+			identifier: ternary.shortNotAllowed
+			count: 1
+			path: tests/Module/ModuleRegistryTest.php
+
+		-
+			rawMessage: 'Dynamic call to static method PHPUnit\Framework\TestCase::createStub().'
+			identifier: staticMethod.dynamicCall
+			count: 1
+			path: tests/Navigation/Views/NavigationViewsXssTest.php
+
+		-
+			rawMessage: 'Dynamic call to static method PHPUnit\Framework\TestCase::createStub().'
+			identifier: staticMethod.dynamicCall
+			count: 1
+			path: tests/Negotiation/NegotiationDemandCalculatorTest.php
+
+		-
+			rawMessage: 'Method Tests\Negotiation\NegotiationDemandCalculatorTest::createPlayerWithRatings() has parameter $overrides with no value type specified in iterable type array.'
+			identifier: missingType.iterableValue
+			count: 1
+			path: tests/Negotiation/NegotiationDemandCalculatorTest.php
 
 		-
 			rawMessage: 'Method Tests\Negotiation\NegotiationDemandCalculatorTest::getDefaultTeamFactors() return type has no value type specified in iterable type array.'
@@ -3051,186 +3819,6 @@ parameters:
 			identifier: missingType.property
 			count: 1
 			path: tests/Negotiation/NegotiationDemandCalculatorTest.php
-
-		-
-			rawMessage: 'AnonymousClassa1d74fa8d59aa5eaa50091bfe3075ed7::__construct() does not call parent constructor from mysqli.'
-			identifier: constructor.missingParentCall
-			count: 1
-			path: tests/Negotiation/NegotiationRepositoryTest.php
-
-		-
-			rawMessage: 'Call to method PHPUnit\Framework\Assert::assertInstanceOf() with ''BaseMysqliRepository'' and Negotiation\NegotiationRepository will always evaluate to true.'
-			identifier: method.alreadyNarrowedType
-			count: 1
-			path: tests/Negotiation/NegotiationRepositoryTest.php
-
-		-
-			rawMessage: 'Call to method PHPUnit\Framework\Assert::assertInstanceOf() with ''Negotiation\\Contracts\\NegotiationRepositoryInterface'' and Negotiation\NegotiationRepository will always evaluate to true.'
-			identifier: method.alreadyNarrowedType
-			count: 1
-			path: tests/Negotiation/NegotiationRepositoryTest.php
-
-		-
-			rawMessage: 'Call to method PHPUnit\Framework\Assert::assertInstanceOf() with ''Negotiation\\NegotiationRepository'' and Negotiation\NegotiationRepository will always evaluate to true.'
-			identifier: method.alreadyNarrowedType
-			count: 3
-			path: tests/Negotiation/NegotiationRepositoryTest.php
-
-		-
-			rawMessage: 'Method mysqli@anonymous/Negotiation/NegotiationRepositoryTest.php:42::prepare() never returns false so it can be removed from the return type.'
-			identifier: return.unusedType
-			count: 1
-			path: tests/Negotiation/NegotiationRepositoryTest.php
-
-		-
-			rawMessage: 'Method mysqli@anonymous/Negotiation/NegotiationRepositoryTest.php:42::query() never returns mysqli_result so it can be removed from the return type.'
-			identifier: return.unusedType
-			count: 1
-			path: tests/Negotiation/NegotiationRepositoryTest.php
-
-		-
-			rawMessage: 'Return type (Tests\WideUnit\Mocks\MockPreparedStatement|false) of method mysqli@anonymous/Negotiation/NegotiationRepositoryTest.php:42::prepare() should be covariant with return type (mysqli_stmt|false) of method mysqli::prepare()'
-			identifier: method.childReturnType
-			count: 1
-			path: tests/Negotiation/NegotiationRepositoryTest.php
-
-		-
-			rawMessage: 'You should use assertSame() instead of assertEquals(), because both values are scalars of the same type'
-			identifier: phpunit.assertEquals
-			count: 5
-			path: tests/Negotiation/NegotiationRepositoryTest.php
-
-		-
-			rawMessage: 'AnonymousClass9144c77919f170f7d165bd0705dbba23::__construct() does not call parent constructor from mysqli.'
-			identifier: constructor.missingParentCall
-			count: 1
-			path: tests/Negotiation/NegotiationServiceTest.php
-
-		-
-			rawMessage: 'Call to method PHPUnit\Framework\Assert::assertInstanceOf() with ''Negotiation\\Contracts\\NegotiationServiceInterface'' and Negotiation\NegotiationService will always evaluate to true.'
-			identifier: method.alreadyNarrowedType
-			count: 1
-			path: tests/Negotiation/NegotiationServiceTest.php
-
-		-
-			rawMessage: 'Call to method PHPUnit\Framework\Assert::assertInstanceOf() with ''Negotiation\\NegotiationService'' and Negotiation\NegotiationService will always evaluate to true.'
-			identifier: method.alreadyNarrowedType
-			count: 1
-			path: tests/Negotiation/NegotiationServiceTest.php
-
-		-
-			rawMessage: 'Dynamic call to static method PHPUnit\Framework\TestCase::createStub().'
-			identifier: staticMethod.dynamicCall
-			count: 1
-			path: tests/Negotiation/NegotiationServiceTest.php
-
-		-
-			rawMessage: 'Method Tests\Negotiation\NegotiationServiceTest::getCompletePlayerData() has parameter $overrides with no value type specified in iterable type array.'
-			identifier: missingType.iterableValue
-			count: 1
-			path: tests/Negotiation/NegotiationServiceTest.php
-
-		-
-			rawMessage: 'Method Tests\Negotiation\NegotiationServiceTest::getCompletePlayerData() return type has no value type specified in iterable type array.'
-			identifier: missingType.iterableValue
-			count: 1
-			path: tests/Negotiation/NegotiationServiceTest.php
-
-		-
-			rawMessage: 'Method mysqli@anonymous/Negotiation/NegotiationServiceTest.php:44::prepare() never returns false so it can be removed from the return type.'
-			identifier: return.unusedType
-			count: 1
-			path: tests/Negotiation/NegotiationServiceTest.php
-
-		-
-			rawMessage: 'Method mysqli@anonymous/Negotiation/NegotiationServiceTest.php:44::query() never returns mysqli_result so it can be removed from the return type.'
-			identifier: return.unusedType
-			count: 1
-			path: tests/Negotiation/NegotiationServiceTest.php
-
-		-
-			rawMessage: 'Return type (Tests\WideUnit\Mocks\MockPreparedStatement|false) of method mysqli@anonymous/Negotiation/NegotiationServiceTest.php:44::prepare() should be covariant with return type (mysqli_stmt|false) of method mysqli::prepare()'
-			identifier: method.childReturnType
-			count: 1
-			path: tests/Negotiation/NegotiationServiceTest.php
-
-		-
-			rawMessage: 'Dynamic call to static method PHPUnit\Framework\TestCase::createStub().'
-			identifier: staticMethod.dynamicCall
-			count: 1
-			path: tests/Negotiation/NegotiationValidatorTest.php
-
-		-
-			rawMessage: 'Method Tests\Negotiation\NegotiationValidatorTest::testAcceptsPlayerInLastContractYear() has no return type specified.'
-			identifier: missingType.return
-			count: 1
-			path: tests/Negotiation/NegotiationValidatorTest.php
-
-		-
-			rawMessage: 'Method Tests\Negotiation\NegotiationValidatorTest::testAcceptsPlayerOnUsersTeamWhenEligible() has no return type specified.'
-			identifier: missingType.return
-			count: 1
-			path: tests/Negotiation/NegotiationValidatorTest.php
-
-		-
-			rawMessage: 'Method Tests\Negotiation\NegotiationValidatorTest::testAcceptsPlayerWithNoNextYearSalary() has no return type specified.'
-			identifier: missingType.return
-			count: 1
-			path: tests/Negotiation/NegotiationValidatorTest.php
-
-		-
-			rawMessage: 'Method Tests\Negotiation\NegotiationValidatorTest::testAcceptsWhenFreeAgencyModuleNotFound() has no return type specified.'
-			identifier: missingType.return
-			count: 1
-			path: tests/Negotiation/NegotiationValidatorTest.php
-
-		-
-			rawMessage: 'Method Tests\Negotiation\NegotiationValidatorTest::testAcceptsWhenFreeAgencyNotActive() has no return type specified.'
-			identifier: missingType.return
-			count: 1
-			path: tests/Negotiation/NegotiationValidatorTest.php
-
-		-
-			rawMessage: 'Method Tests\Negotiation\NegotiationValidatorTest::testRejectsDuringFreeAgency() has no return type specified.'
-			identifier: missingType.return
-			count: 1
-			path: tests/Negotiation/NegotiationValidatorTest.php
-
-		-
-			rawMessage: 'Method Tests\Negotiation\NegotiationValidatorTest::testRejectsPlayerNotEligibleForRenegotiation() has no return type specified.'
-			identifier: missingType.return
-			count: 1
-			path: tests/Negotiation/NegotiationValidatorTest.php
-
-		-
-			rawMessage: 'Method Tests\Negotiation\NegotiationValidatorTest::testRejectsPlayerNotOnUsersTeam() has no return type specified.'
-			identifier: missingType.return
-			count: 1
-			path: tests/Negotiation/NegotiationValidatorTest.php
-
-		-
-			rawMessage: 'Method Tests\Negotiation\NegotiationValidatorTest::testRejectsRookieOptionedPlayerInOptionYear() has no return type specified.'
-			identifier: missingType.return
-			count: 1
-			path: tests/Negotiation/NegotiationValidatorTest.php
-
-		-
-			rawMessage: Property Tests\Negotiation\NegotiationValidatorTest::$mockDb has no type specified.
-			identifier: missingType.property
-			count: 1
-			path: tests/Negotiation/NegotiationValidatorTest.php
-
-		-
-			rawMessage: Property Tests\Negotiation\NegotiationValidatorTest::$mockSeason has no type specified.
-			identifier: missingType.property
-			count: 1
-			path: tests/Negotiation/NegotiationValidatorTest.php
-
-		-
-			rawMessage: Property Tests\Negotiation\NegotiationValidatorTest::$validator has no type specified.
-			identifier: missingType.property
-			count: 1
-			path: tests/Negotiation/NegotiationValidatorTest.php
 
 		-
 			rawMessage: 'Method Tests\Negotiation\NegotiationOfferViewTest::getDefaultDemands() return type has no value type specified in iterable type array.'
@@ -3335,6 +3923,186 @@ parameters:
 			path: tests/Negotiation/NegotiationOfferViewTest.php
 
 		-
+			rawMessage: 'AnonymousClassde6b13e27b0507a8822088af7a7ac780::__construct() does not call parent constructor from mysqli.'
+			identifier: constructor.missingParentCall
+			count: 1
+			path: tests/Negotiation/NegotiationRepositoryTest.php
+
+		-
+			rawMessage: 'Call to method PHPUnit\Framework\Assert::assertInstanceOf() with ''BaseMysqliRepository'' and Negotiation\NegotiationRepository will always evaluate to true.'
+			identifier: method.alreadyNarrowedType
+			count: 1
+			path: tests/Negotiation/NegotiationRepositoryTest.php
+
+		-
+			rawMessage: 'Call to method PHPUnit\Framework\Assert::assertInstanceOf() with ''Negotiation\\Contracts\\NegotiationRepositoryInterface'' and Negotiation\NegotiationRepository will always evaluate to true.'
+			identifier: method.alreadyNarrowedType
+			count: 1
+			path: tests/Negotiation/NegotiationRepositoryTest.php
+
+		-
+			rawMessage: 'Call to method PHPUnit\Framework\Assert::assertInstanceOf() with ''Negotiation\\NegotiationRepository'' and Negotiation\NegotiationRepository will always evaluate to true.'
+			identifier: method.alreadyNarrowedType
+			count: 3
+			path: tests/Negotiation/NegotiationRepositoryTest.php
+
+		-
+			rawMessage: 'Dynamic call to static method PHPUnit\Framework\TestCase::createStub().'
+			identifier: staticMethod.dynamicCall
+			count: 9
+			path: tests/Negotiation/NegotiationRepositoryTest.php
+
+		-
+			rawMessage: 'Method mysqli@anonymous/Negotiation/NegotiationRepositoryTest.php:43::prepare() never returns false so it can be removed from the return type.'
+			identifier: return.unusedType
+			count: 1
+			path: tests/Negotiation/NegotiationRepositoryTest.php
+
+		-
+			rawMessage: 'Method mysqli@anonymous/Negotiation/NegotiationRepositoryTest.php:43::query() never returns mysqli_result so it can be removed from the return type.'
+			identifier: return.unusedType
+			count: 1
+			path: tests/Negotiation/NegotiationRepositoryTest.php
+
+		-
+			rawMessage: 'Return type (Tests\WideUnit\Mocks\MockPreparedStatement|false) of method mysqli@anonymous/Negotiation/NegotiationRepositoryTest.php:43::prepare() should be covariant with return type (mysqli_stmt|false) of method mysqli::prepare()'
+			identifier: method.childReturnType
+			count: 1
+			path: tests/Negotiation/NegotiationRepositoryTest.php
+
+		-
+			rawMessage: 'You should use assertSame() instead of assertEquals(), because both values are scalars of the same type'
+			identifier: phpunit.assertEquals
+			count: 5
+			path: tests/Negotiation/NegotiationRepositoryTest.php
+
+		-
+			rawMessage: 'AnonymousClass653854fa41e6f0de9ead4b0e02be92b0::__construct() does not call parent constructor from mysqli.'
+			identifier: constructor.missingParentCall
+			count: 1
+			path: tests/Negotiation/NegotiationServiceTest.php
+
+		-
+			rawMessage: 'Call to method PHPUnit\Framework\Assert::assertInstanceOf() with ''Negotiation\\Contracts\\NegotiationServiceInterface'' and Negotiation\NegotiationService will always evaluate to true.'
+			identifier: method.alreadyNarrowedType
+			count: 1
+			path: tests/Negotiation/NegotiationServiceTest.php
+
+		-
+			rawMessage: 'Call to method PHPUnit\Framework\Assert::assertInstanceOf() with ''Negotiation\\NegotiationService'' and Negotiation\NegotiationService will always evaluate to true.'
+			identifier: method.alreadyNarrowedType
+			count: 1
+			path: tests/Negotiation/NegotiationServiceTest.php
+
+		-
+			rawMessage: 'Dynamic call to static method PHPUnit\Framework\TestCase::createStub().'
+			identifier: staticMethod.dynamicCall
+			count: 2
+			path: tests/Negotiation/NegotiationServiceTest.php
+
+		-
+			rawMessage: 'Method Tests\Negotiation\NegotiationServiceTest::getCompletePlayerData() has parameter $overrides with no value type specified in iterable type array.'
+			identifier: missingType.iterableValue
+			count: 1
+			path: tests/Negotiation/NegotiationServiceTest.php
+
+		-
+			rawMessage: 'Method Tests\Negotiation\NegotiationServiceTest::getCompletePlayerData() return type has no value type specified in iterable type array.'
+			identifier: missingType.iterableValue
+			count: 1
+			path: tests/Negotiation/NegotiationServiceTest.php
+
+		-
+			rawMessage: 'Method mysqli@anonymous/Negotiation/NegotiationServiceTest.php:45::prepare() never returns false so it can be removed from the return type.'
+			identifier: return.unusedType
+			count: 1
+			path: tests/Negotiation/NegotiationServiceTest.php
+
+		-
+			rawMessage: 'Method mysqli@anonymous/Negotiation/NegotiationServiceTest.php:45::query() never returns mysqli_result so it can be removed from the return type.'
+			identifier: return.unusedType
+			count: 1
+			path: tests/Negotiation/NegotiationServiceTest.php
+
+		-
+			rawMessage: 'Return type (Tests\WideUnit\Mocks\MockPreparedStatement|false) of method mysqli@anonymous/Negotiation/NegotiationServiceTest.php:45::prepare() should be covariant with return type (mysqli_stmt|false) of method mysqli::prepare()'
+			identifier: method.childReturnType
+			count: 1
+			path: tests/Negotiation/NegotiationServiceTest.php
+
+		-
+			rawMessage: 'Dynamic call to static method PHPUnit\Framework\TestCase::createStub().'
+			identifier: staticMethod.dynamicCall
+			count: 1
+			path: tests/Negotiation/NegotiationValidatorTest.php
+
+		-
+			rawMessage: 'Method Tests\Negotiation\NegotiationValidatorTest::testAcceptsPlayerInLastContractYear() has no return type specified.'
+			identifier: missingType.return
+			count: 1
+			path: tests/Negotiation/NegotiationValidatorTest.php
+
+		-
+			rawMessage: 'Method Tests\Negotiation\NegotiationValidatorTest::testAcceptsPlayerOnUsersTeamWhenEligible() has no return type specified.'
+			identifier: missingType.return
+			count: 1
+			path: tests/Negotiation/NegotiationValidatorTest.php
+
+		-
+			rawMessage: 'Method Tests\Negotiation\NegotiationValidatorTest::testAcceptsPlayerWithNoNextYearSalary() has no return type specified.'
+			identifier: missingType.return
+			count: 1
+			path: tests/Negotiation/NegotiationValidatorTest.php
+
+		-
+			rawMessage: 'Method Tests\Negotiation\NegotiationValidatorTest::testAcceptsWhenFreeAgencyModuleNotFound() has no return type specified.'
+			identifier: missingType.return
+			count: 1
+			path: tests/Negotiation/NegotiationValidatorTest.php
+
+		-
+			rawMessage: 'Method Tests\Negotiation\NegotiationValidatorTest::testAcceptsWhenFreeAgencyNotActive() has no return type specified.'
+			identifier: missingType.return
+			count: 1
+			path: tests/Negotiation/NegotiationValidatorTest.php
+
+		-
+			rawMessage: 'Method Tests\Negotiation\NegotiationValidatorTest::testRejectsDuringFreeAgency() has no return type specified.'
+			identifier: missingType.return
+			count: 1
+			path: tests/Negotiation/NegotiationValidatorTest.php
+
+		-
+			rawMessage: 'Method Tests\Negotiation\NegotiationValidatorTest::testRejectsPlayerNotEligibleForRenegotiation() has no return type specified.'
+			identifier: missingType.return
+			count: 1
+			path: tests/Negotiation/NegotiationValidatorTest.php
+
+		-
+			rawMessage: 'Method Tests\Negotiation\NegotiationValidatorTest::testRejectsPlayerNotOnUsersTeam() has no return type specified.'
+			identifier: missingType.return
+			count: 1
+			path: tests/Negotiation/NegotiationValidatorTest.php
+
+		-
+			rawMessage: 'Method Tests\Negotiation\NegotiationValidatorTest::testRejectsRookieOptionedPlayerInOptionYear() has no return type specified.'
+			identifier: missingType.return
+			count: 1
+			path: tests/Negotiation/NegotiationValidatorTest.php
+
+		-
+			rawMessage: Property Tests\Negotiation\NegotiationValidatorTest::$mockSeason has no type specified.
+			identifier: missingType.property
+			count: 1
+			path: tests/Negotiation/NegotiationValidatorTest.php
+
+		-
+			rawMessage: Property Tests\Negotiation\NegotiationValidatorTest::$validator has no type specified.
+			identifier: missingType.property
+			count: 1
+			path: tests/Negotiation/NegotiationValidatorTest.php
+
+		-
 			rawMessage: 'AnonymousClass74f29325097307b95a6bfe8f2d34bc8a::__construct() does not call parent constructor from mysqli.'
 			identifier: constructor.missingParentCall
 			count: 1
@@ -3369,6 +4137,42 @@ parameters:
 			identifier: method.childReturnType
 			count: 1
 			path: tests/NextSim/NextSimServiceTest.php
+
+		-
+			rawMessage: Access to an undefined property PHPUnit\Framework\MockObject\Stub&Player\Player::$age.
+			identifier: property.notFound
+			count: 2
+			path: tests/NextSim/NextSimViewTest.php
+
+		-
+			rawMessage: Access to an undefined property PHPUnit\Framework\MockObject\Stub&Player\Player::$daysRemainingForInjury.
+			identifier: property.notFound
+			count: 2
+			path: tests/NextSim/NextSimViewTest.php
+
+		-
+			rawMessage: Access to an undefined property PHPUnit\Framework\MockObject\Stub&Player\Player::$decoratedName.
+			identifier: property.notFound
+			count: 2
+			path: tests/NextSim/NextSimViewTest.php
+
+		-
+			rawMessage: Access to an undefined property PHPUnit\Framework\MockObject\Stub&Player\Player::$name.
+			identifier: property.notFound
+			count: 2
+			path: tests/NextSim/NextSimViewTest.php
+
+		-
+			rawMessage: Access to an undefined property PHPUnit\Framework\MockObject\Stub&Player\Player::$playerID.
+			identifier: property.notFound
+			count: 2
+			path: tests/NextSim/NextSimViewTest.php
+
+		-
+			rawMessage: Access to an undefined property PHPUnit\Framework\MockObject\Stub&Player\Player::$position.
+			identifier: property.notFound
+			count: 2
+			path: tests/NextSim/NextSimViewTest.php
 
 		-
 			rawMessage: 'Call to method PHPUnit\Framework\Assert::assertInstanceOf() with ''NextSim\\Contracts\\NextSimViewInterface'' and NextSim\NextSimView will always evaluate to true.'
@@ -3417,6 +4221,48 @@ parameters:
 			identifier: argument.type
 			count: 3
 			path: tests/NextSim/NextSimViewTest.php
+
+		-
+			rawMessage: Access to an undefined property PHPUnit\Framework\MockObject\Stub&Player\Player::$age.
+			identifier: property.notFound
+			count: 1
+			path: tests/NextSim/NextSimViewXssTest.php
+
+		-
+			rawMessage: Access to an undefined property PHPUnit\Framework\MockObject\Stub&Player\Player::$daysRemainingForInjury.
+			identifier: property.notFound
+			count: 1
+			path: tests/NextSim/NextSimViewXssTest.php
+
+		-
+			rawMessage: Access to an undefined property PHPUnit\Framework\MockObject\Stub&Player\Player::$decoratedName.
+			identifier: property.notFound
+			count: 1
+			path: tests/NextSim/NextSimViewXssTest.php
+
+		-
+			rawMessage: Access to an undefined property PHPUnit\Framework\MockObject\Stub&Player\Player::$playerID.
+			identifier: property.notFound
+			count: 1
+			path: tests/NextSim/NextSimViewXssTest.php
+
+		-
+			rawMessage: Access to an undefined property PHPUnit\Framework\MockObject\Stub&Player\Player::$position.
+			identifier: property.notFound
+			count: 1
+			path: tests/NextSim/NextSimViewXssTest.php
+
+		-
+			rawMessage: 'Dynamic call to static method PHPUnit\Framework\TestCase::createStub().'
+			identifier: staticMethod.dynamicCall
+			count: 5
+			path: tests/NextSim/NextSimViewXssTest.php
+
+		-
+			rawMessage: 'Property Tests\NextSim\NextSimViewXssTest::$userStarters is never read, only written.'
+			identifier: property.onlyWritten
+			count: 1
+			path: tests/NextSim/NextSimViewXssTest.php
 
 		-
 			rawMessage: 'Call to method PHPUnit\Framework\Assert::assertInstanceOf() with ''OneOnOneGame\\OneOnOneGameResult'' and OneOnOneGame\OneOnOneGameResult will always evaluate to true.'
@@ -3515,82 +4361,16 @@ parameters:
 			path: tests/OneOnOneGame/OneOnOneGameViewTest.php
 
 		-
-			rawMessage: 'Call to static method header() on an unknown class PageLayout.'
-			identifier: class.notFound
+			rawMessage: 'Call to static method PHPUnit\Framework\Assert::assertSame() with ''testuser'' and ''testuser'' will always evaluate to true.'
+			identifier: staticMethod.alreadyNarrowedType
 			count: 1
-			path: tests/PHPStanRules/Fixtures/classes/CookieAfterHeader.php
+			path: tests/PageLayout/PageLayoutHeaderSideEffectTest.php
 
 		-
-			rawMessage: 'Call to static method header() on an unknown class PageLayout.'
-			identifier: class.notFound
-			count: 1
-			path: tests/PHPStanRules/Fixtures/classes/CookieBeforeHeader.php
-
-		-
-			rawMessage: 'Call to static method header() on an unknown class PageLayout.'
-			identifier: class.notFound
-			count: 1
-			path: tests/PHPStanRules/Fixtures/classes/CookieWriteBeforeHeader.php
-
-		-
-			rawMessage: 'Missing declare(strict_types=1) at the top of the file.'
-			identifier: ibl.missingStrictTypes
-			count: 1
-			path: tests/PHPStanRules/Fixtures/classes/MissingStrictTypesFixture.php
-
-		-
-			rawMessage: 'Call to static method e() on an unknown class HtmlSanitizer.'
-			identifier: class.notFound
-			count: 1
-			path: tests/PHPStanRules/Fixtures/classes/SafeEchoView.php
-
-		-
-			rawMessage: Ternary operator condition is always true.
-			identifier: ternary.alwaysTrue
-			count: 1
-			path: tests/PHPStanRules/Fixtures/classes/TernaryEchoView.php
-
-		-
-			rawMessage: 'Call to an undefined method AssertEqualsIdenticalFixture::assertEquals().'
-			identifier: method.notFound
-			count: 1
-			path: tests/PHPStanRules/Fixtures/tests/AssertEqualsIdenticalFixture.php
-
-		-
-			rawMessage: 'Equality assertion `assertEquals()` is called with two identical literal arguments. This assertion is trivially true and does not test anything. Compare against actual behavior instead.'
-			identifier: ibl.meaninglessAssertion
-			count: 1
-			path: tests/PHPStanRules/Fixtures/tests/AssertEqualsIdenticalFixture.php
-
-		-
-			rawMessage: 'Call to an undefined method AssertTrueTrueFixture::assertTrue().'
-			identifier: method.notFound
-			count: 1
-			path: tests/PHPStanRules/Fixtures/tests/AssertTrueTrueFixture.php
-
-		-
-			rawMessage: 'Trivial assertion `assertTrue(true)` always passes and does not test anything. Delete the call or replace it with an assertion against actual behavior.'
-			identifier: ibl.meaninglessAssertion
-			count: 1
-			path: tests/PHPStanRules/Fixtures/tests/AssertTrueTrueFixture.php
-
-		-
-			rawMessage: 'Call to an undefined method EmptyNonTestMethodFixture::assertEquals().'
-			identifier: method.notFound
-			count: 1
-			path: tests/PHPStanRules/Fixtures/tests/EmptyNonTestMethodFixture.php
-
-		-
-			rawMessage: 'Test method `testDoesNothing()` has an empty body. Add meaningful assertions or delete the test.'
-			identifier: ibl.meaninglessAssertion
-			count: 1
-			path: tests/PHPStanRules/Fixtures/tests/EmptyTestBodyFixture.php
-
-		-
-			rawMessage: 'Call to an undefined method MeaningfulAssertionFixture::assertEquals().'
-			identifier: method.notFound
-			count: 1
-			path: tests/PHPStanRules/Fixtures/tests/MeaningfulAssertionFixture.php
+			rawMessage: 'Dynamic call to static method PHPUnit\Framework\TestCase::createStub().'
+			identifier: staticMethod.dynamicCall
+			count: 2
+			path: tests/PageLayout/PageLayoutHeaderSideEffectTest.php
 
 		-
 			rawMessage: 'Method Tests\Player\PlayerContractCalculatorTest::testGetCurrentSeasonSalaryForYear0() has no return type specified.'
@@ -3809,6 +4589,12 @@ parameters:
 			path: tests/Player/PlayerContractValidatorTest.php
 
 		-
+			rawMessage: 'Call to method PHPUnit\Framework\Assert::assertInstanceOf() with ''Player\\PlayerData'' and Player\PlayerData will always evaluate to true.'
+			identifier: method.alreadyNarrowedType
+			count: 1
+			path: tests/Player/PlayerDataConverterTest.php
+
+		-
 			rawMessage: 'Parameter #1 $playerID of static method Player\PlayerImageHelper::getImageUrl() expects int|string|null, float given.'
 			identifier: argument.type
 			count: 1
@@ -3847,7 +4633,19 @@ parameters:
 		-
 			rawMessage: 'Dynamic call to static method PHPUnit\Framework\TestCase::createStub().'
 			identifier: staticMethod.dynamicCall
+			count: 2
+			path: tests/Player/PlayerPageControllerTest.php
+
+		-
+			rawMessage: 'Method Tests\Player\PlayerPageControllerTest::playerStatsRow() return type has no value type specified in iterable type array.'
+			identifier: missingType.iterableValue
 			count: 1
+			path: tests/Player/PlayerPageControllerTest.php
+
+		-
+			rawMessage: 'Dynamic call to static method PHPUnit\Framework\TestCase::createStub().'
+			identifier: staticMethod.dynamicCall
+			count: 2
 			path: tests/Player/PlayerPageServiceTest.php
 
 		-
@@ -3947,6 +4745,12 @@ parameters:
 			path: tests/Player/PlayerPageServiceTest.php
 
 		-
+			rawMessage: 'Dynamic call to static method PHPUnit\Framework\TestCase::createStub().'
+			identifier: staticMethod.dynamicCall
+			count: 1
+			path: tests/Player/PlayerRepositoryFieldMapTest.php
+
+		-
 			rawMessage: 'You should use assertSame() instead of assertEquals(), because both values are scalars of the same type'
 			identifier: phpunit.assertEquals
 			count: 3
@@ -3963,6 +4767,84 @@ parameters:
 			identifier: property.onlyWritten
 			count: 1
 			path: tests/Player/PlayerViewFactoryTest.php
+
+		-
+			rawMessage: 'Call to internal method PHPUnit\Framework\TestCase::addToAssertionCount() from outside its root namespace PHPUnit.'
+			identifier: method.internal
+			count: 1
+			path: tests/Player/Stats/Views/PlayerHeatAveragesViewTest.php
+
+		-
+			rawMessage: 'Dynamic call to static method PHPUnit\Framework\TestCase::createStub().'
+			identifier: staticMethod.dynamicCall
+			count: 2
+			path: tests/Player/Stats/Views/PlayerHeatAveragesViewTest.php
+
+		-
+			rawMessage: 'Call to internal method PHPUnit\Framework\TestCase::addToAssertionCount() from outside its root namespace PHPUnit.'
+			identifier: method.internal
+			count: 1
+			path: tests/Player/Stats/Views/PlayerHeatTotalsViewTest.php
+
+		-
+			rawMessage: 'Dynamic call to static method PHPUnit\Framework\TestCase::createStub().'
+			identifier: staticMethod.dynamicCall
+			count: 1
+			path: tests/Player/Stats/Views/PlayerHeatTotalsViewTest.php
+
+		-
+			rawMessage: 'Call to internal method PHPUnit\Framework\TestCase::addToAssertionCount() from outside its root namespace PHPUnit.'
+			identifier: method.internal
+			count: 1
+			path: tests/Player/Stats/Views/PlayerOlympicAveragesViewTest.php
+
+		-
+			rawMessage: 'Dynamic call to static method PHPUnit\Framework\TestCase::createStub().'
+			identifier: staticMethod.dynamicCall
+			count: 2
+			path: tests/Player/Stats/Views/PlayerOlympicAveragesViewTest.php
+
+		-
+			rawMessage: 'Call to internal method PHPUnit\Framework\TestCase::addToAssertionCount() from outside its root namespace PHPUnit.'
+			identifier: method.internal
+			count: 1
+			path: tests/Player/Stats/Views/PlayerOlympicTotalsViewTest.php
+
+		-
+			rawMessage: 'Dynamic call to static method PHPUnit\Framework\TestCase::createStub().'
+			identifier: staticMethod.dynamicCall
+			count: 1
+			path: tests/Player/Stats/Views/PlayerOlympicTotalsViewTest.php
+
+		-
+			rawMessage: 'Call to internal method PHPUnit\Framework\TestCase::addToAssertionCount() from outside its root namespace PHPUnit.'
+			identifier: method.internal
+			count: 1
+			path: tests/Player/Stats/Views/PlayerPlayoffAveragesViewTest.php
+
+		-
+			rawMessage: 'Dynamic call to static method PHPUnit\Framework\TestCase::createStub().'
+			identifier: staticMethod.dynamicCall
+			count: 2
+			path: tests/Player/Stats/Views/PlayerPlayoffAveragesViewTest.php
+
+		-
+			rawMessage: 'Call to internal method PHPUnit\Framework\TestCase::addToAssertionCount() from outside its root namespace PHPUnit.'
+			identifier: method.internal
+			count: 1
+			path: tests/Player/Stats/Views/PlayerPlayoffTotalsViewTest.php
+
+		-
+			rawMessage: 'Dynamic call to static method PHPUnit\Framework\TestCase::createStub().'
+			identifier: staticMethod.dynamicCall
+			count: 1
+			path: tests/Player/Stats/Views/PlayerPlayoffTotalsViewTest.php
+
+		-
+			rawMessage: 'Call to internal method PHPUnit\Framework\TestCase::addToAssertionCount() from outside its root namespace PHPUnit.'
+			identifier: method.internal
+			count: 1
+			path: tests/Player/Stats/Views/PlayerSeasonTableRendererTest.php
 
 		-
 			rawMessage: 'Dynamic call to static method PHPUnit\Framework\TestCase::createStub().'
@@ -4185,7 +5067,7 @@ parameters:
 			path: tests/RecordHolders/RecordHoldersServiceTest.php
 
 		-
-			rawMessage: 'AnonymousClassaa460f25a1d583f53fa352a36bb631d6::__construct() does not call parent constructor from mysqli.'
+			rawMessage: 'AnonymousClassa2e628c8baf15b88c869eaeb4c45cf1b::__construct() does not call parent constructor from mysqli.'
 			identifier: constructor.missingParentCall
 			count: 1
 			path: tests/RookieOption/RookieOptionControllerTest.php
@@ -4203,88 +5085,112 @@ parameters:
 			path: tests/RookieOption/RookieOptionControllerTest.php
 
 		-
-			rawMessage: 'Method class@anonymous/RookieOption/RookieOptionControllerTest.php:37::__construct() has parameter $mockData with no value type specified in iterable type array.'
+			rawMessage: 'Dynamic call to static method PHPUnit\Framework\TestCase::createStub().'
+			identifier: staticMethod.dynamicCall
+			count: 2
+			path: tests/RookieOption/RookieOptionControllerTest.php
+
+		-
+			rawMessage: 'Method class@anonymous/RookieOption/RookieOptionControllerTest.php:38::__construct() has parameter $mockData with no value type specified in iterable type array.'
 			identifier: missingType.iterableValue
 			count: 1
 			path: tests/RookieOption/RookieOptionControllerTest.php
 
 		-
-			rawMessage: 'Method class@anonymous/RookieOption/RookieOptionControllerTest.php:54::__construct() has parameter $rows with no value type specified in iterable type array.'
+			rawMessage: 'Method class@anonymous/RookieOption/RookieOptionControllerTest.php:55::__construct() has parameter $rows with no value type specified in iterable type array.'
 			identifier: missingType.iterableValue
 			count: 1
 			path: tests/RookieOption/RookieOptionControllerTest.php
 
 		-
-			rawMessage: 'Method class@anonymous/RookieOption/RookieOptionControllerTest.php:54::fetch_assoc() return type has no value type specified in iterable type array.'
+			rawMessage: 'Method class@anonymous/RookieOption/RookieOptionControllerTest.php:55::fetch_assoc() return type has no value type specified in iterable type array.'
 			identifier: missingType.iterableValue
 			count: 1
 			path: tests/RookieOption/RookieOptionControllerTest.php
 
 		-
-			rawMessage: 'Method class@anonymous/RookieOption/RookieOptionControllerTest.php:82::__construct() has parameter $rows with no value type specified in iterable type array.'
+			rawMessage: 'Method class@anonymous/RookieOption/RookieOptionControllerTest.php:83::__construct() has parameter $rows with no value type specified in iterable type array.'
 			identifier: missingType.iterableValue
 			count: 1
 			path: tests/RookieOption/RookieOptionControllerTest.php
 
 		-
-			rawMessage: 'Method class@anonymous/RookieOption/RookieOptionControllerTest.php:82::fetch_assoc() return type has no value type specified in iterable type array.'
+			rawMessage: 'Method class@anonymous/RookieOption/RookieOptionControllerTest.php:83::fetch_assoc() return type has no value type specified in iterable type array.'
 			identifier: missingType.iterableValue
 			count: 1
 			path: tests/RookieOption/RookieOptionControllerTest.php
 
 		-
-			rawMessage: 'Method mysqli@anonymous/RookieOption/RookieOptionControllerTest.php:25::prepare() never returns false so it can be removed from the return type.'
+			rawMessage: 'Method mysqli@anonymous/RookieOption/RookieOptionControllerTest.php:26::prepare() never returns false so it can be removed from the return type.'
 			identifier: return.unusedType
 			count: 1
 			path: tests/RookieOption/RookieOptionControllerTest.php
 
 		-
-			rawMessage: 'Method mysqli@anonymous/RookieOption/RookieOptionControllerTest.php:25::prepare() never returns mysqli_stmt so it can be removed from the return type.'
+			rawMessage: 'Method mysqli@anonymous/RookieOption/RookieOptionControllerTest.php:26::prepare() never returns mysqli_stmt so it can be removed from the return type.'
 			identifier: return.unusedType
 			count: 1
 			path: tests/RookieOption/RookieOptionControllerTest.php
 
 		-
-			rawMessage: 'Method mysqli@anonymous/RookieOption/RookieOptionControllerTest.php:25::prepare() should return mysqli_stmt|false but returns class@anonymous/RookieOption/RookieOptionControllerTest.php:37.'
+			rawMessage: 'Method mysqli@anonymous/RookieOption/RookieOptionControllerTest.php:26::prepare() should return mysqli_stmt|false but returns class@anonymous/RookieOption/RookieOptionControllerTest.php:38.'
 			identifier: return.type
 			count: 1
 			path: tests/RookieOption/RookieOptionControllerTest.php
 
 		-
-			rawMessage: 'Method mysqli@anonymous/RookieOption/RookieOptionControllerTest.php:25::query() never returns bool so it can be removed from the return type.'
+			rawMessage: 'Method mysqli@anonymous/RookieOption/RookieOptionControllerTest.php:26::query() never returns bool so it can be removed from the return type.'
 			identifier: return.unusedType
 			count: 1
 			path: tests/RookieOption/RookieOptionControllerTest.php
 
 		-
-			rawMessage: 'Method mysqli@anonymous/RookieOption/RookieOptionControllerTest.php:25::query() never returns mysqli_result so it can be removed from the return type.'
+			rawMessage: 'Method mysqli@anonymous/RookieOption/RookieOptionControllerTest.php:26::query() never returns mysqli_result so it can be removed from the return type.'
 			identifier: return.unusedType
 			count: 1
 			path: tests/RookieOption/RookieOptionControllerTest.php
 
 		-
-			rawMessage: Property class@anonymous/RookieOption/RookieOptionControllerTest.php:37::$mockData type has no value type specified in iterable type array.
+			rawMessage: Property class@anonymous/RookieOption/RookieOptionControllerTest.php:38::$mockData type has no value type specified in iterable type array.
 			identifier: missingType.iterableValue
 			count: 1
 			path: tests/RookieOption/RookieOptionControllerTest.php
 
 		-
-			rawMessage: Property class@anonymous/RookieOption/RookieOptionControllerTest.php:54::$rows type has no value type specified in iterable type array.
+			rawMessage: Property class@anonymous/RookieOption/RookieOptionControllerTest.php:55::$rows type has no value type specified in iterable type array.
 			identifier: missingType.iterableValue
 			count: 1
 			path: tests/RookieOption/RookieOptionControllerTest.php
 
 		-
-			rawMessage: Property class@anonymous/RookieOption/RookieOptionControllerTest.php:82::$rows type has no value type specified in iterable type array.
+			rawMessage: Property class@anonymous/RookieOption/RookieOptionControllerTest.php:83::$rows type has no value type specified in iterable type array.
 			identifier: missingType.iterableValue
 			count: 1
 			path: tests/RookieOption/RookieOptionControllerTest.php
 
 		-
-			rawMessage: Property mysqli@anonymous/RookieOption/RookieOptionControllerTest.php:25::$mockData type has no value type specified in iterable type array.
+			rawMessage: Property mysqli@anonymous/RookieOption/RookieOptionControllerTest.php:26::$mockData type has no value type specified in iterable type array.
 			identifier: missingType.iterableValue
 			count: 1
 			path: tests/RookieOption/RookieOptionControllerTest.php
+
+		-
+			rawMessage: Access to an undefined property PHPUnit\Framework\MockObject\MockObject&Player\Player::$name.
+			identifier: property.notFound
+			count: 1
+			path: tests/RookieOption/RookieOptionFormViewXssTest.php
+
+		-
+			rawMessage: Access to an undefined property PHPUnit\Framework\MockObject\MockObject&Player\Player::$playerID.
+			identifier: property.notFound
+			count: 1
+			path: tests/RookieOption/RookieOptionFormViewXssTest.php
+
+		-
+			rawMessage: Access to an undefined property PHPUnit\Framework\MockObject\MockObject&Player\Player::$position.
+			identifier: property.notFound
+			count: 1
+			path: tests/RookieOption/RookieOptionFormViewXssTest.php
 
 		-
 			rawMessage: 'Method Tests\RookieOption\RookieOptionRepositoryTest::testUpdatePlayerRookieOptionFirstRound() has no return type specified.'
@@ -4311,10 +5217,34 @@ parameters:
 			path: tests/RookieOption/RookieOptionRepositoryTest.php
 
 		-
+			rawMessage: Access to an undefined property PHPUnit\Framework\MockObject\MockObject&Player\Player::$name.
+			identifier: property.notFound
+			count: 1
+			path: tests/RookieOption/RookieOptionValidatorTest.php
+
+		-
+			rawMessage: Access to an undefined property PHPUnit\Framework\MockObject\MockObject&Player\Player::$position.
+			identifier: property.notFound
+			count: 1
+			path: tests/RookieOption/RookieOptionValidatorTest.php
+
+		-
+			rawMessage: 'Dynamic call to static method PHPUnit\Framework\TestCase::createStub().'
+			identifier: staticMethod.dynamicCall
+			count: 5
+			path: tests/RookieOption/RookieOptionValidatorTest.php
+
+		-
 			rawMessage: Expression on left side of ?? is not nullable.
 			identifier: nullCoalesce.expr
 			count: 2
 			path: tests/RookieOption/RookieOptionValidatorTest.php
+
+		-
+			rawMessage: 'Dynamic call to static method PHPUnit\Framework\TestCase::createStub().'
+			identifier: staticMethod.dynamicCall
+			count: 1
+			path: tests/SavedDepthChart/SavedDepthChartApiHandlerTest.php
 
 		-
 			rawMessage: 'Call to method PHPUnit\Framework\Assert::assertInstanceOf() with ''SavedDepthChart\\Contracts\\SavedDepthChartServiceInterface'' and SavedDepthChart\SavedDepthChartService will always evaluate to true.'
@@ -4495,6 +5425,18 @@ parameters:
 			identifier: argument.type
 			count: 1
 			path: tests/SeasonLeaderboards/SeasonLeaderboardsViewTest.php
+
+		-
+			rawMessage: 'Dynamic call to static method PHPUnit\Framework\TestCase::createStub().'
+			identifier: staticMethod.dynamicCall
+			count: 1
+			path: tests/SeasonLeaderboards/SeasonLeaderboardsViewXssTest.php
+
+		-
+			rawMessage: 'Method Tests\SeasonLeaderboards\SeasonLeaderboardsViewXssTest::makeStats() has parameter $overrides with no value type specified in iterable type array.'
+			identifier: missingType.iterableValue
+			count: 1
+			path: tests/SeasonLeaderboards/SeasonLeaderboardsViewXssTest.php
 
 		-
 			rawMessage: 'AnonymousClass94bf36a589116f369a5b12136f7fafea::__construct() does not call parent constructor from mysqli.'
@@ -4689,7 +5631,7 @@ parameters:
 			path: tests/Security/HtmlSanitizerTest.php
 
 		-
-			rawMessage: 'AnonymousClass5f05f4cbdbe4082cf8af01303617d929::__construct() does not call parent constructor from mysqli.'
+			rawMessage: 'AnonymousClassf37fff8a911b6b22b8f2eb5bbb3fab5a::__construct() does not call parent constructor from mysqli.'
 			identifier: constructor.missingParentCall
 			count: 1
 			path: tests/SeriesRecords/SeriesRecordsControllerTest.php
@@ -4707,91 +5649,97 @@ parameters:
 			path: tests/SeriesRecords/SeriesRecordsControllerTest.php
 
 		-
-			rawMessage: 'Method class@anonymous/SeriesRecords/SeriesRecordsControllerTest.php:37::__construct() has parameter $mockData with no value type specified in iterable type array.'
+			rawMessage: 'Dynamic call to static method PHPUnit\Framework\TestCase::createStub().'
+			identifier: staticMethod.dynamicCall
+			count: 2
+			path: tests/SeriesRecords/SeriesRecordsControllerTest.php
+
+		-
+			rawMessage: 'Method class@anonymous/SeriesRecords/SeriesRecordsControllerTest.php:38::__construct() has parameter $mockData with no value type specified in iterable type array.'
 			identifier: missingType.iterableValue
 			count: 1
 			path: tests/SeriesRecords/SeriesRecordsControllerTest.php
 
 		-
-			rawMessage: 'Method class@anonymous/SeriesRecords/SeriesRecordsControllerTest.php:54::__construct() has parameter $rows with no value type specified in iterable type array.'
+			rawMessage: 'Method class@anonymous/SeriesRecords/SeriesRecordsControllerTest.php:55::__construct() has parameter $rows with no value type specified in iterable type array.'
 			identifier: missingType.iterableValue
 			count: 1
 			path: tests/SeriesRecords/SeriesRecordsControllerTest.php
 
 		-
-			rawMessage: 'Method class@anonymous/SeriesRecords/SeriesRecordsControllerTest.php:54::fetch_assoc() return type has no value type specified in iterable type array.'
+			rawMessage: 'Method class@anonymous/SeriesRecords/SeriesRecordsControllerTest.php:55::fetch_assoc() return type has no value type specified in iterable type array.'
 			identifier: missingType.iterableValue
 			count: 1
 			path: tests/SeriesRecords/SeriesRecordsControllerTest.php
 
 		-
-			rawMessage: 'Method class@anonymous/SeriesRecords/SeriesRecordsControllerTest.php:82::__construct() has parameter $rows with no value type specified in iterable type array.'
+			rawMessage: 'Method class@anonymous/SeriesRecords/SeriesRecordsControllerTest.php:83::__construct() has parameter $rows with no value type specified in iterable type array.'
 			identifier: missingType.iterableValue
 			count: 1
 			path: tests/SeriesRecords/SeriesRecordsControllerTest.php
 
 		-
-			rawMessage: 'Method class@anonymous/SeriesRecords/SeriesRecordsControllerTest.php:82::fetch_assoc() return type has no value type specified in iterable type array.'
+			rawMessage: 'Method class@anonymous/SeriesRecords/SeriesRecordsControllerTest.php:83::fetch_assoc() return type has no value type specified in iterable type array.'
 			identifier: missingType.iterableValue
 			count: 1
 			path: tests/SeriesRecords/SeriesRecordsControllerTest.php
 
 		-
-			rawMessage: 'Method mysqli@anonymous/SeriesRecords/SeriesRecordsControllerTest.php:25::prepare() never returns false so it can be removed from the return type.'
+			rawMessage: 'Method mysqli@anonymous/SeriesRecords/SeriesRecordsControllerTest.php:26::prepare() never returns false so it can be removed from the return type.'
 			identifier: return.unusedType
 			count: 1
 			path: tests/SeriesRecords/SeriesRecordsControllerTest.php
 
 		-
-			rawMessage: 'Method mysqli@anonymous/SeriesRecords/SeriesRecordsControllerTest.php:25::prepare() never returns mysqli_stmt so it can be removed from the return type.'
+			rawMessage: 'Method mysqli@anonymous/SeriesRecords/SeriesRecordsControllerTest.php:26::prepare() never returns mysqli_stmt so it can be removed from the return type.'
 			identifier: return.unusedType
 			count: 1
 			path: tests/SeriesRecords/SeriesRecordsControllerTest.php
 
 		-
-			rawMessage: 'Method mysqli@anonymous/SeriesRecords/SeriesRecordsControllerTest.php:25::prepare() should return mysqli_stmt|false but returns class@anonymous/SeriesRecords/SeriesRecordsControllerTest.php:37.'
+			rawMessage: 'Method mysqli@anonymous/SeriesRecords/SeriesRecordsControllerTest.php:26::prepare() should return mysqli_stmt|false but returns class@anonymous/SeriesRecords/SeriesRecordsControllerTest.php:38.'
 			identifier: return.type
 			count: 1
 			path: tests/SeriesRecords/SeriesRecordsControllerTest.php
 
 		-
-			rawMessage: 'Method mysqli@anonymous/SeriesRecords/SeriesRecordsControllerTest.php:25::query() never returns bool so it can be removed from the return type.'
+			rawMessage: 'Method mysqli@anonymous/SeriesRecords/SeriesRecordsControllerTest.php:26::query() never returns bool so it can be removed from the return type.'
 			identifier: return.unusedType
 			count: 1
 			path: tests/SeriesRecords/SeriesRecordsControllerTest.php
 
 		-
-			rawMessage: 'Method mysqli@anonymous/SeriesRecords/SeriesRecordsControllerTest.php:25::query() never returns mysqli_result so it can be removed from the return type.'
+			rawMessage: 'Method mysqli@anonymous/SeriesRecords/SeriesRecordsControllerTest.php:26::query() never returns mysqli_result so it can be removed from the return type.'
 			identifier: return.unusedType
 			count: 1
 			path: tests/SeriesRecords/SeriesRecordsControllerTest.php
 
 		-
-			rawMessage: 'Method mysqli@anonymous/SeriesRecords/SeriesRecordsControllerTest.php:25::query() should return bool|mysqli_result but returns class@anonymous/SeriesRecords/SeriesRecordsControllerTest.php:82.'
+			rawMessage: 'Method mysqli@anonymous/SeriesRecords/SeriesRecordsControllerTest.php:26::query() should return bool|mysqli_result but returns class@anonymous/SeriesRecords/SeriesRecordsControllerTest.php:83.'
 			identifier: return.type
 			count: 1
 			path: tests/SeriesRecords/SeriesRecordsControllerTest.php
 
 		-
-			rawMessage: Property class@anonymous/SeriesRecords/SeriesRecordsControllerTest.php:37::$mockData type has no value type specified in iterable type array.
+			rawMessage: Property class@anonymous/SeriesRecords/SeriesRecordsControllerTest.php:38::$mockData type has no value type specified in iterable type array.
 			identifier: missingType.iterableValue
 			count: 1
 			path: tests/SeriesRecords/SeriesRecordsControllerTest.php
 
 		-
-			rawMessage: Property class@anonymous/SeriesRecords/SeriesRecordsControllerTest.php:54::$rows type has no value type specified in iterable type array.
+			rawMessage: Property class@anonymous/SeriesRecords/SeriesRecordsControllerTest.php:55::$rows type has no value type specified in iterable type array.
 			identifier: missingType.iterableValue
 			count: 1
 			path: tests/SeriesRecords/SeriesRecordsControllerTest.php
 
 		-
-			rawMessage: Property class@anonymous/SeriesRecords/SeriesRecordsControllerTest.php:82::$rows type has no value type specified in iterable type array.
+			rawMessage: Property class@anonymous/SeriesRecords/SeriesRecordsControllerTest.php:83::$rows type has no value type specified in iterable type array.
 			identifier: missingType.iterableValue
 			count: 1
 			path: tests/SeriesRecords/SeriesRecordsControllerTest.php
 
 		-
-			rawMessage: Property mysqli@anonymous/SeriesRecords/SeriesRecordsControllerTest.php:25::$mockData type has no value type specified in iterable type array.
+			rawMessage: Property mysqli@anonymous/SeriesRecords/SeriesRecordsControllerTest.php:26::$mockData type has no value type specified in iterable type array.
 			identifier: missingType.iterableValue
 			count: 1
 			path: tests/SeriesRecords/SeriesRecordsControllerTest.php
@@ -4839,82 +5787,22 @@ parameters:
 			path: tests/SeriesRecords/SeriesRecordsServiceTest.php
 
 		-
-			rawMessage: 'Parameter #1 $offer of method Services\CommonContractValidator::calculateOfferValue() expects array{year1: int, year2: int, year3: int, year4?: int, year5?: int, year6?: int}, array{} given.'
-			identifier: argument.type
-			count: 1
-			path: tests/Services/CommonContractValidatorTest.php
-
-		-
-			rawMessage: 'Parameter #1 $offer of method Services\CommonContractValidator::validateMaximumYearOne() expects array{year1: int, year2?: int, year3?: int, year4?: int, year5?: int, year6?: int}, array{} given.'
-			identifier: argument.type
-			count: 1
-			path: tests/Services/CommonContractValidatorTest.php
-
-		-
-			rawMessage: 'Parameter #1 $offer of method Services\CommonContractValidator::validateNoGaps() expects array{year1: int, year2: int, year3: int, year4?: int, year5?: int, year6?: int}, array{} given.'
-			identifier: argument.type
-			count: 1
-			path: tests/Services/CommonContractValidatorTest.php
-
-		-
-			rawMessage: 'Parameter #1 $offer of method Services\CommonContractValidator::validateRaises() expects array{year1: int, year2: int, year3: int, year4?: int, year5?: int, year6?: int}, array{} given.'
-			identifier: argument.type
-			count: 1
-			path: tests/Services/CommonContractValidatorTest.php
-
-		-
-			rawMessage: 'Parameter #1 $offer of method Services\CommonContractValidator::validateSalaryDecreases() expects array{year1: int, year2: int, year3: int, year4?: int, year5?: int, year6?: int}, array{} given.'
-			identifier: argument.type
-			count: 1
-			path: tests/Services/CommonContractValidatorTest.php
-
-		-
-			rawMessage: 'You should use assertSame() instead of assertEquals(), because both values are scalars of the same type'
-			identifier: phpunit.assertEquals
-			count: 42
-			path: tests/Services/CommonContractValidatorTest.php
-
-		-
-			rawMessage: 'Parameter #1 $player of static method Services\CommonValidator::validatePlayerOwnership() expects Player\Player, object{teamName: string, position: string, name: string}&stdClass given.'
-			identifier: argument.type
-			count: 5
-			path: tests/Services/CommonValidatorTest.php
-
-		-
-			rawMessage: 'Parameter #1 $player of static method Services\CommonValidator::validatePlayerOwnership() expects Player\Player, object{teamName: string}&stdClass given.'
-			identifier: argument.type
-			count: 1
-			path: tests/Services/CommonValidatorTest.php
-
-		-
-			rawMessage: 'Call to method PHPUnit\Framework\Assert::assertInstanceOf() with ''Player\\PlayerData'' and Player\PlayerData will always evaluate to true.'
-			identifier: method.alreadyNarrowedType
-			count: 1
-			path: tests/Services/PlayerDataConverterTest.php
-
-		-
-			rawMessage: 'Method Tests\Services\SalaryConverterTest::testConvertToMillions() has no return type specified.'
-			identifier: missingType.return
-			count: 1
-			path: tests/Services/SalaryConverterTest.php
-
-		-
-			rawMessage: 'You should use assertSame() instead of assertEquals(), because both values are scalars of the same type'
-			identifier: phpunit.assertEquals
-			count: 4
-			path: tests/Services/SalaryConverterTest.php
-
-		-
 			rawMessage: 'Dynamic call to static method PHPUnit\Framework\TestCase::createStub().'
 			identifier: staticMethod.dynamicCall
 			count: 1
 			path: tests/Settings/SettingsServiceTest.php
 
 		-
-			rawMessage: 'You should use assertSame() instead of assertEquals(), because both values are scalars of the same type'
-			identifier: phpunit.assertEquals
-			count: 13
-			path: tests/Shared/SalaryConverterTest.php
+			rawMessage: 'Dynamic call to static method PHPUnit\Framework\TestCase::createStub().'
+			identifier: staticMethod.dynamicCall
+			count: 1
+			path: tests/Standings/OlympicsStandingsViewTest.php
+
+		-
+			rawMessage: 'Method Tests\Standings\OlympicsStandingsViewTest::makeBulkRow() has parameter $overrides with no value type specified in iterable type array.'
+			identifier: missingType.iterableValue
+			count: 1
+			path: tests/Standings/OlympicsStandingsViewTest.php
 
 		-
 			rawMessage: 'Call to method PHPUnit\Framework\Assert::assertInstanceOf() with ''Standings\\Contracts\\StandingsRepositoryInterface'' and Standings\StandingsRepository will always evaluate to true.'
@@ -4941,6 +5829,18 @@ parameters:
 			path: tests/Standings/StandingsRepositoryTest.php
 
 		-
+			rawMessage: 'Dynamic call to static method PHPUnit\Framework\TestCase::createStub().'
+			identifier: staticMethod.dynamicCall
+			count: 2
+			path: tests/Standings/StandingsViewXssTest.php
+
+		-
+			rawMessage: 'Method Tests\Standings\StandingsViewXssTest::makeStandingsRow() has parameter $overrides with no value type specified in iterable type array.'
+			identifier: missingType.iterableValue
+			count: 1
+			path: tests/Standings/StandingsViewXssTest.php
+
+		-
 			rawMessage: 'Parameter #1 $games of method Statistics\TeamStatsCalculator::calculate() expects list<array{visitor_teamid: int, visitor_score: int, home_teamid: int, home_score: int}>, array{array{visitor_score: 100, home_score: 95}} given.'
 			identifier: argument.type
 			count: 1
@@ -4965,7 +5865,7 @@ parameters:
 			path: tests/Statistics/TeamStatsCalculatorTest.php
 
 		-
-			rawMessage: 'AnonymousClass6d7a8577e026f20f8918f6520f2fbf11::__construct() does not call parent constructor from mysqli.'
+			rawMessage: 'AnonymousClasseb21003b881e4c313b7b2ba42b09b41d::__construct() does not call parent constructor from mysqli.'
 			identifier: constructor.missingParentCall
 			count: 1
 			path: tests/Team/TeamControllerTest.php
@@ -4983,85 +5883,91 @@ parameters:
 			path: tests/Team/TeamControllerTest.php
 
 		-
-			rawMessage: 'Method class@anonymous/Team/TeamControllerTest.php:37::__construct() has parameter $mockData with no value type specified in iterable type array.'
+			rawMessage: 'Dynamic call to static method PHPUnit\Framework\TestCase::createStub().'
+			identifier: staticMethod.dynamicCall
+			count: 6
+			path: tests/Team/TeamControllerTest.php
+
+		-
+			rawMessage: 'Method class@anonymous/Team/TeamControllerTest.php:38::__construct() has parameter $mockData with no value type specified in iterable type array.'
 			identifier: missingType.iterableValue
 			count: 1
 			path: tests/Team/TeamControllerTest.php
 
 		-
-			rawMessage: 'Method class@anonymous/Team/TeamControllerTest.php:54::__construct() has parameter $rows with no value type specified in iterable type array.'
+			rawMessage: 'Method class@anonymous/Team/TeamControllerTest.php:55::__construct() has parameter $rows with no value type specified in iterable type array.'
 			identifier: missingType.iterableValue
 			count: 1
 			path: tests/Team/TeamControllerTest.php
 
 		-
-			rawMessage: 'Method class@anonymous/Team/TeamControllerTest.php:54::fetch_assoc() return type has no value type specified in iterable type array.'
+			rawMessage: 'Method class@anonymous/Team/TeamControllerTest.php:55::fetch_assoc() return type has no value type specified in iterable type array.'
 			identifier: missingType.iterableValue
 			count: 1
 			path: tests/Team/TeamControllerTest.php
 
 		-
-			rawMessage: 'Method class@anonymous/Team/TeamControllerTest.php:82::__construct() has parameter $rows with no value type specified in iterable type array.'
+			rawMessage: 'Method class@anonymous/Team/TeamControllerTest.php:83::__construct() has parameter $rows with no value type specified in iterable type array.'
 			identifier: missingType.iterableValue
 			count: 1
 			path: tests/Team/TeamControllerTest.php
 
 		-
-			rawMessage: 'Method class@anonymous/Team/TeamControllerTest.php:82::fetch_assoc() return type has no value type specified in iterable type array.'
+			rawMessage: 'Method class@anonymous/Team/TeamControllerTest.php:83::fetch_assoc() return type has no value type specified in iterable type array.'
 			identifier: missingType.iterableValue
 			count: 1
 			path: tests/Team/TeamControllerTest.php
 
 		-
-			rawMessage: 'Method mysqli@anonymous/Team/TeamControllerTest.php:25::prepare() never returns false so it can be removed from the return type.'
+			rawMessage: 'Method mysqli@anonymous/Team/TeamControllerTest.php:26::prepare() never returns false so it can be removed from the return type.'
 			identifier: return.unusedType
 			count: 1
 			path: tests/Team/TeamControllerTest.php
 
 		-
-			rawMessage: 'Method mysqli@anonymous/Team/TeamControllerTest.php:25::prepare() never returns mysqli_stmt so it can be removed from the return type.'
+			rawMessage: 'Method mysqli@anonymous/Team/TeamControllerTest.php:26::prepare() never returns mysqli_stmt so it can be removed from the return type.'
 			identifier: return.unusedType
 			count: 1
 			path: tests/Team/TeamControllerTest.php
 
 		-
-			rawMessage: 'Method mysqli@anonymous/Team/TeamControllerTest.php:25::prepare() should return mysqli_stmt|false but returns class@anonymous/Team/TeamControllerTest.php:37.'
+			rawMessage: 'Method mysqli@anonymous/Team/TeamControllerTest.php:26::prepare() should return mysqli_stmt|false but returns class@anonymous/Team/TeamControllerTest.php:38.'
 			identifier: return.type
 			count: 1
 			path: tests/Team/TeamControllerTest.php
 
 		-
-			rawMessage: 'Method mysqli@anonymous/Team/TeamControllerTest.php:25::query() never returns bool so it can be removed from the return type.'
+			rawMessage: 'Method mysqli@anonymous/Team/TeamControllerTest.php:26::query() never returns bool so it can be removed from the return type.'
 			identifier: return.unusedType
 			count: 1
 			path: tests/Team/TeamControllerTest.php
 
 		-
-			rawMessage: 'Method mysqli@anonymous/Team/TeamControllerTest.php:25::query() never returns mysqli_result so it can be removed from the return type.'
+			rawMessage: 'Method mysqli@anonymous/Team/TeamControllerTest.php:26::query() never returns mysqli_result so it can be removed from the return type.'
 			identifier: return.unusedType
 			count: 1
 			path: tests/Team/TeamControllerTest.php
 
 		-
-			rawMessage: Property class@anonymous/Team/TeamControllerTest.php:37::$mockData type has no value type specified in iterable type array.
+			rawMessage: Property class@anonymous/Team/TeamControllerTest.php:38::$mockData type has no value type specified in iterable type array.
 			identifier: missingType.iterableValue
 			count: 1
 			path: tests/Team/TeamControllerTest.php
 
 		-
-			rawMessage: Property class@anonymous/Team/TeamControllerTest.php:54::$rows type has no value type specified in iterable type array.
+			rawMessage: Property class@anonymous/Team/TeamControllerTest.php:55::$rows type has no value type specified in iterable type array.
 			identifier: missingType.iterableValue
 			count: 1
 			path: tests/Team/TeamControllerTest.php
 
 		-
-			rawMessage: Property class@anonymous/Team/TeamControllerTest.php:82::$rows type has no value type specified in iterable type array.
+			rawMessage: Property class@anonymous/Team/TeamControllerTest.php:83::$rows type has no value type specified in iterable type array.
 			identifier: missingType.iterableValue
 			count: 1
 			path: tests/Team/TeamControllerTest.php
 
 		-
-			rawMessage: Property mysqli@anonymous/Team/TeamControllerTest.php:25::$mockData type has no value type specified in iterable type array.
+			rawMessage: Property mysqli@anonymous/Team/TeamControllerTest.php:26::$mockData type has no value type specified in iterable type array.
 			identifier: missingType.iterableValue
 			count: 1
 			path: tests/Team/TeamControllerTest.php
@@ -5111,6 +6017,12 @@ parameters:
 		-
 			rawMessage: 'Call to method PHPUnit\Framework\Assert::assertInstanceOf() with ''Team\\Contracts\\TeamServiceInterface'' and Team\TeamService will always evaluate to true.'
 			identifier: method.alreadyNarrowedType
+			count: 1
+			path: tests/Team/TeamServiceTest.php
+
+		-
+			rawMessage: 'Dynamic call to static method PHPUnit\Framework\TestCase::createStub().'
+			identifier: staticMethod.dynamicCall
 			count: 1
 			path: tests/Team/TeamServiceTest.php
 
@@ -5307,7 +6219,7 @@ parameters:
 			path: tests/Topics/TopicsViewTest.php
 
 		-
-			rawMessage: 'AnonymousClassdbb76a182eb582d7b195a46f92f37bc5::__construct() does not call parent constructor from mysqli.'
+			rawMessage: 'AnonymousClass6d67ed5703ba9d609bf3307f59aeaabd::__construct() does not call parent constructor from mysqli.'
 			identifier: constructor.missingParentCall
 			count: 1
 			path: tests/Trading/CashTransactionHandlerTest.php
@@ -5325,91 +6237,97 @@ parameters:
 			path: tests/Trading/CashTransactionHandlerTest.php
 
 		-
-			rawMessage: 'Method class@anonymous/Trading/CashTransactionHandlerTest.php:41::__construct() has parameter $mockData with no value type specified in iterable type array.'
+			rawMessage: 'Dynamic call to static method PHPUnit\Framework\TestCase::createStub().'
+			identifier: staticMethod.dynamicCall
+			count: 1
+			path: tests/Trading/CashTransactionHandlerTest.php
+
+		-
+			rawMessage: 'Method class@anonymous/Trading/CashTransactionHandlerTest.php:44::__construct() has parameter $mockData with no value type specified in iterable type array.'
 			identifier: missingType.iterableValue
 			count: 1
 			path: tests/Trading/CashTransactionHandlerTest.php
 
 		-
-			rawMessage: 'Method class@anonymous/Trading/CashTransactionHandlerTest.php:61::__construct() has parameter $rows with no value type specified in iterable type array.'
+			rawMessage: 'Method class@anonymous/Trading/CashTransactionHandlerTest.php:64::__construct() has parameter $rows with no value type specified in iterable type array.'
 			identifier: missingType.iterableValue
 			count: 1
 			path: tests/Trading/CashTransactionHandlerTest.php
 
 		-
-			rawMessage: 'Method class@anonymous/Trading/CashTransactionHandlerTest.php:61::fetch_assoc() return type has no value type specified in iterable type array.'
+			rawMessage: 'Method class@anonymous/Trading/CashTransactionHandlerTest.php:64::fetch_assoc() return type has no value type specified in iterable type array.'
 			identifier: missingType.iterableValue
 			count: 1
 			path: tests/Trading/CashTransactionHandlerTest.php
 
 		-
-			rawMessage: 'Method class@anonymous/Trading/CashTransactionHandlerTest.php:93::__construct() has parameter $rows with no value type specified in iterable type array.'
+			rawMessage: 'Method class@anonymous/Trading/CashTransactionHandlerTest.php:96::__construct() has parameter $rows with no value type specified in iterable type array.'
 			identifier: missingType.iterableValue
 			count: 1
 			path: tests/Trading/CashTransactionHandlerTest.php
 
 		-
-			rawMessage: 'Method class@anonymous/Trading/CashTransactionHandlerTest.php:93::fetch_assoc() return type has no value type specified in iterable type array.'
+			rawMessage: 'Method class@anonymous/Trading/CashTransactionHandlerTest.php:96::fetch_assoc() return type has no value type specified in iterable type array.'
 			identifier: missingType.iterableValue
 			count: 1
 			path: tests/Trading/CashTransactionHandlerTest.php
 
 		-
-			rawMessage: 'Method mysqli@anonymous/Trading/CashTransactionHandlerTest.php:27::prepare() never returns false so it can be removed from the return type.'
+			rawMessage: 'Method mysqli@anonymous/Trading/CashTransactionHandlerTest.php:30::prepare() never returns false so it can be removed from the return type.'
 			identifier: return.unusedType
 			count: 1
 			path: tests/Trading/CashTransactionHandlerTest.php
 
 		-
-			rawMessage: 'Method mysqli@anonymous/Trading/CashTransactionHandlerTest.php:27::prepare() never returns mysqli_stmt so it can be removed from the return type.'
+			rawMessage: 'Method mysqli@anonymous/Trading/CashTransactionHandlerTest.php:30::prepare() never returns mysqli_stmt so it can be removed from the return type.'
 			identifier: return.unusedType
 			count: 1
 			path: tests/Trading/CashTransactionHandlerTest.php
 
 		-
-			rawMessage: 'Method mysqli@anonymous/Trading/CashTransactionHandlerTest.php:27::prepare() should return mysqli_stmt|false but returns class@anonymous/Trading/CashTransactionHandlerTest.php:41.'
+			rawMessage: 'Method mysqli@anonymous/Trading/CashTransactionHandlerTest.php:30::prepare() should return mysqli_stmt|false but returns class@anonymous/Trading/CashTransactionHandlerTest.php:44.'
 			identifier: return.type
 			count: 1
 			path: tests/Trading/CashTransactionHandlerTest.php
 
 		-
-			rawMessage: 'Method mysqli@anonymous/Trading/CashTransactionHandlerTest.php:27::query() never returns bool so it can be removed from the return type.'
+			rawMessage: 'Method mysqli@anonymous/Trading/CashTransactionHandlerTest.php:30::query() never returns bool so it can be removed from the return type.'
 			identifier: return.unusedType
 			count: 1
 			path: tests/Trading/CashTransactionHandlerTest.php
 
 		-
-			rawMessage: 'Method mysqli@anonymous/Trading/CashTransactionHandlerTest.php:27::query() never returns mysqli_result so it can be removed from the return type.'
+			rawMessage: 'Method mysqli@anonymous/Trading/CashTransactionHandlerTest.php:30::query() never returns mysqli_result so it can be removed from the return type.'
 			identifier: return.unusedType
 			count: 1
 			path: tests/Trading/CashTransactionHandlerTest.php
 
 		-
-			rawMessage: Property class@anonymous/Trading/CashTransactionHandlerTest.php:41::$mockData type has no value type specified in iterable type array.
+			rawMessage: Property class@anonymous/Trading/CashTransactionHandlerTest.php:44::$mockData type has no value type specified in iterable type array.
 			identifier: missingType.iterableValue
 			count: 1
 			path: tests/Trading/CashTransactionHandlerTest.php
 
 		-
-			rawMessage: 'Property class@anonymous/Trading/CashTransactionHandlerTest.php:61::$playerExists is never read, only written.'
+			rawMessage: 'Property class@anonymous/Trading/CashTransactionHandlerTest.php:64::$playerExists is never read, only written.'
 			identifier: property.onlyWritten
 			count: 1
 			path: tests/Trading/CashTransactionHandlerTest.php
 
 		-
-			rawMessage: Property class@anonymous/Trading/CashTransactionHandlerTest.php:61::$rows type has no value type specified in iterable type array.
+			rawMessage: Property class@anonymous/Trading/CashTransactionHandlerTest.php:64::$rows type has no value type specified in iterable type array.
 			identifier: missingType.iterableValue
 			count: 1
 			path: tests/Trading/CashTransactionHandlerTest.php
 
 		-
-			rawMessage: Property class@anonymous/Trading/CashTransactionHandlerTest.php:93::$rows type has no value type specified in iterable type array.
+			rawMessage: Property class@anonymous/Trading/CashTransactionHandlerTest.php:96::$rows type has no value type specified in iterable type array.
 			identifier: missingType.iterableValue
 			count: 1
 			path: tests/Trading/CashTransactionHandlerTest.php
 
 		-
-			rawMessage: Property mysqli@anonymous/Trading/CashTransactionHandlerTest.php:27::$mockData type has no value type specified in iterable type array.
+			rawMessage: Property mysqli@anonymous/Trading/CashTransactionHandlerTest.php:30::$mockData type has no value type specified in iterable type array.
 			identifier: missingType.iterableValue
 			count: 1
 			path: tests/Trading/CashTransactionHandlerTest.php
@@ -5487,7 +6405,7 @@ parameters:
 			path: tests/Trading/TradeOfferTest.php
 
 		-
-			rawMessage: 'AnonymousClass1c7d18a53ac4f046bf25a9952534161b::__construct() does not call parent constructor from mysqli.'
+			rawMessage: 'AnonymousClassb9eb6ccaf8186089ff8af56ea46d7a07::__construct() does not call parent constructor from mysqli.'
 			identifier: constructor.missingParentCall
 			count: 1
 			path: tests/Trading/TradeProcessorTest.php
@@ -5505,99 +6423,99 @@ parameters:
 			path: tests/Trading/TradeProcessorTest.php
 
 		-
-			rawMessage: 'Method class@anonymous/Trading/TradeProcessorTest.php:37::__construct() has parameter $mockData with no value type specified in iterable type array.'
+			rawMessage: 'Dynamic call to static method PHPUnit\Framework\TestCase::createStub().'
+			identifier: staticMethod.dynamicCall
+			count: 1
+			path: tests/Trading/TradeProcessorTest.php
+
+		-
+			rawMessage: 'Method class@anonymous/Trading/TradeProcessorTest.php:102::__construct() has parameter $rows with no value type specified in iterable type array.'
 			identifier: missingType.iterableValue
 			count: 1
 			path: tests/Trading/TradeProcessorTest.php
 
 		-
-			rawMessage: 'Method class@anonymous/Trading/TradeProcessorTest.php:54::__construct() has parameter $rows with no value type specified in iterable type array.'
+			rawMessage: 'Method class@anonymous/Trading/TradeProcessorTest.php:102::fetch_assoc() return type has no value type specified in iterable type array.'
 			identifier: missingType.iterableValue
 			count: 1
 			path: tests/Trading/TradeProcessorTest.php
 
 		-
-			rawMessage: 'Method class@anonymous/Trading/TradeProcessorTest.php:54::fetch_assoc() return type has no value type specified in iterable type array.'
+			rawMessage: 'Method class@anonymous/Trading/TradeProcessorTest.php:40::__construct() has parameter $mockData with no value type specified in iterable type array.'
 			identifier: missingType.iterableValue
 			count: 1
 			path: tests/Trading/TradeProcessorTest.php
 
 		-
-			rawMessage: 'Method class@anonymous/Trading/TradeProcessorTest.php:99::__construct() has parameter $rows with no value type specified in iterable type array.'
+			rawMessage: 'Method class@anonymous/Trading/TradeProcessorTest.php:57::__construct() has parameter $rows with no value type specified in iterable type array.'
 			identifier: missingType.iterableValue
 			count: 1
 			path: tests/Trading/TradeProcessorTest.php
 
 		-
-			rawMessage: 'Method class@anonymous/Trading/TradeProcessorTest.php:99::fetch_assoc() return type has no value type specified in iterable type array.'
+			rawMessage: 'Method class@anonymous/Trading/TradeProcessorTest.php:57::fetch_assoc() return type has no value type specified in iterable type array.'
 			identifier: missingType.iterableValue
 			count: 1
 			path: tests/Trading/TradeProcessorTest.php
 
 		-
-			rawMessage: 'Method mysqli@anonymous/Trading/TradeProcessorTest.php:25::prepare() never returns false so it can be removed from the return type.'
+			rawMessage: 'Method mysqli@anonymous/Trading/TradeProcessorTest.php:28::prepare() never returns false so it can be removed from the return type.'
 			identifier: return.unusedType
 			count: 1
 			path: tests/Trading/TradeProcessorTest.php
 
 		-
-			rawMessage: 'Method mysqli@anonymous/Trading/TradeProcessorTest.php:25::prepare() never returns mysqli_stmt so it can be removed from the return type.'
+			rawMessage: 'Method mysqli@anonymous/Trading/TradeProcessorTest.php:28::prepare() never returns mysqli_stmt so it can be removed from the return type.'
 			identifier: return.unusedType
 			count: 1
 			path: tests/Trading/TradeProcessorTest.php
 
 		-
-			rawMessage: 'Method mysqli@anonymous/Trading/TradeProcessorTest.php:25::prepare() should return mysqli_stmt|false but returns class@anonymous/Trading/TradeProcessorTest.php:37.'
+			rawMessage: 'Method mysqli@anonymous/Trading/TradeProcessorTest.php:28::prepare() should return mysqli_stmt|false but returns class@anonymous/Trading/TradeProcessorTest.php:40.'
 			identifier: return.type
 			count: 1
 			path: tests/Trading/TradeProcessorTest.php
 
 		-
-			rawMessage: 'Method mysqli@anonymous/Trading/TradeProcessorTest.php:25::query() never returns bool so it can be removed from the return type.'
+			rawMessage: 'Method mysqli@anonymous/Trading/TradeProcessorTest.php:28::query() never returns bool so it can be removed from the return type.'
 			identifier: return.unusedType
 			count: 1
 			path: tests/Trading/TradeProcessorTest.php
 
 		-
-			rawMessage: 'Method mysqli@anonymous/Trading/TradeProcessorTest.php:25::query() never returns mysqli_result so it can be removed from the return type.'
+			rawMessage: 'Method mysqli@anonymous/Trading/TradeProcessorTest.php:28::query() never returns mysqli_result so it can be removed from the return type.'
 			identifier: return.unusedType
 			count: 1
 			path: tests/Trading/TradeProcessorTest.php
 
 		-
-			rawMessage: Property class@anonymous/Trading/TradeProcessorTest.php:37::$mockData type has no value type specified in iterable type array.
+			rawMessage: Property class@anonymous/Trading/TradeProcessorTest.php:102::$rows type has no value type specified in iterable type array.
 			identifier: missingType.iterableValue
 			count: 1
 			path: tests/Trading/TradeProcessorTest.php
 
 		-
-			rawMessage: Property class@anonymous/Trading/TradeProcessorTest.php:54::$rows type has no value type specified in iterable type array.
+			rawMessage: Property class@anonymous/Trading/TradeProcessorTest.php:40::$mockData type has no value type specified in iterable type array.
 			identifier: missingType.iterableValue
 			count: 1
 			path: tests/Trading/TradeProcessorTest.php
 
 		-
-			rawMessage: Property class@anonymous/Trading/TradeProcessorTest.php:99::$rows type has no value type specified in iterable type array.
+			rawMessage: Property class@anonymous/Trading/TradeProcessorTest.php:57::$rows type has no value type specified in iterable type array.
 			identifier: missingType.iterableValue
 			count: 1
 			path: tests/Trading/TradeProcessorTest.php
 
 		-
-			rawMessage: Property mysqli@anonymous/Trading/TradeProcessorTest.php:25::$mockData type has no value type specified in iterable type array.
+			rawMessage: Property mysqli@anonymous/Trading/TradeProcessorTest.php:28::$mockData type has no value type specified in iterable type array.
 			identifier: missingType.iterableValue
 			count: 1
 			path: tests/Trading/TradeProcessorTest.php
-
-		-
-			rawMessage: 'AnonymousClass115df03e6b4faf2259e9add647449ce8::__construct() does not call parent constructor from mysqli.'
-			identifier: constructor.missingParentCall
-			count: 1
-			path: tests/Trading/TradeQueueProcessorTest.php
 
 		-
 			rawMessage: 'Dynamic call to static method PHPUnit\Framework\TestCase::createStub().'
 			identifier: staticMethod.dynamicCall
-			count: 6
+			count: 7
 			path: tests/Trading/TradeQueueProcessorTest.php
 
 		-
@@ -5781,6 +6699,126 @@ parameters:
 			path: tests/Trading/TradeValidatorTest.php
 
 		-
+			rawMessage: 'AnonymousClass87301b1fa28e16c2c74f8f424805e5c6::__construct() does not call parent constructor from mysqli.'
+			identifier: constructor.missingParentCall
+			count: 1
+			path: tests/Trading/TradingControllerAcceptOfferTest.php
+
+		-
+			rawMessage: 'Call to method PHPUnit\Framework\Assert::assertInstanceOf() with ''Trading\\Contracts\\TradingControllerInterface'' and Trading\TradingController will always evaluate to true.'
+			identifier: method.alreadyNarrowedType
+			count: 1
+			path: tests/Trading/TradingControllerAcceptOfferTest.php
+
+		-
+			rawMessage: 'Call to method PHPUnit\Framework\Assert::assertInstanceOf() with ''Trading\\TradingController'' and Trading\TradingController will always evaluate to true.'
+			identifier: method.alreadyNarrowedType
+			count: 1
+			path: tests/Trading/TradingControllerAcceptOfferTest.php
+
+		-
+			rawMessage: 'Dynamic call to static method PHPUnit\Framework\TestCase::createStub().'
+			identifier: staticMethod.dynamicCall
+			count: 7
+			path: tests/Trading/TradingControllerAcceptOfferTest.php
+
+		-
+			rawMessage: 'AnonymousClass0a6b2cbada662207de9128fd01703e32::__construct() does not call parent constructor from mysqli.'
+			identifier: constructor.missingParentCall
+			count: 1
+			path: tests/Trading/TradingControllerOfferTest.php
+
+		-
+			rawMessage: 'Call to method PHPUnit\Framework\Assert::assertInstanceOf() with ''Trading\\TradingController'' and Trading\TradingController will always evaluate to true.'
+			identifier: method.alreadyNarrowedType
+			count: 1
+			path: tests/Trading/TradingControllerOfferTest.php
+
+		-
+			rawMessage: 'Dynamic call to static method PHPUnit\Framework\TestCase::createStub().'
+			identifier: staticMethod.dynamicCall
+			count: 8
+			path: tests/Trading/TradingControllerOfferTest.php
+
+		-
+			rawMessage: 'AnonymousClassdaa3935e821acc879e516cc033ea6985::__construct() does not call parent constructor from mysqli.'
+			identifier: constructor.missingParentCall
+			count: 1
+			path: tests/Trading/TradingControllerRejectOfferTest.php
+
+		-
+			rawMessage: 'Call to method PHPUnit\Framework\Assert::assertInstanceOf() with ''Trading\\Contracts\\TradingControllerInterface'' and Trading\TradingController will always evaluate to true.'
+			identifier: method.alreadyNarrowedType
+			count: 1
+			path: tests/Trading/TradingControllerRejectOfferTest.php
+
+		-
+			rawMessage: 'Call to method PHPUnit\Framework\Assert::assertInstanceOf() with ''Trading\\TradingController'' and Trading\TradingController will always evaluate to true.'
+			identifier: method.alreadyNarrowedType
+			count: 1
+			path: tests/Trading/TradingControllerRejectOfferTest.php
+
+		-
+			rawMessage: 'Dynamic call to static method PHPUnit\Framework\TestCase::createStub().'
+			identifier: staticMethod.dynamicCall
+			count: 7
+			path: tests/Trading/TradingControllerRejectOfferTest.php
+
+		-
+			rawMessage: 'AnonymousClassfdabb87ea876986bbe87ab9322f68dcc::__construct() does not call parent constructor from mysqli.'
+			identifier: constructor.missingParentCall
+			count: 1
+			path: tests/Trading/TradingControllerReviewTest.php
+
+		-
+			rawMessage: 'Call to method PHPUnit\Framework\Assert::assertInstanceOf() with ''Trading\\Contracts\\TradingControllerInterface'' and Trading\TradingController will always evaluate to true.'
+			identifier: method.alreadyNarrowedType
+			count: 1
+			path: tests/Trading/TradingControllerReviewTest.php
+
+		-
+			rawMessage: 'Dynamic call to static method PHPUnit\Framework\TestCase::createStub().'
+			identifier: staticMethod.dynamicCall
+			count: 8
+			path: tests/Trading/TradingControllerReviewTest.php
+
+		-
+			rawMessage: 'AnonymousClass6bff3a09370dc33493d3dee377ce00be::__construct() does not call parent constructor from mysqli.'
+			identifier: constructor.missingParentCall
+			count: 1
+			path: tests/Trading/TradingControllerRosterPreviewTest.php
+
+		-
+			rawMessage: 'Dynamic call to static method PHPUnit\Framework\TestCase::createStub().'
+			identifier: staticMethod.dynamicCall
+			count: 9
+			path: tests/Trading/TradingControllerRosterPreviewTest.php
+
+		-
+			rawMessage: 'AnonymousClass9a703ff2a761b21167a04cdac3793377::__construct() does not call parent constructor from mysqli.'
+			identifier: constructor.missingParentCall
+			count: 1
+			path: tests/Trading/TradingControllerSubmitOfferTest.php
+
+		-
+			rawMessage: 'Call to method PHPUnit\Framework\Assert::assertInstanceOf() with ''Trading\\Contracts\\TradingControllerInterface'' and Trading\TradingController will always evaluate to true.'
+			identifier: method.alreadyNarrowedType
+			count: 1
+			path: tests/Trading/TradingControllerSubmitOfferTest.php
+
+		-
+			rawMessage: 'Call to method PHPUnit\Framework\Assert::assertInstanceOf() with ''Trading\\TradingController'' and Trading\TradingController will always evaluate to true.'
+			identifier: method.alreadyNarrowedType
+			count: 1
+			path: tests/Trading/TradingControllerSubmitOfferTest.php
+
+		-
+			rawMessage: 'Dynamic call to static method PHPUnit\Framework\TestCase::createStub().'
+			identifier: staticMethod.dynamicCall
+			count: 7
+			path: tests/Trading/TradingControllerSubmitOfferTest.php
+
+		-
 			rawMessage: 'AnonymousClassb0d8ff15a6d01fa74fec69063e320558::__construct() does not call parent constructor from mysqli.'
 			identifier: constructor.missingParentCall
 			count: 1
@@ -5865,7 +6903,7 @@ parameters:
 			path: tests/Trading/TradingRepositoryTest.php
 
 		-
-			rawMessage: 'AnonymousClass0790eb2e895e6364353f4de8e80e344d::__construct() does not call parent constructor from mysqli.'
+			rawMessage: 'AnonymousClass1c5674ae0410fe91d691385d16df6b55::__construct() does not call parent constructor from mysqli.'
 			identifier: constructor.missingParentCall
 			count: 1
 			path: tests/Trading/TradingServiceTest.php
@@ -5873,7 +6911,7 @@ parameters:
 		-
 			rawMessage: 'Dynamic call to static method PHPUnit\Framework\TestCase::createStub().'
 			identifier: staticMethod.dynamicCall
-			count: 64
+			count: 69
 			path: tests/Trading/TradingServiceTest.php
 
 		-
@@ -5961,6 +6999,12 @@ parameters:
 			path: tests/TransactionHistory/TransactionHistoryViewTest.php
 
 		-
+			rawMessage: 'Parameter #1 $data of method TransactionHistory\TransactionHistoryView::render() expects array{transactions: array<int, array{sid: string, catid: string, title: string, time: string}>, categories: array<int, string>, availableYears: array<int, int>, monthNames: array<int, string>, selectedCategory: int, selectedYear: int, selectedMonth: int}, array{transactions: array{array{catid: 1, time: ''2024-01-15 12:00:00'', title: ''<script>alert(1)<…'', sid: 1}}, categories: array{1: ''<script>alert(1)<…''}, availableYears: array{2024}, monthNames: array{1: ''January''}, selectedCategory: 0, selectedYear: 0, selectedMonth: 0} given.'
+			identifier: argument.type
+			count: 1
+			path: tests/TransactionHistory/TransactionHistoryViewXssTest.php
+
+		-
 			rawMessage: 'Dynamic call to static method PHPUnit\Framework\TestCase::createStub().'
 			identifier: staticMethod.dynamicCall
 			count: 11
@@ -6007,6 +7051,12 @@ parameters:
 			identifier: staticMethod.dynamicCall
 			count: 7
 			path: tests/Unit/BulkImport/BulkImportRunnerTest.php
+
+		-
+			rawMessage: 'Dynamic call to static method PHPUnit\Framework\Assert::anything().'
+			identifier: staticMethod.dynamicCall
+			count: 3
+			path: tests/Unit/BulkImport/FileTypeHandlerTest.php
 
 		-
 			rawMessage: 'Dynamic call to static method PHPUnit\Framework\TestCase::createStub().'
@@ -6077,7 +7127,7 @@ parameters:
 		-
 			rawMessage: 'Dynamic call to static method PHPUnit\Framework\TestCase::createStub().'
 			identifier: staticMethod.dynamicCall
-			count: 1
+			count: 2
 			path: tests/UpdateAllTheThings/ScheduleUpdaterTest.php
 
 		-
@@ -6091,6 +7141,12 @@ parameters:
 			identifier: staticMethod.dynamicCall
 			count: 3
 			path: tests/UpdateAllTheThings/StandingsUpdaterTest.php
+
+		-
+			rawMessage: 'Call to method PHPUnit\Framework\Assert::assertInstanceOf() with ''Updater\\Contracts\\PipelineStepInterface'' and Updater\Steps\AutoSeedOlympicsTeamInfoStep will always evaluate to true.'
+			identifier: method.alreadyNarrowedType
+			count: 1
+			path: tests/UpdateAllTheThings/Steps/AutoSeedOlympicsTeamInfoStepTest.php
 
 		-
 			rawMessage: 'Call to an undefined method JsbParser\Contracts\JsbImportRepositoryInterface::method().'
@@ -6137,7 +7193,7 @@ parameters:
 		-
 			rawMessage: 'Call to an undefined method BulkImport\Contracts\BackupArchiveLocatorInterface::method().'
 			identifier: method.notFound
-			count: 5
+			count: 6
 			path: tests/UpdateAllTheThings/Steps/ExtractFromBackupStepTest.php
 
 		-
@@ -6161,7 +7217,7 @@ parameters:
 		-
 			rawMessage: 'Call to an undefined method LeagueConfig\LeagueConfigRepository::method().'
 			identifier: method.notFound
-			count: 5
+			count: 7
 			path: tests/UpdateAllTheThings/Steps/ImportLeagueConfigStepTest.php
 
 		-
@@ -6173,13 +7229,13 @@ parameters:
 		-
 			rawMessage: 'Call to an undefined method LeagueConfig\LeagueConfigView::method().'
 			identifier: method.notFound
-			count: 4
+			count: 6
 			path: tests/UpdateAllTheThings/Steps/ImportLeagueConfigStepTest.php
 
 		-
 			rawMessage: 'Call to an undefined method Updater\Contracts\JsbSourceResolverInterface::method().'
 			identifier: method.notFound
-			count: 4
+			count: 6
 			path: tests/UpdateAllTheThings/Steps/ImportLeagueConfigStepTest.php
 
 		-
@@ -6339,15 +7395,27 @@ parameters:
 			path: tests/UpdateAllTheThings/Steps/RefreshTeamSeasonRecordsStepTest.php
 
 		-
+			rawMessage: 'AnonymousClassda9df0f5fb27c4becd27f088f4642270::__construct() does not call parent constructor from mysqli.'
+			identifier: constructor.missingParentCall
+			count: 1
+			path: tests/UpdateAllTheThings/Steps/ResetExtensionAttemptsStepTest.php
+
+		-
 			rawMessage: 'Call to method PHPUnit\Framework\Assert::assertInstanceOf() with ''Updater\\Contracts\\PipelineStepInterface'' and Updater\Steps\ResetExtensionAttemptsStep will always evaluate to true.'
 			identifier: method.alreadyNarrowedType
 			count: 1
 			path: tests/UpdateAllTheThings/Steps/ResetExtensionAttemptsStepTest.php
 
 		-
-			rawMessage: 'Dynamic call to static method PHPUnit\Framework\TestCase::createStub().'
-			identifier: staticMethod.dynamicCall
-			count: 2
+			rawMessage: 'Method mysqli@anonymous/UpdateAllTheThings/Steps/ResetExtensionAttemptsStepTest.php:46::prepare() never returns false so it can be removed from the return type.'
+			identifier: return.unusedType
+			count: 1
+			path: tests/UpdateAllTheThings/Steps/ResetExtensionAttemptsStepTest.php
+
+		-
+			rawMessage: 'Return type (Tests\WideUnit\Mocks\MockPreparedStatement|false) of method mysqli@anonymous/UpdateAllTheThings/Steps/ResetExtensionAttemptsStepTest.php:46::prepare() should be covariant with return type (mysqli_stmt|false) of method mysqli::prepare()'
+			identifier: method.childReturnType
+			count: 1
 			path: tests/UpdateAllTheThings/Steps/ResetExtensionAttemptsStepTest.php
 
 		-
@@ -6447,9 +7515,15 @@ parameters:
 			path: tests/Updater/RecordParserTest.php
 
 		-
+			rawMessage: Casting to int something that's already int.
+			identifier: cast.useless
+			count: 1
+			path: tests/Updater/ScheduleUpdaterTest.php
+
+		-
 			rawMessage: 'Dynamic call to static method PHPUnit\Framework\TestCase::createStub().'
 			identifier: staticMethod.dynamicCall
-			count: 2
+			count: 3
 			path: tests/Updater/ScheduleUpdaterTest.php
 
 		-
@@ -6467,6 +7541,12 @@ parameters:
 		-
 			rawMessage: 'Dynamic call to static method PHPUnit\Framework\TestCase::createStub().'
 			identifier: staticMethod.dynamicCall
+			count: 11
+			path: tests/Updater/UpdaterControllerTest.php
+
+		-
+			rawMessage: 'Dynamic call to static method PHPUnit\Framework\TestCase::createStub().'
+			identifier: staticMethod.dynamicCall
 			count: 6
 			path: tests/Updater/UpdaterServiceTest.php
 
@@ -6475,6 +7555,12 @@ parameters:
 			identifier: phpunit.assertEquals
 			count: 1
 			path: tests/Utilities/UuidGeneratorTest.php
+
+		-
+			rawMessage: 'Dynamic call to static method PHPUnit\Framework\TestCase::createStub().'
+			identifier: staticMethod.dynamicCall
+			count: 1
+			path: tests/Validation/CommonValidatorTest.php
 
 		-
 			rawMessage: 'Call to method PHPUnit\Framework\Assert::assertInstanceOf() with ''Voting\\Contracts\\VotingBallotServiceInterface'' and Voting\VotingBallotService will always evaluate to true.'
@@ -6551,13 +7637,13 @@ parameters:
 		-
 			rawMessage: 'Dynamic call to static method PHPUnit\Framework\TestCase::createStub().'
 			identifier: staticMethod.dynamicCall
-			count: 6
+			count: 7
 			path: tests/Waivers/WaiversControllerTest.php
 
 		-
 			rawMessage: 'Dynamic call to static method PHPUnit\Framework\TestCase::createStub().'
 			identifier: staticMethod.dynamicCall
-			count: 5
+			count: 6
 			path: tests/Waivers/WaiversProcessorTest.php
 
 		-
@@ -6735,21 +7821,21 @@ parameters:
 			path: tests/Waivers/WaiversProcessorTest.php
 
 		-
-			rawMessage: Variable property access on PHPUnit\Framework\MockObject\MockObject&Player\Player.
-			identifier: property.dynamicName
-			count: 1
-			path: tests/Waivers/WaiversProcessorTest.php
-
-		-
 			rawMessage: 'You should use assertSame() instead of assertEquals(), because both values are scalars of the same type'
 			identifier: phpunit.assertEquals
 			count: 27
 			path: tests/Waivers/WaiversProcessorTest.php
 
 		-
-			rawMessage: 'Call to an undefined method Services\CommonMysqliRepository::method().'
+			rawMessage: 'Call to an undefined method Repositories\Contracts\PlayerLookupRepositoryInterface::method().'
 			identifier: method.notFound
-			count: 11
+			count: 8
+			path: tests/Waivers/WaiversProcessorWriteTest.php
+
+		-
+			rawMessage: 'Call to an undefined method Repositories\Contracts\TeamIdentityRepositoryInterface::method().'
+			identifier: method.notFound
+			count: 3
 			path: tests/Waivers/WaiversProcessorWriteTest.php
 
 		-
@@ -6767,7 +7853,7 @@ parameters:
 		-
 			rawMessage: 'Dynamic call to static method PHPUnit\Framework\TestCase::createStub().'
 			identifier: staticMethod.dynamicCall
-			count: 5
+			count: 6
 			path: tests/Waivers/WaiversProcessorWriteTest.php
 
 		-
@@ -7011,6 +8097,12 @@ parameters:
 			path: tests/WideUnit/DepthChartEntry/DepthChartEntryWideUnitTest.php
 
 		-
+			rawMessage: Access to an undefined property Tests\WideUnit\Draft\DraftWideUnitTest::$mockSharedFunctions.
+			identifier: property.notFound
+			count: 1
+			path: tests/WideUnit/Draft/DraftWideUnitTest.php
+
+		-
 			rawMessage: 'Dynamic call to static method PHPUnit\Framework\TestCase::createStub().'
 			identifier: staticMethod.dynamicCall
 			count: 2
@@ -7057,6 +8149,12 @@ parameters:
 			identifier: phpunit.assertEquals
 			count: 2
 			path: tests/WideUnit/Extension/ExtensionWideUnitTest.php
+
+		-
+			rawMessage: 'Dynamic call to static method PHPUnit\Framework\TestCase::createStub().'
+			identifier: staticMethod.dynamicCall
+			count: 1
+			path: tests/WideUnit/FreeAgency/FreeAgencyWideUnitTest.php
 
 		-
 			rawMessage: 'Method Tests\WideUnit\FreeAgency\FreeAgencyWideUnitTest::getBaseFreeAgentData() return type has no value type specified in iterable type array.'
@@ -7320,6 +8418,12 @@ parameters:
 			rawMessage: 'Dynamic call to static method PHPUnit\Framework\TestCase::createStub().'
 			identifier: staticMethod.dynamicCall
 			count: 1
+			path: tests/WideUnit/ModifierConsistencyTest.php
+
+		-
+			rawMessage: 'Dynamic call to static method PHPUnit\Framework\TestCase::createStub().'
+			identifier: staticMethod.dynamicCall
+			count: 2
 			path: tests/WideUnit/Negotiation/NegotiationWideUnitTest.php
 
 		-
@@ -7375,6 +8479,12 @@ parameters:
 			identifier: missingType.iterableValue
 			count: 1
 			path: tests/WideUnit/Standings/StandingsWideUnitTest.php
+
+		-
+			rawMessage: 'Dynamic call to static method PHPUnit\Framework\TestCase::createStub().'
+			identifier: staticMethod.dynamicCall
+			count: 1
+			path: tests/WideUnit/Trading/TradeWideUnitTest.php
 
 		-
 			rawMessage: 'You should use assertSame() instead of assertEquals(), because both values are scalars of the same type'
@@ -7439,7 +8549,7 @@ parameters:
 		-
 			rawMessage: 'Dynamic call to static method PHPUnit\Framework\TestCase::createStub().'
 			identifier: staticMethod.dynamicCall
-			count: 6
+			count: 7
 			path: tests/WideUnit/Waivers/WaiversWideUnitTest.php
 
 		-

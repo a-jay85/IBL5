@@ -13,6 +13,13 @@ use Repositories\Contracts\TeamIdentityRepositoryInterface;
  */
 class TeamIdentityRepository extends \BaseMysqliRepository implements TeamIdentityRepositoryInterface
 {
+    protected function rewriteTableNames(string $query): string
+    {
+        // GM assignments (gm_username) and auth data live in IBL-scoped tables only.
+        // Never route identity lookups to Olympics tables.
+        return $query;
+    }
+
     /**
      * @return UserRow|null
      */

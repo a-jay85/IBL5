@@ -51,7 +51,12 @@ test.describe('Olympics nav filtering', () => {
     const nav = desktopNav(page);
     await nav.getByRole('button', { name: 'History' }).click();
 
-    await expect(nav.locator('.nav-dropdown-item', { hasText: 'Record Holders' }).first()).toBeVisible();
+    await expect(nav.locator('.nav-dropdown-item', { hasText: 'Transaction History' }).first()).toBeVisible();
+    await expect(nav.locator('.nav-dropdown-item', { hasText: 'Record Holders' })).not.toBeAttached();
+    await expect(nav.locator('.nav-dropdown-item', { hasText: 'Award History' })).not.toBeAttached();
+    await expect(nav.locator('.nav-dropdown-item', { hasText: 'Season Leaderboards' })).not.toBeAttached();
+    await expect(nav.locator('.nav-dropdown-item', { hasText: 'Career Leaderboards' })).not.toBeAttached();
+    await expect(nav.locator('.nav-dropdown-item', { hasText: 'Franchise Record Book' })).not.toBeAttached();
     await expect(nav.locator('.nav-dropdown-item', { hasText: 'Franchise History' })).not.toBeAttached();
     await expect(nav.locator('.nav-dropdown-item', { hasText: 'All-Star Appearances' })).not.toBeAttached();
   });

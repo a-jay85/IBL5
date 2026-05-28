@@ -141,6 +141,24 @@ run_heartbeat_watcher() {
     done
 }
 
+# Append a per-phase cost row to the night's cost roll-up. Cost is parsed from
+# the phase's `exit:` line (emitted by nightly-stream-filter into the log). One
+# row per phase keeps this robust across split impl/postplan invocations — no
+# cross-phase variable dependency. See .claude/rules/nightly-workflow.md.
+append_cost_row() {
+    local plan=$1 phase=$2 log_before=$3
+    local cost report
+    cost=$(tail -n +"$((log_before + 1))" "$LOG" | grep -oE 'cost=\$[0-9.]+' | tail -1 | sed 's/cost=\$//')
+    [ -n "$cost" ] || cost="?"
+    report="$NIGHTLY_DIR/reports/$(date +%Y-%m-%d)-costs.md"
+    mkdir -p "$(dirname "$report")"
+    if [ ! -f "$report" ]; then
+        printf '# Nightly cost roll-up — %s\n\n| Plan | Phase | Cost ($) |\n|---|---|---|\n' \
+            "$(date +%Y-%m-%d)" > "$report"
+    fi
+    printf '| %s | %s | %s |\n' "$plan" "$phase" "$cost" >> "$report"
+}
+
 LOG="$LOG_DIR/$(date +%Y-%m-%d).log"
 
 cd "$REPO"
@@ -264,6 +282,7 @@ PLAN_FILE=$PLAN_NAME" \
         fi
 
         echo "--- Plan #$PLANS_RUN impl finished at $(date) ---" >> "$LOG"
+        append_cost_row "$PLAN_NAME" impl "$IMPL_LOG_BEFORE"
 
         # Auth-error circuit breaker — transient, not a plan failure; stop immediately
         if tail -n +"$((IMPL_LOG_BEFORE + 1))" "$LOG" | grep -q "authentication_error"; then
@@ -346,6 +365,7 @@ PLAN_FILE=$PLAN_NAME" \
         fi
 
         echo "--- Plan #$PLANS_RUN postplan finished at $(date) ---" >> "$LOG"
+        append_cost_row "$PLAN_NAME" postplan "$PP_LOG_BEFORE"
 
         # Auth-error circuit breaker — transient, not a plan failure; stop immediately
         if tail -n +"$((PP_LOG_BEFORE + 1))" "$LOG" | grep -q "authentication_error"; then

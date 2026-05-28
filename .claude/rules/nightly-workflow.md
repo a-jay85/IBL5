@@ -31,7 +31,8 @@ A headless `claude -p` process runs twice daily via macOS `launchd`. It loops th
   done/     symlinks moved here after successful execution
   skipped/  symlinks moved here when skipped (ambiguity/errors/poison-pill)
   handoff/  JSON files bridging state from implementation to post-plan agent
-  reports/  per-night markdown reports (YYYY-MM-DD-{done|skipped|no-queue|error}-<slug>.md)
+  reports/  per-night markdown reports (YYYY-MM-DD-{done|skipped|no-queue|error}-<slug>.md);
+            plus YYYY-MM-DD-costs.md — per-phase token cost roll-up written by nightly-run
   logs/     claude -p output logs + launchd stdout/stderr
 ```
 

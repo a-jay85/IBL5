@@ -301,7 +301,7 @@ git diff --name-only origin/master...HEAD > /tmp/post-plan-changed-$PPID
 grep -qF "$T" /tmp/post-plan-changed-$PPID || echo "MISSING: $T (matrix planned a test the diff never wrote)"
 ```
 
-For each `MISSING:` test the impl silently dropped planned coverage — now likelier to matter, since the matrix carries the negative-path and security rows `/plan` gates 9 and 12 require. Author the missing test yourself (Opus-tier — do not delegate), run it green, checkpoint. Skip a planned test **only** if its target behavior was cut from the implementation; note that in a PR comment rather than writing a hollow test.
+For each `MISSING:` test the impl silently dropped planned coverage — now likelier to matter, since the matrix carries the negative-path and security rows `/plan` gates 9 and 12 require. Write the missing test, run it green, and checkpoint (same as Phase 6 test authoring). Skip a planned test **only** if its target behavior was cut from the implementation; note that in a PR comment rather than writing a hollow test.
 
 **PHPUnit + PHPStan — direct Bash (no agent):** **Skip if** `! $HAS_PHP`. The PostToolUse hook already ran both during edits, and a PHP-less diff cannot regress either suite. Run both as direct Bash calls with `run_in_background: true` so they execute in parallel with the E2E agent below. Output is ~5 lines each — agent overhead (~25K tokens) is never justified.
 

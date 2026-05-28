@@ -14,8 +14,14 @@ const AUTH_MODULES = [
   { name: 'DepthChartEntry', phase: null },
   { name: 'NextSim', phase: null },
   { name: 'Voting', phase: null },
-  // Trading, FreeAgency, and Draft require specific phase settings
-  // but the auth check happens first inside the module
+  // Trading and FreeAgency call loginbox() for unauthenticated users before the
+  // phase gate, so they redirect to YourAccount regardless of phase.
+  { name: 'Trading', phase: null },
+  { name: 'FreeAgency', phase: null },
+  // NOTE: Draft and Waivers are intentionally NOT here — they render a public,
+  // read-only view for unauthenticated users (no loginbox redirect), so a
+  // redirect assertion would not hold. Their public render is covered by the
+  // phase-gating-public spec instead.
 ];
 
 test.describe('Unauthenticated redirect tests', () => {

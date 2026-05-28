@@ -42,13 +42,49 @@ if (!$allowed) {
     exit;
 }
 
-// Minimal bootstrap — only config.php for DB credentials
+// Minimal bootstrap — config.php for DB credentials, Composer autoloader for
+// the delight-auth seeding actions below (reset/confirm user fixtures). Both
+// requires sit after the E2E_TESTING gate, so neither loads in production.
 require __DIR__ . '/config.php';
+require_once __DIR__ . '/vendor/autoload.php';
+
+// In git worktrees vendor/ is symlinked to the main repo, so Composer resolves
+// classes/ through the symlink's realpath and app classes (e.g. PdoConnection)
+// fail to load. Mirror mainfile.php's worktree fallback autoloader so the
+// seeding actions below can reach classes/. No-op in CI (vendor/ is real).
+if (is_link(__DIR__ . '/vendor')) {
+    $worktreeClasses = realpath(__DIR__ . '/classes');
+    if ($worktreeClasses !== false) {
+        spl_autoload_register(static function (string $class) use ($worktreeClasses): void {
+            $file = $worktreeClasses . '/' . str_replace('\\', '/', $class) . '.php';
+            if (file_exists($file)) {
+                require $file;
+            }
+        }, true, true);
+    }
+}
 
 /** @var string $dbhost */
 /** @var string $dbuname */
 /** @var string $dbpass */
 /** @var string $dbname */
+
+/**
+ * Build a Delight\Auth\Auth instance over the shared PDO connection.
+ *
+ * Mirrors classes/Auth/AuthService.php's construction (prefix 'auth_') but with
+ * throttling disabled — E2E seeds many accounts and must not trip the lockout.
+ * Used only by the seed-reset-user / seed-confirm-user actions.
+ */
+function e2eAuth(): \Delight\Auth\Auth
+{
+    return new \Delight\Auth\Auth(
+        \Database\PdoConnection::getInstance(),
+        null,
+        'auth_',
+        false,
+    );
+}
 
 $db = new mysqli($dbhost, $dbuname, $dbpass, $dbname);
 if ($db->connect_error) {
@@ -155,6 +191,80 @@ if ($method === 'DELETE' && $action === 'delete-test-user') {
     $deleted = $stmt->affected_rows;
     $stmt->close();
     echo json_encode(['deleted' => $deleted]);
+    $db->close();
+    exit;
+}
+
+// POST ?action=seed-reset-user — create a VERIFIED e2e_reset_<rand> account
+// and generate a real password-reset selector/token pair via the delight-auth
+// library. The reset row stores a password_hash() digest of the token, so a
+// raw SQL INSERT cannot mint a usable pair — only forgotPassword()'s callback
+// can. forgotPassword() requires a confirmed account, so we register then
+// immediately confirm before requesting the reset. Returns the pair plus the
+// known oldPassword so the E2E can prove the new password works / old fails.
+if ($method === 'POST' && $action === 'seed-reset-user') {
+    $rand = bin2hex(random_bytes(4));
+    $username = 'e2e_reset_' . $rand;
+    $email = $username . '@example.test';
+    $oldPassword = 'OldPass!' . $rand;
+    try {
+        $auth = e2eAuth();
+        $confirm = ['selector' => '', 'token' => ''];
+        $auth->register($email, $oldPassword, $username, function (string $selector, string $token) use (&$confirm): void {
+            $confirm['selector'] = $selector;
+            $confirm['token'] = $token;
+        });
+        $auth->confirmEmail($confirm['selector'], $confirm['token']);
+
+        $reset = ['selector' => '', 'token' => ''];
+        $auth->forgotPassword($email, function (string $selector, string $token) use (&$reset): void {
+            $reset['selector'] = $selector;
+            $reset['token'] = $token;
+        });
+    } catch (\Throwable $e) {
+        http_response_code(500);
+        echo json_encode(['error' => 'seed-reset-user failed: ' . $e->getMessage()]);
+        $db->close();
+        exit;
+    }
+    echo json_encode([
+        'username' => $username,
+        'email' => $email,
+        'selector' => $reset['selector'],
+        'token' => $reset['token'],
+        'oldPassword' => $oldPassword,
+    ]);
+    $db->close();
+    exit;
+}
+
+// POST ?action=seed-confirm-user — register an UNVERIFIED e2e_confirm_<rand>
+// account and capture the confirmation selector/token from the registration
+// email callback, so the confirm_email success round-trip can be driven E2E.
+if ($method === 'POST' && $action === 'seed-confirm-user') {
+    $rand = bin2hex(random_bytes(4));
+    $username = 'e2e_confirm_' . $rand;
+    $email = $username . '@example.test';
+    $password = 'ConfirmPass!' . $rand;
+    try {
+        $auth = e2eAuth();
+        $confirm = ['selector' => '', 'token' => ''];
+        $auth->register($email, $password, $username, function (string $selector, string $token) use (&$confirm): void {
+            $confirm['selector'] = $selector;
+            $confirm['token'] = $token;
+        });
+    } catch (\Throwable $e) {
+        http_response_code(500);
+        echo json_encode(['error' => 'seed-confirm-user failed: ' . $e->getMessage()]);
+        $db->close();
+        exit;
+    }
+    echo json_encode([
+        'username' => $username,
+        'email' => $email,
+        'selector' => $confirm['selector'],
+        'token' => $confirm['token'],
+    ]);
     $db->close();
     exit;
 }

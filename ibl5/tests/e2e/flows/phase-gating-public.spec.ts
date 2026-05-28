@@ -13,6 +13,10 @@ test.describe('Trading disabled', () => {
     await appState({ 'Allow Trades': 'No' });
     await page.goto('modules.php?name=Trading');
 
+    // Positive: the gating UI (loginBox) actually rendered — a blank PHP crash
+    // would fail this, where the absence check alone would pass.
+    await expect(page.locator('#login-username')).toBeVisible();
+
     // Should NOT show the trade partner selection form
     const teamSelect = page.locator('.trading-team-select');
     const teamSelectVisible = await teamSelect.isVisible().catch(() => false);
@@ -32,6 +36,10 @@ test.describe('Draft hidden', () => {
       'Show Draft Link': 'Off',
     });
     await page.goto('modules.php?name=Draft');
+
+    // Positive: the page rendered its content shell (Draft is a public,
+    // read-only view — no loginBox), so a blank PHP crash would fail here.
+    await expect(page.locator('#site-content')).toBeVisible();
 
     // Should NOT show the draft table
     const draftTable = page.locator('table.draft-table');
@@ -53,6 +61,9 @@ test.describe('Voting closed (ASG)', () => {
     });
     await page.goto('modules.php?name=Voting');
 
+    // Positive: gating UI (loginBox) rendered, not a blank crash.
+    await expect(page.locator('#login-username')).toBeVisible();
+
     // Should NOT show the ASG ballot form
     const form = page.locator('form[name="ASGVote"]');
     const formVisible = await form.isVisible().catch(() => false);
@@ -73,6 +84,9 @@ test.describe('Voting closed (EOY)', () => {
     });
     await page.goto('modules.php?name=Voting');
 
+    // Positive: gating UI (loginBox) rendered, not a blank crash.
+    await expect(page.locator('#login-username')).toBeVisible();
+
     // Should NOT show the EOY ballot form
     const form = page.locator('form[name="EOYVote"]');
     const formVisible = await form.isVisible().catch(() => false);
@@ -89,6 +103,10 @@ test.describe('Waivers disabled', () => {
   }) => {
     await appState({ 'Allow Waiver Moves': 'No' });
     await page.goto('modules.php?name=Waivers');
+
+    // Positive: the page rendered its content shell (Waivers is a public,
+    // read-only view — no loginBox), so a blank PHP crash would fail here.
+    await expect(page.locator('#site-content')).toBeVisible();
 
     // Should NOT show waiver claim form elements
     const waiverForm = page.locator('form[name="waiver_add"], .waiver-form');

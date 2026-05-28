@@ -107,13 +107,9 @@ test.describe('ASG Voting: validation errors', () => {
       hasText: /submit votes/i,
     });
 
-    await Promise.all([
-      page.waitForNavigation(),
-      submitBtn.first().click(),
-    ]);
+    await submitBtn.first().click();
 
-    const body = await page.locator('body').textContent();
-    expect(body).toContain('less than FOUR');
+    await expect(page.locator('body')).toContainText('less than FOUR');
   });
 
   test('no PHP errors on validation page', async ({ appState, page }) => {
@@ -140,10 +136,8 @@ test.describe('ASG Voting: validation errors', () => {
       hasText: /submit votes/i,
     });
 
-    await Promise.all([
-      page.waitForNavigation(),
-      submitBtn.first().click(),
-    ]);
+    await submitBtn.first().click();
+    await page.waitForLoadState('domcontentloaded');
 
     await assertNoPhpErrors(page, 'after ASG validation error');
   });
@@ -200,13 +194,9 @@ test.describe('EOY Voting: validation errors', () => {
       hasText: /submit votes/i,
     });
 
-    await Promise.all([
-      page.waitForNavigation(),
-      submitBtn.first().click(),
-    ]);
+    await submitBtn.first().click();
 
-    const body = await page.locator('body').textContent();
-    expect(body).toContain('you must select an MVP');
+    await expect(page.locator('body')).toContainText('you must select an MVP');
   });
 
   test('duplicate EOY selections shows error', async ({ appState, page }) => {
@@ -280,13 +270,11 @@ test.describe('EOY Voting: validation errors', () => {
       hasText: /submit votes/i,
     });
 
-    await Promise.all([
-      page.waitForNavigation(),
-      submitBtn.first().click(),
-    ]);
+    await submitBtn.first().click();
 
-    const body = await page.locator('body').textContent();
-    expect(body).toContain('same player for multiple MVP slots');
+    await expect(page.locator('body')).toContainText(
+      'same player for multiple MVP slots',
+    );
   });
 });
 

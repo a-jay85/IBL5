@@ -137,6 +137,62 @@ export async function resetVote(
   }
 }
 
+export interface SeedResetUser {
+  username: string;
+  email: string;
+  selector: string;
+  token: string;
+  oldPassword: string;
+}
+
+export interface SeedConfirmUser {
+  username: string;
+  email: string;
+  selector: string;
+  token: string;
+}
+
+/**
+ * Seed a VERIFIED `e2e_reset_*` account and return a usable password-reset
+ * selector/token pair (minted by delight-auth, since the reset row stores a
+ * password_hash digest a raw INSERT cannot reproduce). Clean up with
+ * deleteTestUser(request, result.username).
+ */
+export async function seedResetUser(
+  request: APIRequestContext,
+): Promise<SeedResetUser> {
+  const response = await request.post(
+    'test-state.php?action=seed-reset-user',
+    { data: {} },
+  );
+  if (!response.ok()) {
+    throw new Error(
+      `seed-reset-user failed: ${response.status()} ${await response.text()}`,
+    );
+  }
+  return (await response.json()) as SeedResetUser;
+}
+
+/**
+ * Seed an UNVERIFIED `e2e_confirm_*` account and return the confirmation
+ * selector/token pair so the confirm_email success round-trip can run.
+ * Clean up with deleteTestUser(request, result.username).
+ */
+export async function seedConfirmUser(
+  request: APIRequestContext,
+): Promise<SeedConfirmUser> {
+  const response = await request.post(
+    'test-state.php?action=seed-confirm-user',
+    { data: {} },
+  );
+  if (!response.ok()) {
+    throw new Error(
+      `seed-confirm-user failed: ${response.status()} ${await response.text()}`,
+    );
+  }
+  return (await response.json()) as SeedConfirmUser;
+}
+
 export type SetStateFn = (settings: Settings) => Promise<SetStateResult>;
 
 /**

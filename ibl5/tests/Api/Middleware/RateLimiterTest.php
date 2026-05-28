@@ -151,4 +151,39 @@ class RateLimiterTest extends TestCase
         $rateLimiter->check($apiKey);
         $this->assertSame(['increment', 'getRequestCount'], $callOrder);
     }
+
+    // ==================== limitHeaders (always-on tier advertisement) ====================
+
+    public function testLimitHeadersAdvertisesStandardLimit(): void
+    {
+        $rateLimiter = new RateLimiter($this->createStub(RateLimitRepository::class));
+        $this->assertSame(
+            ['X-RateLimit-Limit' => '60'],
+            $rateLimiter->limitHeaders($this->makeApiKey('standard')),
+        );
+    }
+
+    public function testLimitHeadersAdvertisesElevatedLimit(): void
+    {
+        $rateLimiter = new RateLimiter($this->createStub(RateLimitRepository::class));
+        $this->assertSame(
+            ['X-RateLimit-Limit' => '300'],
+            $rateLimiter->limitHeaders($this->makeApiKey('elevated')),
+        );
+    }
+
+    public function testLimitHeadersAreEmptyForUnlimitedTier(): void
+    {
+        $rateLimiter = new RateLimiter($this->createStub(RateLimitRepository::class));
+        $this->assertSame([], $rateLimiter->limitHeaders($this->makeApiKey('unlimited')));
+    }
+
+    public function testLimitHeadersUnknownTierDefaultsToStandard(): void
+    {
+        $rateLimiter = new RateLimiter($this->createStub(RateLimitRepository::class));
+        $this->assertSame(
+            ['X-RateLimit-Limit' => '60'],
+            $rateLimiter->limitHeaders($this->makeApiKey('mystery_tier')),
+        );
+    }
 }

@@ -65,6 +65,28 @@ class RateLimiter implements RateLimiterInterface
     }
 
     /**
+     * Rate-limit headers advertised on every successful request so a client (or
+     * test) can observe its tier without firing enough requests to hit the
+     * limit. Limit-only by design: X-RateLimit-Remaining would require the live
+     * count and couple this pure method to the repository. The unlimited tier
+     * advertises nothing (there is no limit to report).
+     *
+     * @param array{rate_limit_tier: string} $apiKey
+     * @return array<string, string>
+     */
+    public function limitHeaders(array $apiKey): array
+    {
+        $tier = $apiKey['rate_limit_tier'];
+        $limit = self::TIER_LIMITS[$tier] ?? self::TIER_LIMITS['standard'];
+
+        if ($limit === 0) {
+            return [];
+        }
+
+        return ['X-RateLimit-Limit' => (string) $limit];
+    }
+
+    /**
      * ~1% probability cleanup of old rate limit entries.
      */
     private function maybePrune(): void

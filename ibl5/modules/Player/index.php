@@ -195,4 +195,14 @@ switch ($pa) {
     case "showpage":
         showpage($pid, $pageView);
         break;
+
+    default:
+        // No (or unrecognized) action: the Player module has no landing view, but
+        // a bare `?name=Player` request must still paint content — a blank 200
+        // body fails Lighthouse with NO_FCP. Render page chrome with a notice.
+        PageLayout\PageLayout::header();
+        echo '<div class="ibl-alert ibl-alert--info">No player selected. Choose a player from a roster, leaderboard, or search to view their archives.</div>';
+        echo '<a href="index.php" class="ibl-btn ibl-btn--primary" style="margin-top: 0.5rem; display: inline-block;">Return to Home</a>';
+        PageLayout\PageLayout::footer();
+        break;
 }

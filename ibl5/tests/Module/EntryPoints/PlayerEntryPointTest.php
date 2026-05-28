@@ -17,20 +17,22 @@ use Tests\WideUnit\Mocks\TestDataFactory;
 #[PreserveGlobalState(false)]
 class PlayerEntryPointTest extends ModuleEntryPointTestCase
 {
-    public function testMissingPaShowsNothing(): void
+    public function testMissingPaRendersNoPlayerSelectedNotice(): void
     {
         $this->mockDb->setMockData([]);
         $output = $this->runModule('Player');
 
-        $this->assertSame('', $output);
+        $this->assertNotEmpty($output);
+        $this->assertStringContainsString('No player selected', $output);
     }
 
-    public function testInvalidPaShowsNothing(): void
+    public function testInvalidPaRendersNoPlayerSelectedNotice(): void
     {
         $this->mockDb->setMockData([]);
         $output = $this->runModule('Player', ['pa' => 'bogus']);
 
-        $this->assertSame('', $output);
+        $this->assertNotEmpty($output);
+        $this->assertStringContainsString('No player selected', $output);
     }
 
     private function seedShowpageMocks(array $playerOverrides = []): void

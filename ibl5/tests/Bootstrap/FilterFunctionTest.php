@@ -10,7 +10,6 @@ final class FilterFunctionTest extends TestCase
 {
     protected function setUp(): void
     {
-        /** @phpstan-ignore ibl.requireOnce (loading legacy functions for characterization tests) */
         require_once __DIR__ . '/../../classes/Bootstrap/LegacyFunctions.php';
     }
 

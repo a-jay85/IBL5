@@ -22,7 +22,6 @@ final class AuthServiceUsernameTest extends TestCase
         }
         unset($_SESSION['auth_user_id'], $_SESSION['auth_username'], $_SESSION['auth_roles']);
 
-        /** @phpstan-ignore ibl.requireOnce (loading legacy functions for characterization tests) */
         require_once __DIR__ . '/../../classes/Bootstrap/LegacyFunctions.php';
     }
 

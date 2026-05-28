@@ -1,0 +1,10 @@
+[
+  {
+    "url": "http://localhost:8080/ibl5/index.php",
+    "summary": { "performance": 0.92, "accessibility": 0.96, "best-practices": 0.91 }
+  },
+  {
+    "url": "http://localhost:8080/ibl5/modules.php?name=Standings",
+    "summary": { "performance": 0.85, "accessibility": 0.93, "best-practices": 0.88 }
+  }
+]

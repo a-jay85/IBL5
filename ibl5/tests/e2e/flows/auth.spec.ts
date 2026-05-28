@@ -77,15 +77,11 @@ test.describe('Login page', () => {
     await loginForm.locator('#login-password').fill('wrong_password_123');
     await loginForm.locator('button[type="submit"]').click();
 
-    await page.waitForLoadState('domcontentloaded');
-
-    // Should stay on login page or show error
-    const body = await page.locator('body').textContent();
-    const hasError =
-      body?.match(/incorrect|invalid|error|failed/i) ||
-      page.url().includes('YourAccount');
-
-    expect(hasError).toBeTruthy();
+    // Deterministic: the rendered login error must be visible AND we must
+    // remain on YourAccount. (No `|| url.includes('YourAccount')` escape — that
+    // clause was always true and made the test green regardless of the error.)
+    await expect(page.getByText(/login was incorrect/i)).toBeVisible();
+    expect(page.url()).toContain('name=YourAccount');
   });
 
   test('no PHP errors on login page', async ({ page }) => {
@@ -100,16 +96,83 @@ test.describe('Login required redirect', () => {
   }) => {
     await page.goto('modules.php?name=DepthChartEntry');
 
-    // Should see login form or redirect to login
-    const loginForm = page.locator('#login-username');
-    const signInText = page.getByText('Sign In');
+    // loginbox() emits a JS redirect to YourAccount for unauthenticated users.
+    // Deterministic: wait for that redirect, then confirm the login form
+    // rendered. (No three-way OR with an always-true URL clause.)
+    await page.waitForURL(/name=YourAccount/, { timeout: 10_000 });
+    await expect(page.locator('#login-username')).toBeVisible();
+  });
+});
 
-    // Either the login form is shown inline or we're redirected to YourAccount
-    const hasLoginForm = (await loginForm.count()) > 0;
-    const hasSignInText = (await signInText.count()) > 0;
-    const isOnLoginPage = page.url().includes('YourAccount');
+// ============================================================
+// Remember me — drives the login form with the checkbox on/off and inspects
+// the resulting cookies. delight-auth's persistent cookie name is a hash of
+// the session name (not the literal `auth_remember`), so we assert on the
+// observable discriminator: a long-lived cookie (90-day expiry) appears only
+// when remember-me is checked. Public fixture (fresh context per test).
+// ============================================================
 
-    expect(hasLoginForm || hasSignInText || isOnLoginPage).toBeTruthy();
+test.describe('Remember me cookie', () => {
+  const username = process.env.IBL_TEST_USER;
+  const password = process.env.IBL_TEST_PASS;
+  // delight-auth names its persistent cookie `remember_<hash-of-session-name>`,
+  // not the literal `auth_remember`. Matching the prefix isolates it from the
+  // always-present `lang` / `PHPSESSID` cookies (which are persistent too).
+  const REMEMBER_PREFIX = /^remember_/;
+  // 30 days: above a session cookie, below the 90-day remember lifetime.
+  const PERSISTENT_THRESHOLD_S = 30 * 24 * 60 * 60;
+
+  test.beforeAll(() => {
+    expect(username, 'IBL_TEST_USER must be set').toBeTruthy();
+    expect(password, 'IBL_TEST_PASS must be set').toBeTruthy();
+  });
+
+  async function loginWithRemember(
+    page: import('@playwright/test').Page,
+    remember: boolean,
+  ): Promise<void> {
+    await page.goto('modules.php?name=YourAccount');
+    const loginForm = page.locator('form', {
+      has: page.locator('#login-username'),
+    });
+    await loginForm.locator('#login-username').fill(username!);
+    await loginForm.locator('#login-password').fill(password!);
+    if (remember) {
+      await loginForm.locator('input[name="remember_me"]').check();
+    }
+    await loginForm.locator('button[type="submit"]').click();
+    await page.waitForURL((url) => !url.href.includes('name=YourAccount'), {
+      timeout: 10_000,
+    });
+  }
+
+  test('checked remember-me sets a long-lived remember cookie', async ({
+    page,
+  }) => {
+    await loginWithRemember(page, true);
+
+    const cookies = await page.context().cookies();
+    const nowS = Date.now() / 1000;
+    const remember = cookies.filter((c) => REMEMBER_PREFIX.test(c.name));
+    expect(
+      remember,
+      'a remember_ cookie should be set when remember-me is checked',
+    ).toHaveLength(1);
+    expect(
+      remember[0].expires,
+      'the remember cookie should be long-lived, not session-scoped',
+    ).toBeGreaterThan(nowS + PERSISTENT_THRESHOLD_S);
+  });
+
+  test('unchecked remember-me sets no remember cookie', async ({ page }) => {
+    await loginWithRemember(page, false);
+
+    const cookies = await page.context().cookies();
+    const remember = cookies.filter((c) => REMEMBER_PREFIX.test(c.name));
+    expect(
+      remember,
+      'no remember_ cookie should be set without remember-me',
+    ).toHaveLength(0);
   });
 });
 

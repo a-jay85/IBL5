@@ -92,4 +92,28 @@ class TeamApiHandlerTest extends TestCase
         $url = TeamApiHandler::buildPushUrl(7, 'ratings', null, null);
         self::assertSame('modules.php?name=Team&op=team&teamid=7&display=ratings', $url);
     }
+
+    // ==================== Unknown-team guard ====================
+
+    public function testIsUnknownTeamFlagsPositiveIdWithNoRow(): void
+    {
+        self::assertTrue(TeamApiHandler::isUnknownTeam(99999, null));
+    }
+
+    public function testIsUnknownTeamAcceptsExistingTeam(): void
+    {
+        self::assertFalse(TeamApiHandler::isUnknownTeam(1, ['team_name' => 'Metros']));
+    }
+
+    public function testIsUnknownTeamTreatsFreeAgentsAsServable(): void
+    {
+        // teamid=0 → free agents, handled by TeamTableService; never a 404.
+        self::assertFalse(TeamApiHandler::isUnknownTeam(0, null));
+    }
+
+    public function testIsUnknownTeamTreatsEntireLeagueAsServable(): void
+    {
+        // teamid=-1 → entire league roster; never a 404.
+        self::assertFalse(TeamApiHandler::isUnknownTeam(-1, null));
+    }
 }

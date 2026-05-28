@@ -1,5 +1,7 @@
 import { test, expect } from '../fixtures/public';
 import { assertNoPhpErrors } from '../helpers/php-errors';
+import { seedResetUser, type SeedResetUser } from '../helpers/test-state';
+import { deleteTestUser } from '../helpers/cleanup';
 
 // Password reset flow — uses public (unauthenticated) fixture.
 // Full end-to-end reset not covered: intercepting the password-reset email
@@ -87,5 +89,74 @@ test.describe('Password reset flow', () => {
     await expect(
       page.locator('input[name="op"][value="do_reset_password"]'),
     ).toBeAttached();
+  });
+});
+
+// Full do_reset_password round-trip against a real, library-minted reset token.
+// A dedicated e2e_reset_* user (seeded VERIFIED so forgotPassword can issue a
+// token) keeps the shared IBL_TEST_USER password untouched. Serial: the three
+// tests share one seeded account whose password Test 1 changes.
+test.describe('Password reset round-trip', () => {
+  test.describe.configure({ mode: 'serial' });
+
+  const NEW_PASSWORD = 'ResetNewPass456!';
+  let seeded: SeedResetUser;
+
+  test.beforeAll(async ({ request }) => {
+    seeded = await seedResetUser(request);
+  });
+
+  test.afterAll(async ({ request }) => {
+    await deleteTestUser(request, seeded.username);
+  });
+
+  test('do_reset_password with valid token sets the new password', async ({
+    page,
+  }) => {
+    await page.goto(
+      `modules.php?name=YourAccount&op=reset_password&selector=${seeded.selector}&token=${seeded.token}`,
+    );
+    // Driving the form submits the reset form's own CSRF token; the layout also
+    // renders login forms with their own tokens, so manual extraction would
+    // grab the wrong one.
+    await page.locator('#reset-new-password').fill(NEW_PASSWORD);
+    await page.locator('#reset-confirm-password').fill(NEW_PASSWORD);
+    await page
+      .locator('form:has(input[name="op"][value="do_reset_password"]) button[type="submit"]')
+      .click();
+
+    await expect(page.locator('.auth-status__title')).toContainText(
+      /password changed/i,
+    );
+    await expect(page.locator('body')).toContainText(/password has been reset/i);
+    await assertNoPhpErrors(page, 'after do_reset_password');
+  });
+
+  test('new password logs in successfully', async ({ page }) => {
+    await page.goto('modules.php?name=YourAccount');
+    const loginForm = page.locator('form', {
+      has: page.locator('#login-username'),
+    });
+    await loginForm.locator('#login-username').fill(seeded.username);
+    await loginForm.locator('#login-password').fill(NEW_PASSWORD);
+    await loginForm.locator('button[type="submit"]').click();
+
+    await page.waitForURL((url) => !url.href.includes('name=YourAccount'), {
+      timeout: 10_000,
+    });
+    expect(page.url()).not.toContain('name=YourAccount');
+  });
+
+  test('old password no longer logs in', async ({ page }) => {
+    await page.goto('modules.php?name=YourAccount');
+    const loginForm = page.locator('form', {
+      has: page.locator('#login-username'),
+    });
+    await loginForm.locator('#login-username').fill(seeded.username);
+    await loginForm.locator('#login-password').fill(seeded.oldPassword);
+    await loginForm.locator('button[type="submit"]').click();
+
+    await expect(page.getByText(/login was incorrect/i)).toBeVisible();
+    expect(page.url()).toContain('name=YourAccount');
   });
 });

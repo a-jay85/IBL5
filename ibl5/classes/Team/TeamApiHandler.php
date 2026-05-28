@@ -24,13 +24,14 @@ class TeamApiHandler
     ];
 
     private \mysqli $db;
+    private TeamRepository $repository;
     private TeamTableService $tableService;
 
     public function __construct(\mysqli $db)
     {
         $this->db = $db;
-        $repository = new TeamRepository($db);
-        $this->tableService = new TeamTableService($db, $repository);
+        $this->repository = new TeamRepository($db);
+        $this->tableService = new TeamTableService($db, $this->repository);
     }
 
     public function handle(): void
@@ -38,6 +39,17 @@ class TeamApiHandler
         header('Content-Type: text/html; charset=utf-8');
 
         $teamid = isset($_GET['teamid']) && is_string($_GET['teamid']) ? (int) $_GET['teamid'] : 0;
+
+        // Guard unknown teams with a 404 before Team initialization would throw
+        // a 500. Pseudo-teams 0 (free agents) and -1 (entire league roster) are
+        // valid and handled by TeamTableService, so only positive ids are
+        // checked against ibl_team_info.
+        $teamRow = $teamid > 0 ? $this->repository->getTeam($teamid) : null;
+        if (self::isUnknownTeam($teamid, $teamRow)) {
+            http_response_code(404);
+            (new \Api\Response\HtmlResponder())->html('Unknown team.');
+            return;
+        }
 
         $display = self::extractValidatedDisplay($_GET);
         $yr = self::extractValidatedYr($_GET);
@@ -59,6 +71,22 @@ class TeamApiHandler
 
         $responder = new \Api\Response\HtmlResponder();
         $responder->html($this->tableService->getTableOutput($teamid, $yr, $display, $split));
+    }
+
+    /**
+     * Whether a teamid has no servable team. Pseudo-teams 0 (free agents) and
+     * -1 (entire league roster) are always servable; a positive teamid is
+     * unknown only when no ibl_team_info row exists for it.
+     *
+     * @param array<mixed>|null $teamRow result of TeamRepository::getTeam()
+     */
+    public static function isUnknownTeam(int $teamid, ?array $teamRow): bool
+    {
+        if ($teamid <= 0) {
+            return false;
+        }
+
+        return $teamRow === null;
     }
 
     /** @param array<mixed> $params */

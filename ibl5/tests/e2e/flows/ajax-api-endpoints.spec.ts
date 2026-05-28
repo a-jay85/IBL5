@@ -163,14 +163,15 @@ test.describe('Team API', () => {
     expect(pushUrl).toContain('teamid=1');
   });
 
-  test('invalid teamID returns error response', async ({ request }) => {
+  test('invalid teamID returns a 4xx client error', async ({ request }) => {
     const response = await request.get(
       'modules.php?name=Team&op=api&teamid=99999&display=ratings',
     );
 
-    // Invalid teamID currently returns 500 (Team::initialize fails).
-    // Verify it returns a response at all (doesn't hang/timeout).
-    expect([200, 500]).toContain(response.status());
+    // An unknown teamID is a client error: TeamApiHandler guards it with a 404
+    // before Team initialization would otherwise throw a 500.
+    expect(response.status()).toBeGreaterThanOrEqual(400);
+    expect(response.status()).toBeLessThan(500);
   });
 });
 

@@ -1,6 +1,7 @@
 import { test, expect } from '../fixtures/public';
 import { assertNoPhpErrors } from '../helpers/php-errors';
 import { deleteTestUser } from '../helpers/cleanup';
+import { seedConfirmUser, type SeedConfirmUser } from '../helpers/test-state';
 
 // YourAccount flow tests — registration, forgot password, activation errors,
 // reset password. Login/logout is covered in login-logout.spec.ts.
@@ -59,10 +60,7 @@ test.describe('Registration validation errors', () => {
       hasText: /create account/i,
     });
 
-    await Promise.all([
-      page.waitForNavigation(),
-      submitBtn.click(),
-    ]);
+    await submitBtn.click();
 
     await expect(page.locator('.ibl-alert--error')).toContainText(
       /passwords you entered do not match/i,
@@ -81,10 +79,7 @@ test.describe('Registration validation errors', () => {
       hasText: /create account/i,
     });
 
-    await Promise.all([
-      page.waitForNavigation(),
-      submitBtn.click(),
-    ]);
+    await submitBtn.click();
 
     await expect(page.locator('.ibl-alert--error')).toContainText(
       /password must be at least/i,
@@ -103,15 +98,11 @@ test.describe('Registration validation errors', () => {
       hasText: /create account/i,
     });
 
-    await Promise.all([
-      page.waitForNavigation(),
-      submitBtn.click(),
-    ]);
+    await submitBtn.click();
 
     // Global username guard (index.php line 23) fires before form handler,
     // rendering plain text "Illegal username..." via die()
-    const body = await page.locator('body').textContent();
-    expect(body).toMatch(/illegal username/i);
+    await expect(page.locator('body')).toContainText(/illegal username/i);
   });
 });
 
@@ -130,14 +121,10 @@ test.describe('Registration: duplicate username', () => {
       hasText: /create account/i,
     });
 
-    await Promise.all([
-      page.waitForNavigation(),
-      submitBtn.click(),
-    ]);
+    await submitBtn.click();
 
     // Should show error about username already being taken
-    const body = await page.locator('body').textContent();
-    expect(body).toMatch(/already|taken|exists|in use/i);
+    await expect(page.locator('body')).toContainText(/already|taken|exists|in use/i);
   });
 });
 
@@ -181,15 +168,13 @@ test.describe('Registration: successful submission', () => {
       hasText: /create account/i,
     });
 
-    await Promise.all([
-      page.waitForNavigation(),
-      submitBtn.click(),
-    ]);
+    await submitBtn.click();
 
     // Success page shows "Account Created" with activation email confirmation
     await expect(page.locator('.auth-status__icon--success')).toBeVisible();
-    const body = await page.locator('body').textContent();
-    expect(body).toMatch(/account created|activation email/i);
+    await expect(page.locator('body')).toContainText(
+      /account created|activation email/i,
+    );
 
     // The afterEach hook above asserts the auth_users row was actually
     // written (deleted === 1). That's the DB-level proof — a passing
@@ -261,10 +246,7 @@ test.describe('Forgot password submission', () => {
       hasText: /send reset link/i,
     });
 
-    await Promise.all([
-      page.waitForNavigation(),
-      submitBtn.click(),
-    ]);
+    await submitBtn.click();
 
     await expect(page.locator('.auth-status__title')).toContainText(
       /check your email/i,
@@ -291,6 +273,33 @@ test.describe('Email activation error pages', () => {
     );
     const body = await page.locator('body').textContent();
     expect(body).toMatch(/expired or is invalid/i);
+  });
+});
+
+test.describe('Email activation success', () => {
+  let seeded: SeedConfirmUser;
+
+  test.beforeEach(async ({ request }) => {
+    seeded = await seedConfirmUser(request);
+  });
+
+  test.afterEach(async ({ request }) => {
+    await deleteTestUser(request, seeded.username);
+  });
+
+  test('confirm_email with valid token activates the account', async ({
+    page,
+  }) => {
+    await page.goto(
+      `modules.php?name=YourAccount&op=confirm_email&selector=${seeded.selector}&token=${seeded.token}`,
+    );
+
+    await expect(page.locator('.auth-status__title')).toContainText(
+      /account activated/i,
+    );
+    // renderActivationSuccessPage echoes the username in a <strong> tag.
+    await expect(page.locator('body')).toContainText(seeded.username);
+    await assertNoPhpErrors(page, 'after confirm_email success');
   });
 });
 

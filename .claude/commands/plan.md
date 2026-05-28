@@ -11,7 +11,9 @@ last_verified: 2026-05-28
 
 You are planning an implementation task. The user's request follows this skill's instructions as `$ARGUMENTS`.
 
-**Do NOT write or edit any code files.** This skill produces a plan only. The single output is the plan file.
+**Do NOT write or edit any code files.** This skill produces a plan only. The output is one plan file per PR.
+
+**One plan = one PR.** A single plan file must be implementable and mergeable as exactly one pull request. If the work naturally spans multiple PRs (independent concerns, separate review surfaces, a refactor that should land before the feature that uses it, or a change too large to review in one sitting), do NOT bundle them. Split the work into PR-sized units and produce a separate, fully self-contained plan — its own implementation steps and its own Verification Matrix — for each one. The user should never have to ask for this split.
 
 ## Step 1: Verification rule
 
@@ -35,13 +37,28 @@ Provide each agent a single concrete question, pre-resolved paths, and a respons
 
 Collect: file paths, existing patterns, dependencies, blast radius, existing test coverage for affected code.
 
+## Step 2.5: Scope into PRs
+
+Using the blast radius from Step 2, decide how many PRs the work requires. Default to **one** — most tasks are a single PR. Split into multiple only when a boundary is real:
+
+- Independent concerns that can land and be reviewed separately
+- A refactor/extraction that should merge before the feature that depends on it (stacked PRs)
+- A change large enough that one reviewer cannot reasonably review it in a single sitting
+- Distinct migrations or schema changes that each warrant their own rollback boundary
+
+If the work is **one PR**, proceed to Step 3 once.
+
+If the work is **multiple PRs**, list the PR-sized units in dependency order (what must merge first), then run Steps 3–5 **once per unit** — each producing its own plan file. Plans for stacked PRs should note their base branch in the implementation steps (`bin/wt-new --base <branch>`). Do not collapse the units back into one plan to "save effort" — the split is the deliverable.
+
 ## Step 3: Design the plan
+
+Run this step once per PR-sized unit identified in Step 2.5. Each run plans exactly one PR.
 
 The Plan agent auto-loads CLAUDE.md, all always-loaded rules (agent-tiering, core-coding, plan-verification, etc.), and user memory. Do NOT re-inject any of these into the prompt — only supply what the agent cannot get on its own.
 
 Launch a **single Plan agent** (`model: "opus"`) with a prompt containing ALL of these:
 
-1. **Task description** from `$ARGUMENTS`
+1. **Task description** from `$ARGUMENTS` — when the work was split in Step 2.5, scope this to the single PR being planned and state which PR it is and what it depends on
 2. **Exploration results** from Step 2 — file paths, code traces, existing patterns, test coverage findings
 3. **The full `$VERIFICATION_RULE`** from Step 1, prefixed with: `MANDATORY — you must follow this rule exactly:`
 
@@ -81,11 +98,12 @@ PLAN_PATH="$HOME/.claude/plans/<slug>.md"
 
 If a plan file already exists at that path, create a new one with a numeric suffix rather than overwriting.
 
-Write the validated plan (with corrected matrix if Step 4 required fixes) to the plan file.
+Write the validated plan (with corrected matrix if Step 4 required fixes) to the plan file. When the work was split into multiple PRs, give each plan a distinct slug (e.g. `<base-slug>-1-<unit>`, `<base-slug>-2-<unit>`) so they sort in dependency order, and write one file per unit.
 
 ## Step 6: Report
 
 Tell the user:
-- The plan file path
-- A one-line matrix summary (e.g., "12 items: 7 PHPUnit, 3 E2E, 2 CLI-executable, 0 truly-manual")
-- Whether the plan is ready for implementation or has open questions
+- The plan file path — **all of them** when the work was split into multiple PRs
+- A one-line matrix summary per plan (e.g., "12 items: 7 PHPUnit, 3 E2E, 2 CLI-executable, 0 truly-manual")
+- For a multi-PR split: the PR sequence and dependency order (which lands first, what each stacks on)
+- Whether each plan is ready for implementation or has open questions

@@ -1,7 +1,11 @@
 import { test, expect } from '../fixtures/public';
 
-const API_KEY = 'e2e-test-key-do-not-use-in-production'; // ci-seed.sql:1524
+const API_KEY = 'e2e-test-key-do-not-use-in-production'; // ci-seed.sql (unlimited tier)
 const AUTH_HEADERS = { 'X-API-Key': API_KEY };
+
+const STANDARD_KEY = 'e2e-standard-tier-key'; // ci-seed.sql, rate_limit_tier=standard
+const REVOKED_KEY = 'e2e-revoked-key'; // ci-seed.sql, is_active=0
+const WRONG_KEY = `wrong-${'f'.repeat(40)}`; // valid format, never seeded
 
 const PLAYER_UUID = 'a0000000-0000-0000-0000-000000000001'; // pid=1, Test Player
 const TEAM_UUID = 'b0000000-0000-0000-0000-000000000001'; // teamid=1, Metros
@@ -45,6 +49,44 @@ test.describe('api/v1 REST contract', () => {
     expectJsonEnvelope(response, 401);
     const body = await response.json();
     expect(body.error.code).toBe('unauthorized');
+  });
+
+  test('GET api/v1/players with a wrong (valid-format) key returns 401', async ({
+    request,
+  }) => {
+    const response = await request.get('api/v1/players', {
+      headers: { 'X-API-Key': WRONG_KEY },
+    });
+    expectJsonEnvelope(response, 401);
+    const body = await response.json();
+    expect(body.error.code).toBe('unauthorized');
+  });
+
+  test('GET api/v1/players with a revoked key returns 401', async ({
+    request,
+  }) => {
+    // is_active=0 → ApiKeyRepository::findByHash resolves null → 401, same as
+    // an unknown key (there is no separate "forbidden" path for keys today).
+    const response = await request.get('api/v1/players', {
+      headers: { 'X-API-Key': REVOKED_KEY },
+    });
+    expectJsonEnvelope(response, 401);
+    const body = await response.json();
+    expect(body.error.code).toBe('unauthorized');
+  });
+
+  test('rate-limit tier is observable: standard key emits X-RateLimit-Limit, unlimited does not', async ({
+    request,
+  }) => {
+    const standard = await request.get('api/v1/players', {
+      headers: { 'X-API-Key': STANDARD_KEY },
+    });
+    expect(standard.status()).toBe(200);
+    expect(standard.headers()['x-ratelimit-limit']).toBe('60');
+
+    const unlimited = await getJson(request, 'api/v1/players');
+    expect(unlimited.status()).toBe(200);
+    expect(unlimited.headers()['x-ratelimit-limit']).toBeUndefined();
   });
 
   test('GET api/v1/players/{uuid} returns seeded player', async ({ request }) => {

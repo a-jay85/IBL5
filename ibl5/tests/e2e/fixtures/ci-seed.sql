@@ -1642,6 +1642,30 @@ VALUES (
   1
 ) ON DUPLICATE KEY UPDATE is_active = 1;
 
+-- Standard-tier key — exercises the X-RateLimit-Limit: 60 tier signal.
+-- Raw key: "e2e-standard-tier-key"
+INSERT INTO ibl_api_keys (key_hash, key_prefix, owner_name, permission_level, rate_limit_tier, is_active)
+VALUES (
+  SHA2('e2e-standard-tier-key', 256),
+  'e2e-std',
+  'E2E Standard Tier',
+  'public',
+  'standard',
+  1
+) ON DUPLICATE KEY UPDATE is_active = 1, rate_limit_tier = 'standard';
+
+-- Revoked key (is_active = 0) — every lookup resolves to null → 401.
+-- Raw key: "e2e-revoked-key"
+INSERT INTO ibl_api_keys (key_hash, key_prefix, owner_name, permission_level, rate_limit_tier, is_active)
+VALUES (
+  SHA2('e2e-revoked-key', 256),
+  'e2e-rvk',
+  'E2E Revoked Key',
+  'public',
+  'standard',
+  0
+) ON DUPLICATE KEY UPDATE is_active = 0;
+
 
 -- ============================================================
 -- Voting Results test data (ASG and EOY ballots)

@@ -35,6 +35,13 @@ class RateLimitingBootstrap implements BootstrapStepInterface
             $responder = $container->get('api.responder');
             $responder->error(429, 'rate_limit_exceeded', 'Rate limit exceeded. Try again later.', $rateLimitResult);
             $container->set('app.terminated', true);
+            return;
+        }
+
+        // Advertise the tier's limit on successful requests so clients can
+        // observe their tier without firing enough requests to trip the limit.
+        foreach ($rateLimiter->limitHeaders($apiKey) as $name => $value) {
+            header($name . ': ' . $value);
         }
     }
 }

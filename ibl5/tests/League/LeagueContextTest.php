@@ -109,8 +109,12 @@ class LeagueContextTest extends TestCase
     public function testSetLeagueIbl(): void
     {
         $this->leagueContext->setLeague('ibl');
-        
-        $this->assertEquals('ibl', $_SESSION['current_league']);
+
+        // setLeague stores the selection in-memory (not $_SESSION) so it is
+        // immediately observable for the rest of the request without leaking
+        // into the shared E2E server session.
+        $this->assertEquals('ibl', $this->leagueContext->getCurrentLeague());
+        $this->assertArrayNotHasKey('current_league', $_SESSION);
     }
 
     /**
@@ -119,8 +123,9 @@ class LeagueContextTest extends TestCase
     public function testSetLeagueOlympics(): void
     {
         $this->leagueContext->setLeague('olympics');
-        
-        $this->assertEquals('olympics', $_SESSION['current_league']);
+
+        $this->assertEquals('olympics', $this->leagueContext->getCurrentLeague());
+        $this->assertArrayNotHasKey('current_league', $_SESSION);
     }
 
     /**

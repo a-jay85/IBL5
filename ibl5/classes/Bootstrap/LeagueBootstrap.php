@@ -20,15 +20,13 @@ class LeagueBootstrap implements BootstrapStepInterface
      */
     public function boot(ContainerInterface $container): void
     {
-        // Hydrate session from cookie if not set
-        if (!isset($_SESSION['current_league']) && isset($_COOKIE[LeagueContext::COOKIE_NAME])) {
-            $cookieLeague = $_COOKIE[LeagueContext::COOKIE_NAME];
-            if (in_array($cookieLeague, [LeagueContext::LEAGUE_IBL, LeagueContext::LEAGUE_OLYMPICS], true)) {
-                $_SESSION['current_league'] = $cookieLeague;
-            }
-        }
-
-        // Initialize global LeagueContext instance
+        // Initialize global LeagueContext instance.
+        // Persistence across requests is read directly from the cookie by
+        // LeagueContext::getCurrentLeague(); we intentionally do NOT hydrate
+        // $_SESSION from the cookie. The E2E harness shares one server-side
+        // session across all authenticated workers, so any session write of the
+        // current league leaks one test's Olympics switch into every other
+        // concurrent test.
         $leagueContext = new LeagueContext();
 
         // Persist league selection when user switches via URL parameter

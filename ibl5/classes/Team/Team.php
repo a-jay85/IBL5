@@ -15,7 +15,7 @@ use League\League;
  * @see BaseMysqliRepository For base class documentation and error codes
  *
  *
- * @phpstan-type TeamWithStandingsRow array{teamid: int, team_city: string, team_name: string, color1: string, color2: string, arena: string, capacity: int, owner_name: string, owner_email: string, discord_id: ?int, used_extension_this_chunk: int, used_extension_this_season: ?int, has_mle: int, has_lle: int, league_record: ?string, ...}
+ * @phpstan-type TeamWithStandingsRow array{teamid: int, team_city: string, team_name: string, color1: string, color2: string, arena: string, capacity: int, owner_name: string, owner_email: string, discord_id: ?int, used_extension_this_chunk?: int, used_extension_this_season?: ?int, has_mle?: int, has_lle?: int, league_record: ?string, ...}
  */
 class Team extends \BaseMysqliRepository
 {
@@ -144,10 +144,13 @@ class Team extends \BaseMysqliRepository
         $discordId = $teamRow['discord_id'] ?? null;
         $this->discord_id = $discordId;
 
-        $this->hasUsedExtensionThisSim = $teamRow['used_extension_this_chunk'];
+        // Extension / MLE / LLE are IBL salary-cap concepts; the Olympics
+        // team_info table omits these columns, so SELECT * yields a row without
+        // these keys. Default to 0 rather than fataling on the typed int props.
+        $this->hasUsedExtensionThisSim = $teamRow['used_extension_this_chunk'] ?? 0;
         $this->hasUsedExtensionThisSeason = $teamRow['used_extension_this_season'] ?? 0;
-        $this->has_mle = $teamRow['has_mle'];
-        $this->has_lle = $teamRow['has_lle'];
+        $this->has_mle = $teamRow['has_mle'] ?? 0;
+        $this->has_lle = $teamRow['has_lle'] ?? 0;
 
         /** @var string|null $leagueRecord */
         $leagueRecord = $teamRow['league_record'] ?? null;

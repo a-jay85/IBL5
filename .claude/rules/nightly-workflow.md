@@ -1,6 +1,6 @@
 ---
 description: Nightly autonomous workflow — launchd fires claude -p at 00:03 and 05:03 daily, running two context-isolated agents per plan (implementation + post-plan) with time guards and incremental checkpoints.
-last_verified: 2026-05-27
+last_verified: 2026-05-28
 paths: "bin/nightly-*"
 ---
 
@@ -14,6 +14,7 @@ A headless `claude -p` process runs twice daily via macOS `launchd`. It loops th
 |--------|---------|
 | Queue a plan | `bin/nightly-queue <slug>` |
 | Show queue | `bin/nightly-queue` (no args) |
+| Remove a plan from queue | `bin/nightly-queue remove <slug>` |
 | Check morning results | `ls ~/.claude/projects/-Users-ajaynicolas-GitHub-IBL5/nightly/reports/` |
 | Cancel tonight's run | `rm ~/.claude/projects/-Users-ajaynicolas-GitHub-IBL5/nightly/queue/*.md` |
 | Disable nightly job | `launchctl unload ~/Library/LaunchAgents/com.ibl5.nightly-claude.plist` |

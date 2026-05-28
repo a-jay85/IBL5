@@ -153,6 +153,29 @@ abstract class BaseMysqliRepository
             : $iblTableName;
     }
 
+    /**
+     * Rewrite IBL table names to their Olympics equivalents when the active
+     * league context is Olympics.
+     *
+     * Opt-in is signalled by BACKTICK-QUOTING the table name (`` `ibl_plr` ``):
+     * a query that quotes a mapped table is rewritten; a query that references
+     * it bare (e.g. `FROM ibl_team_info`) is left on IBL. This is deliberate —
+     * identity/GM lookups (e.g. NavigationRepository::resolveTeamId, which reads
+     * the IBL-only `gm_username` column) write the table name bare precisely so
+     * they stay on IBL even in Olympics context. Rewriting bare names would
+     * route them to Olympics tables that lack those columns and fatal.
+     *
+     * When a table opts in, ALL of its references in that query are rewritten —
+     * the backtick FROM, column-qualified refs (`ibl_plr.pid`), and any bare
+     * mention. A naive backtick-only str_replace rewrote the FROM but left
+     * `table.column` references dangling, producing "Unknown table" fatals
+     * (e.g. Team::load() in Olympics context). Word boundaries ensure `ibl_plr`
+     * never matches inside `ibl_plr_snapshots` or the already-rewritten
+     * `ibl_olympics_plr`, so the transform is idempotent.
+     *
+     * The IBL→Olympics mapping is owned by {@see \League\LeagueContext::TABLE_MAP}
+     * — the single source of truth shared with getTableName().
+     */
     protected function rewriteTableNames(string $query): string
     {
         $ctx = $this->leagueContext ?? self::$sharedLeagueContext;
@@ -160,45 +183,24 @@ abstract class BaseMysqliRepository
             return $query;
         }
 
-        return str_replace(
-            [
-                '`ibl_saved_depth_chart_players`',
-                '`ibl_saved_depth_charts`',
-                '`ibl_box_scores_teams`',
-                '`ibl_box_scores`',
-                '`ibl_rcb_alltime_records`',
-                '`ibl_rcb_season_records`',
-                '`ibl_jsb_transactions`',
-                '`ibl_jsb_history`',
-                '`ibl_plr_snapshots`',
-                '`ibl_league_config`',
-                '`ibl_team_info`',
-                '`ibl_standings`',
-                '`ibl_schedule`',
-                '`ibl_power`',
-                '`ibl_hist`',
-                '`ibl_plr`',
-            ],
-            [
-                '`ibl_olympics_saved_depth_chart_players`',
-                '`ibl_olympics_saved_depth_charts`',
-                '`ibl_olympics_box_scores_teams`',
-                '`ibl_olympics_box_scores`',
-                '`ibl_olympics_rcb_alltime_records`',
-                '`ibl_olympics_rcb_season_records`',
-                '`ibl_olympics_jsb_transactions`',
-                '`ibl_olympics_jsb_history`',
-                '`ibl_olympics_plr_snapshots`',
-                '`ibl_olympics_league_config`',
-                '`ibl_olympics_team_info`',
-                '`ibl_olympics_standings`',
-                '`ibl_olympics_schedule`',
-                '`ibl_olympics_power`',
-                '`ibl_olympics_hist`',
-                '`ibl_olympics_plr`',
-            ],
-            $query
-        );
+        foreach (\League\LeagueContext::TABLE_MAP as $iblTable => $olympicsTable) {
+            // Only rewrite tables that opt in via a backtick-quoted reference.
+            if (strpos($query, '`' . $iblTable . '`') === false) {
+                continue;
+            }
+
+            $rewritten = preg_replace(
+                '/(?<![A-Za-z0-9_])' . preg_quote($iblTable, '/') . '(?![A-Za-z0-9_])/',
+                $olympicsTable,
+                $query
+            );
+
+            // preg_replace returns null only on regex engine failure; keep the
+            // current query rather than passing null downstream.
+            $query = $rewritten ?? $query;
+        }
+
+        return $query;
     }
 
     /**

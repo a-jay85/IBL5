@@ -17,6 +17,33 @@ class LeagueContext
     const COOKIE_NAME = 'ibl_league';
 
     /**
+     * Single source of truth mapping IBL table names to their Olympics
+     * equivalents. Consumed by both getTableName() (explicit per-name
+     * resolution) and BaseMysqliRepository::rewriteTableNames() (query-string
+     * rewrite). Add a new Olympics-backed table here in ONE place.
+     *
+     * @var array<string, string>
+     */
+    const TABLE_MAP = [
+        'ibl_box_scores' => 'ibl_olympics_box_scores',
+        'ibl_box_scores_teams' => 'ibl_olympics_box_scores_teams',
+        'ibl_schedule' => 'ibl_olympics_schedule',
+        'ibl_standings' => 'ibl_olympics_standings',
+        'ibl_power' => 'ibl_olympics_power',
+        'ibl_team_info' => 'ibl_olympics_team_info',
+        'ibl_league_config' => 'ibl_olympics_league_config',
+        'ibl_plr' => 'ibl_olympics_plr',
+        'ibl_hist' => 'ibl_olympics_hist',
+        'ibl_plr_snapshots' => 'ibl_olympics_plr_snapshots',
+        'ibl_jsb_history' => 'ibl_olympics_jsb_history',
+        'ibl_jsb_transactions' => 'ibl_olympics_jsb_transactions',
+        'ibl_rcb_alltime_records' => 'ibl_olympics_rcb_alltime_records',
+        'ibl_rcb_season_records' => 'ibl_olympics_rcb_season_records',
+        'ibl_saved_depth_charts' => 'ibl_olympics_saved_depth_charts',
+        'ibl_saved_depth_chart_players' => 'ibl_olympics_saved_depth_chart_players',
+    ];
+
+    /**
      * Request-scoped league selection set via setLeague().
      *
      * Holds the value for the remainder of the current request so that an
@@ -216,25 +243,7 @@ class LeagueContext
             return $iblTableName;
         }
 
-        return match ($iblTableName) {
-            'ibl_box_scores' => 'ibl_olympics_box_scores',
-            'ibl_box_scores_teams' => 'ibl_olympics_box_scores_teams',
-            'ibl_schedule' => 'ibl_olympics_schedule',
-            'ibl_standings' => 'ibl_olympics_standings',
-            'ibl_power' => 'ibl_olympics_power',
-            'ibl_team_info' => 'ibl_olympics_team_info',
-            'ibl_league_config' => 'ibl_olympics_league_config',
-            'ibl_plr' => 'ibl_olympics_plr',
-            'ibl_hist' => 'ibl_olympics_hist',
-            'ibl_plr_snapshots' => 'ibl_olympics_plr_snapshots',
-            'ibl_jsb_history' => 'ibl_olympics_jsb_history',
-            'ibl_jsb_transactions' => 'ibl_olympics_jsb_transactions',
-            'ibl_rcb_alltime_records' => 'ibl_olympics_rcb_alltime_records',
-            'ibl_rcb_season_records' => 'ibl_olympics_rcb_season_records',
-            'ibl_saved_depth_charts' => 'ibl_olympics_saved_depth_charts',
-            'ibl_saved_depth_chart_players' => 'ibl_olympics_saved_depth_chart_players',
-            default => $iblTableName,
-        };
+        return self::TABLE_MAP[$iblTableName] ?? $iblTableName;
     }
 
     /**

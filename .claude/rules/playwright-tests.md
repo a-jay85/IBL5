@@ -1,7 +1,7 @@
 ---
 description: Playwright E2E testing rules, Docker requirements, and actionability pitfalls.
 paths: ibl5/tests/e2e/**/*.ts
-last_verified: 2026-05-23
+last_verified: 2026-05-28
 ---
 
 # Playwright E2E Testing Rules
@@ -141,6 +141,28 @@ test.describe('Public module flow', () => {
 | Authenticated page | `../fixtures/auth` | None (uses stored auth state + cookie-based appState) |
 
 **Never** call the login flow inside a test — always use the auth fixture. The `auth.setup.ts` project runs first and saves browser state to `playwright/.auth/user.json`.
+
+### Shared server session — never mutate it; test the isolation invariant
+
+All authenticated workers share ONE server-side PHP session (the single pinned
+PHPSESSID in `playwright/.auth/user.json`). Per-browser-context cookie jars are
+isolated; the server session is not. So **anything an authenticated test writes
+into `$_SESSION` leaks into every other concurrent authenticated test.** This is
+why the auth fixture forbids logout tests, and it is what broke PR #878: an
+authenticated test switching `?league=olympics` wrote `$_SESSION['current_league']`,
+flipping every parallel test into Olympics context.
+
+Two consequences for any **global mode/context switch** (league, impersonation,
+admin-mode, feature flag) that is read by shared infrastructure:
+
+1. **Production code** must persist the switch per-request (cookie + in-memory),
+   never in `$_SESSION`. See `League\LeagueContext::setLeague()`.
+2. **Tests** must cover the *negative invariant*, not just that the switch works:
+   open a second context sharing the same storageState (= same session) and assert
+   the switch in context A does NOT change what context B resolves. See
+   `tests/e2e/flows/league-context-isolation.spec.ts` as the canonical example.
+   Assert against the RAW server response (`context.request.get(...)`) when the
+   signal lives in markup that Alpine/HTMX removes from the live DOM.
 
 ## PHP Error Detection (Mandatory)
 

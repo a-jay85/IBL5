@@ -347,6 +347,7 @@ class MockDatabase extends \mysqli
     {
         $this->executedQueries = [];
         $this->operationLog = [];
+        $this->insertCount = 0;
     }
     
     public function sql_escape_string(string $string): string

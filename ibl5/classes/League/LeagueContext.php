@@ -113,7 +113,12 @@ class LeagueContext
                 'Voting',
                 'VotingResults',
                 'CapSpace',
-                'FranchiseHistory'
+                'FranchiseHistory',
+                'AwardHistory',
+                'FranchiseRecordBook',
+                'CareerLeaderboards',
+                'SeasonLeaderboards',
+                'RecordHolders',
             ];
 
             return !in_array($moduleName, $iblOnlyModules, true);

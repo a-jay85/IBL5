@@ -29,6 +29,11 @@ class NavigationMenuBuilder implements NavigationMenuBuilderInterface
         'DraftHistory',
         'AllStarAppearances',
         'OneOnOneGame',
+        'AwardHistory',
+        'FranchiseRecordBook',
+        'CareerLeaderboards',
+        'SeasonLeaderboards',
+        'RecordHolders',
     ];
 
     private NavigationConfig $config;

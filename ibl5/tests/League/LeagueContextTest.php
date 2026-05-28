@@ -475,7 +475,24 @@ class LeagueContextTest extends TestCase
         $this->assertTrue($context->isModuleEnabled('Standings'));
         $this->assertTrue($context->isModuleEnabled('Team'));
         $this->assertTrue($context->isModuleEnabled('Player'));
-        $this->assertTrue($context->isModuleEnabled('SeasonLeaderboards'));
+    }
+
+    public function testNewlyDisabledModulesInOlympicsContext(): void
+    {
+        $_GET['league'] = 'olympics';
+        $context = new LeagueContext();
+
+        $disabledModules = [
+            'AwardHistory',
+            'FranchiseRecordBook',
+            'CareerLeaderboards',
+            'SeasonLeaderboards',
+            'RecordHolders',
+        ];
+
+        foreach ($disabledModules as $module) {
+            $this->assertFalse($context->isModuleEnabled($module), "$module should be disabled in Olympics");
+        }
     }
 
     public function testAllModulesEnabledInIblContext(): void

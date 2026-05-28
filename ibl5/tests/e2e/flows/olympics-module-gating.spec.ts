@@ -14,6 +14,11 @@ const IBL_ONLY_MODULES = [
   'Voting',
   'CapSpace',
   'FranchiseHistory',
+  'AwardHistory',
+  'FranchiseRecordBook',
+  'CareerLeaderboards',
+  'SeasonLeaderboards',
+  'RecordHolders',
 ];
 
 test.describe('Olympics module gating', () => {
@@ -48,11 +53,4 @@ test.describe('Olympics module gating', () => {
     expect(body).not.toContain("Module isn't active");
   });
 
-  test('SeasonLeaderboards renders in Olympics context', async ({ page }) => {
-    await page.goto('modules.php?name=SeasonLeaderboards&league=olympics');
-    await assertNoPhpErrors(page, 'on SeasonLeaderboards in Olympics');
-
-    const body = await page.locator('body').textContent();
-    expect(body).not.toContain("Module isn't active");
-  });
 });

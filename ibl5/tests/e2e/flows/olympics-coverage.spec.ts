@@ -31,12 +31,6 @@ test.describe('Olympics module coverage', () => {
     await expect(table.first()).toBeVisible();
   });
 
-  test('olympics leaderboards loads', async ({ appState, page }) => {
-    await appState({ 'Trivia Mode': 'Off' });
-    await page.goto('modules.php?name=SeasonLeaderboards&league=olympics');
-    await assertNoPhpErrors(page, 'on Olympics Leaderboards');
-  });
-
   test('IBL-only modules show gating message in olympics context', async ({ appState, page }) => {
     await appState({ 'Trivia Mode': 'Off' });
     // FranchiseHistory is IBL-only
@@ -50,7 +44,6 @@ test.describe('Olympics module coverage', () => {
     const urls = [
       'modules.php?name=Standings&league=olympics',
       'modules.php?name=Team&op=team&teamid=1&league=olympics',
-      'modules.php?name=SeasonLeaderboards&league=olympics',
     ];
     for (const url of urls) {
       await page.goto(url);

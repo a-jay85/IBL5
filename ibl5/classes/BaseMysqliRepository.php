@@ -83,6 +83,8 @@ use League\League;
  */
 abstract class BaseMysqliRepository
 {
+    private static ?\League\LeagueContext $sharedLeagueContext = null;
+
     /**
      * @var \mysqli Database connection
      */
@@ -128,6 +130,16 @@ abstract class BaseMysqliRepository
         $this->logger = $logger;
     }
 
+    public static function setSharedLeagueContext(\League\LeagueContext $context): void
+    {
+        self::$sharedLeagueContext = $context;
+    }
+
+    public static function clearSharedLeagueContext(): void
+    {
+        self::$sharedLeagueContext = null;
+    }
+
     /**
      * Resolve a table name through LeagueContext (if set), else return as-is.
      *
@@ -139,6 +151,54 @@ abstract class BaseMysqliRepository
         return $this->leagueContext !== null
             ? $this->leagueContext->getTableName($iblTableName)
             : $iblTableName;
+    }
+
+    protected function rewriteTableNames(string $query): string
+    {
+        $ctx = $this->leagueContext ?? self::$sharedLeagueContext;
+        if ($ctx === null || !$ctx->isOlympics()) {
+            return $query;
+        }
+
+        return str_replace(
+            [
+                '`ibl_saved_depth_chart_players`',
+                '`ibl_saved_depth_charts`',
+                '`ibl_box_scores_teams`',
+                '`ibl_box_scores`',
+                '`ibl_rcb_alltime_records`',
+                '`ibl_rcb_season_records`',
+                '`ibl_jsb_transactions`',
+                '`ibl_jsb_history`',
+                '`ibl_plr_snapshots`',
+                '`ibl_league_config`',
+                '`ibl_team_info`',
+                '`ibl_standings`',
+                '`ibl_schedule`',
+                '`ibl_power`',
+                '`ibl_hist`',
+                '`ibl_plr`',
+            ],
+            [
+                '`ibl_olympics_saved_depth_chart_players`',
+                '`ibl_olympics_saved_depth_charts`',
+                '`ibl_olympics_box_scores_teams`',
+                '`ibl_olympics_box_scores`',
+                '`ibl_olympics_rcb_alltime_records`',
+                '`ibl_olympics_rcb_season_records`',
+                '`ibl_olympics_jsb_transactions`',
+                '`ibl_olympics_jsb_history`',
+                '`ibl_olympics_plr_snapshots`',
+                '`ibl_olympics_league_config`',
+                '`ibl_olympics_team_info`',
+                '`ibl_olympics_standings`',
+                '`ibl_olympics_schedule`',
+                '`ibl_olympics_power`',
+                '`ibl_olympics_hist`',
+                '`ibl_olympics_plr`',
+            ],
+            $query
+        );
     }
 
     /**
@@ -186,6 +246,8 @@ abstract class BaseMysqliRepository
             $this->logError($message, $query);
             throw new \RuntimeException($message, 1001);
         }
+        $query = $this->rewriteTableNames($query);
+
         // Prepare statement
         $startTime = hrtime(true);
 

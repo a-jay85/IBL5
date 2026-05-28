@@ -215,116 +215,124 @@ class ScheduleUpdater extends \BaseMysqliRepository {
 
         $log = '';
 
-        $this->execute("DELETE FROM {$scheduleTable}", '');
-        $log .= "DELETE FROM {$scheduleTable}<p>";
+        // Rebuild the schedule atomically: a DELETE followed by row-by-row
+        // INSERTs is not safe to expose to concurrent readers. Without a
+        // transaction, a page load mid-import (or an import that throws partway)
+        // sees only the games inserted so far — the early season, since inserts
+        // run in date order. Wrapping it commits the new schedule all at once
+        // and rolls the DELETE back if any insert fails.
+        $this->transactional(function () use (&$log, $scheduleTable): void {
+            $this->execute("DELETE FROM {$scheduleTable}", '');
+            $log .= "DELETE FROM {$scheduleTable}<p>";
 
-        $this->preloadTeamNameMap();
+            $this->preloadTeamNameMap();
 
-        if ($this->sourceResolver !== null) {
-            $schData = $this->sourceResolver->getContents('sch');
-            if ($schData === null) {
-                throw new \RuntimeException('Schedule file not found via resolver');
+            if ($this->sourceResolver !== null) {
+                $schData = $this->sourceResolver->getContents('sch');
+                if ($schData === null) {
+                    throw new \RuntimeException('Schedule file not found via resolver');
+                }
+                $games = SchFileParser::parse($schData);
+            } else {
+                $ibl5Root = \Bootstrap\AppPaths::root();
+                $filePrefix = $this->leagueContext !== null ? $this->leagueContext->getFilePrefix() : 'IBL5';
+                $schFilePath = $ibl5Root . '/' . $filePrefix . '.sch';
+                $games = SchFileParser::parseFile($schFilePath);
             }
-            $games = SchFileParser::parse($schData);
-        } else {
-            $ibl5Root = \Bootstrap\AppPaths::root();
-            $filePrefix = $this->leagueContext !== null ? $this->leagueContext->getFilePrefix() : 'IBL5';
-            $schFilePath = $ibl5Root . '/' . $filePrefix . '.sch';
-            $games = SchFileParser::parseFile($schFilePath);
-        }
 
-        $currentDateSlot = -1;
-        $date = null;
-        $year = null;
-        /** @var int|null $month */
-        $month = null;
+            $currentDateSlot = -1;
+            $date = null;
+            $year = null;
+            /** @var int|null $month */
+            $month = null;
 
-        foreach ($games as $game) {
-            // Compute date when we move to a new date slot
-            if ($game['date_slot'] !== $currentDateSlot) {
-                $currentDateSlot = $game['date_slot'];
-                $monthDay = SchFileParser::dateSlotToMonthDay($game['date_slot']);
+            foreach ($games as $game) {
+                // Compute date when we move to a new date slot
+                if ($game['date_slot'] !== $currentDateSlot) {
+                    $currentDateSlot = $game['date_slot'];
+                    $monthDay = SchFileParser::dateSlotToMonthDay($game['date_slot']);
 
-                if ($monthDay !== null) {
-                    $dateString = $this->buildDateString($monthDay['month'], $monthDay['day']);
-                    $fullDate = $this->extractDate($dateString);
-                    $date = $fullDate['date'] ?? null;
-                    $year = $fullDate['year'] ?? null;
-                    $month = $fullDate['month'] ?? null;
+                    if ($monthDay !== null) {
+                        $dateString = $this->buildDateString($monthDay['month'], $monthDay['day']);
+                        $fullDate = $this->extractDate($dateString);
+                        $date = $fullDate['date'] ?? null;
+                        $year = $fullDate['year'] ?? null;
+                        $month = $fullDate['month'] ?? null;
+                    } else {
+                        $date = null;
+                        $year = null;
+                        $month = null;
+                    }
+                }
+
+                if ($date === null || $year === null) {
+                    continue;
+                }
+
+                // HEAT phase: only include games from the HEAT month
+                if ($this->season->phase === "HEAT" && $month !== Season::IBL_HEAT_MONTH) {
+                    continue;
+                }
+                if ($this->season->phase === "Preseason" && $month !== null
+                    && $month !== Season::IBL_PRESEASON_MONTH && $month !== Season::IBL_HEAT_MONTH) {
+                    continue;
+                }
+
+                // Compute BoxID: real for played games, placeholder for unplayed
+                if ($game['played']) {
+                    $boxID = SchFileParser::computeBoxId($game['date_slot'], $game['game_index']);
                 } else {
-                    $date = null;
-                    $year = null;
-                    $month = null;
+                    $boxID = self::UNPLAYED_BOX_ID;
+                }
+
+                $visitor_teamid = $game['visitor'];
+                $home_teamid = $game['home'];
+
+                if (!$this->isRealTeamGame($visitor_teamid, $home_teamid)) {
+                    continue;
+                }
+
+                $vScore = $game['visitor_score'];
+                $hScore = $game['home_score'];
+
+                $uuid = UuidGenerator::generateUuid();
+
+                $visitorName = $this->getTeamNameById($visitor_teamid);
+                $homeName = $this->getTeamNameById($home_teamid);
+
+                try {
+                    $this->execute(
+                        "INSERT INTO {$scheduleTable} (
+                            season_year,
+                            box_id,
+                            game_date,
+                            visitor_teamid,
+                            visitor_score,
+                            home_teamid,
+                            home_score,
+                            uuid
+                        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+                        "iisiiiis",
+                        $this->season->endingYear,
+                        $boxID,
+                        $date,
+                        $visitor_teamid,
+                        $vScore,
+                        $home_teamid,
+                        $hScore,
+                        $uuid
+                    );
+                    $log .= "Inserted game: {$visitorName} @ {$homeName} on {$date}<br>";
+                } catch (\Exception $e) {
+                    $errorMessage = "Failed to insert schedule data for game between {$visitorName} and {$homeName}: " . $e->getMessage();
+                    \Logging\LoggerFactory::getChannel('db')->error('ScheduleUpdater database insert error', ['error' => $errorMessage]);
+                    echo '<strong class="ibl-form-error">Script Error: Failed to insert schedule data for game between ' . HtmlSanitizer::e($visitorName) . ' and ' . HtmlSanitizer::e($homeName) . '.</strong>';
+                    throw new \RuntimeException($errorMessage, 1002);
                 }
             }
 
-            if ($date === null || $year === null) {
-                continue;
-            }
-
-            // HEAT phase: only include games from the HEAT month
-            if ($this->season->phase === "HEAT" && $month !== Season::IBL_HEAT_MONTH) {
-                continue;
-            }
-            if ($this->season->phase === "Preseason" && $month !== null
-                && $month !== Season::IBL_PRESEASON_MONTH && $month !== Season::IBL_HEAT_MONTH) {
-                continue;
-            }
-
-            // Compute BoxID: real for played games, placeholder for unplayed
-            if ($game['played']) {
-                $boxID = SchFileParser::computeBoxId($game['date_slot'], $game['game_index']);
-            } else {
-                $boxID = self::UNPLAYED_BOX_ID;
-            }
-
-            $visitor_teamid = $game['visitor'];
-            $home_teamid = $game['home'];
-
-            if (!$this->isRealTeamGame($visitor_teamid, $home_teamid)) {
-                continue;
-            }
-
-            $vScore = $game['visitor_score'];
-            $hScore = $game['home_score'];
-
-            $uuid = UuidGenerator::generateUuid();
-
-            $visitorName = $this->getTeamNameById($visitor_teamid);
-            $homeName = $this->getTeamNameById($home_teamid);
-
-            try {
-                $this->execute(
-                    "INSERT INTO {$scheduleTable} (
-                        season_year,
-                        box_id,
-                        game_date,
-                        visitor_teamid,
-                        visitor_score,
-                        home_teamid,
-                        home_score,
-                        uuid
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-                    "iisiiiis",
-                    $this->season->endingYear,
-                    $boxID,
-                    $date,
-                    $visitor_teamid,
-                    $vScore,
-                    $home_teamid,
-                    $hScore,
-                    $uuid
-                );
-                $log .= "Inserted game: {$visitorName} @ {$homeName} on {$date}<br>";
-            } catch (\Exception $e) {
-                $errorMessage = "Failed to insert schedule data for game between {$visitorName} and {$homeName}: " . $e->getMessage();
-                \Logging\LoggerFactory::getChannel('db')->error('ScheduleUpdater database insert error', ['error' => $errorMessage]);
-                echo '<strong class="ibl-form-error">Script Error: Failed to insert schedule data for game between ' . HtmlSanitizer::e($visitorName) . ' and ' . HtmlSanitizer::e($homeName) . '.</strong>';
-                throw new \RuntimeException($errorMessage, 1002);
-            }
-        }
-
-        $log .= $this->insertPlayoffGamesFromScheduleHtm($scheduleTable);
+            $log .= $this->insertPlayoffGamesFromScheduleHtm($scheduleTable);
+        });
 
         \UI\DebugOutput::display($log, "{$scheduleTable} SQL Queries");
 

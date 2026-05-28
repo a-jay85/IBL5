@@ -4,6 +4,7 @@ disallowed-tools:
   - EnterPlanMode
   - ExitPlanMode
 last_verified: 2026-05-28
+
 ---
 
 # /plan — Implementation Planning with Verification Matrix
@@ -66,6 +67,7 @@ After receiving the Plan agent's output, check these gates yourself — do NOT d
    - `subject to validation`
    - `subject to review`
    If any match is found, resolve the decision in-place before saving the plan. The nightly agent cannot make judgment calls — every table cell must contain a concrete action, not a deferred question.
+8. **Decision-trigger pre-classified** — scan implementation phases for file additions matching `bin/adr-check` trigger patterns (listed in `plan-verification.md` § Decision-trigger pre-classification). If any trigger fires, verify the plan includes a resolution step (ADR or bypass marker). If missing, add the appropriate resolution step and update the verification matrix.
 
 If validation fails on any gate, fix the matrix yourself rather than re-running the Plan agent.
 

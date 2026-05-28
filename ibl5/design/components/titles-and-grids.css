@@ -5,9 +5,6 @@
 
    Unified title system for all headings:
    - .ibl-title: Base title (1.5rem, uppercase, orange underline)
-   - .ibl-title--large: Larger variant (2rem)
-   - .ibl-title--centered: Centered text, no underline
-   - .ibl-section-title: Alias for .ibl-title--large with accent line
    ========================================================================== */
 
 .ibl-title {

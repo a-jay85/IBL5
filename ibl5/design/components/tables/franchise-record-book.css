@@ -32,38 +32,6 @@
     background: white;
 }
 
-.record-book-category {
-    margin-bottom: var(--space-6);
-}
-
-.record-book-category-title {
-    font-family: var(--font-display);
-    font-size: 1rem;
-    font-weight: 600;
-    color: var(--gray-700);
-    text-transform: uppercase;
-    letter-spacing: var(--tracking-display);
-    margin: var(--space-3) 0 var(--space-2);
-    padding-left: var(--space-2);
-    border-left: 3px solid var(--accent-500);
-}
-
-.record-book-table {
-    font-size: var(--text-sm);
-}
-
-.record-book-table td:first-child {
-    font-weight: 600;
-    color: var(--gray-500);
-    width: 2rem;
-    text-align: center;
-}
-
-.record-book-table td:nth-child(3) {
-    font-weight: 700;
-    font-variant-numeric: tabular-nums;
-}
-
 .record-book-section-title {
     font-size: var(--text-xl);
     margin-top: 1.5rem;

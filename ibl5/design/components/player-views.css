@@ -90,12 +90,6 @@
     text-align: center;
 }
 
-/* Stats table — unique rule */
-.stats-table .header-cell {
-    font-weight: bold;
-    text-align: center;
-}
-
 /* Sortable tables - extends existing .sortable class */
 .sortable.player-table {
     margin: 0 auto;

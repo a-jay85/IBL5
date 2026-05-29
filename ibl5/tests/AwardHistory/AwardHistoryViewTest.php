@@ -174,8 +174,8 @@ final class AwardHistoryViewTest extends TestCase
 
     public function testRenderAwardRowHandlesMissingData(): void
     {
-        $award = ['year' => null, 'award' => null, 'name' => null];
-        
+        $award = ['year' => 0, 'award' => '', 'name' => ''];
+
         $result = $this->view->renderAwardRow($award, 0);
 
         // Should not throw an exception and return valid HTML

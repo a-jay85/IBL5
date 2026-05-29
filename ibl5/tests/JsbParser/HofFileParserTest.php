@@ -94,9 +94,8 @@ class HofFileParserTest extends TestCase
 
     public function testIgnoresEmptyBlocks(): void
     {
-        // Only put entries in block index 5
-        $blocks = [];
-        $blocks[5] = [['pos' => 'SG', 'name' => 'Solo Entry', 'pid' => 777, 'year' => 2001]];
+        // Only put entries in block index 5; use a proper list so indices 0-4 are empty
+        $blocks = [[], [], [], [], [], [['pos' => 'SG', 'name' => 'Solo Entry', 'pid' => 777, 'year' => 2001]]];
         $hofData = $this->buildHofFile($blocks);
 
         $tmpFile = tempnam(sys_get_temp_dir(), 'hof_test_');

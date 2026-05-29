@@ -17,7 +17,7 @@ final class TransactionHistoryViewXssTest extends TestCase
         $view = new TransactionHistoryView();
         $output = $view->render([
             'transactions' => [
-                ['catid' => 1, 'time' => '2024-01-15 12:00:00', 'title' => $xss, 'sid' => 1],
+                ['catid' => '1', 'time' => '2024-01-15 12:00:00', 'title' => $xss, 'sid' => '1'],
             ],
             'categories' => [1 => $xss],
             'availableYears' => [2024],

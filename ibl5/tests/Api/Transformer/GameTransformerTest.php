@@ -7,6 +7,7 @@ namespace Tests\Api\Transformer;
 use Api\Transformer\GameTransformer;
 use PHPUnit\Framework\TestCase;
 
+/** @phpstan-import-type GameViewRow from \Api\Repository\ApiGameRepository */
 class GameTransformerTest extends TestCase
 {
     private GameTransformer $transformer;
@@ -17,7 +18,7 @@ class GameTransformerTest extends TestCase
     }
 
     /**
-     * @return array<string, mixed>
+     * @return GameViewRow
      */
     private function makeGameRow(): array
     {
@@ -96,9 +97,11 @@ class GameTransformerTest extends TestCase
 
     public function testTransformHandlesNullScores(): void
     {
+        /** @var array<string, mixed> $row */
         $row = $this->makeGameRow();
         $row['visitor_score'] = null;
         $row['home_score'] = null;
+        /** @var GameViewRow $row */
         $result = $this->transformer->transform($row);
 
         $this->assertNull($result['visitor']['score']);
@@ -107,10 +110,12 @@ class GameTransformerTest extends TestCase
 
     public function testTransformScheduledGameStatus(): void
     {
+        /** @var array<string, mixed> $row */
         $row = $this->makeGameRow();
         $row['game_status'] = 'scheduled';
         $row['visitor_score'] = null;
         $row['home_score'] = null;
+        /** @var GameViewRow $row */
         $result = $this->transformer->transform($row);
 
         $this->assertSame('scheduled', $result['status']);

@@ -14,6 +14,8 @@ use BasketballStats\StatsFormatter;
  *
  * Verifies team statistics processing, league totals calculation,
  * and offense/defense differential computation.
+ *
+ * @phpstan-import-type ProcessedTeamStats from \TeamOffDefStats\Contracts\TeamOffDefStatsServiceInterface
  */
 class TeamOffDefStatsServiceTest extends TestCase
 {
@@ -316,6 +318,7 @@ class TeamOffDefStatsServiceTest extends TestCase
             ],
         ];
 
+        /** @var list<ProcessedTeamStats> $processedStats */
         $result = $this->service->calculateLeagueTotals($processedStats);
 
         // Total FGM should be 100 + 120 = 220
@@ -363,6 +366,7 @@ class TeamOffDefStatsServiceTest extends TestCase
             ],
         ];
 
+        /** @var list<ProcessedTeamStats> $processedStats */
         $result = $this->service->calculateDifferentials($processedStats);
 
         $this->assertCount(1, $result);
@@ -391,6 +395,7 @@ class TeamOffDefStatsServiceTest extends TestCase
             ],
         ];
 
+        /** @var list<ProcessedTeamStats> $processedStats */
         $result = $this->service->calculateDifferentials($processedStats);
         $diffs = $result[0]['differentials'];
 
@@ -420,6 +425,7 @@ class TeamOffDefStatsServiceTest extends TestCase
             ],
         ];
 
+        /** @var list<ProcessedTeamStats> $processedStats */
         $result = $this->service->calculateDifferentials($processedStats);
         $diffs = $result[0]['differentials'];
 
@@ -522,8 +528,17 @@ class TeamOffDefStatsServiceTest extends TestCase
                 'pf' => '20.7',
                 'pts' => '108.5',
             ],
-            'defense_totals' => [],
-            'defense_averages' => [],
+            'defense_totals' => [
+                'games' => '82', 'fgm' => '3,100', 'fga' => '6,900', 'ftm' => '1,400', 'fta' => '1,900',
+                'tgm' => '950', 'tga' => '2,700', 'orb' => '850', 'reb' => '3,500', 'ast' => '1,900',
+                'stl' => '580', 'tvr' => '1,250', 'blk' => '380', 'pf' => '1,650', 'pts' => '8,600',
+            ],
+            'defense_averages' => [
+                'fgm' => '37.8', 'fga' => '84.1', 'fgp' => '0.449', 'ftm' => '17.1', 'fta' => '23.2',
+                'ftp' => '0.737', 'tgm' => '11.6', 'tga' => '32.9', 'tgp' => '0.352', 'orb' => '10.4',
+                'reb' => '42.7', 'ast' => '23.2', 'stl' => '7.1', 'tvr' => '15.2', 'blk' => '4.6',
+                'pf' => '20.1', 'pts' => '104.9',
+            ],
             'raw_offense' => [
                 'fgm' => 3200,
                 'fga' => 7000,

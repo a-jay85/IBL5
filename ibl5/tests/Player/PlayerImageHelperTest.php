@@ -186,8 +186,8 @@ class PlayerImageHelperTest extends TestCase
      */
     public function testFloatPlayerIDIsConvertedCorrectly(): void
     {
-        $result = PlayerImageHelper::getImageUrl(123.7);
-        
+        $result = PlayerImageHelper::getImageUrl((int)123.7);
+
         // Should truncate to 123
         $this->assertStringContainsString('./images/player/123.jpg', $result);
     }

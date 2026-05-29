@@ -22,6 +22,7 @@ final class FranchiseRecordBookViewXssTest extends TestCase
             'team' => ['teamid' => 1, 'team_name' => $xss, 'color1' => 'FF0000', 'color2' => '000000'],
             'singleSeason' => [],
             'career' => [],
+            'scope' => 'team',
         ]);
 
         $this->assertStringContainsString($escaped, $output);

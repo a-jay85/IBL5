@@ -8,6 +8,7 @@ use PHPUnit\Framework\TestCase;
 use DepthChartEntry\DepthChartEntryProcessor;
 use DepthChartEntry\DepthChartEntryView;
 
+/** @phpstan-import-type PlayerRow from \Repositories\Contracts\PlayerLookupRepositoryInterface */
 class DepthChartEntryProcessorTest extends TestCase
 {
     private $processor;
@@ -290,6 +291,7 @@ class DepthChartEntryProcessorTest extends TestCase
         ];
 
         ob_start();
+        /** @var PlayerRow $playerFromDb */
         $view->renderPlayerRow($playerFromDb, 1);
         $html = ob_get_clean();
 
@@ -426,6 +428,7 @@ class DepthChartEntryProcessorTest extends TestCase
 
         // Step 2: Form displays these values (capture HTML)
         ob_start();
+        /** @var PlayerRow $dbPlayer */
         $view->renderPlayerRow($dbPlayer, 1);
         $formHtml = ob_get_clean();
 
@@ -498,6 +501,7 @@ class DepthChartEntryProcessorTest extends TestCase
         ];
 
         ob_start();
+        /** @var PlayerRow $dbPlayerAfterUpdate */
         $view->renderPlayerRow($dbPlayerAfterUpdate, 1);
         $reloadedFormHtml = ob_get_clean();
 
@@ -542,6 +546,7 @@ class DepthChartEntryProcessorTest extends TestCase
         ];
 
         ob_start();
+        /** @var PlayerRow $player */
         $view->renderPlayerRow($player, 1);
         $html = ob_get_clean();
 

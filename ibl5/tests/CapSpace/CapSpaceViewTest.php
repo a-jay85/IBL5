@@ -63,8 +63,10 @@ class CapSpaceViewTest extends TestCase
 
     public function testRenderEscapesHtmlEntities(): void
     {
+        $mockTeam = $this->createStub(\Team\Team::class);
         $teams = [
             [
+                'team' => $mockTeam,
                 'teamid' => 1,
                 'teamId' => 1,
                 'teamCity' => 'Test<script>',

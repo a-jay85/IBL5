@@ -60,8 +60,10 @@ class PlayerRowTransformerTest extends TestCase
     {
         $db = $this->createStub(\mysqli::class);
 
-        // Pass an iterable with a non-array/non-Player element
-        $result = PlayerRowTransformer::resolveWithStats($db, [new \stdClass()], '');
+        // Pass an iterable with a non-array/non-Player element (stdClass is filtered by the else{continue} branch)
+        $input = [new \stdClass()];
+        /** @var iterable<int, \Player\Player|array<string, mixed>> $input */
+        $result = PlayerRowTransformer::resolveWithStats($db, $input, '');
 
         $this->assertSame([], $result);
     }

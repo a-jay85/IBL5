@@ -10,6 +10,7 @@ use Bootstrap\ApiKeyAuthBootstrap;
 use Bootstrap\ApiRoutingBootstrap;
 use Bootstrap\ConfigBootstrap;
 use Bootstrap\CorsBootstrap;
+use Bootstrap\ErrorHandlerBootstrap;
 use Bootstrap\RateLimitingBootstrap;
 use Bootstrap\RequestParsingBootstrap;
 use PHPUnit\Framework\TestCase;
@@ -24,14 +25,15 @@ final class ApiApplicationFactoryTest extends TestCase
         /** @var list<\Bootstrap\Contracts\BootstrapStepInterface> $steps */
         $steps = $reflection->getValue($app);
 
-        self::assertCount(7, $steps);
+        self::assertCount(8, $steps);
         self::assertInstanceOf(CorsBootstrap::class, $steps[0]);
         self::assertInstanceOf(ConfigBootstrap::class, $steps[1]);
-        self::assertInstanceOf(RequestParsingBootstrap::class, $steps[2]);
-        self::assertInstanceOf(ApiKeyAuthBootstrap::class, $steps[3]);
-        self::assertInstanceOf(RateLimitingBootstrap::class, $steps[4]);
-        self::assertInstanceOf(ApiRoutingBootstrap::class, $steps[5]);
-        self::assertInstanceOf(ApiDispatchBootstrap::class, $steps[6]);
+        self::assertInstanceOf(ErrorHandlerBootstrap::class, $steps[2]);
+        self::assertInstanceOf(RequestParsingBootstrap::class, $steps[3]);
+        self::assertInstanceOf(ApiKeyAuthBootstrap::class, $steps[4]);
+        self::assertInstanceOf(RateLimitingBootstrap::class, $steps[5]);
+        self::assertInstanceOf(ApiRoutingBootstrap::class, $steps[6]);
+        self::assertInstanceOf(ApiDispatchBootstrap::class, $steps[7]);
     }
 
     public function testBuildRegistersResponderInContainer(): void

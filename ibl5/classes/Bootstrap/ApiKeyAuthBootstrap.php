@@ -25,7 +25,7 @@ class ApiKeyAuthBootstrap implements BootstrapStepInterface
     {
         // Public routes (e.g. /health) are reachable without an API key so external
         // uptime monitors can probe them. They expose no data, only reachability.
-        $route = $container->get('api.route');
+        $route = $container->has('api.route') ? $container->get('api.route') : '';
         if (is_string($route) && in_array(trim($route, '/'), Router::PUBLIC_ROUTES, true)) {
             return;
         }

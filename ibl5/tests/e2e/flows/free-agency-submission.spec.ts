@@ -153,6 +153,13 @@ test.describe('Free Agency -- submit and manage offers', () => {
 test.describe('Free Agency -- quick offer buttons', () => {
   test.describe.configure({ mode: 'serial' });
 
+  test.beforeAll(async ({ request }) => {
+    // The submit-and-manage-offers block above deletes the pid=11 ci-seed offer during cleanup.
+    // Reseed all three FA offers so hasExistingOffer=true for pid=11 and pid=12, bypassing the
+    // 0-roster-spots guard (Metros is full in CI seed).
+    await request.delete('test-state.php?action=reset-fa-offers');
+  });
+
   test.beforeEach(async ({ appState }) => {
     await appState({ 'Current Season Phase': 'Free Agency', 'Current Season Ending Year': '2026' });
   });

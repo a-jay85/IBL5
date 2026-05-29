@@ -2,6 +2,7 @@ import { test, expect } from '../fixtures/auth';
 import { submitFormAndAssertEffect } from '../helpers/submit-form';
 import { assertNoPhpErrors } from '../helpers/php-errors';
 import { offerForm } from '../helpers/free-agency';
+import { resetFaSignings } from '../helpers/cleanup';
 
 // Free Agency submission tests — create, amend, delete offers + quick offer buttons
 // + admin clear_offers (block.php).
@@ -332,6 +333,100 @@ test.describe('block.php — Free Agency admin clear_offers flow', () => {
 
   test.afterAll(async ({ request }) => {
     await request.delete('test-state.php?action=reset-fa-offers');
+  });
+});
+
+// Admin assign_free_agents (block.php) — exercises the full assign flow end-to-end.
+// Kept in this owner file so ibl_fa_offers mutation (re-seed in beforeAll) never races
+// with the offer-submission blocks above (see file header).
+//
+// Assertion strategy: $actionCompleted and $actionMessage are per-request variables in
+// block.php (set only inside the POST branch, lines 44-45/81). A follow-up GET
+// always re-initialises them to false/''. Therefore success state is asserted directly
+// on the POST response body — specifically the rendered id="actionMessage" class="message-success"
+// element (block.php:231) and the "Clear All Free Agency Offers" button (block.php:316),
+// both of which are gated on $actionCompleted and only appear in the POST response.
+// A follow-up GET verifies no PHP errors (structural sanity), not the message element.
+//
+// executeSigningsTransactionally does NOT delete from ibl_fa_offers — it updates ibl_plr
+// and inserts a news story. So the follow-up GET still shows 3 offers; the afterAll
+// resetFaSignings restores players to seed state and re-seeds offers.
+test.describe('Free Agency admin: assign free agents', () => {
+  test.describe.configure({ mode: 'serial' });
+
+  test.beforeAll(async ({ request }) => {
+    // Re-seed offers so processDay(1) has data to compute signings from.
+    // (The outer file-level beforeAll cleared them; this describe needs them present.)
+    await request.delete('test-state.php?action=reset-fa-offers');
+  });
+
+  test('assign_free_agents reaches completed state', async ({ page, appState }) => {
+    await appState({ 'Current Season Phase': 'Free Agency', 'Current Season Ending Year': '2026' });
+
+    // Load block.php with day=1. Day 1 is the default and applies a demand multiplier
+    // of (11-1)/10 = 1.0 (full demands). The seed offers are constructed so that at
+    // least one signing is produced at day=1; this is verified by the precondition
+    // assertion on #signingsDataInput below.
+    await page.goto('block.php?day=1');
+    await assertNoPhpErrors(page, 'on block.php?day=1 before assign');
+
+    // Read the server-rendered form values. signings_data is JSON-encoded in the
+    // hidden input by block.php:127,341. news_hometext/bodytext are rendered into
+    // textareas (block.php:323,327); the form's hidden inputs start empty and are
+    // filled by JS only when the modal opens — we bypass JS and POST textarea values
+    // directly as news_hometext / news_bodytext (the server reads $_POST['news_hometext']
+    // / $_POST['news_bodytext'] at block.php:68-69).
+    const signingsData = await page.locator('#signingsDataInput').getAttribute('value');
+    expect(
+      signingsData,
+      'signingsDataInput must be non-empty JSON array for day=1 to produce signings',
+    ).not.toBe('[]');
+    expect(signingsData).not.toBeNull();
+
+    const newsHometext = await page.locator('#newsHometextArea').inputValue();
+    const newsBodytext = await page.locator('#newsBodytextArea').inputValue();
+    const csrfToken = await page
+      .locator('#assignFreeAgentsForm input[name="_csrf_token"]')
+      .getAttribute('value');
+    expect(csrfToken, 'CSRF token must be present in #assignFreeAgentsForm').toBeTruthy();
+
+    // POST the assign action. page.request shares the pinned PHPSESSID with the page
+    // context, so CSRF validation passes (same session as the GET that generated the token).
+    const response = await page.request.post('block.php?day=1', {
+      form: {
+        action: 'assign_free_agents',
+        signings_data: signingsData!,
+        news_hometext: newsHometext,
+        news_bodytext: newsBodytext,
+        _csrf_token: csrfToken!,
+      },
+    });
+    expect(response.status()).toBeLessThan(400);
+
+    // Assert the POST response body contains the success message element and the
+    // "Clear All Free Agency Offers" button — both gated on $actionCompleted (block.php:231,316).
+    // The substring 'message-success' alone is not sufficient because the CSS class
+    // definition '.message-success {' appears in the <style> block on every response.
+    // We match the rendered attribute string 'id="actionMessage" class="message-success"'
+    // which block.php:231 only emits when $actionCompleted is true.
+    const body = await response.text();
+    expect(body, 'POST response must render message-success element on successful assign').toContain(
+      'id="actionMessage" class="message-success"',
+    );
+    expect(body, 'POST response must show Clear All Free Agency Offers button on success').toContain(
+      'Clear All Free Agency Offers',
+    );
+
+    // Structural read-back: a follow-up GET must load without PHP errors.
+    // (Message/button state is per-request and is not re-asserted here — see comment above.)
+    await page.goto('block.php?day=1');
+    await assertNoPhpErrors(page, 'on block.php?day=1 after assign');
+  });
+
+  test.afterAll(async ({ request }) => {
+    // Restore pids 10/11/12 to their pre-signing seed state, reset Metros MLE/LLE,
+    // delete the assign news story, and re-seed ibl_fa_offers.
+    await resetFaSignings(request);
   });
 });
 

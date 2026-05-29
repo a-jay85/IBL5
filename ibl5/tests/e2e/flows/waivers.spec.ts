@@ -95,4 +95,24 @@ test.describe('Waivers: view switcher tabs', () => {
     await tab.click();
     await assertNoPhpErrors(page, 'after tab switch');
   });
+
+  test('stat-column header set differs between ratings and total_s views', async ({ page }) => {
+    // ratings view renders percentage/attribute columns (2g%, fta, oo, do, ...)
+    await page.goto('modules.php?name=Waivers&display=ratings');
+    await expect(page.locator('.ibl-data-table').first()).toBeVisible();
+    const ratingsHeader = (
+      await page.locator('.ibl-data-table thead').first().textContent()
+    )?.replace(/\s+/g, ' ').trim() ?? '';
+
+    // total_s view renders season-totals columns (g, gs, min, fgm, fga, ...)
+    await page.goto('modules.php?name=Waivers&display=total_s');
+    await expect(page.locator('.ibl-data-table').first()).toBeVisible();
+    const totalsHeader = (
+      await page.locator('.ibl-data-table thead').first().textContent()
+    )?.replace(/\s+/g, ' ').trim() ?? '';
+
+    expect(ratingsHeader).not.toEqual(totalsHeader);
+    expect(ratingsHeader).toContain('2g%');
+    expect(totalsHeader).toContain('fgm');
+  });
 });

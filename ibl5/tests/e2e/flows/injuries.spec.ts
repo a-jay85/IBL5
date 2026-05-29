@@ -53,4 +53,24 @@ test.describe('Injuries flow', () => {
   test('no PHP errors', async ({ page }) => {
     await assertNoPhpErrors(page, 'on Injuries page');
   });
+
+  // Characterization: the Injuries module reads ?teamid (modules/Injuries/index.php)
+  // but never passes it to the service — getInjuredPlayersWithTeams() always returns
+  // the whole league. So ?teamid=2 must STILL show injured players from other teams
+  // (seed: pid=5 on teamid 2, pid=7 on teamid 14). This locks in the current no-op
+  // behavior; if a real team filter is later added, update this test alongside it.
+  // (See PR notes — the accepted-then-ignored param is a latent bug for the reviewer.)
+  test('teamid param does not filter the injuries list (currently a no-op)', async ({
+    page,
+  }) => {
+    await page.goto('modules.php?name=Injuries&teamid=2');
+
+    await expect(
+      page.locator('.injuries-table tbody tr[data-team-id="2"]').first(),
+    ).toBeVisible();
+    await expect(
+      page.locator('.injuries-table tbody tr[data-team-id="14"]').first(),
+    ).toBeVisible();
+    await assertNoPhpErrors(page, 'on Injuries with teamid=2');
+  });
 });

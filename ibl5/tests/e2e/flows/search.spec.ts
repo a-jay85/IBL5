@@ -33,46 +33,80 @@ test.describe('Search flow', () => {
     await assertSearchTypeRadiosPresent(page);
   });
 
-  test('searching for common term returns results or empty state', async ({ page }) => {
+  test('searching for common term returns results', async ({ page }) => {
     await page.locator('input[name="query"]').fill('trade');
     await page.locator('.ibl-search__btn').click();
 
     // POST form may navigate — wait for search page to re-render
     await page.waitForLoadState('domcontentloaded');
 
-    // Should either have results or a "no matches" message — no PHP errors
     await assertNoPhpErrors(page);
 
-    // Check for result cards, empty state, or the search form re-rendered
-    const results = page.locator('.search-result');
-    const emptyState = page.locator('.ibl-empty-state');
-    const searchPage = page.locator('.search-page');
-    const hasResults = (await results.count()) > 0;
-    const hasEmpty = (await emptyState.count()) > 0;
-    const hasSearchPage = (await searchPage.count()) > 0;
-
-    expect(hasResults || hasEmpty || hasSearchPage).toBe(true);
+    // 'trade' is a seeded term — real result rows must be present
+    await expect(page.locator('.search-result').first()).toBeVisible();
   });
 
-  test('users radio + search returns user results or empty state', async ({ page }) => {
-    const usersRadio = page.locator('input[name="type"][value="users"]');
-    await usersRadio.check();
-    await page.locator('input[name="query"]').fill('admin');
+  test('no-match query shows empty state and zero result rows', async ({ page }) => {
+    await page.locator('input[name="query"]').fill('zzznomatch999');
     await page.locator('.ibl-search__btn').click();
 
     await page.waitForLoadState('domcontentloaded');
 
     await assertNoPhpErrors(page);
 
-    // User results use compact cards, or we get empty state, or search page
-    const results = page.locator('.search-result');
-    const emptyState = page.locator('.ibl-empty-state');
-    const searchPage = page.locator('.search-page');
-    expect(
-      (await results.count()) > 0 ||
-        (await emptyState.count()) > 0 ||
-        (await searchPage.count()) > 0,
-    ).toBe(true);
+    await expect(page.locator('.ibl-empty-state')).toBeVisible();
+    await expect(page.locator('.search-result')).toHaveCount(0);
+  });
+
+  test('users radio + search returns compact user result for ibl_demo', async ({ page }) => {
+    const usersRadio = page.locator('input[name="type"][value="users"]');
+    await usersRadio.check();
+    await page.locator('input[name="query"]').fill('demo');
+    await page.locator('.ibl-search__btn').click();
+
+    await page.waitForLoadState('domcontentloaded');
+
+    await assertNoPhpErrors(page);
+
+    // ibl_demo is the only seeded auth_users row matching 'demo'
+    const compactResult = page.locator('.search-result--compact').first();
+    await expect(compactResult).toBeVisible();
+    await expect(compactResult.locator('.search-result__title')).toContainText('ibl_demo');
+  });
+
+  test('comments search type shows empty state — comment system is removed', async ({ page }) => {
+    // The comments radio was removed from the form, but the backend type=comments
+    // branch still calls the stubbed searchComments() which always returns empty.
+    // Exercise it via query param to assert the empty-state path stays intact.
+    await page.goto('modules.php?name=Search&query=trade&type=comments');
+
+    await page.waitForLoadState('domcontentloaded');
+
+    await assertNoPhpErrors(page);
+
+    await expect(page.locator('.ibl-empty-state').first()).toBeVisible();
+    await expect(page.locator('.search-result')).toHaveCount(0);
+  });
+
+  test('topic filter Trades returns trade stories without waive stories', async ({ page }) => {
+    await page.locator('input[name="query"]').fill('the');
+    // Trades is the Topic dropdown (topic=2). Waive-move stories live under the
+    // IBL News topic (topic=1), so filtering to Trades must exclude them.
+    await page.locator('select[name="topic"]').selectOption('2');
+    await page.locator('.ibl-search__btn').click();
+
+    await page.waitForLoadState('domcontentloaded');
+
+    await assertNoPhpErrors(page);
+
+    // Trade stories must be present under this category filter
+    await expect(page.locator('.search-result').first()).toBeVisible();
+    // Waive-only category (catid=1) stories must NOT appear
+    const heading = page.locator('.search-results__heading');
+    await expect(heading).not.toContainText('waive', { ignoreCase: true });
+    const resultList = page.locator('.search-result');
+    const resultText = await resultList.allTextContents();
+    expect(resultText.join(' ').toLowerCase()).not.toContain('waive');
   });
 
   test('short query shows error message', async ({ page }) => {

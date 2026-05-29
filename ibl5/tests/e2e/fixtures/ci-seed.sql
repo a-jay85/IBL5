@@ -1865,3 +1865,44 @@ WHERE snap.rn = 1;
 -- roles_mask=0, no ibl_team_info row — exercises the authenticated
 -- non-admin "no franchise" code path.
 -- ============================================================
+
+-- ============================================================
+-- Read-module interaction coverage seed (PR: read-module-interaction-coverage)
+-- Deterministic fixtures for tightened filter/sort/tab/replay E2E tests.
+-- ============================================================
+
+-- OneOnOneGame replay (one-on-one-game.spec.ts) — table starts empty.
+-- Columns match OneOnOneGameRepository::getGameById(): gameid, playbyplay,
+-- winner, loser, winscore, lossscore, owner. winner/loser are plain name
+-- strings rendered verbatim by OneOnOneGameView::renderGameReplay().
+INSERT INTO ibl_one_on_one (gameid, playbyplay, winner, loser, winscore, lossscore, owner) VALUES
+  (1, '<p>E2E seeded one-on-one replay.</p>', 'Test Player', 'Test Player Two', 21, 15, 'ibl_demo')
+ON DUPLICATE KEY UPDATE winner = VALUES(winner);
+
+-- AwardHistory deterministic name-vs-year sort (award-history.spec.ts).
+-- Unique award token "E2E Sort Award" isolates exactly two rows so a
+-- name-sort (Alpha before Zeta) is observably distinct from a year-sort
+-- (2024 Zeta before 2025 Alpha). LEFT JOIN to ibl_plr means non-player
+-- names still render (pid NULL), so no ibl_plr rows are required.
+INSERT INTO ibl_awards (year, award, name) VALUES
+  (2024, 'E2E Sort Award', 'Zeta Award Winner'),
+  (2025, 'E2E Sort Award', 'Alpha Award Winner');
+
+-- SeasonHighs playoff-window box score (season-highs.spec.ts seasonPhase=Playoffs).
+-- Playoff window is {endingYear}-06-01..-06-30 (Season::IBL_PLAYOFF_MONTH=6).
+-- A June 2026 row makes the Playoffs stat-leader tables render real data
+-- instead of an empty phase. game_type / season_year / calc_* are generated.
+INSERT INTO ibl_box_scores (
+  `game_date`, pid, name, pos, visitor_teamid, home_teamid, teamid,
+  game_of_that_day, game_min, game_2gm, game_2ga, game_ftm, game_fta, game_3gm, game_3ga,
+  game_orb, game_drb, game_ast, game_stl, game_tov, game_blk, game_pf,
+  `uuid`
+) VALUES
+  ('2026-06-15', 1, 'Test Player', 'SG', 2, 1, 1,
+   1, 38, 9, 16, 6, 7, 4, 8,
+   3, 6, 7, 2, 2, 1, 3,
+   'b0000000-0000-0000-0000-000000000601'),
+  ('2026-06-15', 4, 'Stars Guard', 'PG', 2, 1, 2,
+   1, 36, 7, 15, 5, 6, 3, 7,
+   2, 5, 9, 3, 3, 0, 2,
+   'b0000000-0000-0000-0000-000000000602');

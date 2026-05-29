@@ -99,6 +99,42 @@ test.describe('Award History flow', () => {
     expect(headerString).toContain('Award');
   });
 
+  test('name sort orders awards differently than year sort', async ({ page }) => {
+    const submitBtn = page.locator('.ibl-filter-form__submit');
+
+    // --- Sort by name (value "1") ---
+    await page.locator('#aw_Award').fill('E2E Sort Award');
+    await page.locator('input[name="aw_sortby"][value="1"]').check();
+    await submitBtn.click();
+
+    const table = page.locator('.ibl-data-table.sortable');
+    await expect(table.first()).toBeVisible();
+    await expect(table.first().locator('tbody tr').first()).toBeVisible();
+
+    const nameTableText = await table.first().locator('tbody').textContent() ?? '';
+    expect(nameTableText).toContain('Alpha Award Winner');
+    expect(nameTableText).toContain('Zeta Award Winner');
+    expect(nameTableText.indexOf('Alpha Award Winner')).toBeLessThan(
+      nameTableText.indexOf('Zeta Award Winner'),
+    );
+
+    // --- Sort by year (value "3") ---
+    await page.goto('modules.php?name=AwardHistory');
+    await page.locator('#aw_Award').fill('E2E Sort Award');
+    await page.locator('input[name="aw_sortby"][value="3"]').check();
+    await submitBtn.click();
+
+    await expect(table.first()).toBeVisible();
+    await expect(table.first().locator('tbody tr').first()).toBeVisible();
+
+    const yearTableText = await table.first().locator('tbody').textContent() ?? '';
+    expect(yearTableText).toContain('Alpha Award Winner');
+    expect(yearTableText).toContain('Zeta Award Winner');
+    expect(yearTableText.indexOf('Zeta Award Winner')).toBeLessThan(
+      yearTableText.indexOf('Alpha Award Winner'),
+    );
+  });
+
   test('no PHP errors on form and results pages', async ({ page }) => {
     // Check form page
     await assertNoPhpErrors(page, 'on Award History form page');

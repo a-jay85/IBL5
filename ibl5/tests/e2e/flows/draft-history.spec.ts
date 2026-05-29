@@ -1,7 +1,15 @@
 import { test, expect } from '../fixtures/base';
 import type { Page } from '../fixtures/base';
 import { assertNoPhpErrors } from '../helpers/php-errors';
+import { assertHtmxSwap } from '../helpers/htmx-swap';
 import { publicStorageState } from '../helpers/public-storage-state';
+
+// Seeded draftyear discriminators (ci-seed.sql): 2026 has exactly one pick
+// ("Draft Rookie 2026"); 2021 has "Test Player" (and others). Switching to
+// 2026 must surface the 2026 pick and exclude the 2021 pick.
+const YEAR_WITH_ONE_PICK = '2026';
+const PICK_IN_2026 = 'Draft Rookie 2026';
+const PICK_IN_2021 = 'Test Player';
 
 // Draft History — public page.
 test.use({ storageState: publicStorageState() });
@@ -141,58 +149,39 @@ test.describe('Draft History flow', () => {
 test.describe('HTMX year switching', () => {
   test.use({ actionTimeout: 15_000, navigationTimeout: 20_000 });
 
-  test('year dropdown swaps content without full page reload', async ({
+  test('year dropdown swaps to the selected year-specific picks', async ({
     page,
   }) => {
     await page.goto('modules.php?name=DraftHistory');
 
-    // Mark nav to verify it persists (proves no full reload)
-    await page.evaluate(() => {
-      const navEl = document.querySelector('nav.fixed');
-      if (navEl) navEl.setAttribute('data-htmx-marker', '1');
+    await assertHtmxSwap(page, {
+      trigger: () =>
+        page.locator('#draft-year-select').selectOption(YEAR_WITH_ONE_PICK),
+      apiUrlPattern: (url) => url.includes('DraftHistory'),
+      expectedUrl: new RegExp('year=' + YEAR_WITH_ONE_PICK),
+      contentSelector: '#draft-history-content',
     });
 
-    const yearValue = await getFirstDraftYear(page);
-    expect(yearValue).toBeTruthy();
-
-    await Promise.all([
-      page.waitForResponse(
-        (r) =>
-          r.url().includes('DraftHistory') &&
-          r.url().includes('op=api') &&
-          r.status() === 200,
-      ),
-      page.locator('#draft-year-select').selectOption(yearValue),
-    ]);
-
-    await expect(page.locator('#draft-history-content')).toBeVisible();
-
-    // Nav marker survived — no full page reload occurred
-    const marker = await page.evaluate(() =>
-      document.querySelector('nav.fixed')?.getAttribute('data-htmx-marker'),
-    );
-    expect(marker).toBe('1');
+    // Content delta: the swapped table shows only the 2026 pick, never the
+    // 2021 pick — proving the year param actually filtered the result set.
+    const table = page.locator('.draft-history-table');
+    await expect(table.first()).toBeVisible();
+    await expect(table).toContainText(PICK_IN_2026);
+    await expect(table).not.toContainText(PICK_IN_2021);
   });
 
   test('year change updates URL', async ({ page }) => {
     await page.goto('modules.php?name=DraftHistory');
 
-    const yearValue = await getFirstDraftYear(page);
-    expect(yearValue).toBeTruthy();
+    await assertHtmxSwap(page, {
+      trigger: () =>
+        page.locator('#draft-year-select').selectOption(YEAR_WITH_ONE_PICK),
+      apiUrlPattern: (url) => url.includes('DraftHistory'),
+      expectedUrl: new RegExp('year=' + YEAR_WITH_ONE_PICK),
+      contentSelector: '#draft-history-content',
+    });
 
-    await Promise.all([
-      page.waitForResponse(
-        (r) =>
-          r.url().includes('DraftHistory') &&
-          r.url().includes('op=api') &&
-          r.status() === 200,
-      ),
-      page.locator('#draft-year-select').selectOption(yearValue),
-    ]);
-
-    // HX-Push-Url fires after HTMX swap — allow extra time for pushState
-    await page.waitForURL(new RegExp('year=' + yearValue), { timeout: 10000 });
-    expect(page.url()).toContain('year=' + yearValue);
+    expect(page.url()).toContain('year=' + YEAR_WITH_ONE_PICK);
   });
 });
 
@@ -202,20 +191,15 @@ test.describe('browser back/forward after HTMX year switch', () => {
   test('back/forward works after year switch', async ({ page }) => {
     await page.goto('modules.php?name=DraftHistory');
 
-    const yearValue = await getFirstDraftYear(page);
-    expect(yearValue).toBeTruthy();
+    const yearValue = YEAR_WITH_ONE_PICK;
 
-    await Promise.all([
-      page.waitForResponse(
-        (r) =>
-          r.url().includes('DraftHistory') &&
-          r.url().includes('op=api') &&
-          r.status() === 200,
-      ),
-      page.locator('#draft-year-select').selectOption(yearValue),
-    ]);
-
-    await page.waitForURL(new RegExp('year=' + yearValue), { timeout: 10000 });
+    await assertHtmxSwap(page, {
+      trigger: () =>
+        page.locator('#draft-year-select').selectOption(yearValue),
+      apiUrlPattern: (url) => url.includes('DraftHistory'),
+      expectedUrl: new RegExp('year=' + yearValue),
+      contentSelector: '#draft-history-content',
+    });
 
     await page.goBack();
     await page.waitForURL(/DraftHistory/, { timeout: 10000 });

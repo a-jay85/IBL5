@@ -1,5 +1,6 @@
 import { test, expect } from '../fixtures/base';
 import { assertNoPhpErrors } from '../helpers/php-errors';
+import { assertHtmxSwap } from '../helpers/htmx-swap';
 import { publicStorageState } from '../helpers/public-storage-state';
 
 // Franchise Record Book — public page, no authentication required.
@@ -95,52 +96,30 @@ test.describe('Franchise Record Book flow', () => {
   test('team selection does not trigger full page reload', async ({ page }) => {
     await page.goto('modules.php?name=FranchiseRecordBook');
 
-    // Mark nav to verify it persists (proves no full reload)
-    await page.evaluate(() => {
-      const navEl = document.querySelector('nav.fixed');
-      if (navEl) navEl.setAttribute('data-htmx-marker', '1');
-    });
-
     const teamSelect = page.locator('#record-book-team');
-    const options = teamSelect.locator('option');
-    const teamValue = await options.nth(1).getAttribute('value');
+    const teamValue = await teamSelect.locator('option').nth(1).getAttribute('value');
 
-    await Promise.all([
-      page.waitForResponse(
-        (r) =>
-          r.url().includes('FranchiseRecordBook') &&
-          r.url().includes('op=api') &&
-          r.status() === 200,
-      ),
-      teamSelect.selectOption(teamValue!),
-    ]);
-
-    // Nav marker survived — no full page reload occurred
-    const marker = await page.evaluate(() =>
-      document.querySelector('nav.fixed')?.getAttribute('data-htmx-marker'),
-    );
-    expect(marker).toBe('1');
+    await assertHtmxSwap(page, {
+      trigger: () => teamSelect.selectOption(teamValue!),
+      apiUrlPattern: (url) => url.includes('FranchiseRecordBook'),
+      expectedUrl: /teamid=/,
+      contentSelector: '#record-book-content',
+    });
   });
 
   test('team selection updates URL', async ({ page }) => {
     await page.goto('modules.php?name=FranchiseRecordBook');
 
     const teamSelect = page.locator('#record-book-team');
-    const options = teamSelect.locator('option');
-    const teamValue = await options.nth(1).getAttribute('value');
+    const teamValue = await teamSelect.locator('option').nth(1).getAttribute('value');
 
-    await Promise.all([
-      page.waitForResponse(
-        (r) =>
-          r.url().includes('FranchiseRecordBook') &&
-          r.url().includes('op=api') &&
-          r.status() === 200,
-      ),
-      teamSelect.selectOption(teamValue!),
-    ]);
+    await assertHtmxSwap(page, {
+      trigger: () => teamSelect.selectOption(teamValue!),
+      apiUrlPattern: (url) => url.includes('FranchiseRecordBook'),
+      expectedUrl: /teamid=/,
+      contentSelector: '#record-book-content',
+    });
 
-    // HX-Push-Url fires after HTMX swap — allow extra time for pushState
-    await page.waitForURL(/teamid=/, { timeout: 10000 });
     expect(page.url()).toContain('teamid=');
   });
 
@@ -162,19 +141,14 @@ test.describe('browser back/forward after HTMX team switch', () => {
     const teamValue = await options.nth(1).getAttribute('value');
     const teamName = (await options.nth(1).textContent())?.trim() ?? '';
 
-    await Promise.all([
-      page.waitForResponse(
-        (r) =>
-          r.url().includes('FranchiseRecordBook') &&
-          r.url().includes('op=api') &&
-          r.status() === 200,
-      ),
-      teamSelect.selectOption(teamValue!),
-    ]);
+    await assertHtmxSwap(page, {
+      trigger: () => teamSelect.selectOption(teamValue!),
+      apiUrlPattern: (url) => url.includes('FranchiseRecordBook'),
+      expectedUrl: /teamid=/,
+      contentSelector: '#record-book-content',
+    });
 
-    await page.waitForURL(/teamid=/, { timeout: 10000 });
-
-    // Verify team view loaded
+    // Content delta: the swapped title reflects the selected team.
     const title = page.locator('#record-book-content .ibl-title').first();
     await expect(title).toContainText(teamName, { timeout: 10_000 });
 

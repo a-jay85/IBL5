@@ -8,12 +8,21 @@ use Api\Contracts\RouterInterface;
 
 class Router implements RouterInterface
 {
+    /**
+     * Routes reachable without an API key. The health probe must answer external
+     * uptime monitors that hold no credential; it exposes only reachability, no data.
+     *
+     * @var list<string>
+     */
+    public const PUBLIC_ROUTES = ['health'];
+
     private const UUID_PATTERN = '[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}';
     private const CONFERENCE_PATTERN = 'East(?:ern)?|West(?:ern)?';
     private const OFFER_ID_PATTERN = '\d+';
 
     /** @var array<string, string> GET route patterns to controller class names. Order matters: specific first. */
     private const GET_ROUTES = [
+        'health'                  => Controller\HealthController::class,
         'players/export'          => Controller\PlayerExportController::class,
         'players/{uuid}/stats'    => Controller\PlayerStatsController::class,
         'players/{uuid}/history'  => Controller\PlayerHistoryController::class,

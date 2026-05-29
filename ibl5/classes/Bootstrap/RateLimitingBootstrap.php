@@ -22,6 +22,12 @@ class RateLimitingBootstrap implements BootstrapStepInterface
      */
     public function boot(ContainerInterface $container): void
     {
+        // Public routes (e.g. /health) skip auth and therefore set no api.key;
+        // there is no key to rate-limit, so this step is a no-op for them.
+        if (!$container->has('api.key')) {
+            return;
+        }
+
         /** @var \mysqli $db */
         $db = $container->get(\mysqli::class);
         /** @var array{key_hash: string, key_prefix: string, owner_name: string, permission_level: string, rate_limit_tier: string} $apiKey */

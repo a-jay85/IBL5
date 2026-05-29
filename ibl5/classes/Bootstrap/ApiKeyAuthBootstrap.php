@@ -7,6 +7,7 @@ namespace Bootstrap;
 use Api\Middleware\ApiKeyAuthenticator;
 use Api\Repository\ApiKeyRepository;
 use Api\Response\JsonResponder;
+use Api\Router;
 use Bootstrap\Contracts\BootstrapStepInterface;
 use Bootstrap\Contracts\ContainerInterface;
 
@@ -22,6 +23,13 @@ class ApiKeyAuthBootstrap implements BootstrapStepInterface
      */
     public function boot(ContainerInterface $container): void
     {
+        // Public routes (e.g. /health) are reachable without an API key so external
+        // uptime monitors can probe them. They expose no data, only reachability.
+        $route = $container->get('api.route');
+        if (is_string($route) && in_array(trim($route, '/'), Router::PUBLIC_ROUTES, true)) {
+            return;
+        }
+
         /** @var \mysqli $db */
         $db = $container->get(\mysqli::class);
 

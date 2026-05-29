@@ -17,6 +17,20 @@ class RouterTest extends TestCase
         $this->router = new Router();
     }
 
+    public function testMatchesHealth(): void
+    {
+        $result = $this->router->match('health', 'GET');
+
+        $this->assertNotNull($result);
+        $this->assertSame('Api\Controller\HealthController', $result['controller']);
+        $this->assertSame([], $result['params']);
+    }
+
+    public function testHealthIsListedAsPublicRoute(): void
+    {
+        $this->assertContains('health', Router::PUBLIC_ROUTES);
+    }
+
     public function testMatchesPlayersExport(): void
     {
         $result = $this->router->match('players/export', 'GET');

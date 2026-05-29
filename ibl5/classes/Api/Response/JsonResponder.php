@@ -54,6 +54,21 @@ class JsonResponder
     }
 
     /**
+     * Send a flat JSON body verbatim with a custom status code (no success/error envelope).
+     *
+     * Used by monitor-facing probes (e.g. /health) whose response shape must be a
+     * fixed top-level object rather than the wrapped success/error envelope.
+     *
+     * @param array<string, mixed> $body                  Response body sent as-is
+     * @param int $statusCode                              HTTP status code
+     * @param array<string, string> $extraHeaders          Additional headers
+     */
+    public function raw(array $body, int $statusCode = 200, array $extraHeaders = []): void
+    {
+        $this->send($statusCode, $body, $extraHeaders);
+    }
+
+    /**
      * Send a 304 Not Modified response (no body).
      */
     public function notModified(): void

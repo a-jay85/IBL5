@@ -1,6 +1,6 @@
 ---
 description: Long-running backlog of maintenance-cost reduction opportunities, organized by axis. Each item is a candidate for a future plan.
-last_verified: 2026-05-28
+last_verified: 2026-05-29
 ---
 
 # Maintenance-Cost Reduction Backlog
@@ -86,6 +86,7 @@ Effort scale:
 **Suggested direction:** Move roster/cash fetching to the service layer; pass pre-fetched arrays into render methods.
 **Est. effort:** M
 **Risk if untouched:** Slow queries inside renders block page output; view can't be unit-tested or screenshotted without a live DB.
+**Status:** Completed (verified 2026-05-29 audit) — constructor now accepts injected `TeamIdentityRepositoryInterface`; no inline `new TeamQueryRepository`/`new BuyoutLedgerRepository`; render methods receive pre-fetched arrays.
 
 ### 1.9 SavedDepthChartService — Three Separate Fetches for the Same Active DC
 **Location:** `ibl5/classes/SavedDepthChart/SavedDepthChartService.php` (593 lines)
@@ -100,6 +101,7 @@ Effort scale:
 **Suggested direction:** Deprecate direct property access; add typed getters delegating to `$this->playerData`; remove parallel properties.
 **Est. effort:** L
 **Risk if untouched:** New properties land in wrong place causing PHPStan errors or silent nulls; 4-place-update is a persistent bug attractor.
+**Status:** Completed (verified 2026-05-29 audit) — public nullable properties replaced by typed getters delegating to `$this->playerData`; `syncPropertiesFromPlayerData()` deleted.
 
 ### 1.11 BoxscoreProcessor — Hardcoded 30-Parameter Method Call
 **Location:** `ibl5/classes/Boxscore/BoxscoreProcessor.php` lines 260-295 (557 LOC)
@@ -142,6 +144,7 @@ Effort scale:
 **Suggested direction:** Move to `DepthChartEntryService` or `JsbProductionCalculator`; migrate to `return`-based output.
 **Est. effort:** S
 **Risk if untouched:** Formula invisible to tests; will silently break if column names change.
+**Status:** Completed (verified 2026-05-29 audit) — `computeJsbProduction()` moved to `DepthChartEntryService`; View now calls `$this->service->computeJsbProduction()`.
 
 ### 1.17 BaseMysqliRepository — Slow-Query Logging via Static Global
 **Location:** `ibl5/classes/BaseMysqliRepository.php` lines 225-237 (481 LOC)
@@ -477,6 +480,7 @@ Effort scale:
 **Suggested direction:** Delete; update `ibl5/bin/e2e-local.sh`; add to `.gitignore` as safety.
 **Est. effort:** S
 **Risk if untouched:** Dead credential file confuses; risks recommit.
+**Status:** Completed (verified 2026-05-29 audit) — `configOlympics.php` deleted from disk.
 
 ### 3.5 `mainfile.php` and `LegacyFunctions.php` Define the Same Functions — Already Diverged
 **Location:** `ibl5/mainfile.php:374-666` and `ibl5/classes/Bootstrap/LegacyFunctions.php`
@@ -484,6 +488,7 @@ Effort scale:
 **Suggested direction:** Remove duplicates from `mainfile.php`; `require_once 'LegacyFunctions.php'`.
 **Est. effort:** M
 **Risk if untouched:** Latent SQL injection in production `blocks()` if any request path supplies untrusted `$currentlang`.
+**Status:** Completed (verified 2026-05-29 audit) — `mainfile.php` reduced to ~65 LOC; defines no functions, `require_once`s `LegacyFunctions.php` (single source). Duplicate definitions gone. See ADR-0030 / [[14.3]].
 
 ### 3.6 `$_REQUEST → $GLOBALS` Injection — Incomplete Denylist
 **Location:** `ibl5/mainfile.php:165-193`
@@ -491,6 +496,7 @@ Effort scale:
 **Suggested direction:** Extend denylist OR replace with whitelist-only (`newlang`, `redirect`).
 **Est. effort:** M
 **Risk if untouched:** Overriding `$AllowableHTML` enables stored XSS through `filter()` consumers.
+**Status:** Completed (verified 2026-05-29 audit) — wholesale `$_REQUEST`→`$GLOBALS` block removed from `mainfile.php`; `ConfigBootstrap` now uses a 2-key allowlist (`newlang`, `redirect`). See [[14.12]].
 
 ### 3.7 `block.php` Violates `BanInlineCssRule` and `BanNumberFormatRule`
 **Location:** `ibl5/block.php:138-224, 283`
@@ -519,6 +525,7 @@ Effort scale:
 **Suggested direction:** Remove; confirm server-level compression.
 **Est. effort:** S
 **Risk if untouched:** `ob_gzhandler` + `PageCache` `ob_start` can cache gzip content and serve to non-gzip clients as plain text.
+**Status:** Completed (verified 2026-05-29 audit) — no `ob_gzhandler` / `HTTP_USER_AGENT` MSIE check remains in `mainfile.php`.
 
 ### 3.11 `config.php` and `config.php.example` Drift on Keys
 **Location:** `ibl5/config.php.example`, `ibl5/config.php:69,132`
@@ -533,6 +540,7 @@ Effort scale:
 **Suggested direction:** Replace with `require_once 'modules.php'` after setting `$name`; remove dup.
 **Est. effort:** S
 **Risk if untouched:** Any module-routing change must be mirrored in two files.
+**Status:** Completed (verified 2026-05-29 audit) — `index.php` is now a thin shim: sets `$name='News'` then delegates to `mainfile.php`; dispatch lives in one place.
 
 ### 3.13 `Bootstrap\Application` Exists But Is Wired Nowhere
 **Location:** `ibl5/classes/Bootstrap/Application.php` (+ all step classes)
@@ -562,6 +570,7 @@ Effort scale:
 **Suggested direction:** Audit all `filter(..., ..., 1)` callers; remove the branch; add PHPStan rule banning the `save=1` form.
 **Est. effort:** M
 **Risk if untouched:** Any path using `filter($x, "", 1)` before prepared insert stores `\\'`-escaped content.
+**Status:** Completed (verified 2026-05-29 audit) — `mainfile.php` no longer contains `filter()`/`addslashes`; the `save=1` branch is gone from the active path. (`LegacyFunctions.php:320` `addslashes` is JS-string escaping in `loginbox()`, not the SQL `save=1` path.)
 
 ### 3.17 `modules.php` Loose Equality on Module Name
 **Location:** `ibl5/modules.php:20`
@@ -569,6 +578,7 @@ Effort scale:
 **Suggested direction:** Read only from `$_GET['name']` with string narrowing and `===`.
 **Est. effort:** S
 **Risk if untouched:** Edge cases pass when they shouldn't (mostly fixed in PHP 8, but the pattern is wrong).
+**Status:** Completed (verified 2026-05-29 audit) — `modules.php` reads `$_GET['name']`, validates via `preg_match('/^[a-zA-Z0-9_]+$/', ...)` + `ModuleRegistry::isValid()`; no loose `==`.
 
 ---
 
@@ -768,6 +778,7 @@ Effort scale:
 **Suggested direction:** Per-rule baseline suppression OR swap to `createMock()`.
 **Est. effort:** S
 **Risk if untouched:** Noise masks real Trading validator/processor issues.
+**Status:** Completed (verified 2026-05-29 audit) — Trading `staticMethod.dynamicCall` now 0 (was 91), resolved by the 5.1 MockDatabase-alias fix. Rule-wide total grew to ~218 elsewhere; if still a concern, re-scope as a new finding.
 
 ### 5.3 UpdateAllTheThings Tests — 151 Errors Hiding Missing Interface Coverage
 **Location:** `ibl5/tests/UpdateAllTheThings/` (259 errors)
@@ -775,6 +786,7 @@ Effort scale:
 **Suggested direction:** Fix mock alias first; then trace `method.notFound` to interface stubs.
 **Est. effort:** M
 **Risk if untouched:** Nightly update pipeline mocks methods that don't exist on production interface.
+**Status:** Completed (verified 2026-05-29 audit) — the 151 `class.notFound`+`method.notFound` errors are gone (5.1 alias fix). ~51 UAT baseline entries remain but are different error types; re-scope if pursuing.
 
 ### 5.4 `MockDatabase` Untyped Arrays — 46 Cascade Errors
 **Location:** `ibl5/tests/WideUnit/Mocks/MockDatabase.php`, `MockDatabaseResult.php`
@@ -828,6 +840,7 @@ Effort scale:
 **Suggested direction:** Resolve via mock-alias fix; then real interface method names enforce correctness.
 **Est. effort:** M
 **Risk if untouched:** Parser interface drift goes silent.
+**Status:** Completed (verified 2026-05-29 audit) — 25 `method.notFound` cleared by 5.1 alias fix; ~16 JsbParser baseline entries remain (other identifiers).
 
 ### 5.13 Waivers Tests — Stubs Stub a Concrete Class, Not an Interface
 **Location:** `ibl5/tests/Waivers/` (133 errors)
@@ -835,6 +848,7 @@ Effort scale:
 **Suggested direction:** Extract `CommonMysqliRepositoryInterface`; have Waivers depend on it.
 **Est. effort:** M
 **Risk if untouched:** Waivers is business-critical; mock signatures pass even after class refactors.
+**Status:** Completed (verified 2026-05-29 audit) — `CommonMysqliRepositoryInterface` extraction (7.1, 2026-05-16) cleared the 27 `method.notFound`; Waivers now stubs the interface.
 
 ### 5.14 36 `constructor.missingParentCall` — Anonymous mysqli Subclasses
 **Location:** Inline `new class extends mysqli` in tests (Trading 9, DepthChartEntry 8, Draft 8, FreeAgency 2)
@@ -842,6 +856,7 @@ Effort scale:
 **Suggested direction:** Replace with shared `MockDatabase`.
 **Est. effort:** M
 **Risk if untouched:** Degraded static analysis on 40+ test files.
+**Status:** Completed (verified 2026-05-29 audit) — `constructor.missingParentCall` now 0 in baselines (was 36).
 
 ### 5.15 161 `argument.type` in Tests — Mostly Phantom Cascades
 **Location:** Extension (41), FreeAgency (23), WideUnit (22), Injuries (18), UpdateAllTheThings (16), DepthChartEntry (9)
@@ -856,6 +871,7 @@ Effort scale:
 **Suggested direction:** Fix `PageLayout` first (widest); migrate trading cards together.
 **Est. effort:** S per file
 **Risk if untouched:** Inline CSS overrides component styles invisibly.
+**Status:** Completed (verified 2026-05-29 audit) — no `ibl.inlineCss` entries remain in `phpstan-baseline.neon`; PageLayout's 2 cases are now inline `@phpstan-ignore` (see [[11.1]]).
 
 ### 5.17 4 `ibl.cookieBeforeHeader` Suppressions — Possibly Real Auth Ordering Bugs
 **Location:** `FreeAgencyController.php` (2 — possibly false-positive), `SeriesRecordsController.php` (1), `TeamController.php` (1), `WaiversController.php` (2)
@@ -892,6 +908,7 @@ Effort scale:
 **Suggested direction:** Extract `TradeOffer` HTML to a View class; replace `ConfigBootstrap` tags with `<strong>` + CSS.
 **Est. effort:** S (ConfigBootstrap) / M (TradeOffer)
 **Risk if untouched:** Presentation tangled with domain logic; untestable.
+**Status:** Completed (verified 2026-05-29 audit) — no `ibl.deprecatedHtmlTag` entries remain in either baseline.
 
 ---
 
@@ -919,6 +936,7 @@ Effort scale:
 **Suggested direction:** PHPUnit for authorization rules.
 **Est. effort:** S
 **Risk if untouched:** Unauthorized module access; feature gates unvalidated.
+**Status:** Completed (verified 2026-05-29 audit) — `tests/Module/` now has `ModuleAccessControlTest.php` + `ModuleRegistryTest.php`.
 
 ### 6.4 PageLayout — Zero Tests
 **Location:** `ibl5/classes/PageLayout/PageLayout.php`
@@ -926,6 +944,7 @@ Effort scale:
 **Suggested direction:** PHPUnit for structure assembly, CSS class injection.
 **Est. effort:** S
 **Risk if untouched:** Layout regressions invisible.
+**Status:** Partially completed (verified 2026-05-29 audit) — `tests/PageLayout/PageLayoutHeaderSideEffectTest.php` now exists (header side-effect coverage); broader structure/CSS-injection coverage still thin.
 
 ### 6.5 Statistics/TeamStatsCalculator — Zero Tests
 **Location:** `ibl5/classes/Statistics/TeamStatsCalculator.php`
@@ -933,6 +952,7 @@ Effort scale:
 **Suggested direction:** PHPUnit for aggregation, rounding, div-by-zero.
 **Est. effort:** M
 **Risk if untouched:** Stats mismatches vs player-level box scores.
+**Status:** Completed (verified 2026-05-29 audit) — `tests/Statistics/TeamStatsCalculatorTest.php` now exists.
 
 ### 6.6 StrengthOfScheduleCalculator — Zero Tests
 **Location:** `ibl5/classes/StrengthOfSchedule/StrengthOfScheduleCalculator.php`
@@ -940,6 +960,7 @@ Effort scale:
 **Suggested direction:** PHPUnit for weighting math.
 **Est. effort:** M
 **Risk if untouched:** SoS rankings mathematically wrong; playoff seeding affected.
+**Status:** Completed (verified 2026-05-29 audit) — `tests/StrengthOfSchedule/StrengthOfScheduleCalculatorTest.php` now exists.
 
 ### 6.7 LeagueStarters — Thin (7 files, 2 tests, 0.29 ratio)
 **Location:** `ibl5/classes/LeagueStarters`
@@ -1066,6 +1087,7 @@ Effort scale:
 **Suggested direction:** Refactor to `fetchAll($query, $types, ...$names)` pattern.
 **Est. effort:** S
 **Risk if untouched:** Silent error swallowing; inconsistent observability.
+**Status:** Completed (verified 2026-05-29 audit) — `getPlayerIdsByNames` now calls `$this->fetchAllInList()` (see [[7.6]]); no raw prepare/execute.
 
 ### 7.5 `DatabaseCache` Bypasses `BaseMysqliRepository`
 **Location:** `ibl5/classes/Cache/DatabaseCache.php`
@@ -1080,6 +1102,7 @@ Effort scale:
 **Suggested direction:** Add `protected fetchAllInList(string $query, string $type, array $ids): array` to `BaseMysqliRepository`.
 **Est. effort:** S
 **Risk if untouched:** Off-by-one risk; missing empty-array guards drift.
+**Status:** Partially completed (verified 2026-05-29 audit) — `BaseMysqliRepository::fetchAllInList()` helper exists and is adopted by LeagueControlPanel/SeasonArchive/Voting repos; remaining repos not yet migrated.
 
 ### 7.7 `FreeAgencyView` and `FreeAgencyProcessor` Store Raw `\mysqli`
 **Location:** `ibl5/classes/FreeAgency/FreeAgencyView.php`, `FreeAgencyProcessor.php`
@@ -1131,6 +1154,7 @@ Effort scale:
 **Suggested direction:** Constructor-inject `CommonMysqliRepository`.
 **Est. effort:** S
 **Risk if untouched:** Three+ instances during draft operations; team-lookup behavior can't be stubbed.
+**Status:** Completed (verified 2026-05-29 audit) — `DraftRepository` constructor now injects `TeamIdentityRepositoryInterface`; no inline `new CommonMysqliRepository`.
 
 ### 7.14 `StandingsRepository` Contains Business Logic
 **Location:** `ibl5/classes/Standings/StandingsRepository.php` lines 602-663
@@ -1310,6 +1334,7 @@ one-time backfill (its tables now live in the baseline schema + migrations).
 **Suggested direction:** Delete the section.
 **Est. effort:** S
 **Risk if untouched:** Agents avoid valid MariaDB constructs for a migration that won't happen.
+**Status:** Completed (verified 2026-05-29 audit) — PostgreSQL compatibility section removed from `DATABASE_GUIDE.md` (part of 9.1 / `doc-freshness-catchup`).
 
 ### 9.3 `schema-reference.md` — Dropped `nuke_users` Listed as Live
 **Location:** `.claude/rules/schema-reference.md` lines 18, 26
@@ -1394,6 +1419,7 @@ one-time backfill (its tables now live in the baseline schema + migrations).
 **Suggested direction:** Remove or point to `SELECT MAX(version) FROM schema_migrations`.
 **Est. effort:** S
 **Risk if untouched:** Agents cite "v1.5" misleadingly.
+**Status:** Completed (verified 2026-05-29 audit) — "Schema Version: v1.5" line removed from `DATABASE_GUIDE.md` (part of 9.1 / `doc-freshness-catchup`).
 
 ### 9.14 `css-architecture.md` Loading Verification
 **Location:** `.claude/rules/css-architecture.md`
@@ -1433,7 +1459,7 @@ one-time backfill (its tables now live in the baseline schema + migrations).
 
 ### 9.19 65 of 80 Module Directories Have No README
 **Location:** `ibl5/classes/` (65 dirs)
-**Problem:** 15 have READMEs; 65 don't (Trading, FreeAgency, Api, JsbParser, PlrParser, Waivers, Auth, Bootstrap, BulkImport, Season).
+**Problem:** ~19 have READMEs (as of 2026-05-29 audit; was 15); ~61 don't (Trading, FreeAgency, Api, JsbParser, PlrParser, Waivers, Auth, Bootstrap, BulkImport, Season).
 **Suggested direction:** Prioritize READMEs for top-10 modules; add to doc-freshness CI scope.
 **Est. effort:** M (top 10) / L (all)
 **Risk if untouched:** Agent reverse-engineers module from code; orientation tokens wasted.
@@ -1467,7 +1493,7 @@ one-time backfill (its tables now live in the baseline schema + migrations).
 **Risk if untouched:** Any IBL6 contributor starts from zero context.
 
 ### 9.24 `codebase-map.md` — Machine-Generated But No Auto-Regen
-**Location:** CLAUDE.md line 36 + `.claude/rules/codebase-map.md`
+**Location:** CLAUDE.md line 36 + repo-root `.claude/rules/codebase-map.md` (NOT under `ibl5/` — corrected 2026-05-29 audit)
 **Problem:** No CI regenerates it; drifts on module add/rename.
 **Suggested direction:** CI step running `bin/generate-codebase-map` with diff-fail; or add to post-plan.
 **Est. effort:** S
@@ -1501,7 +1527,7 @@ one-time backfill (its tables now live in the baseline schema + migrations).
 
 ### 10.1 Baseline-Counts.json Stale: `ibl.rawSuperglobal` Claims 7 Entries (Actual: 0)
 **Location:** `ibl5/phpstan-baseline-counts.json`
-**Problem:** 7 entries were burned down; snapshot never updated. Drift detector warns on large decreases but doesn't fail.
+**Problem:** 7 entries were burned down; snapshot never updated. Drift detector warns on large decreases but doesn't fail. (2026-05-29 audit: `phpstan-baseline.neon`'s entry list is now empty entirely — the drift is broader than just `rawSuperglobal`.)
 **Suggested direction:** `php bin/check-baseline-drift --update`; tighten drift detector to FAIL on large decreases.
 **Est. effort:** S
 **Risk if untouched:** Misleads maintainers about true baseline.
@@ -1512,6 +1538,7 @@ one-time backfill (its tables now live in the baseline schema + migrations).
 **Suggested direction:** Add `_SESSION` to banned list; allowlist `AuthService.php`, `DevAutoLogin.php`, `CsrfGuard.php`, `LeagueBootstrap.php`.
 **Est. effort:** S
 **Risk if untouched:** Implicit precondition on session order; untestable.
+**Status:** Completed (verified 2026-05-29 audit) — `_SESSION` now in `BanRawSuperglobalsRule` allowlist-by-superglobal (banned outside allowlist); part of the 2026-05-17 rule expansion (see [[5.9]]).
 
 ### 10.3 `$_SERVER` Direct Access Outside HTTP Boundary
 **Location:** `Discord/Discord.php:43`, `Extension/ExtensionService.php:267`, `Trading/TradeProcessor.php:378`, `Trading/TradeOfferRepository.php:58`
@@ -1519,6 +1546,7 @@ one-time backfill (its tables now live in the baseline schema + migrations).
 **Suggested direction:** Add `_SERVER`, `_FILES` to banned list; allow `HtmxHelper`, `ETagHandler`, `LeagueContext`, `PageLayout`, Controllers, Bootstrap, ApiHandlers.
 **Est. effort:** S
 **Risk if untouched:** Repository behaves differently per environment with no type signal.
+**Status:** Completed (verified 2026-05-29 audit) — `_SERVER` now banned in `BanRawSuperglobalsRule` with a broad allowlist (HtmxHelper, ETagHandler, controllers, etc.); part of the 2026-05-17 expansion (see [[5.9]]).
 
 ### 10.4 `echo` in Non-View, Non-CLI Classes
 **Location:** `DepthChartEntry/DepthChartEntryController.php` (15+ HTML lines), `NextSim/NextSimTabApiHandler.php`, `LeagueStarters/LeagueStartersApiHandler.php`
@@ -1534,6 +1562,7 @@ one-time backfill (its tables now live in the baseline schema + migrations).
 **Suggested direction:** New `BanGlobalKeywordRule`; allow `LegacyFunctions.php`, `ConfigBootstrap.php`, `NukeCompat.php`, `PageLayout.php`.
 **Est. effort:** S
 **Risk if untouched:** Silent dep on procedural init order.
+**Status:** Rule landed (verified 2026-05-29 audit) — `BanGlobalKeywordRule` exists in `phpstan-rules/` (added with the 2026-05-17 superglobal expansion; see [[5.9]]). Any remaining call-site burndown is incremental.
 
 ### 10.6 `$GLOBALS` Access Outside Bootstrap
 **Location:** `Player/Views/PlayerViewFactory.php:68-69` (fallback to `$GLOBALS['mysqli_db']`)
@@ -1541,6 +1570,7 @@ one-time backfill (its tables now live in the baseline schema + migrations).
 **Suggested direction:** New `BanRawGlobalsRule` for variable name `GLOBALS`; allow Bootstrap.
 **Est. effort:** S
 **Risk if untouched:** Untestable fallback paths.
+**Status:** Completed (verified 2026-05-29 audit) — `GLOBALS` covered by `BanRawSuperglobalsRule` allowlist (Bootstrap suffix + `ApiApplicationFactory.php`); no separate `BanRawGlobalsRule` needed. See also [[7.3]] (PlayerViewFactory fallback removed).
 
 ### 10.7 `die`/`exit` in Non-CLI Production Classes
 **Location:** `Utilities/HtmxHelper.php:33` (`exit;`), `Bootstrap/ConfigBootstrap.php:86`, `Bootstrap/SecurityBootstrap.php:35`, `Bootstrap/LegacyFunctions.php:327`
@@ -1670,8 +1700,9 @@ one-time backfill (its tables now live in the baseline schema + migrations).
 **Risk if untouched:** Rule files self-exempt; coercion bugs in rules.
 
 ### 10.25 Baseline Burn-Down Targets (no new rule)
-**Location:** `phpstan-baseline.neon` — `ibl.unescapedOutput` (17), `ibl.cookieBeforeHeader` (0 — zero-floored), `ibl.inlineCss` (6), `ibl.deprecatedHtmlTag` (3)
+**Location:** `phpstan-baseline.neon` — `ibl.unescapedOutput` (0), `ibl.cookieBeforeHeader` (0 — zero-floored), `ibl.inlineCss` (0 — now inline `@phpstan-ignore`), `ibl.deprecatedHtmlTag` (0) — all zero as of 2026-05-29 audit (was 17/0/6/3)
 **Problem:** Existing rules have actionable backlogs; staleness of `rawSuperglobal` (10.1) shows snapshot drift.
+**Status:** Largely completed (verified 2026-05-29 audit) — the four cited counts are all 0 in `phpstan-baseline.neon`; remaining work is the snapshot/drift fix in [[10.1]].
 **Suggested direction:** Sprint focus + `ibl5/bin/check-baseline-drift --update`.
 **Est. effort:** M (cumulative burn-down)
 **Risk if untouched:** Baselines stagnate; new violations indistinguishable from inherited.
@@ -1694,9 +1725,9 @@ one-time backfill (its tables now live in the baseline schema + migrations).
 **Est. effort:** S
 **Risk if untouched:** Rule creates false confidence; new inline CSS in themes goes unchecked.
 
-### 11.3 `tables.css` Is a 2,731-Line Monolith Covering 25+ Feature Areas
+### 11.3 `tables.css` Is a ~1,410-Line Monolith Covering 25+ Feature Areas
 **Location:** `ibl5/design/components/tables.css`
-**Problem:** Base table system + module-specific overrides (Trading, Draft, Voting, Contact List, etc.) in one file; module edits risk touching the base.
+**Problem:** Base table system + module-specific overrides (Trading, Draft, Voting, Contact List, etc.) in one file; module edits risk touching the base. (2026-05-29 audit: actual size ~1,410 LOC, not the originally-stated 2,731 — partial splitting already done; structural concern stands.)
 **Suggested direction:** Keep base system in `tables.css`; split module sections into paired component files (`trade-roster-preview.css`, `draft.css`); `CSS_TABLE_MAP.md` is the split guide.
 **Est. effort:** M
 **Risk if untouched:** Contributors keep adding module rules to base file; file grows.
@@ -1744,8 +1775,8 @@ one-time backfill (its tables now live in the baseline schema + migrations).
 **Risk if untouched:** Silent inconsistency that bites on Tailwind version bumps.
 
 ### 11.10 Depth Chart CSS Split With Load-Order Coupling
-**Location:** `design/components/depth-chart.css`, `depth-chart-mobile.css`, `depth-chart-changes.css`
-**Problem:** Comment at line ~242 warns mobile overrides must load after `tables.css`; three-file coupling invisible to CSS engine.
+**Location:** `design/components/depth-chart.css` (+ `components/tables/depth-chart.css`, `saved-depth-charts.css`)
+**Problem:** Comment at line ~242 warns mobile overrides must load after `tables.css`; multi-file load-order coupling invisible to CSS engine. (2026-05-29 audit: the originally-cited `depth-chart-mobile.css`/`depth-chart-changes.css` are JS files, not CSS — locations corrected.)
 **Suggested direction:** Consolidate into `depth-chart.css` (720 LOC combined — manageable).
 **Est. effort:** S
 **Risk if untouched:** `input.css` reorders silently break depth chart layout.
@@ -1763,6 +1794,7 @@ one-time backfill (its tables now live in the baseline schema + migrations).
 **Suggested direction:** Replace with `hidden` attribute; remove baseline entries.
 **Est. effort:** S
 **Risk if untouched:** Two baseline slots stay occupied.
+**Status:** Completed (verified 2026-05-29 audit) — no `style="display:none"` remains in `DepthChartEntryView.php`; the two baseline entries are gone.
 
 ### 11.13 TradingView `str_replace` Patches CSS Custom Property Into Rendered HTML
 **Location:** `classes/Trading/TradingView.php` line 357
@@ -1915,7 +1947,7 @@ one-time backfill (its tables now live in the baseline schema + migrations).
 **Risk if untouched:** Dedup logic change requires updating 5 copies.
 
 ### 13.4 `FreeAgencyOfferValidator` Duplicates `CommonContractValidator`
-**Location:** `FreeAgency/FreeAgencyOfferValidator.php` (private methods) vs `Services/CommonContractValidator.php`
+**Location:** `FreeAgency/FreeAgencyOfferValidator.php` (private methods). NOTE (2026-05-29 audit): the originally-cited `Services/CommonContractValidator.php` no longer exists (`Services/` was deleted, see [[2.22]]) — the shared comparator must be re-identified or extracted fresh.
 **Problem:** FA validator has its own private raise-percentage / salary-decrease / continuity / max-contract checks. `ExtensionService` correctly delegates; FA doesn't.
 **Suggested direction:** Inject `CommonContractValidator` into `FreeAgencyOfferValidator`; replace private methods with delegation.
 **Est. effort:** M
@@ -2077,6 +2109,7 @@ one-time backfill (its tables now live in the baseline schema + migrations).
 **Suggested direction:** Replace with explicit `Request` object; module entry points read named parameters by key.
 **Est. effort:** L
 **Risk if untouched:** Name collisions silently overwrite globals; PHPStan needs per-site `@var` annotations.
+**Status:** Partially completed (verified 2026-05-29 audit) — the wholesale `$_REQUEST`→`$GLOBALS` copy is gone; `ConfigBootstrap` now allowlists only `newlang`/`redirect` (see [[3.6]]). Modules still read `$op`/`$pid`/`$action` directly from `$_REQUEST` — a `Request` object remains the longer-term fix.
 
 ### 14.13 `Season` Instantiated 30 Times in Class Files
 **Location:** ~30 `new Season($db)` calls across `classes/`
@@ -2258,6 +2291,7 @@ one-time backfill (its tables now live in the baseline schema + migrations).
 **Suggested direction:** Confirm 091 is in queue; if missing, add `KEY idx_pid_gt (pid, game_type)`.
 **Est. effort:** S
 **Risk if untouched:** Full-table scans on multi-million-row table; 10-100x slower career aggregates.
+**Status:** Completed (verified 2026-05-29 audit) — migration 091 added the covering index; migration 121 recreates `idx_gt_pid (game_type, pid)` + `idx_gt_pid_season (game_type, pid, season_year)`, which the optimizer uses for pid+game_type filters.
 
 ### 15.22 Non-Idempotent Recent Migrations (113, 117, 122, 125)
 **Location:** Migrations 113, 117, 122, 125

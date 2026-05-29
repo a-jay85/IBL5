@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Navigation;
 
+use League\LeagueContext;
 use Navigation\NavigationRepository;
 use Tests\WideUnit\WideUnitTestCase;
 
@@ -15,6 +16,14 @@ class NavigationRepositoryTest extends WideUnitTestCase
     {
         parent::setUp();
         $this->repository = new NavigationRepository($this->mockDb);
+    }
+
+    protected function tearDown(): void
+    {
+        // setSharedLeagueContext() writes a static slot that leaks into every
+        // later test in the process; always clear it.
+        \BaseMysqliRepository::clearSharedLeagueContext();
+        parent::tearDown();
     }
 
     public function testResolveTeamIdReturnsIdForValidUser(): void
@@ -61,5 +70,47 @@ class NavigationRepositoryTest extends WideUnitTestCase
         $result = $this->repository->getTeamsData();
 
         $this->assertNull($result);
+    }
+
+    // ── Olympics static-path identity lock (the #878 regression) ──────────
+    // NavigationRepository receives NO instance LeagueContext in production
+    // (themes/IBL/theme.php constructs `new NavigationRepository($mysqli_db)`),
+    // so the only Olympics signal it could see is the STATIC shared context.
+    // resolveTeamId() reads the IBL-only `gm_username` column; it MUST stay on
+    // ibl_team_info even under Olympics, or it fatals on the missing column.
+
+    public function testResolveTeamIdStaysOnIblTeamInfoUnderOlympicsStaticContext(): void
+    {
+        $context = new LeagueContext();
+        $context->setLeague(LeagueContext::LEAGUE_OLYMPICS);
+        \BaseMysqliRepository::setSharedLeagueContext($context);
+
+        $this->mockDb->setMockData([['teamid' => 5]]);
+
+        $result = $this->repository->resolveTeamId('TestUser');
+
+        $this->assertSame(5, $result);
+        $this->assertQueryExecuted('ibl_team_info');
+        $this->assertQueryNotExecuted('ibl_olympics_team_info');
+    }
+
+    public function testGetTeamsDataReturnsIblTeamsUnderOlympicsStaticContext(): void
+    {
+        $context = new LeagueContext();
+        $context->setLeague(LeagueContext::LEAGUE_OLYMPICS);
+        \BaseMysqliRepository::setSharedLeagueContext($context);
+
+        $this->mockDb->setMockData([
+            ['teamid' => 1, 'team_name' => 'Celtics', 'team_city' => 'Boston', 'conference' => 'Eastern', 'division' => 'Atlantic'],
+        ]);
+
+        $result = $this->repository->getTeamsData();
+
+        $this->assertNotNull($result);
+        $this->assertSame('Celtics', $result['Eastern']['Atlantic'][0]['team_name']);
+        $this->assertQueryExecuted('ibl_team_info');
+        $this->assertQueryExecuted('ibl_standings');
+        $this->assertQueryNotExecuted('ibl_olympics_team_info');
+        $this->assertQueryNotExecuted('ibl_olympics_standings');
     }
 }

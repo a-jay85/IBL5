@@ -11,7 +11,9 @@ use Updater\JsbSourceResolver;
 
 class JsbSourceResolverTest extends TestCase
 {
+    /** @var BackupArchiveLocatorInterface&\PHPUnit\Framework\MockObject\Stub */
     private BackupArchiveLocatorInterface $stubLocator;
+    /** @var ArchiveExtractorInterface&\PHPUnit\Framework\MockObject\Stub */
     private ArchiveExtractorInterface $stubExtractor;
     private string $tempDir;
 
@@ -102,6 +104,7 @@ class JsbSourceResolverTest extends TestCase
 
     public function testResolvesArchivePathLazilyPerCall(): void
     {
+        /** @var BackupArchiveLocatorInterface&\PHPUnit\Framework\MockObject\MockObject */
         $mockLocator = $this->createMock(BackupArchiveLocatorInterface::class);
         $mockLocator->expects($this->exactly(2))
             ->method('findLatestArchive')
@@ -123,6 +126,7 @@ class JsbSourceResolverTest extends TestCase
     {
         $this->stubLocator->method('findLatestArchive')->willReturn('/backups/archive.zip');
 
+        /** @var ArchiveExtractorInterface&\PHPUnit\Framework\MockObject\MockObject */
         $mockExtractor = $this->createMock(ArchiveExtractorInterface::class);
         $mockExtractor->expects($this->once())
             ->method('extractToString')

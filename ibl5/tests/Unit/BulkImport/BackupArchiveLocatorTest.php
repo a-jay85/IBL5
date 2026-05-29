@@ -10,6 +10,7 @@ use PHPUnit\Framework\TestCase;
 
 class BackupArchiveLocatorTest extends TestCase
 {
+    /** @var ArchiveExtractorInterface&\PHPUnit\Framework\MockObject\Stub */
     private ArchiveExtractorInterface $stubExtractor;
     private BackupArchiveLocator $locator;
     private string $tmpDir;

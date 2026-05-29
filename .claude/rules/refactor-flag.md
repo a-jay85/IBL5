@@ -1,6 +1,7 @@
 ---
 description: Refactor PRs that touch ibl5/classes/** without an accompanying test change are blocked by bin/refactor-flag (workflow refactor-flag.yml).
-last_verified: 2026-05-13
+paths: "ibl5/classes/**"
+last_verified: 2026-05-28
 ---
 
 # Refactor PR Flag

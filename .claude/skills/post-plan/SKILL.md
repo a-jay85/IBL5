@@ -5,7 +5,7 @@ disallowed-tools:
   - EnterPlanMode
   - ExitPlanMode
   - Skill
-last_verified: 2026-05-27
+last_verified: 2026-05-28
 ---
 
 # Post-Plan Orchestrator
@@ -29,17 +29,37 @@ if ! git diff --cached --quiet; then
 fi
 ```
 
-Phase 2 makes the initial commit and opens the PR. Phases that may modify files after Phase 2 (Phase 4D follow-up fixes if review identifies real bugs, Phase 5 fix-and-rerun loops, Phase 6 test writing, Phase 7 CI fixes) MUST checkpoint before continuing. Squash-merge in Phase 8 collapses the chain.
+Phase 2 makes the initial commit and opens the PR. Phases that may modify files after Phase 2 (Phase 4D follow-up fixes if review identifies real bugs, Phase 5 fix-and-rerun loops, Phase 6 test writing, Phase 7 CI fixes) MUST checkpoint before continuing. The squash-merge armed in Phase 6.5 collapses the chain.
 
 ---
 
-## Phase 1: Clear Plan Gate
+## Phase 1: Clear Plan Gate & Locate Plan
 
 Remove the plan workflow gate so that commits and edits within this skill are not blocked by PreToolUse hooks:
 
 ```bash
 rm -f /tmp/claude-plan-active-$PPID
 ```
+
+Then locate the plan backing this branch so later phases can verify the implementation against its intent. The plan is the spec; phases 4–6 check conformance to it.
+
+```bash
+# Authoritative in nightly mode: the handoff JSON's plan_file (the postplan prompt passes its path).
+# Interactive fallback: branch slug -> ~/.claude/plans/<slug>.md.
+SLUG=$(git rev-parse --abbrev-ref HEAD)
+PLAN_FILE=""
+[ -f "$HOME/.claude/plans/$SLUG.md" ] && PLAN_FILE="$HOME/.claude/plans/$SLUG.md"
+if [ -n "$PLAN_FILE" ]; then
+    echo "PLAN_FOUND=$PLAN_FILE"
+    grep -qiE '^\s*\|.*Test type' "$PLAN_FILE" && echo "HAS_MATRIX=true" || echo "HAS_MATRIX=false"
+    grep -qiE '^#+ *Security'    "$PLAN_FILE" && echo "HAS_PLAN_SECURITY=true" || echo "HAS_PLAN_SECURITY=false"
+    grep -qiE 'Reuse'            "$PLAN_FILE" && echo "HAS_PLAN_REUSE=true" || echo "HAS_PLAN_REUSE=false"
+else
+    echo "PLAN_FOUND=none — plan-blind mode: skip every plan-conformance step below; behave exactly as before."
+fi
+```
+
+When the nightly postplan prompt supplied an authoritative plan path, use it instead of the branch-slug derivation above. Record `$PLAN_FILE` and the flags. **Plan conformance is additive, never a hard dependency** — when `PLAN_FOUND=none` (any PR with no `/plan` file), every "if a plan exists" gate below is skipped and post-plan runs as it does today.
 
 ---
 
@@ -190,6 +210,8 @@ Capture the `cat` output — that is `$DIFF` for every sub-agent prompt below. N
 
 Pass each agent: PR metadata, file list, and filtered `$DIFF`. **No agent calls `gh pr diff`.** Do not forward CLAUDE.md content (auto-loaded).
 
+**Reuse conformance (Agent A only, when `PLAN_FOUND` and `$HAS_PLAN_REUSE`):** extract the plan's Reuse notes from `$PLAN_FILE` and append them to Agent A's prompt under a `PLANNED REUSE:` heading, instructing it to flag any step that hand-rolled logic the plan directed it to reuse (e.g. plan named `SalaryCapRepository::getTeamTotalSalary()`, impl wrote a raw query). This turns Section 1's open-ended architectural judgment into a concrete conformance check.
+
 **Model tiers:**
 
 - Agent A (Architecture + Bug detection + DB performance): **Sonnet**
@@ -233,6 +255,8 @@ Pass each agent: PR metadata, file list, and filtered `$DIFF`. **No agent calls 
 
 Run the pattern-detection block from that file to get SQL and Forms category counts. Build the `CATEGORIES:` line (always include Auth/Authz; add SQL Injection if SQL > 0; add CSRF Protection if Forms > 0). Launch a **single Haiku agent** with the categories line and the PHP-only subset of `$DIFF`. Do not forward CLAUDE.md content (auto-loaded).
 
+**Plan-backed mode (when `PLAN_FOUND` and `$HAS_PLAN_SECURITY`):** the plan already declares each touched surface and its intended defense. Pass the plan's Security section to the agent as an `EXPECTED DEFENSES:` checklist and instruct it to (a) confirm each planned defense is present in the diff and (b) flag any state-changing surface the plan did *not* anticipate. You may build `CATEGORIES:` directly from the plan's declared surfaces instead of running the pattern-detection grep. This shifts the audit from discovery to verification — it catches "CSRF was planned but the impl omitted it" and cuts the false positives blind pattern-matching produces.
+
 **XSS and Input Validation are NOT audited here** — they're deterministically enforced by `RequireEscapedOutputRule` and `BanRawSuperglobalsRule` (run in PostToolUse and CI).
 
 ### 4D: Score, filter, and post
@@ -266,6 +290,18 @@ Both comments end with: `Generated with [Claude Code](https://claude.ai/code)` a
 ---
 
 ## Phase 5: Final Verification
+
+### Phase 5.0: Plan→test conformance — skip if `PLAN_FOUND=none` or `! $HAS_MATRIX`
+
+Read the Verification Matrix from `$PLAN_FILE`. Collect the test-file path from the "Test file / location" column of every row whose Test type is PHPUnit, API-test, E2E, or Visual-regression. Confirm the PR diff actually wrote each one:
+
+```bash
+git diff --name-only origin/master...HEAD > /tmp/post-plan-changed-$PPID
+# For each planned test path $T extracted from the matrix:
+grep -qF "$T" /tmp/post-plan-changed-$PPID || echo "MISSING: $T (matrix planned a test the diff never wrote)"
+```
+
+For each `MISSING:` test the impl silently dropped planned coverage — now likelier to matter, since the matrix carries the negative-path and security rows `/plan` gates 9 and 12 require. Write the missing test, run it green, and checkpoint (same as Phase 6 test authoring). Skip a planned test **only** if its target behavior was cut from the implementation; note that in a PR comment rather than writing a hollow test.
 
 **PHPUnit + PHPStan — direct Bash (no agent):** **Skip if** `! $HAS_PHP`. The PostToolUse hook already ran both during edits, and a PHP-less diff cannot regress either suite. Run both as direct Bash calls with `run_in_background: true` so they execute in parallel with the E2E agent below. Output is ~5 lines each — agent overhead (~25K tokens) is never justified.
 
@@ -309,6 +345,8 @@ echo "$EXTRACTED"
 
 ### Step 2: Sonnet Review Gate
 
+**Skip this gate when `PLAN_FOUND` and the surviving Manual Testing steps came from the plan's matrix** — `/plan` gates 3, 9, and 12 already classified automatable-vs-manual upstream and authoritatively, so re-litigating it here is wasted. Treat the remaining steps as truly-manual and leave them in the PR. Run the gate below only for plan-less PRs, where no upstream classification occurred.
+
 Launch a **single Sonnet agent** with this prompt (substitute the extracted steps and file list):
 
 > You are a **Senior QA Automation Engineer** reviewing manual testing steps from a PR. Your job: eliminate every step that can be replaced by automated verification. Be aggressive — manual testing is expensive and error-prone. Only steps requiring subjective human judgment on **new or redesigned** UI/UX should survive ("does this look/feel good?", "does this flow work well?").
@@ -346,13 +384,27 @@ Using the Sonnet agent's classifications:
 2. **PHPUnit/API-test/E2E-replaceable:** Write the appropriate test type. Fix until green. Do not reclassify as truly manual — if the test is hard to write, that's a reason to spend more effort, not less. After 3 failed attempts, keep the item in the PR description as-is (not reclassified) and note what was tried.
 3. **Truly manual:** Keep in PR description.
 4. **Update PR:** Remove verified/automated steps. If none remain, replace section with `No manual testing needed — all changes are covered by automated tests.` Apply: `gh pr edit --body "<updated>"`
-5. **Checkpoint:** If any new tests were written or files modified, commit and push before continuing to Phase 7.
+5. **Checkpoint:** If any new tests were written or files modified, commit and push before continuing to Phase 6.5.
+
+---
+
+## Phase 6.5: Arm Auto-Merge
+
+Enable auto-merge **before** watching CI. This is the earliest point both gating conditions are known — review/audit findings are scored in Phase 4, manual-testing is resolved in Phase 6 — and arming here (rather than after the watch) is the whole point: if this post-plan phase is later killed mid-watch by the per-phase cap (`MAX_PP_SECS`) or a usage limit, GitHub still holds the queued merge and fires it once required checks pass, with no further agent action needed. Arming after the watch (the old Phase 8 placement) meant any phase that ran out of budget during the watch shipped a PR that was never set to auto-merge.
+
+**Already merged?** If `gh pr view --json state --jq '.state'` returns `MERGED`, there is nothing to arm — skip to Phase 7 (which will early-exit).
+
+Both conditions must be true: (1) PR says "No manual testing needed", (2) no review/audit findings scored >= 80.
+
+If met: `gh pr merge --squash --auto --delete-branch`. The `--auto` flag queues the merge — it does **not** merge now, it arms; GitHub executes it once all required status checks pass. Do not sync local to master here; the merge has not happened yet.
+
+If not met: do **not** arm auto-merge. Report which condition(s) blocked — the user merges manually after review. Continue to Phase 7 regardless, to monitor and fix CI.
 
 ---
 
 ## Phase 7: CI Monitoring
 
-**Monitor CI and attempt fixes, then always continue to Phase 8.**
+**Auto-merge is already armed (Phase 6.5). Monitor CI and fix failures so the queued merge can fire; then continue to Phase 8.**
 
 > **Field-shape gotcha — read before editing this phase.**
 > Two `gh` commands return different shapes; mixing them produces unsatisfiable conditions.
@@ -360,7 +412,7 @@ Using the Sonnet agent's classifications:
 > - `gh pr view <pr> --json statusCheckRollup` → `status` ∈ `COMPLETED | IN_PROGRESS | QUEUED`, `conclusion` ∈ `SUCCESS | FAILURE | SKIPPED | …`.
 > Do not write `state == "COMPLETED"` or `conclusion == "failure"` against `gh pr checks` — both are silently false forever.
 
-0. **Early-exit on merged PR:** Before any polling, run `gh pr view <pr> --json state --jq '.state'`. If `MERGED`, skip the rest of Phase 7 and continue at Phase 8 — auto-merge has already fired (most commonly during Phase 4/5/6) and watching CI to completion adds nothing but wall-clock burn. This is the load-bearing optimization that keeps the nightly loop from burning a full watch timeout on an already-shipped PR.
+0. **Early-exit on merged PR:** Before any polling, run `gh pr view <pr> --json state --jq '.state'`. If `MERGED`, skip the rest of Phase 7 and continue at Phase 8 — the auto-merge armed in Phase 6.5 has already fired (required checks were already green) and watching CI to completion adds nothing but wall-clock burn. This is the load-bearing optimization that keeps the nightly loop from burning a full watch timeout on an already-shipped PR.
 1. **Wait for checks to register:** Poll `gh pr checks <pr> --json name,state 2>/dev/null | jq 'length'` up to 4 times with 15s waits. If count stays 0, warn user and continue to Phase 8.
 2. **Block until CI settles:** `gh pr checks <pr> --watch --fail-fast --interval 20` (Bash timeout 1200000 = 20 min cap — leaves a 10-min cushion under `MAX_PP_SECS=1800` for Phases 8-11 cleanup). The gh CLI handles the polling and exit logic itself; do not re-implement it in jq. Exit codes: `0` = all checks passed, `8` = at least one failed, other = transport error.
 3. **If exit 0** → Phase 8. (Mid-watch merge detection was intentionally dropped: `gh pr checks --watch` exits as soon as the last check settles, so the only window auto-merge could fire inside the watch is the ~5–30s between final-check-pass and auto-merge action — not worth a hand-rolled poll loop. Step 0 already covers the case where the PR merged before Phase 7 started.)
@@ -369,15 +421,13 @@ Using the Sonnet agent's classifications:
 
 ---
 
-## Phase 8: Auto-Merge
+## Phase 8: Confirm Merge State
 
-**Already merged?** If `gh pr view --json state --jq '.state'` returns `MERGED`, skip the merge call entirely. Run `cd <repo-root> && git checkout master && git pull origin master` to sync local, then continue to Phase 9. Do not treat this as an error — it's the expected outcome when auto-merge fires during Phase 7.
+Auto-merge was already armed (or deliberately not armed) in Phase 6.5 — this phase only confirms the outcome and syncs local if the merge landed. Do not re-run `gh pr merge` here.
 
-Both conditions must be true: (1) PR says "No manual testing needed", (2) no review/audit findings scored >= 80.
-
-If met: `gh pr merge --squash --auto --delete-branch`. The `--auto` flag queues the merge — GitHub executes it once all required status checks pass. Do not sync local to master here; the merge has not happened yet.
-
-If not: report which condition(s) blocked. User merges manually.
+- **If `gh pr view --json state --jq '.state'` returns `MERGED`:** the queued merge fired. Run `cd <repo-root> && git checkout master && git pull origin master` to sync local, then continue to Phase 9.
+- **If still `OPEN` and auto-merge was armed in Phase 6.5:** the merge is queued and will fire when required checks pass — no further action. Do not sync local to master; the merge has not happened yet. Continue to Phase 9.
+- **If still `OPEN` and auto-merge was NOT armed (a Phase 6.5 condition blocked):** report which condition(s) blocked. The user merges manually.
 
 ---
 

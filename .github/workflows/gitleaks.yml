@@ -1,0 +1,36 @@
+name: gitleaks
+
+# Secret-scanning gate (ADR-0034). Fails the build if a credential is committed.
+# Remediation for any hit is rotation + scrub, never .gitignore — see the ADR.
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+  push:
+    branches: [master]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  gitleaks:
+    name: Scan for committed secrets
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          # Full clone so gitleaks-action can resolve the event's commit range
+          # (PR: base..head; push: the pushed commits) for diff-scoped scanning.
+          fetch-depth: 0
+      - name: gitleaks
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # Allowlist + rules live in .gitleaks.toml at the repo root.
+          GITLEAKS_CONFIG: ${{ github.workspace }}/.gitleaks.toml
+          # GITLEAKS_LICENSE is required only for GitHub *organization* repos.
+          # a-jay85/IBL5 is a personal-account repo, so no license is needed.

@@ -1,6 +1,6 @@
 ---
 description: Sub-agent decision rules — when to spawn, when to skip, and which model to pick
-last_verified: 2026-05-27
+last_verified: 2026-05-28
 ---
 
 # Agent Tiering
@@ -9,7 +9,7 @@ When spawning sub-agents or writing plans that will spawn them, always tier by t
 
 ## Skip the Agent — Direct Tool Calls
 
-Every sub-agent pays a fixed context overhead: system prompt, CLAUDE.md, rules, and memory (~3-5K tokens depending on path-conditional loading) are loaded before the agent reads its prompt. This overhead is justified when the agent absorbs verbose output, runs in parallel, or needs multi-step reasoning. It is not justified for a single short-output command.
+Every sub-agent pays a fixed context overhead: system prompt, rules, and memory (~3-5K tokens depending on path-conditional loading) are loaded before the agent reads its prompt. This overhead is justified when the agent absorbs verbose output, runs in parallel, or needs multi-step reasoning. It is not justified for a single short-output command.
 
 **Run it directly (no agent) when ALL of these are true:**
 - The task is a single command or tool call (one bash invocation, one file read)

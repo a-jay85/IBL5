@@ -1,6 +1,6 @@
 ---
 description: Frontmatter schema, 60-day staleness policy, on-touch verification rule, and dead-reference rules enforced by bin/check-docs
-last_verified: 2026-05-27
+last_verified: 2026-05-28
 paths: "**/*.md"
 ---
 
@@ -8,7 +8,7 @@ paths: "**/*.md"
 
 ## Frontmatter Schema
 
-Every in-scope `.md` file (CLAUDE.md, README.md, `.claude/rules/`, `.claude/skills/**/SKILL.md`, `.claude/commands/`, `ibl5/docs/`, `ibl5/docs/decisions/`) must open with:
+Every in-scope `.md` file (README.md, `.claude/rules/`, `.claude/skills/**/SKILL.md`, `.claude/commands/`, `ibl5/docs/`, `ibl5/docs/decisions/`) must open with:
 
 ```yaml
 ---

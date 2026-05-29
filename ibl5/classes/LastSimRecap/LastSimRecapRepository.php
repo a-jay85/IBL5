@@ -32,6 +32,7 @@ class LastSimRecapRepository extends \BaseMysqliRepository implements LastSimRec
     {
         /** @var array{sim:int,start_date:string|null,end_date:string|null}|null $row */
         $row = $this->fetchOne(
+            // `ibl_sim_dates` is not in TABLE_MAP — backtick is rename-safety only, never rewritten.
             "SELECT sim, start_date, end_date FROM `ibl_sim_dates` ORDER BY sim DESC LIMIT 1"
         );
 

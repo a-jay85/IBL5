@@ -325,6 +325,7 @@ class PlrBoxScoreRepository extends \BaseMysqliRepository implements PlrBoxScore
 
         /** @var list<array{end_date: string}> $rows */
         $rows = $this->fetchAll(
+            // `ibl_sim_dates` is not in TABLE_MAP — backtick is rename-safety only, never rewritten.
             "SELECT end_date FROM `ibl_sim_dates`
              WHERE end_date BETWEEN ? AND ? ORDER BY sim",
             'ss',

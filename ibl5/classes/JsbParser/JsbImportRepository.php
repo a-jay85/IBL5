@@ -424,6 +424,8 @@ class JsbImportRepository extends \BaseMysqliRepository implements JsbImportRepo
     public function upsertPlbSnapshot(array $record): int
     {
         return $this->execute(
+            // Backticked for the rename-safety rule only; not in
+            // LeagueContext::TABLE_MAP, so the Olympics rewrite never touches it.
             "INSERT INTO `ibl_plb_snapshots`
                 (season_year, sim_number, source_archive, teamid, slot_index,
                  pid, player_name, dc_minutes, dc_of, dc_df, dc_oi, dc_di, dc_bh)
@@ -462,6 +464,7 @@ class JsbImportRepository extends \BaseMysqliRepository implements JsbImportRepo
     public function upsertDraftResult(array $record): int
     {
         return $this->execute(
+            // Non-TABLE_MAP table: backtick is rename-safety only, never rewritten.
             "INSERT INTO `ibl_jsb_draft_results`
                 (draft_year, round, pick, team_name, pos, player_name, pid)
             VALUES (?, ?, ?, ?, ?, ?, ?)
@@ -487,6 +490,7 @@ class JsbImportRepository extends \BaseMysqliRepository implements JsbImportRepo
     public function upsertRetiredPlayer(array $record): int
     {
         return $this->execute(
+            // Non-TABLE_MAP table: backtick is rename-safety only, never rewritten.
             "INSERT INTO `ibl_jsb_retired_players`
                 (jsb_pid, retirement_year, player_name, pid)
             VALUES (?, ?, ?, ?)
@@ -507,6 +511,7 @@ class JsbImportRepository extends \BaseMysqliRepository implements JsbImportRepo
     public function upsertHofInductee(array $record): int
     {
         return $this->execute(
+            // Non-TABLE_MAP table: backtick is rename-safety only, never rewritten.
             "INSERT INTO `ibl_jsb_hall_of_fame`
                 (jsb_pid, player_name, pos, induction_year, pid)
             VALUES (?, ?, ?, ?, ?)

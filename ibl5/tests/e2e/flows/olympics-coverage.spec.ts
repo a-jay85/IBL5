@@ -29,15 +29,9 @@ test.describe('Olympics module coverage', () => {
     await assertNoPhpErrors(page, 'on IBL-only module in olympics context');
   });
 
-  test('no PHP errors across olympics pages', async ({ appState, page }) => {
-    await appState({ 'Trivia Mode': 'Off' });
-    const urls = [
-      'modules.php?name=Standings&league=olympics',
-      'modules.php?name=Team&op=team&teamid=1&league=olympics',
-    ];
-    for (const url of urls) {
-      await page.goto(url);
-      await assertNoPhpErrors(page, `on ${url}`);
-    }
-  });
+  // The former 'no PHP errors across olympics pages' loop test was removed: it
+  // re-visited Standings + Team (&league=olympics), already asserted individually
+  // above, and carried no unique header-content assertion. The unique Olympics
+  // header checks live at smoke/olympics-pages.spec.ts (the "Olympics Standings"
+  // title + Eastern/Western-Conference-absence assertions).
 });

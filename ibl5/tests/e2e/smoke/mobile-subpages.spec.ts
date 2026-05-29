@@ -44,8 +44,8 @@ const TEAM_BASE_URL = 'modules.php?name=Team&op=team&teamid=1';
 // --- Olympics pages ---
 
 const OLYMPICS_URLS = [
-  { name: 'Standings', url: 'modules.php?name=Standings&league=olympics' },
-  { name: 'Team', url: 'modules.php?name=Team&op=team&teamid=1&league=olympics' },
+  { name: 'Standings', url: 'modules.php?name=Standings&league=olympics', anchor: '.ibl-data-table' },
+  { name: 'Team', url: 'modules.php?name=Team&op=team&teamid=1&league=olympics', anchor: '.team-page-layout' },
   // Player omitted: ibl_olympics_plr is not seeded in CI, so pid=1 has no Olympics data
 ] as const;
 
@@ -135,8 +135,7 @@ test.describe('Olympics mobile smoke tests', () => {
       test.setTimeout(60_000);
       await gotoWithRetry(page, entry.url);
       await assertNoPhpErrors(page, `on olympics ${entry.name} (mobile)`);
-      const body = await page.locator('body').textContent();
-      expect(body?.length, `olympics ${entry.name} body too short`).toBeGreaterThan(100);
+      await expect(page.locator(entry.anchor).first()).toBeVisible();
     });
   }
 
@@ -144,8 +143,7 @@ test.describe('Olympics mobile smoke tests', () => {
     test.setTimeout(60_000);
     await gotoWithRetry(page, 'modules.php?name=Standings&league=olympics');
     await assertNoPhpErrors(page, 'on olympics Standings (mobile)');
-    const body = await page.locator('body').textContent();
-    expect(body?.length, 'olympics Standings body too short').toBeGreaterThan(100);
+    await expect(page.locator('.ibl-data-table').first()).toBeVisible();
     await assertNoHorizontalOverflow(page, 'on olympics Standings');
   });
 
@@ -153,8 +151,7 @@ test.describe('Olympics mobile smoke tests', () => {
     test.setTimeout(60_000);
     await gotoWithRetry(page, 'modules.php?name=Team&op=team&teamid=1&league=olympics');
     await assertNoPhpErrors(page, 'on olympics Team (mobile)');
-    const body = await page.locator('body').textContent();
-    expect(body?.length, 'olympics Team body too short').toBeGreaterThan(100);
+    await expect(page.locator('.team-page-layout').first()).toBeVisible();
     await assertNoHorizontalOverflow(page, 'on olympics Team');
   });
 

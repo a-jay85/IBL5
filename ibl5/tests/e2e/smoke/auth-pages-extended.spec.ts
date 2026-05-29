@@ -54,4 +54,14 @@ test.describe('Extended authenticated page smoke tests', () => {
       page.locator('.ibl-data-table, table').first(),
     ).toBeVisible();
   });
+
+  // Folded in from the deleted auth-pages.spec.ts — the only assertion there not
+  // already covered by VR + this file: an authenticated user sees the entry form,
+  // not a Sign In prompt.
+  test('depth chart entry page loads', async ({ page }) => {
+    await page.goto('modules.php?name=DepthChartEntry');
+    await assertNoPhpErrors(page, 'on modules.php?name=DepthChartEntry');
+    await expect(page.getByText('Sign In')).not.toBeVisible();
+    await expect(page.locator('form[name="DepthChartEntry"]').first()).toBeVisible();
+  });
 });

@@ -1,0 +1,107 @@
+#!/usr/bin/env bash
+# shellcheck shell=bash
+#
+# bin/check-plan-staleness — staleness guard for nightly queued plans.
+#
+# Takes one argument: a plan file path (in production, the queue symlink that
+# points at ~/.claude/plans/<name>.md). Scans the plan body for repo-path
+# reference tokens and exits non-zero, printing each unresolved token, when the
+# plan references files that no longer exist in the current checkout. A stale
+# plan would otherwise burn all three nightly attempts as a poison pill.
+#
+# Token resolution mirrors bin/check-docs::scanReferences() (PHP), reimplemented
+# in Bash since check-docs is not callable for a single out-of-repo plan file:
+#   - tokens come from markdown links `[...](target)` and backtick spans `...`
+#   - the part before the first '#', '?', or whitespace is kept
+#   - only tokens prefixed bin/ ibl5/ .claude/ .github/ are repo paths
+#   - glob/placeholder metacharacters and non-charset tokens are skipped
+#   - survivors are de-duplicated and tested with [ -e "$REPO_ROOT/$token" ]
+#
+# Exit codes: 0 = all tokens resolve (or none), 1 = stale (unresolved tokens
+# printed as "STALE: <token>"), 2 = usage error / plan file missing.
+#
+# Bash 3.2 / macOS compatible: no mapfile, no declare -A; temp files collect
+# tokens. The `shell=bash` directive above keeps shellcheck's SC3xxx
+# (sh-dialect) warnings from firing on the intentional bashisms.
+
+set -u
+
+usage() {
+    echo "Usage: bin/check-plan-staleness <plan-file>" >&2
+}
+
+PLAN_FILE="${1:-}"
+if [ -z "$PLAN_FILE" ] || [ ! -e "$PLAN_FILE" ]; then
+    usage
+    exit 2
+fi
+
+# Resolve the repo root from THIS SCRIPT's own location — never from the plan
+# file (which lives outside the repo) or the cwd. Walk up until a .git dir/file
+# is found. This is the load-bearing correctness point: resolving tokens
+# relative to the out-of-repo plan file would mark every token unresolved.
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+REPO_ROOT="$SCRIPT_DIR"
+while [ "$REPO_ROOT" != "/" ] && [ ! -e "$REPO_ROOT/.git" ]; do
+    REPO_ROOT="$(dirname "$REPO_ROOT")"
+done
+if [ "$REPO_ROOT" = "/" ]; then
+    echo "error: could not locate repo root" >&2
+    exit 2
+fi
+
+TOKENS_FILE="$(mktemp)"
+SEEN_FILE="$(mktemp)"
+MISSING_FILE="$(mktemp)"
+trap 'rm -f "$TOKENS_FILE" "$SEEN_FILE" "$MISSING_FILE"' EXIT
+
+# Collect candidate tokens. grep follows the symlink at $PLAN_FILE for its
+# content. Markdown link targets and backtick-span contents are extracted, then
+# the surrounding syntax is stripped. A no-match grep exits 1 harmlessly (no
+# `set -e`).
+{
+    grep -oE '\[[^]]*\]\([^)[:space:]]+\)' "$PLAN_FILE" | sed -E 's/^\[[^]]*\]\(//; s/\)$//'
+    # shellcheck disable=SC2016  # backticks are literal markdown-span delimiters, not command substitution
+    grep -oE '`[^`]+`' "$PLAN_FILE" | sed -E 's/^`//; s/`$//'
+} >> "$TOKENS_FILE"
+
+while IFS= read -r token; do
+    # Keep only the part before the first '#', '?', or whitespace.
+    token="$(printf '%s' "$token" | sed -E 's/[[:space:]#?].*$//')"
+    [ -n "$token" ] || continue
+
+    # Only the four in-scope repo-path prefixes (narrower than check-docs).
+    case "$token" in
+        bin/*|ibl5/*|.claude/*|.github/*) : ;;
+        *) continue ;;
+    esac
+
+    # Skip glob/placeholder metacharacters (this also drops `<placeholder>`).
+    case "$token" in
+        *[\*\?\[\]\{\}\<\>]*) continue ;;
+    esac
+
+    # Validate charset; this also drops `$VAR/...` shell-variable tokens.
+    if ! printf '%s' "$token" | grep -qE '^[A-Za-z0-9._/-]+$'; then
+        continue
+    fi
+
+    # De-duplicate.
+    if grep -qxF "$token" "$SEEN_FILE"; then
+        continue
+    fi
+    printf '%s\n' "$token" >> "$SEEN_FILE"
+
+    if [ ! -e "$REPO_ROOT/$token" ]; then
+        printf '%s\n' "$token" >> "$MISSING_FILE"
+    fi
+done < "$TOKENS_FILE"
+
+if [ -s "$MISSING_FILE" ]; then
+    while IFS= read -r m; do
+        echo "STALE: $m"
+    done < "$MISSING_FILE"
+    exit 1
+fi
+
+exit 0

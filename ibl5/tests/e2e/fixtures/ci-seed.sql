@@ -347,6 +347,67 @@ INSERT INTO ibl_plr (
    60, 30, 75,
    'a0000000-0000-0000-0000-000000200030');
 
+-- ============================================================
+-- Mutation-submission fixtures (waivers + rookie option)
+-- Synthetic high pids (200000031/032) mirror the 200000030 convention so they
+-- never collide with real dev-DB players (pids 1-42 are already load-bearing in
+-- this seed). The plan referenced pid=31/32 but those are taken (Flames Forward
+-- / Minutemen Guard), so these high pids are used instead.
+-- ============================================================
+
+-- pid=200000031 "Waive Target": Metros (tid=1) active player for the waive/drop
+-- submission test (waivers-submission.spec.ts). reset-waiver-player restores
+-- ordinal+droptime after a waive moves it to the waiver pool (ordinal='1000').
+INSERT INTO ibl_plr (
+  pid, name, age, peak, teamid, pos, ordinal,
+  stamina, oo, od, r_drive_off, dd, po, pd, r_trans_off, r_tvr,
+  cy, cyt, salary_yr1, salary_yr2,
+  retired, exp, droptime,
+  htft, htin, wt, college,
+  draftround, draftpickno, draftyear, draftedby, draftedbycurrentname,
+  stats_gm, stats_min, stats_fgm, stats_fga, stats_ftm, stats_fta,
+  stats_3gm, stats_3ga, stats_orb, stats_drb, stats_ast, stats_stl,
+  stats_tvr, stats_blk, stats_pf,
+  uuid
+) VALUES
+  (200000031, 'Waive Target', 27, 28, 1, 'SF', 20,
+   78, 72, 68, 63, 58, 70, 66, 68, 63,
+   1, 2, 500, 550,
+   0, 4, 0,
+   6, 7, 215, 'Waiver College',
+   2, 30, 2022, 'Metros', 'Metros',
+   41, 1260, 180, 400, 90, 110,
+   40, 120, 50, 130, 150, 45,
+   70, 25, 85,
+   'a0000000-0000-0000-0000-000000200031');
+
+-- pid=200000032 "Rookie Option Target": Metros (tid=1) round-1 rookie with exp=2
+-- and salary_yr3=500 (final-year rookie salary, non-zero) / salary_yr4=0 (option
+-- year, observable). canRookieOption() round-1 Free Agency path requires exp===2
+-- and salary_yr4===0; the option write sets salary_yr4 to the exercised value.
+INSERT INTO ibl_plr (
+  pid, name, age, peak, teamid, pos, ordinal,
+  stamina, oo, od, r_drive_off, dd, po, pd, r_trans_off, r_tvr,
+  cy, cyt, salary_yr1, salary_yr2, salary_yr3, salary_yr4,
+  retired, exp,
+  htft, htin, wt, college,
+  draftround, draftpickno, draftyear, draftedby, draftedbycurrentname,
+  stats_gm, stats_min, stats_fgm, stats_fga, stats_ftm, stats_fta,
+  stats_3gm, stats_3ga, stats_orb, stats_drb, stats_ast, stats_stl,
+  stats_tvr, stats_blk, stats_pf,
+  uuid
+) VALUES
+  (200000032, 'Rookie Option Target', 23, 27, 1, 'PG', 21,
+   80, 74, 69, 64, 59, 71, 67, 69, 64,
+   1, 3, 400, 440, 500, 0,
+   0, 2,
+   6, 2, 190, 'Rookie College',
+   1, 15, 2024, 'Metros', 'Metros',
+   41, 1260, 190, 420, 95, 115,
+   45, 130, 45, 140, 160, 48,
+   65, 22, 88,
+   'a0000000-0000-0000-0000-000000200032');
+
 -- Cash consideration record for Free Agency placeholder filtering tests.
 -- Cash entries live in ibl_cash_considerations (not ibl_plr) since migration 095.
 -- Tests verify that cash rows appear in "Under Contract" and do NOT appear

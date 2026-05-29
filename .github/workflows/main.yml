@@ -183,8 +183,13 @@ jobs:
             echo "Start IBL6" > /tmp/ibl5-last-deploy-step
             cd www/IBL6
             mkdir -p logs
-            pm2 restart ibl6 --update-env 2>/dev/null \
-              || pm2 start ecosystem.config.cjs --only ibl6
+            # delete + start (not restart --update-env) so pm2 re-reads script,
+            # wait_ready, and listen_timeout from ecosystem.config.cjs. With
+            # wait_ready, this start call blocks until IBL6 signals ready, so it
+            # is itself the readiness gate. The app is already stopped (see the
+            # "Stop IBL6 to free resources" step), so delete adds no real downtime.
+            pm2 delete ibl6 2>/dev/null || true
+            pm2 start ecosystem.config.cjs --only ibl6 --update-env
             pm2 save
             echo "IBL6 started (PID: $(pm2 pid ibl6))"
           '
@@ -192,19 +197,29 @@ jobs:
       - name: Smoke test IBL6
         if: ${{ !cancelled() }}
         run: |
-          for i in 1 2 3; do
-            if curl -fsS --max-time 10 https://ibl6.iblhoops.net/ >/dev/null 2>&1; then
-              echo "IBL6 smoke test passed (attempt $i)"
-              exit 0
-            fi
-            echo "Attempt $i failed, waiting 5s..."
-            sleep 5
-          done
-          echo "Smoke test failed after 3 attempts, restarting IBL6..."
+          poll() {
+            for i in $(seq 1 "$1"); do
+              if curl -fsS --max-time 10 https://ibl6.iblhoops.net/health >/dev/null 2>&1; then
+                echo "IBL6 healthy (attempt $i)"
+                return 0
+              fi
+              echo "Attempt $i failed, waiting 5s..."
+              sleep 5
+            done
+            return 1
+          }
+          # ~30s warmup budget for proxy/TLS after pm2 already reported ready.
+          if poll 6; then exit 0; fi
+          echo "Smoke test failed after warmup, restarting IBL6..."
           ssh -p ${{ secrets.PORT }} -i ~/.ssh/id_deploy ${{ secrets.USERNAME }}@${{ secrets.HOST }} 'pm2 restart ibl6'
-          sleep 5
-          curl -fsS --max-time 10 https://ibl6.iblhoops.net/ >/dev/null 2>&1
-          echo "IBL6 recovered after restart"
+          # Retry the poll instead of a single un-retried curl; restart re-honors
+          # the wait_ready config it was started with.
+          if poll 6; then
+            echo "IBL6 recovered after restart"
+            exit 0
+          fi
+          echo "IBL6 still down after restart"
+          exit 1
 
   notify-deploy-failure:
     name: Notify Deploy Failure

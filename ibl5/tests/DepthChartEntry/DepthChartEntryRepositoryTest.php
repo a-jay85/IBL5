@@ -68,6 +68,11 @@ class DepthChartEntryRepositoryTest extends TestCase
             'c' => 0,
             'canPlayInGame' => 1,
             'min' => 30,
+            'of' => 0,
+            'df' => 0,
+            'oi' => 0,
+            'di' => 0,
+            'bh' => 0,
         ];
 
         // Set affected rows to 1 to simulate successful update
@@ -113,11 +118,16 @@ class DepthChartEntryRepositoryTest extends TestCase
             'c' => 0,
             'canPlayInGame' => 1,
             'min' => 30,
+            'of' => 0,
+            'df' => 0,
+            'oi' => 0,
+            'di' => 0,
+            'bh' => 0,
         ];
-        
+
         // Set affected rows to 0 to simulate no change (values already match)
         $this->mockDb->setAffectedRows(0);
-        
+
         $result = $this->repository->updatePlayerDepthChart($playerName, $depthChartValues);
 
         // This should return true because 0 affected rows means the player exists
@@ -128,6 +138,9 @@ class DepthChartEntryRepositoryTest extends TestCase
     public function testUpdatePlayerDepthChartHandlesStringNumbers(): void
     {
         // Test that the method properly converts string numbers to integers
+        // (mysqli bind_param "i" coerces string inputs). Strings are intentional;
+        // the array{...: int} shape mismatch is a documented baseline defer, not a
+        // defect to "fix" by changing these to ints (that would gut the test).
         $playerName = 'Test Player';
         $depthChartValues = [
             'pg' => '1',  // String instead of int
@@ -138,7 +151,7 @@ class DepthChartEntryRepositoryTest extends TestCase
             'canPlayInGame' => '1',
             'min' => '30',
         ];
-        
+
         $this->mockDb->setAffectedRows(1);
         
         $result = $this->repository->updatePlayerDepthChart($playerName, $depthChartValues);
@@ -158,6 +171,11 @@ class DepthChartEntryRepositoryTest extends TestCase
             'c' => 3,
             'canPlayInGame' => 1,
             'min' => 30,
+            'of' => 0,
+            'df' => 0,
+            'oi' => 0,
+            'di' => 0,
+            'bh' => 0,
         ];
 
         $this->mockDb->setAffectedRows(1);
@@ -313,6 +331,11 @@ class DepthChartEntryRepositoryTest extends TestCase
             'c' => 1,
             'canPlayInGame' => 1,
             'min' => 20,
+            'of' => 0,
+            'df' => 0,
+            'oi' => 0,
+            'di' => 0,
+            'bh' => 0,
         ];
 
         $this->mockDb->setAffectedRows(1);
@@ -397,6 +420,7 @@ class DepthChartEntryRepositoryTest extends TestCase
         $depthChartValues = [
             'pg' => 1, 'sg' => 0, 'sf' => 0, 'pf' => 0, 'c' => 0,
             'canPlayInGame' => 1, 'min' => 30,
+            'of' => 0, 'df' => 0, 'oi' => 0, 'di' => 0, 'bh' => 0,
         ];
 
         $result = $repo->updatePlayerDepthChart('Test Player', $depthChartValues);

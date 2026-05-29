@@ -728,6 +728,9 @@ class CommonContractValidatorTest extends TestCase
      */
     public function testValidateRaisesWithEmptyArraySucceeds(): void
     {
+        // Empty array is intentional (exercises the `?? default` missing-key path);
+        // the array{} shape mismatch is a documented baseline defer, not a defect to
+        // "fix" by populating the array (that would gut these WithEmptyArray tests).
         $result = $this->validator->validateRaises([], 0);
 
         $this->assertTrue($result['valid']);

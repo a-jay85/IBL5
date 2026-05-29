@@ -46,8 +46,12 @@ class AswFileParserTest extends TestCase
         array $threePtSemisScores = [],
         array $threePtFinalsScores = [],
     ): string {
-        // Initialize 112 lines with "0"
-        $lines = array_fill(0, AswFileParser::TOTAL_DATA_LINES, '0');
+        // Initialize 112 lines with "0". array_map with a string-typed callback yields
+        // list<string> (not list<'0'>), matching fillLines()'s by-ref param type.
+        $lines = array_map(
+            static fn (int $i): string => '0',
+            range(0, AswFileParser::TOTAL_DATA_LINES - 1)
+        );
 
         // Fill roster sections
         $this->fillLines($lines, AswFileParser::ALLSTAR_1_START, $allstar1);
@@ -78,7 +82,7 @@ class AswFileParserTest extends TestCase
     /**
      * Fill lines array starting at offset with values.
      *
-     * @param list<string> $lines Lines array (modified in place)
+     * @param array<int, string> $lines Lines array (modified in place)
      * @param int $startLine Starting line index
      * @param list<int> $values Values to fill
      */

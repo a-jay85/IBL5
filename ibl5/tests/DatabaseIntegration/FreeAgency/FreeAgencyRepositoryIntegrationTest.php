@@ -48,7 +48,7 @@ class FreeAgencyRepositoryIntegrationTest extends DatabaseTestCase
             'offer5' => 0,
             'offer6' => 0,
             'modifier' => 1.0,
-            'random' => 0.5,
+            'random' => 0,
             'perceivedValue' => 1650.0,
             'mle' => 0,
             'lle' => 0,
@@ -88,7 +88,7 @@ class FreeAgencyRepositoryIntegrationTest extends DatabaseTestCase
             'offer5' => 0,
             'offer6' => 0,
             'modifier' => 1.2,
-            'random' => 0.7,
+            'random' => 1,
             'perceivedValue' => 2250.0,
             'mle' => 0,
             'lle' => 0,
@@ -165,7 +165,14 @@ class FreeAgencyRepositoryIntegrationTest extends DatabaseTestCase
         $this->assertSame(500, $player1['salary_yr1']);
         $this->assertSame(550, $player1['salary_yr2']);
         $this->assertSame(600, $player1['salary_yr3']);
-        $this->assertSame(1, $player1['fa_signing_flag']);
+        $stmt = $this->db->prepare('SELECT fa_signing_flag FROM ibl_plr WHERE pid = ?');
+        $this->assertNotFalse($stmt);
+        $stmt->bind_param('i', $pid1);
+        $stmt->execute();
+        $flagRow = $stmt->get_result()->fetch_assoc();
+        $stmt->close();
+        $this->assertNotNull($flagRow);
+        $this->assertSame(1, $flagRow['fa_signing_flag']);
 
         $player2 = $this->playerRepo->getPlayerByID($pid2);
         $this->assertNotNull($player2);

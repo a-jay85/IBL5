@@ -92,7 +92,6 @@ class FreeAgencyAdminRepositoryTest extends TestCase
         $result = $repository->updatePlayerContract(
             100,
             5,
-            1,
             3,
             500,
             525,

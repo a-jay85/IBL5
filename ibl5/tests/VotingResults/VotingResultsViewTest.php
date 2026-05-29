@@ -18,8 +18,8 @@ final class VotingResultsViewTest extends TestCase
             [
                 'title' => 'Test & Title',
                 'rows' => [
-                    ['name' => 'Alice <One>', 'votes' => 10],
-                    ['name' => 'Bob "Two"', 'votes' => 5],
+                    ['name' => 'Alice <One>', 'votes' => 10, 'pid' => 1],
+                    ['name' => 'Bob "Two"', 'votes' => 5, 'pid' => 2],
                 ],
             ],
         ]);

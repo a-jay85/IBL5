@@ -69,11 +69,11 @@ class RatingsTest extends TestCase
     /**
      * Create a mock Team object
      *
-     * @return \stdClass
+     * @return \Team\Team&\PHPUnit\Framework\MockObject\MockObject
      */
-    private function createMockTeam(): object
+    private function createMockTeam(): \Team\Team
     {
-        $team = new \stdClass();
+        $team = $this->createMock(\Team\Team::class);
         $team->color1 = 'FF0000';
         $team->color2 = '0000FF';
         $team->teamid = 1;

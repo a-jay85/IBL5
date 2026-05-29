@@ -433,6 +433,7 @@ class DepthChartEntryWideUnitTest extends WideUnitTestCase
         $depthChartValues = [
             'pg' => 1, 'sg' => 2, 'sf' => 3, 'pf' => 4, 'c' => 5,
             'canPlayInGame' => 1, 'min' => 35,
+            'of' => 0, 'df' => 0, 'oi' => 0, 'di' => 0, 'bh' => 0,
         ];
         $this->mockDb->setAffectedRows(1);
 
@@ -472,6 +473,7 @@ class DepthChartEntryWideUnitTest extends WideUnitTestCase
         $depthChartValues = [
             'pg' => 0, 'sg' => 0, 'sf' => 0, 'pf' => 0, 'c' => 0,
             'canPlayInGame' => 1, 'min' => 0,
+            'of' => 0, 'df' => 0, 'oi' => 0, 'di' => 0, 'bh' => 0,
         ];
         $this->mockDb->setAffectedRows(0); // No rows affected
 
@@ -491,9 +493,9 @@ class DepthChartEntryWideUnitTest extends WideUnitTestCase
     {
         // Arrange
         $players = [
-            ['name' => 'Player 1', 'pg' => 1, 'sg' => 0, 'sf' => 0, 'pf' => 0, 'c' => 0, 'canPlayInGame' => 1, 'min' => 30],
-            ['name' => 'Player 2', 'pg' => 0, 'sg' => 1, 'sf' => 0, 'pf' => 0, 'c' => 0, 'canPlayInGame' => 1, 'min' => 28],
-            ['name' => 'Player 3', 'pg' => 0, 'sg' => 0, 'sf' => 1, 'pf' => 0, 'c' => 0, 'canPlayInGame' => 1, 'min' => 32],
+            ['name' => 'Player 1', 'pg' => 1, 'sg' => 0, 'sf' => 0, 'pf' => 0, 'c' => 0, 'canPlayInGame' => 1, 'min' => 30, 'of' => 0, 'df' => 0, 'oi' => 0, 'di' => 0, 'bh' => 0],
+            ['name' => 'Player 2', 'pg' => 0, 'sg' => 1, 'sf' => 0, 'pf' => 0, 'c' => 0, 'canPlayInGame' => 1, 'min' => 28, 'of' => 0, 'df' => 0, 'oi' => 0, 'di' => 0, 'bh' => 0],
+            ['name' => 'Player 3', 'pg' => 0, 'sg' => 0, 'sf' => 1, 'pf' => 0, 'c' => 0, 'canPlayInGame' => 1, 'min' => 32, 'of' => 0, 'df' => 0, 'oi' => 0, 'di' => 0, 'bh' => 0],
         ];
         $this->mockDb->setAffectedRows(1);
 
@@ -748,7 +750,7 @@ class DepthChartEntryWideUnitTest extends WideUnitTestCase
 
         for ($i = 0; $i < 12; $i++) {
             $idx = $i + 1;
-            $pos = $positions[$i] ?? ['pg' => 0, 'sg' => 0, 'sf' => 0, 'pf' => 0, 'c' => 0];
+            $pos = $positions[$i];
             $postData["Name{$idx}"] = "Player {$idx}";
             $postData["pg{$idx}"] = (string) $pos['pg'];
             $postData["sg{$idx}"] = (string) $pos['sg'];

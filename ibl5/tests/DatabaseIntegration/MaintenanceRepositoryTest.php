@@ -59,8 +59,8 @@ class MaintenanceRepositoryTest extends DatabaseTestCase
 
         $stmt = $this->db->prepare('SELECT contract_avg_w, contract_avg_l FROM ibl_team_info WHERE team_name = ?');
         self::assertNotFalse($stmt);
-        $stmt->bind_param('s', $tn);
         $tn = 'Metros';
+        $stmt->bind_param('s', $tn);
         $stmt->execute();
         $row = $stmt->get_result()->fetch_assoc();
         $stmt->close();

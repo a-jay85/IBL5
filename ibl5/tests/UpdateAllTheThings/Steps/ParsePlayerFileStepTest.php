@@ -13,7 +13,9 @@ use Updater\Steps\ParsePlayerFileStep;
 
 class ParsePlayerFileStepTest extends TestCase
 {
+    /** @var PlrParserServiceInterface&\PHPUnit\Framework\MockObject\Stub */
     private PlrParserServiceInterface $stubService;
+    /** @var JsbSourceResolverInterface&\PHPUnit\Framework\MockObject\Stub */
     private JsbSourceResolverInterface $stubResolver;
 
     protected function setUp(): void
@@ -54,6 +56,7 @@ class ParsePlayerFileStepTest extends TestCase
 
         $this->stubResolver->method('getContents')->willReturn('plr-bytes');
 
+        /** @var PlrParserServiceInterface&\PHPUnit\Framework\MockObject\MockObject */
         $mockService = $this->createMock(PlrParserServiceInterface::class);
         $mockService->expects($this->once())
             ->method('processPlrData')

@@ -14,9 +14,13 @@ use Updater\Steps\ProcessAllStarGamesStep;
 
 class ProcessAllStarGamesStepTest extends TestCase
 {
+    /** @var BoxscoreProcessor&\PHPUnit\Framework\MockObject\Stub */
     private BoxscoreProcessor $stubProcessor;
+    /** @var BoxscoreRepository&\PHPUnit\Framework\MockObject\Stub */
     private BoxscoreRepository $stubRepo;
+    /** @var BoxscoreView&\PHPUnit\Framework\MockObject\Stub */
     private BoxscoreView $stubView;
+    /** @var JsbSourceResolverInterface&\PHPUnit\Framework\MockObject\Stub */
     private JsbSourceResolverInterface $stubResolver;
 
     protected function setUp(): void

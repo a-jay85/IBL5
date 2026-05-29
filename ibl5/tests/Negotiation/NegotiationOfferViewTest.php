@@ -44,7 +44,8 @@ class NegotiationOfferViewTest extends TestCase
             'year5' => 700,
             'year6' => 0,
             'years' => 5,
-            'total' => 3000
+            'total' => 3000,
+            'modifier' => 1.0,
         ];
         $capSpace = 1000;
         $maxYearOneSalary = \ContractRules::getMaxContractSalary(0);
@@ -148,7 +149,8 @@ class NegotiationOfferViewTest extends TestCase
             'year5' => 0,
             'year6' => 0,
             'years' => 3,
-            'total' => 1650
+            'total' => 1650,
+            'modifier' => 1.0,
         ];
         $capSpace = 3000;
         $maxYearOneSalary = \ContractRules::getMaxContractSalary(0);
@@ -179,7 +181,8 @@ class NegotiationOfferViewTest extends TestCase
             'year5' => 0,
             'year6' => 0,
             'years' => 3,
-            'total' => 3600
+            'total' => 3600,
+            'modifier' => 1.0,
         ];
         $capSpace = 2000;
         $maxYearOneSalary = \ContractRules::getMaxContractSalary(0);
@@ -350,7 +353,8 @@ class NegotiationOfferViewTest extends TestCase
             'year5' => 700,
             'year6' => 0,
             'years' => 5,
-            'total' => 3000
+            'total' => 3000,
+            'modifier' => 1.0,
         ];
     }
 }

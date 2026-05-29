@@ -13,8 +13,11 @@ use Updater\Steps\ProcessBoxscoresStep;
 
 class ProcessBoxscoresStepTest extends TestCase
 {
+    /** @var BoxscoreProcessor&\PHPUnit\Framework\MockObject\Stub */
     private BoxscoreProcessor $stubProcessor;
+    /** @var BoxscoreView&\PHPUnit\Framework\MockObject\Stub */
     private BoxscoreView $stubView;
+    /** @var JsbSourceResolverInterface&\PHPUnit\Framework\MockObject\Stub */
     private JsbSourceResolverInterface $stubResolver;
 
     protected function setUp(): void

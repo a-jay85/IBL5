@@ -166,7 +166,7 @@ class StandingsRepositoryTest extends TestCase
     /**
      * Create a mock database with prepared statement support
      *
-     * @param mixed $returnData Data to return from the query
+     * @param array<string, mixed>|list<array<string, mixed>>|null $returnData Data to return from the query
      */
     private function createMockDatabaseWithPreparedStatement($returnData): object
     {
@@ -181,7 +181,9 @@ class StandingsRepositoryTest extends TestCase
             $mockResult->method('fetch_all')->willReturn([$returnData]);
         } else {
             // Multiple rows result
-            $mockResult->method('fetch_assoc')->willReturnOnConsecutiveCalls(...array_merge($returnData, [null]));
+            // array_values() forces an int-keyed list so the unpacked spread passes
+            // positional args (not named) to willReturnOnConsecutiveCalls().
+            $mockResult->method('fetch_assoc')->willReturnOnConsecutiveCalls(...array_values(array_merge($returnData, [null])));
             $mockResult->method('fetch_all')->willReturn($returnData);
         }
 

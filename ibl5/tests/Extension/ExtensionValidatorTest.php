@@ -182,33 +182,6 @@ class ExtensionValidatorTest extends TestCase
     }
 
     /**
-     * Helper method to get base team data for Team object initialization
-     */
-    private function getBaseTeamData()
-    {
-        return [
-            'team_name' => 'Test Team',
-            'teamid' => 1,
-            'team_city' => 'Test',
-            'team_nick' => 'Team',
-            'seasonRecord' => '0-0',
-            'has_mle' => 0,
-            'has_lle' => 0,
-            'league_record' => '0-0',
-            'capRoom' => 0,
-            'capacity' => 20000,
-            'owner_name' => 'Test Owner',
-            'owner_email' => 'test@example.com',
-            'color1' => '#000000',
-            'color2' => '#FFFFFF',
-            'arena' => 'Test Arena',
-            'discord_id' => '',
-            'used_extension_this_season' => 0,
-            'used_extension_this_chunk' => 0
-        ];
-    }
-
-    /**
      * @group validation
      * @group maximum-offer
      */

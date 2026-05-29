@@ -18,8 +18,11 @@ use Tests\WideUnit\Mocks\MockDatabase;
  */
 class FreeAgencyServiceTest extends TestCase
 {
+    /** @var FreeAgencyRepositoryInterface&\PHPUnit\Framework\MockObject\Stub */
     private FreeAgencyRepositoryInterface $stubRepo;
+    /** @var FreeAgencyDemandRepositoryInterface&\PHPUnit\Framework\MockObject\Stub */
     private FreeAgencyDemandRepositoryInterface $stubDemandRepo;
+    /** @var TeamQueryRepositoryInterface&\PHPUnit\Framework\MockObject\Stub */
     private TeamQueryRepositoryInterface $stubTeamQueryRepo;
     private MockDatabase $mockDb;
 

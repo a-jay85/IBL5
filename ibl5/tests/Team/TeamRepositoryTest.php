@@ -27,21 +27,36 @@ class TeamRepositoryTest extends TestCase
     public function testGetTeamPowerDataReturnsData()
     {
         $mockData = [[
-            'Team' => 'Boston Celtics',
-            'win' => 50,
-            'loss' => 32,
-            'gb' => 0,
-            'Division' => 'Atlantic',
-            'Conference' => 'Eastern'
+            'teamid' => 1,
+            'team_name' => 'Boston Celtics',
+            'league_record' => '50-32',
+            'wins' => 50,
+            'losses' => 32,
+            'pct' => 0.609,
+            'conference' => 'Eastern',
+            'division' => 'Atlantic',
+            'conf_record' => '30-20',
+            'div_record' => '10-5',
+            'div_gb' => 0.0,
+            'home_record' => '28-13',
+            'away_record' => '22-19',
+            'games_unplayed' => 0,
+            'ranking' => 1.0,
+            'last_win' => 50,
+            'last_loss' => 32,
+            'streak_type' => 'W',
+            'streak' => 3,
+            'sos' => 0.5,
+            'remaining_sos' => 0.5,
         ]];
-        
+
         $this->db->setMockData($mockData);
         $this->db->setNumRows(1);
-        
+
         $result = $this->repository->getTeamPowerData('Boston Celtics');
-        
-        $this->assertEquals('Boston Celtics', $result['Team']);
-        $this->assertEquals(50, $result['win']);
+
+        $this->assertSame('Boston Celtics', $result['team_name']);
+        $this->assertSame(50, $result['wins']);
     }
 
     public function testGetTeamPowerDataReturnsNullWhenNoResults()

@@ -208,7 +208,7 @@ class NextSimViewTest extends TestCase
     }
 
     /**
-     * @return array<int, array{game: \Game, date: \DateTime, dayNumber: int, opposingTeam: Team, locationPrefix: string, opposingStarters: array<string, Player>, opponentTier: string, opponentPowerRanking: float}>
+     * @return array<int, array{game: Game, date: \DateTime, dayNumber: int, opposingTeam: Team, locationPrefix: string, opposingStarters: array<string, Player>, opponentTier: string, opponentPowerRanking: float}>
      */
     private function createGameData(): array
     {

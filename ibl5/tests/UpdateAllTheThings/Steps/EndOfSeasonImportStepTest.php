@@ -14,8 +14,11 @@ use Updater\Steps\EndOfSeasonImportStep;
 
 class EndOfSeasonImportStepTest extends TestCase
 {
+    /** @var JsbImportRepositoryInterface&\PHPUnit\Framework\MockObject\Stub */
     private JsbImportRepositoryInterface $stubRepo;
+    /** @var JsbImportService&\PHPUnit\Framework\MockObject\Stub */
     private JsbImportService $stubService;
+    /** @var JsbSourceResolverInterface&\PHPUnit\Framework\MockObject\Stub */
     private JsbSourceResolverInterface $stubResolver;
 
     protected function setUp(): void

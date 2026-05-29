@@ -24,36 +24,17 @@ class TradeValidatorTest extends TestCase
 {
     private $validator;
     private $mockDb;
-    private $mockMysqli;
 
     protected function setUp(): void
     {
         $this->mockDb = new MockDatabase();
-        
-        // Set up mock mysqli for Trading repository
-        $this->mockMysqli = new class($this->mockDb) {
-            private $mockDb;
-            public int $connect_errno = 0;
-            public ?string $connect_error = null;
-            public int $insert_id = 1;
-            
-            public function __construct($mockDb) {
-                $this->mockDb = $mockDb;
-            }
-            
-            public function prepare($query) {
-                return new MockPreparedStatement($this->mockDb, $query);
-            }
-        };
-        
-        $this->validator = new \Trading\TradeValidator($this->mockDb, $this->mockMysqli);
+        $this->validator = new \Trading\TradeValidator($this->mockDb);
     }
 
     protected function tearDown(): void
     {
         $this->validator = null;
         $this->mockDb = null;
-        $this->mockMysqli = null;
     }
 
     /**

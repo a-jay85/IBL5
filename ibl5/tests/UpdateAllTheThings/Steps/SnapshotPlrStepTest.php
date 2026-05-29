@@ -15,8 +15,11 @@ use Updater\Steps\SnapshotPlrStep;
 
 class SnapshotPlrStepTest extends TestCase
 {
+    /** @var JsbImportRepositoryInterface&\PHPUnit\Framework\MockObject\Stub */
     private JsbImportRepositoryInterface $stubJsbRepo;
+    /** @var PlrParserServiceInterface&\PHPUnit\Framework\MockObject\Stub */
     private PlrParserServiceInterface $stubPlrService;
+    /** @var JsbSourceResolverInterface&\PHPUnit\Framework\MockObject\Stub */
     private JsbSourceResolverInterface $stubResolver;
 
     protected function setUp(): void
@@ -64,6 +67,7 @@ class SnapshotPlrStepTest extends TestCase
         $plrResult = new PlrParseResult();
         $plrResult->playersUpserted = 10;
 
+        /** @var PlrParserServiceInterface&\PHPUnit\Framework\MockObject\MockObject */
         $mockPlrService = $this->createMock(PlrParserServiceInterface::class);
         $mockPlrService->expects($this->once())
             ->method('processPlrDataForYear')
@@ -91,6 +95,7 @@ class SnapshotPlrStepTest extends TestCase
         $plrResult = new PlrParseResult();
         $plrResult->playersUpserted = 5;
 
+        /** @var PlrParserServiceInterface&\PHPUnit\Framework\MockObject\MockObject */
         $mockPlrService = $this->createMock(PlrParserServiceInterface::class);
         $mockPlrService->expects($this->once())
             ->method('processPlrDataForYear')

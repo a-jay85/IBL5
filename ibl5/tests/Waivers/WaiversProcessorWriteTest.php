@@ -11,9 +11,13 @@ use Waivers\WaiversProcessor;
 
 class WaiversProcessorWriteTest extends TestCase
 {
+    /** @var WaiversRepositoryInterface&\PHPUnit\Framework\MockObject\Stub */
     private WaiversRepositoryInterface $repoStub;
+    /** @var \Repositories\Contracts\TeamIdentityRepositoryInterface&\PHPUnit\Framework\MockObject\Stub */
     private \Repositories\Contracts\TeamIdentityRepositoryInterface $teamIdentityRepoStub;
+    /** @var \Repositories\Contracts\PlayerLookupRepositoryInterface&\PHPUnit\Framework\MockObject\Stub */
     private \Repositories\Contracts\PlayerLookupRepositoryInterface $playerLookupRepoStub;
+    /** @var WaiversValidatorInterface&\PHPUnit\Framework\MockObject\Stub */
     private WaiversValidatorInterface $validatorStub;
     private \Topics\News\NewsRepository $newsServiceStub;
     private WaiversProcessor $processor;

@@ -109,8 +109,8 @@ class FreeAgencyAdminRepositoryTest extends DatabaseTestCase
 
         $stmt = $this->db->prepare('SELECT cy, cyt, salary_yr1, salary_yr2, salary_yr3, salary_yr4, teamid, fa_signing_flag FROM ibl_plr WHERE pid = ?');
         self::assertNotFalse($stmt);
-        $stmt->bind_param('i', $pid);
         $pid = 200060005;
+        $stmt->bind_param('i', $pid);
         $stmt->execute();
         $row = $stmt->get_result()->fetch_assoc();
         $stmt->close();
@@ -133,8 +133,8 @@ class FreeAgencyAdminRepositoryTest extends DatabaseTestCase
         // Seed has Metros in ibl_team_info — set has_mle=1 first
         $stmt = $this->db->prepare('UPDATE ibl_team_info SET has_mle = 1 WHERE team_name = ?');
         self::assertNotFalse($stmt);
-        $stmt->bind_param('s', $team);
         $team = 'Metros';
+        $stmt->bind_param('s', $team);
         $stmt->execute();
         $stmt->close();
 
@@ -142,8 +142,8 @@ class FreeAgencyAdminRepositoryTest extends DatabaseTestCase
 
         $stmt = $this->db->prepare('SELECT has_mle FROM ibl_team_info WHERE team_name = ?');
         self::assertNotFalse($stmt);
-        $stmt->bind_param('s', $team);
         $team = 'Metros';
+        $stmt->bind_param('s', $team);
         $stmt->execute();
         $row = $stmt->get_result()->fetch_assoc();
         $stmt->close();
@@ -157,8 +157,8 @@ class FreeAgencyAdminRepositoryTest extends DatabaseTestCase
         // Set has_lle=1 first
         $stmt = $this->db->prepare('UPDATE ibl_team_info SET has_lle = 1 WHERE team_name = ?');
         self::assertNotFalse($stmt);
-        $stmt->bind_param('s', $team);
         $team = 'Metros';
+        $stmt->bind_param('s', $team);
         $stmt->execute();
         $stmt->close();
 
@@ -166,8 +166,8 @@ class FreeAgencyAdminRepositoryTest extends DatabaseTestCase
 
         $stmt = $this->db->prepare('SELECT has_lle FROM ibl_team_info WHERE team_name = ?');
         self::assertNotFalse($stmt);
-        $stmt->bind_param('s', $team);
         $team = 'Metros';
+        $stmt->bind_param('s', $team);
         $stmt->execute();
         $row = $stmt->get_result()->fetch_assoc();
         $stmt->close();

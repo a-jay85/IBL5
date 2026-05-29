@@ -48,7 +48,7 @@ class ExtensionOfferEvaluatorTest extends TestCase
 
     public function testCalculateOfferValueReturnsArray(): void
     {
-        $offer = [1 => 5000000, 2 => 5500000];
+        $offer = ['year1' => 5000000, 'year2' => 5500000, 'year3' => 6000000];
 
         $result = $this->contractValidator->calculateOfferValue($offer);
 
@@ -57,7 +57,7 @@ class ExtensionOfferEvaluatorTest extends TestCase
 
     public function testCalculateOfferValueHasAveragePerYearKey(): void
     {
-        $offer = [1 => 5000000, 2 => 5500000];
+        $offer = ['year1' => 5000000, 'year2' => 5500000, 'year3' => 6000000];
 
         $result = $this->contractValidator->calculateOfferValue($offer);
 
@@ -161,7 +161,10 @@ class ExtensionOfferEvaluatorTest extends TestCase
 
     public function testCalculateCombinedModifierStartsAtOne(): void
     {
-        // With all default preferences, modifier should be 1.0
+        // With all default preferences, modifier should be 1.0. Empty arrays are
+        // intentional: this exercises the production `?? default` coalescing for
+        // every missing key. The array{...} shape mismatch is a documented baseline
+        // defer, not a defect to "fix" by populating the arrays (that guts the test).
         $teamFactors = [];
         $playerPreferences = [];
 
@@ -172,8 +175,8 @@ class ExtensionOfferEvaluatorTest extends TestCase
 
     public function testCalculateCombinedModifierWithPositiveFactors(): void
     {
-        $teamFactors = ['wins' => 60, 'losses' => 22, 'tradition_wins' => 1000, 'tradition_losses' => 400];
-        $playerPreferences = ['winner' => 5, 'tradition' => 3, 'loyalty' => 5];
+        $teamFactors = ['wins' => 60, 'losses' => 22, 'tradition_wins' => 1000, 'tradition_losses' => 400, 'money_committed_at_position' => 0];
+        $playerPreferences = ['winner' => 5, 'tradition' => 3, 'loyalty' => 5, 'playing_time' => 1];
 
         $result = $this->evaluator->calculateCombinedModifier($teamFactors, $playerPreferences);
 
@@ -186,10 +189,10 @@ class ExtensionOfferEvaluatorTest extends TestCase
 
     public function testEvaluateOfferReturnsArray(): void
     {
-        $offer = [1 => 10000000, 2 => 11000000];
-        $demands = [1 => 9000000, 2 => 9500000];
-        $teamFactors = ['wins' => 50, 'losses' => 32];
-        $playerPreferences = ['winner' => 3];
+        $offer = ['year1' => 10000000, 'year2' => 11000000, 'year3' => 12000000];
+        $demands = ['year1' => 9000000, 'year2' => 9500000, 'year3' => 10000000];
+        $teamFactors = ['wins' => 50, 'losses' => 32, 'tradition_wins' => 500, 'tradition_losses' => 300, 'money_committed_at_position' => 0];
+        $playerPreferences = ['winner' => 3, 'tradition' => 1, 'loyalty' => 1, 'playing_time' => 1];
 
         $result = $this->evaluator->evaluateOffer($offer, $demands, $teamFactors, $playerPreferences);
 
@@ -198,10 +201,10 @@ class ExtensionOfferEvaluatorTest extends TestCase
 
     public function testEvaluateOfferHasAcceptedKey(): void
     {
-        $offer = [1 => 10000000];
-        $demands = [1 => 9000000];
-        $teamFactors = [];
-        $playerPreferences = [];
+        $offer = ['year1' => 10000000, 'year2' => 10000000, 'year3' => 10000000];
+        $demands = ['year1' => 9000000, 'year2' => 9000000, 'year3' => 9000000];
+        $teamFactors = ['wins' => 0, 'losses' => 0, 'tradition_wins' => 0, 'tradition_losses' => 0, 'money_committed_at_position' => 0];
+        $playerPreferences = ['winner' => 1, 'tradition' => 1, 'loyalty' => 1, 'playing_time' => 1];
 
         $result = $this->evaluator->evaluateOffer($offer, $demands, $teamFactors, $playerPreferences);
 
@@ -210,10 +213,10 @@ class ExtensionOfferEvaluatorTest extends TestCase
 
     public function testEvaluateOfferAcceptedWhenOfferExceedsDemands(): void
     {
-        $offer = [1 => 15000000]; // Higher than demands
-        $demands = [1 => 10000000];
-        $teamFactors = [];
-        $playerPreferences = [];
+        $offer = ['year1' => 15000000, 'year2' => 15000000, 'year3' => 15000000]; // Higher than demands
+        $demands = ['year1' => 10000000, 'year2' => 10000000, 'year3' => 10000000];
+        $teamFactors = ['wins' => 0, 'losses' => 0, 'tradition_wins' => 0, 'tradition_losses' => 0, 'money_committed_at_position' => 0];
+        $playerPreferences = ['winner' => 1, 'tradition' => 1, 'loyalty' => 1, 'playing_time' => 1];
 
         $result = $this->evaluator->evaluateOffer($offer, $demands, $teamFactors, $playerPreferences);
 
@@ -222,10 +225,10 @@ class ExtensionOfferEvaluatorTest extends TestCase
 
     public function testEvaluateOfferHasModifierKey(): void
     {
-        $offer = [1 => 10000000];
-        $demands = [1 => 9000000];
-        $teamFactors = [];
-        $playerPreferences = [];
+        $offer = ['year1' => 10000000, 'year2' => 10000000, 'year3' => 10000000];
+        $demands = ['year1' => 9000000, 'year2' => 9000000, 'year3' => 9000000];
+        $teamFactors = ['wins' => 0, 'losses' => 0, 'tradition_wins' => 0, 'tradition_losses' => 0, 'money_committed_at_position' => 0];
+        $playerPreferences = ['winner' => 1, 'tradition' => 1, 'loyalty' => 1, 'playing_time' => 1];
 
         $result = $this->evaluator->evaluateOffer($offer, $demands, $teamFactors, $playerPreferences);
 
@@ -587,7 +590,9 @@ class ExtensionOfferEvaluatorTest extends TestCase
 
     public function testCalculateWinnerModifierWithMissingTeamFactors(): void
     {
-        // Empty team factors → wins ?? 0, losses ?? 0 → winDiff = 0
+        // Empty team factors → wins ?? 0, losses ?? 0 → winDiff = 0. Empty array is
+        // intentional (mutation-hardening of the `?? 0` defaults); the shape mismatch
+        // is a documented baseline defer, not a defect to "fix" by populating it.
         $result = $this->evaluator->calculateWinnerModifier([], ['winner' => 3]);
 
         $this->assertSame(0.0, $result);
@@ -595,7 +600,8 @@ class ExtensionOfferEvaluatorTest extends TestCase
 
     public function testCalculateWinnerModifierWithMissingPreference(): void
     {
-        // Missing 'winner' key → defaults to 1, so (1-1) = 0 → modifier = 0
+        // Missing 'winner' key → defaults to 1, so (1-1) = 0 → modifier = 0. Empty
+        // preference array is intentional (hardens the `?? 1` default); deferred shape.
         $result = $this->evaluator->calculateWinnerModifier(
             ['wins' => 50, 'losses' => 32],
             []
@@ -606,6 +612,8 @@ class ExtensionOfferEvaluatorTest extends TestCase
 
     public function testCalculateTraditionModifierWithMissingTeamFactors(): void
     {
+        // Empty team factors → tradition_wins/losses ?? 0 → diff = 0. Intentional
+        // (hardens the `?? 0` defaults); deferred shape.
         $result = $this->evaluator->calculateTraditionModifier([], ['tradition' => 3]);
 
         $this->assertSame(0.0, $result);
@@ -613,7 +621,8 @@ class ExtensionOfferEvaluatorTest extends TestCase
 
     public function testCalculateLoyaltyModifierWithMissingPreference(): void
     {
-        // Missing 'loyalty' key → defaults to 1, so (1-1) = 0
+        // Missing 'loyalty' key → defaults to 1, so (1-1) = 0. Empty array is
+        // intentional (hardens the `?? 1` default); deferred shape.
         $result = $this->evaluator->calculateLoyaltyModifier([]);
 
         $this->assertSame(0.0, $result);
@@ -621,7 +630,8 @@ class ExtensionOfferEvaluatorTest extends TestCase
 
     public function testCalculatePlayingTimeModifierWithMissingData(): void
     {
-        // Missing money_committed → defaults to 0; missing playingTime → defaults to 1
+        // Missing money_committed → defaults to 0; missing playingTime → defaults to 1.
+        // Empty arrays are intentional (harden the `??` defaults); deferred shape.
         $result = $this->evaluator->calculatePlayingTimeModifier([], []);
 
         $this->assertSame(0.0, $result);

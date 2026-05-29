@@ -186,8 +186,11 @@ class PlayerImageHelperTest extends TestCase
      */
     public function testFloatPlayerIDIsConvertedCorrectly(): void
     {
+        // Float input is intentional — this test verifies getImageUrl() itself
+        // converts a float ID. Pre-casting would gut it; any arg-type mismatch is
+        // a documented baseline defer.
         $result = PlayerImageHelper::getImageUrl(123.7);
-        
+
         // Should truncate to 123
         $this->assertStringContainsString('./images/player/123.jpg', $result);
     }

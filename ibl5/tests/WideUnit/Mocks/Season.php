@@ -126,20 +126,6 @@ class Season
         return (string)$this->endingYear;
     }
     
-    /**
-     * Get last sim dates array (mock implementation)
-     *
-     * @return array Array with keys: sim, start_date, end_date
-     */
-    private function getLastSimDatesArray(): array
-    {
-        return [
-            'sim' => $this->lastSimNumber,
-            'start_date' => $this->lastSimStartDate,
-            'end_date' => $this->lastSimEndDate,
-        ];
-    }
-    
     public function getProjectedNextSimEndDate(string $lastSimEndDate): \DateTimeInterface
     {
         $lastSimEndDateObj = new \DateTime($lastSimEndDate);

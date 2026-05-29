@@ -52,8 +52,8 @@ class RookieOptionValidatorTest extends TestCase
 
         $this->assertFalse($result->isValid());
         $this->assertNotNull($result->getError());
-        $this->assertStringContainsString('SG Other Player', $result->getError() ?? '');
-        $this->assertStringContainsString('not on your team', $result->getError() ?? '');
+        $this->assertStringContainsString('SG Other Player', $result->getError());
+        $this->assertStringContainsString('not on your team', $result->getError());
     }
 
     /**

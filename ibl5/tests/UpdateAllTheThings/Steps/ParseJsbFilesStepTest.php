@@ -13,7 +13,9 @@ use Updater\Steps\ParseJsbFilesStep;
 
 class ParseJsbFilesStepTest extends TestCase
 {
+    /** @var JsbImportService&\PHPUnit\Framework\MockObject\Stub */
     private JsbImportService $stubService;
+    /** @var JsbSourceResolverInterface&\PHPUnit\Framework\MockObject\Stub */
     private JsbSourceResolverInterface $stubResolver;
 
     protected function setUp(): void

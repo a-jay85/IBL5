@@ -19,15 +19,20 @@ final class DepthChartEntryViewXssTest extends TestCase
     }
 
     /**
-     * @return array{pid: int, name: string, pos: string, injured: int, dc_can_play_in_game: int, dc_pg_depth: int, dc_sg_depth: int, dc_sf_depth: int, dc_pf_depth: int, dc_c_depth: int, dc_minutes: int, stats_fgm: int, stats_3gm: int, stats_ftm: int, stats_orb: int, stats_drb: int, stats_ast: int, stats_stl: int, stats_blk: int}
+     * @return array<string, mixed>
      */
     private function makePlayer(array $overrides = []): array
     {
         return array_merge([
             'pid' => 1,
             'name' => 'Safe Player',
+            'nickname' => null,
+            'age' => null,
+            'teamid' => 1,
+            'teamname' => null,
             'pos' => 'PG',
             'injured' => 0,
+            'stamina' => null,
             'dc_can_play_in_game' => 1,
             'dc_pg_depth' => 1,
             'dc_sg_depth' => 0,

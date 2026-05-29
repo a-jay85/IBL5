@@ -1178,12 +1178,14 @@ Effort scale:
 **Est. effort:** M
 **Risk if untouched:** Clones slow; shallow-clone fragility; credential exposure.
 
-### 8.2 Three Homes for Scripts With Unclear Separation
-**Location:** `/bin/` (31), `ibl5/bin/` (14), `ibl5/scripts/` (14)
-**Problem:** No documented convention. `db-query` is symlinked from `bin/` to `ibl5/bin/`; `migrate` lives only in `ibl5/bin/`.
-**Suggested direction:** Consolidate: repo-level CLI → `/bin/`; app internal → `ibl5/bin/`; web entry points → `ibl5/scripts/`; document in CLAUDE.md.
-**Est. effort:** M
-**Risk if untouched:** New scripts placed randomly; duplicate names; CI calls wrong paths.
+### 8.2 Three Homes for Scripts With Unclear Separation — RESOLVED
+**Resolution:** Convention documented in `bin/README.md` and `ibl5/bin/README.md`.
+Repo/git/CI/worktree/prod-ops tooling → `bin/` (host only); scripts needing the
+PHP app or run inside the Docker container → `ibl5/bin/` (pinned by the
+`./ibl5`-only bind mount); PHP admin/data entry points → `ibl5/scripts/`.
+Two dead scripts were removed in the same change: the Olympics schema-parity
+CLI (superseded by `OlympicsSchemaParityTest.php`) and the franchise-seasons
+one-time backfill (its tables now live in the baseline schema + migrations).
 
 ### 8.3 Mixed kebab-case, camelCase, `.sh` Extensions
 **Location:** `/bin/` and `ibl5/bin/`

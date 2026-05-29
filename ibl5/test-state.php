@@ -666,14 +666,15 @@ if ($method === 'DELETE' && $action === 'reset-saved-dc-names') {
     exit;
 }
 
-// DELETE ?action=clear-trade-offers — delete the seeded review offers (1-6) and
-// their ibl_trade_info line items so the trade-review empty-state can be observed.
-// Scoped to ids 1-6 so offers 7-8 (reserved for api-v1-rest.spec.ts) and any
-// ibl_trade_cash survive. Paired with reset-trade-offers.
+// DELETE ?action=clear-trade-offers — delete ALL non-REST trade offers so the
+// trade-review empty-state can be observed. Spares ids 7-8 (reserved for
+// api-v1-rest.spec.ts) and any ibl_trade_cash. Uses NOT IN (7,8) rather than
+// IN (1-6) because trading-submission.spec.ts creates dynamic offers during
+// the same run that also block the empty-state. Paired with reset-trade-offers.
 if ($method === 'DELETE' && $action === 'clear-trade-offers') {
-    $db->query('DELETE FROM ibl_trade_info WHERE tradeofferid IN (1,2,3,4,5,6)');
+    $db->query('DELETE FROM ibl_trade_info WHERE tradeofferid NOT IN (7,8)');
     $infoDeleted = $db->affected_rows;
-    $db->query('DELETE FROM ibl_trade_offers WHERE id IN (1,2,3,4,5,6)');
+    $db->query('DELETE FROM ibl_trade_offers WHERE id NOT IN (7,8)');
     $offersDeleted = $db->affected_rows;
     echo json_encode(['info_deleted' => $infoDeleted, 'offers_deleted' => $offersDeleted]);
     $db->close();

@@ -143,8 +143,13 @@ test.describe('Waivers: waive player', () => {
         await assertNoPhpErrors(page, 'after waiver drop');
       },
       readBack: async () => {
-        await page.goto('modules.php?name=Team&op=team&teamid=1');
-        await expect(page.getByText('Waive Target')).toHaveCount(0);
+        // dropPlayerToWaivers sets ordinal=1000; getHealthyAndInjuredPlayersOrderedByName
+        // filters to ordinal <= WAIVERS_ORDINAL (960), so a waived player disappears
+        // from the waive-form select. This proves the drop persisted.
+        await page.goto('modules.php?name=Waivers&action=waive');
+        await expect(
+          page.locator('select[name="Player_ID"] option[value="200000031"]'),
+        ).toHaveCount(0);
       },
     });
   });

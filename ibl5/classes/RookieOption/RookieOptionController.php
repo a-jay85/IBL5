@@ -70,7 +70,11 @@ class RookieOptionController implements RookieOptionControllerInterface
         // Send Discord notification
         $playerName = $player->getName() ?? 'Unknown';
         $discordMessage = $teamName . " exercise the rookie extension option on " . $playerName . " in the amount of " . $extensionAmount . ".";
-        Discord::postToChannel(self::DISCORD_CHANNEL, $discordMessage);
+        try {
+            Discord::postToChannel(self::DISCORD_CHANNEL, $discordMessage);
+        } catch (\Exception $e) {
+            \Logging\LoggerFactory::getChannel('app')->warning('RookieOption Discord notification failed', ['error' => $e->getMessage()]);
+        }
 
         // Send email notification
         $emailSubject = "Rookie Extension Option - " . $playerName;

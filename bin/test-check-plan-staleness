@@ -1,0 +1,63 @@
+#!/usr/bin/env bash
+# shellcheck shell=bash
+#
+# bin/test-check-plan-staleness — regression test for bin/check-plan-staleness.
+#
+# The guard relaxes two false-positive classes (bare bin/ tokens that live at
+# ibl5/bin/, and to-be-created files referenced in a creation context). This
+# test pins both the relaxations AND the negative case: a missing path that is
+# NOT in a creation context must still be flagged stale. Without the negative
+# case, a relaxed guard could silently stop catching real poison-pill plans.
+#
+# Run: bin/test-check-plan-staleness  (exit 0 = all pass, 1 = a case failed)
+
+set -u
+
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+GUARD="$SCRIPT_DIR/check-plan-staleness"
+TMP="$(mktemp -d)"
+trap 'rm -f "$TMP"/*.md 2>/dev/null; rmdir "$TMP" 2>/dev/null' EXIT
+
+FAILED=0
+
+# assert <name> <expected-exit> <plan-body>
+assert() {
+    name="$1"; want="$2"; body="$3"
+    f="$TMP/$name.md"
+    printf '%s\n' "$body" > "$f"
+    "$GUARD" "$f" >/dev/null 2>&1
+    got=$?
+    if [ "$got" -ne "$want" ]; then
+        echo "FAIL: $name — expected exit $want, got $got"
+        FAILED=1
+    else
+        echo "ok: $name (exit $got)"
+    fi
+}
+
+# A genuinely stale path referenced as something that should already exist must
+# still flag (exit 1). This is the load-bearing negative case.
+assert "stale-modify" 1 'Modify the existing helper `ibl5/classes/DoesNotExistAnywhere.php` to add a method.'
+
+# Same nonexistent path, but in a creation context, must pass (exit 0).
+assert "create-new-file" 0 'Create `ibl5/classes/DoesNotExistAnywhere.php` exposing a new handler.'
+
+# A verification-matrix row for a new (post-impl) test file must pass.
+assert "post-impl-test" 0 '| 2 | thing works | PHPUnit | post-impl | `ibl5/tests/Brand/NewThingTest.php` |'
+
+# A bare bin/ token whose real home is ibl5/bin/ must resolve (exit 0).
+assert "ibl5-bin-token" 0 'CI runs `bin/check-baseline-drift` under working-directory ibl5.'
+
+# A bare bin/ token that exists at neither root bin/ nor ibl5/bin/, with no
+# creation cue, must still flag stale (exit 1).
+assert "stale-bin-token" 1 'Run `bin/this-script-does-not-exist-at-all` as part of the job.'
+
+# An existing repo path must always pass (exit 0).
+assert "existing-path" 0 'See `bin/check-plan-staleness` for the guard itself.'
+
+if [ "$FAILED" -ne 0 ]; then
+    echo "RESULT: FAILED"
+    exit 1
+fi
+echo "RESULT: all passed"
+exit 0

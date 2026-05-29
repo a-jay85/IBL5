@@ -92,9 +92,35 @@ while IFS= read -r token; do
     fi
     printf '%s\n' "$token" >> "$SEEN_FILE"
 
-    if [ ! -e "$REPO_ROOT/$token" ]; then
-        printf '%s\n' "$token" >> "$MISSING_FILE"
+    # A token resolves if it exists at the repo root. For bare bin/ tokens it
+    # also resolves at ibl5/bin/ — CI runs those scripts under
+    # `working-directory: ibl5`, so plans reference them in the bare bin/ form
+    # (e.g. `bin/check-baseline-drift`) even though the file is ibl5/bin/<x>.
+    if [ -e "$REPO_ROOT/$token" ]; then
+        continue
     fi
+    case "$token" in
+        bin/*)
+            if [ -e "$REPO_ROOT/ibl5/$token" ]; then
+                continue
+            fi
+            ;;
+    esac
+
+    # Not on disk. Before flagging it stale, check whether the plan references
+    # this token in a CREATION context — a file the plan itself creates is not a
+    # poison-pill stale path. The guard catches renamed/moved/deleted paths, not
+    # to-be-created ones. We require the creation cue to appear on a line that
+    # also contains the token (same-line), so a "Create X" elsewhere can't mask
+    # a genuinely stale Y. `post-impl` is the verification-matrix timing column
+    # for new artifacts; `pre-impl` rows reference existing files (which resolve
+    # on disk and never reach here).
+    if grep -F -- "$token" "$PLAN_FILE" \
+        | grep -qE '([Cc]reate|[Nn]ew file|[Aa]dd(s|ing)? (a )?new|[Ii]ntroduce|[Ss]caffold|throwaway|scratch|post-impl)'; then
+        continue
+    fi
+
+    printf '%s\n' "$token" >> "$MISSING_FILE"
 done < "$TOKENS_FILE"
 
 if [ -s "$MISSING_FILE" ]; then

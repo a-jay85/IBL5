@@ -425,15 +425,29 @@ if ($method === 'DELETE' && $action === 'clear-fa-offers') {
     exit;
 }
 
-// DELETE ?action=reset-fa-offers — wipe and re-insert the three seed FA offer rows
+// DELETE ?action=reset-fa-offers[&pid=N] — wipe and re-insert the seed FA offer
+// rows. With no pid, all three seed rows (pid 10/11/12, all on Metros) are
+// inserted. With ?pid=N, only that pid's row is inserted — the other Metros
+// offers count against the team's soft cap (FreeAgencyCapCalculator sums pending
+// offers), so a max-contract test for one pid needs the other two offers gone to
+// leave enough cap room for a non-exception max offer.
 if ($method === 'DELETE' && $action === 'reset-fa-offers') {
+    $seedRows = [
+        10 => "('FA Guard',   10, 'Metros', 1, 700, 770, 840, 0, 0, 0,  1.0, 0.5, 1000.0, 0, 0, 0)",
+        11 => "('FA Center',  11, 'Metros', 1, 480, 528, 0,   0, 0, 0,  1.0, 0.5, 600.0,  0, 0, 0)",
+        12 => "('FA Forward', 12, 'Metros', 1, 380, 418, 460, 0, 0, 0,  1.0, 0.5, 550.0,  0, 0, 0)",
+    ];
+    $onlyPid = isset($_GET['pid']) ? (int) $_GET['pid'] : 0;
+    if ($onlyPid !== 0 && isset($seedRows[$onlyPid])) {
+        $rows = [$seedRows[$onlyPid]];
+    } else {
+        $rows = array_values($seedRows);
+    }
     $db->query('DELETE FROM ibl_fa_offers');
     $db->query(
-        "INSERT INTO ibl_fa_offers (name, pid, team, teamid, offer1, offer2, offer3, offer4, offer5, offer6,
-                                    modifier, random, perceivedvalue, mle, lle, offer_type) VALUES
-          ('FA Guard',   10, 'Metros', 1, 700, 770, 840, 0, 0, 0,  1.0, 0.5, 1000.0, 0, 0, 0),
-          ('FA Center',  11, 'Metros', 1, 480, 528, 0,   0, 0, 0,  1.0, 0.5, 600.0,  0, 0, 0),
-          ('FA Forward', 12, 'Metros', 1, 380, 418, 460, 0, 0, 0,  1.0, 0.5, 550.0,  0, 0, 0)"
+        'INSERT INTO ibl_fa_offers (name, pid, team, teamid, offer1, offer2, offer3, offer4, offer5, offer6,
+                                    modifier, random, perceivedvalue, mle, lle, offer_type) VALUES '
+        . implode(', ', $rows)
     );
     echo json_encode(['reset' => $db->affected_rows]);
     $db->close();

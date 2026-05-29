@@ -203,10 +203,12 @@ test.describe('Free Agency -- quick offer buttons', () => {
   });
 
   // LLE test after MLE — delete MLE offer first so HasMLE remains available, then
-  // re-seed so pid=11 has a (non-MLE) existing offer again. The LLE test navigates
-  // to pid=11 on the full Metros roster, where the negotiate form only renders when
-  // hasExistingOffer=true; without the re-seed the form is absent and the LLE quick
-  // offer click times out.
+  // re-seed ONLY pid=11 so it has a (non-MLE) existing offer again. The LLE test
+  // navigates to pid=11 on the full Metros roster, where the negotiate form only
+  // renders when hasExistingOffer=true; without the re-seed the form is absent and
+  // the LLE quick offer click times out. Seeding only pid=11 (not pid=10/12) keeps
+  // those offers from consuming Metros soft cap, which the later max-contract test
+  // needs (a non-exception max offer must fit under the soft cap).
   test('delete MLE offer before LLE test', async ({ page, request }) => {
     await page.goto('modules.php?name=FreeAgency&pa=negotiate&pid=11');
     const deleteBtn = page.getByRole('button', { name: /Delete This Offer/i });
@@ -214,7 +216,7 @@ test.describe('Free Agency -- quick offer buttons', () => {
       await deleteBtn.click();
       await page.waitForURL(/result=deleted/);
     }
-    await request.delete('test-state.php?action=reset-fa-offers');
+    await request.delete('test-state.php?action=reset-fa-offers&pid=11');
   });
 
   test('submit LLE offer', async ({ page }) => {
@@ -236,8 +238,10 @@ test.describe('Free Agency -- quick offer buttons', () => {
     });
   });
 
-  // Delete LLE offer before max contract test, then re-seed so pid=11 keeps an
-  // existing offer (hasExistingOffer=true) for the max-contract test's negotiate page.
+  // Delete LLE offer before max contract test, then re-seed ONLY pid=11 so it keeps
+  // an existing offer (hasExistingOffer=true) for the max-contract negotiate page
+  // while leaving Metros enough soft-cap room for the non-exception max offer
+  // (pid=10/12 offers would otherwise consume ~1080 of the cap).
   test('delete LLE offer before max contract test', async ({ page, request }) => {
     await page.goto('modules.php?name=FreeAgency&pa=negotiate&pid=11');
     const deleteBtn = page.getByRole('button', { name: /Delete This Offer/i });
@@ -245,7 +249,7 @@ test.describe('Free Agency -- quick offer buttons', () => {
       await deleteBtn.click();
       await page.waitForURL(/result=deleted/);
     }
-    await request.delete('test-state.php?action=reset-fa-offers');
+    await request.delete('test-state.php?action=reset-fa-offers&pid=11');
   });
 
   test('submit max contract offer', async ({ page }) => {

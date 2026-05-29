@@ -63,4 +63,17 @@ test.describe('Season Highs flow', () => {
   test('no PHP errors', async ({ page }) => {
     await assertNoPhpErrors(page, 'on Season Highs page');
   });
+
+  test('playoffs phase renders playoff stat leaders', async ({ page }) => {
+    await page.goto('modules.php?name=SeasonHighs&seasonPhase=Playoffs');
+    await expect(page.locator('.ibl-table-title', { hasText: 'Playoffs' }).first()).toBeVisible();
+    await expect(page.locator('.value-cell').first()).toBeVisible();
+    await assertNoPhpErrors(page, 'SeasonHighs Playoffs');
+  });
+
+  test('preseason phase reflects phase in section headings', async ({ page }) => {
+    await page.goto('modules.php?name=SeasonHighs&seasonPhase=Preseason');
+    await expect(page.locator('.ibl-table-title', { hasText: 'Preseason' }).first()).toBeVisible();
+    await assertNoPhpErrors(page, 'SeasonHighs Preseason');
+  });
 });

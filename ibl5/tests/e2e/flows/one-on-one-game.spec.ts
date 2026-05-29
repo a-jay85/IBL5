@@ -33,9 +33,12 @@ test.describe('One-on-One Game flow', () => {
     await expect(button).toBeVisible();
   });
 
-  test('review old game section is present', async ({ page }) => {
-    const reviewButton = page.getByRole('button', { name: /review|old game/i });
-    await expect(reviewButton).toBeVisible();
+  test('replaying a seeded game shows the game replay', async ({ page }) => {
+    await page.goto('modules.php?name=OneOnOneGame&gameid=1');
+    await expect(page.locator('.ibl-card__title', { hasText: 'Replay of Game Number 1' }).first()).toBeVisible();
+    await expect(page.locator('.ibl-card__body .text-center strong').first()).toContainText('Test Player');
+    await expect(page.locator('.ibl-card__body .text-center strong').first()).toContainText('21');
+    await assertNoPhpErrors(page, 'OneOnOne replay');
   });
 
   test('submitting a match produces results', async ({ page }) => {

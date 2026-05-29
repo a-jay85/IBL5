@@ -265,7 +265,14 @@ class TradingRepositoryTest extends DatabaseTestCase
         $pick = $this->assetRepo->getDraftPickById($pickId);
         self::assertNotNull($pick);
         self::assertSame('Sharks', $pick['ownerofpick']);
-        self::assertSame(2, $pick['owner_teamid']);
+        $stmt = $this->db->prepare('SELECT owner_teamid FROM ibl_draft_picks WHERE pickid = ?');
+        self::assertNotFalse($stmt);
+        $stmt->bind_param('i', $pickId);
+        $stmt->execute();
+        $pickRow = $stmt->get_result()->fetch_assoc();
+        $stmt->close();
+        self::assertNotNull($pickRow);
+        self::assertSame(2, $pickRow['owner_teamid']);
     }
 
     // ── Single player/pick fetch ────────────────────────────────

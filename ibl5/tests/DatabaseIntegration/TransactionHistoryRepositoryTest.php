@@ -52,8 +52,8 @@ class TransactionHistoryRepositoryTest extends DatabaseTestCase
 
         self::assertNotEmpty($transactions);
         foreach ($transactions as $row) {
-            // nuke_stories.catid is INT — native types enabled, returns int
-            self::assertSame(1, $row['catid']);
+            // nuke_stories.catid is returned as string by mysqli without native types
+            self::assertSame('1', $row['catid']);
         }
     }
 

@@ -372,7 +372,7 @@ INSERT INTO ibl_plr (
 ) VALUES
   (200000031, 'Waive Target', 27, 28, 1, 'SF', 20,
    78, 72, 68, 63, 58, 70, 66, 68, 63,
-   1, 2, 500, 550,
+   1, 2, 1, 1,
    0, 4, 0,
    6, 7, 215, 'Waiver College',
    2, 30, 2022, 'Metros', 'Metros',
@@ -399,7 +399,7 @@ INSERT INTO ibl_plr (
 ) VALUES
   (200000032, 'Rookie Option Target', 23, 27, 1, 'PG', 21,
    80, 74, 69, 64, 59, 71, 67, 69, 64,
-   1, 3, 400, 440, 500, 0,
+   1, 3, 1, 1, 500, 0,
    0, 2,
    6, 2, 190, 'Rookie College',
    1, 15, 2024, 'Metros', 'Metros',

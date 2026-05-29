@@ -32,11 +32,15 @@ setup('authenticate', async ({ page, request }) => {
   const loginForm = page.locator('form', { has: page.locator('#login-username') });
   await loginForm.locator('#login-username').fill(username);
   await loginForm.locator('#login-password').fill(password);
-  await loginForm.locator('button[type="submit"]').click();
-
-  // Wait for login redirect — successful login redirects away from YourAccount.
-  // "Logout" is inside a collapsed dropdown so we can't check for it directly.
-  await page.waitForURL((url) => !url.href.includes('name=YourAccount'));
+  // Submit and wait for the redirect off YourAccount atomically. Without the
+  // Promise.all, a fast PHP redirect can complete before waitForURL installs,
+  // causing a timeout under CI load (race condition). Mirrors
+  // auth-regular.setup.ts. "Logout" is inside a collapsed dropdown so we can't
+  // check for it directly — we assert the URL left YourAccount instead.
+  await Promise.all([
+    page.waitForURL((url) => !url.href.includes('name=YourAccount'), { timeout: 20_000 }),
+    loginForm.locator('button[type="submit"]').click(),
+  ]);
 
   await page.context().storageState({ path: authFile });
 });

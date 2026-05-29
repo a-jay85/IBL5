@@ -168,7 +168,7 @@ test.describe('Waivers: waive player', () => {
     // Read the CSRF token from the rendered waive form
     await page.goto('modules.php?name=Waivers&action=waive');
     const csrfToken = await page
-      .locator('input[name="_csrf_token"]')
+      .locator('form[name="Waiver_Move"] input[name="_csrf_token"]')
       .inputValue();
 
     // POST with an invalid Player_ID that is not on the user's roster

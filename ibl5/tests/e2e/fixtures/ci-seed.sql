@@ -425,9 +425,9 @@ INSERT INTO ibl_demands (name, pid, dem1, dem2, dem3, dem4, dem5, dem6) VALUES
 -- Three pending offers — Metros bidding on the three FA players.
 INSERT INTO ibl_fa_offers (name, pid, team, teamid, offer1, offer2, offer3, offer4, offer5, offer6,
                            modifier, random, perceivedvalue, mle, lle, offer_type) VALUES
-  ('FA Guard',   10, 'Metros', 1, 700, 770, 840, 0, 0, 0,  1.0, 0.5, 700.0, 0, 0, 0),
-  ('FA Center',  11, 'Metros', 1, 480, 528, 0,   0, 0, 0,  1.0, 0.5, 480.0, 0, 0, 0),
-  ('FA Forward', 12, 'Metros', 1, 380, 418, 460, 0, 0, 0,  1.0, 0.5, 380.0, 0, 0, 0);
+  ('FA Guard',   10, 'Metros', 1, 700, 770, 840, 0, 0, 0,  1.0, 0.5, 1000.0, 0, 0, 0),
+  ('FA Center',  11, 'Metros', 1, 480, 528, 0,   0, 0, 0,  1.0, 0.5, 600.0,  0, 0, 0),
+  ('FA Forward', 12, 'Metros', 1, 380, 418, 460, 0, 0, 0,  1.0, 0.5, 550.0,  0, 0, 0);
 
 -- All-Star Game team rows with default names (allStarRename test)
 -- visitor_teamid=50 (ALL_STAR_AWAY_TEAMID), home_teamid=51 (ALL_STAR_HOME_TEAMID)

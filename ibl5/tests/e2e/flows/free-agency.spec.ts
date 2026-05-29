@@ -162,6 +162,15 @@ test.describe('Free Agency -- negotiation page', () => {
 });
 
 test.describe('Free Agency -- Bird Rights negotiation', () => {
+  test.beforeAll(async ({ request }) => {
+    // Seed the Metros offer for pid=10 so hasExistingOffer=true on the negotiate page,
+    // bypassing the 0-roster-spots guard (the CI test team is full).
+    await request.delete('test-state.php?action=reset-fa-offers');
+  });
+  test.afterAll(async ({ request }) => {
+    await request.delete('test-state.php?action=clear-fa-offers');
+  });
+
   test('Bird Rights player shows raise info in notes', async ({ appState, page }) => {
     await appState({ 'Current Season Phase': 'Free Agency', 'Current Season Ending Year': '2026' });
     // pid=10 has bird=4 (Bird Rights) in CI seed

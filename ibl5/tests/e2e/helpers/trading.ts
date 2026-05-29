@@ -8,7 +8,7 @@
  * diff), and `rejectOfferSafe` (best-effort cleanup). The `FormData` /
  * `FormField` shapes the body builder depends on live here too.
  */
-import { expect } from '@playwright/test';
+import { expect } from '../fixtures/base';
 import type { Page, APIRequestContext } from '@playwright/test';
 import { gotoWithRetry } from './navigation';
 

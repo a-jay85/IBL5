@@ -161,37 +161,11 @@ test.describe('Free Agency -- negotiation page', () => {
   });
 });
 
-test.describe('Free Agency -- Bird Rights negotiation', () => {
-  test.beforeAll(async ({ request }) => {
-    // Seed the Metros offer for pid=10 so hasExistingOffer=true on the negotiate page,
-    // bypassing the 0-roster-spots guard (the CI test team is full).
-    await request.delete('test-state.php?action=reset-fa-offers');
-  });
-  // No afterAll cleanup needed: beforeAll seeds the same 3 rows as the ci-seed, so the
-  // offers table remains in seed state after this test. clear-fa-offers would race with
-  // the MLE offer test in free-agency-submission.spec.ts (both run in parallel workers).
-
-  test('Bird Rights player shows raise info in notes', async ({ appState, page }) => {
-    await appState({ 'Current Season Phase': 'Free Agency', 'Current Season Ending Year': '2026' });
-    // pid=10 has bird=4 (Bird Rights) in CI seed
-    await page.goto('modules.php?name=FreeAgency&pa=negotiate&pid=10');
-
-    const notesCard = page.locator('.ibl-card').filter({
-      has: page.locator('.ibl-card__title', { hasText: 'Notes / Reminders' }),
-    });
-    await expect(notesCard).toBeVisible();
-
-    const notesText = await notesCard.textContent() ?? '';
-    // pid=10 has Bird Rights: shows "Bird Rights Player on Your Team" + 12.5% raise
-    expect(notesText).toMatch(/\d+%/);
-  });
-});
-
-// NOTE: the "Free Agency -- validation errors" block moved to
-// free-agency-submission.spec.ts. Those tests submit offers for pid=11 and did a
-// table-wide clear-fa-offers, which raced against the submission spec's in-flight
-// offers under fullyParallel sharding. All ibl_fa_offers mutation now lives in
-// that one serial file. See its header for the full rationale.
+// NOTE: the "Bird Rights negotiation" and "validation errors" blocks moved to
+// free-agency-submission.spec.ts. They mutate ibl_fa_offers (seed/clear) which,
+// as a separate file, raced against the submission spec's in-flight offers under
+// fullyParallel sharding. All ibl_fa_offers mutation now lives in that one serial
+// file. See its header for the full rationale.
 
 test.describe('Free Agency -- wrong season phase', () => {
   test('page renders without PHP errors in non-FA phase', async ({ appState, page }) => {

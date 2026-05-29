@@ -202,14 +202,19 @@ test.describe('Free Agency -- quick offer buttons', () => {
     });
   });
 
-  // LLE test after MLE — delete MLE offer first so HasMLE remains available
-  test('delete MLE offer before LLE test', async ({ page }) => {
+  // LLE test after MLE — delete MLE offer first so HasMLE remains available, then
+  // re-seed so pid=11 has a (non-MLE) existing offer again. The LLE test navigates
+  // to pid=11 on the full Metros roster, where the negotiate form only renders when
+  // hasExistingOffer=true; without the re-seed the form is absent and the LLE quick
+  // offer click times out.
+  test('delete MLE offer before LLE test', async ({ page, request }) => {
     await page.goto('modules.php?name=FreeAgency&pa=negotiate&pid=11');
     const deleteBtn = page.getByRole('button', { name: /Delete This Offer/i });
     if (await deleteBtn.count() > 0) { // e2e-hygiene-allow: cleanup precondition — element may not exist depending on prior test state
       await deleteBtn.click();
       await page.waitForURL(/result=deleted/);
     }
+    await request.delete('test-state.php?action=reset-fa-offers');
   });
 
   test('submit LLE offer', async ({ page }) => {
@@ -231,14 +236,16 @@ test.describe('Free Agency -- quick offer buttons', () => {
     });
   });
 
-  // Delete LLE offer before max contract test
-  test('delete LLE offer before max contract test', async ({ page }) => {
+  // Delete LLE offer before max contract test, then re-seed so pid=11 keeps an
+  // existing offer (hasExistingOffer=true) for the max-contract test's negotiate page.
+  test('delete LLE offer before max contract test', async ({ page, request }) => {
     await page.goto('modules.php?name=FreeAgency&pa=negotiate&pid=11');
     const deleteBtn = page.getByRole('button', { name: /Delete This Offer/i });
     if (await deleteBtn.count() > 0) { // e2e-hygiene-allow: cleanup precondition — element may not exist depending on prior test state
       await deleteBtn.click();
       await page.waitForURL(/result=deleted/);
     }
+    await request.delete('test-state.php?action=reset-fa-offers');
   });
 
   test('submit max contract offer', async ({ page }) => {
@@ -524,5 +531,38 @@ test.describe('Free Agency -- validation errors', () => {
     const text = await alert.textContent() ?? '';
     // CI seed has Metros under hard cap — gap validation fires (not cap space error)
     expect(text).toContain('gaps in contract years');
+  });
+});
+
+// Bird Rights negotiation — merged from free-agency.spec.ts. Reads pid=10's
+// negotiate page, which requires pid=10's seed offer present so hasExistingOffer
+// bypasses the 0-roster-spots guard (the CI Metros team is full). The beforeAll
+// re-seed mutates ibl_fa_offers, so it must live in this one serial owner file —
+// a separate file would race the submission blocks above under fullyParallel.
+test.describe('Free Agency -- Bird Rights negotiation', () => {
+  test.describe.configure({ mode: 'serial' });
+
+  test.beforeAll(async ({ request }) => {
+    // Seed the 3 FA offer rows so pid=10 has an existing Metros offer.
+    await request.delete('test-state.php?action=reset-fa-offers');
+  });
+
+  test.afterAll(async ({ request }) => {
+    await request.delete('test-state.php?action=reset-fa-offers');
+  });
+
+  test('Bird Rights player shows raise info in notes', async ({ appState, page }) => {
+    await appState({ 'Current Season Phase': 'Free Agency', 'Current Season Ending Year': '2026' });
+    // pid=10 has bird=4 (Bird Rights) in CI seed
+    await page.goto('modules.php?name=FreeAgency&pa=negotiate&pid=10');
+
+    const notesCard = page.locator('.ibl-card').filter({
+      has: page.locator('.ibl-card__title', { hasText: 'Notes / Reminders' }),
+    });
+    await expect(notesCard).toBeVisible();
+
+    const notesText = await notesCard.textContent() ?? '';
+    // pid=10 has Bird Rights: shows "Bird Rights Player on Your Team" + 12.5% raise
+    expect(notesText).toMatch(/\d+%/);
   });
 });

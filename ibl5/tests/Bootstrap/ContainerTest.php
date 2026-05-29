@@ -45,20 +45,25 @@ final class ContainerTest extends TestCase
 
     public function testFactoryClosureIsCalledLazily(): void
     {
-        $callCount = 0;
+        // Counter held on an object so PHPStan re-reads it after the impure get()
+        // call (a by-ref int would be narrowed to literal 0 by the assertSame below,
+        // and PHPStan can't see that get() invokes the factory — staticMethod.impossibleType).
+        $counter = new class {
+            public int $count = 0;
+        };
 
-        $this->container->set('service', static function () use (&$callCount): string {
-            $callCount++;
+        $this->container->set('service', static function () use ($counter): string {
+            $counter->count++;
             return 'created';
         });
 
         // Factory not yet called
-        self::assertSame(0, $callCount);
+        self::assertSame(0, $counter->count);
 
         $result = $this->container->get('service');
 
         self::assertSame('created', $result);
-        self::assertSame(1, $callCount);
+        self::assertSame(1, $counter->count);
     }
 
     public function testFactoryResultIsCached(): void

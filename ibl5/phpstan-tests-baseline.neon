@@ -439,12 +439,6 @@ parameters:
 			path: tests/AwardHistory/AwardHistoryValidatorTest.php
 
 		-
-			rawMessage: 'Parameter #1 $award of method AwardHistory\AwardHistoryView::renderAwardRow() expects array{year: int, award: string, name: string, pid?: int}, array{year: null, award: null, name: null} given.'
-			identifier: argument.type
-			count: 1
-			path: tests/AwardHistory/AwardHistoryViewTest.php
-
-		-
 			rawMessage: 'You should use assertSame() instead of assertEquals(), because both values are scalars of the same type'
 			identifier: phpunit.assertEquals
 			count: 13
@@ -533,12 +527,6 @@ parameters:
 			identifier: missingType.iterableValue
 			count: 1
 			path: tests/Bootstrap/ConfigBootstrapExtractRequestTest.php
-
-		-
-			rawMessage: 'Call to static method PHPUnit\Framework\Assert::assertSame() with 1 and 0 will always evaluate to false.'
-			identifier: staticMethod.impossibleType
-			count: 1
-			path: tests/Bootstrap/ContainerTest.php
 
 		-
 			rawMessage: 'Dynamic call to static method PHPUnit\Framework\TestCase::createStub().'
@@ -645,12 +633,6 @@ parameters:
 		-
 			rawMessage: 'Call to method PHPUnit\Framework\Assert::assertInstanceOf() with ''CapSpace\\Contracts\\CapSpaceViewInterface'' and CapSpace\Contracts\CapSpaceViewInterface will always evaluate to true.'
 			identifier: method.alreadyNarrowedType
-			count: 1
-			path: tests/CapSpace/CapSpaceViewTest.php
-
-		-
-			rawMessage: 'Method CapSpace\Contracts\CapSpaceViewInterface::render() invoked with 4 parameters, 3 required.'
-			identifier: arguments.count
 			count: 1
 			path: tests/CapSpace/CapSpaceViewTest.php
 
@@ -991,88 +973,10 @@ parameters:
 			path: tests/DatabaseIntegration/DatabaseTestCase.php
 
 		-
-			rawMessage: 'Parameter #2 $depthChartValues of method DepthChartEntry\DepthChartEntryRepository::updatePlayerDepthChart() expects array{pg: int, sg: int, sf: int, pf: int, c: int, canPlayInGame: int, min: int, of: int, ..., ...<string, mixed>}, array{pg: 1, sg: 0, sf: 0, pf: 0, c: 0, canPlayInGame: 1, min: 20} given.'
-			identifier: argument.type
-			count: 1
-			path: tests/DatabaseIntegration/DepthChartEntryRepositoryTest.php
-
-		-
-			rawMessage: 'Parameter #2 $depthChartValues of method DepthChartEntry\DepthChartEntryRepository::updatePlayerDepthChart() expects array{pg: int, sg: int, sf: int, pf: int, c: int, canPlayInGame: int, min: int, of: int, ..., ...<string, mixed>}, array{pg: 3, sg: 2, sf: 1, pf: 0, c: 0, canPlayInGame: 1, min: 32} given.'
-			identifier: argument.type
-			count: 1
-			path: tests/DatabaseIntegration/DepthChartEntryRepositoryTest.php
-
-		-
-			rawMessage: 'Undefined variable: $pid'
-			identifier: variable.undefined
-			count: 1
-			path: tests/DatabaseIntegration/DepthChartEntryRepositoryTest.php
-
-		-
-			rawMessage: 'Undefined variable: $tn'
-			identifier: variable.undefined
-			count: 1
-			path: tests/DatabaseIntegration/DepthChartEntryRepositoryTest.php
-
-		-
 			rawMessage: 'Call to static method PHPUnit\Framework\Assert::assertTrue() with true will always evaluate to true.'
 			identifier: staticMethod.alreadyNarrowedType
 			count: 1
 			path: tests/DatabaseIntegration/FranchiseHistoryRepositoryTest.php
-
-		-
-			rawMessage: 'Parameter #1 $offerData of method FreeAgency\FreeAgencyRepository::saveOffer() expects array{pid: int, teamid: int, teamName: string, playerName: string, offer1: int, offer2: int, offer3: int, offer4: int, ...}, array{playerName: ''FA Replace'', pid: 200060402, teamName: ''Metros'', teamid: 1, offer1: 700, offer2: 750, offer3: 800, offer4: 0, ...} given.'
-			identifier: argument.type
-			count: 1
-			path: tests/DatabaseIntegration/FreeAgency/FreeAgencyRepositoryIntegrationTest.php
-
-		-
-			rawMessage: 'Parameter #1 $offerData of method FreeAgency\FreeAgencyRepository::saveOffer() expects array{pid: int, teamid: int, teamName: string, playerName: string, offer1: int, offer2: int, offer3: int, offer4: int, ...}, array{playerName: ''FA Target'', pid: 200060401, teamName: ''Metros'', teamid: 1, offer1: 500, offer2: 550, offer3: 600, offer4: 0, ...} given.'
-			identifier: argument.type
-			count: 1
-			path: tests/DatabaseIntegration/FreeAgency/FreeAgencyRepositoryIntegrationTest.php
-
-		-
-			rawMessage: 'Undefined variable: $pid'
-			identifier: variable.undefined
-			count: 1
-			path: tests/DatabaseIntegration/FreeAgencyAdminRepositoryTest.php
-
-		-
-			rawMessage: 'Undefined variable: $team'
-			identifier: variable.undefined
-			count: 2
-			path: tests/DatabaseIntegration/FreeAgencyAdminRepositoryTest.php
-
-		-
-			rawMessage: 'Undefined variable: $al'
-			identifier: variable.undefined
-			count: 1
-			path: tests/DatabaseIntegration/FreeAgencyDemandRepositoryTest.php
-
-		-
-			rawMessage: 'Undefined variable: $aw'
-			identifier: variable.undefined
-			count: 1
-			path: tests/DatabaseIntegration/FreeAgencyDemandRepositoryTest.php
-
-		-
-			rawMessage: 'Undefined variable: $l'
-			identifier: variable.undefined
-			count: 1
-			path: tests/DatabaseIntegration/FreeAgencyDemandRepositoryTest.php
-
-		-
-			rawMessage: 'Undefined variable: $tn'
-			identifier: variable.undefined
-			count: 1
-			path: tests/DatabaseIntegration/FreeAgencyDemandRepositoryTest.php
-
-		-
-			rawMessage: 'Undefined variable: $w'
-			identifier: variable.undefined
-			count: 1
-			path: tests/DatabaseIntegration/FreeAgencyDemandRepositoryTest.php
 
 		-
 			rawMessage: 'Parameter #1 $offerData of method FreeAgency\FreeAgencyRepository::saveOffer() expects array{pid: int, teamid: int, teamName: string, playerName: string, offer1: int, offer2: int, offer3: int, offer4: int, ...}, array<string, float|int|string> given.'
@@ -1087,88 +991,10 @@ parameters:
 			path: tests/DatabaseIntegration/IblHistStructuralTest.php
 
 		-
-			rawMessage: 'Undefined variable: $from'
-			identifier: variable.undefined
-			count: 1
-			path: tests/DatabaseIntegration/JsbImportRepositoryTest.php
-
-		-
-			rawMessage: 'Undefined variable: $name'
-			identifier: variable.undefined
-			count: 1
-			path: tests/DatabaseIntegration/JsbImportRepositoryTest.php
-
-		-
-			rawMessage: 'Undefined variable: $pid'
-			identifier: variable.undefined
-			count: 1
-			path: tests/DatabaseIntegration/JsbImportRepositoryTest.php
-
-		-
-			rawMessage: 'Undefined variable: $sy'
-			identifier: variable.undefined
-			count: 2
-			path: tests/DatabaseIntegration/JsbImportRepositoryTest.php
-
-		-
-			rawMessage: 'Undefined variable: $td'
-			identifier: variable.undefined
-			count: 1
-			path: tests/DatabaseIntegration/JsbImportRepositoryTest.php
-
-		-
-			rawMessage: 'Undefined variable: $teamid'
-			identifier: variable.undefined
-			count: 1
-			path: tests/DatabaseIntegration/JsbImportRepositoryTest.php
-
-		-
-			rawMessage: 'Undefined variable: $tm'
-			identifier: variable.undefined
-			count: 1
-			path: tests/DatabaseIntegration/JsbImportRepositoryTest.php
-
-		-
-			rawMessage: 'Undefined variable: $tn'
-			identifier: variable.undefined
-			count: 1
-			path: tests/DatabaseIntegration/JsbImportRepositoryTest.php
-
-		-
-			rawMessage: 'Undefined variable: $to'
-			identifier: variable.undefined
-			count: 1
-			path: tests/DatabaseIntegration/JsbImportRepositoryTest.php
-
-		-
-			rawMessage: 'Undefined variable: $tt'
-			identifier: variable.undefined
-			count: 1
-			path: tests/DatabaseIntegration/JsbImportRepositoryTest.php
-
-		-
 			rawMessage: 'Dynamic call to static method PHPUnit\Framework\TestCase::createStub().'
 			identifier: staticMethod.dynamicCall
 			count: 2
 			path: tests/DatabaseIntegration/LeagueControlPanelRepositoryTest.php
-
-		-
-			rawMessage: 'Undefined variable: $tn'
-			identifier: variable.undefined
-			count: 1
-			path: tests/DatabaseIntegration/MaintenanceRepositoryTest.php
-
-		-
-			rawMessage: 'Undefined variable: $teamid'
-			identifier: variable.undefined
-			count: 1
-			path: tests/DatabaseIntegration/NavigationRepositoryTest.php
-
-		-
-			rawMessage: 'Undefined variable: $user'
-			identifier: variable.undefined
-			count: 1
-			path: tests/DatabaseIntegration/NavigationRepositoryTest.php
 
 		-
 			rawMessage: 'Call to static method PHPUnit\Framework\Assert::assertNotNull() with int will always evaluate to true.'
@@ -1181,12 +1007,6 @@ parameters:
 			identifier: staticMethod.alreadyNarrowedType
 			count: 1
 			path: tests/DatabaseIntegration/Player/PlayerFacadePropertyValuesTest.php
-
-		-
-			rawMessage: 'Undefined variable: $pid'
-			identifier: variable.undefined
-			count: 2
-			path: tests/DatabaseIntegration/PlrParserRepositoryTest.php
 
 		-
 			rawMessage: Casting to float something that's already float.
@@ -1219,12 +1039,6 @@ parameters:
 			path: tests/DatabaseIntegration/RecordHoldersRepositoryTest.php
 
 		-
-			rawMessage: 'Undefined variable: $pid'
-			identifier: variable.undefined
-			count: 2
-			path: tests/DatabaseIntegration/RookieOptionRepositoryTest.php
-
-		-
 			rawMessage: 'Call to static method PHPUnit\Framework\Assert::assertNull() with null will always evaluate to true.'
 			identifier: staticMethod.alreadyNarrowedType
 			count: 1
@@ -1241,18 +1055,6 @@ parameters:
 			identifier: staticMethod.dynamicCall
 			count: 1
 			path: tests/DatabaseIntegration/TeamOlympicsLoadTest.php
-
-		-
-			rawMessage: 'Offset ''owner_teamid'' does not exist on array{pickid: int, ownerofpick: ''Sharks'', teampick: string, year: string, round: string, notes: string|null, created_at: string, updated_at: string}.'
-			identifier: offsetAccess.notFound
-			count: 1
-			path: tests/DatabaseIntegration/TradingRepositoryTest.php
-
-		-
-			rawMessage: 'Call to static method PHPUnit\Framework\Assert::assertSame() with 1 and string will always evaluate to false.'
-			identifier: staticMethod.impossibleType
-			count: 1
-			path: tests/DatabaseIntegration/TransactionHistoryRepositoryTest.php
 
 		-
 			rawMessage: Casting to int something that's already int.
@@ -1459,30 +1261,6 @@ parameters:
 			path: tests/DepthChartEntry/DepthChartEntryRepositoryTest.php
 
 		-
-			rawMessage: 'Parameter #2 $depthChartValues of method DepthChartEntry\DepthChartEntryRepository::updatePlayerDepthChart() expects array{pg: int, sg: int, sf: int, pf: int, c: int, canPlayInGame: int, min: int, of: int, ..., ...<string, mixed>}, array{pg: 0, sg: 0, sf: 0, pf: 0, c: 1, canPlayInGame: 1, min: 20} given.'
-			identifier: argument.type
-			count: 1
-			path: tests/DepthChartEntry/DepthChartEntryRepositoryTest.php
-
-		-
-			rawMessage: 'Parameter #2 $depthChartValues of method DepthChartEntry\DepthChartEntryRepository::updatePlayerDepthChart() expects array{pg: int, sg: int, sf: int, pf: int, c: int, canPlayInGame: int, min: int, of: int, ..., ...<string, mixed>}, array{pg: 1, sg: 0, sf: 0, pf: 0, c: 0, canPlayInGame: 1, min: 30} given.'
-			identifier: argument.type
-			count: 2
-			path: tests/DepthChartEntry/DepthChartEntryRepositoryTest.php
-
-		-
-			rawMessage: 'Parameter #2 $depthChartValues of method DepthChartEntry\DepthChartEntryRepository::updatePlayerDepthChart() expects array{pg: int, sg: int, sf: int, pf: int, c: int, canPlayInGame: int, min: int, of: int, ..., ...<string, mixed>}, array{pg: 1, sg: 0, sf: 2, pf: 0, c: 0, canPlayInGame: 1, min: 30} given.'
-			identifier: argument.type
-			count: 1
-			path: tests/DepthChartEntry/DepthChartEntryRepositoryTest.php
-
-		-
-			rawMessage: 'Parameter #2 $depthChartValues of method DepthChartEntry\DepthChartEntryRepository::updatePlayerDepthChart() expects array{pg: int, sg: int, sf: int, pf: int, c: int, canPlayInGame: int, min: int, of: int, ..., ...<string, mixed>}, array{pg: 1, sg: 2, sf: 0, pf: 0, c: 3, canPlayInGame: 1, min: 30} given.'
-			identifier: argument.type
-			count: 1
-			path: tests/DepthChartEntry/DepthChartEntryRepositoryTest.php
-
-		-
 			rawMessage: 'You should use assertSame() instead of assertEquals(), because both values are scalars of the same type'
 			identifier: phpunit.assertEquals
 			count: 13
@@ -1603,32 +1381,8 @@ parameters:
 			path: tests/DepthChartEntry/DepthChartEntryViewXssTest.php
 
 		-
-			rawMessage: 'Method Tests\DepthChartEntry\DepthChartEntryViewXssTest::makePlayer() should return array{pid: int, name: string, pos: string, injured: int, dc_can_play_in_game: int, dc_pg_depth: int, dc_sg_depth: int, dc_sf_depth: int, ...} but returns array{pid: mixed, name: mixed, pos: mixed, injured: mixed, dc_can_play_in_game: mixed, dc_pg_depth: mixed, dc_sg_depth: mixed, dc_sf_depth: mixed, ..., ...}.'
-			identifier: return.type
-			count: 1
-			path: tests/DepthChartEntry/DepthChartEntryViewXssTest.php
-
-		-
-			rawMessage: 'Parameter #1 $player of method DepthChartEntry\DepthChartEntryView::renderPlayerRow() expects array{pid: int, name: string, nickname: string|null, age: int|null, teamid: int, teamname: string|null, pos: string, stamina: int|null, ..., ...<string, mixed>}, array{pid: int, name: string, pos: string, injured: int, dc_can_play_in_game: int, dc_pg_depth: int, dc_sg_depth: int, dc_sf_depth: int, ...} given.'
-			identifier: argument.type
-			count: 1
-			path: tests/DepthChartEntry/DepthChartEntryViewXssTest.php
-
-		-
 			rawMessage: @@covers value \Discord references an invalid class or function.
 			identifier: phpunit.covers
-			count: 1
-			path: tests/Discord/DiscordIntegrationTest.php
-
-		-
-			rawMessage: 'Call to an undefined method Repositories\Contracts\TeamIdentityRepositoryInterface::method().'
-			identifier: method.notFound
-			count: 5
-			path: tests/Discord/DiscordIntegrationTest.php
-
-		-
-			rawMessage: 'Call to method PHPUnit\Framework\Assert::assertFalse() with false and ''Host \''\'' should not…''|''Host \''127.0.0.1\''…''|''Host \''localhost\''…''|''Host \''main…'' will always evaluate to true.'
-			identifier: method.alreadyNarrowedType
 			count: 1
 			path: tests/Discord/DiscordIntegrationTest.php
 
@@ -1636,12 +1390,6 @@ parameters:
 			rawMessage: 'Call to method PHPUnit\Framework\Assert::assertInstanceOf() with ''Discord\\Discord'' and Discord\Discord will always evaluate to true.'
 			identifier: method.alreadyNarrowedType
 			count: 2
-			path: tests/Discord/DiscordIntegrationTest.php
-
-		-
-			rawMessage: 'Call to method PHPUnit\Framework\Assert::assertTrue() with true and ''Host \''iblhoops.net\''…''|''Host \''www.iblhoops…'' will always evaluate to true.'
-			identifier: method.alreadyNarrowedType
-			count: 1
 			path: tests/Discord/DiscordIntegrationTest.php
 
 		-
@@ -1657,57 +1405,9 @@ parameters:
 			path: tests/Discord/DiscordIntegrationTest.php
 
 		-
-			rawMessage: Result of && is always false.
-			identifier: booleanAnd.alwaysFalse
-			count: 1
-			path: tests/Discord/DiscordIntegrationTest.php
-
-		-
-			rawMessage: Result of || is always false.
-			identifier: booleanOr.alwaysFalse
-			count: 1
-			path: tests/Discord/DiscordIntegrationTest.php
-
-		-
-			rawMessage: Result of || is always true.
-			identifier: booleanOr.alwaysTrue
-			count: 1
-			path: tests/Discord/DiscordIntegrationTest.php
-
-		-
-			rawMessage: 'Strict comparison using === between ''''|''127.0.0.1''|''localhost''|''main.localhost'' and ''iblhoops.net'' will always evaluate to false.'
-			identifier: identical.alwaysFalse
-			count: 1
-			path: tests/Discord/DiscordIntegrationTest.php
-
-		-
-			rawMessage: 'Strict comparison using === between ''''|''127.0.0.1''|''localhost''|''main.localhost'' and ''www.iblhoops.net'' will always evaluate to false.'
-			identifier: identical.alwaysFalse
-			count: 1
-			path: tests/Discord/DiscordIntegrationTest.php
-
-		-
-			rawMessage: 'Strict comparison using === between ''www.iblhoops.net'' and ''www.iblhoops.net'' will always evaluate to true.'
-			identifier: identical.alwaysTrue
-			count: 1
-			path: tests/Discord/DiscordIntegrationTest.php
-
-		-
-			rawMessage: 'Variable $fromDiscordId in empty() always exists and is always falsy.'
-			identifier: empty.variable
-			count: 1
-			path: tests/Discord/DiscordIntegrationTest.php
-
-		-
-			rawMessage: 'Variable $toDiscordId in empty() always exists and is always falsy.'
-			identifier: empty.variable
-			count: 1
-			path: tests/Discord/DiscordIntegrationTest.php
-
-		-
 			rawMessage: 'You should use assertSame() instead of assertEquals(), because both values are scalars of the same type'
 			identifier: phpunit.assertEquals
-			count: 10
+			count: 9
 			path: tests/Discord/DiscordIntegrationTest.php
 
 		-
@@ -1719,42 +1419,6 @@ parameters:
 		-
 			rawMessage: 'Dynamic call to static method PHPUnit\Framework\TestCase::createStub().'
 			identifier: staticMethod.dynamicCall
-			count: 1
-			path: tests/Discord/DiscordTest.php
-
-		-
-			rawMessage: Result of && is always false.
-			identifier: booleanAnd.alwaysFalse
-			count: 1
-			path: tests/Discord/DiscordTest.php
-
-		-
-			rawMessage: Result of && is always true.
-			identifier: booleanAnd.alwaysTrue
-			count: 1
-			path: tests/Discord/DiscordTest.php
-
-		-
-			rawMessage: 'Variable $fromDiscordId in empty() always exists and is always falsy.'
-			identifier: empty.variable
-			count: 1
-			path: tests/Discord/DiscordTest.php
-
-		-
-			rawMessage: 'Variable $fromDiscordId in empty() always exists and is not falsy.'
-			identifier: empty.variable
-			count: 1
-			path: tests/Discord/DiscordTest.php
-
-		-
-			rawMessage: 'Variable $toDiscordId in empty() always exists and is always falsy.'
-			identifier: empty.variable
-			count: 1
-			path: tests/Discord/DiscordTest.php
-
-		-
-			rawMessage: 'Variable $toDiscordId in empty() always exists and is not falsy.'
-			identifier: empty.variable
 			count: 1
 			path: tests/Discord/DiscordTest.php
 
@@ -2053,24 +1717,6 @@ parameters:
 			path: tests/DraftPickLocator/DraftPickLocatorViewTest.php
 
 		-
-			rawMessage: 'Parameter #1 $teamsWithPicks of method DraftPickLocator\Contracts\DraftPickLocatorViewInterface::render() expects list<array{teamId: int, teamCity: string, teamName: string, color1: string, color2: string, picks: list<array{ownerofpick: string, year: int, round: int}>}>, array{array{teamId: 1, teamCity: ''Miami'', teamName: ''Heat'', color1: ''98002E'', color2: ''F9A01B'', picks: array{array{ownerofpick: ''Celtics'', year: ''2025'', round: ''1''}}}, array{teamId: 2, teamCity: ''Boston'', teamName: ''Celtics'', color1: ''007A33'', color2: ''FFFFFF'', picks: array{array{ownerofpick: ''Celtics'', year: ''2025'', round: ''1''}}}} given.'
-			identifier: argument.type
-			count: 1
-			path: tests/DraftPickLocator/DraftPickLocatorViewTest.php
-
-		-
-			rawMessage: 'Parameter #1 $teamsWithPicks of method DraftPickLocator\Contracts\DraftPickLocatorViewInterface::render() expects list<array{teamId: int, teamCity: string, teamName: string, color1: string, color2: string, picks: list<array{ownerofpick: string, year: int, round: int}>}>, array{array{teamId: 1, teamCity: ''Miami'', teamName: ''Heat'', color1: ''98002E'', color2: ''F9A01B'', picks: array{array{ownerofpick: ''Heat'', year: ''2025'', round: ''1''}, array{ownerofpick: ''Celtics'', year: ''2025'', round: ''2''}}}, array{teamId: 2, teamCity: ''Boston'', teamName: ''Celtics'', color1: ''007A33'', color2: ''FFFFFF'', picks: array{array{ownerofpick: ''Celtics'', year: ''2025'', round: ''1''}}}} given.'
-			identifier: argument.type
-			count: 1
-			path: tests/DraftPickLocator/DraftPickLocatorViewTest.php
-
-		-
-			rawMessage: 'Parameter #1 $teamsWithPicks of method DraftPickLocator\Contracts\DraftPickLocatorViewInterface::render() expects list<array{teamId: int, teamCity: string, teamName: string, color1: string, color2: string, picks: list<array{ownerofpick: string, year: int, round: int}>}>, array{array{teamId: 1, teamCity: ''Miami'', teamName: ''Heat'', color1: ''98002E'', color2: ''F9A01B'', picks: array{array{ownerofpick: ''Heat'', year: ''2025'', round: ''1''}}}} given.'
-			identifier: argument.type
-			count: 1
-			path: tests/DraftPickLocator/DraftPickLocatorViewTest.php
-
-		-
 			rawMessage: 'Parameter #1 $teamsWithPicks of method DraftPickLocator\Contracts\DraftPickLocatorViewInterface::render() expects list<array{teamId: int, teamCity: string, teamName: string, color1: string, color2: string, picks: list<array{ownerofpick: string, year: int, round: int}>}>, array{array{teamid: 1, teamId: 1, teamCity: ''Test<script>'', teamName: ''Team&Name'', color1: ''000000'', color2: ''FFFFFF'', picks: array{}}} given.'
 			identifier: argument.type
 			count: 1
@@ -2113,30 +1759,6 @@ parameters:
 			path: tests/Extension/ExtensionOfferEvaluatorTest.php
 
 		-
-			rawMessage: 'Parameter #1 $offer of method Extension\ExtensionOfferEvaluator::evaluateOffer() expects array{year1: int, year2: int, year3: int, year4?: int, year5?: int}, array{1: 10000000, 2: 11000000} given.'
-			identifier: argument.type
-			count: 1
-			path: tests/Extension/ExtensionOfferEvaluatorTest.php
-
-		-
-			rawMessage: 'Parameter #1 $offer of method Extension\ExtensionOfferEvaluator::evaluateOffer() expects array{year1: int, year2: int, year3: int, year4?: int, year5?: int}, array{1: 10000000} given.'
-			identifier: argument.type
-			count: 2
-			path: tests/Extension/ExtensionOfferEvaluatorTest.php
-
-		-
-			rawMessage: 'Parameter #1 $offer of method Extension\ExtensionOfferEvaluator::evaluateOffer() expects array{year1: int, year2: int, year3: int, year4?: int, year5?: int}, array{1: 15000000} given.'
-			identifier: argument.type
-			count: 1
-			path: tests/Extension/ExtensionOfferEvaluatorTest.php
-
-		-
-			rawMessage: 'Parameter #1 $offer of method FreeAgency\CommonContractValidator::calculateOfferValue() expects array{year1: int, year2: int, year3: int, year4?: int, year5?: int, year6?: int}, array{1: 5000000, 2: 5500000} given.'
-			identifier: argument.type
-			count: 2
-			path: tests/Extension/ExtensionOfferEvaluatorTest.php
-
-		-
 			rawMessage: 'Parameter #1 $playerPreferences of method Extension\ExtensionOfferEvaluator::calculateLoyaltyModifier() expects array{winner: int, tradition: int, loyalty: int, playing_time: int}, array{loyalty: 1} given.'
 			identifier: argument.type
 			count: 2
@@ -2156,12 +1778,6 @@ parameters:
 
 		-
 			rawMessage: 'Parameter #1 $teamFactors of method Extension\ExtensionOfferEvaluator::calculateCombinedModifier() expects array{wins: int, losses: int, tradition_wins: int, tradition_losses: int, money_committed_at_position: int}, array{wins: 50, losses: 32, tradition_wins: 2500, tradition_losses: 2000, coach_rating: 80, money_committed_at_position: 3000} given.'
-			identifier: argument.type
-			count: 1
-			path: tests/Extension/ExtensionOfferEvaluatorTest.php
-
-		-
-			rawMessage: 'Parameter #1 $teamFactors of method Extension\ExtensionOfferEvaluator::calculateCombinedModifier() expects array{wins: int, losses: int, tradition_wins: int, tradition_losses: int, money_committed_at_position: int}, array{wins: 60, losses: 22, tradition_wins: 1000, tradition_losses: 400} given.'
 			identifier: argument.type
 			count: 1
 			path: tests/Extension/ExtensionOfferEvaluatorTest.php
@@ -2251,31 +1867,7 @@ parameters:
 			path: tests/Extension/ExtensionOfferEvaluatorTest.php
 
 		-
-			rawMessage: 'Parameter #2 $demands of method Extension\ExtensionOfferEvaluator::evaluateOffer() expects array{year1: int, year2: int, year3: int, year4?: int, year5?: int}, array{1: 10000000} given.'
-			identifier: argument.type
-			count: 1
-			path: tests/Extension/ExtensionOfferEvaluatorTest.php
-
-		-
-			rawMessage: 'Parameter #2 $demands of method Extension\ExtensionOfferEvaluator::evaluateOffer() expects array{year1: int, year2: int, year3: int, year4?: int, year5?: int}, array{1: 9000000, 2: 9500000} given.'
-			identifier: argument.type
-			count: 1
-			path: tests/Extension/ExtensionOfferEvaluatorTest.php
-
-		-
-			rawMessage: 'Parameter #2 $demands of method Extension\ExtensionOfferEvaluator::evaluateOffer() expects array{year1: int, year2: int, year3: int, year4?: int, year5?: int}, array{1: 9000000} given.'
-			identifier: argument.type
-			count: 2
-			path: tests/Extension/ExtensionOfferEvaluatorTest.php
-
-		-
 			rawMessage: 'Parameter #2 $playerPreferences of method Extension\ExtensionOfferEvaluator::calculateCombinedModifier() expects array{winner: int, tradition: int, loyalty: int, playing_time: int}, array{winner: 3, tradition: 3, coach: 3, loyalty: 3, security: 3, playing_time: 3} given.'
-			identifier: argument.type
-			count: 1
-			path: tests/Extension/ExtensionOfferEvaluatorTest.php
-
-		-
-			rawMessage: 'Parameter #2 $playerPreferences of method Extension\ExtensionOfferEvaluator::calculateCombinedModifier() expects array{winner: int, tradition: int, loyalty: int, playing_time: int}, array{winner: 5, tradition: 3, loyalty: 5} given.'
 			identifier: argument.type
 			count: 1
 			path: tests/Extension/ExtensionOfferEvaluatorTest.php
@@ -2338,30 +1930,6 @@ parameters:
 			rawMessage: 'Parameter #2 $playerPreferences of method Extension\ExtensionOfferEvaluator::calculateWinnerModifier() expects array{winner: int, tradition: int, loyalty: int, playing_time: int}, array{} given.'
 			identifier: argument.type
 			count: 1
-			path: tests/Extension/ExtensionOfferEvaluatorTest.php
-
-		-
-			rawMessage: 'Parameter #3 $teamFactors of method Extension\ExtensionOfferEvaluator::evaluateOffer() expects array{wins: int, losses: int, tradition_wins: int, tradition_losses: int, money_committed_at_position: int}, array{wins: 50, losses: 32} given.'
-			identifier: argument.type
-			count: 1
-			path: tests/Extension/ExtensionOfferEvaluatorTest.php
-
-		-
-			rawMessage: 'Parameter #3 $teamFactors of method Extension\ExtensionOfferEvaluator::evaluateOffer() expects array{wins: int, losses: int, tradition_wins: int, tradition_losses: int, money_committed_at_position: int}, array{} given.'
-			identifier: argument.type
-			count: 3
-			path: tests/Extension/ExtensionOfferEvaluatorTest.php
-
-		-
-			rawMessage: 'Parameter #4 $playerPreferences of method Extension\ExtensionOfferEvaluator::evaluateOffer() expects array{winner: int, tradition: int, loyalty: int, playing_time: int}, array{winner: 3} given.'
-			identifier: argument.type
-			count: 1
-			path: tests/Extension/ExtensionOfferEvaluatorTest.php
-
-		-
-			rawMessage: 'Parameter #4 $playerPreferences of method Extension\ExtensionOfferEvaluator::evaluateOffer() expects array{winner: int, tradition: int, loyalty: int, playing_time: int}, array{} given.'
-			identifier: argument.type
-			count: 3
 			path: tests/Extension/ExtensionOfferEvaluatorTest.php
 
 		-
@@ -2432,18 +2000,6 @@ parameters:
 			identifier: missingType.iterableValue
 			count: 1
 			path: tests/Extension/ExtensionServiceTest.php
-
-		-
-			rawMessage: 'Method Tests\Extension\ExtensionValidatorTest::getBaseTeamData() has no return type specified.'
-			identifier: missingType.return
-			count: 1
-			path: tests/Extension/ExtensionValidatorTest.php
-
-		-
-			rawMessage: 'Method Tests\Extension\ExtensionValidatorTest::getBaseTeamData() is unused.'
-			identifier: method.unused
-			count: 1
-			path: tests/Extension/ExtensionValidatorTest.php
 
 		-
 			rawMessage: 'Method Tests\Extension\ExtensionValidatorTest::invalidRaiseProvider() has no return type specified.'
@@ -2596,24 +2152,6 @@ parameters:
 			path: tests/FranchiseHistory/FranchiseHistoryViewTest.php
 
 		-
-			rawMessage: 'Parameter #1 $franchiseData of method FranchiseHistory\Contracts\FranchiseHistoryViewInterface::render() expects array<int, array{teamid: int|string, team_name: string, color1: string, color2: string, totwins: int|string, totloss: int|string, winpct: string, five_season_wins: int|string, ..., ...<string, mixed>}>, array{array{teamid: 1, team_city: ''Los Angeles'', team_name: ''Lakers'', color1: ''552583'', color2: ''FDB927'', totwins: 100, totloss: 50, winpct: 0.667, ...}} given.'
-			identifier: argument.type
-			count: 1
-			path: tests/FranchiseHistory/FranchiseHistoryViewTest.php
-
-		-
-			rawMessage: 'Parameter #1 $franchiseData of method FranchiseHistory\Contracts\FranchiseHistoryViewInterface::render() expects array<int, array{teamid: int|string, team_name: string, color1: string, color2: string, totwins: int|string, totloss: int|string, winpct: string, five_season_wins: int|string, ..., ...<string, mixed>}>, array{array{teamid: 1, team_city: ''Test<script>'', team_name: ''Team&Name'', color1: ''000000'', color2: ''FFFFFF'', wins: 0, losses: 0, totwins: 0, ...}} given.'
-			identifier: argument.type
-			count: 1
-			path: tests/FranchiseHistory/FranchiseHistoryViewTest.php
-
-		-
-			rawMessage: 'Parameter #1 $franchiseData of method FranchiseHistory\Contracts\FranchiseHistoryViewInterface::render() expects array<int, array{teamid: int|string, team_name: string, color1: string, color2: string, totwins: int|string, totloss: int|string, winpct: string, five_season_wins: int|string, ..., ...<string, mixed>}>, array{array{teamid: 2, team_city: ''Charlotte'', team_name: ''Bobcats'', color1: ''000000'', color2: ''FFFFFF'', totwins: 20, totloss: 60, winpct: 0.25, ...}} given.'
-			identifier: argument.type
-			count: 1
-			path: tests/FranchiseHistory/FranchiseHistoryViewTest.php
-
-		-
 			rawMessage: 'Call to method PHPUnit\Framework\Assert::assertInstanceOf() with ''FranchiseRecordBook\\FranchiseRecordBookApiHandler'' and FranchiseRecordBook\FranchiseRecordBookApiHandler will always evaluate to true.'
 			identifier: method.alreadyNarrowedType
 			count: 1
@@ -2624,42 +2162,6 @@ parameters:
 			identifier: staticMethod.dynamicCall
 			count: 1
 			path: tests/FranchiseRecordBook/FranchiseRecordBookServiceTest.php
-
-		-
-			rawMessage: 'Parameter #1 $data of method FranchiseRecordBook\FranchiseRecordBookView::render() expects array{singleSeason: array<string, list<array{id: int, scope: string, teamid: int, record_type: string, stat_category: string, ranking: int, player_name: string, car_block_id: int|null, ...}>>, career: array<string, list<array{id: int, scope: string, teamid: int, record_type: string, stat_category: string, ranking: int, player_name: string, car_block_id: int|null, ...}>>, team: array{teamid: int, team_name: string, color1: string, color2: string}|null, teams: list<array{teamid: int, team_name: string, color1: string, color2: string}>, scope: string}, array{teams: array{array{teamid: 1, team_name: ''<script>alert(1)<…'', color1: ''FF0000'', color2: ''000000''}}, team: array{teamid: 1, team_name: ''<script>alert(1)<…'', color1: ''FF0000'', color2: ''000000''}, singleSeason: array{}, career: array{}} given.'
-			identifier: argument.type
-			count: 1
-			path: tests/FranchiseRecordBook/FranchiseRecordBookViewXssTest.php
-
-		-
-			rawMessage: 'Parameter #1 $offer of method FreeAgency\CommonContractValidator::calculateOfferValue() expects array{year1: int, year2: int, year3: int, year4?: int, year5?: int, year6?: int}, array{} given.'
-			identifier: argument.type
-			count: 1
-			path: tests/FreeAgency/CommonContractValidatorTest.php
-
-		-
-			rawMessage: 'Parameter #1 $offer of method FreeAgency\CommonContractValidator::validateMaximumYearOne() expects array{year1: int, year2?: int, year3?: int, year4?: int, year5?: int, year6?: int}, array{} given.'
-			identifier: argument.type
-			count: 1
-			path: tests/FreeAgency/CommonContractValidatorTest.php
-
-		-
-			rawMessage: 'Parameter #1 $offer of method FreeAgency\CommonContractValidator::validateNoGaps() expects array{year1: int, year2: int, year3: int, year4?: int, year5?: int, year6?: int}, array{} given.'
-			identifier: argument.type
-			count: 1
-			path: tests/FreeAgency/CommonContractValidatorTest.php
-
-		-
-			rawMessage: 'Parameter #1 $offer of method FreeAgency\CommonContractValidator::validateRaises() expects array{year1: int, year2: int, year3: int, year4?: int, year5?: int, year6?: int}, array{} given.'
-			identifier: argument.type
-			count: 1
-			path: tests/FreeAgency/CommonContractValidatorTest.php
-
-		-
-			rawMessage: 'Parameter #1 $offer of method FreeAgency\CommonContractValidator::validateSalaryDecreases() expects array{year1: int, year2: int, year3: int, year4?: int, year5?: int, year6?: int}, array{} given.'
-			identifier: argument.type
-			count: 1
-			path: tests/FreeAgency/CommonContractValidatorTest.php
 
 		-
 			rawMessage: 'You should use assertSame() instead of assertEquals(), because both values are scalars of the same type'
@@ -2700,12 +2202,6 @@ parameters:
 		-
 			rawMessage: 'Call to method PHPUnit\Framework\Assert::assertTrue() with true will always evaluate to true.'
 			identifier: method.alreadyNarrowedType
-			count: 1
-			path: tests/FreeAgency/FreeAgencyAdminRepositoryTest.php
-
-		-
-			rawMessage: 'Method FreeAgency\FreeAgencyAdminRepository::updatePlayerContract() invoked with 10 parameters, 9 required.'
-			identifier: arguments.count
 			count: 1
 			path: tests/FreeAgency/FreeAgencyAdminRepositoryTest.php
 
@@ -2836,18 +2332,6 @@ parameters:
 			path: tests/FreeAgency/FreeAgencyServiceTest.php
 
 		-
-			rawMessage: 'Call to an undefined method FreeAgency\Contracts\FreeAgencyDemandRepositoryInterface::method().'
-			identifier: method.notFound
-			count: 4
-			path: tests/FreeAgency/FreeAgencyServiceTest.php
-
-		-
-			rawMessage: 'Call to an undefined method FreeAgency\Contracts\FreeAgencyRepositoryInterface::method().'
-			identifier: method.notFound
-			count: 13
-			path: tests/FreeAgency/FreeAgencyServiceTest.php
-
-		-
 			rawMessage: 'Call to method PHPUnit\Framework\Assert::assertInstanceOf() with ''Player\\Player'' and Player\Player will always evaluate to true.'
 			identifier: method.alreadyNarrowedType
 			count: 1
@@ -2968,120 +2452,6 @@ parameters:
 			path: tests/GameTest.php
 
 		-
-			rawMessage: 'Parameter #1 $injuredPlayers of method Injuries\InjuriesView::render() expects array<int, array{playerID: int, name: string, position: string, daysRemaining: int, returnDate: string, teamid: int, teamCity: string, teamName: string, ...}>, array{array{playerID: 1, name: '''', position: ''PG'', daysRemaining: 5, teamid: 1, teamCity: ''Charlotte'', teamName: ''Hornets'', teamColor1: ''00788C'', ...}} given.'
-			identifier: argument.type
-			count: 1
-			path: tests/Injuries/InjuriesIntegrationTest.php
-
-		-
-			rawMessage: 'Parameter #1 $injuredPlayers of method Injuries\InjuriesView::render() expects array<int, array{playerID: int, name: string, position: string, daysRemaining: int, returnDate: string, teamid: int, teamCity: string, teamName: string, ...}>, array{array{playerID: 1, name: ''<script>alert("xss"…'', position: ''PG'', daysRemaining: 5, teamid: 1, teamCity: ''Boston'', teamName: ''Celtics'', teamColor1: ''007A33'', ...}} given.'
-			identifier: argument.type
-			count: 1
-			path: tests/Injuries/InjuriesIntegrationTest.php
-
-		-
-			rawMessage: 'Parameter #1 $injuredPlayers of method Injuries\InjuriesView::render() expects array<int, array{playerID: int, name: string, position: string, daysRemaining: int, returnDate: string, teamid: int, teamCity: string, teamName: string, ...}>, array{array{playerID: 1, name: ''Day To Day'', position: ''PG'', daysRemaining: 1, teamid: 1, teamCity: ''Denver'', teamName: ''Nuggets'', teamColor1: ''0E2240'', ...}} given.'
-			identifier: argument.type
-			count: 1
-			path: tests/Injuries/InjuriesIntegrationTest.php
-
-		-
-			rawMessage: 'Parameter #1 $injuredPlayers of method Injuries\InjuriesView::render() expects array<int, array{playerID: int, name: string, position: string, daysRemaining: int, returnDate: string, teamid: int, teamCity: string, teamName: string, ...}>, array{array{playerID: 1, name: ''Giannis…'', position: ''PF'', daysRemaining: 5, teamid: 1, teamCity: ''Milwaukee'', teamName: ''Bucks'', teamColor1: ''00471B'', ...}} given.'
-			identifier: argument.type
-			count: 1
-			path: tests/Injuries/InjuriesIntegrationTest.php
-
-		-
-			rawMessage: 'Parameter #1 $injuredPlayers of method Injuries\InjuriesView::render() expects array<int, array{playerID: int, name: string, position: string, daysRemaining: int, returnDate: string, teamid: int, teamCity: string, teamName: string, ...}>, array{array{playerID: 1, name: ''Jose Calderon'', position: ''PG'', daysRemaining: 5, teamid: 1, teamCity: ''New York'', teamName: ''Knicks'', teamColor1: ''006BB6'', ...}} given.'
-			identifier: argument.type
-			count: 1
-			path: tests/Injuries/InjuriesIntegrationTest.php
-
-		-
-			rawMessage: 'Parameter #1 $injuredPlayers of method Injuries\InjuriesView::render() expects array<int, array{playerID: int, name: string, position: string, daysRemaining: int, returnDate: string, teamid: int, teamCity: string, teamName: string, ...}>, array{array{playerID: 1, name: ''Long Term Injury'', position: ''C'', daysRemaining: 42, teamid: 1, teamCity: ''Portland'', teamName: ''Trail Blazers'', teamColor1: ''E03A3E'', ...}} given.'
-			identifier: argument.type
-			count: 1
-			path: tests/Injuries/InjuriesIntegrationTest.php
-
-		-
-			rawMessage: 'Parameter #1 $injuredPlayers of method Injuries\InjuriesView::render() expects array<int, array{playerID: int, name: string, position: string, daysRemaining: int, returnDate: string, teamid: int, teamCity: string, teamName: string, ...}>, array{array{playerID: 1, name: ''Ready To Return'', position: ''SF'', daysRemaining: 0, teamid: 1, teamCity: ''Sacramento'', teamName: ''Kings'', teamColor1: ''5A2D81'', ...}} given.'
-			identifier: argument.type
-			count: 1
-			path: tests/Injuries/InjuriesIntegrationTest.php
-
-		-
-			rawMessage: 'Parameter #1 $injuredPlayers of method Injuries\InjuriesView::render() expects array<int, array{playerID: int, name: string, position: string, daysRemaining: int, returnDate: string, teamid: int, teamCity: string, teamName: string, ...}>, array{array{playerID: 1, name: ''Test Player'', position: ''<img src=x onerror…'', daysRemaining: 5, teamid: 1, teamCity: ''Boston'', teamName: ''Celtics'', teamColor1: ''007A33'', ...}} given.'
-			identifier: argument.type
-			count: 1
-			path: tests/Injuries/InjuriesIntegrationTest.php
-
-		-
-			rawMessage: 'Parameter #1 $injuredPlayers of method Injuries\InjuriesView::render() expects array<int, array{playerID: int, name: string, position: string, daysRemaining: int, returnDate: string, teamid: int, teamCity: string, teamName: string, ...}>, array{array{playerID: 1, name: ''Test Player'', position: ''C'', daysRemaining: 5, teamid: 1, teamCity: ''<script>steal…'', teamName: ''Celtics'', teamColor1: ''007A33'', ...}} given.'
-			identifier: argument.type
-			count: 1
-			path: tests/Injuries/InjuriesIntegrationTest.php
-
-		-
-			rawMessage: 'Parameter #1 $injuredPlayers of method Injuries\InjuriesView::render() expects array<int, array{playerID: int, name: string, position: string, daysRemaining: int, returnDate: string, teamid: int, teamCity: string, teamName: string, ...}>, array{array{playerID: 1, name: ''Test Player'', position: ''C'', daysRemaining: 5, teamid: 1, teamCity: ''City'', teamName: ''O\''Brien'', teamColor1: ''000000'', ...}} given.'
-			identifier: argument.type
-			count: 1
-			path: tests/Injuries/InjuriesIntegrationTest.php
-
-		-
-			rawMessage: 'Parameter #1 $injuredPlayers of method Injuries\InjuriesView::render() expects array<int, array{playerID: int, name: string, position: string, daysRemaining: int, returnDate: string, teamid: int, teamCity: string, teamName: string, ...}>, array{array{playerID: 1, name: ''Test Player'', position: ''C'', daysRemaining: 5, teamid: 1, teamCity: ''Golden State'', teamName: ''Warriors'', teamColor1: ''006BB6'', ...}} given.'
-			identifier: argument.type
-			count: 1
-			path: tests/Injuries/InjuriesIntegrationTest.php
-
-		-
-			rawMessage: 'Parameter #1 $injuredPlayers of method Injuries\InjuriesView::render() expects array<int, array{playerID: int, name: string, position: string, daysRemaining: int, returnDate: string, teamid: int, teamCity: string, teamName: string, ...}>, array{array{playerID: 1, name: ''Test Player'', position: ''PF'', daysRemaining: 5, teamid: 1, teamCity: ''Oklahoma City'', teamName: ''Thunder'', teamColor1: ''007AC1'', ...}} given.'
-			identifier: argument.type
-			count: 1
-			path: tests/Injuries/InjuriesIntegrationTest.php
-
-		-
-			rawMessage: 'Parameter #1 $injuredPlayers of method Injuries\InjuriesView::render() expects array<int, array{playerID: int, name: string, position: string, daysRemaining: int, returnDate: string, teamid: int, teamCity: string, teamName: string, ...}>, array{array{playerID: 1, name: ''Test Player'', position: ''PF'', daysRemaining: 7, teamid: 1, teamCity: ''Chicago'', teamName: ''Bulls'', teamColor1: ''FF0000;"><script…'', ...}} given.'
-			identifier: argument.type
-			count: 1
-			path: tests/Injuries/InjuriesIntegrationTest.php
-
-		-
-			rawMessage: 'Parameter #1 $injuredPlayers of method Injuries\InjuriesView::render() expects array<int, array{playerID: int, name: string, position: string, daysRemaining: int, returnDate: string, teamid: int, teamCity: string, teamName: string, ...}>, array{array{playerID: 1, name: ''Test Player'', position: ''PG'', daysRemaining: 5, teamid: 1, teamCity: ''Atlanta'', teamName: ''Hawks'', teamColor1: ''E03A3E'', ...}} given.'
-			identifier: argument.type
-			count: 1
-			path: tests/Injuries/InjuriesIntegrationTest.php
-
-		-
-			rawMessage: 'Parameter #1 $injuredPlayers of method Injuries\InjuriesView::render() expects array<int, array{playerID: int, name: string, position: string, daysRemaining: int, returnDate: string, teamid: int, teamCity: string, teamName: string, ...}>, array{array{playerID: 1, name: ''Test Player'', position: ''SF'', daysRemaining: 3, teamid: 1, teamCity: ''Los Angeles'', teamName: ''Lakers" onclick=…'', teamColor1: ''552583'', ...}} given.'
-			identifier: argument.type
-			count: 1
-			path: tests/Injuries/InjuriesIntegrationTest.php
-
-		-
-			rawMessage: 'Parameter #1 $injuredPlayers of method Injuries\InjuriesView::render() expects array<int, array{playerID: int, name: string, position: string, daysRemaining: int, returnDate: string, teamid: int, teamCity: string, teamName: string, ...}>, array{array{playerID: 1, name: ''Test Player'', position: ''SG'', daysRemaining: 10, teamid: 1, teamCity: ''San Antonio'', teamName: ''Spurs'', teamColor1: ''C4CED4'', ...}} given.'
-			identifier: argument.type
-			count: 1
-			path: tests/Injuries/InjuriesIntegrationTest.php
-
-		-
-			rawMessage: 'Parameter #1 $injuredPlayers of method Injuries\InjuriesView::render() expects array<int, array{playerID: int, name: string, position: string, daysRemaining: int, returnDate: string, teamid: int, teamCity: string, teamName: string, ...}>, array{array{playerID: 1, name: ''Test Player'', position: ''SG'', daysRemaining: 5, teamid: 99, teamCity: ''Phoenix'', teamName: ''Suns'', teamColor1: ''1D1160'', ...}} given.'
-			identifier: argument.type
-			count: 1
-			path: tests/Injuries/InjuriesIntegrationTest.php
-
-		-
-			rawMessage: 'Parameter #1 $injuredPlayers of method Injuries\InjuriesView::render() expects array<int, array{playerID: int, name: string, position: string, daysRemaining: int, returnDate: string, teamid: int, teamCity: string, teamName: string, ...}>, array{array{playerID: 12345, name: ''Test Player'', position: ''PG'', daysRemaining: 5, teamid: 1, teamCity: ''Miami'', teamName: ''Heat'', teamColor1: ''98002E'', ...}} given.'
-			identifier: argument.type
-			count: 1
-			path: tests/Injuries/InjuriesIntegrationTest.php
-
-		-
-			rawMessage: 'Parameter #1 $injuredPlayers of method Injuries\InjuriesView::render() expects array<int, array{playerID: int, name: string, position: string, daysRemaining: int, returnDate: string, teamid: int, teamCity: string, teamName: string, ...}>, list<array{playerID: int<1, 20>, name: literal-string&non-falsy-string, position: ''G'', daysRemaining: int<1, 20>, teamid: int<1, 20>, teamCity: ''City'', teamName: literal-string&non-falsy-string, teamColor1: ''000000'', ...}> given.'
-			identifier: argument.type
-			count: 1
-			path: tests/Injuries/InjuriesIntegrationTest.php
-
-		-
 			rawMessage: 'Call to method PHPUnit\Framework\Assert::assertInstanceOf() with ''Injuries\\Contracts\\InjuriesServiceInterface'' and Injuries\InjuriesService will always evaluate to true.'
 			identifier: method.alreadyNarrowedType
 			count: 1
@@ -3100,28 +2470,10 @@ parameters:
 			path: tests/Injuries/InjuriesViewTest.php
 
 		-
-			rawMessage: 'Parameter &$lines by-ref type of method Tests\JsbParser\AswFileParserTest::fillLines() expects list<string>, non-empty-array<int, string> given.'
-			identifier: parameterByRef.type
-			count: 1
-			path: tests/JsbParser/AswFileParserTest.php
-
-		-
 			rawMessage: Constant Tests\JsbParser\HofFileParserTest::FILE_SIZE is unused.
 			identifier: classConstant.unused
 			count: 1
 			path: tests/JsbParser/HofFileParserTest.php
-
-		-
-			rawMessage: 'Parameter #1 $blocks of method Tests\JsbParser\HofFileParserTest::buildHofFile() expects list<list<array{pos: string, name: string, pid: int, year: int}>>, array{5: array{array{pos: ''SG'', name: ''Solo Entry'', pid: 777, year: 2001}}} given.'
-			identifier: argument.type
-			count: 1
-			path: tests/JsbParser/HofFileParserTest.php
-
-		-
-			rawMessage: 'Call to an undefined method JsbParser\Contracts\JsbExportRepositoryInterface::method().'
-			identifier: method.notFound
-			count: 11
-			path: tests/JsbParser/JsbExportServiceTest.php
 
 		-
 			rawMessage: 'Dynamic call to static method PHPUnit\Framework\TestCase::createStub().'
@@ -3136,12 +2488,6 @@ parameters:
 			path: tests/JsbParser/JsbExportServiceTest.php
 
 		-
-			rawMessage: 'Call to an undefined method JsbParser\Contracts\JsbImportRepositoryInterface::method().'
-			identifier: method.notFound
-			count: 25
-			path: tests/JsbParser/JsbImportServiceTest.php
-
-		-
 			rawMessage: 'Dynamic call to static method PHPUnit\Framework\TestCase::createStub().'
 			identifier: staticMethod.dynamicCall
 			count: 2
@@ -3152,24 +2498,6 @@ parameters:
 			identifier: missingType.iterableValue
 			count: 1
 			path: tests/JsbParser/JsbImportServiceTest.php
-
-		-
-			rawMessage: Variable method call on JsbParser\JsbImportService.
-			identifier: method.dynamicName
-			count: 1
-			path: tests/JsbParser/JsbImportServiceTest.php
-
-		-
-			rawMessage: 'Dynamic call to static method PHPUnit\Framework\Assert::fail().'
-			identifier: staticMethod.dynamicCall
-			count: 1
-			path: tests/JsbParser/PlbFileParserTest.php
-
-		-
-			rawMessage: 'Strict comparison using === between non-falsy-string and false will always evaluate to false.'
-			identifier: identical.alwaysFalse
-			count: 1
-			path: tests/JsbParser/PlbFileParserTest.php
 
 		-
 			rawMessage: 'Dynamic call to static method PHPUnit\Framework\Assert::fail().'
@@ -3863,24 +3191,6 @@ parameters:
 			path: tests/Negotiation/NegotiationOfferViewTest.php
 
 		-
-			rawMessage: 'Parameter #2 $demands of static method Negotiation\NegotiationOfferView::renderNegotiationForm() expects array{year1: float|int, year2: float|int, year3: float|int, year4: float|int, year5: float|int, year6: int, years: int, total: float|int, ...}, array{year1: 1100, year2: 1200, year3: 1300, year4: 0, year5: 0, year6: 0, years: 3, total: 3600} given.'
-			identifier: argument.type
-			count: 1
-			path: tests/Negotiation/NegotiationOfferViewTest.php
-
-		-
-			rawMessage: 'Parameter #2 $demands of static method Negotiation\NegotiationOfferView::renderNegotiationForm() expects array{year1: float|int, year2: float|int, year3: float|int, year4: float|int, year5: float|int, year6: int, years: int, total: float|int, ...}, array{year1: 500, year2: 550, year3: 600, year4: 0, year5: 0, year6: 0, years: 3, total: 1650} given.'
-			identifier: argument.type
-			count: 1
-			path: tests/Negotiation/NegotiationOfferViewTest.php
-
-		-
-			rawMessage: 'Parameter #2 $demands of static method Negotiation\NegotiationOfferView::renderNegotiationForm() expects array{year1: float|int, year2: float|int, year3: float|int, year4: float|int, year5: float|int, year6: int, years: int, total: float|int, ...}, array{year1: 500, year2: 550, year3: 600, year4: 650, year5: 700, year6: 0, years: 5, total: 3000} given.'
-			identifier: argument.type
-			count: 1
-			path: tests/Negotiation/NegotiationOfferViewTest.php
-
-		-
 			rawMessage: 'Call to method PHPUnit\Framework\Assert::assertInstanceOf() with ''BaseMysqliRepository'' and Negotiation\NegotiationRepository will always evaluate to true.'
 			identifier: method.alreadyNarrowedType
 			count: 1
@@ -4076,42 +3386,6 @@ parameters:
 			rawMessage: 'Dynamic call to static method PHPUnit\Framework\TestCase::createStub().'
 			identifier: staticMethod.dynamicCall
 			count: 6
-			path: tests/NextSim/NextSimViewTest.php
-
-		-
-			rawMessage: 'Method Tests\NextSim\NextSimViewTest::createGameData() has invalid return type Game.'
-			identifier: class.notFound
-			count: 1
-			path: tests/NextSim/NextSimViewTest.php
-
-		-
-			rawMessage: 'Method Tests\NextSim\NextSimViewTest::createGameData() should return array<int, array{game: Game, date: DateTime, dayNumber: int, opposingTeam: Team\Team, locationPrefix: string, opposingStarters: array<string, Player\Player>, opponentTier: string, opponentPowerRanking: float}> but returns array{array{game: LeagueSchedule\Game&PHPUnit\Framework\MockObject\Stub, date: DateTime, dayNumber: 1, opposingTeam: PHPUnit\Framework\MockObject\Stub&Team\Team, locationPrefix: ''@'', opposingStarters: array{PG: PHPUnit\Framework\MockObject\Stub&Player\Player, SG: PHPUnit\Framework\MockObject\Stub&Player\Player, SF: PHPUnit\Framework\MockObject\Stub&Player\Player, PF: PHPUnit\Framework\MockObject\Stub&Player\Player, C: PHPUnit\Framework\MockObject\Stub&Player\Player}, opponentTier: ''strong'', opponentPowerRanking: 75.0}}.'
-			identifier: return.type
-			count: 1
-			path: tests/NextSim/NextSimViewTest.php
-
-		-
-			rawMessage: 'Parameter #1 $games of method NextSim\NextSimView::render() expects array<int, array{game: LeagueSchedule\Game, date: DateTime, dayNumber: int, opposingTeam: Team\Team, locationPrefix: string, opposingStarters: array<string, Player\Player>, opponentTier: string, opponentPowerRanking: float}>, array<int, array{game: Game, date: DateTime, dayNumber: int, opposingTeam: Team\Team, locationPrefix: string, opposingStarters: array<string, Player\Player>, opponentTier: string, opponentPowerRanking: float}> given.'
-			identifier: argument.type
-			count: 8
-			path: tests/NextSim/NextSimViewTest.php
-
-		-
-			rawMessage: 'Parameter #1 $games of method NextSim\NextSimView::renderPositionTable() expects array<int, array{game: LeagueSchedule\Game, date: DateTime, dayNumber: int, opposingTeam: Team\Team, locationPrefix: string, opposingStarters: array<string, Player\Player>, opponentTier: string, opponentPowerRanking: float}>, array<int, array{game: Game, date: DateTime, dayNumber: int, opposingTeam: Team\Team, locationPrefix: string, opposingStarters: array<string, Player\Player>, opponentTier: string, opponentPowerRanking: float}> given.'
-			identifier: argument.type
-			count: 1
-			path: tests/NextSim/NextSimViewTest.php
-
-		-
-			rawMessage: 'Parameter #1 $games of method NextSim\NextSimView::renderScheduleStrip() expects array<int, array{game: LeagueSchedule\Game, date: DateTime, dayNumber: int, opposingTeam: Team\Team, locationPrefix: string, opposingStarters: array<string, Player\Player>, opponentTier: string, opponentPowerRanking: float}>, array<int, array{game: Game, date: DateTime, dayNumber: int, opposingTeam: Team\Team, locationPrefix: string, opposingStarters: array<string, Player\Player>, opponentTier: string, opponentPowerRanking: float}> given.'
-			identifier: argument.type
-			count: 1
-			path: tests/NextSim/NextSimViewTest.php
-
-		-
-			rawMessage: 'Parameter #1 $games of method NextSim\NextSimView::renderTabbedPositionTable() expects array<int, array{game: LeagueSchedule\Game, date: DateTime, dayNumber: int, opposingTeam: Team\Team, locationPrefix: string, opposingStarters: array<string, Player\Player>, opponentTier: string, opponentPowerRanking: float}>, array<int, array{game: Game, date: DateTime, dayNumber: int, opposingTeam: Team\Team, locationPrefix: string, opposingStarters: array<string, Player\Player>, opponentTier: string, opponentPowerRanking: float}> given.'
-			identifier: argument.type
-			count: 3
 			path: tests/NextSim/NextSimViewTest.php
 
 		-
@@ -4481,12 +3755,6 @@ parameters:
 			path: tests/Player/PlayerDataConverterTest.php
 
 		-
-			rawMessage: 'Parameter #1 $playerID of static method Player\PlayerImageHelper::getImageUrl() expects int|string|null, float given.'
-			identifier: argument.type
-			count: 1
-			path: tests/Player/PlayerImageHelperTest.php
-
-		-
 			rawMessage: 'Method Tests\Player\PlayerInjuryCalculatorTest::testGetInjuryReturnDateCrossingMonth() has no return type specified.'
 			identifier: missingType.return
 			count: 1
@@ -4797,18 +4065,6 @@ parameters:
 			path: tests/PlrParser/PlrFileWriterExpandedFieldsTest.php
 
 		-
-			rawMessage: 'Dynamic call to static method PHPUnit\Framework\Assert::fail().'
-			identifier: staticMethod.dynamicCall
-			count: 1
-			path: tests/PlrParser/PlrOrdinalMapTest.php
-
-		-
-			rawMessage: 'Strict comparison using === between non-falsy-string and false will always evaluate to false.'
-			identifier: identical.alwaysFalse
-			count: 1
-			path: tests/PlrParser/PlrOrdinalMapTest.php
-
-		-
 			rawMessage: 'Call to function is_subclass_of() with ''PlrParser\\PlrParserRepository'' and ''BaseMysqliRepository'' will always evaluate to true.'
 			identifier: function.alreadyNarrowedType
 			count: 1
@@ -5001,12 +4257,6 @@ parameters:
 			path: tests/RookieOption/RookieOptionValidatorTest.php
 
 		-
-			rawMessage: Expression on left side of ?? is not nullable.
-			identifier: nullCoalesce.expr
-			count: 2
-			path: tests/RookieOption/RookieOptionValidatorTest.php
-
-		-
 			rawMessage: 'Dynamic call to static method PHPUnit\Framework\TestCase::createStub().'
 			identifier: staticMethod.dynamicCall
 			count: 1
@@ -5145,24 +4395,6 @@ parameters:
 			path: tests/SeasonLeaderboards/SeasonLeaderboardsServiceTest.php
 
 		-
-			rawMessage: 'Parameter #1 $row of method SeasonLeaderboards\SeasonLeaderboardsService::processPlayerRow() expects array{pid: int, name: string, year: int, team: string, teamid: int, games: int, minutes: int, fgm: int, ...}, array{pid: 123, name: ''Test Player'', year: 2024, team: ''Test Team'', teamid: 1, games: 0, minutes: 0, fgm: 0, ...} given.'
-			identifier: argument.type
-			count: 1
-			path: tests/SeasonLeaderboards/SeasonLeaderboardsServiceTest.php
-
-		-
-			rawMessage: 'Parameter #1 $row of method SeasonLeaderboards\SeasonLeaderboardsService::processPlayerRow() expects array{pid: int, name: string, year: int, team: string, teamid: int, games: int, minutes: int, fgm: int, ...}, array{pid: 123, name: ''Test Player'', year: 2024, team: ''Test Team'', teamid: 1, games: 10, minutes: 300, fgm: 0, ...} given.'
-			identifier: argument.type
-			count: 1
-			path: tests/SeasonLeaderboards/SeasonLeaderboardsServiceTest.php
-
-		-
-			rawMessage: 'Parameter #1 $row of method SeasonLeaderboards\SeasonLeaderboardsService::processPlayerRow() expects array{pid: int, name: string, year: int, team: string, teamid: int, games: int, minutes: int, fgm: int, ...}, array{pid: 123, name: ''Test Player'', year: 2024, team: ''Test Team'', teamid: 1, games: 10, minutes: 300, fgm: 50, ...} given.'
-			identifier: argument.type
-			count: 2
-			path: tests/SeasonLeaderboards/SeasonLeaderboardsServiceTest.php
-
-		-
 			rawMessage: 'You should use assertSame() instead of assertEquals(), because both values are scalars of the same type'
 			identifier: phpunit.assertEquals
 			count: 18
@@ -5171,12 +4403,6 @@ parameters:
 		-
 			rawMessage: 'Dynamic call to static method PHPUnit\Framework\TestCase::createStub().'
 			identifier: staticMethod.dynamicCall
-			count: 1
-			path: tests/SeasonLeaderboards/SeasonLeaderboardsViewTest.php
-
-		-
-			rawMessage: 'Parameter #1 $stats of method SeasonLeaderboards\SeasonLeaderboardsView::renderPlayerRow() expects array{pid: int, name: string, year: int, teamname: string, teamid: int, team_city: string, color1: string, color2: string, ...}, array{pid: 123, name: ''Test Player'', year: ''2024'', teamname: ''Test Team'', teamid: 1, team_city: ''Test City'', color1: ''FF0000'', color2: ''000000'', ...} given.'
-			identifier: argument.type
 			count: 1
 			path: tests/SeasonLeaderboards/SeasonLeaderboardsViewTest.php
 
@@ -5343,18 +4569,6 @@ parameters:
 			path: tests/Standings/StandingsRepositoryTest.php
 
 		-
-			rawMessage: 'Method PHPUnit\Framework\MockObject\InvocationStubber::willReturnOnConsecutiveCalls() invoked with unpacked array with possibly string key, but it''s not allowed because of @no-named-arguments.'
-			identifier: argument.named
-			count: 1
-			path: tests/Standings/StandingsRepositoryTest.php
-
-		-
-			rawMessage: 'Parameter #1 ...$arrays of function array_merge expects array, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: tests/Standings/StandingsRepositoryTest.php
-
-		-
 			rawMessage: 'You should use assertSame() instead of assertEquals(), because both values are scalars of the same type'
 			identifier: phpunit.assertEquals
 			count: 2
@@ -5377,24 +4591,6 @@ parameters:
 			identifier: return.type
 			count: 1
 			path: tests/Standings/StandingsViewXssTest.php
-
-		-
-			rawMessage: 'Parameter #1 $games of method Statistics\TeamStatsCalculator::calculate() expects list<array{visitor_teamid: int, visitor_score: int, home_teamid: int, home_score: int}>, array{array{visitor_score: 100, home_score: 95}} given.'
-			identifier: argument.type
-			count: 1
-			path: tests/Statistics/TeamStatsCalculatorTest.php
-
-		-
-			rawMessage: 'Parameter #1 $games of method Statistics\TeamStatsCalculator::calculate() expects list<array{visitor_teamid: int, visitor_score: int, home_teamid: int, home_score: int}>, array{array{visitor_teamid: 1, home_teamid: 2}} given.'
-			identifier: argument.type
-			count: 1
-			path: tests/Statistics/TeamStatsCalculatorTest.php
-
-		-
-			rawMessage: 'Parameter #1 $games of method Statistics\TeamStatsCalculator::calculate() expects list<array{visitor_teamid: int, visitor_score: int, home_teamid: int, home_score: int}>, array{array{visitor_teamid: null, visitor_score: null, home_teamid: null, home_score: null}} given.'
-			identifier: argument.type
-			count: 1
-			path: tests/Statistics/TeamStatsCalculatorTest.php
 
 		-
 			rawMessage: 'You should use assertSame() instead of assertEquals(), because both values are scalars of the same type'
@@ -5447,18 +4643,6 @@ parameters:
 		-
 			rawMessage: 'Method Tests\Team\TeamRepositoryTest::testGetTeamPowerDataReturnsNullWhenNoResults() has no return type specified.'
 			identifier: missingType.return
-			count: 1
-			path: tests/Team/TeamRepositoryTest.php
-
-		-
-			rawMessage: 'Offset ''Team'' does not exist on array{teamid: int, team_name: string, league_record: string, wins: int, losses: int, pct: float|string, conference: string, division: string, ...}.'
-			identifier: offsetAccess.notFound
-			count: 1
-			path: tests/Team/TeamRepositoryTest.php
-
-		-
-			rawMessage: 'Offset ''win'' does not exist on array{teamid: int, team_name: string, league_record: string, wins: int, losses: int, pct: float|string, conference: string, division: string, ...}.'
-			identifier: offsetAccess.notFound
 			count: 1
 			path: tests/Team/TeamRepositoryTest.php
 
@@ -5793,12 +4977,6 @@ parameters:
 			path: tests/Trading/TradeRosterPreviewApiHandlerTest.php
 
 		-
-			rawMessage: 'Class Trading\TradeValidator constructor invoked with 2 parameters, 1 required.'
-			identifier: arguments.count
-			count: 1
-			path: tests/Trading/TradeValidatorTest.php
-
-		-
 			rawMessage: 'Method Tests\Trading\TradeValidatorTest::invalidCashAmountProvider() has no return type specified.'
 			identifier: missingType.return
 			count: 1
@@ -5907,43 +5085,13 @@ parameters:
 			path: tests/Trading/TradeValidatorTest.php
 
 		-
-			rawMessage: 'Method class@anonymous/Trading/TradeValidatorTest.php:34::__construct() has parameter $mockDb with no type specified.'
-			identifier: missingType.parameter
-			count: 1
-			path: tests/Trading/TradeValidatorTest.php
-
-		-
-			rawMessage: 'Method class@anonymous/Trading/TradeValidatorTest.php:34::prepare() has no return type specified.'
-			identifier: missingType.return
-			count: 1
-			path: tests/Trading/TradeValidatorTest.php
-
-		-
-			rawMessage: 'Method class@anonymous/Trading/TradeValidatorTest.php:34::prepare() has parameter $query with no type specified.'
-			identifier: missingType.parameter
-			count: 1
-			path: tests/Trading/TradeValidatorTest.php
-
-		-
 			rawMessage: Property Tests\Trading\TradeValidatorTest::$mockDb has no type specified.
 			identifier: missingType.property
 			count: 1
 			path: tests/Trading/TradeValidatorTest.php
 
 		-
-			rawMessage: Property Tests\Trading\TradeValidatorTest::$mockMysqli has no type specified.
-			identifier: missingType.property
-			count: 1
-			path: tests/Trading/TradeValidatorTest.php
-
-		-
 			rawMessage: Property Tests\Trading\TradeValidatorTest::$validator has no type specified.
-			identifier: missingType.property
-			count: 1
-			path: tests/Trading/TradeValidatorTest.php
-
-		-
-			rawMessage: Property class@anonymous/Trading/TradeValidatorTest.php:34::$mockDb has no type specified.
 			identifier: missingType.property
 			count: 1
 			path: tests/Trading/TradeValidatorTest.php
@@ -6105,24 +5253,6 @@ parameters:
 			path: tests/Trading/TradingServiceTest.php
 
 		-
-			rawMessage: 'Parameter #1 $tradeData of method Trading\TradeOffer::createTradeOffer() expects array{offeringTeam: string, listeningTeam: string, switchCounter: int, fieldsCounter: int, check: array<int, string|null>, index: array<int, string>, type: array<int, string>, contract: array<int, string>, ...}, array{offeringTeam: ''Atlanta Hawks'', listeningTeam: ''Boston Celtics'', switchCounter: 1, fieldsCounter: 2, userSendsCash: array{0, 0, 0, 0, 0, 0, 0}, partnerSendsCash: array{0, 0, 0, 0, 0, 0, 0}, check: array{''on'', ''on''}, contract: array{0, 0}, ...} given.'
-			identifier: argument.type
-			count: 1
-			path: tests/Trading/TradingServiceTest.php
-
-		-
-			rawMessage: 'Parameter #1 $tradeData of method Trading\TradeOffer::createTradeOffer() expects array{offeringTeam: string, listeningTeam: string, switchCounter: int, fieldsCounter: int, check: array<int, string|null>, index: array<int, string>, type: array<int, string>, contract: array<int, string>, ...}, array{offeringTeam: ''Atlanta Hawks'', listeningTeam: ''Boston Celtics'', switchCounter: 1, fieldsCounter: 2, userSendsCash: array{0, 0, 0, 0, 0, 0, 0}, partnerSendsCash: array{0, 0, 0, 0, 0, 0, 0}, check: array{''on'', ''on''}, contract: array{1000, 1500}, ...} given.'
-			identifier: argument.type
-			count: 1
-			path: tests/Trading/TradingServiceTest.php
-
-		-
-			rawMessage: 'Parameter #1 $tradeData of method Trading\TradeOffer::createTradeOffer() expects array{offeringTeam: string, listeningTeam: string, switchCounter: int, fieldsCounter: int, check: array<int, string|null>, index: array<int, string>, type: array<int, string>, contract: array<int, string>, ...}, array{offeringTeam: ''Atlanta Hawks'', listeningTeam: ''Boston Celtics'', switchCounter: 1, fieldsCounter: 2, userSendsCash: array{0, 200, 200, 0, 0, 0, 0}, partnerSendsCash: array{0, 150, 150, 0, 0, 0, 0}, check: array{''on'', ''on''}, contract: array{2000, 1800}, ...} given.'
-			identifier: argument.type
-			count: 1
-			path: tests/Trading/TradingServiceTest.php
-
-		-
 			rawMessage: 'Dynamic call to static method PHPUnit\Framework\TestCase::createStub().'
 			identifier: staticMethod.dynamicCall
 			count: 2
@@ -6165,12 +5295,6 @@ parameters:
 			path: tests/TransactionHistory/TransactionHistoryViewTest.php
 
 		-
-			rawMessage: 'Parameter #1 $data of method TransactionHistory\TransactionHistoryView::render() expects array{transactions: array<int, array{sid: string, catid: string, title: string, time: string}>, categories: array<int, string>, availableYears: array<int, int>, monthNames: array<int, string>, selectedCategory: int, selectedYear: int, selectedMonth: int}, array{transactions: array{array{catid: 1, time: ''2024-01-15 12:00:00'', title: ''<script>alert(1)<…'', sid: 1}}, categories: array{1: ''<script>alert(1)<…''}, availableYears: array{2024}, monthNames: array{1: ''January''}, selectedCategory: 0, selectedYear: 0, selectedMonth: 0} given.'
-			identifier: argument.type
-			count: 1
-			path: tests/TransactionHistory/TransactionHistoryViewXssTest.php
-
-		-
 			rawMessage: 'Dynamic call to static method PHPUnit\Framework\TestCase::createStub().'
 			identifier: staticMethod.dynamicCall
 			count: 11
@@ -6181,12 +5305,6 @@ parameters:
 			identifier: argument.type
 			count: 1
 			path: tests/UI/Tables/PlayerRowTransformerTest.php
-
-		-
-			rawMessage: 'Parameter #3 $team of static method UI\Tables\Ratings::render() expects Team\Team, stdClass given.'
-			identifier: argument.type
-			count: 2
-			path: tests/UI/Tables/RatingsTest.php
 
 		-
 			rawMessage: 'Parameter #1 $row of method Api\Transformer\InjuryTransformer::transform() expects array{player_uuid: string, pid: int, name: string, pos: string, injured: int, teamid: int|null, team_uuid: string|null, team_city: string|null, ...}, array<string, mixed> given.'
@@ -6211,12 +5329,6 @@ parameters:
 			identifier: ternary.shortNotAllowed
 			count: 9
 			path: tests/Unit/BulkImport/ArchiveExtractorTest.php
-
-		-
-			rawMessage: 'Call to an undefined method BulkImport\Contracts\ArchiveExtractorInterface::method().'
-			identifier: method.notFound
-			count: 5
-			path: tests/Unit/BulkImport/BackupArchiveLocatorTest.php
 
 		-
 			rawMessage: 'Dynamic call to static method PHPUnit\Framework\TestCase::createStub().'
@@ -6247,18 +5359,6 @@ parameters:
 			identifier: phpunit.assertCount
 			count: 1
 			path: tests/Unit/BulkImport/JsbFileTypeTest.php
-
-		-
-			rawMessage: 'Call to an undefined method BulkImport\Contracts\ArchiveExtractorInterface::method().'
-			identifier: method.notFound
-			count: 2
-			path: tests/UpdateAllTheThings/JsbSourceResolverTest.php
-
-		-
-			rawMessage: 'Call to an undefined method BulkImport\Contracts\BackupArchiveLocatorInterface::method().'
-			identifier: method.notFound
-			count: 5
-			path: tests/UpdateAllTheThings/JsbSourceResolverTest.php
 
 		-
 			rawMessage: 'Dynamic call to static method PHPUnit\Framework\TestCase::createStub().'
@@ -6327,24 +5427,6 @@ parameters:
 			path: tests/UpdateAllTheThings/Steps/AutoSeedOlympicsTeamInfoStepTest.php
 
 		-
-			rawMessage: 'Call to an undefined method JsbParser\Contracts\JsbImportRepositoryInterface::method().'
-			identifier: method.notFound
-			count: 8
-			path: tests/UpdateAllTheThings/Steps/EndOfSeasonImportStepTest.php
-
-		-
-			rawMessage: 'Call to an undefined method JsbParser\JsbImportService::method().'
-			identifier: method.notFound
-			count: 5
-			path: tests/UpdateAllTheThings/Steps/EndOfSeasonImportStepTest.php
-
-		-
-			rawMessage: 'Call to an undefined method Updater\Contracts\JsbSourceResolverInterface::method().'
-			identifier: method.notFound
-			count: 6
-			path: tests/UpdateAllTheThings/Steps/EndOfSeasonImportStepTest.php
-
-		-
 			rawMessage: 'Call to method PHPUnit\Framework\Assert::assertInstanceOf() with ''Updater\\Contracts\\PipelineStepInterface'' and Updater\Steps\EndOfSeasonImportStep will always evaluate to true.'
 			identifier: method.alreadyNarrowedType
 			count: 1
@@ -6369,12 +5451,6 @@ parameters:
 			path: tests/UpdateAllTheThings/Steps/ExtendDepthChartsStepTest.php
 
 		-
-			rawMessage: 'Call to an undefined method BulkImport\Contracts\BackupArchiveLocatorInterface::method().'
-			identifier: method.notFound
-			count: 6
-			path: tests/UpdateAllTheThings/Steps/ExtractFromBackupStepTest.php
-
-		-
 			rawMessage: 'Call to method PHPUnit\Framework\Assert::assertInstanceOf() with ''Updater\\Contracts\\PipelineStepInterface'' and Updater\Steps\ExtractFromBackupStep will always evaluate to true.'
 			identifier: method.alreadyNarrowedType
 			count: 1
@@ -6393,30 +5469,6 @@ parameters:
 			path: tests/UpdateAllTheThings/Steps/GenerateSeasonAwardsStepTest.php
 
 		-
-			rawMessage: 'Call to an undefined method LeagueConfig\LeagueConfigRepository::method().'
-			identifier: method.notFound
-			count: 7
-			path: tests/UpdateAllTheThings/Steps/ImportLeagueConfigStepTest.php
-
-		-
-			rawMessage: 'Call to an undefined method LeagueConfig\LeagueConfigService::method().'
-			identifier: method.notFound
-			count: 5
-			path: tests/UpdateAllTheThings/Steps/ImportLeagueConfigStepTest.php
-
-		-
-			rawMessage: 'Call to an undefined method LeagueConfig\LeagueConfigView::method().'
-			identifier: method.notFound
-			count: 6
-			path: tests/UpdateAllTheThings/Steps/ImportLeagueConfigStepTest.php
-
-		-
-			rawMessage: 'Call to an undefined method Updater\Contracts\JsbSourceResolverInterface::method().'
-			identifier: method.notFound
-			count: 6
-			path: tests/UpdateAllTheThings/Steps/ImportLeagueConfigStepTest.php
-
-		-
 			rawMessage: 'Call to method PHPUnit\Framework\Assert::assertInstanceOf() with ''Updater\\Contracts\\PipelineStepInterface'' and Updater\Steps\ImportLeagueConfigStep will always evaluate to true.'
 			identifier: method.alreadyNarrowedType
 			count: 1
@@ -6427,18 +5479,6 @@ parameters:
 			identifier: staticMethod.dynamicCall
 			count: 4
 			path: tests/UpdateAllTheThings/Steps/ImportLeagueConfigStepTest.php
-
-		-
-			rawMessage: 'Call to an undefined method JsbParser\JsbImportService::method().'
-			identifier: method.notFound
-			count: 2
-			path: tests/UpdateAllTheThings/Steps/ParseJsbFilesStepTest.php
-
-		-
-			rawMessage: 'Call to an undefined method Updater\Contracts\JsbSourceResolverInterface::method().'
-			identifier: method.notFound
-			count: 4
-			path: tests/UpdateAllTheThings/Steps/ParseJsbFilesStepTest.php
 
 		-
 			rawMessage: 'Call to method PHPUnit\Framework\Assert::assertInstanceOf() with ''Updater\\Contracts\\PipelineStepInterface'' and Updater\Steps\ParseJsbFilesStep will always evaluate to true.'
@@ -6453,12 +5493,6 @@ parameters:
 			path: tests/UpdateAllTheThings/Steps/ParseJsbFilesStepTest.php
 
 		-
-			rawMessage: 'Call to an undefined method Updater\Contracts\JsbSourceResolverInterface::method().'
-			identifier: method.notFound
-			count: 2
-			path: tests/UpdateAllTheThings/Steps/ParsePlayerFileStepTest.php
-
-		-
 			rawMessage: 'Call to method PHPUnit\Framework\Assert::assertInstanceOf() with ''Updater\\Contracts\\PipelineStepInterface'' and Updater\Steps\ParsePlayerFileStep will always evaluate to true.'
 			identifier: method.alreadyNarrowedType
 			count: 1
@@ -6471,30 +5505,6 @@ parameters:
 			path: tests/UpdateAllTheThings/Steps/ParsePlayerFileStepTest.php
 
 		-
-			rawMessage: 'Call to an undefined method Boxscore\BoxscoreProcessor::method().'
-			identifier: method.notFound
-			count: 2
-			path: tests/UpdateAllTheThings/Steps/ProcessAllStarGamesStepTest.php
-
-		-
-			rawMessage: 'Call to an undefined method Boxscore\BoxscoreRepository::method().'
-			identifier: method.notFound
-			count: 3
-			path: tests/UpdateAllTheThings/Steps/ProcessAllStarGamesStepTest.php
-
-		-
-			rawMessage: 'Call to an undefined method Boxscore\BoxscoreView::method().'
-			identifier: method.notFound
-			count: 3
-			path: tests/UpdateAllTheThings/Steps/ProcessAllStarGamesStepTest.php
-
-		-
-			rawMessage: 'Call to an undefined method Updater\Contracts\JsbSourceResolverInterface::method().'
-			identifier: method.notFound
-			count: 3
-			path: tests/UpdateAllTheThings/Steps/ProcessAllStarGamesStepTest.php
-
-		-
 			rawMessage: 'Call to method PHPUnit\Framework\Assert::assertInstanceOf() with ''Updater\\Contracts\\PipelineStepInterface'' and Updater\Steps\ProcessAllStarGamesStep will always evaluate to true.'
 			identifier: method.alreadyNarrowedType
 			count: 1
@@ -6505,24 +5515,6 @@ parameters:
 			identifier: staticMethod.dynamicCall
 			count: 4
 			path: tests/UpdateAllTheThings/Steps/ProcessAllStarGamesStepTest.php
-
-		-
-			rawMessage: 'Call to an undefined method Boxscore\BoxscoreProcessor::method().'
-			identifier: method.notFound
-			count: 1
-			path: tests/UpdateAllTheThings/Steps/ProcessBoxscoresStepTest.php
-
-		-
-			rawMessage: 'Call to an undefined method Boxscore\BoxscoreView::method().'
-			identifier: method.notFound
-			count: 1
-			path: tests/UpdateAllTheThings/Steps/ProcessBoxscoresStepTest.php
-
-		-
-			rawMessage: 'Call to an undefined method Updater\Contracts\JsbSourceResolverInterface::method().'
-			identifier: method.notFound
-			count: 2
-			path: tests/UpdateAllTheThings/Steps/ProcessBoxscoresStepTest.php
 
 		-
 			rawMessage: 'Call to method PHPUnit\Framework\Assert::assertInstanceOf() with ''Updater\\Contracts\\PipelineStepInterface'' and Updater\Steps\ProcessBoxscoresStep will always evaluate to true.'
@@ -6577,24 +5569,6 @@ parameters:
 			identifier: method.alreadyNarrowedType
 			count: 1
 			path: tests/UpdateAllTheThings/Steps/ResetExtensionAttemptsStepTest.php
-
-		-
-			rawMessage: 'Call to an undefined method JsbParser\Contracts\JsbImportRepositoryInterface::method().'
-			identifier: method.notFound
-			count: 3
-			path: tests/UpdateAllTheThings/Steps/SnapshotPlrStepTest.php
-
-		-
-			rawMessage: 'Call to an undefined method PlrParser\Contracts\PlrParserServiceInterface::method().'
-			identifier: method.notFound
-			count: 1
-			path: tests/UpdateAllTheThings/Steps/SnapshotPlrStepTest.php
-
-		-
-			rawMessage: 'Call to an undefined method Updater\Contracts\JsbSourceResolverInterface::method().'
-			identifier: method.notFound
-			count: 4
-			path: tests/UpdateAllTheThings/Steps/SnapshotPlrStepTest.php
 
 		-
 			rawMessage: 'Call to method PHPUnit\Framework\Assert::assertInstanceOf() with ''Updater\\Contracts\\PipelineStepInterface'' and Updater\Steps\SnapshotPlrStep will always evaluate to true.'
@@ -6765,12 +5739,6 @@ parameters:
 			path: tests/Voting/VotingSubmissionViewTest.php
 
 		-
-			rawMessage: 'Property Tests\VotingResults\StubVotingResultsRenderer::$lastRenderedTables (array<int, array{title: string, rows: array<int, array{name: string, votes: int}>}>) does not accept list<array{title: string, rows: list<array{name: string, votes: int, pid: int}>}>.'
-			identifier: assign.propertyType
-			count: 1
-			path: tests/VotingResults/VotingResultsControllerTest.php
-
-		-
 			rawMessage: Property Tests\VotingResults\StubVotingResultsService::$allStarResponse type has no value type specified in iterable type array.
 			identifier: missingType.iterableValue
 			count: 1
@@ -6787,12 +5755,6 @@ parameters:
 			identifier: staticMethod.dynamicCall
 			count: 4
 			path: tests/VotingResults/VotingResultsServiceTest.php
-
-		-
-			rawMessage: 'Parameter #1 $tables of method Voting\VotingResultsView::renderTables() expects list<array{title: string, rows: list<array{name: string, votes: int, pid: int}>}>, array{array{title: ''Test & Title'', rows: array{array{name: ''Alice <One>'', votes: 10}, array{name: ''Bob "Two"'', votes: 5}}}} given.'
-			identifier: argument.type
-			count: 1
-			path: tests/VotingResults/VotingResultsViewTest.php
 
 		-
 			rawMessage: 'Call to method PHPUnit\Framework\Assert::assertInstanceOf() with ''Waivers\\Contracts\\WaiversControllerInterface'' and Waivers\WaiversController will always evaluate to true.'
@@ -7003,30 +5965,6 @@ parameters:
 			identifier: phpunit.assertEquals
 			count: 27
 			path: tests/Waivers/WaiversProcessorTest.php
-
-		-
-			rawMessage: 'Call to an undefined method Repositories\Contracts\PlayerLookupRepositoryInterface::method().'
-			identifier: method.notFound
-			count: 8
-			path: tests/Waivers/WaiversProcessorWriteTest.php
-
-		-
-			rawMessage: 'Call to an undefined method Repositories\Contracts\TeamIdentityRepositoryInterface::method().'
-			identifier: method.notFound
-			count: 3
-			path: tests/Waivers/WaiversProcessorWriteTest.php
-
-		-
-			rawMessage: 'Call to an undefined method Waivers\Contracts\WaiversRepositoryInterface::method().'
-			identifier: method.notFound
-			count: 4
-			path: tests/Waivers/WaiversProcessorWriteTest.php
-
-		-
-			rawMessage: 'Call to an undefined method Waivers\Contracts\WaiversValidatorInterface::method().'
-			identifier: method.notFound
-			count: 12
-			path: tests/Waivers/WaiversProcessorWriteTest.php
 
 		-
 			rawMessage: 'Dynamic call to static method PHPUnit\Framework\TestCase::createStub().'
@@ -7241,30 +6179,6 @@ parameters:
 		-
 			rawMessage: 'Method Tests\WideUnit\DepthChartEntry\DepthChartEntryWideUnitTest::createValidRegularSeasonPostData() return type has no value type specified in iterable type array.'
 			identifier: missingType.iterableValue
-			count: 1
-			path: tests/WideUnit/DepthChartEntry/DepthChartEntryWideUnitTest.php
-
-		-
-			rawMessage: 'Offset int<0, 11> on array{array{pg: 1, sg: 0, sf: 0, pf: 0, c: 0}, array{pg: 2, sg: 0, sf: 0, pf: 0, c: 0}, array{pg: 0, sg: 1, sf: 0, pf: 0, c: 0}, array{pg: 0, sg: 2, sf: 0, pf: 0, c: 0}, array{pg: 0, sg: 0, sf: 1, pf: 0, c: 0}, array{pg: 0, sg: 0, sf: 2, pf: 0, c: 0}, array{pg: 0, sg: 0, sf: 0, pf: 1, c: 0}, array{pg: 0, sg: 0, sf: 0, pf: 2, c: 0}, ...} on left side of ?? always exists and is not nullable.'
-			identifier: nullCoalesce.offset
-			count: 1
-			path: tests/WideUnit/DepthChartEntry/DepthChartEntryWideUnitTest.php
-
-		-
-			rawMessage: 'Parameter #2 $depthChartValues of method DepthChartEntry\DepthChartEntryRepository::updatePlayerDepthChart() expects array{pg: int, sg: int, sf: int, pf: int, c: int, canPlayInGame: int, min: int, of: int, ..., ...<string, mixed>}, array{name: ''Player 1'', pg: 1, sg: 0, sf: 0, pf: 0, c: 0, canPlayInGame: 1, min: 30}|array{name: ''Player 2'', pg: 0, sg: 1, sf: 0, pf: 0, c: 0, canPlayInGame: 1, min: 28}|array{name: ''Player 3'', pg: 0, sg: 0, sf: 1, pf: 0, c: 0, canPlayInGame: 1, min: 32} given.'
-			identifier: argument.type
-			count: 1
-			path: tests/WideUnit/DepthChartEntry/DepthChartEntryWideUnitTest.php
-
-		-
-			rawMessage: 'Parameter #2 $depthChartValues of method DepthChartEntry\DepthChartEntryRepository::updatePlayerDepthChart() expects array{pg: int, sg: int, sf: int, pf: int, c: int, canPlayInGame: int, min: int, of: int, ..., ...<string, mixed>}, array{pg: 0, sg: 0, sf: 0, pf: 0, c: 0, canPlayInGame: 1, min: 0} given.'
-			identifier: argument.type
-			count: 1
-			path: tests/WideUnit/DepthChartEntry/DepthChartEntryWideUnitTest.php
-
-		-
-			rawMessage: 'Parameter #2 $depthChartValues of method DepthChartEntry\DepthChartEntryRepository::updatePlayerDepthChart() expects array{pg: int, sg: int, sf: int, pf: int, c: int, canPlayInGame: int, min: int, of: int, ..., ...<string, mixed>}, array{pg: 1, sg: 2, sf: 3, pf: 4, c: 5, canPlayInGame: 1, min: 35} given.'
-			identifier: argument.type
 			count: 1
 			path: tests/WideUnit/DepthChartEntry/DepthChartEntryWideUnitTest.php
 
@@ -7545,18 +6459,6 @@ parameters:
 			path: tests/WideUnit/Mocks/MockPreparedStatement.php
 
 		-
-			rawMessage: 'Method Tests\WideUnit\Mocks\Season::getLastSimDatesArray() is unused.'
-			identifier: method.unused
-			count: 1
-			path: tests/WideUnit/Mocks/Season.php
-
-		-
-			rawMessage: 'Method Tests\WideUnit\Mocks\Season::getLastSimDatesArray() return type has no value type specified in iterable type array.'
-			identifier: missingType.iterableValue
-			count: 1
-			path: tests/WideUnit/Mocks/Season.php
-
-		-
 			rawMessage: 'Array has 2 duplicate keys with value ''intangibles'' (''intangibles'', ''intangibles'').'
 			identifier: array.duplicateKey
 			count: 1
@@ -7641,12 +6543,6 @@ parameters:
 			path: tests/WideUnit/Negotiation/NegotiationWideUnitTest.php
 
 		-
-			rawMessage: Expression on left side of ?? is not nullable.
-			identifier: nullCoalesce.expr
-			count: 2
-			path: tests/WideUnit/RookieOption/RookieOptionWideUnitTest.php
-
-		-
 			rawMessage: 'You should use assertSame() instead of assertEquals(), because both values are scalars of the same type'
 			identifier: phpunit.assertEquals
 			count: 5
@@ -7716,48 +6612,6 @@ parameters:
 			rawMessage: 'Call to method PHPUnit\Framework\Assert::assertTrue() with true will always evaluate to true.'
 			identifier: method.alreadyNarrowedType
 			count: 7
-			path: tests/WideUnit/Voting/VotingWideUnitTest.php
-
-		-
-			rawMessage: 'Parameter #1 $tables of method Voting\VotingResultsView::renderTables() expects list<array{title: string, rows: list<array{name: string, votes: int, pid: int}>}>, array{array{title: ''Category'', rows: array{array{name: ''Player'', votes: 1}}}} given.'
-			identifier: argument.type
-			count: 1
-			path: tests/WideUnit/Voting/VotingWideUnitTest.php
-
-		-
-			rawMessage: 'Parameter #1 $tables of method Voting\VotingResultsView::renderTables() expects list<array{title: string, rows: list<array{name: string, votes: int, pid: int}>}>, array{array{title: ''MVP Voting'', rows: array{array{name: ''Star Player'', votes: 25}, array{name: ''Runner Up'', votes: 18}}}} given.'
-			identifier: argument.type
-			count: 1
-			path: tests/WideUnit/Voting/VotingWideUnitTest.php
-
-		-
-			rawMessage: 'Parameter #1 $tables of method Voting\VotingResultsView::renderTables() expects list<array{title: string, rows: list<array{name: string, votes: int, pid: int}>}>, array{array{title: ''Styled Table'', rows: array{array{name: ''Row 1'', votes: 1}, array{name: ''Row 2'', votes: 2}, array{name: ''Row 3'', votes: 3}}}} given.'
-			identifier: argument.type
-			count: 1
-			path: tests/WideUnit/Voting/VotingWideUnitTest.php
-
-		-
-			rawMessage: 'Parameter #1 $tables of method Voting\VotingResultsView::renderTables() expects list<array{title: string, rows: list<array{name: string, votes: int, pid: int}>}>, array{array{title: ''Test Category'', rows: array{array{name: ''Player One'', votes: 10}}}} given.'
-			identifier: argument.type
-			count: 1
-			path: tests/WideUnit/Voting/VotingWideUnitTest.php
-
-		-
-			rawMessage: 'Parameter #1 $tables of method Voting\VotingResultsView::renderTables() expects list<array{title: string, rows: list<array{name: string, votes: int, pid: int}>}>, array{array{title: ''Test'', rows: array{array{name: ''<script>alert("xss"…'', votes: 1}}}} given.'
-			identifier: argument.type
-			count: 1
-			path: tests/WideUnit/Voting/VotingWideUnitTest.php
-
-		-
-			rawMessage: 'Parameter #1 $tables of method Voting\VotingResultsView::renderTables() expects list<array{title: string, rows: list<array{name: string, votes: int, pid: int}>}>, array{array{title: ''Test'', rows: array{array{name: ''Player "The Great"…'', votes: 5}}}} given.'
-			identifier: argument.type
-			count: 1
-			path: tests/WideUnit/Voting/VotingWideUnitTest.php
-
-		-
-			rawMessage: 'Parameter #1 $tables of method Voting\VotingResultsView::renderTables() expects list<array{title: string, rows: list<array{name: string, votes: int, pid: int}>}>, array{array{title: ''Test'', rows: array{array{name: ''Player'', votes: 1}}}} given.'
-			identifier: argument.type
-			count: 1
 			path: tests/WideUnit/Voting/VotingWideUnitTest.php
 
 		-

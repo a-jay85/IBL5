@@ -106,7 +106,7 @@ final class StubVotingResultsService extends VotingResultsService
 
 final class StubVotingResultsRenderer extends VotingResultsView
 {
-    /** @var array<int, array{title: string, rows: array<int, array{name: string, votes: int}>}> */
+    /** @var array<array-key, mixed> Captures whatever renderTables() receives. */
     public array $lastRenderedTables = [];
 
     public function renderTables(array $tables): string

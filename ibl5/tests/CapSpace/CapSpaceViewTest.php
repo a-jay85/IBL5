@@ -55,7 +55,7 @@ class CapSpaceViewTest extends TestCase
     {
         $beginningYear = 2024;
         $endingYear = 2025;
-        $result = $this->view->render([], $beginningYear, $endingYear, null);
+        $result = $this->view->render([], $beginningYear, $endingYear);
 
         $this->assertStringContainsString((string) $endingYear, $result);
         $this->assertStringContainsString((string) ($endingYear + 1), $result);

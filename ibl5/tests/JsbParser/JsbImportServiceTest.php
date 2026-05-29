@@ -716,20 +716,22 @@ class JsbImportServiceTest extends TestCase
     public function testProcessFileReturnsErrorWhenFileNotFound(string $method, string $expectedMessage): void
     {
         $service = $this->makeService();
-        $args = ['/nonexistent'];
+        $path = '/nonexistent';
 
-        // Methods with extra required parameters
-        match ($method) {
-            'processCarFile' => $args[] = null,
-            'processAswFile' => $args[] = 2006,
-            'processRcbFile' => array_push($args, 2006, null),
-            'processPlbFile' => array_push($args, \PlrParser\PlrOrdinalMap::empty(), 2006, 1, 'test'),
-            'processRetFile' => $args[] = 2006,
-            default => null,
+        // Explicit dispatch per method (avoids a dynamic $service->$method() call,
+        // which also lets PHPStan type-check each call's arguments).
+        $result = match ($method) {
+            'processCarFile' => $service->processCarFile($path, null),
+            'processTrnFile' => $service->processTrnFile($path),
+            'processHisFile' => $service->processHisFile($path),
+            'processAswFile' => $service->processAswFile($path, 2006),
+            'processRcbFile' => $service->processRcbFile($path, 2006, null),
+            'processPlbFile' => $service->processPlbFile($path, \PlrParser\PlrOrdinalMap::empty(), 2006, 1, 'test'),
+            'processDraFile' => $service->processDraFile($path),
+            'processRetFile' => $service->processRetFile($path, 2006),
+            'processHofFile' => $service->processHofFile($path),
+            default => throw new \LogicException("Unhandled method: {$method}"),
         };
-
-        /** @var \JsbParser\JsbImportResult $result */
-        $result = $service->$method(...$args);
         $this->assertSame(1, $result->errors);
         $this->assertSame('ERROR: ' . $expectedMessage, $result->messages[0]);
     }

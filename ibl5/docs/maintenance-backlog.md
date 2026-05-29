@@ -1,6 +1,6 @@
 ---
 description: Long-running backlog of maintenance-cost reduction opportunities, organized by axis. Each item is a candidate for a future plan.
-last_verified: 2026-05-20
+last_verified: 2026-05-28
 ---
 
 # Maintenance-Cost Reduction Backlog
@@ -451,7 +451,7 @@ Effort scale:
 
 ### 3.1 Hardcoded Production DB Credentials in `config.php`
 **Location:** `ibl5/config.php:61-63`
-**Problem:** `$dbpass = "whereWTFhappens19!"` in a file not in `.gitignore`. Any accidental `git add .` would leak credentials.
+**Problem:** `$dbpass = "<REDACTED — credential rotated 2026-05; see ADR-0034>"` in a file not in `.gitignore`. Any accidental `git add .` would leak credentials.
 **Suggested direction:** Add `config.php` and `configOlympics.php` to `ibl5/.gitignore`; move secrets to env vars.
 **Est. effort:** S
 **Risk if untouched:** Credential leak via accidental staging; CI exposure if a workflow runs `git add -A`.
@@ -462,6 +462,7 @@ Effort scale:
 **Suggested direction:** Random 32-char secret via env var.
 **Est. effort:** S
 **Risk if untouched:** Public URL grants authenticated read-only "Warriors GM" session.
+**Status (2026-05):** Hardened — `demo-login.php` now fails closed via `Auth\DemoLoginGate`. The weak `'demo'` literal and any empty token are rejected with HTTP 403 regardless of a stale `config.php`; demo login is disabled unless a non-weak token is configured via the `DEMO_LOGIN_TOKEN` env var. See ADR-0034.
 
 ### 3.3 `config.php` display_errors Logic Always Disables Errors
 **Location:** `ibl5/config.php:10`

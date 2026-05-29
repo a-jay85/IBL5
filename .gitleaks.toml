@@ -1,0 +1,57 @@
+# gitleaks configuration for IBL5.
+#
+# Extends the default ruleset and adds a narrow allowlist for unavoidable false
+# positives. Every entry is a value or path that is provably NOT a live secret:
+# a rotated-and-scrubbed credential, a synthetic test fixture, a documentation
+# placeholder, a public-by-design key, or a deleted legacy/vendor subtree that
+# survives only in git history (history rewrite is out of scope — see ADR-0034).
+
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Rotated/scrubbed credential, synthetic fixtures, placeholders, deleted-legacy history"
+
+# --- Value/line allowlist ---------------------------------------------------
+# Matched against the whole line so both git-history scans (CI full checkout)
+# and --no-git working-tree scans are covered.
+regexTarget = "line"
+regexes = [
+  # Production DB password — rotated 2026-05 and scrubbed from HEAD (ADR-0034).
+  # Survives in git history; rotation is the remediation, so the dead literal
+  # across old commits is noise.
+  '''whereWTFhappens19''',
+
+  # Synthetic API keys used only in PHPUnit fixtures (never real credentials):
+  # tests/Api/Middleware/ApiKeyAuthenticatorTest.php, tests/ApiKeys/*,
+  # tests/Logging/PiiRedactionProcessorTest.php.
+  '''ibl_(test|headerkey|abcdef|abc12345)''',
+
+  # Sequential placeholder Discord snowflake IDs in test fixtures
+  # (tests/Discord/*, tests/Team/TeamViewTest.php).
+  '''123456789012345678''',
+  '''999888777666555444''',
+
+  # Literal documentation placeholder in API guides (.archive/, removed docs).
+  '''your-api-key''',
+]
+
+# --- Path allowlist ---------------------------------------------------------
+# Paths that exist only in history (deleted trees) or hold public-by-design /
+# vendored content. Allowlisting these never blinds scanning of live code: the
+# deleted paths have no HEAD content, and the live ones below are non-secret.
+paths = [
+  # Deleted legacy / vendored subtrees — present only in old commits.
+  '''^wordpress/''',
+  '''^phpmyadmin/''',
+  '''^2003olympics/''',
+  '''^ibl5/ibl-laravel/vendor/''',
+
+  # Archived API documentation — contains placeholder tokens, not secrets.
+  '''^\.archive/''',
+
+  # Firebase WEB app config. Firebase web API keys are public by design (shipped
+  # in client JS; access is gated by Firebase security rules, not key secrecy).
+  # See https://firebase.google.com/docs/projects/api-keys
+  '''^IBL6/src/lib/firebase/''',
+]

@@ -90,6 +90,18 @@ class MockDatabase extends \mysqli
      */
     public function query(string $query, int $resultMode = MYSQLI_STORE_RESULT): bool
     {
+        // Transaction-introspection/control statements are connection machinery,
+        // not SQL the SUT meaningfully issued, so they stay OUT of the recorded
+        // query log (mirroring how begin_transaction()/commit()/rollback() record
+        // only into operationLog). BaseMysqliRepository::isInTransaction() probes
+        // with "SELECT @@in_transaction": returning a non-result bool makes it
+        // correctly treat the mock as not-in-transaction, and skipping the record
+        // keeps getExecutedQueries() limited to the repository's real statements.
+        if (stripos($query, '@@in_transaction') !== false
+            || stripos($query, 'ROLLBACK TO SAVEPOINT') === 0) {
+            return false;
+        }
+
         $result = $this->sql_query($query);
         return !($result instanceof MockDatabaseResult) && (bool) $result;
     }

@@ -8,6 +8,20 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 IBL5_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 
+# Worktree-footgun guard: this is the MAIN-checkout runner — it seeds ibl5_e2e_test,
+# injects the .e2e-active guard into the symlink-resolved MAIN config.php, and runs
+# Playwright against http://main.localhost/ibl5/ (the dev/main stack). A worktree copy
+# physically lives at .../worktrees/<slug>/ibl5, so $IBL5_DIR (the script's own resolved
+# path) is the deterministic, cwd-independent detection key. Fire before any DB/config
+# side effect. (CONFIG_DIR is readlink-resolved back to main, so it can't be used here.)
+if [[ "$IBL5_DIR" == */worktrees/* ]]; then
+    echo "ERROR: e2e-local.sh is the MAIN-checkout E2E runner and serves http://main.localhost/ibl5/." >&2
+    echo "       You are inside a worktree — it would seed ibl5_e2e_test but Playwright would hit the MAIN stack, not this worktree's <slug>.localhost DB." >&2
+    echo "       Use the worktree-correct path instead:" >&2
+    echo "         bin/wt-up <slug> --seed && bin/e2e-wt.sh <slug>" >&2
+    exit 1
+fi
+
 # Resolve config.php's real directory (follows symlinks to main repo)
 CONFIG_DIR="$(cd "$(dirname "$(readlink "$IBL5_DIR/config.php" || echo "$IBL5_DIR/config.php")")" && pwd)"
 

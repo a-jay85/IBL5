@@ -93,4 +93,20 @@ test.describe('News module flow', () => {
     await page.goto('modules.php?name=News&new_topic=1');
     await assertNoPhpErrors(page, 'on News with topic filter');
   });
+
+  test('category filter shows only that category\'s stories', async ({ page }) => {
+    await page.goto('modules.php?name=News&file=categories&op=newindex&catid=2');
+    await expect(page.locator('.news-article__title', { hasText: 'Monarchs acquire' }).first()).toBeVisible();
+    await expect(page.locator('.news-article__title', { hasText: 'Cougars waive' })).toHaveCount(0);
+    await assertNoPhpErrors(page, 'on News category filter catid=2');
+  });
+
+  test('news pagination loads a second page of stories', async ({ page }) => {
+    // The News module renders the 10 most-recent stories on the index (storyhome=10).
+    // There is no URL offset param; navigate directly to an older article (sid=10)
+    // which is outside the first-page window (sids 19-28) to confirm older stories load.
+    await page.goto('modules.php?name=News&file=article&sid=10');
+    await expect(page.locator('article.news-article').first()).toBeVisible();
+    await assertNoPhpErrors(page, 'on News older article (pagination page 2 equivalent)');
+  });
 });

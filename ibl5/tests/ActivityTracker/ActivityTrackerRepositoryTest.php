@@ -8,44 +8,19 @@ use ActivityTracker\ActivityTrackerRepository;
 use ActivityTracker\Contracts\ActivityTrackerRepositoryInterface;
 use PHPUnit\Framework\TestCase;
 use Tests\WideUnit\Mocks\MockDatabase;
-use Tests\WideUnit\Mocks\MockPreparedStatement;
 
 class ActivityTrackerRepositoryTest extends TestCase
 {
     private MockDatabase $mockDb;
-    private object $mockMysqliDb;
 
     protected function setUp(): void
     {
         $this->mockDb = new MockDatabase();
-        $this->setupMockMysqliDb();
-    }
-
-    private function setupMockMysqliDb(): void
-    {
-        $mockDb = $this->mockDb;
-
-        $this->mockMysqliDb = new class($mockDb) extends \mysqli {
-            private MockDatabase $mockDb;
-            public int $connect_errno = 0;
-            public ?string $connect_error = null;
-
-            public function __construct(MockDatabase $mockDb)
-            {
-                $this->mockDb = $mockDb;
-            }
-
-            #[\ReturnTypeWillChange]
-            public function prepare(string $query): MockPreparedStatement|false
-            {
-                return new MockPreparedStatement($this->mockDb, $query);
-            }
-        };
     }
 
     public function testImplementsInterface(): void
     {
-        $repository = new ActivityTrackerRepository($this->mockMysqliDb);
+        $repository = new ActivityTrackerRepository($this->mockDb);
 
         $this->assertInstanceOf(ActivityTrackerRepositoryInterface::class, $repository);
     }
@@ -53,7 +28,7 @@ class ActivityTrackerRepositoryTest extends TestCase
     public function testGetTeamActivityReturnsEmptyArrayWhenNoTeams(): void
     {
         $this->mockDb->setMockData([]);
-        $repository = new ActivityTrackerRepository($this->mockMysqliDb);
+        $repository = new ActivityTrackerRepository($this->mockDb);
 
         $result = $repository->getTeamActivity();
 
@@ -75,7 +50,7 @@ class ActivityTrackerRepositoryTest extends TestCase
                 'eoy_vote' => 'No',
             ],
         ]);
-        $repository = new ActivityTrackerRepository($this->mockMysqliDb);
+        $repository = new ActivityTrackerRepository($this->mockDb);
 
         $result = $repository->getTeamActivity();
 

@@ -3,122 +3,78 @@
  * element on its URL. If a module fails to render its primary content, this
  * test surfaces the broken anchor before the VR screenshot diff can silently
  * pass with a blank baseline.
+ *
+ * Rows are sourced from VR_MANIFEST (the single source of truth) so this
+ * discriminator and the screenshot spec (visual-regression.spec.ts) cannot
+ * drift apart. Each manifest row produces exactly one anchor check here — the
+ * discriminator does not expand by viewport/state/tab (that is the screenshot
+ * spec's concern); for multi-state rows it uses the first (canonical/default)
+ * state.
  */
+import type { Page } from '@playwright/test';
 import { test as publicTest } from '../fixtures/public';
 import { test as authTest } from '../fixtures/auth';
+import { test as authRegularTest } from '../fixtures/auth-regular';
 import { expect } from '../fixtures/base';
 import { assertNoPhpErrors } from '../helpers/php-errors';
+import { VR_MANIFEST, type AuthMode, type VrRow } from '../vr-manifest';
 
-type AnchorRow = {
-  name: string;
-  url: string;
-  anchor: string;
-  state?: Record<string, string>;
-  skipContentCheck?: boolean; // CI seed renders empty — anchor visibility is the strongest available check
-  timeout?: number;
-};
+type AppStateFn = (state: Record<string, string>) => Promise<void>;
 
-const PUBLIC_ANCHORS: AnchorRow[] = [
-  { name: 'index', url: 'index.php', anchor: 'article' },
-  { name: 'activity-tracker', url: 'modules.php?name=ActivityTracker', anchor: '.ibl-data-table' },
-  { name: 'all-star-appearances', url: 'modules.php?name=AllStarAppearances', anchor: '.ibl-data-table' },
-  { name: 'award-history', url: 'modules.php?name=AwardHistory', anchor: '.ibl-data-table', skipContentCheck: true },
-  { name: 'career-leaderboards', url: 'modules.php?name=CareerLeaderboards', anchor: 'form[name="CareerLeaderboards"]' },
-  { name: 'compare-players', url: 'modules.php?name=ComparePlayers', anchor: 'form[action*="ComparePlayers"]' },
-  { name: 'contract-list', url: 'modules.php?name=ContractList', anchor: '.totals-row' },
-  { name: 'draft-history', url: 'modules.php?name=DraftHistory', anchor: '.ibl-data-table' },
-  { name: 'draft-pick-locator', url: 'modules.php?name=DraftPickLocator', anchor: '.draft-pick-locator-container' },
-  { name: 'franchise-history', url: 'modules.php?name=FranchiseHistory&teamid=1', anchor: '.ibl-data-table' },
-  { name: 'franchise-record-book', url: 'modules.php?name=FranchiseRecordBook&teamid=1', anchor: '.ibl-data-table' },
-  { name: 'free-agency-preview', url: 'modules.php?name=FreeAgencyPreview', anchor: 'th.fa-preview-pos-col' },
-  { name: 'gm-contact-list', url: 'modules.php?name=GMContactList', anchor: '.ibl-data-table' },
-  { name: 'injuries', url: 'modules.php?name=Injuries', anchor: '.ibl-data-table' },
-  { name: 'league-starters', url: 'modules.php?name=LeagueStarters', anchor: '#league-starters-tables' },
-  { name: 'news', url: 'modules.php?name=News', anchor: 'article' },
-  { name: 'player', url: 'modules.php?name=Player&pa=showpage&pid=1', anchor: '.stats-grid' },
-  { name: 'player-database', url: 'modules.php?name=PlayerDatabase', anchor: 'form[action*="PlayerDatabase"]' },
-  { name: 'player-movement', url: 'modules.php?name=PlayerMovement', anchor: '.ibl-data-table' },
-  { name: 'projected-draft-order', url: 'modules.php?name=ProjectedDraftOrder', anchor: '.ibl-data-table' },
-  { name: 'record-holders', url: 'modules.php?name=RecordHolders', anchor: '.record-section' },
-  { name: 'schedule', url: 'modules.php?name=Schedule', anchor: '.schedule-header' },
-  { name: 'search', url: 'modules.php?name=Search', anchor: '.search-page' },
-  { name: 'season-archive', url: 'modules.php?name=SeasonArchive', anchor: '.ibl-data-table' },
-  { name: 'season-highs', url: 'modules.php?name=SeasonHighs', anchor: '.ibl-data-table', timeout: 15_000 },
-  { name: 'season-leaderboards', url: 'modules.php?name=SeasonLeaderboards', anchor: '.ibl-data-table' },
-  { name: 'series-records', url: 'modules.php?name=SeriesRecords', anchor: '.ibl-data-table' },
-  { name: 'standings', url: 'modules.php?name=Standings', anchor: '.ibl-data-table' },
-  { name: 'team', url: 'modules.php?name=Team&op=team&teamid=1', anchor: '.team-page-layout' },
-  { name: 'team-off-def-stats', url: 'modules.php?name=TeamOffDefStats', anchor: '.ibl-data-table' },
-  { name: 'topics', url: 'modules.php?name=Topics', anchor: '.topics-page' },
-  { name: 'transaction-history', url: 'modules.php?name=TransactionHistory', anchor: '.ibl-data-table' },
-  { name: 'voting-results', url: 'modules.php?name=VotingResults', anchor: 'table.voting-results-table' },
-  { name: 'your-account', url: 'modules.php?name=YourAccount', anchor: '.auth-page' },
-];
+function rowsByAuth(auth: AuthMode): VrRow[] {
+  return VR_MANIFEST.filter((row) => row.auth === auth);
+}
 
-const AUTH_ANCHORS: AnchorRow[] = [
-  { name: 'api-keys', url: 'modules.php?name=ApiKeys', anchor: 'form[action*="ApiKeys"]', skipContentCheck: true },
-  { name: 'cap-space', url: 'modules.php?name=CapSpace&teamid=1', anchor: '.ibl-data-table' },
-  { name: 'depth-chart-entry', url: 'modules.php?name=DepthChartEntry', anchor: 'form[name="DepthChartEntry"]' },
-  { name: 'draft', url: 'modules.php?name=Draft', anchor: '.draft-container',
-    state: { 'Show Draft Link': 'Yes' } },
-  { name: 'free-agency', url: 'modules.php?name=FreeAgency', anchor: '.fa-table',
-    state: { 'Current Season Phase': 'Free Agency' } },
-  { name: 'next-sim', url: 'modules.php?name=NextSim', anchor: '.next-sim-container' },
-  { name: 'one-on-one-game', url: 'modules.php?name=OneOnOneGame', anchor: 'form[name="OneOnOneGame"]' },
-  { name: 'player-export-guide', url: 'modules.php?name=PlayerExportGuide', anchor: '.ibl-code-block' },
-  { name: 'trading', url: 'modules.php?name=Trading', anchor: '.trading-team-select',
-    state: { 'Allow Trades': 'Yes' } },
-  { name: 'training-camp-ratings-diff', url: 'modules.php?name=TrainingCampRatingsDiff', anchor: '.ratings-diff-page' },
-  { name: 'voting', url: 'modules.php?name=Voting', anchor: '.voting-form-container' },
-  { name: 'waivers', url: 'modules.php?name=Waivers', anchor: '.waivers-page' },
-];
+async function checkAnchorRow(page: Page, appState: AppStateFn, row: VrRow): Promise<void> {
+  // Multi-state rows (player-movement, draft, free-agency, voting, waivers) use
+  // their first state — the canonical/default one — for the anchor check.
+  const state = row.states?.[0]?.appState ?? {};
+  if (Object.keys(state).length > 0) {
+    await appState(state);
+  }
+
+  await page.goto(row.url);
+  await assertNoPhpErrors(page, `on ${row.url}`);
+
+  const timeoutOpt = row.timeout ? { timeout: row.timeout } : undefined;
+  await expect(page.locator(row.anchor).first()).toBeVisible(timeoutOpt);
+
+  if (!row.skipContentCheck) {
+    const anchor = page.locator(row.anchor).first();
+    if (row.anchor === '.ibl-data-table' || row.anchor.startsWith('table.')) {
+      await expect(anchor.locator('tbody tr').first()).toBeVisible(timeoutOpt);
+    } else if (row.anchor.startsWith('form[')) {
+      await expect(
+        anchor.locator('input:not([type="hidden"]), select, textarea').first(),
+      ).toBeVisible(timeoutOpt);
+    }
+  }
+}
 
 publicTest.describe('VR anchor discrimination — public pages', () => {
   publicTest.beforeEach(async ({ appState }) => {
     await appState({ 'Trivia Mode': 'Off' });
   });
 
-  for (const row of PUBLIC_ANCHORS) {
+  for (const row of rowsByAuth('public')) {
     publicTest(`${row.name} anchor resolves`, async ({ appState, page }) => {
-      if (row.state) {
-        await appState(row.state);
-      }
-      await page.goto(row.url);
-      await assertNoPhpErrors(page, `on ${row.url}`);
-      const timeoutOpt = row.timeout ? { timeout: row.timeout } : undefined;
-      await expect(page.locator(row.anchor).first()).toBeVisible(timeoutOpt);
-
-      if (!row.skipContentCheck) {
-        const anchor = page.locator(row.anchor).first();
-        if (row.anchor === '.ibl-data-table' || row.anchor.startsWith('table.')) {
-          await expect(anchor.locator('tbody tr').first()).toBeVisible(timeoutOpt);
-        } else if (row.anchor.startsWith('form[')) {
-          await expect(anchor.locator('input:not([type="hidden"]), select, textarea').first()).toBeVisible(timeoutOpt);
-        }
-      }
+      await checkAnchorRow(page, appState, row);
     });
   }
 });
 
 authTest.describe('VR anchor discrimination — authenticated pages', () => {
-  for (const row of AUTH_ANCHORS) {
+  for (const row of rowsByAuth('auth')) {
     authTest(`${row.name} anchor resolves`, async ({ appState, page }) => {
-      if (row.state) {
-        await appState(row.state);
-      }
-      await page.goto(row.url);
-      await assertNoPhpErrors(page, `on ${row.url}`);
-      const timeoutOpt = row.timeout ? { timeout: row.timeout } : undefined;
-      await expect(page.locator(row.anchor).first()).toBeVisible(timeoutOpt);
+      await checkAnchorRow(page, appState, row);
+    });
+  }
+});
 
-      if (!row.skipContentCheck) {
-        const anchor = page.locator(row.anchor).first();
-        if (row.anchor === '.ibl-data-table' || row.anchor.startsWith('table.')) {
-          await expect(anchor.locator('tbody tr').first()).toBeVisible(timeoutOpt);
-        } else if (row.anchor.startsWith('form[')) {
-          await expect(anchor.locator('input:not([type="hidden"]), select, textarea').first()).toBeVisible(timeoutOpt);
-        }
-      }
+authRegularTest.describe('VR anchor discrimination — non-admin authenticated pages', () => {
+  for (const row of rowsByAuth('auth-regular')) {
+    authRegularTest(`${row.name} anchor resolves`, async ({ appState, page }) => {
+      await checkAnchorRow(page, appState, row);
     });
   }
 });

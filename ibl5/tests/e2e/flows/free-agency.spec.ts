@@ -167,9 +167,9 @@ test.describe('Free Agency -- Bird Rights negotiation', () => {
     // bypassing the 0-roster-spots guard (the CI test team is full).
     await request.delete('test-state.php?action=reset-fa-offers');
   });
-  test.afterAll(async ({ request }) => {
-    await request.delete('test-state.php?action=clear-fa-offers');
-  });
+  // No afterAll cleanup needed: beforeAll seeds the same 3 rows as the ci-seed, so the
+  // offers table remains in seed state after this test. clear-fa-offers would race with
+  // the MLE offer test in free-agency-submission.spec.ts (both run in parallel workers).
 
   test('Bird Rights player shows raise info in notes', async ({ appState, page }) => {
     await appState({ 'Current Season Phase': 'Free Agency', 'Current Season Ending Year': '2026' });

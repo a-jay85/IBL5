@@ -157,7 +157,6 @@ test.describe('Waivers: waive player', () => {
   test('submit waive rejection: invalid player returns error', async ({
     appState,
     page,
-    request,
   }) => {
     await appState({
       'Current Season Phase': 'Free Agency',
@@ -171,8 +170,9 @@ test.describe('Waivers: waive player', () => {
       .locator('form[name="Waiver_Move"] input[name="_csrf_token"]')
       .inputValue();
 
-    // POST with an invalid Player_ID that is not on the user's roster
-    const response = await request.post('/ibl5/modules.php?name=Waivers', {
+    // page.request shares the PHPSESSID with the page context, so the CSRF token obtained
+    // above is valid for this POST.
+    const response = await page.request.post('/ibl5/modules.php?name=Waivers', {
       form: {
         Action: 'waive',
         Player_ID: '999999',

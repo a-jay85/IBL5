@@ -3,129 +3,18 @@
 declare(strict_types=1);
 
 use Season\Season;
+use Tests\WideUnit\Mocks\MockDatabase;
 
 /**
  * SeasonTest - Tests for Season class
  */
 class SeasonTest extends \PHPUnit\Framework\TestCase
 {
-    private object $mockDb;
+    private MockDatabase $mockDb;
 
     protected function setUp(): void
     {
-        $this->mockDb = $this->createMockDatabase();
-    }
-
-    private function createMockDatabase(): object
-    {
-        return new class extends \mysqli {
-            public array $mockData = [
-                'phase' => 'Regular Season',
-                'year' => '2025',
-            ];
-
-            public function __construct()
-            {
-                // Don't call parent constructor
-            }
-
-            #[\ReturnTypeWillChange]
-            public function prepare(string $query)
-            {
-                $mockData = $this->mockData;
-                return new class($mockData, $query) {
-                    private array $mockData;
-                    private string $query;
-                    public function __construct(array $mockData, string $query)
-                    {
-                        $this->mockData = $mockData;
-                        $this->query = $query;
-                    }
-                    public function bind_param(string $types, mixed &...$vars): bool
-                    {
-                        return true;
-                    }
-                    public function execute(): bool
-                    {
-                        return true;
-                    }
-                    public function get_result(): object
-                    {
-                        $data = $this->mockData;
-                        $query = $this->query;
-                        return new class($data, $query) {
-                            private array $data;
-                            private string $query;
-                            private int $callCount = 0;
-                            public int $num_rows = 1;
-                            public function __construct(array $data, string $query)
-                            {
-                                $this->data = $data;
-                                $this->query = $query;
-                            }
-                            public function fetch_assoc(): ?array
-                            {
-                                if ($this->callCount++ > 0) {
-                                    return null;
-                                }
-                                
-                                // Return appropriate data based on query
-                                if (str_contains($this->query, 'ibl_settings')) {
-                                    return ['value' => $this->data['phase']];
-                                }
-                                if (str_contains($this->query, 'ibl_season')) {
-                                    return ['year' => $this->data['year']];
-                                }
-                                if (str_contains($this->query, 'ibl_schedule')) {
-                                    return ['max_date' => null];
-                                }
-                                if (str_contains($this->query, 'ibl_sim_dates')) {
-                                    return [
-                                        'sim' => 10,
-                                        'start_date' => '2025-01-01',
-                                        'end_date' => '2025-01-07'
-                                    ];
-                                }
-                                return ['value' => 'yes'];
-                            }
-                            public function fetch_object(): ?object
-                            {
-                                $row = $this->fetch_assoc();
-                                return $row ? (object) $row : null;
-                            }
-                        };
-                    }
-                    public function close(): void
-                    {
-                    }
-                };
-            }
-
-            #[\ReturnTypeWillChange]
-            public function query(string $query, int $result_mode = MYSQLI_STORE_RESULT)
-            {
-                $data = $this->mockData;
-                $mockResult = new class($data) {
-                    private array $rows;
-                    private int $index = 0;
-                    public int $num_rows = 1;
-                    public function __construct(array $rows)
-                    {
-                        $this->rows = $rows;
-                    }
-                    public function fetch_assoc(): ?array
-                    {
-                        return ['value' => $this->rows['phase']];
-                    }
-                    public function fetch_object(): ?object
-                    {
-                        return (object) ['value' => $this->rows['phase']];
-                    }
-                };
-                /** @phpstan-ignore-next-line */
-                return $mockResult;
-            }
-        };
+        $this->mockDb = new MockDatabase();
     }
 
     // ============================================

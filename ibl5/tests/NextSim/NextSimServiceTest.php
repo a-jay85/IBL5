@@ -8,7 +8,6 @@ use PHPUnit\Framework\TestCase;
 use NextSim\NextSimService;
 use TeamSchedule\Contracts\TeamScheduleRepositoryInterface;
 use Tests\WideUnit\Mocks\MockDatabase;
-use Tests\WideUnit\Mocks\MockPreparedStatement;
 
 /**
  * NextSimServiceTest - Tests for NextSimService
@@ -16,7 +15,6 @@ use Tests\WideUnit\Mocks\MockPreparedStatement;
 class NextSimServiceTest extends TestCase
 {
     private MockDatabase $mockDb;
-    private object $mockMysqliDb;
 
     /** @var TeamScheduleRepositoryInterface&\PHPUnit\Framework\MockObject\Stub */
     private TeamScheduleRepositoryInterface $stubRepository;
@@ -24,7 +22,7 @@ class NextSimServiceTest extends TestCase
     protected function setUp(): void
     {
         $this->mockDb = new MockDatabase();
-        $this->setupMockMysqliDb();
+        $GLOBALS['mysqli_db'] = $this->mockDb;
         $this->stubRepository = $this->createStub(TeamScheduleRepositoryInterface::class);
     }
 
@@ -33,55 +31,20 @@ class NextSimServiceTest extends TestCase
         unset($GLOBALS['mysqli_db']);
     }
 
-    private function setupMockMysqliDb(): void
-    {
-        $mockDb = $this->mockDb;
-
-        $this->mockMysqliDb = new class($mockDb) extends \mysqli {
-            private MockDatabase $mockDb;
-            public int $connect_errno = 0;
-            public ?string $connect_error = null;
-
-            public function __construct(MockDatabase $mockDb)
-            {
-                $this->mockDb = $mockDb;
-            }
-
-            #[\ReturnTypeWillChange]
-            public function prepare(string $query): MockPreparedStatement|false
-            {
-                return new MockPreparedStatement($this->mockDb, $query);
-            }
-
-            #[\ReturnTypeWillChange]
-            public function query(string $query, int $resultMode = MYSQLI_STORE_RESULT): \mysqli_result|bool
-            {
-                return false;
-            }
-
-            public function real_escape_string(string $string): string
-            {
-                return addslashes($string);
-            }
-        };
-
-        $GLOBALS['mysqli_db'] = $this->mockMysqliDb;
-    }
-
     // ============================================
     // CONSTRUCTOR TESTS
     // ============================================
 
     public function testServiceCanBeInstantiated(): void
     {
-        $service = new NextSimService($this->mockMysqliDb, $this->stubRepository);
+        $service = new NextSimService($this->mockDb, $this->stubRepository);
 
         $this->assertInstanceOf(NextSimService::class, $service);
     }
 
     public function testServiceImplementsCorrectInterface(): void
     {
-        $service = new NextSimService($this->mockMysqliDb, $this->stubRepository);
+        $service = new NextSimService($this->mockDb, $this->stubRepository);
 
         $this->assertInstanceOf(
             \NextSim\Contracts\NextSimServiceInterface::class,
@@ -95,8 +58,8 @@ class NextSimServiceTest extends TestCase
 
     public function testMultipleServicesCanBeInstantiated(): void
     {
-        $service1 = new NextSimService($this->mockMysqliDb, $this->stubRepository);
-        $service2 = new NextSimService($this->mockMysqliDb, $this->stubRepository);
+        $service1 = new NextSimService($this->mockDb, $this->stubRepository);
+        $service2 = new NextSimService($this->mockDb, $this->stubRepository);
 
         $this->assertNotSame($service1, $service2);
     }
@@ -121,7 +84,7 @@ class NextSimServiceTest extends TestCase
             )
             ->willReturn([]);
 
-        $service = new NextSimService($this->mockMysqliDb, $mockRepository);
+        $service = new NextSimService($this->mockDb, $mockRepository);
 
         $service->getNextSimGames(1, $season);
     }

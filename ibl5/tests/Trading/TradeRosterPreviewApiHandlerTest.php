@@ -5,37 +5,18 @@ declare(strict_types=1);
 namespace Tests\Trading;
 
 use PHPUnit\Framework\TestCase;
+use Tests\WideUnit\Mocks\MockDatabase;
 use Trading\Contracts\TradeAssetRepositoryInterface;
 use Trading\TradeRosterPreviewApiHandler;
 
 class TradeRosterPreviewApiHandlerTest extends TestCase
 {
-    private \mysqli $mockDb;
+    private MockDatabase $mockDb;
     private TradeAssetRepositoryInterface $stubTradeAssetRepo;
 
     protected function setUp(): void
     {
-        $this->mockDb = new class extends \mysqli {
-            public int $connect_errno = 0;
-            public ?string $connect_error = null;
-
-            public function __construct()
-            {
-                // Don't call parent::__construct() to avoid real DB connection
-            }
-
-            #[\ReturnTypeWillChange]
-            public function prepare(string $query): \mysqli_stmt|false
-            {
-                return false;
-            }
-
-            #[\ReturnTypeWillChange]
-            public function query(string $query, int $resultMode = MYSQLI_STORE_RESULT): \mysqli_result|bool
-            {
-                return false;
-            }
-        };
+        $this->mockDb = new MockDatabase();
 
         $this->stubTradeAssetRepo = $this->createStub(TradeAssetRepositoryInterface::class);
     }

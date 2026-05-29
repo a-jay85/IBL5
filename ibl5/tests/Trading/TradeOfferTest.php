@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Tests\Trading;
 
 use PHPUnit\Framework\TestCase;
+use Tests\WideUnit\Mocks\MockDatabase;
 use Trading\CashTransactionHandler;
 use Trading\Contracts\TradeOfferRepositoryInterface;
 use Trading\Contracts\TradeAssetRepositoryInterface;
@@ -38,6 +39,7 @@ class TradeOfferTest extends TestCase
         $cashConsiderationRepoStub = $cashConsiderationRepo ?? $this->createStub(BuyoutLedgerRepositoryInterface::class);
 
         return new class ($offerRepository, $assetRepository, $validator, $cashHandler, $commonRepo, $season, $discord, $cashRepoStub, $cashConsiderationRepoStub) extends TradeOffer {
+            // @phpstan-ignore constructor.missingParentCall (intentional: TradeOffer's real constructor wires concrete Season/TradeValidator/CashTransactionHandler/Discord against a live DB; this double skips it to inject test stubs directly)
             public function __construct(
                 TradeOfferRepositoryInterface $offerRepository,
                 TradeAssetRepositoryInterface $assetRepository,
@@ -50,11 +52,7 @@ class TradeOfferTest extends TestCase
                 BuyoutLedgerRepositoryInterface $cashConsiderationRepo,
             ) {
                 // Skip parent constructor — inject directly
-                $this->db = new class extends \mysqli {
-                    public function __construct()
-                    {
-                    }
-                };
+                $this->db = new MockDatabase();
                 $this->offerRepository = $offerRepository;
                 $this->assetRepository = $assetRepository;
                 $this->cashRepository = $cashRepo;

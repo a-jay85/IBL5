@@ -1,26 +1,8 @@
 parameters:
 	ignoreErrors:
 		-
-			rawMessage: 'AnonymousClass3681c386dfbb87fa14b8721aa096f559::__construct() does not call parent constructor from mysqli.'
-			identifier: constructor.missingParentCall
-			count: 1
-			path: tests/ActivityTracker/ActivityTrackerRepositoryTest.php
-
-		-
 			rawMessage: 'Call to method PHPUnit\Framework\Assert::assertInstanceOf() with ''ActivityTracker\\Contracts\\ActivityTrackerRepositoryInterface'' and ActivityTracker\ActivityTrackerRepository will always evaluate to true.'
 			identifier: method.alreadyNarrowedType
-			count: 1
-			path: tests/ActivityTracker/ActivityTrackerRepositoryTest.php
-
-		-
-			rawMessage: 'Method mysqli@anonymous/ActivityTracker/ActivityTrackerRepositoryTest.php:28::prepare() never returns false so it can be removed from the return type.'
-			identifier: return.unusedType
-			count: 1
-			path: tests/ActivityTracker/ActivityTrackerRepositoryTest.php
-
-		-
-			rawMessage: 'Return type (Tests\WideUnit\Mocks\MockPreparedStatement|false) of method mysqli@anonymous/ActivityTracker/ActivityTrackerRepositoryTest.php:28::prepare() should be covariant with return type (mysqli_stmt|false) of method mysqli::prepare()'
-			identifier: method.childReturnType
 			count: 1
 			path: tests/ActivityTracker/ActivityTrackerRepositoryTest.php
 
@@ -345,7 +327,7 @@ parameters:
 		-
 			rawMessage: 'Dynamic call to static method PHPUnit\Framework\TestCase::createStub().'
 			identifier: staticMethod.dynamicCall
-			count: 6
+			count: 10
 			path: tests/Api/Middleware/RateLimiterTest.php
 
 		-
@@ -607,28 +589,10 @@ parameters:
 			path: tests/Boxscore/BoxscoreRepositoryTest.php
 
 		-
-			rawMessage: 'Dynamic call to static method PHPUnit\Framework\TestCase::createStub().'
-			identifier: staticMethod.dynamicCall
-			count: 2
-			path: tests/Boxscore/BoxscoreRepositoryTest.php
-
-		-
 			rawMessage: Short ternary operator is not allowed. Use null coalesce operator if applicable or consider using long ternary.
 			identifier: ternary.shortNotAllowed
 			count: 1
 			path: tests/Boxscore/BoxscoreRepositoryTest.php
-
-		-
-			rawMessage: 'Return type (Tests\Cache\MockCacheStmt|false) of method Tests\Cache\MockCacheDb::prepare() should be covariant with return type (mysqli_stmt|false) of method mysqli::prepare()'
-			identifier: method.childReturnType
-			count: 1
-			path: tests/Cache/DatabaseCacheTest.php
-
-		-
-			rawMessage: 'Tests\Cache\MockCacheDb::__construct() does not call parent constructor from mysqli.'
-			identifier: constructor.missingParentCall
-			count: 1
-			path: tests/Cache/DatabaseCacheTest.php
 
 		-
 			rawMessage: Short ternary operator is not allowed. Use null coalesce operator if applicable or consider using long ternary.
@@ -915,7 +879,7 @@ parameters:
 		-
 			rawMessage: 'Dynamic call to static method PHPUnit\Framework\TestCase::createStub().'
 			identifier: staticMethod.dynamicCall
-			count: 1
+			count: 10
 			path: tests/DatabaseIntegration/BaseMysqliRepositoryTest.php
 
 		-
@@ -1231,10 +1195,10 @@ parameters:
 			path: tests/DatabaseIntegration/TeamOffDefStatsRepositoryTest.php
 
 		-
-			rawMessage: 'Missing call to parent::tearDown() method.'
-			identifier: phpunit.callParent
+			rawMessage: 'Dynamic call to static method PHPUnit\Framework\TestCase::createStub().'
+			identifier: staticMethod.dynamicCall
 			count: 1
-			path: tests/DatabaseIntegration/Trading/TradeProcessorIntegrationTest.php
+			path: tests/DatabaseIntegration/TeamOlympicsLoadTest.php
 
 		-
 			rawMessage: 'Offset ''owner_teamid'' does not exist on array{pickid: int, ownerofpick: ''Sharks'', teampick: string, year: string, round: string, notes: string|null, created_at: string, updated_at: string}.'
@@ -1285,12 +1249,6 @@ parameters:
 			path: tests/DepthChartEntry/DepthChartEntryApiHandlerTest.php
 
 		-
-			rawMessage: 'AnonymousClass58da200f0dfac4a568b2ea46839a3256::__construct() does not call parent constructor from mysqli.'
-			identifier: constructor.missingParentCall
-			count: 1
-			path: tests/DepthChartEntry/DepthChartEntryControllerTest.php
-
-		-
 			rawMessage: 'Call to method PHPUnit\Framework\Assert::assertInstanceOf() with ''DepthChartEntry\\Contracts\\DepthChartEntryControllerInterface'' and DepthChartEntry\DepthChartEntryController will always evaluate to true.'
 			identifier: method.alreadyNarrowedType
 			count: 1
@@ -1306,24 +1264,6 @@ parameters:
 			rawMessage: 'Dynamic call to static method PHPUnit\Framework\TestCase::createStub().'
 			identifier: staticMethod.dynamicCall
 			count: 5
-			path: tests/DepthChartEntry/DepthChartEntryControllerTest.php
-
-		-
-			rawMessage: 'Method mysqli@anonymous/DepthChartEntry/DepthChartEntryControllerTest.php:44::prepare() never returns false so it can be removed from the return type.'
-			identifier: return.unusedType
-			count: 1
-			path: tests/DepthChartEntry/DepthChartEntryControllerTest.php
-
-		-
-			rawMessage: 'Method mysqli@anonymous/DepthChartEntry/DepthChartEntryControllerTest.php:44::query() never returns mysqli_result so it can be removed from the return type.'
-			identifier: return.unusedType
-			count: 1
-			path: tests/DepthChartEntry/DepthChartEntryControllerTest.php
-
-		-
-			rawMessage: 'Return type (Tests\WideUnit\Mocks\MockPreparedStatement|false) of method mysqli@anonymous/DepthChartEntry/DepthChartEntryControllerTest.php:44::prepare() should be covariant with return type (mysqli_stmt|false) of method mysqli::prepare()'
-			identifier: method.childReturnType
-			count: 1
 			path: tests/DepthChartEntry/DepthChartEntryControllerTest.php
 
 		-
@@ -1513,12 +1453,6 @@ parameters:
 			path: tests/DepthChartEntry/DepthChartEntryServiceTest.php
 
 		-
-			rawMessage: 'AnonymousClassa6c09346776dd84b3f5df73dafc8ee53::__construct() does not call parent constructor from mysqli.'
-			identifier: constructor.missingParentCall
-			count: 1
-			path: tests/DepthChartEntry/DepthChartEntrySubmissionHandlerTest.php
-
-		-
 			rawMessage: 'Call to method PHPUnit\Framework\Assert::assertInstanceOf() with ''DepthChartEntry\\Contracts\\DepthChartEntrySubmissionHandlerInterface'' and DepthChartEntry\DepthChartEntrySubmissionHandler will always evaluate to true.'
 			identifier: method.alreadyNarrowedType
 			count: 1
@@ -1533,24 +1467,6 @@ parameters:
 		-
 			rawMessage: 'Dynamic call to static method PHPUnit\Framework\TestCase::createStub().'
 			identifier: staticMethod.dynamicCall
-			count: 1
-			path: tests/DepthChartEntry/DepthChartEntrySubmissionHandlerTest.php
-
-		-
-			rawMessage: 'Method mysqli@anonymous/DepthChartEntry/DepthChartEntrySubmissionHandlerTest.php:45::prepare() never returns false so it can be removed from the return type.'
-			identifier: return.unusedType
-			count: 1
-			path: tests/DepthChartEntry/DepthChartEntrySubmissionHandlerTest.php
-
-		-
-			rawMessage: 'Method mysqli@anonymous/DepthChartEntry/DepthChartEntrySubmissionHandlerTest.php:45::query() never returns mysqli_result so it can be removed from the return type.'
-			identifier: return.unusedType
-			count: 1
-			path: tests/DepthChartEntry/DepthChartEntrySubmissionHandlerTest.php
-
-		-
-			rawMessage: 'Return type (Tests\WideUnit\Mocks\MockPreparedStatement|false) of method mysqli@anonymous/DepthChartEntry/DepthChartEntrySubmissionHandlerTest.php:45::prepare() should be covariant with return type (mysqli_stmt|false) of method mysqli::prepare()'
-			identifier: method.childReturnType
 			count: 1
 			path: tests/DepthChartEntry/DepthChartEntrySubmissionHandlerTest.php
 
@@ -1945,12 +1861,6 @@ parameters:
 			path: tests/Draft/DraftRepositoryTest.php
 
 		-
-			rawMessage: 'AnonymousClass6ba3edb7ad05a17dcd6c03646d5927a7::__construct() does not call parent constructor from mysqli.'
-			identifier: constructor.missingParentCall
-			count: 1
-			path: tests/Draft/DraftSelectionHandlerTest.php
-
-		-
 			rawMessage: 'Call to method PHPUnit\Framework\Assert::assertInstanceOf() with ''Draft\\Contracts\\DraftSelectionHandlerInterface'' and Draft\DraftSelectionHandler will always evaluate to true.'
 			identifier: method.alreadyNarrowedType
 			count: 1
@@ -1966,24 +1876,6 @@ parameters:
 			rawMessage: 'Dynamic call to static method PHPUnit\Framework\TestCase::createStub().'
 			identifier: staticMethod.dynamicCall
 			count: 2
-			path: tests/Draft/DraftSelectionHandlerTest.php
-
-		-
-			rawMessage: 'Method mysqli@anonymous/Draft/DraftSelectionHandlerTest.php:46::prepare() never returns false so it can be removed from the return type.'
-			identifier: return.unusedType
-			count: 1
-			path: tests/Draft/DraftSelectionHandlerTest.php
-
-		-
-			rawMessage: 'Method mysqli@anonymous/Draft/DraftSelectionHandlerTest.php:46::query() never returns mysqli_result so it can be removed from the return type.'
-			identifier: return.unusedType
-			count: 1
-			path: tests/Draft/DraftSelectionHandlerTest.php
-
-		-
-			rawMessage: 'Return type (Tests\WideUnit\Mocks\MockPreparedStatement|false) of method mysqli@anonymous/Draft/DraftSelectionHandlerTest.php:46::prepare() should be covariant with return type (mysqli_stmt|false) of method mysqli::prepare()'
-			identifier: method.childReturnType
-			count: 1
 			path: tests/Draft/DraftSelectionHandlerTest.php
 
 		-
@@ -2608,12 +2500,6 @@ parameters:
 			path: tests/FreeAgency/FreeAgencyAdminProcessorTest.php
 
 		-
-			rawMessage: 'AnonymousClassd01a25ef1001b810081aa69769e0a656::__construct() does not call parent constructor from mysqli.'
-			identifier: constructor.missingParentCall
-			count: 1
-			path: tests/FreeAgency/FreeAgencyAdminRepositoryTest.php
-
-		-
 			rawMessage: 'Call to method PHPUnit\Framework\Assert::assertInstanceOf() with ''FreeAgency\\Contracts\\FreeAgencyAdminRepositoryInterface'' and FreeAgency\FreeAgencyAdminRepository will always evaluate to true.'
 			identifier: method.alreadyNarrowedType
 			count: 1
@@ -2634,24 +2520,6 @@ parameters:
 		-
 			rawMessage: 'Method FreeAgency\FreeAgencyAdminRepository::updatePlayerContract() invoked with 10 parameters, 9 required.'
 			identifier: arguments.count
-			count: 1
-			path: tests/FreeAgency/FreeAgencyAdminRepositoryTest.php
-
-		-
-			rawMessage: 'Method mysqli@anonymous/FreeAgency/FreeAgencyAdminRepositoryTest.php:39::prepare() never returns false so it can be removed from the return type.'
-			identifier: return.unusedType
-			count: 1
-			path: tests/FreeAgency/FreeAgencyAdminRepositoryTest.php
-
-		-
-			rawMessage: 'Method mysqli@anonymous/FreeAgency/FreeAgencyAdminRepositoryTest.php:39::query() never returns mysqli_result so it can be removed from the return type.'
-			identifier: return.unusedType
-			count: 1
-			path: tests/FreeAgency/FreeAgencyAdminRepositoryTest.php
-
-		-
-			rawMessage: 'Return type (Tests\WideUnit\Mocks\MockPreparedStatement|false) of method mysqli@anonymous/FreeAgency/FreeAgencyAdminRepositoryTest.php:39::prepare() should be covariant with return type (mysqli_stmt|false) of method mysqli::prepare()'
-			identifier: method.childReturnType
 			count: 1
 			path: tests/FreeAgency/FreeAgencyAdminRepositoryTest.php
 
@@ -2740,12 +2608,6 @@ parameters:
 			path: tests/FreeAgency/FreeAgencyProcessorTest.php
 
 		-
-			rawMessage: 'AnonymousClass05e31732eac53b8905cec8d8f283c32f::__construct() does not call parent constructor from mysqli.'
-			identifier: constructor.missingParentCall
-			count: 1
-			path: tests/FreeAgency/FreeAgencyRepositoryTest.php
-
-		-
 			rawMessage: 'Call to method PHPUnit\Framework\Assert::assertInstanceOf() with ''BaseMysqliRepository'' and FreeAgency\FreeAgencyRepository will always evaluate to true.'
 			identifier: method.alreadyNarrowedType
 			count: 1
@@ -2761,24 +2623,6 @@ parameters:
 			rawMessage: 'Call to method PHPUnit\Framework\Assert::assertInstanceOf() with ''FreeAgency\\FreeAgencyRepository'' and FreeAgency\FreeAgencyRepository will always evaluate to true.'
 			identifier: method.alreadyNarrowedType
 			count: 3
-			path: tests/FreeAgency/FreeAgencyRepositoryTest.php
-
-		-
-			rawMessage: 'Method mysqli@anonymous/FreeAgency/FreeAgencyRepositoryTest.php:41::prepare() never returns false so it can be removed from the return type.'
-			identifier: return.unusedType
-			count: 1
-			path: tests/FreeAgency/FreeAgencyRepositoryTest.php
-
-		-
-			rawMessage: 'Method mysqli@anonymous/FreeAgency/FreeAgencyRepositoryTest.php:41::query() never returns mysqli_result so it can be removed from the return type.'
-			identifier: return.unusedType
-			count: 1
-			path: tests/FreeAgency/FreeAgencyRepositoryTest.php
-
-		-
-			rawMessage: 'Return type (Tests\WideUnit\Mocks\MockPreparedStatement|false) of method mysqli@anonymous/FreeAgency/FreeAgencyRepositoryTest.php:41::prepare() should be covariant with return type (mysqli_stmt|false) of method mysqli::prepare()'
-			identifier: method.childReturnType
-			count: 1
 			path: tests/FreeAgency/FreeAgencyRepositoryTest.php
 
 		-
@@ -3040,12 +2884,6 @@ parameters:
 			path: tests/Injuries/InjuriesIntegrationTest.php
 
 		-
-			rawMessage: 'AnonymousClass73934fbc4af20f599b549638380762c7::__construct() does not call parent constructor from mysqli.'
-			identifier: constructor.missingParentCall
-			count: 1
-			path: tests/Injuries/InjuriesServiceTest.php
-
-		-
 			rawMessage: 'Call to method PHPUnit\Framework\Assert::assertInstanceOf() with ''Injuries\\Contracts\\InjuriesServiceInterface'' and Injuries\InjuriesService will always evaluate to true.'
 			identifier: method.alreadyNarrowedType
 			count: 1
@@ -3054,18 +2892,6 @@ parameters:
 		-
 			rawMessage: 'Call to method PHPUnit\Framework\Assert::assertInstanceOf() with ''Injuries\\InjuriesService'' and Injuries\InjuriesService will always evaluate to true.'
 			identifier: method.alreadyNarrowedType
-			count: 1
-			path: tests/Injuries/InjuriesServiceTest.php
-
-		-
-			rawMessage: 'Method mysqli@anonymous/Injuries/InjuriesServiceTest.php:35::prepare() never returns false so it can be removed from the return type.'
-			identifier: return.unusedType
-			count: 1
-			path: tests/Injuries/InjuriesServiceTest.php
-
-		-
-			rawMessage: 'Return type (Tests\WideUnit\Mocks\MockPreparedStatement|false) of method mysqli@anonymous/Injuries/InjuriesServiceTest.php:35::prepare() should be covariant with return type (mysqli_stmt|false) of method mysqli::prepare()'
-			identifier: method.childReturnType
 			count: 1
 			path: tests/Injuries/InjuriesServiceTest.php
 
@@ -3134,30 +2960,6 @@ parameters:
 			identifier: method.dynamicName
 			count: 1
 			path: tests/JsbParser/JsbImportServiceTest.php
-
-		-
-			rawMessage: 'AnonymousClass70698db9172ae0afd5d03b244d864cde::__construct() does not call parent constructor from mysqli.'
-			identifier: constructor.missingParentCall
-			count: 1
-			path: tests/JsbParser/PlayerIdResolverTest.php
-
-		-
-			rawMessage: 'Method mysqli@anonymous/JsbParser/PlayerIdResolverTest.php:42::prepare() never returns false so it can be removed from the return type.'
-			identifier: return.unusedType
-			count: 1
-			path: tests/JsbParser/PlayerIdResolverTest.php
-
-		-
-			rawMessage: 'Method mysqli@anonymous/JsbParser/PlayerIdResolverTest.php:42::query() never returns mysqli_result so it can be removed from the return type.'
-			identifier: return.unusedType
-			count: 1
-			path: tests/JsbParser/PlayerIdResolverTest.php
-
-		-
-			rawMessage: 'Return type (Tests\WideUnit\Mocks\MockPreparedStatement|false) of method mysqli@anonymous/JsbParser/PlayerIdResolverTest.php:42::prepare() should be covariant with return type (mysqli_stmt|false) of method mysqli::prepare()'
-			identifier: method.childReturnType
-			count: 1
-			path: tests/JsbParser/PlayerIdResolverTest.php
 
 		-
 			rawMessage: 'Dynamic call to static method PHPUnit\Framework\Assert::fail().'
@@ -3352,18 +3154,6 @@ parameters:
 			path: tests/LastSimRecap/NewsModuleIntegrationTest.php
 
 		-
-			rawMessage: 'Method LastSimRecap\Contracts\LastSimRecapRepositoryInterface@anonymous/LastSimRecap/NewsModuleIntegrationTest.php:72::getLastSimWindow() never returns null so it can be removed from the return type.'
-			identifier: return.unusedType
-			count: 1
-			path: tests/LastSimRecap/NewsModuleIntegrationTest.php
-
-		-
-			rawMessage: 'Method LastSimRecap\Contracts\LastSimRecapRepositoryInterface@anonymous/LastSimRecap/NewsModuleIntegrationTest.php:72::getTeamBoxscoreLines() never returns null so it can be removed from the return type.'
-			identifier: return.unusedType
-			count: 1
-			path: tests/LastSimRecap/NewsModuleIntegrationTest.php
-
-		-
 			rawMessage: 'Method Tests\LastSimRecap\NewsModuleIntegrationTest::repoWithGames() has parameter $games with no value type specified in iterable type array.'
 			identifier: missingType.iterableValue
 			count: 1
@@ -3372,8 +3162,14 @@ parameters:
 		-
 			rawMessage: 'You should use assertSame() instead of assertEquals(), because both values are scalars of the same type'
 			identifier: phpunit.assertEquals
-			count: 15
+			count: 17
 			path: tests/League/LeagueContextIntegrationTest.php
+
+		-
+			rawMessage: 'Call to method PHPUnit\Framework\Assert::assertNotSame() with arguments ''ibl_box_scores''|''ibl_box_scores_teams''|''ibl_hist''|''ibl_jsb_history''|''ibl_jsb_transactions''|''ibl_league_config''|''ibl_plr''|''ibl_plr_snapshots''|''ibl_power''|''ibl_rcb_alltime…''|''ibl_rcb_season…''|''ibl_saved_depth…''|''ibl_schedule''|''ibl_standings''|''ibl_team_info'', ''ibl_olympics_box…''|''ibl_olympics_hist''|''ibl_olympics_jsb…''|''ibl_olympics_league…''|''ibl_olympics_plr''|''ibl_olympics_plr…''|''ibl_olympics_power''|''ibl_olympics_rcb…''|''ibl_olympics_saved…''|''ibl_olympics…''|''ibl_olympics_team…'' and ''\''ibl_box_scores\''…''|''\''ibl_box_scores…''|''\''ibl_hist\'' must map…''|''\''ibl_jsb_history\''…''|''\''ibl_jsb…''|''\''ibl_league_config\''…''|''\''ibl_plr\'' must map…''|''\''ibl_plr_snapshots\''…''|''\''ibl_power\'' must…''|''\''ibl_rcb_alltime…''|''\''ibl_rcb_season…''|''\''ibl_saved_depth…''|''\''ibl_schedule\'' must…''|''\''ibl_standings\''…''|''\''ibl_team_info\''…'' will always evaluate to true.'
+			identifier: method.alreadyNarrowedType
+			count: 1
+			path: tests/League/LeagueContextTest.php
 
 		-
 			rawMessage: Property Tests\League\LeagueContextTest::$leagueContext has no type specified.
@@ -3485,26 +3281,8 @@ parameters:
 			path: tests/LeagueControlPanel/LeagueControlPanelViewTest.php
 
 		-
-			rawMessage: 'AnonymousClass39b608d314c1e76812c0232d04bf2484::__construct() does not call parent constructor from mysqli.'
-			identifier: constructor.missingParentCall
-			count: 1
-			path: tests/LeagueSchedule/LeagueScheduleRepositoryTest.php
-
-		-
 			rawMessage: 'Call to method PHPUnit\Framework\Assert::assertInstanceOf() with ''LeagueSchedule\\Contracts\\LeagueScheduleRepositoryInterface'' and LeagueSchedule\LeagueScheduleRepository will always evaluate to true.'
 			identifier: method.alreadyNarrowedType
-			count: 1
-			path: tests/LeagueSchedule/LeagueScheduleRepositoryTest.php
-
-		-
-			rawMessage: 'Method mysqli@anonymous/LeagueSchedule/LeagueScheduleRepositoryTest.php:28::prepare() never returns false so it can be removed from the return type.'
-			identifier: return.unusedType
-			count: 1
-			path: tests/LeagueSchedule/LeagueScheduleRepositoryTest.php
-
-		-
-			rawMessage: 'Return type (Tests\WideUnit\Mocks\MockPreparedStatement|false) of method mysqli@anonymous/LeagueSchedule/LeagueScheduleRepositoryTest.php:28::prepare() should be covariant with return type (mysqli_stmt|false) of method mysqli::prepare()'
-			identifier: method.childReturnType
 			count: 1
 			path: tests/LeagueSchedule/LeagueScheduleRepositoryTest.php
 
@@ -3545,12 +3323,6 @@ parameters:
 			path: tests/LeagueStarters/LeagueStartersApiHandlerTest.php
 
 		-
-			rawMessage: 'AnonymousClass1168d70942f8499e27d025ff85029d91::__construct() does not call parent constructor from mysqli.'
-			identifier: constructor.missingParentCall
-			count: 1
-			path: tests/LeagueStarters/LeagueStartersServiceTest.php
-
-		-
 			rawMessage: 'Call to method PHPUnit\Framework\Assert::assertInstanceOf() with ''LeagueStarters\\Contracts\\LeagueStartersServiceInterface'' and LeagueStarters\LeagueStartersService will always evaluate to true.'
 			identifier: method.alreadyNarrowedType
 			count: 1
@@ -3567,24 +3339,6 @@ parameters:
 			identifier: staticMethod.dynamicCall
 			count: 4
 			path: tests/LeagueStarters/LeagueStartersServiceTest.php
-
-		-
-			rawMessage: 'Method mysqli@anonymous/LeagueStarters/LeagueStartersServiceTest.php:37::prepare() never returns false so it can be removed from the return type.'
-			identifier: return.unusedType
-			count: 1
-			path: tests/LeagueStarters/LeagueStartersServiceTest.php
-
-		-
-			rawMessage: 'Return type (Tests\WideUnit\Mocks\MockPreparedStatement|false) of method mysqli@anonymous/LeagueStarters/LeagueStartersServiceTest.php:37::prepare() should be covariant with return type (mysqli_stmt|false) of method mysqli::prepare()'
-			identifier: method.childReturnType
-			count: 1
-			path: tests/LeagueStarters/LeagueStartersServiceTest.php
-
-		-
-			rawMessage: 'AnonymousClass1a129972668db7ca34c9c71cd8e0ab60::__construct() does not call parent constructor from mysqli.'
-			identifier: constructor.missingParentCall
-			count: 1
-			path: tests/LeagueTest.php
 
 		-
 			rawMessage: 'Call to method PHPUnit\Framework\Assert::assertInstanceOf() with ''BaseMysqliRepository'' and League\League will always evaluate to true.'
@@ -3619,18 +3373,6 @@ parameters:
 		-
 			rawMessage: 'Call to static method PHPUnit\Framework\Assert::assertSame() with 51 and 51 will always evaluate to true.'
 			identifier: staticMethod.alreadyNarrowedType
-			count: 1
-			path: tests/LeagueTest.php
-
-		-
-			rawMessage: 'Method mysqli@anonymous/LeagueTest.php:35::prepare() never returns false so it can be removed from the return type.'
-			identifier: return.unusedType
-			count: 1
-			path: tests/LeagueTest.php
-
-		-
-			rawMessage: 'Return type (Tests\WideUnit\Mocks\MockPreparedStatement|false) of method mysqli@anonymous/LeagueTest.php:35::prepare() should be covariant with return type (mysqli_stmt|false) of method mysqli::prepare()'
-			identifier: method.childReturnType
 			count: 1
 			path: tests/LeagueTest.php
 
@@ -3923,12 +3665,6 @@ parameters:
 			path: tests/Negotiation/NegotiationOfferViewTest.php
 
 		-
-			rawMessage: 'AnonymousClassde6b13e27b0507a8822088af7a7ac780::__construct() does not call parent constructor from mysqli.'
-			identifier: constructor.missingParentCall
-			count: 1
-			path: tests/Negotiation/NegotiationRepositoryTest.php
-
-		-
 			rawMessage: 'Call to method PHPUnit\Framework\Assert::assertInstanceOf() with ''BaseMysqliRepository'' and Negotiation\NegotiationRepository will always evaluate to true.'
 			identifier: method.alreadyNarrowedType
 			count: 1
@@ -3953,34 +3689,10 @@ parameters:
 			path: tests/Negotiation/NegotiationRepositoryTest.php
 
 		-
-			rawMessage: 'Method mysqli@anonymous/Negotiation/NegotiationRepositoryTest.php:43::prepare() never returns false so it can be removed from the return type.'
-			identifier: return.unusedType
-			count: 1
-			path: tests/Negotiation/NegotiationRepositoryTest.php
-
-		-
-			rawMessage: 'Method mysqli@anonymous/Negotiation/NegotiationRepositoryTest.php:43::query() never returns mysqli_result so it can be removed from the return type.'
-			identifier: return.unusedType
-			count: 1
-			path: tests/Negotiation/NegotiationRepositoryTest.php
-
-		-
-			rawMessage: 'Return type (Tests\WideUnit\Mocks\MockPreparedStatement|false) of method mysqli@anonymous/Negotiation/NegotiationRepositoryTest.php:43::prepare() should be covariant with return type (mysqli_stmt|false) of method mysqli::prepare()'
-			identifier: method.childReturnType
-			count: 1
-			path: tests/Negotiation/NegotiationRepositoryTest.php
-
-		-
 			rawMessage: 'You should use assertSame() instead of assertEquals(), because both values are scalars of the same type'
 			identifier: phpunit.assertEquals
 			count: 5
 			path: tests/Negotiation/NegotiationRepositoryTest.php
-
-		-
-			rawMessage: 'AnonymousClass653854fa41e6f0de9ead4b0e02be92b0::__construct() does not call parent constructor from mysqli.'
-			identifier: constructor.missingParentCall
-			count: 1
-			path: tests/Negotiation/NegotiationServiceTest.php
 
 		-
 			rawMessage: 'Call to method PHPUnit\Framework\Assert::assertInstanceOf() with ''Negotiation\\Contracts\\NegotiationServiceInterface'' and Negotiation\NegotiationService will always evaluate to true.'
@@ -4009,24 +3721,6 @@ parameters:
 		-
 			rawMessage: 'Method Tests\Negotiation\NegotiationServiceTest::getCompletePlayerData() return type has no value type specified in iterable type array.'
 			identifier: missingType.iterableValue
-			count: 1
-			path: tests/Negotiation/NegotiationServiceTest.php
-
-		-
-			rawMessage: 'Method mysqli@anonymous/Negotiation/NegotiationServiceTest.php:45::prepare() never returns false so it can be removed from the return type.'
-			identifier: return.unusedType
-			count: 1
-			path: tests/Negotiation/NegotiationServiceTest.php
-
-		-
-			rawMessage: 'Method mysqli@anonymous/Negotiation/NegotiationServiceTest.php:45::query() never returns mysqli_result so it can be removed from the return type.'
-			identifier: return.unusedType
-			count: 1
-			path: tests/Negotiation/NegotiationServiceTest.php
-
-		-
-			rawMessage: 'Return type (Tests\WideUnit\Mocks\MockPreparedStatement|false) of method mysqli@anonymous/Negotiation/NegotiationServiceTest.php:45::prepare() should be covariant with return type (mysqli_stmt|false) of method mysqli::prepare()'
-			identifier: method.childReturnType
 			count: 1
 			path: tests/Negotiation/NegotiationServiceTest.php
 
@@ -4103,12 +3797,6 @@ parameters:
 			path: tests/Negotiation/NegotiationValidatorTest.php
 
 		-
-			rawMessage: 'AnonymousClass74f29325097307b95a6bfe8f2d34bc8a::__construct() does not call parent constructor from mysqli.'
-			identifier: constructor.missingParentCall
-			count: 1
-			path: tests/NextSim/NextSimServiceTest.php
-
-		-
 			rawMessage: 'Call to method PHPUnit\Framework\Assert::assertInstanceOf() with ''NextSim\\Contracts\\NextSimServiceInterface'' and NextSim\NextSimService will always evaluate to true.'
 			identifier: method.alreadyNarrowedType
 			count: 1
@@ -4123,18 +3811,6 @@ parameters:
 		-
 			rawMessage: 'Dynamic call to static method PHPUnit\Framework\TestCase::createStub().'
 			identifier: staticMethod.dynamicCall
-			count: 1
-			path: tests/NextSim/NextSimServiceTest.php
-
-		-
-			rawMessage: 'Method mysqli@anonymous/NextSim/NextSimServiceTest.php:40::prepare() never returns false so it can be removed from the return type.'
-			identifier: return.unusedType
-			count: 1
-			path: tests/NextSim/NextSimServiceTest.php
-
-		-
-			rawMessage: 'Return type (Tests\WideUnit\Mocks\MockPreparedStatement|false) of method mysqli@anonymous/NextSim/NextSimServiceTest.php:40::prepare() should be covariant with return type (mysqli_stmt|false) of method mysqli::prepare()'
-			identifier: method.childReturnType
 			count: 1
 			path: tests/NextSim/NextSimServiceTest.php
 
@@ -4289,12 +3965,6 @@ parameters:
 			path: tests/OneOnOneGame/OneOnOneGamePlayerStatsTest.php
 
 		-
-			rawMessage: 'AnonymousClassb731f323364b4f20adde72b66c50c14f::__construct() does not call parent constructor from mysqli.'
-			identifier: constructor.missingParentCall
-			count: 1
-			path: tests/OneOnOneGame/OneOnOneGameRepositoryTest.php
-
-		-
 			rawMessage: 'Call to method PHPUnit\Framework\Assert::assertInstanceOf() with ''BaseMysqliRepository'' and OneOnOneGame\OneOnOneGameRepository will always evaluate to true.'
 			identifier: method.alreadyNarrowedType
 			count: 1
@@ -4309,18 +3979,6 @@ parameters:
 		-
 			rawMessage: 'Call to method PHPUnit\Framework\Assert::assertInstanceOf() with ''OneOnOneGame\\OneOnOneGameRepository'' and OneOnOneGame\OneOnOneGameRepository will always evaluate to true.'
 			identifier: method.alreadyNarrowedType
-			count: 1
-			path: tests/OneOnOneGame/OneOnOneGameRepositoryTest.php
-
-		-
-			rawMessage: 'Method mysqli@anonymous/OneOnOneGame/OneOnOneGameRepositoryTest.php:35::prepare() never returns false so it can be removed from the return type.'
-			identifier: return.unusedType
-			count: 1
-			path: tests/OneOnOneGame/OneOnOneGameRepositoryTest.php
-
-		-
-			rawMessage: 'Return type (Tests\WideUnit\Mocks\MockPreparedStatement|false) of method mysqli@anonymous/OneOnOneGame/OneOnOneGameRepositoryTest.php:35::prepare() should be covariant with return type (mysqli_stmt|false) of method mysqli::prepare()'
-			identifier: method.childReturnType
 			count: 1
 			path: tests/OneOnOneGame/OneOnOneGameRepositoryTest.php
 
@@ -4863,12 +4521,6 @@ parameters:
 			path: tests/Player/Views/PlayerStatsCardViewTest.php
 
 		-
-			rawMessage: 'Call to method expects() on an unknown class Tests\PlayerDatabase\mysqli.'
-			identifier: class.notFound
-			count: 9
-			path: tests/PlayerDatabase/PlayerDatabaseRepositoryTest.php
-
-		-
 			rawMessage: 'Dynamic call to static method PHPUnit\Framework\Assert::anything().'
 			identifier: staticMethod.dynamicCall
 			count: 1
@@ -4878,24 +4530,6 @@ parameters:
 			rawMessage: 'Dynamic call to static method PHPUnit\Framework\Assert::callback().'
 			identifier: staticMethod.dynamicCall
 			count: 8
-			path: tests/PlayerDatabase/PlayerDatabaseRepositoryTest.php
-
-		-
-			rawMessage: 'Property Tests\PlayerDatabase\PlayerDatabaseRepositoryTest::$mockDb (PHPUnit\Framework\MockObject\MockObject&Tests\PlayerDatabase\mysqli) does not accept mysqli&PHPUnit\Framework\MockObject\MockObject.'
-			identifier: assign.propertyType
-			count: 1
-			path: tests/PlayerDatabase/PlayerDatabaseRepositoryTest.php
-
-		-
-			rawMessage: Property Tests\PlayerDatabase\PlayerDatabaseRepositoryTest::$mockDb has unknown class Tests\PlayerDatabase\mysqli as its type.
-			identifier: class.notFound
-			count: 1
-			path: tests/PlayerDatabase/PlayerDatabaseRepositoryTest.php
-
-		-
-			rawMessage: 'Trying to mock an undefined method prepare() on class Tests\PlayerDatabase\mysqli.'
-			identifier: phpunit.mockMethod
-			count: 9
 			path: tests/PlayerDatabase/PlayerDatabaseRepositoryTest.php
 
 		-
@@ -4911,26 +4545,8 @@ parameters:
 			path: tests/PlayerDatabase/PlayerDatabaseValidatorTest.php
 
 		-
-			rawMessage: 'AnonymousClass7f3273afe4f0f1d2b78b33c376f7be9c::__construct() does not call parent constructor from mysqli.'
-			identifier: constructor.missingParentCall
-			count: 1
-			path: tests/PlayerMovement/PlayerMovementRepositoryTest.php
-
-		-
 			rawMessage: 'Call to method PHPUnit\Framework\Assert::assertInstanceOf() with ''PlayerMovement\\Contracts\\PlayerMovementRepositoryInterface'' and PlayerMovement\PlayerMovementRepository will always evaluate to true.'
 			identifier: method.alreadyNarrowedType
-			count: 1
-			path: tests/PlayerMovement/PlayerMovementRepositoryTest.php
-
-		-
-			rawMessage: 'Method mysqli@anonymous/PlayerMovement/PlayerMovementRepositoryTest.php:28::prepare() never returns false so it can be removed from the return type.'
-			identifier: return.unusedType
-			count: 1
-			path: tests/PlayerMovement/PlayerMovementRepositoryTest.php
-
-		-
-			rawMessage: 'Return type (Tests\WideUnit\Mocks\MockPreparedStatement|false) of method mysqli@anonymous/PlayerMovement/PlayerMovementRepositoryTest.php:28::prepare() should be covariant with return type (mysqli_stmt|false) of method mysqli::prepare()'
-			identifier: method.childReturnType
 			count: 1
 			path: tests/PlayerMovement/PlayerMovementRepositoryTest.php
 
@@ -5067,12 +4683,6 @@ parameters:
 			path: tests/RecordHolders/RecordHoldersServiceTest.php
 
 		-
-			rawMessage: 'AnonymousClassa2e628c8baf15b88c869eaeb4c45cf1b::__construct() does not call parent constructor from mysqli.'
-			identifier: constructor.missingParentCall
-			count: 1
-			path: tests/RookieOption/RookieOptionControllerTest.php
-
-		-
 			rawMessage: 'Call to method PHPUnit\Framework\Assert::assertInstanceOf() with ''RookieOption\\Contracts\\RookieOptionControllerInterface'' and RookieOption\RookieOptionController will always evaluate to true.'
 			identifier: method.alreadyNarrowedType
 			count: 1
@@ -5088,90 +4698,6 @@ parameters:
 			rawMessage: 'Dynamic call to static method PHPUnit\Framework\TestCase::createStub().'
 			identifier: staticMethod.dynamicCall
 			count: 2
-			path: tests/RookieOption/RookieOptionControllerTest.php
-
-		-
-			rawMessage: 'Method class@anonymous/RookieOption/RookieOptionControllerTest.php:38::__construct() has parameter $mockData with no value type specified in iterable type array.'
-			identifier: missingType.iterableValue
-			count: 1
-			path: tests/RookieOption/RookieOptionControllerTest.php
-
-		-
-			rawMessage: 'Method class@anonymous/RookieOption/RookieOptionControllerTest.php:55::__construct() has parameter $rows with no value type specified in iterable type array.'
-			identifier: missingType.iterableValue
-			count: 1
-			path: tests/RookieOption/RookieOptionControllerTest.php
-
-		-
-			rawMessage: 'Method class@anonymous/RookieOption/RookieOptionControllerTest.php:55::fetch_assoc() return type has no value type specified in iterable type array.'
-			identifier: missingType.iterableValue
-			count: 1
-			path: tests/RookieOption/RookieOptionControllerTest.php
-
-		-
-			rawMessage: 'Method class@anonymous/RookieOption/RookieOptionControllerTest.php:83::__construct() has parameter $rows with no value type specified in iterable type array.'
-			identifier: missingType.iterableValue
-			count: 1
-			path: tests/RookieOption/RookieOptionControllerTest.php
-
-		-
-			rawMessage: 'Method class@anonymous/RookieOption/RookieOptionControllerTest.php:83::fetch_assoc() return type has no value type specified in iterable type array.'
-			identifier: missingType.iterableValue
-			count: 1
-			path: tests/RookieOption/RookieOptionControllerTest.php
-
-		-
-			rawMessage: 'Method mysqli@anonymous/RookieOption/RookieOptionControllerTest.php:26::prepare() never returns false so it can be removed from the return type.'
-			identifier: return.unusedType
-			count: 1
-			path: tests/RookieOption/RookieOptionControllerTest.php
-
-		-
-			rawMessage: 'Method mysqli@anonymous/RookieOption/RookieOptionControllerTest.php:26::prepare() never returns mysqli_stmt so it can be removed from the return type.'
-			identifier: return.unusedType
-			count: 1
-			path: tests/RookieOption/RookieOptionControllerTest.php
-
-		-
-			rawMessage: 'Method mysqli@anonymous/RookieOption/RookieOptionControllerTest.php:26::prepare() should return mysqli_stmt|false but returns class@anonymous/RookieOption/RookieOptionControllerTest.php:38.'
-			identifier: return.type
-			count: 1
-			path: tests/RookieOption/RookieOptionControllerTest.php
-
-		-
-			rawMessage: 'Method mysqli@anonymous/RookieOption/RookieOptionControllerTest.php:26::query() never returns bool so it can be removed from the return type.'
-			identifier: return.unusedType
-			count: 1
-			path: tests/RookieOption/RookieOptionControllerTest.php
-
-		-
-			rawMessage: 'Method mysqli@anonymous/RookieOption/RookieOptionControllerTest.php:26::query() never returns mysqli_result so it can be removed from the return type.'
-			identifier: return.unusedType
-			count: 1
-			path: tests/RookieOption/RookieOptionControllerTest.php
-
-		-
-			rawMessage: Property class@anonymous/RookieOption/RookieOptionControllerTest.php:38::$mockData type has no value type specified in iterable type array.
-			identifier: missingType.iterableValue
-			count: 1
-			path: tests/RookieOption/RookieOptionControllerTest.php
-
-		-
-			rawMessage: Property class@anonymous/RookieOption/RookieOptionControllerTest.php:55::$rows type has no value type specified in iterable type array.
-			identifier: missingType.iterableValue
-			count: 1
-			path: tests/RookieOption/RookieOptionControllerTest.php
-
-		-
-			rawMessage: Property class@anonymous/RookieOption/RookieOptionControllerTest.php:83::$rows type has no value type specified in iterable type array.
-			identifier: missingType.iterableValue
-			count: 1
-			path: tests/RookieOption/RookieOptionControllerTest.php
-
-		-
-			rawMessage: Property mysqli@anonymous/RookieOption/RookieOptionControllerTest.php:26::$mockData type has no value type specified in iterable type array.
-			identifier: missingType.iterableValue
-			count: 1
 			path: tests/RookieOption/RookieOptionControllerTest.php
 
 		-
@@ -5343,12 +4869,6 @@ parameters:
 			path: tests/SeasonLeaderboards/CachedSeasonLeaderboardsRepositoryTest.php
 
 		-
-			rawMessage: 'AnonymousClass9acfc5e3bd783c7203d5fc93ff35e725::__construct() does not call parent constructor from mysqli.'
-			identifier: constructor.missingParentCall
-			count: 1
-			path: tests/SeasonLeaderboards/SeasonLeaderboardsRepositoryTest.php
-
-		-
 			rawMessage: 'Call to method PHPUnit\Framework\Assert::assertInstanceOf() with ''BaseMysqliRepository'' and SeasonLeaderboards\SeasonLeaderboardsRepository will always evaluate to true.'
 			identifier: method.alreadyNarrowedType
 			count: 1
@@ -5363,18 +4883,6 @@ parameters:
 		-
 			rawMessage: 'Call to method PHPUnit\Framework\Assert::assertInstanceOf() with ''SeasonLeaderboards\\SeasonLeaderboardsRepository'' and SeasonLeaderboards\SeasonLeaderboardsRepository will always evaluate to true.'
 			identifier: method.alreadyNarrowedType
-			count: 1
-			path: tests/SeasonLeaderboards/SeasonLeaderboardsRepositoryTest.php
-
-		-
-			rawMessage: 'Method mysqli@anonymous/SeasonLeaderboards/SeasonLeaderboardsRepositoryTest.php:35::prepare() never returns false so it can be removed from the return type.'
-			identifier: return.unusedType
-			count: 1
-			path: tests/SeasonLeaderboards/SeasonLeaderboardsRepositoryTest.php
-
-		-
-			rawMessage: 'Return type (Tests\WideUnit\Mocks\MockPreparedStatement|false) of method mysqli@anonymous/SeasonLeaderboards/SeasonLeaderboardsRepositoryTest.php:35::prepare() should be covariant with return type (mysqli_stmt|false) of method mysqli::prepare()'
-			identifier: method.childReturnType
 			count: 1
 			path: tests/SeasonLeaderboards/SeasonLeaderboardsRepositoryTest.php
 
@@ -5437,12 +4945,6 @@ parameters:
 			identifier: missingType.iterableValue
 			count: 1
 			path: tests/SeasonLeaderboards/SeasonLeaderboardsViewXssTest.php
-
-		-
-			rawMessage: 'AnonymousClass94bf36a589116f369a5b12136f7fafea::__construct() does not call parent constructor from mysqli.'
-			identifier: constructor.missingParentCall
-			count: 1
-			path: tests/SeasonTest.php
 
 		-
 			rawMessage: 'Call to function property_exists() with Tests\WideUnit\Mocks\Season and ''showDraftLink'' will always evaluate to true.'
@@ -5517,124 +5019,10 @@ parameters:
 			path: tests/SeasonTest.php
 
 		-
-			rawMessage: 'Method class@anonymous/SeasonTest.php:108::__construct() has parameter $rows with no value type specified in iterable type array.'
-			identifier: missingType.iterableValue
-			count: 1
-			path: tests/SeasonTest.php
-
-		-
-			rawMessage: 'Method class@anonymous/SeasonTest.php:108::fetch_assoc() never returns null so it can be removed from the return type.'
-			identifier: return.unusedType
-			count: 1
-			path: tests/SeasonTest.php
-
-		-
-			rawMessage: 'Method class@anonymous/SeasonTest.php:108::fetch_assoc() return type has no value type specified in iterable type array.'
-			identifier: missingType.iterableValue
-			count: 1
-			path: tests/SeasonTest.php
-
-		-
-			rawMessage: 'Method class@anonymous/SeasonTest.php:108::fetch_object() never returns null so it can be removed from the return type.'
-			identifier: return.unusedType
-			count: 1
-			path: tests/SeasonTest.php
-
-		-
-			rawMessage: 'Method class@anonymous/SeasonTest.php:36::__construct() has parameter $mockData with no value type specified in iterable type array.'
-			identifier: missingType.iterableValue
-			count: 1
-			path: tests/SeasonTest.php
-
-		-
-			rawMessage: 'Method class@anonymous/SeasonTest.php:56::__construct() has parameter $data with no value type specified in iterable type array.'
-			identifier: missingType.iterableValue
-			count: 1
-			path: tests/SeasonTest.php
-
-		-
-			rawMessage: 'Method class@anonymous/SeasonTest.php:56::fetch_assoc() return type has no value type specified in iterable type array.'
-			identifier: missingType.iterableValue
-			count: 1
-			path: tests/SeasonTest.php
-
-		-
-			rawMessage: 'Method mysqli@anonymous/SeasonTest.php:21::prepare() never returns false so it can be removed from the return type.'
-			identifier: return.unusedType
-			count: 1
-			path: tests/SeasonTest.php
-
-		-
-			rawMessage: 'Method mysqli@anonymous/SeasonTest.php:21::prepare() never returns mysqli_stmt so it can be removed from the return type.'
-			identifier: return.unusedType
-			count: 1
-			path: tests/SeasonTest.php
-
-		-
-			rawMessage: 'Method mysqli@anonymous/SeasonTest.php:21::prepare() should return mysqli_stmt|false but returns class@anonymous/SeasonTest.php:36.'
-			identifier: return.type
-			count: 1
-			path: tests/SeasonTest.php
-
-		-
-			rawMessage: 'Method mysqli@anonymous/SeasonTest.php:21::query() never returns bool so it can be removed from the return type.'
-			identifier: return.unusedType
-			count: 1
-			path: tests/SeasonTest.php
-
-		-
-			rawMessage: 'Method mysqli@anonymous/SeasonTest.php:21::query() never returns mysqli_result so it can be removed from the return type.'
-			identifier: return.unusedType
-			count: 1
-			path: tests/SeasonTest.php
-
-		-
-			rawMessage: 'Only booleans are allowed in a ternary operator condition, array|null given.'
-			identifier: ternary.condNotBoolean
-			count: 1
-			path: tests/SeasonTest.php
-
-		-
-			rawMessage: 'Property class@anonymous/SeasonTest.php:108::$index is never read, only written.'
-			identifier: property.onlyWritten
-			count: 1
-			path: tests/SeasonTest.php
-
-		-
-			rawMessage: Property class@anonymous/SeasonTest.php:108::$rows type has no value type specified in iterable type array.
-			identifier: missingType.iterableValue
-			count: 1
-			path: tests/SeasonTest.php
-
-		-
-			rawMessage: Property class@anonymous/SeasonTest.php:36::$mockData type has no value type specified in iterable type array.
-			identifier: missingType.iterableValue
-			count: 1
-			path: tests/SeasonTest.php
-
-		-
-			rawMessage: Property class@anonymous/SeasonTest.php:56::$data type has no value type specified in iterable type array.
-			identifier: missingType.iterableValue
-			count: 1
-			path: tests/SeasonTest.php
-
-		-
-			rawMessage: Property mysqli@anonymous/SeasonTest.php:21::$mockData type has no value type specified in iterable type array.
-			identifier: missingType.iterableValue
-			count: 1
-			path: tests/SeasonTest.php
-
-		-
 			rawMessage: 'You should use assertSame() instead of assertEquals(), because both values are scalars of the same type'
 			identifier: phpunit.assertEquals
 			count: 11
 			path: tests/Security/HtmlSanitizerTest.php
-
-		-
-			rawMessage: 'AnonymousClassf37fff8a911b6b22b8f2eb5bbb3fab5a::__construct() does not call parent constructor from mysqli.'
-			identifier: constructor.missingParentCall
-			count: 1
-			path: tests/SeriesRecords/SeriesRecordsControllerTest.php
 
 		-
 			rawMessage: 'Call to method PHPUnit\Framework\Assert::assertInstanceOf() with ''SeriesRecords\\Contracts\\SeriesRecordsControllerInterface'' and SeriesRecords\SeriesRecordsController will always evaluate to true.'
@@ -5655,102 +5043,6 @@ parameters:
 			path: tests/SeriesRecords/SeriesRecordsControllerTest.php
 
 		-
-			rawMessage: 'Method class@anonymous/SeriesRecords/SeriesRecordsControllerTest.php:38::__construct() has parameter $mockData with no value type specified in iterable type array.'
-			identifier: missingType.iterableValue
-			count: 1
-			path: tests/SeriesRecords/SeriesRecordsControllerTest.php
-
-		-
-			rawMessage: 'Method class@anonymous/SeriesRecords/SeriesRecordsControllerTest.php:55::__construct() has parameter $rows with no value type specified in iterable type array.'
-			identifier: missingType.iterableValue
-			count: 1
-			path: tests/SeriesRecords/SeriesRecordsControllerTest.php
-
-		-
-			rawMessage: 'Method class@anonymous/SeriesRecords/SeriesRecordsControllerTest.php:55::fetch_assoc() return type has no value type specified in iterable type array.'
-			identifier: missingType.iterableValue
-			count: 1
-			path: tests/SeriesRecords/SeriesRecordsControllerTest.php
-
-		-
-			rawMessage: 'Method class@anonymous/SeriesRecords/SeriesRecordsControllerTest.php:83::__construct() has parameter $rows with no value type specified in iterable type array.'
-			identifier: missingType.iterableValue
-			count: 1
-			path: tests/SeriesRecords/SeriesRecordsControllerTest.php
-
-		-
-			rawMessage: 'Method class@anonymous/SeriesRecords/SeriesRecordsControllerTest.php:83::fetch_assoc() return type has no value type specified in iterable type array.'
-			identifier: missingType.iterableValue
-			count: 1
-			path: tests/SeriesRecords/SeriesRecordsControllerTest.php
-
-		-
-			rawMessage: 'Method mysqli@anonymous/SeriesRecords/SeriesRecordsControllerTest.php:26::prepare() never returns false so it can be removed from the return type.'
-			identifier: return.unusedType
-			count: 1
-			path: tests/SeriesRecords/SeriesRecordsControllerTest.php
-
-		-
-			rawMessage: 'Method mysqli@anonymous/SeriesRecords/SeriesRecordsControllerTest.php:26::prepare() never returns mysqli_stmt so it can be removed from the return type.'
-			identifier: return.unusedType
-			count: 1
-			path: tests/SeriesRecords/SeriesRecordsControllerTest.php
-
-		-
-			rawMessage: 'Method mysqli@anonymous/SeriesRecords/SeriesRecordsControllerTest.php:26::prepare() should return mysqli_stmt|false but returns class@anonymous/SeriesRecords/SeriesRecordsControllerTest.php:38.'
-			identifier: return.type
-			count: 1
-			path: tests/SeriesRecords/SeriesRecordsControllerTest.php
-
-		-
-			rawMessage: 'Method mysqli@anonymous/SeriesRecords/SeriesRecordsControllerTest.php:26::query() never returns bool so it can be removed from the return type.'
-			identifier: return.unusedType
-			count: 1
-			path: tests/SeriesRecords/SeriesRecordsControllerTest.php
-
-		-
-			rawMessage: 'Method mysqli@anonymous/SeriesRecords/SeriesRecordsControllerTest.php:26::query() never returns mysqli_result so it can be removed from the return type.'
-			identifier: return.unusedType
-			count: 1
-			path: tests/SeriesRecords/SeriesRecordsControllerTest.php
-
-		-
-			rawMessage: 'Method mysqli@anonymous/SeriesRecords/SeriesRecordsControllerTest.php:26::query() should return bool|mysqli_result but returns class@anonymous/SeriesRecords/SeriesRecordsControllerTest.php:83.'
-			identifier: return.type
-			count: 1
-			path: tests/SeriesRecords/SeriesRecordsControllerTest.php
-
-		-
-			rawMessage: Property class@anonymous/SeriesRecords/SeriesRecordsControllerTest.php:38::$mockData type has no value type specified in iterable type array.
-			identifier: missingType.iterableValue
-			count: 1
-			path: tests/SeriesRecords/SeriesRecordsControllerTest.php
-
-		-
-			rawMessage: Property class@anonymous/SeriesRecords/SeriesRecordsControllerTest.php:55::$rows type has no value type specified in iterable type array.
-			identifier: missingType.iterableValue
-			count: 1
-			path: tests/SeriesRecords/SeriesRecordsControllerTest.php
-
-		-
-			rawMessage: Property class@anonymous/SeriesRecords/SeriesRecordsControllerTest.php:83::$rows type has no value type specified in iterable type array.
-			identifier: missingType.iterableValue
-			count: 1
-			path: tests/SeriesRecords/SeriesRecordsControllerTest.php
-
-		-
-			rawMessage: Property mysqli@anonymous/SeriesRecords/SeriesRecordsControllerTest.php:26::$mockData type has no value type specified in iterable type array.
-			identifier: missingType.iterableValue
-			count: 1
-			path: tests/SeriesRecords/SeriesRecordsControllerTest.php
-
-		-
-			rawMessage: 'AnonymousClass488ce1d08edf0466adc81521ecf2edee::__construct() does not call parent constructor from mysqli.'
-			identifier: constructor.missingParentCall
-			count: 1
-			path: tests/SeriesRecords/SeriesRecordsRepositoryTest.php
-
-		-
 			rawMessage: 'Call to method PHPUnit\Framework\Assert::assertInstanceOf() with ''BaseMysqliRepository'' and SeriesRecords\SeriesRecordsRepository will always evaluate to true.'
 			identifier: method.alreadyNarrowedType
 			count: 1
@@ -5765,18 +5057,6 @@ parameters:
 		-
 			rawMessage: 'Call to method PHPUnit\Framework\Assert::assertInstanceOf() with ''SeriesRecords\\SeriesRecordsRepository'' and SeriesRecords\SeriesRecordsRepository will always evaluate to true.'
 			identifier: method.alreadyNarrowedType
-			count: 1
-			path: tests/SeriesRecords/SeriesRecordsRepositoryTest.php
-
-		-
-			rawMessage: 'Method mysqli@anonymous/SeriesRecords/SeriesRecordsRepositoryTest.php:35::prepare() never returns false so it can be removed from the return type.'
-			identifier: return.unusedType
-			count: 1
-			path: tests/SeriesRecords/SeriesRecordsRepositoryTest.php
-
-		-
-			rawMessage: 'Return type (Tests\WideUnit\Mocks\MockPreparedStatement|false) of method mysqli@anonymous/SeriesRecords/SeriesRecordsRepositoryTest.php:35::prepare() should be covariant with return type (mysqli_stmt|false) of method mysqli::prepare()'
-			identifier: method.childReturnType
 			count: 1
 			path: tests/SeriesRecords/SeriesRecordsRepositoryTest.php
 
@@ -5865,12 +5145,6 @@ parameters:
 			path: tests/Statistics/TeamStatsCalculatorTest.php
 
 		-
-			rawMessage: 'AnonymousClasseb21003b881e4c313b7b2ba42b09b41d::__construct() does not call parent constructor from mysqli.'
-			identifier: constructor.missingParentCall
-			count: 1
-			path: tests/Team/TeamControllerTest.php
-
-		-
 			rawMessage: 'Call to method PHPUnit\Framework\Assert::assertInstanceOf() with ''Team\\Contracts\\TeamControllerInterface'' and Team\TeamController will always evaluate to true.'
 			identifier: method.alreadyNarrowedType
 			count: 1
@@ -5886,90 +5160,6 @@ parameters:
 			rawMessage: 'Dynamic call to static method PHPUnit\Framework\TestCase::createStub().'
 			identifier: staticMethod.dynamicCall
 			count: 6
-			path: tests/Team/TeamControllerTest.php
-
-		-
-			rawMessage: 'Method class@anonymous/Team/TeamControllerTest.php:38::__construct() has parameter $mockData with no value type specified in iterable type array.'
-			identifier: missingType.iterableValue
-			count: 1
-			path: tests/Team/TeamControllerTest.php
-
-		-
-			rawMessage: 'Method class@anonymous/Team/TeamControllerTest.php:55::__construct() has parameter $rows with no value type specified in iterable type array.'
-			identifier: missingType.iterableValue
-			count: 1
-			path: tests/Team/TeamControllerTest.php
-
-		-
-			rawMessage: 'Method class@anonymous/Team/TeamControllerTest.php:55::fetch_assoc() return type has no value type specified in iterable type array.'
-			identifier: missingType.iterableValue
-			count: 1
-			path: tests/Team/TeamControllerTest.php
-
-		-
-			rawMessage: 'Method class@anonymous/Team/TeamControllerTest.php:83::__construct() has parameter $rows with no value type specified in iterable type array.'
-			identifier: missingType.iterableValue
-			count: 1
-			path: tests/Team/TeamControllerTest.php
-
-		-
-			rawMessage: 'Method class@anonymous/Team/TeamControllerTest.php:83::fetch_assoc() return type has no value type specified in iterable type array.'
-			identifier: missingType.iterableValue
-			count: 1
-			path: tests/Team/TeamControllerTest.php
-
-		-
-			rawMessage: 'Method mysqli@anonymous/Team/TeamControllerTest.php:26::prepare() never returns false so it can be removed from the return type.'
-			identifier: return.unusedType
-			count: 1
-			path: tests/Team/TeamControllerTest.php
-
-		-
-			rawMessage: 'Method mysqli@anonymous/Team/TeamControllerTest.php:26::prepare() never returns mysqli_stmt so it can be removed from the return type.'
-			identifier: return.unusedType
-			count: 1
-			path: tests/Team/TeamControllerTest.php
-
-		-
-			rawMessage: 'Method mysqli@anonymous/Team/TeamControllerTest.php:26::prepare() should return mysqli_stmt|false but returns class@anonymous/Team/TeamControllerTest.php:38.'
-			identifier: return.type
-			count: 1
-			path: tests/Team/TeamControllerTest.php
-
-		-
-			rawMessage: 'Method mysqli@anonymous/Team/TeamControllerTest.php:26::query() never returns bool so it can be removed from the return type.'
-			identifier: return.unusedType
-			count: 1
-			path: tests/Team/TeamControllerTest.php
-
-		-
-			rawMessage: 'Method mysqli@anonymous/Team/TeamControllerTest.php:26::query() never returns mysqli_result so it can be removed from the return type.'
-			identifier: return.unusedType
-			count: 1
-			path: tests/Team/TeamControllerTest.php
-
-		-
-			rawMessage: Property class@anonymous/Team/TeamControllerTest.php:38::$mockData type has no value type specified in iterable type array.
-			identifier: missingType.iterableValue
-			count: 1
-			path: tests/Team/TeamControllerTest.php
-
-		-
-			rawMessage: Property class@anonymous/Team/TeamControllerTest.php:55::$rows type has no value type specified in iterable type array.
-			identifier: missingType.iterableValue
-			count: 1
-			path: tests/Team/TeamControllerTest.php
-
-		-
-			rawMessage: Property class@anonymous/Team/TeamControllerTest.php:83::$rows type has no value type specified in iterable type array.
-			identifier: missingType.iterableValue
-			count: 1
-			path: tests/Team/TeamControllerTest.php
-
-		-
-			rawMessage: Property mysqli@anonymous/Team/TeamControllerTest.php:26::$mockData type has no value type specified in iterable type array.
-			identifier: missingType.iterableValue
-			count: 1
 			path: tests/Team/TeamControllerTest.php
 
 		-
@@ -6141,12 +5331,6 @@ parameters:
 			path: tests/TeamOffDefStats/TeamOffDefStatsViewTest.php
 
 		-
-			rawMessage: 'AnonymousClass620c2105dd3fe95bd4a0eeb0a46651aa::__construct() does not call parent constructor from mysqli.'
-			identifier: constructor.missingParentCall
-			count: 1
-			path: tests/TeamSchedule/TeamScheduleServiceTest.php
-
-		-
 			rawMessage: 'Call to method PHPUnit\Framework\Assert::assertInstanceOf() with ''TeamSchedule\\Contracts\\TeamScheduleServiceInterface'' and TeamSchedule\TeamScheduleService will always evaluate to true.'
 			identifier: method.alreadyNarrowedType
 			count: 1
@@ -6161,18 +5345,6 @@ parameters:
 		-
 			rawMessage: 'Dynamic call to static method PHPUnit\Framework\TestCase::createStub().'
 			identifier: staticMethod.dynamicCall
-			count: 1
-			path: tests/TeamSchedule/TeamScheduleServiceTest.php
-
-		-
-			rawMessage: 'Method mysqli@anonymous/TeamSchedule/TeamScheduleServiceTest.php:41::prepare() never returns false so it can be removed from the return type.'
-			identifier: return.unusedType
-			count: 1
-			path: tests/TeamSchedule/TeamScheduleServiceTest.php
-
-		-
-			rawMessage: 'Return type (Tests\WideUnit\Mocks\MockPreparedStatement|false) of method mysqli@anonymous/TeamSchedule/TeamScheduleServiceTest.php:41::prepare() should be covariant with return type (mysqli_stmt|false) of method mysqli::prepare()'
-			identifier: method.childReturnType
 			count: 1
 			path: tests/TeamSchedule/TeamScheduleServiceTest.php
 
@@ -6219,12 +5391,6 @@ parameters:
 			path: tests/Topics/TopicsViewTest.php
 
 		-
-			rawMessage: 'AnonymousClass6d67ed5703ba9d609bf3307f59aeaabd::__construct() does not call parent constructor from mysqli.'
-			identifier: constructor.missingParentCall
-			count: 1
-			path: tests/Trading/CashTransactionHandlerTest.php
-
-		-
 			rawMessage: 'Call to method PHPUnit\Framework\Assert::assertInstanceOf() with ''Trading\\CashTransactionHandler'' and Trading\CashTransactionHandler will always evaluate to true.'
 			identifier: method.alreadyNarrowedType
 			count: 1
@@ -6243,106 +5409,10 @@ parameters:
 			path: tests/Trading/CashTransactionHandlerTest.php
 
 		-
-			rawMessage: 'Method class@anonymous/Trading/CashTransactionHandlerTest.php:44::__construct() has parameter $mockData with no value type specified in iterable type array.'
-			identifier: missingType.iterableValue
-			count: 1
-			path: tests/Trading/CashTransactionHandlerTest.php
-
-		-
-			rawMessage: 'Method class@anonymous/Trading/CashTransactionHandlerTest.php:64::__construct() has parameter $rows with no value type specified in iterable type array.'
-			identifier: missingType.iterableValue
-			count: 1
-			path: tests/Trading/CashTransactionHandlerTest.php
-
-		-
-			rawMessage: 'Method class@anonymous/Trading/CashTransactionHandlerTest.php:64::fetch_assoc() return type has no value type specified in iterable type array.'
-			identifier: missingType.iterableValue
-			count: 1
-			path: tests/Trading/CashTransactionHandlerTest.php
-
-		-
-			rawMessage: 'Method class@anonymous/Trading/CashTransactionHandlerTest.php:96::__construct() has parameter $rows with no value type specified in iterable type array.'
-			identifier: missingType.iterableValue
-			count: 1
-			path: tests/Trading/CashTransactionHandlerTest.php
-
-		-
-			rawMessage: 'Method class@anonymous/Trading/CashTransactionHandlerTest.php:96::fetch_assoc() return type has no value type specified in iterable type array.'
-			identifier: missingType.iterableValue
-			count: 1
-			path: tests/Trading/CashTransactionHandlerTest.php
-
-		-
-			rawMessage: 'Method mysqli@anonymous/Trading/CashTransactionHandlerTest.php:30::prepare() never returns false so it can be removed from the return type.'
-			identifier: return.unusedType
-			count: 1
-			path: tests/Trading/CashTransactionHandlerTest.php
-
-		-
-			rawMessage: 'Method mysqli@anonymous/Trading/CashTransactionHandlerTest.php:30::prepare() never returns mysqli_stmt so it can be removed from the return type.'
-			identifier: return.unusedType
-			count: 1
-			path: tests/Trading/CashTransactionHandlerTest.php
-
-		-
-			rawMessage: 'Method mysqli@anonymous/Trading/CashTransactionHandlerTest.php:30::prepare() should return mysqli_stmt|false but returns class@anonymous/Trading/CashTransactionHandlerTest.php:44.'
-			identifier: return.type
-			count: 1
-			path: tests/Trading/CashTransactionHandlerTest.php
-
-		-
-			rawMessage: 'Method mysqli@anonymous/Trading/CashTransactionHandlerTest.php:30::query() never returns bool so it can be removed from the return type.'
-			identifier: return.unusedType
-			count: 1
-			path: tests/Trading/CashTransactionHandlerTest.php
-
-		-
-			rawMessage: 'Method mysqli@anonymous/Trading/CashTransactionHandlerTest.php:30::query() never returns mysqli_result so it can be removed from the return type.'
-			identifier: return.unusedType
-			count: 1
-			path: tests/Trading/CashTransactionHandlerTest.php
-
-		-
-			rawMessage: Property class@anonymous/Trading/CashTransactionHandlerTest.php:44::$mockData type has no value type specified in iterable type array.
-			identifier: missingType.iterableValue
-			count: 1
-			path: tests/Trading/CashTransactionHandlerTest.php
-
-		-
-			rawMessage: 'Property class@anonymous/Trading/CashTransactionHandlerTest.php:64::$playerExists is never read, only written.'
-			identifier: property.onlyWritten
-			count: 1
-			path: tests/Trading/CashTransactionHandlerTest.php
-
-		-
-			rawMessage: Property class@anonymous/Trading/CashTransactionHandlerTest.php:64::$rows type has no value type specified in iterable type array.
-			identifier: missingType.iterableValue
-			count: 1
-			path: tests/Trading/CashTransactionHandlerTest.php
-
-		-
-			rawMessage: Property class@anonymous/Trading/CashTransactionHandlerTest.php:96::$rows type has no value type specified in iterable type array.
-			identifier: missingType.iterableValue
-			count: 1
-			path: tests/Trading/CashTransactionHandlerTest.php
-
-		-
-			rawMessage: Property mysqli@anonymous/Trading/CashTransactionHandlerTest.php:30::$mockData type has no value type specified in iterable type array.
-			identifier: missingType.iterableValue
-			count: 1
-			path: tests/Trading/CashTransactionHandlerTest.php
-
-		-
 			rawMessage: 'You should use assertSame() instead of assertEquals(), because both values are scalars of the same type'
 			identifier: phpunit.assertEquals
 			count: 4
 			path: tests/Trading/CashTransactionHandlerTest.php
-
-		-
-			rawMessage: 'AnonymousClasse725bbbf9a0b0ae2e707b64d8ba3a0f5::__construct() does not call parent constructor from mysqli.'
-			identifier: constructor.missingParentCall
-			count: 1
-			path: tests/Trading/TradeCashRepositoryTest.php
 
 		-
 			rawMessage: 'Call to method PHPUnit\Framework\Assert::assertInstanceOf() with ''Trading\\Contracts\\TradeCashRepositoryInterface'' and Trading\TradeCashRepository will always evaluate to true.'
@@ -6355,36 +5425,6 @@ parameters:
 			identifier: method.alreadyNarrowedType
 			count: 1
 			path: tests/Trading/TradeCashRepositoryTest.php
-
-		-
-			rawMessage: 'Method mysqli@anonymous/Trading/TradeCashRepositoryTest.php:38::prepare() never returns false so it can be removed from the return type.'
-			identifier: return.unusedType
-			count: 1
-			path: tests/Trading/TradeCashRepositoryTest.php
-
-		-
-			rawMessage: 'Method mysqli@anonymous/Trading/TradeCashRepositoryTest.php:38::query() never returns mysqli_result so it can be removed from the return type.'
-			identifier: return.unusedType
-			count: 1
-			path: tests/Trading/TradeCashRepositoryTest.php
-
-		-
-			rawMessage: 'Return type (Tests\WideUnit\Mocks\MockPreparedStatement|false) of method mysqli@anonymous/Trading/TradeCashRepositoryTest.php:38::prepare() should be covariant with return type (mysqli_stmt|false) of method mysqli::prepare()'
-			identifier: method.childReturnType
-			count: 1
-			path: tests/Trading/TradeCashRepositoryTest.php
-
-		-
-			rawMessage: 'AnonymousClass0c523006e897925abd2fecab0f98167e::__construct() does not call parent constructor from Trading\TradeOffer.'
-			identifier: constructor.missingParentCall
-			count: 1
-			path: tests/Trading/TradeOfferTest.php
-
-		-
-			rawMessage: 'AnonymousClass52a28f38319fd81ebf642526e47afe0c::__construct() does not call parent constructor from mysqli.'
-			identifier: constructor.missingParentCall
-			count: 1
-			path: tests/Trading/TradeOfferTest.php
 
 		-
 			rawMessage: 'Dynamic call to static method PHPUnit\Framework\Assert::anything().'
@@ -6405,12 +5445,6 @@ parameters:
 			path: tests/Trading/TradeOfferTest.php
 
 		-
-			rawMessage: 'AnonymousClassb9eb6ccaf8186089ff8af56ea46d7a07::__construct() does not call parent constructor from mysqli.'
-			identifier: constructor.missingParentCall
-			count: 1
-			path: tests/Trading/TradeProcessorTest.php
-
-		-
 			rawMessage: 'Call to method PHPUnit\Framework\Assert::assertInstanceOf() with ''Trading\\Contracts\\TradeProcessorInterface'' and Trading\TradeProcessor will always evaluate to true.'
 			identifier: method.alreadyNarrowedType
 			count: 1
@@ -6429,100 +5463,10 @@ parameters:
 			path: tests/Trading/TradeProcessorTest.php
 
 		-
-			rawMessage: 'Method class@anonymous/Trading/TradeProcessorTest.php:102::__construct() has parameter $rows with no value type specified in iterable type array.'
-			identifier: missingType.iterableValue
-			count: 1
-			path: tests/Trading/TradeProcessorTest.php
-
-		-
-			rawMessage: 'Method class@anonymous/Trading/TradeProcessorTest.php:102::fetch_assoc() return type has no value type specified in iterable type array.'
-			identifier: missingType.iterableValue
-			count: 1
-			path: tests/Trading/TradeProcessorTest.php
-
-		-
-			rawMessage: 'Method class@anonymous/Trading/TradeProcessorTest.php:40::__construct() has parameter $mockData with no value type specified in iterable type array.'
-			identifier: missingType.iterableValue
-			count: 1
-			path: tests/Trading/TradeProcessorTest.php
-
-		-
-			rawMessage: 'Method class@anonymous/Trading/TradeProcessorTest.php:57::__construct() has parameter $rows with no value type specified in iterable type array.'
-			identifier: missingType.iterableValue
-			count: 1
-			path: tests/Trading/TradeProcessorTest.php
-
-		-
-			rawMessage: 'Method class@anonymous/Trading/TradeProcessorTest.php:57::fetch_assoc() return type has no value type specified in iterable type array.'
-			identifier: missingType.iterableValue
-			count: 1
-			path: tests/Trading/TradeProcessorTest.php
-
-		-
-			rawMessage: 'Method mysqli@anonymous/Trading/TradeProcessorTest.php:28::prepare() never returns false so it can be removed from the return type.'
-			identifier: return.unusedType
-			count: 1
-			path: tests/Trading/TradeProcessorTest.php
-
-		-
-			rawMessage: 'Method mysqli@anonymous/Trading/TradeProcessorTest.php:28::prepare() never returns mysqli_stmt so it can be removed from the return type.'
-			identifier: return.unusedType
-			count: 1
-			path: tests/Trading/TradeProcessorTest.php
-
-		-
-			rawMessage: 'Method mysqli@anonymous/Trading/TradeProcessorTest.php:28::prepare() should return mysqli_stmt|false but returns class@anonymous/Trading/TradeProcessorTest.php:40.'
-			identifier: return.type
-			count: 1
-			path: tests/Trading/TradeProcessorTest.php
-
-		-
-			rawMessage: 'Method mysqli@anonymous/Trading/TradeProcessorTest.php:28::query() never returns bool so it can be removed from the return type.'
-			identifier: return.unusedType
-			count: 1
-			path: tests/Trading/TradeProcessorTest.php
-
-		-
-			rawMessage: 'Method mysqli@anonymous/Trading/TradeProcessorTest.php:28::query() never returns mysqli_result so it can be removed from the return type.'
-			identifier: return.unusedType
-			count: 1
-			path: tests/Trading/TradeProcessorTest.php
-
-		-
-			rawMessage: Property class@anonymous/Trading/TradeProcessorTest.php:102::$rows type has no value type specified in iterable type array.
-			identifier: missingType.iterableValue
-			count: 1
-			path: tests/Trading/TradeProcessorTest.php
-
-		-
-			rawMessage: Property class@anonymous/Trading/TradeProcessorTest.php:40::$mockData type has no value type specified in iterable type array.
-			identifier: missingType.iterableValue
-			count: 1
-			path: tests/Trading/TradeProcessorTest.php
-
-		-
-			rawMessage: Property class@anonymous/Trading/TradeProcessorTest.php:57::$rows type has no value type specified in iterable type array.
-			identifier: missingType.iterableValue
-			count: 1
-			path: tests/Trading/TradeProcessorTest.php
-
-		-
-			rawMessage: Property mysqli@anonymous/Trading/TradeProcessorTest.php:28::$mockData type has no value type specified in iterable type array.
-			identifier: missingType.iterableValue
-			count: 1
-			path: tests/Trading/TradeProcessorTest.php
-
-		-
 			rawMessage: 'Dynamic call to static method PHPUnit\Framework\TestCase::createStub().'
 			identifier: staticMethod.dynamicCall
 			count: 7
 			path: tests/Trading/TradeQueueProcessorTest.php
-
-		-
-			rawMessage: 'AnonymousClass69ff2a639c35219578b019e0e30d3872::__construct() does not call parent constructor from mysqli.'
-			identifier: constructor.missingParentCall
-			count: 1
-			path: tests/Trading/TradeRosterPreviewApiHandlerTest.php
 
 		-
 			rawMessage: 'Call to method PHPUnit\Framework\Assert::assertTrue() with true will always evaluate to true.'
@@ -6699,12 +5643,6 @@ parameters:
 			path: tests/Trading/TradeValidatorTest.php
 
 		-
-			rawMessage: 'AnonymousClass87301b1fa28e16c2c74f8f424805e5c6::__construct() does not call parent constructor from mysqli.'
-			identifier: constructor.missingParentCall
-			count: 1
-			path: tests/Trading/TradingControllerAcceptOfferTest.php
-
-		-
 			rawMessage: 'Call to method PHPUnit\Framework\Assert::assertInstanceOf() with ''Trading\\Contracts\\TradingControllerInterface'' and Trading\TradingController will always evaluate to true.'
 			identifier: method.alreadyNarrowedType
 			count: 1
@@ -6723,12 +5661,6 @@ parameters:
 			path: tests/Trading/TradingControllerAcceptOfferTest.php
 
 		-
-			rawMessage: 'AnonymousClass0a6b2cbada662207de9128fd01703e32::__construct() does not call parent constructor from mysqli.'
-			identifier: constructor.missingParentCall
-			count: 1
-			path: tests/Trading/TradingControllerOfferTest.php
-
-		-
 			rawMessage: 'Call to method PHPUnit\Framework\Assert::assertInstanceOf() with ''Trading\\TradingController'' and Trading\TradingController will always evaluate to true.'
 			identifier: method.alreadyNarrowedType
 			count: 1
@@ -6739,12 +5671,6 @@ parameters:
 			identifier: staticMethod.dynamicCall
 			count: 8
 			path: tests/Trading/TradingControllerOfferTest.php
-
-		-
-			rawMessage: 'AnonymousClassdaa3935e821acc879e516cc033ea6985::__construct() does not call parent constructor from mysqli.'
-			identifier: constructor.missingParentCall
-			count: 1
-			path: tests/Trading/TradingControllerRejectOfferTest.php
 
 		-
 			rawMessage: 'Call to method PHPUnit\Framework\Assert::assertInstanceOf() with ''Trading\\Contracts\\TradingControllerInterface'' and Trading\TradingController will always evaluate to true.'
@@ -6765,12 +5691,6 @@ parameters:
 			path: tests/Trading/TradingControllerRejectOfferTest.php
 
 		-
-			rawMessage: 'AnonymousClassfdabb87ea876986bbe87ab9322f68dcc::__construct() does not call parent constructor from mysqli.'
-			identifier: constructor.missingParentCall
-			count: 1
-			path: tests/Trading/TradingControllerReviewTest.php
-
-		-
 			rawMessage: 'Call to method PHPUnit\Framework\Assert::assertInstanceOf() with ''Trading\\Contracts\\TradingControllerInterface'' and Trading\TradingController will always evaluate to true.'
 			identifier: method.alreadyNarrowedType
 			count: 1
@@ -6781,12 +5701,6 @@ parameters:
 			identifier: staticMethod.dynamicCall
 			count: 8
 			path: tests/Trading/TradingControllerReviewTest.php
-
-		-
-			rawMessage: 'AnonymousClass6bff3a09370dc33493d3dee377ce00be::__construct() does not call parent constructor from mysqli.'
-			identifier: constructor.missingParentCall
-			count: 1
-			path: tests/Trading/TradingControllerRosterPreviewTest.php
 
 		-
 			rawMessage: 'Dynamic call to static method PHPUnit\Framework\TestCase::createStub().'
@@ -6795,12 +5709,6 @@ parameters:
 			path: tests/Trading/TradingControllerRosterPreviewTest.php
 
 		-
-			rawMessage: 'AnonymousClass9a703ff2a761b21167a04cdac3793377::__construct() does not call parent constructor from mysqli.'
-			identifier: constructor.missingParentCall
-			count: 1
-			path: tests/Trading/TradingControllerSubmitOfferTest.php
-
-		-
 			rawMessage: 'Call to method PHPUnit\Framework\Assert::assertInstanceOf() with ''Trading\\Contracts\\TradingControllerInterface'' and Trading\TradingController will always evaluate to true.'
 			identifier: method.alreadyNarrowedType
 			count: 1
@@ -6817,12 +5725,6 @@ parameters:
 			identifier: staticMethod.dynamicCall
 			count: 7
 			path: tests/Trading/TradingControllerSubmitOfferTest.php
-
-		-
-			rawMessage: 'AnonymousClassb0d8ff15a6d01fa74fec69063e320558::__construct() does not call parent constructor from mysqli.'
-			identifier: constructor.missingParentCall
-			count: 1
-			path: tests/Trading/TradingRepositoryTest.php
 
 		-
 			rawMessage: 'Call to method PHPUnit\Framework\Assert::assertInstanceOf() with ''BaseMysqliRepository'' and Trading\TradeAssetRepository will always evaluate to true.'
@@ -6885,30 +5787,6 @@ parameters:
 			path: tests/Trading/TradingRepositoryTest.php
 
 		-
-			rawMessage: 'Method mysqli@anonymous/Trading/TradingRepositoryTest.php:43::prepare() never returns false so it can be removed from the return type.'
-			identifier: return.unusedType
-			count: 1
-			path: tests/Trading/TradingRepositoryTest.php
-
-		-
-			rawMessage: 'Method mysqli@anonymous/Trading/TradingRepositoryTest.php:43::query() never returns mysqli_result so it can be removed from the return type.'
-			identifier: return.unusedType
-			count: 1
-			path: tests/Trading/TradingRepositoryTest.php
-
-		-
-			rawMessage: 'Return type (Tests\WideUnit\Mocks\MockPreparedStatement|false) of method mysqli@anonymous/Trading/TradingRepositoryTest.php:43::prepare() should be covariant with return type (mysqli_stmt|false) of method mysqli::prepare()'
-			identifier: method.childReturnType
-			count: 1
-			path: tests/Trading/TradingRepositoryTest.php
-
-		-
-			rawMessage: 'AnonymousClass1c5674ae0410fe91d691385d16df6b55::__construct() does not call parent constructor from mysqli.'
-			identifier: constructor.missingParentCall
-			count: 1
-			path: tests/Trading/TradingServiceTest.php
-
-		-
 			rawMessage: 'Dynamic call to static method PHPUnit\Framework\TestCase::createStub().'
 			identifier: staticMethod.dynamicCall
 			count: 69
@@ -6957,26 +5835,8 @@ parameters:
 			path: tests/Trading/TradingViewTest.php
 
 		-
-			rawMessage: 'AnonymousClass2cc53c05b504c5ad105b666f27717cc1::__construct() does not call parent constructor from mysqli.'
-			identifier: constructor.missingParentCall
-			count: 1
-			path: tests/TrainingCampRatingsDiff/TrainingCampRatingsDiffRepositoryTest.php
-
-		-
 			rawMessage: 'Call to static method PHPUnit\Framework\Assert::assertInstanceOf() with ''TrainingCampRatingsDiff\\Contracts\\TrainingCampRatingsDiffRepositoryInterface'' and TrainingCampRatingsDiff\TrainingCampRatingsDiffRepository will always evaluate to true.'
 			identifier: staticMethod.alreadyNarrowedType
-			count: 1
-			path: tests/TrainingCampRatingsDiff/TrainingCampRatingsDiffRepositoryTest.php
-
-		-
-			rawMessage: 'Method mysqli@anonymous/TrainingCampRatingsDiff/TrainingCampRatingsDiffRepositoryTest.php:106::prepare() never returns false so it can be removed from the return type.'
-			identifier: return.unusedType
-			count: 1
-			path: tests/TrainingCampRatingsDiff/TrainingCampRatingsDiffRepositoryTest.php
-
-		-
-			rawMessage: 'Return type (Tests\WideUnit\Mocks\MockPreparedStatement|false) of method mysqli@anonymous/TrainingCampRatingsDiff/TrainingCampRatingsDiffRepositoryTest.php:106::prepare() should be covariant with return type (mysqli_stmt|false) of method mysqli::prepare()'
-			identifier: method.childReturnType
 			count: 1
 			path: tests/TrainingCampRatingsDiff/TrainingCampRatingsDiffRepositoryTest.php
 
@@ -7395,26 +6255,8 @@ parameters:
 			path: tests/UpdateAllTheThings/Steps/RefreshTeamSeasonRecordsStepTest.php
 
 		-
-			rawMessage: 'AnonymousClassda9df0f5fb27c4becd27f088f4642270::__construct() does not call parent constructor from mysqli.'
-			identifier: constructor.missingParentCall
-			count: 1
-			path: tests/UpdateAllTheThings/Steps/ResetExtensionAttemptsStepTest.php
-
-		-
 			rawMessage: 'Call to method PHPUnit\Framework\Assert::assertInstanceOf() with ''Updater\\Contracts\\PipelineStepInterface'' and Updater\Steps\ResetExtensionAttemptsStep will always evaluate to true.'
 			identifier: method.alreadyNarrowedType
-			count: 1
-			path: tests/UpdateAllTheThings/Steps/ResetExtensionAttemptsStepTest.php
-
-		-
-			rawMessage: 'Method mysqli@anonymous/UpdateAllTheThings/Steps/ResetExtensionAttemptsStepTest.php:46::prepare() never returns false so it can be removed from the return type.'
-			identifier: return.unusedType
-			count: 1
-			path: tests/UpdateAllTheThings/Steps/ResetExtensionAttemptsStepTest.php
-
-		-
-			rawMessage: 'Return type (Tests\WideUnit\Mocks\MockPreparedStatement|false) of method mysqli@anonymous/UpdateAllTheThings/Steps/ResetExtensionAttemptsStepTest.php:46::prepare() should be covariant with return type (mysqli_stmt|false) of method mysqli::prepare()'
-			identifier: method.childReturnType
 			count: 1
 			path: tests/UpdateAllTheThings/Steps/ResetExtensionAttemptsStepTest.php
 
@@ -8271,18 +7113,6 @@ parameters:
 			path: tests/WideUnit/Mocks/MockDatabase.php
 
 		-
-			rawMessage: 'Return type (Tests\WideUnit\Mocks\MockPreparedStatement) of method Tests\WideUnit\Mocks\MockDatabase::prepare() should be compatible with return type (mysqli_stmt|false) of method mysqli::prepare()'
-			identifier: method.childReturnType
-			count: 1
-			path: tests/WideUnit/Mocks/MockDatabase.php
-
-		-
-			rawMessage: 'Tests\WideUnit\Mocks\MockDatabase::__construct() does not call parent constructor from mysqli.'
-			identifier: constructor.missingParentCall
-			count: 1
-			path: tests/WideUnit/Mocks/MockDatabase.php
-
-		-
 			rawMessage: 'Method Tests\WideUnit\Mocks\MockDatabaseResult::__construct() has parameter $data with no value type specified in iterable type array.'
 			identifier: missingType.iterableValue
 			count: 1
@@ -8571,12 +7401,6 @@ parameters:
 			path: tests/WideUnit/Waivers/WaiversWideUnitTest.php
 
 		-
-			rawMessage: 'AnonymousClassf81ca2c6816c6895d71bed1fe6551122::__construct() does not call parent constructor from mysqli.'
-			identifier: constructor.missingParentCall
-			count: 1
-			path: tests/WideUnit/WideUnitTestCase.php
-
-		-
 			rawMessage: 'Call to method PHPUnit\Framework\Assert::assertTrue() with true will always evaluate to true.'
 			identifier: method.alreadyNarrowedType
 			count: 1
@@ -8591,24 +7415,6 @@ parameters:
 		-
 			rawMessage: 'Method Tests\WideUnit\WideUnitTestCase::getExecutedQueries() return type has no value type specified in iterable type array.'
 			identifier: missingType.iterableValue
-			count: 1
-			path: tests/WideUnit/WideUnitTestCase.php
-
-		-
-			rawMessage: 'Method mysqli@anonymous/WideUnit/WideUnitTestCase.php:70::prepare() never returns false so it can be removed from the return type.'
-			identifier: return.unusedType
-			count: 1
-			path: tests/WideUnit/WideUnitTestCase.php
-
-		-
-			rawMessage: 'Method mysqli@anonymous/WideUnit/WideUnitTestCase.php:70::query() never returns mysqli_result so it can be removed from the return type.'
-			identifier: return.unusedType
-			count: 1
-			path: tests/WideUnit/WideUnitTestCase.php
-
-		-
-			rawMessage: 'Return type (Tests\WideUnit\Mocks\MockPreparedStatement|false) of method mysqli@anonymous/WideUnit/WideUnitTestCase.php:70::prepare() should be covariant with return type (mysqli_stmt|false) of method mysqli::prepare()'
-			identifier: method.childReturnType
 			count: 1
 			path: tests/WideUnit/WideUnitTestCase.php
 

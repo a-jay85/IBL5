@@ -8,15 +8,13 @@ use PHPUnit\Framework\TestCase;
 use Updater\Contracts\PipelineStepInterface;
 use Updater\Steps\ResetExtensionAttemptsStep;
 use Tests\WideUnit\Mocks\MockDatabase;
-use Tests\WideUnit\Mocks\MockPreparedStatement;
 
 class ResetExtensionAttemptsStepTest extends TestCase
 {
     public function testImplementsPipelineStepInterface(): void
     {
         $mockDb = new MockDatabase();
-        $db = $this->createMockMysqli($mockDb);
-        $step = new ResetExtensionAttemptsStep($db);
+        $step = new ResetExtensionAttemptsStep($mockDb);
 
         $this->assertInstanceOf(PipelineStepInterface::class, $step);
     }
@@ -24,8 +22,7 @@ class ResetExtensionAttemptsStepTest extends TestCase
     public function testGetLabelReturnsExpectedLabel(): void
     {
         $mockDb = new MockDatabase();
-        $db = $this->createMockMysqli($mockDb);
-        $step = new ResetExtensionAttemptsStep($db);
+        $step = new ResetExtensionAttemptsStep($mockDb);
 
         $this->assertSame('Extension attempts reset', $step->getLabel());
     }
@@ -33,29 +30,10 @@ class ResetExtensionAttemptsStepTest extends TestCase
     public function testExecuteReturnsSuccess(): void
     {
         $mockDb = new MockDatabase();
-        $db = $this->createMockMysqli($mockDb);
-        $step = new ResetExtensionAttemptsStep($db);
+        $step = new ResetExtensionAttemptsStep($mockDb);
         $result = $step->execute();
 
         $this->assertTrue($result->success);
         $this->assertSame('Extension attempts reset', $result->label);
-    }
-
-    private function createMockMysqli(MockDatabase $mockDb): \mysqli
-    {
-        return new class($mockDb) extends \mysqli {
-            private MockDatabase $mockDb;
-
-            public function __construct(MockDatabase $mockDb)
-            {
-                $this->mockDb = $mockDb;
-            }
-
-            #[\ReturnTypeWillChange]
-            public function prepare(string $query): MockPreparedStatement|false
-            {
-                return new MockPreparedStatement($this->mockDb, $query);
-            }
-        };
     }
 }

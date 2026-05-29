@@ -7,8 +7,6 @@ namespace Tests\Trading;
 use PHPUnit\Framework\TestCase;
 use Trading\TradeCashRepository;
 use Tests\WideUnit\Mocks\MockDatabase;
-use Tests\WideUnit\Mocks\MockDatabaseResult;
-use Tests\WideUnit\Mocks\MockPreparedStatement;
 
 /**
  * TradeCashRepositoryTest - Tests for TradeCashRepository database operations
@@ -18,56 +16,16 @@ use Tests\WideUnit\Mocks\MockPreparedStatement;
 class TradeCashRepositoryTest extends TestCase
 {
     private MockDatabase $mockDb;
-    private object $mockMysqliDb;
 
     protected function setUp(): void
     {
         $this->mockDb = new MockDatabase();
-        $this->setupMockMysqliDb();
+        $GLOBALS['mysqli_db'] = $this->mockDb;
     }
 
     protected function tearDown(): void
     {
         unset($GLOBALS['mysqli_db']);
-    }
-
-    private function setupMockMysqliDb(): void
-    {
-        $mockDb = $this->mockDb;
-
-        $this->mockMysqliDb = new class ($mockDb) extends \mysqli {
-            private MockDatabase $mockDb;
-            public int $connect_errno = 0;
-            public ?string $connect_error = null;
-
-            public function __construct(MockDatabase $mockDb)
-            {
-                $this->mockDb = $mockDb;
-            }
-
-            #[\ReturnTypeWillChange]
-            public function prepare(string $query): MockPreparedStatement|false
-            {
-                return new MockPreparedStatement($this->mockDb, $query);
-            }
-
-            #[\ReturnTypeWillChange]
-            public function query(string $query, int $resultMode = MYSQLI_STORE_RESULT): \mysqli_result|bool
-            {
-                $result = $this->mockDb->sql_query($query);
-                if ($result instanceof MockDatabaseResult) {
-                    return false;
-                }
-                return (bool) $result;
-            }
-
-            public function real_escape_string(string $string): string
-            {
-                return addslashes($string);
-            }
-        };
-
-        $GLOBALS['mysqli_db'] = $this->mockMysqliDb;
     }
 
     // ============================================
@@ -76,14 +34,14 @@ class TradeCashRepositoryTest extends TestCase
 
     public function testRepositoryCanBeInstantiated(): void
     {
-        $repository = new TradeCashRepository($this->mockMysqliDb);
+        $repository = new TradeCashRepository($this->mockDb);
 
         $this->assertInstanceOf(TradeCashRepository::class, $repository);
     }
 
     public function testRepositoryImplementsCorrectInterface(): void
     {
-        $repository = new TradeCashRepository($this->mockMysqliDb);
+        $repository = new TradeCashRepository($this->mockDb);
 
         $this->assertInstanceOf(
             \Trading\Contracts\TradeCashRepositoryInterface::class,
@@ -97,7 +55,7 @@ class TradeCashRepositoryTest extends TestCase
 
     public function testGetCashTransactionByOfferReturnsDataWhenFound(): void
     {
-        $repository = new TradeCashRepository($this->mockMysqliDb);
+        $repository = new TradeCashRepository($this->mockDb);
         $this->mockDb->setMockData([
             ['trade_offer_id' => 5, 'sending_team' => 'Boston', 'receiving_team' => 'Denver', 'salary_yr1' => 50, 'salary_yr2' => 75, 'salary_yr3' => 0, 'salary_yr4' => 0, 'salary_yr5' => 0, 'salary_yr6' => 0],
         ]);
@@ -110,7 +68,7 @@ class TradeCashRepositoryTest extends TestCase
 
     public function testGetCashTransactionByOfferReturnsNullWhenNotFound(): void
     {
-        $repository = new TradeCashRepository($this->mockMysqliDb);
+        $repository = new TradeCashRepository($this->mockDb);
         $this->mockDb->setMockData([]);
 
         $result = $repository->getCashTransactionByOffer(999, 'Nobody');
@@ -124,7 +82,7 @@ class TradeCashRepositoryTest extends TestCase
 
     public function testClearTradeCashExecutesDelete(): void
     {
-        $repository = new TradeCashRepository($this->mockMysqliDb);
+        $repository = new TradeCashRepository($this->mockDb);
 
         $result = $repository->clearTradeCash();
 
@@ -137,7 +95,7 @@ class TradeCashRepositoryTest extends TestCase
 
     public function testInsertCashTradeOfferExecutesInsert(): void
     {
-        $repository = new TradeCashRepository($this->mockMysqliDb);
+        $repository = new TradeCashRepository($this->mockDb);
 
         $result = $repository->insertCashTradeOffer(1, 'Miami', 'Chicago', 100, 200, 0, 0, 0, 0);
 
@@ -150,7 +108,7 @@ class TradeCashRepositoryTest extends TestCase
 
     public function testDeleteTradeCashByOfferIdExecutesDelete(): void
     {
-        $repository = new TradeCashRepository($this->mockMysqliDb);
+        $repository = new TradeCashRepository($this->mockDb);
 
         $result = $repository->deleteTradeCashByOfferId(1);
 

@@ -9,8 +9,6 @@ use League\League;
 use Negotiation\NegotiationRepository;
 use Repositories\Contracts\SalaryCapRepositoryInterface;
 use Tests\WideUnit\Mocks\MockDatabase;
-use Tests\WideUnit\Mocks\MockDatabaseResult;
-use Tests\WideUnit\Mocks\MockPreparedStatement;
 
 /**
  * NegotiationRepositoryTest - Tests for NegotiationRepository database operations
@@ -23,56 +21,16 @@ use Tests\WideUnit\Mocks\MockPreparedStatement;
 class NegotiationRepositoryTest extends TestCase
 {
     private MockDatabase $mockDb;
-    private object $mockMysqliDb;
 
     protected function setUp(): void
     {
         $this->mockDb = new MockDatabase();
-        $this->setupMockMysqliDb();
+        $GLOBALS['mysqli_db'] = $this->mockDb;
     }
 
     protected function tearDown(): void
     {
         unset($GLOBALS['mysqli_db']);
-    }
-
-    private function setupMockMysqliDb(): void
-    {
-        $mockDb = $this->mockDb;
-        
-        $this->mockMysqliDb = new class($mockDb) extends \mysqli {
-            private MockDatabase $mockDb;
-            public int $connect_errno = 0;
-            public ?string $connect_error = null;
-
-            public function __construct(MockDatabase $mockDb)
-            {
-                $this->mockDb = $mockDb;
-            }
-
-            #[\ReturnTypeWillChange]
-            public function prepare(string $query): MockPreparedStatement|false
-            {
-                return new MockPreparedStatement($this->mockDb, $query);
-            }
-
-            #[\ReturnTypeWillChange]
-            public function query(string $query, int $resultMode = MYSQLI_STORE_RESULT): \mysqli_result|bool
-            {
-                $result = $this->mockDb->sql_query($query);
-                if ($result instanceof MockDatabaseResult) {
-                    return false;
-                }
-                return (bool) $result;
-            }
-
-            public function real_escape_string(string $string): string
-            {
-                return addslashes($string);
-            }
-        };
-        
-        $GLOBALS['mysqli_db'] = $this->mockMysqliDb;
     }
 
     // ============================================
@@ -81,14 +39,14 @@ class NegotiationRepositoryTest extends TestCase
 
     public function testRepositoryCanBeInstantiated(): void
     {
-        $repository = new NegotiationRepository($this->mockMysqliDb, $this->createStub(SalaryCapRepositoryInterface::class));
+        $repository = new NegotiationRepository($this->mockDb, $this->createStub(SalaryCapRepositoryInterface::class));
         
         $this->assertInstanceOf(NegotiationRepository::class, $repository);
     }
 
     public function testRepositoryImplementsCorrectInterface(): void
     {
-        $repository = new NegotiationRepository($this->mockMysqliDb, $this->createStub(SalaryCapRepositoryInterface::class));
+        $repository = new NegotiationRepository($this->mockDb, $this->createStub(SalaryCapRepositoryInterface::class));
         
         $this->assertInstanceOf(
             \Negotiation\Contracts\NegotiationRepositoryInterface::class,
@@ -98,7 +56,7 @@ class NegotiationRepositoryTest extends TestCase
 
     public function testRepositoryExtendsBaseMysqliRepository(): void
     {
-        $repository = new NegotiationRepository($this->mockMysqliDb, $this->createStub(SalaryCapRepositoryInterface::class));
+        $repository = new NegotiationRepository($this->mockDb, $this->createStub(SalaryCapRepositoryInterface::class));
         
         $this->assertInstanceOf(
             \BaseMysqliRepository::class,
@@ -112,7 +70,7 @@ class NegotiationRepositoryTest extends TestCase
 
     public function testGetTeamPerformanceReturnsDefaultsWhenNoData(): void
     {
-        $repository = new NegotiationRepository($this->mockMysqliDb, $this->createStub(SalaryCapRepositoryInterface::class));
+        $repository = new NegotiationRepository($this->mockDb, $this->createStub(SalaryCapRepositoryInterface::class));
         $this->mockDb->setMockData([]);
 
         $result = $repository->getTeamPerformance('Test Team');
@@ -126,7 +84,7 @@ class NegotiationRepositoryTest extends TestCase
 
     public function testGetTeamPerformanceReturnsTeamData(): void
     {
-        $repository = new NegotiationRepository($this->mockMysqliDb, $this->createStub(SalaryCapRepositoryInterface::class));
+        $repository = new NegotiationRepository($this->mockDb, $this->createStub(SalaryCapRepositoryInterface::class));
         $this->mockDb->setMockData([
             [
                 'contract_wins' => 50,
@@ -149,7 +107,7 @@ class NegotiationRepositoryTest extends TestCase
 
     public function testGetPositionSalaryCommitmentReturnsZeroWhenNoPlayers(): void
     {
-        $repository = new NegotiationRepository($this->mockMysqliDb, $this->createStub(SalaryCapRepositoryInterface::class));
+        $repository = new NegotiationRepository($this->mockDb, $this->createStub(SalaryCapRepositoryInterface::class));
         $this->mockDb->setMockData([]);
 
         $result = $repository->getPositionSalaryCommitment('Test Team', 'G', 'Excluded Player');
@@ -166,7 +124,7 @@ class NegotiationRepositoryTest extends TestCase
     {
         $commonRepo = $this->createStub(SalaryCapRepositoryInterface::class);
         $commonRepo->method('getTeamCapSpaceNextSeason')->willReturn(League::HARD_CAP_MAX);
-        $repository = new NegotiationRepository($this->mockMysqliDb, $commonRepo);
+        $repository = new NegotiationRepository($this->mockDb, $commonRepo);
 
         $result = $repository->getTeamCapSpaceNextSeason('Empty Team');
 
@@ -177,7 +135,7 @@ class NegotiationRepositoryTest extends TestCase
     {
         $commonRepo = $this->createStub(SalaryCapRepositoryInterface::class);
         $commonRepo->method('getTeamCapSpaceNextSeason')->willReturn(League::HARD_CAP_MAX - 5000);
-        $repository = new NegotiationRepository($this->mockMysqliDb, $commonRepo);
+        $repository = new NegotiationRepository($this->mockDb, $commonRepo);
 
         $result = $repository->getTeamCapSpaceNextSeason('Test Team');
 
@@ -191,8 +149,8 @@ class NegotiationRepositoryTest extends TestCase
     public function testMultipleRepositoriesCanBeInstantiated(): void
     {
         $commonRepo = $this->createStub(SalaryCapRepositoryInterface::class);
-        $repo1 = new NegotiationRepository($this->mockMysqliDb, $commonRepo);
-        $repo2 = new NegotiationRepository($this->mockMysqliDb, $commonRepo);
+        $repo1 = new NegotiationRepository($this->mockDb, $commonRepo);
+        $repo2 = new NegotiationRepository($this->mockDb, $commonRepo);
         
         $this->assertInstanceOf(NegotiationRepository::class, $repo1);
         $this->assertInstanceOf(NegotiationRepository::class, $repo2);

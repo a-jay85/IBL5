@@ -9,8 +9,6 @@ use Trading\TradeOfferRepository;
 use Trading\TradeAssetRepository;
 use Trading\TradeFormRepository;
 use Tests\WideUnit\Mocks\MockDatabase;
-use Tests\WideUnit\Mocks\MockDatabaseResult;
-use Tests\WideUnit\Mocks\MockPreparedStatement;
 
 /**
  * TradingRepositoryTest - Tests for the 3 split Trading repositories
@@ -23,57 +21,16 @@ use Tests\WideUnit\Mocks\MockPreparedStatement;
 class TradingRepositoryTest extends TestCase
 {
     private MockDatabase $mockDb;
-    private object $mockMysqliDb;
 
     protected function setUp(): void
     {
         $this->mockDb = new MockDatabase();
-        $this->setupMockMysqliDb();
+        $GLOBALS['mysqli_db'] = $this->mockDb;
     }
 
     protected function tearDown(): void
     {
         unset($GLOBALS['mysqli_db']);
-    }
-
-    private function setupMockMysqliDb(): void
-    {
-        $mockDb = $this->mockDb;
-
-        $this->mockMysqliDb = new class($mockDb) extends \mysqli {
-            private MockDatabase $mockDb;
-            public int $connect_errno = 0;
-            public ?string $connect_error = null;
-
-            public function __construct(MockDatabase $mockDb)
-            {
-                // Don't call parent::__construct() to avoid real DB connection
-                $this->mockDb = $mockDb;
-            }
-
-            #[\ReturnTypeWillChange]
-            public function prepare(string $query): MockPreparedStatement|false
-            {
-                return new MockPreparedStatement($this->mockDb, $query);
-            }
-
-            #[\ReturnTypeWillChange]
-            public function query(string $query, int $resultMode = MYSQLI_STORE_RESULT): \mysqli_result|bool
-            {
-                $result = $this->mockDb->sql_query($query);
-                if ($result instanceof MockDatabaseResult) {
-                    return false;
-                }
-                return (bool) $result;
-            }
-
-            public function real_escape_string(string $string): string
-            {
-                return addslashes($string);
-            }
-        };
-
-        $GLOBALS['mysqli_db'] = $this->mockMysqliDb;
     }
 
     // ============================================
@@ -82,14 +39,14 @@ class TradingRepositoryTest extends TestCase
 
     public function testTradeOfferRepositoryCanBeInstantiated(): void
     {
-        $repository = new TradeOfferRepository($this->mockMysqliDb, 'localhost');
+        $repository = new TradeOfferRepository($this->mockDb, 'localhost');
 
         $this->assertInstanceOf(TradeOfferRepository::class, $repository);
     }
 
     public function testTradeOfferRepositoryImplementsCorrectInterface(): void
     {
-        $repository = new TradeOfferRepository($this->mockMysqliDb, 'localhost');
+        $repository = new TradeOfferRepository($this->mockDb, 'localhost');
 
         $this->assertInstanceOf(
             \Trading\Contracts\TradeOfferRepositoryInterface::class,
@@ -99,7 +56,7 @@ class TradingRepositoryTest extends TestCase
 
     public function testTradeOfferRepositoryExtendsBaseMysqliRepository(): void
     {
-        $repository = new TradeOfferRepository($this->mockMysqliDb, 'localhost');
+        $repository = new TradeOfferRepository($this->mockDb, 'localhost');
 
         $this->assertInstanceOf(
             \BaseMysqliRepository::class,
@@ -113,14 +70,14 @@ class TradingRepositoryTest extends TestCase
 
     public function testTradeAssetRepositoryCanBeInstantiated(): void
     {
-        $repository = new TradeAssetRepository($this->mockMysqliDb);
+        $repository = new TradeAssetRepository($this->mockDb);
 
         $this->assertInstanceOf(TradeAssetRepository::class, $repository);
     }
 
     public function testTradeAssetRepositoryImplementsCorrectInterface(): void
     {
-        $repository = new TradeAssetRepository($this->mockMysqliDb);
+        $repository = new TradeAssetRepository($this->mockDb);
 
         $this->assertInstanceOf(
             \Trading\Contracts\TradeAssetRepositoryInterface::class,
@@ -130,7 +87,7 @@ class TradingRepositoryTest extends TestCase
 
     public function testTradeAssetRepositoryExtendsBaseMysqliRepository(): void
     {
-        $repository = new TradeAssetRepository($this->mockMysqliDb);
+        $repository = new TradeAssetRepository($this->mockDb);
 
         $this->assertInstanceOf(
             \BaseMysqliRepository::class,
@@ -144,14 +101,14 @@ class TradingRepositoryTest extends TestCase
 
     public function testTradeFormRepositoryCanBeInstantiated(): void
     {
-        $repository = new TradeFormRepository($this->mockMysqliDb);
+        $repository = new TradeFormRepository($this->mockDb);
 
         $this->assertInstanceOf(TradeFormRepository::class, $repository);
     }
 
     public function testTradeFormRepositoryImplementsCorrectInterface(): void
     {
-        $repository = new TradeFormRepository($this->mockMysqliDb);
+        $repository = new TradeFormRepository($this->mockDb);
 
         $this->assertInstanceOf(
             \Trading\Contracts\TradeFormRepositoryInterface::class,
@@ -161,7 +118,7 @@ class TradingRepositoryTest extends TestCase
 
     public function testTradeFormRepositoryExtendsBaseMysqliRepository(): void
     {
-        $repository = new TradeFormRepository($this->mockMysqliDb);
+        $repository = new TradeFormRepository($this->mockDb);
 
         $this->assertInstanceOf(
             \BaseMysqliRepository::class,
@@ -175,7 +132,7 @@ class TradingRepositoryTest extends TestCase
 
     public function testGetPlayerForTradeValidationReturnsNullWhenNoData(): void
     {
-        $repository = new TradeAssetRepository($this->mockMysqliDb);
+        $repository = new TradeAssetRepository($this->mockDb);
         $this->mockDb->setMockData([]);
 
         $result = $repository->getPlayerForTradeValidation(1);
@@ -185,7 +142,7 @@ class TradingRepositoryTest extends TestCase
 
     public function testGetPlayerForTradeValidationReturnsPlayerData(): void
     {
-        $repository = new TradeAssetRepository($this->mockMysqliDb);
+        $repository = new TradeAssetRepository($this->mockDb);
         $this->mockDb->setMockData([
             ['ordinal' => 5, 'cy' => 2]
         ]);
@@ -203,7 +160,7 @@ class TradingRepositoryTest extends TestCase
 
     public function testGetTeamPlayersForTradingReturnsPlayerRows(): void
     {
-        $repository = new TradeFormRepository($this->mockMysqliDb);
+        $repository = new TradeFormRepository($this->mockDb);
         $this->mockDb->setMockData([
             ['pos' => 'PG', 'name' => 'Guard One', 'pid' => 1, 'ordinal' => 10, 'cy' => 2, 'salary_yr1' => 500, 'salary_yr2' => 525, 'salary_yr3' => 0, 'salary_yr4' => 0, 'salary_yr5' => 0, 'salary_yr6' => 0],
             ['pos' => 'C', 'name' => 'Center Two', 'pid' => 2, 'ordinal' => 20, 'cy' => 1, 'salary_yr1' => 800, 'salary_yr2' => 0, 'salary_yr3' => 0, 'salary_yr4' => 0, 'salary_yr5' => 0, 'salary_yr6' => 0],
@@ -219,7 +176,7 @@ class TradingRepositoryTest extends TestCase
 
     public function testGetTeamPlayersForTradingReturnsEmptyArray(): void
     {
-        $repository = new TradeFormRepository($this->mockMysqliDb);
+        $repository = new TradeFormRepository($this->mockDb);
         $this->mockDb->setMockData([]);
 
         $result = $repository->getTeamPlayersForTrading(99);
@@ -230,7 +187,7 @@ class TradingRepositoryTest extends TestCase
 
     public function testGetTeamDraftPicksForTradingReturnsDraftPicks(): void
     {
-        $repository = new TradeFormRepository($this->mockMysqliDb);
+        $repository = new TradeFormRepository($this->mockDb);
         $this->mockDb->setMockData([
             ['pickid' => 1, 'year' => 2026, 'round' => 1, 'pick' => 5, 'owner_teamid' => 1, 'teampick_teamid' => 3],
             ['pickid' => 2, 'year' => 2026, 'round' => 2, 'pick' => 10, 'owner_teamid' => 1, 'teampick_teamid' => 1],
@@ -244,7 +201,7 @@ class TradingRepositoryTest extends TestCase
 
     public function testGetTeamDraftPicksForTradingReturnsEmptyArray(): void
     {
-        $repository = new TradeFormRepository($this->mockMysqliDb);
+        $repository = new TradeFormRepository($this->mockDb);
         $this->mockDb->setMockData([]);
 
         $result = $repository->getTeamDraftPicksForTrading(99);
@@ -259,9 +216,9 @@ class TradingRepositoryTest extends TestCase
 
     public function testMultipleRepositoriesCanBeInstantiated(): void
     {
-        $repo1 = new TradeOfferRepository($this->mockMysqliDb, 'localhost');
-        $repo2 = new TradeAssetRepository($this->mockMysqliDb);
-        $repo3 = new TradeFormRepository($this->mockMysqliDb);
+        $repo1 = new TradeOfferRepository($this->mockDb, 'localhost');
+        $repo2 = new TradeAssetRepository($this->mockDb);
+        $repo3 = new TradeFormRepository($this->mockDb);
 
         $this->assertInstanceOf(TradeOfferRepository::class, $repo1);
         $this->assertInstanceOf(TradeAssetRepository::class, $repo2);

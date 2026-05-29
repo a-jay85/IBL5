@@ -22,7 +22,7 @@ interface AwardHistoryServiceInterface
      * 
      * @param array<string, mixed> $rawParams Raw POST parameters from form
      * @return array{
-     *     awards: array<int, array{year: int, award: string, name: string}>,
+     *     awards: array<int, array{year: int, award: string, name: string, table_id: int}>,
      *     count: int,
      *     params: array{name: string|null, award: string|null, year: int|null, sortby: int}
      * } Search results:

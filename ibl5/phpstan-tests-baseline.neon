@@ -25,6 +25,18 @@ parameters:
 			path: tests/AllStarAppearances/AllStarAppearancesViewTest.php
 
 		-
+			rawMessage: 'Parameter #1 $appearances of method AllStarAppearances\AllStarAppearancesView::render() expects array<int, array{name: string, appearances: int}>, array{array{name: string, pid: int, appearances: int}, array{name: string, pid: int, appearances: int}} given.'
+			identifier: argument.type
+			count: 1
+			path: tests/AllStarAppearances/AllStarAppearancesViewTest.php
+
+		-
+			rawMessage: 'Parameter #1 $appearances of method AllStarAppearances\AllStarAppearancesView::render() expects array<int, array{name: string, appearances: int}>, array{array{name: string, pid: int, appearances: int}} given.'
+			identifier: argument.type
+			count: 6
+			path: tests/AllStarAppearances/AllStarAppearancesViewTest.php
+
+		-
 			rawMessage: 'Dynamic call to static method PHPUnit\Framework\Assert::callback().'
 			identifier: staticMethod.dynamicCall
 			count: 3
@@ -343,10 +355,28 @@ parameters:
 			path: tests/Api/Response/HtmlResponderTest.php
 
 		-
-			rawMessage: 'Parameter #1 $row of method Api\Transformer\GameTransformer::transform() expects array{game_uuid: string, season_year: int, game_date: string, game_status: string, box_score_id: int, game_of_that_day: int, visitor_uuid: string, visitor_city: string, ...}, non-empty-array<string, mixed> given.'
+			rawMessage: 'Parameter #1 $row of method Api\Transformer\GameTransformer::transform() expects array{game_uuid: string, season_year: int, game_date: string, game_status: string, box_score_id: int, game_of_that_day: int, visitor_uuid: string, visitor_city: string, ..., ...<string, mixed>}, non-empty-array<string, mixed> given.'
 			identifier: argument.type
 			count: 2
 			path: tests/Api/Transformer/GameTransformerTest.php
+
+		-
+			rawMessage: 'Parameter #1 $row of method Api\Transformer\InjuryTransformer::transform() expects array{player_uuid: string, pid: int, name: string, pos: string, injured: int, teamid: int|null, team_uuid: string|null, team_city: string|null, ...}, array<string, mixed> given.'
+			identifier: argument.type
+			count: 4
+			path: tests/Api/Transformer/InjuryTransformerTest.php
+
+		-
+			rawMessage: 'Parameter #1 $row of method Api\Transformer\InjuryTransformer::transform() expects array{player_uuid: string, pid: int, name: string, pos: string, injured: int, teamid: int|null, team_uuid: string|null, team_city: string|null, ...}, non-empty-array<string, mixed> given.'
+			identifier: argument.type
+			count: 1
+			path: tests/Api/Transformer/InjuryTransformerTest.php
+
+		-
+			rawMessage: 'Parameter #1 $row of method Api\Transformer\TeamTransformer::transformDetail() expects array{teamid: int, uuid: string, team_city: string, team_name: string, owner_name: string, arena: string, conference: string|null, division: string|null, ...}, non-empty-array<string, mixed> given.'
+			identifier: argument.type
+			count: 2
+			path: tests/Api/Transformer/TeamTransformerTest.php
 
 		-
 			rawMessage: 'Dynamic call to static method PHPUnit\Framework\Assert::anything().'
@@ -655,6 +685,12 @@ parameters:
 			path: tests/CareerLeaderboards/CareerLeaderboardsViewXssTest.php
 
 		-
+			rawMessage: 'Method Tests\CareerLeaderboards\CareerLeaderboardsViewXssTest::makeStats() should return array{pid: int, name: string, games: int, minutes: string, fgm: string, fga: string, fgp: string, ftm: string, ...} but returns array{pid: mixed, name: mixed, games: mixed, minutes: mixed, fgm: mixed, fga: mixed, fgp: mixed, ftm: mixed, ..., ...}.'
+			identifier: return.type
+			count: 1
+			path: tests/CareerLeaderboards/CareerLeaderboardsViewXssTest.php
+
+		-
 			rawMessage: Short ternary operator is not allowed. Use null coalesce operator if applicable or consider using long ternary.
 			identifier: ternary.shortNotAllowed
 			count: 1
@@ -781,6 +817,12 @@ parameters:
 			path: tests/ComparePlayers/ComparePlayersViewTest.php
 
 		-
+			rawMessage: 'Parameter #1 $comparisonData of method ComparePlayers\ComparePlayersView::renderComparisonResults() expects array{player1: array<string, mixed>, player2: array<string, mixed>}, array given.'
+			identifier: argument.type
+			count: 7
+			path: tests/ComparePlayers/ComparePlayersViewTest.php
+
+		-
 			rawMessage: 'Call to method PHPUnit\Framework\Assert::assertInstanceOf() with ''ContractList\\Contracts\\ContractListServiceInterface'' and ContractList\ContractListService will always evaluate to true.'
 			identifier: method.alreadyNarrowedType
 			count: 1
@@ -856,6 +898,12 @@ parameters:
 			rawMessage: 'Offset ''pid'' does not exist on array{year: int, award: string, name: string, table_id: int}.'
 			identifier: offsetAccess.notFound
 			count: 2
+			path: tests/DatabaseIntegration/AwardHistoryRepositoryTest.php
+
+		-
+			rawMessage: 'Parameter #1 $params of method AwardHistory\AwardHistoryRepository::searchAwards() expects array{name: string|null, award: string|null, year: int|null, sortby: int}, array<string, mixed> given.'
+			identifier: argument.type
+			count: 15
 			path: tests/DatabaseIntegration/AwardHistoryRepositoryTest.php
 
 		-
@@ -943,13 +991,13 @@ parameters:
 			path: tests/DatabaseIntegration/DatabaseTestCase.php
 
 		-
-			rawMessage: 'Parameter #2 $depthChartValues of method DepthChartEntry\DepthChartEntryRepository::updatePlayerDepthChart() expects array{pg: int, sg: int, sf: int, pf: int, c: int, canPlayInGame: int, min: int, of: int, ...}, array{pg: 1, sg: 0, sf: 0, pf: 0, c: 0, canPlayInGame: 1, min: 20} given.'
+			rawMessage: 'Parameter #2 $depthChartValues of method DepthChartEntry\DepthChartEntryRepository::updatePlayerDepthChart() expects array{pg: int, sg: int, sf: int, pf: int, c: int, canPlayInGame: int, min: int, of: int, ..., ...<string, mixed>}, array{pg: 1, sg: 0, sf: 0, pf: 0, c: 0, canPlayInGame: 1, min: 20} given.'
 			identifier: argument.type
 			count: 1
 			path: tests/DatabaseIntegration/DepthChartEntryRepositoryTest.php
 
 		-
-			rawMessage: 'Parameter #2 $depthChartValues of method DepthChartEntry\DepthChartEntryRepository::updatePlayerDepthChart() expects array{pg: int, sg: int, sf: int, pf: int, c: int, canPlayInGame: int, min: int, of: int, ...}, array{pg: 3, sg: 2, sf: 1, pf: 0, c: 0, canPlayInGame: 1, min: 32} given.'
+			rawMessage: 'Parameter #2 $depthChartValues of method DepthChartEntry\DepthChartEntryRepository::updatePlayerDepthChart() expects array{pg: int, sg: int, sf: int, pf: int, c: int, canPlayInGame: int, min: int, of: int, ..., ...<string, mixed>}, array{pg: 3, sg: 2, sf: 1, pf: 0, c: 0, canPlayInGame: 1, min: 32} given.'
 			identifier: argument.type
 			count: 1
 			path: tests/DatabaseIntegration/DepthChartEntryRepositoryTest.php
@@ -971,12 +1019,6 @@ parameters:
 			identifier: staticMethod.alreadyNarrowedType
 			count: 1
 			path: tests/DatabaseIntegration/FranchiseHistoryRepositoryTest.php
-
-		-
-			rawMessage: 'Offset ''fa_signing_flag'' does not exist on array{pid: int, name: string, nickname: string|null, age: int|null, teamid: 1, teamname: string|null, pos: string, stamina: int|null, ...}.'
-			identifier: offsetAccess.notFound
-			count: 1
-			path: tests/DatabaseIntegration/FreeAgency/FreeAgencyRepositoryIntegrationTest.php
 
 		-
 			rawMessage: 'Parameter #1 $offerData of method FreeAgency\FreeAgencyRepository::saveOffer() expects array{pid: int, teamid: int, teamName: string, playerName: string, offer1: int, offer2: int, offer3: int, offer4: int, ...}, array{playerName: ''FA Replace'', pid: 200060402, teamName: ''Metros'', teamid: 1, offer1: 700, offer2: 750, offer3: 800, offer4: 0, ...} given.'
@@ -1031,6 +1073,12 @@ parameters:
 			identifier: variable.undefined
 			count: 1
 			path: tests/DatabaseIntegration/FreeAgencyDemandRepositoryTest.php
+
+		-
+			rawMessage: 'Parameter #1 $offerData of method FreeAgency\FreeAgencyRepository::saveOffer() expects array{pid: int, teamid: int, teamName: string, playerName: string, offer1: int, offer2: int, offer3: int, offer4: int, ...}, array<string, float|int|string> given.'
+			identifier: argument.type
+			count: 8
+			path: tests/DatabaseIntegration/FreeAgencyRepositoryTest.php
 
 		-
 			rawMessage: 'PHPDoc tag @var with type array<string, mixed>|null is not subtype of type array<string, float|int|string|null>|false|null.'
@@ -1175,12 +1223,6 @@ parameters:
 			identifier: variable.undefined
 			count: 2
 			path: tests/DatabaseIntegration/RookieOptionRepositoryTest.php
-
-		-
-			rawMessage: Casting to int something that's already int.
-			identifier: cast.useless
-			count: 3
-			path: tests/DatabaseIntegration/SeasonLeaderboardsRepositoryTest.php
 
 		-
 			rawMessage: 'Call to static method PHPUnit\Framework\Assert::assertNull() with null will always evaluate to true.'
@@ -1357,25 +1399,25 @@ parameters:
 			path: tests/DepthChartEntry/DepthChartEntryProcessorTest.php
 
 		-
-			rawMessage: 'Parameter #1 $player of method DepthChartEntry\DepthChartEntryView::renderPlayerRow() expects array{pid: int, name: string, nickname: string|null, age: int|null, teamid: int, teamname: string|null, pos: string, stamina: int|null, ...}, array{pid: 1, name: ''Round Trip Player'', pos: ''SG'', injured: 0, stamina: 60, dc_pg_depth: 0, dc_sg_depth: 1, dc_sf_depth: 2, ...} given.'
+			rawMessage: 'Parameter #1 $player of method DepthChartEntry\DepthChartEntryView::renderPlayerRow() expects array{pid: int, name: string, nickname: string|null, age: int|null, teamid: int, teamname: string|null, pos: string, stamina: int|null, ..., ...<string, mixed>}, array{pid: 1, name: ''Round Trip Player'', pos: ''SG'', injured: 0, stamina: 60, dc_pg_depth: 0, dc_sg_depth: 1, dc_sf_depth: 2, ...} given.'
 			identifier: argument.type
 			count: 1
 			path: tests/DepthChartEntry/DepthChartEntryProcessorTest.php
 
 		-
-			rawMessage: 'Parameter #1 $player of method DepthChartEntry\DepthChartEntryView::renderPlayerRow() expects array{pid: int, name: string, nickname: string|null, age: int|null, teamid: int, teamname: string|null, pos: string, stamina: int|null, ...}, array{pid: 1, name: ''Round Trip Player'', pos: ''SG'', injured: 0, stamina: 60, dc_pg_depth: mixed, dc_sg_depth: mixed, dc_sf_depth: mixed, ...} given.'
+			rawMessage: 'Parameter #1 $player of method DepthChartEntry\DepthChartEntryView::renderPlayerRow() expects array{pid: int, name: string, nickname: string|null, age: int|null, teamid: int, teamname: string|null, pos: string, stamina: int|null, ..., ...<string, mixed>}, array{pid: 1, name: ''Round Trip Player'', pos: ''SG'', injured: 0, stamina: 60, dc_pg_depth: mixed, dc_sg_depth: mixed, dc_sf_depth: mixed, ...} given.'
 			identifier: argument.type
 			count: 1
 			path: tests/DepthChartEntry/DepthChartEntryProcessorTest.php
 
 		-
-			rawMessage: 'Parameter #1 $player of method DepthChartEntry\DepthChartEntryView::renderPlayerRow() expects array{pid: int, name: string, nickname: string|null, age: int|null, teamid: int, teamname: string|null, pos: string, stamina: int|null, ...}, array{pid: 1, name: ''Test Player'', pos: ''PG'', injured: 0, stamina: 50, dc_pg_depth: 1, dc_sg_depth: 3, dc_sf_depth: 0, ...} given.'
+			rawMessage: 'Parameter #1 $player of method DepthChartEntry\DepthChartEntryView::renderPlayerRow() expects array{pid: int, name: string, nickname: string|null, age: int|null, teamid: int, teamname: string|null, pos: string, stamina: int|null, ..., ...<string, mixed>}, array{pid: 1, name: ''Test Player'', pos: ''PG'', injured: 0, stamina: 50, dc_pg_depth: 1, dc_sg_depth: 3, dc_sf_depth: 0, ...} given.'
 			identifier: argument.type
 			count: 1
 			path: tests/DepthChartEntry/DepthChartEntryProcessorTest.php
 
 		-
-			rawMessage: 'Parameter #1 $player of method DepthChartEntry\DepthChartEntryView::renderPlayerRow() expects array{pid: int, name: string, nickname: string|null, age: int|null, teamid: int, teamname: string|null, pos: string, stamina: int|null, ...}, array{pid: 1, name: ''Zero Settings Player'', pos: ''C'', injured: 0, stamina: 50, dc_pg_depth: 0, dc_sg_depth: 0, dc_sf_depth: 0, ...} given.'
+			rawMessage: 'Parameter #1 $player of method DepthChartEntry\DepthChartEntryView::renderPlayerRow() expects array{pid: int, name: string, nickname: string|null, age: int|null, teamid: int, teamname: string|null, pos: string, stamina: int|null, ..., ...<string, mixed>}, array{pid: 1, name: ''Zero Settings Player'', pos: ''C'', injured: 0, stamina: 50, dc_pg_depth: 0, dc_sg_depth: 0, dc_sf_depth: 0, ...} given.'
 			identifier: argument.type
 			count: 1
 			path: tests/DepthChartEntry/DepthChartEntryProcessorTest.php
@@ -1411,31 +1453,31 @@ parameters:
 			path: tests/DepthChartEntry/DepthChartEntryRepositoryTest.php
 
 		-
-			rawMessage: 'Parameter #2 $depthChartValues of method DepthChartEntry\DepthChartEntryRepository::updatePlayerDepthChart() expects array{pg: int, sg: int, sf: int, pf: int, c: int, canPlayInGame: int, min: int, of: int, ...}, array{pg: ''1'', sg: ''0'', sf: ''2'', pf: ''0'', c: ''0'', canPlayInGame: ''1'', min: ''30''} given.'
+			rawMessage: 'Parameter #2 $depthChartValues of method DepthChartEntry\DepthChartEntryRepository::updatePlayerDepthChart() expects array{pg: int, sg: int, sf: int, pf: int, c: int, canPlayInGame: int, min: int, of: int, ..., ...<string, mixed>}, array{pg: ''1'', sg: ''0'', sf: ''2'', pf: ''0'', c: ''0'', canPlayInGame: ''1'', min: ''30''} given.'
 			identifier: argument.type
 			count: 1
 			path: tests/DepthChartEntry/DepthChartEntryRepositoryTest.php
 
 		-
-			rawMessage: 'Parameter #2 $depthChartValues of method DepthChartEntry\DepthChartEntryRepository::updatePlayerDepthChart() expects array{pg: int, sg: int, sf: int, pf: int, c: int, canPlayInGame: int, min: int, of: int, ...}, array{pg: 0, sg: 0, sf: 0, pf: 0, c: 1, canPlayInGame: 1, min: 20} given.'
+			rawMessage: 'Parameter #2 $depthChartValues of method DepthChartEntry\DepthChartEntryRepository::updatePlayerDepthChart() expects array{pg: int, sg: int, sf: int, pf: int, c: int, canPlayInGame: int, min: int, of: int, ..., ...<string, mixed>}, array{pg: 0, sg: 0, sf: 0, pf: 0, c: 1, canPlayInGame: 1, min: 20} given.'
 			identifier: argument.type
 			count: 1
 			path: tests/DepthChartEntry/DepthChartEntryRepositoryTest.php
 
 		-
-			rawMessage: 'Parameter #2 $depthChartValues of method DepthChartEntry\DepthChartEntryRepository::updatePlayerDepthChart() expects array{pg: int, sg: int, sf: int, pf: int, c: int, canPlayInGame: int, min: int, of: int, ...}, array{pg: 1, sg: 0, sf: 0, pf: 0, c: 0, canPlayInGame: 1, min: 30} given.'
+			rawMessage: 'Parameter #2 $depthChartValues of method DepthChartEntry\DepthChartEntryRepository::updatePlayerDepthChart() expects array{pg: int, sg: int, sf: int, pf: int, c: int, canPlayInGame: int, min: int, of: int, ..., ...<string, mixed>}, array{pg: 1, sg: 0, sf: 0, pf: 0, c: 0, canPlayInGame: 1, min: 30} given.'
 			identifier: argument.type
 			count: 2
 			path: tests/DepthChartEntry/DepthChartEntryRepositoryTest.php
 
 		-
-			rawMessage: 'Parameter #2 $depthChartValues of method DepthChartEntry\DepthChartEntryRepository::updatePlayerDepthChart() expects array{pg: int, sg: int, sf: int, pf: int, c: int, canPlayInGame: int, min: int, of: int, ...}, array{pg: 1, sg: 0, sf: 2, pf: 0, c: 0, canPlayInGame: 1, min: 30} given.'
+			rawMessage: 'Parameter #2 $depthChartValues of method DepthChartEntry\DepthChartEntryRepository::updatePlayerDepthChart() expects array{pg: int, sg: int, sf: int, pf: int, c: int, canPlayInGame: int, min: int, of: int, ..., ...<string, mixed>}, array{pg: 1, sg: 0, sf: 2, pf: 0, c: 0, canPlayInGame: 1, min: 30} given.'
 			identifier: argument.type
 			count: 1
 			path: tests/DepthChartEntry/DepthChartEntryRepositoryTest.php
 
 		-
-			rawMessage: 'Parameter #2 $depthChartValues of method DepthChartEntry\DepthChartEntryRepository::updatePlayerDepthChart() expects array{pg: int, sg: int, sf: int, pf: int, c: int, canPlayInGame: int, min: int, of: int, ...}, array{pg: 1, sg: 2, sf: 0, pf: 0, c: 3, canPlayInGame: 1, min: 30} given.'
+			rawMessage: 'Parameter #2 $depthChartValues of method DepthChartEntry\DepthChartEntryRepository::updatePlayerDepthChart() expects array{pg: int, sg: int, sf: int, pf: int, c: int, canPlayInGame: int, min: int, of: int, ..., ...<string, mixed>}, array{pg: 1, sg: 2, sf: 0, pf: 0, c: 3, canPlayInGame: 1, min: 30} given.'
 			identifier: argument.type
 			count: 1
 			path: tests/DepthChartEntry/DepthChartEntryRepositoryTest.php
@@ -1561,7 +1603,13 @@ parameters:
 			path: tests/DepthChartEntry/DepthChartEntryViewXssTest.php
 
 		-
-			rawMessage: 'Parameter #1 $player of method DepthChartEntry\DepthChartEntryView::renderPlayerRow() expects array{pid: int, name: string, nickname: string|null, age: int|null, teamid: int, teamname: string|null, pos: string, stamina: int|null, ...}, array{pid: int, name: string, pos: string, injured: int, dc_can_play_in_game: int, dc_pg_depth: int, dc_sg_depth: int, dc_sf_depth: int, ...} given.'
+			rawMessage: 'Method Tests\DepthChartEntry\DepthChartEntryViewXssTest::makePlayer() should return array{pid: int, name: string, pos: string, injured: int, dc_can_play_in_game: int, dc_pg_depth: int, dc_sg_depth: int, dc_sf_depth: int, ...} but returns array{pid: mixed, name: mixed, pos: mixed, injured: mixed, dc_can_play_in_game: mixed, dc_pg_depth: mixed, dc_sg_depth: mixed, dc_sf_depth: mixed, ..., ...}.'
+			identifier: return.type
+			count: 1
+			path: tests/DepthChartEntry/DepthChartEntryViewXssTest.php
+
+		-
+			rawMessage: 'Parameter #1 $player of method DepthChartEntry\DepthChartEntryView::renderPlayerRow() expects array{pid: int, name: string, nickname: string|null, age: int|null, teamid: int, teamname: string|null, pos: string, stamina: int|null, ..., ...<string, mixed>}, array{pid: int, name: string, pos: string, injured: int, dc_can_play_in_game: int, dc_pg_depth: int, dc_sg_depth: int, dc_sf_depth: int, ...} given.'
 			identifier: argument.type
 			count: 1
 			path: tests/DepthChartEntry/DepthChartEntryViewXssTest.php
@@ -2023,6 +2071,12 @@ parameters:
 			path: tests/DraftPickLocator/DraftPickLocatorViewTest.php
 
 		-
+			rawMessage: 'Parameter #1 $teamsWithPicks of method DraftPickLocator\Contracts\DraftPickLocatorViewInterface::render() expects list<array{teamId: int, teamCity: string, teamName: string, color1: string, color2: string, picks: list<array{ownerofpick: string, year: int, round: int}>}>, array{array{teamid: 1, teamId: 1, teamCity: ''Test<script>'', teamName: ''Team&Name'', color1: ''000000'', color2: ''FFFFFF'', picks: array{}}} given.'
+			identifier: argument.type
+			count: 1
+			path: tests/DraftPickLocator/DraftPickLocatorViewTest.php
+
+		-
 			rawMessage: 'Call to method PHPUnit\Framework\Assert::assertInstanceOf() with ''Draft\\DraftPick'' and Draft\DraftPick will always evaluate to true.'
 			identifier: method.alreadyNarrowedType
 			count: 1
@@ -2083,7 +2137,25 @@ parameters:
 			path: tests/Extension/ExtensionOfferEvaluatorTest.php
 
 		-
-			rawMessage: 'Parameter #1 $playerPreferences of method Extension\ExtensionOfferEvaluator::calculateLoyaltyModifier() expects array{loyalty: int}, array{} given.'
+			rawMessage: 'Parameter #1 $playerPreferences of method Extension\ExtensionOfferEvaluator::calculateLoyaltyModifier() expects array{winner: int, tradition: int, loyalty: int, playing_time: int}, array{loyalty: 1} given.'
+			identifier: argument.type
+			count: 2
+			path: tests/Extension/ExtensionOfferEvaluatorTest.php
+
+		-
+			rawMessage: 'Parameter #1 $playerPreferences of method Extension\ExtensionOfferEvaluator::calculateLoyaltyModifier() expects array{winner: int, tradition: int, loyalty: int, playing_time: int}, array{loyalty: 5} given.'
+			identifier: argument.type
+			count: 2
+			path: tests/Extension/ExtensionOfferEvaluatorTest.php
+
+		-
+			rawMessage: 'Parameter #1 $playerPreferences of method Extension\ExtensionOfferEvaluator::calculateLoyaltyModifier() expects array{winner: int, tradition: int, loyalty: int, playing_time: int}, array{} given.'
+			identifier: argument.type
+			count: 1
+			path: tests/Extension/ExtensionOfferEvaluatorTest.php
+
+		-
+			rawMessage: 'Parameter #1 $teamFactors of method Extension\ExtensionOfferEvaluator::calculateCombinedModifier() expects array{wins: int, losses: int, tradition_wins: int, tradition_losses: int, money_committed_at_position: int}, array{wins: 50, losses: 32, tradition_wins: 2500, tradition_losses: 2000, coach_rating: 80, money_committed_at_position: 3000} given.'
 			identifier: argument.type
 			count: 1
 			path: tests/Extension/ExtensionOfferEvaluatorTest.php
@@ -2101,19 +2173,79 @@ parameters:
 			path: tests/Extension/ExtensionOfferEvaluatorTest.php
 
 		-
-			rawMessage: 'Parameter #1 $teamFactors of method Extension\ExtensionOfferEvaluator::calculatePlayingTimeModifier() expects array{money_committed_at_position: int}, array{} given.'
+			rawMessage: 'Parameter #1 $teamFactors of method Extension\ExtensionOfferEvaluator::calculatePlayingTimeModifier() expects array{wins: int, losses: int, tradition_wins: int, tradition_losses: int, money_committed_at_position: int}, array{money_committed_at_position: 1500} given.'
 			identifier: argument.type
 			count: 1
 			path: tests/Extension/ExtensionOfferEvaluatorTest.php
 
 		-
-			rawMessage: 'Parameter #1 $teamFactors of method Extension\ExtensionOfferEvaluator::calculateTraditionModifier() expects array{tradition_wins: int, tradition_losses: int}, array{} given.'
+			rawMessage: 'Parameter #1 $teamFactors of method Extension\ExtensionOfferEvaluator::calculatePlayingTimeModifier() expects array{wins: int, losses: int, tradition_wins: int, tradition_losses: int, money_committed_at_position: int}, array{money_committed_at_position: 50000000} given.'
 			identifier: argument.type
 			count: 1
 			path: tests/Extension/ExtensionOfferEvaluatorTest.php
 
 		-
-			rawMessage: 'Parameter #1 $teamFactors of method Extension\ExtensionOfferEvaluator::calculateWinnerModifier() expects array{wins: int, losses: int}, array{} given.'
+			rawMessage: 'Parameter #1 $teamFactors of method Extension\ExtensionOfferEvaluator::calculatePlayingTimeModifier() expects array{wins: int, losses: int, tradition_wins: int, tradition_losses: int, money_committed_at_position: int}, array{money_committed_at_position: 5000} given.'
+			identifier: argument.type
+			count: 1
+			path: tests/Extension/ExtensionOfferEvaluatorTest.php
+
+		-
+			rawMessage: 'Parameter #1 $teamFactors of method Extension\ExtensionOfferEvaluator::calculatePlayingTimeModifier() expects array{wins: int, losses: int, tradition_wins: int, tradition_losses: int, money_committed_at_position: int}, array{money_committed_at_position: 500} given.'
+			identifier: argument.type
+			count: 1
+			path: tests/Extension/ExtensionOfferEvaluatorTest.php
+
+		-
+			rawMessage: 'Parameter #1 $teamFactors of method Extension\ExtensionOfferEvaluator::calculatePlayingTimeModifier() expects array{wins: int, losses: int, tradition_wins: int, tradition_losses: int, money_committed_at_position: int}, array{} given.'
+			identifier: argument.type
+			count: 1
+			path: tests/Extension/ExtensionOfferEvaluatorTest.php
+
+		-
+			rawMessage: 'Parameter #1 $teamFactors of method Extension\ExtensionOfferEvaluator::calculateTraditionModifier() expects array{wins: int, losses: int, tradition_wins: int, tradition_losses: int, money_committed_at_position: int}, array{tradition_wins: 1000, tradition_losses: 500} given.'
+			identifier: argument.type
+			count: 1
+			path: tests/Extension/ExtensionOfferEvaluatorTest.php
+
+		-
+			rawMessage: 'Parameter #1 $teamFactors of method Extension\ExtensionOfferEvaluator::calculateTraditionModifier() expects array{wins: int, losses: int, tradition_wins: int, tradition_losses: int, money_committed_at_position: int}, array{tradition_wins: 60, tradition_losses: 22} given.'
+			identifier: argument.type
+			count: 1
+			path: tests/Extension/ExtensionOfferEvaluatorTest.php
+
+		-
+			rawMessage: 'Parameter #1 $teamFactors of method Extension\ExtensionOfferEvaluator::calculateTraditionModifier() expects array{wins: int, losses: int, tradition_wins: int, tradition_losses: int, money_committed_at_position: int}, array{tradition_wins: 700, tradition_losses: 300} given.'
+			identifier: argument.type
+			count: 1
+			path: tests/Extension/ExtensionOfferEvaluatorTest.php
+
+		-
+			rawMessage: 'Parameter #1 $teamFactors of method Extension\ExtensionOfferEvaluator::calculateTraditionModifier() expects array{wins: int, losses: int, tradition_wins: int, tradition_losses: int, money_committed_at_position: int}, array{} given.'
+			identifier: argument.type
+			count: 1
+			path: tests/Extension/ExtensionOfferEvaluatorTest.php
+
+		-
+			rawMessage: 'Parameter #1 $teamFactors of method Extension\ExtensionOfferEvaluator::calculateWinnerModifier() expects array{wins: int, losses: int, tradition_wins: int, tradition_losses: int, money_committed_at_position: int}, array{wins: 20, losses: 62} given.'
+			identifier: argument.type
+			count: 1
+			path: tests/Extension/ExtensionOfferEvaluatorTest.php
+
+		-
+			rawMessage: 'Parameter #1 $teamFactors of method Extension\ExtensionOfferEvaluator::calculateWinnerModifier() expects array{wins: int, losses: int, tradition_wins: int, tradition_losses: int, money_committed_at_position: int}, array{wins: 50, losses: 32} given.'
+			identifier: argument.type
+			count: 3
+			path: tests/Extension/ExtensionOfferEvaluatorTest.php
+
+		-
+			rawMessage: 'Parameter #1 $teamFactors of method Extension\ExtensionOfferEvaluator::calculateWinnerModifier() expects array{wins: int, losses: int, tradition_wins: int, tradition_losses: int, money_committed_at_position: int}, array{wins: 60, losses: 22} given.'
+			identifier: argument.type
+			count: 2
+			path: tests/Extension/ExtensionOfferEvaluatorTest.php
+
+		-
+			rawMessage: 'Parameter #1 $teamFactors of method Extension\ExtensionOfferEvaluator::calculateWinnerModifier() expects array{wins: int, losses: int, tradition_wins: int, tradition_losses: int, money_committed_at_position: int}, array{} given.'
 			identifier: argument.type
 			count: 1
 			path: tests/Extension/ExtensionOfferEvaluatorTest.php
@@ -2137,6 +2269,12 @@ parameters:
 			path: tests/Extension/ExtensionOfferEvaluatorTest.php
 
 		-
+			rawMessage: 'Parameter #2 $playerPreferences of method Extension\ExtensionOfferEvaluator::calculateCombinedModifier() expects array{winner: int, tradition: int, loyalty: int, playing_time: int}, array{winner: 3, tradition: 3, coach: 3, loyalty: 3, security: 3, playing_time: 3} given.'
+			identifier: argument.type
+			count: 1
+			path: tests/Extension/ExtensionOfferEvaluatorTest.php
+
+		-
 			rawMessage: 'Parameter #2 $playerPreferences of method Extension\ExtensionOfferEvaluator::calculateCombinedModifier() expects array{winner: int, tradition: int, loyalty: int, playing_time: int}, array{winner: 5, tradition: 3, loyalty: 5} given.'
 			identifier: argument.type
 			count: 1
@@ -2149,13 +2287,55 @@ parameters:
 			path: tests/Extension/ExtensionOfferEvaluatorTest.php
 
 		-
-			rawMessage: 'Parameter #2 $playerPreferences of method Extension\ExtensionOfferEvaluator::calculatePlayingTimeModifier() expects array{playing_time: int}, array{} given.'
+			rawMessage: 'Parameter #2 $playerPreferences of method Extension\ExtensionOfferEvaluator::calculatePlayingTimeModifier() expects array{winner: int, tradition: int, loyalty: int, playing_time: int}, array{playing_time: 5} given.'
+			identifier: argument.type
+			count: 4
+			path: tests/Extension/ExtensionOfferEvaluatorTest.php
+
+		-
+			rawMessage: 'Parameter #2 $playerPreferences of method Extension\ExtensionOfferEvaluator::calculatePlayingTimeModifier() expects array{winner: int, tradition: int, loyalty: int, playing_time: int}, array{} given.'
 			identifier: argument.type
 			count: 1
 			path: tests/Extension/ExtensionOfferEvaluatorTest.php
 
 		-
-			rawMessage: 'Parameter #2 $playerPreferences of method Extension\ExtensionOfferEvaluator::calculateWinnerModifier() expects array{winner: int}, array{} given.'
+			rawMessage: 'Parameter #2 $playerPreferences of method Extension\ExtensionOfferEvaluator::calculateTraditionModifier() expects array{winner: int, tradition: int, loyalty: int, playing_time: int}, array{tradition: 3} given.'
+			identifier: argument.type
+			count: 2
+			path: tests/Extension/ExtensionOfferEvaluatorTest.php
+
+		-
+			rawMessage: 'Parameter #2 $playerPreferences of method Extension\ExtensionOfferEvaluator::calculateTraditionModifier() expects array{winner: int, tradition: int, loyalty: int, playing_time: int}, array{tradition: 4} given.'
+			identifier: argument.type
+			count: 1
+			path: tests/Extension/ExtensionOfferEvaluatorTest.php
+
+		-
+			rawMessage: 'Parameter #2 $playerPreferences of method Extension\ExtensionOfferEvaluator::calculateTraditionModifier() expects array{winner: int, tradition: int, loyalty: int, playing_time: int}, array{tradition: 5} given.'
+			identifier: argument.type
+			count: 1
+			path: tests/Extension/ExtensionOfferEvaluatorTest.php
+
+		-
+			rawMessage: 'Parameter #2 $playerPreferences of method Extension\ExtensionOfferEvaluator::calculateWinnerModifier() expects array{winner: int, tradition: int, loyalty: int, playing_time: int}, array{winner: 1} given.'
+			identifier: argument.type
+			count: 1
+			path: tests/Extension/ExtensionOfferEvaluatorTest.php
+
+		-
+			rawMessage: 'Parameter #2 $playerPreferences of method Extension\ExtensionOfferEvaluator::calculateWinnerModifier() expects array{winner: int, tradition: int, loyalty: int, playing_time: int}, array{winner: 3} given.'
+			identifier: argument.type
+			count: 3
+			path: tests/Extension/ExtensionOfferEvaluatorTest.php
+
+		-
+			rawMessage: 'Parameter #2 $playerPreferences of method Extension\ExtensionOfferEvaluator::calculateWinnerModifier() expects array{winner: int, tradition: int, loyalty: int, playing_time: int}, array{winner: 5} given.'
+			identifier: argument.type
+			count: 2
+			path: tests/Extension/ExtensionOfferEvaluatorTest.php
+
+		-
+			rawMessage: 'Parameter #2 $playerPreferences of method Extension\ExtensionOfferEvaluator::calculateWinnerModifier() expects array{winner: int, tradition: int, loyalty: int, playing_time: int}, array{} given.'
 			identifier: argument.type
 			count: 1
 			path: tests/Extension/ExtensionOfferEvaluatorTest.php
@@ -2416,19 +2596,19 @@ parameters:
 			path: tests/FranchiseHistory/FranchiseHistoryViewTest.php
 
 		-
-			rawMessage: 'Parameter #1 $franchiseData of method FranchiseHistory\Contracts\FranchiseHistoryViewInterface::render() expects array<int, array{teamid: int|string, team_name: string, color1: string, color2: string, totwins: int|string, totloss: int|string, winpct: string, five_season_wins: int|string, ...}>, array{array{teamid: 1, team_city: ''Los Angeles'', team_name: ''Lakers'', color1: ''552583'', color2: ''FDB927'', totwins: 100, totloss: 50, winpct: 0.667, ...}} given.'
+			rawMessage: 'Parameter #1 $franchiseData of method FranchiseHistory\Contracts\FranchiseHistoryViewInterface::render() expects array<int, array{teamid: int|string, team_name: string, color1: string, color2: string, totwins: int|string, totloss: int|string, winpct: string, five_season_wins: int|string, ..., ...<string, mixed>}>, array{array{teamid: 1, team_city: ''Los Angeles'', team_name: ''Lakers'', color1: ''552583'', color2: ''FDB927'', totwins: 100, totloss: 50, winpct: 0.667, ...}} given.'
 			identifier: argument.type
 			count: 1
 			path: tests/FranchiseHistory/FranchiseHistoryViewTest.php
 
 		-
-			rawMessage: 'Parameter #1 $franchiseData of method FranchiseHistory\Contracts\FranchiseHistoryViewInterface::render() expects array<int, array{teamid: int|string, team_name: string, color1: string, color2: string, totwins: int|string, totloss: int|string, winpct: string, five_season_wins: int|string, ...}>, array{array{teamid: 1, team_city: ''Test<script>'', team_name: ''Team&Name'', color1: ''000000'', color2: ''FFFFFF'', wins: 0, losses: 0, totwins: 0, ...}} given.'
+			rawMessage: 'Parameter #1 $franchiseData of method FranchiseHistory\Contracts\FranchiseHistoryViewInterface::render() expects array<int, array{teamid: int|string, team_name: string, color1: string, color2: string, totwins: int|string, totloss: int|string, winpct: string, five_season_wins: int|string, ..., ...<string, mixed>}>, array{array{teamid: 1, team_city: ''Test<script>'', team_name: ''Team&Name'', color1: ''000000'', color2: ''FFFFFF'', wins: 0, losses: 0, totwins: 0, ...}} given.'
 			identifier: argument.type
 			count: 1
 			path: tests/FranchiseHistory/FranchiseHistoryViewTest.php
 
 		-
-			rawMessage: 'Parameter #1 $franchiseData of method FranchiseHistory\Contracts\FranchiseHistoryViewInterface::render() expects array<int, array{teamid: int|string, team_name: string, color1: string, color2: string, totwins: int|string, totloss: int|string, winpct: string, five_season_wins: int|string, ...}>, array{array{teamid: 2, team_city: ''Charlotte'', team_name: ''Bobcats'', color1: ''000000'', color2: ''FFFFFF'', totwins: 20, totloss: 60, winpct: 0.25, ...}} given.'
+			rawMessage: 'Parameter #1 $franchiseData of method FranchiseHistory\Contracts\FranchiseHistoryViewInterface::render() expects array<int, array{teamid: int|string, team_name: string, color1: string, color2: string, totwins: int|string, totloss: int|string, winpct: string, five_season_wins: int|string, ..., ...<string, mixed>}>, array{array{teamid: 2, team_city: ''Charlotte'', team_name: ''Bobcats'', color1: ''000000'', color2: ''FFFFFF'', totwins: 20, totloss: 60, winpct: 0.25, ...}} given.'
 			identifier: argument.type
 			count: 1
 			path: tests/FranchiseHistory/FranchiseHistoryViewTest.php
@@ -2500,6 +2680,12 @@ parameters:
 			path: tests/FreeAgency/FreeAgencyAdminProcessorTest.php
 
 		-
+			rawMessage: 'Parameter #2 $signings of method FreeAgency\FreeAgencyAdminProcessor::executeSignings() expects list<array{playerId: int, teamId: int, teamName: string, offers: array{offer1: int, offer2: int, offer3: int, offer4: int, offer5: int, offer6: int}, offerYears: int, usedMle: bool, usedLle: bool}>, array{array{playerId: int, teamId: int, teamName: string, offers: array{offer1: int, offer2: int, offer3: int, offer4: int, offer5: int, offer6: int}, offerYears: int, offerTotal: float, usedMle: bool, usedLle: bool}} given.'
+			identifier: argument.type
+			count: 3
+			path: tests/FreeAgency/FreeAgencyAdminProcessorTest.php
+
+		-
 			rawMessage: 'Call to method PHPUnit\Framework\Assert::assertInstanceOf() with ''FreeAgency\\Contracts\\FreeAgencyAdminRepositoryInterface'' and FreeAgency\FreeAgencyAdminRepository will always evaluate to true.'
 			identifier: method.alreadyNarrowedType
 			count: 1
@@ -2562,6 +2748,18 @@ parameters:
 		-
 			rawMessage: 'Dynamic call to static method PHPUnit\Framework\TestCase::createStub().'
 			identifier: staticMethod.dynamicCall
+			count: 1
+			path: tests/FreeAgency/FreeAgencyDemandCalculatorTest.php
+
+		-
+			rawMessage: 'Method Tests\FreeAgency\MockDemandRepository::getPlayerDemands() should return array{dem1: int, dem2: int, dem3: int, dem4: int, dem5: int, dem6: int} but returns array.'
+			identifier: return.type
+			count: 1
+			path: tests/FreeAgency/FreeAgencyDemandCalculatorTest.php
+
+		-
+			rawMessage: 'Method Tests\FreeAgency\MockDemandRepository::getTeamPerformance() should return array{wins: int, losses: int, tradWins: int, tradLosses: int} but returns array.'
+			identifier: return.type
 			count: 1
 			path: tests/FreeAgency/FreeAgencyDemandCalculatorTest.php
 
@@ -2878,7 +3076,7 @@ parameters:
 			path: tests/Injuries/InjuriesIntegrationTest.php
 
 		-
-			rawMessage: 'Parameter #1 $injuredPlayers of method Injuries\InjuriesView::render() expects array<int, array{playerID: int, name: string, position: string, daysRemaining: int, returnDate: string, teamid: int, teamCity: string, teamName: string, ...}>, list<array{playerID: int<1, max>, name: literal-string&non-falsy-string, position: ''G'', daysRemaining: int<1, max>, teamid: int<1, max>, teamCity: ''City'', teamName: literal-string&non-falsy-string, teamColor1: ''000000'', ...}> given.'
+			rawMessage: 'Parameter #1 $injuredPlayers of method Injuries\InjuriesView::render() expects array<int, array{playerID: int, name: string, position: string, daysRemaining: int, returnDate: string, teamid: int, teamCity: string, teamName: string, ...}>, list<array{playerID: int<1, 20>, name: literal-string&non-falsy-string, position: ''G'', daysRemaining: int<1, 20>, teamid: int<1, 20>, teamCity: ''City'', teamName: literal-string&non-falsy-string, teamColor1: ''000000'', ...}> given.'
 			identifier: argument.type
 			count: 1
 			path: tests/Injuries/InjuriesIntegrationTest.php
@@ -3078,6 +3276,12 @@ parameters:
 		-
 			rawMessage: 'Method LastSimRecap\Contracts\LastSimRecapRepositoryInterface@anonymous/LastSimRecap/LastSimRecapServiceTest.php:240::__construct() has parameter $window with no value type specified in iterable type array.'
 			identifier: missingType.iterableValue
+			count: 1
+			path: tests/LastSimRecap/LastSimRecapServiceTest.php
+
+		-
+			rawMessage: 'Method LastSimRecap\Contracts\LastSimRecapRepositoryInterface@anonymous/LastSimRecap/LastSimRecapServiceTest.php:240::getLastSimWindow() should return array{sim: int, startDate: string, endDate: string}|null but returns array|null.'
+			identifier: return.type
 			count: 1
 			path: tests/LastSimRecap/LastSimRecapServiceTest.php
 
@@ -3308,6 +3512,12 @@ parameters:
 			rawMessage: 'Method Tests\LeagueSchedule\LeagueScheduleViewTest::createPageData() return type has no value type specified in iterable type array.'
 			identifier: missingType.iterableValue
 			count: 1
+			path: tests/LeagueSchedule/LeagueScheduleViewTest.php
+
+		-
+			rawMessage: 'Parameter #1 $pageData of method LeagueSchedule\LeagueScheduleView::render() expects array{gamesByMonth: array<string, array{label: string, dates: array<string, list<array{date: string, visitor: int, visitorScore: int, visitorTeam: string, visitorRecord: string, home: int, homeScore: int, homeTeam: string, ...}>>}>, firstUnplayedId: string|null, isPlayoffPhase: bool, playoffMonthKey: string|null, simLengthDays: int}, array given.'
+			identifier: argument.type
+			count: 10
 			path: tests/LeagueSchedule/LeagueScheduleViewTest.php
 
 		-
@@ -3647,6 +3857,12 @@ parameters:
 			path: tests/Negotiation/NegotiationOfferViewTest.php
 
 		-
+			rawMessage: 'Parameter #2 $demands of static method Negotiation\NegotiationOfferView::renderNegotiationForm() expects array{year1: float|int, year2: float|int, year3: float|int, year4: float|int, year5: float|int, year6: int, years: int, total: float|int, ...}, array given.'
+			identifier: argument.type
+			count: 6
+			path: tests/Negotiation/NegotiationOfferViewTest.php
+
+		-
 			rawMessage: 'Parameter #2 $demands of static method Negotiation\NegotiationOfferView::renderNegotiationForm() expects array{year1: float|int, year2: float|int, year3: float|int, year4: float|int, year5: float|int, year6: int, years: int, total: float|int, ...}, array{year1: 1100, year2: 1200, year3: 1300, year4: 0, year5: 0, year6: 0, years: 3, total: 3600} given.'
 			identifier: argument.type
 			count: 1
@@ -3950,6 +4166,18 @@ parameters:
 			rawMessage: 'Method Tests\OneOnOneGame\OneOnOneGameEngineTest::createMockPlayerData() return type has no value type specified in iterable type array.'
 			identifier: missingType.iterableValue
 			count: 1
+			path: tests/OneOnOneGame/OneOnOneGameEngineTest.php
+
+		-
+			rawMessage: 'Parameter #1 $player1Data of method OneOnOneGame\OneOnOneGameEngine::simulateGame() expects array{pid: int, name: string, oo: int, r_drive_off: int, po: int, od: int, dd: int, pd: int, ...}, array given.'
+			identifier: argument.type
+			count: 7
+			path: tests/OneOnOneGame/OneOnOneGameEngineTest.php
+
+		-
+			rawMessage: 'Parameter #2 $player2Data of method OneOnOneGame\OneOnOneGameEngine::simulateGame() expects array{pid: int, name: string, oo: int, r_drive_off: int, po: int, od: int, dd: int, pd: int, ...}, array given.'
+			identifier: argument.type
+			count: 7
 			path: tests/OneOnOneGame/OneOnOneGameEngineTest.php
 
 		-
@@ -4659,6 +4887,18 @@ parameters:
 			path: tests/ProjectedDraftOrder/ProjectedDraftOrderViewTest.php
 
 		-
+			rawMessage: 'Parameter #1 $draftOrder of method ProjectedDraftOrder\ProjectedDraftOrderView::render() expects array{round1: list<array{pick: int, teamId: int, teamName: string, wins: int, losses: int, color1: string, color2: string, ownerId: int, ...}>, round2: list<array{pick: int, teamId: int, teamName: string, wins: int, losses: int, color1: string, color2: string, ownerId: int, ...}>}, array given.'
+			identifier: argument.type
+			count: 35
+			path: tests/ProjectedDraftOrder/ProjectedDraftOrderViewTest.php
+
+		-
+			rawMessage: 'Parameter #1 $draftOrder of method ProjectedDraftOrder\ProjectedDraftOrderView::render() expects array{round1: list<array{pick: int, teamId: int, teamName: string, wins: int, losses: int, color1: string, color2: string, ownerId: int, ...}>, round2: list<array{pick: int, teamId: int, teamName: string, wins: int, losses: int, color1: string, color2: string, ownerId: int, ...}>}, non-empty-array given.'
+			identifier: argument.type
+			count: 12
+			path: tests/ProjectedDraftOrder/ProjectedDraftOrderViewTest.php
+
+		-
 			rawMessage: 'Dynamic call to static method PHPUnit\Framework\TestCase::createStub().'
 			identifier: staticMethod.dynamicCall
 			count: 1
@@ -4809,6 +5049,12 @@ parameters:
 			path: tests/Search/SearchViewTest.php
 
 		-
+			rawMessage: 'Parameter #1 $data of method Search\SearchView::render() expects array{query: string, type: string, topic: int, category: int, author: string, days: int, min: int, offset: int, ...}, array{query: string, type: string, topic: int, category: int, author: string, days: int, min: int, offset: int, ...} given.'
+			identifier: argument.type
+			count: 6
+			path: tests/Search/SearchViewTest.php
+
+		-
 			rawMessage: 'Call to method PHPUnit\Framework\Assert::assertInstanceOf() with ''SeasonArchive\\Contracts\\SeasonArchiveRepositoryInterface'' and SeasonArchive\SeasonArchiveRepository will always evaluate to true.'
 			identifier: method.alreadyNarrowedType
 			count: 1
@@ -4943,6 +5189,12 @@ parameters:
 		-
 			rawMessage: 'Method Tests\SeasonLeaderboards\SeasonLeaderboardsViewXssTest::makeStats() has parameter $overrides with no value type specified in iterable type array.'
 			identifier: missingType.iterableValue
+			count: 1
+			path: tests/SeasonLeaderboards/SeasonLeaderboardsViewXssTest.php
+
+		-
+			rawMessage: 'Method Tests\SeasonLeaderboards\SeasonLeaderboardsViewXssTest::makeStats() should return array{pid: int, name: string, year: int, teamname: string, teamid: int, team_city: string, color1: string, color2: string, ...} but returns array{pid: mixed, name: mixed, year: mixed, teamname: mixed, teamid: mixed, team_city: mixed, color1: mixed, color2: mixed, ..., ...}.'
+			identifier: return.type
 			count: 1
 			path: tests/SeasonLeaderboards/SeasonLeaderboardsViewXssTest.php
 
@@ -5121,6 +5373,12 @@ parameters:
 			path: tests/Standings/StandingsViewXssTest.php
 
 		-
+			rawMessage: 'Method Tests\Standings\StandingsViewXssTest::makeStandingsRow() should return array{teamid: int, team_name: string, league_record: string, pct: string, gamesBack: string, conf_record: string, div_record: string, home_record: string, ...} but returns array{teamid: mixed, team_name: mixed, league_record: mixed, pct: mixed, gamesBack: mixed, conf_record: mixed, div_record: mixed, home_record: mixed, ..., ...}.'
+			identifier: return.type
+			count: 1
+			path: tests/Standings/StandingsViewXssTest.php
+
+		-
 			rawMessage: 'Parameter #1 $games of method Statistics\TeamStatsCalculator::calculate() expects list<array{visitor_teamid: int, visitor_score: int, home_teamid: int, home_score: int}>, array{array{visitor_score: 100, home_score: 95}} given.'
 			identifier: argument.type
 			count: 1
@@ -5247,6 +5505,18 @@ parameters:
 			path: tests/Team/TeamViewTest.php
 
 		-
+			rawMessage: 'Parameter #1 $pageData of method Team\TeamView::render() expects array{teamid: int, team: Team\Team, imagesPath: string, yr: string|null, display: string, insertyear: string, isActualTeam: bool, tableOutput: string, ...}, array given.'
+			identifier: argument.type
+			count: 23
+			path: tests/Team/TeamViewTest.php
+
+		-
+			rawMessage: 'Parameter #1 $pageData of method Team\TeamView::render() expects array{teamid: int, team: Team\Team, imagesPath: string, yr: string|null, display: string, insertyear: string, isActualTeam: bool, tableOutput: string, ...}, array<string, mixed> given.'
+			identifier: argument.type
+			count: 1
+			path: tests/Team/TeamViewXssTest.php
+
+		-
 			rawMessage: 'Call to method PHPUnit\Framework\Assert::assertInstanceOf() with ''TeamOffDefStats\\Contracts\\TeamOffDefStatsServiceInterface'' and TeamOffDefStats\TeamOffDefStatsService will always evaluate to true.'
 			identifier: method.alreadyNarrowedType
 			count: 1
@@ -5289,6 +5559,18 @@ parameters:
 			path: tests/TeamOffDefStats/TeamOffDefStatsServiceTest.php
 
 		-
+			rawMessage: 'Parameter #1 $processedStats of method TeamOffDefStats\TeamOffDefStatsService::calculateLeagueTotals() expects list<array{teamid: int, team_city: string, team_name: string, color1: string, color2: string, offense_totals: array{games: string, fgm: string, fga: string, ftm: string, fta: string, tgm: string, tga: string, orb: string, ...}, offense_averages: array{fgm: string, fga: string, fgp: string, ftm: string, fta: string, ftp: string, tgm: string, tga: string, ...}, defense_totals: array{games: string, fgm: string, fga: string, ftm: string, fta: string, tgm: string, tga: string, orb: string, ...}, ...}>, array{array} given.'
+			identifier: argument.type
+			count: 1
+			path: tests/TeamOffDefStats/TeamOffDefStatsServiceTest.php
+
+		-
+			rawMessage: 'Parameter #1 $rawStats of method TeamOffDefStats\TeamOffDefStatsService::processTeamStats() expects list<array{teamid: int, team_city: string, team_name: string, color1: string, color2: string, offense_games: int|null, offense_fgm: int|null, offense_fga: int|null, ...}>, array{array} given.'
+			identifier: argument.type
+			count: 1
+			path: tests/TeamOffDefStats/TeamOffDefStatsServiceTest.php
+
+		-
 			rawMessage: 'You should use assertSame() instead of assertEquals(), because both values are scalars of the same type'
 			identifier: phpunit.assertEquals
 			count: 18
@@ -5325,9 +5607,21 @@ parameters:
 			path: tests/TeamOffDefStats/TeamOffDefStatsViewTest.php
 
 		-
+			rawMessage: 'Parameter #1 $data of method TeamOffDefStats\TeamOffDefStatsView::render() expects array{teams: list<array{teamid: int, team_city: string, team_name: string, color1: string, color2: string, offense_totals: array{games: string, fgm: string, fga: string, ftm: string, fta: string, tgm: string, tga: string, orb: string, ...}, offense_averages: array{fgm: string, fga: string, fgp: string, ftm: string, fta: string, ftp: string, tgm: string, tga: string, ...}, defense_totals: array{games: string, fgm: string, fga: string, ftm: string, fta: string, tgm: string, tga: string, orb: string, ...}, ...}>, league: array{totals: array{games: string, fgm: string, fga: string, ftm: string, fta: string, tgm: string, tga: string, orb: string, ...}, averages: array{fgm: string, fga: string, fgp: string, ftm: string, fta: string, ftp: string, tgm: string, tga: string, ...}, games: int}, differentials: list<array{teamid: int, team_city: string, team_name: string, color1: string, color2: string, differentials: array{fgm: string, fga: string, fgp: string, ftm: string, fta: string, ftp: string, tgm: string, tga: string, ...}}>}, array given.'
+			identifier: argument.type
+			count: 9
+			path: tests/TeamOffDefStats/TeamOffDefStatsViewTest.php
+
+		-
 			rawMessage: 'Parameter #1 $data of method TeamOffDefStats\TeamOffDefStatsView::render() expects array{teams: list<array{teamid: int, team_city: string, team_name: string, color1: string, color2: string, offense_totals: array{games: string, fgm: string, fga: string, ftm: string, fta: string, tgm: string, tga: string, orb: string, ...}, offense_averages: array{fgm: string, fga: string, fgp: string, ftm: string, fta: string, ftp: string, tgm: string, tga: string, ...}, defense_totals: array{games: string, fgm: string, fga: string, ftm: string, fta: string, tgm: string, tga: string, orb: string, ...}, ...}>, league: array{totals: array{games: string, fgm: string, fga: string, ftm: string, fta: string, tgm: string, tga: string, orb: string, ...}, averages: array{fgm: string, fga: string, fgp: string, ftm: string, fta: string, ftp: string, tgm: string, tga: string, ...}, games: int}, differentials: list<array{teamid: int, team_city: string, team_name: string, color1: string, color2: string, differentials: array{fgm: string, fga: string, fgp: string, ftm: string, fta: string, ftp: string, tgm: string, tga: string, ...}}>}, array{teams: array{}, league: array{totals: array{}, averages: array{}}, differentials: array{}} given.'
 			identifier: argument.type
 			count: 1
+			path: tests/TeamOffDefStats/TeamOffDefStatsViewTest.php
+
+		-
+			rawMessage: 'Parameter #1 $data of method TeamOffDefStats\TeamOffDefStatsView::render() expects array{teams: list<array{teamid: int, team_city: string, team_name: string, color1: string, color2: string, offense_totals: array{games: string, fgm: string, fga: string, ftm: string, fta: string, tgm: string, tga: string, orb: string, ...}, offense_averages: array{fgm: string, fga: string, fgp: string, ftm: string, fta: string, ftp: string, tgm: string, tga: string, ...}, defense_totals: array{games: string, fgm: string, fga: string, ftm: string, fta: string, tgm: string, tga: string, orb: string, ...}, ...}>, league: array{totals: array{games: string, fgm: string, fga: string, ftm: string, fta: string, tgm: string, tga: string, orb: string, ...}, averages: array{fgm: string, fga: string, fgp: string, ftm: string, fta: string, ftp: string, tgm: string, tga: string, ...}, games: int}, differentials: list<array{teamid: int, team_city: string, team_name: string, color1: string, color2: string, differentials: array{fgm: string, fga: string, fgp: string, ftm: string, fta: string, ftp: string, tgm: string, tga: string, ...}}>}, non-empty-array given.'
+			identifier: argument.type
+			count: 3
 			path: tests/TeamOffDefStats/TeamOffDefStatsViewTest.php
 
 		-
@@ -5352,6 +5646,18 @@ parameters:
 			rawMessage: 'Method Tests\TeamSchedule\TeamScheduleViewTest::createMockGame() return type has no value type specified in iterable type array.'
 			identifier: missingType.iterableValue
 			count: 1
+			path: tests/TeamSchedule/TeamScheduleViewTest.php
+
+		-
+			rawMessage: 'Parameter #2 $games of method TeamSchedule\TeamScheduleView::render() expects list<array{game: LeagueSchedule\Game, currentMonth: string, opposingTeam: Team\Team, opponentText: string, highlight: string, gameResult: string, wins: int, losses: int, ...}>, array{array, array} given.'
+			identifier: argument.type
+			count: 1
+			path: tests/TeamSchedule/TeamScheduleViewTest.php
+
+		-
+			rawMessage: 'Parameter #2 $games of method TeamSchedule\TeamScheduleView::render() expects list<array{game: LeagueSchedule\Game, currentMonth: string, opposingTeam: Team\Team, opponentText: string, highlight: string, gameResult: string, wins: int, losses: int, ...}>, array{array} given.'
+			identifier: argument.type
+			count: 3
 			path: tests/TeamSchedule/TeamScheduleViewTest.php
 
 		-
@@ -5881,6 +6187,18 @@ parameters:
 			identifier: argument.type
 			count: 2
 			path: tests/UI/Tables/RatingsTest.php
+
+		-
+			rawMessage: 'Parameter #1 $row of method Api\Transformer\InjuryTransformer::transform() expects array{player_uuid: string, pid: int, name: string, pos: string, injured: int, teamid: int|null, team_uuid: string|null, team_city: string|null, ...}, array<string, mixed> given.'
+			identifier: argument.type
+			count: 1
+			path: tests/Unit/Api/ApiContractTest.php
+
+		-
+			rawMessage: 'Parameter #1 $row of method Api\Transformer\TeamTransformer::transformDetail() expects array{teamid: int, uuid: string, team_city: string, team_name: string, owner_name: string, arena: string, conference: string|null, division: string|null, ...}, array<string, mixed> given.'
+			identifier: argument.type
+			count: 1
+			path: tests/Unit/Api/ApiContractTest.php
 
 		-
 			rawMessage: 'Call to static method PHPUnit\Framework\Assert::assertTrue() with true will always evaluate to true.'
@@ -6429,10 +6747,28 @@ parameters:
 			path: tests/Voting/VotingSubmissionServiceTest.php
 
 		-
+			rawMessage: 'Parameter #2 $ballot of method Voting\VotingSubmissionService::submitEoyVote() expects array{mvp_1: string, mvp_2: string, mvp_3: string, six_1: string, six_2: string, six_3: string, roy_1: string, roy_2: string, ...}, array{mvp_1: string, mvp_2: string, mvp_3: string, six_1: string, six_2: string, six_3: string, roy_1: string, roy_2: string, ..., ...<string, ''John Doe, My Team''>} given.'
+			identifier: argument.type
+			count: 1
+			path: tests/Voting/VotingSubmissionServiceTest.php
+
+		-
+			rawMessage: 'Parameter #2 $ballot of method Voting\VotingSubmissionService::submitEoyVote() expects array{mvp_1: string, mvp_2: string, mvp_3: string, six_1: string, six_2: string, six_3: string, roy_1: string, roy_2: string, ...}, array{mvp_1: string, mvp_2: string, mvp_3: string, six_1: string, six_2: string, six_3: string, roy_1: string, roy_2: string, ..., ...<string, ''Star Player, My Team''>} given.'
+			identifier: argument.type
+			count: 1
+			path: tests/Voting/VotingSubmissionServiceTest.php
+
+		-
 			rawMessage: 'Call to method PHPUnit\Framework\Assert::assertInstanceOf() with ''Voting\\Contracts\\VotingSubmissionViewInterface'' and Voting\VotingSubmissionView will always evaluate to true.'
 			identifier: method.alreadyNarrowedType
 			count: 1
 			path: tests/Voting/VotingSubmissionViewTest.php
+
+		-
+			rawMessage: 'Property Tests\VotingResults\StubVotingResultsRenderer::$lastRenderedTables (array<int, array{title: string, rows: array<int, array{name: string, votes: int}>}>) does not accept list<array{title: string, rows: list<array{name: string, votes: int, pid: int}>}>.'
+			identifier: assign.propertyType
+			count: 1
+			path: tests/VotingResults/VotingResultsControllerTest.php
 
 		-
 			rawMessage: Property Tests\VotingResults\StubVotingResultsService::$allStarResponse type has no value type specified in iterable type array.
@@ -6639,25 +6975,25 @@ parameters:
 			path: tests/Waivers/WaiversProcessorTest.php
 
 		-
-			rawMessage: 'Parameter #1 $playerData of method Waivers\WaiversProcessor::determineContractData() expects array{pid: int, name: string, nickname: string|null, age: int|null, teamid: int, teamname: string|null, pos: string, stamina: int|null, ...}, array{salary_yr1: 0, exp: 8} given.'
+			rawMessage: 'Parameter #1 $playerData of method Waivers\WaiversProcessor::determineContractData() expects array{pid: int, name: string, nickname: string|null, age: int|null, teamid: int, teamname: string|null, pos: string, stamina: int|null, ..., ...<string, mixed>}, array{salary_yr1: 0, exp: 8} given.'
 			identifier: argument.type
 			count: 1
 			path: tests/Waivers/WaiversProcessorTest.php
 
 		-
-			rawMessage: 'Parameter #1 $playerData of method Waivers\WaiversProcessor::determineContractData() expects array{pid: int, name: string, nickname: string|null, age: int|null, teamid: int, teamname: string|null, pos: string, stamina: int|null, ...}, array{salary_yr1: 0, salary_yr2: 0, exp: 6} given.'
+			rawMessage: 'Parameter #1 $playerData of method Waivers\WaiversProcessor::determineContractData() expects array{pid: int, name: string, nickname: string|null, age: int|null, teamid: int, teamname: string|null, pos: string, stamina: int|null, ..., ...<string, mixed>}, array{salary_yr1: 0, salary_yr2: 0, exp: 6} given.'
 			identifier: argument.type
 			count: 1
 			path: tests/Waivers/WaiversProcessorTest.php
 
 		-
-			rawMessage: 'Parameter #1 $playerData of method Waivers\WaiversProcessor::determineContractData() expects array{pid: int, name: string, nickname: string|null, age: int|null, teamid: int, teamname: string|null, pos: string, stamina: int|null, ...}, array{salary_yr1: 500, cy: 1, cyt: 3, salary_yr2: 550, salary_yr3: 600} given.'
+			rawMessage: 'Parameter #1 $playerData of method Waivers\WaiversProcessor::determineContractData() expects array{pid: int, name: string, nickname: string|null, age: int|null, teamid: int, teamname: string|null, pos: string, stamina: int|null, ..., ...<string, mixed>}, array{salary_yr1: 500, cy: 1, cyt: 3, salary_yr2: 550, salary_yr3: 600} given.'
 			identifier: argument.type
 			count: 1
 			path: tests/Waivers/WaiversProcessorTest.php
 
 		-
-			rawMessage: 'Parameter #1 $playerData of method Waivers\WaiversProcessor::determineContractData() expects array{pid: int, name: string, nickname: string|null, age: int|null, teamid: int, teamname: string|null, pos: string, stamina: int|null, ...}, array{salary_yr1: 500, cy: 2, cyt: 3, salary_yr2: 550, salary_yr3: 600} given.'
+			rawMessage: 'Parameter #1 $playerData of method Waivers\WaiversProcessor::determineContractData() expects array{pid: int, name: string, nickname: string|null, age: int|null, teamid: int, teamname: string|null, pos: string, stamina: int|null, ..., ...<string, mixed>}, array{salary_yr1: 500, cy: 2, cyt: 3, salary_yr2: 550, salary_yr3: 600} given.'
 			identifier: argument.type
 			count: 1
 			path: tests/Waivers/WaiversProcessorTest.php
@@ -6915,19 +7251,19 @@ parameters:
 			path: tests/WideUnit/DepthChartEntry/DepthChartEntryWideUnitTest.php
 
 		-
-			rawMessage: 'Parameter #2 $depthChartValues of method DepthChartEntry\DepthChartEntryRepository::updatePlayerDepthChart() expects array{pg: int, sg: int, sf: int, pf: int, c: int, canPlayInGame: int, min: int, of: int, ...}, array{name: ''Player 1'', pg: 1, sg: 0, sf: 0, pf: 0, c: 0, canPlayInGame: 1, min: 30}|array{name: ''Player 2'', pg: 0, sg: 1, sf: 0, pf: 0, c: 0, canPlayInGame: 1, min: 28}|array{name: ''Player 3'', pg: 0, sg: 0, sf: 1, pf: 0, c: 0, canPlayInGame: 1, min: 32} given.'
+			rawMessage: 'Parameter #2 $depthChartValues of method DepthChartEntry\DepthChartEntryRepository::updatePlayerDepthChart() expects array{pg: int, sg: int, sf: int, pf: int, c: int, canPlayInGame: int, min: int, of: int, ..., ...<string, mixed>}, array{name: ''Player 1'', pg: 1, sg: 0, sf: 0, pf: 0, c: 0, canPlayInGame: 1, min: 30}|array{name: ''Player 2'', pg: 0, sg: 1, sf: 0, pf: 0, c: 0, canPlayInGame: 1, min: 28}|array{name: ''Player 3'', pg: 0, sg: 0, sf: 1, pf: 0, c: 0, canPlayInGame: 1, min: 32} given.'
 			identifier: argument.type
 			count: 1
 			path: tests/WideUnit/DepthChartEntry/DepthChartEntryWideUnitTest.php
 
 		-
-			rawMessage: 'Parameter #2 $depthChartValues of method DepthChartEntry\DepthChartEntryRepository::updatePlayerDepthChart() expects array{pg: int, sg: int, sf: int, pf: int, c: int, canPlayInGame: int, min: int, of: int, ...}, array{pg: 0, sg: 0, sf: 0, pf: 0, c: 0, canPlayInGame: 1, min: 0} given.'
+			rawMessage: 'Parameter #2 $depthChartValues of method DepthChartEntry\DepthChartEntryRepository::updatePlayerDepthChart() expects array{pg: int, sg: int, sf: int, pf: int, c: int, canPlayInGame: int, min: int, of: int, ..., ...<string, mixed>}, array{pg: 0, sg: 0, sf: 0, pf: 0, c: 0, canPlayInGame: 1, min: 0} given.'
 			identifier: argument.type
 			count: 1
 			path: tests/WideUnit/DepthChartEntry/DepthChartEntryWideUnitTest.php
 
 		-
-			rawMessage: 'Parameter #2 $depthChartValues of method DepthChartEntry\DepthChartEntryRepository::updatePlayerDepthChart() expects array{pg: int, sg: int, sf: int, pf: int, c: int, canPlayInGame: int, min: int, of: int, ...}, array{pg: 1, sg: 2, sf: 3, pf: 4, c: 5, canPlayInGame: 1, min: 35} given.'
+			rawMessage: 'Parameter #2 $depthChartValues of method DepthChartEntry\DepthChartEntryRepository::updatePlayerDepthChart() expects array{pg: int, sg: int, sf: int, pf: int, c: int, canPlayInGame: int, min: int, of: int, ..., ...<string, mixed>}, array{pg: 1, sg: 2, sf: 3, pf: 4, c: 5, canPlayInGame: 1, min: 35} given.'
 			identifier: argument.type
 			count: 1
 			path: tests/WideUnit/DepthChartEntry/DepthChartEntryWideUnitTest.php
@@ -7251,6 +7587,48 @@ parameters:
 			path: tests/WideUnit/ModifierConsistencyTest.php
 
 		-
+			rawMessage: 'Parameter #1 $playerPreferences of method Extension\ExtensionOfferEvaluator::calculateLoyaltyModifier() expects array{winner: int, tradition: int, loyalty: int, playing_time: int}, array{loyalty: 4} given.'
+			identifier: argument.type
+			count: 1
+			path: tests/WideUnit/ModifierConsistencyTest.php
+
+		-
+			rawMessage: 'Parameter #1 $teamFactors of method Extension\ExtensionOfferEvaluator::calculatePlayingTimeModifier() expects array{wins: int, losses: int, tradition_wins: int, tradition_losses: int, money_committed_at_position: int}, array{money_committed_at_position: 800} given.'
+			identifier: argument.type
+			count: 1
+			path: tests/WideUnit/ModifierConsistencyTest.php
+
+		-
+			rawMessage: 'Parameter #1 $teamFactors of method Extension\ExtensionOfferEvaluator::calculateTraditionModifier() expects array{wins: int, losses: int, tradition_wins: int, tradition_losses: int, money_committed_at_position: int}, array{tradition_wins: 700, tradition_losses: 300} given.'
+			identifier: argument.type
+			count: 1
+			path: tests/WideUnit/ModifierConsistencyTest.php
+
+		-
+			rawMessage: 'Parameter #1 $teamFactors of method Extension\ExtensionOfferEvaluator::calculateWinnerModifier() expects array{wins: int, losses: int, tradition_wins: int, tradition_losses: int, money_committed_at_position: int}, array{wins: 60, losses: 22} given.'
+			identifier: argument.type
+			count: 1
+			path: tests/WideUnit/ModifierConsistencyTest.php
+
+		-
+			rawMessage: 'Parameter #2 $playerPreferences of method Extension\ExtensionOfferEvaluator::calculatePlayingTimeModifier() expects array{winner: int, tradition: int, loyalty: int, playing_time: int}, array{playing_time: 5} given.'
+			identifier: argument.type
+			count: 1
+			path: tests/WideUnit/ModifierConsistencyTest.php
+
+		-
+			rawMessage: 'Parameter #2 $playerPreferences of method Extension\ExtensionOfferEvaluator::calculateTraditionModifier() expects array{winner: int, tradition: int, loyalty: int, playing_time: int}, array{tradition: 3} given.'
+			identifier: argument.type
+			count: 1
+			path: tests/WideUnit/ModifierConsistencyTest.php
+
+		-
+			rawMessage: 'Parameter #2 $playerPreferences of method Extension\ExtensionOfferEvaluator::calculateWinnerModifier() expects array{winner: int, tradition: int, loyalty: int, playing_time: int}, array{winner: 5} given.'
+			identifier: argument.type
+			count: 1
+			path: tests/WideUnit/ModifierConsistencyTest.php
+
+		-
 			rawMessage: 'Dynamic call to static method PHPUnit\Framework\TestCase::createStub().'
 			identifier: staticMethod.dynamicCall
 			count: 2
@@ -7296,6 +7674,18 @@ parameters:
 			rawMessage: 'Method Tests\WideUnit\Schedule\ScheduleWideUnitTest::getDefaultTeamData() return type has no value type specified in iterable type array.'
 			identifier: missingType.iterableValue
 			count: 1
+			path: tests/WideUnit/Schedule/ScheduleWideUnitTest.php
+
+		-
+			rawMessage: 'Parameter #2 $games of method TeamSchedule\TeamScheduleView::render() expects list<array{game: LeagueSchedule\Game, currentMonth: string, opposingTeam: Team\Team, opponentText: string, highlight: string, gameResult: string, wins: int, losses: int, ...}>, array{array, array} given.'
+			identifier: argument.type
+			count: 1
+			path: tests/WideUnit/Schedule/ScheduleWideUnitTest.php
+
+		-
+			rawMessage: 'Parameter #2 $games of method TeamSchedule\TeamScheduleView::render() expects list<array{game: LeagueSchedule\Game, currentMonth: string, opposingTeam: Team\Team, opponentText: string, highlight: string, gameResult: string, wins: int, losses: int, ...}>, array{array} given.'
+			identifier: argument.type
+			count: 3
 			path: tests/WideUnit/Schedule/ScheduleWideUnitTest.php
 
 		-

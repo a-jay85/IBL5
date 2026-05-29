@@ -14,7 +14,7 @@ class DraftPick
     public ?string $notes;
 
     /**
-     * @param array{pickid: int, ownerofpick: string, teampick: string, year: int|string, round: int|string, notes: string|null} $draftPickRow
+     * @param array{pickid: int, ownerofpick: string, teampick: string, year: int|string, round: int|string, notes: string|null, ...<string, mixed>} $draftPickRow
      */
     public function __construct(array $draftPickRow)
     {

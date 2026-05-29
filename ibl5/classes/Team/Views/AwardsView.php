@@ -40,7 +40,7 @@ class AwardsView
     /**
      * Render team accomplishments.
      *
-     * @param list<array{year: int, award: string}> $awards
+     * @param list<array{year: int, award: string, ...<string, mixed>}> $awards
      */
     public function renderTeamAccomplishments(array $awards): string
     {
@@ -94,7 +94,7 @@ class AwardsView
     }
 
     /**
-     * @param list<array{year: int, award: string}> $awards
+     * @param list<array{year: int, award: string, ...<string, mixed>}> $awards
      */
     private function renderAwardsList(array $awards): string
     {

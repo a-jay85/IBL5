@@ -227,7 +227,7 @@ class ExtensionService implements ExtensionProcessorInterface
      * Handle accepted extension: DB transaction, audit log, Discord, email
      *
      * @param ExtensionOffer $offer
-     * @param array{accepted: bool, offerValue: float, demandValue: float, modifier: float} $evaluation
+     * @param array{accepted: bool, offerValue: float, demandValue: float, modifier: float, offerYears: int} $evaluation
      * @return array{success: true, accepted: true, message: string, offerValue: float, demandValue: float, modifier: float, extensionYears: int, offerInMillions: float, offerDetails: string, discordNotificationSent: bool, discordChannel: string}
      */
     private function handleAcceptedExtension(
@@ -297,7 +297,7 @@ class ExtensionService implements ExtensionProcessorInterface
     /**
      * Handle rejected extension: news story, audit log, Discord, email
      *
-     * @param array{accepted: bool, offerValue: float, demandValue: float, modifier: float} $evaluation
+     * @param array{accepted: bool, offerValue: float, demandValue: float, modifier: float, offerYears: int} $evaluation
      * @return array{success: true, accepted: false, message: string, refusalMessage: string, offerValue: float, demandValue: float, modifier: float, extensionYears: int, offerInMillions: float, offerDetails: string, discordNotificationSent: bool, discordChannel: string}
      */
     private function handleRejectedExtension(

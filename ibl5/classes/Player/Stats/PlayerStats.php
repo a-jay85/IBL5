@@ -206,7 +206,6 @@ class PlayerStats implements PlayerStatsInterface
      */
     protected function loadByID(int $playerID): void
     {
-        /** @var PlayerStatsRow|null $plrRow */
         $plrRow = $this->repository->getPlayerStats($playerID);
         if ($plrRow !== null) {
             $this->fill($plrRow);

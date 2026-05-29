@@ -219,7 +219,6 @@ class TeamOffDefStatsRepository extends \BaseMysqliRepository implements TeamOff
      */
     private static function unpackBothStatsRow(array $row): array
     {
-        /** @var TeamOffenseStatsRow $offense */
         $offense = [
             'teamid' => (int) $row['tos_teamID'],
             'name' => (string) $row['tos_name'],
@@ -237,9 +236,9 @@ class TeamOffDefStatsRepository extends \BaseMysqliRepository implements TeamOff
             'tvr' => (int) $row['tos_tvr'],
             'blk' => (int) $row['tos_blk'],
             'pf' => (int) $row['tos_pf'],
+            'minutes' => null,
         ];
 
-        /** @var TeamDefenseStatsRow $defense */
         $defense = [
             'teamid' => (int) $row['tds_teamID'],
             'name' => (string) $row['tds_name'],
@@ -257,6 +256,7 @@ class TeamOffDefStatsRepository extends \BaseMysqliRepository implements TeamOff
             'tvr' => (int) $row['tds_tvr'],
             'blk' => (int) $row['tds_blk'],
             'pf' => (int) $row['tds_pf'],
+            'minutes' => null,
         ];
 
         return ['offense' => $offense, 'defense' => $defense];

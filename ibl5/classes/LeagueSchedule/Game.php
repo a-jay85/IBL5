@@ -24,7 +24,7 @@ class Game
     public string $userTeamLocationPrefix;
 
     /**
-     * @param array{game_date: string, box_id: int, visitor_teamid: int, home_teamid: int, visitor_score: int, home_score: int, game_of_that_day?: int|null} $scheduleRow
+     * @param array{game_date: string, box_id: int, visitor_teamid: int, home_teamid: int, visitor_score: int, home_score: int, game_of_that_day?: int|null, ...<string, mixed>} $scheduleRow
      */
     public function __construct(array $scheduleRow)
     {

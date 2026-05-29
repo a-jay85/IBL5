@@ -62,7 +62,7 @@ interface TradingServiceInterface
      *         approval: string,
      *         oppositeTeam: string,
      *         hasHammer: bool,
-     *         items: array<array{description: string, notes: string|null}>,
+     *         items: list<array{type: string, description: string, notes: string|null, from: string, to: string}>,
      *         previewData: array{
      *             fromPids: list<int>,
      *             toPids: list<int>,

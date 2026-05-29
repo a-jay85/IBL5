@@ -620,7 +620,7 @@ class StandingsRepository extends \BaseMysqliRepository implements StandingsRepo
     /**
      * Calculate Pythagorean stats from raw shooting data
      *
-     * @param array{off_fgm: int, off_ftm: int, off_tgm: int, def_fgm: int, def_ftm: int, def_tgm: int} $stats
+     * @param array{off_fgm: int, off_ftm: int, off_tgm: int, def_fgm: int, def_ftm: int, def_tgm: int, ...<string, mixed>} $stats
      * @return PythagoreanStats
      */
     private function calculatePythagoreanStats(array $stats): array

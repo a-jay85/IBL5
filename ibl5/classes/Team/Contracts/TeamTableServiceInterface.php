@@ -55,7 +55,7 @@ interface TeamTableServiceInterface
     /**
      * Extract starting lineup data from roster array
      *
-     * @param list<PlayerRow> $roster Array of player rows with depth chart fields
+     * @param list<array<string, mixed>> $roster Array of player rows with depth chart fields
      * @return StartersData Starters keyed by position
      */
     public function extractStartersData(array $roster): array;

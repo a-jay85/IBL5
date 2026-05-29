@@ -98,7 +98,7 @@ class OfferType
      * Counts backwards from year 6; trailing zeros are excluded.
      * Returns at least 1 (a valid offer always has year 1).
      *
-     * @param array{offer1: int, offer2: int, offer3: int, offer4: int, offer5: int, offer6: int} $offers
+     * @param array{offer1: int, offer2: int, offer3: int, offer4: int, offer5: int, offer6: int, ...<string, mixed>} $offers
      */
     public static function calculateYears(array $offers): int
     {

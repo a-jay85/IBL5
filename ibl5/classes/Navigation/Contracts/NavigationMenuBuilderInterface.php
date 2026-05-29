@@ -29,7 +29,7 @@ interface NavigationMenuBuilderInterface
     /**
      * Get account menu items based on login state.
      *
-     * @return list<array{label: string, url: string}>
+     * @return list<array{label: string, url: string, noBoost?: bool}>
      */
     public function getAccountMenu(): array;
 }

@@ -106,7 +106,7 @@ class ContractListService implements ContractListServiceInterface
     /**
      * Calculate contract year values for a player.
      *
-     * @param array{cy: int, cyt: int, salary_yr1: int, salary_yr2: int, salary_yr3: int, salary_yr4: int, salary_yr5: int, salary_yr6: int} $player Player data
+     * @param array{cy: int, cyt: int, salary_yr1: int, salary_yr2: int, salary_yr3: int, salary_yr4: int, salary_yr5: int, salary_yr6: int, ...<string, mixed>} $player Player data
      * @return array{con1: int, con2: int, con3: int, con4: int, con5: int, con6: int} Contract values per year
      */
     private function calculateContractYears(array $player): array

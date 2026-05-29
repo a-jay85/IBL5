@@ -627,8 +627,9 @@ if ($method === 'DELETE' && $action === 'reset-draft-pick') {
         $playersDeleted = $d->affected_rows;
         $d->close();
     }
-    // Clear the slot.
-    $c = $db->prepare("UPDATE ibl_draft SET player = '', date = '' WHERE round = ? AND pick = ? AND year = ?");
+    // Clear the slot. `date` is a nullable datetime — NULL means "no pick made";
+    // an empty string is rejected under MySQL strict mode (Incorrect datetime value).
+    $c = $db->prepare("UPDATE ibl_draft SET player = '', date = NULL WHERE round = ? AND pick = ? AND year = ?");
     $c->bind_param('iii', $round, $pick, $year);
     $c->execute();
     $cleared = $c->affected_rows;

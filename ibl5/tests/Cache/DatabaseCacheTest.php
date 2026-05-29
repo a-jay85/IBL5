@@ -170,7 +170,9 @@ class MockCacheDb extends \mysqli
 
     public function __construct()
     {
-        // Don't call parent::__construct() to avoid real DB connection
+        // No-arg parent constructor allocates an unconnected mysqli shell; the
+        // real connection is never used because prepare() is overridden.
+        parent::__construct();
     }
 
     public function setCacheData(string $key, string $value, int $expiration): void
@@ -199,7 +201,13 @@ class MockCacheDb extends \mysqli
     }
 
     /**
+     * MockCacheStmt cannot extend mysqli_stmt (mysqli_result has read-only
+     * properties a mock must write), so this override cannot be covariant with
+     * mysqli::prepare()'s mysqli_stmt|false. ReturnTypeWillChange suppresses the
+     * runtime LSP deprecation; the ignore below is its static-analysis twin.
+     *
      * @return MockCacheStmt|false
+     * @phpstan-ignore method.childReturnType
      */
     #[\ReturnTypeWillChange]
     public function prepare(string $query): MockCacheStmt|false

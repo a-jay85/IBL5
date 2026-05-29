@@ -36,6 +36,7 @@ class TradeProcessorIntegrationTest extends DatabaseTestCase
     protected function tearDown(): void
     {
         if (!isset($this->db)) {
+            parent::tearDown();
             return;
         }
 
@@ -63,6 +64,8 @@ class TradeProcessorIntegrationTest extends DatabaseTestCase
             $this->db->close();
         } catch (\Throwable) {
         }
+
+        parent::tearDown();
     }
 
     // ── Scenario 1: Player-for-player ──────────────────────────

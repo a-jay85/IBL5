@@ -142,7 +142,15 @@ jobs:
             -e "CREATE DATABASE IF NOT EXISTS \`$DB\`;"
 
           echo "Restoring dump into $DB..."
-          gunzip -c ./prod-dump.sql.gz | mysql -h 127.0.0.1 -P 3306 -uroot -proot "$DB"
+          # Mirror bin/lib/db-helpers.sh db_import_sql: disable FK checks around
+          # the restore (the single-pass dump is alphabetically ordered, so FK
+          # parents may load after children) and strip DEFINER clauses (the
+          # ephemeral server has no matching definer users).
+          {
+            echo "SET FOREIGN_KEY_CHECKS=0;"
+            gunzip -c ./prod-dump.sql.gz | perl -pe 's/ DEFINER=\S+ / /g'
+            echo "SET FOREIGN_KEY_CHECKS=1;"
+          } | mysql -h 127.0.0.1 -P 3306 -uroot -proot "$DB"
 
           TEAMS=$(mysql -N -B -h 127.0.0.1 -P 3306 -uroot -proot "$DB" \
             -e "SELECT COUNT(*) FROM ibl_team_info;")

@@ -240,7 +240,10 @@ run_heartbeat_watcher() {
 append_cost_row() {
     local plan=$1 phase=$2 log_before=$3
     local cost report
-    cost=$(tail -n +"$((log_before + 1))" "$LOG" | grep -oE 'cost=\$[0-9.]+' | tail -1 | sed 's/cost=\$//')
+    # `|| true` is load-bearing: under `set -euo pipefail` a killed phase emits no
+    # `cost=` line, so grep exits non-zero and this plain assignment would abort the
+    # whole nightly loop before the `cost="?"` fallback below. Swallow it and continue.
+    cost=$(tail -n +"$((log_before + 1))" "$LOG" | grep -oE 'cost=\$[0-9.]+' | tail -1 | sed 's/cost=\$//') || true
     [ -n "$cost" ] || cost="?"
     report="$NIGHTLY_DIR/reports/$(date +%Y-%m-%d)-costs.md"
     mkdir -p "$(dirname "$report")"

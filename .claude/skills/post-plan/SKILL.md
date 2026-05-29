@@ -29,7 +29,7 @@ if ! git diff --cached --quiet; then
 fi
 ```
 
-Phase 2 makes the initial commit and opens the PR. Phases that may modify files after Phase 2 (Phase 4D follow-up fixes if review identifies real bugs, Phase 5 fix-and-rerun loops, Phase 6 test writing, Phase 7 CI fixes) MUST checkpoint before continuing. Squash-merge in Phase 8 collapses the chain.
+Phase 2 makes the initial commit and opens the PR. Phases that may modify files after Phase 2 (Phase 4D follow-up fixes if review identifies real bugs, Phase 5 fix-and-rerun loops, Phase 6 test writing, Phase 7 CI fixes) MUST checkpoint before continuing. The squash-merge armed in Phase 6.5 collapses the chain.
 
 ---
 
@@ -384,13 +384,27 @@ Using the Sonnet agent's classifications:
 2. **PHPUnit/API-test/E2E-replaceable:** Write the appropriate test type. Fix until green. Do not reclassify as truly manual — if the test is hard to write, that's a reason to spend more effort, not less. After 3 failed attempts, keep the item in the PR description as-is (not reclassified) and note what was tried.
 3. **Truly manual:** Keep in PR description.
 4. **Update PR:** Remove verified/automated steps. If none remain, replace section with `No manual testing needed — all changes are covered by automated tests.` Apply: `gh pr edit --body "<updated>"`
-5. **Checkpoint:** If any new tests were written or files modified, commit and push before continuing to Phase 7.
+5. **Checkpoint:** If any new tests were written or files modified, commit and push before continuing to Phase 6.5.
+
+---
+
+## Phase 6.5: Arm Auto-Merge
+
+Enable auto-merge **before** watching CI. This is the earliest point both gating conditions are known — review/audit findings are scored in Phase 4, manual-testing is resolved in Phase 6 — and arming here (rather than after the watch) is the whole point: if this post-plan phase is later killed mid-watch by the per-phase cap (`MAX_PP_SECS`) or a usage limit, GitHub still holds the queued merge and fires it once required checks pass, with no further agent action needed. Arming after the watch (the old Phase 8 placement) meant any phase that ran out of budget during the watch shipped a PR that was never set to auto-merge.
+
+**Already merged?** If `gh pr view --json state --jq '.state'` returns `MERGED`, there is nothing to arm — skip to Phase 7 (which will early-exit).
+
+Both conditions must be true: (1) PR says "No manual testing needed", (2) no review/audit findings scored >= 80.
+
+If met: `gh pr merge --squash --auto --delete-branch`. The `--auto` flag queues the merge — it does **not** merge now, it arms; GitHub executes it once all required status checks pass. Do not sync local to master here; the merge has not happened yet.
+
+If not met: do **not** arm auto-merge. Report which condition(s) blocked — the user merges manually after review. Continue to Phase 7 regardless, to monitor and fix CI.
 
 ---
 
 ## Phase 7: CI Monitoring
 
-**Monitor CI and attempt fixes, then always continue to Phase 8.**
+**Auto-merge is already armed (Phase 6.5). Monitor CI and fix failures so the queued merge can fire; then continue to Phase 8.**
 
 > **Field-shape gotcha — read before editing this phase.**
 > Two `gh` commands return different shapes; mixing them produces unsatisfiable conditions.
@@ -398,7 +412,7 @@ Using the Sonnet agent's classifications:
 > - `gh pr view <pr> --json statusCheckRollup` → `status` ∈ `COMPLETED | IN_PROGRESS | QUEUED`, `conclusion` ∈ `SUCCESS | FAILURE | SKIPPED | …`.
 > Do not write `state == "COMPLETED"` or `conclusion == "failure"` against `gh pr checks` — both are silently false forever.
 
-0. **Early-exit on merged PR:** Before any polling, run `gh pr view <pr> --json state --jq '.state'`. If `MERGED`, skip the rest of Phase 7 and continue at Phase 8 — auto-merge has already fired (most commonly during Phase 4/5/6) and watching CI to completion adds nothing but wall-clock burn. This is the load-bearing optimization that keeps the nightly loop from burning a full watch timeout on an already-shipped PR.
+0. **Early-exit on merged PR:** Before any polling, run `gh pr view <pr> --json state --jq '.state'`. If `MERGED`, skip the rest of Phase 7 and continue at Phase 8 — the auto-merge armed in Phase 6.5 has already fired (required checks were already green) and watching CI to completion adds nothing but wall-clock burn. This is the load-bearing optimization that keeps the nightly loop from burning a full watch timeout on an already-shipped PR.
 1. **Wait for checks to register:** Poll `gh pr checks <pr> --json name,state 2>/dev/null | jq 'length'` up to 4 times with 15s waits. If count stays 0, warn user and continue to Phase 8.
 2. **Block until CI settles:** `gh pr checks <pr> --watch --fail-fast --interval 20` (Bash timeout 1200000 = 20 min cap — leaves a 10-min cushion under `MAX_PP_SECS=1800` for Phases 8-11 cleanup). The gh CLI handles the polling and exit logic itself; do not re-implement it in jq. Exit codes: `0` = all checks passed, `8` = at least one failed, other = transport error.
 3. **If exit 0** → Phase 8. (Mid-watch merge detection was intentionally dropped: `gh pr checks --watch` exits as soon as the last check settles, so the only window auto-merge could fire inside the watch is the ~5–30s between final-check-pass and auto-merge action — not worth a hand-rolled poll loop. Step 0 already covers the case where the PR merged before Phase 7 started.)
@@ -407,15 +421,13 @@ Using the Sonnet agent's classifications:
 
 ---
 
-## Phase 8: Auto-Merge
+## Phase 8: Confirm Merge State
 
-**Already merged?** If `gh pr view --json state --jq '.state'` returns `MERGED`, skip the merge call entirely. Run `cd <repo-root> && git checkout master && git pull origin master` to sync local, then continue to Phase 9. Do not treat this as an error — it's the expected outcome when auto-merge fires during Phase 7.
+Auto-merge was already armed (or deliberately not armed) in Phase 6.5 — this phase only confirms the outcome and syncs local if the merge landed. Do not re-run `gh pr merge` here.
 
-Both conditions must be true: (1) PR says "No manual testing needed", (2) no review/audit findings scored >= 80.
-
-If met: `gh pr merge --squash --auto --delete-branch`. The `--auto` flag queues the merge — GitHub executes it once all required status checks pass. Do not sync local to master here; the merge has not happened yet.
-
-If not: report which condition(s) blocked. User merges manually.
+- **If `gh pr view --json state --jq '.state'` returns `MERGED`:** the queued merge fired. Run `cd <repo-root> && git checkout master && git pull origin master` to sync local, then continue to Phase 9.
+- **If still `OPEN` and auto-merge was armed in Phase 6.5:** the merge is queued and will fire when required checks pass — no further action. Do not sync local to master; the merge has not happened yet. Continue to Phase 9.
+- **If still `OPEN` and auto-merge was NOT armed (a Phase 6.5 condition blocked):** report which condition(s) blocked. The user merges manually.
 
 ---
 

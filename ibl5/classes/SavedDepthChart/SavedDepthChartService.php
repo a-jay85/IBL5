@@ -544,7 +544,7 @@ class SavedDepthChartService implements SavedDepthChartServiceInterface
      * match for every player. Detects roster changes from trades.
      *
      * @param list<SavedDepthChartPlayerRow> $dcPlayers Saved DC player settings
-     * @param list<array{pid: int, dc_pg_depth: int, dc_sg_depth: int, dc_sf_depth: int, dc_pf_depth: int, dc_c_depth: int, dc_can_play_in_game: int, dc_minutes: int, dc_of: int, dc_df: int, dc_oi: int, dc_di: int, dc_bh: int}> $liveRosterPlayers Live ibl_plr settings
+     * @param list<array{pid: int, dc_pg_depth: int, dc_sg_depth: int, dc_sf_depth: int, dc_pf_depth: int, dc_c_depth: int, dc_can_play_in_game: int, dc_minutes: int, dc_of: int, dc_df: int, dc_oi: int, dc_di: int, dc_bh: int, ...<string, mixed>}> $liveRosterPlayers Live ibl_plr settings
      */
     private function isDepthChartMatchingLive(array $dcPlayers, array $liveRosterPlayers): bool
     {

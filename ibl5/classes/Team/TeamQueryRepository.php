@@ -337,7 +337,8 @@ class TeamQueryRepository extends \BaseMysqliRepository implements TeamQueryRepo
                 if (!isset($salaryCapSpent[$key])) {
                     $salaryCapSpent[$key] = 0;
                 }
-                $salaryCapSpent[$key] += (int) ($contract[$fieldString] ?? 0);
+                $rawSalary = $contract[$fieldString] ?? 0;
+                $salaryCapSpent[$key] += is_numeric($rawSalary) ? (int) $rawSalary : 0;
                 $yearUnderContract++;
                 $i++;
             }

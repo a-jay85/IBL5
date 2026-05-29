@@ -71,7 +71,7 @@ class RateLimiter implements RateLimiterInterface
      * count and couple this pure method to the repository. The unlimited tier
      * advertises nothing (there is no limit to report).
      *
-     * @param array{rate_limit_tier: string} $apiKey
+     * @param array{rate_limit_tier: string, ...<string, mixed>} $apiKey
      * @return array<string, string>
      */
     public function limitHeaders(array $apiKey): array

@@ -6,10 +6,12 @@ namespace ComparePlayers\Contracts;
 
 /**
  * ComparePlayersRepositoryInterface - Contract for player comparison data access
- * 
+ *
  * Defines database operations for retrieving player data for comparison purposes.
  * All methods use prepared statements to prevent SQL injection.
  * Handles both modern (prepared statements) and legacy (sql_*) database interfaces.
+ *
+ * @phpstan-import-type PlayerRow from \Repositories\Contracts\PlayerLookupRepositoryInterface
  */
 interface ComparePlayersRepositoryInterface
 {
@@ -48,7 +50,7 @@ interface ComparePlayersRepositoryInterface
      * Returns a single row or null if player not found.
      * 
      * @param string $playerName Exact player name to search for
-     * @return array<string, mixed>|null Complete player row or null if not found
+     * @return PlayerRow|null Complete player row or null if not found
      * 
      * RETURNED FIELDS (selection of key fields):
      *  Basic Info:

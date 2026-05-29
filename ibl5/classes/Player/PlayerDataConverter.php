@@ -16,7 +16,7 @@ class PlayerDataConverter
     /**
      * Convert player array data to PlayerData object
      *
-     * @param array{cy?: int|string|null, cyt?: int|string|null, salary_yr1?: int|string|null, salary_yr2?: int|string|null, salary_yr3?: int|string|null, salary_yr4?: int|string|null, salary_yr5?: int|string|null, salary_yr6?: int|string|null, exp?: int|string|null} $playerData Raw player data array from database
+     * @param array{cy?: int|string|null, cyt?: int|string|null, salary_yr1?: int|string|null, salary_yr2?: int|string|null, salary_yr3?: int|string|null, salary_yr4?: int|string|null, salary_yr5?: int|string|null, salary_yr6?: int|string|null, exp?: int|string|null, ...<string, mixed>} $playerData Raw player data array from database
      * @return PlayerData PlayerData object with contract and salary data
      */
     public static function arrayToPlayerData(array $playerData): PlayerData

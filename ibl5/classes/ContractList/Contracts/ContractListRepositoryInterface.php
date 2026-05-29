@@ -14,7 +14,7 @@ interface ContractListRepositoryInterface
     /**
      * Get all active player contracts ordered by ordinal.
      *
-     * @return array<int, array{
+     * @return list<array{
      *     name: string,
      *     pos: string,
      *     teamname: string,

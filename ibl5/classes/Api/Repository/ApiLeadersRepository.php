@@ -7,7 +7,7 @@ namespace Api\Repository;
 use Api\Pagination\Paginator;
 
 /**
- * @phpstan-type LeaderRow array{player_uuid: string, pid: int, name: string, teamid: int, team_uuid: string|null, team_city: string|null, team_name: string|null, year: int, games: int, minutes: int, fgm: int, fga: int, ftm: int, fta: int, tgm: int, tga: int, orb: int, reb: int, ast: int, stl: int, blk: int, tvr: int, pf: int, pts: int, ...}
+ * @phpstan-type LeaderRow array{player_uuid: string, pid: int, name: string, teamid: int, team_uuid: string|null, team_city: string|null, team_name: string|null, year: int, games: int, minutes: int, fgm: int, fga: int, ftm: int, fta: int, tgm: int, tga: int, orb: int, reb: int, ast: int, stl: int, blk: int, tvr: int, pf: int, pts: int, ...<string, mixed>}
  */
 class ApiLeadersRepository extends \BaseMysqliRepository
 {

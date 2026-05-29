@@ -24,7 +24,7 @@ class RateLimitingBootstrap implements BootstrapStepInterface
     {
         /** @var \mysqli $db */
         $db = $container->get(\mysqli::class);
-        /** @var array{key_hash: string, permission_level: string, rate_limit_tier: string} $apiKey */
+        /** @var array{key_hash: string, key_prefix: string, owner_name: string, permission_level: string, rate_limit_tier: string} $apiKey */
         $apiKey = $container->get('api.key');
 
         $rateLimiter = new RateLimiter(new RateLimitRepository($db));

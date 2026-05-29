@@ -12,7 +12,7 @@ namespace DepthChartEntry\Contracts;
  *
  * @phpstan-import-type PlayerRow from \Repositories\Contracts\PlayerLookupRepositoryInterface
  *
- * @phpstan-type DepthChartValues array{pg: int, sg: int, sf: int, pf: int, c: int, canPlayInGame: int, min: int, of: int, df: int, oi: int, di: int, bh: int}
+ * @phpstan-type DepthChartValues array{pg: int, sg: int, sf: int, pf: int, c: int, canPlayInGame: int, min: int, of: int, df: int, oi: int, di: int, bh: int, ...<string, mixed>}
  */
 interface DepthChartEntryRepositoryInterface
 {

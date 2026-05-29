@@ -105,7 +105,7 @@ class TeamTableService implements TeamTableServiceInterface
 
     /**
      * @see TeamTableServiceInterface::extractStartersData()
-     * @param list<array<string, mixed>> $roster
+     * @param list<PlayerRow> $roster
      * @return StartersData
      */
     public function extractStartersData(array $roster): array

@@ -182,7 +182,7 @@ QUEUE_DIR="$NIGHTLY_DIR/queue"
 MAX_ELAPSED=17100  # ~4h45m — stops around 4:45am, leaves headroom in the 5h usage window
 MAX_ATTEMPTS=3     # per-plan retry cap within one night (covers impl + postplan phases)
 MAX_IMPL_SECS=3600   # per-phase cap: impl gets at most 1h
-MAX_PP_SECS=1800     # per-phase cap: post-plan gets at most 30m
+MAX_PP_SECS=3600     # per-phase cap: post-plan gets at most 1h
 STALL_KILL_SECS=600  # kill phase if no stream events for 10 minutes
 
 HANDOFF_DIR="$NIGHTLY_DIR/handoff"

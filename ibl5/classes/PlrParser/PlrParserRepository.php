@@ -15,14 +15,9 @@ use PlrParser\Contracts\PlrParserRepositoryInterface;
  */
 class PlrParserRepository extends \BaseMysqliRepository implements PlrParserRepositoryInterface
 {
-    private string $plrTable;
-    private string $snapshotsTable;
-
     public function __construct(\mysqli $db, ?LeagueContext $leagueContext = null)
     {
         parent::__construct($db, $leagueContext);
-        $this->plrTable = $this->resolveTable('ibl_plr');
-        $this->snapshotsTable = $this->resolveTable('ibl_plr_snapshots');
     }
 
     /**
@@ -32,7 +27,7 @@ class PlrParserRepository extends \BaseMysqliRepository implements PlrParserRepo
      */
     public function upsertPlayer(array $data): int
     {
-        $query = "INSERT INTO {$this->plrTable}
+        $query = "INSERT INTO `ibl_plr`
             (`ordinal`, `name`, `age`, `pid`, `teamid`, `peak`, `pos`,
              `oo`, `od`, `r_drive_off`, `dd`, `po`, `pd`, `r_trans_off`, `td`,
              `clutch`, `consistency`,
@@ -374,7 +369,7 @@ class PlrParserRepository extends \BaseMysqliRepository implements PlrParserRepo
             $updateClauses[] = '`' . $col . '` = VALUES(`' . $col . '`)';
         }
 
-        $query = "INSERT INTO {$this->snapshotsTable} ({$colList})
+        $query = "INSERT INTO `ibl_plr_snapshots` ({$colList})
             VALUES ({$placeholders})
             ON DUPLICATE KEY UPDATE " . implode(', ', $updateClauses);
 

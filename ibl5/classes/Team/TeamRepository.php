@@ -25,16 +25,9 @@ use Team\Contracts\TeamRepositoryInterface;
  */
 class TeamRepository extends \BaseMysqliRepository implements TeamRepositoryInterface
 {
-    private string $teamInfoTable;
-    private string $standingsTable;
-    private string $powerTable;
-
     public function __construct(\mysqli $db, ?LeagueContext $leagueContext = null)
     {
         parent::__construct($db, $leagueContext);
-        $this->teamInfoTable = $this->resolveTable('ibl_team_info');
-        $this->standingsTable = $this->resolveTable('ibl_standings');
-        $this->powerTable = $this->resolveTable('ibl_power');
     }
 
     /**
@@ -45,7 +38,7 @@ class TeamRepository extends \BaseMysqliRepository implements TeamRepositoryInte
     {
         /** @var TeamInfoRow|null */
         return $this->fetchOne(
-            "SELECT * FROM {$this->teamInfoTable} WHERE teamid = ?",
+            "SELECT * FROM `ibl_team_info` WHERE teamid = ?",
             "i",
             $teamid
         );
@@ -64,9 +57,9 @@ class TeamRepository extends \BaseMysqliRepository implements TeamRepositoryInte
                 s.home_record, s.away_record, s.games_unplayed,
                 p.ranking, p.last_win, p.last_loss, p.streak_type, p.streak,
                 p.sos, p.remaining_sos
-            FROM {$this->standingsTable} s
-            JOIN {$this->powerTable} p ON s.teamid = p.teamid
-            JOIN {$this->teamInfoTable} t ON s.teamid = t.teamid
+            FROM `ibl_standings` s
+            JOIN `ibl_power` p ON s.teamid = p.teamid
+            JOIN `ibl_team_info` t ON s.teamid = t.teamid
             WHERE t.team_name = ?",
             "s",
             $teamName
@@ -86,8 +79,8 @@ class TeamRepository extends \BaseMysqliRepository implements TeamRepositoryInte
                 s.home_record, s.away_record, s.games_unplayed,
                 p.ranking, p.last_win, p.last_loss, p.streak_type, p.streak,
                 p.sos, p.remaining_sos
-            FROM {$this->standingsTable} s
-            JOIN {$this->powerTable} p ON s.teamid = p.teamid
+            FROM `ibl_standings` s
+            JOIN `ibl_power` p ON s.teamid = p.teamid
             WHERE s.division = ?
             ORDER BY s.div_gb ASC",
             "s",
@@ -108,8 +101,8 @@ class TeamRepository extends \BaseMysqliRepository implements TeamRepositoryInte
                 s.home_record, s.away_record, s.games_unplayed,
                 p.ranking, p.last_win, p.last_loss, p.streak_type, p.streak,
                 p.sos, p.remaining_sos
-            FROM {$this->standingsTable} s
-            JOIN {$this->powerTable} p ON s.teamid = p.teamid
+            FROM `ibl_standings` s
+            JOIN `ibl_power` p ON s.teamid = p.teamid
             WHERE s.conference = ?
             ORDER BY s.conf_gb ASC",
             "s",

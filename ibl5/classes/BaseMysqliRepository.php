@@ -92,7 +92,8 @@ abstract class BaseMysqliRepository
 
     /**
      * Optional league context for multi-league table resolution.
-     * When set, resolveTable() maps IBL table names to their league-specific equivalents.
+     * When set (or via the static shared context), rewriteTableNames() maps
+     * backtick-quoted IBL table names to their league-specific equivalents.
      */
     protected ?\League\LeagueContext $leagueContext;
 
@@ -138,19 +139,6 @@ abstract class BaseMysqliRepository
     public static function clearSharedLeagueContext(): void
     {
         self::$sharedLeagueContext = null;
-    }
-
-    /**
-     * Resolve a table name through LeagueContext (if set), else return as-is.
-     *
-     * @param string $iblTableName The IBL table name (e.g., 'ibl_standings')
-     * @return string The resolved table name (e.g., 'ibl_olympics_standings' if Olympics)
-     */
-    protected function resolveTable(string $iblTableName): string
-    {
-        return $this->leagueContext !== null
-            ? $this->leagueContext->getTableName($iblTableName)
-            : $iblTableName;
     }
 
     /**
@@ -483,9 +471,10 @@ abstract class BaseMysqliRepository
      */
     protected function gameOfThatDaySubquery(): string
     {
-        $table = $this->resolveTable('ibl_box_scores_teams');
+        // Backtick `ibl_box_scores_teams` so the executeQuery() rewrite resolves
+        // it to the Olympics table on Olympics pages (stats subquery).
         return "(SELECT game_date, visitor_teamid, home_teamid, MIN(game_of_that_day) AS game_of_that_day
-             FROM {$table}
+             FROM `ibl_box_scores_teams`
              GROUP BY game_date, visitor_teamid, home_teamid)";
     }
 

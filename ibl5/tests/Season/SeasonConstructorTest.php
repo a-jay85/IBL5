@@ -42,10 +42,20 @@ class SeasonConstructorTest extends TestCase
 
         $repo = new SeasonQueryRepository($mockDb, $leagueContext);
 
-        $refProp = new \ReflectionProperty(SeasonQueryRepository::class, 'scheduleTable');
-        $scheduleTable = $refProp->getValue($repo);
+        // Drive the executeQuery() rewrite path (the production mechanism), not
+        // the removed resolveTable() property. With an Olympics context the
+        // backtick-quoted `ibl_schedule` is rewritten to its Olympics equivalent.
+        $repo->getLastRegularSeasonGameDate(2025);
 
-        $this->assertSame('ibl_olympics_schedule', $scheduleTable);
+        $scheduleQueries = array_filter(
+            $mockDb->getExecutedQueries(),
+            static fn (string $q): bool => stripos($q, 'schedule') !== false,
+        );
+        $this->assertNotEmpty($scheduleQueries);
+        foreach ($scheduleQueries as $q) {
+            $this->assertStringContainsString('ibl_olympics_schedule', $q);
+            $this->assertStringNotContainsString('FROM `ibl_schedule`', $q);
+        }
 
         unset($_SESSION['current_league']);
     }

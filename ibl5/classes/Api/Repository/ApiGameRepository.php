@@ -14,14 +14,9 @@ use League\LeagueContext;
  */
 class ApiGameRepository extends \BaseMysqliRepository
 {
-    private string $boxScoresTable;
-    private string $boxScoresTeamsTable;
-
     public function __construct(\mysqli $db, ?LeagueContext $leagueContext = null)
     {
         parent::__construct($db, $leagueContext);
-        $this->boxScoresTable = $this->resolveTable('ibl_box_scores');
-        $this->boxScoresTeamsTable = $this->resolveTable('ibl_box_scores_teams');
     }
 
     /**
@@ -95,7 +90,7 @@ class ApiGameRepository extends \BaseMysqliRepository
     {
         /** @var list<BoxscoreTeamRow> */
         return $this->fetchAll(
-            "SELECT * FROM {$this->boxScoresTeamsTable} WHERE visitor_teamid = ? AND home_teamid = ? AND game_date = ? ORDER BY id ASC",
+            "SELECT * FROM `ibl_box_scores_teams` WHERE visitor_teamid = ? AND home_teamid = ? AND game_date = ? ORDER BY id ASC",
             'iis',
             $visitorTeamId,
             $homeTeamId,
@@ -113,7 +108,7 @@ class ApiGameRepository extends \BaseMysqliRepository
         /** @var list<BoxscorePlayerRow> */
         return $this->fetchAll(
             "SELECT b.*, COALESCE(p.name, b.name) AS name, p.uuid AS player_uuid, p.teamid AS player_tid
-             FROM {$this->boxScoresTable} b
+             FROM `ibl_box_scores` b
              LEFT JOIN `ibl_plr` p ON b.pid = p.pid
              WHERE b.game_date = ? AND b.visitor_teamid = ? AND b.home_teamid = ?
              ORDER BY b.id ASC",

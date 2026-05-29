@@ -39,6 +39,33 @@ If `$NIGHTLY_DIR/handoff/${PLAN_FILE}.json` exists, implementation was already c
 
 IMPORTANT: Only check for THIS plan's handoff file. Ignore any other .json files in the handoff directory — they belong to other plans being processed by the bash loop.
 
+## Step 2.5: Staleness Guard (run BEFORE any worktree is created)
+
+This gate is DISTINCT from the Step 3 ambiguity skip. It catches plans that reference repo paths which have since been renamed, moved, or deleted on master — a stale plan would otherwise burn all three nightly attempts as a poison pill. Moving the symlink to `skipped/` here, before a worktree exists, is the entire purpose of this gate.
+
+First, freshen local master so the guard checks the freshly-pulled tree. Without this, a file deleted on origin still resolves against stale local master and the guard wrongly passes a plan that genuinely IS stale — the exact case this gate exists to catch. (This also pre-stages the same pull Step 5 "Fresh start" does, so it is not wasted work.)
+
+```bash
+git -C /Users/ajaynicolas/GitHub/IBL5 fetch origin master
+git -C /Users/ajaynicolas/GitHub/IBL5 checkout master
+git -C /Users/ajaynicolas/GitHub/IBL5 pull origin master
+```
+
+Then run the staleness check against the queue symlink path. The guard resolves repo paths against the freshly-pulled master:
+
+```bash
+/Users/ajaynicolas/GitHub/IBL5/bin/check-plan-staleness "$PLAN_PATH"
+```
+
+If `bin/check-plan-staleness` exits non-zero, the plan is STALE. Take the skip-with-report path IMMEDIATELY — before any worktree is created, no partial work, no handoff:
+
+1. Capture the unresolved paths the helper printed (its `STALE: <token>` lines).
+2. `mv "$NIGHTLY_DIR/queue/$PLAN_FILE" "$NIGHTLY_DIR/skipped/"`
+3. Write a STALENESS-specific report to `$NIGHTLY_DIR/reports/$(date +%Y-%m-%d)-skipped-<slug>.md` (derive `<slug>` from the plan title). The title and body must make it visibly a **staleness skip** — clearly distinct wording from the ambiguity skip — and must list the specific unresolved repo paths the helper emitted.
+4. STOP.
+
+If `bin/check-plan-staleness` exits 0, the plan is fresh — continue to Step 3.
+
 ## Step 3: Validate the Plan
 
 The plan must have:

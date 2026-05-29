@@ -293,6 +293,12 @@ Both comments end with: `Generated with [Claude Code](https://claude.ai/code)` a
 
 ### Phase 5.0: Plan→test conformance — skip if `PLAN_FOUND=none` or `! $HAS_MATRIX`
 
+At Phase 5.0 START, clear the conformance bridge file so each run begins from a clean slate (an empty file means "nothing unresolved"):
+
+```bash
+: > /tmp/post-plan-missing-tests-$PPID
+```
+
 Read the Verification Matrix from `$PLAN_FILE`. Collect the test-file path from the "Test file / location" column of every row whose Test type is PHPUnit, API-test, E2E, or Visual-regression. Confirm the PR diff actually wrote each one:
 
 ```bash
@@ -302,6 +308,10 @@ grep -qF "$T" /tmp/post-plan-changed-$PPID || echo "MISSING: $T (matrix planned 
 ```
 
 For each `MISSING:` test the impl silently dropped planned coverage — now likelier to matter, since the matrix carries the negative-path and security rows `/plan` gates 9 and 12 require. Write the missing test, run it green, and checkpoint (same as Phase 6 test authoring). Skip a planned test **only** if its target behavior was cut from the implementation; note that in a PR comment rather than writing a hollow test.
+
+A `MISSING:` item is **resolved** when its test was authored-and-run-green OR was explicitly cut-from-implementation with a PR comment noting the cut. An item that is neither — a planned test the diff never wrote and which you did not author or explicitly cut — is **unresolved**.
+
+At Phase 5.0 END, append each remaining **UNRESOLVED** `MISSING:` item (path + reason) to `/tmp/post-plan-missing-tests-$PPID`, one per line. Authored-green or cut-with-comment items are NOT written. This bridge file is consulted by the Phase 6.5 auto-merge gate.
 
 **PHPUnit + PHPStan — direct Bash (no agent):** **Skip if** `! $HAS_PHP`. The PostToolUse hook already ran both during edits, and a PHP-less diff cannot regress either suite. Run both as direct Bash calls with `run_in_background: true` so they execute in parallel with the E2E agent below. Output is ~5 lines each — agent overhead (~25K tokens) is never justified.
 
@@ -394,11 +404,11 @@ Enable auto-merge **before** watching CI. This is the earliest point both gating
 
 **Already merged?** If `gh pr view --json state --jq '.state'` returns `MERGED`, there is nothing to arm — skip to Phase 7 (which will early-exit).
 
-Both conditions must be true: (1) PR says "No manual testing needed", (2) no review/audit findings scored >= 80.
+**All three** conditions must be true: (1) PR says "No manual testing needed", (2) no review/audit findings scored >= 80, (3) no unresolved `MISSING:` planned-test items remain from Phase 5.0 — i.e. `/tmp/post-plan-missing-tests-$PPID` is absent or empty. Phase 5.0 is skipped entirely when `PLAN_FOUND=none` or `! $HAS_MATRIX`, so this bridge file frequently never exists; **absent/empty = PASS (non-blocking)**. Only a non-empty file blocks: `[ -s /tmp/post-plan-missing-tests-$PPID ]` → condition (3) fails.
 
 If met: `gh pr merge --squash --auto --delete-branch`. The `--auto` flag queues the merge — it does **not** merge now, it arms; GitHub executes it once all required status checks pass. Do not sync local to master here; the merge has not happened yet.
 
-If not met: do **not** arm auto-merge. Report which condition(s) blocked — the user merges manually after review. Continue to Phase 7 regardless, to monitor and fix CI.
+If not met: do **not** arm auto-merge. Report which condition(s) blocked — the user merges manually after review. When condition (3) is the blocker, cite which planned test is missing by `cat`-ing the bridge file (`cat /tmp/post-plan-missing-tests-$PPID`) into the report. Continue to Phase 7 regardless, to monitor and fix CI.
 
 ---
 
@@ -414,7 +424,7 @@ If not met: do **not** arm auto-merge. Report which condition(s) blocked — the
 
 0. **Early-exit on merged PR:** Before any polling, run `gh pr view <pr> --json state --jq '.state'`. If `MERGED`, skip the rest of Phase 7 and continue at Phase 8 — the auto-merge armed in Phase 6.5 has already fired (required checks were already green) and watching CI to completion adds nothing but wall-clock burn. This is the load-bearing optimization that keeps the nightly loop from burning a full watch timeout on an already-shipped PR.
 1. **Wait for checks to register:** Poll `gh pr checks <pr> --json name,state 2>/dev/null | jq 'length'` up to 4 times with 15s waits. If count stays 0, warn user and continue to Phase 8.
-2. **Block until CI settles:** `gh pr checks <pr> --watch --fail-fast --interval 20` (Bash timeout 1200000 = 20 min cap — leaves a 10-min cushion under `MAX_PP_SECS=1800` for Phases 8-11 cleanup). The gh CLI handles the polling and exit logic itself; do not re-implement it in jq. Exit codes: `0` = all checks passed, `8` = at least one failed, other = transport error.
+2. **Block until CI settles:** `gh pr checks <pr> --watch --fail-fast --interval 20` (Bash timeout 1200000 = 20 min cap — leaves a ~40-min cushion under `MAX_PP_SECS=3600` for Phase 5.0 conformance + Phases 8-11 cleanup). The gh CLI handles the polling and exit logic itself; do not re-implement it in jq. Exit codes: `0` = all checks passed, `8` = at least one failed, other = transport error.
 3. **If exit 0** → Phase 8. (Mid-watch merge detection was intentionally dropped: `gh pr checks --watch` exits as soon as the last check settles, so the only window auto-merge could fire inside the watch is the ~5–30s between final-check-pass and auto-merge action — not worth a hand-rolled poll loop. Step 0 already covers the case where the PR merged before Phase 7 started.)
 4. **If exit 8:** Get failed checks via `gh pr checks <pr> --json name,state,link --jq '[.[] | select(.state == "FAILURE")]'` (uppercase `FAILURE`, field is `state` not `conclusion`). Download logs (`gh run view <id> --log-failed`). **Fix all failures** — master's CI is green, so any failure on this PR is this PR's fault (even in files outside the diff). The only exception is a flaky test that passes on retry with no code change; note it in a PR comment and move on. Fix, commit, push, loop back to step 1. After 3 iterations, report failures to user and continue to Phase 8 — auto-merge will fire when CI eventually passes.
 5. **If bash times out (20 min elapsed):** Run one final `gh pr checks <pr>` (no `--watch`) to capture settled state. If it now exits 0, continue to Phase 8. If 8, jump to step 4. Otherwise report to user and continue to Phase 8 — do not re-enter watch.
@@ -542,7 +552,7 @@ Kill known lingering patterns so their tool results deliver immediately (cache w
 pkill -f 'bin/e2e-wt\.sh' 2>/dev/null
 pkill -f 'bunx.*playwright' 2>/dev/null
 pkill -f 'gh pr checks.*--watch' 2>/dev/null
-rm -f /tmp/post-plan-spec-diff-$PPID /tmp/post-plan-spec-prod-diff-$PPID 2>/dev/null
+rm -f /tmp/post-plan-spec-diff-$PPID /tmp/post-plan-spec-prod-diff-$PPID /tmp/post-plan-missing-tests-$PPID 2>/dev/null
 echo "Background process cleanup complete"
 ```
 

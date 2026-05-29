@@ -5,7 +5,7 @@ disallowed-tools:
   - EnterPlanMode
   - ExitPlanMode
   - Skill
-last_verified: 2026-05-28
+last_verified: 2026-05-29
 ---
 
 # Post-Plan Orchestrator
@@ -338,6 +338,22 @@ Prompt MUST ALSO include this long-run handling rule: "`bin/e2e-wt.sh` can excee
 
 If either fails, fix in worktree, commit, push, and re-run the failing track.
 
+### Phase 5 END: emit `PHASE5_VERIFY_STATUS`
+
+**After** the fix-and-rerun loop above has resolved (every launched track green) or given up (a deterministic failure survives), aggregate the three Phase 5 tracks — PHPUnit, PHPStan (both direct Bash, skipped when `! $HAS_PHP`), and the E2E Haiku sub-agent — into one status. The E2E track runs in a sub-agent whose shell state does not persist, so you (Opus) read its reported pass/fail from context, combine it with the PHPUnit/PHPStan results, and write the flag. Persist it for durability across the per-phase cap (same `$PPID` temp-file pattern Phase 3 / Phase 5.0 use):
+
+```bash
+# PHASE5_VERIFY_STATUS: pass = every launched track green (or only-flaky-on-retry);
+#                       fail = a deterministic failure survived the fix-and-rerun loop;
+#                       skipped = no track ran (e.g. ! $HAS_PHP and E2E mapped to nothing).
+echo "PHASE5_VERIFY_STATUS=$PHASE5_VERIFY_STATUS" > /tmp/post-plan-phase5-status-$PPID
+```
+
+Rules for the value:
+- A flaky failure (e.g. shared-session/CSRF) that passes on retry **with no code change** counts as `pass` — only a deterministic failure surviving the loop is `fail`.
+- `skipped` is NOT `fail`: when no track ran (PHP-less PR whose E2E mapped to nothing — `bin/e2e-for-pr` exit 0 with empty stdout), the value is `skipped`.
+- Record the status **after** the loop resolves or gives up — never mid-fix.
+
 ---
 
 ## Phase 6: Manual Testing Automation
@@ -400,15 +416,22 @@ Using the Sonnet agent's classifications:
 
 ## Phase 6.5: Arm Auto-Merge
 
-Enable auto-merge **before** watching CI. This is the earliest point both gating conditions are known — review/audit findings are scored in Phase 4, manual-testing is resolved in Phase 6 — and arming here (rather than after the watch) is the whole point: if this post-plan phase is later killed mid-watch by the per-phase cap (`MAX_PP_SECS`) or a usage limit, GitHub still holds the queued merge and fires it once required checks pass, with no further agent action needed. Arming after the watch (the old Phase 8 placement) meant any phase that ran out of budget during the watch shipped a PR that was never set to auto-merge.
+Enable auto-merge **before** watching CI. This is the earliest point all gating conditions are known — review/audit findings are scored in Phase 4, manual-testing is resolved in Phase 6, and Phase 5's local verification status is recorded at its END — and arming here (rather than after the watch) is the whole point: if this post-plan phase is later killed mid-watch by the per-phase cap (`MAX_PP_SECS`) or a usage limit, GitHub still holds the queued merge and fires it once required checks pass, with no further agent action needed. Arming after the watch (the old Phase 8 placement) meant any phase that ran out of budget during the watch shipped a PR that was never set to auto-merge.
 
 **Already merged?** If `gh pr view --json state --jq '.state'` returns `MERGED`, there is nothing to arm — skip to Phase 7 (which will early-exit).
 
-**All three** conditions must be true: (1) PR says "No manual testing needed", (2) no review/audit findings scored >= 80, (3) no unresolved `MISSING:` planned-test items remain from Phase 5.0 — i.e. `/tmp/post-plan-missing-tests-$PPID` is absent or empty. Phase 5.0 is skipped entirely when `PLAN_FOUND=none` or `! $HAS_MATRIX`, so this bridge file frequently never exists; **absent/empty = PASS (non-blocking)**. Only a non-empty file blocks: `[ -s /tmp/post-plan-missing-tests-$PPID ]` → condition (3) fails.
+**All four** conditions must be true: (1) PR says "No manual testing needed", (2) no review/audit findings scored >= 80, (3) no unresolved `MISSING:` planned-test items remain from Phase 5.0 — i.e. `/tmp/post-plan-missing-tests-$PPID` is absent or empty. Phase 5.0 is skipped entirely when `PLAN_FOUND=none` or `! $HAS_MATRIX`, so this bridge file frequently never exists; **absent/empty = PASS (non-blocking)**. Only a non-empty file blocks: `[ -s /tmp/post-plan-missing-tests-$PPID ]` → condition (3) fails. (4) Phase 5's local verification did not deterministically fail — i.e. `PHASE5_VERIFY_STATUS` is `pass` or `skipped`, **not** `fail`. This is the condition #887 lacked: it armed auto-merge with red E2E because no gate checked Phase 5's result.
+
+**Condition (4) blocks on the VALUE, not file presence** — the status file is non-empty for `pass` and `skipped` too (it always contains `PHASE5_VERIFY_STATUS=...`), so the `[ -s ... ]` idiom condition (3) uses would wrongly block every `pass`/`skipped`. Block only on the literal `fail` value; **absent file OR `pass` OR `skipped` = PASS (non-blocking)** — a `skipped` status (docs-only / PHP-less PR with no mapped E2E) must NOT block, or every such PR would stop arming, a regression worse than #887:
+
+```bash
+# condition (4): fails ONLY when the status is the literal `fail`
+grep -q 'PHASE5_VERIFY_STATUS=fail' /tmp/post-plan-phase5-status-$PPID 2>/dev/null && echo "BLOCKED: Phase 5 deterministic failure"
+```
 
 If met: `gh pr merge --squash --auto --delete-branch`. The `--auto` flag queues the merge — it does **not** merge now, it arms; GitHub executes it once all required status checks pass. Do not sync local to master here; the merge has not happened yet.
 
-If not met: do **not** arm auto-merge. Report which condition(s) blocked — the user merges manually after review. When condition (3) is the blocker, cite which planned test is missing by `cat`-ing the bridge file (`cat /tmp/post-plan-missing-tests-$PPID`) into the report. Continue to Phase 7 regardless, to monitor and fix CI.
+If not met: do **not** arm auto-merge. Report which condition(s) blocked — the user merges manually after review. When condition (3) is the blocker, cite which planned test is missing by `cat`-ing the bridge file (`cat /tmp/post-plan-missing-tests-$PPID`) into the report. When condition (4) is the blocker, report which Phase 5 track failed (PHPUnit / PHPStan / E2E). Continue to Phase 7 regardless, to monitor and fix CI — the fix-and-rerun there clears the red track so a later run can arm.
 
 ---
 

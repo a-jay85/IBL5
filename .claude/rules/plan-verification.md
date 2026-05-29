@@ -1,6 +1,6 @@
 ---
-description: Requires plans to classify every verification step into the test-type taxonomy at plan-write time, preventing manual-testing items from deferring to post-plan cleanup.
-last_verified: 2026-05-28
+description: Requires plans to classify every verification step into the test-type taxonomy at plan-write time, preventing manual-testing items from deferring to post-plan cleanup, and grounds seed/DOM-dependent E2E assertions in real fixtures.
+last_verified: 2026-05-29
 ---
 
 # Plan Verification Matrix
@@ -64,6 +64,20 @@ These patterns **require** at least one E2E row in the verification matrix, even
 When a plan introduces any of these patterns, the planner must add a corresponding E2E row — one row per distinct user-visible state. For example, a toggle that shows/hides UI needs two E2E rows: one verifying the ON state, one verifying OFF.
 
 If E2E coverage is blocked by a missing test fixture (e.g., no CI seed user for an admin-gated feature), the plan must include a phase that creates the fixture. "No fixture exists" is not a reason to downgrade to PHPUnit.
+
+### Seed- and DOM-grounded E2E assertions
+
+Any E2E verification-matrix row that asserts a **seed-** or **DOM-dependent** value — a row count, a dropdown/option value, sort order or direction, filter results, or "control X exists / is a `<select>` vs. radio" — must **cite its source**, never an assumed value. An assertion grounded in an imagined value is how PR #887 shipped: it expected a display-cap count (~500, full-league) while the CI seed has only ~24 career rows, so the test was deterministically red the moment it ran.
+
+The source must be one of:
+
+- A specific row or count from `ibl5/tests/e2e/fixtures/ci-seed.sql` (cite the table and the rows that produce the expected value), or
+- The rendered form DOM, fetched live from the worktree stack: `curl http://<slug>.localhost/ibl5/modules.php?name=X` (cite the element the assertion targets).
+
+Two gotchas this rule exists to catch (cross-referenced from memory):
+
+- **Sort direction is not "ascending by default."** `ibl5/jslib/sorttable.js` sorts **descending** on first click. An assertion on first-click sort order must match that, not an assumed ascending order. See memory `reference_sorttable_descending_first`.
+- **Seed cardinality is small.** The CI seed is a fixture, not production — counts, option lists, and "is the list non-empty" assertions must be grounded in what the seed actually contains. See memory `feedback_e2e_seed_grounding`.
 
 ## Hot-file thresholds
 

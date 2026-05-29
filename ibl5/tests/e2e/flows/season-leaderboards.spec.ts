@@ -59,26 +59,37 @@ test.describe('Season Leaderboards flow', () => {
 
   test('filtering by team shows only that team players', async ({ page }) => {
     const teamSelect = page.locator('select[name="team"]');
-    const options = teamSelect.locator('option');
-    const optionCount = await options.count();
+    await teamSelect.selectOption('2');
+    await page.locator('.ibl-filter-form__submit').click();
 
-    if (optionCount > 1) {
-      const teamValue = await options.nth(1).getAttribute('value');
-      await teamSelect.selectOption(teamValue!);
-      await page.locator('.ibl-filter-form__submit').click();
+    await expect(page.locator('.ibl-data-table').first()).toBeVisible();
 
-      await expect(page.locator('.ibl-data-table').first()).toBeVisible();
+    const teamRows = page.locator('.ibl-data-table').first().locator('tbody tr[data-team-id]');
+    await expect(teamRows.first()).toBeVisible();
 
-      const teamRows = page.locator('.ibl-data-table').first().locator('tbody tr[data-team-id]');
-      const teamIds = await teamRows.evaluateAll((els) =>
-        els.map((el) => el.getAttribute('data-team-id')),
-      );
-      if (teamIds.length > 0) {
-        for (const id of teamIds) {
-          expect(id).toBe(teamIds[0]);
-        }
-      }
+    const rowCount = await teamRows.count();
+    for (let i = 0; i < rowCount; i++) {
+      expect(await teamRows.nth(i).getAttribute('data-team-id')).toBe('2');
     }
+  });
+
+  test('year filter reduces row count', async ({ page }) => {
+    await page.locator('select[name="year"]').selectOption('2026');
+    await page.locator('.ibl-filter-form__submit').click();
+
+    await expect(page.locator('.ibl-data-table').first()).toBeVisible();
+    const rows2026 = page.locator('.ibl-data-table tbody tr');
+    await expect(rows2026.first()).toBeVisible();
+    const count2026 = await rows2026.count();
+    expect(count2026).toBeGreaterThanOrEqual(5);
+
+    await page.locator('select[name="year"]').selectOption('2025');
+    await page.locator('.ibl-filter-form__submit').click();
+
+    await expect(page.locator('.ibl-data-table').first()).toBeVisible();
+    const rows2025 = page.locator('.ibl-data-table tbody tr');
+    await expect(rows2025.first()).toBeVisible();
+    expect(await rows2025.count()).toBeLessThan(count2026);
   });
 
   test('limit input controls row count', async ({ page }) => {

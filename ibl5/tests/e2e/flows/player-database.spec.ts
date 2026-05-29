@@ -1,6 +1,7 @@
 import { test, expect } from '../fixtures/base';
 import { assertNoPhpErrors } from '../helpers/php-errors';
 import { publicStorageState } from '../helpers/public-storage-state';
+import { gotoWithRetry } from '../helpers/navigation';
 
 // Player Database — public page, no authentication required.
 // The results table only appears AFTER submitting a search.
@@ -8,13 +9,7 @@ test.use({ storageState: publicStorageState() });
 
 test.describe('Player Database flow', () => {
   test.beforeEach(async ({ page }) => {
-    await page.goto('modules.php?name=PlayerDatabase');
-    // Under parallel load, the page may render blank — retry once
-    const body = await page.locator('body').innerText();
-    if (body.trim().length < 20) {
-      await page.waitForLoadState('domcontentloaded');
-      await page.goto('modules.php?name=PlayerDatabase');
-    }
+    await gotoWithRetry(page, 'modules.php?name=PlayerDatabase');
   });
 
   test('page loads with search form', async ({ page }) => {

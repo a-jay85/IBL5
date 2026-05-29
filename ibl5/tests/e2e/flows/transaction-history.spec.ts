@@ -53,18 +53,11 @@ test.describe('Transaction History flow', () => {
   test('filtering by year reflects selection in dropdown', async ({
     page,
   }) => {
-    const yearSelect = page.locator('select[name="year"]');
-    const options = yearSelect.locator('option');
-    const optionCount = await options.count();
+    // Navigate directly with a known seed year
+    await page.goto(`${BASE}&year=2026`);
 
-    if (optionCount > 1) {
-      const yearValue = await options.nth(1).getAttribute('value');
-      // Navigate directly with year parameter
-      await page.goto(`${BASE}&year=${yearValue}`);
-
-      // After load, the year dropdown should have the selected value
-      await expect(page.locator('select[name="year"]')).toHaveValue(yearValue!);
-    }
+    // After load, the year dropdown should have the selected value
+    await expect(page.locator('select[name="year"]')).toHaveValue('2026');
   });
 
   test('reset link navigates to unfiltered state', async ({ page }) => {

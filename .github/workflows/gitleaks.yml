@@ -23,8 +23,8 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v6
         with:
-          # Full history so the push scan covers the whole default branch, not
-          # just the latest commit. PR scans cover the base..head diff range.
+          # Full clone so gitleaks-action can resolve the event's commit range
+          # (PR: base..head; push: the pushed commits) for diff-scoped scanning.
           fetch-depth: 0
       - name: gitleaks
         uses: gitleaks/gitleaks-action@v2

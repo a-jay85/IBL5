@@ -236,6 +236,7 @@ class TeamOffDefStatsRepository extends \BaseMysqliRepository implements TeamOff
             'tvr' => (int) $row['tos_tvr'],
             'blk' => (int) $row['tos_blk'],
             'pf' => (int) $row['tos_pf'],
+            'minutes' => null,
         ];
 
         $defense = [
@@ -255,6 +256,7 @@ class TeamOffDefStatsRepository extends \BaseMysqliRepository implements TeamOff
             'tvr' => (int) $row['tds_tvr'],
             'blk' => (int) $row['tds_blk'],
             'pf' => (int) $row['tds_pf'],
+            'minutes' => null,
         ];
 
         return ['offense' => $offense, 'defense' => $defense];

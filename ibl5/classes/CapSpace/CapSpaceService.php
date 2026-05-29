@@ -95,7 +95,6 @@ class CapSpaceService
         }
         $positionSalaries = [];
         foreach (\JSB::PLAYER_POSITIONS as $position) {
-            /** @var list<PlayerRow> $positionPlayers */
             $positionPlayers = $playersByPosition[$position] ?? [];
             $positionSalaries[$position] = $this->teamQueryRepo->getTotalNextSeasonSalaries($positionPlayers);
         }

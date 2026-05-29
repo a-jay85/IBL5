@@ -35,7 +35,7 @@ class DesktopNavView
      *
      * @param array<string, NavMenuData> $menus
      * @param NavMenuData|null $myTeamMenu
-     * @param list<array{label: string, url: string}> $accountMenu
+     * @param list<array{label: string, url: string, noBoost?: bool}> $accountMenu
      */
     public function render(array $menus, ?array $myTeamMenu, array $accountMenu): string
     {

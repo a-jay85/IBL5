@@ -136,7 +136,7 @@ interface TeamQueryRepositoryInterface
     /**
      * Get total next season salaries from player result array
      *
-     * @param list<PlayerRow> $result Array of player rows
+     * @param list<array<string, mixed>> $result Array of player rows
      * @return int Total next season salaries
      */
     public function getTotalNextSeasonSalaries(array $result): int;

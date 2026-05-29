@@ -15,9 +15,11 @@ interface ContractListRepositoryInterface
      * Get all active player contracts ordered by ordinal.
      *
      * @return list<array{
+     *     pid: int,
      *     name: string,
      *     pos: string,
      *     teamname: string,
+     *     teamid: int,
      *     cy: int,
      *     cyt: int,
      *     salary_yr1: int,
@@ -26,7 +28,10 @@ interface ContractListRepositoryInterface
      *     salary_yr4: int,
      *     salary_yr5: int,
      *     salary_yr6: int,
-     *     bird: string
+     *     bird: string,
+     *     team_city: string|null,
+     *     color1: string|null,
+     *     color2: string|null
      * }> Array of player contract data
      */
     public function getActivePlayerContracts(): array;

@@ -45,7 +45,7 @@ class WaiversRepository extends BaseMysqliRepository implements WaiversRepositor
     /**
      * @see WaiversRepositoryInterface::signPlayerFromWaivers()
      *
-     * @param array{team_name: string, teamid: int} $team
+     * @param array{team_name: string, teamid: int, ...<string, mixed>} $team
      * @param array{hasExistingContract: bool, salary: int} $contractData
      */
     public function signPlayerFromWaivers(int $playerID, array $team, array $contractData): bool

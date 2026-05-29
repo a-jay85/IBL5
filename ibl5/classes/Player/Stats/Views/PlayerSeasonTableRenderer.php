@@ -23,7 +23,7 @@ class PlayerSeasonTableRenderer implements PlayerSeasonTableRendererInterface
 
     /**
      * @param list<array{year: int, pos: string, pid: int, name: string, team: string, games: int, minutes: int, fgm: int, fga: int, ftm: int, fta: int, tgm: int, tga: int, orb: int, reb: int, ast: int, stl: int, tvr: int, blk: int, pf: int, pts: int}> $seasonRows
-     * @param array{pid: int, name: string, games: int, minutes: float, fgm: float, fga: float, fgpct: float, ftm: float, fta: float, ftpct: float, tgm: float, tga: float, tpct: float, orb: float, reb: float, ast: float, stl: float, tvr: float, blk: float, pf: float, pts: float, retired: int}|null $careerAverages
+     * @param array{pid: int, name: string, games: int, minutes: float, fgm: float, fga: float, fgpct: float, ftm: float, fta: float, ftpct: float, tgm: float, tga: float, tpct: float, orb: float, reb: float, ast: float, stl: float, tvr: float, blk: float, pf: float, pts: float, retired: int, ...<string, mixed>}|null $careerAverages
      */
     private function renderAveragesTable(PlayerSeasonTableConfig $config, array $seasonRows, ?array $careerAverages): string
     {
@@ -77,7 +77,7 @@ class PlayerSeasonTableRenderer implements PlayerSeasonTableRendererInterface
 
         // Career averages row
         if ($careerAverages !== null) {
-            /** @var array{pid: int, name: string, games: int, minutes: float, fgm: float, fga: float, fgpct: float, ftm: float, fta: float, ftpct: float, tgm: float, tga: float, tpct: float, orb: float, reb: float, ast: float, stl: float, tvr: float, blk: float, pf: float, pts: float, retired: int} $careerAverages */
+            /** @var array{pid: int, name: string, games: int, minutes: float, fgm: float, fga: float, fgpct: float, ftm: float, fta: float, ftpct: float, tgm: float, tga: float, tpct: float, orb: float, reb: float, ast: float, stl: float, tvr: float, blk: float, pf: float, pts: float, retired: int, ...<string, mixed>} $careerAverages */
             ?>
     <tr class="player-table-row-bold">
         <td colspan=2><?= HtmlSanitizer::e($config->careerLabel) ?></td>

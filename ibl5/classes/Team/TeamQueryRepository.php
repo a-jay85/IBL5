@@ -395,13 +395,15 @@ class TeamQueryRepository extends \BaseMysqliRepository implements TeamQueryRepo
     /**
      * @see TeamQueryRepositoryInterface::getTotalNextSeasonSalaries()
      *
-     * @param list<PlayerRow> $result
+     * @param list<array<string, mixed>> $result
      */
     public function getTotalNextSeasonSalaries(array $result): int
     {
         $totalNextSeasonSalaries = 0;
 
-        $playerArray = $this->convertPlrResultIntoPlayerArray($result);
+        /** @var list<PlayerRow> $typedResult */
+        $typedResult = $result;
+        $playerArray = $this->convertPlrResultIntoPlayerArray($typedResult);
         foreach ($playerArray as $player) {
             $totalNextSeasonSalaries += $player->getNextSeasonSalary();
         }

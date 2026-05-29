@@ -7,6 +7,7 @@ on:
     paths:
       - 'ibl5/tests/e2e/**'
       - 'bin/check-e2e-hygiene'
+      - 'bin/check-e2e-fa-offers-owner'
       - '.e2e-hygiene-skip-allowlist'
       - '.github/workflows/e2e-hygiene.yml'
 
@@ -30,3 +31,5 @@ jobs:
         env:
           PR_NUMBER: ${{ github.event.pull_request.number }}
         run: bin/check-e2e-hygiene --pr
+      - name: Run bin/check-e2e-fa-offers-owner
+        run: bin/check-e2e-fa-offers-owner

@@ -180,90 +180,11 @@ test.describe('Free Agency -- Bird Rights negotiation', () => {
   });
 });
 
-test.describe('Free Agency -- validation errors', () => {
-  test.beforeAll(async ({ request }) => {
-    await request.delete('test-state.php?action=clear-fa-offers');
-  });
-
-  test.afterAll(async ({ request }) => {
-    await request.delete('test-state.php?action=reset-fa-offers');
-  });
-
-  test.beforeEach(async ({ appState, page }) => {
-    await appState({ 'Current Season Phase': 'Free Agency', 'Current Season Ending Year': '2026' });
-    // Use FA Center pid=11 for validation tests
-    await page.goto('modules.php?name=FreeAgency&pa=negotiate&pid=11');
-    // CI seed provides pid=11 as an unsigned free agent — form must be present
-    const formCount = await page.locator('form[name="FAOffer"] input[type="number"]').count();
-    expect(formCount, 'CI seed must provide negotiate form for pid=11').toBeGreaterThan(0);
-  });
-
-  test('zero first year shows error', async ({ page }) => {
-    const form = offerForm(page);
-    await form.locator('input[name="offeryear1"]').fill('0');
-    await page.getByRole('button', { name: /Offer.*Free Agent Contract/i }).click();
-    await expect(page.locator('.ibl-alert--error')).toContainText('must enter an amount greater than zero');
-  });
-
-  test('below veteran minimum shows error', async ({ page }) => {
-    const form = offerForm(page);
-    // FA Center exp=8, vet min=89; offer 1 is below that
-    await form.locator('input[name="offeryear1"]').fill('1');
-    await page.getByRole('button', { name: /Offer.*Free Agent Contract/i }).click();
-    await expect(page.locator('.ibl-alert--error')).toContainText("Veteran's Minimum");
-  });
-
-  test('hard cap exceeded shows error', async ({ page }) => {
-    const form = offerForm(page);
-    // Offer 9999 — exceeds hard cap space for any team
-    await form.locator('input[name="offeryear1"]').fill('9999');
-    await page.getByRole('button', { name: /Offer.*Free Agent Contract/i }).click();
-    const alert = page.locator('.ibl-alert--error');
-    await expect(alert).toBeVisible();
-    const text = await alert.textContent() ?? '';
-    // Either hard cap or max contract error fires (both are valid for 9999)
-    expect(text.includes('hard cap') || text.includes('maximum allowed')).toBe(true);
-  });
-
-  test('max contract exceeded shows error', async ({ page }) => {
-    const form = offerForm(page);
-    // Offer above max contract but plausibly under hard cap
-    // Max contract for exp 0-6 = 1063, exp 7-9 = 1275, exp 10+ = 1451
-    // Use 1500 which exceeds all max contract tiers
-    await form.locator('input[name="offeryear1"]').fill('1500');
-    await page.getByRole('button', { name: /Offer.*Free Agent Contract/i }).click();
-    const alert = page.locator('.ibl-alert--error');
-    await expect(alert).toBeVisible();
-    const text = await alert.textContent() ?? '';
-    // Cap space error may fire before max contract check if team is over the cap
-    expect(text.includes('maximum allowed') || text.includes('cap space')).toBe(true);
-  });
-
-  test('raise too large between years', async ({ page }) => {
-    const form = offerForm(page);
-    await form.locator('input[name="offeryear1"]').fill('500');
-    await form.locator('input[name="offeryear2"]').fill('700');
-    await page.getByRole('button', { name: /Offer.*Free Agent Contract/i }).click();
-    const alert = page.locator('.ibl-alert--error');
-    await expect(alert).toBeVisible();
-    const text = await alert.textContent() ?? '';
-    // CI seed has Metros under hard cap — raise validation fires (not cap space error)
-    expect(text).toContain('larger raise than is permitted');
-  });
-
-  test('gap in contract years', async ({ page }) => {
-    const form = offerForm(page);
-    await form.locator('input[name="offeryear1"]').fill('200');
-    await form.locator('input[name="offeryear2"]').fill('0');
-    await form.locator('input[name="offeryear3"]').fill('200');
-    await page.getByRole('button', { name: /Offer.*Free Agent Contract/i }).click();
-    const alert = page.locator('.ibl-alert--error');
-    await expect(alert).toBeVisible();
-    const text = await alert.textContent() ?? '';
-    // CI seed has Metros under hard cap — gap validation fires (not cap space error)
-    expect(text).toContain('gaps in contract years');
-  });
-});
+// NOTE: the "Free Agency -- validation errors" block moved to
+// free-agency-submission.spec.ts. Those tests submit offers for pid=11 and did a
+// table-wide clear-fa-offers, which raced against the submission spec's in-flight
+// offers under fullyParallel sharding. All ibl_fa_offers mutation now lives in
+// that one serial file. See its header for the full rationale.
 
 test.describe('Free Agency -- wrong season phase', () => {
   test('page renders without PHP errors in non-FA phase', async ({ appState, page }) => {

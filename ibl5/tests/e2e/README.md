@@ -47,8 +47,8 @@ tests/e2e/
 ├── fixtures/
 │   └── auth.ts                # Auth fixture for authenticated tests
 ├── smoke/
-│   ├── public-pages.spec.ts   # Public pages load without PHP errors
-│   └── auth-pages.spec.ts     # Protected pages load when logged in
+│   ├── public-pages.spec.ts          # Public pages load without PHP errors
+│   └── auth-pages-extended.spec.ts   # Protected pages load when logged in
 ├── flows/
 │   └── trading.spec.ts        # Interactive trading flow tests
 └── README.md
@@ -68,7 +68,7 @@ Tests that need authentication import from `./fixtures/auth.ts`. Tests for publi
 ## Adding New Tests
 
 1. **Public page test** — add to `smoke/public-pages.spec.ts` or create a new file in `smoke/`
-2. **Authenticated page test** — import `{ test, expect }` from `../fixtures/auth` and add to `smoke/auth-pages.spec.ts`
+2. **Authenticated page test** — import `{ test, expect }` from `../fixtures/auth` and add to `smoke/auth-pages-extended.spec.ts`
 3. **Interactive flow test** — create a new `.spec.ts` in `flows/`
 
 ## Visual Regression

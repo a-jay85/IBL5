@@ -666,18 +666,17 @@ if ($method === 'DELETE' && $action === 'reset-saved-dc-names') {
     exit;
 }
 
-// DELETE ?action=clear-trade-offers — delete ALL non-REST trade offers and mark
-// REST offers 7-8 as 'completed' so the trade-review empty-state (toHaveCount 0)
-// can be observed. Uses NOT IN (7,8) rather than IN (1-6) because
-// trading-submission.spec.ts creates dynamic offers during the same run.
-// Paired with reset-trade-offers (which restores 7-8 to 'test' approval).
+// DELETE ?action=clear-trade-offers — delete ALL non-REST trade offers so the
+// trade-review empty-state can be observed. Spares ids 7-8 (reserved for
+// api-v1-rest.spec.ts) — ci-seed seeds 7-8 as non-Metros trades (Spurs/Flames,
+// Minutemen/Royals), so they do NOT appear on the Metros Trade Review page.
+// Uses NOT IN (7,8) rather than IN (1-6) because trading-submission.spec.ts
+// creates dynamic offers during the same run that also block the empty-state.
+// Paired with reset-trade-offers.
 if ($method === 'DELETE' && $action === 'clear-trade-offers') {
     $db->query('DELETE FROM ibl_trade_info WHERE tradeofferid NOT IN (7,8)');
     $infoDeleted = $db->affected_rows;
     $db->query('DELETE FROM ibl_trade_offers WHERE id NOT IN (7,8)');
-    // REST spec offers 7-8 stay but must appear as 'completed' so they don't
-    // render as pending offer cards on the review page.
-    $db->query("UPDATE ibl_trade_info SET approval = 'completed' WHERE tradeofferid IN (7,8)");
     $offersDeleted = $db->affected_rows;
     echo json_encode(['info_deleted' => $infoDeleted, 'offers_deleted' => $offersDeleted]);
     $db->close();

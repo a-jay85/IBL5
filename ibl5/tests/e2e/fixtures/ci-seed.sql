@@ -899,12 +899,15 @@ INSERT INTO ibl_trade_info (tradeofferid, itemid, itemtype, trade_from, trade_to
 
 -- Offers 7-8 reserved for api-v1-rest.spec.ts (REST trade accept/decline happy paths).
 -- approval='test' bypasses the Discord-ID gate in TradeAcceptController / TradeDeclineController.
+-- Deliberately use non-Metros teams (Spurs/Flames and Minutemen/Royals) so these offers
+-- do NOT appear on the Metros Trade Review page. This ensures clearTradeOffers() (which
+-- spares ids 7-8) leaves 0 visible cards for the Metros test user in the empty-state test.
 INSERT INTO ibl_trade_offers (id) VALUES (7), (8);
 INSERT INTO ibl_trade_info (tradeofferid, itemid, itemtype, trade_from, trade_to, approval) VALUES
-  (7, 4, '1', 'Stars',  'Metros', 'test'),
-  (7, 2, '1', 'Metros', 'Stars',  'test'),
-  (8, 5, '1', 'Stars',  'Metros', 'test'),
-  (8, 1, '1', 'Metros', 'Stars',  'test');
+  (7, 30, '1', 'Spurs',      'Flames',    'test'),
+  (7, 31, '1', 'Flames',     'Spurs',     'test'),
+  (8, 32, '1', 'Minutemen',  'Royals',    'test'),
+  (8, 33, '1', 'Royals',     'Minutemen', 'test');
 
 -- ============================================================
 -- Stories for search pagination (need >10 results for "the")

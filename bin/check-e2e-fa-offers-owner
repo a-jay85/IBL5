@@ -1,0 +1,42 @@
+#!/bin/bash
+# Guards the single-owner invariant for the global ibl_fa_offers E2E table.
+#
+# Under Playwright's fullyParallel sharding, two separate spec files that both
+# mutate ibl_fa_offers run in different workers concurrently against the shared
+# DB. A table-wide wipe (clear_offers / reset-fa-offers) then races against
+# another file's in-flight offer and deletes it mid-test (master CI shard-2
+# failure, PR #884). The fix is to keep ALL global FA-offer mutation in ONE
+# serial file. This guard fails CI if any OTHER spec reintroduces such mutation.
+#
+# Owner: tests/e2e/flows/free-agency-submission.spec.ts
+# Exits 0 (clean) or 1 (a non-owner spec mutates ibl_fa_offers).
+set -euo pipefail
+
+ROOT=$(git rev-parse --show-toplevel)
+E2E_FLOWS="$ROOT/ibl5/tests/e2e/flows"
+OWNER="free-agency-submission.spec.ts"
+
+# Mutation signals: the test-state reset/clear endpoints and the deleteoffer POST.
+# (clear_offers as a forged-CSRF *rejected* POST is not a mutation — it never
+# reaches the handler — so it is intentionally NOT matched here.)
+PATTERN='action=reset-fa-offers|action=clear-fa-offers|pa=deleteoffer'
+
+violations=0
+while IFS= read -r f; do
+  base=$(basename "$f")
+  [ "$base" = "$OWNER" ] && continue
+  if grep -nE "$PATTERN" "$f" >/dev/null 2>&1; then
+    echo "ERROR: $base mutates the global ibl_fa_offers table." >&2
+    grep -nE "$PATTERN" "$f" | sed 's/^/    /' >&2
+    violations=$((violations + 1))
+  fi
+done < <(find "$E2E_FLOWS" -name '*.spec.ts')
+
+if [ "$violations" -gt 0 ]; then
+  echo "" >&2
+  echo "Global ibl_fa_offers mutation must live ONLY in $OWNER (serial, single-worker)." >&2
+  echo "Move the offending tests there. See that file's header for the rationale." >&2
+  exit 1
+fi
+
+echo "OK: $OWNER is the sole ibl_fa_offers mutator."

@@ -9,9 +9,12 @@ import { test, expect } from '../fixtures/auth';
  *
  * Each protected endpoint validates the token BEFORE any DB mutation, so the
  * endpoint-specific rejection signal (error message / redirect away from the
- * success page) is itself proof that no mutation occurred. For block.php we
- * additionally read back the offer count, since a reset endpoint already
- * exists and the assertion is cheap.
+ * success page) is itself proof that no mutation occurred — no read-back needed.
+ *
+ * This spec deliberately does NOT seed/reset ibl_fa_offers: the forged token is
+ * rejected before the clear_offers handler runs, so the table state is
+ * irrelevant. Touching the global table here would race against the FA offer
+ * submission spec under fullyParallel sharding (see free-agency-submission.spec.ts).
  *
  * Admin (auth) fixture: all four endpoints are GM/admin actions.
  */
@@ -24,15 +27,7 @@ function forgedToken(): string {
 test.describe('Forged CSRF token is rejected', () => {
   test.describe.configure({ mode: 'serial' });
 
-  test.beforeEach(async ({ request }) => {
-    await request.delete('test-state.php?action=reset-fa-offers');
-  });
-
-  test.afterAll(async ({ request }) => {
-    await request.delete('test-state.php?action=reset-fa-offers');
-  });
-
-  test('block.php clear_offers with forged token → rejected, offers untouched', async ({
+  test('block.php clear_offers with forged token → rejected, no mutation', async ({
     request,
   }) => {
     const response = await request.post('block.php', {
@@ -40,12 +35,9 @@ test.describe('Forged CSRF token is rejected', () => {
     });
     expect(response.status()).toBeLessThan(400);
     const html = await response.text();
+    // CsrfGuard rejects before the clear_offers handler runs. This rejection
+    // signal is itself proof no offers were cleared.
     expect(html).toContain('Security validation failed');
-
-    // Read-back: the three seed offers must still be present.
-    const reload = await request.get('block.php');
-    const reloadHtml = await reload.text();
-    expect(reloadHtml).toMatch(/total number of offers:\s*3/i);
   });
 
   test('maketradeoffer.php with forged token → redirected to Trading error, no offer sent', async ({

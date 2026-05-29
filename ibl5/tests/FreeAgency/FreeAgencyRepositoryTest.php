@@ -7,8 +7,6 @@ namespace Tests\FreeAgency;
 use PHPUnit\Framework\TestCase;
 use FreeAgency\FreeAgencyRepository;
 use Tests\WideUnit\Mocks\MockDatabase;
-use Tests\WideUnit\Mocks\MockDatabaseResult;
-use Tests\WideUnit\Mocks\MockPreparedStatement;
 
 /**
  * FreeAgencyRepositoryTest - Tests for FreeAgencyRepository database operations
@@ -21,71 +19,16 @@ use Tests\WideUnit\Mocks\MockPreparedStatement;
 class FreeAgencyRepositoryTest extends TestCase
 {
     private MockDatabase $mockDb;
-    private object $mockMysqliDb;
 
     protected function setUp(): void
     {
         $this->mockDb = new MockDatabase();
-        $this->setupMockMysqliDb();
+        $GLOBALS['mysqli_db'] = $this->mockDb;
     }
 
     protected function tearDown(): void
     {
         unset($GLOBALS['mysqli_db']);
-    }
-
-    private function setupMockMysqliDb(): void
-    {
-        $mockDb = $this->mockDb;
-        
-        $this->mockMysqliDb = new class($mockDb) extends \mysqli {
-            private MockDatabase $mockDb;
-            public int $connect_errno = 0;
-            public ?string $connect_error = null;
-
-            public function __construct(MockDatabase $mockDb)
-            {
-                $this->mockDb = $mockDb;
-            }
-
-            #[\ReturnTypeWillChange]
-            public function prepare(string $query): MockPreparedStatement|false
-            {
-                return new MockPreparedStatement($this->mockDb, $query);
-            }
-
-            #[\ReturnTypeWillChange]
-            public function query(string $query, int $resultMode = MYSQLI_STORE_RESULT): \mysqli_result|bool
-            {
-                $result = $this->mockDb->sql_query($query);
-                if ($result instanceof MockDatabaseResult) {
-                    return false;
-                }
-                return (bool) $result;
-            }
-
-            public function real_escape_string(string $string): string
-            {
-                return addslashes($string);
-            }
-
-            public function begin_transaction(int $flags = 0, ?string $name = null): bool
-            {
-                return true;
-            }
-
-            public function commit(int $flags = 0, ?string $name = null): bool
-            {
-                return true;
-            }
-
-            public function rollback(int $flags = 0, ?string $name = null): bool
-            {
-                return true;
-            }
-        };
-        
-        $GLOBALS['mysqli_db'] = $this->mockMysqliDb;
     }
 
     // ============================================
@@ -94,14 +37,14 @@ class FreeAgencyRepositoryTest extends TestCase
 
     public function testRepositoryCanBeInstantiated(): void
     {
-        $repository = new FreeAgencyRepository($this->mockMysqliDb);
+        $repository = new FreeAgencyRepository($this->mockDb);
         
         $this->assertInstanceOf(FreeAgencyRepository::class, $repository);
     }
 
     public function testRepositoryImplementsCorrectInterface(): void
     {
-        $repository = new FreeAgencyRepository($this->mockMysqliDb);
+        $repository = new FreeAgencyRepository($this->mockDb);
         
         $this->assertInstanceOf(
             \FreeAgency\Contracts\FreeAgencyRepositoryInterface::class,
@@ -111,7 +54,7 @@ class FreeAgencyRepositoryTest extends TestCase
 
     public function testRepositoryExtendsBaseMysqliRepository(): void
     {
-        $repository = new FreeAgencyRepository($this->mockMysqliDb);
+        $repository = new FreeAgencyRepository($this->mockDb);
         
         $this->assertInstanceOf(
             \BaseMysqliRepository::class,
@@ -125,7 +68,7 @@ class FreeAgencyRepositoryTest extends TestCase
 
     public function testGetExistingOfferReturnsNullWhenNoOffer(): void
     {
-        $repository = new FreeAgencyRepository($this->mockMysqliDb);
+        $repository = new FreeAgencyRepository($this->mockDb);
         $this->mockDb->setMockData([]);
 
         $result = $repository->getExistingOffer(1, 1);
@@ -135,7 +78,7 @@ class FreeAgencyRepositoryTest extends TestCase
 
     public function testGetExistingOfferReturnsOfferData(): void
     {
-        $repository = new FreeAgencyRepository($this->mockMysqliDb);
+        $repository = new FreeAgencyRepository($this->mockDb);
         $this->mockDb->setMockData([
             ['offer1' => 500, 'offer2' => 525, 'offer3' => 550, 'offer4' => 0, 'offer5' => 0, 'offer6' => 0]
         ]);
@@ -153,7 +96,7 @@ class FreeAgencyRepositoryTest extends TestCase
 
     public function testDeleteOfferExecutesQuery(): void
     {
-        $repository = new FreeAgencyRepository($this->mockMysqliDb);
+        $repository = new FreeAgencyRepository($this->mockDb);
         
         // Track that the delete query was executed
         $result = $repository->deleteOffer(1, 1);
@@ -168,7 +111,7 @@ class FreeAgencyRepositoryTest extends TestCase
 
     public function testSaveOfferReturnsTrueOnSuccessfulInsert(): void
     {
-        $repository = new FreeAgencyRepository($this->mockMysqliDb);
+        $repository = new FreeAgencyRepository($this->mockDb);
 
         $offerData = [
             'teamid' => 1,
@@ -200,7 +143,7 @@ class FreeAgencyRepositoryTest extends TestCase
 
     public function testGetAllPlayersExcludingTeamReturnsPlayerRows(): void
     {
-        $repository = new FreeAgencyRepository($this->mockMysqliDb);
+        $repository = new FreeAgencyRepository($this->mockDb);
         $this->mockDb->setMockData([
             ['pid' => 1, 'name' => 'Player One', 'teamname' => 'Chicago', 'retired' => 0],
             ['pid' => 2, 'name' => 'Player Two', 'teamname' => 'Boston', 'retired' => 0],
@@ -215,7 +158,7 @@ class FreeAgencyRepositoryTest extends TestCase
 
     public function testGetAllPlayersExcludingTeamReturnsEmptyArrayWhenNone(): void
     {
-        $repository = new FreeAgencyRepository($this->mockMysqliDb);
+        $repository = new FreeAgencyRepository($this->mockDb);
         $this->mockDb->setMockData([]);
 
         $result = $repository->getAllPlayersExcludingTeam(5);
@@ -230,7 +173,7 @@ class FreeAgencyRepositoryTest extends TestCase
 
     public function testIsPlayerAlreadySignedReturnsTrueWhenCyZeroAndCy1NonZero(): void
     {
-        $repository = new FreeAgencyRepository($this->mockMysqliDb);
+        $repository = new FreeAgencyRepository($this->mockDb);
         $this->mockDb->onQuery('SELECT cy, salary_yr1 FROM ibl_plr', [['cy' => 0, 'salary_yr1' => 500]]);
 
         $result = $repository->isPlayerAlreadySigned(100);
@@ -240,7 +183,7 @@ class FreeAgencyRepositoryTest extends TestCase
 
     public function testIsPlayerAlreadySignedReturnsFalseWhenCy1IsZero(): void
     {
-        $repository = new FreeAgencyRepository($this->mockMysqliDb);
+        $repository = new FreeAgencyRepository($this->mockDb);
         $this->mockDb->onQuery('SELECT cy, salary_yr1 FROM ibl_plr', [['cy' => 0, 'salary_yr1' => 0]]);
 
         $result = $repository->isPlayerAlreadySigned(100);
@@ -250,7 +193,7 @@ class FreeAgencyRepositoryTest extends TestCase
 
     public function testIsPlayerAlreadySignedReturnsFalseWhenPlayerNotFound(): void
     {
-        $repository = new FreeAgencyRepository($this->mockMysqliDb);
+        $repository = new FreeAgencyRepository($this->mockDb);
         $this->mockDb->onQuery('SELECT cy, salary_yr1 FROM ibl_plr', []);
 
         $result = $repository->isPlayerAlreadySigned(999);
@@ -264,8 +207,8 @@ class FreeAgencyRepositoryTest extends TestCase
 
     public function testMultipleRepositoriesCanBeInstantiated(): void
     {
-        $repo1 = new FreeAgencyRepository($this->mockMysqliDb);
-        $repo2 = new FreeAgencyRepository($this->mockMysqliDb);
+        $repo1 = new FreeAgencyRepository($this->mockDb);
+        $repo2 = new FreeAgencyRepository($this->mockDb);
 
         $this->assertInstanceOf(FreeAgencyRepository::class, $repo1);
         $this->assertInstanceOf(FreeAgencyRepository::class, $repo2);

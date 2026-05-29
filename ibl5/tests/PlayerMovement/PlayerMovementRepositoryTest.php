@@ -8,44 +8,19 @@ use PlayerMovement\PlayerMovementRepository;
 use PlayerMovement\Contracts\PlayerMovementRepositoryInterface;
 use PHPUnit\Framework\TestCase;
 use Tests\WideUnit\Mocks\MockDatabase;
-use Tests\WideUnit\Mocks\MockPreparedStatement;
 
 class PlayerMovementRepositoryTest extends TestCase
 {
     private MockDatabase $mockDb;
-    private object $mockMysqliDb;
 
     protected function setUp(): void
     {
         $this->mockDb = new MockDatabase();
-        $this->setupMockMysqliDb();
-    }
-
-    private function setupMockMysqliDb(): void
-    {
-        $mockDb = $this->mockDb;
-
-        $this->mockMysqliDb = new class($mockDb) extends \mysqli {
-            private MockDatabase $mockDb;
-            public int $connect_errno = 0;
-            public ?string $connect_error = null;
-
-            public function __construct(MockDatabase $mockDb)
-            {
-                $this->mockDb = $mockDb;
-            }
-
-            #[\ReturnTypeWillChange]
-            public function prepare(string $query): MockPreparedStatement|false
-            {
-                return new MockPreparedStatement($this->mockDb, $query);
-            }
-        };
     }
 
     public function testImplementsInterface(): void
     {
-        $repository = new PlayerMovementRepository($this->mockMysqliDb);
+        $repository = new PlayerMovementRepository($this->mockDb);
 
         $this->assertInstanceOf(PlayerMovementRepositoryInterface::class, $repository);
     }
@@ -53,7 +28,7 @@ class PlayerMovementRepositoryTest extends TestCase
     public function testGetPlayerMovementsReturnsEmptyArrayWhenNoMovements(): void
     {
         $this->mockDb->setMockData([]);
-        $repository = new PlayerMovementRepository($this->mockMysqliDb);
+        $repository = new PlayerMovementRepository($this->mockDb);
 
         $result = $repository->getPlayerMovements(2024);
 
@@ -78,7 +53,7 @@ class PlayerMovementRepositoryTest extends TestCase
                 'new_color2' => 'BA9653',
             ],
         ]);
-        $repository = new PlayerMovementRepository($this->mockMysqliDb);
+        $repository = new PlayerMovementRepository($this->mockDb);
 
         $result = $repository->getPlayerMovements(2024);
 

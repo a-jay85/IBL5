@@ -16,106 +16,13 @@ use Tests\WideUnit\Mocks\MockDatabase;
  */
 class CashTransactionHandlerTest extends TestCase
 {
-    private object $mockDb;
+    private MockDatabase $mockDb;
     private TeamIdentityRepositoryInterface $mockCommonRepo;
 
     protected function setUp(): void
     {
-        $this->mockDb = $this->createMockDatabase();
+        $this->mockDb = new MockDatabase();
         $this->mockCommonRepo = $this->createStub(TeamIdentityRepositoryInterface::class);
-    }
-
-    private function createMockDatabase(): object
-    {
-        return new class extends \mysqli {
-            public array $mockData = [];
-            public bool $playerExists = false;
-
-            public function __construct()
-            {
-                // Don't call parent constructor
-            }
-
-            #[\ReturnTypeWillChange]
-            public function prepare(string $query)
-            {
-                $mockData = $this->mockData;
-                $playerExists = $this->playerExists;
-                return new class($mockData, $playerExists) {
-                    private array $mockData;
-                    private bool $playerExists;
-                    public function __construct(array $mockData, bool $playerExists)
-                    {
-                        $this->mockData = $mockData;
-                        $this->playerExists = $playerExists;
-                    }
-                    public function bind_param(string $types, mixed &...$vars): bool
-                    {
-                        return true;
-                    }
-                    public function execute(): bool
-                    {
-                        return true;
-                    }
-                    public function get_result(): object
-                    {
-                        $data = $this->mockData;
-                        $exists = $this->playerExists;
-                        return new class($data, $exists) {
-                            private array $rows;
-                            private int $index = 0;
-                            private bool $playerExists;
-                            public int $num_rows;
-                            public function __construct(array $rows, bool $playerExists)
-                            {
-                                $this->rows = $rows;
-                                $this->playerExists = $playerExists;
-                                $this->num_rows = $playerExists ? 1 : 0;
-                            }
-                            public function fetch_assoc(): ?array
-                            {
-                                return $this->rows[$this->index++] ?? null;
-                            }
-                            public function fetch_object(): ?object
-                            {
-                                $row = $this->rows[$this->index++] ?? null;
-                                return $row ? (object) $row : null;
-                            }
-                        };
-                    }
-                    public function close(): void
-                    {
-                    }
-                };
-            }
-
-            #[\ReturnTypeWillChange]
-            public function query(string $query, int $result_mode = MYSQLI_STORE_RESULT)
-            {
-                $data = $this->mockData;
-                $mockResult = new class($data) {
-                    private array $rows;
-                    private int $index = 0;
-                    public int $num_rows = 0;
-                    public function __construct(array $rows)
-                    {
-                        $this->rows = $rows;
-                        $this->num_rows = count($rows);
-                    }
-                    public function fetch_assoc(): ?array
-                    {
-                        return $this->rows[$this->index++] ?? null;
-                    }
-                    public function fetch_object(): ?object
-                    {
-                        $row = $this->rows[$this->index++] ?? null;
-                        return $row ? (object) $row : null;
-                    }
-                };
-                /** @phpstan-ignore-next-line */
-                return $mockResult;
-            }
-        };
     }
 
     // ============================================

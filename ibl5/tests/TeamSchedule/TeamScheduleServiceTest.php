@@ -9,7 +9,6 @@ use TeamSchedule\Contracts\TeamScheduleRepositoryInterface;
 use TeamSchedule\TeamScheduleService;
 use Season\Season;
 use Tests\WideUnit\Mocks\MockDatabase;
-use Tests\WideUnit\Mocks\MockPreparedStatement;
 
 /**
  * TeamScheduleServiceTest - Tests for TeamScheduleService
@@ -17,7 +16,6 @@ use Tests\WideUnit\Mocks\MockPreparedStatement;
 class TeamScheduleServiceTest extends TestCase
 {
     private MockDatabase $mockDb;
-    private object $mockMysqliDb;
 
     /** @var TeamScheduleRepositoryInterface&\PHPUnit\Framework\MockObject\Stub */
     private TeamScheduleRepositoryInterface $stubRepository;
@@ -25,7 +23,7 @@ class TeamScheduleServiceTest extends TestCase
     protected function setUp(): void
     {
         $this->mockDb = new MockDatabase();
-        $this->setupMockMysqliDb();
+        $GLOBALS['mysqli_db'] = $this->mockDb;
         $this->stubRepository = $this->createStub(TeamScheduleRepositoryInterface::class);
     }
 
@@ -34,55 +32,20 @@ class TeamScheduleServiceTest extends TestCase
         unset($GLOBALS['mysqli_db']);
     }
 
-    private function setupMockMysqliDb(): void
-    {
-        $mockDb = $this->mockDb;
-
-        $this->mockMysqliDb = new class($mockDb) extends \mysqli {
-            private MockDatabase $mockDb;
-            public int $connect_errno = 0;
-            public ?string $connect_error = null;
-
-            public function __construct(MockDatabase $mockDb)
-            {
-                $this->mockDb = $mockDb;
-            }
-
-            #[\ReturnTypeWillChange]
-            public function prepare(string $query): MockPreparedStatement|false
-            {
-                return new MockPreparedStatement($this->mockDb, $query);
-            }
-
-            #[\ReturnTypeWillChange]
-            public function query(string $query, int $resultMode = MYSQLI_STORE_RESULT): \mysqli_result|bool
-            {
-                return false;
-            }
-
-            public function real_escape_string(string $string): string
-            {
-                return addslashes($string);
-            }
-        };
-
-        $GLOBALS['mysqli_db'] = $this->mockMysqliDb;
-    }
-
     // ============================================
     // CONSTRUCTOR TESTS
     // ============================================
 
     public function testServiceCanBeInstantiated(): void
     {
-        $service = new TeamScheduleService($this->mockMysqliDb, $this->stubRepository);
+        $service = new TeamScheduleService($this->mockDb, $this->stubRepository);
 
         $this->assertInstanceOf(TeamScheduleService::class, $service);
     }
 
     public function testServiceImplementsCorrectInterface(): void
     {
-        $service = new TeamScheduleService($this->mockMysqliDb, $this->stubRepository);
+        $service = new TeamScheduleService($this->mockDb, $this->stubRepository);
 
         $this->assertInstanceOf(
             \TeamSchedule\Contracts\TeamScheduleServiceInterface::class,
@@ -96,8 +59,8 @@ class TeamScheduleServiceTest extends TestCase
 
     public function testMultipleServicesCanBeInstantiated(): void
     {
-        $service1 = new TeamScheduleService($this->mockMysqliDb, $this->stubRepository);
-        $service2 = new TeamScheduleService($this->mockMysqliDb, $this->stubRepository);
+        $service1 = new TeamScheduleService($this->mockDb, $this->stubRepository);
+        $service2 = new TeamScheduleService($this->mockDb, $this->stubRepository);
 
         $this->assertNotSame($service1, $service2);
     }
@@ -110,7 +73,7 @@ class TeamScheduleServiceTest extends TestCase
     {
         $this->stubRepository->method('getSchedule')->willReturn([]);
 
-        $service = new TeamScheduleService($this->mockMysqliDb, $this->stubRepository);
+        $service = new TeamScheduleService($this->mockDb, $this->stubRepository);
         $season = new Season($this->mockDb);
 
         $result = $service->getProcessedSchedule(1, $season);
@@ -125,7 +88,7 @@ class TeamScheduleServiceTest extends TestCase
             $this->makeGameRow('2024-01-10', visitor: 1, home: 2, vScore: 100, hScore: 90),
         ]);
 
-        $service = new TeamScheduleService($this->mockMysqliDb, $this->stubRepository);
+        $service = new TeamScheduleService($this->mockDb, $this->stubRepository);
         $season = new Season($this->mockDb);
 
         $result = $service->getProcessedSchedule(1, $season);
@@ -144,7 +107,7 @@ class TeamScheduleServiceTest extends TestCase
             $this->makeGameRow('2024-01-10', visitor: 1, home: 2, vScore: 80, hScore: 95),
         ]);
 
-        $service = new TeamScheduleService($this->mockMysqliDb, $this->stubRepository);
+        $service = new TeamScheduleService($this->mockDb, $this->stubRepository);
         $season = new Season($this->mockDb);
 
         $result = $service->getProcessedSchedule(1, $season);
@@ -163,7 +126,7 @@ class TeamScheduleServiceTest extends TestCase
             $this->makeGameRow('2024-01-12', visitor: 2, home: 1, vScore: 85, hScore: 95),
         ]);
 
-        $service = new TeamScheduleService($this->mockMysqliDb, $this->stubRepository);
+        $service = new TeamScheduleService($this->mockDb, $this->stubRepository);
         $season = new Season($this->mockDb);
 
         $result = $service->getProcessedSchedule(1, $season);
@@ -179,7 +142,7 @@ class TeamScheduleServiceTest extends TestCase
             $this->makeGameRow('2024-01-12', visitor: 1, home: 2, vScore: 80, hScore: 95),
         ]);
 
-        $service = new TeamScheduleService($this->mockMysqliDb, $this->stubRepository);
+        $service = new TeamScheduleService($this->mockDb, $this->stubRepository);
         $season = new Season($this->mockDb);
 
         $result = $service->getProcessedSchedule(1, $season);
@@ -195,7 +158,7 @@ class TeamScheduleServiceTest extends TestCase
             $this->makeGameRow('2024-02-10', visitor: 1, home: 2, vScore: 0, hScore: 0),
         ]);
 
-        $service = new TeamScheduleService($this->mockMysqliDb, $this->stubRepository);
+        $service = new TeamScheduleService($this->mockDb, $this->stubRepository);
         $season = new Season($this->mockDb);
 
         $result = $service->getProcessedSchedule(1, $season);
@@ -213,7 +176,7 @@ class TeamScheduleServiceTest extends TestCase
             $this->makeGameRow('2024-01-14', visitor: 2, home: 1, vScore: 85, hScore: 105),
         ]);
 
-        $service = new TeamScheduleService($this->mockMysqliDb, $this->stubRepository);
+        $service = new TeamScheduleService($this->mockDb, $this->stubRepository);
         $season = new Season($this->mockDb);
 
         $result = $service->getProcessedSchedule(1, $season);
@@ -236,7 +199,7 @@ class TeamScheduleServiceTest extends TestCase
             ->with(1, $season->endingYear)
             ->willReturn([]);
 
-        $service = new TeamScheduleService($this->mockMysqliDb, $mockRepository);
+        $service = new TeamScheduleService($this->mockDb, $mockRepository);
 
         $service->getProcessedSchedule(1, $season);
     }

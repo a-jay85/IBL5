@@ -10,59 +10,22 @@ use PHPUnit\Framework\TestCase;
 use League\League;
 use Tests\WideUnit\Mocks\TestDataFactory;
 use Tests\WideUnit\Mocks\MockDatabase;
-use Tests\WideUnit\Mocks\MockPreparedStatement;
 
 class LeagueStartersServiceTest extends TestCase
 {
     private MockDatabase $mockDb;
-    private object $mockMysqliDb;
     private League $mockLeague;
 
     protected function setUp(): void
     {
         $this->mockDb = new MockDatabase();
-        $this->setupMockMysqliDb();
-        $this->mockLeague = new League($this->mockMysqliDb);
+        $GLOBALS['mysqli_db'] = $this->mockDb;
+        $this->mockLeague = new League($this->mockDb);
     }
 
     protected function tearDown(): void
     {
         unset($GLOBALS['mysqli_db']);
-    }
-
-    private function setupMockMysqliDb(): void
-    {
-        $mockDb = $this->mockDb;
-
-        $this->mockMysqliDb = new class ($mockDb) extends \mysqli {
-            private MockDatabase $mockDb;
-            public int $connect_errno = 0;
-            public ?string $connect_error = null;
-
-            public function __construct(MockDatabase $mockDb)
-            {
-                $this->mockDb = $mockDb;
-            }
-
-            #[\ReturnTypeWillChange]
-            public function prepare(string $query): MockPreparedStatement|false
-            {
-                return new MockPreparedStatement($this->mockDb, $query);
-            }
-
-            #[\ReturnTypeWillChange]
-            public function query(string $query, int $resultMode = MYSQLI_STORE_RESULT): \mysqli_result|bool
-            {
-                return false;
-            }
-
-            public function real_escape_string(string $string): string
-            {
-                return addslashes($string);
-            }
-        };
-
-        $GLOBALS['mysqli_db'] = $this->mockMysqliDb;
     }
 
     // ============================================
@@ -71,14 +34,14 @@ class LeagueStartersServiceTest extends TestCase
 
     public function testServiceCanBeInstantiated(): void
     {
-        $service = new LeagueStartersService($this->mockMysqliDb, $this->mockLeague);
+        $service = new LeagueStartersService($this->mockDb, $this->mockLeague);
 
         $this->assertInstanceOf(LeagueStartersService::class, $service);
     }
 
     public function testServiceImplementsCorrectInterface(): void
     {
-        $service = new LeagueStartersService($this->mockMysqliDb, $this->mockLeague);
+        $service = new LeagueStartersService($this->mockDb, $this->mockLeague);
 
         $this->assertInstanceOf(
             \LeagueStarters\Contracts\LeagueStartersServiceInterface::class,
@@ -92,7 +55,7 @@ class LeagueStartersServiceTest extends TestCase
 
     public function testGetAllStartersByPositionReturnsEmptyPositionsWhenNoTeams(): void
     {
-        $service = new LeagueStartersService($this->mockMysqliDb, $this->mockLeague);
+        $service = new LeagueStartersService($this->mockDb, $this->mockLeague);
 
         $result = $service->getAllStartersByPosition();
 
@@ -106,7 +69,7 @@ class LeagueStartersServiceTest extends TestCase
 
     public function testGetAllStartersByPositionReturnsEmptyArraysForEachPosition(): void
     {
-        $service = new LeagueStartersService($this->mockMysqliDb, $this->mockLeague);
+        $service = new LeagueStartersService($this->mockDb, $this->mockLeague);
 
         $result = $service->getAllStartersByPosition();
 
@@ -136,7 +99,7 @@ class LeagueStartersServiceTest extends TestCase
             $this->makeTeamRow(1, 'Test Team', 'Test City'),
         ]);
 
-        $service = new LeagueStartersService($this->mockMysqliDb, $this->mockLeague, $mockRepo);
+        $service = new LeagueStartersService($this->mockDb, $this->mockLeague, $mockRepo);
         $result = $service->getAllStartersByPosition();
 
         $this->assertCount(1, $result['PG']);
@@ -164,7 +127,7 @@ class LeagueStartersServiceTest extends TestCase
             $this->makeTeamRow(1, 'Test Team', 'Test City'),
         ]);
 
-        $service = new LeagueStartersService($this->mockMysqliDb, $this->mockLeague, $mockRepo);
+        $service = new LeagueStartersService($this->mockDb, $this->mockLeague, $mockRepo);
         $result = $service->getAllStartersByPosition();
 
         $this->assertSame(101, $result['PG'][0]->getPlayerID());
@@ -186,7 +149,7 @@ class LeagueStartersServiceTest extends TestCase
             $this->makeTeamRow(1, 'Test Team', 'Test City'),
         ]);
 
-        $service = new LeagueStartersService($this->mockMysqliDb, $this->mockLeague, $mockRepo);
+        $service = new LeagueStartersService($this->mockDb, $this->mockLeague, $mockRepo);
         $result = $service->getAllStartersByPosition();
 
         $pgPlayer = $result['PG'][0];
@@ -208,7 +171,7 @@ class LeagueStartersServiceTest extends TestCase
             $this->makeTeamRow(2, 'Team B', 'City B'),
         ]);
 
-        $service = new LeagueStartersService($this->mockMysqliDb, $this->mockLeague, $mockRepo);
+        $service = new LeagueStartersService($this->mockDb, $this->mockLeague, $mockRepo);
         $result = $service->getAllStartersByPosition();
 
         $this->assertCount(2, $result['PG']);
@@ -225,8 +188,8 @@ class LeagueStartersServiceTest extends TestCase
 
     public function testMultipleServicesCanBeInstantiated(): void
     {
-        $service1 = new LeagueStartersService($this->mockMysqliDb, $this->mockLeague);
-        $service2 = new LeagueStartersService($this->mockMysqliDb, $this->mockLeague);
+        $service1 = new LeagueStartersService($this->mockDb, $this->mockLeague);
+        $service2 = new LeagueStartersService($this->mockDb, $this->mockLeague);
 
         $this->assertNotSame($service1, $service2);
     }

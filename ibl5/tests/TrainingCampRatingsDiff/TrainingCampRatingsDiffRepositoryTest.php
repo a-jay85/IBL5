@@ -8,22 +8,19 @@ use PHPUnit\Framework\TestCase;
 use TrainingCampRatingsDiff\Contracts\TrainingCampRatingsDiffRepositoryInterface;
 use TrainingCampRatingsDiff\TrainingCampRatingsDiffRepository;
 use Tests\WideUnit\Mocks\MockDatabase;
-use Tests\WideUnit\Mocks\MockPreparedStatement;
 
 class TrainingCampRatingsDiffRepositoryTest extends TestCase
 {
     private MockDatabase $mockDb;
-    private \mysqli $mockMysqliDb;
 
     protected function setUp(): void
     {
         $this->mockDb = new MockDatabase();
-        $this->mockMysqliDb = $this->buildMockMysqliDb($this->mockDb);
     }
 
     public function testImplementsInterface(): void
     {
-        $repository = new TrainingCampRatingsDiffRepository($this->mockMysqliDb);
+        $repository = new TrainingCampRatingsDiffRepository($this->mockDb);
 
         self::assertInstanceOf(TrainingCampRatingsDiffRepositoryInterface::class, $repository);
     }
@@ -31,7 +28,7 @@ class TrainingCampRatingsDiffRepositoryTest extends TestCase
     public function testGetLatestEndOfSeasonYearReturnsNullWhenNoSnapshotsExist(): void
     {
         $this->mockDb->onQuery('MAX\(season_year\)', [['y' => null]]);
-        $repository = new TrainingCampRatingsDiffRepository($this->mockMysqliDb);
+        $repository = new TrainingCampRatingsDiffRepository($this->mockDb);
 
         $result = $repository->getLatestEndOfSeasonYear();
 
@@ -41,7 +38,7 @@ class TrainingCampRatingsDiffRepositoryTest extends TestCase
     public function testGetLatestEndOfSeasonYearReturnsMaxYearFromSnapshots(): void
     {
         $this->mockDb->onQuery('MAX\(season_year\)', [['y' => 2025]]);
-        $repository = new TrainingCampRatingsDiffRepository($this->mockMysqliDb);
+        $repository = new TrainingCampRatingsDiffRepository($this->mockDb);
 
         $result = $repository->getLatestEndOfSeasonYear();
 
@@ -52,7 +49,7 @@ class TrainingCampRatingsDiffRepositoryTest extends TestCase
     {
         // MariaDB typically returns ints natively, but older drivers may yield strings
         $this->mockDb->onQuery('MAX\(season_year\)', [['y' => '2024']]);
-        $repository = new TrainingCampRatingsDiffRepository($this->mockMysqliDb);
+        $repository = new TrainingCampRatingsDiffRepository($this->mockDb);
 
         $result = $repository->getLatestEndOfSeasonYear();
 
@@ -62,7 +59,7 @@ class TrainingCampRatingsDiffRepositoryTest extends TestCase
     public function testGetDiffRowsQueriesLiveAndSnapshotTables(): void
     {
         $this->mockDb->setMockData([]);
-        $repository = new TrainingCampRatingsDiffRepository($this->mockMysqliDb);
+        $repository = new TrainingCampRatingsDiffRepository($this->mockDb);
 
         $repository->getDiffRows(2024);
 
@@ -78,7 +75,7 @@ class TrainingCampRatingsDiffRepositoryTest extends TestCase
     public function testGetDiffRowsAppliesFilterTidWhenSet(): void
     {
         $this->mockDb->setMockData([]);
-        $repository = new TrainingCampRatingsDiffRepository($this->mockMysqliDb);
+        $repository = new TrainingCampRatingsDiffRepository($this->mockDb);
 
         $repository->getDiffRows(2024, 7);
 
@@ -93,31 +90,11 @@ class TrainingCampRatingsDiffRepositoryTest extends TestCase
     {
         $row = ['pid' => 1, 'name' => 'Test Player', 'pos' => 'PG', 'teamid' => 5];
         $this->mockDb->setMockData([$row]);
-        $repository = new TrainingCampRatingsDiffRepository($this->mockMysqliDb);
+        $repository = new TrainingCampRatingsDiffRepository($this->mockDb);
 
         $result = $repository->getDiffRows(2024);
 
         self::assertCount(1, $result);
         self::assertSame('Test Player', $result[0]['name']);
-    }
-
-    private function buildMockMysqliDb(MockDatabase $mockDb): \mysqli
-    {
-        return new class($mockDb) extends \mysqli {
-            private MockDatabase $mockDb;
-            public int $connect_errno = 0;
-            public ?string $connect_error = null;
-
-            public function __construct(MockDatabase $mockDb)
-            {
-                $this->mockDb = $mockDb;
-            }
-
-            #[\ReturnTypeWillChange]
-            public function prepare(string $query): MockPreparedStatement|false
-            {
-                return new MockPreparedStatement($this->mockDb, $query);
-            }
-        };
     }
 }

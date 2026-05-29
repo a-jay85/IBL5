@@ -9,8 +9,6 @@ use Draft\DraftSelectionHandler;
 use Repositories\Contracts\TeamIdentityRepositoryInterface;
 use Season\Season;
 use Tests\WideUnit\Mocks\MockDatabase;
-use Tests\WideUnit\Mocks\MockDatabaseResult;
-use Tests\WideUnit\Mocks\MockPreparedStatement;
 
 /**
  * DraftSelectionHandlerTest - Tests for draft pick selection handling
@@ -23,60 +21,19 @@ use Tests\WideUnit\Mocks\MockPreparedStatement;
 class DraftSelectionHandlerTest extends TestCase
 {
     private MockDatabase $mockDb;
-    private object $mockMysqliDb;
     private TeamIdentityRepositoryInterface $mockCommonRepository;
     private Season $mockSeason;
 
     protected function setUp(): void
     {
         $this->mockDb = new MockDatabase();
-        $this->setupMockMysqliDb();
+        $GLOBALS['mysqli_db'] = $this->mockDb;
         $this->setupMockDependencies();
     }
 
     protected function tearDown(): void
     {
         unset($GLOBALS['mysqli_db']);
-    }
-
-    private function setupMockMysqliDb(): void
-    {
-        $mockDb = $this->mockDb;
-        
-        $this->mockMysqliDb = new class($mockDb) extends \mysqli {
-            private MockDatabase $mockDb;
-            public int $connect_errno = 0;
-            public ?string $connect_error = null;
-
-            public function __construct(MockDatabase $mockDb)
-            {
-                // Don't call parent::__construct() to avoid real DB connection
-                $this->mockDb = $mockDb;
-            }
-
-            #[\ReturnTypeWillChange]
-            public function prepare(string $query): MockPreparedStatement|false
-            {
-                return new MockPreparedStatement($this->mockDb, $query);
-            }
-
-            #[\ReturnTypeWillChange]
-            public function query(string $query, int $resultMode = MYSQLI_STORE_RESULT): \mysqli_result|bool
-            {
-                $result = $this->mockDb->sql_query($query);
-                if ($result instanceof MockDatabaseResult) {
-                    return false;
-                }
-                return (bool) $result;
-            }
-
-            public function real_escape_string(string $string): string
-            {
-                return addslashes($string);
-            }
-        };
-        
-        $GLOBALS['mysqli_db'] = $this->mockMysqliDb;
     }
 
     private function setupMockDependencies(): void
@@ -102,7 +59,7 @@ class DraftSelectionHandlerTest extends TestCase
             $this->mockCommonRepository,
             $this->mockSeason
         );
-        
+
         $this->assertInstanceOf(DraftSelectionHandler::class, $handler);
     }
 
@@ -113,7 +70,7 @@ class DraftSelectionHandlerTest extends TestCase
             $this->mockCommonRepository,
             $this->mockSeason
         );
-        
+
         $this->assertInstanceOf(
             \Draft\Contracts\DraftSelectionHandlerInterface::class,
             $handler
@@ -133,7 +90,7 @@ class DraftSelectionHandlerTest extends TestCase
         );
 
         $result = $handler->handleDraftSelection('Test Team', null, 1, 1);
-        
+
         $this->assertIsString($result);
         // Should return validation error message containing "didn't select"
         $this->assertStringContainsString('select a player', $result);
@@ -148,7 +105,7 @@ class DraftSelectionHandlerTest extends TestCase
         );
 
         $result = $handler->handleDraftSelection('Test Team', '', 1, 1);
-        
+
         $this->assertIsString($result);
     }
 
@@ -168,7 +125,7 @@ class DraftSelectionHandlerTest extends TestCase
             $this->mockCommonRepository,
             $this->mockSeason
         );
-        
+
         $this->assertInstanceOf(DraftSelectionHandler::class, $handler1);
         $this->assertInstanceOf(DraftSelectionHandler::class, $handler2);
         $this->assertNotSame($handler1, $handler2);

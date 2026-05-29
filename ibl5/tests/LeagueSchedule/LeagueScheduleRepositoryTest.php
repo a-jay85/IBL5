@@ -8,44 +8,19 @@ use LeagueSchedule\LeagueScheduleRepository;
 use LeagueSchedule\Contracts\LeagueScheduleRepositoryInterface;
 use PHPUnit\Framework\TestCase;
 use Tests\WideUnit\Mocks\MockDatabase;
-use Tests\WideUnit\Mocks\MockPreparedStatement;
 
 class LeagueScheduleRepositoryTest extends TestCase
 {
     private MockDatabase $mockDb;
-    private object $mockMysqliDb;
 
     protected function setUp(): void
     {
         $this->mockDb = new MockDatabase();
-        $this->setupMockMysqliDb();
-    }
-
-    private function setupMockMysqliDb(): void
-    {
-        $mockDb = $this->mockDb;
-
-        $this->mockMysqliDb = new class($mockDb) extends \mysqli {
-            private MockDatabase $mockDb;
-            public int $connect_errno = 0;
-            public ?string $connect_error = null;
-
-            public function __construct(MockDatabase $mockDb)
-            {
-                $this->mockDb = $mockDb;
-            }
-
-            #[\ReturnTypeWillChange]
-            public function prepare(string $query): MockPreparedStatement|false
-            {
-                return new MockPreparedStatement($this->mockDb, $query);
-            }
-        };
     }
 
     public function testImplementsInterface(): void
     {
-        $repository = new LeagueScheduleRepository($this->mockMysqliDb);
+        $repository = new LeagueScheduleRepository($this->mockDb);
 
         $this->assertInstanceOf(LeagueScheduleRepositoryInterface::class, $repository);
     }
@@ -53,7 +28,7 @@ class LeagueScheduleRepositoryTest extends TestCase
     public function testGetAllGamesWithBoxScoreInfoReturnsEmptyArrayWhenNoGames(): void
     {
         $this->mockDb->setMockData([]);
-        $repository = new LeagueScheduleRepository($this->mockMysqliDb);
+        $repository = new LeagueScheduleRepository($this->mockDb);
 
         $result = $repository->getAllGamesWithBoxScoreInfo(2026);
 
@@ -74,7 +49,7 @@ class LeagueScheduleRepositoryTest extends TestCase
                 'game_of_that_day' => 1,
             ],
         ]);
-        $repository = new LeagueScheduleRepository($this->mockMysqliDb);
+        $repository = new LeagueScheduleRepository($this->mockDb);
 
         $result = $repository->getAllGamesWithBoxScoreInfo(2026);
 
@@ -98,7 +73,7 @@ class LeagueScheduleRepositoryTest extends TestCase
                 'game_of_that_day' => null,
             ],
         ]);
-        $repository = new LeagueScheduleRepository($this->mockMysqliDb);
+        $repository = new LeagueScheduleRepository($this->mockDb);
 
         $result = $repository->getAllGamesWithBoxScoreInfo(2026);
 
@@ -108,7 +83,7 @@ class LeagueScheduleRepositoryTest extends TestCase
     public function testGetTeamRecordsReturnsEmptyArrayWhenNoTeams(): void
     {
         $this->mockDb->setMockData([]);
-        $repository = new LeagueScheduleRepository($this->mockMysqliDb);
+        $repository = new LeagueScheduleRepository($this->mockDb);
 
         $result = $repository->getTeamRecords();
 
@@ -121,7 +96,7 @@ class LeagueScheduleRepositoryTest extends TestCase
             ['teamid' => 1, 'league_record' => '25-10'],
             ['teamid' => 2, 'league_record' => '20-15'],
         ]);
-        $repository = new LeagueScheduleRepository($this->mockMysqliDb);
+        $repository = new LeagueScheduleRepository($this->mockDb);
 
         $result = $repository->getTeamRecords();
 

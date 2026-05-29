@@ -7,7 +7,6 @@ namespace Tests;
 use PHPUnit\Framework\TestCase;
 use League\League;
 use Tests\WideUnit\Mocks\MockDatabase;
-use Tests\WideUnit\Mocks\MockPreparedStatement;
 
 /**
  * LeagueTest - Tests for League class constants and utility methods
@@ -15,52 +14,16 @@ use Tests\WideUnit\Mocks\MockPreparedStatement;
 class LeagueTest extends TestCase
 {
     private MockDatabase $mockDb;
-    private object $mockMysqliDb;
 
     protected function setUp(): void
     {
         $this->mockDb = new MockDatabase();
-        $this->setupMockMysqliDb();
+        $GLOBALS['mysqli_db'] = $this->mockDb;
     }
 
     protected function tearDown(): void
     {
         unset($GLOBALS['mysqli_db']);
-    }
-
-    private function setupMockMysqliDb(): void
-    {
-        $mockDb = $this->mockDb;
-        
-        $this->mockMysqliDb = new class($mockDb) extends \mysqli {
-            private MockDatabase $mockDb;
-            public int $connect_errno = 0;
-            public ?string $connect_error = null;
-
-            public function __construct(MockDatabase $mockDb)
-            {
-                $this->mockDb = $mockDb;
-            }
-
-            #[\ReturnTypeWillChange]
-            public function prepare(string $query): MockPreparedStatement|false
-            {
-                return new MockPreparedStatement($this->mockDb, $query);
-            }
-
-            #[\ReturnTypeWillChange]
-            public function query(string $query, int $resultMode = MYSQLI_STORE_RESULT): \mysqli_result|bool
-            {
-                return false;
-            }
-
-            public function real_escape_string(string $string): string
-            {
-                return addslashes($string);
-            }
-        };
-        
-        $GLOBALS['mysqli_db'] = $this->mockMysqliDb;
     }
 
     // ============================================
@@ -69,14 +32,14 @@ class LeagueTest extends TestCase
 
     public function testLeagueCanBeInstantiated(): void
     {
-        $league = new League($this->mockMysqliDb);
+        $league = new League($this->mockDb);
         
         $this->assertInstanceOf(League::class, $league);
     }
 
     public function testLeagueExtendsBaseMysqliRepository(): void
     {
-        $league = new League($this->mockMysqliDb);
+        $league = new League($this->mockDb);
         
         $this->assertInstanceOf(\BaseMysqliRepository::class, $league);
     }
@@ -162,7 +125,7 @@ class LeagueTest extends TestCase
 
     public function testFormatTidsForSqlQueryFormatsCorrectly(): void
     {
-        $league = new League($this->mockMysqliDb);
+        $league = new League($this->mockDb);
         
         $result = $league->formatTidsForSqlQuery([1, 2, 3]);
         
@@ -171,7 +134,7 @@ class LeagueTest extends TestCase
 
     public function testFormatTidsForSqlQueryHandlesSingleTeam(): void
     {
-        $league = new League($this->mockMysqliDb);
+        $league = new League($this->mockDb);
         
         $result = $league->formatTidsForSqlQuery([5]);
         
@@ -180,7 +143,7 @@ class LeagueTest extends TestCase
 
     public function testFormatTidsForSqlQueryHandlesEmptyArray(): void
     {
-        $league = new League($this->mockMysqliDb);
+        $league = new League($this->mockDb);
         
         $result = $league->formatTidsForSqlQuery([]);
         
@@ -210,8 +173,8 @@ class LeagueTest extends TestCase
 
     public function testMultipleLeagueInstancesCanBeCreated(): void
     {
-        $league1 = new League($this->mockMysqliDb);
-        $league2 = new League($this->mockMysqliDb);
+        $league1 = new League($this->mockDb);
+        $league2 = new League($this->mockDb);
         
         $this->assertNotSame($league1, $league2);
     }

@@ -8,15 +8,28 @@ namespace Tests\WideUnit\Mocks;
  * Mock database class for testing
  * Provides a mock implementation of database operations without requiring actual database connections
  * Extends mysqli to satisfy type hints in modern code while supporting legacy sql_* methods
+ *
+ * This is the single canonical mysqli mock: tests pass a MockDatabase instance
+ * directly anywhere a `\mysqli` connection is type-hinted (e.g. BaseMysqliRepository
+ * subclasses). The no-argument parent constructor allocates an unconnected mysqli
+ * shell — connect_errno is 0 and connect_error is null, so connection guards pass —
+ * while every method a SUT actually calls (prepare/query/real_escape_string/the
+ * sql_* helpers/transactions) is overridden to route through in-memory mock data.
  */
 class MockDatabase extends \mysqli
 {
     /**
-     * Override constructor to prevent actual database connection
+     * Allocate an unconnected mysqli shell.
+     *
+     * Calling parent::__construct() with no arguments does NOT open a connection
+     * (verified on PHP 8.x): connect_errno stays 0 and connect_error stays null,
+     * so BaseMysqliRepository's connection guard accepts a MockDatabase passed
+     * directly. The real connection is never used because every consumed method
+     * is overridden below.
      */
     public function __construct()
     {
-        // Don't call parent constructor - we're a mock that doesn't need a real connection
+        parent::__construct();
     }
 
     private array $mockData = [];
@@ -63,6 +76,43 @@ class MockDatabase extends \mysqli
     public function clearQueryPatterns(): void
     {
         $this->queryPatterns = [];
+    }
+
+    /**
+     * mysqli-style query() entry point.
+     *
+     * Routes through sql_query() for tracking and mock-data resolution. Returns a
+     * narrowed bool (covariant with mysqli::query()'s mysqli_result|bool): write
+     * statements return their success bool, while SELECT-style queries that would
+     * yield a result set return false — matching the historical inline-mock
+     * behavior that callers of this mock already relied on (no consumer reads a
+     * mysqli_result back from query() on the mock).
+     */
+    public function query(string $query, int $resultMode = MYSQLI_STORE_RESULT): bool
+    {
+        // Transaction-introspection/control statements are connection machinery,
+        // not SQL the SUT meaningfully issued, so they stay OUT of the recorded
+        // query log (mirroring how begin_transaction()/commit()/rollback() record
+        // only into operationLog). BaseMysqliRepository::isInTransaction() probes
+        // with "SELECT @@in_transaction": returning a non-result bool makes it
+        // correctly treat the mock as not-in-transaction, and skipping the record
+        // keeps getExecutedQueries() limited to the repository's real statements.
+        if (stripos($query, '@@in_transaction') !== false
+            || stripos($query, 'ROLLBACK TO SAVEPOINT') === 0) {
+            return false;
+        }
+
+        $result = $this->sql_query($query);
+        return !($result instanceof MockDatabaseResult) && (bool) $result;
+    }
+
+    /**
+     * Mock close() — no real connection to release.
+     */
+    public function close(): bool
+    {
+        // Mock close - nothing to release.
+        return true;
     }
 
     public function sql_query(string $query): bool|object
@@ -390,7 +440,17 @@ class MockDatabase extends \mysqli
 
     /**
      * Mock prepared statement support
-     * Returns a MockPreparedStatement that supports bind_param and execute
+     * Returns a MockPreparedStatement that supports bind_param and execute.
+     *
+     * The return type cannot be made covariant with mysqli::prepare()'s
+     * mysqli_stmt|false: MockPreparedStatement cannot extend mysqli_stmt because
+     * mysqli_stmt::get_result() returns mysqli_result|false and mysqli_result
+     * declares read-only properties (num_rows, field_count, …) that a mock must
+     * write, so it cannot be subclassed. The ReturnTypeWillChange attribute
+     * suppresses the runtime LSP deprecation; the ignore below is its
+     * static-analysis twin.
+     *
+     * @phpstan-ignore method.childReturnType
      */
     #[\ReturnTypeWillChange]
     public function prepare(string $query): MockPreparedStatement

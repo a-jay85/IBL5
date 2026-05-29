@@ -14,7 +14,7 @@ use PlayerDatabase\PlayerDatabaseRepository;
  */
 final class PlayerDatabaseRepositoryTest extends TestCase
 {
-    /** @var mysqli&\PHPUnit\Framework\MockObject\MockObject */
+    /** @var \mysqli&\PHPUnit\Framework\MockObject\MockObject */
     private $mockDb;
     private PlayerDatabaseRepository $repository;
 

@@ -71,11 +71,11 @@ class NewsModuleIntegrationTest extends TestCase
     {
         return new class($games) implements LastSimRecapRepositoryInterface {
             public function __construct(private array $games) {}
-            public function getLastSimWindow(): ?array {
+            public function getLastSimWindow(): array {
                 return ['sim' => 1, 'startDate' => '2026-05-01', 'endDate' => '2026-05-13'];
             }
             public function getGamesForTeamInWindow(int $tid, string $startDate, string $endDate): array { return $this->games; }
-            public function getTeamBoxscoreLines(int $visitor, int $home, string $date): ?array {
+            public function getTeamBoxscoreLines(int $visitor, int $home, string $date): array {
                 return [
                     'visQ' => [25, 25, 25, 25], 'homeQ' => [30, 30, 30, 27],
                     'visOT' => 0, 'homeOT' => 0,

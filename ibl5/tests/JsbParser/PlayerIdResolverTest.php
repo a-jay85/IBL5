@@ -7,8 +7,6 @@ namespace Tests\JsbParser;
 use JsbParser\PlayerIdResolver;
 use PHPUnit\Framework\TestCase;
 use Tests\WideUnit\Mocks\MockDatabase;
-use Tests\WideUnit\Mocks\MockDatabaseResult;
-use Tests\WideUnit\Mocks\MockPreparedStatement;
 
 /**
  * Tests for PlayerIdResolver's multi-strategy fallback chain and caching.
@@ -22,56 +20,16 @@ use Tests\WideUnit\Mocks\MockPreparedStatement;
 class PlayerIdResolverTest extends TestCase
 {
     private MockDatabase $mockDb;
-    private object $mockMysqliDb;
 
     protected function setUp(): void
     {
         $this->mockDb = new MockDatabase();
-        $this->setupMockMysqliDb();
+        $GLOBALS['mysqli_db'] = $this->mockDb;
     }
 
     protected function tearDown(): void
     {
         unset($GLOBALS['mysqli_db']);
-    }
-
-    private function setupMockMysqliDb(): void
-    {
-        $mockDb = $this->mockDb;
-
-        $this->mockMysqliDb = new class ($mockDb) extends \mysqli {
-            private MockDatabase $mockDb;
-            public int $connect_errno = 0;
-            public ?string $connect_error = null;
-
-            public function __construct(MockDatabase $mockDb)
-            {
-                $this->mockDb = $mockDb;
-            }
-
-            #[\ReturnTypeWillChange]
-            public function prepare(string $query): MockPreparedStatement|false
-            {
-                return new MockPreparedStatement($this->mockDb, $query);
-            }
-
-            #[\ReturnTypeWillChange]
-            public function query(string $query, int $resultMode = MYSQLI_STORE_RESULT): \mysqli_result|bool
-            {
-                $result = $this->mockDb->sql_query($query);
-                if ($result instanceof MockDatabaseResult) {
-                    return false;
-                }
-                return (bool) $result;
-            }
-
-            public function real_escape_string(string $string): string
-            {
-                return addslashes($string);
-            }
-        };
-
-        $GLOBALS['mysqli_db'] = $this->mockMysqliDb;
     }
 
     // ============================================
@@ -82,7 +40,7 @@ class PlayerIdResolverTest extends TestCase
     {
         $this->mockDb->onQuery('SELECT pid FROM ibl_plr_snapshots WHERE name.*AND teamid.*AND season_year', [['pid' => 42]]);
 
-        $resolver = new PlayerIdResolver($this->mockMysqliDb);
+        $resolver = new PlayerIdResolver($this->mockDb);
         $result = $resolver->resolve('John Smith', 'Miami', 2025, 5);
 
         $this->assertSame(42, $result);
@@ -98,7 +56,7 @@ class PlayerIdResolverTest extends TestCase
         $this->mockDb->onQuery('SELECT pid FROM ibl_plr_snapshots WHERE name.*AND teamid.*AND season_year', []);
         $this->mockDb->onQuery('SELECT pid FROM ibl_plr WHERE name.*AND teamid', [['pid' => 77]]);
 
-        $resolver = new PlayerIdResolver($this->mockMysqliDb);
+        $resolver = new PlayerIdResolver($this->mockDb);
         $result = $resolver->resolve('Jane Doe', 'Chicago', 2025, 3);
 
         $this->assertSame(77, $result);
@@ -115,7 +73,7 @@ class PlayerIdResolverTest extends TestCase
         $this->mockDb->onQuery('SELECT pid FROM ibl_plr WHERE name.*AND teamid', []);
         $this->mockDb->onQuery('SELECT pid FROM ibl_plr_snapshots WHERE name.*AND season_year.*LIMIT', [['pid' => 99]]);
 
-        $resolver = new PlayerIdResolver($this->mockMysqliDb);
+        $resolver = new PlayerIdResolver($this->mockDb);
         $result = $resolver->resolve('Traded Player', 'OldTeam', 2025, 7);
 
         $this->assertSame(99, $result);
@@ -133,7 +91,7 @@ class PlayerIdResolverTest extends TestCase
         $this->mockDb->onQuery('SELECT pid FROM ibl_plr_snapshots WHERE name.*AND season_year.*LIMIT', []);
         $this->mockDb->onQuery('SELECT pid FROM ibl_plr WHERE name.*LIMIT', [['pid' => 101]]);
 
-        $resolver = new PlayerIdResolver($this->mockMysqliDb);
+        $resolver = new PlayerIdResolver($this->mockDb);
         $result = $resolver->resolve('Unknown Team Guy', 'NoTeam', 2025, 10);
 
         $this->assertSame(101, $result);
@@ -150,7 +108,7 @@ class PlayerIdResolverTest extends TestCase
         // If strategy 2 were reached, it would return a different pid
         $this->mockDb->onQuery('SELECT pid FROM ibl_plr WHERE name.*AND teamid', [['pid' => 999]]);
 
-        $resolver = new PlayerIdResolver($this->mockMysqliDb);
+        $resolver = new PlayerIdResolver($this->mockDb);
         $result = $resolver->resolve('Matched Early', 'TeamA', 2025, 1);
 
         $this->assertSame(1, $result);
@@ -168,7 +126,7 @@ class PlayerIdResolverTest extends TestCase
         $this->mockDb->onQuery('SELECT pid FROM ibl_plr_snapshots WHERE name.*AND season_year.*LIMIT', []);
         $this->mockDb->onQuery('SELECT pid FROM ibl_plr WHERE name.*LIMIT', []);
 
-        $resolver = new PlayerIdResolver($this->mockMysqliDb);
+        $resolver = new PlayerIdResolver($this->mockDb);
         $result = $resolver->resolve('Nobody', 'Nowhere', 2025, 99);
 
         $this->assertNull($result);
@@ -182,7 +140,7 @@ class PlayerIdResolverTest extends TestCase
     {
         $this->mockDb->onQuery('SELECT pid FROM ibl_plr_snapshots WHERE name.*AND teamid.*AND season_year', [['pid' => 50]]);
 
-        $resolver = new PlayerIdResolver($this->mockMysqliDb);
+        $resolver = new PlayerIdResolver($this->mockDb);
 
         // First call resolves via strategy 1
         $first = $resolver->resolve('Cached Player', 'TeamX', 2025, 1);
@@ -204,7 +162,7 @@ class PlayerIdResolverTest extends TestCase
         $this->mockDb->onQuery('SELECT pid FROM ibl_plr_snapshots WHERE name.*AND season_year.*LIMIT', []);
         $this->mockDb->onQuery('SELECT pid FROM ibl_plr WHERE name.*LIMIT', []);
 
-        $resolver = new PlayerIdResolver($this->mockMysqliDb);
+        $resolver = new PlayerIdResolver($this->mockDb);
 
         $first = $resolver->resolve('Ghost', 'Nowhere', 2025, 99);
         $this->assertNull($first);
@@ -221,7 +179,7 @@ class PlayerIdResolverTest extends TestCase
     {
         $this->mockDb->onQuery('SELECT pid FROM ibl_plr_snapshots WHERE name.*AND teamid.*AND season_year', [['pid' => 10]]);
 
-        $resolver = new PlayerIdResolver($this->mockMysqliDb);
+        $resolver = new PlayerIdResolver($this->mockDb);
 
         $first = $resolver->resolve('Clearing', 'TeamY', 2025, 2);
         $this->assertSame(10, $first);

@@ -6,8 +6,6 @@ namespace Tests\WideUnit;
 
 use PHPUnit\Framework\TestCase;
 use Tests\WideUnit\Mocks\MockDatabase;
-use Tests\WideUnit\Mocks\MockDatabaseResult;
-use Tests\WideUnit\Mocks\MockPreparedStatement;
 
 /**
  * Base class for wide-unit tests (multi-class workflows using MockDatabase).
@@ -61,44 +59,16 @@ abstract class WideUnitTestCase extends TestCase
     }
 
     /**
-     * Inject mock database into global $mysqli_db for classes that use it
+     * Inject mock database into global $mysqli_db for classes that use it.
+     *
+     * MockDatabase is itself a `\mysqli` subclass that routes prepare()/query()/
+     * real_escape_string() through the same in-memory mock data, so the global is
+     * the same instance as $this->mockDb — queries issued via the global are
+     * tracked identically to those issued through an injected repository.
      */
     protected function injectGlobalMockDb(): void
     {
-        $mockDb = $this->mockDb;
-        
-        $GLOBALS['mysqli_db'] = new class($mockDb) extends \mysqli {
-            private MockDatabase $mockDb;
-            public int $connect_errno = 0;
-            public ?string $connect_error = null;
-
-            public function __construct(MockDatabase $mockDb)
-            {
-                // Don't call parent::__construct() to avoid real DB connection
-                $this->mockDb = $mockDb;
-            }
-
-            #[\ReturnTypeWillChange]
-            public function prepare(string $query): MockPreparedStatement|false
-            {
-                return new MockPreparedStatement($this->mockDb, $query);
-            }
-
-            #[\ReturnTypeWillChange]
-            public function query(string $query, int $resultMode = MYSQLI_STORE_RESULT): \mysqli_result|bool
-            {
-                $result = $this->mockDb->sql_query($query);
-                if ($result instanceof MockDatabaseResult) {
-                    return false;
-                }
-                return (bool) $result;
-            }
-
-            public function real_escape_string(string $value): string
-            {
-                return addslashes($value);
-            }
-        };
+        $GLOBALS['mysqli_db'] = $this->mockDb;
     }
 
     /**

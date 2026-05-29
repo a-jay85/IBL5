@@ -11,8 +11,6 @@ use Negotiation\NegotiationValidator;
 use Negotiation\NegotiationDemandCalculator;
 use Repositories\Contracts\SalaryCapRepositoryInterface;
 use Tests\WideUnit\Mocks\MockDatabase;
-use Tests\WideUnit\Mocks\MockDatabaseResult;
-use Tests\WideUnit\Mocks\MockPreparedStatement;
 
 /**
  * NegotiationServiceTest - Tests for the negotiation workflow service
@@ -25,57 +23,16 @@ use Tests\WideUnit\Mocks\MockPreparedStatement;
 class NegotiationServiceTest extends TestCase
 {
     private MockDatabase $mockDb;
-    private \mysqli $mockMysqliDb;
 
     protected function setUp(): void
     {
         $this->mockDb = new MockDatabase();
-        $this->setupMockMysqliDb();
+        $GLOBALS['mysqli_db'] = $this->mockDb;
     }
 
     protected function tearDown(): void
     {
         unset($GLOBALS['mysqli_db']);
-    }
-
-    private function setupMockMysqliDb(): void
-    {
-        $mockDb = $this->mockDb;
-        
-        $this->mockMysqliDb = new class($mockDb) extends \mysqli {
-            private MockDatabase $mockDb;
-            public int $connect_errno = 0;
-            public ?string $connect_error = null;
-
-            public function __construct(MockDatabase $mockDb)
-            {
-                // Don't call parent::__construct() to avoid real DB connection
-                $this->mockDb = $mockDb;
-            }
-
-            #[\ReturnTypeWillChange]
-            public function prepare(string $query): MockPreparedStatement|false
-            {
-                return new MockPreparedStatement($this->mockDb, $query);
-            }
-
-            #[\ReturnTypeWillChange]
-            public function query(string $query, int $resultMode = MYSQLI_STORE_RESULT): \mysqli_result|bool
-            {
-                $result = $this->mockDb->sql_query($query);
-                if ($result instanceof MockDatabaseResult) {
-                    return false;
-                }
-                return (bool) $result;
-            }
-
-            public function real_escape_string(string $value): string
-            {
-                return addslashes($value);
-            }
-        };
-        
-        $GLOBALS['mysqli_db'] = $this->mockMysqliDb;
     }
 
     // ============================================
@@ -145,10 +102,10 @@ class NegotiationServiceTest extends TestCase
     {
         $commonRepo = $this->createStub(SalaryCapRepositoryInterface::class);
         return new NegotiationService(
-            $this->mockMysqliDb,
-            new NegotiationRepository($this->mockMysqliDb, $commonRepo),
-            new NegotiationValidator($this->mockMysqliDb, $season),
-            new NegotiationDemandCalculator($this->mockMysqliDb, $commonRepo),
+            $this->mockDb,
+            new NegotiationRepository($this->mockDb, $commonRepo),
+            new NegotiationValidator($this->mockDb, $season),
+            new NegotiationDemandCalculator($this->mockDb, $commonRepo),
         );
     }
 

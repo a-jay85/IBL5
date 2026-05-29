@@ -21,8 +21,8 @@ interface ExtensionOfferEvaluatorInterface
      * Players who value winning adjust their demands based on team performance.
      * Formula: 0.000153 * (wins - losses) * (player_winner - 1)
      * 
-     * @param array{wins: int, losses: int} $teamFactors Team performance data
-     * @param array{winner: int} $playerPreferences Player's "play for winner" preference (1-5 scale)
+     * @param array{wins: int, losses: int, tradition_wins: int, tradition_losses: int, money_committed_at_position: int} $teamFactors Team performance data
+     * @param array{winner: int, tradition: int, loyalty: int, playing_time: int} $playerPreferences Player's "play for winner" preference (1-5 scale)
      * @return float Modifier contribution (positive for winning teams with winner-preferring players)
      */
     public function calculateWinnerModifier(array $teamFactors, array $playerPreferences): float;
@@ -33,8 +33,8 @@ interface ExtensionOfferEvaluatorInterface
      * Players who value tradition adjust their demands based on franchise success.
      * Formula: 0.000153 * (tradition_wins - tradition_losses) * (player_tradition - 1)
      * 
-     * @param array{tradition_wins: int, tradition_losses: int} $teamFactors Franchise history data
-     * @param array{tradition: int} $playerPreferences Player's tradition preference (1-5 scale)
+     * @param array{wins: int, losses: int, tradition_wins: int, tradition_losses: int, money_committed_at_position: int} $teamFactors Franchise history data
+     * @param array{winner: int, tradition: int, loyalty: int, playing_time: int} $playerPreferences Player's tradition preference (1-5 scale)
      * @return float Modifier contribution
      */
     public function calculateTraditionModifier(array $teamFactors, array $playerPreferences): float;
@@ -45,7 +45,7 @@ interface ExtensionOfferEvaluatorInterface
      * Loyal players are more likely to accept hometown discounts.
      * Formula: 0.025 * (player_loyalty - 1)
      * 
-     * @param array{loyalty: int} $playerPreferences Player's loyalty rating (1-5 scale)
+     * @param array{winner: int, tradition: int, loyalty: int, playing_time: int} $playerPreferences Player's loyalty rating (1-5 scale)
      * @return float Modifier contribution (0 to 0.1 range)
      */
     public function calculateLoyaltyModifier(array $playerPreferences): float;
@@ -57,8 +57,8 @@ interface ExtensionOfferEvaluatorInterface
      * at their position (indicating more opportunity).
      * Formula: -0.0025 * (money_committed / 100) * (player_playingtime - 1)
      * 
-     * @param array{money_committed_at_position: int} $teamFactors Salary at player's position
-     * @param array{playing_time: int} $playerPreferences Player's playing time preference (1-5 scale)
+     * @param array{wins: int, losses: int, tradition_wins: int, tradition_losses: int, money_committed_at_position: int} $teamFactors Salary at player's position
+     * @param array{winner: int, tradition: int, loyalty: int, playing_time: int} $playerPreferences Player's playing time preference (1-5 scale)
      * @return float Modifier contribution
      */
     public function calculatePlayingTimeModifier(array $teamFactors, array $playerPreferences): float;

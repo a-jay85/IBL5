@@ -6,7 +6,7 @@ namespace Repositories\Contracts;
 
 /**
  * @phpstan-type UserRow array{user_id: int, username: string, user_email: string}
- * @phpstan-type TeamInfoRow array{teamid: int, team_city: string, team_name: string, color1: string, color2: string, arena: string, owner_name: string, owner_email: string, gm_username: ?string, discord_id: ?int, used_extension_this_chunk: int, used_extension_this_season: ?int, has_mle: int, has_lle: int, ...}
+ * @phpstan-type TeamInfoRow array{teamid: int, team_city: string, team_name: string, color1: string, color2: string, arena: string, owner_name: string, owner_email: string, gm_username: ?string, discord_id: ?int, used_extension_this_chunk: int, used_extension_this_season: ?int, has_mle: int, has_lle: int, ...<string, mixed>}
  */
 interface TeamIdentityRepositoryInterface
 {

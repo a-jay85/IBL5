@@ -1,5 +1,6 @@
 import { test, expect } from '../fixtures/auth';
 import { assertNoPhpErrors } from '../helpers/php-errors';
+import { resetExtension } from '../helpers/cleanup';
 
 // Contract Extension flow — requires authenticated user (Metros GM).
 // CI seed has extension-eligible player: pid=30 'Extension Vet' (cy=2, cyt=2 → final year).
@@ -14,13 +15,16 @@ test.describe('Contract Extension flow', () => {
     expect(body).toContain('Extension Vet');
   });
 
-  test('extension negotiate page renders form or eligibility message', async ({ appState, page }) => {
+  test('extension negotiate page renders form or eligibility message', async ({ appState, page, request }) => {
+    await resetExtension(request, 30);
     await appState({ 'Current Season Phase': 'Regular Season', 'Current Season Ending Year': '2026' });
     await page.goto('modules.php?name=Player&pa=negotiate&pid=30');
     await assertNoPhpErrors(page, 'on extension form');
 
-    // The negotiate page shows either the extension form (offerYear inputs)
-    // or a validation message (e.g., eligibility, ownership). Both are valid renders.
+    // The negotiate page renders either the extension form (offerYear inputs) or a
+    // validation message (eligibility/ownership). Both are valid renders — pid=30's
+    // exact eligibility depends on parallel-test contract state, so assert that the
+    // page produced a meaningful render rather than over-pinning the form. // e2e-hygiene-allow: form-or-message is the asserted contract here, not a silent fallback
     const formOrMessage = page.locator('input[name^="offerYear"], .ibl-alert, .ibl-card__title').first();
     await expect(formOrMessage).toBeVisible();
   });

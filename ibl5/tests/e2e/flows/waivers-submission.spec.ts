@@ -1,6 +1,7 @@
 import { test, expect } from '../fixtures/auth';
 import { assertNoPhpErrors } from '../helpers/php-errors';
 import { submitFormAndAssertEffect } from '../helpers/submit-form';
+import { resetWaiverPlayer } from '../helpers/cleanup';
 
 // Waivers submission flow — tests that actually submit waiver moves.
 // Serial: add/waive mutate roster state.
@@ -100,31 +101,96 @@ test.describe('Waivers: add player', () => {
 // ============================================================
 
 test.describe('Waivers: waive player', () => {
-  test('waive form renders with roster options', async ({
-    appState,
-    page,
-  }) => {
-    await appState({ 'Allow Waiver Moves': 'Yes' });
-    await page.goto('modules.php?name=Waivers');
+  test('submit waive: drop player to waivers', async ({ appState, page }) => {
+    await appState({
+      'Current Season Phase': 'Free Agency',
+      'Allow Waiver Moves': 'Yes',
+      'Current Season Ending Year': '2026',
+    });
+    await page.goto('modules.php?name=Waivers&action=waive');
 
-    // The page should have some form for waiving
-    // Verify roster info is visible
-    await expect(page.locator('.ibl-card').first()).toBeVisible();
-  });
+    const form = page.locator('form[name="Waiver_Move"]');
+    await expect(form).toBeVisible();
 
-  test('error banner shows on error result', async ({
-    appState,
-    page,
-  }) => {
-    await appState({ 'Allow Waiver Moves': 'Yes' });
+    const playerSelect = form.locator('select[name="Player_ID"]');
+    await playerSelect.selectOption('200000031');
 
-    // Navigate with an error param to verify error banner rendering
-    await page.goto(
-      'modules.php?name=Waivers&action=waive&error=Test+error+message',
+    const responsePromise = page.waitForResponse(
+      resp => resp.url().includes('modules.php') && resp.request().method() === 'POST',
     );
 
-    const errorBanner = page.locator('.ibl-alert--error');
-    await expect(errorBanner).toBeVisible();
+    // Strip onclick handler — it disables button + calls form.submit() which
+    // races with Playwright's navigation tracking
+    const submitBtn = form.locator('button[type="submit"], input[type="submit"]').first();
+    await submitBtn.evaluate(btn => (btn as HTMLElement).removeAttribute('onclick'));
+
+    await submitFormAndAssertEffect(page, {
+      submit: async () => {
+        await submitBtn.click();
+        const response = await responsePromise;
+        const postStatus = response.status();
+        const postBody = await response.text().catch(() => '');
+        await page.waitForLoadState('networkidle');
+        const url = page.url();
+        const bodySnippet = postBody.substring(0, 500).replace(/\s+/g, ' ').trim();
+        expect(url, `POST status=${postStatus} body=${bodySnippet}`).toContain('result=player_dropped');
+      },
+      expectSameSpot: async () => {
+        await expect(page.locator('.ibl-alert--success')).toBeVisible();
+        await expect(page.locator('.ibl-alert--success')).toContainText(
+          'Player successfully dropped to waivers.',
+        );
+        await assertNoPhpErrors(page, 'after waiver drop');
+      },
+      readBack: async () => {
+        // dropPlayerToWaivers sets ordinal=1000; getHealthyAndInjuredPlayersOrderedByName
+        // filters to ordinal <= WAIVERS_ORDINAL (960), so a waived player disappears
+        // from the waive-form select. This proves the drop persisted.
+        await page.goto('modules.php?name=Waivers&action=waive');
+        await expect(
+          page.locator('select[name="Player_ID"] option[value="200000031"]'),
+        ).toHaveCount(0);
+      },
+    });
+  });
+
+  test('submit waive rejection: invalid player returns error', async ({
+    appState,
+    page,
+  }) => {
+    await appState({
+      'Current Season Phase': 'Free Agency',
+      'Allow Waiver Moves': 'Yes',
+      'Current Season Ending Year': '2026',
+    });
+
+    // Read the CSRF token from the rendered waive form
+    await page.goto('modules.php?name=Waivers&action=waive');
+    const csrfToken = await page
+      .locator('form[name="Waiver_Move"] input[name="_csrf_token"]')
+      .inputValue();
+
+    // page.request shares the PHPSESSID with the page context, so the CSRF token obtained
+    // above is valid for this POST.
+    const response = await page.request.post('/ibl5/modules.php?name=Waivers', {
+      form: {
+        Action: 'waive',
+        Player_ID: '999999',
+        _csrf_token: csrfToken,
+      },
+      maxRedirects: 0,
+    });
+
+    const location = response.headers()['location'] ?? '';
+    expect(location, 'Expected error redirect').toContain('error=');
+    expect(location, 'Expected action=waive in redirect').toContain('action=waive');
+
+    await page.goto(location);
+    await expect(page.locator('.ibl-alert--error')).toBeVisible();
+  });
+
+  test.afterAll(async ({ request }) => {
+    await resetWaiverPlayer(request, 200000031);
   });
 });
 

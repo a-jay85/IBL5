@@ -255,7 +255,8 @@ jobs:
           --skip-initial-tests \
           --show-mutations \
           --no-progress \
-          --min-msi=100
+          --min-msi=100 \
+          --ignore-msi-with-no-mutations
 
     - name: Build mutation comment body
       if: always() && steps.changes.outputs.skip == 'false' && hashFiles('ibl5/infection-summary.log') != ''

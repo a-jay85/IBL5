@@ -1,6 +1,7 @@
 import { test, expect } from '../fixtures/auth';
 import { test as publicTest, expect as publicExpect } from '../fixtures/public';
 import { assertNoPhpErrors } from '../helpers/php-errors';
+import { offerForm } from '../helpers/free-agency';
 
 // Free Agency E2E tests — read-only rendering and validation.
 // Seed data provides 3 free agent players:
@@ -10,10 +11,7 @@ import { assertNoPhpErrors } from '../helpers/php-errors';
 // And 1 cash consideration (ibl_cash_considerations table):
 //   Cash from Trade on Metros (tid=1) → "Players Under Contract" (not FA tables)
 // Submission tests are in free-agency-submission.spec.ts.
-
-// Helper: scope form inputs to the visible custom offer form (not hidden quick-offer forms)
-const offerForm = (page: import('@playwright/test').Page) =>
-  page.locator('form[name="FAOffer"]').filter({ has: page.locator('input[type="number"]') });
+// The `offerForm` locator helper is shared via helpers/free-agency.ts.
 
 test.describe('Free Agency -- main page', () => {
   test.beforeEach(async ({ appState, page }) => {
@@ -163,28 +161,11 @@ test.describe('Free Agency -- negotiation page', () => {
   });
 });
 
-test.describe('Free Agency -- Bird Rights negotiation', () => {
-  test('Bird Rights player shows raise info in notes', async ({ appState, page }) => {
-    await appState({ 'Current Season Phase': 'Free Agency', 'Current Season Ending Year': '2026' });
-    // pid=10 has bird=4 (Bird Rights) in CI seed
-    await page.goto('modules.php?name=FreeAgency&pa=negotiate&pid=10');
-
-    const notesCard = page.locator('.ibl-card').filter({
-      has: page.locator('.ibl-card__title', { hasText: 'Notes / Reminders' }),
-    });
-    await expect(notesCard).toBeVisible();
-
-    const notesText = await notesCard.textContent() ?? '';
-    // pid=10 has Bird Rights: shows "Bird Rights Player on Your Team" + 12.5% raise
-    expect(notesText).toMatch(/\d+%/);
-  });
-});
-
-// NOTE: the "Free Agency -- validation errors" block moved to
-// free-agency-submission.spec.ts. Those tests submit offers for pid=11 and did a
-// table-wide clear-fa-offers, which raced against the submission spec's in-flight
-// offers under fullyParallel sharding. All ibl_fa_offers mutation now lives in
-// that one serial file. See its header for the full rationale.
+// NOTE: the "Bird Rights negotiation" and "validation errors" blocks moved to
+// free-agency-submission.spec.ts. They mutate ibl_fa_offers (seed/clear) which,
+// as a separate file, raced against the submission spec's in-flight offers under
+// fullyParallel sharding. All ibl_fa_offers mutation now lives in that one serial
+// file. See its header for the full rationale.
 
 test.describe('Free Agency -- wrong season phase', () => {
   test('page renders without PHP errors in non-FA phase', async ({ appState, page }) => {

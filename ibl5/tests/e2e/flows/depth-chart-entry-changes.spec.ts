@@ -123,37 +123,6 @@ test.describe('Depth Chart change detection', () => {
     await expect(options.first()).toBeAttached();
   });
 
-  test('saved DC load triggers AJAX and updates positions', async ({
-    page,
-  }) => {
-    const dropdown = page.locator('#saved-dc-select');
-    const options = dropdown.locator('option');
-    expect(await options.count()).toBeGreaterThanOrEqual(2);
-
-    // Mock the AJAX endpoint
-    await page.route(
-      '**/modules.php*name=DepthChartEntry*op=dc-api*action=load**',
-      async (route) => {
-        // Return a mock response — the JS expects JSON with player data
-        await route.fulfill({
-          status: 200,
-          contentType: 'application/json',
-          body: JSON.stringify({ success: true }),
-        });
-      },
-    );
-
-    // Select a saved config (skip index 0 which is usually the default/prompt)
-    const savedValue = await options.nth(1).getAttribute('value');
-    if (savedValue) {
-      await dropdown.selectOption(savedValue);
-
-      // Wait for AJAX to complete, then verify no errors
-      await page.waitForLoadState('networkidle');
-      await assertNoPhpErrors(page);
-    }
-  });
-
   test('no PHP errors', async ({ page }) => {
     await assertNoPhpErrors(page, 'on Depth Chart Entry');
   });

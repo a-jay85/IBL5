@@ -347,6 +347,67 @@ INSERT INTO ibl_plr (
    60, 30, 75,
    'a0000000-0000-0000-0000-000000200030');
 
+-- ============================================================
+-- Mutation-submission fixtures (waivers + rookie option)
+-- Synthetic high pids (200000031/032) mirror the 200000030 convention so they
+-- never collide with real dev-DB players (pids 1-42 are already load-bearing in
+-- this seed). The plan referenced pid=31/32 but those are taken (Flames Forward
+-- / Minutemen Guard), so these high pids are used instead.
+-- ============================================================
+
+-- pid=200000031 "Waive Target": Metros (tid=1) active player for the waive/drop
+-- submission test (waivers-submission.spec.ts). reset-waiver-player restores
+-- ordinal+droptime after a waive moves it to the waiver pool (ordinal='1000').
+INSERT INTO ibl_plr (
+  pid, name, age, peak, teamid, pos, ordinal,
+  stamina, oo, od, r_drive_off, dd, po, pd, r_trans_off, r_tvr,
+  cy, cyt, salary_yr1, salary_yr2,
+  retired, exp, droptime,
+  htft, htin, wt, college,
+  draftround, draftpickno, draftyear, draftedby, draftedbycurrentname,
+  stats_gm, stats_min, stats_fgm, stats_fga, stats_ftm, stats_fta,
+  stats_3gm, stats_3ga, stats_orb, stats_drb, stats_ast, stats_stl,
+  stats_tvr, stats_blk, stats_pf,
+  uuid
+) VALUES
+  (200000031, 'Waive Target', 27, 28, 1, 'SF', 20,
+   78, 72, 68, 63, 58, 70, 66, 68, 63,
+   1, 2, 1, 1,
+   0, 4, 0,
+   6, 7, 215, 'Waiver College',
+   2, 30, 2022, 'Metros', 'Metros',
+   41, 1260, 180, 400, 90, 110,
+   40, 120, 50, 130, 150, 45,
+   70, 25, 85,
+   'a0000000-0000-0000-0000-000000200031');
+
+-- pid=200000032 "Rookie Option Target": Metros (tid=1) round-1 rookie with exp=2
+-- and salary_yr3=500 (final-year rookie salary, non-zero) / salary_yr4=0 (option
+-- year, observable). canRookieOption() round-1 Free Agency path requires exp===2
+-- and salary_yr4===0; the option write sets salary_yr4 to the exercised value.
+INSERT INTO ibl_plr (
+  pid, name, age, peak, teamid, pos, ordinal,
+  stamina, oo, od, r_drive_off, dd, po, pd, r_trans_off, r_tvr,
+  cy, cyt, salary_yr1, salary_yr2, salary_yr3, salary_yr4,
+  retired, exp,
+  htft, htin, wt, college,
+  draftround, draftpickno, draftyear, draftedby, draftedbycurrentname,
+  stats_gm, stats_min, stats_fgm, stats_fga, stats_ftm, stats_fta,
+  stats_3gm, stats_3ga, stats_orb, stats_drb, stats_ast, stats_stl,
+  stats_tvr, stats_blk, stats_pf,
+  uuid
+) VALUES
+  (200000032, 'Rookie Option Target', 23, 27, 1, 'PG', 21,
+   80, 74, 69, 64, 59, 71, 67, 69, 64,
+   1, 3, 1, 1, 500, 0,
+   0, 2,
+   6, 2, 190, 'Rookie College',
+   1, 15, 2024, 'Metros', 'Metros',
+   41, 1260, 190, 420, 95, 115,
+   45, 130, 45, 140, 160, 48,
+   65, 22, 88,
+   'a0000000-0000-0000-0000-000000200032');
+
 -- Cash consideration record for Free Agency placeholder filtering tests.
 -- Cash entries live in ibl_cash_considerations (not ibl_plr) since migration 095.
 -- Tests verify that cash rows appear in "Under Contract" and do NOT appear
@@ -364,9 +425,9 @@ INSERT INTO ibl_demands (name, pid, dem1, dem2, dem3, dem4, dem5, dem6) VALUES
 -- Three pending offers — Metros bidding on the three FA players.
 INSERT INTO ibl_fa_offers (name, pid, team, teamid, offer1, offer2, offer3, offer4, offer5, offer6,
                            modifier, random, perceivedvalue, mle, lle, offer_type) VALUES
-  ('FA Guard',   10, 'Metros', 1, 700, 770, 840, 0, 0, 0,  1.0, 0.5, 700.0, 0, 0, 0),
-  ('FA Center',  11, 'Metros', 1, 480, 528, 0,   0, 0, 0,  1.0, 0.5, 480.0, 0, 0, 0),
-  ('FA Forward', 12, 'Metros', 1, 380, 418, 460, 0, 0, 0,  1.0, 0.5, 380.0, 0, 0, 0);
+  ('FA Guard',   10, 'Metros', 1, 700, 770, 840, 0, 0, 0,  1.0, 0.5, 1000.0, 0, 0, 0),
+  ('FA Center',  11, 'Metros', 1, 480, 528, 0,   0, 0, 0,  1.0, 0.5, 600.0,  0, 0, 0),
+  ('FA Forward', 12, 'Metros', 1, 380, 418, 460, 0, 0, 0,  1.0, 0.5, 550.0,  0, 0, 0);
 
 -- All-Star Game team rows with default names (allStarRename test)
 -- visitor_teamid=50 (ALL_STAR_AWAY_TEAMID), home_teamid=51 (ALL_STAR_HOME_TEAMID)
@@ -838,12 +899,15 @@ INSERT INTO ibl_trade_info (tradeofferid, itemid, itemtype, trade_from, trade_to
 
 -- Offers 7-8 reserved for api-v1-rest.spec.ts (REST trade accept/decline happy paths).
 -- approval='test' bypasses the Discord-ID gate in TradeAcceptController / TradeDeclineController.
+-- Deliberately use non-Metros teams (Spurs/Flames and Minutemen/Royals) so these offers
+-- do NOT appear on the Metros Trade Review page. This ensures clearTradeOffers() (which
+-- spares ids 7-8) leaves 0 visible cards for the Metros test user in the empty-state test.
 INSERT INTO ibl_trade_offers (id) VALUES (7), (8);
 INSERT INTO ibl_trade_info (tradeofferid, itemid, itemtype, trade_from, trade_to, approval) VALUES
-  (7, 4, '1', 'Stars',  'Metros', 'test'),
-  (7, 2, '1', 'Metros', 'Stars',  'test'),
-  (8, 5, '1', 'Stars',  'Metros', 'test'),
-  (8, 1, '1', 'Metros', 'Stars',  'test');
+  (7, 30, '1', 'Spurs',      'Flames',    'test'),
+  (7, 31, '1', 'Flames',     'Spurs',     'test'),
+  (8, 32, '1', 'Minutemen',  'Royals',    'test'),
+  (8, 33, '1', 'Royals',     'Minutemen', 'test');
 
 -- ============================================================
 -- Stories for search pagination (need >10 results for "the")
@@ -1783,7 +1847,7 @@ INSERT INTO ibl_plr (
    50, 130, 35, 120, 150, 50,
    70, 15, 80,
    'a0000000-0000-0000-0000-000000000030')
-ON DUPLICATE KEY UPDATE name = VALUES(name), cy = VALUES(cy), cyt = VALUES(cyt);
+ON DUPLICATE KEY UPDATE name = VALUES(name), teamid = VALUES(teamid), cy = VALUES(cy), cyt = VALUES(cyt);
 
 -- ============================================================
 -- NOTE: Test user (auth_users) is created by the

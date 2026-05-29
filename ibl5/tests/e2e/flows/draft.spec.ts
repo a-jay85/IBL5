@@ -1,5 +1,6 @@
 import { test, expect } from '../fixtures/auth';
 import { assertNoPhpErrors } from '../helpers/php-errors';
+import { resetDraftPick } from '../helpers/cleanup';
 
 // Draft flow — authenticated tests with state control.
 // Serial: describe blocks share ibl_settings state and must not run in parallel.
@@ -93,6 +94,10 @@ test.describe('Draft board: renders', () => {
 });
 
 test.describe('Draft selection: submission', () => {
+  test.afterAll(async ({ request }) => {
+    await resetDraftPick(request, 1, 1, 2026);
+  });
+
   test('successful draft selection', async ({ appState, page }) => {
     await appState({
       'Current Season Phase': 'Draft',

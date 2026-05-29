@@ -3,6 +3,7 @@ import type { Page } from '../fixtures/base';
 import { assertNoPhpErrors } from '../helpers/php-errors';
 import { gotoWithRetry } from '../helpers/navigation';
 import { navigateToTradeForm } from '../helpers/trading';
+import { clearTradeOffers, resetTradeOffers } from '../helpers/cleanup';
 
 // ---------------------------------------------------------------------------
 // Shared constants & helpers
@@ -83,18 +84,35 @@ test.describe('Trading flow', () => {
     await expect(checkboxes.first()).toBeVisible();
   });
 
-  test('trade review page loads', async ({ page }) => {
-    await gotoWithRetry(page, 'modules.php?name=Trading&op=reviewtrade');
+});
 
-    // Should show either trade offer cards or an empty state
-    const hasOffers = await page.locator('.trade-offer-card').count();
-    if (hasOffers > 0) {
-      await expect(page.locator('.trade-offer-card').first()).toBeVisible();
-    } else {
-      // Empty state — just verify no PHP errors
-      const body = await page.locator('body').textContent();
-      expect(body).not.toContain('Fatal error');
-    }
+// ===========================================================================
+// Trade review: offers present vs empty
+// ===========================================================================
+
+test.describe('Trade review: offers present vs empty', () => {
+  test.describe.configure({ mode: 'serial' });
+
+  test.beforeEach(async ({ appState }) => {
+    await appState({ 'Allow Trades': 'Yes', 'Current Season Ending Year': '2026' });
+  });
+
+  test.afterAll(async ({ request }) => {
+    await resetTradeOffers(request);
+  });
+
+  test('shows offer card when offers exist', async ({ page, request }) => {
+    await resetTradeOffers(request);
+    await gotoWithRetry(page, 'modules.php?name=Trading&op=reviewtrade');
+    await expect(page.locator('.trade-offer-card').first()).toBeVisible();
+  });
+
+  test('shows empty-state message when no offers', async ({ page, request }) => {
+    await clearTradeOffers(request);
+    await gotoWithRetry(page, 'modules.php?name=Trading&op=reviewtrade');
+    await expect(page.locator('.trading-review-wrapper')).toBeVisible();
+    await expect(page.locator('.trade-offer-card')).toHaveCount(0);
+    await assertNoPhpErrors(page, 'trade review empty state');
   });
 });
 

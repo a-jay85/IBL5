@@ -155,6 +155,107 @@ test.describe('save_order: validation errors', () => {
   });
 });
 
+// ---------------------------------------------------------------------------
+// Block 5 — finalized render: title and separator label change
+// ---------------------------------------------------------------------------
+
+test.describe('ProjectedDraftOrder: finalized render', () => {
+  test('shows "Draft Order" title and "Lottery Results" separator when finalized', async ({
+    appState,
+    page,
+    request,
+  }) => {
+    await appState({
+      'Current Season Ending Year': String(TEST_SEASON_YEAR),
+    });
+
+    // POST a valid 12-team order — this sets Draft Order Finalized = Yes
+    const order = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
+    const response = await request.post(SAVE_ORDER_URL, {
+      data: { order },
+      headers: { 'Content-Type': 'application/json' },
+    });
+    expect(response.status()).toBe(200);
+    const body = (await response.json()) as SaveOrderResponse;
+    expect(body.success).toBe(true);
+
+    await page.goto('modules.php?name=ProjectedDraftOrder');
+
+    // Finalized title: "{year} Draft Order" (not "Projected Draft Order")
+    await expect(page.locator('h2.ibl-title')).toContainText(
+      `${TEST_SEASON_YEAR} Draft Order`,
+    );
+    await expect(page.locator('h2.ibl-title')).not.toContainText(
+      'Projected Draft Order',
+    );
+
+    // Finalized separator: "Lottery Results" (not "Lottery Teams")
+    await expect(
+      page.locator('.projected-draft-order-separator').first(),
+    ).toContainText('Lottery Results');
+    await expect(
+      page.locator('.projected-draft-order-separator').first(),
+    ).not.toContainText('Lottery Teams');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Block 6 — admin drag UI presence + reorder persistence
+// ---------------------------------------------------------------------------
+
+test.describe('ProjectedDraftOrder: admin drag reorder', () => {
+  test('drag UI is present in non-finalized admin state and reordered save persists', async ({
+    appState,
+    page,
+    request,
+  }) => {
+    await appState({
+      'Current Season Ending Year': String(TEST_SEASON_YEAR),
+    });
+
+    // Ensure non-finalized state (reset clears the finalized flag)
+    await resetDraftOrder(request, TEST_SEASON_YEAR);
+
+    await page.goto('modules.php?name=ProjectedDraftOrder');
+
+    // Assert drag UI is rendered: Round 1 table exists with draggable rows
+    const round1 = page.locator('#draft-order-round1');
+    await expect(round1).toBeVisible();
+    await expect(round1.locator('tr[draggable="true"]').first()).toBeVisible();
+
+    // Reorder via POST with a swapped order (teamid 2 before teamid 1)
+    const reorderedOrder = [2, 1, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
+    const saveResponse = await request.post(SAVE_ORDER_URL, {
+      data: { order: reorderedOrder },
+      headers: { 'Content-Type': 'application/json' },
+    });
+    expect(saveResponse.status()).toBe(200);
+    const saveBody = (await saveResponse.json()) as SaveOrderResponse;
+    expect(saveBody.success).toBe(true);
+
+    // Read back: navigate and assert the reordered teamid order persisted
+    await page.goto('modules.php?name=ProjectedDraftOrder');
+    const table = page
+      .locator('.projected-draft-order-table, .ibl-data-table')
+      .first();
+    await expect(table).toBeVisible();
+
+    const lotteryRows = table
+      .locator('tbody tr:not(.projected-draft-order-separator)')
+      .filter({ has: page.locator('td a[href*="teamid="]') });
+
+    for (let i = 0; i < reorderedOrder.length; i++) {
+      const row = lotteryRows.nth(i);
+      const teamLink = row.locator('a[href*="teamid="]').first();
+      const href = await teamLink.getAttribute('href');
+      expect(
+        href,
+        `pick ${i + 1} should link to teamid=${reorderedOrder[i]} (reordered)`,
+      ).toMatch(new RegExp(`teamid=${reorderedOrder[i]}(\\D|$)`));
+    }
+  });
+});
+
 test.afterAll(async ({ request }) => {
   await resetDraftOrder(request, TEST_SEASON_YEAR);
 });

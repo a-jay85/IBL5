@@ -1,5 +1,6 @@
 import { test, expect } from '../fixtures/auth';
 import { assertNoPhpErrors } from '../helpers/php-errors';
+import { resetRookieOption } from '../helpers/cleanup';
 
 // Player sub-pages — routes beyond the main showpage view.
 // These test articles.php, negotiate, rookieoption, and extension.php.
@@ -91,7 +92,37 @@ test.describe('Player rookie option sub-page', () => {
     await assertNoPhpErrors(page, 'on rookie option with invalid PID');
   });
 
-  // Success path not covered — would mutate pid=25's contract; no reset endpoint exists.
+  test.afterAll(async ({ request }) => {
+    await resetRookieOption(request, 200000032);
+  });
+
+  test('POST to processrookieoption with eligible round-1 player succeeds', async ({
+    appState,
+    request,
+  }) => {
+    await appState({ 'Current Season Phase': 'Free Agency', 'Current Season Ending Year': '2026' });
+    const response = await request.post(
+      '/ibl5/modules.php?name=Player&pa=processrookieoption',
+      {
+        form: {
+          teamname: 'Metros',
+          playerID: '200000032',
+          rookieOptionValue: '1000',
+          from: '',
+        },
+        maxRedirects: 0,
+      },
+    );
+    const location = response.headers()['location'] ?? '';
+    expect(
+      location.includes('result=rookie_option_success') ||
+        location.includes('result=email_failed'),
+    ).toBe(true);
+    expect(location).not.toContain('error=');
+  });
+
+  // Success path is covered above (pid=200000032, Free Agency phase).
+  // The reset-rookie-option endpoint restores seed values after the success test.
   test('POST to processrookieoption with ineligible player returns error redirect', async ({
     appState,
     request,
